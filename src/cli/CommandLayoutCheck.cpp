@@ -76,8 +76,7 @@ struct LayoutOptions {
 // ============================================================================
 
 static bool RectsOverlap(const LCRect& a, const LCRect& b) {
-  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height &&
-         a.y + a.height > b.y;
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
 }
 
 static bool IsFullyContained(const LCRect& parent, const LCRect& child) {
@@ -141,7 +140,7 @@ static std::string NodeLabel(const CheckNode& node) {
 }
 
 static void DetectOverlap(const std::vector<std::shared_ptr<CheckNode>>& layoutChildren,
-                           const std::string& parentLayoutMode) {
+                          const std::string& parentLayoutMode) {
   if (parentLayoutMode.empty()) {
     return;
   }
@@ -162,7 +161,7 @@ static void DetectOverlap(const std::vector<std::shared_ptr<CheckNode>>& layoutC
 }
 
 static void DetectClippedContent(const LCRect& parentBounds,
-                                  const std::vector<std::shared_ptr<CheckNode>>& children) {
+                                 const std::vector<std::shared_ptr<CheckNode>>& children) {
   for (const auto& child : children) {
     if (!IsFullyContained(parentBounds, child->bounds)) {
       child->problems.push_back("clipped by parent (outside parent bounds)");
@@ -212,7 +211,7 @@ static void BuildElementNodes(const std::vector<Element*>& elements,
 // ============================================================================
 
 static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float parentX, float parentY,
-                                                   int indexInParent, bool check) {
+                                                  int indexInParent, bool check) {
   if (layer == nullptr) {
     return nullptr;
   }
