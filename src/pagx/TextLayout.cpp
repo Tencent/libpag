@@ -26,18 +26,14 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "renderer/BidiResolver.h"
+#include "renderer/HarfBuzzShaper.h"
 #include "renderer/LineBreaker.h"
 #include "renderer/PunctuationSquash.h"
 #include "renderer/VerticalTextUtils.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/core/UTF.h"
-#ifdef PAG_USE_HARFBUZZ
-#include "renderer/HarfBuzzShaper.h"
-#endif
-#ifdef PAG_BUILD_PAGX
-#include "renderer/BidiResolver.h"
-#endif
 
 namespace pagx {
 
@@ -152,10 +148,31 @@ class TextLayoutContext {
     size_t length = 0;
     bool isNewline = false;
     bool isTab = false;
-#ifdef PAG_BUILD_PAGX
     uint8_t bidiLevel = 0;
-#endif
   };
+
+  // Returns font metrics with browser-compatible adjustments applied. On macOS, Chromium and Safari
+  // increase the ascent of Helvetica, Times, and Courier by 15% of (ascent + descent) to align
+  // their vertical metrics with the Microsoft counterparts (Arial, Times New Roman, Courier New)
+  // that are the de facto web standard. Without this adjustment, text in these fonts appears
+  // shifted upward within the linebox compared to browser rendering.
+  // Reference: https://issues.chromium.org/issues/41150386
+  static tgfx::FontMetrics GetFontMetrics(const tgfx::Font& font) {
+    auto metrics = font.getMetrics();
+#ifdef __APPLE__
+    auto typeface = font.getTypeface();
+    if (typeface != nullptr) {
+      auto family = typeface->fontFamily();
+      if (family == "Helvetica" || family == "Times" || family == "Courier") {
+        float ascent = roundf(fabsf(metrics.ascent));
+        float descent = roundf(metrics.descent);
+        float adjustment = floorf((ascent + descent) * 0.15f + 0.5f);
+        metrics.ascent -= adjustment;
+      }
+    }
+#endif
+    return metrics;
+  }
 
   // Splits a text range into segments by newlines and tabs, appending to the output vector.
   static void SplitTextSegments(const std::string& content, size_t rangeStart, size_t rangeLength,
@@ -201,18 +218,14 @@ class TextLayoutContext {
         TextSegment seg = {};
         seg.start = segStart;
         seg.length = pos - segStart;
-#ifdef PAG_BUILD_PAGX
         seg.bidiLevel = bidiLevel;
-#else
-        (void)bidiLevel;
-#endif
         segments.push_back(seg);
       }
     }
   }
 
   static GlyphInfo CreateNewlineGlyph(Text* text, const tgfx::Font& font) {
-    auto metrics = font.getMetrics();
+    auto metrics = GetFontMetrics(font);
     GlyphInfo gi = {};
     gi.unichar = '\n';
     gi.fontSize = text->fontSize;
@@ -233,7 +246,7 @@ class TextLayoutContext {
     if (tabAdvance < 0) {
       tabAdvance = 0;
     }
-    auto metrics = font.getMetrics();
+    auto metrics = GetFontMetrics(font);
     GlyphInfo gi = {};
     gi.unichar = '\t';
     gi.advance = tabAdvance;
@@ -362,53 +375,47 @@ class TextLayoutContext {
 
   void shapeText(Text* text, ShapedInfo& info, bool vertical = false) {
     auto primaryTypeface = findTypeface(text->fontFamily, text->fontStyle);
-    if (primaryTypeface == nullptr) {
-      // Try to get a usable typeface from fallback for HarfBuzz to work with.
-      if (layoutContext_ != nullptr) {
-        // Use a common codepoint to find any available fallback typeface.
-        primaryTypeface = layoutContext_->fallbackTypeface('A', nullptr);
-      }
-      if (primaryTypeface == nullptr) {
-        return;
-      }
+
+    // When the primary typeface is not found, find a fallback typeface for font metrics used by
+    // special characters (newline, tab) that do not go through per-character glyph fallback.
+    auto metricsTypeface = primaryTypeface;
+    if (metricsTypeface == nullptr && layoutContext_ != nullptr) {
+      metricsTypeface = layoutContext_->fallbackTypeface('A', nullptr);
     }
 
     tgfx::Font primaryFont(primaryTypeface, text->fontSize);
     primaryFont.setFauxBold(text->fauxBold);
     primaryFont.setFauxItalic(text->fauxItalic);
+    tgfx::Font metricsFont(metricsTypeface, text->fontSize);
+    metricsFont.setFauxBold(text->fauxBold);
+    metricsFont.setFauxItalic(text->fauxItalic);
     float currentX = 0;
     const std::string& content = text->text;
     bool hasLetterSpacing = !FloatNearlyEqual(text->letterSpacing, 0.0f);
 
-#ifdef PAG_USE_HARFBUZZ
-
     // Collect newline and tab positions, then shape non-special segments.
     std::vector<TextSegment> segments = {};
 
-#ifdef PAG_BUILD_PAGX
     // Use BiDi resolver to split text into directional runs, then further split by newlines/tabs.
     auto bidiResult = BidiResolver::Resolve(content);
     info.paragraphRTL = bidiResult.isRTL;
     for (auto& run : bidiResult.runs) {
       SplitTextSegments(content, run.start, run.length, run.level, segments);
     }
-#else
-    SplitTextSegments(content, 0, content.size(), 0, segments);
-#endif
 
     std::shared_ptr<tgfx::Typeface> currentTypeface = nullptr;
     float tabWidth = text->fontSize * 4;
 
     for (auto& seg : segments) {
       if (seg.isNewline) {
-        info.allGlyphs.push_back(CreateNewlineGlyph(text, primaryFont));
+        info.allGlyphs.push_back(CreateNewlineGlyph(text, metricsFont));
         currentX = 0;
         currentTypeface = nullptr;
         continue;
       }
 
       if (seg.isTab) {
-        auto tabGlyph = CreateTabGlyph(text, primaryFont, tabWidth, currentX);
+        auto tabGlyph = CreateTabGlyph(text, metricsFont, tabWidth, currentX);
         currentX += tabGlyph.advance;
         info.allGlyphs.push_back(std::move(tabGlyph));
         currentTypeface = nullptr;
@@ -417,14 +424,10 @@ class TextLayoutContext {
 
       // Shape this text segment with HarfBuzz.
       auto substring = content.substr(seg.start, seg.length);
-      bool rtl = false;
-#ifdef PAG_BUILD_PAGX
-      rtl = seg.bidiLevel & 1;
-#endif
+      bool rtl = seg.bidiLevel & 1;
       auto shapedGlyphs =
           HarfBuzzShaper::Shape(substring, primaryFont, *layoutContext_, vertical, rtl);
 
-#ifdef PAG_BUILD_PAGX
       // HarfBuzz returns RTL glyphs in visual order (left-to-right). Sort them by cluster
       // to restore logical order so that allGlyphs is always in logical order. Simple reverse
       // is insufficient because HarfBuzz places neutral characters (spaces, punctuation) at
@@ -433,7 +436,6 @@ class TextLayoutContext {
       if (rtl) {
         std::sort(shapedGlyphs.begin(), shapedGlyphs.end(), CompareByCluster);
       }
-#endif
 
       for (auto& sg : shapedGlyphs) {
         if (sg.glyphID == 0) {
@@ -445,7 +447,7 @@ class TextLayoutContext {
           currentTypeface = glyphTypeface;
         }
 
-        auto metrics = sg.font.getMetrics();
+        auto metrics = GetFontMetrics(sg.font);
         // Decode the unichar at this cluster position for line breaking and other logic.
         int32_t unichar = 0;
         size_t clusterByteOffset = seg.start + sg.cluster;
@@ -469,103 +471,12 @@ class TextLayoutContext {
         gi.cluster = static_cast<uint32_t>(seg.start) + sg.cluster;
         gi.xOffset = sg.xOffset;
         gi.yOffset = sg.yOffset;
-#ifdef PAG_BUILD_PAGX
         gi.bidiLevel = seg.bidiLevel;
-#endif
         info.allGlyphs.push_back(gi);
 
         currentX += sg.xAdvance + text->letterSpacing;
       }
     }
-
-#else
-    // Non-HarfBuzz path: original per-character glyph lookup.
-
-    // Fallback font cache: built on demand as fallback typefaces are loaded during glyph lookup.
-    std::unordered_map<const tgfx::Typeface*, tgfx::Font> fallbackFontCache = {};
-
-    std::shared_ptr<tgfx::Typeface> currentTypeface = nullptr;
-
-    size_t i = 0;
-    while (i < content.size()) {
-      int32_t unichar = 0;
-      size_t charLen = DecodeUTF8Char(content.data() + i, content.size() - i, &unichar);
-      if (charLen == 0) {
-        i++;
-        continue;
-      }
-      i += charLen;
-
-      // Handle newline: store font metrics so \n participates in line metrics calculation
-      // when it becomes the leading cluster of the next line.
-      if (unichar == '\n') {
-        info.allGlyphs.push_back(CreateNewlineGlyph(text, primaryFont));
-        currentX = 0;
-        currentTypeface = nullptr;
-        continue;
-      }
-
-      // Handle tab character.
-      if (unichar == '\t') {
-        float tabWidth = text->fontSize * 4;
-        auto tabGlyph = CreateTabGlyph(text, primaryFont, tabWidth, currentX);
-        currentX += tabGlyph.advance;
-        info.allGlyphs.push_back(std::move(tabGlyph));
-        currentTypeface = nullptr;
-        continue;
-      }
-
-      // Try to find glyph in primary font or fallbacks
-      tgfx::GlyphID glyphID = primaryFont.getGlyphID(unichar);
-      tgfx::Font glyphFont = primaryFont;
-      std::shared_ptr<tgfx::Typeface> glyphTypeface = primaryTypeface;
-
-      if (glyphID == 0 && layoutContext_ != nullptr) {
-        auto fallback = layoutContext_->fallbackTypeface(unichar, primaryTypeface.get());
-        if (fallback != nullptr) {
-          auto it = fallbackFontCache.find(fallback.get());
-          if (it == fallbackFontCache.end()) {
-            tgfx::Font f(fallback, text->fontSize);
-            f.setFauxBold(text->fauxBold);
-            f.setFauxItalic(text->fauxItalic);
-            it = fallbackFontCache.emplace(fallback.get(), std::move(f)).first;
-          }
-          glyphID = it->second.getGlyphID(unichar);
-          if (glyphID != 0) {
-            glyphFont = it->second;
-            glyphTypeface = fallback;
-          }
-        }
-      }
-
-      if (glyphID == 0) {
-        continue;
-      }
-
-      float advance = glyphFont.getAdvance(glyphID);
-
-      // Start new run if typeface changed
-      if (currentTypeface != glyphTypeface) {
-        currentTypeface = glyphTypeface;
-      }
-
-      auto metrics = glyphFont.getMetrics();
-      GlyphInfo gi = {};
-      gi.glyphID = glyphID;
-      gi.font = glyphFont;
-      gi.advance = advance;
-      gi.xPosition = currentX;
-      gi.unichar = unichar;
-      gi.fontSize = text->fontSize;
-      gi.ascent = metrics.ascent;
-      gi.descent = metrics.descent;
-      gi.fontLineHeight = std::max(0.0f, fabsf(metrics.ascent) + metrics.descent + metrics.leading);
-      gi.sourceText = text;
-      info.allGlyphs.push_back(gi);
-
-      currentX += advance + text->letterSpacing;
-    }
-#endif
 
     // Remove the extra letterSpacing after the last glyph.
     if (hasLetterSpacing && currentX > 0) {
@@ -642,32 +553,20 @@ class TextLayoutContext {
           for (size_t j = 0; j + 1 < currentLine->glyphs.size(); j++) {
             auto& prev = currentLine->glyphs[j];
             auto& next = currentLine->glyphs[j + 1];
-#ifdef PAG_USE_HARFBUZZ
             bool sameCluster =
                 (prev.cluster != 0 || next.cluster != 0) && prev.cluster == next.cluster;
             if (!sameCluster && LineBreaker::CanBreakBetween(prev.unichar, next.unichar)) {
               lastBreakIndex = static_cast<int>(j);
             }
-#else
-            if (LineBreaker::CanBreakBetween(prev.unichar, next.unichar)) {
-              lastBreakIndex = static_cast<int>(j);
-            }
-#endif
           }
           // Also check break between the last glyph and the next unprocessed glyph.
           if (i + 1 < allGlyphs.size() && allGlyphs[i + 1].unichar != '\n') {
-#ifdef PAG_USE_HARFBUZZ
             bool sameCluster = (glyph.cluster != 0 || allGlyphs[i + 1].cluster != 0) &&
                                glyph.cluster == allGlyphs[i + 1].cluster;
             if (!sameCluster &&
                 LineBreaker::CanBreakBetween(glyph.unichar, allGlyphs[i + 1].unichar)) {
               lastBreakIndex = static_cast<int>(currentLine->glyphs.size()) - 1;
             }
-#else
-            if (LineBreaker::CanBreakBetween(glyph.unichar, allGlyphs[i + 1].unichar)) {
-              lastBreakIndex = static_cast<int>(currentLine->glyphs.size()) - 1;
-            }
-#endif
           }
           continue;
         } else {
@@ -693,32 +592,23 @@ class TextLayoutContext {
 
       // Update break opportunity
       if (i + 1 < allGlyphs.size() && allGlyphs[i + 1].unichar != '\n') {
-#ifdef PAG_USE_HARFBUZZ
         // Cluster-aware breaking: never break within the same HarfBuzz cluster.
         bool sameCluster = (glyph.cluster != 0 || allGlyphs[i + 1].cluster != 0) &&
                            glyph.cluster == allGlyphs[i + 1].cluster;
         if (!sameCluster && LineBreaker::CanBreakBetween(glyph.unichar, allGlyphs[i + 1].unichar)) {
           lastBreakIndex = static_cast<int>(currentLine->glyphs.size()) - 1;
         }
-#else
-        if (LineBreaker::CanBreakBetween(glyph.unichar, allGlyphs[i + 1].unichar)) {
-          lastBreakIndex = static_cast<int>(currentLine->glyphs.size()) - 1;
-        }
-#endif
       }
     }
 
     FinishLine(currentLine, params.lineHeight, pendingNewlineFontLineHeight);
 
-#ifdef PAG_BUILD_PAGX
     // Apply punctuation squash to all lines.
     ApplyPunctuationSquashToLines(lines);
-#endif
 
     return lines;
   }
 
-#ifdef PAG_BUILD_PAGX
   static void ApplyPunctuationSquashToLines(std::vector<LineInfo>& lines) {
     for (auto& line : lines) {
       if (line.glyphs.empty()) {
@@ -801,7 +691,6 @@ class TextLayoutContext {
       }
     }
   }
-#endif
 
   static void FinishLine(LineInfo* line, float lineHeight, float newlineFontLineHeight) {
     if (line->glyphs.empty()) {
@@ -1054,27 +943,16 @@ class TextLayoutContext {
         xOffset += effectiveBoxWidth - line.width;
       } else if (params.textAlign == TextAlign::Justify && !std::isnan(params.boxWidth)) {
         // Justify: distribute extra space at word boundaries. Last line uses Start alignment.
-        // Note: under PAG_BUILD_PAGX, gap counting is deferred until after L2 BiDi reorder
-        // so that it operates on the same visual glyph order used during gap application.
+        // Gap counting is deferred until after L2 BiDi reorder so that it operates on the
+        // same visual glyph order used during gap application.
         if (lineIdx < lines.size() - 1 && line.glyphs.size() > 1) {
-#ifndef PAG_BUILD_PAGX
-          int gapCount = 0;
-          for (size_t i = 0; i + 1 < line.glyphs.size(); i++) {
-            if (LineBreaker::CanBreakBetween(line.glyphs[i].unichar, line.glyphs[i + 1].unichar)) {
-              gapCount++;
-            }
-          }
-          if (gapCount > 0) {
-            justifyExtraPerGap = (params.boxWidth - line.width) / static_cast<float>(gapCount);
-          }
-#endif
+          // Handled after BiDi L2 reorder below.
         } else if (paragraphRTL) {
           xOffset += params.boxWidth - line.width;
         }
       }
 
       float justifyOffset = 0;
-#ifdef PAG_BUILD_PAGX
       // UAX#9 L2: reorder glyphs from logical order to visual order for rendering.
       // Reverse contiguous runs of glyphs whose bidi level >= current level, starting from the
       // maximum level down to 1. After reordering, recalculate xPosition for each glyph.
@@ -1125,19 +1003,11 @@ class TextLayoutContext {
       }
       for (size_t gi = 0; gi < visualGlyphs.size(); gi++) {
         auto& g = visualGlyphs[gi];
-#else
-      for (size_t gi = 0; gi < line.glyphs.size(); gi++) {
-        auto& g = line.glyphs[gi];
-#endif
         // Skip newline and tab glyphs: they only participate in metrics/spacing, not rendering.
         if (g.unichar == '\n' || g.unichar == '\t') {
           continue;
         }
-#ifdef PAG_BUILD_PAGX
         if (gi > 0 && LineBreaker::CanBreakBetween(visualGlyphs[gi - 1].unichar, g.unichar)) {
-#else
-        if (gi > 0 && LineBreaker::CanBreakBetween(line.glyphs[gi - 1].unichar, g.unichar)) {
-#endif
           justifyOffset += justifyExtraPerGap;
         }
         PositionedGlyph pg = {};
@@ -1242,14 +1112,10 @@ class TextLayoutContext {
         }
 
         if (i > 0 && allGlyphs[i - 1].unichar != '\n') {
-#ifdef PAG_USE_HARFBUZZ
           bool sameCluster = (glyph.cluster != 0 || allGlyphs[i - 1].cluster != 0) &&
                              glyph.cluster == allGlyphs[i - 1].cluster;
           vg.canBreakBefore =
               !sameCluster && LineBreaker::CanBreakBetween(allGlyphs[i - 1].unichar, glyph.unichar);
-#else
-          vg.canBreakBefore = LineBreaker::CanBreakBetween(allGlyphs[i - 1].unichar, glyph.unichar);
-#endif
         }
         vgList.push_back(std::move(vg));
       }
@@ -1348,15 +1214,12 @@ class TextLayoutContext {
 
     FinishColumn(currentColumn, params.lineHeight, pendingNewlineFontLineHeight);
 
-#ifdef PAG_BUILD_PAGX
     // Apply punctuation squash to all columns.
     ApplyPunctuationSquashToColumns(columns);
-#endif
 
     return columns;
   }
 
-#ifdef PAG_BUILD_PAGX
   static bool IsSquashable(const VerticalGlyphInfo& vg) {
     return vg.orientation == VerticalOrientation::Upright;
   }
@@ -1434,7 +1297,6 @@ class TextLayoutContext {
       column.height = totalHeight;
     }
   }
-#endif
 
   void buildTextBlobVertical(const TextLayoutParams& params, const std::vector<ColumnInfo>& columns,
                              TextLayoutResult& result) {
@@ -1553,7 +1415,6 @@ class TextLayoutContext {
           float ty = currentY - vg.leadingSquash;
           vpg.xform = tgfx::RSXform::Make(0, 1, tx, ty);
           result.verticalGlyphs[g.sourceText].push_back(vpg);
-#ifdef PAG_USE_HARFBUZZ
         } else {
           // With HarfBuzz vert shaping, use getVerticalOffset() for all upright glyphs.
           // If the font has vert/vrt2 features, HarfBuzz already substituted the glyph.
@@ -1568,33 +1429,6 @@ class TextLayoutContext {
           vpg.position = tgfx::Point::Make(glyphX, glyphY);
           result.verticalGlyphs[g.sourceText].push_back(vpg);
         }
-#else
-        } else if (VerticalTextUtils::NeedsPunctuationOffset(vg.glyphs.front().unichar)) {
-          auto& g = vg.glyphs.front();
-          VerticalPositionedGlyph vpg = {};
-          vpg.glyphID = g.glyphID;
-          vpg.font = g.font;
-          vpg.useRSXform = false;
-          float dx = 0;
-          float dy = 0;
-          VerticalTextUtils::GetPunctuationOffset(g.fontSize, &dx, &dy);
-          float glyphX = columnCenterX - g.advance / 2 + dx;
-          float glyphY = currentY + fabsf(g.ascent) + dy;
-          vpg.position = tgfx::Point::Make(glyphX, glyphY);
-          result.verticalGlyphs[g.sourceText].push_back(vpg);
-        } else {
-          auto& g = vg.glyphs.front();
-          VerticalPositionedGlyph vpg = {};
-          vpg.glyphID = g.glyphID;
-          vpg.font = g.font;
-          vpg.useRSXform = false;
-          auto offset = g.font.getVerticalOffset(g.glyphID);
-          float glyphX = columnCenterX + offset.x;
-          float glyphY = currentY + offset.y;
-          vpg.position = tgfx::Point::Make(glyphX, glyphY);
-          result.verticalGlyphs[g.sourceText].push_back(vpg);
-        }
-#endif
 
         currentY += vg.height;
         // Update per-Text linebox bounds in layout coordinate system for vertical layout.

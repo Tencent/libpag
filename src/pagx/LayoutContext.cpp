@@ -79,9 +79,31 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
     }
   }
 
-  // Stage 3: System font lookup via MakeFromName
+  // Stage 3: Family-name match in user fallback typefaces
   if (!fontFamily.empty()) {
-    return tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
+    for (auto& holder : fontConfig->fallbackTypefaces) {
+      if (holder.getFontFamily() == fontFamily) {
+        return holder.getTypeface();
+      }
+    }
+  }
+
+  // Stage 4: System font lookup via MakeFromName
+  if (!fontFamily.empty()) {
+    auto typeface = tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
+    if (typeface != nullptr) {
+      return typeface;
+    }
+  }
+
+  // Stage 5: Family-name match in system fallback typefaces
+  if (!fontFamily.empty()) {
+    ensureSystemFallbacks();
+    for (auto& holder : systemFallbacks) {
+      if (holder.getFontFamily() == fontFamily) {
+        return holder.getTypeface();
+      }
+    }
   }
 
   return nullptr;
