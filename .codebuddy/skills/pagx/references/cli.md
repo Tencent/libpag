@@ -211,7 +211,7 @@ chain) are output. Clean sibling nodes before a problematic node are replaced wi
 `<Layer/>` placeholders to preserve index counting. Returns exit code 1 if any problems are
 found, 0 otherwise.
 
-Detects nine categories of layout problems:
+Detects twelve categories of layout problems:
 
 1. **Overlapping siblings** — sibling Layers whose bounds intersect inside an auto-layout parent
 2. **Clipped content** — elements outside parent bounds when `clipToBounds` is set
@@ -222,6 +222,9 @@ Detects nine categories of layout problems:
 7. **Off-canvas** — top-level Layers completely outside the canvas bounds
 8. **Redundant constraints (override)** — constraint attributes overridden by centerX/centerY
 9. **Redundant constraints (default)** — left=0 or top=0 with no opposite constraint (equivalent to default)
+10. **Container overflow** — fixed-size children + gap exceed parent's available main-axis space (no flex children to absorb)
+11. **Negative constraint-derived size** — opposite-pair constraints (left+right or top+bottom) sum exceeds parent dimension
+12. **Element constraint conflict** — constraint conflicts on VectorElements (Rectangle, Ellipse, etc.), same rules as Layer constraint conflicts
 
 ```xml
 <layout>

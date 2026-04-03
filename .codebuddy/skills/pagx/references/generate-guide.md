@@ -300,13 +300,17 @@ matches the design intent:
 pagx layout --problems-only input.pagx
 ```
 
-Detects six categories of problems:
+Detects layout problems across multiple categories (see `cli.md` §pagx layout for the full
+list). Key categories for generation:
 - **Overlapping siblings** — sibling Layers whose bounds intersect inside an auto-layout parent
 - **Clipped content** — elements outside parent bounds when `clipToBounds` is set
 - **Zero-size** — elements with zero width or height, with cause analysis when applicable
 - **Flex in content-measured parent** — `flex` child where parent has no main-axis size to distribute
 - **Content origin offset** — unconstrained children not starting at (0, 0) in a content-measured container
 - **Constraints ignored by layout** — constraint attributes silently ignored in container layout flow
+- **Container overflow** — fixed-size children + gap exceed parent's main-axis available space
+- **Negative constraint-derived size** — `left`+`right` or `top`+`bottom` exceeds parent dimension
+- **Element constraint conflict** — `centerX` overrides `left`/`right` on VectorElements (same as Layer rules)
 
 Exit code 1 = problems found. Exit code 0 = no problems. Scope with `--id` or `--xpath`
 during incremental build:
@@ -325,6 +329,9 @@ pagx layout --problems-only --id "header" input.pagx
 | **Flex in content-measured parent** | Parent has `layout` but no explicit main-axis size | Set explicit main-axis size, or use opposite-pair constraints |
 | **Content origin offset** | Unconstrained Path/Polystar/Text not at (0, 0) | Localize coordinates (`design-patterns.md` §6) |
 | **Constraints ignored** | Constraints on child in layout flow | Remove constraints; use `gap`/`alignment`/`arrangement` instead |
+| **Container overflow** | Fixed children + gap exceed parent main-axis size | Reduce child sizes, add `flex` children, increase parent size, or reduce `gap` |
+| **Negative constraint-derived size** | `left`+`right` or `top`+`bottom` > parent dimension | Reduce constraint values so their sum is ≤ parent size |
+| **Element constraint conflict** | `centerX` set alongside `left`/`right` on VectorElement | Remove the lower-priority constraint (`centerX` wins over `left`/`right`) |
 
 #### 3. Inspect layout tree and render
 
