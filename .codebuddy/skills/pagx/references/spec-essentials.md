@@ -1,7 +1,7 @@
 # PAGX Specification Essentials
 
-This file extracts the specification knowledge that AI must understand when generating or
-optimizing PAGX files. It is not a copy of the full spec — it is the **minimum essential
+This file extracts the specification knowledge that AI must understand when generating
+PAGX files. It is not a copy of the full spec — it is the **minimum essential
 subset** organized around the core concepts most relevant to AI generation.
 
 Some sections are simplified from the full specification — low-frequency features such as

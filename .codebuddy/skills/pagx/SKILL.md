@@ -1,21 +1,21 @@
 ---
 name: pagx
 description: >-
-  PAGX (.pagx) file handler. MUST invoke for ANY task involving PAGX format or
-  ".pagx" files — including create, edit, review, debug, or query syntax.
-  Also invoke when user runs pagx CLI commands (render, lint, format, layout,
-  bounds, font info/embed, import/export) or asks about PAGX elements, attributes, or layout.
+  Generates well-structured PAGX files from visual descriptions and edits existing ones.
+  Use when user asks to create, write, design, or modify PAGX content, run pagx CLI
+  commands (render, lint, format, layout, bounds, font info/embed, import/export), or
+  look up PAGX element attributes and syntax.
 ---
 
 # PAGX Skill
 
 ## Generate or Edit — `references/generate-guide.md`
 
-**When**: User asks to create, write, design, or modify a PAGX file.
+**When**: User asks to create, write, design, or modify a PAGX file from a text description,
+reference image, or design spec.
 
-**What it provides**: Complete step-by-step methodology — design analysis, CSS/SVG→PAGX
-mapping, structure decisions (Layer vs Group, Flexbox layout, constraint positioning),
-incremental build strategy, painter/modifier scope patterns, text layout, and a
+Covers: design analysis, CSS/SVG→PAGX mapping, structure decisions, Flexbox layout,
+constraint positioning, incremental build, painter scope isolation, text layout, and a
 layout-check-based verification loop.
 
 ## Reference Lookup

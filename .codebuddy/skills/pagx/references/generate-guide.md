@@ -32,8 +32,6 @@ Systematically decompose the visual before writing any code:
 4. **Shape vocabulary** — geometric primitives or freeform curves?
 5. **Text inventory** — list all text elements with approximate font sizes.
 
-Document these observations before proceeding.
-
 ---
 
 ## Step 2: Decompose into Structure
@@ -306,7 +304,8 @@ Gradient coordinates are geometry-relative and stay unchanged when the container
 ### Incremental Build Strategy
 
 For designs with multiple sections, **do not write the entire PAGX file in one pass**. Build
-incrementally — confirm each stage is correct before adding the next:
+incrementally — confirm each stage is correct before adding the next. Ensure the `pagx` CLI
+is installed before the first invocation (see `cli.md` §Setup).
 
 **Stage 1 — Skeleton**: `<pagx>` root + section Layers with only layout attributes. No
 content. Run verification loop (Step 4) to confirm structure.
