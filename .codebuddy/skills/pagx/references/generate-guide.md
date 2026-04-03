@@ -344,15 +344,22 @@ Run verification after each module.
 - **NO** (first content) → no Group needed, place directly
 
 ```xml
+<!-- ✅ Correct: Group isolates second content from first -->
 <Layer width="200" height="200">
-  <!-- First content: no Group needed -->
   <Rectangle left="0" right="0" top="0" bottom="0"/>
   <Fill color="#F00"/>
-  <!-- Second content: Group isolates from Rectangle above -->
   <Group>
     <Ellipse left="35" top="35" size="30,30"/>
     <Stroke color="#000" width="1"/>
   </Group>
+</Layer>
+
+<!-- ❌ Wrong: missing Group — Stroke leaks onto Rectangle -->
+<Layer width="200" height="200">
+  <Rectangle left="0" right="0" top="0" bottom="0"/>
+  <Fill color="#F00"/>
+  <Ellipse left="35" top="35" size="30,30"/>
+  <Stroke color="#000" width="1"/>  <!-- applies to BOTH Rectangle and Ellipse -->
 </Layer>
 ```
 
@@ -430,6 +437,10 @@ Positioning for examples). Exception: TextPath.
 ### PAGX-Specific Format Rules
 
 These constraints differ from CSS/SVG:
+
+- **Do not invent attribute values.** If a property is not specified in the design, use the
+  PAGX default (see `attributes.md`) — do not guess a value. E.g., omit `roundness` on a
+  Rectangle rather than inventing `roundness="8"`.
 
 - **`roundness` is a single value** — all corners uniform. Auto-limited to
   `min(roundness, width/2, height/2)`.
@@ -512,6 +523,19 @@ pagx render --scale 2 input.pagx         # visual check
 
 **Screenshot** — catches issues automated detection cannot:
 - Alignment, spacing, text rendering, colors, gradients, visual balance, stacking order
+
+**Visual symptom troubleshooting** — if the screenshot looks wrong but `--problems-only`
+reports no issues, check these common causes:
+
+| Symptom | Likely Cause | Fix |
+|---------|-------------|-----|
+| Element invisible | Missing `<Fill>` or `<Stroke>` after geometry | Add painter — geometry alone is not rendered |
+| Text invisible | Missing `<Fill>` after `<Text>` | Add `<Fill color="#000"/>` (or desired color) |
+| Background missing | No Rectangle + Fill before content | Add `<Rectangle left="0" right="0" top="0" bottom="0"/>` + `<Fill>` as first content |
+| Stroke on wrong shape | Missing Group for scope isolation | Wrap subsequent content in `<Group>` (see §Geometry and Painters) |
+| Element shifted/offset | Unconstrained child not at (0,0) in content-measured container | Localize coordinates (see §Origin-Based Positioning) |
+| Gradient wrong direction | Gradient coords in canvas space instead of geometry-local | Use geometry-relative coordinates for `startPoint`/`endPoint` |
+| Text not centered in button | Using bare `<Text>` instead of `<TextBox>` | Wrap in `<TextBox centerX="0" centerY="0">` |
 
 When diagnosing a visual issue, use `pagx layout` (without `--problems-only`) to see the
 full layout tree with bounds and any `<Problem>` nodes for the suspect area.
