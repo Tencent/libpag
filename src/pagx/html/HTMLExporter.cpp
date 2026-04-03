@@ -1690,18 +1690,21 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha) {
       if (outAlpha) {
         *outAlpha = 1.0f;
       }
-      // CSS conic-gradient does not support gradient transforms. Fall back to SVG when
-      // the matrix contains rotation, scale, or skew (non-identity, non-pure-translation).
+      // CSS conic-gradient supports rotation via the 'from' angle.
+      // Extract rotation from the matrix and apply it to the start angle.
+      float matRotation = 0.0f;
       if (!g->matrix.isIdentity()) {
-        bool isPureTranslation = FloatNearlyZero(g->matrix.a - 1.0f) &&
-                                 FloatNearlyZero(g->matrix.b) && FloatNearlyZero(g->matrix.c) &&
-                                 FloatNearlyZero(g->matrix.d - 1.0f);
-        if (!isPureTranslation) {
-          return {};
+        float sx = std::sqrt(g->matrix.a * g->matrix.a + g->matrix.b * g->matrix.b);
+        float sy = std::sqrt(g->matrix.c * g->matrix.c + g->matrix.d * g->matrix.d);
+        bool hasNonUniformScale = !FloatNearlyZero(sx - 1.0f) || !FloatNearlyZero(sy - 1.0f);
+        if (hasNonUniformScale) {
+          return {};  // Non-uniform scale cannot be expressed in CSS conic-gradient.
         }
+        matRotation =
+            std::atan2(g->matrix.b, g->matrix.a) * 180.0f / static_cast<float>(M_PI);
       }
       Point c = g->matrix.mapPoint(g->center);
-      float cssStartAng = g->startAngle + 90.0f;
+      float cssStartAng = g->startAngle + 90.0f + matRotation;
       float sweepRange = g->endAngle - g->startAngle;
       if (FloatNearlyZero(sweepRange - 360.0f)) {
         return "conic-gradient(from " + FloatToString(cssStartAng) + "deg at " +
@@ -1794,8 +1797,13 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha) 
     _defs->addAttr("width", patternSize);
     _defs->addAttr("height", patternSize);
     _defs->closeTagStart();
-    Point c = g->matrix.mapPoint(g->center);
-    float cssStartAng = g->startAngle + 90.0f;
+    // Extract rotation angle from the matrix and add it to the CSS start angle.
+    // Use the original center (not matrix-mapped) since the conic-gradient center
+    // is relative to the element's local coordinate space within the SVG pattern.
+    float matRotation =
+        std::atan2(g->matrix.b, g->matrix.a) * 180.0f / static_cast<float>(M_PI);
+    Point c = g->center;
+    float cssStartAng = g->startAngle + 90.0f + matRotation;
     float sweepRange = g->endAngle - g->startAngle;
     std::string cssGrad;
     if (FloatNearlyZero(sweepRange - 360.0f)) {
@@ -1873,7 +1881,9 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha) 
       repeatY = "repeat";
     }
     std::string bgRepeat = (repeatX == repeatY) ? repeatX : (repeatX + " " + repeatY);
-    std::string bgSize = "cover";
+    bool isTilingSVG = (p->tileModeX == TileMode::Repeat || p->tileModeX == TileMode::Mirror ||
+                        p->tileModeY == TileMode::Repeat || p->tileModeY == TileMode::Mirror);
+    std::string bgSize = isTilingSVG ? "" : "cover";
     std::string bgPos;
     if (!p->matrix.isIdentity()) {
       float sx = std::sqrt(p->matrix.a * p->matrix.a + p->matrix.b * p->matrix.b);
@@ -1886,7 +1896,10 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha) 
       }
     }
     std::string cssStyle = "width:100%;height:100%;background-image:" + imgUrl +
-                           ";background-repeat:" + bgRepeat + ";background-size:" + bgSize;
+                           ";background-repeat:" + bgRepeat;
+    if (!bgSize.empty()) {
+      cssStyle += ";background-size:" + bgSize;
+    }
     if (!bgPos.empty()) {
       cssStyle += ";background-position:" + bgPos;
     }
@@ -2506,6 +2519,15 @@ bool HTMLWriter::canCSS(const std::vector<GeoInfo>& geos, const Fill* fill, cons
     if (fill->color && fill->color->nodeType() == NodeType::DiamondGradient) {
       return false;
     }
+    // ConicGradient with non-uniform scale cannot be expressed in CSS conic-gradient.
+    if (fill->color && fill->color->nodeType() == NodeType::ConicGradient) {
+      auto g = static_cast<const ConicGradient*>(fill->color);
+      float sx = std::sqrt(g->matrix.a * g->matrix.a + g->matrix.b * g->matrix.b);
+      float sy = std::sqrt(g->matrix.c * g->matrix.c + g->matrix.d * g->matrix.d);
+      if (!FloatNearlyZero(sx - 1.0f) || !FloatNearlyZero(sy - 1.0f)) {
+        return false;
+      }
+    }
   }
   return true;
 }
@@ -2584,7 +2606,12 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
                    FloatToString(p->matrix.ty) + "px";
         }
       } else {
-        style += ";background-size:cover";
+        // Only use 'cover' for non-tiling patterns; tiling modes need natural image size.
+        bool isTiling = (p->tileModeX == TileMode::Repeat || p->tileModeX == TileMode::Mirror ||
+                         p->tileModeY == TileMode::Repeat || p->tileModeY == TileMode::Mirror);
+        if (!isTiling) {
+          style += ";background-size:cover";
+        }
       }
       // Filter mode
       // TODO: ImagePattern.mipmapMode is ignored. CSS/SVG has no direct control over mipmap
@@ -3308,6 +3335,8 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     }
     if (tb->wordWrap) {
       style += ";word-wrap:break-word";
+    } else {
+      style += ";white-space:nowrap";
     }
     if (tb->overflow == Overflow::Hidden) {
       style += ";overflow:hidden";
