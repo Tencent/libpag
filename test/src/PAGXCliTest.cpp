@@ -1881,9 +1881,9 @@ CLI_TEST(PAGXCliTest, LayoutCheck_Clean) {
   EXPECT_EQ(ret, 0);
 }
 
-CLI_TEST(PAGXCliTest, LayoutCheck_CleanJson) {
+CLI_TEST(PAGXCliTest, LayoutCheck_CleanXml) {
   auto path = TestResourcePath("layout_check_clean.pagx");
-  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--json", path});
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", path});
   EXPECT_EQ(ret, 0);
 }
 
@@ -1908,8 +1908,8 @@ CLI_TEST(PAGXCliTest, LayoutCheck_Clipped) {
   std::cout.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
-  // In global mode, overflow Layer should show absolute coordinates (x=150 y=150).
-  EXPECT_TRUE(output.find("x=150 y=150 w=100 h=100") != std::string::npos);
+  // In global mode, overflow Layer should show absolute coordinates.
+  EXPECT_TRUE(output.find("bounds=\"150,150,100,100\"") != std::string::npos);
   // Default mode does not output problems.
   EXPECT_TRUE(output.find("clipped by parent") == std::string::npos);
 }
@@ -1943,7 +1943,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_IdNodeRelativeCoords) {
   EXPECT_EQ(ret, 0);
   // The overflow Layer is at x=150 y=150 in the document, but when targeted via --id
   // its bounds should start from (0,0) as the coordinate origin.
-  EXPECT_TRUE(output.find("x=0 y=0 w=100 h=100") != std::string::npos);
+  EXPECT_TRUE(output.find("bounds=\"0,0,100,100\"") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, LayoutCheck_IdNodeNotFound) {
@@ -1958,9 +1958,9 @@ CLI_TEST(PAGXCliTest, LayoutCheck_XPath) {
   EXPECT_EQ(ret, 0);
 }
 
-CLI_TEST(PAGXCliTest, LayoutCheck_CheckJson) {
+CLI_TEST(PAGXCliTest, LayoutCheck_CheckXml) {
   auto path = TestResourcePath("layout_check_overlap.pagx");
-  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", "--json", path});
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
   // Manual-positioned Layers without container layout no longer trigger overlap warnings.
   EXPECT_EQ(ret, 0);
 }
@@ -1990,9 +1990,9 @@ CLI_TEST(PAGXCliTest, LayoutCheck_Elements) {
   EXPECT_EQ(ret, 0);
 }
 
-CLI_TEST(PAGXCliTest, LayoutCheck_ElementsJson) {
+CLI_TEST(PAGXCliTest, LayoutCheck_ElementsXml) {
   auto path = TestResourcePath("layout_check_elements.pagx");
-  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--json", path});
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", path});
   EXPECT_EQ(ret, 0);
 }
 
