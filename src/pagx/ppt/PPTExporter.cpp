@@ -1045,9 +1045,11 @@ void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofs
   out.open("a:path").a("w", pw).a("h", ph).a("fill", "norm").gt();
 
   if (fillRule == FillRule::EvenOdd) {
-    // PowerPoint uses the non-zero winding rule. To emulate even-odd, reverse
-    // the winding direction of every other closed contour so that nested regions
-    // cancel out to winding number 0, producing holes.
+    // PowerPoint uses the non-zero winding rule. To emulate even-odd, ensure
+    // inner contours have the opposite winding direction of the outer contour
+    // so that nested regions cancel out to winding number 0, producing holes.
+    // We use the signed area (shoelace formula) to detect each contour's actual
+    // winding direction and only reverse those that share the outer's winding.
     struct Seg {
       PathVerb verb;
       Point pts[3];
@@ -1086,43 +1088,57 @@ void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofs
       return s.pts[0];
     };
 
-    // Reverse winding of every other closed contour
-    for (size_t ci = 1; ci < contours.size(); ci += 2) {
-      auto& c = contours[ci];
-      if (!c.closed || c.segs.size() < 2) {
-        continue;
+    auto computeSignedArea = [&segEndpoint](const Contour& c) -> float {
+      float area = 0;
+      Point prev = c.start;
+      for (const auto& s : c.segs) {
+        Point next = segEndpoint(s);
+        area += (prev.x * next.y - next.x * prev.y);
+        prev = next;
       }
-      size_t n = c.segs.size();
-      std::vector<Seg> rev;
-      rev.reserve(n);
+      area += (prev.x * c.start.y - c.start.x * prev.y);
+      return area;
+    };
 
-      // The implicit close edge (V[N]→V[0]) becomes an explicit Line(V[N])
-      Seg closeSeg;
-      closeSeg.verb = PathVerb::Line;
-      closeSeg.pts[0] = segEndpoint(c.segs[n - 1]);
-      rev.push_back(closeSeg);
-
-      // Reverse segments S[N-1]..S[1]; Close replaces reversed S[0]
-      for (int i = static_cast<int>(n) - 1; i >= 1; i--) {
-        Point dest = segEndpoint(c.segs[i - 1]);
-        const auto& s = c.segs[i];
-        Seg rs;
-        if (s.verb == PathVerb::Cubic) {
-          rs.verb = PathVerb::Cubic;
-          rs.pts[0] = s.pts[1];
-          rs.pts[1] = s.pts[0];
-          rs.pts[2] = dest;
-        } else if (s.verb == PathVerb::Quad) {
-          rs.verb = PathVerb::Quad;
-          rs.pts[0] = s.pts[0];
-          rs.pts[1] = dest;
-        } else {
-          rs.verb = PathVerb::Line;
-          rs.pts[0] = dest;
+    if (contours.size() > 1) {
+      float outerArea = computeSignedArea(contours[0]);
+      for (size_t ci = 1; ci < contours.size(); ci++) {
+        auto& c = contours[ci];
+        if (!c.closed || c.segs.empty()) {
+          continue;
         }
-        rev.push_back(rs);
+        float area = computeSignedArea(c);
+        bool sameWinding = (outerArea > 0 && area > 0) || (outerArea < 0 && area < 0);
+        if (!sameWinding) {
+          continue;
+        }
+        size_t n = c.segs.size();
+        Point originalStart = c.start;
+        c.start = segEndpoint(c.segs[n - 1]);
+
+        std::vector<Seg> rev;
+        rev.reserve(n);
+        for (int i = static_cast<int>(n) - 1; i >= 0; i--) {
+          Point dest = (i > 0) ? segEndpoint(c.segs[i - 1]) : originalStart;
+          const auto& s = c.segs[i];
+          Seg rs;
+          if (s.verb == PathVerb::Cubic) {
+            rs.verb = PathVerb::Cubic;
+            rs.pts[0] = s.pts[1];
+            rs.pts[1] = s.pts[0];
+            rs.pts[2] = dest;
+          } else if (s.verb == PathVerb::Quad) {
+            rs.verb = PathVerb::Quad;
+            rs.pts[0] = s.pts[0];
+            rs.pts[1] = dest;
+          } else {
+            rs.verb = PathVerb::Line;
+            rs.pts[0] = dest;
+          }
+          rev.push_back(rs);
+        }
+        c.segs = std::move(rev);
       }
-      c.segs = std::move(rev);
     }
 
     for (const auto& c : contours) {
