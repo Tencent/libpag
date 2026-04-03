@@ -355,6 +355,16 @@ static const char* BlendModeToMixBlendMode(BlendMode mode) {
   return nullptr;
 }
 
+static Color LerpColor(const Color& a, const Color& b, float t) {
+  Color result = {};
+  result.red = a.red + (b.red - a.red) * t;
+  result.green = a.green + (b.green - a.green) * t;
+  result.blue = a.blue + (b.blue - a.blue) * t;
+  result.alpha = a.alpha + (b.alpha - a.alpha) * t;
+  result.colorSpace = a.colorSpace;
+  return result;
+}
+
 static std::string LayerTransformCSS(const Layer* layer) {
   if (!layer->matrix3D.isIdentity()) {
     return Matrix3DToCSS(layer->matrix3D);
@@ -904,6 +914,41 @@ static PathData ReversePathData(const PathData& pathData) {
   return result;
 }
 
+static std::string TransformPathDataToSVG(const PathData& pathData, const Matrix& m) {
+  PathData result = PathDataFromSVGString("");
+  pathData.forEach([&](PathVerb verb, const Point* pts) {
+    switch (verb) {
+      case PathVerb::Move: {
+        Point p = m.mapPoint(pts[0]);
+        result.moveTo(p.x, p.y);
+        break;
+      }
+      case PathVerb::Line: {
+        Point p = m.mapPoint(pts[0]);
+        result.lineTo(p.x, p.y);
+        break;
+      }
+      case PathVerb::Quad: {
+        Point c = m.mapPoint(pts[0]);
+        Point p = m.mapPoint(pts[1]);
+        result.quadTo(c.x, c.y, p.x, p.y);
+        break;
+      }
+      case PathVerb::Cubic: {
+        Point c1 = m.mapPoint(pts[0]);
+        Point c2 = m.mapPoint(pts[1]);
+        Point p = m.mapPoint(pts[2]);
+        result.cubicTo(c1.x, c1.y, c2.x, c2.y, p.x, p.y);
+        break;
+      }
+      case PathVerb::Close:
+        result.close();
+        break;
+    }
+  });
+  return PathDataToSVGString(result);
+}
+
 // Convert geometry to PathData
 static PathData GeoToPathData(const Element* element, NodeType type) {
   PathData pathData = PathDataFromSVGString("");
@@ -1086,7 +1131,8 @@ static float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t gl
   // Normalize glyph position to [0, 1]
   float glyphPos = 0.0f;
   if (selector->unit == SelectorUnit::Percentage) {
-    glyphPos = static_cast<float>(glyphIndex) / static_cast<float>(totalGlyphs);
+    float denom = totalGlyphs > 1 ? static_cast<float>(totalGlyphs - 1) : 1.0f;
+    glyphPos = static_cast<float>(glyphIndex) / denom;
   } else {
     // Index mode: start/end are direct indices
     glyphPos = static_cast<float>(glyphIndex);
@@ -2030,17 +2076,8 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
       case NodeType::InnerShadowFilter: {
         auto s = static_cast<const InnerShadowFilter*>(f);
         std::string i = std::to_string(si++);
-        _defs->openTag("feGaussianBlur");
-        _defs->addAttr("in", "SourceAlpha");
-        std::string sd = FloatToString(s->blurX);
-        if (s->blurX != s->blurY) {
-          sd += " " + FloatToString(s->blurY);
-        }
-        _defs->addAttr("stdDeviation", sd);
-        _defs->addAttr("result", "iBlur" + i);
-        _defs->closeTagSelfClosing();
         _defs->openTag("feOffset");
-        _defs->addAttr("in", "iBlur" + i);
+        _defs->addAttr("in", "SourceAlpha");
         if (!FloatNearlyZero(s->offsetX)) {
           _defs->addAttr("dx", FloatToString(s->offsetX));
         }
@@ -2057,8 +2094,17 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
         _defs->addAttr("k3", "1");
         _defs->addAttr("result", "iComp" + i);
         _defs->closeTagSelfClosing();
-        _defs->openTag("feColorMatrix");
+        std::string sd = FloatToString(s->blurX);
+        if (s->blurX != s->blurY) {
+          sd += " " + FloatToString(s->blurY);
+        }
+        _defs->openTag("feGaussianBlur");
         _defs->addAttr("in", "iComp" + i);
+        _defs->addAttr("stdDeviation", sd);
+        _defs->addAttr("result", "iBlur" + i);
+        _defs->closeTagSelfClosing();
+        _defs->openTag("feColorMatrix");
+        _defs->addAttr("in", "iBlur" + i);
         _defs->addAttr("type", "matrix");
         _defs->addAttr("values", "0 0 0 0 " + FloatToString(s->color.red) + " 0 0 0 0 " +
                                      FloatToString(s->color.green) + " 0 0 0 0 " +
@@ -2411,6 +2457,9 @@ bool HTMLWriter::canCSS(const std::vector<GeoInfo>& geos, const Fill* fill, cons
   if (hasTrim || hasMerge || geos.size() != 1 || stroke) {
     return false;
   }
+  if (!geos[0].modifiedPathData.empty()) {
+    return false;
+  }
   auto t = geos[0].type;
   if (t != NodeType::Rectangle && t != NodeType::Ellipse) {
     return false;
@@ -2575,45 +2624,56 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
   float x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
   for (auto& g : geos) {
     float gx = 0, gy = 0, gw = 0, gh = 0;
-    switch (g.type) {
-      case NodeType::Rectangle: {
-        auto r = static_cast<const Rectangle*>(g.element);
-        gx = r->position.x - r->size.width / 2;
-        gy = r->position.y - r->size.height / 2;
-        gw = r->size.width;
-        gh = r->size.height;
-        break;
+    if (!g.modifiedPathData.empty()) {
+      PathData pd = PathDataFromSVGString(g.modifiedPathData);
+      if (!pd.isEmpty()) {
+        Rect b = pd.getBounds();
+        gx = b.x;
+        gy = b.y;
+        gw = b.width;
+        gh = b.height;
       }
-      case NodeType::Ellipse: {
-        auto e = static_cast<const Ellipse*>(g.element);
-        gx = e->position.x - e->size.width / 2;
-        gy = e->position.y - e->size.height / 2;
-        gw = e->size.width;
-        gh = e->size.height;
-        break;
-      }
-      case NodeType::Path: {
-        auto p = static_cast<const Path*>(g.element);
-        if (p->data && !p->data->isEmpty()) {
-          Rect b = p->data->getBounds();
-          gx = b.x;
-          gy = b.y;
-          gw = b.width;
-          gh = b.height;
+    } else {
+      switch (g.type) {
+        case NodeType::Rectangle: {
+          auto r = static_cast<const Rectangle*>(g.element);
+          gx = r->position.x - r->size.width / 2;
+          gy = r->position.y - r->size.height / 2;
+          gw = r->size.width;
+          gh = r->size.height;
+          break;
         }
-        break;
+        case NodeType::Ellipse: {
+          auto e = static_cast<const Ellipse*>(g.element);
+          gx = e->position.x - e->size.width / 2;
+          gy = e->position.y - e->size.height / 2;
+          gw = e->size.width;
+          gh = e->size.height;
+          break;
+        }
+        case NodeType::Path: {
+          auto p = static_cast<const Path*>(g.element);
+          if (p->data && !p->data->isEmpty()) {
+            Rect b = p->data->getBounds();
+            gx = b.x;
+            gy = b.y;
+            gw = b.width;
+            gh = b.height;
+          }
+          break;
+        }
+        case NodeType::Polystar: {
+          auto ps = static_cast<const Polystar*>(g.element);
+          float r = std::max(ps->outerRadius, ps->innerRadius);
+          gx = ps->position.x - r;
+          gy = ps->position.y - r;
+          gw = r * 2;
+          gh = r * 2;
+          break;
+        }
+        default:
+          break;
       }
-      case NodeType::Polystar: {
-        auto ps = static_cast<const Polystar*>(g.element);
-        float r = std::max(ps->outerRadius, ps->innerRadius);
-        gx = ps->position.x - r;
-        gy = ps->position.y - r;
-        gw = r * 2;
-        gh = r * 2;
-        break;
-      }
-      default:
-        break;
     }
     x0 = std::min(x0, gx - pad);
     y0 = std::min(y0, gy - pad);
@@ -3492,10 +3552,12 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           out.addAttr("d", PathDataToSVGString(*glyph->path));
           // Apply fill/stroke with potential color override
           if (fill) {
-            if (modifier->fillColor.has_value() && absF > 0.0f) {
-              Color blended = modifier->fillColor.value();
+            if (modifier->fillColor.has_value() && absF > 0.0f && fill->color &&
+                fill->color->nodeType() == NodeType::SolidColor) {
+              auto baseSC = static_cast<const SolidColor*>(fill->color);
+              Color blended = LerpColor(baseSC->color, modifier->fillColor.value(), absF);
               out.addAttr("fill", ColorToSVGHex(blended));
-              float fa = blended.alpha * absF;
+              float fa = blended.alpha * fill->alpha;
               if (fa < 1.0f) {
                 out.addAttr("fill-opacity", FloatToString(fa));
               }
@@ -3535,6 +3597,12 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
       float ty = text->position.y - text->fontSize * 0.8f;
       std::string containerStyle = "position:absolute;left:" + FloatToString(text->position.x) +
                                    "px;top:" + FloatToString(ty) + "px";
+      // Apply textAnchor
+      if (text->textAnchor == TextAnchor::Center) {
+        containerStyle += ";transform:translateX(-50%)";
+      } else if (text->textAnchor == TextAnchor::End) {
+        containerStyle += ";transform:translateX(-100%)";
+      }
       if (!text->fontFamily.empty()) {
         std::string escapedFamilyM = text->fontFamily;
         for (size_t p = 0; p < escapedFamilyM.size(); p++) {
@@ -3611,7 +3679,8 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         if (fill && fill->color && fill->color->nodeType() == NodeType::SolidColor) {
           auto sc = static_cast<const SolidColor*>(fill->color);
           if (modifier->fillColor.has_value() && absF > 0.0f) {
-            charStyle += ";color:" + ColorToRGBA(modifier->fillColor.value());
+            Color blended = LerpColor(sc->color, modifier->fillColor.value(), absF);
+            charStyle += ";color:" + ColorToRGBA(blended, fill->alpha);
           } else {
             charStyle += ";color:" + ColorToRGBA(sc->color, fill->alpha);
           }
@@ -3883,9 +3952,8 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
     if (!FloatNearlyZero(rep->anchor.x) || !FloatNearlyZero(rep->anchor.y)) {
       m = Matrix::Translate(rep->anchor.x, rep->anchor.y) * m;
     }
-    float np = std::ceil(rep->copies) > 0
-                   ? (static_cast<float>(idx) + rep->offset) / std::ceil(rep->copies)
-                   : 0.0f;
+    float denom = std::max(std::ceil(rep->copies) - 1.0f, 1.0f);
+    float np = std::clamp((static_cast<float>(idx) + rep->offset) / denom, 0.0f, 1.0f);
     float ca = rep->startAlpha + (rep->endAlpha - rep->startAlpha) * np;
     if (idx == n - 1 && frac > 0 && frac < 1.0f) {
       ca *= frac;
@@ -4101,6 +4169,16 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
   const TextModifier* curTextModifier = nullptr;
   const TextPath* curTextPath = nullptr;
 
+  // Pre-scan: check if a Repeater exists among the elements.
+  // When a Repeater is present, Fill/Stroke before it should not render independently.
+  bool hasUpcomingRepeater = false;
+  for (auto* e : elements) {
+    if (e->nodeType() == NodeType::Repeater) {
+      hasUpcomingRepeater = true;
+      break;
+    }
+  }
+
   for (auto* element : elements) {
     auto type = element->nodeType();
     switch (type) {
@@ -4114,7 +4192,8 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
       case NodeType::Fill: {
         auto fill = static_cast<const Fill*>(element);
         curFill = fill;
-        if (fill->placement == targetPlacement) {
+        // Skip rendering if a Repeater follows (it will handle rendering)
+        if (fill->placement == targetPlacement && !hasUpcomingRepeater) {
           float a = distribute ? alpha : 1.0f;
           // Handle TextModifier or TextPath if present
           if (curTextModifier && !geos.empty()) {
@@ -4131,7 +4210,8 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
       case NodeType::Stroke: {
         auto stroke = static_cast<const Stroke*>(element);
         curStroke = stroke;
-        if (stroke->placement == targetPlacement) {
+        // Skip rendering if a Repeater follows (it will handle rendering)
+        if (stroke->placement == targetPlacement && !hasUpcomingRepeater) {
           float a = distribute ? alpha : 1.0f;
           // Handle TextModifier or TextPath if present
           if (curTextModifier && !geos.empty()) {
@@ -4183,9 +4263,44 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
       case NodeType::TextPath:
         curTextPath = static_cast<const TextPath*>(element);
         break;
-      case NodeType::Group:
-        writeGroup(out, static_cast<const Group*>(element), alpha, distribute);
+      case NodeType::Group: {
+        auto group = static_cast<const Group*>(element);
+        // Check if the Group has its own Fill/Stroke (scope-isolated).
+        // If not, propagate its geometry to the parent geos vector.
+        bool hasPainter = false;
+        for (auto* ge : group->elements) {
+          auto gt = ge->nodeType();
+          if (gt == NodeType::Fill || gt == NodeType::Stroke) {
+            hasPainter = true;
+            break;
+          }
+        }
+        if (hasPainter) {
+          writeGroup(out, group, alpha, distribute);
+        } else {
+          // Geometry propagation: add child geometries with Group transform applied.
+          Matrix gm = BuildGroupMatrix(group);
+          for (auto* ge : group->elements) {
+            auto gt = ge->nodeType();
+            if (gt == NodeType::Rectangle || gt == NodeType::Ellipse || gt == NodeType::Path ||
+                gt == NodeType::Polystar) {
+              // Convert geometry to path data with group transform baked in
+              PathData pathData = GeoToPathData(ge, gt);
+              if (!pathData.isEmpty()) {
+                std::string svgPath = gm.isIdentity() ? PathDataToSVGString(pathData)
+                                                      : TransformPathDataToSVG(pathData, gm);
+                geos.push_back({gt, ge, svgPath});
+              }
+            } else if (gt == NodeType::Text) {
+              geos.push_back({gt, ge, {}});
+            } else if (gt == NodeType::Group) {
+              // Nested groups without painters also propagate
+              writeGroup(out, static_cast<const Group*>(ge), alpha, distribute);
+            }
+          }
+        }
         break;
+      }
       case NodeType::Repeater: {
         auto rep = static_cast<const Repeater*>(element);
         writeRepeater(out, rep, geos, curFill, curStroke, distribute ? alpha : 1.0f);
