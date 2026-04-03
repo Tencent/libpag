@@ -1194,17 +1194,21 @@ h1{text-align:center;color:#1e293b;margin-bottom:4px}
     }
     int w = static_cast<int>(doc->width);
     int h = static_cast<int>(doc->height);
+    int scale = 2;
+    int rw = w * scale;
+    int rh = h * scale;
 
-    // Render PAGX native
+    // Render PAGX native at 2x resolution
     auto nativePng = outDir + "/" + baseName + "_pagx.png";
     auto layer = pagx::LayerBuilder::Build(doc.get(), &textLayout);
     if (layer) {
-      auto surface = tgfx::Surface::Make(context, w, h);
+      layer->setMatrix(tgfx::Matrix::MakeScale(static_cast<float>(scale)));
+      auto surface = tgfx::Surface::Make(context, rw, rh);
       if (surface) {
         tgfx::DisplayList displayList;
         displayList.root()->addChild(layer);
         displayList.render(surface.get(), false);
-        tgfx::Bitmap bitmap(w, h, false, false);
+        tgfx::Bitmap bitmap(rw, rh, false, false);
         tgfx::Pixmap pixmap(bitmap);
         surface->readPixels(pixmap.info(), pixmap.writablePixels());
         auto data = tgfx::ImageCodec::Encode(pixmap, tgfx::EncodedFormat::PNG, 100);
@@ -1216,15 +1220,25 @@ h1{text-align:center;color:#1e293b;margin-bottom:4px}
       }
     }
 
-    auto htmlPng = baseName + ".png";
+    // Generate HTML screenshot at 2x resolution
+    auto htmlPngHires = outDir + "/" + baseName + "_html2x.png";
+    auto htmlPath = outDir + "/" + baseName + ".html";
+    if (std::filesystem::exists(htmlPath)) {
+      auto scriptPath = ProjectPath::Absolute("test/screenshot.js");
+      auto cmd = "node " + scriptPath + " " + htmlPath + " " + htmlPngHires + " " +
+                 std::to_string(w) + " " + std::to_string(h) + " " + std::to_string(scale) +
+                 " 2>&1";
+      std::system(cmd.c_str());
+    }
+
     page += "<div class=\"card\" id=\"" + baseName + "\">\n";
     page += "  <div class=\"hd\"><h3>" + baseName + "</h3><span class=\"sz\">" + std::to_string(w) +
-            "x" + std::to_string(h) + "</span></div>\n";
+            "x" + std::to_string(h) + " @" + std::to_string(scale) + "x</span></div>\n";
     page += "  <div class=\"cmp\">\n";
     page += "    <div><label>PAGX Native</label><img src=\"" + baseName + "_pagx.png\" width=\"" +
             std::to_string(w) + "\"></div>\n";
-    page += "    <div><label>HTML (Browser)</label><img src=\"" + htmlPng + "\" width=\"" +
-            std::to_string(w) + "\"></div>\n";
+    page += "    <div><label>HTML (Browser)</label><img src=\"" + baseName +
+            "_html2x.png\" width=\"" + std::to_string(w) + "\"></div>\n";
     page += "  </div>\n</div>\n";
     count++;
   }
