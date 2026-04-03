@@ -220,9 +220,7 @@ When no problems are found:
 
 ```xml
 <layout>
-  <pagx width="400" height="300">
-    <!-- No layout problems detected. -->
-  </pagx>
+  <!-- No layout problems detected. -->
 </layout>
 ```
 

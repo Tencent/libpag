@@ -565,20 +565,20 @@ int RunLayout(int argc, char* argv[]) {
   // Output XML.
   bool hasTargetScope = !opts.id.empty() || !opts.xpath.empty();
   std::cout << "<layout>\n";
-  if (!hasTargetScope) {
+  bool emptyCheck = results.empty() && opts.check;
+  if (!hasTargetScope && !emptyCheck) {
     auto docWidth = static_cast<int>(document->width);
     auto docHeight = static_cast<int>(document->height);
     std::cout << "  <pagx width=\"" << docWidth << "\" height=\"" << docHeight << "\">\n";
   }
-  if (results.empty() && opts.check) {
-    std::string pad = hasTargetScope ? "  " : "    ";
-    std::cout << pad << "<!-- No layout problems detected. -->\n";
+  if (emptyCheck) {
+    std::cout << "  <!-- No layout problems detected. -->\n";
   }
   int contentIndent = hasTargetScope ? 1 : 2;
   for (const auto& node : results) {
     PrintNodeXml(std::cout, *node, contentIndent);
   }
-  if (!hasTargetScope) {
+  if (!hasTargetScope && !emptyCheck) {
     std::cout << "  </pagx>\n";
   }
   std::cout << "</layout>\n";
