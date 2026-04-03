@@ -21,13 +21,7 @@
 namespace pagx::cli {
 
 /**
- * Check layout structure and detect layout problems in PAGX files.
- *
- * Detects three categories of layout problems:
- * 1. Overlapping sibling Layers inside auto-layout parents
- * 2. Content clipped by parent bounds (clipToBounds)
- * 3. Zero-size (invisible) elements
- *
+ * Display layout structure and detect layout problems in PAGX files.
  * Returns non-zero exit code when layout problems are detected.
  */
 int RunLayout(int argc, char* argv[]);
