@@ -2035,8 +2035,8 @@ CLI_TEST(PAGXCliTest, LayoutCheck_TextFontFallback) {
   EXPECT_TRUE(output.find("zero size") == std::string::npos);
 }
 
-// Horizontal and vertical line Paths (single-axis zero) should not trigger zero-size warnings.
-// Only a degenerate point Path (both axes zero) should be flagged.
+// Line Paths have preferred size clamped to 1px minimum, so they should not trigger zero-size
+// warnings. Content-measured Layers containing line Paths also get a non-zero size.
 CLI_TEST(PAGXCliTest, LayoutCheck_PathZeroSize) {
   auto path = TestResourcePath("layout_check_path_zero.pagx");
   std::streambuf* old = std::cout.rdbuf();
@@ -2045,15 +2045,8 @@ CLI_TEST(PAGXCliTest, LayoutCheck_PathZeroSize) {
   auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
   std::cout.rdbuf(old);
   auto output = oss.str();
-  // The point Path should trigger zero-size.
-  EXPECT_EQ(ret, 1);
-  // Only one zero-size problem (the degenerate point), not three.
-  auto pos = output.find("zero size");
-  EXPECT_TRUE(pos != std::string::npos);
-  // Verify no second occurrence.
-  if (pos != std::string::npos) {
-    EXPECT_TRUE(output.find("zero size", pos + 1) == std::string::npos);
-  }
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("zero size") == std::string::npos);
 }
 
 }  // namespace pag

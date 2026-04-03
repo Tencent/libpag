@@ -28,8 +28,10 @@ void TextPath::onMeasure(LayoutContext*) {
     auto bounds = path->getBounds();
     preferredX = bounds.x;
     preferredY = bounds.y;
-    preferredWidth = bounds.width;
-    preferredHeight = bounds.height;
+    // Clamp to 1px minimum so that line paths (e.g. horizontal lines with height=0) have a
+    // meaningful size for content measurement and constraint positioning.
+    preferredWidth = std::max(bounds.width, 1.0f);
+    preferredHeight = std::max(bounds.height, 1.0f);
   }
 }
 
@@ -44,8 +46,8 @@ void TextPath::setLayoutSize(LayoutContext*, float width, float height) {
     baselineOrigin.y *= scale;
   }
   auto bounds = path->getBounds();
-  layoutWidth = bounds.width;
-  layoutHeight = bounds.height;
+  layoutWidth = std::max(bounds.width, 1.0f);
+  layoutHeight = std::max(bounds.height, 1.0f);
 }
 
 void TextPath::setLayoutPosition(LayoutContext*, float x, float y) {

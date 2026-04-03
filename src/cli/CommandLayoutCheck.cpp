@@ -29,7 +29,6 @@
 #include "pagx/layout/LayoutNode.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Layer.h"
-#include "pagx/nodes/Node.h"
 
 namespace pagx::cli {
 
@@ -133,22 +132,6 @@ static void DetectZeroSize(CheckNode* node, bool check) {
   }
 }
 
-static void DetectElementZeroSize(CheckNode* node, bool check, NodeType type) {
-  if (!check) {
-    return;
-  }
-  // Path and TextPath legitimately have a single zero axis (e.g. horizontal/vertical lines).
-  bool isZero = (type == NodeType::Path || type == NodeType::TextPath)
-                    ? (node->bounds.width == 0 && node->bounds.height == 0)
-                    : (node->bounds.width == 0 || node->bounds.height == 0);
-  if (isZero) {
-    std::ostringstream oss;
-    oss << "zero size (width: " << static_cast<int>(node->bounds.width)
-        << ", height: " << static_cast<int>(node->bounds.height) << "); node will be invisible";
-    node->problems.push_back(oss.str());
-  }
-}
-
 static void DetectOverlap(const std::vector<std::shared_ptr<CheckNode>>& layoutChildren,
                           const std::string& parentLayoutMode) {
   if (parentLayoutMode.empty()) {
@@ -179,7 +162,6 @@ static void DetectClippedContent(const LCRect& parentBounds,
   }
 }
 
-
 // ============================================================================
 // Element Tree Building
 // ============================================================================
@@ -201,7 +183,7 @@ static void BuildElementNodes(const std::vector<Element*>& elements,
     auto node = std::make_shared<CheckNode>();
     node->label = MakeLabel(NodeTypeName(element->nodeType()), element->id, i);
     node->bounds = {parentX + bounds.x, parentY + bounds.y, bounds.width, bounds.height};
-    DetectElementZeroSize(node.get(), check, element->nodeType());
+    DetectZeroSize(node.get(), check);
 
     if (element->nodeType() == NodeType::Group || element->nodeType() == NodeType::TextBox) {
       auto* group = static_cast<const Group*>(element);

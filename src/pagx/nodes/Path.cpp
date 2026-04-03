@@ -28,8 +28,10 @@ void Path::onMeasure(LayoutContext*) {
     auto bounds = data->getBounds();
     preferredX = bounds.x;
     preferredY = bounds.y;
-    preferredWidth = bounds.width;
-    preferredHeight = bounds.height;
+    // Clamp to 1px minimum so that line paths (e.g. horizontal lines with height=0) have a
+    // meaningful size for content measurement and constraint positioning.
+    preferredWidth = std::max(bounds.width, 1.0f);
+    preferredHeight = std::max(bounds.height, 1.0f);
   }
 }
 
@@ -42,8 +44,8 @@ void Path::setLayoutSize(LayoutContext*, float width, float height) {
     data->transform(Matrix::Scale(scale, scale));
   }
   auto bounds = data->getBounds();
-  layoutWidth = bounds.width;
-  layoutHeight = bounds.height;
+  layoutWidth = std::max(bounds.width, 1.0f);
+  layoutHeight = std::max(bounds.height, 1.0f);
 }
 
 void Path::setLayoutPosition(LayoutContext*, float x, float y) {
