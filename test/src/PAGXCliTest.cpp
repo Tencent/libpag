@@ -704,7 +704,7 @@ CLI_TEST(PAGXCliTest, Lint_UnreferencedResources) {
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
-  EXPECT_TRUE(output.find("unreferenced resource(s) can be removed") != std::string::npos);
+  EXPECT_TRUE(output.find("unreferenced resource") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Lint_DuplicatePathData) {
@@ -716,7 +716,7 @@ CLI_TEST(PAGXCliTest, Lint_DuplicatePathData) {
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("duplicate PathData(s) can be merged") != std::string::npos);
+  EXPECT_TRUE(output.find("duplicate PathData") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Lint_DuplicateGradient) {
@@ -728,7 +728,7 @@ CLI_TEST(PAGXCliTest, Lint_DuplicateGradient) {
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("duplicate gradient(s) can be merged") != std::string::npos);
+  EXPECT_TRUE(output.find("duplicate") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Lint_MergeableGroups) {
@@ -740,8 +740,7 @@ CLI_TEST(PAGXCliTest, Lint_MergeableGroups) {
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("adjacent Group(s) with same painters can be merged") !=
-              std::string::npos);
+  EXPECT_TRUE(output.find("can be merged with previous Group") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Lint_UnwrappableGroup) {
@@ -753,7 +752,7 @@ CLI_TEST(PAGXCliTest, Lint_UnwrappableGroup) {
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("redundant first-child Group(s) can be unwrapped") != std::string::npos);
+  EXPECT_TRUE(output.find("redundant first-child Group") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Lint_PathToPrimitive) {
@@ -765,7 +764,7 @@ CLI_TEST(PAGXCliTest, Lint_PathToPrimitive) {
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("Path(s) can be replaced with Rectangle/Ellipse") != std::string::npos);
+  EXPECT_TRUE(output.find("Path can be replaced with") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Lint_LocalizableCoordinates) {
@@ -777,7 +776,7 @@ CLI_TEST(PAGXCliTest, Lint_LocalizableCoordinates) {
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("Layer(s) have coordinates that can be moved") != std::string::npos);
+  EXPECT_TRUE(output.find("coordinates can be localized") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Lint_LocalizablePathData) {
@@ -789,7 +788,7 @@ CLI_TEST(PAGXCliTest, Lint_LocalizablePathData) {
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("PathData(s) can be localized to origin") != std::string::npos);
+  EXPECT_TRUE(output.find("PathData can be localized to origin") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Lint_ExtractableCompositions) {
@@ -801,7 +800,7 @@ CLI_TEST(PAGXCliTest, Lint_ExtractableCompositions) {
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("structurally identical Layer(s) can be extracted") != std::string::npos);
+  EXPECT_TRUE(output.find("can extract to shared Composition") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Lint_DowngradeableLayer) {
@@ -1739,6 +1738,48 @@ CLI_TEST(PAGXCliTest, LayoutCheck_RedundantConstraintTopZero) {
   EXPECT_EQ(ret, 1);
   EXPECT_TRUE(output.find("top=0 with no opposite constraint is equivalent to default") !=
               std::string::npos);
+}
+
+// centerX/centerY on VectorElement inside content-measured Layer — ineffective.
+CLI_TEST(PAGXCliTest, LayoutCheck_IneffectiveCenterLayer) {
+  auto path = TestResourcePath("layout_check_ineffective_center_layer.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("centerX ineffective") != std::string::npos);
+  EXPECT_TRUE(output.find("centerY ineffective") != std::string::npos);
+}
+
+// centerX/centerY on VectorElement inside content-measured Group — ineffective.
+CLI_TEST(PAGXCliTest, LayoutCheck_IneffectiveCenterGroup) {
+  auto path = TestResourcePath("layout_check_ineffective_center_group.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("centerX ineffective") != std::string::npos);
+  EXPECT_TRUE(output.find("centerY ineffective") != std::string::npos);
+}
+
+// centerX/centerY on VectorElement inside explicit-size Layer — valid, no problem.
+CLI_TEST(PAGXCliTest, LayoutCheck_IneffectiveCenterExplicitSize) {
+  auto path = TestResourcePath("layout_check_ineffective_center_explicit.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("centerX ineffective") == std::string::npos);
+  EXPECT_TRUE(output.find("centerY ineffective") == std::string::npos);
 }
 
 }  // namespace pag

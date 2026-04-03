@@ -409,7 +409,13 @@ static void DetectFullCanvasClipMasks(xmlNodePtr root, float canvasWidth, float 
 
 // --- Pass 13: Unreferenced resource detection ---
 
-static void CollectResourceIds(xmlNodePtr root, std::unordered_set<std::string>& resourceIds) {
+struct ResourceInfo {
+  int line = 0;
+  std::string nodeType = {};
+};
+
+static void CollectResourceIds(xmlNodePtr root,
+                               std::unordered_map<std::string, ResourceInfo>& resourceIds) {
   auto children = XmlChildElements(root);
   for (auto* child : children) {
     if (XmlNodeIs(child, "Resources")) {
@@ -418,7 +424,10 @@ static void CollectResourceIds(xmlNodePtr root, std::unordered_set<std::string>&
       for (auto* resNode : allResNodes) {
         auto id = XmlAttr(resNode, "id");
         if (!id.empty()) {
-          resourceIds.insert(id);
+          ResourceInfo info = {};
+          info.line = static_cast<int>(resNode->line);
+          info.nodeType = XmlNodeName(resNode);
+          resourceIds[id] = info;
         }
       }
       break;
@@ -444,24 +453,21 @@ static void CollectReferencedIds(xmlNodePtr node, std::unordered_set<std::string
 }
 
 static void DetectUnreferencedResources(xmlNodePtr root, std::vector<LintDiagnostic>& diagnostics) {
-  std::unordered_set<std::string> resourceIds = {};
+  std::unordered_map<std::string, ResourceInfo> resourceIds = {};
   CollectResourceIds(root, resourceIds);
 
   std::unordered_set<std::string> referencedIds = {};
   CollectReferencedIds(root, referencedIds);
 
-  int unreferencedCount = 0;
-  for (const auto& id : resourceIds) {
-    if (referencedIds.find(id) == referencedIds.end()) {
-      unreferencedCount++;
+  for (const auto& pair : resourceIds) {
+    if (referencedIds.find(pair.first) == referencedIds.end()) {
+      LintDiagnostic diag = {};
+      diag.line = pair.second.line;
+      diag.category = "warning";
+      diag.message =
+          "unreferenced resource: <" + pair.second.nodeType + "> (id='" + pair.first + "')";
+      diagnostics.push_back(std::move(diag));
     }
-  }
-
-  if (unreferencedCount > 0) {
-    LintDiagnostic diag = {};
-    diag.category = "warning";
-    diag.message = std::to_string(unreferencedCount) + " unreferenced resource(s) can be removed";
-    diagnostics.push_back(std::move(diag));
   }
 }
 
@@ -481,21 +487,18 @@ static void DetectDuplicatePathData(xmlNodePtr root, std::vector<LintDiagnostic>
     }
   }
 
-  std::unordered_set<std::string> seen = {};
-  int duplicateCount = 0;
+  std::unordered_map<std::string, int> seen = {};
   for (const auto& item : pathDataList) {
-    if (seen.find(item.first) != seen.end()) {
-      duplicateCount++;
+    auto it = seen.find(item.first);
+    if (it != seen.end()) {
+      LintDiagnostic diag = {};
+      diag.line = item.second;
+      diag.category = "info";
+      diag.message = "duplicate PathData, same content as line " + std::to_string(it->second);
+      diagnostics.push_back(std::move(diag));
     } else {
-      seen.insert(item.first);
+      seen[item.first] = item.second;
     }
-  }
-
-  if (duplicateCount > 0) {
-    LintDiagnostic diag = {};
-    diag.category = "info";
-    diag.message = std::to_string(duplicateCount) + " duplicate PathData(s) can be merged";
-    diagnostics.push_back(std::move(diag));
   }
 }
 
@@ -531,28 +534,35 @@ static void DetectDuplicateGradients(xmlNodePtr root, std::vector<LintDiagnostic
   std::vector<xmlNodePtr> allNodes = {};
   CollectAllNodes(root, allNodes);
 
-  std::vector<std::pair<std::string, int>> gradientList = {};
+  struct GradientEntry {
+    std::string signature = {};
+    std::string nodeType = {};
+    int line = 0;
+  };
+  std::vector<GradientEntry> gradientList = {};
   for (auto* node : allNodes) {
     if (IsGradientNode(node)) {
-      gradientList.emplace_back(SerializeGradientNode(node), static_cast<int>(node->line));
+      GradientEntry entry = {};
+      entry.signature = SerializeGradientNode(node);
+      entry.nodeType = XmlNodeName(node);
+      entry.line = static_cast<int>(node->line);
+      gradientList.push_back(std::move(entry));
     }
   }
 
-  std::unordered_set<std::string> seen = {};
-  int duplicateCount = 0;
+  std::unordered_map<std::string, int> seen = {};
   for (const auto& item : gradientList) {
-    if (seen.find(item.first) != seen.end()) {
-      duplicateCount++;
+    auto it = seen.find(item.signature);
+    if (it != seen.end()) {
+      LintDiagnostic diag = {};
+      diag.line = item.line;
+      diag.category = "info";
+      diag.message =
+          "duplicate " + item.nodeType + ", same parameters as line " + std::to_string(it->second);
+      diagnostics.push_back(std::move(diag));
     } else {
-      seen.insert(item.first);
+      seen[item.signature] = item.line;
     }
-  }
-
-  if (duplicateCount > 0) {
-    LintDiagnostic diag = {};
-    diag.category = "info";
-    diag.message = std::to_string(duplicateCount) + " duplicate gradient(s) can be merged";
-    diagnostics.push_back(std::move(diag));
   }
 }
 
@@ -665,7 +675,6 @@ static void DetectMergeableGroups(xmlNodePtr root, std::vector<LintDiagnostic>& 
   std::vector<xmlNodePtr> allNodes = {};
   CollectAllNodes(root, allNodes);
 
-  int mergeableCount = 0;
   for (auto* node : allNodes) {
     if (!XmlNodeIs(node, "Layer") && !XmlNodeIs(node, "Group") && !XmlNodeIs(node, "TextBox")) {
       continue;
@@ -693,19 +702,15 @@ static void DetectMergeableGroups(xmlNodePtr root, std::vector<LintDiagnostic>& 
         if (nextSig != sig) {
           break;
         }
-        mergeableCount++;
+        LintDiagnostic diag = {};
+        diag.line = static_cast<int>(next->line);
+        diag.category = "info";
+        diag.message = "can be merged with previous Group (same painters)";
+        diagnostics.push_back(std::move(diag));
         j++;
       }
       i = j;
     }
-  }
-
-  if (mergeableCount > 0) {
-    LintDiagnostic diag = {};
-    diag.category = "info";
-    diag.message =
-        std::to_string(mergeableCount) + " adjacent Group(s) with same painters can be merged";
-    diagnostics.push_back(std::move(diag));
   }
 }
 
@@ -765,29 +770,32 @@ static bool CanUnwrapFirstChildGroup(xmlNodePtr groupNode) {
   return true;
 }
 
-static int CountUnwrappableFirstChildGroupsInElements(const std::vector<xmlNodePtr>& elements);
+static void CollectUnwrappableFirstChildGroups(const std::vector<xmlNodePtr>& elements,
+                                               std::vector<LintDiagnostic>& diagnostics);
 
-static int CountUnwrappableFirstChildGroupsRecursive(const std::vector<xmlNodePtr>& elements) {
-  int count = 0;
+static void CollectUnwrappableFirstChildGroupsRecursive(const std::vector<xmlNodePtr>& elements,
+                                                        std::vector<LintDiagnostic>& diagnostics) {
   for (auto* element : elements) {
     if (XmlNodeIs(element, "Group") || XmlNodeIs(element, "TextBox")) {
-      count += CountUnwrappableFirstChildGroupsInElements(XmlChildElements(element));
+      CollectUnwrappableFirstChildGroups(XmlChildElements(element), diagnostics);
     }
   }
-  return count;
 }
 
-static int CountUnwrappableFirstChildGroupsInElements(const std::vector<xmlNodePtr>& elements) {
-  int count = 0;
+static void CollectUnwrappableFirstChildGroups(const std::vector<xmlNodePtr>& elements,
+                                               std::vector<LintDiagnostic>& diagnostics) {
   if (elements.empty()) {
-    return count;
+    return;
   }
   auto* first = elements[0];
   if (XmlNodeIs(first, "Group") && CanUnwrapFirstChildGroup(first)) {
-    count++;
+    LintDiagnostic diag = {};
+    diag.line = static_cast<int>(first->line);
+    diag.category = "info";
+    diag.message = "redundant first-child Group, can be unwrapped";
+    diagnostics.push_back(std::move(diag));
   }
-  count += CountUnwrappableFirstChildGroupsRecursive(elements);
-  return count;
+  CollectUnwrappableFirstChildGroupsRecursive(elements, diagnostics);
 }
 
 static void DetectUnwrappableFirstChildGroups(xmlNodePtr root,
@@ -795,7 +803,6 @@ static void DetectUnwrappableFirstChildGroups(xmlNodePtr root,
   std::vector<xmlNodePtr> allNodes = {};
   CollectAllNodes(root, allNodes);
 
-  int unwrappableCount = 0;
   for (auto* node : allNodes) {
     std::vector<xmlNodePtr> contentChildren = {};
     auto children = XmlChildElements(node);
@@ -804,19 +811,9 @@ static void DetectUnwrappableFirstChildGroups(xmlNodePtr root,
         contentChildren.push_back(child);
       }
     }
-    if (XmlNodeIs(node, "Layer")) {
-      unwrappableCount += CountUnwrappableFirstChildGroupsInElements(contentChildren);
-    } else if (XmlNodeIs(node, "Group") || XmlNodeIs(node, "TextBox")) {
-      unwrappableCount += CountUnwrappableFirstChildGroupsInElements(contentChildren);
+    if (XmlNodeIs(node, "Layer") || XmlNodeIs(node, "Group") || XmlNodeIs(node, "TextBox")) {
+      CollectUnwrappableFirstChildGroups(contentChildren, diagnostics);
     }
-  }
-
-  if (unwrappableCount > 0) {
-    LintDiagnostic diag = {};
-    diag.category = "info";
-    diag.message =
-        std::to_string(unwrappableCount) + " redundant first-child Group(s) can be unwrapped";
-    diagnostics.push_back(std::move(diag));
   }
 }
 
@@ -870,7 +867,6 @@ static void DetectPathsToPrimitives(xmlNodePtr root, std::vector<LintDiagnostic>
     }
   }
 
-  int convertibleCount = 0;
   for (auto* node : allNodes) {
     if (!XmlNodeIs(node, "Path")) {
       continue;
@@ -904,17 +900,19 @@ static void DetectPathsToPrimitives(xmlNodePtr root, std::vector<LintDiagnostic>
     }
 
     auto verbs = ParseVerbs(pathDataStr);
-    if (IsRectangleVerbPattern(verbs) || IsEllipseVerbPattern(verbs)) {
-      convertibleCount++;
+    if (IsRectangleVerbPattern(verbs)) {
+      LintDiagnostic diag = {};
+      diag.line = static_cast<int>(node->line);
+      diag.category = "info";
+      diag.message = "Path can be replaced with Rectangle";
+      diagnostics.push_back(std::move(diag));
+    } else if (IsEllipseVerbPattern(verbs)) {
+      LintDiagnostic diag = {};
+      diag.line = static_cast<int>(node->line);
+      diag.category = "info";
+      diag.message = "Path can be replaced with Ellipse";
+      diagnostics.push_back(std::move(diag));
     }
-  }
-
-  if (convertibleCount > 0) {
-    LintDiagnostic diag = {};
-    diag.category = "info";
-    diag.message = std::to_string(convertibleCount) +
-                   " Path(s) can be replaced with Rectangle/Ellipse primitives";
-    diagnostics.push_back(std::move(diag));
   }
 }
 
@@ -936,7 +934,6 @@ static void DetectLocalizableCoordinates(xmlNodePtr root,
   std::vector<xmlNodePtr> allNodes = {};
   CollectAllNodes(root, allNodes);
 
-  int localizableCount = 0;
   for (auto* node : allNodes) {
     if (!XmlNodeIs(node, "Layer")) {
       continue;
@@ -984,16 +981,12 @@ static void DetectLocalizableCoordinates(xmlNodePtr root,
       y = 0;
     }
     if (x != 0 || y != 0) {
-      localizableCount++;
+      LintDiagnostic diag = {};
+      diag.line = static_cast<int>(node->line);
+      diag.category = "info";
+      diag.message = "Layer coordinates can be localized to origin";
+      diagnostics.push_back(std::move(diag));
     }
-  }
-
-  if (localizableCount > 0) {
-    LintDiagnostic diag = {};
-    diag.category = "info";
-    diag.message =
-        std::to_string(localizableCount) + " Layer(s) have coordinates that can be moved";
-    diagnostics.push_back(std::move(diag));
   }
 }
 
@@ -1021,7 +1014,6 @@ static void DetectLocalizablePathData(xmlNodePtr root, std::vector<LintDiagnosti
   std::vector<xmlNodePtr> allNodes = {};
   CollectAllNodes(root, allNodes);
 
-  int localizableCount = 0;
   for (auto* node : allNodes) {
     if (!XmlNodeIs(node, "PathData")) {
       continue;
@@ -1032,15 +1024,12 @@ static void DetectLocalizablePathData(xmlNodePtr root, std::vector<LintDiagnosti
     }
     auto firstPoint = ParseFirstPoint(data);
     if (std::abs(firstPoint.first) >= 0.001f || std::abs(firstPoint.second) >= 0.001f) {
-      localizableCount++;
+      LintDiagnostic diag = {};
+      diag.line = static_cast<int>(node->line);
+      diag.category = "info";
+      diag.message = "PathData can be localized to origin";
+      diagnostics.push_back(std::move(diag));
     }
-  }
-
-  if (localizableCount > 0) {
-    LintDiagnostic diag = {};
-    diag.category = "info";
-    diag.message = std::to_string(localizableCount) + " PathData(s) can be localized to origin";
-    diagnostics.push_back(std::move(diag));
   }
 }
 
@@ -1149,19 +1138,19 @@ static void DetectExtractableCompositions(xmlNodePtr root,
     groups[signature].push_back(layer);
   }
 
-  int extractableCount = 0;
   for (const auto& pair : groups) {
-    if (pair.second.size() >= 2) {
-      extractableCount += static_cast<int>(pair.second.size());
+    if (pair.second.size() < 2) {
+      continue;
     }
-  }
-
-  if (extractableCount > 0) {
-    LintDiagnostic diag = {};
-    diag.category = "info";
-    diag.message = std::to_string(extractableCount) +
-                   " structurally identical Layer(s) can be extracted to shared Composition";
-    diagnostics.push_back(std::move(diag));
+    int firstLine = static_cast<int>(pair.second[0]->line);
+    for (size_t i = 1; i < pair.second.size(); i++) {
+      LintDiagnostic diag = {};
+      diag.line = static_cast<int>(pair.second[i]->line);
+      diag.category = "info";
+      diag.message = "structurally identical to Layer at line " + std::to_string(firstLine) +
+                     ", can extract to shared Composition";
+      diagnostics.push_back(std::move(diag));
+    }
   }
 }
 
