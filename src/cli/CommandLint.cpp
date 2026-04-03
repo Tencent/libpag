@@ -22,7 +22,6 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
-#include <functional>
 #include <iostream>
 #include <string>
 #include <unordered_map>
@@ -205,43 +204,40 @@ static bool IsEmptyElement(const Element* element) {
   return false;
 }
 
+static int CountEmptyLayersIn(const std::vector<Layer*>& layers) {
+  int count = 0;
+  for (auto* layer : layers) {
+    if (IsEmptyLayer(layer)) {
+      count++;
+    }
+  }
+  return count;
+}
+
+static int CountEmptyElementsIn(const std::vector<Element*>& elements) {
+  int count = 0;
+  for (auto* element : elements) {
+    if (IsEmptyElement(element)) {
+      count++;
+    }
+  }
+  return count;
+}
+
 static int CountEmptyNodes(const PAGXDocument* document) {
   int count = 0;
-
-  std::function<int(const std::vector<Layer*>&)> countEmptyLayers =
-      [&](const std::vector<Layer*>& layers) {
-        int c = 0;
-        for (auto* layer : layers) {
-          if (IsEmptyLayer(layer)) {
-            c++;
-          }
-        }
-        return c;
-      };
-
-  std::function<int(const std::vector<Element*>&)> countEmptyElements =
-      [&](const std::vector<Element*>& elements) {
-        int c = 0;
-        for (auto* element : elements) {
-          if (IsEmptyElement(element)) {
-            c++;
-          }
-        }
-        return c;
-      };
-
-  count += countEmptyLayers(document->layers);
+  count += CountEmptyLayersIn(document->layers);
   for (auto& node : document->nodes) {
     if (node->nodeType() == NodeType::Layer) {
       auto layer = static_cast<const Layer*>(node.get());
-      count += countEmptyLayers(layer->children);
-      count += countEmptyElements(layer->contents);
+      count += CountEmptyLayersIn(layer->children);
+      count += CountEmptyElementsIn(layer->contents);
     } else if (node->nodeType() == NodeType::Group || node->nodeType() == NodeType::TextBox) {
       auto group = static_cast<const Group*>(node.get());
-      count += countEmptyElements(group->elements);
+      count += CountEmptyElementsIn(group->elements);
     } else if (node->nodeType() == NodeType::Composition) {
       auto composition = static_cast<const Composition*>(node.get());
-      count += countEmptyLayers(composition->layers);
+      count += CountEmptyLayersIn(composition->layers);
     }
   }
   return count;
@@ -273,26 +269,22 @@ static bool IsFullCanvasClipMask(const Layer* maskLayer, float canvasWidth, floa
          rect->size.height >= canvasHeight;
 }
 
+static void CountFullCanvasClipMasksIn(const std::vector<Layer*>& layers, float canvasWidth,
+                                       float canvasHeight, int& count) {
+  for (auto* layer : layers) {
+    if (layer->mask != nullptr && IsFullCanvasClipMask(layer->mask, canvasWidth, canvasHeight)) {
+      count++;
+    }
+    if (layer->composition != nullptr) {
+      CountFullCanvasClipMasksIn(layer->composition->layers, canvasWidth, canvasHeight, count);
+    }
+    CountFullCanvasClipMasksIn(layer->children, canvasWidth, canvasHeight, count);
+  }
+}
+
 static int CountFullCanvasClipMasks(const PAGXDocument* document) {
   int count = 0;
-  float canvasWidth = document->width;
-  float canvasHeight = document->height;
-
-  std::function<void(const std::vector<Layer*>&)> checkLayers =
-      [&](const std::vector<Layer*>& layers) {
-        for (auto* layer : layers) {
-          if (layer->mask != nullptr &&
-              IsFullCanvasClipMask(layer->mask, canvasWidth, canvasHeight)) {
-            count++;
-          }
-          if (layer->composition != nullptr) {
-            checkLayers(layer->composition->layers);
-          }
-          checkLayers(layer->children);
-        }
-      };
-
-  checkLayers(document->layers);
+  CountFullCanvasClipMasksIn(document->layers, document->width, document->height, count);
   return count;
 }
 
