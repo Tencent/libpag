@@ -51,11 +51,7 @@
 #include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/StringParser.h"
 #include "renderer/LayerBuilder.h"
-#include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Data.h"
-#include "tgfx/core/ImageCodec.h"
-#include "tgfx/core/Pixmap.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/layers/DisplayList.h"
 
 namespace pagx {
@@ -211,13 +207,6 @@ static int AngleToPPT(float degrees) {
 
 static int FontSizeToPPT(float px) {
   return std::max(100, static_cast<int>(std::round(px * 75.0)));
-}
-
-static std::string StripQuotes(const std::string& s) {
-  if (s.size() >= 2 && s.front() == '"' && s.back() == '"') {
-    return s.substr(1, s.size() - 2);
-  }
-  return s;
 }
 
 //==============================================================================
@@ -386,50 +375,6 @@ class PPTWriterContext {
 };
 
 //==============================================================================
-// RenderMaskedLayer – rasterize a masked layer to PNG via tgfx pipeline
-//==============================================================================
-
-static std::shared_ptr<tgfx::Data> RenderMaskedLayer(
-    const std::shared_ptr<tgfx::Layer>& root, const std::shared_ptr<tgfx::Layer>& targetLayer) {
-  auto globalBounds = targetLayer->getBounds(root.get(), true);
-  int width = static_cast<int>(ceilf(globalBounds.width()));
-  int height = static_cast<int>(ceilf(globalBounds.height()));
-  if (width <= 0 || height <= 0) {
-    return nullptr;
-  }
-  auto device = tgfx::GLDevice::Make();
-  if (device == nullptr) {
-    return nullptr;
-  }
-  auto context = device->lockContext();
-  if (context == nullptr) {
-    return nullptr;
-  }
-  auto surface = tgfx::Surface::Make(context, width, height);
-  if (surface == nullptr) {
-    device->unlock();
-    return nullptr;
-  }
-  auto canvas = surface->getCanvas();
-  canvas->translate(-globalBounds.left, -globalBounds.top);
-  canvas->concat(targetLayer->getRelativeMatrix(root.get()));
-  targetLayer->draw(canvas);
-
-  tgfx::Bitmap bitmap(width, height, false, false);
-  if (bitmap.isEmpty()) {
-    device->unlock();
-    return nullptr;
-  }
-  tgfx::Pixmap pixmap(bitmap);
-  bool readSuccess = surface->readPixels(pixmap.info(), pixmap.writablePixels());
-  device->unlock();
-  if (!readSuccess) {
-    return nullptr;
-  }
-  return tgfx::ImageCodec::Encode(pixmap, tgfx::EncodedFormat::PNG, 100);
-}
-
-//==============================================================================
 // Dash pattern → OOXML preset dash mapping
 //==============================================================================
 
@@ -459,6 +404,42 @@ static const char* MatchPresetDash(const std::vector<float>& dashes, float strok
     return (dr > 4.5f) ? "lgDashDotDot" : "sysDashDotDot";
   }
   return nullptr;
+}
+
+//==============================================================================
+// ImagePatternRect – shared visible-area / srcRect computation
+//==============================================================================
+
+struct ImagePatternRect {
+  float visL = 0;
+  float visT = 0;
+  float visR = 0;
+  float visB = 0;
+  int srcL = 0;
+  int srcT = 0;
+  int srcR = 0;
+  int srcB = 0;
+};
+
+static bool ComputeImagePatternRect(const ImagePattern* pattern, int imgW, int imgH,
+                                    const Rect& shapeBounds, ImagePatternRect* result) {
+  const auto& M = pattern->matrix;
+  float imageDocW = static_cast<float>(imgW) * M.a;
+  float imageDocH = static_cast<float>(imgH) * M.d;
+  result->visL = std::max(shapeBounds.x, M.tx);
+  result->visT = std::max(shapeBounds.y, M.ty);
+  result->visR = std::min(shapeBounds.x + shapeBounds.width, M.tx + imageDocW);
+  result->visB = std::min(shapeBounds.y + shapeBounds.height, M.ty + imageDocH);
+  if (result->visR <= result->visL || result->visB <= result->visT) {
+    return false;
+  }
+  result->srcL = static_cast<int>(std::round((result->visL - M.tx) / imageDocW * 100000.0f));
+  result->srcT = static_cast<int>(std::round((result->visT - M.ty) / imageDocH * 100000.0f));
+  result->srcR =
+      static_cast<int>(std::round((M.tx + imageDocW - result->visR) / imageDocW * 100000.0f));
+  result->srcB =
+      static_cast<int>(std::round((M.ty + imageDocH - result->visB) / imageDocH * 100000.0f));
+  return true;
 }
 
 //==============================================================================
@@ -519,6 +500,15 @@ class PPTWriter {
   void writeGradientStops(XMLBuilder& out, const std::vector<ColorStop*>& stops);
   void writeStroke(XMLBuilder& out, const Stroke* stroke, float alpha);
   void writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& filters);
+  void writeShadowElement(XMLBuilder& out, const char* tag, float blurX, float blurY, float offsetX,
+                          float offsetY, const Color& color, bool includeAlign);
+
+  static void WriteBlip(XMLBuilder& out, const std::string& relId, float alpha);
+  static void WriteDefaultStretch(XMLBuilder& out);
+
+  void writeShapeTail(XMLBuilder& out, const FillStrokeInfo& fs, float alpha,
+                      const Rect& shapeBounds, bool imageWritten,
+                      const std::vector<LayerFilter*>& filters);
 
   // Custom geometry from PathData
   void writeCustomGeom(XMLBuilder& out, const PathData* data, float ofsX, float ofsY, float boundsW,
@@ -589,6 +579,19 @@ void PPTWriter::endShape(XMLBuilder& out) {
   out.end();  // p:sp
 }
 
+void PPTWriter::writeShapeTail(XMLBuilder& out, const FillStrokeInfo& fs, float alpha,
+                               const Rect& shapeBounds, bool imageWritten,
+                               const std::vector<LayerFilter*>& filters) {
+  if (imageWritten) {
+    out.open("a:noFill").sc();
+  } else {
+    writeFill(out, fs.fill, alpha, shapeBounds);
+  }
+  writeStroke(out, fs.stroke, alpha);
+  writeEffects(out, filters);
+  endShape(out);
+}
+
 // ── Lazy build result ───────────────────────────────────────────────────────
 
 const LayerBuildResult& PPTWriter::ensureBuildResult() {
@@ -597,6 +600,25 @@ const LayerBuildResult& PPTWriter::ensureBuildResult() {
     _buildResultReady = true;
   }
   return _buildResult;
+}
+
+// ── Shared XML helpers ──────────────────────────────────────────────────────
+
+void PPTWriter::WriteBlip(XMLBuilder& out, const std::string& relId, float alpha) {
+  out.open("a:blip").a("r:embed", relId);
+  if (alpha < 1.0f) {
+    out.gt();
+    out.open("a:alphaModFix").a("amt", AlphaToPct(alpha)).sc();
+    out.end();  // a:blip
+  } else {
+    out.sc();
+  }
+}
+
+void PPTWriter::WriteDefaultStretch(XMLBuilder& out) {
+  out.open("a:stretch").gt();
+  out.open("a:fillRect").sc();
+  out.end();  // a:stretch
 }
 
 // ── Rasterized picture ──────────────────────────────────────────────────────
@@ -615,10 +637,8 @@ void PPTWriter::writePicture(XMLBuilder& out, const std::string& relId, int64_t 
   out.end();  // p:nvPicPr
 
   out.open("p:blipFill").gt();
-  out.open("a:blip").a("r:embed", relId).sc();
-  out.open("a:stretch").gt();
-  out.open("a:fillRect").sc();
-  out.end();  // a:stretch
+  WriteBlip(out, relId, 1.0f);
+  WriteDefaultStretch(out);
   out.end();  // p:blipFill
 
   out.open("p:spPr").gt();
@@ -656,24 +676,17 @@ bool PPTWriter::writeImagePatternAsPicture(XMLBuilder& out, const Fill* fill,
     return false;
   }
 
-  const auto& M = pattern->matrix;
-  float imageDocW = static_cast<float>(imgW) * M.a;
-  float imageDocH = static_cast<float>(imgH) * M.d;
-
-  float visL = std::max(shapeBounds.x, M.tx);
-  float visT = std::max(shapeBounds.y, M.ty);
-  float visR = std::min(shapeBounds.x + shapeBounds.width, M.tx + imageDocW);
-  float visB = std::min(shapeBounds.y + shapeBounds.height, M.ty + imageDocH);
-  if (visR <= visL || visB <= visT) {
+  ImagePatternRect ipr = {};
+  if (!ComputeImagePatternRect(pattern, imgW, imgH, shapeBounds, &ipr)) {
     return false;
   }
 
   // When the image covers the entire shape, a:blipFill inside p:spPr with
   // a:stretch works correctly.  Only switch to p:pic when the image is smaller
   // than the shape (i.e. a:fillRect would need non-zero insets).
-  bool imageFillsShape = (visL <= shapeBounds.x + 0.5f && visT <= shapeBounds.y + 0.5f &&
-                          visR >= shapeBounds.x + shapeBounds.width - 0.5f &&
-                          visB >= shapeBounds.y + shapeBounds.height - 0.5f);
+  bool imageFillsShape = (ipr.visL <= shapeBounds.x + 0.5f && ipr.visT <= shapeBounds.y + 0.5f &&
+                          ipr.visR >= shapeBounds.x + shapeBounds.width - 0.5f &&
+                          ipr.visB >= shapeBounds.y + shapeBounds.height - 0.5f);
   if (imageFillsShape) {
     return false;
   }
@@ -685,13 +698,9 @@ bool PPTWriter::writeImagePatternAsPicture(XMLBuilder& out, const Fill* fill,
 
   float effectiveAlpha = fill->alpha * alpha;
 
-  int srcL = static_cast<int>(std::round((visL - M.tx) / imageDocW * 100000.0f));
-  int srcT = static_cast<int>(std::round((visT - M.ty) / imageDocH * 100000.0f));
-  int srcR = static_cast<int>(std::round((M.tx + imageDocW - visR) / imageDocW * 100000.0f));
-  int srcB = static_cast<int>(std::round((M.ty + imageDocH - visB) / imageDocH * 100000.0f));
-  bool hasSrcRect = (srcL != 0 || srcT != 0 || srcR != 0 || srcB != 0);
+  bool hasSrcRect = (ipr.srcL != 0 || ipr.srcT != 0 || ipr.srcR != 0 || ipr.srcB != 0);
 
-  auto xf = decomposeXform(visL, visT, visR - visL, visB - visT, m);
+  auto xf = decomposeXform(ipr.visL, ipr.visT, ipr.visR - ipr.visL, ipr.visB - ipr.visT, m);
 
   int id = _ctx->nextShapeId();
   out.open("p:pic").gt();
@@ -705,20 +714,11 @@ bool PPTWriter::writeImagePatternAsPicture(XMLBuilder& out, const Fill* fill,
   out.end();  // p:nvPicPr
 
   out.open("p:blipFill").gt();
-  out.open("a:blip").a("r:embed", relId);
-  if (effectiveAlpha < 1.0f) {
-    out.gt();
-    out.open("a:alphaModFix").a("amt", AlphaToPct(effectiveAlpha)).sc();
-    out.end();  // a:blip
-  } else {
-    out.sc();
-  }
+  WriteBlip(out, relId, effectiveAlpha);
   if (hasSrcRect) {
-    out.open("a:srcRect").a("l", srcL).a("t", srcT).a("r", srcR).a("b", srcB).sc();
+    out.open("a:srcRect").a("l", ipr.srcL).a("t", ipr.srcT).a("r", ipr.srcR).a("b", ipr.srcB).sc();
   }
-  out.open("a:stretch").gt();
-  out.open("a:fillRect").sc();
-  out.end();  // a:stretch
+  WriteDefaultStretch(out);
   out.end();  // p:blipFill
 
   out.open("p:spPr").gt();
@@ -813,14 +813,7 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
         std::string relId = _ctx->addImage(pattern->image);
         if (!relId.empty()) {
           out.open("a:blipFill").gt();
-          out.open("a:blip").a("r:embed", relId);
-          if (alpha < 1.0f) {
-            out.gt();
-            out.open("a:alphaModFix").a("amt", AlphaToPct(alpha)).sc();
-            out.end();  // a:blip
-          } else {
-            out.sc();
-          }
+          WriteBlip(out, relId, alpha);
           int imgW = 0;
           int imgH = 0;
           bool hasDimensions = GetImageDimensions(pattern->image, &imgW, &imgH);
@@ -859,42 +852,28 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
           } else {
             bool hasTransform =
                 hasDimensions && !shapeBounds.isEmpty() && !pattern->matrix.isIdentity();
-            if (hasTransform) {
-              const auto& M = pattern->matrix;
-              float imageDocW = static_cast<float>(imgW) * M.a;
-              float imageDocH = static_cast<float>(imgH) * M.d;
-              float visL = std::max(shapeBounds.x, M.tx);
-              float visT = std::max(shapeBounds.y, M.ty);
-              float visR = std::min(shapeBounds.x + shapeBounds.width, M.tx + imageDocW);
-              float visB = std::min(shapeBounds.y + shapeBounds.height, M.ty + imageDocH);
-              if (visR > visL && visB > visT) {
-                int srcL = static_cast<int>(std::round((visL - M.tx) / imageDocW * 100000.0f));
-                int srcT = static_cast<int>(std::round((visT - M.ty) / imageDocH * 100000.0f));
-                int srcR =
-                    static_cast<int>(std::round((M.tx + imageDocW - visR) / imageDocW * 100000.0f));
-                int srcB =
-                    static_cast<int>(std::round((M.ty + imageDocH - visB) / imageDocH * 100000.0f));
-                out.open("a:srcRect").a("l", srcL).a("t", srcT).a("r", srcR).a("b", srcB).sc();
-                int fillL = static_cast<int>(
-                    std::round((visL - shapeBounds.x) / shapeBounds.width * 100000.0f));
-                int fillT = static_cast<int>(
-                    std::round((visT - shapeBounds.y) / shapeBounds.height * 100000.0f));
-                int fillR = static_cast<int>(std::round((shapeBounds.x + shapeBounds.width - visR) /
-                                                        shapeBounds.width * 100000.0f));
-                int fillB = static_cast<int>(std::round(
-                    (shapeBounds.y + shapeBounds.height - visB) / shapeBounds.height * 100000.0f));
-                out.open("a:stretch").gt();
-                out.open("a:fillRect").a("l", fillL).a("t", fillT).a("r", fillR).a("b", fillB).sc();
-                out.end();  // a:stretch
-              } else {
-                out.open("a:stretch").gt();
-                out.open("a:fillRect").sc();
-                out.end();  // a:stretch
-              }
-            } else {
+            ImagePatternRect ipr = {};
+            if (hasTransform && ComputeImagePatternRect(pattern, imgW, imgH, shapeBounds, &ipr)) {
+              out.open("a:srcRect")
+                  .a("l", ipr.srcL)
+                  .a("t", ipr.srcT)
+                  .a("r", ipr.srcR)
+                  .a("b", ipr.srcB)
+                  .sc();
+              int fillL = static_cast<int>(
+                  std::round((ipr.visL - shapeBounds.x) / shapeBounds.width * 100000.0f));
+              int fillT = static_cast<int>(
+                  std::round((ipr.visT - shapeBounds.y) / shapeBounds.height * 100000.0f));
+              int fillR = static_cast<int>(std::round(
+                  (shapeBounds.x + shapeBounds.width - ipr.visR) / shapeBounds.width * 100000.0f));
+              int fillB =
+                  static_cast<int>(std::round((shapeBounds.y + shapeBounds.height - ipr.visB) /
+                                              shapeBounds.height * 100000.0f));
               out.open("a:stretch").gt();
-              out.open("a:fillRect").sc();
+              out.open("a:fillRect").a("l", fillL).a("t", fillT).a("r", fillR).a("b", fillB).sc();
               out.end();  // a:stretch
+            } else {
+              WriteDefaultStretch(out);
             }
           }
           out.end();  // a:blipFill
@@ -979,6 +958,26 @@ void PPTWriter::writeStroke(XMLBuilder& out, const Stroke* stroke, float alpha) 
 
 // ── Effects (shadow) ───────────────────────────────────────────────────────
 
+void PPTWriter::writeShadowElement(XMLBuilder& out, const char* tag, float blurX, float blurY,
+                                   float offsetX, float offsetY, const Color& color,
+                                   bool includeAlign) {
+  float blur = (blurX + blurY) / 2.0f;
+  float dist = std::sqrt(offsetX * offsetX + offsetY * offsetY);
+  float dir = std::atan2(offsetY, offsetX) * 180.0f / 3.14159265358979323846f;
+  auto& builder = out.open(tag)
+                      .a("blurRad", PxToEMU(blur))
+                      .a("dist", PxToEMU(dist))
+                      .a("dir", AngleToPPT(dir + 90.0f));
+  if (includeAlign) {
+    builder.a("algn", "ctr").a("rotWithShape", "0");
+  }
+  builder.gt();
+  out.open("a:srgbClr").a("val", ColorToHex6(color)).gt();
+  out.open("a:alpha").a("val", AlphaToPct(color.alpha)).sc();
+  out.end();  // a:srgbClr
+  out.end();  // tag
+}
+
 void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& filters) {
   bool hasShadow = false;
   for (const auto* f : filters) {
@@ -996,34 +995,12 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
   for (const auto* f : filters) {
     if (f->nodeType() == NodeType::DropShadowFilter) {
       auto* s = static_cast<const DropShadowFilter*>(f);
-      float blur = (s->blurX + s->blurY) / 2.0f;
-      float dist = std::sqrt(s->offsetX * s->offsetX + s->offsetY * s->offsetY);
-      float dir = std::atan2(s->offsetY, s->offsetX) * 180.0f / 3.14159265358979323846f;
-      out.open("a:outerShdw")
-          .a("blurRad", PxToEMU(blur))
-          .a("dist", PxToEMU(dist))
-          .a("dir", AngleToPPT(dir + 90.0f))
-          .a("algn", "ctr")
-          .a("rotWithShape", "0")
-          .gt();
-      out.open("a:srgbClr").a("val", ColorToHex6(s->color)).gt();
-      out.open("a:alpha").a("val", AlphaToPct(s->color.alpha)).sc();
-      out.end();  // a:srgbClr
-      out.end();  // a:outerShdw
+      writeShadowElement(out, "a:outerShdw", s->blurX, s->blurY, s->offsetX, s->offsetY, s->color,
+                         true);
     } else if (f->nodeType() == NodeType::InnerShadowFilter) {
       auto* s = static_cast<const InnerShadowFilter*>(f);
-      float blur = (s->blurX + s->blurY) / 2.0f;
-      float dist = std::sqrt(s->offsetX * s->offsetX + s->offsetY * s->offsetY);
-      float dir = std::atan2(s->offsetY, s->offsetX) * 180.0f / 3.14159265358979323846f;
-      out.open("a:innerShdw")
-          .a("blurRad", PxToEMU(blur))
-          .a("dist", PxToEMU(dist))
-          .a("dir", AngleToPPT(dir + 90.0f))
-          .gt();
-      out.open("a:srgbClr").a("val", ColorToHex6(s->color)).gt();
-      out.open("a:alpha").a("val", AlphaToPct(s->color.alpha)).sc();
-      out.end();  // a:srgbClr
-      out.end();  // a:innerShdw
+      writeShadowElement(out, "a:innerShdw", s->blurX, s->blurY, s->offsetX, s->offsetY, s->color,
+                         false);
     }
   }
   out.end();  // a:effectLst
@@ -1229,14 +1206,7 @@ void PPTWriter::writeRectangle(XMLBuilder& out, const Rectangle* rect, const Fil
     out.end();
   }
 
-  if (imageWritten) {
-    out.open("a:noFill").sc();
-  } else {
-    writeFill(out, fs.fill, alpha, shapeBounds);
-  }
-  writeStroke(out, fs.stroke, alpha);
-  writeEffects(out, filters);
-  endShape(out);
+  writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters);
 }
 
 void PPTWriter::writeEllipse(XMLBuilder& out, const Ellipse* ellipse, const FillStrokeInfo& fs,
@@ -1260,14 +1230,7 @@ void PPTWriter::writeEllipse(XMLBuilder& out, const Ellipse* ellipse, const Fill
   out.open("a:avLst").sc();
   out.end();
 
-  if (imageWritten) {
-    out.open("a:noFill").sc();
-  } else {
-    writeFill(out, fs.fill, alpha, shapeBounds);
-  }
-  writeStroke(out, fs.stroke, alpha);
-  writeEffects(out, filters);
-  endShape(out);
+  writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters);
 }
 
 void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInfo& fs,
@@ -1299,14 +1262,7 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
   FillRule fillRule = (fs.fill) ? fs.fill->fillRule : FillRule::Winding;
   writeCustomGeom(out, path->data, adjustedX, adjustedY, adjustedW, adjustedH, fillRule);
 
-  if (imageWritten) {
-    out.open("a:noFill").sc();
-  } else {
-    writeFill(out, fs.fill, alpha, shapeBounds);
-  }
-  writeStroke(out, fs.stroke, alpha);
-  writeEffects(out, filters);
-  endShape(out);
+  writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters);
 }
 
 void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStrokeInfo& fs,

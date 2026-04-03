@@ -32,7 +32,8 @@
 
 namespace tgfx {
 class Data;
-}
+class Layer;
+}  // namespace tgfx
 
 namespace pagx {
 
@@ -84,5 +85,17 @@ std::shared_ptr<tgfx::Data> GetImageData(const Image* image);
 bool HasNonASCII(const std::string& str);
 
 std::string UTF8ToUTF16BEHex(const std::string& utf8);
+
+/**
+ * Rasterizes a tgfx layer (including any masks) to a PNG-encoded Data object.
+ * Returns nullptr if the layer has zero bounds or rasterization fails.
+ */
+std::shared_ptr<tgfx::Data> RenderMaskedLayer(const std::shared_ptr<tgfx::Layer>& root,
+                                              const std::shared_ptr<tgfx::Layer>& targetLayer);
+
+/**
+ * Strips surrounding double-quote characters from a string.
+ */
+std::string StripQuotes(const std::string& s);
 
 }  // namespace pagx

@@ -28,7 +28,12 @@
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/utils/Base64.h"
+#include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/Pixmap.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
+#include "tgfx/layers/DisplayList.h"
 
 namespace pagx {
 
@@ -403,6 +408,53 @@ std::string UTF8ToUTF16BEHex(const std::string& utf8) {
     hex += buf;
   }
   return hex;
+}
+
+std::shared_ptr<tgfx::Data> RenderMaskedLayer(const std::shared_ptr<tgfx::Layer>& root,
+                                              const std::shared_ptr<tgfx::Layer>& targetLayer) {
+  auto globalBounds = targetLayer->getBounds(root.get(), true);
+  int width = static_cast<int>(ceilf(globalBounds.width()));
+  int height = static_cast<int>(ceilf(globalBounds.height()));
+  if (width <= 0 || height <= 0) {
+    return nullptr;
+  }
+  auto device = tgfx::GLDevice::Make();
+  if (device == nullptr) {
+    return nullptr;
+  }
+  auto context = device->lockContext();
+  if (context == nullptr) {
+    return nullptr;
+  }
+  auto surface = tgfx::Surface::Make(context, width, height);
+  if (surface == nullptr) {
+    device->unlock();
+    return nullptr;
+  }
+  auto canvas = surface->getCanvas();
+  canvas->translate(-globalBounds.left, -globalBounds.top);
+  canvas->concat(targetLayer->getRelativeMatrix(root.get()));
+  targetLayer->draw(canvas);
+
+  tgfx::Bitmap bitmap(width, height, false, false);
+  if (bitmap.isEmpty()) {
+    device->unlock();
+    return nullptr;
+  }
+  tgfx::Pixmap pixmap(bitmap);
+  bool readSuccess = surface->readPixels(pixmap.info(), pixmap.writablePixels());
+  device->unlock();
+  if (!readSuccess) {
+    return nullptr;
+  }
+  return tgfx::ImageCodec::Encode(pixmap, tgfx::EncodedFormat::PNG, 100);
+}
+
+std::string StripQuotes(const std::string& s) {
+  if (s.size() >= 2 && s.front() == '"' && s.back() == '"') {
+    return s.substr(1, s.size() - 2);
+  }
+  return s;
 }
 
 }  // namespace pagx
