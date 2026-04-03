@@ -137,21 +137,20 @@ pagx format --indent 4 input.pagx       # 4-space indent (default: 2)
 
 ## pagx layout
 
-Display the layout structure of a PAGX file. By default outputs the full layout tree with
-resolved bounds for all Layers and their internal elements (Rectangle, Ellipse, Path, Polystar,
-Text, TextPath, Group, TextBox). With `--check`, detects layout problems and returns non-zero
-exit code when issues are found.
+Display the layout structure of a PAGX file in XML format. By default outputs the full
+layout tree with resolved bounds and layout attributes for all Layers and their internal
+elements (Rectangle, Ellipse, Path, Polystar, Text, TextPath, Group, TextBox). With
+`--check`, detects layout problems and returns non-zero exit code when issues are found.
 
-Bounds coordinates are relative to the document origin by default. When `--id` or `--xpath` is
-used, bounds are relative to the target Layer's origin (the target Layer itself starts at 0,0).
+Output is wrapped in a `<layout>` root element. Without `--id`/`--xpath`, a `<pagx>` element
+with document dimensions contains the layer tree. With `--id`/`--xpath`, target Layers appear
+directly inside `<layout>` with bounds relative to their own origin (starting at 0,0).
 
 ```bash
 pagx layout input.pagx                                      # full layout tree
-pagx layout --json input.pagx                                # JSON format
 pagx layout --id "card" input.pagx                           # scope to a Layer by id
 pagx layout --xpath "//Layer[@id='header']" input.pagx       # scope to Layers by XPath
 pagx layout --check input.pagx                               # detect problems
-pagx layout --check --json input.pagx                        # problems in JSON
 ```
 
 | Option | Description |
@@ -159,69 +158,66 @@ pagx layout --check --json input.pagx                        # problems in JSON
 | `--id <id>` | Limit scope to the Layer with the specified `id` attribute |
 | `--xpath <expr>` | Limit scope to Layers matched by XPath expression |
 | `--check` | Detect layout problems; only output nodes with problems; return non-zero exit code if issues found |
-| `--json` | Output in JSON format |
 
 `--id` and `--xpath` are mutually exclusive.
 
 ### Default mode (no --check)
 
-Outputs the complete layout tree showing every Layer and element with their resolved bounds.
-No problem detection is performed. Always returns exit code 0.
+Outputs the complete layout tree showing every Layer and element with their resolved bounds
+and layout attributes (only non-default values). No problem detection is performed. Always
+returns exit code 0.
 
+```xml
+<layout>
+<pagx width="400" height="300">
+    <Layer id="container" bounds="0,0,400,300" layout="horizontal" gap="20" padding="20">
+      <Rectangle bounds="0,0,400,300"/>
+      <Layer id="sidebar" bounds="20,20,120,260"/>
+      <Layer id="content" bounds="160,20,220,260" flex="1"/>
+    </Layer>
+</pagx>
+</layout>
 ```
-Layer#container
-  bounds: x=0 y=0 w=400 h=300
-  layoutMode: HORIZONTAL
-  Rectangle[0]
-    bounds: x=0 y=0 w=400 h=300
-  Layer#sidebar
-    bounds: x=20 y=20 w=120 h=260
-  Layer#content
-    bounds: x=160 y=20 w=220 h=260
-```
+
+Layer attributes output when non-default: `layout`, `gap`, `flex`, `padding`, `alignment`,
+`arrangement`, `includeInLayout="false"`, `clipToBounds="true"`.
 
 ### Check mode (--check)
 
 Detects four categories of layout problems:
 
-1. **Overlapping siblings** — sibling elements whose bounds intersect
+1. **Overlapping siblings** — sibling Layers whose bounds intersect inside an auto-layout parent
 2. **Clipped content** — elements outside parent bounds when `clipToBounds` is set
-3. **Excluded from layout flow** — elements with `includeInLayout="false"` inside an auto-layout parent
-4. **Zero-size** — elements with zero width or height (invisible)
+3. **Zero-size** — elements with zero width or height (invisible)
 
-Only nodes with problems (and their ancestor chain) are output. Returns exit code 1 if any
-problems are found, 0 otherwise.
+Only nodes with problems (and their ancestor chain) are output. Problems appear as
+`<Problem>` child elements before other children. Returns exit code 1 if any problems are
+found, 0 otherwise.
 
-```
-Layer#container
-  bounds: x=0 y=0 w=400 h=300
-  Layer#box1
-    bounds: x=50 y=50 w=200 h=150
-    problems:
-      - overlaps with Layer#box2
-  Layer#box2
-    bounds: x=150 y=100 w=200 h=150
-    problems:
-      - overlaps with Layer#box1
-```
-
-### JSON output
-
-Both default and check modes support `--json`. The output is a JSON array of node objects:
-
-```json
-[{"label":"Layer#card","bounds":{"x":0,"y":0,"width":300,"height":200},"layoutMode":"VERTICAL","children":[...]}]
+```xml
+<layout>
+<pagx width="400" height="300">
+    <Layer id="container" bounds="0,0,400,300" layout="horizontal">
+      <Layer id="box1" bounds="50,50,200,150">
+        <Problem>overlaps with Layer#box2</Problem>
+      </Layer>
+      <Layer id="box2" bounds="150,100,200,150">
+        <Problem>overlaps with Layer#box1</Problem>
+      </Layer>
+    </Layer>
+</pagx>
+</layout>
 ```
 
-Each node contains: `label` (node identifier), `bounds` (`x`, `y`, `width`, `height`), and
-optionally `clipToBounds`, `layoutMode`, `layoutPositioning`, `problems` (check mode only),
-and `children`.
+When no problems are found:
 
-### Node labels
-
-Labels identify nodes in the output and problem messages:
-- **Layer**: `Layer#id` (when id is set) or `Layer[index]` (positional)
-- **Elements**: `Rectangle#id`, `Ellipse[0]`, `TextBox#title`, `Path[2]`, etc.
+```xml
+<layout>
+<pagx width="400" height="300">
+    <!-- No layout problems detected. -->
+</pagx>
+</layout>
+```
 
 ---
 

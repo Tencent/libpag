@@ -87,10 +87,11 @@ For each Layer that contains child Layers, decide:
 4. **Recurse** — repeat for each child Layer that contains sub-Layers.
 
 5. **Name structural Layers** — assign `id` to every Layer that represents a meaningful
-   section (header, content, sidebar, card row, tab bar, etc.). This enables `--id`-scoped
-   verification (`pagx layout --id "header"`, `pagx render --id "cardRow"`) and produces
-   readable layout output (`Layer#header` instead of `Layer[0]`). Skip `id` on anonymous
-   wrappers that exist only for flex distribution.
+   section (header, content, sidebar, card row, tab bar, etc.). Each `id` must be unique
+   within the entire file. This enables `--id`-scoped verification (`pagx layout --id
+   "header"`, `pagx render --id "cardRow"`) and produces readable layout output
+   (`Layer#header` instead of `Layer[0]`). Skip `id` on anonymous wrappers that exist only
+   for flex distribution.
 
 ```xml
 <!-- Example: top-level Layer as vertical flex container -->
@@ -299,13 +300,12 @@ screenshot matches the design intent:
 pagx layout --check input.pagx
 ```
 
-This detects four categories of problems:
-- **Overlapping siblings** — sibling elements whose bounds intersect
+This detects three categories of problems:
+- **Overlapping siblings** — sibling Layers whose bounds intersect inside an auto-layout parent
 - **Clipped content** — elements outside parent bounds when `clipToBounds` is set
 - **Zero-size** — elements with zero width or height (invisible)
-- **Excluded from layout flow** — `includeInLayout="false"` inside an auto-layout parent
 
-Exit code 1 = problems found (output shows each problem with node labels and bounds).
+Exit code 1 = problems found (output shows `<Problem>` nodes with descriptions).
 Exit code 0 = no problems.
 
 To check a specific section during incremental build, scope with `--id` or `--xpath`:
@@ -325,7 +325,6 @@ Use the structured problem output to identify and fix the root cause:
 | **Zero-size Layer** | Content-measured Layer with no content yet; `flex` child in a container that has no main-axis size | Add content, or set explicit `width`/`height`, or ensure parent has a main-axis size for flex to distribute |
 | **Zero-size element** | Rectangle/Ellipse with `size="0,0"`; opposite-pair constraints (`left`+`right`) in a zero-width container | Set explicit `size`; fix parent container dimensions |
 | **Clipped content** | Child positioned outside parent bounds with `clipToBounds="true"` | Adjust child constraints; enlarge parent; or remove `clipToBounds` if clipping is unintended |
-| **Excluded from layout** | `includeInLayout="false"` without constraint attributes (element becomes invisible/misplaced) | Add constraint positioning (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`), or remove `includeInLayout="false"` if the element should participate in layout flow |
 
 #### 3. Inspect layout tree
 
