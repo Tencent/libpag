@@ -191,20 +191,22 @@ Layer attributes output when non-default: `layout`, `gap`, `flex`, `padding`, `a
 
 ### Check mode (--check)
 
-Detects four categories of layout problems:
+Detects three categories of layout problems:
 
 1. **Overlapping siblings** — sibling Layers whose bounds intersect inside an auto-layout parent
 2. **Clipped content** — elements outside parent bounds when `clipToBounds` is set
 3. **Zero-size** — elements with zero width or height (invisible)
 
-Only nodes with problems (and their ancestor chain) are output. Problems appear as
-`<Problem>` child elements before other children. Returns exit code 1 if any problems are
-found, 0 otherwise.
+Only nodes with problems (and their ancestor chain) are output. Clean sibling nodes before
+a problematic node are replaced with empty `<Layer/>` placeholders to preserve index counting.
+Problems appear as `<Problem>` child elements before other children. Returns exit code 1 if
+any problems are found, 0 otherwise.
 
 ```xml
 <layout>
   <pagx width="400" height="300">
     <Layer id="container" bounds="0,0,400,300" layout="horizontal">
+      <Layer/>
       <Layer id="box1" bounds="50,50,200,150">
         <Problem>overlaps with Layer#box2</Problem>
       </Layer>
