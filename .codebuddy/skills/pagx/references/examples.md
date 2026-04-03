@@ -11,7 +11,7 @@ as defaults.
 
 ## Icons
 
-Icon patterns using the "Think in SVG, write in PAGX" approach. See `design-patterns.md`
+Icon patterns using the "Think in SVG, write in PAGX" approach. See `generate-guide.md`
 §Icon Generation for the methodology.
 
 ### Stroke Icon (Outline / Inactive)
@@ -311,7 +311,7 @@ A card with vertical container layout, text header, and action buttons.
   arrangement="center"` to center its text Group. `flex="1"` on both buttons distributes
   width equally.
 
-For flexible height layouts, see `design-patterns.md` §Fixed + flex mix.
+For flexible height layouts, see `generate-guide.md` §Layout: Think in Flexbox.
 
 ### Input Field (InnerShadowStyle)
 

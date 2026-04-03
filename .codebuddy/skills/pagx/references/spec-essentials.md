@@ -661,7 +661,7 @@ If you need both shape modifiers and text effects on the same text, use separate
 ### Rich Text Pattern
 
 Multiple Text elements in one TextBox, each with independent Fill/Stroke.
-See `design-patterns.md` §Container Layout for examples and usage guidance.
+See `generate-guide.md` §Internal Content Positioning for examples and usage guidance.
 
 ---
 

@@ -2,37 +2,30 @@
 name: pagx
 description: >-
   PAGX (.pagx) file handler. MUST invoke for ANY task involving PAGX format or
-  ".pagx" files — including create, edit, optimize, review, debug, or query syntax.
+  ".pagx" files — including create, edit, review, debug, or query syntax.
   Also invoke when user runs pagx CLI commands (render, lint, format, layout,
   bounds, font info/embed, import/export) or asks about PAGX elements, attributes, or layout.
 ---
 
 # PAGX Skill
 
-Choose the guide that matches the current task. Each guide lists its own references
-at the top — read those as directed by the guide.
+## Generate or Edit — `references/generate-guide.md`
 
-## Guides
+**When**: User asks to create, write, design, or modify a PAGX file.
 
-### Generate — `references/generate-guide.md`
-
-**When**: User asks to create, write, or design a new PAGX file from a text description,
-reference image, or design spec.
-
-**What it provides**: A step-by-step process covering design analysis, structure decisions,
-incremental construction, text layout, coordinate handling, common pitfalls, and a
-screenshot-based verification loop. Scene-specific examples are indexed inside.
+**What it provides**: Complete step-by-step methodology — design analysis, CSS/SVG→PAGX
+mapping, structure decisions (Layer vs Group, Flexbox layout, constraint positioning),
+incremental build strategy, painter/modifier scope patterns, text layout, and a
+layout-check-based verification loop.
 
 ## Reference Lookup
 
 **When**: User asks about PAGX syntax, attributes, node behavior, or CLI usage — not a
-generation task.
-
-**Where to look**:
+generation or editing task.
 
 | Reference | Content |
 |-----------|--------|
 | `references/spec-essentials.md` | Node types, Layer rendering pipeline, auto layout (container layout + constraint positioning), painter scope, text system, masking, resources |
-| `references/design-patterns.md` | Structure decisions (Layer vs Group), layout patterns (container layout, constraint positioning, Layer constraints), text layout, practical pitfall patterns |
 | `references/attributes.md` | Attribute defaults, enumerations, required attributes |
+| `references/examples.md` | Structural code patterns for Icons, UI components, Charts, Decorative effects |
 | `references/cli.md` | CLI commands — `render`, `lint`, `format`, `layout`, `bounds`, `font info`, `font embed`, `import`, `export` |
