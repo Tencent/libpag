@@ -1996,6 +1996,28 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ElementsXml) {
   EXPECT_EQ(ret, 0);
 }
 
+CLI_TEST(PAGXCliTest, LayoutCheck_Placeholder) {
+  auto path = TestResourcePath("layout_check_placeholder.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  // The third child Layer (id="bad") has zero width. The two clean siblings before it
+  // should appear as placeholder nodes to preserve index counting.
+  auto pos1 = output.find("<Layer/>");
+  EXPECT_TRUE(pos1 != std::string::npos);
+  auto pos2 = output.find("<Layer/>", pos1 + 1);
+  EXPECT_TRUE(pos2 != std::string::npos);
+  // The problematic node should be present with its id and Problem.
+  EXPECT_TRUE(output.find("id=\"bad\"") != std::string::npos);
+  EXPECT_TRUE(output.find("<Problem>") != std::string::npos);
+  // The clean sibling after the problematic node (id="ok3") should not appear.
+  EXPECT_TRUE(output.find("id=\"ok3\"") == std::string::npos);
+}
+
 // Background Rectangle on a layout Layer should not trigger overlap warnings with child Layers.
 CLI_TEST(PAGXCliTest, LayoutCheck_BackgroundNoOverlap) {
   auto path = TestResourcePath("layout_check_background.pagx");

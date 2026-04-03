@@ -60,6 +60,7 @@ struct CheckNode {
   int index = -1;
   LCRect bounds;
   LayoutAttrs attrs;
+  bool placeholder = false;
   std::vector<std::string> problems;
   std::vector<std::shared_ptr<CheckNode>> children;
 };
@@ -284,21 +285,46 @@ static int CountProblems(const std::vector<std::shared_ptr<CheckNode>>& nodes) {
   return count;
 }
 
+static bool HasProblems(const CheckNode& node) {
+  if (!node.problems.empty()) {
+    return true;
+  }
+  for (const auto& child : node.children) {
+    if (HasProblems(*child)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 static std::vector<std::shared_ptr<CheckNode>> FilterProblematicNodes(
     const std::vector<std::shared_ptr<CheckNode>>& nodes) {
-  std::vector<std::shared_ptr<CheckNode>> result;
-  for (const auto& node : nodes) {
-    auto filtered = std::make_shared<CheckNode>(*node);
-    if (!filtered->children.empty()) {
-      filtered->children = FilterProblematicNodes(filtered->children);
+  // Find the last node that has problems (directly or in descendants).
+  int lastIdx = -1;
+  for (int i = static_cast<int>(nodes.size()) - 1; i >= 0; --i) {
+    if (HasProblems(*nodes[i])) {
+      lastIdx = i;
+      break;
     }
-    bool hasProblems = !filtered->problems.empty();
-    bool hasProblematicChildren = !filtered->children.empty();
-    if (hasProblems || hasProblematicChildren) {
-      if (!hasProblematicChildren) {
+  }
+  if (lastIdx < 0) {
+    return {};
+  }
+  // Output nodes up to lastIdx: problematic nodes keep details, clean nodes become placeholders.
+  std::vector<std::shared_ptr<CheckNode>> result;
+  for (int i = 0; i <= lastIdx; ++i) {
+    if (HasProblems(*nodes[i])) {
+      auto filtered = std::make_shared<CheckNode>(*nodes[i]);
+      filtered->children = FilterProblematicNodes(filtered->children);
+      if (filtered->children.empty()) {
         filtered->children.clear();
       }
       result.push_back(filtered);
+    } else {
+      auto placeholder = std::make_shared<CheckNode>();
+      placeholder->tagName = nodes[i]->tagName;
+      placeholder->placeholder = true;
+      result.push_back(placeholder);
     }
   }
   return result;
@@ -337,6 +363,10 @@ static std::string FormatInt(float v) {
 
 static void PrintNodeXml(std::ostream& os, const CheckNode& node, int indent) {
   std::string pad(indent * 2, ' ');
+  if (node.placeholder) {
+    os << pad << "<" << node.tagName << "/>\n";
+    return;
+  }
   os << pad << "<" << node.tagName;
 
   // id attribute
