@@ -507,6 +507,11 @@ class PPTWriter {
   void writePicture(XMLBuilder& out, const std::string& relId, int64_t offX, int64_t offY,
                     int64_t extCX, int64_t extCY);
 
+  // Write non-tiling ImagePattern fill as a separate p:pic element.
+  // Returns true if the image was written; caller should use a:noFill for the shape.
+  bool writeImagePatternAsPicture(XMLBuilder& out, const Fill* fill, const Rect& shapeBounds,
+                                  const Matrix& m, float alpha);
+
   // Fill / stroke / effects
   void writeFill(XMLBuilder& out, const Fill* fill, float alpha, const Rect& shapeBounds = {});
   void writeColorSource(XMLBuilder& out, const ColorSource* source, float alpha,
@@ -627,6 +632,111 @@ void PPTWriter::writePicture(XMLBuilder& out, const std::string& relId, int64_t 
   out.end();  // p:spPr
 
   out.end();  // p:pic
+}
+
+// ── ImagePattern as p:pic element ──────────────────────────────────────────
+
+bool PPTWriter::writeImagePatternAsPicture(XMLBuilder& out, const Fill* fill,
+                                           const Rect& shapeBounds, const Matrix& m, float alpha) {
+  if (!fill || !fill->color || fill->color->nodeType() != NodeType::ImagePattern) {
+    return false;
+  }
+  auto* pattern = static_cast<const ImagePattern*>(fill->color);
+  if (!pattern->image) {
+    return false;
+  }
+  if (pattern->tileModeX == TileMode::Repeat || pattern->tileModeX == TileMode::Mirror ||
+      pattern->tileModeY == TileMode::Repeat || pattern->tileModeY == TileMode::Mirror) {
+    return false;
+  }
+
+  int imgW = 0;
+  int imgH = 0;
+  if (!GetImageDimensions(pattern->image, &imgW, &imgH) || shapeBounds.isEmpty()) {
+    return false;
+  }
+
+  const auto& M = pattern->matrix;
+  float imageDocW = static_cast<float>(imgW) * M.a;
+  float imageDocH = static_cast<float>(imgH) * M.d;
+
+  float visL = std::max(shapeBounds.x, M.tx);
+  float visT = std::max(shapeBounds.y, M.ty);
+  float visR = std::min(shapeBounds.x + shapeBounds.width, M.tx + imageDocW);
+  float visB = std::min(shapeBounds.y + shapeBounds.height, M.ty + imageDocH);
+  if (visR <= visL || visB <= visT) {
+    return false;
+  }
+
+  // When the image covers the entire shape, a:blipFill inside p:spPr with
+  // a:stretch works correctly.  Only switch to p:pic when the image is smaller
+  // than the shape (i.e. a:fillRect would need non-zero insets).
+  bool imageFillsShape = (visL <= shapeBounds.x + 0.5f && visT <= shapeBounds.y + 0.5f &&
+                          visR >= shapeBounds.x + shapeBounds.width - 0.5f &&
+                          visB >= shapeBounds.y + shapeBounds.height - 0.5f);
+  if (imageFillsShape) {
+    return false;
+  }
+
+  std::string relId = _ctx->addImage(pattern->image);
+  if (relId.empty()) {
+    return false;
+  }
+
+  float effectiveAlpha = fill->alpha * alpha;
+
+  int srcL = static_cast<int>(std::round((visL - M.tx) / imageDocW * 100000.0f));
+  int srcT = static_cast<int>(std::round((visT - M.ty) / imageDocH * 100000.0f));
+  int srcR = static_cast<int>(std::round((M.tx + imageDocW - visR) / imageDocW * 100000.0f));
+  int srcB = static_cast<int>(std::round((M.ty + imageDocH - visB) / imageDocH * 100000.0f));
+  bool hasSrcRect = (srcL != 0 || srcT != 0 || srcR != 0 || srcB != 0);
+
+  auto xf = decomposeXform(visL, visT, visR - visL, visB - visT, m);
+
+  int id = _ctx->nextShapeId();
+  out.open("p:pic").gt();
+
+  out.open("p:nvPicPr").gt();
+  out.open("p:cNvPr").a("id", id).a("name", "Image").sc();
+  out.open("p:cNvPicPr").gt();
+  out.open("a:picLocks").a("noChangeAspect", "1").sc();
+  out.end();  // p:cNvPicPr
+  out.open("p:nvPr").sc();
+  out.end();  // p:nvPicPr
+
+  out.open("p:blipFill").gt();
+  out.open("a:blip").a("r:embed", relId);
+  if (effectiveAlpha < 1.0f) {
+    out.gt();
+    out.open("a:alphaModFix").a("amt", AlphaToPct(effectiveAlpha)).sc();
+    out.end();  // a:blip
+  } else {
+    out.sc();
+  }
+  if (hasSrcRect) {
+    out.open("a:srcRect").a("l", srcL).a("t", srcT).a("r", srcR).a("b", srcB).sc();
+  }
+  out.open("a:stretch").gt();
+  out.open("a:fillRect").sc();
+  out.end();  // a:stretch
+  out.end();  // p:blipFill
+
+  out.open("p:spPr").gt();
+  if (xf.rotation != 0) {
+    out.open("a:xfrm").a("rot", xf.rotation).gt();
+  } else {
+    out.open("a:xfrm").gt();
+  }
+  out.open("a:off").a("x", xf.offX).a("y", xf.offY).sc();
+  out.open("a:ext").a("cx", xf.extCX).a("cy", xf.extCY).sc();
+  out.end();  // a:xfrm
+  out.open("a:prstGeom").a("prst", "rect").gt();
+  out.open("a:avLst").sc();
+  out.end();  // a:prstGeom
+  out.end();  // p:spPr
+
+  out.end();  // p:pic
+  return true;
 }
 
 // ── Color source / gradient ────────────────────────────────────────────────
@@ -1088,6 +1198,13 @@ void PPTWriter::writeRectangle(XMLBuilder& out, const Rectangle* rect, const Fil
                                const std::vector<LayerFilter*>& filters) {
   float x = rect->position.x - rect->size.width / 2.0f;
   float y = rect->position.y - rect->size.height / 2.0f;
+  Rect shapeBounds = Rect::MakeXYWH(x, y, rect->size.width, rect->size.height);
+
+  bool imageWritten = writeImagePatternAsPicture(out, fs.fill, shapeBounds, m, alpha);
+  if (imageWritten && !fs.stroke && filters.empty()) {
+    return;
+  }
+
   auto xf = decomposeXform(x, y, rect->size.width, rect->size.height, m);
   beginShape(out, "Rectangle", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
 
@@ -1107,7 +1224,11 @@ void PPTWriter::writeRectangle(XMLBuilder& out, const Rectangle* rect, const Fil
     out.end();
   }
 
-  writeFill(out, fs.fill, alpha, Rect::MakeXYWH(x, y, rect->size.width, rect->size.height));
+  if (imageWritten) {
+    out.open("a:noFill").sc();
+  } else {
+    writeFill(out, fs.fill, alpha, shapeBounds);
+  }
   writeStroke(out, fs.stroke, alpha);
   writeEffects(out, filters);
   endShape(out);
@@ -1120,6 +1241,13 @@ void PPTWriter::writeEllipse(XMLBuilder& out, const Ellipse* ellipse, const Fill
   float ry = ellipse->size.height / 2.0f;
   float x = ellipse->position.x - rx;
   float y = ellipse->position.y - ry;
+  Rect shapeBounds = Rect::MakeXYWH(x, y, ellipse->size.width, ellipse->size.height);
+
+  bool imageWritten = writeImagePatternAsPicture(out, fs.fill, shapeBounds, m, alpha);
+  if (imageWritten && !fs.stroke && filters.empty()) {
+    return;
+  }
+
   auto xf = decomposeXform(x, y, ellipse->size.width, ellipse->size.height, m);
   beginShape(out, "Ellipse", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
 
@@ -1127,7 +1255,11 @@ void PPTWriter::writeEllipse(XMLBuilder& out, const Ellipse* ellipse, const Fill
   out.open("a:avLst").sc();
   out.end();
 
-  writeFill(out, fs.fill, alpha, Rect::MakeXYWH(x, y, ellipse->size.width, ellipse->size.height));
+  if (imageWritten) {
+    out.open("a:noFill").sc();
+  } else {
+    writeFill(out, fs.fill, alpha, shapeBounds);
+  }
   writeStroke(out, fs.stroke, alpha);
   writeEffects(out, filters);
   endShape(out);
@@ -1149,6 +1281,12 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
   float adjustedH = std::max(bounds.height, minDim);
   float adjustedX = bounds.x - (adjustedW - bounds.width) / 2.0f;
   float adjustedY = bounds.y - (adjustedH - bounds.height) / 2.0f;
+  Rect shapeBounds = Rect::MakeXYWH(adjustedX, adjustedY, adjustedW, adjustedH);
+
+  bool imageWritten = writeImagePatternAsPicture(out, fs.fill, shapeBounds, m, alpha);
+  if (imageWritten && !fs.stroke && filters.empty()) {
+    return;
+  }
 
   auto xf = decomposeXform(adjustedX, adjustedY, adjustedW, adjustedH, m);
   beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
@@ -1156,7 +1294,11 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
   FillRule fillRule = (fs.fill) ? fs.fill->fillRule : FillRule::Winding;
   writeCustomGeom(out, path->data, adjustedX, adjustedY, adjustedW, adjustedH, fillRule);
 
-  writeFill(out, fs.fill, alpha, Rect::MakeXYWH(adjustedX, adjustedY, adjustedW, adjustedH));
+  if (imageWritten) {
+    out.open("a:noFill").sc();
+  } else {
+    writeFill(out, fs.fill, alpha, shapeBounds);
+  }
   writeStroke(out, fs.stroke, alpha);
   writeEffects(out, filters);
   endShape(out);
