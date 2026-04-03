@@ -438,6 +438,33 @@ static void DetectNegativeConstraintSize(const LayoutNode* layoutNode, CheckNode
   }
 }
 
+static void DetectIneffectiveCentering(const std::vector<Element*>& elements,
+                                       const std::vector<std::shared_ptr<CheckNode>>& childNodes) {
+  for (size_t i = 0; i < elements.size() && i < childNodes.size(); ++i) {
+    auto* layoutNode = LayoutNode::AsLayoutNode(elements[i]);
+    if (layoutNode == nullptr) {
+      continue;
+    }
+    bool hasCenterX = !std::isnan(layoutNode->centerX);
+    bool hasCenterY = !std::isnan(layoutNode->centerY);
+    if (!hasCenterX && !hasCenterY) {
+      continue;
+    }
+    auto type = elements[i]->nodeType();
+    if (type == NodeType::Group || type == NodeType::TextBox) {
+      continue;
+    }
+    if (hasCenterX) {
+      childNodes[i]->problems.push_back(
+          "centerX ineffective: parent is content-measured, centering relative to own size");
+    }
+    if (hasCenterY) {
+      childNodes[i]->problems.push_back(
+          "centerY ineffective: parent is content-measured, centering relative to own size");
+    }
+  }
+}
+
 // ============================================================================
 // Element Tree Building
 // ============================================================================
@@ -491,6 +518,7 @@ static void BuildElementNodes(const std::vector<Element*>& elements,
         // Check content origin offset for content-measured Group/TextBox containers.
         if (check && std::isnan(group->width) && std::isnan(group->height)) {
           DetectContentOriginOffset(group->elements, node.get());
+          DetectIneffectiveCentering(group->elements, node->children);
         }
       }
     }
@@ -553,6 +581,7 @@ static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float pare
                           parentLayer->layout != LayoutMode::None && layer->includeInLayout;
       if (!sizeFromConstraints && !sizeFromFlex) {
         DetectContentOriginOffset(layer->contents, node.get());
+        DetectIneffectiveCentering(layer->contents, elementNodes);
       }
     }
   }

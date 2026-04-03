@@ -354,6 +354,13 @@ of on the Group itself. Inner element constraints position the element within th
 bounds, not within the parent Layer — the element centers inside the Group, but the Group
 itself stays at (0,0).
 
+Another common mistake: centering VectorElements inside a **content-measured** Group or
+Layer (no explicit `width`/`height`). The centering is ineffective because the container
+sizes itself from the child — the child centers relative to its own size, which is a no-op.
+Move the centering constraint to the Group or Layer instead. The same applies to bare Layers
+without explicit size. `pagx layout --problems-only` detects this as
+`centerX/centerY ineffective`.
+
 ```xml
 <!-- ✅ Correct: Group isolates scope AND positions content at center -->
 <Layer width="200" height="200">
@@ -381,6 +388,26 @@ itself stays at (0,0).
   <Fill color="#F00"/>
   <Ellipse left="35" top="35" size="30,30"/>
   <Stroke color="#000" width="1"/>  <!-- applies to BOTH Rectangle and Ellipse -->
+</Layer>
+
+<!-- ❌ Anti-pattern: centerX/centerY on child in content-measured Group -->
+<Layer width="200" height="200">
+  <Rectangle left="0" right="0" top="0" bottom="0"/>
+  <Fill color="#F00"/>
+  <Group>  <!-- no width/height — content-measured from children -->
+    <Ellipse centerX="0" centerY="0" size="30,30"/>  <!-- centering is a no-op -->
+    <Fill color="#0F0"/>
+  </Group>
+</Layer>
+
+<!-- ✅ Fix: move centering to Group -->
+<Layer width="200" height="200">
+  <Rectangle left="0" right="0" top="0" bottom="0"/>
+  <Fill color="#F00"/>
+  <Group centerX="0" centerY="0">
+    <Ellipse size="30,30"/>
+    <Fill color="#0F0"/>
+  </Group>
 </Layer>
 ```
 
@@ -506,6 +533,7 @@ list). Key categories for generation:
 - **Container overflow** — fixed-size children + gap exceed parent's main-axis available space
 - **Negative constraint-derived size** — `left`+`right` or `top`+`bottom` exceeds parent dimension
 - **Element constraint conflict** — `centerX` overrides `left`/`right` on VectorElements (same as Layer rules)
+- **Ineffective centering** — `centerX`/`centerY` on VectorElement inside a content-measured Group or Layer (no explicit size); centering relative to own size is a no-op
 
 Exit code 1 = problems found. Exit code 0 = no problems. Scope with `--id` or `--xpath`
 during incremental build:
@@ -527,6 +555,7 @@ pagx layout --problems-only --id "header" input.pagx
 | **Container overflow** | Fixed children + gap exceed parent main-axis size | Reduce child sizes, add `flex` children, increase parent size, or reduce `gap` |
 | **Negative constraint-derived size** | `left`+`right` or `top`+`bottom` > parent dimension | Reduce constraint values so their sum is ≤ parent size |
 | **Element constraint conflict** | `centerX` set alongside `left`/`right` on VectorElement | Remove the lower-priority constraint (`centerX` wins over `left`/`right`) |
+| **Ineffective centering** | `centerX`/`centerY` on child inside content-measured Group/Layer | Move `centerX`/`centerY` to the Group or Layer itself |
 
 #### 3. Inspect layout tree and render
 
