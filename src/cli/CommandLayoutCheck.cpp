@@ -48,7 +48,7 @@ struct CheckNode {
   LCRect bounds;
   bool clipToBounds = false;
   std::string layoutMode;
-  std::string layoutPositioning;
+  bool excludedFromLayout = false;
   std::vector<std::string> problems;
   std::vector<std::shared_ptr<CheckNode>> children;
 };
@@ -138,11 +138,11 @@ static void DetectOverlap(const std::vector<std::shared_ptr<CheckNode>>& layoutC
     return;
   }
   for (size_t i = 0; i < layoutChildren.size(); ++i) {
-    if (layoutChildren[i]->layoutPositioning == "ABSOLUTE") {
+    if (layoutChildren[i]->excludedFromLayout) {
       continue;
     }
     for (size_t j = i + 1; j < layoutChildren.size(); ++j) {
-      if (layoutChildren[j]->layoutPositioning == "ABSOLUTE") {
+      if (layoutChildren[j]->excludedFromLayout) {
         continue;
       }
       if (RectsOverlap(layoutChildren[i]->bounds, layoutChildren[j]->bounds)) {
@@ -176,9 +176,6 @@ static void BuildElementNodes(const std::vector<Element*>& elements,
       continue;
     }
     auto bounds = layoutNode->layoutBounds();
-    if (bounds.width == 0 && bounds.height == 0 && bounds.x == 0 && bounds.y == 0) {
-      continue;
-    }
 
     auto node = std::make_shared<CheckNode>();
     node->label = MakeLabel(NodeTypeName(element->nodeType()), element->id, i);
@@ -225,7 +222,7 @@ static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float pare
     node->layoutMode = "VERTICAL";
   }
   if (!layer->includeInLayout) {
-    node->layoutPositioning = "ABSOLUTE";
+    node->excludedFromLayout = true;
   }
 
   DetectZeroSize(node.get(), check);
@@ -349,8 +346,8 @@ static std::string NodeToJson(const CheckNode& node) {
   if (!node.layoutMode.empty()) {
     oss << ",\"layoutMode\":" << EscapeJsonString(node.layoutMode);
   }
-  if (!node.layoutPositioning.empty()) {
-    oss << ",\"layoutPositioning\":" << EscapeJsonString(node.layoutPositioning);
+  if (node.excludedFromLayout) {
+    oss << ",\"includeInLayout\":false";
   }
   if (!node.problems.empty()) {
     oss << ",\"problems\":[";
@@ -390,8 +387,8 @@ static void PrintNodeText(const CheckNode& node, int indent) {
   if (!node.layoutMode.empty()) {
     std::cout << pad << "  layoutMode: " << node.layoutMode << "\n";
   }
-  if (!node.layoutPositioning.empty()) {
-    std::cout << pad << "  layoutPositioning: " << node.layoutPositioning << "\n";
+  if (node.excludedFromLayout) {
+    std::cout << pad << "  includeInLayout: false\n";
   }
   if (node.clipToBounds) {
     std::cout << pad << "  clipToBounds: true\n";

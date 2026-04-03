@@ -86,14 +86,20 @@ For each Layer that contains child Layers, decide:
 
 4. **Recurse** — repeat for each child Layer that contains sub-Layers.
 
+5. **Name structural Layers** — assign `id` to every Layer that represents a meaningful
+   section (header, content, sidebar, card row, tab bar, etc.). This enables `--id`-scoped
+   verification (`pagx layout --id "header"`, `pagx render --id "cardRow"`) and produces
+   readable layout output (`Layer#header` instead of `Layer[0]`). Skip `id` on anonymous
+   wrappers that exist only for flex distribution.
+
 ```xml
 <!-- Example: top-level Layer as vertical flex container -->
 <pagx version="1.0" width="393" height="852">
-  <Layer left="0" right="0" top="0" bottom="0" layout="vertical">
-    <Layer height="60"><!-- header --></Layer>
-    <Layer flex="1" layout="vertical" gap="16" padding="0,20,0,20">
-      <!-- content area: nested flex containers -->
-      <Layer height="200" layout="horizontal" gap="12">
+  <Layer id="screen" left="0" right="0" top="0" bottom="0" layout="vertical">
+    <Layer id="header" height="60"/>
+    <Layer id="content" flex="1" layout="vertical" gap="16" padding="0,20,0,20">
+      <!-- nested flex containers -->
+      <Layer id="cardRow" height="200" layout="horizontal" gap="12">
         <Layer flex="1"/>
         <Layer flex="1"/>
         <Layer flex="1"/>
@@ -103,7 +109,7 @@ For each Layer that contains child Layers, decide:
         <Layer flex="1"/>
       </Layer>
     </Layer>
-    <Layer height="83"><!-- tab bar --></Layer>
+    <Layer id="tabBar" height="83"/>
   </Layer>
 </pagx>
 ```
@@ -166,13 +172,13 @@ loop (Step 4) to confirm dimensions and arrangement are correct.
 ```xml
 <!-- Stage 1: skeleton only -->
 <pagx version="1.0" width="393" height="852">
-  <Layer left="0" right="0" top="0" bottom="0" layout="vertical">
-    <Layer height="60"/>          <!-- header -->
-    <Layer flex="1" layout="vertical" gap="16" padding="0,20,0,20">
-      <Layer height="200" layout="horizontal" gap="12"/> <!-- card row -->
-      <Layer flex="1"/>                                   <!-- content area -->
+  <Layer id="screen" left="0" right="0" top="0" bottom="0" layout="vertical">
+    <Layer id="header" height="60"/>
+    <Layer id="content" flex="1" layout="vertical" gap="16" padding="0,20,0,20">
+      <Layer id="cardRow" height="200" layout="horizontal" gap="12"/>
+      <Layer id="body" flex="1"/>
     </Layer>
-    <Layer height="83"/>          <!-- tab bar -->
+    <Layer id="tabBar" height="83"/>
   </Layer>
 </pagx>
 ```
