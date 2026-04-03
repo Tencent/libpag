@@ -1232,8 +1232,9 @@ h1{text-align:center;color:#1e293b;margin-bottom:4px}
     }
 
     page += "<div class=\"card\" id=\"" + baseName + "\">\n";
-    page += "  <div class=\"hd\"><h3>" + baseName + "</h3><span class=\"sz\">" + std::to_string(w) +
-            "x" + std::to_string(h) + " @" + std::to_string(scale) + "x</span></div>\n";
+    page += "  <div class=\"hd\"><h3>" + std::to_string(count + 1) + ". " + baseName +
+            "</h3><span class=\"sz\">" + std::to_string(w) + "x" + std::to_string(h) + " @" +
+            std::to_string(scale) + "x</span></div>\n";
     page += "  <div class=\"cmp\">\n";
     page += "    <div><label>PAGX Native</label><img src=\"" + baseName + "_pagx.png\" width=\"" +
             std::to_string(w) + "\"></div>\n";
