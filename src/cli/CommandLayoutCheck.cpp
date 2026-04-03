@@ -43,12 +43,23 @@ struct LCRect {
   float height = 0;
 };
 
-struct CheckNode {
-  std::string label;
-  LCRect bounds;
-  bool clipToBounds = false;
+struct LayoutAttrs {
   std::string layoutMode;
-  bool excludedFromLayout = false;
+  float gap = 0;
+  float flex = 0;
+  Padding padding = {};
+  Alignment alignment = Alignment::Stretch;
+  Arrangement arrangement = Arrangement::Start;
+  bool includeInLayout = true;
+  bool clipToBounds = false;
+};
+
+struct CheckNode {
+  std::string tagName;
+  std::string id;
+  int index = -1;
+  LCRect bounds;
+  LayoutAttrs attrs;
   std::vector<std::string> problems;
   std::vector<std::shared_ptr<CheckNode>> children;
 };
@@ -58,7 +69,6 @@ struct LayoutOptions {
   std::string id;
   std::string xpath;
   bool check = false;
-  bool jsonOutput = false;
 };
 
 // ============================================================================
@@ -66,7 +76,8 @@ struct LayoutOptions {
 // ============================================================================
 
 static bool RectsOverlap(const LCRect& a, const LCRect& b) {
-  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height &&
+         a.y + a.height > b.y;
 }
 
 static bool IsFullyContained(const LCRect& parent, const LCRect& child) {
@@ -103,19 +114,6 @@ static const char* NodeTypeName(NodeType type) {
   }
 }
 
-static std::string MakeLabel(const char* typeName, const std::string& id, int index) {
-  std::string label = typeName;
-  if (!id.empty()) {
-    label += "#";
-    label += id;
-  } else if (index >= 0) {
-    label += "[";
-    label += std::to_string(index);
-    label += "]";
-  }
-  return label;
-}
-
 // ============================================================================
 // Problem Detection
 // ============================================================================
@@ -132,29 +130,39 @@ static void DetectZeroSize(CheckNode* node, bool check) {
   }
 }
 
+static std::string NodeLabel(const CheckNode& node) {
+  if (!node.id.empty()) {
+    return node.tagName + "#" + node.id;
+  }
+  if (node.index >= 0) {
+    return node.tagName + "[" + std::to_string(node.index) + "]";
+  }
+  return node.tagName;
+}
+
 static void DetectOverlap(const std::vector<std::shared_ptr<CheckNode>>& layoutChildren,
-                          const std::string& parentLayoutMode) {
+                           const std::string& parentLayoutMode) {
   if (parentLayoutMode.empty()) {
     return;
   }
   for (size_t i = 0; i < layoutChildren.size(); ++i) {
-    if (layoutChildren[i]->excludedFromLayout) {
+    if (!layoutChildren[i]->attrs.includeInLayout) {
       continue;
     }
     for (size_t j = i + 1; j < layoutChildren.size(); ++j) {
-      if (layoutChildren[j]->excludedFromLayout) {
+      if (!layoutChildren[j]->attrs.includeInLayout) {
         continue;
       }
       if (RectsOverlap(layoutChildren[i]->bounds, layoutChildren[j]->bounds)) {
-        layoutChildren[i]->problems.push_back("overlaps with " + layoutChildren[j]->label);
-        layoutChildren[j]->problems.push_back("overlaps with " + layoutChildren[i]->label);
+        layoutChildren[i]->problems.push_back("overlaps with " + NodeLabel(*layoutChildren[j]));
+        layoutChildren[j]->problems.push_back("overlaps with " + NodeLabel(*layoutChildren[i]));
       }
     }
   }
 }
 
 static void DetectClippedContent(const LCRect& parentBounds,
-                                 const std::vector<std::shared_ptr<CheckNode>>& children) {
+                                  const std::vector<std::shared_ptr<CheckNode>>& children) {
   for (const auto& child : children) {
     if (!IsFullyContained(parentBounds, child->bounds)) {
       child->problems.push_back("clipped by parent (outside parent bounds)");
@@ -178,7 +186,9 @@ static void BuildElementNodes(const std::vector<Element*>& elements,
     auto bounds = layoutNode->layoutBounds();
 
     auto node = std::make_shared<CheckNode>();
-    node->label = MakeLabel(NodeTypeName(element->nodeType()), element->id, i);
+    node->tagName = NodeTypeName(element->nodeType());
+    node->id = element->id;
+    node->index = i;
     node->bounds = {parentX + bounds.x, parentY + bounds.y, bounds.width, bounds.height};
     DetectZeroSize(node.get(), check);
 
@@ -202,28 +212,31 @@ static void BuildElementNodes(const std::vector<Element*>& elements,
 // ============================================================================
 
 static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float parentX, float parentY,
-                                                  int indexInParent, bool check) {
+                                                   int indexInParent, bool check) {
   if (layer == nullptr) {
     return nullptr;
   }
 
   auto node = std::make_shared<CheckNode>();
-  node->label = MakeLabel("Layer", layer->id, indexInParent);
+  node->tagName = "Layer";
+  node->id = layer->id;
+  node->index = indexInParent;
 
   auto lb = layer->layoutBounds();
   node->bounds = {parentX + lb.x, parentY + lb.y, lb.width, lb.height};
 
-  if (layer->clipToBounds) {
-    node->clipToBounds = true;
-  }
   if (layer->layout == LayoutMode::Horizontal) {
-    node->layoutMode = "HORIZONTAL";
+    node->attrs.layoutMode = "horizontal";
   } else if (layer->layout == LayoutMode::Vertical) {
-    node->layoutMode = "VERTICAL";
+    node->attrs.layoutMode = "vertical";
   }
-  if (!layer->includeInLayout) {
-    node->excludedFromLayout = true;
-  }
+  node->attrs.gap = layer->gap;
+  node->attrs.flex = layer->flex;
+  node->attrs.padding = layer->padding;
+  node->attrs.alignment = layer->alignment;
+  node->attrs.arrangement = layer->arrangement;
+  node->attrs.includeInLayout = layer->includeInLayout;
+  node->attrs.clipToBounds = layer->clipToBounds;
 
   DetectZeroSize(node.get(), check);
 
@@ -242,7 +255,7 @@ static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float pare
   }
 
   if (check) {
-    DetectOverlap(childLayerNodes, node->layoutMode);
+    DetectOverlap(childLayerNodes, node->attrs.layoutMode);
     if (layer->clipToBounds) {
       DetectClippedContent(node->bounds, childLayerNodes);
     }
@@ -260,7 +273,7 @@ static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float pare
 }
 
 // ============================================================================
-// Problem Counting
+// Problem Counting and Filtering
 // ============================================================================
 
 static int CountProblems(const std::vector<std::shared_ptr<CheckNode>>& nodes) {
@@ -271,10 +284,6 @@ static int CountProblems(const std::vector<std::shared_ptr<CheckNode>>& nodes) {
   }
   return count;
 }
-
-// ============================================================================
-// Problem Filtering
-// ============================================================================
 
 static std::vector<std::shared_ptr<CheckNode>> FilterProblematicNodes(
     const std::vector<std::shared_ptr<CheckNode>>& nodes) {
@@ -297,111 +306,137 @@ static std::vector<std::shared_ptr<CheckNode>> FilterProblematicNodes(
 }
 
 // ============================================================================
-// Output: JSON
+// XML Output
 // ============================================================================
 
-static std::string EscapeJsonString(const std::string& s) {
-  std::string out = "\"";
+static std::string EscapeXmlAttr(const std::string& s) {
+  std::string out;
   for (char c : s) {
     switch (c) {
+      case '&':
+        out += "&amp;";
+        break;
       case '"':
-        out += "\\\"";
+        out += "&quot;";
         break;
-      case '\\':
-        out += "\\\\";
+      case '<':
+        out += "&lt;";
         break;
-      case '\n':
-        out += "\\n";
-        break;
-      case '\r':
-        out += "\\r";
-        break;
-      case '\t':
-        out += "\\t";
+      case '>':
+        out += "&gt;";
         break;
       default:
-        if (static_cast<unsigned char>(c) < 0x20) {
-          char buf[8];
-          snprintf(buf, sizeof(buf), "\\u%04x", static_cast<unsigned char>(c));
-          out += buf;
-        } else {
-          out += c;
-        }
+        out += c;
     }
   }
-  out += "\"";
   return out;
 }
 
-static std::string NodeToJson(const CheckNode& node) {
-  std::ostringstream oss;
-  oss << "{\"label\":" << EscapeJsonString(node.label);
-  oss << ",\"bounds\":{\"x\":" << static_cast<int>(node.bounds.x)
-      << ",\"y\":" << static_cast<int>(node.bounds.y)
-      << ",\"width\":" << static_cast<int>(node.bounds.width)
-      << ",\"height\":" << static_cast<int>(node.bounds.height) << "}";
-  if (node.clipToBounds) {
-    oss << ",\"clipToBounds\":true";
-  }
-  if (!node.layoutMode.empty()) {
-    oss << ",\"layoutMode\":" << EscapeJsonString(node.layoutMode);
-  }
-  if (node.excludedFromLayout) {
-    oss << ",\"includeInLayout\":false";
-  }
-  if (!node.problems.empty()) {
-    oss << ",\"problems\":[";
-    for (size_t i = 0; i < node.problems.size(); ++i) {
-      if (i > 0) {
-        oss << ",";
-      }
-      oss << EscapeJsonString(node.problems[i]);
-    }
-    oss << "]";
-  }
-  if (!node.children.empty()) {
-    oss << ",\"children\":[";
-    for (size_t i = 0; i < node.children.size(); ++i) {
-      if (i > 0) {
-        oss << ",";
-      }
-      oss << NodeToJson(*node.children[i]);
-    }
-    oss << "]";
-  }
-  oss << "}";
-  return oss.str();
+static std::string FormatInt(float v) {
+  return std::to_string(static_cast<int>(v));
 }
 
-// ============================================================================
-// Output: Text
-// ============================================================================
-
-static void PrintNodeText(const CheckNode& node, int indent) {
+static void PrintNodeXml(std::ostream& os, const CheckNode& node, int indent) {
   std::string pad(indent * 2, ' ');
-  std::cout << pad << node.label << "\n";
-  std::cout << pad << "  bounds: x=" << static_cast<int>(node.bounds.x)
-            << " y=" << static_cast<int>(node.bounds.y)
-            << " w=" << static_cast<int>(node.bounds.width)
-            << " h=" << static_cast<int>(node.bounds.height) << "\n";
-  if (!node.layoutMode.empty()) {
-    std::cout << pad << "  layoutMode: " << node.layoutMode << "\n";
+  os << pad << "<" << node.tagName;
+
+  // id attribute
+  if (!node.id.empty()) {
+    os << " id=\"" << EscapeXmlAttr(node.id) << "\"";
   }
-  if (node.excludedFromLayout) {
-    std::cout << pad << "  includeInLayout: false\n";
-  }
-  if (node.clipToBounds) {
-    std::cout << pad << "  clipToBounds: true\n";
-  }
-  if (!node.problems.empty()) {
-    std::cout << pad << "  problems:\n";
-    for (const auto& p : node.problems) {
-      std::cout << pad << "    - " << p << "\n";
+
+  // bounds attribute
+  os << " bounds=\"" << FormatInt(node.bounds.x) << "," << FormatInt(node.bounds.y) << ","
+     << FormatInt(node.bounds.width) << "," << FormatInt(node.bounds.height) << "\"";
+
+  // Layout attributes (only non-default values, only for Layer nodes)
+  if (node.tagName == "Layer") {
+    const auto& a = node.attrs;
+    if (!a.layoutMode.empty()) {
+      os << " layout=\"" << a.layoutMode << "\"";
+    }
+    if (a.gap != 0) {
+      os << " gap=\"" << FormatInt(a.gap) << "\"";
+    }
+    if (a.flex != 0) {
+      os << " flex=\"" << FormatInt(a.flex) << "\"";
+    }
+    if (!a.padding.isZero()) {
+      bool allEqual = (a.padding.top == a.padding.right && a.padding.right == a.padding.bottom &&
+                       a.padding.bottom == a.padding.left);
+      bool vhEqual = (a.padding.top == a.padding.bottom && a.padding.left == a.padding.right);
+      if (allEqual) {
+        os << " padding=\"" << FormatInt(a.padding.top) << "\"";
+      } else if (vhEqual) {
+        os << " padding=\"" << FormatInt(a.padding.top) << "," << FormatInt(a.padding.left) << "\"";
+      } else {
+        os << " padding=\"" << FormatInt(a.padding.top) << "," << FormatInt(a.padding.right) << ","
+           << FormatInt(a.padding.bottom) << "," << FormatInt(a.padding.left) << "\"";
+      }
+    }
+    if (a.alignment != Alignment::Stretch) {
+      switch (a.alignment) {
+        case Alignment::Start:
+          os << " alignment=\"start\"";
+          break;
+        case Alignment::Center:
+          os << " alignment=\"center\"";
+          break;
+        case Alignment::End:
+          os << " alignment=\"end\"";
+          break;
+        default:
+          break;
+      }
+    }
+    if (a.arrangement != Arrangement::Start) {
+      switch (a.arrangement) {
+        case Arrangement::Center:
+          os << " arrangement=\"center\"";
+          break;
+        case Arrangement::End:
+          os << " arrangement=\"end\"";
+          break;
+        case Arrangement::SpaceBetween:
+          os << " arrangement=\"spaceBetween\"";
+          break;
+        case Arrangement::SpaceEvenly:
+          os << " arrangement=\"spaceEvenly\"";
+          break;
+        case Arrangement::SpaceAround:
+          os << " arrangement=\"spaceAround\"";
+          break;
+        default:
+          break;
+      }
+    }
+    if (!a.includeInLayout) {
+      os << " includeInLayout=\"false\"";
+    }
+    if (a.clipToBounds) {
+      os << " clipToBounds=\"true\"";
     }
   }
-  for (const auto& child : node.children) {
-    PrintNodeText(*child, indent + 1);
+
+  bool hasChildren = !node.problems.empty() || !node.children.empty();
+  if (!hasChildren) {
+    os << "/>\n";
+    return;
   }
+
+  os << ">\n";
+
+  // Problem nodes first
+  for (const auto& p : node.problems) {
+    os << pad << "  <Problem>" << EscapeXmlAttr(p) << "</Problem>\n";
+  }
+
+  // Child nodes
+  for (const auto& child : node.children) {
+    PrintNodeXml(os, *child, indent + 1);
+  }
+
+  os << pad << "</" << node.tagName << ">\n";
 }
 
 // ============================================================================
@@ -411,15 +446,14 @@ static void PrintNodeText(const CheckNode& node, int indent) {
 static void PrintUsage() {
   std::cout << "Usage: pagx layout [options] <file.pagx>\n"
             << "\n"
-            << "Display layout structure of a PAGX file. By default outputs the full layout\n"
-            << "tree with bounds for all Layers and elements. With --check, detects layout\n"
-            << "problems and returns non-zero exit code when issues are found.\n"
+            << "Display layout structure of a PAGX file in XML format. By default outputs the\n"
+            << "full layout tree with bounds for all Layers and elements. With --check, detects\n"
+            << "layout problems and returns non-zero exit code when issues are found.\n"
             << "\n"
             << "Options:\n"
             << "  --id <id>             Limit scope to the Layer with the specified id\n"
             << "  --xpath <expr>        Limit scope to Layers matched by XPath expression\n"
             << "  --check               Detect layout problems (returns non-zero if found)\n"
-            << "  --json                Output in JSON format\n"
             << "  -h, --help            Show this help message\n";
 }
 
@@ -439,8 +473,6 @@ static int ParseOptions(int argc, char* argv[], LayoutOptions* opts) {
       opts->xpath = argv[++i];
     } else if (strcmp(argv[i], "--check") == 0) {
       opts->check = true;
-    } else if (strcmp(argv[i], "--json") == 0) {
-      opts->jsonOutput = true;
     } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
       PrintUsage();
       return -1;
@@ -513,11 +545,11 @@ int RunLayout(int argc, char* argv[]) {
   // Build layout tree. Use the target layer's own position as the coordinate origin so that
   // bounds are output relative to the specified root (matching --id / --xpath expectation).
   std::vector<std::shared_ptr<CheckNode>> results;
-  bool hasTargetScope = !opts.id.empty() || !opts.xpath.empty();
+  bool scopedQuery = !opts.id.empty() || !opts.xpath.empty();
   for (int i = 0; i < static_cast<int>(targetLayers.size()); ++i) {
     auto lb = targetLayers[i]->layoutBounds();
-    float originX = hasTargetScope ? -lb.x : 0;
-    float originY = hasTargetScope ? -lb.y : 0;
+    float originX = scopedQuery ? -lb.x : 0;
+    float originY = scopedQuery ? -lb.y : 0;
     auto node = BuildLayoutTree(targetLayers[i], originX, originY, i, opts.check);
     if (node) {
       results.push_back(node);
@@ -530,24 +562,26 @@ int RunLayout(int argc, char* argv[]) {
     results = FilterProblematicNodes(results);
   }
 
-  // Output.
-  if (opts.jsonOutput) {
-    std::cout << "[";
-    for (size_t i = 0; i < results.size(); ++i) {
-      if (i > 0) {
-        std::cout << ",";
-      }
-      std::cout << NodeToJson(*results[i]);
-    }
-    std::cout << "]\n";
-  } else {
-    if (results.empty() && opts.check) {
-      std::cout << "No layout issues detected.\n";
-    }
-    for (const auto& node : results) {
-      PrintNodeText(*node, 0);
-    }
+  // Output XML.
+  bool hasTargetScope = !opts.id.empty() || !opts.xpath.empty();
+  std::cout << "<layout>\n";
+  if (!hasTargetScope) {
+    auto docWidth = static_cast<int>(document->width);
+    auto docHeight = static_cast<int>(document->height);
+    std::cout << "<pagx width=\"" << docWidth << "\" height=\"" << docHeight << "\">\n";
   }
+  if (results.empty() && opts.check) {
+    std::string pad = hasTargetScope ? "  " : "    ";
+    std::cout << pad << "<!-- No layout problems detected. -->\n";
+  }
+  int contentIndent = hasTargetScope ? 1 : 2;
+  for (const auto& node : results) {
+    PrintNodeXml(std::cout, *node, contentIndent);
+  }
+  if (!hasTargetScope) {
+    std::cout << "</pagx>\n";
+  }
+  std::cout << "</layout>\n";
 
   return problemCount > 0 ? 1 : 0;
 }
