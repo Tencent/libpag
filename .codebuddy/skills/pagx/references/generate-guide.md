@@ -370,7 +370,7 @@ pagx render --scale 2 --id "header" input.pagx
 #### 5. Diagnose visual issues with layout data
 
 When the screenshot reveals a visual issue not caught by automated `<Problem>` detection,
-use `pagx layout` to inspect the suspect node's layout structure:
+use `pagx layout` (without `--problems-only`) to inspect the suspect node's layout structure:
 
 ```bash
 pagx layout --id "cardRow" input.pagx
