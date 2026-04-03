@@ -23,6 +23,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -30,40 +31,7 @@
 #include "cli/CliUtils.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXImporter.h"
-#include "pagx/nodes/BackgroundBlurStyle.h"
-#include "pagx/nodes/BlurFilter.h"
-#include "pagx/nodes/ColorSource.h"
-#include "pagx/nodes/Composition.h"
-#include "pagx/nodes/ConicGradient.h"
-#include "pagx/nodes/DiamondGradient.h"
-#include "pagx/nodes/DropShadowStyle.h"
-#include "pagx/nodes/Ellipse.h"
-#include "pagx/nodes/Fill.h"
-#include "pagx/nodes/Font.h"
-#include "pagx/nodes/GlyphRun.h"
-#include "pagx/nodes/Group.h"
-#include "pagx/nodes/Image.h"
-#include "pagx/nodes/ImagePattern.h"
-#include "pagx/nodes/InnerShadowStyle.h"
-#include "pagx/nodes/Layer.h"
-#include "pagx/nodes/LinearGradient.h"
-#include "pagx/nodes/Path.h"
-#include "pagx/nodes/PathData.h"
-#include "pagx/nodes/Polystar.h"
-#include "pagx/nodes/RadialGradient.h"
-#include "pagx/nodes/Rectangle.h"
-#include "pagx/nodes/Repeater.h"
-#include "pagx/nodes/SolidColor.h"
-#include "pagx/nodes/Stroke.h"
-#include "pagx/nodes/Text.h"
-#include "pagx/nodes/TextBox.h"
-#include "pagx/nodes/TextModifier.h"
-#include "pagx/nodes/TextPath.h"
 #include "pagx_xsd.h"
-#include "renderer/ToTGFX.h"
-#include "tgfx/core/Path.h"
-#include "tgfx/core/RRect.h"
-#include "tgfx/core/Rect.h"
 
 namespace pagx::cli {
 
@@ -74,6 +42,68 @@ struct LintDiagnostic {
   std::string category = {};
   std::string message = {};
 };
+
+// --- XML helper functions ---
+
+static std::string XmlAttr(xmlNodePtr node, const char* name) {
+  if (node == nullptr) {
+    return {};
+  }
+  xmlChar* value = xmlGetProp(node, reinterpret_cast<const xmlChar*>(name));
+  if (value == nullptr) {
+    return {};
+  }
+  std::string result(reinterpret_cast<const char*>(value));
+  xmlFree(value);
+  return result;
+}
+
+static float XmlAttrFloat(xmlNodePtr node, const char* name) {
+  auto str = XmlAttr(node, name);
+  if (str.empty()) {
+    return NAN;
+  }
+  char* endPtr = nullptr;
+  float val = strtof(str.c_str(), &endPtr);
+  if (endPtr == str.c_str()) {
+    return NAN;
+  }
+  return val;
+}
+
+static bool XmlNodeIs(xmlNodePtr node, const char* name) {
+  if (node == nullptr || node->type != XML_ELEMENT_NODE) {
+    return false;
+  }
+  return xmlStrcmp(node->name, reinterpret_cast<const xmlChar*>(name)) == 0;
+}
+
+static std::string XmlNodeName(xmlNodePtr node) {
+  if (node == nullptr || node->name == nullptr) {
+    return {};
+  }
+  return reinterpret_cast<const char*>(node->name);
+}
+
+static std::vector<xmlNodePtr> XmlChildElements(xmlNodePtr node) {
+  std::vector<xmlNodePtr> result = {};
+  if (node == nullptr) {
+    return result;
+  }
+  for (xmlNodePtr child = node->children; child != nullptr; child = child->next) {
+    if (child->type == XML_ELEMENT_NODE) {
+      result.push_back(child);
+    }
+  }
+  return result;
+}
+
+static xmlNodePtr XmlFindRoot(xmlDocPtr doc) {
+  if (doc == nullptr) {
+    return nullptr;
+  }
+  return xmlDocGetRootElement(doc);
+}
 
 // --- XSD validation ---
 
@@ -97,518 +127,1259 @@ static void CollectStructuredError(void* context, xmlError* xmlError) {
   diagnostics->push_back(std::move(diag));
 }
 
-static void ValidateXsdAndSemantic(const std::string& filePath,
-                                   std::vector<LintDiagnostic>& diagnostics) {
-  xmlDocPtr doc = xmlReadFile(filePath.c_str(), nullptr, XML_PARSE_NONET);
-  if (doc == nullptr) {
-    LintDiagnostic diag = {};
-    diag.category = "error";
-    diag.message = "Failed to parse XML document";
-    diagnostics.push_back(std::move(diag));
-    return;
-  }
-
+static bool ValidateXsd(xmlDocPtr doc, std::vector<LintDiagnostic>& diagnostics) {
   const auto& xsdContent = PagxXsdContent();
   xmlSchemaParserCtxtPtr parserCtxt =
       xmlSchemaNewMemParserCtxt(xsdContent.c_str(), static_cast<int>(xsdContent.size()));
   if (parserCtxt == nullptr) {
-    xmlFreeDoc(doc);
     LintDiagnostic diag = {};
     diag.category = "error";
     diag.message = "Internal error: failed to create schema parser context";
     diagnostics.push_back(std::move(diag));
-    return;
+    return false;
   }
 
   xmlSchemaPtr schema = xmlSchemaParse(parserCtxt);
   xmlSchemaFreeParserCtxt(parserCtxt);
   if (schema == nullptr) {
-    xmlFreeDoc(doc);
     LintDiagnostic diag = {};
     diag.category = "error";
     diag.message = "Internal error: failed to parse XSD schema";
     diagnostics.push_back(std::move(diag));
-    return;
+    return false;
   }
 
   xmlSchemaValidCtxtPtr validCtxt = xmlSchemaNewValidCtxt(schema);
   if (validCtxt == nullptr) {
     xmlSchemaFree(schema);
-    xmlFreeDoc(doc);
     LintDiagnostic diag = {};
     diag.category = "error";
     diag.message = "Internal error: failed to create validation context";
     diagnostics.push_back(std::move(diag));
-    return;
+    return false;
   }
 
   xmlSchemaSetValidStructuredErrors(validCtxt, CollectStructuredError, &diagnostics);
-  xmlSchemaValidateDoc(validCtxt, doc);
+  int ret = xmlSchemaValidateDoc(validCtxt, doc);
 
   xmlSchemaFreeValidCtxt(validCtxt);
   xmlSchemaFree(schema);
-  xmlFreeDoc(doc);
+  return ret == 0;
+}
 
+static void CollectSemanticErrors(const std::string& filePath,
+                                  std::vector<LintDiagnostic>& diagnostics) {
   auto pagxDoc = pagx::PAGXImporter::FromFile(filePath);
-  if (pagxDoc != nullptr) {
-    for (const auto& errorStr : pagxDoc->errors) {
-      LintDiagnostic diag = {};
-      diag.category = "error";
-      if (errorStr.compare(0, 5, "line ") == 0) {
-        auto colonPos = errorStr.find(':', 5);
-        if (colonPos != std::string::npos) {
-          auto lineStr = errorStr.substr(5, colonPos - 5);
-          char* endPtr = nullptr;
-          long lineNum = strtol(lineStr.c_str(), &endPtr, 10);
-          diag.line =
-              (endPtr != lineStr.c_str() && *endPtr == '\0') ? static_cast<int>(lineNum) : 0;
-          diag.message = errorStr.substr(colonPos + 2);
-        } else {
-          diag.message = errorStr;
-        }
+  if (pagxDoc == nullptr) {
+    return;
+  }
+  for (const auto& errorStr : pagxDoc->errors) {
+    LintDiagnostic diag = {};
+    diag.category = "error";
+    if (errorStr.compare(0, 5, "line ") == 0) {
+      auto colonPos = errorStr.find(':', 5);
+      if (colonPos != std::string::npos) {
+        auto lineStr = errorStr.substr(5, colonPos - 5);
+        char* endPtr = nullptr;
+        long lineNum = strtol(lineStr.c_str(), &endPtr, 10);
+        diag.line = (endPtr != lineStr.c_str() && *endPtr == '\0') ? static_cast<int>(lineNum) : 0;
+        diag.message = errorStr.substr(colonPos + 2);
       } else {
         diag.message = errorStr;
       }
+    } else {
+      diag.message = errorStr;
+    }
+    diagnostics.push_back(std::move(diag));
+  }
+}
+
+// --- Node traversal helpers ---
+
+static void CollectAllNodes(xmlNodePtr node, std::vector<xmlNodePtr>& nodes);
+
+static void CollectAllNodesFromChildren(xmlNodePtr node, std::vector<xmlNodePtr>& nodes) {
+  for (auto& child : XmlChildElements(node)) {
+    CollectAllNodes(child, nodes);
+  }
+}
+
+static void CollectAllNodes(xmlNodePtr node, std::vector<xmlNodePtr>& nodes) {
+  if (node == nullptr) {
+    return;
+  }
+  nodes.push_back(node);
+  CollectAllNodesFromChildren(node, nodes);
+}
+
+static xmlNodePtr FindNodeById(xmlNodePtr root, const std::string& id) {
+  std::vector<xmlNodePtr> allNodes = {};
+  CollectAllNodes(root, allNodes);
+  for (auto* node : allNodes) {
+    if (XmlAttr(node, "id") == id) {
+      return node;
+    }
+  }
+  return nullptr;
+}
+
+static std::string GetNodeDisplayName(xmlNodePtr node) {
+  auto name = XmlAttr(node, "name");
+  if (!name.empty()) {
+    return name;
+  }
+  auto id = XmlAttr(node, "id");
+  if (!id.empty()) {
+    return id;
+  }
+  return XmlNodeName(node);
+}
+
+// --- Pass 1: Empty node detection ---
+
+static bool IsGeometryNode(xmlNodePtr node) {
+  auto name = XmlNodeName(node);
+  return name == "Rectangle" || name == "Ellipse" || name == "Polystar" || name == "Path";
+}
+
+static bool IsPainterNode(xmlNodePtr node) {
+  auto name = XmlNodeName(node);
+  return name == "Fill" || name == "Stroke";
+}
+
+static bool IsModifierNode(xmlNodePtr node) {
+  auto name = XmlNodeName(node);
+  return name == "TrimPath" || name == "RoundCorner" || name == "MergePath";
+}
+
+static bool IsContentNode(xmlNodePtr node) {
+  return IsGeometryNode(node) || IsPainterNode(node) || IsModifierNode(node) ||
+         XmlNodeName(node) == "Group" || XmlNodeName(node) == "Repeater" ||
+         XmlNodeName(node) == "Text" || XmlNodeName(node) == "TextBox" ||
+         XmlNodeName(node) == "TextPath" || XmlNodeName(node) == "TextModifier";
+}
+
+static bool IsLayerChildNode(xmlNodePtr node) {
+  return XmlNodeName(node) == "Layer";
+}
+
+static void DetectEmptyNodes(xmlNodePtr root, std::vector<LintDiagnostic>& diagnostics) {
+  std::vector<xmlNodePtr> allNodes = {};
+  CollectAllNodes(root, allNodes);
+
+  for (auto* node : allNodes) {
+    auto nodeName = XmlNodeName(node);
+
+    if (nodeName == "Layer") {
+      auto children = XmlChildElements(node);
+      bool hasContents = false;
+      bool hasChildLayers = false;
+      for (auto* child : children) {
+        if (IsContentNode(child)) {
+          hasContents = true;
+        }
+        if (IsLayerChildNode(child)) {
+          hasChildLayers = true;
+        }
+      }
+      bool hasWidth = !std::isnan(XmlAttrFloat(node, "width"));
+      bool hasHeight = !std::isnan(XmlAttrFloat(node, "height"));
+      auto composition = XmlAttr(node, "composition");
+      bool hasComposition = !composition.empty();
+
+      if (!hasContents && !hasChildLayers && !hasWidth && !hasHeight && !hasComposition) {
+        LintDiagnostic diag = {};
+        diag.line = static_cast<int>(node->line);
+        diag.category = "warning";
+        diag.message =
+            "empty node(s) can be removed: Layer (no contents, children, or composition)";
+        diagnostics.push_back(std::move(diag));
+      }
+    }
+
+    if (nodeName == "Group") {
+      auto children = XmlChildElements(node);
+      bool hasElements = false;
+      for (auto* child : children) {
+        if (IsContentNode(child)) {
+          hasElements = true;
+          break;
+        }
+      }
+      if (!hasElements) {
+        LintDiagnostic diag = {};
+        diag.line = static_cast<int>(node->line);
+        diag.category = "warning";
+        diag.message = "empty node(s) can be removed: Group (no elements)";
+        diagnostics.push_back(std::move(diag));
+      }
+    }
+
+    if (nodeName == "Stroke") {
+      float width = XmlAttrFloat(node, "width");
+      if (!std::isnan(width) && width <= 0.0f) {
+        LintDiagnostic diag = {};
+        diag.line = static_cast<int>(node->line);
+        diag.category = "warning";
+        diag.message = "empty node(s) can be removed: Stroke width <= 0, no visual effect";
+        diagnostics.push_back(std::move(diag));
+      }
+    }
+  }
+}
+
+// --- Pass 7: Full canvas clip mask detection ---
+
+static void DetectFullCanvasClipMasks(xmlNodePtr root, float canvasWidth, float canvasHeight,
+                                      std::vector<LintDiagnostic>& diagnostics) {
+  std::vector<xmlNodePtr> allNodes = {};
+  CollectAllNodes(root, allNodes);
+
+  for (auto* node : allNodes) {
+    if (!XmlNodeIs(node, "Layer")) {
+      continue;
+    }
+    auto maskRef = XmlAttr(node, "mask");
+    if (maskRef.empty() || maskRef[0] != '@') {
+      continue;
+    }
+    std::string maskId = maskRef.substr(1);
+    auto* maskNode = FindNodeById(root, maskId);
+    if (maskNode == nullptr || !XmlNodeIs(maskNode, "Layer")) {
+      continue;
+    }
+
+    float maskX = XmlAttrFloat(maskNode, "x");
+    float maskY = XmlAttrFloat(maskNode, "y");
+    if (std::isnan(maskX)) {
+      maskX = 0;
+    }
+    if (std::isnan(maskY)) {
+      maskY = 0;
+    }
+    if (maskX != 0 || maskY != 0) {
+      continue;
+    }
+
+    auto maskMatrix = XmlAttr(maskNode, "matrix");
+    if (!maskMatrix.empty() && maskMatrix != "1,0,0,1,0,0") {
+      continue;
+    }
+
+    auto maskChildren = XmlChildElements(maskNode);
+    xmlNodePtr rectNode = nullptr;
+    for (auto* child : maskChildren) {
+      if (XmlNodeIs(child, "Rectangle")) {
+        rectNode = child;
+        break;
+      }
+    }
+    if (rectNode == nullptr) {
+      continue;
+    }
+
+    auto sizeStr = XmlAttr(rectNode, "size");
+    if (sizeStr.empty()) {
+      continue;
+    }
+    float rectWidth = 0;
+    float rectHeight = 0;
+    if (sscanf(sizeStr.c_str(), "%f,%f", &rectWidth, &rectHeight) != 2) {
+      continue;
+    }
+
+    auto posStr = XmlAttr(rectNode, "position");
+    float rectPosX = 0;
+    float rectPosY = 0;
+    if (!posStr.empty()) {
+      sscanf(posStr.c_str(), "%f,%f", &rectPosX, &rectPosY);
+    }
+
+    float left = rectPosX - rectWidth * 0.5f;
+    float top = rectPosY - rectHeight * 0.5f;
+    if (left <= 0 && top <= 0 && rectWidth >= canvasWidth && rectHeight >= canvasHeight) {
+      LintDiagnostic diag = {};
+      diag.line = static_cast<int>(node->line);
+      diag.category = "warning";
+      diag.message = "full-canvas clip mask(s) can be removed (no visible effect)";
       diagnostics.push_back(std::move(diag));
     }
   }
 }
 
-// --- Helper functions ---
+// --- Pass 13: Unreferenced resource detection ---
 
-static bool HasConstraintAttributes(float left, float right, float top, float bottom, float centerX,
-                                    float centerY) {
-  return !std::isnan(left) || !std::isnan(right) || !std::isnan(top) || !std::isnan(bottom) ||
-         !std::isnan(centerX) || !std::isnan(centerY);
-}
-
-// --- Pass 1: Empty node detection ---
-
-static bool IsEmptyLayer(const Layer* layer) {
-  if (!std::isnan(layer->width) || !std::isnan(layer->height)) {
-    return false;
-  }
-  return layer->contents.empty() && layer->children.empty() && layer->composition == nullptr &&
-         layer->styles.empty() && layer->filters.empty();
-}
-
-static bool IsEmptyElement(const Element* element) {
-  if (element->nodeType() == NodeType::Stroke) {
-    auto stroke = static_cast<const Stroke*>(element);
-    return stroke->width <= 0.0f;
-  }
-  if (element->nodeType() == NodeType::Group) {
-    auto group = static_cast<const Group*>(element);
-    return group->elements.empty();
-  }
-  return false;
-}
-
-static int CountEmptyLayersIn(const std::vector<Layer*>& layers) {
-  int count = 0;
-  for (auto* layer : layers) {
-    if (IsEmptyLayer(layer)) {
-      count++;
-    }
-  }
-  return count;
-}
-
-static int CountEmptyElementsIn(const std::vector<Element*>& elements) {
-  int count = 0;
-  for (auto* element : elements) {
-    if (IsEmptyElement(element)) {
-      count++;
-    }
-  }
-  return count;
-}
-
-static int CountEmptyNodes(const PAGXDocument* document) {
-  int count = 0;
-  count += CountEmptyLayersIn(document->layers);
-  for (auto& node : document->nodes) {
-    if (node->nodeType() == NodeType::Layer) {
-      auto layer = static_cast<const Layer*>(node.get());
-      count += CountEmptyLayersIn(layer->children);
-      count += CountEmptyElementsIn(layer->contents);
-    } else if (node->nodeType() == NodeType::Group || node->nodeType() == NodeType::TextBox) {
-      auto group = static_cast<const Group*>(node.get());
-      count += CountEmptyElementsIn(group->elements);
-    } else if (node->nodeType() == NodeType::Composition) {
-      auto composition = static_cast<const Composition*>(node.get());
-      count += CountEmptyLayersIn(composition->layers);
-    }
-  }
-  return count;
-}
-
-// --- Pass 7: Full canvas clip mask detection ---
-
-static bool IsFullCanvasClipMask(const Layer* maskLayer, float canvasWidth, float canvasHeight) {
-  if (maskLayer->x != 0 || maskLayer->y != 0) {
-    return false;
-  }
-  if (!maskLayer->matrix.isIdentity()) {
-    return false;
-  }
-  // Find the first Rectangle in the mask layer's contents.
-  const Rectangle* rect = nullptr;
-  for (auto* element : maskLayer->contents) {
-    if (element->nodeType() == NodeType::Rectangle) {
-      rect = static_cast<const Rectangle*>(element);
+static void CollectResourceIds(xmlNodePtr root, std::unordered_set<std::string>& resourceIds) {
+  auto children = XmlChildElements(root);
+  for (auto* child : children) {
+    if (XmlNodeIs(child, "Resources")) {
+      std::vector<xmlNodePtr> allResNodes = {};
+      CollectAllNodesFromChildren(child, allResNodes);
+      for (auto* resNode : allResNodes) {
+        auto id = XmlAttr(resNode, "id");
+        if (!id.empty()) {
+          resourceIds.insert(id);
+        }
+      }
       break;
     }
   }
-  if (rect == nullptr) {
-    return false;
-  }
-  auto left = rect->position.x - rect->size.width * 0.5f;
-  auto top = rect->position.y - rect->size.height * 0.5f;
-  return left <= 0 && top <= 0 && rect->size.width >= canvasWidth &&
-         rect->size.height >= canvasHeight;
 }
 
-static void CountFullCanvasClipMasksIn(const std::vector<Layer*>& layers, float canvasWidth,
-                                       float canvasHeight, int& count) {
-  for (auto* layer : layers) {
-    if (layer->mask != nullptr && IsFullCanvasClipMask(layer->mask, canvasWidth, canvasHeight)) {
-      count++;
-    }
-    if (layer->composition != nullptr) {
-      CountFullCanvasClipMasksIn(layer->composition->layers, canvasWidth, canvasHeight, count);
-    }
-    CountFullCanvasClipMasksIn(layer->children, canvasWidth, canvasHeight, count);
-  }
-}
-
-static int CountFullCanvasClipMasks(const PAGXDocument* document) {
-  int count = 0;
-  CountFullCanvasClipMasksIn(document->layers, document->width, document->height, count);
-  return count;
-}
-
-// --- Pass 13: Unreferenced resource detection ---
-
-static bool IsGradient(NodeType type) {
-  return type == NodeType::LinearGradient || type == NodeType::RadialGradient ||
-         type == NodeType::ConicGradient || type == NodeType::DiamondGradient;
-}
-
-static void CollectReferencedNodes(const std::vector<Element*>& elements,
-                                   std::unordered_set<const Node*>& referenced);
-
-static void CollectColorStops(const ColorSource* source,
-                              std::unordered_set<const Node*>& referenced) {
-  const std::vector<ColorStop*>* stops = nullptr;
-  auto type = source->nodeType();
-  if (type == NodeType::LinearGradient) {
-    stops = &static_cast<const LinearGradient*>(source)->colorStops;
-  } else if (type == NodeType::RadialGradient) {
-    stops = &static_cast<const RadialGradient*>(source)->colorStops;
-  } else if (type == NodeType::ConicGradient) {
-    stops = &static_cast<const ConicGradient*>(source)->colorStops;
-  } else if (type == NodeType::DiamondGradient) {
-    stops = &static_cast<const DiamondGradient*>(source)->colorStops;
-  }
-  if (stops != nullptr) {
-    for (auto* stop : *stops) {
-      referenced.insert(stop);
-    }
-  }
-}
-
-static void CollectReferencedNodesFromColorSource(const ColorSource* source,
-                                                  std::unordered_set<const Node*>& referenced) {
-  if (source == nullptr) {
+static void CollectReferencedIds(xmlNodePtr node, std::unordered_set<std::string>& referencedIds) {
+  if (node == nullptr) {
     return;
   }
-  referenced.insert(source);
-  if (IsGradient(source->nodeType())) {
-    CollectColorStops(source, referenced);
-  } else if (source->nodeType() == NodeType::ImagePattern) {
-    auto pattern = static_cast<const ImagePattern*>(source);
-    if (pattern->image != nullptr) {
-      referenced.insert(pattern->image);
-    }
-  }
-}
-
-static void CollectReferencedNodes(const std::vector<Element*>& elements,
-                                   std::unordered_set<const Node*>& referenced) {
-  for (auto* element : elements) {
-    if (element == nullptr) {
-      continue;
-    }
-    referenced.insert(element);
-    auto type = element->nodeType();
-    if (type == NodeType::Fill) {
-      auto fill = static_cast<const Fill*>(element);
-      CollectReferencedNodesFromColorSource(fill->color, referenced);
-    } else if (type == NodeType::Stroke) {
-      auto stroke = static_cast<const Stroke*>(element);
-      CollectReferencedNodesFromColorSource(stroke->color, referenced);
-    } else if (type == NodeType::Path) {
-      auto path = static_cast<const Path*>(element);
-      if (path->data != nullptr) {
-        referenced.insert(path->data);
-      }
-    } else if (type == NodeType::Text) {
-      auto text = static_cast<const Text*>(element);
-      for (auto* run : text->glyphRuns) {
-        referenced.insert(run);
-        if (run->font != nullptr) {
-          referenced.insert(run->font);
-          for (auto* glyph : run->font->glyphs) {
-            referenced.insert(glyph);
-            if (glyph->path != nullptr) {
-              referenced.insert(glyph->path);
-            }
-            if (glyph->image != nullptr) {
-              referenced.insert(glyph->image);
-            }
-          }
-        }
-      }
-    } else if (type == NodeType::Group || type == NodeType::TextBox) {
-      auto group = static_cast<const Group*>(element);
-      CollectReferencedNodes(group->elements, referenced);
-    } else if (type == NodeType::TextPath) {
-      auto textPath = static_cast<const TextPath*>(element);
-      if (textPath->path != nullptr) {
-        referenced.insert(textPath->path);
-      }
-    } else if (type == NodeType::TextModifier) {
-      auto modifier = static_cast<const TextModifier*>(element);
-      for (auto* selector : modifier->selectors) {
-        referenced.insert(selector);
+  for (xmlAttrPtr attr = node->properties; attr != nullptr; attr = attr->next) {
+    if (attr->children != nullptr && attr->children->content != nullptr) {
+      std::string value(reinterpret_cast<const char*>(attr->children->content));
+      if (!value.empty() && value[0] == '@') {
+        referencedIds.insert(value.substr(1));
       }
     }
   }
+  for (auto& child : XmlChildElements(node)) {
+    CollectReferencedIds(child, referencedIds);
+  }
 }
 
-static void CollectReferencedNodesFromLayer(const Layer* layer,
-                                            std::unordered_set<const Node*>& referenced) {
-  if (layer == nullptr) {
-    return;
-  }
-  referenced.insert(layer);
-  CollectReferencedNodes(layer->contents, referenced);
-  for (auto* style : layer->styles) {
-    referenced.insert(style);
-  }
-  for (auto* filter : layer->filters) {
-    referenced.insert(filter);
-  }
-  if (layer->mask != nullptr) {
-    CollectReferencedNodesFromLayer(layer->mask, referenced);
-  }
-  if (layer->composition != nullptr) {
-    referenced.insert(layer->composition);
-    for (auto* child : layer->composition->layers) {
-      CollectReferencedNodesFromLayer(child, referenced);
+static void DetectUnreferencedResources(xmlNodePtr root, std::vector<LintDiagnostic>& diagnostics) {
+  std::unordered_set<std::string> resourceIds = {};
+  CollectResourceIds(root, resourceIds);
+
+  std::unordered_set<std::string> referencedIds = {};
+  CollectReferencedIds(root, referencedIds);
+
+  int unreferencedCount = 0;
+  for (const auto& id : resourceIds) {
+    if (referencedIds.find(id) == referencedIds.end()) {
+      unreferencedCount++;
     }
   }
-  for (auto* child : layer->children) {
-    CollectReferencedNodesFromLayer(child, referenced);
+
+  if (unreferencedCount > 0) {
+    LintDiagnostic diag = {};
+    diag.category = "warning";
+    diag.message = std::to_string(unreferencedCount) + " unreferenced resource(s) can be removed";
+    diagnostics.push_back(std::move(diag));
   }
 }
 
-static int CountUnreferencedResources(const PAGXDocument* document) {
-  std::unordered_set<const Node*> referenced = {};
-  for (auto* layer : document->layers) {
-    CollectReferencedNodesFromLayer(layer, referenced);
-  }
+// --- Pass 2: PathData deduplication detection ---
 
-  int count = 0;
-  for (auto& node : document->nodes) {
-    if (referenced.find(node.get()) == referenced.end()) {
-      count++;
+static void DetectDuplicatePathData(xmlNodePtr root, std::vector<LintDiagnostic>& diagnostics) {
+  std::vector<xmlNodePtr> allNodes = {};
+  CollectAllNodes(root, allNodes);
+
+  std::vector<std::pair<std::string, int>> pathDataList = {};
+  for (auto* node : allNodes) {
+    if (XmlNodeIs(node, "PathData")) {
+      auto data = XmlAttr(node, "data");
+      if (!data.empty()) {
+        pathDataList.emplace_back(data, static_cast<int>(node->line));
+      }
     }
   }
-  return count;
+
+  std::unordered_set<std::string> seen = {};
+  int duplicateCount = 0;
+  for (const auto& item : pathDataList) {
+    if (seen.find(item.first) != seen.end()) {
+      duplicateCount++;
+    } else {
+      seen.insert(item.first);
+    }
+  }
+
+  if (duplicateCount > 0) {
+    LintDiagnostic diag = {};
+    diag.category = "info";
+    diag.message = std::to_string(duplicateCount) + " duplicate PathData(s) can be merged";
+    diagnostics.push_back(std::move(diag));
+  }
 }
 
-// --- Lint hints (performance warnings) ---
+// --- Pass 3: Gradient deduplication detection ---
 
-static bool CanDowngradeToGroup(const Layer* layer) {
-  if (!layer->styles.empty() || !layer->filters.empty() || !layer->children.empty()) {
+static std::string SerializeGradientNode(xmlNodePtr node) {
+  std::ostringstream oss;
+  oss << XmlNodeName(node) << "|";
+  oss << XmlAttr(node, "startPoint") << "|";
+  oss << XmlAttr(node, "endPoint") << "|";
+  oss << XmlAttr(node, "center") << "|";
+  oss << XmlAttr(node, "radius") << "|";
+  oss << XmlAttr(node, "startAngle") << "|";
+  oss << XmlAttr(node, "endAngle") << "|";
+  oss << XmlAttr(node, "matrix") << "|";
+
+  auto children = XmlChildElements(node);
+  for (auto* child : children) {
+    if (XmlNodeIs(child, "ColorStop")) {
+      oss << "stop:" << XmlAttr(child, "offset") << ":" << XmlAttr(child, "color") << ";";
+    }
+  }
+  return oss.str();
+}
+
+static bool IsGradientNode(xmlNodePtr node) {
+  auto name = XmlNodeName(node);
+  return name == "LinearGradient" || name == "RadialGradient" || name == "ConicGradient" ||
+         name == "DiamondGradient";
+}
+
+static void DetectDuplicateGradients(xmlNodePtr root, std::vector<LintDiagnostic>& diagnostics) {
+  std::vector<xmlNodePtr> allNodes = {};
+  CollectAllNodes(root, allNodes);
+
+  std::vector<std::pair<std::string, int>> gradientList = {};
+  for (auto* node : allNodes) {
+    if (IsGradientNode(node)) {
+      gradientList.emplace_back(SerializeGradientNode(node), static_cast<int>(node->line));
+    }
+  }
+
+  std::unordered_set<std::string> seen = {};
+  int duplicateCount = 0;
+  for (const auto& item : gradientList) {
+    if (seen.find(item.first) != seen.end()) {
+      duplicateCount++;
+    } else {
+      seen.insert(item.first);
+    }
+  }
+
+  if (duplicateCount > 0) {
+    LintDiagnostic diag = {};
+    diag.category = "info";
+    diag.message = std::to_string(duplicateCount) + " duplicate gradient(s) can be merged";
+    diagnostics.push_back(std::move(diag));
+  }
+}
+
+// --- Pass 4: Mergeable Group detection ---
+
+static std::string SerializePainter(xmlNodePtr node) {
+  if (!IsPainterNode(node)) {
+    return {};
+  }
+  std::ostringstream oss;
+  oss << XmlNodeName(node) << "|";
+  oss << XmlAttr(node, "color") << "|";
+  oss << XmlAttr(node, "alpha") << "|";
+  oss << XmlAttr(node, "blendMode") << "|";
+  if (XmlNodeIs(node, "Fill")) {
+    oss << XmlAttr(node, "fillRule") << "|";
+    oss << XmlAttr(node, "placement") << "|";
+  }
+  if (XmlNodeIs(node, "Stroke")) {
+    oss << XmlAttr(node, "width") << "|";
+    oss << XmlAttr(node, "cap") << "|";
+    oss << XmlAttr(node, "join") << "|";
+    oss << XmlAttr(node, "miterLimit") << "|";
+    oss << XmlAttr(node, "dashes") << "|";
+    oss << XmlAttr(node, "dashOffset") << "|";
+    oss << XmlAttr(node, "dashAdaptive") << "|";
+    oss << XmlAttr(node, "align") << "|";
+    oss << XmlAttr(node, "placement") << "|";
+  }
+
+  auto children = XmlChildElements(node);
+  for (auto* child : children) {
+    if (IsGradientNode(child)) {
+      oss << "gradient:" << SerializeGradientNode(child) << ";";
+    } else if (XmlNodeIs(child, "SolidColor")) {
+      oss << "solid:" << XmlAttr(child, "color") << ";";
+    } else if (XmlNodeIs(child, "ImagePattern")) {
+      oss << "pattern:" << XmlAttr(child, "image") << ";";
+    }
+  }
+  return oss.str();
+}
+
+static bool HasDefaultGroupTransform(xmlNodePtr node) {
+  auto anchor = XmlAttr(node, "anchor");
+  auto position = XmlAttr(node, "position");
+  auto rotation = XmlAttrFloat(node, "rotation");
+  auto scale = XmlAttr(node, "scale");
+  auto skew = XmlAttrFloat(node, "skew");
+  auto skewAxis = XmlAttrFloat(node, "skewAxis");
+  auto alpha = XmlAttrFloat(node, "alpha");
+  auto width = XmlAttrFloat(node, "width");
+  auto height = XmlAttrFloat(node, "height");
+  auto left = XmlAttrFloat(node, "left");
+  auto right = XmlAttrFloat(node, "right");
+  auto top = XmlAttrFloat(node, "top");
+  auto bottom = XmlAttrFloat(node, "bottom");
+  auto centerX = XmlAttrFloat(node, "centerX");
+  auto centerY = XmlAttrFloat(node, "centerY");
+
+  if (!anchor.empty() && anchor != "0,0") {
     return false;
   }
-  if (layer->mask != nullptr || layer->composition != nullptr) {
+  if (!position.empty() && position != "0,0") {
     return false;
   }
-  if (layer->blendMode != BlendMode::Normal) {
+  if (!std::isnan(rotation) && rotation != 0) {
     return false;
   }
-  if (layer->hasScrollRect || !layer->visible) {
+  if (!scale.empty() && scale != "1,1") {
     return false;
   }
-  if (!layer->matrix.isIdentity() || !layer->matrix3D.isIdentity()) {
+  if (!std::isnan(skew) && skew != 0) {
     return false;
   }
-  if (layer->preserve3D || layer->groupOpacity || !layer->passThroughBackground) {
+  if (!std::isnan(skewAxis) && skewAxis != 0) {
     return false;
   }
-  if (!layer->antiAlias) {
+  if (!std::isnan(alpha) && alpha != 1) {
     return false;
   }
-  if (!layer->id.empty() || !layer->name.empty()) {
+  if (!std::isnan(width) || !std::isnan(height)) {
     return false;
   }
-  if (!layer->customData.empty()) {
-    return false;
-  }
-  if (layer->layout != LayoutMode::None || layer->flex != 0.0f) {
-    return false;
-  }
-  if (!std::isnan(layer->width) || !std::isnan(layer->height)) {
-    return false;
-  }
-  if (HasConstraintAttributes(layer->left, layer->right, layer->top, layer->bottom, layer->centerX,
-                              layer->centerY)) {
-    return false;
-  }
-  if (!layer->includeInLayout) {
+  if (!std::isnan(left) || !std::isnan(right) || !std::isnan(top) || !std::isnan(bottom) ||
+      !std::isnan(centerX) || !std::isnan(centerY)) {
     return false;
   }
   return true;
 }
 
-static void CollectLintHintsFromContentsHelper(const std::vector<Element*>& elements,
-                                               float outerProduct, const Layer* layer,
-                                               std::vector<LintDiagnostic>& diagnostics);
-
-static void CollectLintHintsFromContents(const Layer* layer,
-                                         std::vector<LintDiagnostic>& diagnostics,
-                                         float repeaterProductSoFar) {
-  CollectLintHintsFromContentsHelper(layer->contents, repeaterProductSoFar, layer, diagnostics);
+static std::string ExtractPaintersSignature(xmlNodePtr groupNode) {
+  auto children = XmlChildElements(groupNode);
+  std::ostringstream oss;
+  bool seenPainter = false;
+  for (auto* child : children) {
+    if (IsPainterNode(child)) {
+      seenPainter = true;
+      oss << SerializePainter(child);
+    } else if (seenPainter) {
+      return {};
+    } else if (!IsGeometryNode(child)) {
+      return {};
+    }
+  }
+  return oss.str();
 }
 
-static void CollectLintHintsFromContentsHelper(const std::vector<Element*>& elements,
-                                               float outerProduct, const Layer* layer,
-                                               std::vector<LintDiagnostic>& diagnostics) {
-  float localProduct = outerProduct;
-  int repeaterCount = 0;
-  for (auto* element : elements) {
-    if (element->nodeType() == NodeType::Repeater) {
-      auto repeater = static_cast<const Repeater*>(element);
-      localProduct *= repeater->copies;
-      repeaterCount++;
+static void DetectMergeableGroups(xmlNodePtr root, std::vector<LintDiagnostic>& diagnostics) {
+  std::vector<xmlNodePtr> allNodes = {};
+  CollectAllNodes(root, allNodes);
+
+  int mergeableCount = 0;
+  for (auto* node : allNodes) {
+    if (!XmlNodeIs(node, "Layer") && !XmlNodeIs(node, "Group") && !XmlNodeIs(node, "TextBox")) {
+      continue;
+    }
+    auto children = XmlChildElements(node);
+    size_t i = 0;
+    while (i < children.size()) {
+      auto* current = children[i];
+      if (!XmlNodeIs(current, "Group") || !HasDefaultGroupTransform(current)) {
+        i++;
+        continue;
+      }
+      auto sig = ExtractPaintersSignature(current);
+      if (sig.empty()) {
+        i++;
+        continue;
+      }
+      size_t j = i + 1;
+      while (j < children.size()) {
+        auto* next = children[j];
+        if (!XmlNodeIs(next, "Group") || !HasDefaultGroupTransform(next)) {
+          break;
+        }
+        auto nextSig = ExtractPaintersSignature(next);
+        if (nextSig != sig) {
+          break;
+        }
+        mergeableCount++;
+        j++;
+      }
+      i = j;
     }
   }
 
-  bool hasRepeater = localProduct > outerProduct;
-  bool hasStrokeWithDashes = false;
-  auto name = layer->name.empty() ? layer->id : layer->name;
+  if (mergeableCount > 0) {
+    LintDiagnostic diag = {};
+    diag.category = "info";
+    diag.message =
+        std::to_string(mergeableCount) + " adjacent Group(s) with same painters can be merged";
+    diagnostics.push_back(std::move(diag));
+  }
+}
+
+// --- Pass 5: Redundant first-child Group detection ---
+
+static bool CanUnwrapFirstChildGroup(xmlNodePtr groupNode) {
+  if (!XmlNodeIs(groupNode, "Group")) {
+    return false;
+  }
+  auto alpha = XmlAttrFloat(groupNode, "alpha");
+  if (!std::isnan(alpha) && alpha != 1.0f) {
+    return false;
+  }
+  auto rotation = XmlAttrFloat(groupNode, "rotation");
+  if (!std::isnan(rotation) && rotation != 0) {
+    return false;
+  }
+  auto scale = XmlAttr(groupNode, "scale");
+  if (!scale.empty() && scale != "1,1") {
+    return false;
+  }
+  auto skew = XmlAttrFloat(groupNode, "skew");
+  if (!std::isnan(skew) && skew != 0) {
+    return false;
+  }
+  auto skewAxis = XmlAttrFloat(groupNode, "skewAxis");
+  if (!std::isnan(skewAxis) && skewAxis != 0) {
+    return false;
+  }
+  auto width = XmlAttrFloat(groupNode, "width");
+  auto height = XmlAttrFloat(groupNode, "height");
+  if (!std::isnan(width) || !std::isnan(height)) {
+    return false;
+  }
+  auto left = XmlAttrFloat(groupNode, "left");
+  auto right = XmlAttrFloat(groupNode, "right");
+  auto top = XmlAttrFloat(groupNode, "top");
+  auto bottom = XmlAttrFloat(groupNode, "bottom");
+  auto centerX = XmlAttrFloat(groupNode, "centerX");
+  auto centerY = XmlAttrFloat(groupNode, "centerY");
+  if (!std::isnan(left) || !std::isnan(right) || !std::isnan(top) || !std::isnan(bottom) ||
+      !std::isnan(centerX) || !std::isnan(centerY)) {
+    return false;
+  }
+
+  auto children = XmlChildElements(groupNode);
+  for (auto* child : children) {
+    auto childRight = XmlAttrFloat(child, "right");
+    auto childBottom = XmlAttrFloat(child, "bottom");
+    auto childCenterX = XmlAttrFloat(child, "centerX");
+    auto childCenterY = XmlAttrFloat(child, "centerY");
+    if (!std::isnan(childRight) || !std::isnan(childBottom) || !std::isnan(childCenterX) ||
+        !std::isnan(childCenterY)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+static int CountUnwrappableFirstChildGroupsInElements(const std::vector<xmlNodePtr>& elements);
+
+static int CountUnwrappableFirstChildGroupsRecursive(const std::vector<xmlNodePtr>& elements) {
+  int count = 0;
+  for (auto* element : elements) {
+    if (XmlNodeIs(element, "Group") || XmlNodeIs(element, "TextBox")) {
+      count += CountUnwrappableFirstChildGroupsInElements(XmlChildElements(element));
+    }
+  }
+  return count;
+}
+
+static int CountUnwrappableFirstChildGroupsInElements(const std::vector<xmlNodePtr>& elements) {
+  int count = 0;
+  if (elements.empty()) {
+    return count;
+  }
+  auto* first = elements[0];
+  if (XmlNodeIs(first, "Group") && CanUnwrapFirstChildGroup(first)) {
+    count++;
+  }
+  count += CountUnwrappableFirstChildGroupsRecursive(elements);
+  return count;
+}
+
+static void DetectUnwrappableFirstChildGroups(xmlNodePtr root,
+                                              std::vector<LintDiagnostic>& diagnostics) {
+  std::vector<xmlNodePtr> allNodes = {};
+  CollectAllNodes(root, allNodes);
+
+  int unwrappableCount = 0;
+  for (auto* node : allNodes) {
+    std::vector<xmlNodePtr> contentChildren = {};
+    auto children = XmlChildElements(node);
+    for (auto* child : children) {
+      if (IsContentNode(child)) {
+        contentChildren.push_back(child);
+      }
+    }
+    if (XmlNodeIs(node, "Layer")) {
+      unwrappableCount += CountUnwrappableFirstChildGroupsInElements(contentChildren);
+    } else if (XmlNodeIs(node, "Group") || XmlNodeIs(node, "TextBox")) {
+      unwrappableCount += CountUnwrappableFirstChildGroupsInElements(contentChildren);
+    }
+  }
+
+  if (unwrappableCount > 0) {
+    LintDiagnostic diag = {};
+    diag.category = "info";
+    diag.message =
+        std::to_string(unwrappableCount) + " redundant first-child Group(s) can be unwrapped";
+    diagnostics.push_back(std::move(diag));
+  }
+}
+
+// --- Pass 6: Path to primitive detection ---
+
+static std::vector<std::string> ParseVerbs(const std::string& data) {
+  std::vector<std::string> verbs = {};
+  for (size_t i = 0; i < data.size(); i++) {
+    char c = data[i];
+    if (c == 'M' || c == 'm' || c == 'L' || c == 'l' || c == 'H' || c == 'h' || c == 'V' ||
+        c == 'v' || c == 'C' || c == 'c' || c == 'S' || c == 's' || c == 'Q' || c == 'q' ||
+        c == 'T' || c == 't' || c == 'A' || c == 'a' || c == 'Z' || c == 'z') {
+      verbs.push_back(std::string(1, static_cast<char>(std::toupper(c))));
+    }
+  }
+  return verbs;
+}
+
+static bool IsRectangleVerbPattern(const std::vector<std::string>& verbs) {
+  if (verbs.size() == 5) {
+    return verbs[0] == "M" && verbs[1] == "L" && verbs[2] == "L" && verbs[3] == "L" &&
+           verbs[4] == "Z";
+  }
+  if (verbs.size() == 6) {
+    return verbs[0] == "M" && verbs[1] == "L" && verbs[2] == "L" && verbs[3] == "L" &&
+           verbs[4] == "L" && verbs[5] == "Z";
+  }
+  return false;
+}
+
+static bool IsEllipseVerbPattern(const std::vector<std::string>& verbs) {
+  if (verbs.size() != 6) {
+    return false;
+  }
+  return verbs[0] == "M" && verbs[1] == "C" && verbs[2] == "C" && verbs[3] == "C" &&
+         verbs[4] == "C" && verbs[5] == "Z";
+}
+
+static void DetectPathsToPrimitives(xmlNodePtr root, std::vector<LintDiagnostic>& diagnostics) {
+  std::vector<xmlNodePtr> allNodes = {};
+  CollectAllNodes(root, allNodes);
+
+  std::unordered_map<std::string, std::string> pathDataMap = {};
+  for (auto* node : allNodes) {
+    if (XmlNodeIs(node, "PathData")) {
+      auto id = XmlAttr(node, "id");
+      auto data = XmlAttr(node, "data");
+      if (!id.empty() && !data.empty()) {
+        pathDataMap[id] = data;
+      }
+    }
+  }
+
+  int convertibleCount = 0;
+  for (auto* node : allNodes) {
+    if (!XmlNodeIs(node, "Path")) {
+      continue;
+    }
+    auto left = XmlAttrFloat(node, "left");
+    auto right = XmlAttrFloat(node, "right");
+    auto top = XmlAttrFloat(node, "top");
+    auto bottom = XmlAttrFloat(node, "bottom");
+    auto centerX = XmlAttrFloat(node, "centerX");
+    auto centerY = XmlAttrFloat(node, "centerY");
+    if (!std::isnan(left) || !std::isnan(right) || !std::isnan(top) || !std::isnan(bottom) ||
+        !std::isnan(centerX) || !std::isnan(centerY)) {
+      continue;
+    }
+
+    auto dataRef = XmlAttr(node, "data");
+    if (dataRef.empty()) {
+      continue;
+    }
+    std::string pathDataStr;
+    if (dataRef[0] == '@') {
+      auto it = pathDataMap.find(dataRef.substr(1));
+      if (it != pathDataMap.end()) {
+        pathDataStr = it->second;
+      }
+    } else {
+      pathDataStr = dataRef;
+    }
+    if (pathDataStr.empty()) {
+      continue;
+    }
+
+    auto verbs = ParseVerbs(pathDataStr);
+    if (IsRectangleVerbPattern(verbs) || IsEllipseVerbPattern(verbs)) {
+      convertibleCount++;
+    }
+  }
+
+  if (convertibleCount > 0) {
+    LintDiagnostic diag = {};
+    diag.category = "info";
+    diag.message = std::to_string(convertibleCount) +
+                   " Path(s) can be replaced with Rectangle/Ellipse primitives";
+    diagnostics.push_back(std::move(diag));
+  }
+}
+
+// --- Pass 9: Coordinate localization detection ---
+
+static bool HasConstraintAttributes(xmlNodePtr node) {
+  auto left = XmlAttrFloat(node, "left");
+  auto right = XmlAttrFloat(node, "right");
+  auto top = XmlAttrFloat(node, "top");
+  auto bottom = XmlAttrFloat(node, "bottom");
+  auto centerX = XmlAttrFloat(node, "centerX");
+  auto centerY = XmlAttrFloat(node, "centerY");
+  return !std::isnan(left) || !std::isnan(right) || !std::isnan(top) || !std::isnan(bottom) ||
+         !std::isnan(centerX) || !std::isnan(centerY);
+}
+
+static void DetectLocalizableCoordinates(xmlNodePtr root,
+                                         std::vector<LintDiagnostic>& diagnostics) {
+  std::vector<xmlNodePtr> allNodes = {};
+  CollectAllNodes(root, allNodes);
+
+  int localizableCount = 0;
+  for (auto* node : allNodes) {
+    if (!XmlNodeIs(node, "Layer")) {
+      continue;
+    }
+    auto matrix = XmlAttr(node, "matrix");
+    if (!matrix.empty() && matrix != "1,0,0,1,0,0") {
+      continue;
+    }
+    auto composition = XmlAttr(node, "composition");
+    if (!composition.empty()) {
+      continue;
+    }
+    auto children = XmlChildElements(node);
+    bool hasContents = false;
+    for (auto* child : children) {
+      if (IsContentNode(child)) {
+        hasContents = true;
+        break;
+      }
+    }
+    if (!hasContents) {
+      continue;
+    }
+    if (HasConstraintAttributes(node)) {
+      continue;
+    }
+
+    bool childHasConstraints = false;
+    for (auto* child : children) {
+      if (IsContentNode(child) && HasConstraintAttributes(child)) {
+        childHasConstraints = true;
+        break;
+      }
+    }
+    if (childHasConstraints) {
+      continue;
+    }
+
+    float x = XmlAttrFloat(node, "x");
+    float y = XmlAttrFloat(node, "y");
+    if (std::isnan(x)) {
+      x = 0;
+    }
+    if (std::isnan(y)) {
+      y = 0;
+    }
+    if (x != 0 || y != 0) {
+      localizableCount++;
+    }
+  }
+
+  if (localizableCount > 0) {
+    LintDiagnostic diag = {};
+    diag.category = "info";
+    diag.message =
+        std::to_string(localizableCount) + " Layer(s) have coordinates that can be moved";
+    diagnostics.push_back(std::move(diag));
+  }
+}
+
+// --- Pass 10: PathData localization detection ---
+
+static std::pair<float, float> ParseFirstPoint(const std::string& data) {
+  size_t start = data.find_first_of("Mm");
+  if (start == std::string::npos) {
+    return {0, 0};
+  }
+  start++;
+  while (start < data.size() && (data[start] == ' ' || data[start] == ',')) {
+    start++;
+  }
+  float x = 0;
+  float y = 0;
+  if (sscanf(data.c_str() + start, "%f,%f", &x, &y) == 2 ||
+      sscanf(data.c_str() + start, "%f %f", &x, &y) == 2) {
+    return {x, y};
+  }
+  return {0, 0};
+}
+
+static void DetectLocalizablePathData(xmlNodePtr root, std::vector<LintDiagnostic>& diagnostics) {
+  std::vector<xmlNodePtr> allNodes = {};
+  CollectAllNodes(root, allNodes);
+
+  int localizableCount = 0;
+  for (auto* node : allNodes) {
+    if (!XmlNodeIs(node, "PathData")) {
+      continue;
+    }
+    auto data = XmlAttr(node, "data");
+    if (data.empty()) {
+      continue;
+    }
+    auto firstPoint = ParseFirstPoint(data);
+    if (std::abs(firstPoint.first) >= 0.001f || std::abs(firstPoint.second) >= 0.001f) {
+      localizableCount++;
+    }
+  }
+
+  if (localizableCount > 0) {
+    LintDiagnostic diag = {};
+    diag.category = "info";
+    diag.message = std::to_string(localizableCount) + " PathData(s) can be localized to origin";
+    diagnostics.push_back(std::move(diag));
+  }
+}
+
+// --- Pass 12: Extractable Composition detection ---
+
+static std::string SerializeLayerContents(xmlNodePtr layer);
+
+static std::string SerializeElement(xmlNodePtr node) {
+  std::ostringstream oss;
+  oss << XmlNodeName(node) << "{";
+
+  for (xmlAttrPtr attr = node->properties; attr != nullptr; attr = attr->next) {
+    std::string name(reinterpret_cast<const char*>(attr->name));
+    if (name == "id" || name == "name") {
+      continue;
+    }
+    auto value = XmlAttr(node, name.c_str());
+    oss << name << "=" << value << ";";
+  }
+
+  auto children = XmlChildElements(node);
+  for (auto* child : children) {
+    oss << SerializeElement(child);
+  }
+  oss << "}";
+  return oss.str();
+}
+
+static std::string SerializeLayerContents(xmlNodePtr layer) {
+  std::ostringstream oss;
+  auto children = XmlChildElements(layer);
+  for (auto* child : children) {
+    if (IsContentNode(child)) {
+      oss << SerializeElement(child);
+    } else if (XmlNodeIs(child, "Layer")) {
+      oss << "Layer{" << SerializeLayerContents(child) << "}";
+    }
+  }
+  return oss.str();
+}
+
+static bool IsExtractableCandidate(xmlNodePtr layer) {
+  auto children = XmlChildElements(layer);
+  bool hasContents = false;
+  bool hasChildLayers = false;
+  for (auto* child : children) {
+    if (IsContentNode(child)) {
+      hasContents = true;
+    }
+    if (XmlNodeIs(child, "Layer")) {
+      hasChildLayers = true;
+    }
+  }
+  if (!hasContents || hasChildLayers) {
+    return false;
+  }
+
+  auto composition = XmlAttr(layer, "composition");
+  if (!composition.empty()) {
+    return false;
+  }
+  auto matrix = XmlAttr(layer, "matrix");
+  if (!matrix.empty() && matrix != "1,0,0,1,0,0") {
+    return false;
+  }
+
+  auto right = XmlAttrFloat(layer, "right");
+  auto bottom = XmlAttrFloat(layer, "bottom");
+  auto centerX = XmlAttrFloat(layer, "centerX");
+  auto centerY = XmlAttrFloat(layer, "centerY");
+  auto flex = XmlAttrFloat(layer, "flex");
+  if (!std::isnan(right) || !std::isnan(bottom) || !std::isnan(centerX) || !std::isnan(centerY)) {
+    return false;
+  }
+  if (!std::isnan(flex) && flex != 0) {
+    return false;
+  }
+  return true;
+}
+
+static void CollectExtractableLayers(xmlNodePtr node, std::vector<xmlNodePtr>& candidates) {
+  if (XmlNodeIs(node, "Layer") && IsExtractableCandidate(node)) {
+    candidates.push_back(node);
+  }
+  auto children = XmlChildElements(node);
+  for (auto* child : children) {
+    if (XmlNodeIs(child, "Layer")) {
+      CollectExtractableLayers(child, candidates);
+    }
+  }
+}
+
+static void DetectExtractableCompositions(xmlNodePtr root,
+                                          std::vector<LintDiagnostic>& diagnostics) {
+  std::vector<xmlNodePtr> candidates = {};
+  auto children = XmlChildElements(root);
+  for (auto* child : children) {
+    if (XmlNodeIs(child, "Layer")) {
+      CollectExtractableLayers(child, candidates);
+    }
+  }
+
+  std::unordered_map<std::string, std::vector<xmlNodePtr>> groups = {};
+  for (auto* layer : candidates) {
+    auto signature = SerializeLayerContents(layer);
+    groups[signature].push_back(layer);
+  }
+
+  int extractableCount = 0;
+  for (const auto& pair : groups) {
+    if (pair.second.size() >= 2) {
+      extractableCount += static_cast<int>(pair.second.size());
+    }
+  }
+
+  if (extractableCount > 0) {
+    LintDiagnostic diag = {};
+    diag.category = "info";
+    diag.message = std::to_string(extractableCount) +
+                   " structurally identical Layer(s) can be extracted to shared Composition";
+    diagnostics.push_back(std::move(diag));
+  }
+}
+
+// --- Lint hints (performance warnings) ---
+
+struct RepeaterContext {
+  float productSoFar = 1.0f;
+  int repeaterCount = 0;
+  bool hasRepeater = false;
+};
+
+static bool IsHighCostNode(xmlNodePtr node) {
+  auto name = XmlNodeName(node);
+  return name == "Repeater" || name == "BlurFilter" || name == "DropShadowStyle" ||
+         name == "BackgroundBlurStyle" || name == "InnerShadowStyle";
+}
+
+static bool HasHighCostChildren(xmlNodePtr node);
+
+static bool CheckHighCostRecursive(const std::vector<xmlNodePtr>& children) {
+  for (auto* child : children) {
+    if (IsHighCostNode(child)) {
+      return true;
+    }
+    if (HasHighCostChildren(child)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool HasHighCostChildren(xmlNodePtr node) {
+  return CheckHighCostRecursive(XmlChildElements(node));
+}
+
+static void CollectLintHintsFromContents(xmlNodePtr layer, const std::string& displayName,
+                                         RepeaterContext ctx,
+                                         std::vector<LintDiagnostic>& diagnostics);
+
+static void CollectLintHintsFromElements(const std::vector<xmlNodePtr>& elements,
+                                         const std::string& displayName, RepeaterContext ctx,
+                                         std::vector<LintDiagnostic>& diagnostics) {
+  float localProduct = ctx.productSoFar;
+  int localRepeaterCount = ctx.repeaterCount;
 
   for (auto* element : elements) {
-    NodeType type = element->nodeType();
+    if (XmlNodeIs(element, "Repeater")) {
+      float copies = XmlAttrFloat(element, "copies");
+      if (!std::isnan(copies)) {
+        localProduct *= copies;
+        localRepeaterCount++;
+      }
+    }
+  }
 
-    if (type == NodeType::Repeater) {
-      auto repeater = static_cast<const Repeater*>(element);
-      if (repeater->copies > 200.0f) {
+  bool hasRepeater = localProduct > ctx.productSoFar;
+  bool hasStrokeWithDashes = false;
+
+  for (auto* element : elements) {
+    auto nodeName = XmlNodeName(element);
+
+    if (nodeName == "Repeater") {
+      float copies = XmlAttrFloat(element, "copies");
+      if (!std::isnan(copies) && copies > 200.0f) {
         LintDiagnostic diag = {};
+        diag.line = static_cast<int>(element->line);
         diag.category = "warning";
-        diag.message = name + ": Repeater with high copies count (" +
-                       std::to_string(static_cast<int>(repeater->copies)) +
-                       ") may cause performance issues";
+        diag.message = displayName + ": Repeater with high copies count (" +
+                       std::to_string(static_cast<int>(copies)) + ") may cause performance issues";
         diagnostics.push_back(std::move(diag));
       }
-      if (localProduct > 500.0f && (outerProduct > 1.0f || repeaterCount > 1)) {
+      if (localProduct > 500.0f && (ctx.productSoFar > 1.0f || localRepeaterCount > 1)) {
         LintDiagnostic diag = {};
+        diag.line = static_cast<int>(element->line);
         diag.category = "warning";
-        diag.message = name + ": Nested Repeater with product " +
+        diag.message = displayName + ": Nested Repeater with product " +
                        std::to_string(static_cast<int>(localProduct)) +
                        " (> 500) may cause performance issues";
         diagnostics.push_back(std::move(diag));
       }
     }
 
-    if (type == NodeType::Stroke) {
-      auto stroke = static_cast<const Stroke*>(element);
-      if (hasRepeater && stroke->align != StrokeAlign::Center) {
-        std::string alignStr = (stroke->align == StrokeAlign::Inside) ? "Inside" : "Outside";
+    if (nodeName == "Stroke") {
+      auto align = XmlAttr(element, "align");
+      if (hasRepeater && !align.empty() && align != "center") {
         LintDiagnostic diag = {};
+        diag.line = static_cast<int>(element->line);
         diag.category = "warning";
-        diag.message = name + ": Stroke with non-center alignment (" + alignStr +
+        std::string alignStr = (align == "inside") ? "Inside" : "Outside";
+        diag.message = displayName + ": Stroke with non-center alignment (" + alignStr +
                        ") in Repeater scope requires expensive CPU path operations";
         diagnostics.push_back(std::move(diag));
       }
-      if (!stroke->dashes.empty()) {
+      auto dashes = XmlAttr(element, "dashes");
+      if (!dashes.empty()) {
         hasStrokeWithDashes = true;
       }
     }
 
-    if (type == NodeType::Path) {
-      auto path = static_cast<const Path*>(element);
-      if (path->data != nullptr) {
-        auto verbCount = path->data->verbs().size();
-        if (verbCount > 15) {
-          LintDiagnostic diag = {};
-          diag.category = "warning";
-          diag.message = name + ": Path with high complexity (" + std::to_string(verbCount) +
-                         " verbs) may cause rendering performance issues";
-          diagnostics.push_back(std::move(diag));
+    if (nodeName == "Path") {
+      auto dataRef = XmlAttr(element, "data");
+      if (!dataRef.empty() && dataRef[0] == '@') {
+        auto root = element->doc != nullptr ? xmlDocGetRootElement(element->doc) : nullptr;
+        if (root != nullptr) {
+          auto* pathDataNode = FindNodeById(root, dataRef.substr(1));
+          if (pathDataNode != nullptr) {
+            auto data = XmlAttr(pathDataNode, "data");
+            auto verbs = ParseVerbs(data);
+            if (verbs.size() > 15) {
+              LintDiagnostic diag = {};
+              diag.line = static_cast<int>(element->line);
+              diag.category = "warning";
+              diag.message = displayName + ": Path with high complexity (" +
+                             std::to_string(verbs.size()) +
+                             " verbs) may cause rendering performance issues";
+              diagnostics.push_back(std::move(diag));
+            }
+          }
         }
       }
     }
 
-    if (type == NodeType::Group || type == NodeType::TextBox) {
-      auto group = static_cast<const Group*>(element);
-      CollectLintHintsFromContentsHelper(group->elements, localProduct, layer, diagnostics);
+    if (nodeName == "Group" || nodeName == "TextBox") {
+      RepeaterContext childCtx = {};
+      childCtx.productSoFar = localProduct;
+      childCtx.repeaterCount = localRepeaterCount;
+      childCtx.hasRepeater = hasRepeater;
+      CollectLintHintsFromElements(XmlChildElements(element), displayName, childCtx, diagnostics);
     }
   }
 
   if (hasRepeater && hasStrokeWithDashes) {
     LintDiagnostic diag = {};
     diag.category = "warning";
-    diag.message = name +
+    diag.message = displayName +
                    ": Dashed Stroke within Repeater scope may cause performance "
                    "issues due to complex rendering calculations";
     diagnostics.push_back(std::move(diag));
   }
 }
 
-static void CollectBlurHints(const Layer* layer, std::vector<LintDiagnostic>& diagnostics) {
-  auto name = layer->name.empty() ? layer->id : layer->name;
+static void CollectLintHintsFromContents(xmlNodePtr layer, const std::string& displayName,
+                                         RepeaterContext ctx,
+                                         std::vector<LintDiagnostic>& diagnostics) {
+  auto children = XmlChildElements(layer);
+  std::vector<xmlNodePtr> contentChildren = {};
+  for (auto* child : children) {
+    if (IsContentNode(child)) {
+      contentChildren.push_back(child);
+    }
+  }
+  CollectLintHintsFromElements(contentChildren, displayName, ctx, diagnostics);
+}
 
-  for (auto* filter : layer->filters) {
-    if (filter->nodeType() == NodeType::BlurFilter) {
-      auto blur = static_cast<const BlurFilter*>(filter);
-      if (blur->blurX > 30.0f || blur->blurY > 30.0f) {
+static void CollectBlurHints(xmlNodePtr layer, const std::string& displayName,
+                             std::vector<LintDiagnostic>& diagnostics) {
+  auto children = XmlChildElements(layer);
+  for (auto* child : children) {
+    auto nodeName = XmlNodeName(child);
+
+    if (nodeName == "BlurFilter") {
+      float blurX = XmlAttrFloat(child, "blurX");
+      float blurY = XmlAttrFloat(child, "blurY");
+      if (std::isnan(blurX)) {
+        blurX = 0;
+      }
+      if (std::isnan(blurY)) {
+        blurY = 0;
+      }
+      if (blurX > 30.0f || blurY > 30.0f) {
         LintDiagnostic diag = {};
+        diag.line = static_cast<int>(child->line);
         diag.category = "warning";
-        diag.message = name + ": BlurFilter with high blur radius (X:" +
-                       std::to_string(static_cast<int>(blur->blurX)) +
-                       " Y:" + std::to_string(static_cast<int>(blur->blurY)) +
+        diag.message =
+            displayName +
+            ": BlurFilter with high blur radius (X:" + std::to_string(static_cast<int>(blurX)) +
+            " Y:" + std::to_string(static_cast<int>(blurY)) + ") may cause performance issues";
+        diagnostics.push_back(std::move(diag));
+      }
+    }
+
+    if (nodeName == "DropShadowStyle") {
+      float blurX = XmlAttrFloat(child, "blurX");
+      float blurY = XmlAttrFloat(child, "blurY");
+      if (std::isnan(blurX)) {
+        blurX = 0;
+      }
+      if (std::isnan(blurY)) {
+        blurY = 0;
+      }
+      if (blurX > 30.0f || blurY > 30.0f) {
+        LintDiagnostic diag = {};
+        diag.line = static_cast<int>(child->line);
+        diag.category = "warning";
+        diag.message = displayName + ": DropShadowStyle with high blur radius (X:" +
+                       std::to_string(static_cast<int>(blurX)) +
+                       " Y:" + std::to_string(static_cast<int>(blurY)) +
                        ") may cause performance issues";
         diagnostics.push_back(std::move(diag));
       }
     }
-  }
 
-  for (auto* style : layer->styles) {
-    auto type = style->nodeType();
-    if (type == NodeType::DropShadowStyle) {
-      auto shadow = static_cast<const DropShadowStyle*>(style);
-      if (shadow->blurX > 30.0f || shadow->blurY > 30.0f) {
-        LintDiagnostic diag = {};
-        diag.category = "warning";
-        diag.message = name + ": DropShadowStyle with high blur radius (X:" +
-                       std::to_string(static_cast<int>(shadow->blurX)) +
-                       " Y:" + std::to_string(static_cast<int>(shadow->blurY)) +
-                       ") may cause performance issues";
-        diagnostics.push_back(std::move(diag));
+    if (nodeName == "BackgroundBlurStyle") {
+      float blurX = XmlAttrFloat(child, "blurX");
+      float blurY = XmlAttrFloat(child, "blurY");
+      if (std::isnan(blurX)) {
+        blurX = 0;
       }
-    } else if (type == NodeType::BackgroundBlurStyle) {
-      auto bgBlur = static_cast<const BackgroundBlurStyle*>(style);
-      if (bgBlur->blurX > 30.0f || bgBlur->blurY > 30.0f) {
+      if (std::isnan(blurY)) {
+        blurY = 0;
+      }
+      if (blurX > 30.0f || blurY > 30.0f) {
         LintDiagnostic diag = {};
+        diag.line = static_cast<int>(child->line);
         diag.category = "warning";
-        diag.message = name + ": BackgroundBlurStyle with high blur radius (X:" +
-                       std::to_string(static_cast<int>(bgBlur->blurX)) +
-                       " Y:" + std::to_string(static_cast<int>(bgBlur->blurY)) +
+        diag.message = displayName + ": BackgroundBlurStyle with high blur radius (X:" +
+                       std::to_string(static_cast<int>(blurX)) +
+                       " Y:" + std::to_string(static_cast<int>(blurY)) +
                        ") may cause performance issues";
         diagnostics.push_back(std::move(diag));
       }
@@ -616,889 +1387,244 @@ static void CollectBlurHints(const Layer* layer, std::vector<LintDiagnostic>& di
   }
 }
 
-static bool HasHighCostElementsHelper(const std::vector<Element*>& elements);
+static bool CanDowngradeLayerToGroup(xmlNodePtr layer) {
+  auto children = XmlChildElements(layer);
+  for (auto* child : children) {
+    auto name = XmlNodeName(child);
+    if (name == "Layer" || name == "DropShadowStyle" || name == "InnerShadowStyle" ||
+        name == "BackgroundBlurStyle" || name == "BlurFilter") {
+      return false;
+    }
+  }
 
-static bool HasHighCostElements(const Layer* layer) {
-  if (HasHighCostElementsHelper(layer->contents)) {
-    return true;
-  }
-  for (auto* filter : layer->filters) {
-    if (filter->nodeType() == NodeType::BlurFilter) {
-      return true;
-    }
-  }
-  for (auto* style : layer->styles) {
-    auto type = style->nodeType();
-    if (type == NodeType::DropShadowStyle || type == NodeType::BackgroundBlurStyle ||
-        type == NodeType::InnerShadowStyle) {
-      return true;
-    }
-  }
-  return false;
-}
+  auto mask = XmlAttr(layer, "mask");
+  auto composition = XmlAttr(layer, "composition");
+  auto blendMode = XmlAttr(layer, "blendMode");
+  auto visible = XmlAttr(layer, "visible");
+  auto hasScrollRect = XmlAttr(layer, "hasScrollRect");
+  auto matrix = XmlAttr(layer, "matrix");
+  auto matrix3D = XmlAttr(layer, "matrix3D");
+  auto preserve3D = XmlAttr(layer, "preserve3D");
+  auto groupOpacity = XmlAttr(layer, "groupOpacity");
+  auto passThroughBackground = XmlAttr(layer, "passThroughBackground");
+  auto antiAlias = XmlAttr(layer, "antiAlias");
+  auto id = XmlAttr(layer, "id");
+  auto name = XmlAttr(layer, "name");
+  auto customData = XmlAttr(layer, "customData");
+  auto layout = XmlAttr(layer, "layout");
+  auto flex = XmlAttrFloat(layer, "flex");
+  auto width = XmlAttrFloat(layer, "width");
+  auto height = XmlAttrFloat(layer, "height");
+  auto includeInLayout = XmlAttr(layer, "includeInLayout");
 
-static bool HasHighCostElementsHelper(const std::vector<Element*>& elements) {
-  for (auto* element : elements) {
-    NodeType type = element->nodeType();
-    if (type == NodeType::Repeater) {
-      return true;
-    }
-    if (type == NodeType::Group || type == NodeType::TextBox) {
-      auto group = static_cast<const Group*>(element);
-      if (HasHighCostElementsHelper(group->elements)) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-static bool IsMaskASimpleRectangle(const Layer* mask) {
-  if (mask == nullptr) {
+  if (!mask.empty()) {
     return false;
   }
-  if (mask->contents.size() != 2) {
+  if (!composition.empty()) {
     return false;
   }
-  if (mask->contents[0]->nodeType() != NodeType::Rectangle) {
+  if (!blendMode.empty() && blendMode != "normal") {
     return false;
   }
-  if (mask->contents[1]->nodeType() != NodeType::Fill) {
+  if (!visible.empty() && visible != "true") {
     return false;
   }
-  auto fill = static_cast<const Fill*>(mask->contents[1]);
-  if (fill->color == nullptr || fill->color->nodeType() != NodeType::SolidColor) {
+  if (!hasScrollRect.empty() && hasScrollRect != "false") {
     return false;
   }
-  if (fill->alpha < 0.999f) {
+  if (!matrix.empty() && matrix != "1,0,0,1,0,0") {
     return false;
   }
-  if (!mask->matrix.isIdentity() || !mask->matrix3D.isIdentity()) {
+  if (!matrix3D.empty() && matrix3D != "1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1") {
     return false;
   }
-  if (!mask->styles.empty() || !mask->filters.empty()) {
+  if (!preserve3D.empty() && preserve3D != "false") {
     return false;
   }
-  if (mask->blendMode != BlendMode::Normal) {
+  if (!groupOpacity.empty() && groupOpacity != "false") {
+    return false;
+  }
+  if (!passThroughBackground.empty() && passThroughBackground != "true") {
+    return false;
+  }
+  if (!antiAlias.empty() && antiAlias != "true") {
+    return false;
+  }
+  if (!id.empty() || !name.empty()) {
+    return false;
+  }
+  if (!customData.empty()) {
+    return false;
+  }
+  if (!layout.empty() && layout != "none") {
+    return false;
+  }
+  if (!std::isnan(flex) && flex != 0) {
+    return false;
+  }
+  if (!std::isnan(width) || !std::isnan(height)) {
+    return false;
+  }
+  if (HasConstraintAttributes(layer)) {
+    return false;
+  }
+  if (!includeInLayout.empty() && includeInLayout != "true") {
     return false;
   }
   return true;
 }
 
-static void CollectLintHints(const Layer* layer, std::vector<LintDiagnostic>& diagnostics,
-                             bool isRoot, bool parentHasLayout) {
-  auto name = layer->name.empty() ? layer->id : layer->name;
-
-  // Check: includeInLayout=false has no effect when parent has no container layout.
-  if (!isRoot && !parentHasLayout && !layer->includeInLayout) {
-    LintDiagnostic diag = {};
-    diag.category = "warning";
-    diag.message = name + ": includeInLayout=false has no effect, parent has no container layout";
-    diagnostics.push_back(std::move(diag));
+static bool IsMaskSimpleRectangle(xmlNodePtr root, const std::string& maskId) {
+  auto* maskNode = FindNodeById(root, maskId);
+  if (maskNode == nullptr || !XmlNodeIs(maskNode, "Layer")) {
+    return false;
   }
 
-  // Check: flex has no effect when parent has no container layout.
-  if (!isRoot && !parentHasLayout && layer->flex > 0) {
-    LintDiagnostic diag = {};
-    diag.category = "warning";
-    diag.message = name + ": flex has no effect, parent has no container layout";
-    diagnostics.push_back(std::move(diag));
+  auto children = XmlChildElements(maskNode);
+  if (children.size() != 2) {
+    return false;
+  }
+  if (!XmlNodeIs(children[0], "Rectangle")) {
+    return false;
+  }
+  if (!XmlNodeIs(children[1], "Fill")) {
+    return false;
   }
 
-  if (!isRoot && !layer->children.empty() && layer->layout == LayoutMode::None) {
+  auto fillNode = children[1];
+  auto fillChildren = XmlChildElements(fillNode);
+  bool hasSolidColor = false;
+  for (auto* fc : fillChildren) {
+    if (XmlNodeIs(fc, "SolidColor")) {
+      hasSolidColor = true;
+      break;
+    }
+  }
+  auto colorAttr = XmlAttr(fillNode, "color");
+  if (!hasSolidColor && colorAttr.empty()) {
+    return false;
+  }
+  auto fillAlpha = XmlAttrFloat(fillNode, "alpha");
+  if (!std::isnan(fillAlpha) && fillAlpha < 0.999f) {
+    return false;
+  }
+
+  auto maskMatrix = XmlAttr(maskNode, "matrix");
+  if (!maskMatrix.empty() && maskMatrix != "1,0,0,1,0,0") {
+    return false;
+  }
+  auto maskMatrix3D = XmlAttr(maskNode, "matrix3D");
+  if (!maskMatrix3D.empty() && maskMatrix3D != "1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1") {
+    return false;
+  }
+
+  auto blendMode = XmlAttr(maskNode, "blendMode");
+  if (!blendMode.empty() && blendMode != "normal") {
+    return false;
+  }
+
+  return true;
+}
+
+static void CollectLintHints(xmlNodePtr layer, xmlNodePtr root, bool isRoot, bool parentHasLayout,
+                             std::vector<LintDiagnostic>& diagnostics) {
+  auto displayName = GetNodeDisplayName(layer);
+
+  if (!isRoot && !parentHasLayout) {
+    auto includeInLayout = XmlAttr(layer, "includeInLayout");
+    if (!includeInLayout.empty() && includeInLayout != "true") {
+      LintDiagnostic diag = {};
+      diag.line = static_cast<int>(layer->line);
+      diag.category = "warning";
+      diag.message =
+          displayName + ": includeInLayout=false has no effect, parent has no container layout";
+      diagnostics.push_back(std::move(diag));
+    }
+
+    auto flex = XmlAttrFloat(layer, "flex");
+    if (!std::isnan(flex) && flex > 0) {
+      LintDiagnostic diag = {};
+      diag.line = static_cast<int>(layer->line);
+      diag.category = "warning";
+      diag.message = displayName + ": flex has no effect, parent has no container layout";
+      diagnostics.push_back(std::move(diag));
+    }
+  }
+
+  auto children = XmlChildElements(layer);
+  std::vector<xmlNodePtr> childLayers = {};
+  for (auto* child : children) {
+    if (XmlNodeIs(child, "Layer")) {
+      childLayers.push_back(child);
+    }
+  }
+
+  auto layout = XmlAttr(layer, "layout");
+  bool thisHasLayout = !layout.empty() && layout != "none";
+
+  if (!isRoot && !childLayers.empty() && !thisHasLayout) {
     bool allDowngradable = true;
-    for (auto* child : layer->children) {
-      if (!CanDowngradeToGroup(child)) {
+    for (auto* childLayer : childLayers) {
+      if (!CanDowngradeLayerToGroup(childLayer)) {
         allDowngradable = false;
         break;
       }
     }
     if (allDowngradable) {
-      auto count = static_cast<int>(layer->children.size());
       LintDiagnostic diag = {};
+      diag.line = static_cast<int>(layer->line);
       diag.category = "warning";
-      diag.message = name + ": " + std::to_string(count) +
+      diag.message = displayName + ": " + std::to_string(childLayers.size()) +
                      " child Layer(s) use no Layer-exclusive "
                      "features and could be downgraded to Groups";
       diagnostics.push_back(std::move(diag));
     }
   }
 
-  CollectLintHintsFromContents(layer, diagnostics, 1.0f);
-  CollectBlurHints(layer, diagnostics);
+  RepeaterContext ctx = {};
+  ctx.productSoFar = 1.0f;
+  ctx.repeaterCount = 0;
+  ctx.hasRepeater = false;
+  CollectLintHintsFromContents(layer, displayName, ctx, diagnostics);
+  CollectBlurHints(layer, displayName, diagnostics);
 
-  if (layer->alpha < 0.2f && layer->alpha > 0.0f && HasHighCostElements(layer)) {
+  auto alpha = XmlAttrFloat(layer, "alpha");
+  if (!std::isnan(alpha) && alpha < 0.2f && alpha > 0.0f && HasHighCostChildren(layer)) {
     LintDiagnostic diag = {};
+    diag.line = static_cast<int>(layer->line);
     diag.category = "warning";
-    diag.message = name + ": Low opacity (" + std::to_string(static_cast<int>(layer->alpha * 100)) +
+    diag.message = displayName + ": Low opacity (" + std::to_string(static_cast<int>(alpha * 100)) +
                    "%) with high-cost elements (Repeater/Blur) may indicate unnecessary rendering";
     diagnostics.push_back(std::move(diag));
   }
 
-  if (layer->mask != nullptr && layer->maskType == MaskType::Alpha &&
-      IsMaskASimpleRectangle(layer->mask)) {
-    LintDiagnostic diag = {};
-    diag.category = "warning";
-    diag.message =
-        name +
-        ": Using rectangular mask could be replaced with clipToBounds for better performance";
-    diagnostics.push_back(std::move(diag));
+  auto maskRef = XmlAttr(layer, "mask");
+  auto maskType = XmlAttr(layer, "maskType");
+  if (!maskRef.empty() && maskRef[0] == '@') {
+    std::string maskId = maskRef.substr(1);
+    if ((maskType.empty() || maskType == "alpha") && IsMaskSimpleRectangle(root, maskId)) {
+      LintDiagnostic diag = {};
+      diag.line = static_cast<int>(layer->line);
+      diag.category = "warning";
+      diag.message =
+          displayName +
+          ": Using rectangular mask could be replaced with clipToBounds for better performance";
+      diagnostics.push_back(std::move(diag));
+    }
   }
 
-  bool hasLayout = layer->layout != LayoutMode::None;
-  for (auto* child : layer->children) {
-    CollectLintHints(child, diagnostics, false, hasLayout);
+  for (auto* childLayer : childLayers) {
+    CollectLintHints(childLayer, root, false, thisHasLayout, diagnostics);
   }
 }
 
-static void CollectAllLintHints(const PAGXDocument* document,
-                                std::vector<LintDiagnostic>& diagnostics) {
-  for (auto* layer : document->layers) {
-    CollectLintHints(layer, diagnostics, true, false);
-  }
-  for (auto& node : document->nodes) {
-    if (node->nodeType() == NodeType::Composition) {
-      auto comp = static_cast<const Composition*>(node.get());
-      for (auto* layer : comp->layers) {
-        CollectLintHints(layer, diagnostics, true, false);
-      }
+static void CollectAllLintHints(xmlNodePtr root, std::vector<LintDiagnostic>& diagnostics) {
+  auto children = XmlChildElements(root);
+  for (auto* child : children) {
+    if (XmlNodeIs(child, "Layer")) {
+      CollectLintHints(child, root, true, false, diagnostics);
     }
   }
-}
-
-// --- Pass 2: PathData deduplication detection ---
-
-static bool PathDataEqual(const PathData* a, const PathData* b) {
-  if (a == b) {
-    return true;
-  }
-  if (a == nullptr || b == nullptr) {
-    return false;
-  }
-  return a->verbs() == b->verbs() && a->points() == b->points();
-}
-
-static int CountDuplicatePathData(const PAGXDocument* document) {
-  std::vector<const PathData*> uniquePaths = {};
-  int duplicateCount = 0;
-
-  for (auto& node : document->nodes) {
-    if (node->nodeType() != NodeType::PathData) {
-      continue;
-    }
-    auto pathData = static_cast<const PathData*>(node.get());
-    bool found = false;
-    for (auto* existing : uniquePaths) {
-      if (PathDataEqual(existing, pathData)) {
-        duplicateCount++;
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      uniquePaths.push_back(pathData);
-    }
-  }
-  return duplicateCount;
-}
-
-// --- Pass 3: Gradient deduplication detection ---
-
-static bool ColorStopsEqual(const std::vector<ColorStop*>& a, const std::vector<ColorStop*>& b) {
-  if (a.size() != b.size()) {
-    return false;
-  }
-  for (size_t i = 0; i < a.size(); i++) {
-    if (a[i]->offset != b[i]->offset || a[i]->color != b[i]->color) {
-      return false;
-    }
-  }
-  return true;
-}
-
-static bool GradientEqual(const ColorSource* a, const ColorSource* b) {
-  if (a->nodeType() != b->nodeType()) {
-    return false;
-  }
-  auto type = a->nodeType();
-  if (type == NodeType::LinearGradient) {
-    auto ga = static_cast<const LinearGradient*>(a);
-    auto gb = static_cast<const LinearGradient*>(b);
-    return ga->startPoint == gb->startPoint && ga->endPoint == gb->endPoint &&
-           ga->matrix == gb->matrix && ColorStopsEqual(ga->colorStops, gb->colorStops);
-  }
-  if (type == NodeType::RadialGradient) {
-    auto ga = static_cast<const RadialGradient*>(a);
-    auto gb = static_cast<const RadialGradient*>(b);
-    return ga->center == gb->center && ga->radius == gb->radius && ga->matrix == gb->matrix &&
-           ColorStopsEqual(ga->colorStops, gb->colorStops);
-  }
-  if (type == NodeType::ConicGradient) {
-    auto ga = static_cast<const ConicGradient*>(a);
-    auto gb = static_cast<const ConicGradient*>(b);
-    return ga->center == gb->center && ga->startAngle == gb->startAngle &&
-           ga->endAngle == gb->endAngle && ga->matrix == gb->matrix &&
-           ColorStopsEqual(ga->colorStops, gb->colorStops);
-  }
-  if (type == NodeType::DiamondGradient) {
-    auto ga = static_cast<const DiamondGradient*>(a);
-    auto gb = static_cast<const DiamondGradient*>(b);
-    return ga->center == gb->center && ga->radius == gb->radius && ga->matrix == gb->matrix &&
-           ColorStopsEqual(ga->colorStops, gb->colorStops);
-  }
-  return false;
-}
-
-static int CountDuplicateGradients(const PAGXDocument* document) {
-  std::vector<const ColorSource*> uniqueSources = {};
-  int duplicateCount = 0;
-
-  for (auto& node : document->nodes) {
-    if (!IsGradient(node->nodeType())) {
-      continue;
-    }
-    auto source = static_cast<const ColorSource*>(node.get());
-    bool found = false;
-    for (auto* existing : uniqueSources) {
-      if (GradientEqual(existing, source)) {
-        duplicateCount++;
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      uniqueSources.push_back(source);
-    }
-  }
-  return duplicateCount;
-}
-
-// --- Pass 4: Mergeable Group detection ---
-
-static bool IsGeometry(NodeType type) {
-  return type == NodeType::Rectangle || type == NodeType::Ellipse || type == NodeType::Polystar ||
-         type == NodeType::Path;
-}
-
-static bool IsPainter(NodeType type) {
-  return type == NodeType::Fill || type == NodeType::Stroke;
-}
-
-static bool IsModifier(NodeType type) {
-  return type == NodeType::TrimPath || type == NodeType::RoundCorner || type == NodeType::MergePath;
-}
-
-static bool HasDefaultGroupTransform(const Group* group) {
-  if (group->anchor.x != 0 || group->anchor.y != 0 || group->position.x != 0 ||
-      group->position.y != 0 || group->rotation != 0 || group->scale.x != 1 ||
-      group->scale.y != 1 || group->skew != 0 || group->skewAxis != 0 || group->alpha != 1) {
-    return false;
-  }
-  if (HasConstraintAttributes(group->left, group->right, group->top, group->bottom, group->centerX,
-                              group->centerY)) {
-    return false;
-  }
-  if (!std::isnan(group->width) || !std::isnan(group->height)) {
-    return false;
-  }
-  return true;
-}
-
-static bool SplitGeometryAndPainters(const Group* group, std::vector<Element*>& geometry,
-                                     std::vector<Element*>& painters) {
-  bool seenPainter = false;
-  for (auto* element : group->elements) {
-    auto type = element->nodeType();
-    if (IsModifier(type)) {
-      return false;
-    }
-    if (type == NodeType::Group || type == NodeType::Repeater || type == NodeType::Text ||
-        type == NodeType::TextBox || type == NodeType::TextPath || type == NodeType::TextModifier) {
-      return false;
-    }
-    if (IsPainter(type)) {
-      seenPainter = true;
-      painters.push_back(element);
-    } else if (IsGeometry(type)) {
-      if (seenPainter) {
-        return false;
-      }
-      geometry.push_back(element);
-    } else {
-      return false;
-    }
-  }
-  return !geometry.empty() && !painters.empty();
-}
-
-static bool ElementsStructurallyEqual(const Element* a, const Element* b);
-
-static bool PainterColorsEqual(const ColorSource* a, const ColorSource* b) {
-  if (a == b) {
-    return true;
-  }
-  if (a == nullptr || b == nullptr) {
-    return false;
-  }
-  if (a->nodeType() != b->nodeType()) {
-    return false;
-  }
-  if (a->nodeType() == NodeType::SolidColor) {
-    return static_cast<const SolidColor*>(a)->color == static_cast<const SolidColor*>(b)->color;
-  }
-  return false;
-}
-
-static bool ElementsStructurallyEqual(const Element* a, const Element* b) {
-  if (a->nodeType() != b->nodeType()) {
-    return false;
-  }
-  auto type = a->nodeType();
-  if (type == NodeType::Rectangle) {
-    auto ra = static_cast<const Rectangle*>(a);
-    auto rb = static_cast<const Rectangle*>(b);
-    return ra->position == rb->position && ra->size == rb->size && ra->roundness == rb->roundness &&
-           ra->reversed == rb->reversed;
-  }
-  if (type == NodeType::Ellipse) {
-    auto ea = static_cast<const Ellipse*>(a);
-    auto eb = static_cast<const Ellipse*>(b);
-    return ea->position == eb->position && ea->size == eb->size && ea->reversed == eb->reversed;
-  }
-  if (type == NodeType::Polystar) {
-    auto pa = static_cast<const Polystar*>(a);
-    auto pb = static_cast<const Polystar*>(b);
-    return pa->position == pb->position && pa->type == pb->type &&
-           pa->pointCount == pb->pointCount && pa->outerRadius == pb->outerRadius &&
-           pa->innerRadius == pb->innerRadius && pa->rotation == pb->rotation &&
-           pa->outerRoundness == pb->outerRoundness && pa->innerRoundness == pb->innerRoundness &&
-           pa->reversed == pb->reversed;
-  }
-  if (type == NodeType::Path) {
-    auto pathA = static_cast<const Path*>(a);
-    auto pathB = static_cast<const Path*>(b);
-    if (pathA->reversed != pathB->reversed) {
-      return false;
-    }
-    return PathDataEqual(pathA->data, pathB->data);
-  }
-  if (type == NodeType::Fill) {
-    auto fa = static_cast<const Fill*>(a);
-    auto fb = static_cast<const Fill*>(b);
-    return fa->alpha == fb->alpha && fa->blendMode == fb->blendMode &&
-           fa->fillRule == fb->fillRule && fa->placement == fb->placement &&
-           PainterColorsEqual(fa->color, fb->color);
-  }
-  if (type == NodeType::Stroke) {
-    auto sa = static_cast<const Stroke*>(a);
-    auto sb = static_cast<const Stroke*>(b);
-    return sa->width == sb->width && sa->alpha == sb->alpha && sa->blendMode == sb->blendMode &&
-           sa->cap == sb->cap && sa->join == sb->join && sa->miterLimit == sb->miterLimit &&
-           sa->dashes == sb->dashes && sa->dashOffset == sb->dashOffset &&
-           sa->dashAdaptive == sb->dashAdaptive && sa->align == sb->align &&
-           sa->placement == sb->placement && PainterColorsEqual(sa->color, sb->color);
-  }
-  if (type == NodeType::Group) {
-    auto ga = static_cast<const Group*>(a);
-    auto gb = static_cast<const Group*>(b);
-    if (ga->position != gb->position || ga->anchor != gb->anchor || ga->rotation != gb->rotation ||
-        ga->scale != gb->scale || ga->skew != gb->skew || ga->skewAxis != gb->skewAxis ||
-        ga->alpha != gb->alpha) {
-      return false;
-    }
-    if (ga->elements.size() != gb->elements.size()) {
-      return false;
-    }
-    for (size_t i = 0; i < ga->elements.size(); i++) {
-      if (!ElementsStructurallyEqual(ga->elements[i], gb->elements[i])) {
-        return false;
-      }
-    }
-    return true;
-  }
-  if (type == NodeType::Text) {
-    auto ta = static_cast<const Text*>(a);
-    auto tb = static_cast<const Text*>(b);
-    if (ta->text != tb->text || ta->fontFamily != tb->fontFamily ||
-        ta->fontStyle != tb->fontStyle || ta->fontSize != tb->fontSize ||
-        ta->letterSpacing != tb->letterSpacing || ta->fauxBold != tb->fauxBold ||
-        ta->fauxItalic != tb->fauxItalic || ta->textAnchor != tb->textAnchor ||
-        ta->glyphRuns.size() != tb->glyphRuns.size()) {
-      return false;
-    }
-    for (size_t i = 0; i < ta->glyphRuns.size(); i++) {
-      auto ra = ta->glyphRuns[i];
-      auto rb = tb->glyphRuns[i];
-      if (ra->font != rb->font || ra->fontSize != rb->fontSize || ra->glyphs != rb->glyphs ||
-          ra->x != rb->x || ra->y != rb->y || ra->xOffsets != rb->xOffsets ||
-          ra->positions != rb->positions || ra->anchors != rb->anchors ||
-          ra->scales != rb->scales || ra->rotations != rb->rotations || ra->skews != rb->skews) {
-        return false;
-      }
-    }
-    return true;
-  }
-  if (type == NodeType::TextBox) {
-    auto tba = static_cast<const TextBox*>(a);
-    auto tbb = static_cast<const TextBox*>(b);
-    return tba->position == tbb->position &&
-           (tba->width == tbb->width || (std::isnan(tba->width) && std::isnan(tbb->width))) &&
-           (tba->height == tbb->height || (std::isnan(tba->height) && std::isnan(tbb->height))) &&
-           tba->textAlign == tbb->textAlign && tba->paragraphAlign == tbb->paragraphAlign &&
-           tba->writingMode == tbb->writingMode && tba->lineHeight == tbb->lineHeight &&
-           tba->wordWrap == tbb->wordWrap && tba->overflow == tbb->overflow;
-  }
-  return false;
-}
-
-static bool PaintersEqual(const std::vector<Element*>& a, const std::vector<Element*>& b) {
-  if (a.size() != b.size()) {
-    return false;
-  }
-  for (size_t i = 0; i < a.size(); i++) {
-    if (!ElementsStructurallyEqual(a[i], b[i])) {
-      return false;
-    }
-  }
-  return true;
-}
-
-static int CountMergeableGroupsInElements(const std::vector<Element*>& elements) {
-  int count = 0;
-  size_t i = 0;
-  while (i < elements.size()) {
-    auto* element = elements[i];
-    if (element->nodeType() != NodeType::Group) {
-      i++;
-      continue;
-    }
-    auto* group = static_cast<const Group*>(element);
-    if (!HasDefaultGroupTransform(group)) {
-      i++;
-      continue;
-    }
-    std::vector<Element*> geometry = {};
-    std::vector<Element*> painters = {};
-    if (!SplitGeometryAndPainters(group, geometry, painters)) {
-      i++;
-      continue;
-    }
-    size_t j = i + 1;
-    while (j < elements.size()) {
-      auto* next = elements[j];
-      if (next->nodeType() != NodeType::Group) {
-        break;
-      }
-      auto* nextGroup = static_cast<const Group*>(next);
-      if (!HasDefaultGroupTransform(nextGroup)) {
-        break;
-      }
-      std::vector<Element*> nextGeometry = {};
-      std::vector<Element*> nextPainters = {};
-      if (!SplitGeometryAndPainters(nextGroup, nextGeometry, nextPainters)) {
-        break;
-      }
-      if (!PaintersEqual(painters, nextPainters)) {
-        break;
-      }
-      count++;
-      j++;
-    }
-    i = j;
-  }
-  return count;
-}
-
-static int CountMergeableGroups(const PAGXDocument* document) {
-  int count = 0;
-  for (auto& node : document->nodes) {
-    if (node->nodeType() == NodeType::Layer) {
-      auto layer = static_cast<const Layer*>(node.get());
-      count += CountMergeableGroupsInElements(layer->contents);
-    } else if (node->nodeType() == NodeType::Group || node->nodeType() == NodeType::TextBox) {
-      auto group = static_cast<const Group*>(node.get());
-      count += CountMergeableGroupsInElements(group->elements);
-    }
-  }
-  return count;
-}
-
-// --- Pass 5: Redundant first-child Group detection ---
-
-static bool CanUnwrapFirstChildGroup(const Group* group) {
-  if (group->nodeType() != NodeType::Group) {
-    return false;
-  }
-  if (group->alpha != 1.0f) {
-    return false;
-  }
-  if (group->rotation != 0 || group->scale.x != 1 || group->scale.y != 1 || group->skew != 0 ||
-      group->skewAxis != 0) {
-    return false;
-  }
-  if (!std::isnan(group->width) || !std::isnan(group->height)) {
-    return false;
-  }
-  if (HasConstraintAttributes(group->left, group->right, group->top, group->bottom, group->centerX,
-                              group->centerY)) {
-    return false;
-  }
-  for (auto* element : group->elements) {
-    auto* layout = LayoutNode::AsLayoutNode(element);
-    if (layout != nullptr) {
-      if (!std::isnan(layout->right) || !std::isnan(layout->bottom) ||
-          !std::isnan(layout->centerX) || !std::isnan(layout->centerY)) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
-static int CountUnwrappableFirstChildGroupsInElements(const std::vector<Element*>& elements) {
-  int count = 0;
-  if (elements.empty()) {
-    return count;
-  }
-  auto* first = elements[0];
-  if (first->nodeType() == NodeType::Group) {
-    auto* group = static_cast<const Group*>(first);
-    if (CanUnwrapFirstChildGroup(group)) {
-      count++;
-    }
-  }
-  for (auto* element : elements) {
-    if (element->nodeType() == NodeType::Group || element->nodeType() == NodeType::TextBox) {
-      auto* group = static_cast<const Group*>(element);
-      count += CountUnwrappableFirstChildGroupsInElements(group->elements);
-    }
-  }
-  return count;
-}
-
-static int CountUnwrappableFirstChildGroups(const PAGXDocument* document) {
-  int count = 0;
-  for (auto& node : document->nodes) {
-    if (node->nodeType() == NodeType::Layer) {
-      auto layer = static_cast<const Layer*>(node.get());
-      count += CountUnwrappableFirstChildGroupsInElements(layer->contents);
-    } else if (node->nodeType() == NodeType::Group || node->nodeType() == NodeType::TextBox) {
-      auto group = static_cast<const Group*>(node.get());
-      count += CountUnwrappableFirstChildGroupsInElements(group->elements);
-    }
-  }
-  return count;
-}
-
-// --- Pass 6: Path to primitive detection ---
-
-static int CountPathsToPrimitives(const PAGXDocument* document) {
-  int count = 0;
-  for (auto& node : document->nodes) {
-    std::vector<Element*>* elements = nullptr;
-    if (node->nodeType() == NodeType::Layer) {
-      elements = &static_cast<Layer*>(node.get())->contents;
-    } else if (node->nodeType() == NodeType::Group || node->nodeType() == NodeType::TextBox) {
-      elements = &static_cast<Group*>(node.get())->elements;
-    }
-    if (elements == nullptr) {
-      continue;
-    }
-    for (auto* element : *elements) {
-      if (element->nodeType() != NodeType::Path) {
-        continue;
-      }
-      auto path = static_cast<const Path*>(element);
-      if (path->data == nullptr) {
-        continue;
-      }
-      if (HasConstraintAttributes(path->left, path->right, path->top, path->bottom, path->centerX,
-                                  path->centerY)) {
-        continue;
-      }
-      auto tgfxPath = ToTGFX(*path->data);
-      tgfx::RRect rrect = {};
-      tgfx::Rect rect = {};
-      if (tgfxPath.isRRect(&rrect) || tgfxPath.isOval(&rect) || tgfxPath.isRect(&rect)) {
-        count++;
-      }
-    }
-  }
-  return count;
-}
-
-// --- Pass 9: Coordinate localization detection ---
-
-static bool ShouldSkipLocalization(const Layer* layer) {
-  if (!layer->matrix.isIdentity()) {
-    return true;
-  }
-  if (layer->composition != nullptr) {
-    return true;
-  }
-  if (layer->contents.empty()) {
-    return true;
-  }
-  if (HasConstraintAttributes(layer->left, layer->right, layer->top, layer->bottom, layer->centerX,
-                              layer->centerY)) {
-    return true;
-  }
-  for (auto* element : layer->contents) {
-    auto type = element->nodeType();
-    if (type == NodeType::Rectangle) {
-      auto rect = static_cast<const Rectangle*>(element);
-      if (HasConstraintAttributes(rect->left, rect->right, rect->top, rect->bottom, rect->centerX,
-                                  rect->centerY)) {
-        return true;
-      }
-    } else if (type == NodeType::Ellipse) {
-      auto ellipse = static_cast<const Ellipse*>(element);
-      if (HasConstraintAttributes(ellipse->left, ellipse->right, ellipse->top, ellipse->bottom,
-                                  ellipse->centerX, ellipse->centerY)) {
-        return true;
-      }
-    } else if (type == NodeType::Polystar) {
-      auto polystar = static_cast<const Polystar*>(element);
-      if (HasConstraintAttributes(polystar->left, polystar->right, polystar->top, polystar->bottom,
-                                  polystar->centerX, polystar->centerY)) {
-        return true;
-      }
-    } else if (type == NodeType::Path) {
-      auto path = static_cast<const Path*>(element);
-      if (HasConstraintAttributes(path->left, path->right, path->top, path->bottom, path->centerX,
-                                  path->centerY)) {
-        return true;
-      }
-    } else if (type == NodeType::Text) {
-      auto text = static_cast<const Text*>(element);
-      if (HasConstraintAttributes(text->left, text->right, text->top, text->bottom, text->centerX,
-                                  text->centerY)) {
-        return true;
-      }
-    } else if (type == NodeType::Group || type == NodeType::TextBox) {
-      auto group = static_cast<const Group*>(element);
-      if (HasConstraintAttributes(group->left, group->right, group->top, group->bottom,
-                                  group->centerX, group->centerY)) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-static int CountLocalizableCoordinates(const PAGXDocument* document) {
-  int count = 0;
-  for (auto& node : document->nodes) {
-    if (node->nodeType() != NodeType::Layer) {
-      continue;
-    }
-    auto layer = static_cast<const Layer*>(node.get());
-    if (ShouldSkipLocalization(layer)) {
-      continue;
-    }
-    if (layer->x != 0 || layer->y != 0) {
-      count++;
-    }
-  }
-  return count;
-}
-
-// --- Pass 10: PathData localization detection ---
-
-static void CollectPaths(const std::vector<Element*>& elements, std::vector<const Path*>& paths) {
-  for (auto* element : elements) {
-    if (element->nodeType() == NodeType::Path) {
-      paths.push_back(static_cast<const Path*>(element));
-    } else if (element->nodeType() == NodeType::Group || element->nodeType() == NodeType::TextBox) {
-      CollectPaths(static_cast<const Group*>(element)->elements, paths);
-    }
-  }
-}
-
-static int CountLocalizablePathData(const PAGXDocument* document) {
-  int count = 0;
-  for (auto& node : document->nodes) {
-    std::vector<const Path*> paths = {};
-    if (node->nodeType() == NodeType::Layer) {
-      CollectPaths(static_cast<const Layer*>(node.get())->contents, paths);
-    } else if (node->nodeType() == NodeType::Group || node->nodeType() == NodeType::TextBox) {
-      CollectPaths(static_cast<const Group*>(node.get())->elements, paths);
-    }
-    for (auto* path : paths) {
-      if (path->data == nullptr || path->data->isEmpty()) {
-        continue;
-      }
-      auto bounds = path->data->getBounds();
-      if (std::abs(bounds.x) >= 0.001f || std::abs(bounds.y) >= 0.001f) {
-        count++;
-      }
-    }
-  }
-  return count;
-}
-
-// --- Pass 12: Extractable Composition detection ---
-
-static size_t HashElement(const Element* element) {
-  size_t h = std::hash<int>{}(static_cast<int>(element->nodeType()));
-  auto type = element->nodeType();
-  if (type == NodeType::Rectangle) {
-    auto rect = static_cast<const Rectangle*>(element);
-    h ^= std::hash<float>{}(rect->position.x) * 29;
-    h ^= std::hash<float>{}(rect->position.y) * 31;
-    h ^= std::hash<float>{}(rect->size.width) * 37;
-    h ^= std::hash<float>{}(rect->size.height) * 41;
-    h ^= std::hash<float>{}(rect->roundness) * 43;
-    h ^= std::hash<bool>{}(rect->reversed) * 47;
-  } else if (type == NodeType::Ellipse) {
-    auto ellipse = static_cast<const Ellipse*>(element);
-    h ^= std::hash<float>{}(ellipse->position.x) * 29;
-    h ^= std::hash<float>{}(ellipse->position.y) * 31;
-    h ^= std::hash<float>{}(ellipse->size.width) * 37;
-    h ^= std::hash<float>{}(ellipse->size.height) * 41;
-    h ^= std::hash<bool>{}(ellipse->reversed) * 43;
-  } else if (type == NodeType::Polystar) {
-    auto polystar = static_cast<const Polystar*>(element);
-    h ^= std::hash<float>{}(polystar->position.x) * 29;
-    h ^= std::hash<float>{}(polystar->position.y) * 31;
-    h ^= std::hash<int>{}(static_cast<int>(polystar->type)) * 37;
-    h ^= std::hash<float>{}(polystar->pointCount) * 41;
-    h ^= std::hash<float>{}(polystar->outerRadius) * 43;
-    h ^= std::hash<float>{}(polystar->innerRadius) * 47;
-    h ^= std::hash<float>{}(polystar->rotation) * 53;
-    h ^= std::hash<float>{}(polystar->outerRoundness) * 59;
-    h ^= std::hash<float>{}(polystar->innerRoundness) * 61;
-    h ^= std::hash<bool>{}(polystar->reversed) * 67;
-  } else if (type == NodeType::Path) {
-    auto path = static_cast<const Path*>(element);
-    if (path->data != nullptr) {
-      h ^= std::hash<size_t>{}(path->data->verbs().size()) * 31;
-      h ^= std::hash<size_t>{}(path->data->points().size()) * 37;
-    }
-    h ^= std::hash<bool>{}(path->reversed) * 43;
-  } else if (type == NodeType::Fill) {
-    auto fill = static_cast<const Fill*>(element);
-    h ^= std::hash<float>{}(fill->alpha) * 31;
-    h ^= std::hash<int>{}(static_cast<int>(fill->blendMode)) * 37;
-    h ^= std::hash<int>{}(static_cast<int>(fill->fillRule)) * 41;
-    if (fill->color != nullptr) {
-      h ^= std::hash<int>{}(static_cast<int>(fill->color->nodeType())) * 43;
-    }
-  } else if (type == NodeType::Stroke) {
-    auto stroke = static_cast<const Stroke*>(element);
-    h ^= std::hash<float>{}(stroke->width) * 31;
-    h ^= std::hash<float>{}(stroke->alpha) * 37;
-    h ^= std::hash<int>{}(static_cast<int>(stroke->cap)) * 41;
-    h ^= std::hash<int>{}(static_cast<int>(stroke->join)) * 43;
-  } else if (type == NodeType::Group) {
-    auto group = static_cast<const Group*>(element);
-    h ^= std::hash<float>{}(group->position.x) * 29;
-    h ^= std::hash<float>{}(group->position.y) * 31;
-    h ^= std::hash<float>{}(group->rotation) * 37;
-    h ^= std::hash<float>{}(group->scale.x) * 41;
-    h ^= std::hash<float>{}(group->scale.y) * 43;
-    h ^= std::hash<float>{}(group->alpha) * 47;
-    h ^= std::hash<size_t>{}(group->elements.size()) * 53;
-  }
-  return h;
-}
-
-static size_t HashLayerStructure(const Layer* layer) {
-  size_t h = std::hash<size_t>{}(layer->contents.size());
-  h ^= std::hash<size_t>{}(layer->children.size()) * 17;
-  for (auto* element : layer->contents) {
-    h = h * 131 + HashElement(element);
-  }
-  for (auto* child : layer->children) {
-    h = h * 131 + HashLayerStructure(child);
-  }
-  return h;
-}
-
-static bool LayersStructurallyEqual(const Layer* a, const Layer* b) {
-  if (a->contents.size() != b->contents.size()) {
-    return false;
-  }
-  if (a->children.size() != b->children.size()) {
-    return false;
-  }
-  if (a->composition != nullptr || b->composition != nullptr) {
-    return false;
-  }
-  if (a->styles.size() != b->styles.size() || a->filters.size() != b->filters.size()) {
-    return false;
-  }
-  if (a->alpha != b->alpha || a->blendMode != b->blendMode || a->visible != b->visible ||
-      a->maskType != b->maskType || a->antiAlias != b->antiAlias ||
-      a->groupOpacity != b->groupOpacity) {
-    return false;
-  }
-  if (!a->matrix.isIdentity() || !b->matrix.isIdentity()) {
-    return false;
-  }
-  for (size_t i = 0; i < a->contents.size(); i++) {
-    if (!ElementsStructurallyEqual(a->contents[i], b->contents[i])) {
-      return false;
-    }
-  }
-  for (size_t i = 0; i < a->children.size(); i++) {
-    if (!LayersStructurallyEqual(a->children[i], b->children[i])) {
-      return false;
-    }
-  }
-  return true;
-}
-
-static void CollectCandidateLayers(
-    const Layer* layer, std::unordered_map<size_t, std::vector<const Layer*>>& hashGroups,
-    bool parentHasContainerLayout) {
-  bool skipDueToLayout = parentHasContainerLayout && layer->includeInLayout;
-  if (!skipDueToLayout && !layer->contents.empty() && layer->composition == nullptr &&
-      layer->matrix.isIdentity() && layer->children.empty() && layer->styles.empty() &&
-      layer->filters.empty() && layer->flex == 0.0f && std::isnan(layer->right) &&
-      std::isnan(layer->bottom) && std::isnan(layer->centerX) && std::isnan(layer->centerY)) {
-    auto hash = HashLayerStructure(layer);
-    hashGroups[hash].push_back(layer);
-  }
-  bool thisHasContainerLayout = layer->layout != LayoutMode::None;
-  for (auto* child : layer->children) {
-    CollectCandidateLayers(child, hashGroups, thisHasContainerLayout);
-  }
-}
-
-static int CountExtractableCompositions(const PAGXDocument* document) {
-  std::unordered_map<size_t, std::vector<const Layer*>> hashGroups = {};
-  for (auto* layer : document->layers) {
-    CollectCandidateLayers(layer, hashGroups, false);
-  }
-
-  int count = 0;
-  for (auto& pair : hashGroups) {
-    auto& layers = pair.second;
-    if (layers.size() < 2) {
-      continue;
-    }
-    std::vector<bool> used(layers.size(), false);
-    for (size_t i = 0; i < layers.size(); i++) {
-      if (used[i]) {
-        continue;
-      }
-      int groupSize = 1;
-      for (size_t j = i + 1; j < layers.size(); j++) {
-        if (used[j]) {
-          continue;
-        }
-        if (LayersStructurallyEqual(layers[i], layers[j])) {
-          used[j] = true;
-          groupSize++;
-        }
-      }
-      if (groupSize >= 2) {
-        count += groupSize;
-      }
-    }
-  }
-  return count;
 }
 
 // --- Output formatting ---
@@ -1571,10 +1697,25 @@ int RunLint(int argc, char* argv[]) {
 
   std::vector<LintDiagnostic> diagnostics = {};
 
-  // Part A: XSD validation + semantic checks
-  ValidateXsdAndSemantic(filePath, diagnostics);
+  xmlDocPtr doc = xmlReadFile(filePath.c_str(), nullptr, XML_PARSE_NONET);
+  if (doc == nullptr) {
+    LintDiagnostic diag = {};
+    diag.category = "error";
+    diag.message = "Failed to parse XML document";
+    diagnostics.push_back(std::move(diag));
+    if (jsonOutput) {
+      PrintDiagnosticsJson(diagnostics, filePath);
+    } else {
+      PrintDiagnosticsText(diagnostics, filePath);
+    }
+    return 1;
+  }
 
-  // If XSD validation failed, skip structural analysis
+  bool xsdValid = ValidateXsd(doc, diagnostics);
+  if (xsdValid) {
+    CollectSemanticErrors(filePath, diagnostics);
+  }
+
   bool hasErrors = false;
   for (const auto& diag : diagnostics) {
     if (diag.category == "error") {
@@ -1584,112 +1725,33 @@ int RunLint(int argc, char* argv[]) {
   }
 
   if (!hasErrors) {
-    auto document = PAGXImporter::FromFile(filePath);
-    if (document != nullptr) {
-      // Part B: Structural issue detection
-      int emptyNodes = CountEmptyNodes(document.get());
-      if (emptyNodes > 0) {
-        LintDiagnostic diag = {};
-        diag.category = "warning";
-        diag.message = std::to_string(emptyNodes) + " empty node(s) can be removed";
-        diagnostics.push_back(std::move(diag));
-      }
+    xmlNodePtr root = XmlFindRoot(doc);
 
-      int fullCanvasClipMasks = CountFullCanvasClipMasks(document.get());
-      if (fullCanvasClipMasks > 0) {
-        LintDiagnostic diag = {};
-        diag.category = "warning";
-        diag.message = std::to_string(fullCanvasClipMasks) +
-                       " full-canvas clip mask(s) can be removed (no visible effect)";
-        diagnostics.push_back(std::move(diag));
-      }
-
-      int unreferencedResources = CountUnreferencedResources(document.get());
-      if (unreferencedResources > 0) {
-        LintDiagnostic diag = {};
-        diag.category = "warning";
-        diag.message =
-            std::to_string(unreferencedResources) + " unreferenced resource(s) can be removed";
-        diagnostics.push_back(std::move(diag));
-      }
-
-      // Part C: Optimization suggestions
-      int duplicatePathData = CountDuplicatePathData(document.get());
-      if (duplicatePathData > 0) {
-        LintDiagnostic diag = {};
-        diag.category = "info";
-        diag.message = std::to_string(duplicatePathData) + " duplicate PathData(s) can be merged";
-        diagnostics.push_back(std::move(diag));
-      }
-
-      int duplicateGradients = CountDuplicateGradients(document.get());
-      if (duplicateGradients > 0) {
-        LintDiagnostic diag = {};
-        diag.category = "info";
-        diag.message = std::to_string(duplicateGradients) + " duplicate gradient(s) can be merged";
-        diagnostics.push_back(std::move(diag));
-      }
-
-      int mergeableGroups = CountMergeableGroups(document.get());
-      if (mergeableGroups > 0) {
-        LintDiagnostic diag = {};
-        diag.category = "info";
-        diag.message =
-            std::to_string(mergeableGroups) + " adjacent Group(s) with same painters can be merged";
-        diagnostics.push_back(std::move(diag));
-      }
-
-      int unwrappableGroups = CountUnwrappableFirstChildGroups(document.get());
-      if (unwrappableGroups > 0) {
-        LintDiagnostic diag = {};
-        diag.category = "info";
-        diag.message =
-            std::to_string(unwrappableGroups) + " redundant first-child Group(s) can be unwrapped";
-        diagnostics.push_back(std::move(diag));
-      }
-
-      int pathsToPrimitives = CountPathsToPrimitives(document.get());
-      if (pathsToPrimitives > 0) {
-        LintDiagnostic diag = {};
-        diag.category = "info";
-        diag.message = std::to_string(pathsToPrimitives) +
-                       " Path(s) can be replaced with Rectangle/Ellipse primitives";
-        diagnostics.push_back(std::move(diag));
-      }
-
-      int localizableCoordinates = CountLocalizableCoordinates(document.get());
-      if (localizableCoordinates > 0) {
-        LintDiagnostic diag = {};
-        diag.category = "info";
-        diag.message =
-            std::to_string(localizableCoordinates) + " Layer(s) have coordinates that can be moved";
-        diagnostics.push_back(std::move(diag));
-      }
-
-      int localizablePathData = CountLocalizablePathData(document.get());
-      if (localizablePathData > 0) {
-        LintDiagnostic diag = {};
-        diag.category = "info";
-        diag.message =
-            std::to_string(localizablePathData) + " PathData(s) can be localized to origin";
-        diagnostics.push_back(std::move(diag));
-      }
-
-      int extractableCompositions = CountExtractableCompositions(document.get());
-      if (extractableCompositions > 0) {
-        LintDiagnostic diag = {};
-        diag.category = "info";
-        diag.message = std::to_string(extractableCompositions) +
-                       " structurally identical Layer(s) can be extracted to shared Composition";
-        diagnostics.push_back(std::move(diag));
-      }
-
-      // Lint hints (performance warnings)
-      CollectAllLintHints(document.get(), diagnostics);
+    float canvasWidth = XmlAttrFloat(root, "width");
+    float canvasHeight = XmlAttrFloat(root, "height");
+    if (std::isnan(canvasWidth)) {
+      canvasWidth = 0;
     }
+    if (std::isnan(canvasHeight)) {
+      canvasHeight = 0;
+    }
+
+    DetectEmptyNodes(root, diagnostics);
+    DetectFullCanvasClipMasks(root, canvasWidth, canvasHeight, diagnostics);
+    DetectUnreferencedResources(root, diagnostics);
+    DetectDuplicatePathData(root, diagnostics);
+    DetectDuplicateGradients(root, diagnostics);
+    DetectMergeableGroups(root, diagnostics);
+    DetectUnwrappableFirstChildGroups(root, diagnostics);
+    DetectPathsToPrimitives(root, diagnostics);
+    DetectLocalizableCoordinates(root, diagnostics);
+    DetectLocalizablePathData(root, diagnostics);
+    DetectExtractableCompositions(root, diagnostics);
+    CollectAllLintHints(root, diagnostics);
   }
 
-  // Output results
+  xmlFreeDoc(doc);
+
   if (jsonOutput) {
     PrintDiagnosticsJson(diagnostics, filePath);
   } else if (!diagnostics.empty()) {
@@ -1698,7 +1760,6 @@ int RunLint(int argc, char* argv[]) {
     std::cout << filePath << ": ok\n";
   }
 
-  // Return non-zero if there are errors or warnings
   for (const auto& diag : diagnostics) {
     if (diag.category == "error" || diag.category == "warning") {
       return 1;
