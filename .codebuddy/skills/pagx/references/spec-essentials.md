@@ -121,32 +121,14 @@ writes the final size, computes position from constraints, then recursively lays
 child's own children using the computed size as the container reference frame.
 
 This two-phase model ensures every container has a deterministic size before its children
-are positioned. The key enabler is **content-driven sizing**: when a container has no
-explicit `width`/`height`, it automatically grows to fit its content — measured from (0,0)
-to the bottom-right extent of all children's bounds (including constraint-contributed
-margins). This supports patterns like:
-
-- **Auto-width button**: `<Layer layout="horizontal" padding="8,16">` wrapping a Text
-  element — the Layer measures Text content and adds padding to determine its own size
-- **Content-hugging card**: A Layer without explicit size containing positioned elements —
-  the Layer shrinks to exactly fit its children
-- **Nested auto-sizing**: Multiple levels of containers without explicit sizes, each level
-  measuring from its children, propagating sizes upward
-
-Three sources determine a container's size (highest priority first):
-1. **Opposite-pair constraints** — derived from parent (`width = parent.width - left - right`)
-2. **Explicit `width`/`height`** — directly declared
-3. **Content measurement** — automatically computed from children's bounds
+are positioned.
 
 Two positioning mechanisms are available:
 
-- **Constraint positioning** — attributes (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`)
-  on any element, resolved against the parent container's size
-- **Container layout** — the parent arranges children automatically. Layer uses `layout` +
-  `alignment` to arrange child Layers; TextBox uses `textAlign` + `paragraphAlign` to
-  arrange text lines
-
-This model applies identically at every nesting depth.
+- **Container layout** — parent Layer with `layout` arranges child Layers automatically
+  (see §Container Layout)
+- **Constraint positioning** — attributes on any element position it relative to its parent
+  (see §Constraint Positioning)
 
 ### Container Layout (between Layers)
 
@@ -198,18 +180,19 @@ Key rules:
   size keep it. This default naturally propagates width to rows in nested layouts (e.g.,
   vertical parent with horizontal rows), which then distribute to their flexible children.
   Use `alignment="start"` only when you explicitly want children to keep their content size.
-- **Pixel grid alignment**: All layout-computed **Layer** coordinates and sizes
-  (`width`/`height`) are rounded to the nearest integer pixel. VectorElement positions
-  computed by constraint positioning retain sub-pixel precision.
+- **Pixel grid alignment**: All layout-computed coordinates and sizes are rounded to the
+  nearest integer pixel (`std::round` for positions, `std::ceil` for sizes). This applies to
+  both Layers and VectorElements. Constraint attribute values themselves (e.g., `left="10.5"`)
+  are preserved as-is; only the computed layout results are rounded.
 
-### Constraint Positioning (inside Layers and between Layers)
+### Constraint Positioning
 
-Elements inside a Layer (or Group) can use constraint attributes to
-declare their position relative to the container. Constraint positioning is a fundamental
-capability — it is not a layout mode. Supported elements:
+Constraint attributes position elements relative to their immediate parent container
+(Layer or Group). This is a fundamental capability, not a layout mode — it is always
+available for VectorElements, and available for child Layers when there is no container
+layout or the child has `includeInLayout="false"`.
 
-- **Layer contents**: Geometry elements (Rectangle, Ellipse, Polystar, Path), Text, Group, TextBox, TextPath — always active
-- **Child Layers**: when the parent has no container layout (default), or the child has `includeInLayout="false"`
+**Attributes** (all default to unset, not zero):
 
 | Attribute | Effect |
 |-----------|--------|
@@ -220,67 +203,64 @@ capability — it is not a layout mode. Supported elements:
 | `centerX` | Horizontal offset from container center (0 = centered) |
 | `centerY` | Vertical offset from container center (0 = centered) |
 
-**Opposite-pair behavior** (`left`+`right` or `top`+`bottom`):
+**Per-axis rules** — use only one combination per axis:
+- `left`, `right`, or `centerX` alone → position only
+- `left`+`right` pair → derives size AND positions (opposite-pair)
+- `centerX` overrides `left`/`right` silently if both set (avoid this)
+
+Constraints override the element's `position` attribute on the constrained axis.
+
+**Priority**: `centerX` > `left`+`right` > `left` > `right` (same for vertical axis).
+
+#### Opposite-Pair Behavior
+
+When both edges are constrained (`left`+`right` or `top`+`bottom`), the engine computes
+a target size (`containerWidth - left - right`). What happens next depends on element type:
 
 | Element Type | Behavior | Details |
 |--------------|----------|--------|
-| Rectangle, Ellipse, TextBox | **STRETCH** | Resize to fill target area |
-| Path, Polystar | **SCALE TO FIT** | Single-axis: scale to exactly fill, other axis proportional; Both-axis: use smaller scale factor (fit mode), center on longer axis |
+| Rectangle, Ellipse | **STRETCH** | Resize to fill target area |
+| TextBox | **STRETCH** | Use target area as text layout region (wrapping, alignment) |
+| Path, Polystar, Text | **SCALE TO FIT** | Single-axis: scale to exactly fill, other axis proportional; Both-axis: use smaller scale factor (fit mode), center on longer axis. Text scales `fontSize`. |
 | TextPath | **SCALE TO FIT** | Same as Path — scales path data proportionally |
 | Group | **DERIVE SIZE** | Align to target area; set layout size for child constraint reference |
-| Child Layer | **ALWAYS OVERRIDE** | Opposite-pair constraints always override: `width = parent.width - left - right`, `x = left` |
+| Child Layer | **ALWAYS OVERRIDE** | `width = parent.width - left - right`, `x = left` |
 
 > **Key distinction**: VectorElements (stretch/scale) vs Layer (derive only — no stretch/scale).
 
-Key rules:
-- **Direct parent container**: Constraints always reference the **immediate parent container**
-  (Layer or Group) — not any ancestor further up. Layout sizes propagate level by level:
-  each container resolves its own size, then its children's constraints reference that size.
-- **Size resolution** — container layout and constraint positioning are **mutually exclusive** on
-  any given child Layer. A child in container layout flow is sized by the container; a child
-  outside (no container layout or `includeInLayout="false"`) is sized by constraints.
-  **VectorElements** (contents inside a Layer/Group) always use constraint positioning regardless
-  of the parent's `layout` mode.
+#### Size Priority
 
-  **In container layout** (child Layer participates in `layout="horizontal"/"vertical"`):
-  - Main axis: explicit `width`/`height` → fixed; no explicit size + `flex`=0 → content-measured; no explicit size + `flex`>0 → proportional share
-  - Cross axis: default stretch fills children without explicit cross-axis size;
-    children with explicit cross-axis size keep it
+The final size of an element with constraint positioning comes from (highest priority first):
 
-  **With constraint positioning** (child Layer without container layout or `includeInLayout="false"`;
-  VectorElements always):
-  1. Opposite-pair constraints (`left`+`right` or `top`+`bottom`) — **ALWAYS OVERRIDE**
-     explicit `width`/`height`
-  2. Explicit `width`/`height` attribute
-  3. Content measurement (automatic from child element bounds)
-- **Content Bounds**: Constraint "edges" refer to an element's content bounds edges. Bounds
-  differ by element type:
-  - **Frame-aligned** (Rectangle, Ellipse, TextBox, Group, Layer): bounds = [0, width] × [0,
-    height] in local coordinates. `left="0"` aligns the logical frame's left edge to the container.
-  - **Pixel-aligned** (Path, Text, Polystar, TextPath): bounds = actual rendered pixel boundary.
-    `left="0"` shifts content so rendered pixels touch the container's left edge. For Text,
-    bounds are the line-box bounds (advance width × font metrics line height), which provides
-    stable measurement independent of specific glyph shapes.
-  - Both ensure `left="0"` means "content aligns with container edge" — the difference is whether
-    "content" means logical frame or rendered pixels.
-  - **Group/Layer measured bounds**: When Group or Layer has no explicit `width`/`height`, its
-    size is measured from (0,0) to the bottom-right extent of all children. This means:
-    (1) children in negative coordinates are rendered but excluded from measured bounds;
-    (2) empty space between (0,0) and the top-left of the nearest child is included in
-    measured bounds. For correct measurement, position children starting from (0,0) —
-    avoid negative coordinates and avoid leaving empty margins at the top-left corner.
-- **Unset, not zero**: Constraint attributes default to unset (not zero).
-- **Overrides position**: Constraints override the element's `position` attribute on the
-  constrained axis.
-- **Mutual exclusion** — valid combinations per axis:
-  - `left` alone, `right` alone, `centerX` alone
-  - `left`+`right` pair (opposite-pair → derives/stretches)
-  - **Invalid**: `left`+`centerX`, `right`+`centerX`, `left`+`right`+`centerX`
-- **Choose by design intent**: Pick the constraint edge that matches where the element is
-  anchored — not the one that requires manual offset calculation.
-  - top-right corner → `right`+`top` (not `left` with a computed value)
-  - bottom-center → `centerX`+`bottom`
-  - fill parent → `left="0" right="0" top="0" bottom="0"`
+1. **Opposite-pair constraints** — derived from parent
+2. **Explicit `width`/`height`** attribute
+3. **Content measurement** — automatic from child bounds
+
+#### Content Bounds
+
+Constraint "edges" refer to an element's content bounds, which differ by type:
+
+- **Frame-aligned** (Rectangle, Ellipse, TextBox, Group, Layer): bounds = [0, width] × [0,
+  height]. `left="0"` aligns the logical frame's left edge to the container.
+- **Pixel-aligned** (Path, Text, Polystar, TextPath): bounds = actual rendered pixel boundary.
+  `left="0"` shifts content so rendered pixels touch the container's left edge. For Text,
+  bounds are the line-box bounds (advance width × font metrics line height).
+- **Group/Layer measured bounds**: When no explicit `width`/`height`, size is measured from
+  (0,0) to the bottom-right extent of all children. Children in negative coordinates are
+  excluded from measurement. Position children starting from (0,0).
+
+#### When Constraints Apply
+
+- **VectorElements** inside a Layer/Group: **always** — regardless of the parent's `layout` mode
+- **Child Layers**: only when parent has **no container layout** (`layout="none"`, the default)
+  or the child has `includeInLayout="false"`
+- Container layout and constraint positioning are **mutually exclusive** on any given child Layer
+
+**Choose by design intent**: Pick the constraint edge that matches where the element is
+anchored — not the one that requires manual offset calculation:
+- top-right corner → `right`+`top` (not `left` with a computed value)
+- bottom-center → `centerX`+`bottom`
+- fill parent → `left="0" right="0" top="0" bottom="0"`
 
 ### Child Layer Constraints
 
