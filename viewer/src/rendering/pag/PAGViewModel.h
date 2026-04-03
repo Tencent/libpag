@@ -78,7 +78,7 @@ class PAGViewModel : public ContentViewModel {
   mutable std::mutex progressMutex = {};
   int editableTextLayerCount = 0;
   int editableImageLayerCount = 0;
-  bool isPlaying_ = true;
+  bool isPlaying_ = false;
   double progress = 0.0;
   double progressPerFrame = 0.0;
   std::unique_ptr<PAGPlayer> pagPlayer = nullptr;

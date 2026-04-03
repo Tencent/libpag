@@ -38,7 +38,7 @@ class XmlSyntaxHighlighter {
   static const QString CDataColor;      // Gray for CDATA sections
 
   // Maximum line length for detailed highlighting (performance optimization)
-  static constexpr int MaxHighlightLength = 10000;
+  static constexpr qsizetype MaxHighlightLength = 10000;
 
   /**
    * Highlight a single line of XML with HTML span tags for coloring.

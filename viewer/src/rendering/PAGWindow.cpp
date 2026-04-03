@@ -88,12 +88,14 @@ void PAGWindow::disconnectContentViewSignals() {
   }
 
   auto* renderThread = contentView->getRenderThread();
-  disconnect(textLayerModel.get(), &PAGTextLayerModel::textChanged, renderThread,
-             &RenderThread::flush);
-  disconnect(imageLayerModel.get(), &PAGImageLayerModel::imageChanged, renderThread,
-             &RenderThread::flush);
-  disconnect(renderThread, &RenderThread::renderMetricsReady, runTimeDataModel.get(),
-             &PAGRunTimeDataModel::updateMetrics);
+  if (renderThread != nullptr) {
+    disconnect(textLayerModel.get(), &PAGTextLayerModel::textChanged, renderThread,
+               &RenderThread::flush);
+    disconnect(imageLayerModel.get(), &PAGImageLayerModel::imageChanged, renderThread,
+               &RenderThread::flush);
+    disconnect(renderThread, &RenderThread::renderMetricsReady, runTimeDataModel.get(),
+               &PAGRunTimeDataModel::updateMetrics);
+  }
   if (hostWindow) {
     disconnect(hostWindow, &QQuickWindow::afterRendering, contentView, &ContentView::flush);
   }
@@ -129,12 +131,14 @@ void PAGWindow::connectContentViewSignals() {
   }
 
   auto* renderThread = contentView->getRenderThread();
-  connect(textLayerModel.get(), &PAGTextLayerModel::textChanged, renderThread,
-          &RenderThread::flush);
-  connect(imageLayerModel.get(), &PAGImageLayerModel::imageChanged, renderThread,
-          &RenderThread::flush);
-  connect(renderThread, &RenderThread::renderMetricsReady, runTimeDataModel.get(),
-          &PAGRunTimeDataModel::updateMetrics);
+  if (renderThread != nullptr) {
+    connect(textLayerModel.get(), &PAGTextLayerModel::textChanged, renderThread,
+            &RenderThread::flush);
+    connect(imageLayerModel.get(), &PAGImageLayerModel::imageChanged, renderThread,
+            &RenderThread::flush);
+    connect(renderThread, &RenderThread::renderMetricsReady, runTimeDataModel.get(),
+            &PAGRunTimeDataModel::updateMetrics);
+  }
   if (hostWindow) {
     connect(hostWindow, &QQuickWindow::afterRendering, contentView, &ContentView::flush);
   }

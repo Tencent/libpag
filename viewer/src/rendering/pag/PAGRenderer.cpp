@@ -41,7 +41,7 @@ IContentRenderer::RenderMetrics PAGRenderer::flush() {
     return metrics;
   }
   auto* player = viewModel->getPAGPlayer();
-  auto file = std::static_pointer_cast<PAGFile>(player->getComposition());
+  auto* file = viewModel->getPAGFile();
   if (file == nullptr) {
     return metrics;
   }
