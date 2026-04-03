@@ -25,6 +25,7 @@
 #include "cli/CommandFormat.h"
 #include "cli/CommandImport.h"
 #include "cli/CommandLayoutCheck.h"
+#include "cli/CommandLint.h"
 #include "cli/CommandOptimize.h"
 #include "cli/CommandRender.h"
 #include "cli/CommandValidator.h"
@@ -94,6 +95,9 @@ int main(int argc, char* argv[]) {
   }
   if (command == "optimize") {
     return pagx::cli::RunOptimize(argc - 1, argv + 1);
+  }
+  if (command == "lint") {
+    return pagx::cli::RunLint(argc - 1, argv + 1);
   }
   if (command == "import") {
     return pagx::cli::RunImport(argc - 1, argv + 1);
