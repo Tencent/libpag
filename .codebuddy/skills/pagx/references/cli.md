@@ -103,9 +103,13 @@ default to `--scale 1`. When the context explicitly specifies a scale value, use
 
 ## pagx validate
 
-Validate a PAGX file against the specification schema. Note: `pagx optimize` already includes
-validation as its first step — use this command only when you need a standalone check without
-running optimizations.
+Validate a PAGX file against the specification schema — checks XML structure, required
+attributes, valid attribute values, and element nesting rules. This is a **static** check
+on the source XML; it does not run the layout engine. For runtime layout issues (overlapping
+elements, zero-size, content origin offset, etc.), use `pagx layout` instead.
+
+Note: `pagx optimize` already includes validation as its first step — use this command only
+when you need a standalone schema check without running optimizations.
 
 ```bash
 pagx validate input.pagx
@@ -235,9 +239,16 @@ When no problems are found:
 
 ## pagx bounds
 
-Query precise rendered bounds of Layer nodes. Supports `--id` for quick lookup by id attribute
-and `--xpath` for flexible node selection. Without either, outputs bounds for the entire
-document and all layers.
+Query **rendered pixel bounds** of Layer nodes — the actual bounding box of rendered content
+including stroke width, shadows, and blur effects. This differs from `pagx layout` bounds,
+which show layout-engine-resolved positions and sizes (based on `layout`/`flex`/`gap`/`padding`/
+constraint attributes, without rendering effects).
+
+Use `pagx bounds` for determining crop regions (`pagx render --crop`) and measuring rendered
+output size. Use `pagx layout` for debugging layout structure and alignment.
+
+Supports `--id` for quick lookup by id attribute and `--xpath` for flexible node selection.
+Without either, outputs bounds for the entire document and all layers.
 
 ```bash
 pagx bounds input.pagx                                          # all layers

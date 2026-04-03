@@ -42,7 +42,9 @@ struct BoundsOptions {
 static void PrintBoundsUsage() {
   std::cout << "Usage: pagx bounds [options] <file.pagx>\n"
             << "\n"
-            << "Query precise rendered bounds of Layer nodes.\n"
+            << "Query rendered pixel bounds of Layer nodes (including stroke, shadows,\n"
+            << "and blur effects). Use for crop regions and rendered size measurement.\n"
+            << "For layout-resolved bounds (without rendering effects), use 'pagx layout'.\n"
             << "\n"
             << "Options:\n"
             << "  --id <id>              Select a Layer by its id attribute\n"

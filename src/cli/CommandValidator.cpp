@@ -83,7 +83,9 @@ static void PrintErrorsJson(const std::vector<ValidationError>& errors, const st
 static void PrintUsage() {
   std::cout << "Usage: pagx validate [options] <file.pagx>\n"
             << "\n"
-            << "Validate a PAGX file against the specification schema.\n"
+            << "Validate a PAGX file against the specification schema (XML structure,\n"
+            << "required attributes, valid values, element nesting). This is a static check\n"
+            << "on the source XML. For runtime layout issues, use 'pagx layout' instead.\n"
             << "\n"
             << "Options:\n"
             << "  --json                 Output in JSON format\n"
