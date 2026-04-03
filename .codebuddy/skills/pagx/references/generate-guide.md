@@ -19,7 +19,7 @@ Read as needed:
 | Reference | Content |
 |-----------|---------|
 | `attributes.md` | Attribute defaults, enumerations, required attributes |
-| `cli.md` | CLI tool usage — `render`, `layout`, `bounds`, `font info` commands |
+| `cli.md` | CLI tool usage — all commands (`render`, `layout`, `bounds`, `validate`, etc.) |
 
 ---
 
@@ -291,8 +291,8 @@ layout errors early.
 
 ### Verification Loop
 
-Repeat this loop until `pagx layout --problems-only` exits clean (exit code 0) **and** the
-screenshot matches the design intent:
+Repeat until `pagx layout --problems-only` exits clean (exit code 0) **and** the screenshot
+matches the design intent:
 
 #### 1. Detect layout problems
 
@@ -300,111 +300,57 @@ screenshot matches the design intent:
 pagx layout --problems-only input.pagx
 ```
 
-This detects six categories of problems:
+Detects six categories of problems:
 - **Overlapping siblings** — sibling Layers whose bounds intersect inside an auto-layout parent
 - **Clipped content** — elements outside parent bounds when `clipToBounds` is set
-- **Zero-size** — elements with zero width or height (invisible), with cause analysis when applicable (e.g., `flex child, parent has no main-axis size to distribute`)
-- **Flex in content-measured parent** — `flex` child in a container layout parent that has no explicit main-axis size, so there is no space to distribute
-- **Content origin offset** — unconstrained children in a content-measured container do not start at (0, 0), causing inaccurate container measurement
-- **Constraints ignored by layout** — constraint attributes on a child Layer that participates in container layout flow (silently ignored by the engine)
+- **Zero-size** — elements with zero width or height, with cause analysis when applicable
+- **Flex in content-measured parent** — `flex` child where parent has no main-axis size to distribute
+- **Content origin offset** — unconstrained children not starting at (0, 0) in a content-measured container
+- **Constraints ignored by layout** — constraint attributes silently ignored in container layout flow
 
-Exit code 1 = problems found (output shows `<Problem>` nodes with descriptions).
-Exit code 0 = no problems.
-
-To check a specific section during incremental build, scope with `--id` or `--xpath`:
+Exit code 1 = problems found. Exit code 0 = no problems. Scope with `--id` or `--xpath`
+during incremental build:
 
 ```bash
 pagx layout --problems-only --id "header" input.pagx
-pagx layout --problems-only --xpath "//Layer[@layout]" input.pagx
 ```
 
 #### 2. Fix problems
 
-Use the structured problem output to identify and fix the root cause:
-
 | Problem | Typical Root Cause | Fix |
 |---------|-------------------|-----|
-| **Overlapping siblings** | Missing `layout` on parent; wrong `flex` distribution; duplicate `left`/`top` values | Add `layout="horizontal"/"vertical"` to parent; adjust `flex` weights or explicit sizes; use container layout instead of manual positioning |
-| **Zero-size Layer** | Content-measured Layer with no content yet; `flex` child in a container that has no main-axis size | Add content, or set explicit `width`/`height`, or ensure parent has a main-axis size for flex to distribute |
-| **Zero-size element** | Rectangle/Ellipse with `size="0,0"`; opposite-pair constraints (`left`+`right`) in a zero-width container | Set explicit `size`; fix parent container dimensions |
-| **Clipped content** | Child positioned outside parent bounds with `clipToBounds="true"` | Adjust child constraints; enlarge parent; or remove `clipToBounds` if clipping is unintended |
-| **Flex in content-measured parent** | Parent has `layout` but no explicit main-axis `width`/`height`; child has `flex` > 0 | Set explicit main-axis size on the parent Layer, or use opposite-pair constraints to derive it |
-| **Content origin offset** | Unconstrained Path/Polystar/Text children start at a non-zero position inside a content-measured Group or Layer | Localize coordinates: subtract offset from internal positions, set container `left`/`top` to the original offset (see `design-patterns.md` §6 Origin-Based Internal Layout) |
-| **Constraints ignored** | Child Layer has `left`/`right`/`top`/`bottom`/`centerX`/`centerY` but is in container layout flow (`includeInLayout` default true) | Remove constraints (use `gap`/`alignment`/`arrangement` instead), or set `includeInLayout="false"` if an overlay is intended |
+| **Overlapping siblings** | Missing `layout` on parent; wrong `flex` distribution | Add `layout="horizontal"/"vertical"` to parent; adjust `flex` weights or explicit sizes |
+| **Zero-size** | Content-measured with no content; `flex` child with no parent main-axis size | Add content or explicit `width`/`height`; ensure parent has main-axis size |
+| **Clipped content** | Child outside parent bounds with `clipToBounds="true"` | Adjust constraints; enlarge parent; or remove `clipToBounds` |
+| **Flex in content-measured parent** | Parent has `layout` but no explicit main-axis size | Set explicit main-axis size, or use opposite-pair constraints |
+| **Content origin offset** | Unconstrained Path/Polystar/Text not at (0, 0) | Localize coordinates (`design-patterns.md` §6) |
+| **Constraints ignored** | Constraints on child in layout flow | Remove constraints; use `gap`/`alignment`/`arrangement` instead |
 
-#### 3. Inspect layout tree
+#### 3. Inspect layout tree and render
 
-After fixing, inspect the resolved layout tree to confirm dimensions and positions:
-
-```bash
-pagx layout input.pagx                  # full tree
-pagx layout --id "cardRow" input.pagx    # scoped to one section
-```
-
-Verify:
-- Container layout: child Layer bounds show correct positions with expected gap spacing
-- Flex distribution: flex children have proportional widths/heights
-- Internal content: VectorElement bounds are within their parent Layer bounds
-- Constraint positioning: `centerX="0"` elements are centered, `left="0" right="0"` elements
-  span full width
-
-#### 4. Render and visual check
+After fixing, confirm with both layout data and visual output:
 
 ```bash
-pagx render --scale 2 input.pagx
+pagx layout --id "cardRow" input.pagx    # layout-resolved bounds (positions, sizes)
+pagx render --scale 2 input.pagx         # visual check
 ```
 
-Read the screenshot carefully. Visual inspection catches issues that automated detection cannot:
-- **Alignment and spacing** — elements visually misaligned, uneven gaps, asymmetric padding
-- **Text** — wrong font, truncated or overflowing text, invisible text (missing Fill)
-- **Colors and gradients** — wrong colors, gradient direction off, unintended transparency
-- **Visual balance** — disproportionate sections, elements too close or too far apart
-- **Content correctness** — missing elements, wrong stacking order, icon rendering errors
+**Layout tree** — compare bounds values against design intent:
+- Element at unexpected position → wrong constraint or missing container layout
+- Element wrong size → wrong `flex` weight, missing `width`, or content origin offset
+- Two elements at same position → missing `gap` or `layout` on parent
 
-To render a specific section in isolation:
+**Screenshot** — catches issues automated detection cannot:
+- Alignment, spacing, text rendering, colors, gradients, visual balance, stacking order
 
-```bash
-pagx render --scale 2 --id "header" input.pagx
-```
+When diagnosing a visual issue, use `pagx layout` (without `--problems-only`) to see the
+full layout tree with bounds and any `<Problem>` nodes for the suspect area.
 
-#### 5. Diagnose visual issues with layout data
+Note: `pagx bounds` is a different tool — it shows rendered pixel bounds (including stroke,
+shadows, blur), used for crop regions. For layout debugging, always use `pagx layout`.
 
-When the screenshot reveals a visual issue not caught by automated `<Problem>` detection,
-use `pagx layout` (without `--problems-only`) to inspect the suspect node's layout structure:
-
-```bash
-pagx layout --id "cardRow" input.pagx
-```
-
-`pagx layout` shows the **layout-resolved** bounds — positions and sizes computed by the
-layout engine from `layout`/`flex`/`gap`/`padding`/constraint attributes. Compare these
-values against the design intent to identify the mismatch:
-- Element at an unexpected position → wrong constraint attribute or missing container layout
-- Element wider/narrower than expected → wrong `flex` weight, missing `width`, or content
-  measurement including empty margin (see §Content origin offset)
-- Two elements at the same position → missing `gap` or `layout` on parent
-- Element outside parent bounds → constraint offset exceeding parent size
-
-Note: `pagx bounds` is a different tool — it shows **rendered pixel bounds** (including
-stroke width, shadows, blur effects), used for determining crop regions for `pagx render
---crop`. For layout debugging, always use `pagx layout`.
-
-Fix the identified issue, then re-render to confirm.
-
-#### 6. Repeat
+#### 4. Repeat
 
 If any problems remain, return to step 1. Continue until `--problems-only` exits 0 and the
 screenshot is correct.
-
-### Incremental Verification
-
-During incremental build (Step 2 §Incremental Build Strategy), run the verification loop
-at each stage:
-
-1. **After skeleton**: `pagx layout --problems-only` — confirms top-level structure has no
-   overlaps, zero-size sections, or missing layout attributes. Fix before adding content.
-2. **After each module**: `pagx layout --problems-only --id "moduleId"` — scoped check on the
-   module just filled. Catches internal content issues without re-checking the whole file.
-3. **Final pass**: `pagx layout --problems-only` + `pagx render --scale 2` — full verification
-   of the complete file.
 

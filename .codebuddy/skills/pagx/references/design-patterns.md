@@ -327,30 +327,11 @@ segment sits directly in the TextBox; subsequent segments use Groups for painter
 
 ### Layout Verification
 
-After building or modifying layouts, use `pagx layout` to inspect resolved bounds and
-detected problems. Use `pagx layout --problems-only` to see only nodes with issues. This
-is essential during incremental build — see `generate-guide.md` §Step 4 for the full
-verification loop.
+Use `pagx layout` to inspect resolved bounds and detected problems after building or
+modifying layouts. Use `pagx layout --problems-only` to see only nodes with issues.
 
-`pagx layout` detects six problem categories. Each maps to a layout pattern fix:
-
-| Problem | Design Pattern Fix |
-|---------|-------------------|
-| **Overlapping siblings** | Use container layout (`layout`/`gap`) instead of manual positioning; adjust `flex` weights so children fit within parent |
-| **Zero-size** | Ensure flex children have a parent with main-axis size; add content or explicit `width`/`height` to content-measured Layers |
-| **Clipped content** | Enlarge parent, adjust child constraints, or remove `clipToBounds` if clipping is unintended |
-| **Flex in content-measured parent** | Set explicit main-axis `width`/`height` on parent, or use opposite-pair constraints to derive it |
-| **Content origin offset** | Localize coordinates per §6 Origin-Based Internal Layout — shift children to start at (0, 0) |
-| **Constraints ignored by layout** | Remove constraints and use `gap`/`alignment`/`arrangement`, or set `includeInLayout="false"` for overlays |
-
-Scoped checks for individual sections during incremental build:
-
-```bash
-pagx layout --problems-only --id "header" input.pagx  # only problems in one section
-pagx layout --id "cardRow" input.pagx                  # full tree + problems for one section
-```
-
-See `cli.md` §pagx layout for full command reference.
+See `generate-guide.md` §Step 4 for the full verification loop, problem categories, and
+fix guidance. See `cli.md` §pagx layout for command reference.
 
 ---
 

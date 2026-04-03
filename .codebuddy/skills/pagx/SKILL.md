@@ -4,7 +4,7 @@ description: >-
   PAGX (.pagx) file handler. MUST invoke for ANY task involving PAGX format or
   ".pagx" files — including create, edit, optimize, review, debug, or query syntax.
   Also invoke when user runs pagx CLI commands (render, validate, format, optimize,
-  bounds, layout, font info/embed, convert) or asks about PAGX elements, attributes, or layout.
+  bounds, layout, font info/embed, import/export) or asks about PAGX elements, attributes, or layout.
 ---
 
 # PAGX Skill
