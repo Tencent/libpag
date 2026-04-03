@@ -45,31 +45,9 @@ Returns non-zero exit code when errors or warnings are found.
 
 ### What it checks
 
-**Errors** — XML schema violations and semantic conflicts (e.g., invalid attribute values,
-conflicting constraint combinations).
-
-**Warnings** — Structural issues that are likely unintentional:
-- Empty Layers (no contents, children, or composition)
-- Empty Groups (no child elements)
-- Zero-width Strokes (width <= 0)
-- Full-canvas clip masks (covering entire canvas, no clipping effect)
-- Unreferenced resources (PathData, gradients, fonts defined but never used)
-
-**Hints** — Performance and optimization suggestions:
-- Repeater with high copies count
-- High blur radius on filters and styles
-- Non-center-aligned Stroke in Repeater scope
-- Dashed Stroke in Repeater scope
-- Complex Paths (high verb count)
-- Low opacity with high-cost elements
-- Rectangular masks replaceable with clipToBounds
-- Layers that could be downgraded to Groups
-- Duplicate PathData or gradient resources
-- Mergeable adjacent Groups
-- Redundant first-child Groups
-- Paths replaceable with Rectangle/Ellipse
-- Localizable coordinates and PathData
-- Extractable duplicate Layers as Compositions
+- **Errors** — XML schema violations and semantic conflicts.
+- **Warnings** — Structural issues that are likely unintentional (empty nodes, unused resources, layout attribute misuse, etc.).
+- **Hints** — Performance and optimization suggestions (high-cost rendering patterns, redundant structure, deduplication opportunities, etc.).
 
 ---
 
@@ -211,20 +189,9 @@ chain) are output. Clean sibling nodes before a problematic node are replaced wi
 `<Layer/>` placeholders to preserve index counting. Returns exit code 1 if any problems are
 found, 0 otherwise.
 
-Detects twelve categories of layout problems:
-
-1. **Overlapping siblings** — sibling Layers whose bounds intersect inside an auto-layout parent
-2. **Clipped content** — elements outside parent bounds when `clipToBounds` is set
-3. **Zero-size** — elements with zero width or height (invisible), with cause analysis (e.g., flex child in a parent with no main-axis size)
-4. **Flex in content-measured parent** — `flex` child in a container layout parent that has no explicit main-axis size
-5. **Content origin offset** — unconstrained children in a content-measured container do not start at (0, 0), causing inaccurate container measurement
-6. **Constraints ignored by layout** — constraint attributes on a child Layer participating in container layout flow (silently ignored)
-7. **Off-canvas** — top-level Layers completely outside the canvas bounds
-8. **Redundant constraints (override)** — constraint attributes overridden by centerX/centerY
-9. **Redundant constraints (default)** — left=0 or top=0 with no opposite constraint (equivalent to default)
-10. **Container overflow** — fixed-size children + gap exceed parent's available main-axis space (no flex children to absorb)
-11. **Negative constraint-derived size** — opposite-pair constraints (left+right or top+bottom) sum exceeds parent dimension
-12. **Element constraint conflict** — constraint conflicts on VectorElements (Rectangle, Ellipse, etc.), same rules as Layer constraint conflicts
+Problems are reported as `<Problem>` child elements on the affected node. Detection covers
+overlapping siblings, clipped content, zero-size elements, flex/constraint conflicts,
+off-canvas layers, redundant constraints, and more.
 
 ```xml
 <layout>
