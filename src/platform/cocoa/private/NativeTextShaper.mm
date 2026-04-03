@@ -38,6 +38,9 @@ std::vector<ShapedGlyph> NativeTextShaper::Shape(const std::string& text,
     }
   }
   auto str = CFStringCreateWithCString(kCFAllocatorDefault, text.c_str(), kCFStringEncodingUTF8);
+  if (str == nullptr) {
+    return {};
+  }
   auto attr = CFDictionaryCreateMutable(kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks,
                                         &kCFTypeDictionaryValueCallBacks);
   if (mainFont != nullptr) {
