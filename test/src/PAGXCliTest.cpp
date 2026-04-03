@@ -2208,6 +2208,23 @@ CLI_TEST(PAGXCliTest, LayoutCheck_FlexConstraintParent) {
   EXPECT_TRUE(output.find("flex child") == std::string::npos);
 }
 
+// Flex child zero-size with parent that has opposite-pair constraints deriving zero height.
+// The cause should NOT say "parent has no main-axis size" because the parent does have a size
+// source (constraints) — it just happens to derive zero.
+CLI_TEST(PAGXCliTest, LayoutCheck_FlexConstraintZeroParent) {
+  auto path = TestResourcePath("layout_check_flex_constraint_zero_parent.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  // Should report zero-size but NOT the "parent has no main-axis size" cause.
+  EXPECT_TRUE(output.find("zero size") != std::string::npos);
+  EXPECT_TRUE(output.find("parent has no main-axis size") == std::string::npos);
+}
+
 // Flex in horizontal layout with content-measured parent — same problem, different axis.
 CLI_TEST(PAGXCliTest, LayoutCheck_FlexHorizontal) {
   auto path = TestResourcePath("layout_check_flex_horizontal.pagx");
