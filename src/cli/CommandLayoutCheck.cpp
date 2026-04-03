@@ -294,43 +294,44 @@ static void DetectOverlap(const std::vector<std::shared_ptr<CheckNode>>& layoutC
   }
 }
 
-static void DetectRedundantConstraints(const Layer* layer, CheckNode* node, bool check) {
-  if (!check || layer == nullptr) {
+static void DetectRedundantConstraints(const LayoutNode* layoutNode, CheckNode* node, bool check,
+                                       bool checkDefaults = false) {
+  if (!check || layoutNode == nullptr) {
     return;
   }
 
   // Rule A: centerX overrides left and right.
-  if (!std::isnan(layer->centerX)) {
-    if (!std::isnan(layer->left) && !std::isnan(layer->right)) {
+  if (!std::isnan(layoutNode->centerX)) {
+    if (!std::isnan(layoutNode->left) && !std::isnan(layoutNode->right)) {
       node->problems.push_back("left/right ignored, overridden by centerX");
-    } else if (!std::isnan(layer->left)) {
+    } else if (!std::isnan(layoutNode->left)) {
       node->problems.push_back("left ignored, overridden by centerX");
-    } else if (!std::isnan(layer->right)) {
+    } else if (!std::isnan(layoutNode->right)) {
       node->problems.push_back("right ignored, overridden by centerX");
     }
   }
 
   // Rule A: centerY overrides top and bottom.
-  if (!std::isnan(layer->centerY)) {
-    if (!std::isnan(layer->top) && !std::isnan(layer->bottom)) {
+  if (!std::isnan(layoutNode->centerY)) {
+    if (!std::isnan(layoutNode->top) && !std::isnan(layoutNode->bottom)) {
       node->problems.push_back("top/bottom ignored, overridden by centerY");
-    } else if (!std::isnan(layer->top)) {
+    } else if (!std::isnan(layoutNode->top)) {
       node->problems.push_back("top ignored, overridden by centerY");
-    } else if (!std::isnan(layer->bottom)) {
+    } else if (!std::isnan(layoutNode->bottom)) {
       node->problems.push_back("bottom ignored, overridden by centerY");
     }
   }
 
-  // Rule B: left=0 with no right/centerX is equivalent to default x=0.
-  if (!std::isnan(layer->left) && layer->left == 0.0f && std::isnan(layer->right) &&
-      std::isnan(layer->centerX)) {
-    node->problems.push_back("left=0 with no opposite constraint is equivalent to default");
-  }
-
-  // Rule B: top=0 with no bottom/centerY is equivalent to default y=0.
-  if (!std::isnan(layer->top) && layer->top == 0.0f && std::isnan(layer->bottom) &&
-      std::isnan(layer->centerY)) {
-    node->problems.push_back("top=0 with no opposite constraint is equivalent to default");
+  // Rule B (Layer only): left=0 with no right/centerX is equivalent to default x=0.
+  if (checkDefaults) {
+    if (!std::isnan(layoutNode->left) && layoutNode->left == 0.0f &&
+        std::isnan(layoutNode->right) && std::isnan(layoutNode->centerX)) {
+      node->problems.push_back("left=0 with no opposite constraint is equivalent to default");
+    }
+    if (!std::isnan(layoutNode->top) && layoutNode->top == 0.0f && std::isnan(layoutNode->bottom) &&
+        std::isnan(layoutNode->centerY)) {
+      node->problems.push_back("top=0 with no opposite constraint is equivalent to default");
+    }
   }
 }
 
@@ -437,33 +438,6 @@ static void DetectNegativeConstraintSize(const LayoutNode* layoutNode, CheckNode
   }
 }
 
-static void DetectElementConstraintConflicts(const LayoutNode* layoutNode, CheckNode* node,
-                                             bool check) {
-  if (!check || layoutNode == nullptr) {
-    return;
-  }
-  // centerX overrides left and right.
-  if (!std::isnan(layoutNode->centerX)) {
-    if (!std::isnan(layoutNode->left) && !std::isnan(layoutNode->right)) {
-      node->problems.push_back("left/right ignored, overridden by centerX");
-    } else if (!std::isnan(layoutNode->left)) {
-      node->problems.push_back("left ignored, overridden by centerX");
-    } else if (!std::isnan(layoutNode->right)) {
-      node->problems.push_back("right ignored, overridden by centerX");
-    }
-  }
-  // centerY overrides top and bottom.
-  if (!std::isnan(layoutNode->centerY)) {
-    if (!std::isnan(layoutNode->top) && !std::isnan(layoutNode->bottom)) {
-      node->problems.push_back("top/bottom ignored, overridden by centerY");
-    } else if (!std::isnan(layoutNode->top)) {
-      node->problems.push_back("top ignored, overridden by centerY");
-    } else if (!std::isnan(layoutNode->bottom)) {
-      node->problems.push_back("bottom ignored, overridden by centerY");
-    }
-  }
-}
-
 // ============================================================================
 // Element Tree Building
 // ============================================================================
@@ -487,7 +461,7 @@ static void BuildElementNodes(const std::vector<Element*>& elements,
     node->index = i;
     node->bounds = {parentX + bounds.x, parentY + bounds.y, bounds.width, bounds.height};
     DetectZeroSize(node.get(), check);
-    DetectElementConstraintConflicts(layoutNode, node.get(), check);
+    DetectRedundantConstraints(layoutNode, node.get(), check);
     DetectNegativeConstraintSize(layoutNode, node.get(), containerW, containerH, check);
 
     if (element->nodeType() == NodeType::Group || element->nodeType() == NodeType::TextBox) {
@@ -559,7 +533,7 @@ static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float pare
   node->attrs.clipToBounds = layer->clipToBounds;
 
   DetectZeroSize(node.get(), check, layer, parentLayer);
-  DetectRedundantConstraints(layer, node.get(), check);
+  DetectRedundantConstraints(layer, node.get(), check, true);
 
   std::vector<std::shared_ptr<CheckNode>> elementNodes;
   std::vector<std::shared_ptr<CheckNode>> childLayerNodes;
