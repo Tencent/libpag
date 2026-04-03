@@ -370,19 +370,24 @@ pagx render --scale 2 --id "header" input.pagx
 #### 5. Diagnose visual issues with layout data
 
 When the screenshot reveals a visual issue not caught by automated `<Problem>` detection,
-inspect the resolved bounds of the suspect node to diagnose manually:
+use `pagx layout` to inspect the suspect node's layout structure:
 
 ```bash
 pagx layout --id "cardRow" input.pagx
 ```
 
-This outputs every child's exact position and size. Compare the bounds values against
-the design intent to identify the mismatch:
+`pagx layout` shows the **layout-resolved** bounds — positions and sizes computed by the
+layout engine from `layout`/`flex`/`gap`/`padding`/constraint attributes. Compare these
+values against the design intent to identify the mismatch:
 - Element at an unexpected position → wrong constraint attribute or missing container layout
 - Element wider/narrower than expected → wrong `flex` weight, missing `width`, or content
   measurement including empty margin (see §Content origin offset)
 - Two elements at the same position → missing `gap` or `layout` on parent
 - Element outside parent bounds → constraint offset exceeding parent size
+
+Note: `pagx bounds` is a different tool — it shows **rendered pixel bounds** (including
+stroke width, shadows, blur effects), used for determining crop regions for `pagx render
+--crop`. For layout debugging, always use `pagx layout`.
 
 Fix the identified issue, then re-render to confirm.
 
