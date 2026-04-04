@@ -168,7 +168,7 @@ ShapedText GlyphRunRenderer::BuildTextBlob(const Text* text, const tgfx::Matrix&
       continue;
     }
 
-    int unitsPerEm = (run->font != nullptr) ? run->font->unitsPerEm : 1;
+    int unitsPerEm = run->font->unitsPerEm;
     if (unitsPerEm <= 0) {
       unitsPerEm = 1;
     }
