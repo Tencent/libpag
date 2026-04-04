@@ -35,7 +35,6 @@ This specification is organized in the following order:
 - **Appendix A**: Node hierarchy and containment relationships
 - **Appendix B**: Enumeration type reference
 - **Appendix C**: Common usage examples
-- **Appendix D**: Implementation architecture
 
 ---
 
