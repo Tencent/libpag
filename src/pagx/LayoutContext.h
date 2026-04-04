@@ -29,8 +29,6 @@ class Typeface;
 
 namespace pagx {
 
-class SystemFonts;
-
 /**
  * Internal layout context that provides font lookup capabilities during the layout phase.
  * Constructed by applyLayout from the document's FontConfig, passed through all layout methods.
