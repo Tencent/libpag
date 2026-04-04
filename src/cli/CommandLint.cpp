@@ -392,7 +392,9 @@ static void DetectFullCanvasClipMasks(xmlNodePtr root, float canvasWidth, float 
     float rectPosX = 0;
     float rectPosY = 0;
     if (!posStr.empty()) {
-      sscanf(posStr.c_str(), "%f,%f", &rectPosX, &rectPosY);
+      if (sscanf(posStr.c_str(), "%f,%f", &rectPosX, &rectPosY) != 2) {
+        continue;
+      }
     }
 
     float left = rectPosX - rectWidth * 0.5f;
