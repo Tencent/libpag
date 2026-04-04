@@ -129,6 +129,14 @@ static void DetectZeroSize(CheckNode* node, bool check, const Layer* layer = nul
   if (node->bounds.width != 0 && node->bounds.height != 0) {
     return;
   }
+  // Skip nodes with explicit zero size attributes (intentional, e.g. TextBox anchor mode).
+  if (layer != nullptr) {
+    bool zeroW = (node->bounds.width == 0 && !std::isnan(layer->width) && layer->width == 0);
+    bool zeroH = (node->bounds.height == 0 && !std::isnan(layer->height) && layer->height == 0);
+    if (zeroW || zeroH) {
+      return;
+    }
+  }
   std::ostringstream oss;
   oss << "zero size (" << static_cast<int>(node->bounds.width) << "x"
       << static_cast<int>(node->bounds.height) << ")";
@@ -240,7 +248,18 @@ static void DetectFlexInContentMeasuredParent(
   }
 }
 
-static void DetectContentOriginOffset(const std::vector<Element*>& elements, CheckNode* container) {
+static void DetectContentOriginOffset(const std::vector<Element*>& elements, CheckNode* container,
+                                      const LayoutNode* containerNode = nullptr) {
+  // Skip if the container has constraint-derived or explicit size — content offset is
+  // only a problem when the container is truly content-measured (size from children).
+  if (containerNode != nullptr) {
+    bool hasWidthConstraint = !std::isnan(containerNode->left) && !std::isnan(containerNode->right);
+    bool hasHeightConstraint =
+        !std::isnan(containerNode->top) && !std::isnan(containerNode->bottom);
+    if (hasWidthConstraint || hasHeightConstraint) {
+      return;
+    }
+  }
   // If any child has constraint attributes, the positioning is intentional (e.g., padding via
   // left/top, centering via centerX/centerY). Skip detection for the entire container because
   // constrained children define the intended content region, making offsets of other children
@@ -503,7 +522,17 @@ static void BuildElementNodes(const std::vector<Element*>& elements,
     node->id = element->id;
     node->index = i;
     node->bounds = {parentX + bounds.x, parentY + bounds.y, bounds.width, bounds.height};
-    DetectZeroSize(node.get(), check);
+    // For Group/TextBox elements, skip zero-size detection if explicit size is set to 0.
+    bool skipZeroSize = false;
+    if (element->nodeType() == NodeType::Group || element->nodeType() == NodeType::TextBox) {
+      auto* group = static_cast<const Group*>(element);
+      bool zeroW = (node->bounds.width == 0 && !std::isnan(group->width) && group->width == 0);
+      bool zeroH = (node->bounds.height == 0 && !std::isnan(group->height) && group->height == 0);
+      skipZeroSize = zeroW || zeroH;
+    }
+    if (!skipZeroSize) {
+      DetectZeroSize(node.get(), check);
+    }
     DetectRedundantConstraints(layoutNode, node.get(), check);
     DetectNegativeConstraintSize(layoutNode, node.get(), containerW, containerH, check);
 
@@ -533,15 +562,17 @@ static void BuildElementNodes(const std::vector<Element*>& elements,
         }
         // Check content-measured Group/TextBox containers.
         if (check && std::isnan(group->width) && std::isnan(group->height)) {
-          // Content origin offset: only when the Group/TextBox itself has constraints —
-          // if it has no constraints, its measurement doesn't affect positioning.
-          if (layoutNode->hasConstraints()) {
-            DetectContentOriginOffset(group->elements, node.get());
+          bool sizeFromConstraints = (!std::isnan(group->left) && !std::isnan(group->right)) &&
+                                     (!std::isnan(group->top) && !std::isnan(group->bottom));
+          if (!sizeFromConstraints) {
+            // Content origin offset: only when the Group/TextBox itself has constraints —
+            // if it has no constraints, its measurement doesn't affect positioning.
+            if (layoutNode->hasConstraints()) {
+              DetectContentOriginOffset(group->elements, node.get(), group);
+            }
+            // Ineffective centering: only check when container is truly content-measured.
+            DetectIneffectiveCentering(group->elements, node->children);
           }
-          // Ineffective centering: always check — children using centerX/centerY
-          // inside a content-measured container is always a no-op regardless of
-          // whether the container itself is positioned.
-          DetectIneffectiveCentering(group->elements, node->children);
         }
       }
     }
@@ -606,11 +637,11 @@ static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float pare
         // Content origin offset: only when the Layer is positioned (has constraints or
         // participates in parent container layout). If unpositioned, its measurement
         // doesn't affect any positioning.
-        bool inParentLayout = parentLayer != nullptr &&
-                              parentLayer->layout != LayoutMode::None && layer->includeInLayout;
+        bool inParentLayout = parentLayer != nullptr && parentLayer->layout != LayoutMode::None &&
+                              layer->includeInLayout;
         bool isPositioned = layer->hasConstraints() || inParentLayout;
         if (isPositioned) {
-          DetectContentOriginOffset(layer->contents, node.get());
+          DetectContentOriginOffset(layer->contents, node.get(), layer);
         }
         // Ineffective centering: always check — children using centerX/centerY
         // inside a content-measured container is always a no-op.

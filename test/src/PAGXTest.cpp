@@ -3592,9 +3592,9 @@ PAGX_TEST(PAGXTest, LayerConstraintRoundTripNanOmitted) {
  * Extracts complete PAGX documents from markdown code blocks and renders them.
  */
 PAGX_TEST(PAGXTest, SkillExamples) {
-  TestMarkdownExamples(
-      context, ProjectPath::Absolute(".codebuddy/skills/pagx/references/examples.md"), "skills_",
-      2.0f);
+  TestMarkdownExamples(context,
+                       ProjectPath::Absolute(".codebuddy/skills/pagx/references/examples.md"),
+                       "skills_", 2.0f);
 }
 
 /**

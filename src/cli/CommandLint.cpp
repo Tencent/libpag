@@ -823,6 +823,11 @@ static void DetectUnwrappableFirstChildGroups(xmlNodePtr root,
 
 // --- Pass 6: Path to primitive detection ---
 
+struct PathPoint {
+  float x = 0;
+  float y = 0;
+};
+
 static std::vector<std::string> ParseVerbs(const std::string& data) {
   std::vector<std::string> verbs = {};
   for (size_t i = 0; i < data.size(); i++) {
@@ -836,24 +841,153 @@ static std::vector<std::string> ParseVerbs(const std::string& data) {
   return verbs;
 }
 
-static bool IsRectangleVerbPattern(const std::vector<std::string>& verbs) {
-  if (verbs.size() == 5) {
-    return verbs[0] == "M" && verbs[1] == "L" && verbs[2] == "L" && verbs[3] == "L" &&
-           verbs[4] == "Z";
+static std::vector<float> ParseNumbers(const std::string& data) {
+  std::vector<float> nums = {};
+  size_t i = 0;
+  while (i < data.size()) {
+    char c = data[i];
+    if ((c >= '0' && c <= '9') || c == '-' || c == '+' || c == '.') {
+      char* end = nullptr;
+      float val = strtof(data.c_str() + i, &end);
+      if (end != data.c_str() + i) {
+        nums.push_back(val);
+        i = static_cast<size_t>(end - data.c_str());
+        continue;
+      }
+    }
+    i++;
   }
-  if (verbs.size() == 6) {
-    return verbs[0] == "M" && verbs[1] == "L" && verbs[2] == "L" && verbs[3] == "L" &&
-           verbs[4] == "L" && verbs[5] == "Z";
-  }
-  return false;
+  return nums;
 }
 
-static bool IsEllipseVerbPattern(const std::vector<std::string>& verbs) {
+static bool IsAxisAlignedRectangle(const std::string& data, const std::vector<std::string>& verbs) {
+  bool hasCorrectVerbs = false;
+  if (verbs.size() == 5) {
+    hasCorrectVerbs =
+        verbs[0] == "M" && verbs[1] == "L" && verbs[2] == "L" && verbs[3] == "L" && verbs[4] == "Z";
+  } else if (verbs.size() == 6) {
+    hasCorrectVerbs = verbs[0] == "M" && verbs[1] == "L" && verbs[2] == "L" && verbs[3] == "L" &&
+                      verbs[4] == "L" && verbs[5] == "Z";
+  }
+  if (!hasCorrectVerbs) {
+    return false;
+  }
+  auto nums = ParseNumbers(data);
+  // Extract points: M x,y then L x,y pairs.
+  size_t pointCount = (verbs.size() == 5) ? 4 : 5;
+  if (nums.size() < pointCount * 2) {
+    return false;
+  }
+  std::vector<PathPoint> points(pointCount);
+  for (size_t i = 0; i < pointCount; i++) {
+    points[i] = {nums[i * 2], nums[i * 2 + 1]};
+  }
+  // Close the polygon by connecting last point back to first.
+  // Check that every edge is axis-aligned (horizontal or vertical).
+  for (size_t i = 0; i < pointCount; i++) {
+    auto& p1 = points[i];
+    auto& p2 = points[(i + 1) % pointCount];
+    float dx = std::abs(p2.x - p1.x);
+    float dy = std::abs(p2.y - p1.y);
+    if (dx > 0.01f && dy > 0.01f) {
+      return false;  // Diagonal edge — not a rectangle.
+    }
+  }
+  return true;
+}
+
+static bool IsApproximateEllipse(const std::string& data, const std::vector<std::string>& verbs) {
   if (verbs.size() != 6) {
     return false;
   }
-  return verbs[0] == "M" && verbs[1] == "C" && verbs[2] == "C" && verbs[3] == "C" &&
-         verbs[4] == "C" && verbs[5] == "Z";
+  if (!(verbs[0] == "M" && verbs[1] == "C" && verbs[2] == "C" && verbs[3] == "C" &&
+        verbs[4] == "C" && verbs[5] == "Z")) {
+    return false;
+  }
+  auto nums = ParseNumbers(data);
+  // M x,y + 4 * (C cp1x,cp1y cp2x,cp2y x,y) = 2 + 4*6 = 26 numbers
+  if (nums.size() < 26) {
+    return false;
+  }
+  // Extract the 4 on-curve points (start point + 4 endpoints of cubic segments).
+  PathPoint onCurve[4];
+  onCurve[0] = {nums[0], nums[1]};    // M point
+  onCurve[1] = {nums[8], nums[9]};    // End of first C
+  onCurve[2] = {nums[14], nums[15]};  // End of second C
+  onCurve[3] = {nums[20], nums[21]};  // End of third C
+  // Fourth C endpoint should return to start: nums[26], nums[27] ≈ onCurve[0]
+  // Compute bounding box of on-curve points.
+  float minX = onCurve[0].x, maxX = onCurve[0].x;
+  float minY = onCurve[0].y, maxY = onCurve[0].y;
+  for (int i = 1; i < 4; i++) {
+    minX = std::min(minX, onCurve[i].x);
+    maxX = std::max(maxX, onCurve[i].x);
+    minY = std::min(minY, onCurve[i].y);
+    maxY = std::max(maxY, onCurve[i].y);
+  }
+  float cx = (minX + maxX) / 2.0f;
+  float cy = (minY + maxY) / 2.0f;
+  float rx = (maxX - minX) / 2.0f;
+  float ry = (maxY - minY) / 2.0f;
+  if (rx < 0.01f || ry < 0.01f) {
+    return false;
+  }
+  // Check that on-curve points are at the cardinal positions of the ellipse (top/right/bottom/left).
+  // For a standard ellipse drawn with 4 cubic Beziers, the on-curve points should be at the
+  // midpoints of each side of the bounding box.
+  bool foundTop = false, foundBottom = false, foundLeft = false, foundRight = false;
+  static constexpr float TOLERANCE = 1.0f;
+  for (int i = 0; i < 4; i++) {
+    float dx = std::abs(onCurve[i].x - cx);
+    float dy = std::abs(onCurve[i].y - cy);
+    if (dx < TOLERANCE && std::abs(dy - ry) < TOLERANCE) {
+      if (onCurve[i].y < cy) {
+        foundTop = true;
+      } else {
+        foundBottom = true;
+      }
+    } else if (dy < TOLERANCE && std::abs(dx - rx) < TOLERANCE) {
+      if (onCurve[i].x < cx) {
+        foundLeft = true;
+      } else {
+        foundRight = true;
+      }
+    }
+  }
+  if (!(foundTop && foundBottom && foundLeft && foundRight)) {
+    return false;
+  }
+  // Verify control points match the kappa ratio for circular arcs.
+  // kappa ≈ 0.5522847 — control point offset from on-curve point for a quarter circle.
+  static constexpr float KAPPA = 0.5522847f;
+  static constexpr float CP_TOLERANCE = 2.0f;
+  float expectedCpOffsetX = rx * KAPPA;
+  float expectedCpOffsetY = ry * KAPPA;
+  // Check each cubic segment's control points.
+  for (int seg = 0; seg < 4; seg++) {
+    float cp1x = nums[2 + seg * 6];
+    float cp1y = nums[3 + seg * 6];
+    float cp2x = nums[4 + seg * 6];
+    float cp2y = nums[5 + seg * 6];
+    // The control points should be offset from their respective on-curve points by kappa * radius.
+    PathPoint segStart = (seg == 0) ? onCurve[0] : PathPoint{nums[seg * 6], nums[seg * 6 + 1]};
+    PathPoint segEnd = {nums[6 + seg * 6], nums[7 + seg * 6]};
+    float cp1DistX = std::abs(cp1x - segStart.x);
+    float cp1DistY = std::abs(cp1y - segStart.y);
+    float cp2DistX = std::abs(cp2x - segEnd.x);
+    float cp2DistY = std::abs(cp2y - segEnd.y);
+    // One of the distances should be ~0 and the other ~kappa*r.
+    bool cp1Valid =
+        (cp1DistX < CP_TOLERANCE && std::abs(cp1DistY - expectedCpOffsetY) < CP_TOLERANCE) ||
+        (cp1DistY < CP_TOLERANCE && std::abs(cp1DistX - expectedCpOffsetX) < CP_TOLERANCE);
+    bool cp2Valid =
+        (cp2DistX < CP_TOLERANCE && std::abs(cp2DistY - expectedCpOffsetY) < CP_TOLERANCE) ||
+        (cp2DistY < CP_TOLERANCE && std::abs(cp2DistX - expectedCpOffsetX) < CP_TOLERANCE);
+    if (!cp1Valid || !cp2Valid) {
+      return false;
+    }
+  }
+  return true;
 }
 
 static void DetectPathsToPrimitives(xmlNodePtr root, std::vector<LintDiagnostic>& diagnostics) {
@@ -904,13 +1038,13 @@ static void DetectPathsToPrimitives(xmlNodePtr root, std::vector<LintDiagnostic>
     }
 
     auto verbs = ParseVerbs(pathDataStr);
-    if (IsRectangleVerbPattern(verbs)) {
+    if (IsAxisAlignedRectangle(pathDataStr, verbs)) {
       LintDiagnostic diag = {};
       diag.line = static_cast<int>(node->line);
       diag.category = "info";
       diag.message = "Path can be replaced with Rectangle";
       diagnostics.push_back(std::move(diag));
-    } else if (IsEllipseVerbPattern(verbs)) {
+    } else if (IsApproximateEllipse(pathDataStr, verbs)) {
       LintDiagnostic diag = {};
       diag.line = static_cast<int>(node->line);
       diag.category = "info";
@@ -1018,12 +1152,41 @@ static void DetectLocalizablePathData(xmlNodePtr root, std::vector<LintDiagnosti
   std::vector<xmlNodePtr> allNodes = {};
   CollectAllNodes(root, allNodes);
 
+  // Collect all PathData IDs and their references.
+  // If any referencing Path has a parent Group/Layer with rotation, skip the PathData.
+  std::unordered_set<std::string> rotatedPathDataIds = {};
+  for (auto* node : allNodes) {
+    if (!XmlNodeIs(node, "Path")) {
+      continue;
+    }
+    auto dataRef = XmlAttr(node, "data");
+    if (dataRef.empty() || dataRef[0] != '@') {
+      continue;
+    }
+    auto id = dataRef.substr(1);
+    // Walk up ancestors to check for rotation on Group or Layer.
+    for (xmlNodePtr parent = node->parent; parent != nullptr; parent = parent->parent) {
+      if (parent->type != XML_ELEMENT_NODE) {
+        continue;
+      }
+      auto rotation = XmlAttrFloat(parent, "rotation");
+      if (!std::isnan(rotation) && rotation != 0.0f) {
+        rotatedPathDataIds.insert(id);
+        break;
+      }
+    }
+  }
+
   for (auto* node : allNodes) {
     if (!XmlNodeIs(node, "PathData")) {
       continue;
     }
     auto data = XmlAttr(node, "data");
     if (data.empty()) {
+      continue;
+    }
+    auto id = XmlAttr(node, "id");
+    if (!id.empty() && rotatedPathDataIds.count(id) > 0) {
       continue;
     }
     auto firstPoint = ParseFirstPoint(data);
@@ -1324,7 +1487,7 @@ static void CollectBlurHints(xmlNodePtr layer, const std::string& displayName,
       if (std::isnan(blurY)) {
         blurY = 0;
       }
-      if (blurX > 30.0f || blurY > 30.0f) {
+      if (blurX > 100.0f || blurY > 100.0f) {
         LintDiagnostic diag = {};
         diag.line = static_cast<int>(child->line);
         diag.category = "warning";
@@ -1345,7 +1508,7 @@ static void CollectBlurHints(xmlNodePtr layer, const std::string& displayName,
       if (std::isnan(blurY)) {
         blurY = 0;
       }
-      if (blurX > 30.0f || blurY > 30.0f) {
+      if (blurX > 100.0f || blurY > 100.0f) {
         LintDiagnostic diag = {};
         diag.line = static_cast<int>(child->line);
         diag.category = "warning";
@@ -1366,7 +1529,7 @@ static void CollectBlurHints(xmlNodePtr layer, const std::string& displayName,
       if (std::isnan(blurY)) {
         blurY = 0;
       }
-      if (blurX > 30.0f || blurY > 30.0f) {
+      if (blurX > 100.0f || blurY > 100.0f) {
         LintDiagnostic diag = {};
         diag.line = static_cast<int>(child->line);
         diag.category = "warning";
@@ -1387,7 +1550,7 @@ static void CollectBlurHints(xmlNodePtr layer, const std::string& displayName,
       if (std::isnan(blurY)) {
         blurY = 0;
       }
-      if (blurX > 30.0f || blurY > 30.0f) {
+      if (blurX > 100.0f || blurY > 100.0f) {
         LintDiagnostic diag = {};
         diag.line = static_cast<int>(child->line);
         diag.category = "warning";
