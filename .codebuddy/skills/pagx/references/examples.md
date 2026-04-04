@@ -188,6 +188,64 @@ Group isolates the fill bar's Fill from the track's Fill. The outer Layer uses
 `endPoint` coordinates are relative to the Text element's local origin. Text + Fill sit
 directly on the Layer (no Group needed when only one painter scope exists).
 
+### Text Decoration (Strikethrough & Underline)
+
+```xml
+<pagx version="1.0" width="200" height="80">
+  <Layer centerX="0" centerY="0" layout="vertical" gap="16" alignment="center">
+    <!-- Underline: same color — Text + Rectangle + single Fill -->
+    <Layer>
+      <Text text="View All" fontFamily="Arial" fontSize="14"/>
+      <Rectangle left="0" right="0" bottom="0" size="0,1"/>
+      <Fill color="#3B82F6"/>
+    </Layer>
+    <!-- Strikethrough: different colors — Group isolates line's Fill -->
+    <Layer>
+      <Text text="¥599" fontFamily="Arial" fontSize="16"/>
+      <Fill color="#BDC3C7"/>
+      <Group left="0" right="0" centerY="0">
+        <Rectangle left="0" right="0" size="0,1"/>
+        <Fill color="#FF4757"/>
+      </Group>
+    </Layer>
+  </Layer>
+</pagx>
+```
+
+**Pattern**: PAGX has no `text-decoration`. Overlay a 1px Rectangle (`bottom="0"` for
+underline, `centerY="0"` for strikethrough) with `left="0" right="0"` to match text width.
+Same color: single Fill. Different colors: wrap the line in a Group to isolate its Fill.
+
+### Image Placeholder
+
+```xml
+<pagx version="1.0" width="393" height="200">
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="12" alignment="center" arrangement="center">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="393,200">
+        <ColorStop offset="0" color="#F0F4FF"/>
+        <ColorStop offset="1" color="#E8EEFF"/>
+      </LinearGradient>
+    </Fill>
+    <Layer width="48" height="48">
+      <Rectangle left="6" top="6" size="36,36" roundness="4"/>
+      <Ellipse left="14" top="14" size="6,6"/>
+      <Path data="M42 30L32 20L10 42"/>
+      <Stroke color="#D5DAE0" width="3" cap="round" join="round"/>
+    </Layer>
+    <Layer>
+      <Text text="image description" fontFamily="Arial" fontSize="13"/>
+      <Fill color="#BDC3C7"/>
+    </Layer>
+  </Layer>
+</pagx>
+```
+
+**Pattern**: When no image is available — soft gradient background + stroke icon + label.
+Vary gradient hues across placeholders (`#F0F4FF→#E8EEFF`, `#FFF0E8→#FFE8D8`,
+`#F0FFF4→#E8FFE8`).
+
 ### Avatar with Circular Clip
 
 ```xml

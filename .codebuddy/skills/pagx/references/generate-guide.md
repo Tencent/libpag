@@ -491,6 +491,10 @@ Positioning for examples). Exception: TextPath.
 - `overflow="hidden"` discards **entire lines**, not partial content (unlike CSS pixel clip)
 - `lineHeight=0` (auto) calculates from font metrics, not `fontSize`
 
+**Strikethrough / underline text**: PAGX has no `text-decoration`. Overlay a 1px Rectangle
+via Group — `centerY="0"` for strikethrough, `bottom="0"` for underline. See `examples.md`
+§Text Decoration.
+
 ### PAGX-Specific Format Rules
 
 These constraints differ from CSS/SVG:
@@ -513,6 +517,9 @@ These constraints differ from CSS/SVG:
 
 - **Gradient coordinates** are relative to the **geometry element's local origin**, not
   canvas. `left="200"` Rectangle uses `startPoint="0,50"`, not `"200,50"`.
+
+- **Image placeholders** — when no image is available, use a diagonal LinearGradient
+  (soft pastels) instead of flat gray. See `examples.md` §Image Placeholder.
 
 ---
 
