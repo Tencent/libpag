@@ -888,9 +888,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
         xml.addAttribute("writingMode", WritingModeToString(textBox->writingMode));
       }
       xml.addAttribute("lineHeight", textBox->lineHeight, Default<TextBox>().lineHeight);
-      if (textBox->wordWrap != Default<TextBox>().wordWrap) {
-        xml.addAttribute("wordWrap", textBox->wordWrap, Default<TextBox>().wordWrap);
-      }
+      xml.addAttribute("wordWrap", textBox->wordWrap, Default<TextBox>().wordWrap);
       if (textBox->overflow != Default<TextBox>().overflow) {
         xml.addAttribute("overflow", OverflowToString(textBox->overflow));
       }
