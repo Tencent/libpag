@@ -750,11 +750,8 @@ class LayerBuilderContext {
     if (!node->passThroughBackground) {
       layer->setPassThroughBackground(false);
     }
-    // Apply scrollRect if present, or clipToBounds using resolved dimensions
     if (node->hasScrollRect) {
       layer->setScrollRect(ToTGFX(node->scrollRect));
-    } else if (node->clipToBounds && !std::isnan(node->width) && !std::isnan(node->height)) {
-      layer->setScrollRect(tgfx::Rect::MakeWH(node->width, node->height));
     }
 
     // Layer styles
