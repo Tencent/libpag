@@ -634,7 +634,7 @@ static std::vector<std::pair<std::string, std::string>> ExtractMarkdownExamples(
 }
 
 static void TestMarkdownExamples(tgfx::Context* context, const std::string& markdownPath,
-                                 const std::string& prefix = "") {
+                                 const std::string& prefix = "", float scale = 1.0f) {
   auto examples = ExtractMarkdownExamples(markdownPath);
   ASSERT_FALSE(examples.empty()) << "No examples found in: " << markdownPath;
 
@@ -673,14 +673,22 @@ static void TestMarkdownExamples(tgfx::Context* context, const std::string& mark
       continue;
     }
 
-    auto surface =
-        Surface::Make(context, static_cast<int>(doc->width), static_cast<int>(doc->height));
+    int canvasWidth = static_cast<int>(std::ceil(doc->width * scale));
+    int canvasHeight = static_cast<int>(std::ceil(doc->height * scale));
+    auto surface = Surface::Make(context, canvasWidth, canvasHeight);
     if (!surface) {
       ADD_FAILURE() << "Failed to create surface for: " << key;
       continue;
     }
     DisplayList displayList;
-    displayList.root()->addChild(layer);
+    if (scale != 1.0f) {
+      auto container = tgfx::Layer::Make();
+      container->setMatrix(tgfx::Matrix::MakeScale(scale, scale));
+      container->addChild(layer);
+      displayList.root()->addChild(container);
+    } else {
+      displayList.root()->addChild(layer);
+    }
     displayList.render(surface.get(), false);
 
     EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/" + key)) << key;
@@ -3585,7 +3593,8 @@ PAGX_TEST(PAGXTest, LayerConstraintRoundTripNanOmitted) {
  */
 PAGX_TEST(PAGXTest, SkillExamples) {
   TestMarkdownExamples(
-      context, ProjectPath::Absolute(".codebuddy/skills/pagx/references/examples.md"), "skills_");
+      context, ProjectPath::Absolute(".codebuddy/skills/pagx/references/examples.md"), "skills_",
+      2.0f);
 }
 
 /**
