@@ -318,32 +318,15 @@ static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc) {
   layer->flex = getFloatAttribute(node, "flex", Default<Layer>().flex, doc);
   auto paddingStr = getAttribute(node, "padding");
   if (!paddingStr.empty()) {
-    auto paddingValues = ParseFloatList(paddingStr);
-    auto count = paddingValues.size();
+    auto count = ParseFloatList(paddingStr).size();
     if (count != 1 && count != 2 && count != 4) {
       reportError(doc, node, "Invalid value '" + paddingStr + "' for 'padding' attribute.");
-    } else if (count == 1) {
-      layer->padding = {paddingValues[0], paddingValues[0], paddingValues[0], paddingValues[0]};
-    } else if (count == 2) {
-      layer->padding = {paddingValues[0], paddingValues[1], paddingValues[0], paddingValues[1]};
     } else {
-      layer->padding = {paddingValues[0], paddingValues[1], paddingValues[2], paddingValues[3]};
+      layer->padding = PaddingFromString(paddingStr);
     }
   }
-  auto alignmentStr = getAttribute(node, "alignment");
-  if (!alignmentStr.empty()) {
-    if (!IsValidAlignmentString(alignmentStr)) {
-      reportError(doc, node, "Invalid value '" + alignmentStr + "' for 'alignment' attribute.");
-    }
-    layer->alignment = AlignmentFromString(alignmentStr);
-  }
-  auto arrangementStr = getAttribute(node, "arrangement");
-  if (!arrangementStr.empty()) {
-    if (!IsValidArrangementString(arrangementStr)) {
-      reportError(doc, node, "Invalid value '" + arrangementStr + "' for 'arrangement' attribute.");
-    }
-    layer->arrangement = ArrangementFromString(arrangementStr);
-  }
+  layer->alignment = GET_ENUM(node, "alignment", "stretch", doc, Alignment);
+  layer->arrangement = GET_ENUM(node, "arrangement", "start", doc, Arrangement);
   layer->includeInLayout =
       getBoolAttribute(node, "includeInLayout", Default<Layer>().includeInLayout, doc);
   layer->left = getFloatAttributeOrNaN(node, "left", doc);
