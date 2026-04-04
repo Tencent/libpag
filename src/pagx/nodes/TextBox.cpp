@@ -18,7 +18,6 @@
 
 #include "pagx/nodes/TextBox.h"
 #include <cmath>
-#include "pagx/LayoutContext.h"
 #include "pagx/TextLayout.h"
 #include "pagx/TextLayoutParams.h"
 #include "pagx/layout/LayoutNode.h"
