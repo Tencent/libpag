@@ -1377,6 +1377,27 @@ static void CollectBlurHints(xmlNodePtr layer, const std::string& displayName,
         diagnostics.push_back(std::move(diag));
       }
     }
+
+    if (nodeName == "InnerShadowStyle") {
+      float blurX = XmlAttrFloat(child, "blurX");
+      float blurY = XmlAttrFloat(child, "blurY");
+      if (std::isnan(blurX)) {
+        blurX = 0;
+      }
+      if (std::isnan(blurY)) {
+        blurY = 0;
+      }
+      if (blurX > 30.0f || blurY > 30.0f) {
+        LintDiagnostic diag = {};
+        diag.line = static_cast<int>(child->line);
+        diag.category = "warning";
+        diag.message = displayName + ": InnerShadowStyle with high blur radius (X:" +
+                       std::to_string(static_cast<int>(blurX)) +
+                       " Y:" + std::to_string(static_cast<int>(blurY)) +
+                       ") may cause performance issues";
+        diagnostics.push_back(std::move(diag));
+      }
+    }
   }
 }
 
