@@ -1,0 +1,14 @@
+<pagx version="1.0" width="200" height="200">
+  <Resources>
+    <!-- PathData not at origin, but referenced Path is inside a rotated Group.
+         Should NOT trigger "PathData can be localized" because shifting coordinates
+         would change the rotation center. -->
+    <PathData id="arrow" data="M 10 0 L 20 10 L 10 20 Z"/>
+  </Resources>
+  <Layer width="200" height="200">
+    <Group rotation="45">
+      <Path data="@arrow"/>
+      <Fill color="#F00"/>
+    </Group>
+  </Layer>
+</pagx>

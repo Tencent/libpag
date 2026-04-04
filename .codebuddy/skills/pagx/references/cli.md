@@ -356,3 +356,34 @@ pagx export --input icon.pagx --svg-indent 4     # 4-space indent
 
 On success the command prints `pagx export: wrote <path>` and exits 0; on failure it prints
 an error and exits 1.
+
+---
+
+## pagx insert
+
+Insert content from another format (e.g. SVG) into a target Layer of an existing PAGX file.
+The target Layer's contents, children, styles, and filters are replaced. The Layer's width
+and height are set from the source. Other attributes (position, alpha, blendMode, etc.) are
+preserved.
+
+The target Layer should be a placeholder (empty or with only desired background/styling outside
+the insertion point). After insertion, the Layer contains the converted content.
+
+```bash
+pagx insert --svg icon.svg --id menuIcon design.pagx
+pagx insert --svg icon.svg --id menuIcon -o out.pagx design.pagx
+```
+
+| Option | Description |
+|--------|-------------|
+| `--svg <file>` | SVG file to insert (required) |
+| `--id <id>` | Target Layer id in the PAGX file (required) |
+| `-o, --output <file>` | Output PAGX file (default: overwrite input) |
+
+The command locates the Layer with the specified `id`, converts the SVG to PAGX nodes,
+and replaces the Layer's content (contents, children, styles, filters) with the conversion result.
+The Layer's width and height are set to match the SVG's dimensions.
+
+On success the command prints `pagx insert: wrote <path>` and exits 0; on failure it prints
+an error and exits 1.
+

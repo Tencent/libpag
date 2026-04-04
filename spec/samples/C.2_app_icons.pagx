@@ -188,9 +188,6 @@
             <Fill color="#06B6D4"/>
             <Group>
               <Ellipse left="17" top="6" size="12,12"/>
-              <Fill color="#1E2433"/>
-            </Group>
-            <Group>
               <Path data="M12 39C12 27 16 21 23 21C30 21 34 27 34 39"/>
               <Fill color="#1E2433"/>
             </Group>

@@ -453,14 +453,48 @@ size rather than content-measured:
 
 ### Icons
 
-1. **Determine drawing size** from container minus padding (e.g., 48×48 - 12px = 24×24)
-2. **Think in SVG, write in PAGX** — compose as SVG elements, translate using the mapping
-   table above. Path `data` is standard SVG `<path d>` syntax.
-3. **Center in container** — `centerX="0" centerY="0"` on geometry or Group
+Write a placeholder Layer in the PAGX, generate the icon as SVG, then use `pagx insert`
+to convert and inject it.
 
 Prefer Stroke (outline) by default. Fill for solid icons (active states). Mixed for
-complex icons. See `examples.md` §Icons for complete examples.
+complex icons.
 
+**Step 1: Write a placeholder Layer**
+
+```xml
+<Layer id="searchIcon"/>
+```
+
+If the icon needs a background, put the background in a parent Layer and add
+`centerX="0" centerY="0"` on the placeholder to center the icon within the background:
+
+```xml
+<Layer width="48" height="48">
+  <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
+  <Fill color="#EFF6FF"/>
+  <Layer id="searchIcon" centerX="0" centerY="0"/>
+</Layer>
+```
+
+**Step 2: Write the SVG file and insert**
+
+Write the SVG to a temporary file using the target drawing size as the viewBox:
+
+```xml
+<svg viewBox="0 0 24 24" width="24" height="24">
+  <circle cx="10" cy="10" r="7" fill="none" stroke="#1E293B" stroke-width="2"/>
+  <path d="M15 15L21 21" stroke="#1E293B" stroke-width="2" stroke-linecap="round"/>
+</svg>
+```
+
+Then run:
+
+```bash
+pagx insert --svg /tmp/pagx_insert.svg --id searchIcon design.pagx
+```
+
+The command replaces the placeholder's contents with the converted PAGX nodes and sets
+its width/height from the SVG dimensions. All other attributes on the Layer are preserved.
 ### Text Positioning
 
 Text renders from the baseline, making bounding box dependent on font metrics. Prefer

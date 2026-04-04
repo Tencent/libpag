@@ -3,8 +3,7 @@
 <pagx version="1.0" width="400" height="400">
   <!-- Horizontal layout boundary -->
   <Layer left="20" top="20" width="360" height="170">
-    <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-    <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+    <Layer composition="@boundary"/>
   </Layer>
   <!-- Horizontal layout: three equal-width cards -->
   <Layer left="20" top="20" width="360" height="170" layout="horizontal" gap="16" padding="20">
@@ -27,8 +26,7 @@
 
   <!-- Vertical layout boundary -->
   <Layer left="20" top="210" width="360" height="170">
-    <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-    <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+    <Layer composition="@boundary"/>
   </Layer>
   <!-- Vertical layout: three equal-height bars -->
   <Layer left="20" top="210" width="360" height="170" layout="vertical" gap="12" padding="20">
@@ -48,4 +46,12 @@
       <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#3B82F650"/>
     </Layer>
   </Layer>
+  <Resources>
+    <Composition id="boundary" width="360" height="170">
+      <Layer left="0" right="0" top="0" bottom="0">
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+      </Layer>
+    </Composition>
+  </Resources>
 </pagx>

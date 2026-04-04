@@ -19,8 +19,8 @@
     <Stroke color="#334155" width="1"/>
   </Layer>
   <Layer name="Grid" alpha="0.05">
-    <Group left="60" top="60">
-      <Path data="M -4 0 L 4 0 M 0 -4 L 0 4"/>
+    <Group left="56" top="56">
+      <Path data="M 0 4 L 8 4 M 4 0 L 4 8"/>
       <Stroke color="#475569" width="1" cap="round"/>
       <Repeater copies="13" position="120,0"/>
     </Group>
@@ -343,7 +343,7 @@
         <Fill color="#A78BFA"/>
       </TextBox>
     </Group>
-    <Group left="-80">
+    <Group left="-95" top="-6">
       <Path data="@arrowRight"/>
       <Stroke color="#64748B" width="2" cap="round" join="round"/>
     </Group>
@@ -356,7 +356,7 @@
         <Fill color="#F472B6"/>
       </TextBox>
     </Group>
-    <Group left="90">
+    <Group left="75" top="-6">
       <Path data="@arrowRight"/>
       <Stroke color="#64748B" width="2" cap="round" join="round"/>
     </Group>
@@ -397,6 +397,6 @@
       <ColorStop offset="0" color="#06B6D4"/>
       <ColorStop offset="1" color="#3B82F6"/>
     </LinearGradient>
-    <PathData id="arrowRight" data="M -15 0 L 10 0 M 4 -6 L 12 0 L 4 6"/>
+    <PathData id="arrowRight" data="M 0 6 L 25 6 M 19 0 L 27 6 L 19 12"/>
   </Resources>
 </pagx>

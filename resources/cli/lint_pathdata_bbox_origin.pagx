@@ -1,0 +1,18 @@
+<pagx version="1.0" width="200" height="200">
+  <Resources>
+    <!-- First M point is at (10,10) but bbox origin is at (0,0) because of the L commands.
+         Should NOT trigger "PathData can be localized" since bbox is already at origin. -->
+    <PathData id="atOrigin" data="M 10 10 L 0 10 L 0 0 L 10 0 Z"/>
+    <!-- First M point is at (50,50) and bbox origin is also at (50,50).
+         Should trigger "PathData can be localized". -->
+    <PathData id="notAtOrigin" data="M 50 50 L 100 50 L 100 100 Z"/>
+  </Resources>
+  <Layer>
+    <Path data="@atOrigin"/>
+    <Fill color="#F00"/>
+  </Layer>
+  <Layer>
+    <Path data="@notAtOrigin"/>
+    <Fill color="#00F"/>
+  </Layer>
+</pagx>

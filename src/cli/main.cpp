@@ -24,6 +24,7 @@
 #include "cli/CommandFont.h"
 #include "cli/CommandFormat.h"
 #include "cli/CommandImport.h"
+#include "cli/CommandInsert.h"
 #include "cli/CommandLayoutCheck.h"
 #include "cli/CommandLint.h"
 #include "cli/CommandRender.h"
@@ -46,6 +47,7 @@ static void PrintUsage() {
             << "  format         Format a PAGX file (indentation and attribute ordering)\n"
             << "  import         Import from another format (e.g. SVG) to PAGX\n"
             << "  export         Export a PAGX file to another format (e.g. SVG)\n"
+            << "  insert         Insert content from another format into a PAGX Layer\n"
             << "\n"
             << "Options:\n"
             << "  --help, -h       Show help\n"
@@ -95,6 +97,9 @@ int main(int argc, char* argv[]) {
   }
   if (command == "export") {
     return pagx::cli::RunExport(argc - 1, argv + 1);
+  }
+  if (command == "insert") {
+    return pagx::cli::RunInsert(argc - 1, argv + 1);
   }
 
   std::cerr << "pagx: unknown command '" << command << "'\n";

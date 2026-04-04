@@ -65,8 +65,6 @@ Rect Polystar::getContentBounds() const {
 
 void Polystar::onMeasure(LayoutContext*) {
   auto bounds = getContentBounds();
-  preferredX = bounds.x;
-  preferredY = bounds.y;
   preferredWidth = bounds.width;
   preferredHeight = bounds.height;
 }

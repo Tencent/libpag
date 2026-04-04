@@ -87,14 +87,14 @@
     </Layer>
   </Layer>
   <Layer name="LeftSide" left="400" top="0" bottom="0">
-    <Layer top="300">
+    <Layer left="-180" top="200">
       <Path data="@healthArc"/>
       <Stroke color="#002233" width="24" cap="butt"/>
     </Layer>
-    <Layer top="300">
+    <Layer left="-180" top="200">
       <Path data="@healthArc"/>
       <Stroke width="20" cap="butt" dashes="4,2">
-        <LinearGradient startPoint="-180,100" endPoint="-180,-100">
+        <LinearGradient startPoint="0,200" endPoint="0,0">
           <ColorStop offset="0" color="#F00"/>
           <ColorStop offset="0.5" color="#FF0"/>
           <ColorStop offset="1" color="#0F0"/>
@@ -129,14 +129,14 @@
     </Layer>
   </Layer>
   <Layer name="RightSide" left="400" top="0" bottom="0">
-    <Layer top="300">
+    <Layer left="144" top="200">
       <Path data="@energyArc"/>
       <Stroke color="#002233" width="24" cap="butt"/>
     </Layer>
-    <Layer top="300">
+    <Layer left="144" top="200">
       <Path data="@energyArc"/>
       <Stroke width="20" cap="butt" dashes="10,2">
-        <LinearGradient startPoint="180,-100" endPoint="180,100">
+        <LinearGradient startPoint="36,0" endPoint="36,200">
           <ColorStop offset="0" color="#0FF"/>
           <ColorStop offset="1" color="#0044FF"/>
         </LinearGradient>
@@ -232,18 +232,18 @@
       <Repeater copies="10" position="10,0"/>
     </Layer>
     <Layer top="15">
-      <Layer>
+      <Group>
         <Path data="@bullet"/>
         <Fill color="#FFAA00"/>
         <Stroke color="#000" width="1"/>
         <Repeater copies="5" position="10,0"/>
-      </Layer>
-      <Layer>
+      </Group>
+      <Group>
         <Path data="@bullet"/>
         <Fill color="#331100"/>
         <Stroke color="#442200" width="1"/>
         <Repeater copies="5" offset="5" position="10,0"/>
-      </Layer>
+      </Group>
     </Layer>
   </Layer>
   <Layer name="Corners">
@@ -253,7 +253,7 @@
   </Layer>
   <Resources>
     <PathData id="bullet" data="M 0 0 L 4 0 L 6 4 L 4 12 L 0 12 L -2 4 Z"/>
-    <PathData id="healthArc" data="M -180 100 A 200 200 0 0 0 -180 -100"/>
-    <PathData id="energyArc" data="M 180 -100 A 200 200 0 0 0 180 100"/>
+    <PathData id="healthArc" data="M 0 200 A 200 200 0 0 0 0 0"/>
+    <PathData id="energyArc" data="M 36 0 A 200 200 0 0 0 36 200"/>
   </Resources>
 </pagx>

@@ -1721,43 +1721,43 @@
   </Layer>
   <Resources>
     <Composition id="comp1" width="3" height="3">
-      <Layer id="compLayer1">
+      <Layer>
 <Ellipse left="-1.5" top="-1.5" size="3,3"/>
         <Fill color="#FFFFFF"/>
       </Layer>
     </Composition>
     <Composition id="comp2" width="3" height="3">
-      <Layer id="compLayer2">
+      <Layer>
 <Ellipse left="-1.5" top="-1.5" size="3,3"/>
         <Fill color="#FFFFFFBB"/>
       </Layer>
     </Composition>
     <Composition id="comp3" width="3" height="3">
-      <Layer id="compLayer3">
+      <Layer>
 <Ellipse left="-1.5" top="-1.5" size="3,3"/>
         <Fill color="#A78BFA"/>
       </Layer>
     </Composition>
     <Composition id="comp4" width="2" height="2">
-      <Layer id="compLayer4">
+      <Layer>
 <Ellipse left="-1" top="-1" size="2,2"/>
         <Fill color="#FFFFFFCC"/>
       </Layer>
     </Composition>
     <Composition id="comp5" width="2" height="2">
-      <Layer id="compLayer5">
+      <Layer>
 <Ellipse left="-1" top="-1" size="2,2"/>
         <Fill color="#FFFFFFAA"/>
       </Layer>
     </Composition>
     <Composition id="comp6" width="2" height="2">
-      <Layer id="compLayer6">
+      <Layer>
 <Ellipse left="-1" top="-1" size="2,2"/>
         <Fill color="#FFFFFFBB"/>
       </Layer>
     </Composition>
     <Composition id="comp7" width="2" height="2">
-      <Layer id="compLayer7">
+      <Layer>
 <Ellipse left="-1" top="-1" size="2,2"/>
         <Fill color="#FFFFFF"/>
       </Layer>

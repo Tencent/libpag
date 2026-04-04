@@ -28,6 +28,7 @@
 #include "cli/CommandFont.h"
 #include "cli/CommandFormat.h"
 #include "cli/CommandImport.h"
+#include "cli/CommandInsert.h"
 #include "cli/CommandLayoutCheck.h"
 #include "cli/CommandLint.h"
 #include "cli/CommandRender.h"
@@ -767,6 +768,19 @@ CLI_TEST(PAGXCliTest, Lint_PathToPrimitive) {
   EXPECT_TRUE(output.find("Path can be replaced with") != std::string::npos);
 }
 
+// Heart (M C C C C Z) and diamond (M L L L Z) shapes should NOT be reported as replaceable.
+CLI_TEST(PAGXCliTest, Lint_PathNonPrimitive) {
+  auto inputPath = TestResourcePath("lint_path_non_primitive.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("Path can be replaced with") == std::string::npos);
+}
+
 CLI_TEST(PAGXCliTest, Lint_LocalizableCoordinates) {
   auto inputPath = TestResourcePath("lint_localizable_coords.pagx");
   std::streambuf* old = std::cerr.rdbuf();
@@ -789,6 +803,42 @@ CLI_TEST(PAGXCliTest, Lint_LocalizablePathData) {
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(output.find("PathData can be localized to origin") != std::string::npos);
+}
+
+// PathData whose first M point is not at origin but bounding box origin IS at (0,0)
+// should NOT be reported. Only the bbox-offset PathData should be reported.
+CLI_TEST(PAGXCliTest, Lint_PathDataBboxOrigin) {
+  auto inputPath = TestResourcePath("lint_pathdata_bbox_origin.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  // "atOrigin" PathData should NOT be reported (bbox starts at 0,0).
+  // "notAtOrigin" PathData SHOULD be reported (bbox starts at 50,50).
+  // Count occurrences: exactly one "PathData can be localized" expected.
+  size_t pos = 0;
+  int count = 0;
+  while ((pos = output.find("PathData can be localized", pos)) != std::string::npos) {
+    count++;
+    pos += 25;
+  }
+  EXPECT_EQ(count, 1);
+}
+
+// PathData referenced by a Path inside a rotated Group should be skipped.
+CLI_TEST(PAGXCliTest, Lint_PathDataRotatedParent) {
+  auto inputPath = TestResourcePath("lint_pathdata_rotated_parent.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("PathData can be localized") == std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Lint_ExtractableCompositions) {
@@ -1838,6 +1888,171 @@ CLI_TEST(PAGXCliTest, LayoutCheck_IneffectiveCenterExplicitSize) {
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(output.find("centerX ineffective") == std::string::npos);
   EXPECT_TRUE(output.find("centerY ineffective") == std::string::npos);
+}
+
+// Content origin offset: Layer with opposite-edge constraints (left+right) derives size from
+// constraints, not from content measurement. Should NOT report content-origin-offset.
+CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetOppositeConstraint) {
+  auto path = TestResourcePath("layout_check_content_offset_opposite_constraint.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
+}
+
+// Group with opposite-edge constraints (left+right+top+bottom) has constraint-derived size.
+// centerX/centerY on child elements should NOT be reported as ineffective.
+CLI_TEST(PAGXCliTest, LayoutCheck_IneffectiveCenterGroupConstrained) {
+  auto path = TestResourcePath("layout_check_ineffective_center_group_constrained.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("centerX ineffective") == std::string::npos);
+  EXPECT_TRUE(output.find("centerY ineffective") == std::string::npos);
+}
+
+// TextBox with explicit width="0" height="0" is anchor mode (point text).
+// Should NOT trigger zero-size warning.
+CLI_TEST(PAGXCliTest, LayoutCheck_ZeroSizeExplicit) {
+  auto path = TestResourcePath("layout_check_zero_size_explicit.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("zero size") == std::string::npos);
+}
+
+// Polystar without explicit position should have auto-position applied at import time.
+// Content-measured Layer should NOT report content-origin-offset.
+CLI_TEST(PAGXCliTest, LayoutCheck_PolystarOrigin) {
+  auto path = TestResourcePath("layout_check_polystar_origin.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
+}
+
+//==============================================================================
+// Insert tests
+//==============================================================================
+
+CLI_TEST(PAGXCliTest, Insert_SvgIntoLayer_Basic) {
+  auto pagxPath = CopyToTemp("insert_basic.pagx", "insert_basic.pagx");
+  auto svgPath = TestResourcePath("insert_basic.svg");
+  auto outputPath = TempDir() + "/insert_out.pagx";
+  auto ret = CallRun(pagx::cli::RunInsert,
+                     {"insert", "--svg", svgPath, "--id", "icon", "-o", outputPath, pagxPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+  EXPECT_TRUE(RenderAndCompare({"render", "--scale", "2", outputPath}, "PAGXCliTest/insert_basic"));
+}
+
+CLI_TEST(PAGXCliTest, Insert_SvgIntoLayer_DefaultOutput) {
+  auto pagxPath = CopyToTemp("insert_basic.pagx", "insert_default_out.pagx");
+  auto svgPath = TestResourcePath("insert_search.svg");
+  auto ret = CallRun(pagx::cli::RunInsert, {"insert", "--svg", svgPath, "--id", "icon", pagxPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(
+      RenderAndCompare({"render", "--scale", "2", pagxPath}, "PAGXCliTest/insert_default_out"));
+}
+
+CLI_TEST(PAGXCliTest, Insert_MissingTargetId) {
+  auto pagxPath = TestResourcePath("insert_missing_id.pagx");
+  auto svgPath = TestResourcePath("insert_basic.svg");
+  auto ret =
+      CallRun(pagx::cli::RunInsert, {"insert", "--svg", svgPath, "--id", "nonexistent", pagxPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Insert_MissingRequiredOptions) {
+  auto pagxPath = TempDir() + "/dummy.pagx";
+
+  auto ret = CallRun(pagx::cli::RunInsert, {"insert", "--id", "icon", pagxPath});
+  EXPECT_NE(ret, 0);
+
+  ret = CallRun(pagx::cli::RunInsert, {"insert", "--svg", "icon.svg", pagxPath});
+  EXPECT_NE(ret, 0);
+
+  ret = CallRun(pagx::cli::RunInsert, {"insert", "--svg", "icon.svg", "--id", "icon"});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Insert_PreservesLayerAttributes) {
+  auto pagxPath = CopyToTemp("insert_preserve_attrs.pagx", "insert_preserve_attrs.pagx");
+  auto svgPath = TestResourcePath("insert_circle.svg");
+  auto ret = CallRun(pagx::cli::RunInsert, {"insert", "--svg", svgPath, "--id", "icon", pagxPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(
+      RenderAndCompare({"render", "--scale", "2", pagxPath}, "PAGXCliTest/insert_preserve_attrs"));
+}
+
+CLI_TEST(PAGXCliTest, Insert_ReplacesExistingContent) {
+  auto pagxPath = CopyToTemp("insert_replace.pagx", "insert_replace.pagx");
+  auto svgPath = TestResourcePath("insert_triangle.svg");
+  auto ret = CallRun(pagx::cli::RunInsert, {"insert", "--svg", svgPath, "--id", "icon", pagxPath});
+  EXPECT_EQ(ret, 0);
+
+  auto output = ReadFile(pagxPath);
+  EXPECT_EQ(output.find("<Rectangle"), std::string::npos);
+  EXPECT_EQ(output.find("#FF0000"), std::string::npos);
+  EXPECT_EQ(output.find("DropShadowStyle"), std::string::npos);
+
+  EXPECT_TRUE(RenderAndCompare({"render", "--scale", "2", pagxPath}, "PAGXCliTest/insert_replace"));
+}
+
+CLI_TEST(PAGXCliTest, Insert_InvalidSvg) {
+  auto pagxPath = CopyToTemp("insert_basic.pagx", "insert_invalid_svg.pagx");
+  auto svgPath = TestResourcePath("insert_invalid.svg");
+  auto ret = CallRun(pagx::cli::RunInsert, {"insert", "--svg", svgPath, "--id", "icon", pagxPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Insert_MultiElementSvg) {
+  auto pagxPath = CopyToTemp("insert_basic.pagx", "insert_multi.pagx");
+  auto svgPath = TestResourcePath("insert_multi.svg");
+  auto ret = CallRun(pagx::cli::RunInsert, {"insert", "--svg", svgPath, "--id", "icon", pagxPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(RenderAndCompare({"render", "--scale", "2", pagxPath}, "PAGXCliTest/insert_multi"));
+}
+
+CLI_TEST(PAGXCliTest, Insert_RenderResult) {
+  auto pagxPath = CopyToTemp("insert_render.pagx", "insert_render.pagx");
+  auto svgPath = TestResourcePath("insert_render_search.svg");
+  auto ret = CallRun(pagx::cli::RunInsert, {"insert", "--svg", svgPath, "--id", "icon", pagxPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(RenderAndCompare({"render", "--scale", "2", pagxPath}, "PAGXCliTest/insert_render"));
+}
+
+CLI_TEST(PAGXCliTest, Insert_PreservesOriginalFormatting) {
+  auto pagxPath = CopyToTemp("insert_format.pagx", "insert_format.pagx");
+  auto svgPath = TestResourcePath("insert_rect.svg");
+  auto ret = CallRun(pagx::cli::RunInsert, {"insert", "--svg", svgPath, "--id", "icon", pagxPath});
+  EXPECT_EQ(ret, 0);
+
+  auto output = ReadFile(pagxPath);
+  EXPECT_NE(output.find("<!-- header section -->"), std::string::npos);
+  EXPECT_NE(output.find("                <Rectangle"), std::string::npos);
+  EXPECT_NE(output.find("                <Fill color=\"#FF0000\""), std::string::npos);
+  EXPECT_NE(output.find("          <Rectangle"), std::string::npos);
+  EXPECT_NE(output.find("          <Fill color=\"#00FF00\""), std::string::npos);
+  EXPECT_NE(output.find("id=\"icon\""), std::string::npos);
+  EXPECT_NE(output.find("width=\"48\""), std::string::npos);
+  EXPECT_NE(output.find("<Fill color=\"#0000FF\""), std::string::npos);
 }
 
 }  // namespace pag

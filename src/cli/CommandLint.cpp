@@ -31,6 +31,7 @@
 #include "cli/CliUtils.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/svg/SVGPathParser.h"
 #include "pagx_xsd.h"
 
 namespace pagx::cli {
@@ -796,7 +797,9 @@ static void CollectUnwrappableFirstChildGroups(const std::vector<xmlNodePtr>& el
     LintDiagnostic diag = {};
     diag.line = static_cast<int>(first->line);
     diag.category = "info";
-    diag.message = "redundant first-child Group, can be unwrapped";
+    diag.message =
+        "redundant first-child Group: no preceding elements need painter isolation."
+        " Fix: unwrap this Group only";
     diagnostics.push_back(std::move(diag));
   }
   CollectUnwrappableFirstChildGroupsRecursive(elements, diagnostics);
@@ -1130,22 +1133,10 @@ static void DetectLocalizableCoordinates(xmlNodePtr root,
 
 // --- Pass 10: PathData localization detection ---
 
-static std::pair<float, float> ParseFirstPoint(const std::string& data) {
-  size_t start = data.find_first_of("Mm");
-  if (start == std::string::npos) {
-    return {0, 0};
-  }
-  start++;
-  while (start < data.size() && (data[start] == ' ' || data[start] == ',')) {
-    start++;
-  }
-  float x = 0;
-  float y = 0;
-  if (sscanf(data.c_str() + start, "%f,%f", &x, &y) == 2 ||
-      sscanf(data.c_str() + start, "%f %f", &x, &y) == 2) {
-    return {x, y};
-  }
-  return {0, 0};
+static std::pair<float, float> ComputePathBoundsOrigin(const std::string& data) {
+  auto pathData = PathDataFromSVGString(data);
+  auto bounds = pathData.getBounds();
+  return {bounds.x, bounds.y};
 }
 
 static void DetectLocalizablePathData(xmlNodePtr root, std::vector<LintDiagnostic>& diagnostics) {
@@ -1189,8 +1180,8 @@ static void DetectLocalizablePathData(xmlNodePtr root, std::vector<LintDiagnosti
     if (!id.empty() && rotatedPathDataIds.count(id) > 0) {
       continue;
     }
-    auto firstPoint = ParseFirstPoint(data);
-    if (std::abs(firstPoint.first) >= 0.001f || std::abs(firstPoint.second) >= 0.001f) {
+    auto boundsOrigin = ComputePathBoundsOrigin(data);
+    if (std::abs(boundsOrigin.first) >= 0.001f || std::abs(boundsOrigin.second) >= 0.001f) {
       LintDiagnostic diag = {};
       diag.line = static_cast<int>(node->line);
       diag.category = "info";
