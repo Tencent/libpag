@@ -22,55 +22,58 @@ confirms the result. Heavy git operations are delegated to Python scripts
 
 ### Cleanup procedure
 
-Whenever stopping due to failure or discard after Step 2, run:
+Whenever stopping due to failure or user discard, extract these values from
+the latest successful step output (if available), then run:
 
-```
+```bash
 git worktree remove --force {worktree_path}
 git branch -D {tmp_branch}
 rm -rf {session_dir}
 ```
 
-Ignore errors from the first two commands (resources may not exist yet).
+| Field | Source |
+|---|---|
+| `worktree_path` | Step 4 output (on Step 4 failure or Step 5 discard) |
+| `tmp_branch` | Step 4 output (on Step 4 failure or Step 5 discard) |
+| `session_dir` | Step 2 output (on Step 2/3 failure) |
+
+If these values cannot be determined (e.g., Step 2 failed before creating
+session_dir), skip the cleanup that depends on them. Errors during cleanup
+can be safely ignored—resources will eventually be removed by `resolve_scope.py`
+on the next run.
 
 ---
 
-## Step 1: Resolve Scope
+## Step 1: Cleanup
+
+If `$ARGUMENTS` is **empty**, run:
 
 ```
 python3 scripts/resolve_scope.py {repo_dir}
 ```
 
-The script detects branch state and cleans up stale sessions from previous
-runs. If it fails, inform the user and stop.
+The script validates that the current branch is not the default branch, and
+cleans up stale sessions from previous runs. If it fails, inform the user
+and stop.
 
-Based on the `scope` field:
-
-- **`"unpushed_only"`** — ask: *{pushed_count} pushed + {unpushed_count}
-  unpushed commits. Which range?*
-  - **Unpushed only** (default) → proceed with scope `unpushed`.
-  - **Entire branch** → proceed with scope `branch`.
-
-- **`"entire_branch"`** — ask: *All {pushed_count} commits are already pushed.
-  Squash entire branch? (requires `--force` push)*
-  - **Entire branch** → proceed with scope `branch`.
-  - **Cancel** → stop.
-
-- **`"all_unpushed"`** — proceed with scope `branch`.
-
-Scope mapping: `unpushed_only` → `unpushed`, others → `branch`.
+If `$ARGUMENTS` is non-empty (a branch name), **skip this step** — validation
+is handled by the collect script in Step 2.
 
 ---
 
 ## Step 2: Collect Commits
 
-```
-python3 scripts/collect_commits.py {repo_dir} {scope}
-```
+Two modes depending on `$ARGUMENTS`:
 
-Pass the scope determined in Step 1 (`unpushed` or `branch`).
-
-If `$ARGUMENTS` is non-empty, **skip Step 1** and pass `$ARGUMENTS` directly as
-the scope (supports `unpushed`, `branch`, commit ranges, or branch names).
+- **No argument** — squash unpushed commits on the current branch:
+  ```
+  python3 scripts/collect_commits.py {repo_dir}
+  ```
+- **Branch name** (e.g. `/squash feature/foo`) — squash the entire named
+  branch (does not require checking it out):
+  ```
+  python3 scripts/collect_commits.py {repo_dir} $ARGUMENTS
+  ```
 
 If the script fails, inform the user and stop.
 
@@ -162,7 +165,12 @@ added after `squash_end` — no manual git operations needed.
 python3 scripts/format_report.py {session_dir}/decision.json
 ```
 
-Present the report, then ask: **Confirm** / **Discard**. Wait for response.
+Present the report (showing planned changes), then ask: **Confirm** / **Discard**.
+Wait for response.
+
+**Note:** The reported "new commit count" in the format report is an estimate
+based on the decision table. The actual count after execution (which accounts
+for zero-diff groups being skipped) will be shown in Step 6 results.
 
 **Discard** → run cleanup procedure and stop.
 
@@ -170,19 +178,21 @@ Present the report, then ask: **Confirm** / **Discard**. Wait for response.
 
 ## Step 6: Replace Branch
 
-Write `{session_dir}/replace.json` and run:
+Write `{session_dir}/replace.json` using values from prior steps, then run:
 
 ```
 python3 scripts/replace_branch.py {session_dir}/replace.json
 ```
 
-```json
-{
-  "repo_dir": "...", "branch": "...", "tmp_branch": "...",
-  "worktree_path": "...", "current_head": "<full_hash>",
-  "upstream_remote": null, "upstream_merge": null
-}
-```
+| Field | Source |
+|---|---|
+| `repo_dir` | Step 2 output |
+| `branch` | Step 2 output (`branch` field — may be a non-current branch) |
+| `tmp_branch` | Step 4 output |
+| `worktree_path` | Step 4 output |
+| `current_head` | Step 4 output |
+| `upstream_remote` | Step 2 output |
+| `upstream_merge` | Step 2 output |
 
 The script automatically appends any new commits added since `{current_head}`,
 verifies tree equality, and atomically updates the branch ref. On success it
@@ -196,7 +206,9 @@ On success:
 rm -rf {session_dir}
 ```
 
-Report using `original_commit_count` and `new_commit_count` from Step 4 output:
+Report using `new_commit_count` from Step 4 output (which accounts for commits
+skipped due to zero-diff groups):
+
 `Squash complete: {original_commit_count} commits → {new_commit_count} commits`
 
 ---

@@ -100,10 +100,14 @@ def append_extra_commits(repo_dir, tmp_ref, base_commit, end_commit):
     Uses commit-tree to replay each commit's tree snapshot. Zero conflicts.
     Updates the tmp branch ref directly (no worktree needed) with
     compare-and-swap to detect concurrent modifications.
+
+    Collects ALL commits in the range (no --first-parent) to avoid losing
+    sideline histories from merge commits.
+
     Returns the number of commits appended.
     """
     old_tip = git(repo_dir, "rev-parse", tmp_ref)
-    commits_raw = git(repo_dir, "log", "--first-parent", "--format=%H",
+    commits_raw = git(repo_dir, "log", "--format=%H",
                       f"{base_commit}..{end_commit}")
     if not commits_raw:
         return 0
@@ -148,6 +152,13 @@ def main():
     current_head = params["current_head"]
     upstream_remote = params.get("upstream_remote")
     upstream_merge = params.get("upstream_merge")
+
+    # Validate that the branch exists (prevent operating on a wrong branch
+    # if replace.json was manually modified).
+    if git_rc(repo_dir, "rev-parse", "--verify", f"refs/heads/{branch}") != 0:
+        print(f"ERROR: Branch '{branch}' not found in repository.",
+              file=sys.stderr)
+        sys.exit(1)
 
     branch_ref = f"refs/heads/{branch}"
     tmp_ref = f"refs/heads/{tmp_branch}"

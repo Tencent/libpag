@@ -1,19 +1,13 @@
 #!/usr/bin/env python3
 # Copyright (C) 2026 Tencent. All rights reserved.
 """
-Detect branch state and determine the squash scope.
+Clean up stale resources from previous squash runs.
 
 Usage:
     python resolve_scope.py <repo_dir>
 
-Outputs a JSON object to stdout:
-  - scope: "unpushed_only" | "entire_branch" | "all_unpushed"
-  - branch, default_branch, repo_dir
-  - pushed_count, unpushed_count
-  - upstream_remote, upstream_merge
-
-Also cleans up stale worktrees, branches, and session directories from
-previous squash runs.
+Cleans up stale worktrees, branches, and session directories.
+Does not perform branch state detection (handled implicitly by collect_commits.py).
 """
 
 import json
@@ -38,13 +32,6 @@ def git_ok(repo_dir, *args):
     """Run a git command. Returns stdout if success, None if failure."""
     code, out, _ = git(repo_dir, *args)
     return out if code == 0 else None
-
-
-def count_commits(repo_dir, base, end):
-    """Count commits in a range."""
-    code, out, _ = git(repo_dir, "rev-list", "--count", "--first-parent",
-                       f"{base}..{end}")
-    return int(out) if code == 0 and out else 0
 
 
 def cleanup_stale(repo_dir):
@@ -102,8 +89,7 @@ def main():
 
     repo_dir = os.path.abspath(sys.argv[1])
 
-    cleanup_stale(repo_dir)
-
+    # Verify we're on a branch (not detached HEAD).
     branch = git_ok(repo_dir, "rev-parse", "--abbrev-ref", "HEAD")
     if not branch or branch == "HEAD":
         print("ERROR: Not on a branch (detached HEAD).", file=sys.stderr)
@@ -116,67 +102,24 @@ def main():
             default_branch = candidate
             break
 
+    # Refuse to squash the default branch.
     if branch == default_branch:
         print(f"ERROR: Cannot squash the default branch ({default_branch}).",
               file=sys.stderr)
         sys.exit(1)
 
-    # Tracking info.
-    upstream_remote = git_ok(repo_dir, "config", f"branch.{branch}.remote")
-    upstream_merge = git_ok(repo_dir, "config", f"branch.{branch}.merge")
-    tracking = None
-    if upstream_remote and upstream_merge:
-        remote_branch = upstream_merge.replace("refs/heads/", "")
-        tracking = git_ok(repo_dir, "rev-parse",
-                          f"{upstream_remote}/{remote_branch}")
-
-    head = git_ok(repo_dir, "rev-parse", "HEAD")
-    merge_base = git_ok(repo_dir, "merge-base", branch, default_branch)
-
-    if not merge_base:
-        print(
-            f"ERROR: Cannot determine squash range.\n"
-            f"Hint: Branch '{branch}' may not share a common ancestor with "
-            f"'{default_branch}'.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    # Determine scope.
-    pushed_count = 0
-    unpushed_count = 0
-
-    if tracking:
-        if tracking == head:
-            # All commits are pushed.
-            scope = "entire_branch"
-            pushed_count = count_commits(repo_dir, merge_base, head)
-        elif tracking != merge_base:
-            # Some pushed, some not.
-            scope = "unpushed_only"
-            pushed_count = count_commits(repo_dir, merge_base, tracking)
-            unpushed_count = count_commits(repo_dir, tracking, head)
-        else:
-            # Tracking == merge_base, all unpushed.
-            scope = "all_unpushed"
-            unpushed_count = count_commits(repo_dir, merge_base, head)
-    else:
-        # No tracking, all unpushed.
-        scope = "all_unpushed"
-        unpushed_count = count_commits(repo_dir, merge_base, head)
+    # Clean up stale resources.
+    cleanup_stale(repo_dir)
 
     result = {
+        "status": "ok",
         "repo_dir": repo_dir,
         "branch": branch,
         "default_branch": default_branch,
-        "upstream_remote": upstream_remote,
-        "upstream_merge": upstream_merge,
-        "scope": scope,
-        "pushed_count": pushed_count,
-        "unpushed_count": unpushed_count,
     }
     print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":
     main()
+
