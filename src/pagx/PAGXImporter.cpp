@@ -1525,6 +1525,8 @@ static GlyphRun* parseGlyphRun(const DOMNode* node, PAGXDocument* doc) {
     auto values = ParseFloatList(boundsStr);
     if (values.size() >= 4) {
       run->bounds = Rect::MakeXYWH(values[0], values[1], values[2], values[3]);
+    } else {
+      reportError(doc, node, "Invalid 'bounds' value (expected 4 numbers).");
     }
   }
 
