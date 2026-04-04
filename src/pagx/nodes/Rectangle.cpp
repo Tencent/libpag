@@ -22,6 +22,8 @@
 namespace pagx {
 
 void Rectangle::onMeasure(LayoutContext*) {
+  preferredX = position.x - size.width * 0.5f;
+  preferredY = position.y - size.height * 0.5f;
   preferredWidth = size.width;
   preferredHeight = size.height;
 }
