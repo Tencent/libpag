@@ -483,7 +483,7 @@ Write the SVG to a temporary file using the target drawing size as the viewBox:
 ```xml
 <svg viewBox="0 0 24 24" width="24" height="24">
   <circle cx="10" cy="10" r="7" fill="none" stroke="#1E293B" stroke-width="2"/>
-  <path d="M15 15L21 21" stroke="#1E293B" stroke-width="2" stroke-linecap="round"/>
+  <path d="M15 15L21 21" fill="none" stroke="#1E293B" stroke-width="2" stroke-linecap="round"/>
 </svg>
 ```
 
@@ -495,6 +495,7 @@ pagx insert --svg /tmp/pagx_insert.svg --id searchIcon design.pagx
 
 The command replaces the placeholder's contents with the converted PAGX nodes and sets
 its width/height from the SVG dimensions. All other attributes on the Layer are preserved.
+
 ### Text Positioning
 
 Text renders from the baseline, making bounding box dependent on font metrics. Prefer

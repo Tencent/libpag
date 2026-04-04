@@ -382,7 +382,12 @@ pagx insert --svg icon.svg --id menuIcon -o out.pagx design.pagx
 
 The command locates the Layer with the specified `id`, converts the SVG to PAGX nodes,
 and replaces the Layer's content (contents, children, styles, filters) with the conversion result.
-The Layer's width and height are set to match the SVG's dimensions.
+The Layer's width and height are set to match the SVG's dimensions. PathData is inlined
+into Path elements rather than extracted to Resources.
+
+When the SVG contains multiple top-level elements (e.g. `<circle>` + `<path>`), the first
+element's content is placed directly in the Layer, and each subsequent element is wrapped
+in a `<Group>` for painter scope isolation.
 
 On success the command prints `pagx insert: wrote <path>` and exits 0; on failure it prints
 an error and exits 1.
