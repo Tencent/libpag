@@ -241,9 +241,19 @@ static void DetectFlexInContentMeasuredParent(
 }
 
 static void DetectContentOriginOffset(const std::vector<Element*>& elements, CheckNode* container) {
-  // Find the minimum x and y of all children relative to the container origin,
-  // mirroring the measurement logic. Both constrained and unconstrained children
-  // contribute to container measurement and should be checked.
+  // If any child has constraint attributes, the positioning is intentional (e.g., padding via
+  // left/top, centering via centerX/centerY). Skip detection for the entire container because
+  // constrained children define the intended content region, making offsets of other children
+  // within that region acceptable.
+  for (auto* element : elements) {
+    auto* node = LayoutNode::AsLayoutNode(element);
+    if (node != nullptr && node->hasConstraints()) {
+      return;
+    }
+  }
+  // Find the minimum x and y of all unconstrained children relative to the container origin.
+  // Container measurement starts from (0,0), so any gap between (0,0) and the content's
+  // top-left pixel inflates the measured size and offsets the content.
   float minX = FLT_MAX;
   float minY = FLT_MAX;
   bool hasChild = false;
@@ -271,7 +281,9 @@ static void DetectContentOriginOffset(const std::vector<Element*>& elements, Che
   }
   std::ostringstream oss;
   oss << "children start at (" << static_cast<int>(minX) << ", " << static_cast<int>(minY)
-      << "), not (0, 0): container measurement inaccurate";
+      << "), not (0, 0): container measurement inaccurate."
+         " Fix: uniformly shift all children so top-left starts at (0,0),"
+         " preserving relative positions";
   container->problems.push_back(oss.str());
 }
 
@@ -458,11 +470,13 @@ static void DetectIneffectiveCentering(const std::vector<Element*>& elements,
     }
     if (hasCenterX) {
       childNodes[i]->problems.push_back(
-          "centerX ineffective: parent is content-measured, centering relative to own size");
+          "centerX ineffective: parent is content-measured, centering relative to own size."
+          " Fix: move centerX to the Group/Layer itself");
     }
     if (hasCenterY) {
       childNodes[i]->problems.push_back(
-          "centerY ineffective: parent is content-measured, centering relative to own size");
+          "centerY ineffective: parent is content-measured, centering relative to own size."
+          " Fix: move centerY to the Group/Layer itself");
     }
   }
 }

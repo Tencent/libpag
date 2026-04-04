@@ -311,25 +311,6 @@ Container layout children are sized by the engine — never set `left`/`top` on 
 layout flow. Do not combine `flex` with explicit main-axis size (explicit size takes
 precedence, `flex` is ignored). Prefer `arrangement` over empty flex spacer Layers.
 
-### Origin-Based Positioning
-
-All children inside a Layer or Group must have their top-left pixel aligned to **(0,0)**.
-Otherwise the container's measured size is wrong, breaking constraints and layout.
-When wrapping content into a new container Layer, **localize coordinates**:
-
-1. Set the container's `left`/`top` to the content's bounding box top-left corner
-2. Subtract from all internal coordinates so the top-left child starts at (0,0)
-
-```xml
-<Layer left="200" top="480" width="400" height="60">
-  <Path data="M 0 40 L 20 0 L 380 0 L 400 40 Z"/>
-  <Fill color="#001122"/>
-</Layer>
-```
-
-**Which coordinates to localize**: constraint attributes, `size`, Path `data` coordinates.
-Gradient coordinates are geometry-relative and stay unchanged when the container moves.
-
 ### Incremental Build Strategy
 
 For designs with multiple sections, **do not write the entire PAGX file in one pass**. Build
@@ -563,21 +544,8 @@ pagx layout --problems-only --id "header" input.pagx
 
 #### 2. Fix problems
 
-| Problem | Typical Root Cause | Fix |
-|---------|-------------------|-----|
-| **Overlapping siblings** | Missing `layout` on parent; wrong `flex` distribution | Add `layout="horizontal"/"vertical"` to parent; adjust `flex` weights or explicit sizes |
-| **Zero-size** | Content-measured with no content; `flex` child with no parent main-axis size | Add content or explicit `width`/`height`; ensure parent has main-axis size |
-| **Clipped content** | Child outside parent bounds with `clipToBounds="true"` | Adjust constraints; enlarge parent; or remove `clipToBounds` |
-| **Flex in content-measured parent** | Parent has `layout` but no explicit main-axis size | Set explicit main-axis size, or use opposite-pair constraints |
-| **Content origin offset** | Unconstrained Path/Polystar/Text not at (0, 0) | Localize coordinates (see §Origin-Based Positioning) |
-| **Constraints ignored** | Constraints on child in layout flow | Remove constraints; use `gap`/`alignment`/`arrangement` instead |
-| **Container overflow** | Fixed children + gap exceed parent main-axis size | Reduce child sizes, add `flex` children, increase parent size, or reduce `gap` |
-| **Negative constraint-derived size** | `left`+`right` or `top`+`bottom` > parent dimension | Reduce constraint values so their sum is ≤ parent size |
-| **Element constraint conflict** | `centerX` set alongside `left`/`right` on VectorElement | Remove the lower-priority constraint (`centerX` wins over `left`/`right`) |
-| **Ineffective centering** | `centerX`/`centerY` on child inside content-measured Group/Layer | Move `centerX`/`centerY` to the Group or Layer itself |
-
-Refer to §Origin-Based Positioning, §Geometry and Painters, and §Layout for code examples
-of fixes — the patterns above correspond directly to rules covered in Step 2 and Step 3.
+Problem messages are self-explanatory; some include an inline `Fix:` hint.
+Fix all reported problems before proceeding.
 
 #### 3. Inspect layout tree and render
 
@@ -605,7 +573,6 @@ reports no issues, check these common causes:
 | Text invisible | Missing `<Fill>` after `<Text>` | Add `<Fill color="#000"/>` (or desired color) |
 | Background missing | No Rectangle + Fill before content | Add `<Rectangle left="0" right="0" top="0" bottom="0"/>` + `<Fill>` as first content |
 | Stroke on wrong shape | Missing Group for scope isolation | Wrap subsequent content in `<Group>` (see §Geometry and Painters) |
-| Element shifted/offset | Unconstrained child not at (0,0) in content-measured container | Localize coordinates (see §Origin-Based Positioning) |
 | Gradient wrong direction | Gradient coords in canvas space instead of geometry-local | Use geometry-relative coordinates for `startPoint`/`endPoint` |
 | Text not centered in button | Using bare `<Text>` instead of `<TextBox>` | Wrap in `<TextBox centerX="0" centerY="0">` |
 

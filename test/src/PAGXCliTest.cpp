@@ -1562,6 +1562,21 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetInParentLayout) {
   EXPECT_TRUE(output.find("children start at (50, 50), not (0, 0)") != std::string::npos);
 }
 
+// Content origin offset NOT reported when container has a mix of constrained and unconstrained
+// children. The constrained child (Text with left/top/right/bottom) defines the intended content
+// region, so offset of unconstrained siblings is acceptable.
+CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetMixedConstraints) {
+  auto path = TestResourcePath("layout_check_content_offset_mixed_constraints.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
+}
+
 // Flex child in content-measured parent (no main-axis size to distribute).
 CLI_TEST(PAGXCliTest, LayoutCheck_FlexNoParentSize) {
   auto path = TestResourcePath("layout_check_flex_no_parent_size.pagx");
