@@ -14,9 +14,10 @@ description: >-
 **When**: User asks to create, write, design, or modify a PAGX file from a text description,
 reference image, or design spec.
 
-Covers: design analysis, CSS/SVG→PAGX mapping, structure decisions, Flexbox layout,
-constraint positioning, incremental build, painter scope isolation, text layout, and a
-layout-check-based verification loop.
+Covers: context assessment (task type, requirement clarity), design analysis, CSS/SVG→PAGX
+mapping, structure decisions, Flexbox layout, constraint positioning, incremental build,
+painter scope isolation, text layout, **mandatory verification-fix loop**, and recommended
+values for spacing/fonts/colors.
 
 ## Reference Lookup
 

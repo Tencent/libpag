@@ -83,14 +83,10 @@ pagx render --xpath "/pagx/Layer[2]" input.pagx   # render only the matched Laye
 | `--fallback <path\|name>` | Fallback font file or system font name (can be specified multiple times) |
 
 `--id` and `--xpath` are mutually exclusive. When either is specified, only the target Layer
-is rendered — all other content is excluded. The output image is cropped to the target Layer's
-bounds, so the image dimensions reflect the Layer's actual rendered size rather than the full
-canvas. This is useful for inspecting individual components in isolation. For render, `--xpath`
-must match exactly one Layer; an error is reported if zero or more than one Layer matches. In
-contrast, bounds `--xpath` can match multiple Layers.
+is rendered, cropped to that Layer's bounds. `--xpath` must match exactly one Layer.
 
-Errors: `--id` reports an error if no node with that id exists or if the matched node is not a
-Layer. `--xpath` reports an error if no Layer matches or if more than one Layer matches.
+`--id` errors if no node with that id exists or the matched node is not a Layer.
+`--xpath` errors if zero or more than one Layer matches.
 
 `--font` registers a font file matched by fontFamily/fontStyle against PAGX text references.
 `--fallback` accepts either a file path (e.g., `b.otf`) or a system font name (e.g.,
@@ -306,11 +302,7 @@ pagx font embed --file a.ttf --fallback "PingFang SC" --fallback b.otf input.pag
 | `--file <path>` | Register a font file (can be specified multiple times) |
 | `--fallback <path\|name>` | Fallback font file or system font name (can be specified multiple times) |
 
-`--file` registers a font file matched by fontFamily/fontStyle against PAGX text references.
-`--fallback` accepts either a file path (e.g., `b.otf`) or a system font name (e.g.,
-`"PingFang SC"` or `"Arial,Bold"`). All fonts added via `--fallback` are also registered
-automatically. Fallback fonts are tried in order when a character is not found in the
-primary font. System fallback fonts are always appended after user-specified fallbacks.
+`--file` and `--fallback` work the same as in `pagx render` (see above).
 
 ---
 

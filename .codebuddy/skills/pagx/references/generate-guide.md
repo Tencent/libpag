@@ -22,6 +22,39 @@ Read as needed:
 
 ---
 
+## Step 0: Assess Context
+
+Before generating, assess the task and clarify ambiguities.
+
+### Task Type
+
+| Task | Strategy |
+|------|----------|
+| **Create from scratch** | Full workflow: Step 1→4 |
+| **Edit existing file** | Read file first, preserve style consistency, minimal changes |
+| **Modify specific part** | Locate target, change only what’s needed |
+
+For **editing existing files**, scan Resources before adding content:
+- Reuse existing `SolidColor`, `LinearGradient`, `PathData` via `@id` references
+- Reuse existing `Composition` via `composition="@id"`
+- Match existing style (roundness, fonts, spacing) for consistency
+
+### Requirement Clarity
+
+**Ask the user** when:
+- Canvas size unspecified and not inferable from context
+- Visual style ambiguous ("make it look good")
+- Text content missing but layout depends on it
+- Color scheme unclear and no reference provided
+
+**Use reasonable defaults** when:
+- Specific pixel values (use standard spacing: 8, 12, 16, 20, 24)
+- Font weight (Bold for headings, Regular for body)
+- Shadow parameters (common card shadow: `offsetY="2" blurX="6" blurY="6" color="#00000015"`)
+- Roundness (8–12 for buttons/cards, 999 for pills/avatars)
+
+---
+
 ## Step 1: Analyze the Reference
 
 Systematically decompose the visual before writing any code:
@@ -280,12 +313,8 @@ precedence, `flex` is ignored). Prefer `arrangement` over empty flex spacer Laye
 
 ### Origin-Based Positioning
 
-Layer/Group measured bounds = **(0,0) to the bottom-right extent of children**. If children
-start at positive offsets, the measured size includes the empty gap from (0,0); if children
-are at negative coordinates, they fall outside the measured range. Either case produces
-incorrect measured size, breaking constraints and layout.
-
-All children inside a Layer or Group must have their top-left pixel aligned to (0,0).
+All children inside a Layer or Group must have their top-left pixel aligned to **(0,0)**.
+Otherwise the container's measured size is wrong, breaking constraints and layout.
 When wrapping content into a new container Layer, **localize coordinates**:
 
 1. Set the container's `left`/`top` to the content's bounding box top-left corner
@@ -326,7 +355,8 @@ content. Run verification loop (Step 4) to confirm structure.
 **Stage 2 — Per-module content**: One section at a time. Add backgrounds, text, icons.
 Run verification after each module.
 
-**Stage 3 — Polish**: Final full verification + render.
+**Stage 3 — Polish**: Run `pagx lint` to catch schema errors, then final layout
+verification + render.
 
 ---
 
@@ -355,10 +385,9 @@ bounds, not within the parent Layer — the element centers inside the Group, bu
 itself stays at (0,0).
 
 Another common mistake: centering VectorElements inside a **content-measured** Group or
-Layer (no explicit `width`/`height`). The centering is ineffective because the container
-sizes itself from the child — the child centers relative to its own size, which is a no-op.
-Move the centering constraint to the Group or Layer instead. The same applies to bare Layers
-without explicit size. `pagx layout --problems-only` detects this as
+Layer (no explicit `width`/`height`). The container sizes itself from the child, so the
+child centers relative to its own size — a no-op. Move the centering constraint to the
+Group or Layer itself. `pagx layout --problems-only` detects this as
 `centerX/centerY ineffective`.
 
 ```xml
@@ -372,12 +401,12 @@ without explicit size. `pagx layout --problems-only` detects this as
   </Group>
 </Layer>
 
-<!-- ❌ Wrong: centerX/centerY on inner Ellipse instead of Group -->
+<!-- ❌ Wrong: centerX on inner Ellipse — centers within Group, not Layer -->
 <Layer width="200" height="200">
   <Rectangle left="0" right="0" top="0" bottom="0"/>
   <Fill color="#F00"/>
-  <Group>  <!-- no positioning — stuck at (0,0) -->
-    <Ellipse centerX="0" centerY="0" size="30,30"/>  <!-- centers within Group, not Layer -->
+  <Group>
+    <Ellipse centerX="0" centerY="0" size="30,30"/>
     <Stroke color="#000" width="1"/>
   </Group>
 </Layer>
@@ -388,26 +417,6 @@ without explicit size. `pagx layout --problems-only` detects this as
   <Fill color="#F00"/>
   <Ellipse left="35" top="35" size="30,30"/>
   <Stroke color="#000" width="1"/>  <!-- applies to BOTH Rectangle and Ellipse -->
-</Layer>
-
-<!-- ❌ Anti-pattern: centerX/centerY on child in content-measured Group -->
-<Layer width="200" height="200">
-  <Rectangle left="0" right="0" top="0" bottom="0"/>
-  <Fill color="#F00"/>
-  <Group>  <!-- no width/height — content-measured from children -->
-    <Ellipse centerX="0" centerY="0" size="30,30"/>  <!-- centering is a no-op -->
-    <Fill color="#0F0"/>
-  </Group>
-</Layer>
-
-<!-- ✅ Fix: move centering to Group -->
-<Layer width="200" height="200">
-  <Rectangle left="0" right="0" top="0" bottom="0"/>
-  <Fill color="#F00"/>
-  <Group centerX="0" centerY="0">
-    <Ellipse size="30,30"/>
-    <Fill color="#0F0"/>
-  </Group>
 </Layer>
 ```
 
@@ -493,8 +502,9 @@ These constraints differ from CSS/SVG:
 - **`roundness` is a single value** — all corners uniform. Auto-limited to
   `min(roundness, width/2, height/2)`.
 
-- **Constraint mutual exclusion** — per axis, use only one of:
-  `left` / `right` / `centerX` / `left`+`right` pair. Never combine `left`+`centerX`.
+- **Constraint mutual exclusion** — per axis, use only one positioning strategy:
+  single edge, opposite pair, or `centerX`/`centerY`. Mixing them (e.g., `left`+`centerX`)
+  causes silent override (`centerX` wins). See `spec-essentials.md` §Constraint Positioning.
 
 - **Rectangular clipping** — prefer `clipToBounds` over mask (GPU-accelerated):
   ```xml
@@ -509,12 +519,14 @@ These constraints differ from CSS/SVG:
 ## Step 4: Verify and Refine
 
 After building each stage (skeleton, each module, final), **always** run the verification
-loop. Never skip — it is the primary mechanism for catching layout errors early.
+loop. **You MUST fix all detected problems before proceeding to the next task.**
 
 ### Verification Loop
 
-Repeat until `pagx layout --problems-only` exits clean (exit code 0) **and** the screenshot
-matches the design intent:
+**CRITICAL**: Do NOT continue to the next task until `pagx layout --problems-only` exits
+with code 0 **and** the `pagx render` output matches the design intent.
+
+If problems are detected, fix them immediately and re-run verification. Repeat until clean:
 
 #### 1. Detect layout problems
 
@@ -557,6 +569,9 @@ pagx layout --problems-only --id "header" input.pagx
 | **Element constraint conflict** | `centerX` set alongside `left`/`right` on VectorElement | Remove the lower-priority constraint (`centerX` wins over `left`/`right`) |
 | **Ineffective centering** | `centerX`/`centerY` on child inside content-measured Group/Layer | Move `centerX`/`centerY` to the Group or Layer itself |
 
+Refer to §Origin-Based Positioning, §Geometry and Painters, and §Layout for code examples
+of fixes — the patterns above correspond directly to rules covered in Step 2 and Step 3.
+
 #### 3. Inspect layout tree and render
 
 After fixing, confirm with both layout data and visual output:
@@ -590,10 +605,90 @@ reports no issues, check these common causes:
 When diagnosing a visual issue, use `pagx layout` (without `--problems-only`) to see the
 full layout tree with bounds and any `<Problem>` nodes for the suspect area.
 
-Note: `pagx bounds` is a different tool — it shows rendered pixel bounds (including stroke,
-shadows, blur), used for crop regions. For layout debugging, always use `pagx layout`.
-
-#### 4. Repeat
+#### 4. Repeat until clean
 
 If any problems remain, return to step 1. Continue until `--problems-only` exits 0 and the
 screenshot is correct.
+
+### Final Lint Pass
+
+After all content is complete (Stage 3), run `pagx lint` once to catch schema-level errors:
+
+```bash
+pagx lint input.pagx
+```
+
+Fix any reported errors before delivering the file.
+
+---
+
+## Appendix: Recommended Values
+
+### Spacing Scale
+
+| Level | Value | Use For |
+|-------|-------|--------|
+| xs | 4 | Tight spacing, icon-to-text |
+| sm | 8 | Same-group elements |
+| md | 12–16 | Intra-component spacing |
+| lg | 20–24 | Inter-component spacing |
+| xl | 32–48 | Section separation |
+
+### Font Pairing
+
+| Style | Heading | Body | Weights |
+|-------|---------|------|---------|
+| Modern UI | Inter | Inter | Bold / Regular |
+| Classic | Georgia | Georgia | Bold / Regular |
+| Technical | JetBrains Mono | SF Pro | Medium / Regular |
+
+When font is unspecified, default to `Arial` (widely available).
+
+### Color Palette (Neutral Reference)
+
+| Purpose | Values | Notes |
+|---------|--------|-------|
+| Primary text | #1E293B, #0F172A | Dark, high contrast |
+| Secondary text | #64748B, #94A3B8 | Medium gray |
+| Primary action | #3B82F6, #6366F1 | Blue/purple, common CTA |
+| Success | #10B981, #22C55E | Green |
+| Warning | #F59E0B, #EAB308 | Yellow/orange |
+| Error | #EF4444, #DC2626 | Red |
+| Surface | #FFFFFF, #F8FAFC, #F1F5F9 | Backgrounds |
+
+### Roundness Guidelines
+
+| Element | Recommended |
+|---------|-------------|
+| Button | 8–12 |
+| Card | 12–16 |
+| Input field | 6–8 |
+| Avatar / Pill | 999 (fully round) |
+| Modal | 16–20 |
+
+---
+
+## Appendix: Design Quality Checklist
+
+After verification passes, review these subjective criteria:
+
+### Visual Hierarchy
+- [ ] Each section has one clear focal point
+- [ ] Primary actions are visually dominant (larger, bolder, higher contrast)
+- [ ] Secondary elements are visually reduced (smaller, lighter color)
+
+### Alignment & Spacing
+- [ ] All elements align to an implicit grid
+- [ ] Sibling elements have consistent spacing
+- [ ] No orphaned or floating elements
+- [ ] Adequate breathing room (not overcrowded)
+
+### Typography
+- [ ] At most 2 font families
+- [ ] Clear size hierarchy (title > subtitle > body > caption)
+- [ ] Reasonable line height (body: 1.4–1.6 × fontSize)
+
+### Color & Contrast
+- [ ] Text-to-background contrast ≥ 4.5:1 (body) or ≥ 3:1 (large text)
+- [ ] Avoid pure black #000 on pure white #FFF (too harsh)
+- [ ] Semantic consistency (success=green, warning=yellow, error=red)
