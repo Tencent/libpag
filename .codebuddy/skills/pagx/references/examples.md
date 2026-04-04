@@ -559,96 +559,45 @@ stroked Path; area fill = same path closed to bottom with semi-transparent Fill.
 ### Donut Chart (TrimPath)
 
 ```xml
-<pagx version="1.0" width="340" height="200">
-  <Layer width="340" height="200" layout="horizontal" gap="20" alignment="center" padding="20">
-    <!-- Donut -->
-    <Layer width="160" height="160">
-      <!-- Segment 1: 40% (0 to 0.4) -->
-      <Ellipse centerX="0" centerY="0" size="130,130"/>
-      <TrimPath end="0.38"/>
-      <Stroke color="#3B82F6" width="18"/>
-      <!-- Segment 2: 30% (0.4 to 0.7) -->
-      <Group centerX="0" centerY="0">
-        <Ellipse size="130,130"/>
-        <TrimPath start="0.4" end="0.68"/>
-        <Stroke color="#10B981" width="18"/>
-      </Group>
-      <!-- Segment 3: 20% (0.7 to 0.9) -->
-      <Group centerX="0" centerY="0">
-        <Ellipse size="130,130"/>
-        <TrimPath start="0.7" end="0.88"/>
-        <Stroke color="#F59E0B" width="18"/>
-      </Group>
-      <!-- Segment 4: 10% (0.9 to 1.0) -->
-      <Group centerX="0" centerY="0">
-        <Ellipse size="130,130"/>
-        <TrimPath start="0.9" end="0.98"/>
-        <Stroke color="#EF4444" width="18"/>
-      </Group>
-    </Layer>
-    <!-- Legend -->
-    <Layer layout="vertical" gap="12">
-      <Layer layout="horizontal" gap="8" alignment="center">
-        <Layer>
-          <Ellipse size="10,10"/>
-          <Fill color="#3B82F6"/>
-        </Layer>
-        <Layer>
-          <Text text="Sales 40%" fontFamily="Arial" fontSize="12"/>
-          <Fill color="#334155"/>
-        </Layer>
-      </Layer>
-      <Layer layout="horizontal" gap="8" alignment="center">
-        <Layer>
-          <Ellipse size="10,10"/>
-          <Fill color="#10B981"/>
-        </Layer>
-        <Layer>
-          <Text text="Growth 30%" fontFamily="Arial" fontSize="12"/>
-          <Fill color="#334155"/>
-        </Layer>
-      </Layer>
-      <Layer layout="horizontal" gap="8" alignment="center">
-        <Layer>
-          <Ellipse size="10,10"/>
-          <Fill color="#F59E0B"/>
-        </Layer>
-        <Layer>
-          <Text text="Costs 20%" fontFamily="Arial" fontSize="12"/>
-          <Fill color="#334155"/>
-        </Layer>
-      </Layer>
-      <Layer layout="horizontal" gap="8" alignment="center">
-        <Layer>
-          <Ellipse size="10,10"/>
-          <Fill color="#EF4444"/>
-        </Layer>
-        <Layer>
-          <Text text="Other 10%" fontFamily="Arial" fontSize="12"/>
-          <Fill color="#334155"/>
-        </Layer>
-      </Layer>
-    </Layer>
+<pagx version="1.0" width="200" height="200">
+  <Layer width="200" height="200">
+    <!-- Segment 1: 40% (0 to 0.4) — gradient stroke -->
+    <Ellipse centerX="0" centerY="0" size="130,130"/>
+    <TrimPath end="0.38"/>
+    <Stroke width="18">
+      <ConicGradient center="65,65" startAngle="270" endAngle="407">
+        <ColorStop offset="0" color="#F43F5E"/>
+        <ColorStop offset="1" color="#6366F1"/>
+      </ConicGradient>
+    </Stroke>
+    <!-- Segment 2: 30% (0.4 to 0.7) — solid stroke -->
+    <Group centerX="0" centerY="0">
+      <Ellipse size="130,130"/>
+      <TrimPath start="0.4" end="0.68"/>
+      <Stroke color="#10B981" width="18"/>
+    </Group>
+    <!-- Segment 3: 20% (0.7 to 0.9) -->
+    <Group centerX="0" centerY="0">
+      <Ellipse size="130,130"/>
+      <TrimPath start="0.7" end="0.88"/>
+      <Stroke color="#F59E0B" width="18"/>
+    </Group>
+    <!-- Segment 4: 10% (0.9 to 1.0) -->
+    <Group centerX="0" centerY="0">
+      <Ellipse size="130,130"/>
+      <TrimPath start="0.9" end="0.98"/>
+      <Stroke color="#EF4444" width="18"/>
+    </Group>
   </Layer>
 </pagx>
 ```
 
 **Pattern**: Donut = Ellipse + TrimPath + thick Stroke per segment. `start/end` partition
 the circle (0–1); leave small gaps between segments for visual separation. Each segment
-needs its own Group for painter isolation. Same technique for pie charts (use Fill instead
-of Stroke) and ring progress indicators.
-
-**Gradient stroke variant**: for ring progress with gradient color, embed a LinearGradient
-directly inside the Stroke element:
-
-```xml
-<Stroke width="10" cap="round">
-  <LinearGradient startPoint="-70,-70" endPoint="70,70">
-    <ColorStop offset="0" color="#06B6D4"/>
-    <ColorStop offset="1" color="#8B5CF6"/>
-  </LinearGradient>
-</Stroke>
-```
+needs its own Group for painter isolation. Segments can use solid color (`color="..."`) or
+gradient (embed `<ConicGradient>` inside `<Stroke>`). Same technique for pie charts (use
+Fill instead of Stroke) and ring progress indicators. For legends, use the Icon + Label Row
+pattern.
 
 ### Circular Gauge (TrimPath + Repeater)
 
