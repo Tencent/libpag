@@ -97,9 +97,9 @@ class Layer : public Node, public LayoutNode {
   bool antiAlias = true;
 
   /**
-   * Whether to use group opacity mode for the layer and its children. The default value is false.
+   * Whether to use group opacity mode for the layer and its children. The default value is true.
    */
-  bool groupOpacity = false;
+  bool groupOpacity = true;
 
   /**
    * Whether layer effects pass through to the background. The default value is true.

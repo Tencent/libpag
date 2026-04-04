@@ -907,7 +907,7 @@ Layer 的子元素按类型自动归类为四个集合：
 | `matrix3D` | Matrix | - | 3D 变换（16 个值，列优先） |
 | `preserve3D` | bool | false | 保持 3D 变换 |
 | `antiAlias` | bool | true | 边缘抗锯齿 |
-| `groupOpacity` | bool | false | 组透明度 |
+| `groupOpacity` | bool | true | 组透明度 |
 | `passThroughBackground` | bool | true | 是否允许背景透传给子图层 |
 | `scrollRect` | Rect | - | 滚动裁剪区域 "x,y,w,h" |
 | `clipToBounds` | bool | false | 将内容裁剪到图层边界（见 §5.5.2） |
@@ -930,7 +930,7 @@ Layer 的子元素按类型自动归类为四个集合：
 | `centerX` | float | - | 相对容器水平中心的偏移（见 §4.3） |
 | `centerY` | float | - | 相对容器垂直中心的偏移（见 §4.3） |
 
-**groupOpacity**：当值为 `false`（默认）时，图层的 `alpha` 独立应用到每个子元素，重叠的半透明子元素在交叉处可能显得更深。当值为 `true` 时，所有图层内容先合成到离屏缓冲区，再将 `alpha` 整体应用到缓冲区，使整个图层呈现均匀的透明效果。
+**groupOpacity**：当值为 `true`（默认）时，所有图层内容先合成到离屏缓冲区，再将 `alpha` 整体应用到缓冲区，使整个图层呈现均匀的透明效果。当值为 `false` 时，图层的 `alpha` 独立应用到每个子元素，重叠的半透明子元素在交叉处可能显得更深。
 
 **preserve3D**：当值为 `false`（默认）时，具有 3D 变换的子图层在合成前会被压平到父级的 2D 平面。当值为 `true` 时，子图层保留其 3D 位置，在共享的 3D 空间中渲染，实现基于深度的交叉和正确的兄弟层 Z 排序。类似于 CSS 的 `transform-style: preserve-3d`。
 

@@ -908,7 +908,7 @@ Layer child elements are automatically categorized into four collections by type
 | `matrix3D` | Matrix | - | 3D transform (16 values, column-major) |
 | `preserve3D` | bool | false | Preserve 3D transform |
 | `antiAlias` | bool | true | Edge anti-aliasing |
-| `groupOpacity` | bool | false | Group opacity |
+| `groupOpacity` | bool | true | Group opacity |
 | `passThroughBackground` | bool | true | Whether to pass background through to child layers |
 | `scrollRect` | Rect | - | Scroll clipping region "x,y,w,h" |
 | `clipToBounds` | bool | false | Clip content to layer bounds (see §5.5.2) |
@@ -931,7 +931,7 @@ Layer child elements are automatically categorized into four collections by type
 | `centerX` | float | - | Horizontal offset from container center (see §4.3) |
 | `centerY` | float | - | Vertical offset from container center (see §4.3) |
 
-**groupOpacity**: When `false` (default), the layer's `alpha` is applied independently to each child element, which may cause overlapping semi-transparent children to appear darker at intersections. When `true`, all layer content is first composited into an offscreen buffer, then `alpha` is applied to the buffer as a whole, producing uniform transparency across the entire layer.
+**groupOpacity**: When `true` (default), all layer content is first composited into an offscreen buffer, then `alpha` is applied to the buffer as a whole, producing uniform transparency across the entire layer. When `false`, the layer's `alpha` is applied independently to each child element, which may cause overlapping semi-transparent children to appear darker at intersections.
 
 **preserve3D**: When `false` (default), child layers with 3D transforms are flattened into the parent's 2D plane before compositing. When `true`, child layers retain their 3D positions and are rendered in a shared 3D space, enabling depth-based intersections and correct z-ordering among siblings. Similar to CSS `transform-style: preserve-3d`.
 

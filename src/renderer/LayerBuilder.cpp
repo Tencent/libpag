@@ -744,9 +744,7 @@ class LayerBuilderContext {
     if (!node->antiAlias) {
       layer->setAllowsEdgeAntialiasing(false);
     }
-    if (node->groupOpacity) {
-      layer->setAllowsGroupOpacity(true);
-    }
+    layer->setAllowsGroupOpacity(node->groupOpacity);
     if (!node->passThroughBackground) {
       layer->setPassThroughBackground(false);
     }

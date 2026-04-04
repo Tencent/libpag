@@ -67,7 +67,7 @@ they **must not** be omitted.
 | `matrix3D` | Matrix3D | — |
 | `preserve3D` | bool | false |
 | `antiAlias` | bool | true |
-| `groupOpacity` | bool | false |
+| `groupOpacity` | bool | true |
 | `passThroughBackground` | bool | true |
 | `scrollRect` | Rect | — |
 | `clipToBounds` | bool | false |

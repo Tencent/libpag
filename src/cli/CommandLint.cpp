@@ -1455,7 +1455,7 @@ static bool CanDowngradeLayerToGroup(xmlNodePtr layer) {
   if (!preserve3D.empty() && preserve3D != "false") {
     return false;
   }
-  if (!groupOpacity.empty() && groupOpacity != "false") {
+  if (!groupOpacity.empty() && groupOpacity != "true") {
     return false;
   }
   if (!passThroughBackground.empty() && passThroughBackground != "true") {
