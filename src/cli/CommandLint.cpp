@@ -399,7 +399,9 @@ static void DetectFullCanvasClipMasks(xmlNodePtr root, float canvasWidth, float 
 
     float left = rectPosX - rectWidth * 0.5f;
     float top = rectPosY - rectHeight * 0.5f;
-    if (left <= 0 && top <= 0 && rectWidth >= canvasWidth && rectHeight >= canvasHeight) {
+    float right = rectPosX + rectWidth * 0.5f;
+    float bottom = rectPosY + rectHeight * 0.5f;
+    if (left <= 0 && top <= 0 && right >= canvasWidth && bottom >= canvasHeight) {
       LintDiagnostic diag = {};
       diag.line = static_cast<int>(node->line);
       diag.category = "warning";
