@@ -241,24 +241,26 @@ static void DetectFlexInContentMeasuredParent(
 }
 
 static void DetectContentOriginOffset(const std::vector<Element*>& elements, CheckNode* container) {
-  // Find the minimum x and y of unconstrained children relative to the container origin.
+  // Find the minimum x and y of all children relative to the container origin,
+  // mirroring the measurement logic. Both constrained and unconstrained children
+  // contribute to container measurement and should be checked.
   float minX = FLT_MAX;
   float minY = FLT_MAX;
-  bool hasUnconstrained = false;
+  bool hasChild = false;
   for (auto* element : elements) {
     auto* layoutNode = LayoutNode::AsLayoutNode(element);
     if (layoutNode == nullptr) {
       continue;
     }
-    if (layoutNode->hasConstraints()) {
+    auto bounds = layoutNode->layoutBounds();
+    if (bounds.width == 0 && bounds.height == 0) {
       continue;
     }
-    auto bounds = layoutNode->layoutBounds();
     minX = std::min(minX, bounds.x);
     minY = std::min(minY, bounds.y);
-    hasUnconstrained = true;
+    hasChild = true;
   }
-  if (!hasUnconstrained) {
+  if (!hasChild) {
     return;
   }
   static constexpr float TOLERANCE = 0.5f;
@@ -515,9 +517,16 @@ static void BuildElementNodes(const std::vector<Element*>& elements,
         if (!groupChildren.empty()) {
           node->children = std::move(groupChildren);
         }
-        // Check content origin offset for content-measured Group/TextBox containers.
+        // Check content-measured Group/TextBox containers.
         if (check && std::isnan(group->width) && std::isnan(group->height)) {
-          DetectContentOriginOffset(group->elements, node.get());
+          // Content origin offset: only when the Group/TextBox itself has constraints —
+          // if it has no constraints, its measurement doesn't affect positioning.
+          if (layoutNode->hasConstraints()) {
+            DetectContentOriginOffset(group->elements, node.get());
+          }
+          // Ineffective centering: always check — children using centerX/centerY
+          // inside a content-measured container is always a no-op regardless of
+          // whether the container itself is positioned.
           DetectIneffectiveCentering(group->elements, node->children);
         }
       }
@@ -570,7 +579,7 @@ static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float pare
     BuildElementNodes(layer->contents, elementNodes, node->bounds.x, node->bounds.y,
                       node->bounds.width, node->bounds.height, nullptr, check, maxDepth,
                       currentDepth);
-    // Check content origin offset for content-measured Layer containers.
+    // Check content-measured Layer containers.
     // A Layer's size is content-measured when both width and height are unset AND not engine-
     // assigned. Skip if: opposite-pair constraints derive both axes, or flex assigns main-axis
     // (with default stretch assigning cross-axis, both axes are covered).
@@ -580,7 +589,17 @@ static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float pare
       bool sizeFromFlex = layer->flex > 0 && parentLayer != nullptr &&
                           parentLayer->layout != LayoutMode::None && layer->includeInLayout;
       if (!sizeFromConstraints && !sizeFromFlex) {
-        DetectContentOriginOffset(layer->contents, node.get());
+        // Content origin offset: only when the Layer is positioned (has constraints or
+        // participates in parent container layout). If unpositioned, its measurement
+        // doesn't affect any positioning.
+        bool inParentLayout = parentLayer != nullptr &&
+                              parentLayer->layout != LayoutMode::None && layer->includeInLayout;
+        bool isPositioned = layer->hasConstraints() || inParentLayout;
+        if (isPositioned) {
+          DetectContentOriginOffset(layer->contents, node.get());
+        }
+        // Ineffective centering: always check — children using centerX/centerY
+        // inside a content-measured container is always a no-op.
         DetectIneffectiveCentering(layer->contents, elementNodes);
       }
     }

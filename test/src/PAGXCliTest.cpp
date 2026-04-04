@@ -1465,8 +1465,8 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetExplicitSize) {
   EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
 }
 
-// Content origin offset: constrained children are excluded, but unconstrained Path still offsets.
-// Here a constrained Group at (0,0) covers the origin, so the container measurement is accurate.
+// Content origin offset: a constrained Group at (0,0) covers the origin, so the minimum
+// coordinate across all children is (0,0) and no offset problem is reported.
 CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetConstrained) {
   auto path = TestResourcePath("layout_check_content_offset_constrained.pagx");
   std::streambuf* old = std::cout.rdbuf();
@@ -1475,10 +1475,10 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetConstrained) {
   auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
   std::cout.rdbuf(old);
   auto output = oss.str();
-  // The unconstrained Path starts at (50, 50), but the check only looks at unconstrained children.
-  // Path is unconstrained and starts at (50, 50), so offset is reported.
-  EXPECT_EQ(ret, 1);
-  EXPECT_TRUE(output.find("container measurement inaccurate") != std::string::npos);
+  // The constrained Group at left=0,top=0 has layoutBounds starting at (0,0),
+  // so minX=0, minY=0 — no offset problem.
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
 }
 
 // Content origin offset not reported when Layer is a flex child (engine assigns size).
@@ -1494,7 +1494,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetFlex) {
   EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
 }
 
-// Content origin offset detected inside a Group (not just Layer).
+// Content origin offset detected inside a Group that has constraints.
 CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetGroup) {
   auto path = TestResourcePath("layout_check_content_offset_group.pagx");
   std::streambuf* old = std::cout.rdbuf();
@@ -1505,6 +1505,61 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetGroup) {
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
   EXPECT_TRUE(output.find("children start at (20, 20), not (0, 0)") != std::string::npos);
+}
+
+// Content origin offset NOT reported for a Group without constraints (painter scope isolation only).
+// The Group's measurement doesn't affect positioning when it has no constraints.
+CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetGroupNoConstraints) {
+  auto path = TestResourcePath("layout_check_content_offset_group_no_constraints.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
+}
+
+// Content origin offset NOT reported for a Layer with no constraints and not in parent layout.
+// The Layer's measurement doesn't affect any positioning.
+CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetLayerUnpositioned) {
+  auto path = TestResourcePath("layout_check_content_offset_layer_unpositioned.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
+}
+
+// Content origin offset NOT reported for a Layer with includeInLayout=false and no constraints.
+// Even though parent has container layout, the Layer is excluded and unpositioned.
+CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetExcludedFromLayout) {
+  auto path = TestResourcePath("layout_check_content_offset_excluded_from_layout.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
+}
+
+// Content origin offset reported for a Layer in parent container layout (positioned by layout).
+CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetInParentLayout) {
+  auto path = TestResourcePath("layout_check_content_offset_in_parent_layout.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("children start at (50, 50), not (0, 0)") != std::string::npos);
 }
 
 // Flex child in content-measured parent (no main-axis size to distribute).
