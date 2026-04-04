@@ -35,14 +35,35 @@ namespace pagx {
  */
 class TypefaceHolder {
  public:
+  /**
+   * Creates a TypefaceHolder from an already-loaded Typeface.
+   * @param typeface The Typeface to hold.
+   */
   explicit TypefaceHolder(std::shared_ptr<tgfx::Typeface> typeface);
 
+  /**
+   * Creates a TypefaceHolder for deferred loading from a font file or system font name.
+   * @param path The font file path (empty if using fontFamily for name-based system font lookup).
+   * @param ttcIndex The face index within a TrueType Collection (.ttc) file.
+   * @param fontFamily The font family name, used for matching and name-based loading.
+   * @param fontStyle The font style name (e.g. "Regular", "Bold").
+   */
   TypefaceHolder(std::string path, int ttcIndex, std::string fontFamily, std::string fontStyle);
 
+  /**
+   * Returns the held Typeface, creating it on demand from the font path or family name if not yet
+   * loaded. Once created, the Typeface is cached for subsequent calls.
+   */
   std::shared_ptr<tgfx::Typeface> getTypeface();
 
+  /**
+   * Returns the font family name associated with this holder.
+   */
   const std::string& getFontFamily() const;
 
+  /**
+   * Returns the font style name associated with this holder.
+   */
   const std::string& getFontStyle() const;
 
  private:
