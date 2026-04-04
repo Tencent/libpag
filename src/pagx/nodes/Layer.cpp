@@ -19,7 +19,6 @@
 #include "pagx/nodes/Layer.h"
 #include <algorithm>
 #include <cmath>
-#include <utility>
 #include <vector>
 #include "pagx/layout/LayoutNode.h"
 #include "pagx/nodes/Composition.h"
