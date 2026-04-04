@@ -561,16 +561,11 @@ stroked Path; area fill = same path closed to bottom with semi-transparent Fill.
 ```xml
 <pagx version="1.0" width="200" height="200">
   <Layer width="200" height="200">
-    <!-- Segment 1: 40% (0 to 0.4) — gradient stroke -->
+    <!-- Segment 1: 40% (0 to 0.4) -->
     <Ellipse centerX="0" centerY="0" size="130,130"/>
     <TrimPath end="0.38"/>
-    <Stroke width="18">
-      <ConicGradient center="65,65" startAngle="270" endAngle="407">
-        <ColorStop offset="0" color="#F43F5E"/>
-        <ColorStop offset="1" color="#6366F1"/>
-      </ConicGradient>
-    </Stroke>
-    <!-- Segment 2: 30% (0.4 to 0.7) — solid stroke -->
+    <Stroke color="#3B82F6" width="18"/>
+    <!-- Segment 2: 30% (0.4 to 0.7) -->
     <Group centerX="0" centerY="0">
       <Ellipse size="130,130"/>
       <TrimPath start="0.4" end="0.68"/>
@@ -594,10 +589,8 @@ stroked Path; area fill = same path closed to bottom with semi-transparent Fill.
 
 **Pattern**: Donut = Ellipse + TrimPath + thick Stroke per segment. `start/end` partition
 the circle (0–1); leave small gaps between segments for visual separation. Each segment
-needs its own Group for painter isolation. Segments can use solid color (`color="..."`) or
-gradient (embed `<ConicGradient>` inside `<Stroke>`). Same technique for pie charts (use
-Fill instead of Stroke) and ring progress indicators. For legends, use the Icon + Label Row
-pattern.
+needs its own Group for painter isolation. Same technique for pie charts (use Fill instead
+of Stroke) and ring progress indicators. For legends, use the Icon + Label Row pattern.
 
 ### Circular Gauge (TrimPath + Repeater)
 
