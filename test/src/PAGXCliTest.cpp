@@ -1234,12 +1234,6 @@ CLI_TEST(PAGXCliTest, LayoutCheck_Clean) {
   EXPECT_EQ(ret, 0);
 }
 
-CLI_TEST(PAGXCliTest, LayoutCheck_CleanXml) {
-  auto path = TestResourcePath("layout_check_clean.pagx");
-  auto ret = CallRun(pagx::cli::RunLayout, {"layout", path});
-  EXPECT_EQ(ret, 0);
-}
-
 CLI_TEST(PAGXCliTest, LayoutCheck_CleanProblemsOnly) {
   auto path = TestResourcePath("layout_check_clean.pagx");
   auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
@@ -1338,12 +1332,6 @@ CLI_TEST(PAGXCliTest, LayoutCheck_CheckOverlap) {
 }
 
 CLI_TEST(PAGXCliTest, LayoutCheck_Elements) {
-  auto path = TestResourcePath("layout_check_elements.pagx");
-  auto ret = CallRun(pagx::cli::RunLayout, {"layout", path});
-  EXPECT_EQ(ret, 0);
-}
-
-CLI_TEST(PAGXCliTest, LayoutCheck_ElementsXml) {
   auto path = TestResourcePath("layout_check_elements.pagx");
   auto ret = CallRun(pagx::cli::RunLayout, {"layout", path});
   EXPECT_EQ(ret, 0);
