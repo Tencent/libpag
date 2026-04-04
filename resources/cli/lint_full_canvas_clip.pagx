@@ -2,7 +2,7 @@
 <!-- Test: full-canvas clip mask that has no clipping effect -->
 <pagx version="1.0" width="400" height="300">
   <Layer id="maskLayer" visible="false">
-    <Rectangle size="400,300"/>
+    <Rectangle position="200,150" size="400,300"/>
     <Fill color="#FFFFFF"/>
   </Layer>
   <Layer id="masked" mask="@maskLayer">
