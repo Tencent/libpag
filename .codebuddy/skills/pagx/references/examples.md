@@ -112,10 +112,10 @@ automatically.
 ```xml
 <pagx version="1.0" width="200" height="60">
   <Layer centerX="0" centerY="0">
-    <Rectangle left="0" right="0" top="0" bottom="0" roundness="22"/>
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
     <Fill color="#3B82F6"/>
     <Group centerX="0" centerY="0">
-      <Text left="40" right="40" top="12" bottom="12" text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+      <Text left="24" right="24" top="9" bottom="9" text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
       <Fill color="#FFF"/>
     </Group>
     <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#3B82F640"/>
@@ -123,8 +123,10 @@ automatically.
 </pagx>
 ```
 
-**Pattern**: Content-driven button — Text constraints define padding, Group `centerX/centerY`
-centers within Layer. Layer auto-sizes, Rectangle stretches via `left/right/top/bottom="0"`.
+**Pattern**: Content-driven button (also used for badges and tags) — Text constraints define
+padding, Group `centerX/centerY` centers within Layer. Layer auto-sizes, Rectangle stretches
+via `left/right/top/bottom="0"`. Text height follows the CSS linebox model, so set horizontal
+padding larger than vertical to achieve visually equal spacing.
 
 ### Icon + Label Row
 
@@ -219,23 +221,23 @@ Same color: single Fill. Different colors: wrap the line in a Group to isolate i
 ### Image Placeholder
 
 ```xml
-<pagx version="1.0" width="393" height="200">
-  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="12" alignment="center" arrangement="center">
+<pagx version="1.0" width="343" height="200">
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="8" alignment="center" arrangement="center">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="393,200">
+      <LinearGradient startPoint="0,0" endPoint="343,200">
         <ColorStop offset="0" color="#F0F4FF"/>
         <ColorStop offset="1" color="#E8EEFF"/>
       </LinearGradient>
     </Fill>
-    <Layer width="48" height="48">
+    <Layer width="48" height="48" alpha="0.4">
       <Rectangle left="6" top="6" size="36,36" roundness="4"/>
       <Ellipse left="14" top="14" size="6,6"/>
       <Path data="M42 30L32 20L10 42"/>
-      <Stroke color="#D5DAE0" width="3" cap="round" join="round"/>
+      <Stroke color="#BDC3C7" width="3" cap="round" join="round"/>
     </Layer>
     <Layer>
-      <Text text="image description" fontFamily="Arial" fontSize="13"/>
+      <Text text="Image Description" fontFamily="Arial" fontSize="12"/>
       <Fill color="#BDC3C7"/>
     </Layer>
   </Layer>
