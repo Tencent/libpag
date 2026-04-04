@@ -27,6 +27,11 @@ namespace pagx {
 class Element;
 class LayoutContext;
 
+/**
+ * LayoutNode provides constraint-based positioning for elements within a parent container. It stores
+ * constraint attributes (left, right, top, bottom, centerX, centerY) and manages the two-phase
+ * layout process: bottom-up measurement followed by top-down constraint resolution.
+ */
 class LayoutNode {
  public:
   /**
