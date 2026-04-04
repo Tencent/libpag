@@ -34,8 +34,8 @@ Icon patterns using the "Think in SVG, write in PAGX" approach. See `generate-gu
 </pagx>
 ```
 
-**Pattern**: Ellipse for rings + Path for lines. Group isolates different Stroke widths.
-`cap="round"` on open endpoints prevents flat cuts.
+**Pattern**: Ellipse for rings, Path for lines. Group isolates different Stroke widths.
+Use `cap="round"` on open-ended Paths for rounded endpoints.
 
 ### Fill Icon (Solid / Active)
 
@@ -53,8 +53,7 @@ Icon patterns using the "Think in SVG, write in PAGX" approach. See `generate-gu
 </pagx>
 ```
 
-**Pattern**: Single closed Path with `Fill` for irregular shapes. Path `data` is SVG syntax,
-closed with `Z`.
+**Pattern**: Single closed Path + Fill for irregular shapes. Close with `Z` for clean fill.
 
 ### Mixed Icon (Stroke + Fill)
 
@@ -80,9 +79,9 @@ closed with `Z`.
 </pagx>
 ```
 
-**Pattern**: Stroke for outlines + Fill for solid areas. Each part with different painters
-needs its own Group. **All icon examples share**: background Rectangle + Fill first, then
-a centered Group (`centerX/centerY`) for the icon content.
+**Pattern**: Stroke outlines + Fill solids — each part with different painters needs its own
+Group. **Common icon structure**: background Rectangle + Fill, then centered Group for icon
+content. Active state = Fill icon, inactive = Stroke icon.
 
 ---
 
@@ -103,19 +102,18 @@ Layers in rows or columns, and constraint positioning for positioning elements w
 </pagx>
 ```
 
-**Pattern**: A 1px-tall Rectangle — equivalent to HTML `<hr>`. Layer uses `centerX="0"
-centerY="0"` to center within the canvas, Rectangle's intrinsic `size` creates side margins
-automatically.
+**Pattern**: 1px Rectangle for horizontal rules. For full-width dividers, use
+`left="0" right="0"` instead of `size`.
 
-### Button
+### Button / Badge
 
 ```xml
-<pagx version="1.0" width="200" height="60">
+<pagx version="1.0" width="200" height="80">
   <Layer centerX="0" centerY="0">
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
     <Fill color="#3B82F6"/>
     <Group centerX="0" centerY="0">
-      <Text left="24" right="24" top="9" bottom="9" text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+      <Text left="15" right="15" top="10" bottom="10" text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
       <Fill color="#FFF"/>
     </Group>
     <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#3B82F640"/>
@@ -123,10 +121,11 @@ automatically.
 </pagx>
 ```
 
-**Pattern**: Content-driven button (also used for badges and tags) — Text constraints define
-padding, Group `centerX/centerY` centers within Layer. Layer auto-sizes, Rectangle stretches
-via `left/right/top/bottom="0"`. Text height follows the CSS linebox model, so set horizontal
-padding larger than vertical to achieve visually equal spacing.
+**Pattern**: Content-driven button (also for badges/tags). Text constraints act as padding —
+they push the content-measured Layer outward to size the button; Rectangle stretches to fill
+as background. For fixed-size buttons, set explicit Layer size or use container layout — text
+stays centered and background adapts. Text linebox is taller than glyphs (CSS linebox model),
+so use larger horizontal than vertical padding for visually equal spacing.
 
 ### Icon + Label Row
 
@@ -145,8 +144,9 @@ padding larger than vertical to achieve visually equal spacing.
 </pagx>
 ```
 
-**Pattern**: `layout="horizontal"` + `gap` + `alignment="center"` for row arrangement.
-Each child Layer provides painter scope isolation.
+**Pattern**: Horizontal layout with `gap` and `alignment="center"` for inline rows. Each
+visual element in its own child Layer for painter isolation. Reuse this pattern for any
+icon + text, avatar + name, or label + value row.
 
 ### Progress Bar
 
@@ -165,9 +165,9 @@ Each child Layer provides painter scope isolation.
 </pagx>
 ```
 
-**Pattern**: Two overlapping rounded Rectangles (track + fill bar) — like HTML `<progress>`.
-Group isolates the fill bar's Fill from the track's Fill. The outer Layer uses
-`centerX="0" centerY="0"` to center the whole bar in the canvas.
+**Pattern**: Two overlapping Rectangles (track + fill). Group isolates the fill bar's
+painter. Adjust fill bar width to represent progress percentage. Same structure works for
+sliders and loading indicators.
 
 ### Gradient Text
 
@@ -185,10 +185,9 @@ Group isolates the fill bar's Fill from the track's Fill. The outer Layer uses
 </pagx>
 ```
 
-**Pattern**: LinearGradient inside Fill applies to Text geometry — the PAGX equivalent of CSS
-`background: linear-gradient(...); -webkit-background-clip: text`. Gradient `startPoint` /
-`endPoint` coordinates are relative to the Text element's local origin. Text + Fill sit
-directly on the Layer (no Group needed when only one painter scope exists).
+**Pattern**: LinearGradient inside Fill applies to Text geometry — equivalent to CSS
+`background-clip: text`. Gradient coordinates are relative to the Text's local origin.
+No Group needed when only one painter scope exists.
 
 ### Text Decoration (Strikethrough & Underline)
 
@@ -262,9 +261,9 @@ Vary gradient hues across placeholders (`#F0F4FF→#E8EEFF`, `#FFF0E8→#FFE8D8`
 </pagx>
 ```
 
-**Pattern**: ImagePattern fills the Ellipse shape — image is clipped to the geometry boundary,
-like CSS `clip-path: circle()` on an `<img>`. Works with any shape (Rectangle, Path, MergePath
-results). DropShadowStyle adds depth. Layer uses `centerX/centerY` for canvas centering.
+**Pattern**: ImagePattern fills the Ellipse — image clips to geometry boundary, like CSS
+`clip-path: circle()`. Works with any shape (Rectangle, Path, MergePath). Use
+DropShadowStyle for depth. For square avatars, use Rectangle with `roundness`.
 
 ### Notification Badge (includeInLayout)
 
@@ -297,8 +296,10 @@ results). DropShadowStyle adds depth. Layer uses `centerX/centerY` for canvas ce
 </pagx>
 ```
 
-**Pattern**: Content-driven buttons with constraint margins for padding. `includeInLayout="false"`
-exempts the red dot. Negative offsets place it outside parent bounds.
+**Pattern**: `includeInLayout="false"` removes the badge from layout flow — it overlaps
+without affecting sibling positions. Negative constraints (`right="-6" top="-6"`) place it
+outside parent bounds. Use this for any floating overlay: notification dots, "NEW" ribbons,
+corner decorations.
 
 ### Card with Internal Layout
 
@@ -346,10 +347,10 @@ A card with vertical container layout, text header, and action buttons.
 </pagx>
 ```
 
-**Pattern**:
-- Background Rectangle + Fill on `layout` Layer (VectorElements skip layout)
-- `flex="1"` absorbs remaining height after fixed-height button row
-- Two `flex="1"` buttons distribute width equally
+**Pattern**: VectorElements (background) on a `layout` Layer don't participate in layout —
+only child Layers do. `flex="1"` absorbs remaining space; multiple `flex="1"` siblings
+distribute equally. This structure (background + header + flex content + fixed footer) is
+the standard card/panel/screen template.
 
 ### Input Field (InnerShadowStyle)
 
@@ -368,10 +369,9 @@ A card with vertical container layout, text header, and action buttons.
 </pagx>
 ```
 
-**Pattern**: Fixed-size input field — Layer has explicit `width/height`. Group uses `left="12"
-centerY="0"` to left-align and vertically center the placeholder text. Group isolates the
-placeholder Fill from the outer Rectangle's Fill + Stroke. InnerShadowStyle = CSS
-`box-shadow: inset`, combined with Stroke border for the standard `<input>` look.
+**Pattern**: Fixed-size Layer for form controls. Group with `left` + `centerY="0"` for
+left-aligned, vertically centered content. InnerShadowStyle = CSS `box-shadow: inset`.
+Same structure for text inputs, search bars, dropdowns, and text areas (adjust height).
 
 ### Card Grid (Composition)
 
@@ -398,11 +398,10 @@ placeholder Fill from the outer Rectangle's Fill + Stroke. InnerShadowStyle = CS
 </pagx>
 ```
 
-**Pattern**: Composition = reusable component (like React component) — define once in
-`<Resources>`, instantiate via `composition="@id"`. Internal Layer uses `left/right/top/bottom="0"`
-to stretch-fill the Composition bounds. `flex="1"` on each instance distributes available width
-evenly. Composition `width`/`height` are required — they set the intrinsic size used by flex
-allocation.
+**Pattern**: Composition = reusable component — define once in `<Resources>`, instantiate
+via `composition="@id"`. Composition `width`/`height` are required (intrinsic size for
+layout). Internal Layers use `left/right/top/bottom="0"` to stretch-fill bounds. Use for
+any repeated element: cards, list items, grid cells.
 
 ### Tab Bar (Partial Roundness)
 
@@ -468,9 +467,10 @@ allocation.
 </pagx>
 ```
 
-**Pattern**: `MergePath mode="intersect"` clips rounded rect with straight rect for
-partial roundness. `arrangement="spaceAround"` distributes tabs. Each tab is a vertical
-layout with icon + label Layers. Active = Fill, inactive = Stroke.
+**Pattern**: `MergePath mode="intersect"` creates partial roundness by clipping a rounded
+rect with a straight rect. Tabs use vertical layout (icon + label) distributed by
+`arrangement="spaceAround"`. Active tab = Fill icon + bold color; inactive = Stroke icon +
+muted color. Same structure for bottom navigation, segmented controls, toolbar items.
 
 ---
 
@@ -515,9 +515,9 @@ goes clockwise — use Group `rotation` to reposition the start point.
 </pagx>
 ```
 
-**Pattern**: `layout="horizontal"` + `alignment="end"` bottom-aligns bars.
-`arrangement="spaceBetween"` distributes across width. Different heights per bar cannot
-use Repeater.
+**Pattern**: `alignment="end"` bottom-aligns bars of varying height.
+`arrangement="spaceBetween"` distributes evenly. Each bar is a content-measured child
+Layer. Cannot use Repeater when heights differ — list each bar individually.
 
 ### Line Chart
 
@@ -552,9 +552,9 @@ use Repeater.
 </pagx>
 ```
 
-**Pattern**: Repeater for grid lines (`copies="5" position="0,35"`). Path with `M/L` for
-data line (stroked), closed variant for area fill. Data points = individual Ellipses sharing
-one Fill.
+**Pattern**: Repeater with `position="0,35"` creates evenly spaced grid lines. Data line =
+stroked Path; area fill = same path closed to bottom with semi-transparent Fill. Data points
+= individual Ellipses sharing one Fill. Group isolates each visual layer.
 
 ### Donut Chart (TrimPath)
 
@@ -634,8 +634,9 @@ one Fill.
 ```
 
 **Pattern**: Donut = Ellipse + TrimPath + thick Stroke per segment. `start/end` partition
-the circle (0–1). Small gaps (e.g., `end="0.38"` not `0.4`) for visual separation.
-Horizontal layout arranges donut + legend.
+the circle (0–1); leave small gaps between segments for visual separation. Each segment
+needs its own Group for painter isolation. Same technique for pie charts (use Fill instead
+of Stroke) and ring progress indicators.
 
 **Gradient stroke variant**: for ring progress with gradient color, embed a LinearGradient
 directly inside the Stroke element:
@@ -679,10 +680,10 @@ directly inside the Stroke element:
 </pagx>
 ```
 
-**Pattern**: `TrimPath end="0.75"` draws a 270° arc; `offset="-135"` rotates the start
-point so the gap sits at bottom. The value arc uses the same offset but smaller `end` —
-`end="0.5"` = 67% of the 270° track. Tick Repeater uses `anchor="70,70"` (Ellipse center)
-to rotate around the arc center.
+**Pattern**: `TrimPath end` controls arc length (0.75 = 270°); `offset` rotates the start
+point. Value arc = same offset, proportional `end`. Tick marks use Repeater with `anchor`
+at the Ellipse center for radial rotation. Same technique for speedometers, dials, and
+circular timers.
 
 ---
 
@@ -715,10 +716,9 @@ frosted glass.
 </pagx>
 ```
 
-**Pattern**: Solid semi-transparent Fill + BlurFilter on Ellipse = soft glow (same as CSS
-`filter: blur()` on a colored circle). Each orb is a separate Layer with
-`blendMode="screen"` for additive brightening on dark backgrounds. Position orbs via
-`left/top` constraint offsets. Performance note: blur cost scales with radius.
+**Pattern**: Semi-transparent Fill + BlurFilter = soft glow (CSS `filter: blur()`).
+`blendMode="screen"` for additive glow on dark backgrounds. Each orb needs its own Layer
+(filters are Layer-level). Use for ambient lighting, bokeh effects, or glowing accents.
 
 ### Frosted Panel (BackgroundBlurStyle)
 
@@ -744,9 +744,8 @@ frosted glass.
 ```
 
 **Pattern**: BackgroundBlurStyle = CSS `backdrop-filter: blur()`. Blurs everything rendered
-**below** this Layer, clipped to the Layer's opaque content (here, the semi-transparent
-Rectangle). The frosted panel Layer uses `centerX/centerY` for centering. Must have
-visible content below to blur — empty background produces no effect.
+**below** this Layer, clipped to the Layer's content shape. Must have visible content below
+to blur. Use for frosted glass panels, iOS-style navigation bars, modal overlays.
 
 ---
 
@@ -771,8 +770,7 @@ Badges often combine Polystar with gradients and layer styles for depth.
 </pagx>
 ```
 
-**Pattern**: Polystar generates a star shape from `pointCount`, `outerRadius`, and
-`innerRadius` — no manual path coordinates needed. Default `rotation="0"` points the first
-vertex upward. RadialGradient `center` defaults to `0,0` (Polystar's origin); `radius`
-matches `outerRadius` for full coverage. DropShadowStyle with matching hue adds a colored
-glow effect. Layer uses `centerX/centerY` for canvas centering.
+**Pattern**: Polystar generates regular stars/polygons from parameters — no manual Path
+needed. `type="polygon"` for regular polygons (hexagons, octagons). RadialGradient `radius`
+should match `outerRadius` for full coverage. DropShadowStyle with a matching hue creates a
+colored glow. Use for rating stars, achievement badges, decorative shapes.
