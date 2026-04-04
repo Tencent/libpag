@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <unordered_map>
+#include "base/utils/MathUtil.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/Group.h"
@@ -325,10 +326,11 @@ static GlyphRun* CreateGlyphRunFromLayoutRun(
     bool hasNonDefaultScale = false;
     bool hasNonDefaultRotation = false;
     for (size_t i = 0; i < glyphRun->scales.size(); i++) {
-      if (glyphRun->scales[i].x != 1.0f || glyphRun->scales[i].y != 1.0f) {
+      if (!pag::FloatNearlyEqual(glyphRun->scales[i].x, 1.0f) ||
+          !pag::FloatNearlyEqual(glyphRun->scales[i].y, 1.0f)) {
         hasNonDefaultScale = true;
       }
-      if (glyphRun->rotations[i] != 0.0f) {
+      if (!pag::FloatNearlyZero(glyphRun->rotations[i])) {
         hasNonDefaultRotation = true;
       }
     }
