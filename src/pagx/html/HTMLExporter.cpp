@@ -781,8 +781,8 @@ static PathData ApplyRoundCorner(const PathData& pathData, float radius) {
       if (i > 0) {
         prevStart = (i >= 2) ? contour.segments[i - 2].endPoint : contour.startPoint;
       } else {
-        // i==0 and closed: previous is the last segment
-        prevStart = (n >= 2) ? contour.segments[n - 2].endPoint : contour.startPoint;
+        // i==0 and closed: the edge arriving at startPoint comes from the last segment's endpoint
+        prevStart = contour.segments[n - 1].endPoint;
       }
 
       // Compute edge vectors
@@ -1604,21 +1604,22 @@ class HTMLWriter {
   void writeGroup(HTMLBuilder& out, const Group* group, float alpha, bool distribute);
   void writeRepeater(HTMLBuilder& out, const Repeater* rep, const std::vector<GeoInfo>& geos,
                      const Fill* fill, const Stroke* stroke, float alpha);
-  void writeComposition(HTMLBuilder& out, const Composition* comp);
+  void writeComposition(HTMLBuilder& out, const Composition* comp, float alpha = 1.0f,
+                        bool distribute = false);
   void paintGeos(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
                  const Stroke* stroke, const TextBox* textBox, float alpha, bool hasTrim,
                  const TrimPath* curTrim, bool hasMerge, MergePathMode mergeMode);
   void applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim, bool isEllipse = false);
   void applyTrimAttrsContinuous(HTMLBuilder& builder, const TrimPath* trim,
                                 const std::vector<float>& pathLengths, float totalLength,
-                                size_t geoIndex);
+                                size_t geoIndex, bool isEllipse = false);
   float computeGeoPathLength(const GeoInfo& geo);
 
   // Filter defs
   std::string writeFilterDefs(const std::vector<LayerFilter*>& filters);
 
   // Mask/clip defs
-  std::string writeMaskDef(const Layer* mask, MaskType type);
+  std::string writeMaskCSS(const Layer* mask, MaskType type);
   std::string writeClipDef(const Layer* mask);
   void writeClipContent(HTMLBuilder& out, const Layer* layer, const Matrix& parent);
 
@@ -2173,12 +2174,18 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
         _defs->addAttr("result", "bFlood" + i);
         _defs->closeTagSelfClosing();
         _defs->openTag("feBlend");
-        _defs->addAttr("in", "SourceGraphic");
-        _defs->addAttr("in2", "bFlood" + i);
+        _defs->addAttr("in", "bFlood" + i);
+        _defs->addAttr("in2", "SourceGraphic");
         auto ms = BlendModeToMixBlendMode(bf->blendMode);
         if (ms) {
           _defs->addAttr("mode", ms);
         }
+        _defs->addAttr("result", "bBlend" + i);
+        _defs->closeTagSelfClosing();
+        _defs->openTag("feComposite");
+        _defs->addAttr("in", "bBlend" + i);
+        _defs->addAttr("in2", "SourceAlpha");
+        _defs->addAttr("operator", "in");
         _defs->closeTagSelfClosing();
         break;
       }
@@ -2216,105 +2223,202 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
 // HTMLWriter – mask / clip defs
 //==============================================================================
 
-std::string HTMLWriter::writeMaskDef(const Layer* mask, MaskType type) {
-  std::string id = mask->id.empty() ? _ctx->nextId("mask") : mask->id;
-  _defs->openTag("mask");
-  _defs->addAttr("id", id);
-  if (type == MaskType::Alpha) {
-    _defs->addAttr("style", "mask-type:alpha");
-  }
-  _defs->closeTagStart();
-  _defs->openTag("g");
-  _defs->closeTagStart();
-
-  // For luminance masks, we need to preserve the fill colors from the mask layer's elements.
-  // First, scan for Fill painters in the mask layer to get the color source.
+// Build an inline SVG data URI for use as CSS mask-image. This avoids the Chrome
+// limitation where CSS mask:url(#id) cannot reference SVG <mask> elements from
+// HTML div elements.
+std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type) {
+  // Scan for Fill painters to get the color source for luminance masks.
   const Fill* maskFill = nullptr;
   for (auto* e : mask->contents) {
     if (e->nodeType() == NodeType::Fill) {
       maskFill = static_cast<const Fill*>(e);
-      break;  // Use the first fill found
+      break;
     }
   }
 
-  // Determine if we should use the fill color (for luminance) or white (for alpha/default)
   bool useFillColor = (type == MaskType::Luminance && maskFill != nullptr && maskFill->color);
+  std::string fillAttr = "white";
+  float fillOpacity = 1.0f;
+
+  // Build the inline SVG content. For luminance masks with gradients, the gradient
+  // definition must be included inside this self-contained SVG.
+  HTMLBuilder svg(0);
+  svg.openTag("svg");
+  svg.addAttr("xmlns", "http://www.w3.org/2000/svg");
+  svg.closeTagStart();
+
+  if (useFillColor) {
+    // Write gradient defs directly into the inline SVG.
+    auto* src = maskFill->color;
+    if (src->nodeType() == NodeType::LinearGradient ||
+        src->nodeType() == NodeType::RadialGradient) {
+      std::string gradId = "g";
+      svg.openTag("defs");
+      svg.closeTagStart();
+      if (src->nodeType() == NodeType::LinearGradient) {
+        auto g = static_cast<const LinearGradient*>(src);
+        svg.openTag("linearGradient");
+        svg.addAttr("id", gradId);
+        svg.addAttr("x1", FloatToString(g->startPoint.x));
+        svg.addAttr("y1", FloatToString(g->startPoint.y));
+        svg.addAttr("x2", FloatToString(g->endPoint.x));
+        svg.addAttr("y2", FloatToString(g->endPoint.y));
+        svg.addAttr("gradientUnits", "userSpaceOnUse");
+        if (!g->matrix.isIdentity()) {
+          svg.addAttr("gradientTransform", MatrixToCSS(g->matrix));
+        }
+        svg.closeTagStart();
+        for (auto* stop : g->colorStops) {
+          svg.openTag("stop");
+          svg.addAttr("offset", FloatToString(stop->offset));
+          svg.addAttr("stop-color", ColorToSVGHex(stop->color));
+          if (stop->color.alpha < 1.0f) {
+            svg.addAttr("stop-opacity", FloatToString(stop->color.alpha));
+          }
+          svg.closeTagSelfClosing();
+        }
+        svg.closeTag();
+      } else {
+        auto g = static_cast<const RadialGradient*>(src);
+        svg.openTag("radialGradient");
+        svg.addAttr("id", gradId);
+        svg.addAttr("cx", FloatToString(g->center.x));
+        svg.addAttr("cy", FloatToString(g->center.y));
+        svg.addAttr("r", FloatToString(g->radius));
+        svg.addAttr("gradientUnits", "userSpaceOnUse");
+        if (!g->matrix.isIdentity()) {
+          svg.addAttr("gradientTransform", MatrixToCSS(g->matrix));
+        }
+        svg.closeTagStart();
+        for (auto* stop : g->colorStops) {
+          svg.openTag("stop");
+          svg.addAttr("offset", FloatToString(stop->offset));
+          svg.addAttr("stop-color", ColorToSVGHex(stop->color));
+          if (stop->color.alpha < 1.0f) {
+            svg.addAttr("stop-opacity", FloatToString(stop->color.alpha));
+          }
+          svg.closeTagSelfClosing();
+        }
+        svg.closeTag();
+      }
+      svg.closeTag();  // </defs>
+      fillAttr = "url(#g)";
+      fillOpacity = maskFill->alpha;
+    } else if (src->nodeType() == NodeType::SolidColor) {
+      auto sc = static_cast<const SolidColor*>(src);
+      fillAttr = ColorToSVGHex(sc->color);
+      fillOpacity = sc->color.alpha * maskFill->alpha;
+    }
+  }
 
   for (auto* e : mask->contents) {
-    std::string fillAttr = "white";
-    float fillOpacity = 1.0f;
-
-    if (useFillColor) {
-      fillAttr = colorToSVGFill(maskFill->color, &fillOpacity);
-      fillOpacity *= maskFill->alpha;
-    }
-
     if (e->nodeType() == NodeType::Rectangle) {
       auto rect = static_cast<const Rectangle*>(e);
-      _defs->openTag("rect");
+      svg.openTag("rect");
       float x = rect->position.x - rect->size.width / 2;
       float y = rect->position.y - rect->size.height / 2;
       if (!FloatNearlyZero(x)) {
-        _defs->addAttr("x", FloatToString(x));
+        svg.addAttr("x", FloatToString(x));
       }
       if (!FloatNearlyZero(y)) {
-        _defs->addAttr("y", FloatToString(y));
+        svg.addAttr("y", FloatToString(y));
       }
-      _defs->addAttr("width", FloatToString(rect->size.width));
-      _defs->addAttr("height", FloatToString(rect->size.height));
+      svg.addAttr("width", FloatToString(rect->size.width));
+      svg.addAttr("height", FloatToString(rect->size.height));
       if (rect->roundness > 0) {
-        _defs->addAttr("rx", FloatToString(rect->roundness));
+        svg.addAttr("rx", FloatToString(rect->roundness));
       }
-      _defs->addAttr("fill", fillAttr);
+      svg.addAttr("fill", fillAttr);
       if (fillOpacity < 1.0f) {
-        _defs->addAttr("fill-opacity", FloatToString(fillOpacity));
+        svg.addAttr("fill-opacity", FloatToString(fillOpacity));
       }
-      _defs->closeTagSelfClosing();
+      svg.closeTagSelfClosing();
     } else if (e->nodeType() == NodeType::Ellipse) {
       auto el = static_cast<const Ellipse*>(e);
-      _defs->openTag("ellipse");
-      _defs->addAttr("cx", FloatToString(el->position.x));
-      _defs->addAttr("cy", FloatToString(el->position.y));
-      _defs->addAttr("rx", FloatToString(el->size.width / 2));
-      _defs->addAttr("ry", FloatToString(el->size.height / 2));
-      _defs->addAttr("fill", fillAttr);
+      svg.openTag("ellipse");
+      svg.addAttr("cx", FloatToString(el->position.x));
+      svg.addAttr("cy", FloatToString(el->position.y));
+      svg.addAttr("rx", FloatToString(el->size.width / 2));
+      svg.addAttr("ry", FloatToString(el->size.height / 2));
+      svg.addAttr("fill", fillAttr);
       if (fillOpacity < 1.0f) {
-        _defs->addAttr("fill-opacity", FloatToString(fillOpacity));
+        svg.addAttr("fill-opacity", FloatToString(fillOpacity));
       }
-      _defs->closeTagSelfClosing();
+      svg.closeTagSelfClosing();
     } else if (e->nodeType() == NodeType::Path) {
       auto p = static_cast<const Path*>(e);
       std::string d = GetPathSVGString(p);
       if (!d.empty()) {
-        _defs->openTag("path");
-        _defs->addAttr("d", d);
-        _defs->addAttr("fill", fillAttr);
+        svg.openTag("path");
+        svg.addAttr("d", d);
+        svg.addAttr("fill", fillAttr);
         if (fillOpacity < 1.0f) {
-          _defs->addAttr("fill-opacity", FloatToString(fillOpacity));
+          svg.addAttr("fill-opacity", FloatToString(fillOpacity));
         }
-        _defs->closeTagSelfClosing();
+        svg.closeTagSelfClosing();
       }
     } else if (e->nodeType() == NodeType::Polystar) {
       auto ps = static_cast<const Polystar*>(e);
       std::string d = BuildPolystarPath(ps);
       if (!d.empty()) {
-        _defs->openTag("path");
-        _defs->addAttr("d", d);
-        _defs->addAttr("fill", fillAttr);
+        svg.openTag("path");
+        svg.addAttr("d", d);
+        svg.addAttr("fill", fillAttr);
         if (fillOpacity < 1.0f) {
-          _defs->addAttr("fill-opacity", FloatToString(fillOpacity));
+          svg.addAttr("fill-opacity", FloatToString(fillOpacity));
         }
-        _defs->closeTagSelfClosing();
+        svg.closeTagSelfClosing();
       }
     }
   }
-  _defs->closeTag();  // </g>
-  _defs->closeTag();  // </mask>
-  return id;
+  svg.closeTag();  // </svg>
+
+  // Build the CSS properties for mask-image with an inline SVG data URI.
+  std::string svgContent = svg.release();
+  // Remove newlines for a compact single-line data URI.
+  std::string compactSVG;
+  compactSVG.reserve(svgContent.size());
+  for (char c : svgContent) {
+    if (c != '\n') {
+      compactSVG += c;
+    }
+  }
+  // Percent-encode characters that are problematic in CSS url() data URIs.
+  std::string encoded;
+  encoded.reserve(compactSVG.size() * 2);
+  for (char c : compactSVG) {
+    switch (c) {
+      case '<':
+        encoded += "%3C";
+        break;
+      case '>':
+        encoded += "%3E";
+        break;
+      case '#':
+        encoded += "%23";
+        break;
+      case '"':
+        encoded += "%22";
+        break;
+      default:
+        encoded += c;
+        break;
+    }
+  }
+  std::string dataURI = "url('data:image/svg+xml," + encoded + "')";
+  std::string css = ";-webkit-mask-image:" + dataURI;
+  css += ";mask-image:" + dataURI;
+  css += ";-webkit-mask-size:100% 100%;mask-size:100% 100%";
+  if (type == MaskType::Luminance) {
+    css += ";-webkit-mask-mode:luminance;mask-mode:luminance";
+  } else {
+    css += ";-webkit-mask-mode:alpha;mask-mode:alpha";
+  }
+  return css;
 }
 
 std::string HTMLWriter::writeClipDef(const Layer* mask) {
-  std::string id = mask->id.empty() ? _ctx->nextId("clip") : mask->id;
+  std::string id = _ctx->nextId("clip");
   _defs->openTag("clipPath");
   _defs->addAttr("id", id);
   _defs->closeTagStart();
@@ -2909,7 +3013,7 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         applySVGFill(out, trim ? nullptr : fill);
         if (isContinuousTrim) {
           applySVGStroke(out, stroke, computeGeoPathLength(g));
-          applyTrimAttrsContinuous(out, trim, pathLengths, totalPathLength, geoIdx);
+          applyTrimAttrsContinuous(out, trim, pathLengths, totalPathLength, geoIdx, true);
         } else {
           applySVGStroke(out, stroke);
           applyTrimAttrs(out, trim, true);
@@ -4023,7 +4127,8 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
   }
 }
 
-void HTMLWriter::writeComposition(HTMLBuilder& out, const Composition* comp) {
+void HTMLWriter::writeComposition(HTMLBuilder& out, const Composition* comp, float alpha,
+                                  bool distribute) {
   if (_ctx->visitedCompositions.count(comp)) {
     return;
   }
@@ -4036,7 +4141,7 @@ void HTMLWriter::writeComposition(HTMLBuilder& out, const Composition* comp) {
     out.closeTagStart();
   }
   for (auto* layer : comp->layers) {
-    writeLayer(out, layer);
+    writeLayer(out, layer, alpha, distribute);
   }
   if (needContainer) {
     out.closeTag();
@@ -4130,7 +4235,7 @@ float HTMLWriter::computeGeoPathLength(const GeoInfo& geo) {
 
 void HTMLWriter::applyTrimAttrsContinuous(HTMLBuilder& builder, const TrimPath* trim,
                                           const std::vector<float>& pathLengths, float totalLength,
-                                          size_t geoIndex) {
+                                          size_t geoIndex, bool isEllipse) {
   if (!trim || trim->type != TrimType::Continuous) {
     applyTrimAttrs(builder, trim);
     return;
@@ -4149,7 +4254,10 @@ void HTMLWriter::applyTrimAttrsContinuous(HTMLBuilder& builder, const TrimPath* 
   float normStart = cumStart / totalLength;
   float normEnd = cumEnd / totalLength;
   // Apply global trim with offset
-  float offsetFrac = trim->offset / 360.0f;
+  // SVG ellipse paths start at 3 o'clock (rightmost point), while PAGX
+  // starts at 12 o'clock (top). Apply +0.25 offset for ellipse geometries.
+  float ellipseAdj = isEllipse ? 0.25f : 0.0f;
+  float offsetFrac = trim->offset / 360.0f + ellipseAdj;
   float globalStart = std::fmod(trim->start + offsetFrac, 1.0f);
   float globalEnd = std::fmod(trim->end + offsetFrac, 1.0f);
   if (globalStart < 0.0f) {
@@ -4641,9 +4749,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       auto clipId = writeClipDef(layer->mask);
       style += ";clip-path:url(#" + clipId + ")";
     } else {
-      auto maskId = writeMaskDef(layer->mask, layer->maskType);
-      style += ";mask:url(#" + maskId + ")";
-      style += ";-webkit-mask:url(#" + maskId + ")";
+      style += writeMaskCSS(layer->mask, layer->maskType);
     }
   }
 
@@ -4807,7 +4913,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   writeLayerContents(out, layer, contentAlpha, childDistribute, LayerPlacement::Background);
 
   if (layer->composition) {
-    writeComposition(out, layer->composition);
+    writeComposition(out, layer->composition, contentAlpha, childDistribute);
   }
 
   for (auto* child : layer->children) {
