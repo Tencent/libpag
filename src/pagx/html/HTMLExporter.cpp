@@ -376,13 +376,21 @@ static std::string LayerTransformCSS(const Layer* layer) {
   if (!layer->matrix3D.isIdentity()) {
     return Matrix3DToCSS(layer->matrix3D);
   }
-  if (!layer->matrix.isIdentity()) {
-    return MatrixToCSS(layer->matrix);
-  }
+  // x/y translation is combined with matrix: Translate(x,y) * matrix.
+  Matrix m = layer->matrix;
   if (!FloatNearlyZero(layer->x) || !FloatNearlyZero(layer->y)) {
-    return "translate(" + FloatToString(layer->x) + "px," + FloatToString(layer->y) + "px)";
+    m = Matrix::Translate(layer->x, layer->y) * m;
   }
-  return {};
+  if (m.isIdentity()) {
+    return {};
+  }
+  // Use translate() shorthand when the result is a pure translation.
+  bool isPureTranslation = FloatNearlyZero(m.a - 1.0f) && FloatNearlyZero(m.b) &&
+                           FloatNearlyZero(m.c) && FloatNearlyZero(m.d - 1.0f);
+  if (isPureTranslation) {
+    return "translate(" + FloatToString(m.tx) + "px," + FloatToString(m.ty) + "px)";
+  }
+  return MatrixToCSS(m);
 }
 
 static Matrix BuildGroupMatrix(const Group* group) {
@@ -1700,8 +1708,7 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha) {
         if (hasNonUniformScale) {
           return {};  // Non-uniform scale cannot be expressed in CSS conic-gradient.
         }
-        matRotation =
-            std::atan2(g->matrix.b, g->matrix.a) * 180.0f / static_cast<float>(M_PI);
+        matRotation = std::atan2(g->matrix.b, g->matrix.a) * 180.0f / static_cast<float>(M_PI);
       }
       Point c = g->matrix.mapPoint(g->center);
       float cssStartAng = g->startAngle + 90.0f + matRotation;
@@ -1800,8 +1807,7 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha) 
     // Extract rotation angle from the matrix and add it to the CSS start angle.
     // Use the original center (not matrix-mapped) since the conic-gradient center
     // is relative to the element's local coordinate space within the SVG pattern.
-    float matRotation =
-        std::atan2(g->matrix.b, g->matrix.a) * 180.0f / static_cast<float>(M_PI);
+    float matRotation = std::atan2(g->matrix.b, g->matrix.a) * 180.0f / static_cast<float>(M_PI);
     Point c = g->center;
     float cssStartAng = g->startAngle + 90.0f + matRotation;
     float sweepRange = g->endAngle - g->startAngle;
@@ -1895,8 +1901,8 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha) 
         bgPos = FloatToString(p->matrix.tx) + "px " + FloatToString(p->matrix.ty) + "px";
       }
     }
-    std::string cssStyle = "width:100%;height:100%;background-image:" + imgUrl +
-                           ";background-repeat:" + bgRepeat;
+    std::string cssStyle =
+        "width:100%;height:100%;background-image:" + imgUrl + ";background-repeat:" + bgRepeat;
     if (!bgSize.empty()) {
       cssStyle += ";background-size:" + bgSize;
     }
@@ -3633,9 +3639,9 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
     } else {
       // Runtime text: split into per-character spans
       float ty = text->position.y - text->fontSize * 0.8f;
-      std::string containerStyle = "position:absolute;white-space:nowrap;left:" +
-                                   FloatToString(text->position.x) + "px;top:" +
-                                   FloatToString(ty) + "px";
+      std::string containerStyle =
+          "position:absolute;white-space:nowrap;left:" + FloatToString(text->position.x) +
+          "px;top:" + FloatToString(ty) + "px";
       // Apply textAnchor
       if (text->textAnchor == TextAnchor::Center) {
         containerStyle += ";transform:translateX(-50%)";
@@ -4051,8 +4057,8 @@ void HTMLWriter::applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim, bool
   }
   builder.addAttr("pathLength", "1");
   // SVG ellipse paths start at 3 o'clock (rightmost point), while PAGX
-  // starts at 12 o'clock (top). Apply -0.25 offset for ellipse geometries.
-  float ellipseAdj = isEllipse ? -0.25f : 0.0f;
+  // starts at 12 o'clock (top). Apply +0.25 offset for ellipse geometries.
+  float ellipseAdj = isEllipse ? 0.25f : 0.0f;
   float offsetFrac = trim->offset / 360.0f + ellipseAdj;
   float s = std::fmod(trim->start + offsetFrac, 1.0f);
   float e = std::fmod(trim->end + offsetFrac, 1.0f);
