@@ -3531,7 +3531,32 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
 void HTMLWriter::writeGlyphRunSVG(HTMLBuilder& out, const Text* text, const Fill* fill,
                                   const Stroke* stroke, float alpha) {
   auto paths = ComputeGlyphPaths(*text, text->position.x, text->position.y);
-  if (paths.empty()) {
+  // Check for bitmap glyphs that ComputeGlyphPaths skips
+  bool hasBitmapGlyphs = false;
+  for (auto* run : text->glyphRuns) {
+    if (!run->font) {
+      continue;
+    }
+    for (size_t i = 0; i < run->glyphs.size(); i++) {
+      uint16_t glyphID = run->glyphs[i];
+      if (glyphID == 0) {
+        continue;
+      }
+      auto glyphIndex = static_cast<size_t>(glyphID) - 1;
+      if (glyphIndex >= run->font->glyphs.size()) {
+        continue;
+      }
+      auto* glyph = run->font->glyphs[glyphIndex];
+      if (glyph && glyph->image) {
+        hasBitmapGlyphs = true;
+        break;
+      }
+    }
+    if (hasBitmapGlyphs) {
+      break;
+    }
+  }
+  if (paths.empty() && !hasBitmapGlyphs) {
     return;
   }
   std::string svgStyle = "position:absolute;left:0;top:0;overflow:visible";
@@ -3542,17 +3567,74 @@ void HTMLWriter::writeGlyphRunSVG(HTMLBuilder& out, const Text* text, const Fill
   out.addAttr("xmlns", "http://www.w3.org/2000/svg");
   out.addAttr("style", svgStyle);
   out.closeTagStart();
-  out.openTag("g");
-  applySVGFill(out, fill);
-  applySVGStroke(out, stroke);
-  out.closeTagStart();
-  for (auto& gp : paths) {
-    out.openTag("path");
-    out.addAttr("transform", MatrixToCSS(gp.transform));
-    out.addAttr("d", PathDataToSVGString(*gp.pathData));
-    out.closeTagSelfClosing();
+  if (!paths.empty()) {
+    out.openTag("g");
+    applySVGFill(out, fill);
+    applySVGStroke(out, stroke);
+    out.closeTagStart();
+    for (auto& gp : paths) {
+      out.openTag("path");
+      out.addAttr("transform", MatrixToCSS(gp.transform));
+      out.addAttr("d", PathDataToSVGString(*gp.pathData));
+      out.closeTagSelfClosing();
+    }
+    out.closeTag();  // </g>
   }
-  out.closeTag();  // </g>
+  // Render bitmap glyphs as <image> elements
+  if (hasBitmapGlyphs) {
+    float textPosX = text->position.x;
+    float textPosY = text->position.y;
+    for (auto* run : text->glyphRuns) {
+      if (!run->font) {
+        continue;
+      }
+      float scale = run->fontSize / static_cast<float>(run->font->unitsPerEm);
+      float currentX = textPosX + run->x;
+      for (size_t i = 0; i < run->glyphs.size(); i++) {
+        uint16_t glyphID = run->glyphs[i];
+        if (glyphID == 0) {
+          continue;
+        }
+        auto glyphIndex = static_cast<size_t>(glyphID) - 1;
+        if (glyphIndex >= run->font->glyphs.size()) {
+          continue;
+        }
+        auto* glyph = run->font->glyphs[glyphIndex];
+        if (!glyph) {
+          continue;
+        }
+        float posX = 0;
+        float posY = 0;
+        if (i < run->positions.size()) {
+          posX = textPosX + run->x + run->positions[i].x;
+          posY = textPosY + run->y + run->positions[i].y;
+          if (i < run->xOffsets.size()) {
+            posX += run->xOffsets[i];
+          }
+        } else if (i < run->xOffsets.size()) {
+          posX = textPosX + run->x + run->xOffsets[i];
+          posY = textPosY + run->y;
+        } else {
+          posX = currentX;
+          posY = textPosY + run->y;
+        }
+        currentX += glyph->advance * scale;
+        if (!glyph->image) {
+          continue;
+        }
+        // Bitmap glyph: render as <image> with transform
+        float ox = glyph->offset.x;
+        float oy = glyph->offset.y;
+        Matrix glyphMatrix =
+            Matrix::Translate(posX + ox * scale, posY + oy * scale) * Matrix::Scale(scale, scale);
+        std::string src = GetImageSrc(glyph->image);
+        out.openTag("image");
+        out.addAttr("href", src);
+        out.addAttr("transform", MatrixToCSS(glyphMatrix));
+        out.closeTagSelfClosing();
+      }
+    }
+  }
   out.closeTag();  // </svg>
 }
 
