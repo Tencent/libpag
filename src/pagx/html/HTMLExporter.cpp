@@ -734,62 +734,64 @@ static PathData ApplyRoundCorner(const PathData& pathData, float radius) {
       continue;
     }
     size_t n = contour.segments.size();
+
+    // Collect all vertices: startPoint followed by each segment's endPoint.
+    std::vector<Point> vertices = {};
+    vertices.reserve(n + 1);
+    vertices.push_back(contour.startPoint);
+    for (size_t i = 0; i < n; i++) {
+      vertices.push_back(contour.segments[i].endPoint);
+    }
+    size_t vertexCount = vertices.size();  // n+1
+
+    // For closed contours, process all vertices (including the closing junction).
+    // For open contours, skip the last vertex (no outgoing edge to round).
+    size_t loopCount = contour.closed ? vertexCount : n;
     bool firstOutput = true;
 
-    for (size_t i = 0; i < n; i++) {
-      auto& seg = contour.segments[i];
-      // Get the start point of this segment
-      Point segStart = (i == 0) ? contour.startPoint : contour.segments[i - 1].endPoint;
+    for (size_t vi = 0; vi < loopCount; vi++) {
+      Point vertex = vertices[vi];
 
-      // Only round a junction if both the incoming and outgoing segments are lines
-      bool incomingIsLine = (i == 0) ? true : (contour.segments[i - 1].verb == PathVerb::Line);
-      bool outgoingIsLine = (seg.verb == PathVerb::Line);
+      // Determine incoming/outgoing verb. The closing edge is always a line.
+      bool incomingIsLine = (vi == 0) ? true : (contour.segments[vi - 1].verb == PathVerb::Line);
+      bool outgoingIsLine = (vi < n) ? (contour.segments[vi].verb == PathVerb::Line) : true;
 
-      if (!incomingIsLine || !outgoingIsLine) {
-        // Not a line-to-line junction: output the segment as-is
-        if (firstOutput) {
-          result.moveTo(segStart.x, segStart.y);
-          firstOutput = false;
-        }
-        if (seg.verb == PathVerb::Line) {
-          result.lineTo(seg.endPoint.x, seg.endPoint.y);
-        } else if (seg.verb == PathVerb::Quad) {
-          result.quadTo(seg.ctrl1.x, seg.ctrl1.y, seg.endPoint.x, seg.endPoint.y);
-        } else if (seg.verb == PathVerb::Cubic) {
-          result.cubicTo(seg.ctrl1.x, seg.ctrl1.y, seg.ctrl2.x, seg.ctrl2.y, seg.endPoint.x,
-                         seg.endPoint.y);
-        }
-        continue;
-      }
+      bool hasPrev = (vi > 0) || contour.closed;
 
-      // Both incoming and outgoing are lines: check if we can round the start vertex
-      // The "start vertex" of this segment is the junction point
-      Point vertex = segStart;
-      // Get previous segment's start point
-      bool hasPrev = (i > 0) || contour.closed;
-      if (!hasPrev) {
-        // First segment, no preceding edge to round
+      if (!hasPrev || !incomingIsLine || !outgoingIsLine) {
         if (firstOutput) {
           result.moveTo(vertex.x, vertex.y);
           firstOutput = false;
         }
-        result.lineTo(seg.endPoint.x, seg.endPoint.y);
+        if (vi < n) {
+          auto& seg = contour.segments[vi];
+          if (seg.verb == PathVerb::Line) {
+            result.lineTo(seg.endPoint.x, seg.endPoint.y);
+          } else if (seg.verb == PathVerb::Quad) {
+            result.quadTo(seg.ctrl1.x, seg.ctrl1.y, seg.endPoint.x, seg.endPoint.y);
+          } else if (seg.verb == PathVerb::Cubic) {
+            result.cubicTo(seg.ctrl1.x, seg.ctrl1.y, seg.ctrl2.x, seg.ctrl2.y, seg.endPoint.x,
+                           seg.endPoint.y);
+          }
+        }
         continue;
       }
 
-      Point prevStart = {};
-      if (i > 0) {
-        prevStart = (i >= 2) ? contour.segments[i - 2].endPoint : contour.startPoint;
+      // Resolve the previous and next vertices for the two edges meeting at this vertex.
+      Point prevVertex = {};
+      if (vi == 0) {
+        prevVertex = contour.segments[n - 1].endPoint;
+      } else if (vi == 1) {
+        prevVertex = contour.startPoint;
       } else {
-        // i==0 and closed: the edge arriving at startPoint comes from the last segment's endpoint
-        prevStart = contour.segments[n - 1].endPoint;
+        prevVertex = contour.segments[vi - 2].endPoint;
       }
+      Point nextVertex = (vi < n) ? contour.segments[vi].endPoint : contour.startPoint;
 
-      // Compute edge vectors
-      float dx1 = vertex.x - prevStart.x;
-      float dy1 = vertex.y - prevStart.y;
-      float dx2 = seg.endPoint.x - vertex.x;
-      float dy2 = seg.endPoint.y - vertex.y;
+      float dx1 = vertex.x - prevVertex.x;
+      float dy1 = vertex.y - prevVertex.y;
+      float dx2 = nextVertex.x - vertex.x;
+      float dy2 = nextVertex.y - vertex.y;
       float len1 = std::sqrt(dx1 * dx1 + dy1 * dy1);
       float len2 = std::sqrt(dx2 * dx2 + dy2 * dy2);
 
@@ -798,7 +800,9 @@ static PathData ApplyRoundCorner(const PathData& pathData, float radius) {
           result.moveTo(vertex.x, vertex.y);
           firstOutput = false;
         }
-        result.lineTo(seg.endPoint.x, seg.endPoint.y);
+        if (vi < n) {
+          result.lineTo(contour.segments[vi].endPoint.x, contour.segments[vi].endPoint.y);
+        }
         continue;
       }
 
@@ -819,10 +823,8 @@ static PathData ApplyRoundCorner(const PathData& pathData, float radius) {
         result.lineTo(p1.x, p1.y);
       }
       result.cubicTo(cp1.x, cp1.y, cp2.x, cp2.y, p2.x, p2.y);
-      // The line from p2 to seg.endPoint will be handled by the next iteration's lineTo
-      // or we output it now if this is the last segment
-      if (i == n - 1 && !contour.closed) {
-        result.lineTo(seg.endPoint.x, seg.endPoint.y);
+      if (vi == n - 1 && !contour.closed) {
+        result.lineTo(contour.segments[vi].endPoint.x, contour.segments[vi].endPoint.y);
       }
     }
     if (contour.closed) {
