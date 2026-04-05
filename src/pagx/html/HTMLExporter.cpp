@@ -4561,6 +4561,11 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           out.openTag("div");
           out.addAttr("style", style);
           out.closeTagStart();
+          bool needsInnerWrap = tb->paragraphAlign != ParagraphAlign::Near;
+          if (needsInnerWrap) {
+            out.openTag("div");
+            out.closeTagStart();
+          }
           for (auto& span : richTextSpans) {
             std::string spanStyle = "white-space:pre";
             if (!span.text->fontFamily.empty()) {
@@ -4593,6 +4598,9 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             out.openTag("span");
             out.addAttr("style", spanStyle);
             out.closeTagWithText(span.text->text);
+          }
+          if (needsInnerWrap) {
+            out.closeTag();
           }
           out.closeTag();
         }

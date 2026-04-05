@@ -349,6 +349,12 @@ CLI_TEST(PAGXHtmlTest, TextModifier) {
 CLI_TEST(PAGXHtmlTest, TextPath) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/text_path.pagx"));
   ASSERT_FALSE(html.empty());
+  // Verify circular path text renders (text_path_advanced has reversed circular path)
+  auto htmlAdv =
+      LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/text_path_advanced.pagx"));
+  ASSERT_FALSE(htmlAdv.empty());
+  // Circular badge text uses red color — at least one red character should be present
+  EXPECT_NE(htmlAdv.find("#EF4444"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, TextGlyphRun) {
