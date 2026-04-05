@@ -481,105 +481,123 @@ static Matrix BuildGroupMatrix(const Group* group) {
   return m;
 }
 
+// Emit a cubic Bezier segment with control points perpendicular to the radial direction,
+// matching the native renderer's AddCurveToPath algorithm.
+static void AppendPolystarCurve(std::string& d, float centerX, float centerY, float angleDelta,
+                                float dx1, float dy1, float roundness1, float dx2, float dy2,
+                                float roundness2) {
+  float cp1x = dx1 - dy1 * roundness1 * angleDelta + centerX;
+  float cp1y = dy1 + dx1 * roundness1 * angleDelta + centerY;
+  float cp2x = dx2 + dy2 * roundness2 * angleDelta + centerX;
+  float cp2y = dy2 - dx2 * roundness2 * angleDelta + centerY;
+  d += "C" + FloatToString(cp1x) + "," + FloatToString(cp1y) + " " + FloatToString(cp2x) + "," +
+       FloatToString(cp2y) + " " + FloatToString(dx2 + centerX) + "," +
+       FloatToString(dy2 + centerY);
+}
+
 static std::string BuildPolystarPath(const Polystar* ps) {
   if (ps->pointCount <= 0.0f) {
     return {};
   }
+  float centerX = ps->position.x;
+  float centerY = ps->position.y;
   bool isStar = ps->type == PolystarType::Star;
-  int numPts = static_cast<int>(std::ceil(ps->pointCount));
-  int total = isStar ? numPts * 2 : numPts;
-  float fractional = ps->pointCount - std::floor(ps->pointCount);
-  bool hasRoundness = ps->outerRoundness > 0.0f || (isStar && ps->innerRoundness > 0.0f);
 
-  // Generate vertices
-  struct Vertex {
-    float x = 0;
-    float y = 0;
-    float angle = 0;
-    float radius = 0;
-    float roundness = 0;
-  };
-  std::vector<Vertex> vertices = {};
-  vertices.reserve(static_cast<size_t>(total));
-  for (int i = 0; i < total; i++) {
-    Vertex v = {};
-    if (isStar) {
-      bool outer = (i % 2 == 0);
-      int pi = i / 2;
-      float frac = static_cast<float>(pi) / ps->pointCount;
-      float half = 0.5f / ps->pointCount;
-      v.angle = ps->rotation + (outer ? frac : frac + half) * 360.0f;
-      v.radius = outer ? ps->outerRadius : ps->innerRadius;
-      v.roundness = outer ? ps->outerRoundness : ps->innerRoundness;
-      // Scale last outer vertex radius by fractional part
-      if (fractional > 0.0f && pi == numPts - 1 && outer) {
-        v.radius *= fractional;
-      }
-    } else {
-      v.angle = ps->rotation + static_cast<float>(i) / ps->pointCount * 360.0f;
-      v.radius = ps->outerRadius;
-      v.roundness = ps->outerRoundness;
-      // Scale last vertex radius by fractional part
-      if (fractional > 0.0f && i == numPts - 1) {
-        v.radius *= fractional;
-      }
+  if (isStar) {
+    float direction = ps->reversed ? -1.0f : 1.0f;
+    float angleStep = static_cast<float>(M_PI) / ps->pointCount;
+    float currentAngle = (ps->rotation - 90.0f) * static_cast<float>(M_PI) / 180.0f;
+    int numPoints = static_cast<int>(std::ceil(ps->pointCount)) * 2;
+    float decimalPart = ps->pointCount - std::floor(ps->pointCount);
+    int decimalIndex = -2;
+    if (decimalPart != 0.0f) {
+      decimalIndex = direction > 0 ? 1 : numPoints - 3;
+      currentAngle -= angleStep * decimalPart * 2.0f;
     }
-    float rad = DegreesToRadians(v.angle);
-    v.x = ps->position.x + v.radius * std::cos(rad);
-    v.y = ps->position.y + v.radius * std::sin(rad);
-    vertices.push_back(v);
+
+    float firstDx = ps->outerRadius * std::cos(currentAngle);
+    float firstDy = ps->outerRadius * std::sin(currentAngle);
+    float lastDx = firstDx;
+    float lastDy = firstDy;
+
+    std::string d;
+    d.reserve(static_cast<size_t>(numPoints) * 50);
+    d += "M" + FloatToString(lastDx + centerX) + "," + FloatToString(lastDy + centerY);
+
+    bool outerFlag = false;
+    for (int i = 0; i < numPoints; i++) {
+      float angleDelta = angleStep * direction;
+      float dx = 0;
+      float dy = 0;
+      if (i == numPoints - 1) {
+        dx = firstDx;
+        dy = firstDy;
+      } else {
+        float radius = outerFlag ? ps->outerRadius : ps->innerRadius;
+        if (i == decimalIndex || i == decimalIndex + 1) {
+          radius = ps->innerRadius + decimalPart * (radius - ps->innerRadius);
+          angleDelta *= decimalPart;
+        }
+        currentAngle += angleDelta;
+        dx = radius * std::cos(currentAngle);
+        dy = radius * std::sin(currentAngle);
+      }
+      if (ps->innerRoundness != 0.0f || ps->outerRoundness != 0.0f) {
+        float lastRoundness = outerFlag ? ps->innerRoundness : ps->outerRoundness;
+        float roundness = outerFlag ? ps->outerRoundness : ps->innerRoundness;
+        AppendPolystarCurve(d, centerX, centerY, angleDelta * 0.5f, lastDx, lastDy, lastRoundness,
+                            dx, dy, roundness);
+        lastDx = dx;
+        lastDy = dy;
+      } else {
+        d += "L" + FloatToString(dx + centerX) + "," + FloatToString(dy + centerY);
+      }
+      outerFlag = !outerFlag;
+    }
+    d += "Z";
+    return d;
   }
 
-  if (ps->reversed) {
-    std::reverse(vertices.begin(), vertices.end());
+  // Polygon
+  int numPoints = static_cast<int>(std::floor(ps->pointCount));
+  if (numPoints < 1) {
+    return {};
   }
+  float direction = ps->reversed ? -1.0f : 1.0f;
+  float angleStep = static_cast<float>(M_PI) * 2.0f / static_cast<float>(numPoints);
+  float currentAngle = (ps->rotation - 90.0f) * static_cast<float>(M_PI) / 180.0f;
+
+  float firstDx = ps->outerRadius * std::cos(currentAngle);
+  float firstDy = ps->outerRadius * std::sin(currentAngle);
+  float lastDx = firstDx;
+  float lastDy = firstDy;
 
   std::string d;
-  d.reserve(static_cast<size_t>(total) * 40);
-  for (int i = 0; i < total; i++) {
-    auto& v = vertices[static_cast<size_t>(i)];
-    if (i == 0) {
-      d += "M" + FloatToString(v.x) + "," + FloatToString(v.y);
-    } else if (hasRoundness) {
-      auto& prev = vertices[static_cast<size_t>(i - 1)];
-      float prevRound = prev.roundness;
-      float curRound = v.roundness;
-      if (prevRound > 0.0f || curRound > 0.0f) {
-        // 0.33 is the approximate Bezier tangent factor used by After Effects for polystar
-        // roundness, matching the native renderer behavior.
-        float dx = v.x - prev.x;
-        float dy = v.y - prev.y;
-        float cp1x = prev.x + dx * prevRound * 0.33f;
-        float cp1y = prev.y + dy * prevRound * 0.33f;
-        float cp2x = v.x - dx * curRound * 0.33f;
-        float cp2y = v.y - dy * curRound * 0.33f;
-        d += "C" + FloatToString(cp1x) + "," + FloatToString(cp1y) + " " + FloatToString(cp2x) +
-             "," + FloatToString(cp2y) + " " + FloatToString(v.x) + "," + FloatToString(v.y);
-      } else {
-        d += "L" + FloatToString(v.x) + "," + FloatToString(v.y);
-      }
+  d.reserve(static_cast<size_t>(numPoints) * 50);
+  d += "M" + FloatToString(lastDx + centerX) + "," + FloatToString(lastDy + centerY);
+
+  for (int i = 0; i < numPoints; i++) {
+    float angleDelta = angleStep * direction;
+    float dx = 0;
+    float dy = 0;
+    if (i == numPoints - 1) {
+      dx = firstDx;
+      dy = firstDy;
     } else {
-      d += "L" + FloatToString(v.x) + "," + FloatToString(v.y);
+      currentAngle += angleDelta;
+      dx = ps->outerRadius * std::cos(currentAngle);
+      dy = ps->outerRadius * std::sin(currentAngle);
+    }
+    if (ps->outerRoundness != 0.0f) {
+      AppendPolystarCurve(d, centerX, centerY, angleDelta * 0.25f, lastDx, lastDy,
+                          ps->outerRoundness, dx, dy, ps->outerRoundness);
+      lastDx = dx;
+      lastDy = dy;
+    } else {
+      d += "L" + FloatToString(dx + centerX) + "," + FloatToString(dy + centerY);
     }
   }
-  // Close path with roundness
-  if (hasRoundness && total > 1) {
-    auto& prev = vertices[static_cast<size_t>(total - 1)];
-    auto& v = vertices[0];
-    float prevRound = prev.roundness;
-    float curRound = v.roundness;
-    if (prevRound > 0.0f || curRound > 0.0f) {
-      float dx = v.x - prev.x;
-      float dy = v.y - prev.y;
-      float cp1x = prev.x + dx * prevRound * 0.33f;
-      float cp1y = prev.y + dy * prevRound * 0.33f;
-      float cp2x = v.x - dx * curRound * 0.33f;
-      float cp2y = v.y - dy * curRound * 0.33f;
-      d += "C" + FloatToString(cp1x) + "," + FloatToString(cp1y) + " " + FloatToString(cp2x) + "," +
-           FloatToString(cp2y) + " " + FloatToString(v.x) + "," + FloatToString(v.y);
-    }
-  }
-  d += 'Z';
+  d += "Z";
   return d;
 }
 
@@ -4653,7 +4671,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             out.closeTagStart();
           }
           for (auto& span : richTextSpans) {
-            std::string spanStyle = "white-space:pre";
+            std::string spanStyle = tb->wordWrap ? "white-space:pre-wrap" : "white-space:pre";
             if (!span.text->fontFamily.empty()) {
               spanStyle += ";font-family:'" + span.text->fontFamily + "'";
             }
