@@ -309,35 +309,41 @@ std::vector<SVGGlyphPath> ComputeGlyphPaths(const Text& text, float textPosX, fl
       }
       currentX += glyph->advance * scale;
 
-      Matrix glyphMatrix = Matrix::Translate(posX, posY) * Matrix::Scale(scale, scale);
-
       bool hasRotation = i < run->rotations.size() && run->rotations[i] != 0;
       bool hasGlyphScale =
           i < run->scales.size() && (run->scales[i].x != 1 || run->scales[i].y != 1);
       bool hasSkew = i < run->skews.size() && run->skews[i] != 0;
 
+      Matrix glyphMatrix = {};
       if (hasRotation || hasGlyphScale || hasSkew) {
-        float anchorX = glyph->advance * 0.5f;
+        // Build the per-glyph transform in screen space to match the renderer, which applies
+        // per-glyph rotation/scale/skew to the already font-scaled glyph. The anchor is computed
+        // in screen coordinates (scaled by fontSize/unitsPerEm).
+        float anchorX = glyph->advance * scale * 0.5f;
         float anchorY = 0;
         if (i < run->anchors.size()) {
           anchorX += run->anchors[i].x;
           anchorY += run->anchors[i].y;
         }
 
-        Matrix perGlyph = Matrix::Translate(-anchorX, -anchorY);
-        if (hasGlyphScale) {
-          perGlyph = Matrix::Scale(run->scales[i].x, run->scales[i].y) * perGlyph;
+        // Screen-space per-glyph matrix: T(-anchor) * S * Skew * R * T(anchor + pos)
+        // This matches the renderer's pre-multiply order.
+        Matrix perGlyph = Matrix::Translate(anchorX + posX, anchorY + posY);
+        if (hasRotation) {
+          perGlyph = Matrix::Rotate(run->rotations[i]) * perGlyph;
         }
         if (hasSkew) {
           Matrix shear = {};
           shear.c = std::tan(pag::DegreesToRadians(run->skews[i]));
           perGlyph = shear * perGlyph;
         }
-        if (hasRotation) {
-          perGlyph = Matrix::Rotate(run->rotations[i]) * perGlyph;
+        if (hasGlyphScale) {
+          perGlyph = Matrix::Scale(run->scales[i].x, run->scales[i].y) * perGlyph;
         }
-        perGlyph = Matrix::Translate(anchorX, anchorY) * perGlyph;
-        glyphMatrix = glyphMatrix * perGlyph;
+        perGlyph = Matrix::Translate(-anchorX, -anchorY) * perGlyph;
+        glyphMatrix = perGlyph * Matrix::Scale(scale, scale);
+      } else {
+        glyphMatrix = Matrix::Translate(posX, posY) * Matrix::Scale(scale, scale);
       }
 
       result.push_back({glyphMatrix, glyph->path});
