@@ -3916,6 +3916,28 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
             charStyle += ";color:" + ColorToRGBA(sc->color, fill->alpha);
           }
         }
+        // Stroke
+        if (stroke) {
+          Color strokeColor = {};
+          float strokeWidth = stroke->width;
+          bool hasStroke = false;
+          if (modifier->strokeColor.has_value() && absF > 0.0f) {
+            strokeColor = modifier->strokeColor.value();
+            strokeColor.alpha *= absF;
+            hasStroke = true;
+          } else if (stroke->color && stroke->color->nodeType() == NodeType::SolidColor) {
+            strokeColor = static_cast<const SolidColor*>(stroke->color)->color;
+            hasStroke = true;
+          }
+          if (modifier->strokeWidth.has_value() && absF > 0.0f) {
+            strokeWidth = stroke->width + (modifier->strokeWidth.value() - stroke->width) * absF;
+          }
+          if (hasStroke && strokeWidth > 0 && strokeColor.alpha > 0) {
+            charStyle += ";-webkit-text-stroke:" + FloatToString(strokeWidth) + "px " +
+                         ColorToRGBA(strokeColor, stroke->alpha);
+            charStyle += ";paint-order:stroke fill";
+          }
+        }
         out.openTag("span");
         out.addAttr("style", charStyle);
         out.closeTagWithText(charStr);
@@ -4410,12 +4432,49 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
   // Pre-scan: check if a Repeater exists among the elements.
   // When a Repeater is present, Fill/Stroke before it should not render independently.
   bool hasUpcomingRepeater = false;
+  // Pre-scan for TextBox and rich-text Groups (Groups containing Text + Fill/Stroke).
+  // When a TextBox coexists with such Groups, render them as a single rich text container.
+  const TextBox* preScannedTextBox = nullptr;
+  struct RichTextSpan {
+    const Text* text = nullptr;
+    const Fill* fill = nullptr;
+    const Stroke* stroke = nullptr;
+  };
+  std::vector<RichTextSpan> richTextSpans = {};
+  int richTextGroupCount = 0;
   for (auto* e : elements) {
     if (e->nodeType() == NodeType::Repeater) {
       hasUpcomingRepeater = true;
-      break;
+    } else if (e->nodeType() == NodeType::TextBox) {
+      preScannedTextBox = static_cast<const TextBox*>(e);
+    } else if (e->nodeType() == NodeType::Group && preScannedTextBox == nullptr) {
+      // Count Groups that look like rich text spans (Text + Fill/Stroke, no geometry)
+      auto grp = static_cast<const Group*>(e);
+      const Text* spanText = nullptr;
+      const Fill* spanFill = nullptr;
+      const Stroke* spanStroke = nullptr;
+      bool isTextSpan = true;
+      for (auto* ge : grp->elements) {
+        auto gt = ge->nodeType();
+        if (gt == NodeType::Text) {
+          spanText = static_cast<const Text*>(ge);
+        } else if (gt == NodeType::Fill) {
+          spanFill = static_cast<const Fill*>(ge);
+        } else if (gt == NodeType::Stroke) {
+          spanStroke = static_cast<const Stroke*>(ge);
+        } else {
+          isTextSpan = false;
+          break;
+        }
+      }
+      if (isTextSpan && spanText && (spanFill || spanStroke)) {
+        richTextGroupCount++;
+        richTextSpans.push_back({spanText, spanFill, spanStroke});
+      }
     }
   }
+  // Only use rich text rendering when TextBox exists with multiple text-span Groups
+  bool useRichText = preScannedTextBox != nullptr && richTextGroupCount >= 2;
 
   for (auto* element : elements) {
     auto type = element->nodeType();
@@ -4463,9 +4522,80 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         }
         break;
       }
-      case NodeType::TextBox:
+      case NodeType::TextBox: {
         curTextBox = static_cast<const TextBox*>(element);
+        if (useRichText && !richTextSpans.empty()) {
+          auto tb = curTextBox;
+          // Render all rich text spans inside a single TextBox container.
+          std::string style = "position:absolute;left:" + FloatToString(tb->position.x) +
+                              "px;top:" + FloatToString(tb->position.y) + "px";
+          if (tb->size.width > 0) {
+            style += ";width:" + FloatToString(tb->size.width) + "px";
+          }
+          if (tb->size.height > 0) {
+            style += ";height:" + FloatToString(tb->size.height) + "px";
+          }
+          if (tb->paragraphAlign != ParagraphAlign::Near) {
+            style += ";display:flex;flex-direction:column";
+            if (tb->paragraphAlign == ParagraphAlign::Middle) {
+              style += ";justify-content:center";
+            } else if (tb->paragraphAlign == ParagraphAlign::Far) {
+              style += ";justify-content:flex-end";
+            }
+          }
+          if (tb->textAlign == TextAlign::Center) {
+            style += ";text-align:center";
+          } else if (tb->textAlign == TextAlign::End) {
+            style += ";text-align:end";
+          } else if (tb->textAlign == TextAlign::Justify) {
+            style += ";text-align:justify";
+          }
+          if (tb->wordWrap) {
+            style += ";word-wrap:break-word";
+          }
+          if (tb->overflow == Overflow::Hidden) {
+            style += ";overflow:hidden";
+          }
+          out.openTag("div");
+          out.addAttr("style", style);
+          out.closeTagStart();
+          for (auto& span : richTextSpans) {
+            std::string spanStyle = "white-space:pre";
+            if (!span.text->fontFamily.empty()) {
+              spanStyle += ";font-family:'" + span.text->fontFamily + "'";
+            }
+            spanStyle += ";font-size:" + FloatToString(span.text->fontSize) + "px";
+            if (!span.text->fontStyle.empty()) {
+              if (span.text->fontStyle.find("Bold") != std::string::npos) {
+                spanStyle += ";font-weight:bold";
+              }
+              if (span.text->fontStyle.find("Italic") != std::string::npos) {
+                spanStyle += ";font-style:italic";
+              }
+            }
+            if (span.text->letterSpacing != 0.0f) {
+              spanStyle += ";letter-spacing:" + FloatToString(span.text->letterSpacing) + "px";
+            }
+            if (span.fill && span.fill->color &&
+                span.fill->color->nodeType() == NodeType::SolidColor) {
+              auto sc = static_cast<const SolidColor*>(span.fill->color);
+              spanStyle += ";color:" + ColorToRGBA(sc->color, span.fill->alpha);
+            }
+            if (span.stroke && span.stroke->color &&
+                span.stroke->color->nodeType() == NodeType::SolidColor) {
+              auto sc = static_cast<const SolidColor*>(span.stroke->color);
+              spanStyle += ";-webkit-text-stroke:" + FloatToString(span.stroke->width) + "px " +
+                           ColorToRGBA(sc->color, span.stroke->alpha);
+              spanStyle += ";paint-order:stroke fill";
+            }
+            out.openTag("span");
+            out.addAttr("style", spanStyle);
+            out.closeTagWithText(span.text->text);
+          }
+          out.closeTag();
+        }
         break;
+      }
       case NodeType::TrimPath:
         hasTrim = true;
         curTrim = static_cast<const TrimPath*>(element);
@@ -4503,6 +4633,27 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         break;
       case NodeType::Group: {
         auto group = static_cast<const Group*>(element);
+        // When useRichText is active, skip Groups that are part of the rich text spans.
+        // They will be rendered collectively when the TextBox element is encountered.
+        if (useRichText) {
+          bool isRichSpan = false;
+          for (auto& span : richTextSpans) {
+            if (span.text != nullptr) {
+              for (auto* ge : group->elements) {
+                if (ge == span.text) {
+                  isRichSpan = true;
+                  break;
+                }
+              }
+            }
+            if (isRichSpan) {
+              break;
+            }
+          }
+          if (isRichSpan) {
+            break;
+          }
+        }
         // Check if the Group has its own Fill/Stroke (scope-isolated).
         // If not, propagate its geometry to the parent geos vector.
         bool hasPainter = false;
