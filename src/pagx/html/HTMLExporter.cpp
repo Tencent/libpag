@@ -3959,7 +3959,13 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
   }
   // Build arc-length LUT
   PathData pathData = *textPath->path;
-  if (textPath->reversed) {
+  bool isClosed = false;
+  pathData.forEach([&](PathVerb verb, const Point*) {
+    if (verb == PathVerb::Close) {
+      isClosed = true;
+    }
+  });
+  if (textPath->reversed && !isClosed) {
     pathData = ReversePathData(pathData);
   }
   ArcLengthLUT lut = BuildArcLengthLUT(pathData);
@@ -3976,6 +3982,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
       continue;
     }
     auto text = static_cast<const Text*>(g.element);
+    bool reversedClosed = textPath->reversed && isClosed;
     if (!text->glyphRuns.empty()) {
       // GlyphRun: position each glyph along the path
       std::string svgStyle = "position:absolute;left:0;top:0;overflow:visible";
@@ -4013,6 +4020,10 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
       float spacingScale =
           textPath->forceAlignment && totalAdvance > 0 ? effectiveLength / totalAdvance : 1.0f;
       float currentArcPos = textPath->firstMargin;
+      // For reversed closed paths, start from the far end of the path.
+      if (reversedClosed) {
+        currentArcPos = lut.totalLength - textPath->lastMargin;
+      }
       for (auto* run : text->glyphRuns) {
         if (!run->font) {
           continue;
@@ -4031,7 +4042,8 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
           }
           float glyphAdvance = glyph->advance * scale * spacingScale;
           // Position at center of glyph
-          float glyphCenterArc = currentArcPos + glyphAdvance / 2.0f;
+          float glyphCenterArc = reversedClosed ? currentArcPos - glyphAdvance / 2.0f
+                                                : currentArcPos + glyphAdvance / 2.0f;
           Point pos = {};
           float tangent = 0;
           SampleArcLengthLUT(lut, glyphCenterArc, &pos, &tangent);
@@ -4059,7 +4071,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
           out.addAttr("transform", MatrixToCSS(m));
           out.addAttr("d", PathDataToSVGString(*glyph->path));
           out.closeTagSelfClosing();
-          currentArcPos += glyphAdvance;
+          currentArcPos += reversedClosed ? -glyphAdvance : glyphAdvance;
         }
       }
       out.closeTag();  // </g>
@@ -4082,6 +4094,9 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
           textPath->forceAlignment && totalWidth > 0 ? effectiveLength / totalWidth : 1.0f;
       // Render each character
       float currentArcPos = textPath->firstMargin;
+      if (reversedClosed) {
+        currentArcPos = lut.totalLength - textPath->lastMargin;
+      }
       p = text->text.c_str();
       while (*p) {
         int32_t ch = 0;
@@ -4090,7 +4105,8 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
           break;
         }
         float charWidth = EstimateCharAdvance(ch, text->fontSize) * spacingScale;
-        float charCenterArc = currentArcPos + charWidth / 2.0f;
+        float charCenterArc =
+            reversedClosed ? currentArcPos - charWidth / 2.0f : currentArcPos + charWidth / 2.0f;
         Point pos = {};
         float tangent = 0;
         SampleArcLengthLUT(lut, charCenterArc, &pos, &tangent);
@@ -4134,7 +4150,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         out.openTag("span");
         out.addAttr("style", charStyle);
         out.closeTagWithText(charStr);
-        currentArcPos += charWidth;
+        currentArcPos += reversedClosed ? -charWidth : charWidth;
         p += len;
       }
     }
