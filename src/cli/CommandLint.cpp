@@ -1181,7 +1181,7 @@ static void DetectLocalizablePathData(xmlNodePtr root, std::vector<LintDiagnosti
       continue;
     }
     auto boundsOrigin = ComputePathBoundsOrigin(data);
-    if (std::abs(boundsOrigin.first) >= 0.001f || std::abs(boundsOrigin.second) >= 0.001f) {
+    if (std::abs(boundsOrigin.first) >= 0.5f || std::abs(boundsOrigin.second) >= 0.5f) {
       LintDiagnostic diag = {};
       diag.line = static_cast<int>(node->line);
       diag.category = "info";
@@ -1367,7 +1367,25 @@ static void CollectLintHintsFromElements(const std::vector<xmlNodePtr>& elements
   bool hasRepeater = localProduct > ctx.productSoFar;
   bool hasStrokeWithDashes = false;
 
-  for (auto* element : elements) {
+  // Collect the product of Repeaters that appear AFTER each element index. A Repeater only
+  // affects elements that precede it in the same scope. So a Group at index i is affected by
+  // Repeaters at indices > i. We compute a suffix product for each position.
+  std::vector<float> suffixProduct(elements.size() + 1, 1.0f);
+  std::vector<int> suffixRepeaterCount(elements.size() + 1, 0);
+  for (int i = static_cast<int>(elements.size()) - 1; i >= 0; --i) {
+    suffixProduct[i] = suffixProduct[i + 1];
+    suffixRepeaterCount[i] = suffixRepeaterCount[i + 1];
+    if (XmlNodeIs(elements[i], "Repeater")) {
+      float copies = XmlAttrFloat(elements[i], "copies");
+      if (!std::isnan(copies)) {
+        suffixProduct[i] *= copies;
+        suffixRepeaterCount[i]++;
+      }
+    }
+  }
+
+  for (size_t idx = 0; idx < elements.size(); ++idx) {
+    auto* element = elements[idx];
     auto nodeName = XmlNodeName(element);
 
     if (nodeName == "Repeater") {
@@ -1417,7 +1435,7 @@ static void CollectLintHintsFromElements(const std::vector<xmlNodePtr>& elements
           if (pathDataNode != nullptr) {
             auto data = XmlAttr(pathDataNode, "data");
             auto verbs = ParseVerbs(data);
-            if (verbs.size() > 15) {
+            if (verbs.size() > 500) {
               LintDiagnostic diag = {};
               diag.line = static_cast<int>(element->line);
               diag.category = "warning";
@@ -1432,10 +1450,14 @@ static void CollectLintHintsFromElements(const std::vector<xmlNodePtr>& elements
     }
 
     if (nodeName == "Group" || nodeName == "TextBox") {
+      // A Group at position idx is affected by Repeaters that appear AFTER it (suffix product).
+      // Combine with the incoming context product.
+      float groupProduct = ctx.productSoFar * suffixProduct[idx + 1];
+      int groupRepeaterCount = ctx.repeaterCount + suffixRepeaterCount[idx + 1];
       RepeaterContext childCtx = {};
-      childCtx.productSoFar = localProduct;
-      childCtx.repeaterCount = localRepeaterCount;
-      childCtx.hasRepeater = hasRepeater;
+      childCtx.productSoFar = groupProduct;
+      childCtx.repeaterCount = groupRepeaterCount;
+      childCtx.hasRepeater = groupProduct > ctx.productSoFar;
       CollectLintHintsFromElements(XmlChildElements(element), displayName, childCtx, diagnostics);
     }
   }
@@ -1478,7 +1500,7 @@ static void CollectBlurHints(xmlNodePtr layer, const std::string& displayName,
       if (std::isnan(blurY)) {
         blurY = 0;
       }
-      if (blurX > 100.0f || blurY > 100.0f) {
+      if (blurX > 256.0f || blurY > 256.0f) {
         LintDiagnostic diag = {};
         diag.line = static_cast<int>(child->line);
         diag.category = "warning";
@@ -1499,7 +1521,7 @@ static void CollectBlurHints(xmlNodePtr layer, const std::string& displayName,
       if (std::isnan(blurY)) {
         blurY = 0;
       }
-      if (blurX > 100.0f || blurY > 100.0f) {
+      if (blurX > 256.0f || blurY > 256.0f) {
         LintDiagnostic diag = {};
         diag.line = static_cast<int>(child->line);
         diag.category = "warning";
@@ -1520,7 +1542,7 @@ static void CollectBlurHints(xmlNodePtr layer, const std::string& displayName,
       if (std::isnan(blurY)) {
         blurY = 0;
       }
-      if (blurX > 100.0f || blurY > 100.0f) {
+      if (blurX > 256.0f || blurY > 256.0f) {
         LintDiagnostic diag = {};
         diag.line = static_cast<int>(child->line);
         diag.category = "warning";
@@ -1541,7 +1563,7 @@ static void CollectBlurHints(xmlNodePtr layer, const std::string& displayName,
       if (std::isnan(blurY)) {
         blurY = 0;
       }
-      if (blurX > 100.0f || blurY > 100.0f) {
+      if (blurX > 256.0f || blurY > 256.0f) {
         LintDiagnostic diag = {};
         diag.line = static_cast<int>(child->line);
         diag.category = "warning";
@@ -1757,7 +1779,7 @@ static void CollectLintHints(xmlNodePtr layer, xmlNodePtr root, bool isRoot, boo
   CollectBlurHints(layer, displayName, diagnostics);
 
   auto alpha = XmlAttrFloat(layer, "alpha");
-  if (!std::isnan(alpha) && alpha < 0.2f && alpha > 0.0f && HasHighCostChildren(layer)) {
+  if (!std::isnan(alpha) && alpha < 0.05f && alpha > 0.0f && HasHighCostChildren(layer)) {
     LintDiagnostic diag = {};
     diag.line = static_cast<int>(layer->line);
     diag.category = "warning";

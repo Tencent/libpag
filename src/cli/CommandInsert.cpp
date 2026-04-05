@@ -154,8 +154,7 @@ static std::string GenerateLayerContent(PAGXDocument* svgDoc, const std::string&
                              svgLayer->contents.end());
       layer->children.insert(layer->children.end(), svgLayer->children.begin(),
                              svgLayer->children.end());
-      layer->styles.insert(layer->styles.end(), svgLayer->styles.begin(),
-                           svgLayer->styles.end());
+      layer->styles.insert(layer->styles.end(), svgLayer->styles.begin(), svgLayer->styles.end());
       layer->filters.insert(layer->filters.end(), svgLayer->filters.begin(),
                             svgLayer->filters.end());
       first = false;
