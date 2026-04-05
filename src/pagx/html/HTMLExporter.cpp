@@ -81,6 +81,58 @@ namespace pagx {
 using pag::DegreesToRadians;
 using pag::FloatNearlyZero;
 
+// Approximate character advance widths as fractions of fontSize for common proportional fonts
+// (Arial / Helvetica). These values are derived from the actual glyph advance widths in
+// Arial at 2048 unitsPerEm, normalized to the range [0..1] of one em.
+static bool IsCJKCodepoint(int32_t ch) {
+  return (ch >= 0x2E80 && ch <= 0x9FFF) || (ch >= 0xF900 && ch <= 0xFAFF) ||
+         (ch >= 0xFE30 && ch <= 0xFE4F) || (ch >= 0x20000 && ch <= 0x2FA1F) ||
+         (ch >= 0x30000 && ch <= 0x323AF) || (ch >= 0x3000 && ch <= 0x30FF) ||
+         (ch >= 0x3100 && ch <= 0x312F) || (ch >= 0xAC00 && ch <= 0xD7AF);
+}
+
+static float EstimateCharAdvanceHTML(int32_t ch, float fontSize) {
+  if (IsCJKCodepoint(ch)) {
+    return fontSize;
+  }
+  if (ch == ' ') {
+    return fontSize * 0.28f;
+  }
+  if (ch == '\t') {
+    return fontSize * 4.0f;
+  }
+  // Per-character width ratios for ASCII printable range (Arial / Helvetica reference).
+  if (ch >= '!' && ch <= '~') {
+    // clang-format off
+    static const float kWidths[94] = {
+      // !      "      #      $      %      &      '      (      )      *
+      0.28f, 0.36f, 0.56f, 0.56f, 0.89f, 0.67f, 0.19f, 0.33f, 0.33f, 0.39f,
+      // +      ,      -      .      /      0      1      2      3      4
+      0.58f, 0.28f, 0.33f, 0.28f, 0.28f, 0.56f, 0.56f, 0.56f, 0.56f, 0.56f,
+      // 5      6      7      8      9      :      ;      <      =      >
+      0.56f, 0.56f, 0.56f, 0.56f, 0.56f, 0.28f, 0.28f, 0.58f, 0.58f, 0.58f,
+      // ?      @      A      B      C      D      E      F      G      H
+      0.56f, 1.02f, 0.67f, 0.67f, 0.72f, 0.72f, 0.67f, 0.61f, 0.78f, 0.72f,
+      // I      J      K      L      M      N      O      P      Q      R
+      0.28f, 0.50f, 0.67f, 0.56f, 0.83f, 0.72f, 0.78f, 0.67f, 0.78f, 0.72f,
+      // S      T      U      V      W      X      Y      Z      [      backslash
+      0.67f, 0.61f, 0.72f, 0.67f, 0.94f, 0.67f, 0.67f, 0.61f, 0.28f, 0.28f,
+      // ]      ^      _      `      a      b      c      d      e      f
+      0.28f, 0.47f, 0.56f, 0.33f, 0.56f, 0.56f, 0.50f, 0.56f, 0.56f, 0.28f,
+      // g      h      i      j      k      l      m      n      o      p
+      0.56f, 0.56f, 0.22f, 0.22f, 0.50f, 0.22f, 0.83f, 0.56f, 0.56f, 0.56f,
+      // q      r      s      t      u      v      w      x      y      z
+      0.56f, 0.33f, 0.50f, 0.28f, 0.56f, 0.50f, 0.72f, 0.50f, 0.50f, 0.50f,
+      // {      |      }      ~
+      0.33f, 0.26f, 0.33f, 0.58f,
+    };
+    // clang-format on
+    return fontSize * kWidths[ch - '!'];
+  }
+  // Fallback for non-ASCII Latin and other scripts.
+  return fontSize * 0.55f;
+}
+
 //==============================================================================
 // HTMLBuilder
 //==============================================================================
@@ -1325,11 +1377,18 @@ static ArcLengthLUT BuildArcLengthLUT(const PathData& pathData, int samplesPerSe
 
 // Sample position and tangent at a given arc length from LUT
 static void SampleArcLengthLUT(const ArcLengthLUT& lut, float arcLength, Point* outPos,
-                               float* outTangent) {
+                               float* outTangent, bool closed = false) {
   if (lut.arcLengths.empty()) {
     *outPos = {};
     *outTangent = 0;
     return;
+  }
+  if (closed && lut.totalLength > 0) {
+    // Wrap around for closed paths so characters continue along the circle.
+    arcLength = std::fmod(arcLength, lut.totalLength);
+    if (arcLength < 0) {
+      arcLength += lut.totalLength;
+    }
   }
   // Clamp to valid range
   arcLength = std::max(0.0f, std::min(arcLength, lut.totalLength));
@@ -3846,13 +3905,17 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         }
         containerStyle += ";font-family:'" + escapedFamilyM + "'";
       }
-      containerStyle += ";font-size:" + FloatToString(text->fontSize) + "px";
+      containerStyle += ";font-size:0";
+      if (text->letterSpacing != 0.0f) {
+        containerStyle += ";letter-spacing:" + FloatToString(text->letterSpacing) + "px";
+      }
       if (alpha < 1.0f) {
         containerStyle += ";opacity:" + FloatToString(alpha);
       }
       out.openTag("div");
       out.addAttr("style", containerStyle);
       out.closeTagStart();
+      std::string fontSizeStr = FloatToString(text->fontSize) + "px";
       const char* p = text->text.c_str();
       size_t charIdx = 0;
       while (*p) {
@@ -3864,7 +3927,7 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         float f = (charIdx < factors.size()) ? factors[charIdx] : 0.0f;
         float absF = std::abs(f);
         std::string charStr(p, len);
-        std::string charStyle = "display:inline-block";
+        std::string charStyle = "display:inline-block;font-size:" + fontSizeStr;
         // Build transform (CSS reads right-to-left):
         // translate(position*f) translate(anchor*f) rotate(rot*f) skew scale translate(-anchor*f)
         std::string transform;
@@ -4046,7 +4109,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
                                                 : currentArcPos + glyphAdvance / 2.0f;
           Point pos = {};
           float tangent = 0;
-          SampleArcLengthLUT(lut, glyphCenterArc, &pos, &tangent);
+          SampleArcLengthLUT(lut, glyphCenterArc, &pos, &tangent, isClosed);
           // Get original glyph y offset
           float yOffset = 0;
           if (i < run->positions.size()) {
@@ -4087,7 +4150,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         if (len == 0) {
           break;
         }
-        totalWidth += EstimateCharAdvance(ch, text->fontSize);
+        totalWidth += EstimateCharAdvanceHTML(ch, text->fontSize) + text->letterSpacing;
         p += len;
       }
       float spacingScale =
@@ -4104,12 +4167,13 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         if (len == 0) {
           break;
         }
-        float charWidth = EstimateCharAdvance(ch, text->fontSize) * spacingScale;
+        float charWidth =
+            (EstimateCharAdvanceHTML(ch, text->fontSize) + text->letterSpacing) * spacingScale;
         float charCenterArc =
             reversedClosed ? currentArcPos - charWidth / 2.0f : currentArcPos + charWidth / 2.0f;
         Point pos = {};
         float tangent = 0;
-        SampleArcLengthLUT(lut, charCenterArc, &pos, &tangent);
+        SampleArcLengthLUT(lut, charCenterArc, &pos, &tangent, isClosed);
         std::string charStr(p, len);
         // Apply baseline offset along the path normal.
         // Normal text sits above the path; reversed text sits below.
