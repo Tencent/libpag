@@ -6,10 +6,8 @@
        Alphabetic: y is the alphabetic baseline, text straddles the line. -->
   <Layer width="400" height="200">
     <!-- Baseline reference line at y=100 -->
-    <Group>
-      <Path data="M0 100 L400 100"/>
-      <Stroke color="#999999" width="2"/>
-    </Group>
+    <Path data="M0 100 L400 100"/>
+    <Stroke color="#999999" width="2"/>
     <!-- LineBox baseline (default) -->
     <Text text="Hello" fontFamily="NotoSansSC" fontSize="48" position="50,100"/>
     <!-- Alphabetic baseline -->

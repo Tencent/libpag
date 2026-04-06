@@ -1203,18 +1203,6 @@ static std::string SerializeElement(xmlNodePtr node) {
     oss << name << "=" << value << ";";
   }
 
-  // Include text content (e.g. CDATA in <Text>) so nodes with different text are not
-  // considered structurally identical.
-  for (xmlNodePtr child = node->children; child != nullptr; child = child->next) {
-    if (child->type == XML_TEXT_NODE || child->type == XML_CDATA_SECTION_NODE) {
-      auto* content = xmlNodeGetContent(child);
-      if (content != nullptr) {
-        oss << "TEXT=" << reinterpret_cast<const char*>(content) << ";";
-        xmlFree(content);
-      }
-    }
-  }
-
   auto children = XmlChildElements(node);
   for (auto* child : children) {
     oss << SerializeElement(child);
@@ -1240,21 +1228,15 @@ static bool IsExtractableCandidate(xmlNodePtr layer) {
   auto children = XmlChildElements(layer);
   bool hasContents = false;
   bool hasChildLayers = false;
-  int contentCount = 0;
   for (auto* child : children) {
     if (IsContentNode(child)) {
       hasContents = true;
-      contentCount++;
     }
     if (XmlNodeIs(child, "Layer")) {
       hasChildLayers = true;
     }
   }
   if (!hasContents || hasChildLayers) {
-    return false;
-  }
-  // Require at least 3 content nodes — a single shape + painter is too trivial to extract.
-  if (contentCount < 3) {
     return false;
   }
 

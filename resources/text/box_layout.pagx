@@ -49,10 +49,8 @@
     <Rectangle size="230,120"/>
     <Stroke/>
     <TextBox width="230" height="120" textAlign="end">
-      <Group>
-        <Text text="Right" fontFamily="NotoSansSC" fontSize="24"/>
-        <Fill/>
-      </Group>
+      <Text text="Right" fontFamily="NotoSansSC" fontSize="24"/>
+      <Fill/>
       <Group>
         <Text text="Align" fontFamily="NotoSansSC" fontSize="36"/>
         <Fill/>
@@ -99,10 +97,8 @@
     <Rectangle size="200,180"/>
     <Stroke/>
     <TextBox width="200" height="180">
-      <Group>
-        <Text text="Hg&#10;" fontFamily="NotoSansSC" fontSize="40"/>
-        <Fill/>
-      </Group>
+      <Text text="Hg&#10;" fontFamily="NotoSansSC" fontSize="40"/>
+      <Fill/>
       <Group>
         <Text text="Xy" fontFamily="NotoSansSC" fontSize="20"/>
         <Fill/>
@@ -119,10 +115,8 @@
     <Rectangle size="200,180"/>
     <Stroke/>
     <TextBox width="200" height="180" lineHeight="40">
-      <Group>
-        <Text text="Hg&#10;" fontFamily="NotoSansSC" fontSize="40"/>
-        <Fill/>
-      </Group>
+      <Text text="Hg&#10;" fontFamily="NotoSansSC" fontSize="40"/>
+      <Fill/>
       <Group>
         <Text text="Xy" fontFamily="NotoSansSC" fontSize="20"/>
         <Fill/>
@@ -151,10 +145,8 @@
     <Rectangle size="150,180"/>
     <Stroke/>
     <TextBox width="150" height="180" paragraphAlign="far">
-      <Group>
-        <Text text="Large&#10;" fontFamily="NotoSansSC" fontSize="36"/>
-        <Fill/>
-      </Group>
+      <Text text="Large&#10;" fontFamily="NotoSansSC" fontSize="36"/>
+      <Fill/>
       <Group>
         <Text text="Medium&#10;" fontFamily="NotoSansSC" fontSize="24"/>
         <Fill/>
@@ -173,10 +165,8 @@
     <Rectangle size="200,180"/>
     <Stroke/>
     <TextBox width="200" height="180">
-      <Group>
-        <Text text="Hg&#10;" fontFamily="NotoSansSC" fontSize="40"/>
-        <Fill/>
-      </Group>
+      <Text text="Hg&#10;" fontFamily="NotoSansSC" fontSize="40"/>
+      <Fill/>
       <Group>
         <Text text="&#10;AB" fontFamily="NotoSansSC" fontSize="16"/>
         <Fill/>

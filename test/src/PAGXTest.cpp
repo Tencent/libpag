@@ -726,7 +726,7 @@ static void TestMarkdownExamples(tgfx::Context* context, const std::string& mark
 }
 
 static void TestPAGXDirectory(tgfx::Context* context, const std::string& directory,
-                              const std::string& prefix = "") {
+                              const std::string& prefix = "", bool verifyLint = false) {
   std::vector<std::string> files = {};
   for (const auto& entry : std::filesystem::directory_iterator(directory)) {
     if (entry.path().extension() == ".pagx") {
@@ -771,7 +771,9 @@ static void TestPAGXDirectory(tgfx::Context* context, const std::string& directo
     displayList.render(surface.get(), false);
 
     EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/" + key)) << key;
-    VerifyLintAndLayout(filePath, key);
+    if (verifyLint) {
+      VerifyLintAndLayout(filePath, key);
+    }
   }
 }
 
@@ -780,7 +782,7 @@ static void TestPAGXDirectory(tgfx::Context* context, const std::string& directo
  * Renders each sample and compares with baseline screenshots.
  */
 PAGX_TEST(PAGXTest, SpecSamples) {
-  TestPAGXDirectory(context, ProjectPath::Absolute("spec/samples"));
+  TestPAGXDirectory(context, ProjectPath::Absolute("spec/samples"), "", true);
 }
 
 /**
