@@ -121,23 +121,6 @@ static const char* NodeTypeName(NodeType type) {
 // Problem Detection
 // ============================================================================
 
-// Returns true if any child element has non-zero rendered area. Used to suppress
-// zero-size warnings on containers whose measured size is truncated to zero by
-// MeasureChildNodes because all children use negative coordinates.
-static bool HasNonZeroChildContent(const std::vector<Element*>& elements) {
-  for (auto* element : elements) {
-    auto* layoutNode = LayoutNode::AsLayoutNode(element);
-    if (layoutNode == nullptr) {
-      continue;
-    }
-    auto bounds = layoutNode->layoutBounds();
-    if (bounds.width > 0 || bounds.height > 0) {
-      return true;
-    }
-  }
-  return false;
-}
-
 static void DetectZeroSize(CheckNode* node, bool check, const Layer* layer = nullptr,
                            const Layer* parentLayer = nullptr) {
   if (!check) {
@@ -146,35 +129,18 @@ static void DetectZeroSize(CheckNode* node, bool check, const Layer* layer = nul
   if (node->bounds.width != 0 && node->bounds.height != 0) {
     return;
   }
-  // Skip nodes with explicit zero size attributes (intentional, e.g. TextBox anchor mode).
+  // Skip nodes with explicit zero size attributes (intentional, e.g. TextBox anchor mode),
+  // but NOT when the Layer participates in a parent container layout — explicit zero size
+  // in a layout flow is likely a mistake since the element becomes invisible.
   if (layer != nullptr) {
-    bool zeroW = (node->bounds.width == 0 && !std::isnan(layer->width) && layer->width == 0);
-    bool zeroH = (node->bounds.height == 0 && !std::isnan(layer->height) && layer->height == 0);
-    if (zeroW || zeroH) {
-      return;
-    }
-  }
-  // Skip Layer nodes whose zero measured size is caused by contents or children using negative
-  // coordinates. MeasureChildNodes clamps extents at 0, so elements entirely in negative space
-  // produce zero measured size even though they have rendered content.
-  if (layer != nullptr) {
-    bool hasVisibleContent = false;
-    if (!layer->contents.empty()) {
-      hasVisibleContent = HasNonZeroChildContent(layer->contents);
-    }
-    if (!hasVisibleContent) {
-      for (auto* child : layer->children) {
-        if (child != nullptr) {
-          auto childBounds = child->layoutBounds();
-          if (childBounds.width > 0 || childBounds.height > 0) {
-            hasVisibleContent = true;
-            break;
-          }
-        }
+    bool inParentLayout =
+        parentLayer != nullptr && parentLayer->layout != LayoutMode::None && layer->includeInLayout;
+    if (!inParentLayout) {
+      bool zeroW = (node->bounds.width == 0 && !std::isnan(layer->width) && layer->width == 0);
+      bool zeroH = (node->bounds.height == 0 && !std::isnan(layer->height) && layer->height == 0);
+      if (zeroW || zeroH) {
+        return;
       }
-    }
-    if (hasVisibleContent) {
-      return;
     }
   }
   std::ostringstream oss;
@@ -562,24 +528,35 @@ static void BuildElementNodes(const std::vector<Element*>& elements,
     node->id = element->id;
     node->index = i;
     node->bounds = {parentX + bounds.x, parentY + bounds.y, bounds.width, bounds.height};
-    // For Group/TextBox elements, skip zero-size detection in two cases:
-    // 1. Explicit size is set to 0 (intentional, e.g. TextBox anchor mode).
-    // 2. Children have non-zero rendered content but the measured size was truncated to zero
-    //    because all children use negative coordinates (e.g. centered shapes, rotated elements).
-    bool skipZeroSize = false;
+    // Zero-size detection: only for Group/TextBox that act as layout containers (have children
+    // using size-dependent constraints on the zero axis). Leaf elements and pure-rendering Groups
+    // are skipped. Per-axis: width=0 checks right/centerX, height=0 checks bottom/centerY.
     if (element->nodeType() == NodeType::Group || element->nodeType() == NodeType::TextBox) {
       auto* group = static_cast<const Group*>(element);
-      bool zeroW = (node->bounds.width == 0 && !std::isnan(group->width) && group->width == 0);
-      bool zeroH = (node->bounds.height == 0 && !std::isnan(group->height) && group->height == 0);
-      if (!zeroW && !zeroH && (node->bounds.width == 0 || node->bounds.height == 0)) {
-        if (HasNonZeroChildContent(group->elements)) {
-          skipZeroSize = true;
+      bool explicitZeroW =
+          (node->bounds.width == 0 && !std::isnan(group->width) && group->width == 0);
+      bool explicitZeroH =
+          (node->bounds.height == 0 && !std::isnan(group->height) && group->height == 0);
+      if (!explicitZeroW && !explicitZeroH &&
+          (node->bounds.width == 0 || node->bounds.height == 0)) {
+        bool zeroW = node->bounds.width == 0;
+        bool zeroH = node->bounds.height == 0;
+        bool needsCheck = false;
+        for (auto* child : group->elements) {
+          auto* childNode = LayoutNode::AsLayoutNode(child);
+          if (childNode == nullptr) {
+            continue;
+          }
+          if ((zeroW && (!std::isnan(childNode->right) || !std::isnan(childNode->centerX))) ||
+              (zeroH && (!std::isnan(childNode->bottom) || !std::isnan(childNode->centerY)))) {
+            needsCheck = true;
+            break;
+          }
+        }
+        if (needsCheck) {
+          DetectZeroSize(node.get(), check);
         }
       }
-      skipZeroSize = skipZeroSize || zeroW || zeroH;
-    }
-    if (!skipZeroSize) {
-      DetectZeroSize(node.get(), check);
     }
     DetectRedundantConstraints(layoutNode, node.get(), check);
     DetectNegativeConstraintSize(layoutNode, node.get(), containerW, containerH, check);
@@ -666,7 +643,48 @@ static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float pare
   node->attrs.includeInLayout = layer->includeInLayout;
   node->attrs.clipToBounds = layer->clipToBounds;
 
-  DetectZeroSize(node.get(), check, layer, parentLayer);
+  // Zero-size detection: only for Layers where zero size would cause downstream layout failures
+  // or affect sibling positioning. Check per-axis: width=0 only matters if children depend on
+  // the horizontal axis (right/centerX), height=0 only if they depend on vertical (bottom/centerY).
+  if (check && (node->bounds.width == 0 || node->bounds.height == 0)) {
+    bool needsCheck = layer->layout != LayoutMode::None || layer->clipToBounds;
+    // Layer participates in parent container layout — zero size affects sibling positioning.
+    if (!needsCheck && parentLayer != nullptr && parentLayer->layout != LayoutMode::None &&
+        layer->includeInLayout) {
+      needsCheck = true;
+    }
+    if (!needsCheck) {
+      bool zeroW = node->bounds.width == 0;
+      bool zeroH = node->bounds.height == 0;
+      for (auto* child : layer->children) {
+        if (child == nullptr) {
+          continue;
+        }
+        if ((zeroW && (!std::isnan(child->right) || !std::isnan(child->centerX))) ||
+            (zeroH && (!std::isnan(child->bottom) || !std::isnan(child->centerY))) ||
+            child->flex > 0) {
+          needsCheck = true;
+          break;
+        }
+      }
+      if (!needsCheck) {
+        for (auto* element : layer->contents) {
+          auto* layoutNode = LayoutNode::AsLayoutNode(element);
+          if (layoutNode == nullptr) {
+            continue;
+          }
+          if ((zeroW && (!std::isnan(layoutNode->right) || !std::isnan(layoutNode->centerX))) ||
+              (zeroH && (!std::isnan(layoutNode->bottom) || !std::isnan(layoutNode->centerY)))) {
+            needsCheck = true;
+            break;
+          }
+        }
+      }
+    }
+    if (needsCheck) {
+      DetectZeroSize(node.get(), check, layer, parentLayer);
+    }
+  }
   DetectRedundantConstraints(layer, node.get(), check, true);
 
   std::vector<std::shared_ptr<CheckNode>> elementNodes;

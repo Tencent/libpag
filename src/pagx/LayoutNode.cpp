@@ -99,10 +99,10 @@ void LayoutNode::PerformConstraintLayout(const std::vector<LayoutNode*>& nodes, 
     float targetW = NAN;
     float targetH = NAN;
     if (!std::isnan(child->left) && !std::isnan(child->right)) {
-      targetW = std::ceil(containerW - child->left - child->right);
+      targetW = std::max(0.0f, std::ceil(containerW - child->left - child->right));
     }
     if (!std::isnan(child->top) && !std::isnan(child->bottom)) {
-      targetH = std::ceil(containerH - child->top - child->bottom);
+      targetH = std::max(0.0f, std::ceil(containerH - child->top - child->bottom));
     }
     // Phase 2: write self rendering attributes and layoutWidth/layoutHeight.
     child->setLayoutSize(context, targetW, targetH);
