@@ -4365,29 +4365,34 @@ void HTMLWriter::applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim, bool
   }
   builder.addAttr("pathLength", "1");
   // SVG ellipse paths start at 3 o'clock (rightmost point), while PAGX
-  // starts at 12 o'clock (top). Apply +0.25 offset for ellipse geometries.
+  // starts at 12 o'clock (top). The +0.25 ellipse adjustment is applied only
+  // to the SVG dashoffset (rendering origin), not to the trim parameters.
   float ellipseAdj = isEllipse ? 0.25f : 0.0f;
-  float offsetFrac = trim->offset / 360.0f + ellipseAdj;
-  float s = std::fmod(trim->start + offsetFrac, 1.0f);
-  float e = std::fmod(trim->end + offsetFrac, 1.0f);
-  if (s < 0.0f) {
-    s += 1.0f;
-  }
-  if (e < 0.0f) {
-    e += 1.0f;
-  }
-  if (s <= e) {
+  float offsetFrac = trim->offset / 360.0f;
+  float s = trim->start + offsetFrac;
+  float e = trim->end + offsetFrac;
+  // Normalize s into [0, 1) range, shift e by the same amount.
+  float shift = std::floor(s);
+  s -= shift;
+  e -= shift;
+  // Determine wrapping: either e crossed the 1.0 boundary, or start > end (reverse wrap).
+  bool wrapping = (e > 1.0f) || (e < s);
+  if (!wrapping) {
+    // Non-wrapping: visible portion is [s, e]
     float visible = e - s;
     float gap = 1.0f - visible;
     builder.addAttr("stroke-dasharray", FloatToString(visible) + " " + FloatToString(gap));
-    builder.addAttr("stroke-dashoffset", FloatToString(-s));
+    builder.addAttr("stroke-dashoffset", FloatToString(-(s + ellipseAdj)));
   } else {
-    // Wrapping case: visible = [s,1] + [0,e] → two segments
+    // Wrapping: visible = [s, 1] + [0, e'] where e' = e if e<s, or e-1 if e>1
     float seg1 = 1.0f - s;
-    float seg2 = e;
-    float gap = s - e;
+    float seg2 = (e > 1.0f) ? (e - 1.0f) : e;
+    float gap = std::max(0.0f, 1.0f - seg1 - seg2);
     builder.addAttr("stroke-dasharray",
                     FloatToString(seg2) + " " + FloatToString(gap) + " " + FloatToString(seg1));
+    if (!FloatNearlyZero(ellipseAdj)) {
+      builder.addAttr("stroke-dashoffset", FloatToString(-ellipseAdj));
+    }
   }
 }
 
@@ -4446,45 +4451,91 @@ void HTMLWriter::applyTrimAttrsContinuous(HTMLBuilder& builder, const TrimPath* 
   if (totalLength <= 0.0f || geoIndex >= pathLengths.size()) {
     return;
   }
-  // Compute cumulative start position for this geometry
-  float cumStart = 0.0f;
+  // Compute this geometry's range within the total path [shapeStart, shapeEnd].
+  float shapeStart = 0.0f;
   for (size_t i = 0; i < geoIndex; i++) {
-    cumStart += pathLengths[i];
+    shapeStart += pathLengths[i];
   }
-  float thisLength = pathLengths[geoIndex];
-  float cumEnd = cumStart + thisLength;
-  // Normalize to [0, 1]
-  float normStart = cumStart / totalLength;
-  float normEnd = cumEnd / totalLength;
-  // Apply global trim with offset
-  // SVG ellipse paths start at 3 o'clock (rightmost point), while PAGX
-  // starts at 12 o'clock (top). Apply +0.25 offset for ellipse geometries.
-  float ellipseAdj = isEllipse ? 0.25f : 0.0f;
-  float offsetFrac = trim->offset / 360.0f + ellipseAdj;
-  float globalStart = std::fmod(trim->start + offsetFrac, 1.0f);
-  float globalEnd = std::fmod(trim->end + offsetFrac, 1.0f);
-  if (globalStart < 0.0f) {
-    globalStart += 1.0f;
-  }
-  if (globalEnd < 0.0f) {
-    globalEnd += 1.0f;
-  }
-  // Intersect global trim range with this geometry's range
-  float localStart = std::max(globalStart, normStart);
-  float localEnd = std::min(globalEnd, normEnd);
-  if (localStart >= localEnd) {
-    // No visible portion for this geometry
+  float shapeLength = pathLengths[geoIndex];
+  float shapeEnd = shapeStart + shapeLength;
+  if (shapeLength <= 0.0f) {
     builder.addAttr("stroke-dasharray", "0");
     return;
   }
-  // Map back to local [0, 1] range for this geometry
-  float localNormStart = (localStart - normStart) / (normEnd - normStart);
-  float localNormEnd = (localEnd - normStart) / (normEnd - normStart);
+
+  // Global trim range in absolute lengths (no ellipse adjustment here — that is
+  // a per-geometry SVG rendering concern, handled in the final dashoffset below).
+  float offsetFrac = trim->offset / 360.0f;
+  float start = trim->start + offsetFrac;
+  float end = trim->end + offsetFrac;
+  // Normalize start into [0, 1)
+  float shift = std::floor(start);
+  start -= shift;
+  end -= shift;
+  float trimStart = start * totalLength;
+  float trimEnd = end * totalLength;
+
+  // Intersect the global trim range with this geometry's [shapeStart, shapeEnd].
+  // Match tgfx ApplyTrimContinuous: handle wrap-around when trimEnd > totalLength.
+  float localStart = 0.0f;
+  float localEnd = 0.0f;
+  bool hasSegment = false;
+
+  if (trimEnd <= totalLength) {
+    // No wrap-around: single segment [trimStart, trimEnd]
+    if (trimStart < shapeEnd && trimEnd > shapeStart) {
+      localStart = std::max(0.0f, trimStart - shapeStart) / shapeLength;
+      localEnd = std::min(shapeLength, trimEnd - shapeStart) / shapeLength;
+      hasSegment = true;
+    }
+  } else {
+    // Wrap-around: [trimStart, totalLength] + [0, trimEnd - totalLength]
+    float seg1Start = trimStart;
+    float seg1End = totalLength;
+    float seg2Start = 0.0f;
+    float seg2End = trimEnd - totalLength;
+    bool hasSeg1 = seg1Start < shapeEnd && seg1End > shapeStart;
+    bool hasSeg2 = seg2Start < shapeEnd && seg2End > shapeStart;
+    if (hasSeg1 && hasSeg2) {
+      localStart = std::max(0.0f, seg1Start - shapeStart) / shapeLength;
+      localEnd = std::min(shapeLength, seg2End - shapeStart) / shapeLength + 1.0f;
+      hasSegment = true;
+    } else if (hasSeg1) {
+      localStart = std::max(0.0f, seg1Start - shapeStart) / shapeLength;
+      localEnd = std::min(shapeLength, seg1End - shapeStart) / shapeLength;
+      hasSegment = true;
+    } else if (hasSeg2) {
+      localStart = std::max(0.0f, seg2Start - shapeStart) / shapeLength;
+      localEnd = std::min(shapeLength, seg2End - shapeStart) / shapeLength;
+      hasSegment = true;
+    }
+  }
+
+  if (!hasSegment) {
+    builder.addAttr("stroke-dasharray", "0");
+    return;
+  }
+
+  // Convert to SVG stroke-dasharray on the [0, 1] pathLength scale.
   builder.addAttr("pathLength", "1");
-  float visible = localNormEnd - localNormStart;
-  float gap = 1.0f - visible;
-  builder.addAttr("stroke-dasharray", FloatToString(visible) + " " + FloatToString(gap));
-  builder.addAttr("stroke-dashoffset", FloatToString(-localNormStart));
+  // SVG ellipse starts at 3 o'clock; PAGX at 12 o'clock. Adjust the local offset.
+  float ellipseAdj = isEllipse ? 0.25f : 0.0f;
+  if (localEnd <= 1.0f) {
+    float visible = localEnd - localStart;
+    float gap = 1.0f - visible;
+    builder.addAttr("stroke-dasharray", FloatToString(visible) + " " + FloatToString(gap));
+    builder.addAttr("stroke-dashoffset", FloatToString(-(localStart + ellipseAdj)));
+  } else {
+    // Wrap-around within this geometry
+    float seg1 = 1.0f - localStart;
+    float seg2 = localEnd - 1.0f;
+    float gap = 1.0f - seg1 - seg2;
+    builder.addAttr("stroke-dasharray",
+                    FloatToString(seg2) + " " + FloatToString(gap) + " " + FloatToString(seg1));
+    if (!FloatNearlyZero(ellipseAdj)) {
+      builder.addAttr("stroke-dashoffset", FloatToString(-ellipseAdj));
+    }
+  }
 }
 
 void HTMLWriter::paintGeos(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
