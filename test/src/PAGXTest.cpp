@@ -22,6 +22,8 @@
 #include <filesystem>
 #include <fstream>
 #include <unordered_map>
+#include "cli/CommandLayoutCheck.h"
+#include "cli/CommandLint.h"
 #include "pagx/FontConfig.h"
 #include "pagx/LayoutContext.h"
 #include "pagx/PAGXDocument.h"
@@ -76,6 +78,33 @@
 
 namespace pag {
 using namespace tgfx;
+
+static int CallRun(int (*fn)(int, char*[]), std::vector<std::string> args) {
+  std::vector<char*> argv = {};
+  argv.reserve(args.size());
+  for (auto& arg : args) {
+    argv.push_back(arg.data());
+  }
+  return fn(static_cast<int>(argv.size()), argv.data());
+}
+
+static void VerifyLintAndLayout(const std::string& filePath, const std::string& key) {
+  // Capture stderr for lint diagnostics.
+  std::streambuf* oldErr = std::cerr.rdbuf();
+  std::ostringstream lintErr;
+  std::cerr.rdbuf(lintErr.rdbuf());
+  auto lintRet = CallRun(pagx::cli::RunLint, {"lint", filePath});
+  std::cerr.rdbuf(oldErr);
+  EXPECT_EQ(lintRet, 0) << "pagx lint failed for " << key << ":\n" << lintErr.str();
+
+  // Capture stdout for layout output.
+  std::streambuf* oldOut = std::cout.rdbuf();
+  std::ostringstream layoutOut;
+  std::cout.rdbuf(layoutOut.rdbuf());
+  auto layoutRet = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", filePath});
+  std::cout.rdbuf(oldOut);
+  EXPECT_EQ(layoutRet, 0) << "pagx layout failed for " << key << ":\n" << layoutOut.str();
+}
 
 static pagx::Layer* MakeTextLayer(pagx::PAGXDocument* doc, const std::string& content,
                                   float fontSize, pagx::Color color) {
@@ -692,6 +721,7 @@ static void TestMarkdownExamples(tgfx::Context* context, const std::string& mark
     displayList.render(surface.get(), false);
 
     EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/" + key)) << key;
+    VerifyLintAndLayout(pagxPath, key);
   }
 }
 
@@ -741,6 +771,7 @@ static void TestPAGXDirectory(tgfx::Context* context, const std::string& directo
     displayList.render(surface.get(), false);
 
     EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/" + key)) << key;
+    VerifyLintAndLayout(filePath, key);
   }
 }
 

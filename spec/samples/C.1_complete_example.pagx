@@ -80,7 +80,7 @@
     </Group>
   </Layer>
   <Layer name="Modifiers" top="325">
-    <Path left="258" top="-20" data="@wavePath"/>
+    <Path left="258" data="@wavePath"/>
     <TrimPath end="0.75"/>
     <Stroke color="@cyan" width="3" cap="round"/>
     <Group left="368">
@@ -147,7 +147,7 @@
     <Fill color="#64748B"/>
   </Layer>
   <Resources>
-    <PathData id="wavePath" data="M 0 20 Q 30 0 60 20 T 120 20 T 180 20"/>
+    <PathData id="wavePath" data="M 0 0 Q 30 -20 60 0 T 120 0 T 180 0"/>
     <Font id="iconFont">
       <Glyph path="M 0 -8 L 8 8 L -8 8 Z" advance="20"/>
       <Glyph path="M -8 -8 L 8 -8 L 8 8 L -8 8 Z" advance="20"/>

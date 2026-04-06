@@ -430,6 +430,9 @@
       <Stroke color="#10B981" width="3" cap="round"/>
     <Group>
       <Path data="M-3 -25C-22 -38 -28 -22 -14 -19"/>
+      <Fill color="#059669"/>
+    </Group>
+    <Group>
       <Path data="M2 -38C20 -50 25 -34 12 -31"/>
       <Fill color="#059669"/>
     </Group>
@@ -1098,7 +1101,10 @@
 <Ellipse left="-1.5" top="-1.5" size="3,3"/>
     <Fill color="#A78BFA"/>
   </Layer>
-  <Layer left="520" top="490" alpha="0.4" composition="@comp10"/>
+  <Layer left="520" top="490" alpha="0.4">
+<Ellipse left="-1" top="-1" size="2,2"/>
+    <Fill color="#C4B5FD"/>
+  </Layer>
   <Layer left="700" top="500" alpha="0.5">
 <Ellipse left="-1.5" top="-1.5" size="3,3"/>
     <Fill color="#22D3EE"/>
@@ -1107,9 +1113,15 @@
 <Ellipse left="-1" top="-1" size="2,2"/>
     <Fill color="#67E8F9"/>
   </Layer>
-  <Layer left="560" top="520" alpha="0.45" composition="@comp9"/>
+  <Layer left="560" top="520" alpha="0.45">
+<Ellipse left="-1" top="-1" size="2,2"/>
+    <Fill color="#34D399"/>
+  </Layer>
   <Layer left="660" top="530" alpha="0.4" composition="@comp3"/>
-  <Layer left="450" top="510" alpha="0.3" composition="@comp10"/>
+  <Layer left="450" top="510" alpha="0.3">
+<Ellipse left="-1" top="-1" size="2,2"/>
+    <Fill color="#C4B5FD"/>
+  </Layer>
   <Layer left="770" top="520" alpha="0.5">
 <Ellipse left="-1" top="-1" size="2,2"/>
     <Fill color="#22D3EE"/>
@@ -1123,11 +1135,26 @@
     <Fill color="#F97316"/>
   </Layer>
   <Layer left="540" top="455" alpha="0.4" composition="@comp3"/>
-  <Layer left="670" top="445" alpha="0.3" composition="@comp9"/>
-  <Layer left="480" top="435" alpha="0.35" composition="@comp10"/>
-  <Layer left="465" top="548" alpha="0.3" composition="@comp8"/>
-  <Layer left="510" top="550" alpha="0.25" composition="@comp8"/>
-  <Layer left="548" top="546" alpha="0.2" composition="@comp8"/>
+  <Layer left="670" top="445" alpha="0.3">
+<Ellipse left="-1" top="-1" size="2,2"/>
+    <Fill color="#34D399"/>
+  </Layer>
+  <Layer left="480" top="435" alpha="0.35">
+<Ellipse left="-1" top="-1" size="2,2"/>
+    <Fill color="#C4B5FD"/>
+  </Layer>
+  <Layer left="465" top="548" alpha="0.3">
+<Ellipse left="-6" top="-8" size="12,16"/>
+    <Fill color="#1A1040"/>
+  </Layer>
+  <Layer left="510" top="550" alpha="0.25">
+<Ellipse left="-6" top="-8" size="12,16"/>
+    <Fill color="#1A1040"/>
+  </Layer>
+  <Layer left="548" top="546" alpha="0.2">
+<Ellipse left="-6" top="-8" size="12,16"/>
+    <Fill color="#1A1040"/>
+  </Layer>
   <Layer>
       <Path data="M0 800L0 710C50 700 120 690 200 695C300 702 400 685 500 690C600 695 700 682 800 688C900 694 1000 680 1100 685L1200 682L1200 800Z"/>
       <Fill>
@@ -1733,24 +1760,6 @@
       <Layer>
 <Ellipse left="-1" top="-1" size="2,2"/>
         <Fill color="#FFFFFF"/>
-      </Layer>
-    </Composition>
-    <Composition id="comp8" width="12" height="16">
-      <Layer>
-<Ellipse left="-6" top="-8" size="12,16"/>
-        <Fill color="#1A1040"/>
-      </Layer>
-    </Composition>
-    <Composition id="comp9" width="2" height="2">
-      <Layer>
-<Ellipse left="-1" top="-1" size="2,2"/>
-        <Fill color="#34D399"/>
-      </Layer>
-    </Composition>
-    <Composition id="comp10" width="2" height="2">
-      <Layer>
-<Ellipse left="-1" top="-1" size="2,2"/>
-        <Fill color="#C4B5FD"/>
       </Layer>
     </Composition>
   </Resources>
