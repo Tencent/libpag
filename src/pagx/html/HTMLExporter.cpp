@@ -4183,12 +4183,15 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         float tangent = 0;
         SampleArcLengthLUT(lut, charCenterArc, &pos, &tangent, isClosed);
         std::string charStr(p, len);
-        // Apply baseline offset along the path normal.
-        // Normal text sits above the path; reversed text sits below.
-        float baselineShift = text->fontSize * 0.8f;
+        // Offset the glyph along the path normal by the font ascent.
+        // For normal paths, text sits on the left side (above); for reversed paths,
+        // the path direction flips, so we negate the offset to keep text on the same
+        // visual side (outside of closed shapes).
+        float ascent = text->fontSize * 0.8f;
+        float normalSign = textPath->reversed ? 1.0f : -1.0f;
         float normalAngle = tangent + static_cast<float>(M_PI) / 2.0f;
-        float offsetX = -baselineShift * std::cos(normalAngle);
-        float offsetY = -baselineShift * std::sin(normalAngle);
+        float offsetX = normalSign * ascent * std::cos(normalAngle);
+        float offsetY = normalSign * ascent * std::sin(normalAngle);
         std::string charStyle = "position:absolute;left:" + FloatToString(pos.x + offsetX) +
                                 "px;top:" + FloatToString(pos.y + offsetY) + "px";
         charStyle += ";display:inline-block";
