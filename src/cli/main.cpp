@@ -25,9 +25,9 @@
 #include "cli/CommandFormat.h"
 #include "cli/CommandImport.h"
 #include "cli/CommandInsert.h"
-#include "cli/CommandLayoutCheck.h"
-#include "cli/CommandLint.h"
+#include "cli/CommandLayout.h"
 #include "cli/CommandRender.h"
+#include "cli/CommandVerify.h"
 
 #ifndef PAGX_CLI_VERSION
 #define PAGX_CLI_VERSION "0.0.0-dev"
@@ -39,8 +39,8 @@ static void PrintUsage() {
             << "Usage: pagx <command> [options] <file>\n"
             << "\n"
             << "Commands:\n"
-            << "  lint           Check for errors, structural issues, and optimization hints\n"
-            << "  layout         Display layout tree with bounds and detected layout problems\n"
+            << "  verify         Resolve imports, check all issues, render screenshot + layout\n"
+            << "  layout         Display layout tree with bounds\n"
             << "  render         Render PAGX to an image file (supports crop and scale)\n"
             << "  bounds         Query rendered pixel bounds of layers (for crop regions)\n"
             << "  font           Query font metrics or embed fonts into a PAGX file\n"
@@ -74,8 +74,8 @@ int main(int argc, char* argv[]) {
     return 0;
   }
 
-  if (command == "lint") {
-    return pagx::cli::RunLint(argc - 1, argv + 1);
+  if (command == "verify") {
+    return pagx::cli::RunVerify(argc - 1, argv + 1);
   }
   if (command == "layout") {
     return pagx::cli::RunLayout(argc - 1, argv + 1);

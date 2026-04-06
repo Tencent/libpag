@@ -3,7 +3,7 @@ name: pagx
 description: >-
   Generates well-structured PAGX files from visual descriptions and edits existing ones.
   Use when user asks to create, write, design, or modify PAGX content, run pagx CLI
-  commands (render, lint, format, layout, bounds, font info/embed, import/export), or
+  commands (render, verify, format, layout, bounds, font info/embed, import/export), or
   look up PAGX element attributes and syntax.
 ---
 
@@ -29,4 +29,4 @@ generation or editing task.
 | `references/spec-essentials.md` | Node types, Layer rendering pipeline, auto layout (container layout + constraint positioning), painter scope, text system, masking, resources |
 | `references/attributes.md` | Attribute defaults, enumerations, required attributes |
 | `references/examples.md` | Structural code patterns for Icons, UI components, Charts, Decorative effects |
-| `references/cli.md` | CLI commands — `render`, `lint`, `format`, `layout`, `bounds`, `font info`, `font embed`, `import`, `export` |
+| `references/cli.md` | CLI commands — `render`, `verify`, `format`, `layout`, `bounds`, `font info`, `font embed`, `import`, `export` |

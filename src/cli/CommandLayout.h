@@ -20,6 +20,9 @@
 
 namespace pagx::cli {
 
-int RunLint(int argc, char* argv[]);
+/**
+ * Display layout structure of a PAGX file in XML format with bounds for all nodes.
+ */
+int RunLayout(int argc, char* argv[]);
 
 }  // namespace pagx::cli

@@ -20,10 +20,6 @@
 
 namespace pagx::cli {
 
-/**
- * Display layout structure and detect layout problems in PAGX files.
- * Returns non-zero exit code when layout problems are detected.
- */
-int RunLayout(int argc, char* argv[]);
+int RunVerify(int argc, char* argv[]);
 
 }  // namespace pagx::cli

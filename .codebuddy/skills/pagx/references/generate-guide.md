@@ -18,7 +18,7 @@ Read as needed:
 | Reference | Content |
 |-----------|---------|
 | `attributes.md` | Attribute defaults, enumerations, required attributes |
-| `cli.md` | CLI tool usage — all commands (`render`, `lint`, `layout`, `bounds`, etc.) |
+| `cli.md` | CLI tool usage — all commands (`render`, `verify`, `layout`, `bounds`, etc.) |
 
 ---
 
@@ -313,12 +313,16 @@ precedence, `flex` is ignored). Prefer `arrangement` over empty flex spacer Laye
 
 ### Incremental Build Strategy
 
-For designs with multiple sections, **do not write the entire PAGX file in one pass**. Build
-incrementally — confirm each stage is correct before adding the next. Ensure the `pagx` CLI
-is installed before the first invocation (see `cli.md` §Setup).
+For designs with multiple sections, you **MUST** build incrementally. **Do NOT write the
+entire PAGX file in one pass** — compounding layout errors are costly to debug and result in
+extensive rework. Each stage has a **mandatory verification gate**: you MUST NOT proceed to
+the next stage until verification passes.
 
-**Stage 1 — Skeleton**: `<pagx>` root + section Layers with only layout attributes. No
-content. Run verification loop (Step 4) to confirm structure.
+Ensure the `pagx` CLI is installed before the first invocation (see `cli.md` §Setup).
+
+**Stage 1 — Skeleton**: Write the `<pagx>` root and all section Layers with **only layout
+attributes** (`id`, `width`/`height`, `flex`, `layout`, `gap`, `padding`). No content — no
+text, no backgrounds, no icons.
 
 ```xml
 <pagx version="1.0" width="393" height="852">
@@ -333,11 +337,59 @@ content. Run verification loop (Step 4) to confirm structure.
 </pagx>
 ```
 
-**Stage 2 — Per-module content**: One section at a time. Add backgrounds, text, icons.
-Run verification after each module.
+**VERIFICATION GATE 1** — run verification to confirm section proportions.
+Fix all problems. Repeat until clean.
 
-**Stage 3 — Polish**: Run `pagx lint` to catch schema errors, then final layout
-verification + render.
+```bash
+pagx verify --scale 2 input.pagx
+```
+
+Verify: are there any reported problems? Check the screenshot — are section heights
+proportional? Is there unexpected empty space? Does the overall layout match the design
+intent? Do NOT proceed until verification passes.
+
+**Stage 2 — Content**: Fill **one section at a time**. For each section:
+
+1. Add backgrounds, text, shapes, and icons (using `<Import>` for SVG icons — see §Icons).
+2. Run verification:
+   ```bash
+   pagx verify --scale 2 --id "sectionId" input.pagx
+   ```
+3. Fix all reported diagnostics.
+4. Check the screenshot — verify text is visible, colors are correct, alignment matches design
+   intent, no overlapping or missing elements.
+5. If the screenshot shows a visual issue but verify reported no problems, Read the
+   `.layout.xml` file to inspect bounds and diagnose the discrepancy.
+6. After fixing, use `--problems-only` for fast regression checks:
+   ```bash
+   pagx verify --problems-only --id "sectionId" input.pagx
+   ```
+7. Do NOT proceed to the next section until verification passes.
+8. After verification passes, delete the scoped artifacts (e.g., for section id `header`):
+   ```bash
+   rm -f input.header.png input.header.layout.xml
+   ```
+
+**CRITICAL**: Do NOT skip per-section verification. Layout problems compound across
+sections — a misaligned header causes every subsequent section to shift. Catching errors
+early in one section is far cheaper than debugging the entire file at the end.
+
+**Stage 3 — Polish**: After all sections are complete:
+
+1. Delete any remaining scoped verification artifacts:
+   ```bash
+   rm -f input.*.png input.*.layout.xml
+   ```
+2. Run full verification:
+   ```bash
+   pagx verify --scale 2 input.pagx
+   ```
+3. Fix all reported problems.
+4. Check the screenshot (`input.png`) — verify overall visual coherence: section spacing,
+   module-to-module alignment, global color consistency.
+5. Repeat until verification passes.
+6. The final `input.png` is the rendered result — keep it alongside the `.pagx` file for
+   reference but do not include it in commits. Delete `input.layout.xml`.
 
 ---
 
@@ -368,8 +420,7 @@ itself stays at (0,0).
 Another common mistake: centering VectorElements inside a **content-measured** Group or
 Layer (no explicit `width`/`height`). The container sizes itself from the child, so the
 child centers relative to its own size — a no-op. Move the centering constraint to the
-Group or Layer itself. `pagx layout --problems-only` detects this as
-`centerX/centerY ineffective`.
+Group or Layer itself. `pagx verify` detects this as `centerX/centerY ineffective`.
 
 ```xml
 <!-- ✅ Correct: Group isolates scope AND positions content at center -->
@@ -453,48 +504,54 @@ size rather than content-measured:
 
 ### Icons
 
-Write a placeholder Layer in the PAGX, generate the icon as SVG, then use `pagx insert`
-to convert and inject it.
+Use `<Import>` to embed SVG icons directly in PAGX. Write the SVG content inline inside an
+`<Import>` node — no separate files or extra tool calls needed. `<Import>` nodes are
+resolved automatically by `pagx verify`.
 
 Prefer Stroke (outline) by default. Fill for solid icons (active states). Mixed for
 complex icons.
 
-**Step 1: Write a placeholder Layer**
+**Write the icon Layer with inline SVG**
 
 ```xml
-<Layer id="searchIcon"/>
+<Layer id="searchIcon" centerX="0" centerY="0">
+  <Import>
+    <svg viewBox="0 0 24 24">
+      <circle cx="10" cy="10" r="7" fill="none" stroke="#1E293B" stroke-width="2"/>
+      <path d="M15 15L21 21" fill="none" stroke="#1E293B" stroke-width="2"
+            stroke-linecap="round"/>
+    </svg>
+  </Import>
+</Layer>
 ```
 
 If the icon needs a background, put the background in a parent Layer and add
-`centerX="0" centerY="0"` on the placeholder to center the icon within the background:
+`centerX="0" centerY="0"` on the icon Layer to center it within the background:
 
 ```xml
 <Layer width="48" height="48">
   <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
   <Fill color="#EFF6FF"/>
-  <Layer id="searchIcon" centerX="0" centerY="0"/>
+  <Layer id="searchIcon" centerX="0" centerY="0">
+    <Import>
+      <svg viewBox="0 0 24 24">
+        <circle cx="10" cy="10" r="7" fill="none"
+                stroke="#1E293B" stroke-width="2"/>
+        <path d="M15 15L21 21" fill="none" stroke="#1E293B"
+              stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </Import>
+  </Layer>
 </Layer>
 ```
 
-**Step 2: Write the SVG file and insert**
-
-Write the SVG to a temporary file using the target drawing size as the viewBox:
+For external SVG files:
 
 ```xml
-<svg viewBox="0 0 24 24" width="24" height="24">
-  <circle cx="10" cy="10" r="7" fill="none" stroke="#1E293B" stroke-width="2"/>
-  <path d="M15 15L21 21" fill="none" stroke="#1E293B" stroke-width="2" stroke-linecap="round"/>
-</svg>
+<Layer id="logoIcon" centerX="0" centerY="0">
+  <Import source="assets/logo.svg"/>
+</Layer>
 ```
-
-Then run:
-
-```bash
-pagx insert --svg /tmp/pagx_insert.svg --id searchIcon design.pagx
-```
-
-The command replaces the placeholder's contents with the converted PAGX nodes and sets
-its width/height from the SVG dimensions. All other attributes on the Layer are preserved.
 
 ### Text Positioning
 
@@ -541,66 +598,12 @@ These constraints differ from CSS/SVG:
 
 ## Step 4: Verify and Refine
 
-After building each stage (skeleton, each module, final), **always** run the verification
-loop. **You MUST fix all detected problems before proceeding to the next task.**
+The verification loop is embedded in each stage (see §Incremental Build Strategy). This
+section covers diagnostic techniques for issues that `pagx verify` cannot detect automatically.
 
-### Verification Loop
+### Visual symptom troubleshooting
 
-**CRITICAL**: Do NOT continue to the next task until `pagx layout --problems-only` exits
-with code 0 **and** the `pagx render` output matches the design intent.
-
-If problems are detected, fix them immediately and re-run verification. Repeat until clean:
-
-#### 1. Detect layout problems
-
-```bash
-pagx layout --problems-only input.pagx
-```
-
-Detects layout problems across multiple categories (see `cli.md` §pagx layout for the full
-list). Key categories for generation:
-- **Overlapping siblings** — sibling Layers whose bounds intersect inside an auto-layout parent
-- **Clipped content** — elements outside parent bounds when `clipToBounds` is set
-- **Zero-size** — elements with zero width or height, with cause analysis when applicable
-- **Flex in content-measured parent** — `flex` child where parent has no main-axis size to distribute
-- **Content origin offset** — unconstrained children not starting at (0, 0) in a content-measured container
-- **Constraints ignored by layout** — constraint attributes silently ignored in container layout flow
-- **Container overflow** — fixed-size children + gap exceed parent's main-axis available space
-- **Negative constraint-derived size** — `left`+`right` or `top`+`bottom` exceeds parent dimension
-- **Element constraint conflict** — `centerX` overrides `left`/`right` on VectorElements (same as Layer rules)
-- **Ineffective centering** — `centerX`/`centerY` on VectorElement inside a content-measured Group or Layer (no explicit size); centering relative to own size is a no-op
-
-Exit code 1 = problems found. Exit code 0 = no problems. Scope with `--id` or `--xpath`
-during incremental build:
-
-```bash
-pagx layout --problems-only --id "header" input.pagx
-```
-
-#### 2. Fix problems
-
-Problem messages are self-explanatory; some include an inline `Fix:` hint.
-Fix all reported problems before proceeding.
-
-#### 3. Inspect layout tree and render
-
-After fixing, confirm with both layout data and visual output:
-
-```bash
-pagx layout --id "cardRow" input.pagx    # layout-resolved bounds (positions, sizes)
-pagx render --scale 2 input.pagx         # visual check
-```
-
-**Layout tree** — compare bounds values against design intent:
-- Element at unexpected position → wrong constraint or missing container layout
-- Element wrong size → wrong `flex` weight, missing `width`, or content origin offset
-- Two elements at same position → missing `gap` or `layout` on parent
-
-**Screenshot** — catches issues automated detection cannot:
-- Alignment, spacing, text rendering, colors, gradients, visual balance, stacking order
-
-**Visual symptom troubleshooting** — if the screenshot looks wrong but `--problems-only`
-reports no issues, check these common causes:
+If the screenshot looks wrong but verify reports no problems, check these common causes:
 
 | Symptom | Likely Cause | Fix |
 |---------|-------------|-----|
@@ -611,23 +614,15 @@ reports no issues, check these common causes:
 | Gradient wrong direction | Gradient coords in canvas space instead of geometry-local | Use geometry-relative coordinates for `startPoint`/`endPoint` |
 | Text not centered in button | Using bare `<Text>` instead of `<TextBox>` | Wrap in `<TextBox centerX="0" centerY="0">` |
 
-When diagnosing a visual issue, use `pagx layout` (without `--problems-only`) to see the
-full layout tree with bounds and any `<Problem>` nodes for the suspect area.
+### Inspecting layout data
 
-#### 4. Repeat until clean
+When diagnosing a visual issue, Read the `.layout.xml` file output by verify. Each node
+includes `line` (source file line number) and `bounds` for precise diagnosis.
 
-If any problems remain, return to step 1. Continue until `--problems-only` exits 0 and the
-screenshot is correct.
-
-### Final Lint Pass
-
-After all content is complete (Stage 3), run `pagx lint` once to catch schema-level errors:
-
-```bash
-pagx lint input.pagx
-```
-
-Fix any reported errors before delivering the file.
+Compare bounds values against design intent:
+- Element at unexpected position → wrong constraint or missing container layout
+- Element wrong size → wrong `flex` weight, missing `width`, or content origin offset
+- Two elements at same position → missing `gap` or `layout` on parent
 
 ---
 

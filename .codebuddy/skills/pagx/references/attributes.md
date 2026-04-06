@@ -471,6 +471,21 @@ Positioning: prefer constraint attributes (`left`/`top`/`right`/`bottom`/`center
 for positioning. When constraints are set, the path coordinate origin is computed automatically.
 Opposite-pair constraints use scale-to-fit (same as Path). See §Constraint Attributes below.
 
+### Import
+
+Build-time preprocessing directive for embedding external content (e.g., SVG) into a PAGX
+file. Resolved by `pagx import --resolve` into native PAGX nodes. Not rendered directly.
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `source` | string | — |
+| `format` | string | — |
+
+- `source`: Path to external file (relative to the PAGX file). When omitted, content is
+  inline as child elements (e.g., `<svg>` inside `<Import>`).
+- `format`: Force input format (`svg`). When omitted, inferred from child element tag name
+  (inline) or `source` file extension (external).
+
 ### Constraint Attributes (Geometry Elements, TextPath, TextBox, Groups, and Child Layers)
 
 These attributes position or stretch an element relative to its container.

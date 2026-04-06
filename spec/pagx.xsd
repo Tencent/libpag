@@ -857,6 +857,18 @@
     <xs:attributeGroup ref="ConstraintAttributes"/>
   </xs:complexType>
 
+  <!-- ========================= Build Directives ========================= -->
+
+  <!-- Import: build-time directive for embedding external content (e.g. SVG) -->
+  <xs:complexType name="ImportType">
+    <xs:sequence>
+      <xs:any namespace="##any" processContents="skip" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="source" type="xs:string"/>
+    <xs:attribute name="format" type="xs:string"/>
+  </xs:complexType>
+
   <!-- ========================= Layer ========================= -->
 
   <!-- Layer child element group: VectorElements, LayerStyles, LayerFilters, child Layers -->
@@ -864,6 +876,8 @@
     <xs:choice>
       <!-- VectorElements -->
       <xs:group ref="VectorElementGroup"/>
+      <!-- Build Directives -->
+      <xs:element name="Import" type="ImportType"/>
       <!-- Layer Styles -->
       <xs:element name="DropShadowStyle" type="DropShadowStyleType"/>
       <xs:element name="InnerShadowStyle" type="InnerShadowStyleType"/>
@@ -890,7 +904,6 @@
     <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
     <xs:attribute name="x" type="xs:decimal" default="0"/>
     <xs:attribute name="y" type="xs:decimal" default="0"/>
-    <xs:attribute name="rotation" type="xs:decimal" default="0"/>
     <xs:attribute name="matrix" type="MatrixType"/>
     <xs:attribute name="matrix3D" type="Matrix3DType"/>
     <xs:attribute name="preserve3D" type="BoolType" default="false"/>

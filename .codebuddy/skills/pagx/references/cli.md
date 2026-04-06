@@ -21,33 +21,73 @@ Run this check before the first `pagx` invocation in each session.
 
 ---
 
-## pagx lint
+## pagx verify
 
-Check a PAGX file for errors, structural issues, and optimization hints. Combines XSD schema
-validation, semantic checks, structural analysis, and performance suggestions in one command.
-Does not modify the input file.
+All-in-one verification command. Resolves `<Import>` nodes (via `pagx import --resolve`),
+runs all checks, and optionally outputs a layout file (via `pagx layout`) and rendered
+screenshot (via `pagx render`).
 
 ```bash
-pagx lint input.pagx
-pagx lint --json input.pagx
+pagx verify input.pagx                                # full file — outputs .png + .layout.xml
+pagx verify --id "header" input.pagx                   # scoped to Layer id
+pagx verify --problems-only input.pagx                 # checks only, no file output
+pagx verify --problems-only --id "header" input.pagx   # scoped checks only
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--json` | Output in JSON format |
+| `--id <id>` | Scope checks and render to the Layer with the specified `id` |
+| `--scale <float>` | Render scale factor (default: 1.0) |
+| `--problems-only` | Only output diagnostics, do not generate screenshot or layout file |
+| `--json` | Output diagnostics in JSON format |
 
-Text output: `filename:line: message` or `filename: message` (when no line number is available).
-JSON output includes `file`, `ok`, and `diagnostics` array with `line`, `category`, and
-`message` fields. Categories: `error` (schema/semantic), `warning` (structural issues),
-`info` (optimization hints).
+### Steps
 
-Returns non-zero exit code when errors or warnings are found.
+1. **Resolve** — expands all `<Import>` nodes in the file (full file, idempotent).
+   See `pagx import` §Resolve mode.
+2. **Parse + layout** — loads the document and computes layout bounds.
+3. **Check** — runs all detection rules (schema, semantic, structural, spatial, performance).
+4. **Diagnostics** — writes problems to stderr, sorted by line number.
+5. **Files** (unless `--problems-only`) — writes layout XML (see `pagx layout` §Output format)
+   and renders screenshot (see `pagx render`).
 
-### What it checks
+### Diagnostics format
 
-- **Errors** — XML schema violations and semantic conflicts.
-- **Warnings** — Structural issues that are likely unintentional (empty nodes, unused resources, layout attribute misuse, etc.).
-- **Hints** — Performance and optimization suggestions (high-cost rendering patterns, redundant structure, deduplication opportunities, etc.).
+All reported problems must be fixed.
+
+```
+file:line: description. Fix: suggested check direction
+```
+
+- Single-node problems: single line number.
+- Two-node problems (e.g., overlap): two line numbers comma-separated.
+- Spatial problems include bounds in the description.
+- No output when there are no problems (in `--problems-only` mode).
+
+Example:
+
+```
+input.pagx:8: unknown attribute "borderRadius" on Rectangle, use "roundness" instead
+input.pagx:18,22: overlapping siblings (20,10,200,40) and (180,10,40,40) in container layout. Fix: check parent layout direction, gap, padding, and children sizes
+input.pagx:60,75: duplicate PathData, identical to line 60. Fix: extract to <Resources> and reference via @id
+Wrote input.png (786x852 @2x)
+Wrote input.layout.xml
+```
+
+### File output
+
+| Scenario | Screenshot | Layout file |
+|----------|-----------|-------------|
+| `pagx verify input.pagx` | `input.png` | `input.layout.xml` |
+| `pagx verify --id "header" input.pagx` | `input.header.png` | `input.header.layout.xml` |
+| `pagx verify --problems-only ...` | not generated | not generated |
+
+### Exit code
+
+| Code | Meaning |
+|------|---------|
+| 0 | No errors (warnings may be present) |
+| 1 | Errors found |
 
 ---
 
@@ -96,12 +136,10 @@ primary font. System fallback fonts are always appended after user-specified fal
 
 **Output convention**: Always output to the same directory as the input `.pagx` file — either omit
 `-o` (default behavior) or specify `-o` with a path in the same directory (e.g., for `--crop`
-variants). Rendered images are verification artifacts — do not delete them, but if the project
-context includes auto-commit rules, do not include these image files (`.png`, `.webp`, `.jpg`)
-in the commit.
+variants). Do not include rendered image files (`.png`, `.webp`, `.jpg`) in commits.
 
-**Scale convention**: Default `--scale 2`; if the document's longer edge exceeds 2048px,
-default to `--scale 1`. When the context explicitly specifies a scale value, use it as-is.
+**Scale convention**: Default `--scale 1`. Use `--scale 2` when higher detail is needed for
+visual inspection. When the context explicitly specifies a scale value, use it as-is.
 
 ---
 
@@ -125,20 +163,21 @@ pagx format --indent 4 input.pagx       # 4-space indent (default: 2)
 ## pagx layout
 
 Display the layout structure of a PAGX file in XML format. Outputs the full layout tree with
-resolved bounds, layout attributes, and detected problems for all Layers and their internal
-elements (Rectangle, Ellipse, Path, Polystar, Text, TextPath, Group, TextBox). With
-`--problems-only`, outputs only nodes with problems and returns non-zero exit code.
+resolved bounds and layout attributes for all Layers and their internal elements (Rectangle,
+Ellipse, Path, Polystar, Text, TextPath, Group, TextBox). Pure data output — no problem
+detection (use `pagx verify` for checks).
+
+Each node includes a `line` attribute mapping back to the source file line number.
 
 Output is wrapped in a `<layout>` root element. Without `--id`/`--xpath`, a `<pagx>` element
 with document dimensions contains the layer tree. With `--id`/`--xpath`, target Layers appear
 directly inside `<layout>` with bounds relative to their own origin (starting at 0,0).
 
 ```bash
-pagx layout input.pagx                                      # full layout tree + problems
+pagx layout input.pagx                                      # full layout tree
 pagx layout --id "card" input.pagx                           # scope to a Layer by id
 pagx layout --xpath "//Layer[@id='header']" input.pagx       # scope to Layers by XPath
 pagx layout --depth 1 input.pagx                             # only one level of child Layers
-pagx layout --problems-only input.pagx                       # only nodes with problems
 ```
 
 | Option | Description |
@@ -146,28 +185,24 @@ pagx layout --problems-only input.pagx                       # only nodes with p
 | `--id <id>` | Limit scope to the Layer with the specified `id` attribute |
 | `--xpath <expr>` | Limit scope to Layers matched by XPath expression |
 | `--depth <n>` | Limit Layer nesting depth (0 or negative = unlimited, default: unlimited) |
-| `--problems-only` | Only output nodes with problems; return non-zero exit code if issues found |
 
 `--id` and `--xpath` are mutually exclusive.
 
-### Default mode
-
-Outputs the complete layout tree showing every Layer and element with their resolved bounds,
-layout attributes (only non-default values), and any detected problems as `<Problem>` child
-elements. Always returns exit code 0.
+Outputs the complete layout tree showing every Layer and element with their resolved bounds
+and layout attributes (only non-default values). Always returns exit code 0.
 
 ```xml
 <layout>
   <pagx width="400" height="300">
-    <Layer id="root" bounds="0,0,400,300" layout="horizontal" gap="20" padding="20">
-      <Rectangle bounds="0,0,400,300"/>
-      <Layer id="sidebar" bounds="20,20,120,260">
-        <Rectangle bounds="20,20,120,260"/>
+    <Layer line="3" id="root" bounds="0,0,400,300" layout="horizontal" gap="20" padding="20">
+      <Rectangle line="5" bounds="0,0,400,300"/>
+      <Layer line="7" id="sidebar" bounds="20,20,120,260">
+        <Rectangle line="9" bounds="20,20,120,260"/>
       </Layer>
-      <Layer id="content" bounds="160,20,220,260" flex="1">
-        <Rectangle bounds="160,20,220,260"/>
-        <TextBox bounds="176,30,188,20">
-          <Text bounds="176,30,188,20"/>
+      <Layer line="12" id="content" bounds="160,20,220,260" flex="1">
+        <Rectangle line="14" bounds="160,20,220,260"/>
+        <TextBox line="16" bounds="176,30,188,20">
+          <Text line="17" bounds="176,30,188,20"/>
         </TextBox>
       </Layer>
     </Layer>
@@ -178,40 +213,8 @@ elements. Always returns exit code 0.
 Layer attributes output when non-default: `layout`, `gap`, `flex`, `padding`, `alignment`,
 `arrangement`, `includeInLayout="false"`, `clipToBounds="true"`.
 
-### Problems-only mode (--problems-only)
-
-Same problem detection as default mode, but only nodes with problems (and their ancestor
-chain) are output. Clean sibling nodes before a problematic node are replaced with empty
-`<Layer/>` placeholders to preserve index counting. Returns exit code 1 if any problems are
-found, 0 otherwise.
-
-Problems are reported as `<Problem>` child elements on the affected node. Detection covers
-overlapping siblings, clipped content, zero-size elements, flex/constraint conflicts,
-off-canvas layers, redundant constraints, and more.
-
-```xml
-<layout>
-  <pagx width="400" height="300">
-    <Layer id="container" bounds="0,0,400,300" layout="horizontal">
-      <Layer/>
-      <Layer id="box1" bounds="50,50,200,150">
-        <Problem>overlaps with Layer#box2</Problem>
-      </Layer>
-      <Layer id="box2" bounds="150,100,200,150">
-        <Problem>overlaps with Layer#box1</Problem>
-      </Layer>
-    </Layer>
-  </pagx>
-</layout>
-```
-
-When no problems are found:
-
-```xml
-<layout>
-  <!-- No layout problems detected. -->
-</layout>
-```
+`pagx verify` outputs the same format to `input.layout.xml` (or `input.{id}.layout.xml`
+when scoped with `--id`). See `pagx verify` for details.
 
 ---
 
@@ -308,7 +311,12 @@ pagx font embed --file a.ttf --fallback "PingFang SC" --fallback b.otf input.pag
 
 ## pagx import
 
-Import a file from another format (e.g. SVG) and convert it to PAGX. The input format is
+Import external format files into PAGX, or resolve `<Import>` nodes within an existing PAGX
+file. Two mutually exclusive modes: **standard** (`--input`) and **resolve** (`--resolve`).
+
+### Standard mode
+
+Convert a file from another format (e.g. SVG) to a standalone PAGX file. The input format is
 inferred from the file extension unless `--format` is specified. Import warnings are printed
 but do not prevent conversion.
 
@@ -320,12 +328,47 @@ pagx import --format svg --input drawing.xml     # force treating drawing.xml as
 
 | Option | Description |
 |--------|-------------|
-| `--input <file>` | Input file to import (required) |
+| `--input <file>` | Input file to import (required in standard mode) |
 | `--output <file>` | Output PAGX file (default: `<input>.pagx`) |
 | `--format <format>` | Force input format (`svg`; default: inferred from input extension) |
 | `--svg-no-expand-use` | Do not expand `<use>` references |
 | `--svg-flatten-transforms` | Flatten nested transforms into single matrices |
 | `--svg-preserve-unknown` | Preserve unsupported SVG elements as Unknown nodes |
+
+On success the command prints `pagx import: wrote <path>` and exits 0; on failure it prints
+an error and exits 1.
+
+### Resolve mode
+
+Expand all `<Import>` nodes in a PAGX file, converting their content (inline or external)
+into native PAGX nodes. This is the counterpart to the `<Import>` build directive defined
+in the PAGX specification.
+
+```bash
+pagx import --resolve design.pagx                          # resolve in place
+pagx import --resolve design.pagx --output out.pagx        # resolve to new file
+pagx import --resolve design.pagx --svg-flatten-transforms # with SVG options
+```
+
+| Option | Description |
+|--------|-------------|
+| `--resolve <file>` | Input PAGX file containing `<Import>` nodes to expand (required in resolve mode) |
+| `-o, --output <path>` | Output file path (default: overwrite input) |
+| `--svg-no-expand-use` | Do not expand `<use>` references in SVG content |
+| `--svg-flatten-transforms` | Flatten nested transforms into single matrices |
+| `--svg-preserve-unknown` | Preserve unsupported SVG elements as Unknown nodes |
+
+`--input` and `--resolve` are mutually exclusive.
+
+**Behavior**:
+- Scans all `<Import>` nodes in the PAGX file
+- Inline mode (`<Import>` with child elements): parses the child SVG content
+- External mode (`<Import source="...">`): reads the file at the specified path (relative
+  to the PAGX file location)
+- Converts content to native PAGX nodes and replaces the `<Import>` element
+- Sets the parent Layer's `width`/`height` from the source dimensions (e.g., SVG
+  `viewBox` or `width`/`height` attributes)
+- If no `<Import>` nodes are found, the file is unchanged and the command exits normally
 
 On success the command prints `pagx import: wrote <path>` and exits 0; on failure it prints
 an error and exits 1.
@@ -355,40 +398,5 @@ pagx export --input icon.pagx --svg-indent 4     # 4-space indent
 | `--svg-no-convert-text-to-path` | Keep text as `<text>` elements instead of `<path>` |
 
 On success the command prints `pagx export: wrote <path>` and exits 0; on failure it prints
-an error and exits 1.
-
----
-
-## pagx insert
-
-Insert content from another format (e.g. SVG) into a target Layer of an existing PAGX file.
-The target Layer's contents, children, styles, and filters are replaced. The Layer's width
-and height are set from the source. Other attributes (position, alpha, blendMode, etc.) are
-preserved.
-
-The target Layer should be a placeholder (empty or with only desired background/styling outside
-the insertion point). After insertion, the Layer contains the converted content.
-
-```bash
-pagx insert --svg icon.svg --id menuIcon design.pagx
-pagx insert --svg icon.svg --id menuIcon -o out.pagx design.pagx
-```
-
-| Option | Description |
-|--------|-------------|
-| `--svg <file>` | SVG file to insert (required) |
-| `--id <id>` | Target Layer id in the PAGX file (required) |
-| `-o, --output <file>` | Output PAGX file (default: overwrite input) |
-
-The command locates the Layer with the specified `id`, converts the SVG to PAGX nodes,
-and replaces the Layer's content (contents, children, styles, filters) with the conversion result.
-The Layer's width and height are set to match the SVG's dimensions. PathData is inlined
-into Path elements rather than extracted to Resources.
-
-When the SVG contains multiple top-level elements (e.g. `<circle>` + `<path>`), the first
-element's content is placed directly in the Layer, and each subsequent element is wrapped
-in a `<Group>` for painter scope isolation.
-
-On success the command prints `pagx insert: wrote <path>` and exits 0; on failure it prints
 an error and exits 1.
 

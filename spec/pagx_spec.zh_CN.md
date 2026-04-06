@@ -2128,6 +2128,81 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 
 ---
 
+## 7. 构建指令（Build Directives）
+
+构建指令是嵌入在 PAGX 文件中的预处理指令。它们**不会被直接渲染** —— 必须通过构建工具解析为
+原生 PAGX 节点后，文件才能被渲染或验证。
+
+### 7.1 导入（Import）
+
+`<Import>` 元素用于在 PAGX 文件中嵌入外部内容（如 SVG）。它出现在 `<Layer>` 内部的
+VectorElement 层级，通过 `pagx import --resolve` 命令解析为原生 PAGX 节点。
+
+#### 属性
+
+| 属性 | 类型 | 默认值 | 必需 | 说明 |
+|------|------|--------|------|------|
+| `source` | string | — | 否 | 外部文件路径，相对于 PAGX 文件所在位置。省略时内容以内联子元素形式提供。 |
+| `format` | string | — | 否 | 强制指定输入格式（如 `svg`）。省略时从子元素标签名（内联）或 `source` 文件扩展名（外部）推断。 |
+
+#### 内联模式
+
+省略 `source` 时，`<Import>` 元素包含外部内容作为子元素。格式从根子元素的标签名推断
+（如 `<svg>`）。
+
+```xml
+<Layer id="shareIcon" centerX="0" centerY="0">
+  <Import>
+    <svg viewBox="0 0 24 24">
+      <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8" fill="none"
+            stroke="#7F8C8D" stroke-width="1.5" stroke-linecap="round"/>
+      <polyline points="16,6 12,2 8,6" fill="none"
+               stroke="#7F8C8D" stroke-width="1.5" stroke-linecap="round"
+               stroke-linejoin="round"/>
+      <line x1="12" y1="2" x2="12" y2="15" fill="none"
+            stroke="#7F8C8D" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+  </Import>
+</Layer>
+```
+
+#### 外部模式
+
+设置 `source` 时，`<Import>` 元素引用外部文件。格式从文件扩展名推断，除非显式指定了 `format`。
+
+```xml
+<Layer id="logoIcon" centerX="0" centerY="0">
+  <Import source="assets/logo.svg"/>
+</Layer>
+
+<!-- 扩展名不明确时显式指定格式 -->
+<Layer id="icon" centerX="0" centerY="0">
+  <Import source="assets/drawing.xml" format="svg"/>
+</Layer>
+```
+
+#### 解析
+
+`pagx import --resolve` 命令处理 PAGX 文件中所有 `<Import>` 节点：
+
+1. 对于每个 `<Import>` 节点，读取其内容（内联子元素或外部文件）
+2. 将内容转换为原生 PAGX 节点（如 SVG 元素转为 Rectangle、Ellipse、Path、Fill、Stroke、
+   Group 节点）
+3. 用转换后的节点替换 `<Import>` 元素
+4. 从源文件尺寸设置父 Layer 的 `width` 和 `height`（如 SVG 的 `viewBox` 或
+   `width`/`height` 属性）
+
+解析完成后，文件仅包含原生 PAGX 节点 —— 不再有 `<Import>` 元素。
+
+#### 工具行为
+
+处理 PAGX 文件的工具遇到未解析的 `<Import>` 节点时报告错误：
+
+- **`pagx verify`**：自动解析所有 `<Import>` 节点后再进行检查。如果解析失败，报告错误。
+- **`pagx render`**：报告错误 —— `unresolved <Import> node`，拒绝渲染。
+
+---
+
 ## 附录 A. 节点层级与包含关系（Node Hierarchy）
 
 本附录描述节点的分类和嵌套规则。
@@ -2146,6 +2221,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 | **几何元素** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` | 可绘制的形状和文本。必须在 Layer/Group 内。 |
 | **修改器** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `TextBox`, `Repeater` | 变换或组合几何图形和文本。 |
 | **绘制器** | `Fill`, `Stroke` | 对几何图形应用颜色/渐变。必须在 Layer/Group 内。 |
+| **构建指令** | `Import` | 构建时预处理指令。通过 `pagx import --resolve` 解析为原生 PAGX 节点。必须在 Layer 内。 |
 
 ### A.2 文档包含关系
 
@@ -2155,6 +2231,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 pagx（必需属性：version、width、height）
 ├── Layer*                      ← 直接子节点仅能是 Layer
 │   ├── VectorElement*（见 A.3）
+│   ├── Import*（构建指令，见 §7）
 │   ├── DropShadowStyle*
 │   ├── InnerShadowStyle*
 │   ├── BackgroundBlurStyle*
@@ -2207,7 +2284,8 @@ Layer / Group
 ├── TextPath
 ├── TextBox
 ├── Repeater
-└── Group*（递归）
+├── Group*（递归）
+└── Import（构建指令，见 §7）
 ```
 
 ---

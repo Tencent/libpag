@@ -118,3 +118,6 @@ cli/npm/win32
 cli/npm/node_modules
 cli/npm/package-lock.json
 
+# PAGX verify artifacts
+*.layout.xml
+

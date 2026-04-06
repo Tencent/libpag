@@ -221,6 +221,13 @@ class Node {
   std::unordered_map<std::string, std::string> customData = {};
 
   /**
+   * The line number in the source XML file where this node was defined. A value of -1 means no
+   * source line information is available (e.g., programmatically created nodes). Set by
+   * PAGXImporter during parsing.
+   */
+  int sourceLine = -1;
+
+  /**
    * Returns true if the given key is a valid custom data key. A valid key contains only lowercase
    * letters ('a'-'z'), digits ('0'-'9'), and hyphens ('-'), must not be empty, and must not end
    * with a hyphen. The key should not include the "data-" prefix.

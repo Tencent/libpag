@@ -1,0 +1,2378 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include "cli/CommandVerify.h"
+#include <cfloat>
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <unordered_map>
+#include <unordered_set>
+#include "cli/CliUtils.h"
+#include "cli/CommandImport.h"
+#include "cli/CommandRender.h"
+#include "cli/LayoutUtils.h"
+#include "pagx/PAGXDocument.h"
+#include "pagx/PAGXImporter.h"
+#include "pagx/layout/LayoutNode.h"
+#include "pagx/nodes/BackgroundBlurStyle.h"
+#include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/ColorStop.h"
+#include "pagx/nodes/Composition.h"
+#include "pagx/nodes/DropShadowStyle.h"
+#include "pagx/nodes/Ellipse.h"
+#include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Font.h"
+#include "pagx/nodes/Group.h"
+#include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/InnerShadowStyle.h"
+#include "pagx/nodes/Layer.h"
+#include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/Path.h"
+#include "pagx/nodes/PathData.h"
+#include "pagx/nodes/Polystar.h"
+#include "pagx/nodes/RadialGradient.h"
+#include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/Repeater.h"
+#include "pagx/nodes/RoundCorner.h"
+#include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/TrimPath.h"
+
+namespace pagx::cli {
+
+// ============================================================================
+// Data Structures
+// ============================================================================
+
+struct VerifyDiagnostic {
+  std::vector<int> lines;
+  std::string message;
+  std::string category;  // "error" or "warning"
+};
+
+struct VerifyOptions {
+  std::string inputFile;
+  std::string id;
+  float scale = 1.0f;
+  bool problemsOnly = false;
+  bool jsonOutput = false;
+};
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+static std::string NodeTypeName(NodeType type) {
+  switch (type) {
+    case NodeType::Layer:
+      return "Layer";
+    case NodeType::Group:
+      return "Group";
+    case NodeType::TextBox:
+      return "TextBox";
+    case NodeType::Rectangle:
+      return "Rectangle";
+    case NodeType::Ellipse:
+      return "Ellipse";
+    case NodeType::Path:
+      return "Path";
+    case NodeType::Polystar:
+      return "Polystar";
+    case NodeType::Text:
+      return "Text";
+    case NodeType::Fill:
+      return "Fill";
+    case NodeType::Stroke:
+      return "Stroke";
+    case NodeType::TrimPath:
+      return "TrimPath";
+    case NodeType::RoundCorner:
+      return "RoundCorner";
+    case NodeType::MergePath:
+      return "MergePath";
+    case NodeType::Repeater:
+      return "Repeater";
+    case NodeType::PathData:
+      return "PathData";
+    case NodeType::LinearGradient:
+      return "LinearGradient";
+    case NodeType::RadialGradient:
+      return "RadialGradient";
+    case NodeType::ConicGradient:
+      return "ConicGradient";
+    case NodeType::DiamondGradient:
+      return "DiamondGradient";
+    case NodeType::Composition:
+      return "Composition";
+    case NodeType::Image:
+      return "Image";
+    case NodeType::BlurFilter:
+      return "BlurFilter";
+    case NodeType::DropShadowStyle:
+      return "DropShadowStyle";
+    case NodeType::InnerShadowStyle:
+      return "InnerShadowStyle";
+    case NodeType::BackgroundBlurStyle:
+      return "BackgroundBlurStyle";
+    default:
+      return "Node";
+  }
+}
+
+static bool IsPainter(NodeType type) {
+  return type == NodeType::Fill || type == NodeType::Stroke;
+}
+
+static bool IsGradient(NodeType type) {
+  return type == NodeType::LinearGradient || type == NodeType::RadialGradient ||
+         type == NodeType::ConicGradient || type == NodeType::DiamondGradient;
+}
+
+static void AddDiagnostic(std::vector<VerifyDiagnostic>& diagnostics, int line,
+                          const std::string& category, const std::string& message) {
+  VerifyDiagnostic diag;
+  diag.lines.push_back(line);
+  diag.message = message;
+  diag.category = category;
+  diagnostics.push_back(std::move(diag));
+}
+
+static void AddDiagnostic(std::vector<VerifyDiagnostic>& diagnostics, const std::vector<int>& lines,
+                          const std::string& category, const std::string& message) {
+  VerifyDiagnostic diag;
+  diag.lines = lines;
+  diag.message = message;
+  diag.category = category;
+  diagnostics.push_back(std::move(diag));
+}
+
+static std::string FormatBounds(float x, float y, float w, float h) {
+  std::ostringstream oss;
+  oss << "(" << static_cast<int>(x) << "," << static_cast<int>(y) << "," << static_cast<int>(w)
+      << "," << static_cast<int>(h) << ")";
+  return oss.str();
+}
+
+// ============================================================================
+// Static Detection: Empty Nodes
+// ============================================================================
+
+static void DetectEmptyLayer(const Layer* layer, std::vector<VerifyDiagnostic>& diagnostics) {
+  bool hasContents = !layer->contents.empty();
+  bool hasChildren = !layer->children.empty();
+  bool hasSize = !std::isnan(layer->width) || !std::isnan(layer->height);
+  bool hasComposition = layer->composition != nullptr;
+
+  if (!hasContents && !hasChildren && !hasSize && !hasComposition) {
+    AddDiagnostic(diagnostics, layer->sourceLine, "error",
+                  "empty Layer with no content, children, or composition. "
+                  "Fix: check if this Layer is needed");
+  }
+}
+
+static void DetectEmptyGroup(const Group* group, std::vector<VerifyDiagnostic>& diagnostics) {
+  if (group->elements.empty()) {
+    AddDiagnostic(diagnostics, group->sourceLine, "error",
+                  "empty Group with no elements. Fix: check if this Group is needed");
+  }
+}
+
+static void DetectZeroStrokeWidth(const Stroke* stroke,
+                                  std::vector<VerifyDiagnostic>& diagnostics) {
+  if (stroke->width <= 0.0f) {
+    AddDiagnostic(
+        diagnostics, stroke->sourceLine, "error",
+        "Stroke width <= 0 produces no visual output. Fix: check if this Stroke is needed");
+  }
+}
+
+// ============================================================================
+// Static Detection: Full Canvas Clip Mask
+// ============================================================================
+
+static void DetectFullCanvasClipMask(const Layer* layer, float canvasWidth, float canvasHeight,
+                                     std::vector<VerifyDiagnostic>& diagnostics) {
+  if (layer->mask == nullptr) {
+    return;
+  }
+  auto* maskLayer = layer->mask;
+  if (maskLayer->x != 0 || maskLayer->y != 0) {
+    return;
+  }
+  if (!maskLayer->matrix.isIdentity()) {
+    return;
+  }
+  if (maskLayer->contents.size() != 1) {
+    return;
+  }
+  auto* rect = dynamic_cast<Rectangle*>(maskLayer->contents[0]);
+  if (rect == nullptr) {
+    return;
+  }
+  float left = rect->position.x - rect->size.width * 0.5f;
+  float top = rect->position.y - rect->size.height * 0.5f;
+  float right = rect->position.x + rect->size.width * 0.5f;
+  float bottom = rect->position.y + rect->size.height * 0.5f;
+  if (left <= 0 && top <= 0 && right >= canvasWidth && bottom >= canvasHeight) {
+    AddDiagnostic(
+        diagnostics, layer->sourceLine, "error",
+        "mask covers entire canvas, no clipping effect. Fix: check if this mask is needed");
+  }
+}
+
+// ============================================================================
+// Static Detection: Unreferenced Resources
+// ============================================================================
+
+static void CollectReferencedIds(const PAGXDocument* doc, std::unordered_set<std::string>& refs);
+
+static void CollectRefsFromLayer(const Layer* layer, std::unordered_set<std::string>& refs);
+static void CollectRefsFromElement(const Element* element, std::unordered_set<std::string>& refs);
+
+static void CollectRefsFromElement(const Element* element, std::unordered_set<std::string>& refs) {
+  if (element == nullptr) {
+    return;
+  }
+  if (!element->id.empty()) {
+    refs.insert(element->id);
+  }
+
+  auto type = element->nodeType();
+  if (type == NodeType::Group || type == NodeType::TextBox) {
+    auto* group = static_cast<const Group*>(element);
+    for (auto* child : group->elements) {
+      CollectRefsFromElement(child, refs);
+    }
+  } else if (type == NodeType::Path) {
+    auto* path = static_cast<const Path*>(element);
+    if (path->data != nullptr && !path->data->id.empty()) {
+      refs.insert(path->data->id);
+    }
+  } else if (type == NodeType::Fill) {
+    auto* fill = static_cast<const Fill*>(element);
+    if (fill->color != nullptr) {
+      if (!fill->color->id.empty()) {
+        refs.insert(fill->color->id);
+      }
+      if (fill->color->nodeType() == NodeType::ImagePattern) {
+        auto* pattern = static_cast<const ImagePattern*>(fill->color);
+        if (pattern->image != nullptr && !pattern->image->id.empty()) {
+          refs.insert(pattern->image->id);
+        }
+      }
+    }
+  } else if (type == NodeType::Stroke) {
+    auto* stroke = static_cast<const Stroke*>(element);
+    if (stroke->color != nullptr) {
+      if (!stroke->color->id.empty()) {
+        refs.insert(stroke->color->id);
+      }
+      if (stroke->color->nodeType() == NodeType::ImagePattern) {
+        auto* pattern = static_cast<const ImagePattern*>(stroke->color);
+        if (pattern->image != nullptr && !pattern->image->id.empty()) {
+          refs.insert(pattern->image->id);
+        }
+      }
+    }
+  } else if (type == NodeType::Text) {
+    auto* text = static_cast<const Text*>(element);
+    for (auto* glyphRun : text->glyphRuns) {
+      if (glyphRun != nullptr && glyphRun->font != nullptr && !glyphRun->font->id.empty()) {
+        refs.insert(glyphRun->font->id);
+      }
+    }
+  }
+}
+
+static void CollectRefsFromLayer(const Layer* layer, std::unordered_set<std::string>& refs) {
+  if (layer == nullptr) {
+    return;
+  }
+  if (!layer->id.empty()) {
+    refs.insert(layer->id);
+  }
+  if (layer->mask != nullptr && !layer->mask->id.empty()) {
+    refs.insert(layer->mask->id);
+  }
+  if (layer->composition != nullptr && !layer->composition->id.empty()) {
+    refs.insert(layer->composition->id);
+  }
+  for (auto* element : layer->contents) {
+    CollectRefsFromElement(element, refs);
+  }
+  for (auto* child : layer->children) {
+    CollectRefsFromLayer(child, refs);
+  }
+}
+
+static void CollectReferencedIds(const PAGXDocument* doc, std::unordered_set<std::string>& refs) {
+  for (auto* layer : doc->layers) {
+    CollectRefsFromLayer(layer, refs);
+  }
+}
+
+static void DetectUnreferencedResources(const PAGXDocument* doc,
+                                        std::vector<VerifyDiagnostic>& diagnostics) {
+  std::unordered_set<std::string> refs;
+  CollectReferencedIds(doc, refs);
+
+  for (const auto& nodePtr : doc->nodes) {
+    auto* node = nodePtr.get();
+    if (node->id.empty()) {
+      continue;
+    }
+    auto type = node->nodeType();
+    if (type == NodeType::Layer || type == NodeType::Document) {
+      continue;
+    }
+    if (refs.find(node->id) == refs.end()) {
+      AddDiagnostic(diagnostics, node->sourceLine, "error",
+                    "unreferenced resource <" + NodeTypeName(type) + "> id=\"" + node->id +
+                        "\". Fix: check if this resource should be "
+                        "referenced or removed");
+    }
+  }
+}
+
+// ============================================================================
+// Static Detection: Duplicate PathData
+// ============================================================================
+
+static std::string SerializePathData(const PathData* data) {
+  std::ostringstream oss;
+  for (auto verb : data->verbs()) {
+    oss << static_cast<int>(verb) << ";";
+  }
+  for (auto& pt : data->points()) {
+    oss << pt.x << "," << pt.y << ";";
+  }
+  return oss.str();
+}
+
+static void DetectDuplicatePathData(const PAGXDocument* doc,
+                                    std::vector<VerifyDiagnostic>& diagnostics) {
+  std::unordered_map<std::string, int> seen;
+  for (const auto& nodePtr : doc->nodes) {
+    if (nodePtr->nodeType() != NodeType::PathData) {
+      continue;
+    }
+    auto* pathData = static_cast<PathData*>(nodePtr.get());
+    auto sig = SerializePathData(pathData);
+    auto it = seen.find(sig);
+    if (it != seen.end()) {
+      AddDiagnostic(diagnostics, pathData->sourceLine, "warning",
+                    "duplicate PathData, identical to line " + std::to_string(it->second) +
+                        ". Fix: extract to <Resources> and reference via @id");
+    } else {
+      seen[sig] = pathData->sourceLine;
+    }
+  }
+}
+
+// ============================================================================
+// Static Detection: Duplicate Gradients
+// ============================================================================
+
+static std::string SerializeGradient(const Node* node) {
+  std::ostringstream oss;
+  oss << NodeTypeName(node->nodeType()) << "|";
+  if (node->nodeType() == NodeType::LinearGradient) {
+    auto* lg = static_cast<const LinearGradient*>(node);
+    oss << lg->startPoint.x << "," << lg->startPoint.y << "|";
+    oss << lg->endPoint.x << "," << lg->endPoint.y << "|";
+    for (auto* stop : lg->colorStops) {
+      oss << stop->offset << ":" << stop->color.red << "," << stop->color.green << ","
+          << stop->color.blue << "," << stop->color.alpha << ";";
+    }
+  } else if (node->nodeType() == NodeType::RadialGradient) {
+    auto* rg = static_cast<const RadialGradient*>(node);
+    oss << rg->center.x << "," << rg->center.y << "|";
+    oss << rg->radius << "|";
+    for (auto* stop : rg->colorStops) {
+      oss << stop->offset << ":" << stop->color.red << "," << stop->color.green << ","
+          << stop->color.blue << "," << stop->color.alpha << ";";
+    }
+  }
+  return oss.str();
+}
+
+static void DetectDuplicateGradients(const PAGXDocument* doc,
+                                     std::vector<VerifyDiagnostic>& diagnostics) {
+  std::unordered_map<std::string, int> seen;
+  for (const auto& nodePtr : doc->nodes) {
+    if (!IsGradient(nodePtr->nodeType())) {
+      continue;
+    }
+    auto sig = SerializeGradient(nodePtr.get());
+    auto it = seen.find(sig);
+    if (it != seen.end()) {
+      AddDiagnostic(diagnostics, nodePtr->sourceLine, "warning",
+                    "duplicate " + NodeTypeName(nodePtr->nodeType()) + ", identical to line " +
+                        std::to_string(it->second) +
+                        ". Fix: extract to <Resources> and reference via @id");
+    } else {
+      seen[sig] = nodePtr->sourceLine;
+    }
+  }
+}
+
+// ============================================================================
+// Static Detection: Mergeable Consecutive Groups
+// ============================================================================
+
+static void SerializeColorSource(std::ostringstream& oss, const ColorSource* color) {
+  if (color == nullptr) {
+    oss << "null";
+    return;
+  }
+  if (!color->id.empty()) {
+    oss << "@" << color->id;
+    return;
+  }
+  if (color->nodeType() == NodeType::SolidColor) {
+    auto* solid = static_cast<const SolidColor*>(color);
+    oss << "solid(" << solid->color.red << "," << solid->color.green << "," << solid->color.blue
+        << "," << solid->color.alpha << ")";
+  } else {
+    // For gradients and other complex sources, use pointer as unique identity.
+    oss << "ptr(" << reinterpret_cast<uintptr_t>(color) << ")";
+  }
+}
+
+static std::string SerializePainters(const std::vector<Element*>& elements) {
+  std::ostringstream oss;
+  bool foundPainter = false;
+  for (auto* element : elements) {
+    auto type = element->nodeType();
+    if (IsPainter(type)) {
+      foundPainter = true;
+      if (type == NodeType::Fill) {
+        auto* fill = static_cast<const Fill*>(element);
+        oss << "Fill|" << fill->alpha << "|";
+        SerializeColorSource(oss, fill->color);
+        oss << "|";
+      } else if (type == NodeType::Stroke) {
+        auto* stroke = static_cast<const Stroke*>(element);
+        oss << "Stroke|" << stroke->width << "|" << stroke->alpha << "|"
+            << static_cast<int>(stroke->cap) << "|" << static_cast<int>(stroke->join) << "|";
+        SerializeColorSource(oss, stroke->color);
+        oss << "|";
+      }
+    } else if (foundPainter) {
+      break;
+    }
+  }
+  return oss.str();
+}
+
+static bool HasDefaultGroupTransform(const Group* group) {
+  if (group->anchor.x != 0 || group->anchor.y != 0) {
+    return false;
+  }
+  if (group->position.x != 0 || group->position.y != 0) {
+    return false;
+  }
+  if (group->rotation != 0) {
+    return false;
+  }
+  if (group->scale.x != 1 || group->scale.y != 1) {
+    return false;
+  }
+  if (group->skew != 0) {
+    return false;
+  }
+  if (group->alpha != 1) {
+    return false;
+  }
+  if (!std::isnan(group->width) || !std::isnan(group->height)) {
+    return false;
+  }
+  return true;
+}
+
+static void DetectMergeableGroups(const std::vector<Element*>& elements,
+                                  std::vector<VerifyDiagnostic>& diagnostics) {
+  size_t i = 0;
+  while (i < elements.size()) {
+    auto* current = elements[i];
+    if (current->nodeType() != NodeType::Group) {
+      i++;
+      continue;
+    }
+    auto* group = static_cast<const Group*>(current);
+    if (!HasDefaultGroupTransform(group)) {
+      i++;
+      continue;
+    }
+    auto sig = SerializePainters(group->elements);
+    if (sig.empty()) {
+      i++;
+      continue;
+    }
+    size_t j = i + 1;
+    while (j < elements.size()) {
+      auto* next = elements[j];
+      if (next->nodeType() != NodeType::Group) {
+        break;
+      }
+      auto* nextGroup = static_cast<const Group*>(next);
+      if (!HasDefaultGroupTransform(nextGroup)) {
+        break;
+      }
+      auto nextSig = SerializePainters(nextGroup->elements);
+      if (nextSig != sig) {
+        break;
+      }
+      AddDiagnostic(
+          diagnostics, next->sourceLine, "warning",
+          "consecutive Groups share identical painters. Fix: merge geometry into one Group");
+      j++;
+    }
+    i = j;
+  }
+}
+
+// ============================================================================
+// Static Detection: Redundant First-Child Group
+// ============================================================================
+
+static bool CanUnwrapFirstChildGroup(const Group* group) {
+  if (group->alpha != 1.0f) {
+    return false;
+  }
+  if (group->position.x != 0 || group->position.y != 0) {
+    return false;
+  }
+  if (group->anchor.x != 0 || group->anchor.y != 0) {
+    return false;
+  }
+  if (group->rotation != 0) {
+    return false;
+  }
+  if (group->scale.x != 1 || group->scale.y != 1) {
+    return false;
+  }
+  if (group->skew != 0) {
+    return false;
+  }
+  if (!std::isnan(group->width) || !std::isnan(group->height)) {
+    return false;
+  }
+  if (!std::isnan(group->left) || !std::isnan(group->right) || !std::isnan(group->top) ||
+      !std::isnan(group->bottom) || !std::isnan(group->centerX) || !std::isnan(group->centerY)) {
+    return false;
+  }
+  for (auto* child : group->elements) {
+    auto* layoutNode = LayoutNode::AsLayoutNode(child);
+    if (layoutNode == nullptr) {
+      continue;
+    }
+    if (!std::isnan(layoutNode->right) || !std::isnan(layoutNode->bottom) ||
+        !std::isnan(layoutNode->centerX) || !std::isnan(layoutNode->centerY)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+static void DetectRedundantFirstChildGroup(const std::vector<Element*>& elements,
+                                           std::vector<VerifyDiagnostic>& diagnostics) {
+  if (elements.empty()) {
+    return;
+  }
+  auto* first = elements[0];
+  if (first->nodeType() != NodeType::Group) {
+    return;
+  }
+  auto* group = static_cast<const Group*>(first);
+  if (CanUnwrapFirstChildGroup(group)) {
+    AddDiagnostic(diagnostics, group->sourceLine, "warning",
+                  "redundant first-child Group, no painter isolation needed. "
+                  "Fix: unwrap — move children into parent scope");
+  }
+}
+
+// ============================================================================
+// Static Detection: Path to Primitives
+// ============================================================================
+
+static void DetectPathToPrimitives(const Path* path, std::vector<VerifyDiagnostic>& diagnostics) {
+  if (path->data == nullptr || path->data->isEmpty()) {
+    return;
+  }
+  if (!std::isnan(path->left) || !std::isnan(path->right) || !std::isnan(path->top) ||
+      !std::isnan(path->bottom) || !std::isnan(path->centerX) || !std::isnan(path->centerY)) {
+    return;
+  }
+  auto& verbs = path->data->verbs();
+  if (verbs.size() == 5 || verbs.size() == 6) {
+    bool allLine = true;
+    for (size_t i = 1; i < verbs.size() - 1; i++) {
+      if (verbs[i] != PathVerb::Line) {
+        allLine = false;
+        break;
+      }
+    }
+    if (allLine && verbs[0] == PathVerb::Move && verbs.back() == PathVerb::Close) {
+      auto& pts = path->data->points();
+      bool axisAligned = true;
+      size_t pointCount = pts.size();
+      for (size_t i = 0; i < pointCount && axisAligned; i++) {
+        auto& p1 = pts[i];
+        auto& p2 = pts[(i + 1) % pointCount];
+        float dx = std::abs(p2.x - p1.x);
+        float dy = std::abs(p2.y - p1.y);
+        if (dx > 0.01f && dy > 0.01f) {
+          axisAligned = false;
+        }
+      }
+      if (axisAligned) {
+        AddDiagnostic(diagnostics, path->sourceLine, "warning",
+                      "Path draws an axis-aligned rectangle. "
+                      "Fix: replace with <Rectangle> for better performance");
+        return;
+      }
+    }
+  }
+  if (verbs.size() == 6 && verbs[0] == PathVerb::Move && verbs[1] == PathVerb::Cubic &&
+      verbs[2] == PathVerb::Cubic && verbs[3] == PathVerb::Cubic && verbs[4] == PathVerb::Cubic &&
+      verbs[5] == PathVerb::Close) {
+    auto& pts = path->data->points();
+    // M(1) + 4*C(3 each) = 13 points minimum.
+    if (pts.size() >= 13) {
+      Point onCurve[4];
+      onCurve[0] = pts[0];  // M point
+      onCurve[1] = pts[3];  // End of first C
+      onCurve[2] = pts[6];  // End of second C
+      onCurve[3] = pts[9];  // End of third C
+      float minX = onCurve[0].x, maxX = onCurve[0].x;
+      float minY = onCurve[0].y, maxY = onCurve[0].y;
+      for (int i = 1; i < 4; i++) {
+        minX = std::min(minX, onCurve[i].x);
+        maxX = std::max(maxX, onCurve[i].x);
+        minY = std::min(minY, onCurve[i].y);
+        maxY = std::max(maxY, onCurve[i].y);
+      }
+      float cx = (minX + maxX) / 2.0f;
+      float cy = (minY + maxY) / 2.0f;
+      float rx = (maxX - minX) / 2.0f;
+      float ry = (maxY - minY) / 2.0f;
+      bool isEllipse = rx >= 0.01f && ry >= 0.01f;
+      // Check that on-curve points are at the cardinal positions (top/right/bottom/left).
+      if (isEllipse) {
+        bool foundTop = false, foundBottom = false, foundLeft = false, foundRight = false;
+        static constexpr float TOLERANCE = 1.0f;
+        for (int i = 0; i < 4; i++) {
+          float dx = std::abs(onCurve[i].x - cx);
+          float dy = std::abs(onCurve[i].y - cy);
+          if (dx < TOLERANCE && std::abs(dy - ry) < TOLERANCE) {
+            if (onCurve[i].y < cy) {
+              foundTop = true;
+            } else {
+              foundBottom = true;
+            }
+          } else if (dy < TOLERANCE && std::abs(dx - rx) < TOLERANCE) {
+            if (onCurve[i].x < cx) {
+              foundLeft = true;
+            } else {
+              foundRight = true;
+            }
+          }
+        }
+        isEllipse = foundTop && foundBottom && foundLeft && foundRight;
+      }
+      // Verify control points match the kappa ratio for circular arcs.
+      // kappa ~ 0.5522847 -- control point offset from on-curve point for a quarter circle.
+      if (isEllipse) {
+        static constexpr float KAPPA = 0.5522847f;
+        static constexpr float CP_TOLERANCE = 2.0f;
+        float expectedCpOffsetX = rx * KAPPA;
+        float expectedCpOffsetY = ry * KAPPA;
+        for (int seg = 0; seg < 4 && isEllipse; seg++) {
+          Point cp1 = pts[1 + seg * 3];
+          Point cp2 = pts[2 + seg * 3];
+          Point segStart = (seg == 0) ? pts[0] : pts[seg * 3];
+          Point segEnd = pts[3 + seg * 3];
+          float cp1DistX = std::abs(cp1.x - segStart.x);
+          float cp1DistY = std::abs(cp1.y - segStart.y);
+          float cp2DistX = std::abs(cp2.x - segEnd.x);
+          float cp2DistY = std::abs(cp2.y - segEnd.y);
+          bool cp1Valid =
+              (cp1DistX < CP_TOLERANCE && std::abs(cp1DistY - expectedCpOffsetY) < CP_TOLERANCE) ||
+              (cp1DistY < CP_TOLERANCE && std::abs(cp1DistX - expectedCpOffsetX) < CP_TOLERANCE);
+          bool cp2Valid =
+              (cp2DistX < CP_TOLERANCE && std::abs(cp2DistY - expectedCpOffsetY) < CP_TOLERANCE) ||
+              (cp2DistY < CP_TOLERANCE && std::abs(cp2DistX - expectedCpOffsetX) < CP_TOLERANCE);
+          isEllipse = cp1Valid && cp2Valid;
+        }
+      }
+      if (isEllipse) {
+        AddDiagnostic(diagnostics, path->sourceLine, "warning",
+                      "Path draws an ellipse. Fix: replace with <Ellipse> for better performance");
+      }
+    }
+  }
+}
+
+// ============================================================================
+// Static Detection: PathData Origin Offset
+// ============================================================================
+
+static void CollectRotatedPathDataIds(const std::vector<Element*>& elements,
+                                      std::unordered_set<std::string>& rotatedIds,
+                                      bool ancestorRotated) {
+  for (auto* element : elements) {
+    auto type = element->nodeType();
+    bool thisRotated = ancestorRotated;
+    if (type == NodeType::Group || type == NodeType::TextBox) {
+      auto* group = static_cast<const Group*>(element);
+      if (group->rotation != 0) {
+        thisRotated = true;
+      }
+      CollectRotatedPathDataIds(group->elements, rotatedIds, thisRotated);
+    } else if (type == NodeType::Path) {
+      auto* path = static_cast<const Path*>(element);
+      if (thisRotated && path->data != nullptr && !path->data->id.empty()) {
+        rotatedIds.insert(path->data->id);
+      }
+    }
+  }
+}
+
+static void CollectRotatedPathDataIdsFromLayer(const Layer* layer,
+                                               std::unordered_set<std::string>& rotatedIds) {
+  CollectRotatedPathDataIds(layer->contents, rotatedIds, false);
+  for (auto* child : layer->children) {
+    CollectRotatedPathDataIdsFromLayer(child, rotatedIds);
+  }
+}
+
+static void CollectAllRotatedPathDataIds(const PAGXDocument* doc,
+                                         std::unordered_set<std::string>& rotatedIds) {
+  for (auto* layer : doc->layers) {
+    CollectRotatedPathDataIdsFromLayer(layer, rotatedIds);
+  }
+}
+
+static void DetectPathDataOriginOffset(const PathData* pathData,
+                                       const std::unordered_set<std::string>& rotatedIds,
+                                       std::vector<VerifyDiagnostic>& diagnostics) {
+  if (pathData->isEmpty()) {
+    return;
+  }
+  if (pathData->id.empty()) {
+    return;
+  }
+  if (rotatedIds.count(pathData->id) > 0) {
+    return;
+  }
+  auto bounds = const_cast<PathData*>(pathData)->getBounds();
+  if (std::abs(bounds.x) >= 0.5f || std::abs(bounds.y) >= 0.5f) {
+    AddDiagnostic(diagnostics, pathData->sourceLine, "warning",
+                  "PathData bounds do not start at origin. Fix: translate path coordinates so "
+                  "bounds start at (0,0) and adjust parent positioning");
+  }
+}
+
+// ============================================================================
+// Static Detection: Structurally Identical Layers
+// ============================================================================
+
+static std::string SerializeLayerContents(const Layer* layer);
+
+static std::string SerializeElement(const Element* element) {
+  std::ostringstream oss;
+  oss << NodeTypeName(element->nodeType()) << "{";
+  auto type = element->nodeType();
+  if (type == NodeType::Group || type == NodeType::TextBox) {
+    auto* group = static_cast<const Group*>(element);
+    for (auto* child : group->elements) {
+      oss << SerializeElement(child);
+    }
+  } else if (type == NodeType::Rectangle) {
+    auto* rect = static_cast<const Rectangle*>(element);
+    oss << rect->size.width << "," << rect->size.height << "|" << rect->roundness;
+  } else if (type == NodeType::Ellipse) {
+    auto* ellipse = static_cast<const Ellipse*>(element);
+    oss << ellipse->size.width << "," << ellipse->size.height;
+  } else if (type == NodeType::Fill) {
+    auto* fill = static_cast<const Fill*>(element);
+    oss << fill->alpha << "|";
+    SerializeColorSource(oss, fill->color);
+  } else if (type == NodeType::Stroke) {
+    auto* stroke = static_cast<const Stroke*>(element);
+    oss << stroke->width << "|" << stroke->alpha << "|";
+    SerializeColorSource(oss, stroke->color);
+  } else if (type == NodeType::Text) {
+    auto* text = static_cast<const Text*>(element);
+    oss << text->text << "|" << text->fontSize;
+  }
+  oss << "}";
+  return oss.str();
+}
+
+static std::string SerializeLayerContents(const Layer* layer) {
+  std::ostringstream oss;
+  for (auto* element : layer->contents) {
+    oss << SerializeElement(element);
+  }
+  for (auto* child : layer->children) {
+    oss << "Layer{" << SerializeLayerContents(child) << "}";
+  }
+  return oss.str();
+}
+
+static bool IsExtractableCandidate(const Layer* layer) {
+  if (layer->contents.size() < 3) {
+    return false;
+  }
+  if (!layer->children.empty()) {
+    return false;
+  }
+  if (layer->composition != nullptr) {
+    return false;
+  }
+  if (!layer->matrix.isIdentity()) {
+    return false;
+  }
+  if (!std::isnan(layer->right) || !std::isnan(layer->bottom) || !std::isnan(layer->centerX) ||
+      !std::isnan(layer->centerY)) {
+    return false;
+  }
+  if (layer->flex > 0) {
+    return false;
+  }
+  return true;
+}
+
+static void CollectExtractableLayers(const Layer* layer, std::vector<const Layer*>& candidates) {
+  if (IsExtractableCandidate(layer)) {
+    candidates.push_back(layer);
+  }
+  for (auto* child : layer->children) {
+    CollectExtractableLayers(child, candidates);
+  }
+}
+
+static void DetectStructurallyIdenticalLayers(const PAGXDocument* doc,
+                                              std::vector<VerifyDiagnostic>& diagnostics) {
+  std::vector<const Layer*> candidates;
+  for (auto* layer : doc->layers) {
+    CollectExtractableLayers(layer, candidates);
+  }
+
+  std::unordered_map<std::string, std::vector<const Layer*>> groups;
+  for (auto* layer : candidates) {
+    auto sig = SerializeLayerContents(layer);
+    groups[sig].push_back(layer);
+  }
+
+  for (auto& pair : groups) {
+    if (pair.second.size() < 2) {
+      continue;
+    }
+    std::vector<int> lines;
+    for (auto* layer : pair.second) {
+      lines.push_back(layer->sourceLine);
+    }
+    std::ostringstream lineList;
+    for (size_t i = 0; i < lines.size(); i++) {
+      if (i > 0) {
+        lineList << ",";
+      }
+      lineList << lines[i];
+    }
+    AddDiagnostic(diagnostics, lines, "warning",
+                  "structurally identical Layers (lines " + lineList.str() +
+                      "). Fix: extract to a shared <Composition> in <Resources>");
+  }
+}
+
+// ============================================================================
+// Static Detection: includeInLayout/flex Without Parent Layout
+// ============================================================================
+
+static void DetectIneffectiveLayoutAttrs(const Layer* layer, bool parentHasLayout,
+                                         std::vector<VerifyDiagnostic>& diagnostics) {
+  if (!parentHasLayout) {
+    if (!layer->includeInLayout) {
+      AddDiagnostic(diagnostics, layer->sourceLine, "error",
+                    "includeInLayout=\"false\" has no effect, parent has no layout. "
+                    "Fix: check if includeInLayout or parent layout is missing");
+    }
+    if (layer->flex > 0) {
+      AddDiagnostic(diagnostics, layer->sourceLine, "error",
+                    "flex has no effect, parent has no layout. Fix: check if parent needs "
+                    "layout=\"horizontal/vertical\" or if flex should be removed");
+    }
+  }
+}
+
+// ============================================================================
+// Static Detection: Downgradable Layers
+// ============================================================================
+
+static bool CanDowngradeLayerToGroup(const Layer* layer) {
+  if (!layer->children.empty()) {
+    return false;
+  }
+  if (!layer->styles.empty()) {
+    return false;
+  }
+  if (!layer->filters.empty()) {
+    return false;
+  }
+  if (layer->mask != nullptr) {
+    return false;
+  }
+  if (layer->composition != nullptr) {
+    return false;
+  }
+  if (layer->blendMode != BlendMode::Normal) {
+    return false;
+  }
+  if (!layer->visible) {
+    return false;
+  }
+  if (layer->hasScrollRect) {
+    return false;
+  }
+  if (!layer->matrix.isIdentity()) {
+    return false;
+  }
+  if (!layer->matrix3D.isIdentity()) {
+    return false;
+  }
+  if (layer->preserve3D) {
+    return false;
+  }
+  if (!layer->groupOpacity) {
+    return false;
+  }
+  if (!layer->passThroughBackground) {
+    return false;
+  }
+  if (!layer->antiAlias) {
+    return false;
+  }
+  if (!layer->id.empty() || !layer->name.empty()) {
+    return false;
+  }
+  if (layer->layout != LayoutMode::None) {
+    return false;
+  }
+  if (layer->flex > 0) {
+    return false;
+  }
+  if (!std::isnan(layer->width) || !std::isnan(layer->height)) {
+    return false;
+  }
+  if (!std::isnan(layer->left) || !std::isnan(layer->right) || !std::isnan(layer->top) ||
+      !std::isnan(layer->bottom) || !std::isnan(layer->centerX) || !std::isnan(layer->centerY)) {
+    return false;
+  }
+  if (!layer->includeInLayout) {
+    return false;
+  }
+  return true;
+}
+
+static void DetectDowngradableLayers(const Layer* parentLayer,
+                                     std::vector<VerifyDiagnostic>& diagnostics) {
+  if (parentLayer->layout != LayoutMode::None) {
+    return;
+  }
+  int downgradableCount = 0;
+  for (auto* child : parentLayer->children) {
+    if (CanDowngradeLayerToGroup(child)) {
+      downgradableCount++;
+    }
+  }
+  if (downgradableCount > 0) {
+    AddDiagnostic(diagnostics, parentLayer->sourceLine, "warning",
+                  std::to_string(downgradableCount) +
+                      " child Layer(s) use no Layer-exclusive features. "
+                      "Fix: check if they can be replaced with <Group>");
+  }
+}
+
+// ============================================================================
+// Static Detection: Repeater Copies
+// ============================================================================
+
+struct RepeaterContext {
+  float productSoFar = 1.0f;
+  bool hasNonCenterStroke = false;
+  bool hasDashedStroke = false;
+};
+
+static void CollectRepeaterProducts(const std::vector<Element*>& elements, RepeaterContext& ctx,
+                                    std::vector<VerifyDiagnostic>& diagnostics);
+
+static void CollectRepeaterProducts(const std::vector<Element*>& elements, RepeaterContext& ctx,
+                                    std::vector<VerifyDiagnostic>& diagnostics) {
+  float localProduct = ctx.productSoFar;
+
+  for (auto* element : elements) {
+    auto type = element->nodeType();
+    if (type == NodeType::Repeater) {
+      auto* repeater = static_cast<const Repeater*>(element);
+      localProduct *= repeater->copies;
+    }
+  }
+
+  bool hasRepeater = localProduct > ctx.productSoFar;
+
+  // Build suffix product: Repeater only affects elements that precede it in the same scope.
+  // A Group at index i is affected by Repeaters at indices > i.
+  std::vector<float> suffixProduct(elements.size() + 1, 1.0f);
+  for (int i = static_cast<int>(elements.size()) - 1; i >= 0; --i) {
+    suffixProduct[i] = suffixProduct[i + 1];
+    if (elements[i]->nodeType() == NodeType::Repeater) {
+      auto* repeater = static_cast<const Repeater*>(elements[i]);
+      suffixProduct[i] *= repeater->copies;
+    }
+  }
+
+  for (size_t idx = 0; idx < elements.size(); ++idx) {
+    auto* element = elements[idx];
+    auto type = element->nodeType();
+    if (type == NodeType::Stroke) {
+      auto* stroke = static_cast<const Stroke*>(element);
+      if (hasRepeater && stroke->align != StrokeAlign::Center) {
+        std::string alignStr = (stroke->align == StrokeAlign::Inside) ? "inside" : "outside";
+        AddDiagnostic(diagnostics, stroke->sourceLine, "error",
+                      "Stroke align=\"" + alignStr +
+                          "\" inside Repeater forces CPU rendering. Fix: check if align=\"center\" "
+                          "(default) works, or move Stroke outside Repeater");
+      }
+      if (hasRepeater && !stroke->dashes.empty()) {
+        AddDiagnostic(diagnostics, stroke->sourceLine, "error",
+                      "dashed Stroke inside Repeater multiplies rendering cost. "
+                      "Fix: check if dashes can be removed or Stroke moved outside Repeater");
+      }
+    } else if (type == NodeType::Repeater) {
+      auto* repeater = static_cast<const Repeater*>(element);
+      static constexpr float REPEATER_THRESHOLD = 200.0f;
+      if (localProduct > REPEATER_THRESHOLD) {
+        AddDiagnostic(diagnostics, repeater->sourceLine, "warning",
+                      "Repeater produces " + std::to_string(static_cast<int>(localProduct)) +
+                          " total copies (threshold: " +
+                          std::to_string(static_cast<int>(REPEATER_THRESHOLD)) +
+                          "), will cause slow rendering. Fix: check if copies can be reduced or "
+                          "content simplified");
+      }
+    } else if (type == NodeType::Group || type == NodeType::TextBox) {
+      auto* group = static_cast<const Group*>(element);
+      float groupProduct = ctx.productSoFar * suffixProduct[idx + 1];
+      RepeaterContext childCtx;
+      childCtx.productSoFar = groupProduct;
+      CollectRepeaterProducts(group->elements, childCtx, diagnostics);
+    }
+  }
+}
+
+// ============================================================================
+// Static Detection: High Path Complexity
+// ============================================================================
+
+static void DetectHighPathComplexity(const Path* path, std::vector<VerifyDiagnostic>& diagnostics) {
+  if (path->data == nullptr) {
+    return;
+  }
+  auto verbCount = path->data->verbs().size();
+  if (verbCount > 500) {
+    AddDiagnostic(diagnostics, path->sourceLine, "error",
+                  "Path with " + std::to_string(verbCount) +
+                      " verbs (> 500), may cause slow rendering. "
+                      "Fix: check if path can be simplified or split");
+  }
+}
+
+// ============================================================================
+// Static Detection: Large Blur Radius
+// ============================================================================
+
+static void DetectLargeBlurRadius(const BlurFilter* blur,
+                                  std::vector<VerifyDiagnostic>& diagnostics) {
+  if (blur->blurX > 256.0f || blur->blurY > 256.0f) {
+    AddDiagnostic(
+        diagnostics, blur->sourceLine, "error",
+        "BlurFilter radius too large (X:" + std::to_string(static_cast<int>(blur->blurX)) +
+            " Y:" + std::to_string(static_cast<int>(blur->blurY)) +
+            ", max recommended 256). Fix: check if blur radius can be reduced");
+  }
+}
+
+static void DetectLargeDropShadowRadius(const DropShadowStyle* shadow,
+                                        std::vector<VerifyDiagnostic>& diagnostics) {
+  if (shadow->blurX > 256.0f || shadow->blurY > 256.0f) {
+    AddDiagnostic(diagnostics, shadow->sourceLine, "error",
+                  "DropShadowStyle blur radius too large (X:" +
+                      std::to_string(static_cast<int>(shadow->blurX)) +
+                      " Y:" + std::to_string(static_cast<int>(shadow->blurY)) +
+                      "). Fix: check if blur radius can be reduced");
+  }
+}
+
+static void DetectLargeBackgroundBlurRadius(const BackgroundBlurStyle* blur,
+                                            std::vector<VerifyDiagnostic>& diagnostics) {
+  if (blur->blurX > 256.0f || blur->blurY > 256.0f) {
+    AddDiagnostic(diagnostics, blur->sourceLine, "error",
+                  "BackgroundBlurStyle blur radius too large (X:" +
+                      std::to_string(static_cast<int>(blur->blurX)) +
+                      " Y:" + std::to_string(static_cast<int>(blur->blurY)) +
+                      "). Fix: check if blur radius can be reduced");
+  }
+}
+
+static void DetectLargeInnerShadowRadius(const InnerShadowStyle* shadow,
+                                         std::vector<VerifyDiagnostic>& diagnostics) {
+  if (shadow->blurX > 256.0f || shadow->blurY > 256.0f) {
+    AddDiagnostic(diagnostics, shadow->sourceLine, "error",
+                  "InnerShadowStyle blur radius too large (X:" +
+                      std::to_string(static_cast<int>(shadow->blurX)) +
+                      " Y:" + std::to_string(static_cast<int>(shadow->blurY)) +
+                      "). Fix: check if blur radius can be reduced");
+  }
+}
+
+// ============================================================================
+// Static Detection: Low Opacity High-Cost Children
+// ============================================================================
+
+static bool HasHighCostChildren(const Layer* layer);
+static bool HasHighCostElements(const std::vector<Element*>& elements);
+
+static bool HasHighCostElements(const std::vector<Element*>& elements) {
+  for (auto* element : elements) {
+    auto type = element->nodeType();
+    if (type == NodeType::Repeater) {
+      return true;
+    }
+    if (type == NodeType::Group || type == NodeType::TextBox) {
+      auto* group = static_cast<const Group*>(element);
+      if (HasHighCostElements(group->elements)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+static bool HasHighCostChildren(const Layer* layer) {
+  for (auto* filter : layer->filters) {
+    if (filter->nodeType() == NodeType::BlurFilter) {
+      return true;
+    }
+  }
+  for (auto* style : layer->styles) {
+    auto type = style->nodeType();
+    if (type == NodeType::DropShadowStyle || type == NodeType::InnerShadowStyle ||
+        type == NodeType::BackgroundBlurStyle) {
+      return true;
+    }
+  }
+  if (HasHighCostElements(layer->contents)) {
+    return true;
+  }
+  for (auto* child : layer->children) {
+    if (HasHighCostChildren(child)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static void DetectLowOpacityHighCost(const Layer* layer,
+                                     std::vector<VerifyDiagnostic>& diagnostics) {
+  if (layer->alpha < 0.05f && layer->alpha > 0.0f && HasHighCostChildren(layer)) {
+    AddDiagnostic(diagnostics, layer->sourceLine, "error",
+                  "opacity " + std::to_string(static_cast<int>(layer->alpha * 100)) +
+                      "% with high-cost children (Repeater/Blur), nearly invisible but still "
+                      "rendered. Fix: check if this Layer should be visible=\"false\" or removed");
+  }
+}
+
+// ============================================================================
+// Static Detection: Rectangular Mask Can Use clipToBounds
+// ============================================================================
+
+static void DetectRectangularMask(const Layer* layer, std::vector<VerifyDiagnostic>& diagnostics) {
+  if (layer->mask == nullptr) {
+    return;
+  }
+  if (layer->maskType != MaskType::Alpha) {
+    return;
+  }
+  auto* maskLayer = layer->mask;
+  if (maskLayer->contents.size() != 2) {
+    return;
+  }
+  auto* rect = dynamic_cast<Rectangle*>(maskLayer->contents[0]);
+  auto* fill = dynamic_cast<Fill*>(maskLayer->contents[1]);
+  if (rect == nullptr || fill == nullptr) {
+    return;
+  }
+  if (fill->alpha < 0.999f) {
+    return;
+  }
+  if (!maskLayer->matrix.isIdentity()) {
+    return;
+  }
+  AddDiagnostic(diagnostics, layer->sourceLine, "error",
+                "rectangular alpha mask can use clipToBounds instead. "
+                "Fix: check if clipToBounds=\"true\" can replace the mask for better performance");
+}
+
+// ============================================================================
+// Static Detection: Run All
+// ============================================================================
+
+static void RunStaticDetectionOnElements(const std::vector<Element*>& elements,
+                                         std::vector<VerifyDiagnostic>& diagnostics) {
+  DetectMergeableGroups(elements, diagnostics);
+  DetectRedundantFirstChildGroup(elements, diagnostics);
+
+  RepeaterContext ctx;
+  ctx.productSoFar = 1.0f;
+  CollectRepeaterProducts(elements, ctx, diagnostics);
+
+  for (auto* element : elements) {
+    auto type = element->nodeType();
+    if (type == NodeType::Group) {
+      auto* group = static_cast<const Group*>(element);
+      DetectEmptyGroup(group, diagnostics);
+      RunStaticDetectionOnElements(group->elements, diagnostics);
+    } else if (type == NodeType::TextBox) {
+      auto* textBox = static_cast<const TextBox*>(element);
+      RunStaticDetectionOnElements(textBox->elements, diagnostics);
+    } else if (type == NodeType::Stroke) {
+      auto* stroke = static_cast<const Stroke*>(element);
+      DetectZeroStrokeWidth(stroke, diagnostics);
+    } else if (type == NodeType::Path) {
+      auto* path = static_cast<const Path*>(element);
+      DetectPathToPrimitives(path, diagnostics);
+      DetectHighPathComplexity(path, diagnostics);
+    }
+  }
+}
+
+static void RunStaticDetectionOnLayer(const Layer* layer, float canvasWidth, float canvasHeight,
+                                      bool parentHasLayout,
+                                      std::vector<VerifyDiagnostic>& diagnostics) {
+  DetectEmptyLayer(layer, diagnostics);
+  DetectFullCanvasClipMask(layer, canvasWidth, canvasHeight, diagnostics);
+  DetectIneffectiveLayoutAttrs(layer, parentHasLayout, diagnostics);
+  DetectDowngradableLayers(layer, diagnostics);
+  DetectLowOpacityHighCost(layer, diagnostics);
+  DetectRectangularMask(layer, diagnostics);
+
+  for (auto* filter : layer->filters) {
+    if (filter->nodeType() == NodeType::BlurFilter) {
+      DetectLargeBlurRadius(static_cast<const BlurFilter*>(filter), diagnostics);
+    }
+  }
+  for (auto* style : layer->styles) {
+    auto type = style->nodeType();
+    if (type == NodeType::DropShadowStyle) {
+      DetectLargeDropShadowRadius(static_cast<const DropShadowStyle*>(style), diagnostics);
+    } else if (type == NodeType::BackgroundBlurStyle) {
+      DetectLargeBackgroundBlurRadius(static_cast<const BackgroundBlurStyle*>(style), diagnostics);
+    } else if (type == NodeType::InnerShadowStyle) {
+      DetectLargeInnerShadowRadius(static_cast<const InnerShadowStyle*>(style), diagnostics);
+    }
+  }
+
+  RunStaticDetectionOnElements(layer->contents, diagnostics);
+
+  bool thisHasLayout = layer->layout != LayoutMode::None;
+  for (auto* child : layer->children) {
+    RunStaticDetectionOnLayer(child, canvasWidth, canvasHeight, thisHasLayout, diagnostics);
+  }
+}
+
+static void RunStaticDetection(const PAGXDocument* doc,
+                               std::vector<VerifyDiagnostic>& diagnostics) {
+  DetectUnreferencedResources(doc, diagnostics);
+  DetectDuplicatePathData(doc, diagnostics);
+  DetectDuplicateGradients(doc, diagnostics);
+  DetectStructurallyIdenticalLayers(doc, diagnostics);
+
+  std::unordered_set<std::string> rotatedPathDataIds;
+  CollectAllRotatedPathDataIds(doc, rotatedPathDataIds);
+
+  for (const auto& nodePtr : doc->nodes) {
+    if (nodePtr->nodeType() == NodeType::PathData) {
+      DetectPathDataOriginOffset(static_cast<const PathData*>(nodePtr.get()), rotatedPathDataIds,
+                                 diagnostics);
+    }
+  }
+
+  for (auto* layer : doc->layers) {
+    RunStaticDetectionOnLayer(layer, doc->width, doc->height, false, diagnostics);
+  }
+
+  for (const auto& err : doc->errors) {
+    VerifyDiagnostic diag;
+    if (err.compare(0, 5, "line ") == 0) {
+      auto colonPos = err.find(':', 5);
+      if (colonPos != std::string::npos) {
+        auto lineStr = err.substr(5, colonPos - 5);
+        char* endPtr = nullptr;
+        long lineNum = strtol(lineStr.c_str(), &endPtr, 10);
+        if (endPtr != lineStr.c_str() && *endPtr == '\0') {
+          diag.lines.push_back(static_cast<int>(lineNum));
+        }
+        diag.message = err.substr(colonPos + 2);
+      } else {
+        diag.message = err;
+      }
+    } else {
+      diag.message = err;
+    }
+    if (diag.lines.empty()) {
+      diag.lines.push_back(0);
+    }
+    diag.category = "error";
+    diagnostics.push_back(std::move(diag));
+  }
+}
+
+// ============================================================================
+// Spatial Detection
+// ============================================================================
+
+struct SpatialRect {
+  float x = 0;
+  float y = 0;
+  float width = 0;
+  float height = 0;
+};
+
+static bool RectsOverlap(const SpatialRect& a, const SpatialRect& b) {
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+}
+
+static bool IsFullyContained(const SpatialRect& parent, const SpatialRect& child) {
+  static constexpr float TOLERANCE = 0.5f;
+  return (child.x + TOLERANCE) >= parent.x && (child.y + TOLERANCE) >= parent.y &&
+         (child.x + child.width) <= (parent.x + parent.width + TOLERANCE) &&
+         (child.y + child.height) <= (parent.y + parent.height + TOLERANCE);
+}
+
+static void DetectZeroSize(const Layer* layer, const Layer* parentLayer,
+                           std::vector<VerifyDiagnostic>& diagnostics) {
+  auto bounds = layer->layoutBounds();
+  if (bounds.width != 0 && bounds.height != 0) {
+    return;
+  }
+  bool inParentLayout =
+      parentLayer != nullptr && parentLayer->layout != LayoutMode::None && layer->includeInLayout;
+  if (!inParentLayout) {
+    bool explicitZeroW = (bounds.width == 0 && !std::isnan(layer->width) && layer->width == 0);
+    bool explicitZeroH = (bounds.height == 0 && !std::isnan(layer->height) && layer->height == 0);
+    if (explicitZeroW || explicitZeroH) {
+      return;
+    }
+  }
+
+  bool hasLayoutChildren = layer->layout != LayoutMode::None || layer->clipToBounds;
+  bool childrenDependOnWidth = false;
+  bool childrenDependOnHeight = false;
+  for (auto* child : layer->children) {
+    if (!std::isnan(child->right) || !std::isnan(child->centerX)) {
+      childrenDependOnWidth = true;
+    }
+    if (!std::isnan(child->bottom) || !std::isnan(child->centerY)) {
+      childrenDependOnHeight = true;
+    }
+    if (child->flex > 0 && layer->layout == LayoutMode::Horizontal) {
+      childrenDependOnWidth = true;
+    }
+    if (child->flex > 0 && layer->layout == LayoutMode::Vertical) {
+      childrenDependOnHeight = true;
+    }
+  }
+  bool zeroWidthMatters = bounds.width == 0 && (hasLayoutChildren || childrenDependOnWidth);
+  bool zeroHeightMatters = bounds.height == 0 && (hasLayoutChildren || childrenDependOnHeight);
+  if (!zeroWidthMatters && !zeroHeightMatters && !inParentLayout) {
+    return;
+  }
+
+  std::ostringstream oss;
+  oss << "zero size (" << static_cast<int>(bounds.width) << "x" << static_cast<int>(bounds.height)
+      << "), children depend on this container for layout";
+
+  if (layer->flex > 0 && parentLayer != nullptr && parentLayer->layout != LayoutMode::None) {
+    bool horizontal = parentLayer->layout == LayoutMode::Horizontal;
+    float parentExplicitMain = horizontal ? parentLayer->width : parentLayer->height;
+    bool parentMainFromConstraints =
+        horizontal ? (!std::isnan(parentLayer->left) && !std::isnan(parentLayer->right))
+                   : (!std::isnan(parentLayer->top) && !std::isnan(parentLayer->bottom));
+    if (std::isnan(parentExplicitMain) && !parentMainFromConstraints) {
+      const char* axis = horizontal ? "width" : "height";
+      oss << " (flex child, parent has no " << axis << " to distribute)";
+    }
+  }
+  oss << ". Fix: check why this container has no size";
+  AddDiagnostic(diagnostics, layer->sourceLine, "error", oss.str());
+}
+
+static void DetectConstraintsIgnoredByLayout(const Layer* layer, const Layer* parentLayer,
+                                             std::vector<VerifyDiagnostic>& diagnostics) {
+  if (parentLayer == nullptr || parentLayer->layout == LayoutMode::None) {
+    return;
+  }
+  if (!layer->includeInLayout) {
+    return;
+  }
+  bool hasConstraints =
+      (!std::isnan(layer->left) || !std::isnan(layer->right) || !std::isnan(layer->centerX) ||
+       !std::isnan(layer->top) || !std::isnan(layer->bottom) || !std::isnan(layer->centerY));
+  if (!hasConstraints) {
+    return;
+  }
+  std::string attrs;
+  if (!std::isnan(layer->left)) {
+    attrs += "left ";
+  }
+  if (!std::isnan(layer->right)) {
+    attrs += "right ";
+  }
+  if (!std::isnan(layer->centerX)) {
+    attrs += "centerX ";
+  }
+  if (!std::isnan(layer->top)) {
+    attrs += "top ";
+  }
+  if (!std::isnan(layer->bottom)) {
+    attrs += "bottom ";
+  }
+  if (!std::isnan(layer->centerY)) {
+    attrs += "centerY ";
+  }
+  if (!attrs.empty() && attrs.back() == ' ') {
+    attrs.pop_back();
+  }
+  AddDiagnostic(diagnostics, layer->sourceLine, "error",
+                "constraints (" + attrs +
+                    ") ignored, parent has container layout. Fix: check if constraints should be "
+                    "removed or includeInLayout=\"false\" added");
+}
+
+static void DetectFlexInContentMeasuredParent(const Layer* layer, const Layer* parentLayer,
+                                              std::vector<VerifyDiagnostic>& diagnostics) {
+  if (parentLayer == nullptr || parentLayer->layout == LayoutMode::None) {
+    return;
+  }
+  if (layer->flex <= 0 || !layer->includeInLayout) {
+    return;
+  }
+  bool horizontal = parentLayer->layout == LayoutMode::Horizontal;
+  float explicitMain = horizontal ? layer->width : layer->height;
+  if (!std::isnan(explicitMain)) {
+    return;
+  }
+  float parentExplicitMain = horizontal ? parentLayer->width : parentLayer->height;
+  if (!std::isnan(parentExplicitMain)) {
+    return;
+  }
+  bool parentMainFromConstraints =
+      horizontal ? (!std::isnan(parentLayer->left) && !std::isnan(parentLayer->right))
+                 : (!std::isnan(parentLayer->top) && !std::isnan(parentLayer->bottom));
+  if (parentMainFromConstraints) {
+    return;
+  }
+  auto bounds = layer->layoutBounds();
+  if (bounds.width > 0 && bounds.height > 0) {
+    return;
+  }
+  const char* axis = horizontal ? "width" : "height";
+  AddDiagnostic(
+      diagnostics, layer->sourceLine, "error",
+      std::string("flex has no effect, parent has no ") + axis +
+          " to distribute. Fix: check parent sizing or use explicit size instead of flex");
+}
+
+static void DetectContentOriginOffset(const Layer* layer, const Layer* parentLayer,
+                                      std::vector<VerifyDiagnostic>& diagnostics) {
+  if (!std::isnan(layer->width) || !std::isnan(layer->height)) {
+    return;
+  }
+  bool sizeFromConstraints = (!std::isnan(layer->left) && !std::isnan(layer->right)) &&
+                             (!std::isnan(layer->top) && !std::isnan(layer->bottom));
+  if (sizeFromConstraints) {
+    return;
+  }
+  bool sizeFromFlex = layer->flex > 0 && parentLayer != nullptr &&
+                      parentLayer->layout != LayoutMode::None && layer->includeInLayout;
+  if (sizeFromFlex) {
+    return;
+  }
+  bool inParentLayout =
+      parentLayer != nullptr && parentLayer->layout != LayoutMode::None && layer->includeInLayout;
+  bool hasSizeDependentConstraint = (!std::isnan(layer->right) || !std::isnan(layer->bottom) ||
+                                     !std::isnan(layer->centerX) || !std::isnan(layer->centerY));
+  if (!inParentLayout && !hasSizeDependentConstraint) {
+    return;
+  }
+  float minX = FLT_MAX;
+  float minY = FLT_MAX;
+  bool hasChild = false;
+  for (auto* element : layer->contents) {
+    auto* layoutNode = LayoutNode::AsLayoutNode(element);
+    if (layoutNode == nullptr) {
+      continue;
+    }
+    auto bounds = layoutNode->layoutBounds();
+    if (bounds.width == 0 && bounds.height == 0) {
+      continue;
+    }
+    minX = std::min(minX, bounds.x);
+    minY = std::min(minY, bounds.y);
+    hasChild = true;
+  }
+  if (!hasChild) {
+    return;
+  }
+  static constexpr float TOLERANCE = 0.5f;
+  if (std::abs(minX) > TOLERANCE || std::abs(minY) > TOLERANCE) {
+    AddDiagnostic(diagnostics, layer->sourceLine, "error",
+                  "children start at (" + std::to_string(static_cast<int>(minX)) + "," +
+                      std::to_string(static_cast<int>(minY)) +
+                      "), not (0,0), container measurement inaccurate. Fix: shift all children so "
+                      "top-left starts at (0,0), preserving relative positions");
+  }
+}
+
+static void DetectContentOriginOffsetForGroup(const Group* group,
+                                              std::vector<VerifyDiagnostic>& diagnostics) {
+  if (!std::isnan(group->width) || !std::isnan(group->height)) {
+    return;
+  }
+  bool sizeFromConstraints = (!std::isnan(group->left) && !std::isnan(group->right)) &&
+                             (!std::isnan(group->top) && !std::isnan(group->bottom));
+  if (sizeFromConstraints) {
+    return;
+  }
+  bool hasSizeDependentConstraint = (!std::isnan(group->right) || !std::isnan(group->bottom) ||
+                                     !std::isnan(group->centerX) || !std::isnan(group->centerY));
+  if (!hasSizeDependentConstraint) {
+    return;
+  }
+  for (auto* element : group->elements) {
+    auto* node = LayoutNode::AsLayoutNode(element);
+    if (node != nullptr && node->hasConstraints()) {
+      return;
+    }
+  }
+  float minX = FLT_MAX;
+  float minY = FLT_MAX;
+  bool hasChild = false;
+  for (auto* element : group->elements) {
+    auto* layoutNode = LayoutNode::AsLayoutNode(element);
+    if (layoutNode == nullptr) {
+      continue;
+    }
+    auto bounds = layoutNode->layoutBounds();
+    if (bounds.width == 0 && bounds.height == 0) {
+      continue;
+    }
+    minX = std::min(minX, bounds.x);
+    minY = std::min(minY, bounds.y);
+    hasChild = true;
+  }
+  if (!hasChild) {
+    return;
+  }
+  static constexpr float TOLERANCE = 0.5f;
+  if (std::abs(minX) > TOLERANCE || std::abs(minY) > TOLERANCE) {
+    AddDiagnostic(diagnostics, group->sourceLine, "error",
+                  "children start at (" + std::to_string(static_cast<int>(minX)) + "," +
+                      std::to_string(static_cast<int>(minY)) +
+                      "), not (0,0), container measurement inaccurate. Fix: shift all children so "
+                      "top-left starts at (0,0), preserving relative positions");
+  }
+}
+
+static void DetectOverlappingSiblings(const Layer* parentLayer,
+                                      std::vector<VerifyDiagnostic>& diagnostics) {
+  if (parentLayer->layout == LayoutMode::None) {
+    return;
+  }
+  std::vector<std::pair<const Layer*, SpatialRect>> layoutChildren;
+  for (auto* child : parentLayer->children) {
+    if (!child->includeInLayout) {
+      continue;
+    }
+    auto bounds = child->layoutBounds();
+    SpatialRect rect = {bounds.x, bounds.y, bounds.width, bounds.height};
+    layoutChildren.emplace_back(child, rect);
+  }
+  for (size_t i = 0; i < layoutChildren.size(); i++) {
+    for (size_t j = i + 1; j < layoutChildren.size(); j++) {
+      if (RectsOverlap(layoutChildren[i].second, layoutChildren[j].second)) {
+        auto& a = layoutChildren[i];
+        auto& b = layoutChildren[j];
+        std::vector<int> lines = {a.first->sourceLine, b.first->sourceLine};
+        AddDiagnostic(diagnostics, lines, "error",
+                      "overlapping siblings " +
+                          FormatBounds(a.second.x, a.second.y, a.second.width, a.second.height) +
+                          " and " +
+                          FormatBounds(b.second.x, b.second.y, b.second.width, b.second.height) +
+                          " in container layout. Fix: check parent layout direction, gap, padding, "
+                          "and children sizes");
+      }
+    }
+  }
+}
+
+static void DetectConstraintConflicts(const LayoutNode* node, int sourceLine,
+                                      std::vector<VerifyDiagnostic>& diagnostics) {
+  if (!std::isnan(node->centerX)) {
+    if (!std::isnan(node->left) && !std::isnan(node->right)) {
+      AddDiagnostic(diagnostics, sourceLine, "error",
+                    "left and right ignored, centerX takes priority. Fix: remove left and right");
+    } else if (!std::isnan(node->left)) {
+      AddDiagnostic(diagnostics, sourceLine, "error",
+                    "left ignored, centerX takes priority. Fix: remove left");
+    } else if (!std::isnan(node->right)) {
+      AddDiagnostic(diagnostics, sourceLine, "error",
+                    "right ignored, centerX takes priority. Fix: remove right");
+    }
+  }
+  if (!std::isnan(node->centerY)) {
+    if (!std::isnan(node->top) && !std::isnan(node->bottom)) {
+      AddDiagnostic(diagnostics, sourceLine, "error",
+                    "top and bottom ignored, centerY takes priority. Fix: remove top and bottom");
+    } else if (!std::isnan(node->top)) {
+      AddDiagnostic(diagnostics, sourceLine, "error",
+                    "top ignored, centerY takes priority. Fix: remove top");
+    } else if (!std::isnan(node->bottom)) {
+      AddDiagnostic(diagnostics, sourceLine, "error",
+                    "bottom ignored, centerY takes priority. Fix: remove bottom");
+    }
+  }
+}
+
+static void DetectRedundantZeroConstraints(const LayoutNode* node, int sourceLine,
+                                           std::vector<VerifyDiagnostic>& diagnostics) {
+  if (!std::isnan(node->left) && node->left == 0.0f && std::isnan(node->right) &&
+      std::isnan(node->centerX)) {
+    AddDiagnostic(diagnostics, sourceLine, "error",
+                  "left=\"0\" redundant, same as default positioning. Fix: remove left");
+  }
+  if (!std::isnan(node->top) && node->top == 0.0f && std::isnan(node->bottom) &&
+      std::isnan(node->centerY)) {
+    AddDiagnostic(diagnostics, sourceLine, "error",
+                  "top=\"0\" redundant, same as default positioning. Fix: remove top");
+  }
+}
+
+static void DetectClippedContent(const Layer* parentLayer,
+                                 std::vector<VerifyDiagnostic>& diagnostics) {
+  if (!parentLayer->clipToBounds) {
+    return;
+  }
+  auto parentBounds = parentLayer->layoutBounds();
+  SpatialRect parent = {0, 0, parentBounds.width, parentBounds.height};
+  for (auto* child : parentLayer->children) {
+    auto childBounds = child->layoutBounds();
+    SpatialRect childRect = {childBounds.x, childBounds.y, childBounds.width, childBounds.height};
+    if (!IsFullyContained(parent, childRect)) {
+      AddDiagnostic(diagnostics, child->sourceLine, "error",
+                    "extends beyond parent bounds, content will be clipped. Fix: check element "
+                    "size/position or parent clipToBounds setting");
+    }
+  }
+}
+
+static void DetectContainerOverflow(const Layer* parentLayer,
+                                    std::vector<VerifyDiagnostic>& diagnostics) {
+  if (parentLayer->layout == LayoutMode::None) {
+    return;
+  }
+  bool horizontal = parentLayer->layout == LayoutMode::Horizontal;
+  float explicitMain = horizontal ? parentLayer->width : parentLayer->height;
+  bool mainFromConstraints =
+      horizontal ? (!std::isnan(parentLayer->left) && !std::isnan(parentLayer->right))
+                 : (!std::isnan(parentLayer->top) && !std::isnan(parentLayer->bottom));
+  if (std::isnan(explicitMain) && !mainFromConstraints) {
+    return;
+  }
+  auto parentBounds = parentLayer->layoutBounds();
+  float paddingStart = horizontal ? parentLayer->padding.left : parentLayer->padding.top;
+  float paddingEnd = horizontal ? parentLayer->padding.right : parentLayer->padding.bottom;
+  float containerMain = horizontal ? parentBounds.width : parentBounds.height;
+  float availableMain = containerMain - paddingStart - paddingEnd;
+
+  float totalFixed = 0;
+  size_t visibleCount = 0;
+  bool hasFlex = false;
+  for (auto* child : parentLayer->children) {
+    if (!child->includeInLayout) {
+      continue;
+    }
+    visibleCount++;
+    float childExplicitMain = horizontal ? child->width : child->height;
+    if (!std::isnan(childExplicitMain)) {
+      totalFixed += childExplicitMain;
+    } else if (child->flex > 0) {
+      hasFlex = true;
+    } else {
+      auto childBounds = child->layoutBounds();
+      float measured = horizontal ? childBounds.width : childBounds.height;
+      totalFixed += measured;
+    }
+  }
+  if (hasFlex) {
+    return;
+  }
+  float totalGap = parentLayer->gap * static_cast<float>(visibleCount > 1 ? visibleCount - 1 : 0);
+  float totalRequired = totalFixed + totalGap;
+  static constexpr float TOLERANCE = 0.5f;
+  if (totalRequired > availableMain + TOLERANCE) {
+    AddDiagnostic(diagnostics, parentLayer->sourceLine, "error",
+                  "children overflow parent: total " +
+                      std::to_string(static_cast<int>(totalRequired)) + "px exceeds available " +
+                      std::to_string(static_cast<int>(availableMain)) +
+                      "px. Fix: check children sizes, gap, or parent size");
+  }
+}
+
+static void DetectNegativeConstraintSize(const Layer* layer, float containerW, float containerH,
+                                         std::vector<VerifyDiagnostic>& diagnostics) {
+  if (!std::isnan(layer->left) && !std::isnan(layer->right) && !std::isnan(containerW)) {
+    float derived = containerW - layer->left - layer->right;
+    if (derived < 0) {
+      AddDiagnostic(diagnostics, layer->sourceLine, "error",
+                    "left=" + std::to_string(static_cast<int>(layer->left)) +
+                        " + right=" + std::to_string(static_cast<int>(layer->right)) + " = " +
+                        std::to_string(static_cast<int>(layer->left + layer->right)) +
+                        " exceeds parent width " + std::to_string(static_cast<int>(containerW)) +
+                        ", negative derived size. Fix: check left/right values");
+    }
+  }
+  if (!std::isnan(layer->top) && !std::isnan(layer->bottom) && !std::isnan(containerH)) {
+    float derived = containerH - layer->top - layer->bottom;
+    if (derived < 0) {
+      AddDiagnostic(diagnostics, layer->sourceLine, "error",
+                    "top=" + std::to_string(static_cast<int>(layer->top)) +
+                        " + bottom=" + std::to_string(static_cast<int>(layer->bottom)) + " = " +
+                        std::to_string(static_cast<int>(layer->top + layer->bottom)) +
+                        " exceeds parent height " + std::to_string(static_cast<int>(containerH)) +
+                        ", negative derived size. Fix: check top/bottom values");
+    }
+  }
+}
+
+static void DetectNegativeConstraintSizeForElement(const LayoutNode* layoutNode, int sourceLine,
+                                                   float containerW, float containerH,
+                                                   std::vector<VerifyDiagnostic>& diagnostics) {
+  if (layoutNode == nullptr) {
+    return;
+  }
+  if (!std::isnan(layoutNode->left) && !std::isnan(layoutNode->right) && !std::isnan(containerW)) {
+    float derived = containerW - layoutNode->left - layoutNode->right;
+    if (derived < 0) {
+      AddDiagnostic(diagnostics, sourceLine, "error",
+                    "left=" + std::to_string(static_cast<int>(layoutNode->left)) +
+                        " + right=" + std::to_string(static_cast<int>(layoutNode->right)) + " = " +
+                        std::to_string(static_cast<int>(layoutNode->left + layoutNode->right)) +
+                        " exceeds parent width " + std::to_string(static_cast<int>(containerW)) +
+                        ", negative derived size. Fix: check left/right values");
+    }
+  }
+  if (!std::isnan(layoutNode->top) && !std::isnan(layoutNode->bottom) && !std::isnan(containerH)) {
+    float derived = containerH - layoutNode->top - layoutNode->bottom;
+    if (derived < 0) {
+      AddDiagnostic(diagnostics, sourceLine, "error",
+                    "top=" + std::to_string(static_cast<int>(layoutNode->top)) + " + bottom=" +
+                        std::to_string(static_cast<int>(layoutNode->bottom)) + " = " +
+                        std::to_string(static_cast<int>(layoutNode->top + layoutNode->bottom)) +
+                        " exceeds parent height " + std::to_string(static_cast<int>(containerH)) +
+                        ", negative derived size. Fix: check top/bottom values");
+    }
+  }
+}
+
+static bool IsContentMeasuredContainer(const Group* group) {
+  if (!std::isnan(group->width) || !std::isnan(group->height)) {
+    return false;
+  }
+  bool wFromConstraints = !std::isnan(group->left) && !std::isnan(group->right);
+  bool hFromConstraints = !std::isnan(group->top) && !std::isnan(group->bottom);
+  return !wFromConstraints && !hFromConstraints;
+}
+
+static bool IsContentMeasuredContainer(const Layer* layer, const Layer* parentLayer) {
+  if (!std::isnan(layer->width) || !std::isnan(layer->height)) {
+    return false;
+  }
+  bool wFromConstraints = !std::isnan(layer->left) && !std::isnan(layer->right);
+  bool hFromConstraints = !std::isnan(layer->top) && !std::isnan(layer->bottom);
+  if (wFromConstraints || hFromConstraints) {
+    return false;
+  }
+  if (layer->flex > 0 && parentLayer != nullptr && parentLayer->layout != LayoutMode::None &&
+      layer->includeInLayout) {
+    return false;
+  }
+  return true;
+}
+
+static void DetectIneffectiveCentering(const std::vector<Element*>& elements,
+                                       std::vector<VerifyDiagnostic>& diagnostics) {
+  for (auto* element : elements) {
+    auto* layoutNode = LayoutNode::AsLayoutNode(element);
+    if (layoutNode == nullptr) {
+      continue;
+    }
+    bool hasCenterX = !std::isnan(layoutNode->centerX);
+    bool hasCenterY = !std::isnan(layoutNode->centerY);
+    if (!hasCenterX && !hasCenterY) {
+      continue;
+    }
+    auto type = element->nodeType();
+    if (type == NodeType::Group || type == NodeType::TextBox) {
+      continue;
+    }
+    if (hasCenterX) {
+      AddDiagnostic(diagnostics, element->sourceLine, "error",
+                    "centerX ineffective: parent is content-measured, centering relative to own "
+                    "size. Fix: move centerX to the Group/Layer itself");
+    }
+    if (hasCenterY) {
+      AddDiagnostic(diagnostics, element->sourceLine, "error",
+                    "centerY ineffective: parent is content-measured, centering relative to own "
+                    "size. Fix: move centerY to the Group/Layer itself");
+    }
+  }
+}
+
+static void DetectNestedTextBox(const TextBox* textBox, const TextBox* parentTextBox,
+                                std::vector<VerifyDiagnostic>& diagnostics) {
+  if (parentTextBox != nullptr) {
+    AddDiagnostic(diagnostics, textBox->sourceLine, "error",
+                  "nested TextBox, inner layout overridden by outer TextBox. "
+                  "Fix: check if inner TextBox should be removed");
+  }
+}
+
+static void DetectOffCanvas(const Layer* layer, float canvasWidth, float canvasHeight,
+                            std::vector<VerifyDiagnostic>& diagnostics) {
+  auto bounds = layer->layoutBounds();
+  if (bounds.width <= 0 || bounds.height <= 0) {
+    return;
+  }
+  bool intersects = bounds.x < canvasWidth && bounds.x + bounds.width > 0 &&
+                    bounds.y < canvasHeight && bounds.y + bounds.height > 0;
+  if (!intersects) {
+    AddDiagnostic(diagnostics, layer->sourceLine, "error",
+                  "completely outside canvas bounds, not visible. "
+                  "Fix: check if this Layer should be repositioned or removed");
+  }
+}
+
+static void RunSpatialDetectionOnElements(const std::vector<Element*>& elements,
+                                          const TextBox* parentTextBox, float containerW,
+                                          float containerH,
+                                          std::vector<VerifyDiagnostic>& diagnostics);
+
+static void RunSpatialDetectionOnElements(const std::vector<Element*>& elements,
+                                          const TextBox* parentTextBox, float containerW,
+                                          float containerH,
+                                          std::vector<VerifyDiagnostic>& diagnostics) {
+  for (auto* element : elements) {
+    auto type = element->nodeType();
+    auto* layoutNode = LayoutNode::AsLayoutNode(element);
+    if (layoutNode != nullptr) {
+      DetectConstraintConflicts(layoutNode, element->sourceLine, diagnostics);
+      DetectNegativeConstraintSizeForElement(layoutNode, element->sourceLine, containerW,
+                                             containerH, diagnostics);
+    }
+    if (type == NodeType::Group) {
+      auto* group = static_cast<const Group*>(element);
+      if (IsContentMeasuredContainer(group)) {
+        DetectIneffectiveCentering(group->elements, diagnostics);
+      }
+      DetectContentOriginOffsetForGroup(group, diagnostics);
+      auto bounds = group->layoutBounds();
+      RunSpatialDetectionOnElements(group->elements, parentTextBox, bounds.width, bounds.height,
+                                    diagnostics);
+    } else if (type == NodeType::TextBox) {
+      auto* textBox = static_cast<const TextBox*>(element);
+      DetectNestedTextBox(textBox, parentTextBox, diagnostics);
+      auto bounds = textBox->layoutBounds();
+      RunSpatialDetectionOnElements(textBox->elements, textBox, bounds.width, bounds.height,
+                                    diagnostics);
+    }
+  }
+}
+
+static void RunSpatialDetectionOnLayer(const Layer* layer, const Layer* parentLayer,
+                                       float canvasWidth, float canvasHeight,
+                                       std::vector<VerifyDiagnostic>& diagnostics) {
+  DetectZeroSize(layer, parentLayer, diagnostics);
+  DetectConstraintsIgnoredByLayout(layer, parentLayer, diagnostics);
+  DetectFlexInContentMeasuredParent(layer, parentLayer, diagnostics);
+  DetectContentOriginOffset(layer, parentLayer, diagnostics);
+  DetectOverlappingSiblings(layer, diagnostics);
+  DetectConstraintConflicts(layer, layer->sourceLine, diagnostics);
+  DetectRedundantZeroConstraints(layer, layer->sourceLine, diagnostics);
+  DetectClippedContent(layer, diagnostics);
+  DetectContainerOverflow(layer, diagnostics);
+
+  auto parentBounds = parentLayer != nullptr ? parentLayer->layoutBounds() : Rect{0, 0, 0, 0};
+  float containerW = parentLayer != nullptr ? parentBounds.width : canvasWidth;
+  float containerH = parentLayer != nullptr ? parentBounds.height : canvasHeight;
+  if (parentLayer == nullptr ||
+      (parentLayer->layout == LayoutMode::None || !layer->includeInLayout)) {
+    DetectNegativeConstraintSize(layer, containerW, containerH, diagnostics);
+  }
+
+  if (IsContentMeasuredContainer(layer, parentLayer)) {
+    DetectIneffectiveCentering(layer->contents, diagnostics);
+  }
+
+  auto layerBounds = layer->layoutBounds();
+  RunSpatialDetectionOnElements(layer->contents, nullptr, layerBounds.width, layerBounds.height,
+                                diagnostics);
+
+  for (auto* child : layer->children) {
+    RunSpatialDetectionOnLayer(child, layer, canvasWidth, canvasHeight, diagnostics);
+  }
+}
+
+static void RunSpatialDetection(const PAGXDocument* doc,
+                                std::vector<VerifyDiagnostic>& diagnostics) {
+  for (auto* layer : doc->layers) {
+    DetectOffCanvas(layer, doc->width, doc->height, diagnostics);
+    RunSpatialDetectionOnLayer(layer, nullptr, doc->width, doc->height, diagnostics);
+  }
+}
+
+// ============================================================================
+// Layout XML Output
+// ============================================================================
+
+static std::string EscapeXmlAttr(const std::string& s) {
+  std::string out;
+  for (char c : s) {
+    switch (c) {
+      case '&':
+        out += "&amp;";
+        break;
+      case '"':
+        out += "&quot;";
+        break;
+      case '<':
+        out += "&lt;";
+        break;
+      case '>':
+        out += "&gt;";
+        break;
+      default:
+        out += c;
+    }
+  }
+  return out;
+}
+
+static void WriteLayoutElement(std::ostream& os, const Element* element, int indent);
+static void WriteLayoutLayer(std::ostream& os, const Layer* layer, int indent);
+
+static void WriteLayoutElement(std::ostream& os, const Element* element, int indent) {
+  std::string pad(indent * 2, ' ');
+  auto type = element->nodeType();
+  std::string tagName = NodeTypeName(type);
+
+  os << pad << "<" << tagName;
+  if (element->sourceLine >= 0) {
+    os << " line=\"" << element->sourceLine << "\"";
+  }
+  if (!element->id.empty()) {
+    os << " id=\"" << EscapeXmlAttr(element->id) << "\"";
+  }
+
+  auto* layoutNode = LayoutNode::AsLayoutNode(const_cast<Element*>(element));
+  if (layoutNode != nullptr) {
+    auto bounds = layoutNode->layoutBounds();
+    os << " bounds=\"" << static_cast<int>(bounds.x) << "," << static_cast<int>(bounds.y) << ","
+       << static_cast<int>(bounds.width) << "," << static_cast<int>(bounds.height) << "\"";
+  }
+
+  if (type == NodeType::Group || type == NodeType::TextBox) {
+    auto* group = static_cast<const Group*>(element);
+    if (group->elements.empty()) {
+      os << "/>\n";
+    } else {
+      os << ">\n";
+      for (auto* child : group->elements) {
+        WriteLayoutElement(os, child, indent + 1);
+      }
+      os << pad << "</" << tagName << ">\n";
+    }
+  } else {
+    os << "/>\n";
+  }
+}
+
+static void WriteLayoutLayer(std::ostream& os, const Layer* layer, int indent) {
+  std::string pad(indent * 2, ' ');
+
+  os << pad << "<Layer";
+  if (layer->sourceLine >= 0) {
+    os << " line=\"" << layer->sourceLine << "\"";
+  }
+  if (!layer->id.empty()) {
+    os << " id=\"" << EscapeXmlAttr(layer->id) << "\"";
+  }
+
+  auto bounds = layer->layoutBounds();
+  os << " bounds=\"" << static_cast<int>(bounds.x) << "," << static_cast<int>(bounds.y) << ","
+     << static_cast<int>(bounds.width) << "," << static_cast<int>(bounds.height) << "\"";
+
+  if (layer->layout == LayoutMode::Horizontal) {
+    os << " layout=\"horizontal\"";
+  } else if (layer->layout == LayoutMode::Vertical) {
+    os << " layout=\"vertical\"";
+  }
+  if (layer->gap != 0) {
+    os << " gap=\"" << static_cast<int>(layer->gap) << "\"";
+  }
+  if (layer->flex != 0) {
+    os << " flex=\"" << static_cast<int>(layer->flex) << "\"";
+  }
+  if (!layer->padding.isZero()) {
+    bool allEqual = (layer->padding.top == layer->padding.right &&
+                     layer->padding.right == layer->padding.bottom &&
+                     layer->padding.bottom == layer->padding.left);
+    bool vhEqual = (layer->padding.top == layer->padding.bottom &&
+                    layer->padding.left == layer->padding.right);
+    if (allEqual) {
+      os << " padding=\"" << static_cast<int>(layer->padding.top) << "\"";
+    } else if (vhEqual) {
+      os << " padding=\"" << static_cast<int>(layer->padding.top) << ","
+         << static_cast<int>(layer->padding.left) << "\"";
+    } else {
+      os << " padding=\"" << static_cast<int>(layer->padding.top) << ","
+         << static_cast<int>(layer->padding.right) << "," << static_cast<int>(layer->padding.bottom)
+         << "," << static_cast<int>(layer->padding.left) << "\"";
+    }
+  }
+  if (layer->alignment != Alignment::Stretch) {
+    switch (layer->alignment) {
+      case Alignment::Start:
+        os << " alignment=\"start\"";
+        break;
+      case Alignment::Center:
+        os << " alignment=\"center\"";
+        break;
+      case Alignment::End:
+        os << " alignment=\"end\"";
+        break;
+      default:
+        break;
+    }
+  }
+  if (layer->arrangement != Arrangement::Start) {
+    switch (layer->arrangement) {
+      case Arrangement::Center:
+        os << " arrangement=\"center\"";
+        break;
+      case Arrangement::End:
+        os << " arrangement=\"end\"";
+        break;
+      case Arrangement::SpaceBetween:
+        os << " arrangement=\"spaceBetween\"";
+        break;
+      case Arrangement::SpaceEvenly:
+        os << " arrangement=\"spaceEvenly\"";
+        break;
+      case Arrangement::SpaceAround:
+        os << " arrangement=\"spaceAround\"";
+        break;
+      default:
+        break;
+    }
+  }
+  if (!layer->includeInLayout) {
+    os << " includeInLayout=\"false\"";
+  }
+  if (layer->clipToBounds) {
+    os << " clipToBounds=\"true\"";
+  }
+
+  bool hasChildren = !layer->contents.empty() || !layer->children.empty();
+  if (!hasChildren) {
+    os << "/>\n";
+    return;
+  }
+
+  os << ">\n";
+  for (auto* element : layer->contents) {
+    WriteLayoutElement(os, element, indent + 1);
+  }
+  for (auto* child : layer->children) {
+    WriteLayoutLayer(os, child, indent + 1);
+  }
+  os << pad << "</Layer>\n";
+}
+
+static std::string GenerateLayoutXml(const PAGXDocument* doc, const Layer* targetLayer) {
+  std::ostringstream oss;
+  oss << "<layout>\n";
+  if (targetLayer != nullptr) {
+    WriteLayoutLayer(oss, targetLayer, 1);
+  } else {
+    oss << "  <pagx width=\"" << static_cast<int>(doc->width) << "\" height=\""
+        << static_cast<int>(doc->height) << "\">\n";
+    for (auto* layer : doc->layers) {
+      WriteLayoutLayer(oss, layer, 2);
+    }
+    oss << "  </pagx>\n";
+  }
+  oss << "</layout>\n";
+  return oss.str();
+}
+
+// ============================================================================
+// Output
+// ============================================================================
+
+static void SortDiagnostics(std::vector<VerifyDiagnostic>& diagnostics) {
+  std::sort(diagnostics.begin(), diagnostics.end(),
+            [](const VerifyDiagnostic& a, const VerifyDiagnostic& b) {
+              int lineA = a.lines.empty() ? 0 : a.lines[0];
+              int lineB = b.lines.empty() ? 0 : b.lines[0];
+              return lineA < lineB;
+            });
+}
+
+static void PrintDiagnosticsText(const std::vector<VerifyDiagnostic>& diagnostics,
+                                 const std::string& file) {
+  for (const auto& diag : diagnostics) {
+    std::cerr << file << ":";
+    if (!diag.lines.empty()) {
+      for (size_t i = 0; i < diag.lines.size(); i++) {
+        if (i > 0) {
+          std::cerr << ",";
+        }
+        std::cerr << diag.lines[i];
+      }
+    }
+    std::cerr << ": " << diag.category << ": " << diag.message << "\n";
+  }
+}
+
+static void PrintDiagnosticsJson(const std::vector<VerifyDiagnostic>& diagnostics,
+                                 const std::string& file) {
+  std::cout << "{\"file\": \"" << EscapeJson(file)
+            << "\", \"ok\": " << (diagnostics.empty() ? "true" : "false") << ", \"diagnostics\": [";
+  for (size_t i = 0; i < diagnostics.size(); i++) {
+    if (i > 0) {
+      std::cout << ", ";
+    }
+    std::cout << "{\"lines\": [";
+    for (size_t j = 0; j < diagnostics[i].lines.size(); j++) {
+      if (j > 0) {
+        std::cout << ", ";
+      }
+      std::cout << diagnostics[i].lines[j];
+    }
+    std::cout << "], \"category\": \"" << EscapeJson(diagnostics[i].category)
+              << "\", \"message\": \"" << EscapeJson(diagnostics[i].message) << "\"}";
+  }
+  std::cout << "]}\n";
+}
+
+// ============================================================================
+// File Helpers
+// ============================================================================
+
+static std::string GetBaseName(const std::string& path) {
+  auto slash = path.rfind('/');
+  auto base = (slash != std::string::npos) ? path.substr(slash + 1) : path;
+  auto dot = base.rfind('.');
+  if (dot != std::string::npos) {
+    return base.substr(0, dot);
+  }
+  return base;
+}
+
+static std::string GetDirectory(const std::string& path) {
+  auto slash = path.rfind('/');
+  if (slash != std::string::npos) {
+    return path.substr(0, slash + 1);
+  }
+  return "./";
+}
+
+// ============================================================================
+// Command
+// ============================================================================
+
+static void PrintUsage() {
+  std::cout << "Usage: pagx verify [options] <file.pagx>\n"
+            << "\n"
+            << "Validate a PAGX file: run all checks, optionally output layout and render.\n"
+            << "\n"
+            << "Options:\n"
+            << "  --id <id>           Limit scope to the Layer with the specified id\n"
+            << "  --scale <float>     Render scale factor (default: 1.0)\n"
+            << "  --problems-only     Only output diagnostics, no layout or render\n"
+            << "  --json              Output diagnostics in JSON format\n"
+            << "  -h, --help          Show this help message\n";
+}
+
+static int ParseOptions(int argc, char* argv[], VerifyOptions* opts) {
+  for (int i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "--id") == 0) {
+      if (i + 1 >= argc) {
+        std::cerr << "pagx verify: --id requires an argument\n";
+        return 1;
+      }
+      opts->id = argv[++i];
+    } else if (strcmp(argv[i], "--scale") == 0) {
+      if (i + 1 >= argc) {
+        std::cerr << "pagx verify: --scale requires an argument\n";
+        return 1;
+      }
+      opts->scale = static_cast<float>(atof(argv[++i]));
+      // scale explicitly set
+    } else if (strcmp(argv[i], "--problems-only") == 0) {
+      opts->problemsOnly = true;
+    } else if (strcmp(argv[i], "--json") == 0) {
+      opts->jsonOutput = true;
+    } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
+      PrintUsage();
+      return -1;
+    } else if (argv[i][0] == '-') {
+      std::cerr << "pagx verify: unknown option '" << argv[i] << "'\n";
+      return 1;
+    } else {
+      opts->inputFile = argv[i];
+    }
+  }
+  if (opts->inputFile.empty()) {
+    std::cerr << "pagx verify: missing input file\n";
+    return 1;
+  }
+  return 0;
+}
+
+int RunVerify(int argc, char* argv[]) {
+  VerifyOptions opts;
+  int rc = ParseOptions(argc, argv, &opts);
+  if (rc != 0) {
+    return rc == -1 ? 0 : rc;
+  }
+
+  // Step 1: Resolve all <Import> nodes in the file (full file, idempotent).
+  std::vector<std::string> resolveArgs = {"pagx", "import", "--resolve", opts.inputFile};
+  std::vector<char*> resolveArgv;
+  for (auto& arg : resolveArgs) {
+    resolveArgv.push_back(const_cast<char*>(arg.c_str()));
+  }
+  resolveArgv.push_back(nullptr);
+  RunImport(static_cast<int>(resolveArgs.size()), resolveArgv.data());
+
+  // Step 2: Load document and compute layout.
+  auto doc = PAGXImporter::FromFile(opts.inputFile);
+  if (doc == nullptr) {
+    std::cerr << "pagx verify: failed to load '" << opts.inputFile << "'\n";
+    return 1;
+  }
+
+  doc->applyLayout();
+
+  const Layer* targetLayer = nullptr;
+  if (!opts.id.empty()) {
+    targetLayer = doc->findNode<Layer>(opts.id);
+    if (targetLayer == nullptr) {
+      std::cerr << "pagx verify: node not found: " << opts.id << "\n";
+      return 1;
+    }
+  }
+
+  std::vector<VerifyDiagnostic> diagnostics;
+  RunStaticDetection(doc.get(), diagnostics);
+  RunSpatialDetection(doc.get(), diagnostics);
+
+  SortDiagnostics(diagnostics);
+
+  if (opts.jsonOutput) {
+    PrintDiagnosticsJson(diagnostics, opts.inputFile);
+  } else if (!diagnostics.empty()) {
+    PrintDiagnosticsText(diagnostics, opts.inputFile);
+  }
+
+  if (opts.problemsOnly) {
+    return diagnostics.empty() ? 0 : 1;
+  }
+
+  std::string baseName = GetBaseName(opts.inputFile);
+  std::string dir = GetDirectory(opts.inputFile);
+  std::string suffix = opts.id.empty() ? "" : ("." + opts.id);
+
+  std::string layoutPath = dir + baseName + suffix + ".layout.xml";
+  auto layoutXml = GenerateLayoutXml(doc.get(), targetLayer);
+  std::ofstream layoutFile(layoutPath);
+  if (layoutFile.is_open()) {
+    layoutFile << layoutXml;
+    layoutFile.close();
+    std::cerr << "Wrote " << layoutPath << "\n";
+  } else {
+    std::cerr << "pagx verify: failed to write " << layoutPath << "\n";
+  }
+
+  std::string pngPath = dir + baseName + suffix + ".png";
+  std::vector<std::string> renderArgs = {"pagx", "render", "--scale", std::to_string(opts.scale),
+                                         "-o",   pngPath};
+  if (!opts.id.empty()) {
+    renderArgs.push_back("--id");
+    renderArgs.push_back(opts.id);
+  }
+  renderArgs.push_back(opts.inputFile);
+
+  std::vector<char*> renderArgv;
+  for (auto& arg : renderArgs) {
+    renderArgv.push_back(const_cast<char*>(arg.c_str()));
+  }
+  renderArgv.push_back(nullptr);
+
+  auto bitmap = RenderToBitmap(static_cast<int>(renderArgs.size()), renderArgv.data());
+  if (!bitmap.isEmpty()) {
+    std::cerr << "Wrote " << pngPath << " (" << bitmap.width() << "x" << bitmap.height() << " @"
+              << static_cast<int>(opts.scale) << "x)\n";
+  }
+
+  return diagnostics.empty() ? 0 : 1;
+}
+
+}  // namespace pagx::cli

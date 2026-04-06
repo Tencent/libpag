@@ -194,11 +194,13 @@ static T* makeNodeFromXML(const DOMNode* xmlNode, PAGXDocument* doc) {
   auto* existing = id.empty() ? nullptr : doc->findNode(id);
   if (existing) {
     parseCustomData(xmlNode, existing);
+    existing->sourceLine = xmlNode->line;
     return static_cast<T*>(existing);
   }
   auto* node = doc->makeNode<T>(id);
   if (node) {
     parseCustomData(xmlNode, node);
+    node->sourceLine = xmlNode->line;
   }
   return node;
 }
@@ -708,6 +710,7 @@ static Path* parsePath(const DOMNode* node, PAGXDocument* doc) {
     } else {
       // Inline path data
       path->data = doc->makeNode<PathData>();
+      path->data->sourceLine = node->line;
       *path->data = PathDataFromSVGString(dataAttr);
     }
   }
@@ -961,6 +964,7 @@ static TextPath* parseTextPath(const DOMNode* node, PAGXDocument* doc) {
     } else {
       // Inline path data
       textPath->path = doc->makeNode<PathData>();
+      textPath->path->sourceLine = node->line;
       *textPath->path = PathDataFromSVGString(pathAttr);
     }
   }
@@ -1357,6 +1361,7 @@ static Glyph* parseGlyph(const DOMNode* node, PAGXDocument* doc) {
       }
     } else {
       glyph->path = doc->makeNode<PathData>();
+      glyph->path->sourceLine = node->line;
       *glyph->path = PathDataFromSVGString(pathAttr);
     }
   }

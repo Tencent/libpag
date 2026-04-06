@@ -2133,6 +2133,84 @@ Since painters do not clear the geometry list, the same geometry can have multip
 
 ---
 
+## 7. Build Directives
+
+Build directives are preprocessing instructions embedded in a PAGX file. They are **not
+rendered directly** — they must be resolved into native PAGX nodes by a build tool before
+the file can be rendered or validated.
+
+### 7.1 Import
+
+The `<Import>` element embeds external content (e.g., SVG) into a PAGX file. It appears
+inside a `<Layer>` at the VectorElement level and is resolved by `pagx import --resolve`
+into native PAGX nodes.
+
+#### Attributes
+
+| Attribute | Type | Default | Required | Description |
+|-----------|------|---------|----------|-------------|
+| `source` | string | — | No | Path to external file, relative to the PAGX file. When omitted, content is provided inline as child elements. |
+| `format` | string | — | No | Force input format (e.g., `svg`). When omitted, inferred from child element tag name (inline) or `source` file extension (external). |
+
+#### Inline Mode
+
+When `source` is omitted, the `<Import>` element contains the external content as child
+elements. The format is inferred from the root child element's tag name (e.g., `<svg>`).
+
+```xml
+<Layer id="shareIcon" centerX="0" centerY="0">
+  <Import>
+    <svg viewBox="0 0 24 24">
+      <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8" fill="none"
+            stroke="#7F8C8D" stroke-width="1.5" stroke-linecap="round"/>
+      <polyline points="16,6 12,2 8,6" fill="none"
+               stroke="#7F8C8D" stroke-width="1.5" stroke-linecap="round"
+               stroke-linejoin="round"/>
+      <line x1="12" y1="2" x2="12" y2="15" fill="none"
+            stroke="#7F8C8D" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+  </Import>
+</Layer>
+```
+
+#### External Mode
+
+When `source` is set, the `<Import>` element references an external file. The format is
+inferred from the file extension unless `format` is explicitly specified.
+
+```xml
+<Layer id="logoIcon" centerX="0" centerY="0">
+  <Import source="assets/logo.svg"/>
+</Layer>
+
+<!-- Explicit format when extension is ambiguous -->
+<Layer id="icon" centerX="0" centerY="0">
+  <Import source="assets/drawing.xml" format="svg"/>
+</Layer>
+```
+
+#### Resolution
+
+The `pagx import --resolve` command processes all `<Import>` nodes in a PAGX file:
+
+1. For each `<Import>` node, reads the content (inline child elements or external file)
+2. Converts the content into native PAGX nodes (e.g., SVG elements become Rectangle,
+   Ellipse, Path, Fill, Stroke, Group nodes)
+3. Replaces the `<Import>` element with the converted nodes
+4. Sets the parent Layer's `width` and `height` from the source dimensions (e.g., SVG
+   `viewBox` or `width`/`height` attributes)
+
+After resolution, the file contains only native PAGX nodes — no `<Import>` elements remain.
+
+#### Tool Behavior
+
+Tools that process PAGX files report an error when encountering unresolved `<Import>` nodes:
+
+- **`pagx verify`**: Automatically resolves all `<Import>` nodes before checking. If resolve fails, reports the error.
+- **`pagx render`**: Reports error — `unresolved <Import> node`, refuses to render.
+
+---
+
 ## Appendix A. Node Hierarchy
 
 This appendix describes node categorization and nesting rules.
@@ -2151,6 +2229,7 @@ This appendix describes node categorization and nesting rules.
 | **Geometry Elements** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` | Drawable shapes and text. Must be inside Layer/Group. |
 | **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `TextBox`, `Repeater` | Transform or combine geometry and text. |
 | **Painters** | `Fill`, `Stroke` | Apply color/gradient to geometry. Must be inside Layer/Group. |
+| **Build Directives** | `Import` | Build-time preprocessing directive. Resolved by `pagx import --resolve` into native PAGX nodes. Must be inside Layer. |
 
 ### A.2 Document Containment
 
@@ -2160,6 +2239,7 @@ The root element `<pagx>` **only accepts `<Layer>` and `<Resources>` as direct c
 pagx (required attributes: version, width, height)
 ├── Layer*                      ← Direct children MUST be Layer
 │   ├── VectorElement* (see A.3)
+│   ├── Import* (build directive, see §7)
 │   ├── DropShadowStyle*
 │   ├── InnerShadowStyle*
 │   ├── BackgroundBlurStyle*
@@ -2212,7 +2292,8 @@ Layer / Group
 ├── TextPath
 ├── TextBox
 ├── Repeater
-└── Group* (recursive)
+├── Group* (recursive)
+└── Import (build directive, see §7)
 ```
 
 ---

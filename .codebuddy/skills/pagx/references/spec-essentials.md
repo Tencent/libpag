@@ -56,7 +56,7 @@ Color syntax follows **CSS Color Level 4** conventions: HEX and `srgb()` match C
 
 ---
 
-## 2. Node Classification (40 node types)
+## 2. Node Classification (41 node types)
 
 | Category | Nodes |
 |----------|-------|
@@ -70,6 +70,7 @@ Color syntax follows **CSS Color Level 4** conventions: HEX and `srgb()` match C
 | **Geometry Elements** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` |
 | **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `Repeater` |
 | **Painters** | `Fill`, `Stroke` |
+| **Build Directives** | `Import` |
 
 **Key distinction**:
 - **Document Root** (`pagx`): Entry point. Direct children must be `<Layer>` or `<Resources>` only.
@@ -82,6 +83,7 @@ Color syntax follows **CSS Color Level 4** conventions: HEX and `srgb()` match C
 pagx (required: version, width, height)
 ├── Layer*                         ← direct children MUST be Layer
 │   ├── VectorElements* (geometry, modifiers, painters, Groups, TextBox)
+│   ├── Import* (build directive, resolved by pagx import --resolve)
 │   ├── LayerStyles* (DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle)
 │   ├── LayerFilters* (BlurFilter, DropShadowFilter, ...)
 │   └── Layer* (child layers, recursive)
@@ -730,3 +732,62 @@ For advanced cases requiring a custom clip region with offset (e.g. scroll views
 
 - GlyphID = list index + 1 (GlyphID 0 = missing glyph).
 - All Glyphs in one Font must be the same type (all path or all image).
+
+---
+
+## 12. Build Directives
+
+### Import
+
+`<Import>` is a build-time preprocessing directive that embeds external content (e.g., SVG)
+into a PAGX file. It is **not rendered directly** — it must be resolved into native PAGX
+nodes by running `pagx import --resolve` before rendering or linting.
+
+**Placement**: Inside a `<Layer>`, at the VectorElement level.
+
+**Attributes**:
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `source` | string | — | Path to external file (relative to the PAGX file). Omit for inline content. |
+| `format` | string | — | Force input format (`svg`). Omit to infer from child element tag (inline) or `source` extension (external). |
+
+**Inline mode** — SVG content as child elements:
+
+```xml
+<Layer id="shareIcon" centerX="0" centerY="0">
+  <Import>
+    <svg viewBox="0 0 24 24">
+      <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8" fill="none"
+            stroke="#7F8C8D" stroke-width="1.5" stroke-linecap="round"/>
+      <polyline points="16,6 12,2 8,6" fill="none"
+               stroke="#7F8C8D" stroke-width="1.5" stroke-linecap="round"
+               stroke-linejoin="round"/>
+      <line x1="12" y1="2" x2="12" y2="15" fill="none"
+            stroke="#7F8C8D" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+  </Import>
+</Layer>
+```
+
+**External mode** — reference an SVG file:
+
+```xml
+<Layer id="logoIcon" centerX="0" centerY="0">
+  <Import source="assets/logo.svg"/>
+</Layer>
+```
+
+**Explicit format** — when file extension is ambiguous:
+
+```xml
+<Import source="assets/drawing.xml" format="svg"/>
+```
+
+**Resolution**: `pagx import --resolve input.pagx` scans all `<Import>` nodes, converts
+their content to native PAGX nodes, replaces the `<Import>` element, and sets the parent
+Layer's `width`/`height` from the source dimensions (e.g., SVG `viewBox`).
+
+**Tool behavior for unresolved `<Import>`**:
+- `pagx verify`: automatically resolves all `<Import>` nodes before checking. If resolve fails, reports the error.
+- `pagx render`: reports error — `unresolved <Import> node`, refuses to render.
