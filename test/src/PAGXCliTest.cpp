@@ -1485,8 +1485,8 @@ CLI_TEST(PAGXCliTest, Export_PagxToPptx_NoConvertTextToPath) {
 CLI_TEST(PAGXCliTest, Export_PagxToPptx_NoBakeMask) {
   auto inputPath = TestResourcePath("validate_simple.pagx");
   auto outputPath = TempDir() + "/ExportPPTX_NoBakeMask.pptx";
-  auto ret = CallRun(pagx::cli::RunExport,
-                     {"export", "--ppt-no-bake-mask", "--input", inputPath, "--output", outputPath});
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--ppt-no-bake-mask", "--input", inputPath,
+                                            "--output", outputPath});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(outputPath));
 }
