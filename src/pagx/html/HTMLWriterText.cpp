@@ -1232,6 +1232,7 @@ void HTMLWriter::writeGroup(HTMLBuilder& out, const Group* group, float alpha, b
   std::string style = "position:relative";
   if (!gm.isIdentity()) {
     style += ";transform:" + MatrixToCSS(gm);
+    style += ";transform-origin:0 0";
   }
   if (group->alpha < 1.0f) {
     float ea = distribute ? (group->alpha * alpha) : group->alpha;
@@ -1306,6 +1307,7 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
       std::string s = "position:absolute";
       if (!m.isIdentity()) {
         s += ";transform:" + MatrixToCSS(m);
+        s += ";transform-origin:0 0";
       }
       if (ea < 1.0f) {
         s += ";opacity:" + FloatToString(ea);
