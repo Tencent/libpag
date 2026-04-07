@@ -411,6 +411,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   std::string transform = LayerTransformCSS(layer);
   if (!transform.empty()) {
     style += ";transform:" + transform;
+    style += ";transform-origin:0 0";
   }
 
   if (layer->preserve3D) {
