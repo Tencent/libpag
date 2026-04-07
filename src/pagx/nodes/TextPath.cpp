@@ -18,7 +18,7 @@
 
 #include "pagx/nodes/TextPath.h"
 #include <cmath>
-#include "pagx/layout/LayoutNode.h"
+#include "pagx/nodes/LayoutNode.h"
 #include "pagx/types/Matrix.h"
 
 namespace pagx {

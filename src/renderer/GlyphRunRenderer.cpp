@@ -19,6 +19,7 @@
 #include "GlyphRunRenderer.h"
 #include <cmath>
 #include "pagx/ShapedText.h"
+#include "pagx/TextLayout.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Image.h"

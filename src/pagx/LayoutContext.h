@@ -21,6 +21,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "TypefaceHolder.h"
 #include "pagx/FontConfig.h"
 
 namespace tgfx {

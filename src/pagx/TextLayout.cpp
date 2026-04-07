@@ -1494,8 +1494,8 @@ void TextLayout::StoreShapedText(Text* text, ShapedText&& shapedText) {
   if (text == nullptr || shapedText.textBlob == nullptr) {
     return;
   }
-  text->textBlob = std::move(shapedText.textBlob);
-  text->anchors = std::move(shapedText.anchors);
+  text->privateData->textBlob = std::move(shapedText.textBlob);
+  text->privateData->anchors = std::move(shapedText.anchors);
 }
 
 void TextLayout::CollectTextElements(const std::vector<Element*>& elements,

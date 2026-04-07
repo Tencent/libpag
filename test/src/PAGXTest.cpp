@@ -4812,7 +4812,7 @@ PAGX_TEST(PAGXTest, TextLayoutGlyphRunIntegrity) {
   doc->setFontConfig(fontConfig);
   doc->applyLayout();
 
-  auto& layoutRuns = text->getLayoutRuns();
+  auto& layoutRuns = text->privateData->layoutRuns;
   ASSERT_FALSE(layoutRuns.empty());
 
   size_t totalGlyphs = 0;
@@ -4858,7 +4858,7 @@ PAGX_TEST(PAGXTest, TextBoxLayoutGlyphRunIntegrity) {
   doc->setFontConfig(fontConfig);
   doc->applyLayout();
 
-  auto& layoutRuns = text->getLayoutRuns();
+  auto& layoutRuns = text->privateData->layoutRuns;
   ASSERT_FALSE(layoutRuns.empty());
   size_t totalGlyphs = 0;
   for (auto& run : layoutRuns) {
@@ -4949,7 +4949,7 @@ PAGX_TEST(PAGXTest, VerticalTextLayoutGlyphRun) {
   doc->setFontConfig(fontConfig);
   doc->applyLayout();
 
-  auto& layoutRuns = text->getLayoutRuns();
+  auto& layoutRuns = text->privateData->layoutRuns;
   ASSERT_FALSE(layoutRuns.empty());
 
   // Vertical Latin text should have per-glyph xforms (rotation for sideways glyphs).
@@ -5005,12 +5005,12 @@ PAGX_TEST(PAGXTest, TextBoundsDirectValidation) {
   doc->applyLayout();
 
   // Standalone Text: textBounds should have positive width and height.
-  auto standaloneBounds = standalone->getTextBounds();
+  auto standaloneBounds = standalone->textBounds;
   EXPECT_GT(standaloneBounds.width, 0);
   EXPECT_GT(standaloneBounds.height, 0);
 
   // TextBox child Text: textBounds should also have positive dimensions.
-  auto boxTextBounds = boxText->getTextBounds();
+  auto boxTextBounds = boxText->textBounds;
   EXPECT_GT(boxTextBounds.width, 0);
   EXPECT_GT(boxTextBounds.height, 0);
 }

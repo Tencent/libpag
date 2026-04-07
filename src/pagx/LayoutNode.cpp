@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/layout/LayoutNode.h"
+#include "pagx/nodes/LayoutNode.h"
 #include <algorithm>
 #include <cmath>
 #include "LayoutContext.h"

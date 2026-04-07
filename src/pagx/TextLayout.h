@@ -29,8 +29,27 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/RSXform.h"
+#include "tgfx/core/TextBlob.h"
 
 namespace pagx {
+
+/**
+ * A run of positioned glyphs with the same font, produced by the text layout engine.
+ * Coordinates are in the layout coordinate system: TextBox coordinates for TextBox children,
+ * Text local coordinates for standalone Text. GlyphIDs reference the original (source) font.
+ */
+struct TextLayoutGlyphRun {
+  tgfx::Font font = {};
+  std::vector<tgfx::GlyphID> glyphs = {};
+  std::vector<tgfx::Point> positions = {};
+  std::vector<tgfx::RSXform> xforms = {};
+};
+
+struct Text::PrivateData {
+  std::shared_ptr<tgfx::TextBlob> textBlob = nullptr;
+  std::vector<tgfx::Point> anchors = {};
+  std::vector<TextLayoutGlyphRun> layoutRuns = {};
+};
 
 class Element;
 class LayoutContext;

@@ -33,7 +33,6 @@
 #include "cli/LayoutUtils.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXImporter.h"
-#include "pagx/layout/LayoutNode.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorStop.h"
@@ -47,6 +46,7 @@
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/Path.h"
@@ -881,8 +881,7 @@ static bool IsSubtreeCandidate(const Layer* layer) {
   return true;
 }
 
-static void CollectSubtreeCandidates(const Layer* layer,
-                                     std::vector<const Layer*>& candidates) {
+static void CollectSubtreeCandidates(const Layer* layer, std::vector<const Layer*>& candidates) {
   if (IsSubtreeCandidate(layer)) {
     candidates.push_back(layer);
   }

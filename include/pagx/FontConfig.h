@@ -20,7 +20,6 @@
 
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 namespace tgfx {
@@ -30,51 +29,6 @@ class Typeface;
 namespace pagx {
 
 /**
- * Holds font location info and creates the Typeface on demand. Once created, the Typeface is
- * cached for subsequent access.
- */
-class TypefaceHolder {
- public:
-  /**
-   * Creates a TypefaceHolder from an already-loaded Typeface.
-   * @param typeface The Typeface to hold.
-   */
-  explicit TypefaceHolder(std::shared_ptr<tgfx::Typeface> typeface);
-
-  /**
-   * Creates a TypefaceHolder for deferred loading from a font file or system font name.
-   * @param path The font file path (empty if using fontFamily for name-based system font lookup).
-   * @param ttcIndex The face index within a TrueType Collection (.ttc) file.
-   * @param fontFamily The font family name, used for matching and name-based loading.
-   * @param fontStyle The font style name (e.g. "Regular", "Bold").
-   */
-  TypefaceHolder(std::string path, int ttcIndex, std::string fontFamily, std::string fontStyle);
-
-  /**
-   * Returns the held Typeface, creating it on demand from the font path or family name if not yet
-   * loaded. Once created, the Typeface is cached for subsequent calls.
-   */
-  std::shared_ptr<tgfx::Typeface> getTypeface();
-
-  /**
-   * Returns the font family name associated with this holder.
-   */
-  const std::string& getFontFamily() const;
-
-  /**
-   * Returns the font style name associated with this holder.
-   */
-  const std::string& getFontStyle() const;
-
- private:
-  std::string path = {};
-  std::string fontFamily = {};
-  std::string fontStyle = {};
-  int ttcIndex = 0;
-  std::shared_ptr<tgfx::Typeface> typeface = nullptr;
-};
-
-/**
  * FontConfig manages registered and fallback typefaces for font lookup.
  * This decouples font configuration from text layout and layout computation,
  * allowing multiple components (LayoutContext, TextLayout, LayerBuilder) to share the same font
@@ -82,7 +36,12 @@ class TypefaceHolder {
  */
 class FontConfig {
  public:
-  FontConfig() = default;
+  FontConfig();
+  ~FontConfig();
+  FontConfig(const FontConfig& other);
+  FontConfig& operator=(const FontConfig& other);
+  FontConfig(FontConfig&& other) noexcept;
+  FontConfig& operator=(FontConfig&& other) noexcept;
 
   /**
    * Registers a typeface for exact family+style lookup.
@@ -108,26 +67,9 @@ class FontConfig {
                        const std::string& fontStyle);
 
  private:
-  friend class LayoutContext;  // Allow LayoutContext to access registeredTypefaces and fallbackTypefaces
-
-  struct FontKey {
-    std::string family = {};
-    std::string style = {};
-
-    bool operator==(const FontKey& other) const {
-      return family == other.family && style == other.style;
-    }
-  };
-
-  struct FontKeyHash {
-    size_t operator()(const FontKey& key) const {
-      return std::hash<std::string>()(key.family) ^ (std::hash<std::string>()(key.style) << 1);
-    }
-  };
-
-  std::unordered_map<FontKey, std::shared_ptr<tgfx::Typeface>, FontKeyHash> registeredTypefaces =
-      {};
-  std::vector<TypefaceHolder> fallbackTypefaces = {};
+  struct Data;
+  std::unique_ptr<Data> data;
+  friend class LayoutContext;
 };
 
 }  // namespace pagx

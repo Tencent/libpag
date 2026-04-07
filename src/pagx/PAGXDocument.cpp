@@ -18,9 +18,9 @@
 
 #include "pagx/PAGXDocument.h"
 #include "LayoutContext.h"
-#include "pagx/layout/LayoutNode.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Image.h"
+#include "pagx/nodes/LayoutNode.h"
 
 namespace pagx {
 

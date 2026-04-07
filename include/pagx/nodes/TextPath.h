@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pagx/layout/LayoutNode.h"
+#include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/types/Point.h"

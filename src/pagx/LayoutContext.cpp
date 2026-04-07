@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LayoutContext.h"
+#include "FontConfigData.h"
 #include "SystemFonts.h"
 #include "tgfx/core/Typeface.h"
 
@@ -49,11 +50,11 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
 
   // Stage 1: Exact match in registered typefaces
   if (!fontFamily.empty()) {
-    FontConfig::FontKey key = {};
+    FontConfig::Data::FontKey key = {};
     key.family = fontFamily;
     key.style = fontStyle.empty() ? "Regular" : fontStyle;
-    auto it = fontConfig->registeredTypefaces.find(key);
-    if (it != fontConfig->registeredTypefaces.end()) {
+    auto it = fontConfig->data->registeredTypefaces.find(key);
+    if (it != fontConfig->data->registeredTypefaces.end()) {
       return it->second;
     }
 
@@ -61,7 +62,7 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
     std::shared_ptr<tgfx::Typeface> bestTypeface = nullptr;
     int bestPriority = 4;
     std::string bestStyle = {};
-    for (const auto& pair : fontConfig->registeredTypefaces) {
+    for (const auto& pair : fontConfig->data->registeredTypefaces) {
       if (pair.first.family != fontFamily) {
         continue;
       }
@@ -81,7 +82,7 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
 
   // Stage 3: Family-name match in user fallback typefaces
   if (!fontFamily.empty()) {
-    for (auto& holder : fontConfig->fallbackTypefaces) {
+    for (auto& holder : fontConfig->data->fallbackTypefaces) {
       if (holder.getFontFamily() == fontFamily) {
         return holder.getTypeface();
       }
@@ -113,7 +114,7 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::fallbackTypeface(
     int32_t codepoint, const tgfx::Typeface* primaryTypeface) {
   if (fontConfig != nullptr) {
     // Search user-registered fallback fonts first.
-    for (auto& holder : fontConfig->fallbackTypefaces) {
+    for (auto& holder : fontConfig->data->fallbackTypefaces) {
       auto typeface = holder.getTypeface();
       if (typeface == nullptr || typeface.get() == primaryTypeface) {
         continue;

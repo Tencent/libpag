@@ -21,7 +21,7 @@
 #include <cmath>
 #include <string>
 #include <vector>
-#include "pagx/layout/LayoutNode.h"
+#include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/LayerFilter.h"
 #include "pagx/nodes/LayerStyle.h"

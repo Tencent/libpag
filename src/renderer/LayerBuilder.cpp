@@ -128,8 +128,6 @@ static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI)
   return tgfx::Image::MakeFromEncoded(ToTGFXData(data));
 }
 
-namespace {
-
 // Build context that maintains state during layer tree construction
 class LayerBuilderContext {
  public:
@@ -243,9 +241,9 @@ class LayerBuilderContext {
   // For standalone Text (not inside TextBox), inverseMatrix is Identity.
   // For TextBox children, inverseMatrix cancels the cumulative Group transforms.
   static void prepareTextBlob(Text* text, const tgfx::Matrix& inverseMatrix) {
-    if (!text->getLayoutRuns().empty()) {
-      auto shaped =
-          GlyphRunRenderer::BuildTextBlobFromLayoutRuns(text->getLayoutRuns(), inverseMatrix);
+    if (!text->privateData->layoutRuns.empty()) {
+      auto shaped = GlyphRunRenderer::BuildTextBlobFromLayoutRuns(text->privateData->layoutRuns,
+                                                                  inverseMatrix);
       TextLayout::StoreShapedText(text, std::move(shaped));
     } else if (!text->glyphRuns.empty()) {
       auto shaped = GlyphRunRenderer::BuildTextBlob(text, inverseMatrix);
@@ -363,15 +361,15 @@ class LayerBuilderContext {
   }
 
   std::shared_ptr<tgfx::Text> convertText(const Text* node) {
-    auto textBlob = node->getTextBlob();
+    auto textBlob = node->privateData->textBlob;
     if (textBlob == nullptr) {
       prepareTextBlob(const_cast<Text*>(node), tgfx::Matrix::I());
-      textBlob = node->getTextBlob();
+      textBlob = node->privateData->textBlob;
     }
     if (textBlob == nullptr) {
       return nullptr;
     }
-    auto tgfxText = tgfx::Text::Make(textBlob, node->getAnchors());
+    auto tgfxText = tgfx::Text::Make(textBlob, node->privateData->anchors);
     if (tgfxText) {
       tgfxText->setPosition(tgfx::Point::Make(node->position.x, node->position.y));
     }
@@ -860,8 +858,6 @@ class LayerBuilderContext {
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
       _pendingMasks = {};
 };
-
-}  // namespace
 
 // Public API implementation
 

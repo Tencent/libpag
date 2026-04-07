@@ -20,7 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
-#include "pagx/layout/LayoutNode.h"
+#include "pagx/nodes/LayoutNode.h"
 
 namespace pagx {
 

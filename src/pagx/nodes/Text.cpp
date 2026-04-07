@@ -19,9 +19,14 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/TextLayout.h"
 #include "pagx/TextLayoutParams.h"
-#include "pagx/layout/LayoutNode.h"
+#include "pagx/nodes/LayoutNode.h"
 
 namespace pagx {
+
+Text::~Text() = default;
+
+Text::Text() : privateData(std::make_unique<PrivateData>()) {
+}
 
 static TextLayoutParams MakeStandaloneParams(const Text* text) {
   TextLayoutParams params = {};
@@ -43,7 +48,7 @@ static TextLayoutParams MakeStandaloneParams(const Text* text) {
 void Text::onMeasure(LayoutContext* context) {
   auto params = MakeStandaloneParams(this);
   auto result = TextLayout::Layout({this}, params, context);
-  layoutRuns = result.extractLayoutRuns(this);
+  privateData->layoutRuns = result.extractLayoutRuns(this);
   textBounds = result.bounds;
   preferredX = textBounds.x;
   preferredY = textBounds.y;
@@ -57,7 +62,7 @@ void Text::setLayoutSize(LayoutContext* context, float width, float height) {
     fontSize = fontSize * scale;
     auto params = MakeStandaloneParams(this);
     auto result = TextLayout::Layout({this}, params, context);
-    layoutRuns = result.extractLayoutRuns(this);
+    privateData->layoutRuns = result.extractLayoutRuns(this);
     textBounds = result.bounds;
   }
   layoutWidth = textBounds.width;

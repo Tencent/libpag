@@ -20,7 +20,7 @@
 #include <cmath>
 #include "pagx/TextLayout.h"
 #include "pagx/TextLayoutParams.h"
-#include "pagx/layout/LayoutNode.h"
+#include "pagx/nodes/LayoutNode.h"
 
 namespace pagx {
 
@@ -66,7 +66,7 @@ void TextBox::updateLayout(LayoutContext* context) {
   auto result = TextLayout::Layout(childText, params, context);
   for (size_t i = 0; i < childText.size(); i++) {
     childText[i]->textBounds = result.getTextBounds(childText[i]);
-    childText[i]->layoutRuns = result.extractLayoutRuns(childText[i]);
+    childText[i]->privateData->layoutRuns = result.extractLayoutRuns(childText[i]);
   }
 }
 

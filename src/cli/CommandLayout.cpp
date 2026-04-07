@@ -26,9 +26,9 @@
 #include "cli/XPathQuery.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXImporter.h"
-#include "pagx/layout/LayoutNode.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/TextBox.h"
 
 namespace pagx::cli {

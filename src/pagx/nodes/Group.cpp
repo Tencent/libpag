@@ -18,7 +18,7 @@
 
 #include "pagx/nodes/Group.h"
 #include <cmath>
-#include "pagx/layout/LayoutNode.h"
+#include "pagx/nodes/LayoutNode.h"
 
 namespace pagx {
 

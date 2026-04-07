@@ -20,8 +20,8 @@
 #include <algorithm>
 #include <cmath>
 #include <vector>
-#include "pagx/layout/LayoutNode.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/LayoutNode.h"
 #include "pagx/types/Alignment.h"
 #include "pagx/types/Arrangement.h"
 #include "pagx/types/LayoutMode.h"

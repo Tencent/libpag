@@ -21,6 +21,7 @@
 #include <cmath>
 #include <unordered_map>
 #include "base/utils/MathUtil.h"
+#include "pagx/TextLayout.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/Group.h"
@@ -406,7 +407,7 @@ bool FontEmbedder::embed(PAGXDocument* document) {
   // First pass: classify all glyphs and collect vector/bitmap/spacing glyph data.
   // Uses TextLayoutGlyphRun populated by applyLayout(). Text nodes without layoutRuns are skipped.
   for (auto* text : textOrder) {
-    auto& layoutRuns = text->getLayoutRuns();
+    auto& layoutRuns = text->privateData->layoutRuns;
     if (!layoutRuns.empty()) {
       for (auto& tlRun : layoutRuns) {
         auto* typeface = tlRun.font.getTypeface().get();
@@ -456,8 +457,8 @@ bool FontEmbedder::embed(PAGXDocument* document) {
   // Uses TextLayoutGlyphRun (direct mapping). Text nodes without layoutRuns produce no GlyphRuns.
   for (auto* text : textOrder) {
     text->glyphRuns.clear();
-    auto textBounds = text->getTextBounds();
-    auto& layoutRuns = text->getLayoutRuns();
+    auto textBounds = text->textBounds;
+    auto& layoutRuns = text->privateData->layoutRuns;
 
     if (!layoutRuns.empty()) {
       // New path: create GlyphRuns directly from TextLayoutGlyphRun.

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/FontConfig.h"
+#include "FontConfigData.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx {
@@ -54,25 +55,43 @@ const std::string& TypefaceHolder::getFontStyle() const {
   return fontStyle;
 }
 
+FontConfig::FontConfig() : data(std::make_unique<Data>()) {
+}
+
+FontConfig::~FontConfig() = default;
+
+FontConfig::FontConfig(const FontConfig& other) : data(std::make_unique<Data>(*other.data)) {
+}
+
+FontConfig& FontConfig::operator=(const FontConfig& other) {
+  if (this != &other) {
+    data = std::make_unique<Data>(*other.data);
+  }
+  return *this;
+}
+
+FontConfig::FontConfig(FontConfig&& other) noexcept = default;
+FontConfig& FontConfig::operator=(FontConfig&& other) noexcept = default;
+
 void FontConfig::registerTypeface(std::shared_ptr<tgfx::Typeface> typeface) {
   if (typeface == nullptr) {
     return;
   }
-  FontKey key = {};
+  Data::FontKey key = {};
   key.family = typeface->fontFamily();
   key.style = typeface->fontStyle();
-  registeredTypefaces[key] = std::move(typeface);
+  data->registeredTypefaces[key] = std::move(typeface);
 }
 
 void FontConfig::addFallbackTypefaces(std::vector<std::shared_ptr<tgfx::Typeface>> typefaces) {
   for (auto& tf : typefaces) {
-    fallbackTypefaces.emplace_back(std::move(tf));
+    data->fallbackTypefaces.emplace_back(std::move(tf));
   }
 }
 
 void FontConfig::addFallbackFont(const std::string& path, int ttcIndex,
                                  const std::string& fontFamily, const std::string& fontStyle) {
-  fallbackTypefaces.emplace_back(path, ttcIndex, fontFamily, fontStyle);
+  data->fallbackTypefaces.emplace_back(path, ttcIndex, fontFamily, fontStyle);
 }
 
 }  // namespace pagx
