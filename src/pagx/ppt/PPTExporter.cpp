@@ -1439,7 +1439,18 @@ static std::string GenerateRootRels() {
          "</Relationships>";
 }
 
+// OOXML ST_SlideSizeCoordinate range: 914400 EMU (1") to 51206400 EMU (56").
+static constexpr int64_t kMaxSlideSizeEMU = 51206400;
+// Standard 16:9 slide dimensions.
+static constexpr int64_t kStdWidth16x9 = 12192000;   // 10"
+static constexpr int64_t kStdHeight16x9 = 6858000;   // 7.5"
+
 static std::string GeneratePresentation(float w, float h) {
+  int64_t rawCX = PxToEMU(w);
+  int64_t rawCY = PxToEMU(h);
+  bool outOfRange = rawCX > kMaxSlideSizeEMU || rawCY > kMaxSlideSizeEMU;
+  int64_t cx = outOfRange ? kStdWidth16x9 : rawCX;
+  int64_t cy = outOfRange ? kStdHeight16x9 : rawCY;
   std::string s;
   s.reserve(512);
   s += "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>";
@@ -1448,8 +1459,12 @@ static std::string GeneratePresentation(float w, float h) {
        "xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">";
   s += "<p:sldMasterIdLst><p:sldMasterId id=\"2147483648\" r:id=\"rId1\"/></p:sldMasterIdLst>";
   s += "<p:sldIdLst><p:sldId id=\"256\" r:id=\"rId2\"/></p:sldIdLst>";
-  s += "<p:sldSz cx=\"" + I64(PxToEMU(w)) + "\" cy=\"" + I64(PxToEMU(h)) + "\" type=\"custom\"/>";
-  s += "<p:notesSz cx=\"" + I64(PxToEMU(w)) + "\" cy=\"" + I64(PxToEMU(h)) + "\"/>";
+  if (outOfRange) {
+    s += "<p:sldSz cx=\"" + I64(cx) + "\" cy=\"" + I64(cy) + "\"/>";
+  } else {
+    s += "<p:sldSz cx=\"" + I64(cx) + "\" cy=\"" + I64(cy) + "\" type=\"custom\"/>";
+  }
+  s += "<p:notesSz cx=\"" + I64(cx) + "\" cy=\"" + I64(cy) + "\"/>";
   s += "<p:defaultTextStyle>"
        "<a:defPPr><a:defRPr lang=\"zh-CN\"/></a:defPPr>";
   for (int lvl = 1; lvl <= 9; lvl++) {
