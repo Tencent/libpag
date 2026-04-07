@@ -23,6 +23,7 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <set>
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
@@ -845,11 +846,23 @@ static std::string SerializeLayerContents(const Layer* layer) {
   return oss.str();
 }
 
-static bool IsExtractableCandidate(const Layer* layer) {
-  if (layer->contents.size() < 3) {
+// Count total Layer nodes in a subtree (including the root).
+static int CountLayerNodes(const Layer* layer) {
+  int count = 1;
+  for (auto* child : layer->children) {
+    count += CountLayerNodes(child);
+  }
+  return count;
+}
+
+// Single Layer with child subtree is a candidate for extraction if it repeats.
+// Requires at least 3 total Layer nodes (root + 2 children or deeper nesting)
+// to justify the overhead of a Composition wrapper.
+static bool IsSubtreeCandidate(const Layer* layer) {
+  if (layer->children.empty()) {
     return false;
   }
-  if (!layer->children.empty()) {
+  if (CountLayerNodes(layer) < 3) {
     return false;
   }
   if (layer->composition != nullptr) {
@@ -868,29 +881,150 @@ static bool IsExtractableCandidate(const Layer* layer) {
   return true;
 }
 
-static void CollectExtractableLayers(const Layer* layer, std::vector<const Layer*>& candidates) {
-  if (IsExtractableCandidate(layer)) {
+static void CollectSubtreeCandidates(const Layer* layer,
+                                     std::vector<const Layer*>& candidates) {
+  if (IsSubtreeCandidate(layer)) {
     candidates.push_back(layer);
   }
   for (auto* child : layer->children) {
-    CollectExtractableLayers(child, candidates);
+    CollectSubtreeCandidates(child, candidates);
   }
 }
 
 static void DetectStructurallyIdenticalLayers(const PAGXDocument* doc,
                                               std::vector<VerifyDiagnostic>& diagnostics) {
-  std::vector<const Layer*> candidates;
+  // Collect all parent containers with >= 2 children for sequence detection.
+  struct ParentInfo {
+    std::vector<const Layer*> children;
+    std::vector<std::string> sigs;
+  };
+  std::vector<ParentInfo> parents;
+
+  auto addParent = [&](const std::vector<Layer*>& children) {
+    if (children.size() < 2) {
+      return;
+    }
+    ParentInfo info;
+    for (auto* child : children) {
+      info.children.push_back(child);
+      info.sigs.push_back(SerializeLayerContents(child));
+    }
+    parents.push_back(std::move(info));
+  };
+
+  addParent(doc->layers);
+  std::function<void(const Layer*)> visit = [&](const Layer* layer) {
+    addParent(layer->children);
+    for (auto* child : layer->children) {
+      visit(child);
+    }
+  };
   for (auto* layer : doc->layers) {
-    CollectExtractableLayers(layer, candidates);
+    visit(layer);
   }
 
-  std::unordered_map<std::string, std::vector<const Layer*>> groups;
-  for (auto* layer : candidates) {
-    auto sig = SerializeLayerContents(layer);
-    groups[sig].push_back(layer);
+  std::unordered_set<std::string> reported;
+
+  // Pattern A: consecutive sibling Layer sequences (window >= 2) that repeat.
+  // Greedy longest-first: scan from largest window down to 2, mark covered positions.
+  // Skip sequences where all Layers are leaf nodes (no children).
+  // Track which (parent, child-index) positions are already covered by a longer match.
+  std::set<std::pair<int, int>> covered;
+
+  for (size_t pi = 0; pi < parents.size(); pi++) {
+    auto& p = parents[pi];
+    auto n = p.sigs.size();
+    // Try window sizes from largest to smallest.
+    for (size_t win = n; win >= 2; win--) {
+      // Collect all occurrences of each signature at this window size.
+      std::unordered_map<std::string, std::vector<int>> sigStarts;
+      for (size_t start = 0; start + win <= n; start++) {
+        // Skip if any position in the window is already covered.
+        bool anyCovered = false;
+        for (size_t k = start; k < start + win; k++) {
+          if (covered.count({static_cast<int>(pi), static_cast<int>(k)})) {
+            anyCovered = true;
+            break;
+          }
+        }
+        if (anyCovered) {
+          continue;
+        }
+        // Skip if all Layers in the window are leaf nodes.
+        bool hasSubtree = false;
+        for (size_t k = start; k < start + win; k++) {
+          if (!p.children[k]->children.empty()) {
+            hasSubtree = true;
+            break;
+          }
+        }
+        if (!hasSubtree) {
+          continue;
+        }
+        std::string sig;
+        for (size_t k = start; k < start + win; k++) {
+          sig += p.sigs[k] + "|";
+        }
+        sigStarts[sig].push_back(static_cast<int>(start));
+      }
+      // Report and cover positions for signatures with >= 2 occurrences.
+      for (auto& entry : sigStarts) {
+        if (entry.second.size() < 2) {
+          continue;
+        }
+        std::vector<int> lines;
+        for (int start : entry.second) {
+          lines.push_back(p.children[start]->sourceLine);
+          for (size_t k = 0; k < win; k++) {
+            covered.insert({static_cast<int>(pi), start + static_cast<int>(k)});
+          }
+        }
+        std::sort(lines.begin(), lines.end());
+        lines.erase(std::unique(lines.begin(), lines.end()), lines.end());
+        if (lines.size() < 2) {
+          continue;
+        }
+        std::ostringstream oss;
+        for (size_t i = 0; i < lines.size(); i++) {
+          if (i > 0) {
+            oss << ",";
+          }
+          oss << lines[i];
+        }
+        auto key = oss.str();
+        if (!reported.count(key)) {
+          reported.insert(key);
+          AddDiagnostic(diagnostics, lines, "warning",
+                        "structurally identical Layers (lines " + key +
+                            "). Fix: extract to a shared <Composition> in <Resources>");
+        }
+      }
+    }
   }
 
-  for (auto& pair : groups) {
+  // Collect covered source lines for Pattern B to skip.
+  std::unordered_set<int> coveredLines;
+  for (auto& pos : covered) {
+    coveredLines.insert(parents[pos.first].children[pos.second]->sourceLine);
+  }
+
+  // Pattern B: single Layer with child subtree that repeats (not already covered by Pattern A).
+  std::vector<const Layer*> subtreeCandidates;
+  for (auto* layer : doc->layers) {
+    CollectSubtreeCandidates(layer, subtreeCandidates);
+  }
+  // Filter out candidates already covered by Pattern A.
+  std::vector<const Layer*> filteredCandidates;
+  for (auto* layer : subtreeCandidates) {
+    if (!coveredLines.count(layer->sourceLine)) {
+      filteredCandidates.push_back(layer);
+    }
+  }
+  std::unordered_map<std::string, std::vector<const Layer*>> subtreeMap;
+  for (auto* layer : filteredCandidates) {
+    subtreeMap[SerializeLayerContents(layer)].push_back(layer);
+  }
+  for (auto& pair : subtreeMap) {
     if (pair.second.size() < 2) {
       continue;
     }
@@ -898,15 +1032,21 @@ static void DetectStructurallyIdenticalLayers(const PAGXDocument* doc,
     for (auto* layer : pair.second) {
       lines.push_back(layer->sourceLine);
     }
-    std::ostringstream lineList;
+    std::sort(lines.begin(), lines.end());
+    std::ostringstream oss;
     for (size_t i = 0; i < lines.size(); i++) {
       if (i > 0) {
-        lineList << ",";
+        oss << ",";
       }
-      lineList << lines[i];
+      oss << lines[i];
     }
+    auto key = oss.str();
+    if (reported.count(key)) {
+      continue;
+    }
+    reported.insert(key);
     AddDiagnostic(diagnostics, lines, "warning",
-                  "structurally identical Layers (lines " + lineList.str() +
+                  "structurally identical Layers (lines " + key +
                       "). Fix: extract to a shared <Composition> in <Resources>");
   }
 }

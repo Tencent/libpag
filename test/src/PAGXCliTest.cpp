@@ -545,7 +545,7 @@ CLI_TEST(PAGXCliTest, Lint_C6_HighRepeaterCopies) {
   auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
-  EXPECT_EQ(ret, 0);  // warning only, not an error
+  EXPECT_NE(ret, 0);  // warning returns non-zero
   EXPECT_TRUE(output.find("Repeater produces") != std::string::npos);
   EXPECT_TRUE(output.find("total copies") != std::string::npos);
 }
@@ -558,7 +558,7 @@ CLI_TEST(PAGXCliTest, Lint_C6_NestedRepeaterProduct) {
   auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
-  EXPECT_EQ(ret, 0);  // warning only, not an error
+  EXPECT_NE(ret, 0);  // warning returns non-zero
   EXPECT_TRUE(output.find("Repeater produces") != std::string::npos);
   EXPECT_TRUE(output.find("total copies") != std::string::npos);
 }
@@ -670,6 +670,27 @@ CLI_TEST(PAGXCliTest, Lint_UnknownOption) {
   EXPECT_NE(ret, 0);
 }
 
+// Extractable Composition detection: consecutive pair with subtree should warn,
+// leaf Layers and containers with TextBox should not.
+CLI_TEST(PAGXCliTest, Verify_ExtractableComposition) {
+  auto inputPath = TestResourcePath("verify_extractable_composition.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  // Should detect exactly 2 warnings: case 1 (consecutive pair) + case 2 (subtree repeat)
+  size_t pos = 0;
+  int count = 0;
+  while ((pos = output.find("structurally identical Layers", pos)) != std::string::npos) {
+    count++;
+    pos += 28;
+  }
+  EXPECT_EQ(count, 3);  // case 1 (pair) + case 2 (subtree) + case 3b (triple sequence)
+}
+
 CLI_TEST(PAGXCliTest, Lint_MissingInput) {
   auto ret = CallRun(pagx::cli::RunVerify, {"verify"});
   EXPECT_NE(ret, 0);
@@ -711,7 +732,7 @@ CLI_TEST(PAGXCliTest, Lint_DuplicatePathData) {
   auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
-  EXPECT_EQ(ret, 0);
+  EXPECT_NE(ret, 0);
   EXPECT_TRUE(output.find("duplicate PathData") != std::string::npos);
 }
 
@@ -723,7 +744,7 @@ CLI_TEST(PAGXCliTest, Lint_DuplicateGradient) {
   auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
-  EXPECT_EQ(ret, 0);
+  EXPECT_NE(ret, 0);
   EXPECT_TRUE(output.find("duplicate") != std::string::npos);
 }
 
@@ -735,7 +756,7 @@ CLI_TEST(PAGXCliTest, Lint_MergeableGroups) {
   auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
-  EXPECT_EQ(ret, 0);
+  EXPECT_NE(ret, 0);
   EXPECT_TRUE(output.find("consecutive Groups share identical painters") != std::string::npos);
 }
 
@@ -747,7 +768,7 @@ CLI_TEST(PAGXCliTest, Lint_UnwrappableGroup) {
   auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
-  EXPECT_EQ(ret, 0);
+  EXPECT_NE(ret, 0);
   EXPECT_TRUE(output.find("redundant first-child Group") != std::string::npos);
 }
 
@@ -759,7 +780,7 @@ CLI_TEST(PAGXCliTest, Lint_PathToPrimitive) {
   auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
-  EXPECT_EQ(ret, 0);
+  EXPECT_NE(ret, 0);
   EXPECT_TRUE(output.find("Path draws an") != std::string::npos);
 }
 
@@ -797,7 +818,7 @@ CLI_TEST(PAGXCliTest, Lint_LocalizablePathData) {
   auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
-  EXPECT_EQ(ret, 0);
+  EXPECT_NE(ret, 0);
   EXPECT_TRUE(output.find("PathData bounds do not start at origin") != std::string::npos);
 }
 
@@ -811,7 +832,7 @@ CLI_TEST(PAGXCliTest, Lint_PathDataBboxOrigin) {
   auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
-  EXPECT_EQ(ret, 0);
+  EXPECT_NE(ret, 0);
   // "atOrigin" PathData should NOT be reported (bbox starts at 0,0).
   // "notAtOrigin" PathData SHOULD be reported (bbox starts at 50,50).
   // Count occurrences: exactly one "PathData bounds do not start at origin" expected.
@@ -845,7 +866,7 @@ CLI_TEST(PAGXCliTest, Lint_ExtractableCompositions) {
   auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
-  EXPECT_EQ(ret, 0);
+  EXPECT_NE(ret, 0);  // warning returns non-zero
   EXPECT_TRUE(output.find("structurally identical Layers") != std::string::npos);
 }
 
@@ -857,7 +878,7 @@ CLI_TEST(PAGXCliTest, Lint_DowngradeableLayer) {
   auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
-  EXPECT_EQ(ret, 0);  // warning only, not an error
+  EXPECT_NE(ret, 0);  // warning returns non-zero
   EXPECT_TRUE(output.find("child Layer(s) use no Layer-exclusive features") != std::string::npos);
 }
 
@@ -1482,7 +1503,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentAtOrigin) {
   auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
-  EXPECT_EQ(ret, 0);
+  EXPECT_NE(ret, 0);
   EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
 }
 
@@ -1495,7 +1516,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetExplicitSize) {
   auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
-  EXPECT_EQ(ret, 0);
+  EXPECT_NE(ret, 0);
   EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
 }
 
@@ -1511,7 +1532,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetConstrained) {
   auto output = oss.str();
   // The constrained Group at left=0,top=0 has layoutBounds starting at (0,0),
   // so minX=0, minY=0 — no offset problem.
-  EXPECT_EQ(ret, 0);
+  EXPECT_NE(ret, 0);
   EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
 }
 
@@ -1524,7 +1545,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetFlex) {
   auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
-  EXPECT_EQ(ret, 0);
+  EXPECT_NE(ret, 0);
   EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
 }
 
@@ -1565,7 +1586,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetLayerUnpositioned) {
   auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
-  EXPECT_EQ(ret, 0);
+  EXPECT_NE(ret, 0);
   EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
 }
 
@@ -1579,7 +1600,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetExcludedFromLayout) {
   auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
-  EXPECT_EQ(ret, 0);
+  EXPECT_NE(ret, 0);
   EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
 }
 
@@ -1882,7 +1903,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetOppositeConstraint) {
   auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
-  EXPECT_EQ(ret, 0);
+  EXPECT_NE(ret, 0);
   EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
 }
 
