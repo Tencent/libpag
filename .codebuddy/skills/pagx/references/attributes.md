@@ -511,7 +511,7 @@ For **child Layers**, constraints are only active when:
 
 ### TextBox
 
-Text layout container that inherits from Group. Bare Text aligns baseline to y=0 — TextBox corrects this so text vertically centers within each line automatically. Always wrap Text in TextBox.
+Text layout container that inherits from Group. Provides paragraph-level features: word wrapping, multi-line alignment (`textAlign`, `paragraphAlign`), and vertical writing mode. Use TextBox when you need any of these; bare Text is fine for single-line labels.
 
 **Inherited from Group:**
 

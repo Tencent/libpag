@@ -1,7 +1,7 @@
 # PAGX Examples
 
 Scene-specific structural patterns for generating PAGX files. For universal methodology
-(generation steps, verification loop), follow `generate-guide.md` first.
+(generation steps, verification loop), follow `generation.md` first.
 
 **Note**: Colors, fonts, sizes, and spacing in these examples are placeholders to illustrate
 structural patterns. Always match the actual design requirements — do not copy these values

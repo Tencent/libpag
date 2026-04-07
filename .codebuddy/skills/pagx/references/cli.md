@@ -86,8 +86,8 @@ Wrote input.layout.xml
 
 | Code | Meaning |
 |------|---------|
-| 0 | No errors (warnings may be present) |
-| 1 | Errors found |
+| 0 | No problems |
+| 1 | Problems found |
 
 ---
 
