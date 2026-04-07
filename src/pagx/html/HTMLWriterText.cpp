@@ -698,11 +698,11 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           float sy = 1.0f + (modifier->scale.y - 1.0f) * absF;
           m = Matrix::Scale(sx, sy) * m;
           if (!FloatNearlyZero(modifier->skew)) {
-            m = Matrix::Rotate(modifier->skewAxis * absF) * m;
+            m = Matrix::Rotate(modifier->skewAxis) * m;
             Matrix shear = {};
-            shear.c = std::tan(DegreesToRadians(modifier->skew * absF));
+            shear.c = std::tan(DegreesToRadians(-modifier->skew * absF));
             m = shear * m;
-            m = Matrix::Rotate(-modifier->skewAxis * absF) * m;
+            m = Matrix::Rotate(-modifier->skewAxis) * m;
           }
           if (!FloatNearlyZero(modifier->rotation)) {
             m = Matrix::Rotate(modifier->rotation * f) * m;
@@ -825,7 +825,7 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           transform += "scale(" + FloatToString(sx) + "," + FloatToString(sy) + ") ";
         }
         if (!FloatNearlyZero(modifier->skew * absF)) {
-          transform += "skewX(" + FloatToString(modifier->skew * absF) + "deg) ";
+          transform += "skewX(" + FloatToString(-modifier->skew * absF) + "deg) ";
         }
         if (!FloatNearlyZero(anchorX) || !FloatNearlyZero(anchorY)) {
           transform +=
