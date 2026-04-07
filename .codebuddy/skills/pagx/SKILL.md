@@ -14,10 +14,9 @@ description: >-
 **When**: User asks to create, write, design, or modify a PAGX file from a text description,
 reference image, or design spec.
 
-Covers: context assessment (task type, requirement clarity), design analysis, CSS/SVG→PAGX
-mapping, structure decisions, Flexbox layout, constraint positioning, incremental build,
-painter scope isolation, text layout, **mandatory verification-fix loop**, and recommended
-values for spacing/fonts/colors.
+Covers: Part 1 (Method) — layout, content, and pitfalls reference; Part 2 (Workflow) —
+4-step execution: assess & analyze → skeleton + verify → fill content per-section + verify
+→ polish + full verify. Appendix provides recommended values for spacing/fonts/colors.
 
 ## Reference Lookup
 

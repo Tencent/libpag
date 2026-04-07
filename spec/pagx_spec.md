@@ -24,11 +24,12 @@ PAGX is a plain XML file (`.pagx`) that can reference external resource files (i
 
 This specification is organized in the following order:
 
-1. **Basic Data Types**: Defines the fundamental data formats used throughout the document
-2. **Document Structure**: Describes the overall organization of a PAGX document
-3. **Auto Layout**: Defines layout size, container layout, and constraint positioning mechanisms
-4. **Layer System**: Defines layers and their related features (styles, filters, masks)
-5. **VectorElement System**: Defines vector elements within layers and their processing model
+- **Basic Data Types**: Defines the fundamental data formats used throughout the document
+- **Document Structure**: Describes the overall organization of a PAGX document
+- **Auto Layout**: Defines layout size, container layout, and constraint positioning mechanisms
+- **Layer System**: Defines layers and their related features (styles, filters, masks)
+- **VectorElement System**: Defines vector elements within layers and their processing model
+- **Build Directives**: Defines build-time preprocessing directives (Import)
 
 **Appendices** (for quick reference):
 
@@ -261,7 +262,7 @@ PAGX uses a standard 2D Cartesian coordinate system:
 
 `<pagx>` is the root element of a PAGX document, defining the canvas dimensions and directly containing the layer list.
 
-> [Sample](samples/3.2_document_structure.pagx)
+> [Sample](samples/document_structure.pagx)
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -279,7 +280,7 @@ PAGX uses a standard 2D Cartesian coordinate system:
 
 **Element Position**: The Resources element may be placed anywhere within the root element; there are no restrictions on its position. Parsers must support forward references—elements that reference resources or layers defined later in the document.
 
-> [Sample](samples/3.3_resources.pagx)
+> [Sample](samples/resources.pagx)
 
 #### 3.3.1 Image
 
@@ -329,7 +330,7 @@ Color sources define colors that can be used for fills and strokes, supporting t
 
 Linear gradients interpolate along the direction from start point to end point.
 
-> [Sample](samples/3.3.3_linear_gradient.pagx)
+> [Sample](samples/linear_gradient.pagx)
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -343,7 +344,7 @@ Linear gradients interpolate along the direction from start point to end point.
 
 Radial gradients radiate outward from the center.
 
-> [Sample](samples/3.3.3_radial_gradient.pagx)
+> [Sample](samples/radial_gradient.pagx)
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -357,7 +358,7 @@ Radial gradients radiate outward from the center.
 
 Conic gradients (also known as sweep gradients) interpolate along the circumference.
 
-> [Sample](samples/3.3.3_conic_gradient.pagx)
+> [Sample](samples/conic_gradient.pagx)
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -381,7 +382,7 @@ Conic gradients (also known as sweep gradients) interpolate along the circumfere
 
 Diamond gradients radiate from the center toward the four corners.
 
-> [Sample](samples/3.3.3_diamond_gradient.pagx)
+> [Sample](samples/diamond_gradient.pagx)
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -437,7 +438,7 @@ Image patterns use an image as a color source.
 
 **Complete Example**: Demonstrates ImagePattern fill with different tile modes
 
-> [Sample](samples/3.3.3_image_pattern.pagx)
+> [Sample](samples/image_pattern.pagx)
 
 ##### Color Source Coordinate System
 
@@ -451,7 +452,7 @@ Except for solid colors, all color sources (gradients, image patterns) operate w
 
 **Example**: Drawing a diagonal linear gradient within a 300×300 region:
 
-> [Sample](samples/3.3.3_color_source_coordinates.pagx)
+> [Sample](samples/color_source_coordinates.pagx)
 
 - Applying `scale(2, 2)` transform to this layer: The rectangle becomes 600×600, and the gradient scales accordingly, maintaining consistent visual appearance
 - Directly changing Rectangle's size to 600,600: The rectangle becomes 600×600, but the gradient coordinates remain unchanged, covering only the top-left quarter of the rectangle
@@ -460,7 +461,7 @@ Except for solid colors, all color sources (gradients, image patterns) operate w
 
 Compositions are used for content reuse (similar to After Effects pre-comps).
 
-> [Sample](samples/3.3.4_composition.pagx)
+> [Sample](samples/composition.pagx)
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -517,28 +518,18 @@ Glyph defines rendering data for a single glyph. Either `path` or `image` must b
 PAGX documents organize content in a hierarchical structure:
 
 ```
-<pagx>                          ← Root element (defines canvas dimensions)
-├── <Layer>                     ← Layer (multiple allowed)
-│   ├── Geometry elements       ← Rectangle, Ellipse, Path, Text, etc.
-│   ├── Modifiers               ← TrimPath, RoundCorner, TextModifier, etc.
-│   ├── Painters                ← Fill, Stroke
-│   ├── <Group>                 ← VectorElement container (nestable)
-│   ├── LayerStyle              ← DropShadowStyle, InnerShadowStyle, etc.
-│   ├── LayerFilter             ← BlurFilter, ColorMatrixFilter, etc.
-│   └── <Layer>                 ← Child layers (recursive structure)
-│       └── ...
-│
-└── <Resources>                 ← Resources section (optional, defines reusable resources)
-    ├── <Image>                 ← Image resource
-    ├── <PathData>              ← Path data resource
-    ├── <SolidColor>            ← Solid color definition
-    ├── <LinearGradient>        ← Gradient definition
-    ├── <ImagePattern>          ← Image pattern definition
-    ├── <Font>                  ← Font resource (embedded font)
-    │   └── <Glyph>             ← Glyph definition
-    └── <Composition>           ← Composition definition
-        └── <Layer>             ← Layers within composition
+<pagx>                          ← Root element (canvas dimensions)
+├── <Layer>*                    ← Content and child layers (recursive)
+│   ├── VectorElements          ← Geometry, modifiers, painters, Group, TextBox
+│   ├── LayerStyles / Filters   ← Visual effects
+│   └── <Layer>*                ← Child layers
+└── <Resources>                 ← Optional reusable definitions
+    ├── Image, PathData, Font   ← Asset resources
+    ├── Color sources           ← Gradients, SolidColor, ImagePattern
+    └── <Composition>           ← Reusable layer subtrees
 ```
+
+For detailed node categories and containment rules, see Appendix A.
 
 ---
 
@@ -559,7 +550,11 @@ For child Layers, container layout and constraint positioning are **mutually exc
 **With constraint positioning** (no container layout or `includeInLayout="false"`):
 1. **Opposite-pair constraints** (`left`+`right` or `top`+`bottom`) derive size from parent container (e.g., `width = parent.width - left - right`), **always overriding** explicit size
 2. **Explicit declaration**: Directly setting `width`/`height` attributes
-3. **Content measurement**: When neither explicit size nor opposite-pair constraints are set, the engine automatically computes size from content bounds — the container grows to fit its content. For Group and Layer, the measured size spans from the local origin (0,0) to the bottom-right extent of all internal elements' content bounds (including constraint-contributed margins), ensuring the measurement result is independent of how elements are positioned inside. For Text, the measured size is the line-box bounds (advance width sum × font metrics line height). This content-driven sizing enables patterns like auto-width buttons (a Layer with `layout="horizontal"` + `padding` wrapping a Text element — the Layer automatically sizes to fit the text content plus padding)
+3. **Content measurement**: When neither explicit size nor opposite-pair constraints are set, the engine automatically computes size from content bounds — the container grows to fit its content.
+
+   For Group and Layer, the measured size spans from the local origin (0,0) to the bottom-right extent of all internal elements' content bounds (including constraint-contributed margins), ensuring the measurement result is independent of how elements are positioned inside. For Text, the measured size is the line-box bounds (advance width sum × font metrics line height).
+
+   This content-driven sizing enables patterns like auto-width buttons (a Layer with `layout="horizontal"` + `padding` wrapping a Text element — the Layer automatically sizes to fit the text content plus padding).
 
 These sources ensure that containers nearly always have a size available during layout calculations. Explicitly setting `width`/`height` is only necessary when a specific design size (different from the natural content size) is needed.
 
@@ -620,6 +615,8 @@ All three child Layers have no `width` set and `flex="1"`, equally sharing avail
 | `spaceEvenly` | Distribute with equal space around all children, including edges |
 | `spaceAround` | Distribute with equal space on each side of children, half-size at edges |
 
+When `arrangement` is `spaceBetween`, `spaceEvenly`, or `spaceAround`, `gap` still reduces the space available for flex children, but the actual inter-child spacing is computed solely by the arrangement formula — `gap` is replaced, not added. Combining both can produce unintuitive results; prefer using only one.
+
 #### Child Element Sizing
 
 Child Layer main-axis sizing has three states:
@@ -632,7 +629,7 @@ Cross-axis: Uses explicit `width`/`height` if set; when the parent has `alignmen
 
 Content area is `width × height` minus `padding` on each side.
 
-Child Layers with `visible="false"` do not participate in layout — they occupy no main-axis space, are excluded from gap calculations, and do not affect cross-axis sizing.
+Child Layers with `visible="false"` are not rendered but still participate in layout if `includeInLayout` is `true` (the default). To exclude an invisible child from the layout flow, set `includeInLayout="false"` explicitly.
 
 #### Leaving the Layout Flow
 
@@ -652,9 +649,9 @@ When a Layer has container layout (`layout="horizontal"` or `"vertical"`), all c
 
 #### Examples
 
-> [Sample](samples/6.2.1_container_layout.pagx)
+> [Sample](samples/container_layout.pagx)
 >
-> [Sample](samples/6.2.2_container_layout_include_in_layout.pagx)
+> [Sample](samples/container_layout_include_in_layout.pagx)
 
 ### 4.3 Constraint Positioning
 
@@ -682,7 +679,7 @@ Constraint attributes allow content nodes to declare positional relationships wi
 | `centerX` | float | - | Horizontal offset from container center (0 = horizontally centered) |
 | `centerY` | float | - | Vertical offset from container center (0 = vertically centered) |
 
-**Combination rules**: On each axis, only one of the following may be used: a single-edge constraint (`left`, `right`, or `centerX`), or an opposite-edge pair (`left` + `right`). The vertical axis follows the same pattern (`top` / `bottom` / `centerY`, or `top` + `bottom`).
+**Combination rules**: On each axis, only one of the following may be used: a single-edge constraint (`left`, `right`, or `centerX`), or an opposite-edge pair (`left` + `right`). The vertical axis follows the same pattern (`top` / `bottom` / `centerY`, or `top` + `bottom`). If multiple combinations are set on the same axis, the engine resolves conflicts in this priority order: `centerX` > `left`+`right` > `left` > `right` (same for vertical axis: `centerY` > `top`+`bottom` > `top` > `bottom`). Lower-priority constraints are silently ignored.
 
 **Activation**: Constraint attributes always reference the **immediate parent container** (Layer or Group)'s layout size, propagating level by level — each container resolves its own size first, then its children's constraints use that size as the reference frame. Since the engine automatically measures container sizes (see §4.1), constraints can generally always take effect. Different constraints have different levels of dependence on container size: `left`/`top` used alone have positioning formulas that do not involve container size (e.g., `tx = left - bounds.x`) and work correctly in any situation; `right`/`bottom`/`centerX`/`centerY` and opposite-edge constraints need to reference container size to calculate position.
 
@@ -699,14 +696,11 @@ All content nodes have a `position` attribute representing the element's anchor 
 
 | Element | Anchor Location | Description |
 |---------|----------------|-------------|
-| Rectangle | Geometric center | When not set, defaults to `(size.width/2, size.height/2)`, placing the top-left corner at the origin |
-| Ellipse | Geometric center | Same as Rectangle |
-| Polystar | Geometric center | When not set, defaults to `(-bounds.x, -bounds.y)` of the computed bounding box, placing the top-left pixel at the origin |
-| Path | Coordinate origin | `position="0,0"` means path data coordinates are used directly |
-| TextPath | Coordinate origin | Same as Path; constraint positioning shifts the path coordinate origin |
-| Text | Determined by `textAnchor` | `start`: baseline start; `center`: horizontal midpoint; `end`: end |
-| TextBox | Top-left corner | `position="0,0"` means text area starts at origin |
-| Group | Coordinate origin | `position="0,0"` means child coordinates are used directly |
+| Rectangle, Ellipse | Geometric center | Defaults to `(size.width/2, size.height/2)`, placing the top-left corner at the origin |
+| Polystar | Geometric center | Defaults to `(-bounds.x, -bounds.y)`, placing the top-left pixel at the origin |
+| Path, TextPath | Coordinate origin | `position="0,0"` means path data coordinates are used directly |
+| Text | Per `textAnchor` | `start`: baseline start; `center`: horizontal midpoint; `end`: end |
+| Group, TextBox | Top-left corner | `position="0,0"` means content starts at origin |
 
 #### Single-Edge and Center Constraints
 
@@ -720,7 +714,7 @@ centerX=C:  tx = (W/2 + C) - B.centerX
 
 Where `B` is the element's content bounds and `W`/`H` is the container's layout size. The vertical axis (`top`/`bottom`/`centerY`) follows the same calculation. `centerX="0"` centers horizontally; `centerX="20"` centers then offsets 20px right.
 
-> [Sample](samples/6.3.1_constraint_single_edge_center.pagx)
+> [Sample](samples/constraint_single_edge_center.pagx)
 
 #### Opposite-Edge Constraints
 
@@ -786,13 +780,13 @@ The vertical axis follows the same pattern.
 ```
 
 **Stretch**:
-> [Sample](samples/6.3.2_constraint_opposite_edge_stretch.pagx)
+> [Sample](samples/constraint_opposite_edge_stretch.pagx)
 
 **TextBox and Group**:
-> [Sample](samples/6.3.3_constraint_textbox_and_group.pagx)
+> [Sample](samples/constraint_textbox_and_group.pagx)
 
 **Scale to fit**:
-> [Sample](samples/6.3.4_constraint_polystar_center.pagx)
+> [Sample](samples/constraint_polystar_center.pagx)
 
 #### Child Layer Constraint Positioning
 
@@ -820,7 +814,7 @@ All layout-related attributes (`width`, `height`, `layout`, `gap`, `padding`, `a
 
 Consequently, animations cannot modify layout attributes. Instead, animations apply visual changes on top of the pre-computed layout results. For example, `transform` and `alpha` can be keyframed and are applied on top of layout results without triggering relayout.
 
-After layout computation completes, the engine rounds all Layer `x`, `y`, `width`, and `height` values to integer pixels, preventing blur from sub-pixel rendering.
+After layout computation completes, the engine rounds all Layer positions (`x`, `y`) to the nearest integer pixel and ceils content-measured sizes to the next integer pixel, preventing blur from sub-pixel rendering and content clipping at constraint boundaries.
 
 ---
 
@@ -879,7 +873,7 @@ Layer background is primarily used for:
 
 `<Layer>` is the basic container for content and child layers.
 
-> [Sample](samples/4.2_layer.pagx)
+> [Sample](samples/layer.pagx)
 
 #### Child Elements
 
@@ -915,21 +909,8 @@ Layer child elements are automatically categorized into four collections by type
 | `mask` | idref | - | Mask layer reference "@id" |
 | `maskType` | MaskType | alpha | Mask type |
 | `composition` | idref | - | Composition reference "@id" |
-| `width` | float | - | Layout width (see §4) |
-| `height` | float | - | Layout height (see §4) |
-| `layout` | LayoutMode | none | Container layout mode for child layers (see §4) |
-| `gap` | float | 0 | Child Layer spacing (see §4) |
-| `padding` | float or "t,r,b,l" | 0 | Inner padding (see §4) |
-| `alignment` | Alignment | stretch | Cross-axis alignment (see §4) |
-| `arrangement` | Arrangement | start | Main-axis arrangement (see §4) |
-| `includeInLayout` | bool | true | Whether to participate in parent container layout (see §4) |
-| `flex` | float | 0 | Flex weight for main-axis proportional sizing in parent container layout (see §4.2) |
-| `left` | float | - | Distance from left edge to container's left edge (see §4.3) |
-| `right` | float | - | Distance from right edge to container's right edge (see §4.3) |
-| `top` | float | - | Distance from top edge to container's top edge (see §4.3) |
-| `bottom` | float | - | Distance from bottom edge to container's bottom edge (see §4.3) |
-| `centerX` | float | - | Horizontal offset from container center (see §4.3) |
-| `centerY` | float | - | Vertical offset from container center (see §4.3) |
+
+**Layout and constraint attributes**: `width`, `height`, `layout`, `gap`, `padding`, `alignment`, `arrangement`, `flex`, `includeInLayout`, `left`, `right`, `top`, `bottom`, `centerX`, `centerY` — see §4 for definitions, defaults, and usage.
 
 **groupOpacity**: When `true` (default), all layer content is first composited into an offscreen buffer, then `alpha` is applied to the buffer as a whole, producing uniform transparency across the entire layer. When `false`, the layer's `alpha` is applied independently to each child element, which may cause overlapping semi-transparent children to appear darker at intersections.
 
@@ -960,7 +941,7 @@ All layer styles compute effects based on **layer content**. During computation,
 
 Some layer styles additionally use **layer contour** or **layer background** as input (see individual style descriptions). Definitions of layer contour and layer background are in §5.1.
 
-> [Sample](samples/4.3_layer_styles.pagx)
+> [Sample](samples/layer_styles.pagx)
 
 **Common LayerStyle Attributes**:
 
@@ -1033,7 +1014,7 @@ Layer filters are the final stage of layer rendering. All previously rendered re
 
 Unlike layer styles (§5.3), which **independently render** visual effects above or below layer content, filters **modify** the layer's overall rendering output. Layer styles are applied before filters.
 
-> [Sample](samples/4.4_layer_filters.pagx)
+> [Sample](samples/layer_filters.pagx)
 
 #### 5.4.1 BlurFilter
 
@@ -1113,19 +1094,19 @@ Transforms colors using a 4×5 color matrix.
 
 The `scrollRect` attribute defines the layer's visible region; content outside this region is clipped.
 
-> [Sample](samples/4.5.1_scroll_rect.pagx)
+> [Sample](samples/scroll_rect.pagx)
 
 #### 5.5.2 clipToBounds
 
 When `clipToBounds="true"`, the layout engine writes `scrollRect="0,0,width,height"` to the layer during the layout phase, clipping its content to the layer's own bounds (`width` × `height`). This works with auto-layout — the clipping region is determined after layout resolves the layer's dimensions. If the layer also has an explicit `scrollRect`, `scrollRect` takes priority and `clipToBounds` is ignored.
 
-> [Sample](samples/4.5.3_clip_to_bounds.pagx)
+> [Sample](samples/clip_to_bounds.pagx)
 
 #### 5.5.3 Masking
 
 Reference another layer as a mask using the `mask` attribute.
 
-> [Sample](samples/4.5.2_masking.pagx)
+> [Sample](samples/masking.pagx)
 
 **Masking Rules**:
 - The mask layer itself is not rendered (the `visible` attribute is ignored)
@@ -1202,7 +1183,7 @@ Different modifiers have different scopes over elements in the geometry list:
 
 ### 6.2 Geometry Elements
 
-Geometry elements provide renderable shapes.
+Geometry elements provide renderable shapes. All geometry elements, as well as TextPath, TextBox, and Group, support constraint attributes (`left`, `right`, `top`, `bottom`, `centerX`, `centerY`) for positioning within their container — see §4.3 for definitions and behavior. Constraint attributes are not repeated in individual element tables below.
 
 #### 6.2.1 Rectangle
 
@@ -1218,12 +1199,6 @@ Rectangles are defined from center point with uniform corner rounding support.
 | `size` | Size | 0,0 | Dimensions "width,height" |
 | `roundness` | float | 0 | Corner radius |
 | `reversed` | bool | false | Reverse path direction |
-| `left` | float | - | Distance from left edge to container's left edge (see §4.3) |
-| `right` | float | - | Distance from right edge to container's right edge (see §4.3) |
-| `top` | float | - | Distance from top edge to container's top edge (see §4.3) |
-| `bottom` | float | - | Distance from bottom edge to container's bottom edge (see §4.3) |
-| `centerX` | float | - | Horizontal offset from container center (see §4.3) |
-| `centerY` | float | - | Vertical offset from container center (see §4.3) |
 
 **Calculation Rules**:
 ```
@@ -1241,7 +1216,7 @@ rect.bottom = position.y + size.height / 2
 
 **Example**:
 
-> [Sample](samples/5.2.1_rectangle.pagx)
+> [Sample](samples/rectangle.pagx)
 
 #### 6.2.2 Ellipse
 
@@ -1256,12 +1231,6 @@ Ellipses are defined from center point.
 | `position` | Point | (center of bounding box) | Center point coordinate, computed from constraint attributes when set. When not set, defaults to `(size.width/2, size.height/2)`, placing the top-left corner at the origin. Prefer constraint attributes (`left`/`top`) for positioning |
 | `size` | Size | 0,0 | Dimensions "width,height" |
 | `reversed` | bool | false | Reverse path direction |
-| `left` | float | - | Distance from left edge to container's left edge (see §4.3) |
-| `right` | float | - | Distance from right edge to container's right edge (see §4.3) |
-| `top` | float | - | Distance from top edge to container's top edge (see §4.3) |
-| `bottom` | float | - | Distance from bottom edge to container's bottom edge (see §4.3) |
-| `centerX` | float | - | Horizontal offset from container center (see §4.3) |
-| `centerY` | float | - | Vertical offset from container center (see §4.3) |
 
 **Calculation Rules**:
 ```
@@ -1275,7 +1244,7 @@ boundingRect.bottom = position.y + size.height / 2
 
 **Example**:
 
-> [Sample](samples/5.2.2_ellipse.pagx)
+> [Sample](samples/ellipse.pagx)
 
 #### 6.2.3 Polystar
 
@@ -1296,12 +1265,6 @@ Supports both regular polygon and star modes.
 | `outerRoundness` | float | 0 | Outer corner roundness 0~1 |
 | `innerRoundness` | float | 0 | Inner corner roundness 0~1 |
 | `reversed` | bool | false | Reverse path direction |
-| `left` | float | - | Distance from left edge to container's left edge (see §4.3) |
-| `right` | float | - | Distance from right edge to container's right edge (see §4.3) |
-| `top` | float | - | Distance from top edge to container's top edge (see §4.3) |
-| `bottom` | float | - | Distance from bottom edge to container's bottom edge (see §4.3) |
-| `centerX` | float | - | Horizontal offset from container center (see §4.3) |
-| `centerY` | float | - | Vertical offset from container center (see §4.3) |
 
 **PolystarType**:
 
@@ -1338,7 +1301,7 @@ y = position.y + outerRadius * sin(angle)
 
 **Example**:
 
-> [Sample](samples/5.2.3_polystar.pagx)
+> [Sample](samples/polystar.pagx)
 
 #### 6.2.4 Path
 
@@ -1357,16 +1320,10 @@ Defines arbitrary shapes using SVG path syntax, supporting inline data or refere
 | `data` | string/idref | (required) | SVG path data or PathData resource reference "@id" |
 | `position` | Point | 0,0 | Offset of the path coordinate system origin. Prefer constraint attributes (`left`/`top`) for positioning |
 | `reversed` | bool | false | Reverse path direction |
-| `left` | float | - | Distance from left edge to container's left edge (see §4.3) |
-| `right` | float | - | Distance from right edge to container's right edge (see §4.3) |
-| `top` | float | - | Distance from top edge to container's top edge (see §4.3) |
-| `bottom` | float | - | Distance from bottom edge to container's bottom edge (see §4.3) |
-| `centerX` | float | - | Horizontal offset from container center (see §4.3) |
-| `centerY` | float | - | Vertical offset from container center (see §4.3) |
 
 **Example**:
 
-> [Sample](samples/5.2.4_path.pagx)
+> [Sample](samples/path.pagx)
 
 #### 6.2.5 Text
 
@@ -1388,12 +1345,6 @@ Text elements provide geometric shapes for text content. Unlike shape elements t
 | `fauxItalic` | bool | false | Faux italic (algorithmically slanted) |
 | `baseline` | TextBaseline | lineBox | Baseline mode for vertical positioning. `lineBox`: position.y is the linebox top (based on font metrics line height); `alphabetic`: position.y is the alphabetic baseline |
 | `textAnchor` | TextAnchor | start | Text anchor alignment relative to the origin (see below). Ignored when a TextBox controls the layout |
-| `left` | float | - | Distance from left edge to container's left edge (see §4.3) |
-| `right` | float | - | Distance from right edge to container's right edge (see §4.3) |
-| `top` | float | - | Distance from top edge to container's top edge (see §4.3) |
-| `bottom` | float | - | Distance from bottom edge to container's bottom edge (see §4.3) |
-| `centerX` | float | - | Horizontal offset from container center (see §4.3) |
-| `centerY` | float | - | Vertical offset from container center (see §4.3) |
 
 Child elements: `CDATA` text, `GlyphRun`*
 
@@ -1443,7 +1394,7 @@ Controls how `position.y` is interpreted for vertical positioning.
 
 **Runtime Layout Example**:
 
-> [Sample](samples/5.2.5_text.pagx)
+> [Sample](samples/text.pagx)
 
 ##### GlyphRun (Pre-layout Data)
 
@@ -1497,7 +1448,7 @@ When a glyph has scale, rotation, or skew transforms, they are applied in the fo
 
 **Pre-layout Example**:
 
-> [Sample](samples/5.2.5_glyph_run.pagx)
+> [Sample](samples/glyph_run.pagx)
 
 ### 6.3 Painters
 
@@ -1507,7 +1458,7 @@ Painters (Fill, Stroke) render all geometry (Paths and glyph lists) accumulated 
 
 Fill draws the interior region of geometry using a specified color source.
 
-> [Sample](samples/5.3.1_fill.pagx)
+> [Sample](samples/fill.pagx)
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -1535,7 +1486,7 @@ Child elements: May embed one color source (SolidColor, LinearGradient, RadialGr
 
 Stroke draws lines along geometry boundaries.
 
-> [Sample](samples/5.3.2_stroke.pagx)
+> [Sample](samples/stroke.pagx)
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -1625,7 +1576,7 @@ Trims paths to a specified start/end range.
 - Supports wrapping: When trim range exceeds [0,1], automatically wraps to other end of path
 - When total path length is 0, no operation is performed
 
-> [Sample](samples/5.4.1_trim_path.pagx)
+> [Sample](samples/trim_path.pagx)
 
 #### 6.4.2 RoundCorner
 
@@ -1646,7 +1597,7 @@ Converts sharp corners of paths to rounded corners.
 
 **Example**:
 
-> [Sample](samples/5.4.2_round_corner.pagx)
+> [Sample](samples/round_corner.pagx)
 
 #### 6.4.3 MergePath
 
@@ -1677,7 +1628,7 @@ Merges all shapes into a single shape.
 
 **Example**:
 
-> [Sample](samples/5.4.3_merge_path.pagx)
+> [Sample](samples/merge_path.pagx)
 
 ### 6.5 Text Modifiers
 
@@ -1805,7 +1756,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 **Example**:
 
-> [Sample](samples/5.5.3_text_modifier.pagx)
+> [Sample](samples/text_modifier.pagx)
 
 #### 6.5.4 RangeSelector
 
@@ -1867,7 +1818,7 @@ baseline onto corresponding positions on the path curve, preserving their relati
 offsets. When forceAlignment is enabled, original glyph positions are ignored and glyphs are
 redistributed evenly to fill the available path length.
 
-> [Sample](samples/5.5.5_text_path.pagx)
+> [Sample](samples/text_path.pagx)
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -1879,12 +1830,6 @@ redistributed evenly to fill the available path length.
 | `perpendicular` | bool | true | Perpendicular to path |
 | `reversed` | bool | false | Reverse direction |
 | `forceAlignment` | bool | false | Force stretch text to fill path |
-| `left` | float | - | Distance from left edge to container's left edge |
-| `right` | float | - | Distance from right edge to container's right edge |
-| `top` | float | - | Distance from top edge to container's top edge |
-| `bottom` | float | - | Distance from bottom edge to container's bottom edge |
-| `centerX` | float | - | Horizontal offset from container center (0 = centered) |
-| `centerY` | float | - | Vertical offset from container center (0 = centered) |
 
 **Baseline**:
 - `baselineOrigin`: The starting point of the baseline in the TextPath's local coordinate space
@@ -1913,7 +1858,7 @@ TextBox is a **pre-layout-only** node: it is processed during the typesetting st
 
 As a container, TextBox processes its child Text elements and text modifiers (TextModifier, TextPath, etc.) in an isolated scope. Text elements inside a TextBox are laid out by the TextBox's typography settings first; subsequent text modifiers within the TextBox then operate on those layout results. TextBox only affects the **initial layout** of Text elements — it determines glyph positions before the text modifier chain begins.
 
-> [Sample](samples/5.5.6_text_box.pagx)
+> [Sample](samples/text_box.pagx)
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -1925,14 +1870,8 @@ As a container, TextBox processes its child Text elements and text modifiers (Te
 | `lineHeight` | float | 0 | Line height in pixels. 0 means auto (calculated from font metrics: ascent + descent + leading). Following CSS Writing Modes conventions, this is a logical property: in vertical mode it controls column width |
 | `wordWrap` | bool | true | Enable automatic word wrapping at the box width boundary (horizontal mode) or height boundary (vertical mode). Has no effect when that dimension is NaN |
 | `overflow` | Overflow | visible | Overflow behavior when text exceeds the box height (horizontal mode) or width (vertical mode). Has no effect when that dimension is NaN |
-| `left` | float | - | Distance from left edge to container's left edge (see §4.3) |
-| `right` | float | - | Distance from right edge to container's right edge (see §4.3) |
-| `top` | float | - | Distance from top edge to container's top edge (see §4.3) |
-| `bottom` | float | - | Distance from bottom edge to container's bottom edge (see §4.3) |
-| `centerX` | float | - | Horizontal offset from container center (see §4.3) |
-| `centerY` | float | - | Vertical offset from container center (see §4.3) |
 
-TextBox inherits all Group attributes (`position`, `anchor`, `rotation`, `scale`, `skew`, `skewAxis`, `alpha`, and constraint attributes `left`, `right`, `top`, `bottom`, `centerX`, `centerY`). The `position` attribute specifies the top-left corner of the text area in the parent coordinate system. Prefer constraint attributes (`left`/`top`) for positioning — when constraints are set, `position` is computed automatically.
+TextBox inherits all Group attributes (`position`, `anchor`, `rotation`, `scale`, `skew`, `skewAxis`, `alpha`) and constraint attributes. The `position` attribute specifies the top-left corner of the text area in the parent coordinate system. Prefer constraint attributes (`left`/`top`) for positioning — when constraints are set, `position` is computed automatically.
 
 **TextAlign (Text Alignment)**:
 
@@ -1971,7 +1910,7 @@ Aligns text lines or columns along the block-flow direction. Uses direction-neut
 
 Rich text is achieved through multiple Text elements within a TextBox, each wrapped in a Group with independent Fill/Stroke styles. TextBox provides unified typography.
 
-> [Sample](samples/5.5.7_rich_text.pagx)
+> [Sample](samples/rich_text.pagx)
 
 **Note**: Each Group's Text + Fill/Stroke defines a text segment with independent styling. TextBox contains all segments as children and treats them as a single unit for typography, enabling auto-wrapping and alignment.
 
@@ -2045,13 +1984,13 @@ When `copies` is a decimal (e.g., `3.5`), partial copies are achieved through **
 - **Preserve text attributes**: Glyph lists retain glyph information after copying; subsequent text modifiers can still affect them
 - **Copy rendered styles**: Also copies already rendered fills and strokes
 
-> [Sample](samples/5.6_repeater.pagx)
+> [Sample](samples/repeater.pagx)
 
 ### 6.7 Group
 
 Group is a VectorElement container with transform properties.
 
-> [Sample](samples/5.7_group.pagx)
+> [Sample](samples/group.pagx)
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -2064,12 +2003,6 @@ Group is a VectorElement container with transform properties.
 | `alpha` | float | 1 | Opacity 0~1 |
 | `width` | float | - | Layout width (see §4) |
 | `height` | float | - | Layout height (see §4) |
-| `left` | float | - | Distance from left edge to container's left edge (see §4.3) |
-| `right` | float | - | Distance from right edge to container's right edge (see §4.3) |
-| `top` | float | - | Distance from top edge to container's top edge (see §4.3) |
-| `bottom` | float | - | Distance from bottom edge to container's bottom edge (see §4.3) |
-| `centerX` | float | - | Horizontal offset from container center (see §4.3) |
-| `centerY` | float | - | Vertical offset from container center (see §4.3) |
 
 #### Transform Order
 
@@ -2108,26 +2041,26 @@ Groups create isolated scopes for geometry accumulation and rendering:
 - **Layer is accumulation boundary**: Geometry propagates upward until reaching a Layer boundary; it does not pass across Layers
 
 **Example 1 - Basic Isolation**:
-> [Sample](samples/5.7_group_isolation.pagx)
+> [Sample](samples/group_isolation.pagx)
 
 **Example 2 - Child Group Geometry Propagates Upward**:
-> [Sample](samples/5.7_group_propagation.pagx)
+> [Sample](samples/group_propagation.pagx)
 
 **Example 3 - Multiple Painters Reuse Geometry**:
-> [Sample](samples/5.7_multiple_painters.pagx)
+> [Sample](samples/multiple_painters.pagx)
 
 #### Multiple Fills and Strokes
 
 Since painters do not clear the geometry list, the same geometry can have multiple Fills and Strokes applied consecutively.
 
 **Example 4 - Multiple Fills**:
-> [Sample](samples/5.7_multiple_fills.pagx)
+> [Sample](samples/multiple_fills.pagx)
 
 **Example 5 - Multiple Strokes**:
-> [Sample](samples/5.7_multiple_strokes.pagx)
+> [Sample](samples/multiple_strokes.pagx)
 
 **Example 6 - Mixed Overlay**:
-> [Sample](samples/5.7_mixed_overlay.pagx)
+> [Sample](samples/mixed_overlay.pagx)
 
 **Rendering Order**: Multiple painters render in document order; those appearing earlier are below.
 
@@ -2219,9 +2152,8 @@ This appendix describes node categorization and nesting rules.
 
 | Category | Nodes | Description |
 |----------|-------|-------------|
-| **Document Root** | `pagx` | Entry point of the document. Direct children: `<Layer>`, `<Resources>` only. |
+| **Structure** | `pagx`, `Resources` | `pagx`: document entry point (children: `<Layer>`, `<Resources>` only). `Resources`: holds reusable definitions (Image, PathData, Composition, Font, etc.) |
 | **Content Containers** | `Layer`, `Group`, `TextBox` | Accept VectorElements, child Layers, styles, and filters. These are the only elements that can contain geometry. |
-| **Resource Container** | `Resources` | Holds reusable definitions: Image, PathData, Composition, Font, etc. |
 | **Resource Types** | `Image`, `PathData`, `Composition`, `Font`, `Glyph` | Reusable assets stored in `<Resources>`. |
 | **Color Sources** | `SolidColor`, `LinearGradient`, `RadialGradient`, `ConicGradient`, `DiamondGradient`, `ImagePattern`, `ColorStop` | Color definitions used by painters. |
 | **Layer Styles** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle` | Visual effects applied to Layer content. |
@@ -2354,35 +2286,35 @@ Layer / Group
 
 The following example covers all major node types in PAGX, demonstrating complete document structure.
 
-> [Sample](samples/C.1_complete_example.pagx)
+> [Sample](samples/complete_example.pagx)
 
 ### C.2 App Icons
 
 A frosted-glass icon grid — 12 multi-color icons on a dark background with soft color fields and backdrop blur cards. Demonstrates icon construction with Path-based vector shapes, Composition reuse, BackgroundBlurStyle, and DropShadowStyle.
 
-> [Sample](samples/C.2_app_icons.pagx)
+> [Sample](samples/app_icons.pagx)
 
 ### C.3 Nebula Cadet
 
 A full-screen UI panel with top navigation bar, avatar, progress bars, action buttons, currency chips, and bottom tab bar. Demonstrates typical application interface layout and component composition.
 
-> [Sample](samples/C.3_nebula_cadet.pagx)
+> [Sample](samples/nebula_cadet.pagx)
 
 ### C.4 Game HUD
 
 A sci-fi heads-up display with a targeting reticle, arc-shaped health and energy gauges, radar mini-map, ammo counter, and mission objectives bar. Demonstrates Repeater-driven tick marks, TrimPath on arc Strokes, ConicGradient sweeps, and layered mask effects.
 
-> [Sample](samples/C.4_game_hud.pagx)
+> [Sample](samples/game_hud.pagx)
 
 ### C.5 PAGX Features Overview
 
 An infographic / presentation slide introducing PAGX capabilities — center title with orbit ring, five feature cards connected by dashed lines, and a conversion pipeline strip. Demonstrates TextBox multi-line layout, card-based information architecture, and decorative connector graphics.
 
-> [Sample](samples/C.5_pagx_features.pagx)
+> [Sample](samples/pagx_features.pagx)
 
 ### C.6 Space Explorer
 
 An illustrated alien planet scene with an astronaut, exotic flora, alien creatures, and atmospheric effects. Demonstrates complex scene composition with layered backgrounds, hand-drawn Path artwork, procedurally generated grass fields via long Path data, and rich gradient lighting.
 
-> [Sample](samples/C.6_space_explorer.pagx)
+> [Sample](samples/space_explorer.pagx)
 

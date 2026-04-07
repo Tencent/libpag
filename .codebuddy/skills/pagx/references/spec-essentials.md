@@ -56,13 +56,12 @@ Color syntax follows **CSS Color Level 4** conventions: HEX and `srgb()` match C
 
 ---
 
-## 2. Node Classification (41 node types)
+## 2. Node Classification
 
 | Category | Nodes |
 |----------|-------|
-| **Document Root** | `pagx` |
+| **Structure** | `pagx`, `Resources` |
 | **Content Containers** | `Layer`, `Group`, `TextBox` |
-| **Resource Container** | `Resources` |
 | **Resources** | `Image`, `PathData`, `Composition`, `Font`, `Glyph` |
 | **Color Sources** | `SolidColor`, `LinearGradient`, `RadialGradient`, `ConicGradient`, `DiamondGradient`, `ImagePattern`, `ColorStop` |
 | **Layer Styles** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle` |
@@ -73,9 +72,8 @@ Color syntax follows **CSS Color Level 4** conventions: HEX and `srgb()` match C
 | **Build Directives** | `Import` |
 
 **Key distinction**:
-- **Document Root** (`pagx`): Entry point. Direct children must be `<Layer>` or `<Resources>` only.
+- **Structure** (`pagx`, `Resources`): `pagx` is the document entry point (children: `<Layer>` and `<Resources>` only); `Resources` holds reusable definitions (Image, PathData, etc.)
 - **Content Containers** (`Layer`, `Group`, `TextBox`): Can contain VectorElements and child Layers. These are the only elements that accept geometry.
-- **Resource Container** (`Resources`): Holds reusable definitions. Direct child types are strictly defined (Image, PathData, etc.)
 
 ### Document Containment Hierarchy
 

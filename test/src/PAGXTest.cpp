@@ -773,7 +773,7 @@ static void TestPAGXDirectory(tgfx::Context* context, const std::string& directo
  * Renders each sample and compares with baseline screenshots.
  */
 PAGX_TEST(PAGXTest, SpecSamples) {
-  TestPAGXDirectory(context, ProjectPath::Absolute("spec/samples"));
+  TestPAGXDirectory(context, ProjectPath::Absolute("spec/samples"), "spec_");
 }
 
 /**

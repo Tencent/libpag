@@ -1,8 +1,8 @@
 # PAGX Generation Guide
 
 Complete methodology for generating PAGX files from visual descriptions — from analysis
-through verification. This guide is self-contained: follow it to produce correct output
-without relying on post-processing.
+through verification. Part 1 covers the methods (read once, reference throughout),
+Part 2 is the execution workflow (follow step by step).
 
 ## References
 
@@ -22,70 +22,15 @@ Read as needed:
 
 ---
 
-## Step 0: Assess Context
+# Part 1: Method
 
-Before generating, assess the task and clarify ambiguities.
+## Layout
 
-### Task Type
+### Container Layout (Flexbox)
 
-| Task | Strategy |
-|------|----------|
-| **Create from scratch** | Full workflow: Step 1→4 |
-| **Edit existing file** | Read file first, preserve style consistency, minimal changes |
-| **Modify specific part** | Locate target, change only what’s needed |
-
-For **editing existing files**, scan Resources before adding content:
-- Reuse existing `SolidColor`, `LinearGradient`, `PathData` via `@id` references
-- Reuse existing `Composition` via `composition="@id"`
-- Match existing style (roundness, fonts, spacing) for consistency
-
-### Requirement Clarity
-
-**Ask the user** when:
-- Canvas size unspecified and not inferable from context
-- Visual style ambiguous ("make it look good")
-- Text content missing but layout depends on it
-- Color scheme unclear and no reference provided
-
-**Use reasonable defaults** when:
-- Specific pixel values (use standard spacing: 8, 12, 16, 20, 24)
-- Font weight (Bold for headings, Regular for body)
-- Shadow parameters (common card shadow: `offsetY="2" blurX="6" blurY="6" color="#00000015"`)
-- Roundness (8–12 for buttons/cards, 999 for pills/avatars)
-
----
-
-## Step 1: Analyze the Reference
-
-Systematically decompose the visual before writing any code:
-
-1. **Layer structure** — how many distinct depth layers? Background vs foreground?
-2. **Rendering technique** — filled shapes, stroked line art, or both?
-3. **Color scheme** — exact colors, gradients, transparency?
-4. **Shape vocabulary** — geometric primitives or freeform curves?
-5. **Text inventory** — list all text elements with approximate font sizes.
-
----
-
-## Step 2: Decompose into Structure
-
-### CSS/SVG → PAGX Mapping
-
-Many PAGX features map directly to CSS/SVG concepts. **Think in the familiar concept first,
-then translate to PAGX**:
-
-| Think in... | Translate to PAGX |
-|---|---|
-| CSS Flexbox | Container layout — see mapping tables and §Layout below |
-| SVG `<path d="...">` | `<Path data="..."/>` — identical syntax, copy `d` values directly |
-| SVG `<circle cx cy r>` | `<Ellipse>` with `size="d,d"` where d = 2r |
-| SVG `<rect x y w h rx>` | `<Rectangle>` with `size="w,h"` + `roundness="rx"` |
-| CSS `box-shadow` | `<DropShadowStyle offsetX offsetY blurX blurY color/>` |
-| CSS `backdrop-filter: blur(N)` | `<BackgroundBlurStyle blurX="N" blurY="N"/>` |
-| CSS `overflow: hidden` | `clipToBounds="true"` on Layer (pixel-level). TextBox `overflow` is line-level |
-| CSS `linear-gradient(angle, stops)` | `<LinearGradient startPoint endPoint>` — convert angle to coordinates |
-| CSS `radial-gradient(circle R at cx cy)` | `<RadialGradient center="cx,cy" radius="R">` |
-| CSS `text-align`, `line-height` | TextBox `textAlign`, `lineHeight` — same names and semantics |
+**Layer arrangement = CSS Flexbox.** Build the entire Layer tree using container layout.
+**Never fall back to constraint positioning when the layout is expressible as nested flex
+containers.** Constraint positioning on Layers is for overlay elements only.
 
 **CSS Flexbox → PAGX Container Layout**:
 
@@ -100,67 +45,6 @@ then translate to PAGX**:
 
 Not in PAGX: `margin` (use `gap` or nested containers with `padding`), `flex-wrap`,
 `order`, `align-content`, `flex-shrink`, `flex-basis`.
-
-### Component Tree
-
-Identify independent visual units — each becomes a `<Layer>`. The hierarchy reflects
-semantic containment, not a flat list:
-
-> A Layer represents a content unit that remains **visually complete** when moved as a whole.
-> If moving a Layer leaves behind a sibling that loses meaning, those siblings belong under
-> the same parent Layer.
-
-```
-ProfileHeader (Layer)
-├── AvatarGroup (Layer)
-│   ├── Avatar (Group: circular photo)
-│   └── OnlineBadge (Layer: green dot + white border ring)
-├── UserInfo (Layer)
-│   ├── Username (Group: name text)
-│   └── Bio (Group: signature text)
-└── EditButton (Layer)
-    ├── background (Group: rounded rectangle + fill)
-    └── label (Group: icon + "Edit" text)
-```
-
-Extract repeated subtrees as `<Composition>` in Resources when the same structure appears
-at 2+ positions (differing only in position).
-
-**Layer vs Group decision tree**:
-
-```
-Is this a direct child of <pagx> or <Composition>?
-  → YES: Must be Layer
-
-Does this need styles, filters, mask, blendMode, composition, or clipToBounds?
-  → YES: Must be Layer
-
-Does this element need independent Fill/Stroke with constraint positioning?
-  → YES: Use Layer (per-shape Layers for painter scope isolation)
-
-Is this an independent visual unit (could be repositioned as a whole)?
-  → YES: Use Layer
-
-Does this content come after earlier geometry+painters in the same scope?
-  → YES: Wrap in Group for painter scope isolation
-  → NO (first content in scope): No wrapper needed
-```
-
-**MergePath vs Mask**: For combining opaque shapes, use MergePath (union, intersect,
-difference, xor) within a Group. Reserve Layer `mask` for alpha/luminance masking
-(soft-edge gradients, vignettes).
-
-**When to extract Resources**:
-- Same gradient/color source in 2+ places → `<Resources>` + `@id` reference
-- Same path data in 2+ places → `<PathData>` in Resources
-- Same layer subtree repeated → `<Composition>` in Resources
-- Single-use → keep inline
-
-### Layout: Think in Flexbox
-
-**Layer arrangement = CSS Flexbox.** Build the entire Layer tree using container layout.
-**Never fall back to constraint positioning when the layout is expressible as nested flex
-containers.** Constraint positioning on Layers is for overlay elements only.
 
 For each Layer that contains child Layers, decide:
 
@@ -177,7 +61,7 @@ For each Layer that contains child Layers, decide:
 **Common patterns** (all derive from three-state sizing + nesting):
 
 ```xml
-<!-- Equal columns: flex="1" shares space equally -->
+<!-- Equal columns -->
 <Layer width="600" height="200" layout="horizontal" gap="12" padding="16">
   <Layer flex="1"/>
   <Layer flex="1"/>
@@ -203,7 +87,7 @@ For each Layer that contains child Layers, decide:
   </Layer>
 </Layer>
 
-<!-- Per-child alignment: nested container for different alignment -->
+<!-- Per-child alignment -->
 <Layer width="400" height="200" layout="horizontal" alignment="center">
   <Layer width="100" height="60"><!-- centered by parent --></Layer>
   <Layer width="100" layout="vertical">
@@ -216,94 +100,12 @@ For each Layer that contains child Layers, decide:
 See `spec-essentials.md` §3 Container Layout for complete three-state sizing rules,
 flex distribution, stretch alignment, and pixel grid alignment.
 
-### Internal Content Positioning
-
-VectorElements inside a Layer (Rectangle, Ellipse, Path, Text, TextBox, Group) use
-constraint attributes to position within the Layer's bounds. This is always active
-regardless of the parent Layer's `layout` mode.
-
-```xml
-<!-- Background: stretch to fill Layer -->
-<Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
-
-<!-- Centered text -->
-<TextBox centerX="0" centerY="0">
-  <Text text="Label" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-  <Fill color="#FFF"/>
-</TextBox>
-
-<!-- Anchored to right edge, vertically centered -->
-<TextBox right="16" centerY="0">
-  <Text text="$99" fontFamily="Arial" fontSize="20"/>
-  <Fill color="#10B981"/>
-</TextBox>
-
-<!-- Positioned by offset -->
-<Ellipse left="8" centerY="0" size="24,24"/>
-```
-
-**TextBox alignment**:
-
-| `textAlign` | Use For | `paragraphAlign` | Use For |
-|-------------|---------|-------------------|---------|
-| `start` | Body text, labels | `near` | Default (top) |
-| `center` | Titles, buttons | `middle` | Buttons, badges |
-| `end` | Prices, numbers | `far` | Bottom-aligned |
-| `justify` | Long paragraphs | | |
-
-**Region-filling TextBox** — deterministic size + alignment:
-
-```xml
-<TextBox width="200" height="40" textAlign="center" paragraphAlign="middle">
-  <Text text="Submit" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-  <Fill color="#FFF"/>
-</TextBox>
-```
-
-**Multi-line** — set `width` (explicit or via constraints) to enable wrapping:
-
-```xml
-<TextBox left="20" right="20" top="10" textAlign="start">
-  <Text text="Long text that wraps..." fontFamily="Arial" fontSize="14"/>
-  <Fill color="#333"/>
-</TextBox>
-```
-
-**Rich text** — multiple Text segments with different styles in one TextBox:
-
-```xml
-<TextBox left="0" right="0" top="0" bottom="0" textAlign="start">
-  <Text text="Bold part " fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-  <Fill color="#000"/>
-  <Group>
-    <Text text="normal part" fontFamily="Arial" fontSize="14"/>
-    <Fill color="#666"/>
-  </Group>
-</TextBox>
-```
-
-See `spec-essentials.md` §3 Constraint Positioning for full rules (opposite-pair behavior,
-mutual exclusion, element type differences).
-
 ### Overlay Elements
 
 For elements that float above the layout flow (badges, floating buttons, decorative
 overlays), use `includeInLayout="false"` + constraint positioning — the PAGX equivalent
-of CSS `position: absolute`:
-
-```xml
-<Layer layout="vertical" gap="8">
-  <Layer height="32"><!-- normal layout child --></Layer>
-  <Layer height="32"><!-- normal layout child --></Layer>
-  <!-- Badge: excluded from layout, positioned at top-right corner -->
-  <Layer right="-6" top="-6" includeInLayout="false">
-    <Ellipse size="12,12"/>
-    <Fill color="#EF4444"/>
-  </Layer>
-</Layer>
-```
-
-Use sparingly — only when an element must overlap or extend beyond parent bounds.
+of CSS `position: absolute`. Use sparingly — only when an element must overlap or extend
+beyond parent bounds.
 
 ### Sizing Rules
 
@@ -311,89 +113,80 @@ Container layout children are sized by the engine — never set `left`/`top` on 
 layout flow. Do not combine `flex` with explicit main-axis size (explicit size takes
 precedence, `flex` is ignored). Prefer `arrangement` over empty flex spacer Layers.
 
-### Incremental Build Strategy
+### Container Size for Constraints
 
-For designs with multiple sections, you **MUST** build incrementally. **Do NOT write the
-entire PAGX file in one pass** — compounding layout errors are costly to debug and result in
-extensive rework. Each stage has a **mandatory verification gate**: you MUST NOT proceed to
-the next stage until verification passes.
+When VectorElements use opposite-pair constraints (e.g., `left="0" right="0"`) to
+stretch-fill their container, the container **must** have a determinate size. Otherwise
+the container measures from content, but the content has no intrinsic size (Rectangle's
+default `size` is `0,0`) — both resolve to zero.
 
-Ensure the `pagx` CLI is installed before the first invocation (see `cli.md` §Setup).
-
-**Stage 1 — Skeleton**: Write the `<pagx>` root and all section Layers with **only layout
-attributes** (`id`, `width`/`height`, `flex`, `layout`, `gap`, `padding`). No content — no
-text, no backgrounds, no icons.
+Three ways a container gets a determinate size:
 
 ```xml
-<pagx version="1.0" width="393" height="852">
-  <Layer id="screen" left="0" right="0" top="0" bottom="0" layout="vertical">
-    <Layer id="header" height="60"/>
-    <Layer id="content" flex="1" layout="vertical" gap="16" padding="0,20,0,20">
-      <Layer id="cardRow" height="200" layout="horizontal" gap="12"/>
-      <Layer id="body" flex="1"/>
-    </Layer>
-    <Layer id="tabBar" height="83"/>
+<!-- 1. Explicit width/height -->
+<Layer width="300" height="200">
+  <Rectangle left="0" right="0" top="0" bottom="0"/>
+  <Fill color="#F00"/>
+</Layer>
+
+<!-- 2. Parent layout assigns size (flex or stretch alignment) -->
+<Layer width="600" height="400" layout="horizontal">
+  <Layer flex="1">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F00"/>
   </Layer>
-</pagx>
+</Layer>
+
+<!-- 3. Opposite-pair constraints derive size from parent -->
+<Layer width="600" height="400">
+  <Layer left="20" right="20" top="20" bottom="20">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+    <Fill color="#F00"/>
+  </Layer>
+</Layer>
 ```
-
-**VERIFICATION GATE 1** — run verification to confirm section proportions.
-Fix all problems. Repeat until clean.
-
-```bash
-pagx verify --scale 2 input.pagx
-```
-
-Verify: are there any reported problems? Check the screenshot — are section heights
-proportional? Is there unexpected empty space? Does the overall layout match the design
-intent? Do NOT proceed until verification passes.
-
-**Stage 2 — Content**: Fill **one section at a time**. For each section:
-
-1. Add backgrounds, text, shapes, and icons (using `<Import>` for SVG icons — see §Icons).
-2. Run verification:
-   ```bash
-   pagx verify --scale 2 --id "sectionId" input.pagx
-   ```
-3. Fix all reported diagnostics.
-4. Check the screenshot — verify text is visible, colors are correct, alignment matches design
-   intent, no overlapping or missing elements.
-5. If the screenshot shows a visual issue but verify reported no problems, Read the
-   `.layout.xml` file to inspect bounds and diagnose the discrepancy.
-6. After fixing, use `--problems-only` for fast regression checks:
-   ```bash
-   pagx verify --problems-only --id "sectionId" input.pagx
-   ```
-7. Do NOT proceed to the next section until verification passes.
-8. After verification passes, delete the scoped artifacts (e.g., for section id `header`):
-   ```bash
-   rm -f input.header.png input.header.layout.xml
-   ```
-
-**CRITICAL**: Do NOT skip per-section verification. Layout problems compound across
-sections — a misaligned header causes every subsequent section to shift. Catching errors
-early in one section is far cheaper than debugging the entire file at the end.
-
-**Stage 3 — Polish**: After all sections are complete:
-
-1. Delete any remaining scoped verification artifacts:
-   ```bash
-   rm -f input.*.png input.*.layout.xml
-   ```
-2. Run full verification:
-   ```bash
-   pagx verify --scale 2 input.pagx
-   ```
-3. Fix all reported problems.
-4. Check the screenshot (`input.png`) — verify overall visual coherence: section spacing,
-   module-to-module alignment, global color consistency.
-5. Repeat until verification passes.
-6. The final `input.png` is the rendered result — keep it alongside the `.pagx` file for
-   reference but do not include it in commits. Delete `input.layout.xml`.
 
 ---
 
-## Step 3: Build Content
+## Content
+
+### CSS → PAGX Quick Reference
+
+| CSS | PAGX |
+|-----|------|
+| `box-shadow` | `<DropShadowStyle offsetX offsetY blurX blurY color/>` |
+| `backdrop-filter: blur(N)` | `<BackgroundBlurStyle blurX="N" blurY="N"/>` |
+| `overflow: hidden` | `clipToBounds="true"` on Layer (pixel-level). TextBox `overflow` is line-level |
+| `linear-gradient(angle, stops)` | `<LinearGradient startPoint endPoint>` — convert angle to coordinates |
+| `radial-gradient(circle R at cx cy)` | `<RadialGradient center="cx,cy" radius="R">` |
+| `text-align`, `line-height` | TextBox `textAlign`, `lineHeight` — same names and semantics |
+
+### Layer vs Group
+
+```
+Is this a direct child of <pagx> or <Composition>?
+  → YES: Must be Layer
+
+Does this need styles, filters, mask, blendMode, composition, or clipToBounds?
+  → YES: Must be Layer
+
+Is this an independent visual unit (could be repositioned as a whole)?
+  → YES: Use Layer
+
+Does this content come after earlier geometry+painters in the same scope?
+  → YES: Wrap in Group for painter scope isolation
+  → NO (first content in scope): No wrapper needed
+```
+
+**MergePath vs Mask**: For combining opaque shapes, use MergePath (union, intersect,
+difference, xor) within a Group. Reserve Layer `mask` for alpha/luminance masking
+(soft-edge gradients, vignettes).
+
+**When to extract Resources**:
+- Same gradient/color source in 2+ places → `<Resources>` + `@id` reference
+- Same path data in 2+ places → `<PathData>` in Resources
+- Same layer subtree repeated → `<Composition>` in Resources
+- Single-use → keep inline
 
 ### Geometry and Painters
 
@@ -401,10 +194,6 @@ early in one section is far cheaper than debugging the entire file at the end.
 2. Add painters (Fill, Stroke) — they render all geometry accumulated in the current scope
 3. Use **Groups for painter scope isolation** — only needed when subsequent content requires
    different painters from earlier content in the same scope
-
-**Scope isolation rule**: Does this content come after earlier geometry+painters?
-- **YES** → wrap in a Group
-- **NO** (first content) → no Group needed, place directly
 
 **Group positioning rule**: Group is both an isolation container **and** a positioning unit.
 After wrapping content in a Group, always ask: "Where should this Group sit in its parent?"
@@ -416,11 +205,6 @@ Common mistake: placing `centerX`/`centerY` on the Path/Ellipse inside the Group
 of on the Group itself. Inner element constraints position the element within the Group's
 bounds, not within the parent Layer — the element centers inside the Group, but the Group
 itself stays at (0,0).
-
-Another common mistake: centering VectorElements inside a **content-measured** Group or
-Layer (no explicit `width`/`height`). The container sizes itself from the child, so the
-child centers relative to its own size — a no-op. Move the centering constraint to the
-Group or Layer itself. `pagx verify` detects this as `centerX/centerY ineffective`.
 
 ```xml
 <!-- ✅ Correct: Group isolates scope AND positions content at center -->
@@ -452,22 +236,6 @@ Group or Layer itself. `pagx verify` detects this as `centerX/centerY ineffectiv
 </Layer>
 ```
 
-**With constraint positioning** — each constrained shape with different painters needs
-its own Layer:
-
-```xml
-<Layer width="300" height="200">
-  <Layer>
-    <Rectangle left="10" top="10" size="80,80" roundness="8"/>
-    <Fill color="#6366F1"/>
-  </Layer>
-  <Layer>
-    <Ellipse left="40" right="40" centerY="0" size="60,60"/>
-    <Fill color="#F43F5E"/>
-  </Layer>
-</Layer>
-```
-
 **Fill + Stroke on same geometry** — no Group when first in scope:
 
 ```xml
@@ -481,26 +249,45 @@ its own Layer:
 **Modifier scope isolation** — isolate TrimPath/RoundCorner/MergePath to their target:
 
 ```xml
-<Group>
-  <Path data="M 0 0 L 100 100"/>
-  <TrimPath end="0.5"/>
+<Layer>
+  <Path data="M 0 0 L 100 0 L 100 100"/>
   <Fill color="#F00"/>
-</Group>
-<Group>
-  <Path data="M 200 0 L 300 100"/>
-  <Fill color="#F00"/>
-</Group>
-```
-
-**Container size for constraints** — set explicit `width`/`height` when you need a specific
-size rather than content-measured:
-
-```xml
-<Layer width="300" height="200">
-  <Rectangle left="0" right="0" top="0" bottom="0"/>
-  <Fill color="#F00"/>
+  <Group>
+    <Path data="M 0 0 L 100 100"/>
+    <TrimPath end="0.5"/>
+    <Stroke color="#000" width="2"/>
+  </Group>
 </Layer>
 ```
+
+### Constraint Positioning
+
+VectorElements inside a Layer (Rectangle, Ellipse, Path, Text, TextBox, Group) use
+constraint attributes to position within the Layer's bounds. This is always active
+regardless of the parent Layer's `layout` mode.
+
+```xml
+<!-- Background: stretch to fill Layer -->
+<Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+
+<!-- Centered text -->
+<TextBox centerX="0" centerY="0">
+  <Text text="Label" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+  <Fill color="#FFF"/>
+</TextBox>
+
+<!-- Anchored to right edge, vertically centered -->
+<TextBox right="16" centerY="0">
+  <Text text="$99" fontFamily="Arial" fontSize="20"/>
+  <Fill color="#10B981"/>
+</TextBox>
+
+<!-- Positioned by offset -->
+<Ellipse left="8" centerY="0" size="24,24"/>
+```
+
+See `spec-essentials.md` §3 Constraint Positioning for full rules (opposite-pair behavior,
+mutual exclusion, element type differences).
 
 ### Icons
 
@@ -510,8 +297,6 @@ resolved automatically by `pagx verify`.
 
 Prefer Stroke (outline) by default. Fill for solid icons (active states). Mixed for
 complex icons.
-
-**Write the icon Layer with inline SVG**
 
 ```xml
 <Layer id="searchIcon" centerX="0" centerY="0">
@@ -553,11 +338,50 @@ For external SVG files:
 </Layer>
 ```
 
-### Text Positioning
+### Text
 
 Text renders from the baseline, making bounding box dependent on font metrics. Prefer
-wrapping Text in TextBox for accurate constraint positioning (see §Internal Content
-Positioning for examples). Exception: TextPath.
+wrapping Text in TextBox for accurate constraint positioning. Exception: TextPath.
+
+**TextBox alignment**:
+
+| `textAlign` | Use For | `paragraphAlign` | Use For |
+|-------------|---------|-------------------|---------|
+| `start` | Body text, labels | `near` | Default (top) |
+| `center` | Titles, buttons | `middle` | Buttons, badges |
+| `end` | Prices, numbers | `far` | Bottom-aligned |
+| `justify` | Long paragraphs | | |
+
+**Region-filling TextBox** — deterministic size + alignment:
+
+```xml
+<TextBox width="200" height="40" textAlign="center" paragraphAlign="middle">
+  <Text text="Submit" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+  <Fill color="#FFF"/>
+</TextBox>
+```
+
+**Multi-line** — set `width` (explicit or via constraints) to enable wrapping:
+
+```xml
+<TextBox left="20" right="20" top="10" textAlign="start">
+  <Text text="Long text that wraps..." fontFamily="Arial" fontSize="14"/>
+  <Fill color="#333"/>
+</TextBox>
+```
+
+**Rich text** — multiple Text segments with different styles in one TextBox:
+
+```xml
+<TextBox left="0" right="0" top="0" bottom="0" textAlign="start">
+  <Text text="Bold part " fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+  <Fill color="#000"/>
+  <Group>
+    <Text text="normal part" fontFamily="Arial" fontSize="14"/>
+    <Fill color="#666"/>
+  </Group>
+</TextBox>
+```
 
 **TextBox behaviors**:
 - TextBox vertically centers text within each line automatically (lineBox baseline mode)
@@ -568,40 +392,219 @@ Positioning for examples). Exception: TextPath.
 via Group — `centerY="0"` for strikethrough, `bottom="0"` for underline. See `examples.md`
 §Text Decoration.
 
-### PAGX-Specific Format Rules
+---
 
-These constraints differ from CSS/SVG:
+## Pitfalls
 
-- **Do not invent attribute values.** If a property is not specified in the design, use the
-  PAGX default (see `attributes.md`) — do not guess a value. E.g., omit `roundness` on a
-  Rectangle rather than inventing `roundness="8"`.
+These errors are detected by `pagx verify` and are easy to make during generation.
+Internalizing them avoids repeated verify-fix cycles.
 
-- **`roundness` is a single value** — all corners uniform. Auto-limited to
-  `min(roundness, width/2, height/2)`.
+### Layout
 
-- **Constraint mutual exclusion** — per axis, use only one positioning strategy:
-  single edge, opposite pair, or `centerX`/`centerY`. Mixing them (e.g., `left`+`centerX`)
-  causes silent override (`centerX` wins). See `spec-essentials.md` §Constraint Positioning.
+- **Zero-size container** — a Layer with `layout` but no main-axis size (no `width`/`height`,
+  no flex, no opposite-pair constraints) gives flex children zero space. Always ensure layout
+  containers have a determinate size on the main axis.
 
-- **Rectangular clipping** — prefer `clipToBounds` over mask (GPU-accelerated):
   ```xml
-  <Layer width="400" height="300" clipToBounds="true"/>
+  <!-- ❌ Wrong: vertical layout parent has no height — flex child gets 0px -->
+  <Layer layout="vertical">
+    <Layer flex="1"><!-- zero height --></Layer>
+  </Layer>
   ```
 
-- **Gradient coordinates** are relative to the **geometry element's local origin**, not
-  canvas. `left="200"` Rectangle uses `startPoint="0,50"`, not `"200,50"`.
+- **Constraints on layout children** — `left`/`top`/`right`/`bottom`/`centerX`/`centerY`
+  on a child Layer are **ignored** when the parent has `layout`. Use `gap`, `padding`,
+  `alignment`, `arrangement` instead. To opt out of layout flow, add
+  `includeInLayout="false"`.
 
-- **Image placeholders** — when no image is available, use a diagonal LinearGradient
-  (soft pastels) instead of flat gray. See `examples.md` §Image Placeholder.
+- **flex without distributable space** — `flex` only works when the parent has a main-axis
+  size to distribute. A content-measured parent (no explicit size, no constraints, no flex)
+  has nothing to share — `flex` children get zero.
+
+- **Redundant `left="0"` / `top="0"`** — a single `left="0"` without `right` or `centerX`
+  is the same as default positioning (elements start at parent origin). Either pair it with
+  an opposite edge (`left="0" right="0"` to stretch) or remove it.
+
+### Content
+
+- **Content origin offset** — in a content-measured container (no explicit size), all
+  children should start from `(0,0)`. Children at negative coordinates or offset positions
+  cause inaccurate container measurement.
+
+- **Ineffective centering** — `centerX`/`centerY` on an element inside a content-measured
+  container is a no-op: the container sizes from the element, so the element centers relative
+  to its own size. Move the centering constraint to the container itself.
+
+  ```xml
+  <!-- ❌ Wrong: centerX on Text inside content-measured Group -->
+  <Group>
+    <Text centerX="0" text="Hi" fontFamily="Arial" fontSize="14"/>
+    <Fill color="#000"/>
+  </Group>
+
+  <!-- ✅ Correct: centerX on the Group, positioned within parent Layer -->
+  <Group centerX="0">
+    <Text text="Hi" fontFamily="Arial" fontSize="14"/>
+    <Fill color="#000"/>
+  </Group>
+  ```
+
+- **Unnecessary first-child Group** — the first content in a scope needs no Group wrapper.
+  Only wrap in Group when there is **earlier** geometry+painters in the same scope that need
+  isolation.
+
+- **Layer where Group suffices** — use Layer only when you need Layer-exclusive features
+  (styles, filters, mask, blendMode, composition, clipToBounds, child Layers, `layout`).
+  For simple painter scope isolation, use Group.
+
+- **Mergeable consecutive Groups** — if adjacent Groups share the exact same painters
+  (same Fill/Stroke sequence), merge their geometry into one Group.
 
 ---
 
-## Step 4: Verify and Refine
+# Part 2: Workflow
 
-The verification loop is embedded in each stage (see §Incremental Build Strategy). This
-section covers diagnostic techniques for issues that `pagx verify` cannot detect automatically.
+**Do not invent attribute values.** If a property is not specified in the design, use the
+PAGX default (see `attributes.md`) — do not guess a value. E.g., omit `roundness` on a
+Rectangle rather than inventing `roundness="8"`.
 
-### Visual symptom troubleshooting
+## Step 1: Assess and Analyze
+
+### Task Type
+
+| Task | Strategy |
+|------|----------|
+| **Create from scratch** | Full workflow: Step 1→4 |
+| **Edit existing file** | Read file first, preserve style consistency, minimal changes |
+| **Modify specific part** | Locate target, change only what's needed |
+
+For **editing existing files**, scan Resources before adding content:
+- Reuse existing `SolidColor`, `LinearGradient`, `PathData` via `@id` references
+- Reuse existing `Composition` via `composition="@id"`
+- Match existing style (roundness, fonts, spacing) for consistency
+
+### Requirement Clarity
+
+**Ask the user** when:
+- Canvas size unspecified and not inferable from context
+- Visual style ambiguous ("make it look good")
+- Text content missing but layout depends on it
+- Color scheme unclear and no reference provided
+
+**Use reasonable defaults** when minor details are unspecified. Before generating, establish
+a **style sheet** — a consistent set of design parameters for the entire file:
+
+1. **Derive from context first** — if a reference image, design spec, or existing file is
+   provided, extract its color scheme, spacing rhythm, roundness, and font choices.
+2. **Infer from purpose** — a playful app uses rounder corners, warmer colors, and more
+   spacing; a data dashboard uses tighter spacing, neutral colors, and sharp corners.
+3. **When no context exists** — consult the Appendix (Recommended Values) as a starting
+   point, then adapt to the design's personality. The Appendix values are sensible
+   reference points, not mandatory defaults.
+
+The style sheet should cover: **color palette** (primary, secondary, text, surface),
+**spacing scale** (small/medium/large gaps and padding), **roundness** per element type,
+and **font hierarchy** (heading/body families and weights). Apply these values consistently
+throughout the file — visual coherence matters more than any individual choice.
+
+### Visual Decomposition
+
+Systematically decompose the visual before writing any code:
+
+1. **Layer structure** — how many distinct depth layers? Background vs foreground?
+2. **Rendering technique** — filled shapes, stroked line art, or both?
+3. **Color scheme** — exact colors, gradients, transparency?
+4. **Shape vocabulary** — geometric primitives or freeform curves?
+5. **Text inventory** — list all text elements with approximate font sizes.
+
+---
+
+## Step 2: Skeleton + Verify
+
+Build the layout skeleton: `<pagx>` root and all section Layers with **only layout
+attributes** (`id`, `width`/`height`, `flex`, `layout`, `gap`, `padding`). No visual
+content — no text, no backgrounds, no icons. Apply §Layout methods throughout.
+
+```xml
+<pagx version="1.0" width="393" height="852">
+  <Layer id="screen" left="0" right="0" top="0" bottom="0" layout="vertical">
+    <Layer id="header" height="60"/>
+    <Layer id="content" flex="1" layout="vertical" gap="16" padding="0,20,0,20">
+      <Layer id="cardRow" height="200" layout="horizontal" gap="12"/>
+      <Layer id="body" flex="1"/>
+    </Layer>
+    <Layer id="tabBar" height="83"/>
+  </Layer>
+</pagx>
+```
+
+**Verify** — run verification. Fix all problems. Repeat until clean.
+
+```bash
+pagx verify --scale 2 input.pagx
+```
+
+Ensure the `pagx` CLI is installed before the first invocation (see `cli.md` §Setup).
+
+Check: are there any reported problems? Are section heights proportional in the screenshot?
+Is there unexpected empty space? Does the overall layout match the design intent?
+Review §Pitfalls/Layout before proceeding. Do NOT proceed until verification passes.
+
+---
+
+## Step 3: Content + Per-Section Verify
+
+Fill **one section at a time** with visual content. Apply §Content methods — painter scope
+isolation, constraint positioning, icons, text. Check §Pitfalls/Content before verifying.
+
+For each section:
+
+1. Add backgrounds, text, shapes, and icons (using `<Import>` for SVG icons — see §Icons).
+2. Run verification:
+   ```bash
+   pagx verify --scale 2 --id "sectionId" input.pagx
+   ```
+3. Fix all reported diagnostics.
+4. Check the screenshot — verify text is visible, colors are correct, alignment matches design
+   intent, no overlapping or missing elements.
+5. If the screenshot shows a visual issue but verify reported no problems, consult
+   §Visual Symptom Troubleshooting below.
+6. After fixing, use `--problems-only` for fast regression checks:
+   ```bash
+   pagx verify --problems-only --id "sectionId" input.pagx
+   ```
+7. Do NOT proceed to the next section until verification passes.
+8. After verification passes, delete the scoped artifacts (e.g., for section id `header`):
+   ```bash
+   rm -f input.header.png input.header.layout.xml
+   ```
+
+**CRITICAL**: Do NOT skip per-section verification. Layout problems compound across
+sections — a misaligned header causes every subsequent section to shift. Catching errors
+early in one section is far cheaper than debugging the entire file at the end.
+
+---
+
+## Step 4: Polish + Full Verify
+
+After all sections are complete:
+
+1. Delete any remaining scoped verification artifacts:
+   ```bash
+   rm -f input.*.png input.*.layout.xml
+   ```
+2. Run full verification:
+   ```bash
+   pagx verify --scale 2 input.pagx
+   ```
+3. Fix all reported problems.
+4. Check the screenshot (`input.png`) — verify overall visual coherence: section spacing,
+   module-to-module alignment, global color consistency.
+5. Repeat until verification passes.
+6. The final `input.png` is the rendered result — keep it alongside the `.pagx` file for
+   reference but do not include it in commits. Delete `input.layout.xml`.
+
+### Visual Symptom Troubleshooting
 
 If the screenshot looks wrong but verify reports no problems, check these common causes:
 
@@ -614,7 +617,7 @@ If the screenshot looks wrong but verify reports no problems, check these common
 | Gradient wrong direction | Gradient coords in canvas space instead of geometry-local | Use geometry-relative coordinates for `startPoint`/`endPoint` |
 | Text not centered in button | Using bare `<Text>` instead of `<TextBox>` | Wrap in `<TextBox centerX="0" centerY="0">` |
 
-### Inspecting layout data
+### Inspecting Layout Data
 
 When diagnosing a visual issue, Read the `.layout.xml` file output by verify. Each node
 includes `line` (source file line number) and `bounds` for precise diagnosis.
