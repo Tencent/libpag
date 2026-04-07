@@ -979,4 +979,249 @@ PAGX_TEST(PAGXUtilsTest, GetImageDPI_EmptyData) {
   EXPECT_FALSE(pagx::GetImageDPI(image, &dpiX, &dpiY));
 }
 
+PAGX_TEST(PAGXUtilsTest, GetImageDPI_ValidPNG_WithpHYs) {
+  // Minimal PNG with pHYs chunk specifying 96 DPI (3780 pixels/meter)
+  // pixels_per_unit = 3780, unit = 1 (meter) → DPI = 3780 * 0.0254 ≈ 96.012
+  uint8_t png[] = {
+      0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,  // PNG signature
+      // IHDR chunk
+      0x00, 0x00, 0x00, 0x0D,                            // length = 13
+      0x49, 0x48, 0x44, 0x52,                            // "IHDR"
+      0x00, 0x00, 0x00, 0x01,                            // width = 1
+      0x00, 0x00, 0x00, 0x01,                            // height = 1
+      0x08, 0x02,                                        // 8-bit RGB
+      0x00, 0x00, 0x00,                                  // compression, filter, interlace
+      0x00, 0x00, 0x00, 0x00,                            // CRC (dummy)
+      // pHYs chunk
+      0x00, 0x00, 0x00, 0x09,                            // length = 9
+      0x70, 0x48, 0x59, 0x73,                            // "pHYs"
+      0x00, 0x00, 0x0E, 0xC4,                            // X: 3780 pixels/meter
+      0x00, 0x00, 0x0E, 0xC4,                            // Y: 3780 pixels/meter
+      0x01,                                              // unit: meter
+      0x00, 0x00, 0x00, 0x00,                            // CRC (dummy)
+  };
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto image = doc->makeNode<pagx::Image>();
+  image->data = pagx::Data::MakeWithCopy(png, sizeof(png));
+  float dpiX = 0, dpiY = 0;
+  EXPECT_TRUE(pagx::GetImageDPI(image, &dpiX, &dpiY));
+  EXPECT_NEAR(dpiX, 96.012f, 0.1f);
+  EXPECT_NEAR(dpiY, 96.012f, 0.1f);
+}
+
+PAGX_TEST(PAGXUtilsTest, GetImageDPI_PNG_NopHYs) {
+  // Minimal PNG without pHYs chunk → DPI not available
+  uint8_t png[] = {
+      0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,  // PNG signature
+      // IHDR chunk
+      0x00, 0x00, 0x00, 0x0D,                            // length = 13
+      0x49, 0x48, 0x44, 0x52,                            // "IHDR"
+      0x00, 0x00, 0x00, 0x01,                            // width = 1
+      0x00, 0x00, 0x00, 0x01,                            // height = 1
+      0x08, 0x02,                                        // 8-bit RGB
+      0x00, 0x00, 0x00,                                  // compression, filter, interlace
+      0x00, 0x00, 0x00, 0x00,                            // CRC (dummy)
+      // IDAT chunk (trigger early exit)
+      0x00, 0x00, 0x00, 0x00,                            // length = 0
+      0x49, 0x44, 0x41, 0x54,                            // "IDAT"
+      0x00, 0x00, 0x00, 0x00,                            // CRC (dummy)
+  };
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto image = doc->makeNode<pagx::Image>();
+  image->data = pagx::Data::MakeWithCopy(png, sizeof(png));
+  float dpiX = 0, dpiY = 0;
+  EXPECT_FALSE(pagx::GetImageDPI(image, &dpiX, &dpiY));
+}
+
+PAGX_TEST(PAGXUtilsTest, GetImageDPI_PNG_pHYs_UnitNotMeter) {
+  // pHYs with unit = 0 (unknown) → DPI not available
+  uint8_t png[] = {
+      0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+      0x00, 0x00, 0x00, 0x0D,
+      0x49, 0x48, 0x44, 0x52,
+      0x00, 0x00, 0x00, 0x01,
+      0x00, 0x00, 0x00, 0x01,
+      0x08, 0x02,
+      0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00,
+      // pHYs chunk
+      0x00, 0x00, 0x00, 0x09,
+      0x70, 0x48, 0x59, 0x73,
+      0x00, 0x00, 0x0E, 0xC4,  // X: 3780
+      0x00, 0x00, 0x0E, 0xC4,  // Y: 3780
+      0x00,                    // unit: unknown (not meter)
+      0x00, 0x00, 0x00, 0x00,
+  };
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto image = doc->makeNode<pagx::Image>();
+  image->data = pagx::Data::MakeWithCopy(png, sizeof(png));
+  float dpiX = 0, dpiY = 0;
+  EXPECT_FALSE(pagx::GetImageDPI(image, &dpiX, &dpiY));
+}
+
+PAGX_TEST(PAGXUtilsTest, GetImageDPI_ValidJPEG_JFIF_DPI) {
+  // JPEG with JFIF APP0 marker, units=1 (DPI), xDensity=72, yDensity=72
+  uint8_t jpeg[] = {
+      0xFF, 0xD8,                                        // SOI
+      0xFF, 0xE0,                                        // APP0
+      0x00, 0x10,                                        // segment length = 16
+      0x4A, 0x46, 0x49, 0x46, 0x00,                      // "JFIF\0"
+      0x01, 0x01,                                        // version 1.1
+      0x01,                                              // units = 1 (DPI)
+      0x00, 0x48,                                        // xDensity = 72
+      0x00, 0x48,                                        // yDensity = 72
+      0x00, 0x00,                                        // thumbnail dims
+  };
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto image = doc->makeNode<pagx::Image>();
+  image->data = pagx::Data::MakeWithCopy(jpeg, sizeof(jpeg));
+  float dpiX = 0, dpiY = 0;
+  EXPECT_TRUE(pagx::GetImageDPI(image, &dpiX, &dpiY));
+  EXPECT_FLOAT_EQ(dpiX, 72.0f);
+  EXPECT_FLOAT_EQ(dpiY, 72.0f);
+}
+
+PAGX_TEST(PAGXUtilsTest, GetImageDPI_ValidJPEG_JFIF_DotPerCm) {
+  // JPEG with JFIF APP0, units=2 (dots/cm), xDensity=28, yDensity=28 → 71.12 DPI
+  uint8_t jpeg[] = {
+      0xFF, 0xD8,
+      0xFF, 0xE0,
+      0x00, 0x10,
+      0x4A, 0x46, 0x49, 0x46, 0x00,
+      0x01, 0x01,
+      0x02,                    // units = 2 (dots per cm)
+      0x00, 0x1C,              // xDensity = 28
+      0x00, 0x1C,              // yDensity = 28
+      0x00, 0x00,
+  };
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto image = doc->makeNode<pagx::Image>();
+  image->data = pagx::Data::MakeWithCopy(jpeg, sizeof(jpeg));
+  float dpiX = 0, dpiY = 0;
+  EXPECT_TRUE(pagx::GetImageDPI(image, &dpiX, &dpiY));
+  EXPECT_NEAR(dpiX, 71.12f, 0.01f);
+  EXPECT_NEAR(dpiY, 71.12f, 0.01f);
+}
+
+PAGX_TEST(PAGXUtilsTest, GetImageDPI_JPEG_NoJFIF) {
+  // JPEG without JFIF APP0 → no DPI
+  uint8_t jpeg[] = {
+      0xFF, 0xD8,
+      0xFF, 0xDA,  // SOS immediately
+      0x00, 0x04, 0x00, 0x00,
+  };
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto image = doc->makeNode<pagx::Image>();
+  image->data = pagx::Data::MakeWithCopy(jpeg, sizeof(jpeg));
+  float dpiX = 0, dpiY = 0;
+  EXPECT_FALSE(pagx::GetImageDPI(image, &dpiX, &dpiY));
+}
+
+PAGX_TEST(PAGXUtilsTest, GetImageDPI_JPEG_InvalidHeader) {
+  uint8_t data[] = {0x00, 0x00, 0x00};
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto image = doc->makeNode<pagx::Image>();
+  image->data = pagx::Data::MakeWithCopy(data, sizeof(data));
+  float dpiX = 0, dpiY = 0;
+  EXPECT_FALSE(pagx::GetImageDPI(image, &dpiX, &dpiY));
+}
+
+PAGX_TEST(PAGXUtilsTest, GetImageDPI_PNG_InvalidSignature) {
+  uint8_t data[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto image = doc->makeNode<pagx::Image>();
+  image->data = pagx::Data::MakeWithCopy(data, sizeof(data));
+  float dpiX = 0, dpiY = 0;
+  EXPECT_FALSE(pagx::GetImageDPI(image, &dpiX, &dpiY));
+}
+
+PAGX_TEST(PAGXUtilsTest, GetImageDPI_PNG_pHYs_WrongLength) {
+  // pHYs chunk with wrong length (not 9) → skip
+  uint8_t png[] = {
+      0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+      0x00, 0x00, 0x00, 0x0D,
+      0x49, 0x48, 0x44, 0x52,
+      0x00, 0x00, 0x00, 0x01,
+      0x00, 0x00, 0x00, 0x01,
+      0x08, 0x02,
+      0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00,
+      // pHYs chunk with wrong length (5 instead of 9)
+      0x00, 0x00, 0x00, 0x05,
+      0x70, 0x48, 0x59, 0x73,
+      0x00, 0x00, 0x0E, 0xC4,  // partial data
+      0x00,
+      0x00, 0x00, 0x00, 0x00,
+  };
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto image = doc->makeNode<pagx::Image>();
+  image->data = pagx::Data::MakeWithCopy(png, sizeof(png));
+  float dpiX = 0, dpiY = 0;
+  EXPECT_FALSE(pagx::GetImageDPI(image, &dpiX, &dpiY));
+}
+
+PAGX_TEST(PAGXUtilsTest, GetImageDPI_JPEG_JFIF_UnitZero) {
+  // JPEG JFIF with units=0 (no DPI, just aspect ratio) → should return false
+  uint8_t jpeg[] = {
+      0xFF, 0xD8,
+      0xFF, 0xE0,
+      0x00, 0x10,
+      0x4A, 0x46, 0x49, 0x46, 0x00,
+      0x01, 0x01,
+      0x00,        // units = 0 (no unit, aspect ratio only)
+      0x00, 0x48,  // xDensity = 72
+      0x00, 0x48,  // yDensity = 72
+      0x00, 0x00,
+  };
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto image = doc->makeNode<pagx::Image>();
+  image->data = pagx::Data::MakeWithCopy(jpeg, sizeof(jpeg));
+  float dpiX = 0, dpiY = 0;
+  EXPECT_FALSE(pagx::GetImageDPI(image, &dpiX, &dpiY));
+}
+
+// ---------------------------------------------------------------------------
+// GetImageData with file path
+// ---------------------------------------------------------------------------
+
+PAGX_TEST(PAGXUtilsTest, GetImageData_WithNonexistentFilePath) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto image = doc->makeNode<pagx::Image>();
+  image->filePath = "/nonexistent/file/path.png";
+  auto data = pagx::GetImageData(image);
+  EXPECT_EQ(data, nullptr);
+}
+
+PAGX_TEST(PAGXUtilsTest, GetImageData_DataTakesPrecedenceOverFilePath) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto image = doc->makeNode<pagx::Image>();
+  uint8_t raw[] = {10, 20, 30};
+  image->data = pagx::Data::MakeWithCopy(raw, sizeof(raw));
+  image->filePath = "/some/file.png";
+  auto data = pagx::GetImageData(image);
+  ASSERT_NE(data, nullptr);
+  EXPECT_EQ(data->size(), 3u);
+}
+
+// ---------------------------------------------------------------------------
+// GetPNGDimensionsFromPath with actual file
+// ---------------------------------------------------------------------------
+
+PAGX_TEST(PAGXUtilsTest, GetPNGDimensionsFromPath_TruncatedFile) {
+  int w = 0, h = 0;
+  EXPECT_FALSE(pagx::GetPNGDimensionsFromPath("data:image/png;base64,AAAA", &w, &h));
+}
+
+// ---------------------------------------------------------------------------
+// GetImagePNGDimensions with file path
+// ---------------------------------------------------------------------------
+
+PAGX_TEST(PAGXUtilsTest, GetImagePNGDimensions_WithNonexistentPath) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto image = doc->makeNode<pagx::Image>();
+  image->filePath = "/nonexistent/path.png";
+  int w = 0, h = 0;
+  EXPECT_FALSE(pagx::GetImagePNGDimensions(image, &w, &h));
+}
+
 }  // namespace pag
