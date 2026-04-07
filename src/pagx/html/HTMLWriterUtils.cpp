@@ -224,7 +224,7 @@ Matrix BuildGroupMatrix(const Group* group) {
   if (hasSkew) {
     m = Matrix::Rotate(group->skewAxis) * m;
     Matrix shear = {};
-    shear.c = std::tan(DegreesToRadians(group->skew));
+    shear.c = std::tan(DegreesToRadians(-group->skew));
     m = shear * m;
     m = Matrix::Rotate(-group->skewAxis) * m;
   }
