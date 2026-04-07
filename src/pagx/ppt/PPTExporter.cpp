@@ -27,6 +27,7 @@
 #include "zip.h"
 #include "base/utils/MathUtil.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/xml/XMLBuilder.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
@@ -94,106 +95,7 @@ static int FontSizeToPPT(float px) {
   return std::max(100, static_cast<int>(std::round(px * 75.0)));
 }
 
-//==============================================================================
-// XMLBuilder – compact XML string builder
-//==============================================================================
-
-class XMLBuilder {
- public:
-  explicit XMLBuilder(size_t reserve = 4096) {
-    _buf.reserve(reserve);
-  }
-
-  void decl() {
-    _buf += "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>";
-  }
-
-  XMLBuilder& open(const char* tag) {
-    _buf += '<';
-    _buf += tag;
-    _tags.push_back(tag);
-    return *this;
-  }
-
-  XMLBuilder& a(const char* name, const char* val) {
-    _buf += ' ';
-    _buf += name;
-    _buf += "=\"";
-    for (const char* p = val; *p; ++p) {
-      switch (*p) {
-        case '"':
-          _buf += "&quot;";
-          break;
-        case '&':
-          _buf += "&amp;";
-          break;
-        case '<':
-          _buf += "&lt;";
-          break;
-        default:
-          _buf += *p;
-          break;
-      }
-    }
-    _buf += '"';
-    return *this;
-  }
-
-  XMLBuilder& a(const char* name, const std::string& val) {
-    return a(name, val.c_str());
-  }
-
-  XMLBuilder& a(const char* name, int64_t val) {
-    return a(name, std::to_string(val).c_str());
-  }
-
-  void gt() {
-    _buf += '>';
-  }
-
-  void sc() {
-    _buf += "/>";
-    _tags.pop_back();
-  }
-
-  void end() {
-    _buf += "</";
-    _buf += _tags.back();
-    _buf += '>';
-    _tags.pop_back();
-  }
-
-  void text(const std::string& t) {
-    for (char c : t) {
-      switch (c) {
-        case '&':
-          _buf += "&amp;";
-          break;
-        case '<':
-          _buf += "&lt;";
-          break;
-        case '>':
-          _buf += "&gt;";
-          break;
-        default:
-          _buf += c;
-          break;
-      }
-    }
-  }
-
-  void raw(const std::string& s) {
-    _buf += s;
-  }
-
-  std::string release() {
-    return std::move(_buf);
-  }
-
- private:
-  std::string _buf;
-  std::vector<const char*> _tags;
-};
+// XMLBuilder is provided by pagx/xml/XMLBuilder.h
 
 //==============================================================================
 // PPTWriterContext – image tracking and ID generation
@@ -1614,7 +1516,7 @@ bool PPTExporter::ToFile(const PAGXDocument& doc, const std::string& filePath,
   PPTWriter writer(&context, &doc, options.convertTextToPath, options.bakeMask);
 
   // Build slide body content
-  XMLBuilder body(16384);
+  XMLBuilder body(false, 2, 16384);
   for (const auto* layer : doc.layers) {
     writer.writeLayer(body, layer);
   }

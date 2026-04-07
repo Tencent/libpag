@@ -52,171 +52,14 @@
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/StringParser.h"
+#include "pagx/xml/XMLBuilder.h"
 
 namespace pagx {
 
 using pag::FloatNearlyZero;
+using SVGBuilder = XMLBuilder;
 
-//==============================================================================
-// SVGBuilder - SVG generation helper
-//==============================================================================
-
-class SVGBuilder {
- public:
-  explicit SVGBuilder(int indentSpaces, int initialIndentLevel = 0, size_t reserveCapacity = 4096)
-      : _indentLevel(initialIndentLevel), _indentSpaces(indentSpaces) {
-    _tagStack.reserve(32);
-    _buffer.reserve(reserveCapacity);
-  }
-
-  void appendDeclaration() {
-    _buffer += "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-  }
-
-  void openElement(const char* tag) {
-    writeIndent();
-    _buffer += "<";
-    _buffer += tag;
-    _tagStack.push_back(tag);
-  }
-
-  void addAttribute(const char* name, const char* value) {
-    if (value && value[0] != '\0') {
-      _buffer += " ";
-      _buffer += name;
-      _buffer += "=\"";
-      _buffer += escapeXML(value);
-      _buffer += "\"";
-    }
-  }
-
-  void addAttribute(const char* name, const std::string& value) {
-    if (!value.empty()) {
-      _buffer += " ";
-      _buffer += name;
-      _buffer += "=\"";
-      _buffer += escapeXML(value);
-      _buffer += "\"";
-    }
-  }
-
-  void addAttribute(const char* name, float value) {
-    _buffer += " ";
-    _buffer += name;
-    _buffer += "=\"";
-    _buffer += FloatToString(value);
-    _buffer += "\"";
-  }
-
-  void addAttributeIfNonZero(const char* name, float value) {
-    if (!FloatNearlyZero(value)) {
-      addAttribute(name, value);
-    }
-  }
-
-  void closeElementStart() {
-    _buffer += ">\n";
-    _indentLevel++;
-  }
-
-  void closeElementSelfClosing() {
-    _buffer += "/>\n";
-    _tagStack.pop_back();
-  }
-
-  void closeElement() {
-    _indentLevel--;
-    writeIndent();
-    _buffer += "</";
-    _buffer += _tagStack.back();
-    _buffer += ">\n";
-    _tagStack.pop_back();
-  }
-
-  void addTextContent(const std::string& text) {
-    _buffer += escapeXML(text);
-  }
-
-  void addRawContent(const std::string& content) {
-    _buffer += content;
-  }
-
-  void closeElementWithText(const std::string& text) {
-    _buffer += ">";
-    _buffer += escapeXML(text);
-    _buffer += "</";
-    _buffer += _tagStack.back();
-    _buffer += ">\n";
-    _tagStack.pop_back();
-  }
-
-  std::string release() {
-    return std::move(_buffer);
-  }
-
- private:
-  std::string _buffer = {};
-  std::vector<const char*> _tagStack = {};
-  int _indentLevel = 0;
-  int _indentSpaces = 2;
-
-  void writeIndent() {
-    _buffer.append(static_cast<size_t>(_indentLevel * _indentSpaces), ' ');
-  }
-
-  static std::string escapeXML(const std::string& input) {
-    size_t extraSize = 0;
-    for (char c : input) {
-      switch (c) {
-        case '&':
-          extraSize += 4;
-          break;
-        case '<':
-          extraSize += 3;
-          break;
-        case '>':
-          extraSize += 3;
-          break;
-        case '"':
-          extraSize += 5;
-          break;
-        case '\'':
-          extraSize += 5;
-          break;
-        default:
-          break;
-      }
-    }
-    if (extraSize == 0) {
-      return input;
-    }
-    std::string result;
-    result.reserve(input.size() + extraSize);
-    for (char c : input) {
-      switch (c) {
-        case '&':
-          result += "&amp;";
-          break;
-        case '<':
-          result += "&lt;";
-          break;
-        case '>':
-          result += "&gt;";
-          break;
-        case '"':
-          result += "&quot;";
-          break;
-        case '\'':
-          result += "&apos;";
-          break;
-        default:
-          result += c;
-          break;
-      }
-    }
-    return result;
-  }
-};
+// SVGBuilder is provided by pagx/xml/XMLBuilder.h (aliased above as SVGBuilder = XMLBuilder)
 
 //==============================================================================
 // Utility types and static helpers
@@ -774,7 +617,7 @@ std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, const char* ta
                                           const char* idPrefix, ContentWriter writer,
                                           MaskType maskType) {
   std::string defId = maskLayer->id.empty() ? generateId(idPrefix) : maskLayer->id;
-  SVGBuilder paintDefs(_indentSpaces);
+  SVGBuilder paintDefs(true, _indentSpaces);
   _defs->openElement(tag);
   _defs->addAttribute("id", defId);
   if (maskType == MaskType::Alpha) {
@@ -912,8 +755,8 @@ void SVGWriter::writeRectangle(SVGBuilder& out, const Rectangle* rect, const Fil
   }
   out.addAttributeIfNonZero("x", x);
   out.addAttributeIfNonZero("y", y);
-  out.addAttribute("width", rect->size.width);
-  out.addAttribute("height", rect->size.height);
+  out.addRequiredAttribute("width", rect->size.width);
+  out.addRequiredAttribute("height", rect->size.height);
   if (rect->roundness > 0) {
     out.addAttribute("rx", rect->roundness);
     out.addAttribute("ry", rect->roundness);
@@ -935,18 +778,18 @@ void SVGWriter::writeEllipse(SVGBuilder& out, const Ellipse* ellipse, const Fill
     if (!transform.empty()) {
       out.addAttribute("transform", transform);
     }
-    out.addAttribute("cx", ellipse->position.x);
-    out.addAttribute("cy", ellipse->position.y);
-    out.addAttribute("r", rx);
+    out.addRequiredAttribute("cx", ellipse->position.x);
+    out.addRequiredAttribute("cy", ellipse->position.y);
+    out.addRequiredAttribute("r", rx);
   } else {
     out.openElement("ellipse");
     if (!transform.empty()) {
       out.addAttribute("transform", transform);
     }
-    out.addAttribute("cx", ellipse->position.x);
-    out.addAttribute("cy", ellipse->position.y);
-    out.addAttribute("rx", rx);
-    out.addAttribute("ry", ry);
+    out.addRequiredAttribute("cx", ellipse->position.x);
+    out.addRequiredAttribute("cy", ellipse->position.y);
+    out.addRequiredAttribute("rx", rx);
+    out.addRequiredAttribute("ry", ry);
   }
   Rect bounds = Rect::MakeXYWH(ellipse->position.x - rx, ellipse->position.y - ry, rx * 2, ry * 2);
   std::string p3Style;
@@ -1077,8 +920,8 @@ void SVGWriter::writeText(SVGBuilder& out, const Text* text, const FillStrokeInf
       }
       out.openElement("text");
       writeSharedTextAttrs();
-      out.addAttribute("x", x);
-      out.addAttribute("y", currentY);
+      out.addRequiredAttribute("x", x);
+      out.addRequiredAttribute("y", currentY);
       out.closeElementWithText(lineText);
       isFirst = false;
     }
@@ -1236,8 +1079,8 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
 //==============================================================================
 
 std::string SVGExporter::ToSVG(const PAGXDocument& doc, const Options& options) {
-  SVGBuilder svg(options.indent);
-  SVGBuilder defs(options.indent, 2);
+  SVGBuilder svg(true, options.indent);
+  SVGBuilder defs(true, options.indent, 2);
   SVGWriterContext context;
   SVGWriter writer(&defs, &context, options.indent, options.convertTextToPath);
 
@@ -1247,13 +1090,13 @@ std::string SVGExporter::ToSVG(const PAGXDocument& doc, const Options& options) 
 
   svg.openElement("svg");
   svg.addAttribute("xmlns", "http://www.w3.org/2000/svg");
-  svg.addAttribute("width", doc.width);
-  svg.addAttribute("height", doc.height);
+  svg.addRequiredAttribute("width", doc.width);
+  svg.addRequiredAttribute("height", doc.height);
   std::string viewBox = "0 0 " + FloatToString(doc.width) + " " + FloatToString(doc.height);
   svg.addAttribute("viewBox", viewBox);
   svg.closeElementStart();
 
-  SVGBuilder bodyContent(options.indent, 1);
+  SVGBuilder bodyContent(true, options.indent, 1);
   for (const auto* layer : doc.layers) {
     writer.writeLayer(bodyContent, layer);
   }
