@@ -410,25 +410,16 @@ std::string UTF8ToUTF16BEHex(const std::string& utf8) {
   return hex;
 }
 
-std::shared_ptr<tgfx::Data> RenderMaskedLayer(const std::shared_ptr<tgfx::Layer>& root,
-                                              const std::shared_ptr<tgfx::Layer>& targetLayer) {
-  auto globalBounds = targetLayer->getBounds(root.get(), true);
+static std::shared_ptr<tgfx::Data> DoRenderMaskedLayer(
+    tgfx::Context* context, const std::shared_ptr<tgfx::Layer>& root,
+    const std::shared_ptr<tgfx::Layer>& targetLayer, const tgfx::Rect& globalBounds) {
   int width = static_cast<int>(ceilf(globalBounds.width()));
   int height = static_cast<int>(ceilf(globalBounds.height()));
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  auto device = tgfx::GLDevice::Make();
-  if (device == nullptr) {
-    return nullptr;
-  }
-  auto context = device->lockContext();
-  if (context == nullptr) {
-    return nullptr;
-  }
   auto surface = tgfx::Surface::Make(context, width, height);
   if (surface == nullptr) {
-    device->unlock();
     return nullptr;
   }
   auto canvas = surface->getCanvas();
@@ -438,16 +429,29 @@ std::shared_ptr<tgfx::Data> RenderMaskedLayer(const std::shared_ptr<tgfx::Layer>
 
   tgfx::Bitmap bitmap(width, height, false, false);
   if (bitmap.isEmpty()) {
-    device->unlock();
     return nullptr;
   }
   tgfx::Pixmap pixmap(bitmap);
-  bool readSuccess = surface->readPixels(pixmap.info(), pixmap.writablePixels());
-  device->unlock();
-  if (!readSuccess) {
+  if (!surface->readPixels(pixmap.info(), pixmap.writablePixels())) {
     return nullptr;
   }
   return tgfx::ImageCodec::Encode(pixmap, tgfx::EncodedFormat::PNG, 100);
+}
+
+std::shared_ptr<tgfx::Data> RenderMaskedLayer(const std::shared_ptr<tgfx::Layer>& root,
+                                              const std::shared_ptr<tgfx::Layer>& targetLayer) {
+  auto globalBounds = targetLayer->getBounds(root.get(), true);
+  auto device = tgfx::GLDevice::Make();
+  if (device == nullptr) {
+    return nullptr;
+  }
+  auto context = device->lockContext();
+  if (context == nullptr) {
+    return nullptr;
+  }
+  auto result = DoRenderMaskedLayer(context, root, targetLayer, globalBounds);
+  device->unlock();
+  return result;
 }
 
 std::string StripQuotes(const std::string& s) {

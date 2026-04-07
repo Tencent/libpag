@@ -19,7 +19,6 @@
 #include "pagx/PAGXExporter.h"
 #include <cstdio>
 #include "pagx/PAGXDocument.h"
-#include "pagx/xml/XMLBuilder.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -57,6 +56,7 @@
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/StringParser.h"
+#include "pagx/xml/XMLBuilder.h"
 
 namespace pagx {
 

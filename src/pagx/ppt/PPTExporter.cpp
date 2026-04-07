@@ -20,14 +20,11 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
-#include <cstring>
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "zip.h"
 #include "base/utils/MathUtil.h"
 #include "pagx/PAGXDocument.h"
-#include "pagx/xml/XMLBuilder.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
@@ -51,13 +48,16 @@
 #include "pagx/types/Rect.h"
 #include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/StringParser.h"
+#include "pagx/xml/XMLBuilder.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/layers/DisplayList.h"
+#include "zip.h"
 
 namespace pagx {
 
 using pag::FloatNearlyZero;
+using pag::RadiansToDegrees;
 
 //==============================================================================
 // Coordinate / color / angle helpers
@@ -103,7 +103,7 @@ static int FontSizeToPPT(float px) {
 
 struct ImageEntry {
   const Image* image = nullptr;
-  std::shared_ptr<tgfx::Data> rawData = nullptr;
+  std::shared_ptr<tgfx::Data> cachedData = nullptr;
   std::string relId;
   std::string mediaPath;
   bool isJPEG = false;
@@ -129,7 +129,7 @@ class PPTWriterContext {
     bool jpeg = IsJPEG(data->bytes(), data->size());
     std::string ext = jpeg ? "jpeg" : "png";
     std::string mediaPath = "ppt/media/image" + std::to_string(idx) + "." + ext;
-    _images.push_back({image, nullptr, relId, mediaPath, jpeg});
+    _images.push_back({image, std::move(data), relId, mediaPath, jpeg});
     _imageMap[image] = relId;
     return relId;
   }
@@ -147,11 +147,21 @@ class PPTWriterContext {
   }
 
   bool hasJPEG() const {
-    return std::any_of(_images.begin(), _images.end(), [](const auto& e) { return e.isJPEG; });
+    for (const auto& entry : _images) {
+      if (entry.isJPEG) {
+        return true;
+      }
+    }
+    return false;
   }
 
   bool hasPNG() const {
-    return std::any_of(_images.begin(), _images.end(), [](const auto& e) { return !e.isJPEG; });
+    for (const auto& entry : _images) {
+      if (!entry.isJPEG) {
+        return true;
+      }
+    }
+    return false;
   }
 
  private:
@@ -327,7 +337,7 @@ PPTWriter::Xform PPTWriter::decomposeXform(float localX, float localY, float loc
   float tw = localW * sx;
   float th = localH * sy;
 
-  float theta = std::atan2(m.b, m.a) * 180.0f / 3.14159265358979323846f;
+  float theta = RadiansToDegrees(std::atan2(m.b, m.a));
 
   Xform xf;
   xf.offX = PxToEMU(tcx - tw / 2.0f);
@@ -576,7 +586,7 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
       Point ep = grad->matrix.mapPoint(grad->endPoint);
       float dx = ep.x - sp.x;
       float dy = ep.y - sp.y;
-      float angleDeg = std::atan2(dy, dx) * 180.0f / 3.14159265358979323846f;
+      float angleDeg = RadiansToDegrees(std::atan2(dy, dx));
       int ang = AngleToPPT(angleDeg);
 
       out.open("a:gradFill").gt();
@@ -751,7 +761,7 @@ void PPTWriter::writeShadowElement(XMLBuilder& out, const char* tag, float blurX
                                    bool includeAlign) {
   float blur = (blurX + blurY) / 2.0f;
   float dist = std::sqrt(offsetX * offsetX + offsetY * offsetY);
-  float dir = std::atan2(offsetY, offsetX) * 180.0f / 3.14159265358979323846f;
+  float dir = RadiansToDegrees(std::atan2(offsetY, offsetX));
   auto& builder = out.open(tag)
                       .a("blurRad", PxToEMU(blur))
                       .a("dist", PxToEMU(dist))
@@ -794,7 +804,135 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
   out.end();  // a:effectLst
 }
 
+// ── Even-odd contour processing ───────────────────────────────────────────
+
+struct PathSeg {
+  PathVerb verb = PathVerb::Move;
+  Point pts[3] = {};
+};
+
+struct PathContour {
+  Point start = {};
+  std::vector<PathSeg> segs;
+  bool closed = false;
+};
+
+static Point SegEndpoint(const PathSeg& seg) {
+  if (seg.verb == PathVerb::Quad) {
+    return seg.pts[1];
+  }
+  if (seg.verb == PathVerb::Cubic) {
+    return seg.pts[2];
+  }
+  return seg.pts[0];
+}
+
+static float ComputeSignedArea(const PathContour& contour) {
+  float area = 0;
+  Point prev = contour.start;
+  for (const auto& seg : contour.segs) {
+    Point next = SegEndpoint(seg);
+    area += (prev.x * next.y - next.x * prev.y);
+    prev = next;
+  }
+  area += (prev.x * contour.start.y - contour.start.x * prev.y);
+  return area;
+}
+
+// Parses path data into contours and reverses inner contours that share the
+// outer contour's winding direction, so that PowerPoint's non-zero winding
+// rule produces the same result as even-odd fill.
+static std::vector<PathContour> BuildEvenOddContours(const PathData* data) {
+  std::vector<PathContour> contours;
+  data->forEach([&](PathVerb verb, const Point* pts) {
+    if (verb == PathVerb::Move) {
+      PathContour c;
+      c.start = pts[0];
+      contours.push_back(std::move(c));
+    } else if (!contours.empty()) {
+      if (verb == PathVerb::Close) {
+        contours.back().closed = true;
+      } else {
+        PathSeg seg;
+        seg.verb = verb;
+        int ptCount = PathData::PointsPerVerb(verb);
+        for (int i = 0; i < ptCount; i++) {
+          seg.pts[i] = pts[i];
+        }
+        contours.back().segs.push_back(seg);
+      }
+    }
+  });
+
+  if (contours.size() <= 1) {
+    return contours;
+  }
+
+  float outerArea = ComputeSignedArea(contours[0]);
+  for (size_t ci = 1; ci < contours.size(); ci++) {
+    auto& c = contours[ci];
+    if (!c.closed || c.segs.empty()) {
+      continue;
+    }
+    float area = ComputeSignedArea(c);
+    bool sameWinding = (outerArea > 0 && area > 0) || (outerArea < 0 && area < 0);
+    if (!sameWinding) {
+      continue;
+    }
+    size_t n = c.segs.size();
+    Point originalStart = c.start;
+    c.start = SegEndpoint(c.segs[n - 1]);
+
+    std::vector<PathSeg> rev;
+    rev.reserve(n);
+    for (int i = static_cast<int>(n) - 1; i >= 0; i--) {
+      Point dest = (i > 0) ? SegEndpoint(c.segs[i - 1]) : originalStart;
+      const auto& seg = c.segs[i];
+      PathSeg reversed;
+      if (seg.verb == PathVerb::Cubic) {
+        reversed.verb = PathVerb::Cubic;
+        reversed.pts[0] = seg.pts[1];
+        reversed.pts[1] = seg.pts[0];
+        reversed.pts[2] = dest;
+      } else if (seg.verb == PathVerb::Quad) {
+        reversed.verb = PathVerb::Quad;
+        reversed.pts[0] = seg.pts[0];
+        reversed.pts[1] = dest;
+      } else {
+        reversed.verb = PathVerb::Line;
+        reversed.pts[0] = dest;
+      }
+      rev.push_back(reversed);
+    }
+    c.segs = std::move(rev);
+  }
+  return contours;
+}
+
 // ── Custom geometry ────────────────────────────────────────────────────────
+
+static void EmitPoint(XMLBuilder& out, const char* tag, float x, float y, float ofsX, float ofsY) {
+  out.open(tag).gt();
+  out.open("a:pt").a("x", PxToEMU(x - ofsX)).a("y", PxToEMU(y - ofsY)).sc();
+  out.end();
+}
+
+static void EmitQuadBezTo(XMLBuilder& out, const char* tag, float x0, float y0, float x1, float y1,
+                          float ofsX, float ofsY) {
+  out.open(tag).gt();
+  out.open("a:pt").a("x", PxToEMU(x0 - ofsX)).a("y", PxToEMU(y0 - ofsY)).sc();
+  out.open("a:pt").a("x", PxToEMU(x1 - ofsX)).a("y", PxToEMU(y1 - ofsY)).sc();
+  out.end();
+}
+
+static void EmitCubicBezTo(XMLBuilder& out, float x0, float y0, float x1, float y1, float x2,
+                           float y2, float ofsX, float ofsY) {
+  out.open("a:cubicBezTo").gt();
+  out.open("a:pt").a("x", PxToEMU(x0 - ofsX)).a("y", PxToEMU(y0 - ofsY)).sc();
+  out.open("a:pt").a("x", PxToEMU(x1 - ofsX)).a("y", PxToEMU(y1 - ofsY)).sc();
+  out.open("a:pt").a("x", PxToEMU(x2 - ofsX)).a("y", PxToEMU(y2 - ofsY)).sc();
+  out.end();
+}
 
 void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofsX, float ofsY,
                                 float boundsW, float boundsH, FillRule fillRule) {
@@ -808,27 +946,6 @@ void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofs
   int64_t pw = std::max(int64_t(1), PxToEMU(boundsW));
   int64_t ph = std::max(int64_t(1), PxToEMU(boundsH));
 
-  auto emitPt = [&](const char* tag, float x, float y) {
-    out.open(tag).gt();
-    out.open("a:pt").a("x", PxToEMU(x - ofsX)).a("y", PxToEMU(y - ofsY)).sc();
-    out.end();
-  };
-
-  auto emitPt2 = [&](const char* tag, float x0, float y0, float x1, float y1) {
-    out.open(tag).gt();
-    out.open("a:pt").a("x", PxToEMU(x0 - ofsX)).a("y", PxToEMU(y0 - ofsY)).sc();
-    out.open("a:pt").a("x", PxToEMU(x1 - ofsX)).a("y", PxToEMU(y1 - ofsY)).sc();
-    out.end();
-  };
-
-  auto emitPt3 = [&](float x0, float y0, float x1, float y1, float x2, float y2) {
-    out.open("a:cubicBezTo").gt();
-    out.open("a:pt").a("x", PxToEMU(x0 - ofsX)).a("y", PxToEMU(y0 - ofsY)).sc();
-    out.open("a:pt").a("x", PxToEMU(x1 - ofsX)).a("y", PxToEMU(y1 - ofsY)).sc();
-    out.open("a:pt").a("x", PxToEMU(x2 - ofsX)).a("y", PxToEMU(y2 - ofsY)).sc();
-    out.end();
-  };
-
   out.open("a:pathLst").gt();
   out.open("a:path").a("w", pw).a("h", ph).a("fill", "norm").gt();
 
@@ -836,111 +953,22 @@ void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofs
     // PowerPoint uses the non-zero winding rule. To emulate even-odd, ensure
     // inner contours have the opposite winding direction of the outer contour
     // so that nested regions cancel out to winding number 0, producing holes.
-    // We use the signed area (shoelace formula) to detect each contour's actual
-    // winding direction and only reverse those that share the outer's winding.
-    struct Seg {
-      PathVerb verb;
-      Point pts[3];
-    };
-    struct Contour {
-      Point start;
-      std::vector<Seg> segs;
-      bool closed;
-    };
-
-    std::vector<Contour> contours;
-    data->forEach([&](PathVerb verb, const Point* pts) {
-      if (verb == PathVerb::Move) {
-        Contour c;
-        c.start = pts[0];
-        c.closed = false;
-        contours.push_back(std::move(c));
-      } else if (!contours.empty()) {
-        if (verb == PathVerb::Close) {
-          contours.back().closed = true;
-        } else {
-          Seg seg;
-          seg.verb = verb;
-          int ptCount = PathData::PointsPerVerb(verb);
-          for (int i = 0; i < ptCount; i++) {
-            seg.pts[i] = pts[i];
-          }
-          contours.back().segs.push_back(seg);
-        }
-      }
-    });
-
-    auto segEndpoint = [](const Seg& s) -> Point {
-      if (s.verb == PathVerb::Quad) return s.pts[1];
-      if (s.verb == PathVerb::Cubic) return s.pts[2];
-      return s.pts[0];
-    };
-
-    auto computeSignedArea = [&segEndpoint](const Contour& c) -> float {
-      float area = 0;
-      Point prev = c.start;
-      for (const auto& s : c.segs) {
-        Point next = segEndpoint(s);
-        area += (prev.x * next.y - next.x * prev.y);
-        prev = next;
-      }
-      area += (prev.x * c.start.y - c.start.x * prev.y);
-      return area;
-    };
-
-    if (contours.size() > 1) {
-      float outerArea = computeSignedArea(contours[0]);
-      for (size_t ci = 1; ci < contours.size(); ci++) {
-        auto& c = contours[ci];
-        if (!c.closed || c.segs.empty()) {
-          continue;
-        }
-        float area = computeSignedArea(c);
-        bool sameWinding = (outerArea > 0 && area > 0) || (outerArea < 0 && area < 0);
-        if (!sameWinding) {
-          continue;
-        }
-        size_t n = c.segs.size();
-        Point originalStart = c.start;
-        c.start = segEndpoint(c.segs[n - 1]);
-
-        std::vector<Seg> rev;
-        rev.reserve(n);
-        for (int i = static_cast<int>(n) - 1; i >= 0; i--) {
-          Point dest = (i > 0) ? segEndpoint(c.segs[i - 1]) : originalStart;
-          const auto& s = c.segs[i];
-          Seg rs;
-          if (s.verb == PathVerb::Cubic) {
-            rs.verb = PathVerb::Cubic;
-            rs.pts[0] = s.pts[1];
-            rs.pts[1] = s.pts[0];
-            rs.pts[2] = dest;
-          } else if (s.verb == PathVerb::Quad) {
-            rs.verb = PathVerb::Quad;
-            rs.pts[0] = s.pts[0];
-            rs.pts[1] = dest;
-          } else {
-            rs.verb = PathVerb::Line;
-            rs.pts[0] = dest;
-          }
-          rev.push_back(rs);
-        }
-        c.segs = std::move(rev);
-      }
-    }
+    auto contours = BuildEvenOddContours(data);
 
     for (const auto& c : contours) {
-      emitPt("a:moveTo", c.start.x, c.start.y);
+      EmitPoint(out, "a:moveTo", c.start.x, c.start.y, ofsX, ofsY);
       for (const auto& s : c.segs) {
         switch (s.verb) {
           case PathVerb::Line:
-            emitPt("a:lnTo", s.pts[0].x, s.pts[0].y);
+            EmitPoint(out, "a:lnTo", s.pts[0].x, s.pts[0].y, ofsX, ofsY);
             break;
           case PathVerb::Quad:
-            emitPt2("a:quadBezTo", s.pts[0].x, s.pts[0].y, s.pts[1].x, s.pts[1].y);
+            EmitQuadBezTo(out, "a:quadBezTo", s.pts[0].x, s.pts[0].y, s.pts[1].x, s.pts[1].y, ofsX,
+                          ofsY);
             break;
           case PathVerb::Cubic:
-            emitPt3(s.pts[0].x, s.pts[0].y, s.pts[1].x, s.pts[1].y, s.pts[2].x, s.pts[2].y);
+            EmitCubicBezTo(out, s.pts[0].x, s.pts[0].y, s.pts[1].x, s.pts[1].y, s.pts[2].x,
+                           s.pts[2].y, ofsX, ofsY);
             break;
           default:
             break;
@@ -954,16 +982,17 @@ void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofs
     data->forEach([&](PathVerb verb, const Point* pts) {
       switch (verb) {
         case PathVerb::Move:
-          emitPt("a:moveTo", pts[0].x, pts[0].y);
+          EmitPoint(out, "a:moveTo", pts[0].x, pts[0].y, ofsX, ofsY);
           break;
         case PathVerb::Line:
-          emitPt("a:lnTo", pts[0].x, pts[0].y);
+          EmitPoint(out, "a:lnTo", pts[0].x, pts[0].y, ofsX, ofsY);
           break;
         case PathVerb::Quad:
-          emitPt2("a:quadBezTo", pts[0].x, pts[0].y, pts[1].x, pts[1].y);
+          EmitQuadBezTo(out, "a:quadBezTo", pts[0].x, pts[0].y, pts[1].x, pts[1].y, ofsX, ofsY);
           break;
         case PathVerb::Cubic:
-          emitPt3(pts[0].x, pts[0].y, pts[1].x, pts[1].y, pts[2].x, pts[2].y);
+          EmitCubicBezTo(out, pts[0].x, pts[0].y, pts[1].x, pts[1].y, pts[2].x, pts[2].y, ofsX,
+                         ofsY);
           break;
         case PathVerb::Close:
           out.open("a:close").sc();
@@ -1323,6 +1352,7 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& pa
 
 static std::string GenerateContentTypes(const PPTWriterContext& ctx) {
   std::string s;
+  s.reserve(2048);
   s += "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>";
   s += "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">";
   s += "<Default Extension=\"xml\" ContentType=\"application/xml\"/>";
@@ -1362,6 +1392,7 @@ static std::string GenerateRootRels() {
 
 static std::string GeneratePresentation(float w, float h) {
   std::string s;
+  s.reserve(512);
   s += "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>";
   s += "<p:presentation xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" "
        "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" "
@@ -1391,6 +1422,7 @@ static std::string GeneratePresentationRels() {
 
 static std::string GenerateSlideRels(const PPTWriterContext& ctx) {
   std::string s;
+  s.reserve(512);
   s += "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>";
   s += "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">";
   s += "<Relationship Id=\"rId1\" "
@@ -1506,6 +1538,19 @@ static std::string GenerateTheme() {
          "</a:theme>";
 }
 
+static void AddZipEntry(zipFile zf, const char* name, const void* data, unsigned size) {
+  zip_fileinfo zi = {};
+  if (zipOpenNewFileInZip(zf, name, &zi, nullptr, 0, nullptr, 0, nullptr, Z_DEFLATED,
+                          Z_DEFAULT_COMPRESSION) == ZIP_OK) {
+    zipWriteInFileInZip(zf, data, size);
+    zipCloseFileInZip(zf);
+  }
+}
+
+static void AddZipString(zipFile zf, const char* name, const std::string& content) {
+  AddZipEntry(zf, name, content.data(), static_cast<unsigned>(content.size()));
+}
+
 //==============================================================================
 // PPTExporter::ToFile
 //==============================================================================
@@ -1516,7 +1561,7 @@ bool PPTExporter::ToFile(const PAGXDocument& doc, const std::string& filePath,
   PPTWriter writer(&context, &doc, options.convertTextToPath, options.bakeMask);
 
   // Build slide body content
-  XMLBuilder body(false, 2, 16384);
+  XMLBuilder body(false, 2, 0, 16384);
   for (const auto* layer : doc.layers) {
     writer.writeLayer(body, layer);
   }
@@ -1543,40 +1588,22 @@ bool PPTExporter::ToFile(const PAGXDocument& doc, const std::string& filePath,
     return false;
   }
 
-  auto addEntry = [&](const char* name, const void* data, unsigned size) {
-    zip_fileinfo zi = {};
-    if (zipOpenNewFileInZip(zf, name, &zi, nullptr, 0, nullptr, 0, nullptr, Z_DEFLATED,
-                            Z_DEFAULT_COMPRESSION) == ZIP_OK) {
-      zipWriteInFileInZip(zf, data, size);
-      zipCloseFileInZip(zf);
-    }
-  };
-
-  auto addString = [&](const char* name, const std::string& content) {
-    addEntry(name, content.data(), static_cast<unsigned>(content.size()));
-  };
-
-  addString("[Content_Types].xml", GenerateContentTypes(context));
-  addString("_rels/.rels", GenerateRootRels());
-  addString("ppt/presentation.xml", GeneratePresentation(doc.width, doc.height));
-  addString("ppt/_rels/presentation.xml.rels", GeneratePresentationRels());
-  addString("ppt/slides/slide1.xml", slide);
-  addString("ppt/slides/_rels/slide1.xml.rels", GenerateSlideRels(context));
-  addString("ppt/slideMasters/slideMaster1.xml", GenerateSlideMaster());
-  addString("ppt/slideMasters/_rels/slideMaster1.xml.rels", GenerateSlideMasterRels());
-  addString("ppt/slideLayouts/slideLayout1.xml", GenerateSlideLayout());
-  addString("ppt/slideLayouts/_rels/slideLayout1.xml.rels", GenerateSlideLayoutRels());
-  addString("ppt/theme/theme1.xml", GenerateTheme());
+  AddZipString(zf, "[Content_Types].xml", GenerateContentTypes(context));
+  AddZipString(zf, "_rels/.rels", GenerateRootRels());
+  AddZipString(zf, "ppt/presentation.xml", GeneratePresentation(doc.width, doc.height));
+  AddZipString(zf, "ppt/_rels/presentation.xml.rels", GeneratePresentationRels());
+  AddZipString(zf, "ppt/slides/slide1.xml", slide);
+  AddZipString(zf, "ppt/slides/_rels/slide1.xml.rels", GenerateSlideRels(context));
+  AddZipString(zf, "ppt/slideMasters/slideMaster1.xml", GenerateSlideMaster());
+  AddZipString(zf, "ppt/slideMasters/_rels/slideMaster1.xml.rels", GenerateSlideMasterRels());
+  AddZipString(zf, "ppt/slideLayouts/slideLayout1.xml", GenerateSlideLayout());
+  AddZipString(zf, "ppt/slideLayouts/_rels/slideLayout1.xml.rels", GenerateSlideLayoutRels());
+  AddZipString(zf, "ppt/theme/theme1.xml", GenerateTheme());
 
   for (const auto& img : context.images()) {
-    if (img.rawData && img.rawData->size() > 0) {
-      addEntry(img.mediaPath.c_str(), img.rawData->bytes(),
-               static_cast<unsigned>(img.rawData->size()));
-    } else if (img.image) {
-      auto data = GetImageData(img.image);
-      if (data && data->size() > 0) {
-        addEntry(img.mediaPath.c_str(), data->bytes(), static_cast<unsigned>(data->size()));
-      }
+    if (img.cachedData && img.cachedData->size() > 0) {
+      AddZipEntry(zf, img.mediaPath.c_str(), img.cachedData->bytes(),
+                  static_cast<unsigned>(img.cachedData->size()));
     }
   }
 
