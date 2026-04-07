@@ -36,9 +36,6 @@
       </Group>
       <Group>
         <Text text=" text.&#10;" fontFamily="Arial" fontSize="20"/>
-        <Fill color="#475569"/>
-      </Group>
-      <Group>
         <Text text="Mix " fontFamily="Arial" fontSize="16"/>
         <Fill color="#475569"/>
       </Group>
@@ -56,9 +53,6 @@
       </Group>
       <Group>
         <Text text=" within one line.&#10;" fontFamily="Arial" fontSize="16"/>
-        <Fill color="#475569"/>
-      </Group>
-      <Group>
         <Text text="Center " fontFamily="Arial" fontSize="20"/>
         <Fill color="#475569"/>
       </Group>

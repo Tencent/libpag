@@ -739,66 +739,6 @@ static void DetectPathToPrimitives(const Path* path, std::vector<VerifyDiagnosti
 }
 
 // ============================================================================
-// Static Detection: PathData Origin Offset
-// ============================================================================
-
-static void CollectRotatedPathDataIds(const std::vector<Element*>& elements,
-                                      std::unordered_set<std::string>& rotatedIds,
-                                      bool ancestorRotated) {
-  for (auto* element : elements) {
-    auto type = element->nodeType();
-    bool thisRotated = ancestorRotated;
-    if (type == NodeType::Group || type == NodeType::TextBox) {
-      auto* group = static_cast<const Group*>(element);
-      if (group->rotation != 0) {
-        thisRotated = true;
-      }
-      CollectRotatedPathDataIds(group->elements, rotatedIds, thisRotated);
-    } else if (type == NodeType::Path) {
-      auto* path = static_cast<const Path*>(element);
-      if (thisRotated && path->data != nullptr && !path->data->id.empty()) {
-        rotatedIds.insert(path->data->id);
-      }
-    }
-  }
-}
-
-static void CollectRotatedPathDataIdsFromLayer(const Layer* layer,
-                                               std::unordered_set<std::string>& rotatedIds) {
-  CollectRotatedPathDataIds(layer->contents, rotatedIds, false);
-  for (auto* child : layer->children) {
-    CollectRotatedPathDataIdsFromLayer(child, rotatedIds);
-  }
-}
-
-static void CollectAllRotatedPathDataIds(const PAGXDocument* doc,
-                                         std::unordered_set<std::string>& rotatedIds) {
-  for (auto* layer : doc->layers) {
-    CollectRotatedPathDataIdsFromLayer(layer, rotatedIds);
-  }
-}
-
-static void DetectPathDataOriginOffset(const PathData* pathData,
-                                       const std::unordered_set<std::string>& rotatedIds,
-                                       std::vector<VerifyDiagnostic>& diagnostics) {
-  if (pathData->isEmpty()) {
-    return;
-  }
-  if (pathData->id.empty()) {
-    return;
-  }
-  if (rotatedIds.count(pathData->id) > 0) {
-    return;
-  }
-  auto bounds = const_cast<PathData*>(pathData)->getBounds();
-  if (std::abs(bounds.x) >= 0.5f || std::abs(bounds.y) >= 0.5f) {
-    AddDiagnostic(diagnostics, pathData->sourceLine, "warning",
-                  "PathData bounds do not start at origin. Fix: translate path coordinates so "
-                  "bounds start at (0,0) and adjust parent positioning");
-  }
-}
-
-// ============================================================================
 // Static Detection: Structurally Identical Layers
 // ============================================================================
 
@@ -850,7 +790,17 @@ static std::string SerializeLayerContents(const Layer* layer) {
     oss << SerializeElement(element);
   }
   for (auto* child : layer->children) {
-    oss << "Layer{" << SerializeLayerContents(child) << "}";
+    oss << "Layer{";
+    if (child->layout != LayoutMode::None) {
+      oss << "layout=" << static_cast<int>(child->layout) << "|";
+    }
+    if (child->arrangement != Arrangement::Start) {
+      oss << "arrangement=" << static_cast<int>(child->arrangement) << "|";
+    }
+    if (child->alignment != Alignment::Start) {
+      oss << "alignment=" << static_cast<int>(child->alignment) << "|";
+    }
+    oss << SerializeLayerContents(child) << "}";
   }
   return oss.str();
 }
@@ -1030,7 +980,18 @@ static void DetectStructurallyIdenticalLayers(const PAGXDocument* doc,
   }
   std::unordered_map<std::string, std::vector<const Layer*>> subtreeMap;
   for (auto* layer : filteredCandidates) {
-    subtreeMap[SerializeLayerContents(layer)].push_back(layer);
+    std::ostringstream sig;
+    if (layer->layout != LayoutMode::None) {
+      sig << "layout=" << static_cast<int>(layer->layout) << "|";
+    }
+    if (layer->arrangement != Arrangement::Start) {
+      sig << "arrangement=" << static_cast<int>(layer->arrangement) << "|";
+    }
+    if (layer->alignment != Alignment::Start) {
+      sig << "alignment=" << static_cast<int>(layer->alignment) << "|";
+    }
+    sig << SerializeLayerContents(layer);
+    subtreeMap[sig.str()].push_back(layer);
   }
   for (auto& pair : subtreeMap) {
     if (pair.second.size() < 2) {
@@ -1153,18 +1114,25 @@ static void DetectDowngradableLayers(const Layer* parentLayer,
   if (parentLayer->layout != LayoutMode::None) {
     return;
   }
-  int downgradableCount = 0;
+  if (parentLayer->children.empty()) {
+    return;
+  }
+  // Cannot downgrade if parent has both contents and children — contents render behind
+  // children, so moving children to contents would change the paint order.
+  if (!parentLayer->contents.empty()) {
+    return;
+  }
+  // All children must be downgradable — partial downgrade changes paint order.
   for (auto* child : parentLayer->children) {
-    if (CanDowngradeLayerToGroup(child)) {
-      downgradableCount++;
+    if (!CanDowngradeLayerToGroup(child)) {
+      return;
     }
   }
-  if (downgradableCount > 0) {
-    AddDiagnostic(diagnostics, parentLayer->sourceLine, "warning",
-                  std::to_string(downgradableCount) +
-                      " child Layer(s) use no Layer-exclusive features. "
-                      "Fix: check if they can be replaced with <Group>");
-  }
+  auto count = static_cast<int>(parentLayer->children.size());
+  AddDiagnostic(diagnostics, parentLayer->sourceLine, "warning",
+                std::to_string(count) +
+                    " child Layer(s) use no Layer-exclusive features. "
+                    "Fix: check if they can be replaced with <Group>");
 }
 
 // ============================================================================
@@ -1469,16 +1437,6 @@ static void RunStaticDetection(const PAGXDocument* doc,
   DetectDuplicatePathData(doc, diagnostics);
   DetectDuplicateGradients(doc, diagnostics);
   DetectStructurallyIdenticalLayers(doc, diagnostics);
-
-  std::unordered_set<std::string> rotatedPathDataIds;
-  CollectAllRotatedPathDataIds(doc, rotatedPathDataIds);
-
-  for (const auto& nodePtr : doc->nodes) {
-    if (nodePtr->nodeType() == NodeType::PathData) {
-      DetectPathDataOriginOffset(static_cast<const PathData*>(nodePtr.get()), rotatedPathDataIds,
-                                 diagnostics);
-    }
-  }
 
   for (auto* layer : doc->layers) {
     RunStaticDetectionOnLayer(layer, doc->width, doc->height, false, diagnostics);

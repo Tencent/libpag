@@ -809,54 +809,6 @@ CLI_TEST(PAGXCliTest, Lint_LocalizableCoordinates) {
   EXPECT_EQ(ret, 0);
 }
 
-CLI_TEST(PAGXCliTest, Lint_LocalizablePathData) {
-  auto inputPath = TestResourcePath("lint_localizable_pathdata.pagx");
-  std::streambuf* old = std::cerr.rdbuf();
-  std::ostringstream oss;
-  std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
-  std::cerr.rdbuf(old);
-  auto output = oss.str();
-  EXPECT_NE(ret, 0);
-  EXPECT_TRUE(output.find("PathData bounds do not start at origin") != std::string::npos);
-}
-
-// PathData whose first M point is not at origin but bounding box origin IS at (0,0)
-// should NOT be reported. Only the bbox-offset PathData should be reported.
-CLI_TEST(PAGXCliTest, Lint_PathDataBboxOrigin) {
-  auto inputPath = TestResourcePath("lint_pathdata_bbox_origin.pagx");
-  std::streambuf* old = std::cerr.rdbuf();
-  std::ostringstream oss;
-  std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
-  std::cerr.rdbuf(old);
-  auto output = oss.str();
-  EXPECT_NE(ret, 0);
-  // "atOrigin" PathData should NOT be reported (bbox starts at 0,0).
-  // "notAtOrigin" PathData SHOULD be reported (bbox starts at 50,50).
-  // Count occurrences: exactly one "PathData bounds do not start at origin" expected.
-  size_t pos = 0;
-  int count = 0;
-  while ((pos = output.find("PathData bounds do not start at origin", pos)) != std::string::npos) {
-    count++;
-    pos += 37;
-  }
-  EXPECT_EQ(count, 1);
-}
-
-// PathData referenced by a Path inside a rotated Group should be skipped.
-CLI_TEST(PAGXCliTest, Lint_PathDataRotatedParent) {
-  auto inputPath = TestResourcePath("lint_pathdata_rotated_parent.pagx");
-  std::streambuf* old = std::cerr.rdbuf();
-  std::ostringstream oss;
-  std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
-  std::cerr.rdbuf(old);
-  auto output = oss.str();
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("PathData bounds do not start at origin") == std::string::npos);
-}
-
 CLI_TEST(PAGXCliTest, Lint_ExtractableCompositions) {
   auto inputPath = TestResourcePath("lint_extractable_compositions.pagx");
   std::streambuf* old = std::cerr.rdbuf();

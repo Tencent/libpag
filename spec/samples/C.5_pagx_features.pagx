@@ -88,7 +88,7 @@
     <Stroke color="#33415580" width="1"/>
     <DropShadowStyle offsetY="4" blurX="24" blurY="24" color="#00000060"/>
     <Layer left="0" right="0" top="0" bottom="0" alpha="0.08">
-      <Path left="20" top="0" data="M 0 0 L 360 0"/>
+      <Path left="20" top="0" data="@cardTopLine"/>
       <Stroke width="1">
         <LinearGradient startPoint="0,0" endPoint="360,0">
           <ColorStop offset="0" color="#F43F5E00"/>
@@ -135,7 +135,7 @@
     <Stroke color="#33415580" width="1"/>
     <DropShadowStyle offsetY="4" blurX="24" blurY="24" color="#00000060"/>
     <Layer left="0" right="0" top="0" bottom="0" alpha="0.08">
-      <Path left="20" top="0" data="M 0 0 L 360 0"/>
+      <Path left="20" top="0" data="@cardTopLine"/>
       <Stroke width="1">
         <LinearGradient startPoint="0,0" endPoint="360,0">
           <ColorStop offset="0" color="#38BDF800"/>
@@ -180,7 +180,7 @@
     <Stroke color="#33415580" width="1"/>
     <DropShadowStyle offsetY="4" blurX="24" blurY="24" color="#00000060"/>
     <Layer left="0" right="0" top="0" bottom="0" alpha="0.08">
-      <Path left="20" top="0" data="M 0 0 L 360 0"/>
+      <Path left="20" top="0" data="@cardTopLine"/>
       <Stroke width="1">
         <LinearGradient startPoint="0,0" endPoint="360,0">
           <ColorStop offset="0" color="#A855F700"/>
@@ -236,7 +236,7 @@
     <Stroke color="#33415580" width="1"/>
     <DropShadowStyle offsetY="4" blurX="24" blurY="24" color="#00000060"/>
     <Layer left="0" right="0" top="0" bottom="0" alpha="0.08">
-      <Path left="20" top="0" data="M 0 0 L 360 0"/>
+      <Path left="20" top="0" data="@cardTopLine"/>
       <Stroke width="1">
         <LinearGradient startPoint="0,0" endPoint="360,0">
           <ColorStop offset="0" color="#10B98100"/>
@@ -279,7 +279,7 @@
     <Stroke color="#33415580" width="1"/>
     <DropShadowStyle offsetY="4" blurX="24" blurY="24" color="#00000060"/>
     <Layer left="0" right="0" top="0" bottom="0" alpha="0.08">
-      <Path left="20" top="0" data="M 0 0 L 360 0"/>
+      <Path left="20" top="0" data="@cardTopLine"/>
       <Stroke width="1">
         <LinearGradient startPoint="0,0" endPoint="360,0">
           <ColorStop offset="0" color="#FBBF2400"/>
@@ -397,6 +397,7 @@
       <ColorStop offset="0" color="#06B6D4"/>
       <ColorStop offset="1" color="#3B82F6"/>
     </LinearGradient>
+    <PathData id="cardTopLine" data="M 0 0 L 360 0"/>
     <PathData id="arrowRight" data="M 0 6 L 25 6 M 19 0 L 27 6 L 19 12"/>
   </Resources>
 </pagx>

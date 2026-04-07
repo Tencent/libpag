@@ -101,9 +101,6 @@
       <Fill/>
       <Group>
         <Text text="Xy" fontFamily="NotoSansSC" fontSize="20"/>
-        <Fill/>
-      </Group>
-      <Group>
         <Text text="&#10;AB" fontFamily="NotoSansSC" fontSize="60"/>
         <Fill/>
       </Group>
@@ -119,9 +116,6 @@
       <Fill/>
       <Group>
         <Text text="Xy" fontFamily="NotoSansSC" fontSize="20"/>
-        <Fill/>
-      </Group>
-      <Group>
         <Text text="&#10;AB" fontFamily="NotoSansSC" fontSize="60"/>
         <Fill/>
       </Group>
@@ -149,9 +143,6 @@
       <Fill/>
       <Group>
         <Text text="Medium&#10;" fontFamily="NotoSansSC" fontSize="24"/>
-        <Fill/>
-      </Group>
-      <Group>
         <Text text="Tiny" fontFamily="NotoSansSC" fontSize="16"/>
         <Fill/>
       </Group>

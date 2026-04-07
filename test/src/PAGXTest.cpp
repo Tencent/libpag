@@ -212,6 +212,7 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
       }
       ADD_FAILURE() << "Parse errors in " << baseName << ":" << errorLog;
     }
+    reloadedDoc->applyLayout();
     auto layer = pagx::LayerBuilder::Build(reloadedDoc.get());
     if (layer == nullptr) {
       ADD_FAILURE() << "Failed to build layer: " << pagxPath;
@@ -245,6 +246,7 @@ PAGX_TEST(PAGXTest, LayerBuilderAPIConsistency) {
   // Load via FromFile
   auto docFromFile = pagx::PAGXImporter::FromFile(pagxPath);
   ASSERT_TRUE(docFromFile != nullptr);
+  docFromFile->applyLayout();
   auto layerFromFile = pagx::LayerBuilder::Build(docFromFile.get());
   ASSERT_TRUE(layerFromFile != nullptr);
 
@@ -254,6 +256,7 @@ PAGX_TEST(PAGXTest, LayerBuilderAPIConsistency) {
   auto docFromData =
       pagx::PAGXImporter::FromXML(fileData->bytes(), static_cast<size_t>(fileData->size()));
   ASSERT_TRUE(docFromData != nullptr);
+  docFromData->applyLayout();
   auto layerFromData = pagx::LayerBuilder::Build(docFromData.get());
   ASSERT_TRUE(layerFromData != nullptr);
 
@@ -500,7 +503,7 @@ PAGX_TEST(PAGXTest, PrecomposedTextRender) {
 
   auto reloadedDoc = pagx::PAGXImporter::FromFile(pagxPath);
   ASSERT_TRUE(reloadedDoc != nullptr);
-
+  reloadedDoc->applyLayout();
   auto tgfxLayer = pagx::LayerBuilder::Build(reloadedDoc.get());
   ASSERT_TRUE(tgfxLayer != nullptr);
 
