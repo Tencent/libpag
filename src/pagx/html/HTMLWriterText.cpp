@@ -1330,7 +1330,7 @@ void HTMLWriter::writeComposition(HTMLBuilder& out, const Composition* comp, flo
   if (needContainer) {
     out.openTag("div");
     out.addAttr("style", "position:relative;width:" + FloatToString(comp->width) +
-                             "px;height:" + FloatToString(comp->height) + "px;overflow:hidden");
+                             "px;height:" + FloatToString(comp->height) + "px");
     out.closeTagStart();
   }
   for (auto* layer : comp->layers) {
