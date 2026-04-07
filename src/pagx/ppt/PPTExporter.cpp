@@ -374,6 +374,13 @@ void PPTWriter::beginShape(XMLBuilder& out, const char* name, int64_t offX, int6
 
 void PPTWriter::endShape(XMLBuilder& out) {
   out.end();  // p:spPr
+  out.open("p:txBody").gt();
+  out.open("a:bodyPr").sc();
+  out.open("a:lstStyle").sc();
+  out.open("a:p").gt();
+  out.open("a:endParaRPr").a("lang", "zh-CN").a("altLang", "en-US").sc();
+  out.end();  // a:p
+  out.end();  // p:txBody
   out.end();  // p:sp
 }
 
@@ -514,7 +521,12 @@ bool PPTWriter::writeImagePatternAsPicture(XMLBuilder& out, const Fill* fill,
   out.open("p:blipFill").gt();
   WriteBlip(out, relId, effectiveAlpha);
   if (hasSrcRect) {
-    out.open("a:srcRect").a("l", ipr.srcL).a("t", ipr.srcT).a("r", ipr.srcR).a("b", ipr.srcB).sc();
+    auto& src = out.open("a:srcRect");
+    if (ipr.srcL != 0) src.a("l", ipr.srcL);
+    if (ipr.srcT != 0) src.a("t", ipr.srcT);
+    if (ipr.srcR != 0) src.a("r", ipr.srcR);
+    if (ipr.srcB != 0) src.a("b", ipr.srcB);
+    src.sc();
   }
   WriteDefaultStretch(out);
   out.end();  // p:blipFill
@@ -652,12 +664,12 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
                 hasDimensions && !shapeBounds.isEmpty() && !pattern->matrix.isIdentity();
             ImagePatternRect ipr = {};
             if (hasTransform && ComputeImagePatternRect(pattern, imgW, imgH, shapeBounds, &ipr)) {
-              out.open("a:srcRect")
-                  .a("l", ipr.srcL)
-                  .a("t", ipr.srcT)
-                  .a("r", ipr.srcR)
-                  .a("b", ipr.srcB)
-                  .sc();
+              auto& src = out.open("a:srcRect");
+              if (ipr.srcL != 0) src.a("l", ipr.srcL);
+              if (ipr.srcT != 0) src.a("t", ipr.srcT);
+              if (ipr.srcR != 0) src.a("r", ipr.srcR);
+              if (ipr.srcB != 0) src.a("b", ipr.srcB);
+              src.sc();
               int fillL = static_cast<int>(
                   std::round((ipr.visL - shapeBounds.x) / shapeBounds.width * 100000.0f));
               int fillT = static_cast<int>(
@@ -668,7 +680,12 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
                   static_cast<int>(std::round((shapeBounds.y + shapeBounds.height - ipr.visB) /
                                               shapeBounds.height * 100000.0f));
               out.open("a:stretch").gt();
-              out.open("a:fillRect").a("l", fillL).a("t", fillT).a("r", fillR).a("b", fillB).sc();
+              auto& fr = out.open("a:fillRect");
+              if (fillL != 0) fr.a("l", fillL);
+              if (fillT != 0) fr.a("t", fillT);
+              if (fillR != 0) fr.a("r", fillR);
+              if (fillB != 0) fr.a("b", fillB);
+              fr.sc();
               out.end();  // a:stretch
             } else {
               WriteDefaultStretch(out);
@@ -947,7 +964,7 @@ void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofs
   int64_t ph = std::max(int64_t(1), PxToEMU(boundsH));
 
   out.open("a:pathLst").gt();
-  out.open("a:path").a("w", pw).a("h", ph).a("fill", "norm").gt();
+  out.open("a:path").a("w", pw).a("h", ph).gt();
 
   if (fillRule == FillRule::EvenOdd) {
     // PowerPoint uses the non-zero winding rule. To emulate even-odd, ensure
@@ -1387,11 +1404,22 @@ static std::string GenerateContentTypes(const PPTWriterContext& ctx) {
   s += "<Override PartName=\"/ppt/slideMasters/slideMaster1.xml\" "
        "ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.slideMaster+"
        "xml\"/>";
+  s += "<Override PartName=\"/ppt/presProps.xml\" "
+       "ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.presProps+xml\"/>";
+  s += "<Override PartName=\"/ppt/viewProps.xml\" "
+       "ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.viewProps+xml\"/>";
+  s += "<Override PartName=\"/ppt/theme/theme1.xml\" "
+       "ContentType=\"application/vnd.openxmlformats-officedocument.theme+xml\"/>";
+  s += "<Override PartName=\"/ppt/tableStyles.xml\" "
+       "ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.tableStyles+"
+       "xml\"/>";
   s += "<Override PartName=\"/ppt/slideLayouts/slideLayout1.xml\" "
        "ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.slideLayout+"
        "xml\"/>";
-  s += "<Override PartName=\"/ppt/theme/theme1.xml\" "
-       "ContentType=\"application/vnd.openxmlformats-officedocument.theme+xml\"/>";
+  s += "<Override PartName=\"/docProps/core.xml\" "
+       "ContentType=\"application/vnd.openxmlformats-package.core-properties+xml\"/>";
+  s += "<Override PartName=\"/docProps/app.xml\" "
+       "ContentType=\"application/vnd.openxmlformats-officedocument.extended-properties+xml\"/>";
   s += "</Types>";
   return s;
 }
@@ -1402,6 +1430,12 @@ static std::string GenerateRootRels() {
          "<Relationship Id=\"rId1\" "
          "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/"
          "officeDocument\" Target=\"ppt/presentation.xml\"/>"
+         "<Relationship Id=\"rId2\" "
+         "Type=\"http://schemas.openxmlformats.org/package/2006/relationships/metadata/"
+         "core-properties\" Target=\"docProps/core.xml\"/>"
+         "<Relationship Id=\"rId3\" "
+         "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/"
+         "extended-properties\" Target=\"docProps/app.xml\"/>"
          "</Relationships>";
 }
 
@@ -1416,6 +1450,21 @@ static std::string GeneratePresentation(float w, float h) {
   s += "<p:sldIdLst><p:sldId id=\"256\" r:id=\"rId2\"/></p:sldIdLst>";
   s += "<p:sldSz cx=\"" + I64(PxToEMU(w)) + "\" cy=\"" + I64(PxToEMU(h)) + "\" type=\"custom\"/>";
   s += "<p:notesSz cx=\"" + I64(PxToEMU(w)) + "\" cy=\"" + I64(PxToEMU(h)) + "\"/>";
+  s += "<p:defaultTextStyle>"
+       "<a:defPPr><a:defRPr lang=\"zh-CN\"/></a:defPPr>";
+  for (int lvl = 1; lvl <= 9; lvl++) {
+    int marL = (lvl - 1) * 457200;
+    s += "<a:lvl" + std::to_string(lvl) +
+         "pPr marL=\"" + std::to_string(marL) +
+         "\" algn=\"l\" defTabSz=\"914400\" rtl=\"0\" eaLnBrk=\"1\" "
+         "latinLnBrk=\"0\" hangingPunct=\"1\">"
+         "<a:defRPr sz=\"1800\" kern=\"1200\">"
+         "<a:solidFill><a:schemeClr val=\"tx1\"/></a:solidFill>"
+         "<a:latin typeface=\"+mn-lt\"/><a:ea typeface=\"+mn-ea\"/>"
+         "<a:cs typeface=\"+mn-cs\"/>"
+         "</a:defRPr></a:lvl" + std::to_string(lvl) + "pPr>";
+  }
+  s += "</p:defaultTextStyle>";
   s += "</p:presentation>";
   return s;
 }
@@ -1430,8 +1479,17 @@ static std::string GeneratePresentationRels() {
          "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide\" "
          "Target=\"slides/slide1.xml\"/>"
          "<Relationship Id=\"rId3\" "
+         "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/presProps\" "
+         "Target=\"presProps.xml\"/>"
+         "<Relationship Id=\"rId4\" "
+         "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/viewProps\" "
+         "Target=\"viewProps.xml\"/>"
+         "<Relationship Id=\"rId5\" "
          "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme\" "
          "Target=\"theme/theme1.xml\"/>"
+         "<Relationship Id=\"rId6\" "
+         "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableStyles\" "
+         "Target=\"tableStyles.xml\"/>"
          "</Relationships>";
 }
 
@@ -1463,7 +1521,10 @@ static std::string GenerateSlideMaster() {
          "<a:solidFill><a:schemeClr val=\"bg1\"/></a:solidFill>"
          "<a:effectLst/></p:bgPr></p:bg>"
          "<p:spTree><p:nvGrpSpPr><p:cNvPr id=\"1\" name=\"\"/>"
-         "<p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree>"
+         "<p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>"
+         "<p:grpSpPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"0\" cy=\"0\"/>"
+         "<a:chOff x=\"0\" y=\"0\"/><a:chExt cx=\"0\" cy=\"0\"/></a:xfrm></p:grpSpPr>"
+         "</p:spTree>"
          "</p:cSld>"
          "<p:clrMap bg1=\"lt1\" tx1=\"dk1\" bg2=\"lt2\" tx2=\"dk2\" "
          "accent1=\"accent1\" accent2=\"accent2\" accent3=\"accent3\" "
@@ -1472,6 +1533,39 @@ static std::string GenerateSlideMaster() {
          "<p:sldLayoutIdLst>"
          "<p:sldLayoutId id=\"2147483649\" r:id=\"rId1\"/>"
          "</p:sldLayoutIdLst>"
+         "<p:txStyles>"
+         "<p:titleStyle>"
+         "<a:lvl1pPr algn=\"l\" defTabSz=\"914400\" rtl=\"0\" eaLnBrk=\"1\" "
+         "latinLnBrk=\"0\" hangingPunct=\"1\">"
+         "<a:lnSpc><a:spcPct val=\"90000\"/></a:lnSpc>"
+         "<a:spcBef><a:spcPct val=\"0\"/></a:spcBef>"
+         "<a:buNone/>"
+         "<a:defRPr sz=\"4400\" kern=\"1200\">"
+         "<a:solidFill><a:schemeClr val=\"tx1\"/></a:solidFill>"
+         "<a:latin typeface=\"+mj-lt\"/><a:ea typeface=\"+mj-ea\"/>"
+         "<a:cs typeface=\"+mj-cs\"/>"
+         "</a:defRPr></a:lvl1pPr>"
+         "</p:titleStyle>"
+         "<p:bodyStyle>"
+         "<a:lvl1pPr marL=\"228600\" indent=\"-228600\" algn=\"l\" defTabSz=\"914400\" "
+         "rtl=\"0\" eaLnBrk=\"1\" latinLnBrk=\"0\" hangingPunct=\"1\">"
+         "<a:lnSpc><a:spcPct val=\"90000\"/></a:lnSpc>"
+         "<a:spcBef><a:spcPts val=\"1000\"/></a:spcBef>"
+         "<a:buFont typeface=\"Arial\" panose=\"020B0604020202020204\" pitchFamily=\"34\" "
+         "charset=\"0\"/>"
+         "<a:buChar char=\"&#x2022;\"/>"
+         "<a:defRPr sz=\"2800\" kern=\"1200\">"
+         "<a:solidFill><a:schemeClr val=\"tx1\"/></a:solidFill>"
+         "<a:latin typeface=\"+mn-lt\"/><a:ea typeface=\"+mn-ea\"/>"
+         "<a:cs typeface=\"+mn-cs\"/>"
+         "</a:defRPr></a:lvl1pPr>"
+         "</p:bodyStyle>"
+         "<p:otherStyle>"
+         "<a:defPPr>"
+         "<a:defRPr lang=\"zh-CN\"/>"
+         "</a:defPPr>"
+         "</p:otherStyle>"
+         "</p:txStyles>"
          "</p:sldMaster>";
 }
 
@@ -1495,7 +1589,9 @@ static std::string GenerateSlideLayout() {
          "type=\"blank\" preserve=\"1\">"
          "<p:cSld name=\"Blank\"><p:spTree>"
          "<p:nvGrpSpPr><p:cNvPr id=\"1\" name=\"\"/>"
-         "<p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>"
+         "<p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>"
+         "<p:grpSpPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"0\" cy=\"0\"/>"
+         "<a:chOff x=\"0\" y=\"0\"/><a:chExt cx=\"0\" cy=\"0\"/></a:xfrm></p:grpSpPr>"
          "</p:spTree></p:cSld>"
          "<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>"
          "</p:sldLayout>";
@@ -1550,7 +1646,75 @@ static std::string GenerateTheme() {
          "<a:solidFill><a:schemeClr val=\"phClr\"/></a:solidFill></a:bgFillStyleLst>"
          "</a:fmtScheme>"
          "</a:themeElements>"
+         "<a:objectDefaults/>"
+         "<a:extraClrSchemeLst/>"
          "</a:theme>";
+}
+
+static std::string GeneratePresProps() {
+  return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+         "<p:presentationPr "
+         "xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" "
+         "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" "
+         "xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\"/>";
+}
+
+static std::string GenerateViewProps() {
+  return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+         "<p:viewPr "
+         "xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" "
+         "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" "
+         "xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">"
+         "<p:normalViewPr><p:restoredLeft sz=\"15611\"/>"
+         "<p:restoredTop sz=\"94658\"/></p:normalViewPr>"
+         "<p:slideViewPr><p:cSldViewPr snapToGrid=\"0\">"
+         "<p:cViewPr varScale=\"1\">"
+         "<p:scale><a:sx n=\"100\" d=\"100\"/><a:sy n=\"100\" d=\"100\"/></p:scale>"
+         "<p:origin x=\"0\" y=\"0\"/></p:cViewPr>"
+         "<p:guideLst/></p:cSldViewPr></p:slideViewPr>"
+         "<p:notesTextViewPr><p:cViewPr>"
+         "<p:scale><a:sx n=\"1\" d=\"1\"/><a:sy n=\"1\" d=\"1\"/></p:scale>"
+         "<p:origin x=\"0\" y=\"0\"/></p:cViewPr></p:notesTextViewPr>"
+         "<p:gridSpacing cx=\"72008\" cy=\"72008\"/>"
+         "</p:viewPr>";
+}
+
+static std::string GenerateTableStyles() {
+  return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+         "<a:tblStyleLst xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" "
+         "def=\"{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}\"/>";
+}
+
+static std::string GenerateCoreProps() {
+  return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+         "<cp:coreProperties "
+         "xmlns:cp=\"http://schemas.openxmlformats.org/package/2006/metadata/core-properties\" "
+         "xmlns:dc=\"http://purl.org/dc/elements/1.1/\" "
+         "xmlns:dcterms=\"http://purl.org/dc/terms/\" "
+         "xmlns:dcmitype=\"http://purl.org/dc/dcmitype/\" "
+         "xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">"
+         "<cp:revision>1</cp:revision>"
+         "</cp:coreProperties>";
+}
+
+static std::string GenerateAppProps() {
+  return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+         "<Properties "
+         "xmlns=\"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties\" "
+         "xmlns:vt=\"http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes\">"
+         "<TotalTime>0</TotalTime>"
+         "<Words>0</Words>"
+         "<Application>PAGX</Application>"
+         "<Paragraphs>0</Paragraphs>"
+         "<Slides>1</Slides>"
+         "<Notes>0</Notes>"
+         "<HiddenSlides>0</HiddenSlides>"
+         "<MMClips>0</MMClips>"
+         "<ScaleCrop>false</ScaleCrop>"
+         "<LinksUpToDate>false</LinksUpToDate>"
+         "<SharedDoc>false</SharedDoc>"
+         "<HyperlinksChanged>false</HyperlinksChanged>"
+         "</Properties>";
 }
 
 static void AddZipEntry(zipFile zf, const char* name, const void* data, unsigned size) {
@@ -1591,7 +1755,8 @@ bool PPTExporter::ToFile(const PAGXDocument& doc, const std::string& filePath,
       "xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">";
   slide += "<p:cSld><p:spTree>";
   slide += "<p:nvGrpSpPr><p:cNvPr id=\"1\" name=\"\"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>";
-  slide += "<p:grpSpPr/>";
+  slide += "<p:grpSpPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"0\" cy=\"0\"/>"
+           "<a:chOff x=\"0\" y=\"0\"/><a:chExt cx=\"0\" cy=\"0\"/></a:xfrm></p:grpSpPr>";
   slide += bodyContent;
   slide += "</p:spTree></p:cSld>";
   slide += "<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>";
@@ -1614,6 +1779,11 @@ bool PPTExporter::ToFile(const PAGXDocument& doc, const std::string& filePath,
   AddZipString(zf, "ppt/slideLayouts/slideLayout1.xml", GenerateSlideLayout());
   AddZipString(zf, "ppt/slideLayouts/_rels/slideLayout1.xml.rels", GenerateSlideLayoutRels());
   AddZipString(zf, "ppt/theme/theme1.xml", GenerateTheme());
+  AddZipString(zf, "ppt/presProps.xml", GeneratePresProps());
+  AddZipString(zf, "ppt/viewProps.xml", GenerateViewProps());
+  AddZipString(zf, "ppt/tableStyles.xml", GenerateTableStyles());
+  AddZipString(zf, "docProps/core.xml", GenerateCoreProps());
+  AddZipString(zf, "docProps/app.xml", GenerateAppProps());
 
   for (const auto& img : context.images()) {
     if (img.cachedData && img.cachedData->size() > 0) {
