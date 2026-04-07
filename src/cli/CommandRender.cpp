@@ -246,14 +246,14 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
     }
   }
 
-  FontConfig fontProvider = {};
+  FontConfig fontConfig = {};
   for (const auto& fontFile : options.fontFiles) {
     auto typeface = tgfx::Typeface::MakeFromPath(fontFile);
     if (typeface == nullptr) {
       std::cerr << "pagx render: failed to load font '" << fontFile << "'\n";
       return {};
     }
-    fontProvider.registerTypeface(typeface);
+    fontConfig.registerTypeface(typeface);
   }
   std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces = {};
   for (const auto& fallbackStr : options.fallbacks) {
@@ -262,11 +262,11 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
       std::cerr << "pagx render: fallback font '" << fallbackStr << "' not found\n";
       return {};
     }
-    fontProvider.registerTypeface(typeface);
+    fontConfig.registerTypeface(typeface);
     fallbackTypefaces.push_back(typeface);
   }
   if (!fallbackTypefaces.empty()) {
-    fontProvider.addFallbackTypefaces(std::move(fallbackTypefaces));
+    fontConfig.addFallbackTypefaces(std::move(fallbackTypefaces));
   }
   bool hasTarget = !options.id.empty() || !options.xpath.empty();
   std::shared_ptr<tgfx::Layer> rootLayer = nullptr;
@@ -274,10 +274,10 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
   LayerBuildResult buildResult = {};
 
   if (hasTarget) {
-    buildResult = LayerBuilder::BuildWithMap(document.get(), &fontProvider);
+    buildResult = LayerBuilder::BuildWithMap(document.get(), &fontConfig);
     rootLayer = buildResult.root;
   } else {
-    rootLayer = LayerBuilder::Build(document.get(), &fontProvider);
+    rootLayer = LayerBuilder::Build(document.get(), &fontConfig);
   }
   if (rootLayer == nullptr) {
     std::cerr << "pagx render: failed to build layer tree\n";

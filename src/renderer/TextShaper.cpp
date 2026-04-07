@@ -18,7 +18,7 @@
 
 #ifdef PAG_USE_HARFBUZZ
 
-#include "HarfBuzzShaper.h"
+#include "TextShaper.h"
 #include <list>
 #include <map>
 #include <memory>
@@ -308,10 +308,8 @@ static std::vector<ShapingRun> ItemizeRuns(const std::string& text, const tgfx::
   return runs;
 }
 
-std::vector<ShapedGlyph> HarfBuzzShaper::Shape(const std::string& text,
-                                               const tgfx::Font& primaryFont,
-                                               LayoutContext& layoutContext, bool vertical,
-                                               bool rtl) {
+std::vector<ShapedGlyph> TextShaper::Shape(const std::string& text, const tgfx::Font& primaryFont,
+                                           LayoutContext& layoutContext, bool vertical, bool rtl) {
   if (text.empty()) {
     return {};
   }
@@ -335,7 +333,7 @@ std::vector<ShapedGlyph> HarfBuzzShaper::Shape(const std::string& text,
   return result;
 }
 
-void HarfBuzzShaper::PurgeCaches() {
+void TextShaper::PurgeCaches() {
   auto cache = GetFontCache();
   cache.reset();
 }

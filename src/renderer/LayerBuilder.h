@@ -44,23 +44,23 @@ class LayerBuilder {
   /**
    * Builds a layer tree from a PAGXDocument.
    * @param document The document to build from.
-   * @param fontProvider Optional font config for text measurement and rendering. If nullptr,
+   * @param fontConfig Optional font config for text measurement and rendering. If nullptr,
    *                     only system fonts are available.
    * @return The root layer of the built layer tree.
    */
   static std::shared_ptr<tgfx::Layer> Build(PAGXDocument* document,
-                                            FontConfig* fontProvider = nullptr);
+                                            FontConfig* fontConfig = nullptr);
 
   /**
    * Builds a layer tree and returns a mapping from PAGX Layer nodes to tgfx::Layer objects. This
    * mapping allows callers to look up the rendered layer for any PAGX Layer node.
    * @param document The document to build from.
-   * @param fontProvider Optional font config for text measurement and rendering. If nullptr,
+   * @param fontConfig Optional font config for text measurement and rendering. If nullptr,
    *                     only system fonts are available.
    * @return A LayerBuildResult containing the root layer and a mapping from PAGX Layer nodes to
    *         their corresponding tgfx::Layer objects.
    */
-  static LayerBuildResult BuildWithMap(PAGXDocument* document, FontConfig* fontProvider = nullptr);
+  static LayerBuildResult BuildWithMap(PAGXDocument* document, FontConfig* fontConfig = nullptr);
 };
 
 }  // namespace pagx

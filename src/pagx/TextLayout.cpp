@@ -27,9 +27,9 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "renderer/BidiResolver.h"
-#include "renderer/HarfBuzzShaper.h"
 #include "renderer/LineBreaker.h"
 #include "renderer/PunctuationSquash.h"
+#include "renderer/TextShaper.h"
 #include "renderer/VerticalTextUtils.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/TextBlob.h"
@@ -425,8 +425,7 @@ class TextLayoutContext {
       // Shape this text segment with HarfBuzz.
       auto substring = content.substr(seg.start, seg.length);
       bool rtl = seg.bidiLevel & 1;
-      auto shapedGlyphs =
-          HarfBuzzShaper::Shape(substring, primaryFont, *layoutContext_, vertical, rtl);
+      auto shapedGlyphs = TextShaper::Shape(substring, primaryFont, *layoutContext_, vertical, rtl);
 
       // HarfBuzz returns RTL glyphs in visual order (left-to-right). Sort them by cluster
       // to restore logical order so that allGlyphs is always in logical order. Simple reverse

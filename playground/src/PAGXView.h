@@ -79,7 +79,7 @@ class PAGXView {
   bool presentImmediately = true;
   float pagxWidth = 0.0f;
   float pagxHeight = 0.0f;
-  FontConfig fontProvider = {};
+  FontConfig fontConfig = {};
   std::shared_ptr<PAGXDocument> document = nullptr;
 
   // Background layer cache

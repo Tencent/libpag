@@ -38,7 +38,7 @@ struct ShapedGlyph {
   tgfx::Font font = {};
 };
 
-class HarfBuzzShaper {
+class TextShaper {
  public:
   /**
    * Shapes the given UTF-8 text using the primary font and a LayoutContext for character-level

@@ -861,15 +861,15 @@ class LayerBuilderContext {
 
 // Public API implementation
 
-std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document, FontConfig* fontProvider) {
+std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document, FontConfig* fontConfig) {
   if (document == nullptr) {
     return nullptr;
   }
 
   // Phase 1: Auto layout (constraint positioning, flex layout).
   // This calls Text::setLayoutSize() which generates TextBlob via TextLayout::Layout().
-  if (fontProvider) {
-    document->setFontConfig(*fontProvider);
+  if (fontConfig) {
+    document->setFontConfig(*fontConfig);
   }
   document->applyLayout();
 
@@ -878,15 +878,15 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document, FontCon
   return context.build(*document);
 }
 
-LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document, FontConfig* fontProvider) {
+LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document, FontConfig* fontConfig) {
   if (document == nullptr) {
     return {};
   }
 
   // Phase 1: Auto layout (constraint positioning, flex layout).
   // This calls Text::setLayoutSize() which generates TextBlob via TextLayout::Layout().
-  if (fontProvider) {
-    document->setFontConfig(*fontProvider);
+  if (fontConfig) {
+    document->setFontConfig(*fontConfig);
   }
   document->applyLayout();
 

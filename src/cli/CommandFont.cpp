@@ -237,14 +237,14 @@ static int RunFontEmbed(int argc, char* argv[]) {
   }
 
   // Load font files.
-  FontConfig fontProvider = {};
+  FontConfig fontConfig = {};
   for (const auto& fontFile : options.fontFiles) {
     auto typeface = tgfx::Typeface::MakeFromPath(fontFile);
     if (typeface == nullptr) {
       std::cerr << "pagx font embed: failed to load font '" << fontFile << "'\n";
       return 1;
     }
-    fontProvider.registerTypeface(typeface);
+    fontConfig.registerTypeface(typeface);
   }
 
   // Resolve fallback typefaces: user-specified first, then system fallbacks.
@@ -255,14 +255,14 @@ static int RunFontEmbed(int argc, char* argv[]) {
       std::cerr << "pagx font embed: fallback font '" << fallbackStr << "' not found\n";
       return 1;
     }
-    fontProvider.registerTypeface(typeface);
+    fontConfig.registerTypeface(typeface);
     fallbackTypefaces.push_back(typeface);
   }
   if (!fallbackTypefaces.empty()) {
-    fontProvider.addFallbackTypefaces(std::move(fallbackTypefaces));
+    fontConfig.addFallbackTypefaces(std::move(fallbackTypefaces));
   }
 
-  document->setFontConfig(fontProvider);
+  document->setFontConfig(fontConfig);
   FontEmbedder::ClearEmbeddedGlyphRuns(document.get());
   document->applyLayout();
 

@@ -159,8 +159,8 @@ int RunBounds(int argc, char* argv[]) {
   }
 
   // Build layer tree with mapping.
-  FontConfig fontProvider = {};
-  auto buildResult = LayerBuilder::BuildWithMap(document.get(), &fontProvider);
+  FontConfig fontConfig = {};
+  auto buildResult = LayerBuilder::BuildWithMap(document.get(), &fontConfig);
   if (buildResult.root == nullptr) {
     std::cerr << "pagx bounds: failed to build layer tree\n";
     return 1;
