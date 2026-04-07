@@ -830,6 +830,15 @@ static std::string SerializeElement(const Element* element) {
   } else if (type == NodeType::Text) {
     auto* text = static_cast<const Text*>(element);
     oss << text->text << "|" << text->fontSize;
+  } else if (type == NodeType::Path) {
+    auto* path = static_cast<const Path*>(element);
+    if (path->data != nullptr) {
+      if (!path->data->id.empty()) {
+        oss << "@" << path->data->id;
+      } else {
+        oss << "ptr(" << reinterpret_cast<uintptr_t>(path->data) << ")";
+      }
+    }
   }
   oss << "}";
   return oss.str();
