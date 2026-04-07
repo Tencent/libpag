@@ -19,14 +19,18 @@
 #ifdef PAG_BUILD_PPT
 
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/PPTExporter.h"
 #include "pagx/SVGImporter.h"
+#include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/DropShadowFilter.h"
+#include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
@@ -2120,6 +2124,538 @@ PAGX_TEST(PAGXPPTTest, MaskNoBakeWithTransformAndAlpha) {
   ASSERT_TRUE(ExportAndVerify(*doc, "mask_no_bake_transform_alpha", options));
 }
 
+PAGX_TEST(PAGXPPTTest, StrokeDashPresetSysDash2) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  auto* pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(50, 100);
+  pathData->lineTo(350, 100);
+  path->data = pathData;
+
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  stroke->width = 4.0f;
+  // dr = 12/4 = 3.0 (> 1.5 and <= 4.5), sr = 4/4 = 1.0 (<= 2.0) → sysDash
+  stroke->dashes = {12.0f, 4.0f};
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  stroke->color = solid;
+
+  layer->contents.push_back(path);
+  layer->contents.push_back(stroke);
+  doc->layers.push_back(layer);
+
+  ASSERT_TRUE(ExportAndVerify(*doc, "dash_preset_sysDash2"));
+}
+
+PAGX_TEST(PAGXPPTTest, StrokeDashEmptyDashes) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  auto* pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(50, 100);
+  pathData->lineTo(350, 100);
+  path->data = pathData;
+
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  stroke->width = 4.0f;
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  stroke->color = solid;
+
+  layer->contents.push_back(path);
+  layer->contents.push_back(stroke);
+  doc->layers.push_back(layer);
+
+  ASSERT_TRUE(ExportAndVerify(*doc, "dash_empty"));
+}
+
+PAGX_TEST(PAGXPPTTest, NativeTextWithTextBoxZeroHeight) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "Zero Height Box";
+  text->position = {50, 100};
+  text->fontSize = 24.0f;
+
+  auto* textBox = doc->makeNode<pagx::TextBox>();
+  textBox->position = {50, 50};
+  textBox->size = {300, 0};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+
+  layer->contents.push_back(text);
+  layer->contents.push_back(textBox);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  pagx::PPTExportOptions options;
+  options.convertTextToPath = false;
+  ASSERT_TRUE(ExportAndVerify(*doc, "native_text_textbox_zero_height", options));
+}
+
+PAGX_TEST(PAGXPPTTest, NativeTextNoLetterSpacing) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "No Spacing";
+  text->position = {50, 150};
+  text->fontSize = 24.0f;
+  text->fontFamily = "Arial";
+  text->letterSpacing = 0.0f;
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.2f, 0.2f, 0.2f, 1.0f};
+  fill->color = solid;
+
+  layer->contents.push_back(text);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  pagx::PPTExportOptions options;
+  options.convertTextToPath = false;
+  ASSERT_TRUE(ExportAndVerify(*doc, "native_text_no_spacing", options));
+}
+
+PAGX_TEST(PAGXPPTTest, NativeTextWithFillAlpha) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "Alpha Text";
+  text->position = {50, 150};
+  text->fontSize = 28.0f;
+  text->fontFamily = "Arial";
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->alpha = 0.6f;
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.0f, 0.0f, 1.0f, 0.5f};
+  fill->color = solid;
+
+  layer->contents.push_back(text);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  pagx::PPTExportOptions options;
+  options.convertTextToPath = false;
+  ASSERT_TRUE(ExportAndVerify(*doc, "native_text_fill_alpha", options));
+}
+
+PAGX_TEST(PAGXPPTTest, PathEvenOddOpenInnerContour) {
+  auto doc = pagx::PAGXDocument::Make(400, 400);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  auto* pathData = doc->makeNode<pagx::PathData>();
+  // Outer square
+  pathData->moveTo(50, 50);
+  pathData->lineTo(350, 50);
+  pathData->lineTo(350, 350);
+  pathData->lineTo(50, 350);
+  pathData->close();
+  // Inner open contour (not closed) - should be kept as-is
+  pathData->moveTo(150, 150);
+  pathData->lineTo(250, 150);
+  pathData->lineTo(250, 250);
+  path->data = pathData;
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->fillRule = pagx::FillRule::EvenOdd;
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.6f, 0.2f, 0.4f, 1.0f};
+  fill->color = solid;
+
+  layer->contents.push_back(path);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  ASSERT_TRUE(ExportAndVerify(*doc, "path_even_odd_open_inner"));
+}
+
+PAGX_TEST(PAGXPPTTest, PathEvenOddOppositeWinding) {
+  auto doc = pagx::PAGXDocument::Make(400, 400);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  auto* pathData = doc->makeNode<pagx::PathData>();
+  // Outer square (CW)
+  pathData->moveTo(50, 50);
+  pathData->lineTo(350, 50);
+  pathData->lineTo(350, 350);
+  pathData->lineTo(50, 350);
+  pathData->close();
+  // Inner square (CCW) - opposite winding, should not be reversed
+  pathData->moveTo(150, 150);
+  pathData->lineTo(150, 250);
+  pathData->lineTo(250, 250);
+  pathData->lineTo(250, 150);
+  pathData->close();
+  path->data = pathData;
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->fillRule = pagx::FillRule::EvenOdd;
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.3f, 0.7f, 0.3f, 1.0f};
+  fill->color = solid;
+
+  layer->contents.push_back(path);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  ASSERT_TRUE(ExportAndVerify(*doc, "path_even_odd_opposite_winding"));
+}
+
+PAGX_TEST(PAGXPPTTest, NativeTextWithShadow) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "Shadow Text";
+  text->position = {50, 150};
+  text->fontSize = 30.0f;
+  text->fontFamily = "Arial";
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+
+  auto* shadow = doc->makeNode<pagx::DropShadowFilter>();
+  shadow->offsetX = 3.0f;
+  shadow->offsetY = 3.0f;
+  shadow->blurX = 5.0f;
+  shadow->blurY = 5.0f;
+  shadow->color = {0.0f, 0.0f, 0.0f, 0.5f};
+  layer->filters.push_back(shadow);
+
+  layer->contents.push_back(text);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  pagx::PPTExportOptions options;
+  options.convertTextToPath = false;
+  ASSERT_TRUE(ExportAndVerify(*doc, "native_text_shadow", options));
+}
+
+PAGX_TEST(PAGXPPTTest, PathZeroBoundsSkipped) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  auto* pathData = doc->makeNode<pagx::PathData>();
+  // Single point → zero width and height
+  pathData->moveTo(100, 100);
+  path->data = pathData;
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+
+  layer->contents.push_back(path);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  ASSERT_TRUE(ExportAndVerify(*doc, "path_zero_bounds"));
+}
+
+PAGX_TEST(PAGXPPTTest, BlurFilterIgnored) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {150, 100};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.5f, 0.5f, 0.9f, 1.0f};
+  fill->color = solid;
+
+  auto* blur = doc->makeNode<pagx::BlurFilter>();
+  blur->blurX = 5.0f;
+  blur->blurY = 5.0f;
+  layer->filters.push_back(blur);
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  ASSERT_TRUE(ExportAndVerify(*doc, "blur_filter_ignored"));
+}
+
+static pagx::Image* MakeTestPNGImage(pagx::PAGXDocument* doc) {
+  // Minimal valid 2x2 RGBA PNG (8-bit, non-interlaced)
+  static const uint8_t kMinimalPNG[] = {
+      0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,  // PNG signature
+      // IHDR
+      0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00,
+      0x00, 0x02, 0x08, 0x02, 0x00, 0x00, 0x00, 0xFD, 0xD4, 0x9A, 0x73,
+      // IDAT (compressed pixel data)
+      0x00, 0x00, 0x00, 0x14, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x62, 0xF8, 0xCF, 0xC0, 0xF0,
+      0x1F, 0x01, 0x18, 0x18, 0x18, 0x00, 0x09, 0x04, 0x01, 0x01, 0xE2, 0x2D, 0x42, 0xA3,
+      // IEND
+      0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+  };
+  auto* image = doc->makeNode<pagx::Image>();
+  image->data = pagx::Data::MakeWithCopy(kMinimalPNG, sizeof(kMinimalPNG));
+  return image;
+}
+
+PAGX_TEST(PAGXPPTTest, ImagePatternFill_Stretch) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 150};
+
+  auto* image = MakeTestPNGImage(doc.get());
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->matrix = {1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  ASSERT_TRUE(ExportAndVerify(*doc, "imagepattern_stretch"));
+}
+
+PAGX_TEST(PAGXPPTTest, ImagePatternFill_TileRepeat) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 150};
+
+  auto* image = MakeTestPNGImage(doc.get());
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->tileModeX = pagx::TileMode::Repeat;
+  pattern->tileModeY = pagx::TileMode::Repeat;
+  pattern->matrix = {0.5f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  ASSERT_TRUE(ExportAndVerify(*doc, "imagepattern_tile_repeat"));
+}
+
+PAGX_TEST(PAGXPPTTest, ImagePatternFill_TileMirror) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 150};
+
+  auto* image = MakeTestPNGImage(doc.get());
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->tileModeX = pagx::TileMode::Mirror;
+  pattern->tileModeY = pagx::TileMode::Mirror;
+  pattern->matrix = {0.5f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  ASSERT_TRUE(ExportAndVerify(*doc, "imagepattern_tile_mirror"));
+}
+
+PAGX_TEST(PAGXPPTTest, ImagePatternFill_MirrorXOnly) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 150};
+
+  auto* image = MakeTestPNGImage(doc.get());
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->tileModeX = pagx::TileMode::Mirror;
+  pattern->tileModeY = pagx::TileMode::Repeat;
+  pattern->matrix = {0.5f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  ASSERT_TRUE(ExportAndVerify(*doc, "imagepattern_mirror_x"));
+}
+
+PAGX_TEST(PAGXPPTTest, ImagePatternFill_MirrorYOnly) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 150};
+
+  auto* image = MakeTestPNGImage(doc.get());
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->tileModeX = pagx::TileMode::Repeat;
+  pattern->tileModeY = pagx::TileMode::Mirror;
+  pattern->matrix = {0.5f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  ASSERT_TRUE(ExportAndVerify(*doc, "imagepattern_mirror_y"));
+}
+
+PAGX_TEST(PAGXPPTTest, ImagePatternFill_NullImage) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 150};
+
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  ASSERT_TRUE(ExportAndVerify(*doc, "imagepattern_null_image"));
+}
+
+PAGX_TEST(PAGXPPTTest, ImagePatternFill_WithTransform) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 150};
+
+  auto* image = MakeTestPNGImage(doc.get());
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->matrix = {100.0f, 0.0f, 0.0f, 75.0f, 100.0f, 75.0f};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  ASSERT_TRUE(ExportAndVerify(*doc, "imagepattern_transform"));
+}
+
+PAGX_TEST(PAGXPPTTest, ImagePatternFill_WithAlpha) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 150};
+
+  auto* image = MakeTestPNGImage(doc.get());
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->matrix = {100.0f, 0.0f, 0.0f, 75.0f, 0.0f, 0.0f};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->alpha = 0.5f;
+  fill->color = pattern;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  ASSERT_TRUE(ExportAndVerify(*doc, "imagepattern_alpha"));
+}
+
+PAGX_TEST(PAGXPPTTest, ImagePatternAsSmallPicture) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 150};
+
+  auto* image = MakeTestPNGImage(doc.get());
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  // Scale image to be smaller than the shape (1px wide, 1px tall at position 150,100)
+  pattern->matrix = {1.0f, 0.0f, 0.0f, 1.0f, 150.0f, 100.0f};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  ASSERT_TRUE(ExportAndVerify(*doc, "imagepattern_small_picture"));
+}
+
+PAGX_TEST(PAGXPPTTest, ImagePatternOnEllipse) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* ellipse = doc->makeNode<pagx::Ellipse>();
+  ellipse->position = {200, 150};
+  ellipse->size = {200, 150};
+
+  auto* image = MakeTestPNGImage(doc.get());
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->matrix = {100.0f, 0.0f, 0.0f, 75.0f, 0.0f, 0.0f};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  layer->contents.push_back(ellipse);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  ASSERT_TRUE(ExportAndVerify(*doc, "imagepattern_ellipse"));
+}
+
+PAGX_TEST(PAGXPPTTest, ImagePatternOnPath) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  auto* pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(100, 50);
+  pathData->lineTo(300, 50);
+  pathData->lineTo(300, 250);
+  pathData->lineTo(100, 250);
+  pathData->close();
+  path->data = pathData;
+
+  auto* image = MakeTestPNGImage(doc.get());
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->matrix = {100.0f, 0.0f, 0.0f, 100.0f, 0.0f, 0.0f};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  layer->contents.push_back(path);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  ASSERT_TRUE(ExportAndVerify(*doc, "imagepattern_path"));
+}
+
 PAGX_TEST(PAGXPPTTest, MaskNoBakeContourType) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
 
@@ -2152,6 +2688,532 @@ PAGX_TEST(PAGXPPTTest, MaskNoBakeContourType) {
   pagx::PPTExportOptions options;
   options.bakeMask = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "mask_no_bake_contour", options));
+}
+
+PAGX_TEST(PAGXPPTTest, NativeTextTextAnchorCenter) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "Centered";
+  text->fontFamily = "Arial";
+  text->fontSize = 24;
+  text->position = {200, 150};
+  text->textAnchor = pagx::TextAnchor::Center;
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(text);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "text_anchor_center"));
+}
+
+PAGX_TEST(PAGXPPTTest, NativeTextTextAnchorEnd) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "Right";
+  text->fontFamily = "Arial";
+  text->fontSize = 24;
+  text->position = {200, 150};
+  text->textAnchor = pagx::TextAnchor::End;
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(text);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "text_anchor_end"));
+}
+
+PAGX_TEST(PAGXPPTTest, NativeTextTextBoxCenterAlign) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "TextBox Center";
+  text->fontFamily = "Arial";
+  text->fontSize = 20;
+  text->position = {100, 100};
+  auto* textBox = doc->makeNode<pagx::TextBox>();
+  textBox->position = {50, 80};
+  textBox->size = {300, 60};
+  textBox->textAlign = pagx::TextAlign::Center;
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(text);
+  layer->contents.push_back(textBox);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "text_textbox_center"));
+}
+
+PAGX_TEST(PAGXPPTTest, NativeTextTextBoxEndAlign) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "TextBox End";
+  text->fontFamily = "Arial";
+  text->fontSize = 20;
+  text->position = {100, 100};
+  auto* textBox = doc->makeNode<pagx::TextBox>();
+  textBox->position = {50, 80};
+  textBox->size = {300, 60};
+  textBox->textAlign = pagx::TextAlign::End;
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(text);
+  layer->contents.push_back(textBox);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "text_textbox_end"));
+}
+
+PAGX_TEST(PAGXPPTTest, NativeTextWithInnerShadow) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "Inner Shadow Text";
+  text->fontFamily = "Arial";
+  text->fontSize = 28;
+  text->position = {200, 150};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.1f, 0.1f, 0.1f, 1.0f};
+  fill->color = solid;
+  auto* innerShadow = doc->makeNode<pagx::InnerShadowFilter>();
+  innerShadow->blurX = 3.0f;
+  innerShadow->blurY = 3.0f;
+  innerShadow->offsetX = 1.0f;
+  innerShadow->offsetY = 1.0f;
+  innerShadow->color = {0.0f, 0.0f, 0.0f, 0.6f};
+  layer->filters.push_back(innerShadow);
+  layer->contents.push_back(text);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "text_inner_shadow"));
+}
+
+PAGX_TEST(PAGXPPTTest, StrokeWithGradient) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  auto* pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(50, 100);
+  pathData->lineTo(350, 100);
+  path->data = pathData;
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  stroke->width = 6.0f;
+  auto* grad = doc->makeNode<pagx::LinearGradient>();
+  auto* stop1 = doc->makeNode<pagx::ColorStop>();
+  stop1->offset = 0.0f;
+  stop1->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  auto* stop2 = doc->makeNode<pagx::ColorStop>();
+  stop2->offset = 1.0f;
+  stop2->color = {0.0f, 0.0f, 1.0f, 1.0f};
+  grad->colorStops.push_back(stop1);
+  grad->colorStops.push_back(stop2);
+  grad->startPoint = {0.0f, 0.0f};
+  grad->endPoint = {1.0f, 0.0f};
+  stroke->color = grad;
+  layer->contents.push_back(path);
+  layer->contents.push_back(stroke);
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "stroke_gradient"));
+}
+
+PAGX_TEST(PAGXPPTTest, ImagePatternOnStroke) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  auto* pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(50, 100);
+  pathData->lineTo(350, 100);
+  path->data = pathData;
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  stroke->width = 10.0f;
+  auto* image = MakeTestPNGImage(doc.get());
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->matrix = {1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f};
+  stroke->color = pattern;
+  layer->contents.push_back(path);
+  layer->contents.push_back(stroke);
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "imagepattern_stroke"));
+}
+
+PAGX_TEST(PAGXPPTTest, ImageWithJPEGData) {
+  // Minimal JPEG data (SOI + JFIF APP0 + EOI) to trigger hasJPEG() path
+  static const uint8_t kMinimalJPEG[] = {
+      0xFF, 0xD8,                                      // SOI
+      0xFF, 0xE0,                                      // APP0
+      0x00, 0x10,                                      // Length: 16
+      0x4A, 0x46, 0x49, 0x46, 0x00,                    // "JFIF\0"
+      0x01, 0x01,                                      // Version 1.1
+      0x01,                                            // Units: DPI
+      0x00, 0x60, 0x00, 0x60,                          // 96x96 DPI
+      0x00, 0x00,                                      // No thumbnail
+      0xFF, 0xD9,                                      // EOI
+  };
+
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 150};
+
+  auto* image = doc->makeNode<pagx::Image>();
+  image->data = pagx::Data::MakeWithCopy(kMinimalJPEG, sizeof(kMinimalJPEG));
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->matrix = {100.0f, 0.0f, 0.0f, 75.0f, 0.0f, 0.0f};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  ASSERT_TRUE(ExportAndVerify(*doc, "imagepattern_jpeg"));
+}
+
+PAGX_TEST(PAGXPPTTest, GroupWithAlpha) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* group = doc->makeNode<pagx::Group>();
+  group->alpha = 0.5f;
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {150, 100};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  group->elements.push_back(rect);
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "group_alpha"));
+}
+
+PAGX_TEST(PAGXPPTTest, NativeTextWithLetterSpacing) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "Spaced";
+  text->fontFamily = "Arial";
+  text->fontSize = 24;
+  text->position = {200, 150};
+  text->letterSpacing = 5.0f;
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(text);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "text_letter_spacing"));
+}
+
+PAGX_TEST(PAGXPPTTest, ImagePatternFill_ImageNoData) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 150};
+
+  auto* image = doc->makeNode<pagx::Image>();
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->matrix = {1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  ASSERT_TRUE(ExportAndVerify(*doc, "imagepattern_no_data"));
+}
+
+PAGX_TEST(PAGXPPTTest, ImagePatternFill_TileWithDPI) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 150};
+
+  // Use a PNG with pHYs chunk encoding 144 DPI (5669 pixels/meter)
+  static const uint8_t kPNG144DPI[] = {
+      0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,  // PNG signature
+      // IHDR: 4x4 RGB
+      0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00,
+      0x00, 0x04, 0x08, 0x02, 0x00, 0x00, 0x00, 0x26, 0x93, 0x09, 0x29,
+      // pHYs: 5669 pixels/meter (~144 DPI), unit = 1
+      0x00, 0x00, 0x00, 0x09, 0x70, 0x48, 0x59, 0x73, 0x00, 0x00, 0x16, 0x25, 0x00, 0x00,
+      0x16, 0x25, 0x01, 0x49, 0x52, 0x24, 0xF0,
+      // IDAT
+      0x00, 0x00, 0x00, 0x14, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x62, 0xF8, 0xCF, 0xC0,
+      0xF0, 0x1F, 0x01, 0x18, 0x18, 0x18, 0x00, 0x09, 0x04, 0x01, 0x01, 0xE2, 0x2D, 0x42,
+      0xA3,
+      // IEND
+      0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+  };
+  auto* image = doc->makeNode<pagx::Image>();
+  image->data = pagx::Data::MakeWithCopy(kPNG144DPI, sizeof(kPNG144DPI));
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->tileModeX = pagx::TileMode::Repeat;
+  pattern->tileModeY = pagx::TileMode::Repeat;
+  pattern->matrix = {0.5f, 0.0f, 0.0f, 0.5f, 10.0f, 20.0f};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  ASSERT_TRUE(ExportAndVerify(*doc, "imagepattern_tile_dpi"));
+}
+
+PAGX_TEST(PAGXPPTTest, RectangleWithImagePatternAndStroke) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 150};
+
+  auto* image = MakeTestPNGImage(doc.get());
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->matrix = {1.0f, 0.0f, 0.0f, 1.0f, 150.0f, 100.0f};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  stroke->width = 3.0f;
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  stroke->color = solid;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  layer->contents.push_back(stroke);
+  doc->layers.push_back(layer);
+
+  ASSERT_TRUE(ExportAndVerify(*doc, "rect_imagepattern_stroke"));
+}
+
+PAGX_TEST(PAGXPPTTest, EllipseWithImagePatternAndShadow) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* ellipse = doc->makeNode<pagx::Ellipse>();
+  ellipse->position = {200, 150};
+  ellipse->size = {200, 150};
+
+  auto* image = MakeTestPNGImage(doc.get());
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->matrix = {1.0f, 0.0f, 0.0f, 1.0f, 150.0f, 100.0f};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  auto* shadow = doc->makeNode<pagx::DropShadowFilter>();
+  shadow->blurX = 4.0f;
+  shadow->blurY = 4.0f;
+  shadow->offsetX = 3.0f;
+  shadow->offsetY = 3.0f;
+  shadow->color = {0.0f, 0.0f, 0.0f, 0.5f};
+  layer->filters.push_back(shadow);
+
+  layer->contents.push_back(ellipse);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  ASSERT_TRUE(ExportAndVerify(*doc, "ellipse_imagepattern_shadow"));
+}
+
+PAGX_TEST(PAGXPPTTest, NativeTextWithFillNoSolidColor) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "Gradient Fill Text";
+  text->fontFamily = "Arial";
+  text->fontSize = 24;
+  text->position = {200, 150};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* grad = doc->makeNode<pagx::LinearGradient>();
+  auto* stop1 = doc->makeNode<pagx::ColorStop>();
+  stop1->offset = 0.0f;
+  stop1->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  auto* stop2 = doc->makeNode<pagx::ColorStop>();
+  stop2->offset = 1.0f;
+  stop2->color = {0.0f, 0.0f, 1.0f, 1.0f};
+  grad->colorStops.push_back(stop1);
+  grad->colorStops.push_back(stop2);
+  fill->color = grad;
+  layer->contents.push_back(text);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "text_gradient_fill"));
+}
+
+PAGX_TEST(PAGXPPTTest, LayerWithScaleMatrix) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->matrix = {2.0f, 0.0f, 0.0f, 2.0f, 0.0f, 0.0f};
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 75};
+  rect->size = {100, 75};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.0f, 1.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "layer_scale"));
+}
+
+PAGX_TEST(PAGXPPTTest, LayerWithRotationMatrix) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  float rad = 0.7853981f;  // 45 degrees
+  layer->matrix = {std::cos(rad), std::sin(rad), -std::sin(rad), std::cos(rad), 100.0f, 75.0f};
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 75};
+  rect->size = {100, 75};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.0f, 0.0f, 1.0f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "layer_rotation"));
+}
+
+PAGX_TEST(PAGXPPTTest, StrokeDashWithZeroWidth) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  auto* pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(50, 100);
+  pathData->lineTo(350, 100);
+  path->data = pathData;
+
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  stroke->width = 0.0f;
+  stroke->dashes = {10.0f, 5.0f};
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  stroke->color = solid;
+
+  layer->contents.push_back(path);
+  layer->contents.push_back(stroke);
+  doc->layers.push_back(layer);
+
+  ASSERT_TRUE(ExportAndVerify(*doc, "stroke_dash_zero_width"));
+}
+
+PAGX_TEST(PAGXPPTTest, ImagePatternSmallPictureRotated) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  float rad = 0.5236f;  // 30 degrees
+  layer->matrix = {std::cos(rad), std::sin(rad), -std::sin(rad), std::cos(rad), 0.0f, 0.0f};
+
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 150};
+
+  auto* image = MakeTestPNGImage(doc.get());
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->matrix = {1.0f, 0.0f, 0.0f, 1.0f, 150.0f, 100.0f};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  ASSERT_TRUE(ExportAndVerify(*doc, "imagepattern_small_rotated"));
+}
+
+PAGX_TEST(PAGXPPTTest, PathEvenOddQuadSameWinding) {
+  auto doc = pagx::PAGXDocument::Make(400, 400);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  auto* pathData = doc->makeNode<pagx::PathData>();
+  // Outer square (CW in screen coords, positive signed area)
+  pathData->moveTo(50, 50);
+  pathData->lineTo(350, 50);
+  pathData->lineTo(350, 350);
+  pathData->lineTo(50, 350);
+  pathData->close();
+  // Inner contour using quadTo with SAME winding direction as outer
+  pathData->moveTo(150, 150);
+  pathData->quadTo(200, 100, 250, 150);
+  pathData->lineTo(250, 250);
+  pathData->lineTo(150, 250);
+  pathData->close();
+  path->data = pathData;
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->fillRule = pagx::FillRule::EvenOdd;
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.5f, 0.3f, 0.7f, 1.0f};
+  fill->color = solid;
+
+  layer->contents.push_back(path);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  ASSERT_TRUE(ExportAndVerify(*doc, "path_even_odd_quad_same_winding"));
+}
+
+PAGX_TEST(PAGXPPTTest, TextToPathEmptyGlyphRuns) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "A";
+  text->position = {100, 200};
+  text->fontSize = 48.0f;
+
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 48.0f;
+  run->glyphs = {0};
+  text->glyphRuns.push_back(run);
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+
+  layer->contents.push_back(text);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  pagx::PPTExportOptions options;
+  options.convertTextToPath = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "text_to_path_empty_glyphs", options));
 }
 
 }  // namespace pag
