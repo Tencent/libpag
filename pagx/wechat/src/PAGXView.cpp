@@ -33,8 +33,10 @@ using namespace emscripten;
 
 namespace pagx {
 
-// Maximum cache limit: 1GB
-constexpr size_t MAX_CACHE_LIMIT = 1U * 1024 * 1024 * 1024;
+// Maximum cache limit: 256MB (reduced for WeChat MiniProgram WASM environment)
+constexpr size_t MAX_CACHE_LIMIT = 256U * 1024 * 1024;
+// Maximum image dimension for LayerBuilder to constrain memory usage in WASM environment.
+constexpr int MAX_IMAGE_DIMENSION = 2048;
 // GPU resource expiration in frames. Resources unused beyond this threshold will be released.
 constexpr size_t EXPIRATION_FRAMES = 10 * 60;
 // Slow frame threshold in milliseconds (more lenient than desktop 32ms due to WeChat environment).
@@ -177,7 +179,7 @@ void PAGXView::buildLayers() {
   // TODO: Integrate this into LayerBuilder so all PAGX renderers get it automatically.
   resolveAllImagePatternMatrices(document.get());
 
-  contentLayer = LayerBuilder::Build(document.get(), &textLayout);
+  contentLayer = LayerBuilder::Build(document.get(), &textLayout, MAX_IMAGE_DIMENSION);
   if (!contentLayer) {
     return;
   }

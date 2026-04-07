@@ -47,10 +47,17 @@ class LayerBuilder {
    * @param textLayout Optional text layout for text rendering. If nullptr, a default TextLayout is
    *                   created internally. Pass a custom TextLayout to use registered typefaces
    *                   and fallback fonts.
+   * @param maxImageDimension Maximum allowed image dimension (width or height). Images exceeding
+   *                          this limit will be scaled down proportionally. A value of 0 means no
+   *                          limit. Useful for memory-constrained environments like WASM.
+   * @param preDecodedImages Optional map of pre-decoded images keyed by Image node ID. When
+   *                         provided, the builder uses these images directly instead of decoding
+   *                         from encoded bytes.
    * @return The root layer of the built layer tree.
    */
   static std::shared_ptr<tgfx::Layer> Build(PAGXDocument* document,
-                                            TextLayout* textLayout = nullptr);
+                                            TextLayout* textLayout = nullptr,
+                                            int maxImageDimension = 0);
 
   /**
    * Builds a layer tree and returns a mapping from PAGX Layer nodes to tgfx::Layer objects. This
@@ -59,10 +66,14 @@ class LayerBuilder {
    * @param textLayout Optional text layout for text rendering. If nullptr, a default TextLayout is
    *                   created internally. Pass a custom TextLayout to use registered typefaces
    *                   and fallback fonts.
+   * @param maxImageDimension Maximum allowed image dimension (width or height). Images exceeding
+   *                          this limit will be scaled down proportionally. A value of 0 means no
+   *                          limit. Useful for memory-constrained environments like WASM.
    * @return A LayerBuildResult containing the root layer and a mapping from PAGX Layer nodes to
    *         their corresponding tgfx::Layer objects.
    */
-  static LayerBuildResult BuildWithMap(PAGXDocument* document, TextLayout* textLayout = nullptr);
+  static LayerBuildResult BuildWithMap(PAGXDocument* document, TextLayout* textLayout = nullptr,
+                                       int maxImageDimension = 0);
 };
 
 }  // namespace pagx
