@@ -66,6 +66,13 @@ static std::vector<std::string> GetHtmlTestFiles() {
   return files;
 }
 
+static std::string WrapHtmlDocument(const std::string& fragment, int width, int height) {
+  return "<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"></head>\n"
+         "<body style=\"margin:0;padding:0;background:transparent;width:" +
+         std::to_string(width) + "px;height:" + std::to_string(height) + "px;overflow:hidden\">\n" +
+         fragment + "\n</body></html>";
+}
+
 // =============================================================================
 // Batch test: ensure every .pagx file in resources/pagx_to_html/ converts successfully
 // =============================================================================
@@ -75,11 +82,15 @@ CLI_TEST(PAGXHtmlTest, BatchConvertAll) {
   ASSERT_FALSE(files.empty()) << "No .pagx files found in resources/pagx_to_html/";
   for (const auto& filePath : files) {
     auto baseName = std::filesystem::path(filePath).stem().string();
-    auto html = LoadAndConvert(filePath);
+    auto doc = pagx::PAGXImporter::FromFile(filePath);
+    ASSERT_NE(doc, nullptr) << "Failed to load: " << baseName;
+    auto html = pagx::HTMLExporter::ToHTML(*doc);
     EXPECT_FALSE(html.empty()) << "Failed to convert: " << baseName;
     EXPECT_NE(html.find("pagx-root"), std::string::npos)
         << "Missing pagx-root class in: " << baseName;
-    SaveFile(html, "PAGXHtmlTest/" + baseName + ".html");
+    auto fullHtml =
+        WrapHtmlDocument(html, static_cast<int>(doc->width), static_cast<int>(doc->height));
+    SaveFile(fullHtml, "PAGXHtmlTest/" + baseName + ".html");
   }
 }
 
@@ -601,13 +612,6 @@ static bool TakeHtmlScreenshot(const std::string& htmlPath, const std::string& p
   auto cmd = "node " + scriptPath + " " + htmlPath + " " + pngPath + " " + std::to_string(width) +
              " " + std::to_string(height) + " 2>&1";
   return std::system(cmd.c_str()) == 0;
-}
-
-static std::string WrapHtmlDocument(const std::string& fragment, int width, int height) {
-  return "<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"></head>\n"
-         "<body style=\"margin:0;padding:0;background:transparent;width:" +
-         std::to_string(width) + "px;height:" + std::to_string(height) + "px;overflow:hidden\">\n" +
-         fragment + "\n</body></html>";
 }
 
 CLI_TEST(PAGXHtmlTest, HtmlScreenshotCompare) {
