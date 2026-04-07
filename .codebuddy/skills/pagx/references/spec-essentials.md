@@ -174,9 +174,10 @@ Key rules:
   visible. It can be positioned using **constraint attributes** (`left`/`right`/
   `top`/`bottom`/`centerX`/`centerY`) — constraints are always effective on
   `includeInLayout="false"` children regardless of parent layout mode.
-- **spaceBetween/spaceEvenly/spaceAround and gap**: When both are set, `gap` serves as base spacing in the
-  available-space calculation, then `spaceBetween`/`spaceEvenly`/`spaceAround` redistributes the remaining space.
-  The combination can produce unintuitive results — prefer using only one of them.
+- **spaceBetween/spaceEvenly/spaceAround and gap**: When both are set, `gap` reduces the
+  space available for flex children, but the actual inter-child spacing is computed solely by
+  the arrangement mode (`extraGap` replaces `gap`, not adds to it). The combination can
+  produce unintuitive results — prefer using only one of them.
 - **Stretch alignment** (container layout only): The default `alignment="stretch"` fills
   children without explicit cross-axis size to the available space. Children with explicit
   size keep it. This default naturally propagates width to rows in nested layouts (e.g.,
@@ -257,20 +258,10 @@ Constraint "edges" refer to an element's content bounds, which differ by type:
 - **Child Layers**: only when parent has **no container layout** (`layout="none"`, the default)
   or the child has `includeInLayout="false"`
 - Container layout and constraint positioning are **mutually exclusive** on any given child Layer
-
-**Choose by design intent**: Pick the constraint edge that matches where the element is
-anchored — not the one that requires manual offset calculation:
-- top-right corner → `right`+`top` (not `left` with a computed value)
-- bottom-center → `centerX`+`bottom`
-- fill parent → `left="0" right="0" top="0" bottom="0"`
-
-### Child Layer Constraints
-
-Child Layers use constraints when the parent has **no container layout** (default) or the child
-has **`includeInLayout="false"`**. Opposite-pair constraints **always override** explicit
-dimensions (`width = parent.width - left - right`). Top-level Layers (direct children of
-`<pagx>` or `<Composition>`) can also use constraints — the document/composition
-`width`×`height` serves as their container size.
+- **Top-level Layers** (direct children of `<pagx>` or `<Composition>`) can also use
+  constraints — the document/composition `width`×`height` serves as their container size.
+  Opposite-pair constraints **always override** explicit dimensions
+  (`width = parent.width - left - right`).
 
 ```xml
 <Layer width="400" height="300">
@@ -278,6 +269,12 @@ dimensions (`width = parent.width - left - right`). Top-level Layers (direct chi
   <Layer centerX="0" bottom="20" width="100" height="40"><!-- centered, fixed size --></Layer>
 </Layer>
 ```
+
+**Choose by design intent**: Pick the constraint edge that matches where the element is
+anchored — not the one that requires manual offset calculation:
+- top-right corner → `right`+`top` (not `left` with a computed value)
+- bottom-center → `centerX`+`bottom`
+- fill parent → `left="0" right="0" top="0" bottom="0"`
 
 ---
 

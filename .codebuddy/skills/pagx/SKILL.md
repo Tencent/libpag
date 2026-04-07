@@ -28,5 +28,5 @@ generation or editing task.
 |-----------|--------|
 | `references/spec-essentials.md` | Node types, Layer rendering pipeline, auto layout (container layout + constraint positioning), painter scope, text system, masking, resources |
 | `references/attributes.md` | Attribute defaults, enumerations, required attributes |
-| `references/examples.md` | Structural code patterns for Icons, UI components, Charts, Decorative effects |
+| `references/examples.md` | Structural code patterns for UI components, Charts, Decorative effects, Logos & Badges |
 | `references/cli.md` | CLI commands — `render`, `verify`, `format`, `layout`, `bounds`, `font info`, `font embed`, `import`, `export` |
