@@ -20,6 +20,7 @@
 #include <tuple>
 #include <unordered_map>
 #include "ToTGFX.h"
+#include "base/utils/Log.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/ShapedText.h"
 #include "pagx/TextLayout.h"
@@ -109,13 +110,6 @@
 #include "tgfx/layers/vectors/TextSelector.h"
 #include "tgfx/layers/vectors/TrimPath.h"
 #include "tgfx/layers/vectors/VectorGroup.h"
-
-#ifdef DEBUG
-#include <cassert>
-#define DEBUG_ASSERT(x) assert(x)
-#else
-#define DEBUG_ASSERT(x)
-#endif
 
 namespace pagx {
 
@@ -861,36 +855,32 @@ class LayerBuilderContext {
 
 // Public API implementation
 
-std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document, FontConfig* fontConfig) {
+std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document) {
   if (document == nullptr) {
     return nullptr;
   }
-
-  // Phase 1: Auto layout (constraint positioning, flex layout).
-  // This calls Text::setLayoutSize() which generates TextBlob via TextLayout::Layout().
-  if (fontConfig) {
-    document->setFontConfig(*fontConfig);
+  if (!document->isLayoutApplied()) {
+    LOGE("LayerBuilder::Build() called before applyLayout(). Call document->applyLayout() first.");
+    DEBUG_ASSERT(false);
+    return nullptr;
   }
-  document->applyLayout();
 
-  // Phase 2: Build layer tree using TextBlobs created during applyLayout.
   LayerBuilderContext context;
   return context.build(*document);
 }
 
-LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document, FontConfig* fontConfig) {
+LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document) {
   if (document == nullptr) {
     return {};
   }
-
-  // Phase 1: Auto layout (constraint positioning, flex layout).
-  // This calls Text::setLayoutSize() which generates TextBlob via TextLayout::Layout().
-  if (fontConfig) {
-    document->setFontConfig(*fontConfig);
+  if (!document->isLayoutApplied()) {
+    LOGE(
+        "LayerBuilder::BuildWithMap() called before applyLayout(). Call document->applyLayout() "
+        "first.");
+    DEBUG_ASSERT(false);
+    return {};
   }
-  document->applyLayout();
 
-  // Phase 2: Build layer tree using TextBlobs created during applyLayout.
   LayerBuilderContext context;
   return context.buildWithMap(*document);
 }

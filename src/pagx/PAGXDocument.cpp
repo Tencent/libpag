@@ -24,14 +24,9 @@
 
 namespace pagx {
 
-void PAGXDocument::setFontConfig(const FontConfig& config) {
-  fontConfig = config;
-  layoutApplied = false;
-}
-
-void PAGXDocument::applyLayout() {
-  if (layoutApplied) {
-    return;
+void PAGXDocument::applyLayout(const FontConfig* config) {
+  if (config != nullptr) {
+    fontConfig = *config;
   }
   LayoutContext context(&fontConfig);
   // Composition layers are laid out first since they may be referenced by document layers.

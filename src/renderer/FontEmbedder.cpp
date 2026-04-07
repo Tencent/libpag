@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <unordered_map>
+#include "base/utils/Log.h"
 #include "base/utils/MathUtil.h"
 #include "pagx/TextLayout.h"
 #include "pagx/nodes/Composition.h"
@@ -394,6 +395,11 @@ void FontEmbedder::ClearEmbeddedGlyphRuns(PAGXDocument* document) {
 
 bool FontEmbedder::embed(PAGXDocument* document) {
   if (document == nullptr) {
+    return false;
+  }
+  if (!document->isLayoutApplied()) {
+    LOGE("FontEmbedder::embed() called before applyLayout(). Call document->applyLayout() first.");
+    DEBUG_ASSERT(false);
     return false;
   }
   auto textOrder = CollectAllText(document);

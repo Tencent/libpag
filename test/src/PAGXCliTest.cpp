@@ -28,7 +28,6 @@
 #include "cli/CommandFont.h"
 #include "cli/CommandFormat.h"
 #include "cli/CommandImport.h"
-#include "cli/CommandInsert.h"
 #include "cli/CommandLayout.h"
 #include "cli/CommandRender.h"
 #include "cli/CommandVerify.h"
@@ -1951,15 +1950,15 @@ CLI_TEST(PAGXCliTest, LayoutCheck_PolystarOrigin) {
 }
 
 //==============================================================================
-// Insert tests
+// Resolve (import --resolve) tests
 //==============================================================================
 
 CLI_TEST(PAGXCliTest, Insert_SvgIntoLayer_Basic) {
   auto pagxPath = CopyToTemp("insert_basic.pagx", "insert_basic.pagx");
   auto svgPath = TestResourcePath("insert_basic.svg");
   auto outputPath = TempDir() + "/insert_out.pagx";
-  auto ret = CallRun(pagx::cli::RunInsert,
-                     {"insert", "--svg", svgPath, "--id", "icon", "-o", outputPath, pagxPath});
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--resolve", "icon", "-o",
+                                            outputPath, pagxPath});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(outputPath));
   EXPECT_TRUE(RenderAndCompare({"render", "--scale", "2", outputPath}, "PAGXCliTest/insert_basic"));
@@ -1968,7 +1967,8 @@ CLI_TEST(PAGXCliTest, Insert_SvgIntoLayer_Basic) {
 CLI_TEST(PAGXCliTest, Insert_SvgIntoLayer_DefaultOutput) {
   auto pagxPath = CopyToTemp("insert_basic.pagx", "insert_default_out.pagx");
   auto svgPath = TestResourcePath("insert_search.svg");
-  auto ret = CallRun(pagx::cli::RunInsert, {"insert", "--svg", svgPath, "--id", "icon", pagxPath});
+  auto ret =
+      CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--resolve", "icon", pagxPath});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(
       RenderAndCompare({"render", "--scale", "2", pagxPath}, "PAGXCliTest/insert_default_out"));
@@ -1977,28 +1977,29 @@ CLI_TEST(PAGXCliTest, Insert_SvgIntoLayer_DefaultOutput) {
 CLI_TEST(PAGXCliTest, Insert_MissingTargetId) {
   auto pagxPath = TestResourcePath("insert_missing_id.pagx");
   auto svgPath = TestResourcePath("insert_basic.svg");
-  auto ret =
-      CallRun(pagx::cli::RunInsert, {"insert", "--svg", svgPath, "--id", "nonexistent", pagxPath});
+  auto ret = CallRun(pagx::cli::RunImport,
+                     {"import", "--input", svgPath, "--resolve", "nonexistent", pagxPath});
   EXPECT_NE(ret, 0);
 }
 
 CLI_TEST(PAGXCliTest, Insert_MissingRequiredOptions) {
   auto pagxPath = TempDir() + "/dummy.pagx";
 
-  auto ret = CallRun(pagx::cli::RunInsert, {"insert", "--id", "icon", pagxPath});
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--resolve", "icon", pagxPath});
   EXPECT_NE(ret, 0);
 
-  ret = CallRun(pagx::cli::RunInsert, {"insert", "--svg", "icon.svg", pagxPath});
+  ret = CallRun(pagx::cli::RunImport, {"import", "--input", "icon.svg", pagxPath});
   EXPECT_NE(ret, 0);
 
-  ret = CallRun(pagx::cli::RunInsert, {"insert", "--svg", "icon.svg", "--id", "icon"});
+  ret = CallRun(pagx::cli::RunImport, {"import", "--input", "icon.svg", "--resolve", "icon"});
   EXPECT_NE(ret, 0);
 }
 
 CLI_TEST(PAGXCliTest, Insert_PreservesLayerAttributes) {
   auto pagxPath = CopyToTemp("insert_preserve_attrs.pagx", "insert_preserve_attrs.pagx");
   auto svgPath = TestResourcePath("insert_circle.svg");
-  auto ret = CallRun(pagx::cli::RunInsert, {"insert", "--svg", svgPath, "--id", "icon", pagxPath});
+  auto ret =
+      CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--resolve", "icon", pagxPath});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(
       RenderAndCompare({"render", "--scale", "2", pagxPath}, "PAGXCliTest/insert_preserve_attrs"));
@@ -2007,7 +2008,8 @@ CLI_TEST(PAGXCliTest, Insert_PreservesLayerAttributes) {
 CLI_TEST(PAGXCliTest, Insert_ReplacesExistingContent) {
   auto pagxPath = CopyToTemp("insert_replace.pagx", "insert_replace.pagx");
   auto svgPath = TestResourcePath("insert_triangle.svg");
-  auto ret = CallRun(pagx::cli::RunInsert, {"insert", "--svg", svgPath, "--id", "icon", pagxPath});
+  auto ret =
+      CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--resolve", "icon", pagxPath});
   EXPECT_EQ(ret, 0);
 
   auto output = ReadFile(pagxPath);
@@ -2021,14 +2023,16 @@ CLI_TEST(PAGXCliTest, Insert_ReplacesExistingContent) {
 CLI_TEST(PAGXCliTest, Insert_InvalidSvg) {
   auto pagxPath = CopyToTemp("insert_basic.pagx", "insert_invalid_svg.pagx");
   auto svgPath = TestResourcePath("insert_invalid.svg");
-  auto ret = CallRun(pagx::cli::RunInsert, {"insert", "--svg", svgPath, "--id", "icon", pagxPath});
+  auto ret =
+      CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--resolve", "icon", pagxPath});
   EXPECT_NE(ret, 0);
 }
 
 CLI_TEST(PAGXCliTest, Insert_MultiElementSvg) {
   auto pagxPath = CopyToTemp("insert_basic.pagx", "insert_multi.pagx");
   auto svgPath = TestResourcePath("insert_multi.svg");
-  auto ret = CallRun(pagx::cli::RunInsert, {"insert", "--svg", svgPath, "--id", "icon", pagxPath});
+  auto ret =
+      CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--resolve", "icon", pagxPath});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(RenderAndCompare({"render", "--scale", "2", pagxPath}, "PAGXCliTest/insert_multi"));
 }
@@ -2036,7 +2040,8 @@ CLI_TEST(PAGXCliTest, Insert_MultiElementSvg) {
 CLI_TEST(PAGXCliTest, Insert_RenderResult) {
   auto pagxPath = CopyToTemp("insert_render.pagx", "insert_render.pagx");
   auto svgPath = TestResourcePath("insert_render_search.svg");
-  auto ret = CallRun(pagx::cli::RunInsert, {"insert", "--svg", svgPath, "--id", "icon", pagxPath});
+  auto ret =
+      CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--resolve", "icon", pagxPath});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(RenderAndCompare({"render", "--scale", "2", pagxPath}, "PAGXCliTest/insert_render"));
 }
@@ -2044,7 +2049,8 @@ CLI_TEST(PAGXCliTest, Insert_RenderResult) {
 CLI_TEST(PAGXCliTest, Insert_PreservesOriginalFormatting) {
   auto pagxPath = CopyToTemp("insert_format.pagx", "insert_format.pagx");
   auto svgPath = TestResourcePath("insert_rect.svg");
-  auto ret = CallRun(pagx::cli::RunInsert, {"insert", "--svg", svgPath, "--id", "icon", pagxPath});
+  auto ret =
+      CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--resolve", "icon", pagxPath});
   EXPECT_EQ(ret, 0);
 
   auto output = ReadFile(pagxPath);

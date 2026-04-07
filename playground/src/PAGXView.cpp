@@ -144,7 +144,8 @@ void PAGXView::buildLayers() {
   if (!document) {
     return;
   }
-  contentLayer = LayerBuilder::Build(document.get(), &fontConfig);
+  document->applyLayout(&fontConfig);
+  contentLayer = LayerBuilder::Build(document.get());
   if (!contentLayer) {
     return;
   }

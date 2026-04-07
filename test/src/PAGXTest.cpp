@@ -29,6 +29,7 @@
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/SVGImporter.h"
+#include "pagx/TextLayout.h"
 #include "pagx/TextLayoutParams.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorStop.h"
@@ -62,7 +63,6 @@
 #include "pagx/utils/StringParser.h"
 #include "renderer/FontEmbedder.h"
 #include "renderer/LayerBuilder.h"
-#include "renderer/TextLayout.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Stream.h"
@@ -191,8 +191,7 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
     }
 
     // Step 2: Layout and embed fonts
-    doc->setFontConfig(svgFontConfig);
-    doc->applyLayout();
+    doc->applyLayout(&svgFontConfig);
     pagx::FontEmbedder().embed(doc.get());
 
     // Step 3: Export to XML and save as PAGX file
@@ -492,8 +491,7 @@ PAGX_TEST(PAGXTest, PrecomposedTextRender) {
 
   pagx::FontConfig embedFontConfig;
   embedFontConfig.addFallbackTypefaces(GetFallbackTypefaces());
-  doc->setFontConfig(embedFontConfig);
-  doc->applyLayout();
+  doc->applyLayout(&embedFontConfig);
   pagx::FontEmbedder().embed(doc.get());
 
   auto xml = pagx::PAGXExporter::ToXML(*doc);
@@ -686,7 +684,8 @@ static void TestMarkdownExamples(tgfx::Context* context, const std::string& mark
       ADD_FAILURE() << "Parse errors in " << key << ":" << errorLog;
     }
 
-    auto layer = pagx::LayerBuilder::Build(doc.get(), &fontConfig);
+    doc->applyLayout(&fontConfig);
+    auto layer = pagx::LayerBuilder::Build(doc.get());
     if (!layer) {
       ADD_FAILURE() << "Failed to build layer for: " << key;
       continue;
@@ -744,7 +743,8 @@ static void TestPAGXDirectory(tgfx::Context* context, const std::string& directo
       ADD_FAILURE() << "Parse errors in " << key << ":" << errorLog;
     }
 
-    auto layer = pagx::LayerBuilder::Build(doc.get(), &fontConfig);
+    doc->applyLayout(&fontConfig);
+    auto layer = pagx::LayerBuilder::Build(doc.get());
     if (!layer) {
       ADD_FAILURE() << "Failed to build layer: " << filePath;
       continue;
@@ -2234,8 +2234,7 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextBothAxes) {
 
   layer->contents.push_back(text);
 
-  doc->setFontConfig(fontConfig);
-  doc->applyLayout();
+  doc->applyLayout(&fontConfig);
 
   // Proportional scaling: areaWidth = 360, areaHeight = 180
   // preferredWidth/Height are ceil'd before scaling.
@@ -2280,8 +2279,7 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextSingleAxis) {
 
   layer->contents.push_back(text);
 
-  doc->setFontConfig(fontConfig);
-  doc->applyLayout();
+  doc->applyLayout(&fontConfig);
 
   // areaWidth = 380, scale = 380 / ceil(origWidth)
   float expectedFontSize = 50 * 380 / std::ceil(origWidth);
@@ -4443,10 +4441,9 @@ PAGX_TEST(PAGXTest, LayoutIdempotent) {
   float layerActualW = layer->layoutWidth;
   float layerActualH = layer->layoutHeight;
 
-  // Reset layout cache and re-layout (simulates setFontConfig triggering re-layout).
+  // Re-layout with empty font config to verify layout results are stable.
   pagx::FontConfig config;
-  doc->setFontConfig(config);
-  doc->applyLayout();
+  doc->applyLayout(&config);
 
   EXPECT_FLOAT_EQ(rect->position.x, firstX);
   EXPECT_FLOAT_EQ(rect->position.y, firstY);
@@ -4633,8 +4630,7 @@ PAGX_TEST(PAGXTest, LayoutTextIndependentConstraint) {
   params.baseline = text->baseline;
   auto origBounds = pagx::TextLayout::Layout({text}, params, &layoutContext);
 
-  doc->setFontConfig(fontConfig);
-  doc->applyLayout();
+  doc->applyLayout(&fontConfig);
 
   // No opposite-edge constraints, so fontSize should remain unchanged.
   EXPECT_FLOAT_EQ(text->fontSize, 30);
@@ -4734,8 +4730,7 @@ PAGX_TEST(PAGXTest, LayoutTextScaledPositionAnchor) {
 
   pagx::FontConfig fontConfig;
   fontConfig.registerTypeface(typeface);
-  doc->setFontConfig(fontConfig);
-  doc->applyLayout();
+  doc->applyLayout(&fontConfig);
 
   // Target width = 400 - 50 - 50 = 300.
   // After scaling, text should be centered in the 300px area.
@@ -4809,8 +4804,7 @@ PAGX_TEST(PAGXTest, TextLayoutGlyphRunIntegrity) {
 
   pagx::FontConfig fontConfig;
   fontConfig.registerTypeface(typeface);
-  doc->setFontConfig(fontConfig);
-  doc->applyLayout();
+  doc->applyLayout(&fontConfig);
 
   auto& layoutRuns = text->privateData->layoutRuns;
   ASSERT_FALSE(layoutRuns.empty());
@@ -4855,8 +4849,7 @@ PAGX_TEST(PAGXTest, TextBoxLayoutGlyphRunIntegrity) {
 
   pagx::FontConfig fontConfig;
   fontConfig.registerTypeface(typeface);
-  doc->setFontConfig(fontConfig);
-  doc->applyLayout();
+  doc->applyLayout(&fontConfig);
 
   auto& layoutRuns = text->privateData->layoutRuns;
   ASSERT_FALSE(layoutRuns.empty());
@@ -4894,8 +4887,7 @@ PAGX_TEST(PAGXTest, FontEmbedderReEmbed) {
 
   pagx::FontConfig fontConfig;
   fontConfig.registerTypeface(typeface);
-  doc->setFontConfig(fontConfig);
-  doc->applyLayout();
+  doc->applyLayout(&fontConfig);
   pagx::FontEmbedder().embed(doc.get());
 
   ASSERT_FALSE(text->glyphRuns.empty());
@@ -4946,8 +4938,7 @@ PAGX_TEST(PAGXTest, VerticalTextLayoutGlyphRun) {
 
   pagx::FontConfig fontConfig;
   fontConfig.registerTypeface(typeface);
-  doc->setFontConfig(fontConfig);
-  doc->applyLayout();
+  doc->applyLayout(&fontConfig);
 
   auto& layoutRuns = text->privateData->layoutRuns;
   ASSERT_FALSE(layoutRuns.empty());
@@ -5001,8 +4992,7 @@ PAGX_TEST(PAGXTest, TextBoundsDirectValidation) {
 
   pagx::FontConfig fontConfig;
   fontConfig.registerTypeface(typeface);
-  doc->setFontConfig(fontConfig);
-  doc->applyLayout();
+  doc->applyLayout(&fontConfig);
 
   // Standalone Text: textBounds should have positive width and height.
   auto standaloneBounds = standalone->textBounds;

@@ -908,7 +908,7 @@
     <xs:attribute name="matrix3D" type="Matrix3DType"/>
     <xs:attribute name="preserve3D" type="BoolType" default="false"/>
     <xs:attribute name="antiAlias" type="BoolType" default="true"/>
-    <xs:attribute name="groupOpacity" type="BoolType" default="false"/>
+    <xs:attribute name="groupOpacity" type="BoolType" default="true"/>
     <xs:attribute name="passThroughBackground" type="BoolType" default="true"/>
     <xs:attribute name="scrollRect" type="RectType"/>
     <xs:attribute name="clipToBounds" type="BoolType" default="false"/>

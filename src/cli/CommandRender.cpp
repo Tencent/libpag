@@ -268,16 +268,17 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
   if (!fallbackTypefaces.empty()) {
     fontConfig.addFallbackTypefaces(std::move(fallbackTypefaces));
   }
+  document->applyLayout(&fontConfig);
   bool hasTarget = !options.id.empty() || !options.xpath.empty();
   std::shared_ptr<tgfx::Layer> rootLayer = nullptr;
   std::shared_ptr<tgfx::Layer> targetTgfxLayer = nullptr;
   LayerBuildResult buildResult = {};
 
   if (hasTarget) {
-    buildResult = LayerBuilder::BuildWithMap(document.get(), &fontConfig);
+    buildResult = LayerBuilder::BuildWithMap(document.get());
     rootLayer = buildResult.root;
   } else {
-    rootLayer = LayerBuilder::Build(document.get(), &fontConfig);
+    rootLayer = LayerBuilder::Build(document.get());
   }
   if (rootLayer == nullptr) {
     std::cerr << "pagx render: failed to build layer tree\n";

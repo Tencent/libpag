@@ -127,18 +127,21 @@ class PAGXDocument : public Node {
   bool loadFileData(const std::string& filePath, std::shared_ptr<Data> data);
 
   /**
-   * Sets the font config for font matching during layout and text rendering.
-   * The config is copied internally. Resets the layout cache so the next
-   * applyLayout call will re-execute.
+   * Executes auto layout on the document, positioning layers according to their layout
+   * constraints. Must be called before rendering or font embedding. Each call re-executes
+   * layout from scratch.
+   * @param fontConfig Optional font config for text measurement and rendering. When provided,
+   *                   updates the internal config before layout. Pass nullptr to use the
+   *                   previously set config (or no config).
    */
-  void setFontConfig(const FontConfig& fontConfig);
+  void applyLayout(const FontConfig* fontConfig = nullptr);
 
   /**
-   * Executes auto layout on the document, positioning layers according to their layout constraints.
-   * Call setFontConfig() first if text elements need font resolution. Must be called before
-   * rendering or font embedding. Skips execution if the layout is already up to date.
+   * Returns true if applyLayout() has been called at least once.
    */
-  void applyLayout();
+  bool isLayoutApplied() const {
+    return layoutApplied;
+  }
 
   NodeType nodeType() const override {
     return NodeType::Document;
@@ -151,14 +154,13 @@ class PAGXDocument : public Node {
 
   void registerNode(Node* node, const std::string& id);
 
-  FontConfig fontConfig = {};
+  FontConfig fontConfig;
   bool layoutApplied = false;
   std::unordered_map<std::string, Node*> nodeMap = {};
 
   friend class PAGXImporter;
   friend class PAGXExporter;
   friend class TextLayoutContext;
-  friend class LayerBuilder;
 };
 
 }  // namespace pagx
