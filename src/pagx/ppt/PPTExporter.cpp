@@ -1204,11 +1204,11 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
 
   out.open("p:txBody").gt();
   auto& bodyPr = out.open("a:bodyPr")
-                         .a("wrap", hasTextBox ? "square" : "none")
-                         .a("lIns", "0")
-                         .a("tIns", "0")
-                         .a("rIns", "0")
-                         .a("bIns", "0");
+                     .a("wrap", hasTextBox ? "square" : "none")
+                     .a("lIns", "0")
+                     .a("tIns", "0")
+                     .a("rIns", "0")
+                     .a("bIns", "0");
   if (fs.textBox) {
     if (fs.textBox->paragraphAlign == ParagraphAlign::Middle) {
       bodyPr.a("anchor", "ctr");
@@ -1405,9 +1405,11 @@ static std::string GenerateContentTypes(const PPTWriterContext& ctx) {
        "ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.slideMaster+"
        "xml\"/>";
   s += "<Override PartName=\"/ppt/presProps.xml\" "
-       "ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.presProps+xml\"/>";
+       "ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.presProps+xml\"/"
+       ">";
   s += "<Override PartName=\"/ppt/viewProps.xml\" "
-       "ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.viewProps+xml\"/>";
+       "ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.viewProps+xml\"/"
+       ">";
   s += "<Override PartName=\"/ppt/theme/theme1.xml\" "
        "ContentType=\"application/vnd.openxmlformats-officedocument.theme+xml\"/>";
   s += "<Override PartName=\"/ppt/tableStyles.xml\" "
@@ -1442,8 +1444,8 @@ static std::string GenerateRootRels() {
 // OOXML ST_SlideSizeCoordinate range: 914400 EMU (1") to 51206400 EMU (56").
 static constexpr int64_t kMaxSlideSizeEMU = 51206400;
 // Standard 16:9 slide dimensions.
-static constexpr int64_t kStdWidth16x9 = 12192000;   // 10"
-static constexpr int64_t kStdHeight16x9 = 6858000;   // 7.5"
+static constexpr int64_t kStdWidth16x9 = 12192000;  // 10"
+static constexpr int64_t kStdHeight16x9 = 6858000;  // 7.5"
 
 static std::string GeneratePresentation(float w, float h) {
   int64_t rawCX = PxToEMU(w);
@@ -1469,15 +1471,15 @@ static std::string GeneratePresentation(float w, float h) {
        "<a:defPPr><a:defRPr lang=\"zh-CN\"/></a:defPPr>";
   for (int lvl = 1; lvl <= 9; lvl++) {
     int marL = (lvl - 1) * 457200;
-    s += "<a:lvl" + std::to_string(lvl) +
-         "pPr marL=\"" + std::to_string(marL) +
+    s += "<a:lvl" + std::to_string(lvl) + "pPr marL=\"" + std::to_string(marL) +
          "\" algn=\"l\" defTabSz=\"914400\" rtl=\"0\" eaLnBrk=\"1\" "
          "latinLnBrk=\"0\" hangingPunct=\"1\">"
          "<a:defRPr sz=\"1800\" kern=\"1200\">"
          "<a:solidFill><a:schemeClr val=\"tx1\"/></a:solidFill>"
          "<a:latin typeface=\"+mn-lt\"/><a:ea typeface=\"+mn-ea\"/>"
          "<a:cs typeface=\"+mn-cs\"/>"
-         "</a:defRPr></a:lvl" + std::to_string(lvl) + "pPr>";
+         "</a:defRPr></a:lvl" +
+         std::to_string(lvl) + "pPr>";
   }
   s += "</p:defaultTextStyle>";
   s += "</p:presentation>";
@@ -1770,8 +1772,9 @@ bool PPTExporter::ToFile(const PAGXDocument& doc, const std::string& filePath,
       "xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">";
   slide += "<p:cSld><p:spTree>";
   slide += "<p:nvGrpSpPr><p:cNvPr id=\"1\" name=\"\"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>";
-  slide += "<p:grpSpPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"0\" cy=\"0\"/>"
-           "<a:chOff x=\"0\" y=\"0\"/><a:chExt cx=\"0\" cy=\"0\"/></a:xfrm></p:grpSpPr>";
+  slide +=
+      "<p:grpSpPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"0\" cy=\"0\"/>"
+      "<a:chOff x=\"0\" y=\"0\"/><a:chExt cx=\"0\" cy=\"0\"/></a:xfrm></p:grpSpPr>";
   slide += bodyContent;
   slide += "</p:spTree></p:cSld>";
   slide += "<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>";
