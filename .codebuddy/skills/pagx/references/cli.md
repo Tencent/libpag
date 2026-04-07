@@ -255,18 +255,23 @@ the command reports an error.
 ```bash
 pagx export --input icon.pagx                    # PAGX to icon.svg
 pagx export --input icon.pagx --output out.svg   # PAGX to out.svg
+pagx export --input icon.pagx --output out.pptx  # PAGX to out.pptx
 pagx export --format svg --input icon.pagx       # force SVG output format
+pagx export --format pptx --input icon.pagx      # force PPTX output format
 pagx export --input icon.pagx --svg-indent 4     # 4-space indent
+pagx export --input icon.pagx --output out.pptx --ppt-no-bake-mask  # vector masks
 ```
 
 | Option | Description |
 |--------|-------------|
 | `--input <file>` | Input PAGX file (required) |
 | `--output <file>` | Output file (default: `<input>.<format>`) |
-| `--format <format>` | Output format (`svg`; inferred from output extension). Required if output has no extension |
+| `--format <format>` | Output format (`svg`, `pptx`; inferred from output extension). Required if output has no extension |
 | `--svg-indent <n>` | Indentation spaces (default: 2, valid range: 0–16) |
 | `--svg-no-xml-declaration` | Omit the `<?xml ...?>` declaration |
 | `--svg-no-convert-text-to-path` | Keep text as `<text>` elements instead of `<path>` |
+| `--ppt-no-convert-text-to-path` | Keep text as native PPTX text runs instead of paths |
+| `--ppt-no-bake-mask` | Export masked layers as editable vector shapes instead of rasterizing to bitmap |
 
 On success the command prints `pagx export: wrote <path>` and exits 0; on failure it prints
 an error and exits 1.

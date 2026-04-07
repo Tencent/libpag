@@ -34,6 +34,13 @@ struct PPTExportOptions {
    * native text when glyph outline data is unavailable. The default value is true.
    */
   bool convertTextToPath = true;
+
+  /**
+   * Whether to rasterize masked layers into bitmap images. When enabled, layers with masks are
+   * rendered to PNG and embedded as picture elements. When disabled, the layer content is exported
+   * as editable vector shapes and the mask effect is ignored. The default value is true.
+   */
+  bool bakeMask = true;
 };
 
 /**

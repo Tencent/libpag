@@ -1910,6 +1910,250 @@ PAGX_TEST(PAGXPPTTest, PathEvenOddWithQuads) {
   ASSERT_TRUE(ExportAndVerify(*doc, "path_even_odd_quads"));
 }
 
+PAGX_TEST(PAGXPPTTest, MaskBakeDefault) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+
+  auto* maskLayer = doc->makeNode<pagx::Layer>();
+  auto* maskRect = doc->makeNode<pagx::Rectangle>();
+  maskRect->position = {200, 150};
+  maskRect->size = {150, 100};
+  auto* maskFill = doc->makeNode<pagx::Fill>();
+  auto* maskSolid = doc->makeNode<pagx::SolidColor>();
+  maskSolid->color = {1.0f, 1.0f, 1.0f, 1.0f};
+  maskFill->color = maskSolid;
+  maskLayer->contents.push_back(maskRect);
+  maskLayer->contents.push_back(maskFill);
+
+  auto* contentLayer = doc->makeNode<pagx::Layer>();
+  auto* contentEllipse = doc->makeNode<pagx::Ellipse>();
+  contentEllipse->position = {200, 150};
+  contentEllipse->size = {250, 200};
+  auto* contentFill = doc->makeNode<pagx::Fill>();
+  auto* contentSolid = doc->makeNode<pagx::SolidColor>();
+  contentSolid->color = {0.0f, 0.5f, 1.0f, 1.0f};
+  contentFill->color = contentSolid;
+  contentLayer->contents.push_back(contentEllipse);
+  contentLayer->contents.push_back(contentFill);
+  contentLayer->mask = maskLayer;
+
+  doc->layers.push_back(contentLayer);
+
+  ASSERT_TRUE(ExportAndVerify(*doc, "mask_bake_default"));
+}
+
+PAGX_TEST(PAGXPPTTest, MaskNoBake) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+
+  auto* maskLayer = doc->makeNode<pagx::Layer>();
+  auto* maskRect = doc->makeNode<pagx::Rectangle>();
+  maskRect->position = {200, 150};
+  maskRect->size = {150, 100};
+  auto* maskFill = doc->makeNode<pagx::Fill>();
+  auto* maskSolid = doc->makeNode<pagx::SolidColor>();
+  maskSolid->color = {1.0f, 1.0f, 1.0f, 1.0f};
+  maskFill->color = maskSolid;
+  maskLayer->contents.push_back(maskRect);
+  maskLayer->contents.push_back(maskFill);
+
+  auto* contentLayer = doc->makeNode<pagx::Layer>();
+  auto* contentEllipse = doc->makeNode<pagx::Ellipse>();
+  contentEllipse->position = {200, 150};
+  contentEllipse->size = {250, 200};
+  auto* contentFill = doc->makeNode<pagx::Fill>();
+  auto* contentSolid = doc->makeNode<pagx::SolidColor>();
+  contentSolid->color = {0.0f, 0.5f, 1.0f, 1.0f};
+  contentFill->color = contentSolid;
+  contentLayer->contents.push_back(contentEllipse);
+  contentLayer->contents.push_back(contentFill);
+  contentLayer->mask = maskLayer;
+
+  doc->layers.push_back(contentLayer);
+
+  pagx::PPTExportOptions options;
+  options.bakeMask = false;
+  ASSERT_TRUE(ExportAndVerify(*doc, "mask_no_bake", options));
+}
+
+PAGX_TEST(PAGXPPTTest, MaskNoBakeProducesSmaller) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+
+  auto* maskLayer = doc->makeNode<pagx::Layer>();
+  auto* maskRect = doc->makeNode<pagx::Rectangle>();
+  maskRect->position = {200, 150};
+  maskRect->size = {150, 100};
+  auto* maskFill = doc->makeNode<pagx::Fill>();
+  auto* maskSolid = doc->makeNode<pagx::SolidColor>();
+  maskSolid->color = {1.0f, 1.0f, 1.0f, 1.0f};
+  maskFill->color = maskSolid;
+  maskLayer->contents.push_back(maskRect);
+  maskLayer->contents.push_back(maskFill);
+
+  auto* contentLayer = doc->makeNode<pagx::Layer>();
+  auto* contentEllipse = doc->makeNode<pagx::Ellipse>();
+  contentEllipse->position = {200, 150};
+  contentEllipse->size = {250, 200};
+  auto* contentFill = doc->makeNode<pagx::Fill>();
+  auto* contentSolid = doc->makeNode<pagx::SolidColor>();
+  contentSolid->color = {0.0f, 0.5f, 1.0f, 1.0f};
+  contentFill->color = contentSolid;
+  contentLayer->contents.push_back(contentEllipse);
+  contentLayer->contents.push_back(contentFill);
+  contentLayer->mask = maskLayer;
+
+  doc->layers.push_back(contentLayer);
+
+  auto outDir = PPTOutDir();
+  auto bakedPath = outDir + "/mask_size_baked.pptx";
+  auto vectorPath = outDir + "/mask_size_vector.pptx";
+
+  pagx::PPTExportOptions bakedOpts;
+  bakedOpts.bakeMask = true;
+  ASSERT_TRUE(pagx::PPTExporter::ToFile(*doc, bakedPath, bakedOpts));
+
+  pagx::PPTExportOptions vectorOpts;
+  vectorOpts.bakeMask = false;
+  ASSERT_TRUE(pagx::PPTExporter::ToFile(*doc, vectorPath, vectorOpts));
+
+  auto bakedSize = std::filesystem::file_size(bakedPath);
+  auto vectorSize = std::filesystem::file_size(vectorPath);
+  EXPECT_GT(bakedSize, vectorSize);
+}
+
+PAGX_TEST(PAGXPPTTest, MaskNoBakeWithChildLayers) {
+  auto doc = pagx::PAGXDocument::Make(400, 400);
+
+  auto* maskLayer = doc->makeNode<pagx::Layer>();
+  auto* maskPath = doc->makeNode<pagx::Path>();
+  auto* maskPathData = doc->makeNode<pagx::PathData>();
+  maskPathData->moveTo(100, 100);
+  maskPathData->lineTo(300, 100);
+  maskPathData->lineTo(300, 300);
+  maskPathData->lineTo(100, 300);
+  maskPathData->close();
+  maskPath->data = maskPathData;
+  auto* maskFill = doc->makeNode<pagx::Fill>();
+  auto* maskSolid = doc->makeNode<pagx::SolidColor>();
+  maskSolid->color = {1.0f, 1.0f, 1.0f, 1.0f};
+  maskFill->color = maskSolid;
+  maskLayer->contents.push_back(maskPath);
+  maskLayer->contents.push_back(maskFill);
+
+  auto* parentLayer = doc->makeNode<pagx::Layer>();
+  auto* parentRect = doc->makeNode<pagx::Rectangle>();
+  parentRect->position = {200, 200};
+  parentRect->size = {300, 300};
+  auto* parentFill = doc->makeNode<pagx::Fill>();
+  auto* parentSolid = doc->makeNode<pagx::SolidColor>();
+  parentSolid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  parentFill->color = parentSolid;
+  parentLayer->contents.push_back(parentRect);
+  parentLayer->contents.push_back(parentFill);
+
+  auto* childLayer = doc->makeNode<pagx::Layer>();
+  childLayer->x = 50;
+  childLayer->y = 50;
+  auto* childEllipse = doc->makeNode<pagx::Ellipse>();
+  childEllipse->position = {100, 100};
+  childEllipse->size = {80, 80};
+  auto* childFill = doc->makeNode<pagx::Fill>();
+  auto* childSolid = doc->makeNode<pagx::SolidColor>();
+  childSolid->color = {0.0f, 0.0f, 1.0f, 1.0f};
+  childFill->color = childSolid;
+  childLayer->contents.push_back(childEllipse);
+  childLayer->contents.push_back(childFill);
+
+  parentLayer->children.push_back(childLayer);
+  parentLayer->mask = maskLayer;
+
+  doc->layers.push_back(parentLayer);
+
+  pagx::PPTExportOptions options;
+  options.bakeMask = false;
+  ASSERT_TRUE(ExportAndVerify(*doc, "mask_no_bake_children", options));
+}
+
+PAGX_TEST(PAGXPPTTest, MaskNoBakeWithTransformAndAlpha) {
+  auto doc = pagx::PAGXDocument::Make(400, 400);
+
+  auto* maskLayer = doc->makeNode<pagx::Layer>();
+  auto* maskRect = doc->makeNode<pagx::Rectangle>();
+  maskRect->position = {200, 200};
+  maskRect->size = {200, 200};
+  auto* maskFill = doc->makeNode<pagx::Fill>();
+  auto* maskSolid = doc->makeNode<pagx::SolidColor>();
+  maskSolid->color = {1.0f, 1.0f, 1.0f, 1.0f};
+  maskFill->color = maskSolid;
+  maskLayer->contents.push_back(maskRect);
+  maskLayer->contents.push_back(maskFill);
+
+  auto* contentLayer = doc->makeNode<pagx::Layer>();
+  contentLayer->x = 20;
+  contentLayer->y = 20;
+  contentLayer->alpha = 0.8f;
+  contentLayer->matrix = pagx::Matrix::Rotate(15.0f);
+
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 200};
+  rect->size = {300, 300};
+  rect->roundness = 15.0f;
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* grad = doc->makeNode<pagx::LinearGradient>();
+  grad->startPoint = {0, 0};
+  grad->endPoint = {1, 1};
+  auto* stop1 = doc->makeNode<pagx::ColorStop>();
+  stop1->offset = 0.0f;
+  stop1->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  auto* stop2 = doc->makeNode<pagx::ColorStop>();
+  stop2->offset = 1.0f;
+  stop2->color = {0.0f, 0.0f, 1.0f, 1.0f};
+  grad->colorStops.push_back(stop1);
+  grad->colorStops.push_back(stop2);
+  fill->color = grad;
+  contentLayer->contents.push_back(rect);
+  contentLayer->contents.push_back(fill);
+  contentLayer->mask = maskLayer;
+
+  doc->layers.push_back(contentLayer);
+
+  pagx::PPTExportOptions options;
+  options.bakeMask = false;
+  ASSERT_TRUE(ExportAndVerify(*doc, "mask_no_bake_transform_alpha", options));
+}
+
+PAGX_TEST(PAGXPPTTest, MaskNoBakeContourType) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+
+  auto* maskLayer = doc->makeNode<pagx::Layer>();
+  auto* maskEllipse = doc->makeNode<pagx::Ellipse>();
+  maskEllipse->position = {200, 150};
+  maskEllipse->size = {180, 120};
+  auto* maskFill = doc->makeNode<pagx::Fill>();
+  auto* maskSolid = doc->makeNode<pagx::SolidColor>();
+  maskSolid->color = {1.0f, 1.0f, 1.0f, 1.0f};
+  maskFill->color = maskSolid;
+  maskLayer->contents.push_back(maskEllipse);
+  maskLayer->contents.push_back(maskFill);
+
+  auto* contentLayer = doc->makeNode<pagx::Layer>();
+  contentLayer->maskType = pagx::MaskType::Contour;
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {300, 200};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.2f, 0.8f, 0.4f, 1.0f};
+  fill->color = solid;
+  contentLayer->contents.push_back(rect);
+  contentLayer->contents.push_back(fill);
+  contentLayer->mask = maskLayer;
+
+  doc->layers.push_back(contentLayer);
+
+  pagx::PPTExportOptions options;
+  options.bakeMask = false;
+  ASSERT_TRUE(ExportAndVerify(*doc, "mask_no_bake_contour", options));
+}
+
 }  // namespace pag
 
 #endif

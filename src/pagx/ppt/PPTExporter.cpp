@@ -448,8 +448,8 @@ static bool ComputeImagePatternRect(const ImagePattern* pattern, int imgW, int i
 
 class PPTWriter {
  public:
-  PPTWriter(PPTWriterContext* ctx, const PAGXDocument* doc, bool convertTextToPath)
-      : _ctx(ctx), _doc(doc), _convertTextToPath(convertTextToPath) {
+  PPTWriter(PPTWriterContext* ctx, const PAGXDocument* doc, bool convertTextToPath, bool bakeMask)
+      : _ctx(ctx), _doc(doc), _convertTextToPath(convertTextToPath), _bakeMask(bakeMask) {
   }
 
   void writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& parentMatrix = {},
@@ -459,6 +459,7 @@ class PPTWriter {
   PPTWriterContext* _ctx;
   const PAGXDocument* _doc;
   bool _convertTextToPath;
+  bool _bakeMask;
   LayerBuildResult _buildResult = {};
   bool _buildResultReady = false;
 
@@ -1503,7 +1504,7 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& pa
   Matrix layerMatrix = parentMatrix * BuildLayerMatrix(layer);
   float layerAlpha = parentAlpha * layer->alpha;
 
-  if (layer->mask != nullptr) {
+  if (layer->mask != nullptr && _bakeMask) {
     auto& buildResult = ensureBuildResult();
     auto it = buildResult.layerMap.find(layer);
     if (it != buildResult.layerMap.end()) {
@@ -1725,7 +1726,7 @@ static std::string GenerateTheme() {
 bool PPTExporter::ToFile(const PAGXDocument& doc, const std::string& filePath,
                          const Options& options) {
   PPTWriterContext context;
-  PPTWriter writer(&context, &doc, options.convertTextToPath);
+  PPTWriter writer(&context, &doc, options.convertTextToPath, options.bakeMask);
 
   // Build slide body content
   XMLBuilder body(16384);

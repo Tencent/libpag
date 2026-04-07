@@ -34,6 +34,7 @@ struct ExportOptions {
   bool svgNoXmlDeclaration = false;
   bool svgNoConvertTextToPath = false;
   bool pptNoConvertTextToPath = false;
+  bool pptNoBakeMask = false;
 };
 
 static void PrintUsage() {
@@ -56,6 +57,8 @@ static void PrintUsage() {
             << "PPT options:\n"
             << "  --ppt-no-convert-text-to-path\n"
             << "                              Keep text as native PPTX text runs instead of paths\n"
+            << "  --ppt-no-bake-mask          Export masked layers as vector shapes instead of\n"
+            << "                              rasterizing to bitmap\n"
             << "\n"
             << "Examples:\n"
             << "  pagx export --input icon.pagx                    # PAGX to icon.svg\n"
@@ -90,6 +93,8 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
       options->svgNoConvertTextToPath = true;
     } else if (arg == "--ppt-no-convert-text-to-path") {
       options->pptNoConvertTextToPath = true;
+    } else if (arg == "--ppt-no-bake-mask") {
+      options->pptNoBakeMask = true;
     } else if (arg == "--help" || arg == "-h") {
       PrintUsage();
       return -1;
@@ -165,6 +170,7 @@ static int ExportToPPT(const ExportOptions& options) {
 
   PPTExporter::Options pptOptions = {};
   pptOptions.convertTextToPath = !options.pptNoConvertTextToPath;
+  pptOptions.bakeMask = !options.pptNoBakeMask;
 
   if (!PPTExporter::ToFile(*document, options.outputFile, pptOptions)) {
     std::cerr << "pagx export: error: failed to write '" << options.outputFile << "'\n";
