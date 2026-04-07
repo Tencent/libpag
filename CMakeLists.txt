@@ -209,6 +209,9 @@ if (PAG_BUILD_PAGX)
 
     if (PAG_BUILD_PPT)
         list(APPEND PAG_FILES src/pagx/ppt/PPTExporter.cpp)
+        set(MINIZIP_DIR ${TGFX_DIR}/third_party/zlib/contrib/minizip)
+        list(APPEND PAG_FILES ${MINIZIP_DIR}/zip.c ${MINIZIP_DIR}/ioapi.c)
+        list(APPEND PAG_INCLUDES ${MINIZIP_DIR})
     endif ()
 endif ()
 file(GLOB COMMON_FILES src/platform/*.*)
@@ -306,6 +309,8 @@ endif ()
 
 if (PAG_BUILD_PPT)
     list(APPEND PAG_DEFINES PAG_BUILD_PPT)
+    list(APPEND PAG_STATIC_VENDORS zlib)
+    list(APPEND PAG_INCLUDES third_party/out/zlib/${INCLUDE_ENTRY})
 endif ()
 
 if (PAG_BUILD_CLI OR PAG_BUILD_TESTS)

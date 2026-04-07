@@ -21,10 +21,10 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
-#include <fstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "zip.h"
 #include "base/utils/MathUtil.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/BlendFilter.h"
@@ -57,121 +57,6 @@
 namespace pagx {
 
 using pag::FloatNearlyZero;
-
-//==============================================================================
-// CRC32 + ZipWriter – minimal store-only ZIP file writer
-//==============================================================================
-
-static uint32_t ComputeCRC32(const uint8_t* data, size_t size) {
-  static uint32_t table[256] = {};
-  static bool initialized = false;
-  if (!initialized) {
-    for (uint32_t i = 0; i < 256; i++) {
-      uint32_t crc = i;
-      for (int j = 0; j < 8; j++) {
-        crc = (crc >> 1) ^ (crc & 1 ? 0xEDB88320u : 0u);
-      }
-      table[i] = crc;
-    }
-    initialized = true;
-  }
-  uint32_t crc = 0xFFFFFFFF;
-  for (size_t i = 0; i < size; i++) {
-    crc = (crc >> 8) ^ table[(crc ^ data[i]) & 0xFF];
-  }
-  return ~crc;
-}
-
-class ZipWriter {
- public:
-  void addFile(const std::string& path, const std::string& content) {
-    auto* ptr = reinterpret_cast<const uint8_t*>(content.data());
-    _entries.push_back({path, {ptr, ptr + content.size()}, ComputeCRC32(ptr, content.size())});
-  }
-
-  void addFile(const std::string& path, const uint8_t* data, size_t size) {
-    _entries.push_back({path, {data, data + size}, ComputeCRC32(data, size)});
-  }
-
-  bool writeToFile(const std::string& filePath) const {
-    std::ofstream f(filePath, std::ios::binary);
-    if (!f) {
-      return false;
-    }
-    std::vector<uint32_t> offsets;
-    for (const auto& e : _entries) {
-      offsets.push_back(static_cast<uint32_t>(f.tellp()));
-      auto sz = static_cast<uint32_t>(e.data.size());
-      auto nameLen = static_cast<uint16_t>(e.path.size());
-      w32(f, 0x04034b50);
-      w16(f, 20);
-      w16(f, 0);
-      w16(f, 0);
-      w16(f, 0);
-      w16(f, 0);
-      w32(f, e.crc);
-      w32(f, sz);
-      w32(f, sz);
-      w16(f, nameLen);
-      w16(f, 0);
-      f.write(e.path.data(), nameLen);
-      f.write(reinterpret_cast<const char*>(e.data.data()), sz);
-    }
-    auto cdOff = static_cast<uint32_t>(f.tellp());
-    for (size_t i = 0; i < _entries.size(); i++) {
-      const auto& e = _entries[i];
-      auto sz = static_cast<uint32_t>(e.data.size());
-      auto nameLen = static_cast<uint16_t>(e.path.size());
-      w32(f, 0x02014b50);
-      w16(f, 20);
-      w16(f, 20);
-      w16(f, 0);
-      w16(f, 0);
-      w16(f, 0);
-      w16(f, 0);
-      w32(f, e.crc);
-      w32(f, sz);
-      w32(f, sz);
-      w16(f, nameLen);
-      w16(f, 0);
-      w16(f, 0);
-      w16(f, 0);
-      w16(f, 0);
-      w32(f, 0);
-      w32(f, offsets[i]);
-      f.write(e.path.data(), nameLen);
-    }
-    auto cdSize = static_cast<uint32_t>(f.tellp()) - cdOff;
-    auto count = static_cast<uint16_t>(_entries.size());
-    w32(f, 0x06054b50);
-    w16(f, 0);
-    w16(f, 0);
-    w16(f, count);
-    w16(f, count);
-    w32(f, cdSize);
-    w32(f, cdOff);
-    w16(f, 0);
-    return f.good();
-  }
-
- private:
-  struct Entry {
-    std::string path;
-    std::vector<uint8_t> data;
-    uint32_t crc = 0;
-  };
-  std::vector<Entry> _entries;
-
-  static void w16(std::ofstream& f, uint16_t v) {
-    char b[2] = {static_cast<char>(v & 0xFF), static_cast<char>((v >> 8) & 0xFF)};
-    f.write(b, 2);
-  }
-  static void w32(std::ofstream& f, uint32_t v) {
-    char b[4] = {static_cast<char>(v & 0xFF), static_cast<char>((v >> 8) & 0xFF),
-                 static_cast<char>((v >> 16) & 0xFF), static_cast<char>((v >> 24) & 0xFF)};
-    f.write(b, 4);
-  }
-};
 
 //==============================================================================
 // Coordinate / color / angle helpers
@@ -1750,32 +1635,50 @@ bool PPTExporter::ToFile(const PAGXDocument& doc, const std::string& filePath,
   slide += "<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>";
   slide += "</p:sld>";
 
-  // Write ZIP
-  ZipWriter zip;
-  zip.addFile("[Content_Types].xml", GenerateContentTypes(context));
-  zip.addFile("_rels/.rels", GenerateRootRels());
-  zip.addFile("ppt/presentation.xml", GeneratePresentation(doc.width, doc.height));
-  zip.addFile("ppt/_rels/presentation.xml.rels", GeneratePresentationRels());
-  zip.addFile("ppt/slides/slide1.xml", slide);
-  zip.addFile("ppt/slides/_rels/slide1.xml.rels", GenerateSlideRels(context));
-  zip.addFile("ppt/slideMasters/slideMaster1.xml", GenerateSlideMaster());
-  zip.addFile("ppt/slideMasters/_rels/slideMaster1.xml.rels", GenerateSlideMasterRels());
-  zip.addFile("ppt/slideLayouts/slideLayout1.xml", GenerateSlideLayout());
-  zip.addFile("ppt/slideLayouts/_rels/slideLayout1.xml.rels", GenerateSlideLayoutRels());
-  zip.addFile("ppt/theme/theme1.xml", GenerateTheme());
+  // Write ZIP via minizip
+  zipFile zf = zipOpen(filePath.c_str(), APPEND_STATUS_CREATE);
+  if (!zf) {
+    return false;
+  }
+
+  auto addEntry = [&](const char* name, const void* data, unsigned size) {
+    zip_fileinfo zi = {};
+    if (zipOpenNewFileInZip(zf, name, &zi, nullptr, 0, nullptr, 0, nullptr, Z_DEFLATED,
+                            Z_DEFAULT_COMPRESSION) == ZIP_OK) {
+      zipWriteInFileInZip(zf, data, size);
+      zipCloseFileInZip(zf);
+    }
+  };
+
+  auto addString = [&](const char* name, const std::string& content) {
+    addEntry(name, content.data(), static_cast<unsigned>(content.size()));
+  };
+
+  addString("[Content_Types].xml", GenerateContentTypes(context));
+  addString("_rels/.rels", GenerateRootRels());
+  addString("ppt/presentation.xml", GeneratePresentation(doc.width, doc.height));
+  addString("ppt/_rels/presentation.xml.rels", GeneratePresentationRels());
+  addString("ppt/slides/slide1.xml", slide);
+  addString("ppt/slides/_rels/slide1.xml.rels", GenerateSlideRels(context));
+  addString("ppt/slideMasters/slideMaster1.xml", GenerateSlideMaster());
+  addString("ppt/slideMasters/_rels/slideMaster1.xml.rels", GenerateSlideMasterRels());
+  addString("ppt/slideLayouts/slideLayout1.xml", GenerateSlideLayout());
+  addString("ppt/slideLayouts/_rels/slideLayout1.xml.rels", GenerateSlideLayoutRels());
+  addString("ppt/theme/theme1.xml", GenerateTheme());
 
   for (const auto& img : context.images()) {
     if (img.rawData && img.rawData->size() > 0) {
-      zip.addFile(img.mediaPath, img.rawData->bytes(), img.rawData->size());
+      addEntry(img.mediaPath.c_str(), img.rawData->bytes(),
+               static_cast<unsigned>(img.rawData->size()));
     } else if (img.image) {
       auto data = GetImageData(img.image);
       if (data && data->size() > 0) {
-        zip.addFile(img.mediaPath, data->bytes(), data->size());
+        addEntry(img.mediaPath.c_str(), data->bytes(), static_cast<unsigned>(data->size()));
       }
     }
   }
 
-  return zip.writeToFile(filePath);
+  return zipClose(zf, nullptr) == ZIP_OK;
 }
 
 }  // namespace pagx

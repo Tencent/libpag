@@ -74,6 +74,22 @@
       }
     },
     {
+      "name": "zlib",
+      "dir": "tgfx/third_party/zlib",
+      "cmake": {
+        "targets": [
+          "zlibstatic"
+        ],
+        "arguments": [
+          "-DZLIB_BUILD_EXAMPLES=OFF"
+        ],
+        "includes": [
+          "${SOURCE_DIR}",
+          "${BUILD_DIR}"
+        ]
+      }
+    },
+    {
       "name": "libxml2",
       "cmake": {
         "targets": [
