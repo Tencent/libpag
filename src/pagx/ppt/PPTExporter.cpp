@@ -1140,12 +1140,20 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   float estHeight = text->fontSize * 1.4f;
   float posX = text->position.x;
   float posY = text->position.y - text->fontSize * 0.85f;
+  bool hasTextBox = false;
 
   if (fs.textBox && fs.textBox->size.width > 0) {
+    hasTextBox = true;
     posX = fs.textBox->position.x;
     posY = fs.textBox->position.y;
     estWidth = fs.textBox->size.width;
     estHeight = (fs.textBox->size.height > 0) ? fs.textBox->size.height : text->fontSize * 1.4f;
+  } else {
+    if (text->textAnchor == TextAnchor::Center) {
+      posX -= estWidth / 2.0f;
+    } else if (text->textAnchor == TextAnchor::End) {
+      posX -= estWidth;
+    }
   }
 
   auto xf = decomposeXform(posX, posY, estWidth, estHeight, m);
@@ -1178,13 +1186,20 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   out.end();  // p:spPr
 
   out.open("p:txBody").gt();
-  out.open("a:bodyPr")
-      .a("wrap", "square")
-      .a("lIns", "0")
-      .a("tIns", "0")
-      .a("rIns", "0")
-      .a("bIns", "0")
-      .sc();
+  auto& bodyPr = out.open("a:bodyPr")
+                         .a("wrap", hasTextBox ? "square" : "none")
+                         .a("lIns", "0")
+                         .a("tIns", "0")
+                         .a("rIns", "0")
+                         .a("bIns", "0");
+  if (fs.textBox) {
+    if (fs.textBox->paragraphAlign == ParagraphAlign::Middle) {
+      bodyPr.a("anchor", "ctr");
+    } else if (fs.textBox->paragraphAlign == ParagraphAlign::Far) {
+      bodyPr.a("anchor", "b");
+    }
+  }
+  bodyPr.sc();
   out.open("a:lstStyle").sc();
 
   // Split text by newlines into paragraphs
