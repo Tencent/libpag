@@ -384,9 +384,11 @@ constraints on the **Group itself**, not on inner elements. Group also supports 
 All geometry elements support constraint attributes for positioning. Prefer constraints
 over `position`.
 
-- **Rectangle**: `size`, `roundness` (single value, auto-limited to `min(r, w/2, h/2)`)
-- **Ellipse**: `size`
-- **Polystar**: `type` (polygon/star), `pointCount`, `outerRadius`, `innerRadius`.
+- **Rectangle**: `size`, `roundness` (single value, auto-limited to `min(r, w/2, h/2)`),
+  `reversed`
+- **Ellipse**: `size`, `reversed`
+- **Polystar**: `type` (polygon/star), `pointCount`, `outerRadius`, `innerRadius`,
+  `outerRoundness`, `innerRoundness` (0–1 for vertex rounding).
   `type="polygon"` for regular polygons, `type="star"` for stars with alternating radii.
   See `examples.md` §Star Badge.
 - **Path**: `data` — SVG `<path d>` syntax exactly (M, L, H, V, C, S, Q, T, A, Z)
@@ -448,12 +450,12 @@ See `examples.md` §Gradient Text for LinearGradient on text, §Star Badge for R
 
 | Modifier | Affects | Key Attributes |
 |----------|---------|----------------|
-| TrimPath | Paths only | `start`, `end` (0–1), `offset` |
+| TrimPath | Paths only | `start`, `end` (0–1), `offset`, `type` (separate/continuous) |
 | RoundCorner | Paths only | `radius` |
 | MergePath | Paths only | `mode` (append/union/intersect/xor/difference) |
 | TextModifier | Glyph lists only | `position`, `rotation`, `scale`, `alpha` |
 | TextPath | Glyph lists only | `path` (required), `firstMargin`, `perpendicular` |
-| Repeater | Both | `copies`, `position`, `rotation`, `scale`, `startAlpha`/`endAlpha` |
+| Repeater | Both | `copies`, `position`, `rotation`, `scale`, `anchor`, `order` (belowOriginal/aboveOriginal), `startAlpha`/`endAlpha` |
 
 Shape modifiers (TrimPath, RoundCorner, MergePath) trigger text-to-shape conversion
 if glyph lists are present (emoji silently discarded). Text modifiers silently skip Paths.
