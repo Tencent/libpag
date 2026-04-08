@@ -1083,7 +1083,10 @@ void HTMLWriter::applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim, bool
   float shift = std::floor(s);
   s -= shift;
   e -= shift;
-  bool wrapping = (e > 1.0f) || (e < s);
+  bool wrapping = (e > 1.0f);
+  if (e < s) {
+    std::swap(s, e);
+  }
   if (!wrapping) {
     float visible = e - s;
     float gap = 1.0f - visible;

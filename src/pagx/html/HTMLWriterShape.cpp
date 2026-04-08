@@ -1049,11 +1049,9 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
                    FloatToString(p->matrix.ty) + "px";
         }
       } else {
-        bool isTiling = (p->tileModeX == TileMode::Repeat || p->tileModeX == TileMode::Mirror ||
-                         p->tileModeY == TileMode::Repeat || p->tileModeY == TileMode::Mirror);
-        if (!isTiling) {
-          style += ";background-size:cover";
-        }
+        // For non-tiling modes (Clamp/Decal), do not set background-size.
+        // The image stays at its natural size with no-repeat (closest to Decal behavior).
+        // CSS has no equivalent for Clamp (edge pixel extension).
       }
       // TODO: ImagePattern.mipmapMode is ignored. CSS/SVG has no direct control over mipmap
       // sampling; browsers handle mipmap generation internally.

@@ -298,13 +298,40 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type) {
   std::string fillAttr = "white";
   float fillOpacity = 1.0f;
 
+  // Compute bounding box of mask geometry for SVG viewBox.
+  float maxX = 0;
+  float maxY = 0;
+  for (auto* e : mask->contents) {
+    if (e->nodeType() == NodeType::Rectangle) {
+      auto rect = static_cast<const Rectangle*>(e);
+      float r = rect->position.x + rect->size.width / 2;
+      float b = rect->position.y + rect->size.height / 2;
+      maxX = std::max(maxX, r);
+      maxY = std::max(maxY, b);
+    } else if (e->nodeType() == NodeType::Ellipse) {
+      auto el = static_cast<const Ellipse*>(e);
+      maxX = std::max(maxX, el->position.x + el->size.width / 2);
+      maxY = std::max(maxY, el->position.y + el->size.height / 2);
+    } else if (e->nodeType() == NodeType::Polystar) {
+      auto ps = static_cast<const Polystar*>(e);
+      float r = std::max(ps->outerRadius, ps->innerRadius);
+      maxX = std::max(maxX, ps->position.x + r);
+      maxY = std::max(maxY, ps->position.y + r);
+    }
+  }
+  if (FloatNearlyZero(maxX)) {
+    maxX = _ctx->docWidth;
+  }
+  if (FloatNearlyZero(maxY)) {
+    maxY = _ctx->docHeight;
+  }
+
   HTMLBuilder svg(0);
   svg.openTag("svg");
   svg.addAttr("xmlns", "http://www.w3.org/2000/svg");
-  svg.addAttr("width", FloatToString(_ctx->docWidth));
-  svg.addAttr("height", FloatToString(_ctx->docHeight));
-  svg.addAttr("viewBox",
-              "0 0 " + FloatToString(_ctx->docWidth) + " " + FloatToString(_ctx->docHeight));
+  svg.addAttr("width", FloatToString(maxX));
+  svg.addAttr("height", FloatToString(maxY));
+  svg.addAttr("viewBox", "0 0 " + FloatToString(maxX) + " " + FloatToString(maxY));
   svg.closeTagStart();
 
   if (useFillColor) {
@@ -464,7 +491,6 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type) {
   std::string dataURI = "url('data:image/svg+xml," + encoded + "')";
   std::string css = ";-webkit-mask-image:" + dataURI;
   css += ";mask-image:" + dataURI;
-  css += ";-webkit-mask-size:100% 100%;mask-size:100% 100%";
   if (type == MaskType::Luminance) {
     css += ";-webkit-mask-mode:luminance;mask-mode:luminance";
   } else {
