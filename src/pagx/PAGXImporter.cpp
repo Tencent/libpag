@@ -41,6 +41,7 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/Import.h"
 #include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/LinearGradient.h"
@@ -131,6 +132,7 @@ static void parseContents(const DOMNode* node, Layer* layer, PAGXDocument* doc);
 static void parseStyles(const DOMNode* node, Layer* layer, PAGXDocument* doc);
 static void parseFilters(const DOMNode* node, Layer* layer, PAGXDocument* doc);
 static Element* parseElement(const DOMNode* node, PAGXDocument* doc);
+static Import* parseImport(const DOMNode* node, PAGXDocument* doc);
 static ColorSource* parseColorSource(const DOMNode* node, PAGXDocument* doc);
 static LayerStyle* parseLayerStyle(const DOMNode* node, PAGXDocument* doc);
 static LayerFilter* parseLayerFilter(const DOMNode* node, PAGXDocument* doc);
@@ -175,6 +177,45 @@ static ColorMatrixFilter* parseColorMatrixFilter(const DOMNode* node, PAGXDocume
 //==============================================================================
 // Custom data parsing
 //==============================================================================
+
+static void serializeDOMNode(const DOMNode* node, std::string& output) {
+  if (node->type == DOMNodeType::Text) {
+    output += node->name;
+    return;
+  }
+  output += "<";
+  output += node->name;
+  for (const auto& attr : node->attributes) {
+    output += " ";
+    output += attr.name;
+    output += "=\"";
+    output += attr.value;
+    output += "\"";
+  }
+  if (!node->firstChild) {
+    output += "/>";
+    return;
+  }
+  output += ">";
+  auto child = node->firstChild;
+  while (child) {
+    serializeDOMNode(child.get(), output);
+    child = child->nextSibling;
+  }
+  output += "</";
+  output += node->name;
+  output += ">";
+}
+
+static std::string serializeDOMChildren(const DOMNode* node) {
+  std::string result;
+  auto child = node->firstChild;
+  while (child) {
+    serializeDOMNode(child.get(), result);
+    child = child->nextSibling;
+  }
+  return result;
+}
 
 static void parseCustomData(const DOMNode* xmlNode, Node* node) {
   for (const auto& attr : xmlNode->attributes) {
@@ -412,6 +453,13 @@ static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc) {
       }
       continue;
     }
+    if (current->name == "Import") {
+      auto* imp = parseImport(current.get(), doc);
+      if (imp) {
+        layer->contents.push_back(imp);
+      }
+      continue;
+    }
     // Try to parse as VectorElement.
     auto element = parseElement(current.get(), doc);
     if (element) {
@@ -451,6 +499,13 @@ static void parseContents(const DOMNode* node, Layer* layer, PAGXDocument* doc) 
     auto current = child;
     child = child->nextSibling;
     if (current->type != DOMNodeType::Element) {
+      continue;
+    }
+    if (current->name == "Import") {
+      auto* imp = parseImport(current.get(), doc);
+      if (imp) {
+        layer->contents.push_back(imp);
+      }
       continue;
     }
     auto element = parseElement(current.get(), doc);
@@ -507,6 +562,25 @@ static void parseFilters(const DOMNode* node, Layer* layer, PAGXDocument* doc) {
                       " InnerShadowFilter, BlendFilter, ColorMatrixFilter.");
     }
   }
+}
+
+static Import* parseImport(const DOMNode* node, PAGXDocument* doc) {
+  auto* import = makeNodeFromXML<Import>(node, doc);
+  if (!import) {
+    return nullptr;
+  }
+  auto* sourceAttr = node->findAttribute("source");
+  if (sourceAttr) {
+    import->source = *sourceAttr;
+  }
+  auto* formatAttr = node->findAttribute("format");
+  if (formatAttr) {
+    import->format = *formatAttr;
+  }
+  if (import->source.empty() && node->firstChild) {
+    import->rawContent = serializeDOMChildren(node);
+  }
+  return import;
 }
 
 static Element* parseElement(const DOMNode* node, PAGXDocument* doc) {
