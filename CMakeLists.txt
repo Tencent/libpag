@@ -95,6 +95,7 @@ endif ()
 # PAG_BUILD_CLI and PAG_BUILD_SVG both require PAG_BUILD_PAGX
 if (PAG_BUILD_CLI)
     set(PAG_BUILD_PAGX ON)
+    set(PAG_BUILD_SVG ON)
 endif ()
 if (PAG_BUILD_SVG)
     set(PAG_BUILD_PAGX ON)

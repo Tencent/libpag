@@ -9,7 +9,7 @@ The `pagx` binary is provided by the `pagx` npm package. Before running any comm
 ensure it is installed and meets the minimum version:
 
 ```bash
-PAGX_MIN="0.1.6"
+PAGX_MIN="0.1.8"
 if ! command -v pagx &>/dev/null; then
   npm install -g @libpag/pagx
 elif [ "$(printf '%s\n' "$PAGX_MIN" "$(pagx -v | awk '{print $2}')" | sort -V | head -1)" != "$PAGX_MIN" ]; then
@@ -220,32 +220,53 @@ primary font. System fallback fonts are always appended after user-specified fal
 
 ---
 
-## pagx convert
+## pagx import
 
-Convert between PAGX and other formats. The conversion direction is inferred from file
-extensions (e.g., `.pagx` → `.svg` or `.svg` → `.pagx`). Loads the input, converts the
-document, and writes the result. Import warnings are printed but do not prevent conversion.
+Import a file from another format (e.g. SVG) and convert it to PAGX. The input format is
+inferred from the file extension unless `--format` is specified. Import warnings are printed
+but do not prevent conversion.
 
 ```bash
-pagx convert input.pagx output.svg                   # PAGX to SVG
-pagx convert input.svg output.pagx                   # SVG to PAGX
-pagx convert --indent 4 input.pagx output.svg        # PAGX to SVG with 4-space indent
-pagx convert --no-xml-declaration input.pagx out.svg
-pagx convert --no-convert-text-to-path input.pagx out.svg  # keep <text> elements
-pagx convert --format svg input.pagx output               # specify SVG output format
-pagx convert --no-expand-use input.svg output.pagx   # SVG to PAGX without expanding <use>
+pagx import --input icon.svg                     # SVG to icon.pagx
+pagx import --input icon.svg --output out.pagx   # SVG to out.pagx
+pagx import --format svg --input drawing.xml     # force treating drawing.xml as SVG format
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--format <format>` | Override output format (`svg`, `pagx`; default: inferred from output extension) |
-| `--indent <n>` | SVG indentation spaces (default: 2, valid range: 0–16) |
-| `--no-xml-declaration` | Omit the `<?xml ...?>` declaration (SVG output only) |
-| `--no-convert-text-to-path` | Keep text as `<text>` elements instead of converting to `<path>` (SVG output only) |
-| `--no-expand-use` | Do not expand `<use>` references (SVG input only) |
-| `--flatten-transforms` | Flatten nested transforms into single matrices (SVG input only) |
-| `--preserve-unknown` | Preserve unsupported SVG elements as Unknown nodes (SVG input only) |
+| `--input <file>` | Input file to import (required) |
+| `--output <file>` | Output PAGX file (default: `<input>.pagx`) |
+| `--format <format>` | Force input format (`svg`; default: inferred from input extension) |
+| `--svg-no-expand-use` | Do not expand `<use>` references |
+| `--svg-flatten-transforms` | Flatten nested transforms into single matrices |
+| `--svg-preserve-unknown` | Preserve unsupported SVG elements as Unknown nodes |
 
-The command takes two positional arguments: `<input>` and `<output>`. Use `--format` when the
-output extension does not make the format unambiguous. On success the command prints
-`pagx convert: wrote <path>` and exits 0; on failure it prints an error and exits 1.
+On success the command prints `pagx import: wrote <path>` and exits 0; on failure it prints
+an error and exits 1.
+
+---
+
+## pagx export
+
+Export a PAGX file to another format (e.g. SVG). The output format is inferred from the
+output file extension. If neither `--format` nor a recognizable output extension is provided,
+the command reports an error.
+
+```bash
+pagx export --input icon.pagx                    # PAGX to icon.svg
+pagx export --input icon.pagx --output out.svg   # PAGX to out.svg
+pagx export --format svg --input icon.pagx       # force SVG output format
+pagx export --input icon.pagx --svg-indent 4     # 4-space indent
+```
+
+| Option | Description |
+|--------|-------------|
+| `--input <file>` | Input PAGX file (required) |
+| `--output <file>` | Output file (default: `<input>.<format>`) |
+| `--format <format>` | Output format (`svg`; inferred from output extension). Required if output has no extension |
+| `--svg-indent <n>` | Indentation spaces (default: 2, valid range: 0–16) |
+| `--svg-no-xml-declaration` | Omit the `<?xml ...?>` declaration |
+| `--svg-no-convert-text-to-path` | Keep text as `<text>` elements instead of `<path>` |
+
+On success the command prints `pagx export: wrote <path>` and exits 0; on failure it prints
+an error and exits 1.

@@ -20,6 +20,9 @@
 
 namespace pagx::cli {
 
-int RunConvert(int argc, char* argv[]);
+/**
+ * Exports a PAGX file to another format (e.g. SVG).
+ */
+int RunExport(int argc, char* argv[]);
 
 }  // namespace pagx::cli
