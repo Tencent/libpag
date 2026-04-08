@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <mutex>
 #include "pagx/PAGXDocument.h"
 
 namespace pagx {
@@ -27,9 +28,17 @@ inline PAGXDocument& DefaultDoc() {
   return *doc;
 }
 
+inline std::mutex& DefaultMutex() {
+  static std::mutex mutex;
+  return mutex;
+}
+
 template <typename T>
 inline const T& Default() {
-  static const T* node = DefaultDoc().makeNode<T>();
+  static const T* node = [] {
+    std::lock_guard<std::mutex> lock(DefaultMutex());
+    return DefaultDoc().makeNode<T>();
+  }();
   return *node;
 }
 
