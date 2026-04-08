@@ -1,26 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Polystar edge cases: fractional pointCount (5.5), innerRoundness/outerRoundness,
      reversed="true", polygon with roundness -->
-<pagx version="1.0" width="460" height="360">
+<pagx version="1.0" width="480" height="360">
   <!-- Background -->
   <Layer>
-    <Rectangle position="230,180" size="460,360"/>
+    <Rectangle position="240,180" size="480,360"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
   <!-- Title -->
   <Layer>
-    <Text text="Polystar Advanced" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="230,34" textAnchor="center"/>
+    <Text text="Polystar Advanced" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="240,34" textAnchor="center"/>
     <Fill color="#1E293B"/>
   </Layer>
   <Layer>
-    <Text text="Fractional points, roundness, reversed, and edge cases" fontFamily="Arial" fontSize="10" position="230,50" textAnchor="center"/>
+    <Text text="Fractional points, roundness, reversed, and edge cases" fontFamily="Arial" fontSize="10" position="240,50" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="230,202" size="400,250" roundness="16"/>
+    <Rectangle position="230,202" size="420,250" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>

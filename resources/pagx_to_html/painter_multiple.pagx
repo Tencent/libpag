@@ -19,14 +19,14 @@
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="160,172" size="260,190" roundness="16"/>
+    <Rectangle position="160,177" size="260,200" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
   <!-- Shape with multiple fills and strokes -->
   <Layer>
-    <Rectangle position="160,165" size="160,160" roundness="20"/>
+    <Rectangle position="160,172" size="160,160" roundness="20"/>
     <!-- First fill (bottom layer) -->
     <Fill color="#3B82F6"/>
     <!-- Second fill overlays the first -->
@@ -39,11 +39,11 @@
 
   <!-- Legend -->
   <Layer>
-    <Text text="Fill #1 (blue) + Fill #2 (red multiply)" fontFamily="Arial" fontSize="8" position="160,258" textAnchor="center"/>
+    <Text text="Fill #1 (blue) + Fill #2 (red multiply)" fontFamily="Arial" fontSize="8" position="160,265" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer>
-    <Text text="Stroke #1 (green) + Stroke #2 (orange dashed)" fontFamily="Arial" fontSize="8" position="160,270" textAnchor="center"/>
+    <Text text="Stroke #1 (green) + Stroke #2 (orange dashed)" fontFamily="Arial" fontSize="8" position="160,277" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 </pagx>

@@ -19,21 +19,21 @@
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="150,160" size="240,170" roundness="16"/>
+    <Rectangle position="150,165" size="240,190" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
   <!-- Triangle with rounded corners -->
   <Layer>
-    <Polystar position="150,158" type="polygon" pointCount="3" outerRadius="80" rotation="-90"/>
+    <Polystar position="150,165" type="polygon" pointCount="3" outerRadius="80" rotation="-90"/>
     <RoundCorner radius="15"/>
     <Fill color="#8B5CF6"/>
   </Layer>
 
   <!-- Label -->
   <Layer>
-    <Text text="radius=15" fontFamily="Arial" fontSize="9" position="150,220" textAnchor="center"/>
+    <Text text="radius=15" fontFamily="Arial" fontSize="9" position="150,230" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 </pagx>
