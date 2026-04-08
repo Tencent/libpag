@@ -28,7 +28,7 @@
   <Layer>
     <Rectangle position="115,155" size="120,140" roundness="8"/>
     <Fill>
-      <RadialGradient center="70,80" radius="80">
+      <RadialGradient center="60,70" radius="80">
         <ColorStop offset="0" color="#FFFFFF"/>
         <ColorStop offset="1" color="#3B82F6"/>
       </RadialGradient>
@@ -43,7 +43,7 @@
   <Layer>
     <Rectangle position="285,155" size="120,140" roundness="8"/>
     <Fill>
-      <RadialGradient center="70,80" radius="60" matrix="1.5,0,0,1,0,0">
+      <RadialGradient center="60,70" radius="60" matrix="1.5,0,0,1,0,0">
         <ColorStop offset="0" color="#FFFFFF"/>
         <ColorStop offset="1" color="#EF4444"/>
       </RadialGradient>
