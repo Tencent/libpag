@@ -1444,6 +1444,9 @@ static void DetectZeroSize(const Layer* layer, const Layer* parentLayer,
   if (bounds.width != 0 && bounds.height != 0) {
     return;
   }
+  if (layer->contents.empty() && layer->children.empty()) {
+    return;
+  }
   bool inParentLayout =
       parentLayer != nullptr && parentLayer->layout != LayoutMode::None && layer->includeInLayout;
   if (!inParentLayout) {
