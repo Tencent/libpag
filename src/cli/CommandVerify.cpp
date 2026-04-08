@@ -2419,7 +2419,11 @@ int RunVerify(int argc, char* argv[]) {
     resolveArgv.push_back(const_cast<char*>(arg.c_str()));
   }
   resolveArgv.push_back(nullptr);
-  RunImport(static_cast<int>(resolveArgs.size()), resolveArgv.data());
+  int importRet = RunImport(static_cast<int>(resolveArgs.size()), resolveArgv.data());
+  if (importRet != 0) {
+    std::cerr << "pagx verify: failed to resolve imports for '" << opts.inputFile << "'\n";
+    return importRet;
+  }
 
   // Step 2: Load document and compute layout.
   auto doc = PAGXImporter::FromFile(opts.inputFile);
