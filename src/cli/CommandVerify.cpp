@@ -88,7 +88,6 @@ struct VerifyOptions {
 // Helper Functions
 // ============================================================================
 
-
 static bool IsGradient(NodeType type) {
   return type == NodeType::LinearGradient || type == NodeType::RadialGradient ||
          type == NodeType::ConicGradient || type == NodeType::DiamondGradient;
