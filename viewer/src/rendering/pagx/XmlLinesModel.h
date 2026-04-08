@@ -20,7 +20,6 @@
 
 #include <QAbstractListModel>
 #include <QString>
-#include <mutex>
 #include <vector>
 
 namespace pag {
@@ -82,8 +81,9 @@ class XmlLinesModel : public QAbstractListModel {
 
  private:
   std::vector<QString> lines = {};
+  // mutable is intentional: highlightedLines is a lazy cache populated on demand inside the
+  // const data() method required by QAbstractListModel. All access is single-threaded (UI thread).
   mutable std::vector<QString> highlightedLines = {};
-  mutable std::mutex highlightCacheMutex = {};
   QString fullText = {};
   qreal _maxLineWidth = 0;
 };
