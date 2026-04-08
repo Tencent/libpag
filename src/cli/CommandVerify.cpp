@@ -1613,8 +1613,11 @@ static void DetectFlexInContentMeasuredParent(const Layer* layer, const Layer* p
   if (parentMainFromConstraints) {
     return;
   }
-  auto bounds = layer->layoutBounds();
-  if (bounds.width > 0 && bounds.height > 0) {
+  // The parent may acquire its main-axis size from flex in a grandparent layout. Check the
+  // resolved layout bounds instead of relying solely on declared attributes.
+  auto parentBounds = parentLayer->layoutBounds();
+  float parentResolvedMain = horizontal ? parentBounds.width : parentBounds.height;
+  if (parentResolvedMain > 0) {
     return;
   }
   const char* axis = horizontal ? "width" : "height";
