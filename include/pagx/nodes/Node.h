@@ -196,7 +196,14 @@ enum class NodeType {
   /**
    * A precomposed glyph run for text rendering.
    */
-  GlyphRun
+  GlyphRun,
+
+  // Build Directives
+  /**
+   * A build directive that embeds external content (e.g., SVG) into a PAGX file. Must be resolved
+   * into native PAGX nodes by `pagx import --resolve` before layout or rendering.
+   */
+  Import
 };
 
 /**

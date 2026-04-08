@@ -73,6 +73,35 @@ void PAGXDocument::registerNode(Node* node, const std::string& id) {
   nodeMap[id] = node;
 }
 
+static bool LayersHaveImports(const std::vector<Layer*>& layers) {
+  for (auto* layer : layers) {
+    for (auto* element : layer->contents) {
+      if (element->nodeType() == NodeType::Import) {
+        return true;
+      }
+    }
+    if (LayersHaveImports(layer->children)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool PAGXDocument::hasUnresolvedImports() const {
+  if (LayersHaveImports(layers)) {
+    return true;
+  }
+  for (auto& node : nodes) {
+    if (node->nodeType() == NodeType::Composition) {
+      auto* comp = static_cast<Composition*>(node.get());
+      if (LayersHaveImports(comp->layers)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 std::vector<std::string> PAGXDocument::getExternalFilePaths() const {
   std::vector<std::string> paths = {};
   for (auto& node : nodes) {

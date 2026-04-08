@@ -111,6 +111,12 @@ class PAGXDocument : public Node {
   std::vector<std::string> errors = {};
 
   /**
+   * Returns true if any layer in the document contains unresolved <Import> nodes. These must be
+   * expanded via `pagx import --resolve` before layout or rendering.
+   */
+  bool hasUnresolvedImports() const;
+
+  /**
    * Returns a list of external file paths referenced by Image nodes that have no embedded data.
    * Data URIs (paths starting with "data:") are excluded.
    */

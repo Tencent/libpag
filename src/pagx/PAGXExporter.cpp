@@ -37,6 +37,7 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/Import.h"
 #include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/LinearGradient.h"
@@ -165,6 +166,10 @@ class XMLBuilder {
     buffer += tagStack.back();
     buffer += ">\n";
     tagStack.pop_back();
+  }
+
+  void writeRaw(const std::string& content) {
+    buffer += content;
   }
 
   std::string release() {
@@ -969,6 +974,21 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
         for (const auto& element : group->elements) {
           writeVectorElement(xml, element, options);
         }
+        xml.closeElement();
+      }
+      break;
+    }
+    case NodeType::Import: {
+      auto* imp = static_cast<const Import*>(node);
+      xml.openElement("Import");
+      xml.addAttribute("source", imp->source);
+      xml.addAttribute("format", imp->format);
+      writeCustomData(xml, node);
+      if (imp->rawContent.empty()) {
+        xml.closeElementSelfClosing();
+      } else {
+        xml.closeElementStart();
+        xml.writeRaw(imp->rawContent);
         xml.closeElement();
       }
       break;

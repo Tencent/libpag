@@ -157,6 +157,11 @@ int RunBounds(int argc, char* argv[]) {
   for (auto& error : document->errors) {
     std::cerr << "pagx bounds: warning: " << error << "\n";
   }
+  if (document->hasUnresolvedImports()) {
+    std::cerr
+        << "pagx bounds: error: unresolved <Import> node, run 'pagx import --resolve' first\n";
+    return 1;
+  }
 
   // Build layer tree with mapping.
   document->applyLayout();

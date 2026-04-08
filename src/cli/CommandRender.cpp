@@ -245,6 +245,11 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
       std::cerr << "pagx render: warning: " << error << "\n";
     }
   }
+  if (document->hasUnresolvedImports()) {
+    std::cerr
+        << "pagx render: error: unresolved <Import> node, run 'pagx import --resolve' first\n";
+    return {};
+  }
 
   FontConfig fontConfig = {};
   for (const auto& fontFile : options.fontFiles) {

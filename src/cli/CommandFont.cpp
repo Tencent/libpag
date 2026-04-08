@@ -235,6 +235,11 @@ static int RunFontEmbed(int argc, char* argv[]) {
     std::cerr << "pagx font embed: failed to load '" << options.inputFile << "'\n";
     return 1;
   }
+  if (document->hasUnresolvedImports()) {
+    std::cerr
+        << "pagx font embed: error: unresolved <Import> node, run 'pagx import --resolve' first\n";
+    return 1;
+  }
 
   // Load font files.
   FontConfig fontConfig = {};

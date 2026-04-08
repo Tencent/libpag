@@ -405,6 +405,11 @@ int RunLayout(int argc, char* argv[]) {
   for (const auto& err : document->errors) {
     std::cerr << "pagx layout: warning: " << err << "\n";
   }
+  if (document->hasUnresolvedImports()) {
+    std::cerr
+        << "pagx layout: error: unresolved <Import> node, run 'pagx import --resolve' first\n";
+    return 1;
+  }
 
   document->applyLayout();
 

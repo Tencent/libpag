@@ -62,6 +62,8 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TrimPath.h"
+#include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/Pixmap.h"
 
 namespace pagx::cli {
 
@@ -1426,14 +1428,19 @@ static void RunStaticDetectionOnLayer(const Layer* layer, float canvasWidth, flo
 }
 
 static void RunStaticDetection(const PAGXDocument* doc, const LineNodeMap& lineNodeMap,
-                               std::vector<VerifyDiagnostic>& diagnostics) {
-  DetectUnreferencedResources(doc, diagnostics);
-  DetectDuplicatePathData(doc, lineNodeMap, diagnostics);
-  DetectDuplicateGradients(doc, lineNodeMap, diagnostics);
-  DetectStructurallyIdenticalLayers(doc, lineNodeMap, diagnostics);
-
-  for (auto* layer : doc->layers) {
-    RunStaticDetectionOnLayer(layer, doc->width, doc->height, false, lineNodeMap, diagnostics);
+                               std::vector<VerifyDiagnostic>& diagnostics,
+                               const Layer* targetLayer = nullptr) {
+  if (targetLayer == nullptr) {
+    DetectUnreferencedResources(doc, diagnostics);
+    DetectDuplicatePathData(doc, lineNodeMap, diagnostics);
+    DetectDuplicateGradients(doc, lineNodeMap, diagnostics);
+    DetectStructurallyIdenticalLayers(doc, lineNodeMap, diagnostics);
+    for (auto* layer : doc->layers) {
+      RunStaticDetectionOnLayer(layer, doc->width, doc->height, false, lineNodeMap, diagnostics);
+    }
+  } else {
+    RunStaticDetectionOnLayer(targetLayer, doc->width, doc->height, false, lineNodeMap,
+                              diagnostics);
   }
 
   for (const auto& err : doc->errors) {
@@ -2067,11 +2074,16 @@ static void RunSpatialDetectionOnLayer(const Layer* layer, const Layer* parentLa
   }
 }
 
-static void RunSpatialDetection(const PAGXDocument* doc,
-                                std::vector<VerifyDiagnostic>& diagnostics) {
-  for (auto* layer : doc->layers) {
-    DetectOffCanvas(layer, doc->width, doc->height, diagnostics);
-    RunSpatialDetectionOnLayer(layer, nullptr, doc->width, doc->height, diagnostics);
+static void RunSpatialDetection(const PAGXDocument* doc, std::vector<VerifyDiagnostic>& diagnostics,
+                                const Layer* targetLayer = nullptr) {
+  if (targetLayer != nullptr) {
+    DetectOffCanvas(targetLayer, doc->width, doc->height, diagnostics);
+    RunSpatialDetectionOnLayer(targetLayer, nullptr, doc->width, doc->height, diagnostics);
+  } else {
+    for (auto* layer : doc->layers) {
+      DetectOffCanvas(layer, doc->width, doc->height, diagnostics);
+      RunSpatialDetectionOnLayer(layer, nullptr, doc->width, doc->height, diagnostics);
+    }
   }
 }
 
@@ -2392,7 +2404,7 @@ int RunVerify(int argc, char* argv[]) {
   }
 
   // Step 1: Resolve all <Import> nodes in the file (full file, idempotent).
-  std::vector<std::string> resolveArgs = {"pagx", "import", "--resolve", opts.inputFile};
+  std::vector<std::string> resolveArgs = {"pagx-verify", "--resolve", opts.inputFile};
   std::vector<char*> resolveArgv;
   for (auto& arg : resolveArgs) {
     resolveArgv.push_back(const_cast<char*>(arg.c_str()));
@@ -2432,8 +2444,8 @@ int RunVerify(int argc, char* argv[]) {
   }
 
   std::vector<VerifyDiagnostic> diagnostics;
-  RunStaticDetection(doc.get(), lineNodeMap, diagnostics);
-  RunSpatialDetection(doc.get(), diagnostics);
+  RunStaticDetection(doc.get(), lineNodeMap, diagnostics, targetLayer);
+  RunSpatialDetection(doc.get(), diagnostics, targetLayer);
 
   if (xmlDoc != nullptr) {
     xmlFreeDoc(xmlDoc);
@@ -2483,6 +2495,15 @@ int RunVerify(int argc, char* argv[]) {
 
   auto bitmap = RenderToBitmap(static_cast<int>(renderArgs.size()), renderArgv.data());
   if (!bitmap.isEmpty()) {
+    tgfx::Pixmap pixmap(bitmap);
+    auto encodedData = tgfx::ImageCodec::Encode(pixmap, tgfx::EncodedFormat::PNG, 100);
+    if (encodedData != nullptr) {
+      std::ofstream pngFile(pngPath, std::ios::binary);
+      if (pngFile.is_open()) {
+        pngFile.write(reinterpret_cast<const char*>(encodedData->data()),
+                      static_cast<std::streamsize>(encodedData->size()));
+      }
+    }
     std::cerr << "Wrote " << pngPath << " (" << bitmap.width() << "x" << bitmap.height() << " @"
               << static_cast<int>(opts.scale) << "x)\n";
   }

@@ -31,6 +31,10 @@
 #include "cli/CommandLayout.h"
 #include "cli/CommandRender.h"
 #include "cli/CommandVerify.h"
+#include "pagx/PAGXDocument.h"
+#include "pagx/PAGXExporter.h"
+#include "pagx/PAGXImporter.h"
+#include "pagx/nodes/Import.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
@@ -1901,121 +1905,6 @@ CLI_TEST(PAGXCliTest, LayoutCheck_PolystarOrigin) {
   EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
 }
 
-//==============================================================================
-// Resolve (import --resolve) tests
-//==============================================================================
-
-CLI_TEST(PAGXCliTest, Insert_SvgIntoLayer_Basic) {
-  auto pagxPath = CopyToTemp("insert_basic.pagx", "insert_basic.pagx");
-  auto svgPath = TestResourcePath("insert_basic.svg");
-  auto outputPath = TempDir() + "/insert_out.pagx";
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--resolve", "icon", "-o",
-                                            outputPath, pagxPath});
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(std::filesystem::exists(outputPath));
-  EXPECT_TRUE(RenderAndCompare({"render", "--scale", "2", outputPath}, "PAGXCliTest/insert_basic"));
-}
-
-CLI_TEST(PAGXCliTest, Insert_SvgIntoLayer_DefaultOutput) {
-  auto pagxPath = CopyToTemp("insert_basic.pagx", "insert_default_out.pagx");
-  auto svgPath = TestResourcePath("insert_search.svg");
-  auto ret =
-      CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--resolve", "icon", pagxPath});
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(
-      RenderAndCompare({"render", "--scale", "2", pagxPath}, "PAGXCliTest/insert_default_out"));
-}
-
-CLI_TEST(PAGXCliTest, Insert_MissingTargetId) {
-  auto pagxPath = TestResourcePath("insert_missing_id.pagx");
-  auto svgPath = TestResourcePath("insert_basic.svg");
-  auto ret = CallRun(pagx::cli::RunImport,
-                     {"import", "--input", svgPath, "--resolve", "nonexistent", pagxPath});
-  EXPECT_NE(ret, 0);
-}
-
-CLI_TEST(PAGXCliTest, Insert_MissingRequiredOptions) {
-  auto pagxPath = TempDir() + "/dummy.pagx";
-
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--resolve", "icon", pagxPath});
-  EXPECT_NE(ret, 0);
-
-  ret = CallRun(pagx::cli::RunImport, {"import", "--input", "icon.svg", pagxPath});
-  EXPECT_NE(ret, 0);
-
-  ret = CallRun(pagx::cli::RunImport, {"import", "--input", "icon.svg", "--resolve", "icon"});
-  EXPECT_NE(ret, 0);
-}
-
-CLI_TEST(PAGXCliTest, Insert_PreservesLayerAttributes) {
-  auto pagxPath = CopyToTemp("insert_preserve_attrs.pagx", "insert_preserve_attrs.pagx");
-  auto svgPath = TestResourcePath("insert_circle.svg");
-  auto ret =
-      CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--resolve", "icon", pagxPath});
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(
-      RenderAndCompare({"render", "--scale", "2", pagxPath}, "PAGXCliTest/insert_preserve_attrs"));
-}
-
-CLI_TEST(PAGXCliTest, Insert_ReplacesExistingContent) {
-  auto pagxPath = CopyToTemp("insert_replace.pagx", "insert_replace.pagx");
-  auto svgPath = TestResourcePath("insert_triangle.svg");
-  auto ret =
-      CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--resolve", "icon", pagxPath});
-  EXPECT_EQ(ret, 0);
-
-  auto output = ReadFile(pagxPath);
-  EXPECT_EQ(output.find("<Rectangle"), std::string::npos);
-  EXPECT_EQ(output.find("#FF0000"), std::string::npos);
-  EXPECT_EQ(output.find("DropShadowStyle"), std::string::npos);
-
-  EXPECT_TRUE(RenderAndCompare({"render", "--scale", "2", pagxPath}, "PAGXCliTest/insert_replace"));
-}
-
-CLI_TEST(PAGXCliTest, Insert_InvalidSvg) {
-  auto pagxPath = CopyToTemp("insert_basic.pagx", "insert_invalid_svg.pagx");
-  auto svgPath = TestResourcePath("insert_invalid.svg");
-  auto ret =
-      CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--resolve", "icon", pagxPath});
-  EXPECT_NE(ret, 0);
-}
-
-CLI_TEST(PAGXCliTest, Insert_MultiElementSvg) {
-  auto pagxPath = CopyToTemp("insert_basic.pagx", "insert_multi.pagx");
-  auto svgPath = TestResourcePath("insert_multi.svg");
-  auto ret =
-      CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--resolve", "icon", pagxPath});
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(RenderAndCompare({"render", "--scale", "2", pagxPath}, "PAGXCliTest/insert_multi"));
-}
-
-CLI_TEST(PAGXCliTest, Insert_RenderResult) {
-  auto pagxPath = CopyToTemp("insert_render.pagx", "insert_render.pagx");
-  auto svgPath = TestResourcePath("insert_render_search.svg");
-  auto ret =
-      CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--resolve", "icon", pagxPath});
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(RenderAndCompare({"render", "--scale", "2", pagxPath}, "PAGXCliTest/insert_render"));
-}
-
-CLI_TEST(PAGXCliTest, Insert_PreservesOriginalFormatting) {
-  auto pagxPath = CopyToTemp("insert_format.pagx", "insert_format.pagx");
-  auto svgPath = TestResourcePath("insert_rect.svg");
-  auto ret =
-      CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--resolve", "icon", pagxPath});
-  EXPECT_EQ(ret, 0);
-
-  auto output = ReadFile(pagxPath);
-  EXPECT_NE(output.find("<!-- header section -->"), std::string::npos);
-  EXPECT_NE(output.find("                <Rectangle"), std::string::npos);
-  EXPECT_NE(output.find("                <Fill color=\"#FF0000\""), std::string::npos);
-  EXPECT_NE(output.find("          <Rectangle"), std::string::npos);
-  EXPECT_NE(output.find("          <Fill color=\"#00FF00\""), std::string::npos);
-  EXPECT_NE(output.find("id=\"icon\""), std::string::npos);
-  EXPECT_NE(output.find("width=\"48\""), std::string::npos);
-  EXPECT_NE(output.find("<Fill color=\"#0000FF\""), std::string::npos);
-}
-
 // Layers at different positions but identical structure should be detected as extractable.
 CLI_TEST(PAGXCliTest, Verify_CompositionPositionDiff) {
   auto inputPath = TestResourcePath("verify_composition_position_diff.pagx");
@@ -2190,6 +2079,167 @@ CLI_TEST(PAGXCliTest, Verify_PathDataDifferent) {
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(output.find("duplicate PathData"), std::string::npos);
+}
+
+//==============================================================================
+// Import node data model tests
+//==============================================================================
+
+CLI_TEST(PAGXCliTest, ImportNode_ParseExternalSource) {
+  auto inputPath = TestResourcePath("import_node_basic.pagx");
+  auto doc = pagx::PAGXImporter::FromFile(inputPath);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+
+  ASSERT_GE(doc->layers.size(), 1u);
+  auto* layer = doc->layers[0];
+  ASSERT_EQ(layer->contents.size(), 1u);
+  EXPECT_EQ(layer->contents[0]->nodeType(), pagx::NodeType::Import);
+  auto* imp = static_cast<pagx::Import*>(layer->contents[0]);
+  EXPECT_EQ(imp->source, "import_external.svg");
+  EXPECT_TRUE(imp->rawContent.empty());
+}
+
+CLI_TEST(PAGXCliTest, ImportNode_ParseInlineContent) {
+  auto inputPath = TestResourcePath("import_node_basic.pagx");
+  auto doc = pagx::PAGXImporter::FromFile(inputPath);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_GE(doc->layers.size(), 2u);
+  auto* layer = doc->layers[1];
+  ASSERT_EQ(layer->contents.size(), 1u);
+  EXPECT_EQ(layer->contents[0]->nodeType(), pagx::NodeType::Import);
+  auto* imp = static_cast<pagx::Import*>(layer->contents[0]);
+  EXPECT_TRUE(imp->source.empty());
+  EXPECT_FALSE(imp->rawContent.empty());
+  EXPECT_NE(imp->rawContent.find("<svg"), std::string::npos);
+  EXPECT_NE(imp->rawContent.find("<circle"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, ImportNode_ExportRoundTrip) {
+  auto inputPath = TestResourcePath("import_node_basic.pagx");
+  auto doc = pagx::PAGXImporter::FromFile(inputPath);
+  ASSERT_NE(doc, nullptr);
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(xml.find("<Import source=\"import_external.svg\""), std::string::npos);
+  EXPECT_NE(xml.find("<Import>"), std::string::npos);
+  EXPECT_NE(xml.find("<svg"), std::string::npos);
+  EXPECT_NE(xml.find("</Import>"), std::string::npos);
+
+  auto doc2 = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc2, nullptr);
+  ASSERT_GE(doc2->layers.size(), 2u);
+  auto* imp1 = static_cast<pagx::Import*>(doc2->layers[0]->contents[0]);
+  EXPECT_EQ(imp1->source, "import_external.svg");
+  auto* imp2 = static_cast<pagx::Import*>(doc2->layers[1]->contents[0]);
+  EXPECT_NE(imp2->rawContent.find("<svg"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, ImportNode_HasUnresolvedImports) {
+  auto withImport = TestResourcePath("import_node_basic.pagx");
+  auto doc1 = pagx::PAGXImporter::FromFile(withImport);
+  ASSERT_NE(doc1, nullptr);
+  EXPECT_TRUE(doc1->hasUnresolvedImports());
+
+  auto withoutImport = TestResourcePath("import_node_none.pagx");
+  auto doc2 = pagx::PAGXImporter::FromFile(withoutImport);
+  ASSERT_NE(doc2, nullptr);
+  EXPECT_FALSE(doc2->hasUnresolvedImports());
+}
+
+//==============================================================================
+// Import --resolve tests (new syntax)
+//==============================================================================
+
+CLI_TEST(PAGXCliTest, ImportResolve_ExpandExternalSource) {
+  auto pagxPath = CopyToTemp("import_node_basic.pagx", "resolve_external.pagx");
+  CopyToTemp("import_external.svg", "import_external.svg");
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--resolve", pagxPath});
+  EXPECT_EQ(ret, 0);
+
+  auto doc = pagx::PAGXImporter::FromFile(pagxPath);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(doc->hasUnresolvedImports());
+}
+
+CLI_TEST(PAGXCliTest, ImportResolve_NoImportNodes) {
+  auto pagxPath = CopyToTemp("import_node_none.pagx", "resolve_none.pagx");
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--resolve", pagxPath});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, ImportResolve_OutputToNewFile) {
+  auto pagxPath = TestResourcePath("import_node_basic.pagx");
+  auto outputPath = TempDir() + "/resolve_output.pagx";
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--resolve", pagxPath, "-o", outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+
+  auto doc = pagx::PAGXImporter::FromFile(outputPath);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(doc->hasUnresolvedImports());
+}
+
+CLI_TEST(PAGXCliTest, ImportResolve_MutuallyExclusiveWithInput) {
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", "a.svg", "--resolve", "b.pagx"});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, ImportResolve_MissingFile) {
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--resolve", "nonexistent.pagx"});
+  EXPECT_NE(ret, 0);
+}
+
+//==============================================================================
+// CLI unresolved Import checks
+//==============================================================================
+
+CLI_TEST(PAGXCliTest, UnresolvedImport_LayoutRejects) {
+  auto pagxPath = TestResourcePath("import_node_basic.pagx");
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", pagxPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, UnresolvedImport_RenderRejects) {
+  auto pagxPath = TestResourcePath("import_node_basic.pagx");
+  auto outputPath = TempDir() + "/unresolved_render.png";
+  auto ret = CallRun(pagx::cli::RunRender, {"render", "-o", outputPath, pagxPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, UnresolvedImport_BoundsRejects) {
+  auto pagxPath = TestResourcePath("import_node_basic.pagx");
+  auto ret = CallRun(pagx::cli::RunBounds, {"bounds", pagxPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, UnresolvedImport_ExportRejects) {
+  auto pagxPath = TestResourcePath("import_node_basic.pagx");
+  auto outputPath = TempDir() + "/unresolved_export.svg";
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--input", pagxPath, "--output", outputPath});
+  EXPECT_NE(ret, 0);
+}
+
+//==============================================================================
+// Verify screenshot output
+//==============================================================================
+
+CLI_TEST(PAGXCliTest, Verify_WritesScreenshot) {
+  auto inputPath = TestResourcePath("import_node_none.pagx");
+  auto pngPath = TempDir() + "/import_node_none.png";
+  auto layoutPath = TempDir() + "/import_node_none.layout.xml";
+  std::filesystem::remove(pngPath);
+  std::filesystem::remove(layoutPath);
+  auto tempPagx = CopyToTemp("import_node_none.pagx", "import_node_none.pagx");
+
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", tempPagx});
+  EXPECT_EQ(ret, 0);
+
+  auto expectedPng = TempDir() + "/import_node_none.png";
+  auto expectedLayout = TempDir() + "/import_node_none.layout.xml";
+  EXPECT_TRUE(std::filesystem::exists(expectedPng));
+  EXPECT_TRUE(std::filesystem::exists(expectedLayout));
+  EXPECT_GT(std::filesystem::file_size(expectedPng), 0u);
 }
 
 }  // namespace pag
