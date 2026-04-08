@@ -2113,7 +2113,7 @@ static void WriteLayoutLayer(std::ostream& os, const Layer* layer, int indent) {
   WriteBoundsAttr(os, bounds.x, bounds.y, bounds.width, bounds.height);
 
   WriteLayoutAttrs(os, layer->layout, layer->gap, layer->flex, layer->padding, layer->alignment,
-                    layer->arrangement, layer->includeInLayout, layer->clipToBounds);
+                   layer->arrangement, layer->includeInLayout, layer->clipToBounds);
 
   bool hasChildren = !layer->contents.empty() || !layer->children.empty();
   if (!hasChildren) {

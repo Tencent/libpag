@@ -372,12 +372,11 @@ void WritePaddingAttr(std::ostream& os, const Padding& padding) {
   if (allEqual) {
     os << " padding=\"" << static_cast<int>(padding.top) << "\"";
   } else if (vhEqual) {
-    os << " padding=\"" << static_cast<int>(padding.top) << ","
-       << static_cast<int>(padding.left) << "\"";
+    os << " padding=\"" << static_cast<int>(padding.top) << "," << static_cast<int>(padding.left)
+       << "\"";
   } else {
-    os << " padding=\"" << static_cast<int>(padding.top) << ","
-       << static_cast<int>(padding.right) << "," << static_cast<int>(padding.bottom) << ","
-       << static_cast<int>(padding.left) << "\"";
+    os << " padding=\"" << static_cast<int>(padding.top) << "," << static_cast<int>(padding.right)
+       << "," << static_cast<int>(padding.bottom) << "," << static_cast<int>(padding.left) << "\"";
   }
 }
 
