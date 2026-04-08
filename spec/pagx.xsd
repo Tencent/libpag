@@ -355,13 +355,6 @@
     </xs:restriction>
   </xs:simpleType>
 
-  <xs:simpleType name="ColorSpaceType">
-    <xs:restriction base="xs:string">
-      <xs:enumeration value="sRGB"/>
-      <xs:enumeration value="p3"/>
-    </xs:restriction>
-  </xs:simpleType>
-
   <!-- ========================= Attribute Groups ========================= -->
 
   <!-- Common attributes available on any element: id and data-* -->
@@ -388,15 +381,10 @@
     <xs:attribute name="color" type="ColorType" use="required"/>
   </xs:complexType>
 
-  <!-- SolidColor: color attribute is preferred; red/green/blue/alpha/colorSpace are fallback -->
+  <!-- SolidColor -->
   <xs:complexType name="SolidColorType">
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="color" type="ColorType"/>
-    <xs:attribute name="red" type="xs:decimal" default="0"/>
-    <xs:attribute name="green" type="xs:decimal" default="0"/>
-    <xs:attribute name="blue" type="xs:decimal" default="0"/>
-    <xs:attribute name="alpha" type="xs:decimal" default="1"/>
-    <xs:attribute name="colorSpace" type="ColorSpaceType" default="sRGB"/>
+    <xs:attribute name="color" type="ColorType" use="required"/>
   </xs:complexType>
 
   <!-- LinearGradient -->
