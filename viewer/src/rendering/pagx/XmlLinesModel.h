@@ -20,6 +20,7 @@
 
 #include <QAbstractListModel>
 #include <QString>
+#include <mutex>
 #include <vector>
 
 namespace pag {
@@ -82,6 +83,7 @@ class XmlLinesModel : public QAbstractListModel {
  private:
   std::vector<QString> lines = {};
   mutable std::vector<QString> highlightedLines = {};
+  mutable std::mutex highlightCacheMutex = {};
   QString fullText = {};
   qreal _maxLineWidth = 0;
 };

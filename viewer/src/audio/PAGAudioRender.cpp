@@ -94,11 +94,13 @@ void PAGAudioRender::init() {  // runs in audio thread
 
 void PAGAudioRender::onVolumeChange(float volume) {
   audioVolume = volume;
-  audioOutput->setVolume(volume);
+  if (audioOutput != nullptr) {
+    audioOutput->setVolume(volume);
+  }
 }
 
 void PAGAudioRender::onWriteData(std::shared_ptr<ByteData> data) {
-  if (!isPlaying || data == nullptr) {
+  if (!isPlaying || data == nullptr || audioOutput == nullptr || audioDevice == nullptr) {
     return;
   }
   auto dataPtr = reinterpret_cast<const char*>(data->data());

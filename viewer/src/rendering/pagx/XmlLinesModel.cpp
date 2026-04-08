@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "rendering/pagx/XmlLinesModel.h"
+#include <mutex>
 #include "rendering/pagx/XmlSyntaxHighlighter.h"
 
 namespace pag {
@@ -45,10 +46,16 @@ QVariant XmlLinesModel::data(const QModelIndex& index, int role) const {
       return line;
     case HighlightedTextRole: {
       auto idx = static_cast<size_t>(index.row());
-      if (highlightedLines[idx].isEmpty()) {
-        highlightedLines[idx] = XmlSyntaxHighlighter::highlightLine(line);
+      {
+        std::lock_guard<std::mutex> lock(highlightCacheMutex);
+        if (idx < highlightedLines.size() && highlightedLines[idx].isEmpty()) {
+          highlightedLines[idx] = XmlSyntaxHighlighter::highlightLine(line);
+        }
+        if (idx < highlightedLines.size()) {
+          return highlightedLines[idx];
+        }
       }
-      return highlightedLines[idx];
+      return {};
     }
     default:
       return {};
@@ -86,15 +93,19 @@ void XmlLinesModel::setContent(const QString& xmlContent) {
   // Release memory if new content is significantly smaller (less than half the previous capacity)
   // This prevents memory bloat when switching from large files to small files
   auto newSize = static_cast<size_t>(lineList.size());
-  if (newSize < lines.capacity() / 2) {
-    lines = std::vector<QString>();
-    highlightedLines = std::vector<QString>();
-  } else {
-    lines.clear();
-    highlightedLines.clear();
+  {
+    std::lock_guard<std::mutex> lock(highlightCacheMutex);
+    if (newSize < lines.capacity() / 2) {
+      lines = std::vector<QString>();
+      highlightedLines = std::vector<QString>();
+    } else {
+      lines.clear();
+      highlightedLines.clear();
+    }
+    lines.reserve(newSize);
+    highlightedLines.resize(newSize);
   }
-  lines.reserve(newSize);
-  highlightedLines.resize(newSize);
+
   int maxLength = 0;
   for (const auto& line : lineList) {
     lines.push_back(line);
@@ -115,8 +126,11 @@ void XmlLinesModel::setContent(const QString& xmlContent) {
 
 void XmlLinesModel::clear() {
   beginResetModel();
-  lines.clear();
-  highlightedLines.clear();
+  {
+    std::lock_guard<std::mutex> lock(highlightCacheMutex);
+    lines.clear();
+    highlightedLines.clear();
+  }
   fullText.clear();
   _maxLineWidth = 0;
   endResetModel();
@@ -138,13 +152,16 @@ void XmlLinesModel::setLineText(int index, const QString& text) {
   }
 
   auto idx = static_cast<size_t>(index);
-  if (lines[idx] == text) {
-    return;  // No change
-  }
+  {
+    std::lock_guard<std::mutex> lock(highlightCacheMutex);
+    if (lines[idx] == text) {
+      return;  // No change
+    }
 
-  // Invalidate highlight cache for modified line
-  if (idx < highlightedLines.size()) {
-    highlightedLines[idx].clear();
+    // Invalidate highlight cache for modified line
+    if (idx < highlightedLines.size()) {
+      highlightedLines[idx].clear();
+    }
   }
 
   // Update max line width

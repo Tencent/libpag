@@ -104,12 +104,15 @@ void PAGView::onAudioTimeChanged(int64_t audioTime) {
   }
   auto timeNow = tgfx::Clock::Now();
   int64_t lastPlayTimeCopy = 0;
+  double currentProgress = 0.0;
   {
     std::lock_guard<std::mutex> lock(lastPlayTimeMutex);
     lastPlayTimeCopy = lastPlayTime;
   }
+  // Read progress once under lock to avoid race condition
+  currentProgress = viewModel->getProgress();
   auto displayTime = timeNow - lastPlayTimeCopy;
-  auto currentDisplayTime = static_cast<int64_t>(viewModel->getProgress() * duration) + displayTime;
+  auto currentDisplayTime = static_cast<int64_t>(currentProgress * duration) + displayTime;
   if (audioTime == 0 || (audioTime - currentDisplayTime > MaxAudioLeadThreshold)) {
     {
       std::lock_guard<std::mutex> lock(lastPlayTimeMutex);

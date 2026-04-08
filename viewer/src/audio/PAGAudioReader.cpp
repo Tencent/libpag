@@ -88,7 +88,9 @@ std::shared_ptr<PAGAudioSample> PAGAudioReader::readNextSample() {
     return nullptr;
   }
   auto sample = audioReader->getNextSample();
-  currentProgress = sample->time;
+  if (sample != nullptr) {
+    currentProgress = sample->time;
+  }
   return sample;
 }
 
