@@ -1889,6 +1889,23 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ZeroSizeExplicit) {
   EXPECT_TRUE(output.find("zero size") == std::string::npos);
 }
 
+// Empty layer (no contents, no children) in a layout should NOT trigger zero-size diagnostic,
+// while a sibling with content and zero width should still trigger it.
+CLI_TEST(PAGXCliTest, LayoutCheck_ZeroSizeEmpty) {
+  auto path = TestResourcePath("layout_check_zero_size_empty.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  // The non-empty Layer with width="0" should trigger zero-size.
+  EXPECT_TRUE(output.find("zero size (0x50)") != std::string::npos);
+  // The empty leaf Layer (line 5) should NOT trigger zero-size.
+  EXPECT_TRUE(output.find(":5: zero size") == std::string::npos);
+}
+
 // Polystar without explicit position should have auto-position applied at import time.
 // Content-measured Layer should NOT report content-origin-offset.
 CLI_TEST(PAGXCliTest, LayoutCheck_PolystarOrigin) {
