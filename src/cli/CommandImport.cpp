@@ -173,7 +173,7 @@ static std::string GetDirectory(const std::string& path) {
   if (slash != std::string::npos) {
     return path.substr(0, slash + 1);
   }
-  return "";
+  return "./";
 }
 
 static std::string InferFormatFromContent(const std::string& content) {
