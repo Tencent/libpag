@@ -663,6 +663,8 @@ SplitView {
                                         }
 
                                         onClicked: {
+                                            if (!contentView || !contentView.viewModel)
+                                                return;
                                             let newXml = xmlSourceEditor.getText();
                                             let error = contentView.viewModel.applyXmlChanges(newXml);
                                             if (error === "") {
