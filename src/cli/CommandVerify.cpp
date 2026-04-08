@@ -290,7 +290,8 @@ static void DetectUnreferencedResources(const PAGXDocument* doc,
     }
     if (refs.find(node->id) == refs.end()) {
       AddDiagnostic(diagnostics, node->sourceLine,
-                    "unreferenced resource <" + NodeTypeName(type) + "> id=\"" + node->id +
+                    std::string("unreferenced resource <") + NodeTypeName(type) + "> id=\"" +
+                        node->id +
                         "\". Fix: check if this resource should be "
                         "referenced or removed");
     }
@@ -413,7 +414,7 @@ static void DetectDuplicateGradients(const PAGXDocument* doc, const LineNodeMap&
     if (!IsGradient(nodePtr->nodeType())) {
       continue;
     }
-    auto typeName = NodeTypeName(nodePtr->nodeType());
+    std::string typeName = NodeTypeName(nodePtr->nodeType());
     auto* xmlNode = FindXmlNode(lineNodeMap, nodePtr->sourceLine, typeName.c_str());
     if (xmlNode == nullptr) {
       continue;
@@ -1293,7 +1294,6 @@ static void DetectRectangularMask(const Layer* layer, std::vector<VerifyDiagnost
       maskLayer->contents[1]->nodeType() != NodeType::Fill) {
     return;
   }
-  auto* rect = static_cast<Rectangle*>(maskLayer->contents[0]);
   auto* fill = static_cast<Fill*>(maskLayer->contents[1]);
   if (fill->alpha < 0.999f) {
     return;
@@ -1547,32 +1547,19 @@ static void DetectFlexInContentMeasuredParent(const Layer* layer, const Layer* p
     return;
   }
   bool horizontal = parentLayer->layout == LayoutMode::Horizontal;
-  float explicitMain = horizontal ? layer->width : layer->height;
-  if (!std::isnan(explicitMain)) {
+  if (!std::isnan(horizontal ? layer->width : layer->height)) {
     return;
   }
-  float parentExplicitMain = horizontal ? parentLayer->width : parentLayer->height;
-  if (!std::isnan(parentExplicitMain)) {
-    return;
-  }
-  bool parentMainFromConstraints =
-      horizontal ? (!std::isnan(parentLayer->left) && !std::isnan(parentLayer->right))
-                 : (!std::isnan(parentLayer->top) && !std::isnan(parentLayer->bottom));
-  if (parentMainFromConstraints) {
-    return;
-  }
-  // The parent may acquire its main-axis size from flex in a grandparent layout. Check the
-  // resolved layout bounds instead of relying solely on declared attributes.
   auto parentBounds = parentLayer->layoutBounds();
-  float parentResolvedMain = horizontal ? parentBounds.width : parentBounds.height;
-  if (parentResolvedMain > 0) {
+  float parentMainSize = horizontal ? parentBounds.width : parentBounds.height;
+  if (parentMainSize > 0) {
     return;
   }
   const char* axis = horizontal ? "width" : "height";
-  AddDiagnostic(
-      diagnostics, layer->sourceLine,
-      std::string("flex has no effect, parent has no ") + axis +
-          " to distribute. Fix: check parent sizing or use explicit size instead of flex");
+  AddDiagnostic(diagnostics, layer->sourceLine,
+                std::string("flex has no effect, parent ") + axis +
+                    " is 0 after layout. Fix: give the parent an explicit " + axis +
+                    " or ensure it receives size from its own parent layout");
 }
 
 static void DetectContentOriginOffset(const Layer* layer, const Layer* parentLayer,

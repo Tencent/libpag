@@ -4480,6 +4480,32 @@ PAGX_TEST(PAGXTest, FlexDoesNotWriteBackWidthHeight) {
   EXPECT_FLOAT_EQ(child2->layoutWidth, 200);
 }
 
+PAGX_TEST(PAGXTest, VerifyNestedFlexNoFalsePositive) {
+  // When a parent container gets its main-axis size from flex in a grandparent layout, child flex
+  // items should not trigger the "flex has no effect" diagnostic.
+  std::string xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="400" height="300">
+  <Layer width="400" height="300" layout="vertical" gap="10">
+    <Layer height="40">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#3366E6"/>
+    </Layer>
+    <Layer flex="1" layout="vertical" gap="5">
+      <Layer flex="1">
+        <Rectangle left="0" right="0" top="0" bottom="0"/>
+        <Fill color="#E63333"/>
+      </Layer>
+      <Layer height="60">
+        <Rectangle left="0" right="0" top="0" bottom="0"/>
+        <Fill color="#33CC4D"/>
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>)";
+  auto pagxPath = SavePAGXFile(xml, "PAGXTest/verify_nested_flex.pagx");
+  VerifyFile(pagxPath, "verify_nested_flex");
+}
+
 // =====================================================================================
 // Auto Layout - Edge Case Fixes (P2)
 // =====================================================================================
