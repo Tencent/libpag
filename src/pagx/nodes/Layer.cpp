@@ -113,6 +113,9 @@ void Layer::onMeasure(LayoutContext*) {
       measuredW = std::max(measuredW, cx);
       measuredH = std::max(measuredH, cy);
     }
+    // Add padding to content measurement, consistent with layout mode behavior.
+    measuredW += padding.left + padding.right;
+    measuredH += padding.top + padding.bottom;
   }
 
   // Use explicit value if set, otherwise use measured value.
@@ -146,15 +149,36 @@ void Layer::updateLayout(LayoutContext* context) {
     performContainerLayout(context);
   }
 
-  // Collect contents + non-flex child Layers for unified constraint positioning.
-  auto nodes = LayoutNode::CollectLayoutNodes(contents, false);
+  // VectorElements (contents): always use full bounds, unaffected by padding.
+  auto contentNodes = LayoutNode::CollectLayoutNodes(contents, false);
+  LayoutNode::PerformConstraintLayout(contentNodes, layoutWidth, layoutHeight, context);
+
+  // Child Layers not in flex flow: use padding-inset bounds as constraint reference frame.
+  std::vector<LayoutNode*> childNodes;
   for (auto* child : children) {
     bool inFlexFlow = (layout != LayoutMode::None && child->includeInLayout);
     if (!inFlexFlow) {
-      nodes.push_back(child);
+      childNodes.push_back(child);
     }
   }
-  LayoutNode::PerformConstraintLayout(nodes, layoutWidth, layoutHeight, context);
+  if (!childNodes.empty()) {
+    bool hasPadding = !padding.isZero();
+    float cw =
+        hasPadding ? std::max(0.0f, layoutWidth - padding.left - padding.right) : layoutWidth;
+    float ch =
+        hasPadding ? std::max(0.0f, layoutHeight - padding.top - padding.bottom) : layoutHeight;
+    LayoutNode::PerformConstraintLayout(childNodes, cw, ch, context);
+    // Offset child positions to the padding-inset origin.
+    if (hasPadding) {
+      for (auto* node : childNodes) {
+        auto* child = static_cast<Layer*>(node);
+        child->x += padding.left;
+        child->y += padding.top;
+        child->layoutX += padding.left;
+        child->layoutY += padding.top;
+      }
+    }
+  }
 }
 
 void Layer::performContainerLayout(LayoutContext* context) {

@@ -33,23 +33,25 @@ Layers in rows or columns, and constraint positioning for positioning elements w
 
 ```xml
 <pagx version="1.0" width="200" height="80">
-  <Layer centerX="0" centerY="0">
+  <Layer centerX="0" centerY="0" padding="10,15">
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
     <Fill color="#3B82F6"/>
-    <Group centerX="0" centerY="0">
-      <Text left="15" right="15" top="10" bottom="10" text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+    <Layer centerX="0" centerY="0">
+      <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
       <Fill color="#FFF"/>
-    </Group>
+    </Layer>
     <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#3B82F640"/>
   </Layer>
 </pagx>
 ```
 
-**Pattern**: Content-driven button (also for badges/tags). Text constraints act as padding —
-they push the content-measured Layer outward to size the button; Rectangle stretches to fill
-as background. For fixed-size buttons, set explicit Layer size or use container layout — text
-stays centered and background adapts. Text linebox is taller than glyphs (CSS linebox model),
-so use larger horizontal than vertical padding for visually equal spacing.
+**Pattern**: Content-driven button (also for badges/tags). `padding` on the outer Layer
+defines inner spacing; the child Layer (Text) is centered within the padding-inset area via
+`centerX`/`centerY`. Rectangle (VectorElement) stretches to fill the full bounds as
+background, unaffected by padding. The outer Layer is content-measured: its size =
+child Layer size + padding, so the button auto-sizes to fit text. Text linebox is taller
+than glyphs (CSS linebox model), so use larger horizontal than vertical padding for visually
+equal spacing.
 
 ### Icon + Label Row
 
@@ -193,22 +195,22 @@ DropShadowStyle for depth. For square avatars, use Rectangle with `roundness`.
 
 ```xml
 <pagx version="1.0" width="200" height="96">
-  <Layer left="12" right="12" top="12" bottom="12" layout="vertical" gap="8">
-    <Layer>
+  <Layer width="200" height="96" layout="vertical" gap="8" padding="12">
+    <Layer padding="8,12">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
       <Fill color="#6366F1"/>
-      <Group centerX="0" centerY="0">
-        <Text left="12" right="12" top="8" bottom="8" text="Messages" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
+      <Layer centerX="0" centerY="0">
+        <Text text="Messages" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
         <Fill color="#FFF"/>
-      </Group>
+      </Layer>
     </Layer>
-    <Layer>
+    <Layer padding="8,12">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
       <Fill color="#F1F5F9"/>
-      <Group centerX="0" centerY="0">
-        <Text left="12" right="12" top="8" bottom="8" text="Settings" fontFamily="Arial" fontSize="13"/>
+      <Layer centerX="0" centerY="0">
+        <Text text="Settings" fontFamily="Arial" fontSize="13"/>
         <Fill color="#334155"/>
-      </Group>
+      </Layer>
     </Layer>
     <!-- Red dot: excluded from layout, positioned outside parent bounds -->
     <Layer right="-6" top="-6" includeInLayout="false">
@@ -248,22 +250,22 @@ A card with vertical container layout, text header, and action buttons.
     </Layer>
     <!-- Action buttons: two equal-width buttons with flex distribution -->
     <Layer height="40" layout="horizontal" gap="16">
-      <Layer flex="1" layout="horizontal" alignment="center" arrangement="center">
+      <Layer flex="1" padding="16">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
         <Fill color="#6366F1"/>
-        <Group centerX="0" centerY="0">
-          <Text left="16" right="16" top="16" bottom="16" text="Send" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+        <Layer centerX="0" centerY="0">
+          <Text text="Send" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
           <Fill color="#FFF"/>
-        </Group>
+        </Layer>
       </Layer>
-      <Layer flex="1" layout="horizontal" alignment="center" arrangement="center">
+      <Layer flex="1" padding="16">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
         <Fill color="#F1F5F9"/>
         <Stroke color="#CBD5E1" width="1" align="inside"/>
-        <Group centerX="0" centerY="0">
-          <Text left="16" right="16" top="16" bottom="16" text="Request" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+        <Layer centerX="0" centerY="0">
+          <Text text="Request" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
           <Fill color="#1E293B"/>
-        </Group>
+        </Layer>
       </Layer>
     </Layer>
     <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000015"/>
@@ -331,11 +333,11 @@ any repeated element: cards, list items, grid cells.
 
 ```xml
 <pagx version="1.0" width="430" height="123">
-  <Layer width="430" height="123">
+  <Layer width="430" height="123" padding="20">
     <!-- Light background to make white tab bar visible -->
     <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F1F5F9"/>
-    <Layer left="20" right="20" top="20" bottom="20">
+    <Layer left="0" right="0" top="0" bottom="0">
       <!-- Top-round shape: intersect rounded rect with straight rect to flatten bottom corners -->
       <Rectangle left="0" right="0" top="0" bottom="-20" roundness="20"/>
       <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -435,13 +437,13 @@ muted color. Same structure for bottom navigation, segmented controls, toolbar i
         <Text text="alice@example.com" fontFamily="Arial" fontSize="14"/>
         <Fill color="#1E293B"/>
       </Layer>
-      <Layer width="70">
+      <Layer width="70" padding="4,8">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
         <Fill color="#ECFDF5"/>
-        <Group centerX="0" centerY="0">
-          <Text left="8" right="8" top="4" bottom="4" text="Active" fontFamily="Arial" fontSize="12"/>
+        <Layer centerX="0" centerY="0">
+          <Text text="Active" fontFamily="Arial" fontSize="12"/>
           <Fill color="#10B981"/>
-        </Group>
+        </Layer>
       </Layer>
     </Layer>
     <!-- Row divider -->
@@ -459,13 +461,13 @@ muted color. Same structure for bottom navigation, segmented controls, toolbar i
         <Text text="bob@example.com" fontFamily="Arial" fontSize="14"/>
         <Fill color="#1E293B"/>
       </Layer>
-      <Layer width="70">
+      <Layer width="70" padding="4,8">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
         <Fill color="#FEF3C7"/>
-        <Group centerX="0" centerY="0">
-          <Text left="8" right="8" top="4" bottom="4" text="Pending" fontFamily="Arial" fontSize="12"/>
+        <Layer centerX="0" centerY="0">
+          <Text text="Pending" fontFamily="Arial" fontSize="12"/>
           <Fill color="#D97706"/>
-        </Group>
+        </Layer>
       </Layer>
     </Layer>
     <DropShadowStyle offsetY="2" blurX="8" blurY="8" color="#0000000A"/>

@@ -963,7 +963,8 @@ static void DetectStructurallyIdenticalLayers(const PAGXDocument* doc,
 }
 
 // ============================================================================
-// Static Detection: includeInLayout/flex Without Parent Layout
+// Static Detection: includeInLayout/flex Without Parent Layout,
+//                   gap/alignment/arrangement Without Self Layout
 // ============================================================================
 
 static void DetectIneffectiveLayoutAttrs(const Layer* layer, bool parentHasLayout,
@@ -978,6 +979,24 @@ static void DetectIneffectiveLayoutAttrs(const Layer* layer, bool parentHasLayou
       AddDiagnostic(diagnostics, layer->sourceLine,
                     "flex has no effect, parent has no layout. Fix: check if parent needs "
                     "layout=\"horizontal/vertical\" or if flex should be removed");
+    }
+  }
+  // gap/alignment/arrangement require layout on self (padding does not — it works without layout).
+  if (layer->layout == LayoutMode::None) {
+    if (layer->gap > 0) {
+      AddDiagnostic(diagnostics, layer->sourceLine,
+                    "gap has no effect without layout. "
+                    "Fix: add layout=\"horizontal\" or layout=\"vertical\", or remove gap");
+    }
+    if (layer->alignment != Alignment::Stretch) {
+      AddDiagnostic(diagnostics, layer->sourceLine,
+                    "alignment has no effect without layout. "
+                    "Fix: add layout=\"horizontal\" or layout=\"vertical\", or remove alignment");
+    }
+    if (layer->arrangement != Arrangement::Start) {
+      AddDiagnostic(diagnostics, layer->sourceLine,
+                    "arrangement has no effect without layout. "
+                    "Fix: add layout=\"horizontal\" or layout=\"vertical\", or remove arrangement");
     }
   }
 }

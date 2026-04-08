@@ -340,7 +340,6 @@ static int ResolveImports(const ImportOptions& options) {
   }
 
   if (resolvedCount == 0 && errorCount == 0) {
-    std::cout << "pagx import: no <Import> nodes found\n";
     return 0;
   }
 

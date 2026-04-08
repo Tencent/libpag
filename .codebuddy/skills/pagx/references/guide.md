@@ -113,6 +113,10 @@ pagx (required: version, width, height)
 **Layer arrangement = CSS Flexbox.** Never fall back to constraint positioning when the
 layout is expressible as nested flex containers.
 
+`padding` works on **all Layers** — with `layout`, it insets the content area for flex
+children; without `layout`, it insets the constraint reference frame for child Layers.
+VectorElements are never affected by padding (they always reference full Layer bounds).
+
 **CSS Flexbox → PAGX**:
 
 | CSS Flexbox | PAGX | Notes |
@@ -120,7 +124,7 @@ layout is expressible as nested flex containers.
 | `flex-direction` | `layout` | `row` → `horizontal`, `column` → `vertical` |
 | `flex` / `flex-grow` | `flex` | Same semantics |
 | `gap` | `gap` | Same semantics |
-| `padding` | `padding` | Same shorthand (`"20"`, `"10,20"`, `"10,20,10,20"`) |
+| `padding` | `padding` | Works with or without `layout` — always insets child Layer constraints. Same shorthand (`"20"`, `"10,20"`, `"10,20,10,20"`) |
 | `align-items` | `alignment` | `stretch`/`flex-start`/`center`/`flex-end` → `stretch`/`start`/`center`/`end` |
 | `justify-content` | `arrangement` | `flex-start`/`center`/... → `start`/`center`/`end`/`spaceBetween`/`spaceEvenly`/`spaceAround` |
 

@@ -582,7 +582,7 @@ All three child Layers have no `width` set and `flex="1"`, equally sharing avail
 | `layout` | LayoutMode | none | Container layout mode for child layer arrangement |
 | `gap` | float | 0 | Spacing between adjacent child Layers |
 | `flex` | float | 0 | Flex weight for main-axis sizing. When a child has no explicit main-axis size: `flex=0` (default) uses content-measured size; `flex>0` takes a proportional share of remaining space by weight. Ignored when explicit `width`/`height` is set on the main axis |
-| `padding` | float or "t,r,b,l" | 0 | Inner padding. Supports single value (uniform), two values (vertical,horizontal), four values (top,right,bottom,left), consistent with CSS shorthand |
+| `padding` | float or "t,r,b,l" | 0 | Inner padding for child Layers. Insets the constraint reference frame for child Layers without affecting VectorElements (which always reference the full Layer bounds). Works both with and without `layout`. Supports single value (uniform), two values (vertical,horizontal), four values (top,right,bottom,left), consistent with CSS shorthand |
 | `alignment` | Alignment | stretch | Cross-axis alignment |
 | `arrangement` | Arrangement | start | Main-axis arrangement |
 | `includeInLayout` | bool | true | Whether to participate in parent container layout; set to false to leave the layout flow |
@@ -628,6 +628,14 @@ Child Layer main-axis sizing has three states:
 Cross-axis: Uses explicit `width`/`height` if set; when the parent has `alignment="stretch"`, child Layers without explicit cross-axis size stretch to fill cross-axis available space (container cross-axis size minus padding on both sides); otherwise determined by content bounds.
 
 Content area is `width × height` minus `padding` on each side.
+
+#### Padding Without Container Layout
+
+When `padding` is set on a Layer without `layout`, it insets the constraint reference frame for child Layers: `left="0"` aligns to the padding-inset left edge, `centerX="0"` centers within the inset area, and `left="0" right="0"` stretches to fill the inset width. VectorElements (Rectangle, Ellipse, Path, Text, etc.) are unaffected — their constraints always reference the full Layer bounds, allowing backgrounds to extend under the padding area. This is consistent with CSS, where padding defines the content box for positioned children while backgrounds extend to the padding edge.
+
+For content-measured Layers (no explicit `width`/`height`), padding is added to the measured size, so a Layer wrapping a 100×50 child Layer with `padding="20"` measures as 140×90.
+
+`gap`, `alignment`, and `arrangement` still require `layout` to take effect.
 
 Child Layers with `visible="false"` are not rendered but still participate in layout if `includeInLayout` is `true` (the default). To exclude an invisible child from the layout flow, set `includeInLayout="false"` explicitly.
 
@@ -681,7 +689,7 @@ Constraint attributes allow content nodes to declare positional relationships wi
 
 **Combination rules**: On each axis, only one of the following may be used: a single-edge constraint (`left`, `right`, or `centerX`), or an opposite-edge pair (`left` + `right`). The vertical axis follows the same pattern (`top` / `bottom` / `centerY`, or `top` + `bottom`). If multiple combinations are set on the same axis, the engine resolves conflicts in this priority order: `centerX` > `left`+`right` > `left` > `right` (same for vertical axis: `centerY` > `top`+`bottom` > `top` > `bottom`). Lower-priority constraints are silently ignored.
 
-**Activation**: Constraint attributes always reference the **immediate parent container** (Layer or Group)'s layout size, propagating level by level — each container resolves its own size first, then its children's constraints use that size as the reference frame. Since the engine automatically measures container sizes (see §4.1), constraints can generally always take effect. Different constraints have different levels of dependence on container size: `left`/`top` used alone have positioning formulas that do not involve container size (e.g., `tx = left - bounds.x`) and work correctly in any situation; `right`/`bottom`/`centerX`/`centerY` and opposite-edge constraints need to reference container size to calculate position.
+**Activation**: Constraint attributes reference the **immediate parent container** (Layer or Group)'s layout size, propagating level by level — each container resolves its own size first, then its children's constraints use that size as the reference frame. For **child Layers** inside a parent with `padding`, the reference frame is inset by the padding amount (see §4.2 "Padding Without Container Layout"). **VectorElements** always reference the full layout size regardless of padding. Since the engine automatically measures container sizes (see §4.1), constraints can generally always take effect. Different constraints have different levels of dependence on container size: `left`/`top` used alone have positioning formulas that do not involve container size (e.g., `tx = left - bounds.x`) and work correctly in any situation; `right`/`bottom`/`centerX`/`centerY` and opposite-edge constraints need to reference container size to calculate position.
 
 **Content Bounds**: "Edges" in constraints refer to the edges of an element's content bounds. The starting point differs by element type:
 

@@ -582,7 +582,7 @@ PAGX 文档采用层级结构组织内容：
 | `layout` | LayoutMode | none | 子图层容器布局模式 |
 | `gap` | float | 0 | 相邻子 Layer 之间的间距 |
 | `flex` | float | 0 | 主轴弹性权重。子元素无显式主轴尺寸时：`flex=0`（默认）使用内容测量尺寸；`flex>0` 按权重按比例分配剩余空间。设置了显式 `width`/`height` 时忽略此属性 |
-| `padding` | float 或 "t,r,b,l" | 0 | 内边距。支持单值（四边均匀）、两值（垂直,水平）、四值（上,右,下,左），与 CSS shorthand 一致 |
+| `padding` | float 或 "t,r,b,l" | 0 | 子 Layer 内边距。内缩子 Layer 的约束参考系，不影响 VectorElements（VectorElements 始终参考完整 Layer 尺寸）。有无 `layout` 均生效。支持单值（四边均匀）、两值（垂直,水平）、四值（上,右,下,左），与 CSS shorthand 一致 |
 | `alignment` | Alignment | stretch | 交叉轴对齐方式 |
 | `arrangement` | Arrangement | start | 主轴排布方式 |
 | `includeInLayout` | bool | true | 是否参与父容器的布局排列，设为 false 时脱离布局流 |
@@ -628,6 +628,14 @@ PAGX 文档采用层级结构组织内容：
 交叉轴尺寸：有显式 `width`/`height` 则使用；当父容器 `alignment="stretch"` 时，未设交叉轴尺寸的子 Layer 拉伸填满交叉轴可用空间（容器交叉轴尺寸减去两侧 padding）；否则由内容 bounds 决定。
 
 内容区域为 `width × height` 减去各边 `padding`。
+
+#### 无容器布局时的 Padding
+
+当 Layer 未设置 `layout` 但设置了 `padding` 时，子 Layer 的约束参考系会内缩：`left="0"` 对齐到内缩后的左边缘，`centerX="0"` 在内缩区域内居中，`left="0" right="0"` 拉伸填满内缩后的宽度。VectorElements（Rectangle、Ellipse、Path、Text 等）不受影响——其约束始终参考完整的 Layer 尺寸，使得背景可以延伸到 padding 区域下方。这与 CSS 行为一致：padding 定义子元素的内容区域，而背景延伸到 padding 边缘。
+
+对内容测量尺寸的 Layer（未显式设置 `width`/`height`），padding 会加到测量值上，例如一个包裹 100×50 子 Layer 且 `padding="20"` 的 Layer 测量尺寸为 140×90。
+
+`gap`、`alignment` 和 `arrangement` 仍然需要 `layout` 才能生效。
 
 `visible="false"` 的子 Layer 不会渲染，但如果 `includeInLayout` 为 `true`（默认值），仍然参与布局计算。若需将不可见的子 Layer 排除出布局流，需显式设置 `includeInLayout="false"`。
 
@@ -681,7 +689,7 @@ PAGX 文档采用层级结构组织内容：
 
 **组合规则**：每个轴上只能使用以下组合之一：单边定位（`left`、`right`、`centerX` 任选其一），或对边约束（`left` + `right`）。垂直轴同理（`top` / `bottom` / `centerY`，或 `top` + `bottom`）。如果同一轴上设置了多种组合，引擎按以下优先级解决冲突：`centerX` > `left`+`right` > `left` > `right`（垂直轴同理：`centerY` > `top`+`bottom` > `top` > `bottom`）。低优先级的约束被静默忽略。
 
-**生效条件**：约束属性总是参照元素的**直接父容器**（Layer 或 Group）的布局尺寸，逐层向下传递——每层容器先确定自身尺寸，其子元素的约束再以该尺寸为参考系。由于引擎会自动测量容器尺寸（见 §4.1），约束通常都能生效。不同约束对容器尺寸的依赖程度不同：`left`/`top` 单独使用时，定位公式不涉及容器尺寸（如 `tx = left - bounds.x`），在任何情况下都能正确工作；`right`/`bottom`/`centerX`/`centerY` 以及对边约束需要引用容器尺寸来计算位置。
+**生效条件**：约束属性参照元素的**直接父容器**（Layer 或 Group）的布局尺寸，逐层向下传递——每层容器先确定自身尺寸，其子元素的约束再以该尺寸为参考系。对于在有 `padding` 的父 Layer 中的**子 Layer**，参考系会按 padding 量内缩（见 §4.2「无容器布局时的 Padding」）。**VectorElements** 始终参考完整的布局尺寸，不受 padding 影响。由于引擎会自动测量容器尺寸（见 §4.1），约束通常都能生效。不同约束对容器尺寸的依赖程度不同：`left`/`top` 单独使用时，定位公式不涉及容器尺寸（如 `tx = left - bounds.x`），在任何情况下都能正确工作；`right`/`bottom`/`centerX`/`centerY` 以及对边约束需要引用容器尺寸来计算位置。
 
 **Content Bounds**：约束中的「边缘」指元素的 content bounds 边缘。不同元素类型的起点不同：
 

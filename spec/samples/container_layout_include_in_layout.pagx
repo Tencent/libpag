@@ -37,7 +37,7 @@
     </Layer>
 
     <!-- Notification badge: a Layer leaves the layout flow -->
-    <Layer right="4" top="4" width="32" height="32" includeInLayout="false">
+    <Layer right="-16" top="-16" width="32" height="32" includeInLayout="false">
       <Ellipse left="0" right="0" top="0" bottom="0"/>
       <Fill color="#EF4444"/>
       <Group centerX="0" centerY="0">

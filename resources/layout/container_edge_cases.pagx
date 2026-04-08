@@ -101,11 +101,9 @@
       <!-- 4. Three-level nesting: vertical → horizontal → vertical -->
       <Layer width="200" height="220" layout="vertical" gap="8" padding="10">
         <!-- Border -->
-        <Layer left="0" right="0" top="0" bottom="0" includeInLayout="false">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Fill color="#E2E8F0"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        </Layer>
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Fill color="#E2E8F0"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer height="40">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
           <Fill color="#6366F1"/>
@@ -140,10 +138,8 @@
 
       <Layer flex="1" layout="horizontal" gap="10" padding="15" alignment="start">
         <!-- Border -->
-        <Layer left="0" right="0" top="0" bottom="0" includeInLayout="false">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        </Layer>
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer width="60" height="120">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
           <Fill color="#F59E0B"/>
