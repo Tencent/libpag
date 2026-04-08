@@ -289,9 +289,7 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha) 
       repeatY = "repeat";
     }
     std::string bgRepeat = (repeatX == repeatY) ? repeatX : (repeatX + " " + repeatY);
-    bool isTilingSVG = (p->tileModeX == TileMode::Repeat || p->tileModeX == TileMode::Mirror ||
-                        p->tileModeY == TileMode::Repeat || p->tileModeY == TileMode::Mirror);
-    std::string bgSize = isTilingSVG ? "" : "cover";
+    std::string bgSize;
     std::string bgPos;
     if (!p->matrix.isIdentity()) {
       float sx = std::sqrt(p->matrix.a * p->matrix.a + p->matrix.b * p->matrix.b);

@@ -482,6 +482,9 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     style += ";-webkit-text-stroke:" + FloatToString(stroke->width) + "px " +
              ColorToRGBA(sc->color, stroke->alpha);
     style += ";paint-order:stroke fill";
+    if (!fill || !fill->color) {
+      style += ";-webkit-text-fill-color:transparent";
+    }
   }
   if (alpha < 1.0f) {
     style += ";opacity:" + FloatToString(alpha);
@@ -1090,11 +1093,10 @@ void HTMLWriter::applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim, bool
     float seg1 = 1.0f - s;
     float seg2 = (e > 1.0f) ? (e - 1.0f) : e;
     float gap = std::max(0.0f, 1.0f - seg1 - seg2);
-    builder.addAttr("stroke-dasharray",
-                    FloatToString(seg2) + " " + FloatToString(gap) + " " + FloatToString(seg1));
-    if (!FloatNearlyZero(ellipseAdj)) {
-      builder.addAttr("stroke-dashoffset", FloatToString(-ellipseAdj));
-    }
+    // Use 4-value dasharray to avoid SVG odd-count auto-duplication.
+    builder.addAttr("stroke-dasharray", FloatToString(seg1) + " " + FloatToString(gap) + " " +
+                                            FloatToString(seg2) + " 0");
+    builder.addAttr("stroke-dashoffset", FloatToString(-(s + ellipseAdj)));
   }
 }
 
@@ -1265,7 +1267,7 @@ void HTMLWriter::writeGroup(HTMLBuilder& out, const Group* group, float alpha, b
 
 void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
                                const std::vector<GeoInfo>& geos, const Fill* fill,
-                               const Stroke* stroke, float alpha) {
+                               const Stroke* stroke, float alpha, const TrimPath* trim) {
   if (rep->copies <= 0) {
     return;
   }
@@ -1314,10 +1316,10 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
       }
       out.addAttr("style", s);
       out.closeTagStart();
-      renderGeo(out, geos, fill, stroke, 1.0f, false, nullptr, false);
+      renderGeo(out, geos, fill, stroke, 1.0f, false, trim, false);
       out.closeTag();
     } else {
-      renderGeo(out, geos, fill, stroke, 1.0f, false, nullptr, false);
+      renderGeo(out, geos, fill, stroke, 1.0f, false, trim, false);
     }
   }
 }

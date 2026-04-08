@@ -93,28 +93,34 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
   int si = 0;
   std::vector<std::string> dropRes = {};
   std::vector<std::string> innerRes = {};
+  std::vector<std::string> blendRes = {};
   bool needSrc = false;
+  std::string currentInput = "SourceGraphic";
+  std::string currentAlpha = "SourceAlpha";
   for (auto* f : filters) {
     switch (f->nodeType()) {
       case NodeType::BlurFilter: {
         auto b = static_cast<const BlurFilter*>(f);
         // TODO: BlurFilter.tileMode is ignored. SVG feGaussianBlur has no equivalent of
         // TileMode (Clamp/Repeat/Mirror/Decal); it always uses Decal-like behavior.
+        std::string blurId = "blur" + std::to_string(si++);
         _defs->openTag("feGaussianBlur");
-        _defs->addAttr("in", "SourceGraphic");
+        _defs->addAttr("in", currentInput);
         std::string sd = FloatToString(b->blurX);
         if (b->blurX != b->blurY) {
           sd += " " + FloatToString(b->blurY);
         }
         _defs->addAttr("stdDeviation", sd);
+        _defs->addAttr("result", blurId);
         _defs->closeTagSelfClosing();
+        currentInput = blurId;
         break;
       }
       case NodeType::DropShadowFilter: {
         auto s = static_cast<const DropShadowFilter*>(f);
         std::string i = std::to_string(si++);
         _defs->openTag("feGaussianBlur");
-        _defs->addAttr("in", "SourceAlpha");
+        _defs->addAttr("in", currentAlpha);
         std::string sd = FloatToString(s->blurX);
         if (s->blurX != s->blurY) {
           sd += " " + FloatToString(s->blurY);
@@ -151,7 +157,7 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
         auto s = static_cast<const InnerShadowFilter*>(f);
         std::string i = std::to_string(si++);
         _defs->openTag("feOffset");
-        _defs->addAttr("in", "SourceAlpha");
+        _defs->addAttr("in", currentAlpha);
         if (!FloatNearlyZero(s->offsetX)) {
           _defs->addAttr("dx", FloatToString(s->offsetX));
         }
@@ -161,7 +167,7 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
         _defs->addAttr("result", "iOff" + i);
         _defs->closeTagSelfClosing();
         _defs->openTag("feComposite");
-        _defs->addAttr("in", "SourceAlpha");
+        _defs->addAttr("in", currentAlpha);
         _defs->addAttr("in2", "iOff" + i);
         _defs->addAttr("operator", "arithmetic");
         _defs->addAttr("k2", "-1");
@@ -194,8 +200,9 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
       }
       case NodeType::ColorMatrixFilter: {
         auto cm = static_cast<const ColorMatrixFilter*>(f);
+        std::string cmId = "cm" + std::to_string(si++);
         _defs->openTag("feColorMatrix");
-        _defs->addAttr("in", "SourceGraphic");
+        _defs->addAttr("in", currentInput);
         _defs->addAttr("type", "matrix");
         std::string v;
         for (size_t j = 0; j < cm->matrix.size(); j++) {
@@ -205,7 +212,9 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
           v += FloatToString(cm->matrix[j]);
         }
         _defs->addAttr("values", v);
+        _defs->addAttr("result", cmId);
         _defs->closeTagSelfClosing();
+        currentInput = cmId;
         break;
       }
       case NodeType::BlendFilter: {
@@ -220,7 +229,7 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
         _defs->closeTagSelfClosing();
         _defs->openTag("feBlend");
         _defs->addAttr("in", "bFlood" + i);
-        _defs->addAttr("in2", "SourceGraphic");
+        _defs->addAttr("in2", currentInput);
         auto ms = BlendModeToMixBlendMode(bf->blendMode);
         if (ms) {
           _defs->addAttr("mode", ms);
@@ -229,36 +238,44 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
         _defs->closeTagSelfClosing();
         _defs->openTag("feComposite");
         _defs->addAttr("in", "bBlend" + i);
-        _defs->addAttr("in2", "SourceAlpha");
+        _defs->addAttr("in2", currentAlpha);
         _defs->addAttr("operator", "in");
+        _defs->addAttr("result", "bClip" + i);
         _defs->closeTagSelfClosing();
+        blendRes.push_back("bClip" + i);
         break;
       }
       default:
         break;
     }
   }
-  if (!dropRes.empty() || !innerRes.empty()) {
-    if (needSrc || (dropRes.size() + innerRes.size()) > 1) {
-      _defs->openTag("feMerge");
-      _defs->closeTagStart();
-      for (auto& r : dropRes) {
-        _defs->openTag("feMergeNode");
-        _defs->addAttr("in", r);
-        _defs->closeTagSelfClosing();
-      }
-      if (needSrc) {
-        _defs->openTag("feMergeNode");
-        _defs->addAttr("in", "SourceGraphic");
-        _defs->closeTagSelfClosing();
-      }
-      for (auto& r : innerRes) {
-        _defs->openTag("feMergeNode");
-        _defs->addAttr("in", r);
-        _defs->closeTagSelfClosing();
-      }
-      _defs->closeTag();
+  bool hasResults = !dropRes.empty() || !innerRes.empty() || !blendRes.empty();
+  bool multiResults = (dropRes.size() + innerRes.size() + blendRes.size() +
+                       static_cast<size_t>(needSrc ? 1 : 0)) > 1;
+  if (hasResults && (needSrc || multiResults)) {
+    _defs->openTag("feMerge");
+    _defs->closeTagStart();
+    for (auto& r : dropRes) {
+      _defs->openTag("feMergeNode");
+      _defs->addAttr("in", r);
+      _defs->closeTagSelfClosing();
     }
+    if (needSrc) {
+      _defs->openTag("feMergeNode");
+      _defs->addAttr("in", currentInput);
+      _defs->closeTagSelfClosing();
+    }
+    for (auto& r : innerRes) {
+      _defs->openTag("feMergeNode");
+      _defs->addAttr("in", r);
+      _defs->closeTagSelfClosing();
+    }
+    for (auto& r : blendRes) {
+      _defs->openTag("feMergeNode");
+      _defs->addAttr("in", r);
+      _defs->closeTagSelfClosing();
+    }
+    _defs->closeTag();
   }
   _defs->closeTag();
   return "url(#" + fid + ")";
@@ -284,6 +301,10 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type) {
   HTMLBuilder svg(0);
   svg.openTag("svg");
   svg.addAttr("xmlns", "http://www.w3.org/2000/svg");
+  svg.addAttr("width", FloatToString(_ctx->docWidth));
+  svg.addAttr("height", FloatToString(_ctx->docHeight));
+  svg.addAttr("viewBox",
+              "0 0 " + FloatToString(_ctx->docWidth) + " " + FloatToString(_ctx->docHeight));
   svg.closeTagStart();
 
   if (useFillColor) {

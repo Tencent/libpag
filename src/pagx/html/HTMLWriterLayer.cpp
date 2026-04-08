@@ -363,7 +363,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             }
           }
         }
-        writeRepeater(out, rep, geos, repFill, repStroke, distribute ? alpha : 1.0f);
+        writeRepeater(out, rep, geos, repFill, repStroke, distribute ? alpha : 1.0f, curTrim);
         geos.clear();
         curFill = nullptr;
         curStroke = nullptr;

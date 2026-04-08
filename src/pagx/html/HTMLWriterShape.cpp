@@ -140,26 +140,23 @@ std::string BuildPolystarPath(const Polystar* ps) {
   d.reserve(static_cast<size_t>(numPoints) * 50);
   d += "M" + FloatToString(lastDx + centerX) + "," + FloatToString(lastDy + centerY);
 
-  for (int i = 0; i < numPoints; i++) {
-    float angleDelta = angleStep * direction;
-    float dx = 0;
-    float dy = 0;
-    if (i == numPoints - 1) {
-      dx = firstDx;
-      dy = firstDy;
-    } else {
-      currentAngle += angleDelta;
-      dx = ps->outerRadius * std::cos(currentAngle);
-      dy = ps->outerRadius * std::sin(currentAngle);
-    }
+  float angleDelta = angleStep * direction;
+  for (int i = 1; i < numPoints; i++) {
+    currentAngle += angleDelta;
+    float dx = ps->outerRadius * std::cos(currentAngle);
+    float dy = ps->outerRadius * std::sin(currentAngle);
     if (ps->outerRoundness != 0.0f) {
       AppendPolystarCurve(d, centerX, centerY, angleDelta * 0.25f, lastDx, lastDy,
                           ps->outerRoundness, dx, dy, ps->outerRoundness);
-      lastDx = dx;
-      lastDy = dy;
     } else {
       d += "L" + FloatToString(dx + centerX) + "," + FloatToString(dy + centerY);
     }
+    lastDx = dx;
+    lastDy = dy;
+  }
+  if (ps->outerRoundness != 0.0f) {
+    AppendPolystarCurve(d, centerX, centerY, angleDelta * 0.25f, lastDx, lastDy, ps->outerRoundness,
+                        firstDx, firstDy, ps->outerRoundness);
   }
   d += "Z";
   return d;
