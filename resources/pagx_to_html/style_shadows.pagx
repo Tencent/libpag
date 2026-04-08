@@ -1,81 +1,81 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Layer styles: DropShadowStyle (uniform/asymmetric blur, showBehindLayer), InnerShadowStyle, BackgroundBlurStyle -->
-<pagx version="1.0" width="460" height="460">
+<pagx version="1.0" width="480" height="480">
   <!-- Background -->
   <Layer>
-    <Rectangle position="230,230" size="460,460"/>
+    <Rectangle position="240,240" size="480,480"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
   <!-- Title -->
   <Layer>
-    <Text text="Layer Styles" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="230,24" textAnchor="center"/>
+    <Text text="Layer Styles" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="240,34" textAnchor="center"/>
     <Fill color="#1E293B"/>
   </Layer>
   <Layer>
-    <Text text="DropShadow, InnerShadow, BackgroundBlur" fontFamily="Arial" fontSize="10" position="230,40" textAnchor="center"/>
+    <Text text="DropShadow, InnerShadow, BackgroundBlur" fontFamily="Arial" fontSize="10" position="240,50" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="230,250" size="420,370" roundness="16"/>
+    <Rectangle position="240,260" size="420,370" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
   <!-- DropShadowStyle: uniform blur -->
-  <Layer x="40" y="55">
+  <Layer x="50" y="65">
     <Rectangle position="60,60" size="100,100" roundness="16"/>
     <Fill color="#3B82F6"/>
     <DropShadowStyle offsetX="4" offsetY="8" blurX="16" blurY="16" color="#00000060"/>
   </Layer>
   <Layer>
-    <Text text="DropShadow" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="100,178" textAnchor="center"/>
+    <Text text="DropShadow" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="110,188" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- DropShadowStyle: asymmetric blur -->
-  <Layer x="210" y="55">
+  <Layer x="220" y="65">
     <Rectangle position="60,60" size="100,100" roundness="16"/>
     <Fill color="#10B981"/>
     <DropShadowStyle offsetX="0" offsetY="8" blurX="40" blurY="8" color="#00000060"/>
   </Layer>
   <Layer>
-    <Text text="Asymmetric" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="330,178" textAnchor="center"/>
+    <Text text="Asymmetric" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="340,188" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- DropShadowStyle: showBehindLayer=false -->
-  <Layer x="40" y="220">
+  <Layer x="50" y="230">
     <Rectangle position="60,60" size="100,100" roundness="16"/>
     <Fill color="#EF4444"/>
     <DropShadowStyle offsetX="4" offsetY="8" blurX="20" blurY="20" color="#00000080" showBehindLayer="false"/>
   </Layer>
   <Layer>
-    <Text text="No Behind" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="100,348" textAnchor="center"/>
+    <Text text="No Behind" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="110,358" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- InnerShadowStyle -->
-  <Layer x="210" y="220">
+  <Layer x="220" y="230">
     <Rectangle position="60,60" size="100,100" roundness="16"/>
     <Fill color="#F59E0B"/>
     <InnerShadowStyle offsetX="4" offsetY="4" blurX="12" blurY="12" color="#00000060"/>
   </Layer>
   <Layer>
-    <Text text="InnerShadow" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="330,348" textAnchor="center"/>
+    <Text text="InnerShadow" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="340,358" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- BackgroundBlurStyle -->
-  <Layer x="125" y="135">
+  <Layer x="135" y="145">
     <Rectangle position="60,60" size="100,100" roundness="16"/>
     <Fill color="#8B5CF630"/>
     <BackgroundBlurStyle blurX="8" blurY="8"/>
   </Layer>
   <Layer>
-    <Text text="BackgroundBlur" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="215,260" textAnchor="center"/>
+    <Text text="BackgroundBlur" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="225,270" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 </pagx>

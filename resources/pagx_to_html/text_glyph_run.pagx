@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: GlyphRun with pre-laid-out font paths; xOffsets, rotations, scales -->
-<pagx version="1.0" width="400" height="280">
+<pagx version="1.0" width="420" height="300">
   <Resources>
     <Font id="font1" unitsPerEm="1000">
       <Glyph id="gA" advance="600" path="M 50,-800 L 300,0 L 550,-800 Z M 175,-300 L 425,-300"/>
@@ -10,30 +10,30 @@
 
   <!-- Background -->
   <Layer>
-    <Rectangle position="200,140" size="400,280"/>
+    <Rectangle position="210,150" size="420,300"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
   <!-- Title -->
   <Layer>
-    <Text text="Glyph Run" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="200,24" textAnchor="center"/>
+    <Text text="Glyph Run" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="210,34" textAnchor="center"/>
     <Fill color="#1E293B"/>
   </Layer>
   <Layer>
-    <Text text="Custom font glyphs with per-glyph transforms" fontFamily="Arial" fontSize="10" position="200,40" textAnchor="center"/>
+    <Text text="Custom font glyphs with per-glyph transforms" fontFamily="Arial" fontSize="10" position="210,50" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="200,162" size="360,190" roundness="16"/>
+    <Rectangle position="210,172" size="360,190" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
   <!-- Layer 1: GlyphRun with xOffsets (horizontal positioning) -->
   <Layer>
-    <Text text="xOffsets positioning" fontFamily="Arial" fontSize="10" position="30,76"/>
+    <Text text="xOffsets positioning" fontFamily="Arial" fontSize="10" position="40,86"/>
     <Fill color="#94A3B8"/>
   </Layer>
   <Layer>
@@ -45,7 +45,7 @@
 
   <!-- Layer 2: GlyphRun with per-glyph rotations and scales -->
   <Layer>
-    <Text text="rotations + scales" fontFamily="Arial" fontSize="10" position="30,170"/>
+    <Text text="rotations + scales" fontFamily="Arial" fontSize="10" position="40,180"/>
     <Fill color="#94A3B8"/>
   </Layer>
   <Layer>

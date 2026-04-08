@@ -1,29 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Stroke advanced — blendMode="multiply", miterLimit="2", dashAdaptive true vs false -->
-<pagx version="1.0" width="400" height="200">
+<pagx version="1.0" width="420" height="220">
 
   <!-- === Row 1: blendMode="multiply" on overlapping strokes === -->
   <Layer>
-    <Text text="blendMode=multiply" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="65,16" textAnchor="center"/>
+    <Text text="blendMode=multiply" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="75,26" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
   <!-- Two overlapping thick stroked circles with multiply blend -->
   <Layer>
-    <Ellipse position="50,70" size="60,60"/>
+    <Ellipse position="60,80" size="60,60"/>
     <Stroke color="#EF4444" width="8" blendMode="multiply"/>
   </Layer>
   <Layer>
-    <Ellipse position="80,70" size="60,60"/>
+    <Ellipse position="90,80" size="60,60"/>
     <Stroke color="#3B82F6" width="8" blendMode="multiply"/>
   </Layer>
 
   <!-- === Row 1 col 2: miterLimit="2" vs default === -->
   <Layer>
-    <Text text="miterLimit=2" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="180,16" textAnchor="center"/>
+    <Text text="miterLimit=2" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="190,26" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
   <Layer>
-    <Text text="default (4)" fontFamily="Arial" fontSize="9" position="155,28"/>
+    <Text text="default (4)" fontFamily="Arial" fontSize="9" position="165,38"/>
     <Fill color="#64748B"/>
   </Layer>
   <!-- Sharp zigzag with default miterLimit=4 -->
@@ -32,7 +32,7 @@
     <Stroke color="#8B5CF6" width="4" join="miter" miterLimit="4"/>
   </Layer>
   <Layer>
-    <Text text="miter=2" fontFamily="Arial" fontSize="9" position="195,28"/>
+    <Text text="miter=2" fontFamily="Arial" fontSize="9" position="205,38"/>
     <Fill color="#64748B"/>
   </Layer>
   <!-- Same zigzag with miterLimit=2 — sharp corners get beveled -->
@@ -43,11 +43,11 @@
 
   <!-- === Row 2: dashAdaptive comparison === -->
   <Layer>
-    <Text text="dashAdaptive=false" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="90,110" textAnchor="center"/>
+    <Text text="dashAdaptive=false" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="100,120" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
   <Layer>
-    <Text text="dashAdaptive=true" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="310,110" textAnchor="center"/>
+    <Text text="dashAdaptive=true" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="320,120" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 

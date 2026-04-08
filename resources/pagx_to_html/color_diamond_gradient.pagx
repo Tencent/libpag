@@ -1,34 +1,34 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: DiamondGradient → CSS cannot represent, needs SVG filter fallback -->
-<pagx version="1.0" width="300" height="250">
+<pagx version="1.0" width="320" height="270">
   <!-- Background -->
   <Layer>
-    <Rectangle position="150,125" size="300,250"/>
+    <Rectangle position="160,135" size="320,270"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
   <!-- Title -->
   <Layer>
-    <Text text="Diamond Gradient" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="150,24" textAnchor="center"/>
+    <Text text="Diamond Gradient" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="160,34" textAnchor="center"/>
     <Fill color="#1E293B"/>
   </Layer>
   <Layer>
-    <Text text="SVG filter fallback required" fontFamily="Arial" fontSize="10" position="150,40" textAnchor="center"/>
+    <Text text="SVG filter fallback required" fontFamily="Arial" fontSize="10" position="160,50" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Card background -->
   <Layer>
-    <Rectangle position="150,140" size="220,150" roundness="16"/>
+    <Rectangle position="160,150" size="220,150" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
   <!-- Diamond gradient shape -->
   <Layer>
-    <Rectangle position="150,140" size="180,120" roundness="8"/>
+    <Rectangle position="160,150" size="180,120" roundness="8"/>
     <Fill>
-      <DiamondGradient center="90,60" radius="80">
+      <DiamondGradient center="100,70" radius="80">
         <ColorStop offset="0" color="#FFFFFF"/>
         <ColorStop offset="0.5" color="#8B5CF6"/>
         <ColorStop offset="1" color="#1E1B4B"/>

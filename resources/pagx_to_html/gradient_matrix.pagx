@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Gradient matrix transforms — ConicGradient.matrix, DiamondGradient.matrix -->
-<pagx version="1.0" width="300" height="200">
+<pagx version="1.0" width="320" height="220">
   <!-- ConicGradient with matrix (rotation transform on conic sweep) -->
   <Layer>
-    <Rectangle position="75,100" size="120,120" roundness="12"/>
+    <Rectangle position="85,110" size="120,120" roundness="12"/>
     <Fill>
-      <ConicGradient center="60,60" startAngle="0" endAngle="360" matrix="0.707,-0.707,0.707,0.707,0,0">
+      <ConicGradient center="70,70" startAngle="0" endAngle="360" matrix="0.707,-0.707,0.707,0.707,0,0">
         <ColorStop offset="0" color="#3B82F6"/>
         <ColorStop offset="0.33" color="#10B981"/>
         <ColorStop offset="0.66" color="#F59E0B"/>
@@ -16,9 +16,9 @@
 
   <!-- DiamondGradient with matrix (scale + rotation transform) -->
   <Layer>
-    <Rectangle position="225,100" size="120,120" roundness="12"/>
+    <Rectangle position="235,110" size="120,120" roundness="12"/>
     <Fill>
-      <DiamondGradient center="60,60" radius="60" matrix="1.2,0.3,-0.3,1.2,0,0">
+      <DiamondGradient center="70,70" radius="60" matrix="1.2,0.3,-0.3,1.2,0,0">
         <ColorStop offset="0" color="#FFFFFF"/>
         <ColorStop offset="0.5" color="#EC4899"/>
         <ColorStop offset="1" color="#1E1B4B"/>
@@ -28,11 +28,11 @@
 
   <!-- Labels -->
   <Layer>
-    <Text text="ConicGradient + matrix" fontFamily="Arial" fontSize="10" position="75,170" textAnchor="center"/>
+    <Text text="ConicGradient + matrix" fontFamily="Arial" fontSize="10" position="85,180" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer>
-    <Text text="DiamondGradient + matrix" fontFamily="Arial" fontSize="10" position="225,170" textAnchor="center"/>
+    <Text text="DiamondGradient + matrix" fontFamily="Arial" fontSize="10" position="235,180" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 </pagx>

@@ -1,46 +1,46 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Stroke all 12 attributes: color, width, alpha, blendMode, cap, join, miterLimit, dashes, dashOffset, dashAdaptive, align, placement -->
-<pagx version="1.0" width="400" height="440">
+<pagx version="1.0" width="420" height="460">
   <!-- Background -->
   <Layer>
-    <Rectangle position="200,220" size="400,440"/>
+    <Rectangle position="210,230" size="420,460"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
   <!-- Title -->
   <Layer>
-    <Text text="Stroke Attributes" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="200,24" textAnchor="center"/>
+    <Text text="Stroke Attributes" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="210,34" textAnchor="center"/>
     <Fill color="#1E293B"/>
   </Layer>
   <Layer>
-    <Text text="Cap, join, dashes, align, gradient — all 12 attributes" fontFamily="Arial" fontSize="10" position="200,40" textAnchor="center"/>
+    <Text text="Cap, join, dashes, align, gradient — all 12 attributes" fontFamily="Arial" fontSize="10" position="210,50" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="200,242" size="360,350" roundness="16"/>
+    <Rectangle position="210,252" size="360,350" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
   <!-- Basic stroke: cap=round, join=round -->
   <Layer>
-    <Rectangle position="80,110" size="90,90" roundness="12"/>
+    <Rectangle position="90,120" size="90,90" roundness="12"/>
     <Stroke color="#3B82F6" width="6" cap="round" join="round"/>
   </Layer>
   <Layer>
-    <Text text="round/round" fontFamily="Arial" fontSize="8" position="80,165" textAnchor="center"/>
+    <Text text="round/round" fontFamily="Arial" fontSize="8" position="90,175" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Dashed stroke with dashOffset -->
   <Layer>
-    <Ellipse position="220,110" size="90,90"/>
+    <Ellipse position="230,120" size="90,90"/>
     <Stroke color="#EF4444" width="4" dashes="12,6" dashOffset="4" cap="butt"/>
   </Layer>
   <Layer>
-    <Text text="Dashed" fontFamily="Arial" fontSize="8" position="220,165" textAnchor="center"/>
+    <Text text="Dashed" fontFamily="Arial" fontSize="8" position="230,175" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
@@ -50,7 +50,7 @@
     <Stroke color="#10B981" width="8" cap="butt"/>
   </Layer>
   <Layer>
-    <Text text="butt" fontFamily="Arial" fontSize="7" position="380,78"/>
+    <Text text="butt" fontFamily="Arial" fontSize="7" position="390,88"/>
     <Fill color="#94A3B8"/>
   </Layer>
   <Layer>
@@ -58,7 +58,7 @@
     <Stroke color="#10B981" width="8" cap="round"/>
   </Layer>
   <Layer>
-    <Text text="round" fontFamily="Arial" fontSize="7" position="380,103"/>
+    <Text text="round" fontFamily="Arial" fontSize="7" position="390,113"/>
     <Fill color="#94A3B8"/>
   </Layer>
   <Layer>
@@ -66,7 +66,7 @@
     <Stroke color="#10B981" width="8" cap="square"/>
   </Layer>
   <Layer>
-    <Text text="square" fontFamily="Arial" fontSize="7" position="380,128"/>
+    <Text text="square" fontFamily="Arial" fontSize="7" position="390,138"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
@@ -76,7 +76,7 @@
     <Stroke color="#F59E0B" width="6" join="miter" miterLimit="10"/>
   </Layer>
   <Layer>
-    <Text text="miter" fontFamily="Arial" fontSize="8" position="70,238" textAnchor="center"/>
+    <Text text="miter" fontFamily="Arial" fontSize="8" position="80,248" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
@@ -85,7 +85,7 @@
     <Stroke color="#F59E0B" width="6" join="round"/>
   </Layer>
   <Layer>
-    <Text text="round" fontFamily="Arial" fontSize="8" position="150,238" textAnchor="center"/>
+    <Text text="round" fontFamily="Arial" fontSize="8" position="160,248" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
@@ -94,40 +94,40 @@
     <Stroke color="#F59E0B" width="6" join="bevel"/>
   </Layer>
   <Layer>
-    <Text text="bevel" fontFamily="Arial" fontSize="8" position="230,238" textAnchor="center"/>
+    <Text text="bevel" fontFamily="Arial" fontSize="8" position="240,248" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- StrokeAlign: center -->
   <Layer>
-    <Rectangle position="70,300" size="70,70" roundness="8"/>
+    <Rectangle position="80,310" size="70,70" roundness="8"/>
     <Fill color="#E2E8F0"/>
     <Stroke color="#8B5CF6" width="8" align="center"/>
   </Layer>
   <Layer>
-    <Text text="center" fontFamily="Arial" fontSize="8" position="70,345" textAnchor="center"/>
+    <Text text="center" fontFamily="Arial" fontSize="8" position="80,355" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- StrokeAlign: inside -->
   <Layer>
-    <Rectangle position="190,300" size="70,70" roundness="8"/>
+    <Rectangle position="200,310" size="70,70" roundness="8"/>
     <Fill color="#E2E8F0"/>
     <Stroke color="#8B5CF6" width="8" align="inside"/>
   </Layer>
   <Layer>
-    <Text text="inside" fontFamily="Arial" fontSize="8" position="190,345" textAnchor="center"/>
+    <Text text="inside" fontFamily="Arial" fontSize="8" position="200,355" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- StrokeAlign: outside -->
   <Layer>
-    <Rectangle position="310,300" size="70,70" roundness="8"/>
+    <Rectangle position="320,310" size="70,70" roundness="8"/>
     <Fill color="#E2E8F0"/>
     <Stroke color="#8B5CF6" width="8" align="outside"/>
   </Layer>
   <Layer>
-    <Text text="outside" fontFamily="Arial" fontSize="8" position="310,345" textAnchor="center"/>
+    <Text text="outside" fontFamily="Arial" fontSize="8" position="320,355" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
@@ -135,14 +135,14 @@
   <Layer>
     <Path data="M 30,395 Q 200,360 370,395"/>
     <Stroke width="6" cap="round">
-      <LinearGradient startPoint="0,0" endPoint="340,0">
+      <LinearGradient startPoint="10,10" endPoint="350,10">
         <ColorStop offset="0" color="#EC4899"/>
         <ColorStop offset="1" color="#3B82F6"/>
       </LinearGradient>
     </Stroke>
   </Layer>
   <Layer>
-    <Text text="Gradient stroke" fontFamily="Arial" fontSize="8" position="200,415" textAnchor="center"/>
+    <Text text="Gradient stroke" fontFamily="Arial" fontSize="8" position="210,425" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 </pagx>

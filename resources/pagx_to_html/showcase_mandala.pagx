@@ -2,10 +2,10 @@
 <!-- Tests: Integration showcase — geometric mandala pattern combining Repeater with rotation,
      Ellipse, Path, TrimPath, ConicGradient, blend modes (screen, multiply), alpha transparency,
      Stroke with round cap and various widths -->
-<pagx version="1.0" width="400" height="400">
+<pagx version="1.0" width="420" height="420">
   <Resources>
     <!-- Rainbow conic gradient for outer ring -->
-    <ConicGradient id="rainbowConic" center="200,200" startAngle="0" endAngle="360">
+    <ConicGradient id="rainbowConic" center="210,210" startAngle="0" endAngle="360">
       <ColorStop offset="0" color="#9333EA"/>
       <ColorStop offset="0.17" color="#DC2626"/>
       <ColorStop offset="0.33" color="#F59E0B"/>
@@ -15,18 +15,18 @@
       <ColorStop offset="1" color="#9333EA"/>
     </ConicGradient>
     <!-- Gold radial gradient -->
-    <RadialGradient id="goldRadial" center="200,200" radius="180">
+    <RadialGradient id="goldRadial" center="210,210" radius="180">
       <ColorStop offset="0" color="#F59E0B"/>
       <ColorStop offset="0.5" color="#D97706"/>
       <ColorStop offset="1" color="#92400E"/>
     </RadialGradient>
     <!-- Teal radial glow -->
-    <RadialGradient id="tealGlow" center="200,200" radius="120">
+    <RadialGradient id="tealGlow" center="210,210" radius="120">
       <ColorStop offset="0" color="#14B8A6"/>
       <ColorStop offset="1" color="#14B8A600"/>
     </RadialGradient>
     <!-- Deep purple background gradient -->
-    <RadialGradient id="bgRadial" center="200,200" radius="280">
+    <RadialGradient id="bgRadial" center="210,210" radius="280">
       <ColorStop offset="0" color="#1E1040"/>
       <ColorStop offset="1" color="#0A0612"/>
     </RadialGradient>
@@ -34,48 +34,48 @@
 
   <!-- Dark background -->
   <Layer>
-    <Rectangle position="200,200" size="400,400"/>
+    <Rectangle position="210,210" size="420,420"/>
     <Fill color="@bgRadial"/>
   </Layer>
 
   <!-- Outer ring: 12 petal shapes via Repeater with rotation -->
   <Layer blendMode="screen" alpha="0.8">
-    <Ellipse position="200,110" size="40,100"/>
-    <Repeater copies="12" offset="0" anchor="200,200" position="0,0" rotation="30" startAlpha="1" endAlpha="1"/>
+    <Ellipse position="210,120" size="40,100"/>
+    <Repeater copies="12" offset="0" anchor="200,200" position="10,10" rotation="30" startAlpha="1" endAlpha="1"/>
     <Stroke color="@rainbowConic" width="2" cap="round"/>
   </Layer>
 
   <!-- Middle ring: trimmed ellipses for animated-look partial strokes -->
   <Layer blendMode="screen" alpha="0.7">
-    <Ellipse position="200,140" size="24,70"/>
+    <Ellipse position="210,150" size="24,70"/>
     <TrimPath start="0.1" end="0.7" offset="0"/>
-    <Repeater copies="12" offset="0" anchor="200,200" position="0,0" rotation="30" startAlpha="1" endAlpha="0.5"/>
+    <Repeater copies="12" offset="0" anchor="200,200" position="10,10" rotation="30" startAlpha="1" endAlpha="0.5"/>
     <Stroke color="#F59E0B" width="3" cap="round"/>
   </Layer>
 
   <!-- Inner decorative ring: small circles at tips -->
   <Layer alpha="0.9">
-    <Ellipse position="200,130" size="12,12"/>
-    <Repeater copies="12" offset="0" anchor="200,200" position="0,0" rotation="30" startAlpha="1" endAlpha="1"/>
+    <Ellipse position="210,140" size="12,12"/>
+    <Repeater copies="12" offset="0" anchor="200,200" position="10,10" rotation="30" startAlpha="1" endAlpha="1"/>
     <Fill color="#9333EA"/>
     <Stroke color="#C084FC" width="1"/>
   </Layer>
 
   <!-- Concentric circle 1: large dashed ring -->
   <Layer alpha="0.4">
-    <Ellipse position="200,200" size="340,340"/>
+    <Ellipse position="210,210" size="340,340"/>
     <Stroke color="#8B5CF6" width="1" cap="round" dashes="4,8"/>
   </Layer>
 
   <!-- Concentric circle 2: medium solid ring -->
   <Layer alpha="0.3">
-    <Ellipse position="200,200" size="260,260"/>
+    <Ellipse position="210,210" size="260,260"/>
     <Stroke color="#D97706" width="1"/>
   </Layer>
 
   <!-- Concentric circle 3: inner ring with trim path -->
   <Layer alpha="0.6">
-    <Ellipse position="200,200" size="160,160"/>
+    <Ellipse position="210,210" size="160,160"/>
     <TrimPath start="0" end="0.75" offset="45"/>
     <Stroke color="#14B8A6" width="2" cap="round"/>
   </Layer>
@@ -83,35 +83,35 @@
   <!-- Core radial path spokes: 6 lines through center -->
   <Layer alpha="0.25" blendMode="screen">
     <Path data="M 200,120 L 200,280"/>
-    <Repeater copies="6" offset="0" anchor="200,200" position="0,0" rotation="30" startAlpha="1" endAlpha="1"/>
+    <Repeater copies="6" offset="0" anchor="200,200" position="10,10" rotation="30" startAlpha="1" endAlpha="1"/>
     <Stroke color="#C084FC" width="1"/>
   </Layer>
 
   <!-- Center glow overlay -->
   <Layer blendMode="screen" alpha="0.5">
-    <Ellipse position="200,200" size="100,100"/>
+    <Ellipse position="210,210" size="100,100"/>
     <Fill color="@tealGlow"/>
   </Layer>
 
   <!-- Center jewel: layered circles -->
   <Layer>
-    <Ellipse position="200,200" size="50,50"/>
+    <Ellipse position="210,210" size="50,50"/>
     <Fill color="#9333EA"/>
     <Stroke color="#C084FC" width="2"/>
   </Layer>
   <Layer blendMode="multiply" alpha="0.6">
-    <Ellipse position="200,200" size="34,34"/>
+    <Ellipse position="210,210" size="34,34"/>
     <Fill color="@goldRadial"/>
   </Layer>
   <Layer>
-    <Ellipse position="200,200" size="18,18"/>
+    <Ellipse position="210,210" size="18,18"/>
     <Fill color="#F8FAFC"/>
   </Layer>
 
   <!-- Outer decorative dots: tiny circles at cardinal points -->
   <Layer alpha="0.6">
-    <Ellipse position="200,28" size="6,6"/>
-    <Repeater copies="12" offset="0" anchor="200,200" position="0,0" rotation="30" startAlpha="1" endAlpha="0.4"/>
+    <Ellipse position="210,38" size="6,6"/>
+    <Repeater copies="12" offset="0" anchor="200,200" position="10,10" rotation="30" startAlpha="1" endAlpha="0.4"/>
     <Fill color="#E879F9"/>
   </Layer>
 </pagx>

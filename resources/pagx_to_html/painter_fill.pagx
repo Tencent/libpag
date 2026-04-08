@@ -1,42 +1,42 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Fill attributes: color, alpha, blendMode, fillRule(winding/evenOdd), placement(bg/fg) -->
-<pagx version="1.0" width="400" height="380">
+<pagx version="1.0" width="420" height="400">
   <!-- Background -->
   <Layer>
-    <Rectangle position="200,190" size="400,380"/>
+    <Rectangle position="210,200" size="420,400"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
   <!-- Title -->
   <Layer>
-    <Text text="Fill Attributes" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="200,24" textAnchor="center"/>
+    <Text text="Fill Attributes" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="210,34" textAnchor="center"/>
     <Fill color="#1E293B"/>
   </Layer>
   <Layer>
-    <Text text="Alpha, blendMode, fillRule, placement, color source" fontFamily="Arial" fontSize="10" position="200,40" textAnchor="center"/>
+    <Text text="Alpha, blendMode, fillRule, placement, color source" fontFamily="Arial" fontSize="10" position="210,50" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="200,210" size="360,290" roundness="16"/>
+    <Rectangle position="210,220" size="360,290" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
   <!-- Fill with alpha -->
   <Layer>
-    <Rectangle position="80,105" size="100,100" roundness="12"/>
+    <Rectangle position="90,115" size="100,100" roundness="12"/>
     <Fill color="#3B82F6" alpha="0.5"/>
   </Layer>
   <Layer>
-    <Text text="alpha=0.5" fontFamily="Arial" fontSize="9" position="80,165" textAnchor="center"/>
+    <Text text="alpha=0.5" fontFamily="Arial" fontSize="9" position="90,175" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Fill with blendMode -->
   <Layer>
-    <Rectangle position="80,105" size="80,80"/>
+    <Rectangle position="90,115" size="80,80"/>
     <Fill color="#EF4444" blendMode="multiply"/>
   </Layer>
 
@@ -46,33 +46,33 @@
     <Fill color="#10B981" fillRule="evenOdd"/>
   </Layer>
   <Layer>
-    <Text text="fillRule=evenOdd" fontFamily="Arial" fontSize="9" position="260,178" textAnchor="center"/>
+    <Text text="fillRule=evenOdd" fontFamily="Arial" fontSize="9" position="270,188" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Placement: foreground -->
   <Layer>
-    <Rectangle position="100,260" size="100,100" roundness="12"/>
+    <Rectangle position="110,270" size="100,100" roundness="12"/>
     <Fill color="#8B5CF680" placement="foreground"/>
     <Layer>
-      <Ellipse position="100,260" size="60,60"/>
+      <Ellipse position="110,270" size="60,60"/>
       <Fill color="#F59E0B"/>
     </Layer>
   </Layer>
   <Layer>
-    <Text text="foreground" fontFamily="Arial" fontSize="9" position="100,320" textAnchor="center"/>
+    <Text text="foreground" fontFamily="Arial" fontSize="9" position="110,330" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Child color source overrides color attribute -->
   <Layer>
-    <Rectangle position="280,260" size="100,100" roundness="12"/>
+    <Rectangle position="290,270" size="100,100" roundness="12"/>
     <Fill color="#000000">
       <SolidColor color="#EC4899"/>
     </Fill>
   </Layer>
   <Layer>
-    <Text text="child override" fontFamily="Arial" fontSize="9" position="280,320" textAnchor="center"/>
+    <Text text="child override" fontFamily="Arial" fontSize="9" position="290,330" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 </pagx>

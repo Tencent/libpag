@@ -1,59 +1,59 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: TextBox writingMode="vertical", paragraphAlign (near/middle/far), lineHeight -->
-<pagx version="1.0" width="300" height="300">
+<pagx version="1.0" width="320" height="320">
   <!-- Vertical writing mode: traditional CJK vertical text -->
   <Layer>
-    <Rectangle position="70,150" size="120,280" roundness="8"/>
+    <Rectangle position="80,160" size="120,280" roundness="8"/>
     <Fill color="#FFF7ED"/>
     <Stroke color="#FDBA74" width="1"/>
   </Layer>
   <Layer>
-    <Text text="竖排文字测试用例" fontFamily="Arial" fontSize="20" position="0,0"/>
-    <TextBox position="10,20" size="120,260" writingMode="vertical" textAlign="start" lineHeight="30"/>
+    <Text text="竖排文字测试用例" fontFamily="Arial" fontSize="20" position="10,10"/>
+    <TextBox position="20,30" size="120,260" writingMode="vertical" textAlign="start" lineHeight="30"/>
     <Fill color="#9A3412"/>
   </Layer>
   <!-- Vertical with paragraphAlign="middle" (centered horizontally in vertical mode) -->
   <Layer>
-    <Rectangle position="200,80" size="80,130" roundness="8"/>
+    <Rectangle position="210,90" size="80,130" roundness="8"/>
     <Fill color="#EFF6FF"/>
     <Stroke color="#93C5FD" width="1"/>
   </Layer>
   <Layer>
-    <Text text="居中对齐" fontFamily="Arial" fontSize="18" position="0,0"/>
-    <TextBox position="160,15" size="80,130" writingMode="vertical" paragraphAlign="middle"/>
+    <Text text="居中对齐" fontFamily="Arial" fontSize="18" position="10,10"/>
+    <TextBox position="170,25" size="80,130" writingMode="vertical" paragraphAlign="middle"/>
     <Fill color="#1E40AF"/>
   </Layer>
   <!-- Vertical with paragraphAlign="far" (aligned to left in vertical mode) -->
   <Layer>
-    <Rectangle position="270,80" size="50,130" roundness="8"/>
+    <Rectangle position="280,90" size="50,130" roundness="8"/>
     <Fill color="#F0FDF4"/>
     <Stroke color="#86EFAC" width="1"/>
   </Layer>
   <Layer>
-    <Text text="远端" fontFamily="Arial" fontSize="16" position="0,0"/>
-    <TextBox position="245,15" size="50,130" writingMode="vertical" paragraphAlign="far"/>
+    <Text text="远端" fontFamily="Arial" fontSize="16" position="10,10"/>
+    <TextBox position="255,25" size="50,130" writingMode="vertical" paragraphAlign="far"/>
     <Fill color="#166534"/>
   </Layer>
   <!-- Horizontal with custom lineHeight and paragraphAlign="middle" -->
   <Layer>
-    <Rectangle position="200,240" size="180,100" roundness="8"/>
+    <Rectangle position="210,250" size="180,100" roundness="8"/>
     <Fill color="#FDF4FF"/>
     <Stroke color="#D8B4FE" width="1"/>
   </Layer>
   <Layer>
-    <Text text="Custom line height with middle paragraph alignment." fontFamily="Arial" fontSize="12" position="0,0"/>
-    <TextBox position="110,195" size="180,90" textAlign="center" paragraphAlign="middle" lineHeight="20"/>
+    <Text text="Custom line height with middle paragraph alignment." fontFamily="Arial" fontSize="12" position="10,10"/>
+    <TextBox position="120,205" size="180,90" textAlign="center" paragraphAlign="middle" lineHeight="20"/>
     <Fill color="#7E22CE"/>
   </Layer>
   <!-- Horizontal with paragraphAlign="far" (bottom aligned) -->
   <Layer>
-    <Rectangle position="70,270" size="120,40" roundness="6"/>
+    <Rectangle position="80,280" size="120,40" roundness="6"/>
     <Fill color="#FEF2F2"/>
     <Stroke color="#FCA5A5" width="1"/>
   </Layer>
   <Layer>
-    <Text text="Bottom aligned" fontFamily="Arial" fontSize="12" position="0,0"/>
-    <TextBox position="10,252" size="120,36" paragraphAlign="far" textAlign="center"/>
+    <Text text="Bottom aligned" fontFamily="Arial" fontSize="12" position="10,10"/>
+    <TextBox position="20,262" size="120,36" paragraphAlign="far" textAlign="center"/>
     <Fill color="#991B1B"/>
   </Layer>
 </pagx>

@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: TrimPath type="continuous" vs type="separate" on multi-shape groups with gradient strokes -->
-<pagx version="1.0" width="400" height="200">
+<pagx version="1.0" width="420" height="220">
   <Resources>
     <!-- Gradient for continuous trim strokes -->
-    <LinearGradient id="gradContinuous" startPoint="0,0" endPoint="280,0">
+    <LinearGradient id="gradContinuous" startPoint="10,10" endPoint="290,10">
       <ColorStop offset="0" color="#8B5CF6"/>
       <ColorStop offset="0.5" color="#EC4899"/>
       <ColorStop offset="1" color="#F59E0B"/>
     </LinearGradient>
     <!-- Gradient for separate trim strokes -->
-    <LinearGradient id="gradSeparate" startPoint="0,0" endPoint="280,0">
+    <LinearGradient id="gradSeparate" startPoint="10,10" endPoint="290,10">
       <ColorStop offset="0" color="#3B82F6"/>
       <ColorStop offset="0.5" color="#10B981"/>
       <ColorStop offset="1" color="#06B6D4"/>
@@ -18,21 +18,21 @@
 
   <!-- Label: Continuous -->
   <Layer>
-    <Text text="continuous" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="110,18" textAnchor="center"/>
+    <Text text="continuous" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="120,28" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
   <!-- Label: Separate -->
   <Layer>
-    <Text text="separate" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="310,18" textAnchor="center"/>
+    <Text text="separate" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="320,28" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Continuous mode: trim spans across all 3 shapes as one path -->
   <Layer>
     <!-- Rectangle outline -->
-    <Rectangle position="40,70" size="40,40"/>
+    <Rectangle position="50,80" size="40,40"/>
     <!-- Ellipse outline -->
-    <Ellipse position="110,70" size="50,40"/>
+    <Ellipse position="120,80" size="50,40"/>
     <!-- Straight line -->
     <Path data="M 140,70 L 180,70"/>
     <!-- Single TrimPath continuous across all shapes -->
@@ -42,16 +42,16 @@
 
   <!-- Ghost shapes for continuous (full outlines at low opacity) -->
   <Layer alpha="0.15">
-    <Rectangle position="40,70" size="40,40"/>
-    <Ellipse position="110,70" size="50,40"/>
+    <Rectangle position="50,80" size="40,40"/>
+    <Ellipse position="120,80" size="50,40"/>
     <Path data="M 140,70 L 180,70"/>
     <Stroke color="#8B5CF6" width="4" cap="round" join="round"/>
   </Layer>
 
   <!-- Separate mode: each shape independently trimmed to same start/end -->
   <Layer>
-    <Rectangle position="240,70" size="40,40"/>
-    <Ellipse position="310,70" size="50,40"/>
+    <Rectangle position="250,80" size="40,40"/>
+    <Ellipse position="320,80" size="50,40"/>
     <Path data="M 340,70 L 380,70"/>
     <TrimPath start="0" end="0.6" type="separate"/>
     <Stroke color="@gradSeparate" width="4" cap="round" join="round"/>
@@ -59,8 +59,8 @@
 
   <!-- Ghost shapes for separate (full outlines at low opacity) -->
   <Layer alpha="0.15">
-    <Rectangle position="240,70" size="40,40"/>
-    <Ellipse position="310,70" size="50,40"/>
+    <Rectangle position="250,80" size="40,40"/>
+    <Ellipse position="320,80" size="50,40"/>
     <Path data="M 340,70 L 380,70"/>
     <Stroke color="#3B82F6" width="4" cap="round" join="round"/>
   </Layer>
@@ -74,18 +74,18 @@
   <!-- Second row: offset demonstration -->
   <!-- Label -->
   <Layer>
-    <Text text="continuous + offset" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="110,120" textAnchor="center"/>
+    <Text text="continuous + offset" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="120,130" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer>
-    <Text text="separate + offset" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="310,120" textAnchor="center"/>
+    <Text text="separate + offset" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="320,130" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Continuous with offset=90 -->
   <Layer>
-    <Rectangle position="40,160" size="40,40"/>
-    <Ellipse position="110,160" size="50,40"/>
+    <Rectangle position="50,170" size="40,40"/>
+    <Ellipse position="120,170" size="50,40"/>
     <Path data="M 140,160 L 180,160"/>
     <TrimPath start="0" end="0.5" offset="90" type="continuous"/>
     <Stroke color="@gradContinuous" width="4" cap="round" join="round"/>
@@ -93,16 +93,16 @@
 
   <!-- Ghost shapes for continuous offset -->
   <Layer alpha="0.15">
-    <Rectangle position="40,160" size="40,40"/>
-    <Ellipse position="110,160" size="50,40"/>
+    <Rectangle position="50,170" size="40,40"/>
+    <Ellipse position="120,170" size="50,40"/>
     <Path data="M 140,160 L 180,160"/>
     <Stroke color="#8B5CF6" width="4" cap="round" join="round"/>
   </Layer>
 
   <!-- Separate with offset=90 -->
   <Layer>
-    <Rectangle position="240,160" size="40,40"/>
-    <Ellipse position="310,160" size="50,40"/>
+    <Rectangle position="250,170" size="40,40"/>
+    <Ellipse position="320,170" size="50,40"/>
     <Path data="M 340,160 L 380,160"/>
     <TrimPath start="0" end="0.5" offset="90" type="separate"/>
     <Stroke color="@gradSeparate" width="4" cap="round" join="round"/>
@@ -110,8 +110,8 @@
 
   <!-- Ghost shapes for separate offset -->
   <Layer alpha="0.15">
-    <Rectangle position="240,160" size="40,40"/>
-    <Ellipse position="310,160" size="50,40"/>
+    <Rectangle position="250,170" size="40,40"/>
+    <Ellipse position="320,170" size="50,40"/>
     <Path data="M 340,160 L 380,160"/>
     <Stroke color="#3B82F6" width="4" cap="round" join="round"/>
   </Layer>

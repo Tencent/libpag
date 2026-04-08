@@ -1,35 +1,35 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Display P3 wide gamut colors: p3(r,g,b) and p3(r,g,b,a) formats,
      comparison between sRGB and P3 colors -->
-<pagx version="1.0" width="360" height="260">
+<pagx version="1.0" width="380" height="280">
   <!-- Background -->
   <Layer>
-    <Rectangle position="180,130" size="360,260"/>
+    <Rectangle position="190,140" size="380,280"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
   <!-- Title -->
   <Layer>
-    <Text text="Display P3 Colors" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="180,24" textAnchor="center"/>
+    <Text text="Display P3 Colors" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="190,34" textAnchor="center"/>
     <Fill color="#1E293B"/>
   </Layer>
   <Layer>
-    <Text text="Wide gamut vs sRGB comparison" fontFamily="Arial" fontSize="10" position="180,40" textAnchor="center"/>
+    <Text text="Wide gamut vs sRGB comparison" fontFamily="Arial" fontSize="10" position="190,50" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="180,152" size="320,185" roundness="16"/>
+    <Rectangle position="190,162" size="320,185" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
   <!-- P3 gradient strip across top of card -->
   <Layer>
-    <Rectangle position="180,72" size="280,10" roundness="4"/>
+    <Rectangle position="190,82" size="280,10" roundness="4"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="280,0">
+      <LinearGradient startPoint="10,10" endPoint="290,10">
         <ColorStop offset="0" color="p3(1.0, 0.0, 0.5)"/>
         <ColorStop offset="0.5" color="p3(0.0, 1.0, 0.3)"/>
         <ColorStop offset="1" color="p3(0.2, 0.1, 1.0)"/>
@@ -39,29 +39,29 @@
 
   <!-- Row 1: P3 vivid colors -->
   <Layer>
-    <Text text="P3" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="36,104"/>
+    <Text text="P3" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="46,114"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer>
-    <Rectangle position="85,105" size="50,50" roundness="8"/>
+    <Rectangle position="95,115" size="50,50" roundness="8"/>
     <Fill>
       <SolidColor color="p3(1.0, 0.0, 0.0)"/>
     </Fill>
   </Layer>
   <Layer>
-    <Rectangle position="150,105" size="50,50" roundness="8"/>
+    <Rectangle position="160,115" size="50,50" roundness="8"/>
     <Fill>
       <SolidColor color="p3(0.0, 1.0, 0.0)"/>
     </Fill>
   </Layer>
   <Layer>
-    <Rectangle position="215,105" size="50,50" roundness="8"/>
+    <Rectangle position="225,115" size="50,50" roundness="8"/>
     <Fill>
       <SolidColor color="p3(0.0, 0.0, 1.0)"/>
     </Fill>
   </Layer>
   <Layer>
-    <Rectangle position="280,105" size="50,50" roundness="8"/>
+    <Rectangle position="290,115" size="50,50" roundness="8"/>
     <Fill>
       <SolidColor color="p3(1.0, 0.3, 0.0, 0.7)"/>
     </Fill>
@@ -69,23 +69,23 @@
 
   <!-- Row 2: sRGB equivalents -->
   <Layer>
-    <Text text="sRGB" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="36,175"/>
+    <Text text="sRGB" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="46,185"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer>
-    <Rectangle position="85,175" size="50,50" roundness="8"/>
+    <Rectangle position="95,185" size="50,50" roundness="8"/>
     <Fill color="#FF0000"/>
   </Layer>
   <Layer>
-    <Rectangle position="150,175" size="50,50" roundness="8"/>
+    <Rectangle position="160,185" size="50,50" roundness="8"/>
     <Fill color="#00FF00"/>
   </Layer>
   <Layer>
-    <Rectangle position="215,175" size="50,50" roundness="8"/>
+    <Rectangle position="225,185" size="50,50" roundness="8"/>
     <Fill color="#0000FF"/>
   </Layer>
   <Layer>
-    <Rectangle position="280,175" size="50,50" roundness="8"/>
+    <Rectangle position="290,185" size="50,50" roundness="8"/>
     <Fill>
       <SolidColor color="srgb(1.0, 0.3, 0.0, 0.7)"/>
     </Fill>
@@ -93,19 +93,19 @@
 
   <!-- Column labels -->
   <Layer>
-    <Text text="Red" fontFamily="Arial" fontSize="8" position="85,215" textAnchor="center"/>
+    <Text text="Red" fontFamily="Arial" fontSize="8" position="95,225" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
   <Layer>
-    <Text text="Green" fontFamily="Arial" fontSize="8" position="150,215" textAnchor="center"/>
+    <Text text="Green" fontFamily="Arial" fontSize="8" position="160,225" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
   <Layer>
-    <Text text="Blue" fontFamily="Arial" fontSize="8" position="215,215" textAnchor="center"/>
+    <Text text="Blue" fontFamily="Arial" fontSize="8" position="225,225" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
   <Layer>
-    <Text text="Alpha" fontFamily="Arial" fontSize="8" position="280,215" textAnchor="center"/>
+    <Text text="Alpha" fontFamily="Arial" fontSize="8" position="290,225" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 </pagx>

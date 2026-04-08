@@ -102,8 +102,8 @@ CLI_TEST(PAGXHtmlTest, RootDocument) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/root_document.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("pagx-root"), std::string::npos);
-  EXPECT_NE(html.find("width:300px"), std::string::npos);
-  EXPECT_NE(html.find("height:200px"), std::string::npos);
+  EXPECT_NE(html.find("width:320px"), std::string::npos);
+  EXPECT_NE(html.find("height:220px"), std::string::npos);
   EXPECT_NE(html.find("overflow:hidden"), std::string::npos);
   EXPECT_NE(html.find("position:relative"), std::string::npos);
   EXPECT_NE(html.find("data-pagx-version"), std::string::npos);
@@ -130,8 +130,8 @@ CLI_TEST(PAGXHtmlTest, LayerTransformXY) {
   auto html =
       LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_transform_xy.pagx"));
   ASSERT_FALSE(html.empty());
-  EXPECT_NE(html.find("translate(30px,50px)"), std::string::npos);
-  EXPECT_NE(html.find("translate(120px,50px)"), std::string::npos);
+  EXPECT_NE(html.find("translate(40px,60px)"), std::string::npos);
+  EXPECT_NE(html.find("translate(130px,60px)"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, LayerTransformMatrix) {
@@ -154,7 +154,7 @@ CLI_TEST(PAGXHtmlTest, LayerTransformPriority) {
       LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_transform_priority.pagx"));
   ASSERT_FALSE(html.empty());
   // The first layer should use translate (no matrix/matrix3D)
-  EXPECT_NE(html.find("translate(40px,78px)"), std::string::npos);
+  EXPECT_NE(html.find("translate(50px,88px)"), std::string::npos);
   // The second layer: matrix overrides x/y, should use matrix() not translate(999,999)
   EXPECT_EQ(html.find("translate(999px,999px)"), std::string::npos);
   // The third layer: matrix3D overrides both matrix and x/y

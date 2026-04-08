@@ -2,23 +2,23 @@
 <!-- Tests: Advanced style/filter attributes — LayerStyle.blendMode (non-normal), excludeChildEffects=true,
      BackgroundBlurStyle.tileMode (non-default), BlurFilter.tileMode (non-default),
      DropShadowStyle with blendMode, Stroke.alpha, Stroke.placement=foreground, Path.reversed=true -->
-<pagx version="1.0" width="400" height="400">
+<pagx version="1.0" width="420" height="420">
   <!-- DropShadowStyle with blendMode="multiply" -->
-  <Layer x="20" y="20">
+  <Layer x="30" y="30">
     <Rectangle position="60,60" size="100,100" roundness="12"/>
     <Fill color="#3B82F6"/>
     <DropShadowStyle offsetX="6" offsetY="6" blurX="16" blurY="16" color="#3B82F680" blendMode="multiply"/>
   </Layer>
 
   <!-- InnerShadowStyle with blendMode="screen" -->
-  <Layer x="200" y="20">
+  <Layer x="210" y="30">
     <Rectangle position="60,60" size="100,100" roundness="12"/>
     <Fill color="#10B981"/>
     <InnerShadowStyle offsetX="4" offsetY="4" blurX="10" blurY="10" color="#FFFFFF80" blendMode="screen"/>
   </Layer>
 
   <!-- DropShadowStyle with excludeChildEffects=true -->
-  <Layer x="20" y="180">
+  <Layer x="30" y="190">
     <Rectangle position="60,60" size="100,100" roundness="12"/>
     <Fill color="#F59E0B"/>
     <DropShadowStyle offsetX="4" offsetY="8" blurX="20" blurY="20" color="#00000060" excludeChildEffects="true"/>
@@ -31,26 +31,26 @@
   </Layer>
 
   <!-- BackgroundBlurStyle with tileMode="clamp" -->
-  <Layer x="200" y="180">
+  <Layer x="210" y="190">
     <Rectangle position="60,40" size="100,60" roundness="8"/>
     <Fill color="#8B5CF620"/>
     <BackgroundBlurStyle blurX="10" blurY="10" tileMode="clamp"/>
   </Layer>
   <!-- Content behind for blur effect -->
-  <Layer x="200" y="225">
+  <Layer x="210" y="235">
     <Ellipse position="60,25" size="80,40"/>
     <Fill color="#EC4899"/>
   </Layer>
 
   <!-- BlurFilter with tileMode="mirror" -->
-  <Layer x="200" y="280">
+  <Layer x="210" y="290">
     <Rectangle position="60,40" size="100,60" roundness="8"/>
     <Fill color="#06B6D4"/>
     <BlurFilter blurX="6" blurY="6" tileMode="mirror"/>
   </Layer>
 
   <!-- Stroke with alpha and placement="foreground" -->
-  <Layer x="20" y="300">
+  <Layer x="30" y="310">
     <Rectangle position="60,40" size="100,60" roundness="12"/>
     <Fill color="#EC4899"/>
     <Stroke color="#FFFFFF" width="4" alpha="0.5" placement="foreground"/>
@@ -62,7 +62,7 @@
   </Layer>
 
   <!-- Path with reversed=true -->
-  <Layer x="280" y="300">
+  <Layer x="290" y="310">
     <Path data="M 0,0 L 60,0 L 60,60 L 0,60 Z" reversed="true"/>
     <Fill color="#8B5CF6"/>
     <Stroke color="#6D28D9" width="2"/>
@@ -70,31 +70,31 @@
 
   <!-- Labels -->
   <Layer>
-    <Text text="DropShadow blendMode" fontFamily="Arial" fontSize="9" position="70,135"/>
+    <Text text="DropShadow blendMode" fontFamily="Arial" fontSize="9" position="80,145"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer>
-    <Text text="InnerShadow blendMode" fontFamily="Arial" fontSize="9" position="250,135"/>
+    <Text text="InnerShadow blendMode" fontFamily="Arial" fontSize="9" position="260,145"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer>
-    <Text text="excludeChildEffects" fontFamily="Arial" fontSize="9" position="70,295"/>
+    <Text text="excludeChildEffects" fontFamily="Arial" fontSize="9" position="80,305"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer>
-    <Text text="BgBlur tileMode=clamp" fontFamily="Arial" fontSize="9" position="250,275"/>
+    <Text text="BgBlur tileMode=clamp" fontFamily="Arial" fontSize="9" position="260,285"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer>
-    <Text text="Blur tileMode=mirror" fontFamily="Arial" fontSize="9" position="250,345"/>
+    <Text text="Blur tileMode=mirror" fontFamily="Arial" fontSize="9" position="260,355"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer>
-    <Text text="Stroke alpha+foreground" fontFamily="Arial" fontSize="9" position="20,365"/>
+    <Text text="Stroke alpha+foreground" fontFamily="Arial" fontSize="9" position="30,375"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer>
-    <Text text="Path reversed" fontFamily="Arial" fontSize="9" position="280,365"/>
+    <Text text="Path reversed" fontFamily="Arial" fontSize="9" position="290,375"/>
     <Fill color="#64748B"/>
   </Layer>
 </pagx>

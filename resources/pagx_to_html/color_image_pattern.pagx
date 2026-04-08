@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: ImagePattern → CSS background-image; tile modes (repeat/mirror/clamp/decal), filterMode -->
-<pagx version="1.0" width="400" height="200">
+<pagx version="1.0" width="420" height="220">
   <Resources>
     <!-- 8x8 red/white checkerboard pattern for clearly visible tiling -->
     <Image id="checker" source="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAGUlEQVR4nGO4o6b2HwRw0Qz4JEE0w7AwAQBB48RhdF1gGQAAAABJRU5ErkJggg=="/>
@@ -8,25 +8,25 @@
 
   <!-- Labels -->
   <Layer>
-    <Text text="repeat" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="50,20" textAnchor="center"/>
+    <Text text="repeat" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="60,30" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer>
-    <Text text="mirror" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="150,20" textAnchor="center"/>
+    <Text text="mirror" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="160,30" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer>
-    <Text text="clamp" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="250,20" textAnchor="center"/>
+    <Text text="clamp" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="260,30" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer>
-    <Text text="decal" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="350,20" textAnchor="center"/>
+    <Text text="decal" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="360,30" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- repeat/repeat → tiling checkerboard -->
   <Layer>
-    <Rectangle position="50,80" size="80,80"/>
+    <Rectangle position="60,90" size="80,80"/>
     <Fill>
       <ImagePattern image="@checker" tileModeX="repeat" tileModeY="repeat"/>
     </Fill>
@@ -35,7 +35,7 @@
 
   <!-- mirror/mirror → reflected checkerboard tiles -->
   <Layer>
-    <Rectangle position="150,80" size="80,80"/>
+    <Rectangle position="160,90" size="80,80"/>
     <Fill>
       <ImagePattern image="@checker" tileModeX="mirror" tileModeY="mirror"/>
     </Fill>
@@ -44,7 +44,7 @@
 
   <!-- clamp/clamp → edge pixels stretched -->
   <Layer>
-    <Rectangle position="250,80" size="80,80"/>
+    <Rectangle position="260,90" size="80,80"/>
     <Fill>
       <ImagePattern image="@checker" tileModeX="clamp" tileModeY="clamp"/>
     </Fill>
@@ -53,7 +53,7 @@
 
   <!-- decal/decal → transparent outside image bounds -->
   <Layer>
-    <Rectangle position="350,80" size="80,80"/>
+    <Rectangle position="360,90" size="80,80"/>
     <Fill>
       <ImagePattern image="@checker" tileModeX="decal" tileModeY="decal"/>
     </Fill>
@@ -62,17 +62,17 @@
 
   <!-- Second row: filterMode comparison -->
   <Layer>
-    <Text text="filterMode=linear" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="120,140" textAnchor="center"/>
+    <Text text="filterMode=linear" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="130,150" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer>
-    <Text text="filterMode=nearest" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="280,140" textAnchor="center"/>
+    <Text text="filterMode=nearest" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="290,150" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- linear filter (smooth/blurry upscale) -->
   <Layer>
-    <Rectangle position="120,175" size="80,50"/>
+    <Rectangle position="130,185" size="80,50"/>
     <Fill>
       <ImagePattern image="@checker" tileModeX="repeat" tileModeY="repeat" filterMode="linear"/>
     </Fill>
@@ -81,7 +81,7 @@
 
   <!-- nearest filter (pixelated/crisp upscale) -->
   <Layer>
-    <Rectangle position="280,175" size="80,50"/>
+    <Rectangle position="290,185" size="80,50"/>
     <Fill>
       <ImagePattern image="@checker" tileModeX="repeat" tileModeY="repeat" filterMode="nearest"/>
     </Fill>

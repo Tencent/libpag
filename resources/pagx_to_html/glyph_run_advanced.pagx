@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: GlyphRun advanced — positions, anchors, skews, bitmap Glyph (image + offset) -->
-<pagx version="1.0" width="400" height="300">
+<pagx version="1.0" width="420" height="320">
   <Resources>
     <!-- Vector font for positions/anchors/skews testing -->
     <Font id="vecFont" unitsPerEm="1000">
@@ -23,19 +23,19 @@
 
   <!-- Background -->
   <Layer>
-    <Rectangle position="200,150" size="400,300"/>
+    <Rectangle position="210,160" size="420,320"/>
     <Fill color="#F8FAFC"/>
   </Layer>
 
   <!-- Title -->
   <Layer>
-    <Text text="GlyphRun Advanced" fontFamily="Arial" fontStyle="Bold" fontSize="14" position="200,20" textAnchor="center"/>
+    <Text text="GlyphRun Advanced" fontFamily="Arial" fontStyle="Bold" fontSize="14" position="210,30" textAnchor="center"/>
     <Fill color="#1E293B"/>
   </Layer>
 
   <!-- 1. GlyphRun with positions (per-glyph x,y offsets) -->
   <Layer>
-    <Text text="positions" fontFamily="Arial" fontSize="9" position="30,50"/>
+    <Text text="positions" fontFamily="Arial" fontSize="9" position="40,60"/>
     <Fill color="#94A3B8"/>
   </Layer>
   <Layer>
@@ -48,7 +48,7 @@
 
   <!-- 2. GlyphRun with anchors + rotations -->
   <Layer>
-    <Text text="anchors + rot" fontFamily="Arial" fontSize="9" position="220,50"/>
+    <Text text="anchors + rot" fontFamily="Arial" fontSize="9" position="230,60"/>
     <Fill color="#94A3B8"/>
   </Layer>
   <Layer>
@@ -60,7 +60,7 @@
 
   <!-- 3. GlyphRun with skews -->
   <Layer>
-    <Text text="skews" fontFamily="Arial" fontSize="9" position="30,130"/>
+    <Text text="skews" fontFamily="Arial" fontSize="9" position="40,140"/>
     <Fill color="#94A3B8"/>
   </Layer>
   <Layer>
@@ -72,7 +72,7 @@
 
   <!-- 4. GlyphRun with all combined: positions + anchors + skews + scales + rotations -->
   <Layer>
-    <Text text="all combined" fontFamily="Arial" fontSize="9" position="220,130"/>
+    <Text text="all combined" fontFamily="Arial" fontSize="9" position="230,140"/>
     <Fill color="#94A3B8"/>
   </Layer>
   <Layer>
@@ -89,7 +89,7 @@
 
   <!-- 5. Bitmap glyph rendering (Glyph.image + Glyph.offset) -->
   <Layer>
-    <Text text="bitmap glyphs" fontFamily="Arial" fontSize="9" position="30,220"/>
+    <Text text="bitmap glyphs" fontFamily="Arial" fontSize="9" position="40,230"/>
     <Fill color="#94A3B8"/>
   </Layer>
   <Layer>

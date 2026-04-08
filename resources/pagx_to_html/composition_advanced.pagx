@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Composition with width/height coordinate system, multiple references to same composition,
      different transforms on each instance -->
-<pagx version="1.0" width="400" height="260">
+<pagx version="1.0" width="420" height="280">
   <Resources>
     <!-- Reusable icon component: a colored circle with an inner diamond -->
     <Composition id="icon" width="60" height="60">
       <Layer>
-        <Ellipse position="30,30" size="56,56"/>
+        <Ellipse position="40,40" size="56,56"/>
         <Fill>
-          <RadialGradient center="30,30" radius="28">
+          <RadialGradient center="40,40" radius="28">
             <ColorStop offset="0" color="#60A5FA"/>
             <ColorStop offset="1" color="#3B82F6"/>
           </RadialGradient>
@@ -22,11 +22,11 @@
     <!-- Reusable badge: rounded rectangle with star -->
     <Composition id="badge" width="50" height="50">
       <Layer>
-        <Rectangle position="25,25" size="46,46" roundness="8"/>
+        <Rectangle position="35,35" size="46,46" roundness="8"/>
         <Fill color="#10B981"/>
       </Layer>
       <Layer>
-        <Polystar position="25,25" type="star" pointCount="5" outerRadius="16" innerRadius="8" rotation="-90"/>
+        <Polystar position="35,35" type="star" pointCount="5" outerRadius="16" innerRadius="8" rotation="-90"/>
         <Fill color="#FFFFFF"/>
       </Layer>
     </Composition>
@@ -34,29 +34,29 @@
 
   <!-- Background -->
   <Layer>
-    <Rectangle position="200,130" size="400,260"/>
+    <Rectangle position="210,140" size="420,280"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
   <!-- Title -->
   <Layer>
-    <Text text="Advanced Composition" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="200,24" textAnchor="center"/>
+    <Text text="Advanced Composition" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="210,34" textAnchor="center"/>
     <Fill color="#1E293B"/>
   </Layer>
   <Layer>
-    <Text text="Multiple instances with different transforms" fontFamily="Arial" fontSize="10" position="200,40" textAnchor="center"/>
+    <Text text="Multiple instances with different transforms" fontFamily="Arial" fontSize="10" position="210,50" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="200,152" size="360,175" roundness="16"/>
+    <Rectangle position="210,162" size="360,175" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
   <!-- Row of icon instances with different positions -->
-  <Layer x="30" y="68" composition="@icon"/>
+  <Layer x="40" y="78" composition="@icon"/>
   <Layer x="110" y="68" composition="@icon"/>
   <Layer x="190" y="68" composition="@icon" alpha="0.6"/>
   <Layer x="270" y="68" composition="@icon" matrix="0.8,0,0,0.8,0,0"/>

@@ -1,33 +1,33 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Multi-geometry accumulated by one painter (each painter renders ALL accumulated geometries) -->
-<pagx version="1.0" width="300" height="250">
+<pagx version="1.0" width="320" height="270">
   <!-- Background -->
   <Layer>
-    <Rectangle position="150,125" size="300,250"/>
+    <Rectangle position="160,135" size="320,270"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
   <!-- Title -->
   <Layer>
-    <Text text="Accumulated Geometry" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="150,24" textAnchor="center"/>
+    <Text text="Accumulated Geometry" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="160,34" textAnchor="center"/>
     <Fill color="#1E293B"/>
   </Layer>
   <Layer>
-    <Text text="One painter renders all accumulated shapes" fontFamily="Arial" fontSize="10" position="150,40" textAnchor="center"/>
+    <Text text="One painter renders all accumulated shapes" fontFamily="Arial" fontSize="10" position="160,50" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="150,148" size="260,165" roundness="16"/>
+    <Rectangle position="160,158" size="260,165" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
   <!-- Both shapes rendered by the same Fill+Stroke -->
   <Layer>
-    <Rectangle position="100,140" size="90,90" roundness="8"/>
-    <Ellipse position="200,140" size="90,90"/>
+    <Rectangle position="110,150" size="90,90" roundness="8"/>
+    <Ellipse position="210,150" size="90,90"/>
     <!-- This Fill renders both shapes above -->
     <Fill color="#8B5CF6"/>
     <!-- This Stroke also renders both shapes -->
@@ -36,15 +36,15 @@
 
   <!-- Labels -->
   <Layer>
-    <Text text="Rectangle" fontFamily="Arial" fontSize="9" position="100,198" textAnchor="center"/>
+    <Text text="Rectangle" fontFamily="Arial" fontSize="9" position="110,208" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer>
-    <Text text="Ellipse" fontFamily="Arial" fontSize="9" position="200,198" textAnchor="center"/>
+    <Text text="Ellipse" fontFamily="Arial" fontSize="9" position="210,208" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer>
-    <Text text="Shared Fill + Stroke" fontFamily="Arial" fontSize="9" position="150,218" textAnchor="center"/>
+    <Text text="Shared Fill + Stroke" fontFamily="Arial" fontSize="9" position="160,228" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 </pagx>

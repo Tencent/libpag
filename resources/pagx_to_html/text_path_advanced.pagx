@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: TextPath advanced attributes: baselineOrigin, baselineAngle, lastMargin,
      reversed="true", forceAlignment="true", perpendicular="false" -->
-<pagx version="1.0" width="400" height="340">
+<pagx version="1.0" width="420" height="360">
   <Resources>
     <!-- Wide arc for top banner -->
     <PathData id="bannerArc" data="M 20,120 C 80,10 320,10 380,120"/>
@@ -13,67 +13,67 @@
 
   <!-- Background -->
   <Layer>
-    <Rectangle position="200,170" size="400,340"/>
+    <Rectangle position="210,180" size="420,360"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
   <!-- Title -->
   <Layer>
-    <Text text="Text Path Advanced" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="200,24" textAnchor="center"/>
+    <Text text="Text Path Advanced" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="210,34" textAnchor="center"/>
     <Fill color="#1E293B"/>
   </Layer>
   <Layer>
-    <Text text="Baseline, reversed, force alignment, perpendicular" fontFamily="Arial" fontSize="10" position="200,40" textAnchor="center"/>
+    <Text text="Baseline, reversed, force alignment, perpendicular" fontFamily="Arial" fontSize="10" position="210,50" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="200,192" size="360,250" roundness="16"/>
+    <Rectangle position="210,202" size="360,250" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
   <!-- Banner text with baselineOrigin and baselineAngle -->
   <Layer>
-    <Text text="DECORATIVE BANNER" fontFamily="Arial" fontStyle="Bold" fontSize="20" position="200,20"/>
+    <Text text="DECORATIVE BANNER" fontFamily="Arial" fontStyle="Bold" fontSize="20" position="210,30"/>
     <TextPath path="@bannerArc" baselineOrigin="200,20" baselineAngle="0" firstMargin="5" lastMargin="5"/>
     <Fill color="#3B82F6"/>
   </Layer>
 
   <!-- Circular badge: reversed text on outer ring -->
   <Layer>
-    <Text text="CIRCULAR BADGE TEXT" fontFamily="Arial" fontStyle="Bold" fontSize="14" position="200,210"/>
+    <Text text="CIRCULAR BADGE TEXT" fontFamily="Arial" fontStyle="Bold" fontSize="14" position="210,220"/>
     <TextPath path="@circlePath" reversed="true" firstMargin="10" lastMargin="10"/>
     <Fill color="#EF4444"/>
   </Layer>
   <!-- Badge center circle -->
   <Layer>
-    <Ellipse position="200,210" size="80,80"/>
+    <Ellipse position="210,220" size="80,80"/>
     <Fill color="#F59E0B"/>
   </Layer>
   <Layer>
-    <Ellipse position="200,210" size="70,70"/>
+    <Ellipse position="210,220" size="70,70"/>
     <Fill color="#FFFFFF"/>
   </Layer>
 
   <!-- Force alignment: text stretched to fill path -->
   <Layer>
-    <Text text="FORCE ALIGN" fontFamily="Arial" fontStyle="Bold" fontSize="18" position="0,0"/>
+    <Text text="FORCE ALIGN" fontFamily="Arial" fontStyle="Bold" fontSize="18" position="10,10"/>
     <TextPath path="@wavyPath" forceAlignment="true"/>
     <Fill color="#10B981"/>
   </Layer>
 
   <!-- Perpendicular=false: glyphs stay upright -->
   <Layer>
-    <Text text="UPRIGHT" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="0,0"/>
+    <Text text="UPRIGHT" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="10,10"/>
     <TextPath path="@bannerArc" perpendicular="false" firstMargin="60" lastMargin="60"/>
     <Fill color="#8B5CF680"/>
   </Layer>
 
   <!-- lastMargin test: text inset from path end -->
   <Layer>
-    <Text text="MARGINS" fontFamily="Arial" fontSize="14" position="0,0"/>
+    <Text text="MARGINS" fontFamily="Arial" fontSize="14" position="10,10"/>
     <TextPath path="M 20,160 L 380,160" firstMargin="30" lastMargin="80"/>
     <Fill color="#EC4899"/>
   </Layer>

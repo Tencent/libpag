@@ -1,29 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Path with inline SVG data and @id resource reference, reversed -->
-<pagx version="1.0" width="400" height="260">
+<pagx version="1.0" width="420" height="280">
   <Resources>
     <PathData id="heart" data="M 150,30 C 120,-10 60,-10 30,30 C 0,70 0,120 75,170 L 150,200 L 225,170 C 300,120 300,70 270,30 C 240,-10 180,-10 150,30 Z"/>
   </Resources>
 
   <!-- Background -->
   <Layer>
-    <Rectangle position="200,130" size="400,260"/>
+    <Rectangle position="210,140" size="420,280"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
   <!-- Title -->
   <Layer>
-    <Text text="Path Geometry" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="200,24" textAnchor="center"/>
+    <Text text="Path Geometry" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="210,34" textAnchor="center"/>
     <Fill color="#1E293B"/>
   </Layer>
   <Layer>
-    <Text text="Inline data and @id resource reference" fontFamily="Arial" fontSize="10" position="200,40" textAnchor="center"/>
+    <Text text="Inline data and @id resource reference" fontFamily="Arial" fontSize="10" position="210,50" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="200,148" size="360,170" roundness="16"/>
+    <Rectangle position="210,158" size="360,170" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
@@ -34,17 +34,17 @@
     <Stroke color="#3B82F6" width="4" cap="round"/>
   </Layer>
   <Layer>
-    <Text text="Inline bezier" fontFamily="Arial" fontSize="9" position="110,200" textAnchor="center"/>
+    <Text text="Inline bezier" fontFamily="Arial" fontSize="9" position="120,210" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Resource reference path -->
-  <Layer x="160" y="52">
+  <Layer x="170" y="62">
     <Path data="@heart"/>
     <Fill color="#EF4444" alpha="0.8"/>
   </Layer>
   <Layer>
-    <Text text="@id reference" fontFamily="Arial" fontSize="9" position="310,200" textAnchor="center"/>
+    <Text text="@id reference" fontFamily="Arial" fontSize="9" position="320,210" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 </pagx>

@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Layer x/y → transform: translate(x, y); demonstrates different x/y positions
      in a labeled grid layout showing how elements are positioned -->
-<pagx version="1.0" width="320" height="320">
+<pagx version="1.0" width="340" height="340">
   <!-- Light background -->
   <Layer>
-    <Rectangle position="160,160" size="320,320"/>
+    <Rectangle position="170,170" size="340,340"/>
     <Fill color="#F8FAFC"/>
   </Layer>
 
   <!-- Title -->
   <Layer>
-    <Text text="Layer Transform X/Y" fontFamily="Arial" fontStyle="Bold" fontSize="14" position="160,20" textAnchor="center"/>
+    <Text text="Layer Transform X/Y" fontFamily="Arial" fontStyle="Bold" fontSize="14" position="170,30" textAnchor="center"/>
     <Fill color="#1E293B"/>
   </Layer>
 
@@ -31,106 +31,106 @@
   </Layer>
 
   <!-- Position (0, 0) — top-left area -->
-  <Layer x="30" y="50">
+  <Layer x="40" y="60">
     <Rectangle position="25,25" size="50,50" roundness="8"/>
     <Fill color="#3B82F6"/>
   </Layer>
   <Layer>
-    <Text text="x=30" fontFamily="Arial" fontSize="9" position="55,88"/>
+    <Text text="x=30" fontFamily="Arial" fontSize="9" position="65,98"/>
     <Fill color="#3B82F6"/>
   </Layer>
   <Layer>
-    <Text text="y=50" fontFamily="Arial" fontSize="9" position="55,99"/>
+    <Text text="y=50" fontFamily="Arial" fontSize="9" position="65,109"/>
     <Fill color="#3B82F6"/>
   </Layer>
 
   <!-- Position (120, 50) — top-center -->
-  <Layer x="120" y="50">
+  <Layer x="130" y="60">
     <Rectangle position="25,25" size="50,50" roundness="8"/>
     <Fill color="#10B981"/>
   </Layer>
   <Layer>
-    <Text text="x=120" fontFamily="Arial" fontSize="9" position="137,88"/>
+    <Text text="x=120" fontFamily="Arial" fontSize="9" position="147,98"/>
     <Fill color="#10B981"/>
   </Layer>
   <Layer>
-    <Text text="y=50" fontFamily="Arial" fontSize="9" position="137,99"/>
+    <Text text="y=50" fontFamily="Arial" fontSize="9" position="147,109"/>
     <Fill color="#10B981"/>
   </Layer>
 
   <!-- Position (220, 50) — top-right -->
-  <Layer x="220" y="50">
+  <Layer x="230" y="60">
     <Rectangle position="25,25" size="50,50" roundness="8"/>
     <Fill color="#8B5CF6"/>
   </Layer>
   <Layer>
-    <Text text="x=220" fontFamily="Arial" fontSize="9" position="237,88"/>
+    <Text text="x=220" fontFamily="Arial" fontSize="9" position="247,98"/>
     <Fill color="#8B5CF6"/>
   </Layer>
   <Layer>
-    <Text text="y=50" fontFamily="Arial" fontSize="9" position="237,99"/>
+    <Text text="y=50" fontFamily="Arial" fontSize="9" position="247,109"/>
     <Fill color="#8B5CF6"/>
   </Layer>
 
   <!-- Position (30, 140) — mid-left -->
-  <Layer x="30" y="140">
+  <Layer x="40" y="150">
     <Rectangle position="25,25" size="50,50" roundness="8"/>
     <Fill color="#F59E0B"/>
   </Layer>
   <Layer>
-    <Text text="x=30" fontFamily="Arial" fontSize="9" position="55,178"/>
+    <Text text="x=30" fontFamily="Arial" fontSize="9" position="65,188"/>
     <Fill color="#F59E0B"/>
   </Layer>
   <Layer>
-    <Text text="y=140" fontFamily="Arial" fontSize="9" position="55,189"/>
+    <Text text="y=140" fontFamily="Arial" fontSize="9" position="65,199"/>
     <Fill color="#F59E0B"/>
   </Layer>
 
   <!-- Position (120, 140) — center -->
-  <Layer x="120" y="140">
+  <Layer x="130" y="150">
     <Rectangle position="25,25" size="50,50" roundness="8"/>
     <Fill color="#EF4444"/>
   </Layer>
   <Layer>
-    <Text text="x=120" fontFamily="Arial" fontSize="9" position="137,178"/>
+    <Text text="x=120" fontFamily="Arial" fontSize="9" position="147,188"/>
     <Fill color="#EF4444"/>
   </Layer>
   <Layer>
-    <Text text="y=140" fontFamily="Arial" fontSize="9" position="137,189"/>
+    <Text text="y=140" fontFamily="Arial" fontSize="9" position="147,199"/>
     <Fill color="#EF4444"/>
   </Layer>
 
   <!-- Position (220, 140) — mid-right -->
-  <Layer x="220" y="140">
+  <Layer x="230" y="150">
     <Rectangle position="25,25" size="50,50" roundness="8"/>
     <Fill color="#EC4899"/>
   </Layer>
   <Layer>
-    <Text text="x=220" fontFamily="Arial" fontSize="9" position="237,178"/>
+    <Text text="x=220" fontFamily="Arial" fontSize="9" position="247,188"/>
     <Fill color="#EC4899"/>
   </Layer>
   <Layer>
-    <Text text="y=140" fontFamily="Arial" fontSize="9" position="237,189"/>
+    <Text text="y=140" fontFamily="Arial" fontSize="9" position="247,199"/>
     <Fill color="#EC4899"/>
   </Layer>
 
   <!-- Position (120, 230) — bottom-center with offset label -->
-  <Layer x="120" y="230">
+  <Layer x="130" y="240">
     <Rectangle position="25,25" size="50,50" roundness="8"/>
     <Fill color="#14B8A6"/>
   </Layer>
   <Layer>
-    <Text text="x=120" fontFamily="Arial" fontSize="9" position="137,268"/>
+    <Text text="x=120" fontFamily="Arial" fontSize="9" position="147,278"/>
     <Fill color="#14B8A6"/>
   </Layer>
   <Layer>
-    <Text text="y=230" fontFamily="Arial" fontSize="9" position="137,279"/>
+    <Text text="y=230" fontFamily="Arial" fontSize="9" position="147,289"/>
     <Fill color="#14B8A6"/>
   </Layer>
 
   <!-- Footer note -->
   <Layer>
-    <Text text="Each square positioned via Layer x/y attributes" fontFamily="Arial" fontSize="9" position="160,310" textAnchor="center"/>
+    <Text text="Each square positioned via Layer x/y attributes" fontFamily="Arial" fontSize="9" position="170,320" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 </pagx>

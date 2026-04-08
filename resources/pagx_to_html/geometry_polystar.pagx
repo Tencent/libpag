@@ -1,86 +1,86 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Polystar → always SVG path; polygon/star types, roundness -->
-<pagx version="1.0" width="440" height="340">
+<pagx version="1.0" width="460" height="360">
   <!-- Background -->
   <Layer>
-    <Rectangle position="220,170" size="440,340"/>
+    <Rectangle position="230,180" size="460,360"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
   <!-- Title -->
   <Layer>
-    <Text text="Polystar Geometry" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="220,24" textAnchor="center"/>
+    <Text text="Polystar Geometry" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="230,34" textAnchor="center"/>
     <Fill color="#1E293B"/>
   </Layer>
   <Layer>
-    <Text text="Polygon and star types with roundness variations" fontFamily="Arial" fontSize="10" position="220,40" textAnchor="center"/>
+    <Text text="Polygon and star types with roundness variations" fontFamily="Arial" fontSize="10" position="230,50" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="220,192" size="400,250" roundness="16"/>
+    <Rectangle position="230,202" size="400,250" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
   <!-- Pentagon (polygon, 5 points) -->
   <Layer>
-    <Polystar position="80,120" type="polygon" pointCount="5" outerRadius="50" rotation="-90"/>
+    <Polystar position="90,130" type="polygon" pointCount="5" outerRadius="50" rotation="-90"/>
     <Fill color="#3B82F6"/>
   </Layer>
   <Layer>
-    <Text text="Pentagon" fontFamily="Arial" fontSize="8" position="80,178" textAnchor="center"/>
+    <Text text="Pentagon" fontFamily="Arial" fontSize="8" position="90,188" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Star (5 points) -->
   <Layer>
-    <Polystar position="220,120" type="star" pointCount="5" outerRadius="55" innerRadius="25" rotation="-90"/>
+    <Polystar position="230,130" type="star" pointCount="5" outerRadius="55" innerRadius="25" rotation="-90"/>
     <Fill color="#EF4444"/>
   </Layer>
   <Layer>
-    <Text text="Star" fontFamily="Arial" fontSize="8" position="220,178" textAnchor="center"/>
+    <Text text="Star" fontFamily="Arial" fontSize="8" position="230,188" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Star with outerRoundness -->
   <Layer>
-    <Polystar position="360,120" type="star" pointCount="6" outerRadius="50" innerRadius="25" outerRoundness="0.5" rotation="0"/>
+    <Polystar position="370,130" type="star" pointCount="6" outerRadius="50" innerRadius="25" outerRoundness="0.5" rotation="0"/>
     <Fill color="#10B981"/>
   </Layer>
   <Layer>
-    <Text text="Rounded" fontFamily="Arial" fontSize="8" position="360,178" textAnchor="center"/>
+    <Text text="Rounded" fontFamily="Arial" fontSize="8" position="370,188" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Triangle (polygon, 3 points) -->
   <Layer>
-    <Polystar position="80,255" type="polygon" pointCount="3" outerRadius="50" rotation="-90"/>
+    <Polystar position="90,265" type="polygon" pointCount="3" outerRadius="50" rotation="-90"/>
     <Fill color="#F59E0B"/>
   </Layer>
   <Layer>
-    <Text text="Triangle" fontFamily="Arial" fontSize="8" position="80,310" textAnchor="center"/>
+    <Text text="Triangle" fontFamily="Arial" fontSize="8" position="90,320" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Star with both roundnesses -->
   <Layer>
-    <Polystar position="220,255" type="star" pointCount="8" outerRadius="50" innerRadius="22" outerRoundness="0.3" innerRoundness="0.5"/>
+    <Polystar position="230,265" type="star" pointCount="8" outerRadius="50" innerRadius="22" outerRoundness="0.3" innerRoundness="0.5"/>
     <Fill color="#8B5CF6"/>
   </Layer>
   <Layer>
-    <Text text="Dual Roundness" fontFamily="Arial" fontSize="8" position="220,310" textAnchor="center"/>
+    <Text text="Dual Roundness" fontFamily="Arial" fontSize="8" position="230,320" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Fractional pointCount (5.5) -->
   <Layer>
-    <Polystar position="360,255" type="star" pointCount="5.5" outerRadius="50" innerRadius="25" rotation="-90"/>
+    <Polystar position="370,265" type="star" pointCount="5.5" outerRadius="50" innerRadius="25" rotation="-90"/>
     <Fill color="#EC4899"/>
   </Layer>
   <Layer>
-    <Text text="Fractional 5.5" fontFamily="Arial" fontSize="8" position="360,310" textAnchor="center"/>
+    <Text text="Fractional 5.5" fontFamily="Arial" fontSize="8" position="370,320" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 </pagx>

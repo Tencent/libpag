@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Integration showcase — glassmorphism dashboard card combining LinearGradient, BackgroundBlurStyle,
      DropShadowStyle, groupOpacity, RoundCorner, Polystar stars, dashed Stroke, Text styles, data-* attributes -->
-<pagx version="1.0" width="400" height="300">
+<pagx version="1.0" width="420" height="320">
   <Resources>
     <!-- Dark gradient background -->
-    <LinearGradient id="bgGrad" startPoint="0,0" endPoint="400,300">
+    <LinearGradient id="bgGrad" startPoint="10,10" endPoint="410,310">
       <ColorStop offset="0" color="#1E293B"/>
       <ColorStop offset="1" color="#0F172A"/>
     </LinearGradient>
     <!-- Blue accent gradient for progress bar fill -->
-    <LinearGradient id="accentGrad" startPoint="0,0" endPoint="200,0">
+    <LinearGradient id="accentGrad" startPoint="10,10" endPoint="210,10">
       <ColorStop offset="0" color="#3B82F6"/>
       <ColorStop offset="1" color="#10B981"/>
     </LinearGradient>
     <!-- Card glass fill -->
-    <LinearGradient id="cardGlass" startPoint="60,40" endPoint="340,260">
+    <LinearGradient id="cardGlass" startPoint="70,50" endPoint="350,270">
       <ColorStop offset="0" color="#FFFFFF20"/>
       <ColorStop offset="1" color="#FFFFFF10"/>
     </LinearGradient>
@@ -22,20 +22,20 @@
 
   <!-- Full-canvas dark background -->
   <Layer data-role="background">
-    <Rectangle position="200,150" size="400,300"/>
+    <Rectangle position="210,160" size="420,320"/>
     <Fill color="@bgGrad"/>
   </Layer>
 
   <!-- Decorative ambient glow spot -->
   <Layer data-role="ambient-glow">
-    <Ellipse position="320,80" size="200,200"/>
+    <Ellipse position="330,90" size="200,200"/>
     <Fill color="#3B82F615"/>
   </Layer>
 
   <!-- Main card layer with groupOpacity and drop shadow -->
   <Layer groupOpacity="true" alpha="0.95" data-role="card" data-component="analytics-widget">
     <!-- Card shape with rounded corners -->
-    <Rectangle position="200,150" size="320,220" roundness="20"/>
+    <Rectangle position="210,160" size="320,220" roundness="20"/>
     <!-- Background blur (glassmorphism) -->
     <BackgroundBlurStyle blurX="12" blurY="12"/>
     <!-- Glass fill -->
@@ -54,79 +54,79 @@
 
   <!-- Title text: "Revenue" -->
   <Layer data-content-type="title">
-    <Text text="Revenue" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="60,62"/>
+    <Text text="Revenue" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="70,72"/>
     <Fill color="#E2E8F0"/>
   </Layer>
 
   <!-- Subtitle text -->
   <Layer data-content-type="subtitle">
-    <Text text="Monthly Overview" fontFamily="Arial" fontSize="11" position="60,82"/>
+    <Text text="Monthly Overview" fontFamily="Arial" fontSize="11" position="70,92"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Status badge -->
   <Layer data-role="badge">
-    <Rectangle position="318,62" size="50,20" roundness="10"/>
+    <Rectangle position="328,72" size="50,20" roundness="10"/>
     <Fill color="#10B98130"/>
   </Layer>
   <Layer>
-    <Text text="+12%" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="318,66" textAnchor="center"/>
+    <Text text="+12%" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="328,76" textAnchor="center"/>
     <Fill color="#10B981"/>
   </Layer>
 
   <!-- Large number display -->
   <Layer data-content-type="metric" data-value="24580">
-    <Text text="$24,580" fontFamily="Arial" fontStyle="Bold" fontSize="40" position="60,160"/>
+    <Text text="$24,580" fontFamily="Arial" fontStyle="Bold" fontSize="40" position="70,170"/>
     <Fill color="#F8FAFC"/>
   </Layer>
 
   <!-- Comparison text -->
   <Layer>
-    <Text text="vs $21,930 last month" fontFamily="Arial" fontSize="11" position="60,182"/>
+    <Text text="vs $21,930 last month" fontFamily="Arial" fontSize="11" position="70,192"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Star rating: 3 filled stars -->
   <Layer data-role="rating" data-stars="3">
     <!-- Star 1 -->
-    <Group position="60,210">
-      <Polystar position="0,0" type="star" pointCount="5" outerRadius="8" innerRadius="4" rotation="-90"/>
+    <Group position="70,220">
+      <Polystar position="10,10" type="star" pointCount="5" outerRadius="8" innerRadius="4" rotation="-90"/>
       <Fill color="#F59E0B"/>
     </Group>
     <!-- Star 2 -->
-    <Group position="78,210">
-      <Polystar position="0,0" type="star" pointCount="5" outerRadius="8" innerRadius="4" rotation="-90"/>
+    <Group position="88,220">
+      <Polystar position="10,10" type="star" pointCount="5" outerRadius="8" innerRadius="4" rotation="-90"/>
       <Fill color="#F59E0B"/>
     </Group>
     <!-- Star 3 -->
-    <Group position="96,210">
-      <Polystar position="0,0" type="star" pointCount="5" outerRadius="8" innerRadius="4" rotation="-90"/>
+    <Group position="106,220">
+      <Polystar position="10,10" type="star" pointCount="5" outerRadius="8" innerRadius="4" rotation="-90"/>
       <Fill color="#F59E0B"/>
     </Group>
   </Layer>
 
   <!-- Rating label -->
   <Layer>
-    <Text text="Customer Satisfaction" fontFamily="Arial" fontSize="10" position="112,214"/>
+    <Text text="Customer Satisfaction" fontFamily="Arial" fontSize="10" position="122,224"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Progress bar track -->
   <Layer data-role="progress-track">
-    <Rectangle position="200,240" size="280,8" roundness="4"/>
+    <Rectangle position="210,250" size="280,8" roundness="4"/>
     <Fill color="#1E293B"/>
   </Layer>
 
   <!-- Progress bar fill (68%) — width = 280 * 0.68 = 190, offset to left-align within track -->
   <Layer data-role="progress-fill" data-percentage="68">
-    <Rectangle position="155,240" size="190,8"/>
+    <Rectangle position="165,250" size="190,8"/>
     <RoundCorner radius="4"/>
     <Fill color="@accentGrad"/>
   </Layer>
 
   <!-- Progress label -->
   <Layer>
-    <Text text="68% of target" fontFamily="Arial" fontSize="10" position="60,258"/>
+    <Text text="68% of target" fontFamily="Arial" fontSize="10" position="70,268"/>
     <Fill color="#64748B"/>
   </Layer>
 </pagx>

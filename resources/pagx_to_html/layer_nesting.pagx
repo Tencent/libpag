@@ -1,31 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Layer nested children, z-order (later layers on top) -->
-<pagx version="1.0" width="300" height="270">
+<pagx version="1.0" width="320" height="290">
   <!-- Background -->
   <Layer>
-    <Rectangle position="150,135" size="300,270"/>
+    <Rectangle position="160,145" size="320,290"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
   <!-- Title -->
   <Layer>
-    <Text text="Layer Nesting" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="150,24" textAnchor="center"/>
+    <Text text="Layer Nesting" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="160,34" textAnchor="center"/>
     <Fill color="#1E293B"/>
   </Layer>
   <Layer>
-    <Text text="Parent-child hierarchy and z-order" fontFamily="Arial" fontSize="10" position="150,40" textAnchor="center"/>
+    <Text text="Parent-child hierarchy and z-order" fontFamily="Arial" fontSize="10" position="160,50" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="150,155" size="260,180" roundness="16"/>
+    <Rectangle position="160,165" size="260,180" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
   <!-- Nesting demo -->
-  <Layer name="Parent" x="50" y="68">
+  <Layer name="Parent" x="60" y="78">
     <Rectangle position="80,80" size="140,140" roundness="16"/>
     <Fill color="#E2E8F0"/>
     <Layer name="Child1" x="10" y="10">
@@ -40,15 +40,15 @@
 
   <!-- Labels -->
   <Layer>
-    <Text text="Parent (gray)" fontFamily="Arial" fontSize="9" position="210,125"/>
+    <Text text="Parent (gray)" fontFamily="Arial" fontSize="9" position="220,135"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer>
-    <Text text="Child1 (blue)" fontFamily="Arial" fontSize="9" position="210,140"/>
+    <Text text="Child1 (blue)" fontFamily="Arial" fontSize="9" position="220,150"/>
     <Fill color="#3B82F6"/>
   </Layer>
   <Layer>
-    <Text text="Child2 (red, on top)" fontFamily="Arial" fontSize="9" position="210,155"/>
+    <Text text="Child2 (red, on top)" fontFamily="Arial" fontSize="9" position="220,165"/>
     <Fill color="#EF4444"/>
   </Layer>
 </pagx>

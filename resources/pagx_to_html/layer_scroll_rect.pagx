@@ -1,31 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: scrollRect dedicated test — viewport clipping with content extending beyond -->
-<pagx version="1.0" width="360" height="280">
+<pagx version="1.0" width="380" height="300">
   <!-- Background -->
   <Layer>
-    <Rectangle position="180,140" size="360,280"/>
+    <Rectangle position="190,150" size="380,300"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
   <!-- Title -->
   <Layer>
-    <Text text="Scroll Rect" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="180,24" textAnchor="center"/>
+    <Text text="Scroll Rect" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="190,34" textAnchor="center"/>
     <Fill color="#1E293B"/>
   </Layer>
   <Layer>
-    <Text text="Viewport clipping with content extending beyond" fontFamily="Arial" fontSize="10" position="180,40" textAnchor="center"/>
+    <Text text="Viewport clipping with content extending beyond" fontFamily="Arial" fontSize="10" position="190,50" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="180,162" size="320,200" roundness="16"/>
+    <Rectangle position="190,172" size="320,200" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
   <!-- Viewport with scrollRect: only the defined rect is visible -->
-  <Layer scrollRect="20,20,120,80" x="25" y="65">
+  <Layer scrollRect="20,20,120,80" x="35" y="75">
     <Rectangle position="80,50" size="200,120" roundness="12"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="200,120">
@@ -37,7 +37,7 @@
   </Layer>
 
   <!-- ScrollRect with offset simulating a scrolled view -->
-  <Layer scrollRect="40,20,120,80" x="195" y="65">
+  <Layer scrollRect="40,20,120,80" x="205" y="75">
     <Rectangle position="80,50" size="200,120" roundness="12"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="200,120">
@@ -49,7 +49,7 @@
   </Layer>
 
   <!-- ScrollRect clipping text content -->
-  <Layer scrollRect="0,0,280,50" x="40" y="168">
+  <Layer scrollRect="0,0,280,50" x="50" y="178">
     <Text text="This is a long text that extends well beyond the scroll rect boundary and should be clipped." fontFamily="Arial" fontSize="14" position="10,20"/>
     <TextBox position="0,5" size="500,50"/>
     <Fill color="#1F2937"/>
@@ -57,27 +57,27 @@
 
   <!-- Border outlines showing viewport boundaries -->
   <Layer>
-    <Rectangle position="105,105" size="120,80"/>
+    <Rectangle position="115,115" size="120,80"/>
     <Stroke color="#94A3B8" width="1" dashes="4,3"/>
   </Layer>
   <Layer>
-    <Text text="Viewport 1" fontFamily="Arial" fontSize="8" position="105,155" textAnchor="center"/>
+    <Text text="Viewport 1" fontFamily="Arial" fontSize="8" position="115,165" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
   <Layer>
-    <Rectangle position="255,105" size="120,80"/>
+    <Rectangle position="265,115" size="120,80"/>
     <Stroke color="#94A3B8" width="1" dashes="4,3"/>
   </Layer>
   <Layer>
-    <Text text="Viewport 2" fontFamily="Arial" fontSize="8" position="255,155" textAnchor="center"/>
+    <Text text="Viewport 2" fontFamily="Arial" fontSize="8" position="265,165" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
   <Layer>
-    <Rectangle position="180,193" size="280,50"/>
+    <Rectangle position="190,203" size="280,50"/>
     <Stroke color="#94A3B8" width="1" dashes="4,3"/>
   </Layer>
   <Layer>
-    <Text text="Text Clipping" fontFamily="Arial" fontSize="8" position="180,228" textAnchor="center"/>
+    <Text text="Text Clipping" fontFamily="Arial" fontSize="8" position="190,238" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 </pagx>
