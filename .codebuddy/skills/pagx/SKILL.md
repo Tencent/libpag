@@ -166,3 +166,13 @@ this section's gate passes.
 2. Fix all reported diagnostics, then re-run verify.
 3. Check the full screenshot against §Screenshot Checklist.
 4. Keep final `input.png` for reference (do not commit). Delete `input.layout.xml`.
+
+---
+
+### Final Screenshot Rule
+
+After **any** modification — whether from initial generation, user-requested edits, or
+iterative fixes — always finish with a **full-file** `pagx verify --scale 2 input.pagx`
+and show the resulting `input.png` to the user. Scoped screenshots (`--id`) are useful
+during development but are never a substitute for a final full render. The user should
+always see the latest complete result.
