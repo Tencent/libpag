@@ -2153,7 +2153,8 @@ This appendix describes node categorization and nesting rules.
 | Category | Nodes | Description |
 |----------|-------|-------------|
 | **Structure** | `pagx`, `Resources` | `pagx`: document entry point (children: `<Layer>`, `<Resources>` only). `Resources`: holds reusable definitions (Image, PathData, Composition, Font, etc.) |
-| **Content Containers** | `Layer`, `Group`, `TextBox` | Accept VectorElements, child Layers, styles, and filters. These are the only elements that can contain geometry. |
+| **Content Containers** | `Layer` | Accepts VectorElements, child Layers, styles, and filters. |
+| **Element Containers** | `Group`, `TextBox` | Accept VectorElements only. |
 | **Resource Types** | `Image`, `PathData`, `Composition`, `Font`, `Glyph` | Reusable assets stored in `<Resources>`. |
 | **Color Sources** | `SolidColor`, `LinearGradient`, `RadialGradient`, `ConicGradient`, `DiamondGradient`, `ImagePattern`, `ColorStop` | Color definitions used by painters. |
 | **Layer Styles** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle` | Visual effects applied to Layer content. |

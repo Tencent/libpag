@@ -2145,7 +2145,8 @@ VectorElement 层级，通过 `pagx import --resolve` 命令解析为原生 PAGX
 | 分类 | 节点 | 说明 |
 |------|------|------|
 | **结构节点** | `pagx`, `Resources` | `pagx`：文档入口（子节点仅限：`<Layer>`、`<Resources>`）。`Resources`：存放可复用定义（Image、PathData、Composition、Font 等） |
-| **内容容器** | `Layer`, `Group`, `TextBox` | 接纳 VectorElement、子 Layer、样式和滤镜。这些是仅有的可包含几何图形的元素。 |
+| **内容容器** | `Layer` | 接纳 VectorElement、子 Layer、样式和滤镜。 |
+| **元素容器** | `Group`, `TextBox` | 仅接纳 VectorElement。 |
 | **资源类型** | `Image`, `PathData`, `Composition`, `Font`, `Glyph` | 存储在 `<Resources>` 中的可复用资源。 |
 | **颜色源** | `SolidColor`, `LinearGradient`, `RadialGradient`, `ConicGradient`, `DiamondGradient`, `ImagePattern`, `ColorStop` | 绘制器使用的颜色定义。 |
 | **图层样式** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle` | 应用于图层内容的视觉效果。 |
