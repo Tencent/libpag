@@ -28,7 +28,7 @@
   <Layer>
     <Rectangle position="160,150" size="180,120" roundness="8"/>
     <Fill>
-      <DiamondGradient center="100,70" radius="80">
+      <DiamondGradient center="160,150" radius="80">
         <ColorStop offset="0" color="#FFFFFF"/>
         <ColorStop offset="0.5" color="#8B5CF6"/>
         <ColorStop offset="1" color="#1E1B4B"/>
