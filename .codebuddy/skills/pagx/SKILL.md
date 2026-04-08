@@ -114,7 +114,8 @@ Do NOT start the next task until the current one is completed.
    - **Edit existing file** → read the file first, scan Resources for reusable `@id`
      references, match existing style. Then go to the relevant step.
    - **Modify specific part** → locate the target, change only what's needed, then
-     run verify and fix as described in Step 3.
+     run verify and fix as described in Step 3. Always finish with a full-file
+     `pagx verify --scale 2` and show `input.png` to the user.
 2. Clarify requirements — ask the user if canvas size, visual style, text content, or
    color scheme is unclear or ambiguous.
 3. Establish a style sheet — color palette, spacing scale, roundness, font hierarchy.
@@ -166,6 +167,3 @@ this section's gate passes.
 2. Fix all reported diagnostics, then re-run verify.
 3. Check the full screenshot against §Screenshot Checklist.
 4. Keep final `input.png` for reference (do not commit). Delete `input.layout.xml`.
-
-Every modification must end with a full-file `pagx verify --scale 2` and show `input.png`
-to the user — scoped `--id` screenshots do not substitute for this.
