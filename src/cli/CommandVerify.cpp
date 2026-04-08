@@ -1483,13 +1483,11 @@ static void DetectZeroSize(const Layer* layer, const Layer* parentLayer,
 
   if (layer->flex > 0 && parentLayer != nullptr && parentLayer->layout != LayoutMode::None) {
     bool horizontal = parentLayer->layout == LayoutMode::Horizontal;
-    float parentExplicitMain = horizontal ? parentLayer->width : parentLayer->height;
-    bool parentMainFromConstraints =
-        horizontal ? (!std::isnan(parentLayer->left) && !std::isnan(parentLayer->right))
-                   : (!std::isnan(parentLayer->top) && !std::isnan(parentLayer->bottom));
-    if (std::isnan(parentExplicitMain) && !parentMainFromConstraints) {
+    auto parentBounds = parentLayer->layoutBounds();
+    float parentMainSize = horizontal ? parentBounds.width : parentBounds.height;
+    if (parentMainSize <= 0) {
       const char* axis = horizontal ? "width" : "height";
-      oss << " (flex child, parent has no " << axis << " to distribute)";
+      oss << " (flex child, parent " << axis << " is 0)";
     }
   }
   oss << ". Fix: check why this container has no size";
@@ -1769,10 +1767,13 @@ static void DetectContainerOverflow(const Layer* parentLayer,
     return;
   }
   auto parentBounds = parentLayer->layoutBounds();
+  float parentMainSize = horizontal ? parentBounds.width : parentBounds.height;
+  if (parentMainSize <= 0) {
+    return;
+  }
   float paddingStart = horizontal ? parentLayer->padding.left : parentLayer->padding.top;
   float paddingEnd = horizontal ? parentLayer->padding.right : parentLayer->padding.bottom;
-  float containerMain = horizontal ? parentBounds.width : parentBounds.height;
-  float availableMain = containerMain - paddingStart - paddingEnd;
+  float availableMain = parentMainSize - paddingStart - paddingEnd;
 
   float totalFixed = 0;
   size_t visibleCount = 0;
