@@ -1,12 +1,11 @@
-# PAGX Generation
+# PAGX Guide
 
-Everything an AI needs to generate correct PAGX files — rules, techniques, pitfalls, and
-the step-by-step workflow, organized by topic.
+Spec rules, techniques, and common pitfalls for writing correct PAGX files.
 
 | Reference | Content |
 |-----------|---------|
 | `attributes.md` | Attribute defaults, enumerations, required attributes |
-| `examples.md` | Structural code patterns — UI, Charts, Logos, Decorations |
+| `patterns.md` | Structural patterns — UI components, tables, charts, decorative effects |
 | `cli.md` | CLI commands — `render`, `verify`, `layout`, `bounds`, etc. |
 | [Full Specification](https://pag.io/pagx/latest/) | Authoritative rules for detailed queries not covered here |
 
@@ -81,7 +80,7 @@ pagx (required: version, width, height)
 - **PathData**: `data` (SVG path syntax), referenced via `data="@id"`
 - **Composition**: Reusable Layer subtree. `width`/`height` required. Top-level children
   must be `<Layer>` (not VectorElements directly). Referenced via `composition="@id"`.
-  See `examples.md` §Card Grid for full example.
+  See `patterns.md` §Card Grid for full example.
 
 ```xml
 <Resources>
@@ -390,7 +389,7 @@ over `position`.
 - **Polystar**: `type` (polygon/star), `pointCount`, `outerRadius`, `innerRadius`,
   `outerRoundness`, `innerRoundness` (0–1 for vertex rounding).
   `type="polygon"` for regular polygons, `type="star"` for stars with alternating radii.
-  See `examples.md` §Star Badge.
+  See `patterns.md` §Star Badge.
 - **Path**: `data` — SVG `<path d>` syntax exactly (M, L, H, V, C, S, Q, T, A, Z)
 - **Text**: `text`, `fontFamily`, `fontStyle`, `fontSize`, `letterSpacing`. Wrap in TextBox
   for paragraph features. `fauxBold`/`fauxItalic` for algorithmic styles. `&#10;` for line
@@ -410,7 +409,7 @@ All gradient/pattern coordinates are **relative to the geometry element's local 
 (not canvas). `ConicGradient` angles follow PAGX convention (0° = right), which differs
 from CSS `conic-gradient` (0° = top) — subtract 90° to convert. `DiamondGradient`
 radiates from center toward four corners (`center`, `radius`). `ImagePattern` fills
-geometry with an image (see `examples.md` §Avatar).
+geometry with an image (see `patterns.md` §Avatar).
 
 ```xml
 <!-- Inline gradient in Fill -->
@@ -425,7 +424,7 @@ geometry with an image (see `examples.md` §Avatar).
 <Fill color="@myGradient"/>
 ```
 
-See `examples.md` §Gradient Text for LinearGradient on text, §Star Badge for RadialGradient.
+See `patterns.md` §Gradient Text for LinearGradient on text, §Star Badge for RadialGradient.
 
 | CSS | PAGX |
 |-----|------|
@@ -464,7 +463,7 @@ if glyph lists are present (emoji silently discarded). Text modifiers silently s
 Fill/Stroke** in the scope. Isolate with Groups.
 
 **Repeater**: copies all accumulated geometry and styles. `copies=0` clears all.
-Nested Repeaters multiply: A × B total. See `examples.md` §Circular Gauge.
+Nested Repeaters multiply: A × B total. See `patterns.md` §Circular Gauge.
 
 **TextModifier + RangeSelector**: applies per-glyph transforms (position, rotation, scale,
 alpha) to accumulated text. `RangeSelector` controls which glyphs are affected (`start`,
@@ -507,7 +506,7 @@ discards **entire lines**, not pixels). TextBox overrides child Text's `position
 ```
 
 **Strikethrough / underline**: Overlay a 1px Rectangle — `centerY="0"` for strikethrough,
-`bottom="0"` for underline. See `examples.md` §Text Decoration.
+`bottom="0"` for underline. See `patterns.md` §Text Decoration.
 
 **TextPath**: maps glyphs onto a curved path. Supports constraint positioning (opposite-pair
 uses scale-to-fit). Text-to-shape conversion is triggered by shape modifiers in the same
@@ -689,119 +688,3 @@ These errors are easy to make during generation.
     <Fill color="#F00"/>
   </Group>
   ```
-
----
-
-# Verify and Fix
-
-Ensure the `pagx` CLI is installed before first use (see `cli.md` §Setup).
-
-```bash
-# Full file
-pagx verify --scale 2 input.pagx
-
-# Scoped to a section by id
-pagx verify --scale 2 --id "sectionId" input.pagx
-```
-
-Outputs: diagnostics, `input.png` (screenshot), `input.layout.xml` (computed bounds).
-With `--id`, outputs are `input.{id}.png` and `input.{id}.layout.xml`.
-
-After every invocation, repeat this cycle until clean:
-
-1. **Fix all reported diagnostics.**
-2. **Re-run verify** to confirm fixes and regenerate outputs.
-3. **Check the screenshot** — verify visual correctness:
-   - All elements and text visible (no missing painters or fills)
-   - Colors and gradients match design intent
-   - Even padding between content and container edges (text not touching button borders)
-   - Consistent spacing between sibling elements (not too tight or too loose)
-   - Elements properly sized (not collapsed to zero or unexpectedly stretched)
-4. **If screenshot has issues**, read the `.layout.xml` file to diagnose. Each node has
-   `line` (source line number) and `bounds` (computed position and size). Compare bounds
-   of problematic elements against design intent to identify the root cause.
-
----
-
-# Generation Workflow
-
-Before starting, read §Common Pitfalls to avoid common errors throughout all steps.
-
-## Step 1: Assess and Analyze
-
-1. **Determine task type**:
-   - **Create from scratch** → follow Step 1–4.
-   - **Edit existing file** → read the file first, scan Resources for reusable `@id`
-     references, match existing style. Then go to the relevant step.
-   - **Modify specific part** → locate the target, change only what's needed, then verify.
-
-2. **Clarify requirements** — ask the user if canvas size, visual style, text content, or
-   color scheme is unclear or ambiguous.
-
-3. **Establish a style sheet** — choose a consistent set of design parameters before writing
-   any code: color palette, spacing scale, roundness per element type, font hierarchy.
-   Derive from context (reference image, design spec) or infer from purpose.
-
-4. **Decompose the visual**:
-   - Layer structure (depth layers, background vs foreground)
-   - Rendering technique (filled shapes, stroked line art, or both)
-   - Color scheme (exact colors, gradients, transparency)
-   - Shape vocabulary (geometric primitives or freeform curves)
-   - Text inventory (all text elements with approximate font sizes)
-
----
-
-## Step 2: Skeleton + Verify
-
-1. Write the `<pagx>` root and all section Layers with **only layout attributes** (`id`,
-   `width`/`height`, `flex`, `layout`, `gap`, `padding`). No visual content.
-   Apply §Container Layout.
-
-   ```xml
-   <pagx version="1.0" width="393" height="852">
-     <Layer id="screen" left="0" right="0" top="0" bottom="0" layout="vertical">
-       <Layer id="header" height="60"/>
-       <Layer id="content" flex="1" layout="vertical" gap="16" padding="0,20,0,20">
-         <Layer id="cardRow" height="200" layout="horizontal" gap="12"/>
-         <Layer id="body" flex="1"/>
-       </Layer>
-       <Layer id="tabBar" height="83"/>
-     </Layer>
-   </pagx>
-   ```
-
-2. Run `pagx verify --scale 2 input.pagx`. Follow §Verify and Fix.
-3. **STOP** — do NOT proceed until verification passes.
-
----
-
-## Step 3: Fill Sections + Verify
-
-For each section, one at a time:
-
-1. Add backgrounds, text, shapes, icons. Apply §Vector Elements (painter scope, geometry,
-   text), §Constraint Positioning, and §Build Directives (for SVG icons). Use the
-   Layer vs Group decision tree:
-
-   ```
-   Direct child of <pagx> or <Composition>? → Must be Layer
-   Needs styles, filters, mask, blendMode, composition, or clipToBounds? → Must be Layer
-   Independent visual unit? → Use Layer
-   Content after earlier geometry+painters? → Wrap in Group
-   First content in scope? → No wrapper needed
-   ```
-
-2. Run `pagx verify --scale 2 --id "sectionId" input.pagx`. Follow §Verify and Fix.
-3. **STOP** — do NOT proceed to the next section until verification passes.
-4. Delete scoped artifacts: `rm -f input.{id}.png input.{id}.layout.xml`
-
-**CRITICAL**: Do NOT skip per-section verification. Layout problems compound — catching
-errors early is far cheaper than debugging the entire file.
-
----
-
-## Step 4: Polish + Full Verify
-
-1. Delete remaining scoped artifacts: `rm -f input.*.png input.*.layout.xml`
-2. Run `pagx verify --scale 2 input.pagx`. Follow §Verify and Fix.
-3. Keep final `input.png` for reference (do not commit). Delete `input.layout.xml`.

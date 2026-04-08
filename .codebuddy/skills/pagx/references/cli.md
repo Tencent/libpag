@@ -1,23 +1,8 @@
 # CLI Reference
 
 The `pagx` command-line tool provides utilities for working with PAGX files. All commands
-operate on local `.pagx` files.
-
-## Setup
-
-The `pagx` binary is provided by the `pagx` npm package. Before running any command below,
-ensure it is installed and meets the minimum version:
-
-```bash
-PAGX_MIN="0.1.6"
-if ! command -v pagx &>/dev/null; then
-  npm install -g @libpag/pagx
-elif [ "$(printf '%s\n' "$PAGX_MIN" "$(pagx -v | awk '{print $2}')" | sort -V | head -1)" != "$PAGX_MIN" ]; then
-  npm update -g @libpag/pagx
-fi
-```
-
-Run this check before the first `pagx` invocation in each session.
+operate on local `.pagx` files. Ensure `pagx` is installed before first use (see the
+setup script in `SKILL.md`).
 
 ---
 
@@ -123,23 +108,15 @@ pagx render --xpath "/pagx/Layer[2]" input.pagx   # render only the matched Laye
 | `--fallback <path\|name>` | Fallback font file or system font name (can be specified multiple times) |
 
 `--id` and `--xpath` are mutually exclusive. When either is specified, only the target Layer
-is rendered, cropped to that Layer's bounds. `--xpath` must match exactly one Layer.
-
-`--id` errors if no node with that id exists or the matched node is not a Layer.
-`--xpath` errors if zero or more than one Layer matches.
+is rendered, cropped to that Layer's bounds.
 
 `--font` registers a font file matched by fontFamily/fontStyle against PAGX text references.
 `--fallback` accepts either a file path (e.g., `b.otf`) or a system font name (e.g.,
-`"PingFang SC"` or `"Arial,Bold"`). All fonts added via `--fallback` are also registered
-automatically. Fallback fonts are tried in order when a character is not found in the
-primary font. System fallback fonts are always appended after user-specified fallbacks.
+`"PingFang SC"` or `"Arial,Bold"`). Fallback fonts are tried in order when a character is
+not found in the primary font.
 
-**Output convention**: Always output to the same directory as the input `.pagx` file — either omit
-`-o` (default behavior) or specify `-o` with a path in the same directory (e.g., for `--crop`
-variants). Do not include rendered image files (`.png`, `.webp`, `.jpg`) in commits.
-
-**Scale convention**: Default `--scale 1`. Use `--scale 2` when higher detail is needed for
-visual inspection. When the context explicitly specifies a scale value, use it as-is.
+Always output to the same directory as the input `.pagx` file. Do not commit rendered
+image files.
 
 ---
 
@@ -187,9 +164,6 @@ pagx layout --depth 1 input.pagx                             # only one level of
 | `--depth <n>` | Limit Layer nesting depth (0 or negative = unlimited, default: unlimited) |
 
 `--id` and `--xpath` are mutually exclusive.
-
-Outputs the complete layout tree showing every Layer and element with their resolved bounds
-and layout attributes (only non-default values). Always returns exit code 0.
 
 ```xml
 <layout>
@@ -246,8 +220,7 @@ pagx bounds --json input.pagx
 | `--relative <xpath>` | Output bounds relative to another Layer |
 | `--json` | JSON output |
 
-`--id` and `--xpath` are mutually exclusive. `--id "btn"` is a shorthand for selecting a
-Layer by its `id` attribute.
+`--id` and `--xpath` are mutually exclusive.
 
 XPath quick reference for PAGX:
 - `//Layer[@id='x']` — Layer with `id="x"` anywhere in the document
@@ -305,7 +278,7 @@ pagx font embed --file a.ttf --fallback "PingFang SC" --fallback b.otf input.pag
 | `--file <path>` | Register a font file (can be specified multiple times) |
 | `--fallback <path\|name>` | Fallback font file or system font name (can be specified multiple times) |
 
-`--file` and `--fallback` work the same as in `pagx render` (see above).
+`--file` and `--fallback` work the same as in `pagx render`.
 
 ---
 
@@ -316,62 +289,41 @@ file. Two mutually exclusive modes: **standard** (`--input`) and **resolve** (`-
 
 ### Standard mode
 
-Convert a file from another format (e.g. SVG) to a standalone PAGX file. The input format is
-inferred from the file extension unless `--format` is specified. Import warnings are printed
-but do not prevent conversion.
+Convert a file from another format (e.g. SVG) to a standalone PAGX file.
 
 ```bash
 pagx import --input icon.svg                     # SVG to icon.pagx
 pagx import --input icon.svg --output out.pagx   # SVG to out.pagx
-pagx import --format svg --input drawing.xml     # force treating drawing.xml as SVG format
 ```
 
 | Option | Description |
 |--------|-------------|
 | `--input <file>` | Input file to import (required in standard mode) |
 | `--output <file>` | Output PAGX file (default: `<input>.pagx`) |
-| `--format <format>` | Force input format (`svg`; default: inferred from input extension) |
+| `--format <format>` | Force input format (`svg`; default: inferred from extension) |
 | `--svg-no-expand-use` | Do not expand `<use>` references |
 | `--svg-flatten-transforms` | Flatten nested transforms into single matrices |
 | `--svg-preserve-unknown` | Preserve unsupported SVG elements as Unknown nodes |
 
-On success the command prints `pagx import: wrote <path>` and exits 0; on failure it prints
-an error and exits 1.
-
 ### Resolve mode
 
-Expand all `<Import>` nodes in a PAGX file, converting their content (inline or external)
-into native PAGX nodes. This is the counterpart to the `<Import>` build directive defined
-in the PAGX specification.
+Expand all `<Import>` nodes in a PAGX file into native PAGX nodes.
 
 ```bash
 pagx import --resolve design.pagx                          # resolve in place
 pagx import --resolve design.pagx --output out.pagx        # resolve to new file
-pagx import --resolve design.pagx --svg-flatten-transforms # with SVG options
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--resolve <file>` | Input PAGX file containing `<Import>` nodes to expand (required in resolve mode) |
+| `--resolve <file>` | Input PAGX file to expand (required in resolve mode) |
 | `-o, --output <path>` | Output file path (default: overwrite input) |
 | `--svg-no-expand-use` | Do not expand `<use>` references in SVG content |
 | `--svg-flatten-transforms` | Flatten nested transforms into single matrices |
 | `--svg-preserve-unknown` | Preserve unsupported SVG elements as Unknown nodes |
 
-`--input` and `--resolve` are mutually exclusive.
-
-**Behavior**:
-- Scans all `<Import>` nodes in the PAGX file
-- Inline mode (`<Import>` with child elements): parses the child SVG content
-- External mode (`<Import source="...">`): reads the file at the specified path (relative
-  to the PAGX file location)
-- Converts content to native PAGX nodes and replaces the `<Import>` element
-- Sets the parent Layer's `width`/`height` from the source dimensions (e.g., SVG
-  `viewBox` or `width`/`height` attributes)
-- If no `<Import>` nodes are found, the file is unchanged and the command exits normally
-
-On success the command prints `pagx import: wrote <path>` and exits 0; on failure it prints
-an error and exits 1.
+`--input` and `--resolve` are mutually exclusive. Resolve mode sets the parent Layer's
+`width`/`height` from the source dimensions.
 
 ---
 
@@ -397,6 +349,4 @@ pagx export --input icon.pagx --svg-indent 4     # 4-space indent
 | `--svg-no-xml-declaration` | Omit the `<?xml ...?>` declaration |
 | `--svg-no-convert-text-to-path` | Keep text as `<text>` elements instead of `<path>` |
 
-On success the command prints `pagx export: wrote <path>` and exits 0; on failure it prints
-an error and exits 1.
 

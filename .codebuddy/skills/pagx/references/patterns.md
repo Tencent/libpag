@@ -1,7 +1,7 @@
-# PAGX Examples
+# PAGX Patterns
 
-Scene-specific structural patterns for generating PAGX files. For universal methodology
-(generation steps, verification loop), follow `generation.md` first.
+Structural patterns for components and layouts. For spec rules and techniques,
+see `guide.md`.
 
 **Note**: Colors, fonts, sizes, and spacing in these examples are placeholders to illustrate
 structural patterns. Always match the actual design requirements — do not copy these values
@@ -395,6 +395,89 @@ any repeated element: cards, list items, grid cells.
 rect with a straight rect. Tabs use vertical layout (icon + label) distributed by
 `arrangement="spaceAround"`. Active tab = Fill icon + bold color; inactive = Stroke icon +
 muted color. Same structure for bottom navigation, segmented controls, toolbar items.
+
+### Data Table
+
+```xml
+<pagx version="1.0" width="520" height="170">
+  <Layer centerX="0" centerY="0" width="480" height="146" layout="vertical">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#FFF"/>
+    <!-- Header row -->
+    <Layer height="44" layout="horizontal" padding="0,16,0,16" alignment="center">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#F8FAFC"/>
+      <Layer width="130">
+        <Text text="Name" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
+        <Fill color="#64748B"/>
+      </Layer>
+      <Layer flex="1">
+        <Text text="Email" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
+        <Fill color="#64748B"/>
+      </Layer>
+      <Layer width="70">
+        <Text text="Status" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
+        <Fill color="#64748B"/>
+      </Layer>
+    </Layer>
+    <!-- Row divider -->
+    <Layer height="1">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#F1F5F9"/>
+    </Layer>
+    <!-- Data row 1 -->
+    <Layer height="44" layout="horizontal" padding="0,16,0,16" alignment="center">
+      <Layer width="130">
+        <Text text="Alice Chen" fontFamily="Arial" fontSize="14"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer flex="1">
+        <Text text="alice@example.com" fontFamily="Arial" fontSize="14"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer width="70">
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+        <Fill color="#ECFDF5"/>
+        <Group centerX="0" centerY="0">
+          <Text left="8" right="8" top="4" bottom="4" text="Active" fontFamily="Arial" fontSize="12"/>
+          <Fill color="#10B981"/>
+        </Group>
+      </Layer>
+    </Layer>
+    <!-- Row divider -->
+    <Layer height="1">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#F1F5F9"/>
+    </Layer>
+    <!-- Data row 2 -->
+    <Layer height="44" layout="horizontal" padding="0,16,0,16" alignment="center">
+      <Layer width="130">
+        <Text text="Bob Smith" fontFamily="Arial" fontSize="14"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer flex="1">
+        <Text text="bob@example.com" fontFamily="Arial" fontSize="14"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer width="70">
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+        <Fill color="#FEF3C7"/>
+        <Group centerX="0" centerY="0">
+          <Text left="8" right="8" top="4" bottom="4" text="Pending" fontFamily="Arial" fontSize="12"/>
+          <Fill color="#D97706"/>
+        </Group>
+      </Layer>
+    </Layer>
+    <DropShadowStyle offsetY="2" blurX="8" blurY="8" color="#0000000A"/>
+  </Layer>
+</pagx>
+```
+
+**Pattern**: Table = vertical stack of horizontal rows. Each row is a `layout="horizontal"`
+Layer with child Layers as cells. Header row has distinct background. Use fixed `width` for
+columns that need consistent sizing (name, status, actions) and `flex="1"` for columns
+that absorb remaining space (email, description). Separate data rows with 1px divider
+Rectangles.
 
 ---
 

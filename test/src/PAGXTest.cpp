@@ -602,12 +602,12 @@ static std::string TitleToKey(const std::string& title) {
   return key;
 }
 
-static std::vector<std::pair<std::string, std::string>> ExtractMarkdownExamples(
+static std::vector<std::pair<std::string, std::string>> ExtractMarkdownPatterns(
     const std::string& markdownPath) {
-  std::vector<std::pair<std::string, std::string>> examples;
+  std::vector<std::pair<std::string, std::string>> patterns;
   std::ifstream file(markdownPath);
   if (!file.is_open()) {
-    return examples;
+    return patterns;
   }
 
   std::string currentTitle;
@@ -640,7 +640,7 @@ static std::vector<std::pair<std::string, std::string>> ExtractMarkdownExamples(
           auto baseKey = TitleToKey(currentTitle);
           auto count = ++keyCounts[baseKey];
           auto key = count > 1 ? baseKey + "_" + std::to_string(count) : baseKey;
-          examples.emplace_back(key, codeContent);
+          patterns.emplace_back(key, codeContent);
         }
       } else {
         if (!codeContent.empty()) {
@@ -650,15 +650,15 @@ static std::vector<std::pair<std::string, std::string>> ExtractMarkdownExamples(
       }
     }
   }
-  return examples;
+  return patterns;
 }
 
-static void TestMarkdownExamples(tgfx::Context* context, const std::string& markdownPath,
+static void TestMarkdownPatterns(tgfx::Context* context, const std::string& markdownPath,
                                  const std::string& prefix = "", float scale = 1.0f) {
-  auto examples = ExtractMarkdownExamples(markdownPath);
-  ASSERT_FALSE(examples.empty()) << "No examples found in: " << markdownPath;
+  auto patterns = ExtractMarkdownPatterns(markdownPath);
+  ASSERT_FALSE(patterns.empty()) << "No patterns found in: " << markdownPath;
 
-  // Ensure output directory exists, then copy test image for examples referencing "avatar.jpg".
+  // Ensure output directory exists, then copy test image for patterns referencing "avatar.jpg".
   auto outDir = std::filesystem::path(ProjectPath::Absolute("test/out/PAGXTest"));
   std::filesystem::create_directories(outDir);
   std::filesystem::copy_file(ProjectPath::Absolute("resources/apitest/imageReplacement.jpg"),
@@ -668,7 +668,7 @@ static void TestMarkdownExamples(tgfx::Context* context, const std::string& mark
   pagx::FontConfig fontConfig;
   fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
 
-  for (const auto& [name, xmlContent] : examples) {
+  for (const auto& [name, xmlContent] : patterns) {
     auto key = prefix + name;
 
     auto pagxPath = SavePAGXFile(xmlContent, "PAGXTest/" + key + ".pagx");
@@ -3610,12 +3610,12 @@ PAGX_TEST(PAGXTest, LayerConstraintRoundTripNanOmitted) {
 }
 
 /**
- * Test all PAGX examples embedded in the skill examples.md documentation.
+ * Test all PAGX patterns embedded in the skill patterns.md documentation.
  * Extracts complete PAGX documents from markdown code blocks and renders them.
  */
-PAGX_TEST(PAGXTest, SkillExamples) {
-  TestMarkdownExamples(context,
-                       ProjectPath::Absolute(".codebuddy/skills/pagx/references/examples.md"),
+PAGX_TEST(PAGXTest, SkillPatterns) {
+  TestMarkdownPatterns(context,
+                       ProjectPath::Absolute(".codebuddy/skills/pagx/references/patterns.md"),
                        "skills_", 2.0f);
 }
 
