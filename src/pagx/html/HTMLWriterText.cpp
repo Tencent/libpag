@@ -1076,7 +1076,9 @@ void HTMLWriter::applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim, bool
     return;
   }
   builder.addAttr("pathLength", "1");
-  float ellipseAdj = isEllipse ? 0.25f : 0.0f;
+  // PAGX ellipse starts at 12 o'clock CCW; SVG ellipse starts at 3 o'clock CW.
+  // Offset = 0.75 accounts for both the starting point difference and direction reversal.
+  float ellipseAdj = isEllipse ? 0.75f : 0.0f;
   float offsetFrac = trim->offset / 360.0f;
   float s = trim->start + offsetFrac;
   float e = trim->end + offsetFrac;
@@ -1214,7 +1216,9 @@ void HTMLWriter::applyTrimAttrsContinuous(HTMLBuilder& builder, const TrimPath* 
   }
 
   builder.addAttr("pathLength", "1");
-  float ellipseAdj = isEllipse ? 0.25f : 0.0f;
+  // PAGX ellipse starts at 12 o'clock CCW; SVG ellipse starts at 3 o'clock CW.
+  // Offset = 0.75 accounts for both the starting point difference and direction reversal.
+  float ellipseAdj = isEllipse ? 0.75f : 0.0f;
   if (localEnd <= 1.0f) {
     float visible = localEnd - localStart;
     float gap = 1.0f - visible;
