@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: LinearGradient → CSS linear-gradient; angle calculation, multi-stop, with matrix -->
-<pagx version="1.0" width="380" height="380">
+<pagx version="1.0" width="380" height="395">
   <!-- Background -->
   <Layer>
-    <Rectangle position="190,190" size="380,380"/>
+    <Rectangle position="190,198" size="380,395"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
@@ -19,7 +19,7 @@
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="190,210" size="320,290" roundness="16"/>
+    <Rectangle position="190,210" size="320,310" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
@@ -57,7 +57,7 @@
 
   <!-- Vertical gradient -->
   <Layer>
-    <Rectangle position="110,270" size="120,120" roundness="12"/>
+    <Rectangle position="110,285" size="120,120" roundness="12"/>
     <Fill>
       <LinearGradient startPoint="10,10" endPoint="10,130">
         <ColorStop offset="0" color="#8B5CF6"/>
@@ -66,13 +66,13 @@
     </Fill>
   </Layer>
   <Layer>
-    <Text text="Vertical" fontFamily="Arial" fontSize="9" position="110,340" textAnchor="center"/>
+    <Text text="Vertical" fontFamily="Arial" fontSize="9" position="110,355" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- LinearGradient with matrix transform -->
   <Layer>
-    <Rectangle position="270,270" size="120,120" roundness="12"/>
+    <Rectangle position="270,285" size="120,120" roundness="12"/>
     <Fill>
       <LinearGradient startPoint="10,10" endPoint="110,10" matrix="0.707,-0.707,0.707,0.707,0,0">
         <ColorStop offset="0" color="#06B6D4"/>
@@ -81,7 +81,7 @@
     </Fill>
   </Layer>
   <Layer>
-    <Text text="Matrix" fontFamily="Arial" fontSize="9" position="270,340" textAnchor="center"/>
+    <Text text="Matrix" fontFamily="Arial" fontSize="9" position="270,355" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 </pagx>
