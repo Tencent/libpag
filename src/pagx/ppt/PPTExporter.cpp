@@ -310,7 +310,8 @@ class PPTWriter {
 
   // Custom geometry from PathData
   void writeCustomGeom(XMLBuilder& out, const PathData* data, float ofsX, float ofsY, float boundsW,
-                       float boundsH, FillRule fillRule = FillRule::Winding);
+                       float boundsH, FillRule fillRule = FillRule::Winding,
+                       float coordScaleX = 1.0f, float coordScaleY = 1.0f);
 
   // Transform decomposition
   struct Xform {
@@ -952,7 +953,8 @@ static void EmitCubicBezTo(XMLBuilder& out, float x0, float y0, float x1, float 
 }
 
 void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofsX, float ofsY,
-                                float boundsW, float boundsH, FillRule fillRule) {
+                                float boundsW, float boundsH, FillRule fillRule,
+                                float coordScaleX, float coordScaleY) {
   out.open("a:custGeom").gt();
   out.open("a:avLst").sc();
   out.open("a:gdLst").sc();
@@ -960,32 +962,34 @@ void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofs
   out.open("a:cxnLst").sc();
   out.open("a:rect").a("l", "0").a("t", "0").a("r", "r").a("b", "b").sc();
 
-  int64_t pw = std::max(int64_t(1), PxToEMU(boundsW));
-  int64_t ph = std::max(int64_t(1), PxToEMU(boundsH));
+  int64_t pw = std::max(int64_t(1), PxToEMU(boundsW * coordScaleX));
+  int64_t ph = std::max(int64_t(1), PxToEMU(boundsH * coordScaleY));
 
   out.open("a:pathLst").gt();
   out.open("a:path").a("w", pw).a("h", ph).gt();
 
+  float sOfsX = ofsX * coordScaleX;
+  float sOfsY = ofsY * coordScaleY;
+  float csX = coordScaleX;
+  float csY = coordScaleY;
+
   if (fillRule == FillRule::EvenOdd) {
-    // PowerPoint uses the non-zero winding rule. To emulate even-odd, ensure
-    // inner contours have the opposite winding direction of the outer contour
-    // so that nested regions cancel out to winding number 0, producing holes.
     auto contours = BuildEvenOddContours(data);
 
     for (const auto& c : contours) {
-      EmitPoint(out, "a:moveTo", c.start.x, c.start.y, ofsX, ofsY);
+      EmitPoint(out, "a:moveTo", c.start.x * csX, c.start.y * csY, sOfsX, sOfsY);
       for (const auto& s : c.segs) {
         switch (s.verb) {
           case PathVerb::Line:
-            EmitPoint(out, "a:lnTo", s.pts[0].x, s.pts[0].y, ofsX, ofsY);
+            EmitPoint(out, "a:lnTo", s.pts[0].x * csX, s.pts[0].y * csY, sOfsX, sOfsY);
             break;
           case PathVerb::Quad:
-            EmitQuadBezTo(out, "a:quadBezTo", s.pts[0].x, s.pts[0].y, s.pts[1].x, s.pts[1].y, ofsX,
-                          ofsY);
+            EmitQuadBezTo(out, "a:quadBezTo", s.pts[0].x * csX, s.pts[0].y * csY,
+                          s.pts[1].x * csX, s.pts[1].y * csY, sOfsX, sOfsY);
             break;
           case PathVerb::Cubic:
-            EmitCubicBezTo(out, s.pts[0].x, s.pts[0].y, s.pts[1].x, s.pts[1].y, s.pts[2].x,
-                           s.pts[2].y, ofsX, ofsY);
+            EmitCubicBezTo(out, s.pts[0].x * csX, s.pts[0].y * csY, s.pts[1].x * csX,
+                           s.pts[1].y * csY, s.pts[2].x * csX, s.pts[2].y * csY, sOfsX, sOfsY);
             break;
           default:
             break;
@@ -999,17 +1003,18 @@ void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofs
     data->forEach([&](PathVerb verb, const Point* pts) {
       switch (verb) {
         case PathVerb::Move:
-          EmitPoint(out, "a:moveTo", pts[0].x, pts[0].y, ofsX, ofsY);
+          EmitPoint(out, "a:moveTo", pts[0].x * csX, pts[0].y * csY, sOfsX, sOfsY);
           break;
         case PathVerb::Line:
-          EmitPoint(out, "a:lnTo", pts[0].x, pts[0].y, ofsX, ofsY);
+          EmitPoint(out, "a:lnTo", pts[0].x * csX, pts[0].y * csY, sOfsX, sOfsY);
           break;
         case PathVerb::Quad:
-          EmitQuadBezTo(out, "a:quadBezTo", pts[0].x, pts[0].y, pts[1].x, pts[1].y, ofsX, ofsY);
+          EmitQuadBezTo(out, "a:quadBezTo", pts[0].x * csX, pts[0].y * csY, pts[1].x * csX,
+                        pts[1].y * csY, sOfsX, sOfsY);
           break;
         case PathVerb::Cubic:
-          EmitCubicBezTo(out, pts[0].x, pts[0].y, pts[1].x, pts[1].y, pts[2].x, pts[2].y, ofsX,
-                         ofsY);
+          EmitCubicBezTo(out, pts[0].x * csX, pts[0].y * csY, pts[1].x * csX, pts[1].y * csY,
+                         pts[2].x * csX, pts[2].y * csY, sOfsX, sOfsY);
           break;
         case PathVerb::Close:
           out.open("a:close").sc();
@@ -1136,8 +1141,16 @@ void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStr
     auto xf = decomposeXform(localBounds.x, localBounds.y, localBounds.width, localBounds.height,
                              combinedMatrix);
     beginShape(out, "Glyph", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
+    FillRule fillRule = (fs.fill) ? fs.fill->fillRule : FillRule::EvenOdd;
+
+    float sx = std::sqrt(combinedMatrix.a * combinedMatrix.a + combinedMatrix.b * combinedMatrix.b);
+    float det = combinedMatrix.a * combinedMatrix.d - combinedMatrix.b * combinedMatrix.c;
+    float sy = (sx > 0) ? std::abs(det) / sx : 0;
+    if (sx <= 0) sx = 1.0f;
+    if (sy <= 0) sy = 1.0f;
+
     writeCustomGeom(out, gp.pathData, localBounds.x, localBounds.y, localBounds.width,
-                    localBounds.height);
+                    localBounds.height, fillRule, sx, sy);
     writeFill(out, fs.fill, alpha);
     out.open("a:ln").gt();
     out.open("a:noFill").sc();
