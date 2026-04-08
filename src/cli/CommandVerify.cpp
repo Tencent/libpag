@@ -838,37 +838,41 @@ static void CollectSubtreeCandidates(const Layer* layer, std::vector<const Layer
   }
 }
 
+struct ParentInfo {
+  std::vector<const Layer*> children;
+  std::vector<std::string> sigs;
+};
+
+static void CollectParent(const std::vector<Layer*>& children, const LineNodeMap& lineNodeMap,
+                          std::vector<ParentInfo>& parents) {
+  if (children.size() < 2) {
+    return;
+  }
+  ParentInfo info;
+  for (auto* child : children) {
+    info.children.push_back(child);
+    info.sigs.push_back(GenerateLayerSignature(lineNodeMap, child->sourceLine));
+  }
+  parents.push_back(std::move(info));
+}
+
+static void CollectParentsRecursive(const Layer* layer, const LineNodeMap& lineNodeMap,
+                                    std::vector<ParentInfo>& parents) {
+  CollectParent(layer->children, lineNodeMap, parents);
+  for (auto* child : layer->children) {
+    CollectParentsRecursive(child, lineNodeMap, parents);
+  }
+}
+
 static void DetectStructurallyIdenticalLayers(const PAGXDocument* doc,
                                               const LineNodeMap& lineNodeMap,
                                               std::vector<VerifyDiagnostic>& diagnostics) {
   // Collect all parent containers with >= 2 children for sequence detection.
-  struct ParentInfo {
-    std::vector<const Layer*> children;
-    std::vector<std::string> sigs;
-  };
   std::vector<ParentInfo> parents;
 
-  auto addParent = [&](const std::vector<Layer*>& children) {
-    if (children.size() < 2) {
-      return;
-    }
-    ParentInfo info;
-    for (auto* child : children) {
-      info.children.push_back(child);
-      info.sigs.push_back(GenerateLayerSignature(lineNodeMap, child->sourceLine));
-    }
-    parents.push_back(std::move(info));
-  };
-
-  addParent(doc->layers);
-  std::function<void(const Layer*)> visit = [&](const Layer* layer) {
-    addParent(layer->children);
-    for (auto* child : layer->children) {
-      visit(child);
-    }
-  };
+  CollectParent(doc->layers, lineNodeMap, parents);
   for (auto* layer : doc->layers) {
-    visit(layer);
+    CollectParentsRecursive(layer, lineNodeMap, parents);
   }
 
   std::unordered_set<std::string> reported;
@@ -2280,13 +2284,14 @@ static std::string GenerateLayoutXml(const PAGXDocument* doc, const Layer* targe
 // Output
 // ============================================================================
 
+static bool CompareDiagnosticsByLine(const VerifyDiagnostic& a, const VerifyDiagnostic& b) {
+  int lineA = a.lines.empty() ? 0 : a.lines[0];
+  int lineB = b.lines.empty() ? 0 : b.lines[0];
+  return lineA < lineB;
+}
+
 static void SortDiagnostics(std::vector<VerifyDiagnostic>& diagnostics) {
-  std::sort(diagnostics.begin(), diagnostics.end(),
-            [](const VerifyDiagnostic& a, const VerifyDiagnostic& b) {
-              int lineA = a.lines.empty() ? 0 : a.lines[0];
-              int lineB = b.lines.empty() ? 0 : b.lines[0];
-              return lineA < lineB;
-            });
+  std::sort(diagnostics.begin(), diagnostics.end(), CompareDiagnosticsByLine);
 }
 
 static void PrintDiagnosticsText(const std::vector<VerifyDiagnostic>& diagnostics,
