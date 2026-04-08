@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: scrollRect → clip-path:inset(); mask (alpha/luminance/contour) → CSS mask/clip-path -->
-<pagx version="1.0" width="360" height="380">
+<pagx version="1.0" width="360" height="395">
   <!-- Background -->
   <Layer>
-    <Rectangle position="180,190" size="360,380"/>
+    <Rectangle position="180,198" size="360,395"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
@@ -19,7 +19,7 @@
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="180,215" size="300,260" roundness="16"/>
+    <Rectangle position="180,225" size="300,280" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
@@ -68,7 +68,7 @@
     <Fill color="#EF4444"/>
   </Layer>
   <Layer>
-    <Text text="Luminance" fontFamily="Arial" fontSize="8" position="110,348" textAnchor="center"/>
+    <Text text="Luminance" fontFamily="Arial" fontSize="8" position="110,358" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
@@ -82,7 +82,7 @@
     <Fill color="#F59E0B"/>
   </Layer>
   <Layer>
-    <Text text="Contour" fontFamily="Arial" fontSize="8" position="270,348" textAnchor="center"/>
+    <Text text="Contour" fontFamily="Arial" fontSize="8" position="270,358" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 </pagx>
