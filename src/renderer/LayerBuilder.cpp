@@ -262,7 +262,7 @@ class LayerBuilderContext {
     }
   }
 
-  std::shared_ptr<tgfx::VectorElement> convertVectorElement(const Element* node) {
+  std::shared_ptr<tgfx::VectorElement> convertVectorElement(Element* node) {
     if (!node) {
       return nullptr;
     }
@@ -277,7 +277,7 @@ class LayerBuilderContext {
       case NodeType::Path:
         return convertPath(static_cast<const Path*>(node));
       case NodeType::Text:
-        return convertText(static_cast<const Text*>(node));
+        return convertText(static_cast<Text*>(node));
       case NodeType::Fill:
         return convertFill(static_cast<const Fill*>(node));
       case NodeType::Stroke:
@@ -354,10 +354,10 @@ class LayerBuilderContext {
     return shapePath;
   }
 
-  std::shared_ptr<tgfx::Text> convertText(const Text* node) {
+  std::shared_ptr<tgfx::Text> convertText(Text* node) {
     auto textBlob = node->privateData->textBlob;
     if (textBlob == nullptr) {
-      prepareTextBlob(const_cast<Text*>(node), tgfx::Matrix::I());
+      prepareTextBlob(node, tgfx::Matrix::I());
       textBlob = node->privateData->textBlob;
     }
     if (textBlob == nullptr) {
