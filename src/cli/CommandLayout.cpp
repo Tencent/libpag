@@ -73,31 +73,7 @@ struct LayoutOptions {
   int depth = 0;
 };
 
-// ============================================================================
-// Node Type Name
-// ============================================================================
 
-static const char* NodeTypeName(NodeType type) {
-  switch (type) {
-    case NodeType::Rectangle:
-      return "Rectangle";
-    case NodeType::Ellipse:
-      return "Ellipse";
-    case NodeType::Path:
-      return "Path";
-    case NodeType::Polystar:
-      return "Polystar";
-    case NodeType::Text:
-      return "Text";
-    case NodeType::TextPath:
-      return "TextPath";
-    case NodeType::Group:
-      return "Group";
-    case NodeType::TextBox:
-      return "TextBox";
-    default:
-      return "Element";
-  }
 }
 
 // ============================================================================

@@ -88,62 +88,6 @@ struct VerifyOptions {
 // Helper Functions
 // ============================================================================
 
-static std::string NodeTypeName(NodeType type) {
-  switch (type) {
-    case NodeType::Layer:
-      return "Layer";
-    case NodeType::Group:
-      return "Group";
-    case NodeType::TextBox:
-      return "TextBox";
-    case NodeType::Rectangle:
-      return "Rectangle";
-    case NodeType::Ellipse:
-      return "Ellipse";
-    case NodeType::Path:
-      return "Path";
-    case NodeType::Polystar:
-      return "Polystar";
-    case NodeType::Text:
-      return "Text";
-    case NodeType::Fill:
-      return "Fill";
-    case NodeType::Stroke:
-      return "Stroke";
-    case NodeType::TrimPath:
-      return "TrimPath";
-    case NodeType::RoundCorner:
-      return "RoundCorner";
-    case NodeType::MergePath:
-      return "MergePath";
-    case NodeType::Repeater:
-      return "Repeater";
-    case NodeType::PathData:
-      return "PathData";
-    case NodeType::LinearGradient:
-      return "LinearGradient";
-    case NodeType::RadialGradient:
-      return "RadialGradient";
-    case NodeType::ConicGradient:
-      return "ConicGradient";
-    case NodeType::DiamondGradient:
-      return "DiamondGradient";
-    case NodeType::Composition:
-      return "Composition";
-    case NodeType::Image:
-      return "Image";
-    case NodeType::BlurFilter:
-      return "BlurFilter";
-    case NodeType::DropShadowStyle:
-      return "DropShadowStyle";
-    case NodeType::InnerShadowStyle:
-      return "InnerShadowStyle";
-    case NodeType::BackgroundBlurStyle:
-      return "BackgroundBlurStyle";
-    default:
-      return "Node";
-  }
-}
 
 static bool IsGradient(NodeType type) {
   return type == NodeType::LinearGradient || type == NodeType::RadialGradient ||

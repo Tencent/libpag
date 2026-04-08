@@ -20,6 +20,7 @@
 
 #include <libxml/tree.h>
 #include <string>
+#include "pagx/nodes/Node.h"
 
 namespace pagx::cli {
 
@@ -45,5 +46,7 @@ std::string EscapeXmlAttr(const std::string& s);
  * escaping.
  */
 void SerializeNode(std::string& output, xmlNodePtr node, int indentLevel, int indentSpaces);
+
+const char* NodeTypeName(NodeType type);
 
 }  // namespace pagx::cli
