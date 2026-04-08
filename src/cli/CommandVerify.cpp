@@ -2079,8 +2079,7 @@ static void WriteLayoutElement(std::ostream& os, const Element* element, int ind
   auto* layoutNode = LayoutNode::AsLayoutNode(const_cast<Element*>(element));
   if (layoutNode != nullptr) {
     auto bounds = layoutNode->layoutBounds();
-    os << " bounds=\"" << static_cast<int>(bounds.x) << "," << static_cast<int>(bounds.y) << ","
-       << static_cast<int>(bounds.width) << "," << static_cast<int>(bounds.height) << "\"";
+    WriteBoundsAttr(os, bounds.x, bounds.y, bounds.width, bounds.height);
   }
 
   if (type == NodeType::Group || type == NodeType::TextBox) {
@@ -2111,8 +2110,7 @@ static void WriteLayoutLayer(std::ostream& os, const Layer* layer, int indent) {
   }
 
   auto bounds = layer->layoutBounds();
-  os << " bounds=\"" << static_cast<int>(bounds.x) << "," << static_cast<int>(bounds.y) << ","
-     << static_cast<int>(bounds.width) << "," << static_cast<int>(bounds.height) << "\"";
+  WriteBoundsAttr(os, bounds.x, bounds.y, bounds.width, bounds.height);
 
   WriteLayoutAttrs(os, layer->layout, layer->gap, layer->flex, layer->padding, layer->alignment,
                     layer->arrangement, layer->includeInLayout, layer->clipToBounds);

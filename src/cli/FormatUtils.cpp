@@ -321,4 +321,99 @@ const char* NodeTypeName(NodeType type) {
   }
 }
 
+const char* LayoutModeName(LayoutMode mode) {
+  switch (mode) {
+    case LayoutMode::Horizontal:
+      return "horizontal";
+    case LayoutMode::Vertical:
+      return "vertical";
+    default:
+      return nullptr;
+  }
+}
+
+const char* AlignmentName(Alignment alignment) {
+  switch (alignment) {
+    case Alignment::Start:
+      return "start";
+    case Alignment::Center:
+      return "center";
+    case Alignment::End:
+      return "end";
+    default:
+      return nullptr;
+  }
+}
+
+const char* ArrangementName(Arrangement arrangement) {
+  switch (arrangement) {
+    case Arrangement::Center:
+      return "center";
+    case Arrangement::End:
+      return "end";
+    case Arrangement::SpaceBetween:
+      return "spaceBetween";
+    case Arrangement::SpaceEvenly:
+      return "spaceEvenly";
+    case Arrangement::SpaceAround:
+      return "spaceAround";
+    default:
+      return nullptr;
+  }
+}
+
+void WritePaddingAttr(std::ostream& os, const Padding& padding) {
+  if (padding.isZero()) {
+    return;
+  }
+  bool allEqual = (padding.top == padding.right && padding.right == padding.bottom &&
+                   padding.bottom == padding.left);
+  bool vhEqual = (padding.top == padding.bottom && padding.left == padding.right);
+  if (allEqual) {
+    os << " padding=\"" << static_cast<int>(padding.top) << "\"";
+  } else if (vhEqual) {
+    os << " padding=\"" << static_cast<int>(padding.top) << ","
+       << static_cast<int>(padding.left) << "\"";
+  } else {
+    os << " padding=\"" << static_cast<int>(padding.top) << ","
+       << static_cast<int>(padding.right) << "," << static_cast<int>(padding.bottom) << ","
+       << static_cast<int>(padding.left) << "\"";
+  }
+}
+
+void WriteLayoutAttrs(std::ostream& os, LayoutMode layout, float gap, float flex,
+                      const Padding& padding, Alignment alignment, Arrangement arrangement,
+                      bool includeInLayout, bool clipToBounds) {
+  auto* layoutName = LayoutModeName(layout);
+  if (layoutName != nullptr) {
+    os << " layout=\"" << layoutName << "\"";
+  }
+  if (gap != 0) {
+    os << " gap=\"" << static_cast<int>(gap) << "\"";
+  }
+  if (flex != 0) {
+    os << " flex=\"" << static_cast<int>(flex) << "\"";
+  }
+  WritePaddingAttr(os, padding);
+  auto* alignmentName = AlignmentName(alignment);
+  if (alignmentName != nullptr) {
+    os << " alignment=\"" << alignmentName << "\"";
+  }
+  auto* arrangementName = ArrangementName(arrangement);
+  if (arrangementName != nullptr) {
+    os << " arrangement=\"" << arrangementName << "\"";
+  }
+  if (!includeInLayout) {
+    os << " includeInLayout=\"false\"";
+  }
+  if (clipToBounds) {
+    os << " clipToBounds=\"true\"";
+  }
+}
+
+void WriteBoundsAttr(std::ostream& os, float x, float y, float width, float height) {
+  os << " bounds=\"" << static_cast<int>(x) << "," << static_cast<int>(y) << ","
+     << static_cast<int>(width) << "," << static_cast<int>(height) << "\"";
+}
+
 }  // namespace pagx::cli

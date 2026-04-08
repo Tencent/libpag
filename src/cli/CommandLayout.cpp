@@ -46,7 +46,7 @@ struct LCRect {
 };
 
 struct LayoutAttrs {
-  std::string layoutMode;
+  LayoutMode layoutMode = LayoutMode::None;
   float gap = 0;
   float flex = 0;
   Padding padding = {};
@@ -130,11 +130,7 @@ static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float pare
   auto lb = layer->layoutBounds();
   node->bounds = {parentX + lb.x, parentY + lb.y, lb.width, lb.height};
 
-  if (layer->layout == LayoutMode::Horizontal) {
-    node->attrs.layoutMode = "horizontal";
-  } else if (layer->layout == LayoutMode::Vertical) {
-    node->attrs.layoutMode = "vertical";
-  }
+  node->attrs.layoutMode = layer->layout;
   node->attrs.gap = layer->gap;
   node->attrs.flex = layer->flex;
   node->attrs.padding = layer->padding;
@@ -175,10 +171,6 @@ static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float pare
 // XML Output
 // ============================================================================
 
-static std::string FormatInt(float v) {
-  return std::to_string(static_cast<int>(v));
-}
-
 static void PrintNodeXml(std::ostream& os, const CheckNode& node, int indent) {
   std::string pad(indent * 2, ' ');
   os << pad << "<" << node.tagName;
@@ -194,76 +186,13 @@ static void PrintNodeXml(std::ostream& os, const CheckNode& node, int indent) {
   }
 
   // bounds attribute
-  os << " bounds=\"" << FormatInt(node.bounds.x) << "," << FormatInt(node.bounds.y) << ","
-     << FormatInt(node.bounds.width) << "," << FormatInt(node.bounds.height) << "\"";
+  WriteBoundsAttr(os, node.bounds.x, node.bounds.y, node.bounds.width, node.bounds.height);
 
   // Layout attributes (only non-default values, only for Layer nodes)
   if (node.tagName == "Layer") {
     const auto& a = node.attrs;
-    if (!a.layoutMode.empty()) {
-      os << " layout=\"" << a.layoutMode << "\"";
-    }
-    if (a.gap != 0) {
-      os << " gap=\"" << FormatInt(a.gap) << "\"";
-    }
-    if (a.flex != 0) {
-      os << " flex=\"" << FormatInt(a.flex) << "\"";
-    }
-    if (!a.padding.isZero()) {
-      bool allEqual = (a.padding.top == a.padding.right && a.padding.right == a.padding.bottom &&
-                       a.padding.bottom == a.padding.left);
-      bool vhEqual = (a.padding.top == a.padding.bottom && a.padding.left == a.padding.right);
-      if (allEqual) {
-        os << " padding=\"" << FormatInt(a.padding.top) << "\"";
-      } else if (vhEqual) {
-        os << " padding=\"" << FormatInt(a.padding.top) << "," << FormatInt(a.padding.left) << "\"";
-      } else {
-        os << " padding=\"" << FormatInt(a.padding.top) << "," << FormatInt(a.padding.right) << ","
-           << FormatInt(a.padding.bottom) << "," << FormatInt(a.padding.left) << "\"";
-      }
-    }
-    if (a.alignment != Alignment::Stretch) {
-      switch (a.alignment) {
-        case Alignment::Start:
-          os << " alignment=\"start\"";
-          break;
-        case Alignment::Center:
-          os << " alignment=\"center\"";
-          break;
-        case Alignment::End:
-          os << " alignment=\"end\"";
-          break;
-        default:
-          break;
-      }
-    }
-    if (a.arrangement != Arrangement::Start) {
-      switch (a.arrangement) {
-        case Arrangement::Center:
-          os << " arrangement=\"center\"";
-          break;
-        case Arrangement::End:
-          os << " arrangement=\"end\"";
-          break;
-        case Arrangement::SpaceBetween:
-          os << " arrangement=\"spaceBetween\"";
-          break;
-        case Arrangement::SpaceEvenly:
-          os << " arrangement=\"spaceEvenly\"";
-          break;
-        case Arrangement::SpaceAround:
-          os << " arrangement=\"spaceAround\"";
-          break;
-        default:
-          break;
-      }
-    }
-    if (!a.includeInLayout) {
-      os << " includeInLayout=\"false\"";
-    }
-    if (a.clipToBounds) {
-      os << " clipToBounds=\"true\"";
-    }
+    WriteLayoutAttrs(os, a.layoutMode, a.gap, a.flex, a.padding, a.alignment, a.arrangement,
+                     a.includeInLayout, a.clipToBounds);
   }
 
   if (node.children.empty()) {
