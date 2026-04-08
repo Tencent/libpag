@@ -1536,7 +1536,38 @@ static void DetectConstraintsIgnoredByLayout(const Layer* layer, const Layer* pa
                     "removed or includeInLayout=\"false\" added");
 }
 
+// Returns true when the layer's main-axis size is determined purely by measuring its children.
+// A content-measured main axis means flex children cannot receive distributed space.
+static bool IsMainAxisContentMeasured(const Layer* layer, const Layer* parentLayer) {
+  bool horizontal = layer->layout == LayoutMode::Horizontal;
+  float explicitMain = horizontal ? layer->width : layer->height;
+  if (!std::isnan(explicitMain)) {
+    return false;
+  }
+  bool mainFromConstraints = horizontal ? (!std::isnan(layer->left) && !std::isnan(layer->right))
+                                        : (!std::isnan(layer->top) && !std::isnan(layer->bottom));
+  if (mainFromConstraints) {
+    return false;
+  }
+  if (parentLayer != nullptr && parentLayer->layout != LayoutMode::None && layer->includeInLayout) {
+    bool parentHorizontal = parentLayer->layout == LayoutMode::Horizontal;
+    // Flex distributes along the parent's layout axis. If that matches this layer's main axis,
+    // the main-axis size is assigned by flex, not by content measurement.
+    if (layer->flex > 0 && parentHorizontal == horizontal) {
+      return false;
+    }
+    // Stretch assigns the parent's cross-axis size to children without explicit cross-axis size.
+    // If the parent's cross axis matches this layer's main axis, the main-axis size comes from
+    // stretch, not from content measurement.
+    if (parentHorizontal != horizontal && parentLayer->alignment == Alignment::Stretch) {
+      return false;
+    }
+  }
+  return true;
+}
+
 static void DetectFlexInContentMeasuredParent(const Layer* layer, const Layer* parentLayer,
+                                              const Layer* grandparentLayer,
                                               std::vector<VerifyDiagnostic>& diagnostics) {
   if (parentLayer == nullptr || parentLayer->layout == LayoutMode::None) {
     return;
@@ -1548,9 +1579,7 @@ static void DetectFlexInContentMeasuredParent(const Layer* layer, const Layer* p
   if (!std::isnan(horizontal ? layer->width : layer->height)) {
     return;
   }
-  auto parentBounds = parentLayer->layoutBounds();
-  float parentMainSize = horizontal ? parentBounds.width : parentBounds.height;
-  if (parentMainSize > 0) {
+  if (!IsMainAxisContentMeasured(parentLayer, grandparentLayer)) {
     return;
   }
   const char* axis = horizontal ? "width" : "height";
@@ -1980,11 +2009,12 @@ static void RunSpatialDetectionOnElements(const std::vector<Element*>& elements,
 }
 
 static void RunSpatialDetectionOnLayer(const Layer* layer, const Layer* parentLayer,
-                                       float canvasWidth, float canvasHeight,
+                                       const Layer* grandparentLayer, float canvasWidth,
+                                       float canvasHeight,
                                        std::vector<VerifyDiagnostic>& diagnostics) {
   DetectZeroSize(layer, parentLayer, diagnostics);
   DetectConstraintsIgnoredByLayout(layer, parentLayer, diagnostics);
-  DetectFlexInContentMeasuredParent(layer, parentLayer, diagnostics);
+  DetectFlexInContentMeasuredParent(layer, parentLayer, grandparentLayer, diagnostics);
   DetectContentOriginOffset(layer, parentLayer, diagnostics);
   DetectOverlappingSiblings(layer, diagnostics);
   DetectConstraintConflicts(layer, layer->sourceLine, diagnostics);
@@ -2009,7 +2039,7 @@ static void RunSpatialDetectionOnLayer(const Layer* layer, const Layer* parentLa
                                 diagnostics);
 
   for (auto* child : layer->children) {
-    RunSpatialDetectionOnLayer(child, layer, canvasWidth, canvasHeight, diagnostics);
+    RunSpatialDetectionOnLayer(child, layer, parentLayer, canvasWidth, canvasHeight, diagnostics);
   }
 }
 
@@ -2017,11 +2047,11 @@ static void RunSpatialDetection(const PAGXDocument* doc, std::vector<VerifyDiagn
                                 const Layer* targetLayer = nullptr) {
   if (targetLayer != nullptr) {
     DetectOffCanvas(targetLayer, doc->width, doc->height, diagnostics);
-    RunSpatialDetectionOnLayer(targetLayer, nullptr, doc->width, doc->height, diagnostics);
+    RunSpatialDetectionOnLayer(targetLayer, nullptr, nullptr, doc->width, doc->height, diagnostics);
   } else {
     for (auto* layer : doc->layers) {
       DetectOffCanvas(layer, doc->width, doc->height, diagnostics);
-      RunSpatialDetectionOnLayer(layer, nullptr, doc->width, doc->height, diagnostics);
+      RunSpatialDetectionOnLayer(layer, nullptr, nullptr, doc->width, doc->height, diagnostics);
     }
   }
 }
@@ -2084,76 +2114,8 @@ static void WriteLayoutLayer(std::ostream& os, const Layer* layer, int indent) {
   os << " bounds=\"" << static_cast<int>(bounds.x) << "," << static_cast<int>(bounds.y) << ","
      << static_cast<int>(bounds.width) << "," << static_cast<int>(bounds.height) << "\"";
 
-  if (layer->layout == LayoutMode::Horizontal) {
-    os << " layout=\"horizontal\"";
-  } else if (layer->layout == LayoutMode::Vertical) {
-    os << " layout=\"vertical\"";
-  }
-  if (layer->gap != 0) {
-    os << " gap=\"" << static_cast<int>(layer->gap) << "\"";
-  }
-  if (layer->flex != 0) {
-    os << " flex=\"" << static_cast<int>(layer->flex) << "\"";
-  }
-  if (!layer->padding.isZero()) {
-    bool allEqual = (layer->padding.top == layer->padding.right &&
-                     layer->padding.right == layer->padding.bottom &&
-                     layer->padding.bottom == layer->padding.left);
-    bool vhEqual = (layer->padding.top == layer->padding.bottom &&
-                    layer->padding.left == layer->padding.right);
-    if (allEqual) {
-      os << " padding=\"" << static_cast<int>(layer->padding.top) << "\"";
-    } else if (vhEqual) {
-      os << " padding=\"" << static_cast<int>(layer->padding.top) << ","
-         << static_cast<int>(layer->padding.left) << "\"";
-    } else {
-      os << " padding=\"" << static_cast<int>(layer->padding.top) << ","
-         << static_cast<int>(layer->padding.right) << "," << static_cast<int>(layer->padding.bottom)
-         << "," << static_cast<int>(layer->padding.left) << "\"";
-    }
-  }
-  if (layer->alignment != Alignment::Stretch) {
-    switch (layer->alignment) {
-      case Alignment::Start:
-        os << " alignment=\"start\"";
-        break;
-      case Alignment::Center:
-        os << " alignment=\"center\"";
-        break;
-      case Alignment::End:
-        os << " alignment=\"end\"";
-        break;
-      default:
-        break;
-    }
-  }
-  if (layer->arrangement != Arrangement::Start) {
-    switch (layer->arrangement) {
-      case Arrangement::Center:
-        os << " arrangement=\"center\"";
-        break;
-      case Arrangement::End:
-        os << " arrangement=\"end\"";
-        break;
-      case Arrangement::SpaceBetween:
-        os << " arrangement=\"spaceBetween\"";
-        break;
-      case Arrangement::SpaceEvenly:
-        os << " arrangement=\"spaceEvenly\"";
-        break;
-      case Arrangement::SpaceAround:
-        os << " arrangement=\"spaceAround\"";
-        break;
-      default:
-        break;
-    }
-  }
-  if (!layer->includeInLayout) {
-    os << " includeInLayout=\"false\"";
-  }
-  if (layer->clipToBounds) {
-    os << " clipToBounds=\"true\"";
-  }
+  WriteLayoutAttrs(os, layer->layout, layer->gap, layer->flex, layer->padding, layer->alignment,
+                    layer->arrangement, layer->includeInLayout, layer->clipToBounds);
 
   bool hasChildren = !layer->contents.empty() || !layer->children.empty();
   if (!hasChildren) {

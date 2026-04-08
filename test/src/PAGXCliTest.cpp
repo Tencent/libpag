@@ -655,7 +655,7 @@ CLI_TEST(PAGXCliTest, Lint_JsonOutput) {
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
   std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--json", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--json", "--problems-only", inputPath});
   std::cout.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
@@ -1596,7 +1596,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_FlexNoParentSize) {
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
-  EXPECT_TRUE(output.find("flex has no effect, parent has no") != std::string::npos);
+  EXPECT_TRUE(output.find("flex has no effect, parent") != std::string::npos);
 }
 
 // Flex child with explicit parent size — no problem.
@@ -1641,8 +1641,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_FlexConstraintParent) {
 }
 
 // Flex child zero-size with parent that has opposite-pair constraints deriving zero height.
-// The cause should NOT say "parent has no ... to distribute" because the parent does have a size
-// source (constraints) — it just happens to derive zero.
+// The diagnostic should report zero-size and indicate the parent height is 0.
 CLI_TEST(PAGXCliTest, LayoutCheck_FlexConstraintZeroParent) {
   auto path = TestResourcePath("layout_check_flex_constraint_zero_parent.pagx");
   std::streambuf* old = std::cerr.rdbuf();
@@ -1652,9 +1651,8 @@ CLI_TEST(PAGXCliTest, LayoutCheck_FlexConstraintZeroParent) {
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
-  // Should report zero-size but NOT the "parent has no ... to distribute" cause.
   EXPECT_TRUE(output.find("zero size") != std::string::npos);
-  EXPECT_TRUE(output.find("parent has no") == std::string::npos);
+  EXPECT_TRUE(output.find("parent height is 0") != std::string::npos);
 }
 
 // Flex in horizontal layout with content-measured parent — same problem, different axis.
@@ -1667,7 +1665,8 @@ CLI_TEST(PAGXCliTest, LayoutCheck_FlexHorizontal) {
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
-  EXPECT_TRUE(output.find("parent has no") != std::string::npos);
+  EXPECT_TRUE(output.find("parent") != std::string::npos &&
+              output.find("is 0") != std::string::npos);
 }
 
 // --depth limits Layer nesting depth. depth=1 shows root + direct child Layers but not

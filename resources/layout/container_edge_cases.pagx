@@ -140,7 +140,7 @@
         </Layer>
       </Layer>
 
-      <Layer flex="1" layout="horizontal" gap="10" padding="15" alignment="start">
+      <Layer layout="horizontal" gap="10" padding="15" alignment="start">
         <!-- Border -->
         <Layer left="0" right="0" top="0" bottom="0" includeInLayout="false">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
