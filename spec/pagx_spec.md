@@ -558,7 +558,7 @@ For child Layers, container layout and constraint positioning are **mutually exc
 
 These sources ensure that containers nearly always have a size available during layout calculations. Explicitly setting `width`/`height` is only necessary when a specific design size (different from the natural content size) is needed.
 
-Layout size itself has no direct rendering effect; it only passes size information downward for constraint positioning of child elements. Layout size and constraint calculations are performed in the element's local coordinate system. Transforms (via `matrix`/`matrix3D` attributes) are applied after layout calculations and do not participate in or affect layout.
+Layout size itself has no direct rendering effect; it only passes size information downward for constraint positioning of child elements. Layout size and constraint calculations are performed in the element's local coordinate system. Transforms (`matrix`/`matrix3D`) are applied on top of the computed layout results — they do not participate in layout calculations and do not affect sibling or parent node positions.
 
 ### 4.2 Container Layout
 
