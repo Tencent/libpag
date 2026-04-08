@@ -788,9 +788,8 @@ CLI_TEST(PAGXCliTest, Lint_PathToPrimitive) {
 }
 
 // Heart (M C C C C Z) and diamond (M L L L Z) shapes should NOT be reported as replaceable.
-// NOTE: The verify command's ellipse detection matches any M+4C+Z verb pattern without
-// checking actual geometry. The heart shape (M C C C C Z) triggers a false positive.
-// This is a known issue in CommandVerify.cpp::DetectPathToPrimitives.
+// The ellipse detection validates cardinal positions and kappa-ratio control points,
+// correctly rejecting non-elliptical curves like the heart shape.
 CLI_TEST(PAGXCliTest, Lint_PathNonPrimitive) {
   auto inputPath = TestResourcePath("lint_path_non_primitive.pagx");
   std::streambuf* old = std::cerr.rdbuf();
