@@ -8541,19 +8541,13 @@
         "RenderIdWithScale": "15eaf7440",
         "RenderJpgFormat": "bf19f4e8",
         "RenderScale": "bf19f4e8",
-        "RenderText": "05357dd89",
+        "RenderText": "9b6dea6a",
         "RenderWebpFormat": "bf19f4e8",
-        "RenderXPathLayer": "15eaf7440",
-        "insert_basic": "b272143b5",
-        "insert_default_out": "b272143b5",
-        "insert_multi": "b272143b5",
-        "insert_preserve_attrs": "b272143b5",
-        "insert_render": "b272143b5",
-        "insert_replace": "b272143b5"
+        "RenderXPathLayer": "15eaf7440"
     },
     "PAGXTest": {
         "LayerBuilderAPIConsistency": "f40e23b6",
-        "PrecomposedTextRender": "004b53bf",
+        "PrecomposedTextRender": "9b6dea6a",
         "layout_constraint_absolute": "b4fef60e9",
         "layout_constraint_ellipse": "b4fef60e9",
         "layout_constraint_group": "b4fef60e9",
@@ -8666,12 +8660,12 @@
         "svg_widegamut": "b4fef60e9",
         "text_baseline": "b4fef60e9",
         "text_bidi_basic": "bf19f4e8",
-        "text_box_layout": "233040cf3",
-        "text_emoji": "bf19f4e8",
+        "text_box_layout": "9b6dea6a",
+        "text_emoji": "9b6dea6a",
         "text_group_matrix": "b4fef60e9",
-        "text_line_break": "bf19f4e8",
-        "text_punctuation_squash": "233040cf3",
+        "text_line_break": "9b6dea6a",
+        "text_punctuation_squash": "9b6dea6a",
         "text_special_chars": "bf19f4e8",
-        "text_vertical": "233040cf3"
+        "text_vertical": "9b6dea6a"
     }
 }
