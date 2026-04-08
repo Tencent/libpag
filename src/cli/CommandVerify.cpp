@@ -225,10 +225,10 @@ static void DetectFullCanvasClipMask(const Layer* layer, float canvasWidth, floa
   if (maskLayer->contents.size() != 1) {
     return;
   }
-  auto* rect = dynamic_cast<Rectangle*>(maskLayer->contents[0]);
-  if (rect == nullptr) {
+  if (maskLayer->contents[0]->nodeType() != NodeType::Rectangle) {
     return;
   }
+  auto* rect = static_cast<Rectangle*>(maskLayer->contents[0]);
   float left = rect->position.x - rect->size.width * 0.5f;
   float top = rect->position.y - rect->size.height * 0.5f;
   float right = rect->position.x + rect->size.width * 0.5f;
@@ -1342,11 +1342,12 @@ static void DetectRectangularMask(const Layer* layer, std::vector<VerifyDiagnost
   if (maskLayer->contents.size() != 2) {
     return;
   }
-  auto* rect = dynamic_cast<Rectangle*>(maskLayer->contents[0]);
-  auto* fill = dynamic_cast<Fill*>(maskLayer->contents[1]);
-  if (rect == nullptr || fill == nullptr) {
+  if (maskLayer->contents[0]->nodeType() != NodeType::Rectangle ||
+      maskLayer->contents[1]->nodeType() != NodeType::Fill) {
     return;
   }
+  auto* rect = static_cast<Rectangle*>(maskLayer->contents[0]);
+  auto* fill = static_cast<Fill*>(maskLayer->contents[1]);
   if (fill->alpha < 0.999f) {
     return;
   }
