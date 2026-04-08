@@ -943,8 +943,8 @@ static void EmitCubicBezTo(XMLBuilder& out, float x0, float y0, float x1, float 
 }
 
 void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofsX, float ofsY,
-                                float boundsW, float boundsH, FillRule fillRule,
-                                float coordScaleX, float coordScaleY) {
+                                float boundsW, float boundsH, FillRule fillRule, float coordScaleX,
+                                float coordScaleY) {
   out.open("a:custGeom").gt();
   out.open("a:avLst").sc();
   out.open("a:gdLst").sc();
@@ -974,8 +974,8 @@ void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofs
             EmitPoint(out, "a:lnTo", s.pts[0].x * csX, s.pts[0].y * csY, sOfsX, sOfsY);
             break;
           case PathVerb::Quad:
-            EmitQuadBezTo(out, "a:quadBezTo", s.pts[0].x * csX, s.pts[0].y * csY,
-                          s.pts[1].x * csX, s.pts[1].y * csY, sOfsX, sOfsY);
+            EmitQuadBezTo(out, "a:quadBezTo", s.pts[0].x * csX, s.pts[0].y * csY, s.pts[1].x * csX,
+                          s.pts[1].y * csY, sOfsX, sOfsY);
             break;
           case PathVerb::Cubic:
             EmitCubicBezTo(out, s.pts[0].x * csX, s.pts[0].y * csY, s.pts[1].x * csX,
@@ -1131,7 +1131,10 @@ void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStr
     auto xf = decomposeXform(localBounds.x, localBounds.y, localBounds.width, localBounds.height,
                              combinedMatrix);
     beginShape(out, "Glyph", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
-    FillRule fillRule = (fs.fill) ? fs.fill->fillRule : FillRule::EvenOdd;
+    // Font glyph outlines are designed for even-odd fill rule. Always use EvenOdd here
+    // to reverse inner contours' winding direction via BuildEvenOddContours(), ensuring
+    // correct rendering on viewers that use non-zero winding rule (e.g. some mobile apps).
+    FillRule fillRule = FillRule::EvenOdd;
 
     float sx = std::sqrt(combinedMatrix.a * combinedMatrix.a + combinedMatrix.b * combinedMatrix.b);
     float det = combinedMatrix.a * combinedMatrix.d - combinedMatrix.b * combinedMatrix.c;
