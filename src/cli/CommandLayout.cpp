@@ -105,7 +105,7 @@ static const char* NodeTypeName(NodeType type) {
 
 static void BuildElementNodes(const std::vector<Element*>& elements,
                               std::vector<std::shared_ptr<CheckNode>>& out, float parentX,
-                              float parentY, int maxDepth, int currentDepth) {
+                              float parentY) {
   for (int i = 0; i < static_cast<int>(elements.size()); ++i) {
     auto* element = elements[i];
     auto* layoutNode = pagx::LayoutNode::AsLayoutNode(element);
@@ -125,8 +125,7 @@ static void BuildElementNodes(const std::vector<Element*>& elements,
       auto* group = static_cast<const Group*>(element);
       if (!group->elements.empty()) {
         std::vector<std::shared_ptr<CheckNode>> groupChildren;
-        BuildElementNodes(group->elements, groupChildren, node->bounds.x, node->bounds.y, maxDepth,
-                          currentDepth);
+        BuildElementNodes(group->elements, groupChildren, node->bounds.x, node->bounds.y);
         if (!groupChildren.empty()) {
           node->children = std::move(groupChildren);
         }
@@ -174,8 +173,7 @@ static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float pare
   std::vector<std::shared_ptr<CheckNode>> childLayerNodes;
 
   if (!layer->contents.empty()) {
-    BuildElementNodes(layer->contents, elementNodes, node->bounds.x, node->bounds.y, maxDepth,
-                      currentDepth);
+    BuildElementNodes(layer->contents, elementNodes, node->bounds.x, node->bounds.y);
   }
 
   if (maxDepth <= 0 || currentDepth < maxDepth) {
