@@ -746,7 +746,7 @@ left=L, right=R:  position.x = L, width = W - L - R
 
 The vertical axis follows the same pattern.
 
-**Scale to fit** (Polystar, Path, Text):
+**Scale to fit** (Polystar, Path, Text, TextPath):
 
 ```
 1. Compute scale factor (B = Content Bounds before scaling):
