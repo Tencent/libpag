@@ -1582,6 +1582,14 @@ static void DetectFlexInContentMeasuredParent(const Layer* layer, const Layer* p
   if (!IsMainAxisContentMeasured(parentLayer, grandparentLayer)) {
     return;
   }
+  // In a content-measured parent, a flex child still displays at its own measured size even though
+  // flex does not distribute extra space. Only flag it when the child ends up with zero main-axis
+  // size after layout — that is the case where flex is truly ineffective.
+  auto childBounds = layer->layoutBounds();
+  float childMainSize = horizontal ? childBounds.width : childBounds.height;
+  if (childMainSize > 0) {
+    return;
+  }
   const char* axis = horizontal ? "width" : "height";
   AddDiagnostic(diagnostics, layer->sourceLine,
                 std::string("flex has no effect, parent ") + axis +

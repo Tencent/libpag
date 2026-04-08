@@ -79,10 +79,8 @@
       <!-- 3. Opposite-pair overrides explicit Layer width: left+right should win -->
       <Layer width="260" height="220">
         <!-- Border -->
-        <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        </Layer>
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <!-- Child has width=100 but left+right should override to 260-20-20=220 -->
         <Layer left="20" right="20" top="15" width="100" height="50">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
@@ -140,7 +138,7 @@
         </Layer>
       </Layer>
 
-      <Layer layout="horizontal" gap="10" padding="15" alignment="start">
+      <Layer flex="1" layout="horizontal" gap="10" padding="15" alignment="start">
         <!-- Border -->
         <Layer left="0" right="0" top="0" bottom="0" includeInLayout="false">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
