@@ -122,8 +122,6 @@ static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI)
   return tgfx::Image::MakeFromEncoded(ToTGFXData(data));
 }
 
-namespace {
-
 // Build context that maintains state during layer tree construction
 class LayerBuilderContext {
  public:
@@ -854,8 +852,6 @@ class LayerBuilderContext {
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
       _pendingMasks = {};
 };
-
-}  // namespace
 
 // Public API implementation
 
