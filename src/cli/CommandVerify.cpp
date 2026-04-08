@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CommandVerify.h"
+#include <libxml/parser.h>
+#include <libxml/tree.h>
 #include <cfloat>
 #include <cmath>
 #include <cstdlib>
@@ -30,12 +32,12 @@
 #include "cli/CliUtils.h"
 #include "cli/CommandImport.h"
 #include "cli/CommandRender.h"
+#include "cli/FormatUtils.h"
 #include "cli/LayoutUtils.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
-#include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
@@ -56,7 +58,6 @@
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/RoundCorner.h"
-#include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
@@ -140,10 +141,6 @@ static std::string NodeTypeName(NodeType type) {
     default:
       return "Node";
   }
-}
-
-static bool IsPainter(NodeType type) {
-  return type == NodeType::Fill || type == NodeType::Stroke;
 }
 
 static bool IsGradient(NodeType type) {
@@ -356,21 +353,83 @@ static void DetectUnreferencedResources(const PAGXDocument* doc,
 }
 
 // ============================================================================
+// XML DOM Signature Infrastructure
+// ============================================================================
+
+using LineNodeMap = std::unordered_multimap<int, xmlNodePtr>;
+
+static void BuildLineNodeMap(xmlNodePtr node, LineNodeMap& map) {
+  for (auto cur = node; cur != nullptr; cur = cur->next) {
+    if (cur->type == XML_ELEMENT_NODE) {
+      map.insert({static_cast<int>(cur->line), cur});
+      BuildLineNodeMap(cur->children, map);
+    }
+  }
+}
+
+static xmlNodePtr FindXmlNode(const LineNodeMap& map, int sourceLine, const char* elementName) {
+  auto range = map.equal_range(sourceLine);
+  for (auto it = range.first; it != range.second; ++it) {
+    if (xmlStrcmp(it->second->name, reinterpret_cast<const xmlChar*>(elementName)) == 0) {
+      return it->second;
+    }
+  }
+  return nullptr;
+}
+
+static void StripAttribute(xmlNodePtr node, const char* attrName) {
+  auto* attr = xmlHasProp(node, reinterpret_cast<const xmlChar*>(attrName));
+  if (attr != nullptr) {
+    xmlRemoveProp(attr);
+  }
+}
+
+static void StripDataAttributes(xmlNodePtr node) {
+  auto* attr = node->properties;
+  while (attr != nullptr) {
+    auto* next = attr->next;
+    auto name = std::string(reinterpret_cast<const char*>(attr->name));
+    if (name.compare(0, 5, "data-") == 0) {
+      xmlRemoveProp(attr);
+    }
+    attr = next;
+  }
+}
+
+static void StripCommonAttrsRecursive(xmlNodePtr node) {
+  for (auto cur = node; cur != nullptr; cur = cur->next) {
+    if (cur->type != XML_ELEMENT_NODE) {
+      continue;
+    }
+    StripAttribute(cur, "id");
+    StripAttribute(cur, "name");
+    StripDataAttributes(cur);
+    StripCommonAttrsRecursive(cur->children);
+  }
+}
+
+static std::string GenerateNodeSignature(xmlNodePtr node,
+                                         const std::vector<const char*>& extraStripAttrs) {
+  auto* copy = xmlCopyNode(node, 1);
+  if (copy == nullptr) {
+    return {};
+  }
+  ReorderAttributesRecursive(copy);
+  StripCommonAttrsRecursive(copy);
+  for (auto* attr : extraStripAttrs) {
+    StripAttribute(copy, attr);
+  }
+  std::string output;
+  SerializeNode(output, copy, 0, 2);
+  xmlFreeNode(copy);
+  return output;
+}
+
+// ============================================================================
 // Static Detection: Duplicate PathData
 // ============================================================================
 
-static std::string SerializePathData(const PathData* data) {
-  std::ostringstream oss;
-  for (auto verb : data->verbs()) {
-    oss << static_cast<int>(verb) << ";";
-  }
-  for (auto& pt : data->points()) {
-    oss << pt.x << "," << pt.y << ";";
-  }
-  return oss.str();
-}
-
-static void DetectDuplicatePathData(const PAGXDocument* doc,
+static void DetectDuplicatePathData(const PAGXDocument* doc, const LineNodeMap& lineNodeMap,
                                     std::vector<VerifyDiagnostic>& diagnostics) {
   std::unordered_map<std::string, int> seen;
   for (const auto& nodePtr : doc->nodes) {
@@ -378,7 +437,14 @@ static void DetectDuplicatePathData(const PAGXDocument* doc,
       continue;
     }
     auto* pathData = static_cast<PathData*>(nodePtr.get());
-    auto sig = SerializePathData(pathData);
+    auto* xmlNode = FindXmlNode(lineNodeMap, pathData->sourceLine, "PathData");
+    if (xmlNode == nullptr) {
+      continue;
+    }
+    auto sig = GenerateNodeSignature(xmlNode, {});
+    if (sig.empty()) {
+      continue;
+    }
     auto it = seen.find(sig);
     if (it != seen.end()) {
       AddDiagnostic(diagnostics, pathData->sourceLine,
@@ -394,42 +460,27 @@ static void DetectDuplicatePathData(const PAGXDocument* doc,
 // Static Detection: Duplicate Gradients
 // ============================================================================
 
-static std::string SerializeGradient(const Node* node) {
-  std::ostringstream oss;
-  oss << NodeTypeName(node->nodeType()) << "|";
-  if (node->nodeType() == NodeType::LinearGradient) {
-    auto* lg = static_cast<const LinearGradient*>(node);
-    oss << lg->startPoint.x << "," << lg->startPoint.y << "|";
-    oss << lg->endPoint.x << "," << lg->endPoint.y << "|";
-    for (auto* stop : lg->colorStops) {
-      oss << stop->offset << ":" << stop->color.red << "," << stop->color.green << ","
-          << stop->color.blue << "," << stop->color.alpha << ";";
-    }
-  } else if (node->nodeType() == NodeType::RadialGradient) {
-    auto* rg = static_cast<const RadialGradient*>(node);
-    oss << rg->center.x << "," << rg->center.y << "|";
-    oss << rg->radius << "|";
-    for (auto* stop : rg->colorStops) {
-      oss << stop->offset << ":" << stop->color.red << "," << stop->color.green << ","
-          << stop->color.blue << "," << stop->color.alpha << ";";
-    }
-  }
-  return oss.str();
-}
-
-static void DetectDuplicateGradients(const PAGXDocument* doc,
+static void DetectDuplicateGradients(const PAGXDocument* doc, const LineNodeMap& lineNodeMap,
                                      std::vector<VerifyDiagnostic>& diagnostics) {
+  static const std::vector<const char*> gradientStripAttrs = {"matrix"};
   std::unordered_map<std::string, int> seen;
   for (const auto& nodePtr : doc->nodes) {
     if (!IsGradient(nodePtr->nodeType())) {
       continue;
     }
-    auto sig = SerializeGradient(nodePtr.get());
+    auto typeName = NodeTypeName(nodePtr->nodeType());
+    auto* xmlNode = FindXmlNode(lineNodeMap, nodePtr->sourceLine, typeName.c_str());
+    if (xmlNode == nullptr) {
+      continue;
+    }
+    auto sig = GenerateNodeSignature(xmlNode, gradientStripAttrs);
+    if (sig.empty()) {
+      continue;
+    }
     auto it = seen.find(sig);
     if (it != seen.end()) {
       AddDiagnostic(diagnostics, nodePtr->sourceLine,
-                    "duplicate " + NodeTypeName(nodePtr->nodeType()) + ", identical to line " +
-                        std::to_string(it->second) +
+                    "duplicate " + typeName + ", identical to line " + std::to_string(it->second) +
                         ". Fix: extract to <Resources> and reference via @id");
     } else {
       seen[sig] = nodePtr->sourceLine;
@@ -440,51 +491,6 @@ static void DetectDuplicateGradients(const PAGXDocument* doc,
 // ============================================================================
 // Static Detection: Mergeable Consecutive Groups
 // ============================================================================
-
-static void SerializeColorSource(std::ostringstream& oss, const ColorSource* color) {
-  if (color == nullptr) {
-    oss << "null";
-    return;
-  }
-  if (!color->id.empty()) {
-    oss << "@" << color->id;
-    return;
-  }
-  if (color->nodeType() == NodeType::SolidColor) {
-    auto* solid = static_cast<const SolidColor*>(color);
-    oss << "solid(" << solid->color.red << "," << solid->color.green << "," << solid->color.blue
-        << "," << solid->color.alpha << ")";
-  } else {
-    // For gradients and other complex sources, use pointer as unique identity.
-    oss << "ptr(" << reinterpret_cast<uintptr_t>(color) << ")";
-  }
-}
-
-static std::string SerializePainters(const std::vector<Element*>& elements) {
-  std::ostringstream oss;
-  bool foundPainter = false;
-  for (auto* element : elements) {
-    auto type = element->nodeType();
-    if (IsPainter(type)) {
-      foundPainter = true;
-      if (type == NodeType::Fill) {
-        auto* fill = static_cast<const Fill*>(element);
-        oss << "Fill|" << fill->alpha << "|";
-        SerializeColorSource(oss, fill->color);
-        oss << "|";
-      } else if (type == NodeType::Stroke) {
-        auto* stroke = static_cast<const Stroke*>(element);
-        oss << "Stroke|" << stroke->width << "|" << stroke->alpha << "|"
-            << static_cast<int>(stroke->cap) << "|" << static_cast<int>(stroke->join) << "|";
-        SerializeColorSource(oss, stroke->color);
-        oss << "|";
-      }
-    } else if (foundPainter) {
-      break;
-    }
-  }
-  return oss.str();
-}
 
 static bool HasDefaultGroupTransform(const Group* group) {
   if (group->anchor.x != 0 || group->anchor.y != 0) {
@@ -511,7 +517,27 @@ static bool HasDefaultGroupTransform(const Group* group) {
   return true;
 }
 
+static std::string SerializePainterSignature(xmlNodePtr groupNode) {
+  std::string sig;
+  bool foundPainter = false;
+  for (auto child = groupNode->children; child != nullptr; child = child->next) {
+    if (child->type != XML_ELEMENT_NODE) {
+      continue;
+    }
+    auto childName = std::string(reinterpret_cast<const char*>(child->name));
+    bool isPainter = (childName == "Fill" || childName == "Stroke");
+    if (isPainter) {
+      foundPainter = true;
+      sig += GenerateNodeSignature(child, {});
+    } else if (foundPainter) {
+      break;
+    }
+  }
+  return sig;
+}
+
 static void DetectMergeableGroups(const std::vector<Element*>& elements,
+                                  const LineNodeMap& lineNodeMap,
                                   std::vector<VerifyDiagnostic>& diagnostics) {
   size_t i = 0;
   while (i < elements.size()) {
@@ -525,7 +551,12 @@ static void DetectMergeableGroups(const std::vector<Element*>& elements,
       i++;
       continue;
     }
-    auto sig = SerializePainters(group->elements);
+    auto* xmlNode = FindXmlNode(lineNodeMap, group->sourceLine, "Group");
+    if (xmlNode == nullptr) {
+      i++;
+      continue;
+    }
+    auto sig = SerializePainterSignature(xmlNode);
     if (sig.empty()) {
       i++;
       continue;
@@ -540,7 +571,11 @@ static void DetectMergeableGroups(const std::vector<Element*>& elements,
       if (!HasDefaultGroupTransform(nextGroup)) {
         break;
       }
-      auto nextSig = SerializePainters(nextGroup->elements);
+      auto* nextXmlNode = FindXmlNode(lineNodeMap, nextGroup->sourceLine, "Group");
+      if (nextXmlNode == nullptr) {
+        break;
+      }
+      auto nextSig = SerializePainterSignature(nextXmlNode);
       if (nextSig != sig) {
         break;
       }
@@ -739,67 +774,22 @@ static void DetectPathToPrimitives(const Path* path, std::vector<VerifyDiagnosti
 // Static Detection: Structurally Identical Layers
 // ============================================================================
 
-static std::string SerializeLayerContents(const Layer* layer);
+// Attributes to strip from the root Layer node for Composition extraction comparison.
+// These are positional/identity attributes that don't affect the structural content.
+// clang-format off
+static const std::vector<const char*> LAYER_ROOT_STRIP_ATTRS = {
+    "x", "y", "matrix", "matrix3D",
+    "left", "right", "top", "bottom", "centerX", "centerY",
+    "flex", "includeInLayout",
+};
+// clang-format on
 
-static std::string SerializeElement(const Element* element) {
-  std::ostringstream oss;
-  oss << NodeTypeName(element->nodeType()) << "{";
-  auto type = element->nodeType();
-  if (type == NodeType::Group || type == NodeType::TextBox) {
-    auto* group = static_cast<const Group*>(element);
-    for (auto* child : group->elements) {
-      oss << SerializeElement(child);
-    }
-  } else if (type == NodeType::Rectangle) {
-    auto* rect = static_cast<const Rectangle*>(element);
-    oss << rect->size.width << "," << rect->size.height << "|" << rect->roundness;
-  } else if (type == NodeType::Ellipse) {
-    auto* ellipse = static_cast<const Ellipse*>(element);
-    oss << ellipse->size.width << "," << ellipse->size.height;
-  } else if (type == NodeType::Fill) {
-    auto* fill = static_cast<const Fill*>(element);
-    oss << fill->alpha << "|";
-    SerializeColorSource(oss, fill->color);
-  } else if (type == NodeType::Stroke) {
-    auto* stroke = static_cast<const Stroke*>(element);
-    oss << stroke->width << "|" << stroke->alpha << "|";
-    SerializeColorSource(oss, stroke->color);
-  } else if (type == NodeType::Text) {
-    auto* text = static_cast<const Text*>(element);
-    oss << text->text << "|" << text->fontSize;
-  } else if (type == NodeType::Path) {
-    auto* path = static_cast<const Path*>(element);
-    if (path->data != nullptr) {
-      if (!path->data->id.empty()) {
-        oss << "@" << path->data->id;
-      } else {
-        oss << "ptr(" << reinterpret_cast<uintptr_t>(path->data) << ")";
-      }
-    }
+static std::string GenerateLayerSignature(const LineNodeMap& lineNodeMap, int sourceLine) {
+  auto* xmlNode = FindXmlNode(lineNodeMap, sourceLine, "Layer");
+  if (xmlNode == nullptr) {
+    return {};
   }
-  oss << "}";
-  return oss.str();
-}
-
-static std::string SerializeLayerContents(const Layer* layer) {
-  std::ostringstream oss;
-  for (auto* element : layer->contents) {
-    oss << SerializeElement(element);
-  }
-  for (auto* child : layer->children) {
-    oss << "Layer{";
-    if (child->layout != LayoutMode::None) {
-      oss << "layout=" << static_cast<int>(child->layout) << "|";
-    }
-    if (child->arrangement != Arrangement::Start) {
-      oss << "arrangement=" << static_cast<int>(child->arrangement) << "|";
-    }
-    if (child->alignment != Alignment::Start) {
-      oss << "alignment=" << static_cast<int>(child->alignment) << "|";
-    }
-    oss << SerializeLayerContents(child) << "}";
-  }
-  return oss.str();
+  return GenerateNodeSignature(xmlNode, LAYER_ROOT_STRIP_ATTRS);
 }
 
 // Count total Layer nodes in a subtree (including the root).
@@ -847,6 +837,7 @@ static void CollectSubtreeCandidates(const Layer* layer, std::vector<const Layer
 }
 
 static void DetectStructurallyIdenticalLayers(const PAGXDocument* doc,
+                                              const LineNodeMap& lineNodeMap,
                                               std::vector<VerifyDiagnostic>& diagnostics) {
   // Collect all parent containers with >= 2 children for sequence detection.
   struct ParentInfo {
@@ -862,7 +853,7 @@ static void DetectStructurallyIdenticalLayers(const PAGXDocument* doc,
     ParentInfo info;
     for (auto* child : children) {
       info.children.push_back(child);
-      info.sigs.push_back(SerializeLayerContents(child));
+      info.sigs.push_back(GenerateLayerSignature(lineNodeMap, child->sourceLine));
     }
     parents.push_back(std::move(info));
   };
@@ -914,6 +905,17 @@ static void DetectStructurallyIdenticalLayers(const PAGXDocument* doc,
           }
         }
         if (!hasSubtree) {
+          continue;
+        }
+        // Skip if any Layer has an empty signature (xmlNode not found).
+        bool hasEmpty = false;
+        for (size_t k = start; k < start + win; k++) {
+          if (p.sigs[k].empty()) {
+            hasEmpty = true;
+            break;
+          }
+        }
+        if (hasEmpty) {
           continue;
         }
         std::string sig;
@@ -977,18 +979,11 @@ static void DetectStructurallyIdenticalLayers(const PAGXDocument* doc,
   }
   std::unordered_map<std::string, std::vector<const Layer*>> subtreeMap;
   for (auto* layer : filteredCandidates) {
-    std::ostringstream sig;
-    if (layer->layout != LayoutMode::None) {
-      sig << "layout=" << static_cast<int>(layer->layout) << "|";
+    auto sig = GenerateLayerSignature(lineNodeMap, layer->sourceLine);
+    if (sig.empty()) {
+      continue;
     }
-    if (layer->arrangement != Arrangement::Start) {
-      sig << "arrangement=" << static_cast<int>(layer->arrangement) << "|";
-    }
-    if (layer->alignment != Alignment::Start) {
-      sig << "alignment=" << static_cast<int>(layer->alignment) << "|";
-    }
-    sig << SerializeLayerContents(layer);
-    subtreeMap[sig.str()].push_back(layer);
+    subtreeMap[sig].push_back(layer);
   }
   for (auto& pair : subtreeMap) {
     if (pair.second.size() < 2) {
@@ -1366,8 +1361,9 @@ static void DetectRectangularMask(const Layer* layer, std::vector<VerifyDiagnost
 // ============================================================================
 
 static void RunStaticDetectionOnElements(const std::vector<Element*>& elements,
+                                         const LineNodeMap& lineNodeMap,
                                          std::vector<VerifyDiagnostic>& diagnostics) {
-  DetectMergeableGroups(elements, diagnostics);
+  DetectMergeableGroups(elements, lineNodeMap, diagnostics);
   DetectRedundantFirstChildGroup(elements, diagnostics);
 
   RepeaterContext ctx;
@@ -1379,10 +1375,10 @@ static void RunStaticDetectionOnElements(const std::vector<Element*>& elements,
     if (type == NodeType::Group) {
       auto* group = static_cast<const Group*>(element);
       DetectEmptyGroup(group, diagnostics);
-      RunStaticDetectionOnElements(group->elements, diagnostics);
+      RunStaticDetectionOnElements(group->elements, lineNodeMap, diagnostics);
     } else if (type == NodeType::TextBox) {
       auto* textBox = static_cast<const TextBox*>(element);
-      RunStaticDetectionOnElements(textBox->elements, diagnostics);
+      RunStaticDetectionOnElements(textBox->elements, lineNodeMap, diagnostics);
     } else if (type == NodeType::Stroke) {
       auto* stroke = static_cast<const Stroke*>(element);
       DetectZeroStrokeWidth(stroke, diagnostics);
@@ -1395,7 +1391,7 @@ static void RunStaticDetectionOnElements(const std::vector<Element*>& elements,
 }
 
 static void RunStaticDetectionOnLayer(const Layer* layer, float canvasWidth, float canvasHeight,
-                                      bool parentHasLayout,
+                                      bool parentHasLayout, const LineNodeMap& lineNodeMap,
                                       std::vector<VerifyDiagnostic>& diagnostics) {
   DetectEmptyLayer(layer, diagnostics);
   DetectFullCanvasClipMask(layer, canvasWidth, canvasHeight, diagnostics);
@@ -1420,23 +1416,24 @@ static void RunStaticDetectionOnLayer(const Layer* layer, float canvasWidth, flo
     }
   }
 
-  RunStaticDetectionOnElements(layer->contents, diagnostics);
+  RunStaticDetectionOnElements(layer->contents, lineNodeMap, diagnostics);
 
   bool thisHasLayout = layer->layout != LayoutMode::None;
   for (auto* child : layer->children) {
-    RunStaticDetectionOnLayer(child, canvasWidth, canvasHeight, thisHasLayout, diagnostics);
+    RunStaticDetectionOnLayer(child, canvasWidth, canvasHeight, thisHasLayout, lineNodeMap,
+                              diagnostics);
   }
 }
 
-static void RunStaticDetection(const PAGXDocument* doc,
+static void RunStaticDetection(const PAGXDocument* doc, const LineNodeMap& lineNodeMap,
                                std::vector<VerifyDiagnostic>& diagnostics) {
   DetectUnreferencedResources(doc, diagnostics);
-  DetectDuplicatePathData(doc, diagnostics);
-  DetectDuplicateGradients(doc, diagnostics);
-  DetectStructurallyIdenticalLayers(doc, diagnostics);
+  DetectDuplicatePathData(doc, lineNodeMap, diagnostics);
+  DetectDuplicateGradients(doc, lineNodeMap, diagnostics);
+  DetectStructurallyIdenticalLayers(doc, lineNodeMap, diagnostics);
 
   for (auto* layer : doc->layers) {
-    RunStaticDetectionOnLayer(layer, doc->width, doc->height, false, diagnostics);
+    RunStaticDetectionOnLayer(layer, doc->width, doc->height, false, lineNodeMap, diagnostics);
   }
 
   for (const auto& err : doc->errors) {
@@ -2412,18 +2409,35 @@ int RunVerify(int argc, char* argv[]) {
 
   doc->applyLayout();
 
+  // Parse the XML DOM for signature-based duplicate detection.
+  auto xmlDoc = xmlReadFile(opts.inputFile.c_str(), nullptr, XML_PARSE_NONET | XML_PARSE_NOBLANKS);
+  LineNodeMap lineNodeMap;
+  if (xmlDoc != nullptr) {
+    auto* root = xmlDocGetRootElement(xmlDoc);
+    if (root != nullptr) {
+      BuildLineNodeMap(root, lineNodeMap);
+    }
+  }
+
   const Layer* targetLayer = nullptr;
   if (!opts.id.empty()) {
     targetLayer = doc->findNode<Layer>(opts.id);
     if (targetLayer == nullptr) {
       std::cerr << "pagx verify: node not found: " << opts.id << "\n";
+      if (xmlDoc != nullptr) {
+        xmlFreeDoc(xmlDoc);
+      }
       return 1;
     }
   }
 
   std::vector<VerifyDiagnostic> diagnostics;
-  RunStaticDetection(doc.get(), diagnostics);
+  RunStaticDetection(doc.get(), lineNodeMap, diagnostics);
   RunSpatialDetection(doc.get(), diagnostics);
+
+  if (xmlDoc != nullptr) {
+    xmlFreeDoc(xmlDoc);
+  }
 
   SortDiagnostics(diagnostics);
 

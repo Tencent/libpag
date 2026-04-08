@@ -2016,4 +2016,180 @@ CLI_TEST(PAGXCliTest, Insert_PreservesOriginalFormatting) {
   EXPECT_NE(output.find("<Fill color=\"#0000FF\""), std::string::npos);
 }
 
+// Layers at different positions but identical structure should be detected as extractable.
+CLI_TEST(PAGXCliTest, Verify_CompositionPositionDiff) {
+  auto inputPath = TestResourcePath("verify_composition_position_diff.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(output.find("structurally identical Layers"), std::string::npos);
+}
+
+// Layers with different blendMode should NOT be detected as extractable.
+CLI_TEST(PAGXCliTest, Verify_CompositionBlendModeDiff) {
+  auto inputPath = TestResourcePath("verify_composition_blendmode_diff.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(output.find("structurally identical Layers"), std::string::npos);
+}
+
+// Layers with different Fill fillRule should NOT be detected as extractable.
+CLI_TEST(PAGXCliTest, Verify_CompositionFillRuleDiff) {
+  auto inputPath = TestResourcePath("verify_composition_fillrule_diff.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(output.find("structurally identical Layers"), std::string::npos);
+}
+
+// Groups with different Stroke cap should NOT be detected as mergeable.
+CLI_TEST(PAGXCliTest, Verify_GroupsDifferentCap) {
+  auto inputPath = TestResourcePath("verify_groups_different_cap.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(output.find("consecutive Groups share identical painters"), std::string::npos);
+}
+
+// Gradients differing only in matrix should be detected as duplicates.
+CLI_TEST(PAGXCliTest, Verify_GradientMatrixDiff) {
+  auto inputPath = TestResourcePath("verify_gradient_matrix_diff.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(output.find("duplicate"), std::string::npos);
+}
+
+// Layers with different matrix but identical structure should be detected (matrix is stripped).
+CLI_TEST(PAGXCliTest, Verify_CompositionMatrixDiff) {
+  auto inputPath = TestResourcePath("verify_composition_matrix_diff.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(output.find("structurally identical Layers"), std::string::npos);
+}
+
+// Layers with different constraints but identical structure should be detected (constraints are
+// stripped from root).
+CLI_TEST(PAGXCliTest, Verify_CompositionConstraintDiff) {
+  auto inputPath = TestResourcePath("verify_composition_constraint_diff.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(output.find("structurally identical Layers"), std::string::npos);
+}
+
+// Layers with different flex/includeInLayout but identical structure should be detected.
+CLI_TEST(PAGXCliTest, Verify_CompositionFlexDiff) {
+  auto inputPath = TestResourcePath("verify_composition_flex_diff.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(output.find("structurally identical Layers"), std::string::npos);
+}
+
+// Layers with different id/name but identical structure should be detected (id/name are stripped).
+CLI_TEST(PAGXCliTest, Verify_CompositionIdNameDiff) {
+  auto inputPath = TestResourcePath("verify_composition_id_name_diff.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(output.find("structurally identical Layers"), std::string::npos);
+}
+
+// Layers with different layout mode should NOT be detected as identical.
+CLI_TEST(PAGXCliTest, Verify_CompositionLayoutDiff) {
+  auto inputPath = TestResourcePath("verify_composition_layout_diff.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(output.find("structurally identical Layers"), std::string::npos);
+}
+
+// Groups with identical Fill+Stroke should be detected as mergeable.
+CLI_TEST(PAGXCliTest, Verify_GroupsMergeableFillStroke) {
+  auto inputPath = TestResourcePath("verify_groups_mergeable_fillstroke.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(output.find("consecutive Groups share identical painters"), std::string::npos);
+}
+
+// Groups with different Fill color should NOT be detected as mergeable.
+CLI_TEST(PAGXCliTest, Verify_GroupsDifferentFillColor) {
+  auto inputPath = TestResourcePath("verify_groups_different_fill_color.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(output.find("consecutive Groups share identical painters"), std::string::npos);
+}
+
+// Gradients with different ColorStop values should NOT be detected as duplicates.
+CLI_TEST(PAGXCliTest, Verify_GradientColorStopDiff) {
+  auto inputPath = TestResourcePath("verify_gradient_colorstop_diff.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(output.find("duplicate"), std::string::npos);
+}
+
+// Two different PathData should NOT be detected as duplicates.
+CLI_TEST(PAGXCliTest, Verify_PathDataDifferent) {
+  auto inputPath = TestResourcePath("verify_pathdata_different.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(output.find("duplicate PathData"), std::string::npos);
+}
+
 }  // namespace pag
