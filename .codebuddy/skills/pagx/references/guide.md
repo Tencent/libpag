@@ -722,15 +722,15 @@ These errors are easy to make during generation.
     <!-- ... marker ... -->
   </Group>
 
-  <!-- ❌ Fixed height when content can determine it -->
-  <Layer height="260" layout="vertical" padding="20" gap="14">
-    <!-- ... content is actually shorter ... -->
-  </Layer>
-
   <!-- ✅ Engine-computed position -->
   <Group centerX="0" centerY="0">
     <!-- ... marker ... -->
   </Group>
+
+  <!-- ❌ Fixed height when content can determine it -->
+  <Layer height="260" layout="vertical" padding="20" gap="14">
+    <!-- ... content is actually shorter ... -->
+  </Layer>
 
   <!-- ✅ Content-measured height — no fixed value needed -->
   <Layer layout="vertical" padding="20" gap="14">
