@@ -109,16 +109,10 @@ Do NOT start the next task until the current one is completed.
 ### Step 1: Assess
 
 **Do**:
-1. Determine task type:
-   - **Create from scratch** → follow Step 1–4.
-   - **Edit existing file** → read the file first, scan Resources for reusable `@id`
-     references, match existing style. Then go to the relevant step.
-   - **Modify specific part** → locate the target, change only what's needed, then
-     run Step 3 and Step 4.
-2. Clarify requirements — ask the user if canvas size, visual style, text content, or
+1. Clarify requirements — ask the user if canvas size, visual style, text content, or
    color scheme is unclear or ambiguous.
-3. Establish a style sheet — color palette, spacing scale, roundness, font hierarchy.
-4. Decompose the visual — layer structure, rendering technique, color scheme, shape
+2. Establish a style sheet — color palette, spacing scale, roundness, font hierarchy.
+3. Decompose the visual — layer structure, rendering technique, color scheme, shape
    vocabulary, text inventory.
 
 **Forbidden**: Do NOT write any PAGX code in this step.
