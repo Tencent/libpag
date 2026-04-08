@@ -657,7 +657,7 @@ PAGX 文档采用层级结构组织内容：
 
 约束定位让元素声明与所属容器的位置关系，引擎自动计算坐标。约束定位是所有节点的基础能力，不是一种布局模式。支持约束属性的元素包括：
 
-- **图层内容节点**：几何元素（Rectangle、Ellipse、Polystar、Path）、Text、TextBox 和 Group——约束属性始终生效
+- **图层内容节点**：几何元素（Rectangle、Ellipse、Polystar、Path）、Text、TextBox、Group 和 TextPath——约束属性始终生效
 - **子 Layer**：当父 Layer 无容器布局（默认），或子 Layer 设了 `includeInLayout="false"` 时
 
 ```xml
