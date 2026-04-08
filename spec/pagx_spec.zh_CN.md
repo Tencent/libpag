@@ -726,7 +726,7 @@ centerX=C:  tx = (W/2 + C) - B.centerX
 | TextBox | 拉伸排版区域 | 修改 `width` 和 `height` 填满目标区域，改变文字排版范围 |
 | Group | 推导布局尺寸 | 对齐目标区域并设置布局尺寸，内部子元素按新尺寸重新布局，不影响渲染 |
 | 子 Layer | 推导尺寸 | 始终从父容器推导该维度的尺寸（`width = 父.width - left - right`），覆盖显式 `width`/`height` |
-| Polystar、Path、Text | 等比缩放适配 | 单轴对边约束时紧贴该轴边界等比缩放；双轴对边约束时取两轴中较小的缩放因子（fit 模式），在较长轴方向居中 |
+| Polystar、Path、Text、TextPath | 等比缩放适配 | 单轴对边约束时紧贴该轴边界等比缩放；双轴对边约束时取两轴中较小的缩放因子（fit 模式），在较长轴方向居中 |
 
 **拉伸**（Rectangle、Ellipse、TextBox）：
 
@@ -746,7 +746,7 @@ left=L, right=R:  position.x = L, width = W - L - R
 
 垂直轴同理。
 
-**等比缩放适配**（Polystar、Path、Text）：
+**等比缩放适配**（Polystar、Path、Text、TextPath）：
 
 ```
 1. 计算缩放因子（B 为缩放前的 Content Bounds）:
