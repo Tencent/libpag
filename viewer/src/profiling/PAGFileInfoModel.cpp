@@ -31,6 +31,7 @@ PAGFileInfoModel::PAGFileInfoModel() : QAbstractListModel(nullptr) {
 }
 
 PAGFileInfoModel::PAGFileInfoModel(QObject* parent) : QAbstractListModel(parent) {
+  beginResetModel();
   fileInfos.emplace_back("Duration", "", "s");
   fileInfos.emplace_back("FrameRate", "", "FPS");
   fileInfos.emplace_back("Width");
@@ -39,7 +40,6 @@ PAGFileInfoModel::PAGFileInfoModel(QObject* parent) : QAbstractListModel(parent)
   fileInfos.emplace_back("Videos");
   fileInfos.emplace_back("Layers");
   fileInfos.emplace_back("SDK Version");
-  beginResetModel();
   endResetModel();
 }
 
@@ -69,6 +69,7 @@ int PAGFileInfoModel::rowCount(const QModelIndex& parent) const {
 }
 
 void PAGFileInfoModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
+  beginResetModel();
   fileInfos.clear();
   if (pagFile == nullptr) {
     fileInfos.emplace_back("Duration", "", "s");
@@ -79,7 +80,6 @@ void PAGFileInfoModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
     fileInfos.emplace_back("Videos");
     fileInfos.emplace_back("Layers");
     fileInfos.emplace_back("SDK Version");
-    beginResetModel();
     endResetModel();
     return;
   }
@@ -94,7 +94,6 @@ void PAGFileInfoModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
   fileInfos.emplace_back("Layers", Utils::ToQString(pagFile->getFile()->numLayers()));
   auto version = Utils::TagCodeToVersion(pagFile->tagLevel());
   fileInfos.emplace_back("SDK Version", version.c_str());
-  beginResetModel();
   endResetModel();
 }
 
@@ -110,6 +109,7 @@ static int CountImageNodes(const std::shared_ptr<pagx::PAGXDocument>& document) 
 }
 
 void PAGFileInfoModel::setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> pagxDocument) {
+  beginResetModel();
   fileInfos.clear();
   if (pagxDocument == nullptr) {
     fileInfos.emplace_back("Width");
@@ -118,7 +118,6 @@ void PAGFileInfoModel::setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> pagxD
     fileInfos.emplace_back("Nodes");
     fileInfos.emplace_back("Images");
     fileInfos.emplace_back("Version");
-    beginResetModel();
     endResetModel();
     return;
   }
@@ -128,7 +127,6 @@ void PAGFileInfoModel::setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> pagxD
   fileInfos.emplace_back("Nodes", Utils::ToQString(static_cast<int>(pagxDocument->nodes.size())));
   fileInfos.emplace_back("Images", Utils::ToQString(CountImageNodes(pagxDocument)));
   fileInfos.emplace_back("Version", QString::fromStdString(pagxDocument->version));
-  beginResetModel();
   endResetModel();
 }
 

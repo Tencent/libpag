@@ -77,11 +77,11 @@ PAGAudioRender::PAGAudioRender(const QAudioFormat& format, int sampleRate, int c
   connect(this, &PAGAudioRender::volumeChangeSignal, this, &PAGAudioRender::onVolumeChange);
   connect(this, &PAGAudioRender::writeData, this, &PAGAudioRender::onWriteData);
   start();
-  init();
+  QMetaObject::invokeMethod(this, "init", Qt::BlockingQueuedConnection);
   isPlaying = true;
 }
 
-void PAGAudioRender::init() {
+void PAGAudioRender::init() {  // runs in audio thread
   if (audioOutput) {
     audioOutput->stop();
     audioOutput->reset();

@@ -81,6 +81,7 @@ class XmlLinesModel : public QAbstractListModel {
 
  private:
   std::vector<QString> lines = {};
+  mutable std::vector<QString> highlightedLines = {};
   QString fullText = {};
   qreal _maxLineWidth = 0;
 };

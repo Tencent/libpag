@@ -98,6 +98,10 @@ void PAGView::onFileChanged(std::shared_ptr<pag::File>) {
 }
 
 void PAGView::onAudioTimeChanged(int64_t audioTime) {
+  auto duration = static_cast<double>(viewModel->getPAGPlayer()->duration());
+  if (duration <= 0) {
+    return;
+  }
   auto timeNow = tgfx::Clock::Now();
   int64_t lastPlayTimeCopy = 0;
   {
@@ -105,7 +109,6 @@ void PAGView::onAudioTimeChanged(int64_t audioTime) {
     lastPlayTimeCopy = lastPlayTime;
   }
   auto displayTime = timeNow - lastPlayTimeCopy;
-  auto duration = static_cast<double>(viewModel->getPAGPlayer()->duration());
   auto currentDisplayTime = static_cast<int64_t>(viewModel->getProgress() * duration) + displayTime;
   if (audioTime == 0 || (audioTime - currentDisplayTime > MaxAudioLeadThreshold)) {
     {

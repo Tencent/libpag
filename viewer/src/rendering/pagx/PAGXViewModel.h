@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <mutex>
 #include "pagx/PAGXDocument.h"
 #include "rendering/ContentViewModel.h"
@@ -111,7 +112,7 @@ class PAGXViewModel : public ContentViewModel {
   float frameRate = 0.0f;
   double progress = 0.0;
   double progressPerFrame = 1.0;
-  bool isPlaying_ = false;
+  std::atomic<bool> isPlaying_ = false;
 };
 
 }  // namespace pag

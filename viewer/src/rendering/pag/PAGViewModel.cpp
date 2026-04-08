@@ -82,6 +82,9 @@ QString PAGViewModel::getTotalFrame() const {
 
 QString PAGViewModel::getCurrentFrame() const {
   int64_t totalFrames = getTotalFrame().toLongLong();
+  if (totalFrames <= 0) {
+    return "0";
+  }
   auto currentFrame =
       static_cast<int64_t>(std::floor(getProgress() * static_cast<double>(totalFrames)));
   if (currentFrame >= totalFrames) {
@@ -206,7 +209,12 @@ void PAGViewModel::setShowVideoFrames(bool isShow) {
 }
 
 void PAGViewModel::setProgress(double progress) {
-  if (std::abs(this->progress - progress) < 1e-9) {
+  double currentProgress = 0.0;
+  {
+    std::lock_guard<std::mutex> lock(progressMutex);
+    currentProgress = this->progress;
+  }
+  if (std::abs(currentProgress - progress) < 1e-9) {
     return;
   }
   setProgressInternal(progress, true);
@@ -232,7 +240,8 @@ bool PAGViewModel::loadFile(const QString& filePath) {
   pagFile->getFile()->path = strPath;
   pagPlayer->setComposition(pagFile);
   audioPlayer->setComposition(pagFile);
-  progressPerFrame = 1.0 / (pagFile->frameRate() * pagFile->duration() / 1000000);
+  auto denominator = pagFile->frameRate() * pagFile->duration() / 1000000;
+  progressPerFrame = denominator > 0 ? 1.0 / denominator : 0.0;
   Q_EMIT fileChanged(pagFile->getFile());
   Q_EMIT filePathChanged(QString::fromLocal8Bit(strPath.data()));
   Q_EMIT pagFileChanged(pagFile);

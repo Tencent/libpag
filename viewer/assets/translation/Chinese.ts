@@ -49,7 +49,7 @@
 <context>
     <name>FileTreeViewDelegate</name>
     <message>
-        <location filename="../qml/FileTreeViewDelegate.qml" line="388"/>
+        <location filename="../qml/FileTreeViewDelegate.qml" line="389"/>
         <source>Unable to save PAG file to the following path:</source>
         <translation>无法将PAG文件保存至如下路径：</translation>
     </message>
@@ -589,12 +589,12 @@
 <context>
     <name>XMLSourceEditor</name>
     <message>
-        <location filename="../qml/XMLSourceEditor.qml" line="406"/>
+        <location filename="../qml/XMLSourceEditor.qml" line="400"/>
         <source>Double-click to edit</source>
         <translation>双击编辑</translation>
     </message>
     <message>
-        <location filename="../qml/XMLSourceEditor.qml" line="437"/>
+        <location filename="../qml/XMLSourceEditor.qml" line="431"/>
         <source>Editing line %1 (Enter=next, Esc=exit)</source>
         <translation>正在编辑第 %1 行（Enter=下一行，Esc=退出）</translation>
     </message>
@@ -602,27 +602,27 @@
 <context>
     <name>pag::PAGXViewModel</name>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="303"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="308"/>
         <source>Failed to parse XML: invalid syntax or structure</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="308"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="313"/>
         <source>Failed to build layer from XML document</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="335"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="341"/>
         <source>No file path specified</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="339"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="345"/>
         <source>Failed to open file for writing: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="344"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="350"/>
         <source>Failed to write all data to file</source>
         <translation type="unfinished"></translation>
     </message>

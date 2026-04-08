@@ -133,6 +133,10 @@ QString XmlSyntaxHighlighter::highlightLine(const QString& line) {
         result += highlightTag(tagContent);
         i = tagEnd + 1;
         continue;
+      } else {
+        // Unclosed tag extends to end of line — highlight it as a tag
+        result += colorSpan(line.mid(i), TagColor);
+        break;
       }
     }
 

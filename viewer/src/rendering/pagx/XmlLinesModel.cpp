@@ -43,8 +43,13 @@ QVariant XmlLinesModel::data(const QModelIndex& index, int role) const {
       return index.row() + 1;
     case PlainTextRole:
       return line;
-    case HighlightedTextRole:
-      return XmlSyntaxHighlighter::highlightLine(line);
+    case HighlightedTextRole: {
+      auto idx = static_cast<size_t>(index.row());
+      if (highlightedLines[idx].isEmpty()) {
+        highlightedLines[idx] = XmlSyntaxHighlighter::highlightLine(line);
+      }
+      return highlightedLines[idx];
+    }
     default:
       return {};
   }
@@ -82,11 +87,14 @@ void XmlLinesModel::setContent(const QString& xmlContent) {
   // This prevents memory bloat when switching from large files to small files
   auto newSize = static_cast<size_t>(lineList.size());
   if (newSize < lines.capacity() / 2) {
-    lines = std::vector<QString>();  // Release old memory completely
+    lines = std::vector<QString>();
+    highlightedLines = std::vector<QString>();
   } else {
     lines.clear();
+    highlightedLines.clear();
   }
   lines.reserve(newSize);
+  highlightedLines.resize(newSize);
   int maxLength = 0;
   for (const auto& line : lineList) {
     lines.push_back(line);
@@ -108,6 +116,7 @@ void XmlLinesModel::setContent(const QString& xmlContent) {
 void XmlLinesModel::clear() {
   beginResetModel();
   lines.clear();
+  highlightedLines.clear();
   fullText.clear();
   _maxLineWidth = 0;
   endResetModel();
@@ -133,7 +142,32 @@ void XmlLinesModel::setLineText(int index, const QString& text) {
     return;  // No change
   }
 
+  // Invalidate highlight cache for modified line
+  if (idx < highlightedLines.size()) {
+    highlightedLines[idx].clear();
+  }
+
+  // Update max line width
+  qreal oldLineWidth = static_cast<qreal>(lines[idx].length()) * CharWidth;
   lines[idx] = text;
+  qreal newLineWidth = static_cast<qreal>(text.length()) * CharWidth;
+  if (newLineWidth > _maxLineWidth) {
+    _maxLineWidth = newLineWidth;
+    Q_EMIT maxLineWidthChanged();
+  } else if (oldLineWidth >= _maxLineWidth && newLineWidth < _maxLineWidth) {
+    // The previously widest line shrank — rescan all lines
+    int maxLength = 0;
+    for (const auto& line : lines) {
+      if (line.length() > maxLength) {
+        maxLength = line.length();
+      }
+    }
+    qreal newMax = static_cast<qreal>(maxLength) * CharWidth;
+    if (newMax != _maxLineWidth) {
+      _maxLineWidth = newMax;
+      Q_EMIT maxLineWidthChanged();
+    }
+  }
 
   // Rebuild fullText from lines
   QStringList lineList;
@@ -142,13 +176,6 @@ void XmlLinesModel::setLineText(int index, const QString& text) {
     lineList.append(line);
   }
   fullText = lineList.join('\n');
-
-  // Update max line width if needed
-  qreal lineWidth = static_cast<qreal>(text.length()) * CharWidth;
-  if (lineWidth > _maxLineWidth) {
-    _maxLineWidth = lineWidth;
-    Q_EMIT maxLineWidthChanged();
-  }
 
   // Notify view that this row changed
   QModelIndex modelIndex = createIndex(index, 0);

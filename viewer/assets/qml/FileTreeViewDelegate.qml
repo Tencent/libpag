@@ -22,6 +22,7 @@ Item {
     required property int layerIdKey
     required property int markerIndexKey
     required property bool isEditableKey
+    required property bool selected
 
     implicitWidth: treeView.width
     implicitHeight: 22

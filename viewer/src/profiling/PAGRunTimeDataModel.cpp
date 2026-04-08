@@ -215,6 +215,9 @@ void PAGRunTimeDataModel::updateChartData() {
 }
 
 void PAGRunTimeDataModel::refreshChartDataModel() {
+  if (totalFrame == 0 || frameTimeMetricsVector.isEmpty()) {
+    return;
+  }
   int64_t maxIndex = frameTimeMetricsVector.size() - 1;
   int64_t lastChartDataIndex = 0;
   int64_t count = 0;

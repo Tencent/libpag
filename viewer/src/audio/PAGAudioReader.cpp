@@ -44,6 +44,8 @@ PAGAudioReader::PAGAudioReader(std::shared_ptr<AudioOutputConfig> outputConfig, 
   this->moveToThread(this);
   isRunning = true;
   connect(this, &PAGAudioReader::read, this, &PAGAudioReader::onRead, Qt::QueuedConnection);
+  connect(this, &PAGAudioReader::compositionChangeRequested, this,
+          &PAGAudioReader::onSetComposition, Qt::BlockingQueuedConnection);
   start();
 }
 
@@ -62,6 +64,10 @@ int64_t PAGAudioReader::getDuration() const {
 }
 
 void PAGAudioReader::setComposition(std::shared_ptr<PAGComposition> newComposition) {
+  Q_EMIT compositionChangeRequested(std::move(newComposition));
+}
+
+void PAGAudioReader::onSetComposition(std::shared_ptr<PAGComposition> newComposition) {
   if (newComposition == composition) {
     return;
   }

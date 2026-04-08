@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <mutex>
 #include "audio/PAGAudioPlayer.h"
 #include "pag/pag.h"
@@ -78,7 +79,7 @@ class PAGViewModel : public ContentViewModel {
   mutable std::mutex progressMutex = {};
   int editableTextLayerCount = 0;
   int editableImageLayerCount = 0;
-  bool isPlaying_ = false;
+  std::atomic<bool> isPlaying_ = false;
   double progress = 0.0;
   double progressPerFrame = 0.0;
   std::unique_ptr<PAGPlayer> pagPlayer = nullptr;

@@ -204,6 +204,10 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
 
   auto newContentLayer = pagx::LayerBuilder::Build(document.get());
   if (newContentLayer == nullptr) {
+    {
+      std::lock_guard<std::mutex> lock(renderMutex);
+      clearContent();
+    }
     Q_EMIT pagxDocumentChanged(nullptr);
     return false;
   }
@@ -318,6 +322,7 @@ QString PAGXViewModel::applyXmlChanges(const QString& newXml) {
     pagxWidth = static_cast<int>(document->width);
     pagxHeight = static_cast<int>(document->height);
     pagxContentLayer = newContentLayer;
+    updateAnimationState();
     displayList = std::move(newDisplayList);
     needsRender = true;
   }

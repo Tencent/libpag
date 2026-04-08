@@ -25,6 +25,9 @@ PAGAudioPlayer::PAGAudioPlayer() {
   audioReader =
       PAGAudioReader::Make(config.sampleRate, config.outputSamplesCount, config.channels, 1.0);
   audioRender = PAGAudioRender::Make(config.sampleRate, config.channels);
+  if (audioRender == nullptr) {
+    return;
+  }
   audioReader->setAudioRender(audioRender);
   connect(this, &PAGAudioPlayer::volumeChanged, audioRender.get(), &PAGAudioRender::setAudioVolume);
   connect(this, &PAGAudioPlayer::isPlayingChanged, audioReader.get(),
