@@ -19,14 +19,14 @@
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="190,210" size="320,270" roundness="16"/>
+    <Rectangle position="190,210" size="320,290" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
   <!-- Diagonal gradient -->
   <Layer>
-    <Rectangle position="110,125" size="120,120" roundness="12"/>
+    <Rectangle position="110,140" size="120,120" roundness="12"/>
     <Fill>
       <LinearGradient startPoint="10,10" endPoint="130,130">
         <ColorStop offset="0" color="#3B82F6"/>
@@ -35,13 +35,13 @@
     </Fill>
   </Layer>
   <Layer>
-    <Text text="Diagonal" fontFamily="Arial" fontSize="9" position="110,195" textAnchor="center"/>
+    <Text text="Diagonal" fontFamily="Arial" fontSize="9" position="110,210" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Horizontal gradient with 3 stops -->
   <Layer>
-    <Rectangle position="270,125" size="120,120" roundness="12"/>
+    <Rectangle position="270,140" size="120,120" roundness="12"/>
     <Fill>
       <LinearGradient startPoint="10,10" endPoint="130,10">
         <ColorStop offset="0" color="#10B981"/>
@@ -51,7 +51,7 @@
     </Fill>
   </Layer>
   <Layer>
-    <Text text="Horizontal" fontFamily="Arial" fontSize="9" position="270,195" textAnchor="center"/>
+    <Text text="Horizontal" fontFamily="Arial" fontSize="9" position="270,210" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
