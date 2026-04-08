@@ -847,9 +847,57 @@ static float ComputeSignedArea(const PathContour& contour) {
   return area;
 }
 
-// Parses path data into contours and reverses inner contours that share the
-// outer contour's winding direction, so that PowerPoint's non-zero winding
-// rule produces the same result as even-odd fill.
+static void ReverseContour(PathContour& c) {
+  size_t n = c.segs.size();
+  Point originalStart = c.start;
+  c.start = SegEndpoint(c.segs[n - 1]);
+
+  std::vector<PathSeg> rev;
+  rev.reserve(n);
+  for (int i = static_cast<int>(n) - 1; i >= 0; i--) {
+    Point dest = (i > 0) ? SegEndpoint(c.segs[i - 1]) : originalStart;
+    const auto& seg = c.segs[i];
+    PathSeg reversed;
+    if (seg.verb == PathVerb::Cubic) {
+      reversed.verb = PathVerb::Cubic;
+      reversed.pts[0] = seg.pts[1];
+      reversed.pts[1] = seg.pts[0];
+      reversed.pts[2] = dest;
+    } else if (seg.verb == PathVerb::Quad) {
+      reversed.verb = PathVerb::Quad;
+      reversed.pts[0] = seg.pts[0];
+      reversed.pts[1] = dest;
+    } else {
+      reversed.verb = PathVerb::Line;
+      reversed.pts[0] = dest;
+    }
+    rev.push_back(reversed);
+  }
+  c.segs = std::move(rev);
+}
+
+// Ray-casting point-in-polygon test using contour endpoint polygon approximation.
+static bool PointInsideContour(const Point& pt, const PathContour& contour) {
+  std::vector<Point> poly;
+  poly.push_back(contour.start);
+  for (const auto& seg : contour.segs) {
+    poly.push_back(SegEndpoint(seg));
+  }
+  bool inside = false;
+  for (size_t i = 0, j = poly.size() - 1; i < poly.size(); j = i++) {
+    if (((poly[i].y > pt.y) != (poly[j].y > pt.y)) &&
+        (pt.x <
+         (poly[j].x - poly[i].x) * (pt.y - poly[i].y) / (poly[j].y - poly[i].y) + poly[i].x)) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+// Parses path data into contours and adjusts winding directions so that
+// PowerPoint's non-zero winding rule produces the same result as even-odd fill.
+// Uses containment depth to correctly handle multiple independent outer contours
+// (e.g. separate strokes in CJK glyphs).
 static std::vector<PathContour> BuildEvenOddContours(const PathData* data) {
   std::vector<PathContour> contours;
   data->forEach([&](PathVerb verb, const Point* pts) {
@@ -876,44 +924,44 @@ static std::vector<PathContour> BuildEvenOddContours(const PathData* data) {
     return contours;
   }
 
-  float outerArea = ComputeSignedArea(contours[0]);
-  for (size_t ci = 1; ci < contours.size(); ci++) {
-    auto& c = contours[ci];
-    if (!c.closed || c.segs.empty()) {
-      continue;
-    }
-    float area = ComputeSignedArea(c);
-    bool sameWinding = (outerArea > 0 && area > 0) || (outerArea < 0 && area < 0);
-    if (!sameWinding) {
-      continue;
-    }
-    size_t n = c.segs.size();
-    Point originalStart = c.start;
-    c.start = SegEndpoint(c.segs[n - 1]);
-
-    std::vector<PathSeg> rev;
-    rev.reserve(n);
-    for (int i = static_cast<int>(n) - 1; i >= 0; i--) {
-      Point dest = (i > 0) ? SegEndpoint(c.segs[i - 1]) : originalStart;
-      const auto& seg = c.segs[i];
-      PathSeg reversed;
-      if (seg.verb == PathVerb::Cubic) {
-        reversed.verb = PathVerb::Cubic;
-        reversed.pts[0] = seg.pts[1];
-        reversed.pts[1] = seg.pts[0];
-        reversed.pts[2] = dest;
-      } else if (seg.verb == PathVerb::Quad) {
-        reversed.verb = PathVerb::Quad;
-        reversed.pts[0] = seg.pts[0];
-        reversed.pts[1] = dest;
-      } else {
-        reversed.verb = PathVerb::Line;
-        reversed.pts[0] = dest;
+  // Compute containment depth: how many other closed contours contain each contour's start point.
+  std::vector<int> depths(contours.size(), 0);
+  for (size_t i = 0; i < contours.size(); i++) {
+    for (size_t j = 0; j < contours.size(); j++) {
+      if (i == j || !contours[j].closed || contours[j].segs.empty()) {
+        continue;
       }
-      rev.push_back(reversed);
+      if (PointInsideContour(contours[i].start, contours[j])) {
+        depths[i]++;
+      }
     }
-    c.segs = std::move(rev);
   }
+
+  // Pick reference winding direction from the first outermost (depth-0) closed contour.
+  int refSign = 0;
+  for (size_t i = 0; i < contours.size(); i++) {
+    if (depths[i] == 0 && contours[i].closed && !contours[i].segs.empty()) {
+      refSign = (ComputeSignedArea(contours[i]) >= 0) ? 1 : -1;
+      break;
+    }
+  }
+  if (refSign == 0) {
+    refSign = (ComputeSignedArea(contours[0]) >= 0) ? 1 : -1;
+  }
+
+  // Even-depth contours keep the reference winding; odd-depth get the opposite.
+  for (size_t i = 0; i < contours.size(); i++) {
+    if (!contours[i].closed || contours[i].segs.empty()) {
+      continue;
+    }
+    float area = ComputeSignedArea(contours[i]);
+    int currentSign = (area >= 0) ? 1 : -1;
+    int targetSign = (depths[i] % 2 == 0) ? refSign : -refSign;
+    if (currentSign != targetSign) {
+      ReverseContour(contours[i]);
+    }
+  }
+
   return contours;
 }
 
