@@ -537,6 +537,8 @@ by `pagx verify`. Inline content as child elements, or reference external files 
 ```
 
 Resolution sets parent Layer's `width`/`height` from the measured size of the source content.
+SVG does not auto-scale to fit the Layer — the `viewBox` size becomes the Layer size, so
+always generate the SVG `viewBox` at the exact dimensions you need.
 
 **Native PAGX elements vs inline SVG:**
 
