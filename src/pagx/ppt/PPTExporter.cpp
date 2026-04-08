@@ -487,16 +487,6 @@ bool PPTWriter::writeImagePatternAsPicture(XMLBuilder& out, const Fill* fill,
     return false;
   }
 
-  // When the image covers the entire shape, a:blipFill inside p:spPr with
-  // a:stretch works correctly.  Only switch to p:pic when the image is smaller
-  // than the shape (i.e. a:fillRect would need non-zero insets).
-  bool imageFillsShape = (ipr.visL <= shapeBounds.x + 0.5f && ipr.visT <= shapeBounds.y + 0.5f &&
-                          ipr.visR >= shapeBounds.x + shapeBounds.width - 0.5f &&
-                          ipr.visB >= shapeBounds.y + shapeBounds.height - 0.5f);
-  if (imageFillsShape) {
-    return false;
-  }
-
   std::string relId = _ctx->addImage(pattern->image);
   if (relId.empty()) {
     return false;

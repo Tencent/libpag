@@ -74,6 +74,8 @@ bool GetImagePNGDimensions(const Image* image, int* width, int* height);
 
 bool GetJPEGDimensions(const uint8_t* data, size_t size, int* width, int* height);
 
+bool GetWebPDimensions(const uint8_t* data, size_t size, int* width, int* height);
+
 bool GetImageDimensions(const Image* image, int* width, int* height);
 
 bool GetImageDPI(const Image* image, float* dpiX, float* dpiY);

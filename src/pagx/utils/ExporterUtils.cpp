@@ -261,13 +261,53 @@ bool GetJPEGDimensions(const uint8_t* data, size_t size, int* width, int* height
   return false;
 }
 
+bool GetWebPDimensions(const uint8_t* data, size_t size, int* width, int* height) {
+  if (size < 16 || memcmp(data, "RIFF", 4) != 0 || memcmp(data + 8, "WEBP", 4) != 0) {
+    return false;
+  }
+  if (size < 20) {
+    return false;
+  }
+  const uint8_t* chunk = data + 12;
+  size_t remaining = size - 12;
+  if (remaining >= 18 && memcmp(chunk, "VP8 ", 4) == 0) {
+    const uint8_t* vp8 = chunk + 8;
+    size_t vp8Size = remaining - 8;
+    if (vp8Size >= 10 && vp8[3] == 0x9D && vp8[4] == 0x01 && vp8[5] == 0x2A) {
+      *width = static_cast<int>((vp8[6] | (vp8[7] << 8)) & 0x3FFF);
+      *height = static_cast<int>((vp8[8] | (vp8[9] << 8)) & 0x3FFF);
+      return *width > 0 && *height > 0;
+    }
+  } else if (remaining >= 13 && memcmp(chunk, "VP8L", 4) == 0) {
+    const uint8_t* vp8l = chunk + 8;
+    size_t vp8lSize = remaining - 8;
+    if (vp8lSize >= 5 && vp8l[0] == 0x2F) {
+      uint32_t bits = vp8l[1] | (static_cast<uint32_t>(vp8l[2]) << 8) |
+                      (static_cast<uint32_t>(vp8l[3]) << 16) |
+                      (static_cast<uint32_t>(vp8l[4]) << 24);
+      *width = static_cast<int>((bits & 0x3FFF) + 1);
+      *height = static_cast<int>(((bits >> 14) & 0x3FFF) + 1);
+      return *width > 0 && *height > 0;
+    }
+  } else if (remaining >= 18 && memcmp(chunk, "VP8X", 4) == 0) {
+    const uint8_t* vp8x = chunk + 8;
+    *width = static_cast<int>((vp8x[4] | (vp8x[5] << 8) | (vp8x[6] << 16)) + 1);
+    *height = static_cast<int>((vp8x[7] | (vp8x[8] << 8) | (vp8x[9] << 16)) + 1);
+    return *width > 0 && *height > 0;
+  }
+  return false;
+}
+
 bool GetImageDimensions(const Image* image, int* width, int* height) {
   if (GetImagePNGDimensions(image, width, height)) {
     return true;
   }
   auto data = GetImageData(image);
   if (data && data->size() > 0) {
-    return GetJPEGDimensions(data->bytes(), data->size(), width, height);
+    if (GetJPEGDimensions(data->bytes(), data->size(), width, height)) {
+      return true;
+    }
+    return GetWebPDimensions(data->bytes(), data->size(), width, height);
   }
   return false;
 }
