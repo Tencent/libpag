@@ -623,6 +623,19 @@ These errors are easy to make during generation.
   </Layer>
   ```
 
+  Same applies to Path/PathData — start path data from (0,0) and use constraints to
+  position the element:
+
+  ```xml
+  <!-- ❌ Path data starts at (50,50) — offset baked into coordinates -->
+  <Path data="M 50 50 L 150 50 L 150 150 Z"/>
+  <Fill color="#F00"/>
+
+  <!-- ✅ Path data starts at (0,0), use constraints to position -->
+  <Path left="50" top="50" data="M 0 0 L 100 0 L 100 100 Z"/>
+  <Fill color="#F00"/>
+  ```
+
 - **Ineffective centering** — `centerX`/`centerY` inside a content-measured container is a
   no-op. Move centering to the container itself.
 
