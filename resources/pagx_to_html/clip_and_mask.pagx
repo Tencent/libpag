@@ -78,7 +78,7 @@
     <Fill color="#FFF"/>
   </Layer>
   <Layer mask="@contourMask" maskType="contour" x="200" y="225">
-    <Rectangle position="60,60" size="110,110"/>
+    <Rectangle position="70,70" size="130,130"/>
     <Fill color="#F59E0B"/>
   </Layer>
   <Layer>
