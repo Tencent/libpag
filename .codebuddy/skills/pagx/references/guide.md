@@ -520,13 +520,12 @@ Use `<Import>` to embed external content (currently supports SVG) — resolved a
 by `pagx verify`. Inline content as child elements, or reference external files via `source`.
 
 ```xml
-<!-- Inline SVG -->
-<Layer id="searchIcon" centerX="0" centerY="0">
+<!-- Inline SVG icon -->
+<Layer centerX="0" centerY="0">
   <Import>
-    <svg viewBox="0 0 24 24">
-      <circle cx="10" cy="10" r="7" fill="none" stroke="#1E293B" stroke-width="2"/>
-      <path d="M15 15L21 21" fill="none" stroke="#1E293B" stroke-width="2"
-            stroke-linecap="round"/>
+    <svg viewBox="0 0 24 24" fill="none" stroke="#1E293B" stroke-width="2">
+      <circle cx="10" cy="10" r="7"/>
+      <path d="M15 15L21 21" stroke-linecap="round"/>
     </svg>
   </Import>
 </Layer>
@@ -538,6 +537,15 @@ by `pagx verify`. Inline content as child elements, or reference external files 
 ```
 
 Resolution sets parent Layer's `width`/`height` from the measured size of the source content.
+
+**Native PAGX elements vs inline SVG:**
+
+Use native PAGX geometry (`Rectangle`, `Ellipse`, `Polystar`, `Path`) for single-element
+shapes — a background rectangle, a divider line, a circular indicator, a progress track.
+
+Use `<Import>` with inline SVG when multiple shapes combine into a composite graphic —
+icons, multi-stroke decorations, illustrated indicators. Wrap the Import in a Layer and
+use constraint positioning on the Layer to place it.
 
 ---
 
@@ -700,4 +708,32 @@ These errors are easy to make during generation.
     <Ellipse left="120" size="40,40"/>
     <Fill color="#F00"/>
   </Group>
+  ```
+
+- **Absolute positioning** — avoid using `left`/`top` with hardcoded values or fixed
+  `width`/`height` when the layout engine can compute them. Prefer container layout
+  (`layout`, `gap`, `padding`, `alignment`, `arrangement`, `flex`) and constraint
+  positioning (`centerX`, `centerY`, opposite-pair `left`+`right`/`top`+`bottom`) over
+  manual pixel values. Only use absolute positioning for `includeInLayout="false"` overlays.
+
+  ```xml
+  <!-- ❌ Absolute positioning — fragile, misaligns easily -->
+  <Group left="156" top="80">
+    <!-- ... marker ... -->
+  </Group>
+
+  <!-- ❌ Fixed height when content can determine it -->
+  <Layer height="260" layout="vertical" padding="20" gap="14">
+    <!-- ... content is actually shorter ... -->
+  </Layer>
+
+  <!-- ✅ Engine-computed position -->
+  <Group centerX="0" centerY="0">
+    <!-- ... marker ... -->
+  </Group>
+
+  <!-- ✅ Content-measured height — no fixed value needed -->
+  <Layer layout="vertical" padding="20" gap="14">
+    <!-- ... height matches content automatically ... -->
+  </Layer>
   ```
