@@ -163,6 +163,49 @@ float CombineSelectorValues(SelectorMode mode, float a, float b) {
   }
 }
 
+// Lookup table for seed=0 special case, matching AE behavior (TextSelectorRenderer.cpp).
+static const struct {
+  int end;
+  int index;
+} randomRanges[] = {{2, 0}, {4, 2}, {5, 4}, {20, 5}, {69, 20}, {127, 69}, {206, 127}, {10000, 205}};
+
+static int GetRandomIndex(int textCount) {
+  for (size_t i = 0; i < sizeof(randomRanges) / sizeof(randomRanges[0]); i++) {
+    if (textCount <= randomRanges[i].end) {
+      return randomRanges[i].index;
+    }
+  }
+  return 0;
+}
+
+static std::vector<size_t> CalculateRandomIndices(uint16_t seed, size_t textCount) {
+  srand(seed);
+  std::vector<std::pair<int, size_t>> randList;
+  randList.reserve(textCount);
+  for (size_t i = 0; i < textCount; i++) {
+    randList.push_back({rand(), i});
+  }
+  std::sort(randList.begin(), randList.end(),
+            [](const std::pair<int, size_t>& a, const std::pair<int, size_t>& b) {
+              return a.first < b.first;
+            });
+  std::vector<size_t> indices(textCount);
+  for (size_t i = 0; i < textCount; i++) {
+    indices[i] = randList[i].second;
+  }
+  if (seed == 0 && textCount > 1) {
+    auto m = static_cast<size_t>(GetRandomIndex(static_cast<int>(textCount)));
+    size_t k = 0;
+    while (k < textCount && indices[k] != m) {
+      k++;
+    }
+    if (k < textCount) {
+      std::swap(indices[0], indices[k]);
+    }
+  }
+  return indices;
+}
+
 float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphIndex,
                                  size_t totalGlyphs) {
   if (totalGlyphs == 0) {
@@ -407,7 +450,7 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     if (tb->lineHeight > 0) {
       style += ";line-height:" + FloatToString(tb->lineHeight) + "px";
     }
-    if (tb->wordWrap) {
+    if (tb->wordWrap && tb->size.width > 0) {
       style += ";word-wrap:break-word";
     } else {
       style += ";white-space:nowrap";
@@ -630,13 +673,25 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
       continue;
     }
     std::vector<float> factors(totalGlyphs, 0.0f);
+    // Pre-compute random indices if any selector uses randomOrder.
+    std::vector<size_t> randomIndices;
+    for (auto* selector : modifier->selectors) {
+      if (selector->nodeType() == NodeType::RangeSelector) {
+        auto rs = static_cast<const RangeSelector*>(selector);
+        if (rs->randomOrder && randomIndices.empty()) {
+          randomIndices =
+              CalculateRandomIndices(static_cast<uint16_t>(rs->randomSeed), totalGlyphs);
+        }
+      }
+    }
     for (size_t i = 0; i < totalGlyphs; i++) {
       float combinedFactor = 0.0f;
       bool firstSelector = true;
       for (auto* selector : modifier->selectors) {
         if (selector->nodeType() == NodeType::RangeSelector) {
           auto rs = static_cast<const RangeSelector*>(selector);
-          float selectorFactor = ComputeRangeSelectorFactor(rs, i, totalGlyphs);
+          size_t idx = (rs->randomOrder && i < randomIndices.size()) ? randomIndices[i] : i;
+          float selectorFactor = ComputeRangeSelectorFactor(rs, idx, totalGlyphs);
           if (firstSelector) {
             combinedFactor = selectorFactor;
             firstSelector = false;
