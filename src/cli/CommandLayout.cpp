@@ -23,6 +23,7 @@
 #include <iostream>
 #include <sstream>
 #include <vector>
+#include "cli/FormatUtils.h"
 #include "cli/XPathQuery.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXImporter.h"
@@ -200,29 +201,6 @@ static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float pare
 // ============================================================================
 // XML Output
 // ============================================================================
-
-static std::string EscapeXmlAttr(const std::string& s) {
-  std::string out;
-  for (char c : s) {
-    switch (c) {
-      case '&':
-        out += "&amp;";
-        break;
-      case '"':
-        out += "&quot;";
-        break;
-      case '<':
-        out += "&lt;";
-        break;
-      case '>':
-        out += "&gt;";
-        break;
-      default:
-        out += c;
-    }
-  }
-  return out;
-}
 
 static std::string FormatInt(float v) {
   return std::to_string(static_cast<int>(v));

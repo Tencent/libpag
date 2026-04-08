@@ -2099,29 +2099,6 @@ static void RunSpatialDetection(const PAGXDocument* doc, std::vector<VerifyDiagn
 // Layout XML Output
 // ============================================================================
 
-static std::string EscapeXmlAttr(const std::string& s) {
-  std::string out;
-  for (char c : s) {
-    switch (c) {
-      case '&':
-        out += "&amp;";
-        break;
-      case '"':
-        out += "&quot;";
-        break;
-      case '<':
-        out += "&lt;";
-        break;
-      case '>':
-        out += "&gt;";
-        break;
-      default:
-        out += c;
-    }
-  }
-  return out;
-}
-
 static void WriteLayoutElement(std::ostream& os, const Element* element, int indent);
 static void WriteLayoutLayer(std::ostream& os, const Layer* layer, int indent);
 

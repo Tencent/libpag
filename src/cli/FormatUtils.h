@@ -36,6 +36,11 @@ void ReorderAttributes(xmlNodePtr node);
 void ReorderAttributesRecursive(xmlNodePtr node);
 
 /**
+ * Escapes special XML characters in a string for use in attribute values.
+ */
+std::string EscapeXmlAttr(const std::string& s);
+
+/**
  * Serializes an XML subtree to a formatted string with consistent indentation and attribute
  * escaping.
  */

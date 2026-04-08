@@ -177,6 +177,29 @@ void ReorderAttributesRecursive(xmlNodePtr node) {
   }
 }
 
+std::string EscapeXmlAttr(const std::string& s) {
+  std::string out;
+  for (char c : s) {
+    switch (c) {
+      case '&':
+        out += "&amp;";
+        break;
+      case '"':
+        out += "&quot;";
+        break;
+      case '<':
+        out += "&lt;";
+        break;
+      case '>':
+        out += "&gt;";
+        break;
+      default:
+        out += c;
+    }
+  }
+  return out;
+}
+
 void SerializeNode(std::string& output, xmlNodePtr node, int indentLevel, int indentSpaces) {
   for (auto cur = node; cur != nullptr; cur = cur->next) {
     if (cur->type == XML_ELEMENT_NODE) {
