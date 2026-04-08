@@ -34,11 +34,14 @@ inline std::mutex& DefaultMutex() {
 }
 
 template <typename T>
+const T* MakeDefaultNode() {
+  std::lock_guard<std::mutex> lock(DefaultMutex());
+  return DefaultDoc().makeNode<T>();
+}
+
+template <typename T>
 inline const T& Default() {
-  static const T* node = [] {
-    std::lock_guard<std::mutex> lock(DefaultMutex());
-    return DefaultDoc().makeNode<T>();
-  }();
+  static const T* node = MakeDefaultNode<T>();
   return *node;
 }
 
