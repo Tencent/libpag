@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Composition resource → inline expansion; composition width/height defines coordinate system -->
-<pagx version="1.0" width="420" height="290">
+<pagx version="1.0" width="420" height="300">
   <Resources>
     <Composition id="badge" width="100" height="100">
       <Layer>
@@ -16,7 +16,7 @@
 
   <!-- Background -->
   <Layer>
-    <Rectangle position="210,145" size="420,290"/>
+    <Rectangle position="210,150" size="420,300"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
@@ -32,7 +32,7 @@
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="210,162" size="360,185" roundness="16"/>
+    <Rectangle position="210,170" size="360,200" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
@@ -40,14 +40,14 @@
   <!-- First instance at normal size -->
   <Layer x="70" y="90" composition="@badge"/>
   <Layer>
-    <Text text="Normal" fontFamily="Arial" fontSize="9" position="110,216" textAnchor="center"/>
+    <Text text="Normal" fontFamily="Arial" fontSize="9" position="130,240" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Second instance, scaled up -->
   <Layer x="210" y="65" composition="@badge" matrix="1.5,0,0,1.5,0,0"/>
   <Layer>
-    <Text text="Scaled 1.5x" fontFamily="Arial" fontSize="9" position="285,216" textAnchor="center"/>
+    <Text text="Scaled 1.5x" fontFamily="Arial" fontSize="9" position="300,240" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 </pagx>
