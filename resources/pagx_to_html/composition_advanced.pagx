@@ -68,5 +68,5 @@
   <!-- Badge with rotation via matrix -->
   <Layer x="240" y="148" composition="@badge" matrix="0.707,0.707,-0.707,0.707,0,0"/>
   <!-- Larger scaled badge -->
-  <Layer x="310" y="138" composition="@badge" matrix="1.4,0,0,1.4,0,0"/>
+  <Layer x="295" y="138" composition="@badge" matrix="1.4,0,0,1.4,0,0"/>
 </pagx>
