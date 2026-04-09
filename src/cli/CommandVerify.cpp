@@ -255,8 +255,8 @@ static void CollectRefsFromLayer(const Layer* layer, std::unordered_set<std::str
   if (!layer->id.empty()) {
     refs.insert(layer->id);
   }
-  if (layer->mask != nullptr && !layer->mask->id.empty()) {
-    refs.insert(layer->mask->id);
+  if (layer->mask != nullptr) {
+    CollectRefsFromLayer(layer->mask, refs);
   }
   if (layer->composition != nullptr && !layer->composition->id.empty()) {
     refs.insert(layer->composition->id);
