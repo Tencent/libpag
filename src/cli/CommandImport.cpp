@@ -22,11 +22,11 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include "base/utils/MathUtil.h"
 #include "cli/CliUtils.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/SVGImporter.h"
-#include "base/utils/MathUtil.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Import.h"

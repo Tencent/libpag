@@ -235,8 +235,8 @@ class LayerBuilderContext {
   // For TextBox children, inverseMatrix cancels the cumulative Group transforms.
   static void PrepareTextBlob(Text* text, const tgfx::Matrix& inverseMatrix) {
     if (!text->glyphData->layoutRuns.empty()) {
-      text->glyphData->textBlob = GlyphRunRenderer::BuildTextBlobFromLayoutRuns(
-          text->glyphData->layoutRuns, inverseMatrix);
+      text->glyphData->textBlob =
+          GlyphRunRenderer::BuildTextBlobFromLayoutRuns(text->glyphData->layoutRuns, inverseMatrix);
     } else if (!text->glyphRuns.empty()) {
       GlyphRunRenderer::BuildTextBlob(text, inverseMatrix);
     }
