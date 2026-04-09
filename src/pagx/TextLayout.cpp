@@ -259,7 +259,7 @@ class TextLayoutContext {
     return gi;
   }
 
-  static void collectTextElementsWithMatrices(const std::vector<Element*>& elements,
+  static void CollectTextElementsWithMatrices(const std::vector<Element*>& elements,
                                               std::vector<Text*>& outText,
                                               std::vector<tgfx::Matrix>& outMatrices,
                                               const tgfx::Matrix& parentMatrix) {
@@ -275,7 +275,7 @@ class TextLayoutContext {
         auto* group = static_cast<Group*>(element);
         auto groupMatrix = parentMatrix;
         groupMatrix.preConcat(ComputeGroupMatrix(group));
-        collectTextElementsWithMatrices(group->elements, outText, outMatrices, groupMatrix);
+        CollectTextElementsWithMatrices(group->elements, outText, outMatrices, groupMatrix);
       }
     }
   }
@@ -1513,7 +1513,7 @@ void TextLayout::CollectTextElements(const std::vector<Element*>& elements,
 void TextLayout::CollectTextElements(const std::vector<Element*>& elements,
                                      std::vector<Text*>& outText,
                                      std::vector<tgfx::Matrix>& outMatrices) {
-  TextLayoutContext::collectTextElementsWithMatrices(elements, outText, outMatrices,
+  TextLayoutContext::CollectTextElementsWithMatrices(elements, outText, outMatrices,
                                                      tgfx::Matrix::I());
 }
 
