@@ -894,11 +894,7 @@ static bool PointInsideContour(const Point& pt, const PathContour& contour) {
   return inside;
 }
 
-// Parses path data into contours and adjusts winding directions so that
-// PowerPoint's non-zero winding rule produces the same result as even-odd fill.
-// Uses containment depth to correctly handle multiple independent outer contours
-// (e.g. separate strokes in CJK glyphs).
-static std::vector<PathContour> BuildEvenOddContours(const PathData* data) {
+static std::vector<PathContour> ParsePathContours(const PathData* data) {
   std::vector<PathContour> contours;
   data->forEach([&](PathVerb verb, const Point* pts) {
     if (verb == PathVerb::Move) {
@@ -919,12 +915,10 @@ static std::vector<PathContour> BuildEvenOddContours(const PathData* data) {
       }
     }
   });
+  return contours;
+}
 
-  if (contours.size() <= 1) {
-    return contours;
-  }
-
-  // Compute containment depth: how many other closed contours contain each contour's start point.
+static std::vector<int> ComputeContainmentDepths(const std::vector<PathContour>& contours) {
   std::vector<int> depths(contours.size(), 0);
   for (size_t i = 0; i < contours.size(); i++) {
     for (size_t j = 0; j < contours.size(); j++) {
@@ -936,8 +930,11 @@ static std::vector<PathContour> BuildEvenOddContours(const PathData* data) {
       }
     }
   }
+  return depths;
+}
 
-  // Pick reference winding direction from the first outermost (depth-0) closed contour.
+static void AdjustWindingForEvenOdd(std::vector<PathContour>& contours,
+                                    const std::vector<int>& depths) {
   int refSign = 0;
   for (size_t i = 0; i < contours.size(); i++) {
     if (depths[i] == 0 && contours[i].closed && !contours[i].segs.empty()) {
@@ -945,11 +942,9 @@ static std::vector<PathContour> BuildEvenOddContours(const PathData* data) {
       break;
     }
   }
-  if (refSign == 0) {
+  if (refSign == 0 && !contours.empty()) {
     refSign = (ComputeSignedArea(contours[0]) >= 0) ? 1 : -1;
   }
-
-  // Even-depth contours keep the reference winding; odd-depth get the opposite.
   for (size_t i = 0; i < contours.size(); i++) {
     if (!contours[i].closed || contours[i].segs.empty()) {
       continue;
@@ -961,8 +956,45 @@ static std::vector<PathContour> BuildEvenOddContours(const PathData* data) {
       ReverseContour(contours[i]);
     }
   }
+}
 
-  return contours;
+// Groups contours by their outermost (depth-0) ancestor so that each group
+// can be emitted as a separate a:path element. This improves compatibility
+// with PPT viewers that limit contour count per path or stop rendering after
+// the first a:close.
+static std::vector<std::vector<size_t>> GroupContoursByOutermost(
+    const std::vector<PathContour>& contours, const std::vector<int>& depths) {
+  std::vector<int> parent(contours.size(), -1);
+  for (size_t i = 0; i < contours.size(); i++) {
+    if (depths[i] == 0) {
+      parent[i] = static_cast<int>(i);
+    } else {
+      for (size_t j = 0; j < contours.size(); j++) {
+        if (depths[j] == 0 && j != i && contours[j].closed && !contours[j].segs.empty()) {
+          if (PointInsideContour(contours[i].start, contours[j])) {
+            parent[i] = static_cast<int>(j);
+            break;
+          }
+        }
+      }
+      if (parent[i] < 0) {
+        parent[i] = static_cast<int>(i);
+      }
+    }
+  }
+
+  std::vector<int> groupIndex(contours.size(), -1);
+  std::vector<std::vector<size_t>> groups;
+  for (size_t i = 0; i < contours.size(); i++) {
+    int p = parent[i];
+    if (groupIndex[p] < 0) {
+      groupIndex[p] = static_cast<int>(groups.size());
+      groups.push_back({i});
+    } else {
+      groups[groupIndex[p]].push_back(i);
+    }
+  }
+  return groups;
 }
 
 // ── Custom geometry ────────────────────────────────────────────────────────
@@ -990,6 +1022,31 @@ static void EmitCubicBezTo(XMLBuilder& out, float x0, float y0, float x1, float 
   out.end();
 }
 
+static void EmitContour(XMLBuilder& out, const PathContour& c, float csX, float csY, float sOfsX,
+                        float sOfsY) {
+  EmitPoint(out, "a:moveTo", c.start.x * csX, c.start.y * csY, sOfsX, sOfsY);
+  for (const auto& s : c.segs) {
+    switch (s.verb) {
+      case PathVerb::Line:
+        EmitPoint(out, "a:lnTo", s.pts[0].x * csX, s.pts[0].y * csY, sOfsX, sOfsY);
+        break;
+      case PathVerb::Quad:
+        EmitQuadBezTo(out, "a:quadBezTo", s.pts[0].x * csX, s.pts[0].y * csY, s.pts[1].x * csX,
+                      s.pts[1].y * csY, sOfsX, sOfsY);
+        break;
+      case PathVerb::Cubic:
+        EmitCubicBezTo(out, s.pts[0].x * csX, s.pts[0].y * csY, s.pts[1].x * csX,
+                       s.pts[1].y * csY, s.pts[2].x * csX, s.pts[2].y * csY, sOfsX, sOfsY);
+        break;
+      default:
+        break;
+    }
+  }
+  if (c.closed) {
+    out.open("a:close").sc();
+  }
+}
+
 void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofsX, float ofsY,
                                 float boundsW, float boundsH, FillRule fillRule, float coordScaleX,
                                 float coordScaleY) {
@@ -1003,65 +1060,36 @@ void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofs
   int64_t pw = std::max(int64_t(1), PxToEMU(boundsW * coordScaleX));
   int64_t ph = std::max(int64_t(1), PxToEMU(boundsH * coordScaleY));
 
-  out.open("a:pathLst").gt();
-  out.open("a:path").a("w", pw).a("h", ph).gt();
-
   float sOfsX = ofsX * coordScaleX;
   float sOfsY = ofsY * coordScaleY;
   float csX = coordScaleX;
   float csY = coordScaleY;
 
-  if (fillRule == FillRule::EvenOdd) {
-    auto contours = BuildEvenOddContours(data);
+  out.open("a:pathLst").gt();
 
-    for (const auto& c : contours) {
-      EmitPoint(out, "a:moveTo", c.start.x * csX, c.start.y * csY, sOfsX, sOfsY);
-      for (const auto& s : c.segs) {
-        switch (s.verb) {
-          case PathVerb::Line:
-            EmitPoint(out, "a:lnTo", s.pts[0].x * csX, s.pts[0].y * csY, sOfsX, sOfsY);
-            break;
-          case PathVerb::Quad:
-            EmitQuadBezTo(out, "a:quadBezTo", s.pts[0].x * csX, s.pts[0].y * csY, s.pts[1].x * csX,
-                          s.pts[1].y * csY, sOfsX, sOfsY);
-            break;
-          case PathVerb::Cubic:
-            EmitCubicBezTo(out, s.pts[0].x * csX, s.pts[0].y * csY, s.pts[1].x * csX,
-                           s.pts[1].y * csY, s.pts[2].x * csX, s.pts[2].y * csY, sOfsX, sOfsY);
-            break;
-          default:
-            break;
-        }
-      }
-      if (c.closed) {
-        out.open("a:close").sc();
-      }
+  auto contours = ParsePathContours(data);
+
+  if (contours.size() <= 1) {
+    out.open("a:path").a("w", pw).a("h", ph).gt();
+    for (auto& c : contours) {
+      EmitContour(out, c, csX, csY, sOfsX, sOfsY);
     }
+    out.end();  // a:path
   } else {
-    data->forEach([&](PathVerb verb, const Point* pts) {
-      switch (verb) {
-        case PathVerb::Move:
-          EmitPoint(out, "a:moveTo", pts[0].x * csX, pts[0].y * csY, sOfsX, sOfsY);
-          break;
-        case PathVerb::Line:
-          EmitPoint(out, "a:lnTo", pts[0].x * csX, pts[0].y * csY, sOfsX, sOfsY);
-          break;
-        case PathVerb::Quad:
-          EmitQuadBezTo(out, "a:quadBezTo", pts[0].x * csX, pts[0].y * csY, pts[1].x * csX,
-                        pts[1].y * csY, sOfsX, sOfsY);
-          break;
-        case PathVerb::Cubic:
-          EmitCubicBezTo(out, pts[0].x * csX, pts[0].y * csY, pts[1].x * csX, pts[1].y * csY,
-                         pts[2].x * csX, pts[2].y * csY, sOfsX, sOfsY);
-          break;
-        case PathVerb::Close:
-          out.open("a:close").sc();
-          break;
+    auto depths = ComputeContainmentDepths(contours);
+    if (fillRule == FillRule::EvenOdd) {
+      AdjustWindingForEvenOdd(contours, depths);
+    }
+    auto groups = GroupContoursByOutermost(contours, depths);
+    for (const auto& group : groups) {
+      out.open("a:path").a("w", pw).a("h", ph).gt();
+      for (size_t idx : group) {
+        EmitContour(out, contours[idx], csX, csY, sOfsX, sOfsY);
       }
-    });
+      out.end();  // a:path
+    }
   }
 
-  out.end();  // a:path
   out.end();  // a:pathLst
   out.end();  // a:custGeom
 }
