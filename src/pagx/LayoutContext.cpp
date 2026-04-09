@@ -89,7 +89,14 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
     }
   }
 
-  // Stage 4: System font lookup via MakeFromName
+#ifdef PAG_BUILD_FOR_WEB
+  // Stage 4: On web, prefer the first registered fallback typeface over browser fonts.
+  if (!fontConfig->data->fallbackTypefaces.empty()) {
+    return fontConfig->data->fallbackTypefaces.front().getTypeface();
+  }
+#endif
+
+  // Stage 5: System font lookup via MakeFromName
   if (!fontFamily.empty()) {
     auto typeface = tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
     if (typeface != nullptr) {
@@ -97,7 +104,7 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
     }
   }
 
-  // Stage 5: Family-name match in system fallback typefaces
+  // Stage 6: Family-name match in system fallback typefaces
   if (!fontFamily.empty()) {
     ensureSystemFallbacks();
     for (auto& holder : systemFallbacks) {
