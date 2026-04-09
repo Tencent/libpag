@@ -97,6 +97,34 @@ inline std::shared_ptr<tgfx::Typeface> ResolveFallbackTypeface(const std::string
   return ResolveSystemTypeface(family, style);
 }
 
+/**
+ * Extracts the file extension from a path (without the dot) in lowercase, or returns an empty
+ * string if none.
+ */
+inline std::string GetFileExtension(const std::string& path) {
+  auto dot = path.rfind('.');
+  if (dot != std::string::npos) {
+    auto ext = path.substr(dot + 1);
+    for (auto& ch : ext) {
+      ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+    }
+    return ext;
+  }
+  return {};
+}
+
+/**
+ * Replaces the file extension in a path with a new extension. If the path has no extension, appends
+ * the new extension.
+ */
+inline std::string ReplaceExtension(const std::string& path, const std::string& newExt) {
+  auto dot = path.rfind('.');
+  if (dot != std::string::npos) {
+    return path.substr(0, dot + 1) + newExt;
+  }
+  return path + "." + newExt;
+}
+
 inline std::string EscapeJson(const std::string& input) {
   std::string result = {};
   result.reserve(input.size() + 16);
