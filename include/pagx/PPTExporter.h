@@ -41,6 +41,15 @@ struct PPTExportOptions {
    * as editable vector shapes and the mask effect is ignored. The default value is true.
    */
   bool bakeMask = true;
+
+  /**
+   * Whether to bridge nested contours within a single path element. When enabled, contours that
+   * contain inner holes are connected by bridge edges so the hole is expressed as a single
+   * self-intersecting sub-path, which some renderers require for correct even-odd fill. When
+   * disabled, each contour is emitted as a separate sub-path inside the path list. The default
+   * value is false.
+   */
+  bool bridgeContours = false;
 };
 
 /**

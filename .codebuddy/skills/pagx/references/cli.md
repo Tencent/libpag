@@ -261,6 +261,7 @@ pagx export --format pptx --input icon.pagx      # force PPTX output format
 pagx export --input icon.pagx --svg-indent 4     # 4-space indent
 pagx export --input icon.pagx --text-to-path     # convert text to paths
 pagx export --input icon.pagx --output out.pptx --ppt-no-bake-mask  # vector masks
+pagx export --input icon.pagx --output out.pptx --ppt-bridge-contours  # bridge nested contours
 ```
 
 | Option | Description |
@@ -272,6 +273,7 @@ pagx export --input icon.pagx --output out.pptx --ppt-no-bake-mask  # vector mas
 | `--svg-indent <n>` | Indentation spaces (default: 2, valid range: 0–16) |
 | `--svg-no-xml-declaration` | Omit the `<?xml ...?>` declaration |
 | `--ppt-no-bake-mask` | Export masked layers as editable vector shapes instead of rasterizing to bitmap |
+| `--ppt-bridge-contours` | Bridge nested contours to express holes via self-intersecting sub-paths (default: off) |
 
 On success the command prints `pagx export: wrote <path>` and exits 0; on failure it prints
 an error and exits 1.

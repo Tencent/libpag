@@ -260,8 +260,13 @@ struct PathContour;
 
 class PPTWriter {
  public:
-  PPTWriter(PPTWriterContext* ctx, PAGXDocument* doc, bool convertTextToPath, bool bakeMask)
-      : _ctx(ctx), _doc(doc), _convertTextToPath(convertTextToPath), _bakeMask(bakeMask) {
+  PPTWriter(PPTWriterContext* ctx, PAGXDocument* doc, bool convertTextToPath, bool bakeMask,
+            bool bridgeContours)
+      : _ctx(ctx),
+        _doc(doc),
+        _convertTextToPath(convertTextToPath),
+        _bakeMask(bakeMask),
+        _bridgeContours(bridgeContours) {
   }
 
   void writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& parentMatrix = {},
@@ -272,6 +277,7 @@ class PPTWriter {
   PAGXDocument* _doc = nullptr;
   bool _convertTextToPath = true;
   bool _bakeMask = true;
+  bool _bridgeContours = false;
   LayerBuildResult _buildResult = {};
   bool _buildResultReady = false;
 
@@ -329,9 +335,9 @@ class PPTWriter {
                        float coordScaleX = 1.0f, float coordScaleY = 1.0f);
 
   // Shared contour-to-custGeom emitter used by writeCustomGeom and writeTextAsPath
-  static void WriteContourGeom(XMLBuilder& out, std::vector<PathContour>& contours,
-                               int64_t pathWidth, int64_t pathHeight, float scaleX, float scaleY,
-                               float scaledOfsX, float scaledOfsY, FillRule fillRule);
+  void WriteContourGeom(XMLBuilder& out, std::vector<PathContour>& contours, int64_t pathWidth,
+                        int64_t pathHeight, float scaleX, float scaleY, float scaledOfsX,
+                        float scaledOfsY, FillRule fillRule);
 
   // Transform decomposition
   struct Xform {
@@ -1124,13 +1130,7 @@ void PPTWriter::WriteContourGeom(XMLBuilder& out, std::vector<PathContour>& cont
 
   out.open("a:pathLst").gt();
 
-  if (contours.size() <= 1) {
-    out.open("a:path").attr("w", pathWidth).attr("h", pathHeight).gt();
-    for (auto& c : contours) {
-      EmitContour(out, c, scaleX, scaleY, scaledOfsX, scaledOfsY);
-    }
-    out.end();  // a:path
-  } else {
+  if (_bridgeContours && contours.size() > 1) {
     auto depths = ComputeContainmentDepths(contours);
     if (fillRule == FillRule::EvenOdd) {
       AdjustWindingForEvenOdd(contours, depths);
@@ -1145,6 +1145,12 @@ void PPTWriter::WriteContourGeom(XMLBuilder& out, std::vector<PathContour>& cont
       }
       out.end();  // a:path
     }
+  } else {
+    out.open("a:path").attr("w", pathWidth).attr("h", pathHeight).gt();
+    for (auto& c : contours) {
+      EmitContour(out, c, scaleX, scaleY, scaledOfsX, scaledOfsY);
+    }
+    out.end();  // a:path
   }
 
   out.end();  // a:pathLst
@@ -1956,7 +1962,8 @@ static bool AddZipString(zipFile zf, const char* name, const std::string& conten
 
 bool PPTExporter::ToFile(PAGXDocument& doc, const std::string& filePath, const Options& options) {
   PPTWriterContext context;
-  PPTWriter writer(&context, &doc, options.convertTextToPath, options.bakeMask);
+  PPTWriter writer(&context, &doc, options.convertTextToPath, options.bakeMask,
+                   options.bridgeContours);
 
   // Build slide body content
   XMLBuilder body(false, 2, 0, 16384);
