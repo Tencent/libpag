@@ -25,7 +25,7 @@
   </Layer>
 
   <!-- 45° rotation + translate -->
-  <Layer matrix="0.707,0.707,-0.707,0.707,100,80">
+  <Layer matrix="0.707,0.707,-0.707,0.707,100,125">
     <Rectangle position="10,10" size="80,80" roundness="8"/>
     <Fill color="#F59E0B"/>
   </Layer>
