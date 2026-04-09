@@ -25,7 +25,7 @@
   </Layer>
 
   <!-- 3D rotated rectangle -->
-  <Layer matrix3D="0.966,0,0.259,0,0,1,0,0,-0.259,0,0.966,0,100,130,0,1" preserve3D="true">
+  <Layer matrix3D="0.966,0,0.259,0,0,1,0,0,-0.259,0,0.966,0,100,140,0,1" preserve3D="true">
     <Rectangle position="10,10" size="120,120" roundness="12"/>
     <Fill color="#EC4899"/>
   </Layer>
