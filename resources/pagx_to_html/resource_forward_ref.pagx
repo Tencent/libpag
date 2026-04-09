@@ -68,12 +68,6 @@
     <Fill color="#94A3B8"/>
   </Layer>
 
-  <!-- Arrow pointing down to Resources -->
-  <Layer>
-    <Path data="M 150,216 L 150,228 M 146,224 L 150,228 L 154,224"/>
-    <Stroke color="#94A3B8" width="1" cap="round" join="round"/>
-  </Layer>
-
   <!-- Resources defined AFTER all usage — tests forward reference resolution -->
   <Resources>
     <SolidColor id="titleColor" color="#1E293B"/>
