@@ -1,26 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Default values and edge cases for various elements — Rectangle, Ellipse, Fill, Stroke,
      ConicGradient defaults, empty layer, zero-size shapes, minimal attributes -->
-<pagx version="1.0" width="480" height="460">
+<pagx version="1.0" width="510" height="460">
   <!-- Background -->
   <Layer>
-    <Rectangle position="240,230" size="480,460"/>
+    <Rectangle position="255,230" size="510,460"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
   <!-- Title -->
   <Layer>
-    <Text text="Edge Cases and Defaults" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="240,34" textAnchor="center"/>
+    <Text text="Edge Cases and Defaults" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="255,34" textAnchor="center"/>
     <Fill color="#1E293B"/>
   </Layer>
   <Layer>
-    <Text text="Default values, zero sizes, minimal attributes" fontFamily="Arial" fontSize="10" position="240,50" textAnchor="center"/>
+    <Text text="Default values, zero sizes, minimal attributes" fontFamily="Arial" fontSize="10" position="255,50" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
-  <!-- Card: center=(240,265), size=420,370 → top=80, bottom=450, left=30, right=450 -->
+  <!-- Card: center=(255,265), size=450,370 → top=80, bottom=450, left=30, right=480 -->
   <Layer>
-    <Rectangle position="240,265" size="420,370" roundness="16"/>
+    <Rectangle position="255,265" size="450,370" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
@@ -28,64 +28,63 @@
   <!-- Row 1: Rectangle defaults, Ellipse defaults, Stroke defaults, Polystar -->
   <!-- All 4 elements aligned at visual center y=145 -->
 
-  <!-- Rectangle with defaults: size=100x100, center=(0,0) → visual center at Layer origin -->
-  <Layer x="80" y="145">
+  <!-- Rectangle: default size=100x100, center=(0,0). Left edge=95-50=45 > card left=30 ✓ (15px) -->
+  <Layer x="95" y="145">
     <Rectangle/>
     <Fill/>
   </Layer>
   <Layer>
-    <Text text="Defaults" fontFamily="Arial" fontSize="7" position="80,208" textAnchor="center"/>
+    <Text text="Defaults" fontFamily="Arial" fontSize="7" position="95,208" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
-  <!-- Ellipse with defaults: size=100x100, center=(0,0) → visual center at Layer origin -->
-  <Layer x="195" y="145">
+  <!-- Ellipse: default size=100x100, center=(0,0) -->
+  <Layer x="210" y="145">
     <Ellipse/>
     <Fill color="#3B82F6"/>
   </Layer>
   <Layer>
-    <Text text="Ellipse" fontFamily="Arial" fontSize="7" position="195,208" textAnchor="center"/>
+    <Text text="Ellipse" fontFamily="Arial" fontSize="7" position="210,208" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
-  <!-- Stroke: rect center=(30,30) size=60x60 → visual center at Layer.y + 30 = 145 → Layer.y=115 -->
-  <Layer x="300" y="115">
+  <!-- Stroke: rect center=(30,30) size=60x60 → visual center at Layer.y+30=145 → Layer.y=115 -->
+  <Layer x="315" y="115">
     <Rectangle position="30,30" size="60,60"/>
     <Stroke/>
   </Layer>
   <Layer>
-    <Text text="Stroke" fontFamily="Arial" fontSize="7" position="330,208" textAnchor="center"/>
+    <Text text="Stroke" fontFamily="Arial" fontSize="7" position="345,208" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
-  <!-- Polystar: outerRadius=65, innerRadius=30 → range [-65,-65] to [65,65] -->
-  <!-- Visual center at Layer origin. y=145, x=405 → right=470 > card right=450? Need x=385 → right=450 exact -->
-  <Layer x="385" y="145">
-    <Polystar outerRadius="65" innerRadius="30"/>
+  <!-- Polystar: outerRadius=55, innerRadius=25. Right edge=390+55=445 < card right=480 ✓ (35px) -->
+  <Layer x="390" y="150">
+    <Polystar outerRadius="55" innerRadius="25"/>
     <Fill color="#F59E0B40"/>
     <Stroke color="#F59E0B" width="1"/>
   </Layer>
   <Layer>
-    <Text text="Polystar" fontFamily="Arial" fontSize="7" position="385,208" textAnchor="center"/>
+    <Text text="Polystar" fontFamily="Arial" fontSize="7" position="390,208" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Row 2: Zero-size, ConicGradient, Default text, Radial -->
 
-  <Layer x="70" y="235">
+  <Layer x="80" y="235">
     <Ellipse position="20,20" size="0,0"/>
     <Fill color="#EF4444"/>
   </Layer>
-  <Layer x="70" y="235">
+  <Layer x="80" y="235">
     <Rectangle position="50,20" size="0,0"/>
     <Fill color="#10B981"/>
   </Layer>
   <Layer>
-    <Text text="Zero-size" fontFamily="Arial" fontSize="7" position="80,275" textAnchor="center"/>
+    <Text text="Zero-size" fontFamily="Arial" fontSize="7" position="90,275" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
-  <Layer x="165" y="228">
+  <Layer x="180" y="228">
     <Ellipse position="32,32" size="60,60"/>
     <Fill>
       <ConicGradient>
@@ -96,20 +95,20 @@
     </Fill>
   </Layer>
   <Layer>
-    <Text text="Conic" fontFamily="Arial" fontSize="7" position="197,275" textAnchor="center"/>
+    <Text text="Conic" fontFamily="Arial" fontSize="7" position="212,275" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
-  <Layer x="280" y="252">
+  <Layer x="295" y="252">
     <Text text="Default text" fontSize="12"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer>
-    <Text text="Minimal" fontFamily="Arial" fontSize="7" position="325,275" textAnchor="center"/>
+    <Text text="Minimal" fontFamily="Arial" fontSize="7" position="340,275" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
-  <Layer x="385" y="232">
+  <Layer x="400" y="232">
     <Rectangle position="25,25" size="45,45" roundness="8"/>
     <Fill>
       <RadialGradient center="22,22" radius="40">
@@ -119,36 +118,36 @@
     </Fill>
   </Layer>
   <Layer>
-    <Text text="Radial" fontFamily="Arial" fontSize="7" position="410,275" textAnchor="center"/>
+    <Text text="Radial" fontFamily="Arial" fontSize="7" position="425,275" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Row 3: evenOdd, TrimPath, Empty layer -->
 
-  <Layer x="55" y="300">
+  <Layer x="65" y="300">
     <Rectangle position="30,30" size="50,50"/>
     <Rectangle position="50,50" size="50,50"/>
     <MergePath mode="append"/>
     <Fill color="#8B5CF680" fillRule="evenOdd"/>
   </Layer>
   <Layer>
-    <Text text="evenOdd" fontFamily="Arial" fontSize="7" position="92,390" textAnchor="center"/>
+    <Text text="evenOdd" fontFamily="Arial" fontSize="7" position="102,390" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
-  <Layer x="195" y="335">
+  <Layer x="210" y="335">
     <Ellipse position="35,18" size="55,28"/>
     <TrimPath/>
     <Stroke color="#06B6D4" width="2"/>
   </Layer>
   <Layer>
-    <Text text="TrimPath" fontFamily="Arial" fontSize="7" position="230,390" textAnchor="center"/>
+    <Text text="TrimPath" fontFamily="Arial" fontSize="7" position="245,390" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
-  <Layer name="emptyLayer" x="370" y="350"/>
+  <Layer name="emptyLayer" x="385" y="350"/>
   <Layer>
-    <Text text="Empty layer" fontFamily="Arial" fontSize="7" position="370,390" textAnchor="center"/>
+    <Text text="Empty layer" fontFamily="Arial" fontSize="7" position="385,390" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 </pagx>
