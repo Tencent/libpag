@@ -15,13 +15,13 @@
       <ColorStop offset="1" color="#9333EA"/>
     </ConicGradient>
     <!-- Gold radial gradient -->
-    <RadialGradient id="goldRadial" center="210,210" radius="180">
+    <RadialGradient id="goldRadial" center="25,25" radius="25">
       <ColorStop offset="0" color="#F59E0B"/>
       <ColorStop offset="0.5" color="#D97706"/>
       <ColorStop offset="1" color="#92400E"/>
     </RadialGradient>
     <!-- Teal radial glow -->
-    <RadialGradient id="tealGlow" center="210,210" radius="120">
+    <RadialGradient id="tealGlow" center="50,50" radius="50">
       <ColorStop offset="0" color="#14B8A6"/>
       <ColorStop offset="1" color="#14B8A600"/>
     </RadialGradient>
@@ -38,25 +38,25 @@
     <Fill color="@bgRadial"/>
   </Layer>
 
-  <!-- Outer ring: 12 petal shapes via Repeater with rotation -->
-  <Layer blendMode="screen" alpha="0.8">
-    <Ellipse position="210,120" size="40,100"/>
-    <Repeater copies="12" offset="0" anchor="200,200" position="10,10" rotation="30" startAlpha="1" endAlpha="1"/>
+  <!-- Outer ring: 12 petal shapes via Repeater with pure rotation around center -->
+  <Layer blendMode="screen" alpha="0.8" x="210" y="210">
+    <Ellipse position="0,-90" size="40,100"/>
+    <Repeater copies="12" anchor="0,0" position="0,0" rotation="30"/>
     <Stroke color="@rainbowConic" width="2" cap="round"/>
   </Layer>
 
   <!-- Middle ring: trimmed ellipses for animated-look partial strokes -->
-  <Layer blendMode="screen" alpha="0.7">
-    <Ellipse position="210,150" size="24,70"/>
-    <TrimPath start="0.1" end="0.7" offset="0"/>
-    <Repeater copies="12" offset="0" anchor="200,200" position="10,10" rotation="30" startAlpha="1" endAlpha="0.5"/>
+  <Layer blendMode="screen" alpha="0.7" x="210" y="210">
+    <Ellipse position="0,-60" size="24,70"/>
+    <TrimPath start="0.1" end="0.7"/>
+    <Repeater copies="12" anchor="0,0" position="0,0" rotation="30" endAlpha="0.5"/>
     <Stroke color="#F59E0B" width="3" cap="round"/>
   </Layer>
 
   <!-- Inner decorative ring: small circles at tips -->
-  <Layer alpha="0.9">
-    <Ellipse position="210,140" size="12,12"/>
-    <Repeater copies="12" offset="0" anchor="200,200" position="10,10" rotation="30" startAlpha="1" endAlpha="1"/>
+  <Layer alpha="0.9" x="210" y="210">
+    <Ellipse position="0,-70" size="12,12"/>
+    <Repeater copies="12" anchor="0,0" position="0,0" rotation="30"/>
     <Fill color="#9333EA"/>
     <Stroke color="#C084FC" width="1"/>
   </Layer>
@@ -81,9 +81,9 @@
   </Layer>
 
   <!-- Core radial path spokes: 6 lines through center -->
-  <Layer alpha="0.25" blendMode="screen">
-    <Path data="M 200,120 L 200,280"/>
-    <Repeater copies="6" offset="0" anchor="200,200" position="10,10" rotation="30" startAlpha="1" endAlpha="1"/>
+  <Layer alpha="0.25" blendMode="screen" x="210" y="210">
+    <Path data="M 0,-90 L 0,90"/>
+    <Repeater copies="6" anchor="0,0" position="0,0" rotation="30"/>
     <Stroke color="#C084FC" width="1"/>
   </Layer>
 
@@ -109,9 +109,9 @@
   </Layer>
 
   <!-- Outer decorative dots: tiny circles at cardinal points -->
-  <Layer alpha="0.6">
-    <Ellipse position="210,38" size="6,6"/>
-    <Repeater copies="12" offset="0" anchor="200,200" position="10,10" rotation="30" startAlpha="1" endAlpha="0.4"/>
+  <Layer alpha="0.6" x="210" y="210">
+    <Ellipse position="0,-172" size="6,6"/>
+    <Repeater copies="12" anchor="0,0" position="0,0" rotation="30" endAlpha="0.4"/>
     <Fill color="#E879F9"/>
   </Layer>
 </pagx>
