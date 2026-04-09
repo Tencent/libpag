@@ -2220,16 +2220,19 @@ CLI_TEST(PAGXCliTest, ImportResolve_MultiLayerPreservesIsolation) {
   ASSERT_NE(doc, nullptr);
   EXPECT_FALSE(doc->hasUnresolvedImports());
 
-  // The host Layer should have Group elements (one per SVG element) for painter isolation.
+  // The host Layer should have the first SVG element unpacked (no Group needed for the first
+  // element since there is no preceding geometry to isolate from) and subsequent elements
+  // wrapped in Groups for painter scope isolation.
   ASSERT_EQ(doc->layers.size(), 1u);
   auto* hostLayer = doc->layers[0];
+  EXPECT_FALSE(hostLayer->contents.empty());
   size_t groupCount = 0;
   for (auto* element : hostLayer->contents) {
     if (element->nodeType() == pagx::NodeType::Group) {
       groupCount++;
     }
   }
-  EXPECT_GE(groupCount, 2u);
+  EXPECT_GE(groupCount, 1u);
 
   // Screenshot test: render the resolved file and compare against baseline.
   EXPECT_TRUE(RenderAndCompare({"render", pagxPath}, "PAGXCliTest/ImportResolve_MultiLayer"));

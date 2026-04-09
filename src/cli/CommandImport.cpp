@@ -29,6 +29,7 @@
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Import.h"
+#include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/Path.h"
 
 namespace pagx::cli {
@@ -307,22 +308,46 @@ static bool ResolveOneImport(Import* imp, const std::string& baseDir,
       replacements.push_back(element);
     }
   } else if (canDowngradeAll) {
-    for (auto* layer : elementLayers) {
-      auto* group = doc->makeNode<Group>();
-      group->elements = std::move(layer->contents);
-      if (!layer->matrix.isIdentity()) {
-        auto m = layer->matrix;
-        group->position = {m.tx, m.ty};
-        if (m.a != 1 || m.b != 0 || m.c != 0 || m.d != 1) {
-          float sx = std::sqrt(m.a * m.a + m.b * m.b);
-          float sy = std::sqrt(m.c * m.c + m.d * m.d);
-          float rot = std::atan2(m.b, m.a) * 180.0f / 3.14159265358979323846f;
-          group->scale = {sx, sy};
-          group->rotation = rot;
+    for (size_t i = 0; i < elementLayers.size(); i++) {
+      auto* layer = elementLayers[i];
+      // The first element layer can be unpacked directly (no preceding geometry to isolate from),
+      // provided it has no extra attributes that would require a Group wrapper. This mirrors the
+      // CanUnwrapFirstChildGroup lint check: identity transform, alpha=1, no constraints, no
+      // explicit size, and no child elements using right/bottom/centerX/centerY constraints.
+      bool unpackFirst = false;
+      if (i == 0 && layer->matrix.isIdentity() && layer->alpha == 1.0f) {
+        unpackFirst = true;
+        for (auto* child : layer->contents) {
+          auto* layoutNode = LayoutNode::AsLayoutNode(child);
+          if (layoutNode != nullptr &&
+              (!std::isnan(layoutNode->right) || !std::isnan(layoutNode->bottom) ||
+               !std::isnan(layoutNode->centerX) || !std::isnan(layoutNode->centerY))) {
+            unpackFirst = false;
+            break;
+          }
         }
       }
-      group->alpha = layer->alpha;
-      replacements.push_back(group);
+      if (unpackFirst) {
+        for (auto* element : layer->contents) {
+          replacements.push_back(element);
+        }
+      } else {
+        auto* group = doc->makeNode<Group>();
+        group->elements = std::move(layer->contents);
+        if (!layer->matrix.isIdentity()) {
+          auto m = layer->matrix;
+          group->position = {m.tx, m.ty};
+          if (m.a != 1 || m.b != 0 || m.c != 0 || m.d != 1) {
+            float sx = std::sqrt(m.a * m.a + m.b * m.b);
+            float sy = std::sqrt(m.c * m.c + m.d * m.d);
+            float rot = std::atan2(m.b, m.a) * 180.0f / 3.14159265358979323846f;
+            group->scale = {sx, sy};
+            group->rotation = rot;
+          }
+        }
+        group->alpha = layer->alpha;
+        replacements.push_back(group);
+      }
     }
   } else {
     for (auto* layer : elementLayers) {
