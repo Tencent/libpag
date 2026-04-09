@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <limits>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -1235,38 +1236,126 @@ void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStr
     return;
   }
 
+  // Merge all glyph paths into a single compound shape to guarantee baseline
+  // alignment.  Per-glyph shapes suffer from independent EMU rounding of offY
+  // and extCY, which causes visible baseline jitter on some mobile renderers.
+  std::vector<PathContour> allContours;
   for (const auto& gp : glyphPaths) {
     if (!gp.pathData || gp.pathData->isEmpty()) {
       continue;
     }
-    Rect localBounds = const_cast<PathData*>(gp.pathData)->getBounds();
-    if (localBounds.isEmpty()) {
-      continue;
-    }
-
-    Matrix combinedMatrix = m * gp.transform;
-    auto xf = decomposeXform(localBounds.x, localBounds.y, localBounds.width, localBounds.height,
-                             combinedMatrix);
-    beginShape(out, "Glyph", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
-    // Font glyph outlines are designed for even-odd fill rule. Always use EvenOdd here
-    // to reverse inner contours' winding direction via BuildEvenOddContours(), ensuring
-    // correct rendering on viewers that use non-zero winding rule (e.g. some mobile apps).
-    FillRule fillRule = FillRule::EvenOdd;
-
-    float sx = std::sqrt(combinedMatrix.a * combinedMatrix.a + combinedMatrix.b * combinedMatrix.b);
-    float det = combinedMatrix.a * combinedMatrix.d - combinedMatrix.b * combinedMatrix.c;
-    float sy = (sx > 0) ? std::abs(det) / sx : 0;
-    if (sx <= 0) sx = 1.0f;
-    if (sy <= 0) sy = 1.0f;
-
-    writeCustomGeom(out, gp.pathData, localBounds.x, localBounds.y, localBounds.width,
-                    localBounds.height, fillRule, sx, sy);
-    writeFill(out, fs.fill, alpha);
-    out.open("a:ln").gt();
-    out.open("a:noFill").sc();
-    out.end();
-    endShape(out);
+    const auto& t = gp.transform;
+    auto txPt = [&](const Point& p) -> Point {
+      return {t.a * p.x + t.c * p.y + t.tx, t.b * p.x + t.d * p.y + t.ty};
+    };
+    gp.pathData->forEach([&](PathVerb verb, const Point* pts) {
+      if (verb == PathVerb::Move) {
+        PathContour c;
+        c.start = txPt(pts[0]);
+        allContours.push_back(std::move(c));
+      } else if (!allContours.empty()) {
+        if (verb == PathVerb::Close) {
+          allContours.back().closed = true;
+        } else {
+          PathSeg seg;
+          seg.verb = verb;
+          int ptCount = PathData::PointsPerVerb(verb);
+          for (int i = 0; i < ptCount; i++) {
+            seg.pts[i] = txPt(pts[i]);
+          }
+          allContours.back().segs.push_back(seg);
+        }
+      }
+    });
   }
+
+  if (allContours.empty()) {
+    return;
+  }
+
+  float minX = std::numeric_limits<float>::max();
+  float minY = std::numeric_limits<float>::max();
+  float maxX = std::numeric_limits<float>::lowest();
+  float maxY = std::numeric_limits<float>::lowest();
+  for (const auto& contour : allContours) {
+    auto updateBounds = [&](const Point& p) {
+      minX = std::min(minX, p.x);
+      minY = std::min(minY, p.y);
+      maxX = std::max(maxX, p.x);
+      maxY = std::max(maxY, p.y);
+    };
+    updateBounds(contour.start);
+    for (const auto& seg : contour.segs) {
+      int n = PathData::PointsPerVerb(seg.verb);
+      for (int i = 0; i < n; i++) {
+        updateBounds(seg.pts[i]);
+      }
+    }
+  }
+
+  if (maxX <= minX || maxY <= minY) {
+    return;
+  }
+
+  float boundsW = maxX - minX;
+  float boundsH = maxY - minY;
+
+  float sx = std::sqrt(m.a * m.a + m.b * m.b);
+  float det = m.a * m.d - m.b * m.c;
+  float sy = (sx > 0) ? std::abs(det) / sx : 0;
+  if (sx <= 0) sx = 1.0f;
+  if (sy <= 0) sy = 1.0f;
+
+  auto xf = decomposeXform(minX, minY, boundsW, boundsH, m);
+  beginShape(out, "Glyph", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
+
+  out.open("a:custGeom").gt();
+  out.open("a:avLst").sc();
+  out.open("a:gdLst").sc();
+  out.open("a:ahLst").sc();
+  out.open("a:cxnLst").sc();
+  out.open("a:rect").a("l", "0").a("t", "0").a("r", "r").a("b", "b").sc();
+
+  int64_t pw = std::max(int64_t(1), PxToEMU(boundsW * sx));
+  int64_t ph = std::max(int64_t(1), PxToEMU(boundsH * sy));
+  float sOfsX = minX * sx;
+  float sOfsY = minY * sy;
+
+  out.open("a:pathLst").gt();
+
+  if (allContours.size() <= 1) {
+    out.open("a:path").a("w", pw).a("h", ph).gt();
+    for (auto& c : allContours) {
+      EmitContour(out, c, sx, sy, sOfsX, sOfsY);
+    }
+    out.end();  // a:path
+  } else {
+    // Group contours by outermost ancestor so that each glyph (or glyph +
+    // its holes) gets its own a:path element.  Bridges only connect related
+    // contours within one glyph (e.g. "O" outer + inner hole), keeping them
+    // short enough to avoid visible hairline artifacts.
+    auto depths = ComputeContainmentDepths(allContours);
+    AdjustWindingForEvenOdd(allContours, depths);
+    auto groups = GroupContoursByOutermost(allContours, depths);
+    for (const auto& group : groups) {
+      out.open("a:path").a("w", pw).a("h", ph).gt();
+      if (group.size() > 1) {
+        EmitBridgedGroup(out, allContours, group, sx, sy, sOfsX, sOfsY);
+      } else {
+        EmitContour(out, allContours[group[0]], sx, sy, sOfsX, sOfsY);
+      }
+      out.end();  // a:path
+    }
+  }
+
+  out.end();  // a:pathLst
+  out.end();  // a:custGeom
+
+  writeFill(out, fs.fill, alpha);
+  out.open("a:ln").gt();
+  out.open("a:noFill").sc();
+  out.end();
+  endShape(out);
 }
 
 void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStrokeInfo& fs,
