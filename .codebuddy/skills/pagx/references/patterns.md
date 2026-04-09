@@ -158,9 +158,7 @@ Same color: single Fill. Different colors: wrap the line in a Group to isolate i
     <Layer width="48" height="48" alpha="0.4">
       <Import>
         <svg viewBox="0 0 48 48" fill="none" stroke="#BDC3C7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="6" y="6" width="36" height="36" rx="4"/>
-          <circle cx="17" cy="17" r="3"/>
-          <path d="M42 30L32 20L10 42"/>
+          <path d="M10 6H38C40.2 6 42 7.8 42 10V38C42 40.2 40.2 42 38 42H10C7.8 42 6 40.2 6 38V10C6 7.8 7.8 6 10 6Z M17 20A3 3 0 1 0 17 14A3 3 0 1 0 17 20 M42 30L32 20L10 42"/>
         </svg>
       </Import>
     </Layer>
