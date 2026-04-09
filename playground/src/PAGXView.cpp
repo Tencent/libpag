@@ -237,7 +237,8 @@ void PAGXView::draw() {
   double frameStartMs = emscripten_get_now();
   bool hasContentChanged = displayList.hasContentChanged();
   bool hasLastRecording = (lastRecording != nullptr);
-  if (!hasContentChanged && !hasLastRecording) {
+  bool needsInitialFrame = presentImmediately || backgroundLayer == nullptr;
+  if (!hasContentChanged && !hasLastRecording && !needsInitialFrame) {
     return;
   }
   auto device = window->getDevice();
