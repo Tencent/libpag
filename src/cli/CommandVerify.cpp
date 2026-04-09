@@ -273,6 +273,14 @@ static void CollectReferencedIds(const PAGXDocument* doc, std::unordered_set<std
   for (auto* layer : doc->layers) {
     CollectRefsFromLayer(layer, refs);
   }
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() == NodeType::Composition) {
+      auto* comp = static_cast<const Composition*>(node.get());
+      for (auto* layer : comp->layers) {
+        CollectRefsFromLayer(layer, refs);
+      }
+    }
+  }
 }
 
 static void DetectUnreferencedResources(const PAGXDocument* doc,
