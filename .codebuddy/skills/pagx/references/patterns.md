@@ -156,10 +156,13 @@ Same color: single Fill. Different colors: wrap the line in a Group to isolate i
       </LinearGradient>
     </Fill>
     <Layer width="48" height="48" alpha="0.4">
-      <Rectangle left="6" top="6" size="36,36" roundness="4"/>
-      <Ellipse left="14" top="14" size="6,6"/>
-      <Path data="M42 30L32 20L10 42"/>
-      <Stroke color="#BDC3C7" width="3" cap="round" join="round"/>
+      <Import>
+        <svg viewBox="0 0 48 48" fill="none" stroke="#BDC3C7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="6" y="6" width="36" height="36" rx="4"/>
+          <circle cx="17" cy="17" r="3"/>
+          <path d="M42 30L32 20L10 42"/>
+        </svg>
+      </Import>
     </Layer>
     <Layer>
       <Text text="Image Description" fontFamily="Arial" fontSize="12"/>
@@ -347,9 +350,12 @@ any repeated element: cards, list items, grid cells.
       <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" arrangement="spaceAround" alignment="center">
         <!-- Home: filled (active) -->
         <Layer layout="vertical" gap="2" alignment="center">
-          <Layer height="24">
-            <Path centerY="0" data="M12 0L0 12L3 12L3 22L9 22L9 15L15 15L15 22L21 22L21 12L24 12Z"/>
-            <Fill color="#6366F1"/>
+          <Layer width="24" height="24">
+            <Import>
+              <svg viewBox="0 0 24 24" fill="#6366F1">
+                <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+              </svg>
+            </Import>
           </Layer>
           <Layer>
             <Text text="Home" fontFamily="Arial" fontStyle="Bold" fontSize="10"/>
@@ -358,13 +364,13 @@ any repeated element: cards, list items, grid cells.
         </Layer>
         <!-- Search: stroke (inactive) -->
         <Layer layout="vertical" gap="2" alignment="center">
-          <Layer height="24">
-            <Ellipse top="0" size="16,16"/>
-            <Stroke color="#94A3B8" width="2"/>
-            <Group>
-              <Path data="M14 14L20 20"/>
-              <Stroke color="#94A3B8" width="2.5" cap="round"/>
-            </Group>
+          <Layer width="24" height="24">
+            <Import>
+              <svg viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2">
+                <circle cx="10" cy="10" r="7"/>
+                <path d="M15 15L21 21" stroke-linecap="round"/>
+              </svg>
+            </Import>
           </Layer>
           <Layer>
             <Text text="Search" fontFamily="Arial" fontSize="10"/>
@@ -373,13 +379,13 @@ any repeated element: cards, list items, grid cells.
         </Layer>
         <!-- Profile: stroke (inactive) -->
         <Layer layout="vertical" gap="2" alignment="center">
-          <Layer height="24">
-            <Ellipse left="6" top="1" size="10,10"/>
-            <Stroke color="#94A3B8" width="1.8"/>
-            <Group>
-              <Path data="M1 22C1 17 5 13 11 13C17 13 21 17 21 22"/>
-              <Stroke color="#94A3B8" width="1.8" cap="round"/>
-            </Group>
+          <Layer width="24" height="24">
+            <Import>
+              <svg viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.8">
+                <circle cx="12" cy="8" r="4"/>
+                <path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" stroke-linecap="round"/>
+              </svg>
+            </Import>
           </Layer>
           <Layer>
             <Text text="Profile" fontFamily="Arial" fontSize="10"/>
@@ -395,8 +401,11 @@ any repeated element: cards, list items, grid cells.
 
 **Pattern**: `MergePath mode="intersect"` creates partial roundness by clipping a rounded
 rect with a straight rect. Tabs use vertical layout (icon + label) distributed by
-`arrangement="spaceAround"`. Active tab = Fill icon + bold color; inactive = Stroke icon +
-muted color. Same structure for bottom navigation, segmented controls, toolbar items.
+`arrangement="spaceAround"`. Active tab = filled icon + bold color; inactive = stroked
+icon + muted color. Icons use `<Import>` with inline SVG — use native PAGX geometry
+(Rectangle, Ellipse, Path) for simple shapes (backgrounds, dividers, progress bars), and
+inline SVG for multi-part icons. Same structure for bottom navigation, segmented controls,
+toolbar items.
 
 ### Data Table
 

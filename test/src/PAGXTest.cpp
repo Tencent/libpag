@@ -22,6 +22,7 @@
 #include <filesystem>
 #include <fstream>
 #include <unordered_map>
+#include "cli/CommandImport.h"
 #include "cli/CommandVerify.h"
 #include "pagx/FontConfig.h"
 #include "pagx/LayoutContext.h"
@@ -85,6 +86,15 @@ static int CallRun(int (*fn)(int, char*[]), std::vector<std::string> args) {
     argv.push_back(arg.data());
   }
   return fn(static_cast<int>(argv.size()), argv.data());
+}
+
+static std::shared_ptr<pagx::PAGXDocument> LoadAndResolve(const std::string& filePath) {
+  auto doc = pagx::PAGXImporter::FromFile(filePath);
+  if (doc && doc->hasUnresolvedImports()) {
+    CallRun(pagx::cli::RunImport, {"import", "--resolve", filePath});
+    doc = pagx::PAGXImporter::FromFile(filePath);
+  }
+  return doc;
 }
 
 static void VerifyFile(const std::string& filePath, const std::string& key) {
@@ -675,7 +685,8 @@ static void TestMarkdownPatterns(tgfx::Context* context, const std::string& mark
     auto pagxPath = SavePAGXFile(xmlContent, "PAGXTest/" + key + ".pagx");
 
     // Load via FromFile so relative image paths resolve against the pagx directory.
-    auto doc = pagx::PAGXImporter::FromFile(pagxPath);
+    // LoadAndResolve also expands any <Import> nodes (e.g., inline SVG) before rendering.
+    auto doc = LoadAndResolve(pagxPath);
     if (!doc) {
       ADD_FAILURE() << "Failed to parse XML for: " << key;
       continue;
@@ -734,7 +745,7 @@ static void TestPAGXDirectory(tgfx::Context* context, const std::string& directo
   for (const auto& filePath : files) {
     auto key = prefix + std::filesystem::path(filePath).stem().string();
 
-    auto doc = pagx::PAGXImporter::FromFile(filePath);
+    auto doc = LoadAndResolve(filePath);
     if (!doc) {
       ADD_FAILURE() << "Failed to load: " << filePath;
       continue;

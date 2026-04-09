@@ -260,28 +260,73 @@ static bool ResolveOneImport(Import* imp, const std::string& baseDir,
 
   InlinePathData(svgDoc.get());
 
-  // Determine whether SVG layers can be safely unpacked into the parent layer's contents.
-  // Unpacking is only safe when there is exactly one SVG layer with no extra attributes
-  // (no transform, opacity, blend mode, mask, styles, filters, or child layers). Multiple
-  // SVG layers must be kept as child layers to preserve painter scope isolation — unpacking
-  // them would merge their contents into a single scope, causing painter accumulation bugs.
+  // Collect the effective element layers from the SVG conversion result. SVG root elements
+  // (<svg>) become wrapper Layers whose actual content is in their children. If such a wrapper
+  // is a plain shell (no own contents, no extra attributes), unwrap it and use its children
+  // as the effective element layers. Otherwise, keep the svgLayer itself.
+  std::vector<Layer*> elementLayers;
+  for (auto* svgLayer : svgDoc->layers) {
+    bool isPlainWrapper = svgLayer->contents.empty() && !svgLayer->children.empty() &&
+                          svgLayer->matrix.isIdentity() && svgLayer->alpha == 1.0f &&
+                          svgLayer->blendMode == BlendMode::Normal && svgLayer->mask == nullptr &&
+                          svgLayer->styles.empty() && svgLayer->filters.empty();
+    if (isPlainWrapper) {
+      for (auto* child : svgLayer->children) {
+        elementLayers.push_back(child);
+      }
+    } else {
+      elementLayers.push_back(svgLayer);
+    }
+  }
+
+  // Determine how to embed element layers into the parent layer.
+  // - Single clean layer (no extra attributes): unpack its contents directly.
+  // - Multiple layers, all downgradable to Group: wrap each in a Group for painter isolation.
+  // - Otherwise: keep ALL as child Layers (partial downgrade forbidden — contents render behind
+  //   children, so mixing would change the paint order).
   bool canUnpack = false;
-  if (svgDoc->layers.size() == 1) {
-    auto* single = svgDoc->layers[0];
+  bool canDowngradeAll = false;
+  if (elementLayers.size() == 1) {
+    auto* single = elementLayers[0];
     canUnpack = single->matrix.isIdentity() && single->alpha == 1.0f &&
                 single->blendMode == BlendMode::Normal && single->mask == nullptr &&
                 single->styles.empty() && single->filters.empty() && single->children.empty();
+  } else if (elementLayers.size() > 1) {
+    canDowngradeAll = true;
+    for (auto* layer : elementLayers) {
+      if (!layer->children.empty() || !layer->styles.empty() || !layer->filters.empty() ||
+          layer->mask != nullptr || layer->composition != nullptr) {
+        canDowngradeAll = false;
+        break;
+      }
+    }
   }
 
   if (canUnpack) {
-    // Single clean layer: unpack its contents directly into the parent layer.
-    for (auto* element : svgDoc->layers[0]->contents) {
+    for (auto* element : elementLayers[0]->contents) {
       replacements.push_back(element);
     }
+  } else if (canDowngradeAll) {
+    for (auto* layer : elementLayers) {
+      auto* group = doc->makeNode<Group>();
+      group->elements = std::move(layer->contents);
+      if (!layer->matrix.isIdentity()) {
+        auto m = layer->matrix;
+        group->position = {m.tx, m.ty};
+        if (m.a != 1 || m.b != 0 || m.c != 0 || m.d != 1) {
+          float sx = std::sqrt(m.a * m.a + m.b * m.b);
+          float sy = std::sqrt(m.c * m.c + m.d * m.d);
+          float rot = std::atan2(m.b, m.a) * 180.0f / 3.14159265358979323846f;
+          group->scale = {sx, sy};
+          group->rotation = rot;
+        }
+      }
+      group->alpha = layer->alpha;
+      replacements.push_back(group);
+    }
   } else {
-    // Multiple layers or layer with extra attributes: preserve as child layers.
-    for (auto* svgLayer : svgDoc->layers) {
-      parentLayer->children.push_back(svgLayer);
+    for (auto* layer : elementLayers) {
+      parentLayer->children.push_back(layer);
     }
   }
 
