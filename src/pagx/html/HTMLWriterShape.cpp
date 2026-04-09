@@ -1191,71 +1191,112 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     out.closeTagStart();
     out.openTag("clipPath");
     out.addAttr("id", strokeClipId);
-    if (stroke->align == StrokeAlign::Outside) {
-      out.addAttr("clip-rule", "evenodd");
-    }
     out.closeTagStart();
     if (stroke->align == StrokeAlign::Outside) {
-      out.openTag("rect");
-      out.addAttr("x", FloatToString(x0));
-      out.addAttr("y", FloatToString(y0));
-      out.addAttr("width", FloatToString(sw));
-      out.addAttr("height", FloatToString(sh));
+      // For outside stroke, build a single <path> with the outer rect and inner shape combined,
+      // using fill-rule="evenodd" to clip to only the exterior region. Using separate <rect>
+      // elements with clip-rule does not work because clip-rule only applies to <path> elements.
+      std::string combinedD;
+      // Outer rectangle path
+      combinedD += "M" + FloatToString(x0) + "," + FloatToString(y0);
+      combinedD += "H" + FloatToString(x0 + sw);
+      combinedD += "V" + FloatToString(y0 + sh);
+      combinedD += "H" + FloatToString(x0);
+      combinedD += "Z";
+      // Inner shape path(s)
+      for (auto& g : geos) {
+        switch (g.type) {
+          case NodeType::Rectangle: {
+            auto r = static_cast<const Rectangle*>(g.element);
+            combinedD += RectToPathData(r);
+            break;
+          }
+          case NodeType::Ellipse: {
+            auto e = static_cast<const Ellipse*>(g.element);
+            combinedD += EllipseToPathData(e);
+            break;
+          }
+          case NodeType::Path: {
+            auto p = static_cast<const Path*>(g.element);
+            std::string clipD = GetPathSVGString(p);
+            if (!clipD.empty()) {
+              combinedD += clipD;
+            }
+            break;
+          }
+          case NodeType::Polystar: {
+            auto ps = static_cast<const Polystar*>(g.element);
+            std::string clipD = BuildPolystarPath(ps);
+            if (!clipD.empty()) {
+              combinedD += clipD;
+            }
+            break;
+          }
+          default:
+            break;
+        }
+      }
+      out.openTag("path");
+      out.addAttr("d", combinedD);
+      out.addAttr("fill-rule", "evenodd");
+      out.addAttr("clip-rule", "evenodd");
       out.closeTagSelfClosing();
-    }
-    for (auto& g : geos) {
-      switch (g.type) {
-        case NodeType::Rectangle: {
-          auto r = static_cast<const Rectangle*>(g.element);
-          float cx = r->position.x - r->size.width / 2;
-          float cy = r->position.y - r->size.height / 2;
-          out.openTag("rect");
-          if (!FloatNearlyZero(cx)) {
-            out.addAttr("x", FloatToString(cx));
-          }
-          if (!FloatNearlyZero(cy)) {
-            out.addAttr("y", FloatToString(cy));
-          }
-          out.addAttr("width", FloatToString(r->size.width));
-          out.addAttr("height", FloatToString(r->size.height));
-          if (r->roundness > 0) {
-            out.addAttr("rx", FloatToString(r->roundness));
-          }
-          out.closeTagSelfClosing();
-          break;
-        }
-        case NodeType::Ellipse: {
-          auto e = static_cast<const Ellipse*>(g.element);
-          out.openTag("ellipse");
-          out.addAttr("cx", FloatToString(e->position.x));
-          out.addAttr("cy", FloatToString(e->position.y));
-          out.addAttr("rx", FloatToString(e->size.width / 2));
-          out.addAttr("ry", FloatToString(e->size.height / 2));
-          out.closeTagSelfClosing();
-          break;
-        }
-        case NodeType::Path: {
-          auto p = static_cast<const Path*>(g.element);
-          std::string clipD = GetPathSVGString(p);
-          if (!clipD.empty()) {
-            out.openTag("path");
-            out.addAttr("d", clipD);
+    } else {
+      // Inside stroke: clip to shape interior
+      for (auto& g : geos) {
+        switch (g.type) {
+          case NodeType::Rectangle: {
+            auto r = static_cast<const Rectangle*>(g.element);
+            float cx = r->position.x - r->size.width / 2;
+            float cy = r->position.y - r->size.height / 2;
+            out.openTag("rect");
+            if (!FloatNearlyZero(cx)) {
+              out.addAttr("x", FloatToString(cx));
+            }
+            if (!FloatNearlyZero(cy)) {
+              out.addAttr("y", FloatToString(cy));
+            }
+            out.addAttr("width", FloatToString(r->size.width));
+            out.addAttr("height", FloatToString(r->size.height));
+            if (r->roundness > 0) {
+              out.addAttr("rx", FloatToString(r->roundness));
+            }
             out.closeTagSelfClosing();
+            break;
           }
-          break;
-        }
-        case NodeType::Polystar: {
-          auto ps = static_cast<const Polystar*>(g.element);
-          std::string clipD = BuildPolystarPath(ps);
-          if (!clipD.empty()) {
-            out.openTag("path");
-            out.addAttr("d", clipD);
+          case NodeType::Ellipse: {
+            auto e = static_cast<const Ellipse*>(g.element);
+            out.openTag("ellipse");
+            out.addAttr("cx", FloatToString(e->position.x));
+            out.addAttr("cy", FloatToString(e->position.y));
+            out.addAttr("rx", FloatToString(e->size.width / 2));
+            out.addAttr("ry", FloatToString(e->size.height / 2));
             out.closeTagSelfClosing();
+            break;
           }
-          break;
+          case NodeType::Path: {
+            auto p = static_cast<const Path*>(g.element);
+            std::string clipD = GetPathSVGString(p);
+            if (!clipD.empty()) {
+              out.openTag("path");
+              out.addAttr("d", clipD);
+              out.closeTagSelfClosing();
+            }
+            break;
+          }
+          case NodeType::Polystar: {
+            auto ps = static_cast<const Polystar*>(g.element);
+            std::string clipD = BuildPolystarPath(ps);
+            if (!clipD.empty()) {
+              out.openTag("path");
+              out.addAttr("d", clipD);
+              out.closeTagSelfClosing();
+            }
+            break;
+          }
+          default:
+            break;
         }
-        default:
-          break;
       }
     }
     out.closeTag();  // </clipPath>

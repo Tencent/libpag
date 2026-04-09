@@ -48,27 +48,27 @@
 
   <!-- Cap styles: butt/round/square -->
   <Layer>
-    <Path data="M 310,105 L 370,105"/>
+    <Path data="M 300,105 L 360,105"/>
     <Stroke color="#10B981" width="8" cap="butt"/>
   </Layer>
   <Layer>
-    <Text text="butt" fontFamily="Arial" fontSize="7" position="385,108" textAnchor="center"/>
+    <Text text="butt" fontFamily="Arial" fontSize="7" position="390,108" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
   <Layer>
-    <Path data="M 310,130 L 370,130"/>
+    <Path data="M 300,130 L 360,130"/>
     <Stroke color="#10B981" width="8" cap="round"/>
   </Layer>
   <Layer>
-    <Text text="round" fontFamily="Arial" fontSize="7" position="385,133" textAnchor="center"/>
+    <Text text="round" fontFamily="Arial" fontSize="7" position="390,133" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
   <Layer>
-    <Path data="M 310,155 L 370,155"/>
+    <Path data="M 300,155 L 360,155"/>
     <Stroke color="#10B981" width="8" cap="square"/>
   </Layer>
   <Layer>
-    <Text text="square" fontFamily="Arial" fontSize="7" position="385,158" textAnchor="center"/>
+    <Text text="square" fontFamily="Arial" fontSize="7" position="390,158" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
@@ -129,7 +129,7 @@
   <Layer>
     <Rectangle position="320,320" size="70,70" roundness="8"/>
     <Fill color="#E2E8F0"/>
-    <Stroke color="#8B5CF6" width="6" align="outside"/>
+    <Stroke color="#8B5CF6" width="8" align="outside"/>
   </Layer>
   <Layer>
     <Text text="outside" fontFamily="Arial" fontSize="8" position="320,370" textAnchor="center"/>
@@ -147,7 +147,7 @@
     </Stroke>
   </Layer>
   <Layer>
-    <Text text="Gradient stroke" fontFamily="Arial" fontSize="8" position="220,435" textAnchor="center"/>
+    <Text text="Gradient stroke" fontFamily="Arial" fontSize="8" position="220,420" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 </pagx>
