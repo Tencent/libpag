@@ -2417,7 +2417,7 @@ int RunVerify(int argc, char* argv[]) {
       }
     }
     std::cerr << "Wrote " << pngPath << " (" << bitmap.width() << "x" << bitmap.height() << " @"
-              << static_cast<int>(opts.scale) << "x)\n";
+              << opts.scale << "x)\n";
   }
 
   return diagnostics.empty() ? 0 : 1;
