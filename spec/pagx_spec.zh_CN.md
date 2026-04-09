@@ -582,7 +582,7 @@ PAGX 文档采用层级结构组织内容：
 | `layout` | LayoutMode | none | 子图层容器布局模式 |
 | `gap` | float | 0 | 相邻子 Layer 之间的间距 |
 | `flex` | float | 0 | 主轴弹性权重。子元素无显式主轴尺寸时：`flex=0`（默认）使用内容测量尺寸；`flex>0` 按权重按比例分配剩余空间。设置了显式 `width`/`height` 时忽略此属性 |
-| `padding` | float 或 "t,r,b,l" | 0 | 子 Layer 内边距。内缩子 Layer 的约束参考系，不影响 VectorElements（VectorElements 始终参考完整 Layer 尺寸）。有无 `layout` 均生效。支持单值（四边均匀）、两值（垂直,水平）、四值（上,右,下,左），与 CSS shorthand 一致 |
+| `padding` | float 或 "t,r,b,l" | 0 | 同时内缩布局内容区域和子 Layer 的约束参考系（VectorElements 不受影响）。有无 `layout` 均生效。支持单值（四边均匀）、两值（垂直,水平）、四值（上,右,下,左），与 CSS shorthand 一致 |
 | `alignment` | Alignment | stretch | 交叉轴对齐方式 |
 | `arrangement` | Arrangement | start | 主轴排布方式 |
 | `includeInLayout` | bool | true | 是否参与父容器的布局排列，设为 false 时脱离布局流 |
@@ -631,7 +631,7 @@ PAGX 文档采用层级结构组织内容：
 
 #### 无容器布局时的 Padding
 
-当 Layer 未设置 `layout` 但设置了 `padding` 时，子 Layer 的约束参考系会内缩：`left="0"` 对齐到内缩后的左边缘，`centerX="0"` 在内缩区域内居中，`left="0" right="0"` 拉伸填满内缩后的宽度。VectorElements（Rectangle、Ellipse、Path、Text 等）不受影响——其约束始终参考完整的 Layer 尺寸，使得背景可以延伸到 padding 区域下方。这与 CSS 行为一致：padding 定义子元素的内容区域，而背景延伸到 padding 边缘。
+当 Layer 未设置 `layout` 但设置了 `padding` 时，每个子 Layer 的约束参考系会内缩（包括 `includeInLayout="false"` 的悬浮层）：`left="0"` 对齐到内缩后的左边缘，`centerX="0"` 在内缩区域内居中，`left="0" right="0"` 拉伸填满内缩后的宽度。VectorElements（Rectangle、Ellipse、Path、Text 等）不受影响——其约束始终参考完整的 Layer 尺寸，使得背景可以延伸到 padding 区域下方。这与 CSS 行为一致：padding 定义子元素的内容区域，而背景延伸到 padding 边缘。
 
 对内容测量尺寸的 Layer（未显式设置 `width`/`height`），padding 会加到测量值上，例如一个包裹 100×50 子 Layer 且 `padding="20"` 的 Layer 测量尺寸为 140×90。
 

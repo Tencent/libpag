@@ -113,9 +113,11 @@ pagx (required: version, width, height)
 **Layer arrangement = CSS Flexbox.** Never fall back to constraint positioning when the
 layout is expressible as nested flex containers.
 
-`padding` works on **all Layers** — with `layout`, it insets the content area for flex
-children; without `layout`, it insets the constraint reference frame for child Layers.
-VectorElements are never affected by padding (they always reference full Layer bounds).
+`padding` works on **all Layers** — it insets both the layout content area and the
+constraint reference frame for every child Layer, including `includeInLayout="false"`
+overlays. VectorElements are unaffected (they always reference full Layer bounds). To
+position an overlay at the Layer's outer edge, offset the constraint by the padding
+amount (e.g., `left="-20"` when `padding="20"`).
 
 **CSS Flexbox → PAGX**:
 

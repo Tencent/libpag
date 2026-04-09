@@ -582,7 +582,7 @@ All three child Layers have no `width` set and `flex="1"`, equally sharing avail
 | `layout` | LayoutMode | none | Container layout mode for child layer arrangement |
 | `gap` | float | 0 | Spacing between adjacent child Layers |
 | `flex` | float | 0 | Flex weight for main-axis sizing. When a child has no explicit main-axis size: `flex=0` (default) uses content-measured size; `flex>0` takes a proportional share of remaining space by weight. Ignored when explicit `width`/`height` is set on the main axis |
-| `padding` | float or "t,r,b,l" | 0 | Inner padding for child Layers. Insets the constraint reference frame for child Layers without affecting VectorElements (which always reference the full Layer bounds). Works both with and without `layout`. Supports single value (uniform), two values (vertical,horizontal), four values (top,right,bottom,left), consistent with CSS shorthand |
+| `padding` | float or "t,r,b,l" | 0 | Insets both the layout content area and the constraint reference frame for child Layers (VectorElements unaffected). Works with or without `layout`. Supports single value (uniform), two values (vertical,horizontal), four values (top,right,bottom,left), consistent with CSS shorthand |
 | `alignment` | Alignment | stretch | Cross-axis alignment |
 | `arrangement` | Arrangement | start | Main-axis arrangement |
 | `includeInLayout` | bool | true | Whether to participate in parent container layout; set to false to leave the layout flow |
@@ -631,7 +631,7 @@ Content area is `width × height` minus `padding` on each side.
 
 #### Padding Without Container Layout
 
-When `padding` is set on a Layer without `layout`, it insets the constraint reference frame for child Layers: `left="0"` aligns to the padding-inset left edge, `centerX="0"` centers within the inset area, and `left="0" right="0"` stretches to fill the inset width. VectorElements (Rectangle, Ellipse, Path, Text, etc.) are unaffected — their constraints always reference the full Layer bounds, allowing backgrounds to extend under the padding area. This is consistent with CSS, where padding defines the content box for positioned children while backgrounds extend to the padding edge.
+When `padding` is set on a Layer without `layout`, it insets the constraint reference frame for every child Layer, including `includeInLayout="false"` overlays: `left="0"` aligns to the padding-inset left edge, `centerX="0"` centers within the inset area, and `left="0" right="0"` stretches to fill the inset width. VectorElements (Rectangle, Ellipse, Path, Text, etc.) are unaffected — their constraints always reference the full Layer bounds, allowing backgrounds to extend under the padding area. This is consistent with CSS, where padding defines the content box for positioned children while backgrounds extend to the padding edge.
 
 For content-measured Layers (no explicit `width`/`height`), padding is added to the measured size, so a Layer wrapping a 100×50 child Layer with `padding="20"` measures as 140×90.
 

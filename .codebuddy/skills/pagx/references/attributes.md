@@ -44,7 +44,7 @@ Basic container for content, child layers, styles, and filters.
 | `layout` | LayoutMode | none | Container layout mode for child layer arrangement |
 | `gap` | float | 0 | Spacing between adjacent child Layers |
 | `flex` | float | 0 | Flex weight for main-axis sizing in parent container layout |
-| `padding` | Padding | 0 | Insets child Layer constraints (VectorElements unaffected). Works with or without `layout`. CSS shorthand: `"20"`, `"10,20"`, `"10,20,10,20"` |
+| `padding` | Padding | 0 | Insets both the layout content area and the constraint reference frame for child Layers (VectorElements unaffected). Works with or without `layout`. CSS shorthand: `"20"`, `"10,20"`, `"10,20,10,20"` |
 | `alignment` | Alignment | stretch | Cross-axis alignment of child Layers |
 | `arrangement` | Arrangement | start | Main-axis arrangement of child Layers |
 | `includeInLayout` | bool | true | Whether to participate in parent container layout flow |
