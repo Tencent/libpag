@@ -39,7 +39,7 @@
   </Layer>
 
   <!-- Resource reference path -->
-  <Layer x="170" y="62">
+  <Layer x="230" y="110" matrix="0.5,0,0,0.5,0,0">
     <Path data="@heart"/>
     <Fill color="#EF4444" alpha="0.8"/>
   </Layer>
