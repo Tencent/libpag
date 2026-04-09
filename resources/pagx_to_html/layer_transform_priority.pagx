@@ -40,7 +40,7 @@
     <Fill color="#10B981"/>
   </Layer>
   <Layer>
-    <Text text="matrix wins" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="210,188" textAnchor="center"/>
+    <Text text="matrix wins" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="190,188" textAnchor="center"/>
     <Fill color="#10B981"/>
   </Layer>
 
@@ -50,7 +50,7 @@
     <Fill color="#EF4444"/>
   </Layer>
   <Layer>
-    <Text text="matrix3D wins" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="330,188" textAnchor="center"/>
+    <Text text="matrix3D wins" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="300,188" textAnchor="center"/>
     <Fill color="#EF4444"/>
   </Layer>
 </pagx>
