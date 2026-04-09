@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Multiple fills and strokes on accumulated geometry → overlay layers -->
-<pagx version="1.0" width="320" height="300">
+<pagx version="1.0" width="320" height="315">
   <!-- Background -->
   <Layer>
-    <Rectangle position="160,150" size="320,300"/>
+    <Rectangle position="160,158" size="320,315"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
@@ -19,7 +19,7 @@
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="160,177" size="260,200" roundness="16"/>
+    <Rectangle position="160,182" size="260,215" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
