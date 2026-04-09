@@ -26,13 +26,13 @@
 
   <!-- Divider -->
   <Layer>
-    <Path data="M 190,68 L 190,228"/>
+    <Path data="M 190,78 L 190,238"/>
     <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
   </Layer>
 
   <!-- Normal dashes label -->
   <Layer>
-    <Text text="dashAdaptive=false" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="105,82" textAnchor="center"/>
+    <Text text="dashAdaptive=false" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="105,92" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
@@ -44,7 +44,7 @@
 
   <!-- Adaptive dashes label -->
   <Layer>
-    <Text text="dashAdaptive=true" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="295,82" textAnchor="center"/>
+    <Text text="dashAdaptive=true" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="295,92" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
