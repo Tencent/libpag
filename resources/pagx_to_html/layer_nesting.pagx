@@ -1,25 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Layer nested children, z-order (later layers on top) -->
-<pagx version="1.0" width="320" height="290">
+<pagx version="1.0" width="360" height="290">
   <!-- Background -->
   <Layer>
-    <Rectangle position="160,145" size="320,290"/>
+    <Rectangle position="180,145" size="360,290"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
   <!-- Title -->
   <Layer>
-    <Text text="Layer Nesting" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="160,34" textAnchor="center"/>
+    <Text text="Layer Nesting" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="180,34" textAnchor="center"/>
     <Fill color="#1E293B"/>
   </Layer>
   <Layer>
-    <Text text="Parent-child hierarchy and z-order" fontFamily="Arial" fontSize="10" position="160,50" textAnchor="center"/>
+    <Text text="Parent-child hierarchy and z-order" fontFamily="Arial" fontSize="10" position="180,50" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="160,165" size="260,180" roundness="16"/>
+    <Rectangle position="180,165" size="300,180" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
