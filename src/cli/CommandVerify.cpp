@@ -2283,7 +2283,10 @@ static int ParseOptions(int argc, char* argv[], VerifyOptions* opts) {
         return 1;
       }
       opts->scale = static_cast<float>(atof(argv[++i]));
-      // scale explicitly set
+      if (opts->scale <= 0.0f || !std::isfinite(opts->scale)) {
+        std::cerr << "pagx verify: --scale must be a positive number\n";
+        return 1;
+      }
     } else if (strcmp(argv[i], "--skip-render") == 0) {
       opts->skipRender = true;
     } else if (strcmp(argv[i], "--skip-layout") == 0) {
