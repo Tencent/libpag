@@ -572,28 +572,22 @@ PathData GeoToPathData(const Element* element, NodeType type) {
       float y = r->position.y - r->size.height / 2;
       float w = r->size.width;
       float h = r->size.height;
-      // Start from bottom-right (startIndex=2) to match the native renderer (tgfx).
       if (r->roundness <= 0) {
-        pathData.moveTo(x + w, y + h);
+        pathData.moveTo(x, y);
         if (r->reversed) {
-          pathData.lineTo(x + w, y);
-          pathData.lineTo(x, y);
           pathData.lineTo(x, y + h);
+          pathData.lineTo(x + w, y + h);
+          pathData.lineTo(x + w, y);
         } else {
-          pathData.lineTo(x, y + h);
-          pathData.lineTo(x, y);
           pathData.lineTo(x + w, y);
+          pathData.lineTo(x + w, y + h);
+          pathData.lineTo(x, y + h);
         }
         pathData.close();
       } else {
         float rn = std::min(r->roundness, std::min(w / 2, h / 2));
-        // Start at (x+w, y+h-rn): the top of the bottom-right corner arc.
-        pathData.moveTo(x + w, y + h - rn);
+        pathData.moveTo(x + rn, y);
         if (r->reversed) {
-          pathData.lineTo(x + w, y + rn);
-          pathData.cubicTo(x + w, y + rn * (1 - kBezierKappa), x + w - rn * (1 - kBezierKappa), y,
-                           x + w - rn, y);
-          pathData.lineTo(x + rn, y);
           pathData.cubicTo(x + rn * (1 - kBezierKappa), y, x, y + rn * (1 - kBezierKappa), x,
                            y + rn);
           pathData.lineTo(x, y + h - rn);
@@ -602,7 +596,14 @@ PathData GeoToPathData(const Element* element, NodeType type) {
           pathData.lineTo(x + w - rn, y + h);
           pathData.cubicTo(x + w - rn * (1 - kBezierKappa), y + h, x + w,
                            y + h - rn * (1 - kBezierKappa), x + w, y + h - rn);
+          pathData.lineTo(x + w, y + rn);
+          pathData.cubicTo(x + w, y + rn * (1 - kBezierKappa), x + w - rn * (1 - kBezierKappa), y,
+                           x + w - rn, y);
         } else {
+          pathData.lineTo(x + w - rn, y);
+          pathData.cubicTo(x + w - rn * (1 - kBezierKappa), y, x + w, y + rn * (1 - kBezierKappa),
+                           x + w, y + rn);
+          pathData.lineTo(x + w, y + h - rn);
           pathData.cubicTo(x + w, y + h - rn * (1 - kBezierKappa), x + w - rn * (1 - kBezierKappa),
                            y + h, x + w - rn, y + h);
           pathData.lineTo(x + rn, y + h);
@@ -611,9 +612,6 @@ PathData GeoToPathData(const Element* element, NodeType type) {
           pathData.lineTo(x, y + rn);
           pathData.cubicTo(x, y + rn * (1 - kBezierKappa), x + rn * (1 - kBezierKappa), y, x + rn,
                            y);
-          pathData.lineTo(x + w - rn, y);
-          pathData.cubicTo(x + w - rn * (1 - kBezierKappa), y, x + w, y + rn * (1 - kBezierKappa),
-                           x + w, y + rn);
         }
         pathData.close();
       }
@@ -672,24 +670,18 @@ std::string RectToPathData(const Rectangle* r) {
   float y = r->position.y - r->size.height / 2;
   float w = r->size.width;
   float h = r->size.height;
-  // Start from bottom-right (startIndex=2) to match the native renderer (tgfx).
   if (r->roundness <= 0) {
     if (r->reversed) {
-      return "M" + FloatToString(x + w) + "," + FloatToString(y + h) + "V" + FloatToString(y) +
-             "H" + FloatToString(x) + "V" + FloatToString(y + h) + "Z";
+      return "M" + FloatToString(x) + "," + FloatToString(y) + "V" + FloatToString(y + h) + "H" +
+             FloatToString(x + w) + "V" + FloatToString(y) + "Z";
     }
-    return "M" + FloatToString(x + w) + "," + FloatToString(y + h) + "H" + FloatToString(x) + "V" +
-           FloatToString(y) + "H" + FloatToString(x + w) + "Z";
+    return "M" + FloatToString(x) + "," + FloatToString(y) + "H" + FloatToString(x + w) + "V" +
+           FloatToString(y + h) + "H" + FloatToString(x) + "Z";
   }
   float rn = std::min(r->roundness, std::min(w / 2, h / 2));
   std::string d;
-  // Start at (x+w, y+h-rn): the top of the bottom-right corner arc.
   if (r->reversed) {
-    d += "M" + FloatToString(x + w) + "," + FloatToString(y + h - rn);
-    d += "V" + FloatToString(y + rn);
-    d += "A" + FloatToString(rn) + "," + FloatToString(rn) + " 0 0 0 " + FloatToString(x + w - rn) +
-         "," + FloatToString(y);
-    d += "H" + FloatToString(x + rn);
+    d += "M" + FloatToString(x + rn) + "," + FloatToString(y);
     d += "A" + FloatToString(rn) + "," + FloatToString(rn) + " 0 0 0 " + FloatToString(x) + "," +
          FloatToString(y + rn);
     d += "V" + FloatToString(y + h - rn);
@@ -698,9 +690,16 @@ std::string RectToPathData(const Rectangle* r) {
     d += "H" + FloatToString(x + w - rn);
     d += "A" + FloatToString(rn) + "," + FloatToString(rn) + " 0 0 0 " + FloatToString(x + w) +
          "," + FloatToString(y + h - rn);
+    d += "V" + FloatToString(y + rn);
+    d += "A" + FloatToString(rn) + "," + FloatToString(rn) + " 0 0 0 " + FloatToString(x + w - rn) +
+         "," + FloatToString(y);
     d += "Z";
   } else {
-    d += "M" + FloatToString(x + w) + "," + FloatToString(y + h - rn);
+    d += "M" + FloatToString(x + rn) + "," + FloatToString(y);
+    d += "H" + FloatToString(x + w - rn);
+    d += "A" + FloatToString(rn) + "," + FloatToString(rn) + " 0 0 1 " + FloatToString(x + w) +
+         "," + FloatToString(y + rn);
+    d += "V" + FloatToString(y + h - rn);
     d += "A" + FloatToString(rn) + "," + FloatToString(rn) + " 0 0 1 " + FloatToString(x + w - rn) +
          "," + FloatToString(y + h);
     d += "H" + FloatToString(x + rn);
@@ -709,9 +708,6 @@ std::string RectToPathData(const Rectangle* r) {
     d += "V" + FloatToString(y + rn);
     d += "A" + FloatToString(rn) + "," + FloatToString(rn) + " 0 0 1 " + FloatToString(x + rn) +
          "," + FloatToString(y);
-    d += "H" + FloatToString(x + w - rn);
-    d += "A" + FloatToString(rn) + "," + FloatToString(rn) + " 0 0 1 " + FloatToString(x + w) +
-         "," + FloatToString(y + rn);
     d += "Z";
   }
   return d;
