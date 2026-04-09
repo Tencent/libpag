@@ -1,25 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Ellipse → CSS div + border-radius:50%; center-point positioning -->
-<pagx version="1.0" width="380" height="270">
+<pagx version="1.0" width="400" height="270">
   <!-- Background -->
   <Layer>
-    <Rectangle position="190,135" size="380,270"/>
+    <Rectangle position="200,135" size="400,270"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
   <!-- Title -->
   <Layer>
-    <Text text="Ellipse Geometry" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="190,34" textAnchor="center"/>
+    <Text text="Ellipse Geometry" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="200,34" textAnchor="center"/>
     <Fill color="#1E293B"/>
   </Layer>
   <Layer>
-    <Text text="Circle, horizontal, and reversed ellipse" fontFamily="Arial" fontSize="10" position="190,50" textAnchor="center"/>
+    <Text text="Circle, horizontal, and reversed ellipse" fontFamily="Arial" fontSize="10" position="200,50" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="190,155" size="320,160" roundness="16"/>
+    <Rectangle position="200,155" size="340,160" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
