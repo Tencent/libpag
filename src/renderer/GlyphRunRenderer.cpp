@@ -19,7 +19,6 @@
 #include "GlyphRunRenderer.h"
 #include <cmath>
 #include "base/utils/MathUtil.h"
-#include "pagx/ShapedText.h"
 #include "pagx/TextLayout.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
@@ -157,9 +156,9 @@ std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(const Fo
   return typeface;
 }
 
-ShapedText GlyphRunRenderer::BuildTextBlob(const Text* text, const tgfx::Matrix& inverseMatrix) {
-  ShapedText shapedText = {};
+void GlyphRunRenderer::BuildTextBlob(Text* text, const tgfx::Matrix& inverseMatrix) {
   tgfx::TextBlobBuilder builder = {};
+  std::vector<tgfx::Point> anchors;
 
   for (const auto& run : text->glyphRuns) {
     if (run->glyphs.empty()) {
@@ -185,9 +184,9 @@ ShapedText GlyphRunRenderer::BuildTextBlob(const Text* text, const tgfx::Matrix&
     if (!run->anchors.empty()) {
       for (size_t i = 0; i < count; i++) {
         if (i < run->anchors.size()) {
-          shapedText.anchors.push_back(tgfx::Point::Make(run->anchors[i].x, run->anchors[i].y));
+          anchors.push_back(tgfx::Point::Make(run->anchors[i].x, run->anchors[i].y));
         } else {
-          shapedText.anchors.push_back(tgfx::Point::Zero());
+          anchors.push_back(tgfx::Point::Zero());
         }
       }
     }
@@ -265,13 +264,12 @@ ShapedText GlyphRunRenderer::BuildTextBlob(const Text* text, const tgfx::Matrix&
     WriteGlyphsWithMode(builder, font, run->glyphs.data(), count, glyphMatrices, mode);
   }
 
-  shapedText.textBlob = builder.build();
-  return shapedText;
+  text->glyphData->textBlob = builder.build();
+  text->glyphData->anchors = std::move(anchors);
 }
 
-ShapedText GlyphRunRenderer::BuildTextBlobFromLayoutRuns(
+std::shared_ptr<tgfx::TextBlob> GlyphRunRenderer::BuildTextBlobFromLayoutRuns(
     const std::vector<TextLayoutGlyphRun>& runs, const tgfx::Matrix& inverseMatrix) {
-  ShapedText shapedText = {};
   tgfx::TextBlobBuilder builder = {};
 
   for (auto& run : runs) {
@@ -312,8 +310,7 @@ ShapedText GlyphRunRenderer::BuildTextBlobFromLayoutRuns(
     WriteGlyphsWithMode(builder, run.font, run.glyphs.data(), count, glyphMatrices, mode);
   }
 
-  shapedText.textBlob = builder.build();
-  return shapedText;
+  return builder.build();
 }
 
 }  // namespace pagx

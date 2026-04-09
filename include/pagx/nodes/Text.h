@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <memory>
 #include <string>
 #include <vector>
 #include "pagx/nodes/LayoutNode.h"
@@ -116,8 +115,8 @@ class Text : public Element, public LayoutNode {
  private:
   Text();
 
-  struct PrivateData;
-  std::unique_ptr<PrivateData> privateData;
+  struct GlyphData;
+  GlyphData* glyphData;
   Rect textBounds = {};
 
   friend class FontEmbedder;

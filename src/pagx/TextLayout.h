@@ -45,7 +45,7 @@ struct TextLayoutGlyphRun {
   std::vector<tgfx::RSXform> xforms = {};
 };
 
-struct Text::PrivateData {
+struct Text::GlyphData {
   std::shared_ptr<tgfx::TextBlob> textBlob = nullptr;
   std::vector<tgfx::Point> anchors = {};
   std::vector<TextLayoutGlyphRun> layoutRuns = {};
@@ -53,7 +53,6 @@ struct Text::PrivateData {
 
 class Element;
 class LayoutContext;
-struct ShapedText;
 struct TextLayoutParams;
 class TextLayoutContext;
 
@@ -132,9 +131,6 @@ class TextLayout {
   static void CollectTextElements(const std::vector<Element*>& elements,
                                   std::vector<Text*>& outText,
                                   std::vector<tgfx::Matrix>& outMatrices);
-
-  /** Writes shaped text data directly to the Text node. */
-  static void StoreShapedText(Text* text, ShapedText&& shapedText);
 };
 
 }  // namespace pagx

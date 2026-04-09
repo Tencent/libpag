@@ -21,6 +21,7 @@
 #include <memory>
 #include <vector>
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/TextBlob.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx {
@@ -28,7 +29,6 @@ namespace pagx {
 class GlyphRun;
 class Font;
 class Text;
-struct ShapedText;
 struct TextLayoutGlyphRun;
 
 /**
@@ -45,16 +45,17 @@ class GlyphRunRenderer {
  public:
   /**
    * Builds a TextBlob from a Text element's embedded GlyphRuns (pagx::GlyphRun), applying the
-   * inverse matrix to convert from layout coordinates to Text local coordinates.
+   * inverse matrix to convert from layout coordinates to Text local coordinates. Writes the
+   * resulting TextBlob and per-glyph anchors directly into text->glyphData.
    */
-  static ShapedText BuildTextBlob(const Text* text, const tgfx::Matrix& inverseMatrix);
+  static void BuildTextBlob(Text* text, const tgfx::Matrix& inverseMatrix);
 
   /**
    * Builds a TextBlob from runtime layout glyph runs (TextLayoutGlyphRun), applying the inverse
    * matrix to convert from layout coordinates to Text local coordinates.
    */
-  static ShapedText BuildTextBlobFromLayoutRuns(const std::vector<TextLayoutGlyphRun>& runs,
-                                                const tgfx::Matrix& inverseMatrix);
+  static std::shared_ptr<tgfx::TextBlob> BuildTextBlobFromLayoutRuns(
+      const std::vector<TextLayoutGlyphRun>& runs, const tgfx::Matrix& inverseMatrix);
 
  private:
   static std::shared_ptr<tgfx::Typeface> BuildTypefaceFromFont(const Font* fontNode);

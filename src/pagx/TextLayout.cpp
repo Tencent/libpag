@@ -20,7 +20,6 @@
 #include <algorithm>
 #include <cmath>
 #include "LayoutContext.h"
-#include "ShapedText.h"
 #include "TextLayoutParams.h"
 #include "base/utils/MathUtil.h"
 #include "pagx/nodes/Group.h"
@@ -1487,14 +1486,6 @@ std::vector<TextLayoutGlyphRun> TextLayoutResult::extractLayoutRuns(Text* text) 
     return runs;
   }
   return {};
-}
-
-void TextLayout::StoreShapedText(Text* text, ShapedText&& shapedText) {
-  if (text == nullptr || shapedText.textBlob == nullptr) {
-    return;
-  }
-  text->privateData->textBlob = std::move(shapedText.textBlob);
-  text->privateData->anchors = std::move(shapedText.anchors);
 }
 
 void TextLayout::CollectTextElements(const std::vector<Element*>& elements,

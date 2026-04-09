@@ -4847,7 +4847,7 @@ PAGX_TEST(PAGXTest, TextLayoutGlyphRunIntegrity) {
   fontConfig.registerTypeface(typeface);
   doc->applyLayout(&fontConfig);
 
-  auto& layoutRuns = text->privateData->layoutRuns;
+  auto& layoutRuns = text->glyphData->layoutRuns;
   ASSERT_FALSE(layoutRuns.empty());
 
   size_t totalGlyphs = 0;
@@ -4892,7 +4892,7 @@ PAGX_TEST(PAGXTest, TextBoxLayoutGlyphRunIntegrity) {
   fontConfig.registerTypeface(typeface);
   doc->applyLayout(&fontConfig);
 
-  auto& layoutRuns = text->privateData->layoutRuns;
+  auto& layoutRuns = text->glyphData->layoutRuns;
   ASSERT_FALSE(layoutRuns.empty());
   size_t totalGlyphs = 0;
   for (auto& run : layoutRuns) {
@@ -4981,7 +4981,7 @@ PAGX_TEST(PAGXTest, VerticalTextLayoutGlyphRun) {
   fontConfig.registerTypeface(typeface);
   doc->applyLayout(&fontConfig);
 
-  auto& layoutRuns = text->privateData->layoutRuns;
+  auto& layoutRuns = text->glyphData->layoutRuns;
   ASSERT_FALSE(layoutRuns.empty());
 
   // Vertical Latin text should have per-glyph xforms (rotation for sideways glyphs).

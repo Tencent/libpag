@@ -66,7 +66,7 @@ void TextBox::updateLayout(LayoutContext* context) {
   auto result = TextLayout::Layout(childText, params, context);
   for (size_t i = 0; i < childText.size(); i++) {
     childText[i]->textBounds = result.getTextBounds(childText[i]);
-    childText[i]->privateData->layoutRuns = result.extractLayoutRuns(childText[i]);
+    childText[i]->glyphData->layoutRuns = result.extractLayoutRuns(childText[i]);
   }
 }
 

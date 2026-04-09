@@ -23,9 +23,11 @@
 
 namespace pagx {
 
-Text::~Text() = default;
+Text::~Text() {
+  delete glyphData;
+}
 
-Text::Text() : privateData(std::make_unique<PrivateData>()) {
+Text::Text() : glyphData(new GlyphData()) {
 }
 
 static TextLayoutParams MakeStandaloneParams(const Text* text) {
@@ -48,7 +50,7 @@ static TextLayoutParams MakeStandaloneParams(const Text* text) {
 void Text::onMeasure(LayoutContext* context) {
   auto params = MakeStandaloneParams(this);
   auto result = TextLayout::Layout({this}, params, context);
-  privateData->layoutRuns = result.extractLayoutRuns(this);
+  glyphData->layoutRuns = result.extractLayoutRuns(this);
   textBounds = result.bounds;
   preferredX = textBounds.x;
   preferredY = textBounds.y;
@@ -62,7 +64,7 @@ void Text::setLayoutSize(LayoutContext* context, float width, float height) {
     fontSize = fontSize * scale;
     auto params = MakeStandaloneParams(this);
     auto result = TextLayout::Layout({this}, params, context);
-    privateData->layoutRuns = result.extractLayoutRuns(this);
+    glyphData->layoutRuns = result.extractLayoutRuns(this);
     textBounds = result.bounds;
   }
   layoutWidth = textBounds.width;

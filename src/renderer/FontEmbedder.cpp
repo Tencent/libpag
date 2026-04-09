@@ -413,7 +413,7 @@ bool FontEmbedder::embed(PAGXDocument* document) {
   // First pass: classify all glyphs and collect vector/bitmap/spacing glyph data.
   // Uses TextLayoutGlyphRun populated by applyLayout(). Text nodes without layoutRuns are skipped.
   for (auto* text : textOrder) {
-    auto& layoutRuns = text->privateData->layoutRuns;
+    auto& layoutRuns = text->glyphData->layoutRuns;
     if (!layoutRuns.empty()) {
       for (auto& tlRun : layoutRuns) {
         auto* typeface = tlRun.font.getTypeface().get();
@@ -464,7 +464,7 @@ bool FontEmbedder::embed(PAGXDocument* document) {
   for (auto* text : textOrder) {
     text->glyphRuns.clear();
     auto textBounds = text->textBounds;
-    auto& layoutRuns = text->privateData->layoutRuns;
+    auto& layoutRuns = text->glyphData->layoutRuns;
 
     if (!layoutRuns.empty()) {
       // New path: create GlyphRuns directly from TextLayoutGlyphRun.

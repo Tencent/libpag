@@ -22,7 +22,6 @@
 #include "ToTGFX.h"
 #include "base/utils/Log.h"
 #include "pagx/PAGXDocument.h"
-#include "pagx/ShapedText.h"
 #include "pagx/TextLayout.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
@@ -235,13 +234,11 @@ class LayerBuilderContext {
   // For standalone Text (not inside TextBox), inverseMatrix is Identity.
   // For TextBox children, inverseMatrix cancels the cumulative Group transforms.
   static void PrepareTextBlob(Text* text, const tgfx::Matrix& inverseMatrix) {
-    if (!text->privateData->layoutRuns.empty()) {
-      auto shaped = GlyphRunRenderer::BuildTextBlobFromLayoutRuns(text->privateData->layoutRuns,
-                                                                  inverseMatrix);
-      TextLayout::StoreShapedText(text, std::move(shaped));
+    if (!text->glyphData->layoutRuns.empty()) {
+      text->glyphData->textBlob = GlyphRunRenderer::BuildTextBlobFromLayoutRuns(
+          text->glyphData->layoutRuns, inverseMatrix);
     } else if (!text->glyphRuns.empty()) {
-      auto shaped = GlyphRunRenderer::BuildTextBlob(text, inverseMatrix);
-      TextLayout::StoreShapedText(text, std::move(shaped));
+      GlyphRunRenderer::BuildTextBlob(text, inverseMatrix);
     }
   }
 
@@ -355,15 +352,15 @@ class LayerBuilderContext {
   }
 
   std::shared_ptr<tgfx::Text> convertText(Text* node) {
-    auto textBlob = node->privateData->textBlob;
+    auto textBlob = node->glyphData->textBlob;
     if (textBlob == nullptr) {
       PrepareTextBlob(node, tgfx::Matrix::I());
-      textBlob = node->privateData->textBlob;
+      textBlob = node->glyphData->textBlob;
     }
     if (textBlob == nullptr) {
       return nullptr;
     }
-    auto tgfxText = tgfx::Text::Make(textBlob, node->privateData->anchors);
+    auto tgfxText = tgfx::Text::Make(textBlob, node->glyphData->anchors);
     if (tgfxText) {
       tgfxText->setPosition(tgfx::Point::Make(node->position.x, node->position.y));
     }
