@@ -91,7 +91,8 @@ static void VerifyFile(const std::string& filePath, const std::string& key) {
   std::streambuf* oldErr = std::cerr.rdbuf();
   std::ostringstream verifyErr;
   std::cerr.rdbuf(verifyErr.rdbuf());
-  auto verifyRet = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", filePath});
+  auto verifyRet =
+      CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", filePath});
   std::cerr.rdbuf(oldErr);
   EXPECT_EQ(verifyRet, 0) << "pagx verify failed for " << key << ":\n" << verifyErr.str();
 }

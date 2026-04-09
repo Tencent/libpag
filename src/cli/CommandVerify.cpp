@@ -80,7 +80,8 @@ struct VerifyOptions {
   std::string inputFile;
   std::string id;
   float scale = 1.0f;
-  bool problemsOnly = false;
+  bool skipRender = false;
+  bool skipLayout = false;
   bool jsonOutput = false;
 };
 
@@ -2242,14 +2243,6 @@ static std::string GetBaseName(const std::string& path) {
   return base;
 }
 
-static std::string GetDirectory(const std::string& path) {
-  auto slash = path.rfind('/');
-  if (slash != std::string::npos) {
-    return path.substr(0, slash + 1);
-  }
-  return "./";
-}
-
 // ============================================================================
 // Command
 // ============================================================================
@@ -2262,7 +2255,8 @@ static void PrintUsage() {
             << "Options:\n"
             << "  --id <id>           Limit scope to the Layer with the specified id\n"
             << "  --scale <float>     Render scale factor (default: 1.0)\n"
-            << "  --problems-only     Only output diagnostics, no layout or render\n"
+            << "  --skip-render       Skip screenshot generation\n"
+            << "  --skip-layout       Skip layout XML generation\n"
             << "  --json              Output diagnostics in JSON format\n"
             << "  -h, --help          Show this help message\n";
 }
@@ -2282,8 +2276,10 @@ static int ParseOptions(int argc, char* argv[], VerifyOptions* opts) {
       }
       opts->scale = static_cast<float>(atof(argv[++i]));
       // scale explicitly set
-    } else if (strcmp(argv[i], "--problems-only") == 0) {
-      opts->problemsOnly = true;
+    } else if (strcmp(argv[i], "--skip-render") == 0) {
+      opts->skipRender = true;
+    } else if (strcmp(argv[i], "--skip-layout") == 0) {
+      opts->skipLayout = true;
     } else if (strcmp(argv[i], "--json") == 0) {
       opts->jsonOutput = true;
     } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
@@ -2366,26 +2362,27 @@ int RunVerify(int argc, char* argv[]) {
     PrintDiagnosticsText(diagnostics, opts.inputFile);
   }
 
-  if (opts.problemsOnly) {
+  std::string baseName = GetBaseName(opts.inputFile);
+  std::string suffix = opts.id.empty() ? "" : ("." + opts.id);
+
+  if (!opts.skipLayout) {
+    std::string layoutPath = baseName + suffix + ".layout.xml";
+    auto layoutXml = GenerateLayoutXml(doc.get(), targetLayer);
+    std::ofstream layoutFile(layoutPath);
+    if (layoutFile.is_open()) {
+      layoutFile << layoutXml;
+      layoutFile.close();
+      std::cerr << "Wrote " << layoutPath << "\n";
+    } else {
+      std::cerr << "pagx verify: failed to write " << layoutPath << "\n";
+    }
+  }
+
+  if (opts.skipRender) {
     return diagnostics.empty() ? 0 : 1;
   }
 
-  std::string baseName = GetBaseName(opts.inputFile);
-  std::string dir = GetDirectory(opts.inputFile);
-  std::string suffix = opts.id.empty() ? "" : ("." + opts.id);
-
-  std::string layoutPath = dir + baseName + suffix + ".layout.xml";
-  auto layoutXml = GenerateLayoutXml(doc.get(), targetLayer);
-  std::ofstream layoutFile(layoutPath);
-  if (layoutFile.is_open()) {
-    layoutFile << layoutXml;
-    layoutFile.close();
-    std::cerr << "Wrote " << layoutPath << "\n";
-  } else {
-    std::cerr << "pagx verify: failed to write " << layoutPath << "\n";
-  }
-
-  std::string pngPath = dir + baseName + suffix + ".png";
+  std::string pngPath = baseName + suffix + ".png";
   std::vector<std::string> renderArgs = {"pagx", "render", "--scale", std::to_string(opts.scale),
                                          "-o",   pngPath};
   if (!opts.id.empty()) {

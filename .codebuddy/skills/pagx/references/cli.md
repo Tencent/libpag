@@ -15,15 +15,16 @@ screenshot (via `pagx render`).
 ```bash
 pagx verify input.pagx                                # full file — outputs .png + .layout.xml
 pagx verify --id "header" input.pagx                   # scoped to Layer id
-pagx verify --problems-only input.pagx                 # checks only, no file output
-pagx verify --problems-only --id "header" input.pagx   # scoped checks only
+pagx verify --skip-render input.pagx                   # skip screenshot, output .layout.xml only
+pagx verify --skip-render --skip-layout input.pagx     # checks only, no file output
 ```
 
 | Option | Description |
 |--------|-------------|
 | `--id <id>` | Scope checks and render to the Layer with the specified `id` |
 | `--scale <float>` | Render scale factor (default: 1.0) |
-| `--problems-only` | Only output diagnostics, do not generate screenshot or layout file |
+| `--skip-render` | Skip screenshot generation |
+| `--skip-layout` | Skip layout XML generation |
 | `--json` | Output diagnostics in JSON format |
 
 ### Steps
@@ -33,8 +34,9 @@ pagx verify --problems-only --id "header" input.pagx   # scoped checks only
 2. **Parse + layout** — loads the document and computes layout bounds.
 3. **Check** — runs all detection rules (schema, semantic, structural, spatial, performance).
 4. **Diagnostics** — writes problems to stderr, sorted by line number.
-5. **Files** (unless `--problems-only`) — writes layout XML (see `pagx layout` §Output format)
-   and renders screenshot (see `pagx render`).
+5. **Files** (unless skipped) — writes layout XML (see `pagx layout` §Output format)
+   and renders screenshot (see `pagx render`). Use `--skip-render` / `--skip-layout` to
+   skip individual outputs.
 
 ### Diagnostics format
 
@@ -47,7 +49,7 @@ file:line: description. Fix: suggested check direction
 - Single-node problems: single line number.
 - Two-node problems (e.g., overlap): two line numbers comma-separated.
 - Spatial problems include bounds in the description.
-- No output when there are no problems (in `--problems-only` mode).
+- No output when there are no problems (when both `--skip-render` and `--skip-layout` are set).
 
 Example:
 
@@ -61,11 +63,14 @@ Wrote input.layout.xml
 
 ### File output
 
+Output files are written to the **current working directory** (not the input file's directory).
+
 | Scenario | Screenshot | Layout file |
 |----------|-----------|-------------|
 | `pagx verify input.pagx` | `input.png` | `input.layout.xml` |
 | `pagx verify --id "header" input.pagx` | `input.header.png` | `input.header.layout.xml` |
-| `pagx verify --problems-only ...` | not generated | not generated |
+| `pagx verify --skip-render ...` | not generated | `input.layout.xml` |
+| `pagx verify --skip-render --skip-layout ...` | not generated | not generated |
 
 ### Exit code
 
@@ -79,7 +84,8 @@ Wrote input.layout.xml
 ## pagx render
 
 Render a PAGX file to an image. By default, output to the same directory as the input file
-with the same base name (e.g., `foo.pagx` → `foo.png`).
+with the same base name (e.g., `foo.pagx` → `foo.png`). `pagx verify` outputs to the
+current working directory; `pagx render` outputs next to the input file.
 
 ```bash
 pagx render input.pagx                    # outputs input.png

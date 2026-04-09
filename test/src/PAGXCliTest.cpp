@@ -545,7 +545,7 @@ CLI_TEST(PAGXCliTest, Lint_C6_HighRepeaterCopies) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);  // warning returns non-zero
@@ -558,7 +558,7 @@ CLI_TEST(PAGXCliTest, Lint_C6_NestedRepeaterProduct) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);  // warning returns non-zero
@@ -571,7 +571,7 @@ CLI_TEST(PAGXCliTest, Lint_C7_HighBlurRadius) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -583,7 +583,7 @@ CLI_TEST(PAGXCliTest, Lint_C8_StrokeAlignmentInRepeater) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -595,7 +595,7 @@ CLI_TEST(PAGXCliTest, Lint_C9_DashedStrokeInRepeater) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -607,7 +607,7 @@ CLI_TEST(PAGXCliTest, Lint_C10_ComplexPath) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -619,7 +619,7 @@ CLI_TEST(PAGXCliTest, Lint_C11_LowOpacityHighCost) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -632,7 +632,7 @@ CLI_TEST(PAGXCliTest, Lint_C13_SimpleRectangleMask) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -641,7 +641,7 @@ CLI_TEST(PAGXCliTest, Lint_C13_SimpleRectangleMask) {
 
 CLI_TEST(PAGXCliTest, Lint_ValidFile) {
   auto inputPath = TestResourcePath("validate_simple.pagx");
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   EXPECT_EQ(ret, 0);
 }
 
@@ -655,7 +655,8 @@ CLI_TEST(PAGXCliTest, Lint_JsonOutput) {
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
   std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--json", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify,
+                     {"verify", "--json", "--skip-render", "--skip-layout", inputPath});
   std::cout.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
@@ -680,7 +681,7 @@ CLI_TEST(PAGXCliTest, Verify_ExtractableComposition) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -704,7 +705,7 @@ CLI_TEST(PAGXCliTest, Lint_EmptyNodes) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -720,7 +721,7 @@ CLI_TEST(PAGXCliTest, Lint_UnreferencedResources) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -732,7 +733,7 @@ CLI_TEST(PAGXCliTest, Lint_DuplicatePathData) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -744,7 +745,7 @@ CLI_TEST(PAGXCliTest, Lint_DuplicateGradient) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -756,7 +757,7 @@ CLI_TEST(PAGXCliTest, Lint_MergeableGroups) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -768,7 +769,7 @@ CLI_TEST(PAGXCliTest, Lint_UnwrappableGroup) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -780,7 +781,7 @@ CLI_TEST(PAGXCliTest, Lint_PathToPrimitive) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -795,7 +796,7 @@ CLI_TEST(PAGXCliTest, Lint_PathNonPrimitive) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
@@ -808,7 +809,7 @@ CLI_TEST(PAGXCliTest, Lint_PathNonPrimitive) {
 // no diagnostics in verify. Adjusted to verify clean exit.
 CLI_TEST(PAGXCliTest, Lint_LocalizableCoordinates) {
   auto inputPath = TestResourcePath("lint_localizable_coords.pagx");
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   EXPECT_EQ(ret, 0);
 }
 
@@ -817,7 +818,7 @@ CLI_TEST(PAGXCliTest, Lint_ExtractableCompositions) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);  // warning returns non-zero
@@ -829,7 +830,7 @@ CLI_TEST(PAGXCliTest, Lint_DowngradeableLayer) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);  // warning returns non-zero
@@ -841,7 +842,7 @@ CLI_TEST(PAGXCliTest, Lint_IncludeInLayoutNoParent) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -853,7 +854,7 @@ CLI_TEST(PAGXCliTest, Lint_FlexNoParentLayout) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -865,7 +866,7 @@ CLI_TEST(PAGXCliTest, Lint_FullCanvasClipMask) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -1256,7 +1257,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_Clean) {
 
 CLI_TEST(PAGXCliTest, LayoutCheck_CleanProblemsOnly) {
   auto path = TestResourcePath("layout_check_clean.pagx");
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   EXPECT_EQ(ret, 0);
 }
 
@@ -1325,14 +1326,14 @@ CLI_TEST(PAGXCliTest, LayoutCheck_XPath) {
 
 CLI_TEST(PAGXCliTest, LayoutCheck_CheckXml) {
   auto path = TestResourcePath("layout_check_overlap.pagx");
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   // Manual-positioned Layers without container layout no longer trigger overlap warnings.
   EXPECT_EQ(ret, 0);
 }
 
 CLI_TEST(PAGXCliTest, LayoutCheck_CheckClean) {
   auto path = TestResourcePath("layout_check_clean.pagx");
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   EXPECT_EQ(ret, 0);
 }
 
@@ -1341,7 +1342,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_CheckOverlap) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   // Manual-positioned Layers without container layout no longer trigger overlap warnings.
@@ -1360,7 +1361,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_Placeholder) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
@@ -1374,7 +1375,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_BackgroundNoOverlap) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
@@ -1387,7 +1388,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ManualPositionNoOverlap) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
@@ -1400,7 +1401,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_TextFontFallback) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
@@ -1414,7 +1415,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_PathZeroSize) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
@@ -1427,7 +1428,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffset) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
@@ -1441,7 +1442,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetNeg) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
@@ -1454,7 +1455,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentAtOrigin) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -1467,7 +1468,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetExplicitSize) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -1481,7 +1482,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetConstrained) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   // The constrained Group at left=0,top=0 has layoutBounds starting at (0,0),
@@ -1496,7 +1497,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetFlex) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -1509,7 +1510,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetGroup) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
@@ -1523,7 +1524,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetGroupNoConstraints) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
@@ -1537,7 +1538,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetLayerUnpositioned) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -1551,7 +1552,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetExcludedFromLayout) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -1564,7 +1565,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetInParentLayout) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
@@ -1579,7 +1580,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetMixedConstraints) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
@@ -1592,7 +1593,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_FlexNoParentSize) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
@@ -1605,7 +1606,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_FlexWithParentSize) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
@@ -1619,7 +1620,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_FlexNested) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
@@ -1633,7 +1634,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_FlexConstraintParent) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
@@ -1647,7 +1648,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_FlexConstraintZeroParent) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
@@ -1661,7 +1662,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_FlexHorizontal) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
@@ -1711,7 +1712,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContainerOverflow) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
@@ -1724,7 +1725,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_NegativeConstraintSize) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
@@ -1737,7 +1738,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ElementConstraintConflict) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
@@ -1749,7 +1750,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_OffCanvas) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -1761,7 +1762,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_RedundantConstraintCenterX) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
@@ -1773,7 +1774,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_RedundantConstraintCenterY) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
@@ -1785,7 +1786,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_RedundantConstraintLeftZero) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
@@ -1797,7 +1798,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_RedundantConstraintTopZero) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
@@ -1810,7 +1811,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_IneffectiveCenterLayer) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
@@ -1824,7 +1825,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_IneffectiveCenterGroup) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
@@ -1838,7 +1839,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_IneffectiveCenterExplicitSize) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
@@ -1853,7 +1854,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetOppositeConstraint) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -1867,7 +1868,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_IneffectiveCenterGroupConstrained) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
@@ -1882,7 +1883,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ZeroSizeExplicit) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
@@ -1896,7 +1897,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ZeroSizeEmpty) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
@@ -1913,7 +1914,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_PolystarOrigin) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", path});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
@@ -1926,7 +1927,7 @@ CLI_TEST(PAGXCliTest, Verify_CompositionPositionDiff) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -1939,7 +1940,7 @@ CLI_TEST(PAGXCliTest, Verify_CompositionBlendModeDiff) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(output.find("structurally identical Layers"), std::string::npos);
@@ -1951,7 +1952,7 @@ CLI_TEST(PAGXCliTest, Verify_CompositionFillRuleDiff) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(output.find("structurally identical Layers"), std::string::npos);
@@ -1963,7 +1964,7 @@ CLI_TEST(PAGXCliTest, Verify_GroupsDifferentCap) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(output.find("consecutive Groups share identical painters"), std::string::npos);
@@ -1975,7 +1976,7 @@ CLI_TEST(PAGXCliTest, Verify_GradientMatrixDiff) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -1988,7 +1989,7 @@ CLI_TEST(PAGXCliTest, Verify_CompositionMatrixDiff) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -2002,7 +2003,7 @@ CLI_TEST(PAGXCliTest, Verify_CompositionConstraintDiff) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -2015,7 +2016,7 @@ CLI_TEST(PAGXCliTest, Verify_CompositionFlexDiff) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -2028,7 +2029,7 @@ CLI_TEST(PAGXCliTest, Verify_CompositionIdNameDiff) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -2041,7 +2042,7 @@ CLI_TEST(PAGXCliTest, Verify_CompositionLayoutDiff) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(output.find("structurally identical Layers"), std::string::npos);
@@ -2053,7 +2054,7 @@ CLI_TEST(PAGXCliTest, Verify_GroupsMergeableFillStroke) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
@@ -2066,7 +2067,7 @@ CLI_TEST(PAGXCliTest, Verify_GroupsDifferentFillColor) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(output.find("consecutive Groups share identical painters"), std::string::npos);
@@ -2078,7 +2079,7 @@ CLI_TEST(PAGXCliTest, Verify_GradientColorStopDiff) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(output.find("duplicate"), std::string::npos);
@@ -2090,7 +2091,7 @@ CLI_TEST(PAGXCliTest, Verify_PathDataDifferent) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  CallRun(pagx::cli::RunVerify, {"verify", "--problems-only", inputPath});
+  CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(output.find("duplicate PathData"), std::string::npos);
@@ -2247,7 +2248,10 @@ CLI_TEST(PAGXCliTest, Verify_WritesScreenshot) {
   std::filesystem::remove(layoutPath);
   auto tempPagx = CopyToTemp("import_node_none.pagx", "import_node_none.pagx");
 
+  auto oldCwd = std::filesystem::current_path();
+  std::filesystem::current_path(TempDir());
   auto ret = CallRun(pagx::cli::RunVerify, {"verify", tempPagx});
+  std::filesystem::current_path(oldCwd);
   EXPECT_EQ(ret, 0);
 
   auto expectedPng = TempDir() + "/import_node_none.png";

@@ -44,11 +44,11 @@ pagx verify --id "sectionId" input.pagx      # scoped to one section
 ```
 
 `--scale <factor>` controls the screenshot resolution (default 1). Use `--scale 2` for
-higher detail when visually inspecting screenshots. Outputs: diagnostics to stdout,
-`input.png` (screenshot), `input.layout.xml` (computed bounds). With `--id`, outputs are
-`input.{id}.png` and `input.{id}.layout.xml`. See `references/cli.md` for verify options
-and all other CLI commands (`render`, `format`, `layout`, `bounds`, `font`, `import`,
-`export`).
+higher detail when visually inspecting screenshots. Output files are written to the current
+working directory: `input.png` (screenshot), `input.layout.xml` (computed bounds). With
+`--id`, outputs are `input.{id}.png` and `input.{id}.layout.xml`. Always run `pagx verify`
+from the same directory as the `.pagx` file. See `references/cli.md` for verify options and
+all other CLI commands (`render`, `format`, `layout`, `bounds`, `font`, `import`, `export`).
 
 ---
 
@@ -127,7 +127,7 @@ No visual content — no shapes, text, painters, styles, or filters. Assign `id`
 structural section for scoped verification in Step 3.
 
 **Gate**: Repeat until clean:
-1. Run `pagx verify input.pagx`.
+1. Run `pagx verify --skip-render input.pagx`.
 2. Fix all reported diagnostics, then re-run verify.
 3. Read the `.layout.xml` output and verify each section's bounds match the intended
    sizes and positions.
