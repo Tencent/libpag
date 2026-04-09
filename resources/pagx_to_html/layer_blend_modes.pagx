@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Layer blendMode → mix-blend-mode (all 18 modes) -->
-<pagx version="1.0" width="440" height="340">
+<pagx version="1.0" width="440" height="356">
   <!-- Background -->
   <Layer>
-    <Rectangle position="220,170" size="440,340"/>
+    <Rectangle position="220,178" size="440,356"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
@@ -19,16 +19,16 @@
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="220,188" size="400,230" roundness="16"/>
+    <Rectangle position="220,196" size="400,254" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
   <!-- Base gradient layer -->
   <Layer>
-    <Rectangle position="220,188" size="380,210" roundness="12"/>
+    <Rectangle position="220,196" size="380,234" roundness="12"/>
     <Fill>
-      <LinearGradient startPoint="20,20" endPoint="400,230">
+      <LinearGradient startPoint="20,20" endPoint="400,246">
         <ColorStop offset="0" color="#3B82F6"/>
         <ColorStop offset="0.5" color="#EF4444"/>
         <ColorStop offset="1" color="#10B981"/>
@@ -42,7 +42,7 @@
     <Fill color="#FFFFFF"/>
   </Layer>
   <Layer x="37" y="82">
-    <Text text="multiply" fontFamily="Arial" fontSize="7" position="28,40" textAnchor="center"/>
+    <Text text="multiply" fontFamily="Arial" fontSize="7" position="28,46" textAnchor="center"/>
     <Fill color="#FFFFFF"/>
   </Layer>
 
@@ -51,7 +51,7 @@
     <Fill color="#808080"/>
   </Layer>
   <Layer x="99" y="82">
-    <Text text="screen" fontFamily="Arial" fontSize="7" position="28,40" textAnchor="center"/>
+    <Text text="screen" fontFamily="Arial" fontSize="7" position="28,46" textAnchor="center"/>
     <Fill color="#FFFFFF"/>
   </Layer>
 
@@ -60,7 +60,7 @@
     <Fill color="#FFFFFF"/>
   </Layer>
   <Layer x="161" y="82">
-    <Text text="overlay" fontFamily="Arial" fontSize="7" position="28,40" textAnchor="center"/>
+    <Text text="overlay" fontFamily="Arial" fontSize="7" position="28,46" textAnchor="center"/>
     <Fill color="#FFFFFF"/>
   </Layer>
 
@@ -69,7 +69,7 @@
     <Fill color="#C0C0C0"/>
   </Layer>
   <Layer x="223" y="82">
-    <Text text="darken" fontFamily="Arial" fontSize="7" position="28,40" textAnchor="center"/>
+    <Text text="darken" fontFamily="Arial" fontSize="7" position="28,46" textAnchor="center"/>
     <Fill color="#FFFFFF"/>
   </Layer>
 
@@ -78,7 +78,7 @@
     <Fill color="#808080"/>
   </Layer>
   <Layer x="285" y="82">
-    <Text text="lighten" fontFamily="Arial" fontSize="7" position="28,40" textAnchor="center"/>
+    <Text text="lighten" fontFamily="Arial" fontSize="7" position="28,46" textAnchor="center"/>
     <Fill color="#FFFFFF"/>
   </Layer>
 
@@ -87,117 +87,117 @@
     <Fill color="#808080"/>
   </Layer>
   <Layer x="347" y="82">
-    <Text text="dodge" fontFamily="Arial" fontSize="7" position="28,40" textAnchor="center"/>
+    <Text text="dodge" fontFamily="Arial" fontSize="7" position="28,46" textAnchor="center"/>
     <Fill color="#FFFFFF"/>
   </Layer>
 
   <!-- Row 2 -->
-  <Layer blendMode="colorBurn" x="37" y="135">
+  <Layer blendMode="colorBurn" x="37" y="141">
     <Rectangle position="28,20" size="44,28" roundness="4"/>
     <Fill color="#C0C0C0"/>
   </Layer>
-  <Layer x="37" y="135">
-    <Text text="burn" fontFamily="Arial" fontSize="7" position="28,40" textAnchor="center"/>
+  <Layer x="37" y="141">
+    <Text text="burn" fontFamily="Arial" fontSize="7" position="28,46" textAnchor="center"/>
     <Fill color="#FFFFFF"/>
   </Layer>
 
-  <Layer blendMode="hardLight" x="99" y="135">
+  <Layer blendMode="hardLight" x="99" y="141">
     <Rectangle position="28,20" size="44,28" roundness="4"/>
     <Fill color="#808080"/>
   </Layer>
-  <Layer x="99" y="135">
-    <Text text="hardLight" fontFamily="Arial" fontSize="7" position="28,40" textAnchor="center"/>
+  <Layer x="99" y="141">
+    <Text text="hardLight" fontFamily="Arial" fontSize="7" position="28,46" textAnchor="center"/>
     <Fill color="#FFFFFF"/>
   </Layer>
 
-  <Layer blendMode="softLight" x="161" y="135">
+  <Layer blendMode="softLight" x="161" y="141">
     <Rectangle position="28,20" size="44,28" roundness="4"/>
     <Fill color="#808080"/>
   </Layer>
-  <Layer x="161" y="135">
-    <Text text="softLight" fontFamily="Arial" fontSize="7" position="28,40" textAnchor="center"/>
+  <Layer x="161" y="141">
+    <Text text="softLight" fontFamily="Arial" fontSize="7" position="28,46" textAnchor="center"/>
     <Fill color="#FFFFFF"/>
   </Layer>
 
-  <Layer blendMode="difference" x="223" y="135">
+  <Layer blendMode="difference" x="223" y="141">
     <Rectangle position="28,20" size="44,28" roundness="4"/>
     <Fill color="#FFFFFF"/>
   </Layer>
-  <Layer x="223" y="135">
-    <Text text="difference" fontFamily="Arial" fontSize="7" position="28,40" textAnchor="center"/>
+  <Layer x="223" y="141">
+    <Text text="difference" fontFamily="Arial" fontSize="7" position="28,46" textAnchor="center"/>
     <Fill color="#FFFFFF"/>
   </Layer>
 
-  <Layer blendMode="exclusion" x="285" y="135">
+  <Layer blendMode="exclusion" x="285" y="141">
     <Rectangle position="28,20" size="44,28" roundness="4"/>
     <Fill color="#FFFFFF"/>
   </Layer>
-  <Layer x="285" y="135">
-    <Text text="exclusion" fontFamily="Arial" fontSize="7" position="28,40" textAnchor="center"/>
+  <Layer x="285" y="141">
+    <Text text="exclusion" fontFamily="Arial" fontSize="7" position="28,46" textAnchor="center"/>
     <Fill color="#FFFFFF"/>
   </Layer>
 
-  <Layer blendMode="hue" x="347" y="135">
+  <Layer blendMode="hue" x="347" y="141">
     <Rectangle position="28,20" size="44,28" roundness="4"/>
     <Fill color="#FF8800"/>
   </Layer>
-  <Layer x="347" y="135">
-    <Text text="hue" fontFamily="Arial" fontSize="7" position="28,40" textAnchor="center"/>
+  <Layer x="347" y="141">
+    <Text text="hue" fontFamily="Arial" fontSize="7" position="28,46" textAnchor="center"/>
     <Fill color="#FFFFFF"/>
   </Layer>
 
   <!-- Row 3 -->
-  <Layer blendMode="saturation" x="37" y="188">
+  <Layer blendMode="saturation" x="37" y="200">
     <Rectangle position="28,20" size="44,28" roundness="4"/>
     <Fill color="#FF0000"/>
   </Layer>
-  <Layer x="37" y="188">
-    <Text text="saturation" fontFamily="Arial" fontSize="7" position="28,40" textAnchor="center"/>
+  <Layer x="37" y="200">
+    <Text text="saturation" fontFamily="Arial" fontSize="7" position="28,46" textAnchor="center"/>
     <Fill color="#FFFFFF"/>
   </Layer>
 
-  <Layer blendMode="color" x="99" y="188">
+  <Layer blendMode="color" x="99" y="200">
     <Rectangle position="28,20" size="44,28" roundness="4"/>
     <Fill color="#00FF00"/>
   </Layer>
-  <Layer x="99" y="188">
-    <Text text="color" fontFamily="Arial" fontSize="7" position="28,40" textAnchor="center"/>
+  <Layer x="99" y="200">
+    <Text text="color" fontFamily="Arial" fontSize="7" position="28,46" textAnchor="center"/>
     <Fill color="#FFFFFF"/>
   </Layer>
 
-  <Layer blendMode="luminosity" x="161" y="188">
+  <Layer blendMode="luminosity" x="161" y="200">
     <Rectangle position="28,20" size="44,28" roundness="4"/>
     <Fill color="#FFFFFF"/>
   </Layer>
-  <Layer x="161" y="188">
-    <Text text="luminosity" fontFamily="Arial" fontSize="7" position="28,40" textAnchor="center"/>
+  <Layer x="161" y="200">
+    <Text text="luminosity" fontFamily="Arial" fontSize="7" position="28,46" textAnchor="center"/>
     <Fill color="#FFFFFF"/>
   </Layer>
 
-  <Layer blendMode="plusLighter" x="223" y="188">
+  <Layer blendMode="plusLighter" x="223" y="200">
     <Rectangle position="28,20" size="44,28" roundness="4"/>
     <Fill color="#404040"/>
   </Layer>
-  <Layer x="223" y="188">
-    <Text text="plusLight" fontFamily="Arial" fontSize="7" position="28,40" textAnchor="center"/>
+  <Layer x="223" y="200">
+    <Text text="plusLight" fontFamily="Arial" fontSize="7" position="28,46" textAnchor="center"/>
     <Fill color="#FFFFFF"/>
   </Layer>
 
-  <Layer blendMode="plusDarker" x="285" y="188">
+  <Layer blendMode="plusDarker" x="285" y="200">
     <Rectangle position="28,20" size="44,28" roundness="4"/>
     <Fill color="#808080"/>
   </Layer>
-  <Layer x="285" y="188">
-    <Text text="plusDark" fontFamily="Arial" fontSize="7" position="28,40" textAnchor="center"/>
+  <Layer x="285" y="200">
+    <Text text="plusDark" fontFamily="Arial" fontSize="7" position="28,46" textAnchor="center"/>
     <Fill color="#FFFFFF"/>
   </Layer>
 
-  <Layer blendMode="normal" x="347" y="188">
+  <Layer blendMode="normal" x="347" y="200">
     <Rectangle position="28,20" size="44,28" roundness="4"/>
     <Fill color="#FFFFFF"/>
   </Layer>
-  <Layer x="347" y="188">
-    <Text text="normal" fontFamily="Arial" fontSize="7" position="28,40" textAnchor="center"/>
+  <Layer x="347" y="200">
+    <Text text="normal" fontFamily="Arial" fontSize="7" position="28,46" textAnchor="center"/>
     <Fill color="#FFFFFF"/>
   </Layer>
 </pagx>
