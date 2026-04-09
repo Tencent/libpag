@@ -31,9 +31,9 @@ struct PPTExportOptions {
    * Whether to convert text elements to path geometry using pre-shaped glyph outlines. When
    * enabled, text with GlyphRun data is rendered as custom geometry paths instead of native PPTX
    * text runs, ensuring identical rendering across platforms without font dependency. Falls back to
-   * native text when glyph outline data is unavailable. The default value is true.
+   * native text when glyph outline data is unavailable. The default value is false.
    */
-  bool convertTextToPath = true;
+  bool convertTextToPath = false;
 
   /**
    * Whether to rasterize masked layers into bitmap images. When enabled, layers with masks are
@@ -52,10 +52,15 @@ class PPTExporter {
   using Options = PPTExportOptions;
 
   /**
-   * Exports a PAGXDocument to a PPTX file.
-   * Returns true on success.
+   * Exports a PAGXDocument to a PPTX file at the specified path.
+   * @param document the PAGXDocument to export. Passed as non-const because internal layout
+   *        computation may cache intermediate results.
+   * @param filePath the output file path. The file will be created or overwritten.
+   * @param options export options controlling text rendering and mask handling.
+   * @return true if the PPTX file was written successfully, false if the file could not be created
+   *         or a write error occurred.
    */
-  static bool ToFile(const PAGXDocument& document, const std::string& filePath,
+  static bool ToFile(PAGXDocument& document, const std::string& filePath,
                      const Options& options = {});
 };
 

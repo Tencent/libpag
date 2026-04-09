@@ -32,41 +32,39 @@ struct ExportOptions {
   std::string format = {};
   int svgIndent = 2;
   bool svgNoXmlDeclaration = false;
-  bool svgNoConvertTextToPath = false;
-  bool pptNoConvertTextToPath = false;
+  bool textToPath = false;
   bool pptNoBakeMask = false;
 };
 
 static void PrintUsage() {
-  std::cout << "Usage: pagx export [options]\n"
-            << "\n"
-            << "Export a PAGX file to another format.\n"
-            << "\n"
-            << "Options:\n"
-            << "  --input <file>              Input PAGX file (required)\n"
-            << "  --output <file>             Output file (default: <input>.<format>)\n"
-            << "  --format <format>           Output format (svg, pptx; inferred from --output "
-               "extension)\n"
-            << "\n"
-            << "SVG options:\n"
-            << "  --svg-indent <n>            Indentation spaces (default: 2, valid range: 0-16)\n"
-            << "  --svg-no-xml-declaration    Omit the <?xml ...?> declaration\n"
-            << "  --svg-no-convert-text-to-path\n"
-            << "                              Keep text as <text> elements instead of <path>\n"
-            << "\n"
-            << "PPT options:\n"
-            << "  --ppt-no-convert-text-to-path\n"
-            << "                              Keep text as native PPTX text runs instead of paths\n"
-            << "  --ppt-no-bake-mask          Export masked layers as vector shapes instead of\n"
-            << "                              rasterizing to bitmap\n"
-            << "\n"
-            << "Examples:\n"
-            << "  pagx export --input icon.pagx                    # PAGX to icon.svg\n"
-            << "  pagx export --input icon.pagx --output out.svg   # PAGX to out.svg\n"
-            << "  pagx export --input icon.pagx --output out.pptx  # PAGX to out.pptx\n"
-            << "  pagx export --format svg --input icon.pagx       # force SVG output format\n"
-            << "  pagx export --format pptx --input icon.pagx      # force PPTX output format\n"
-            << "  pagx export --input icon.pagx --svg-indent 4     # 4-space indent\n";
+  std::cout
+      << "Usage: pagx export [options]\n"
+      << "\n"
+      << "Export a PAGX file to another format.\n"
+      << "\n"
+      << "Options:\n"
+      << "  --input <file>              Input PAGX file (required)\n"
+      << "  --output <file>             Output file (default: <input>.<format>)\n"
+      << "  --format <format>           Output format (svg, pptx; inferred from --output "
+         "extension)\n"
+      << "  --text-to-path              Convert text to path geometry (default: native text)\n"
+      << "\n"
+      << "SVG options:\n"
+      << "  --svg-indent <n>            Indentation spaces (default: 2, valid range: 0-16)\n"
+      << "  --svg-no-xml-declaration    Omit the <?xml ...?> declaration\n"
+      << "\n"
+      << "PPT options:\n"
+      << "  --ppt-no-bake-mask          Export masked layers as vector shapes instead of\n"
+      << "                              rasterizing to bitmap\n"
+      << "\n"
+      << "Examples:\n"
+      << "  pagx export --input icon.pagx                    # PAGX to icon.svg\n"
+      << "  pagx export --input icon.pagx --output out.svg   # PAGX to out.svg\n"
+      << "  pagx export --input icon.pagx --output out.pptx  # PAGX to out.pptx\n"
+      << "  pagx export --format svg --input icon.pagx       # force SVG output format\n"
+      << "  pagx export --format pptx --input icon.pagx      # force PPTX output format\n"
+      << "  pagx export --input icon.pagx --svg-indent 4     # 4-space indent\n"
+      << "  pagx export --input icon.pagx --text-to-path     # convert text to paths\n";
 }
 
 static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
@@ -89,10 +87,8 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
       options->svgIndent = static_cast<int>(value);
     } else if (arg == "--svg-no-xml-declaration") {
       options->svgNoXmlDeclaration = true;
-    } else if (arg == "--svg-no-convert-text-to-path") {
-      options->svgNoConvertTextToPath = true;
-    } else if (arg == "--ppt-no-convert-text-to-path") {
-      options->pptNoConvertTextToPath = true;
+    } else if (arg == "--text-to-path") {
+      options->textToPath = true;
     } else if (arg == "--ppt-no-bake-mask") {
       options->pptNoBakeMask = true;
     } else if (arg == "--help" || arg == "-h") {
@@ -145,7 +141,7 @@ static int ExportToSVG(const ExportOptions& options) {
   SVGExporter::Options svgOptions = {};
   svgOptions.indent = options.svgIndent;
   svgOptions.xmlDeclaration = !options.svgNoXmlDeclaration;
-  svgOptions.convertTextToPath = !options.svgNoConvertTextToPath;
+  svgOptions.convertTextToPath = options.textToPath;
 
   if (!SVGExporter::ToFile(*document, options.outputFile, svgOptions)) {
     std::cerr << "pagx export: error: failed to write '" << options.outputFile << "'\n";
@@ -169,7 +165,7 @@ static int ExportToPPT(const ExportOptions& options) {
   }
 
   PPTExporter::Options pptOptions = {};
-  pptOptions.convertTextToPath = !options.pptNoConvertTextToPath;
+  pptOptions.convertTextToPath = options.textToPath;
   pptOptions.bakeMask = !options.pptNoBakeMask;
 
   if (!PPTExporter::ToFile(*document, options.outputFile, pptOptions)) {

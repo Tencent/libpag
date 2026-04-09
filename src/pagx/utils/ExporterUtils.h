@@ -49,7 +49,7 @@ struct FillStrokeInfo {
 
 struct GlyphPath {
   Matrix transform;
-  const PathData* pathData;
+  const PathData* pathData = nullptr;
 };
 
 FillStrokeInfo CollectFillStroke(const std::vector<Element*>& contents);

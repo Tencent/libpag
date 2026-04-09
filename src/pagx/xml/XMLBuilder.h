@@ -82,7 +82,7 @@ class XMLBuilder {
 
   //--- Always-write Attributes (PPT style) -----------------------------------
 
-  XMLBuilder& a(const char* name, const char* val) {
+  XMLBuilder& attr(const char* name, const char* val) {
     _buf += ' ';
     _buf += name;
     _buf += "=\"";
@@ -91,18 +91,18 @@ class XMLBuilder {
     return *this;
   }
 
-  XMLBuilder& a(const char* name, const std::string& val) {
-    return a(name, val.c_str());
+  XMLBuilder& attr(const char* name, const std::string& val) {
+    return attr(name, val.c_str());
   }
 
-  XMLBuilder& a(const char* name, int64_t val) {
-    return a(name, std::to_string(val).c_str());
+  XMLBuilder& attr(const char* name, int64_t val) {
+    return attr(name, std::to_string(val).c_str());
   }
 
   //--- Required Attributes (always written) ----------------------------------
 
   XMLBuilder& addRequiredAttribute(const char* name, const std::string& value) {
-    return a(name, value);
+    return attr(name, value);
   }
 
   XMLBuilder& addRequiredAttribute(const char* name, float value) {
@@ -118,14 +118,14 @@ class XMLBuilder {
 
   XMLBuilder& addAttribute(const char* name, const char* value) {
     if (value && value[0] != '\0') {
-      return a(name, value);
+      return attr(name, value);
     }
     return *this;
   }
 
   XMLBuilder& addAttribute(const char* name, const std::string& value) {
     if (!value.empty()) {
-      return a(name, value);
+      return attr(name, value);
     }
     return *this;
   }
@@ -139,7 +139,7 @@ class XMLBuilder {
 
   XMLBuilder& addAttribute(const char* name, int value, int defaultValue = 0) {
     if (value != defaultValue) {
-      return a(name, static_cast<int64_t>(value));
+      return attr(name, static_cast<int64_t>(value));
     }
     return *this;
   }

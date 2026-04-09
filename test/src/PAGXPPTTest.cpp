@@ -59,7 +59,7 @@ static std::string PPTOutDir() {
   return dir;
 }
 
-static bool ExportAndVerify(const pagx::PAGXDocument& doc, const std::string& name,
+static bool ExportAndVerify(pagx::PAGXDocument& doc, const std::string& name,
                             const pagx::PPTExportOptions& options = {}) {
   auto path = PPTOutDir() + "/" + name + ".pptx";
   bool ok = pagx::PPTExporter::ToFile(doc, path, options);

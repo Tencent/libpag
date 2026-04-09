@@ -259,6 +259,7 @@ pagx export --input icon.pagx --output out.pptx  # PAGX to out.pptx
 pagx export --format svg --input icon.pagx       # force SVG output format
 pagx export --format pptx --input icon.pagx      # force PPTX output format
 pagx export --input icon.pagx --svg-indent 4     # 4-space indent
+pagx export --input icon.pagx --text-to-path     # convert text to paths
 pagx export --input icon.pagx --output out.pptx --ppt-no-bake-mask  # vector masks
 ```
 
@@ -267,10 +268,9 @@ pagx export --input icon.pagx --output out.pptx --ppt-no-bake-mask  # vector mas
 | `--input <file>` | Input PAGX file (required) |
 | `--output <file>` | Output file (default: `<input>.<format>`) |
 | `--format <format>` | Output format (`svg`, `pptx`; inferred from output extension). Required if output has no extension |
+| `--text-to-path` | Convert text to path geometry using pre-shaped glyph outlines (default: native text rendering) |
 | `--svg-indent <n>` | Indentation spaces (default: 2, valid range: 0–16) |
 | `--svg-no-xml-declaration` | Omit the `<?xml ...?>` declaration |
-| `--svg-no-convert-text-to-path` | Keep text as `<text>` elements instead of `<path>` |
-| `--ppt-no-convert-text-to-path` | Keep text as native PPTX text runs instead of paths |
 | `--ppt-no-bake-mask` | Export masked layers as editable vector shapes instead of rasterizing to bitmap |
 
 On success the command prints `pagx export: wrote <path>` and exits 0; on failure it prints

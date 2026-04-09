@@ -1281,8 +1281,7 @@ CLI_TEST(PAGXCliTest, Import_SvgToPagx_Gradient) {
 }
 
 CLI_TEST(PAGXCliTest, Import_SvgToPagx_Text) {
-  auto svgPath =
-      ExportToSVG("render_text.pagx", "ImportSVG_Text.svg", {"--svg-no-convert-text-to-path"});
+  auto svgPath = ExportToSVG("render_text.pagx", "ImportSVG_Text.svg");
   auto outputPath = TempDir() + "/ImportSVG_Text.pagx";
   auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
@@ -1475,8 +1474,8 @@ CLI_TEST(PAGXCliTest, Export_PagxToPptx_Text) {
 CLI_TEST(PAGXCliTest, Export_PagxToPptx_NoConvertTextToPath) {
   auto inputPath = TestResourcePath("render_text.pagx");
   auto outputPath = TempDir() + "/ExportPPTX_NoText2Path.pptx";
-  auto ret = CallRun(pagx::cli::RunExport, {"export", "--ppt-no-convert-text-to-path", "--input",
-                                            inputPath, "--output", outputPath});
+  auto ret =
+      CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(outputPath));
   EXPECT_GT(std::filesystem::file_size(outputPath), 0u);
@@ -1554,8 +1553,8 @@ CLI_TEST(PAGXCliTest, Export_PagxToPptx_WithDocErrors) {
 CLI_TEST(PAGXCliTest, Export_NoConvertTextToPath) {
   auto inputPath = TestResourcePath("render_text.pagx");
   auto outputPath = TempDir() + "/ExportSVG_NoConvertText.svg";
-  auto ret = CallRun(pagx::cli::RunExport, {"export", "--svg-no-convert-text-to-path", "--input",
-                                            inputPath, "--output", outputPath});
+  auto ret =
+      CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
   EXPECT_NE(output.find("<svg"), std::string::npos);
