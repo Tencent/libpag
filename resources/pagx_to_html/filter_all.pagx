@@ -26,57 +26,57 @@
 
   <!-- Row 1 -->
   <!-- BlurFilter: uniform -->
-  <Layer x="30" y="62">
+  <Layer x="30" y="77">
     <Rectangle position="40,40" size="60,60" roundness="8"/>
     <Fill color="#3B82F6"/>
     <BlurFilter blurX="4" blurY="4"/>
   </Layer>
   <Layer>
-    <Text text="Blur" fontFamily="Arial" fontSize="8" position="70,165" textAnchor="center"/>
+    <Text text="Blur" fontFamily="Arial" fontSize="8" position="70,180" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- BlurFilter: asymmetric -->
-  <Layer x="120" y="62">
+  <Layer x="120" y="77">
     <Rectangle position="40,40" size="60,60" roundness="8"/>
     <Fill color="#3B82F6"/>
     <BlurFilter blurX="8" blurY="2"/>
   </Layer>
   <Layer>
-    <Text text="Asymmetric" fontFamily="Arial" fontSize="8" position="160,165" textAnchor="center"/>
+    <Text text="Asymmetric" fontFamily="Arial" fontSize="8" position="160,180" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- DropShadowFilter -->
-  <Layer x="210" y="62">
+  <Layer x="210" y="77">
     <Rectangle position="40,40" size="60,60" roundness="8"/>
     <Fill color="#10B981"/>
     <DropShadowFilter offsetX="4" offsetY="4" blurX="8" blurY="8" color="#00000060"/>
   </Layer>
   <Layer>
-    <Text text="DropShadow" fontFamily="Arial" fontSize="8" position="250,165" textAnchor="center"/>
+    <Text text="DropShadow" fontFamily="Arial" fontSize="8" position="250,180" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- DropShadowFilter: shadowOnly -->
-  <Layer x="300" y="62">
+  <Layer x="300" y="77">
     <Rectangle position="40,40" size="60,60" roundness="8"/>
     <Fill color="#10B981"/>
     <DropShadowFilter offsetX="4" offsetY="8" blurX="12" blurY="12" color="#00000080" shadowOnly="true"/>
   </Layer>
   <Layer>
-    <Text text="ShadowOnly" fontFamily="Arial" fontSize="8" position="340,165" textAnchor="center"/>
+    <Text text="ShadowOnly" fontFamily="Arial" fontSize="8" position="340,180" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- InnerShadowFilter -->
-  <Layer x="390" y="62">
+  <Layer x="390" y="77">
     <Rectangle position="40,40" size="60,60" roundness="8"/>
     <Fill color="#EF4444"/>
     <InnerShadowFilter offsetX="2" offsetY="2" blurX="6" blurY="6" color="#00000080"/>
   </Layer>
   <Layer>
-    <Text text="InnerShadow" fontFamily="Arial" fontSize="8" position="430,165" textAnchor="center"/>
+    <Text text="InnerShadow" fontFamily="Arial" fontSize="8" position="430,180" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
