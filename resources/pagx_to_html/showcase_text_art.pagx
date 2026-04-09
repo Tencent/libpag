@@ -97,12 +97,12 @@
 
   <!-- GlyphRun demo: "ABC" with per-glyph rotation and scale -->
   <Layer>
-    <Text text="ABC" fontFamily="Arial" fontSize="28">
-      <GlyphRun font="@demoFont" fontSize="28" glyphs="1,2,3"
+    <Text text="ABC" fontFamily="Arial" fontSize="20">
+      <GlyphRun font="@demoFont" fontSize="20" glyphs="1,2,3"
                  xOffsets="0,25,50"
                  rotations="10,-5,15"
                  scales="1.2,1.2;0.9,0.9;1.1,1.1"
-                 x="24" y="40"/>
+                 x="140" y="55"/>
     </Text>
     <Fill color="#E879F9"/>
     <Stroke color="#FFFFFF20" width="1"/>
