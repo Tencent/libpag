@@ -26,38 +26,38 @@
 
   <!-- Divider -->
   <Layer>
-    <Path data="M 190,70 L 190,230"/>
+    <Path data="M 190,80 L 190,240"/>
     <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
   </Layer>
 
   <!-- groupOpacity=false label -->
   <Layer>
-    <Text text="groupOpacity=false" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="105,78" textAnchor="center"/>
+    <Text text="groupOpacity=false" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="105,88" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- groupOpacity=false: alpha applied independently to each child element -->
   <Layer alpha="0.5" groupOpacity="false">
-    <Rectangle position="80,150" size="80,80" roundness="8"/>
+    <Rectangle position="80,160" size="80,80" roundness="8"/>
     <Fill color="#EF4444"/>
     <Layer>
-      <Ellipse position="120,150" size="80,80"/>
+      <Ellipse position="120,160" size="80,80"/>
       <Fill color="#3B82F6"/>
     </Layer>
   </Layer>
 
   <!-- groupOpacity=true label -->
   <Layer>
-    <Text text="groupOpacity=true" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="295,78" textAnchor="center"/>
+    <Text text="groupOpacity=true" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="295,88" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- groupOpacity=true: content composited first, then alpha applied -->
   <Layer alpha="0.5" groupOpacity="true">
-    <Rectangle position="270,150" size="80,80" roundness="8"/>
+    <Rectangle position="270,160" size="80,80" roundness="8"/>
     <Fill color="#EF4444"/>
     <Layer>
-      <Ellipse position="310,150" size="80,80"/>
+      <Ellipse position="310,160" size="80,80"/>
       <Fill color="#3B82F6"/>
     </Layer>
   </Layer>
