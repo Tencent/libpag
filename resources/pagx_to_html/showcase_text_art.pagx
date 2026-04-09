@@ -20,15 +20,6 @@
       <ColorStop offset="1" color="#1E1040"/>
     </LinearGradient>
 
-    <!-- Embedded minimal font for GlyphRun demo -->
-    <Font id="demoFont" unitsPerEm="100">
-      <!-- A -->
-      <Glyph advance="70" path="M 10 80 L 35 10 L 60 80 M 20 55 L 50 55"/>
-      <!-- B -->
-      <Glyph advance="65" path="M 15 10 L 15 80 L 40 80 C 60 80 60 50 40 48 L 15 48 M 15 10 L 38 10 C 55 10 55 48 38 48"/>
-      <!-- C -->
-      <Glyph advance="65" path="M 55 20 C 40 5 15 10 15 45 C 15 80 40 85 55 70"/>
-    </Font>
   </Resources>
 
   <!-- Background -->
@@ -93,19 +84,6 @@
   <Layer>
     <Text text="Italic" fontFamily="Arial" fontSize="14" position="94,292" fauxItalic="true"/>
     <Fill color="#10B981"/>
-  </Layer>
-
-  <!-- GlyphRun demo: "ABC" with per-glyph rotation and scale -->
-  <Layer>
-    <Text text="ABC" fontFamily="Arial" fontSize="20">
-      <GlyphRun font="@demoFont" fontSize="20" glyphs="1,2,3"
-                 xOffsets="0,25,50"
-                 rotations="10,-5,15"
-                 scales="1.2,1.2;0.9,0.9;1.1,1.1"
-                 x="140" y="55"/>
-    </Text>
-    <Fill color="#E879F9"/>
-    <Stroke color="#FFFFFF20" width="1"/>
   </Layer>
 
   <!-- TextModifier with scale and anchor offset -->
