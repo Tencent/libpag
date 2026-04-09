@@ -91,23 +91,30 @@ class LayoutNode {
 
   /**
    * Writes self rendering attributes and layoutWidth/layoutHeight. Does not touch children.
+   * @param context the current layout context
+   * @param width target width from constraints, NaN means use intrinsic size
+   * @param height target height from constraints, NaN means use intrinsic size
    */
   virtual void setLayoutSize(LayoutContext* context, float width, float height);
 
   /** Writes self position and layoutX/layoutY. */
-  virtual void setLayoutPosition(LayoutContext*, float, float) {
+  virtual void setLayoutPosition(LayoutContext* context, float x, float y) {
   }
 
   /**
    * Lays out children using layoutWidth/layoutHeight as container size.
    * Only container nodes (Group/TextBox/Layer) override this.
    */
-  virtual void updateLayout(LayoutContext*) {
+  virtual void updateLayout(LayoutContext* context) {
   }
 
   /**
    * Constraint layout algorithm: for each node computes target size from constraints,
    * calls setLayoutSize + setLayoutPosition + updateLayout.
+   * @param nodes the list of layout nodes to lay out
+   * @param containerW the available container width
+   * @param containerH the available container height
+   * @param context the current layout context
    */
   static void PerformConstraintLayout(const std::vector<LayoutNode*>& nodes, float containerW,
                                       float containerH, LayoutContext* context);
@@ -123,6 +130,10 @@ class LayoutNode {
   /**
    * Computes a uniform scale factor to fit content into target size. Only non-NAN axes contribute.
    * When both axes have targets, returns the smaller scale.
+   * @param contentW intrinsic content width
+   * @param contentH intrinsic content height
+   * @param targetW target width, NaN to ignore this axis
+   * @param targetH target height, NaN to ignore this axis
    */
   static float ComputeUniformScale(float contentW, float contentH, float targetW, float targetH);
 
@@ -137,6 +148,11 @@ class LayoutNode {
   /**
    * Shared measurement: computes preferred size from child LayoutNodes.
    * When explicitWidth/explicitHeight is not NAN, that axis uses the explicit value directly.
+   * @param elements the child elements to measure
+   * @param explicitWidth explicit width override, NaN to compute from children
+   * @param explicitHeight explicit height override, NaN to compute from children
+   * @param outWidth receives the computed preferred width
+   * @param outHeight receives the computed preferred height
    */
   static void MeasureChildNodes(const std::vector<Element*>& elements, float explicitWidth,
                                 float explicitHeight, float& outWidth, float& outHeight);
