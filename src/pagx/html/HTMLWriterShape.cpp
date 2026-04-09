@@ -1302,43 +1302,30 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     switch (g.type) {
       case NodeType::Rectangle: {
         auto r = static_cast<const Rectangle*>(g.element);
-        if (trim) {
-          // Use <path> instead of <rect> when TrimPath is active, because SVG <rect>
-          // always starts its stroke from the top-left corner, while the native renderer
-          // (tgfx) starts from the bottom-right. Using <path> with RectToPathData gives
-          // us control over the path start point to match the native renderer.
-          std::string d = RectToPathData(r);
-          out.openTag("path");
-          out.addAttr("d", d);
-          applySVGFill(out, nullptr);
-          if (isContinuousTrim) {
-            applySVGStroke(out, stroke, computeGeoPathLength(g));
-            applyTrimAttrsContinuous(out, trim, pathLengths, totalPathLength, geoIdx);
-          } else {
-            applySVGStroke(out, stroke);
-            applyTrimAttrs(out, trim);
-          }
-          out.closeTagSelfClosing();
-        } else {
-          float x = r->position.x - r->size.width / 2;
-          float y = r->position.y - r->size.height / 2;
-          out.openTag("rect");
-          if (!FloatNearlyZero(x)) {
-            out.addAttr("x", FloatToString(x));
-          }
-          if (!FloatNearlyZero(y)) {
-            out.addAttr("y", FloatToString(y));
-          }
-          out.addAttr("width", FloatToString(r->size.width));
-          out.addAttr("height", FloatToString(r->size.height));
-          if (r->roundness > 0) {
-            out.addAttr("rx", FloatToString(r->roundness));
-            out.addAttr("ry", FloatToString(r->roundness));
-          }
-          applySVGFill(out, fill);
-          applySVGStroke(out, stroke);
-          out.closeTagSelfClosing();
+        float x = r->position.x - r->size.width / 2;
+        float y = r->position.y - r->size.height / 2;
+        out.openTag("rect");
+        if (!FloatNearlyZero(x)) {
+          out.addAttr("x", FloatToString(x));
         }
+        if (!FloatNearlyZero(y)) {
+          out.addAttr("y", FloatToString(y));
+        }
+        out.addAttr("width", FloatToString(r->size.width));
+        out.addAttr("height", FloatToString(r->size.height));
+        if (r->roundness > 0) {
+          out.addAttr("rx", FloatToString(r->roundness));
+          out.addAttr("ry", FloatToString(r->roundness));
+        }
+        applySVGFill(out, trim ? nullptr : fill);
+        if (isContinuousTrim) {
+          applySVGStroke(out, stroke, computeGeoPathLength(g));
+          applyTrimAttrsContinuous(out, trim, pathLengths, totalPathLength, geoIdx);
+        } else {
+          applySVGStroke(out, stroke);
+          applyTrimAttrs(out, trim);
+        }
+        out.closeTagSelfClosing();
         break;
       }
       case NodeType::Ellipse: {
