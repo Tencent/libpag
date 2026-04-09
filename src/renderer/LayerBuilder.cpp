@@ -234,7 +234,7 @@ class LayerBuilderContext {
   // Generate TextBlob for a Text node using GlyphRunRenderer with the given inverse matrix.
   // For standalone Text (not inside TextBox), inverseMatrix is Identity.
   // For TextBox children, inverseMatrix cancels the cumulative Group transforms.
-  static void prepareTextBlob(Text* text, const tgfx::Matrix& inverseMatrix) {
+  static void PrepareTextBlob(Text* text, const tgfx::Matrix& inverseMatrix) {
     if (!text->privateData->layoutRuns.empty()) {
       auto shaped = GlyphRunRenderer::BuildTextBlobFromLayoutRuns(text->privateData->layoutRuns,
                                                                   inverseMatrix);
@@ -258,7 +258,7 @@ class LayerBuilderContext {
       if (!matrices[i].invert(&inverse)) {
         continue;
       }
-      prepareTextBlob(childText[i], inverse);
+      PrepareTextBlob(childText[i], inverse);
     }
   }
 
@@ -357,7 +357,7 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::Text> convertText(Text* node) {
     auto textBlob = node->privateData->textBlob;
     if (textBlob == nullptr) {
-      prepareTextBlob(node, tgfx::Matrix::I());
+      PrepareTextBlob(node, tgfx::Matrix::I());
       textBlob = node->privateData->textBlob;
     }
     if (textBlob == nullptr) {
