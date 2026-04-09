@@ -27,35 +27,35 @@
 
   <!-- BlurFilter + DropShadowFilter chain -->
   <Layer>
-    <Rectangle position="90,125" size="90,90" roundness="12"/>
+    <Rectangle position="90,140" size="90,90" roundness="12"/>
     <Fill color="#3B82F6"/>
     <BlurFilter blurX="2" blurY="2"/>
     <DropShadowFilter offsetX="6" offsetY="6" blurX="10" blurY="10" color="#1E3A5F80"/>
   </Layer>
   <Layer>
-    <Text text="Blur+Shadow" fontFamily="Arial" fontSize="8" position="90,182" textAnchor="center"/>
+    <Text text="Blur+Shadow" fontFamily="Arial" fontSize="8" position="90,197" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- DropShadowFilter with shadowOnly="true" -->
   <Layer>
-    <Ellipse position="220,125" size="80,80"/>
+    <Ellipse position="220,140" size="80,80"/>
     <Fill color="#10B981"/>
     <DropShadowFilter offsetX="4" offsetY="8" blurX="12" blurY="12" color="#064E3B" shadowOnly="true"/>
   </Layer>
   <Layer>
-    <Text text="ShadowOnly" fontFamily="Arial" fontSize="8" position="220,182" textAnchor="center"/>
+    <Text text="ShadowOnly" fontFamily="Arial" fontSize="8" position="220,197" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- InnerShadowFilter on a rounded rectangle -->
   <Layer>
-    <Rectangle position="350,125" size="90,90" roundness="16"/>
+    <Rectangle position="350,140" size="90,90" roundness="16"/>
     <Fill color="#F59E0B"/>
     <InnerShadowFilter offsetX="3" offsetY="3" blurX="8" blurY="8" color="#78350F"/>
   </Layer>
   <Layer>
-    <Text text="InnerShadow" fontFamily="Arial" fontSize="8" position="350,182" textAnchor="center"/>
+    <Text text="InnerShadow" fontFamily="Arial" fontSize="8" position="350,197" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
