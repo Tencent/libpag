@@ -262,10 +262,7 @@ class PPTWriter {
  public:
   PPTWriter(PPTWriterContext* ctx, PAGXDocument* doc, bool convertTextToPath, bool bakeMask,
             bool bridgeContours)
-      : _ctx(ctx),
-        _doc(doc),
-        _convertTextToPath(convertTextToPath),
-        _bakeMask(bakeMask),
+      : _ctx(ctx), _doc(doc), _convertTextToPath(convertTextToPath), _bakeMask(bakeMask),
         _bridgeContours(bridgeContours) {
   }
 
