@@ -170,8 +170,9 @@ Same color: single Fill. Different colors: wrap the line in a Group to isolate i
 </pagx>
 ```
 
-**Pattern**: When no image is available — soft gradient background + stroke icon + label.
-Vary gradient hues across placeholders (`#F0F4FF→#E8EEFF`, `#FFF0E8→#FFE8D8`,
+**Pattern**: When no image is available — soft gradient background + inline SVG icon +
+label. Icon uses `<Import>` with inline SVG (see §Tab Bar for the same technique). Vary
+gradient hues across placeholders (`#F0F4FF→#E8EEFF`, `#FFF0E8→#FFE8D8`,
 `#F0FFF4→#E8FFE8`).
 
 ### Avatar with Circular Clip
