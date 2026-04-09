@@ -22,6 +22,7 @@
 #include <vector>
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Point.h"
+#include "pagx/types/Rect.h"
 
 namespace pagx {
 
@@ -94,6 +95,13 @@ class GlyphRun : public Node {
    * Skewing is applied around the anchor point.
    */
   std::vector<float> skews = {};
+
+  /**
+   * The bounding rectangle of this text block in its parent coordinate space. For TextBox children,
+   * this is in TextBox coordinates; for standalone Text, this is in Text local coordinates. Only the
+   * first GlyphRun of each Text element carries the bounds for the entire text block.
+   */
+  Rect bounds = {};
 
   NodeType nodeType() const override {
     return NodeType::GlyphRun;

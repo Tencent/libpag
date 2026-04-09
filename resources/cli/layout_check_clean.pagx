@@ -1,0 +1,12 @@
+<pagx version="1.0" width="400" height="300">
+  <Layer id="parent" name="parent" width="400" height="300" layout="horizontal" gap="20" padding="20">
+    <Layer id="box1" name="box1" width="150" height="100">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#3B82F6"/>
+    </Layer>
+    <Layer id="box2" name="box2" width="150" height="100">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#EF4444"/>
+    </Layer>
+  </Layer>
+</pagx>

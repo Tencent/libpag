@@ -18,9 +18,12 @@
 
 #pragma once
 
+#include <cmath>
 #include <vector>
+#include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/types/Point.h"
+#include "pagx/types/Rect.h"
 
 namespace pagx {
 
@@ -29,7 +32,7 @@ namespace pagx {
  * shapes, painters, modifiers, and nested groups, allowing for hierarchical organization of
  * content.
  */
-class Group : public Element {
+class Group : public Element, public LayoutNode {
  public:
   /**
    * The anchor point for transformations.
@@ -71,12 +74,30 @@ class Group : public Element {
    */
   std::vector<Element*> elements = {};
 
+  /**
+   * The layout width of the group. When set, the group becomes a constraint positioning reference
+   * frame for its child elements. Does not affect rendering behavior. NaN means not set.
+   */
+  float width = NAN;
+
+  /**
+   * The layout height of the group. When set, the group becomes a constraint positioning reference
+   * frame for its child elements. Does not affect rendering behavior. NaN means not set.
+   */
+  float height = NAN;
+
   NodeType nodeType() const override {
     return NodeType::Group;
   }
 
- private:
+ protected:
   Group() = default;
+
+  void updateSize(LayoutContext* context) override;
+  void onMeasure(LayoutContext* context) override;
+  void setLayoutSize(LayoutContext* context, float width, float height) override;
+  void setLayoutPosition(LayoutContext* context, float x, float y) override;
+  void updateLayout(LayoutContext* context) override;
 
   friend class PAGXDocument;
 };

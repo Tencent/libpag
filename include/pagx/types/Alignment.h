@@ -1,0 +1,46 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#pragma once
+
+namespace pagx {
+
+/**
+ * Cross-axis alignment for child elements in a layout container.
+ */
+enum class Alignment {
+  /**
+   * Align children to the start of the cross axis.
+   */
+  Start,
+  /**
+   * Align children to the center of the cross axis.
+   */
+  Center,
+  /**
+   * Align children to the end of the cross axis.
+   */
+  End,
+  /**
+   * Stretch children without explicit cross-axis size to fill the available cross-axis space.
+   * Children that already have an explicit cross-axis size are not affected.
+   */
+  Stretch
+};
+
+}  // namespace pagx

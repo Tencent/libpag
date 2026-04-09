@@ -920,7 +920,9 @@ async function loadPAGXData(data: Uint8Array, name: string, baseURL: string) {
 }
 
 async function prepareForLoading(): Promise<void> {
-    hidePlaybackUI();
+    if (playgroundState.pagxView) {
+        hidePlaybackUI();
+    }
     showLoadingUI();
     resetProgressUI();
     await new Promise(resolve => requestAnimationFrame(resolve));

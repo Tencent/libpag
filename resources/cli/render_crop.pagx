@@ -2,19 +2,19 @@
 <!-- Test for crop rendering - a checkerboard pattern -->
 <pagx version="1.0" width="200" height="200">
   <Layer>
-    <Rectangle position="50,50" size="100,100"/>
+    <Rectangle size="100,100"/>
     <Fill color="#000000"/>
   </Layer>
   <Layer>
-    <Rectangle position="150,50" size="100,100"/>
+    <Rectangle left="100" size="100,100"/>
     <Fill color="#FFFFFF"/>
   </Layer>
   <Layer>
-    <Rectangle position="50,150" size="100,100"/>
+    <Rectangle top="100" size="100,100"/>
     <Fill color="#FFFFFF"/>
   </Layer>
   <Layer>
-    <Rectangle position="150,150" size="100,100"/>
+    <Rectangle left="100" top="100" size="100,100"/>
     <Fill color="#000000"/>
   </Layer>
 </pagx>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test: full-canvas clip mask that has no clipping effect -->
+<pagx version="1.0" width="400" height="300">
+  <Layer id="maskLayer" visible="false">
+    <Rectangle position="200,150" size="400,300"/>
+    <Fill color="#FFFFFF"/>
+  </Layer>
+  <Layer id="masked" mask="@maskLayer">
+    <Rectangle size="200,100"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+</pagx>

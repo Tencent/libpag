@@ -18,19 +18,22 @@
 
 #pragma once
 
+#include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/types/Point.h"
 #include "pagx/types/PolystarType.h"
+#include "pagx/types/Rect.h"
 
 namespace pagx {
 
 /**
  * Polystar represents a polygon or star shape with configurable points, radii, and roundness.
  */
-class Polystar : public Element {
+class Polystar : public Element, public LayoutNode {
  public:
   /**
-   * The position of the polystar center point.
+   * The center point of the polystar. When not explicitly set, defaults to the negative of the
+   * bounding box origin so that the top-left pixel aligns with the origin (0, 0).
    */
   Point position = {};
 
@@ -78,6 +81,18 @@ class Polystar : public Element {
   NodeType nodeType() const override {
     return NodeType::Polystar;
   }
+
+  /**
+   * Computes the tight bounding box of the polystar by iterating over all vertices.
+   * Unlike using outerRadius as a square, this accounts for the actual vertex positions
+   * determined by pointCount, rotation, and innerRadius (for star type).
+   */
+  Rect getContentBounds() const;
+
+ protected:
+  void onMeasure(LayoutContext* context) override;
+  void setLayoutSize(LayoutContext* context, float width, float height) override;
+  void setLayoutPosition(LayoutContext* context, float x, float y) override;
 
  private:
   Polystar() = default;

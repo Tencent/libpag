@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="460" height="400">
+  <!-- Test TextBox with Group transforms: inverse matrix cancels Group transform
+       so text renders at TextBox layout position regardless of Group transform. -->
+
+  <!-- Case 1: Group with position offset -->
+  <Layer left="20" top="20">
+    <Rectangle size="200,100"/>
+    <Stroke/>
+    <TextBox width="200" height="100" textAlign="center" paragraphAlign="middle">
+      <Group position="50,30">
+        <Text text="Position" fontFamily="NotoSansSC" fontSize="24"/>
+        <Fill/>
+      </Group>
+    </TextBox>
+  </Layer>
+
+  <!-- Case 2: Group with uniform scale -->
+  <Layer left="240" top="20">
+    <Rectangle size="200,100"/>
+    <Stroke/>
+    <TextBox width="200" height="100" textAlign="center" paragraphAlign="middle">
+      <Group scale="2,2">
+        <Text text="Scale" fontFamily="NotoSansSC" fontSize="24"/>
+        <Fill/>
+      </Group>
+    </TextBox>
+  </Layer>
+
+  <!-- Case 3: Nested Groups with cumulative offset -->
+  <Layer left="20" top="140">
+    <Rectangle size="200,100"/>
+    <Stroke/>
+    <TextBox width="200" height="100" textAlign="center" paragraphAlign="middle">
+      <Group position="20,10">
+        <Group position="30,20">
+          <Text text="Nested" fontFamily="NotoSansSC" fontSize="24"/>
+          <Fill/>
+        </Group>
+      </Group>
+    </TextBox>
+  </Layer>
+
+  <!-- Case 4: Group with non-uniform scale -->
+  <Layer left="240" top="140">
+    <Rectangle size="200,100"/>
+    <Stroke/>
+    <TextBox width="200" height="100" textAlign="center" paragraphAlign="middle">
+      <Group scale="2,1">
+        <Text text="NonUniform" fontFamily="NotoSansSC" fontSize="24"/>
+        <Fill/>
+      </Group>
+    </TextBox>
+  </Layer>
+
+  <!-- Case 5: Nested Groups with rotation + scale (complex inverse matrix) -->
+  <Layer left="20" top="260">
+    <Rectangle size="200,100"/>
+    <Stroke/>
+    <TextBox width="200" height="100" textAlign="center" paragraphAlign="middle">
+      <Group position="30,20" rotation="15">
+        <Group scale="1,2">
+          <Text text="Complex" fontFamily="NotoSansSC" fontSize="24"/>
+          <Fill/>
+        </Group>
+      </Group>
+    </TextBox>
+  </Layer>
+</pagx>
