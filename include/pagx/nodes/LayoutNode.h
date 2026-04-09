@@ -98,14 +98,14 @@ class LayoutNode {
   virtual void setLayoutSize(LayoutContext* context, float width, float height);
 
   /** Writes self position and layoutX/layoutY. */
-  virtual void setLayoutPosition(LayoutContext* context, float x, float y) {
+  virtual void setLayoutPosition(LayoutContext* /*context*/, float /*x*/, float /*y*/) {
   }
 
   /**
    * Lays out children using layoutWidth/layoutHeight as container size.
    * Only container nodes (Group/TextBox/Layer) override this.
    */
-  virtual void updateLayout(LayoutContext* context) {
+  virtual void updateLayout(LayoutContext* /*context*/) {
   }
 
   /**
