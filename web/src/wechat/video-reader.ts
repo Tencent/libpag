@@ -109,7 +109,9 @@ export class VideoReader {
       if (this.isDestroyed) return;
       this.seeking = false;
     }
-    this.arrayBufferImage.setFrameData(await this.getFrameData());
+    const frameData = await this.getFrameData();
+    if (this.isDestroyed) return;
+    this.arrayBufferImage.setFrameData(frameData);
     this.currentFrame = targetFrame;
     return;
   }

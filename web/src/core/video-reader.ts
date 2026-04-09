@@ -178,6 +178,10 @@ export class VideoReader {
                     // Seek and play
                     this.isSought = true;
                     await this.seek(targetTime);
+                    if (this.isDestroyed) {
+                        resolve();
+                        return;
+                    }
                     this.currentFrame = targetFrame;
                     resolve();
                     return;
