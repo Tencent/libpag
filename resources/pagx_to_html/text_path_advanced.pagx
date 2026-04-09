@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: TextPath advanced attributes: baselineOrigin, baselineAngle, lastMargin,
      reversed="true", forceAlignment="true", perpendicular="false" -->
-<pagx version="1.0" width="420" height="380">
+<pagx version="1.0" width="420" height="400">
   <Resources>
     <!-- Wide arc for top banner -->
-    <PathData id="bannerArc" data="M 30,130 C 90,30 310,30 370,130"/>
+    <PathData id="bannerArc" data="M 50,150 C 110,70 310,70 370,150"/>
     <!-- Circle path for badge ring -->
-    <PathData id="circlePath" data="M 310,240 A 50,50 0 1,1 309.99,240 Z"/>
+    <PathData id="circlePath" data="M 310,250 A 45,45 0 1,1 309.99,250 Z"/>
     <!-- Wavy path for bottom text -->
-    <PathData id="wavyPath" data="M 30,320 Q 110,280 210,320 Q 310,360 390,320"/>
+    <PathData id="wavyPath" data="M 50,330 Q 130,295 210,330 Q 290,365 370,330"/>
   </Resources>
 
   <!-- Background -->
   <Layer>
-    <Rectangle position="210,190" size="420,380"/>
+    <Rectangle position="210,200" size="420,400"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
@@ -23,80 +23,80 @@
     <Fill color="#1E293B"/>
   </Layer>
   <Layer>
-    <Text text="Baseline, reversed, force alignment, perpendicular" fontFamily="Arial" fontSize="10" position="210,50" textAnchor="center"/>
+    <Text text="Reversed, force alignment, perpendicular, margins" fontFamily="Arial" fontSize="10" position="210,50" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="210,212" size="360,270" roundness="16"/>
+    <Rectangle position="210,222" size="370,290" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
   <!-- Ghost arc path -->
   <Layer alpha="0.15">
-    <Path data="M 30,130 C 90,30 310,30 370,130"/>
+    <Path data="M 50,150 C 110,70 310,70 370,150"/>
     <Stroke color="#3B82F6" width="1"/>
   </Layer>
 
   <!-- Banner text along arc -->
   <Layer>
-    <Text text="BANNER TEXT" fontFamily="Arial" fontStyle="Bold" fontSize="18" position="10,10"/>
-    <TextPath path="@bannerArc" perpendicular="true" firstMargin="20" lastMargin="20"/>
+    <Text text="BANNER TEXT" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="10,10"/>
+    <TextPath path="@bannerArc" perpendicular="true" firstMargin="30" lastMargin="30"/>
     <Fill color="#3B82F6"/>
   </Layer>
 
   <!-- Margins test: straight line -->
   <Layer alpha="0.15">
-    <Path data="M 30,175 L 200,175"/>
+    <Path data="M 50,190 L 200,190"/>
     <Stroke color="#EC4899" width="1"/>
   </Layer>
   <Layer>
-    <Text text="MARGINS" fontFamily="Arial" fontSize="14" position="10,10"/>
-    <TextPath path="M 30,175 L 200,175" firstMargin="15" lastMargin="15"/>
+    <Text text="MARGINS" fontFamily="Arial" fontSize="12" position="10,10"/>
+    <TextPath path="M 50,190 L 200,190" firstMargin="15" lastMargin="15"/>
     <Fill color="#EC4899"/>
   </Layer>
 
-  <!-- Perpendicular=false: glyphs stay upright -->
+  <!-- Perpendicular=false: glyphs stay upright on arc -->
   <Layer alpha="0.15">
-    <Path data="M 30,130 C 90,30 310,30 370,130"/>
+    <Path data="M 50,150 C 110,70 310,70 370,150"/>
     <Stroke color="#8B5CF6" width="1" dashes="4,3"/>
   </Layer>
   <Layer>
-    <Text text="UPRIGHT" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="10,10"/>
-    <TextPath path="@bannerArc" perpendicular="false" firstMargin="100" lastMargin="100"/>
+    <Text text="UPRIGHT" fontFamily="Arial" fontStyle="Bold" fontSize="11" position="10,10"/>
+    <TextPath path="@bannerArc" perpendicular="false" firstMargin="110" lastMargin="110"/>
     <Fill color="#8B5CF680"/>
   </Layer>
 
   <!-- Badge circle: reversed text -->
   <Layer alpha="0.15">
-    <Path data="M 310,240 A 50,50 0 1,1 309.99,240 Z"/>
+    <Path data="M 310,250 A 45,45 0 1,1 309.99,250 Z"/>
     <Stroke color="#EF4444" width="1"/>
   </Layer>
   <Layer>
-    <Ellipse position="310,240" size="70,70"/>
+    <Ellipse position="310,250" size="60,60"/>
     <Fill color="#FEF3C7"/>
   </Layer>
   <Layer>
-    <Ellipse position="310,240" size="60,60"/>
+    <Ellipse position="310,250" size="50,50"/>
     <Fill color="#FFFFFF"/>
   </Layer>
   <Layer>
-    <Text text="BADGE RING" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="10,10"/>
-    <TextPath path="@circlePath" reversed="true" firstMargin="5" lastMargin="5"/>
+    <Text text="BADGE" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="10,10"/>
+    <TextPath path="@circlePath" reversed="true" firstMargin="10" lastMargin="10"/>
     <Fill color="#EF4444"/>
   </Layer>
 
   <!-- Ghost wavy path -->
   <Layer alpha="0.15">
-    <Path data="M 30,320 Q 110,280 210,320 Q 310,360 390,320"/>
+    <Path data="M 50,330 Q 130,295 210,330 Q 290,365 370,330"/>
     <Stroke color="#10B981" width="1"/>
   </Layer>
 
   <!-- Force alignment: text stretched to fill path -->
   <Layer>
-    <Text text="FORCE ALIGN" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="10,10"/>
+    <Text text="FORCE ALIGN" fontFamily="Arial" fontStyle="Bold" fontSize="14" position="10,10"/>
     <TextPath path="@wavyPath" forceAlignment="true"/>
     <Fill color="#10B981"/>
   </Layer>
