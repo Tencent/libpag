@@ -118,10 +118,14 @@ export class VideoReader {
     }
 
     public async prepare(targetFrame: number, playbackRate: number): Promise<void> {
-        if (targetFrame === this.currentFrame) {
+        if (this.isDestroyed || targetFrame === this.currentFrame) {
             return;
         }
         const promise = new Promise<void>(async (resolve, reject) => {
+            if (this.isDestroyed) {
+                resolve();
+                return;
+            }
             this.setError(null); // reset error
             this.isSought = false; // reset seek status
             const {currentTime} = this.videoEl!;
@@ -130,14 +134,26 @@ export class VideoReader {
             if (currentTime === 0 && targetTime === 0) {
                 if (!this.canplay && !SAFARI_OR_IOS_WEBVIEW) {
                     await waitVideoCanPlay(this.videoEl!);
+                    if (this.isDestroyed) {
+                        resolve();
+                        return;
+                    }
                 } else {
                     try {
                         await waitVideoCanPlay(this.videoEl!);
+                        if (this.isDestroyed) {
+                            resolve();
+                            return;
+                        }
                         await this.play();
                     } catch (e) {
                         this.setError(e);
                         this.currentFrame = targetFrame;
                         reject(e);
+                        return;
+                    }
+                    if (this.isDestroyed) {
+                        resolve();
                         return;
                     }
                     await new Promise<void>((resolveInner) => {
@@ -154,7 +170,7 @@ export class VideoReader {
                     // Static frame
                     await this.seek(targetTime, false);
                     this.currentFrame = targetFrame;
-                    resolve();  // Ensure promise resolves
+                    resolve();
                     return;
                 } else if ((Math.abs(currentTime - targetTime) < (1 / this.frameRate) * VIDEO_DECODE_WAIT_FRAME) && !this.videoEl!.paused) {
                     // Within tolerable frame rate deviation
@@ -168,6 +184,10 @@ export class VideoReader {
                 }
             }
 
+            if (this.isDestroyed) {
+                resolve();
+                return;
+            }
             const targetPlaybackRate = Math.min(Math.max(playbackRate, VIDEO_PLAYBACK_RATE_MIN), VIDEO_PLAYBACK_RATE_MAX);
             if (!this.disablePlaybackRate && this.videoEl!.playbackRate !== targetPlaybackRate) {
                 this.videoEl!.playbackRate = targetPlaybackRate;
@@ -253,34 +273,47 @@ export class VideoReader {
             }
 
             const onSeeked = () => {
-                removeListener(this.videoEl!, 'seeked', onSeeked);
+                if (!this.videoEl || this.isDestroyed) {
+                    clearTimeout(seekTimeout);
+                    resolve();
+                    return;
+                }
+                removeListener(this.videoEl, 'seeked', onSeeked);
                 clearTimeout(seekTimeout);
                 if (play) {
                     // After seeking, the video might still be in 'ended' state
                     // Reset it by setting currentTime to itself to clear the ended flag
-                    if (this.videoEl!.ended) {
-                        this.videoEl!.currentTime = this.videoEl!.currentTime;
+                    if (this.videoEl.ended) {
+                        this.videoEl.currentTime = this.videoEl.currentTime;
                     }
-                    this.videoEl?.play().catch((e) => {
+                    this.videoEl.play().catch((e) => {
                         this.setError(e);
                     });
-                } else if (!play && !this.videoEl!.paused) {
-                    this.videoEl?.pause();
+                } else if (!play && !this.videoEl.paused) {
+                    this.videoEl.pause();
                 }
                 resolve();
             };
 
             const onCanPlay = () => {
-                removeListener(this.videoEl!, 'canplay', onCanPlay);
+                if (!this.videoEl || this.isDestroyed) {
+                    clearTimeout(seekTimeout);
+                    resolve();
+                    return;
+                }
+                removeListener(this.videoEl, 'canplay', onCanPlay);
                 // Now that we have enough data, perform the seek.
-                this.videoEl!.currentTime = targetTime;
-                addListener(this.videoEl!, 'seeked', onSeeked);
+                this.videoEl.currentTime = targetTime;
+                addListener(this.videoEl, 'seeked', onSeeked);
             };
 
             const seekTimeout = setTimeout(() => {
-                removeListener(this.videoEl!, 'canplay', onCanPlay);
-                removeListener(this.videoEl!, 'seeked', onSeeked);
-                reject(new Error('Seek operation timed out.'));
+                if (this.videoEl) {
+                    removeListener(this.videoEl, 'canplay', onCanPlay);
+                    removeListener(this.videoEl, 'seeked', onSeeked);
+                }
+                console.log('[VideoReader] Seek operation timed out, continuing with current frame.');
+                resolve();
             }, (1000 / this.frameRate) * VIDEO_DECODE_SEEK_TIMEOUT_FRAME);
 
             // Check if we need to wait for 'canplay' event before seeking.

@@ -85,10 +85,11 @@ export class VideoReader {
   }
 
   public async prepare(targetFrame: number) {
-    if (targetFrame === this.currentFrame) return;
+    if (this.isDestroyed || targetFrame === this.currentFrame) return;
     this.isSought = false;
     // Wait for videoDecoder ready
     await this.videoDecoderPromise;
+    if (this.isDestroyed) return;
     if (this.frameDataBuffers.length > 0) {
       const index = this.frameDataBuffers.findIndex((frameData) => frameData.id === targetFrame);
       if (index !== -1) {
@@ -105,6 +106,7 @@ export class VideoReader {
       this.isSought = true;
       this.bufferIndex = targetFrame;
       await this.videoDecoder.seek(Math.floor((targetFrame / this.frameRate) * 1000));
+      if (this.isDestroyed) return;
       this.seeking = false;
     }
     this.arrayBufferImage.setFrameData(await this.getFrameData());
@@ -176,6 +178,7 @@ export class VideoReader {
   }
 
   private getFrameDataLoop() {
+    if (this.isDestroyed) return;
     if (this.seeking) return;
     if (!this.videoDecoder) {
       this.clearFrameDataLoop();

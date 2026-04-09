@@ -105,7 +105,7 @@ export class PAGView extends NativePAGView {
   }
 
   protected override async flushLoop(force = false) {
-    if (!this.isPlaying) return;
+    if (!this.isPlaying || this.isDestroyed) return;
     this.setTimer();
     if (this.flushingNextFrame) return;
     try {
