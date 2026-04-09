@@ -70,31 +70,31 @@
 
   <!-- Labels -->
   <Layer>
-    <Text text="DropShadow blendMode" fontFamily="Arial" fontSize="9" position="80,145"/>
+    <Text text="DropShadow blendMode" fontFamily="Arial" fontSize="9" position="90,155" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer>
-    <Text text="InnerShadow blendMode" fontFamily="Arial" fontSize="9" position="260,145"/>
+    <Text text="InnerShadow blendMode" fontFamily="Arial" fontSize="9" position="270,155" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer>
-    <Text text="excludeChildEffects" fontFamily="Arial" fontSize="9" position="80,305"/>
+    <Text text="excludeChildEffects" fontFamily="Arial" fontSize="9" position="90,315" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer>
-    <Text text="BgBlur tileMode=clamp" fontFamily="Arial" fontSize="9" position="260,285"/>
+    <Text text="BgBlur tileMode=clamp" fontFamily="Arial" fontSize="9" position="270,295" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer>
-    <Text text="Blur tileMode=mirror" fontFamily="Arial" fontSize="9" position="260,355"/>
+    <Text text="Blur tileMode=mirror" fontFamily="Arial" fontSize="9" position="270,375" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer>
-    <Text text="Stroke alpha+foreground" fontFamily="Arial" fontSize="9" position="30,375"/>
+    <Text text="Stroke alpha+foreground" fontFamily="Arial" fontSize="9" position="90,395" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer>
-    <Text text="Path reversed" fontFamily="Arial" fontSize="9" position="290,375"/>
+    <Text text="Path reversed" fontFamily="Arial" fontSize="9" position="320,385" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 </pagx>
