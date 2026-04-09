@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Remaining coverage gaps — ImagePattern.mipmapMode (non-default), Repeater.offset (non-zero),
      TextBox.textAlign="end", RangeSelector.offset (non-zero), TextPath.baselineAngle (non-zero) -->
-<pagx version="1.0" width="420" height="420">
+<pagx version="1.0" width="440" height="420">
   <Resources>
     <Image id="tinyImg" source="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAFUlEQVR4nGP8Oo/7PwMSYELmECcAAKy6AqWSorM1AAAAAElFTkSuQmCC"/>
     <PathData id="wavePath" data="M 20,50 C 80,10 120,90 180,50 C 240,10 280,90 360,50"/>
@@ -46,17 +46,17 @@
 
   <!-- TextBox with textAlign="end" -->
   <Layer>
-    <Rectangle position="330,170" size="140,60" roundness="8"/>
+    <Rectangle position="310,170" size="180,60" roundness="8"/>
     <Fill color="#F1F5F9"/>
     <Stroke color="#CBD5E1" width="1"/>
   </Layer>
   <Layer>
     <Text text="End aligned text in a text box area" fontFamily="Arial" fontSize="12" position="10,10"/>
-    <TextBox position="260,145" size="140,50" textAlign="end" lineHeight="18"/>
+    <TextBox position="230,148" size="160,45" textAlign="end" lineHeight="18"/>
     <Fill color="#1E293B"/>
   </Layer>
   <Layer>
-    <Text text="textAlign=end" fontFamily="Arial" fontSize="10" position="330,210" textAnchor="center"/>
+    <Text text="textAlign=end" fontFamily="Arial" fontSize="10" position="310,210" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
