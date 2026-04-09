@@ -1,57 +1,57 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Layer visible attribute → display:none; demonstrates visible vs hidden layers
      with labeled indicators and ghost outline for the hidden element -->
-<pagx version="1.0" width="320" height="220">
+<pagx version="1.0" width="320" height="235">
   <!-- Background -->
   <Layer>
-    <Rectangle position="160,110" size="320,220" roundness="0"/>
+    <Rectangle position="160,118" size="320,235" roundness="0"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
   <!-- Visible layer: solid card with label -->
   <Layer>
-    <Rectangle position="95,110" size="110,120" roundness="12"/>
+    <Rectangle position="95,125" size="110,120" roundness="12"/>
     <Fill color="#3B82F6"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#3B82F640"/>
   </Layer>
   <!-- Visible icon: eye open (circle + dot) -->
   <Layer>
-    <Ellipse position="95,100" size="28,18"/>
+    <Ellipse position="95,115" size="28,18"/>
     <Stroke color="#FFFFFF" width="2"/>
   </Layer>
   <Layer>
-    <Ellipse position="95,100" size="8,8"/>
+    <Ellipse position="95,115" size="8,8"/>
     <Fill color="#FFFFFF"/>
   </Layer>
   <!-- "Visible" label -->
   <Layer>
-    <Text text="Visible" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="95,134" textAnchor="center"/>
+    <Text text="Visible" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="95,149" textAnchor="center"/>
     <Fill color="#FFFFFF"/>
   </Layer>
 
   <!-- Hidden layer: this should not render (visible=false) -->
   <Layer visible="false">
-    <Rectangle position="225,110" size="110,120" roundness="12"/>
+    <Rectangle position="225,125" size="110,120" roundness="12"/>
     <Fill color="#EF4444"/>
   </Layer>
 
   <!-- Ghost outline indicator for the hidden element (always visible) -->
   <Layer>
-    <Rectangle position="225,110" size="110,120" roundness="12"/>
+    <Rectangle position="225,125" size="110,120" roundness="12"/>
     <Stroke color="#CBD5E1" width="2" dashes="6,4"/>
   </Layer>
   <!-- Crossed-out eye icon -->
   <Layer>
-    <Ellipse position="225,100" size="28,18"/>
+    <Ellipse position="225,115" size="28,18"/>
     <Stroke color="#94A3B8" width="2"/>
   </Layer>
   <Layer>
-    <Path data="M 202,80 L 228,100"/>
+    <Path data="M 202,95 L 228,115"/>
     <Stroke color="#94A3B8" width="2" cap="round"/>
   </Layer>
   <!-- "Hidden" label -->
   <Layer>
-    <Text text="Hidden" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="225,134" textAnchor="center"/>
+    <Text text="Hidden" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="225,149" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
@@ -69,7 +69,7 @@
 
   <!-- Footer note -->
   <Layer>
-    <Text text="Red card uses visible=&quot;false&quot; and should not render" fontFamily="Arial" fontSize="9" position="160,190" textAnchor="center"/>
+    <Text text="Red card uses visible=&quot;false&quot; and should not render" fontFamily="Arial" fontSize="9" position="160,205" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 </pagx>
