@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Constraint layout: Ellipse element constraint combinations -->
+<!-- Fully automatic layout: containers are flexible (no width) — auto-equal distribution -->
+<pagx version="1.0" width="820" height="600">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+
+  <!-- Grid layout: 2 rows, padding=30, gap=20 -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30">
+
+    <!-- Row 1 -->
+    <Layer flex="1" layout="horizontal" gap="20">
+
+      <!-- Container 1: Single-edge and center positioning -->
+      <Layer flex="1" height="260">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <!-- 1.1: left="20" top="20" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Ellipse left="20" top="20" size="60,60"/>
+          <Fill color="#6366F1"/>
+        </Layer>
+        <!-- 1.2: right="20" top="20" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Ellipse right="20" top="20" size="60,60"/>
+          <Fill color="#F43F5E"/>
+        </Layer>
+        <!-- 1.3: centerX="0" centerY="0" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Ellipse centerX="0" centerY="0" size="80,50"/>
+          <Fill color="#10B981"/>
+        </Layer>
+        <!-- 1.4: left="20" bottom="20" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Ellipse left="20" bottom="20" size="60,60"/>
+          <Fill color="#F59E0B"/>
+        </Layer>
+        <!-- 1.5: right="20" bottom="20" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Ellipse right="20" bottom="20" size="60,60"/>
+          <Fill color="#06B6D4"/>
+        </Layer>
+      </Layer>
+
+      <!-- Container 2: Horizontal stretch (left+right) -->
+      <Layer flex="1" height="260">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <!-- 2.1: left="25" right="25" top="30" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Ellipse left="25" right="25" top="30" size="1,50"/>
+          <Fill>
+            <LinearGradient startPoint="0,0" endPoint="310,0">
+              <ColorStop offset="0" color="#EC4899"/>
+              <ColorStop offset="1" color="#F472B6"/>
+            </LinearGradient>
+          </Fill>
+        </Layer>
+        <!-- 2.2: left="50" right="50" centerY="0" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Ellipse left="50" right="50" centerY="0" size="1,60"/>
+          <Fill>
+            <LinearGradient startPoint="0,0" endPoint="260,0">
+              <ColorStop offset="0" color="#8B5CF6"/>
+              <ColorStop offset="1" color="#A78BFA"/>
+            </LinearGradient>
+          </Fill>
+        </Layer>
+        <!-- 2.3: left="80" right="80" bottom="30" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Ellipse left="80" right="80" bottom="30" size="1,50"/>
+          <Fill>
+            <LinearGradient startPoint="0,0" endPoint="200,0">
+              <ColorStop offset="0" color="#3B82F6"/>
+              <ColorStop offset="1" color="#1D4ED8"/>
+            </LinearGradient>
+          </Fill>
+        </Layer>
+      </Layer>
+
+    </Layer>
+
+    <!-- Row 2 -->
+    <Layer flex="1" layout="horizontal" gap="20">
+
+      <!-- Container 3: Vertical stretch (top+bottom) -->
+      <Layer flex="1" height="260">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <!-- 3.1: left="20" top="25" bottom="25" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Ellipse left="20" top="25" bottom="25" size="55,1"/>
+          <Fill>
+            <LinearGradient startPoint="0,0" endPoint="0,210">
+              <ColorStop offset="0" color="#FBBF24"/>
+              <ColorStop offset="1" color="#F59E0B"/>
+            </LinearGradient>
+          </Fill>
+        </Layer>
+        <!-- 3.2: right="20" top="50" bottom="50" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Ellipse right="20" top="50" bottom="50" size="55,1"/>
+          <Fill>
+            <LinearGradient startPoint="0,0" endPoint="0,160">
+              <ColorStop offset="0" color="#A16207"/>
+              <ColorStop offset="1" color="#7C2D12"/>
+            </LinearGradient>
+          </Fill>
+        </Layer>
+      </Layer>
+
+      <!-- Container 4: Four-edge stretch -->
+      <Layer flex="1" height="260">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Ellipse left="25" right="25" top="25" bottom="25" size="1,1"/>
+          <Fill>
+            <LinearGradient startPoint="0,0" endPoint="230,210">
+              <ColorStop offset="0" color="#EC4899"/>
+              <ColorStop offset="1" color="#BE185D"/>
+            </LinearGradient>
+          </Fill>
+        </Layer>
+      </Layer>
+
+      <!-- Container 5: Asymmetric stretch -->
+      <Layer flex="1" height="260">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Ellipse left="20" right="50" top="30" bottom="60" size="1,1"/>
+          <Fill>
+            <LinearGradient startPoint="0,0" endPoint="210,170">
+              <ColorStop offset="0" color="#06B6D4"/>
+              <ColorStop offset="1" color="#0369A1"/>
+            </LinearGradient>
+          </Fill>
+        </Layer>
+      </Layer>
+
+    </Layer>
+
+  </Layer>
+</pagx>

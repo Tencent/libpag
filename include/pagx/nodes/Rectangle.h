@@ -18,8 +18,10 @@
 
 #pragma once
 
+#include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/types/Point.h"
+#include "pagx/types/Rect.h"
 #include "pagx/types/Size.h"
 
 namespace pagx {
@@ -27,20 +29,21 @@ namespace pagx {
 /**
  * Rectangle represents a rectangle shape with optional rounded corners.
  */
-class Rectangle : public Element {
+class Rectangle : public Element, public LayoutNode {
  public:
   /**
-   * The position of the rectangle center point.
+   * The center point of the rectangle. When not explicitly set, defaults to the center of the
+   * bounding box so that the top-left corner aligns with the origin (0, 0).
    */
   Point position = {};
 
   /**
-   * The size of the rectangle. The default value is {100, 100}.
+   * The size of the rectangle. The default value is {0, 0}.
    */
-  Size size = {100.0f, 100.0f};
+  Size size = {0.0f, 0.0f};
 
   /**
-   * The corner roundness of the rectangle, ranging from 0 to 100. The default value is 0.
+   * The corner roundness of the rectangle in pixels. The default value is 0.
    */
   float roundness = 0.0f;
 
@@ -52,6 +55,11 @@ class Rectangle : public Element {
   NodeType nodeType() const override {
     return NodeType::Rectangle;
   }
+
+ protected:
+  void onMeasure(LayoutContext* context) override;
+  void setLayoutSize(LayoutContext* context, float width, float height) override;
+  void setLayoutPosition(LayoutContext* context, float x, float y) override;
 
  private:
   Rectangle() = default;

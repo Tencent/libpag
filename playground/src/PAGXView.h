@@ -21,7 +21,7 @@
 #include <deque>
 #include <emscripten/bind.h>
 #include "LayerBuilder.h"
-#include "TextLayout.h"
+#include "pagx/FontConfig.h"
 #include "pagx/PAGXDocument.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Recording.h"
@@ -79,7 +79,7 @@ class PAGXView {
   bool presentImmediately = true;
   float pagxWidth = 0.0f;
   float pagxHeight = 0.0f;
-  TextLayout textLayout = {};
+  FontConfig fontConfig = {};
   std::shared_ptr<PAGXDocument> document = nullptr;
 
   // Background layer cache

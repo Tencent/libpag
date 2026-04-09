@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Constraint layout: TextBox element constraint combinations -->
+<!-- Fully automatic layout: containers are flexible (no width) — auto-equal distribution -->
+<!-- Each TextBox has a matching dashed border to visualize its computed bounds -->
+<pagx version="1.0" width="820" height="480">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+
+  <!-- Main vertical layout -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30">
+
+    <!-- Row 1: Single-edge positioning + Horizontal stretch -->
+    <Layer flex="1" layout="horizontal" gap="20">
+
+      <!-- Container 1: Single-edge and center positioning -->
+      <Layer flex="1" height="200">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <!-- 1.1: left="20" top="20" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="20" top="20" size="100,40" roundness="2"/>
+          <Stroke color="#6366F1" width="1" dashes="2,2"/>
+          <TextBox left="20" top="20" width="100" height="40">
+            <Text text="Left Top" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+            <Fill color="#334155"/>
+          </TextBox>
+        </Layer>
+        <!-- 1.2: right="20" bottom="20" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle right="20" bottom="20" size="100,40" roundness="2"/>
+          <Stroke color="#6366F1" width="1" dashes="2,2"/>
+          <TextBox right="20" bottom="20" width="100" height="40" textAlign="end" paragraphAlign="far">
+            <Text text="Right Bottom" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+            <Fill color="#334155"/>
+          </TextBox>
+        </Layer>
+        <!-- 1.3: centerX="0" centerY="0" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle centerX="0" centerY="0" size="100,40" roundness="2"/>
+          <Stroke color="#6366F1" width="1" dashes="2,2"/>
+          <TextBox centerX="0" centerY="0" width="100" height="40" textAlign="center" paragraphAlign="middle">
+            <Text text="Centered" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
+            <Fill color="#6366F1"/>
+          </TextBox>
+        </Layer>
+      </Layer>
+
+      <!-- Container 2: Horizontal stretch (left+right) with word wrapping -->
+      <Layer flex="1" height="200">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <!-- 2.1: left="20" right="20" top="10" — widest box -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="20" right="20" top="10" size="1,55" roundness="2"/>
+          <Stroke color="#6366F1" width="1" dashes="2,2"/>
+          <TextBox left="20" right="20" top="10" width="1" height="55">
+            <Text text="The quick brown fox jumps over the lazy dog near the river bank" fontFamily="Arial" fontSize="12"/>
+            <Fill color="#334155"/>
+          </TextBox>
+        </Layer>
+        <!-- 2.2: left="40" right="40" centerY="0" — narrower box -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="40" right="40" centerY="0" size="1,55" roundness="2"/>
+          <Stroke color="#10B981" width="1" dashes="2,2"/>
+          <TextBox left="40" right="40" centerY="0" width="1" height="55" paragraphAlign="middle">
+            <Text text="The quick brown fox jumps over the lazy dog near the river bank" fontFamily="Arial" fontSize="12"/>
+            <Fill color="#334155"/>
+          </TextBox>
+        </Layer>
+        <!-- 2.3: left="60" right="60" bottom="10" — narrowest box -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="60" right="60" bottom="10" size="1,55" roundness="2"/>
+          <Stroke color="#F59E0B" width="1" dashes="2,2"/>
+          <TextBox left="60" right="60" bottom="10" width="1" height="55" paragraphAlign="far">
+            <Text text="The quick brown fox jumps over the lazy dog near the river bank" fontFamily="Arial" fontSize="12"/>
+            <Fill color="#334155"/>
+          </TextBox>
+        </Layer>
+      </Layer>
+
+    </Layer>
+
+    <!-- Row 2: Vertical stretch + Four-edge + Asymmetric -->
+    <Layer flex="1" layout="horizontal" gap="20">
+
+      <!-- Container 3: Vertical stretch (top+bottom) -->
+      <Layer flex="1" height="200">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <!-- 3.1: left="15" top="20" bottom="20" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="15" top="20" bottom="20" size="130,1" roundness="2"/>
+          <Stroke color="#6366F1" width="1" dashes="2,2"/>
+          <TextBox left="15" top="20" bottom="20" width="130" height="1" paragraphAlign="middle">
+            <Text text="Vertical stretch makes this text box tall enough to show multiple lines clearly" fontFamily="Arial" fontSize="12"/>
+            <Fill color="#334155"/>
+          </TextBox>
+        </Layer>
+      </Layer>
+
+      <!-- Container 4: Four-edge stretch -->
+      <Layer flex="1" height="200">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <!-- 4.1: all edges stretch -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="20" right="20" top="20" bottom="20" size="1,1" roundness="2"/>
+          <Stroke color="#6366F1" width="1" dashes="2,2"/>
+          <TextBox left="20" right="20" top="20" bottom="20" width="1" height="1" textAlign="center" paragraphAlign="middle">
+            <Text text="Full stretch fills entire area with equal margins on all four edges" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+            <Fill color="#6366F1"/>
+          </TextBox>
+        </Layer>
+      </Layer>
+
+      <!-- Container 5: Asymmetric stretch -->
+      <Layer flex="1" height="200">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <!-- 5.1: asymmetric margins -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="15" right="40" top="25" bottom="50" size="1,1" roundness="2"/>
+          <Stroke color="#6366F1" width="1" dashes="2,2"/>
+          <TextBox left="15" right="40" top="25" bottom="50" width="1" height="1" paragraphAlign="middle">
+            <Text text="Asymmetric margins show different spacing on each edge of the text box" fontFamily="Arial" fontSize="12"/>
+            <Fill color="#334155"/>
+          </TextBox>
+        </Layer>
+      </Layer>
+
+    </Layer>
+
+  </Layer>
+</pagx>

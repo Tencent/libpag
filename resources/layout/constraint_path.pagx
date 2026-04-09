@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Constraint layout: Path element with proportional scaling -->
+<!-- Fully automatic layout: containers are flexible (no width) — auto-equal distribution -->
+<pagx version="1.0" width="800" height="590">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+
+  <!-- Main vertical layout, alignment=stretch -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30">
+
+    <!-- Row 1: Single-edge positioning + Horizontal-only scaling -->
+    <Layer flex="1" layout="horizontal" gap="20">
+
+      <!-- Container 1: Single-edge positioning -->
+      <Layer flex="1" height="250">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <!-- 1.1: left="20" top="20" (arrow shape) -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Path left="20" top="20" data="M 0,20 L 50,20 L 50,0 L 80,30 L 50,60 L 50,40 L 0,40 Z"/>
+          <Fill color="#6366F1"/>
+        </Layer>
+        <!-- 1.2: right="20" bottom="20" (star shape) -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Path right="20" bottom="20" data="M 30,0 L 38,22 L 60,22 L 42,36 L 50,58 L 30,44 L 10,58 L 18,36 L 0,22 L 22,22 Z"/>
+          <Fill color="#F43F5E"/>
+        </Layer>
+        <!-- 1.3: centerX="0" centerY="0" (heart shape) -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Path centerX="0" centerY="0" data="M 40,15 C 40,5 50,0 60,0 C 70,0 80,10 80,20 C 80,35 60,55 40,70 C 20,55 0,35 0,20 C 0,10 10,0 20,0 C 30,0 40,5 40,15 Z"/>
+          <Fill color="#EC4899"/>
+        </Layer>
+      </Layer>
+
+      <!-- Container 2: Horizontal-only scaling (left+right) -->
+      <Layer flex="1" height="250">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <!-- 2.1: left="30" right="30" top="30" (horizontal scale, top position) -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Path left="30" right="30" top="30" data="M 0,0 L 100,0 L 100,40 L 0,40 Z"/>
+          <Fill>
+            <LinearGradient startPoint="0,0" endPoint="300,0">
+              <ColorStop offset="0" color="#F59E0B"/>
+              <ColorStop offset="1" color="#D97706"/>
+            </LinearGradient>
+          </Fill>
+        </Layer>
+        <!-- 2.2: left="50" right="50" bottom="30" (narrower horizontal scale) -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Path left="50" right="50" bottom="30" data="M 0,0 L 80,0 L 80,40 L 0,40 Z"/>
+          <Fill>
+            <LinearGradient startPoint="0,0" endPoint="260,0">
+              <ColorStop offset="0" color="#10B981"/>
+              <ColorStop offset="1" color="#059669"/>
+            </LinearGradient>
+          </Fill>
+        </Layer>
+      </Layer>
+
+    </Layer>
+
+    <!-- Row 2: Vertical-only + Dual-axis containers -->
+    <Layer flex="1" layout="horizontal" gap="20">
+
+      <!-- Container 3: Vertical-only scaling (top+bottom) -->
+      <Layer flex="1" height="250">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <!-- 3.1: top="20" bottom="20" centerX="0" (vertical scale fills height with margins) -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Path top="20" bottom="20" centerX="0" data="M 0,0 L 40,0 L 40,60 L 0,60 Z"/>
+          <Fill>
+            <LinearGradient startPoint="0,0" endPoint="0,210">
+              <ColorStop offset="0" color="#06B6D4"/>
+              <ColorStop offset="1" color="#0369A1"/>
+            </LinearGradient>
+          </Fill>
+        </Layer>
+      </Layer>
+
+      <!-- Container 4: Dual-axis fit scaling -->
+      <Layer flex="1" height="250">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <!-- 4.1: asymmetric margins: top="20" bottom="60" (top tighter than bottom) -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Path left="25" right="25" top="20" bottom="60" data="M 0,0 L 60,0 L 60,60 L 0,60 Z"/>
+          <Fill>
+            <LinearGradient startPoint="0,0" endPoint="150,170">
+              <ColorStop offset="0" color="#8B5CF6"/>
+              <ColorStop offset="1" color="#6D28D9"/>
+            </LinearGradient>
+          </Fill>
+        </Layer>
+      </Layer>
+
+      <!-- Container 5: Dual-axis fit, wide and tall -->
+      <Layer flex="1" height="250">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <!-- 5.1: asymmetric margins: top="60" bottom="20" (top wider than bottom) -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Path left="30" right="30" top="60" bottom="20" data="M 0,0 L 100,0 L 100,50 L 0,50 Z"/>
+          <Fill>
+            <LinearGradient startPoint="0,0" endPoint="300,170">
+              <ColorStop offset="0" color="#EC4899"/>
+              <ColorStop offset="1" color="#BE185D"/>
+            </LinearGradient>
+          </Fill>
+        </Layer>
+      </Layer>
+
+    </Layer>
+
+  </Layer>
+</pagx>

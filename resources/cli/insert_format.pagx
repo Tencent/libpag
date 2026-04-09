@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+      <!-- header section -->
+      <Layer id="header" height="40">
+                <Rectangle left="0" right="0" top="0" bottom="0"/>
+                <Fill color="#FF0000"/>
+      </Layer>
+   <Layer id="icon"/>
+      <Layer id="footer" height="40">
+          <Rectangle left="0" right="0" top="0" bottom="0"/>
+          <Fill color="#00FF00"/>
+      </Layer>
+</pagx>
