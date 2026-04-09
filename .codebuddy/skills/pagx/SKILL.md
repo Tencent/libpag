@@ -126,9 +126,11 @@ Do NOT start the next task until the current one is completed.
 No visual content — no shapes, text, painters, styles, or filters. Assign `id` to every
 structural section for scoped verification in Step 3.
 
-**Gate**: Run `pagx verify input.pagx`. Exit code must be 0 (no diagnostics). If not,
-fix all reported problems and re-run until clean. Then read the `.layout.xml` output and
-verify each section's bounds match the intended sizes and positions.
+**Gate**: Repeat until clean:
+1. Run `pagx verify input.pagx`.
+2. Fix all reported diagnostics, then re-run verify.
+3. Read the `.layout.xml` output and verify each section's bounds match the intended
+   sizes and positions.
 
 **Forbidden**: Do NOT proceed to Step 3 until the gate passes.
 
@@ -138,12 +140,15 @@ verify each section's bounds match the intended sizes and positions.
 
 For each section (identified by `id`), one at a time:
 
-**Do**: Add backgrounds, text, shapes, icons to this section only.
+**Do**: Fill in all visual content for this section only.
 
 **Gate**: Repeat until clean:
 1. Run `pagx verify --scale 2 --id "sectionId" input.pagx`.
 2. Fix all reported diagnostics, then re-run verify.
 3. Check the screenshot against §Screenshot Checklist.
+
+**Cleanup**: After the gate passes, delete that section's scoped artifacts
+(`input.{id}.png`, `input.{id}.layout.xml`) before moving on.
 
 **Forbidden**: Do NOT edit other sections. Do NOT proceed to the next section until
 this section's gate passes.
@@ -152,11 +157,14 @@ this section's gate passes.
 
 ### Step 4: Polish
 
-**Do**: Delete scoped artifacts from Step 3: `rm -f input.*.layout.xml` and any
-`input.{id}.png` files (do NOT delete `input.png`).
+**Do**: Review the full design holistically and refine cross-section details — spacing,
+alignment, color consistency, visual hierarchy — that only become apparent at full scale.
 
 **Gate**: Repeat until clean:
 1. Run `pagx verify --scale 2 input.pagx`.
 2. Fix all reported diagnostics, then re-run verify.
 3. Check the full screenshot against §Screenshot Checklist.
-4. Keep final `input.png` for reference (do not commit). Delete `input.layout.xml`.
+
+Keep final `input.png` and `input.layout.xml` for reference (do not commit). If further
+edits are made after this step, re-run the full verify to regenerate them. Delete any
+scoped `{id}` artifacts produced during the fix.
