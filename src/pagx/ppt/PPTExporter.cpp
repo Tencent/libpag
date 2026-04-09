@@ -1022,9 +1022,8 @@ static void EmitCubicBezTo(XMLBuilder& out, float x0, float y0, float x1, float 
   out.end();
 }
 
-static void EmitContour(XMLBuilder& out, const PathContour& c, float csX, float csY, float sOfsX,
-                        float sOfsY) {
-  EmitPoint(out, "a:moveTo", c.start.x * csX, c.start.y * csY, sOfsX, sOfsY);
+static void EmitContourSegments(XMLBuilder& out, const PathContour& c, float csX, float csY,
+                                float sOfsX, float sOfsY) {
   for (const auto& s : c.segs) {
     switch (s.verb) {
       case PathVerb::Line:
@@ -1042,9 +1041,49 @@ static void EmitContour(XMLBuilder& out, const PathContour& c, float csX, float 
         break;
     }
   }
+}
+
+static void EmitContour(XMLBuilder& out, const PathContour& c, float csX, float csY, float sOfsX,
+                        float sOfsY) {
+  EmitPoint(out, "a:moveTo", c.start.x * csX, c.start.y * csY, sOfsX, sOfsY);
+  EmitContourSegments(out, c, csX, csY, sOfsX, sOfsY);
   if (c.closed) {
     out.open("a:close").sc();
   }
+}
+
+// Stitches an outer contour with its nested inner contours into a single contour
+// using zero-width bridge lines. The bridge goes from the outer's start to each
+// inner contour's start and returns along the same line, producing a self-overlapping
+// edge pair that cancels in any scan-line rasterizer. The result is a single contour
+// that correctly renders hollow regions without relying on multi-path XOR support.
+static void EmitBridgedGroup(XMLBuilder& out, const std::vector<PathContour>& contours,
+                             const std::vector<size_t>& group, float csX, float csY, float sOfsX,
+                             float sOfsY) {
+  const auto& outer = contours[group[0]];
+
+  EmitPoint(out, "a:moveTo", outer.start.x * csX, outer.start.y * csY, sOfsX, sOfsY);
+  EmitContourSegments(out, outer, csX, csY, sOfsX, sOfsY);
+  if (outer.closed) {
+    EmitPoint(out, "a:lnTo", outer.start.x * csX, outer.start.y * csY, sOfsX, sOfsY);
+  }
+
+  for (size_t i = 1; i < group.size(); i++) {
+    const auto& inner = contours[group[i]];
+    if (inner.segs.empty()) {
+      continue;
+    }
+    // Bridge IN: outer.start → inner.start
+    EmitPoint(out, "a:lnTo", inner.start.x * csX, inner.start.y * csY, sOfsX, sOfsY);
+    EmitContourSegments(out, inner, csX, csY, sOfsX, sOfsY);
+    if (inner.closed) {
+      EmitPoint(out, "a:lnTo", inner.start.x * csX, inner.start.y * csY, sOfsX, sOfsY);
+    }
+    // Bridge OUT: inner.start → outer.start (same line reversed, cancels bridge IN)
+    EmitPoint(out, "a:lnTo", outer.start.x * csX, outer.start.y * csY, sOfsX, sOfsY);
+  }
+
+  out.open("a:close").sc();
 }
 
 void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofsX, float ofsY,
@@ -1083,8 +1122,10 @@ void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofs
     auto groups = GroupContoursByOutermost(contours, depths);
     for (const auto& group : groups) {
       out.open("a:path").a("w", pw).a("h", ph).gt();
-      for (size_t idx : group) {
-        EmitContour(out, contours[idx], csX, csY, sOfsX, sOfsY);
+      if (group.size() > 1) {
+        EmitBridgedGroup(out, contours, group, csX, csY, sOfsX, sOfsY);
+      } else {
+        EmitContour(out, contours[group[0]], csX, csY, sOfsX, sOfsY);
       }
       out.end();  // a:path
     }
