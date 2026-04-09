@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Rectangle center-point positioning, size, roundness, reversed; CSS div+border-radius path -->
-<pagx version="1.0" width="440" height="300">
+<pagx version="1.0" width="440" height="310">
   <!-- Background -->
   <Layer>
-    <Rectangle position="220,150" size="440,300"/>
+    <Rectangle position="220,155" size="440,310"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
@@ -19,18 +19,18 @@
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="220,170" size="380,180" roundness="16"/>
+    <Rectangle position="220,175" size="380,200" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
   <!-- Sharp rectangle -->
   <Layer>
-    <Rectangle position="70,125" size="80,60"/>
+    <Rectangle position="85,125" size="80,60"/>
     <Fill color="#3B82F6"/>
   </Layer>
   <Layer>
-    <Text text="Sharp" fontFamily="Arial" fontSize="9" position="70,165" textAnchor="center"/>
+    <Text text="Sharp" fontFamily="Arial" fontSize="9" position="85,165" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
