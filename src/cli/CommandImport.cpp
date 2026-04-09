@@ -260,10 +260,28 @@ static bool ResolveOneImport(Import* imp, const std::string& baseDir,
 
   InlinePathData(svgDoc.get());
 
-  // Collect converted elements from SVG document layers.
-  for (auto* svgLayer : svgDoc->layers) {
-    for (auto* element : svgLayer->contents) {
+  // Determine whether SVG layers can be safely unpacked into the parent layer's contents.
+  // Unpacking is only safe when there is exactly one SVG layer with no extra attributes
+  // (no transform, opacity, blend mode, mask, styles, filters, or child layers). Multiple
+  // SVG layers must be kept as child layers to preserve painter scope isolation — unpacking
+  // them would merge their contents into a single scope, causing painter accumulation bugs.
+  bool canUnpack = false;
+  if (svgDoc->layers.size() == 1) {
+    auto* single = svgDoc->layers[0];
+    canUnpack = single->matrix.isIdentity() && single->alpha == 1.0f &&
+                single->blendMode == BlendMode::Normal && single->mask == nullptr &&
+                single->styles.empty() && single->filters.empty() && single->children.empty();
+  }
+
+  if (canUnpack) {
+    // Single clean layer: unpack its contents directly into the parent layer.
+    for (auto* element : svgDoc->layers[0]->contents) {
       replacements.push_back(element);
+    }
+  } else {
+    // Multiple layers or layer with extra attributes: preserve as child layers.
+    for (auto* svgLayer : svgDoc->layers) {
+      parentLayer->children.push_back(svgLayer);
     }
   }
 

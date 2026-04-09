@@ -2206,6 +2206,28 @@ CLI_TEST(PAGXCliTest, ImportResolve_MissingFile) {
   EXPECT_NE(ret, 0);
 }
 
+CLI_TEST(PAGXCliTest, ImportResolve_MultiLayerPreservesIsolation) {
+  // Verifies that resolving an inline SVG with multiple elements preserves each SVG element
+  // as a separate child Layer, preventing painter accumulation bugs. Before the fix, all SVG
+  // elements were unpacked into the parent Layer's contents, causing the second Stroke to
+  // render both Paths (painter leak).
+  auto pagxPath = CopyToTemp("import_resolve_multi_layer.pagx", "resolve_multi_layer.pagx");
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--resolve", pagxPath});
+  EXPECT_EQ(ret, 0);
+
+  auto doc = pagx::PAGXImporter::FromFile(pagxPath);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(doc->hasUnresolvedImports());
+
+  // The host Layer should have child Layers (one per SVG element), not unpacked VectorElements.
+  ASSERT_EQ(doc->layers.size(), 1u);
+  auto* hostLayer = doc->layers[0];
+  EXPECT_GE(hostLayer->children.size(), 2u);
+
+  // Screenshot test: render the resolved file and compare against baseline.
+  EXPECT_TRUE(RenderAndCompare({"render", pagxPath}, "PAGXCliTest/ImportResolve_MultiLayer"));
+}
+
 //==============================================================================
 // CLI unresolved Import checks
 //==============================================================================
