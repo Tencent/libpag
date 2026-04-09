@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Group → div.pagx-group with anchor/position/rotation/scale/skew/alpha; scope isolation; geometry propagation -->
-<pagx version="1.0" width="420" height="370">
+<pagx version="1.0" width="420" height="380">
   <!-- Background -->
   <Layer>
-    <Rectangle position="210,185" size="420,370"/>
+    <Rectangle position="210,190" size="420,380"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
@@ -19,7 +19,7 @@
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="210,205" size="360,260" roundness="16"/>
+    <Rectangle position="210,205" size="360,280" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>

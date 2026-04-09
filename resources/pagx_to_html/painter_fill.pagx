@@ -26,27 +26,27 @@
 
   <!-- Fill with alpha -->
   <Layer>
-    <Rectangle position="90,115" size="100,100" roundness="12"/>
+    <Rectangle position="90,130" size="100,100" roundness="12"/>
     <Fill color="#3B82F6" alpha="0.5"/>
   </Layer>
   <Layer>
-    <Text text="alpha=0.5" fontFamily="Arial" fontSize="9" position="90,175" textAnchor="center"/>
+    <Text text="alpha=0.5" fontFamily="Arial" fontSize="9" position="90,190" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Fill with blendMode -->
   <Layer>
-    <Rectangle position="90,115" size="80,80"/>
+    <Rectangle position="90,130" size="80,80"/>
     <Fill color="#EF4444" blendMode="multiply"/>
   </Layer>
 
   <!-- fillRule=evenOdd -->
   <Layer>
-    <Path data="M 260,65 L 320,165 L 200,165 Z M 260,85 L 300,155 L 220,155 Z"/>
+    <Path data="M 260,80 L 320,180 L 200,180 Z M 260,100 L 300,170 L 220,170 Z"/>
     <Fill color="#10B981" fillRule="evenOdd"/>
   </Layer>
   <Layer>
-    <Text text="fillRule=evenOdd" fontFamily="Arial" fontSize="9" position="270,188" textAnchor="center"/>
+    <Text text="fillRule=evenOdd" fontFamily="Arial" fontSize="9" position="270,203" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 

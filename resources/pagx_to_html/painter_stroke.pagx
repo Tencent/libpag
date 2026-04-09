@@ -26,47 +26,47 @@
 
   <!-- Basic stroke: cap=round, join=round -->
   <Layer>
-    <Rectangle position="90,120" size="90,90" roundness="12"/>
+    <Rectangle position="90,135" size="90,90" roundness="12"/>
     <Stroke color="#3B82F6" width="6" cap="round" join="round"/>
   </Layer>
   <Layer>
-    <Text text="round/round" fontFamily="Arial" fontSize="8" position="90,175" textAnchor="center"/>
+    <Text text="round/round" fontFamily="Arial" fontSize="8" position="90,190" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Dashed stroke with dashOffset -->
   <Layer>
-    <Ellipse position="230,120" size="90,90"/>
+    <Ellipse position="230,135" size="90,90"/>
     <Stroke color="#EF4444" width="4" dashes="12,6" dashOffset="4" cap="butt"/>
   </Layer>
   <Layer>
-    <Text text="Dashed" fontFamily="Arial" fontSize="8" position="230,175" textAnchor="center"/>
+    <Text text="Dashed" fontFamily="Arial" fontSize="8" position="230,190" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Cap styles: butt/round/square -->
   <Layer>
-    <Path data="M 310,75 L 370,75"/>
+    <Path data="M 310,90 L 370,90"/>
     <Stroke color="#10B981" width="8" cap="butt"/>
   </Layer>
   <Layer>
-    <Text text="butt" fontFamily="Arial" fontSize="7" position="390,88"/>
+    <Text text="butt" fontFamily="Arial" fontSize="7" position="390,103"/>
     <Fill color="#94A3B8"/>
   </Layer>
   <Layer>
-    <Path data="M 310,100 L 370,100"/>
+    <Path data="M 310,115 L 370,115"/>
     <Stroke color="#10B981" width="8" cap="round"/>
   </Layer>
   <Layer>
-    <Text text="round" fontFamily="Arial" fontSize="7" position="390,113"/>
+    <Text text="round" fontFamily="Arial" fontSize="7" position="390,128"/>
     <Fill color="#94A3B8"/>
   </Layer>
   <Layer>
-    <Path data="M 310,125 L 370,125"/>
+    <Path data="M 310,140 L 370,140"/>
     <Stroke color="#10B981" width="8" cap="square"/>
   </Layer>
   <Layer>
-    <Text text="square" fontFamily="Arial" fontSize="7" position="390,138"/>
+    <Text text="square" fontFamily="Arial" fontSize="7" position="390,153"/>
     <Fill color="#94A3B8"/>
   </Layer>
 

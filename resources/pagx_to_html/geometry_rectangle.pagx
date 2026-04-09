@@ -1,25 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Rectangle center-point positioning, size, roundness, reversed; CSS div+border-radius path -->
-<pagx version="1.0" width="420" height="300">
+<pagx version="1.0" width="440" height="300">
   <!-- Background -->
   <Layer>
-    <Rectangle position="210,150" size="420,300"/>
+    <Rectangle position="220,150" size="440,300"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
   <!-- Title -->
   <Layer>
-    <Text text="Rectangle Geometry" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="210,34" textAnchor="center"/>
+    <Text text="Rectangle Geometry" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="220,34" textAnchor="center"/>
     <Fill color="#1E293B"/>
   </Layer>
   <Layer>
-    <Text text="Sharp, rounded, pill, reversed, and large" fontFamily="Arial" fontSize="10" position="210,50" textAnchor="center"/>
+    <Text text="Sharp, rounded, pill, reversed, and large" fontFamily="Arial" fontSize="10" position="220,50" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="210,170" size="360,180" roundness="16"/>
+    <Rectangle position="220,170" size="380,180" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>

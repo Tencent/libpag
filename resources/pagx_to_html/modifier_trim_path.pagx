@@ -26,23 +26,23 @@
 
   <!-- Separate mode: each shape trimmed independently -->
   <Layer>
-    <Ellipse position="120,140" size="110,110"/>
+    <Ellipse position="120,150" size="110,110"/>
     <TrimPath start="0" end="0.75" type="separate"/>
     <Stroke color="#3B82F6" width="6" cap="round"/>
   </Layer>
   <Layer>
-    <Text text="Separate 75%" fontFamily="Arial" fontSize="8" position="120,208" textAnchor="center"/>
+    <Text text="Separate 75%" fontFamily="Arial" fontSize="8" position="120,218" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- start > end → wraps around -->
   <Layer>
-    <Ellipse position="300,140" size="110,110"/>
+    <Ellipse position="300,150" size="110,110"/>
     <TrimPath start="0.7" end="0.3"/>
     <Stroke color="#EF4444" width="6" cap="round"/>
   </Layer>
   <Layer>
-    <Text text="Wrap-around" fontFamily="Arial" fontSize="8" position="300,208" textAnchor="center"/>
+    <Text text="Wrap-around" fontFamily="Arial" fontSize="8" position="300,218" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 

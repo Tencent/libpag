@@ -1,25 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: TextBox → div with text-align, paragraphAlign, writingMode, lineHeight, wordWrap, overflow, size -->
-<pagx version="1.0" width="420" height="460">
+<pagx version="1.0" width="450" height="460">
   <!-- Background -->
   <Layer>
-    <Rectangle position="210,230" size="420,460"/>
+    <Rectangle position="225,230" size="450,460"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
   <!-- Title -->
   <Layer>
-    <Text text="Text Box Layout" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="210,34" textAnchor="center"/>
+    <Text text="Text Box Layout" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="225,34" textAnchor="center"/>
     <Fill color="#1E293B"/>
   </Layer>
   <Layer>
-    <Text text="Alignment, writing mode, overflow, and wrapping" fontFamily="Arial" fontSize="10" position="210,50" textAnchor="center"/>
+    <Text text="Alignment, writing mode, overflow, and wrapping" fontFamily="Arial" fontSize="10" position="225,50" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="210,252" size="360,350" roundness="16"/>
+    <Rectangle position="225,252" size="390,350" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>

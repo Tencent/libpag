@@ -25,24 +25,24 @@
   </Layer>
 
   <!-- DropShadowStyle: uniform blur -->
-  <Layer x="50" y="65">
+  <Layer x="50" y="80">
     <Rectangle position="60,60" size="100,100" roundness="16"/>
     <Fill color="#3B82F6"/>
     <DropShadowStyle offsetX="4" offsetY="8" blurX="16" blurY="16" color="#00000060"/>
   </Layer>
   <Layer>
-    <Text text="DropShadow" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="110,188" textAnchor="center"/>
+    <Text text="DropShadow" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="110,203" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- DropShadowStyle: asymmetric blur -->
-  <Layer x="220" y="65">
+  <Layer x="220" y="80">
     <Rectangle position="60,60" size="100,100" roundness="16"/>
     <Fill color="#10B981"/>
     <DropShadowStyle offsetX="0" offsetY="8" blurX="40" blurY="8" color="#00000060"/>
   </Layer>
   <Layer>
-    <Text text="Asymmetric" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="340,188" textAnchor="center"/>
+    <Text text="Asymmetric" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="340,203" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 

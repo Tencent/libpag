@@ -26,31 +26,31 @@
 
   <!-- Pentagon (polygon, 5 points) -->
   <Layer>
-    <Polystar position="90,130" type="polygon" pointCount="5" outerRadius="50" rotation="-90"/>
+    <Polystar position="90,145" type="polygon" pointCount="5" outerRadius="50" rotation="-90"/>
     <Fill color="#3B82F6"/>
   </Layer>
   <Layer>
-    <Text text="Pentagon" fontFamily="Arial" fontSize="8" position="90,188" textAnchor="center"/>
+    <Text text="Pentagon" fontFamily="Arial" fontSize="8" position="90,203" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Star (5 points) -->
   <Layer>
-    <Polystar position="230,130" type="star" pointCount="5" outerRadius="55" innerRadius="25" rotation="-90"/>
+    <Polystar position="230,145" type="star" pointCount="5" outerRadius="55" innerRadius="25" rotation="-90"/>
     <Fill color="#EF4444"/>
   </Layer>
   <Layer>
-    <Text text="Star" fontFamily="Arial" fontSize="8" position="230,188" textAnchor="center"/>
+    <Text text="Star" fontFamily="Arial" fontSize="8" position="230,203" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Star with outerRoundness -->
   <Layer>
-    <Polystar position="370,130" type="star" pointCount="6" outerRadius="50" innerRadius="25" outerRoundness="0.5" rotation="0"/>
+    <Polystar position="370,145" type="star" pointCount="6" outerRadius="50" innerRadius="25" outerRoundness="0.5" rotation="0"/>
     <Fill color="#10B981"/>
   </Layer>
   <Layer>
-    <Text text="Rounded" fontFamily="Arial" fontSize="8" position="370,188" textAnchor="center"/>
+    <Text text="Rounded" fontFamily="Arial" fontSize="8" position="370,203" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
