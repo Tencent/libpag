@@ -65,7 +65,7 @@
 
   <!-- Geometry propagation: child Group's geometry propagates to parent -->
   <Layer>
-    <Group position="260,240">
+    <Group position="260,225">
       <Rectangle position="40,40" size="50,50"/>
     </Group>
     <!-- This Fill renders the Rectangle from the Group above (geometry propagation) -->
