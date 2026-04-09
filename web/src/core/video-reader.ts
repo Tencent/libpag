@@ -122,10 +122,6 @@ export class VideoReader {
             return;
         }
         const promise = new Promise<void>(async (resolve, reject) => {
-            if (this.isDestroyed) {
-                resolve();
-                return;
-            }
             this.setError(null); // reset error
             this.isSought = false; // reset seek status
             const {currentTime} = this.videoEl!;
@@ -134,17 +130,9 @@ export class VideoReader {
             if (currentTime === 0 && targetTime === 0) {
                 if (!this.canplay && !SAFARI_OR_IOS_WEBVIEW) {
                     await waitVideoCanPlay(this.videoEl!);
-                    if (this.isDestroyed) {
-                        resolve();
-                        return;
-                    }
                 } else {
                     try {
                         await waitVideoCanPlay(this.videoEl!);
-                        if (this.isDestroyed) {
-                            resolve();
-                            return;
-                        }
                         await this.play();
                     } catch (e) {
                         this.setError(e);
@@ -152,13 +140,11 @@ export class VideoReader {
                         reject(e);
                         return;
                     }
-                    if (this.isDestroyed) {
-                        resolve();
-                        return;
-                    }
                     await new Promise<void>((resolveInner) => {
                         requestAnimationFrame(() => {
-                            this.pause();
+                            if (!this.isDestroyed) {
+                                this.pause();
+                            }
                             resolveInner();
                         });
                     });
@@ -178,10 +164,6 @@ export class VideoReader {
                     // Seek and play
                     this.isSought = true;
                     await this.seek(targetTime);
-                    if (this.isDestroyed) {
-                        resolve();
-                        return;
-                    }
                     this.currentFrame = targetFrame;
                     resolve();
                     return;
