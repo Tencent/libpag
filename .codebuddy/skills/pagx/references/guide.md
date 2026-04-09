@@ -546,12 +546,14 @@ always generate the SVG `viewBox` at the exact dimensions you need.
 
 **Native PAGX elements vs inline SVG:**
 
-Use native PAGX geometry (`Rectangle`, `Ellipse`, `Polystar`, `Path`) for single-element
+Use native PAGX geometry (`Rectangle`, `Ellipse`, `Polystar`) for simple, single-element
 shapes — a background rectangle, a divider line, a circular indicator, a progress track.
 
-Use `<Import>` with inline SVG when multiple shapes combine into a composite graphic —
-icons, multi-stroke decorations, illustrated indicators. Wrap the Import in a Layer and
-use constraint positioning on the Layer to place it.
+Use `<Import>` with inline SVG for complex or composite graphics — icons, arbitrary paths,
+multi-stroke decorations, illustrated indicators. This includes any shape that would
+otherwise require `Path` / `PathData`, since those typically represent complex outlines
+better expressed as SVG. Wrap the Import in a Layer and use constraint positioning on the
+Layer to place it.
 
 ---
 
