@@ -1,15 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: TextPath — text along curves with various configurations:
      simple arc, perpendicular=false, multiple paths, firstMargin/lastMargin -->
-<pagx version="1.0" width="420" height="280">
+<pagx version="1.0" width="420" height="320">
   <Resources>
-    <PathData id="arcPath" data="M 30,150 C 100,20 300,20 370,150"/>
-    <PathData id="straightLine" data="M 30,180 L 370,180"/>
+    <PathData id="arcPath" data="M 30,120 C 100,20 300,20 370,120"/>
+    <PathData id="straightLine" data="M 30,210 L 370,210"/>
+    <PathData id="sCurve" data="M 30,270 C 100,230 150,310 220,270 C 290,230 340,310 370,270"/>
   </Resources>
 
   <!-- Background -->
   <Layer>
-    <Rectangle position="210,140" size="420,280"/>
+    <Rectangle position="210,160" size="420,320"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
@@ -25,36 +26,47 @@
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="210,162" size="360,175" roundness="16"/>
+    <Rectangle position="210,182" size="360,215" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
+  <!-- Ghost path for arc -->
+  <Layer alpha="0.15">
+    <Path data="M 30,120 C 100,20 300,20 370,120"/>
+    <Stroke color="#3B82F6" width="1"/>
+  </Layer>
+
   <!-- Text along bezier curve (perpendicular=true) -->
   <Layer>
-    <Text text="Text Along a Path" fontFamily="Arial" fontStyle="Bold" fontSize="24" position="10,10"/>
+    <Text text="Text Along a Path" fontFamily="Arial" fontStyle="Bold" fontSize="20" position="10,10"/>
     <TextPath path="@arcPath" perpendicular="true" firstMargin="10"/>
     <Fill color="#3B82F6"/>
   </Layer>
 
-  <!-- Same path, perpendicular=false: glyphs stay upright -->
-  <Layer>
-    <Text text="Upright Glyphs" fontFamily="Arial" fontSize="16" position="10,10"/>
-    <TextPath path="@arcPath" perpendicular="false" firstMargin="80" lastMargin="80"/>
-    <Fill color="#EF444480"/>
+  <!-- Ghost path for straight line -->
+  <Layer alpha="0.15">
+    <Path data="M 30,210 L 370,210"/>
+    <Stroke color="#10B981" width="1"/>
   </Layer>
 
   <!-- Text on straight line with margins -->
   <Layer>
-    <Text text="Straight Path" fontFamily="Arial" fontSize="14" position="10,10"/>
+    <Text text="Straight Path with Margins" fontFamily="Arial" fontSize="14" position="10,10"/>
     <TextPath path="@straightLine" firstMargin="20" lastMargin="20"/>
     <Fill color="#10B981"/>
   </Layer>
 
-  <!-- S-curve path defined inline -->
+  <!-- Ghost path for S-curve -->
+  <Layer alpha="0.15">
+    <Path data="M 30,270 C 100,230 150,310 220,270 C 290,230 340,310 370,270"/>
+    <Stroke color="#8B5CF6" width="1"/>
+  </Layer>
+
+  <!-- S-curve path -->
   <Layer>
-    <Text text="S-CURVE" fontFamily="Arial" fontStyle="Bold" fontSize="18" position="10,10"/>
-    <TextPath path="M 30,100 C 100,40 150,160 220,100 C 290,40 340,160 370,100"/>
+    <Text text="S-CURVE TEXT" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="10,10"/>
+    <TextPath path="@sCurve"/>
     <Fill color="#8B5CF6"/>
   </Layer>
 </pagx>
