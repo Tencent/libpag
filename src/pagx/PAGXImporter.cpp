@@ -178,9 +178,34 @@ static ColorMatrixFilter* parseColorMatrixFilter(const DOMNode* node, PAGXDocume
 // Custom data parsing
 //==============================================================================
 
+static void EscapeXML(const std::string& input, std::string& output) {
+  for (char c : input) {
+    switch (c) {
+      case '&':
+        output += "&amp;";
+        break;
+      case '<':
+        output += "&lt;";
+        break;
+      case '>':
+        output += "&gt;";
+        break;
+      case '"':
+        output += "&quot;";
+        break;
+      case '\'':
+        output += "&apos;";
+        break;
+      default:
+        output += c;
+        break;
+    }
+  }
+}
+
 static void serializeDOMNode(const DOMNode* node, std::string& output) {
   if (node->type == DOMNodeType::Text) {
-    output += node->name;
+    EscapeXML(node->name, output);
     return;
   }
   output += "<";
@@ -189,7 +214,7 @@ static void serializeDOMNode(const DOMNode* node, std::string& output) {
     output += " ";
     output += attr.name;
     output += "=\"";
-    output += attr.value;
+    EscapeXML(attr.value, output);
     output += "\"";
   }
   if (!node->firstChild) {
