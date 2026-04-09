@@ -350,10 +350,10 @@ any repeated element: cards, list items, grid cells.
       <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" arrangement="spaceAround" alignment="center">
         <!-- Home: filled (active) -->
         <Layer layout="vertical" gap="2" alignment="center">
-          <Layer width="24" height="24">
+          <Layer>
             <Import>
               <svg viewBox="0 0 24 24" fill="#6366F1">
-                <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+                <path d="M12 0L0 12L3 12L3 22L9 22L9 15L15 15L15 22L21 22L21 12L24 12Z"/>
               </svg>
             </Import>
           </Layer>
@@ -364,11 +364,11 @@ any repeated element: cards, list items, grid cells.
         </Layer>
         <!-- Search: stroke (inactive) -->
         <Layer layout="vertical" gap="2" alignment="center">
-          <Layer width="24" height="24">
+          <Layer>
             <Import>
               <svg viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2">
-                <circle cx="10" cy="10" r="7"/>
-                <path d="M15 15L21 21" stroke-linecap="round"/>
+                <ellipse cx="8" cy="8" rx="8" ry="8"/>
+                <path d="M14 14L20 20" stroke-width="2.5" stroke-linecap="round"/>
               </svg>
             </Import>
           </Layer>
@@ -379,11 +379,11 @@ any repeated element: cards, list items, grid cells.
         </Layer>
         <!-- Profile: stroke (inactive) -->
         <Layer layout="vertical" gap="2" alignment="center">
-          <Layer width="24" height="24">
+          <Layer>
             <Import>
               <svg viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.8">
-                <circle cx="12" cy="8" r="4"/>
-                <path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" stroke-linecap="round"/>
+                <ellipse cx="11" cy="6" rx="5" ry="5"/>
+                <path d="M1 22C1 17 5 13 11 13C17 13 21 17 21 22" stroke-linecap="round"/>
               </svg>
             </Import>
           </Layer>
