@@ -132,6 +132,11 @@ class PPTWriterContext {
     std::string mediaPath = "ppt/media/image" + std::to_string(idx) + "." + ext;
     _images.push_back({image, std::move(data), relId, mediaPath, jpeg});
     _imageMap[image] = relId;
+    if (jpeg) {
+      _hasJPEG = true;
+    } else {
+      _hasPNG = true;
+    }
     return relId;
   }
 
@@ -140,6 +145,7 @@ class PPTWriterContext {
     std::string relId = "rId" + std::to_string(_nextRelId++);
     std::string mediaPath = "ppt/media/image" + std::to_string(idx) + ".png";
     _images.push_back({nullptr, std::move(pngData), relId, mediaPath, false});
+    _hasPNG = true;
     return relId;
   }
 
@@ -148,26 +154,18 @@ class PPTWriterContext {
   }
 
   bool hasJPEG() const {
-    for (const auto& entry : _images) {
-      if (entry.isJPEG) {
-        return true;
-      }
-    }
-    return false;
+    return _hasJPEG;
   }
 
   bool hasPNG() const {
-    for (const auto& entry : _images) {
-      if (!entry.isJPEG) {
-        return true;
-      }
-    }
-    return false;
+    return _hasPNG;
   }
 
  private:
   int _shapeId = 2;
   int _nextRelId = 2;
+  bool _hasJPEG = false;
+  bool _hasPNG = false;
   std::vector<ImageEntry> _images;
   std::unordered_map<const Image*, std::string> _imageMap;
 };
@@ -244,6 +242,8 @@ static bool ComputeImagePatternRect(const ImagePattern* pattern, int imgW, int i
 // PPTWriter – converts PAGX nodes to PPTX XML
 //==============================================================================
 
+struct PathContour;
+
 class PPTWriter {
  public:
   PPTWriter(PPTWriterContext* ctx, const PAGXDocument* doc, bool convertTextToPath, bool bakeMask)
@@ -314,13 +314,22 @@ class PPTWriter {
                        float boundsH, FillRule fillRule = FillRule::Winding,
                        float coordScaleX = 1.0f, float coordScaleY = 1.0f);
 
+  // Shared contour-to-custGeom emitter used by writeCustomGeom and writeTextAsPath
+  static void WriteContourGeom(XMLBuilder& out, std::vector<PathContour>& contours,
+                               int64_t pathWidth, int64_t pathHeight, float scaleX, float scaleY,
+                               float scaledOfsX, float scaledOfsY, FillRule fillRule);
+
   // Transform decomposition
   struct Xform {
-    int64_t offX, offY, extCX, extCY;
-    int rotation;
+    int64_t offX = 0;
+    int64_t offY = 0;
+    int64_t extCX = 0;
+    int64_t extCY = 0;
+    int rotation = 0;
   };
   static Xform decomposeXform(float localX, float localY, float localW, float localH,
                               const Matrix& m);
+  static void WriteXfrm(XMLBuilder& out, const Xform& xf);
 };
 
 // ── Transform decomposition ────────────────────────────────────────────────
@@ -350,6 +359,17 @@ PPTWriter::Xform PPTWriter::decomposeXform(float localX, float localY, float loc
   return xf;
 }
 
+void PPTWriter::WriteXfrm(XMLBuilder& out, const Xform& xf) {
+  if (xf.rotation != 0) {
+    out.open("a:xfrm").a("rot", xf.rotation).gt();
+  } else {
+    out.open("a:xfrm").gt();
+  }
+  out.open("a:off").a("x", xf.offX).a("y", xf.offY).sc();
+  out.open("a:ext").a("cx", xf.extCX).a("cy", xf.extCY).sc();
+  out.end();  // a:xfrm
+}
+
 // ── Shape envelope ─────────────────────────────────────────────────────────
 
 void PPTWriter::beginShape(XMLBuilder& out, const char* name, int64_t offX, int64_t offY,
@@ -364,14 +384,7 @@ void PPTWriter::beginShape(XMLBuilder& out, const char* name, int64_t offX, int6
   out.end();  // p:nvSpPr
 
   out.open("p:spPr").gt();
-  if (rot != 0) {
-    out.open("a:xfrm").a("rot", rot).gt();
-  } else {
-    out.open("a:xfrm").gt();
-  }
-  out.open("a:off").a("x", offX).a("y", offY).sc();
-  out.open("a:ext").a("cx", extCX).a("cy", extCY).sc();
-  out.end();  // a:xfrm
+  WriteXfrm(out, {offX, offY, extCX, extCY, rot});
 }
 
 void PPTWriter::endShape(XMLBuilder& out) {
@@ -449,10 +462,7 @@ void PPTWriter::writePicture(XMLBuilder& out, const std::string& relId, int64_t 
   out.end();  // p:blipFill
 
   out.open("p:spPr").gt();
-  out.open("a:xfrm").gt();
-  out.open("a:off").a("x", offX).a("y", offY).sc();
-  out.open("a:ext").a("cx", extCX).a("cy", extCY).sc();
-  out.end();  // a:xfrm
+  WriteXfrm(out, {offX, offY, extCX, extCY, 0});
   out.open("a:prstGeom").a("prst", "rect").gt();
   out.open("a:avLst").sc();
   out.end();  // a:prstGeom
@@ -524,14 +534,7 @@ bool PPTWriter::writeImagePatternAsPicture(XMLBuilder& out, const Fill* fill,
   out.end();  // p:blipFill
 
   out.open("p:spPr").gt();
-  if (xf.rotation != 0) {
-    out.open("a:xfrm").a("rot", xf.rotation).gt();
-  } else {
-    out.open("a:xfrm").gt();
-  }
-  out.open("a:off").a("x", xf.offX).a("y", xf.offY).sc();
-  out.open("a:ext").a("cx", xf.extCX).a("cy", xf.extCY).sc();
-  out.end();  // a:xfrm
+  WriteXfrm(out, xf);
   out.open("a:prstGeom").a("prst", "rect").gt();
   out.open("a:avLst").sc();
   out.end();  // a:prstGeom
@@ -1035,8 +1038,8 @@ static void EmitContourSegments(XMLBuilder& out, const PathContour& c, float csX
                       s.pts[1].y * csY, sOfsX, sOfsY);
         break;
       case PathVerb::Cubic:
-        EmitCubicBezTo(out, s.pts[0].x * csX, s.pts[0].y * csY, s.pts[1].x * csX,
-                       s.pts[1].y * csY, s.pts[2].x * csX, s.pts[2].y * csY, sOfsX, sOfsY);
+        EmitCubicBezTo(out, s.pts[0].x * csX, s.pts[0].y * csY, s.pts[1].x * csX, s.pts[1].y * csY,
+                       s.pts[2].x * csX, s.pts[2].y * csY, sOfsX, sOfsY);
         break;
       default:
         break;
@@ -1087,9 +1090,9 @@ static void EmitBridgedGroup(XMLBuilder& out, const std::vector<PathContour>& co
   out.open("a:close").sc();
 }
 
-void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofsX, float ofsY,
-                                float boundsW, float boundsH, FillRule fillRule, float coordScaleX,
-                                float coordScaleY) {
+void PPTWriter::WriteContourGeom(XMLBuilder& out, std::vector<PathContour>& contours,
+                                 int64_t pathWidth, int64_t pathHeight, float scaleX, float scaleY,
+                                 float scaledOfsX, float scaledOfsY, FillRule fillRule) {
   out.open("a:custGeom").gt();
   out.open("a:avLst").sc();
   out.open("a:gdLst").sc();
@@ -1097,22 +1100,12 @@ void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofs
   out.open("a:cxnLst").sc();
   out.open("a:rect").a("l", "0").a("t", "0").a("r", "r").a("b", "b").sc();
 
-  int64_t pw = std::max(int64_t(1), PxToEMU(boundsW * coordScaleX));
-  int64_t ph = std::max(int64_t(1), PxToEMU(boundsH * coordScaleY));
-
-  float sOfsX = ofsX * coordScaleX;
-  float sOfsY = ofsY * coordScaleY;
-  float csX = coordScaleX;
-  float csY = coordScaleY;
-
   out.open("a:pathLst").gt();
 
-  auto contours = ParsePathContours(data);
-
   if (contours.size() <= 1) {
-    out.open("a:path").a("w", pw).a("h", ph).gt();
+    out.open("a:path").a("w", pathWidth).a("h", pathHeight).gt();
     for (auto& c : contours) {
-      EmitContour(out, c, csX, csY, sOfsX, sOfsY);
+      EmitContour(out, c, scaleX, scaleY, scaledOfsX, scaledOfsY);
     }
     out.end();  // a:path
   } else {
@@ -1122,11 +1115,11 @@ void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofs
     }
     auto groups = GroupContoursByOutermost(contours, depths);
     for (const auto& group : groups) {
-      out.open("a:path").a("w", pw).a("h", ph).gt();
+      out.open("a:path").a("w", pathWidth).a("h", pathHeight).gt();
       if (group.size() > 1) {
-        EmitBridgedGroup(out, contours, group, csX, csY, sOfsX, sOfsY);
+        EmitBridgedGroup(out, contours, group, scaleX, scaleY, scaledOfsX, scaledOfsY);
       } else {
-        EmitContour(out, contours[group[0]], csX, csY, sOfsX, sOfsY);
+        EmitContour(out, contours[group[0]], scaleX, scaleY, scaledOfsX, scaledOfsY);
       }
       out.end();  // a:path
     }
@@ -1134,6 +1127,16 @@ void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofs
 
   out.end();  // a:pathLst
   out.end();  // a:custGeom
+}
+
+void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofsX, float ofsY,
+                                float boundsW, float boundsH, FillRule fillRule, float coordScaleX,
+                                float coordScaleY) {
+  int64_t pw = std::max(int64_t(1), PxToEMU(boundsW * coordScaleX));
+  int64_t ph = std::max(int64_t(1), PxToEMU(boundsH * coordScaleY));
+  auto contours = ParsePathContours(data);
+  WriteContourGeom(out, contours, pw, ph, coordScaleX, coordScaleY, ofsX * coordScaleX,
+                   ofsY * coordScaleY, fillRule);
 }
 
 // ── Shape writers ──────────────────────────────────────────────────────────
@@ -1309,47 +1312,9 @@ void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStr
   auto xf = decomposeXform(minX, minY, boundsW, boundsH, m);
   beginShape(out, "Glyph", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
 
-  out.open("a:custGeom").gt();
-  out.open("a:avLst").sc();
-  out.open("a:gdLst").sc();
-  out.open("a:ahLst").sc();
-  out.open("a:cxnLst").sc();
-  out.open("a:rect").a("l", "0").a("t", "0").a("r", "r").a("b", "b").sc();
-
   int64_t pw = std::max(int64_t(1), PxToEMU(boundsW * sx));
   int64_t ph = std::max(int64_t(1), PxToEMU(boundsH * sy));
-  float sOfsX = minX * sx;
-  float sOfsY = minY * sy;
-
-  out.open("a:pathLst").gt();
-
-  if (allContours.size() <= 1) {
-    out.open("a:path").a("w", pw).a("h", ph).gt();
-    for (auto& c : allContours) {
-      EmitContour(out, c, sx, sy, sOfsX, sOfsY);
-    }
-    out.end();  // a:path
-  } else {
-    // Group contours by outermost ancestor so that each glyph (or glyph +
-    // its holes) gets its own a:path element.  Bridges only connect related
-    // contours within one glyph (e.g. "O" outer + inner hole), keeping them
-    // short enough to avoid visible hairline artifacts.
-    auto depths = ComputeContainmentDepths(allContours);
-    AdjustWindingForEvenOdd(allContours, depths);
-    auto groups = GroupContoursByOutermost(allContours, depths);
-    for (const auto& group : groups) {
-      out.open("a:path").a("w", pw).a("h", ph).gt();
-      if (group.size() > 1) {
-        EmitBridgedGroup(out, allContours, group, sx, sy, sOfsX, sOfsY);
-      } else {
-        EmitContour(out, allContours[group[0]], sx, sy, sOfsX, sOfsY);
-      }
-      out.end();  // a:path
-    }
-  }
-
-  out.end();  // a:pathLst
-  out.end();  // a:custGeom
+  WriteContourGeom(out, allContours, pw, ph, sx, sy, minX * sx, minY * sy, FillRule::EvenOdd);
 
   writeFill(out, fs.fill, alpha);
   out.open("a:ln").gt();
@@ -1396,14 +1361,7 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   out.end();  // p:nvSpPr
 
   out.open("p:spPr").gt();
-  out.open("a:xfrm");
-  if (xf.rotation != 0) {
-    out.a("rot", xf.rotation);
-  }
-  out.gt();
-  out.open("a:off").a("x", xf.offX).a("y", xf.offY).sc();
-  out.open("a:ext").a("cx", xf.extCX).a("cy", xf.extCY).sc();
-  out.end();  // a:xfrm
+  WriteXfrm(out, xf);
   out.open("a:prstGeom").a("prst", "rect").gt();
   out.open("a:avLst").sc();
   out.end();
