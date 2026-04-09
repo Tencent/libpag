@@ -18,6 +18,7 @@
 
 #include "GlyphRunRenderer.h"
 #include <cmath>
+#include "base/utils/MathUtil.h"
 #include "pagx/ShapedText.h"
 #include "pagx/TextLayout.h"
 #include "pagx/nodes/Font.h"
@@ -38,7 +39,8 @@ namespace pagx {
 // Returns true if the matrix can be represented as an RSXform (uniform scale + rotation +
 // translation), i.e. the matrix has the form [scos, -ssin, tx; ssin, scos, ty; 0, 0, 1].
 static bool IsRSXformCompatible(const tgfx::Matrix& matrix) {
-  return matrix.getScaleX() == matrix.getScaleY() && matrix.getSkewX() == -matrix.getSkewY();
+  return pag::FloatNearlyEqual(matrix.getScaleX(), matrix.getScaleY()) &&
+         pag::FloatNearlyEqual(matrix.getSkewX(), -matrix.getSkewY());
 }
 
 // Positioning modes for TextBlob runs, ordered from most compact to most general.
