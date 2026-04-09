@@ -2,7 +2,7 @@
 <!-- Tests: Path with inline SVG data and @id resource reference, reversed -->
 <pagx version="1.0" width="420" height="280">
   <Resources>
-    <PathData id="heart" data="M 75,30 C 75,10 50,-5 30,10 C 5,30 0,60 0,80 C 0,110 30,140 75,170 C 120,140 150,110 150,80 C 150,60 145,30 120,10 C 100,-5 75,10 75,30 Z"/>
+    <PathData id="heart" data="M 75,28 C 75,12 60,0 45,0 C 22,0 0,20 0,45 C 0,68 25,90 75,120 C 125,90 150,68 150,45 C 150,20 128,0 105,0 C 90,0 75,12 75,28 Z"/>
   </Resources>
 
   <!-- Background -->
@@ -39,7 +39,7 @@
   </Layer>
 
   <!-- Resource reference path -->
-  <Layer x="265" y="95" matrix="0.7,0,0,0.7,0,0">
+  <Layer x="240" y="110" matrix="0.8,0,0,0.8,0,0">
     <Path data="@heart"/>
     <Fill color="#EF4444" alpha="0.8"/>
   </Layer>
