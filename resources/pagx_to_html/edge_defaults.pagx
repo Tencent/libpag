@@ -1,76 +1,80 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Default values and edge cases for various elements — Rectangle, Ellipse, Fill, Stroke,
      ConicGradient defaults, empty layer, zero-size shapes, minimal attributes -->
-<pagx version="1.0" width="360" height="380">
+<pagx version="1.0" width="480" height="460">
   <!-- Background -->
   <Layer>
-    <Rectangle position="180,190" size="360,380"/>
+    <Rectangle position="240,230" size="480,460"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
   <!-- Title -->
   <Layer>
-    <Text text="Edge Cases and Defaults" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="180,34" textAnchor="center"/>
+    <Text text="Edge Cases and Defaults" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="240,34" textAnchor="center"/>
     <Fill color="#1E293B"/>
   </Layer>
   <Layer>
-    <Text text="Default values, zero sizes, minimal attributes" fontFamily="Arial" fontSize="10" position="180,50" textAnchor="center"/>
+    <Text text="Default values, zero sizes, minimal attributes" fontFamily="Arial" fontSize="10" position="240,50" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="180,212" size="300,280" roundness="16"/>
+    <Rectangle position="240,255" size="420,350" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
-  <!-- Rectangle with defaults -->
-  <Layer x="32" y="72">
+  <!-- Row 1: Rectangle defaults, Ellipse defaults, Stroke defaults -->
+
+  <!-- Rectangle with defaults (black fill, default size) -->
+  <Layer x="50" y="90">
     <Rectangle/>
     <Fill/>
   </Layer>
   <Layer>
-    <Text text="Defaults" fontFamily="Arial" fontSize="7" position="82,180" textAnchor="center"/>
+    <Text text="Defaults" fontFamily="Arial" fontSize="7" position="100,200" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
-  <!-- Ellipse with defaults -->
-  <Layer x="142" y="72">
+  <!-- Ellipse with defaults (large blue circle) -->
+  <Layer x="170" y="90">
     <Ellipse/>
     <Fill color="#3B82F6"/>
   </Layer>
   <Layer>
-    <Text text="Ellipse" fontFamily="Arial" fontSize="7" position="192,180" textAnchor="center"/>
+    <Text text="Ellipse" fontFamily="Arial" fontSize="7" position="220,200" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Stroke with all defaults -->
-  <Layer x="245" y="82">
+  <Layer x="310" y="100">
     <Rectangle position="40,40" size="60,60"/>
     <Stroke/>
   </Layer>
   <Layer>
-    <Text text="Stroke" fontFamily="Arial" fontSize="7" position="285,180" textAnchor="center"/>
+    <Text text="Stroke" fontFamily="Arial" fontSize="7" position="350,200" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
+  <!-- Row 2: Zero-size, ConicGradient, Polystar -->
+
   <!-- Zero-size shapes: no visible output -->
-  <Layer x="35" y="192">
+  <Layer x="50" y="215">
     <Ellipse position="20,20" size="0,0"/>
     <Fill color="#EF4444"/>
   </Layer>
-  <Layer x="35" y="192">
+  <Layer x="50" y="215">
     <Rectangle position="50,20" size="0,0"/>
     <Fill color="#10B981"/>
   </Layer>
   <Layer>
-    <Text text="Zero-size (invisible)" fontFamily="Arial" fontSize="7" position="82,228" textAnchor="center"/>
+    <Text text="Zero-size (invisible)" fontFamily="Arial" fontSize="7" position="100,250" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- ConicGradient with defaults -->
-  <Layer x="135" y="188">
+  <Layer x="170" y="208">
     <Ellipse position="40,40" size="65,65"/>
     <Fill>
       <ConicGradient>
@@ -81,61 +85,63 @@
     </Fill>
   </Layer>
   <Layer>
-    <Text text="Conic default" fontFamily="Arial" fontSize="7" position="175,228" textAnchor="center"/>
+    <Text text="Conic default" fontFamily="Arial" fontSize="7" position="210,250" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Polystar with defaults -->
-  <Layer x="227" y="188">
+  <Layer x="310" y="170">
     <Polystar/>
     <Fill color="#F59E0B40"/>
     <Stroke color="#F59E0B" width="1"/>
   </Layer>
   <Layer>
-    <Text text="Polystar" fontFamily="Arial" fontSize="7" position="280,228" textAnchor="center"/>
+    <Text text="Polystar" fontFamily="Arial" fontSize="7" position="360,250" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
+  <!-- Row 3: evenOdd, Default text + TrimPath, Radial -->
+
   <!-- Empty layer: no vector elements -->
-  <Layer name="emptyLayer" x="35" y="250"/>
+  <Layer name="emptyLayer" x="50" y="270"/>
 
   <!-- Fill with fillRule=evenOdd on overlapping paths -->
-  <Layer x="25" y="240">
+  <Layer x="45" y="265">
     <Rectangle position="30,30" size="50,50"/>
     <Rectangle position="50,50" size="50,50"/>
     <MergePath mode="append"/>
     <Fill color="#8B5CF680" fillRule="evenOdd"/>
   </Layer>
   <Layer>
-    <Text text="evenOdd" fontFamily="Arial" fontSize="7" position="72,310" textAnchor="center"/>
+    <Text text="evenOdd" fontFamily="Arial" fontSize="7" position="90,345" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Text with minimal attributes -->
-  <Layer x="130" y="260">
+  <Layer x="170" y="280">
     <Text text="Default text" fontSize="12"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- TrimPath with defaults -->
-  <Layer x="130" y="288">
+  <Layer x="170" y="308">
     <Ellipse position="30,15" size="50,25"/>
     <TrimPath/>
     <Stroke color="#06B6D4" width="2"/>
   </Layer>
 
   <!-- RadialGradient with defaults -->
-  <Layer x="230" y="248">
+  <Layer x="310" y="275">
     <Rectangle position="30,30" size="50,50" roundness="8"/>
     <Fill>
-      <RadialGradient center="0,0" radius="50">
+      <RadialGradient center="25,25" radius="50">
         <ColorStop offset="0" color="#FFFFFF"/>
         <ColorStop offset="1" color="#8B5CF6"/>
       </RadialGradient>
     </Fill>
   </Layer>
   <Layer>
-    <Text text="Radial" fontFamily="Arial" fontSize="7" position="260,310" textAnchor="center"/>
+    <Text text="Radial" fontFamily="Arial" fontSize="7" position="340,345" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 </pagx>
