@@ -589,6 +589,33 @@ These errors are easy to make during generation.
   </Layer>
   ```
 
+- **padding does not affect VectorElements** — `padding` only insets the constraint
+  reference frame for **child Layers**. VectorElements (Rectangle, Ellipse, Path, Text,
+  Group, TextBox) always reference the full Layer bounds, ignoring padding. To add inner
+  spacing around a VectorElement, use constraint attributes or wrap it in a child Layer.
+
+  ```xml
+  <!-- ❌ padding has no effect on Text — it renders from (0,0) -->
+  <Layer padding="0,16">
+    <Text text="Hello" fontFamily="Arial" fontSize="14"/>
+    <Fill color="#000"/>
+  </Layer>
+
+  <!-- ✅ Use constraint to position Text -->
+  <Layer>
+    <Text left="16" text="Hello" fontFamily="Arial" fontSize="14"/>
+    <Fill color="#000"/>
+  </Layer>
+
+  <!-- ✅ Or wrap in a child Layer so padding takes effect -->
+  <Layer padding="0,16">
+    <Layer>
+      <Text text="Hello" fontFamily="Arial" fontSize="14"/>
+      <Fill color="#000"/>
+    </Layer>
+  </Layer>
+  ```
+
 - **flex without distributable space** — `flex` needs the parent to have a main-axis size.
   Content-measured parent has nothing to share.
 
