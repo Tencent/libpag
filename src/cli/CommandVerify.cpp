@@ -2238,20 +2238,6 @@ static void PrintDiagnosticsJson(const std::vector<VerifyDiagnostic>& diagnostic
 }
 
 // ============================================================================
-// File Helpers
-// ============================================================================
-
-static std::string GetBaseName(const std::string& path) {
-  auto slash = path.rfind('/');
-  auto base = (slash != std::string::npos) ? path.substr(slash + 1) : path;
-  auto dot = base.rfind('.');
-  if (dot != std::string::npos) {
-    return base.substr(0, dot);
-  }
-  return base;
-}
-
-// ============================================================================
 // Command
 // ============================================================================
 
@@ -2324,7 +2310,9 @@ int RunVerify(int argc, char* argv[]) {
     resolveArgv.push_back(const_cast<char*>(arg.c_str()));
   }
   resolveArgv.push_back(nullptr);
-  RunImport(static_cast<int>(resolveArgs.size()), resolveArgv.data());
+  if (RunImport(static_cast<int>(resolveArgs.size()), resolveArgv.data()) != 0) {
+    std::cerr << "pagx verify: warning: import resolve failed for '" << opts.inputFile << "'\n";
+  }
 
   // Step 2: Load document and compute layout.
   auto doc = PAGXImporter::FromFile(opts.inputFile);

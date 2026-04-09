@@ -113,6 +113,30 @@ inline std::string ReplaceExtension(const std::string& path, const std::string& 
   return path + "." + newExt;
 }
 
+/**
+ * Extracts the directory part of a path (including trailing slash), or returns "./" if none.
+ */
+inline std::string GetDirectory(const std::string& path) {
+  auto slash = path.rfind('/');
+  if (slash != std::string::npos) {
+    return path.substr(0, slash + 1);
+  }
+  return "./";
+}
+
+/**
+ * Extracts the base name from a path (filename without directory and extension).
+ */
+inline std::string GetBaseName(const std::string& path) {
+  auto slash = path.rfind('/');
+  auto base = (slash != std::string::npos) ? path.substr(slash + 1) : path;
+  auto dot = base.rfind('.');
+  if (dot != std::string::npos) {
+    return base.substr(0, dot);
+  }
+  return base;
+}
+
 inline std::string EscapeJson(const std::string& input) {
   std::string result = {};
   result.reserve(input.size() + 16);

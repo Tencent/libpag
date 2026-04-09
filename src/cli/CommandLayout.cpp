@@ -38,7 +38,7 @@ namespace pagx::cli {
 // Data Structures
 // ============================================================================
 
-struct LCRect {
+struct CheckRect {
   float x = 0;
   float y = 0;
   float width = 0;
@@ -61,7 +61,7 @@ struct CheckNode {
   std::string id;
   int index = -1;
   int line = 0;
-  LCRect bounds;
+  CheckRect bounds;
   LayoutAttrs attrs;
   std::vector<std::shared_ptr<CheckNode>> children;
 };

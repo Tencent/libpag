@@ -78,7 +78,7 @@ static const std::string& EmptyString() {
   return empty;
 }
 
-static void reportError(PAGXDocument* doc, const DOMNode* node, const std::string& message) {
+static void ReportError(PAGXDocument* doc, const DOMNode* node, const std::string& message) {
   auto fullMessage = "line " + std::to_string(node->line) + ": " + message;
   doc->errors.push_back(fullMessage);
 #if DEBUG
@@ -86,34 +86,34 @@ static void reportError(PAGXDocument* doc, const DOMNode* node, const std::strin
 #endif
 }
 
-static const std::string& getAttribute(const DOMNode* node, const std::string& name,
+static const std::string& GetAttribute(const DOMNode* node, const std::string& name,
                                        const std::string& defaultValue = EmptyString());
-static float getFloatAttribute(const DOMNode* node, const std::string& name, float defaultValue = 0,
+static float GetFloatAttribute(const DOMNode* node, const std::string& name, float defaultValue = 0,
                                PAGXDocument* doc = nullptr);
-static int getIntAttribute(const DOMNode* node, const std::string& name, int defaultValue = 0,
+static int GetIntAttribute(const DOMNode* node, const std::string& name, int defaultValue = 0,
                            PAGXDocument* doc = nullptr);
-static bool getBoolAttribute(const DOMNode* node, const std::string& name,
+static bool GetBoolAttribute(const DOMNode* node, const std::string& name,
                              bool defaultValue = false, PAGXDocument* doc = nullptr);
-static Point parsePoint(const std::string& str, bool* outValid = nullptr);
-static Size parseSize(const std::string& str, bool* outValid = nullptr);
-static Rect parseRect(const std::string& str, bool* outValid = nullptr);
-static Color parseColor(const std::string& str, bool* outValid = nullptr);
-static Point getPointAttribute(const DOMNode* node, const char* name, Point defaultValue,
+static Point ParsePoint(const std::string& str, bool* outValid = nullptr);
+static Size ParseSize(const std::string& str, bool* outValid = nullptr);
+static Rect ParseRect(const std::string& str, bool* outValid = nullptr);
+static Color ParseColor(const std::string& str, bool* outValid = nullptr);
+static Point GetPointAttribute(const DOMNode* node, const char* name, Point defaultValue,
                                PAGXDocument* doc);
-static Size getSizeAttribute(const DOMNode* node, const char* name, Size defaultValue,
+static Size GetSizeAttribute(const DOMNode* node, const char* name, Size defaultValue,
                              PAGXDocument* doc);
-static Rect getRectAttribute(const DOMNode* node, const char* name, Rect defaultValue,
+static Rect GetRectAttribute(const DOMNode* node, const char* name, Rect defaultValue,
                              PAGXDocument* doc);
-static Color getColorAttribute(const DOMNode* node, const char* name, PAGXDocument* doc);
+static Color GetColorAttribute(const DOMNode* node, const char* name, PAGXDocument* doc);
 
 template <typename EnumType>
-static EnumType getEnumAttribute(const DOMNode* node, const char* name,
+static EnumType GetEnumAttribute(const DOMNode* node, const char* name,
                                  const std::string& defaultStr, PAGXDocument* doc,
                                  EnumType (*fromString)(const std::string&),
                                  bool (*isValid)(const std::string&)) {
-  auto& str = getAttribute(node, name, defaultStr);
+  auto& str = GetAttribute(node, name, defaultStr);
   if (!isValid(str)) {
-    reportError(doc, node,
+    ReportError(doc, node,
                 "Invalid value '" + str + "' for '" + std::string(name) + "' attribute.");
     return fromString(defaultStr);
   }
@@ -121,58 +121,58 @@ static EnumType getEnumAttribute(const DOMNode* node, const char* name,
 }
 
 #define GET_ENUM(node, name, defaultStr, doc, EnumType)                         \
-  getEnumAttribute<EnumType>(node, name, defaultStr, doc, EnumType##FromString, \
+  GetEnumAttribute<EnumType>(node, name, defaultStr, doc, EnumType##FromString, \
                              IsValid##EnumType##String)
 
 // Forward declarations for parse functions
-static void parseDocument(const DOMNode* root, PAGXDocument* doc);
-static void parseResources(const DOMNode* node, PAGXDocument* doc);
-static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc);
-static void parseContents(const DOMNode* node, Layer* layer, PAGXDocument* doc);
-static void parseStyles(const DOMNode* node, Layer* layer, PAGXDocument* doc);
-static void parseFilters(const DOMNode* node, Layer* layer, PAGXDocument* doc);
-static Element* parseElement(const DOMNode* node, PAGXDocument* doc);
-static Import* parseImport(const DOMNode* node, PAGXDocument* doc);
-static ColorSource* parseColorSource(const DOMNode* node, PAGXDocument* doc);
-static LayerStyle* parseLayerStyle(const DOMNode* node, PAGXDocument* doc);
-static LayerFilter* parseLayerFilter(const DOMNode* node, PAGXDocument* doc);
-static Rectangle* parseRectangle(const DOMNode* node, PAGXDocument* doc);
-static Ellipse* parseEllipse(const DOMNode* node, PAGXDocument* doc);
-static Polystar* parsePolystar(const DOMNode* node, PAGXDocument* doc);
-static Path* parsePath(const DOMNode* node, PAGXDocument* doc);
-static Text* parseText(const DOMNode* node, PAGXDocument* doc);
-static Fill* parseFill(const DOMNode* node, PAGXDocument* doc);
-static Stroke* parseStroke(const DOMNode* node, PAGXDocument* doc);
-static TrimPath* parseTrimPath(const DOMNode* node, PAGXDocument* doc);
-static RoundCorner* parseRoundCorner(const DOMNode* node, PAGXDocument* doc);
-static MergePath* parseMergePath(const DOMNode* node, PAGXDocument* doc);
-static TextModifier* parseTextModifier(const DOMNode* node, PAGXDocument* doc);
-static TextPath* parseTextPath(const DOMNode* node, PAGXDocument* doc);
-static TextBox* parseTextBox(const DOMNode* node, PAGXDocument* doc);
-static Repeater* parseRepeater(const DOMNode* node, PAGXDocument* doc);
-static Group* parseGroup(const DOMNode* node, PAGXDocument* doc);
-static RangeSelector* parseRangeSelector(const DOMNode* node, PAGXDocument* doc);
-static SolidColor* parseSolidColor(const DOMNode* node, PAGXDocument* doc);
-static LinearGradient* parseLinearGradient(const DOMNode* node, PAGXDocument* doc);
-static RadialGradient* parseRadialGradient(const DOMNode* node, PAGXDocument* doc);
-static ConicGradient* parseConicGradient(const DOMNode* node, PAGXDocument* doc);
-static DiamondGradient* parseDiamondGradient(const DOMNode* node, PAGXDocument* doc);
-static ImagePattern* parseImagePattern(const DOMNode* node, PAGXDocument* doc);
-static ColorStop* parseColorStop(const DOMNode* node, PAGXDocument* doc);
-static Image* parseImage(const DOMNode* node, PAGXDocument* doc);
-static PathData* parsePathData(const DOMNode* node, PAGXDocument* doc);
-static Composition* parseComposition(const DOMNode* node, PAGXDocument* doc);
-static Font* parseFont(const DOMNode* node, PAGXDocument* doc);
-static Glyph* parseGlyph(const DOMNode* node, PAGXDocument* doc);
-static GlyphRun* parseGlyphRun(const DOMNode* node, PAGXDocument* doc);
-static DropShadowStyle* parseDropShadowStyle(const DOMNode* node, PAGXDocument* doc);
-static InnerShadowStyle* parseInnerShadowStyle(const DOMNode* node, PAGXDocument* doc);
-static BackgroundBlurStyle* parseBackgroundBlurStyle(const DOMNode* node, PAGXDocument* doc);
-static BlurFilter* parseBlurFilter(const DOMNode* node, PAGXDocument* doc);
-static DropShadowFilter* parseDropShadowFilter(const DOMNode* node, PAGXDocument* doc);
-static InnerShadowFilter* parseInnerShadowFilter(const DOMNode* node, PAGXDocument* doc);
-static BlendFilter* parseBlendFilter(const DOMNode* node, PAGXDocument* doc);
-static ColorMatrixFilter* parseColorMatrixFilter(const DOMNode* node, PAGXDocument* doc);
+static void ParseDocument(const DOMNode* root, PAGXDocument* doc);
+static void ParseResources(const DOMNode* node, PAGXDocument* doc);
+static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc);
+static void ParseContents(const DOMNode* node, Layer* layer, PAGXDocument* doc);
+static void ParseStyles(const DOMNode* node, Layer* layer, PAGXDocument* doc);
+static void ParseFilters(const DOMNode* node, Layer* layer, PAGXDocument* doc);
+static Element* ParseElement(const DOMNode* node, PAGXDocument* doc);
+static Import* ParseImport(const DOMNode* node, PAGXDocument* doc);
+static ColorSource* ParseColorSource(const DOMNode* node, PAGXDocument* doc);
+static LayerStyle* ParseLayerStyle(const DOMNode* node, PAGXDocument* doc);
+static LayerFilter* ParseLayerFilter(const DOMNode* node, PAGXDocument* doc);
+static Rectangle* ParseRectangle(const DOMNode* node, PAGXDocument* doc);
+static Ellipse* ParseEllipse(const DOMNode* node, PAGXDocument* doc);
+static Polystar* ParsePolystar(const DOMNode* node, PAGXDocument* doc);
+static Path* ParsePath(const DOMNode* node, PAGXDocument* doc);
+static Text* ParseText(const DOMNode* node, PAGXDocument* doc);
+static Fill* ParseFill(const DOMNode* node, PAGXDocument* doc);
+static Stroke* ParseStroke(const DOMNode* node, PAGXDocument* doc);
+static TrimPath* ParseTrimPath(const DOMNode* node, PAGXDocument* doc);
+static RoundCorner* ParseRoundCorner(const DOMNode* node, PAGXDocument* doc);
+static MergePath* ParseMergePath(const DOMNode* node, PAGXDocument* doc);
+static TextModifier* ParseTextModifier(const DOMNode* node, PAGXDocument* doc);
+static TextPath* ParseTextPath(const DOMNode* node, PAGXDocument* doc);
+static TextBox* ParseTextBox(const DOMNode* node, PAGXDocument* doc);
+static Repeater* ParseRepeater(const DOMNode* node, PAGXDocument* doc);
+static Group* ParseGroup(const DOMNode* node, PAGXDocument* doc);
+static RangeSelector* ParseRangeSelector(const DOMNode* node, PAGXDocument* doc);
+static SolidColor* ParseSolidColor(const DOMNode* node, PAGXDocument* doc);
+static LinearGradient* ParseLinearGradient(const DOMNode* node, PAGXDocument* doc);
+static RadialGradient* ParseRadialGradient(const DOMNode* node, PAGXDocument* doc);
+static ConicGradient* ParseConicGradient(const DOMNode* node, PAGXDocument* doc);
+static DiamondGradient* ParseDiamondGradient(const DOMNode* node, PAGXDocument* doc);
+static ImagePattern* ParseImagePattern(const DOMNode* node, PAGXDocument* doc);
+static ColorStop* ParseColorStop(const DOMNode* node, PAGXDocument* doc);
+static Image* ParseImage(const DOMNode* node, PAGXDocument* doc);
+static PathData* ParsePathData(const DOMNode* node, PAGXDocument* doc);
+static Composition* ParseComposition(const DOMNode* node, PAGXDocument* doc);
+static Font* ParseFont(const DOMNode* node, PAGXDocument* doc);
+static Glyph* ParseGlyph(const DOMNode* node, PAGXDocument* doc);
+static GlyphRun* ParseGlyphRun(const DOMNode* node, PAGXDocument* doc);
+static DropShadowStyle* ParseDropShadowStyle(const DOMNode* node, PAGXDocument* doc);
+static InnerShadowStyle* ParseInnerShadowStyle(const DOMNode* node, PAGXDocument* doc);
+static BackgroundBlurStyle* ParseBackgroundBlurStyle(const DOMNode* node, PAGXDocument* doc);
+static BlurFilter* ParseBlurFilter(const DOMNode* node, PAGXDocument* doc);
+static DropShadowFilter* ParseDropShadowFilter(const DOMNode* node, PAGXDocument* doc);
+static InnerShadowFilter* ParseInnerShadowFilter(const DOMNode* node, PAGXDocument* doc);
+static BlendFilter* ParseBlendFilter(const DOMNode* node, PAGXDocument* doc);
+static ColorMatrixFilter* ParseColorMatrixFilter(const DOMNode* node, PAGXDocument* doc);
 
 //==============================================================================
 // Custom data parsing
@@ -203,7 +203,7 @@ static void EscapeXML(const std::string& input, std::string& output) {
   }
 }
 
-static void serializeDOMNode(const DOMNode* node, std::string& output) {
+static void SerializeDOMNode(const DOMNode* node, std::string& output) {
   if (node->type == DOMNodeType::Text) {
     EscapeXML(node->name, output);
     return;
@@ -224,7 +224,7 @@ static void serializeDOMNode(const DOMNode* node, std::string& output) {
   output += ">";
   auto child = node->firstChild;
   while (child) {
-    serializeDOMNode(child.get(), output);
+    SerializeDOMNode(child.get(), output);
     child = child->nextSibling;
   }
   output += "</";
@@ -232,17 +232,17 @@ static void serializeDOMNode(const DOMNode* node, std::string& output) {
   output += ">";
 }
 
-static std::string serializeDOMChildren(const DOMNode* node) {
+static std::string SerializeDOMChildren(const DOMNode* node) {
   std::string result;
   auto child = node->firstChild;
   while (child) {
-    serializeDOMNode(child.get(), result);
+    SerializeDOMNode(child.get(), result);
     child = child->nextSibling;
   }
   return result;
 }
 
-static void parseCustomData(const DOMNode* xmlNode, Node* node) {
+static void ParseCustomData(const DOMNode* xmlNode, Node* node) {
   for (const auto& attr : xmlNode->attributes) {
     if (attr.name.length() > 5 && attr.name.compare(0, 5, "data-") == 0) {
       auto key = attr.name.substr(5);
@@ -255,17 +255,17 @@ static void parseCustomData(const DOMNode* xmlNode, Node* node) {
 
 template <typename T>
 static T* makeNodeFromXML(const DOMNode* xmlNode, PAGXDocument* doc) {
-  auto id = getAttribute(xmlNode, "id");
+  auto id = GetAttribute(xmlNode, "id");
   // If a node with this ID was pre-registered, reuse it instead of creating a duplicate.
   auto* existing = id.empty() ? nullptr : doc->findNode(id);
   if (existing) {
-    parseCustomData(xmlNode, existing);
+    ParseCustomData(xmlNode, existing);
     existing->sourceLine = xmlNode->line;
     return static_cast<T*>(existing);
   }
   auto* node = doc->makeNode<T>(id);
   if (node) {
-    parseCustomData(xmlNode, node);
+    ParseCustomData(xmlNode, node);
     node->sourceLine = xmlNode->line;
   }
   return node;
@@ -278,9 +278,9 @@ static T* makeNodeFromXML(const DOMNode* xmlNode, PAGXDocument* doc) {
 // Pre-registers a resource node by tag name. Creates an empty node of the correct type and
 // registers its ID in nodeMap. Returns true if the tag name is a known resource type.
 // NOTE: When adding a new resource type to PAGX, add a corresponding branch here and in
-// parseResource() below.
-static bool preRegisterResource(const DOMNode* node, PAGXDocument* doc) {
-  auto id = getAttribute(node, "id");
+// ParseResource() below.
+static bool PreRegisterResource(const DOMNode* node, PAGXDocument* doc) {
+  auto id = GetAttribute(node, "id");
   if (id.empty()) {
     return true;
   }
@@ -313,29 +313,29 @@ static bool preRegisterResource(const DOMNode* node, PAGXDocument* doc) {
 // Fully parses a resource node by tag name. Pre-registered nodes are reused by makeNodeFromXML.
 // Returns true if the tag name is a known resource type.
 // NOTE: When adding a new resource type to PAGX, add a corresponding branch here and in
-// preRegisterResource() above.
-static bool parseResource(const DOMNode* node, PAGXDocument* doc) {
+// PreRegisterResource() above.
+static bool ParseResource(const DOMNode* node, PAGXDocument* doc) {
   if (node->name == "Image") {
-    parseImage(node, doc);
+    ParseImage(node, doc);
   } else if (node->name == "PathData") {
-    parsePathData(node, doc);
+    ParsePathData(node, doc);
   } else if (node->name == "Font") {
-    parseFont(node, doc);
+    ParseFont(node, doc);
   } else if (node->name == "Composition") {
-    parseComposition(node, doc);
+    ParseComposition(node, doc);
   } else {
-    return parseColorSource(node, doc) != nullptr;
+    return ParseColorSource(node, doc) != nullptr;
   }
   return true;
 }
 
-static void parseResources(const DOMNode* node, PAGXDocument* doc) {
+static void ParseResources(const DOMNode* node, PAGXDocument* doc) {
   // First pass: pre-register all resource IDs so that cross-references via '@id' resolve
   // regardless of XML declaration order.
   auto child = node->firstChild;
   while (child) {
     if (child->type == DOMNodeType::Element) {
-      preRegisterResource(child.get(), doc);
+      PreRegisterResource(child.get(), doc);
     }
     child = child->nextSibling;
   }
@@ -347,8 +347,8 @@ static void parseResources(const DOMNode* node, PAGXDocument* doc) {
     if (current->type != DOMNodeType::Element) {
       continue;
     }
-    if (!parseResource(current.get(), doc)) {
-      reportError(doc, current.get(),
+    if (!ParseResource(current.get(), doc)) {
+      ReportError(doc, current.get(),
                   "Element '" + current->name +
                       "' is not allowed in 'Resources'."
                       " Expected: Image, PathData, Composition, Font,"
@@ -359,36 +359,36 @@ static void parseResources(const DOMNode* node, PAGXDocument* doc) {
 }
 
 // Forward declarations for helper functions defined later in the file.
-static std::optional<float> getOptionalFloatAttribute(const DOMNode* node, const std::string& name,
+static std::optional<float> GetOptionalFloatAttribute(const DOMNode* node, const std::string& name,
                                                       PAGXDocument* doc);
 
-static float getFloatAttributeOrNaN(const DOMNode* node, const std::string& name,
+static float GetFloatAttributeOrNaN(const DOMNode* node, const std::string& name,
                                     PAGXDocument* doc) {
-  auto value = getOptionalFloatAttribute(node, name, doc);
+  auto value = GetOptionalFloatAttribute(node, name, doc);
   return value.has_value() ? *value : NAN;
 }
 
-static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc) {
+static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
   auto layer = makeNodeFromXML<Layer>(node, doc);
   if (!layer) {
     return nullptr;
   }
-  layer->name = getAttribute(node, "name");
-  layer->visible = getBoolAttribute(node, "visible", Default<Layer>().visible, doc);
-  layer->alpha = getFloatAttribute(node, "alpha", Default<Layer>().alpha, doc);
+  layer->name = GetAttribute(node, "name");
+  layer->visible = GetBoolAttribute(node, "visible", Default<Layer>().visible, doc);
+  layer->alpha = GetFloatAttribute(node, "alpha", Default<Layer>().alpha, doc);
   layer->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
-  layer->x = getFloatAttribute(node, "x", Default<Layer>().x, doc);
-  layer->y = getFloatAttribute(node, "y", Default<Layer>().y, doc);
-  layer->width = getFloatAttributeOrNaN(node, "width", doc);
-  layer->height = getFloatAttributeOrNaN(node, "height", doc);
+  layer->x = GetFloatAttribute(node, "x", Default<Layer>().x, doc);
+  layer->y = GetFloatAttribute(node, "y", Default<Layer>().y, doc);
+  layer->width = GetFloatAttributeOrNaN(node, "width", doc);
+  layer->height = GetFloatAttributeOrNaN(node, "height", doc);
   layer->layout = GET_ENUM(node, "layout", "none", doc, LayoutMode);
-  layer->gap = getFloatAttribute(node, "gap", Default<Layer>().gap, doc);
-  layer->flex = getFloatAttribute(node, "flex", Default<Layer>().flex, doc);
-  auto paddingStr = getAttribute(node, "padding");
+  layer->gap = GetFloatAttribute(node, "gap", Default<Layer>().gap, doc);
+  layer->flex = GetFloatAttribute(node, "flex", Default<Layer>().flex, doc);
+  auto paddingStr = GetAttribute(node, "padding");
   if (!paddingStr.empty()) {
     auto count = ParseFloatList(paddingStr).size();
     if (count != 1 && count != 2 && count != 4) {
-      reportError(doc, node, "Invalid value '" + paddingStr + "' for 'padding' attribute.");
+      ReportError(doc, node, "Invalid value '" + paddingStr + "' for 'padding' attribute.");
     } else {
       layer->padding = PaddingFromString(paddingStr);
     }
@@ -396,56 +396,56 @@ static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc) {
   layer->alignment = GET_ENUM(node, "alignment", "stretch", doc, Alignment);
   layer->arrangement = GET_ENUM(node, "arrangement", "start", doc, Arrangement);
   layer->includeInLayout =
-      getBoolAttribute(node, "includeInLayout", Default<Layer>().includeInLayout, doc);
-  layer->left = getFloatAttributeOrNaN(node, "left", doc);
-  layer->right = getFloatAttributeOrNaN(node, "right", doc);
-  layer->top = getFloatAttributeOrNaN(node, "top", doc);
-  layer->bottom = getFloatAttributeOrNaN(node, "bottom", doc);
-  layer->centerX = getFloatAttributeOrNaN(node, "centerX", doc);
-  layer->centerY = getFloatAttributeOrNaN(node, "centerY", doc);
-  auto matrixStr = getAttribute(node, "matrix");
+      GetBoolAttribute(node, "includeInLayout", Default<Layer>().includeInLayout, doc);
+  layer->left = GetFloatAttributeOrNaN(node, "left", doc);
+  layer->right = GetFloatAttributeOrNaN(node, "right", doc);
+  layer->top = GetFloatAttributeOrNaN(node, "top", doc);
+  layer->bottom = GetFloatAttributeOrNaN(node, "bottom", doc);
+  layer->centerX = GetFloatAttributeOrNaN(node, "centerX", doc);
+  layer->centerY = GetFloatAttributeOrNaN(node, "centerY", doc);
+  auto matrixStr = GetAttribute(node, "matrix");
   if (!matrixStr.empty()) {
     if (ParseFloatList(matrixStr).size() < 6) {
-      reportError(doc, node, "Invalid value '" + matrixStr + "' for 'matrix' attribute.");
+      ReportError(doc, node, "Invalid value '" + matrixStr + "' for 'matrix' attribute.");
     } else {
       layer->matrix = MatrixFromString(matrixStr);
     }
   }
-  auto matrix3DStr = getAttribute(node, "matrix3D");
+  auto matrix3DStr = GetAttribute(node, "matrix3D");
   if (!matrix3DStr.empty()) {
     auto floats = ParseFloatList(matrix3DStr);
     if (floats.size() == 16) {
       memcpy(layer->matrix3D.values, floats.data(), 16 * sizeof(float));
     } else {
-      reportError(doc, node, "Invalid 'matrix3D' value (expected 16 numbers).");
+      ReportError(doc, node, "Invalid 'matrix3D' value (expected 16 numbers).");
     }
   }
-  layer->preserve3D = getBoolAttribute(node, "preserve3D", Default<Layer>().preserve3D, doc);
-  layer->antiAlias = getBoolAttribute(node, "antiAlias", Default<Layer>().antiAlias, doc);
-  layer->groupOpacity = getBoolAttribute(node, "groupOpacity", Default<Layer>().groupOpacity, doc);
+  layer->preserve3D = GetBoolAttribute(node, "preserve3D", Default<Layer>().preserve3D, doc);
+  layer->antiAlias = GetBoolAttribute(node, "antiAlias", Default<Layer>().antiAlias, doc);
+  layer->groupOpacity = GetBoolAttribute(node, "groupOpacity", Default<Layer>().groupOpacity, doc);
   layer->passThroughBackground =
-      getBoolAttribute(node, "passThroughBackground", Default<Layer>().passThroughBackground, doc);
-  auto scrollRectStr = getAttribute(node, "scrollRect");
+      GetBoolAttribute(node, "passThroughBackground", Default<Layer>().passThroughBackground, doc);
+  auto scrollRectStr = GetAttribute(node, "scrollRect");
   if (!scrollRectStr.empty()) {
-    layer->scrollRect = getRectAttribute(node, "scrollRect", {}, doc);
+    layer->scrollRect = GetRectAttribute(node, "scrollRect", {}, doc);
     layer->hasScrollRect = true;
   }
-  layer->clipToBounds = getBoolAttribute(node, "clipToBounds", Default<Layer>().clipToBounds, doc);
+  layer->clipToBounds = GetBoolAttribute(node, "clipToBounds", Default<Layer>().clipToBounds, doc);
 
-  auto maskAttr = getAttribute(node, "mask");
+  auto maskAttr = GetAttribute(node, "mask");
   if (!maskAttr.empty() && maskAttr[0] == '@') {
     layer->mask = doc->findNode<Layer>(maskAttr.substr(1));
     if (!layer->mask) {
-      reportError(doc, node, "Resource '" + maskAttr + "' not found for 'mask' attribute.");
+      ReportError(doc, node, "Resource '" + maskAttr + "' not found for 'mask' attribute.");
     }
   }
   layer->maskType = GET_ENUM(node, "maskType", "alpha", doc, MaskType);
 
-  auto compositionAttr = getAttribute(node, "composition");
+  auto compositionAttr = GetAttribute(node, "composition");
   if (!compositionAttr.empty() && compositionAttr[0] == '@') {
     layer->composition = doc->findNode<Composition>(compositionAttr.substr(1));
     if (!layer->composition) {
-      reportError(doc, node,
+      ReportError(doc, node,
                   "Resource '" + compositionAttr + "' not found for 'composition' attribute.");
     }
   }
@@ -459,52 +459,52 @@ static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc) {
     }
     // Legacy format: support container nodes for backward compatibility.
     if (current->name == "contents") {
-      parseContents(current.get(), layer, doc);
+      ParseContents(current.get(), layer, doc);
       continue;
     }
     if (current->name == "styles") {
-      parseStyles(current.get(), layer, doc);
+      ParseStyles(current.get(), layer, doc);
       continue;
     }
     if (current->name == "filters") {
-      parseFilters(current.get(), layer, doc);
+      ParseFilters(current.get(), layer, doc);
       continue;
     }
     // New format: direct child elements without container nodes.
     if (current->name == "Layer") {
-      auto childLayer = parseLayer(current.get(), doc);
+      auto childLayer = ParseLayer(current.get(), doc);
       if (childLayer) {
         layer->children.push_back(childLayer);
       }
       continue;
     }
     if (current->name == "Import") {
-      auto* imp = parseImport(current.get(), doc);
+      auto* imp = ParseImport(current.get(), doc);
       if (imp) {
         layer->contents.push_back(imp);
       }
       continue;
     }
     // Try to parse as VectorElement.
-    auto element = parseElement(current.get(), doc);
+    auto element = ParseElement(current.get(), doc);
     if (element) {
       layer->contents.push_back(element);
       continue;
     }
     // Try to parse as LayerStyle.
-    auto style = parseLayerStyle(current.get(), doc);
+    auto style = ParseLayerStyle(current.get(), doc);
     if (style) {
       layer->styles.push_back(style);
       continue;
     }
     // Try to parse as LayerFilter.
-    auto filter = parseLayerFilter(current.get(), doc);
+    auto filter = ParseLayerFilter(current.get(), doc);
     if (filter) {
       layer->filters.push_back(filter);
       continue;
     }
     // Unknown node type - report error.
-    reportError(doc, current.get(),
+    ReportError(doc, current.get(),
                 "Element '" + current->name +
                     "' is not allowed in 'Layer'."
                     " Expected: Layer, Group, Rectangle, Ellipse, Polystar,"
@@ -518,7 +518,7 @@ static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc) {
   return layer;
 }
 
-static void parseContents(const DOMNode* node, Layer* layer, PAGXDocument* doc) {
+static void ParseContents(const DOMNode* node, Layer* layer, PAGXDocument* doc) {
   auto child = node->firstChild;
   while (child) {
     auto current = child;
@@ -527,17 +527,17 @@ static void parseContents(const DOMNode* node, Layer* layer, PAGXDocument* doc) 
       continue;
     }
     if (current->name == "Import") {
-      auto* imp = parseImport(current.get(), doc);
+      auto* imp = ParseImport(current.get(), doc);
       if (imp) {
         layer->contents.push_back(imp);
       }
       continue;
     }
-    auto element = parseElement(current.get(), doc);
+    auto element = ParseElement(current.get(), doc);
     if (element) {
       layer->contents.push_back(element);
     } else {
-      reportError(doc, current.get(),
+      ReportError(doc, current.get(),
                   "Element '" + current->name +
                       "' is not allowed in 'contents'."
                       " Expected: Group, Rectangle, Ellipse, Polystar,"
@@ -547,7 +547,7 @@ static void parseContents(const DOMNode* node, Layer* layer, PAGXDocument* doc) 
   }
 }
 
-static void parseStyles(const DOMNode* node, Layer* layer, PAGXDocument* doc) {
+static void ParseStyles(const DOMNode* node, Layer* layer, PAGXDocument* doc) {
   auto child = node->firstChild;
   while (child) {
     auto current = child;
@@ -555,11 +555,11 @@ static void parseStyles(const DOMNode* node, Layer* layer, PAGXDocument* doc) {
     if (current->type != DOMNodeType::Element) {
       continue;
     }
-    auto style = parseLayerStyle(current.get(), doc);
+    auto style = ParseLayerStyle(current.get(), doc);
     if (style) {
       layer->styles.push_back(style);
     } else {
-      reportError(doc, current.get(),
+      ReportError(doc, current.get(),
                   "Element '" + current->name +
                       "' is not allowed in 'styles'."
                       " Expected: DropShadowStyle, InnerShadowStyle,"
@@ -568,7 +568,7 @@ static void parseStyles(const DOMNode* node, Layer* layer, PAGXDocument* doc) {
   }
 }
 
-static void parseFilters(const DOMNode* node, Layer* layer, PAGXDocument* doc) {
+static void ParseFilters(const DOMNode* node, Layer* layer, PAGXDocument* doc) {
   auto child = node->firstChild;
   while (child) {
     auto current = child;
@@ -576,11 +576,11 @@ static void parseFilters(const DOMNode* node, Layer* layer, PAGXDocument* doc) {
     if (current->type != DOMNodeType::Element) {
       continue;
     }
-    auto filter = parseLayerFilter(current.get(), doc);
+    auto filter = ParseLayerFilter(current.get(), doc);
     if (filter) {
       layer->filters.push_back(filter);
     } else {
-      reportError(doc, current.get(),
+      ReportError(doc, current.get(),
                   "Element '" + current->name +
                       "' is not allowed in 'filters'."
                       " Expected: BlurFilter, DropShadowFilter,"
@@ -589,7 +589,7 @@ static void parseFilters(const DOMNode* node, Layer* layer, PAGXDocument* doc) {
   }
 }
 
-static Import* parseImport(const DOMNode* node, PAGXDocument* doc) {
+static Import* ParseImport(const DOMNode* node, PAGXDocument* doc) {
   auto* import = makeNodeFromXML<Import>(node, doc);
   if (!import) {
     return nullptr;
@@ -603,110 +603,110 @@ static Import* parseImport(const DOMNode* node, PAGXDocument* doc) {
     import->format = *formatAttr;
   }
   if (import->source.empty() && node->firstChild) {
-    import->rawContent = serializeDOMChildren(node);
+    import->rawContent = SerializeDOMChildren(node);
   }
   return import;
 }
 
-static Element* parseElement(const DOMNode* node, PAGXDocument* doc) {
+static Element* ParseElement(const DOMNode* node, PAGXDocument* doc) {
   if (node->name == "Rectangle") {
-    return parseRectangle(node, doc);
+    return ParseRectangle(node, doc);
   }
   if (node->name == "Ellipse") {
-    return parseEllipse(node, doc);
+    return ParseEllipse(node, doc);
   }
   if (node->name == "Polystar") {
-    return parsePolystar(node, doc);
+    return ParsePolystar(node, doc);
   }
   if (node->name == "Path") {
-    return parsePath(node, doc);
+    return ParsePath(node, doc);
   }
   if (node->name == "Text") {
-    return parseText(node, doc);
+    return ParseText(node, doc);
   }
   if (node->name == "Fill") {
-    return parseFill(node, doc);
+    return ParseFill(node, doc);
   }
   if (node->name == "Stroke") {
-    return parseStroke(node, doc);
+    return ParseStroke(node, doc);
   }
   if (node->name == "TrimPath") {
-    return parseTrimPath(node, doc);
+    return ParseTrimPath(node, doc);
   }
   if (node->name == "RoundCorner") {
-    return parseRoundCorner(node, doc);
+    return ParseRoundCorner(node, doc);
   }
   if (node->name == "MergePath") {
-    return parseMergePath(node, doc);
+    return ParseMergePath(node, doc);
   }
   if (node->name == "TextModifier") {
-    return parseTextModifier(node, doc);
+    return ParseTextModifier(node, doc);
   }
   if (node->name == "TextPath") {
-    return parseTextPath(node, doc);
+    return ParseTextPath(node, doc);
   }
   if (node->name == "TextBox") {
-    return parseTextBox(node, doc);
+    return ParseTextBox(node, doc);
   }
   if (node->name == "Repeater") {
-    return parseRepeater(node, doc);
+    return ParseRepeater(node, doc);
   }
   if (node->name == "Group") {
-    return parseGroup(node, doc);
+    return ParseGroup(node, doc);
   }
   return nullptr;
 }
 
-static ColorSource* parseColorSource(const DOMNode* node, PAGXDocument* doc) {
+static ColorSource* ParseColorSource(const DOMNode* node, PAGXDocument* doc) {
   if (node->name == "SolidColor") {
-    return parseSolidColor(node, doc);
+    return ParseSolidColor(node, doc);
   }
   if (node->name == "LinearGradient") {
-    return parseLinearGradient(node, doc);
+    return ParseLinearGradient(node, doc);
   }
   if (node->name == "RadialGradient") {
-    return parseRadialGradient(node, doc);
+    return ParseRadialGradient(node, doc);
   }
   if (node->name == "ConicGradient") {
-    return parseConicGradient(node, doc);
+    return ParseConicGradient(node, doc);
   }
   if (node->name == "DiamondGradient") {
-    return parseDiamondGradient(node, doc);
+    return ParseDiamondGradient(node, doc);
   }
   if (node->name == "ImagePattern") {
-    return parseImagePattern(node, doc);
+    return ParseImagePattern(node, doc);
   }
   return nullptr;
 }
 
-static LayerStyle* parseLayerStyle(const DOMNode* node, PAGXDocument* doc) {
+static LayerStyle* ParseLayerStyle(const DOMNode* node, PAGXDocument* doc) {
   if (node->name == "DropShadowStyle") {
-    return parseDropShadowStyle(node, doc);
+    return ParseDropShadowStyle(node, doc);
   }
   if (node->name == "InnerShadowStyle") {
-    return parseInnerShadowStyle(node, doc);
+    return ParseInnerShadowStyle(node, doc);
   }
   if (node->name == "BackgroundBlurStyle") {
-    return parseBackgroundBlurStyle(node, doc);
+    return ParseBackgroundBlurStyle(node, doc);
   }
   return nullptr;
 }
 
-static LayerFilter* parseLayerFilter(const DOMNode* node, PAGXDocument* doc) {
+static LayerFilter* ParseLayerFilter(const DOMNode* node, PAGXDocument* doc) {
   if (node->name == "BlurFilter") {
-    return parseBlurFilter(node, doc);
+    return ParseBlurFilter(node, doc);
   }
   if (node->name == "DropShadowFilter") {
-    return parseDropShadowFilter(node, doc);
+    return ParseDropShadowFilter(node, doc);
   }
   if (node->name == "InnerShadowFilter") {
-    return parseInnerShadowFilter(node, doc);
+    return ParseInnerShadowFilter(node, doc);
   }
   if (node->name == "BlendFilter") {
-    return parseBlendFilter(node, doc);
+    return ParseBlendFilter(node, doc);
   }
   if (node->name == "ColorMatrixFilter") {
-    return parseColorMatrixFilter(node, doc);
+    return ParseColorMatrixFilter(node, doc);
   }
   return nullptr;
 }
@@ -715,96 +715,96 @@ static LayerFilter* parseLayerFilter(const DOMNode* node, PAGXDocument* doc) {
 // Geometry element parsing
 //==============================================================================
 
-static Rectangle* parseRectangle(const DOMNode* node, PAGXDocument* doc) {
+static Rectangle* ParseRectangle(const DOMNode* node, PAGXDocument* doc) {
   auto rect = makeNodeFromXML<Rectangle>(node, doc);
   if (!rect) {
     return nullptr;
   }
-  rect->size = getSizeAttribute(node, "size", {0, 0}, doc);
+  rect->size = GetSizeAttribute(node, "size", {0, 0}, doc);
   auto* posAttr = node->findAttribute("position");
   if (posAttr && !posAttr->empty()) {
-    rect->position = getPointAttribute(node, "position", Default<Rectangle>().position, doc);
+    rect->position = GetPointAttribute(node, "position", Default<Rectangle>().position, doc);
   } else {
     rect->position = {rect->size.width * 0.5f, rect->size.height * 0.5f};
   }
-  rect->roundness = getFloatAttribute(node, "roundness", Default<Rectangle>().roundness, doc);
-  rect->reversed = getBoolAttribute(node, "reversed", Default<Rectangle>().reversed, doc);
-  rect->left = getFloatAttributeOrNaN(node, "left", doc);
-  rect->right = getFloatAttributeOrNaN(node, "right", doc);
-  rect->top = getFloatAttributeOrNaN(node, "top", doc);
-  rect->bottom = getFloatAttributeOrNaN(node, "bottom", doc);
-  rect->centerX = getFloatAttributeOrNaN(node, "centerX", doc);
-  rect->centerY = getFloatAttributeOrNaN(node, "centerY", doc);
+  rect->roundness = GetFloatAttribute(node, "roundness", Default<Rectangle>().roundness, doc);
+  rect->reversed = GetBoolAttribute(node, "reversed", Default<Rectangle>().reversed, doc);
+  rect->left = GetFloatAttributeOrNaN(node, "left", doc);
+  rect->right = GetFloatAttributeOrNaN(node, "right", doc);
+  rect->top = GetFloatAttributeOrNaN(node, "top", doc);
+  rect->bottom = GetFloatAttributeOrNaN(node, "bottom", doc);
+  rect->centerX = GetFloatAttributeOrNaN(node, "centerX", doc);
+  rect->centerY = GetFloatAttributeOrNaN(node, "centerY", doc);
   return rect;
 }
 
-static Ellipse* parseEllipse(const DOMNode* node, PAGXDocument* doc) {
+static Ellipse* ParseEllipse(const DOMNode* node, PAGXDocument* doc) {
   auto ellipse = makeNodeFromXML<Ellipse>(node, doc);
   if (!ellipse) {
     return nullptr;
   }
-  ellipse->size = getSizeAttribute(node, "size", {0, 0}, doc);
+  ellipse->size = GetSizeAttribute(node, "size", {0, 0}, doc);
   auto* posAttr = node->findAttribute("position");
   if (posAttr && !posAttr->empty()) {
-    ellipse->position = getPointAttribute(node, "position", Default<Ellipse>().position, doc);
+    ellipse->position = GetPointAttribute(node, "position", Default<Ellipse>().position, doc);
   } else {
     ellipse->position = {ellipse->size.width * 0.5f, ellipse->size.height * 0.5f};
   }
-  ellipse->reversed = getBoolAttribute(node, "reversed", Default<Ellipse>().reversed, doc);
-  ellipse->left = getFloatAttributeOrNaN(node, "left", doc);
-  ellipse->right = getFloatAttributeOrNaN(node, "right", doc);
-  ellipse->top = getFloatAttributeOrNaN(node, "top", doc);
-  ellipse->bottom = getFloatAttributeOrNaN(node, "bottom", doc);
-  ellipse->centerX = getFloatAttributeOrNaN(node, "centerX", doc);
-  ellipse->centerY = getFloatAttributeOrNaN(node, "centerY", doc);
+  ellipse->reversed = GetBoolAttribute(node, "reversed", Default<Ellipse>().reversed, doc);
+  ellipse->left = GetFloatAttributeOrNaN(node, "left", doc);
+  ellipse->right = GetFloatAttributeOrNaN(node, "right", doc);
+  ellipse->top = GetFloatAttributeOrNaN(node, "top", doc);
+  ellipse->bottom = GetFloatAttributeOrNaN(node, "bottom", doc);
+  ellipse->centerX = GetFloatAttributeOrNaN(node, "centerX", doc);
+  ellipse->centerY = GetFloatAttributeOrNaN(node, "centerY", doc);
   return ellipse;
 }
 
-static Polystar* parsePolystar(const DOMNode* node, PAGXDocument* doc) {
+static Polystar* ParsePolystar(const DOMNode* node, PAGXDocument* doc) {
   auto polystar = makeNodeFromXML<Polystar>(node, doc);
   if (!polystar) {
     return nullptr;
   }
   polystar->type = GET_ENUM(node, "type", "star", doc, PolystarType);
-  polystar->pointCount = getFloatAttribute(node, "pointCount", Default<Polystar>().pointCount, doc);
+  polystar->pointCount = GetFloatAttribute(node, "pointCount", Default<Polystar>().pointCount, doc);
   polystar->outerRadius =
-      getFloatAttribute(node, "outerRadius", Default<Polystar>().outerRadius, doc);
+      GetFloatAttribute(node, "outerRadius", Default<Polystar>().outerRadius, doc);
   polystar->innerRadius =
-      getFloatAttribute(node, "innerRadius", Default<Polystar>().innerRadius, doc);
-  polystar->rotation = getFloatAttribute(node, "rotation", Default<Polystar>().rotation, doc);
+      GetFloatAttribute(node, "innerRadius", Default<Polystar>().innerRadius, doc);
+  polystar->rotation = GetFloatAttribute(node, "rotation", Default<Polystar>().rotation, doc);
   polystar->outerRoundness =
-      getFloatAttribute(node, "outerRoundness", Default<Polystar>().outerRoundness, doc);
+      GetFloatAttribute(node, "outerRoundness", Default<Polystar>().outerRoundness, doc);
   polystar->innerRoundness =
-      getFloatAttribute(node, "innerRoundness", Default<Polystar>().innerRoundness, doc);
-  polystar->reversed = getBoolAttribute(node, "reversed", Default<Polystar>().reversed, doc);
+      GetFloatAttribute(node, "innerRoundness", Default<Polystar>().innerRoundness, doc);
+  polystar->reversed = GetBoolAttribute(node, "reversed", Default<Polystar>().reversed, doc);
   auto* posAttr = node->findAttribute("position");
   if (posAttr && !posAttr->empty()) {
-    polystar->position = getPointAttribute(node, "position", Default<Polystar>().position, doc);
+    polystar->position = GetPointAttribute(node, "position", Default<Polystar>().position, doc);
   } else {
     auto bounds = polystar->getContentBounds();
     polystar->position = {-bounds.x, -bounds.y};
   }
-  polystar->left = getFloatAttributeOrNaN(node, "left", doc);
-  polystar->right = getFloatAttributeOrNaN(node, "right", doc);
-  polystar->top = getFloatAttributeOrNaN(node, "top", doc);
-  polystar->bottom = getFloatAttributeOrNaN(node, "bottom", doc);
-  polystar->centerX = getFloatAttributeOrNaN(node, "centerX", doc);
-  polystar->centerY = getFloatAttributeOrNaN(node, "centerY", doc);
+  polystar->left = GetFloatAttributeOrNaN(node, "left", doc);
+  polystar->right = GetFloatAttributeOrNaN(node, "right", doc);
+  polystar->top = GetFloatAttributeOrNaN(node, "top", doc);
+  polystar->bottom = GetFloatAttributeOrNaN(node, "bottom", doc);
+  polystar->centerX = GetFloatAttributeOrNaN(node, "centerX", doc);
+  polystar->centerY = GetFloatAttributeOrNaN(node, "centerY", doc);
   return polystar;
 }
 
-static Path* parsePath(const DOMNode* node, PAGXDocument* doc) {
+static Path* ParsePath(const DOMNode* node, PAGXDocument* doc) {
   auto path = makeNodeFromXML<Path>(node, doc);
   if (!path) {
     return nullptr;
   }
-  auto dataAttr = getAttribute(node, "data");
+  auto dataAttr = GetAttribute(node, "data");
   if (!dataAttr.empty()) {
     if (dataAttr[0] == '@') {
       // Reference to PathData resource
       path->data = doc->findNode<PathData>(dataAttr.substr(1));
       if (!path->data) {
-        reportError(doc, node, "Resource '" + dataAttr + "' not found for 'data' attribute.");
+        ReportError(doc, node, "Resource '" + dataAttr + "' not found for 'data' attribute.");
       }
     } else {
       // Inline path data
@@ -813,24 +813,24 @@ static Path* parsePath(const DOMNode* node, PAGXDocument* doc) {
       *path->data = PathDataFromSVGString(dataAttr);
     }
   }
-  path->reversed = getBoolAttribute(node, "reversed", Default<Path>().reversed, doc);
-  path->position = getPointAttribute(node, "position", Default<Path>().position, doc);
-  path->left = getFloatAttributeOrNaN(node, "left", doc);
-  path->right = getFloatAttributeOrNaN(node, "right", doc);
-  path->top = getFloatAttributeOrNaN(node, "top", doc);
-  path->bottom = getFloatAttributeOrNaN(node, "bottom", doc);
-  path->centerX = getFloatAttributeOrNaN(node, "centerX", doc);
-  path->centerY = getFloatAttributeOrNaN(node, "centerY", doc);
+  path->reversed = GetBoolAttribute(node, "reversed", Default<Path>().reversed, doc);
+  path->position = GetPointAttribute(node, "position", Default<Path>().position, doc);
+  path->left = GetFloatAttributeOrNaN(node, "left", doc);
+  path->right = GetFloatAttributeOrNaN(node, "right", doc);
+  path->top = GetFloatAttributeOrNaN(node, "top", doc);
+  path->bottom = GetFloatAttributeOrNaN(node, "bottom", doc);
+  path->centerX = GetFloatAttributeOrNaN(node, "centerX", doc);
+  path->centerY = GetFloatAttributeOrNaN(node, "centerY", doc);
   return path;
 }
 
-static Text* parseText(const DOMNode* node, PAGXDocument* doc) {
+static Text* ParseText(const DOMNode* node, PAGXDocument* doc) {
   auto text = makeNodeFromXML<Text>(node, doc);
   if (!text) {
     return nullptr;
   }
   // Parse text content from attribute first, then fallback to text child node
-  auto textAttr = getAttribute(node, "text");
+  auto textAttr = GetAttribute(node, "text");
   if (!textAttr.empty()) {
     text->text = textAttr;
   } else {
@@ -843,14 +843,14 @@ static Text* parseText(const DOMNode* node, PAGXDocument* doc) {
       textChild = textChild->nextSibling;
     }
   }
-  text->position = getPointAttribute(node, "position", Default<Text>().position, doc);
-  text->fontFamily = getAttribute(node, "fontFamily");
-  text->fontStyle = getAttribute(node, "fontStyle");
-  text->fontSize = getFloatAttribute(node, "fontSize", Default<Text>().fontSize, doc);
+  text->position = GetPointAttribute(node, "position", Default<Text>().position, doc);
+  text->fontFamily = GetAttribute(node, "fontFamily");
+  text->fontStyle = GetAttribute(node, "fontStyle");
+  text->fontSize = GetFloatAttribute(node, "fontSize", Default<Text>().fontSize, doc);
   text->letterSpacing =
-      getFloatAttribute(node, "letterSpacing", Default<Text>().letterSpacing, doc);
-  text->fauxBold = getBoolAttribute(node, "fauxBold", Default<Text>().fauxBold, doc);
-  text->fauxItalic = getBoolAttribute(node, "fauxItalic", Default<Text>().fauxItalic, doc);
+      GetFloatAttribute(node, "letterSpacing", Default<Text>().letterSpacing, doc);
+  text->fauxBold = GetBoolAttribute(node, "fauxBold", Default<Text>().fauxBold, doc);
+  text->fauxItalic = GetBoolAttribute(node, "fauxItalic", Default<Text>().fauxItalic, doc);
   text->textAnchor = GET_ENUM(node, "textAnchor", "start", doc, TextAnchor);
   text->baseline = GET_ENUM(node, "baseline", "lineBox", doc, TextBaseline);
 
@@ -859,24 +859,24 @@ static Text* parseText(const DOMNode* node, PAGXDocument* doc) {
   while (child) {
     if (child->type == DOMNodeType::Element) {
       if (child->name == "GlyphRun") {
-        auto glyphRun = parseGlyphRun(child.get(), doc);
+        auto glyphRun = ParseGlyphRun(child.get(), doc);
         if (glyphRun) {
           text->glyphRuns.push_back(glyphRun);
         }
       } else {
-        reportError(doc, child.get(),
+        ReportError(doc, child.get(),
                     "Element '" + child->name + "' is not allowed in 'Text'. Expected: GlyphRun.");
       }
     }
     child = child->nextSibling;
   }
 
-  text->left = getFloatAttributeOrNaN(node, "left", doc);
-  text->right = getFloatAttributeOrNaN(node, "right", doc);
-  text->top = getFloatAttributeOrNaN(node, "top", doc);
-  text->bottom = getFloatAttributeOrNaN(node, "bottom", doc);
-  text->centerX = getFloatAttributeOrNaN(node, "centerX", doc);
-  text->centerY = getFloatAttributeOrNaN(node, "centerY", doc);
+  text->left = GetFloatAttributeOrNaN(node, "left", doc);
+  text->right = GetFloatAttributeOrNaN(node, "right", doc);
+  text->top = GetFloatAttributeOrNaN(node, "top", doc);
+  text->bottom = GetFloatAttributeOrNaN(node, "bottom", doc);
+  text->centerX = GetFloatAttributeOrNaN(node, "centerX", doc);
+  text->centerY = GetFloatAttributeOrNaN(node, "centerY", doc);
   return text;
 }
 
@@ -884,7 +884,7 @@ static Text* parseText(const DOMNode* node, PAGXDocument* doc) {
 // Painter parsing
 //==============================================================================
 
-static ColorSource* parseColorAttr(const std::string& colorAttr, PAGXDocument* doc,
+static ColorSource* ParseColorAttr(const std::string& colorAttr, PAGXDocument* doc,
                                    const DOMNode* node) {
   if (colorAttr.empty()) {
     return nullptr;
@@ -892,25 +892,25 @@ static ColorSource* parseColorAttr(const std::string& colorAttr, PAGXDocument* d
   if (colorAttr[0] == '@') {
     auto result = doc->findNode<ColorSource>(colorAttr.substr(1));
     if (!result) {
-      reportError(doc, node, "Resource '" + colorAttr + "' not found for 'color' attribute.");
+      ReportError(doc, node, "Resource '" + colorAttr + "' not found for 'color' attribute.");
     }
     return result;
   }
   auto solidColor = doc->makeNode<SolidColor>();
-  solidColor->color = getColorAttribute(node, "color", doc);
+  solidColor->color = GetColorAttribute(node, "color", doc);
   return solidColor;
 }
 
-static ColorSource* parseChildColorSource(const DOMNode* node, PAGXDocument* doc) {
+static ColorSource* ParseChildColorSource(const DOMNode* node, PAGXDocument* doc) {
   ColorSource* result = nullptr;
   auto child = node->firstChild;
   while (child) {
     if (child->type == DOMNodeType::Element) {
-      auto colorSource = parseColorSource(child.get(), doc);
+      auto colorSource = ParseColorSource(child.get(), doc);
       if (colorSource) {
         result = colorSource;
       } else {
-        reportError(doc, child.get(),
+        ReportError(doc, child.get(),
                     "Element '" + child->name + "' is not allowed in '" + node->name +
                         "'. Expected: SolidColor, LinearGradient,"
                         " RadialGradient, ConicGradient,"
@@ -922,45 +922,45 @@ static ColorSource* parseChildColorSource(const DOMNode* node, PAGXDocument* doc
   return result;
 }
 
-static Fill* parseFill(const DOMNode* node, PAGXDocument* doc) {
+static Fill* ParseFill(const DOMNode* node, PAGXDocument* doc) {
   auto fill = makeNodeFromXML<Fill>(node, doc);
   if (!fill) {
     return nullptr;
   }
-  fill->color = parseColorAttr(getAttribute(node, "color"), doc, node);
-  fill->alpha = getFloatAttribute(node, "alpha", Default<Fill>().alpha, doc);
+  fill->color = ParseColorAttr(GetAttribute(node, "color"), doc, node);
+  fill->alpha = GetFloatAttribute(node, "alpha", Default<Fill>().alpha, doc);
   fill->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
   fill->fillRule = GET_ENUM(node, "fillRule", "winding", doc, FillRule);
   fill->placement = GET_ENUM(node, "placement", "background", doc, LayerPlacement);
-  auto childColor = parseChildColorSource(node, doc);
+  auto childColor = ParseChildColorSource(node, doc);
   if (childColor) {
     fill->color = childColor;
   }
   return fill;
 }
 
-static Stroke* parseStroke(const DOMNode* node, PAGXDocument* doc) {
+static Stroke* ParseStroke(const DOMNode* node, PAGXDocument* doc) {
   auto stroke = makeNodeFromXML<Stroke>(node, doc);
   if (!stroke) {
     return nullptr;
   }
-  stroke->color = parseColorAttr(getAttribute(node, "color"), doc, node);
-  stroke->width = getFloatAttribute(node, "width", Default<Stroke>().width, doc);
-  stroke->alpha = getFloatAttribute(node, "alpha", Default<Stroke>().alpha, doc);
+  stroke->color = ParseColorAttr(GetAttribute(node, "color"), doc, node);
+  stroke->width = GetFloatAttribute(node, "width", Default<Stroke>().width, doc);
+  stroke->alpha = GetFloatAttribute(node, "alpha", Default<Stroke>().alpha, doc);
   stroke->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
   stroke->cap = GET_ENUM(node, "cap", "butt", doc, LineCap);
   stroke->join = GET_ENUM(node, "join", "miter", doc, LineJoin);
-  stroke->miterLimit = getFloatAttribute(node, "miterLimit", Default<Stroke>().miterLimit, doc);
-  auto dashesStr = getAttribute(node, "dashes");
+  stroke->miterLimit = GetFloatAttribute(node, "miterLimit", Default<Stroke>().miterLimit, doc);
+  auto dashesStr = GetAttribute(node, "dashes");
   if (!dashesStr.empty()) {
     stroke->dashes = ParseFloatList(dashesStr);
   }
-  stroke->dashOffset = getFloatAttribute(node, "dashOffset", Default<Stroke>().dashOffset, doc);
+  stroke->dashOffset = GetFloatAttribute(node, "dashOffset", Default<Stroke>().dashOffset, doc);
   stroke->dashAdaptive =
-      getBoolAttribute(node, "dashAdaptive", Default<Stroke>().dashAdaptive, doc);
+      GetBoolAttribute(node, "dashAdaptive", Default<Stroke>().dashAdaptive, doc);
   stroke->align = GET_ENUM(node, "align", "center", doc, StrokeAlign);
   stroke->placement = GET_ENUM(node, "placement", "background", doc, LayerPlacement);
-  auto childColor = parseChildColorSource(node, doc);
+  auto childColor = ParseChildColorSource(node, doc);
   if (childColor) {
     stroke->color = childColor;
   }
@@ -971,28 +971,28 @@ static Stroke* parseStroke(const DOMNode* node, PAGXDocument* doc) {
 // Modifier parsing
 //==============================================================================
 
-static TrimPath* parseTrimPath(const DOMNode* node, PAGXDocument* doc) {
+static TrimPath* ParseTrimPath(const DOMNode* node, PAGXDocument* doc) {
   auto trim = makeNodeFromXML<TrimPath>(node, doc);
   if (!trim) {
     return nullptr;
   }
-  trim->start = getFloatAttribute(node, "start", Default<TrimPath>().start, doc);
-  trim->end = getFloatAttribute(node, "end", Default<TrimPath>().end, doc);
-  trim->offset = getFloatAttribute(node, "offset", Default<TrimPath>().offset, doc);
+  trim->start = GetFloatAttribute(node, "start", Default<TrimPath>().start, doc);
+  trim->end = GetFloatAttribute(node, "end", Default<TrimPath>().end, doc);
+  trim->offset = GetFloatAttribute(node, "offset", Default<TrimPath>().offset, doc);
   trim->type = GET_ENUM(node, "type", "separate", doc, TrimType);
   return trim;
 }
 
-static RoundCorner* parseRoundCorner(const DOMNode* node, PAGXDocument* doc) {
+static RoundCorner* ParseRoundCorner(const DOMNode* node, PAGXDocument* doc) {
   auto round = makeNodeFromXML<RoundCorner>(node, doc);
   if (!round) {
     return nullptr;
   }
-  round->radius = getFloatAttribute(node, "radius", Default<RoundCorner>().radius, doc);
+  round->radius = GetFloatAttribute(node, "radius", Default<RoundCorner>().radius, doc);
   return round;
 }
 
-static MergePath* parseMergePath(const DOMNode* node, PAGXDocument* doc) {
+static MergePath* ParseMergePath(const DOMNode* node, PAGXDocument* doc) {
   auto merge = makeNodeFromXML<MergePath>(node, doc);
   if (!merge) {
     return nullptr;
@@ -1001,41 +1001,41 @@ static MergePath* parseMergePath(const DOMNode* node, PAGXDocument* doc) {
   return merge;
 }
 
-static TextModifier* parseTextModifier(const DOMNode* node, PAGXDocument* doc) {
+static TextModifier* ParseTextModifier(const DOMNode* node, PAGXDocument* doc) {
   auto modifier = makeNodeFromXML<TextModifier>(node, doc);
   if (!modifier) {
     return nullptr;
   }
-  modifier->anchor = getPointAttribute(node, "anchor", Default<TextModifier>().anchor, doc);
-  modifier->position = getPointAttribute(node, "position", Default<TextModifier>().position, doc);
-  modifier->rotation = getFloatAttribute(node, "rotation", Default<TextModifier>().rotation, doc);
-  modifier->scale = getPointAttribute(node, "scale", Default<TextModifier>().scale, doc);
-  modifier->skew = getFloatAttribute(node, "skew", Default<TextModifier>().skew, doc);
-  modifier->skewAxis = getFloatAttribute(node, "skewAxis", Default<TextModifier>().skewAxis, doc);
-  modifier->alpha = getFloatAttribute(node, "alpha", Default<TextModifier>().alpha, doc);
-  auto fillColorAttr = getAttribute(node, "fillColor");
+  modifier->anchor = GetPointAttribute(node, "anchor", Default<TextModifier>().anchor, doc);
+  modifier->position = GetPointAttribute(node, "position", Default<TextModifier>().position, doc);
+  modifier->rotation = GetFloatAttribute(node, "rotation", Default<TextModifier>().rotation, doc);
+  modifier->scale = GetPointAttribute(node, "scale", Default<TextModifier>().scale, doc);
+  modifier->skew = GetFloatAttribute(node, "skew", Default<TextModifier>().skew, doc);
+  modifier->skewAxis = GetFloatAttribute(node, "skewAxis", Default<TextModifier>().skewAxis, doc);
+  modifier->alpha = GetFloatAttribute(node, "alpha", Default<TextModifier>().alpha, doc);
+  auto fillColorAttr = GetAttribute(node, "fillColor");
   if (!fillColorAttr.empty()) {
-    modifier->fillColor = getColorAttribute(node, "fillColor", doc);
+    modifier->fillColor = GetColorAttribute(node, "fillColor", doc);
   }
-  auto strokeColorAttr = getAttribute(node, "strokeColor");
+  auto strokeColorAttr = GetAttribute(node, "strokeColor");
   if (!strokeColorAttr.empty()) {
-    modifier->strokeColor = getColorAttribute(node, "strokeColor", doc);
+    modifier->strokeColor = GetColorAttribute(node, "strokeColor", doc);
   }
-  auto strokeWidthAttr = getAttribute(node, "strokeWidth");
+  auto strokeWidthAttr = GetAttribute(node, "strokeWidth");
   if (!strokeWidthAttr.empty()) {
-    modifier->strokeWidth = getFloatAttribute(node, "strokeWidth", 0, doc);
+    modifier->strokeWidth = GetFloatAttribute(node, "strokeWidth", 0, doc);
   }
 
   auto child = node->firstChild;
   while (child) {
     if (child->type == DOMNodeType::Element) {
       if (child->name == "RangeSelector") {
-        auto selector = parseRangeSelector(child.get(), doc);
+        auto selector = ParseRangeSelector(child.get(), doc);
         if (selector) {
           modifier->selectors.push_back(selector);
         }
       } else {
-        reportError(doc, child.get(),
+        ReportError(doc, child.get(),
                     "Element '" + child->name +
                         "' is not allowed in 'TextModifier'."
                         " Expected: RangeSelector.");
@@ -1047,18 +1047,18 @@ static TextModifier* parseTextModifier(const DOMNode* node, PAGXDocument* doc) {
   return modifier;
 }
 
-static TextPath* parseTextPath(const DOMNode* node, PAGXDocument* doc) {
+static TextPath* ParseTextPath(const DOMNode* node, PAGXDocument* doc) {
   auto textPath = makeNodeFromXML<TextPath>(node, doc);
   if (!textPath) {
     return nullptr;
   }
-  auto pathAttr = getAttribute(node, "path");
+  auto pathAttr = GetAttribute(node, "path");
   if (!pathAttr.empty()) {
     if (pathAttr[0] == '@') {
       // Reference to PathData resource
       textPath->path = doc->findNode<PathData>(pathAttr.substr(1));
       if (!textPath->path) {
-        reportError(doc, node, "Resource '" + pathAttr + "' not found for 'path' attribute.");
+        ReportError(doc, node, "Resource '" + pathAttr + "' not found for 'path' attribute.");
       }
     } else {
       // Inline path data
@@ -1068,64 +1068,64 @@ static TextPath* parseTextPath(const DOMNode* node, PAGXDocument* doc) {
     }
   }
   textPath->baselineOrigin =
-      getPointAttribute(node, "baselineOrigin", Default<TextPath>().baselineOrigin, doc);
+      GetPointAttribute(node, "baselineOrigin", Default<TextPath>().baselineOrigin, doc);
   textPath->baselineAngle =
-      getFloatAttribute(node, "baselineAngle", Default<TextPath>().baselineAngle, doc);
+      GetFloatAttribute(node, "baselineAngle", Default<TextPath>().baselineAngle, doc);
   textPath->firstMargin =
-      getFloatAttribute(node, "firstMargin", Default<TextPath>().firstMargin, doc);
-  textPath->lastMargin = getFloatAttribute(node, "lastMargin", Default<TextPath>().lastMargin, doc);
+      GetFloatAttribute(node, "firstMargin", Default<TextPath>().firstMargin, doc);
+  textPath->lastMargin = GetFloatAttribute(node, "lastMargin", Default<TextPath>().lastMargin, doc);
   textPath->perpendicular =
-      getBoolAttribute(node, "perpendicular", Default<TextPath>().perpendicular, doc);
-  textPath->reversed = getBoolAttribute(node, "reversed", Default<TextPath>().reversed, doc);
+      GetBoolAttribute(node, "perpendicular", Default<TextPath>().perpendicular, doc);
+  textPath->reversed = GetBoolAttribute(node, "reversed", Default<TextPath>().reversed, doc);
   textPath->forceAlignment =
-      getBoolAttribute(node, "forceAlignment", Default<TextPath>().forceAlignment, doc);
-  textPath->left = getFloatAttributeOrNaN(node, "left", doc);
-  textPath->right = getFloatAttributeOrNaN(node, "right", doc);
-  textPath->top = getFloatAttributeOrNaN(node, "top", doc);
-  textPath->bottom = getFloatAttributeOrNaN(node, "bottom", doc);
-  textPath->centerX = getFloatAttributeOrNaN(node, "centerX", doc);
-  textPath->centerY = getFloatAttributeOrNaN(node, "centerY", doc);
+      GetBoolAttribute(node, "forceAlignment", Default<TextPath>().forceAlignment, doc);
+  textPath->left = GetFloatAttributeOrNaN(node, "left", doc);
+  textPath->right = GetFloatAttributeOrNaN(node, "right", doc);
+  textPath->top = GetFloatAttributeOrNaN(node, "top", doc);
+  textPath->bottom = GetFloatAttributeOrNaN(node, "bottom", doc);
+  textPath->centerX = GetFloatAttributeOrNaN(node, "centerX", doc);
+  textPath->centerY = GetFloatAttributeOrNaN(node, "centerY", doc);
   return textPath;
 }
 
-static TextBox* parseTextBox(const DOMNode* node, PAGXDocument* doc) {
+static TextBox* ParseTextBox(const DOMNode* node, PAGXDocument* doc) {
   auto textBox = makeNodeFromXML<TextBox>(node, doc);
   if (!textBox) {
     return nullptr;
   }
   // Group properties
-  textBox->anchor = getPointAttribute(node, "anchor", Default<TextBox>().anchor, doc);
-  textBox->position = getPointAttribute(node, "position", Default<TextBox>().position, doc);
-  textBox->rotation = getFloatAttribute(node, "rotation", Default<TextBox>().rotation, doc);
-  textBox->scale = getPointAttribute(node, "scale", Default<TextBox>().scale, doc);
-  textBox->skew = getFloatAttribute(node, "skew", Default<TextBox>().skew, doc);
-  textBox->skewAxis = getFloatAttribute(node, "skewAxis", Default<TextBox>().skewAxis, doc);
-  textBox->alpha = getFloatAttribute(node, "alpha", Default<TextBox>().alpha, doc);
-  textBox->width = getFloatAttributeOrNaN(node, "width", doc);
-  textBox->height = getFloatAttributeOrNaN(node, "height", doc);
+  textBox->anchor = GetPointAttribute(node, "anchor", Default<TextBox>().anchor, doc);
+  textBox->position = GetPointAttribute(node, "position", Default<TextBox>().position, doc);
+  textBox->rotation = GetFloatAttribute(node, "rotation", Default<TextBox>().rotation, doc);
+  textBox->scale = GetPointAttribute(node, "scale", Default<TextBox>().scale, doc);
+  textBox->skew = GetFloatAttribute(node, "skew", Default<TextBox>().skew, doc);
+  textBox->skewAxis = GetFloatAttribute(node, "skewAxis", Default<TextBox>().skewAxis, doc);
+  textBox->alpha = GetFloatAttribute(node, "alpha", Default<TextBox>().alpha, doc);
+  textBox->width = GetFloatAttributeOrNaN(node, "width", doc);
+  textBox->height = GetFloatAttributeOrNaN(node, "height", doc);
   // TextBox typography properties
   textBox->textAlign = GET_ENUM(node, "textAlign", "start", doc, TextAlign);
   textBox->paragraphAlign = GET_ENUM(node, "paragraphAlign", "near", doc, ParagraphAlign);
   textBox->writingMode = GET_ENUM(node, "writingMode", "horizontal", doc, WritingMode);
-  textBox->lineHeight = getFloatAttribute(node, "lineHeight", Default<TextBox>().lineHeight, doc);
-  textBox->wordWrap = getBoolAttribute(node, "wordWrap", Default<TextBox>().wordWrap, doc);
+  textBox->lineHeight = GetFloatAttribute(node, "lineHeight", Default<TextBox>().lineHeight, doc);
+  textBox->wordWrap = GetBoolAttribute(node, "wordWrap", Default<TextBox>().wordWrap, doc);
   textBox->overflow = GET_ENUM(node, "overflow", "visible", doc, Overflow);
   // Constraint properties
-  textBox->left = getFloatAttributeOrNaN(node, "left", doc);
-  textBox->right = getFloatAttributeOrNaN(node, "right", doc);
-  textBox->top = getFloatAttributeOrNaN(node, "top", doc);
-  textBox->bottom = getFloatAttributeOrNaN(node, "bottom", doc);
-  textBox->centerX = getFloatAttributeOrNaN(node, "centerX", doc);
-  textBox->centerY = getFloatAttributeOrNaN(node, "centerY", doc);
+  textBox->left = GetFloatAttributeOrNaN(node, "left", doc);
+  textBox->right = GetFloatAttributeOrNaN(node, "right", doc);
+  textBox->top = GetFloatAttributeOrNaN(node, "top", doc);
+  textBox->bottom = GetFloatAttributeOrNaN(node, "bottom", doc);
+  textBox->centerX = GetFloatAttributeOrNaN(node, "centerX", doc);
+  textBox->centerY = GetFloatAttributeOrNaN(node, "centerY", doc);
   // Child elements
   auto child = node->firstChild;
   while (child) {
     if (child->type == DOMNodeType::Element) {
-      auto element = parseElement(child.get(), doc);
+      auto element = ParseElement(child.get(), doc);
       if (element) {
         textBox->elements.push_back(element);
       } else {
-        reportError(doc, child.get(),
+        ReportError(doc, child.get(),
                     "Element '" + child->name +
                         "' is not allowed in 'TextBox'."
                         " Expected: Rectangle, Ellipse, Polystar, Path,"
@@ -1139,52 +1139,52 @@ static TextBox* parseTextBox(const DOMNode* node, PAGXDocument* doc) {
   return textBox;
 }
 
-static Repeater* parseRepeater(const DOMNode* node, PAGXDocument* doc) {
+static Repeater* ParseRepeater(const DOMNode* node, PAGXDocument* doc) {
   auto repeater = makeNodeFromXML<Repeater>(node, doc);
   if (!repeater) {
     return nullptr;
   }
-  repeater->copies = getFloatAttribute(node, "copies", Default<Repeater>().copies, doc);
-  repeater->offset = getFloatAttribute(node, "offset", Default<Repeater>().offset, doc);
+  repeater->copies = GetFloatAttribute(node, "copies", Default<Repeater>().copies, doc);
+  repeater->offset = GetFloatAttribute(node, "offset", Default<Repeater>().offset, doc);
   repeater->order = GET_ENUM(node, "order", "belowOriginal", doc, RepeaterOrder);
-  repeater->anchor = getPointAttribute(node, "anchor", Default<Repeater>().anchor, doc);
-  repeater->position = getPointAttribute(node, "position", Default<Repeater>().position, doc);
-  repeater->rotation = getFloatAttribute(node, "rotation", Default<Repeater>().rotation, doc);
-  repeater->scale = getPointAttribute(node, "scale", Default<Repeater>().scale, doc);
-  repeater->startAlpha = getFloatAttribute(node, "startAlpha", Default<Repeater>().startAlpha, doc);
-  repeater->endAlpha = getFloatAttribute(node, "endAlpha", Default<Repeater>().endAlpha, doc);
+  repeater->anchor = GetPointAttribute(node, "anchor", Default<Repeater>().anchor, doc);
+  repeater->position = GetPointAttribute(node, "position", Default<Repeater>().position, doc);
+  repeater->rotation = GetFloatAttribute(node, "rotation", Default<Repeater>().rotation, doc);
+  repeater->scale = GetPointAttribute(node, "scale", Default<Repeater>().scale, doc);
+  repeater->startAlpha = GetFloatAttribute(node, "startAlpha", Default<Repeater>().startAlpha, doc);
+  repeater->endAlpha = GetFloatAttribute(node, "endAlpha", Default<Repeater>().endAlpha, doc);
   return repeater;
 }
 
-static Group* parseGroup(const DOMNode* node, PAGXDocument* doc) {
+static Group* ParseGroup(const DOMNode* node, PAGXDocument* doc) {
   auto group = makeNodeFromXML<Group>(node, doc);
   if (!group) {
     return nullptr;
   }
-  group->anchor = getPointAttribute(node, "anchor", Default<Group>().anchor, doc);
-  group->position = getPointAttribute(node, "position", Default<Group>().position, doc);
-  group->rotation = getFloatAttribute(node, "rotation", Default<Group>().rotation, doc);
-  group->scale = getPointAttribute(node, "scale", Default<Group>().scale, doc);
-  group->skew = getFloatAttribute(node, "skew", Default<Group>().skew, doc);
-  group->skewAxis = getFloatAttribute(node, "skewAxis", Default<Group>().skewAxis, doc);
-  group->alpha = getFloatAttribute(node, "alpha", Default<Group>().alpha, doc);
-  group->width = getFloatAttributeOrNaN(node, "width", doc);
-  group->height = getFloatAttributeOrNaN(node, "height", doc);
-  group->left = getFloatAttributeOrNaN(node, "left", doc);
-  group->right = getFloatAttributeOrNaN(node, "right", doc);
-  group->top = getFloatAttributeOrNaN(node, "top", doc);
-  group->bottom = getFloatAttributeOrNaN(node, "bottom", doc);
-  group->centerX = getFloatAttributeOrNaN(node, "centerX", doc);
-  group->centerY = getFloatAttributeOrNaN(node, "centerY", doc);
+  group->anchor = GetPointAttribute(node, "anchor", Default<Group>().anchor, doc);
+  group->position = GetPointAttribute(node, "position", Default<Group>().position, doc);
+  group->rotation = GetFloatAttribute(node, "rotation", Default<Group>().rotation, doc);
+  group->scale = GetPointAttribute(node, "scale", Default<Group>().scale, doc);
+  group->skew = GetFloatAttribute(node, "skew", Default<Group>().skew, doc);
+  group->skewAxis = GetFloatAttribute(node, "skewAxis", Default<Group>().skewAxis, doc);
+  group->alpha = GetFloatAttribute(node, "alpha", Default<Group>().alpha, doc);
+  group->width = GetFloatAttributeOrNaN(node, "width", doc);
+  group->height = GetFloatAttributeOrNaN(node, "height", doc);
+  group->left = GetFloatAttributeOrNaN(node, "left", doc);
+  group->right = GetFloatAttributeOrNaN(node, "right", doc);
+  group->top = GetFloatAttributeOrNaN(node, "top", doc);
+  group->bottom = GetFloatAttributeOrNaN(node, "bottom", doc);
+  group->centerX = GetFloatAttributeOrNaN(node, "centerX", doc);
+  group->centerY = GetFloatAttributeOrNaN(node, "centerY", doc);
 
   auto child = node->firstChild;
   while (child) {
     if (child->type == DOMNodeType::Element) {
-      auto element = parseElement(child.get(), doc);
+      auto element = ParseElement(child.get(), doc);
       if (element) {
         group->elements.push_back(element);
       } else {
-        reportError(doc, child.get(),
+        ReportError(doc, child.get(),
                     "Element '" + child->name +
                         "' is not allowed in 'Group'."
                         " Expected: Rectangle, Ellipse, Polystar, Path,"
@@ -1199,24 +1199,24 @@ static Group* parseGroup(const DOMNode* node, PAGXDocument* doc) {
   return group;
 }
 
-static RangeSelector* parseRangeSelector(const DOMNode* node, PAGXDocument* doc) {
+static RangeSelector* ParseRangeSelector(const DOMNode* node, PAGXDocument* doc) {
   auto selector = makeNodeFromXML<RangeSelector>(node, doc);
   if (!selector) {
     return nullptr;
   }
-  selector->start = getFloatAttribute(node, "start", Default<RangeSelector>().start, doc);
-  selector->end = getFloatAttribute(node, "end", Default<RangeSelector>().end, doc);
-  selector->offset = getFloatAttribute(node, "offset", Default<RangeSelector>().offset, doc);
+  selector->start = GetFloatAttribute(node, "start", Default<RangeSelector>().start, doc);
+  selector->end = GetFloatAttribute(node, "end", Default<RangeSelector>().end, doc);
+  selector->offset = GetFloatAttribute(node, "offset", Default<RangeSelector>().offset, doc);
   selector->unit = GET_ENUM(node, "unit", "percentage", doc, SelectorUnit);
   selector->shape = GET_ENUM(node, "shape", "square", doc, SelectorShape);
-  selector->easeIn = getFloatAttribute(node, "easeIn", Default<RangeSelector>().easeIn, doc);
-  selector->easeOut = getFloatAttribute(node, "easeOut", Default<RangeSelector>().easeOut, doc);
+  selector->easeIn = GetFloatAttribute(node, "easeIn", Default<RangeSelector>().easeIn, doc);
+  selector->easeOut = GetFloatAttribute(node, "easeOut", Default<RangeSelector>().easeOut, doc);
   selector->mode = GET_ENUM(node, "mode", "add", doc, SelectorMode);
-  selector->weight = getFloatAttribute(node, "weight", Default<RangeSelector>().weight, doc);
+  selector->weight = GetFloatAttribute(node, "weight", Default<RangeSelector>().weight, doc);
   selector->randomOrder =
-      getBoolAttribute(node, "randomOrder", Default<RangeSelector>().randomOrder, doc);
+      GetBoolAttribute(node, "randomOrder", Default<RangeSelector>().randomOrder, doc);
   selector->randomSeed =
-      getIntAttribute(node, "randomSeed", Default<RangeSelector>().randomSeed, doc);
+      GetIntAttribute(node, "randomSeed", Default<RangeSelector>().randomSeed, doc);
   return selector;
 }
 
@@ -1224,31 +1224,31 @@ static RangeSelector* parseRangeSelector(const DOMNode* node, PAGXDocument* doc)
 // Color source parsing
 //==============================================================================
 
-static SolidColor* parseSolidColor(const DOMNode* node, PAGXDocument* doc) {
+static SolidColor* ParseSolidColor(const DOMNode* node, PAGXDocument* doc) {
   auto solid = makeNodeFromXML<SolidColor>(node, doc);
   if (!solid) {
     return nullptr;
   }
-  auto colorStr = getAttribute(node, "color");
+  auto colorStr = GetAttribute(node, "color");
   if (!colorStr.empty()) {
-    solid->color = getColorAttribute(node, "color", doc);
+    solid->color = GetColorAttribute(node, "color", doc);
   } else {
     // Fallback to individual red/green/blue/alpha attributes
-    solid->color.red = getFloatAttribute(node, "red", 0, doc);
-    solid->color.green = getFloatAttribute(node, "green", 0, doc);
-    solid->color.blue = getFloatAttribute(node, "blue", 0, doc);
-    solid->color.alpha = getFloatAttribute(node, "alpha", 1, doc);
+    solid->color.red = GetFloatAttribute(node, "red", 0, doc);
+    solid->color.green = GetFloatAttribute(node, "green", 0, doc);
+    solid->color.blue = GetFloatAttribute(node, "blue", 0, doc);
+    solid->color.alpha = GetFloatAttribute(node, "alpha", 1, doc);
     solid->color.colorSpace = GET_ENUM(node, "colorSpace", "sRGB", doc, ColorSpace);
   }
   return solid;
 }
 
-static void parseGradientCommon(const DOMNode* node, PAGXDocument* doc, Matrix& matrix,
+static void ParseGradientCommon(const DOMNode* node, PAGXDocument* doc, Matrix& matrix,
                                 std::vector<ColorStop*>& colorStops) {
-  auto matrixStr = getAttribute(node, "matrix");
+  auto matrixStr = GetAttribute(node, "matrix");
   if (!matrixStr.empty()) {
     if (ParseFloatList(matrixStr).size() < 6) {
-      reportError(doc, node, "Invalid value '" + matrixStr + "' for 'matrix' attribute.");
+      ReportError(doc, node, "Invalid value '" + matrixStr + "' for 'matrix' attribute.");
     } else {
       matrix = MatrixFromString(matrixStr);
     }
@@ -1256,12 +1256,12 @@ static void parseGradientCommon(const DOMNode* node, PAGXDocument* doc, Matrix& 
   auto child = node->firstChild;
   while (child) {
     if (child->type == DOMNodeType::Element && child->name == "ColorStop") {
-      auto stop = parseColorStop(child.get(), doc);
+      auto stop = ParseColorStop(child.get(), doc);
       if (stop) {
         colorStops.push_back(stop);
       }
     } else if (child->type == DOMNodeType::Element) {
-      reportError(doc, child.get(),
+      ReportError(doc, child.get(),
                   "Element '" + child->name + "' is not allowed in '" + node->name +
                       "'. Expected: ColorStop.");
     }
@@ -1269,64 +1269,64 @@ static void parseGradientCommon(const DOMNode* node, PAGXDocument* doc, Matrix& 
   }
 }
 
-static LinearGradient* parseLinearGradient(const DOMNode* node, PAGXDocument* doc) {
+static LinearGradient* ParseLinearGradient(const DOMNode* node, PAGXDocument* doc) {
   auto gradient = makeNodeFromXML<LinearGradient>(node, doc);
   if (!gradient) {
     return nullptr;
   }
   gradient->startPoint =
-      getPointAttribute(node, "startPoint", Default<LinearGradient>().startPoint, doc);
-  gradient->endPoint = getPointAttribute(node, "endPoint", Default<LinearGradient>().endPoint, doc);
-  parseGradientCommon(node, doc, gradient->matrix, gradient->colorStops);
+      GetPointAttribute(node, "startPoint", Default<LinearGradient>().startPoint, doc);
+  gradient->endPoint = GetPointAttribute(node, "endPoint", Default<LinearGradient>().endPoint, doc);
+  ParseGradientCommon(node, doc, gradient->matrix, gradient->colorStops);
   return gradient;
 }
 
-static RadialGradient* parseRadialGradient(const DOMNode* node, PAGXDocument* doc) {
+static RadialGradient* ParseRadialGradient(const DOMNode* node, PAGXDocument* doc) {
   auto gradient = makeNodeFromXML<RadialGradient>(node, doc);
   if (!gradient) {
     return nullptr;
   }
-  gradient->center = getPointAttribute(node, "center", Default<RadialGradient>().center, doc);
-  gradient->radius = getFloatAttribute(node, "radius", Default<RadialGradient>().radius, doc);
-  parseGradientCommon(node, doc, gradient->matrix, gradient->colorStops);
+  gradient->center = GetPointAttribute(node, "center", Default<RadialGradient>().center, doc);
+  gradient->radius = GetFloatAttribute(node, "radius", Default<RadialGradient>().radius, doc);
+  ParseGradientCommon(node, doc, gradient->matrix, gradient->colorStops);
   return gradient;
 }
 
-static ConicGradient* parseConicGradient(const DOMNode* node, PAGXDocument* doc) {
+static ConicGradient* ParseConicGradient(const DOMNode* node, PAGXDocument* doc) {
   auto gradient = makeNodeFromXML<ConicGradient>(node, doc);
   if (!gradient) {
     return nullptr;
   }
-  gradient->center = getPointAttribute(node, "center", Default<ConicGradient>().center, doc);
+  gradient->center = GetPointAttribute(node, "center", Default<ConicGradient>().center, doc);
   gradient->startAngle =
-      getFloatAttribute(node, "startAngle", Default<ConicGradient>().startAngle, doc);
-  gradient->endAngle = getFloatAttribute(node, "endAngle", Default<ConicGradient>().endAngle, doc);
-  parseGradientCommon(node, doc, gradient->matrix, gradient->colorStops);
+      GetFloatAttribute(node, "startAngle", Default<ConicGradient>().startAngle, doc);
+  gradient->endAngle = GetFloatAttribute(node, "endAngle", Default<ConicGradient>().endAngle, doc);
+  ParseGradientCommon(node, doc, gradient->matrix, gradient->colorStops);
   return gradient;
 }
 
-static DiamondGradient* parseDiamondGradient(const DOMNode* node, PAGXDocument* doc) {
+static DiamondGradient* ParseDiamondGradient(const DOMNode* node, PAGXDocument* doc) {
   auto gradient = makeNodeFromXML<DiamondGradient>(node, doc);
   if (!gradient) {
     return nullptr;
   }
-  gradient->center = getPointAttribute(node, "center", Default<DiamondGradient>().center, doc);
-  gradient->radius = getFloatAttribute(node, "radius", Default<DiamondGradient>().radius, doc);
-  parseGradientCommon(node, doc, gradient->matrix, gradient->colorStops);
+  gradient->center = GetPointAttribute(node, "center", Default<DiamondGradient>().center, doc);
+  gradient->radius = GetFloatAttribute(node, "radius", Default<DiamondGradient>().radius, doc);
+  ParseGradientCommon(node, doc, gradient->matrix, gradient->colorStops);
   return gradient;
 }
 
-static ImagePattern* parseImagePattern(const DOMNode* node, PAGXDocument* doc) {
+static ImagePattern* ParseImagePattern(const DOMNode* node, PAGXDocument* doc) {
   auto pattern = makeNodeFromXML<ImagePattern>(node, doc);
   if (!pattern) {
     return nullptr;
   }
-  auto imageAttr = getAttribute(node, "image");
+  auto imageAttr = GetAttribute(node, "image");
   if (!imageAttr.empty()) {
     if (imageAttr[0] == '@') {
       pattern->image = doc->findNode<Image>(imageAttr.substr(1));
       if (!pattern->image) {
-        reportError(doc, node, "Resource '" + imageAttr + "' not found for 'image' attribute.");
+        ReportError(doc, node, "Resource '" + imageAttr + "' not found for 'image' attribute.");
       }
     } else {
       // Inline image source (data URI or file path)
@@ -1343,10 +1343,10 @@ static ImagePattern* parseImagePattern(const DOMNode* node, PAGXDocument* doc) {
   pattern->tileModeY = GET_ENUM(node, "tileModeY", "clamp", doc, TileMode);
   pattern->filterMode = GET_ENUM(node, "filterMode", "linear", doc, FilterMode);
   pattern->mipmapMode = GET_ENUM(node, "mipmapMode", "linear", doc, MipmapMode);
-  auto matrixStr = getAttribute(node, "matrix");
+  auto matrixStr = GetAttribute(node, "matrix");
   if (!matrixStr.empty()) {
     if (ParseFloatList(matrixStr).size() < 6) {
-      reportError(doc, node, "Invalid value '" + matrixStr + "' for 'matrix' attribute.");
+      ReportError(doc, node, "Invalid value '" + matrixStr + "' for 'matrix' attribute.");
     } else {
       pattern->matrix = MatrixFromString(matrixStr);
     }
@@ -1354,12 +1354,12 @@ static ImagePattern* parseImagePattern(const DOMNode* node, PAGXDocument* doc) {
   return pattern;
 }
 
-static ColorStop* parseColorStop(const DOMNode* node, PAGXDocument* doc) {
+static ColorStop* ParseColorStop(const DOMNode* node, PAGXDocument* doc) {
   auto stop = makeNodeFromXML<ColorStop>(node, doc);
-  stop->offset = getFloatAttribute(node, "offset", Default<ColorStop>().offset, doc);
-  auto colorStr = getAttribute(node, "color");
+  stop->offset = GetFloatAttribute(node, "offset", Default<ColorStop>().offset, doc);
+  auto colorStr = GetAttribute(node, "color");
   if (!colorStr.empty()) {
-    stop->color = getColorAttribute(node, "color", doc);
+    stop->color = GetColorAttribute(node, "color", doc);
   }
   return stop;
 }
@@ -1368,12 +1368,12 @@ static ColorStop* parseColorStop(const DOMNode* node, PAGXDocument* doc) {
 // Resource parsing
 //==============================================================================
 
-static Image* parseImage(const DOMNode* node, PAGXDocument* doc) {
+static Image* ParseImage(const DOMNode* node, PAGXDocument* doc) {
   auto image = makeNodeFromXML<Image>(node, doc);
   if (!image) {
     return nullptr;
   }
-  auto source = getAttribute(node, "source");
+  auto source = GetAttribute(node, "source");
   auto data = DecodeBase64DataURI(source);
   if (data) {
     image->data = data;
@@ -1383,35 +1383,35 @@ static Image* parseImage(const DOMNode* node, PAGXDocument* doc) {
   return image;
 }
 
-static PathData* parsePathData(const DOMNode* node, PAGXDocument* doc) {
+static PathData* ParsePathData(const DOMNode* node, PAGXDocument* doc) {
   auto pathData = makeNodeFromXML<PathData>(node, doc);
   if (!pathData) {
     return nullptr;
   }
-  auto data = getAttribute(node, "data");
+  auto data = GetAttribute(node, "data");
   if (!data.empty()) {
     *pathData = PathDataFromSVGString(data);
   }
   return pathData;
 }
 
-static Composition* parseComposition(const DOMNode* node, PAGXDocument* doc) {
+static Composition* ParseComposition(const DOMNode* node, PAGXDocument* doc) {
   auto comp = makeNodeFromXML<Composition>(node, doc);
   if (!comp) {
     return nullptr;
   }
-  comp->width = getFloatAttribute(node, "width", Default<Composition>().width, doc);
-  comp->height = getFloatAttribute(node, "height", Default<Composition>().height, doc);
+  comp->width = GetFloatAttribute(node, "width", Default<Composition>().width, doc);
+  comp->height = GetFloatAttribute(node, "height", Default<Composition>().height, doc);
   auto child = node->firstChild;
   while (child) {
     if (child->type == DOMNodeType::Element) {
       if (child->name == "Layer") {
-        auto layer = parseLayer(child.get(), doc);
+        auto layer = ParseLayer(child.get(), doc);
         if (layer) {
           comp->layers.push_back(layer);
         }
       } else {
-        reportError(
+        ReportError(
             doc, child.get(),
             "Element '" + child->name + "' is not allowed in 'Composition'. Expected: Layer.");
       }
@@ -1421,22 +1421,22 @@ static Composition* parseComposition(const DOMNode* node, PAGXDocument* doc) {
   return comp;
 }
 
-static Font* parseFont(const DOMNode* node, PAGXDocument* doc) {
+static Font* ParseFont(const DOMNode* node, PAGXDocument* doc) {
   auto font = makeNodeFromXML<Font>(node, doc);
   if (!font) {
     return nullptr;
   }
-  font->unitsPerEm = getIntAttribute(node, "unitsPerEm", Default<Font>().unitsPerEm, doc);
+  font->unitsPerEm = GetIntAttribute(node, "unitsPerEm", Default<Font>().unitsPerEm, doc);
   auto child = node->firstChild;
   while (child) {
     if (child->type == DOMNodeType::Element) {
       if (child->name == "Glyph") {
-        auto glyph = parseGlyph(child.get(), doc);
+        auto glyph = ParseGlyph(child.get(), doc);
         if (glyph) {
           font->glyphs.push_back(glyph);
         }
       } else {
-        reportError(doc, child.get(),
+        ReportError(doc, child.get(),
                     "Element '" + child->name + "' is not allowed in 'Font'. Expected: Glyph.");
       }
     }
@@ -1445,17 +1445,17 @@ static Font* parseFont(const DOMNode* node, PAGXDocument* doc) {
   return font;
 }
 
-static Glyph* parseGlyph(const DOMNode* node, PAGXDocument* doc) {
+static Glyph* ParseGlyph(const DOMNode* node, PAGXDocument* doc) {
   auto glyph = makeNodeFromXML<Glyph>(node, doc);
   if (!glyph) {
     return nullptr;
   }
-  auto pathAttr = getAttribute(node, "path");
+  auto pathAttr = GetAttribute(node, "path");
   if (!pathAttr.empty()) {
     if (pathAttr[0] == '@') {
       glyph->path = doc->findNode<PathData>(pathAttr.substr(1));
       if (!glyph->path) {
-        reportError(doc, node,
+        ReportError(doc, node,
                     "Resource '@" + pathAttr.substr(1) + "' not found for 'path' attribute.");
       }
     } else {
@@ -1464,13 +1464,13 @@ static Glyph* parseGlyph(const DOMNode* node, PAGXDocument* doc) {
       *glyph->path = PathDataFromSVGString(pathAttr);
     }
   }
-  auto imageAttr = getAttribute(node, "image");
+  auto imageAttr = GetAttribute(node, "image");
   if (!imageAttr.empty()) {
     if (imageAttr[0] == '@') {
       // Reference to existing Image resource
       glyph->image = doc->findNode<Image>(imageAttr.substr(1));
       if (!glyph->image) {
-        reportError(doc, node,
+        ReportError(doc, node,
                     "Resource '@" + imageAttr.substr(1) + "' not found for 'image' attribute.");
       }
     } else {
@@ -1484,15 +1484,15 @@ static Glyph* parseGlyph(const DOMNode* node, PAGXDocument* doc) {
       }
     }
   }
-  auto offsetStr = getAttribute(node, "offset");
+  auto offsetStr = GetAttribute(node, "offset");
   if (!offsetStr.empty()) {
-    glyph->offset = getPointAttribute(node, "offset", Default<Glyph>().offset, doc);
+    glyph->offset = GetPointAttribute(node, "offset", Default<Glyph>().offset, doc);
   }
-  glyph->advance = getFloatAttribute(node, "advance", Default<Glyph>().advance, doc);
+  glyph->advance = GetFloatAttribute(node, "advance", Default<Glyph>().advance, doc);
   return glyph;
 }
 
-static std::vector<Point> parseSemicolonSeparatedPoints(const std::string& str) {
+static std::vector<Point> ParseSemicolonSeparatedPoints(const std::string& str) {
   std::vector<Point> result = {};
   const char* ptr = str.c_str();
   const char* end = ptr + str.size();
@@ -1522,25 +1522,25 @@ static std::vector<Point> parseSemicolonSeparatedPoints(const std::string& str) 
   return result;
 }
 
-static GlyphRun* parseGlyphRun(const DOMNode* node, PAGXDocument* doc) {
+static GlyphRun* ParseGlyphRun(const DOMNode* node, PAGXDocument* doc) {
   auto run = makeNodeFromXML<GlyphRun>(node, doc);
   if (!run) {
     return nullptr;
   }
-  auto fontAttr = getAttribute(node, "font");
+  auto fontAttr = GetAttribute(node, "font");
   if (!fontAttr.empty() && fontAttr[0] == '@') {
     auto fontId = fontAttr.substr(1);
     run->font = doc->findNode<Font>(fontId);
     if (!run->font) {
-      reportError(doc, node, "Resource '" + fontAttr + "' not found for 'font' attribute.");
+      ReportError(doc, node, "Resource '" + fontAttr + "' not found for 'font' attribute.");
     }
   }
-  run->fontSize = getFloatAttribute(node, "fontSize", Default<GlyphRun>().fontSize, doc);
-  run->x = getFloatAttribute(node, "x", Default<GlyphRun>().x, doc);
-  run->y = getFloatAttribute(node, "y", Default<GlyphRun>().y, doc);
+  run->fontSize = GetFloatAttribute(node, "fontSize", Default<GlyphRun>().fontSize, doc);
+  run->x = GetFloatAttribute(node, "x", Default<GlyphRun>().x, doc);
+  run->y = GetFloatAttribute(node, "y", Default<GlyphRun>().y, doc);
 
   // Parse glyphs regardless of whether font is valid, to maintain data consistency.
-  auto glyphsStr = getAttribute(node, "glyphs");
+  auto glyphsStr = GetAttribute(node, "glyphs");
   if (!glyphsStr.empty()) {
     const char* ptr = glyphsStr.c_str();
     const char* end = ptr + glyphsStr.size();
@@ -1554,13 +1554,13 @@ static GlyphRun* parseGlyphRun(const DOMNode* node, PAGXDocument* doc) {
       char* endPtr = nullptr;
       long value = strtol(ptr, &endPtr, 10);
       if (endPtr == ptr) {
-        reportError(doc, node,
+        ReportError(doc, node,
                     "Invalid 'glyphs' value: parse error at position " +
                         std::to_string(ptr - glyphsStr.c_str()) + ".");
         break;
       }
       if (value < 0 || value > 65535) {
-        reportError(doc, node,
+        ReportError(doc, node,
                     "Invalid 'glyphs' value: glyph index " + std::to_string(value) +
                         " out of range [0, 65535].");
         break;
@@ -1571,49 +1571,49 @@ static GlyphRun* parseGlyphRun(const DOMNode* node, PAGXDocument* doc) {
   }
 
   // Parse xOffsets (comma-separated x offsets)
-  auto xOffsetsStr = getAttribute(node, "xOffsets");
+  auto xOffsetsStr = GetAttribute(node, "xOffsets");
   if (!xOffsetsStr.empty()) {
     run->xOffsets = ParseFloatList(xOffsetsStr);
   }
 
   // Parse positions
-  auto posStr = getAttribute(node, "positions");
+  auto posStr = GetAttribute(node, "positions");
   if (!posStr.empty()) {
-    run->positions = parseSemicolonSeparatedPoints(posStr);
+    run->positions = ParseSemicolonSeparatedPoints(posStr);
   }
 
   // Parse anchors
-  auto anchorsStr = getAttribute(node, "anchors");
+  auto anchorsStr = GetAttribute(node, "anchors");
   if (!anchorsStr.empty()) {
-    run->anchors = parseSemicolonSeparatedPoints(anchorsStr);
+    run->anchors = ParseSemicolonSeparatedPoints(anchorsStr);
   }
 
   // Parse scales
-  auto scalesStr = getAttribute(node, "scales");
+  auto scalesStr = GetAttribute(node, "scales");
   if (!scalesStr.empty()) {
-    run->scales = parseSemicolonSeparatedPoints(scalesStr);
+    run->scales = ParseSemicolonSeparatedPoints(scalesStr);
   }
 
   // Parse rotations (comma-separated angles in degrees)
-  auto rotationsStr = getAttribute(node, "rotations");
+  auto rotationsStr = GetAttribute(node, "rotations");
   if (!rotationsStr.empty()) {
     run->rotations = ParseFloatList(rotationsStr);
   }
 
   // Parse skews (comma-separated angles in degrees)
-  auto skewsStr = getAttribute(node, "skews");
+  auto skewsStr = GetAttribute(node, "skews");
   if (!skewsStr.empty()) {
     run->skews = ParseFloatList(skewsStr);
   }
 
   // Parse linebox bounds (x,y,w,h)
-  auto boundsStr = getAttribute(node, "bounds");
+  auto boundsStr = GetAttribute(node, "bounds");
   if (!boundsStr.empty()) {
     auto values = ParseFloatList(boundsStr);
     if (values.size() >= 4) {
       run->bounds = Rect::MakeXYWH(values[0], values[1], values[2], values[3]);
     } else {
-      reportError(doc, node, "Invalid 'bounds' value (expected 4 numbers).");
+      ReportError(doc, node, "Invalid 'bounds' value (expected 4 numbers).");
     }
   }
 
@@ -1625,56 +1625,56 @@ static GlyphRun* parseGlyphRun(const DOMNode* node, PAGXDocument* doc) {
 //==============================================================================
 
 template <typename T>
-static void parseShadowAttributes(const DOMNode* node, PAGXDocument* doc, float& offsetX,
+static void ParseShadowAttributes(const DOMNode* node, PAGXDocument* doc, float& offsetX,
                                   float& offsetY, float& blurX, float& blurY, Color& color) {
-  offsetX = getFloatAttribute(node, "offsetX", Default<T>().offsetX, doc);
-  offsetY = getFloatAttribute(node, "offsetY", Default<T>().offsetY, doc);
-  blurX = getFloatAttribute(node, "blurX", Default<T>().blurX, doc);
-  blurY = getFloatAttribute(node, "blurY", Default<T>().blurY, doc);
-  auto colorStr = getAttribute(node, "color");
+  offsetX = GetFloatAttribute(node, "offsetX", Default<T>().offsetX, doc);
+  offsetY = GetFloatAttribute(node, "offsetY", Default<T>().offsetY, doc);
+  blurX = GetFloatAttribute(node, "blurX", Default<T>().blurX, doc);
+  blurY = GetFloatAttribute(node, "blurY", Default<T>().blurY, doc);
+  auto colorStr = GetAttribute(node, "color");
   if (!colorStr.empty()) {
-    color = getColorAttribute(node, "color", doc);
+    color = GetColorAttribute(node, "color", doc);
   }
 }
 
-static DropShadowStyle* parseDropShadowStyle(const DOMNode* node, PAGXDocument* doc) {
+static DropShadowStyle* ParseDropShadowStyle(const DOMNode* node, PAGXDocument* doc) {
   auto style = makeNodeFromXML<DropShadowStyle>(node, doc);
   if (!style) {
     return nullptr;
   }
   style->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
-  style->excludeChildEffects = getBoolAttribute(
+  style->excludeChildEffects = GetBoolAttribute(
       node, "excludeChildEffects", Default<DropShadowStyle>().excludeChildEffects, doc);
-  parseShadowAttributes<DropShadowStyle>(node, doc, style->offsetX, style->offsetY, style->blurX,
+  ParseShadowAttributes<DropShadowStyle>(node, doc, style->offsetX, style->offsetY, style->blurX,
                                          style->blurY, style->color);
   style->showBehindLayer =
-      getBoolAttribute(node, "showBehindLayer", Default<DropShadowStyle>().showBehindLayer, doc);
+      GetBoolAttribute(node, "showBehindLayer", Default<DropShadowStyle>().showBehindLayer, doc);
   return style;
 }
 
-static InnerShadowStyle* parseInnerShadowStyle(const DOMNode* node, PAGXDocument* doc) {
+static InnerShadowStyle* ParseInnerShadowStyle(const DOMNode* node, PAGXDocument* doc) {
   auto style = makeNodeFromXML<InnerShadowStyle>(node, doc);
   if (!style) {
     return nullptr;
   }
   style->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
-  style->excludeChildEffects = getBoolAttribute(
+  style->excludeChildEffects = GetBoolAttribute(
       node, "excludeChildEffects", Default<InnerShadowStyle>().excludeChildEffects, doc);
-  parseShadowAttributes<InnerShadowStyle>(node, doc, style->offsetX, style->offsetY, style->blurX,
+  ParseShadowAttributes<InnerShadowStyle>(node, doc, style->offsetX, style->offsetY, style->blurX,
                                           style->blurY, style->color);
   return style;
 }
 
-static BackgroundBlurStyle* parseBackgroundBlurStyle(const DOMNode* node, PAGXDocument* doc) {
+static BackgroundBlurStyle* ParseBackgroundBlurStyle(const DOMNode* node, PAGXDocument* doc) {
   auto style = makeNodeFromXML<BackgroundBlurStyle>(node, doc);
   if (!style) {
     return nullptr;
   }
   style->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
-  style->excludeChildEffects = getBoolAttribute(
+  style->excludeChildEffects = GetBoolAttribute(
       node, "excludeChildEffects", Default<BackgroundBlurStyle>().excludeChildEffects, doc);
-  style->blurX = getFloatAttribute(node, "blurX", Default<BackgroundBlurStyle>().blurX, doc);
-  style->blurY = getFloatAttribute(node, "blurY", Default<BackgroundBlurStyle>().blurY, doc);
+  style->blurX = GetFloatAttribute(node, "blurX", Default<BackgroundBlurStyle>().blurX, doc);
+  style->blurY = GetFloatAttribute(node, "blurY", Default<BackgroundBlurStyle>().blurY, doc);
   style->tileMode = GET_ENUM(node, "tileMode", "mirror", doc, TileMode);
   return style;
 }
@@ -1683,64 +1683,64 @@ static BackgroundBlurStyle* parseBackgroundBlurStyle(const DOMNode* node, PAGXDo
 // Layer filter parsing
 //==============================================================================
 
-static BlurFilter* parseBlurFilter(const DOMNode* node, PAGXDocument* doc) {
+static BlurFilter* ParseBlurFilter(const DOMNode* node, PAGXDocument* doc) {
   auto filter = makeNodeFromXML<BlurFilter>(node, doc);
   if (!filter) {
     return nullptr;
   }
-  filter->blurX = getFloatAttribute(node, "blurX", Default<BlurFilter>().blurX, doc);
-  filter->blurY = getFloatAttribute(node, "blurY", Default<BlurFilter>().blurY, doc);
+  filter->blurX = GetFloatAttribute(node, "blurX", Default<BlurFilter>().blurX, doc);
+  filter->blurY = GetFloatAttribute(node, "blurY", Default<BlurFilter>().blurY, doc);
   filter->tileMode = GET_ENUM(node, "tileMode", "decal", doc, TileMode);
   return filter;
 }
 
-static DropShadowFilter* parseDropShadowFilter(const DOMNode* node, PAGXDocument* doc) {
+static DropShadowFilter* ParseDropShadowFilter(const DOMNode* node, PAGXDocument* doc) {
   auto filter = makeNodeFromXML<DropShadowFilter>(node, doc);
   if (!filter) {
     return nullptr;
   }
-  parseShadowAttributes<DropShadowFilter>(node, doc, filter->offsetX, filter->offsetY,
+  ParseShadowAttributes<DropShadowFilter>(node, doc, filter->offsetX, filter->offsetY,
                                           filter->blurX, filter->blurY, filter->color);
   filter->shadowOnly =
-      getBoolAttribute(node, "shadowOnly", Default<DropShadowFilter>().shadowOnly, doc);
+      GetBoolAttribute(node, "shadowOnly", Default<DropShadowFilter>().shadowOnly, doc);
   return filter;
 }
 
-static InnerShadowFilter* parseInnerShadowFilter(const DOMNode* node, PAGXDocument* doc) {
+static InnerShadowFilter* ParseInnerShadowFilter(const DOMNode* node, PAGXDocument* doc) {
   auto filter = makeNodeFromXML<InnerShadowFilter>(node, doc);
   if (!filter) {
     return nullptr;
   }
-  parseShadowAttributes<InnerShadowFilter>(node, doc, filter->offsetX, filter->offsetY,
+  ParseShadowAttributes<InnerShadowFilter>(node, doc, filter->offsetX, filter->offsetY,
                                            filter->blurX, filter->blurY, filter->color);
   filter->shadowOnly =
-      getBoolAttribute(node, "shadowOnly", Default<InnerShadowFilter>().shadowOnly, doc);
+      GetBoolAttribute(node, "shadowOnly", Default<InnerShadowFilter>().shadowOnly, doc);
   return filter;
 }
 
-static BlendFilter* parseBlendFilter(const DOMNode* node, PAGXDocument* doc) {
+static BlendFilter* ParseBlendFilter(const DOMNode* node, PAGXDocument* doc) {
   auto filter = makeNodeFromXML<BlendFilter>(node, doc);
   if (!filter) {
     return nullptr;
   }
-  auto colorStr = getAttribute(node, "color");
+  auto colorStr = GetAttribute(node, "color");
   if (!colorStr.empty()) {
-    filter->color = getColorAttribute(node, "color", doc);
+    filter->color = GetColorAttribute(node, "color", doc);
   }
   filter->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
   return filter;
 }
 
-static ColorMatrixFilter* parseColorMatrixFilter(const DOMNode* node, PAGXDocument* doc) {
+static ColorMatrixFilter* ParseColorMatrixFilter(const DOMNode* node, PAGXDocument* doc) {
   auto filter = makeNodeFromXML<ColorMatrixFilter>(node, doc);
   if (!filter) {
     return nullptr;
   }
-  auto matrixStr = getAttribute(node, "matrix");
+  auto matrixStr = GetAttribute(node, "matrix");
   if (!matrixStr.empty()) {
     auto values = ParseFloatList(matrixStr);
     if (values.size() < 20) {
-      reportError(doc, node, "Invalid 'matrix' value (expected 20 numbers).");
+      ReportError(doc, node, "Invalid 'matrix' value (expected 20 numbers).");
     }
     for (size_t i = 0; i < std::min(values.size(), size_t(20)); i++) {
       filter->matrix[i] = values[i];
@@ -1753,13 +1753,13 @@ static ColorMatrixFilter* parseColorMatrixFilter(const DOMNode* node, PAGXDocume
 // Utility functions
 //==============================================================================
 
-static const std::string& getAttribute(const DOMNode* node, const std::string& name,
+static const std::string& GetAttribute(const DOMNode* node, const std::string& name,
                                        const std::string& defaultValue) {
   auto* value = node->findAttribute(name);
   return value ? *value : defaultValue;
 }
 
-static float getFloatAttribute(const DOMNode* node, const std::string& name, float defaultValue,
+static float GetFloatAttribute(const DOMNode* node, const std::string& name, float defaultValue,
                                PAGXDocument* doc) {
   auto* str = node->findAttribute(name);
   if (!str || str->empty()) {
@@ -1769,14 +1769,14 @@ static float getFloatAttribute(const DOMNode* node, const std::string& name, flo
   float value = strtof(str->c_str(), &endPtr);
   if (endPtr == str->c_str()) {
     if (doc) {
-      reportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
+      ReportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
     }
     return defaultValue;
   }
   return value;
 }
 
-static int getIntAttribute(const DOMNode* node, const std::string& name, int defaultValue,
+static int GetIntAttribute(const DOMNode* node, const std::string& name, int defaultValue,
                            PAGXDocument* doc) {
   auto* str = node->findAttribute(name);
   if (!str || str->empty()) {
@@ -1786,20 +1786,20 @@ static int getIntAttribute(const DOMNode* node, const std::string& name, int def
   long value = strtol(str->c_str(), &endPtr, 10);
   if (endPtr == str->c_str()) {
     if (doc) {
-      reportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
+      ReportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
     }
     return defaultValue;
   }
   if (value < INT_MIN || value > INT_MAX) {
     if (doc) {
-      reportError(doc, node, "Value out of range for '" + name + "' attribute.");
+      ReportError(doc, node, "Value out of range for '" + name + "' attribute.");
     }
     return defaultValue;
   }
   return static_cast<int>(value);
 }
 
-static bool getBoolAttribute(const DOMNode* node, const std::string& name, bool defaultValue,
+static bool GetBoolAttribute(const DOMNode* node, const std::string& name, bool defaultValue,
                              PAGXDocument* doc) {
   auto* str = node->findAttribute(name);
   if (!str || str->empty()) {
@@ -1812,12 +1812,12 @@ static bool getBoolAttribute(const DOMNode* node, const std::string& name, bool 
     return false;
   }
   if (doc) {
-    reportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
+    ReportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
   }
   return defaultValue;
 }
 
-static std::optional<float> getOptionalFloatAttribute(const DOMNode* node, const std::string& name,
+static std::optional<float> GetOptionalFloatAttribute(const DOMNode* node, const std::string& name,
                                                       PAGXDocument* doc) {
   auto* str = node->findAttribute(name);
   if (!str || str->empty()) {
@@ -1827,30 +1827,30 @@ static std::optional<float> getOptionalFloatAttribute(const DOMNode* node, const
   float value = strtof(str->c_str(), &endPtr);
   if (endPtr == str->c_str()) {
     if (doc) {
-      reportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
+      ReportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
     }
     return std::nullopt;
   }
   return value;
 }
 
-static const char* skipWhitespaceAndComma(const char* ptr, const char* end) {
+static const char* SkipWhitespaceAndComma(const char* ptr, const char* end) {
   while (ptr < end && (*ptr == ' ' || *ptr == '\t' || *ptr == ',')) {
     ++ptr;
   }
   return ptr;
 }
 
-static std::pair<float, float> parseTwoFloats(const std::string& str, bool* outValid) {
+static std::pair<float, float> ParseTwoFloats(const std::string& str, bool* outValid) {
   float first = 0;
   float second = 0;
   const char* ptr = str.c_str();
   const char* end = ptr + str.size();
   char* endPtr = nullptr;
-  ptr = skipWhitespaceAndComma(ptr, end);
+  ptr = SkipWhitespaceAndComma(ptr, end);
   first = strtof(ptr, &endPtr);
   if (endPtr > ptr) {
-    ptr = skipWhitespaceAndComma(endPtr, end);
+    ptr = SkipWhitespaceAndComma(endPtr, end);
     second = strtof(ptr, &endPtr);
     if (outValid) {
       *outValid = (endPtr > ptr);
@@ -1863,34 +1863,34 @@ static std::pair<float, float> parseTwoFloats(const std::string& str, bool* outV
   return {first, second};
 }
 
-static Point parsePoint(const std::string& str, bool* outValid) {
-  auto [x, y] = parseTwoFloats(str, outValid);
+static Point ParsePoint(const std::string& str, bool* outValid) {
+  auto [x, y] = ParseTwoFloats(str, outValid);
   return {x, y};
 }
 
-static Size parseSize(const std::string& str, bool* outValid) {
-  auto [width, height] = parseTwoFloats(str, outValid);
+static Size ParseSize(const std::string& str, bool* outValid) {
+  auto [width, height] = ParseTwoFloats(str, outValid);
   return {width, height};
 }
 
-static Rect parseRect(const std::string& str, bool* outValid) {
+static Rect ParseRect(const std::string& str, bool* outValid) {
   Rect rect = {};
   const char* ptr = str.c_str();
   const char* end = ptr + str.size();
   char* endPtr = nullptr;
   bool valid = true;
-  ptr = skipWhitespaceAndComma(ptr, end);
+  ptr = SkipWhitespaceAndComma(ptr, end);
   rect.x = strtof(ptr, &endPtr);
   if (endPtr > ptr) {
-    ptr = skipWhitespaceAndComma(endPtr, end);
+    ptr = SkipWhitespaceAndComma(endPtr, end);
     rect.y = strtof(ptr, &endPtr);
   }
   if (endPtr > ptr) {
-    ptr = skipWhitespaceAndComma(endPtr, end);
+    ptr = SkipWhitespaceAndComma(endPtr, end);
     rect.width = strtof(ptr, &endPtr);
   }
   if (endPtr > ptr) {
-    ptr = skipWhitespaceAndComma(endPtr, end);
+    ptr = SkipWhitespaceAndComma(endPtr, end);
     rect.height = strtof(ptr, &endPtr);
     if (endPtr <= ptr) {
       valid = false;
@@ -1919,7 +1919,7 @@ int parseHexDigit(char c) {
 }
 }  // namespace
 
-static Color parseColor(const std::string& str, bool* outValid) {
+static Color ParseColor(const std::string& str, bool* outValid) {
   if (str.empty()) {
     if (outValid) {
       *outValid = false;
@@ -2008,7 +2008,7 @@ static Color parseColor(const std::string& str, bool* outValid) {
     float components[4] = {};
     int count = 0;
     for (; count < 4 && ptr < strEnd && *ptr != ')'; ++count) {
-      ptr = skipWhitespaceAndComma(ptr, strEnd);
+      ptr = SkipWhitespaceAndComma(ptr, strEnd);
       if (ptr >= strEnd || *ptr == ')') {
         break;
       }
@@ -2039,7 +2039,7 @@ static Color parseColor(const std::string& str, bool* outValid) {
 }
 
 template <typename T, typename Parser>
-static T getParsedAttribute(const DOMNode* node, const char* name, T defaultValue,
+static T GetParsedAttribute(const DOMNode* node, const char* name, T defaultValue,
                             PAGXDocument* doc, Parser parser) {
   auto* str = node->findAttribute(name);
   if (!str || str->empty()) {
@@ -2048,37 +2048,37 @@ static T getParsedAttribute(const DOMNode* node, const char* name, T defaultValu
   bool valid = false;
   auto result = parser(*str, &valid);
   if (!valid) {
-    reportError(doc, node,
+    ReportError(doc, node,
                 "Invalid value '" + *str + "' for '" + std::string(name) + "' attribute.");
     return defaultValue;
   }
   return result;
 }
 
-static Point getPointAttribute(const DOMNode* node, const char* name, Point defaultValue,
+static Point GetPointAttribute(const DOMNode* node, const char* name, Point defaultValue,
                                PAGXDocument* doc) {
-  return getParsedAttribute(node, name, defaultValue, doc, parsePoint);
+  return GetParsedAttribute(node, name, defaultValue, doc, ParsePoint);
 }
 
-static Size getSizeAttribute(const DOMNode* node, const char* name, Size defaultValue,
+static Size GetSizeAttribute(const DOMNode* node, const char* name, Size defaultValue,
                              PAGXDocument* doc) {
-  return getParsedAttribute(node, name, defaultValue, doc, parseSize);
+  return GetParsedAttribute(node, name, defaultValue, doc, ParseSize);
 }
 
-static Rect getRectAttribute(const DOMNode* node, const char* name, Rect defaultValue,
+static Rect GetRectAttribute(const DOMNode* node, const char* name, Rect defaultValue,
                              PAGXDocument* doc) {
-  return getParsedAttribute(node, name, defaultValue, doc, parseRect);
+  return GetParsedAttribute(node, name, defaultValue, doc, ParseRect);
 }
 
-static Color getColorAttribute(const DOMNode* node, const char* name, PAGXDocument* doc) {
+static Color GetColorAttribute(const DOMNode* node, const char* name, PAGXDocument* doc) {
   auto* str = node->findAttribute(name);
   if (!str || str->empty()) {
     return {};
   }
   bool valid = false;
-  auto result = parseColor(*str, &valid);
+  auto result = ParseColor(*str, &valid);
   if (!valid) {
-    reportError(doc, node,
+    ReportError(doc, node,
                 "Invalid value '" + *str + "' for '" + std::string(name) + "' attribute.");
   }
   return result;
@@ -2141,20 +2141,20 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const uint8_t* data, size_t 
     return nullptr;
   }
   auto doc = std::shared_ptr<PAGXDocument>(new PAGXDocument());
-  parseDocument(root.get(), doc.get());
+  ParseDocument(root.get(), doc.get());
   return doc;
 }
 
-static void parseDocument(const DOMNode* root, PAGXDocument* doc) {
-  doc->version = getAttribute(root, "version", "1.0");
-  doc->width = getFloatAttribute(root, "width", 0, doc);
-  doc->height = getFloatAttribute(root, "height", 0, doc);
-  parseCustomData(root, doc);
+static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
+  doc->version = GetAttribute(root, "version", "1.0");
+  doc->width = GetFloatAttribute(root, "width", 0, doc);
+  doc->height = GetFloatAttribute(root, "height", 0, doc);
+  ParseCustomData(root, doc);
 
   // First pass: Parse Resources.
   auto child = root->getFirstChild("Resources");
   if (child) {
-    parseResources(child.get(), doc);
+    ParseResources(child.get(), doc);
   }
 
   // Second pass: Parse Layers.
@@ -2162,12 +2162,12 @@ static void parseDocument(const DOMNode* root, PAGXDocument* doc) {
   while (child) {
     if (child->type == DOMNodeType::Element) {
       if (child->name == "Layer") {
-        auto layer = parseLayer(child.get(), doc);
+        auto layer = ParseLayer(child.get(), doc);
         if (layer) {
           doc->layers.push_back(layer);
         }
       } else if (child->name != "Resources") {
-        reportError(
+        ReportError(
             doc, child.get(),
             "Element '" + child->name + "' is not allowed in 'pagx'. Expected: Resources, Layer.");
       }

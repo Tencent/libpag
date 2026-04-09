@@ -170,14 +170,6 @@ static int ImportFromSVG(const ImportOptions& options) {
 // Resolve mode: expand all <Import> nodes in a PAGX file.
 //--------------------------------------------------------------------------------------------------
 
-static std::string GetDirectory(const std::string& path) {
-  auto slash = path.rfind('/');
-  if (slash != std::string::npos) {
-    return path.substr(0, slash + 1);
-  }
-  return "./";
-}
-
 static std::string InferFormatFromContent(const std::string& content) {
   auto pos = content.find('<');
   while (pos != std::string::npos) {
