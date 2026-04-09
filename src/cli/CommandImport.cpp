@@ -26,6 +26,7 @@
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/SVGImporter.h"
+#include "base/utils/MathUtil.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Import.h"
@@ -332,14 +333,25 @@ static bool ResolveOneImport(Import* imp, const std::string& baseDir,
           replacements.push_back(element);
         }
       } else {
+        auto m = layer->matrix;
+        bool hasSkew = !pag::FloatNearlyEqual(m.a * m.c + m.b * m.d, 0.0f);
+        if (hasSkew) {
+          // Matrix contains skew which cannot be represented by Group's
+          // position/scale/rotation. Keep it as a Layer instead of downgrading.
+          parentLayer->children.push_back(layer);
+          continue;
+        }
         auto* group = doc->makeNode<Group>();
         group->elements = std::move(layer->contents);
         if (!layer->matrix.isIdentity()) {
-          auto m = layer->matrix;
           group->position = {m.tx, m.ty};
           if (m.a != 1 || m.b != 0 || m.c != 0 || m.d != 1) {
             float sx = std::sqrt(m.a * m.a + m.b * m.b);
             float sy = std::sqrt(m.c * m.c + m.d * m.d);
+            float det = m.a * m.d - m.b * m.c;
+            if (det < 0) {
+              sy = -sy;
+            }
             float rot = std::atan2(m.b, m.a) * 180.0f / 3.14159265358979323846f;
             group->scale = {sx, sy};
             group->rotation = rot;
