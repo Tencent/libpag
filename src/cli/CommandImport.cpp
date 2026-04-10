@@ -81,6 +81,14 @@ static SVGImporter::Options ToSVGOptions(const ImportFormatOptions& formatOption
   return svgOptions;
 }
 
+static void InlinePathData(PAGXDocument* doc) {
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() == NodeType::PathData) {
+      node->id.clear();
+    }
+  }
+}
+
 ImportResult ImportFile(const std::string& filePath, const std::string& format,
                         const ImportFormatOptions& formatOptions, float targetWidth,
                         float targetHeight) {
@@ -96,6 +104,7 @@ ImportResult ImportFile(const std::string& filePath, const std::string& format,
     result.error = "failed to parse '" + filePath + "'";
     return result;
   }
+  InlinePathData(result.document.get());
   result.warnings = std::move(result.document->errors);
   return result;
 }
@@ -115,6 +124,7 @@ ImportResult ImportString(const std::string& content, const std::string& format,
     result.error = "failed to parse inline content";
     return result;
   }
+  InlinePathData(result.document.get());
   result.warnings = std::move(result.document->errors);
   return result;
 }

@@ -97,14 +97,6 @@ static int ParseResolveOptions(int argc, char* argv[], ResolveOptions* options) 
 // Resolve logic
 //--------------------------------------------------------------------------------------------------
 
-static void InlinePathData(PAGXDocument* svgDoc) {
-  for (auto& node : svgDoc->nodes) {
-    if (node->nodeType() == NodeType::PathData) {
-      node->id.clear();
-    }
-  }
-}
-
 static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
                             const ImportFormatOptions& formatOptions, PAGXDocument* doc) {
   bool hasImportSource = !layer->importDirective.source.empty();
@@ -158,8 +150,6 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
   if (std::isnan(layer->height) && svgDoc->height > 0) {
     layer->height = svgDoc->height;
   }
-
-  InlinePathData(svgDoc.get());
 
   // Collect the effective element layers from the conversion result. Root elements (e.g. <svg>)
   // become wrapper Layers whose actual content is in their children. If such a wrapper is a plain
