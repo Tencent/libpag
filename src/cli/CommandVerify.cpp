@@ -1484,13 +1484,47 @@ static bool IsFullyContained(const SpatialRect& parent, const SpatialRect& child
          (child.y + child.height) <= (parent.y + parent.height + TOLERANCE);
 }
 
+static bool ElementsHaveLeafContent(const std::vector<Element*>& elements);
+
+static bool HasLeafContent(const Layer* layer) {
+  if (layer->composition != nullptr) {
+    return true;
+  }
+  if (ElementsHaveLeafContent(layer->contents)) {
+    return true;
+  }
+  for (auto* child : layer->children) {
+    if (HasLeafContent(child)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool ElementsHaveLeafContent(const std::vector<Element*>& elements) {
+  for (auto* element : elements) {
+    auto type = element->nodeType();
+    if (type == NodeType::Rectangle || type == NodeType::Ellipse || type == NodeType::Polystar ||
+        type == NodeType::Path || type == NodeType::Text || type == NodeType::Import) {
+      return true;
+    }
+    if (type == NodeType::Group || type == NodeType::TextBox) {
+      auto* group = static_cast<const Group*>(element);
+      if (ElementsHaveLeafContent(group->elements)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 static void DetectZeroSize(const Layer* layer, const Layer* parentLayer,
                            std::vector<VerifyDiagnostic>& diagnostics) {
   auto bounds = layer->layoutBounds();
   if (bounds.width != 0 && bounds.height != 0) {
     return;
   }
-  if (layer->contents.empty() && layer->children.empty()) {
+  if (!HasLeafContent(layer)) {
     return;
   }
   bool inParentLayout =
