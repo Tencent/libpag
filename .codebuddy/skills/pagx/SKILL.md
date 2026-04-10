@@ -54,8 +54,8 @@ all other CLI commands (`render`, `format`, `layout`, `bounds`, `font`, `import`
 
 ## Verify Checklist
 
-After each `pagx verify` run, check the `.layout.xml` output and the screenshot
-against the design intent.
+After each `pagx verify` run, systematically check the `.layout.xml` output and the
+screenshot against the design intent. Do NOT glance and move on.
 
 **Layout checks** (read `.layout.xml` — each node has `line` and `bounds`):
 - **Bounds accuracy**: For every key element, verify that `bounds` (x, y, width,
