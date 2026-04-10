@@ -121,7 +121,8 @@ verification in Step 3.
 
 **Gate**:
 1. Run `pagx verify input.pagx`. Fix all diagnostics until clean.
-2. Read `.layout.xml` and screenshot, check against §Verify Checklist.
+2. Read `.layout.xml` and screenshot, check against §Verify Checklist. Fix any
+   issues found and re-run verify.
 
 **Forbidden**: Do NOT proceed to Step 3 until the gate passes.
 
@@ -136,7 +137,8 @@ For each section (identified by `id`), one at a time:
 **Gate**:
 1. Run `pagx verify --scale 2 --id "sectionId" input.pagx`. Fix all diagnostics
    until clean.
-2. Read `.layout.xml` and screenshot, check against §Verify Checklist.
+2. Read `.layout.xml` and screenshot, check against §Verify Checklist. Fix any
+   issues found and re-run verify.
 
 **Cleanup**: After the gate passes, delete that section's scoped artifacts
 (`input.{id}.png`, `input.{id}.layout.xml`) before moving on.
@@ -153,7 +155,8 @@ alignment, color consistency, visual hierarchy — that only become apparent at 
 
 **Gate**:
 1. Run `pagx verify --scale 2 input.pagx`. Fix all diagnostics until clean.
-2. Read `.layout.xml` and screenshot, check against §Verify Checklist.
+2. Read `.layout.xml` and screenshot, check against §Verify Checklist. Fix any
+   issues found and re-run verify.
 3. Read `guide.md` §Common Pitfalls, scan the entire PAGX source against every
    listed anti-pattern.
 
