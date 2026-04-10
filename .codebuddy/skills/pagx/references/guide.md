@@ -567,11 +567,14 @@ child element, or external file reference via the `import` attribute on a Layer.
 <Layer import="assets/drawing.xml" importFormat="svg"/>
 ```
 
-Resolution sets the Layer's `width`/`height` from the measured size of the source content.
+Resolution behavior depends on whether the Layer has explicit dimensions:
+- **Layer with `width`/`height`**: content is uniformly scaled to fit (centered, aspect
+  ratio preserved). The Layer keeps its declared size.
+- **Layer without explicit size**: `width`/`height` are set from the source content
+  dimensions (e.g., SVG `viewBox`).
+
 After resolution, a comment is added inside the Layer indicating the source:
 `<!-- Resolved from: inline svg -->` or `<!-- Resolved from: assets/logo.svg -->`.
-SVG does not auto-scale to fit the Layer — the `viewBox` size becomes the Layer size, so
-always generate the SVG `viewBox` at the exact dimensions you need.
 
 **Native PAGX elements vs inline SVG:**
 

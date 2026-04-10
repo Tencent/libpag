@@ -2143,7 +2143,9 @@ The `pagx resolve` command processes all import directives in a PAGX file:
    Ellipse, Path, Fill, Stroke, Group nodes)
 3. Replaces the `<svg>` element or removes the `import`/`importFormat` attributes, and
    inserts the converted nodes as children of the Layer
-4. Sets the Layer's `width` and `height` from the source dimensions (e.g., SVG `viewBox`
+4. If the Layer has explicit `width` and `height`, content is uniformly scaled to fit
+   within those dimensions (centered, preserving aspect ratio). If the Layer has no explicit
+   size, sets `width` and `height` from the source dimensions (e.g., SVG `viewBox`
    or `width`/`height` attributes)
 5. Inserts a comment in the Layer's children indicating the original source:
    - Inline SVG: `<!-- Resolved from: inline svg -->`

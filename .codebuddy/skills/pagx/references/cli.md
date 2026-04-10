@@ -311,9 +311,10 @@ pagx import --input icon.svg --output out.pagx   # SVG to out.pagx
 ## pagx resolve
 
 Resolve all inline `<svg>` elements and `import` attributes in a PAGX file into native PAGX
-nodes. Sets the parent Layer's `width`/`height` from the source dimensions and adds a
-comment indicating the source (e.g., `<!-- Resolved from: inline svg -->` or
-`<!-- Resolved from: assets/logo.svg -->`).
+nodes. When a Layer has explicit `width`/`height`, content is uniformly scaled to fit
+(centered, aspect ratio preserved). Otherwise, the Layer's size is set from the source
+dimensions. Adds a comment indicating the source (e.g., `<!-- Resolved from: inline svg -->`
+or `<!-- Resolved from: assets/logo.svg -->`).
 
 ```bash
 pagx resolve design.pagx                          # resolve in place

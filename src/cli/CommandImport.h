@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cmath>
 #include <memory>
 #include <string>
 #include <vector>
@@ -48,17 +49,22 @@ void ParseFormatOptions(int argc, char* argv[], ImportFormatOptions* options);
 
 /**
  * Imports a file and converts it to a PAGXDocument. Format is inferred from file extension
- * when `format` is empty.
+ * when `format` is empty. When both targetWidth and targetHeight are set (non-NaN), content
+ * is uniformly scaled to fit within the target dimensions.
  */
 ImportResult ImportFile(const std::string& filePath, const std::string& format,
-                        const ImportFormatOptions& formatOptions);
+                        const ImportFormatOptions& formatOptions, float targetWidth = NAN,
+                        float targetHeight = NAN);
 
 /**
  * Imports from string content and converts it to a PAGXDocument. Format is inferred from
- * the content's root element tag when `format` is empty.
+ * the content's root element tag when `format` is empty. When both targetWidth and
+ * targetHeight are set (non-NaN), content is uniformly scaled to fit within the target
+ * dimensions.
  */
 ImportResult ImportString(const std::string& content, const std::string& format,
-                          const ImportFormatOptions& formatOptions);
+                          const ImportFormatOptions& formatOptions, float targetWidth = NAN,
+                          float targetHeight = NAN);
 
 /**
  * Imports a file from another format (e.g. SVG) and converts it to PAGX.

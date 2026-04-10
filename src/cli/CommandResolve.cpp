@@ -132,10 +132,11 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
 
   if (hasImportSource) {
     auto filePath = baseDir + layer->importSource;
-    result = ImportFile(filePath, layer->importFormat, formatOptions);
+    result = ImportFile(filePath, layer->importFormat, formatOptions, layer->width, layer->height);
     resolvedFromDesc = layer->importSource;
   } else {
-    result = ImportString(layer->importContent, layer->importFormat, formatOptions);
+    result = ImportString(layer->importContent, layer->importFormat, formatOptions, layer->width,
+                          layer->height);
     resolvedFromDesc = "inline svg";
   }
 

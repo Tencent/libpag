@@ -70,23 +70,28 @@ static std::string InferFormatFromContent(const std::string& content) {
 // Import functions
 //--------------------------------------------------------------------------------------------------
 
-static SVGImporter::Options ToSVGOptions(const ImportFormatOptions& formatOptions) {
+static SVGImporter::Options ToSVGOptions(const ImportFormatOptions& formatOptions,
+                                         float targetWidth = NAN, float targetHeight = NAN) {
   SVGImporter::Options svgOptions = {};
   svgOptions.expandUseReferences = formatOptions.svgExpandUse;
   svgOptions.flattenTransforms = formatOptions.svgFlattenTransforms;
   svgOptions.preserveUnknownElements = formatOptions.svgPreserveUnknown;
+  svgOptions.targetWidth = targetWidth;
+  svgOptions.targetHeight = targetHeight;
   return svgOptions;
 }
 
 ImportResult ImportFile(const std::string& filePath, const std::string& format,
-                        const ImportFormatOptions& formatOptions) {
+                        const ImportFormatOptions& formatOptions, float targetWidth,
+                        float targetHeight) {
   ImportResult result = {};
   auto effectiveFormat = format.empty() ? GetFileExtension(filePath) : format;
   if (effectiveFormat != "svg") {
     result.error = "unsupported format '" + effectiveFormat + "'";
     return result;
   }
-  result.document = SVGImporter::Parse(filePath, ToSVGOptions(formatOptions));
+  result.document =
+      SVGImporter::Parse(filePath, ToSVGOptions(formatOptions, targetWidth, targetHeight));
   if (result.document == nullptr) {
     result.error = "failed to parse '" + filePath + "'";
     return result;
@@ -96,14 +101,16 @@ ImportResult ImportFile(const std::string& filePath, const std::string& format,
 }
 
 ImportResult ImportString(const std::string& content, const std::string& format,
-                          const ImportFormatOptions& formatOptions) {
+                          const ImportFormatOptions& formatOptions, float targetWidth,
+                          float targetHeight) {
   ImportResult result = {};
   auto effectiveFormat = format.empty() ? InferFormatFromContent(content) : format;
   if (effectiveFormat != "svg") {
     result.error = "unsupported inline import format '" + effectiveFormat + "'";
     return result;
   }
-  result.document = SVGImporter::ParseString(content, ToSVGOptions(formatOptions));
+  result.document =
+      SVGImporter::ParseString(content, ToSVGOptions(formatOptions, targetWidth, targetHeight));
   if (result.document == nullptr) {
     result.error = "failed to parse inline content";
     return result;
