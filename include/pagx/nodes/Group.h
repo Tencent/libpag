@@ -22,6 +22,7 @@
 #include <vector>
 #include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/Element.h"
+#include "pagx/types/Padding.h"
 #include "pagx/types/Point.h"
 #include "pagx/types/Rect.h"
 
@@ -85,6 +86,12 @@ class Group : public Element, public LayoutNode {
    * frame for its child elements. Does not affect rendering behavior. NaN means not set.
    */
   float height = NAN;
+
+  /**
+   * The inner padding of the group. Insets the constraint reference frame for child elements.
+   * The default value is zero on all sides.
+   */
+  Padding padding = {};
 
   NodeType nodeType() const override {
     return NodeType::Group;

@@ -113,11 +113,36 @@ pagx (required: version, width, height)
 **Layer arrangement = CSS Flexbox.** Never fall back to constraint positioning when the
 layout is expressible as nested flex containers.
 
-`padding` works on **all Layers** — it insets both the layout content area and the
-constraint reference frame for every child Layer, including `includeInLayout="false"`
-overlays. VectorElements are unaffected (they always reference full Layer bounds). To
-position an overlay at the Layer's outer edge, offset the constraint by the padding
-amount (e.g., `left="-20"` when `padding="20"`).
+`padding` works on **all Layers, Groups, and TextBoxes** — it insets the layout content
+area and the constraint reference frame for all contents. This means `left="0" top="0"`
+inside a padded container resolves to the padding inner edge, not the Layer edge.
+
+**Nested container structure**: When a container needs both edge-to-edge elements
+(background fills, dividers, borders that span the full bounds) and padded content, split
+them across an outer and inner container. The outer container holds edge elements without
+padding; the inner container carries `padding` for content. Either container can be a
+Layer or Group — use Layer when it needs `layout` or child Layers, use Group otherwise.
+
+```xml
+<!-- Outer: background (no padding). Inner: padded layout content. -->
+<Layer>
+  <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+  <Fill color="#FFF"/>
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="8" padding="16">
+    <!-- content here -->
+  </Layer>
+</Layer>
+
+<!-- Button: outer background, inner Group for padded text -->
+<Layer centerX="0" centerY="0">
+  <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+  <Fill color="#3B82F6"/>
+  <Group centerX="0" centerY="0" padding="10,15">
+    <Text text="Click" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+    <Fill color="#FFF"/>
+  </Group>
+</Layer>
+```
 
 **CSS Flexbox → PAGX**:
 
@@ -126,7 +151,7 @@ amount (e.g., `left="-20"` when `padding="20"`).
 | `flex-direction` | `layout` | `row` → `horizontal`, `column` → `vertical` |
 | `flex` / `flex-grow` | `flex` | Same semantics |
 | `gap` | `gap` | Same semantics |
-| `padding` | `padding` | Works with or without `layout` — always insets child Layer constraints. Same shorthand (`"20"`, `"10,20"`, `"10,20,10,20"`) |
+| `padding` | `padding` | Insets all content constraints. Same shorthand (`"20"`, `"10,20"`, `"10,20,10,20"`) |
 | `align-items` | `alignment` | `stretch`/`flex-start`/`center`/`flex-end` → `stretch`/`start`/`center`/`end` |
 | `justify-content` | `arrangement` | `flex-start`/`center`/... → `start`/`center`/`end`/`spaceBetween`/`spaceEvenly`/`spaceAround` |
 
@@ -561,65 +586,18 @@ Layer to place it.
 
 # Common Pitfalls
 
-These errors are easy to make during generation.
+**IMPORTANT**: The following are known generation errors that MUST be avoided. Before
+finalizing any PAGX output, verify that none of these anti-patterns appear in your code.
 
-- **Zero-size container** — a layout container without main-axis size gives flex children
-  zero space. Ensure layout containers have a determinate size.
+- **NEVER** use `flex` when the parent has no main-axis size — a content-measured parent has
+  nothing to distribute, so `flex` children get zero space.
 
   ```xml
   <!-- ❌ vertical layout with no height — flex child gets 0px -->
   <Layer layout="vertical">
     <Layer flex="1"><!-- zero height --></Layer>
   </Layer>
-  ```
 
-- **Constraints on layout children** — constraints on a child Layer are **ignored** when
-  parent has `layout`. Use `gap`/`padding`/`alignment`/`arrangement`. Or add
-  `includeInLayout="false"`.
-
-  ```xml
-  <!-- ❌ left="20" is ignored — parent has layout -->
-  <Layer width="400" height="200" layout="horizontal">
-    <Layer left="20" flex="1"/>
-  </Layer>
-
-  <!-- ✅ Use padding on the parent instead -->
-  <Layer width="400" height="200" layout="horizontal" padding="0,20,0,20">
-    <Layer flex="1"/>
-  </Layer>
-  ```
-
-- **padding does not affect VectorElements** — `padding` only insets the constraint
-  reference frame for **child Layers**. VectorElements (Rectangle, Ellipse, Path, Text,
-  Group, TextBox) always reference the full Layer bounds, ignoring padding. To add inner
-  spacing around a VectorElement, use constraint attributes or wrap it in a child Layer.
-
-  ```xml
-  <!-- ❌ padding has no effect on Text — it renders from (0,0) -->
-  <Layer padding="0,16">
-    <Text text="Hello" fontFamily="Arial" fontSize="14"/>
-    <Fill color="#000"/>
-  </Layer>
-
-  <!-- ✅ Use constraint to position Text -->
-  <Layer>
-    <Text left="16" text="Hello" fontFamily="Arial" fontSize="14"/>
-    <Fill color="#000"/>
-  </Layer>
-
-  <!-- ✅ Or wrap in a child Layer so padding takes effect -->
-  <Layer padding="0,16">
-    <Layer>
-      <Text text="Hello" fontFamily="Arial" fontSize="14"/>
-      <Fill color="#000"/>
-    </Layer>
-  </Layer>
-  ```
-
-- **flex without distributable space** — `flex` needs the parent to have a main-axis size.
-  Content-measured parent has nothing to share.
-
-  ```xml
   <!-- ❌ Parent has no height — nothing to distribute -->
   <Layer layout="vertical">
     <Layer height="100"/>
@@ -633,8 +611,25 @@ These errors are easy to make during generation.
   </Layer>
   ```
 
-- **Redundant `left="0"` / `top="0"`** — single `left="0"` without `right`/`centerX` is
-  same as default. Pair with opposite edge or remove.
+- **NEVER** put constraints (`left`/`top`/`right`/`bottom`/`centerX`/`centerY`) on a child
+  inside a `layout` parent — they are silently ignored. Use `gap`/`padding`/`alignment`/
+  `arrangement` on the parent, or set `includeInLayout="false"` on the child.
+
+  ```xml
+  <!-- ❌ left="20" is ignored — parent has layout -->
+  <Layer width="400" height="200" layout="horizontal">
+    <Layer left="20" flex="1"/>
+  </Layer>
+
+  <!-- ✅ Use padding on the parent instead -->
+  <Layer width="400" height="200" layout="horizontal" padding="0,20,0,20">
+    <Layer flex="1"/>
+  </Layer>
+  ```
+
+- **NEVER** write a lone `left="0"` or `top="0"` without a paired opposite constraint — it
+  is redundant (default positioning already starts at the parent origin). Either pair it with
+  the opposite edge to stretch, or remove it.
 
   ```xml
   <!-- ❌ Redundant — left="0" alone is default positioning -->
@@ -647,11 +642,11 @@ These errors are easy to make during generation.
   <Layer left="0" right="0" top="0" bottom="0"/>
   ```
 
-- **`visible="false"` still occupies layout space** — a hidden Layer still participates in
-  container layout by default. To fully remove, also set `includeInLayout="false"`.
+- **NEVER** assume `visible="false"` removes a Layer from layout — a hidden Layer still
+  occupies space. MUST also set `includeInLayout="false"` to fully remove it.
 
-- **Content origin offset** — in a content-measured container, children should start from
-  (0,0). Offset positions cause inaccurate measurement.
+- **NEVER** start content at a non-zero offset in a content-measured container — offset
+  positions cause inaccurate measurement. Children MUST start from (0,0).
 
   ```xml
   <!-- ❌ Wrong: content starts at (50,50), container measures from (0,0) to (150,150)
@@ -668,7 +663,7 @@ These errors are easy to make during generation.
   </Layer>
   ```
 
-  Same applies to Path/PathData — start path data from (0,0) and use constraints to
+  Same applies to Path/PathData — MUST start path data from (0,0) and use constraints to
   position the element:
 
   ```xml
@@ -681,8 +676,8 @@ These errors are easy to make during generation.
   <Fill color="#F00"/>
   ```
 
-- **Ineffective centering** — `centerX`/`centerY` inside a content-measured container is a
-  no-op. Move centering to the container itself.
+- **NEVER** put `centerX`/`centerY` on a child inside a content-measured container — it is a
+  no-op. MUST move the centering constraint to the container itself.
 
   ```xml
   <!-- ❌ centerX on Text inside content-measured Group -->
@@ -698,8 +693,8 @@ These errors are easy to make during generation.
   </Group>
   ```
 
-- **Unnecessary first-child Group** — first content in scope needs no wrapper. Only wrap
-  when earlier geometry+painters need isolation.
+- **NEVER** wrap the first content in a scope inside a Group — the first content needs no
+  wrapper. Only wrap when earlier geometry+painters need isolation from later ones.
 
   ```xml
   <!-- ❌ First Group is redundant — no earlier content to isolate from -->
@@ -725,8 +720,8 @@ These errors are easy to make during generation.
   </Layer>
   ```
 
-- **Mergeable consecutive Groups** — adjacent Groups with identical painters should be
-  merged into one.
+- **NEVER** leave adjacent Groups that share identical painters as separate Groups — MUST
+  merge them into one.
 
   ```xml
   <!-- ❌ Two Groups with the same Fill -->
@@ -747,11 +742,11 @@ These errors are easy to make during generation.
   </Group>
   ```
 
-- **Absolute positioning** — avoid using `left`/`top` with hardcoded values or fixed
-  `width`/`height` when the layout engine can compute them. Prefer container layout
-  (`layout`, `gap`, `padding`, `alignment`, `arrangement`, `flex`) and constraint
-  positioning (`centerX`, `centerY`, opposite-pair `left`+`right`/`top`+`bottom`) over
-  manual pixel values. Only use absolute positioning for `includeInLayout="false"` overlays.
+- **NEVER** use hardcoded `left`/`top` pixel values or fixed `width`/`height` when the
+  layout engine can compute them. MUST prefer container layout (`layout`, `gap`, `padding`,
+  `alignment`, `arrangement`, `flex`) and constraint positioning (`centerX`, `centerY`,
+  opposite-pair `left`+`right`/`top`+`bottom`). Only use absolute positioning for
+  `includeInLayout="false"` overlays.
 
   ```xml
   <!-- ❌ Absolute positioning — fragile, misaligns easily -->

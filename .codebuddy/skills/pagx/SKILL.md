@@ -52,36 +52,28 @@ all other CLI commands (`render`, `format`, `layout`, `bounds`, `font`, `import`
 
 ---
 
-## Screenshot Checklist
+## Verify Checklist
 
-When checking a screenshot, carefully examine every detail against the design intent.
-Do NOT glance and move on. Systematically check each of the following:
-- **Visibility**: Every element described in the design is rendered. No missing text,
-  icons, shapes, or backgrounds. No elements accidentally hidden or clipped.
-- **Clipping and overflow**: Content that should be contained is not spilling outside
-  its container. Conversely, content is not unexpectedly clipped or cut off.
+After each `pagx verify` run, systematically check the `.layout.xml` output and the
+screenshot against the design intent. Do NOT glance and move on.
+
+**Layout checks** (read `.layout.xml` — each node has `line` and `bounds`):
+- **Bounds accuracy**: For every key element, verify that `bounds` (x, y, width,
+  height) match the design spec — padding offsets produce the expected x/y
+  coordinates, container widths/heights are correct, spacing between siblings equals
+  the intended `gap`, and centered elements have the expected coordinates.
+- **Visibility**: No element has zero width or height unless intentionally hidden.
+  Every element described in the design has a corresponding node with non-zero bounds.
+- **Containment**: No child element's bounds extend beyond its parent's bounds
+  (unless intentional overflow like a scrollable card row).
+
+**Visual checks** (inspect the screenshot):
 - **Stacking order**: No element is accidentally covering another — e.g., a background
   obscuring text, or painter leaks causing unwanted fills on unrelated shapes.
 - **Color accuracy**: Fill colors, gradients, and text colors match the design spec.
   No leftover default black fills or white-on-white invisible elements.
-- **Spacing and padding**: Even padding between content and container edges — text
-  should not touch button borders. Consistent gaps between sibling elements — not too
-  tight or too loose. Margins match the design spec.
-- **Sizing**: No elements collapsed to zero size or unexpectedly stretched. Text
-  should be readable at the intended font size. Icons proportional to surrounding
-  content.
-- **Alignment**: Text and elements are properly aligned (centered where specified,
-  left/right aligned where intended). Vertical centering looks visually balanced.
-- **Visual hierarchy**: Primary content stands out over secondary. Font weight and
-  size differences create clear hierarchy. Active/selected states visually distinct
-  from inactive.
-- **Overall polish**: The output should look like a professional, production-quality
-  design — not a rough draft. If anything looks "off" even if hard to pinpoint,
-  investigate.
-
-If screenshot has issues, read the `.layout.xml` file to diagnose. Each node has
-`line` (source line number) and `bounds` (computed position and size). Compare bounds
-of problematic elements against design intent to identify the root cause.
+- **Visual hierarchy**: Primary content stands out over secondary. Active/selected
+  states visually distinct from inactive.
 
 ---
 
@@ -121,16 +113,17 @@ Do NOT start the next task until the current one is completed.
 
 ### Step 2: Skeleton
 
-**Do**: Write the `<pagx>` root and all section Layers with **only layout attributes**
-(`id`, `width`/`height`, `flex`, `layout`, `gap`, `padding`, `alignment`, `arrangement`).
-No visual content — no shapes, text, painters, styles, or filters. Assign `id` to every
-structural section for scoped verification in Step 3.
+**Do**: Write the `<pagx>` root and all section Layers with **structural layout attributes**
+(`id`, `width`/`height`, `flex`, `layout`, `gap`, `alignment`, `arrangement`),
+**background fills, and section dividers** using the nested container structure
+(see `guide.md` §Container Layout). Assign `id` to every structural section for scoped
+verification in Step 3.
 
 **Gate**: Repeat until clean:
-1. Run `pagx verify --skip-render input.pagx`.
+1. Run `pagx verify input.pagx`.
 2. Fix all reported diagnostics, then re-run verify.
-3. Read the `.layout.xml` output and verify each section's bounds match the intended
-   sizes and positions.
+3. Check against §Common Pitfalls — scan output for every listed anti-pattern.
+4. Check against §Verify Checklist.
 
 **Forbidden**: Do NOT proceed to Step 3 until the gate passes.
 
@@ -145,7 +138,8 @@ For each section (identified by `id`), one at a time:
 **Gate**: Repeat until clean:
 1. Run `pagx verify --scale 2 --id "sectionId" input.pagx`.
 2. Fix all reported diagnostics, then re-run verify.
-3. Check the screenshot against §Screenshot Checklist.
+3. Check against §Common Pitfalls — scan output for every listed anti-pattern.
+4. Check against §Verify Checklist.
 
 **Cleanup**: After the gate passes, delete that section's scoped artifacts
 (`input.{id}.png`, `input.{id}.layout.xml`) before moving on.
@@ -163,7 +157,8 @@ alignment, color consistency, visual hierarchy — that only become apparent at 
 **Gate**: Repeat until clean:
 1. Run `pagx verify --scale 2 input.pagx`.
 2. Fix all reported diagnostics, then re-run verify.
-3. Check the full screenshot against §Screenshot Checklist.
+3. Check against §Common Pitfalls — scan output for every listed anti-pattern.
+4. Check against §Verify Checklist.
 
 Keep final `input.png` and `input.layout.xml` for reference (do not commit). If further
 edits are made after this step, re-run the full verify to regenerate them. Delete any

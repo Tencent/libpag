@@ -149,11 +149,11 @@ void Layer::updateLayout(LayoutContext* context) {
     performContainerLayout(context);
   }
 
-  // VectorElements (contents): always use full bounds, unaffected by padding.
+  // VectorElements (contents): use padding-inset bounds.
   auto contentNodes = LayoutNode::CollectLayoutNodes(contents, false);
-  LayoutNode::PerformConstraintLayout(contentNodes, layoutWidth, layoutHeight, context);
+  LayoutNode::PerformConstraintLayout(contentNodes, layoutWidth, layoutHeight, padding, context);
 
-  // Child Layers not in flex flow: use padding-inset bounds as constraint reference frame.
+  // Child Layers not in flex flow: use padding-inset bounds.
   std::vector<LayoutNode*> childNodes;
   for (auto* child : children) {
     bool inFlexFlow = (layout != LayoutMode::None && child->includeInLayout);
@@ -162,22 +162,7 @@ void Layer::updateLayout(LayoutContext* context) {
     }
   }
   if (!childNodes.empty()) {
-    bool hasPadding = !padding.isZero();
-    float cw =
-        hasPadding ? std::max(0.0f, layoutWidth - padding.left - padding.right) : layoutWidth;
-    float ch =
-        hasPadding ? std::max(0.0f, layoutHeight - padding.top - padding.bottom) : layoutHeight;
-    LayoutNode::PerformConstraintLayout(childNodes, cw, ch, context);
-    // Offset child positions to the padding-inset origin.
-    if (hasPadding) {
-      for (auto* node : childNodes) {
-        auto* child = static_cast<Layer*>(node);
-        child->x += padding.left;
-        child->y += padding.top;
-        child->layoutX += padding.left;
-        child->layoutY += padding.top;
-      }
-    }
+    LayoutNode::PerformConstraintLayout(childNodes, layoutWidth, layoutHeight, padding, context);
   }
 }
 

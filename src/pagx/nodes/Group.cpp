@@ -34,6 +34,14 @@ void Group::updateSize(LayoutContext* context) {
 
 void Group::onMeasure(LayoutContext*) {
   MeasureChildNodes(elements, width, height, preferredWidth, preferredHeight);
+  if (!padding.isZero()) {
+    if (std::isnan(width)) {
+      preferredWidth += padding.left + padding.right;
+    }
+    if (std::isnan(height)) {
+      preferredHeight += padding.top + padding.bottom;
+    }
+  }
 }
 
 void Group::setLayoutSize(LayoutContext*, float width, float height) {
@@ -54,7 +62,7 @@ void Group::setLayoutPosition(LayoutContext*, float x, float y) {
 
 void Group::updateLayout(LayoutContext* context) {
   auto nodes = CollectLayoutNodes(elements, false);
-  PerformConstraintLayout(nodes, layoutWidth, layoutHeight, context);
+  PerformConstraintLayout(nodes, layoutWidth, layoutHeight, padding, context);
 }
 
 }  // namespace pagx

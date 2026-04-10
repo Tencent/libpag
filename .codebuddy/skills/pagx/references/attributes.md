@@ -44,7 +44,7 @@ Basic container for content, child layers, styles, and filters.
 | `layout` | LayoutMode | none | Container layout mode for child layer arrangement |
 | `gap` | float | 0 | Spacing between adjacent child Layers |
 | `flex` | float | 0 | Flex weight for main-axis sizing in parent container layout |
-| `padding` | Padding | 0 | Insets both the layout content area and the constraint reference frame for child Layers (VectorElements unaffected). Works with or without `layout`. CSS shorthand: `"20"`, `"10,20"`, `"10,20,10,20"` |
+| `padding` | Padding | 0 | Insets the layout content area and the constraint reference frame for all contents (VectorElements and child Layers). CSS shorthand: `"20"`, `"10,20"`, `"10,20,10,20"` |
 | `alignment` | Alignment | stretch | Cross-axis alignment of child Layers |
 | `arrangement` | Arrangement | start | Main-axis arrangement of child Layers |
 | `includeInLayout` | bool | true | Whether to participate in parent container layout flow |
@@ -97,6 +97,7 @@ VectorElement container with transform properties, creating isolated scopes for 
 |-----------|------|---------|-------------|
 | `width` | float | — | Layout width for constraint positioning of children |
 | `height` | float | — | Layout height for constraint positioning of children |
+| `padding` | Padding | 0 | Insets the constraint reference frame for child elements. CSS shorthand: `"20"`, `"10,20"`, `"10,20,10,20"` |
 | `left` | float | — | Distance from left edge to container left edge |
 | `right` | float | — | Distance from right edge to container right edge |
 | `top` | float | — | Distance from top edge to container top edge |
@@ -598,6 +599,7 @@ Text layout container that inherits from Group. Provides paragraph-level feature
 | `skew` | float | 0 | Skew amount in degrees |
 | `skewAxis` | float | 0 | Skew axis angle in degrees |
 | `alpha` | float | 1 | Opacity 0~1 |
+| `padding` | Padding | 0 | Insets the text layout area and the constraint reference frame for non-Text child elements (inherited from Group). CSS shorthand: `"20"`, `"10,20"`, `"10,20,10,20"` |
 
 **TextBox-specific:**
 

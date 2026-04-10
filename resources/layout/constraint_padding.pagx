@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Constraint layout: padding on Layers WITHOUT container layout -->
-<!-- Verifies that padding insets the constraint reference frame for child Layers -->
-<!-- while VectorElements remain unaffected (always reference full bounds). -->
+<!-- Verifies that padding insets the constraint reference frame for both child Layers -->
+<!-- and VectorElements (both reference the padding-inset area). -->
 <pagx version="1.0" width="820" height="600">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
@@ -17,8 +17,8 @@
 
       <!-- Case 1: padding + left/right/top/bottom on child Layer -->
       <!-- Child Layer left="0" should be at x=30 (padding.left), not x=0 -->
-      <Layer flex="1" height="260" padding="30">
-        <!-- Dashed border (VectorElement: unaffected by padding, fills full bounds) -->
+      <Layer flex="1" height="260">
+        <!-- Dashed border (VectorElement: fills full bounds of outer Layer) -->
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <!-- Background showing the padding-inset area -->
@@ -26,42 +26,49 @@
           <Rectangle left="30" right="30" top="30" bottom="30" roundness="4"/>
           <Fill color="#E8F4FF"/>
         </Group>
-        <!-- Child Layer: left="0" right="0" top="0" bottom="0" should fill inset area -->
-        <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-          <Fill color="#3B82F6"/>
+        <!-- Inner Layer with padding, containing only child Layers -->
+        <Layer left="0" right="0" top="0" bottom="0" padding="30">
+          <!-- Child Layer: left="0" right="0" top="0" bottom="0" should fill inset area -->
+          <Layer left="0" right="0" top="0" bottom="0">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Fill color="#3B82F6"/>
+          </Layer>
         </Layer>
       </Layer>
 
       <!-- Case 2: padding + centerX/centerY on child Layer -->
       <!-- Child Layer centerX="0" centerY="0" should center within inset area -->
-      <Layer flex="1" height="260" padding="30">
+      <Layer flex="1" height="260">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Group>
           <Rectangle left="30" right="30" top="30" bottom="30" roundness="4"/>
           <Fill color="#FFF3E8"/>
         </Group>
-        <!-- Child Layer: centered within inset area -->
-        <Layer centerX="0" centerY="0">
-          <Rectangle size="80,60" roundness="8"/>
-          <Fill color="#F59E0B"/>
+        <Layer left="0" right="0" top="0" bottom="0" padding="30">
+          <!-- Child Layer: centered within inset area -->
+          <Layer centerX="0" centerY="0">
+            <Rectangle size="80,60" roundness="8"/>
+            <Fill color="#F59E0B"/>
+          </Layer>
         </Layer>
       </Layer>
 
-      <!-- Case 3: VectorElement with left/right/top/bottom (should NOT be affected) -->
-      <Layer flex="1" height="260" padding="30">
+      <!-- Case 3: VectorElement with left/right/top/bottom (now ALSO affected by padding) -->
+      <Layer flex="1" height="260">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        <!-- Rectangle is a VectorElement: left/right/top/bottom reference full bounds -->
-        <Group>
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-          <Fill color="#10B981"/>
-        </Group>
-        <!-- Child Layer with left/right for comparison: references inset bounds -->
-        <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Fill color="#10B981" alpha="0.4"/>
+        <Layer left="0" right="0" top="0" bottom="0" padding="30">
+          <!-- Rectangle is a VectorElement: now references inset bounds (same as child Layers) -->
+          <Group>
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Fill color="#10B981"/>
+          </Group>
+          <!-- Child Layer with left/right for comparison: also references inset bounds -->
+          <Layer left="0" right="0" top="0" bottom="0">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+            <Fill color="#10B981" alpha="0.4"/>
+          </Layer>
         </Layer>
       </Layer>
 
@@ -76,19 +83,18 @@
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <!-- Content-measured child with padding and a child Layer -->
-        <Layer left="20" top="20" padding="20">
+        <Layer left="20" top="20">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
           <Fill color="#EDE9FE"/>
-          <!-- Inner child Layer -->
-          <Layer>
+          <Group padding="20">
             <Rectangle size="80,60" roundness="8"/>
             <Fill color="#8B5CF6"/>
-          </Layer>
+          </Group>
         </Layer>
       </Layer>
 
       <!-- Case 5: asymmetric padding (top=10, right=30, bottom=50, left=20) -->
-      <Layer flex="1" height="260" padding="10,30,50,20">
+      <Layer flex="1" height="260">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <!-- Show inset area -->
@@ -96,25 +102,29 @@
           <Rectangle left="20" right="30" top="10" bottom="50" roundness="4"/>
           <Fill color="#FFE8EE"/>
         </Group>
-        <!-- Child Layer: should fill the asymmetric inset area -->
-        <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-          <Fill color="#F43F5E"/>
+        <Layer left="0" right="0" top="0" bottom="0" padding="10,30,50,20">
+          <!-- Child Layer: should fill the asymmetric inset area -->
+          <Layer left="0" right="0" top="0" bottom="0">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Fill color="#F43F5E"/>
+          </Layer>
         </Layer>
       </Layer>
 
       <!-- Case 6: no constraints on child Layer (should default to padding origin) -->
-      <Layer flex="1" height="260" padding="30">
+      <Layer flex="1" height="260">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Group>
           <Rectangle left="30" right="30" top="30" bottom="30" roundness="4"/>
           <Fill color="#E8F7F0"/>
         </Group>
-        <!-- Child Layer: no constraints — should appear at (padding.left, padding.top) -->
-        <Layer>
-          <Rectangle size="80,60" roundness="8"/>
-          <Fill color="#06B6D4"/>
+        <Layer id="case6-padding" left="0" right="0" top="0" bottom="0" padding="30">
+          <!-- Child Layer: no constraints — should appear at (padding.left, padding.top) -->
+          <Layer id="case6-child">
+            <Rectangle size="80,60" roundness="8"/>
+            <Fill color="#06B6D4"/>
+          </Layer>
         </Layer>
       </Layer>
 

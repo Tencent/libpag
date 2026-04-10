@@ -1,9 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Test file for lint: empty Layer and empty Group -->
 <pagx version="1.0" width="200" height="200">
+  <!-- Should warn: pure empty shell -->
   <Layer name="emptyLayer"/>
   <Layer name="hasContent">
+    <!-- Should warn: empty Group with no size or constraints -->
     <Group/>
+    <Rectangle size="100,100"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+  <!-- Should NOT warn: has explicit size -->
+  <Layer name="sizedEmpty" width="100" height="50"/>
+  <!-- Should NOT warn: has size-dependent constraint -->
+  <Layer name="constrainedEmpty" right="0" bottom="0"/>
+  <!-- Should NOT warn: in parent container layout -->
+  <Layer name="layoutParent" width="200" height="200" layout="horizontal">
+    <Layer name="layoutChild"/>
+  </Layer>
+  <!-- Should NOT warn: empty Group with explicit size -->
+  <Layer name="groupSizedParent" width="100" height="100">
+    <Group width="50" height="50"/>
+    <Rectangle size="100,100"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+  <!-- Should NOT warn: empty Group with size-dependent constraint -->
+  <Layer name="groupConstraintParent" width="100" height="100">
+    <Group centerX="0"/>
     <Rectangle size="100,100"/>
     <Fill color="#FF0000"/>
   </Layer>

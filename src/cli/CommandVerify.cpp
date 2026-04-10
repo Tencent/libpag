@@ -121,24 +121,42 @@ static std::string FormatBounds(float x, float y, float w, float h) {
 // Static Detection: Empty Nodes
 // ============================================================================
 
-static void DetectEmptyLayer(const Layer* layer, std::vector<VerifyDiagnostic>& diagnostics) {
-  bool hasContents = !layer->contents.empty();
-  bool hasChildren = !layer->children.empty();
-  bool hasSize = !std::isnan(layer->width) || !std::isnan(layer->height);
-  bool hasComposition = layer->composition != nullptr;
-
-  if (!hasContents && !hasChildren && !hasSize && !hasComposition) {
-    AddDiagnostic(diagnostics, layer->sourceLine,
-                  "empty Layer with no content, children, or composition. "
-                  "Fix: check if this Layer is needed");
+static void DetectEmptyLayer(const Layer* layer, bool parentHasLayout,
+                             std::vector<VerifyDiagnostic>& diagnostics) {
+  if (!layer->contents.empty() || !layer->children.empty() || layer->composition != nullptr) {
+    return;
   }
+  if (!std::isnan(layer->width) || !std::isnan(layer->height)) {
+    return;
+  }
+  bool hasSizeDependentConstraint = (!std::isnan(layer->right) || !std::isnan(layer->bottom) ||
+                                     !std::isnan(layer->centerX) || !std::isnan(layer->centerY));
+  if (hasSizeDependentConstraint) {
+    return;
+  }
+  bool inParentLayout = parentHasLayout && layer->includeInLayout;
+  if (inParentLayout) {
+    return;
+  }
+  AddDiagnostic(diagnostics, layer->sourceLine,
+                "empty Layer with no content, children, or composition. "
+                "Fix: check if this Layer is needed");
 }
 
 static void DetectEmptyGroup(const Group* group, std::vector<VerifyDiagnostic>& diagnostics) {
-  if (group->elements.empty()) {
-    AddDiagnostic(diagnostics, group->sourceLine,
-                  "empty Group with no elements. Fix: check if this Group is needed");
+  if (!group->elements.empty()) {
+    return;
   }
+  if (!std::isnan(group->width) || !std::isnan(group->height)) {
+    return;
+  }
+  bool hasSizeDependentConstraint = (!std::isnan(group->right) || !std::isnan(group->bottom) ||
+                                     !std::isnan(group->centerX) || !std::isnan(group->centerY));
+  if (hasSizeDependentConstraint) {
+    return;
+  }
+  AddDiagnostic(diagnostics, group->sourceLine,
+                "empty Group with no elements. Fix: check if this Group is needed");
 }
 
 static void DetectZeroStrokeWidth(const Stroke* stroke,
@@ -1371,7 +1389,7 @@ static void RunStaticDetectionOnElements(const std::vector<Element*>& elements,
 static void RunStaticDetectionOnLayer(const Layer* layer, float canvasWidth, float canvasHeight,
                                       bool parentHasLayout, const LineNodeMap& lineNodeMap,
                                       std::vector<VerifyDiagnostic>& diagnostics) {
-  DetectEmptyLayer(layer, diagnostics);
+  DetectEmptyLayer(layer, parentHasLayout, diagnostics);
   DetectFullCanvasClipMask(layer, canvasWidth, canvasHeight, diagnostics);
   DetectIneffectiveLayoutAttrs(layer, parentHasLayout, diagnostics);
   DetectDowngradableLayers(layer, diagnostics);
@@ -1466,13 +1484,47 @@ static bool IsFullyContained(const SpatialRect& parent, const SpatialRect& child
          (child.y + child.height) <= (parent.y + parent.height + TOLERANCE);
 }
 
+static bool ElementsHaveLeafContent(const std::vector<Element*>& elements);
+
+static bool HasLeafContent(const Layer* layer) {
+  if (layer->composition != nullptr) {
+    return true;
+  }
+  if (ElementsHaveLeafContent(layer->contents)) {
+    return true;
+  }
+  for (auto* child : layer->children) {
+    if (HasLeafContent(child)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool ElementsHaveLeafContent(const std::vector<Element*>& elements) {
+  for (auto* element : elements) {
+    auto type = element->nodeType();
+    if (type == NodeType::Rectangle || type == NodeType::Ellipse || type == NodeType::Polystar ||
+        type == NodeType::Path || type == NodeType::Text || type == NodeType::Import) {
+      return true;
+    }
+    if (type == NodeType::Group || type == NodeType::TextBox) {
+      auto* group = static_cast<const Group*>(element);
+      if (ElementsHaveLeafContent(group->elements)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 static void DetectZeroSize(const Layer* layer, const Layer* parentLayer,
                            std::vector<VerifyDiagnostic>& diagnostics) {
   auto bounds = layer->layoutBounds();
   if (bounds.width != 0 && bounds.height != 0) {
     return;
   }
-  if (layer->contents.empty() && layer->children.empty()) {
+  if (!HasLeafContent(layer)) {
     return;
   }
   bool inParentLayout =
@@ -1628,6 +1680,42 @@ static void DetectFlexInContentMeasuredParent(const Layer* layer, const Layer* p
                     " or ensure it receives size from its own parent layout");
 }
 
+static void CheckContentOriginOffset(const std::vector<Element*>& elements, const Padding& padding,
+                                     int sourceLine, std::vector<VerifyDiagnostic>& diagnostics) {
+  float minX = FLT_MAX;
+  float minY = FLT_MAX;
+  bool hasChild = false;
+  for (auto* element : elements) {
+    auto* layoutNode = LayoutNode::AsLayoutNode(element);
+    if (layoutNode == nullptr) {
+      continue;
+    }
+    auto bounds = layoutNode->layoutBounds();
+    if (bounds.width == 0 && bounds.height == 0) {
+      continue;
+    }
+    minX = std::min(minX, bounds.x);
+    minY = std::min(minY, bounds.y);
+    hasChild = true;
+  }
+  if (!hasChild) {
+    return;
+  }
+  static constexpr float TOLERANCE = 0.5f;
+  float expectedX = padding.left;
+  float expectedY = padding.top;
+  if (std::abs(minX - expectedX) > TOLERANCE || std::abs(minY - expectedY) > TOLERANCE) {
+    auto expectedStr = "(" + std::to_string(static_cast<int>(expectedX)) + "," +
+                       std::to_string(static_cast<int>(expectedY)) + ")";
+    AddDiagnostic(diagnostics, sourceLine,
+                  "children start at (" + std::to_string(static_cast<int>(minX)) + "," +
+                      std::to_string(static_cast<int>(minY)) + "), not " + expectedStr +
+                      ", container measurement inaccurate. Fix: shift all children so "
+                      "top-left starts at " +
+                      expectedStr + ", preserving relative positions");
+  }
+}
+
 static void DetectContentOriginOffset(const Layer* layer, const Layer* parentLayer,
                                       std::vector<VerifyDiagnostic>& diagnostics) {
   if (!std::isnan(layer->width) || !std::isnan(layer->height)) {
@@ -1650,33 +1738,7 @@ static void DetectContentOriginOffset(const Layer* layer, const Layer* parentLay
   if (!inParentLayout && !hasSizeDependentConstraint) {
     return;
   }
-  float minX = FLT_MAX;
-  float minY = FLT_MAX;
-  bool hasChild = false;
-  for (auto* element : layer->contents) {
-    auto* layoutNode = LayoutNode::AsLayoutNode(element);
-    if (layoutNode == nullptr) {
-      continue;
-    }
-    auto bounds = layoutNode->layoutBounds();
-    if (bounds.width == 0 && bounds.height == 0) {
-      continue;
-    }
-    minX = std::min(minX, bounds.x);
-    minY = std::min(minY, bounds.y);
-    hasChild = true;
-  }
-  if (!hasChild) {
-    return;
-  }
-  static constexpr float TOLERANCE = 0.5f;
-  if (std::abs(minX) > TOLERANCE || std::abs(minY) > TOLERANCE) {
-    AddDiagnostic(diagnostics, layer->sourceLine,
-                  "children start at (" + std::to_string(static_cast<int>(minX)) + "," +
-                      std::to_string(static_cast<int>(minY)) +
-                      "), not (0,0), container measurement inaccurate. Fix: shift all children so "
-                      "top-left starts at (0,0), preserving relative positions");
-  }
+  CheckContentOriginOffset(layer->contents, layer->padding, layer->sourceLine, diagnostics);
 }
 
 static void DetectContentOriginOffsetForGroup(const Group* group,
@@ -1700,33 +1762,7 @@ static void DetectContentOriginOffsetForGroup(const Group* group,
       return;
     }
   }
-  float minX = FLT_MAX;
-  float minY = FLT_MAX;
-  bool hasChild = false;
-  for (auto* element : group->elements) {
-    auto* layoutNode = LayoutNode::AsLayoutNode(element);
-    if (layoutNode == nullptr) {
-      continue;
-    }
-    auto bounds = layoutNode->layoutBounds();
-    if (bounds.width == 0 && bounds.height == 0) {
-      continue;
-    }
-    minX = std::min(minX, bounds.x);
-    minY = std::min(minY, bounds.y);
-    hasChild = true;
-  }
-  if (!hasChild) {
-    return;
-  }
-  static constexpr float TOLERANCE = 0.5f;
-  if (std::abs(minX) > TOLERANCE || std::abs(minY) > TOLERANCE) {
-    AddDiagnostic(diagnostics, group->sourceLine,
-                  "children start at (" + std::to_string(static_cast<int>(minX)) + "," +
-                      std::to_string(static_cast<int>(minY)) +
-                      "), not (0,0), container measurement inaccurate. Fix: shift all children so "
-                      "top-left starts at (0,0), preserving relative positions");
-  }
+  CheckContentOriginOffset(group->elements, group->padding, group->sourceLine, diagnostics);
 }
 
 static void DetectOverlappingSiblings(const Layer* parentLayer,

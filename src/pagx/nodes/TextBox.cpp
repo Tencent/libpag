@@ -44,12 +44,31 @@ void TextBox::onMeasure(LayoutContext* context) {
     preferredHeight = height;
     return;
   }
-  auto params = MakeTextLayoutParams(this, width, height);
+  bool hasPadding = !padding.isZero();
+  float boxW = width;
+  float boxH = height;
+  if (hasPadding) {
+    if (!std::isnan(boxW)) {
+      boxW = std::max(0.0f, boxW - padding.left - padding.right);
+    }
+    if (!std::isnan(boxH)) {
+      boxH = std::max(0.0f, boxH - padding.top - padding.bottom);
+    }
+  }
+  auto params = MakeTextLayoutParams(this, boxW, boxH);
   std::vector<Text*> childText = {};
   TextLayout::CollectTextElements(elements, childText);
   auto result = TextLayout::Layout(childText, params, context);
   preferredWidth = std::isnan(width) ? result.bounds.width : width;
   preferredHeight = std::isnan(height) ? result.bounds.height : height;
+  if (hasPadding) {
+    if (std::isnan(width)) {
+      preferredWidth += padding.left + padding.right;
+    }
+    if (std::isnan(height)) {
+      preferredHeight += padding.top + padding.bottom;
+    }
+  }
 }
 
 void TextBox::setLayoutSize(LayoutContext*, float width, float height) {
@@ -58,15 +77,35 @@ void TextBox::setLayoutSize(LayoutContext*, float width, float height) {
 }
 
 void TextBox::updateLayout(LayoutContext* context) {
+  bool hasPadding = !padding.isZero();
+  float cw = hasPadding ? std::max(0.0f, layoutWidth - padding.left - padding.right) : layoutWidth;
+  float ch =
+      hasPadding ? std::max(0.0f, layoutHeight - padding.top - padding.bottom) : layoutHeight;
+  // Non-Text elements: constraint layout with padding.
   auto nodes = CollectLayoutNodes(elements, true);
-  PerformConstraintLayout(nodes, layoutWidth, layoutHeight, context);
-  auto params = MakeTextLayoutParams(this, layoutWidth, layoutHeight);
+  PerformConstraintLayout(nodes, layoutWidth, layoutHeight, padding, context);
+  // Text elements: typeset with inset bounds, then offset positions by padding.
+  auto params = MakeTextLayoutParams(this, cw, ch);
   std::vector<Text*> childText = {};
   TextLayout::CollectTextElements(elements, childText);
   auto result = TextLayout::Layout(childText, params, context);
   for (size_t i = 0; i < childText.size(); i++) {
     childText[i]->textBounds = result.getTextBounds(childText[i]);
     childText[i]->glyphData->layoutRuns = result.extractLayoutRuns(childText[i]);
+    if (hasPadding) {
+      childText[i]->textBounds.x += padding.left;
+      childText[i]->textBounds.y += padding.top;
+      for (auto& run : childText[i]->glyphData->layoutRuns) {
+        for (auto& pos : run.positions) {
+          pos.x += padding.left;
+          pos.y += padding.top;
+        }
+        for (auto& xf : run.xforms) {
+          xf.tx += padding.left;
+          xf.ty += padding.top;
+        }
+      }
+    }
   }
 }
 

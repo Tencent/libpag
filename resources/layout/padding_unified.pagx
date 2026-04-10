@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Padding unified semantics: VectorElements, Group padding, TextBox padding -->
+<pagx version="1.0" width="820" height="520">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30">
+
+    <!-- Row 1: Layer padding on VectorElements -->
+    <Layer flex="1" layout="horizontal" gap="20">
+
+      <!-- 1. Rectangle with left/right/top/bottom fills padding-inset area -->
+      <Layer flex="1" height="220">
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer left="0" right="0" top="0" bottom="0" padding="30">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Fill color="#3B82F6"/>
+        </Layer>
+      </Layer>
+
+      <!-- 2. Unconstrained Rectangle starts at padding origin -->
+      <Layer flex="1" height="220">
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer left="0" right="0" top="0" bottom="0" padding="30">
+          <Rectangle size="80,60" roundness="8"/>
+          <Fill color="#F59E0B"/>
+        </Layer>
+      </Layer>
+
+      <!-- 3. Two-layer background pattern: outer bg + inner padded layout -->
+      <Layer flex="1" height="220">
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+        <Fill color="#6366F1"/>
+        <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="8" padding="20" alignment="center" arrangement="center">
+          <Layer>
+            <Text text="Card Title" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
+            <Fill color="#FFF"/>
+          </Layer>
+          <Layer>
+            <Text text="Subtitle" fontFamily="Arial" fontSize="12"/>
+            <Fill color="#C4B5FD"/>
+          </Layer>
+        </Layer>
+      </Layer>
+
+    </Layer>
+
+    <!-- Row 2: Group padding and TextBox padding -->
+    <Layer flex="1" layout="horizontal" gap="20">
+
+      <!-- 4. Group padding insets child elements -->
+      <Layer flex="1" height="220">
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Group centerX="0" centerY="0" padding="20">
+          <Rectangle size="80,60" roundness="8"/>
+          <Fill color="#10B981"/>
+        </Group>
+      </Layer>
+
+      <!-- 5. Button with Group padding (content-measured) -->
+      <Layer flex="1" height="220">
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer centerX="0" centerY="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="24"/>
+          <Fill color="#EC4899"/>
+          <Group centerX="0" centerY="0" padding="12,24">
+            <Text text="Button" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+            <Fill color="#FFF"/>
+          </Group>
+        </Layer>
+      </Layer>
+
+      <!-- 6. TextBox with padding -->
+      <Layer flex="1" height="220">
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer left="20" top="20" width="200" height="120">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Fill color="#FFF7ED"/>
+          <TextBox left="0" right="0" top="0" bottom="0" padding="16" textAlign="start">
+            <Text text="TextBox with padding. The text area is inset by 16px on all sides." fontFamily="Arial" fontSize="13"/>
+            <Fill color="#9A3412"/>
+          </TextBox>
+        </Layer>
+      </Layer>
+
+    </Layer>
+  </Layer>
+</pagx>

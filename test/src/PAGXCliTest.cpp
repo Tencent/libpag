@@ -709,8 +709,19 @@ CLI_TEST(PAGXCliTest, Lint_EmptyNodes) {
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
-  EXPECT_TRUE(output.find("empty Layer with no content") != std::string::npos ||
-              output.find("empty Group with no elements") != std::string::npos);
+  // Pure empty Layer and empty Group should be detected.
+  EXPECT_NE(output.find("empty Layer with no content"), std::string::npos);
+  EXPECT_NE(output.find("empty Group with no elements"), std::string::npos);
+  // Empty nodes with explicit size, size-dependent constraints, or in parent layout should
+  // NOT be detected. Verify that only 2 diagnostics are reported (emptyLayer + empty Group).
+  int count = 0;
+  std::string marker = "empty ";
+  size_t pos = 0;
+  while ((pos = output.find(marker, pos)) != std::string::npos) {
+    count++;
+    pos += marker.size();
+  }
+  EXPECT_EQ(count, 2);
 }
 
 // NOTE: The Lint_FullCanvasClipMask test is now exercisable because the verify command
@@ -1905,6 +1916,35 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ZeroSizeEmpty) {
   EXPECT_TRUE(output.find("zero size (0x50)") != std::string::npos);
   // The empty leaf Layer (line 5) should NOT trigger zero-size.
   EXPECT_TRUE(output.find(":5: zero size") == std::string::npos);
+}
+
+// Skeleton-phase containers: nested Layers with layout attributes and painters (Fill/Stroke) but
+// no leaf content (Rectangle/Ellipse/Path/Text/etc.) anywhere in the subtree. Zero size is
+// expected and should NOT trigger a diagnostic.
+CLI_TEST(PAGXCliTest, LayoutCheck_ZeroSizeNoLeaf) {
+  auto path = TestResourcePath("layout_check_zero_size_no_leaf.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("zero size") == std::string::npos);
+}
+
+// Container with explicit zero width but leaf content (Rectangle) deep in the subtree.
+// Zero size IS a real problem and should be reported.
+CLI_TEST(PAGXCliTest, LayoutCheck_ZeroSizeDeepLeaf) {
+  auto path = TestResourcePath("layout_check_zero_size_deep_leaf.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("zero size (0x100)") != std::string::npos);
 }
 
 // Polystar without explicit position should have auto-position applied at import time.
