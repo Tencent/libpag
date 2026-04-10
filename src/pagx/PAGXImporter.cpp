@@ -368,6 +368,19 @@ static float GetFloatAttributeOrNaN(const DOMNode* node, const std::string& name
   return value.has_value() ? *value : NAN;
 }
 
+static Padding GetPaddingAttribute(const DOMNode* node, PAGXDocument* doc) {
+  auto& str = GetAttribute(node, "padding");
+  if (str.empty()) {
+    return {};
+  }
+  auto count = ParseFloatList(str).size();
+  if (count != 1 && count != 2 && count != 4) {
+    ReportError(doc, node, "Invalid value '" + str + "' for 'padding' attribute.");
+    return {};
+  }
+  return PaddingFromString(str);
+}
+
 static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
   auto layer = makeNodeFromXML<Layer>(node, doc);
   if (!layer) {
@@ -384,15 +397,7 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
   layer->layout = GET_ENUM(node, "layout", "none", doc, LayoutMode);
   layer->gap = GetFloatAttribute(node, "gap", Default<Layer>().gap, doc);
   layer->flex = GetFloatAttribute(node, "flex", Default<Layer>().flex, doc);
-  auto paddingStr = GetAttribute(node, "padding");
-  if (!paddingStr.empty()) {
-    auto count = ParseFloatList(paddingStr).size();
-    if (count != 1 && count != 2 && count != 4) {
-      ReportError(doc, node, "Invalid value '" + paddingStr + "' for 'padding' attribute.");
-    } else {
-      layer->padding = PaddingFromString(paddingStr);
-    }
-  }
+  layer->padding = GetPaddingAttribute(node, doc);
   layer->alignment = GET_ENUM(node, "alignment", "stretch", doc, Alignment);
   layer->arrangement = GET_ENUM(node, "arrangement", "start", doc, Arrangement);
   layer->includeInLayout =
@@ -1103,15 +1108,7 @@ static TextBox* ParseTextBox(const DOMNode* node, PAGXDocument* doc) {
   textBox->alpha = GetFloatAttribute(node, "alpha", Default<TextBox>().alpha, doc);
   textBox->width = GetFloatAttributeOrNaN(node, "width", doc);
   textBox->height = GetFloatAttributeOrNaN(node, "height", doc);
-  auto paddingStr = GetAttribute(node, "padding");
-  if (!paddingStr.empty()) {
-    auto count = ParseFloatList(paddingStr).size();
-    if (count != 1 && count != 2 && count != 4) {
-      ReportError(doc, node, "Invalid value '" + paddingStr + "' for 'padding' attribute.");
-    } else {
-      textBox->padding = PaddingFromString(paddingStr);
-    }
-  }
+  textBox->padding = GetPaddingAttribute(node, doc);
   // TextBox typography properties
   textBox->textAlign = GET_ENUM(node, "textAlign", "start", doc, TextAlign);
   textBox->paragraphAlign = GET_ENUM(node, "paragraphAlign", "near", doc, ParagraphAlign);
@@ -1179,15 +1176,7 @@ static Group* ParseGroup(const DOMNode* node, PAGXDocument* doc) {
   group->alpha = GetFloatAttribute(node, "alpha", Default<Group>().alpha, doc);
   group->width = GetFloatAttributeOrNaN(node, "width", doc);
   group->height = GetFloatAttributeOrNaN(node, "height", doc);
-  auto paddingStr = GetAttribute(node, "padding");
-  if (!paddingStr.empty()) {
-    auto count = ParseFloatList(paddingStr).size();
-    if (count != 1 && count != 2 && count != 4) {
-      ReportError(doc, node, "Invalid value '" + paddingStr + "' for 'padding' attribute.");
-    } else {
-      group->padding = PaddingFromString(paddingStr);
-    }
-  }
+  group->padding = GetPaddingAttribute(node, doc);
   group->left = GetFloatAttributeOrNaN(node, "left", doc);
   group->right = GetFloatAttributeOrNaN(node, "right", doc);
   group->top = GetFloatAttributeOrNaN(node, "top", doc);
