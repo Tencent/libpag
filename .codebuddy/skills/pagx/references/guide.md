@@ -53,7 +53,7 @@ Spec rules, techniques, and common pitfalls for writing correct PAGX files.
 | **Geometry** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` |
 | **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `Repeater` |
 | **Painters** | `Fill`, `Stroke` |
-| **Build Directives** | `<svg>` (inline SVG), `import` attribute |
+| **Build Directives** | `<svg>` (inline SVG), `import` attribute | Build-time SVG import, resolved by `pagx resolve`. |
 
 ### Containment Hierarchy
 

@@ -172,6 +172,25 @@ label. Icon uses inline `<svg>` in a Layer (see §Tab Bar for the same technique
 gradient hues across placeholders (`#F0F4FF→#E8EEFF`, `#FFF0E8→#FFE8D8`,
 `#F0FFF4→#E8FFE8`).
 
+### External SVG Import
+
+```xml
+<pagx version="1.0" width="200" height="60">
+  <Layer centerX="0" centerY="0" layout="horizontal" gap="12" alignment="center">
+    <Layer import="assets/brand-logo.svg"/>
+    <Layer>
+      <Text text="Acme Corp" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
+      <Fill color="#1E293B"/>
+    </Layer>
+  </Layer>
+</pagx>
+```
+
+**Pattern**: `import` attribute references an external SVG file (relative to the PAGX
+file). Resolved by `pagx resolve` (or `pagx verify`) into native PAGX nodes. Use for
+logos, brand assets, or any SVG maintained as a separate file. For non-`.svg` extensions,
+add `importFormat="svg"` explicitly.
+
 ### Avatar with Circular Clip
 
 ```xml

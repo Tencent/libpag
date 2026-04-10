@@ -2271,6 +2271,50 @@ CLI_TEST(PAGXCliTest, Resolve_AddsResolvedFromComment) {
   EXPECT_NE(content.find("Resolved from: inline svg"), std::string::npos);
 }
 
+CLI_TEST(PAGXCliTest, Resolve_LayerWithContentsSkipsResolve) {
+  auto pagxPath = CopyToTemp("resolve_conflict_contents.pagx", "resolve_conflict_contents.pagx");
+  CopyToTemp("import_external.svg", "import_external.svg");
+
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve", pagxPath});
+  std::cerr.rdbuf(old);
+
+  // Conflicting Layer is counted as an error, so resolve returns non-zero.
+  EXPECT_NE(ret, 0);
+  auto warning = oss.str();
+  EXPECT_NE(warning.find("warning"), std::string::npos);
+  EXPECT_NE(warning.find("skipping resolve"), std::string::npos);
+
+  // The import should remain unresolved because the Layer was skipped.
+  auto doc = pagx::PAGXImporter::FromFile(pagxPath);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->hasUnresolvedImports());
+}
+
+CLI_TEST(PAGXCliTest, Resolve_LayerWithChildrenSkipsResolve) {
+  auto pagxPath = CopyToTemp("resolve_conflict_children.pagx", "resolve_conflict_children.pagx");
+  CopyToTemp("import_external.svg", "import_external.svg");
+
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve", pagxPath});
+  std::cerr.rdbuf(old);
+
+  // Conflicting Layer is counted as an error, so resolve returns non-zero.
+  EXPECT_NE(ret, 0);
+  auto warning = oss.str();
+  EXPECT_NE(warning.find("warning"), std::string::npos);
+  EXPECT_NE(warning.find("skipping resolve"), std::string::npos);
+
+  // The import should remain unresolved because the Layer was skipped.
+  auto doc = pagx::PAGXImporter::FromFile(pagxPath);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->hasUnresolvedImports());
+}
+
 //==============================================================================
 // CLI unresolved import checks
 //==============================================================================

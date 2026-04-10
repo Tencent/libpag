@@ -1505,7 +1505,7 @@ static bool ElementsHaveLeafContent(const std::vector<Element*>& elements) {
   for (auto* element : elements) {
     auto type = element->nodeType();
     if (type == NodeType::Rectangle || type == NodeType::Ellipse || type == NodeType::Polystar ||
-        type == NodeType::Path || type == NodeType::Text || type == NodeType::Import) {
+        type == NodeType::Path || type == NodeType::Text) {
       return true;
     }
     if (type == NodeType::Group || type == NodeType::TextBox) {
