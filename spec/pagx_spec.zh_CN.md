@@ -2232,9 +2232,10 @@ Layer / Group
 ├── TextPath
 ├── TextBox
 ├── Repeater
-├── Group*（递归）
-└── <svg>（导入指令，见 §7）
+└── Group*（递归）
 ```
+
+此外，`Layer`（不含 `Group`）可包含 `<svg>` 作为导入指令（见 §7）。
 
 ---
 

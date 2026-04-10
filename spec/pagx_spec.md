@@ -2244,9 +2244,10 @@ Layer / Group
 ├── TextPath
 ├── TextBox
 ├── Repeater
-├── Group* (recursive)
-└── <svg> (import directive, see §7)
+└── Group* (recursive)
 ```
+
+Additionally, `Layer` (but not `Group`) may contain `<svg>` as an import directive (see §7).
 
 ---
 
