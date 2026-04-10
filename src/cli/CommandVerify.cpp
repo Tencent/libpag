@@ -121,24 +121,42 @@ static std::string FormatBounds(float x, float y, float w, float h) {
 // Static Detection: Empty Nodes
 // ============================================================================
 
-static void DetectEmptyLayer(const Layer* layer, std::vector<VerifyDiagnostic>& diagnostics) {
-  bool hasContents = !layer->contents.empty();
-  bool hasChildren = !layer->children.empty();
-  bool hasSize = !std::isnan(layer->width) || !std::isnan(layer->height);
-  bool hasComposition = layer->composition != nullptr;
-
-  if (!hasContents && !hasChildren && !hasSize && !hasComposition) {
-    AddDiagnostic(diagnostics, layer->sourceLine,
-                  "empty Layer with no content, children, or composition. "
-                  "Fix: check if this Layer is needed");
+static void DetectEmptyLayer(const Layer* layer, bool parentHasLayout,
+                             std::vector<VerifyDiagnostic>& diagnostics) {
+  if (!layer->contents.empty() || !layer->children.empty() || layer->composition != nullptr) {
+    return;
   }
+  if (!std::isnan(layer->width) || !std::isnan(layer->height)) {
+    return;
+  }
+  bool hasSizeDependentConstraint = (!std::isnan(layer->right) || !std::isnan(layer->bottom) ||
+                                     !std::isnan(layer->centerX) || !std::isnan(layer->centerY));
+  if (hasSizeDependentConstraint) {
+    return;
+  }
+  bool inParentLayout = parentHasLayout && layer->includeInLayout;
+  if (inParentLayout) {
+    return;
+  }
+  AddDiagnostic(diagnostics, layer->sourceLine,
+                "empty Layer with no content, children, or composition. "
+                "Fix: check if this Layer is needed");
 }
 
 static void DetectEmptyGroup(const Group* group, std::vector<VerifyDiagnostic>& diagnostics) {
-  if (group->elements.empty()) {
-    AddDiagnostic(diagnostics, group->sourceLine,
-                  "empty Group with no elements. Fix: check if this Group is needed");
+  if (!group->elements.empty()) {
+    return;
   }
+  if (!std::isnan(group->width) || !std::isnan(group->height)) {
+    return;
+  }
+  bool hasSizeDependentConstraint = (!std::isnan(group->right) || !std::isnan(group->bottom) ||
+                                     !std::isnan(group->centerX) || !std::isnan(group->centerY));
+  if (hasSizeDependentConstraint) {
+    return;
+  }
+  AddDiagnostic(diagnostics, group->sourceLine,
+                "empty Group with no elements. Fix: check if this Group is needed");
 }
 
 static void DetectZeroStrokeWidth(const Stroke* stroke,
@@ -1371,7 +1389,7 @@ static void RunStaticDetectionOnElements(const std::vector<Element*>& elements,
 static void RunStaticDetectionOnLayer(const Layer* layer, float canvasWidth, float canvasHeight,
                                       bool parentHasLayout, const LineNodeMap& lineNodeMap,
                                       std::vector<VerifyDiagnostic>& diagnostics) {
-  DetectEmptyLayer(layer, diagnostics);
+  DetectEmptyLayer(layer, parentHasLayout, diagnostics);
   DetectFullCanvasClipMask(layer, canvasWidth, canvasHeight, diagnostics);
   DetectIneffectiveLayoutAttrs(layer, parentHasLayout, diagnostics);
   DetectDowngradableLayers(layer, diagnostics);

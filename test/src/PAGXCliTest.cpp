@@ -709,8 +709,19 @@ CLI_TEST(PAGXCliTest, Lint_EmptyNodes) {
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
-  EXPECT_TRUE(output.find("empty Layer with no content") != std::string::npos ||
-              output.find("empty Group with no elements") != std::string::npos);
+  // Pure empty Layer and empty Group should be detected.
+  EXPECT_NE(output.find("empty Layer with no content"), std::string::npos);
+  EXPECT_NE(output.find("empty Group with no elements"), std::string::npos);
+  // Empty nodes with explicit size, size-dependent constraints, or in parent layout should
+  // NOT be detected. Verify that only 2 diagnostics are reported (emptyLayer + empty Group).
+  int count = 0;
+  std::string marker = "empty ";
+  size_t pos = 0;
+  while ((pos = output.find(marker, pos)) != std::string::npos) {
+    count++;
+    pos += marker.size();
+  }
+  EXPECT_EQ(count, 2);
 }
 
 // NOTE: The Lint_FullCanvasClipMask test is now exercisable because the verify command
