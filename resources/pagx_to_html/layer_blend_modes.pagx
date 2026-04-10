@@ -2,27 +2,30 @@
 <!-- Tests: Layer blendMode → mix-blend-mode (all 18 modes) -->
 <pagx version="1.0" width="440" height="376">
   <!-- Background -->
-  <Layer>
-    <Rectangle position="220,188" size="440,376"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
-  <!-- Title -->
-  <Layer>
-    <Text text="Layer Blend Modes" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="220,34" textAnchor="center"/>
-    <Fill color="#1E293B"/>
-  </Layer>
-  <Layer>
-    <Text text="All 18 blend modes on gradient background" fontFamily="Arial" fontSize="10" position="220,50" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="center">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Layer Blend Modes" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="All 18 blend modes on gradient background" fontFamily="Arial" fontSize="10" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
 
-  <!-- Card -->
-  <Layer>
-    <Rectangle position="220,206" size="400,274" roundness="16"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
-  </Layer>
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
   <!-- Base gradient layer -->
   <Layer>
@@ -199,5 +202,7 @@
   <Layer x="347" y="200">
     <Text text="normal" fontFamily="Arial" fontSize="7" position="28,46" textAnchor="center"/>
     <Fill color="#FFFFFF"/>
+  </Layer>
+    </Layer>
   </Layer>
 </pagx>

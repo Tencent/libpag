@@ -6,85 +6,98 @@
     <Image id="checker" source="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAGUlEQVR4nGO4o6b2HwRw0Qz4JEE0w7AwAQBB48RhdF1gGQAAAABJRU5ErkJggg=="/>
   </Resources>
 
-  <!-- Labels -->
-  <Layer>
-    <Text text="repeat" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="60,30" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-  <Layer>
-    <Text text="mirror" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="160,30" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-  <Layer>
-    <Text text="clamp" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="260,30" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-  <Layer>
-    <Text text="decal" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="360,30" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="10,20,10,20" gap="10" alignment="center">
+    <!-- Row 1: tile modes -->
+    <Layer layout="horizontal" gap="20" arrangement="center">
+      <!-- repeat -->
+      <Layer layout="vertical" gap="4" alignment="center">
+        <Layer height="14">
+          <Text text="repeat" fontFamily="Arial" fontStyle="Bold" fontSize="10" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+        <Layer width="80" height="80">
+          <Rectangle left="0" right="0" top="0" bottom="0"/>
+          <Fill>
+            <ImagePattern image="@checker" tileModeX="repeat" tileModeY="repeat"/>
+          </Fill>
+          <Stroke color="#CBD5E1" width="1"/>
+        </Layer>
+      </Layer>
+      <!-- mirror -->
+      <Layer layout="vertical" gap="4" alignment="center">
+        <Layer height="14">
+          <Text text="mirror" fontFamily="Arial" fontStyle="Bold" fontSize="10" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+        <Layer width="80" height="80">
+          <Rectangle left="0" right="0" top="0" bottom="0"/>
+          <Fill>
+            <ImagePattern image="@checker" tileModeX="mirror" tileModeY="mirror"/>
+          </Fill>
+          <Stroke color="#CBD5E1" width="1"/>
+        </Layer>
+      </Layer>
+      <!-- clamp -->
+      <Layer layout="vertical" gap="4" alignment="center">
+        <Layer height="14">
+          <Text text="clamp" fontFamily="Arial" fontStyle="Bold" fontSize="10" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+        <Layer width="80" height="80">
+          <Rectangle left="0" right="0" top="0" bottom="0"/>
+          <Fill>
+            <ImagePattern image="@checker" tileModeX="clamp" tileModeY="clamp"/>
+          </Fill>
+          <Stroke color="#CBD5E1" width="1"/>
+        </Layer>
+      </Layer>
+      <!-- decal -->
+      <Layer layout="vertical" gap="4" alignment="center">
+        <Layer height="14">
+          <Text text="decal" fontFamily="Arial" fontStyle="Bold" fontSize="10" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+        <Layer width="80" height="80">
+          <Rectangle left="0" right="0" top="0" bottom="0"/>
+          <Fill>
+            <ImagePattern image="@checker" tileModeX="decal" tileModeY="decal"/>
+          </Fill>
+          <Stroke color="#CBD5E1" width="1"/>
+        </Layer>
+      </Layer>
+    </Layer>
 
-  <!-- repeat/repeat → tiling checkerboard -->
-  <Layer>
-    <Rectangle position="60,90" size="80,80"/>
-    <Fill>
-      <ImagePattern image="@checker" tileModeX="repeat" tileModeY="repeat"/>
-    </Fill>
-    <Stroke color="#CBD5E1" width="1"/>
-  </Layer>
-
-  <!-- mirror/mirror → reflected checkerboard tiles -->
-  <Layer>
-    <Rectangle position="160,90" size="80,80"/>
-    <Fill>
-      <ImagePattern image="@checker" tileModeX="mirror" tileModeY="mirror"/>
-    </Fill>
-    <Stroke color="#CBD5E1" width="1"/>
-  </Layer>
-
-  <!-- clamp/clamp → edge pixels stretched -->
-  <Layer>
-    <Rectangle position="260,90" size="80,80"/>
-    <Fill>
-      <ImagePattern image="@checker" tileModeX="clamp" tileModeY="clamp"/>
-    </Fill>
-    <Stroke color="#CBD5E1" width="1"/>
-  </Layer>
-
-  <!-- decal/decal → transparent outside image bounds -->
-  <Layer>
-    <Rectangle position="360,90" size="80,80"/>
-    <Fill>
-      <ImagePattern image="@checker" tileModeX="decal" tileModeY="decal"/>
-    </Fill>
-    <Stroke color="#CBD5E1" width="1"/>
-  </Layer>
-
-  <!-- Second row: filterMode comparison -->
-  <Layer>
-    <Text text="filterMode=linear" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="130,150" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-  <Layer>
-    <Text text="filterMode=nearest" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="290,150" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-
-  <!-- linear filter (smooth/blurry upscale) -->
-  <Layer>
-    <Rectangle position="130,185" size="80,50"/>
-    <Fill>
-      <ImagePattern image="@checker" tileModeX="repeat" tileModeY="repeat" filterMode="linear"/>
-    </Fill>
-    <Stroke color="#CBD5E1" width="1"/>
-  </Layer>
-
-  <!-- nearest filter (pixelated/crisp upscale) -->
-  <Layer>
-    <Rectangle position="290,185" size="80,50"/>
-    <Fill>
-      <ImagePattern image="@checker" tileModeX="repeat" tileModeY="repeat" filterMode="nearest"/>
-    </Fill>
-    <Stroke color="#CBD5E1" width="1"/>
+    <!-- Row 2: filterMode comparison -->
+    <Layer layout="horizontal" gap="40" arrangement="center">
+      <!-- linear filter -->
+      <Layer layout="vertical" gap="4" alignment="center">
+        <Layer height="14">
+          <Text text="filterMode=linear" fontFamily="Arial" fontStyle="Bold" fontSize="10" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+        <Layer width="80" height="50">
+          <Rectangle left="0" right="0" top="0" bottom="0"/>
+          <Fill>
+            <ImagePattern image="@checker" tileModeX="repeat" tileModeY="repeat" filterMode="linear"/>
+          </Fill>
+          <Stroke color="#CBD5E1" width="1"/>
+        </Layer>
+      </Layer>
+      <!-- nearest filter -->
+      <Layer layout="vertical" gap="4" alignment="center">
+        <Layer height="14">
+          <Text text="filterMode=nearest" fontFamily="Arial" fontStyle="Bold" fontSize="10" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+        <Layer width="80" height="50">
+          <Rectangle left="0" right="0" top="0" bottom="0"/>
+          <Fill>
+            <ImagePattern image="@checker" tileModeX="repeat" tileModeY="repeat" filterMode="nearest"/>
+          </Fill>
+          <Stroke color="#CBD5E1" width="1"/>
+        </Layer>
+      </Layer>
+    </Layer>
   </Layer>
 </pagx>

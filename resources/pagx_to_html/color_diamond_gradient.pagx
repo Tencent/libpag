@@ -2,37 +2,42 @@
 <!-- Tests: DiamondGradient → CSS cannot represent, needs SVG filter fallback -->
 <pagx version="1.0" width="320" height="270">
   <!-- Background -->
-  <Layer>
-    <Rectangle position="160,135" size="320,270"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
-  <!-- Title -->
-  <Layer>
-    <Text text="Diamond Gradient" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="160,34" textAnchor="center"/>
-    <Fill color="#1E293B"/>
-  </Layer>
-  <Layer>
-    <Text text="SVG filter fallback required" fontFamily="Arial" fontSize="10" position="160,50" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="center">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Diamond Gradient" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="SVG filter fallback required" fontFamily="Arial" fontSize="10" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
 
-  <!-- Card background -->
-  <Layer>
-    <Rectangle position="160,150" size="220,150" roundness="16"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
-  </Layer>
+    <!-- Card -->
+    <Layer flex="1" layout="vertical" padding="15" alignment="center" arrangement="center">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-  <!-- Diamond gradient shape -->
-  <Layer>
-    <Rectangle position="160,150" size="180,120" roundness="8"/>
-    <Fill>
-      <DiamondGradient center="160,150" radius="80">
-        <ColorStop offset="0" color="#FFFFFF"/>
-        <ColorStop offset="0.5" color="#8B5CF6"/>
-        <ColorStop offset="1" color="#1E1B4B"/>
-      </DiamondGradient>
-    </Fill>
+      <!-- Diamond gradient shape -->
+      <Layer width="180" height="120">
+        <Rectangle position="90,60" size="180,120" roundness="8"/>
+        <Fill>
+          <DiamondGradient center="90,60" radius="80">
+            <ColorStop offset="0" color="#FFFFFF"/>
+            <ColorStop offset="0.5" color="#8B5CF6"/>
+            <ColorStop offset="1" color="#1E1B4B"/>
+          </DiamondGradient>
+        </Fill>
+      </Layer>
+    </Layer>
   </Layer>
 </pagx>

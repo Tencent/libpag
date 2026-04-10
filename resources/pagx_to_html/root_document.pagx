@@ -10,8 +10,8 @@
   </Resources>
 
   <!-- Background with subtle gradient -->
-  <Layer>
-    <Rectangle position="160,110" size="320,220"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="@bgGrad"/>
   </Layer>
 
@@ -28,8 +28,8 @@
   </Layer>
 
   <!-- Main card -->
-  <Layer>
-    <Rectangle position="160,105" size="240,120" roundness="16"/>
+  <Layer centerX="0" centerY="-5" width="240" height="120">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>

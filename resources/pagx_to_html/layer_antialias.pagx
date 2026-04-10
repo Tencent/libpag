@@ -2,45 +2,54 @@
 <!-- Tests: Layer antiAlias=false → shape-rendering: crispEdges (SVG), no direct CSS equivalent -->
 <pagx version="1.0" width="320" height="270">
   <!-- Background -->
-  <Layer>
-    <Rectangle position="160,135" size="320,270"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
-  <!-- Title -->
-  <Layer>
-    <Text text="Anti-Aliasing" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="160,34" textAnchor="center"/>
-    <Fill color="#1E293B"/>
-  </Layer>
-  <Layer>
-    <Text text="antiAlias=false vs antiAlias=true" fontFamily="Arial" fontSize="10" position="160,50" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="center">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Anti-Aliasing" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="antiAlias=false vs antiAlias=true" fontFamily="Arial" fontSize="10" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
 
-  <!-- Card -->
-  <Layer>
-    <Rectangle position="160,155" size="260,160" roundness="16"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
-  </Layer>
+    <!-- Card -->
+    <Layer flex="1" layout="horizontal" gap="30" padding="20" alignment="center" arrangement="center">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-  <!-- antiAlias=false: crisp edges -->
-  <Layer antiAlias="false">
-    <Rectangle position="95,150" size="90,90" roundness="8"/>
-    <Fill color="#3B82F6"/>
-  </Layer>
-  <Layer>
-    <Text text="Crisp Edges" fontFamily="Arial" fontSize="9" position="95,205" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
+      <!-- Crisp Edges -->
+      <Layer width="90" layout="vertical" gap="4" alignment="center">
+        <Layer antiAlias="false" width="90" height="90">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Fill color="#3B82F6"/>
+        </Layer>
+        <Layer height="12">
+          <Text text="Crisp Edges" fontFamily="Arial" fontSize="9" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+      </Layer>
 
-  <!-- antiAlias=true: smooth edges -->
-  <Layer antiAlias="true">
-    <Rectangle position="225,150" size="90,90" roundness="8"/>
-    <Fill color="#10B981"/>
-  </Layer>
-  <Layer>
-    <Text text="Smooth Edges" fontFamily="Arial" fontSize="9" position="225,205" textAnchor="center"/>
-    <Fill color="#64748B"/>
+      <!-- Smooth Edges -->
+      <Layer width="90" layout="vertical" gap="4" alignment="center">
+        <Layer antiAlias="true" width="90" height="90">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Fill color="#10B981"/>
+        </Layer>
+        <Layer height="12">
+          <Text text="Smooth Edges" fontFamily="Arial" fontSize="9" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+      </Layer>
+    </Layer>
   </Layer>
 </pagx>

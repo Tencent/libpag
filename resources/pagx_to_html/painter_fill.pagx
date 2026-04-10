@@ -2,77 +2,82 @@
 <!-- Tests: Fill attributes: color, alpha, blendMode, fillRule(winding/evenOdd), placement(bg/fg) -->
 <pagx version="1.0" width="420" height="400">
   <!-- Background -->
-  <Layer>
-    <Rectangle position="210,200" size="420,400"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
-  <!-- Title -->
-  <Layer>
-    <Text text="Fill Attributes" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="210,34" textAnchor="center"/>
-    <Fill color="#1E293B"/>
-  </Layer>
-  <Layer>
-    <Text text="Alpha, blendMode, fillRule, placement, color source" fontFamily="Arial" fontSize="10" position="210,50" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
-
-  <!-- Card -->
-  <Layer>
-    <Rectangle position="210,220" size="360,290" roundness="16"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
-  </Layer>
-
-  <!-- Fill with alpha -->
-  <Layer>
-    <Rectangle position="90,130" size="100,100" roundness="12"/>
-    <Fill color="#3B82F6" alpha="0.5"/>
-  </Layer>
-  <Layer>
-    <Text text="alpha=0.5" fontFamily="Arial" fontSize="9" position="90,190" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-
-  <!-- Fill with blendMode -->
-  <Layer>
-    <Rectangle position="90,130" size="80,80"/>
-    <Fill color="#EF4444" blendMode="multiply"/>
-  </Layer>
-
-  <!-- fillRule=evenOdd -->
-  <Layer>
-    <Path data="M 260,80 L 320,180 L 200,180 Z M 260,100 L 300,170 L 220,170 Z"/>
-    <Fill color="#10B981" fillRule="evenOdd"/>
-  </Layer>
-  <Layer>
-    <Text text="fillRule=evenOdd" fontFamily="Arial" fontSize="9" position="270,203" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-
-  <!-- Placement: foreground -->
-  <Layer>
-    <Rectangle position="110,270" size="100,100" roundness="12"/>
-    <Fill color="#8B5CF680" placement="foreground"/>
-    <Layer>
-      <Ellipse position="110,270" size="60,60"/>
-      <Fill color="#F59E0B"/>
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="center">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Fill Attributes" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="Alpha, blendMode, fillRule, placement, color source" fontFamily="Arial" fontSize="10" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
     </Layer>
-  </Layer>
-  <Layer>
-    <Text text="foreground" fontFamily="Arial" fontSize="9" position="110,330" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
 
-  <!-- Child color source overrides color attribute -->
-  <Layer>
-    <Rectangle position="290,270" size="100,100" roundness="12"/>
-    <Fill color="#000000">
-      <SolidColor color="#EC4899"/>
-    </Fill>
-  </Layer>
-  <Layer>
-    <Text text="child override" fontFamily="Arial" fontSize="9" position="290,330" textAnchor="center"/>
-    <Fill color="#64748B"/>
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <!-- Fill with alpha -->
+      <Layer>
+        <Rectangle position="90,130" size="100,100" roundness="12"/>
+        <Fill color="#3B82F6" alpha="0.5"/>
+      </Layer>
+      <Layer>
+        <Text text="alpha=0.5" fontFamily="Arial" fontSize="9" position="90,190" textAnchor="center"/>
+        <Fill color="#64748B"/>
+      </Layer>
+
+      <!-- Fill with blendMode -->
+      <Layer>
+        <Rectangle position="90,130" size="80,80"/>
+        <Fill color="#EF4444" blendMode="multiply"/>
+      </Layer>
+
+      <!-- fillRule=evenOdd -->
+      <Layer>
+        <Path data="M 260,80 L 320,180 L 200,180 Z M 260,100 L 300,170 L 220,170 Z"/>
+        <Fill color="#10B981" fillRule="evenOdd"/>
+      </Layer>
+      <Layer>
+        <Text text="fillRule=evenOdd" fontFamily="Arial" fontSize="9" position="270,203" textAnchor="center"/>
+        <Fill color="#64748B"/>
+      </Layer>
+
+      <!-- Placement: foreground -->
+      <Layer>
+        <Rectangle position="110,270" size="100,100" roundness="12"/>
+        <Fill color="#8B5CF680" placement="foreground"/>
+        <Layer>
+          <Ellipse position="110,270" size="60,60"/>
+          <Fill color="#F59E0B"/>
+        </Layer>
+      </Layer>
+      <Layer>
+        <Text text="foreground" fontFamily="Arial" fontSize="9" position="110,330" textAnchor="center"/>
+        <Fill color="#64748B"/>
+      </Layer>
+
+      <!-- Child color source overrides color attribute -->
+      <Layer>
+        <Rectangle position="290,270" size="100,100" roundness="12"/>
+        <Fill color="#000000">
+          <SolidColor color="#EC4899"/>
+        </Fill>
+      </Layer>
+      <Layer>
+        <Text text="child override" fontFamily="Arial" fontSize="9" position="290,330" textAnchor="center"/>
+        <Fill color="#64748B"/>
+      </Layer>
+    </Layer>
   </Layer>
 </pagx>

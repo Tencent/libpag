@@ -3,73 +3,79 @@
      with labeled indicators and ghost outline for the hidden element -->
 <pagx version="1.0" width="320" height="235">
   <!-- Background -->
-  <Layer>
-    <Rectangle position="160,118" size="320,235" roundness="0"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
-  <!-- Visible layer: solid card with label -->
-  <Layer>
-    <Rectangle position="95,125" size="110,120" roundness="12"/>
-    <Fill color="#3B82F6"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#3B82F640"/>
-  </Layer>
-  <!-- Visible icon: eye open (circle + dot) -->
-  <Layer>
-    <Ellipse position="95,115" size="28,18"/>
-    <Stroke color="#FFFFFF" width="2"/>
-  </Layer>
-  <Layer>
-    <Ellipse position="95,115" size="8,8"/>
-    <Fill color="#FFFFFF"/>
-  </Layer>
-  <!-- "Visible" label -->
-  <Layer>
-    <Text text="Visible" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="95,149" textAnchor="center"/>
-    <Fill color="#FFFFFF"/>
-  </Layer>
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="15,20,15,20" gap="6" alignment="center">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="18">
+        <Text text="Layer Visibility" fontFamily="Arial" fontStyle="Bold" fontSize="14" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="visible=true vs visible=false" fontFamily="Arial" fontSize="10" textAnchor="center"/>
+        <Fill color="#64748B"/>
+      </Layer>
+    </Layer>
 
-  <!-- Hidden layer: this should not render (visible=false) -->
-  <Layer visible="false">
-    <Rectangle position="225,125" size="110,120" roundness="12"/>
-    <Fill color="#EF4444"/>
-  </Layer>
+    <!-- Content area -->
+    <Layer flex="1">
+      <!-- Visible layer: solid card with label -->
+      <Layer>
+        <Rectangle position="95,125" size="110,120" roundness="12"/>
+        <Fill color="#3B82F6"/>
+        <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#3B82F640"/>
+      </Layer>
+      <!-- Visible icon: eye open (circle + dot) -->
+      <Layer>
+        <Ellipse position="95,115" size="28,18"/>
+        <Stroke color="#FFFFFF" width="2"/>
+      </Layer>
+      <Layer>
+        <Ellipse position="95,115" size="8,8"/>
+        <Fill color="#FFFFFF"/>
+      </Layer>
+      <!-- "Visible" label -->
+      <Layer>
+        <Text text="Visible" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="95,149" textAnchor="center"/>
+        <Fill color="#FFFFFF"/>
+      </Layer>
 
-  <!-- Ghost outline indicator for the hidden element (always visible) -->
-  <Layer>
-    <Rectangle position="225,125" size="110,120" roundness="12"/>
-    <Stroke color="#CBD5E1" width="2" dashes="6,4"/>
-  </Layer>
-  <!-- Crossed-out eye icon -->
-  <Layer>
-    <Ellipse position="225,115" size="28,18"/>
-    <Stroke color="#94A3B8" width="2"/>
-  </Layer>
-  <Layer>
-    <Path data="M 202,95 L 228,115"/>
-    <Stroke color="#94A3B8" width="2" cap="round"/>
-  </Layer>
-  <!-- "Hidden" label -->
-  <Layer>
-    <Text text="Hidden" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="225,149" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
+      <!-- Hidden layer: this should not render (visible=false) -->
+      <Layer visible="false">
+        <Rectangle position="225,125" size="110,120" roundness="12"/>
+        <Fill color="#EF4444"/>
+      </Layer>
 
-  <!-- Title -->
-  <Layer>
-    <Text text="Layer Visibility" fontFamily="Arial" fontStyle="Bold" fontSize="14" position="160,32" textAnchor="center"/>
-    <Fill color="#1E293B"/>
-  </Layer>
+      <!-- Ghost outline indicator for the hidden element (always visible) -->
+      <Layer>
+        <Rectangle position="225,125" size="110,120" roundness="12"/>
+        <Stroke color="#CBD5E1" width="2" dashes="6,4"/>
+      </Layer>
+      <!-- Crossed-out eye icon -->
+      <Layer>
+        <Ellipse position="225,115" size="28,18"/>
+        <Stroke color="#94A3B8" width="2"/>
+      </Layer>
+      <Layer>
+        <Path data="M 202,95 L 228,115"/>
+        <Stroke color="#94A3B8" width="2" cap="round"/>
+      </Layer>
+      <!-- "Hidden" label -->
+      <Layer>
+        <Text text="Hidden" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="225,149" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
 
-  <!-- Subtitle -->
-  <Layer>
-    <Text text="visible=true vs visible=false" fontFamily="Arial" fontSize="10" position="160,48" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-
-  <!-- Footer note -->
-  <Layer>
-    <Text text="Red card uses visible=&quot;false&quot; and should not render" fontFamily="Arial" fontSize="9" position="160,205" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
+    <!-- Footer note -->
+    <Layer height="12">
+      <Text text="Red card uses visible=&quot;false&quot; and should not render" fontFamily="Arial" fontSize="9" textAnchor="center"/>
+      <Fill color="#94A3B8"/>
+    </Layer>
   </Layer>
 </pagx>

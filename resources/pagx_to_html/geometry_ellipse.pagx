@@ -2,55 +2,66 @@
 <!-- Tests: Ellipse → CSS div + border-radius:50%; center-point positioning -->
 <pagx version="1.0" width="400" height="270">
   <!-- Background -->
-  <Layer>
-    <Rectangle position="200,135" size="400,270"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
-  <!-- Title -->
-  <Layer>
-    <Text text="Ellipse Geometry" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="200,34" textAnchor="center"/>
-    <Fill color="#1E293B"/>
-  </Layer>
-  <Layer>
-    <Text text="Circle, horizontal, and reversed ellipse" fontFamily="Arial" fontSize="10" position="200,50" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="center">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Ellipse Geometry" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="Circle, horizontal, and reversed ellipse" fontFamily="Arial" fontSize="10" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
 
-  <!-- Card -->
-  <Layer>
-    <Rectangle position="200,155" size="340,160" roundness="16"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
-  </Layer>
+    <!-- Card -->
+    <Layer flex="1" layout="horizontal" gap="20" padding="20" alignment="center" arrangement="center">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-  <!-- Circle: equal width/height -->
-  <Layer>
-    <Ellipse position="90,140" size="100,100"/>
-    <Fill color="#3B82F6"/>
-  </Layer>
-  <Layer>
-    <Text text="Circle" fontFamily="Arial" fontSize="9" position="90,200" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
+      <!-- Circle: equal width/height -->
+      <Layer layout="vertical" gap="6" alignment="center">
+        <Layer width="100" height="100">
+          <Ellipse position="50,50" size="100,100"/>
+          <Fill color="#3B82F6"/>
+        </Layer>
+        <Layer height="12">
+          <Text text="Circle" fontFamily="Arial" fontSize="9" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+      </Layer>
 
-  <!-- Horizontal ellipse -->
-  <Layer>
-    <Ellipse position="220,130" size="140,80"/>
-    <Fill color="#10B981"/>
-  </Layer>
-  <Layer>
-    <Text text="Horizontal" fontFamily="Arial" fontSize="9" position="220,180" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
+      <!-- Horizontal ellipse -->
+      <Layer layout="vertical" gap="6" alignment="center">
+        <Layer width="140" height="80">
+          <Ellipse position="70,40" size="140,80"/>
+          <Fill color="#10B981"/>
+        </Layer>
+        <Layer height="12">
+          <Text text="Horizontal" fontFamily="Arial" fontSize="9" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+      </Layer>
 
-  <!-- Vertical ellipse, reversed -->
-  <Layer>
-    <Ellipse position="320,150" size="60,90" reversed="true"/>
-    <Fill color="#EC4899"/>
-  </Layer>
-  <Layer>
-    <Text text="Reversed" fontFamily="Arial" fontSize="9" position="320,205" textAnchor="center"/>
-    <Fill color="#64748B"/>
+      <!-- Vertical ellipse, reversed -->
+      <Layer layout="vertical" gap="6" alignment="center">
+        <Layer width="60" height="90">
+          <Ellipse position="30,45" size="60,90" reversed="true"/>
+          <Fill color="#EC4899"/>
+        </Layer>
+        <Layer height="12">
+          <Text text="Reversed" fontFamily="Arial" fontSize="9" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+      </Layer>
+    </Layer>
   </Layer>
 </pagx>

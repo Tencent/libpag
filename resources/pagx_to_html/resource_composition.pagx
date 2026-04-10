@@ -15,39 +15,44 @@
   </Resources>
 
   <!-- Background -->
-  <Layer>
-    <Rectangle position="210,150" size="420,300"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
-  <!-- Title -->
-  <Layer>
-    <Text text="Composition Resource" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="210,34" textAnchor="center"/>
-    <Fill color="#1E293B"/>
-  </Layer>
-  <Layer>
-    <Text text="Reusable component with matrix transform" fontFamily="Arial" fontSize="10" position="210,50" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="center">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Composition Resource" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="Reusable component with matrix transform" fontFamily="Arial" fontSize="10" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
 
-  <!-- Card -->
-  <Layer>
-    <Rectangle position="210,170" size="360,200" roundness="16"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
-  </Layer>
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-  <!-- First instance at normal size -->
-  <Layer x="70" y="90" composition="@badge"/>
-  <Layer>
-    <Text text="Normal" fontFamily="Arial" fontSize="9" position="130,240" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
+      <!-- First instance at normal size -->
+      <Layer x="70" y="90" composition="@badge"/>
+      <Layer>
+        <Text text="Normal" fontFamily="Arial" fontSize="9" position="130,240" textAnchor="center"/>
+        <Fill color="#64748B"/>
+      </Layer>
 
-  <!-- Second instance, scaled up -->
-  <Layer x="210" y="65" composition="@badge" matrix="1.5,0,0,1.5,0,0"/>
-  <Layer>
-    <Text text="Scaled 1.5x" fontFamily="Arial" fontSize="9" position="300,240" textAnchor="center"/>
-    <Fill color="#64748B"/>
+      <!-- Second instance, scaled up -->
+      <Layer x="210" y="65" composition="@badge" matrix="1.5,0,0,1.5,0,0"/>
+      <Layer>
+        <Text text="Scaled 1.5x" fontFamily="Arial" fontSize="9" position="300,240" textAnchor="center"/>
+        <Fill color="#64748B"/>
+      </Layer>
+    </Layer>
   </Layer>
 </pagx>

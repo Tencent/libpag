@@ -3,69 +3,75 @@
      Resources are referenced by layers that appear before the Resources block in document order. -->
 <pagx version="1.0" width="320" height="260">
   <!-- Background using a forward-referenced gradient (defined below in Resources) -->
-  <Layer>
-    <Rectangle position="160,130" size="320,260"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="@bgGrad"/>
   </Layer>
 
-  <!-- Title using forward-referenced solid color -->
-  <Layer>
-    <Text text="Forward Reference" fontFamily="Arial" fontStyle="Bold" fontSize="18" position="160,40" textAnchor="center"/>
-    <Fill color="@titleColor"/>
-  </Layer>
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="center">
+    <!-- Title using forward-referenced solid color -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="22">
+        <Text text="Forward Reference" fontFamily="Arial" fontStyle="Bold" fontSize="18" textAnchor="center"/>
+        <Fill color="@titleColor"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="Resources defined after usage" fontFamily="Arial" fontSize="10" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
 
-  <!-- Subtitle -->
-  <Layer>
-    <Text text="Resources defined after usage" fontFamily="Arial" fontSize="10" position="160,60" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
+    <!-- Cards area -->
+    <Layer flex="1">
+      <!-- Card 1: uses forward-referenced color -->
+      <Layer>
+        <Rectangle position="90,55" size="120,100" roundness="12"/>
+        <Fill color="@cardPurple"/>
+        <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#8B5CF630"/>
+      </Layer>
+      <Layer>
+        <Ellipse position="90,40" size="30,30"/>
+        <Fill color="#FFFFFF30"/>
+      </Layer>
+      <Layer>
+        <Text text="Color" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="90,67" textAnchor="center"/>
+        <Fill color="#FFFFFF"/>
+      </Layer>
+      <Layer>
+        <Text text="@cardPurple" fontFamily="Arial" fontSize="9" position="90,83" textAnchor="center"/>
+        <Fill color="#FFFFFFAA"/>
+      </Layer>
 
-  <!-- Card 1: uses forward-referenced color -->
-  <Layer>
-    <Rectangle position="90,125" size="120,100" roundness="12"/>
-    <Fill color="@cardPurple"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#8B5CF630"/>
-  </Layer>
-  <Layer>
-    <Ellipse position="90,110" size="30,30"/>
-    <Fill color="#FFFFFF30"/>
-  </Layer>
-  <Layer>
-    <Text text="Color" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="90,137" textAnchor="center"/>
-    <Fill color="#FFFFFF"/>
-  </Layer>
-  <Layer>
-    <Text text="@cardPurple" fontFamily="Arial" fontSize="9" position="90,153" textAnchor="center"/>
-    <Fill color="#FFFFFFAA"/>
-  </Layer>
+      <!-- Card 2: uses forward-referenced gradient -->
+      <Layer>
+        <Rectangle position="230,55" size="120,100" roundness="12"/>
+        <Fill color="@cardGrad"/>
+        <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#3B82F630"/>
+      </Layer>
+      <Layer>
+        <Polystar position="230,40" type="star" pointCount="5" outerRadius="15" innerRadius="7" rotation="-90"/>
+        <Fill color="#FFFFFF30"/>
+      </Layer>
+      <Layer>
+        <Text text="Gradient" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="230,67" textAnchor="center"/>
+        <Fill color="#FFFFFF"/>
+      </Layer>
+      <Layer>
+        <Text text="@cardGrad" fontFamily="Arial" fontSize="9" position="230,83" textAnchor="center"/>
+        <Fill color="#FFFFFFAA"/>
+      </Layer>
 
-  <!-- Card 2: uses forward-referenced gradient -->
-  <Layer>
-    <Rectangle position="230,125" size="120,100" roundness="12"/>
-    <Fill color="@cardGrad"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#3B82F630"/>
-  </Layer>
-  <Layer>
-    <Polystar position="230,110" type="star" pointCount="5" outerRadius="15" innerRadius="7" rotation="-90"/>
-    <Fill color="#FFFFFF30"/>
-  </Layer>
-  <Layer>
-    <Text text="Gradient" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="230,137" textAnchor="center"/>
-    <Fill color="#FFFFFF"/>
-  </Layer>
-  <Layer>
-    <Text text="@cardGrad" fontFamily="Arial" fontSize="9" position="230,153" textAnchor="center"/>
-    <Fill color="#FFFFFFAA"/>
-  </Layer>
-
-  <!-- Footer -->
-  <Layer>
-    <Path data="M 30,190 L 270,190"/>
-    <Stroke color="#E2E8F0" width="1"/>
-  </Layer>
-  <Layer>
-    <Text text="All @id references resolve to Resources block below" fontFamily="Arial" fontSize="9" position="160,218" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
+      <!-- Footer -->
+      <Layer>
+        <Path data="M 30,120 L 270,120"/>
+        <Stroke color="#E2E8F0" width="1"/>
+      </Layer>
+      <Layer>
+        <Text text="All @id references resolve to Resources block below" fontFamily="Arial" fontSize="9" position="160,148" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
   </Layer>
 
   <!-- Resources defined AFTER all usage — tests forward reference resolution -->

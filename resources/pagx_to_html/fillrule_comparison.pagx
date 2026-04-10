@@ -19,8 +19,8 @@
   </Layer>
 
   <!-- Divider -->
-  <Layer>
-    <Path data="M 150,10 L 150,190"/>
+  <Layer centerX="0" top="10" bottom="30" width="1">
+    <Path data="M 0,0 L 0,180"/>
     <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
   </Layer>
 

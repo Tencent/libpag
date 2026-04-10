@@ -2,13 +2,13 @@
 <!-- Tests: All 18 blend modes in a grid layout with labeled overlapping shapes -->
 <pagx version="1.0" width="470" height="420">
   <!-- Background -->
-  <Layer>
-    <Rectangle position="235,210" size="470,420"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F8FAFC"/>
   </Layer>
   <!-- Base gradient layer covering the grid area -->
-  <Layer>
-    <Rectangle position="235,210" size="430,380" roundness="8"/>
+  <Layer left="20" right="20" top="20" bottom="20">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
     <Fill>
       <LinearGradient startPoint="20,20" endPoint="440,390">
         <ColorStop offset="0" color="#3B82F6"/>

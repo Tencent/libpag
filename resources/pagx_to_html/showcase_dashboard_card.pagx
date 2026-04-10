@@ -21,8 +21,8 @@
   </Resources>
 
   <!-- Full-canvas dark background -->
-  <Layer data-role="background">
-    <Rectangle position="210,160" size="420,320"/>
+  <Layer left="0" right="0" top="0" bottom="0" data-role="background">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="@bgGrad"/>
   </Layer>
 
@@ -33,9 +33,9 @@
   </Layer>
 
   <!-- Main card layer with groupOpacity and drop shadow -->
-  <Layer groupOpacity="true" alpha="0.95" data-role="card" data-component="analytics-widget">
+  <Layer groupOpacity="true" alpha="0.95" centerX="0" centerY="0" width="320" height="220" data-role="card" data-component="analytics-widget">
     <!-- Card shape with rounded corners -->
-    <Rectangle position="210,160" size="320,220" roundness="20"/>
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="20"/>
     <!-- Background blur (glassmorphism) -->
     <BackgroundBlurStyle blurX="12" blurY="12"/>
     <!-- Glass fill -->
@@ -44,89 +44,90 @@
     <Stroke color="#FFFFFF18" width="1"/>
     <!-- Card shadow -->
     <DropShadowStyle offsetX="0" offsetY="8" blurX="24" blurY="24" color="#00000040"/>
-  </Layer>
 
-  <!-- Dashed decorative separator line -->
-  <Layer data-role="separator">
-    <Path data="M 60,110 L 340,110"/>
-    <Stroke color="#FFFFFF20" width="1" cap="round" dashes="6,4"/>
-  </Layer>
+    <!-- Card content uses absolute positioning for precise layout -->
+    <!-- Dashed decorative separator line -->
+    <Layer data-role="separator">
+      <Path data="M 10,60 L 310,60"/>
+      <Stroke color="#FFFFFF20" width="1" cap="round" dashes="6,4"/>
+    </Layer>
 
-  <!-- Title text: "Revenue" -->
-  <Layer data-content-type="title">
-    <Text text="Revenue" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="70,72"/>
-    <Fill color="#E2E8F0"/>
-  </Layer>
+    <!-- Title text: "Revenue" -->
+    <Layer data-content-type="title">
+      <Text text="Revenue" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="20,22"/>
+      <Fill color="#E2E8F0"/>
+    </Layer>
 
-  <!-- Subtitle text -->
-  <Layer data-content-type="subtitle">
-    <Text text="Monthly Overview" fontFamily="Arial" fontSize="11" position="70,92"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
+    <!-- Subtitle text -->
+    <Layer data-content-type="subtitle">
+      <Text text="Monthly Overview" fontFamily="Arial" fontSize="11" position="20,42"/>
+      <Fill color="#94A3B8"/>
+    </Layer>
 
-  <!-- Status badge -->
-  <Layer data-role="badge">
-    <Rectangle position="328,72" size="50,20" roundness="10"/>
-    <Fill color="#10B98130"/>
-  </Layer>
-  <Layer>
-    <Text text="+12%" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="328,76" textAnchor="center"/>
-    <Fill color="#10B981"/>
-  </Layer>
+    <!-- Status badge -->
+    <Layer data-role="badge">
+      <Rectangle position="278,22" size="50,20" roundness="10"/>
+      <Fill color="#10B98130"/>
+    </Layer>
+    <Layer>
+      <Text text="+12%" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="278,26" textAnchor="center"/>
+      <Fill color="#10B981"/>
+    </Layer>
 
-  <!-- Large number display -->
-  <Layer data-content-type="metric" data-value="24580">
-    <Text text="$24,580" fontFamily="Arial" fontStyle="Bold" fontSize="40" position="70,170"/>
-    <Fill color="#F8FAFC"/>
-  </Layer>
+    <!-- Large number display -->
+    <Layer data-content-type="metric" data-value="24580">
+      <Text text="$24,580" fontFamily="Arial" fontStyle="Bold" fontSize="40" position="20,120"/>
+      <Fill color="#F8FAFC"/>
+    </Layer>
 
-  <!-- Comparison text -->
-  <Layer>
-    <Text text="vs $21,930 last month" fontFamily="Arial" fontSize="11" position="70,192"/>
-    <Fill color="#64748B"/>
-  </Layer>
+    <!-- Comparison text -->
+    <Layer>
+      <Text text="vs $21,930 last month" fontFamily="Arial" fontSize="11" position="20,142"/>
+      <Fill color="#64748B"/>
+    </Layer>
 
-  <!-- Star rating: 3 filled stars -->
-  <Layer data-role="rating" data-stars="3">
-    <!-- Star 1 -->
-    <Group position="70,220">
-      <Polystar position="10,10" type="star" pointCount="5" outerRadius="8" innerRadius="4" rotation="-90"/>
-      <Fill color="#F59E0B"/>
-    </Group>
-    <!-- Star 2 -->
-    <Group position="88,220">
-      <Polystar position="10,10" type="star" pointCount="5" outerRadius="8" innerRadius="4" rotation="-90"/>
-      <Fill color="#F59E0B"/>
-    </Group>
-    <!-- Star 3 -->
-    <Group position="106,220">
-      <Polystar position="10,10" type="star" pointCount="5" outerRadius="8" innerRadius="4" rotation="-90"/>
-      <Fill color="#F59E0B"/>
-    </Group>
-  </Layer>
+    <!-- Star rating: 3 filled stars -->
+    <Layer data-role="rating" data-stars="3">
+      <!-- Star 1 -->
+      <Group position="20,170">
+        <Polystar position="10,10" type="star" pointCount="5" outerRadius="8" innerRadius="4" rotation="-90"/>
+        <Fill color="#F59E0B"/>
+      </Group>
+      <!-- Star 2 -->
+      <Group position="38,170">
+        <Polystar position="10,10" type="star" pointCount="5" outerRadius="8" innerRadius="4" rotation="-90"/>
+        <Fill color="#F59E0B"/>
+      </Group>
+      <!-- Star 3 -->
+      <Group position="56,170">
+        <Polystar position="10,10" type="star" pointCount="5" outerRadius="8" innerRadius="4" rotation="-90"/>
+        <Fill color="#F59E0B"/>
+      </Group>
+    </Layer>
 
-  <!-- Rating label -->
-  <Layer>
-    <Text text="Customer Satisfaction" fontFamily="Arial" fontSize="10" position="122,224"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
+    <!-- Rating label -->
+    <Layer>
+      <Text text="Customer Satisfaction" fontFamily="Arial" fontSize="10" position="72,174"/>
+      <Fill color="#94A3B8"/>
+    </Layer>
 
-  <!-- Progress bar track -->
-  <Layer data-role="progress-track">
-    <Rectangle position="210,250" size="280,8" roundness="4"/>
-    <Fill color="#1E293B"/>
-  </Layer>
+    <!-- Progress bar track -->
+    <Layer data-role="progress-track">
+      <Rectangle position="160,200" size="280,8" roundness="4"/>
+      <Fill color="#1E293B"/>
+    </Layer>
 
-  <!-- Progress bar fill (68%) — width = 280 * 0.68 = 190, offset to left-align within track -->
-  <Layer data-role="progress-fill" data-percentage="68">
-    <Rectangle position="165,250" size="190,8"/>
-    <RoundCorner radius="4"/>
-    <Fill color="@accentGrad"/>
-  </Layer>
+    <!-- Progress bar fill (68%) — width = 280 * 0.68 = 190 -->
+    <Layer data-role="progress-fill" data-percentage="68">
+      <Rectangle position="115,200" size="190,8"/>
+      <RoundCorner radius="4"/>
+      <Fill color="@accentGrad"/>
+    </Layer>
 
-  <!-- Progress label -->
-  <Layer>
-    <Text text="68% of target" fontFamily="Arial" fontSize="10" position="70,268"/>
-    <Fill color="#64748B"/>
+    <!-- Progress label -->
+    <Layer>
+      <Text text="68% of target" fontFamily="Arial" fontSize="10" position="20,218"/>
+      <Fill color="#64748B"/>
+    </Layer>
   </Layer>
 </pagx>

@@ -2,27 +2,30 @@
 <!-- Tests: passThroughBackground attribute; auto-disabled when non-normal blend/filter/3D -->
 <pagx version="1.0" width="360" height="300">
   <!-- Background -->
-  <Layer>
-    <Rectangle position="180,150" size="360,300"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
-  <!-- Title -->
-  <Layer>
-    <Text text="Pass-Through Background" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="180,34" textAnchor="center"/>
-    <Fill color="#1E293B"/>
-  </Layer>
-  <Layer>
-    <Text text="Background transparency vs opaque compositing" fontFamily="Arial" fontSize="10" position="180,50" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="center">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Pass-Through Background" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="Background transparency vs opaque compositing" fontFamily="Arial" fontSize="10" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
 
-  <!-- Card -->
-  <Layer>
-    <Rectangle position="180,170" size="300,190" roundness="16"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
-  </Layer>
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
   <!-- Divider -->
   <Layer>
@@ -58,5 +61,7 @@
   <Layer passThroughBackground="false" alpha="0.8">
     <Rectangle position="265,165" size="100,100" roundness="8"/>
     <Fill color="#EF444480"/>
+  </Layer>
+    </Layer>
   </Layer>
 </pagx>

@@ -2,85 +2,90 @@
 <!-- Tests: MergePath all 5 modes: append, union, intersect, xor, difference; clears prior Fill/Stroke -->
 <pagx version="1.0" width="560" height="300">
   <!-- Background -->
-  <Layer>
-    <Rectangle position="280,150" size="560,300"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
-  <!-- Title -->
-  <Layer>
-    <Text text="Merge Path Modes" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="280,34" textAnchor="center"/>
-    <Fill color="#1E293B"/>
-  </Layer>
-  <Layer>
-    <Text text="Boolean operations on overlapping shapes" fontFamily="Arial" fontSize="10" position="280,50" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="center">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Merge Path Modes" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="Boolean operations on overlapping shapes" fontFamily="Arial" fontSize="10" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
 
-  <!-- Card -->
-  <Layer>
-    <Rectangle position="280,172" size="500,190" roundness="16"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
-  </Layer>
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-  <!-- Append: combine subpaths -->
-  <Layer>
-    <Rectangle position="70,160" size="60,60"/>
-    <Ellipse position="100,160" size="60,60"/>
-    <MergePath mode="append"/>
-    <Fill color="#3B82F6"/>
-  </Layer>
-  <Layer>
-    <Text text="Append" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="85,205" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
+      <!-- Append: combine subpaths -->
+      <Layer>
+        <Rectangle position="70,160" size="60,60"/>
+        <Ellipse position="100,160" size="60,60"/>
+        <MergePath mode="append"/>
+        <Fill color="#3B82F6"/>
+      </Layer>
+      <Layer>
+        <Text text="Append" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="85,205" textAnchor="center"/>
+        <Fill color="#64748B"/>
+      </Layer>
 
-  <!-- Union: boolean OR -->
-  <Layer>
-    <Rectangle position="175,160" size="60,60"/>
-    <Ellipse position="205,160" size="60,60"/>
-    <MergePath mode="union"/>
-    <Fill color="#10B981"/>
-  </Layer>
-  <Layer>
-    <Text text="Union" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="190,205" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
+      <!-- Union: boolean OR -->
+      <Layer>
+        <Rectangle position="175,160" size="60,60"/>
+        <Ellipse position="205,160" size="60,60"/>
+        <MergePath mode="union"/>
+        <Fill color="#10B981"/>
+      </Layer>
+      <Layer>
+        <Text text="Union" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="190,205" textAnchor="center"/>
+        <Fill color="#64748B"/>
+      </Layer>
 
-  <!-- Intersect: boolean AND -->
-  <Layer>
-    <Rectangle position="280,160" size="60,60"/>
-    <Ellipse position="310,160" size="60,60"/>
-    <MergePath mode="intersect"/>
-    <Fill color="#F59E0B"/>
-  </Layer>
-  <Layer>
-    <Text text="Intersect" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="295,205" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
+      <!-- Intersect: boolean AND -->
+      <Layer>
+        <Rectangle position="280,160" size="60,60"/>
+        <Ellipse position="310,160" size="60,60"/>
+        <MergePath mode="intersect"/>
+        <Fill color="#F59E0B"/>
+      </Layer>
+      <Layer>
+        <Text text="Intersect" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="295,205" textAnchor="center"/>
+        <Fill color="#64748B"/>
+      </Layer>
 
-  <!-- Xor: boolean XOR -->
-  <Layer>
-    <Rectangle position="385,160" size="60,60"/>
-    <Ellipse position="415,160" size="60,60"/>
-    <MergePath mode="xor"/>
-    <Fill color="#EF4444"/>
-  </Layer>
-  <Layer>
-    <Text text="Xor" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="400,205" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
+      <!-- Xor: boolean XOR -->
+      <Layer>
+        <Rectangle position="385,160" size="60,60"/>
+        <Ellipse position="415,160" size="60,60"/>
+        <MergePath mode="xor"/>
+        <Fill color="#EF4444"/>
+      </Layer>
+      <Layer>
+        <Text text="Xor" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="400,205" textAnchor="center"/>
+        <Fill color="#64748B"/>
+      </Layer>
 
-  <!-- Difference: A minus B -->
-  <Layer>
-    <Rectangle position="485,160" size="60,60"/>
-    <Ellipse position="485,160" size="40,40"/>
-    <MergePath mode="difference"/>
-    <Fill color="#8B5CF6"/>
-  </Layer>
-  <Layer>
-    <Text text="Difference" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="485,205" textAnchor="center"/>
-    <Fill color="#64748B"/>
+      <!-- Difference: A minus B -->
+      <Layer>
+        <Rectangle position="485,160" size="60,60"/>
+        <Ellipse position="485,160" size="40,40"/>
+        <MergePath mode="difference"/>
+        <Fill color="#8B5CF6"/>
+      </Layer>
+      <Layer>
+        <Text text="Difference" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="485,205" textAnchor="center"/>
+        <Fill color="#64748B"/>
+      </Layer>
+    </Layer>
   </Layer>
 </pagx>

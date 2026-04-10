@@ -2,45 +2,52 @@
 <!-- Tests: Layer alpha → opacity -->
 <pagx version="1.0" width="320" height="300">
   <!-- Background -->
-  <Layer>
-    <Rectangle position="160,150" size="320,300"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
-  <!-- Title -->
-  <Layer>
-    <Text text="Layer Alpha" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="160,34" textAnchor="center"/>
-    <Fill color="#1E293B"/>
-  </Layer>
-  <Layer>
-    <Text text="Opacity blending on overlapping layers" fontFamily="Arial" fontSize="10" position="160,50" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="center">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Layer Alpha" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="Opacity blending on overlapping layers" fontFamily="Arial" fontSize="10" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
 
-  <!-- Card -->
-  <Layer>
-    <Rectangle position="160,168" size="260,190" roundness="16"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
-  </Layer>
+    <!-- Card: overlapping alpha rectangles need absolute positioning inside -->
+    <Layer flex="1" width="260">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-  <!-- Alpha=0.3 red -->
-  <Layer alpha="0.3">
-    <Rectangle position="125,158" size="120,120" roundness="8"/>
-    <Fill color="#EF4444"/>
-  </Layer>
-  <Layer>
-    <Text text="alpha=0.3" fontFamily="Arial" fontSize="9" position="90,232" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
+      <!-- Alpha=0.3 red (positioned within card) -->
+      <Layer alpha="0.3" centerX="-35" centerY="-10" width="120" height="120">
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+        <Fill color="#EF4444"/>
+      </Layer>
 
-  <!-- Alpha=0.7 blue -->
-  <Layer alpha="0.7">
-    <Rectangle position="195,158" size="120,120" roundness="8"/>
-    <Fill color="#3B82F6"/>
-  </Layer>
-  <Layer>
-    <Text text="alpha=0.7" fontFamily="Arial" fontSize="9" position="230,232" textAnchor="center"/>
-    <Fill color="#64748B"/>
+      <!-- Alpha=0.7 blue (positioned within card, overlapping red) -->
+      <Layer alpha="0.7" centerX="35" centerY="-10" width="120" height="120">
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+        <Fill color="#3B82F6"/>
+      </Layer>
+
+      <!-- Labels -->
+      <Layer left="15" bottom="15" width="80" height="12">
+        <Text text="alpha=0.3" fontFamily="Arial" fontSize="9"/>
+        <Fill color="#64748B"/>
+      </Layer>
+      <Layer right="15" bottom="15" width="80" height="12">
+        <Text text="alpha=0.7" fontFamily="Arial" fontSize="9" textAnchor="end"/>
+        <Fill color="#64748B"/>
+      </Layer>
+    </Layer>
   </Layer>
 </pagx>

@@ -2,8 +2,8 @@
 <!-- Tests: data-* custom attributes on various elements, id and name attributes -->
 <pagx version="1.0" width="320" height="220">
   <!-- Card background with data attributes -->
-  <Layer name="cardBackground" data-figma-id="1:42" data-exported-by="PAGExporter" data-category="ui-card">
-    <Rectangle position="160,110" size="280,180" roundness="12" data-role="container"/>
+  <Layer name="cardBackground" data-figma-id="1:42" data-exported-by="PAGExporter" data-category="ui-card" left="20" right="20" top="20" bottom="20">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="12" data-role="container"/>
     <Fill color="#F8FAFC"/>
     <Stroke color="#E2E8F0" width="1"/>
   </Layer>

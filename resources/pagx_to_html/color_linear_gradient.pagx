@@ -2,86 +2,103 @@
 <!-- Tests: LinearGradient → CSS linear-gradient; angle calculation, multi-stop, with matrix -->
 <pagx version="1.0" width="380" height="395">
   <!-- Background -->
-  <Layer>
-    <Rectangle position="190,198" size="380,395"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
-  <!-- Title -->
-  <Layer>
-    <Text text="Linear Gradient" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="190,34" textAnchor="center"/>
-    <Fill color="#1E293B"/>
-  </Layer>
-  <Layer>
-    <Text text="Diagonal, horizontal, vertical, and matrix transform" fontFamily="Arial" fontSize="10" position="190,50" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="center">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Linear Gradient" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="Diagonal, horizontal, vertical, and matrix transform" fontFamily="Arial" fontSize="10" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
 
-  <!-- Card -->
-  <Layer>
-    <Rectangle position="190,210" size="320,310" roundness="16"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
-  </Layer>
+    <!-- Card -->
+    <Layer flex="1" layout="vertical" gap="12" padding="15" alignment="center" arrangement="center">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-  <!-- Diagonal gradient -->
-  <Layer>
-    <Rectangle position="110,140" size="120,120" roundness="12"/>
-    <Fill>
-      <LinearGradient startPoint="10,10" endPoint="130,130">
-        <ColorStop offset="0" color="#3B82F6"/>
-        <ColorStop offset="1" color="#EF4444"/>
-      </LinearGradient>
-    </Fill>
-  </Layer>
-  <Layer>
-    <Text text="Diagonal" fontFamily="Arial" fontSize="9" position="110,210" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
+      <!-- Row 1: Diagonal + Horizontal -->
+      <Layer layout="horizontal" gap="20" arrangement="center">
+        <!-- Diagonal gradient -->
+        <Layer layout="vertical" gap="6" alignment="center">
+          <Layer width="120" height="120">
+            <Rectangle position="60,60" size="120,120" roundness="12"/>
+            <Fill>
+              <LinearGradient startPoint="10,10" endPoint="130,130">
+                <ColorStop offset="0" color="#3B82F6"/>
+                <ColorStop offset="1" color="#EF4444"/>
+              </LinearGradient>
+            </Fill>
+          </Layer>
+          <Layer height="12">
+            <Text text="Diagonal" fontFamily="Arial" fontSize="9" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+        <!-- Horizontal gradient with 3 stops -->
+        <Layer layout="vertical" gap="6" alignment="center">
+          <Layer width="120" height="120">
+            <Rectangle position="60,60" size="120,120" roundness="12"/>
+            <Fill>
+              <LinearGradient startPoint="10,10" endPoint="130,10">
+                <ColorStop offset="0" color="#10B981"/>
+                <ColorStop offset="0.5" color="#F59E0B"/>
+                <ColorStop offset="1" color="#EF4444"/>
+              </LinearGradient>
+            </Fill>
+          </Layer>
+          <Layer height="12">
+            <Text text="Horizontal" fontFamily="Arial" fontSize="9" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+      </Layer>
 
-  <!-- Horizontal gradient with 3 stops -->
-  <Layer>
-    <Rectangle position="270,140" size="120,120" roundness="12"/>
-    <Fill>
-      <LinearGradient startPoint="10,10" endPoint="130,10">
-        <ColorStop offset="0" color="#10B981"/>
-        <ColorStop offset="0.5" color="#F59E0B"/>
-        <ColorStop offset="1" color="#EF4444"/>
-      </LinearGradient>
-    </Fill>
-  </Layer>
-  <Layer>
-    <Text text="Horizontal" fontFamily="Arial" fontSize="9" position="270,210" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-
-  <!-- Vertical gradient -->
-  <Layer>
-    <Rectangle position="110,285" size="120,120" roundness="12"/>
-    <Fill>
-      <LinearGradient startPoint="10,10" endPoint="10,130">
-        <ColorStop offset="0" color="#8B5CF6"/>
-        <ColorStop offset="1" color="#EC4899"/>
-      </LinearGradient>
-    </Fill>
-  </Layer>
-  <Layer>
-    <Text text="Vertical" fontFamily="Arial" fontSize="9" position="110,355" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-
-  <!-- LinearGradient with matrix transform -->
-  <Layer>
-    <Rectangle position="270,285" size="120,120" roundness="12"/>
-    <Fill>
-      <LinearGradient startPoint="10,10" endPoint="110,10" matrix="0.707,-0.707,0.707,0.707,0,0">
-        <ColorStop offset="0" color="#06B6D4"/>
-        <ColorStop offset="1" color="#3B82F6"/>
-      </LinearGradient>
-    </Fill>
-  </Layer>
-  <Layer>
-    <Text text="Matrix" fontFamily="Arial" fontSize="9" position="270,355" textAnchor="center"/>
-    <Fill color="#64748B"/>
+      <!-- Row 2: Vertical + Matrix -->
+      <Layer layout="horizontal" gap="20" arrangement="center">
+        <!-- Vertical gradient -->
+        <Layer layout="vertical" gap="6" alignment="center">
+          <Layer width="120" height="120">
+            <Rectangle position="60,60" size="120,120" roundness="12"/>
+            <Fill>
+              <LinearGradient startPoint="10,10" endPoint="10,130">
+                <ColorStop offset="0" color="#8B5CF6"/>
+                <ColorStop offset="1" color="#EC4899"/>
+              </LinearGradient>
+            </Fill>
+          </Layer>
+          <Layer height="12">
+            <Text text="Vertical" fontFamily="Arial" fontSize="9" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+        <!-- Matrix gradient -->
+        <Layer layout="vertical" gap="6" alignment="center">
+          <Layer width="120" height="120">
+            <Rectangle position="60,60" size="120,120" roundness="12"/>
+            <Fill>
+              <LinearGradient startPoint="10,10" endPoint="110,10" matrix="0.707,-0.707,0.707,0.707,0,0">
+                <ColorStop offset="0" color="#06B6D4"/>
+                <ColorStop offset="1" color="#3B82F6"/>
+              </LinearGradient>
+            </Fill>
+          </Layer>
+          <Layer height="12">
+            <Text text="Matrix" fontFamily="Arial" fontSize="9" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+      </Layer>
+    </Layer>
   </Layer>
 </pagx>

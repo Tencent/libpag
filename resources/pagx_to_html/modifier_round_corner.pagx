@@ -2,38 +2,43 @@
 <!-- Tests: RoundCorner modifier → convert sharp corners to bezier arcs -->
 <pagx version="1.0" width="300" height="280">
   <!-- Background -->
-  <Layer>
-    <Rectangle position="150,140" size="300,280"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
-  <!-- Title -->
-  <Layer>
-    <Text text="Round Corner Modifier" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="150,34" textAnchor="center"/>
-    <Fill color="#1E293B"/>
-  </Layer>
-  <Layer>
-    <Text text="Sharp corners converted to bezier arcs" fontFamily="Arial" fontSize="10" position="150,50" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="center">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Round Corner Modifier" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="Sharp corners converted to bezier arcs" fontFamily="Arial" fontSize="10" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
 
-  <!-- Card -->
-  <Layer>
-    <Rectangle position="150,165" size="240,190" roundness="16"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
-  </Layer>
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-  <!-- Triangle with rounded corners -->
-  <Layer>
-    <Polystar position="150,165" type="polygon" pointCount="3" outerRadius="80" rotation="-90"/>
-    <RoundCorner radius="15"/>
-    <Fill color="#8B5CF6"/>
-  </Layer>
+      <!-- Triangle with rounded corners -->
+      <Layer>
+        <Polystar position="150,165" type="polygon" pointCount="3" outerRadius="80" rotation="-90"/>
+        <RoundCorner radius="15"/>
+        <Fill color="#8B5CF6"/>
+      </Layer>
 
-  <!-- Label -->
-  <Layer>
-    <Text text="radius=15" fontFamily="Arial" fontSize="9" position="150,230" textAnchor="center"/>
-    <Fill color="#64748B"/>
+      <!-- Label -->
+      <Layer>
+        <Text text="radius=15" fontFamily="Arial" fontSize="9" position="150,230" textAnchor="center"/>
+        <Fill color="#64748B"/>
+      </Layer>
+    </Layer>
   </Layer>
 </pagx>
