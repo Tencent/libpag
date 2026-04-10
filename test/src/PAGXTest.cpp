@@ -5046,4 +5046,82 @@ PAGX_TEST(PAGXTest, TextBoundsDirectValidation) {
   EXPECT_GT(boxTextBounds.height, 0);
 }
 
+// =====================================================================================
+// Padding Unified Semantics — Round-Trip Tests
+// =====================================================================================
+
+// Group padding round-trip through export/import.
+PAGX_TEST(PAGXTest, GroupPaddingRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 200;
+  layer->height = 100;
+
+  auto group = doc->makeNode<pagx::Group>();
+  group->padding = pagx::Padding{5, 10, 15, 20};
+  layer->contents.push_back(group);
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {50, 30};
+  group->elements.push_back(rect);
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  group->elements.push_back(fill);
+
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+
+  auto doc2 = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc2 != nullptr);
+  ASSERT_GE(doc2->layers.size(), 1u);
+
+  auto* layer2 = doc2->layers[0];
+  ASSERT_FALSE(layer2->contents.empty());
+  auto* group2 = static_cast<pagx::Group*>(layer2->contents[0]);
+  EXPECT_FLOAT_EQ(group2->padding.top, 5);
+  EXPECT_FLOAT_EQ(group2->padding.right, 10);
+  EXPECT_FLOAT_EQ(group2->padding.bottom, 15);
+  EXPECT_FLOAT_EQ(group2->padding.left, 20);
+}
+
+// TextBox padding round-trip through export/import.
+PAGX_TEST(PAGXTest, TextBoxPaddingRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 200;
+  layer->height = 100;
+
+  auto textBox = doc->makeNode<pagx::TextBox>();
+  textBox->width = 180;
+  textBox->height = 60;
+  textBox->padding = pagx::Padding{8, 12, 8, 12};
+  layer->contents.push_back(textBox);
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Test";
+  text->fontFamily = "Arial";
+  text->fontSize = 14;
+  textBox->elements.push_back(text);
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  textBox->elements.push_back(fill);
+
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+
+  auto doc2 = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc2 != nullptr);
+  ASSERT_GE(doc2->layers.size(), 1u);
+
+  auto* layer2 = doc2->layers[0];
+  ASSERT_FALSE(layer2->contents.empty());
+  auto* textBox2 = static_cast<pagx::TextBox*>(layer2->contents[0]);
+  EXPECT_FLOAT_EQ(textBox2->padding.top, 8);
+  EXPECT_FLOAT_EQ(textBox2->padding.right, 12);
+  EXPECT_FLOAT_EQ(textBox2->padding.bottom, 8);
+  EXPECT_FLOAT_EQ(textBox2->padding.left, 12);
+}
+
 }  // namespace pag

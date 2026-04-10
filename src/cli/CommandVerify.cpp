@@ -1688,7 +1688,9 @@ static void DetectContentOriginOffset(const Layer* layer, const Layer* parentLay
     return;
   }
   static constexpr float TOLERANCE = 0.5f;
-  if (std::abs(minX) > TOLERANCE || std::abs(minY) > TOLERANCE) {
+  float expectedX = layer->padding.left;
+  float expectedY = layer->padding.top;
+  if (std::abs(minX - expectedX) > TOLERANCE || std::abs(minY - expectedY) > TOLERANCE) {
     AddDiagnostic(diagnostics, layer->sourceLine,
                   "children start at (" + std::to_string(static_cast<int>(minX)) + "," +
                       std::to_string(static_cast<int>(minY)) +
@@ -1738,7 +1740,9 @@ static void DetectContentOriginOffsetForGroup(const Group* group,
     return;
   }
   static constexpr float TOLERANCE = 0.5f;
-  if (std::abs(minX) > TOLERANCE || std::abs(minY) > TOLERANCE) {
+  float expectedX = group->padding.left;
+  float expectedY = group->padding.top;
+  if (std::abs(minX - expectedX) > TOLERANCE || std::abs(minY - expectedY) > TOLERANCE) {
     AddDiagnostic(diagnostics, group->sourceLine,
                   "children start at (" + std::to_string(static_cast<int>(minX)) + "," +
                       std::to_string(static_cast<int>(minY)) +

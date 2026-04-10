@@ -46,7 +46,7 @@ void PAGXDocument::layoutLayers(const std::vector<Layer*>& layers, float contain
     layer->updateSize(context);
   }
   std::vector<LayoutNode*> nodes(layers.begin(), layers.end());
-  LayoutNode::PerformConstraintLayout(nodes, containerW, containerH, context);
+  LayoutNode::PerformConstraintLayout(nodes, containerW, containerH, {}, context);
 }
 
 std::shared_ptr<PAGXDocument> PAGXDocument::Make(float docWidth, float docHeight) {

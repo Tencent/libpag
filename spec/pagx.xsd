@@ -692,6 +692,7 @@
     <xs:attribute name="alpha" type="xs:decimal" default="1"/>
     <xs:attribute name="width" type="xs:decimal"/>
     <xs:attribute name="height" type="xs:decimal"/>
+    <xs:attribute name="padding" type="PaddingType"/>
     <xs:attribute name="textAlign" type="TextAlignType" default="start"/>
     <xs:attribute name="paragraphAlign" type="ParagraphAlignType" default="near"/>
     <xs:attribute name="writingMode" type="WritingModeType" default="horizontal"/>
@@ -842,6 +843,7 @@
     <xs:attribute name="alpha" type="xs:decimal" default="1"/>
     <xs:attribute name="width" type="xs:decimal"/>
     <xs:attribute name="height" type="xs:decimal"/>
+    <xs:attribute name="padding" type="PaddingType"/>
     <xs:attributeGroup ref="ConstraintAttributes"/>
   </xs:complexType>
 

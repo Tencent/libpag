@@ -884,6 +884,9 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       // Layout dimensions
       xml.addOptionalAttribute("width", textBox->width);
       xml.addOptionalAttribute("height", textBox->height);
+      if (!textBox->padding.isZero()) {
+        xml.addAttribute("padding", PaddingToString(textBox->padding));
+      }
       // TextBox typography properties
       if (textBox->textAlign != Default<TextBox>().textAlign) {
         xml.addAttribute("textAlign", TextAlignToString(textBox->textAlign));
@@ -962,6 +965,9 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.addAttribute("alpha", group->alpha, Default<Group>().alpha);
       xml.addOptionalAttribute("width", group->width);
       xml.addOptionalAttribute("height", group->height);
+      if (!group->padding.isZero()) {
+        xml.addAttribute("padding", PaddingToString(group->padding));
+      }
       xml.addOptionalAttribute("left", group->left);
       xml.addOptionalAttribute("right", group->right);
       xml.addOptionalAttribute("top", group->top);

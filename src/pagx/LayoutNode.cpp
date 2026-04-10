@@ -93,25 +93,33 @@ void LayoutNode::setLayoutSize(LayoutContext*, float, float) {
 }
 
 void LayoutNode::PerformConstraintLayout(const std::vector<LayoutNode*>& nodes, float containerW,
-                                         float containerH, LayoutContext* context) {
+                                         float containerH, const Padding& padding,
+                                         LayoutContext* context) {
+  bool hasPadding = !padding.isZero();
+  float cw = hasPadding ? std::max(0.0f, containerW - padding.left - padding.right) : containerW;
+  float ch = hasPadding ? std::max(0.0f, containerH - padding.top - padding.bottom) : containerH;
   for (auto* child : nodes) {
     // Phase 1: compute target size from opposite-edge constraints.
     float targetW = NAN;
     float targetH = NAN;
     if (!std::isnan(child->left) && !std::isnan(child->right)) {
-      targetW = std::max(0.0f, std::ceil(containerW - child->left - child->right));
+      targetW = std::max(0.0f, std::ceil(cw - child->left - child->right));
     }
     if (!std::isnan(child->top) && !std::isnan(child->bottom)) {
-      targetH = std::max(0.0f, std::ceil(containerH - child->top - child->bottom));
+      targetH = std::max(0.0f, std::ceil(ch - child->top - child->bottom));
     }
     // Phase 2: write self rendering attributes and layoutWidth/layoutHeight.
     child->setLayoutSize(context, targetW, targetH);
     // Phase 3: compute position from layoutWidth/layoutHeight.
     if (child->hasConstraints()) {
-      auto pos = CalculateConstrainedPosition(containerW, containerH, child->layoutWidth,
-                                              child->layoutHeight, *child);
+      auto pos =
+          CalculateConstrainedPosition(cw, ch, child->layoutWidth, child->layoutHeight, *child);
+      float finalX = hasPadding ? std::round(pos.x + padding.left) : std::round(pos.x);
+      float finalY = hasPadding ? std::round(pos.y + padding.top) : std::round(pos.y);
       // Phase 4: write self position and layoutX/layoutY.
-      child->setLayoutPosition(context, std::round(pos.x), std::round(pos.y));
+      child->setLayoutPosition(context, finalX, finalY);
+    } else if (hasPadding) {
+      child->setLayoutPosition(context, std::round(padding.left), std::round(padding.top));
     }
     // Phase 5: recursively lay out children (containers only, leaf nodes no-op).
     child->updateLayout(context);

@@ -1103,6 +1103,15 @@ static TextBox* ParseTextBox(const DOMNode* node, PAGXDocument* doc) {
   textBox->alpha = GetFloatAttribute(node, "alpha", Default<TextBox>().alpha, doc);
   textBox->width = GetFloatAttributeOrNaN(node, "width", doc);
   textBox->height = GetFloatAttributeOrNaN(node, "height", doc);
+  auto paddingStr = GetAttribute(node, "padding");
+  if (!paddingStr.empty()) {
+    auto count = ParseFloatList(paddingStr).size();
+    if (count != 1 && count != 2 && count != 4) {
+      ReportError(doc, node, "Invalid value '" + paddingStr + "' for 'padding' attribute.");
+    } else {
+      textBox->padding = PaddingFromString(paddingStr);
+    }
+  }
   // TextBox typography properties
   textBox->textAlign = GET_ENUM(node, "textAlign", "start", doc, TextAlign);
   textBox->paragraphAlign = GET_ENUM(node, "paragraphAlign", "near", doc, ParagraphAlign);
@@ -1170,6 +1179,15 @@ static Group* ParseGroup(const DOMNode* node, PAGXDocument* doc) {
   group->alpha = GetFloatAttribute(node, "alpha", Default<Group>().alpha, doc);
   group->width = GetFloatAttributeOrNaN(node, "width", doc);
   group->height = GetFloatAttributeOrNaN(node, "height", doc);
+  auto paddingStr = GetAttribute(node, "padding");
+  if (!paddingStr.empty()) {
+    auto count = ParseFloatList(paddingStr).size();
+    if (count != 1 && count != 2 && count != 4) {
+      ReportError(doc, node, "Invalid value '" + paddingStr + "' for 'padding' attribute.");
+    } else {
+      group->padding = PaddingFromString(paddingStr);
+    }
+  }
   group->left = GetFloatAttributeOrNaN(node, "left", doc);
   group->right = GetFloatAttributeOrNaN(node, "right", doc);
   group->top = GetFloatAttributeOrNaN(node, "top", doc);

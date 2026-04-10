@@ -113,11 +113,32 @@ pagx (required: version, width, height)
 **Layer arrangement = CSS Flexbox.** Never fall back to constraint positioning when the
 layout is expressible as nested flex containers.
 
-`padding` works on **all Layers, Groups, and TextBoxes** — it insets the constraint
-reference frame for all contents (VectorElements and child Layers alike). When a
-background Rectangle needs to fill the entire Layer including the padding area, split into
-two nested Layers: an outer Layer with `padding` and an inner Layer (without padding) for
-the background.
+`padding` works on **all Layers, Groups, and TextBoxes** — it insets the layout content
+area and the constraint reference frame for all contents. When a background Rectangle needs
+to fill the entire Layer, use a two-layer structure: the outer Layer holds the background
+Rectangle, the inner container carries `padding`. Use `Layer` when the inner container
+needs `layout`; use `Group` when it only needs `padding`.
+
+```xml
+<!-- Outer Layer for background, inner Layer for padded layout content -->
+<Layer>
+  <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+  <Fill color="#FFF"/>
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="8" padding="16">
+    <!-- content here -->
+  </Layer>
+</Layer>
+
+<!-- Outer Layer for background, inner Group for padded VectorElements (no layout needed) -->
+<Layer centerX="0" centerY="0">
+  <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+  <Fill color="#3B82F6"/>
+  <Group centerX="0" centerY="0" padding="10,15">
+    <Text text="Click" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+    <Fill color="#FFF"/>
+  </Group>
+</Layer>
+```
 
 **CSS Flexbox → PAGX**:
 
@@ -126,7 +147,7 @@ the background.
 | `flex-direction` | `layout` | `row` → `horizontal`, `column` → `vertical` |
 | `flex` / `flex-grow` | `flex` | Same semantics |
 | `gap` | `gap` | Same semantics |
-| `padding` | `padding` | Works with or without `layout` — insets all content constraints. Same shorthand (`"20"`, `"10,20"`, `"10,20,10,20"`) |
+| `padding` | `padding` | Insets all content constraints. Same shorthand (`"20"`, `"10,20"`, `"10,20,10,20"`) |
 | `align-items` | `alignment` | `stretch`/`flex-start`/`center`/`flex-end` → `stretch`/`start`/`center`/`end` |
 | `justify-content` | `arrangement` | `flex-start`/`center`/... → `start`/`center`/`end`/`spaceBetween`/`spaceEvenly`/`spaceAround` |
 
@@ -599,32 +620,6 @@ finalizing any PAGX output, verify that none of these anti-patterns appear in yo
   <!-- ✅ Use padding on the parent instead -->
   <Layer width="400" height="200" layout="horizontal" padding="0,20,0,20">
     <Layer flex="1"/>
-  </Layer>
-  ```
-
-- **NEVER** place a background shape (Rectangle, RoundedRectangle, etc.) inside a padded
-  Layer — padding insets all contents including VectorElements. MUST split into two nested
-  Layers: outer for the background, inner for padded content.
-
-  ```xml
-  <!-- ❌ Rectangle is inset by padding — does not fill the full Layer -->
-  <Layer padding="12" layout="horizontal">
-    <Rectangle left="0" right="0" top="0" bottom="0">
-      <Fill color="#2196F3"/>
-    </Rectangle>
-    <Text text="Click" fontFamily="Arial" fontSize="14"/>
-    <Fill color="#FFF"/>
-  </Layer>
-
-  <!-- ✅ Two-layer nesting: background outside, padded content inside -->
-  <Layer>
-    <Rectangle left="0" right="0" top="0" bottom="0">
-      <Fill color="#2196F3"/>
-    </Rectangle>
-    <Layer padding="12" layout="horizontal">
-      <Text text="Click" fontFamily="Arial" fontSize="14"/>
-      <Fill color="#FFF"/>
-    </Layer>
   </Layer>
   ```
 
