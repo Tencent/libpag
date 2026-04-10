@@ -1918,6 +1918,35 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ZeroSizeEmpty) {
   EXPECT_TRUE(output.find(":5: zero size") == std::string::npos);
 }
 
+// Skeleton-phase containers: nested Layers with layout attributes and painters (Fill/Stroke) but
+// no leaf content (Rectangle/Ellipse/Path/Text/etc.) anywhere in the subtree. Zero size is
+// expected and should NOT trigger a diagnostic.
+CLI_TEST(PAGXCliTest, LayoutCheck_ZeroSizeNoLeaf) {
+  auto path = TestResourcePath("layout_check_zero_size_no_leaf.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("zero size") == std::string::npos);
+}
+
+// Container with explicit zero width but leaf content (Rectangle) deep in the subtree.
+// Zero size IS a real problem and should be reported.
+CLI_TEST(PAGXCliTest, LayoutCheck_ZeroSizeDeepLeaf) {
+  auto path = TestResourcePath("layout_check_zero_size_deep_leaf.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("zero size (0x100)") != std::string::npos);
+}
+
 // Polystar without explicit position should have auto-position applied at import time.
 // Content-measured Layer should NOT report content-origin-offset.
 CLI_TEST(PAGXCliTest, LayoutCheck_PolystarOrigin) {

@@ -1,0 +1,12 @@
+<pagx version="1.0" width="400" height="300">
+  <!-- Container with explicit width="0" but has leaf content deep in the subtree.
+       Zero size IS a real problem here and should be reported. -->
+  <Layer width="400" height="300">
+    <Layer width="0" height="100" layout="vertical">
+      <Layer flex="1">
+        <Rectangle size="80,40"/>
+        <Fill color="#EF4444"/>
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>
