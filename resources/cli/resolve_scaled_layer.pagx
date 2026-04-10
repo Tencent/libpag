@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="200" height="200">
+  <Layer id="scaledExternal" centerX="0" centerY="0" width="96" height="96" import="import_external.svg"/>
+  <Layer id="scaledInline" centerX="0" centerY="0" width="48" height="48">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#FF0000"/></svg>
+  </Layer>
+</pagx>

@@ -2271,6 +2271,32 @@ CLI_TEST(PAGXCliTest, Resolve_AddsResolvedFromComment) {
   EXPECT_NE(content.find("Resolved from: inline svg"), std::string::npos);
 }
 
+CLI_TEST(PAGXCliTest, Resolve_LayerWithExplicitSizeScalesContent) {
+  auto pagxPath = CopyToTemp("resolve_scaled_layer.pagx", "resolve_scaled_layer.pagx");
+  CopyToTemp("import_external.svg", "import_external.svg");
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve", pagxPath});
+  EXPECT_EQ(ret, 0);
+
+  auto doc = pagx::PAGXImporter::FromFile(pagxPath);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(doc->hasUnresolvedImports());
+
+  // External SVG (48x48 viewBox) into 96x96 Layer → scale factor 2.
+  ASSERT_GE(doc->layers.size(), 2u);
+  auto* scaledExternal = doc->layers[0];
+  EXPECT_EQ(scaledExternal->width, 96);
+  EXPECT_EQ(scaledExternal->height, 96);
+
+  // Inline SVG (24x24 viewBox) into 48x48 Layer → scale factor 2.
+  auto* scaledInline = doc->layers[1];
+  EXPECT_EQ(scaledInline->width, 48);
+  EXPECT_EQ(scaledInline->height, 48);
+
+  // Both layers should have content (resolved successfully).
+  EXPECT_FALSE(scaledExternal->contents.empty() || !scaledExternal->children.empty());
+  EXPECT_FALSE(scaledInline->contents.empty() || !scaledInline->children.empty());
+}
+
 CLI_TEST(PAGXCliTest, Resolve_LayerWithContentsSkipsResolve) {
   auto pagxPath = CopyToTemp("resolve_conflict_contents.pagx", "resolve_conflict_contents.pagx");
   CopyToTemp("import_external.svg", "import_external.svg");
