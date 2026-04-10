@@ -114,6 +114,7 @@ export class PAGView extends NativePAGView {
       this.flushingNextFrame = false;
     } catch (e: any) {
       this.flushingNextFrame = false;
+      this.clearTimer();
       console.error(e);
     }
   }
