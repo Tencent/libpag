@@ -575,8 +575,8 @@ Resolution behavior depends on whether the Layer has explicit dimensions:
 
 After resolution, a comment is added inside the Layer indicating the source:
 `<!-- Resolved from: inline svg -->` or `<!-- Resolved from: assets/logo.svg -->`.
-For the simplest resolved structure, generate SVG at the exact target dimensions so no
-scaling wrapper is needed.
+Always generate SVG at the exact target dimensions to avoid a scaling wrapper in the
+resolved output.
 
 **Native PAGX elements vs inline SVG:**
 
