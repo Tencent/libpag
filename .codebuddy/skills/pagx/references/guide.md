@@ -575,6 +575,8 @@ Resolution behavior depends on whether the Layer has explicit dimensions:
 
 After resolution, a comment is added inside the Layer indicating the source:
 `<!-- Resolved from: inline svg -->` or `<!-- Resolved from: assets/logo.svg -->`.
+For the simplest resolved structure, generate SVG at the exact target dimensions so no
+scaling wrapper is needed.
 
 **Native PAGX elements vs inline SVG:**
 
@@ -772,5 +774,29 @@ finalizing any PAGX output, verify that none of these anti-patterns appear in yo
   <!-- ✅ Content-measured height — no fixed value needed -->
   <Layer layout="vertical" padding="20" gap="14">
     <!-- ... height matches content automatically ... -->
+  </Layer>
+  ```
+
+- **NEVER** put `padding` on a Layer that also has stretch-fill background VectorElements
+  (`left="0" right="0" top="0" bottom="0"`) — `padding` insets the constraint reference
+  frame for **all contents** including VectorElements, so the background shrinks away from
+  the Layer edges instead of filling them. MUST use nested container structure: outer Layer
+  for edge-to-edge background (no padding), inner Layer for padded content layout.
+
+  ```xml
+  <!-- ❌ padding shrinks the Rectangle — background has 12px gap around all edges -->
+  <Layer layout="vertical" gap="8" padding="12">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+    <Fill color="#F8F9FA"/>
+    <!-- content starts at same offset as background — no visual padding -->
+  </Layer>
+
+  <!-- ✅ Outer holds background, inner carries padding -->
+  <Layer>
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+    <Fill color="#F8F9FA"/>
+    <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="8" padding="12">
+      <!-- content has 12px visual padding inside the background -->
+    </Layer>
   </Layer>
   ```
