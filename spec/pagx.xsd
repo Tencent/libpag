@@ -849,7 +849,7 @@
 
   <!-- ========================= Build Directives ========================= -->
 
-  <!-- SVG import is handled via inline <svg> child elements in Layer (parsed opaquely)
+  <!-- Import is handled via inline <svg> child elements in Layer (parsed opaquely)
        and the "import"/"importFormat" attributes on LayerType. No separate complex type needed. -->
 
   <!-- ========================= Layer ========================= -->

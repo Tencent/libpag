@@ -75,7 +75,7 @@ Basic container for content, child layers, styles, and filters.
 | `clipToBounds` | bool | false | Clip content to layer bounds (writes scrollRect during layout) |
 | `mask` | idref | — | Mask layer reference "@id" |
 | `composition` | idref | — | Composition reference "@id" for content reuse |
-| `import` | string | — | Path to external SVG file (relative to the PAGX file) for import |
+| `import` | string | — | Path to external file to import (relative to the PAGX file); format inferred from extension |
 | `importFormat` | string | — | Force import format (e.g., `svg`); inferred from file extension when omitted |
 | `maskType` | MaskType | alpha | Mask type (alpha, luminance, or contour) |
 

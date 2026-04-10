@@ -29,7 +29,7 @@ This specification is organized in the following order:
 - **Auto Layout**: Defines layout size, container layout, and constraint positioning mechanisms
 - **Layer System**: Defines layers and their related features (styles, filters, masks)
 - **VectorElement System**: Defines vector elements within layers and their processing model
-- **Build Directives**: Defines build-time SVG import via inline `<svg>` elements and the `import` attribute on Layer
+- **Build Directives**: Defines build-time import directives (inline `<svg>` elements and the `import` attribute on Layer)
 
 **Appendices** (for quick reference):
 
@@ -2135,9 +2135,9 @@ attribute can be used to explicitly specify the format.
 
 ### 7.3 Resolution
 
-The `pagx resolve` command processes all SVG import directives in a PAGX file:
+The `pagx resolve` command processes all import directives in a PAGX file:
 
-1. For each Layer with an inline `<svg>` child or an `import` attribute, reads the SVG
+1. For each Layer with an inline `<svg>` child or an `import` attribute, reads the
    content (inline element or external file)
 2. Converts the SVG content into native PAGX nodes (e.g., SVG elements become Rectangle,
    Ellipse, Path, Fill, Stroke, Group nodes)
@@ -2154,10 +2154,10 @@ After resolution, the file contains only native PAGX nodes — no `<svg>` elemen
 
 #### Tool Behavior
 
-Tools that process PAGX files handle unresolved SVG import directives as follows:
+Tools that process PAGX files handle unresolved import directives as follows:
 
-- **`pagx verify`**: Automatically resolves all SVG imports before checking. If resolve fails, reports the error.
-- **`pagx render`**: Reports error — `unresolved SVG import`, refuses to render.
+- **`pagx verify`**: Automatically resolves all imports before checking. If resolve fails, reports the error.
+- **`pagx render`**: Reports error — `unresolved import`, refuses to render.
 
 ---
 
@@ -2179,7 +2179,7 @@ This appendix describes node categorization and nesting rules.
 | **Geometry Elements** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` | Drawable shapes and text. Must be inside Layer/Group. |
 | **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `TextBox`, `Repeater` | Transform or combine geometry and text. |
 | **Painters** | `Fill`, `Stroke` | Apply color/gradient to geometry. Must be inside Layer/Group. |
-| **Build Directives** | (inline `<svg>`, `import` attribute) | Build-time SVG import on Layer. Inline `<svg>` child elements and the `import`/`importFormat` attributes are resolved by `pagx resolve` into native PAGX nodes. |
+| **Build Directives** | (inline `<svg>`, `import` attribute) | Build-time import directives on Layer. Inline `<svg>` child elements and the `import`/`importFormat` attributes are resolved by `pagx resolve` into native PAGX nodes. |
 
 ### A.2 Document Containment
 
