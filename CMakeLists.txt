@@ -208,7 +208,10 @@ if (PAG_BUILD_PAGX)
     endif ()
 
     if (PAG_BUILD_PPT)
-        list(APPEND PAG_FILES src/pagx/ppt/PPTExporter.cpp)
+        list(APPEND PAG_FILES src/pagx/ppt/PPTExporter.cpp
+                src/pagx/ppt/PPTBoilerplate.cpp
+                src/pagx/ppt/PPTContourUtils.cpp
+                src/pagx/ppt/PPTGeomEmitter.cpp)
         set(MINIZIP_DIR ${TGFX_DIR}/third_party/zlib/contrib/minizip)
         list(APPEND PAG_FILES ${MINIZIP_DIR}/zip.c ${MINIZIP_DIR}/ioapi.c)
         list(APPEND PAG_INCLUDES ${MINIZIP_DIR})
