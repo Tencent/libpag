@@ -299,26 +299,6 @@ holds the background Rectangle; the inner Layer with `padding` and `layout` mana
 Button cells use Group with `padding` for centered text (no layout needed). This structure
 (outer background + inner padded container) is the standard card/panel/screen template.
 
-**Common mistake** — putting `padding` on the same Layer as the background Rectangle:
-
-```xml
-<!-- ❌ padding shrinks the background — Rectangle gets inset by 16px on all sides -->
-<Layer layout="vertical" padding="16">
-  <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
-  <Fill color="#FFF"/>
-  <!-- content here — starts at same offset as the background, no visual padding -->
-</Layer>
-
-<!-- ✅ Correct: outer Layer has background, inner Layer has padding -->
-<Layer>
-  <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
-  <Fill color="#FFF"/>
-  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16">
-    <!-- content here — 16px inside the background edge -->
-  </Layer>
-</Layer>
-```
-
 ### Input Field (InnerShadowStyle)
 
 ```xml
