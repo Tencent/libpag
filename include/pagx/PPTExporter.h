@@ -47,9 +47,9 @@ struct PPTExportOptions {
    * contain inner holes are connected by bridge edges so the hole is expressed as a single
    * self-intersecting sub-path, which some renderers require for correct even-odd fill. When
    * disabled, each contour is emitted as a separate sub-path inside the path list. The default
-   * value is false.
+   * value is true.
    */
-  bool bridgeContours = false;
+  bool bridgeContours = true;
 };
 
 /**

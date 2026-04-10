@@ -274,7 +274,7 @@ class PPTWriter {
   PAGXDocument* _doc = nullptr;
   bool _convertTextToPath = true;
   bool _bakeMask = true;
-  bool _bridgeContours = false;
+  bool _bridgeContours = true;
   LayerBuildResult _buildResult = {};
   bool _buildResultReady = false;
 

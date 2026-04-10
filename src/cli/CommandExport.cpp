@@ -34,7 +34,7 @@ struct ExportOptions {
   bool svgNoXmlDeclaration = false;
   bool textToPath = false;
   bool pptNoBakeMask = false;
-  bool pptBridgeContours = false;
+  bool pptNoBridgeContours = false;
 };
 
 static void PrintUsage() {
@@ -57,8 +57,8 @@ static void PrintUsage() {
       << "PPT options:\n"
       << "  --ppt-no-bake-mask          Export masked layers as vector shapes instead of\n"
       << "                              rasterizing to bitmap\n"
-      << "  --ppt-bridge-contours       Bridge nested contours to express holes via\n"
-      << "                              self-intersecting sub-paths (default: off)\n"
+      << "  --ppt-no-bridge-contours    Emit each contour as a separate sub-path instead\n"
+      << "                              of bridging nested contours (default: bridge on)\n"
       << "\n"
       << "Examples:\n"
       << "  pagx export --input icon.pagx                    # PAGX to icon.svg\n"
@@ -94,8 +94,8 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
       options->textToPath = true;
     } else if (arg == "--ppt-no-bake-mask") {
       options->pptNoBakeMask = true;
-    } else if (arg == "--ppt-bridge-contours") {
-      options->pptBridgeContours = true;
+    } else if (arg == "--ppt-no-bridge-contours") {
+      options->pptNoBridgeContours = true;
     } else if (arg == "--help" || arg == "-h") {
       PrintUsage();
       return -1;
@@ -172,7 +172,7 @@ static int ExportToPPT(const ExportOptions& options) {
   PPTExporter::Options pptOptions = {};
   pptOptions.convertTextToPath = options.textToPath;
   pptOptions.bakeMask = !options.pptNoBakeMask;
-  pptOptions.bridgeContours = options.pptBridgeContours;
+  pptOptions.bridgeContours = !options.pptNoBridgeContours;
 
   if (!PPTExporter::ToFile(*document, options.outputFile, pptOptions)) {
     std::cerr << "pagx export: error: failed to write '" << options.outputFile << "'\n";
