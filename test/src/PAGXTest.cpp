@@ -25,6 +25,7 @@
 #include "cli/CommandImport.h"
 #include "cli/CommandVerify.h"
 #include "pagx/FontConfig.h"
+#include "pagx/HTMLExporter.h"
 #include "pagx/LayoutContext.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
@@ -5059,18 +5060,17 @@ PAGX_TEST(PAGXTest, HtmlFiles) {
  * Then: open test/out/PAGXHtmlTest/comparison.html
  */
 PAGX_TEST(PAGXTest, GenerateComparisonPage) {
-  auto directory = ProjectPath::Absolute("resources/pagx_to_html");
   auto outDir = ProjectPath::Absolute("test/out/PAGXHtmlTest");
   std::filesystem::create_directories(outDir);
 
-  std::vector<std::string> files;
-  for (const auto& entry : std::filesystem::directory_iterator(directory)) {
-    if (entry.path().extension() == ".pagx") {
-      files.push_back(entry.path().string());
-    }
-  }
-  std::sort(files.begin(), files.end());
-  ASSERT_FALSE(files.empty());
+  struct DirectoryInfo {
+    std::string path;
+    std::string label;
+  };
+  std::vector<DirectoryInfo> directories = {
+      {ProjectPath::Absolute("resources/pagx_to_html"), "resources/pagx_to_html"},
+      {ProjectPath::Absolute("resources/cli"), "resources/cli"},
+  };
 
   pagx::FontConfig fontConfig;
   fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
@@ -5083,6 +5083,8 @@ PAGX_TEST(PAGXTest, GenerateComparisonPage) {
 body{font-family:-apple-system,Arial,sans-serif;background:#f1f5f9;margin:0;padding:20px}
 h1{text-align:center;color:#1e293b;margin-bottom:4px}
 .sub{text-align:center;color:#94a3b8;font-size:14px;margin-bottom:24px}
+.sep{margin:40px 0 24px;padding:16px 24px;background:#1e293b;border-radius:8px;color:white;font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:space-between}
+.sep span{font-size:12px;font-weight:400;color:#94a3b8}
 .card{background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);margin-bottom:20px;overflow:hidden}
 .hd{padding:12px 16px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between}
 .hd h3{margin:0;font-size:14px;color:#334155}
@@ -5098,63 +5100,100 @@ h1{text-align:center;color:#1e293b;margin-bottom:4px}
 )";
 
   int count = 0;
-  for (const auto& filePath : files) {
-    auto baseName = std::filesystem::path(filePath).stem().string();
-    auto doc = pagx::PAGXImporter::FromFile(filePath);
-    if (!doc || doc->width <= 0 || doc->height <= 0) {
+  for (const auto& dirInfo : directories) {
+    std::vector<std::string> files;
+    if (!std::filesystem::exists(dirInfo.path)) {
       continue;
     }
-    int w = static_cast<int>(doc->width);
-    int h = static_cast<int>(doc->height);
-    int scale = 2;
-    int rw = w * scale;
-    int rh = h * scale;
-
-    // Render PAGX native at 2x resolution
-    auto nativePng = outDir + "/" + baseName + "_pagx.png";
-    doc->applyLayout(&fontConfig);
-    auto layer = pagx::LayerBuilder::Build(doc.get());
-    if (layer) {
-      layer->setMatrix(tgfx::Matrix::MakeScale(static_cast<float>(scale)));
-      auto surface = tgfx::Surface::Make(context, rw, rh);
-      if (surface) {
-        tgfx::DisplayList displayList;
-        displayList.root()->addChild(layer);
-        displayList.render(surface.get(), false);
-        tgfx::Bitmap bitmap(rw, rh, false, false);
-        tgfx::Pixmap pixmap(bitmap);
-        surface->readPixels(pixmap.info(), pixmap.writablePixels());
-        auto data = tgfx::ImageCodec::Encode(pixmap, tgfx::EncodedFormat::PNG, 100);
-        if (data) {
-          std::ofstream f(nativePng, std::ios::binary);
-          f.write(reinterpret_cast<const char*>(data->data()),
-                  static_cast<std::streamsize>(data->size()));
-        }
+    for (const auto& entry : std::filesystem::directory_iterator(dirInfo.path)) {
+      if (entry.path().extension() == ".pagx") {
+        files.push_back(entry.path().string());
       }
     }
-
-    // Generate HTML screenshot at 2x resolution
-    auto htmlPngHires = outDir + "/" + baseName + "_html2x.png";
-    auto htmlPath = outDir + "/" + baseName + ".html";
-    if (std::filesystem::exists(htmlPath)) {
-      auto scriptPath = ProjectPath::Absolute("test/screenshot.js");
-      auto cmd = "node " + scriptPath + " " + htmlPath + " " + htmlPngHires + " " +
-                 std::to_string(w) + " " + std::to_string(h) + " " + std::to_string(scale) +
-                 " 2>&1";
-      std::system(cmd.c_str());
+    std::sort(files.begin(), files.end());
+    if (files.empty()) {
+      continue;
     }
 
-    page += "<div class=\"card\" id=\"" + baseName + "\">\n";
-    page += "  <div class=\"hd\"><h3>" + std::to_string(count + 1) + ". " + baseName +
-            "</h3><span class=\"sz\">" + std::to_string(w) + "x" + std::to_string(h) + " @" +
-            std::to_string(scale) + "x</span></div>\n";
-    page += "  <div class=\"cmp\">\n";
-    page += "    <div><label>PAGX Native</label><img src=\"" + baseName + "_pagx.png\" width=\"" +
-            std::to_string(w) + "\"></div>\n";
-    page += "    <div><label>HTML (Browser)</label><img src=\"" + baseName +
-            "_html2x.png\" width=\"" + std::to_string(w) + "\"></div>\n";
-    page += "  </div>\n</div>\n";
-    count++;
+    int sectionCount = 0;
+    for (const auto& filePath : files) {
+      auto baseName = std::filesystem::path(filePath).stem().string();
+      auto doc = pagx::PAGXImporter::FromFile(filePath);
+      if (!doc || doc->width <= 0 || doc->height <= 0) {
+        continue;
+      }
+      sectionCount++;
+    }
+
+    page += "<div class=\"sep\">" + dirInfo.label + "<span>" + std::to_string(sectionCount) +
+            " files</span></div>\n";
+
+    for (const auto& filePath : files) {
+      auto baseName = std::filesystem::path(filePath).stem().string();
+      auto doc = pagx::PAGXImporter::FromFile(filePath);
+      if (!doc || doc->width <= 0 || doc->height <= 0) {
+        continue;
+      }
+      int w = static_cast<int>(doc->width);
+      int h = static_cast<int>(doc->height);
+      int scale = 2;
+      int rw = w * scale;
+      int rh = h * scale;
+
+      // Render PAGX native at 2x resolution
+      auto nativePng = outDir + "/" + baseName + "_pagx.png";
+      doc->applyLayout(&fontConfig);
+      auto layer = pagx::LayerBuilder::Build(doc.get());
+      if (layer) {
+        layer->setMatrix(tgfx::Matrix::MakeScale(static_cast<float>(scale)));
+        auto surface = tgfx::Surface::Make(context, rw, rh);
+        if (surface) {
+          tgfx::DisplayList displayList;
+          displayList.root()->addChild(layer);
+          displayList.render(surface.get(), false);
+          tgfx::Bitmap bitmap(rw, rh, false, false);
+          tgfx::Pixmap pixmap(bitmap);
+          surface->readPixels(pixmap.info(), pixmap.writablePixels());
+          auto data = tgfx::ImageCodec::Encode(pixmap, tgfx::EncodedFormat::PNG, 100);
+          if (data) {
+            std::ofstream f(nativePng, std::ios::binary);
+            f.write(reinterpret_cast<const char*>(data->data()),
+                    static_cast<std::streamsize>(data->size()));
+          }
+        }
+      }
+
+      // Generate HTML for this file
+      auto htmlPath = outDir + "/" + baseName + ".html";
+      doc->applyLayout();
+      auto htmlContent = pagx::HTMLExporter::ToHTML(*doc);
+      if (!htmlContent.empty()) {
+        std::ofstream hf(htmlPath, std::ios::binary);
+        hf.write(htmlContent.data(), static_cast<std::streamsize>(htmlContent.size()));
+      }
+
+      // Generate HTML screenshot at 2x resolution
+      auto htmlPngHires = outDir + "/" + baseName + "_html2x.png";
+      if (std::filesystem::exists(htmlPath)) {
+        auto scriptPath = ProjectPath::Absolute("test/screenshot.js");
+        auto cmd = "node " + scriptPath + " " + htmlPath + " " + htmlPngHires + " " +
+                   std::to_string(w) + " " + std::to_string(h) + " " + std::to_string(scale) +
+                   " 2>&1";
+        std::system(cmd.c_str());
+      }
+
+      page += "<div class=\"card\" id=\"" + baseName + "\">\n";
+      page += "  <div class=\"hd\"><h3>" + std::to_string(count + 1) + ". " + baseName +
+              "</h3><span class=\"sz\">" + std::to_string(w) + "x" + std::to_string(h) + " @" +
+              std::to_string(scale) + "x</span></div>\n";
+      page += "  <div class=\"cmp\">\n";
+      page += "    <div><label>PAGX Native</label><img src=\"" + baseName + "_pagx.png\" width=\"" +
+              std::to_string(w) + "\"></div>\n";
+      page += "    <div><label>HTML (Browser)</label><img src=\"" + baseName +
+              "_html2x.png\" width=\"" + std::to_string(w) + "\"></div>\n";
+      page += "  </div>\n</div>\n";
+      count++;
+    }
   }
 
   page += "<p class=\"sub\">" + std::to_string(count) + " files compared</p></body></html>";
