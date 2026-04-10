@@ -218,12 +218,12 @@ export class VideoReader {
                     return;
                 }
                 if (document.visibilityState === 'visible') {
-                    if (this.videoEl) this.videoEl.play();
+                    if (this.videoEl) this.videoEl.play().catch((e) => { this.setError(e); });
                     this.clearVisibilityListener();
                 }
             };
             window.addEventListener('visibilitychange', this.visibilityHandle);
-            return;
+            throw new Error('The play() request was interrupted because the document was hidden!');
         }
         await this.videoEl?.play();
     }
