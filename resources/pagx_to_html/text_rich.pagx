@@ -22,39 +22,38 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="vertical" padding="15" alignment="center" arrangement="center">
+    <Layer flex="1">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <!-- Rich text content -->
-      <Layer width="280" height="120">
-        <!-- Shared text box for layout -->
+      <!-- Rich text content: centered in card using constraints -->
+      <Layer left="20" right="20" top="15" bottom="15">
         <TextBox left="0" right="0" top="0" bottom="0" textAlign="center" paragraphAlign="middle"/>
         <!-- First text span: red bold -->
         <Group>
-          <Text text="Hello " fontFamily="Arial" fontStyle="Bold" fontSize="24" position="10,10"/>
+          <Text text="Hello " fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
           <Fill color="#EF4444"/>
         </Group>
         <!-- Second text span: blue italic -->
         <Group>
-          <Text text="Beautiful " fontFamily="Arial" fontStyle="Italic" fontSize="24" position="10,10"/>
+          <Text text="Beautiful " fontFamily="Arial" fontStyle="Italic" fontSize="24"/>
           <Fill color="#3B82F6"/>
         </Group>
         <!-- Third text span: green bold -->
         <Group>
-          <Text text="World!" fontFamily="Arial" fontStyle="Bold" fontSize="24" position="10,10"/>
+          <Text text="World!" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
           <Fill color="#10B981"/>
         </Group>
         <!-- Fourth text span: purple with stroke -->
         <Group>
-          <Text text=" Mixed " fontFamily="Arial" fontStyle="Bold" fontSize="20" position="10,10"/>
+          <Text text=" Mixed " fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
           <Fill color="#8B5CF6"/>
           <Stroke color="#6D28D9" width="0.5"/>
         </Group>
         <!-- Fifth text span: orange -->
         <Group>
-          <Text text="Styles" fontFamily="Arial" fontStyle="Bold Italic" fontSize="20" position="10,10"/>
+          <Text text="Styles" fontFamily="Arial" fontStyle="Bold Italic" fontSize="20"/>
           <Fill color="#F59E0B"/>
         </Group>
       </Layer>
