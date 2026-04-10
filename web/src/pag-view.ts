@@ -436,7 +436,9 @@ export class PAGView {
       this.flushingNextFrame = false;
     } catch (e: any) {
       this.flushingNextFrame = false;
-      this.clearTimer();
+      if (e.message !== 'The play() request was interrupted because the document was hidden!') {
+        this.clearTimer();
+      }
       console.error(e);
     }
   }
