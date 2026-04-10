@@ -96,6 +96,7 @@ export class VideoReader {
       if (index !== -1) {
         this.frameDataBuffers = this.frameDataBuffers.slice(index);
         this.arrayBufferImage.setFrameData(await this.getFrameData());
+        if (this.isDestroyed) return;
         this.currentFrame = targetFrame;
         return;
       }
@@ -114,6 +115,7 @@ export class VideoReader {
       this.seeking = false;
     }
     this.arrayBufferImage.setFrameData(await this.getFrameData());
+    if (this.isDestroyed) return;
     this.currentFrame = targetFrame;
     return;
   }
@@ -144,6 +146,10 @@ export class VideoReader {
 
   public onDestroy() {
     this.isDestroyed = true;
+    if (this.getFrameDataResolve) {
+      this.getFrameDataResolve({ id: -1, data: new ArrayBuffer(0), width: 0, height: 0 });
+      this.getFrameDataResolve = null;
+    }
     if (this.player) {
       this.player.unlinkVideoReader(this);
       this.player = null;

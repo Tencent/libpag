@@ -171,16 +171,16 @@ export class VideoReader {
                 }
             }
 
-            if (this.isDestroyed) {
+            if (this.isDestroyed || !this.videoEl) {
                 resolve();
                 return;
             }
             const targetPlaybackRate = Math.min(Math.max(playbackRate, VIDEO_PLAYBACK_RATE_MIN), VIDEO_PLAYBACK_RATE_MAX);
-            if (!this.disablePlaybackRate && this.videoEl!.playbackRate !== targetPlaybackRate) {
-                this.videoEl!.playbackRate = targetPlaybackRate;
+            if (!this.disablePlaybackRate && this.videoEl.playbackRate !== targetPlaybackRate) {
+                this.videoEl.playbackRate = targetPlaybackRate;
             }
 
-            if (this.isPlaying && this.videoEl!.paused) {
+            if (this.isPlaying && this.videoEl.paused) {
                 try {
                     await this.play();
                 } catch (e) {
