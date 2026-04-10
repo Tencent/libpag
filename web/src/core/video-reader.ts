@@ -136,10 +136,8 @@ export class VideoReader {
                         await waitVideoCanPlay(this.videoEl!);
                         await this.play();
                     } catch (e) {
-                        // Soft failure: record error but continue with current frame
                         this.setError(e);
                         this.currentFrame = targetFrame;
-                        console.warn('[VideoReader] Play failed, continuing with current frame:', e);
                         resolve();
                         return;
                     }
@@ -186,10 +184,8 @@ export class VideoReader {
                 try {
                     await this.play();
                 } catch (e) {
-                    // Soft failure: record error but continue with current frame
                     this.setError(e);
                     this.currentFrame = targetFrame;
-                    console.warn('[VideoReader] Play failed, continuing with current frame:', e);
                     resolve();
                     return;
                 }
@@ -215,6 +211,7 @@ export class VideoReader {
         }
         if (document.visibilityState !== 'visible') {
             // Page is hidden, defer video play until visible
+            this.clearVisibilityListener();
             this.visibilityHandle = () => {
                 if (this.isDestroyed) {
                     this.clearVisibilityListener();
@@ -226,7 +223,6 @@ export class VideoReader {
                 }
             };
             window.addEventListener('visibilitychange', this.visibilityHandle);
-            console.log('[VideoReader] Page hidden, video play deferred until visible.');
             return;
         }
         await this.videoEl?.play();
@@ -250,6 +246,7 @@ export class VideoReader {
     }
 
     public onDestroy() {
+        this.isDestroyed = true;
         if (this.player) {
             this.player.unlinkVideoReader(this);
             this.player = null;
@@ -257,10 +254,11 @@ export class VideoReader {
         this.clearVisibilityListener();
         removeAllListeners(this.videoEl!, 'playing');
         removeAllListeners(this.videoEl!, 'timeupdate');
+        removeAllListeners(this.videoEl!, 'seeked');
+        removeAllListeners(this.videoEl!, 'canplay');
         this.videoEl = null;
         this.bitmapCanvas = null;
         this.bitmapCtx = null;
-        this.isDestroyed = true;
     }
 
     private seek(targetTime: number, play = true) {
@@ -310,7 +308,7 @@ export class VideoReader {
                     removeListener(this.videoEl, 'canplay', onCanPlay);
                     removeListener(this.videoEl, 'seeked', onSeeked);
                 }
-                console.log('[VideoReader] Seek operation timed out, continuing with current frame.');
+                this.setError('Seek operation timed out.');
                 resolve();
             }, (1000 / this.frameRate) * VIDEO_DECODE_SEEK_TIMEOUT_FRAME);
 

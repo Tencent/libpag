@@ -46,6 +46,7 @@ export class VideoReader {
   public isPlaying = false; // Web SDK use this property to check if video is playing
   public isDestroyed = false;
   private player: PAGPlayer | null = null;
+  private error: any = null;
 
   private readonly frameRate: number;
   private currentFrame: number;
@@ -106,7 +107,10 @@ export class VideoReader {
       this.isSought = true;
       this.bufferIndex = targetFrame;
       await this.videoDecoder.seek(Math.floor((targetFrame / this.frameRate) * 1000));
-      if (this.isDestroyed) return;
+      if (this.isDestroyed) {
+        this.seeking = false;
+        return;
+      }
       this.seeking = false;
     }
     this.arrayBufferImage.setFrameData(await this.getFrameData());
@@ -135,11 +139,11 @@ export class VideoReader {
   }
 
   public getError(): any {
-    // Web SDK use this function to get video error.
-    return null;
+    return this.error;
   }
 
   public onDestroy() {
+    this.isDestroyed = true;
     if (this.player) {
       this.player.unlinkVideoReader(this);
       this.player = null;
@@ -149,7 +153,6 @@ export class VideoReader {
     if (this.mp4Path) {
       removeFile(this.mp4Path);
     }
-    this.isDestroyed = true;
   }
 
   private getFrameData() {
@@ -182,7 +185,7 @@ export class VideoReader {
     if (this.seeking) return;
     if (!this.videoDecoder) {
       this.clearFrameDataLoop();
-      console.warn('[VideoReader] VideoDecoder is not ready, frame data loop stopped.');
+      this.error = 'VideoDecoder is not ready.';
       return;
     }
     if (this.frameDataBuffers.length >= BUFFER_MAX_SIZE) {
