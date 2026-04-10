@@ -121,17 +121,19 @@ Do NOT start the next task until the current one is completed.
 
 ### Step 2: Skeleton
 
-**Do**: Write the `<pagx>` root and all section Layers with **only layout attributes**
-(`id`, `width`/`height`, `flex`, `layout`, `gap`, `padding`, `alignment`, `arrangement`).
-No visual content — no shapes, text, painters, styles, or filters. Assign `id` to every
-structural section for scoped verification in Step 3.
+**Do**: Write the `<pagx>` root and all section Layers with **structural layout attributes**
+(`id`, `width`/`height`, `flex`, `layout`, `gap`, `alignment`, `arrangement`),
+**background fills, and section dividers** using the nested container structure
+(see `guide.md` §Container Layout). Assign `id` to every structural section for scoped
+verification in Step 3.
 
 **Gate**: Repeat until clean:
-1. Run `pagx verify --skip-render input.pagx`.
+1. Run `pagx verify input.pagx`.
 2. Fix all reported diagnostics, then re-run verify.
 3. Read the `.layout.xml` output and verify each section's bounds match the intended
    sizes and positions.
 4. Check against §Common Pitfalls — scan output for every listed anti-pattern.
+5. Check the screenshot against §Screenshot Checklist.
 
 **Forbidden**: Do NOT proceed to Step 3 until the gate passes.
 

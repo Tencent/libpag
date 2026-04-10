@@ -114,13 +114,17 @@ pagx (required: version, width, height)
 layout is expressible as nested flex containers.
 
 `padding` works on **all Layers, Groups, and TextBoxes** — it insets the layout content
-area and the constraint reference frame for all contents. When a background Rectangle needs
-to fill the entire Layer, use a two-layer structure: the outer Layer holds the background
-Rectangle, the inner container carries `padding`. Use `Layer` when the inner container
-needs `layout`; use `Group` when it only needs `padding`.
+area and the constraint reference frame for all contents. This means `left="0" top="0"`
+inside a padded container resolves to the padding inner edge, not the Layer edge.
+
+**Nested container structure**: When a container needs both edge-to-edge elements
+(background fills, dividers, borders that span the full bounds) and padded content, split
+them across an outer and inner container. The outer container holds edge elements without
+padding; the inner container carries `padding` for content. Either container can be a
+Layer or Group — use Layer when it needs `layout` or child Layers, use Group otherwise.
 
 ```xml
-<!-- Outer Layer for background, inner Layer for padded layout content -->
+<!-- Outer: background (no padding). Inner: padded layout content. -->
 <Layer>
   <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
   <Fill color="#FFF"/>
@@ -129,7 +133,7 @@ needs `layout`; use `Group` when it only needs `padding`.
   </Layer>
 </Layer>
 
-<!-- Outer Layer for background, inner Group for padded VectorElements (no layout needed) -->
+<!-- Button: outer background, inner Group for padded text -->
 <Layer centerX="0" centerY="0">
   <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
   <Fill color="#3B82F6"/>

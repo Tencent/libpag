@@ -276,7 +276,7 @@ A card with vertical container layout, text header, and action buttons.
 </pagx>
 ```
 
-**Pattern**: Two-layer nesting separates background from padded content. The outer Layer
+**Pattern**: Nested container structure separates background from padded content. The outer Layer
 holds the background Rectangle; the inner Layer with `padding` and `layout` manages content.
 `flex="1"` absorbs remaining space; multiple `flex="1"` siblings distribute equally.
 Button cells use Group with `padding` for centered text (no layout needed). This structure
