@@ -172,9 +172,21 @@ class XMLBuilder {
   }
 
   void writeRawLine(const std::string& content) {
-    writeIndent();
-    buffer += content;
-    buffer += "\n";
+    // Handle multi-line content by indenting each line individually.
+    size_t start = 0;
+    while (start < content.size()) {
+      auto end = content.find('\n', start);
+      if (end == std::string::npos) {
+        writeIndent();
+        buffer.append(content, start, content.size() - start);
+        buffer += "\n";
+        break;
+      }
+      writeIndent();
+      buffer.append(content, start, end - start);
+      buffer += "\n";
+      start = end + 1;
+    }
   }
 
   void writeComment(const std::string& text) {
