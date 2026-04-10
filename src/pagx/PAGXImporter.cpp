@@ -477,6 +477,10 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
     }
     if (current->name == "svg") {
       // Inline SVG: serialize the entire <svg> node (including children) as raw XML text.
+      if (!layer->importDirective.content.empty()) {
+        ReportError(doc, current.get(),
+                    "Multiple inline <svg> elements in the same Layer. Only the last one is kept.");
+      }
       std::string svgText;
       SerializeDOMNode(current.get(), svgText);
       layer->importDirective.content = std::move(svgText);
@@ -525,6 +529,10 @@ static void ParseContents(const DOMNode* node, Layer* layer, PAGXDocument* doc) 
     }
     if (current->name == "svg") {
       // Inline SVG in legacy <contents> block.
+      if (!layer->importDirective.content.empty()) {
+        ReportError(doc, current.get(),
+                    "Multiple inline <svg> elements in the same Layer. Only the last one is kept.");
+      }
       std::string svgText;
       SerializeDOMNode(current.get(), svgText);
       layer->importDirective.content = std::move(svgText);
