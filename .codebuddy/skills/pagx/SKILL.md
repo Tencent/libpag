@@ -57,7 +57,7 @@ all other CLI commands (`render`, `format`, `layout`, `bounds`, `font`, `import`
 After each `pagx verify` run, systematically check the `.layout.xml` output and the
 screenshot against the design intent. Do NOT glance and move on.
 
-**Layout checks** (read `.layout.xml` — each node has `line` and `bounds`):
+**Layout checks** (MUST read `.layout.xml` — each node has `line` and `bounds`):
 - **Bounds accuracy**: For every key element, verify that `bounds` (x, y, width,
   height) match the design spec — padding offsets produce the expected x/y
   coordinates, container widths/heights are correct, spacing between siblings equals
@@ -66,6 +66,15 @@ screenshot against the design intent. Do NOT glance and move on.
   Every element described in the design has a corresponding node with non-zero bounds.
 - **Containment**: No child element's bounds extend beyond its parent's bounds
   (unless intentional overflow like a scrollable card row).
+- **Red flags** — scan `.layout.xml` for these patterns that indicate structural bugs:
+  - Background VectorElement (Rectangle/Ellipse used as background fill) with bounds
+    starting at x>0 or y>0 inside a padded container → `padding` is shrinking the
+    background. Fix: use nested container structure (see `guide.md` §Container Layout).
+  - Child Layer bounds starting at the same (x,y) as a sibling background
+    VectorElement → content overlaps with the background edge, no visual padding
+    effect. Fix: restructure as outer (background) + inner (padded content) Layers.
+  - Text element bounds width > parent TextBox bounds width → text overflows the
+    layout region and will be clipped or hidden.
 
 **Visual checks** (inspect the screenshot):
 - **Stacking order**: No element is accidentally covering another — e.g., a background
@@ -119,11 +128,12 @@ Do NOT start the next task until the current one is completed.
 (see `guide.md` §Container Layout). Assign `id` to every structural section for scoped
 verification in Step 3.
 
-**Gate**: Repeat until clean:
-1. Run `pagx verify input.pagx`.
-2. Fix all reported diagnostics, then re-run verify.
-3. Check against §Common Pitfalls — scan output for every listed anti-pattern.
-4. Check against §Verify Checklist.
+**Gate** (MUST complete ALL steps — do NOT skip any):
+1. Run `pagx verify input.pagx`. Fix all reported diagnostics, then re-run until clean.
+2. **Read `.layout.xml`** — scan for §Verify Checklist red flags (background bounds,
+   content overlap, text overflow). Fix any found, re-run verify.
+3. Check against §Common Pitfalls — scan PAGX source for every listed anti-pattern.
+4. Inspect screenshot for visual issues (§Verify Checklist visual checks).
 
 **Forbidden**: Do NOT proceed to Step 3 until the gate passes.
 
@@ -135,11 +145,13 @@ For each section (identified by `id`), one at a time:
 
 **Do**: Fill in all visual content for this section only.
 
-**Gate**: Repeat until clean:
-1. Run `pagx verify --scale 2 --id "sectionId" input.pagx`.
-2. Fix all reported diagnostics, then re-run verify.
-3. Check against §Common Pitfalls — scan output for every listed anti-pattern.
-4. Check against §Verify Checklist.
+**Gate** (MUST complete ALL steps — do NOT skip any):
+1. Run `pagx verify --scale 2 --id "sectionId" input.pagx`. Fix all reported
+   diagnostics, then re-run until clean.
+2. **Read `.layout.xml`** — scan for §Verify Checklist red flags (background bounds,
+   content overlap, text overflow). Fix any found, re-run verify.
+3. Check against §Common Pitfalls — scan PAGX source for every listed anti-pattern.
+4. Inspect screenshot for visual issues (§Verify Checklist visual checks).
 
 **Cleanup**: After the gate passes, delete that section's scoped artifacts
 (`input.{id}.png`, `input.{id}.layout.xml`) before moving on.
@@ -154,11 +166,13 @@ this section's gate passes.
 **Do**: Review the full design holistically and refine cross-section details — spacing,
 alignment, color consistency, visual hierarchy — that only become apparent at full scale.
 
-**Gate**: Repeat until clean:
-1. Run `pagx verify --scale 2 input.pagx`.
-2. Fix all reported diagnostics, then re-run verify.
-3. Check against §Common Pitfalls — scan output for every listed anti-pattern.
-4. Check against §Verify Checklist.
+**Gate** (MUST complete ALL steps — do NOT skip any):
+1. Run `pagx verify --scale 2 input.pagx`. Fix all reported diagnostics, then re-run
+   until clean.
+2. **Read `.layout.xml`** — scan for §Verify Checklist red flags (background bounds,
+   content overlap, text overflow). Fix any found, re-run verify.
+3. Check against §Common Pitfalls — scan PAGX source for every listed anti-pattern.
+4. Inspect screenshot for visual issues (§Verify Checklist visual checks).
 
 Keep final `input.png` and `input.layout.xml` for reference (do not commit). If further
 edits are made after this step, re-run the full verify to regenerate them. Delete any
