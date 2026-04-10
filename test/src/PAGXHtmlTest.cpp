@@ -48,6 +48,7 @@ static std::string LoadAndConvert(const std::string& pagxPath,
   if (doc == nullptr) {
     return "";
   }
+  doc->applyLayout();
   return pagx::HTMLExporter::ToHTML(*doc, options);
 }
 
@@ -84,6 +85,7 @@ CLI_TEST(PAGXHtmlTest, BatchConvertAll) {
     auto baseName = std::filesystem::path(filePath).stem().string();
     auto doc = pagx::PAGXImporter::FromFile(filePath);
     ASSERT_NE(doc, nullptr) << "Failed to load: " << baseName;
+    doc->applyLayout();
     auto html = pagx::HTMLExporter::ToHTML(*doc);
     EXPECT_FALSE(html.empty()) << "Failed to convert: " << baseName;
     EXPECT_NE(html.find("pagx-root"), std::string::npos)
@@ -479,6 +481,7 @@ CLI_TEST(PAGXHtmlTest, ExportOptions_Indent) {
   auto doc = pagx::PAGXImporter::FromFile(
       ProjectPath::Absolute("resources/pagx_to_html/root_document.pagx"));
   ASSERT_TRUE(doc != nullptr);
+  doc->applyLayout();
 
   pagx::HTMLExportOptions opts = {};
   opts.indent = 4;
@@ -492,6 +495,7 @@ CLI_TEST(PAGXHtmlTest, ExportToFile) {
   auto doc = pagx::PAGXImporter::FromFile(
       ProjectPath::Absolute("resources/pagx_to_html/root_document.pagx"));
   ASSERT_TRUE(doc != nullptr);
+  doc->applyLayout();
 
   auto outPath = ProjectPath::Absolute("test/out/PAGXHtmlTest/export_to_file.html");
   auto dirPath = std::filesystem::path(outPath).parent_path();
@@ -515,6 +519,7 @@ CLI_TEST(PAGXHtmlTest, ReactJSXOutput) {
   auto doc = pagx::PAGXImporter::FromFile(
       ProjectPath::Absolute("resources/pagx_to_html/root_document.pagx"));
   ASSERT_TRUE(doc != nullptr);
+  doc->applyLayout();
 
   pagx::HTMLExportOptions opts = {};
   opts.framework = pagx::HTMLFramework::React;
@@ -541,6 +546,7 @@ CLI_TEST(PAGXHtmlTest, ReactJSXStyleConversion) {
   auto doc = pagx::PAGXImporter::FromFile(
       ProjectPath::Absolute("resources/pagx_to_html/layer_alpha.pagx"));
   ASSERT_TRUE(doc != nullptr);
+  doc->applyLayout();
 
   pagx::HTMLExportOptions opts = {};
   opts.framework = pagx::HTMLFramework::React;
@@ -561,6 +567,7 @@ CLI_TEST(PAGXHtmlTest, VueSFCOutput) {
   auto doc = pagx::PAGXImporter::FromFile(
       ProjectPath::Absolute("resources/pagx_to_html/root_document.pagx"));
   ASSERT_TRUE(doc != nullptr);
+  doc->applyLayout();
 
   pagx::HTMLExportOptions opts = {};
   opts.framework = pagx::HTMLFramework::Vue;
@@ -586,6 +593,7 @@ CLI_TEST(PAGXHtmlTest, VueSFCStyleConversion) {
   auto doc = pagx::PAGXImporter::FromFile(
       ProjectPath::Absolute("resources/pagx_to_html/layer_alpha.pagx"));
   ASSERT_TRUE(doc != nullptr);
+  doc->applyLayout();
 
   pagx::HTMLExportOptions opts = {};
   opts.framework = pagx::HTMLFramework::Vue;
@@ -633,6 +641,7 @@ CLI_TEST(PAGXHtmlTest, HtmlScreenshotCompare) {
       ADD_FAILURE() << "Failed to load: " << baseName;
       continue;
     }
+    doc->applyLayout();
 
     int width = static_cast<int>(doc->width);
     int height = static_cast<int>(doc->height);
@@ -692,6 +701,7 @@ CLI_TEST(PAGXHtmlTest, FrameworkSemanticConsistency) {
 
     auto doc = pagx::PAGXImporter::FromFile(filePath);
     ASSERT_TRUE(doc != nullptr) << "Failed to load: " << baseName;
+    doc->applyLayout();
 
     // Generate all three formats
     auto nativeHtml = pagx::HTMLExporter::ToHTML(*doc);

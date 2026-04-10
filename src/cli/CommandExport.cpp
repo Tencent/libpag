@@ -187,6 +187,8 @@ static int ExportToHTML(const ExportOptions& options) {
 
   HTMLExporter::Options htmlOptions = {};
   htmlOptions.indent = options.htmlIndent;
+
+  document->applyLayout();
   htmlOptions.componentName = options.htmlComponentName;
 
   std::string framework = options.htmlFramework;
