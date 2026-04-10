@@ -170,9 +170,8 @@ alignment, color consistency, visual hierarchy — that only become apparent at 
 2. **Read `.layout.xml`** — scan for §Verify Checklist red flags (background bounds,
    content overlap, text overflow). Fix any found, re-run verify.
 3. Inspect screenshot for visual issues (§Verify Checklist visual checks).
-4. **Pitfall scan** — read `guide.md` §Common Pitfalls and scan the **entire** PAGX
-   source against every listed anti-pattern. This is the only step where pitfalls are
-   checked, so do it thoroughly — do NOT skip any item.
+4. **Pitfall scan** — read `guide.md` §Common Pitfalls and scan the entire PAGX
+   source against every listed anti-pattern.
 
 Keep final `input.png` and `input.layout.xml` for reference (do not commit). If further
 edits are made after this step, re-run the full verify to regenerate them. Delete any
