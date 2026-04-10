@@ -77,6 +77,7 @@ export class VideoReader {
     private bitmapCtx: OffscreenCanvasRenderingContext2D | null = null;
     private currentFrame = -1;
     private targetFrame = -1;
+    private visibilityHandle: (() => void) | null = null;
 
     public constructor(
         source: Uint8Array | HTMLVideoElement,
@@ -214,13 +215,17 @@ export class VideoReader {
         }
         if (document.visibilityState !== 'visible') {
             // Page is hidden, defer video play until visible
-            const visibilityHandle = () => {
+            this.visibilityHandle = () => {
+                if (this.isDestroyed) {
+                    this.clearVisibilityListener();
+                    return;
+                }
                 if (document.visibilityState === 'visible') {
                     if (this.videoEl) this.videoEl.play();
-                    window.removeEventListener('visibilitychange', visibilityHandle);
+                    this.clearVisibilityListener();
                 }
             };
-            window.addEventListener('visibilitychange', visibilityHandle);
+            window.addEventListener('visibilitychange', this.visibilityHandle);
             console.log('[VideoReader] Page hidden, video play deferred until visible.');
             return;
         }
@@ -249,6 +254,7 @@ export class VideoReader {
             this.player.unlinkVideoReader(this);
             this.player = null;
         }
+        this.clearVisibilityListener();
         removeAllListeners(this.videoEl!, 'playing');
         removeAllListeners(this.videoEl!, 'timeupdate');
         this.videoEl = null;
@@ -321,6 +327,13 @@ export class VideoReader {
 
     private setError(e: any) {
         this.error = e;
+    }
+
+    private clearVisibilityListener() {
+        if (this.visibilityHandle) {
+            window.removeEventListener('visibilitychange', this.visibilityHandle);
+            this.visibilityHandle = null;
+        }
     }
 
     private linkPlayer(player: PAGPlayer | null) {
