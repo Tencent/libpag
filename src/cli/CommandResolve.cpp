@@ -236,7 +236,7 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
             if (det < 0) {
               sy = -sy;
             }
-            float rot = std::atan2(m.b, m.a) * 180.0f / 3.14159265358979323846f;
+            float rot = pag::RadiansToDegrees(std::atan2(m.b, m.a));
             group->scale = {sx, sy};
             group->rotation = rot;
           }
