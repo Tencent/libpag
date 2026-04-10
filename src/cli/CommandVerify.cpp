@@ -1691,11 +1691,14 @@ static void DetectContentOriginOffset(const Layer* layer, const Layer* parentLay
   float expectedX = layer->padding.left;
   float expectedY = layer->padding.top;
   if (std::abs(minX - expectedX) > TOLERANCE || std::abs(minY - expectedY) > TOLERANCE) {
+    auto expectedStr = "(" + std::to_string(static_cast<int>(expectedX)) + "," +
+                       std::to_string(static_cast<int>(expectedY)) + ")";
     AddDiagnostic(diagnostics, layer->sourceLine,
                   "children start at (" + std::to_string(static_cast<int>(minX)) + "," +
-                      std::to_string(static_cast<int>(minY)) +
-                      "), not (0,0), container measurement inaccurate. Fix: shift all children so "
-                      "top-left starts at (0,0), preserving relative positions");
+                      std::to_string(static_cast<int>(minY)) + "), not " + expectedStr +
+                      ", container measurement inaccurate. Fix: shift all children so "
+                      "top-left starts at " +
+                      expectedStr + ", preserving relative positions");
   }
 }
 
@@ -1743,11 +1746,14 @@ static void DetectContentOriginOffsetForGroup(const Group* group,
   float expectedX = group->padding.left;
   float expectedY = group->padding.top;
   if (std::abs(minX - expectedX) > TOLERANCE || std::abs(minY - expectedY) > TOLERANCE) {
+    auto expectedStr = "(" + std::to_string(static_cast<int>(expectedX)) + "," +
+                       std::to_string(static_cast<int>(expectedY)) + ")";
     AddDiagnostic(diagnostics, group->sourceLine,
                   "children start at (" + std::to_string(static_cast<int>(minX)) + "," +
-                      std::to_string(static_cast<int>(minY)) +
-                      "), not (0,0), container measurement inaccurate. Fix: shift all children so "
-                      "top-left starts at (0,0), preserving relative positions");
+                      std::to_string(static_cast<int>(minY)) + "), not " + expectedStr +
+                      ", container measurement inaccurate. Fix: shift all children so "
+                      "top-left starts at " +
+                      expectedStr + ", preserving relative positions");
   }
 }
 
