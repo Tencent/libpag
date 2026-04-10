@@ -120,10 +120,8 @@ Do NOT start the next task until the current one is completed.
 verification in Step 3.
 
 **Gate**:
-1. Run `pagx verify input.pagx`. Fix all reported diagnostics, then re-run until clean.
-2. **Read `.layout.xml`** — check §Verify Checklist layout checks (bounds accuracy,
-   visibility, containment). Fix any found, re-run verify.
-3. Inspect screenshot for visual issues (§Verify Checklist visual checks).
+1. Run `pagx verify input.pagx`. Fix all diagnostics until clean.
+2. Read `.layout.xml` and screenshot, check against §Verify Checklist.
 
 **Forbidden**: Do NOT proceed to Step 3 until the gate passes.
 
@@ -136,11 +134,9 @@ For each section (identified by `id`), one at a time:
 **Do**: Fill in all visual content for this section only.
 
 **Gate**:
-1. Run `pagx verify --scale 2 --id "sectionId" input.pagx`. Fix all reported
-   diagnostics, then re-run until clean.
-2. **Read `.layout.xml`** — check §Verify Checklist layout checks (bounds accuracy,
-   visibility, containment). Fix any found, re-run verify.
-3. Inspect screenshot for visual issues (§Verify Checklist visual checks).
+1. Run `pagx verify --scale 2 --id "sectionId" input.pagx`. Fix all diagnostics
+   until clean.
+2. Read `.layout.xml` and screenshot, check against §Verify Checklist.
 
 **Cleanup**: After the gate passes, delete that section's scoped artifacts
 (`input.{id}.png`, `input.{id}.layout.xml`) before moving on.
@@ -156,13 +152,10 @@ this section's gate passes.
 alignment, color consistency, visual hierarchy — that only become apparent at full scale.
 
 **Gate**:
-1. Run `pagx verify --scale 2 input.pagx`. Fix all reported diagnostics, then re-run
-   until clean.
-2. **Read `.layout.xml`** — check §Verify Checklist layout checks (bounds accuracy,
-   visibility, containment). Fix any found, re-run verify.
-3. Inspect screenshot for visual issues (§Verify Checklist visual checks).
-4. **Pitfall scan** — read `guide.md` §Common Pitfalls and scan the entire PAGX
-   source against every listed anti-pattern.
+1. Run `pagx verify --scale 2 input.pagx`. Fix all diagnostics until clean.
+2. Read `.layout.xml` and screenshot, check against §Verify Checklist.
+3. Read `guide.md` §Common Pitfalls, scan the entire PAGX source against every
+   listed anti-pattern.
 
 Keep final `input.png` and `input.layout.xml` for reference (do not commit). If further
 edits are made after this step, re-run the full verify to regenerate them. Delete any
