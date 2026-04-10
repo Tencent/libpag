@@ -1680,6 +1680,42 @@ static void DetectFlexInContentMeasuredParent(const Layer* layer, const Layer* p
                     " or ensure it receives size from its own parent layout");
 }
 
+static void CheckContentOriginOffset(const std::vector<Element*>& elements, const Padding& padding,
+                                     int sourceLine, std::vector<VerifyDiagnostic>& diagnostics) {
+  float minX = FLT_MAX;
+  float minY = FLT_MAX;
+  bool hasChild = false;
+  for (auto* element : elements) {
+    auto* layoutNode = LayoutNode::AsLayoutNode(element);
+    if (layoutNode == nullptr) {
+      continue;
+    }
+    auto bounds = layoutNode->layoutBounds();
+    if (bounds.width == 0 && bounds.height == 0) {
+      continue;
+    }
+    minX = std::min(minX, bounds.x);
+    minY = std::min(minY, bounds.y);
+    hasChild = true;
+  }
+  if (!hasChild) {
+    return;
+  }
+  static constexpr float TOLERANCE = 0.5f;
+  float expectedX = padding.left;
+  float expectedY = padding.top;
+  if (std::abs(minX - expectedX) > TOLERANCE || std::abs(minY - expectedY) > TOLERANCE) {
+    auto expectedStr = "(" + std::to_string(static_cast<int>(expectedX)) + "," +
+                       std::to_string(static_cast<int>(expectedY)) + ")";
+    AddDiagnostic(diagnostics, sourceLine,
+                  "children start at (" + std::to_string(static_cast<int>(minX)) + "," +
+                      std::to_string(static_cast<int>(minY)) + "), not " + expectedStr +
+                      ", container measurement inaccurate. Fix: shift all children so "
+                      "top-left starts at " +
+                      expectedStr + ", preserving relative positions");
+  }
+}
+
 static void DetectContentOriginOffset(const Layer* layer, const Layer* parentLayer,
                                       std::vector<VerifyDiagnostic>& diagnostics) {
   if (!std::isnan(layer->width) || !std::isnan(layer->height)) {
@@ -1702,38 +1738,7 @@ static void DetectContentOriginOffset(const Layer* layer, const Layer* parentLay
   if (!inParentLayout && !hasSizeDependentConstraint) {
     return;
   }
-  float minX = FLT_MAX;
-  float minY = FLT_MAX;
-  bool hasChild = false;
-  for (auto* element : layer->contents) {
-    auto* layoutNode = LayoutNode::AsLayoutNode(element);
-    if (layoutNode == nullptr) {
-      continue;
-    }
-    auto bounds = layoutNode->layoutBounds();
-    if (bounds.width == 0 && bounds.height == 0) {
-      continue;
-    }
-    minX = std::min(minX, bounds.x);
-    minY = std::min(minY, bounds.y);
-    hasChild = true;
-  }
-  if (!hasChild) {
-    return;
-  }
-  static constexpr float TOLERANCE = 0.5f;
-  float expectedX = layer->padding.left;
-  float expectedY = layer->padding.top;
-  if (std::abs(minX - expectedX) > TOLERANCE || std::abs(minY - expectedY) > TOLERANCE) {
-    auto expectedStr = "(" + std::to_string(static_cast<int>(expectedX)) + "," +
-                       std::to_string(static_cast<int>(expectedY)) + ")";
-    AddDiagnostic(diagnostics, layer->sourceLine,
-                  "children start at (" + std::to_string(static_cast<int>(minX)) + "," +
-                      std::to_string(static_cast<int>(minY)) + "), not " + expectedStr +
-                      ", container measurement inaccurate. Fix: shift all children so "
-                      "top-left starts at " +
-                      expectedStr + ", preserving relative positions");
-  }
+  CheckContentOriginOffset(layer->contents, layer->padding, layer->sourceLine, diagnostics);
 }
 
 static void DetectContentOriginOffsetForGroup(const Group* group,
@@ -1757,38 +1762,7 @@ static void DetectContentOriginOffsetForGroup(const Group* group,
       return;
     }
   }
-  float minX = FLT_MAX;
-  float minY = FLT_MAX;
-  bool hasChild = false;
-  for (auto* element : group->elements) {
-    auto* layoutNode = LayoutNode::AsLayoutNode(element);
-    if (layoutNode == nullptr) {
-      continue;
-    }
-    auto bounds = layoutNode->layoutBounds();
-    if (bounds.width == 0 && bounds.height == 0) {
-      continue;
-    }
-    minX = std::min(minX, bounds.x);
-    minY = std::min(minY, bounds.y);
-    hasChild = true;
-  }
-  if (!hasChild) {
-    return;
-  }
-  static constexpr float TOLERANCE = 0.5f;
-  float expectedX = group->padding.left;
-  float expectedY = group->padding.top;
-  if (std::abs(minX - expectedX) > TOLERANCE || std::abs(minY - expectedY) > TOLERANCE) {
-    auto expectedStr = "(" + std::to_string(static_cast<int>(expectedX)) + "," +
-                       std::to_string(static_cast<int>(expectedY)) + ")";
-    AddDiagnostic(diagnostics, group->sourceLine,
-                  "children start at (" + std::to_string(static_cast<int>(minX)) + "," +
-                      std::to_string(static_cast<int>(minY)) + "), not " + expectedStr +
-                      ", container measurement inaccurate. Fix: shift all children so "
-                      "top-left starts at " +
-                      expectedStr + ", preserving relative positions");
-  }
+  CheckContentOriginOffset(group->elements, group->padding, group->sourceLine, diagnostics);
 }
 
 static void DetectOverlappingSiblings(const Layer* parentLayer,
