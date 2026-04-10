@@ -132,8 +132,7 @@ verification in Step 3.
 1. Run `pagx verify input.pagx`. Fix all reported diagnostics, then re-run until clean.
 2. **Read `.layout.xml`** — scan for §Verify Checklist red flags (background bounds,
    content overlap, text overflow). Fix any found, re-run verify.
-3. Check against §Common Pitfalls — scan PAGX source for every listed anti-pattern.
-4. Inspect screenshot for visual issues (§Verify Checklist visual checks).
+3. Inspect screenshot for visual issues (§Verify Checklist visual checks).
 
 **Forbidden**: Do NOT proceed to Step 3 until the gate passes.
 
@@ -150,8 +149,7 @@ For each section (identified by `id`), one at a time:
    diagnostics, then re-run until clean.
 2. **Read `.layout.xml`** — scan for §Verify Checklist red flags (background bounds,
    content overlap, text overflow). Fix any found, re-run verify.
-3. Check against §Common Pitfalls — scan PAGX source for every listed anti-pattern.
-4. Inspect screenshot for visual issues (§Verify Checklist visual checks).
+3. Inspect screenshot for visual issues (§Verify Checklist visual checks).
 
 **Cleanup**: After the gate passes, delete that section's scoped artifacts
 (`input.{id}.png`, `input.{id}.layout.xml`) before moving on.
@@ -171,8 +169,10 @@ alignment, color consistency, visual hierarchy — that only become apparent at 
    until clean.
 2. **Read `.layout.xml`** — scan for §Verify Checklist red flags (background bounds,
    content overlap, text overflow). Fix any found, re-run verify.
-3. Check against §Common Pitfalls — scan PAGX source for every listed anti-pattern.
-4. Inspect screenshot for visual issues (§Verify Checklist visual checks).
+3. Inspect screenshot for visual issues (§Verify Checklist visual checks).
+4. **Pitfall scan** — read `guide.md` §Common Pitfalls and scan the **entire** PAGX
+   source against every listed anti-pattern. This is the only step where pitfalls are
+   checked, so do it thoroughly — do NOT skip any item.
 
 Keep final `input.png` and `input.layout.xml` for reference (do not commit). If further
 edits are made after this step, re-run the full verify to regenerate them. Delete any
