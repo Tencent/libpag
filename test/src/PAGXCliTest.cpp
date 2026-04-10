@@ -2332,8 +2332,8 @@ CLI_TEST(PAGXCliTest, Resolve_LayerWithExplicitSizeScalesContent) {
   EXPECT_EQ(scaledInline->height, 48);
 
   // Both layers should have content (resolved successfully).
-  EXPECT_FALSE(scaledExternal->contents.empty() || !scaledExternal->children.empty());
-  EXPECT_FALSE(scaledInline->contents.empty() || !scaledInline->children.empty());
+  EXPECT_FALSE(scaledExternal->contents.empty() && scaledExternal->children.empty());
+  EXPECT_FALSE(scaledInline->contents.empty() && scaledInline->children.empty());
 }
 
 CLI_TEST(PAGXCliTest, Resolve_LayerWithContentsSkipsResolve) {
