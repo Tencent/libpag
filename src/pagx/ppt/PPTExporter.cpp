@@ -987,10 +987,10 @@ static void AdjustWindingForEvenOdd(std::vector<PathContour>& contours,
   }
 }
 
-// Groups contours by their outermost (depth-0) ancestor so that each group
-// can be emitted as a separate a:path element. This improves compatibility
-// with PPT viewers that limit contour count per path or stop rendering after
-// the first a:close.
+// Groups contours by their outermost (depth-0) ancestor. Each group contains
+// one depth-0 contour and all its nested descendants. Nested contours within
+// a group are bridged into a single self-intersecting sub-path, while groups
+// that are independent (non-nesting) are emitted as separate shapes.
 static std::vector<std::vector<size_t>> GroupContoursByOutermost(
     const std::vector<PathContour>& contours, const std::vector<int>& depths) {
   std::vector<int> parent(contours.size(), -1);
@@ -1113,6 +1113,61 @@ static void EmitBridgedGroup(XMLBuilder& out, const std::vector<PathContour>& co
   }
 
   out.open("a:close").sc();
+}
+
+// Computes contour groups with winding adjustment. Modifies contours in place
+// (may reverse winding of some contours).
+static std::vector<std::vector<size_t>> PrepareContourGroups(std::vector<PathContour>& contours,
+                                                             FillRule fillRule) {
+  auto depths = ComputeContainmentDepths(contours);
+  if (fillRule == FillRule::EvenOdd) {
+    AdjustWindingForEvenOdd(contours, depths);
+  }
+  return GroupContoursByOutermost(contours, depths);
+}
+
+// Emits a complete a:custGeom element containing a single a:path for one
+// contour group, producing exactly one a:close.  This satisfies renderers
+// that only process the first a:close per path (e.g. WeChat) and renderers
+// that only fill the first a:path per pathLst (e.g. Keynote).
+static void EmitGroupCustGeom(XMLBuilder& out, const std::vector<PathContour>& contours,
+                              const std::vector<size_t>& group, int64_t pathWidth,
+                              int64_t pathHeight, float scaleX, float scaleY, float scaledOfsX,
+                              float scaledOfsY) {
+  out.open("a:custGeom").gt();
+  out.open("a:avLst").sc();
+  out.open("a:gdLst").sc();
+  out.open("a:ahLst").sc();
+  out.open("a:cxnLst").sc();
+  out.open("a:rect").attr("l", "0").attr("t", "0").attr("r", "r").attr("b", "b").sc();
+  out.open("a:pathLst").gt();
+  out.open("a:path").attr("w", pathWidth).attr("h", pathHeight).gt();
+
+  // Zero-length segments at opposite corners of the coordinate space.  They
+  // are invisible but force the content bounding box to match the declared
+  // (w, h), preventing renderers that auto-fit shapes to actual content bounds
+  // (e.g. WeChat) from rescaling each group independently.
+  out.open("a:moveTo").gt();
+  out.open("a:pt").attr("x", int64_t(0)).attr("y", int64_t(0)).sc();
+  out.end();
+  out.open("a:lnTo").gt();
+  out.open("a:pt").attr("x", int64_t(0)).attr("y", int64_t(0)).sc();
+  out.end();
+  out.open("a:moveTo").gt();
+  out.open("a:pt").attr("x", pathWidth).attr("y", pathHeight).sc();
+  out.end();
+  out.open("a:lnTo").gt();
+  out.open("a:pt").attr("x", pathWidth).attr("y", pathHeight).sc();
+  out.end();
+
+  if (group.size() > 1) {
+    EmitBridgedGroup(out, contours, group, scaleX, scaleY, scaledOfsX, scaledOfsY);
+  } else {
+    EmitContour(out, contours[group[0]], scaleX, scaleY, scaledOfsX, scaledOfsY);
+  }
+  out.end();  // a:path
+  out.end();  // a:pathLst
+  out.end();  // a:custGeom
 }
 
 void PPTWriter::WriteContourGeom(XMLBuilder& out, std::vector<PathContour>& contours,
@@ -1285,11 +1340,27 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
   }
 
   auto xf = decomposeXform(adjustedX, adjustedY, adjustedW, adjustedH, m);
-  beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
-
   FillRule fillRule = (fs.fill) ? fs.fill->fillRule : FillRule::Winding;
-  writeCustomGeom(out, path->data, adjustedX, adjustedY, adjustedW, adjustedH, fillRule);
 
+  if (_bridgeContours) {
+    auto contours = ParsePathContours(path->data);
+    if (contours.size() > 1) {
+      auto groups = PrepareContourGroups(contours, fillRule);
+      if (groups.size() > 1) {
+        int64_t pw = std::max(int64_t(1), PxToEMU(adjustedW));
+        int64_t ph = std::max(int64_t(1), PxToEMU(adjustedH));
+        for (const auto& group : groups) {
+          beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
+          EmitGroupCustGeom(out, contours, group, pw, ph, 1.0f, 1.0f, adjustedX, adjustedY);
+          writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters);
+        }
+        return;
+      }
+    }
+  }
+
+  beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
+  writeCustomGeom(out, path->data, adjustedX, adjustedY, adjustedW, adjustedH, fillRule);
   writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters);
 }
 
@@ -1344,17 +1415,37 @@ void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStr
   if (sy <= 0) sy = 1.0f;
 
   auto xf = decomposeXform(minX, minY, boundsW, boundsH, m);
-  beginShape(out, "Glyph", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
-
   int64_t pw = std::max(int64_t(1), PxToEMU(boundsW * sx));
   int64_t ph = std::max(int64_t(1), PxToEMU(boundsH * sy));
-  WriteContourGeom(out, allContours, pw, ph, sx, sy, minX * sx, minY * sy, FillRule::EvenOdd);
+  float scaledOfsX = minX * sx;
+  float scaledOfsY = minY * sy;
 
-  writeFill(out, fs.fill, alpha);
-  out.open("a:ln").gt();
-  out.open("a:noFill").sc();
-  out.end();
-  endShape(out);
+  if (_bridgeContours && allContours.size() > 1) {
+    // Each group becomes a separate p:sp shape to satisfy renderers that only
+    // process the first a:close per path (WeChat) or only fill the first
+    // a:path per pathLst (Keynote).  All shapes share the same xf so the
+    // coordinate mapping is identical — no independent EMU rounding occurs,
+    // and baseline alignment is preserved without a p:grpSp wrapper (which
+    // some renderers such as WeChat do not support).
+    auto groups = PrepareContourGroups(allContours, FillRule::EvenOdd);
+    for (const auto& group : groups) {
+      beginShape(out, "Glyph", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
+      EmitGroupCustGeom(out, allContours, group, pw, ph, sx, sy, scaledOfsX, scaledOfsY);
+      writeFill(out, fs.fill, alpha);
+      out.open("a:ln").gt();
+      out.open("a:noFill").sc();
+      out.end();
+      endShape(out);
+    }
+  } else {
+    beginShape(out, "Glyph", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
+    WriteContourGeom(out, allContours, pw, ph, sx, sy, scaledOfsX, scaledOfsY, FillRule::EvenOdd);
+    writeFill(out, fs.fill, alpha);
+    out.open("a:ln").gt();
+    out.open("a:noFill").sc();
+    out.end();
+    endShape(out);
+  }
 }
 
 void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStrokeInfo& fs,
