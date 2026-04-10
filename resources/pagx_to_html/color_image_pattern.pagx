@@ -13,7 +13,7 @@
       <!-- repeat -->
       <Layer layout="vertical" gap="4" alignment="center">
         <Layer height="14">
-          <Text text="repeat" fontFamily="Arial" fontStyle="Bold" fontSize="10" textAnchor="center"/>
+          <Text text="repeat" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
         <Layer width="80" height="80">
@@ -27,7 +27,7 @@
       <!-- mirror -->
       <Layer layout="vertical" gap="4" alignment="center">
         <Layer height="14">
-          <Text text="mirror" fontFamily="Arial" fontStyle="Bold" fontSize="10" textAnchor="center"/>
+          <Text text="mirror" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
         <Layer width="80" height="80">
@@ -41,7 +41,7 @@
       <!-- clamp -->
       <Layer layout="vertical" gap="4" alignment="center">
         <Layer height="14">
-          <Text text="clamp" fontFamily="Arial" fontStyle="Bold" fontSize="10" textAnchor="center"/>
+          <Text text="clamp" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
         <Layer width="80" height="80">
@@ -55,7 +55,7 @@
       <!-- decal -->
       <Layer layout="vertical" gap="4" alignment="center">
         <Layer height="14">
-          <Text text="decal" fontFamily="Arial" fontStyle="Bold" fontSize="10" textAnchor="center"/>
+          <Text text="decal" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
         <Layer width="80" height="80">
@@ -73,7 +73,7 @@
       <!-- linear filter -->
       <Layer layout="vertical" gap="4" alignment="center">
         <Layer height="14">
-          <Text text="filterMode=linear" fontFamily="Arial" fontStyle="Bold" fontSize="10" textAnchor="center"/>
+          <Text text="filterMode=linear" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
         <Layer width="80" height="50">
@@ -87,7 +87,7 @@
       <!-- nearest filter -->
       <Layer layout="vertical" gap="4" alignment="center">
         <Layer height="14">
-          <Text text="filterMode=nearest" fontFamily="Arial" fontStyle="Bold" fontSize="10" textAnchor="center"/>
+          <Text text="filterMode=nearest" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
         <Layer width="80" height="50">

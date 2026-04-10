@@ -13,11 +13,11 @@
     <!-- Title using forward-referenced solid color -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="22">
-        <Text text="Forward Reference" fontFamily="Arial" fontStyle="Bold" fontSize="18" textAnchor="center"/>
+        <Text text="Forward Reference" fontFamily="Arial" fontStyle="Bold" fontSize="18" centerX="0" textAnchor="center"/>
         <Fill color="@titleColor"/>
       </Layer>
       <Layer height="14">
-        <Text text="Resources defined after usage" fontFamily="Arial" fontSize="10" textAnchor="center"/>
+        <Text text="Resources defined after usage" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>

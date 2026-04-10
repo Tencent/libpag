@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Conic Gradient" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
+        <Text text="Conic Gradient" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Full 360-degree and partial angle range" fontFamily="Arial" fontSize="10" textAnchor="center"/>
+        <Text text="Full 360-degree and partial angle range" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -41,7 +41,7 @@
           </Fill>
         </Layer>
         <Layer height="12">
-          <Text text="Full 360" fontFamily="Arial" fontSize="9" textAnchor="center"/>
+          <Text text="Full 360" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
       </Layer>
@@ -58,7 +58,7 @@
           </Fill>
         </Layer>
         <Layer height="12">
-          <Text text="Partial (45-270)" fontFamily="Arial" fontSize="9" textAnchor="center"/>
+          <Text text="Partial (45-270)" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
       </Layer>

@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Polystar Geometry" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
+        <Text text="Polystar Geometry" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Polygon and star types with roundness variations" fontFamily="Arial" fontSize="10" textAnchor="center"/>
+        <Text text="Polygon and star types with roundness variations" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -36,7 +36,7 @@
             <Fill color="#3B82F6"/>
           </Layer>
           <Layer height="12">
-            <Text text="Pentagon" fontFamily="Arial" fontSize="8" textAnchor="center"/>
+            <Text text="Pentagon" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -47,7 +47,7 @@
             <Fill color="#EF4444"/>
           </Layer>
           <Layer height="12">
-            <Text text="Star" fontFamily="Arial" fontSize="8" textAnchor="center"/>
+            <Text text="Star" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -58,7 +58,7 @@
             <Fill color="#10B981"/>
           </Layer>
           <Layer height="12">
-            <Text text="Rounded" fontFamily="Arial" fontSize="8" textAnchor="center"/>
+            <Text text="Rounded" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -73,7 +73,7 @@
             <Fill color="#F59E0B"/>
           </Layer>
           <Layer height="12">
-            <Text text="Triangle" fontFamily="Arial" fontSize="8" textAnchor="center"/>
+            <Text text="Triangle" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -84,7 +84,7 @@
             <Fill color="#8B5CF6"/>
           </Layer>
           <Layer height="12">
-            <Text text="Dual Roundness" fontFamily="Arial" fontSize="8" textAnchor="center"/>
+            <Text text="Dual Roundness" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -95,7 +95,7 @@
             <Fill color="#EC4899"/>
           </Layer>
           <Layer height="12">
-            <Text text="Fractional 5.5" fontFamily="Arial" fontSize="8" textAnchor="center"/>
+            <Text text="Fractional 5.5" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>

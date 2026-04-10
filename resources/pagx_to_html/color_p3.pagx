@@ -13,11 +13,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Display P3 Colors" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
+        <Text text="Display P3 Colors" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Wide gamut vs sRGB comparison" fontFamily="Arial" fontSize="10" textAnchor="center"/>
+        <Text text="Wide gamut vs sRGB comparison" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -102,19 +102,19 @@
       <Layer layout="horizontal" gap="15" arrangement="center">
         <Layer width="30" height="10"/>
         <Layer width="50" height="10">
-          <Text text="Red" fontFamily="Arial" fontSize="8" textAnchor="center"/>
+          <Text text="Red" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
           <Fill color="#94A3B8"/>
         </Layer>
         <Layer width="50" height="10">
-          <Text text="Green" fontFamily="Arial" fontSize="8" textAnchor="center"/>
+          <Text text="Green" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
           <Fill color="#94A3B8"/>
         </Layer>
         <Layer width="50" height="10">
-          <Text text="Blue" fontFamily="Arial" fontSize="8" textAnchor="center"/>
+          <Text text="Blue" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
           <Fill color="#94A3B8"/>
         </Layer>
         <Layer width="50" height="10">
-          <Text text="Alpha" fontFamily="Arial" fontSize="8" textAnchor="center"/>
+          <Text text="Alpha" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
           <Fill color="#94A3B8"/>
         </Layer>
       </Layer>

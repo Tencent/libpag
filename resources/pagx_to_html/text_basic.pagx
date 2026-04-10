@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Text Basics" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
+        <Text text="Text Basics" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Anchors, spacing, faux styles, and font styles" fontFamily="Arial" fontSize="10" textAnchor="center"/>
+        <Text text="Anchors, spacing, faux styles, and font styles" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -42,11 +42,11 @@
       <!-- textAnchor=center -->
       <Layer layout="vertical" gap="2" alignment="center">
         <Layer height="28">
-          <Text text="Centered" fontFamily="Arial" fontSize="24" textAnchor="center"/>
+          <Text text="Centered" fontFamily="Arial" fontSize="24" centerX="0" textAnchor="center"/>
           <Fill color="#3B82F6"/>
         </Layer>
         <Layer height="10">
-          <Text text="center" fontFamily="Arial" fontSize="8" textAnchor="center"/>
+          <Text text="center" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
           <Fill color="#94A3B8"/>
         </Layer>
       </Layer>

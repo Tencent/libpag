@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Multiple Painters" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
+        <Text text="Multiple Painters" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Stacked fills and strokes on one shape" fontFamily="Arial" fontSize="10" textAnchor="center"/>
+        <Text text="Stacked fills and strokes on one shape" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>

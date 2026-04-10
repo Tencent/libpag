@@ -13,11 +13,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="18">
-        <Text text="Layer Visibility" fontFamily="Arial" fontStyle="Bold" fontSize="14" textAnchor="center"/>
+        <Text text="Layer Visibility" fontFamily="Arial" fontStyle="Bold" fontSize="14" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="visible=true vs visible=false" fontFamily="Arial" fontSize="10" textAnchor="center"/>
+        <Text text="visible=true vs visible=false" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#64748B"/>
       </Layer>
     </Layer>
@@ -74,7 +74,7 @@
 
     <!-- Footer note -->
     <Layer height="12">
-      <Text text="Red card uses visible=&quot;false&quot; and should not render" fontFamily="Arial" fontSize="9" textAnchor="center"/>
+      <Text text="Red card uses visible=&quot;false&quot; and should not render" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
       <Fill color="#94A3B8"/>
     </Layer>
   </Layer>

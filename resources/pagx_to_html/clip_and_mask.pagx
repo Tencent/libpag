@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="stretch">
       <Layer height="20">
-        <Text text="Clip and Mask" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
+        <Text text="Clip and Mask" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="scrollRect, alpha, luminance, contour masks" fontFamily="Arial" fontSize="10" textAnchor="center"/>
+        <Text text="scrollRect, alpha, luminance, contour masks" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -43,7 +43,7 @@
             </Layer>
           </Layer>
           <Layer height="12">
-            <Text text="scrollRect" fontFamily="Arial" fontSize="8" textAnchor="center"/>
+            <Text text="scrollRect" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -61,7 +61,7 @@
             </Layer>
           </Layer>
           <Layer height="12">
-            <Text text="Alpha Mask" fontFamily="Arial" fontSize="8" textAnchor="center"/>
+            <Text text="Alpha Mask" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -87,7 +87,7 @@
             </Layer>
           </Layer>
           <Layer height="12">
-            <Text text="Luminance" fontFamily="Arial" fontSize="8" textAnchor="center"/>
+            <Text text="Luminance" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -105,7 +105,7 @@
             </Layer>
           </Layer>
           <Layer height="12">
-            <Text text="Contour" fontFamily="Arial" fontSize="8" textAnchor="center"/>
+            <Text text="Contour" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
