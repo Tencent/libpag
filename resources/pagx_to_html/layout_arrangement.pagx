@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: All arrangement values (start, center, end, spaceBetween, spaceEvenly, spaceAround), alignment=start, includeInLayout -->
+<pagx version="1.0" width="480" height="560">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="stretch">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="stretch">
+      <Layer height="20">
+        <Text text="Layout Arrangement" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="start, center, end, spaceBetween, spaceEvenly, spaceAround" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
+
+    <!-- Card -->
+    <Layer flex="1" layout="vertical" gap="8" padding="15" alignment="stretch">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <!-- includeInLayout=false overlay badge in top-right corner -->
+      <Layer right="8" top="8" width="80" height="18" includeInLayout="false">
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="9"/>
+        <Fill color="#EF4444"/>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Text text="overlay" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" centerY="0" textAnchor="center"/>
+          <Fill color="#FFFFFF"/>
+        </Layer>
+      </Layer>
+
+      <!-- Row 1: arrangement=start -->
+      <Layer layout="vertical" gap="3" alignment="start">
+        <Layer height="12">
+          <Text text="arrangement=start" fontFamily="Arial" fontStyle="Bold" fontSize="9" textAnchor="start"/>
+          <Fill color="#64748B"/>
+        </Layer>
+        <Layer height="35" layout="horizontal" gap="8" arrangement="start" alignment="start">
+          <Layer width="40" height="30">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+            <Fill color="#3B82F6"/>
+          </Layer>
+          <Layer width="60" height="30">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+            <Fill color="#60A5FA"/>
+          </Layer>
+          <Layer width="50" height="30">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+            <Fill color="#93C5FD"/>
+          </Layer>
+        </Layer>
+      </Layer>
+
+      <!-- Row 2: arrangement=center -->
+      <Layer layout="vertical" gap="3" alignment="start">
+        <Layer height="12">
+          <Text text="arrangement=center" fontFamily="Arial" fontStyle="Bold" fontSize="9" textAnchor="start"/>
+          <Fill color="#64748B"/>
+        </Layer>
+        <Layer height="35" layout="horizontal" gap="8" arrangement="center">
+          <Layer width="40" height="30">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+            <Fill color="#EF4444"/>
+          </Layer>
+          <Layer width="60" height="30">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+            <Fill color="#F87171"/>
+          </Layer>
+          <Layer width="50" height="30">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+            <Fill color="#FCA5A5"/>
+          </Layer>
+        </Layer>
+      </Layer>
+
+      <!-- Row 3: arrangement=end -->
+      <Layer layout="vertical" gap="3" alignment="start">
+        <Layer height="12">
+          <Text text="arrangement=end" fontFamily="Arial" fontStyle="Bold" fontSize="9" textAnchor="start"/>
+          <Fill color="#64748B"/>
+        </Layer>
+        <Layer height="35" layout="horizontal" gap="8" arrangement="end">
+          <Layer width="40" height="30">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+            <Fill color="#10B981"/>
+          </Layer>
+          <Layer width="60" height="30">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+            <Fill color="#34D399"/>
+          </Layer>
+          <Layer width="50" height="30">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+            <Fill color="#6EE7B7"/>
+          </Layer>
+        </Layer>
+      </Layer>
+
+      <!-- Row 4: arrangement=spaceBetween -->
+      <Layer layout="vertical" gap="3" alignment="start">
+        <Layer height="12">
+          <Text text="arrangement=spaceBetween" fontFamily="Arial" fontStyle="Bold" fontSize="9" textAnchor="start"/>
+          <Fill color="#64748B"/>
+        </Layer>
+        <Layer height="35" layout="horizontal" arrangement="spaceBetween">
+          <Layer width="40" height="30">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+            <Fill color="#F59E0B"/>
+          </Layer>
+          <Layer width="60" height="30">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+            <Fill color="#FBBF24"/>
+          </Layer>
+          <Layer width="50" height="30">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+            <Fill color="#FDE68A"/>
+          </Layer>
+        </Layer>
+      </Layer>
+
+      <!-- Row 5: arrangement=spaceEvenly -->
+      <Layer layout="vertical" gap="3" alignment="start">
+        <Layer height="12">
+          <Text text="arrangement=spaceEvenly" fontFamily="Arial" fontStyle="Bold" fontSize="9" textAnchor="start"/>
+          <Fill color="#64748B"/>
+        </Layer>
+        <Layer height="35" layout="horizontal" arrangement="spaceEvenly">
+          <Layer width="40" height="30">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+            <Fill color="#8B5CF6"/>
+          </Layer>
+          <Layer width="60" height="30">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+            <Fill color="#A78BFA"/>
+          </Layer>
+          <Layer width="50" height="30">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+            <Fill color="#C4B5FD"/>
+          </Layer>
+        </Layer>
+      </Layer>
+
+      <!-- Row 6: arrangement=spaceAround -->
+      <Layer layout="vertical" gap="3" alignment="start">
+        <Layer height="12">
+          <Text text="arrangement=spaceAround" fontFamily="Arial" fontStyle="Bold" fontSize="9" textAnchor="start"/>
+          <Fill color="#64748B"/>
+        </Layer>
+        <Layer height="35" layout="horizontal" arrangement="spaceAround">
+          <Layer width="40" height="30">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+            <Fill color="#EC4899"/>
+          </Layer>
+          <Layer width="60" height="30">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+            <Fill color="#F472B6"/>
+          </Layer>
+          <Layer width="50" height="30">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+            <Fill color="#F9A8D4"/>
+          </Layer>
+        </Layer>
+      </Layer>
+
+      <!-- Row 7: alignment=start demonstration (cross-axis) -->
+      <Layer layout="vertical" gap="3" alignment="start">
+        <Layer height="12">
+          <Text text="alignment=start (cross-axis top)" fontFamily="Arial" fontStyle="Bold" fontSize="9" textAnchor="start"/>
+          <Fill color="#64748B"/>
+        </Layer>
+        <Layer height="50" layout="horizontal" gap="8" arrangement="center" alignment="start">
+          <Layer width="40" height="20">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+            <Fill color="#0EA5E9"/>
+          </Layer>
+          <Layer width="60" height="35">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+            <Fill color="#38BDF8"/>
+          </Layer>
+          <Layer width="50" height="25">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+            <Fill color="#7DD3FC"/>
+          </Layer>
+        </Layer>
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>

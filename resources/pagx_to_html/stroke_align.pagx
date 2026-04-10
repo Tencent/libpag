@@ -1,68 +1,94 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: StrokeAlign center, inside, outside — visual comparison with same width -->
-<pagx version="1.0" width="420" height="220">
-  <!-- Label: center -->
-  <Layer>
-    <Text text="center" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="80,30" textAnchor="center"/>
-    <Fill color="#64748B"/>
+<pagx version="1.0" width="420" height="280">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
   </Layer>
-  <!-- StrokeAlign center (default) -->
-  <Layer>
-    <Rectangle position="80,110" size="80,80" roundness="10"/>
-    <Fill color="#DBEAFE"/>
-    <Stroke color="#3B82F6" width="8" align="center"/>
-  </Layer>
-  <!-- Ellipse with center stroke -->
-  <Layer>
-    <Ellipse position="80,110" size="50,50"/>
-    <Fill color="#FEF3C7"/>
-    <Stroke color="#F59E0B" width="4" align="center"/>
-  </Layer>
-  <!-- Label: inside -->
-  <Layer>
-    <Text text="inside" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="210,30" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-  <!-- StrokeAlign inside -->
-  <Layer>
-    <Rectangle position="210,110" size="80,80" roundness="10"/>
-    <Fill color="#DBEAFE"/>
-    <Stroke color="#3B82F6" width="8" align="inside"/>
-  </Layer>
-  <!-- Ellipse with inside stroke -->
-  <Layer>
-    <Ellipse position="210,110" size="50,50"/>
-    <Fill color="#FEF3C7"/>
-    <Stroke color="#F59E0B" width="4" align="inside"/>
-  </Layer>
-  <!-- Label: outside -->
-  <Layer>
-    <Text text="outside" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="340,30" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-  <!-- StrokeAlign outside -->
-  <Layer>
-    <Rectangle position="340,110" size="80,80" roundness="10"/>
-    <Fill color="#DBEAFE"/>
-    <Stroke color="#3B82F6" width="8" align="outside"/>
-  </Layer>
-  <!-- Ellipse with outside stroke -->
-  <Layer>
-    <Ellipse position="340,110" size="50,50"/>
-    <Fill color="#FEF3C7"/>
-    <Stroke color="#F59E0B" width="4" align="outside"/>
-  </Layer>
-  <!-- Reference lines: thin center stroke on all three for size comparison -->
-  <Layer>
-    <Rectangle position="80,110" size="80,80" roundness="10"/>
-    <Stroke color="#EF444440" width="1" align="center"/>
-  </Layer>
-  <Layer>
-    <Rectangle position="210,110" size="80,80" roundness="10"/>
-    <Stroke color="#EF444440" width="1" align="center"/>
-  </Layer>
-  <Layer>
-    <Rectangle position="340,110" size="80,80" roundness="10"/>
-    <Stroke color="#EF444440" width="1" align="center"/>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="stretch">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="stretch">
+      <Layer height="20">
+        <Text text="Stroke Alignment" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="center, inside, outside comparison" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
+
+    <!-- Card -->
+    <Layer flex="1" layout="horizontal" gap="10" padding="15" alignment="stretch" arrangement="center">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <!-- Column: center -->
+      <Layer width="110" layout="vertical" gap="6" alignment="center" arrangement="center">
+        <Layer height="14">
+          <Text text="center" fontFamily="Arial" fontStyle="Bold" fontSize="12" centerX="0" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+        <Layer width="96" height="96">
+          <Rectangle position="48,48" size="80,80" roundness="10"/>
+          <Fill color="#DBEAFE"/>
+          <Stroke color="#3B82F6" width="8" align="center"/>
+          <!-- Reference line overlay -->
+          <Rectangle position="48,48" size="80,80" roundness="10"/>
+          <Stroke color="#EF444440" width="1" align="center"/>
+        </Layer>
+        <Layer width="60" height="60">
+          <Ellipse position="30,30" size="50,50"/>
+          <Fill color="#FEF3C7"/>
+          <Stroke color="#F59E0B" width="4" align="center"/>
+        </Layer>
+      </Layer>
+
+      <!-- Column: inside -->
+      <Layer width="110" layout="vertical" gap="6" alignment="center" arrangement="center">
+        <Layer height="14">
+          <Text text="inside" fontFamily="Arial" fontStyle="Bold" fontSize="12" centerX="0" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+        <Layer width="96" height="96">
+          <Rectangle position="48,48" size="80,80" roundness="10"/>
+          <Fill color="#DBEAFE"/>
+          <Stroke color="#3B82F6" width="8" align="inside"/>
+          <!-- Reference line overlay -->
+          <Rectangle position="48,48" size="80,80" roundness="10"/>
+          <Stroke color="#EF444440" width="1" align="center"/>
+        </Layer>
+        <Layer width="60" height="60">
+          <Ellipse position="30,30" size="50,50"/>
+          <Fill color="#FEF3C7"/>
+          <Stroke color="#F59E0B" width="4" align="inside"/>
+        </Layer>
+      </Layer>
+
+      <!-- Column: outside -->
+      <Layer width="110" layout="vertical" gap="6" alignment="center" arrangement="center">
+        <Layer height="14">
+          <Text text="outside" fontFamily="Arial" fontStyle="Bold" fontSize="12" centerX="0" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+        <Layer width="96" height="96">
+          <Rectangle position="48,48" size="80,80" roundness="10"/>
+          <Fill color="#DBEAFE"/>
+          <Stroke color="#3B82F6" width="8" align="outside"/>
+          <!-- Reference line overlay -->
+          <Rectangle position="48,48" size="80,80" roundness="10"/>
+          <Stroke color="#EF444440" width="1" align="center"/>
+        </Layer>
+        <Layer width="60" height="60">
+          <Ellipse position="30,30" size="50,50"/>
+          <Fill color="#FEF3C7"/>
+          <Stroke color="#F59E0B" width="4" align="outside"/>
+        </Layer>
+      </Layer>
+    </Layer>
   </Layer>
 </pagx>
