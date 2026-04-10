@@ -246,8 +246,7 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
     }
   }
   if (document->hasUnresolvedImports()) {
-    std::cerr
-        << "pagx render: error: unresolved <Import> node, run 'pagx import --resolve' first\n";
+    std::cerr << "pagx render: error: unresolved import directive, run 'pagx resolve' first\n";
     return {};
   }
 

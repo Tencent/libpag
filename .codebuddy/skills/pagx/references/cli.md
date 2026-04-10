@@ -8,9 +8,9 @@ setup script in `SKILL.md`).
 
 ## pagx verify
 
-All-in-one verification command. Resolves `<Import>` nodes (via `pagx import --resolve`),
-runs all checks, and optionally outputs a layout file (via `pagx layout`) and rendered
-screenshot (via `pagx render`).
+All-in-one verification command. Resolves inline `<svg>` and `import` attributes (via
+`pagx resolve`), runs all checks, and optionally outputs a layout file (via `pagx layout`)
+and rendered screenshot (via `pagx render`).
 
 ```bash
 pagx verify input.pagx                                # full file — outputs .png + .layout.xml
@@ -29,8 +29,8 @@ pagx verify --skip-render --skip-layout input.pagx     # checks only, no file ou
 
 ### Steps
 
-1. **Resolve** — expands all `<Import>` nodes in the file (full file, idempotent).
-   See `pagx import` §Resolve mode.
+1. **Resolve** — expands all inline `<svg>` and `import` attributes in the file
+   (full file, idempotent). See `pagx resolve`.
 2. **Parse + layout** — loads the document and computes layout bounds.
 3. **Check** — runs all detection rules (schema, semantic, structural, spatial, performance).
 4. **Diagnostics** — writes problems to stderr, sorted by line number.
@@ -290,11 +290,6 @@ pagx font embed --file a.ttf --fallback "PingFang SC" --fallback b.otf input.pag
 
 ## pagx import
 
-Import external format files into PAGX, or resolve `<Import>` nodes within an existing PAGX
-file. Two mutually exclusive modes: **standard** (`--input`) and **resolve** (`--resolve`).
-
-### Standard mode
-
 Convert a file from another format (e.g. SVG) to a standalone PAGX file.
 
 ```bash
@@ -304,32 +299,33 @@ pagx import --input icon.svg --output out.pagx   # SVG to out.pagx
 
 | Option | Description |
 |--------|-------------|
-| `--input <file>` | Input file to import (required in standard mode) |
+| `--input <file>` | Input file to import (required) |
 | `--output <file>` | Output PAGX file (default: `<input>.pagx`) |
 | `--format <format>` | Force input format (`svg`; default: inferred from extension) |
 | `--svg-no-expand-use` | Do not expand `<use>` references |
 | `--svg-flatten-transforms` | Flatten nested transforms into single matrices |
 | `--svg-preserve-unknown` | Preserve unsupported SVG elements as Unknown nodes |
 
-### Resolve mode
+---
 
-Expand all `<Import>` nodes in a PAGX file into native PAGX nodes.
+## pagx resolve
+
+Resolve all inline `<svg>` elements and `import` attributes in a PAGX file into native PAGX
+nodes. Sets the parent Layer's `width`/`height` from the source dimensions and adds a
+comment indicating the source (e.g., `<!-- Resolved from: inline svg -->` or
+`<!-- Resolved from: assets/logo.svg -->`).
 
 ```bash
-pagx import --resolve design.pagx                          # resolve in place
-pagx import --resolve design.pagx --output out.pagx        # resolve to new file
+pagx resolve design.pagx                          # resolve in place
+pagx resolve design.pagx -o out.pagx              # resolve to new file
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--resolve <file>` | Input PAGX file to expand (required in resolve mode) |
 | `-o, --output <path>` | Output file path (default: overwrite input) |
 | `--svg-no-expand-use` | Do not expand `<use>` references in SVG content |
 | `--svg-flatten-transforms` | Flatten nested transforms into single matrices |
 | `--svg-preserve-unknown` | Preserve unsupported SVG elements as Unknown nodes |
-
-`--input` and `--resolve` are mutually exclusive. Resolve mode sets the parent Layer's
-`width`/`height` from the source dimensions.
 
 ---
 

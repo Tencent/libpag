@@ -75,6 +75,8 @@ Basic container for content, child layers, styles, and filters.
 | `clipToBounds` | bool | false | Clip content to layer bounds (writes scrollRect during layout) |
 | `mask` | idref | — | Mask layer reference "@id" |
 | `composition` | idref | — | Composition reference "@id" for content reuse |
+| `import` | string | — | Path to external SVG file (relative to the PAGX file) for import |
+| `importFormat` | string | — | Force import format (e.g., `svg`); inferred from file extension when omitted |
 | `maskType` | MaskType | alpha | Mask type (alpha, luminance, or contour) |
 
 ### Composition
@@ -537,21 +539,6 @@ Text modifier that arranges text along a specified path curve, mapping glyph pos
 Positioning: prefer constraint attributes (`left`/`top`/`right`/`bottom`/`centerX`/`centerY`)
 for positioning. When constraints are set, the path coordinate origin is computed automatically.
 Opposite-pair constraints use scale-to-fit (same as Path). See §Constraint Attributes below.
-
-### Import
-
-Build-time preprocessing directive for embedding external content (e.g., SVG) into a PAGX
-file. Resolved by `pagx import --resolve` into native PAGX nodes. Not rendered directly.
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `source` | string | — | Path to external file (relative to the PAGX file) |
-| `format` | string | — | Force input format (e.g., `svg`); inferred from tag name or extension when omitted |
-
-- `source`: Path to external file (relative to the PAGX file). When omitted, content is
-  inline as child elements (e.g., `<svg>` inside `<Import>`).
-- `format`: Force input format (`svg`). When omitted, inferred from child element tag name
-  (inline) or `source` file extension (external).
 
 ### Constraint Attributes (Geometry Elements, TextPath, TextBox, Groups, and Child Layers)
 

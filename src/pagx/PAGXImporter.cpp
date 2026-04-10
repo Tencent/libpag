@@ -41,7 +41,6 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
-#include "pagx/nodes/Import.h"
 #include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/LinearGradient.h"
@@ -132,7 +131,6 @@ static void ParseContents(const DOMNode* node, Layer* layer, PAGXDocument* doc);
 static void ParseStyles(const DOMNode* node, Layer* layer, PAGXDocument* doc);
 static void ParseFilters(const DOMNode* node, Layer* layer, PAGXDocument* doc);
 static Element* ParseElement(const DOMNode* node, PAGXDocument* doc);
-static Import* ParseImport(const DOMNode* node, PAGXDocument* doc);
 static ColorSource* ParseColorSource(const DOMNode* node, PAGXDocument* doc);
 static LayerStyle* ParseLayerStyle(const DOMNode* node, PAGXDocument* doc);
 static LayerFilter* ParseLayerFilter(const DOMNode* node, PAGXDocument* doc);
@@ -230,16 +228,6 @@ static void SerializeDOMNode(const DOMNode* node, std::string& output) {
   output += "</";
   output += node->name;
   output += ">";
-}
-
-static std::string SerializeDOMChildren(const DOMNode* node) {
-  std::string result;
-  auto child = node->firstChild;
-  while (child) {
-    SerializeDOMNode(child.get(), result);
-    child = child->nextSibling;
-  }
-  return result;
 }
 
 static void ParseCustomData(const DOMNode* xmlNode, Node* node) {
@@ -455,6 +443,10 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
     }
   }
 
+  // Build directive attributes.
+  layer->importSource = GetAttribute(node, "import");
+  layer->importFormat = GetAttribute(node, "importFormat");
+
   auto child = node->firstChild;
   while (child) {
     auto current = child;
@@ -483,11 +475,11 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
       }
       continue;
     }
-    if (current->name == "Import") {
-      auto* imp = ParseImport(current.get(), doc);
-      if (imp) {
-        layer->contents.push_back(imp);
-      }
+    if (current->name == "svg") {
+      // Inline SVG: serialize the entire <svg> node (including children) as raw XML text.
+      std::string svgText;
+      SerializeDOMNode(current.get(), svgText);
+      layer->importContent = std::move(svgText);
       continue;
     }
     // Try to parse as VectorElement.
@@ -531,11 +523,11 @@ static void ParseContents(const DOMNode* node, Layer* layer, PAGXDocument* doc) 
     if (current->type != DOMNodeType::Element) {
       continue;
     }
-    if (current->name == "Import") {
-      auto* imp = ParseImport(current.get(), doc);
-      if (imp) {
-        layer->contents.push_back(imp);
-      }
+    if (current->name == "svg") {
+      // Inline SVG in legacy <contents> block.
+      std::string svgText;
+      SerializeDOMNode(current.get(), svgText);
+      layer->importContent = std::move(svgText);
       continue;
     }
     auto element = ParseElement(current.get(), doc);
@@ -592,25 +584,6 @@ static void ParseFilters(const DOMNode* node, Layer* layer, PAGXDocument* doc) {
                       " InnerShadowFilter, BlendFilter, ColorMatrixFilter.");
     }
   }
-}
-
-static Import* ParseImport(const DOMNode* node, PAGXDocument* doc) {
-  auto* import = makeNodeFromXML<Import>(node, doc);
-  if (!import) {
-    return nullptr;
-  }
-  auto* sourceAttr = node->findAttribute("source");
-  if (sourceAttr) {
-    import->source = *sourceAttr;
-  }
-  auto* formatAttr = node->findAttribute("format");
-  if (formatAttr) {
-    import->format = *formatAttr;
-  }
-  if (import->source.empty() && node->firstChild) {
-    import->rawContent = SerializeDOMChildren(node);
-  }
-  return import;
 }
 
 static Element* ParseElement(const DOMNode* node, PAGXDocument* doc) {

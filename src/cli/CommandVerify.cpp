@@ -30,8 +30,8 @@
 #include <unordered_map>
 #include <unordered_set>
 #include "cli/CliUtils.h"
-#include "cli/CommandImport.h"
 #include "cli/CommandRender.h"
+#include "cli/CommandResolve.h"
 #include "cli/FormatUtils.h"
 #include "cli/LayoutUtils.h"
 #include "pagx/PAGXDocument.h"
@@ -2339,15 +2339,15 @@ int RunVerify(int argc, char* argv[]) {
     return rc == -1 ? 0 : rc;
   }
 
-  // Step 1: Resolve all <Import> nodes in the file (full file, idempotent).
-  std::vector<std::string> resolveArgs = {"pagx-verify", "--resolve", opts.inputFile};
+  // Step 1: Resolve all import directives in the file (full file, idempotent).
+  std::vector<std::string> resolveArgs = {"pagx-verify", opts.inputFile};
   std::vector<char*> resolveArgv;
   for (auto& arg : resolveArgs) {
     resolveArgv.push_back(const_cast<char*>(arg.c_str()));
   }
   resolveArgv.push_back(nullptr);
-  if (RunImport(static_cast<int>(resolveArgs.size()), resolveArgv.data()) != 0) {
-    std::cerr << "pagx verify: warning: import resolve failed for '" << opts.inputFile << "'\n";
+  if (RunResolve(static_cast<int>(resolveArgs.size()), resolveArgv.data()) != 0) {
+    std::cerr << "pagx verify: warning: resolve failed for '" << opts.inputFile << "'\n";
   }
 
   // Step 2: Load document and compute layout.

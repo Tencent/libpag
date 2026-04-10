@@ -211,6 +211,34 @@ class Layer : public Node, public LayoutNode {
    */
   bool includeInLayout = true;
 
+  // ── Build directives (resolved by `pagx resolve`) ──
+
+  /**
+   * Path to an external file to import (e.g., SVG). Relative to the PAGX file. Resolved by
+   * `pagx resolve` into native PAGX nodes.
+   */
+  std::string importSource = {};
+
+  /**
+   * Forced import format (e.g., "svg"). When empty, inferred from file extension (external) or
+   * child element tag name (inline).
+   */
+  std::string importFormat = {};
+
+  /**
+   * Raw XML text of inline import content (e.g., `<svg>...</svg>`). Populated by the parser when
+   * inline content such as `<svg>` is found inside the Layer. Empty when no inline import content
+   * is present.
+   */
+  std::string importContent = {};
+
+  /**
+   * Description of the import source after resolution. Set by `pagx resolve` to record the origin
+   * of the resolved content (e.g., "inline svg", "assets/logo.svg"). Used by the exporter to emit
+   * an XML comment inside the Layer.
+   */
+  std::string resolvedFrom = {};
+
   NodeType nodeType() const override {
     return NodeType::Layer;
   }

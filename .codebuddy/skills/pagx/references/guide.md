@@ -53,7 +53,7 @@ Spec rules, techniques, and common pitfalls for writing correct PAGX files.
 | **Geometry** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` |
 | **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `Repeater` |
 | **Painters** | `Fill`, `Stroke` |
-| **Build Directives** | `Import` |
+| **Build Directives** | `<svg>` (inline SVG), `import` attribute |
 
 ### Containment Hierarchy
 
@@ -61,7 +61,7 @@ Spec rules, techniques, and common pitfalls for writing correct PAGX files.
 pagx (required: version, width, height)
 ├── Layer*
 │   ├── VectorElements* (geometry, modifiers, painters, Groups, TextBox)
-│   ├── Import* (build directive)
+│   ├── <svg>* (build directive)
 │   ├── LayerStyles* (DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle)
 │   ├── LayerFilters* (BlurFilter, DropShadowFilter, ...)
 │   └── Layer* (child layers, recursive)
@@ -547,27 +547,29 @@ scope — use separate Groups if you need both.
 
 # Build Directives
 
-Use `<Import>` to embed external content (currently supports SVG) — resolved automatically
-by `pagx verify`. Inline content as child elements, or reference external files via `source`.
+Embed SVG content directly in Layers — resolved automatically by `pagx verify` (which
+internally calls `pagx resolve`). Two forms: inline `<svg>` as a child element, or
+external file reference via the `import` attribute on a Layer.
 
 ```xml
 <!-- Inline SVG icon -->
 <Layer centerX="0" centerY="0">
-  <Import>
-    <svg viewBox="0 0 24 24" fill="none" stroke="#1E293B" stroke-width="2">
-      <circle cx="10" cy="10" r="7"/>
-      <path d="M15 15L21 21" stroke-linecap="round"/>
-    </svg>
-  </Import>
+  <svg viewBox="0 0 24 24" fill="none" stroke="#1E293B" stroke-width="2">
+    <circle cx="10" cy="10" r="7"/>
+    <path d="M15 15L21 21" stroke-linecap="round"/>
+  </svg>
 </Layer>
 
-<!-- External file -->
-<Layer id="logoIcon" centerX="0" centerY="0">
-  <Import source="assets/logo.svg"/>
-</Layer>
+<!-- External file reference -->
+<Layer id="logoIcon" centerX="0" centerY="0" import="assets/logo.svg"/>
+
+<!-- External file with explicit format -->
+<Layer import="assets/drawing.xml" importFormat="svg"/>
 ```
 
-Resolution sets parent Layer's `width`/`height` from the measured size of the source content.
+Resolution sets the Layer's `width`/`height` from the measured size of the source content.
+After resolution, a comment is added inside the Layer indicating the source:
+`<!-- Resolved from: inline svg -->` or `<!-- Resolved from: assets/logo.svg -->`.
 SVG does not auto-scale to fit the Layer — the `viewBox` size becomes the Layer size, so
 always generate the SVG `viewBox` at the exact dimensions you need.
 
@@ -576,11 +578,11 @@ always generate the SVG `viewBox` at the exact dimensions you need.
 Use native PAGX geometry (`Rectangle`, `Ellipse`, `Polystar`) for simple, single-element
 shapes — a background rectangle, a divider line, a circular indicator, a progress track.
 
-Use `<Import>` with inline SVG for complex or composite graphics — icons, arbitrary paths,
+Use inline `<svg>` for complex or composite graphics — icons, arbitrary paths,
 multi-stroke decorations, illustrated indicators. This includes any shape that would
 otherwise require `Path` / `PathData`, since those typically represent complex outlines
-better expressed as SVG. Wrap the Import in a Layer and use constraint positioning on the
-Layer to place it.
+better expressed as SVG. Place the `<svg>` inside a Layer and use constraint positioning
+on the Layer.
 
 ---
 

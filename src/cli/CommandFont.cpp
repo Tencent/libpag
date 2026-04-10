@@ -236,8 +236,7 @@ static int RunFontEmbed(int argc, char* argv[]) {
     return 1;
   }
   if (document->hasUnresolvedImports()) {
-    std::cerr
-        << "pagx font embed: error: unresolved <Import> node, run 'pagx import --resolve' first\n";
+    std::cerr << "pagx font embed: error: unresolved import directive, run 'pagx resolve' first\n";
     return 1;
   }
 

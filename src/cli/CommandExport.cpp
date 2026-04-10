@@ -127,8 +127,7 @@ static int ExportToSVG(const ExportOptions& options) {
     }
   }
   if (document->hasUnresolvedImports()) {
-    std::cerr
-        << "pagx export: error: unresolved <Import> node, run 'pagx import --resolve' first\n";
+    std::cerr << "pagx export: error: unresolved import directive, run 'pagx resolve' first\n";
     return 1;
   }
 
