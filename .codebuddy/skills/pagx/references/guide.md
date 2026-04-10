@@ -547,9 +547,9 @@ scope — use separate Groups if you need both.
 
 # Build Directives
 
-Embed external content directly in Layers — resolved automatically by `pagx verify` (which
-internally calls `pagx resolve`). Two forms: inline `<svg>` as a child element, or
-external file reference via the `import` attribute on a Layer.
+Embed external content (currently SVG) directly in Layers — resolved automatically by
+`pagx verify` (which internally calls `pagx resolve`). Two forms: inline `<svg>` as a
+child element, or external file reference via the `import` attribute on a Layer.
 
 ```xml
 <!-- Inline SVG icon -->
