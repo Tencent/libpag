@@ -119,7 +119,7 @@ Do NOT start the next task until the current one is completed.
 (see `guide.md` §Container Layout). Assign `id` to every structural section for scoped
 verification in Step 3.
 
-**Gate** (MUST complete ALL steps — do NOT skip any):
+**Gate**:
 1. Run `pagx verify input.pagx`. Fix all reported diagnostics, then re-run until clean.
 2. **Read `.layout.xml`** — check §Verify Checklist layout checks (bounds accuracy,
    visibility, containment). Fix any found, re-run verify.
@@ -135,7 +135,7 @@ For each section (identified by `id`), one at a time:
 
 **Do**: Fill in all visual content for this section only.
 
-**Gate** (MUST complete ALL steps — do NOT skip any):
+**Gate**:
 1. Run `pagx verify --scale 2 --id "sectionId" input.pagx`. Fix all reported
    diagnostics, then re-run until clean.
 2. **Read `.layout.xml`** — check §Verify Checklist layout checks (bounds accuracy,
@@ -155,7 +155,7 @@ this section's gate passes.
 **Do**: Review the full design holistically and refine cross-section details — spacing,
 alignment, color consistency, visual hierarchy — that only become apparent at full scale.
 
-**Gate** (MUST complete ALL steps — do NOT skip any):
+**Gate**:
 1. Run `pagx verify --scale 2 input.pagx`. Fix all reported diagnostics, then re-run
    until clean.
 2. **Read `.layout.xml`** — check §Verify Checklist layout checks (bounds accuracy,
