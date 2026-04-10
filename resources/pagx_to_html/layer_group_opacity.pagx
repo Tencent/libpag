@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: groupOpacity=false → alpha distributed to children; groupOpacity=true → alpha on parent -->
-<pagx version="1.0" width="400" height="280">
+<pagx version="1.0" width="400" height="300">
   <!-- Background -->
   <Layer>
-    <Rectangle position="200,140" size="400,280"/>
+    <Rectangle position="200,150" size="400,300"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
@@ -19,14 +19,14 @@
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="200,160" size="340,170" roundness="16"/>
+    <Rectangle position="200,170" size="340,190" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
   <!-- Divider -->
   <Layer>
-    <Path data="M 190,80 L 190,240"/>
+    <Path data="M 190,80 L 190,260"/>
     <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
   </Layer>
 
@@ -38,10 +38,10 @@
 
   <!-- groupOpacity=false: alpha applied independently to each child element -->
   <Layer alpha="0.5" groupOpacity="false">
-    <Rectangle position="80,160" size="80,80" roundness="8"/>
+    <Rectangle position="80,170" size="80,80" roundness="8"/>
     <Fill color="#EF4444"/>
     <Layer>
-      <Ellipse position="120,160" size="80,80"/>
+      <Ellipse position="120,170" size="80,80"/>
       <Fill color="#3B82F6"/>
     </Layer>
   </Layer>
@@ -54,10 +54,10 @@
 
   <!-- groupOpacity=true: content composited first, then alpha applied -->
   <Layer alpha="0.5" groupOpacity="true">
-    <Rectangle position="270,160" size="80,80" roundness="8"/>
+    <Rectangle position="270,170" size="80,80" roundness="8"/>
     <Fill color="#EF4444"/>
     <Layer>
-      <Ellipse position="310,160" size="80,80"/>
+      <Ellipse position="310,170" size="80,80"/>
       <Fill color="#3B82F6"/>
     </Layer>
   </Layer>

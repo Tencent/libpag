@@ -2,7 +2,7 @@
 <!-- Tests: Advanced style/filter attributes — LayerStyle.blendMode (non-normal), excludeChildEffects=true,
      BackgroundBlurStyle.tileMode (non-default), BlurFilter.tileMode (non-default),
      DropShadowStyle with blendMode, Stroke.alpha, Stroke.placement=foreground, Path.reversed=true -->
-<pagx version="1.0" width="420" height="420">
+<pagx version="1.0" width="420" height="450">
   <!-- DropShadowStyle with blendMode="multiply" -->
   <Layer x="30" y="30">
     <Rectangle position="60,60" size="100,100" roundness="12"/>

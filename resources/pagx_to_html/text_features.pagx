@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Text features — letterSpacing, fauxBold, fauxItalic, CDATA multiline, TextBox overflow="visible" -->
-<pagx version="1.0" width="420" height="320">
+<pagx version="1.0" width="420" height="350">
   <Resources>
     <LinearGradient id="headerGrad" startPoint="10,10" endPoint="410,10">
       <ColorStop offset="0" color="#6366F1"/>

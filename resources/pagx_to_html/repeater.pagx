@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Repeater → N copies with transform/alpha interpolation; fractional copies, order, copies=0 -->
-<pagx version="1.0" width="500" height="400">
+<pagx version="1.0" width="500" height="420">
   <!-- Background -->
   <Layer>
-    <Rectangle position="250,200" size="500,400"/>
+    <Rectangle position="250,210" size="500,420"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
@@ -19,7 +19,7 @@
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="250,220" size="440,290" roundness="16"/>
+    <Rectangle position="250,230" size="440,310" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>

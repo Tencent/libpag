@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Multi-geometry accumulated by one painter (each painter renders ALL accumulated geometries) -->
-<pagx version="1.0" width="320" height="270">
+<pagx version="1.0" width="320" height="285">
   <!-- Background -->
   <Layer>
-    <Rectangle position="160,135" size="320,270"/>
+    <Rectangle position="160,142" size="320,285"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
@@ -19,15 +19,15 @@
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="160,158" size="260,165" roundness="16"/>
+    <Rectangle position="160,165" size="260,180" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
   <!-- Both shapes rendered by the same Fill+Stroke -->
   <Layer>
-    <Rectangle position="110,150" size="90,90" roundness="8"/>
-    <Ellipse position="210,150" size="90,90"/>
+    <Rectangle position="110,158" size="90,90" roundness="8"/>
+    <Ellipse position="210,158" size="90,90"/>
     <!-- This Fill renders both shapes above -->
     <Fill color="#8B5CF6"/>
     <!-- This Stroke also renders both shapes -->
@@ -36,15 +36,15 @@
 
   <!-- Labels -->
   <Layer>
-    <Text text="Rectangle" fontFamily="Arial" fontSize="9" position="110,208" textAnchor="center"/>
+    <Text text="Rectangle" fontFamily="Arial" fontSize="9" position="110,216" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer>
-    <Text text="Ellipse" fontFamily="Arial" fontSize="9" position="210,208" textAnchor="center"/>
+    <Text text="Ellipse" fontFamily="Arial" fontSize="9" position="210,216" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer>
-    <Text text="Shared Fill + Stroke" fontFamily="Arial" fontSize="9" position="160,228" textAnchor="center"/>
+    <Text text="Shared Fill + Stroke" fontFamily="Arial" fontSize="9" position="160,238" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 </pagx>

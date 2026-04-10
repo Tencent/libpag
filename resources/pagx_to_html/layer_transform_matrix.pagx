@@ -1,42 +1,42 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Layer matrix="a,b,c,d,tx,ty" → transform: matrix(a,b,c,d,tx,ty) -->
-<pagx version="1.0" width="320" height="270">
+<pagx version="1.0" width="340" height="300">
   <!-- Background -->
   <Layer>
-    <Rectangle position="160,135" size="320,270"/>
+    <Rectangle position="170,150" size="340,300"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
   <!-- Title -->
   <Layer>
-    <Text text="Matrix Transform" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="160,34" textAnchor="center"/>
+    <Text text="Matrix Transform" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="170,34" textAnchor="center"/>
     <Fill color="#1E293B"/>
   </Layer>
   <Layer>
-    <Text text="45-degree rotation via 2D matrix" fontFamily="Arial" fontSize="10" position="160,50" textAnchor="center"/>
+    <Text text="45-degree rotation via 2D matrix" fontFamily="Arial" fontSize="10" position="170,50" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="160,155" size="260,160" roundness="16"/>
+    <Rectangle position="170,170" size="280,190" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
   <!-- 45° rotation + translate -->
-  <Layer matrix="0.707,0.707,-0.707,0.707,100,125">
+  <Layer matrix="0.707,0.707,-0.707,0.707,110,130">
     <Rectangle position="10,10" size="80,80" roundness="8"/>
     <Fill color="#F59E0B"/>
   </Layer>
 
   <!-- Reference outline showing original position -->
   <Layer alpha="0.2">
-    <Rectangle position="150,150" size="80,80" roundness="8"/>
+    <Rectangle position="160,165" size="80,80" roundness="8"/>
     <Stroke color="#94A3B8" width="1" dashes="4,3"/>
   </Layer>
   <Layer>
-    <Text text="Original position" fontFamily="Arial" fontSize="8" position="150,200" textAnchor="center"/>
+    <Text text="Original position" fontFamily="Arial" fontSize="8" position="160,218" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 </pagx>

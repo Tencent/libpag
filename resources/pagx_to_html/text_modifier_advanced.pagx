@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: TextModifier advanced attributes (anchor, skew, skewAxis, strokeColor, strokeWidth)
      and RangeSelector modes (subtract, intersect, min, max, difference), unit="index", randomOrder, randomSeed -->
-<pagx version="1.0" width="420" height="460">
+<pagx version="1.0" width="420" height="550">
   <!-- Background -->
   <Layer>
-    <Rectangle position="210,230" size="420,460"/>
+    <Rectangle position="210,275" size="420,550"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
@@ -20,14 +20,14 @@
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="210,252" size="360,350" roundness="16"/>
+    <Rectangle position="210,300" size="360,430" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
   <!-- Anchor offset -->
   <Layer>
-    <Text text="ANCHOR" fontFamily="Arial" fontStyle="Bold" fontSize="36" position="210,98" textAnchor="center"/>
+    <Text text="ANCHOR" fontFamily="Arial" fontStyle="Bold" fontSize="36" position="210,120" textAnchor="center"/>
     <TextModifier anchor="0,-18" rotation="15">
       <RangeSelector start="0" end="1" shape="rampUp"/>
     </TextModifier>
@@ -36,7 +36,7 @@
 
   <!-- Skew + skewAxis -->
   <Layer>
-    <Text text="SKEWED" fontFamily="Arial" fontStyle="Bold" fontSize="36" position="210,158" textAnchor="center"/>
+    <Text text="SKEWED" fontFamily="Arial" fontStyle="Bold" fontSize="36" position="210,190" textAnchor="center"/>
     <TextModifier skew="25" skewAxis="90">
       <RangeSelector start="0" end="1" shape="triangle"/>
     </TextModifier>
@@ -45,7 +45,7 @@
 
   <!-- StrokeColor + strokeWidth override -->
   <Layer>
-    <Text text="STROKE" fontFamily="Arial" fontStyle="Bold" fontSize="40" position="210,218" textAnchor="center"/>
+    <Text text="STROKE" fontFamily="Arial" fontStyle="Bold" fontSize="40" position="210,255" textAnchor="center"/>
     <TextModifier strokeColor="#EF4444" strokeWidth="2">
       <RangeSelector start="0" end="1" shape="square"/>
     </TextModifier>
@@ -55,7 +55,7 @@
 
   <!-- RangeSelector mode="subtract" -->
   <Layer>
-    <Text text="SUBTRACT" fontFamily="Arial" fontStyle="Bold" fontSize="30" position="210,275" textAnchor="center"/>
+    <Text text="SUBTRACT" fontFamily="Arial" fontStyle="Bold" fontSize="30" position="210,320" textAnchor="center"/>
     <TextModifier fillColor="#EC4899" position="10,2">
       <RangeSelector start="0" end="1" shape="square" mode="add"/>
       <RangeSelector start="2" end="5" unit="index" shape="square" mode="subtract"/>
@@ -65,7 +65,7 @@
 
   <!-- RangeSelector mode="intersect" -->
   <Layer>
-    <Text text="INTERSECT" fontFamily="Arial" fontStyle="Bold" fontSize="28" position="210,320" textAnchor="center"/>
+    <Text text="INTERSECT" fontFamily="Arial" fontStyle="Bold" fontSize="28" position="210,375" textAnchor="center"/>
     <TextModifier position="10,0" fillColor="#3B82F6">
       <RangeSelector start="0" end="0.7" shape="rampUp" mode="add"/>
       <RangeSelector start="0.3" end="1" shape="rampDown" mode="intersect"/>
@@ -75,7 +75,7 @@
 
   <!-- RangeSelector mode="min" and mode="max" -->
   <Layer>
-    <Text text="MIN MAX" fontFamily="Arial" fontStyle="Bold" fontSize="30" position="125,375" textAnchor="center"/>
+    <Text text="MIN MAX" fontFamily="Arial" fontStyle="Bold" fontSize="30" position="125,435" textAnchor="center"/>
     <TextModifier scale="1.4,1.4" fillColor="#F59E0B">
       <RangeSelector start="0" end="1" shape="rampUp" mode="add"/>
       <RangeSelector start="0" end="1" shape="rampDown" mode="min"/>
@@ -83,7 +83,7 @@
     <Fill color="#1F2937"/>
   </Layer>
   <Layer>
-    <Text text="DIFF" fontFamily="Arial" fontStyle="Bold" fontSize="30" position="320,375" textAnchor="center"/>
+    <Text text="DIFF" fontFamily="Arial" fontStyle="Bold" fontSize="30" position="320,435" textAnchor="center"/>
     <TextModifier fillColor="#10B981">
       <RangeSelector start="0" end="1" shape="rampUp" mode="add"/>
       <RangeSelector start="0" end="1" shape="rampDown" mode="difference"/>
@@ -93,7 +93,7 @@
 
   <!-- RangeSelector randomOrder + randomSeed -->
   <Layer>
-    <Text text="RANDOM" fontFamily="Arial" fontStyle="Bold" fontSize="32" position="210,428" textAnchor="center"/>
+    <Text text="RANDOM" fontFamily="Arial" fontStyle="Bold" fontSize="32" position="210,495" textAnchor="center"/>
     <TextModifier position="10,-2" rotation="10" fillColor="#EC4899">
       <RangeSelector start="0" end="0.6" shape="square" randomOrder="true" randomSeed="42"/>
     </TextModifier>

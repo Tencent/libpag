@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Layer blendMode → mix-blend-mode (all 18 modes) -->
-<pagx version="1.0" width="440" height="356">
+<pagx version="1.0" width="440" height="376">
   <!-- Background -->
   <Layer>
-    <Rectangle position="220,178" size="440,356"/>
+    <Rectangle position="220,188" size="440,376"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
@@ -19,14 +19,14 @@
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="220,196" size="400,254" roundness="16"/>
+    <Rectangle position="220,206" size="400,274" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
   <!-- Base gradient layer -->
   <Layer>
-    <Rectangle position="220,196" size="380,234" roundness="12"/>
+    <Rectangle position="220,206" size="380,254" roundness="12"/>
     <Fill>
       <LinearGradient startPoint="20,20" endPoint="400,246">
         <ColorStop offset="0" color="#3B82F6"/>

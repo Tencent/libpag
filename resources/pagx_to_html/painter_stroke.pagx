@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Stroke all 12 attributes: color, width, alpha, blendMode, cap, join, miterLimit, dashes, dashOffset, dashAdaptive, align, placement -->
-<pagx version="1.0" width="440" height="470">
+<pagx version="1.0" width="440" height="480">
   <!-- Background -->
   <Layer>
-    <Rectangle position="220,235" size="440,470"/>
+    <Rectangle position="220,240" size="440,480"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
@@ -19,7 +19,7 @@
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="220,258" size="380,360" roundness="16"/>
+    <Rectangle position="220,263" size="380,370" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>

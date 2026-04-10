@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Polystar edge cases: fractional pointCount (5.5), innerRoundness/outerRoundness,
      reversed="true", polygon with roundness -->
-<pagx version="1.0" width="480" height="360">
+<pagx version="1.0" width="480" height="380">
   <!-- Background -->
   <Layer>
-    <Rectangle position="240,180" size="480,360"/>
+    <Rectangle position="240,190" size="480,380"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
@@ -20,100 +20,100 @@
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="230,202" size="420,250" roundness="16"/>
+    <Rectangle position="230,212" size="420,270" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
   <!-- Fractional pointCount: 5.5 -->
   <Layer>
-    <Polystar position="75,128" type="star" pointCount="5.5" outerRadius="45" innerRadius="20" rotation="-90"/>
+    <Polystar position="75,138" type="star" pointCount="5.5" outerRadius="45" innerRadius="20" rotation="-90"/>
     <Fill color="#3B82F6"/>
   </Layer>
   <Layer>
-    <Text text="5.5 pts" fontFamily="Arial" fontSize="8" position="75,183" textAnchor="center"/>
+    <Text text="5.5 pts" fontFamily="Arial" fontSize="8" position="75,193" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Full inner + outer roundness -->
   <Layer>
-    <Polystar position="185,128" type="star" pointCount="8" outerRadius="45" innerRadius="22" outerRoundness="0.7" innerRoundness="0.8" rotation="0"/>
+    <Polystar position="185,138" type="star" pointCount="8" outerRadius="45" innerRadius="22" outerRoundness="0.7" innerRoundness="0.8" rotation="0"/>
     <Fill color="#EC4899"/>
   </Layer>
   <Layer>
-    <Text text="Flower" fontFamily="Arial" fontSize="8" position="185,183" textAnchor="center"/>
+    <Text text="Flower" fontFamily="Arial" fontSize="8" position="185,193" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Reversed star -->
   <Layer>
-    <Polystar position="295,128" type="star" pointCount="6" outerRadius="45" innerRadius="25" rotation="-90" reversed="true"/>
+    <Polystar position="295,138" type="star" pointCount="6" outerRadius="45" innerRadius="25" rotation="-90" reversed="true"/>
     <Fill color="#10B981"/>
   </Layer>
   <Layer>
-    <Text text="Reversed" fontFamily="Arial" fontSize="8" position="295,183" textAnchor="center"/>
+    <Text text="Reversed" fontFamily="Arial" fontSize="8" position="295,193" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Polygon with roundness -->
   <Layer>
-    <Polystar position="395,128" type="polygon" pointCount="6" outerRadius="40" outerRoundness="0.6" rotation="-90"/>
+    <Polystar position="395,138" type="polygon" pointCount="6" outerRadius="40" outerRoundness="0.6" rotation="-90"/>
     <Fill color="#F59E0B"/>
   </Layer>
   <Layer>
-    <Text text="Soft Hex" fontFamily="Arial" fontSize="8" position="395,183" textAnchor="center"/>
+    <Text text="Soft Hex" fontFamily="Arial" fontSize="8" position="395,193" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Row 2 -->
   <!-- Fractional polygon: 3.7 -->
   <Layer>
-    <Polystar position="75,248" type="polygon" pointCount="3.7" outerRadius="28" rotation="-90"/>
+    <Polystar position="75,260" type="polygon" pointCount="3.7" outerRadius="28" rotation="-90"/>
     <Fill color="#8B5CF6"/>
   </Layer>
   <Layer>
-    <Text text="3.7 polygon" fontFamily="Arial" fontSize="8" position="75,285" textAnchor="center"/>
+    <Text text="3.7 polygon" fontFamily="Arial" fontSize="8" position="75,297" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- High roundness star -->
   <Layer>
-    <Polystar position="185,248" type="star" pointCount="5" outerRadius="28" innerRadius="14" outerRoundness="1" innerRoundness="1" rotation="-90"/>
+    <Polystar position="185,260" type="star" pointCount="5" outerRadius="28" innerRadius="14" outerRoundness="1" innerRoundness="1" rotation="-90"/>
     <Fill color="#EF4444"/>
   </Layer>
   <Layer>
-    <Text text="Max round" fontFamily="Arial" fontSize="8" position="185,285" textAnchor="center"/>
+    <Text text="Max round" fontFamily="Arial" fontSize="8" position="185,297" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Reversed polygon -->
   <Layer>
-    <Polystar position="295,248" type="polygon" pointCount="5" outerRadius="28" rotation="-90" reversed="true"/>
+    <Polystar position="295,260" type="polygon" pointCount="5" outerRadius="28" rotation="-90" reversed="true"/>
     <Fill color="#06B6D4"/>
   </Layer>
   <Layer>
-    <Text text="Rev polygon" fontFamily="Arial" fontSize="8" position="295,285" textAnchor="center"/>
+    <Text text="Rev polygon" fontFamily="Arial" fontSize="8" position="295,297" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Low fractional star: 2.3 points -->
   <Layer>
-    <Polystar position="395,248" type="star" pointCount="2.3" outerRadius="28" innerRadius="12" rotation="-90"/>
+    <Polystar position="395,260" type="star" pointCount="2.3" outerRadius="28" innerRadius="12" rotation="-90"/>
     <Fill color="#D946EF"/>
   </Layer>
   <Layer>
-    <Text text="2.3 pts" fontFamily="Arial" fontSize="8" position="395,285" textAnchor="center"/>
+    <Text text="2.3 pts" fontFamily="Arial" fontSize="8" position="395,297" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Center: Fractional + roundness combined -->
   <Layer>
-    <Polystar position="230,215" type="star" pointCount="5.5" outerRadius="32" innerRadius="16" outerRoundness="0.7" innerRoundness="0.5" rotation="-90"/>
+    <Polystar position="230,228" type="star" pointCount="5.5" outerRadius="32" innerRadius="16" outerRoundness="0.7" innerRoundness="0.5" rotation="-90"/>
     <Fill color="#F43F5E"/>
     <Stroke color="#BE123C" width="1.5"/>
   </Layer>
   <Layer>
-    <Text text="Combined" fontFamily="Arial" fontSize="8" position="230,258" textAnchor="center"/>
+    <Text text="Combined" fontFamily="Arial" fontSize="8" position="230,270" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 </pagx>

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: TextModifier + RangeSelector → per-glyph transforms and style overrides -->
-<pagx version="1.0" width="420" height="360">
+<pagx version="1.0" width="420" height="420">
   <!-- Background -->
   <Layer>
-    <Rectangle position="210,180" size="420,360"/>
+    <Rectangle position="210,210" size="420,420"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
@@ -19,40 +19,40 @@
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="210,205" size="360,250" roundness="16"/>
+    <Rectangle position="210,238" size="360,310" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
   <!-- Position shift with triangle shape selector -->
   <Layer>
-    <Text text="WAVE" fontFamily="Arial" fontStyle="Bold" fontSize="48" position="210,110" textAnchor="center"/>
+    <Text text="WAVE" fontFamily="Arial" fontStyle="Bold" fontSize="48" position="210,130" textAnchor="center"/>
     <TextModifier position="10,-10">
       <RangeSelector start="0" end="1" shape="triangle"/>
     </TextModifier>
     <Fill color="#3B82F6"/>
   </Layer>
   <Layer>
-    <Text text="position + triangle" fontFamily="Arial" fontSize="8" position="210,138" textAnchor="center"/>
+    <Text text="position + triangle" fontFamily="Arial" fontSize="8" position="210,160" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Rotation with rampUp selector -->
   <Layer>
-    <Text text="ROTATE" fontFamily="Arial" fontStyle="Bold" fontSize="36" position="210,190" textAnchor="center"/>
+    <Text text="ROTATE" fontFamily="Arial" fontStyle="Bold" fontSize="36" position="210,210" textAnchor="center"/>
     <TextModifier rotation="45">
       <RangeSelector start="0" end="1" shape="rampUp"/>
     </TextModifier>
     <Fill color="#10B981"/>
   </Layer>
   <Layer>
-    <Text text="rotation + rampUp" fontFamily="Arial" fontSize="8" position="210,212" textAnchor="center"/>
+    <Text text="rotation + rampUp" fontFamily="Arial" fontSize="8" position="210,238" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Scale + alpha with smooth selector -->
   <Layer>
-    <Text text="SCALE" fontFamily="Arial" fontStyle="Bold" fontSize="36" position="210,262" textAnchor="center"/>
+    <Text text="SCALE" fontFamily="Arial" fontStyle="Bold" fontSize="36" position="210,295" textAnchor="center"/>
     <TextModifier scale="1.5,1.5" alpha="0.3">
       <RangeSelector start="0.2" end="0.8" shape="smooth" easeIn="0.5" easeOut="0.5"/>
     </TextModifier>
@@ -61,7 +61,7 @@
 
   <!-- fillColor override -->
   <Layer>
-    <Text text="COLOR" fontFamily="Arial" fontStyle="Bold" fontSize="40" position="210,322" textAnchor="center"/>
+    <Text text="COLOR" fontFamily="Arial" fontStyle="Bold" fontSize="40" position="210,360" textAnchor="center"/>
     <TextModifier fillColor="#EC4899">
       <RangeSelector start="0" end="1" shape="rampDown"/>
     </TextModifier>

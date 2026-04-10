@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Layer alpha → opacity -->
-<pagx version="1.0" width="320" height="280">
+<pagx version="1.0" width="320" height="300">
   <!-- Background -->
   <Layer>
-    <Rectangle position="160,140" size="320,280"/>
+    <Rectangle position="160,150" size="320,300"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
@@ -19,28 +19,28 @@
 
   <!-- Card -->
   <Layer>
-    <Rectangle position="160,158" size="260,170" roundness="16"/>
+    <Rectangle position="160,168" size="260,190" roundness="16"/>
     <Fill color="#FFFFFF"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
   </Layer>
 
   <!-- Alpha=0.3 red -->
   <Layer alpha="0.3">
-    <Rectangle position="125,150" size="120,120" roundness="8"/>
+    <Rectangle position="125,158" size="120,120" roundness="8"/>
     <Fill color="#EF4444"/>
   </Layer>
   <Layer>
-    <Text text="alpha=0.3" fontFamily="Arial" fontSize="9" position="90,220" textAnchor="center"/>
+    <Text text="alpha=0.3" fontFamily="Arial" fontSize="9" position="90,232" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
   <!-- Alpha=0.7 blue -->
   <Layer alpha="0.7">
-    <Rectangle position="195,150" size="120,120" roundness="8"/>
+    <Rectangle position="195,158" size="120,120" roundness="8"/>
     <Fill color="#3B82F6"/>
   </Layer>
   <Layer>
-    <Text text="alpha=0.7" fontFamily="Arial" fontSize="9" position="230,220" textAnchor="center"/>
+    <Text text="alpha=0.7" fontFamily="Arial" fontSize="9" position="230,232" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 </pagx>
