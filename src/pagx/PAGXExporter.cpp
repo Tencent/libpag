@@ -1305,15 +1305,15 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
   }
 
   // Build directive attributes.
-  xml.addAttribute("import", node->importSource);
-  xml.addAttribute("importFormat", node->importFormat);
+  xml.addAttribute("import", node->importDirective.source);
+  xml.addAttribute("importFormat", node->importDirective.format);
 
   // Write custom data as data-* attributes.
   WriteCustomData(xml, node);
 
   bool hasChildren = !node->contents.empty() || !node->styles.empty() || !node->filters.empty() ||
-                     !node->children.empty() || !node->importContent.empty() ||
-                     !node->resolvedFrom.empty();
+                     !node->children.empty() || !node->importDirective.content.empty() ||
+                     !node->importDirective.resolvedFrom.empty();
   if (!hasChildren) {
     xml.closeElementSelfClosing();
     return;
@@ -1322,13 +1322,13 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
   xml.closeElementStart();
 
   // Write resolved-from comment if present.
-  if (!node->resolvedFrom.empty()) {
-    xml.writeComment("Resolved from: " + node->resolvedFrom);
+  if (!node->importDirective.resolvedFrom.empty()) {
+    xml.writeComment("Resolved from: " + node->importDirective.resolvedFrom);
   }
 
   // Write inline import content (e.g., <svg>...</svg>) if present.
-  if (!node->importContent.empty()) {
-    xml.writeRawLine(node->importContent);
+  if (!node->importDirective.content.empty()) {
+    xml.writeRawLine(node->importDirective.content);
   }
 
   // Write VectorElement (contents) directly without container node.

@@ -444,8 +444,8 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
   }
 
   // Build directive attributes.
-  layer->importSource = GetAttribute(node, "import");
-  layer->importFormat = GetAttribute(node, "importFormat");
+  layer->importDirective.source = GetAttribute(node, "import");
+  layer->importDirective.format = GetAttribute(node, "importFormat");
 
   auto child = node->firstChild;
   while (child) {
@@ -479,7 +479,7 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
       // Inline SVG: serialize the entire <svg> node (including children) as raw XML text.
       std::string svgText;
       SerializeDOMNode(current.get(), svgText);
-      layer->importContent = std::move(svgText);
+      layer->importDirective.content = std::move(svgText);
       continue;
     }
     // Try to parse as VectorElement.
@@ -527,7 +527,7 @@ static void ParseContents(const DOMNode* node, Layer* layer, PAGXDocument* doc) 
       // Inline SVG in legacy <contents> block.
       std::string svgText;
       SerializeDOMNode(current.get(), svgText);
-      layer->importContent = std::move(svgText);
+      layer->importDirective.content = std::move(svgText);
       continue;
     }
     auto element = ParseElement(current.get(), doc);

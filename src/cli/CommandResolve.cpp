@@ -107,8 +107,8 @@ static void InlinePathData(PAGXDocument* svgDoc) {
 
 static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
                             const ImportFormatOptions& formatOptions, PAGXDocument* doc) {
-  bool hasImportSource = !layer->importSource.empty();
-  bool hasImportContent = !layer->importContent.empty();
+  bool hasImportSource = !layer->importDirective.source.empty();
+  bool hasImportContent = !layer->importDirective.content.empty();
 
   if (!hasImportSource && !hasImportContent) {
     return false;  // Nothing to resolve.
@@ -117,7 +117,7 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
   // Check for conflicting contents or children.
   if (!layer->contents.empty() || !layer->children.empty()) {
     std::string desc =
-        hasImportSource ? ("import=\"" + layer->importSource + "\"") : "inline <svg>";
+        hasImportSource ? ("import=\"" + layer->importDirective.source + "\"") : "inline <svg>";
     std::cerr << "pagx resolve: warning: Layer";
     if (!layer->id.empty()) {
       std::cerr << " '" << layer->id << "'";
@@ -131,12 +131,13 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
   std::string resolvedFromDesc;
 
   if (hasImportSource) {
-    auto filePath = baseDir + layer->importSource;
-    result = ImportFile(filePath, layer->importFormat, formatOptions, layer->width, layer->height);
-    resolvedFromDesc = layer->importSource;
+    auto filePath = baseDir + layer->importDirective.source;
+    result = ImportFile(filePath, layer->importDirective.format, formatOptions, layer->width,
+                        layer->height);
+    resolvedFromDesc = layer->importDirective.source;
   } else {
-    result = ImportString(layer->importContent, layer->importFormat, formatOptions, layer->width,
-                          layer->height);
+    result = ImportString(layer->importDirective.content, layer->importDirective.format,
+                          formatOptions, layer->width, layer->height);
     resolvedFromDesc = "inline svg";
   }
 
@@ -269,10 +270,10 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
   svgDoc->layers.clear();
 
   // Clear import fields and set resolved marker.
-  layer->importSource.clear();
-  layer->importFormat.clear();
-  layer->importContent.clear();
-  layer->resolvedFrom = resolvedFromDesc;
+  layer->importDirective.source.clear();
+  layer->importDirective.format.clear();
+  layer->importDirective.content.clear();
+  layer->importDirective.resolvedFrom = resolvedFromDesc;
 
   return true;
 }
@@ -281,11 +282,13 @@ static void ResolveLayers(const std::vector<Layer*>& layers, const std::string& 
                           const ImportFormatOptions& formatOptions, PAGXDocument* doc,
                           int& resolvedCount, int& errorCount) {
   for (auto* layer : layers) {
-    bool hasImport = !layer->importSource.empty() || !layer->importContent.empty();
+    bool hasImport =
+        !layer->importDirective.source.empty() || !layer->importDirective.content.empty();
     if (hasImport) {
       if (ResolveOneLayer(layer, baseDir, formatOptions, doc)) {
         resolvedCount++;
-      } else if (!layer->importSource.empty() || !layer->importContent.empty()) {
+      } else if (!layer->importDirective.source.empty() ||
+                 !layer->importDirective.content.empty()) {
         // ResolveOneLayer returned false and fields are still set — this is an error,
         // not a skip (skips clear the fields themselves or leave them for re-resolve).
         errorCount++;

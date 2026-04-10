@@ -2149,8 +2149,8 @@ CLI_TEST(PAGXCliTest, ImportDirective_ParseExternalSource) {
 
   ASSERT_GE(doc->layers.size(), 1u);
   auto* layer = doc->layers[0];
-  EXPECT_EQ(layer->importSource, "import_external.svg");
-  EXPECT_TRUE(layer->importContent.empty());
+  EXPECT_EQ(layer->importDirective.source, "import_external.svg");
+  EXPECT_TRUE(layer->importDirective.content.empty());
 }
 
 CLI_TEST(PAGXCliTest, ImportDirective_ParseInlineContent) {
@@ -2159,10 +2159,10 @@ CLI_TEST(PAGXCliTest, ImportDirective_ParseInlineContent) {
   ASSERT_NE(doc, nullptr);
   ASSERT_GE(doc->layers.size(), 2u);
   auto* layer = doc->layers[1];
-  EXPECT_TRUE(layer->importSource.empty());
-  EXPECT_FALSE(layer->importContent.empty());
-  EXPECT_NE(layer->importContent.find("<svg"), std::string::npos);
-  EXPECT_NE(layer->importContent.find("<circle"), std::string::npos);
+  EXPECT_TRUE(layer->importDirective.source.empty());
+  EXPECT_FALSE(layer->importDirective.content.empty());
+  EXPECT_NE(layer->importDirective.content.find("<svg"), std::string::npos);
+  EXPECT_NE(layer->importDirective.content.find("<circle"), std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, ImportDirective_ExportRoundTrip) {
@@ -2177,8 +2177,8 @@ CLI_TEST(PAGXCliTest, ImportDirective_ExportRoundTrip) {
   auto doc2 = pagx::PAGXImporter::FromXML(xml);
   ASSERT_NE(doc2, nullptr);
   ASSERT_GE(doc2->layers.size(), 2u);
-  EXPECT_EQ(doc2->layers[0]->importSource, "import_external.svg");
-  EXPECT_NE(doc2->layers[1]->importContent.find("<svg"), std::string::npos);
+  EXPECT_EQ(doc2->layers[0]->importDirective.source, "import_external.svg");
+  EXPECT_NE(doc2->layers[1]->importDirective.content.find("<svg"), std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, ImportDirective_HasUnresolvedImports) {
