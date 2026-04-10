@@ -564,13 +564,25 @@ Layer to place it.
 **IMPORTANT**: The following are known generation errors that MUST be avoided. Before
 finalizing any PAGX output, verify that none of these anti-patterns appear in your code.
 
-- **NEVER** create a layout container without main-axis size when it has `flex` children —
-  the children will receive zero space.
+- **NEVER** use `flex` when the parent has no main-axis size — a content-measured parent has
+  nothing to distribute, so `flex` children get zero space.
 
   ```xml
   <!-- ❌ vertical layout with no height — flex child gets 0px -->
   <Layer layout="vertical">
     <Layer flex="1"><!-- zero height --></Layer>
+  </Layer>
+
+  <!-- ❌ Parent has no height — nothing to distribute -->
+  <Layer layout="vertical">
+    <Layer height="100"/>
+    <Layer flex="1"><!-- gets 0px --></Layer>
+  </Layer>
+
+  <!-- ✅ Parent has explicit height — flex gets remaining space -->
+  <Layer height="400" layout="vertical">
+    <Layer height="100"/>
+    <Layer flex="1"><!-- gets 300px --></Layer>
   </Layer>
   ```
 
@@ -613,23 +625,6 @@ finalizing any PAGX output, verify that none of these anti-patterns appear in yo
       <Text text="Click" fontFamily="Arial" fontSize="14"/>
       <Fill color="#FFF"/>
     </Layer>
-  </Layer>
-  ```
-
-- **NEVER** use `flex` when the parent has no main-axis size — a content-measured parent has
-  nothing to distribute, so `flex` children get zero space.
-
-  ```xml
-  <!-- ❌ Parent has no height — nothing to distribute -->
-  <Layer layout="vertical">
-    <Layer height="100"/>
-    <Layer flex="1"><!-- gets 0px --></Layer>
-  </Layer>
-
-  <!-- ✅ Parent has explicit height — flex gets remaining space -->
-  <Layer height="400" layout="vertical">
-    <Layer height="100"/>
-    <Layer flex="1"><!-- gets 300px --></Layer>
   </Layer>
   ```
 

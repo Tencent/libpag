@@ -131,7 +131,7 @@ structural section for scoped verification in Step 3.
 2. Fix all reported diagnostics, then re-run verify.
 3. Read the `.layout.xml` output and verify each section's bounds match the intended
    sizes and positions.
-4. Self-check against §Common Pitfalls — scan output for every listed anti-pattern.
+4. Check against §Common Pitfalls — scan output for every listed anti-pattern.
 
 **Forbidden**: Do NOT proceed to Step 3 until the gate passes.
 
@@ -146,7 +146,7 @@ For each section (identified by `id`), one at a time:
 **Gate**: Repeat until clean:
 1. Run `pagx verify --scale 2 --id "sectionId" input.pagx`.
 2. Fix all reported diagnostics, then re-run verify.
-3. Self-check against §Common Pitfalls — scan output for every listed anti-pattern.
+3. Check against §Common Pitfalls — scan output for every listed anti-pattern.
 4. Check the screenshot against §Screenshot Checklist.
 
 **Cleanup**: After the gate passes, delete that section's scoped artifacts
@@ -165,7 +165,7 @@ alignment, color consistency, visual hierarchy — that only become apparent at 
 **Gate**: Repeat until clean:
 1. Run `pagx verify --scale 2 input.pagx`.
 2. Fix all reported diagnostics, then re-run verify.
-3. Self-check against §Common Pitfalls — scan output for every listed anti-pattern.
+3. Check against §Common Pitfalls — scan output for every listed anti-pattern.
 4. Check the full screenshot against §Screenshot Checklist.
 
 Keep final `input.png` and `input.layout.xml` for reference (do not commit). If further
