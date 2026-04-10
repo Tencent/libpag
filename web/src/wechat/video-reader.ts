@@ -182,7 +182,8 @@ export class VideoReader {
     if (this.seeking) return;
     if (!this.videoDecoder) {
       this.clearFrameDataLoop();
-      throw new Error('VideoDecoder is not ready!');
+      console.warn('[VideoReader] VideoDecoder is not ready, frame data loop stopped.');
+      return;
     }
     if (this.frameDataBuffers.length >= BUFFER_MAX_SIZE) {
       this.getFrameDataLooping = false;

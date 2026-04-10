@@ -121,7 +121,7 @@ export class VideoReader {
         if (this.isDestroyed || targetFrame === this.currentFrame) {
             return;
         }
-        const promise = new Promise<void>(async (resolve, reject) => {
+        const promise = new Promise<void>(async (resolve) => {
             this.setError(null); // reset error
             this.isSought = false; // reset seek status
             const {currentTime} = this.videoEl!;
@@ -135,9 +135,11 @@ export class VideoReader {
                         await waitVideoCanPlay(this.videoEl!);
                         await this.play();
                     } catch (e) {
+                        // Soft failure: record error but continue with current frame
                         this.setError(e);
                         this.currentFrame = targetFrame;
-                        reject(e);
+                        console.warn('[VideoReader] Play failed, continuing with current frame:', e);
+                        resolve();
                         return;
                     }
                     await new Promise<void>((resolveInner) => {
@@ -183,9 +185,11 @@ export class VideoReader {
                 try {
                     await this.play();
                 } catch (e) {
+                    // Soft failure: record error but continue with current frame
                     this.setError(e);
                     this.currentFrame = targetFrame;
-                    reject(e);
+                    console.warn('[VideoReader] Play failed, continuing with current frame:', e);
+                    resolve();
                     return;
                 }
             }
@@ -209,6 +213,7 @@ export class VideoReader {
             await getWechatNetwork();
         }
         if (document.visibilityState !== 'visible') {
+            // Page is hidden, defer video play until visible
             const visibilityHandle = () => {
                 if (document.visibilityState === 'visible') {
                     if (this.videoEl) this.videoEl.play();
@@ -216,7 +221,8 @@ export class VideoReader {
                 }
             };
             window.addEventListener('visibilitychange', visibilityHandle);
-            throw new Error('The play() request was interrupted because the document was hidden!');
+            console.log('[VideoReader] Page hidden, video play deferred until visible.');
+            return;
         }
         await this.videoEl?.play();
     }
