@@ -29,7 +29,7 @@ This specification is organized in the following order:
 - **Auto Layout**: Defines layout size, container layout, and constraint positioning mechanisms
 - **Layer System**: Defines layers and their related features (styles, filters, masks)
 - **VectorElement System**: Defines vector elements within layers and their processing model
-- **Build Directives**: Defines build-time import directives (inline `<svg>` elements and the `import` attribute on Layer)
+- **Import Directives**: Defines import directives for embedding external content (inline `<svg>` elements and the `import` attribute on Layer)
 
 **Appendices** (for quick reference):
 
@@ -2087,11 +2087,11 @@ Since painters do not clear the geometry list, the same geometry can have multip
 
 ---
 
-## 7. Build Directives
+## 7. Import Directives
 
-Build directives are preprocessing instructions embedded in a PAGX file. They are **not
-rendered directly** — they must be resolved into native PAGX nodes by a build tool before
-the file can be rendered or validated.
+Import directives embed external content (currently SVG) into a PAGX file. They are **not
+rendered directly** — they must be resolved into native PAGX nodes by `pagx resolve`
+before the file can be rendered or validated.
 
 ### 7.1 Inline SVG
 
@@ -2179,7 +2179,7 @@ This appendix describes node categorization and nesting rules.
 | **Geometry Elements** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` | Drawable shapes and text. Must be inside Layer/Group. |
 | **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `TextBox`, `Repeater` | Transform or combine geometry and text. |
 | **Painters** | `Fill`, `Stroke` | Apply color/gradient to geometry. Must be inside Layer/Group. |
-| **Build Directives** | (inline `<svg>`, `import` attribute) | Build-time import directives on Layer. Inline `<svg>` child elements and the `import`/`importFormat` attributes are resolved by `pagx resolve` into native PAGX nodes. |
+| **Import Directives** | (inline `<svg>`, `import` attribute) | Import directives on Layer. Inline `<svg>` child elements and the `import`/`importFormat` attributes are resolved by `pagx resolve` into native PAGX nodes. |
 
 ### A.2 Document Containment
 
@@ -2189,7 +2189,7 @@ The root element `<pagx>` **only accepts `<Layer>` and `<Resources>` as direct c
 pagx (required attributes: version, width, height)
 ├── Layer*                      ← Direct children MUST be Layer
 │   ├── VectorElement* (see A.3)
-│   ├── <svg>* (build directive, see §7)
+│   ├── <svg>* (import directive, see §7)
 │   ├── DropShadowStyle*
 │   ├── InnerShadowStyle*
 │   ├── BackgroundBlurStyle*
@@ -2243,7 +2243,7 @@ Layer / Group
 ├── TextBox
 ├── Repeater
 ├── Group* (recursive)
-└── <svg> (build directive, see §7)
+└── <svg> (import directive, see §7)
 ```
 
 ---

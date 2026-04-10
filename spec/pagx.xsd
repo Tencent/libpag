@@ -847,7 +847,7 @@
     <xs:attributeGroup ref="ConstraintAttributes"/>
   </xs:complexType>
 
-  <!-- ========================= Build Directives ========================= -->
+  <!-- ========================= Import Directives ========================= -->
 
   <!-- Import is handled via inline <svg> child elements in Layer (parsed opaquely)
        and the "import"/"importFormat" attributes on LayerType. No separate complex type needed. -->
@@ -859,7 +859,7 @@
     <xs:choice>
       <!-- VectorElements -->
       <xs:group ref="VectorElementGroup"/>
-      <!-- Build Directives: inline SVG -->
+      <!-- Import Directives: inline SVG -->
       <xs:any namespace="http://www.w3.org/2000/svg" processContents="skip"/>
       <!-- Layer Styles -->
       <xs:element name="DropShadowStyle" type="DropShadowStyleType"/>

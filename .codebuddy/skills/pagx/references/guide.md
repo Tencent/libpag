@@ -53,7 +53,7 @@ Spec rules, techniques, and common pitfalls for writing correct PAGX files.
 | **Geometry** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` |
 | **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `Repeater` |
 | **Painters** | `Fill`, `Stroke` |
-| **Build Directives** | `<svg>` (inline SVG), `import` attribute | Build-time import directives, resolved by `pagx resolve`. |
+| **Import Directives** | `<svg>` (inline SVG), `import` attribute | Import directives, resolved by `pagx resolve`. |
 
 ### Containment Hierarchy
 
@@ -61,7 +61,7 @@ Spec rules, techniques, and common pitfalls for writing correct PAGX files.
 pagx (required: version, width, height)
 ├── Layer*
 │   ├── VectorElements* (geometry, modifiers, painters, Groups, TextBox)
-│   ├── <svg>* (build directive)
+│   ├── <svg>* (import directive)
 │   ├── LayerStyles* (DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle)
 │   ├── LayerFilters* (BlurFilter, DropShadowFilter, ...)
 │   └── Layer* (child layers, recursive)
@@ -545,7 +545,7 @@ scope — use separate Groups if you need both.
 
 ---
 
-# Build Directives
+# Import Directives
 
 Embed external content (currently SVG) directly in Layers — resolved automatically by
 `pagx verify` (which internally calls `pagx resolve`). Two forms: inline `<svg>` as a
