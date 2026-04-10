@@ -1,52 +1,91 @@
 # CLI Reference
 
 The `pagx` command-line tool provides utilities for working with PAGX files. All commands
-operate on local `.pagx` files.
-
-## Setup
-
-The `pagx` binary is provided by the `pagx` npm package. Before running any command below,
-ensure it is installed and meets the minimum version:
-
-```bash
-PAGX_MIN="0.1.6"
-if ! command -v pagx &>/dev/null; then
-  npm install -g @libpag/pagx
-elif [ "$(printf '%s\n' "$PAGX_MIN" "$(pagx -v | awk '{print $2}')" | sort -V | head -1)" != "$PAGX_MIN" ]; then
-  npm update -g @libpag/pagx
-fi
-```
-
-Run this check before the first `pagx` invocation in each session.
+operate on local `.pagx` files. Ensure `pagx` is installed before first use (see the
+setup script in `SKILL.md`).
 
 ---
 
-## pagx optimize
+## pagx verify
 
-Validates, optimizes, and formats a PAGX file in one step. First validates the input against
-the specification schema — aborts with errors if invalid. Then applies structural optimizations:
-empty element removal, PathData/gradient dedup, unreferenced resource removal,
-Path→Rectangle/Ellipse replacement, full-canvas clip mask removal, off-canvas layer removal,
-coordinate localization, and Composition extraction. The exporter also handles default value
-omission, number normalization, transform simplification, Resources ordering, and consistent
-formatting.
+All-in-one verification command. Resolves `<Import>` nodes (via `pagx import --resolve`),
+runs all checks, and optionally outputs a layout file (via `pagx layout`) and rendered
+screenshot (via `pagx render`).
 
 ```bash
-pagx optimize -o output.pagx input.pagx
-pagx optimize --dry-run input.pagx       # preview only
+pagx verify input.pagx                                # full file — outputs .png + .layout.xml
+pagx verify --id "header" input.pagx                   # scoped to Layer id
+pagx verify --skip-render input.pagx                   # skip screenshot, output .layout.xml only
+pagx verify --skip-render --skip-layout input.pagx     # checks only, no file output
 ```
 
 | Option | Description |
 |--------|-------------|
-| `-o, --output <path>` | Output file path (default: overwrite input) |
-| `--dry-run` | Print report without writing output |
+| `--id <id>` | Scope checks and render to the Layer with the specified `id` |
+| `--scale <float>` | Render scale factor (default: 1.0) |
+| `--skip-render` | Skip screenshot generation |
+| `--skip-layout` | Skip layout XML generation |
+| `--json` | Output diagnostics in JSON format |
+
+### Steps
+
+1. **Resolve** — expands all `<Import>` nodes in the file (full file, idempotent).
+   See `pagx import` §Resolve mode.
+2. **Parse + layout** — loads the document and computes layout bounds.
+3. **Check** — runs all detection rules (schema, semantic, structural, spatial, performance).
+4. **Diagnostics** — writes problems to stderr, sorted by line number.
+5. **Files** (unless skipped) — writes layout XML (see `pagx layout` §Output format)
+   and renders screenshot (see `pagx render`). Use `--skip-render` / `--skip-layout` to
+   skip individual outputs.
+
+### Diagnostics format
+
+All reported problems must be fixed.
+
+```
+file:line: description. Fix: suggested check direction
+```
+
+- Single-node problems: single line number.
+- Two-node problems (e.g., overlap): two line numbers comma-separated.
+- Spatial problems include bounds in the description.
+- No output when there are no problems (when both `--skip-render` and `--skip-layout` are set).
+
+Example:
+
+```
+input.pagx:8: unknown attribute "borderRadius" on Rectangle, use "roundness" instead
+input.pagx:18,22: overlapping siblings (20,10,200,40) and (180,10,40,40) in container layout. Fix: check parent layout direction, gap, padding, and children sizes
+input.pagx:60,75: duplicate PathData, identical to line 60. Fix: extract to <Resources> and reference via @id
+Wrote input.png (786x852 @2x)
+Wrote input.layout.xml
+```
+
+### File output
+
+Output files are written to the **current working directory** (not the input file's directory).
+
+| Scenario | Screenshot | Layout file |
+|----------|-----------|-------------|
+| `pagx verify input.pagx` | `input.png` | `input.layout.xml` |
+| `pagx verify --id "header" input.pagx` | `input.header.png` | `input.header.layout.xml` |
+| `pagx verify --skip-render ...` | not generated | `input.layout.xml` |
+| `pagx verify --skip-render --skip-layout ...` | not generated | not generated |
+
+### Exit code
+
+| Code | Meaning |
+|------|---------|
+| 0 | No problems |
+| 1 | Problems found |
 
 ---
 
 ## pagx render
 
 Render a PAGX file to an image. By default, output to the same directory as the input file
-with the same base name (e.g., `foo.pagx` → `foo.png`).
+with the same base name (e.g., `foo.pagx` → `foo.png`). `pagx verify` outputs to the
+current working directory; `pagx render` outputs next to the input file.
 
 ```bash
 pagx render input.pagx                    # outputs input.png
@@ -75,50 +114,22 @@ pagx render --xpath "/pagx/Layer[2]" input.pagx   # render only the matched Laye
 | `--fallback <path\|name>` | Fallback font file or system font name (can be specified multiple times) |
 
 `--id` and `--xpath` are mutually exclusive. When either is specified, only the target Layer
-is rendered — all other content is excluded. The output image is cropped to the target Layer's
-bounds, so the image dimensions reflect the Layer's actual rendered size rather than the full
-canvas. This is useful for inspecting individual components in isolation. For render, `--xpath`
-must match exactly one Layer; an error is reported if zero or more than one Layer matches. In
-contrast, bounds `--xpath` can match multiple Layers.
-
-Errors: `--id` reports an error if no node with that id exists or if the matched node is not a
-Layer. `--xpath` reports an error if no Layer matches or if more than one Layer matches.
+is rendered, cropped to that Layer's bounds.
 
 `--font` registers a font file matched by fontFamily/fontStyle against PAGX text references.
 `--fallback` accepts either a file path (e.g., `b.otf`) or a system font name (e.g.,
-`"PingFang SC"` or `"Arial,Bold"`). All fonts added via `--fallback` are also registered
-automatically. Fallback fonts are tried in order when a character is not found in the
-primary font. System fallback fonts are always appended after user-specified fallbacks.
+`"PingFang SC"` or `"Arial,Bold"`). Fallback fonts are tried in order when a character is
+not found in the primary font.
 
-**Output convention**: Always output to the same directory as the input `.pagx` file — either omit
-`-o` (default behavior) or specify `-o` with a path in the same directory (e.g., for `--crop`
-variants). Rendered images are verification artifacts — do not delete them, but if the project
-context includes auto-commit rules, do not include these image files (`.png`, `.webp`, `.jpg`)
-in the commit.
-
----
-
-## pagx validate
-
-Validate a PAGX file against the specification schema. Note: `pagx optimize` already includes
-validation as its first step — use this command only when you need a standalone check without
-running optimizations.
-
-```bash
-pagx validate input.pagx
-pagx validate --json input.pagx
-```
-
-Text output: `filename:line: error message`. JSON output includes `file`, `valid`, and `errors`
-array with `line` and `message` fields.
+Always output to the same directory as the input `.pagx` file. Do not commit rendered
+image files.
 
 ---
 
 ## pagx format
 
 Pretty-print a PAGX file with consistent indentation and attribute ordering. Does not modify
-values or structure. Note: `pagx optimize` already formats its output — use this command only
-when you want to reformat without applying optimizations.
+values or structure.
 
 ```bash
 pagx format -o output.pagx input.pagx
@@ -132,11 +143,73 @@ pagx format --indent 4 input.pagx       # 4-space indent (default: 2)
 
 ---
 
+## pagx layout
+
+Display the layout structure of a PAGX file in XML format. Outputs the full layout tree with
+resolved bounds and layout attributes for all Layers and their internal elements (Rectangle,
+Ellipse, Path, Polystar, Text, TextPath, Group, TextBox). Pure data output — no problem
+detection (use `pagx verify` for checks).
+
+Each node includes a `line` attribute mapping back to the source file line number.
+
+Output is wrapped in a `<layout>` root element. Without `--id`/`--xpath`, a `<pagx>` element
+with document dimensions contains the layer tree. With `--id`/`--xpath`, target Layers appear
+directly inside `<layout>` with bounds relative to their own origin (starting at 0,0).
+
+```bash
+pagx layout input.pagx                                      # full layout tree
+pagx layout --id "card" input.pagx                           # scope to a Layer by id
+pagx layout --xpath "//Layer[@id='header']" input.pagx       # scope to Layers by XPath
+pagx layout --depth 1 input.pagx                             # only one level of child Layers
+```
+
+| Option | Description |
+|--------|-------------|
+| `--id <id>` | Limit scope to the Layer with the specified `id` attribute |
+| `--xpath <expr>` | Limit scope to Layers matched by XPath expression |
+| `--depth <n>` | Limit Layer nesting depth (0 or negative = unlimited, default: unlimited) |
+
+`--id` and `--xpath` are mutually exclusive.
+
+```xml
+<layout>
+  <pagx width="400" height="300">
+    <Layer line="3" id="root" bounds="0,0,400,300" layout="horizontal" gap="20" padding="20">
+      <Rectangle line="5" bounds="0,0,400,300"/>
+      <Layer line="7" id="sidebar" bounds="20,20,120,260">
+        <Rectangle line="9" bounds="20,20,120,260"/>
+      </Layer>
+      <Layer line="12" id="content" bounds="160,20,220,260" flex="1">
+        <Rectangle line="14" bounds="160,20,220,260"/>
+        <TextBox line="16" bounds="176,30,188,20">
+          <Text line="17" bounds="176,30,188,20"/>
+        </TextBox>
+      </Layer>
+    </Layer>
+  </pagx>
+</layout>
+```
+
+Layer attributes output when non-default: `layout`, `gap`, `flex`, `padding`, `alignment`,
+`arrangement`, `includeInLayout="false"`, `clipToBounds="true"`.
+
+`pagx verify` outputs the same format to `input.layout.xml` (or `input.{id}.layout.xml`
+when scoped with `--id`). See `pagx verify` for details.
+
+---
+
 ## pagx bounds
 
-Query precise rendered bounds of Layer nodes. Supports `--id` for quick lookup by id attribute
-and `--xpath` for flexible node selection. Without either, outputs bounds for the entire
-document and all layers.
+Query **rendered pixel bounds** of Layer nodes — the actual bounding box of rendered content
+including stroke width, shadows, and blur effects. This differs from `pagx layout` bounds,
+which show layout-engine-resolved positions and sizes (based on `layout`/`flex`/`gap`/`padding`/
+constraint attributes, without rendering effects).
+
+Use `pagx bounds` for determining crop regions (`pagx render --crop`) and measuring rendered
+output size. Use `pagx layout` for debugging layout structure and alignment.
+
+Supports `--id` for quick lookup by id attribute and `--xpath` for flexible node selection.
+Without either, outputs bounds for the entire document and all layers.
 
 ```bash
 pagx bounds input.pagx                                          # all layers
@@ -153,8 +226,7 @@ pagx bounds --json input.pagx
 | `--relative <xpath>` | Output bounds relative to another Layer |
 | `--json` | JSON output |
 
-`--id` and `--xpath` are mutually exclusive. `--id "btn"` is a shorthand for selecting a
-Layer by its `id` attribute.
+`--id` and `--xpath` are mutually exclusive.
 
 XPath quick reference for PAGX:
 - `//Layer[@id='x']` — Layer with `id="x"` anywhere in the document
@@ -212,37 +284,52 @@ pagx font embed --file a.ttf --fallback "PingFang SC" --fallback b.otf input.pag
 | `--file <path>` | Register a font file (can be specified multiple times) |
 | `--fallback <path\|name>` | Fallback font file or system font name (can be specified multiple times) |
 
-`--file` registers a font file matched by fontFamily/fontStyle against PAGX text references.
-`--fallback` accepts either a file path (e.g., `b.otf`) or a system font name (e.g.,
-`"PingFang SC"` or `"Arial,Bold"`). All fonts added via `--fallback` are also registered
-automatically. Fallback fonts are tried in order when a character is not found in the
-primary font. System fallback fonts are always appended after user-specified fallbacks.
+`--file` and `--fallback` work the same as in `pagx render`.
 
 ---
 
 ## pagx import
 
-Import a file from another format (e.g. SVG) and convert it to PAGX. The input format is
-inferred from the file extension unless `--format` is specified. Import warnings are printed
-but do not prevent conversion.
+Import external format files into PAGX, or resolve `<Import>` nodes within an existing PAGX
+file. Two mutually exclusive modes: **standard** (`--input`) and **resolve** (`--resolve`).
+
+### Standard mode
+
+Convert a file from another format (e.g. SVG) to a standalone PAGX file.
 
 ```bash
 pagx import --input icon.svg                     # SVG to icon.pagx
 pagx import --input icon.svg --output out.pagx   # SVG to out.pagx
-pagx import --format svg --input drawing.xml     # force treating drawing.xml as SVG format
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--input <file>` | Input file to import (required) |
+| `--input <file>` | Input file to import (required in standard mode) |
 | `--output <file>` | Output PAGX file (default: `<input>.pagx`) |
-| `--format <format>` | Force input format (`svg`; default: inferred from input extension) |
+| `--format <format>` | Force input format (`svg`; default: inferred from extension) |
 | `--svg-no-expand-use` | Do not expand `<use>` references |
 | `--svg-flatten-transforms` | Flatten nested transforms into single matrices |
 | `--svg-preserve-unknown` | Preserve unsupported SVG elements as Unknown nodes |
 
-On success the command prints `pagx import: wrote <path>` and exits 0; on failure it prints
-an error and exits 1.
+### Resolve mode
+
+Expand all `<Import>` nodes in a PAGX file into native PAGX nodes.
+
+```bash
+pagx import --resolve design.pagx                          # resolve in place
+pagx import --resolve design.pagx --output out.pagx        # resolve to new file
+```
+
+| Option | Description |
+|--------|-------------|
+| `--resolve <file>` | Input PAGX file to expand (required in resolve mode) |
+| `-o, --output <path>` | Output file path (default: overwrite input) |
+| `--svg-no-expand-use` | Do not expand `<use>` references in SVG content |
+| `--svg-flatten-transforms` | Flatten nested transforms into single matrices |
+| `--svg-preserve-unknown` | Preserve unsupported SVG elements as Unknown nodes |
+
+`--input` and `--resolve` are mutually exclusive. Resolve mode sets the parent Layer's
+`width`/`height` from the source dimensions.
 
 ---
 
@@ -268,5 +355,4 @@ pagx export --input icon.pagx --svg-indent 4     # 4-space indent
 | `--svg-no-xml-declaration` | Omit the `<?xml ...?>` declaration |
 | `--svg-no-convert-text-to-path` | Keep text as `<text>` elements instead of `<path>` |
 
-On success the command prints `pagx export: wrote <path>` and exits 0; on failure it prints
-an error and exits 1.
+

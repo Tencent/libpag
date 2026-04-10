@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="800" height="520">
+  <Layer name="background" left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="800,520">
+        <ColorStop offset="0" color="#0F172A"/>
+        <ColorStop offset="1" color="#1E293B"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+  <Layer name="GlowTopLeft" blendMode="screen">
+    <Ellipse left="-80" top="-100" size="320,320"/>
+    <Fill color="@glowPurple"/>
+    <BlurFilter blurX="30" blurY="30"/>
+  </Layer>
+  <Layer name="GlowBottomRight" blendMode="screen">
+    <Ellipse left="520" top="260" size="400,400"/>
+    <Fill color="@glowCyan"/>
+    <BlurFilter blurX="40" blurY="40"/>
+  </Layer>
+  <Layer name="Title" width="800">
+    <Text centerX="0" text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="56"/>
+    <Fill color="@titleGradient"/>
+  </Layer>
+  <Layer name="Subtitle">
+    <Text text="Portable Animated Graphics XML" fontFamily="Arial" fontSize="14"/>
+    <TextPath path="M 220,135 Q 400,65 580,135" forceAlignment="true"/>
+    <Fill color="#64748B"/>
+  </Layer>
+  <Layer name="Cards" left="110" top="155" width="580" height="80" layout="horizontal" gap="20">
+    <Layer name="Card1" width="100">
+      <Layer composition="@cardBg"/>
+      <Layer left="50" top="40">
+        <Rectangle left="-25" top="-17.5" size="50,35" roundness="8"/>
+        <Fill color="@coral"/>
+        <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#F43F5E80"/>
+      </Layer>
+    </Layer>
+    <Layer name="Card2" width="100">
+      <Layer composition="@cardBg"/>
+      <Layer left="50" top="40">
+        <Ellipse left="-25" top="-17.5" size="50,35"/>
+        <Fill color="@purple"/>
+        <InnerShadowStyle offsetX="2" offsetY="2" blurX="6" blurY="6" color="#00000080"/>
+      </Layer>
+    </Layer>
+    <Layer name="Card3" width="100">
+      <Layer composition="@cardBg"/>
+      <Layer left="50" top="40">
+        <Polystar left="-24" top="-24" type="star" pointCount="5" outerRadius="24" innerRadius="11"/>
+        <Fill color="@amber"/>
+        <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#F59E0B80"/>
+      </Layer>
+    </Layer>
+    <Layer name="Card4" width="100">
+      <Layer composition="@cardBg"/>
+      <Layer left="50" top="40">
+        <Polystar left="-26" top="-26" type="polygon" pointCount="6" outerRadius="26"/>
+        <Fill color="@diamond"/>
+        <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#14B8A680"/>
+      </Layer>
+    </Layer>
+    <Layer name="Card5" width="100">
+      <Layer composition="@cardBg"/>
+      <Layer left="50" top="40">
+        <Path data="M-20 -15L0 -25L20 -15L20 15L0 25L-20 15Z"/>
+        <Fill color="@orange"/>
+        <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#F9731680"/>
+      </Layer>
+    </Layer>
+  </Layer>
+  <Layer name="GetStartedButton" left="88" top="307">
+    <Rectangle size="120,36" roundness="18"/>
+    <Fill color="@buttonGradient"/>
+    <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#6366F180"/>
+    <Group centerX="0" centerY="0">
+      <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
+      <Fill color="#FFF"/>
+    </Group>
+  </Layer>
+  <Layer name="Modifiers" top="325">
+    <Path left="258" top="-20" data="@wavePath"/>
+    <TrimPath end="0.75"/>
+    <Stroke color="@cyan" width="3" cap="round"/>
+    <Group left="368">
+      <Rectangle left="-30" top="-20" size="60,40"/>
+      <RoundCorner radius="10"/>
+      <Fill color="@emerald"/>
+    </Group>
+    <Group left="478">
+      <Rectangle left="-27.5" top="-17.5" size="35,35"/>
+      <Ellipse left="-7.5" top="-17.5" size="35,35"/>
+      <MergePath mode="xor"/>
+      <Fill color="@purple"/>
+    </Group>
+    <Group left="588">
+      <Ellipse left="16" top="-6" size="12,12"/>
+      <Fill color="@cyan"/>
+      <Repeater copies="5" position="0,0" rotation="72"/>
+    </Group>
+    <Group left="688">
+      <Rectangle left="-25" top="-25" size="50,50"/>
+      <Fill color="@rainbow"/>
+    </Group>
+  </Layer>
+  <Layer id="circleMask" visible="false">
+    <Ellipse left="-22.5" top="-22.5" size="45,45"/>
+    <Fill color="#FFF"/>
+  </Layer>
+  <Layer name="MaskedLayer" left="688" top="325" mask="@circleMask">
+    <Rectangle left="-25" top="-25" size="50,50"/>
+    <Fill color="@rainbow"/>
+  </Layer>
+  <Layer left="130" top="430">
+    <Rectangle left="-40" top="-30" size="80,60" roundness="10"/>
+    <Fill color="@emerald"/>
+    <BlurFilter blurX="3" blurY="3"/>
+  </Layer>
+  <Layer left="260" top="430">
+    <Rectangle left="-40" top="-30" size="80,60" roundness="10"/>
+    <Fill color="@cyan"/>
+    <DropShadowFilter offsetX="4" offsetY="4" blurX="12" blurY="12" color="#00000080"/>
+  </Layer>
+  <Layer left="390" top="430">
+    <Ellipse left="-27.5" top="-27.5" size="55,55"/>
+    <Fill color="@purple"/>
+    <ColorMatrixFilter matrix="0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0,0,0,1,0"/>
+  </Layer>
+  <Layer left="520" top="430">
+    <Rectangle left="-40" top="-30" size="80,60" roundness="10"/>
+    <Fill color="@coral"/>
+    <BlendFilter color="#6366F160" blendMode="overlay"/>
+  </Layer>
+  <Layer left="670" top="430">
+    <Rectangle left="-45" top="-30" size="90,60" roundness="8"/>
+    <Fill>
+      <ImagePattern image="pag_logo.png" tileModeX="clamp" tileModeY="clamp" matrix="0.23,0,0,0.23,-30,-30"/>
+    </Fill>
+    <Stroke color="#FFFFFF20" width="1"/>
+    <DropShadowStyle offsetY="6" blurX="16" blurY="16" color="#00000060"/>
+  </Layer>
+  <Layer left="400" top="500">
+    <Text fontFamily="Arial" fontSize="18">
+      <GlyphRun font="@iconFont" glyphs="1,2,3" y="0" xOffsets="0,28,56" bounds="0,0,80,18"/>
+    </Text>
+    <Fill color="#64748B"/>
+  </Layer>
+  <Resources>
+    <PathData id="wavePath" data="M 0 20 Q 30 0 60 20 T 120 20 T 180 20"/>
+    <Font id="iconFont">
+      <Glyph path="M 0 -8 L 8 8 L -8 8 Z" advance="20"/>
+      <Glyph path="M -8 -8 L 8 -8 L 8 8 L -8 8 Z" advance="20"/>
+      <Glyph path="M 0 -10 A 10 10 0 1 1 0 10 A 10 10 0 1 1 0 -10" advance="24"/>
+    </Font>
+    <RadialGradient id="glowPurple" center="160,160" radius="160">
+      <ColorStop offset="0" color="#8B5CF660"/>
+      <ColorStop offset="1" color="#8B5CF600"/>
+    </RadialGradient>
+    <RadialGradient id="glowCyan" center="200,200" radius="200">
+      <ColorStop offset="0" color="#06B6D450"/>
+      <ColorStop offset="1" color="#06B6D400"/>
+    </RadialGradient>
+    <LinearGradient id="titleGradient" startPoint="-400,0" endPoint="-200,0">
+      <ColorStop offset="0" color="#FFF"/>
+      <ColorStop offset="0.5" color="#8B5CF6"/>
+      <ColorStop offset="1" color="#06B6D4"/>
+    </LinearGradient>
+    <LinearGradient id="buttonGradient" startPoint="0,0" endPoint="120,0">
+      <ColorStop offset="0" color="#6366F1"/>
+      <ColorStop offset="1" color="#8B5CF6"/>
+    </LinearGradient>
+    <ConicGradient id="rainbow" center="25,25">
+      <ColorStop offset="0" color="#F43F5E"/>
+      <ColorStop offset="0.25" color="#8B5CF6"/>
+      <ColorStop offset="0.5" color="#06B6D4"/>
+      <ColorStop offset="0.75" color="#10B981"/>
+      <ColorStop offset="1" color="#F43F5E"/>
+    </ConicGradient>
+    <SolidColor id="coral" color="#F43F5E"/>
+    <SolidColor id="purple" color="#8B5CF6"/>
+    <SolidColor id="amber" color="#F59E0B"/>
+    <SolidColor id="orange" color="#F97316"/>
+    <SolidColor id="cyan" color="#06B6D4"/>
+    <SolidColor id="emerald" color="#10B981"/>
+    <DiamondGradient id="diamond" center="26,26" radius="26">
+      <ColorStop offset="0" color="#14B8A6"/>
+      <ColorStop offset="1" color="#0F766E"/>
+    </DiamondGradient>
+    <Composition id="cardBg" width="100" height="80">
+      <Layer width="100" height="80">
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+        <Fill color="#1E293B"/>
+        <Stroke color="#334155" width="1"/>
+      </Layer>
+    </Composition>
+  </Resources>
+</pagx>

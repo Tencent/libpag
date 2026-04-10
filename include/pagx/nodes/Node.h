@@ -196,7 +196,14 @@ enum class NodeType {
   /**
    * A precomposed glyph run for text rendering.
    */
-  GlyphRun
+  GlyphRun,
+
+  // Build Directives
+  /**
+   * A build directive that embeds external content (e.g., SVG) into a PAGX file. Must be resolved
+   * into native PAGX nodes by `pagx import --resolve` before layout or rendering.
+   */
+  Import
 };
 
 /**
@@ -219,6 +226,13 @@ class Node {
    * storing debug information.
    */
   std::unordered_map<std::string, std::string> customData = {};
+
+  /**
+   * The line number in the source XML file where this node was defined. A value of -1 means no
+   * source line information is available (e.g., programmatically created nodes). Set by
+   * PAGXImporter during parsing.
+   */
+  int sourceLine = -1;
 
   /**
    * Returns true if the given key is a valid custom data key. A valid key contains only lowercase

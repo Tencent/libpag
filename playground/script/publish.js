@@ -969,7 +969,7 @@ function main() {
 
     for (const pagxFile of pagxFiles) {
       const baseName = pagxFile.replace(/\.pagx$/, '');
-      const baselineFile = baseName + '_base.webp';
+      const baselineFile = 'spec_' + baseName + '_base.webp';
       const src = path.join(testOutputDir, baselineFile);
       if (fs.existsSync(src)) {
         copyFile(src, path.join(imagesOutputDir, baseName + '.webp'));

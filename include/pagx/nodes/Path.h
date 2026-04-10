@@ -18,8 +18,11 @@
 
 #pragma once
 
-#include "pagx/nodes/PathData.h"
+#include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/Element.h"
+#include "pagx/nodes/PathData.h"
+#include "pagx/types/Point.h"
+#include "pagx/types/Rect.h"
 
 namespace pagx {
 
@@ -27,12 +30,17 @@ namespace pagx {
  * Path represents a freeform shape defined by a PathData containing vertices, in-tangents, and
  * out-tangents.
  */
-class Path : public Element {
+class Path : public Element, public LayoutNode {
  public:
   /**
    * The path data containing vertices and control points.
    */
   PathData* data = nullptr;
+
+  /**
+   * The position offset of the path coordinate system origin. The default value is (0, 0).
+   */
+  Point position = {};
 
   /**
    * Whether the path direction is reversed. The default value is false.
@@ -42,6 +50,11 @@ class Path : public Element {
   NodeType nodeType() const override {
     return NodeType::Path;
   }
+
+ protected:
+  void onMeasure(LayoutContext* context) override;
+  void setLayoutSize(LayoutContext* context, float width, float height) override;
+  void setLayoutPosition(LayoutContext* context, float x, float y) override;
 
  private:
   Path() = default;

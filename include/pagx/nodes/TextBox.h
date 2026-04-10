@@ -18,39 +18,30 @@
 
 #pragma once
 
-#include "pagx/nodes/Element.h"
+#include "pagx/nodes/Group.h"
 #include "pagx/types/Overflow.h"
 #include "pagx/types/ParagraphAlign.h"
-#include "pagx/types/Point.h"
-#include "pagx/types/Size.h"
 #include "pagx/types/TextAlign.h"
 #include "pagx/types/WritingMode.h"
 
 namespace pagx {
 
 /**
- * TextBox is a text layout node that controls typography for accumulated Text elements.
- * It recalculates glyph positions and provides layout capabilities including:
+ * TextBox is a text layout container that inherits from Group, providing typography control for
+ * accumulated Text elements. It recalculates glyph positions and provides layout capabilities
+ * including:
  * - Automatic word wrapping when wordWrap is enabled
  * - Horizontal/vertical writing mode
  * - Overflow control (visible or hidden)
  *
- * Position and size define the text area. In vertical mode, the first column is positioned with
- * its right edge touching the right side, and columns flow from right to left.
+ * The inherited width and height define the text area dimensions. When width or height is NaN, the
+ * TextBox has no boundary in that dimension (auto-sizing). In vertical mode, the first column is
+ * positioned with its right edge touching the right side, and columns flow from right to left.
+ *
+ * After typesetting, TextBox behaves as a regular Group containing positioned Text elements.
  */
-class TextBox : public Element {
+class TextBox : public Group {
  public:
-  /**
-   * The top-left corner of the text area. The default value is (0, 0).
-   */
-  Point position = {};
-
-  /**
-   * The size of the text box. When width or height is 0, text has no boundary in that dimension,
-   * which may cause wordWrap or overflow to have no effect. The default value is (0, 0).
-   */
-  Size size = {};
-
   /**
    * The text alignment along the inline direction. In horizontal mode, this controls horizontal
    * alignment within each line. In vertical mode, this controls vertical alignment within each
@@ -82,22 +73,27 @@ class TextBox : public Element {
 
   /**
    * Whether automatic word wrapping is enabled. When true, text wraps at the box width boundary
-   * (horizontal mode) or height boundary (vertical mode). Has no effect when that dimension of
-   * size is 0. The default value is true.
+   * (horizontal mode) or height boundary (vertical mode). Has no effect when that dimension is NaN
+   * (auto-sizing). The default value is true.
    */
   bool wordWrap = true;
 
   /**
    * The overflow behavior when text exceeds the box boundaries. When set to Hidden, entire lines
    * that exceed the box height (horizontal mode) or columns that exceed the box width (vertical
-   * mode) are discarded during typesetting. Has no effect when that dimension of size is 0. The
-   * default value is Visible.
+   * mode) are discarded during typesetting. Has no effect when that dimension is NaN (auto-sizing).
+   * The default value is Visible.
    */
   Overflow overflow = Overflow::Visible;
 
   NodeType nodeType() const override {
     return NodeType::TextBox;
   }
+
+ protected:
+  void onMeasure(LayoutContext* context) override;
+  void setLayoutSize(LayoutContext* context, float width, float height) override;
+  void updateLayout(LayoutContext* context) override;
 
  private:
   TextBox() = default;

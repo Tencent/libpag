@@ -1,0 +1,18 @@
+<pagx version="1.0" width="400" height="300">
+  <Layer id="root" width="400" height="300" layout="vertical">
+    <Layer id="child1" height="100" layout="horizontal" gap="10" padding="10">
+      <Layer id="grandchild1" flex="1">
+        <Rectangle left="0" right="0" top="0" bottom="0"/>
+        <Fill color="#3B82F6"/>
+      </Layer>
+      <Layer id="grandchild2" flex="1">
+        <Rectangle left="0" right="0" top="0" bottom="0"/>
+        <Fill color="#10B981"/>
+      </Layer>
+    </Layer>
+    <Layer id="child2" flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#EEE"/>
+    </Layer>
+  </Layer>
+</pagx>

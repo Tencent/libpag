@@ -28,6 +28,7 @@
 #include "pagx/svg/SVGBlendMode.h"
 #include "pagx/svg/SVGParserContext.h"
 #include "pagx/svg/SVGPathParser.h"
+#include "pagx/types/TextBaseline.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
 
@@ -1055,6 +1056,8 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
 
     // Font size already resolved above.
     text->fontSize = currentFontSize;
+    // SVG <text> y attribute specifies the alphabetic baseline position.
+    text->baseline = TextBaseline::Alphabetic;
 
     // Font weight: element attribute > inherited style.
     // SVG font-weight maps to fontStyle in PAGX (e.g., "Bold", "Light").

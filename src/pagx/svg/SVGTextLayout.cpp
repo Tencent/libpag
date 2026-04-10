@@ -151,7 +151,8 @@ std::vector<SVGTextLine> BreakTextIntoLines(const std::vector<SVGCharInfo>& char
 
 std::string ExtractLineText(const std::string& fullText, const std::vector<SVGCharInfo>& chars,
                             const SVGTextLine& line) {
-  if (line.charCount == 0) {
+  if (line.charCount == 0 || line.charStart >= chars.size() ||
+      line.charStart + line.charCount > chars.size()) {
     return "";
   }
   size_t byteStart = chars[line.charStart].byteOffset;
@@ -166,14 +167,14 @@ SVGTextLayoutResult ComputeTextLayout(const SVGTextLayoutParams& params) {
   auto* textBox = params.textBox;
   float fontSize = params.fontSize;
 
-  bool needsMultiLine = textBox != nullptr && textBox->wordWrap && textBox->size.width > 0;
+  bool needsMultiLine = textBox != nullptr && textBox->wordWrap && textBox->width > 0;
   result.isMultiLine = needsMultiLine;
 
   // ── Multi-line: parse text and break into lines ──
   float boxWidth = 0;
 
   if (needsMultiLine) {
-    boxWidth = textBox->size.width;
+    boxWidth = textBox->width;
     // Default line height is 1.2em, a widely used typographic convention (CSS "normal" line-height).
     result.lineHeight = textBox->lineHeight > 0 ? textBox->lineHeight : fontSize * 1.2f;
 
@@ -210,11 +211,11 @@ SVGTextLayoutResult ComputeTextLayout(const SVGTextLayoutParams& params) {
   if (textBox) {
     switch (textBox->textAlign) {
       case TextAlign::Center:
-        result.x = textBox->position.x + textBox->size.width / 2;
+        result.x = textBox->position.x + textBox->width / 2;
         result.anchor = TextAnchor::Center;
         break;
       case TextAlign::End:
-        result.x = textBox->position.x + textBox->size.width;
+        result.x = textBox->position.x + textBox->width;
         result.anchor = TextAnchor::End;
         break;
       default:
@@ -224,7 +225,7 @@ SVGTextLayoutResult ComputeTextLayout(const SVGTextLayoutParams& params) {
     }
 
     if (needsMultiLine) {
-      float boxHeight = textBox->size.height;
+      float boxHeight = textBox->height;
       float totalHeight = static_cast<float>(result.lines.size()) * result.lineHeight;
       // Approximate ascent for common fonts: ascender ≈ 80% of em-square (e.g. Arial 0.81,
       // Helvetica 0.77, Times New Roman 0.81). Used to shift the first baseline down from the
@@ -255,10 +256,10 @@ SVGTextLayoutResult ComputeTextLayout(const SVGTextLayoutParams& params) {
           // is roughly 0.35em above the baseline (e.g. Arial ascent 0.81, descent 0.19 →
           // (0.81 − 0.19) / 2 = 0.31; Helvetica similar). This shifts the baseline so that
           // the visual center of the glyphs aligns with the vertical center of the text box.
-          result.y = textBox->position.y + textBox->size.height / 2 + fontSize * 0.35f;
+          result.y = textBox->position.y + textBox->height / 2 + fontSize * 0.35f;
           break;
         case ParagraphAlign::Far:
-          result.y = textBox->position.y + textBox->size.height;
+          result.y = textBox->position.y + textBox->height;
           break;
         default:
           result.y = textBox->position.y + fontSize;

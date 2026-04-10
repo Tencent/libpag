@@ -7,8 +7,8 @@ low or high risk depending on scope and impact.
 
 | Risk | Rule | Examples |
 |------|------|----------|
-| Low | Only one reasonable fix exists | null check, fix incorrect comment, rename to match convention, remove redundant duplicate code, add `reserve`, fix obvious off-by-one error |
-| Medium | Multiple fixes possible, but no design decision or external contract involved | extracting shared logic across functions, removing unused internal methods, simplifying cross-function control flow, adjusting internal module boundaries |
+| Low | Only one reasonable fix exists | null check, fix stale comment to match current code, rename variable/function to match its current meaning, remove dead code (unused function/parameter/branch), delete leftover scaffolding from a replaced approach, remove redundant duplicate code, add `reserve`, fix obvious off-by-one error, fix test that copies the implementation formula instead of using an independent expected value |
+| Medium | Multiple fixes possible, but no design decision or external contract involved | extracting shared logic across functions, consolidating scattered constants into a shared definition, removing unused internal methods, completing a partial refactoring (updating remaining call sites), making asymmetric code paths consistent, simplifying cross-function control flow, adjusting internal module boundaries |
 | High | Involves design decisions or external contracts | public API change (signature, behavior, deprecation), test baseline change, architecture restructuring, algorithm replacement with multiple viable approaches, introducing a new dependency, changing data persistence/serialization format, changing threading model, performance optimization involving space-time trade-offs, user-facing behavior change beyond the stated bug scope, build system configuration change |
 
 ## Handling by Risk Level

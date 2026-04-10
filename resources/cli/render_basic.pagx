@@ -3,12 +3,12 @@
 <pagx version="1.0" width="200" height="200">
   <!-- Red circle in top-left quadrant -->
   <Layer>
-    <Ellipse position="50,50" size="80,80"/>
+    <Ellipse left="10" top="10" size="80,80"/>
     <Fill color="#FF0000"/>
   </Layer>
   <!-- Blue rectangle in bottom-right quadrant -->
   <Layer>
-    <Rectangle position="150,150" size="80,80"/>
+    <Rectangle left="110" top="110" size="80,80"/>
     <Fill color="#0000FF"/>
   </Layer>
 </pagx>

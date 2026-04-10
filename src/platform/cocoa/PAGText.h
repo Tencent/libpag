@@ -116,7 +116,8 @@ PAG_API @interface PAGText : NSObject
 @property(nonatomic, assign) uint8_t justification;
 
 /**
- * The space between lines, 0 indicates 'auto', which is fontSize * 1.2
+ * The space between lines, 0 indicates 'auto', which calculates from font metrics
+ * (ascent + descent + leading).
  */
 @property(nonatomic, assign) float leading;
 
