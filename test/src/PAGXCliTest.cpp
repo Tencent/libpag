@@ -1961,6 +1961,45 @@ CLI_TEST(PAGXCliTest, LayoutCheck_PolystarOrigin) {
   EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
 }
 
+// stretch-fill Rectangle inside a padded Layer should be detected.
+CLI_TEST(PAGXCliTest, LayoutCheck_PaddingStretch) {
+  auto path = TestResourcePath("layout_check_padding_stretch.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("stretch-fill element affected by padding") != std::string::npos);
+}
+
+// stretch-fill divider (left="0" right="0") inside a padded Layer should be detected.
+CLI_TEST(PAGXCliTest, LayoutCheck_PaddingStretchDivider) {
+  auto path = TestResourcePath("layout_check_padding_stretch_divider.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("stretch-fill element affected by padding") != std::string::npos);
+}
+
+// Correct nested container (background in outer, padding in inner) should NOT trigger.
+CLI_TEST(PAGXCliTest, LayoutCheck_PaddingStretchNested) {
+  auto path = TestResourcePath("layout_check_padding_stretch_nested.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("stretch-fill element affected by padding") == std::string::npos);
+}
+
 // Layers at different positions but identical structure should be detected as extractable.
 CLI_TEST(PAGXCliTest, Verify_CompositionPositionDiff) {
   auto inputPath = TestResourcePath("verify_composition_position_diff.pagx");

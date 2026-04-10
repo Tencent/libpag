@@ -1839,6 +1839,33 @@ static void DetectRedundantZeroConstraints(const LayoutNode* node, int sourceLin
   }
 }
 
+static void DetectStretchFillAffectedByPadding(const std::vector<Element*>& elements,
+                                               const Padding& padding,
+                                               std::vector<VerifyDiagnostic>& diagnostics) {
+  if (padding.isZero()) {
+    return;
+  }
+  for (auto* element : elements) {
+    auto type = element->nodeType();
+    if (type != NodeType::Rectangle && type != NodeType::Ellipse) {
+      continue;
+    }
+    auto* layoutNode = LayoutNode::AsLayoutNode(element);
+    if (layoutNode == nullptr) {
+      continue;
+    }
+    bool hStretch = layoutNode->left == 0.0f && layoutNode->right == 0.0f &&
+                    (padding.left != 0 || padding.right != 0);
+    bool vStretch = layoutNode->top == 0.0f && layoutNode->bottom == 0.0f &&
+                    (padding.top != 0 || padding.bottom != 0);
+    if (hStretch || vStretch) {
+      AddDiagnostic(diagnostics, element->sourceLine,
+                    "stretch-fill element affected by padding, background will be inset. Fix: use "
+                    "nested container — move background to an outer Layer without padding");
+    }
+  }
+}
+
 static void DetectClippedContent(const Layer* parentLayer,
                                  std::vector<VerifyDiagnostic>& diagnostics) {
   if (!parentLayer->clipToBounds) {
@@ -2070,6 +2097,7 @@ static void RunSpatialDetectionOnElements(const std::vector<Element*>& elements,
         DetectIneffectiveCentering(group->elements, diagnostics);
       }
       DetectContentOriginOffsetForGroup(group, diagnostics);
+      DetectStretchFillAffectedByPadding(group->elements, group->padding, diagnostics);
       auto bounds = group->layoutBounds();
       RunSpatialDetectionOnElements(group->elements, parentTextBox, bounds.width, bounds.height,
                                     diagnostics);
@@ -2094,6 +2122,7 @@ static void RunSpatialDetectionOnLayer(const Layer* layer, const Layer* parentLa
   DetectOverlappingSiblings(layer, diagnostics);
   DetectConstraintConflicts(layer, layer->sourceLine, diagnostics);
   DetectRedundantZeroConstraints(layer, layer->sourceLine, diagnostics);
+  DetectStretchFillAffectedByPadding(layer->contents, layer->padding, diagnostics);
   DetectClippedContent(layer, diagnostics);
   DetectContainerOverflow(layer, diagnostics);
 
