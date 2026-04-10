@@ -77,9 +77,9 @@ std::string GetPathSVGString(const Path* path);
 std::string ReversePathDataToSVGString(const PathData& pathData);
 std::string RectToPathData(const Rectangle* r);
 std::string EllipseToPathData(const Ellipse* e);
-PathData GeoToPathData(const Element* element, NodeType type);
-PathData ReversePathData(const PathData& pathData);
-PathData ApplyRoundCorner(const PathData& pathData, float radius);
+void GeoToPathData(const Element* element, NodeType type, PathData& output);
+void ReversePathData(const PathData& pathData, PathData& output);
+void ApplyRoundCorner(const PathData& pathData, float radius, PathData& output);
 std::string TransformPathDataToSVG(const PathData& pathData, const Matrix& m);
 
 float ComputePathLength(const PathData& pathData);

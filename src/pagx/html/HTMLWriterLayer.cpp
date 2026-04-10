@@ -181,11 +181,11 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           auto tb = curTextBox;
           std::string style = "position:absolute;left:" + FloatToString(tb->position.x) +
                               "px;top:" + FloatToString(tb->position.y) + "px";
-          if (tb->size.width > 0) {
-            style += ";width:" + FloatToString(tb->size.width) + "px";
+          if (!std::isnan(tb->width)) {
+            style += ";width:" + FloatToString(tb->width) + "px";
           }
-          if (tb->size.height > 0) {
-            style += ";height:" + FloatToString(tb->size.height) + "px";
+          if (!std::isnan(tb->height)) {
+            style += ";height:" + FloatToString(tb->height) + "px";
           }
           if (tb->paragraphAlign != ParagraphAlign::Near) {
             style += ";display:flex;flex-direction:column";
@@ -267,8 +267,10 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           for (auto& g : geos) {
             if (g.type == NodeType::Rectangle || g.type == NodeType::Ellipse ||
                 g.type == NodeType::Path || g.type == NodeType::Polystar) {
-              PathData pathData = GeoToPathData(g.element, g.type);
-              PathData rounded = ApplyRoundCorner(pathData, roundCornerRadius);
+              PathData pathData = PathDataFromSVGString("");
+              GeoToPathData(g.element, g.type, pathData);
+              PathData rounded = PathDataFromSVGString("");
+              ApplyRoundCorner(pathData, roundCornerRadius, rounded);
               g.modifiedPathData = PathDataToSVGString(rounded);
             }
           }
@@ -326,7 +328,8 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             auto gt = ge->nodeType();
             if (gt == NodeType::Rectangle || gt == NodeType::Ellipse || gt == NodeType::Path ||
                 gt == NodeType::Polystar) {
-              PathData pathData = GeoToPathData(ge, gt);
+              PathData pathData = PathDataFromSVGString("");
+              GeoToPathData(ge, gt, pathData);
               if (!pathData.isEmpty()) {
                 std::string svgPath = gm.isIdentity() ? PathDataToSVGString(pathData)
                                                       : TransformPathDataToSVG(pathData, gm);

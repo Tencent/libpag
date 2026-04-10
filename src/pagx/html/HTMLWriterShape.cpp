@@ -271,9 +271,10 @@ float ComputePathLength(const PathData& pathData) {
   return length;
 }
 
-PathData ApplyRoundCorner(const PathData& pathData, float radius) {
+void ApplyRoundCorner(const PathData& pathData, float radius, PathData& output) {
   if (radius <= 0 || pathData.isEmpty()) {
-    return pathData;
+    output = pathData;
+    return;
   }
   struct Segment {
     PathVerb verb = PathVerb::Line;
@@ -333,12 +334,12 @@ PathData ApplyRoundCorner(const PathData& pathData, float radius) {
     contours.push_back(std::move(currentContour));
   }
 
-  PathData result = PathDataFromSVGString("");
+  output = PathDataFromSVGString("");
   for (auto& contour : contours) {
     if (contour.segments.empty()) {
-      result.moveTo(contour.startPoint.x, contour.startPoint.y);
+      output.moveTo(contour.startPoint.x, contour.startPoint.y);
       if (contour.closed) {
-        result.close();
+        output.close();
       }
       continue;
     }
@@ -365,17 +366,17 @@ PathData ApplyRoundCorner(const PathData& pathData, float radius) {
 
       if (!hasPrev || !incomingIsLine || !outgoingIsLine) {
         if (firstOutput) {
-          result.moveTo(vertex.x, vertex.y);
+          output.moveTo(vertex.x, vertex.y);
           firstOutput = false;
         }
         if (vi < n) {
           auto& seg = contour.segments[vi];
           if (seg.verb == PathVerb::Line) {
-            result.lineTo(seg.endPoint.x, seg.endPoint.y);
+            output.lineTo(seg.endPoint.x, seg.endPoint.y);
           } else if (seg.verb == PathVerb::Quad) {
-            result.quadTo(seg.ctrl1.x, seg.ctrl1.y, seg.endPoint.x, seg.endPoint.y);
+            output.quadTo(seg.ctrl1.x, seg.ctrl1.y, seg.endPoint.x, seg.endPoint.y);
           } else if (seg.verb == PathVerb::Cubic) {
-            result.cubicTo(seg.ctrl1.x, seg.ctrl1.y, seg.ctrl2.x, seg.ctrl2.y, seg.endPoint.x,
+            output.cubicTo(seg.ctrl1.x, seg.ctrl1.y, seg.ctrl2.x, seg.ctrl2.y, seg.endPoint.x,
                            seg.endPoint.y);
           }
         }
@@ -401,11 +402,11 @@ PathData ApplyRoundCorner(const PathData& pathData, float radius) {
 
       if (len1 < 0.001f || len2 < 0.001f) {
         if (firstOutput) {
-          result.moveTo(vertex.x, vertex.y);
+          output.moveTo(vertex.x, vertex.y);
           firstOutput = false;
         }
         if (vi < n) {
-          result.lineTo(contour.segments[vi].endPoint.x, contour.segments[vi].endPoint.y);
+          output.lineTo(contour.segments[vi].endPoint.x, contour.segments[vi].endPoint.y);
         }
         continue;
       }
@@ -421,26 +422,26 @@ PathData ApplyRoundCorner(const PathData& pathData, float radius) {
                    p2.y + (vertex.y - p2.y) * kBezierKappa};
 
       if (firstOutput) {
-        result.moveTo(p1.x, p1.y);
+        output.moveTo(p1.x, p1.y);
         firstOutput = false;
       } else {
-        result.lineTo(p1.x, p1.y);
+        output.lineTo(p1.x, p1.y);
       }
-      result.cubicTo(cp1.x, cp1.y, cp2.x, cp2.y, p2.x, p2.y);
+      output.cubicTo(cp1.x, cp1.y, cp2.x, cp2.y, p2.x, p2.y);
       if (vi == n - 1 && !contour.closed) {
-        result.lineTo(contour.segments[vi].endPoint.x, contour.segments[vi].endPoint.y);
+        output.lineTo(contour.segments[vi].endPoint.x, contour.segments[vi].endPoint.y);
       }
     }
     if (contour.closed) {
-      result.close();
+      output.close();
     }
   }
-  return result;
 }
 
-PathData ReversePathData(const PathData& pathData) {
+void ReversePathData(const PathData& pathData, PathData& output) {
   if (pathData.isEmpty()) {
-    return pathData;
+    output = pathData;
+    return;
   }
   struct Segment {
     PathVerb verb = PathVerb::Move;
@@ -489,18 +490,18 @@ PathData ReversePathData(const PathData& pathData) {
     contours.push_back(std::move(currentContour));
   }
 
-  PathData result = PathDataFromSVGString("");
+  output = PathDataFromSVGString("");
   for (auto& contour : contours) {
     if (contour.segments.empty()) {
-      result.moveTo(contour.startPoint.x, contour.startPoint.y);
+      output.moveTo(contour.startPoint.x, contour.startPoint.y);
       if (contour.closed) {
-        result.close();
+        output.close();
       }
       continue;
     }
     auto& lastSeg = contour.segments.back();
     Point newStart = lastSeg.points.back();
-    result.moveTo(newStart.x, newStart.y);
+    output.moveTo(newStart.x, newStart.y);
 
     for (int i = static_cast<int>(contour.segments.size()) - 1; i >= 0; i--) {
       auto& seg = contour.segments[static_cast<size_t>(i)];
@@ -508,13 +509,13 @@ PathData ReversePathData(const PathData& pathData) {
                                 : contour.segments[static_cast<size_t>(i - 1)].points.back();
       switch (seg.verb) {
         case PathVerb::Line:
-          result.lineTo(segStart.x, segStart.y);
+          output.lineTo(segStart.x, segStart.y);
           break;
         case PathVerb::Quad:
-          result.quadTo(seg.points[0].x, seg.points[0].y, segStart.x, segStart.y);
+          output.quadTo(seg.points[0].x, seg.points[0].y, segStart.x, segStart.y);
           break;
         case PathVerb::Cubic:
-          result.cubicTo(seg.points[1].x, seg.points[1].y, seg.points[0].x, seg.points[0].y,
+          output.cubicTo(seg.points[1].x, seg.points[1].y, seg.points[0].x, seg.points[0].y,
                          segStart.x, segStart.y);
           break;
         default:
@@ -522,10 +523,9 @@ PathData ReversePathData(const PathData& pathData) {
       }
     }
     if (contour.closed) {
-      result.close();
+      output.close();
     }
   }
-  return result;
 }
 
 std::string TransformPathDataToSVG(const PathData& pathData, const Matrix& m) {
@@ -563,8 +563,8 @@ std::string TransformPathDataToSVG(const PathData& pathData, const Matrix& m) {
   return PathDataToSVGString(result);
 }
 
-PathData GeoToPathData(const Element* element, NodeType type) {
-  PathData pathData = PathDataFromSVGString("");
+void GeoToPathData(const Element* element, NodeType type, PathData& pathData) {
+  pathData = PathDataFromSVGString("");
   switch (type) {
     case NodeType::Rectangle: {
       auto r = static_cast<const Rectangle*>(element);
@@ -644,9 +644,9 @@ PathData GeoToPathData(const Element* element, NodeType type) {
       auto p = static_cast<const Path*>(element);
       if (p->data) {
         if (p->reversed) {
-          pathData = ReversePathData(*p->data);
+          ReversePathData(*p->data, pathData);
         } else {
-          pathData.setPathData(*p->data);
+          pathData = *p->data;
         }
       }
       break;
@@ -662,7 +662,6 @@ PathData GeoToPathData(const Element* element, NodeType type) {
     default:
       break;
   }
-  return pathData;
 }
 
 std::string RectToPathData(const Rectangle* r) {
@@ -1614,7 +1613,7 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
       if (!g.modifiedPathData.empty()) {
         pathData = PathDataFromSVGString(g.modifiedPathData);
       } else {
-        pathData = GeoToPathData(g.element, g.type);
+        GeoToPathData(g.element, g.type, pathData);
       }
       bool needReverse = false;
       switch (mergeMode) {
@@ -1644,9 +1643,12 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           break;
       }
       if (needReverse) {
-        pathData = ReversePathData(pathData);
+        PathData reversed = PathDataFromSVGString("");
+        ReversePathData(pathData, reversed);
+        mergedPath += PathDataToSVGString(reversed);
+      } else {
+        mergedPath += PathDataToSVGString(pathData);
       }
-      mergedPath += PathDataToSVGString(pathData);
     }
     if (mergedPath.empty()) {
       return;

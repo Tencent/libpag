@@ -423,11 +423,11 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
   if (tb) {
     style += "position:absolute;left:" + FloatToString(tb->position.x) +
              "px;top:" + FloatToString(tb->position.y) + "px";
-    if (tb->size.width > 0) {
-      style += ";width:" + FloatToString(tb->size.width) + "px";
+    if (!std::isnan(tb->width)) {
+      style += ";width:" + FloatToString(tb->width) + "px";
     }
-    if (tb->size.height > 0) {
-      style += ";height:" + FloatToString(tb->size.height) + "px";
+    if (!std::isnan(tb->height)) {
+      style += ";height:" + FloatToString(tb->height) + "px";
     }
     if (tb->textAlign == TextAlign::Center) {
       style += ";text-align:center";
@@ -450,7 +450,7 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     if (tb->lineHeight > 0) {
       style += ";line-height:" + FloatToString(tb->lineHeight) + "px";
     }
-    if (tb->wordWrap && tb->size.width > 0) {
+    if (tb->wordWrap && !std::isnan(tb->width)) {
       style += ";word-wrap:break-word";
     } else {
       style += ";white-space:nowrap";
@@ -943,7 +943,8 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
   if (!textPath->path || textPath->path->isEmpty()) {
     return;
   }
-  PathData pathData = *textPath->path;
+  PathData pathData = PathDataFromSVGString("");
+  pathData = *textPath->path;
   bool isClosed = false;
   pathData.forEach([&](PathVerb verb, const Point*) {
     if (verb == PathVerb::Close) {
@@ -951,7 +952,9 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
     }
   });
   if (textPath->reversed) {
-    pathData = ReversePathData(pathData);
+    PathData reversed = PathDataFromSVGString("");
+    ReversePathData(pathData, reversed);
+    pathData = reversed;
   }
   ArcLengthLUT lut = BuildArcLengthLUT(pathData);
   if (lut.totalLength <= 0) {

@@ -742,8 +742,6 @@ static void TestPAGXDirectory(tgfx::Context* context, const std::string& directo
   pagx::FontConfig fontConfig;
   fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
 
-  auto baselinePrefix = subdir.empty() ? std::string("PAGXTest/") : ("PAGXTest/" + subdir + "/");
-
   for (const auto& filePath : files) {
     auto key = prefix + std::filesystem::path(filePath).stem().string();
 
@@ -5074,8 +5072,8 @@ PAGX_TEST(PAGXTest, GenerateComparisonPage) {
   std::sort(files.begin(), files.end());
   ASSERT_FALSE(files.empty());
 
-  pagx::TextLayout textLayout;
-  textLayout.addFallbackTypefaces(GetFallbackTypefaces());
+  pagx::FontConfig fontConfig;
+  fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
 
   // Build comparison page
   std::string page = R"(<!DOCTYPE html>
@@ -5114,7 +5112,8 @@ h1{text-align:center;color:#1e293b;margin-bottom:4px}
 
     // Render PAGX native at 2x resolution
     auto nativePng = outDir + "/" + baseName + "_pagx.png";
-    auto layer = pagx::LayerBuilder::Build(doc.get(), &textLayout);
+    doc->applyLayout(&fontConfig);
+    auto layer = pagx::LayerBuilder::Build(doc.get());
     if (layer) {
       layer->setMatrix(tgfx::Matrix::MakeScale(static_cast<float>(scale)));
       auto surface = tgfx::Surface::Make(context, rw, rh);
