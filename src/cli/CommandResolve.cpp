@@ -65,7 +65,8 @@ static int ParseResolveOptions(int argc, char* argv[], ResolveOptions* options) 
     } else if (arg == "--help" || arg == "-h") {
       PrintResolveUsage();
       return -1;
-    } else if (arg.rfind("--svg-", 0) == 0) {
+    } else if (arg == "--svg-no-expand-use" || arg == "--svg-flatten-transforms" ||
+               arg == "--svg-preserve-unknown") {
       // Format-specific options — handled by ParseFormatOptions below.
     } else if (arg[0] == '-') {
       std::cerr << "pagx resolve: error: unknown option '" << arg << "'\n";
