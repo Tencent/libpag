@@ -10,7 +10,7 @@
   <!-- Main container -->
   <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="center">
     <!-- Title area -->
-    <Layer layout="vertical" gap="2" alignment="center">
+    <Layer layout="vertical" gap="2" alignment="stretch">
       <Layer height="20">
         <Text text="Clip and Mask" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
         <Fill color="#1E293B"/>
@@ -30,8 +30,8 @@
       <!-- Row 1: scrollRect + alpha mask -->
       <Layer layout="horizontal" gap="30" arrangement="center">
         <!-- scrollRect clipping -->
-        <Layer width="120" layout="vertical" gap="4" alignment="center">
-          <Layer width="110" height="110">
+        <Layer width="120" layout="vertical" gap="4" alignment="stretch">
+          <Layer height="110">
             <Layer scrollRect="15,15,110,110">
               <Rectangle position="70,70" size="140,140" roundness="20"/>
               <Fill>
@@ -49,8 +49,8 @@
         </Layer>
 
         <!-- Alpha mask -->
-        <Layer width="120" layout="vertical" gap="4" alignment="center">
-          <Layer width="110" height="110">
+        <Layer width="120" layout="vertical" gap="4" alignment="stretch">
+          <Layer height="110">
             <Layer id="alphaMask" visible="false">
               <Ellipse position="55,55" size="110,110"/>
               <Fill color="#FFFFFF"/>
@@ -70,8 +70,8 @@
       <!-- Row 2: luminance + contour mask -->
       <Layer layout="horizontal" gap="30" arrangement="center">
         <!-- Luminance mask -->
-        <Layer width="120" layout="vertical" gap="4" alignment="center">
-          <Layer width="110" height="110">
+        <Layer width="120" layout="vertical" gap="4" alignment="stretch">
+          <Layer height="110">
             <Layer id="lumMask" visible="false">
               <Ellipse position="55,55" size="110,110"/>
               <Fill>
@@ -93,8 +93,8 @@
         </Layer>
 
         <!-- Contour mask → clipPath -->
-        <Layer width="120" layout="vertical" gap="4" alignment="center">
-          <Layer width="110" height="110">
+        <Layer width="120" layout="vertical" gap="4" alignment="stretch">
+          <Layer height="110">
             <Layer id="contourMask" visible="false">
               <Polystar position="55,55" type="star" pointCount="5" outerRadius="55" innerRadius="25" rotation="-90"/>
               <Fill color="#FFF"/>
