@@ -74,6 +74,7 @@
 
   <!-- Section 2: Rich text block with TextBox and multi-color fills -->
   <Layer>
+    <TextBox position="20,108" size="360,30" textAlign="center"/>
     <Group>
       <Text text="Modern " fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
       <Fill color="#FF6B6B"/>
@@ -86,7 +87,6 @@
       <Text text="Design" fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
       <Fill color="#FFE66D"/>
     </Group>
-    <TextBox position="20,108" size="360,30" textAlign="center"/>
   </Layer>
 
   <!-- Section description with paragraphAlign -->

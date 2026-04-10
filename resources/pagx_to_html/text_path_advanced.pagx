@@ -71,7 +71,7 @@
 
   <!-- Badge circle: reversed text -->
   <Layer alpha="0.15">
-    <Path data="M 310,250 A 45,45 0 1,1 309.99,250 Z"/>
+    <Ellipse position="310,250" size="90,90"/>
     <Stroke color="#EF4444" width="1"/>
   </Layer>
   <Layer>

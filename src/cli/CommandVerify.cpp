@@ -61,6 +61,7 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
@@ -245,6 +246,11 @@ static void CollectRefsFromElement(const Element* element, std::unordered_set<st
         refs.insert(glyphRun->font->id);
       }
     }
+  } else if (type == NodeType::TextPath) {
+    auto* textPath = static_cast<const TextPath*>(element);
+    if (textPath->path != nullptr && !textPath->path->id.empty()) {
+      refs.insert(textPath->path->id);
+    }
   }
 }
 
@@ -294,7 +300,7 @@ static void DetectUnreferencedResources(const PAGXDocument* doc,
       continue;
     }
     auto type = node->nodeType();
-    if (type == NodeType::Layer || type == NodeType::Document) {
+    if (type == NodeType::Layer || type == NodeType::Document || type == NodeType::Glyph) {
       continue;
     }
     if (refs.find(node->id) == refs.end()) {
@@ -1324,6 +1330,9 @@ static void DetectRectangularMask(const Layer* layer, std::vector<VerifyDiagnost
   }
   auto* fill = static_cast<Fill*>(maskLayer->contents[1]);
   if (fill->alpha < 0.999f) {
+    return;
+  }
+  if (fill->color != nullptr && fill->color->nodeType() != NodeType::SolidColor) {
     return;
   }
   if (!maskLayer->matrix.isIdentity()) {

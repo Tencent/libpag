@@ -25,6 +25,8 @@
   </Layer>
 
   <Layer>
+    <!-- Shared text box for layout -->
+    <TextBox position="40,88" size="280,120" textAlign="center" paragraphAlign="middle"/>
     <!-- First text span: red bold -->
     <Group>
       <Text text="Hello " fontFamily="Arial" fontStyle="Bold" fontSize="24" position="10,10"/>
@@ -51,7 +53,5 @@
       <Text text="Styles" fontFamily="Arial" fontStyle="Bold Italic" fontSize="20" position="10,10"/>
       <Fill color="#F59E0B"/>
     </Group>
-    <!-- Shared text box for layout -->
-    <TextBox position="40,88" size="280,120" textAlign="center" paragraphAlign="middle"/>
   </Layer>
 </pagx>
