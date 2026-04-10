@@ -29,7 +29,6 @@
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/LayoutNode.h"
-#include "pagx/nodes/Path.h"
 
 namespace pagx::cli {
 
