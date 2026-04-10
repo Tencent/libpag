@@ -23,9 +23,9 @@
 #include <string>
 #include "base/utils/MathUtil.h"
 #include "cli/CliUtils.h"
+#include "cli/CommandImport.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
-#include "pagx/SVGImporter.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/LayoutNode.h"
@@ -36,9 +36,7 @@ namespace pagx::cli {
 struct ResolveOptions {
   std::string inputFile = {};
   std::string outputFile = {};
-  bool svgExpandUse = true;
-  bool svgFlattenTransforms = false;
-  bool svgPreserveUnknown = false;
+  ImportFormatOptions formatOptions = {};
 };
 
 static void PrintResolveUsage() {
@@ -51,10 +49,8 @@ static void PrintResolveUsage() {
             << "Options:\n"
             << "  -o, --output <file>         Output PAGX file (default: overwrite input)\n"
             << "\n"
-            << "SVG options (see `pagx import` for details):\n"
-            << "  --svg-no-expand-use         Do not expand <use> references\n"
-            << "  --svg-flatten-transforms    Flatten nested transforms into single matrices\n"
-            << "  --svg-preserve-unknown      Preserve unsupported SVG elements as Unknown nodes\n"
+            << "Format-specific options are shared with `pagx import`;\n"
+            << "see `pagx import --help` for details.\n"
             << "\n"
             << "Examples:\n"
             << "  pagx resolve design.pagx                # resolve in place\n"
@@ -67,15 +63,11 @@ static int ParseResolveOptions(int argc, char* argv[], ResolveOptions* options) 
     std::string arg = argv[i];
     if ((arg == "--output" || arg == "-o") && i + 1 < argc) {
       options->outputFile = argv[++i];
-    } else if (arg == "--svg-no-expand-use") {
-      options->svgExpandUse = false;
-    } else if (arg == "--svg-flatten-transforms") {
-      options->svgFlattenTransforms = true;
-    } else if (arg == "--svg-preserve-unknown") {
-      options->svgPreserveUnknown = true;
     } else if (arg == "--help" || arg == "-h") {
       PrintResolveUsage();
       return -1;
+    } else if (arg.rfind("--svg-", 0) == 0) {
+      // Format-specific options — handled by ParseFormatOptions below.
     } else if (arg[0] == '-') {
       std::cerr << "pagx resolve: error: unknown option '" << arg << "'\n";
       return 1;
@@ -97,31 +89,13 @@ static int ParseResolveOptions(int argc, char* argv[], ResolveOptions* options) 
     options->outputFile = options->inputFile;
   }
 
+  ParseFormatOptions(argc, argv, &options->formatOptions);
   return 0;
 }
 
 //--------------------------------------------------------------------------------------------------
 // Resolve logic
 //--------------------------------------------------------------------------------------------------
-
-static std::string InferFormatFromContent(const std::string& content) {
-  auto pos = content.find('<');
-  while (pos != std::string::npos) {
-    if (pos + 1 < content.size() && content[pos + 1] != '/' && content[pos + 1] != '!' &&
-        content[pos + 1] != '?') {
-      auto tagEnd = content.find_first_of(" \t\n/>", pos + 1);
-      if (tagEnd != std::string::npos) {
-        auto tagName = content.substr(pos + 1, tagEnd - pos - 1);
-        for (auto& ch : tagName) {
-          ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
-        }
-        return tagName;
-      }
-    }
-    pos = content.find('<', pos + 1);
-  }
-  return {};
-}
 
 static void InlinePathData(PAGXDocument* svgDoc) {
   for (auto& node : svgDoc->nodes) {
@@ -132,7 +106,7 @@ static void InlinePathData(PAGXDocument* svgDoc) {
 }
 
 static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
-                            const SVGImporter::Options& svgOptions, PAGXDocument* doc) {
+                            const ImportFormatOptions& formatOptions, PAGXDocument* doc) {
   bool hasImportSource = !layer->importSource.empty();
   bool hasImportContent = !layer->importContent.empty();
 
@@ -153,51 +127,29 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
     return false;
   }
 
-  std::string format = layer->importFormat;
+  ImportResult result;
   std::string resolvedFromDesc;
-  std::shared_ptr<PAGXDocument> svgDoc;
 
   if (hasImportSource) {
-    // External mode: read from file.
     auto filePath = baseDir + layer->importSource;
-    if (format.empty()) {
-      format = GetFileExtension(filePath);
-    }
-    if (format != "svg") {
-      std::cerr << "pagx resolve: error: unsupported import format '" << format << "' for '"
-                << layer->importSource << "'\n";
-      return false;
-    }
-    svgDoc = SVGImporter::Parse(filePath, svgOptions);
-    if (svgDoc == nullptr) {
-      std::cerr << "pagx resolve: error: failed to parse '" << filePath << "'\n";
-      return false;
-    }
+    result = ImportFile(filePath, layer->importFormat, formatOptions);
     resolvedFromDesc = layer->importSource;
   } else {
-    // Inline mode: parse embedded content.
-    if (format.empty()) {
-      format = InferFormatFromContent(layer->importContent);
-    }
-    if (format != "svg") {
-      std::cerr << "pagx resolve: error: unsupported inline import format '" << format << "'\n";
-      return false;
-    }
-    svgDoc = SVGImporter::ParseString(layer->importContent, svgOptions);
-    if (svgDoc == nullptr) {
-      std::cerr << "pagx resolve: error: failed to parse inline SVG content\n";
-      return false;
-    }
+    result = ImportString(layer->importContent, layer->importFormat, formatOptions);
     resolvedFromDesc = "inline svg";
   }
 
-  if (!svgDoc->errors.empty()) {
-    for (auto& error : svgDoc->errors) {
-      std::cerr << "pagx resolve: warning: " << error << "\n";
-    }
+  if (!result.error.empty()) {
+    std::cerr << "pagx resolve: error: " << result.error << "\n";
+    return false;
+  }
+  for (auto& warning : result.warnings) {
+    std::cerr << "pagx resolve: warning: " << warning << "\n";
   }
 
-  // Update Layer dimensions from SVG source.
+  auto& svgDoc = result.document;
+
+  // Update Layer dimensions from source.
   if (std::isnan(layer->width) && svgDoc->width > 0) {
     layer->width = svgDoc->width;
   }
@@ -207,10 +159,10 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
 
   InlinePathData(svgDoc.get());
 
-  // Collect the effective element layers from the SVG conversion result. SVG root elements
-  // (<svg>) become wrapper Layers whose actual content is in their children. If such a wrapper
-  // is a plain shell (no own contents, no extra attributes), unwrap it and use its children
-  // as the effective element layers. Otherwise, keep the svgLayer itself.
+  // Collect the effective element layers from the conversion result. Root elements (e.g. <svg>)
+  // become wrapper Layers whose actual content is in their children. If such a wrapper is a plain
+  // shell (no own contents, no extra attributes), unwrap it and use its children as the effective
+  // element layers. Otherwise, keep the wrapper itself.
   std::vector<Layer*> elementLayers;
   for (auto* svgLayer : svgDoc->layers) {
     bool isPlainWrapper = svgLayer->contents.empty() && !svgLayer->children.empty() &&
@@ -308,7 +260,7 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
     }
   }
 
-  // Transfer ownership of all nodes from SVG document to target document.
+  // Transfer ownership of all nodes from imported document to target document.
   for (auto& node : svgDoc->nodes) {
     doc->nodes.push_back(std::move(node));
   }
@@ -325,12 +277,12 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
 }
 
 static void ResolveLayers(const std::vector<Layer*>& layers, const std::string& baseDir,
-                          const SVGImporter::Options& svgOptions, PAGXDocument* doc,
+                          const ImportFormatOptions& formatOptions, PAGXDocument* doc,
                           int& resolvedCount, int& errorCount) {
   for (auto* layer : layers) {
     bool hasImport = !layer->importSource.empty() || !layer->importContent.empty();
     if (hasImport) {
-      if (ResolveOneLayer(layer, baseDir, svgOptions, doc)) {
+      if (ResolveOneLayer(layer, baseDir, formatOptions, doc)) {
         resolvedCount++;
       } else if (!layer->importSource.empty() || !layer->importContent.empty()) {
         // ResolveOneLayer returned false and fields are still set — this is an error,
@@ -339,7 +291,7 @@ static void ResolveLayers(const std::vector<Layer*>& layers, const std::string& 
       }
     }
     // Recurse into child layers.
-    ResolveLayers(layer->children, baseDir, svgOptions, doc, resolvedCount, errorCount);
+    ResolveLayers(layer->children, baseDir, formatOptions, doc, resolvedCount, errorCount);
   }
 }
 
@@ -365,22 +317,18 @@ int RunResolve(int argc, char* argv[]) {
     }
   }
 
-  SVGImporter::Options svgOptions = {};
-  svgOptions.expandUseReferences = options.svgExpandUse;
-  svgOptions.flattenTransforms = options.svgFlattenTransforms;
-  svgOptions.preserveUnknownElements = options.svgPreserveUnknown;
-
   auto baseDir = GetDirectory(options.inputFile);
   int resolvedCount = 0;
   int errorCount = 0;
 
-  ResolveLayers(doc->layers, baseDir, svgOptions, doc.get(), resolvedCount, errorCount);
+  ResolveLayers(doc->layers, baseDir, options.formatOptions, doc.get(), resolvedCount, errorCount);
 
   // Also resolve in Composition layers.
   for (auto& node : doc->nodes) {
     if (node->nodeType() == NodeType::Composition) {
       auto* comp = static_cast<Composition*>(node.get());
-      ResolveLayers(comp->layers, baseDir, svgOptions, doc.get(), resolvedCount, errorCount);
+      ResolveLayers(comp->layers, baseDir, options.formatOptions, doc.get(), resolvedCount,
+                    errorCount);
     }
   }
 
