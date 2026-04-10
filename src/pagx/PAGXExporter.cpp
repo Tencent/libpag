@@ -37,7 +37,6 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
-#include "pagx/nodes/Import.h"
 #include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/LinearGradient.h"
@@ -170,6 +169,31 @@ class XMLBuilder {
 
   void writeRaw(const std::string& content) {
     buffer += content;
+  }
+
+  void writeRawLine(const std::string& content) {
+    // Handle multi-line content by indenting each line individually.
+    size_t start = 0;
+    while (start < content.size()) {
+      auto end = content.find('\n', start);
+      if (end == std::string::npos) {
+        writeIndent();
+        buffer.append(content, start, content.size() - start);
+        buffer += "\n";
+        break;
+      }
+      writeIndent();
+      buffer.append(content, start, end - start);
+      buffer += "\n";
+      start = end + 1;
+    }
+  }
+
+  void writeComment(const std::string& text) {
+    writeIndent();
+    buffer += "<!-- ";
+    buffer += text;
+    buffer += " -->\n";
   }
 
   std::string release() {
@@ -986,21 +1010,6 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       }
       break;
     }
-    case NodeType::Import: {
-      auto* imp = static_cast<const Import*>(node);
-      xml.openElement("Import");
-      xml.addAttribute("source", imp->source);
-      xml.addAttribute("format", imp->format);
-      WriteCustomData(xml, node);
-      if (imp->rawContent.empty()) {
-        xml.closeElementSelfClosing();
-      } else {
-        xml.closeElementStart();
-        xml.writeRaw(imp->rawContent);
-        xml.closeElement();
-      }
-      break;
-    }
     default:
       break;
   }
@@ -1307,17 +1316,32 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
     xml.addAttribute("composition", "@" + node->composition->id);
   }
 
+  // Build directive attributes.
+  xml.addAttribute("import", node->importDirective.source);
+  xml.addAttribute("importFormat", node->importDirective.format);
+
   // Write custom data as data-* attributes.
   WriteCustomData(xml, node);
 
   bool hasChildren = !node->contents.empty() || !node->styles.empty() || !node->filters.empty() ||
-                     !node->children.empty();
+                     !node->children.empty() || !node->importDirective.content.empty() ||
+                     !node->importDirective.resolvedFrom.empty();
   if (!hasChildren) {
     xml.closeElementSelfClosing();
     return;
   }
 
   xml.closeElementStart();
+
+  // Write resolved-from comment if present.
+  if (!node->importDirective.resolvedFrom.empty()) {
+    xml.writeComment("Resolved from: " + node->importDirective.resolvedFrom);
+  }
+
+  // Write inline import content (e.g., <svg>...</svg>) if present.
+  if (!node->importDirective.content.empty()) {
+    xml.writeRawLine(node->importDirective.content);
+  }
 
   // Write VectorElement (contents) directly without container node.
   for (const auto& element : node->contents) {

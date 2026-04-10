@@ -12,12 +12,12 @@
     <!-- Row 1: Layer padding on VectorElements -->
     <Layer flex="1" layout="horizontal" gap="20">
 
-      <!-- 1. Rectangle with left/right/top/bottom fills padding-inset area -->
+      <!-- 1. Polystar centered within padding-inset area -->
       <Layer flex="1" height="220">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer left="0" right="0" top="0" bottom="0" padding="30">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Polystar centerX="0" centerY="0" pointCount="5" outerRadius="60" innerRadius="25"/>
           <Fill color="#3B82F6"/>
         </Layer>
       </Layer>

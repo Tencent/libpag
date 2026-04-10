@@ -22,7 +22,7 @@
 #include <filesystem>
 #include <fstream>
 #include <unordered_map>
-#include "cli/CommandImport.h"
+#include "cli/CommandResolve.h"
 #include "cli/CommandVerify.h"
 #include "pagx/FontConfig.h"
 #include "pagx/LayoutContext.h"
@@ -91,7 +91,7 @@ static int CallRun(int (*fn)(int, char*[]), std::vector<std::string> args) {
 static std::shared_ptr<pagx::PAGXDocument> LoadAndResolve(const std::string& filePath) {
   auto doc = pagx::PAGXImporter::FromFile(filePath);
   if (doc && doc->hasUnresolvedImports()) {
-    CallRun(pagx::cli::RunImport, {"import", "--resolve", filePath});
+    CallRun(pagx::cli::RunResolve, {"resolve", filePath});
     doc = pagx::PAGXImporter::FromFile(filePath);
   }
   return doc;

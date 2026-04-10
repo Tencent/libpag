@@ -53,7 +53,7 @@ Spec rules, techniques, and common pitfalls for writing correct PAGX files.
 | **Geometry** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` |
 | **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `Repeater` |
 | **Painters** | `Fill`, `Stroke` |
-| **Build Directives** | `Import` |
+| **Import Directives** | `<svg>` (inline SVG), `import` attribute |
 
 ### Containment Hierarchy
 
@@ -61,7 +61,7 @@ Spec rules, techniques, and common pitfalls for writing correct PAGX files.
 pagx (required: version, width, height)
 ├── Layer*
 │   ├── VectorElements* (geometry, modifiers, painters, Groups, TextBox)
-│   ├── Import* (build directive)
+│   ├── <svg>* (import directive)
 │   ├── LayerStyles* (DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle)
 │   ├── LayerFilters* (BlurFilter, DropShadowFilter, ...)
 │   └── Layer* (child layers, recursive)
@@ -545,42 +545,49 @@ scope — use separate Groups if you need both.
 
 ---
 
-# Build Directives
+# Import Directives
 
-Use `<Import>` to embed external content (currently supports SVG) — resolved automatically
-by `pagx verify`. Inline content as child elements, or reference external files via `source`.
+Embed external content (currently SVG) directly in Layers — resolved automatically by
+`pagx verify` (which internally calls `pagx resolve`). Two forms: inline `<svg>` as a
+child element, or external file reference via the `import` attribute on a Layer.
 
 ```xml
 <!-- Inline SVG icon -->
 <Layer centerX="0" centerY="0">
-  <Import>
-    <svg viewBox="0 0 24 24" fill="none" stroke="#1E293B" stroke-width="2">
-      <circle cx="10" cy="10" r="7"/>
-      <path d="M15 15L21 21" stroke-linecap="round"/>
-    </svg>
-  </Import>
+  <svg viewBox="0 0 24 24" fill="none" stroke="#1E293B" stroke-width="2">
+    <circle cx="10" cy="10" r="7"/>
+    <path d="M15 15L21 21" stroke-linecap="round"/>
+  </svg>
 </Layer>
 
-<!-- External file -->
-<Layer id="logoIcon" centerX="0" centerY="0">
-  <Import source="assets/logo.svg"/>
-</Layer>
+<!-- External file reference -->
+<Layer id="logoIcon" centerX="0" centerY="0" import="assets/logo.svg"/>
+
+<!-- External file with explicit format -->
+<Layer import="assets/drawing.xml" importFormat="svg"/>
 ```
 
-Resolution sets parent Layer's `width`/`height` from the measured size of the source content.
-SVG does not auto-scale to fit the Layer — the `viewBox` size becomes the Layer size, so
-always generate the SVG `viewBox` at the exact dimensions you need.
+Resolution behavior depends on whether the Layer has explicit dimensions:
+- **Layer with `width`/`height`**: content is uniformly scaled to fit (centered, aspect
+  ratio preserved). The Layer keeps its declared size.
+- **Layer without explicit size**: `width`/`height` are set from the source content
+  dimensions (e.g., SVG `viewBox`).
+
+After resolution, a comment is added inside the Layer indicating the source:
+`<!-- Resolved from: inline svg -->` or `<!-- Resolved from: assets/logo.svg -->`.
+Always generate SVG at the exact target dimensions to avoid a scaling wrapper in the
+resolved output.
 
 **Native PAGX elements vs inline SVG:**
 
 Use native PAGX geometry (`Rectangle`, `Ellipse`, `Polystar`) for simple, single-element
 shapes — a background rectangle, a divider line, a circular indicator, a progress track.
 
-Use `<Import>` with inline SVG for complex or composite graphics — icons, arbitrary paths,
+Use inline `<svg>` for complex or composite graphics — icons, arbitrary paths,
 multi-stroke decorations, illustrated indicators. This includes any shape that would
 otherwise require `Path` / `PathData`, since those typically represent complex outlines
-better expressed as SVG. Wrap the Import in a Layer and use constraint positioning on the
-Layer to place it.
+better expressed as SVG. Place the `<svg>` inside a Layer and use constraint positioning
+on the Layer.
 
 ---
 
@@ -767,5 +774,29 @@ finalizing any PAGX output, verify that none of these anti-patterns appear in yo
   <!-- ✅ Content-measured height — no fixed value needed -->
   <Layer layout="vertical" padding="20" gap="14">
     <!-- ... height matches content automatically ... -->
+  </Layer>
+  ```
+
+- **NEVER** put `padding` on a Layer that also has stretch-fill background VectorElements
+  (`left="0" right="0" top="0" bottom="0"`) — `padding` insets the constraint reference
+  frame for **all contents** including VectorElements, so the background shrinks away from
+  the Layer edges instead of filling them. MUST use nested container structure: outer Layer
+  for edge-to-edge background (no padding), inner Layer for padded content layout.
+
+  ```xml
+  <!-- ❌ padding shrinks the Rectangle — background has 12px gap around all edges -->
+  <Layer layout="vertical" gap="8" padding="12">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+    <Fill color="#F8F9FA"/>
+    <!-- content starts at same offset as background — no visual padding -->
+  </Layer>
+
+  <!-- ✅ Outer holds background, inner carries padding -->
+  <Layer>
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+    <Fill color="#F8F9FA"/>
+    <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="8" padding="12">
+      <!-- content has 12px visual padding inside the background -->
+    </Layer>
   </Layer>
   ```

@@ -29,7 +29,7 @@ This specification is organized in the following order:
 - **Auto Layout**: Defines layout size, container layout, and constraint positioning mechanisms
 - **Layer System**: Defines layers and their related features (styles, filters, masks)
 - **VectorElement System**: Defines vector elements within layers and their processing model
-- **Build Directives**: Defines build-time preprocessing directives (Import)
+- **Import Directives**: Defines import directives for embedding external content (inline `<svg>` elements and the `import` attribute on Layer)
 
 **Appendices** (for quick reference):
 
@@ -2087,81 +2087,79 @@ Since painters do not clear the geometry list, the same geometry can have multip
 
 ---
 
-## 7. Build Directives
+## 7. Import Directives
 
-Build directives are preprocessing instructions embedded in a PAGX file. They are **not
-rendered directly** — they must be resolved into native PAGX nodes by a build tool before
-the file can be rendered or validated.
+Import directives embed external content (currently SVG) into a PAGX file. They are **not
+rendered directly** — they must be resolved into native PAGX nodes by `pagx resolve`
+before the file can be rendered or validated.
 
-### 7.1 Import
+### 7.1 Inline SVG
 
-The `<Import>` element embeds external content (e.g., SVG) into a PAGX file. It appears
-inside a `<Layer>` at the VectorElement level and is resolved by `pagx import --resolve`
-into native PAGX nodes.
+A `<Layer>` may contain an `<svg>` element as a direct child. The parser reads only the
+`<svg>` root node and treats it as opaque external content — child nodes of `<svg>` are
+not expanded or validated as PAGX nodes.
+
+```xml
+<Layer id="shareIcon" centerX="0" centerY="0">
+  <svg viewBox="0 0 24 24">
+    <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8" fill="none"
+          stroke="#7F8C8D" stroke-width="1.5" stroke-linecap="round"/>
+    <polyline points="16,6 12,2 8,6" fill="none"
+             stroke="#7F8C8D" stroke-width="1.5" stroke-linecap="round"
+             stroke-linejoin="round"/>
+    <line x1="12" y1="2" x2="12" y2="15" fill="none"
+          stroke="#7F8C8D" stroke-width="1.5" stroke-linecap="round"/>
+  </svg>
+</Layer>
+```
+
+### 7.2 External Import
+
+The `import` attribute on a `<Layer>` references an external file to be imported. The format
+is inferred from the file extension. When the extension is ambiguous, the `importFormat`
+attribute can be used to explicitly specify the format.
 
 #### Attributes
 
 | Attribute | Type | Default | Required | Description |
 |-----------|------|---------|----------|-------------|
-| `source` | string | — | No | Path to external file, relative to the PAGX file. When omitted, content is provided inline as child elements. |
-| `format` | string | — | No | Force input format (e.g., `svg`). When omitted, inferred from child element tag name (inline) or `source` file extension (external). |
-
-#### Inline Mode
-
-When `source` is omitted, the `<Import>` element contains the external content as child
-elements. The format is inferred from the root child element's tag name (e.g., `<svg>`).
+| `import` | string | — | No | Path to an external file, relative to the PAGX file. |
+| `importFormat` | string | — | No | Force input format (e.g., `svg`). When omitted, inferred from the `import` file extension. |
 
 ```xml
-<Layer id="shareIcon" centerX="0" centerY="0">
-  <Import>
-    <svg viewBox="0 0 24 24">
-      <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8" fill="none"
-            stroke="#7F8C8D" stroke-width="1.5" stroke-linecap="round"/>
-      <polyline points="16,6 12,2 8,6" fill="none"
-               stroke="#7F8C8D" stroke-width="1.5" stroke-linecap="round"
-               stroke-linejoin="round"/>
-      <line x1="12" y1="2" x2="12" y2="15" fill="none"
-            stroke="#7F8C8D" stroke-width="1.5" stroke-linecap="round"/>
-    </svg>
-  </Import>
-</Layer>
-```
-
-#### External Mode
-
-When `source` is set, the `<Import>` element references an external file. The format is
-inferred from the file extension unless `format` is explicitly specified.
-
-```xml
-<Layer id="logoIcon" centerX="0" centerY="0">
-  <Import source="assets/logo.svg"/>
-</Layer>
+<Layer id="logoIcon" centerX="0" centerY="0" import="assets/logo.svg"/>
 
 <!-- Explicit format when extension is ambiguous -->
-<Layer id="icon" centerX="0" centerY="0">
-  <Import source="assets/drawing.xml" format="svg"/>
-</Layer>
+<Layer id="icon" centerX="0" centerY="0" import="assets/drawing.xml" importFormat="svg"/>
 ```
 
-#### Resolution
+### 7.3 Resolution
 
-The `pagx import --resolve` command processes all `<Import>` nodes in a PAGX file:
+The `pagx resolve` command processes all import directives in a PAGX file:
 
-1. For each `<Import>` node, reads the content (inline child elements or external file)
-2. Converts the content into native PAGX nodes (e.g., SVG elements become Rectangle,
+1. For each Layer with an inline `<svg>` child or an `import` attribute, reads the
+   content (inline element or external file)
+2. Converts the SVG content into native PAGX nodes (e.g., SVG elements become Rectangle,
    Ellipse, Path, Fill, Stroke, Group nodes)
-3. Replaces the `<Import>` element with the converted nodes
-4. Sets the parent Layer's `width` and `height` from the source dimensions (e.g., SVG
-   `viewBox` or `width`/`height` attributes)
+3. Replaces the `<svg>` element or removes the `import`/`importFormat` attributes, and
+   inserts the converted nodes as children of the Layer
+4. If the Layer has explicit `width` and `height`, content is uniformly scaled to fit
+   within those dimensions (centered, preserving aspect ratio). If the Layer has no explicit
+   size, sets `width` and `height` from the source dimensions (e.g., SVG `viewBox`
+   or `width`/`height` attributes)
+5. Inserts a comment in the Layer's children indicating the original source:
+   - Inline SVG: `<!-- Resolved from: inline svg -->`
+   - External file: `<!-- Resolved from: assets/logo.svg -->`
 
-After resolution, the file contains only native PAGX nodes — no `<Import>` elements remain.
+After resolution, the file contains only native PAGX nodes — no `<svg>` elements or
+`import` attributes remain.
 
 #### Tool Behavior
 
-Tools that process PAGX files report an error when encountering unresolved `<Import>` nodes:
+Tools that process PAGX files handle unresolved import directives as follows:
 
-- **`pagx verify`**: Automatically resolves all `<Import>` nodes before checking. If resolve fails, reports the error.
-- **`pagx render`**: Reports error — `unresolved <Import> node`, refuses to render.
+- **`pagx verify`**: Automatically resolves all imports before checking. If resolve fails, reports the error.
+- **`pagx render`**: Reports error — `unresolved import`, refuses to render.
 
 ---
 
@@ -2183,7 +2181,7 @@ This appendix describes node categorization and nesting rules.
 | **Geometry Elements** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` | Drawable shapes and text. Must be inside Layer/Group. |
 | **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `TextBox`, `Repeater` | Transform or combine geometry and text. |
 | **Painters** | `Fill`, `Stroke` | Apply color/gradient to geometry. Must be inside Layer/Group. |
-| **Build Directives** | `Import` | Build-time preprocessing directive. Resolved by `pagx import --resolve` into native PAGX nodes. Must be inside Layer. |
+| **Import Directives** | (inline `<svg>`, `import` attribute) | Import directives on Layer. Inline `<svg>` child elements and the `import`/`importFormat` attributes are resolved by `pagx resolve` into native PAGX nodes. |
 
 ### A.2 Document Containment
 
@@ -2193,7 +2191,7 @@ The root element `<pagx>` **only accepts `<Layer>` and `<Resources>` as direct c
 pagx (required attributes: version, width, height)
 ├── Layer*                      ← Direct children MUST be Layer
 │   ├── VectorElement* (see A.3)
-│   ├── Import* (build directive, see §7)
+│   ├── <svg>* (import directive, see §7)
 │   ├── DropShadowStyle*
 │   ├── InnerShadowStyle*
 │   ├── BackgroundBlurStyle*
@@ -2246,9 +2244,10 @@ Layer / Group
 ├── TextPath
 ├── TextBox
 ├── Repeater
-├── Group* (recursive)
-└── Import (build directive, see §7)
+└── Group* (recursive)
 ```
+
+Additionally, `Layer` (but not `Group`) may contain `<svg>` as an import directive (see §7).
 
 ---
 
