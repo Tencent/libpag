@@ -324,9 +324,8 @@ pagx resolve design.pagx -o out.pagx              # resolve to new file
 | Option | Description |
 |--------|-------------|
 | `-o, --output <path>` | Output file path (default: overwrite input) |
-| `--svg-no-expand-use` | Do not expand `<use>` references in SVG content |
-| `--svg-flatten-transforms` | Flatten nested transforms into single matrices |
-| `--svg-preserve-unknown` | Preserve unsupported SVG elements as Unknown nodes |
+
+Format-specific options (e.g. `--svg-*`) are shared with `pagx import`; see above for details.
 
 ---
 
