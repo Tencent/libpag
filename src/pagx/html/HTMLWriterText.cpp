@@ -459,7 +459,10 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       style += ";overflow:hidden";
     }
   } else {
-    float ty = text->position.y - text->fontSize * 0.8f;
+    float ty = text->position.y;
+    if (text->baseline == TextBaseline::Alphabetic) {
+      ty -= text->fontSize * 0.8f;
+    }
     style += "position:absolute;left:" + FloatToString(text->position.x) +
              "px;top:" + FloatToString(ty) + "px;white-space:pre";
   }
@@ -820,7 +823,10 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
       }
       out.closeTag();  // </svg>
     } else {
-      float ty = text->position.y - text->fontSize * 0.8f;
+      float ty = text->position.y;
+      if (text->baseline == TextBaseline::Alphabetic) {
+        ty -= text->fontSize * 0.8f;
+      }
       std::string containerStyle =
           "position:absolute;white-space:nowrap;left:" + FloatToString(text->position.x) +
           "px;top:" + FloatToString(ty) + "px";
