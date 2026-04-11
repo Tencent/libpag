@@ -1,0 +1,6 @@
+<pagx version="1.0" width="200" height="200">
+  <Layer centerX="0" centerY="0">
+    <Path data="M 0 0 L 80 0 L 80 40 Z"/>
+    <Fill color="#F00"/>
+  </Layer>
+</pagx>

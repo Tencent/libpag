@@ -23,9 +23,9 @@
 #include <climits>
 #include <cstdlib>
 #include <cstring>
-#include <fstream>
 #include <iostream>
 #include <string>
+#include "cli/CliUtils.h"
 #include "cli/FormatUtils.h"
 
 namespace pagx::cli {
@@ -110,19 +110,10 @@ int RunFormat(int argc, char* argv[]) {
 
   xmlFreeDoc(doc);
 
-  std::ofstream out(outputPath);
-  if (!out.is_open()) {
-    std::cerr << "pagx format: failed to write '" << outputPath << "'\n";
-    return 1;
-  }
-  out << output;
-  out.close();
-  if (out.fail()) {
-    std::cerr << "pagx format: error writing to '" << outputPath << "'\n";
+  if (!WriteStringToFile(output, outputPath, "pagx format")) {
     return 1;
   }
 
-  std::cout << "pagx format: wrote " << outputPath << "\n";
   return 0;
 }
 

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test file for lint: painter leaks geometry from prior painters -->
+<pagx version="1.0" width="200" height="200">
+  <!-- CASE 1: Fill leaks Rectangle from prior Fill (should warn on 2nd Fill) -->
+  <Layer name="leak-fill-fill">
+    <Rectangle size="50,50"/>
+    <Fill color="#FF0000"/>
+    <Ellipse size="30,30"/>
+    <Fill color="#0000FF"/>
+  </Layer>
+
+  <!-- CASE 2: Stroke leaks from prior Fill (should warn) -->
+  <Layer name="leak-fill-stroke">
+    <Rectangle size="50,50"/>
+    <Fill color="#FF0000"/>
+    <Ellipse size="30,30"/>
+    <Stroke color="#00FF00" width="2"/>
+  </Layer>
+
+  <!-- CASE 3: Fill leaks from prior Stroke (should warn) -->
+  <Layer name="leak-stroke-fill">
+    <Rectangle size="50,50"/>
+    <Stroke color="#FF0000" width="2"/>
+    <Ellipse size="30,30"/>
+    <Fill color="#0000FF"/>
+  </Layer>
+
+  <!-- CASE 4: No leak - two Fills without geometry in between (multi-fill) -->
+  <Layer name="no-leak-multi-fill">
+    <Rectangle size="50,50"/>
+    <Fill color="#FF0000"/>
+    <Fill color="#0000FF" alpha="0.5"/>
+  </Layer>
+
+  <!-- CASE 5: No leak - single painter -->
+  <Layer name="no-leak-single">
+    <Rectangle size="50,50"/>
+    <Ellipse size="30,30"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+
+  <!-- CASE 6: Leak inside a nested Group (should warn) -->
+  <Layer name="leak-in-group">
+    <Group>
+      <Rectangle size="50,50"/>
+      <Fill color="#FF0000"/>
+      <Ellipse size="30,30"/>
+      <Fill color="#0000FF"/>
+    </Group>
+  </Layer>
+</pagx>

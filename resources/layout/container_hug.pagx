@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Container layout: HUG mode (no main-axis size, measured from children) -->
-<pagx version="1.0" width="820" height="500">
+<pagx version="1.0" width="900" height="560">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F8FAFC"/>
   </Layer>
 
-  <Layer layout="vertical" gap="20" padding="30" alignment="start">
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30">
     <!-- Row 1: Three horizontal HUG layouts -->
     <Layer flex="1" layout="horizontal" gap="20" alignment="start">
       <!-- 1. Horizontal HUG: basic (three children, no padding) -->

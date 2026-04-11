@@ -18,11 +18,25 @@
 
 #pragma once
 
+#include <string>
+
+namespace pagx {
+class PAGXDocument;
+class Layer;
+}  // namespace pagx
+
 namespace pagx::cli {
 
 /**
  * Display layout structure of a PAGX file in XML format with bounds for all nodes.
  */
 int RunLayout(int argc, char* argv[]);
+
+/**
+ * Generate layout XML string for a document or a specific layer subtree. Coordinates are in
+ * canvas (global) space. When targetLayer is non-null, only that subtree is included and
+ * coordinates are relative to the target layer's origin.
+ */
+std::string GenerateLayoutXml(const PAGXDocument* doc, const Layer* targetLayer = nullptr);
 
 }  // namespace pagx::cli

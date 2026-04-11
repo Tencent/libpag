@@ -25,7 +25,6 @@
 #include "cli/CliUtils.h"
 #include "cli/CommandImport.h"
 #include "pagx/PAGXExporter.h"
-#include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/LayoutNode.h"
@@ -300,15 +299,9 @@ int RunResolve(int argc, char* argv[]) {
     return parseResult == -1 ? 0 : parseResult;
   }
 
-  auto doc = PAGXImporter::FromFile(options.inputFile);
+  auto doc = LoadDocument(options.inputFile, "pagx resolve");
   if (doc == nullptr) {
-    std::cerr << "pagx resolve: error: failed to load '" << options.inputFile << "'\n";
     return 1;
-  }
-  if (!doc->errors.empty()) {
-    for (auto& error : doc->errors) {
-      std::cerr << "pagx resolve: warning: " << error << "\n";
-    }
   }
 
   auto baseDir = GetDirectory(options.inputFile);

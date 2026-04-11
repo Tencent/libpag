@@ -26,13 +26,15 @@
       </Group>
       <Fill color="#0066AA"/>
     </Layer>
-    <Rectangle size="800,600"/>
-    <Fill>
-      <RadialGradient center="400,300" radius="600">
-        <ColorStop offset="0.6" color="#00000000"/>
-        <ColorStop offset="1" color="#00000080"/>
-      </RadialGradient>
-    </Fill>
+    <Group>
+      <Rectangle size="800,600"/>
+      <Fill>
+        <RadialGradient center="400,300" radius="600">
+          <ColorStop offset="0.6" color="#00000000"/>
+          <ColorStop offset="1" color="#00000080"/>
+        </RadialGradient>
+      </Fill>
+    </Group>
   </Layer>
   <Layer name="ReticleComplex" left="400" top="300">
     <Layer>
@@ -82,8 +84,10 @@
     <Layer>
       <Ellipse left="-3" top="-3" size="6,6"/>
       <Fill color="#FFF"/>
-      <Path data="M -20 0 L 20 0 M 0 -20 L 0 20"/>
-      <Stroke color="#FFF" width="1" alpha="0.5"/>
+      <Group>
+        <Path data="M -20 0 L 20 0 M 0 -20 L 0 20"/>
+        <Stroke color="#FFF" width="1" alpha="0.5"/>
+      </Group>
     </Layer>
   </Layer>
   <Layer name="LeftSide" left="400" top="0" bottom="0">
@@ -172,20 +176,20 @@
         <Fill color="#FFAA00"/>
       </Layer>
     </Layer>
-    <Layer top="70">
-        <Rectangle left="180" top="-2" size="40,4"/>
-        <Fill color="#004488"/>
-      <Group>
-        <Rectangle left="165" top="-2" size="10,4"/>
-        <Rectangle left="225" top="-2" size="10,4"/>
-        <Fill color="#002244"/>
-      </Group>
-    </Layer>
+  </Layer>
+  <Layer left="200" top="550">
+    <Rectangle left="180" top="-2" size="40,4"/>
+    <Fill color="#004488"/>
+    <Group>
+      <Rectangle left="165" top="-2" size="10,4"/>
+      <Rectangle left="225" top="-2" size="10,4"/>
+      <Fill color="#002244"/>
+    </Group>
   </Layer>
   <Layer name="Radar" left="100" top="500">
-      <Ellipse left="-70" top="-70" size="140,140"/>
-      <Fill color="#001122" alpha="0.9"/>
-      <Stroke color="#0066AA" width="2"/>
+    <Ellipse left="-70" top="-70" size="140,140"/>
+    <Fill color="#001122" alpha="0.9"/>
+    <Stroke color="#0066AA" width="2"/>
     <Group>
       <Ellipse left="-50" top="-50" size="100,100"/>
       <Ellipse left="-25" top="-25" size="50,50"/>

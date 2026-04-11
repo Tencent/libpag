@@ -21,9 +21,11 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
+#include <memory>
 #include <string>
 #include <vector>
 #include "pagx/FontConfig.h"
+#include "pagx/PAGXDocument.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx::cli {
@@ -176,5 +178,25 @@ inline std::string EscapeJson(const std::string& input) {
   }
   return result;
 }
+
+/**
+ * Loads a PAGX document from a file. Prints load errors and warnings to stderr using the given
+ * command name as prefix. Returns nullptr on failure.
+ */
+std::shared_ptr<PAGXDocument> LoadDocument(const std::string& filePath, const std::string& command);
+
+/**
+ * Loads font files and fallback typefaces into a FontConfig. Prints errors to stderr using the
+ * given command name as prefix. Returns false on failure.
+ */
+bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& fontFiles,
+                    const std::vector<std::string>& fallbacks, const std::string& command);
+
+/**
+ * Writes a string to a file. Prints errors to stderr using the given command name as prefix.
+ * On success, prints a "wrote <path>" message to stdout and returns true.
+ */
+bool WriteStringToFile(const std::string& content, const std::string& filePath,
+                       const std::string& command);
 
 }  // namespace pagx::cli

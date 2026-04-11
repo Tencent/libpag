@@ -652,7 +652,7 @@ frosted glass.
 
 ```xml
 <pagx version="1.0" width="400" height="300">
-  <Layer width="400" height="300">
+  <Layer width="400" height="300" clipToBounds="true">
     <!-- Dark background -->
     <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#0F172A"/>

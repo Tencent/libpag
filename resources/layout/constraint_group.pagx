@@ -169,8 +169,12 @@
           <Group left="20" right="20" top="20" bottom="20">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
             <Fill color="#F0F9FF"/>
+          </Group>
+          <Group left="20" right="20" top="20" bottom="20">
             <Rectangle left="20" right="20" top="15" size="1,50" roundness="8"/>
             <Fill color="#3B82F6"/>
+          </Group>
+          <Group left="20" right="20" top="20" bottom="20">
             <Ellipse left="20" right="20" bottom="15" size="1,50"/>
             <Fill color="#EC4899"/>
           </Group>

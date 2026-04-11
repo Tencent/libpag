@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test: verify margins attribute in layout XML output -->
+<pagx version="1.0" width="400" height="300">
+  <Layer width="400" height="300">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#EEE"/>
+    <Layer left="20" top="30" width="200" height="100">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#F00"/>
+    </Layer>
+  </Layer>
+</pagx>

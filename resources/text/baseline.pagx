@@ -8,10 +8,12 @@
     <!-- Baseline reference line at y=100 -->
     <Path data="M0 100 L400 100"/>
     <Stroke color="#999999" width="2"/>
-    <!-- LineBox baseline (default) -->
-    <Text text="Hello" fontFamily="NotoSansSC" fontSize="48" position="50,100"/>
-    <!-- Alphabetic baseline -->
-    <Text text="Hello" fontFamily="NotoSansSC" fontSize="48" position="220,100" baseline="alphabetic"/>
-    <Fill/>
+    <Group>
+      <!-- LineBox baseline (default) -->
+      <Text text="Hello" fontFamily="NotoSansSC" fontSize="48" position="50,100"/>
+      <!-- Alphabetic baseline -->
+      <Text text="Hello" fontFamily="NotoSansSC" fontSize="48" position="220,100" baseline="alphabetic"/>
+      <Fill/>
+    </Group>
   </Layer>
 </pagx>

@@ -589,6 +589,10 @@ otherwise require `Path` / `PathData`, since those typically represent complex o
 better expressed as SVG. Place the `<svg>` inside a Layer and use constraint positioning
 on the Layer.
 
+**Import restrictions**: `<svg>` and `import` can only be direct children of `<Layer>`
+— not `<Group>` or `<TextBox>`. The Layer must not contain other children, because
+resolve replaces its entire content.
+
 ---
 
 # Common Pitfalls

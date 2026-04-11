@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="64" height="64">
-  <Layer id="icon" centerX="0" centerY="0" width="48" height="48">
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
-    <Fill color="#FF0000"/>
-    <DropShadowStyle offsetY="2" blurX="4" blurY="4" color="#00000040"/>
-  </Layer>
-</pagx>
