@@ -999,9 +999,28 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
     isEllipse = true;
   }
 
-  std::string style = "position:absolute;left:" + FloatToString(left) +
-                      "px;top:" + FloatToString(top) + "px;width:" + FloatToString(w) +
-                      "px;height:" + FloatToString(h) + "px";
+  // Use CSS inset:0 when the element fills its parent via constraints (left=0 right=0 top=0
+  // bottom=0), so it adapts to dynamic flex sizing instead of using fixed pixel values.
+  bool fillsParent = false;
+  if (isRect) {
+    auto* r = static_cast<const Rectangle*>(geo.element);
+    fillsParent = !std::isnan(r->left) && FloatNearlyZero(r->left) && !std::isnan(r->right) &&
+                  FloatNearlyZero(r->right) && !std::isnan(r->top) && FloatNearlyZero(r->top) &&
+                  !std::isnan(r->bottom) && FloatNearlyZero(r->bottom);
+  } else {
+    auto* e = static_cast<const Ellipse*>(geo.element);
+    fillsParent = !std::isnan(e->left) && FloatNearlyZero(e->left) && !std::isnan(e->right) &&
+                  FloatNearlyZero(e->right) && !std::isnan(e->top) && FloatNearlyZero(e->top) &&
+                  !std::isnan(e->bottom) && FloatNearlyZero(e->bottom);
+  }
+
+  std::string style;
+  if (fillsParent) {
+    style = "position:absolute;inset:0";
+  } else {
+    style = "position:absolute;left:" + FloatToString(left) + "px;top:" + FloatToString(top) +
+            "px;width:" + FloatToString(w) + "px;height:" + FloatToString(h) + "px";
+  }
 
   if (isEllipse) {
     style += ";border-radius:50%";
