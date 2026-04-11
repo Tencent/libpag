@@ -417,20 +417,26 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     if (layer->flex > 0) {
       style += "flex:" + FloatToString(layer->flex);
     }
-    if (!std::isnan(layer->width)) {
+    // Use explicit width/height from pagx, or fall back to layout-resolved size when the Layer
+    // has contents that require absolute positioning.
+    bool needsResolvedSize = !layer->contents.empty() || !layer->styles.empty();
+    auto bounds = layer->layoutBounds();
+    float resolvedW = !std::isnan(layer->width) ? layer->width : bounds.width;
+    float resolvedH = !std::isnan(layer->height) ? layer->height : bounds.height;
+    if (resolvedW > 0 && (needsResolvedSize || !std::isnan(layer->width))) {
       if (!style.empty()) {
         style += ';';
       }
-      style += "width:" + FloatToString(layer->width) + "px";
+      style += "width:" + FloatToString(resolvedW) + "px";
     }
-    if (!std::isnan(layer->height)) {
+    if (resolvedH > 0 && (needsResolvedSize || !std::isnan(layer->height))) {
       if (!style.empty()) {
         style += ';';
       }
-      style += "height:" + FloatToString(layer->height) + "px";
+      style += "height:" + FloatToString(resolvedH) + "px";
     }
-    // Flex container also needs position:relative for absolute-positioned contents.
-    if (isFlexContainer || !layer->contents.empty() || !layer->styles.empty()) {
+    // Flex item needs position:relative for absolute-positioned contents.
+    if (isFlexContainer || needsResolvedSize) {
       if (!style.empty()) {
         style += ';';
       }
