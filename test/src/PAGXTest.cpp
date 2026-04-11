@@ -5069,7 +5069,6 @@ PAGX_TEST(PAGXTest, GenerateComparisonPage) {
   };
   std::vector<DirectoryInfo> directories = {
       {ProjectPath::Absolute("resources/pagx_to_html"), "resources/pagx_to_html"},
-      {ProjectPath::Absolute("resources/cli"), "resources/cli"},
   };
 
   pagx::FontConfig fontConfig;
