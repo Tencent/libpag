@@ -459,7 +459,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
 
   // Flex container properties
   if (isFlexContainer) {
-    style += ";display:flex";
+    style += ";display:flex;box-sizing:border-box";
     if (layer->layout == LayoutMode::Horizontal) {
       style += ";flex-direction:row";
     } else {
