@@ -27,6 +27,9 @@
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/svg/SVGBlendMode.h"
+#include "pagx/types/Alignment.h"
+#include "pagx/types/Arrangement.h"
+#include "pagx/types/Padding.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/StringParser.h"
 
@@ -236,6 +239,52 @@ Matrix BuildGroupMatrix(const Group* group) {
   }
 
   return m;
+}
+
+const char* AlignmentToCSS(Alignment alignment) {
+  switch (alignment) {
+    case Alignment::Start:
+      return "flex-start";
+    case Alignment::Center:
+      return "center";
+    case Alignment::End:
+      return "flex-end";
+    case Alignment::Stretch:
+      return "stretch";
+  }
+  return "stretch";
+}
+
+const char* ArrangementToCSS(Arrangement arrangement) {
+  switch (arrangement) {
+    case Arrangement::Start:
+      return "flex-start";
+    case Arrangement::Center:
+      return "center";
+    case Arrangement::End:
+      return "flex-end";
+    case Arrangement::SpaceBetween:
+      return "space-between";
+    case Arrangement::SpaceEvenly:
+      return "space-evenly";
+    case Arrangement::SpaceAround:
+      return "space-around";
+  }
+  return "flex-start";
+}
+
+std::string PaddingToCSS(const Padding& padding) {
+  if (FloatNearlyZero(padding.right - padding.left) &&
+      FloatNearlyZero(padding.bottom - padding.top) &&
+      FloatNearlyZero(padding.top - padding.left)) {
+    return FloatToString(padding.top) + "px";
+  }
+  if (FloatNearlyZero(padding.top - padding.bottom) &&
+      FloatNearlyZero(padding.left - padding.right)) {
+    return FloatToString(padding.top) + "px " + FloatToString(padding.right) + "px";
+  }
+  return FloatToString(padding.top) + "px " + FloatToString(padding.right) + "px " +
+         FloatToString(padding.bottom) + "px " + FloatToString(padding.left) + "px";
 }
 
 }  // namespace pagx

@@ -34,7 +34,10 @@
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Stroke.h"
+#include "pagx/types/Alignment.h"
+#include "pagx/types/Arrangement.h"
 #include "pagx/types/MergePathMode.h"
+#include "pagx/types/Padding.h"
 #include "pagx/types/Rect.h"
 #include "pagx/types/SelectorTypes.h"
 
@@ -67,6 +70,9 @@ const char* BlendModeToMixBlendMode(BlendMode mode);
 Color LerpColor(const Color& a, const Color& b, float t);
 std::string LayerTransformCSS(const Layer* layer);
 Matrix BuildGroupMatrix(const Group* group);
+const char* AlignmentToCSS(Alignment alignment);
+const char* ArrangementToCSS(Arrangement arrangement);
+std::string PaddingToCSS(const Padding& padding);
 
 std::string GetImageSrc(const Image* image);
 const char* DetectImageMime(const uint8_t* bytes, size_t size);
@@ -135,7 +141,7 @@ class HTMLWriter {
   }
 
   void writeLayer(HTMLBuilder& out, const Layer* layer, float parentAlpha = 1.0f,
-                  bool distributeAlpha = false);
+                  bool distributeAlpha = false, bool isFlexItem = false);
 
  private:
   HTMLBuilder* _defs = nullptr;

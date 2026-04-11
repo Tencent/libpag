@@ -395,7 +395,7 @@ void HTMLWriter::writeLayerContents(HTMLBuilder& out, const Layer* layer, float 
 //==============================================================================
 
 void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAlpha,
-                            bool distributeAlpha) {
+                            bool distributeAlpha, bool isFlexItem) {
   if (!layer->visible) {
     out.openTag("div");
     out.addAttr("class", "pagx-layer");
@@ -407,14 +407,66 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     return;
   }
 
-  std::string style;
-  style.reserve(200);
-  style += "position:absolute";
+  bool isFlexContainer = (layer->layout != LayoutMode::None);
 
-  std::string transform = LayerTransformCSS(layer);
-  if (!transform.empty()) {
-    style += ";transform:" + transform;
-    style += ";transform-origin:0 0";
+  std::string style;
+  style.reserve(300);
+
+  if (isFlexItem) {
+    // Flex item: positioned by parent's flexbox, no absolute positioning needed.
+    if (layer->flex > 0) {
+      style += "flex:" + FloatToString(layer->flex);
+    }
+    if (!std::isnan(layer->width)) {
+      if (!style.empty()) {
+        style += ';';
+      }
+      style += "width:" + FloatToString(layer->width) + "px";
+    }
+    if (!std::isnan(layer->height)) {
+      if (!style.empty()) {
+        style += ';';
+      }
+      style += "height:" + FloatToString(layer->height) + "px";
+    }
+    // Flex container also needs position:relative for absolute-positioned contents.
+    if (isFlexContainer || !layer->contents.empty() || !layer->styles.empty()) {
+      if (!style.empty()) {
+        style += ';';
+      }
+      style += "position:relative";
+    }
+  } else {
+    style += "position:absolute";
+    std::string transform = LayerTransformCSS(layer);
+    if (!transform.empty()) {
+      style += ";transform:" + transform;
+      style += ";transform-origin:0 0";
+    }
+  }
+
+  // Flex container properties
+  if (isFlexContainer) {
+    style += ";display:flex";
+    if (layer->layout == LayoutMode::Horizontal) {
+      style += ";flex-direction:row";
+    } else {
+      style += ";flex-direction:column";
+    }
+    if (layer->gap > 0) {
+      style += ";gap:" + FloatToString(layer->gap) + "px";
+    }
+    if (!layer->padding.isZero()) {
+      style += ";padding:" + PaddingToCSS(layer->padding);
+    }
+    if (layer->alignment != Alignment::Stretch) {
+      style += ";align-items:";
+      style += AlignmentToCSS(layer->alignment);
+    }
+    if (layer->arrangement != Arrangement::Start) {
+      style += ";justify-content:";
+      style += ArrangementToCSS(layer->arrangement);
+    }
   }
 
   if (layer->preserve3D) {
@@ -785,7 +837,8 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   }
 
   for (auto* child : layer->children) {
-    writeLayer(out, child, contentAlpha, childDistribute);
+    bool childIsFlexItem = isFlexContainer && child->includeInLayout;
+    writeLayer(out, child, contentAlpha, childDistribute, childIsFlexItem);
   }
 
   if (hasForeground) {
