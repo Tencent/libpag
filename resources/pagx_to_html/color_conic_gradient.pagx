@@ -32,7 +32,7 @@
         <Layer width="120" height="120">
           <Ellipse position="60,60" size="120,120"/>
           <Fill>
-            <ConicGradient center="70,70" startAngle="0" endAngle="360">
+            <ConicGradient center="60,60" startAngle="0" endAngle="360">
               <ColorStop offset="0" color="#EF4444"/>
               <ColorStop offset="0.33" color="#10B981"/>
               <ColorStop offset="0.66" color="#3B82F6"/>
@@ -51,7 +51,7 @@
         <Layer width="120" height="120">
           <Ellipse position="60,60" size="120,120"/>
           <Fill>
-            <ConicGradient center="70,70" startAngle="45" endAngle="270">
+            <ConicGradient center="60,60" startAngle="45" endAngle="270">
               <ColorStop offset="0" color="#F59E0B"/>
               <ColorStop offset="1" color="#8B5CF6"/>
             </ConicGradient>
