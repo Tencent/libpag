@@ -6,27 +6,27 @@
     <!-- Reusable icon component: a colored circle with an inner diamond -->
     <Composition id="icon" width="60" height="60">
       <Layer>
-        <Ellipse position="40,40" size="56,56"/>
+        <Ellipse position="30,30" size="56,56"/>
         <Fill>
-          <RadialGradient center="40,40" radius="28">
+          <RadialGradient center="30,30" radius="28">
             <ColorStop offset="0" color="#60A5FA"/>
             <ColorStop offset="1" color="#3B82F6"/>
           </RadialGradient>
         </Fill>
       </Layer>
       <Layer>
-        <Path data="M 30,10 L 50,30 L 30,50 L 10,30 Z"/>
+        <Path data="M 30,4 L 56,30 L 30,56 L 4,30 Z"/>
         <Fill color="#FFFFFF"/>
       </Layer>
     </Composition>
     <!-- Reusable badge: rounded rectangle with star -->
     <Composition id="badge" width="50" height="50">
       <Layer>
-        <Rectangle position="35,35" size="46,46" roundness="8"/>
+        <Rectangle position="25,25" size="46,46" roundness="8"/>
         <Fill color="#10B981"/>
       </Layer>
       <Layer>
-        <Polystar position="35,35" type="star" pointCount="5" outerRadius="16" innerRadius="8" rotation="-90"/>
+        <Polystar position="25,25" type="star" pointCount="5" outerRadius="16" innerRadius="8" rotation="-90"/>
         <Fill color="#FFFFFF"/>
       </Layer>
     </Composition>
