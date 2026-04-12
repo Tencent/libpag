@@ -59,19 +59,19 @@
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
       <!-- Row of icon instances with different positions -->
-      <Layer x="40" y="78" composition="@icon"/>
-  <Layer x="110" y="68" composition="@icon"/>
-  <Layer x="190" y="68" composition="@icon" alpha="0.6"/>
-  <Layer x="270" y="68" composition="@icon" matrix="0.8,0,0,0.8,0,0"/>
+      <Layer x="24" y="19" composition="@icon"/>
+      <Layer x="108" y="19" composition="@icon"/>
+      <Layer x="192" y="19" composition="@icon" alpha="0.6"/>
+      <Layer x="276" y="19" composition="@icon" matrix="0.8,0,0,0.8,0,0"/>
 
-  <!-- Row of badge instances -->
-  <Layer x="30" y="148" composition="@badge"/>
-  <Layer x="100" y="148" composition="@badge"/>
-  <Layer x="170" y="148" composition="@badge" alpha="0.7"/>
-  <!-- Badge with rotation via matrix -->
-  <Layer x="240" y="148" composition="@badge" matrix="0.707,0.707,-0.707,0.707,0,0"/>
-  <!-- Larger scaled badge -->
-  <Layer x="295" y="138" composition="@badge" matrix="1.4,0,0,1.4,0,0"/>
+      <!-- Row of badge instances -->
+      <Layer x="15" y="118" composition="@badge"/>
+      <Layer x="85" y="118" composition="@badge"/>
+      <Layer x="155" y="118" composition="@badge" alpha="0.7"/>
+      <!-- Badge with rotation via matrix -->
+      <Layer x="225" y="118" composition="@badge" matrix="0.707,0.707,-0.707,0.707,0,0"/>
+      <!-- Larger scaled badge -->
+      <Layer x="280" y="108" composition="@badge" matrix="1.4,0,0,1.4,0,0"/>
     </Layer>
   </Layer>
 </pagx>
