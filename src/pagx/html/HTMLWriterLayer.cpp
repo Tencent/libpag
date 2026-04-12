@@ -445,8 +445,9 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       style += ";transform:" + transform;
       style += ";transform-origin:0 0";
     }
-    // Flex containers need explicit size for proper child layout.
-    if (isFlexContainer) {
+    // Absolute-positioned layers need explicit size when they have contents that use inset:0,
+    // or when they are flex containers that need a reference frame for child layout.
+    if (isFlexContainer || !layer->contents.empty()) {
       auto bounds = layer->layoutBounds();
       if (bounds.width > 0) {
         style += ";width:" + FloatToString(bounds.width) + "px";
