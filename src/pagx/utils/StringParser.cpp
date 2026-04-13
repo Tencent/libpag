@@ -19,9 +19,9 @@
 #include "StringParser.h"
 #include <cctype>
 #include <cmath>
-#include <cstdio>
 #include <cstdlib>
 #include <unordered_map>
+#include "base/utils/Log.h"
 
 namespace pagx {
 
@@ -44,7 +44,14 @@ namespace pagx {
   }                                                                                             \
   EnumType EnumType##FromString(const std::string& str) {                                       \
     auto it = StringTo##EnumType##Map.find(str);                                                \
-    return it != StringTo##EnumType##Map.end() ? it->second : (DefaultValue);                   \
+    if (it != StringTo##EnumType##Map.end()) {                                                  \
+      return it->second;                                                                        \
+    }                                                                                           \
+    LOGE("Invalid %s value: \"%s\"", #EnumType, str.c_str());                                   \
+    return (DefaultValue);                                                                      \
+  }                                                                                             \
+  bool IsValid##EnumType##String(const std::string& str) {                                      \
+    return StringTo##EnumType##Map.count(str) > 0;                                              \
   }
 
 //==============================================================================
@@ -193,6 +200,9 @@ DEFINE_ENUM_CONVERSION(ParagraphAlign, ParagraphAlign::Near, {ParagraphAlign::Ne
 DEFINE_ENUM_CONVERSION(TextAnchor, TextAnchor::Start, {TextAnchor::Start, "start"},
                        {TextAnchor::Center, "center"}, {TextAnchor::End, "end"})
 
+DEFINE_ENUM_CONVERSION(TextBaseline, TextBaseline::LineBox, {TextBaseline::LineBox, "lineBox"},
+                       {TextBaseline::Alphabetic, "alphabetic"})
+
 DEFINE_ENUM_CONVERSION(WritingMode, WritingMode::Horizontal,
                        {WritingMode::Horizontal, "horizontal"}, {WritingMode::Vertical, "vertical"})
 
@@ -216,6 +226,19 @@ DEFINE_ENUM_CONVERSION(RepeaterOrder, RepeaterOrder::BelowOriginal,
                        {RepeaterOrder::BelowOriginal, "belowOriginal"},
                        {RepeaterOrder::AboveOriginal, "aboveOriginal"})
 
+DEFINE_ENUM_CONVERSION(LayoutMode, LayoutMode::None, {LayoutMode::None, "none"},
+                       {LayoutMode::Horizontal, "horizontal"}, {LayoutMode::Vertical, "vertical"})
+
+DEFINE_ENUM_CONVERSION(Alignment, Alignment::Stretch, {Alignment::Start, "start"},
+                       {Alignment::Center, "center"}, {Alignment::End, "end"},
+                       {Alignment::Stretch, "stretch"})
+
+DEFINE_ENUM_CONVERSION(Arrangement, Arrangement::Start, {Arrangement::Start, "start"},
+                       {Arrangement::Center, "center"}, {Arrangement::End, "end"},
+                       {Arrangement::SpaceBetween, "spaceBetween"},
+                       {Arrangement::SpaceEvenly, "spaceEvenly"},
+                       {Arrangement::SpaceAround, "spaceAround"})
+
 std::string ColorSpaceToString(ColorSpace space) {
   switch (space) {
     case ColorSpace::SRGB:
@@ -228,10 +251,19 @@ std::string ColorSpaceToString(ColorSpace space) {
 }
 
 ColorSpace ColorSpaceFromString(const std::string& str) {
+  if (str.empty() || str == "srgb" || str == "sRGB" || str == "SRGB") {
+    return ColorSpace::SRGB;
+  }
   if (str == "p3" || str == "displayP3" || str == "DisplayP3") {
     return ColorSpace::DisplayP3;
   }
+  LOGE("Invalid ColorSpace value: \"%s\"", str.c_str());
   return ColorSpace::SRGB;
+}
+
+bool IsValidColorSpaceString(const std::string& str) {
+  return str.empty() || str == "srgb" || str == "sRGB" || str == "SRGB" || str == "p3" ||
+         str == "displayP3" || str == "DisplayP3";
 }
 
 static int FloatToHexByte(float v) {
@@ -284,6 +316,8 @@ Matrix MatrixFromString(const std::string& str) {
     m.d = values[3];
     m.tx = values[4];
     m.ty = values[5];
+  } else if (!str.empty()) {
+    LOGE("Invalid Matrix value: \"%s\" (expected 6 numbers)", str.c_str());
   }
   return m;
 }
@@ -321,6 +355,42 @@ std::string FloatToString(float value) {
   char buf[32] = {};
   snprintf(buf, sizeof(buf), "%g", value);
   return std::string(buf);
+}
+
+Padding PaddingFromString(const std::string& str) {
+  auto values = ParseFloatList(str);
+  Padding p = {};
+  if (values.size() == 1) {
+    p.top = values[0];
+    p.right = values[0];
+    p.bottom = values[0];
+    p.left = values[0];
+  } else if (values.size() == 2) {
+    p.top = values[0];
+    p.bottom = values[0];
+    p.right = values[1];
+    p.left = values[1];
+  } else if (values.size() >= 4) {
+    p.top = values[0];
+    p.right = values[1];
+    p.bottom = values[2];
+    p.left = values[3];
+  } else if (!str.empty()) {
+    LOGE("Invalid Padding value: \"%s\" (expected 1, 2, or 4 numbers)", str.c_str());
+  }
+  return p;
+}
+
+std::string PaddingToString(const Padding& padding) {
+  if (padding.top == padding.right && padding.right == padding.bottom &&
+      padding.bottom == padding.left) {
+    return FloatToString(padding.top);
+  }
+  if (padding.top == padding.bottom && padding.left == padding.right) {
+    return FloatToString(padding.top) + "," + FloatToString(padding.right);
+  }
+  return FloatToString(padding.top) + "," + FloatToString(padding.right) + "," +
+         FloatToString(padding.bottom) + "," + FloatToString(padding.left);
 }
 
 #undef DEFINE_ENUM_CONVERSION

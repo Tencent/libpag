@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test: flex on child Layer without parent container layout -->
+<pagx version="1.0" width="400" height="300">
+  <Layer id="noLayout">
+    <Layer id="flexChild" flex="1" left="10" top="10">
+      <Rectangle size="100,50"/>
+      <Fill color="#0000FF"/>
+    </Layer>
+  </Layer>
+</pagx>

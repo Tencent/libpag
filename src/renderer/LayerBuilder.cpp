@@ -20,6 +20,9 @@
 #include <tuple>
 #include <unordered_map>
 #include "ToTGFX.h"
+#include "base/utils/Log.h"
+#include "pagx/PAGXDocument.h"
+#include "pagx/TextLayout.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -51,6 +54,7 @@
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
@@ -63,6 +67,7 @@
 #include "pagx/types/SelectorTypes.h"
 #include "pagx/types/TileMode.h"
 #include "pagx/utils/Base64.h"
+#include "renderer/GlyphRunRenderer.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Data.h"
@@ -105,13 +110,6 @@
 #include "tgfx/layers/vectors/TrimPath.h"
 #include "tgfx/layers/vectors/VectorGroup.h"
 
-#ifdef DEBUG
-#include <cassert>
-#define DEBUG_ASSERT(x) assert(x)
-#else
-#define DEBUG_ASSERT(x)
-#endif
-
 namespace pagx {
 
 // Decode a data URI (e.g., "data:image/png;base64,...") to an Image.
@@ -123,13 +121,10 @@ static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI)
   return tgfx::Image::MakeFromEncoded(ToTGFXData(data));
 }
 
-namespace {
-
 // Build context that maintains state during layer tree construction
 class LayerBuilderContext {
  public:
-  explicit LayerBuilderContext(const ShapedTextMap& shapedTextMap) : _shapedTextMap(shapedTextMap) {
-  }
+  LayerBuilderContext() = default;
 
   LayerBuildResult buildWithMap(const PAGXDocument& document) {
     auto root = build(document);
@@ -235,7 +230,36 @@ class LayerBuilderContext {
     return layer;
   }
 
-  std::shared_ptr<tgfx::VectorElement> convertVectorElement(const Element* node) {
+  // Generate TextBlob for a Text node using GlyphRunRenderer with the given inverse matrix.
+  // For standalone Text (not inside TextBox), inverseMatrix is Identity.
+  // For TextBox children, inverseMatrix cancels the cumulative Group transforms.
+  static void PrepareTextBlob(Text* text, const tgfx::Matrix& inverseMatrix) {
+    if (!text->glyphData->layoutRuns.empty()) {
+      text->glyphData->textBlob =
+          GlyphRunRenderer::BuildTextBlobFromLayoutRuns(text->glyphData->layoutRuns, inverseMatrix);
+    } else if (!text->glyphRuns.empty()) {
+      GlyphRunRenderer::BuildTextBlob(text, inverseMatrix);
+    }
+  }
+
+  // Prepare TextBlobs for all Text children of a TextBox by applying inverse matrices.
+  // This must happen at render time (not layout time) so that tgfx's StrokePainter can
+  // detect the Group transform via geometry->matrix changes between apply() and draw().
+  void prepareTextBoxTextBlobs(const TextBox* textBox) {
+    std::vector<Text*> childText;
+    std::vector<tgfx::Matrix> matrices;
+    TextLayout::CollectTextElements(textBox->elements, childText, matrices);
+
+    for (size_t i = 0; i < childText.size(); i++) {
+      tgfx::Matrix inverse = {};
+      if (!matrices[i].invert(&inverse)) {
+        continue;
+      }
+      PrepareTextBlob(childText[i], inverse);
+    }
+  }
+
+  std::shared_ptr<tgfx::VectorElement> convertVectorElement(Element* node) {
     if (!node) {
       return nullptr;
     }
@@ -250,7 +274,7 @@ class LayerBuilderContext {
       case NodeType::Path:
         return convertPath(static_cast<const Path*>(node));
       case NodeType::Text:
-        return convertText(static_cast<const Text*>(node));
+        return convertText(static_cast<Text*>(node));
       case NodeType::Fill:
         return convertFill(static_cast<const Fill*>(node));
       case NodeType::Stroke:
@@ -269,9 +293,14 @@ class LayerBuilderContext {
         return convertTextModifier(static_cast<const TextModifier*>(node));
       case NodeType::Group:
         return convertGroup(static_cast<const Group*>(node));
-      case NodeType::TextBox:
-        // TextBox is handled in convertGroup, not converted directly.
-        return nullptr;
+      case NodeType::TextBox: {
+        auto* textBox = static_cast<const TextBox*>(node);
+        if (textBox->elements.empty()) {
+          return nullptr;
+        }
+        prepareTextBoxTextBlobs(textBox);
+        return convertGroup(textBox);
+      }
       default:
         return nullptr;
     }
@@ -314,6 +343,7 @@ class LayerBuilderContext {
 
   std::shared_ptr<tgfx::ShapePath> convertPath(const Path* node) {
     auto shapePath = tgfx::ShapePath::Make();
+    shapePath->setPosition(ToTGFX(node->position));
     if (node->data) {
       shapePath->setPath(ToTGFX(*node->data));
     }
@@ -321,13 +351,16 @@ class LayerBuilderContext {
     return shapePath;
   }
 
-  std::shared_ptr<tgfx::Text> convertText(const Text* node) {
-    auto it = _shapedTextMap.find(node);
-    if (it == _shapedTextMap.end() || it->second.textBlob == nullptr) {
+  std::shared_ptr<tgfx::Text> convertText(Text* node) {
+    auto textBlob = node->glyphData->textBlob;
+    if (textBlob == nullptr) {
+      PrepareTextBlob(node, tgfx::Matrix::I());
+      textBlob = node->glyphData->textBlob;
+    }
+    if (textBlob == nullptr) {
       return nullptr;
     }
-    auto& shapedText = it->second;
-    auto tgfxText = tgfx::Text::Make(shapedText.textBlob, shapedText.anchors);
+    auto tgfxText = tgfx::Text::Make(textBlob, node->glyphData->anchors);
     if (tgfxText) {
       tgfxText->setPosition(tgfx::Point::Make(node->position.x, node->position.y));
     }
@@ -629,9 +662,13 @@ class LayerBuilderContext {
     elements.reserve(node->elements.size());
 
     for (const auto& element : node->elements) {
-      // Skip TextBox modifier - layout has been baked into GlyphRun positions by TextLayout
+      // Skip empty TextBox modifier (no children) - layout has been baked into GlyphRun positions
+      // by TextLayout. TextBox with children is rendered as a Group.
       if (element->nodeType() == NodeType::TextBox) {
-        continue;
+        auto* textBox = static_cast<const TextBox*>(element);
+        if (textBox->elements.empty()) {
+          continue;
+        }
       }
 
       auto tgfxElement = convertVectorElement(element);
@@ -696,13 +733,10 @@ class LayerBuilderContext {
     if (!node->antiAlias) {
       layer->setAllowsEdgeAntialiasing(false);
     }
-    if (node->groupOpacity) {
-      layer->setAllowsGroupOpacity(true);
-    }
+    layer->setAllowsGroupOpacity(node->groupOpacity);
     if (!node->passThroughBackground) {
       layer->setPassThroughBackground(false);
     }
-    // Apply scrollRect if present
     if (node->hasScrollRect) {
       layer->setScrollRect(ToTGFX(node->scrollRect));
     }
@@ -811,39 +845,40 @@ class LayerBuilderContext {
     }
   }
 
-  const ShapedTextMap& _shapedTextMap;
   std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>> _tgfxLayerByPagxLayer = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
       _pendingMasks = {};
 };
 
-}  // namespace
-
 // Public API implementation
 
-static TextLayoutResult PerformTextLayout(PAGXDocument* document, TextLayout* textLayout) {
-  if (textLayout != nullptr) {
-    return textLayout->layout(document);
-  }
-  TextLayout defaultTextLayout;
-  return defaultTextLayout.layout(document);
-}
-
-std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document, TextLayout* textLayout) {
+std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document) {
   if (document == nullptr) {
     return nullptr;
   }
-  auto layoutResult = PerformTextLayout(document, textLayout);
-  LayerBuilderContext context(layoutResult.shapedTextMap);
+  if (!document->isLayoutApplied()) {
+    LOGE("LayerBuilder::Build() called before applyLayout(). Call document->applyLayout() first.");
+    DEBUG_ASSERT(false);
+    return nullptr;
+  }
+
+  LayerBuilderContext context;
   return context.build(*document);
 }
 
-LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document, TextLayout* textLayout) {
+LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document) {
   if (document == nullptr) {
     return {};
   }
-  auto layoutResult = PerformTextLayout(document, textLayout);
-  LayerBuilderContext context(layoutResult.shapedTextMap);
+  if (!document->isLayoutApplied()) {
+    LOGE(
+        "LayerBuilder::BuildWithMap() called before applyLayout(). Call document->applyLayout() "
+        "first.");
+    DEBUG_ASSERT(false);
+    return {};
+  }
+
+  LayerBuilderContext context;
   return context.buildWithMap(*document);
 }
 

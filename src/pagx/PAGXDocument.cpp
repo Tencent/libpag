@@ -17,9 +17,37 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXDocument.h"
+#include "LayoutContext.h"
+#include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Image.h"
+#include "pagx/nodes/LayoutNode.h"
 
 namespace pagx {
+
+void PAGXDocument::applyLayout(const FontConfig* config) {
+  if (config != nullptr) {
+    fontConfig = *config;
+  }
+  LayoutContext context(&fontConfig);
+  // Composition layers are laid out first since they may be referenced by document layers.
+  for (auto& node : nodes) {
+    if (node->nodeType() == NodeType::Composition) {
+      auto* comp = static_cast<Composition*>(node.get());
+      layoutLayers(comp->layers, comp->width, comp->height, &context);
+    }
+  }
+  layoutLayers(layers, width, height, &context);
+  layoutApplied = true;
+}
+
+void PAGXDocument::layoutLayers(const std::vector<Layer*>& layers, float containerW,
+                                float containerH, LayoutContext* context) {
+  for (auto* layer : layers) {
+    layer->updateSize(context);
+  }
+  std::vector<LayoutNode*> nodes(layers.begin(), layers.end());
+  LayoutNode::PerformConstraintLayout(nodes, containerW, containerH, {}, context);
+}
 
 std::shared_ptr<PAGXDocument> PAGXDocument::Make(float docWidth, float docHeight) {
   auto doc = std::shared_ptr<PAGXDocument>(new PAGXDocument());
@@ -43,6 +71,35 @@ void PAGXDocument::registerNode(Node* node, const std::string& id) {
   }
   node->id = id;
   nodeMap[id] = node;
+}
+
+static bool LayersHaveImports(const std::vector<Layer*>& layers) {
+  for (auto* layer : layers) {
+    for (auto* element : layer->contents) {
+      if (element->nodeType() == NodeType::Import) {
+        return true;
+      }
+    }
+    if (LayersHaveImports(layer->children)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool PAGXDocument::hasUnresolvedImports() const {
+  if (LayersHaveImports(layers)) {
+    return true;
+  }
+  for (auto& node : nodes) {
+    if (node->nodeType() == NodeType::Composition) {
+      auto* comp = static_cast<Composition*>(node.get());
+      if (LayersHaveImports(comp->layers)) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 std::vector<std::string> PAGXDocument::getExternalFilePaths() const {

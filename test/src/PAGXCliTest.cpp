@@ -28,9 +28,13 @@
 #include "cli/CommandFont.h"
 #include "cli/CommandFormat.h"
 #include "cli/CommandImport.h"
-#include "cli/CommandOptimize.h"
+#include "cli/CommandLayout.h"
 #include "cli/CommandRender.h"
-#include "cli/CommandValidator.h"
+#include "cli/CommandVerify.h"
+#include "pagx/PAGXDocument.h"
+#include "pagx/PAGXExporter.h"
+#include "pagx/PAGXImporter.h"
+#include "pagx/nodes/Import.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
@@ -106,16 +110,6 @@ static int CallRun(int (*fn)(int, char*[]), std::vector<std::string> args) {
   return fn(static_cast<int>(argv.size()), argv.data());
 }
 
-static size_t CountOccurrences(const std::string& text, const std::string& pattern) {
-  size_t count = 0;
-  size_t pos = 0;
-  while ((pos = text.find(pattern, pos)) != std::string::npos) {
-    count++;
-    pos++;
-  }
-  return count;
-}
-
 static std::string ExportToSVG(const std::string& pagxResourceName, const std::string& svgTempName,
                                std::vector<std::string> extraExportArgs = {}) {
   auto pagxPath = TestResourcePath(pagxResourceName);
@@ -129,363 +123,6 @@ static std::string ExportToSVG(const std::string& pagxResourceName, const std::s
   return svgPath;
 }
 
-//==============================================================================
-// Validate tests
-//==============================================================================
-
-CLI_TEST(PAGXCliTest, Validate_ValidFile) {
-  auto path = TestResourcePath("validate_simple.pagx");
-  auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
-  EXPECT_EQ(ret, 0);
-}
-
-CLI_TEST(PAGXCliTest, Validate_MissingAttribute) {
-  auto path = TestResourcePath("validate_missing_attr.pagx");
-  auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
-  EXPECT_NE(ret, 0);
-}
-
-CLI_TEST(PAGXCliTest, Validate_NonXmlFile) {
-  auto path = TestResourcePath("validate_not_xml.pagx");
-  auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
-  EXPECT_NE(ret, 0);
-}
-
-CLI_TEST(PAGXCliTest, Validate_MalformedXml) {
-  auto path = TestResourcePath("validate_malformed.pagx");
-  auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
-  EXPECT_NE(ret, 0);
-}
-
-CLI_TEST(PAGXCliTest, Validate_InvalidRootElement) {
-  auto path = TestResourcePath("validate_wrong_root.pagx");
-  auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
-  EXPECT_NE(ret, 0);
-}
-
-CLI_TEST(PAGXCliTest, Validate_JsonFormat) {
-  auto path = TestResourcePath("validate_simple.pagx");
-  auto ret = CallRun(pagx::cli::RunValidate, {"validate", "--json", path});
-  EXPECT_EQ(ret, 0);
-}
-
-CLI_TEST(PAGXCliTest, Validate_MissingFile) {
-  auto ret = CallRun(pagx::cli::RunValidate, {"validate", "nonexistent_file.pagx"});
-  EXPECT_NE(ret, 0);
-}
-
-//==============================================================================
-// Optimize tests — RemoveEmptyNodes
-//==============================================================================
-
-CLI_TEST(PAGXCliTest, Optimize_RemoveEmptyElements) {
-  auto inputPath = TestResourcePath("optimize_remove_empty.pagx");
-  auto outputPath = TempDir() + "/empty_elements_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("\"empty\"") == std::string::npos);
-  EXPECT_TRUE(output.find("width=\"0\"") == std::string::npos);
-  EXPECT_TRUE(output.find("\"visible\"") != std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_RemoveEmptyGroup) {
-  auto inputPath = TestResourcePath("optimize_remove_empty_group.pagx");
-  auto outputPath = TempDir() + "/empty_group_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("<Group") == std::string::npos);
-  EXPECT_TRUE(output.find("\"main\"") != std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_KeepLayerWithComposition) {
-  auto inputPath = TestResourcePath("optimize_keep_comp_layer.pagx");
-  auto outputPath = TempDir() + "/keep_comp_layer_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("\"ref\"") != std::string::npos);
-  EXPECT_TRUE(output.find("composition=\"@comp1\"") != std::string::npos);
-}
-
-//==============================================================================
-// Optimize tests — DeduplicatePathData
-//==============================================================================
-
-CLI_TEST(PAGXCliTest, Optimize_DeduplicateMultiplePaths) {
-  auto inputPath = TestResourcePath("optimize_dedup_multi_path.pagx");
-  auto outputPath = TempDir() + "/dup_multi_path_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_EQ(CountOccurrences(output, "<PathData"), 1u);
-}
-
-//==============================================================================
-// Optimize tests — DeduplicateColorSources
-//==============================================================================
-
-CLI_TEST(PAGXCliTest, Optimize_DeduplicateGradient) {
-  auto inputPath = TestResourcePath("optimize_dedup_linear_gradient.pagx");
-  auto outputPath = TempDir() + "/dup_gradient_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_EQ(CountOccurrences(output, "<LinearGradient"), 1u);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_DeduplicateRadialGradient) {
-  auto inputPath = TestResourcePath("optimize_dedup_radial_gradient.pagx");
-  auto outputPath = TempDir() + "/dup_radial_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_EQ(CountOccurrences(output, "<RadialGradient"), 1u);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_NoDeduplicateDifferentGradients) {
-  auto inputPath = TestResourcePath("optimize_no_dedup_diff_gradient.pagx");
-  auto outputPath = TempDir() + "/no_dup_gradient_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_EQ(CountOccurrences(output, "<LinearGradient"), 1u);
-  EXPECT_EQ(CountOccurrences(output, "<RadialGradient"), 1u);
-}
-
-//==============================================================================
-// Optimize tests — RemoveUnreferencedResources
-//==============================================================================
-
-CLI_TEST(PAGXCliTest, Optimize_UnreferencedResources) {
-  auto inputPath = TestResourcePath("optimize_unref_resources.pagx");
-  auto outputPath = TempDir() + "/unref_resources_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("orphanPath") == std::string::npos);
-  EXPECT_TRUE(output.find("unusedGrad") == std::string::npos);
-  EXPECT_TRUE(output.find("\"grad\"") != std::string::npos);
-  EXPECT_EQ(CountOccurrences(output, "<LinearGradient"), 1u);
-}
-
-//==============================================================================
-// Optimize tests — ReplacePathsWithPrimitives
-//==============================================================================
-
-CLI_TEST(PAGXCliTest, Optimize_PathToRectangle) {
-  auto inputPath = TestResourcePath("optimize_path_to_rect.pagx");
-  auto outputPath = TempDir() + "/rect_path_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("<Rectangle") != std::string::npos);
-  EXPECT_TRUE(output.find("<Path") == std::string::npos);
-}
-
-// NOTE: Path->Ellipse detection via isOval() requires exact Bezier control points. The SVG path
-// string format used by PAGX (with default float precision) introduces rounding that prevents
-// isOval() from matching after an export->import round trip. The optimization still works for
-// Path data constructed programmatically with full float precision (e.g., from non-PAGX sources).
-// A Path->Ellipse test is omitted here due to this inherent limitation.
-
-CLI_TEST(PAGXCliTest, Optimize_PathKeepIrregular) {
-  auto inputPath = TestResourcePath("optimize_path_keep_irregular.pagx");
-  auto outputPath = TempDir() + "/irregular_path_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("<Path") != std::string::npos ||
-              output.find("<PathData") != std::string::npos);
-  EXPECT_TRUE(output.find("<Rectangle") == std::string::npos);
-  EXPECT_TRUE(output.find("<Ellipse") == std::string::npos);
-}
-
-//==============================================================================
-// Optimize tests — RemoveFullCanvasClipMasks
-//==============================================================================
-
-// NOTE: Partial clip mask retention test is omitted because mask="@id" references are not
-// preserved through the PAGX import/export round trip in the current Exporter implementation.
-
-CLI_TEST(PAGXCliTest, Optimize_RemoveFullCanvasClips) {
-  auto inputPath = TestResourcePath("optimize_fullcanvas_clips.pagx");
-  auto outputPath = TempDir() + "/fullcanvas_clips_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("mask=") == std::string::npos);
-}
-
-//==============================================================================
-// Optimize tests — RemoveOffCanvasLayers
-//==============================================================================
-
-CLI_TEST(PAGXCliTest, Optimize_RemoveOffCanvasRight) {
-  auto inputPath = TestResourcePath("optimize_offcanvas_right.pagx");
-  auto outputPath = TempDir() + "/offcanvas_right_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("\"visible\"") != std::string::npos);
-  EXPECT_TRUE(output.find("\"offscreen\"") == std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_KeepPartiallyVisible) {
-  auto inputPath = TestResourcePath("optimize_partial_visible.pagx");
-  auto outputPath = TempDir() + "/partial_visible_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("\"partial\"") != std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_KeepInvisibleLayer) {
-  auto inputPath = TestResourcePath("optimize_invisible_layer.pagx");
-  auto outputPath = TempDir() + "/invisible_layer_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("\"hidden\"") != std::string::npos);
-}
-
-//==============================================================================
-// Optimize tests — LocalizeCoordinates
-//==============================================================================
-
-CLI_TEST(PAGXCliTest, Optimize_LocalizeRectangle) {
-  auto inputPath = TestResourcePath("optimize_localize_rect.pagx");
-  auto outputPath = TempDir() + "/localize_rect_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("x=\"200\"") != std::string::npos);
-  EXPECT_TRUE(output.find("y=\"300\"") != std::string::npos);
-  EXPECT_TRUE(output.find("position=") == std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_LocalizeEllipse) {
-  auto inputPath = TestResourcePath("optimize_localize_ellipse.pagx");
-  auto outputPath = TempDir() + "/localize_ellipse_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("x=\"150\"") != std::string::npos);
-  EXPECT_TRUE(output.find("y=\"250\"") != std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_LocalizePolystar) {
-  auto inputPath = TestResourcePath("optimize_localize_polystar.pagx");
-  auto outputPath = TempDir() + "/localize_polystar_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("x=\"300\"") != std::string::npos);
-  EXPECT_TRUE(output.find("y=\"200\"") != std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_LocalizeTextBox) {
-  auto inputPath = TestResourcePath("optimize_localize_textbox.pagx");
-  auto outputPath = TempDir() + "/localize_textbox_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("x=\"100\"") != std::string::npos);
-  EXPECT_TRUE(output.find("y=\"150\"") != std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_LocalizeSkipMatrix) {
-  auto inputPath = TestResourcePath("optimize_localize_skip_matrix.pagx");
-  auto outputPath = TempDir() + "/localize_matrix_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("position=\"200,200\"") != std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_LocalizeAlreadyAtOrigin) {
-  auto inputPath = TestResourcePath("optimize_localize_at_origin.pagx");
-  auto outputPath = TempDir() + "/localize_origin_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("x=\"100\"") != std::string::npos);
-  EXPECT_TRUE(output.find("y=\"100\"") != std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_LocalizeNestedLayers) {
-  auto inputPath = TestResourcePath("optimize_localize_nested.pagx");
-  auto outputPath = TempDir() + "/localize_nested_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("\"parent\"") != std::string::npos);
-  EXPECT_TRUE(output.find("\"child\"") != std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_LocalizeMultipleElements) {
-  auto inputPath = TestResourcePath("optimize_localize_multi_elements.pagx");
-  auto outputPath = TempDir() + "/localize_multi_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-}
-
-//==============================================================================
-// Optimize tests — ExtractCompositions
-//==============================================================================
-
-CLI_TEST(PAGXCliTest, Optimize_ExtractFourPlusLayers) {
-  auto inputPath = TestResourcePath("optimize_extract_four_layers.pagx");
-  auto outputPath = TempDir() + "/extract_four_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_EQ(CountOccurrences(output, "<Composition"), 1u);
-  EXPECT_EQ(CountOccurrences(output, "composition=\"@"), 4u);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_NoExtractDifferentContent) {
-  auto inputPath = TestResourcePath("optimize_no_extract_diff_content.pagx");
-  auto outputPath = TempDir() + "/no_extract_diff_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("<Composition") == std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_NoExtractMatrixLayer) {
-  auto inputPath = TestResourcePath("optimize_no_extract_matrix.pagx");
-  auto outputPath = TempDir() + "/no_extract_matrix_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("<Composition") == std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_NoExtractSingleLayer) {
-  auto inputPath = TestResourcePath("optimize_no_extract_single.pagx");
-  auto outputPath = TempDir() + "/no_extract_single_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("<Composition") == std::string::npos);
-}
-
-//==============================================================================
-// Optimize tests — DryRun, general, and error handling
-//==============================================================================
-
-CLI_TEST(PAGXCliTest, Optimize_PreserveNewline) {
-  auto inputPath = TestResourcePath("optimize_preserve_newline.pagx");
-  auto outputPath = TempDir() + "/preserve_newline_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("&#10;") != std::string::npos);
-  EXPECT_TRUE(output.find("Hello&#10;World") != std::string::npos);
-}
-
 CLI_TEST(PAGXCliTest, Format_PreserveNewline) {
   auto inputPath = TestResourcePath("optimize_preserve_newline.pagx");
   auto outputPath = TempDir() + "/format_newline_out.pagx";
@@ -494,52 +131,6 @@ CLI_TEST(PAGXCliTest, Format_PreserveNewline) {
   auto output = ReadFile(outputPath);
   EXPECT_TRUE(output.find("&#10;") != std::string::npos);
   EXPECT_TRUE(output.find("Hello&#10;World") != std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_DryRun) {
-  auto inputPath = CopyToTemp("validate_simple.pagx", "dryrun.pagx");
-  auto originalContent = ReadFile(inputPath);
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
-  EXPECT_EQ(ret, 0);
-  auto afterContent = ReadFile(inputPath);
-  EXPECT_EQ(originalContent, afterContent);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_DryRunWithChanges) {
-  auto inputPath = CopyToTemp("optimize_remove_empty.pagx", "dryrun_changes.pagx");
-  auto originalContent = ReadFile(inputPath);
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
-  EXPECT_EQ(ret, 0);
-  auto afterContent = ReadFile(inputPath);
-  EXPECT_EQ(originalContent, afterContent);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_NoOptimizationsNeeded) {
-  auto inputPath = TestResourcePath("validate_simple.pagx");
-  auto outputPath = TempDir() + "/already_optimal_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_InPlaceOverwrite) {
-  auto inputPath = CopyToTemp("optimize_inplace.pagx", "inplace.pagx");
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(inputPath);
-  EXPECT_TRUE(output.find("\"empty\"") == std::string::npos);
-  EXPECT_TRUE(output.find("\"main\"") != std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_InvalidPagx) {
-  auto inputPath = TestResourcePath("validate_not_xml.pagx");
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", inputPath});
-  EXPECT_NE(ret, 0);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_UnknownOption) {
-  auto inputPath = TestResourcePath("validate_simple.pagx");
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--unknown", inputPath});
-  EXPECT_NE(ret, 0);
 }
 
 //==============================================================================
@@ -568,11 +159,11 @@ CLI_TEST(PAGXCliTest, Format_AttributeReordering) {
   ASSERT_NE(namePos, std::string::npos);
   ASSERT_NE(alphaPos, std::string::npos);
   EXPECT_LT(namePos, alphaPos);
-  auto positionPos = output.find("position=");
+  auto leftPos = output.find("left=");
   auto sizePos = output.find("size=");
-  ASSERT_NE(positionPos, std::string::npos);
+  ASSERT_NE(leftPos, std::string::npos);
   ASSERT_NE(sizePos, std::string::npos);
-  EXPECT_LT(positionPos, sizePos);
+  EXPECT_LT(leftPos, sizePos);
 }
 
 CLI_TEST(PAGXCliTest, Format_PreservesValues) {
@@ -910,64 +501,6 @@ CLI_TEST(PAGXCliTest, Render_XPathNoMatch) {
 }
 
 //==============================================================================
-// Optimize render consistency — Verify optimization preserves visual output
-//==============================================================================
-
-static void TestOptimizeAndRender(const std::string& testName, const std::string& inputFile) {
-  auto inputPath = TestResourcePath(inputFile);
-  auto optimizedPath = TempDir() + "/" + testName + "_optimized.pagx";
-
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", optimizedPath, inputPath});
-  ASSERT_EQ(ret, 0) << "Failed to optimize file";
-
-  auto baselineKey = "PAGXCliTest/" + testName;
-  EXPECT_TRUE(RenderAndCompare({"render", inputPath}, baselineKey + "_original"))
-      << "Original rendering mismatch for " << testName;
-  EXPECT_TRUE(RenderAndCompare({"render", optimizedPath}, baselineKey + "_optimized"))
-      << "Optimized rendering mismatch for " << testName;
-}
-
-CLI_TEST(PAGXCliTest, OptimizeRender_EmptyElements) {
-  TestOptimizeAndRender("OptimizeEmptyElements", "optimize_empty_elements.pagx");
-}
-
-CLI_TEST(PAGXCliTest, OptimizeRender_DedupPath) {
-  TestOptimizeAndRender("OptimizeDedupPath", "optimize_dedup_path.pagx");
-}
-
-CLI_TEST(PAGXCliTest, OptimizeRender_DedupGradient) {
-  TestOptimizeAndRender("OptimizeDedupGradient", "optimize_dedup_gradient.pagx");
-}
-
-CLI_TEST(PAGXCliTest, OptimizeRender_PathToPrimitive) {
-  TestOptimizeAndRender("OptimizePathToPrimitive", "optimize_path_to_primitive.pagx");
-}
-
-CLI_TEST(PAGXCliTest, OptimizeRender_FullCanvasClip) {
-  TestOptimizeAndRender("OptimizeFullCanvasClip", "optimize_full_canvas_clip.pagx");
-}
-
-CLI_TEST(PAGXCliTest, OptimizeRender_OffCanvas) {
-  TestOptimizeAndRender("OptimizeOffCanvas", "optimize_off_canvas.pagx");
-}
-
-CLI_TEST(PAGXCliTest, OptimizeRender_LocalizeCoords) {
-  TestOptimizeAndRender("OptimizeLocalizeCoords", "optimize_localize_coords.pagx");
-}
-
-CLI_TEST(PAGXCliTest, OptimizeRender_Unreferenced) {
-  TestOptimizeAndRender("OptimizeUnreferenced", "optimize_unreferenced.pagx");
-}
-
-CLI_TEST(PAGXCliTest, OptimizeRender_ExtractComposition) {
-  TestOptimizeAndRender("OptimizeExtractComposition", "optimize_extract_composition.pagx");
-}
-
-CLI_TEST(PAGXCliTest, OptimizeRender_Comprehensive) {
-  TestOptimizeAndRender("OptimizeComprehensive", "optimize_comprehensive.pagx");
-}
-
-//==============================================================================
 // Font tests
 //==============================================================================
 
@@ -1004,129 +537,351 @@ CLI_TEST(PAGXCliTest, Font_UnknownSubcommand) {
 }
 
 //==============================================================================
-// Lint hints tests
+// Lint tests
 //==============================================================================
 
 CLI_TEST(PAGXCliTest, Lint_C6_HighRepeaterCopies) {
   auto inputPath = TestResourcePath("lint_c6_high_repeater.pagx");
-  std::string output;
-  std::streambuf* old = std::cout.rdbuf();
+  std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
-  std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
-  std::cout.rdbuf(old);
-  output = oss.str();
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("lint hint") != std::string::npos);
-  EXPECT_TRUE(output.find("HighCopies") != std::string::npos);
-  EXPECT_TRUE(output.find("Repeater with high copies count") != std::string::npos);
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);  // warning returns non-zero
+  EXPECT_TRUE(output.find("Repeater produces") != std::string::npos);
+  EXPECT_TRUE(output.find("total copies") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Lint_C6_NestedRepeaterProduct) {
   auto inputPath = TestResourcePath("lint_c6_nested_repeater.pagx");
-  std::string output;
-  std::streambuf* old = std::cout.rdbuf();
+  std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
-  std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
-  std::cout.rdbuf(old);
-  output = oss.str();
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("lint hint") != std::string::npos);
-  EXPECT_TRUE(output.find("NestedRepeaters") != std::string::npos);
-  EXPECT_TRUE(output.find("Nested Repeater with product") != std::string::npos);
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);  // warning returns non-zero
+  EXPECT_TRUE(output.find("Repeater produces") != std::string::npos);
+  EXPECT_TRUE(output.find("total copies") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Lint_C7_HighBlurRadius) {
   auto inputPath = TestResourcePath("lint_c7_high_blur.pagx");
-  std::string output;
-  std::streambuf* old = std::cout.rdbuf();
+  std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
-  std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
-  std::cout.rdbuf(old);
-  output = oss.str();
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("lint hint") != std::string::npos);
-  EXPECT_TRUE(output.find("HighBlur") != std::string::npos);
-  EXPECT_TRUE(output.find("blur radius") != std::string::npos);
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("BlurFilter radius too large") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Lint_C8_StrokeAlignmentInRepeater) {
   auto inputPath = TestResourcePath("lint_c8_stroke_align.pagx");
-  std::string output;
-  std::streambuf* old = std::cout.rdbuf();
+  std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
-  std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
-  std::cout.rdbuf(old);
-  output = oss.str();
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("lint hint") != std::string::npos);
-  EXPECT_TRUE(output.find("StrokeAlign") != std::string::npos);
-  EXPECT_TRUE(output.find("Stroke with non-center alignment") != std::string::npos);
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("inside Repeater forces CPU rendering") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Lint_C9_DashedStrokeInRepeater) {
   auto inputPath = TestResourcePath("lint_c9_dashed_stroke.pagx");
-  std::string output;
-  std::streambuf* old = std::cout.rdbuf();
+  std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
-  std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
-  std::cout.rdbuf(old);
-  output = oss.str();
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("lint hint") != std::string::npos);
-  EXPECT_TRUE(output.find("DashedStroke") != std::string::npos);
-  EXPECT_TRUE(output.find("Dashed Stroke within Repeater scope") != std::string::npos);
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("dashed Stroke inside Repeater") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Lint_C10_ComplexPath) {
   auto inputPath = TestResourcePath("lint_c10_complex_path.pagx");
-  std::string output;
-  std::streambuf* old = std::cout.rdbuf();
+  std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
-  std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
-  std::cout.rdbuf(old);
-  output = oss.str();
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("lint hint") != std::string::npos);
-  EXPECT_TRUE(output.find("ComplexPath") != std::string::npos);
-  EXPECT_TRUE(output.find("Path with high complexity") != std::string::npos);
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("verbs (> 500)") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Lint_C11_LowOpacityHighCost) {
   auto inputPath = TestResourcePath("lint_c11_low_opacity.pagx");
-  std::string output;
-  std::streambuf* old = std::cout.rdbuf();
+  std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
-  std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
-  std::cout.rdbuf(old);
-  output = oss.str();
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("lint hint") != std::string::npos);
-  EXPECT_TRUE(output.find("LowOpacity") != std::string::npos);
-  EXPECT_TRUE(output.find("Low opacity") != std::string::npos);
-  EXPECT_TRUE(output.find("high-cost elements") != std::string::npos);
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("opacity") != std::string::npos);
+  EXPECT_TRUE(output.find("high-cost children") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Lint_C13_SimpleRectangleMask) {
   auto inputPath = TestResourcePath("lint_c13_simple_rect_mask.pagx");
-  std::string output;
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("rectangular alpha mask can use clipToBounds") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_ValidFile) {
+  auto inputPath = TestResourcePath("validate_simple.pagx");
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Lint_MissingFile) {
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "nonexistent_file.pagx"});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Lint_JsonOutput) {
+  auto inputPath = TestResourcePath("validate_simple.pagx");
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
   std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify,
+                     {"verify", "--json", "--skip-render", "--skip-layout", inputPath});
   std::cout.rdbuf(old);
-  output = oss.str();
+  auto output = oss.str();
   EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("lint hint") != std::string::npos);
-  EXPECT_TRUE(output.find("MaskedContent") != std::string::npos);
-  EXPECT_TRUE(output.find("rectangular mask") != std::string::npos);
-  EXPECT_TRUE(output.find("scrollRect") != std::string::npos);
+  EXPECT_TRUE(output.find("\"ok\": true") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_Help) {
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--help"});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Lint_UnknownOption) {
+  auto inputPath = TestResourcePath("validate_simple.pagx");
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--unknown", inputPath});
+  EXPECT_NE(ret, 0);
+}
+
+// Extractable Composition detection: consecutive pair with subtree should warn,
+// leaf Layers and containers with TextBox should not.
+CLI_TEST(PAGXCliTest, Verify_ExtractableComposition) {
+  auto inputPath = TestResourcePath("verify_extractable_composition.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  // Should detect exactly 2 warnings: case 1 (consecutive pair) + case 2 (subtree repeat)
+  size_t pos = 0;
+  int count = 0;
+  while ((pos = output.find("structurally identical Layers", pos)) != std::string::npos) {
+    count++;
+    pos += 28;
+  }
+  EXPECT_EQ(count, 3);  // case 1 (pair) + case 2 (subtree) + case 3b (triple sequence)
+}
+
+CLI_TEST(PAGXCliTest, Lint_MissingInput) {
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify"});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Lint_EmptyNodes) {
+  auto inputPath = TestResourcePath("lint_empty_nodes.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  // Pure empty Layer and empty Group should be detected.
+  EXPECT_NE(output.find("empty Layer with no content"), std::string::npos);
+  EXPECT_NE(output.find("empty Group with no elements"), std::string::npos);
+  // Empty nodes with explicit size, size-dependent constraints, or in parent layout should
+  // NOT be detected. Verify that only 2 diagnostics are reported (emptyLayer + empty Group).
+  int count = 0;
+  std::string marker = "empty ";
+  size_t pos = 0;
+  while ((pos = output.find(marker, pos)) != std::string::npos) {
+    count++;
+    pos += marker.size();
+  }
+  EXPECT_EQ(count, 2);
+}
+
+// NOTE: The Lint_FullCanvasClipMask test is now exercisable because the verify command
+// uses a different detection path (DetectFullCanvasClipMask on the document model).
+
+CLI_TEST(PAGXCliTest, Lint_UnreferencedResources) {
+  auto inputPath = TestResourcePath("lint_unref_resources.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("unreferenced resource") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_DuplicatePathData) {
+  auto inputPath = TestResourcePath("lint_duplicate_pathdata.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("duplicate PathData") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_DuplicateGradient) {
+  auto inputPath = TestResourcePath("lint_duplicate_gradient.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("duplicate") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_MergeableGroups) {
+  auto inputPath = TestResourcePath("lint_mergeable_groups.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("consecutive Groups share identical painters") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_UnwrappableGroup) {
+  auto inputPath = TestResourcePath("lint_unwrappable_group.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("redundant first-child Group") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_PathToPrimitive) {
+  auto inputPath = TestResourcePath("lint_path_to_primitive.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("Path draws an") != std::string::npos);
+}
+
+// Heart (M C C C C Z) and diamond (M L L L Z) shapes should NOT be reported as replaceable.
+// The ellipse detection validates cardinal positions and kappa-ratio control points,
+// correctly rejecting non-elliptical curves like the heart shape.
+CLI_TEST(PAGXCliTest, Lint_PathNonPrimitive) {
+  auto inputPath = TestResourcePath("lint_path_non_primitive.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  // Diamond (M L L L Z) should NOT be reported as a rectangle (edges not axis-aligned).
+  EXPECT_TRUE(output.find("Path draws an axis-aligned rectangle") == std::string::npos);
+}
+
+// Lint_LocalizableCoordinates: The old lint had a "localizable coordinates" check for Layer x/y
+// attributes, but the new verify command does not include this check. The test resource triggers
+// no diagnostics in verify. Adjusted to verify clean exit.
+CLI_TEST(PAGXCliTest, Lint_LocalizableCoordinates) {
+  auto inputPath = TestResourcePath("lint_localizable_coords.pagx");
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Lint_ExtractableCompositions) {
+  auto inputPath = TestResourcePath("lint_extractable_compositions.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);  // warning returns non-zero
+  EXPECT_TRUE(output.find("structurally identical Layers") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_DowngradeableLayer) {
+  auto inputPath = TestResourcePath("lint_downgradeable_layer.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);  // warning returns non-zero
+  EXPECT_TRUE(output.find("child Layer(s) use no Layer-exclusive features") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_IncludeInLayoutNoParent) {
+  auto inputPath = TestResourcePath("lint_include_in_layout_no_parent.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("includeInLayout=\"false\" has no effect") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_FlexNoParentLayout) {
+  auto inputPath = TestResourcePath("lint_flex_no_parent_layout.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("flex has no effect") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_FullCanvasClipMask) {
+  auto inputPath = TestResourcePath("lint_full_canvas_clip.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("rectangular alpha mask can use clipToBounds") != std::string::npos);
 }
 
 //==============================================================================
@@ -1293,8 +1048,6 @@ CLI_TEST(PAGXCliTest, Import_SvgToPagx_RoundTrip) {
   auto svgPath = ExportToSVG("validate_simple.pagx", "ImportSVG_RoundTrip.svg");
   auto outputPath = TempDir() + "/ImportSVG_RoundTrip.pagx";
   auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--output", outputPath});
-  EXPECT_EQ(ret, 0);
-  ret = CallRun(pagx::cli::RunValidate, {"validate", outputPath});
   EXPECT_EQ(ret, 0);
 }
 
@@ -1603,6 +1356,1104 @@ CLI_TEST(PAGXCliTest, Import_DefaultOutputNoExtInput) {
   EXPECT_EQ(ret, 0);
   auto defaultOutput = TempDir() + "/ImportNoExt.pagx";
   EXPECT_TRUE(std::filesystem::exists(defaultOutput));
+}
+
+//==============================================================================
+// LayoutCheck tests
+//==============================================================================
+
+CLI_TEST(PAGXCliTest, LayoutCheck_Help) {
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--help"});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_MissingFile) {
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "nonexistent.pagx"});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_MissingInput) {
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout"});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_UnknownOption) {
+  auto path = TestResourcePath("layout_check_clean.pagx");
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--bogus", path});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_Clean) {
+  auto path = TestResourcePath("layout_check_clean.pagx");
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", path});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_CleanProblemsOnly) {
+  auto path = TestResourcePath("layout_check_clean.pagx");
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_Overlap) {
+  auto path = TestResourcePath("layout_check_overlap.pagx");
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", path});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_Clipped) {
+  auto path = TestResourcePath("layout_check_clipped.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  // In global mode, overflow Layer should show absolute coordinates.
+  EXPECT_TRUE(output.find("bounds=\"150,150,100,100\"") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_Absolute) {
+  auto path = TestResourcePath("layout_check_absolute.pagx");
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", path});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_ZeroSize) {
+  auto path = TestResourcePath("layout_check_zero_size.pagx");
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", path});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_IdNode) {
+  auto path = TestResourcePath("layout_check_overlap.pagx");
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--id", "parent", path});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_IdNodeRelativeCoords) {
+  auto path = TestResourcePath("layout_check_clipped.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--id", "overflow", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  // The overflow Layer is at x=150 y=150 in the document, but when targeted via --id
+  // its bounds should start from (0,0) as the coordinate origin.
+  EXPECT_TRUE(output.find("bounds=\"0,0,100,100\"") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_IdNodeNotFound) {
+  auto path = TestResourcePath("layout_check_overlap.pagx");
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--id", "nonexistent_id", path});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_XPath) {
+  auto path = TestResourcePath("layout_check_overlap.pagx");
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--xpath", "//Layer[@id='parent']", path});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_CheckXml) {
+  auto path = TestResourcePath("layout_check_overlap.pagx");
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  // Manual-positioned Layers without container layout no longer trigger overlap warnings.
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_CheckClean) {
+  auto path = TestResourcePath("layout_check_clean.pagx");
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_CheckOverlap) {
+  auto path = TestResourcePath("layout_check_overlap.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  // Manual-positioned Layers without container layout no longer trigger overlap warnings.
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("overlapping siblings") == std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_Elements) {
+  auto path = TestResourcePath("layout_check_elements.pagx");
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", path});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_Placeholder) {
+  auto path = TestResourcePath("layout_check_placeholder.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  // The third child Layer (id="bad") has zero width, should trigger a diagnostic.
+  EXPECT_TRUE(output.find("zero size") != std::string::npos);
+}
+
+// Background Rectangle on a layout Layer should not trigger overlap warnings with child Layers.
+CLI_TEST(PAGXCliTest, LayoutCheck_BackgroundNoOverlap) {
+  auto path = TestResourcePath("layout_check_background.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("overlapping siblings") == std::string::npos);
+}
+
+// Manual-positioned Layers without container layout should not trigger overlap warnings.
+CLI_TEST(PAGXCliTest, LayoutCheck_ManualPositionNoOverlap) {
+  auto path = TestResourcePath("layout_check_layout_overlap.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("overlapping siblings") == std::string::npos);
+}
+
+// Text with system fonts should be measured correctly via font fallback (not zero-size).
+CLI_TEST(PAGXCliTest, LayoutCheck_TextFontFallback) {
+  auto path = TestResourcePath("layout_check_text_fallback.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("zero size") == std::string::npos);
+}
+
+// Line Paths have preferred size clamped to 1px minimum, so they should not trigger zero-size
+// warnings. Content-measured Layers containing line Paths also get a non-zero size.
+CLI_TEST(PAGXCliTest, LayoutCheck_PathZeroSize) {
+  auto path = TestResourcePath("layout_check_path_zero.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("zero size") == std::string::npos);
+}
+
+// Content origin offset: unconstrained Path starts at (50, 50), not (0, 0).
+CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffset) {
+  auto path = TestResourcePath("layout_check_content_offset.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("children start at (50,50), not (0,0)") != std::string::npos);
+  EXPECT_TRUE(output.find("container measurement inaccurate") != std::string::npos);
+}
+
+// Content origin offset with negative coordinates.
+CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetNeg) {
+  auto path = TestResourcePath("layout_check_content_offset_neg.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("children start at (-20,0), not (0,0)") != std::string::npos);
+}
+
+// Content at origin (0, 0) — no offset problem.
+CLI_TEST(PAGXCliTest, LayoutCheck_ContentAtOrigin) {
+  auto path = TestResourcePath("layout_check_content_at_origin.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
+}
+
+// Content origin offset not reported when Layer has explicit width/height.
+CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetExplicitSize) {
+  auto path = TestResourcePath("layout_check_content_offset_explicit_size.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
+}
+
+// Content origin offset: a constrained Group at (0,0) covers the origin, so the minimum
+// coordinate across all children is (0,0) and no offset problem is reported.
+CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetConstrained) {
+  auto path = TestResourcePath("layout_check_content_offset_constrained.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  // The constrained Group at left=0,top=0 has layoutBounds starting at (0,0),
+  // so minX=0, minY=0 — no offset problem.
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
+}
+
+// Content origin offset not reported when Layer is a flex child (engine assigns size).
+CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetFlex) {
+  auto path = TestResourcePath("layout_check_content_offset_flex.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
+}
+
+// Content origin offset detected inside a Group that has constraints.
+CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetGroup) {
+  auto path = TestResourcePath("layout_check_content_offset_group.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("children start at (20,20), not (0,0)") != std::string::npos);
+}
+
+// Content origin offset NOT reported for a Group without constraints (painter scope isolation only).
+// The Group's measurement doesn't affect positioning when it has no constraints.
+CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetGroupNoConstraints) {
+  auto path = TestResourcePath("layout_check_content_offset_group_no_constraints.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
+}
+
+// Content origin offset NOT reported for a Layer with no constraints and not in parent layout.
+// The Layer's measurement doesn't affect any positioning.
+CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetLayerUnpositioned) {
+  auto path = TestResourcePath("layout_check_content_offset_layer_unpositioned.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
+}
+
+// Content origin offset NOT reported for a Layer with includeInLayout=false and no constraints.
+// Even though parent has container layout, the Layer is excluded and unpositioned.
+CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetExcludedFromLayout) {
+  auto path = TestResourcePath("layout_check_content_offset_excluded_from_layout.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
+}
+
+// Content origin offset reported for a Layer in parent container layout (positioned by layout).
+CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetInParentLayout) {
+  auto path = TestResourcePath("layout_check_content_offset_in_parent_layout.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("children start at (50,50), not (0,0)") != std::string::npos);
+}
+
+// Content origin offset NOT reported when container has a mix of constrained and unconstrained
+// children. The constrained child (Text with left/top/right/bottom) defines the intended content
+// region, so offset of unconstrained siblings is acceptable.
+CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetMixedConstraints) {
+  auto path = TestResourcePath("layout_check_content_offset_mixed_constraints.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
+}
+
+// Flex child in content-measured parent (no main-axis size to distribute).
+CLI_TEST(PAGXCliTest, LayoutCheck_FlexNoParentSize) {
+  auto path = TestResourcePath("layout_check_flex_no_parent_size.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("flex has no effect, parent") != std::string::npos);
+}
+
+// Flex child with explicit parent size — no problem.
+CLI_TEST(PAGXCliTest, LayoutCheck_FlexWithParentSize) {
+  auto path = TestResourcePath("layout_check_flex_with_parent_size.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("flex child") == std::string::npos);
+  EXPECT_TRUE(output.find("no space to distribute") == std::string::npos);
+}
+
+// Nested flex: parent gets main-axis size from grandparent — no false positive.
+CLI_TEST(PAGXCliTest, LayoutCheck_FlexNested) {
+  auto path = TestResourcePath("layout_check_flex_nested.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("flex child") == std::string::npos);
+  EXPECT_TRUE(output.find("no space to distribute") == std::string::npos);
+}
+
+// Flex child — parent derives main-axis size from opposite-pair constraints.
+CLI_TEST(PAGXCliTest, LayoutCheck_FlexConstraintParent) {
+  auto path = TestResourcePath("layout_check_flex_constraint_parent.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("flex child") == std::string::npos);
+}
+
+// Flex child zero-size with parent that has opposite-pair constraints deriving zero height.
+// The diagnostic should report zero-size and indicate the parent height is 0.
+CLI_TEST(PAGXCliTest, LayoutCheck_FlexConstraintZeroParent) {
+  auto path = TestResourcePath("layout_check_flex_constraint_zero_parent.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("zero size") != std::string::npos);
+  EXPECT_TRUE(output.find("parent height is 0") != std::string::npos);
+}
+
+// Flex in horizontal layout with content-measured parent — same problem, different axis.
+CLI_TEST(PAGXCliTest, LayoutCheck_FlexHorizontal) {
+  auto path = TestResourcePath("layout_check_flex_horizontal.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("parent") != std::string::npos &&
+              output.find("is 0") != std::string::npos);
+}
+
+// --depth limits Layer nesting depth. depth=1 shows root + direct child Layers but not
+// grandchild Layers. Elements inside each shown Layer are always included.
+CLI_TEST(PAGXCliTest, LayoutCheck_Depth) {
+  auto path = TestResourcePath("layout_check_depth.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--depth", "1", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  // Root and direct child Layers should be present.
+  EXPECT_TRUE(output.find("id=\"root\"") != std::string::npos);
+  EXPECT_TRUE(output.find("id=\"child1\"") != std::string::npos);
+  EXPECT_TRUE(output.find("id=\"child2\"") != std::string::npos);
+  // Grandchild Layers should NOT be present (depth exceeded).
+  EXPECT_TRUE(output.find("id=\"grandchild1\"") == std::string::npos);
+  EXPECT_TRUE(output.find("id=\"grandchild2\"") == std::string::npos);
+}
+
+// --depth 0 means unlimited (same as no --depth).
+CLI_TEST(PAGXCliTest, LayoutCheck_DepthZero) {
+  auto path = TestResourcePath("layout_check_depth.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--depth", "0", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  // All nodes should be present with unlimited depth.
+  EXPECT_TRUE(output.find("id=\"root\"") != std::string::npos);
+  EXPECT_TRUE(output.find("id=\"grandchild1\"") != std::string::npos);
+  EXPECT_TRUE(output.find("id=\"grandchild2\"") != std::string::npos);
+}
+
+// Container overflow: children total main-axis size exceeds parent available space.
+CLI_TEST(PAGXCliTest, LayoutCheck_ContainerOverflow) {
+  auto path = TestResourcePath("layout_check_container_overflow.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("children overflow") != std::string::npos);
+}
+
+// Negative constraint-derived size: left+right exceeds parent width.
+CLI_TEST(PAGXCliTest, LayoutCheck_NegativeConstraintSize) {
+  auto path = TestResourcePath("layout_check_negative_constraint.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("negative derived size") != std::string::npos);
+}
+
+// Element constraint conflict: centerX overrides left on a VectorElement.
+CLI_TEST(PAGXCliTest, LayoutCheck_ElementConstraintConflict) {
+  auto path = TestResourcePath("layout_check_element_constraint_conflict.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("left ignored, centerX takes priority") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_OffCanvas) {
+  auto path = TestResourcePath("layout_check_offcanvas.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("completely outside canvas bounds, not visible") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_RedundantConstraintCenterX) {
+  auto path = TestResourcePath("layout_check_redundant_centerx.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("left ignored, centerX takes priority") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_RedundantConstraintCenterY) {
+  auto path = TestResourcePath("layout_check_redundant_centery.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("ignored, centerY takes priority") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_RedundantConstraintLeftZero) {
+  auto path = TestResourcePath("layout_check_redundant_left_zero.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("left=\"0\" redundant") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_RedundantConstraintTopZero) {
+  auto path = TestResourcePath("layout_check_redundant_top_zero.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("top=\"0\" redundant") != std::string::npos);
+}
+
+// centerX/centerY on VectorElement inside content-measured Layer — ineffective.
+CLI_TEST(PAGXCliTest, LayoutCheck_IneffectiveCenterLayer) {
+  auto path = TestResourcePath("layout_check_ineffective_center_layer.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("centerX ineffective") != std::string::npos);
+  EXPECT_TRUE(output.find("centerY ineffective") != std::string::npos);
+}
+
+// centerX/centerY on VectorElement inside content-measured Group — ineffective.
+CLI_TEST(PAGXCliTest, LayoutCheck_IneffectiveCenterGroup) {
+  auto path = TestResourcePath("layout_check_ineffective_center_group.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("centerX ineffective") != std::string::npos);
+  EXPECT_TRUE(output.find("centerY ineffective") != std::string::npos);
+}
+
+// centerX/centerY on VectorElement inside explicit-size Layer — valid, no problem.
+CLI_TEST(PAGXCliTest, LayoutCheck_IneffectiveCenterExplicitSize) {
+  auto path = TestResourcePath("layout_check_ineffective_center_explicit.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("centerX ineffective") == std::string::npos);
+  EXPECT_TRUE(output.find("centerY ineffective") == std::string::npos);
+}
+
+// Content origin offset: Layer with opposite-edge constraints (left+right) derives size from
+// constraints, not from content measurement. Should NOT report content-origin-offset.
+CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetOppositeConstraint) {
+  auto path = TestResourcePath("layout_check_content_offset_opposite_constraint.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
+}
+
+// Group with opposite-edge constraints (left+right+top+bottom) has constraint-derived size.
+// centerX/centerY on child elements should NOT be reported as ineffective.
+CLI_TEST(PAGXCliTest, LayoutCheck_IneffectiveCenterGroupConstrained) {
+  auto path = TestResourcePath("layout_check_ineffective_center_group_constrained.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("centerX ineffective") == std::string::npos);
+  EXPECT_TRUE(output.find("centerY ineffective") == std::string::npos);
+}
+
+// TextBox with explicit width="0" height="0" is anchor mode (point text).
+// Should NOT trigger zero-size warning.
+CLI_TEST(PAGXCliTest, LayoutCheck_ZeroSizeExplicit) {
+  auto path = TestResourcePath("layout_check_zero_size_explicit.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("zero size") == std::string::npos);
+}
+
+// Empty layer (no contents, no children) in a layout should NOT trigger zero-size diagnostic,
+// while a sibling with content and zero width should still trigger it.
+CLI_TEST(PAGXCliTest, LayoutCheck_ZeroSizeEmpty) {
+  auto path = TestResourcePath("layout_check_zero_size_empty.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  // The non-empty Layer with width="0" should trigger zero-size.
+  EXPECT_TRUE(output.find("zero size (0x50)") != std::string::npos);
+  // The empty leaf Layer (line 5) should NOT trigger zero-size.
+  EXPECT_TRUE(output.find(":5: zero size") == std::string::npos);
+}
+
+// Skeleton-phase containers: nested Layers with layout attributes and painters (Fill/Stroke) but
+// no leaf content (Rectangle/Ellipse/Path/Text/etc.) anywhere in the subtree. Zero size is
+// expected and should NOT trigger a diagnostic.
+CLI_TEST(PAGXCliTest, LayoutCheck_ZeroSizeNoLeaf) {
+  auto path = TestResourcePath("layout_check_zero_size_no_leaf.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("zero size") == std::string::npos);
+}
+
+// Container with explicit zero width but leaf content (Rectangle) deep in the subtree.
+// Zero size IS a real problem and should be reported.
+CLI_TEST(PAGXCliTest, LayoutCheck_ZeroSizeDeepLeaf) {
+  auto path = TestResourcePath("layout_check_zero_size_deep_leaf.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("zero size (0x100)") != std::string::npos);
+}
+
+// Polystar without explicit position should have auto-position applied at import time.
+// Content-measured Layer should NOT report content-origin-offset.
+CLI_TEST(PAGXCliTest, LayoutCheck_PolystarOrigin) {
+  auto path = TestResourcePath("layout_check_polystar_origin.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
+}
+
+// Layers at different positions but identical structure should be detected as extractable.
+CLI_TEST(PAGXCliTest, Verify_CompositionPositionDiff) {
+  auto inputPath = TestResourcePath("verify_composition_position_diff.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(output.find("structurally identical Layers"), std::string::npos);
+}
+
+// Layers with different blendMode should NOT be detected as extractable.
+CLI_TEST(PAGXCliTest, Verify_CompositionBlendModeDiff) {
+  auto inputPath = TestResourcePath("verify_composition_blendmode_diff.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(output.find("structurally identical Layers"), std::string::npos);
+}
+
+// Layers with different Fill fillRule should NOT be detected as extractable.
+CLI_TEST(PAGXCliTest, Verify_CompositionFillRuleDiff) {
+  auto inputPath = TestResourcePath("verify_composition_fillrule_diff.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(output.find("structurally identical Layers"), std::string::npos);
+}
+
+// Groups with different Stroke cap should NOT be detected as mergeable.
+CLI_TEST(PAGXCliTest, Verify_GroupsDifferentCap) {
+  auto inputPath = TestResourcePath("verify_groups_different_cap.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(output.find("consecutive Groups share identical painters"), std::string::npos);
+}
+
+// Gradients differing only in matrix should be detected as duplicates.
+CLI_TEST(PAGXCliTest, Verify_GradientMatrixDiff) {
+  auto inputPath = TestResourcePath("verify_gradient_matrix_diff.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(output.find("duplicate"), std::string::npos);
+}
+
+// Layers with different matrix but identical structure should be detected (matrix is stripped).
+CLI_TEST(PAGXCliTest, Verify_CompositionMatrixDiff) {
+  auto inputPath = TestResourcePath("verify_composition_matrix_diff.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(output.find("structurally identical Layers"), std::string::npos);
+}
+
+// Layers with different constraints but identical structure should be detected (constraints are
+// stripped from root).
+CLI_TEST(PAGXCliTest, Verify_CompositionConstraintDiff) {
+  auto inputPath = TestResourcePath("verify_composition_constraint_diff.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(output.find("structurally identical Layers"), std::string::npos);
+}
+
+// Layers with different flex/includeInLayout but identical structure should be detected.
+CLI_TEST(PAGXCliTest, Verify_CompositionFlexDiff) {
+  auto inputPath = TestResourcePath("verify_composition_flex_diff.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(output.find("structurally identical Layers"), std::string::npos);
+}
+
+// Layers with different id/name but identical structure should be detected (id/name are stripped).
+CLI_TEST(PAGXCliTest, Verify_CompositionIdNameDiff) {
+  auto inputPath = TestResourcePath("verify_composition_id_name_diff.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(output.find("structurally identical Layers"), std::string::npos);
+}
+
+// Layers with different layout mode should NOT be detected as identical.
+CLI_TEST(PAGXCliTest, Verify_CompositionLayoutDiff) {
+  auto inputPath = TestResourcePath("verify_composition_layout_diff.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(output.find("structurally identical Layers"), std::string::npos);
+}
+
+// Groups with identical Fill+Stroke should be detected as mergeable.
+CLI_TEST(PAGXCliTest, Verify_GroupsMergeableFillStroke) {
+  auto inputPath = TestResourcePath("verify_groups_mergeable_fillstroke.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(output.find("consecutive Groups share identical painters"), std::string::npos);
+}
+
+// Groups with different Fill color should NOT be detected as mergeable.
+CLI_TEST(PAGXCliTest, Verify_GroupsDifferentFillColor) {
+  auto inputPath = TestResourcePath("verify_groups_different_fill_color.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(output.find("consecutive Groups share identical painters"), std::string::npos);
+}
+
+// Gradients with different ColorStop values should NOT be detected as duplicates.
+CLI_TEST(PAGXCliTest, Verify_GradientColorStopDiff) {
+  auto inputPath = TestResourcePath("verify_gradient_colorstop_diff.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(output.find("duplicate"), std::string::npos);
+}
+
+// Two different PathData should NOT be detected as duplicates.
+CLI_TEST(PAGXCliTest, Verify_PathDataDifferent) {
+  auto inputPath = TestResourcePath("verify_pathdata_different.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(output.find("duplicate PathData"), std::string::npos);
+}
+
+//==============================================================================
+// Import node data model tests
+//==============================================================================
+
+CLI_TEST(PAGXCliTest, ImportNode_ParseExternalSource) {
+  auto inputPath = TestResourcePath("import_node_basic.pagx");
+  auto doc = pagx::PAGXImporter::FromFile(inputPath);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+
+  ASSERT_GE(doc->layers.size(), 1u);
+  auto* layer = doc->layers[0];
+  ASSERT_EQ(layer->contents.size(), 1u);
+  EXPECT_EQ(layer->contents[0]->nodeType(), pagx::NodeType::Import);
+  auto* imp = static_cast<pagx::Import*>(layer->contents[0]);
+  EXPECT_EQ(imp->source, "import_external.svg");
+  EXPECT_TRUE(imp->rawContent.empty());
+}
+
+CLI_TEST(PAGXCliTest, ImportNode_ParseInlineContent) {
+  auto inputPath = TestResourcePath("import_node_basic.pagx");
+  auto doc = pagx::PAGXImporter::FromFile(inputPath);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_GE(doc->layers.size(), 2u);
+  auto* layer = doc->layers[1];
+  ASSERT_EQ(layer->contents.size(), 1u);
+  EXPECT_EQ(layer->contents[0]->nodeType(), pagx::NodeType::Import);
+  auto* imp = static_cast<pagx::Import*>(layer->contents[0]);
+  EXPECT_TRUE(imp->source.empty());
+  EXPECT_FALSE(imp->rawContent.empty());
+  EXPECT_NE(imp->rawContent.find("<svg"), std::string::npos);
+  EXPECT_NE(imp->rawContent.find("<circle"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, ImportNode_ExportRoundTrip) {
+  auto inputPath = TestResourcePath("import_node_basic.pagx");
+  auto doc = pagx::PAGXImporter::FromFile(inputPath);
+  ASSERT_NE(doc, nullptr);
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(xml.find("<Import source=\"import_external.svg\""), std::string::npos);
+  EXPECT_NE(xml.find("<Import>"), std::string::npos);
+  EXPECT_NE(xml.find("<svg"), std::string::npos);
+  EXPECT_NE(xml.find("</Import>"), std::string::npos);
+
+  auto doc2 = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc2, nullptr);
+  ASSERT_GE(doc2->layers.size(), 2u);
+  auto* imp1 = static_cast<pagx::Import*>(doc2->layers[0]->contents[0]);
+  EXPECT_EQ(imp1->source, "import_external.svg");
+  auto* imp2 = static_cast<pagx::Import*>(doc2->layers[1]->contents[0]);
+  EXPECT_NE(imp2->rawContent.find("<svg"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, ImportNode_HasUnresolvedImports) {
+  auto withImport = TestResourcePath("import_node_basic.pagx");
+  auto doc1 = pagx::PAGXImporter::FromFile(withImport);
+  ASSERT_NE(doc1, nullptr);
+  EXPECT_TRUE(doc1->hasUnresolvedImports());
+
+  auto withoutImport = TestResourcePath("import_node_none.pagx");
+  auto doc2 = pagx::PAGXImporter::FromFile(withoutImport);
+  ASSERT_NE(doc2, nullptr);
+  EXPECT_FALSE(doc2->hasUnresolvedImports());
+}
+
+//==============================================================================
+// Import --resolve tests (new syntax)
+//==============================================================================
+
+CLI_TEST(PAGXCliTest, ImportResolve_ExpandExternalSource) {
+  auto pagxPath = CopyToTemp("import_node_basic.pagx", "resolve_external.pagx");
+  CopyToTemp("import_external.svg", "import_external.svg");
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--resolve", pagxPath});
+  EXPECT_EQ(ret, 0);
+
+  auto doc = pagx::PAGXImporter::FromFile(pagxPath);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(doc->hasUnresolvedImports());
+}
+
+CLI_TEST(PAGXCliTest, ImportResolve_NoImportNodes) {
+  auto pagxPath = CopyToTemp("import_node_none.pagx", "resolve_none.pagx");
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--resolve", pagxPath});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, ImportResolve_OutputToNewFile) {
+  auto pagxPath = TestResourcePath("import_node_basic.pagx");
+  auto outputPath = TempDir() + "/resolve_output.pagx";
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--resolve", pagxPath, "-o", outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+
+  auto doc = pagx::PAGXImporter::FromFile(outputPath);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(doc->hasUnresolvedImports());
+}
+
+CLI_TEST(PAGXCliTest, ImportResolve_MutuallyExclusiveWithInput) {
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", "a.svg", "--resolve", "b.pagx"});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, ImportResolve_MissingFile) {
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--resolve", "nonexistent.pagx"});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, ImportResolve_MultiLayerPreservesIsolation) {
+  // Verifies that resolving an inline SVG with multiple elements preserves each SVG element
+  // in a separate painter scope, preventing painter accumulation bugs. Before the fix, all SVG
+  // elements were unpacked into the parent Layer's contents, causing the second Stroke to
+  // render both Paths (painter leak). The fix wraps each SVG element in a Group (for scope
+  // isolation) or keeps it as a child Layer (when Layer-exclusive features are needed).
+  auto pagxPath = CopyToTemp("import_resolve_multi_layer.pagx", "resolve_multi_layer.pagx");
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--resolve", pagxPath});
+  EXPECT_EQ(ret, 0);
+
+  auto doc = pagx::PAGXImporter::FromFile(pagxPath);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(doc->hasUnresolvedImports());
+
+  // The host Layer should have the first SVG element unpacked (no Group needed for the first
+  // element since there is no preceding geometry to isolate from) and subsequent elements
+  // wrapped in Groups for painter scope isolation.
+  ASSERT_EQ(doc->layers.size(), 1u);
+  auto* hostLayer = doc->layers[0];
+  EXPECT_FALSE(hostLayer->contents.empty());
+  size_t groupCount = 0;
+  for (auto* element : hostLayer->contents) {
+    if (element->nodeType() == pagx::NodeType::Group) {
+      groupCount++;
+    }
+  }
+  EXPECT_GE(groupCount, 1u);
+
+  // Screenshot test: render the resolved file and compare against baseline.
+  EXPECT_TRUE(RenderAndCompare({"render", pagxPath}, "PAGXCliTest/ImportResolve_MultiLayer"));
+}
+
+//==============================================================================
+// CLI unresolved Import checks
+//==============================================================================
+
+CLI_TEST(PAGXCliTest, UnresolvedImport_LayoutRejects) {
+  auto pagxPath = TestResourcePath("import_node_basic.pagx");
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", pagxPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, UnresolvedImport_RenderRejects) {
+  auto pagxPath = TestResourcePath("import_node_basic.pagx");
+  auto outputPath = TempDir() + "/unresolved_render.png";
+  auto ret = CallRun(pagx::cli::RunRender, {"render", "-o", outputPath, pagxPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, UnresolvedImport_BoundsRejects) {
+  auto pagxPath = TestResourcePath("import_node_basic.pagx");
+  auto ret = CallRun(pagx::cli::RunBounds, {"bounds", pagxPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, UnresolvedImport_ExportRejects) {
+  auto pagxPath = TestResourcePath("import_node_basic.pagx");
+  auto outputPath = TempDir() + "/unresolved_export.svg";
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--input", pagxPath, "--output", outputPath});
+  EXPECT_NE(ret, 0);
+}
+
+//==============================================================================
+// Verify screenshot output
+//==============================================================================
+
+CLI_TEST(PAGXCliTest, Verify_WritesScreenshot) {
+  auto inputPath = TestResourcePath("import_node_none.pagx");
+  auto pngPath = TempDir() + "/import_node_none.png";
+  auto layoutPath = TempDir() + "/import_node_none.layout.xml";
+  std::filesystem::remove(pngPath);
+  std::filesystem::remove(layoutPath);
+  auto tempPagx = CopyToTemp("import_node_none.pagx", "import_node_none.pagx");
+
+  auto oldCwd = std::filesystem::current_path();
+  std::filesystem::current_path(TempDir());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", tempPagx});
+  std::filesystem::current_path(oldCwd);
+  EXPECT_EQ(ret, 0);
+
+  auto expectedPng = TempDir() + "/import_node_none.png";
+  auto expectedLayout = TempDir() + "/import_node_none.layout.xml";
+  EXPECT_TRUE(std::filesystem::exists(expectedPng));
+  EXPECT_TRUE(std::filesystem::exists(expectedLayout));
+  EXPECT_GT(std::filesystem::file_size(expectedPng), 0u);
 }
 
 }  // namespace pag

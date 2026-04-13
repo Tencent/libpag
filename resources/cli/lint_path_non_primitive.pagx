@@ -1,0 +1,14 @@
+<pagx version="1.0" width="200" height="200">
+  <!-- Heart shape: M C C C C Z verb pattern matches ellipse check, but geometry is NOT
+       an ellipse. Should NOT suggest replacement with Ellipse.
+       Diamond shape: M L L L Z verb pattern matches rectangle check, but edges are NOT
+       axis-aligned. Should NOT suggest replacement with Rectangle. -->
+  <Layer>
+    <Path data="M19 13C16 3 0 0 0 13C0 24 12 32 19 39C26 32 38 24 38 13C38 0 22 3 19 13Z"/>
+    <Fill color="#F00"/>
+  </Layer>
+  <Layer>
+    <Path data="M 53 37 L 60 30 L 67 37 L 60 44 Z"/>
+    <Fill color="#00F"/>
+  </Layer>
+</pagx>

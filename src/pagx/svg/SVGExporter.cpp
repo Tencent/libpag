@@ -805,7 +805,16 @@ void SVGWriter::writePath(SVGBuilder& out, const Path* path, const FillStrokeInf
     return;
   }
   out.openElement("path");
-  if (!transform.empty()) {
+  bool hasPosition = path->position.x != 0.0f || path->position.y != 0.0f;
+  if (hasPosition) {
+    std::string posTransform = "translate(" + FloatToString(path->position.x) + "," +
+                               FloatToString(path->position.y) + ")";
+    if (!transform.empty()) {
+      out.addAttribute("transform", transform + " " + posTransform);
+    } else {
+      out.addAttribute("transform", posTransform);
+    }
+  } else if (!transform.empty()) {
     out.addAttribute("transform", transform);
   }
   out.addAttribute("d", PathDataToSVGString(*path->data));

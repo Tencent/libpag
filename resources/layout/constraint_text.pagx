@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Constraint layout: Text element with fontSize scaling -->
+<!-- Fully automatic layout: containers are flexible (no width) — auto-equal distribution -->
+<pagx version="1.0" width="800" height="520">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+
+  <!-- Main vertical layout -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30">
+
+    <!-- Row 1: Single-edge positioning + Horizontal-only scaling -->
+    <Layer flex="1" layout="horizontal" gap="20">
+
+      <!-- Container 1: Single-edge positioning -->
+      <Layer flex="1" height="220">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <!-- 1.1: left="25" top="25" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Text left="25" top="25" text="Left" fontFamily="Arial" fontStyle="Bold" fontSize="20" textAnchor="start"/>
+          <Fill color="#6366F1"/>
+        </Layer>
+        <!-- 1.2: right="25" top="25" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Text right="25" top="25" text="Right" fontFamily="Arial" fontStyle="Bold" fontSize="20" textAnchor="end"/>
+          <Fill color="#F43F5E"/>
+        </Layer>
+        <!-- 1.3: centerX="0" centerY="0" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Text centerX="0" centerY="0" text="Center" fontFamily="Arial" fontStyle="Bold" fontSize="24" textAnchor="center"/>
+          <Fill color="#10B981"/>
+        </Layer>
+        <!-- 1.4: left="25" bottom="25" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Text left="25" bottom="25" text="Bottom L" fontFamily="Arial" fontStyle="Bold" fontSize="18" textAnchor="start"/>
+          <Fill color="#F59E0B"/>
+        </Layer>
+        <!-- 1.5: right="25" bottom="25" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Text right="25" bottom="25" text="Bottom R" fontFamily="Arial" fontStyle="Bold" fontSize="18" textAnchor="end"/>
+          <Fill color="#06B6D4"/>
+        </Layer>
+      </Layer>
+
+      <!-- Right side: vertical stack of 3 horizontal-scaling containers -->
+      <Layer flex="1" height="220" layout="vertical" gap="10">
+
+        <!-- Container 2a: Horizontal-only scaling - wide area (flexible, fills row width) -->
+        <Layer height="60">
+          <Layer left="0" right="0" top="0" bottom="0">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+            <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          </Layer>
+          <Layer left="0" right="0" top="0" bottom="0">
+            <Text left="20" right="20" centerY="0" text="WIDE TEXT" fontFamily="Arial" fontStyle="Bold" fontSize="80" textAnchor="center"/>
+            <Fill>
+              <LinearGradient startPoint="0,0" endPoint="320,0">
+                <ColorStop offset="0" color="#EC4899"/>
+                <ColorStop offset="1" color="#F472B6"/>
+              </LinearGradient>
+            </Fill>
+          </Layer>
+        </Layer>
+
+        <!-- Container 2b: Horizontal-only scaling - medium area -->
+        <Layer width="260" height="60">
+          <Layer left="0" right="0" top="0" bottom="0">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+            <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          </Layer>
+          <Layer left="0" right="0" top="0" bottom="0">
+            <Text left="20" right="20" centerY="0" text="MEDIUM" fontFamily="Arial" fontStyle="Bold" fontSize="80" textAnchor="center"/>
+            <Fill>
+              <LinearGradient startPoint="0,0" endPoint="220,0">
+                <ColorStop offset="0" color="#8B5CF6"/>
+                <ColorStop offset="1" color="#A78BFA"/>
+              </LinearGradient>
+            </Fill>
+          </Layer>
+        </Layer>
+
+        <!-- Container 2c: Horizontal-only scaling - narrow area -->
+        <Layer width="160" height="60">
+          <Layer left="0" right="0" top="0" bottom="0">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+            <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          </Layer>
+          <Layer left="0" right="0" top="0" bottom="0">
+            <Text left="15" right="15" centerY="0" text="NARROW" fontFamily="Arial" fontStyle="Bold" fontSize="80" textAnchor="center"/>
+            <Fill>
+              <LinearGradient startPoint="0,0" endPoint="130,0">
+                <ColorStop offset="0" color="#10B981"/>
+                <ColorStop offset="1" color="#059669"/>
+              </LinearGradient>
+            </Fill>
+          </Layer>
+        </Layer>
+
+      </Layer>
+
+    </Layer>
+
+    <!-- Row 2: Vertical-only + Dual-axis containers -->
+    <Layer flex="1" layout="horizontal" gap="20">
+
+      <!-- Container 3: Vertical-only scaling (top+bottom) -->
+      <Layer flex="1" height="220">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <!-- 3.1: top="20" bottom="20" centerX="0" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Text top="0" bottom="0" centerX="0" text="Ǘy" fontFamily="Arial" fontStyle="Bold" fontSize="200" textAnchor="center"/>
+          <Fill>
+            <LinearGradient startPoint="0,0" endPoint="0,180">
+              <ColorStop offset="0" color="#FBBF24"/>
+              <ColorStop offset="1" color="#F59E0B"/>
+            </LinearGradient>
+          </Fill>
+        </Layer>
+      </Layer>
+
+      <!-- Container 4: Dual-axis fit scaling - square container -->
+      <Layer flex="1" height="220">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <!-- 4.1: all edges, scales to fit minimum axis -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Text left="0" right="0" centerY="0" text="Horizontal" fontFamily="Arial" fontStyle="Bold" fontSize="200" textAnchor="center"/>
+          <Fill>
+            <LinearGradient startPoint="0,0" endPoint="160,180">
+              <ColorStop offset="0" color="#06B6D4"/>
+              <ColorStop offset="1" color="#0891B2"/>
+            </LinearGradient>
+          </Fill>
+        </Layer>
+      </Layer>
+
+      <!-- Container 5: Dual-axis fit in wide container -->
+      <Layer flex="1" height="220">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <!-- 5.1: fit in wide container (height is limiting axis) -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Text left="30" right="30" top="20" bottom="20" text="Fit" fontFamily="Arial" fontStyle="Bold" fontSize="200" textAnchor="center"/>
+          <Fill>
+            <LinearGradient startPoint="0,0" endPoint="300,180">
+              <ColorStop offset="0" color="#EC4899"/>
+              <ColorStop offset="1" color="#BE185D"/>
+            </LinearGradient>
+          </Fill>
+        </Layer>
+      </Layer>
+
+    </Layer>
+
+  </Layer>
+</pagx>

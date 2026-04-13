@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates ImagePattern fill with different tile modes -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Clamp mode: original size, centered in 140x140 rect -->
+  <!-- Rectangle left=40,top=40 size=140,140: left-top=(40,40), right-bottom=(180,180) -->
+  <!-- Image 256x256, scale 0.5 = 128x128 -->
+  <!-- Center in rect: image offset in local coords = (140-128)/2 - 70 = -64 (from center origin) -->
+  <Layer name="ClampFill">
+    <Rectangle left="40" top="40" size="140,140" roundness="24"/>
+    <Fill>
+      <ImagePattern image="@logo" tileModeX="clamp" tileModeY="clamp" matrix="0.5,0,0,0.5,46,46"/>
+    </Fill>
+    <Stroke color="#FFF" width="2"/>
+  </Layer>
+
+  <Layer name="RepeatFill">
+    <Rectangle left="220" top="40" size="140,140" roundness="24"/>
+    <Fill>
+      <ImagePattern image="@logo" tileModeX="repeat" tileModeY="repeat" matrix="0.24,0,0,0.24,0,0"/>
+    </Fill>
+    <Stroke color="#FFF" width="2"/>
+  </Layer>
+
+  <Layer name="MirrorFill">
+    <Rectangle left="40" top="220" size="140,140" roundness="24"/>
+    <Fill>
+      <ImagePattern image="@logo" tileModeX="mirror" tileModeY="mirror" matrix="0.24,0,0,0.24,0,0"/>
+    </Fill>
+    <Stroke color="#FFF" width="2"/>
+  </Layer>
+
+  <Layer name="RepeatScaled">
+    <Rectangle left="220" top="220" size="140,140" roundness="24"/>
+    <Fill>
+      <ImagePattern image="@logo" tileModeX="repeat" tileModeY="repeat" matrix="0.35,0,0,0.35,0,0"/>
+    </Fill>
+    <Stroke color="#FFF" width="2"/>
+  </Layer>
+
+  <Resources>
+    <Image id="logo" source="pag_logo.png"/>
+  </Resources>
+</pagx>

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates Polystar shape (star and polygon) -->
+<pagx version="1.0" width="400" height="400">
+  <Layer width="400" height="400" layout="vertical">
+    <!-- Row 1: stars -->
+    <Layer flex="1" layout="horizontal">
+      <!-- 5-pointed star -->
+      <Layer flex="1">
+        <Polystar centerX="0" centerY="0" type="star" pointCount="5" outerRadius="60" innerRadius="28"/>
+        <Fill>
+          <LinearGradient startPoint="0,0" endPoint="120,120">
+            <ColorStop offset="0" color="#FBBF24"/>
+            <ColorStop offset="1" color="#F59E0B"/>
+          </LinearGradient>
+        </Fill>
+      </Layer>
+      <!-- 6-pointed star -->
+      <Layer flex="1">
+        <Polystar centerX="0" centerY="0" type="star" pointCount="6" outerRadius="60" innerRadius="32"/>
+        <Fill>
+          <LinearGradient startPoint="0,0" endPoint="120,120">
+            <ColorStop offset="0" color="#F43F5E"/>
+            <ColorStop offset="1" color="#E11D48"/>
+          </LinearGradient>
+        </Fill>
+      </Layer>
+    </Layer>
+    <!-- Row 2: polygons -->
+    <Layer flex="1" layout="horizontal">
+      <!-- Hexagon -->
+      <Layer flex="1">
+        <Polystar centerX="0" centerY="0" type="polygon" pointCount="6" outerRadius="64"/>
+        <Fill>
+          <LinearGradient startPoint="0,0" endPoint="128,128">
+            <ColorStop offset="0" color="#06B6D4"/>
+            <ColorStop offset="1" color="#0891B2"/>
+          </LinearGradient>
+        </Fill>
+      </Layer>
+      <!-- Pentagon -->
+      <Layer flex="1">
+        <Polystar centerX="0" centerY="0" type="polygon" pointCount="5" outerRadius="64"/>
+        <Fill>
+          <LinearGradient startPoint="0,0" endPoint="128,128">
+            <ColorStop offset="0" color="#8B5CF6"/>
+            <ColorStop offset="1" color="#7C3AED"/>
+          </LinearGradient>
+        </Fill>
+      </Layer>
+    </Layer>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#00000050"/>
+  </Layer>
+</pagx>

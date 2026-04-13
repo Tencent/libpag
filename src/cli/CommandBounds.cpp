@@ -24,9 +24,9 @@
 #include "cli/CliUtils.h"
 #include "cli/LayoutUtils.h"
 #include "cli/XPathQuery.h"
+#include "pagx/PAGXDocument.h"
 #include "pagx/PAGXImporter.h"
 #include "renderer/LayerBuilder.h"
-#include "renderer/TextLayout.h"
 #include "tgfx/layers/Layer.h"
 
 namespace pagx::cli {
@@ -42,7 +42,9 @@ struct BoundsOptions {
 static void PrintBoundsUsage() {
   std::cout << "Usage: pagx bounds [options] <file.pagx>\n"
             << "\n"
-            << "Query precise rendered bounds of Layer nodes.\n"
+            << "Query rendered pixel bounds of Layer nodes (including stroke, shadows,\n"
+            << "and blur effects). Use for crop regions and rendered size measurement.\n"
+            << "For layout-resolved bounds (without rendering effects), use 'pagx layout'.\n"
             << "\n"
             << "Options:\n"
             << "  --id <id>              Select a Layer by its id attribute\n"
@@ -155,11 +157,15 @@ int RunBounds(int argc, char* argv[]) {
   for (auto& error : document->errors) {
     std::cerr << "pagx bounds: warning: " << error << "\n";
   }
+  if (document->hasUnresolvedImports()) {
+    std::cerr
+        << "pagx bounds: error: unresolved <Import> node, run 'pagx import --resolve' first\n";
+    return 1;
+  }
 
   // Build layer tree with mapping.
-  TextLayout textLayout = {};
-  SetupSystemFallbackFonts(textLayout);
-  auto buildResult = LayerBuilder::BuildWithMap(document.get(), &textLayout);
+  document->applyLayout();
+  auto buildResult = LayerBuilder::BuildWithMap(document.get());
   if (buildResult.root == nullptr) {
     std::cerr << "pagx bounds: failed to build layer tree\n";
     return 1;

@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test file for verify: extractable Composition detection -->
+<pagx version="1.0" width="800" height="600">
+
+  <!-- Case 1: Two consecutive sibling Layers with child subtrees — should WARN -->
+  <Layer name="case1" width="800" height="200">
+    <Layer width="100" height="100">
+      <Layer left="0" right="0" top="0" bottom="0">
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+        <Fill color="#FF0000"/>
+      </Layer>
+    </Layer>
+    <Layer width="100" height="100">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#00FF00"/>
+    </Layer>
+    <!-- Repeat the same pair -->
+    <Layer width="100" height="100">
+      <Layer left="0" right="0" top="0" bottom="0">
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+        <Fill color="#FF0000"/>
+      </Layer>
+    </Layer>
+    <Layer width="100" height="100">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#00FF00"/>
+    </Layer>
+  </Layer>
+
+  <!-- Case 2: Single Layer with deep subtree repeated (3+ layers) — should WARN -->
+  <Layer name="case2" width="800" height="200">
+    <Layer width="100" height="100">
+      <Layer left="10" top="10" width="80" height="80">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Ellipse left="0" right="0" top="0" bottom="0"/>
+          <Fill color="#0000FF"/>
+        </Layer>
+        <Stroke color="#000" width="2"/>
+      </Layer>
+    </Layer>
+    <Layer width="100" height="100">
+      <Layer left="10" top="10" width="80" height="80">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Ellipse left="0" right="0" top="0" bottom="0"/>
+          <Fill color="#0000FF"/>
+        </Layer>
+        <Stroke color="#000" width="2"/>
+      </Layer>
+    </Layer>
+  </Layer>
+
+  <!-- Case 3: Leaf Layers (no children) with same contents — should NOT warn -->
+  <Layer name="case3" width="800" height="200">
+    <Layer width="50" height="50">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#FF6600"/>
+    </Layer>
+    <Layer width="50" height="50">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#FF6600"/>
+    </Layer>
+    <Layer width="50" height="50">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#FF6600"/>
+    </Layer>
+  </Layer>
+
+  <!-- Case 3b: Consecutive triple with subtrees, repeated — should WARN as 3-Layer sequence -->
+  <Layer name="case3b" width="800" height="200">
+    <Layer width="80" height="80">
+      <Layer left="0" right="0" top="0" bottom="0">
+        <Rectangle left="0" right="0" top="0" bottom="0"/>
+        <Fill color="#111111"/>
+      </Layer>
+    </Layer>
+    <Layer width="80" height="80">
+      <Layer left="0" right="0" top="0" bottom="0">
+        <Ellipse left="0" right="0" top="0" bottom="0"/>
+        <Fill color="#222222"/>
+      </Layer>
+    </Layer>
+    <Layer width="80" height="80">
+      <Layer left="0" right="0" top="0" bottom="0">
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+        <Fill color="#333333"/>
+      </Layer>
+    </Layer>
+    <!-- Same triple repeated -->
+    <Layer width="80" height="80">
+      <Layer left="0" right="0" top="0" bottom="0">
+        <Rectangle left="0" right="0" top="0" bottom="0"/>
+        <Fill color="#111111"/>
+      </Layer>
+    </Layer>
+    <Layer width="80" height="80">
+      <Layer left="0" right="0" top="0" bottom="0">
+        <Ellipse left="0" right="0" top="0" bottom="0"/>
+        <Fill color="#222222"/>
+      </Layer>
+    </Layer>
+    <Layer width="80" height="80">
+      <Layer left="0" right="0" top="0" bottom="0">
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+        <Fill color="#333333"/>
+      </Layer>
+    </Layer>
+  </Layer>
+
+  <!-- Case 4: Only one occurrence of a subtree — should NOT warn (need >= 2) -->
+  <Layer name="case4" width="400" height="100">
+    <Layer width="50" height="50">
+      <Layer left="5" top="5" width="40" height="40">
+        <Ellipse left="0" right="0" top="0" bottom="0"/>
+        <Fill color="#AA00AA"/>
+      </Layer>
+    </Layer>
+  </Layer>
+
+  <!-- Case 5: Layer with TextBox — should NOT warn (contains container element) -->
+  <Layer name="case5" width="800" height="100">
+    <Layer width="200" height="50">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Stroke/>
+      <TextBox width="200" height="50">
+        <Text text="Hello" fontFamily="Arial" fontSize="16"/>
+        <Fill/>
+      </TextBox>
+    </Layer>
+    <Layer width="200" height="50">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Stroke/>
+      <TextBox width="200" height="50">
+        <Text text="World" fontFamily="Arial" fontSize="16"/>
+        <Fill/>
+      </TextBox>
+    </Layer>
+  </Layer>
+
+</pagx>
