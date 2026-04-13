@@ -26,30 +26,34 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1">
+    <Layer flex="1" layout="horizontal" gap="20" padding="20,30,20,30" alignment="center" arrangement="center">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-  <!-- Inline path data -->
-  <Layer>
-    <Path data="M 40,150 C 60,80 100,80 120,150 C 140,220 160,80 180,150"/>
-    <Stroke color="#3B82F6" width="4" cap="round"/>
-  </Layer>
-  <Layer>
-    <Text text="Inline bezier" fontFamily="Arial" fontSize="9" position="120,210" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
+      <!-- Inline path data -->
+      <Layer layout="vertical" gap="6" alignment="center">
+        <Layer width="150" height="120">
+          <Path data="M 5,80 C 25,10 65,10 85,80 C 105,150 125,10 145,80" centerX="0" centerY="0"/>
+          <Stroke color="#3B82F6" width="4" cap="round"/>
+        </Layer>
+        <Layer height="12">
+          <Text text="Inline bezier" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+      </Layer>
 
-  <!-- Resource reference path -->
-  <Layer x="240" y="100" matrix="0.8,0,0,0.8,0,0">
-    <Path data="@heart"/>
-    <Fill color="#EF4444" alpha="0.8"/>
-  </Layer>
-  <Layer>
-    <Text text="@id reference" fontFamily="Arial" fontSize="9" position="320,210" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
+      <!-- Resource reference path -->
+      <Layer layout="vertical" gap="6" alignment="center">
+        <Layer width="120" height="100">
+          <Path data="@heart" centerX="0" centerY="0"/>
+          <Fill color="#EF4444" alpha="0.8"/>
+        </Layer>
+        <Layer height="12">
+          <Text text="@id reference" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+      </Layer>
     </Layer>
   </Layer>
 </pagx>
