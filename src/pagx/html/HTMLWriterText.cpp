@@ -966,6 +966,14 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
     ReversePathData(pathData, reversed);
     pathData = reversed;
   }
+  if (textPath->baselineAngle != 0) {
+    float ox = textPath->baselineOrigin.x;
+    float oy = textPath->baselineOrigin.y;
+    auto m = Matrix::Translate(-ox, -oy);
+    m = Matrix::Rotate(textPath->baselineAngle) * m;
+    m = Matrix::Translate(ox, oy) * m;
+    pathData.transform(m);
+  }
   ArcLengthLUT lut = BuildArcLengthLUT(pathData);
   if (lut.totalLength <= 0) {
     return;
