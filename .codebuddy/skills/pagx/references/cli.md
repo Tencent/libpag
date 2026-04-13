@@ -344,6 +344,7 @@ pagx export --format pptx --input icon.pagx      # force PPTX output format
 pagx export --input icon.pagx --svg-indent 4     # 4-space indent
 pagx export --input icon.pagx --text-to-path     # convert text to paths
 pagx export --input icon.pagx --output out.pptx --ppt-no-bake-mask  # vector masks
+pagx export --input icon.pagx --output out.pptx --ppt-no-bake-tiled-pattern  # native a:tile
 pagx export --input icon.pagx --output out.pptx --ppt-no-bridge-contours  # separate sub-paths
 ```
 
@@ -356,6 +357,7 @@ pagx export --input icon.pagx --output out.pptx --ppt-no-bridge-contours  # sepa
 | `--svg-indent <n>` | Indentation spaces (default: 2, valid range: 0–16) |
 | `--svg-no-xml-declaration` | Omit the `<?xml ...?>` declaration |
 | `--ppt-no-bake-mask` | Export masked layers as editable vector shapes instead of rasterizing to bitmap |
+| `--ppt-no-bake-tiled-pattern` | Use native OOXML `a:tile` for tiled image patterns instead of rasterizing to bitmap (may produce inconsistent scaling across apps) |
 | `--ppt-no-bridge-contours` | Emit each contour as a separate sub-path instead of bridging nested contours (default: bridge on) |
 
 

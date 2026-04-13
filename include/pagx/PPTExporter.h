@@ -43,6 +43,15 @@ struct PPTExportOptions {
   bool bakeMask = true;
 
   /**
+   * Whether to rasterize tiled image patterns into bitmap images. When enabled, ImagePattern fills
+   * with repeat or mirror tile modes are pre-rendered at the shape size and embedded as stretched
+   * images, ensuring identical rendering across PowerPoint and Keynote regardless of DPI settings.
+   * When disabled, the native OOXML a:tile mechanism is used, which may produce inconsistent tile
+   * scaling across applications. The default value is true.
+   */
+  bool bakeTiledPattern = true;
+
+  /**
    * Whether to bridge nested contours within a single path element. When enabled, contours that
    * contain inner holes are connected by bridge edges so the hole is expressed as a single
    * self-intersecting sub-path, which some renderers require for correct even-odd fill. When

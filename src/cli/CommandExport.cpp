@@ -34,6 +34,7 @@ struct ExportOptions {
   bool svgNoXmlDeclaration = false;
   bool textToPath = false;
   bool pptNoBakeMask = false;
+  bool pptNoBakeTiledPattern = false;
   bool pptNoBridgeContours = false;
 };
 
@@ -57,6 +58,8 @@ static void PrintUsage() {
       << "PPT options:\n"
       << "  --ppt-no-bake-mask          Export masked layers as vector shapes instead of\n"
       << "                              rasterizing to bitmap\n"
+      << "  --ppt-no-bake-tiled-pattern Use native OOXML a:tile instead of rasterizing\n"
+      << "                              tiled image patterns to bitmap\n"
       << "  --ppt-no-bridge-contours    Emit each contour as a separate sub-path instead\n"
       << "                              of bridging nested contours (default: bridge on)\n"
       << "\n"
@@ -94,6 +97,8 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
       options->textToPath = true;
     } else if (arg == "--ppt-no-bake-mask") {
       options->pptNoBakeMask = true;
+    } else if (arg == "--ppt-no-bake-tiled-pattern") {
+      options->pptNoBakeTiledPattern = true;
     } else if (arg == "--ppt-no-bridge-contours") {
       options->pptNoBridgeContours = true;
     } else if (arg == "--help" || arg == "-h") {
@@ -176,6 +181,7 @@ static int ExportToPPT(const ExportOptions& options) {
   PPTExporter::Options pptOptions = {};
   pptOptions.convertTextToPath = options.textToPath;
   pptOptions.bakeMask = !options.pptNoBakeMask;
+  pptOptions.bakeTiledPattern = !options.pptNoBakeTiledPattern;
   pptOptions.bridgeContours = !options.pptNoBridgeContours;
 
   if (!PPTExporter::ToFile(*document, options.outputFile, pptOptions)) {

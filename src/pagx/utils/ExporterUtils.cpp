@@ -25,13 +25,19 @@
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/utils/Base64.h"
 #include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/Image.h"
 #include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/Paint.h"
 #include "tgfx/core/Pixmap.h"
+#include "tgfx/core/Shader.h"
+#include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/layers/DisplayList.h"
 
@@ -490,6 +496,75 @@ std::shared_ptr<tgfx::Data> RenderMaskedLayer(const std::shared_ptr<tgfx::Layer>
     return nullptr;
   }
   auto result = DoRenderMaskedLayer(context, root, targetLayer, globalBounds);
+  device->unlock();
+  return result;
+}
+
+static tgfx::TileMode ToTGFXTileMode(TileMode mode) {
+  switch (mode) {
+    case TileMode::Repeat:
+      return tgfx::TileMode::Repeat;
+    case TileMode::Mirror:
+      return tgfx::TileMode::Mirror;
+    case TileMode::Decal:
+      return tgfx::TileMode::Decal;
+    default:
+      return tgfx::TileMode::Clamp;
+  }
+}
+
+std::shared_ptr<tgfx::Data> RenderTiledPattern(const ImagePattern* pattern, int width, int height,
+                                               float offsetX, float offsetY) {
+  if (width <= 0 || height <= 0 || !pattern || !pattern->image) {
+    return nullptr;
+  }
+  auto imageData = GetImageData(pattern->image);
+  if (!imageData) {
+    return nullptr;
+  }
+  auto tgfxImage = tgfx::Image::MakeFromEncoded(imageData);
+  if (!tgfxImage) {
+    return nullptr;
+  }
+  auto shader = tgfx::Shader::MakeImageShader(std::move(tgfxImage),
+                                              ToTGFXTileMode(pattern->tileModeX),
+                                              ToTGFXTileMode(pattern->tileModeY));
+  if (!shader) {
+    return nullptr;
+  }
+  const auto& M = pattern->matrix;
+  tgfx::Matrix shaderMatrix = tgfx::Matrix::MakeAll(M.a, M.c, offsetX, M.b, M.d, offsetY);
+  shader = shader->makeWithMatrix(shaderMatrix);
+  if (!shader) {
+    return nullptr;
+  }
+  auto device = tgfx::GLDevice::Make();
+  if (!device) {
+    return nullptr;
+  }
+  auto context = device->lockContext();
+  if (!context) {
+    return nullptr;
+  }
+  auto surface = tgfx::Surface::Make(context, width, height);
+  if (!surface) {
+    device->unlock();
+    return nullptr;
+  }
+  tgfx::Paint paint;
+  paint.setShader(std::move(shader));
+  surface->getCanvas()->drawRect(tgfx::Rect::MakeWH(width, height), paint);
+  tgfx::Bitmap bitmap(width, height, false, false);
+  if (bitmap.isEmpty()) {
+    device->unlock();
+    return nullptr;
+  }
+  tgfx::Pixmap pixmap(bitmap);
+  if (!surface->readPixels(pixmap.info(), pixmap.writablePixels())) {
+    device->unlock();
+    return nullptr;
+  }
+  auto result = tgfx::ImageCodec::Encode(pixmap, tgfx::EncodedFormat::PNG, 100);
   device->unlock();
   return result;
 }

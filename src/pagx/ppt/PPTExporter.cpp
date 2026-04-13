@@ -178,9 +178,9 @@ static bool ComputeImagePatternRect(const ImagePattern* pattern, int imgW, int i
 class PPTWriter {
  public:
   PPTWriter(PPTWriterContext* ctx, PAGXDocument* doc, bool convertTextToPath, bool bakeMask,
-            bool bridgeContours)
+            bool bakeTiledPattern, bool bridgeContours)
       : _ctx(ctx), _doc(doc), _convertTextToPath(convertTextToPath), _bakeMask(bakeMask),
-        _bridgeContours(bridgeContours) {
+        _bakeTiledPattern(bakeTiledPattern), _bridgeContours(bridgeContours) {
   }
 
   void writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& parentMatrix = {},
@@ -191,6 +191,7 @@ class PPTWriter {
   PAGXDocument* _doc = nullptr;
   bool _convertTextToPath = true;
   bool _bakeMask = true;
+  bool _bakeTiledPattern = true;
   bool _bridgeContours = true;
   LayerBuildResult _buildResult = {};
   bool _buildResultReady = false;
@@ -608,6 +609,27 @@ void PPTWriter::writeImagePatternFill(XMLBuilder& out, const ImagePattern* patte
     out.openElement("a:noFill").closeElementSelfClosing();
     return;
   }
+
+  bool needsTiling =
+      (pattern->tileModeX == TileMode::Repeat || pattern->tileModeX == TileMode::Mirror ||
+       pattern->tileModeY == TileMode::Repeat || pattern->tileModeY == TileMode::Mirror);
+
+  if (needsTiling && _bakeTiledPattern && !shapeBounds.isEmpty()) {
+    int w = static_cast<int>(ceilf(shapeBounds.width));
+    int h = static_cast<int>(ceilf(shapeBounds.height));
+    float offsetX = pattern->matrix.tx - shapeBounds.x;
+    float offsetY = pattern->matrix.ty - shapeBounds.y;
+    auto tiledPng = RenderTiledPattern(pattern, w, h, offsetX, offsetY);
+    if (tiledPng) {
+      auto relId = _ctx->addRawImage(std::move(tiledPng));
+      out.openElement("a:blipFill").closeElementStart();
+      WriteBlip(out, relId, alpha);
+      WriteDefaultStretch(out);
+      out.closeElement();  // a:blipFill
+      return;
+    }
+  }
+
   std::string relId = _ctx->addImage(pattern->image);
   if (relId.empty()) {
     out.openElement("a:noFill").closeElementSelfClosing();
@@ -617,9 +639,6 @@ void PPTWriter::writeImagePatternFill(XMLBuilder& out, const ImagePattern* patte
   int imgW = 0;
   int imgH = 0;
   bool hasDimensions = GetImageDimensions(pattern->image, &imgW, &imgH);
-  bool needsTiling =
-      (pattern->tileModeX == TileMode::Repeat || pattern->tileModeX == TileMode::Mirror ||
-       pattern->tileModeY == TileMode::Repeat || pattern->tileModeY == TileMode::Mirror);
 
   out.openElement("a:blipFill").closeElementStart();
   WriteBlip(out, relId, alpha);
@@ -1299,7 +1318,7 @@ bool PPTExporter::ToFile(PAGXDocument& doc, const std::string& filePath, const O
 
   PPTWriterContext context;
   PPTWriter writer(&context, &doc, options.convertTextToPath, options.bakeMask,
-                   options.bridgeContours);
+                   options.bakeTiledPattern, options.bridgeContours);
 
   // Build slide body content
   XMLBuilder body(false, 2, 0, 16384);

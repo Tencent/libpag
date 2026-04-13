@@ -95,6 +95,16 @@ std::string UTF8ToUTF16BEHex(const std::string& utf8);
 std::shared_ptr<tgfx::Data> RenderMaskedLayer(const std::shared_ptr<tgfx::Layer>& root,
                                               const std::shared_ptr<tgfx::Layer>& targetLayer);
 
+class ImagePattern;
+
+/**
+ * Rasterizes a tiled ImagePattern fill to a PNG-encoded Data object at the given pixel dimensions.
+ * The image is drawn with the pattern's tile modes and matrix (offset relative to shapeBounds).
+ * Returns nullptr if rendering fails.
+ */
+std::shared_ptr<tgfx::Data> RenderTiledPattern(const ImagePattern* pattern, int width, int height,
+                                               float offsetX, float offsetY);
+
 /**
  * Strips surrounding double-quote characters from a string.
  */
