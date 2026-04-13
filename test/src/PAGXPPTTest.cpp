@@ -872,7 +872,8 @@ PAGX_TEST(PAGXPPTTest, NativeTextWithTextBox) {
 
   auto* textBox = doc->makeNode<pagx::TextBox>();
   textBox->position = {50, 50};
-  textBox->size = {300, 200};
+  textBox->width = 300;
+  textBox->height = 200;
   textBox->textAlign = pagx::TextAlign::Center;
 
   auto* fill = doc->makeNode<pagx::Fill>();
@@ -900,7 +901,8 @@ PAGX_TEST(PAGXPPTTest, NativeTextWithTextBoxEndAlign) {
 
   auto* textBox = doc->makeNode<pagx::TextBox>();
   textBox->position = {50, 50};
-  textBox->size = {300, 200};
+  textBox->width = 300;
+  textBox->height = 200;
   textBox->textAlign = pagx::TextAlign::End;
 
   auto* fill = doc->makeNode<pagx::Fill>();
@@ -2180,7 +2182,7 @@ PAGX_TEST(PAGXPPTTest, NativeTextWithTextBoxZeroHeight) {
 
   auto* textBox = doc->makeNode<pagx::TextBox>();
   textBox->position = {50, 50};
-  textBox->size = {300, 0};
+  textBox->width = 300;
 
   auto* fill = doc->makeNode<pagx::Fill>();
   auto* solid = doc->makeNode<pagx::SolidColor>();
@@ -2806,7 +2808,8 @@ PAGX_TEST(PAGXPPTTest, NativeTextTextBoxCenterAlign) {
   text->position = {100, 100};
   auto* textBox = doc->makeNode<pagx::TextBox>();
   textBox->position = {50, 80};
-  textBox->size = {300, 60};
+  textBox->width = 300;
+  textBox->height = 60;
   textBox->textAlign = pagx::TextAlign::Center;
   auto* fill = doc->makeNode<pagx::Fill>();
   auto* solid = doc->makeNode<pagx::SolidColor>();
@@ -2829,7 +2832,8 @@ PAGX_TEST(PAGXPPTTest, NativeTextTextBoxEndAlign) {
   text->position = {100, 100};
   auto* textBox = doc->makeNode<pagx::TextBox>();
   textBox->position = {50, 80};
-  textBox->size = {300, 60};
+  textBox->width = 300;
+  textBox->height = 60;
   textBox->textAlign = pagx::TextAlign::End;
   auto* fill = doc->makeNode<pagx::Fill>();
   auto* solid = doc->makeNode<pagx::SolidColor>();

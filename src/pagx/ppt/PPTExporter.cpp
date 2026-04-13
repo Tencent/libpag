@@ -1005,12 +1005,13 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   float posY = text->position.y - text->fontSize * 0.85f;
   bool hasTextBox = false;
 
-  if (fs.textBox && fs.textBox->size.width > 0) {
+  if (fs.textBox && !std::isnan(fs.textBox->width) && fs.textBox->width > 0) {
     hasTextBox = true;
     posX = fs.textBox->position.x;
     posY = fs.textBox->position.y;
-    estWidth = fs.textBox->size.width;
-    estHeight = (fs.textBox->size.height > 0) ? fs.textBox->size.height : text->fontSize * 1.4f;
+    estWidth = fs.textBox->width;
+    estHeight = (!std::isnan(fs.textBox->height) && fs.textBox->height > 0) ? fs.textBox->height
+                                                                            : text->fontSize * 1.4f;
   } else {
     if (text->textAnchor == TextAnchor::Center) {
       posX -= estWidth / 2.0f;
