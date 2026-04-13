@@ -77,6 +77,7 @@ export class VideoReader {
     private bitmapCtx: OffscreenCanvasRenderingContext2D | null = null;
     private currentFrame = -1;
     private targetFrame = -1;
+    private visibilityHandle: (() => void) | null = null;
 
     public constructor(
         source: Uint8Array | HTMLVideoElement,
@@ -118,10 +119,10 @@ export class VideoReader {
     }
 
     public async prepare(targetFrame: number, playbackRate: number): Promise<void> {
-        if (targetFrame === this.currentFrame) {
+        if (this.isDestroyed || targetFrame === this.currentFrame) {
             return;
         }
-        const promise = new Promise<void>(async (resolve, reject) => {
+        const promise = new Promise<void>(async (resolve) => {
             this.setError(null); // reset error
             this.isSought = false; // reset seek status
             const {currentTime} = this.videoEl!;
@@ -137,12 +138,14 @@ export class VideoReader {
                     } catch (e) {
                         this.setError(e);
                         this.currentFrame = targetFrame;
-                        reject(e);
+                        resolve();
                         return;
                     }
                     await new Promise<void>((resolveInner) => {
                         requestAnimationFrame(() => {
-                            this.pause();
+                            if (!this.isDestroyed) {
+                                this.pause();
+                            }
                             resolveInner();
                         });
                     });
@@ -154,7 +157,7 @@ export class VideoReader {
                     // Static frame
                     await this.seek(targetTime, false);
                     this.currentFrame = targetFrame;
-                    resolve();  // Ensure promise resolves
+                    resolve();
                     return;
                 } else if ((Math.abs(currentTime - targetTime) < (1 / this.frameRate) * VIDEO_DECODE_WAIT_FRAME) && !this.videoEl!.paused) {
                     // Within tolerable frame rate deviation
@@ -168,18 +171,22 @@ export class VideoReader {
                 }
             }
 
+            if (this.isDestroyed || !this.videoEl) {
+                resolve();
+                return;
+            }
             const targetPlaybackRate = Math.min(Math.max(playbackRate, VIDEO_PLAYBACK_RATE_MIN), VIDEO_PLAYBACK_RATE_MAX);
-            if (!this.disablePlaybackRate && this.videoEl!.playbackRate !== targetPlaybackRate) {
-                this.videoEl!.playbackRate = targetPlaybackRate;
+            if (!this.disablePlaybackRate && this.videoEl.playbackRate !== targetPlaybackRate) {
+                this.videoEl.playbackRate = targetPlaybackRate;
             }
 
-            if (this.isPlaying && this.videoEl!.paused) {
+            if (this.isPlaying && this.videoEl.paused) {
                 try {
                     await this.play();
                 } catch (e) {
                     this.setError(e);
                     this.currentFrame = targetFrame;
-                    reject(e);
+                    resolve();
                     return;
                 }
             }
@@ -203,13 +210,19 @@ export class VideoReader {
             await getWechatNetwork();
         }
         if (document.visibilityState !== 'visible') {
-            const visibilityHandle = () => {
+            // Page is hidden, defer video play until visible
+            this.clearVisibilityListener();
+            this.visibilityHandle = () => {
+                if (this.isDestroyed) {
+                    this.clearVisibilityListener();
+                    return;
+                }
                 if (document.visibilityState === 'visible') {
-                    if (this.videoEl) this.videoEl.play();
-                    window.removeEventListener('visibilitychange', visibilityHandle);
+                    if (this.videoEl) this.videoEl.play().catch((e) => { this.setError(e); });
+                    this.clearVisibilityListener();
                 }
             };
-            window.addEventListener('visibilitychange', visibilityHandle);
+            window.addEventListener('visibilitychange', this.visibilityHandle);
             throw new Error('The play() request was interrupted because the document was hidden!');
         }
         await this.videoEl?.play();
@@ -233,16 +246,19 @@ export class VideoReader {
     }
 
     public onDestroy() {
+        this.isDestroyed = true;
         if (this.player) {
             this.player.unlinkVideoReader(this);
             this.player = null;
         }
+        this.clearVisibilityListener();
         removeAllListeners(this.videoEl!, 'playing');
         removeAllListeners(this.videoEl!, 'timeupdate');
+        removeAllListeners(this.videoEl!, 'seeked');
+        removeAllListeners(this.videoEl!, 'canplay');
         this.videoEl = null;
         this.bitmapCanvas = null;
         this.bitmapCtx = null;
-        this.isDestroyed = true;
     }
 
     private seek(targetTime: number, play = true) {
@@ -253,34 +269,47 @@ export class VideoReader {
             }
 
             const onSeeked = () => {
-                removeListener(this.videoEl!, 'seeked', onSeeked);
+                if (!this.videoEl || this.isDestroyed) {
+                    clearTimeout(seekTimeout);
+                    resolve();
+                    return;
+                }
+                removeListener(this.videoEl, 'seeked', onSeeked);
                 clearTimeout(seekTimeout);
                 if (play) {
                     // After seeking, the video might still be in 'ended' state
                     // Reset it by setting currentTime to itself to clear the ended flag
-                    if (this.videoEl!.ended) {
-                        this.videoEl!.currentTime = this.videoEl!.currentTime;
+                    if (this.videoEl.ended) {
+                        this.videoEl.currentTime = this.videoEl.currentTime;
                     }
-                    this.videoEl?.play().catch((e) => {
+                    this.videoEl.play().catch((e) => {
                         this.setError(e);
                     });
-                } else if (!play && !this.videoEl!.paused) {
-                    this.videoEl?.pause();
+                } else if (!play && !this.videoEl.paused) {
+                    this.videoEl.pause();
                 }
                 resolve();
             };
 
             const onCanPlay = () => {
-                removeListener(this.videoEl!, 'canplay', onCanPlay);
+                if (!this.videoEl || this.isDestroyed) {
+                    clearTimeout(seekTimeout);
+                    resolve();
+                    return;
+                }
+                removeListener(this.videoEl, 'canplay', onCanPlay);
                 // Now that we have enough data, perform the seek.
-                this.videoEl!.currentTime = targetTime;
-                addListener(this.videoEl!, 'seeked', onSeeked);
+                this.videoEl.currentTime = targetTime;
+                addListener(this.videoEl, 'seeked', onSeeked);
             };
 
             const seekTimeout = setTimeout(() => {
-                removeListener(this.videoEl!, 'canplay', onCanPlay);
-                removeListener(this.videoEl!, 'seeked', onSeeked);
-                reject(new Error('Seek operation timed out.'));
+                if (this.videoEl) {
+                    removeListener(this.videoEl, 'canplay', onCanPlay);
+                    removeListener(this.videoEl, 'seeked', onSeeked);
+                }
+                this.setError('Seek operation timed out.');
+                resolve();
             }, (1000 / this.frameRate) * VIDEO_DECODE_SEEK_TIMEOUT_FRAME);
 
             // Check if we need to wait for 'canplay' event before seeking.
@@ -296,6 +325,13 @@ export class VideoReader {
 
     private setError(e: any) {
         this.error = e;
+    }
+
+    private clearVisibilityListener() {
+        if (this.visibilityHandle) {
+            window.removeEventListener('visibilitychange', this.visibilityHandle);
+            this.visibilityHandle = null;
+        }
     }
 
     private linkPlayer(player: PAGPlayer | null) {
