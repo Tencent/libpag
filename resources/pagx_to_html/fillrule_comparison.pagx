@@ -4,8 +4,8 @@
   <Resources>
     <!-- Star path with self-intersections (pentagram) -->
     <PathData id="starPath" data="M 0,-40 L 10,-13 L 40,-13 L 16,4 L 25,35 L 0,16 L -25,35 L -16,4 L -40,-13 L -10,-13 Z"/>
-    <!-- Two overlapping circles path -->
-    <PathData id="overlapCircles" data="M -10,0 A 22,22 0 1 1 -10,-0.01 Z M 10,0 A 22,22 0 1 1 10,-0.01 Z"/>
+    <!-- Two overlapping circles path (pre-shifted to positive coordinates) -->
+    <PathData id="overlapCircles" data="M 22,32 A 22,22 0 1 1 22,31.99 Z M 42,32 A 22,22 0 1 1 42,31.99 Z"/>
   </Resources>
 
   <!-- Background -->
@@ -90,11 +90,11 @@
             <Fill color="#94A3B8"/>
           </Layer>
           <Layer width="90" height="60">
-            <Group position="45,30">
+            <Group position="13,8">
               <Path data="@overlapCircles"/>
               <Fill color="#3B82F6" fillRule="winding"/>
             </Group>
-            <Group position="45,30">
+            <Group position="13,8">
               <Path data="@overlapCircles"/>
               <Stroke color="#1D4ED8" width="1"/>
             </Group>
@@ -106,11 +106,11 @@
             <Fill color="#94A3B8"/>
           </Layer>
           <Layer width="90" height="60">
-            <Group position="45,30">
+            <Group position="13,8">
               <Path data="@overlapCircles"/>
               <Fill color="#10B981" fillRule="evenOdd"/>
             </Group>
-            <Group position="45,30">
+            <Group position="13,8">
               <Path data="@overlapCircles"/>
               <Stroke color="#047857" width="1"/>
             </Group>
