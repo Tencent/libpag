@@ -18,7 +18,6 @@
 
 #include "pagx/PAGXExporter.h"
 #include <cmath>
-#include <cstdio>
 #include "pagx/PAGXDefaults.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
@@ -58,222 +57,9 @@
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/StringParser.h"
+#include "pagx/xml/XMLBuilder.h"
 
 namespace pagx {
-
-//==============================================================================
-// XMLBuilder - XML generation helper
-//==============================================================================
-
-class XMLBuilder {
- public:
-  XMLBuilder() {
-    tagStack.reserve(32);
-  }
-
-  void appendDeclaration() {
-    buffer += "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-  }
-
-  void openElement(const char* tag) {
-    writeIndent();
-    buffer += "<";
-    buffer += tag;
-    tagStack.push_back(tag);
-  }
-
-  void addAttribute(const char* name, const std::string& value) {
-    if (!value.empty()) {
-      buffer += " ";
-      buffer += name;
-      buffer += "=\"";
-      buffer += escapeXML(value);
-      buffer += "\"";
-    }
-  }
-
-  void addAttribute(const char* name, float value, float defaultValue = 0) {
-    if (value != defaultValue) {
-      buffer += " ";
-      buffer += name;
-      buffer += "=\"";
-      buffer += FloatToString(value);
-      buffer += "\"";
-    }
-  }
-
-  void addRequiredAttribute(const char* name, float value) {
-    buffer += " ";
-    buffer += name;
-    buffer += "=\"";
-    buffer += FloatToString(value);
-    buffer += "\"";
-  }
-
-  void addRequiredAttribute(const char* name, const std::string& value) {
-    buffer += " ";
-    buffer += name;
-    buffer += "=\"";
-    buffer += escapeXML(value);
-    buffer += "\"";
-  }
-
-  void addAttribute(const char* name, int value, int defaultValue = 0) {
-    if (value != defaultValue) {
-      buffer += " ";
-      buffer += name;
-      buffer += "=\"";
-      buffer += std::to_string(value);
-      buffer += "\"";
-    }
-  }
-
-  void addAttribute(const char* name, bool value, bool defaultValue = false) {
-    if (value != defaultValue) {
-      buffer += " ";
-      buffer += name;
-      buffer += "=\"";
-      buffer += (value ? "true" : "false");
-      buffer += "\"";
-    }
-  }
-
-  void addOptionalAttribute(const char* name, float value) {
-    if (!std::isnan(value)) {
-      buffer += " ";
-      buffer += name;
-      buffer += "=\"";
-      buffer += FloatToString(value);
-      buffer += "\"";
-    }
-  }
-
-  void closeElementStart() {
-    buffer += ">\n";
-    indentLevel++;
-  }
-
-  void closeElementSelfClosing() {
-    buffer += "/>\n";
-    tagStack.pop_back();
-  }
-
-  void closeElement() {
-    indentLevel--;
-    writeIndent();
-    buffer += "</";
-    buffer += tagStack.back();
-    buffer += ">\n";
-    tagStack.pop_back();
-  }
-
-  void writeRaw(const std::string& content) {
-    buffer += content;
-  }
-
-  void writeRawLine(const std::string& content) {
-    // Handle multi-line content by indenting each line individually.
-    size_t start = 0;
-    while (start < content.size()) {
-      auto end = content.find('\n', start);
-      if (end == std::string::npos) {
-        writeIndent();
-        buffer.append(content, start, content.size() - start);
-        buffer += "\n";
-        break;
-      }
-      writeIndent();
-      buffer.append(content, start, end - start);
-      buffer += "\n";
-      start = end + 1;
-    }
-  }
-
-  void writeComment(const std::string& text) {
-    writeIndent();
-    buffer += "<!-- ";
-    buffer += text;
-    buffer += " -->\n";
-  }
-
-  std::string release() {
-    return std::move(buffer);
-  }
-
- private:
-  std::string buffer = {};
-  std::vector<const char*> tagStack = {};
-  int indentLevel = 0;
-
-  void writeIndent() {
-    buffer.append(static_cast<size_t>(indentLevel * 2), ' ');
-  }
-
-  static std::string escapeXML(const std::string& input) {
-    size_t extraSize = 0;
-    for (char c : input) {
-      switch (c) {
-        case '&':
-          extraSize += 4;  // &amp;
-          break;
-        case '<':
-          extraSize += 3;  // &lt;
-          break;
-        case '"':
-          extraSize += 5;  // &quot;
-          break;
-        case '\'':
-          extraSize += 5;  // &apos;
-          break;
-        case '\n':
-          extraSize += 4;  // &#10;
-          break;
-        case '\r':
-          extraSize += 4;  // &#13;
-          break;
-        case '\t':
-          extraSize += 3;  // &#9;
-          break;
-        default:
-          break;
-      }
-    }
-    if (extraSize == 0) {
-      return input;
-    }
-    std::string result;
-    result.reserve(input.size() + extraSize);
-    for (char c : input) {
-      switch (c) {
-        case '&':
-          result += "&amp;";
-          break;
-        case '<':
-          result += "&lt;";
-          break;
-        case '"':
-          result += "&quot;";
-          break;
-        case '\'':
-          result += "&apos;";
-          break;
-        case '\n':
-          result += "&#10;";
-          break;
-        case '\r':
-          result += "&#13;";
-          break;
-        case '\t':
-          result += "&#9;";
-          break;
-        default:
-          result += c;
-          break;
-      }
-    }
-    return result;
-  }
-};
 
 //==============================================================================
 // Helper functions for converting types to strings
@@ -1371,7 +1157,7 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
 //==============================================================================
 
 std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options) {
-  XMLBuilder xml = {};
+  XMLBuilder xml(true);
   xml.appendDeclaration();
 
   xml.openElement("pagx");

@@ -221,6 +221,45 @@ class XMLBuilder {
     return *this;
   }
 
+  XMLBuilder& writeRawLine(const std::string& content) {
+    size_t start = 0;
+    while (start < content.size()) {
+      auto end = content.find('\n', start);
+      if (end == std::string::npos) {
+        if (_prettyPrint) {
+          writeIndent();
+        }
+        _buf.append(content, start, content.size() - start);
+        if (_prettyPrint) {
+          _buf += '\n';
+        }
+        break;
+      }
+      if (_prettyPrint) {
+        writeIndent();
+      }
+      _buf.append(content, start, end - start);
+      if (_prettyPrint) {
+        _buf += '\n';
+      }
+      start = end + 1;
+    }
+    return *this;
+  }
+
+  XMLBuilder& writeComment(const std::string& text) {
+    if (_prettyPrint) {
+      writeIndent();
+    }
+    _buf += "<!-- ";
+    _buf += text;
+    _buf += " -->";
+    if (_prettyPrint) {
+      _buf += '\n';
+    }
+    return *this;
+  }
+
   //--- Result ----------------------------------------------------------------
 
   std::string release() {
