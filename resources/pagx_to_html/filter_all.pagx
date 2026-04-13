@@ -22,112 +22,127 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1">
+    <Layer flex="1" layout="vertical" gap="8" padding="10,8,10,8" alignment="stretch" arrangement="center">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-  <!-- Row 1 -->
-  <!-- BlurFilter: uniform -->
-  <Layer x="30" y="77">
-    <Rectangle position="40,40" size="60,60" roundness="8"/>
-    <Fill color="#3B82F6"/>
-    <BlurFilter blurX="4" blurY="4"/>
-  </Layer>
-  <Layer>
-    <Text text="Blur" fontFamily="Arial" fontSize="8" position="70,180" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
+      <!-- Row 1: 5 filters -->
+      <Layer layout="horizontal" gap="4" alignment="center" arrangement="spaceEvenly">
+        <!-- Blur uniform -->
+        <Layer layout="vertical" gap="3" alignment="center">
+          <Layer width="68" height="68">
+            <Rectangle position="34,34" size="56,56" roundness="8"/>
+            <Fill color="#3B82F6"/>
+            <BlurFilter blurX="4" blurY="4"/>
+          </Layer>
+          <Layer height="10">
+            <Text text="Blur" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+        <!-- Blur asymmetric -->
+        <Layer layout="vertical" gap="3" alignment="center">
+          <Layer width="68" height="68">
+            <Rectangle position="34,34" size="56,56" roundness="8"/>
+            <Fill color="#3B82F6"/>
+            <BlurFilter blurX="8" blurY="2"/>
+          </Layer>
+          <Layer height="10">
+            <Text text="Asymmetric" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+        <!-- DropShadow -->
+        <Layer layout="vertical" gap="3" alignment="center">
+          <Layer width="68" height="68">
+            <Rectangle position="34,34" size="56,56" roundness="8"/>
+            <Fill color="#10B981"/>
+            <DropShadowFilter offsetX="4" offsetY="4" blurX="8" blurY="8" color="#00000060"/>
+          </Layer>
+          <Layer height="10">
+            <Text text="DropShadow" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+        <!-- ShadowOnly -->
+        <Layer layout="vertical" gap="3" alignment="center">
+          <Layer width="68" height="68">
+            <Rectangle position="34,34" size="56,56" roundness="8"/>
+            <Fill color="#10B981"/>
+            <DropShadowFilter offsetX="4" offsetY="8" blurX="12" blurY="12" color="#00000080" shadowOnly="true"/>
+          </Layer>
+          <Layer height="10">
+            <Text text="ShadowOnly" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+        <!-- InnerShadow -->
+        <Layer layout="vertical" gap="3" alignment="center">
+          <Layer width="68" height="68">
+            <Rectangle position="34,34" size="56,56" roundness="8"/>
+            <Fill color="#EF4444"/>
+            <InnerShadowFilter offsetX="2" offsetY="2" blurX="6" blurY="6" color="#00000080"/>
+          </Layer>
+          <Layer height="10">
+            <Text text="InnerShadow" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+      </Layer>
 
-  <!-- BlurFilter: asymmetric -->
-  <Layer x="120" y="77">
-    <Rectangle position="40,40" size="60,60" roundness="8"/>
-    <Fill color="#3B82F6"/>
-    <BlurFilter blurX="8" blurY="2"/>
-  </Layer>
-  <Layer>
-    <Text text="Asymmetric" fontFamily="Arial" fontSize="8" position="160,180" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-
-  <!-- DropShadowFilter -->
-  <Layer x="210" y="77">
-    <Rectangle position="40,40" size="60,60" roundness="8"/>
-    <Fill color="#10B981"/>
-    <DropShadowFilter offsetX="4" offsetY="4" blurX="8" blurY="8" color="#00000060"/>
-  </Layer>
-  <Layer>
-    <Text text="DropShadow" fontFamily="Arial" fontSize="8" position="250,180" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-
-  <!-- DropShadowFilter: shadowOnly -->
-  <Layer x="300" y="77">
-    <Rectangle position="40,40" size="60,60" roundness="8"/>
-    <Fill color="#10B981"/>
-    <DropShadowFilter offsetX="4" offsetY="8" blurX="12" blurY="12" color="#00000080" shadowOnly="true"/>
-  </Layer>
-  <Layer>
-    <Text text="ShadowOnly" fontFamily="Arial" fontSize="8" position="340,180" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-
-  <!-- InnerShadowFilter -->
-  <Layer x="390" y="77">
-    <Rectangle position="40,40" size="60,60" roundness="8"/>
-    <Fill color="#EF4444"/>
-    <InnerShadowFilter offsetX="2" offsetY="2" blurX="6" blurY="6" color="#00000080"/>
-  </Layer>
-  <Layer>
-    <Text text="InnerShadow" fontFamily="Arial" fontSize="8" position="430,180" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-
-  <!-- Row 2 -->
-  <!-- BlendFilter -->
-  <Layer x="30" y="178">
-    <Rectangle position="40,40" size="60,60" roundness="8"/>
-    <Fill color="#F59E0B"/>
-    <BlendFilter color="#0000FF80" blendMode="overlay"/>
-  </Layer>
-  <Layer>
-    <Text text="BlendFilter" fontFamily="Arial" fontSize="8" position="70,280" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-
-  <!-- ColorMatrixFilter -->
-  <Layer x="120" y="178">
-    <Rectangle position="40,40" size="60,60" roundness="8"/>
-    <Fill color="#8B5CF6"/>
-    <ColorMatrixFilter matrix="0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0,0,0,1,0"/>
-  </Layer>
-  <Layer>
-    <Text text="Grayscale" fontFamily="Arial" fontSize="8" position="160,280" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-
-  <!-- Chained filters: blur + drop-shadow -->
-  <Layer x="210" y="178">
-    <Rectangle position="40,40" size="60,60" roundness="8"/>
-    <Fill color="#EC4899"/>
-    <BlurFilter blurX="2" blurY="2"/>
-    <DropShadowFilter offsetX="4" offsetY="4" blurX="8" blurY="8" color="#00000060"/>
-  </Layer>
-  <Layer>
-    <Text text="Chained" fontFamily="Arial" fontSize="8" position="250,280" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-
-  <!-- InnerShadowFilter: shadowOnly -->
-  <Layer x="300" y="178">
-    <Rectangle position="40,40" size="60,60" roundness="8"/>
-    <Fill color="#06B6D4"/>
-    <InnerShadowFilter offsetX="2" offsetY="2" blurX="8" blurY="8" color="#00000080" shadowOnly="true"/>
-  </Layer>
-  <Layer>
-    <Text text="Inner Only" fontFamily="Arial" fontSize="8" position="340,280" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
+      <!-- Row 2: 4 filters -->
+      <Layer layout="horizontal" gap="4" alignment="center" arrangement="spaceEvenly">
+        <!-- BlendFilter -->
+        <Layer layout="vertical" gap="3" alignment="center">
+          <Layer width="68" height="68">
+            <Rectangle position="34,34" size="56,56" roundness="8"/>
+            <Fill color="#F59E0B"/>
+            <BlendFilter color="#0000FF80" blendMode="overlay"/>
+          </Layer>
+          <Layer height="10">
+            <Text text="BlendFilter" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+        <!-- ColorMatrix (grayscale) -->
+        <Layer layout="vertical" gap="3" alignment="center">
+          <Layer width="68" height="68">
+            <Rectangle position="34,34" size="56,56" roundness="8"/>
+            <Fill color="#8B5CF6"/>
+            <ColorMatrixFilter matrix="0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0,0,0,1,0"/>
+          </Layer>
+          <Layer height="10">
+            <Text text="Grayscale" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+        <!-- Chained filters -->
+        <Layer layout="vertical" gap="3" alignment="center">
+          <Layer width="68" height="68">
+            <Rectangle position="34,34" size="56,56" roundness="8"/>
+            <Fill color="#EC4899"/>
+            <BlurFilter blurX="2" blurY="2"/>
+            <DropShadowFilter offsetX="4" offsetY="4" blurX="8" blurY="8" color="#00000060"/>
+          </Layer>
+          <Layer height="10">
+            <Text text="Chained" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+        <!-- InnerShadow shadowOnly -->
+        <Layer layout="vertical" gap="3" alignment="center">
+          <Layer width="68" height="68">
+            <Rectangle position="34,34" size="56,56" roundness="8"/>
+            <Fill color="#06B6D4"/>
+            <InnerShadowFilter offsetX="2" offsetY="2" blurX="8" blurY="8" color="#00000080" shadowOnly="true"/>
+          </Layer>
+          <Layer height="10">
+            <Text text="Inner Only" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+      </Layer>
     </Layer>
   </Layer>
 </pagx>
