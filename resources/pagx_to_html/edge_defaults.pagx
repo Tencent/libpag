@@ -23,7 +23,7 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="vertical" gap="10" padding="12" alignment="stretch">
+    <Layer flex="1" layout="vertical" gap="10" padding="12" alignment="stretch" arrangement="center">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
