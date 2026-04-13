@@ -29,7 +29,7 @@
       <Layer flex="1" layout="vertical" gap="10" padding="12" alignment="stretch" name="bodyContent" data-section="body" data-index="0">
         <!-- Description text -->
         <Layer height="36">
-          <TextBox position="124,18" width="248" height="36" textAlign="start" lineHeight="15">
+          <TextBox left="0" right="0" top="0" bottom="0" textAlign="start" lineHeight="15">
             <Text text="Description text with custom data attributes on multiple elements." fontFamily="Arial" fontSize="11"/>
             <Fill color="#64748B"/>
           </TextBox>
