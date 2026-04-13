@@ -217,15 +217,6 @@ class PPTWriter {
                   int64_t extCY, int rot = 0);
   void endShape(XMLBuilder& out);
 
-  // Rasterized image as p:pic element
-  void writePicture(XMLBuilder& out, const std::string& relId, int64_t offX, int64_t offY,
-                    int64_t extCX, int64_t extCY);
-
-  // Write non-tiling ImagePattern fill as a separate p:pic element.
-  // Returns true if the image was written; caller should use a:noFill for the shape.
-  bool writeImagePatternAsPicture(XMLBuilder& out, const Fill* fill, const Rect& shapeBounds,
-                                  const Matrix& m, float alpha);
-
   // Fill / stroke / effects
   void writeFill(XMLBuilder& out, const Fill* fill, float alpha, const Rect& shapeBounds = {});
   void writeColorSource(XMLBuilder& out, const ColorSource* source, float alpha,
@@ -268,6 +259,19 @@ class PPTWriter {
   static Xform decomposeXform(float localX, float localY, float localW, float localH,
                               const Matrix& m);
   static void WriteXfrm(XMLBuilder& out, const Xform& xf);
+
+  // p:pic helpers (declared after Xform)
+  void beginPicture(XMLBuilder& out, const char* name);
+  void endPicture(XMLBuilder& out, const Xform& xf);
+
+  // Rasterized image as p:pic element
+  void writePicture(XMLBuilder& out, const std::string& relId, int64_t offX, int64_t offY,
+                    int64_t extCX, int64_t extCY);
+
+  // Write non-tiling ImagePattern fill as a separate p:pic element.
+  // Returns true if the image was written; caller should use a:noFill for the shape.
+  bool writeImagePatternAsPicture(XMLBuilder& out, const Fill* fill, const Rect& shapeBounds,
+                                  const Matrix& m, float alpha);
 };
 
 static void DecomposeScale(const Matrix& m, float* sx, float* sy) {
@@ -407,17 +411,16 @@ void PPTWriter::WriteDefaultStretch(XMLBuilder& out) {
   out.closeElement();  // a:stretch
 }
 
-// ── Rasterized picture ──────────────────────────────────────────────────────
+// ── Picture helpers ─────────────────────────────────────────────────────────
 
-void PPTWriter::writePicture(XMLBuilder& out, const std::string& relId, int64_t offX, int64_t offY,
-                             int64_t extCX, int64_t extCY) {
+void PPTWriter::beginPicture(XMLBuilder& out, const char* name) {
   int id = _ctx->nextShapeId();
   out.openElement("p:pic").closeElementStart();
 
   out.openElement("p:nvPicPr").closeElementStart();
   out.openElement("p:cNvPr")
       .addRequiredAttribute("id", id)
-      .addRequiredAttribute("name", "MaskedImage")
+      .addRequiredAttribute("name", name)
       .closeElementSelfClosing();
   out.openElement("p:cNvPicPr").closeElementStart();
   out.openElement("a:picLocks")
@@ -426,20 +429,31 @@ void PPTWriter::writePicture(XMLBuilder& out, const std::string& relId, int64_t 
   out.closeElement();  // p:cNvPicPr
   out.openElement("p:nvPr").closeElementSelfClosing();
   out.closeElement();  // p:nvPicPr
+}
 
-  out.openElement("p:blipFill").closeElementStart();
-  WriteBlip(out, relId, 1.0f);
-  WriteDefaultStretch(out);
-  out.closeElement();  // p:blipFill
-
+void PPTWriter::endPicture(XMLBuilder& out, const Xform& xf) {
   out.openElement("p:spPr").closeElementStart();
-  WriteXfrm(out, {offX, offY, extCX, extCY, 0});
+  WriteXfrm(out, xf);
   out.openElement("a:prstGeom").addRequiredAttribute("prst", "rect").closeElementStart();
   out.openElement("a:avLst").closeElementSelfClosing();
   out.closeElement();  // a:prstGeom
   out.closeElement();  // p:spPr
 
   out.closeElement();  // p:pic
+}
+
+// ── Rasterized picture ──────────────────────────────────────────────────────
+
+void PPTWriter::writePicture(XMLBuilder& out, const std::string& relId, int64_t offX, int64_t offY,
+                             int64_t extCX, int64_t extCY) {
+  beginPicture(out, "MaskedImage");
+
+  out.openElement("p:blipFill").closeElementStart();
+  WriteBlip(out, relId, 1.0f);
+  WriteDefaultStretch(out);
+  out.closeElement();  // p:blipFill
+
+  endPicture(out, {offX, offY, extCX, extCY, 0});
 }
 
 // ── ImagePattern as p:pic element ──────────────────────────────────────────
@@ -480,21 +494,7 @@ bool PPTWriter::writeImagePatternAsPicture(XMLBuilder& out, const Fill* fill,
 
   auto xf = decomposeXform(ipr.visL, ipr.visT, ipr.visR - ipr.visL, ipr.visB - ipr.visT, m);
 
-  int id = _ctx->nextShapeId();
-  out.openElement("p:pic").closeElementStart();
-
-  out.openElement("p:nvPicPr").closeElementStart();
-  out.openElement("p:cNvPr")
-      .addRequiredAttribute("id", id)
-      .addRequiredAttribute("name", "Image")
-      .closeElementSelfClosing();
-  out.openElement("p:cNvPicPr").closeElementStart();
-  out.openElement("a:picLocks")
-      .addRequiredAttribute("noChangeAspect", "1")
-      .closeElementSelfClosing();
-  out.closeElement();  // p:cNvPicPr
-  out.openElement("p:nvPr").closeElementSelfClosing();
-  out.closeElement();  // p:nvPicPr
+  beginPicture(out, "Image");
 
   out.openElement("p:blipFill").closeElementStart();
   WriteBlip(out, relId, effectiveAlpha);
@@ -509,14 +509,7 @@ bool PPTWriter::writeImagePatternAsPicture(XMLBuilder& out, const Fill* fill,
   WriteDefaultStretch(out);
   out.closeElement();  // p:blipFill
 
-  out.openElement("p:spPr").closeElementStart();
-  WriteXfrm(out, xf);
-  out.openElement("a:prstGeom").addRequiredAttribute("prst", "rect").closeElementStart();
-  out.openElement("a:avLst").closeElementSelfClosing();
-  out.closeElement();  // a:prstGeom
-  out.closeElement();  // p:spPr
-
-  out.closeElement();  // p:pic
+  endPicture(out, xf);
   return true;
 }
 
@@ -824,18 +817,7 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
 void PPTWriter::WriteContourGeom(XMLBuilder& out, std::vector<PathContour>& contours,
                                  int64_t pathWidth, int64_t pathHeight, float scaleX, float scaleY,
                                  float scaledOfsX, float scaledOfsY, FillRule fillRule) {
-  out.openElement("a:custGeom").closeElementStart();
-  out.openElement("a:avLst").closeElementSelfClosing();
-  out.openElement("a:gdLst").closeElementSelfClosing();
-  out.openElement("a:ahLst").closeElementSelfClosing();
-  out.openElement("a:cxnLst").closeElementSelfClosing();
-  out.openElement("a:rect")
-      .addRequiredAttribute("l", "0")
-      .addRequiredAttribute("t", "0")
-      .addRequiredAttribute("r", "r")
-      .addRequiredAttribute("b", "b")
-      .closeElementSelfClosing();
-
+  EmitCustGeomHeader(out);
   out.openElement("a:pathLst").closeElementStart();
 
   if (_bridgeContours && contours.size() > 1) {
@@ -1176,20 +1158,7 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
     out.closeElementStart();
 
     if (fs.fill && fs.fill->color && fs.fill->color->nodeType() == NodeType::SolidColor) {
-      auto* solid = static_cast<const SolidColor*>(fs.fill->color);
-      float ea = solid->color.alpha * fs.fill->alpha * alpha;
-      out.openElement("a:solidFill").closeElementStart();
-      out.openElement("a:srgbClr").addRequiredAttribute("val", ColorToHex6(solid->color));
-      if (ea < 1.0f) {
-        out.closeElementStart();
-        out.openElement("a:alpha")
-            .addRequiredAttribute("val", AlphaToPct(ea))
-            .closeElementSelfClosing();
-        out.closeElement();
-      } else {
-        out.closeElementSelfClosing();
-      }
-      out.closeElement();  // a:solidFill
+      writeColorSource(out, fs.fill->color, fs.fill->alpha * alpha);
     }
 
     if (!text->fontFamily.empty()) {
@@ -1362,30 +1331,40 @@ bool PPTExporter::ToFile(PAGXDocument& doc, const std::string& filePath, const O
     return false;
   }
 
-  AddZipString(zf, "[Content_Types].xml", GenerateContentTypes(context));
-  AddZipString(zf, "_rels/.rels", GenerateRootRels());
-  AddZipString(zf, "ppt/presentation.xml", GeneratePresentation(doc.width, doc.height));
-  AddZipString(zf, "ppt/_rels/presentation.xml.rels", GeneratePresentationRels());
-  AddZipString(zf, "ppt/slides/slide1.xml", slide);
-  AddZipString(zf, "ppt/slides/_rels/slide1.xml.rels", GenerateSlideRels(context));
-  AddZipString(zf, "ppt/slideMasters/slideMaster1.xml", GenerateSlideMaster());
-  AddZipString(zf, "ppt/slideMasters/_rels/slideMaster1.xml.rels", GenerateSlideMasterRels());
-  AddZipString(zf, "ppt/slideLayouts/slideLayout1.xml", GenerateSlideLayout());
-  AddZipString(zf, "ppt/slideLayouts/_rels/slideLayout1.xml.rels", GenerateSlideLayoutRels());
-  AddZipString(zf, "ppt/theme/theme1.xml", GenerateTheme());
-  AddZipString(zf, "ppt/presProps.xml", GeneratePresProps());
-  AddZipString(zf, "ppt/viewProps.xml", GenerateViewProps());
-  AddZipString(zf, "ppt/tableStyles.xml", GenerateTableStyles());
-  AddZipString(zf, "docProps/core.xml", GenerateCoreProps());
-  AddZipString(zf, "docProps/app.xml", GenerateAppProps());
+  bool ok = true;
+  ok = ok && AddZipString(zf, "[Content_Types].xml", GenerateContentTypes(context));
+  ok = ok && AddZipString(zf, "_rels/.rels", GenerateRootRels());
+  ok = ok && AddZipString(zf, "ppt/presentation.xml", GeneratePresentation(doc.width, doc.height));
+  ok = ok && AddZipString(zf, "ppt/_rels/presentation.xml.rels", GeneratePresentationRels());
+  ok = ok && AddZipString(zf, "ppt/slides/slide1.xml", slide);
+  ok = ok && AddZipString(zf, "ppt/slides/_rels/slide1.xml.rels", GenerateSlideRels(context));
+  ok = ok && AddZipString(zf, "ppt/slideMasters/slideMaster1.xml", GenerateSlideMaster());
+  ok = ok &&
+       AddZipString(zf, "ppt/slideMasters/_rels/slideMaster1.xml.rels", GenerateSlideMasterRels());
+  ok = ok && AddZipString(zf, "ppt/slideLayouts/slideLayout1.xml", GenerateSlideLayout());
+  ok = ok &&
+       AddZipString(zf, "ppt/slideLayouts/_rels/slideLayout1.xml.rels", GenerateSlideLayoutRels());
+  ok = ok && AddZipString(zf, "ppt/theme/theme1.xml", GenerateTheme());
+  ok = ok && AddZipString(zf, "ppt/presProps.xml", GeneratePresProps());
+  ok = ok && AddZipString(zf, "ppt/viewProps.xml", GenerateViewProps());
+  ok = ok && AddZipString(zf, "ppt/tableStyles.xml", GenerateTableStyles());
+  ok = ok && AddZipString(zf, "docProps/core.xml", GenerateCoreProps());
+  ok = ok && AddZipString(zf, "docProps/app.xml", GenerateAppProps());
 
   for (const auto& img : context.images()) {
+    if (!ok) {
+      break;
+    }
     if (img.cachedData && img.cachedData->size() > 0) {
-      AddZipEntry(zf, img.mediaPath.c_str(), img.cachedData->bytes(),
-                  static_cast<unsigned>(img.cachedData->size()));
+      ok = AddZipEntry(zf, img.mediaPath.c_str(), img.cachedData->bytes(),
+                       static_cast<unsigned>(img.cachedData->size()));
     }
   }
 
+  if (!ok) {
+    zipClose(zf, nullptr);
+    return false;
+  }
   return zipClose(zf, nullptr) == ZIP_OK;
 }
 

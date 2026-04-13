@@ -129,9 +129,7 @@ void EmitBridgedGroup(XMLBuilder& out, const std::vector<PathContour>& contours,
   out.openElement("a:close").closeElementSelfClosing();
 }
 
-void EmitGroupCustGeom(XMLBuilder& out, const std::vector<PathContour>& contours,
-                       const std::vector<size_t>& group, int64_t pathWidth, int64_t pathHeight,
-                       float scaleX, float scaleY, float scaledOfsX, float scaledOfsY) {
+void EmitCustGeomHeader(XMLBuilder& out) {
   out.openElement("a:custGeom").closeElementStart();
   out.openElement("a:avLst").closeElementSelfClosing();
   out.openElement("a:gdLst").closeElementSelfClosing();
@@ -143,6 +141,12 @@ void EmitGroupCustGeom(XMLBuilder& out, const std::vector<PathContour>& contours
       .addRequiredAttribute("r", "r")
       .addRequiredAttribute("b", "b")
       .closeElementSelfClosing();
+}
+
+void EmitGroupCustGeom(XMLBuilder& out, const std::vector<PathContour>& contours,
+                       const std::vector<size_t>& group, int64_t pathWidth, int64_t pathHeight,
+                       float scaleX, float scaleY, float scaledOfsX, float scaledOfsY) {
+  EmitCustGeomHeader(out);
   out.openElement("a:pathLst").closeElementStart();
   out.openElement("a:path")
       .addRequiredAttribute("w", pathWidth)

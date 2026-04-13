@@ -54,4 +54,6 @@ void EmitGroupCustGeom(XMLBuilder& out, const std::vector<PathContour>& contours
                        const std::vector<size_t>& group, int64_t pathWidth, int64_t pathHeight,
                        float scaleX, float scaleY, float scaledOfsX, float scaledOfsY);
 
+void EmitCustGeomHeader(XMLBuilder& out);
+
 }  // namespace pagx
