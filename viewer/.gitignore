@@ -2,6 +2,7 @@ assets/translation/Chinese.qm
 build_*/
 cmake-build-*/
 src/editing/rttr/PAGRttr.hpp
+src/editing/rttr/PAGXRttr.hpp
 src/version.h
 tools/*RttrAutoRegister*
 tools/libclang.dll

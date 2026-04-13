@@ -25,23 +25,23 @@
 <context>
     <name>ControlForm</name>
     <message>
-        <location filename="../qml/ControlForm.qml" line="184"/>
+        <location filename="../qml/ControlForm.qml" line="199"/>
         <source>00:00</source>
         <translation>00:00</translation>
     </message>
     <message>
-        <location filename="../qml/ControlForm.qml" line="197"/>
-        <location filename="../qml/ControlForm.qml" line="209"/>
+        <location filename="../qml/ControlForm.qml" line="212"/>
+        <location filename="../qml/ControlForm.qml" line="224"/>
         <source>0</source>
         <translation>0</translation>
     </message>
     <message>
-        <location filename="../qml/ControlForm.qml" line="203"/>
+        <location filename="../qml/ControlForm.qml" line="218"/>
         <source>/</source>
         <translation>/</translation>
     </message>
     <message>
-        <location filename="../qml/ControlForm.qml" line="255"/>
+        <location filename="../qml/ControlForm.qml" line="270"/>
         <source>Discover a new version, click to update</source>
         <translation>发现新版本，点击更新</translation>
     </message>
@@ -49,7 +49,7 @@
 <context>
     <name>FileTreeViewDelegate</name>
     <message>
-        <location filename="../qml/FileTreeViewDelegate.qml" line="318"/>
+        <location filename="../qml/FileTreeViewDelegate.qml" line="389"/>
         <source>Unable to save PAG file to the following path:</source>
         <translation>无法将PAG文件保存至如下路径：</translation>
     </message>
@@ -65,56 +65,56 @@
 <context>
     <name>Main</name>
     <message>
-        <location filename="../qml/Main.qml" line="167"/>
+        <location filename="../qml/Main.qml" line="205"/>
         <source>Settings</source>
         <translation>设置</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="196"/>
+        <location filename="../qml/Main.qml" line="234"/>
         <source>About PAGViewer</source>
         <translation>关于PAGViewer</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="227"/>
+        <location filename="../qml/Main.qml" line="265"/>
         <source>Select Save Path</source>
         <translation>选择保存路径</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="324"/>
+        <location filename="../qml/Main.qml" line="362"/>
         <source>Performance Benchmark Test</source>
         <translation>性能基准测试</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="325"/>
+        <location filename="../qml/Main.qml" line="363"/>
         <source>Performance Benchmark Test Complete</source>
         <translation>性能基准测试已完成</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="347"/>
+        <location filename="../qml/Main.qml" line="385"/>
         <source>Export failed, error code: </source>
         <translation>导出错误，错误码：</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="489"/>
+        <location filename="../qml/Main.qml" line="535"/>
         <source>Open PAG File</source>
         <translation>打开PAG文件</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="559"/>
-        <location filename="../qml/Main.qml" line="584"/>
-        <location filename="../qml/Main.qml" line="607"/>
+        <location filename="../qml/Main.qml" line="610"/>
+        <location filename="../qml/Main.qml" line="635"/>
+        <location filename="../qml/Main.qml" line="658"/>
         <source>Select save path</source>
         <translation>选择保存路径</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="570"/>
-        <location filename="../qml/Main.qml" line="591"/>
-        <location filename="../qml/Main.qml" line="616"/>
+        <location filename="../qml/Main.qml" line="621"/>
+        <location filename="../qml/Main.qml" line="642"/>
+        <location filename="../qml/Main.qml" line="667"/>
         <source>Exporting</source>
         <translation>正在导出</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="634"/>
+        <location filename="../qml/Main.qml" line="685"/>
         <source>Profiling</source>
         <translation>分析</translation>
     </message>
@@ -122,235 +122,288 @@
 <context>
     <name>MainForm</name>
     <message>
-        <location filename="../qml/MainForm.qml" line="115"/>
+        <location filename="../qml/MainForm.qml" line="182"/>
         <source>Click the menu or drag-drop here to open a PAG file</source>
         <translation>点击菜单，或拖放到这里打开一个PAG文件</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="168"/>
+        <location filename="../qml/MainForm.qml" line="242"/>
         <source>Edit Layer</source>
         <translation>图层编辑</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="173"/>
+        <location filename="../qml/MainForm.qml" line="247"/>
         <source>File Structure</source>
         <translation>文件结构</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="235"/>
+        <location filename="../qml/MainForm.qml" line="247"/>
+        <source>Source Editor</source>
+        <translation>源码编辑</translation>
+    </message>
+    <message>
+        <location filename="../qml/MainForm.qml" line="315"/>
         <source>No layer was editable</source>
         <translation>没有可以编辑的图层</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="299"/>
+        <location filename="../qml/MainForm.qml" line="315"/>
+        <source>PAGX files do not support layer editing</source>
+        <translation>PAGX 文件不支持图层编辑</translation>
+    </message>
+    <message>
+        <location filename="../qml/MainForm.qml" line="323"/>
+        <source>Go to Source Editor →</source>
+        <translation>前往源码编辑 →</translation>
+    </message>
+    <message>
+        <location filename="../qml/MainForm.qml" line="397"/>
         <source>Edit Text</source>
         <translation>文本编辑</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="381"/>
+        <location filename="../qml/MainForm.qml" line="479"/>
         <source>Edit Image</source>
         <translation>图片编辑</translation>
+    </message>
+    <message>
+        <location filename="../qml/MainForm.qml" line="607"/>
+        <source>Discard</source>
+        <translation>放弃</translation>
+    </message>
+    <message>
+        <location filename="../qml/MainForm.qml" line="641"/>
+        <source>Apply</source>
+        <translation>应用</translation>
+    </message>
+    <message>
+        <location filename="../qml/MainForm.qml" line="679"/>
+        <source>Save</source>
+        <translation type="unfinished">保存</translation>
+    </message>
+    <message>
+        <location filename="../qml/MainForm.qml" line="635"/>
+        <source>Changes discarded</source>
+        <translation>修改已放弃</translation>
+    </message>
+    <message>
+        <location filename="../qml/MainForm.qml" line="670"/>
+        <source>Changes applied</source>
+        <translation>修改已应用</translation>
+    </message>
+    <message>
+        <source>Failed to apply changes</source>
+        <translation type="vanished">应用修改失败</translation>
+    </message>
+    <message>
+        <location filename="../qml/MainForm.qml" line="712"/>
+        <source>File saved</source>
+        <translation>文件已保存</translation>
+    </message>
+    <message>
+        <source>Failed to save file</source>
+        <translation type="vanished">保存文件失败</translation>
     </message>
 </context>
 <context>
     <name>Menu</name>
     <message>
-        <location filename="../qml/Menu.qml" line="30"/>
-        <location filename="../qml/Menu.qml" line="273"/>
+        <location filename="../qml/Menu.qml" line="31"/>
+        <location filename="../qml/Menu.qml" line="274"/>
         <source>File</source>
         <translation>文件</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="32"/>
-        <location filename="../qml/Menu.qml" line="275"/>
+        <location filename="../qml/Menu.qml" line="33"/>
+        <location filename="../qml/Menu.qml" line="276"/>
         <source>Open...</source>
         <translation>打开...</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="39"/>
-        <location filename="../qml/Menu.qml" line="264"/>
+        <location filename="../qml/Menu.qml" line="40"/>
+        <location filename="../qml/Menu.qml" line="265"/>
         <source>Close</source>
         <translation>关闭</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="46"/>
+        <location filename="../qml/Menu.qml" line="47"/>
         <source>Settings...</source>
         <translation>设置...</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="52"/>
-        <location filename="../qml/Menu.qml" line="225"/>
+        <location filename="../qml/Menu.qml" line="53"/>
+        <location filename="../qml/Menu.qml" line="226"/>
         <source>Check for Updates</source>
         <translation>检查更新</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="58"/>
-        <location filename="../qml/Menu.qml" line="282"/>
+        <location filename="../qml/Menu.qml" line="59"/>
+        <location filename="../qml/Menu.qml" line="283"/>
         <source>Performance Test</source>
         <translation>性能测试</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="65"/>
-        <location filename="../qml/Menu.qml" line="289"/>
+        <location filename="../qml/Menu.qml" line="66"/>
+        <location filename="../qml/Menu.qml" line="290"/>
         <source>Performance Benchmark Test</source>
         <translation>性能基准测试</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="73"/>
-        <location filename="../qml/Menu.qml" line="296"/>
+        <location filename="../qml/Menu.qml" line="74"/>
+        <location filename="../qml/Menu.qml" line="297"/>
         <source>Export</source>
         <translation>导出</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="75"/>
-        <location filename="../qml/Menu.qml" line="298"/>
+        <location filename="../qml/Menu.qml" line="76"/>
+        <location filename="../qml/Menu.qml" line="299"/>
         <source>Export as PNG Sequence Frames</source>
         <translation>导出为PNG序列帧</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="82"/>
-        <location filename="../qml/Menu.qml" line="305"/>
+        <location filename="../qml/Menu.qml" line="83"/>
+        <location filename="../qml/Menu.qml" line="306"/>
         <source>Export as APNG</source>
         <translation>导出为APNG</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="89"/>
-        <location filename="../qml/Menu.qml" line="312"/>
+        <location filename="../qml/Menu.qml" line="90"/>
+        <location filename="../qml/Menu.qml" line="313"/>
         <source>Export current frame as PNG</source>
         <translation>导出当前帧为PNG</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="101"/>
-        <location filename="../qml/Menu.qml" line="322"/>
+        <location filename="../qml/Menu.qml" line="102"/>
+        <location filename="../qml/Menu.qml" line="323"/>
         <source>Play</source>
         <translation>播放</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="103"/>
-        <location filename="../qml/Menu.qml" line="324"/>
+        <location filename="../qml/Menu.qml" line="104"/>
+        <location filename="../qml/Menu.qml" line="325"/>
         <source>Pause and go to the first frame</source>
         <translation>暂停并回到首帧</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="111"/>
-        <location filename="../qml/Menu.qml" line="332"/>
+        <location filename="../qml/Menu.qml" line="112"/>
+        <location filename="../qml/Menu.qml" line="333"/>
         <source>Pause and go to the last frame</source>
         <translation>暂停并回到末帧</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="119"/>
-        <location filename="../qml/Menu.qml" line="340"/>
+        <location filename="../qml/Menu.qml" line="120"/>
+        <location filename="../qml/Menu.qml" line="341"/>
         <source>Previous frame</source>
         <translation>上一帧</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="127"/>
+        <location filename="../qml/Menu.qml" line="128"/>
         <source>Next frame </source>
         <translation>下一帧</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="135"/>
-        <location filename="../qml/Menu.qml" line="356"/>
+        <location filename="../qml/Menu.qml" line="136"/>
+        <location filename="../qml/Menu.qml" line="357"/>
         <source>Pause/Play</source>
         <translation>暂停/播放</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="146"/>
-        <location filename="../qml/Menu.qml" line="365"/>
+        <location filename="../qml/Menu.qml" line="147"/>
+        <location filename="../qml/Menu.qml" line="366"/>
         <source>View</source>
         <translation>视图</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="148"/>
-        <location filename="../qml/Menu.qml" line="367"/>
+        <location filename="../qml/Menu.qml" line="149"/>
+        <location filename="../qml/Menu.qml" line="368"/>
         <source>Show/Hide Background</source>
         <translation>显示/隐藏背景色</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="156"/>
-        <location filename="../qml/Menu.qml" line="375"/>
+        <location filename="../qml/Menu.qml" line="157"/>
+        <location filename="../qml/Menu.qml" line="376"/>
         <source>Show/Hide Edit Panel</source>
         <translation>显示/隐藏编辑面板</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="167"/>
-        <location filename="../qml/Menu.qml" line="407"/>
+        <location filename="../qml/Menu.qml" line="168"/>
+        <location filename="../qml/Menu.qml" line="408"/>
         <source>Help</source>
         <translation>帮助</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="169"/>
-        <location filename="../qml/Menu.qml" line="409"/>
+        <location filename="../qml/Menu.qml" line="170"/>
+        <location filename="../qml/Menu.qml" line="410"/>
         <source>Help for PAGViewer</source>
         <translation>PAGViewer帮助</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="175"/>
-        <location filename="../qml/Menu.qml" line="257"/>
+        <location filename="../qml/Menu.qml" line="176"/>
+        <location filename="../qml/Menu.qml" line="258"/>
         <source>About PAGViewer</source>
         <translation>关于PAGViewer</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="181"/>
-        <location filename="../qml/Menu.qml" line="415"/>
+        <location filename="../qml/Menu.qml" line="182"/>
+        <location filename="../qml/Menu.qml" line="416"/>
         <source>Feedback</source>
         <translation>问题反馈</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="187"/>
-        <location filename="../qml/Menu.qml" line="217"/>
+        <location filename="../qml/Menu.qml" line="188"/>
+        <location filename="../qml/Menu.qml" line="218"/>
         <source>About PAG Enterprise Edition</source>
         <translation>了解PAG企业版</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="193"/>
-        <location filename="../qml/Menu.qml" line="233"/>
+        <location filename="../qml/Menu.qml" line="194"/>
+        <location filename="../qml/Menu.qml" line="234"/>
         <source>Install Plugin</source>
         <translation>安装插件</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="199"/>
-        <location filename="../qml/Menu.qml" line="241"/>
+        <location filename="../qml/Menu.qml" line="200"/>
+        <location filename="../qml/Menu.qml" line="242"/>
         <source>Uninstall Plugin</source>
         <translation>卸载插件</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="214"/>
+        <location filename="../qml/Menu.qml" line="215"/>
         <source>PAGViewer</source>
         <translation>PAGViewer</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="249"/>
+        <location filename="../qml/Menu.qml" line="250"/>
         <source>Preference Settings</source>
         <translation>偏好设置</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="348"/>
+        <location filename="../qml/Menu.qml" line="349"/>
         <source>Next frame</source>
         <translation>下一帧</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="384"/>
+        <location filename="../qml/Menu.qml" line="385"/>
         <source>Window</source>
         <translation>窗口</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="386"/>
+        <location filename="../qml/Menu.qml" line="387"/>
         <source>Minimize</source>
         <translation>最小化</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="393"/>
+        <location filename="../qml/Menu.qml" line="394"/>
         <source>Zoom</source>
         <translation>缩放</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="399"/>
+        <location filename="../qml/Menu.qml" line="400"/>
         <source>Exit Fullscreen</source>
         <translation>退出全屏</translation>
     </message>
     <message>
-        <location filename="../qml/Menu.qml" line="399"/>
+        <location filename="../qml/Menu.qml" line="400"/>
         <source>Fullscreen</source>
         <translation>全屏</translation>
     </message>
@@ -371,42 +424,57 @@
 <context>
     <name>Profiler</name>
     <message>
-        <location filename="../qml/Profiler.qml" line="16"/>
+        <location filename="../qml/Profiler.qml" line="21"/>
         <source>Rendering time too long, suggest optimizing time cost to under %1 us</source>
         <translation>Rendering 耗时过大，请控制在 %1 微秒以内</translation>
     </message>
     <message>
-        <location filename="../qml/Profiler.qml" line="17"/>
+        <location filename="../qml/Profiler.qml" line="22"/>
         <source>Memory usage is too large, suggest optimizing memory cost to under 50M</source>
         <translation>内存占用过大，请控制在50M以内</translation>
     </message>
     <message>
-        <location filename="../qml/Profiler.qml" line="18"/>
+        <location filename="../qml/Profiler.qml" line="23"/>
         <source>(Run performance benchmark, results will be more accurate)</source>
         <translation>（运行一下性能基准测试，结果会更加准确）</translation>
     </message>
     <message>
-        <location filename="../qml/Profiler.qml" line="19"/>
+        <location filename="../qml/Profiler.qml" line="24"/>
         <source>Using too many video sequences can slow performance</source>
         <translation>视频序列过多会导致性能下降</translation>
     </message>
     <message>
-        <location filename="../qml/Profiler.qml" line="23"/>
+        <location filename="../qml/Profiler.qml" line="28"/>
         <source>Limit video sequences to two or fewer</source>
         <translation>建议将视频序列帧数量控制在两个以内</translation>
     </message>
     <message>
-        <location filename="../qml/Profiler.qml" line="21"/>
+        <location filename="../qml/Profiler.qml" line="692"/>
+        <source>Node Distribution</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Profiler.qml" line="702"/>
+        <source>nodes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Profiler.qml" line="809"/>
+        <source>Theoretical FPS</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Profiler.qml" line="26"/>
         <source>Too many layers, Suggest combining same layers into composition</source>
         <translation>可能和 Layer 图层数量过多有关，建议使用预合成的方式合并相同图层</translation>
     </message>
     <message>
-        <location filename="../qml/Profiler.qml" line="22"/>
+        <location filename="../qml/Profiler.qml" line="27"/>
         <source>Sticker scale is too large, suggest reducing sticker scale</source>
         <translation>可能和贴纸缩放大小有关，建议减少贴纸缩放程度</translation>
     </message>
     <message>
-        <location filename="../qml/Profiler.qml" line="77"/>
+        <location filename="../qml/Profiler.qml" line="92"/>
         <source>File Info</source>
         <translation>文件信息</translation>
     </message>
@@ -516,6 +584,47 @@
         <location filename="../qml/TextListView.qml" line="109"/>
         <source>Edit</source>
         <translation>编辑</translation>
+    </message>
+</context>
+<context>
+    <name>XMLSourceEditor</name>
+    <message>
+        <location filename="../qml/XMLSourceEditor.qml" line="400"/>
+        <source>Double-click to edit</source>
+        <translation>双击编辑</translation>
+    </message>
+    <message>
+        <location filename="../qml/XMLSourceEditor.qml" line="431"/>
+        <source>Editing line %1 (Enter=next, Esc=exit)</source>
+        <translation>正在编辑第 %1 行（Enter=下一行，Esc=退出）</translation>
+    </message>
+</context>
+<context>
+    <name>pag::PAGXViewModel</name>
+    <message>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="308"/>
+        <source>Failed to parse XML: invalid syntax or structure</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="313"/>
+        <source>Failed to build layer from XML document</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="341"/>
+        <source>No file path specified</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="345"/>
+        <source>Failed to open file for writing: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="350"/>
+        <source>Failed to write all data to file</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>

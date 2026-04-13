@@ -53,14 +53,14 @@ int64_t MergeSamples(const std::vector<std::shared_ptr<ByteData>>& audioSamples,
   for (auto& sample : audioSamples) {
     maxLength = std::max(maxLength, sample->length());
   }
-  int64_t sampleCount = static_cast<int64_t>(maxLength + 1) / 2;
-  auto data = reinterpret_cast<int16_t*>(buffer);
-  for (size_t index = 0; index < maxLength; index++) {
+  size_t sampleCount = maxLength / sizeof(int16_t);
+  auto outputData = reinterpret_cast<int16_t*>(buffer);
+  for (size_t index = 0; index < sampleCount; index++) {
     int32_t value = 0;
     for (auto& sample : audioSamples) {
-      if (index < sample->length()) {
-        int16_t sampleValue = (reinterpret_cast<int16_t*>(sample->data()))[index / 2];
-        value += sampleValue;
+      if (index * sizeof(int16_t) < sample->length()) {
+        auto sampleData = reinterpret_cast<int16_t*>(sample->data());
+        value += sampleData[index];
       }
     }
     if (value > SHRT_MAX) {
@@ -68,9 +68,9 @@ int64_t MergeSamples(const std::vector<std::shared_ptr<ByteData>>& audioSamples,
     } else if (value < SHRT_MIN) {
       value = SHRT_MIN;
     }
-    data[index / 2] = value;
+    outputData[index] = static_cast<int16_t>(value);
   }
-  return sampleCount * 2;
+  return static_cast<int64_t>(maxLength);
 }
 
 }  // namespace pag::Utils
