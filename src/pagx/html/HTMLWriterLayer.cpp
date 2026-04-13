@@ -177,7 +177,78 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
       }
       case NodeType::TextBox: {
         curTextBox = static_cast<const TextBox*>(element);
-        if (useRichText && !richTextSpans.empty()) {
+        if (!curTextBox->elements.empty()) {
+          // TextBox with child elements: render as a positioned container with text styling.
+          auto tb = curTextBox;
+          float tbW = tb->width;
+          float tbH = tb->height;
+          float tbLeft = !std::isnan(tbW) ? (tb->position.x - tbW * 0.5f) : tb->position.x;
+          float tbTop = !std::isnan(tbH) ? (tb->position.y - tbH * 0.5f) : tb->position.y;
+          std::string style = "position:absolute;left:" + FloatToString(tbLeft) +
+                              "px;top:" + FloatToString(tbTop) + "px";
+          if (!std::isnan(tbW) && tbW > 0) {
+            style += ";width:" + FloatToString(tbW) + "px";
+          }
+          if (!std::isnan(tbH) && tbH > 0) {
+            style += ";height:" + FloatToString(tbH) + "px";
+          }
+          if (tb->textAlign == TextAlign::Center) {
+            style += ";text-align:center";
+          } else if (tb->textAlign == TextAlign::End) {
+            style += ";text-align:end";
+          } else if (tb->textAlign == TextAlign::Justify) {
+            style += ";text-align:justify";
+          }
+          if (tb->paragraphAlign != ParagraphAlign::Near) {
+            style += ";display:flex;flex-direction:column";
+            if (tb->paragraphAlign == ParagraphAlign::Middle) {
+              style += ";justify-content:center";
+            } else if (tb->paragraphAlign == ParagraphAlign::Far) {
+              style += ";justify-content:flex-end";
+            }
+          }
+          if (tb->lineHeight > 0) {
+            style += ";line-height:" + FloatToString(tb->lineHeight) + "px";
+          }
+          if (tb->wordWrap && !std::isnan(tbW) && tbW > 0) {
+            style += ";word-wrap:break-word";
+          } else {
+            style += ";white-space:nowrap";
+          }
+          if (tb->overflow == Overflow::Hidden) {
+            style += ";overflow:hidden";
+          }
+          const Fill* childFill = nullptr;
+          const Text* childText = nullptr;
+          for (auto* childElem : tb->elements) {
+            if (childElem->nodeType() == NodeType::Fill) {
+              childFill = static_cast<const Fill*>(childElem);
+            } else if (childElem->nodeType() == NodeType::Text) {
+              childText = static_cast<const Text*>(childElem);
+            }
+          }
+          if (childText && childFill) {
+            if (!childText->fontFamily.empty()) {
+              style += ";font-family:'" + childText->fontFamily + "'";
+            }
+            style += ";font-size:" + FloatToString(childText->fontSize) + "px";
+            if (!childText->fontStyle.empty()) {
+              if (childText->fontStyle.find("Bold") != std::string::npos) {
+                style += ";font-weight:bold";
+              }
+              if (childText->fontStyle.find("Italic") != std::string::npos) {
+                style += ";font-style:italic";
+              }
+            }
+            auto colorStr = colorToCSS(childFill->color, nullptr);
+            if (!colorStr.empty()) {
+              style += ";color:" + colorStr;
+            }
+            out.openTag("span");
+            out.addAttr("style", style);
+            out.closeTagWithText(childText->text);
+          }
+        } else if (useRichText && !richTextSpans.empty()) {
           auto tb = curTextBox;
           std::string style = "position:absolute;left:" + FloatToString(tb->position.x) +
                               "px;top:" + FloatToString(tb->position.y) + "px";
