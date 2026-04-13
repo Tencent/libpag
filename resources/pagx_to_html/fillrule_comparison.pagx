@@ -2,10 +2,10 @@
 <!-- Tests: fillRule comparison — winding vs evenOdd on identical overlapping paths -->
 <pagx version="1.0" width="320" height="280">
   <Resources>
-    <!-- Star path with self-intersections (pentagram) -->
+    <!-- Star path with self-intersections (pentagram), centered at origin -->
     <PathData id="starPath" data="M 0,-40 L 10,-13 L 40,-13 L 16,4 L 25,35 L 0,16 L -25,35 L -16,4 L -40,-13 L -10,-13 Z"/>
-    <!-- Two overlapping circles path (pre-shifted to positive coordinates) -->
-    <PathData id="overlapCircles" data="M 22,32 A 22,22 0 1 1 22,31.99 Z M 42,32 A 22,22 0 1 1 42,31.99 Z"/>
+    <!-- Two overlapping circles, centered at origin -->
+    <PathData id="overlapCircles" data="M -10,0 A 22,22 0 1 1 -10,-0.01 Z M 10,0 A 22,22 0 1 1 10,-0.01 Z"/>
   </Resources>
 
   <!-- Background -->
@@ -36,11 +36,11 @@
 
       <!-- Column headers -->
       <Layer layout="horizontal" gap="0" alignment="center">
-        <Layer flex="1" height="20">
+        <Layer flex="1" height="22">
           <Text text="winding" fontFamily="Arial" fontStyle="Bold" fontSize="13" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
-        <Layer flex="1" height="20">
+        <Layer flex="1" height="22">
           <Text text="evenOdd" fontFamily="Arial" fontStyle="Bold" fontSize="13" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
@@ -53,12 +53,12 @@
             <Text text="Star" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
-          <Layer width="90" height="80">
-            <Group position="45,40">
+          <Layer width="80" height="80">
+            <Group position="40,40">
               <Path data="@starPath"/>
               <Fill color="#8B5CF6" fillRule="winding"/>
             </Group>
-            <Group position="45,40">
+            <Group position="40,40">
               <Path data="@starPath"/>
               <Stroke color="#6D28D9" width="1"/>
             </Group>
@@ -69,12 +69,12 @@
             <Text text="Star" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
-          <Layer width="90" height="80">
-            <Group position="45,40">
+          <Layer width="80" height="80">
+            <Group position="40,40">
               <Path data="@starPath"/>
               <Fill color="#EC4899" fillRule="evenOdd"/>
             </Group>
-            <Group position="45,40">
+            <Group position="40,40">
               <Path data="@starPath"/>
               <Stroke color="#BE185D" width="1"/>
             </Group>
@@ -89,12 +89,12 @@
             <Text text="Circles" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
-          <Layer width="90" height="60">
-            <Group position="13,8">
+          <Layer width="64" height="55">
+            <Group position="32,27">
               <Path data="@overlapCircles"/>
               <Fill color="#3B82F6" fillRule="winding"/>
             </Group>
-            <Group position="13,8">
+            <Group position="32,27">
               <Path data="@overlapCircles"/>
               <Stroke color="#1D4ED8" width="1"/>
             </Group>
@@ -105,12 +105,12 @@
             <Text text="Circles" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
-          <Layer width="90" height="60">
-            <Group position="13,8">
+          <Layer width="64" height="55">
+            <Group position="32,27">
               <Path data="@overlapCircles"/>
               <Fill color="#10B981" fillRule="evenOdd"/>
             </Group>
-            <Group position="13,8">
+            <Group position="32,27">
               <Path data="@overlapCircles"/>
               <Stroke color="#047857" width="1"/>
             </Group>
