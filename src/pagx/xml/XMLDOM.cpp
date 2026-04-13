@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/xml/XMLDOM.h"
+#include <tgfx/platform/Print.h>
+#include <chrono>
 #include <stack>
 #include <utility>
 #include "pagx/xml/XMLParser.h"
@@ -34,14 +36,33 @@ class DOMParser : public XMLParser {
     return _root;
   }
 
+  size_t getElementCount() const {
+    return _elementCount;
+  }
+
+  size_t getAttributeCount() const {
+    return _attributeCount;
+  }
+
+  size_t getTextCount() const {
+    return _textCount;
+  }
+
+  size_t getTotalAttributeBytes() const {
+    return _totalAttributeBytes;
+  }
+
  protected:
   bool onStartElement(const char* element) override {
     startCommon(element, DOMNodeType::Element);
+    _elementCount++;
     return false;
   }
 
   bool onAddAttribute(const char* name, const char* value) override {
     _attributes.push_back({name, value});
+    _attributeCount++;
+    _totalAttributeBytes += strlen(name) + strlen(value);
     return false;
   }
 
@@ -61,6 +82,7 @@ class DOMParser : public XMLParser {
     if (text.find_first_not_of(" \n\r\t") != std::string::npos) {
       startCommon(text, DOMNodeType::Text);
       onEndElement(_elementName.c_str());
+      _textCount++;
     }
     return false;
   }
@@ -117,6 +139,12 @@ class DOMParser : public XMLParser {
   DOMNodeType _elementType = DOMNodeType::Element;
   int _level = 0;
   int _pendingLine = 0;
+
+  // Performance counters
+  size_t _elementCount = 0;
+  size_t _attributeCount = 0;
+  size_t _textCount = 0;
+  size_t _totalAttributeBytes = 0;
 };
 
 // ============== XMLDOM ==============
@@ -127,15 +155,26 @@ XMLDOM::XMLDOM(std::shared_ptr<DOMNode> root) : _root(std::move(root)) {
 XMLDOM::~XMLDOM() = default;
 
 std::shared_ptr<XMLDOM> XMLDOM::Make(const uint8_t* data, size_t length) {
+  auto totalStart = std::chrono::high_resolution_clock::now();
   DOMParser parser;
   if (!parser.parse(data, length)) {
     return nullptr;
   }
+  auto parseEnd = std::chrono::high_resolution_clock::now();
   auto root = parser.getRoot();
   if (!root) {
     return nullptr;
   }
-  return std::shared_ptr<XMLDOM>(new XMLDOM(root));
+  auto result = std::shared_ptr<XMLDOM>(new XMLDOM(root));
+  auto totalEnd = std::chrono::high_resolution_clock::now();
+  auto parseMs = std::chrono::duration<double, std::milli>(parseEnd - totalStart).count();
+  auto totalMs = std::chrono::duration<double, std::milli>(totalEnd - totalStart).count();
+  tgfx::PrintLog(
+      "[PAGX Perf]   XMLDOM::Make total=%.1fms (expat parse=%.1fms) "
+      "elements=%zu attrs=%zu texts=%zu attrBytes=%zuKB\n",
+      totalMs, parseMs, parser.getElementCount(), parser.getAttributeCount(), parser.getTextCount(),
+      parser.getTotalAttributeBytes() / 1024);
+  return result;
 }
 
 std::shared_ptr<XMLDOM> XMLDOM::MakeFromFile(const std::string& filePath) {

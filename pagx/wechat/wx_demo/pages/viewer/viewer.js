@@ -481,6 +481,7 @@ Page({
       { id: 3, cocraftX: -191,  cocraftY: 409, text: 'Comment 3', color: '#52c41a' },
       { id: 4, cocraftX: -719,  cocraftY: 301, text: 'Comment 4', color: '#faad14' },
       { id: 5, cocraftX: -1085,  cocraftY: 257, text: 'Comment 5', color: '#0000FF' },
+      { id: 6, cocraftX: -1585,  cocraftY: 257, text: 'Comment 6', color: '#0000FF' },
     ];
   },
 

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LayerBuilder.h"
+#include <chrono>
 #include <tuple>
 #include <unordered_map>
 #include "ToTGFX.h"
@@ -104,6 +105,7 @@
 #include "tgfx/layers/vectors/TextSelector.h"
 #include "tgfx/layers/vectors/TrimPath.h"
 #include "tgfx/layers/vectors/VectorGroup.h"
+#include "tgfx/platform/Print.h"
 
 #ifdef DEBUG
 #include <cassert>
@@ -530,13 +532,29 @@ class LayerBuilderContext {
     if (it != _imageCache.end()) {
       return it->second;
     }
+    auto imgStart = std::chrono::high_resolution_clock::now();
     std::shared_ptr<tgfx::Image> image = nullptr;
+    const char* source = "none";
     if (imageNode->data) {
       image = tgfx::Image::MakeFromEncoded(ToTGFXData(imageNode->data));
+      source = "data";
     } else if (imageNode->filePath.find("data:") == 0) {
       image = ImageFromDataURI(imageNode->filePath);
+      source = "dataURI";
     } else if (!imageNode->filePath.empty()) {
       image = tgfx::Image::MakeFromFile(imageNode->filePath);
+      source = "file";
+    }
+    auto imgEnd = std::chrono::high_resolution_clock::now();
+    auto imgMs = std::chrono::duration<double, std::milli>(imgEnd - imgStart).count();
+    if (imgMs > 1.0) {
+      if (image) {
+        tgfx::PrintLog("[PAGX Perf]     getOrCreateImage=%.1fms source=%s id=%s size=%dx%d\n",
+                       imgMs, source, imageNode->id.c_str(), image->width(), image->height());
+      } else {
+        tgfx::PrintLog("[PAGX Perf]     getOrCreateImage=%.1fms source=%s id=%s\n", imgMs, source,
+                       imageNode->id.c_str());
+      }
     }
     _imageCache[imageNode] = image;
     return image;
@@ -885,9 +903,20 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document, TextLay
   if (document == nullptr) {
     return nullptr;
   }
+  auto start = std::chrono::high_resolution_clock::now();
   auto layoutResult = PerformTextLayout(document, textLayout);
+  auto layoutEnd = std::chrono::high_resolution_clock::now();
   LayerBuilderContext context(layoutResult.shapedTextMap, maxImageDimension);
-  return context.build(*document);
+  auto result = context.build(*document);
+  auto buildEnd = std::chrono::high_resolution_clock::now();
+  auto layoutMs = std::chrono::duration<double, std::milli>(layoutEnd - start).count();
+  auto buildMs = std::chrono::duration<double, std::milli>(buildEnd - layoutEnd).count();
+  auto totalMs = std::chrono::duration<double, std::milli>(buildEnd - start).count();
+  tgfx::PrintLog(
+      "[PAGX Perf] LayerBuilder::Build total=%.1fms (textLayout=%.1fms "
+      "buildLayerTree=%.1fms) shapedTexts=%zu\n",
+      totalMs, layoutMs, buildMs, layoutResult.shapedTextMap.size());
+  return result;
 }
 
 LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document, TextLayout* textLayout,

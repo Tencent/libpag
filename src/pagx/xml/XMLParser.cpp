@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/xml/XMLParser.h"
+#include <tgfx/platform/Print.h>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <limits>
@@ -185,6 +187,7 @@ bool XMLParser::parse(const uint8_t* data, size_t length) {
     return false;
   }
 
+  auto initStart = std::chrono::high_resolution_clock::now();
   ParsingContext parsingContext(this);
   if (!parsingContext._XMLParser) {
     return false;
@@ -202,16 +205,25 @@ bool XMLParser::parse(const uint8_t* data, size_t length) {
   XML_SetCharacterDataHandler(parsingContext._XMLParser, text_handler);
   XML_SetCdataSectionHandler(parsingContext._XMLParser, start_cdata_handler, end_cdata_handler);
   XML_SetEntityDeclHandler(parsingContext._XMLParser, entity_decl_handler);
+  auto initEnd = std::chrono::high_resolution_clock::now();
 
   if (length > static_cast<size_t>(std::numeric_limits<int>::max())) {
     _expatParser = nullptr;
     return false;
   }
 
+  auto parseStart = std::chrono::high_resolution_clock::now();
   auto status = XML_Parse(parsingContext._XMLParser, reinterpret_cast<const char*>(data),
                           static_cast<int>(length), true);
+  auto parseEnd = std::chrono::high_resolution_clock::now();
 
   _expatParser = nullptr;
+
+  auto initMs = std::chrono::duration<double, std::milli>(initEnd - initStart).count();
+  auto parseMs = std::chrono::duration<double, std::milli>(parseEnd - parseStart).count();
+  tgfx::PrintLog("[PAGX Perf]     XMLParser::parse init=%.1fms XML_Parse=%.1fms dataSize=%zuKB\n",
+                 initMs, parseMs, length / 1024);
+
   return XML_STATUS_ERROR != status;
 }
 

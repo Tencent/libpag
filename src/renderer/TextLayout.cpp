@@ -18,6 +18,7 @@
 
 #include "TextLayout.h"
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include "LineBreaker.h"
 #include "PunctuationSquash.h"
@@ -37,6 +38,7 @@
 #include "tgfx/core/Path.h"
 #include "tgfx/core/TextBlobBuilder.h"
 #include "tgfx/core/UTF.h"
+#include "tgfx/platform/Print.h"
 #ifdef PAG_USE_HARFBUZZ
 #include "HarfBuzzShaper.h"
 #endif
@@ -2236,8 +2238,14 @@ class TextLayoutContext {
 };
 
 TextLayoutResult TextLayout::layout(PAGXDocument* document) {
+  auto start = std::chrono::high_resolution_clock::now();
   TextLayoutContext context(this, document);
-  return context.run();
+  auto result = context.run();
+  auto end = std::chrono::high_resolution_clock::now();
+  auto ms = std::chrono::duration<double, std::milli>(end - start).count();
+  tgfx::PrintLog("[PAGX Perf] TextLayout::layout=%.1fms shapedTexts=%zu\n", ms,
+                 result.shapedTextMap.size());
+  return result;
 }
 
 }  // namespace pagx

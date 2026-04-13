@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXImporter.h"
+#include <tgfx/platform/Print.h>
+#include <chrono>
 #include <climits>
 #include <cstdlib>
 #include <cstring>
@@ -65,6 +67,58 @@
 #include "pagx/xml/XMLDOM.h"
 
 namespace pagx {
+
+//==============================================================================
+// Performance tracking for element parsing
+//==============================================================================
+
+struct ElementParseStats {
+  size_t layerCount = 0;
+  size_t groupCount = 0;
+  size_t rectangleCount = 0;
+  size_t ellipseCount = 0;
+  size_t pathCount = 0;
+  size_t textCount = 0;
+  size_t fillCount = 0;
+  size_t strokeCount = 0;
+  size_t otherCount = 0;
+
+  double layerTimeMs = 0;
+  double groupTimeMs = 0;
+  double rectangleTimeMs = 0;
+  double ellipseTimeMs = 0;
+  double pathTimeMs = 0;
+  double textTimeMs = 0;
+  double fillTimeMs = 0;
+  double strokeTimeMs = 0;
+  double otherTimeMs = 0;
+
+  // Attribute parsing breakdown
+  double getAttrTimeMs = 0;
+  double stringCompareTimeMs = 0;
+  size_t getAttrCalls = 0;
+
+  void reset() {
+    *this = ElementParseStats();
+  }
+
+  void print() const {
+    tgfx::PrintLog(
+        "[PAGX Perf]       Element stats: Layer=%zu(%.1fms) Group=%zu(%.1fms) "
+        "Rect=%zu(%.1fms) Path=%zu(%.1fms) Text=%zu(%.1fms)\n",
+        layerCount, layerTimeMs, groupCount, groupTimeMs, rectangleCount, rectangleTimeMs,
+        pathCount, pathTimeMs, textCount, textTimeMs);
+    tgfx::PrintLog(
+        "[PAGX Perf]       Element stats: Fill=%zu(%.1fms) Stroke=%zu(%.1fms) "
+        "Ellipse=%zu(%.1fms) Other=%zu(%.1fms)\n",
+        fillCount, fillTimeMs, strokeCount, strokeTimeMs, ellipseCount, ellipseTimeMs, otherCount,
+        otherTimeMs);
+    tgfx::PrintLog("[PAGX Perf]       Attr stats: getAttrCalls=%zu getAttrTime=%.1fms\n",
+                   getAttrCalls, getAttrTimeMs);
+  }
+};
+
+static thread_local ElementParseStats g_parseStats;
 
 //==============================================================================
 // Forward declarations and utility functions
@@ -238,15 +292,25 @@ static bool parseResource(const DOMNode* node, PAGXDocument* doc) {
 }
 
 static void parseResources(const DOMNode* node, PAGXDocument* doc) {
+  auto preRegStart = std::chrono::high_resolution_clock::now();
   // First pass: pre-register all resource IDs so that cross-references via '@id' resolve
   // regardless of XML declaration order.
   auto child = node->firstChild;
+  int resourceCount = 0;
   while (child) {
     if (child->type == DOMNodeType::Element) {
       preRegisterResource(child.get(), doc);
+      resourceCount++;
     }
     child = child->nextSibling;
   }
+  auto preRegEnd = std::chrono::high_resolution_clock::now();
+
+  int imageCount = 0;
+  int pathDataCount = 0;
+  int colorSourceCount = 0;
+  int fontCount = 0;
+  int compositionCount = 0;
   // Second pass: fully parse each resource. Pre-registered nodes are reused by makeNodeFromXML.
   child = node->firstChild;
   while (child) {
@@ -254,6 +318,17 @@ static void parseResources(const DOMNode* node, PAGXDocument* doc) {
     child = child->nextSibling;
     if (current->type != DOMNodeType::Element) {
       continue;
+    }
+    if (current->name == "Image") {
+      imageCount++;
+    } else if (current->name == "PathData") {
+      pathDataCount++;
+    } else if (current->name == "Font") {
+      fontCount++;
+    } else if (current->name == "Composition") {
+      compositionCount++;
+    } else {
+      colorSourceCount++;
     }
     if (!parseResource(current.get(), doc)) {
       reportError(doc, current.get(),
@@ -264,6 +339,14 @@ static void parseResources(const DOMNode* node, PAGXDocument* doc) {
                       " ConicGradient, DiamondGradient, ImagePattern.");
     }
   }
+  auto parseEnd = std::chrono::high_resolution_clock::now();
+  auto preRegMs = std::chrono::duration<double, std::milli>(preRegEnd - preRegStart).count();
+  auto parseMs = std::chrono::duration<double, std::milli>(parseEnd - preRegEnd).count();
+  tgfx::PrintLog(
+      "[PAGX Perf]     parseResources preReg=%.1fms parse=%.1fms total=%d "
+      "(Image=%d PathData=%d ColorSource=%d Font=%d Composition=%d)\n",
+      preRegMs, parseMs, resourceCount, imageCount, pathDataCount, colorSourceCount, fontCount,
+      compositionCount);
 }
 
 static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc) {
@@ -442,50 +525,113 @@ static void parseFilters(const DOMNode* node, Layer* layer, PAGXDocument* doc) {
 }
 
 static Element* parseElement(const DOMNode* node, PAGXDocument* doc) {
+  auto start = std::chrono::high_resolution_clock::now();
+  Element* result = nullptr;
+
   if (node->name == "Rectangle") {
-    return parseRectangle(node, doc);
+    result = parseRectangle(node, doc);
+    auto end = std::chrono::high_resolution_clock::now();
+    g_parseStats.rectangleCount++;
+    g_parseStats.rectangleTimeMs += std::chrono::duration<double, std::milli>(end - start).count();
+    return result;
   }
   if (node->name == "Ellipse") {
-    return parseEllipse(node, doc);
+    result = parseEllipse(node, doc);
+    auto end = std::chrono::high_resolution_clock::now();
+    g_parseStats.ellipseCount++;
+    g_parseStats.ellipseTimeMs += std::chrono::duration<double, std::milli>(end - start).count();
+    return result;
   }
   if (node->name == "Polystar") {
-    return parsePolystar(node, doc);
+    result = parsePolystar(node, doc);
+    auto end = std::chrono::high_resolution_clock::now();
+    g_parseStats.otherCount++;
+    g_parseStats.otherTimeMs += std::chrono::duration<double, std::milli>(end - start).count();
+    return result;
   }
   if (node->name == "Path") {
-    return parsePath(node, doc);
+    result = parsePath(node, doc);
+    auto end = std::chrono::high_resolution_clock::now();
+    g_parseStats.pathCount++;
+    g_parseStats.pathTimeMs += std::chrono::duration<double, std::milli>(end - start).count();
+    return result;
   }
   if (node->name == "Text") {
-    return parseText(node, doc);
+    result = parseText(node, doc);
+    auto end = std::chrono::high_resolution_clock::now();
+    g_parseStats.textCount++;
+    g_parseStats.textTimeMs += std::chrono::duration<double, std::milli>(end - start).count();
+    return result;
   }
   if (node->name == "Fill") {
-    return parseFill(node, doc);
+    result = parseFill(node, doc);
+    auto end = std::chrono::high_resolution_clock::now();
+    g_parseStats.fillCount++;
+    g_parseStats.fillTimeMs += std::chrono::duration<double, std::milli>(end - start).count();
+    return result;
   }
   if (node->name == "Stroke") {
-    return parseStroke(node, doc);
+    result = parseStroke(node, doc);
+    auto end = std::chrono::high_resolution_clock::now();
+    g_parseStats.strokeCount++;
+    g_parseStats.strokeTimeMs += std::chrono::duration<double, std::milli>(end - start).count();
+    return result;
   }
   if (node->name == "TrimPath") {
-    return parseTrimPath(node, doc);
+    result = parseTrimPath(node, doc);
+    auto end = std::chrono::high_resolution_clock::now();
+    g_parseStats.otherCount++;
+    g_parseStats.otherTimeMs += std::chrono::duration<double, std::milli>(end - start).count();
+    return result;
   }
   if (node->name == "RoundCorner") {
-    return parseRoundCorner(node, doc);
+    result = parseRoundCorner(node, doc);
+    auto end = std::chrono::high_resolution_clock::now();
+    g_parseStats.otherCount++;
+    g_parseStats.otherTimeMs += std::chrono::duration<double, std::milli>(end - start).count();
+    return result;
   }
   if (node->name == "MergePath") {
-    return parseMergePath(node, doc);
+    result = parseMergePath(node, doc);
+    auto end = std::chrono::high_resolution_clock::now();
+    g_parseStats.otherCount++;
+    g_parseStats.otherTimeMs += std::chrono::duration<double, std::milli>(end - start).count();
+    return result;
   }
   if (node->name == "TextModifier") {
-    return parseTextModifier(node, doc);
+    result = parseTextModifier(node, doc);
+    auto end = std::chrono::high_resolution_clock::now();
+    g_parseStats.otherCount++;
+    g_parseStats.otherTimeMs += std::chrono::duration<double, std::milli>(end - start).count();
+    return result;
   }
   if (node->name == "TextPath") {
-    return parseTextPath(node, doc);
+    result = parseTextPath(node, doc);
+    auto end = std::chrono::high_resolution_clock::now();
+    g_parseStats.otherCount++;
+    g_parseStats.otherTimeMs += std::chrono::duration<double, std::milli>(end - start).count();
+    return result;
   }
   if (node->name == "TextBox") {
-    return parseTextBox(node, doc);
+    result = parseTextBox(node, doc);
+    auto end = std::chrono::high_resolution_clock::now();
+    g_parseStats.otherCount++;
+    g_parseStats.otherTimeMs += std::chrono::duration<double, std::milli>(end - start).count();
+    return result;
   }
   if (node->name == "Repeater") {
-    return parseRepeater(node, doc);
+    result = parseRepeater(node, doc);
+    auto end = std::chrono::high_resolution_clock::now();
+    g_parseStats.otherCount++;
+    g_parseStats.otherTimeMs += std::chrono::duration<double, std::milli>(end - start).count();
+    return result;
   }
   if (node->name == "Group") {
-    return parseGroup(node, doc);
+    result = parseGroup(node, doc);
+    auto end = std::chrono::high_resolution_clock::now();
+    g_parseStats.groupCount++;
+    g_parseStats.groupTimeMs += std::chrono::duration<double, std::milli>(end - start).count();
+    return result;
   }
   return nullptr;
 }
@@ -1074,9 +1220,16 @@ static Image* parseImage(const DOMNode* node, PAGXDocument* doc) {
     return nullptr;
   }
   auto source = getAttribute(node, "source");
+  auto decodeStart = std::chrono::high_resolution_clock::now();
   auto data = DecodeBase64DataURI(source);
+  auto decodeEnd = std::chrono::high_resolution_clock::now();
   if (data) {
     image->data = data;
+    auto decodeMs = std::chrono::duration<double, std::milli>(decodeEnd - decodeStart).count();
+    if (decodeMs > 1.0) {
+      tgfx::PrintLog("[PAGX Perf]     parseImage base64Decode=%.1fms decodedSize=%zuKB id=%s\n",
+                     decodeMs, data->size() / 1024, image->id.c_str());
+    }
   } else {
     image->filePath = source;
   }
@@ -1427,7 +1580,11 @@ static ColorMatrixFilter* parseColorMatrixFilter(const DOMNode* node, PAGXDocume
 
 static const std::string& getAttribute(const DOMNode* node, const std::string& name,
                                        const std::string& defaultValue) {
+  auto start = std::chrono::high_resolution_clock::now();
   auto* value = node->findAttribute(name);
+  auto end = std::chrono::high_resolution_clock::now();
+  g_parseStats.getAttrTimeMs += std::chrono::duration<double, std::milli>(end - start).count();
+  g_parseStats.getAttrCalls++;
   return value ? *value : defaultValue;
 }
 
@@ -1787,7 +1944,9 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const std::string& xmlConten
 }
 
 std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const uint8_t* data, size_t length) {
+  auto totalStart = std::chrono::high_resolution_clock::now();
   auto dom = XMLDOM::Make(data, length);
+  auto domEnd = std::chrono::high_resolution_clock::now();
   if (!dom) {
     return nullptr;
   }
@@ -1797,10 +1956,20 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const uint8_t* data, size_t 
   }
   auto doc = std::shared_ptr<PAGXDocument>(new PAGXDocument());
   parseDocument(root.get(), doc.get());
+  auto parseEnd = std::chrono::high_resolution_clock::now();
+  auto domMs = std::chrono::duration<double, std::milli>(domEnd - totalStart).count();
+  auto parseMs = std::chrono::duration<double, std::milli>(parseEnd - domEnd).count();
+  auto totalMs = std::chrono::duration<double, std::milli>(parseEnd - totalStart).count();
+  tgfx::PrintLog(
+      "[PAGX Perf] PAGXImporter::FromXML total=%.1fms (XMLDOM::Make=%.1fms "
+      "parseDocument=%.1fms) dataSize=%zuKB\n",
+      totalMs, domMs, parseMs, length / 1024);
   return doc;
 }
 
 static void parseDocument(const DOMNode* root, PAGXDocument* doc) {
+  g_parseStats.reset();
+  auto docStart = std::chrono::high_resolution_clock::now();
   doc->version = getAttribute(root, "version", "1.0");
   doc->width = getFloatAttribute(root, "width", 0, doc);
   doc->height = getFloatAttribute(root, "height", 0, doc);
@@ -1811,16 +1980,26 @@ static void parseDocument(const DOMNode* root, PAGXDocument* doc) {
   if (child) {
     parseResources(child.get(), doc);
   }
+  auto resourceEnd = std::chrono::high_resolution_clock::now();
 
   // Second pass: Parse Layers.
   child = root->firstChild;
+  int layerIndex = 0;
   while (child) {
     if (child->type == DOMNodeType::Element) {
       if (child->name == "Layer") {
+        auto layerStart = std::chrono::high_resolution_clock::now();
+        auto nodesBefore = doc->nodes.size();
         auto layer = parseLayer(child.get(), doc);
+        auto layerEnd = std::chrono::high_resolution_clock::now();
+        auto layerMs = std::chrono::duration<double, std::milli>(layerEnd - layerStart).count();
+        auto nodesCreated = doc->nodes.size() - nodesBefore;
+        tgfx::PrintLog("[PAGX Perf]     parseLayer[%d] name=\"%s\" time=%.1fms nodes=%zu\n",
+                       layerIndex, layer ? layer->name.c_str() : "null", layerMs, nodesCreated);
         if (layer) {
           doc->layers.push_back(layer);
         }
+        layerIndex++;
       } else if (child->name != "Resources") {
         reportError(
             doc, child.get(),
@@ -1829,6 +2008,14 @@ static void parseDocument(const DOMNode* root, PAGXDocument* doc) {
     }
     child = child->nextSibling;
   }
+  auto layerEnd = std::chrono::high_resolution_clock::now();
+  auto resMs = std::chrono::duration<double, std::milli>(resourceEnd - docStart).count();
+  auto layerMs = std::chrono::duration<double, std::milli>(layerEnd - resourceEnd).count();
+  tgfx::PrintLog(
+      "[PAGX Perf]   parseDocument (parseResources=%.1fms parseLayers=%.1fms "
+      "nodes=%zu layers=%zu)\n",
+      resMs, layerMs, doc->nodes.size(), doc->layers.size());
+  g_parseStats.print();
 }
 
 }  // namespace pagx

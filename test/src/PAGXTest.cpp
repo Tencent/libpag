@@ -16,10 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <chrono>
 #include <cmath>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include "base/utils/Log.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
@@ -207,7 +209,8 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
  * Test case: Verify PAGXImporter::FromFile and FromXML produce identical results when rendered.
  */
 PAGX_TEST(PAGXTest, LayerBuilderAPIConsistency) {
-  auto pagxPath = ProjectPath::Absolute("resources/apitest/api_consistency.pagx");
+  auto pagxPath =
+      ProjectPath::Absolute("resources/apitest/09e7de5854666b649d27ac07ca97032053b11476.pagx");
 
   // Load via FromFile
   auto docFromFile = pagx::PAGXImporter::FromFile(pagxPath);
@@ -218,8 +221,13 @@ PAGX_TEST(PAGXTest, LayerBuilderAPIConsistency) {
   // Load via FromXML (read raw bytes from the same file)
   auto fileData = tgfx::Data::MakeFromFile(pagxPath);
   ASSERT_TRUE(fileData != nullptr);
+  LOGI("PAGXImporter::FromXML start");
+  auto startTime = std::chrono::high_resolution_clock::now();
   auto docFromData =
       pagx::PAGXImporter::FromXML(fileData->bytes(), static_cast<size_t>(fileData->size()));
+  auto endTime = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+  LOGI("PAGXImporter::FromXML took %lld ms", static_cast<long long>(duration.count()));
   ASSERT_TRUE(docFromData != nullptr);
   auto layerFromData = pagx::LayerBuilder::Build(docFromData.get());
   ASSERT_TRUE(layerFromData != nullptr);
