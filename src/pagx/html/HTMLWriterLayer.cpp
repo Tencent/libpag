@@ -180,10 +180,11 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         if (!curTextBox->elements.empty()) {
           // TextBox with child elements: render as a positioned container with text styling.
           auto tb = curTextBox;
-          float tbW = tb->width;
-          float tbH = tb->height;
-          float tbLeft = !std::isnan(tbW) ? (tb->position.x - tbW * 0.5f) : tb->position.x;
-          float tbTop = !std::isnan(tbH) ? (tb->position.y - tbH * 0.5f) : tb->position.y;
+          auto tbBounds = tb->layoutBounds();
+          float tbW = !std::isnan(tb->width) ? tb->width : tbBounds.width;
+          float tbH = !std::isnan(tb->height) ? tb->height : tbBounds.height;
+          float tbLeft = !std::isnan(tb->width) ? (tb->position.x - tb->width * 0.5f) : tbBounds.x;
+          float tbTop = !std::isnan(tb->height) ? (tb->position.y - tb->height * 0.5f) : tbBounds.y;
           std::string style = "position:absolute;left:" + FloatToString(tbLeft) +
                               "px;top:" + FloatToString(tbTop) + "px";
           if (!std::isnan(tbW) && tbW > 0) {
