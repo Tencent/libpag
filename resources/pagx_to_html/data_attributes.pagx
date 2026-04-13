@@ -28,15 +28,11 @@
       <!-- Body content -->
       <Layer flex="1" layout="vertical" gap="10" padding="12" alignment="stretch" name="bodyContent" data-section="body" data-index="0">
         <!-- Description text -->
-        <Layer height="36" layout="vertical" gap="2" alignment="stretch">
-          <Layer height="16">
-            <Text text="Description text with custom" fontFamily="Arial" fontSize="11" position="0,0"/>
+        <Layer height="36">
+          <TextBox position="124,18" width="248" height="36" textAlign="start" lineHeight="15">
+            <Text text="Description text with custom data attributes on multiple elements." fontFamily="Arial" fontSize="11"/>
             <Fill color="#64748B"/>
-          </Layer>
-          <Layer height="16">
-            <Text text="data attributes on elements." fontFamily="Arial" fontSize="11" position="0,0"/>
-            <Fill color="#64748B"/>
-          </Layer>
+          </TextBox>
         </Layer>
 
         <!-- Icon and button row -->
