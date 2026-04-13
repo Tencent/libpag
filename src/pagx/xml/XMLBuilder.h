@@ -48,7 +48,7 @@ class XMLBuilder {
 
   //--- XML Declaration -------------------------------------------------------
 
-  XMLBuilder& decl(bool standalone = false) {
+  XMLBuilder& appendDeclaration(bool standalone = false) {
     _buf += "<?xml version=\"1.0\" encoding=\"UTF-8\"";
     if (standalone) {
       _buf += " standalone=\"yes\"";
@@ -60,13 +60,9 @@ class XMLBuilder {
     return *this;
   }
 
-  XMLBuilder& appendDeclaration() {
-    return decl();
-  }
-
   //--- Open Element ----------------------------------------------------------
 
-  XMLBuilder& open(const char* tag) {
+  XMLBuilder& openElement(const char* tag) {
     if (_prettyPrint) {
       writeIndent();
     }
@@ -76,33 +72,22 @@ class XMLBuilder {
     return *this;
   }
 
-  XMLBuilder& openElement(const char* tag) {
-    return open(tag);
-  }
-
-  //--- Always-write Attributes (PPT style) -----------------------------------
-
-  XMLBuilder& attr(const char* name, const char* val) {
-    _buf += ' ';
-    _buf += name;
-    _buf += "=\"";
-    escapeAttrTo(_buf, val);
-    _buf += '"';
-    return *this;
-  }
-
-  XMLBuilder& attr(const char* name, const std::string& val) {
-    return attr(name, val.c_str());
-  }
-
-  XMLBuilder& attr(const char* name, int64_t val) {
-    return attr(name, std::to_string(val).c_str());
-  }
-
   //--- Required Attributes (always written) ----------------------------------
+
+  XMLBuilder& addRequiredAttribute(const char* name, const char* value) {
+    return attr(name, value);
+  }
 
   XMLBuilder& addRequiredAttribute(const char* name, const std::string& value) {
     return attr(name, value);
+  }
+
+  XMLBuilder& addRequiredAttribute(const char* name, int value) {
+    return attr(name, std::to_string(value).c_str());
+  }
+
+  XMLBuilder& addRequiredAttribute(const char* name, int64_t value) {
+    return attr(name, std::to_string(value).c_str());
   }
 
   XMLBuilder& addRequiredAttribute(const char* name, float value) {
@@ -139,7 +124,7 @@ class XMLBuilder {
 
   XMLBuilder& addAttribute(const char* name, int value, int defaultValue = 0) {
     if (value != defaultValue) {
-      return attr(name, static_cast<int64_t>(value));
+      return attr(name, std::to_string(value).c_str());
     }
     return *this;
   }
@@ -163,9 +148,16 @@ class XMLBuilder {
     return *this;
   }
 
+  XMLBuilder& addOptionalAttribute(const char* name, float value) {
+    if (!std::isnan(value)) {
+      return addRequiredAttribute(name, value);
+    }
+    return *this;
+  }
+
   //--- Close Start Tag -------------------------------------------------------
 
-  XMLBuilder& gt() {
+  XMLBuilder& closeElementStart() {
     _buf += '>';
     if (_prettyPrint) {
       _buf += '\n';
@@ -174,13 +166,9 @@ class XMLBuilder {
     return *this;
   }
 
-  XMLBuilder& closeElementStart() {
-    return gt();
-  }
-
   //--- Self-Closing ----------------------------------------------------------
 
-  XMLBuilder& sc() {
+  XMLBuilder& closeElementSelfClosing() {
     _buf += "/>";
     if (_prettyPrint) {
       _buf += '\n';
@@ -189,13 +177,9 @@ class XMLBuilder {
     return *this;
   }
 
-  XMLBuilder& closeElementSelfClosing() {
-    return sc();
-  }
-
   //--- Close Element ---------------------------------------------------------
 
-  XMLBuilder& end() {
+  XMLBuilder& closeElement() {
     if (_prettyPrint) {
       _indent--;
       writeIndent();
@@ -208,10 +192,6 @@ class XMLBuilder {
     }
     _tags.pop_back();
     return *this;
-  }
-
-  XMLBuilder& closeElement() {
-    return end();
   }
 
   //--- Inline Text Element: >text</tag>\n ------------------------------------
@@ -231,22 +211,14 @@ class XMLBuilder {
 
   //--- Text / Raw Content ----------------------------------------------------
 
-  XMLBuilder& text(const std::string& t) {
+  XMLBuilder& addTextContent(const std::string& t) {
     escapeTextTo(_buf, t);
     return *this;
   }
 
-  XMLBuilder& addTextContent(const std::string& t) {
-    return text(t);
-  }
-
-  XMLBuilder& raw(const std::string& s) {
+  XMLBuilder& addRawContent(const std::string& s) {
     _buf += s;
     return *this;
-  }
-
-  XMLBuilder& addRawContent(const std::string& s) {
-    return raw(s);
   }
 
   //--- Result ----------------------------------------------------------------
@@ -261,6 +233,19 @@ class XMLBuilder {
   bool _prettyPrint;
   int _indentSpaces;
   int _indent = 0;
+
+  XMLBuilder& attr(const char* name, const char* val) {
+    _buf += ' ';
+    _buf += name;
+    _buf += "=\"";
+    escapeAttrTo(_buf, val);
+    _buf += '"';
+    return *this;
+  }
+
+  XMLBuilder& attr(const char* name, const std::string& val) {
+    return attr(name, val.c_str());
+  }
 
   void writeIndent() {
     _buf.append(static_cast<size_t>(_indent * _indentSpaces), ' ');

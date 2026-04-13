@@ -28,26 +28,26 @@ int64_t PxToEMU(float px) {
 }
 
 void EmitPoint(XMLBuilder& out, const char* tag, float x, float y, float ofsX, float ofsY) {
-  out.open(tag).gt();
-  out.open("a:pt").attr("x", PxToEMU(x - ofsX)).attr("y", PxToEMU(y - ofsY)).sc();
-  out.end();
+  out.openElement(tag).closeElementStart();
+  out.openElement("a:pt").addRequiredAttribute("x", PxToEMU(x - ofsX)).addRequiredAttribute("y", PxToEMU(y - ofsY)).closeElementSelfClosing();
+  out.closeElement();
 }
 
 void EmitQuadBezTo(XMLBuilder& out, const char* tag, float x0, float y0, float x1, float y1,
                    float ofsX, float ofsY) {
-  out.open(tag).gt();
-  out.open("a:pt").attr("x", PxToEMU(x0 - ofsX)).attr("y", PxToEMU(y0 - ofsY)).sc();
-  out.open("a:pt").attr("x", PxToEMU(x1 - ofsX)).attr("y", PxToEMU(y1 - ofsY)).sc();
-  out.end();
+  out.openElement(tag).closeElementStart();
+  out.openElement("a:pt").addRequiredAttribute("x", PxToEMU(x0 - ofsX)).addRequiredAttribute("y", PxToEMU(y0 - ofsY)).closeElementSelfClosing();
+  out.openElement("a:pt").addRequiredAttribute("x", PxToEMU(x1 - ofsX)).addRequiredAttribute("y", PxToEMU(y1 - ofsY)).closeElementSelfClosing();
+  out.closeElement();
 }
 
 void EmitCubicBezTo(XMLBuilder& out, float x0, float y0, float x1, float y1, float x2, float y2,
                     float ofsX, float ofsY) {
-  out.open("a:cubicBezTo").gt();
-  out.open("a:pt").attr("x", PxToEMU(x0 - ofsX)).attr("y", PxToEMU(y0 - ofsY)).sc();
-  out.open("a:pt").attr("x", PxToEMU(x1 - ofsX)).attr("y", PxToEMU(y1 - ofsY)).sc();
-  out.open("a:pt").attr("x", PxToEMU(x2 - ofsX)).attr("y", PxToEMU(y2 - ofsY)).sc();
-  out.end();
+  out.openElement("a:cubicBezTo").closeElementStart();
+  out.openElement("a:pt").addRequiredAttribute("x", PxToEMU(x0 - ofsX)).addRequiredAttribute("y", PxToEMU(y0 - ofsY)).closeElementSelfClosing();
+  out.openElement("a:pt").addRequiredAttribute("x", PxToEMU(x1 - ofsX)).addRequiredAttribute("y", PxToEMU(y1 - ofsY)).closeElementSelfClosing();
+  out.openElement("a:pt").addRequiredAttribute("x", PxToEMU(x2 - ofsX)).addRequiredAttribute("y", PxToEMU(y2 - ofsY)).closeElementSelfClosing();
+  out.closeElement();
 }
 
 void EmitContourSegments(XMLBuilder& out, const PathContour& c, float csX, float csY, float sOfsX,
@@ -76,7 +76,7 @@ void EmitContour(XMLBuilder& out, const PathContour& c, float csX, float csY, fl
   EmitPoint(out, "a:moveTo", c.start.x * csX, c.start.y * csY, sOfsX, sOfsY);
   EmitContourSegments(out, c, csX, csY, sOfsX, sOfsY);
   if (c.closed) {
-    out.open("a:close").sc();
+    out.openElement("a:close").closeElementSelfClosing();
   }
 }
 
@@ -108,46 +108,46 @@ void EmitBridgedGroup(XMLBuilder& out, const std::vector<PathContour>& contours,
     EmitPoint(out, "a:lnTo", outer.start.x * csX, outer.start.y * csY, sOfsX, sOfsY);
   }
 
-  out.open("a:close").sc();
+  out.openElement("a:close").closeElementSelfClosing();
 }
 
 void EmitGroupCustGeom(XMLBuilder& out, const std::vector<PathContour>& contours,
                        const std::vector<size_t>& group, int64_t pathWidth, int64_t pathHeight,
                        float scaleX, float scaleY, float scaledOfsX, float scaledOfsY) {
-  out.open("a:custGeom").gt();
-  out.open("a:avLst").sc();
-  out.open("a:gdLst").sc();
-  out.open("a:ahLst").sc();
-  out.open("a:cxnLst").sc();
-  out.open("a:rect").attr("l", "0").attr("t", "0").attr("r", "r").attr("b", "b").sc();
-  out.open("a:pathLst").gt();
-  out.open("a:path").attr("w", pathWidth).attr("h", pathHeight).gt();
+  out.openElement("a:custGeom").closeElementStart();
+  out.openElement("a:avLst").closeElementSelfClosing();
+  out.openElement("a:gdLst").closeElementSelfClosing();
+  out.openElement("a:ahLst").closeElementSelfClosing();
+  out.openElement("a:cxnLst").closeElementSelfClosing();
+  out.openElement("a:rect").addRequiredAttribute("l", "0").addRequiredAttribute("t", "0").addRequiredAttribute("r", "r").addRequiredAttribute("b", "b").closeElementSelfClosing();
+  out.openElement("a:pathLst").closeElementStart();
+  out.openElement("a:path").addRequiredAttribute("w", pathWidth).addRequiredAttribute("h", pathHeight).closeElementStart();
 
   // Zero-length segments at opposite corners of the coordinate space.  They
   // are invisible but force the content bounding box to match the declared
   // (w, h), preventing renderers that auto-fit shapes to actual content bounds
   // (e.g. WeChat) from rescaling each group independently.
-  out.open("a:moveTo").gt();
-  out.open("a:pt").attr("x", int64_t(0)).attr("y", int64_t(0)).sc();
-  out.end();
-  out.open("a:lnTo").gt();
-  out.open("a:pt").attr("x", int64_t(0)).attr("y", int64_t(0)).sc();
-  out.end();
-  out.open("a:moveTo").gt();
-  out.open("a:pt").attr("x", pathWidth).attr("y", pathHeight).sc();
-  out.end();
-  out.open("a:lnTo").gt();
-  out.open("a:pt").attr("x", pathWidth).attr("y", pathHeight).sc();
-  out.end();
+  out.openElement("a:moveTo").closeElementStart();
+  out.openElement("a:pt").addRequiredAttribute("x", int64_t(0)).addRequiredAttribute("y", int64_t(0)).closeElementSelfClosing();
+  out.closeElement();
+  out.openElement("a:lnTo").closeElementStart();
+  out.openElement("a:pt").addRequiredAttribute("x", int64_t(0)).addRequiredAttribute("y", int64_t(0)).closeElementSelfClosing();
+  out.closeElement();
+  out.openElement("a:moveTo").closeElementStart();
+  out.openElement("a:pt").addRequiredAttribute("x", pathWidth).addRequiredAttribute("y", pathHeight).closeElementSelfClosing();
+  out.closeElement();
+  out.openElement("a:lnTo").closeElementStart();
+  out.openElement("a:pt").addRequiredAttribute("x", pathWidth).addRequiredAttribute("y", pathHeight).closeElementSelfClosing();
+  out.closeElement();
 
   if (group.size() > 1) {
     EmitBridgedGroup(out, contours, group, scaleX, scaleY, scaledOfsX, scaledOfsY);
   } else {
     EmitContour(out, contours[group[0]], scaleX, scaleY, scaledOfsX, scaledOfsY);
   }
-  out.end();  // a:path
-  out.end();  // a:pathLst
-  out.end();  // a:custGeom
+  out.closeElement();  // a:path
+  out.closeElement();  // a:pathLst
+  out.closeElement();  // a:custGeom
 }
 
 }  // namespace pagx

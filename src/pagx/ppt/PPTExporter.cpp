@@ -295,13 +295,13 @@ PPTWriter::Xform PPTWriter::decomposeXform(float localX, float localY, float loc
 
 void PPTWriter::WriteXfrm(XMLBuilder& out, const Xform& xf) {
   if (xf.rotation != 0) {
-    out.open("a:xfrm").attr("rot", xf.rotation).gt();
+    out.openElement("a:xfrm").addRequiredAttribute("rot", xf.rotation).closeElementStart();
   } else {
-    out.open("a:xfrm").gt();
+    out.openElement("a:xfrm").closeElementStart();
   }
-  out.open("a:off").attr("x", xf.offX).attr("y", xf.offY).sc();
-  out.open("a:ext").attr("cx", xf.extCX).attr("cy", xf.extCY).sc();
-  out.end();  // a:xfrm
+  out.openElement("a:off").addRequiredAttribute("x", xf.offX).addRequiredAttribute("y", xf.offY).closeElementSelfClosing();
+  out.openElement("a:ext").addRequiredAttribute("cx", xf.extCX).addRequiredAttribute("cy", xf.extCY).closeElementSelfClosing();
+  out.closeElement();  // a:xfrm
 }
 
 // ── Shape envelope ─────────────────────────────────────────────────────────
@@ -309,35 +309,35 @@ void PPTWriter::WriteXfrm(XMLBuilder& out, const Xform& xf) {
 void PPTWriter::beginShape(XMLBuilder& out, const char* name, int64_t offX, int64_t offY,
                            int64_t extCX, int64_t extCY, int rot) {
   int id = _ctx->nextShapeId();
-  out.open("p:sp").gt();
+  out.openElement("p:sp").closeElementStart();
 
-  out.open("p:nvSpPr").gt();
-  out.open("p:cNvPr").attr("id", id).attr("name", name).sc();
-  out.open("p:cNvSpPr").sc();
-  out.open("p:nvPr").sc();
-  out.end();  // p:nvSpPr
+  out.openElement("p:nvSpPr").closeElementStart();
+  out.openElement("p:cNvPr").addRequiredAttribute("id", id).addRequiredAttribute("name", name).closeElementSelfClosing();
+  out.openElement("p:cNvSpPr").closeElementSelfClosing();
+  out.openElement("p:nvPr").closeElementSelfClosing();
+  out.closeElement();  // p:nvSpPr
 
-  out.open("p:spPr").gt();
+  out.openElement("p:spPr").closeElementStart();
   WriteXfrm(out, {offX, offY, extCX, extCY, rot});
 }
 
 void PPTWriter::endShape(XMLBuilder& out) {
-  out.end();  // p:spPr
-  out.open("p:txBody").gt();
-  out.open("a:bodyPr").sc();
-  out.open("a:lstStyle").sc();
-  out.open("a:p").gt();
-  out.open("a:endParaRPr").attr("lang", "zh-CN").attr("altLang", "en-US").sc();
-  out.end();  // a:p
-  out.end();  // p:txBody
-  out.end();  // p:sp
+  out.closeElement();  // p:spPr
+  out.openElement("p:txBody").closeElementStart();
+  out.openElement("a:bodyPr").closeElementSelfClosing();
+  out.openElement("a:lstStyle").closeElementSelfClosing();
+  out.openElement("a:p").closeElementStart();
+  out.openElement("a:endParaRPr").addRequiredAttribute("lang", "zh-CN").addRequiredAttribute("altLang", "en-US").closeElementSelfClosing();
+  out.closeElement();  // a:p
+  out.closeElement();  // p:txBody
+  out.closeElement();  // p:sp
 }
 
 void PPTWriter::writeShapeTail(XMLBuilder& out, const FillStrokeInfo& fs, float alpha,
                                const Rect& shapeBounds, bool imageWritten,
                                const std::vector<LayerFilter*>& filters) {
   if (imageWritten) {
-    out.open("a:noFill").sc();
+    out.openElement("a:noFill").closeElementSelfClosing();
   } else {
     writeFill(out, fs.fill, alpha, shapeBounds);
   }
@@ -359,20 +359,20 @@ const LayerBuildResult& PPTWriter::ensureBuildResult() {
 // ── Shared XML helpers ──────────────────────────────────────────────────────
 
 void PPTWriter::WriteBlip(XMLBuilder& out, const std::string& relId, float alpha) {
-  out.open("a:blip").attr("r:embed", relId);
+  out.openElement("a:blip").addRequiredAttribute("r:embed", relId);
   if (alpha < 1.0f) {
-    out.gt();
-    out.open("a:alphaModFix").attr("amt", AlphaToPct(alpha)).sc();
-    out.end();  // a:blip
+    out.closeElementStart();
+    out.openElement("a:alphaModFix").addRequiredAttribute("amt", AlphaToPct(alpha)).closeElementSelfClosing();
+    out.closeElement();  // a:blip
   } else {
-    out.sc();
+    out.closeElementSelfClosing();
   }
 }
 
 void PPTWriter::WriteDefaultStretch(XMLBuilder& out) {
-  out.open("a:stretch").gt();
-  out.open("a:fillRect").sc();
-  out.end();  // a:stretch
+  out.openElement("a:stretch").closeElementStart();
+  out.openElement("a:fillRect").closeElementSelfClosing();
+  out.closeElement();  // a:stretch
 }
 
 // ── Rasterized picture ──────────────────────────────────────────────────────
@@ -380,29 +380,29 @@ void PPTWriter::WriteDefaultStretch(XMLBuilder& out) {
 void PPTWriter::writePicture(XMLBuilder& out, const std::string& relId, int64_t offX, int64_t offY,
                              int64_t extCX, int64_t extCY) {
   int id = _ctx->nextShapeId();
-  out.open("p:pic").gt();
+  out.openElement("p:pic").closeElementStart();
 
-  out.open("p:nvPicPr").gt();
-  out.open("p:cNvPr").attr("id", id).attr("name", "MaskedImage").sc();
-  out.open("p:cNvPicPr").gt();
-  out.open("a:picLocks").attr("noChangeAspect", "1").sc();
-  out.end();  // p:cNvPicPr
-  out.open("p:nvPr").sc();
-  out.end();  // p:nvPicPr
+  out.openElement("p:nvPicPr").closeElementStart();
+  out.openElement("p:cNvPr").addRequiredAttribute("id", id).addRequiredAttribute("name", "MaskedImage").closeElementSelfClosing();
+  out.openElement("p:cNvPicPr").closeElementStart();
+  out.openElement("a:picLocks").addRequiredAttribute("noChangeAspect", "1").closeElementSelfClosing();
+  out.closeElement();  // p:cNvPicPr
+  out.openElement("p:nvPr").closeElementSelfClosing();
+  out.closeElement();  // p:nvPicPr
 
-  out.open("p:blipFill").gt();
+  out.openElement("p:blipFill").closeElementStart();
   WriteBlip(out, relId, 1.0f);
   WriteDefaultStretch(out);
-  out.end();  // p:blipFill
+  out.closeElement();  // p:blipFill
 
-  out.open("p:spPr").gt();
+  out.openElement("p:spPr").closeElementStart();
   WriteXfrm(out, {offX, offY, extCX, extCY, 0});
-  out.open("a:prstGeom").attr("prst", "rect").gt();
-  out.open("a:avLst").sc();
-  out.end();  // a:prstGeom
-  out.end();  // p:spPr
+  out.openElement("a:prstGeom").addRequiredAttribute("prst", "rect").closeElementStart();
+  out.openElement("a:avLst").closeElementSelfClosing();
+  out.closeElement();  // a:prstGeom
+  out.closeElement();  // p:spPr
 
-  out.end();  // p:pic
+  out.closeElement();  // p:pic
 }
 
 // ── ImagePattern as p:pic element ──────────────────────────────────────────
@@ -444,64 +444,64 @@ bool PPTWriter::writeImagePatternAsPicture(XMLBuilder& out, const Fill* fill,
   auto xf = decomposeXform(ipr.visL, ipr.visT, ipr.visR - ipr.visL, ipr.visB - ipr.visT, m);
 
   int id = _ctx->nextShapeId();
-  out.open("p:pic").gt();
+  out.openElement("p:pic").closeElementStart();
 
-  out.open("p:nvPicPr").gt();
-  out.open("p:cNvPr").attr("id", id).attr("name", "Image").sc();
-  out.open("p:cNvPicPr").gt();
-  out.open("a:picLocks").attr("noChangeAspect", "1").sc();
-  out.end();  // p:cNvPicPr
-  out.open("p:nvPr").sc();
-  out.end();  // p:nvPicPr
+  out.openElement("p:nvPicPr").closeElementStart();
+  out.openElement("p:cNvPr").addRequiredAttribute("id", id).addRequiredAttribute("name", "Image").closeElementSelfClosing();
+  out.openElement("p:cNvPicPr").closeElementStart();
+  out.openElement("a:picLocks").addRequiredAttribute("noChangeAspect", "1").closeElementSelfClosing();
+  out.closeElement();  // p:cNvPicPr
+  out.openElement("p:nvPr").closeElementSelfClosing();
+  out.closeElement();  // p:nvPicPr
 
-  out.open("p:blipFill").gt();
+  out.openElement("p:blipFill").closeElementStart();
   WriteBlip(out, relId, effectiveAlpha);
   if (hasSrcRect) {
-    auto& src = out.open("a:srcRect");
-    if (ipr.srcL != 0) src.attr("l", ipr.srcL);
-    if (ipr.srcT != 0) src.attr("t", ipr.srcT);
-    if (ipr.srcR != 0) src.attr("r", ipr.srcR);
-    if (ipr.srcB != 0) src.attr("b", ipr.srcB);
-    src.sc();
+    auto& src = out.openElement("a:srcRect");
+    if (ipr.srcL != 0) src.addRequiredAttribute("l", ipr.srcL);
+    if (ipr.srcT != 0) src.addRequiredAttribute("t", ipr.srcT);
+    if (ipr.srcR != 0) src.addRequiredAttribute("r", ipr.srcR);
+    if (ipr.srcB != 0) src.addRequiredAttribute("b", ipr.srcB);
+    src.closeElementSelfClosing();
   }
   WriteDefaultStretch(out);
-  out.end();  // p:blipFill
+  out.closeElement();  // p:blipFill
 
-  out.open("p:spPr").gt();
+  out.openElement("p:spPr").closeElementStart();
   WriteXfrm(out, xf);
-  out.open("a:prstGeom").attr("prst", "rect").gt();
-  out.open("a:avLst").sc();
-  out.end();  // a:prstGeom
-  out.end();  // p:spPr
+  out.openElement("a:prstGeom").addRequiredAttribute("prst", "rect").closeElementStart();
+  out.openElement("a:avLst").closeElementSelfClosing();
+  out.closeElement();  // a:prstGeom
+  out.closeElement();  // p:spPr
 
-  out.end();  // p:pic
+  out.closeElement();  // p:pic
   return true;
 }
 
 // ── Color source / gradient ────────────────────────────────────────────────
 
 void PPTWriter::writeGradientStops(XMLBuilder& out, const std::vector<ColorStop*>& stops) {
-  out.open("a:gsLst").gt();
+  out.openElement("a:gsLst").closeElementStart();
   for (const auto* stop : stops) {
     int pos = std::clamp(static_cast<int>(std::round(stop->offset * 100000.0f)), 0, 100000);
-    out.open("a:gs").attr("pos", pos).gt();
-    out.open("a:srgbClr").attr("val", ColorToHex6(stop->color));
+    out.openElement("a:gs").addRequiredAttribute("pos", pos).closeElementStart();
+    out.openElement("a:srgbClr").addRequiredAttribute("val", ColorToHex6(stop->color));
     if (stop->color.alpha < 1.0f) {
-      out.gt();
-      out.open("a:alpha").attr("val", AlphaToPct(stop->color.alpha)).sc();
-      out.end();  // a:srgbClr
+      out.closeElementStart();
+      out.openElement("a:alpha").addRequiredAttribute("val", AlphaToPct(stop->color.alpha)).closeElementSelfClosing();
+      out.closeElement();  // a:srgbClr
     } else {
-      out.sc();
+      out.closeElementSelfClosing();
     }
-    out.end();  // a:gs
+    out.closeElement();  // a:gs
   }
-  out.end();  // a:gsLst
+  out.closeElement();  // a:gsLst
 }
 
 void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, float alpha,
                                  const Rect& shapeBounds) {
   if (!source) {
-    out.open("a:noFill").sc();
+    out.openElement("a:noFill").closeElementSelfClosing();
     return;
   }
 
@@ -509,16 +509,16 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
     case NodeType::SolidColor: {
       auto* solid = static_cast<const SolidColor*>(source);
       float effectiveAlpha = solid->color.alpha * alpha;
-      out.open("a:solidFill").gt();
-      out.open("a:srgbClr").attr("val", ColorToHex6(solid->color));
+      out.openElement("a:solidFill").closeElementStart();
+      out.openElement("a:srgbClr").addRequiredAttribute("val", ColorToHex6(solid->color));
       if (effectiveAlpha < 1.0f) {
-        out.gt();
-        out.open("a:alpha").attr("val", AlphaToPct(effectiveAlpha)).sc();
-        out.end();
+        out.closeElementStart();
+        out.openElement("a:alpha").addRequiredAttribute("val", AlphaToPct(effectiveAlpha)).closeElementSelfClosing();
+        out.closeElement();
       } else {
-        out.sc();
+        out.closeElementSelfClosing();
       }
-      out.end();  // a:solidFill
+      out.closeElement();  // a:solidFill
       break;
     }
     case NodeType::LinearGradient: {
@@ -530,25 +530,25 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
       float angleDeg = RadiansToDegrees(std::atan2(dy, dx));
       int ang = AngleToPPT(angleDeg);
 
-      out.open("a:gradFill").gt();
+      out.openElement("a:gradFill").closeElementStart();
       writeGradientStops(out, grad->colorStops);
-      out.open("a:lin").attr("ang", ang).attr("scaled", "1").sc();
-      out.end();  // a:gradFill
+      out.openElement("a:lin").addRequiredAttribute("ang", ang).addRequiredAttribute("scaled", "1").closeElementSelfClosing();
+      out.closeElement();  // a:gradFill
       break;
     }
     case NodeType::RadialGradient: {
       auto* grad = static_cast<const RadialGradient*>(source);
-      out.open("a:gradFill").gt();
+      out.openElement("a:gradFill").closeElementStart();
       writeGradientStops(out, grad->colorStops);
-      out.open("a:path").attr("path", "circle").gt();
-      out.open("a:fillToRect")
-          .attr("l", 50000)
-          .attr("t", 50000)
-          .attr("r", 50000)
-          .attr("b", 50000)
-          .sc();
-      out.end();  // a:path
-      out.end();  // a:gradFill
+      out.openElement("a:path").addRequiredAttribute("path", "circle").closeElementStart();
+      out.openElement("a:fillToRect")
+          .addRequiredAttribute("l", 50000)
+          .addRequiredAttribute("t", 50000)
+          .addRequiredAttribute("r", 50000)
+          .addRequiredAttribute("b", 50000)
+          .closeElementSelfClosing();
+      out.closeElement();  // a:path
+      out.closeElement();  // a:gradFill
       break;
     }
     case NodeType::ImagePattern: {
@@ -556,7 +556,7 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
       if (pattern->image) {
         std::string relId = _ctx->addImage(pattern->image);
         if (!relId.empty()) {
-          out.open("a:blipFill").gt();
+          out.openElement("a:blipFill").closeElementStart();
           WriteBlip(out, relId, alpha);
           int imgW = 0;
           int imgH = 0;
@@ -585,25 +585,25 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
             } else if (flipY) {
               flip = "y";
             }
-            out.open("a:tile")
-                .attr("tx", tx)
-                .attr("ty", ty)
-                .attr("sx", sx)
-                .attr("sy", sy)
-                .attr("flip", flip)
-                .attr("algn", "tl")
-                .sc();
+            out.openElement("a:tile")
+                .addRequiredAttribute("tx", tx)
+                .addRequiredAttribute("ty", ty)
+                .addRequiredAttribute("sx", sx)
+                .addRequiredAttribute("sy", sy)
+                .addRequiredAttribute("flip", flip)
+                .addRequiredAttribute("algn", "tl")
+                .closeElementSelfClosing();
           } else {
             bool hasTransform =
                 hasDimensions && !shapeBounds.isEmpty() && !pattern->matrix.isIdentity();
             ImagePatternRect ipr = {};
             if (hasTransform && ComputeImagePatternRect(pattern, imgW, imgH, shapeBounds, &ipr)) {
-              auto& src = out.open("a:srcRect");
-              if (ipr.srcL != 0) src.attr("l", ipr.srcL);
-              if (ipr.srcT != 0) src.attr("t", ipr.srcT);
-              if (ipr.srcR != 0) src.attr("r", ipr.srcR);
-              if (ipr.srcB != 0) src.attr("b", ipr.srcB);
-              src.sc();
+              auto& src = out.openElement("a:srcRect");
+              if (ipr.srcL != 0) src.addRequiredAttribute("l", ipr.srcL);
+              if (ipr.srcT != 0) src.addRequiredAttribute("t", ipr.srcT);
+              if (ipr.srcR != 0) src.addRequiredAttribute("r", ipr.srcR);
+              if (ipr.srcB != 0) src.addRequiredAttribute("b", ipr.srcB);
+              src.closeElementSelfClosing();
               int fillL = static_cast<int>(
                   std::round((ipr.visL - shapeBounds.x) / shapeBounds.width * 100000.0f));
               int fillT = static_cast<int>(
@@ -613,27 +613,27 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
               int fillB =
                   static_cast<int>(std::round((shapeBounds.y + shapeBounds.height - ipr.visB) /
                                               shapeBounds.height * 100000.0f));
-              out.open("a:stretch").gt();
-              auto& fr = out.open("a:fillRect");
-              if (fillL != 0) fr.attr("l", fillL);
-              if (fillT != 0) fr.attr("t", fillT);
-              if (fillR != 0) fr.attr("r", fillR);
-              if (fillB != 0) fr.attr("b", fillB);
-              fr.sc();
-              out.end();  // a:stretch
+              out.openElement("a:stretch").closeElementStart();
+              auto& fr = out.openElement("a:fillRect");
+              if (fillL != 0) fr.addRequiredAttribute("l", fillL);
+              if (fillT != 0) fr.addRequiredAttribute("t", fillT);
+              if (fillR != 0) fr.addRequiredAttribute("r", fillR);
+              if (fillB != 0) fr.addRequiredAttribute("b", fillB);
+              fr.closeElementSelfClosing();
+              out.closeElement();  // a:stretch
             } else {
               WriteDefaultStretch(out);
             }
           }
-          out.end();  // a:blipFill
+          out.closeElement();  // a:blipFill
           break;
         }
       }
-      out.open("a:noFill").sc();
+      out.openElement("a:noFill").closeElementSelfClosing();
       break;
     }
     default:
-      out.open("a:noFill").sc();
+      out.openElement("a:noFill").closeElementSelfClosing();
       break;
   }
 }
@@ -642,7 +642,7 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
 
 void PPTWriter::writeFill(XMLBuilder& out, const Fill* fill, float alpha, const Rect& shapeBounds) {
   if (!fill || !fill->color) {
-    out.open("a:noFill").sc();
+    out.openElement("a:noFill").closeElementSelfClosing();
     return;
   }
   float effectiveAlpha = fill->alpha * alpha;
@@ -651,58 +651,58 @@ void PPTWriter::writeFill(XMLBuilder& out, const Fill* fill, float alpha, const 
 
 void PPTWriter::writeStroke(XMLBuilder& out, const Stroke* stroke, float alpha) {
   if (!stroke) {
-    out.open("a:ln").gt();
-    out.open("a:noFill").sc();
-    out.end();
+    out.openElement("a:ln").closeElementStart();
+    out.openElement("a:noFill").closeElementSelfClosing();
+    out.closeElement();
     return;
   }
 
   int64_t w = PxToEMU(stroke->width);
-  out.open("a:ln").attr("w", w);
+  out.openElement("a:ln").addRequiredAttribute("w", w);
   if (stroke->cap == LineCap::Round) {
-    out.attr("cap", "rnd");
+    out.addRequiredAttribute("cap", "rnd");
   } else if (stroke->cap == LineCap::Square) {
-    out.attr("cap", "sq");
+    out.addRequiredAttribute("cap", "sq");
   }
-  out.gt();
+  out.closeElementStart();
 
   float effectiveAlpha = stroke->alpha * alpha;
   if (stroke->color) {
     writeColorSource(out, stroke->color, effectiveAlpha);
   } else {
-    out.open("a:noFill").sc();
+    out.openElement("a:noFill").closeElementSelfClosing();
   }
 
   if (!stroke->dashes.empty()) {
     float sw = (stroke->width > 0) ? stroke->width : 1.0f;
     const char* preset = MatchPresetDash(stroke->dashes, sw);
     if (preset) {
-      out.open("a:prstDash").attr("val", preset).sc();
+      out.openElement("a:prstDash").addRequiredAttribute("val", preset).closeElementSelfClosing();
     } else {
-      out.open("a:custDash").gt();
+      out.openElement("a:custDash").closeElementStart();
       for (size_t i = 0; i + 1 < stroke->dashes.size(); i += 2) {
         int d = std::max(1, static_cast<int>(std::round(stroke->dashes[i] / sw * 100000.0)));
         int sp = std::max(1, static_cast<int>(std::round(stroke->dashes[i + 1] / sw * 100000.0)));
-        out.open("a:ds").attr("d", d).attr("sp", sp).sc();
+        out.openElement("a:ds").addRequiredAttribute("d", d).addRequiredAttribute("sp", sp).closeElementSelfClosing();
       }
       if (stroke->dashes.size() % 2 != 0) {
         int d = std::max(1, static_cast<int>(std::round(stroke->dashes.back() / sw * 100000.0)));
-        out.open("a:ds").attr("d", d).attr("sp", d).sc();
+        out.openElement("a:ds").addRequiredAttribute("d", d).addRequiredAttribute("sp", d).closeElementSelfClosing();
       }
-      out.end();  // a:custDash
+      out.closeElement();  // a:custDash
     }
   }
 
   if (stroke->join == LineJoin::Round) {
-    out.open("a:round").sc();
+    out.openElement("a:round").closeElementSelfClosing();
   } else if (stroke->join == LineJoin::Bevel) {
-    out.open("a:bevel").sc();
+    out.openElement("a:bevel").closeElementSelfClosing();
   } else {
     int lim = static_cast<int>(std::round(stroke->miterLimit * 100000.0f));
-    out.open("a:miter").attr("lim", lim).sc();
+    out.openElement("a:miter").addRequiredAttribute("lim", lim).closeElementSelfClosing();
   }
 
-  out.end();  // a:ln
+  out.closeElement();  // a:ln
 }
 
 // ── Effects (shadow) ───────────────────────────────────────────────────────
@@ -713,18 +713,18 @@ void PPTWriter::writeShadowElement(XMLBuilder& out, const char* tag, float blurX
   float blur = (blurX + blurY) / 2.0f;
   float dist = std::sqrt(offsetX * offsetX + offsetY * offsetY);
   float dir = RadiansToDegrees(std::atan2(offsetY, offsetX));
-  auto& builder = out.open(tag)
-                      .attr("blurRad", PxToEMU(blur))
-                      .attr("dist", PxToEMU(dist))
-                      .attr("dir", AngleToPPT(dir + 90.0f));
+  auto& builder = out.openElement(tag)
+                      .addRequiredAttribute("blurRad", PxToEMU(blur))
+                      .addRequiredAttribute("dist", PxToEMU(dist))
+                      .addRequiredAttribute("dir", AngleToPPT(dir + 90.0f));
   if (includeAlign) {
-    builder.attr("algn", "ctr").attr("rotWithShape", "0");
+    builder.addRequiredAttribute("algn", "ctr").addRequiredAttribute("rotWithShape", "0");
   }
-  builder.gt();
-  out.open("a:srgbClr").attr("val", ColorToHex6(color)).gt();
-  out.open("a:alpha").attr("val", AlphaToPct(color.alpha)).sc();
-  out.end();  // a:srgbClr
-  out.end();  // tag
+  builder.closeElementStart();
+  out.openElement("a:srgbClr").addRequiredAttribute("val", ColorToHex6(color)).closeElementStart();
+  out.openElement("a:alpha").addRequiredAttribute("val", AlphaToPct(color.alpha)).closeElementSelfClosing();
+  out.closeElement();  // a:srgbClr
+  out.closeElement();  // tag
 }
 
 void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& filters) {
@@ -740,7 +740,7 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
     return;
   }
 
-  out.open("a:effectLst").gt();
+  out.openElement("a:effectLst").closeElementStart();
   for (const auto* f : filters) {
     if (f->nodeType() == NodeType::DropShadowFilter) {
       auto* s = static_cast<const DropShadowFilter*>(f);
@@ -752,7 +752,7 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
                          false);
     }
   }
-  out.end();  // a:effectLst
+  out.closeElement();  // a:effectLst
 }
 
 // ── Custom geometry ────────────────────────────────────────────────────────
@@ -760,14 +760,14 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
 void PPTWriter::WriteContourGeom(XMLBuilder& out, std::vector<PathContour>& contours,
                                  int64_t pathWidth, int64_t pathHeight, float scaleX, float scaleY,
                                  float scaledOfsX, float scaledOfsY, FillRule fillRule) {
-  out.open("a:custGeom").gt();
-  out.open("a:avLst").sc();
-  out.open("a:gdLst").sc();
-  out.open("a:ahLst").sc();
-  out.open("a:cxnLst").sc();
-  out.open("a:rect").attr("l", "0").attr("t", "0").attr("r", "r").attr("b", "b").sc();
+  out.openElement("a:custGeom").closeElementStart();
+  out.openElement("a:avLst").closeElementSelfClosing();
+  out.openElement("a:gdLst").closeElementSelfClosing();
+  out.openElement("a:ahLst").closeElementSelfClosing();
+  out.openElement("a:cxnLst").closeElementSelfClosing();
+  out.openElement("a:rect").addRequiredAttribute("l", "0").addRequiredAttribute("t", "0").addRequiredAttribute("r", "r").addRequiredAttribute("b", "b").closeElementSelfClosing();
 
-  out.open("a:pathLst").gt();
+  out.openElement("a:pathLst").closeElementStart();
 
   if (_bridgeContours && contours.size() > 1) {
     auto depths = ComputeContainmentDepths(contours);
@@ -776,24 +776,24 @@ void PPTWriter::WriteContourGeom(XMLBuilder& out, std::vector<PathContour>& cont
     }
     auto groups = GroupContoursByOutermost(contours, depths);
     for (const auto& group : groups) {
-      out.open("a:path").attr("w", pathWidth).attr("h", pathHeight).gt();
+      out.openElement("a:path").addRequiredAttribute("w", pathWidth).addRequiredAttribute("h", pathHeight).closeElementStart();
       if (group.size() > 1) {
         EmitBridgedGroup(out, contours, group, scaleX, scaleY, scaledOfsX, scaledOfsY);
       } else {
         EmitContour(out, contours[group[0]], scaleX, scaleY, scaledOfsX, scaledOfsY);
       }
-      out.end();  // a:path
+      out.closeElement();  // a:path
     }
   } else {
-    out.open("a:path").attr("w", pathWidth).attr("h", pathHeight).gt();
+    out.openElement("a:path").addRequiredAttribute("w", pathWidth).addRequiredAttribute("h", pathHeight).closeElementStart();
     for (auto& c : contours) {
       EmitContour(out, c, scaleX, scaleY, scaledOfsX, scaledOfsY);
     }
-    out.end();  // a:path
+    out.closeElement();  // a:path
   }
 
-  out.end();  // a:pathLst
-  out.end();  // a:custGeom
+  out.closeElement();  // a:pathLst
+  out.closeElement();  // a:custGeom
 }
 
 void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofsX, float ofsY,
@@ -828,15 +828,15 @@ void PPTWriter::writeRectangle(XMLBuilder& out, const Rectangle* rect, const Fil
     int adj = (minSide > 0)
                   ? std::clamp(static_cast<int>(rect->roundness * 100000.0f / minSide), 0, 50000)
                   : 0;
-    out.open("a:prstGeom").attr("prst", "roundRect").gt();
-    out.open("a:avLst").gt();
-    out.open("a:gd").attr("name", "adj").attr("fmla", "val " + std::to_string(adj)).sc();
-    out.end();  // a:avLst
-    out.end();  // a:prstGeom
+    out.openElement("a:prstGeom").addRequiredAttribute("prst", "roundRect").closeElementStart();
+    out.openElement("a:avLst").closeElementStart();
+    out.openElement("a:gd").addRequiredAttribute("name", "adj").addRequiredAttribute("fmla", "val " + std::to_string(adj)).closeElementSelfClosing();
+    out.closeElement();  // a:avLst
+    out.closeElement();  // a:prstGeom
   } else {
-    out.open("a:prstGeom").attr("prst", "rect").gt();
-    out.open("a:avLst").sc();
-    out.end();
+    out.openElement("a:prstGeom").addRequiredAttribute("prst", "rect").closeElementStart();
+    out.openElement("a:avLst").closeElementSelfClosing();
+    out.closeElement();
   }
 
   writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters);
@@ -859,9 +859,9 @@ void PPTWriter::writeEllipse(XMLBuilder& out, const Ellipse* ellipse, const Fill
   auto xf = decomposeXform(x, y, ellipse->size.width, ellipse->size.height, m);
   beginShape(out, "Ellipse", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
 
-  out.open("a:prstGeom").attr("prst", "ellipse").gt();
-  out.open("a:avLst").sc();
-  out.end();
+  out.openElement("a:prstGeom").addRequiredAttribute("prst", "ellipse").closeElementStart();
+  out.openElement("a:avLst").closeElementSelfClosing();
+  out.closeElement();
 
   writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters);
 }
@@ -976,18 +976,18 @@ void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStr
       beginShape(out, "Glyph", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
       EmitGroupCustGeom(out, allContours, group, pw, ph, sx, sy, scaledOfsX, scaledOfsY);
       writeFill(out, fs.fill, alpha);
-      out.open("a:ln").gt();
-      out.open("a:noFill").sc();
-      out.end();
+      out.openElement("a:ln").closeElementStart();
+      out.openElement("a:noFill").closeElementSelfClosing();
+      out.closeElement();
       endShape(out);
     }
   } else {
     beginShape(out, "Glyph", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
     WriteContourGeom(out, allContours, pw, ph, sx, sy, scaledOfsX, scaledOfsY, FillRule::EvenOdd);
     writeFill(out, fs.fill, alpha);
-    out.open("a:ln").gt();
-    out.open("a:noFill").sc();
-    out.end();
+    out.openElement("a:ln").closeElementStart();
+    out.openElement("a:noFill").closeElementSelfClosing();
+    out.closeElement();
     endShape(out);
   }
 }
@@ -1023,41 +1023,41 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   auto xf = decomposeXform(posX, posY, estWidth, estHeight, m);
 
   int id = _ctx->nextShapeId();
-  out.open("p:sp").gt();
-  out.open("p:nvSpPr").gt();
-  out.open("p:cNvPr").attr("id", id).attr("name", "TextBox").sc();
-  out.open("p:cNvSpPr").attr("txBox", "1").sc();
-  out.open("p:nvPr").sc();
-  out.end();  // p:nvSpPr
+  out.openElement("p:sp").closeElementStart();
+  out.openElement("p:nvSpPr").closeElementStart();
+  out.openElement("p:cNvPr").addRequiredAttribute("id", id).addRequiredAttribute("name", "TextBox").closeElementSelfClosing();
+  out.openElement("p:cNvSpPr").addRequiredAttribute("txBox", "1").closeElementSelfClosing();
+  out.openElement("p:nvPr").closeElementSelfClosing();
+  out.closeElement();  // p:nvSpPr
 
-  out.open("p:spPr").gt();
+  out.openElement("p:spPr").closeElementStart();
   WriteXfrm(out, xf);
-  out.open("a:prstGeom").attr("prst", "rect").gt();
-  out.open("a:avLst").sc();
-  out.end();
-  out.open("a:noFill").sc();
-  out.open("a:ln").gt();
-  out.open("a:noFill").sc();
-  out.end();
+  out.openElement("a:prstGeom").addRequiredAttribute("prst", "rect").closeElementStart();
+  out.openElement("a:avLst").closeElementSelfClosing();
+  out.closeElement();
+  out.openElement("a:noFill").closeElementSelfClosing();
+  out.openElement("a:ln").closeElementStart();
+  out.openElement("a:noFill").closeElementSelfClosing();
+  out.closeElement();
   writeEffects(out, filters);
-  out.end();  // p:spPr
+  out.closeElement();  // p:spPr
 
-  out.open("p:txBody").gt();
-  auto& bodyPr = out.open("a:bodyPr")
-                     .attr("wrap", hasTextBox ? "square" : "none")
-                     .attr("lIns", "0")
-                     .attr("tIns", "0")
-                     .attr("rIns", "0")
-                     .attr("bIns", "0");
+  out.openElement("p:txBody").closeElementStart();
+  auto& bodyPr = out.openElement("a:bodyPr")
+                     .addRequiredAttribute("wrap", hasTextBox ? "square" : "none")
+                     .addRequiredAttribute("lIns", "0")
+                     .addRequiredAttribute("tIns", "0")
+                     .addRequiredAttribute("rIns", "0")
+                     .addRequiredAttribute("bIns", "0");
   if (fs.textBox) {
     if (fs.textBox->paragraphAlign == ParagraphAlign::Middle) {
-      bodyPr.attr("anchor", "ctr");
+      bodyPr.addRequiredAttribute("anchor", "ctr");
     } else if (fs.textBox->paragraphAlign == ParagraphAlign::Far) {
-      bodyPr.attr("anchor", "b");
+      bodyPr.addRequiredAttribute("anchor", "b");
     }
   }
-  bodyPr.sc();
-  out.open("a:lstStyle").sc();
+  bodyPr.closeElementSelfClosing();
+  out.openElement("a:lstStyle").closeElementSelfClosing();
 
   // Split text by newlines into paragraphs
   std::string remaining = text->text;
@@ -1066,7 +1066,7 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
     size_t nl = remaining.find('\n', pos);
     std::string line =
         (nl == std::string::npos) ? remaining.substr(pos) : remaining.substr(pos, nl - pos);
-    out.open("a:p").gt();
+    out.openElement("a:p").closeElementStart();
 
     const char* algn = nullptr;
     if (text->textAnchor == TextAnchor::Center) {
@@ -1082,51 +1082,51 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
       }
     }
     if (algn) {
-      out.open("a:pPr").attr("algn", algn).sc();
+      out.openElement("a:pPr").addRequiredAttribute("algn", algn).closeElementSelfClosing();
     }
 
-    out.open("a:r").gt();
-    out.open("a:rPr").attr("lang", "en-US").attr("sz", FontSizeToPPT(text->fontSize));
+    out.openElement("a:r").closeElementStart();
+    out.openElement("a:rPr").addRequiredAttribute("lang", "en-US").addRequiredAttribute("sz", FontSizeToPPT(text->fontSize));
     bool hasBold = text->fontStyle.find("Bold") != std::string::npos;
     bool hasItalic = text->fontStyle.find("Italic") != std::string::npos;
     if (hasBold) {
-      out.attr("b", "1");
+      out.addRequiredAttribute("b", "1");
     }
     if (hasItalic) {
-      out.attr("i", "1");
+      out.addRequiredAttribute("i", "1");
     }
     if (text->letterSpacing != 0.0f) {
-      out.attr("spc", static_cast<int64_t>(std::round(text->letterSpacing * 75.0)));
+      out.addRequiredAttribute("spc", static_cast<int64_t>(std::round(text->letterSpacing * 75.0)));
     }
-    out.gt();
+    out.closeElementStart();
 
     if (fs.fill && fs.fill->color && fs.fill->color->nodeType() == NodeType::SolidColor) {
       auto* solid = static_cast<const SolidColor*>(fs.fill->color);
       float ea = solid->color.alpha * fs.fill->alpha * alpha;
-      out.open("a:solidFill").gt();
-      out.open("a:srgbClr").attr("val", ColorToHex6(solid->color));
+      out.openElement("a:solidFill").closeElementStart();
+      out.openElement("a:srgbClr").addRequiredAttribute("val", ColorToHex6(solid->color));
       if (ea < 1.0f) {
-        out.gt();
-        out.open("a:alpha").attr("val", AlphaToPct(ea)).sc();
-        out.end();
+        out.closeElementStart();
+        out.openElement("a:alpha").addRequiredAttribute("val", AlphaToPct(ea)).closeElementSelfClosing();
+        out.closeElement();
       } else {
-        out.sc();
+        out.closeElementSelfClosing();
       }
-      out.end();  // a:solidFill
+      out.closeElement();  // a:solidFill
     }
 
     if (!text->fontFamily.empty()) {
       auto typeface = StripQuotes(text->fontFamily);
-      out.open("a:latin").attr("typeface", typeface).sc();
-      out.open("a:ea").attr("typeface", typeface).sc();
+      out.openElement("a:latin").addRequiredAttribute("typeface", typeface).closeElementSelfClosing();
+      out.openElement("a:ea").addRequiredAttribute("typeface", typeface).closeElementSelfClosing();
     }
 
-    out.end();  // a:rPr
-    out.open("a:t").gt();
-    out.text(line);
-    out.end();  // a:t
-    out.end();  // a:r
-    out.end();  // a:p
+    out.closeElement();  // a:rPr
+    out.openElement("a:t").closeElementStart();
+    out.addTextContent(line);
+    out.closeElement();  // a:t
+    out.closeElement();  // a:r
+    out.closeElement();  // a:p
 
     if (nl == std::string::npos) {
       break;
@@ -1134,8 +1134,8 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
     pos = nl + 1;
   }
 
-  out.end();  // p:txBody
-  out.end();  // p:sp
+  out.closeElement();  // p:txBody
+  out.closeElement();  // p:sp
 }
 
 // ── Element / layer traversal ──────────────────────────────────────────────
