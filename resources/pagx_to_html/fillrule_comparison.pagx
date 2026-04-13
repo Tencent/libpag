@@ -4,8 +4,8 @@
   <Resources>
     <!-- Star path with self-intersections (pentagram), positive coordinates -->
     <PathData id="starPath" data="M 40,0 L 50,27 L 80,27 L 56,44 L 65,75 L 40,56 L 15,75 L 24,44 L 0,27 L 30,27 Z"/>
-    <!-- Two overlapping circles, positive coordinates -->
-    <PathData id="overlapCircles" data="M 22,22 A 22,22 0 1 1 22,21.99 Z M 42,22 A 22,22 0 1 1 42,21.99 Z"/>
+    <!-- Two overlapping circles: center1=(22,22) r=22, center2=(42,22) r=22 -->
+    <PathData id="overlapCircles" data="M 44,22 A 22,22 0 1 1 44,21.99 Z M 64,22 A 22,22 0 1 1 64,21.99 Z"/>
   </Resources>
 
   <!-- Background -->
