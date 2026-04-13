@@ -421,13 +421,17 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
   std::string style;
   style.reserve(300);
   if (tb) {
-    style += "position:absolute;left:" + FloatToString(tb->position.x) +
-             "px;top:" + FloatToString(tb->position.y) + "px";
-    if (!std::isnan(tb->width)) {
-      style += ";width:" + FloatToString(tb->width) + "px";
+    float tbW = tb->width;
+    float tbH = tb->height;
+    float tbLeft = !std::isnan(tbW) ? (tb->position.x - tbW * 0.5f) : tb->position.x;
+    float tbTop = !std::isnan(tbH) ? (tb->position.y - tbH * 0.5f) : tb->position.y;
+    style +=
+        "position:absolute;left:" + FloatToString(tbLeft) + "px;top:" + FloatToString(tbTop) + "px";
+    if (!std::isnan(tbW) && tbW > 0) {
+      style += ";width:" + FloatToString(tbW) + "px";
     }
-    if (!std::isnan(tb->height)) {
-      style += ";height:" + FloatToString(tb->height) + "px";
+    if (!std::isnan(tbH) && tbH > 0) {
+      style += ";height:" + FloatToString(tbH) + "px";
     }
     if (tb->textAlign == TextAlign::Center) {
       style += ";text-align:center";
@@ -450,7 +454,7 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     if (tb->lineHeight > 0) {
       style += ";line-height:" + FloatToString(tb->lineHeight) + "px";
     }
-    if (tb->wordWrap && !std::isnan(tb->width)) {
+    if (tb->wordWrap && !std::isnan(tbW) && tbW > 0) {
       style += ";word-wrap:break-word";
     } else {
       style += ";white-space:nowrap";

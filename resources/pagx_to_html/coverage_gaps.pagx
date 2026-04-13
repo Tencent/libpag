@@ -87,7 +87,7 @@
             <Stroke color="#CBD5E1" width="1"/>
             <Layer left="5" right="5" top="5" bottom="5">
               <Text text="End aligned text in a box" fontFamily="Arial" fontSize="11" position="70,22"/>
-              <TextBox position="70,22" size="140,44" textAlign="end" lineHeight="16"/>
+              <TextBox position="70,22" width="140" height="44" textAlign="end" lineHeight="16"/>
               <Fill color="#1E293B"/>
             </Layer>
           </Layer>
