@@ -86,10 +86,9 @@
             <Fill color="#F1F5F9"/>
             <Stroke color="#CBD5E1" width="1"/>
             <Layer left="5" right="5" top="5" bottom="5">
-              <TextBox position="75,25" width="150" height="50" textAlign="end" lineHeight="16">
-                <Text text="End aligned text" fontFamily="Arial" fontSize="11"/>
-                <Fill color="#1E293B"/>
-              </TextBox>
+              <Text text="End aligned text" fontFamily="Arial" fontSize="11"/>
+              <TextBox position="75,25" width="150" height="50" textAlign="end" lineHeight="16"/>
+              <Fill color="#1E293B"/>
             </Layer>
           </Layer>
           <Layer height="12">
