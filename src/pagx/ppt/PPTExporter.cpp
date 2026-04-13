@@ -971,25 +971,26 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
   auto xf = decomposeXform(adjustedX, adjustedY, adjustedW, adjustedH, m);
   FillRule fillRule = (fs.fill) ? fs.fill->fillRule : FillRule::Winding;
 
-  if (_bridgeContours) {
-    auto contours = ParsePathContours(path->data);
-    if (contours.size() > 1) {
-      auto groups = PrepareContourGroups(contours, fillRule);
-      if (groups.size() > 1) {
-        int64_t pw = std::max(int64_t(1), PxToEMU(adjustedW));
-        int64_t ph = std::max(int64_t(1), PxToEMU(adjustedH));
-        for (const auto& group : groups) {
-          beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
-          EmitGroupCustGeom(out, contours, group, pw, ph, 1.0f, 1.0f, adjustedX, adjustedY);
-          writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters);
-        }
-        return;
+  auto contours = ParsePathContours(path->data);
+
+  if (_bridgeContours && contours.size() > 1) {
+    auto groups = PrepareContourGroups(contours, fillRule);
+    if (groups.size() > 1) {
+      int64_t pw = std::max(int64_t(1), PxToEMU(adjustedW));
+      int64_t ph = std::max(int64_t(1), PxToEMU(adjustedH));
+      for (const auto& group : groups) {
+        beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
+        EmitGroupCustGeom(out, contours, group, pw, ph, 1.0f, 1.0f, adjustedX, adjustedY);
+        writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters);
       }
+      return;
     }
   }
 
   beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
-  writeCustomGeom(out, path->data, adjustedX, adjustedY, adjustedW, adjustedH, fillRule);
+  int64_t pw = std::max(int64_t(1), PxToEMU(adjustedW));
+  int64_t ph = std::max(int64_t(1), PxToEMU(adjustedH));
+  WriteContourGeom(out, contours, pw, ph, 1.0f, 1.0f, adjustedX, adjustedY, fillRule);
   writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters);
 }
 
@@ -1133,8 +1134,29 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   bodyPr.closeElementSelfClosing();
   out.openElement("a:lstStyle").closeElementSelfClosing();
 
-  // Split text by newlines into paragraphs
-  std::string remaining = text->text;
+  const char* algn = nullptr;
+  if (text->textAnchor == TextAnchor::Center) {
+    algn = "ctr";
+  } else if (text->textAnchor == TextAnchor::End) {
+    algn = "r";
+  }
+  if (fs.textBox) {
+    if (fs.textBox->textAlign == TextAlign::Center) {
+      algn = "ctr";
+    } else if (fs.textBox->textAlign == TextAlign::End) {
+      algn = "r";
+    }
+  }
+  bool hasBold = text->fontStyle.find("Bold") != std::string::npos;
+  bool hasItalic = text->fontStyle.find("Italic") != std::string::npos;
+  int fontSize = FontSizeToPPT(text->fontSize);
+  int64_t letterSpc = static_cast<int64_t>(std::round(text->letterSpacing * 75.0));
+  bool hasFillColor =
+      fs.fill && fs.fill->color && fs.fill->color->nodeType() == NodeType::SolidColor;
+  float fillAlpha = hasFillColor ? fs.fill->alpha * alpha : 0;
+  std::string typeface = text->fontFamily.empty() ? std::string() : StripQuotes(text->fontFamily);
+
+  const std::string& remaining = text->text;
   size_t pos = 0;
   while (pos <= remaining.size()) {
     size_t nl = remaining.find('\n', pos);
@@ -1142,29 +1164,13 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
         (nl == std::string::npos) ? remaining.substr(pos) : remaining.substr(pos, nl - pos);
     out.openElement("a:p").closeElementStart();
 
-    const char* algn = nullptr;
-    if (text->textAnchor == TextAnchor::Center) {
-      algn = "ctr";
-    } else if (text->textAnchor == TextAnchor::End) {
-      algn = "r";
-    }
-    if (fs.textBox) {
-      if (fs.textBox->textAlign == TextAlign::Center) {
-        algn = "ctr";
-      } else if (fs.textBox->textAlign == TextAlign::End) {
-        algn = "r";
-      }
-    }
     if (algn) {
       out.openElement("a:pPr").addRequiredAttribute("algn", algn).closeElementSelfClosing();
     }
 
     out.openElement("a:r").closeElementStart();
-    out.openElement("a:rPr")
-        .addRequiredAttribute("lang", "en-US")
-        .addRequiredAttribute("sz", FontSizeToPPT(text->fontSize));
-    bool hasBold = text->fontStyle.find("Bold") != std::string::npos;
-    bool hasItalic = text->fontStyle.find("Italic") != std::string::npos;
+    out.openElement("a:rPr").addRequiredAttribute("lang", "en-US").addRequiredAttribute("sz",
+                                                                                        fontSize);
     if (hasBold) {
       out.addRequiredAttribute("b", "1");
     }
@@ -1172,16 +1178,15 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
       out.addRequiredAttribute("i", "1");
     }
     if (text->letterSpacing != 0.0f) {
-      out.addRequiredAttribute("spc", static_cast<int64_t>(std::round(text->letterSpacing * 75.0)));
+      out.addRequiredAttribute("spc", letterSpc);
     }
     out.closeElementStart();
 
-    if (fs.fill && fs.fill->color && fs.fill->color->nodeType() == NodeType::SolidColor) {
-      writeColorSource(out, fs.fill->color, fs.fill->alpha * alpha);
+    if (hasFillColor) {
+      writeColorSource(out, fs.fill->color, fillAlpha);
     }
 
-    if (!text->fontFamily.empty()) {
-      auto typeface = StripQuotes(text->fontFamily);
+    if (!typeface.empty()) {
       out.openElement("a:latin")
           .addRequiredAttribute("typeface", typeface)
           .closeElementSelfClosing();

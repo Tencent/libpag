@@ -73,20 +73,21 @@ void ReverseContour(PathContour& c) {
   c.segs = std::move(rev);
 }
 
-// Ray-casting point-in-polygon test using contour endpoint polygon approximation.
 bool PointInsideContour(const Point& pt, const PathContour& contour) {
-  std::vector<Point> poly;
-  poly.push_back(contour.start);
-  for (const auto& seg : contour.segs) {
-    poly.push_back(SegEndpoint(seg));
-  }
   bool inside = false;
-  for (size_t i = 0, j = poly.size() - 1; i < poly.size(); j = i++) {
-    if (((poly[i].y > pt.y) != (poly[j].y > pt.y)) &&
-        (pt.x <
-         (poly[j].x - poly[i].x) * (pt.y - poly[i].y) / (poly[j].y - poly[i].y) + poly[i].x)) {
+  auto testEdge = [&](const Point& pi, const Point& pj) {
+    if (((pi.y > pt.y) != (pj.y > pt.y)) &&
+        (pt.x < (pj.x - pi.x) * (pt.y - pi.y) / (pj.y - pi.y) + pi.x)) {
       inside = !inside;
     }
+  };
+  Point lastVertex = contour.segs.empty() ? contour.start : SegEndpoint(contour.segs.back());
+  testEdge(contour.start, lastVertex);
+  Point prev = contour.start;
+  for (const auto& seg : contour.segs) {
+    Point cur = SegEndpoint(seg);
+    testEdge(cur, prev);
+    prev = cur;
   }
   return inside;
 }

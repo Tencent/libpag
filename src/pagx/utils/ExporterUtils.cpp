@@ -46,6 +46,8 @@ namespace pagx {
 using pag::DegreesToRadians;
 using pag::FloatNearlyZero;
 
+static const uint8_t kPNGSignature[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+
 FillStrokeInfo CollectFillStroke(const std::vector<Element*>& contents) {
   FillStrokeInfo info = {};
   for (const auto* element : contents) {
@@ -204,7 +206,6 @@ bool GetPNGDimensions(const uint8_t* data, size_t size, int* width, int* height)
   if (size < 24) {
     return false;
   }
-  static const uint8_t kPNGSignature[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
   if (memcmp(data, kPNGSignature, 8) != 0) {
     return false;
   }
@@ -319,7 +320,6 @@ bool GetImageDimensions(const Image* image, int* width, int* height) {
 }
 
 static bool GetPNGDPI(const uint8_t* data, size_t size, float* dpiX, float* dpiY) {
-  static const uint8_t kPNGSignature[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
   if (size < 8 || memcmp(data, kPNGSignature, 8) != 0) {
     return false;
   }
@@ -513,6 +513,27 @@ static tgfx::TileMode ToTGFXTileMode(TileMode mode) {
   }
 }
 
+static std::shared_ptr<tgfx::Data> DoRenderTiledPattern(tgfx::Context* context,
+                                                        std::shared_ptr<tgfx::Shader> shader,
+                                                        int width, int height) {
+  auto surface = tgfx::Surface::Make(context, width, height);
+  if (!surface) {
+    return nullptr;
+  }
+  tgfx::Paint paint;
+  paint.setShader(std::move(shader));
+  surface->getCanvas()->drawRect(tgfx::Rect::MakeWH(width, height), paint);
+  tgfx::Bitmap bitmap(width, height, false, false);
+  if (bitmap.isEmpty()) {
+    return nullptr;
+  }
+  tgfx::Pixmap pixmap(bitmap);
+  if (!surface->readPixels(pixmap.info(), pixmap.writablePixels())) {
+    return nullptr;
+  }
+  return tgfx::ImageCodec::Encode(pixmap, tgfx::EncodedFormat::PNG, 100);
+}
+
 std::shared_ptr<tgfx::Data> RenderTiledPattern(const ImagePattern* pattern, int width, int height,
                                                float offsetX, float offsetY) {
   if (width <= 0 || height <= 0 || !pattern || !pattern->image) {
@@ -546,25 +567,7 @@ std::shared_ptr<tgfx::Data> RenderTiledPattern(const ImagePattern* pattern, int 
   if (!context) {
     return nullptr;
   }
-  auto surface = tgfx::Surface::Make(context, width, height);
-  if (!surface) {
-    device->unlock();
-    return nullptr;
-  }
-  tgfx::Paint paint;
-  paint.setShader(std::move(shader));
-  surface->getCanvas()->drawRect(tgfx::Rect::MakeWH(width, height), paint);
-  tgfx::Bitmap bitmap(width, height, false, false);
-  if (bitmap.isEmpty()) {
-    device->unlock();
-    return nullptr;
-  }
-  tgfx::Pixmap pixmap(bitmap);
-  if (!surface->readPixels(pixmap.info(), pixmap.writablePixels())) {
-    device->unlock();
-    return nullptr;
-  }
-  auto result = tgfx::ImageCodec::Encode(pixmap, tgfx::EncodedFormat::PNG, 100);
+  auto result = DoRenderTiledPattern(context, std::move(shader), width, height);
   device->unlock();
   return result;
 }
