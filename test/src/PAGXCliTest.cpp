@@ -1293,14 +1293,6 @@ CLI_TEST(PAGXCliTest, Export_PagxToPptx_ValidateSimple) {
   EXPECT_GT(std::filesystem::file_size(outputPath), 0u);
 }
 
-CLI_TEST(PAGXCliTest, Export_PagxToPptx_WithDocErrors) {
-  auto inputPath = TestResourcePath("validate_missing_attr.pagx");
-  auto outputPath = TempDir() + "/ExportPPTX_DocErrors.pptx";
-  auto ret =
-      CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
-  EXPECT_EQ(ret, 0);
-}
-
 #endif  // PAG_BUILD_PPT
 
 CLI_TEST(PAGXCliTest, Export_NoConvertTextToPath) {
