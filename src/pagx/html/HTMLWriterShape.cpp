@@ -847,7 +847,7 @@ void HTMLWriter::applySVGFill(HTMLBuilder& out, const Fill* fill) {
     return;
   }
   float alpha = 1.0f;
-  std::string f = colorToSVGFill(fill->color, &alpha);
+  std::string f = fill->color ? colorToSVGFill(fill->color, &alpha) : "#000000";
   out.addAttr("fill", f);
   float ea = alpha * fill->alpha;
   if (ea < 1.0f) {
@@ -863,7 +863,7 @@ void HTMLWriter::applySVGStroke(HTMLBuilder& out, const Stroke* stroke, float pa
     return;
   }
   float alpha = 1.0f;
-  std::string s = colorToSVGFill(stroke->color, &alpha);
+  std::string s = stroke->color ? colorToSVGFill(stroke->color, &alpha) : "#000000";
   out.addAttr("stroke", s);
   float ea = alpha * stroke->alpha;
   if (ea < 1.0f) {
@@ -1028,67 +1028,71 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
     style += ";border-radius:" + FloatToString(roundness) + "px";
   }
 
-  if (fill && fill->color) {
-    float ca = 1.0f;
-    std::string css = colorToCSS(fill->color, &ca);
-    auto ct = fill->color->nodeType();
-    if (ct == NodeType::LinearGradient || ct == NodeType::RadialGradient ||
-        ct == NodeType::ConicGradient) {
-      style += ";background:" + css;
-      float fillOpacity = ca * fill->alpha;
-      if (fillOpacity < 1.0f) {
-        alpha *= fillOpacity;
-      }
-    } else if (ct == NodeType::ImagePattern) {
-      auto p = static_cast<const ImagePattern*>(fill->color);
-      style += ";background-image:" + css;
-      std::string repeatX = "no-repeat";
-      std::string repeatY = "no-repeat";
-      if (p->tileModeX == TileMode::Repeat || p->tileModeX == TileMode::Mirror) {
-        repeatX = "repeat";
-      }
-      if (p->tileModeY == TileMode::Repeat || p->tileModeY == TileMode::Mirror) {
-        repeatY = "repeat";
-      }
-      if (repeatX == repeatY) {
-        style += ";background-repeat:" + repeatX;
-      } else {
-        style += ";background-repeat:" + repeatX + " " + repeatY;
-      }
-      if (!p->matrix.isIdentity()) {
-        float sx = std::sqrt(p->matrix.a * p->matrix.a + p->matrix.b * p->matrix.b);
-        float sy = std::sqrt(p->matrix.c * p->matrix.c + p->matrix.d * p->matrix.d);
-        if (!FloatNearlyZero(sx - 1.0f) || !FloatNearlyZero(sy - 1.0f)) {
-          style += ";background-size:" + FloatToString(sx * 100.0f) + "% " +
-                   FloatToString(sy * 100.0f) + "%";
+  if (fill) {
+    if (fill->color) {
+      float ca = 1.0f;
+      std::string css = colorToCSS(fill->color, &ca);
+      auto ct = fill->color->nodeType();
+      if (ct == NodeType::LinearGradient || ct == NodeType::RadialGradient ||
+          ct == NodeType::ConicGradient) {
+        style += ";background:" + css;
+        float fillOpacity = ca * fill->alpha;
+        if (fillOpacity < 1.0f) {
+          alpha *= fillOpacity;
         }
-        if (!FloatNearlyZero(p->matrix.tx) || !FloatNearlyZero(p->matrix.ty)) {
-          style += ";background-position:" + FloatToString(p->matrix.tx) + "px " +
-                   FloatToString(p->matrix.ty) + "px";
+      } else if (ct == NodeType::ImagePattern) {
+        auto p = static_cast<const ImagePattern*>(fill->color);
+        style += ";background-image:" + css;
+        std::string repeatX = "no-repeat";
+        std::string repeatY = "no-repeat";
+        if (p->tileModeX == TileMode::Repeat || p->tileModeX == TileMode::Mirror) {
+          repeatX = "repeat";
         }
-      } else {
-        // For non-tiling modes (Clamp/Decal), do not set background-size.
-        // The image stays at its natural size with no-repeat (closest to Decal behavior).
-        // CSS has no equivalent for Clamp (edge pixel extension).
-      }
-      // TODO: ImagePattern.mipmapMode is ignored. CSS/SVG has no direct control over mipmap
-      // sampling; browsers handle mipmap generation internally.
-      if (p->filterMode == FilterMode::Nearest) {
-        style += ";image-rendering:pixelated";
-      }
-      if (fill->alpha < 1.0f) {
-        alpha *= fill->alpha;
-      }
-    } else if (ct == NodeType::SolidColor) {
-      float ea = ca * fill->alpha;
-      if (ea < 1.0f) {
-        auto sc = static_cast<const SolidColor*>(fill->color);
-        style += ";background-color:" + ColorToRGBA(sc->color, fill->alpha);
+        if (p->tileModeY == TileMode::Repeat || p->tileModeY == TileMode::Mirror) {
+          repeatY = "repeat";
+        }
+        if (repeatX == repeatY) {
+          style += ";background-repeat:" + repeatX;
+        } else {
+          style += ";background-repeat:" + repeatX + " " + repeatY;
+        }
+        if (!p->matrix.isIdentity()) {
+          float sx = std::sqrt(p->matrix.a * p->matrix.a + p->matrix.b * p->matrix.b);
+          float sy = std::sqrt(p->matrix.c * p->matrix.c + p->matrix.d * p->matrix.d);
+          if (!FloatNearlyZero(sx - 1.0f) || !FloatNearlyZero(sy - 1.0f)) {
+            style += ";background-size:" + FloatToString(sx * 100.0f) + "% " +
+                     FloatToString(sy * 100.0f) + "%";
+          }
+          if (!FloatNearlyZero(p->matrix.tx) || !FloatNearlyZero(p->matrix.ty)) {
+            style += ";background-position:" + FloatToString(p->matrix.tx) + "px " +
+                     FloatToString(p->matrix.ty) + "px";
+          }
+        } else {
+          // For non-tiling modes (Clamp/Decal), do not set background-size.
+          // The image stays at its natural size with no-repeat (closest to Decal behavior).
+          // CSS has no equivalent for Clamp (edge pixel extension).
+        }
+        // TODO: ImagePattern.mipmapMode is ignored. CSS/SVG has no direct control over mipmap
+        // sampling; browsers handle mipmap generation internally.
+        if (p->filterMode == FilterMode::Nearest) {
+          style += ";image-rendering:pixelated";
+        }
+        if (fill->alpha < 1.0f) {
+          alpha *= fill->alpha;
+        }
+      } else if (ct == NodeType::SolidColor) {
+        float ea = ca * fill->alpha;
+        if (ea < 1.0f) {
+          auto sc = static_cast<const SolidColor*>(fill->color);
+          style += ";background-color:" + ColorToRGBA(sc->color, fill->alpha);
+        } else {
+          style += ";background-color:" + css;
+        }
       } else {
         style += ";background-color:" + css;
       }
     } else {
-      style += ";background-color:" + css;
+      style += ";background-color:" + ColorToRGBA({0, 0, 0, 255}, fill->alpha);
     }
   }
   if (painterBlend != BlendMode::Normal) {
