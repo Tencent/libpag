@@ -161,7 +161,7 @@
         <Layer layout="vertical" gap="4" alignment="center">
           <Layer width="60" height="60">
             <Ellipse position="30,30" size="50,30"/>
-            <TrimPath/>
+            <TrimPath start="0" end="0.7"/>
             <Stroke color="#06B6D4" width="2"/>
           </Layer>
           <Layer height="10">
