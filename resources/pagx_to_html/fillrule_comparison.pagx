@@ -1,92 +1,122 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: fillRule comparison — winding vs evenOdd on identical overlapping paths -->
-<pagx version="1.0" width="320" height="220">
+<pagx version="1.0" width="320" height="280">
   <Resources>
     <!-- Star path with self-intersections (pentagram) -->
-    <PathData id="starPath" data="M 0,-45 L 12,-15 L 45,-15 L 18,5 L 28,40 L 0,18 L -28,40 L -18,5 L -45,-15 L -12,-15 Z"/>
+    <PathData id="starPath" data="M 0,-40 L 10,-13 L 40,-13 L 16,4 L 25,35 L 0,16 L -25,35 L -16,4 L -40,-13 L -10,-13 Z"/>
     <!-- Two overlapping circles path -->
-    <PathData id="overlapCircles" data="M -10,0 A 25,25 0 1 1 -10,-0.01 Z M 10,0 A 25,25 0 1 1 10,-0.01 Z"/>
+    <PathData id="overlapCircles" data="M -10,0 A 22,22 0 1 1 -10,-0.01 Z M 10,0 A 22,22 0 1 1 10,-0.01 Z"/>
   </Resources>
 
-  <!-- Header labels -->
-  <Layer>
-    <Text text="winding" fontFamily="Arial" fontStyle="Bold" fontSize="14" position="85,30" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-  <Layer>
-    <Text text="evenOdd" fontFamily="Arial" fontStyle="Bold" fontSize="14" position="235,30" textAnchor="center"/>
-    <Fill color="#64748B"/>
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
   </Layer>
 
-  <!-- Divider -->
-  <Layer centerX="0" top="10" bottom="30" width="1">
-    <Path data="M 0,0 L 0,180"/>
-    <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-  </Layer>
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16,20,16,20" gap="8" alignment="stretch">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Fill Rule Comparison" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="winding vs evenOdd on overlapping paths" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
 
-  <!-- Row 1: Self-intersecting star (pentagram) -->
-  <!-- Winding: fills everything including center -->
-  <Layer>
-    <Text text="Star" fontFamily="Arial" fontSize="10" position="85,48" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
-  <Layer>
-    <Group position="85,95">
-      <Path data="@starPath"/>
-      <Fill color="#8B5CF6" fillRule="winding"/>
-    </Group>
-    <Group position="85,95">
-      <Path data="@starPath"/>
-      <Stroke color="#6D28D9" width="1.5"/>
-    </Group>
-  </Layer>
+    <!-- Card -->
+    <Layer flex="1" layout="vertical" gap="0" padding="12" alignment="stretch" arrangement="center">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-  <!-- EvenOdd: hole in center where paths overlap -->
-  <Layer>
-    <Text text="Star" fontFamily="Arial" fontSize="10" position="235,48" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
-  <Layer>
-    <Group position="235,95">
-      <Path data="@starPath"/>
-      <Fill color="#EC4899" fillRule="evenOdd"/>
-    </Group>
-    <Group position="235,95">
-      <Path data="@starPath"/>
-      <Stroke color="#BE185D" width="1.5"/>
-    </Group>
-  </Layer>
+      <!-- Column headers -->
+      <Layer layout="horizontal" gap="0" alignment="center">
+        <Layer flex="1" height="20">
+          <Text text="winding" fontFamily="Arial" fontStyle="Bold" fontSize="13" centerX="0" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+        <Layer flex="1" height="20">
+          <Text text="evenOdd" fontFamily="Arial" fontStyle="Bold" fontSize="13" centerX="0" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+      </Layer>
 
-  <!-- Row 2: Two overlapping circles -->
-  <!-- Winding: both circles filled solid -->
-  <Layer>
-    <Text text="Circles" fontFamily="Arial" fontSize="10" position="85,138" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
-  <Layer>
-    <Group position="85,175">
-      <Path data="@overlapCircles"/>
-      <Fill color="#3B82F6" fillRule="winding"/>
-    </Group>
-    <Group position="85,175">
-      <Path data="@overlapCircles"/>
-      <Stroke color="#1D4ED8" width="1.5"/>
-    </Group>
-  </Layer>
+      <!-- Row 1: Star pentagram -->
+      <Layer layout="horizontal" gap="0" alignment="center">
+        <Layer flex="1" layout="vertical" gap="6" alignment="center">
+          <Layer height="14">
+            <Text text="Star" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+          <Layer width="90" height="80">
+            <Group position="45,40">
+              <Path data="@starPath"/>
+              <Fill color="#8B5CF6" fillRule="winding"/>
+            </Group>
+            <Group position="45,40">
+              <Path data="@starPath"/>
+              <Stroke color="#6D28D9" width="1"/>
+            </Group>
+          </Layer>
+        </Layer>
+        <Layer flex="1" layout="vertical" gap="6" alignment="center">
+          <Layer height="14">
+            <Text text="Star" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+          <Layer width="90" height="80">
+            <Group position="45,40">
+              <Path data="@starPath"/>
+              <Fill color="#EC4899" fillRule="evenOdd"/>
+            </Group>
+            <Group position="45,40">
+              <Path data="@starPath"/>
+              <Stroke color="#BE185D" width="1"/>
+            </Group>
+          </Layer>
+        </Layer>
+      </Layer>
 
-  <!-- EvenOdd: hole where circles overlap -->
-  <Layer>
-    <Text text="Circles" fontFamily="Arial" fontSize="10" position="235,138" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
-  <Layer>
-    <Group position="235,175">
-      <Path data="@overlapCircles"/>
-      <Fill color="#10B981" fillRule="evenOdd"/>
-    </Group>
-    <Group position="235,175">
-      <Path data="@overlapCircles"/>
-      <Stroke color="#047857" width="1.5"/>
-    </Group>
+      <!-- Row 2: Overlapping circles -->
+      <Layer layout="horizontal" gap="0" alignment="center">
+        <Layer flex="1" layout="vertical" gap="6" alignment="center">
+          <Layer height="14">
+            <Text text="Circles" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+          <Layer width="90" height="60">
+            <Group position="45,30">
+              <Path data="@overlapCircles"/>
+              <Fill color="#3B82F6" fillRule="winding"/>
+            </Group>
+            <Group position="45,30">
+              <Path data="@overlapCircles"/>
+              <Stroke color="#1D4ED8" width="1"/>
+            </Group>
+          </Layer>
+        </Layer>
+        <Layer flex="1" layout="vertical" gap="6" alignment="center">
+          <Layer height="14">
+            <Text text="Circles" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+          <Layer width="90" height="60">
+            <Group position="45,30">
+              <Path data="@overlapCircles"/>
+              <Fill color="#10B981" fillRule="evenOdd"/>
+            </Group>
+            <Group position="45,30">
+              <Path data="@overlapCircles"/>
+              <Stroke color="#047857" width="1"/>
+            </Group>
+          </Layer>
+        </Layer>
+      </Layer>
+    </Layer>
   </Layer>
 </pagx>
