@@ -547,9 +547,8 @@ std::shared_ptr<tgfx::Data> RenderTiledPattern(const ImagePattern* pattern, int 
   if (!tgfxImage) {
     return nullptr;
   }
-  auto shader = tgfx::Shader::MakeImageShader(std::move(tgfxImage),
-                                              ToTGFXTileMode(pattern->tileModeX),
-                                              ToTGFXTileMode(pattern->tileModeY));
+  auto shader = tgfx::Shader::MakeImageShader(
+      std::move(tgfxImage), ToTGFXTileMode(pattern->tileModeX), ToTGFXTileMode(pattern->tileModeY));
   if (!shader) {
     return nullptr;
   }

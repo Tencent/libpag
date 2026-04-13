@@ -1169,8 +1169,9 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
     }
 
     out.openElement("a:r").closeElementStart();
-    out.openElement("a:rPr").addRequiredAttribute("lang", "en-US").addRequiredAttribute("sz",
-                                                                                        fontSize);
+    out.openElement("a:rPr")
+        .addRequiredAttribute("lang", "en-US")
+        .addRequiredAttribute("sz", fontSize);
     if (hasBold) {
       out.addRequiredAttribute("b", "1");
     }
