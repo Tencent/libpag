@@ -82,14 +82,14 @@
         <!-- TextBox with textAlign="end" -->
         <Layer layout="vertical" gap="4" alignment="center">
           <Layer width="160" height="60">
-            <Rectangle position="80,30" size="160,60" roundness="6"/>
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
             <Fill color="#F1F5F9"/>
             <Stroke color="#CBD5E1" width="1"/>
-          </Layer>
-          <Layer width="160" height="60">
-            <Text text="End aligned text in a text box area" fontFamily="Arial" fontSize="11" position="5,5"/>
-            <TextBox position="80,30" size="150,50" textAlign="end" lineHeight="16"/>
-            <Fill color="#1E293B"/>
+            <Layer left="5" right="5" top="5" bottom="5">
+              <Text text="End aligned text in a text box area" fontFamily="Arial" fontSize="11" position="75,25"/>
+              <TextBox position="75,25" size="150,50" textAlign="end" lineHeight="16"/>
+              <Fill color="#1E293B"/>
+            </Layer>
           </Layer>
           <Layer height="12">
             <Text text="textAlign=end" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
