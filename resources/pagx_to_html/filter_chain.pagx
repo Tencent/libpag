@@ -23,79 +23,93 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1">
+    <Layer flex="1" layout="vertical" gap="8" padding="10,8,10,8" alignment="stretch" arrangement="center">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-  <!-- BlurFilter + DropShadowFilter chain -->
-  <Layer>
-    <Rectangle position="90,140" size="90,90" roundness="12"/>
-    <Fill color="#3B82F6"/>
-    <BlurFilter blurX="2" blurY="2"/>
-    <DropShadowFilter offsetX="6" offsetY="6" blurX="10" blurY="10" color="#1E3A5F80"/>
-  </Layer>
-  <Layer>
-    <Text text="Blur+Shadow" fontFamily="Arial" fontSize="8" position="90,197" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
+      <!-- Row 1: 3 filters -->
+      <Layer layout="horizontal" gap="4" alignment="center" arrangement="spaceEvenly">
+        <!-- Blur + DropShadow chain -->
+        <Layer layout="vertical" gap="3" alignment="center">
+          <Layer width="90" height="90">
+            <Rectangle position="45,45" size="80,80" roundness="12"/>
+            <Fill color="#3B82F6"/>
+            <BlurFilter blurX="2" blurY="2"/>
+            <DropShadowFilter offsetX="6" offsetY="6" blurX="10" blurY="10" color="#1E3A5F80"/>
+          </Layer>
+          <Layer height="10">
+            <Text text="Blur+Shadow" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+        <!-- DropShadow shadowOnly -->
+        <Layer layout="vertical" gap="3" alignment="center">
+          <Layer width="90" height="90">
+            <Ellipse position="45,45" size="76,76"/>
+            <Fill color="#10B981"/>
+            <DropShadowFilter offsetX="4" offsetY="8" blurX="12" blurY="12" color="#064E3B" shadowOnly="true"/>
+          </Layer>
+          <Layer height="10">
+            <Text text="ShadowOnly" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+        <!-- InnerShadow -->
+        <Layer layout="vertical" gap="3" alignment="center">
+          <Layer width="90" height="90">
+            <Rectangle position="45,45" size="80,80" roundness="16"/>
+            <Fill color="#F59E0B"/>
+            <InnerShadowFilter offsetX="3" offsetY="3" blurX="8" blurY="8" color="#78350F"/>
+          </Layer>
+          <Layer height="10">
+            <Text text="InnerShadow" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+      </Layer>
 
-  <!-- DropShadowFilter with shadowOnly="true" -->
-  <Layer>
-    <Ellipse position="220,140" size="80,80"/>
-    <Fill color="#10B981"/>
-    <DropShadowFilter offsetX="4" offsetY="8" blurX="12" blurY="12" color="#064E3B" shadowOnly="true"/>
-  </Layer>
-  <Layer>
-    <Text text="ShadowOnly" fontFamily="Arial" fontSize="8" position="220,197" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-
-  <!-- InnerShadowFilter on a rounded rectangle -->
-  <Layer>
-    <Rectangle position="350,140" size="90,90" roundness="16"/>
-    <Fill color="#F59E0B"/>
-    <InnerShadowFilter offsetX="3" offsetY="3" blurX="8" blurY="8" color="#78350F"/>
-  </Layer>
-  <Layer>
-    <Text text="InnerShadow" fontFamily="Arial" fontSize="8" position="350,197" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-
-  <!-- InnerShadowFilter with shadowOnly="true" -->
-  <Layer>
-    <Rectangle position="90,250" size="90,90" roundness="12"/>
-    <Fill color="#EC4899"/>
-    <InnerShadowFilter offsetX="-2" offsetY="-2" blurX="6" blurY="6" color="#831843" shadowOnly="true"/>
-  </Layer>
-  <Layer>
-    <Text text="Inner Only" fontFamily="Arial" fontSize="8" position="90,308" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-
-  <!-- BlendFilter with multiply mode -->
-  <Layer>
-    <Ellipse position="220,250" size="80,80"/>
-    <Fill color="#8B5CF6"/>
-    <BlendFilter color="#FF880060" blendMode="multiply"/>
-  </Layer>
-  <Layer>
-    <Text text="Blend Multiply" fontFamily="Arial" fontSize="8" position="220,308" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-
-  <!-- Triple chain: BlurFilter + InnerShadowFilter + BlendFilter -->
-  <Layer>
-    <Rectangle position="350,250" size="90,90" roundness="12"/>
-    <Fill color="#06B6D4"/>
-    <BlurFilter blurX="1" blurY="1"/>
-    <InnerShadowFilter offsetX="2" offsetY="2" blurX="6" blurY="6" color="#0E7490"/>
-    <BlendFilter color="#F0ABFC40" blendMode="screen"/>
-  </Layer>
-  <Layer>
-    <Text text="Triple Chain" fontFamily="Arial" fontSize="8" position="350,308" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
+      <!-- Row 2: 3 filters -->
+      <Layer layout="horizontal" gap="4" alignment="center" arrangement="spaceEvenly">
+        <!-- InnerShadow shadowOnly -->
+        <Layer layout="vertical" gap="3" alignment="center">
+          <Layer width="90" height="90">
+            <Rectangle position="45,45" size="80,80" roundness="12"/>
+            <Fill color="#EC4899"/>
+            <InnerShadowFilter offsetX="-2" offsetY="-2" blurX="6" blurY="6" color="#831843" shadowOnly="true"/>
+          </Layer>
+          <Layer height="10">
+            <Text text="Inner Only" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+        <!-- BlendFilter multiply -->
+        <Layer layout="vertical" gap="3" alignment="center">
+          <Layer width="90" height="90">
+            <Ellipse position="45,45" size="76,76"/>
+            <Fill color="#8B5CF6"/>
+            <BlendFilter color="#FF880060" blendMode="multiply"/>
+          </Layer>
+          <Layer height="10">
+            <Text text="Blend Multiply" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+        <!-- Triple chain: Blur + InnerShadow + Blend -->
+        <Layer layout="vertical" gap="3" alignment="center">
+          <Layer width="90" height="90">
+            <Rectangle position="45,45" size="80,80" roundness="12"/>
+            <Fill color="#06B6D4"/>
+            <BlurFilter blurX="1" blurY="1"/>
+            <InnerShadowFilter offsetX="2" offsetY="2" blurX="6" blurY="6" color="#0E7490"/>
+            <BlendFilter color="#F0ABFC40" blendMode="screen"/>
+          </Layer>
+          <Layer height="10">
+            <Text text="Triple Chain" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+      </Layer>
     </Layer>
   </Layer>
 </pagx>
