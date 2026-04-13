@@ -259,6 +259,9 @@ void PAGXView::applyCenteringTransform() {
   float scaleX = static_cast<float>(_width) / pagxWidth;
   float scaleY = static_cast<float>(_height) / pagxHeight;
   float scale = std::min(scaleX, scaleY);
+  // Don't shrink the design below 1:1. When the design is larger than the canvas,
+  // show the top-left portion at full resolution to avoid triggering full texture upload.
+  scale = std::max(scale, 1.0f);
   float offsetX = (static_cast<float>(_width) - pagxWidth * scale) * 0.5f;
   float offsetY = (static_cast<float>(_height) - pagxHeight * scale) * 0.5f;
 
@@ -281,7 +284,7 @@ val PAGXView::getContentTransform() const {
   if (_width > 0 && _height > 0 && pagxWidth > 0 && pagxHeight > 0) {
     float scaleX = static_cast<float>(_width) / pagxWidth;
     float scaleY = static_cast<float>(_height) / pagxHeight;
-    fitScale = std::min(scaleX, scaleY);
+    fitScale = std::max(std::min(scaleX, scaleY), 1.0f);
     centerOffsetX = (static_cast<float>(_width) - pagxWidth * fitScale) * 0.5f;
     centerOffsetY = (static_cast<float>(_height) - pagxHeight * fitScale) * 0.5f;
   }
