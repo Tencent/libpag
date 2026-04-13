@@ -299,8 +299,14 @@ void PPTWriter::WriteXfrm(XMLBuilder& out, const Xform& xf) {
   } else {
     out.openElement("a:xfrm").closeElementStart();
   }
-  out.openElement("a:off").addRequiredAttribute("x", xf.offX).addRequiredAttribute("y", xf.offY).closeElementSelfClosing();
-  out.openElement("a:ext").addRequiredAttribute("cx", xf.extCX).addRequiredAttribute("cy", xf.extCY).closeElementSelfClosing();
+  out.openElement("a:off")
+      .addRequiredAttribute("x", xf.offX)
+      .addRequiredAttribute("y", xf.offY)
+      .closeElementSelfClosing();
+  out.openElement("a:ext")
+      .addRequiredAttribute("cx", xf.extCX)
+      .addRequiredAttribute("cy", xf.extCY)
+      .closeElementSelfClosing();
   out.closeElement();  // a:xfrm
 }
 
@@ -312,7 +318,10 @@ void PPTWriter::beginShape(XMLBuilder& out, const char* name, int64_t offX, int6
   out.openElement("p:sp").closeElementStart();
 
   out.openElement("p:nvSpPr").closeElementStart();
-  out.openElement("p:cNvPr").addRequiredAttribute("id", id).addRequiredAttribute("name", name).closeElementSelfClosing();
+  out.openElement("p:cNvPr")
+      .addRequiredAttribute("id", id)
+      .addRequiredAttribute("name", name)
+      .closeElementSelfClosing();
   out.openElement("p:cNvSpPr").closeElementSelfClosing();
   out.openElement("p:nvPr").closeElementSelfClosing();
   out.closeElement();  // p:nvSpPr
@@ -327,7 +336,10 @@ void PPTWriter::endShape(XMLBuilder& out) {
   out.openElement("a:bodyPr").closeElementSelfClosing();
   out.openElement("a:lstStyle").closeElementSelfClosing();
   out.openElement("a:p").closeElementStart();
-  out.openElement("a:endParaRPr").addRequiredAttribute("lang", "zh-CN").addRequiredAttribute("altLang", "en-US").closeElementSelfClosing();
+  out.openElement("a:endParaRPr")
+      .addRequiredAttribute("lang", "zh-CN")
+      .addRequiredAttribute("altLang", "en-US")
+      .closeElementSelfClosing();
   out.closeElement();  // a:p
   out.closeElement();  // p:txBody
   out.closeElement();  // p:sp
@@ -362,7 +374,9 @@ void PPTWriter::WriteBlip(XMLBuilder& out, const std::string& relId, float alpha
   out.openElement("a:blip").addRequiredAttribute("r:embed", relId);
   if (alpha < 1.0f) {
     out.closeElementStart();
-    out.openElement("a:alphaModFix").addRequiredAttribute("amt", AlphaToPct(alpha)).closeElementSelfClosing();
+    out.openElement("a:alphaModFix")
+        .addRequiredAttribute("amt", AlphaToPct(alpha))
+        .closeElementSelfClosing();
     out.closeElement();  // a:blip
   } else {
     out.closeElementSelfClosing();
@@ -383,9 +397,14 @@ void PPTWriter::writePicture(XMLBuilder& out, const std::string& relId, int64_t 
   out.openElement("p:pic").closeElementStart();
 
   out.openElement("p:nvPicPr").closeElementStart();
-  out.openElement("p:cNvPr").addRequiredAttribute("id", id).addRequiredAttribute("name", "MaskedImage").closeElementSelfClosing();
+  out.openElement("p:cNvPr")
+      .addRequiredAttribute("id", id)
+      .addRequiredAttribute("name", "MaskedImage")
+      .closeElementSelfClosing();
   out.openElement("p:cNvPicPr").closeElementStart();
-  out.openElement("a:picLocks").addRequiredAttribute("noChangeAspect", "1").closeElementSelfClosing();
+  out.openElement("a:picLocks")
+      .addRequiredAttribute("noChangeAspect", "1")
+      .closeElementSelfClosing();
   out.closeElement();  // p:cNvPicPr
   out.openElement("p:nvPr").closeElementSelfClosing();
   out.closeElement();  // p:nvPicPr
@@ -447,9 +466,14 @@ bool PPTWriter::writeImagePatternAsPicture(XMLBuilder& out, const Fill* fill,
   out.openElement("p:pic").closeElementStart();
 
   out.openElement("p:nvPicPr").closeElementStart();
-  out.openElement("p:cNvPr").addRequiredAttribute("id", id).addRequiredAttribute("name", "Image").closeElementSelfClosing();
+  out.openElement("p:cNvPr")
+      .addRequiredAttribute("id", id)
+      .addRequiredAttribute("name", "Image")
+      .closeElementSelfClosing();
   out.openElement("p:cNvPicPr").closeElementStart();
-  out.openElement("a:picLocks").addRequiredAttribute("noChangeAspect", "1").closeElementSelfClosing();
+  out.openElement("a:picLocks")
+      .addRequiredAttribute("noChangeAspect", "1")
+      .closeElementSelfClosing();
   out.closeElement();  // p:cNvPicPr
   out.openElement("p:nvPr").closeElementSelfClosing();
   out.closeElement();  // p:nvPicPr
@@ -488,7 +512,9 @@ void PPTWriter::writeGradientStops(XMLBuilder& out, const std::vector<ColorStop*
     out.openElement("a:srgbClr").addRequiredAttribute("val", ColorToHex6(stop->color));
     if (stop->color.alpha < 1.0f) {
       out.closeElementStart();
-      out.openElement("a:alpha").addRequiredAttribute("val", AlphaToPct(stop->color.alpha)).closeElementSelfClosing();
+      out.openElement("a:alpha")
+          .addRequiredAttribute("val", AlphaToPct(stop->color.alpha))
+          .closeElementSelfClosing();
       out.closeElement();  // a:srgbClr
     } else {
       out.closeElementSelfClosing();
@@ -513,7 +539,9 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
       out.openElement("a:srgbClr").addRequiredAttribute("val", ColorToHex6(solid->color));
       if (effectiveAlpha < 1.0f) {
         out.closeElementStart();
-        out.openElement("a:alpha").addRequiredAttribute("val", AlphaToPct(effectiveAlpha)).closeElementSelfClosing();
+        out.openElement("a:alpha")
+            .addRequiredAttribute("val", AlphaToPct(effectiveAlpha))
+            .closeElementSelfClosing();
         out.closeElement();
       } else {
         out.closeElementSelfClosing();
@@ -532,7 +560,10 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
 
       out.openElement("a:gradFill").closeElementStart();
       writeGradientStops(out, grad->colorStops);
-      out.openElement("a:lin").addRequiredAttribute("ang", ang).addRequiredAttribute("scaled", "1").closeElementSelfClosing();
+      out.openElement("a:lin")
+          .addRequiredAttribute("ang", ang)
+          .addRequiredAttribute("scaled", "1")
+          .closeElementSelfClosing();
       out.closeElement();  // a:gradFill
       break;
     }
@@ -683,11 +714,17 @@ void PPTWriter::writeStroke(XMLBuilder& out, const Stroke* stroke, float alpha) 
       for (size_t i = 0; i + 1 < stroke->dashes.size(); i += 2) {
         int d = std::max(1, static_cast<int>(std::round(stroke->dashes[i] / sw * 100000.0)));
         int sp = std::max(1, static_cast<int>(std::round(stroke->dashes[i + 1] / sw * 100000.0)));
-        out.openElement("a:ds").addRequiredAttribute("d", d).addRequiredAttribute("sp", sp).closeElementSelfClosing();
+        out.openElement("a:ds")
+            .addRequiredAttribute("d", d)
+            .addRequiredAttribute("sp", sp)
+            .closeElementSelfClosing();
       }
       if (stroke->dashes.size() % 2 != 0) {
         int d = std::max(1, static_cast<int>(std::round(stroke->dashes.back() / sw * 100000.0)));
-        out.openElement("a:ds").addRequiredAttribute("d", d).addRequiredAttribute("sp", d).closeElementSelfClosing();
+        out.openElement("a:ds")
+            .addRequiredAttribute("d", d)
+            .addRequiredAttribute("sp", d)
+            .closeElementSelfClosing();
       }
       out.closeElement();  // a:custDash
     }
@@ -722,7 +759,9 @@ void PPTWriter::writeShadowElement(XMLBuilder& out, const char* tag, float blurX
   }
   builder.closeElementStart();
   out.openElement("a:srgbClr").addRequiredAttribute("val", ColorToHex6(color)).closeElementStart();
-  out.openElement("a:alpha").addRequiredAttribute("val", AlphaToPct(color.alpha)).closeElementSelfClosing();
+  out.openElement("a:alpha")
+      .addRequiredAttribute("val", AlphaToPct(color.alpha))
+      .closeElementSelfClosing();
   out.closeElement();  // a:srgbClr
   out.closeElement();  // tag
 }
@@ -765,7 +804,12 @@ void PPTWriter::WriteContourGeom(XMLBuilder& out, std::vector<PathContour>& cont
   out.openElement("a:gdLst").closeElementSelfClosing();
   out.openElement("a:ahLst").closeElementSelfClosing();
   out.openElement("a:cxnLst").closeElementSelfClosing();
-  out.openElement("a:rect").addRequiredAttribute("l", "0").addRequiredAttribute("t", "0").addRequiredAttribute("r", "r").addRequiredAttribute("b", "b").closeElementSelfClosing();
+  out.openElement("a:rect")
+      .addRequiredAttribute("l", "0")
+      .addRequiredAttribute("t", "0")
+      .addRequiredAttribute("r", "r")
+      .addRequiredAttribute("b", "b")
+      .closeElementSelfClosing();
 
   out.openElement("a:pathLst").closeElementStart();
 
@@ -776,7 +820,10 @@ void PPTWriter::WriteContourGeom(XMLBuilder& out, std::vector<PathContour>& cont
     }
     auto groups = GroupContoursByOutermost(contours, depths);
     for (const auto& group : groups) {
-      out.openElement("a:path").addRequiredAttribute("w", pathWidth).addRequiredAttribute("h", pathHeight).closeElementStart();
+      out.openElement("a:path")
+          .addRequiredAttribute("w", pathWidth)
+          .addRequiredAttribute("h", pathHeight)
+          .closeElementStart();
       if (group.size() > 1) {
         EmitBridgedGroup(out, contours, group, scaleX, scaleY, scaledOfsX, scaledOfsY);
       } else {
@@ -785,7 +832,10 @@ void PPTWriter::WriteContourGeom(XMLBuilder& out, std::vector<PathContour>& cont
       out.closeElement();  // a:path
     }
   } else {
-    out.openElement("a:path").addRequiredAttribute("w", pathWidth).addRequiredAttribute("h", pathHeight).closeElementStart();
+    out.openElement("a:path")
+        .addRequiredAttribute("w", pathWidth)
+        .addRequiredAttribute("h", pathHeight)
+        .closeElementStart();
     for (auto& c : contours) {
       EmitContour(out, c, scaleX, scaleY, scaledOfsX, scaledOfsY);
     }
@@ -830,7 +880,10 @@ void PPTWriter::writeRectangle(XMLBuilder& out, const Rectangle* rect, const Fil
                   : 0;
     out.openElement("a:prstGeom").addRequiredAttribute("prst", "roundRect").closeElementStart();
     out.openElement("a:avLst").closeElementStart();
-    out.openElement("a:gd").addRequiredAttribute("name", "adj").addRequiredAttribute("fmla", "val " + std::to_string(adj)).closeElementSelfClosing();
+    out.openElement("a:gd")
+        .addRequiredAttribute("name", "adj")
+        .addRequiredAttribute("fmla", "val " + std::to_string(adj))
+        .closeElementSelfClosing();
     out.closeElement();  // a:avLst
     out.closeElement();  // a:prstGeom
   } else {
@@ -1025,7 +1078,10 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   int id = _ctx->nextShapeId();
   out.openElement("p:sp").closeElementStart();
   out.openElement("p:nvSpPr").closeElementStart();
-  out.openElement("p:cNvPr").addRequiredAttribute("id", id).addRequiredAttribute("name", "TextBox").closeElementSelfClosing();
+  out.openElement("p:cNvPr")
+      .addRequiredAttribute("id", id)
+      .addRequiredAttribute("name", "TextBox")
+      .closeElementSelfClosing();
   out.openElement("p:cNvSpPr").addRequiredAttribute("txBox", "1").closeElementSelfClosing();
   out.openElement("p:nvPr").closeElementSelfClosing();
   out.closeElement();  // p:nvSpPr
@@ -1086,7 +1142,9 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
     }
 
     out.openElement("a:r").closeElementStart();
-    out.openElement("a:rPr").addRequiredAttribute("lang", "en-US").addRequiredAttribute("sz", FontSizeToPPT(text->fontSize));
+    out.openElement("a:rPr")
+        .addRequiredAttribute("lang", "en-US")
+        .addRequiredAttribute("sz", FontSizeToPPT(text->fontSize));
     bool hasBold = text->fontStyle.find("Bold") != std::string::npos;
     bool hasItalic = text->fontStyle.find("Italic") != std::string::npos;
     if (hasBold) {
@@ -1107,7 +1165,9 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
       out.openElement("a:srgbClr").addRequiredAttribute("val", ColorToHex6(solid->color));
       if (ea < 1.0f) {
         out.closeElementStart();
-        out.openElement("a:alpha").addRequiredAttribute("val", AlphaToPct(ea)).closeElementSelfClosing();
+        out.openElement("a:alpha")
+            .addRequiredAttribute("val", AlphaToPct(ea))
+            .closeElementSelfClosing();
         out.closeElement();
       } else {
         out.closeElementSelfClosing();
@@ -1117,7 +1177,9 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
 
     if (!text->fontFamily.empty()) {
       auto typeface = StripQuotes(text->fontFamily);
-      out.openElement("a:latin").addRequiredAttribute("typeface", typeface).closeElementSelfClosing();
+      out.openElement("a:latin")
+          .addRequiredAttribute("typeface", typeface)
+          .closeElementSelfClosing();
       out.openElement("a:ea").addRequiredAttribute("typeface", typeface).closeElementSelfClosing();
     }
 
