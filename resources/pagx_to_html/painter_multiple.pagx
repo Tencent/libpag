@@ -22,13 +22,14 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1">
+    <Layer flex="1" layout="vertical" alignment="center" arrangement="center">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
+      <Layer width="260" height="215">
       <!-- Shape with multiple fills and strokes -->
-      <Layer>
+      <Layer name="item">
         <Rectangle position="160,172" size="160,160" roundness="20"/>
         <!-- First fill (bottom layer) -->
         <Fill color="#3B82F6"/>
@@ -48,6 +49,7 @@
       <Layer>
         <Text text="Stroke #1 (green) + Stroke #2 (orange dashed)" fontFamily="Arial" fontSize="8" position="160,277" textAnchor="center"/>
         <Fill color="#64748B"/>
+      </Layer>
       </Layer>
     </Layer>
   </Layer>

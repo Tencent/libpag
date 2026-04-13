@@ -22,13 +22,14 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1">
+    <Layer flex="1" layout="vertical" alignment="center" arrangement="center">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
+      <Layer width="380" height="380">
       <!-- Row 1: Basic stroke + Dashed + Cap styles -->
-      <Layer>
+      <Layer name="item">
         <Rectangle position="90,140" size="90,90" roundness="12"/>
         <Stroke color="#3B82F6" width="6" cap="round" join="round"/>
       </Layer>
@@ -144,6 +145,7 @@
       <Layer>
         <Text text="Gradient stroke" fontFamily="Arial" fontSize="8" position="220,420" textAnchor="center"/>
         <Fill color="#64748B"/>
+      </Layer>
       </Layer>
     </Layer>
   </Layer>

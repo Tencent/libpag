@@ -22,11 +22,12 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1">
+    <Layer flex="1" layout="vertical" alignment="center" arrangement="center">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
+      <Layer width="280" height="200">
       <!-- 45° rotation + translate -->
       <Layer matrix="0.707,0.707,-0.707,0.707,110,130">
         <Rectangle position="10,10" size="80,80" roundness="8"/>
@@ -41,6 +42,7 @@
       <Layer>
         <Text text="Original position" fontFamily="Arial" fontSize="8" position="160,218" textAnchor="center"/>
         <Fill color="#94A3B8"/>
+      </Layer>
       </Layer>
     </Layer>
   </Layer>

@@ -22,11 +22,12 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1">
+    <Layer flex="1" layout="vertical" alignment="center" arrangement="center">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
+      <Layer width="320" height="200">
       <!-- Viewport with scrollRect: only the defined rect is visible -->
       <Layer scrollRect="20,20,120,80" x="35" y="85">
         <Rectangle position="80,50" size="200,120" roundness="12"/>
@@ -82,6 +83,7 @@
       <Layer>
         <Text text="Text Clipping" fontFamily="Arial" fontSize="8" position="190,248" textAnchor="center"/>
         <Fill color="#94A3B8"/>
+      </Layer>
       </Layer>
     </Layer>
   </Layer>

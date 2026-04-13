@@ -23,7 +23,8 @@
     </Layer>
 
     <!-- Content area -->
-    <Layer flex="1">
+    <Layer flex="1" layout="vertical" alignment="center" arrangement="center">
+      <Layer width="260" height="135">
       <!-- Visible layer: solid card with label -->
       <Layer>
         <Rectangle position="95,125" size="110,120" roundness="12"/>
@@ -69,6 +70,7 @@
       <Layer>
         <Text text="Hidden" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="225,149" textAnchor="center"/>
         <Fill color="#94A3B8"/>
+      </Layer>
       </Layer>
     </Layer>
 

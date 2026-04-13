@@ -22,11 +22,12 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1">
+    <Layer flex="1" layout="vertical" alignment="center" arrangement="center">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
+      <Layer width="300" height="190">
   <!-- Nesting demo -->
   <Layer name="Parent" x="60" y="78">
     <Rectangle position="80,80" size="140,140" roundness="16"/>
@@ -54,6 +55,7 @@
     <Text text="Child2 (red, on top)" fontFamily="Arial" fontSize="9" position="220,165"/>
     <Fill color="#EF4444"/>
   </Layer>
+      </Layer>
     </Layer>
   </Layer>
 </pagx>

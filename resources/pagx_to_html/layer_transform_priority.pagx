@@ -22,11 +22,12 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1">
+    <Layer flex="1" layout="vertical" alignment="center" arrangement="center">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
+      <Layer width="360" height="160">
       <!-- Only x/y (no matrix/matrix3D) → translate(20,20) -->
       <Layer x="50" y="88">
         <Rectangle position="40,40" size="60,60" roundness="8"/>
@@ -55,6 +56,7 @@
       <Layer>
         <Text text="matrix3D wins" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="300,188" textAnchor="center"/>
         <Fill color="#EF4444"/>
+      </Layer>
       </Layer>
     </Layer>
   </Layer>

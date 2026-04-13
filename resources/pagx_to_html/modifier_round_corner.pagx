@@ -22,13 +22,14 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1">
+    <Layer flex="1" layout="vertical" alignment="center" arrangement="center">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
+      <Layer width="240" height="180">
       <!-- Triangle with rounded corners -->
-      <Layer>
+      <Layer name="item">
         <Polystar position="150,165" type="polygon" pointCount="3" outerRadius="80" rotation="-90"/>
         <RoundCorner radius="15"/>
         <Fill color="#8B5CF6"/>
@@ -38,6 +39,7 @@
       <Layer>
         <Text text="radius=15" fontFamily="Arial" fontSize="9" position="150,230" textAnchor="center"/>
         <Fill color="#64748B"/>
+      </Layer>
       </Layer>
     </Layer>
   </Layer>

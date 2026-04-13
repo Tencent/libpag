@@ -22,11 +22,12 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1">
+    <Layer flex="1" layout="vertical" alignment="center" arrangement="center">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
+      <Layer width="380" height="276">
   <!-- Base gradient layer -->
   <Layer>
     <Rectangle position="220,206" size="380,254" roundness="12"/>
@@ -203,6 +204,7 @@
     <Text text="normal" fontFamily="Arial" fontSize="7" position="28,46" textAnchor="center"/>
     <Fill color="#FFFFFF"/>
   </Layer>
+      </Layer>
     </Layer>
   </Layer>
 </pagx>

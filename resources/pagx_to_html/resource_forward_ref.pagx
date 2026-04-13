@@ -23,7 +23,8 @@
     </Layer>
 
     <!-- Cards area -->
-    <Layer flex="1">
+    <Layer flex="1" layout="vertical" alignment="center" arrangement="center">
+      <Layer width="260" height="160">
       <!-- Card 1: uses forward-referenced color -->
       <Layer>
         <Rectangle position="90,55" size="120,100" roundness="12"/>
@@ -70,6 +71,7 @@
       <Layer>
         <Text text="All @id references resolve to Resources block below" fontFamily="Arial" fontSize="9" position="160,148" textAnchor="center"/>
         <Fill color="#94A3B8"/>
+      </Layer>
       </Layer>
     </Layer>
   </Layer>

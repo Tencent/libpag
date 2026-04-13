@@ -22,13 +22,14 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1">
+    <Layer flex="1" layout="vertical" alignment="center" arrangement="center">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
+      <Layer width="500" height="200">
       <!-- Append: combine subpaths -->
-      <Layer>
+      <Layer name="item">
         <Rectangle position="70,160" size="60,60"/>
         <Ellipse position="100,160" size="60,60"/>
         <MergePath mode="append"/>
@@ -85,6 +86,7 @@
       <Layer>
         <Text text="Difference" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="485,205" textAnchor="center"/>
         <Fill color="#64748B"/>
+      </Layer>
       </Layer>
     </Layer>
   </Layer>
