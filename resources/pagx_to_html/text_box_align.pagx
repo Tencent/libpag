@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: TextBox textAlign — start, center, end, justify in sibling mode -->
+<pagx version="1.0" width="420" height="340">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="stretch">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="TextBox textAlign" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="start, center, end, justify in text box" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
+
+    <!-- Card -->
+    <Layer flex="1" layout="horizontal" gap="12" padding="12" alignment="stretch" arrangement="center">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <!-- textAlign=start -->
+      <Layer flex="1" layout="vertical" gap="4" alignment="stretch">
+        <Layer flex="1">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
+          <Fill color="#F8FAFC"/>
+          <Stroke color="#E2E8F0" width="1"/>
+          <Text text="Hello World from the start side" fontFamily="Arial" fontSize="10"/>
+          <TextBox position="40,55" width="80" height="110" textAlign="start" lineHeight="15"/>
+          <Fill color="#1E293B"/>
+        </Layer>
+        <Layer height="12">
+          <Text text="start" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+      </Layer>
+
+      <!-- textAlign=center -->
+      <Layer flex="1" layout="vertical" gap="4" alignment="stretch">
+        <Layer flex="1">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
+          <Fill color="#F8FAFC"/>
+          <Stroke color="#E2E8F0" width="1"/>
+          <Text text="Hello World from the center" fontFamily="Arial" fontSize="10"/>
+          <TextBox position="40,55" width="80" height="110" textAlign="center" lineHeight="15"/>
+          <Fill color="#1E293B"/>
+        </Layer>
+        <Layer height="12">
+          <Text text="center" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+      </Layer>
+
+      <!-- textAlign=end -->
+      <Layer flex="1" layout="vertical" gap="4" alignment="stretch">
+        <Layer flex="1">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
+          <Fill color="#F8FAFC"/>
+          <Stroke color="#E2E8F0" width="1"/>
+          <Text text="Hello World from the end side" fontFamily="Arial" fontSize="10"/>
+          <TextBox position="40,55" width="80" height="110" textAlign="end" lineHeight="15"/>
+          <Fill color="#1E293B"/>
+        </Layer>
+        <Layer height="12">
+          <Text text="end" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+      </Layer>
+
+      <!-- textAlign=justify -->
+      <Layer flex="1" layout="vertical" gap="4" alignment="stretch">
+        <Layer flex="1">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
+          <Fill color="#F8FAFC"/>
+          <Stroke color="#E2E8F0" width="1"/>
+          <Text text="Hello World from the justify mode" fontFamily="Arial" fontSize="10"/>
+          <TextBox position="40,55" width="80" height="110" textAlign="justify" lineHeight="15"/>
+          <Fill color="#1E293B"/>
+        </Layer>
+        <Layer height="12">
+          <Text text="justify" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Remaining coverage gaps — ImagePattern.mipmapMode (non-default), Repeater.offset (non-zero),
-     TextBox.textAlign="end", RangeSelector.offset (non-zero), TextPath.baselineAngle (non-zero) -->
+     textAnchor="end", RangeSelector.offset (non-zero), TextPath.baselineAngle (non-zero) -->
 <pagx version="1.0" width="440" height="420">
   <Resources>
     <Image id="tinyImg" source="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAFUlEQVR4nGP8Oo/7PwMSYELmECcAAKy6AqWSorM1AAAAAElFTkSuQmCC"/>
@@ -79,20 +79,19 @@
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
-        <!-- TextBox with textAlign="end" -->
+        <!-- textAnchor="end" right-aligned text -->
         <Layer layout="vertical" gap="4" alignment="center">
           <Layer width="160" height="60">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
             <Fill color="#F1F5F9"/>
             <Stroke color="#CBD5E1" width="1"/>
             <Layer left="5" right="5" top="5" bottom="5">
-              <Text text="End aligned text" fontFamily="Arial" fontSize="11"/>
-              <TextBox position="75,25" width="150" height="50" textAlign="end" lineHeight="16"/>
+              <Text text="End aligned text" fontFamily="Arial" fontSize="11" position="150,5" textAnchor="end"/>
               <Fill color="#1E293B"/>
             </Layer>
           </Layer>
           <Layer height="12">
-            <Text text="textAlign=end" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="textAnchor=end" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
