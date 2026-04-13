@@ -966,14 +966,6 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
     ReversePathData(pathData, reversed);
     pathData = reversed;
   }
-  if (textPath->baselineAngle != 0) {
-    float ox = textPath->baselineOrigin.x;
-    float oy = textPath->baselineOrigin.y;
-    auto m = Matrix::Translate(-ox, -oy);
-    m = Matrix::Rotate(textPath->baselineAngle) * m;
-    m = Matrix::Translate(ox, oy) * m;
-    pathData.transform(m);
-  }
   ArcLengthLUT lut = BuildArcLengthLUT(pathData);
   if (lut.totalLength <= 0) {
     return;
@@ -1054,7 +1046,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
           Matrix m = Matrix::Scale(scale, scale);
           m = Matrix::Translate(-glyph->advance / 2.0f, 0) * m;
           if (textPath->perpendicular) {
-            float angleDeg = tangent * 180.0f / static_cast<float>(M_PI);
+            float angleDeg = tangent * 180.0f / static_cast<float>(M_PI) - textPath->baselineAngle;
             m = Matrix::Rotate(angleDeg) * m;
           }
           m = Matrix::Translate(pos.x, pos.y) * m;
@@ -1118,7 +1110,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         std::string transform;
         transform += "translateX(-50%)";
         if (textPath->perpendicular) {
-          float angleDeg = tangent * 180.0f / static_cast<float>(M_PI);
+          float angleDeg = tangent * 180.0f / static_cast<float>(M_PI) - textPath->baselineAngle;
           transform += " rotate(" + FloatToString(angleDeg) + "deg)";
         }
         charStyle += ";transform:" + transform;
