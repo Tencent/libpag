@@ -4,12 +4,12 @@
   <Resources>
     <!-- Vector font for positions/anchors/skews testing -->
     <Font id="vecFont" unitsPerEm="1000">
-      <!-- H: GlyphID=1 -->
-      <Glyph id="gH" advance="600" path="M 80,0 L 80,-700 M 520,0 L 520,-700 M 80,-350 L 520,-350"/>
-      <!-- E: GlyphID=2 -->
-      <Glyph id="gE" advance="550" path="M 80,0 L 80,-700 L 470,-700 M 80,-350 L 400,-350 M 80,0 L 470,0"/>
-      <!-- L: GlyphID=3 -->
-      <Glyph id="gL" advance="500" path="M 80,0 L 80,-700 M 80,0 L 420,0"/>
+      <!-- H: two vertical bars + horizontal crossbar, closed outlines -->
+      <Glyph id="gH" advance="600" path="M 60,0 L 60,-700 L 140,-700 L 140,-390 L 460,-390 L 460,-700 L 540,-700 L 540,0 L 460,0 L 460,-310 L 140,-310 L 140,0 Z"/>
+      <!-- E: vertical bar + 3 horizontal bars, closed outline -->
+      <Glyph id="gE" advance="520" path="M 60,0 L 60,-700 L 460,-700 L 460,-620 L 140,-620 L 140,-390 L 390,-390 L 390,-310 L 140,-310 L 140,-80 L 460,-80 L 460,0 Z"/>
+      <!-- L: vertical bar + bottom bar, closed outline -->
+      <Glyph id="gL" advance="480" path="M 60,0 L 60,-700 L 140,-700 L 140,-80 L 420,-80 L 420,0 Z"/>
     </Font>
 
     <!-- Bitmap font for Glyph.image and Glyph.offset testing -->
