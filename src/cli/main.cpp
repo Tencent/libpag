@@ -26,6 +26,7 @@
 #include "cli/CommandImport.h"
 #include "cli/CommandLayout.h"
 #include "cli/CommandRender.h"
+#include "cli/CommandResolve.h"
 #include "cli/CommandVerify.h"
 
 #ifndef PAGX_CLI_VERSION
@@ -39,6 +40,7 @@ static void PrintUsage() {
             << "\n"
             << "Commands:\n"
             << "  verify         Resolve imports, check all issues, render screenshot + layout\n"
+            << "  resolve        Resolve import directives (inline SVG, external imports)\n"
             << "  layout         Display layout tree with bounds\n"
             << "  render         Render PAGX to an image file (supports crop and scale)\n"
             << "  bounds         Query rendered pixel bounds of layers (for crop regions)\n"
@@ -92,6 +94,9 @@ int main(int argc, char* argv[]) {
   }
   if (command == "import") {
     return pagx::cli::RunImport(argc - 1, argv + 1);
+  }
+  if (command == "resolve") {
+    return pagx::cli::RunResolve(argc - 1, argv + 1);
   }
   if (command == "export") {
     return pagx::cli::RunExport(argc - 1, argv + 1);

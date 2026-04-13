@@ -30,11 +30,11 @@
 #include "cli/CommandImport.h"
 #include "cli/CommandLayout.h"
 #include "cli/CommandRender.h"
+#include "cli/CommandResolve.h"
 #include "cli/CommandVerify.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
-#include "pagx/nodes/Import.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
@@ -2084,6 +2084,45 @@ CLI_TEST(PAGXCliTest, LayoutCheck_PolystarOrigin) {
   EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
 }
 
+// stretch-fill Rectangle inside a padded Layer should be detected.
+CLI_TEST(PAGXCliTest, LayoutCheck_PaddingStretch) {
+  auto path = TestResourcePath("layout_check_padding_stretch.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("stretch-fill element affected by padding") != std::string::npos);
+}
+
+// stretch-fill divider (left="0" right="0") inside a padded Layer should be detected.
+CLI_TEST(PAGXCliTest, LayoutCheck_PaddingStretchDivider) {
+  auto path = TestResourcePath("layout_check_padding_stretch_divider.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("stretch-fill element affected by padding") != std::string::npos);
+}
+
+// Correct nested container (background in outer, padding in inner) should NOT trigger.
+CLI_TEST(PAGXCliTest, LayoutCheck_PaddingStretchNested) {
+  auto path = TestResourcePath("layout_check_padding_stretch_nested.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("stretch-fill element affected by padding") == std::string::npos);
+}
+
 // Layers at different positions but identical structure should be detected as extractable.
 CLI_TEST(PAGXCliTest, Verify_CompositionPositionDiff) {
   auto inputPath = TestResourcePath("verify_composition_position_diff.pagx");
@@ -2261,10 +2300,10 @@ CLI_TEST(PAGXCliTest, Verify_PathDataDifferent) {
 }
 
 //==============================================================================
-// Import node data model tests
+// Import directive tests (inline <svg> and import attribute)
 //==============================================================================
 
-CLI_TEST(PAGXCliTest, ImportNode_ParseExternalSource) {
+CLI_TEST(PAGXCliTest, ImportDirective_ParseExternalSource) {
   auto inputPath = TestResourcePath("import_node_basic.pagx");
   auto doc = pagx::PAGXImporter::FromFile(inputPath);
   ASSERT_NE(doc, nullptr);
@@ -2272,49 +2311,39 @@ CLI_TEST(PAGXCliTest, ImportNode_ParseExternalSource) {
 
   ASSERT_GE(doc->layers.size(), 1u);
   auto* layer = doc->layers[0];
-  ASSERT_EQ(layer->contents.size(), 1u);
-  EXPECT_EQ(layer->contents[0]->nodeType(), pagx::NodeType::Import);
-  auto* imp = static_cast<pagx::Import*>(layer->contents[0]);
-  EXPECT_EQ(imp->source, "import_external.svg");
-  EXPECT_TRUE(imp->rawContent.empty());
+  EXPECT_EQ(layer->importDirective.source, "import_external.svg");
+  EXPECT_TRUE(layer->importDirective.content.empty());
 }
 
-CLI_TEST(PAGXCliTest, ImportNode_ParseInlineContent) {
+CLI_TEST(PAGXCliTest, ImportDirective_ParseInlineContent) {
   auto inputPath = TestResourcePath("import_node_basic.pagx");
   auto doc = pagx::PAGXImporter::FromFile(inputPath);
   ASSERT_NE(doc, nullptr);
   ASSERT_GE(doc->layers.size(), 2u);
   auto* layer = doc->layers[1];
-  ASSERT_EQ(layer->contents.size(), 1u);
-  EXPECT_EQ(layer->contents[0]->nodeType(), pagx::NodeType::Import);
-  auto* imp = static_cast<pagx::Import*>(layer->contents[0]);
-  EXPECT_TRUE(imp->source.empty());
-  EXPECT_FALSE(imp->rawContent.empty());
-  EXPECT_NE(imp->rawContent.find("<svg"), std::string::npos);
-  EXPECT_NE(imp->rawContent.find("<circle"), std::string::npos);
+  EXPECT_TRUE(layer->importDirective.source.empty());
+  EXPECT_FALSE(layer->importDirective.content.empty());
+  EXPECT_NE(layer->importDirective.content.find("<svg"), std::string::npos);
+  EXPECT_NE(layer->importDirective.content.find("<circle"), std::string::npos);
 }
 
-CLI_TEST(PAGXCliTest, ImportNode_ExportRoundTrip) {
+CLI_TEST(PAGXCliTest, ImportDirective_ExportRoundTrip) {
   auto inputPath = TestResourcePath("import_node_basic.pagx");
   auto doc = pagx::PAGXImporter::FromFile(inputPath);
   ASSERT_NE(doc, nullptr);
 
   auto xml = pagx::PAGXExporter::ToXML(*doc);
-  EXPECT_NE(xml.find("<Import source=\"import_external.svg\""), std::string::npos);
-  EXPECT_NE(xml.find("<Import>"), std::string::npos);
+  EXPECT_NE(xml.find("import=\"import_external.svg\""), std::string::npos);
   EXPECT_NE(xml.find("<svg"), std::string::npos);
-  EXPECT_NE(xml.find("</Import>"), std::string::npos);
 
   auto doc2 = pagx::PAGXImporter::FromXML(xml);
   ASSERT_NE(doc2, nullptr);
   ASSERT_GE(doc2->layers.size(), 2u);
-  auto* imp1 = static_cast<pagx::Import*>(doc2->layers[0]->contents[0]);
-  EXPECT_EQ(imp1->source, "import_external.svg");
-  auto* imp2 = static_cast<pagx::Import*>(doc2->layers[1]->contents[0]);
-  EXPECT_NE(imp2->rawContent.find("<svg"), std::string::npos);
+  EXPECT_EQ(doc2->layers[0]->importDirective.source, "import_external.svg");
+  EXPECT_NE(doc2->layers[1]->importDirective.content.find("<svg"), std::string::npos);
 }
 
-CLI_TEST(PAGXCliTest, ImportNode_HasUnresolvedImports) {
+CLI_TEST(PAGXCliTest, ImportDirective_HasUnresolvedImports) {
   auto withImport = TestResourcePath("import_node_basic.pagx");
   auto doc1 = pagx::PAGXImporter::FromFile(withImport);
   ASSERT_NE(doc1, nullptr);
@@ -2327,13 +2356,13 @@ CLI_TEST(PAGXCliTest, ImportNode_HasUnresolvedImports) {
 }
 
 //==============================================================================
-// Import --resolve tests (new syntax)
+// Resolve command tests
 //==============================================================================
 
-CLI_TEST(PAGXCliTest, ImportResolve_ExpandExternalSource) {
+CLI_TEST(PAGXCliTest, Resolve_ExpandExternalSource) {
   auto pagxPath = CopyToTemp("import_node_basic.pagx", "resolve_external.pagx");
   CopyToTemp("import_external.svg", "import_external.svg");
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--resolve", pagxPath});
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve", pagxPath});
   EXPECT_EQ(ret, 0);
 
   auto doc = pagx::PAGXImporter::FromFile(pagxPath);
@@ -2341,16 +2370,17 @@ CLI_TEST(PAGXCliTest, ImportResolve_ExpandExternalSource) {
   EXPECT_FALSE(doc->hasUnresolvedImports());
 }
 
-CLI_TEST(PAGXCliTest, ImportResolve_NoImportNodes) {
+CLI_TEST(PAGXCliTest, Resolve_NoImportNodes) {
   auto pagxPath = CopyToTemp("import_node_none.pagx", "resolve_none.pagx");
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--resolve", pagxPath});
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve", pagxPath});
   EXPECT_EQ(ret, 0);
 }
 
-CLI_TEST(PAGXCliTest, ImportResolve_OutputToNewFile) {
+CLI_TEST(PAGXCliTest, Resolve_OutputToNewFile) {
   auto pagxPath = TestResourcePath("import_node_basic.pagx");
   auto outputPath = TempDir() + "/resolve_output.pagx";
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--resolve", pagxPath, "-o", outputPath});
+  CopyToTemp("import_external.svg", "import_external.svg");
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve", pagxPath, "-o", outputPath});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(outputPath));
 
@@ -2359,33 +2389,22 @@ CLI_TEST(PAGXCliTest, ImportResolve_OutputToNewFile) {
   EXPECT_FALSE(doc->hasUnresolvedImports());
 }
 
-CLI_TEST(PAGXCliTest, ImportResolve_MutuallyExclusiveWithInput) {
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", "a.svg", "--resolve", "b.pagx"});
+CLI_TEST(PAGXCliTest, Resolve_MissingFile) {
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve", "nonexistent.pagx"});
   EXPECT_NE(ret, 0);
 }
 
-CLI_TEST(PAGXCliTest, ImportResolve_MissingFile) {
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--resolve", "nonexistent.pagx"});
-  EXPECT_NE(ret, 0);
-}
-
-CLI_TEST(PAGXCliTest, ImportResolve_MultiLayerPreservesIsolation) {
+CLI_TEST(PAGXCliTest, Resolve_MultiLayerPreservesIsolation) {
   // Verifies that resolving an inline SVG with multiple elements preserves each SVG element
-  // in a separate painter scope, preventing painter accumulation bugs. Before the fix, all SVG
-  // elements were unpacked into the parent Layer's contents, causing the second Stroke to
-  // render both Paths (painter leak). The fix wraps each SVG element in a Group (for scope
-  // isolation) or keeps it as a child Layer (when Layer-exclusive features are needed).
+  // in a separate painter scope, preventing painter accumulation bugs.
   auto pagxPath = CopyToTemp("import_resolve_multi_layer.pagx", "resolve_multi_layer.pagx");
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--resolve", pagxPath});
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve", pagxPath});
   EXPECT_EQ(ret, 0);
 
   auto doc = pagx::PAGXImporter::FromFile(pagxPath);
   ASSERT_NE(doc, nullptr);
   EXPECT_FALSE(doc->hasUnresolvedImports());
 
-  // The host Layer should have the first SVG element unpacked (no Group needed for the first
-  // element since there is no preceding geometry to isolate from) and subsequent elements
-  // wrapped in Groups for painter scope isolation.
   ASSERT_EQ(doc->layers.size(), 1u);
   auto* hostLayer = doc->layers[0];
   EXPECT_FALSE(hostLayer->contents.empty());
@@ -2401,8 +2420,91 @@ CLI_TEST(PAGXCliTest, ImportResolve_MultiLayerPreservesIsolation) {
   EXPECT_TRUE(RenderAndCompare({"render", pagxPath}, "PAGXCliTest/ImportResolve_MultiLayer"));
 }
 
+CLI_TEST(PAGXCliTest, Resolve_AddsResolvedFromComment) {
+  auto pagxPath = CopyToTemp("import_node_basic.pagx", "resolve_comment.pagx");
+  CopyToTemp("import_external.svg", "import_external.svg");
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve", pagxPath});
+  EXPECT_EQ(ret, 0);
+
+  // Read the output file and check for resolved-from comments.
+  std::ifstream file(pagxPath);
+  std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  EXPECT_NE(content.find("Resolved from: import_external.svg"), std::string::npos);
+  EXPECT_NE(content.find("Resolved from: inline svg"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Resolve_LayerWithExplicitSizeScalesContent) {
+  auto pagxPath = CopyToTemp("resolve_scaled_layer.pagx", "resolve_scaled_layer.pagx");
+  CopyToTemp("import_external.svg", "import_external.svg");
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve", pagxPath});
+  EXPECT_EQ(ret, 0);
+
+  auto doc = pagx::PAGXImporter::FromFile(pagxPath);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(doc->hasUnresolvedImports());
+
+  // External SVG (48x48 viewBox) into 96x96 Layer → scale factor 2.
+  ASSERT_GE(doc->layers.size(), 2u);
+  auto* scaledExternal = doc->layers[0];
+  EXPECT_EQ(scaledExternal->width, 96);
+  EXPECT_EQ(scaledExternal->height, 96);
+
+  // Inline SVG (24x24 viewBox) into 48x48 Layer → scale factor 2.
+  auto* scaledInline = doc->layers[1];
+  EXPECT_EQ(scaledInline->width, 48);
+  EXPECT_EQ(scaledInline->height, 48);
+
+  // Both layers should have content (resolved successfully).
+  EXPECT_FALSE(scaledExternal->contents.empty() && scaledExternal->children.empty());
+  EXPECT_FALSE(scaledInline->contents.empty() && scaledInline->children.empty());
+}
+
+CLI_TEST(PAGXCliTest, Resolve_LayerWithContentsSkipsResolve) {
+  auto pagxPath = CopyToTemp("resolve_conflict_contents.pagx", "resolve_conflict_contents.pagx");
+  CopyToTemp("import_external.svg", "import_external.svg");
+
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve", pagxPath});
+  std::cerr.rdbuf(old);
+
+  // Conflicting Layer is counted as an error, so resolve returns non-zero.
+  EXPECT_NE(ret, 0);
+  auto warning = oss.str();
+  EXPECT_NE(warning.find("warning"), std::string::npos);
+  EXPECT_NE(warning.find("skipping resolve"), std::string::npos);
+
+  // The import should remain unresolved because the Layer was skipped.
+  auto doc = pagx::PAGXImporter::FromFile(pagxPath);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->hasUnresolvedImports());
+}
+
+CLI_TEST(PAGXCliTest, Resolve_LayerWithChildrenSkipsResolve) {
+  auto pagxPath = CopyToTemp("resolve_conflict_children.pagx", "resolve_conflict_children.pagx");
+  CopyToTemp("import_external.svg", "import_external.svg");
+
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve", pagxPath});
+  std::cerr.rdbuf(old);
+
+  // Conflicting Layer is counted as an error, so resolve returns non-zero.
+  EXPECT_NE(ret, 0);
+  auto warning = oss.str();
+  EXPECT_NE(warning.find("warning"), std::string::npos);
+  EXPECT_NE(warning.find("skipping resolve"), std::string::npos);
+
+  // The import should remain unresolved because the Layer was skipped.
+  auto doc = pagx::PAGXImporter::FromFile(pagxPath);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->hasUnresolvedImports());
+}
+
 //==============================================================================
-// CLI unresolved Import checks
+// CLI unresolved import checks
 //==============================================================================
 
 CLI_TEST(PAGXCliTest, UnresolvedImport_LayoutRejects) {

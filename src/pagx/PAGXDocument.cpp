@@ -75,10 +75,8 @@ void PAGXDocument::registerNode(Node* node, const std::string& id) {
 
 static bool LayersHaveImports(const std::vector<Layer*>& layers) {
   for (auto* layer : layers) {
-    for (auto* element : layer->contents) {
-      if (element->nodeType() == NodeType::Import) {
-        return true;
-      }
+    if (!layer->importDirective.source.empty() || !layer->importDirective.content.empty()) {
+      return true;
     }
     if (LayersHaveImports(layer->children)) {
       return true;

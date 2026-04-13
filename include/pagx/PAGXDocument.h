@@ -111,8 +111,8 @@ class PAGXDocument : public Node {
   std::vector<std::string> errors = {};
 
   /**
-   * Returns true if any layer in the document contains unresolved <Import> nodes. These must be
-   * expanded via `pagx import --resolve` before layout or rendering.
+   * Returns true if any layer in the document has unresolved import content (inline `<svg>` or
+   * `import` attribute). These must be resolved via `pagx resolve` before layout or rendering.
    */
   bool hasUnresolvedImports() const;
 

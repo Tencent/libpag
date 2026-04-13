@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,24 +18,12 @@
 
 #pragma once
 
-#include <QThread>
+namespace pagx::cli {
 
-namespace pag {
+/**
+ * Resolves all import directives (inline <svg> and `import` attribute) in a PAGX file,
+ * expanding them into native PAGX nodes.
+ */
+int RunResolve(int argc, char* argv[]);
 
-class PAGView;
-
-class PAGRenderThread : public QThread {
-  Q_OBJECT
- public:
-  explicit PAGRenderThread(PAGView* pagView);
-
-  Q_SIGNAL void frameTimeMetricsReady(int64_t frame, int64_t renderTime, int64_t presentTime,
-                                      int64_t imageDecodeTime);
-
-  Q_SLOT void flush();
-  Q_SLOT void shutDown();
-
- private:
-  PAGView* pagView = nullptr;
-};
-}  // namespace pag
+}  // namespace pagx::cli

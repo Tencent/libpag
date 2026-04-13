@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cmath>
 #include <memory>
 #include <string>
 #include "pagx/PAGXDocument.h"
@@ -45,6 +46,20 @@ class SVGImporter {
      * If true, nested transforms are flattened into single matrices.
      */
     bool flattenTransforms = false;
+
+    /**
+     * Target width for the output document. When not NaN, overrides the SVG element's explicit
+     * width attribute. Both targetWidth and targetHeight must be set (non-NaN) to take effect;
+     * content is then uniformly scaled to fit within the target dimensions.
+     */
+    float targetWidth = NAN;
+
+    /**
+     * Target height for the output document. When not NaN, overrides the SVG element's explicit
+     * height attribute. Both targetWidth and targetHeight must be set (non-NaN) to take effect;
+     * content is then uniformly scaled to fit within the target dimensions.
+     */
+    float targetHeight = NAN;
 
     Options() {
     }

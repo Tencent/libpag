@@ -158,8 +158,7 @@ int RunBounds(int argc, char* argv[]) {
     std::cerr << "pagx bounds: warning: " << error << "\n";
   }
   if (document->hasUnresolvedImports()) {
-    std::cerr
-        << "pagx bounds: error: unresolved <Import> node, run 'pagx import --resolve' first\n";
+    std::cerr << "pagx bounds: error: unresolved import directive, run 'pagx resolve' first\n";
     return 1;
   }
 

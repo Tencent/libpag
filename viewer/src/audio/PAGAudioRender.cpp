@@ -77,11 +77,11 @@ PAGAudioRender::PAGAudioRender(const QAudioFormat& format, int sampleRate, int c
   connect(this, &PAGAudioRender::volumeChangeSignal, this, &PAGAudioRender::onVolumeChange);
   connect(this, &PAGAudioRender::writeData, this, &PAGAudioRender::onWriteData);
   start();
-  init();
+  QMetaObject::invokeMethod(this, "init", Qt::BlockingQueuedConnection);
   isPlaying = true;
 }
 
-void PAGAudioRender::init() {
+void PAGAudioRender::init() {  // runs in audio thread
   if (audioOutput) {
     audioOutput->stop();
     audioOutput->reset();
@@ -94,15 +94,33 @@ void PAGAudioRender::init() {
 
 void PAGAudioRender::onVolumeChange(float volume) {
   audioVolume = volume;
-  audioOutput->setVolume(volume);
+  if (audioOutput != nullptr) {
+    audioOutput->setVolume(volume);
+  }
 }
 
 void PAGAudioRender::onWriteData(std::shared_ptr<ByteData> data) {
-  if (!isPlaying) {
+  if (!isPlaying || data == nullptr || audioOutput == nullptr || audioDevice == nullptr) {
     return;
   }
-  if (audioOutput->bytesFree() >= static_cast<int64_t>(data->length())) {
-    audioDevice->write(reinterpret_cast<const char*>(data->data()), data->length());
+  auto dataPtr = reinterpret_cast<const char*>(data->data());
+  int64_t remaining = static_cast<int64_t>(data->length());
+  while (remaining > 0 && isPlaying) {
+    int64_t freeSpace = audioOutput->bytesFree();
+    if (freeSpace <= 0) {
+      int64_t waitTime = Utils::SampleLengthToTime(remaining, sampleRate, channels);
+      std::this_thread::sleep_for(
+          std::chrono::microseconds(std::min(waitTime, static_cast<int64_t>(1000))));
+      continue;
+    }
+    int64_t toWrite = std::min(freeSpace, remaining);
+    int64_t written = audioDevice->write(dataPtr, toWrite);
+    if (written > 0) {
+      dataPtr += written;
+      remaining -= written;
+    } else {
+      std::this_thread::sleep_for(std::chrono::microseconds(500));
+    }
   }
 }
 

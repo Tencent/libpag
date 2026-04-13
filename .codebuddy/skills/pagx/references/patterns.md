@@ -155,11 +155,9 @@ Same color: single Fill. Different colors: wrap the line in a Group to isolate i
       </LinearGradient>
     </Fill>
     <Layer width="48" height="48" alpha="0.4">
-      <Import>
-        <svg viewBox="0 0 48 48" fill="none" stroke="#BDC3C7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M10 6H38C40.2 6 42 7.8 42 10V38C42 40.2 40.2 42 38 42H10C7.8 42 6 40.2 6 38V10C6 7.8 7.8 6 10 6Z M17 20A3 3 0 1 0 17 14A3 3 0 1 0 17 20 M42 30L32 20L10 42"/>
-        </svg>
-      </Import>
+      <svg viewBox="0 0 48 48" fill="none" stroke="#BDC3C7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10 6H38C40.2 6 42 7.8 42 10V38C42 40.2 40.2 42 38 42H10C7.8 42 6 40.2 6 38V10C6 7.8 7.8 6 10 6Z M17 20A3 3 0 1 0 17 14A3 3 0 1 0 17 20 M42 30L32 20L10 42"/>
+      </svg>
     </Layer>
     <Layer>
       <Text text="Image Description" fontFamily="Arial" fontSize="12"/>
@@ -170,7 +168,7 @@ Same color: single Fill. Different colors: wrap the line in a Group to isolate i
 ```
 
 **Pattern**: When no image is available — soft gradient background + inline SVG icon +
-label. Icon uses `<Import>` with inline SVG (see §Tab Bar for the same technique). Vary
+label. Icon uses inline `<svg>` in a Layer (see §Tab Bar for the same technique). Vary
 gradient hues across placeholders (`#F0F4FF→#E8EEFF`, `#FFF0E8→#FFE8D8`,
 `#F0FFF4→#E8FFE8`).
 
@@ -353,11 +351,9 @@ any repeated element: cards, list items, grid cells.
         <!-- Home: filled (active) -->
         <Layer layout="vertical" gap="2" alignment="center">
           <Layer>
-            <Import>
-              <svg viewBox="0 0 24 24" fill="#6366F1">
-                <path d="M12 0L0 12L3 12L3 22L9 22L9 15L15 15L15 22L21 22L21 12L24 12Z"/>
-              </svg>
-            </Import>
+            <svg viewBox="0 0 24 24" fill="#6366F1">
+              <path d="M12 0L0 12L3 12L3 22L9 22L9 15L15 15L15 22L21 22L21 12L24 12Z"/>
+            </svg>
           </Layer>
           <Layer>
             <Text text="Home" fontFamily="Arial" fontStyle="Bold" fontSize="10"/>
@@ -367,12 +363,10 @@ any repeated element: cards, list items, grid cells.
         <!-- Search: stroke (inactive) -->
         <Layer layout="vertical" gap="2" alignment="center">
           <Layer>
-            <Import>
-              <svg viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2">
-                <ellipse cx="8" cy="8" rx="8" ry="8"/>
-                <path d="M14 14L20 20" stroke-width="2.5" stroke-linecap="round"/>
-              </svg>
-            </Import>
+            <svg viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2">
+              <ellipse cx="8" cy="8" rx="8" ry="8"/>
+              <path d="M14 14L20 20" stroke-width="2.5" stroke-linecap="round"/>
+            </svg>
           </Layer>
           <Layer>
             <Text text="Search" fontFamily="Arial" fontSize="10"/>
@@ -382,12 +376,10 @@ any repeated element: cards, list items, grid cells.
         <!-- Profile: stroke (inactive) -->
         <Layer layout="vertical" gap="2" alignment="center">
           <Layer>
-            <Import>
-              <svg viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.8">
-                <ellipse cx="11" cy="6" rx="5" ry="5"/>
-                <path d="M1 22C1 17 5 13 11 13C17 13 21 17 21 22" stroke-linecap="round"/>
-              </svg>
-            </Import>
+            <svg viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.8">
+              <ellipse cx="11" cy="6" rx="5" ry="5"/>
+              <path d="M1 22C1 17 5 13 11 13C17 13 21 17 21 22" stroke-linecap="round"/>
+            </svg>
           </Layer>
           <Layer>
             <Text text="Profile" fontFamily="Arial" fontSize="10"/>
@@ -404,7 +396,7 @@ any repeated element: cards, list items, grid cells.
 **Pattern**: `MergePath mode="intersect"` creates partial roundness by clipping a rounded
 rect with a straight rect. Tabs use vertical layout (icon + label) distributed by
 `arrangement="spaceAround"`. Active tab = filled icon + bold color; inactive = stroked
-icon + muted color. Icons use `<Import>` with inline SVG — use native PAGX geometry
+icon + muted color. Icons use inline `<svg>` in Layers — use native PAGX geometry
 (Rectangle, Ellipse, Path) for simple shapes (backgrounds, dividers, progress bars), and
 inline SVG for multi-part icons. Same structure for bottom navigation, segmented controls,
 toolbar items.

@@ -1,10 +1,8 @@
 <pagx version="1.0" width="40" height="40">
   <Layer centerX="0" centerY="0">
-    <Import>
-      <svg viewBox="0 0 20 20" fill="none">
-        <path d="M3 3V7.5H7.5" stroke="#FF4757" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M3 7.5C4.2 4.3 7.2 2 10.5 2C14.6 2 18 5.4 18 9.5C18 13.6 14.6 17 10.5 17C7.5 17 4.9 15.2 3.7 12.5" stroke="#3498DB" stroke-width="1.6" stroke-linecap="round"/>
-      </svg>
-    </Import>
+    <svg viewBox="0 0 20 20" fill="none">
+      <path d="M3 3V7.5H7.5" stroke="#FF4757" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M3 7.5C4.2 4.3 7.2 2 10.5 2C14.6 2 18 5.4 18 9.5C18 13.6 14.6 17 10.5 17C7.5 17 4.9 15.2 3.7 12.5" stroke="#3498DB" stroke-width="1.6" stroke-linecap="round"/>
+    </svg>
   </Layer>
 </pagx>

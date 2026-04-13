@@ -71,7 +71,6 @@ QVariant PAGTreeViewModel::data(const QModelIndex& index, int role) const {
 bool PAGTreeViewModel::setData(const QModelIndex& index, const QVariant& value,
                                [[maybe_unused]] int role) {
   if (!index.isValid()) {
-    qDebug() << "index is invalid";
     return false;
   }
 
@@ -103,7 +102,11 @@ Qt::ItemFlags PAGTreeViewModel::flags(const QModelIndex& index) const {
 
 QModelIndex PAGTreeViewModel::index(int row, int column, const QModelIndex& parent) const {
   if (!parent.isValid()) {
-    return createIndex(row, column, fileTree->getRootNode());
+    auto* rootNode = fileTree->getRootNode();
+    if (rootNode == nullptr) {
+      return {};
+    }
+    return createIndex(row, column, rootNode);
   }
 
   if (!hasIndex(row, column, parent)) {
@@ -135,7 +138,7 @@ QModelIndex PAGTreeViewModel::parent(const QModelIndex& index) const {
 
 int PAGTreeViewModel::rowCount(const QModelIndex& parent) const {
   if (!parent.isValid()) {
-    return 1;
+    return fileTree->getRootNode() != nullptr ? 1 : 0;
   }
 
   if (parent.column() > 0) {
@@ -165,9 +168,16 @@ QHash<int, QByteArray> PAGTreeViewModel::roleNames() const {
 }
 
 void PAGTreeViewModel::setFile(std::shared_ptr<File> file) {
+  beginResetModel();
   fileTree->setFile(std::move(file));
   fileTree->buildTree();
+  endResetModel();
+}
+
+void PAGTreeViewModel::setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> document) {
   beginResetModel();
+  fileTree->setPAGXDocument(std::move(document));
+  fileTree->buildTree();
   endResetModel();
 }
 

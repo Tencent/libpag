@@ -847,17 +847,10 @@
     <xs:attributeGroup ref="ConstraintAttributes"/>
   </xs:complexType>
 
-  <!-- ========================= Build Directives ========================= -->
+  <!-- ========================= Import Directives ========================= -->
 
-  <!-- Import: build-time directive for embedding external content (e.g. SVG) -->
-  <xs:complexType name="ImportType">
-    <xs:sequence>
-      <xs:any namespace="##any" processContents="skip" minOccurs="0" maxOccurs="unbounded"/>
-    </xs:sequence>
-    <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="source" type="xs:string"/>
-    <xs:attribute name="format" type="xs:string"/>
-  </xs:complexType>
+  <!-- Import is handled via inline <svg> child elements in Layer (parsed opaquely)
+       and the "import"/"importFormat" attributes on LayerType. No separate complex type needed. -->
 
   <!-- ========================= Layer ========================= -->
 
@@ -866,8 +859,8 @@
     <xs:choice>
       <!-- VectorElements -->
       <xs:group ref="VectorElementGroup"/>
-      <!-- Build Directives -->
-      <xs:element name="Import" type="ImportType"/>
+      <!-- Import Directives: inline SVG -->
+      <xs:any namespace="http://www.w3.org/2000/svg" processContents="skip"/>
       <!-- Layer Styles -->
       <xs:element name="DropShadowStyle" type="DropShadowStyleType"/>
       <xs:element name="InnerShadowStyle" type="InnerShadowStyleType"/>
@@ -915,9 +908,9 @@
     <xs:attribute name="arrangement" type="ArrangementType" default="start"/>
     <xs:attribute name="includeInLayout" type="BoolType" default="true"/>
     <xs:attributeGroup ref="ConstraintAttributes"/>
+    <xs:attribute name="import" type="xs:string"/>
+    <xs:attribute name="importFormat" type="xs:string"/>
   </xs:complexType>
-
-  <!-- ========================= Composition ========================= -->
 
   <xs:complexType name="CompositionType">
     <xs:sequence>

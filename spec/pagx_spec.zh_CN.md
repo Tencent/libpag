@@ -29,7 +29,7 @@ PAGX 是纯 XML 文件（`.pagx`），可引用外部资源文件（图片、视
 - **自动布局**：定义布局尺寸、容器布局和约束定位机制
 - **图层系统**：定义图层及其相关功能（样式、滤镜、遮罩）
 - **矢量元素系统**：定义图层内的矢量元素及其处理模型
-- **构建指令**：定义构建时预处理指令（Import）
+- **导入指令**：定义嵌入外部内容的导入指令（内联 `<svg>` 和 `import` 属性）
 
 **附录**（方便速查）：
 
@@ -2082,78 +2082,72 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 
 ---
 
-## 7. 构建指令（Build Directives）
+## 7. 导入指令（Import Directives）
 
-构建指令是嵌入在 PAGX 文件中的预处理指令。它们**不会被直接渲染** —— 必须通过构建工具解析为
-原生 PAGX 节点后，文件才能被渲染或验证。
+导入指令用于将外部内容（目前支持 SVG）嵌入到 PAGX 文件中。它们**不会被直接渲染** —— 必须通过
+`pagx resolve` 解析为原生 PAGX 节点后，文件才能被渲染或验证。
 
-### 7.1 导入（Import）
+### 7.1 内联 SVG（Inline SVG）
 
-`<Import>` 元素用于在 PAGX 文件中嵌入外部内容（如 SVG）。它出现在 `<Layer>` 内部的
-VectorElement 层级，通过 `pagx import --resolve` 命令解析为原生 PAGX 节点。
+`<Layer>` 可以直接包含一个 `<svg>` 元素作为子节点。解析器只读取 `<svg>` 根节点，将其视为
+不透明的外部内容 —— `<svg>` 的子节点不会被展开或作为 PAGX 节点验证。
+
+```xml
+<Layer id="shareIcon" centerX="0" centerY="0">
+  <svg viewBox="0 0 24 24">
+    <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8" fill="none"
+          stroke="#7F8C8D" stroke-width="1.5" stroke-linecap="round"/>
+    <polyline points="16,6 12,2 8,6" fill="none"
+             stroke="#7F8C8D" stroke-width="1.5" stroke-linecap="round"
+             stroke-linejoin="round"/>
+    <line x1="12" y1="2" x2="12" y2="15" fill="none"
+          stroke="#7F8C8D" stroke-width="1.5" stroke-linecap="round"/>
+  </svg>
+</Layer>
+```
+
+### 7.2 外部导入（External Import）
+
+Layer 的 `import` 属性引用要导入的外部文件。格式从文件扩展名推断。当扩展名不明确时，
+可以使用 `importFormat` 属性显式指定格式。
 
 #### 属性
 
 | 属性 | 类型 | 默认值 | 必需 | 说明 |
 |------|------|--------|------|------|
-| `source` | string | — | 否 | 外部文件路径，相对于 PAGX 文件所在位置。省略时内容以内联子元素形式提供。 |
-| `format` | string | — | 否 | 强制指定输入格式（如 `svg`）。省略时从子元素标签名（内联）或 `source` 文件扩展名（外部）推断。 |
-
-#### 内联模式
-
-省略 `source` 时，`<Import>` 元素包含外部内容作为子元素。格式从根子元素的标签名推断
-（如 `<svg>`）。
+| `import` | string | — | 否 | 外部文件路径，相对于 PAGX 文件所在位置。 |
+| `importFormat` | string | — | 否 | 强制指定输入格式（如 `svg`）。省略时从 `import` 文件扩展名推断。 |
 
 ```xml
-<Layer id="shareIcon" centerX="0" centerY="0">
-  <Import>
-    <svg viewBox="0 0 24 24">
-      <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8" fill="none"
-            stroke="#7F8C8D" stroke-width="1.5" stroke-linecap="round"/>
-      <polyline points="16,6 12,2 8,6" fill="none"
-               stroke="#7F8C8D" stroke-width="1.5" stroke-linecap="round"
-               stroke-linejoin="round"/>
-      <line x1="12" y1="2" x2="12" y2="15" fill="none"
-            stroke="#7F8C8D" stroke-width="1.5" stroke-linecap="round"/>
-    </svg>
-  </Import>
-</Layer>
-```
-
-#### 外部模式
-
-设置 `source` 时，`<Import>` 元素引用外部文件。格式从文件扩展名推断，除非显式指定了 `format`。
-
-```xml
-<Layer id="logoIcon" centerX="0" centerY="0">
-  <Import source="assets/logo.svg"/>
-</Layer>
+<Layer id="logoIcon" centerX="0" centerY="0" import="assets/logo.svg"/>
 
 <!-- 扩展名不明确时显式指定格式 -->
-<Layer id="icon" centerX="0" centerY="0">
-  <Import source="assets/drawing.xml" format="svg"/>
-</Layer>
+<Layer id="icon" centerX="0" centerY="0" import="assets/drawing.xml" importFormat="svg"/>
 ```
 
-#### 解析
+### 7.3 解析（Resolution）
 
-`pagx import --resolve` 命令处理 PAGX 文件中所有 `<Import>` 节点：
+`pagx resolve` 命令处理 PAGX 文件中所有导入指令：
 
-1. 对于每个 `<Import>` 节点，读取其内容（内联子元素或外部文件）
-2. 将内容转换为原生 PAGX 节点（如 SVG 元素转为 Rectangle、Ellipse、Path、Fill、Stroke、
+1. 对于每个包含内联 `<svg>` 子节点或 `import` 属性的 Layer，读取内容（内联元素或外部文件）
+2. 将 SVG 内容转换为原生 PAGX 节点（如 SVG 元素转为 Rectangle、Ellipse、Path、Fill、Stroke、
    Group 节点）
-3. 用转换后的节点替换 `<Import>` 元素
-4. 从源文件尺寸设置父 Layer 的 `width` 和 `height`（如 SVG 的 `viewBox` 或
+3. 替换 `<svg>` 元素或移除 `import`/`importFormat` 属性，并将转换后的节点插入 Layer 的子节点
+4. 如果 Layer 已显式设置了 `width` 和 `height`，内容将等比缩放以适应这些尺寸（居中，保持宽高比）。
+   如果 Layer 未设置显式尺寸，则从源文件尺寸设置 `width` 和 `height`（如 SVG 的 `viewBox` 或
    `width`/`height` 属性）
+5. 在 Layer 的子节点中插入注释以标注原始来源：
+   - 内联 SVG：`<!-- Resolved from: inline svg -->`
+   - 外部文件：`<!-- Resolved from: assets/logo.svg -->`
 
-解析完成后，文件仅包含原生 PAGX 节点 —— 不再有 `<Import>` 元素。
+解析完成后，文件仅包含原生 PAGX 节点 —— 不再有 `<svg>` 元素或 `import` 属性。
 
 #### 工具行为
 
-处理 PAGX 文件的工具遇到未解析的 `<Import>` 节点时报告错误：
+处理 PAGX 文件的工具对未解析的导入指令的处理方式：
 
-- **`pagx verify`**：自动解析所有 `<Import>` 节点后再进行检查。如果解析失败，报告错误。
-- **`pagx render`**：报告错误 —— `unresolved <Import> node`，拒绝渲染。
+- **`pagx verify`**：自动解析所有导入后再进行检查。如果解析失败，报告错误。
+- **`pagx render`**：报告错误 —— `unresolved import`，拒绝渲染。
 
 ---
 
@@ -2175,7 +2169,7 @@ VectorElement 层级，通过 `pagx import --resolve` 命令解析为原生 PAGX
 | **几何元素** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` | 可绘制的形状和文本。必须在 Layer/Group 内。 |
 | **修改器** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `TextBox`, `Repeater` | 变换或组合几何图形和文本。 |
 | **绘制器** | `Fill`, `Stroke` | 对几何图形应用颜色/渐变。必须在 Layer/Group 内。 |
-| **构建指令** | `Import` | 构建时预处理指令。通过 `pagx import --resolve` 解析为原生 PAGX 节点。必须在 Layer 内。 |
+| **导入指令** | （内联 `<svg>`、`import` 属性） | 导入指令。Layer 的内联 `<svg>` 子元素和 `import`/`importFormat` 属性通过 `pagx resolve` 解析为原生 PAGX 节点。 |
 
 ### A.2 文档包含关系
 
@@ -2185,7 +2179,7 @@ VectorElement 层级，通过 `pagx import --resolve` 命令解析为原生 PAGX
 pagx（必需属性：version、width、height）
 ├── Layer*                      ← 直接子节点仅能是 Layer
 │   ├── VectorElement*（见 A.3）
-│   ├── Import*（构建指令，见 §7）
+│   ├── <svg>*（导入指令，见 §7）
 │   ├── DropShadowStyle*
 │   ├── InnerShadowStyle*
 │   ├── BackgroundBlurStyle*
@@ -2238,9 +2232,10 @@ Layer / Group
 ├── TextPath
 ├── TextBox
 ├── Repeater
-├── Group*（递归）
-└── Import（构建指令，见 §7）
+└── Group*（递归）
 ```
+
+此外，`Layer`（不含 `Group`）可包含 `<svg>` 作为导入指令（见 §7）。
 
 ---
 
