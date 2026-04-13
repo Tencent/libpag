@@ -192,7 +192,13 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
                                      FloatToString(s->color.alpha) + " 0");
         _defs->addAttr("result", "iShadow" + i);
         _defs->closeTagSelfClosing();
-        innerRes.push_back("iShadow" + i);
+        _defs->openTag("feComposite");
+        _defs->addAttr("in", "iShadow" + i);
+        _defs->addAttr("in2", currentAlpha);
+        _defs->addAttr("operator", "in");
+        _defs->addAttr("result", "iClip" + i);
+        _defs->closeTagSelfClosing();
+        innerRes.push_back("iClip" + i);
         if (!s->shadowOnly) {
           needSrc = true;
         }
