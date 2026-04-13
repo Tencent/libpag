@@ -230,6 +230,8 @@ class PPTWriter {
   void writeFill(XMLBuilder& out, const Fill* fill, float alpha, const Rect& shapeBounds = {});
   void writeColorSource(XMLBuilder& out, const ColorSource* source, float alpha,
                         const Rect& shapeBounds = {});
+  void writeImagePatternFill(XMLBuilder& out, const ImagePattern* pattern, float alpha,
+                             const Rect& shapeBounds);
   void writeGradientStops(XMLBuilder& out, const std::vector<ColorStop*>& stops);
   void writeStroke(XMLBuilder& out, const Stroke* stroke, float alpha);
   void writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& filters);
@@ -238,6 +240,8 @@ class PPTWriter {
 
   static void WriteBlip(XMLBuilder& out, const std::string& relId, float alpha);
   static void WriteDefaultStretch(XMLBuilder& out);
+
+  void writeGlyphShape(XMLBuilder& out, const Fill* fill, float alpha);
 
   void writeShapeTail(XMLBuilder& out, const FillStrokeInfo& fs, float alpha,
                       const Rect& shapeBounds, bool imageWritten,
@@ -266,6 +270,12 @@ class PPTWriter {
   static void WriteXfrm(XMLBuilder& out, const Xform& xf);
 };
 
+static void DecomposeScale(const Matrix& m, float* sx, float* sy) {
+  *sx = std::sqrt(m.a * m.a + m.b * m.b);
+  float det = m.a * m.d - m.b * m.c;
+  *sy = (*sx > 0) ? std::abs(det) / *sx : 0;
+}
+
 // ── Transform decomposition ────────────────────────────────────────────────
 
 PPTWriter::Xform PPTWriter::decomposeXform(float localX, float localY, float localW, float localH,
@@ -275,9 +285,9 @@ PPTWriter::Xform PPTWriter::decomposeXform(float localX, float localY, float loc
   float tcx = m.a * cx + m.c * cy + m.tx;
   float tcy = m.b * cx + m.d * cy + m.ty;
 
-  float sx = std::sqrt(m.a * m.a + m.b * m.b);
-  float det = m.a * m.d - m.b * m.c;
-  float sy = (sx > 0) ? std::abs(det) / sx : 0;
+  float sx = 0;
+  float sy = 0;
+  DecomposeScale(m, &sx, &sy);
 
   float tw = localW * sx;
   float th = localH * sy;
@@ -343,6 +353,14 @@ void PPTWriter::endShape(XMLBuilder& out) {
   out.closeElement();  // a:p
   out.closeElement();  // p:txBody
   out.closeElement();  // p:sp
+}
+
+void PPTWriter::writeGlyphShape(XMLBuilder& out, const Fill* fill, float alpha) {
+  writeFill(out, fill, alpha);
+  out.openElement("a:ln").closeElementStart();
+  out.openElement("a:noFill").closeElementSelfClosing();
+  out.closeElement();
+  endShape(out);
 }
 
 void PPTWriter::writeShapeTail(XMLBuilder& out, const FillStrokeInfo& fs, float alpha,
@@ -582,91 +600,98 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
       out.closeElement();  // a:gradFill
       break;
     }
-    case NodeType::ImagePattern: {
-      auto* pattern = static_cast<const ImagePattern*>(source);
-      if (pattern->image) {
-        std::string relId = _ctx->addImage(pattern->image);
-        if (!relId.empty()) {
-          out.openElement("a:blipFill").closeElementStart();
-          WriteBlip(out, relId, alpha);
-          int imgW = 0;
-          int imgH = 0;
-          bool hasDimensions = GetImageDimensions(pattern->image, &imgW, &imgH);
-          bool needsTiling =
-              (pattern->tileModeX == TileMode::Repeat || pattern->tileModeX == TileMode::Mirror ||
-               pattern->tileModeY == TileMode::Repeat || pattern->tileModeY == TileMode::Mirror);
-          if (needsTiling && hasDimensions && !shapeBounds.isEmpty()) {
-            const auto& M = pattern->matrix;
-            float imgDpiX = 72.0f;
-            float imgDpiY = 72.0f;
-            GetImageDPI(pattern->image, &imgDpiX, &imgDpiY);
-            double dpiCorrX = static_cast<double>(imgDpiX) / 96.0;
-            double dpiCorrY = static_cast<double>(imgDpiY) / 96.0;
-            auto sx = static_cast<int>(std::round(M.a * dpiCorrX * 100000.0));
-            auto sy = static_cast<int>(std::round(M.d * dpiCorrY * 100000.0));
-            auto tx = PxToEMU(M.tx - shapeBounds.x);
-            auto ty = PxToEMU(M.ty - shapeBounds.y);
-            bool flipX = (pattern->tileModeX == TileMode::Mirror);
-            bool flipY = (pattern->tileModeY == TileMode::Mirror);
-            const char* flip = "none";
-            if (flipX && flipY) {
-              flip = "xy";
-            } else if (flipX) {
-              flip = "x";
-            } else if (flipY) {
-              flip = "y";
-            }
-            out.openElement("a:tile")
-                .addRequiredAttribute("tx", tx)
-                .addRequiredAttribute("ty", ty)
-                .addRequiredAttribute("sx", sx)
-                .addRequiredAttribute("sy", sy)
-                .addRequiredAttribute("flip", flip)
-                .addRequiredAttribute("algn", "tl")
-                .closeElementSelfClosing();
-          } else {
-            bool hasTransform =
-                hasDimensions && !shapeBounds.isEmpty() && !pattern->matrix.isIdentity();
-            ImagePatternRect ipr = {};
-            if (hasTransform && ComputeImagePatternRect(pattern, imgW, imgH, shapeBounds, &ipr)) {
-              auto& src = out.openElement("a:srcRect");
-              if (ipr.srcL != 0) src.addRequiredAttribute("l", ipr.srcL);
-              if (ipr.srcT != 0) src.addRequiredAttribute("t", ipr.srcT);
-              if (ipr.srcR != 0) src.addRequiredAttribute("r", ipr.srcR);
-              if (ipr.srcB != 0) src.addRequiredAttribute("b", ipr.srcB);
-              src.closeElementSelfClosing();
-              int fillL = static_cast<int>(
-                  std::round((ipr.visL - shapeBounds.x) / shapeBounds.width * 100000.0f));
-              int fillT = static_cast<int>(
-                  std::round((ipr.visT - shapeBounds.y) / shapeBounds.height * 100000.0f));
-              int fillR = static_cast<int>(std::round(
-                  (shapeBounds.x + shapeBounds.width - ipr.visR) / shapeBounds.width * 100000.0f));
-              int fillB =
-                  static_cast<int>(std::round((shapeBounds.y + shapeBounds.height - ipr.visB) /
-                                              shapeBounds.height * 100000.0f));
-              out.openElement("a:stretch").closeElementStart();
-              auto& fr = out.openElement("a:fillRect");
-              if (fillL != 0) fr.addRequiredAttribute("l", fillL);
-              if (fillT != 0) fr.addRequiredAttribute("t", fillT);
-              if (fillR != 0) fr.addRequiredAttribute("r", fillR);
-              if (fillB != 0) fr.addRequiredAttribute("b", fillB);
-              fr.closeElementSelfClosing();
-              out.closeElement();  // a:stretch
-            } else {
-              WriteDefaultStretch(out);
-            }
-          }
-          out.closeElement();  // a:blipFill
-          break;
-        }
-      }
-      out.openElement("a:noFill").closeElementSelfClosing();
+    case NodeType::ImagePattern:
+      writeImagePatternFill(out, static_cast<const ImagePattern*>(source), alpha, shapeBounds);
       break;
-    }
     default:
       out.openElement("a:noFill").closeElementSelfClosing();
       break;
   }
+}
+
+void PPTWriter::writeImagePatternFill(XMLBuilder& out, const ImagePattern* pattern, float alpha,
+                                      const Rect& shapeBounds) {
+  if (!pattern->image) {
+    out.openElement("a:noFill").closeElementSelfClosing();
+    return;
+  }
+  std::string relId = _ctx->addImage(pattern->image);
+  if (relId.empty()) {
+    out.openElement("a:noFill").closeElementSelfClosing();
+    return;
+  }
+
+  int imgW = 0;
+  int imgH = 0;
+  bool hasDimensions = GetImageDimensions(pattern->image, &imgW, &imgH);
+  bool needsTiling =
+      (pattern->tileModeX == TileMode::Repeat || pattern->tileModeX == TileMode::Mirror ||
+       pattern->tileModeY == TileMode::Repeat || pattern->tileModeY == TileMode::Mirror);
+
+  out.openElement("a:blipFill").closeElementStart();
+  WriteBlip(out, relId, alpha);
+
+  if (needsTiling && hasDimensions && !shapeBounds.isEmpty()) {
+    const auto& M = pattern->matrix;
+    float imgDpiX = 72.0f;
+    float imgDpiY = 72.0f;
+    GetImageDPI(pattern->image, &imgDpiX, &imgDpiY);
+    double dpiCorrX = static_cast<double>(imgDpiX) / 96.0;
+    double dpiCorrY = static_cast<double>(imgDpiY) / 96.0;
+    auto sx = static_cast<int>(std::round(M.a * dpiCorrX * 100000.0));
+    auto sy = static_cast<int>(std::round(M.d * dpiCorrY * 100000.0));
+    auto tx = PxToEMU(M.tx - shapeBounds.x);
+    auto ty = PxToEMU(M.ty - shapeBounds.y);
+    bool flipX = (pattern->tileModeX == TileMode::Mirror);
+    bool flipY = (pattern->tileModeY == TileMode::Mirror);
+    const char* flip = "none";
+    if (flipX && flipY) {
+      flip = "xy";
+    } else if (flipX) {
+      flip = "x";
+    } else if (flipY) {
+      flip = "y";
+    }
+    out.openElement("a:tile")
+        .addRequiredAttribute("tx", tx)
+        .addRequiredAttribute("ty", ty)
+        .addRequiredAttribute("sx", sx)
+        .addRequiredAttribute("sy", sy)
+        .addRequiredAttribute("flip", flip)
+        .addRequiredAttribute("algn", "tl")
+        .closeElementSelfClosing();
+  } else {
+    bool hasTransform = hasDimensions && !shapeBounds.isEmpty() && !pattern->matrix.isIdentity();
+    ImagePatternRect ipr = {};
+    if (hasTransform && ComputeImagePatternRect(pattern, imgW, imgH, shapeBounds, &ipr)) {
+      auto& src = out.openElement("a:srcRect");
+      if (ipr.srcL != 0) src.addRequiredAttribute("l", ipr.srcL);
+      if (ipr.srcT != 0) src.addRequiredAttribute("t", ipr.srcT);
+      if (ipr.srcR != 0) src.addRequiredAttribute("r", ipr.srcR);
+      if (ipr.srcB != 0) src.addRequiredAttribute("b", ipr.srcB);
+      src.closeElementSelfClosing();
+      int fillL =
+          static_cast<int>(std::round((ipr.visL - shapeBounds.x) / shapeBounds.width * 100000.0f));
+      int fillT =
+          static_cast<int>(std::round((ipr.visT - shapeBounds.y) / shapeBounds.height * 100000.0f));
+      int fillR = static_cast<int>(std::round((shapeBounds.x + shapeBounds.width - ipr.visR) /
+                                              shapeBounds.width * 100000.0f));
+      int fillB = static_cast<int>(std::round((shapeBounds.y + shapeBounds.height - ipr.visB) /
+                                              shapeBounds.height * 100000.0f));
+      out.openElement("a:stretch").closeElementStart();
+      auto& fr = out.openElement("a:fillRect");
+      if (fillL != 0) fr.addRequiredAttribute("l", fillL);
+      if (fillT != 0) fr.addRequiredAttribute("t", fillT);
+      if (fillR != 0) fr.addRequiredAttribute("r", fillR);
+      if (fillB != 0) fr.addRequiredAttribute("b", fillB);
+      fr.closeElementSelfClosing();
+      out.closeElement();  // a:stretch
+    } else {
+      WriteDefaultStretch(out);
+    }
+  }
+
+  out.closeElement();  // a:blipFill
 }
 
 // ── Fill / stroke ──────────────────────────────────────────────────────────
@@ -1011,9 +1036,9 @@ void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStr
   float boundsW = maxX - minX;
   float boundsH = maxY - minY;
 
-  float sx = std::sqrt(m.a * m.a + m.b * m.b);
-  float det = m.a * m.d - m.b * m.c;
-  float sy = (sx > 0) ? std::abs(det) / sx : 0;
+  float sx = 0;
+  float sy = 0;
+  DecomposeScale(m, &sx, &sy);
   if (sx <= 0) sx = 1.0f;
   if (sy <= 0) sy = 1.0f;
 
@@ -1028,20 +1053,12 @@ void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStr
     for (const auto& group : groups) {
       beginShape(out, "Glyph", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
       EmitGroupCustGeom(out, allContours, group, pw, ph, sx, sy, scaledOfsX, scaledOfsY);
-      writeFill(out, fs.fill, alpha);
-      out.openElement("a:ln").closeElementStart();
-      out.openElement("a:noFill").closeElementSelfClosing();
-      out.closeElement();
-      endShape(out);
+      writeGlyphShape(out, fs.fill, alpha);
     }
   } else {
     beginShape(out, "Glyph", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
     WriteContourGeom(out, allContours, pw, ph, sx, sy, scaledOfsX, scaledOfsY, FillRule::EvenOdd);
-    writeFill(out, fs.fill, alpha);
-    out.openElement("a:ln").closeElementStart();
-    out.openElement("a:noFill").closeElementSelfClosing();
-    out.closeElement();
-    endShape(out);
+    writeGlyphShape(out, fs.fill, alpha);
   }
 }
 

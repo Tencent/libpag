@@ -205,30 +205,24 @@ Point TransformPoint(const Matrix& t, const Point& p) {
   return {t.a * p.x + t.c * p.y + t.tx, t.b * p.x + t.d * p.y + t.ty};
 }
 
-void AppendTransformedContours(std::vector<PathContour>& allContours, const PathData* pathData,
-                               const Matrix& transform) {
-  const auto& verbs = pathData->verbs();
-  const auto& points = pathData->points();
-  size_t ptIndex = 0;
-  for (const auto& verb : verbs) {
-    if (verb == PathVerb::Move) {
-      PathContour c;
-      c.start = TransformPoint(transform, points[ptIndex++]);
-      allContours.push_back(std::move(c));
-    } else if (!allContours.empty()) {
-      if (verb == PathVerb::Close) {
-        allContours.back().closed = true;
-      } else {
-        PathSeg seg;
-        seg.verb = verb;
-        int ptCount = PathData::PointsPerVerb(verb);
-        for (int i = 0; i < ptCount; i++) {
-          seg.pts[i] = TransformPoint(transform, points[ptIndex++]);
-        }
-        allContours.back().segs.push_back(seg);
+void TransformContours(std::vector<PathContour>& contours, const Matrix& transform) {
+  for (auto& c : contours) {
+    c.start = TransformPoint(transform, c.start);
+    for (auto& seg : c.segs) {
+      int ptCount = PathData::PointsPerVerb(seg.verb);
+      for (int i = 0; i < ptCount; i++) {
+        seg.pts[i] = TransformPoint(transform, seg.pts[i]);
       }
     }
   }
+}
+
+void AppendTransformedContours(std::vector<PathContour>& allContours, const PathData* pathData,
+                               const Matrix& transform) {
+  auto contours = ParsePathContours(pathData);
+  TransformContours(contours, transform);
+  allContours.insert(allContours.end(), std::make_move_iterator(contours.begin()),
+                     std::make_move_iterator(contours.end()));
 }
 
 void ExpandBounds(float& minX, float& minY, float& maxX, float& maxY, const Point& p) {

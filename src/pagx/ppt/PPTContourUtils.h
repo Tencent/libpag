@@ -59,6 +59,8 @@ std::vector<std::vector<size_t>> PrepareContourGroups(std::vector<PathContour>& 
 
 Point TransformPoint(const Matrix& t, const Point& p);
 
+void TransformContours(std::vector<PathContour>& contours, const Matrix& transform);
+
 void AppendTransformedContours(std::vector<PathContour>& allContours, const PathData* pathData,
                                const Matrix& transform);
 
