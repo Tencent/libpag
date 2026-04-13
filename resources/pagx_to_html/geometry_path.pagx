@@ -2,7 +2,7 @@
 <!-- Tests: Path with inline SVG data and @id resource reference, reversed -->
 <pagx version="1.0" width="420" height="280">
   <Resources>
-    <PathData id="heart" data="M 75,28 C 75,12 60,0 45,0 C 22,0 0,20 0,45 C 0,68 25,90 75,120 C 125,90 150,68 150,45 C 150,20 128,0 105,0 C 90,0 75,12 75,28 Z"/>
+    <PathData id="heart" data="M 60,22 C 60,10 48,0 36,0 C 18,0 0,16 0,36 C 0,54 20,72 60,96 C 100,72 120,54 120,36 C 120,16 102,0 84,0 C 72,0 60,10 60,22 Z"/>
   </Resources>
 
   <!-- Background -->
@@ -26,15 +26,15 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="horizontal" gap="20" padding="20,30,20,30" alignment="center" arrangement="center">
+    <Layer flex="1" layout="horizontal" gap="0" padding="15" alignment="center" arrangement="center">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
       <!-- Inline path data -->
-      <Layer layout="vertical" gap="6" alignment="center">
-        <Layer width="150" height="120">
-          <Path data="M 5,80 C 25,10 65,10 85,80 C 105,150 125,10 145,80" centerX="0" centerY="0"/>
+      <Layer flex="1" layout="vertical" gap="6" alignment="center">
+        <Layer width="150" height="110">
+          <Path data="M 5,70 C 25,10 65,10 85,70 C 105,130 125,10 145,70" centerX="0" centerY="0"/>
           <Stroke color="#3B82F6" width="4" cap="round"/>
         </Layer>
         <Layer height="12">
@@ -43,8 +43,8 @@
         </Layer>
       </Layer>
 
-      <!-- Resource reference path -->
-      <Layer layout="vertical" gap="6" alignment="center">
+      <!-- Resource reference path (heart scaled to 120x96) -->
+      <Layer flex="1" layout="vertical" gap="6" alignment="center">
         <Layer width="120" height="100">
           <Path data="@heart" centerX="0" centerY="0"/>
           <Fill color="#EF4444" alpha="0.8"/>
