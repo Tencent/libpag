@@ -1,0 +1,298 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="700" height="1200">
+  <!-- === Row 1: Basic box text layout === -->
+
+  <!-- Box A: CJK auto word wrap -->
+  <Layer left="50" top="50">
+    <Rectangle size="150,120"/>
+    <Stroke/>
+    <TextBox width="150" height="120">
+      <Text text="你好世界，这是测试文本。" fontFamily="NotoSansSC" fontSize="20"/>
+      <Fill/>
+    </TextBox>
+  </Layer>
+
+  <!-- Box B: Overflow hidden -->
+  <Layer left="220" top="50">
+    <Rectangle size="150,80"/>
+    <Stroke/>
+    <TextBox width="150" height="80" overflow="hidden">
+      <Text text="Overflow text that is very long and should be clipped by the box boundary." fontFamily="NotoSansSC" fontSize="18"/>
+      <Fill/>
+    </TextBox>
+  </Layer>
+
+  <!-- Box C: Justify alignment -->
+  <Layer left="390" top="50">
+    <Rectangle size="150,80"/>
+    <Stroke/>
+    <TextBox width="150" height="80" textAlign="justify">
+      <Text text="Justify this line&#10;Last line start" fontFamily="NotoSansSC" fontSize="18"/>
+      <Fill/>
+    </TextBox>
+  </Layer>
+
+  <!-- === Row 2: Empty lines and rich text === -->
+
+  <!-- Box D: Empty lines (\n at start + consecutive \n\n) -->
+  <Layer left="50" top="200">
+    <Rectangle size="120,130"/>
+    <Stroke/>
+    <TextBox width="120" height="130">
+      <Text text="&#10;Line2&#10;&#10;Line4" fontFamily="NotoSansSC" fontSize="20"/>
+      <Fill/>
+    </TextBox>
+  </Layer>
+
+  <!-- Box E: Rich text + end alignment -->
+  <Layer left="190" top="200">
+    <Rectangle size="230,120"/>
+    <Stroke/>
+    <TextBox width="230" height="120" textAlign="end">
+      <Text text="Right" fontFamily="NotoSansSC" fontSize="24"/>
+      <Fill/>
+      <Group>
+        <Text text="Align" fontFamily="NotoSansSC" fontSize="36"/>
+        <Fill/>
+      </Group>
+    </TextBox>
+  </Layer>
+
+  <!-- === Row 3: Paragraph alignment near/middle/far === -->
+
+  <!-- Box F: ParagraphAlign near -->
+  <Layer left="50" top="360">
+    <Rectangle size="150,80"/>
+    <Stroke/>
+    <TextBox width="150" height="80">
+      <Text text="aaAÂẤ" fontFamily="NotoSansSC" fontSize="32"/>
+      <Fill/>
+    </TextBox>
+  </Layer>
+
+  <!-- Box G: ParagraphAlign middle -->
+  <Layer left="220" top="360">
+    <Rectangle size="150,80"/>
+    <Stroke/>
+    <TextBox width="150" height="80" paragraphAlign="middle">
+      <Text text="aaAÂẤ" fontFamily="NotoSansSC" fontSize="32"/>
+      <Fill/>
+    </TextBox>
+  </Layer>
+
+  <!-- Box H: ParagraphAlign far -->
+  <Layer left="390" top="360">
+    <Rectangle size="150,80"/>
+    <Stroke/>
+    <TextBox width="150" height="80" paragraphAlign="far">
+      <Text text="aaAÂẤ" fontFamily="NotoSansSC" fontSize="32"/>
+      <Fill/>
+    </TextBox>
+  </Layer>
+
+  <!-- === Row 4: Line height === -->
+
+  <!-- Box I: Auto lineHeight, mixed font sizes -->
+  <Layer left="50" top="470">
+    <Rectangle size="200,180"/>
+    <Stroke/>
+    <TextBox width="200" height="180">
+      <Text text="Hg&#10;" fontFamily="NotoSansSC" fontSize="40"/>
+      <Fill/>
+      <Group>
+        <Text text="Xy" fontFamily="NotoSansSC" fontSize="20"/>
+        <Text text="&#10;AB" fontFamily="NotoSansSC" fontSize="60"/>
+        <Fill/>
+      </Group>
+    </TextBox>
+  </Layer>
+
+  <!-- Box J: Fixed lineHeight=40, mixed font sizes -->
+  <Layer left="270" top="470">
+    <Rectangle size="200,180"/>
+    <Stroke/>
+    <TextBox width="200" height="180" lineHeight="40">
+      <Text text="Hg&#10;" fontFamily="NotoSansSC" fontSize="40"/>
+      <Fill/>
+      <Group>
+        <Text text="Xy" fontFamily="NotoSansSC" fontSize="20"/>
+        <Text text="&#10;AB" fontFamily="NotoSansSC" fontSize="60"/>
+        <Fill/>
+      </Group>
+    </TextBox>
+  </Layer>
+
+  <!-- Box K: Fixed lineHeight=50, paragraphAlign far -->
+  <Layer left="490" top="470">
+    <Rectangle size="150,160"/>
+    <Stroke/>
+    <TextBox width="150" height="160" paragraphAlign="far" lineHeight="50">
+      <Text text="Line1&#10;Line2" fontFamily="NotoSansSC" fontSize="24"/>
+      <Fill/>
+    </TextBox>
+  </Layer>
+
+  <!-- === Row 5: Line height with mixed sizes === -->
+
+  <!-- Box L: 3-line mixed sizes, paragraphAlign far -->
+  <Layer left="50" top="680">
+    <Rectangle size="150,180"/>
+    <Stroke/>
+    <TextBox width="150" height="180" paragraphAlign="far">
+      <Text text="Large&#10;" fontFamily="NotoSansSC" fontSize="36"/>
+      <Fill/>
+      <Group>
+        <Text text="Medium&#10;" fontFamily="NotoSansSC" fontSize="24"/>
+        <Text text="Tiny" fontFamily="NotoSansSC" fontSize="16"/>
+        <Fill/>
+      </Group>
+    </TextBox>
+  </Layer>
+
+  <!-- Box L2: Mixed font sizes with empty line — empty line height uses the \n that created it.
+       "Hg\n" at 40pt produces the empty line, "\nAB" at 16pt starts the next line.
+       The empty line height should use 40pt metrics, not 16pt. -->
+  <Layer left="240" top="680">
+    <Rectangle size="200,180"/>
+    <Stroke/>
+    <TextBox width="200" height="180">
+      <Text text="Hg&#10;" fontFamily="NotoSansSC" fontSize="40"/>
+      <Fill/>
+      <Group>
+        <Text text="&#10;AB" fontFamily="NotoSansSC" fontSize="16"/>
+        <Fill/>
+      </Group>
+    </TextBox>
+  </Layer>
+
+  <!-- === Row 6: Partial dimensions (auto-measure one axis) === -->
+  <!-- Stroke rectangle with left/right/top/bottom=0 visualizes the final TextBox bounds. -->
+
+  <!-- Box Q: width=180, height auto-measured, textAlign=center. Text wraps at 180px. -->
+  <Layer left="50" top="890">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Stroke/>
+    <TextBox width="180" textAlign="center">
+      <Text text="Width set, height auto." fontFamily="NotoSansSC" fontSize="24"/>
+      <Fill/>
+    </TextBox>
+  </Layer>
+
+  <!-- Box R: height=90, width auto-measured. paragraphAlign=middle centers in 90px. -->
+  <Layer left="260" top="890">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Stroke/>
+    <TextBox height="90" paragraphAlign="middle">
+      <Text text="Height only" fontFamily="NotoSansSC" fontSize="24"/>
+      <Fill/>
+    </TextBox>
+  </Layer>
+
+  <!-- Box S: height=90, width auto-measured, vertical writing mode. Columns split at 90px. -->
+  <Layer left="480" top="890">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Stroke/>
+    <TextBox height="90" writingMode="vertical">
+      <Text text="竖排设高度宽度靠测量自动分列" fontFamily="NotoSansSC" fontSize="24"/>
+      <Fill/>
+    </TextBox>
+  </Layer>
+
+  <!-- === Row 7: Point text (no TextBox, multiline with anchor) === -->
+
+  <!-- Box M: Point text, textAnchor=start (default) -->
+  <Layer left="50" top="1000">
+    <Text text="Line One&#10;Line Two&#10;Line Three" fontFamily="NotoSansSC" fontSize="24"/>
+    <Fill/>
+    <Group>
+<Ellipse left="-3" top="-3" size="6,6"/>
+      <Fill color="#F00"/>
+    </Group>
+  </Layer>
+
+  <!-- Box N: Point text, textAnchor=center -->
+  <Layer left="320" top="1000">
+    <Text text="Center A&#10;Center BB&#10;Center CCC" fontFamily="NotoSansSC" fontSize="24" textAnchor="center"/>
+    <Fill/>
+    <Group>
+<Ellipse left="-3" top="-3" size="6,6"/>
+      <Fill color="#F00"/>
+    </Group>
+  </Layer>
+
+  <!-- Box O: Point text, textAnchor=end -->
+  <Layer left="590" top="1000">
+    <Text text="End X&#10;End YY&#10;End ZZZ" fontFamily="NotoSansSC" fontSize="24" textAnchor="end"/>
+    <Fill/>
+    <Group>
+<Ellipse left="-3" top="-3" size="6,6"/>
+      <Fill color="#F00"/>
+    </Group>
+  </Layer>
+
+  <!-- === Row 8: TextBox anchor mode (width="0" height="0") === -->
+
+  <!-- Box P: 6 anchor alignment combinations. Explicit zero size keeps anchor mode where
+       alignment offsets text relative to the TextBox position (marked by red dots). -->
+  <Layer left="50" top="1130">
+    <!-- TextAlign Start -->
+    <TextBox width="0" height="0">
+      <Text text="Start" fontFamily="NotoSansSC" fontSize="20"/>
+      <Fill/>
+    </TextBox>
+    <Group>
+<Ellipse left="-3" top="-3" size="6,6"/>
+      <Fill color="#F00"/>
+    </Group>
+
+    <!-- TextAlign Center -->
+    <TextBox left="110" width="0" height="0" textAlign="center">
+      <Text text="Center" fontFamily="NotoSansSC" fontSize="20"/>
+      <Fill/>
+    </TextBox>
+    <Group>
+      <Ellipse left="107" top="-3" size="6,6"/>
+      <Fill color="#F00"/>
+    </Group>
+
+    <!-- TextAlign End -->
+    <TextBox left="220" width="0" height="0" textAlign="end">
+      <Text text="End" fontFamily="NotoSansSC" fontSize="20"/>
+      <Fill/>
+    </TextBox>
+    <Group>
+      <Ellipse left="217" top="-3" size="6,6"/>
+      <Fill color="#F00"/>
+    </Group>
+
+    <!-- ParagraphAlign Near -->
+    <TextBox left="330" width="0" height="0">
+      <Text text="Near" fontFamily="NotoSansSC" fontSize="20"/>
+      <Fill/>
+    </TextBox>
+    <Group>
+      <Ellipse left="327" top="-3" size="6,6"/>
+      <Fill color="#F00"/>
+    </Group>
+
+    <!-- ParagraphAlign Middle -->
+    <TextBox left="440" width="0" height="0" paragraphAlign="middle">
+      <Text text="Middle" fontFamily="NotoSansSC" fontSize="20"/>
+      <Fill/>
+    </TextBox>
+    <Group>
+      <Ellipse left="437" top="-3" size="6,6"/>
+      <Fill color="#F00"/>
+    </Group>
+
+    <!-- ParagraphAlign Far -->
+    <TextBox left="550" width="0" height="0" paragraphAlign="far">
+      <Text text="Far" fontFamily="NotoSansSC" fontSize="20"/>
+      <Fill/>
+    </TextBox>
+    <Group>
+      <Ellipse left="547" top="-3" size="6,6"/>
+      <Fill color="#F00"/>
+    </Group>
+  </Layer>
+</pagx>

@@ -20,10 +20,12 @@
 
 #include <string>
 #include <vector>
+#include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/types/Point.h"
 #include "pagx/types/TextAnchor.h"
+#include "pagx/types/TextBaseline.h"
 
 namespace pagx {
 
@@ -35,11 +37,11 @@ namespace pagx {
  * - Runtime shaping mode: Performs text shaping at runtime using the text content and font
  *   properties. Results may vary slightly across platforms due to font and shaping differences.
  */
-class Text : public Element {
+class Text : public Element, public LayoutNode {
  public:
   /**
-   * The text content to render. Supports newline characters (\n) for line breaks, which use a
-   * default line height of 1.2 times the font size.
+   * The text content to render. Supports newline characters (\n) for line breaks, which use the
+   * font metrics line height (ascent + descent + leading).
    */
   std::string text = {};
 
@@ -93,14 +95,36 @@ class Text : public Element {
    */
   std::vector<GlyphRun*> glyphRuns = {};
 
+  /**
+   * Specifies how position.y is interpreted. LineBox (default): position.y is the top of the
+   * linebox (based on font metrics line height). Alphabetic: position.y is the alphabetic baseline.
+   */
+  TextBaseline baseline = TextBaseline::LineBox;
+
+  ~Text() override;
+
   NodeType nodeType() const override {
     return NodeType::Text;
   }
 
- private:
-  Text() = default;
+ protected:
+  void onMeasure(LayoutContext* context) override;
+  void setLayoutSize(LayoutContext* context, float width, float height) override;
+  void setLayoutPosition(LayoutContext* context, float x, float y) override;
 
+ private:
+  Text();
+
+  struct GlyphData;
+  GlyphData* glyphData;
+  Rect textBounds = {};
+
+  friend class FontEmbedder;
+  friend class GlyphRunRenderer;
+  friend class LayerBuilderContext;
   friend class PAGXDocument;
+  friend class TextBox;
+  friend class TextLayout;
 };
 
 }  // namespace pagx

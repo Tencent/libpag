@@ -126,6 +126,10 @@ static int ExportToSVG(const ExportOptions& options) {
       std::cerr << "pagx export: warning: " << error << "\n";
     }
   }
+  if (document->hasUnresolvedImports()) {
+    std::cerr << "pagx export: error: unresolved import directive, run 'pagx resolve' first\n";
+    return 1;
+  }
 
   SVGExporter::Options svgOptions = {};
   svgOptions.indent = options.svgIndent;

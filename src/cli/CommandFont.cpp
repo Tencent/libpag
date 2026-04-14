@@ -27,7 +27,6 @@
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "renderer/FontEmbedder.h"
-#include "renderer/TextLayout.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Typeface.h"
 
@@ -236,16 +235,20 @@ static int RunFontEmbed(int argc, char* argv[]) {
     std::cerr << "pagx font embed: failed to load '" << options.inputFile << "'\n";
     return 1;
   }
+  if (document->hasUnresolvedImports()) {
+    std::cerr << "pagx font embed: error: unresolved import directive, run 'pagx resolve' first\n";
+    return 1;
+  }
 
   // Load font files.
-  TextLayout textLayout = {};
+  FontConfig fontConfig = {};
   for (const auto& fontFile : options.fontFiles) {
     auto typeface = tgfx::Typeface::MakeFromPath(fontFile);
     if (typeface == nullptr) {
       std::cerr << "pagx font embed: failed to load font '" << fontFile << "'\n";
       return 1;
     }
-    textLayout.registerTypeface(typeface);
+    fontConfig.registerTypeface(typeface);
   }
 
   // Resolve fallback typefaces: user-specified first, then system fallbacks.
@@ -256,21 +259,18 @@ static int RunFontEmbed(int argc, char* argv[]) {
       std::cerr << "pagx font embed: fallback font '" << fallbackStr << "' not found\n";
       return 1;
     }
-    textLayout.registerTypeface(typeface);
+    fontConfig.registerTypeface(typeface);
     fallbackTypefaces.push_back(typeface);
   }
   if (!fallbackTypefaces.empty()) {
-    textLayout.addFallbackTypefaces(std::move(fallbackTypefaces));
-  }
-  auto systemFallbacks = SystemFonts::FallbackTypefaces();
-  for (const auto& loc : systemFallbacks) {
-    textLayout.addFallbackFont(loc.path, loc.ttcIndex, loc.fontFamily, loc.fontStyle);
+    fontConfig.addFallbackTypefaces(std::move(fallbackTypefaces));
   }
 
-  auto result = textLayout.layout(document.get());
+  FontEmbedder::ClearEmbeddedGlyphRuns(document.get());
+  document->applyLayout(&fontConfig);
 
   FontEmbedder embedder = {};
-  if (!embedder.embed(document.get(), result.shapedTextMap, result.textOrder)) {
+  if (!embedder.embed(document.get())) {
     std::cerr << "pagx font embed: font embedding failed\n";
     return 1;
   }

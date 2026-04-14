@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="200" height="200">
+  <Layer id="parentLayer" centerX="0" centerY="0" import="import_external.svg">
+    <Layer id="childLayer">
+      <Rectangle size="50,50"/>
+      <Fill color="#00FF00"/>
+    </Layer>
+  </Layer>
+</pagx>

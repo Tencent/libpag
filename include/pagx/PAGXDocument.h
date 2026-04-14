@@ -21,11 +21,14 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "pagx/FontConfig.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Data.h"
 
 namespace pagx {
+
+class LayoutContext;
 
 /**
  * PAGXDocument is the root container for a PAGX document.
@@ -108,6 +111,12 @@ class PAGXDocument : public Node {
   std::vector<std::string> errors = {};
 
   /**
+   * Returns true if any layer in the document has unresolved import content (inline `<svg>` or
+   * `import` attribute). These must be resolved via `pagx resolve` before layout or rendering.
+   */
+  bool hasUnresolvedImports() const;
+
+  /**
    * Returns a list of external file paths referenced by Image nodes that have no embedded data.
    * Data URIs (paths starting with "data:") are excluded.
    */
@@ -123,15 +132,37 @@ class PAGXDocument : public Node {
    */
   bool loadFileData(const std::string& filePath, std::shared_ptr<Data> data);
 
+  /**
+   * Executes auto layout on the document, positioning layers according to their layout
+   * constraints. Must be called before rendering or font embedding. This method should only
+   * be called once per document — repeated calls may produce incorrect results because
+   * measurement data is cached and some layout operations permanently modify source geometry.
+   * @param fontConfig Optional font config for text measurement and rendering. When provided,
+   *                   updates the internal config before layout. Pass nullptr to use the
+   *                   previously set config (or no config).
+   */
+  void applyLayout(const FontConfig* fontConfig = nullptr);
+
+  /**
+   * Returns true if applyLayout() has been called at least once.
+   */
+  bool isLayoutApplied() const {
+    return layoutApplied;
+  }
+
   NodeType nodeType() const override {
     return NodeType::Document;
   }
 
  private:
   PAGXDocument() = default;
+  static void layoutLayers(const std::vector<Layer*>& layers, float containerW, float containerH,
+                           LayoutContext* context);
 
   void registerNode(Node* node, const std::string& id);
 
+  FontConfig fontConfig;
+  bool layoutApplied = false;
   std::unordered_map<std::string, Node*> nodeMap = {};
 
   friend class PAGXImporter;

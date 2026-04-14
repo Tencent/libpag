@@ -1,0 +1,343 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#ifdef PAG_USE_HARFBUZZ
+
+#include "TextShaper.h"
+#include <list>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <unordered_map>
+#include "UTF8Utils.h"
+#include "hb.h"
+#include "pagx/LayoutContext.h"
+
+namespace pagx {
+
+template <typename T>
+struct DataPointer {
+  explicit DataPointer(std::shared_ptr<T> data) : data(std::move(data)) {
+  }
+  std::shared_ptr<T> data;
+};
+
+static void DestroyDataPointerData(void* ctx) {
+  delete reinterpret_cast<DataPointer<tgfx::Data>*>(ctx);
+}
+
+static void DestroyDataPointerTypeface(void* ctx) {
+  delete reinterpret_cast<DataPointer<tgfx::Typeface>*>(ctx);
+}
+
+static hb_blob_t* GetTable(hb_face_t*, hb_tag_t tag, void* userData) {
+  auto typeface = reinterpret_cast<DataPointer<tgfx::Typeface>*>(userData)->data;
+  auto tableData = typeface->copyTableData(tag);
+  if (tableData == nullptr) {
+    return nullptr;
+  }
+  auto wrapper = new DataPointer<tgfx::Data>(tableData);
+  return hb_blob_create(static_cast<const char*>(tableData->data()),
+                        static_cast<unsigned int>(tableData->size()), HB_MEMORY_MODE_READONLY,
+                        static_cast<void*>(wrapper), DestroyDataPointerData);
+}
+
+static std::shared_ptr<hb_face_t> CreateHBFace(const std::shared_ptr<tgfx::Typeface>& typeface) {
+  if (typeface == nullptr) {
+    return nullptr;
+  }
+  auto wrapper = new DataPointer<tgfx::Typeface>(typeface);
+  auto face = std::shared_ptr<hb_face_t>(
+      hb_face_create_for_tables(GetTable, static_cast<void*>(wrapper), DestroyDataPointerTypeface),
+      hb_face_destroy);
+  if (hb_face_get_empty() == face.get()) {
+    return nullptr;
+  }
+  hb_face_set_index(face.get(), 0);
+  hb_face_set_upem(face.get(), typeface->unitsPerEm());
+  return face;
+}
+
+class FontCache {
+ public:
+  FontCache(std::list<uint32_t>* lru, std::map<uint32_t, std::shared_ptr<hb_font_t>>* cache,
+            std::mutex* mutex)
+      : lru(lru), fontCache(cache), fontMutex(mutex) {
+    fontMutex->lock();
+  }
+  FontCache(const FontCache&) = delete;
+  FontCache(FontCache&&) = delete;
+  FontCache& operator=(const FontCache&) = delete;
+  FontCache& operator=(FontCache&&) = delete;
+
+  ~FontCache() {
+    fontMutex->unlock();
+  }
+
+  std::shared_ptr<hb_font_t> find(uint32_t fontId) {
+    auto iter = std::find(lru->begin(), lru->end(), fontId);
+    if (iter == lru->end()) {
+      return nullptr;
+    }
+    lru->erase(iter);
+    lru->push_front(fontId);
+    return (*fontCache)[fontId];
+  }
+
+  std::shared_ptr<hb_font_t> insert(uint32_t fontId, std::shared_ptr<hb_font_t> font) {
+    if (hb_font_get_empty() == font.get()) {
+      return nullptr;
+    }
+    fontCache->insert_or_assign(fontId, std::move(font));
+    lru->push_front(fontId);
+    while (lru->size() > MAX_CACHE_SIZE) {
+      auto id = lru->back();
+      lru->pop_back();
+      fontCache->erase(id);
+    }
+    return (*fontCache)[fontId];
+  }
+
+  void reset() {
+    lru->clear();
+    fontCache->clear();
+  }
+
+ private:
+  static constexpr size_t MAX_CACHE_SIZE = 100;
+  std::list<uint32_t>* lru;
+  std::map<uint32_t, std::shared_ptr<hb_font_t>>* fontCache;
+  std::mutex* fontMutex;
+};
+
+static FontCache GetFontCache() {
+  static auto* cacheMutex = new std::mutex();
+  static auto* cacheLRU = new std::list<uint32_t>();
+  static auto* cacheMap = new std::map<uint32_t, std::shared_ptr<hb_font_t>>();
+  return {cacheLRU, cacheMap, cacheMutex};
+}
+
+static std::shared_ptr<hb_font_t> CreateHBFont(const std::shared_ptr<tgfx::Typeface>& typeface) {
+  if (typeface == nullptr) {
+    return nullptr;
+  }
+  auto cache = GetFontCache();
+  auto font = cache.find(typeface->uniqueID());
+  if (font != nullptr) {
+    return font;
+  }
+  auto face = CreateHBFace(typeface);
+  if (face == nullptr) {
+    return nullptr;
+  }
+  auto hbFont = std::shared_ptr<hb_font_t>(hb_font_create(face.get()), hb_font_destroy);
+  // Set scale to UPEM so output positions are in font units. The caller converts to pixels by
+  // multiplying with (fontSize / UPEM). This allows caching hb_font per typeface regardless of
+  // font size — a standard optimization used by Chrome and other engines.
+  auto upem = static_cast<int>(typeface->unitsPerEm());
+  hb_font_set_scale(hbFont.get(), upem, upem);
+  return cache.insert(typeface->uniqueID(), hbFont);
+}
+
+// Shapes a single run. The run must be homogeneous in font and script.
+static std::vector<ShapedGlyph> ShapeRun(const std::string& text, size_t byteOffset,
+                                         size_t byteLength, const tgfx::Font& font,
+                                         hb_script_t script, bool vertical, bool rtl) {
+  auto typeface = font.getTypeface();
+  auto hbFont = CreateHBFont(typeface);
+  if (hbFont == nullptr) {
+    return {};
+  }
+
+  auto buffer = std::shared_ptr<hb_buffer_t>(hb_buffer_create(), hb_buffer_destroy);
+  if (!hb_buffer_allocation_successful(buffer.get())) {
+    return {};
+  }
+
+  // Add the run substring, but provide full text as context for correct shaping at boundaries.
+  hb_buffer_add_utf8(buffer.get(), text.data(), static_cast<int>(text.size()),
+                     static_cast<unsigned int>(byteOffset), static_cast<int>(byteLength));
+
+  hb_feature_t features[2] = {};
+  unsigned int featureCount = 0;
+
+  if (vertical) {
+    hb_buffer_set_direction(buffer.get(), HB_DIRECTION_TTB);
+    hb_buffer_set_script(buffer.get(), script);
+    hb_buffer_set_language(buffer.get(), hb_language_get_default());
+    features[featureCount++] = {HB_TAG('v', 'e', 'r', 't'), 1, 0, static_cast<unsigned>(-1)};
+    features[featureCount++] = {HB_TAG('v', 'r', 't', '2'), 1, 0, static_cast<unsigned>(-1)};
+  } else if (rtl) {
+    hb_buffer_set_direction(buffer.get(), HB_DIRECTION_RTL);
+    hb_buffer_set_script(buffer.get(), script);
+    hb_buffer_set_language(buffer.get(), hb_language_get_default());
+  } else {
+    hb_buffer_set_direction(buffer.get(), HB_DIRECTION_LTR);
+    hb_buffer_set_script(buffer.get(), script);
+    hb_buffer_set_language(buffer.get(), hb_language_get_default());
+  }
+
+  hb_shape(hbFont.get(), buffer.get(), features, featureCount);
+
+  unsigned int glyphCount = 0;
+  auto* infos = hb_buffer_get_glyph_infos(buffer.get(), &glyphCount);
+  auto* positions = hb_buffer_get_glyph_positions(buffer.get(), &glyphCount);
+
+  auto upem = static_cast<float>(typeface->unitsPerEm());
+  if (upem == 0) {
+    upem = 1;
+  }
+  auto fontSize = font.getSize();
+  auto scale = fontSize / upem;
+
+  std::vector<ShapedGlyph> result;
+  result.reserve(glyphCount);
+  for (unsigned int i = 0; i < glyphCount; ++i) {
+    ShapedGlyph glyph = {};
+    glyph.glyphID = static_cast<tgfx::GlyphID>(infos[i].codepoint);
+    glyph.cluster = infos[i].cluster;
+    glyph.xAdvance = static_cast<float>(positions[i].x_advance) * scale;
+    glyph.yAdvance = static_cast<float>(positions[i].y_advance) * scale;
+    glyph.xOffset = static_cast<float>(positions[i].x_offset) * scale;
+    glyph.yOffset = static_cast<float>(positions[i].y_offset) * scale;
+    glyph.font = font;
+    result.push_back(glyph);
+  }
+  return result;
+}
+
+// A shaped run: a contiguous byte range with uniform font and script.
+struct ShapingRun {
+  size_t byteStart = 0;
+  size_t byteEnd = 0;
+  tgfx::Font font = {};
+  hb_script_t script = HB_SCRIPT_COMMON;
+};
+
+// Resolves the effective script for a Unicode code point. COMMON and INHERITED scripts inherit the
+// previous "real" script so they stay in the same shaping run as their neighbors. This matches the
+// approach used by rive-runtime, Pango, and Chrome.
+static hb_script_t ResolveScript(int32_t codepoint, hb_script_t lastScript) {
+  auto ufuncs = hb_unicode_funcs_get_default();
+  auto script =
+      hb_unicode_general_category(ufuncs, codepoint) == HB_UNICODE_GENERAL_CATEGORY_NON_SPACING_MARK
+          ? HB_SCRIPT_INHERITED
+          : hb_unicode_script(ufuncs, codepoint);
+  if (script == HB_SCRIPT_COMMON || script == HB_SCRIPT_INHERITED) {
+    return lastScript;
+  }
+  return script;
+}
+
+// Performs combined font + script itemization. Each character is assigned the best available font
+// and an effective script. Adjacent characters sharing both font and script are merged into runs.
+static std::vector<ShapingRun> ItemizeRuns(const std::string& text, const tgfx::Font& primaryFont,
+                                           LayoutContext& layoutContext) {
+  std::vector<ShapingRun> runs;
+  size_t pos = 0;
+  const tgfx::Font* lastFont = nullptr;
+  hb_script_t lastScript = HB_SCRIPT_COMMON;
+  auto primaryTypeface = primaryFont.getTypeface();
+  std::unordered_map<const tgfx::Typeface*, tgfx::Font> fallbackFontCache = {};
+
+  while (pos < text.size()) {
+    int32_t codepoint = 0;
+    auto charLen = DecodeUTF8(text.data() + pos, text.size() - pos, &codepoint);
+    if (charLen == 0) {
+      pos++;
+      continue;
+    }
+
+    // Find the best font for this codepoint.
+    const tgfx::Font* bestFont = nullptr;
+    if (primaryFont.getGlyphID(codepoint) != 0) {
+      bestFont = &primaryFont;
+    } else {
+      auto fallbackTypeface = layoutContext.fallbackTypeface(codepoint, primaryTypeface.get());
+      if (fallbackTypeface != nullptr) {
+        auto it = fallbackFontCache.find(fallbackTypeface.get());
+        if (it == fallbackFontCache.end()) {
+          tgfx::Font f(fallbackTypeface, primaryFont.getSize());
+          f.setFauxBold(primaryFont.isFauxBold());
+          f.setFauxItalic(primaryFont.isFauxItalic());
+          it = fallbackFontCache.emplace(fallbackTypeface.get(), std::move(f)).first;
+        }
+        bestFont = &it->second;
+      }
+    }
+
+    if (bestFont == nullptr) {
+      bestFont = &primaryFont;
+    }
+
+    auto script = ResolveScript(codepoint, lastScript);
+
+    bool sameFont = lastFont != nullptr && bestFont->getTypeface() == lastFont->getTypeface();
+    bool sameScript = (script == lastScript);
+    if (sameFont && sameScript) {
+      runs.back().byteEnd = pos + charLen;
+    } else {
+      ShapingRun run = {};
+      run.byteStart = pos;
+      run.byteEnd = pos + charLen;
+      run.font = *bestFont;
+      run.script = script;
+      runs.push_back(run);
+      lastFont = bestFont;
+    }
+
+    lastScript = script;
+    pos += charLen;
+  }
+
+  return runs;
+}
+
+std::vector<ShapedGlyph> TextShaper::Shape(const std::string& text, const tgfx::Font& primaryFont,
+                                           LayoutContext& layoutContext, bool vertical, bool rtl) {
+  if (text.empty()) {
+    return {};
+  }
+
+  // Phase 1: Combined font + script itemization.
+  auto shapingRuns = ItemizeRuns(text, primaryFont, layoutContext);
+  if (shapingRuns.empty()) {
+    return {};
+  }
+
+  // Phase 2: Per-run shaping — shape each run independently with full text context.
+  std::vector<ShapedGlyph> result;
+  result.reserve(text.size() / 2 + 1);
+
+  for (auto& run : shapingRuns) {
+    auto shaped = ShapeRun(text, run.byteStart, run.byteEnd - run.byteStart, run.font, run.script,
+                           vertical, rtl);
+    result.insert(result.end(), shaped.begin(), shaped.end());
+  }
+
+  return result;
+}
+
+void TextShaper::PurgeCaches() {
+  auto cache = GetFontCache();
+  cache.reset();
+}
+
+}  // namespace pagx
+
+#endif

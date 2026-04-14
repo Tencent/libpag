@@ -24,7 +24,6 @@ namespace exporter {
 
 void CombineAudioMarkers(std::vector<pag::Composition*>& compositions);
 
-void GetAudioSequence(const AEGP_ItemH& itemHandle, const std::string& outputPath,
-                      pag::Composition* composition);
+void GetAudioSequence(const AEGP_ItemH& itemHandle, pag::Composition* composition);
 
 }  // namespace exporter

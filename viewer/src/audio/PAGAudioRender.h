@@ -38,12 +38,12 @@ class PAGAudioRender : public QThread {
 
  private:
   explicit PAGAudioRender(const QAudioFormat& format, int sampleRate, int channels);
-  void init();
 
   Q_SIGNAL void volumeChangeSignal(float volume);
   Q_SIGNAL void writeData(std::shared_ptr<ByteData> data);
 
   Q_SLOT void onVolumeChange(float volume);
+  Q_SLOT void init();
   Q_SLOT void onWriteData(std::shared_ptr<ByteData> data);
 
   int channels = 2;

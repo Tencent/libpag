@@ -105,7 +105,7 @@ export class PAGView extends NativePAGView {
   }
 
   protected override async flushLoop(force = false) {
-    if (!this.isPlaying) return;
+    if (!this.isPlaying || this.isDestroyed) return;
     this.setTimer();
     if (this.flushingNextFrame) return;
     try {
@@ -114,6 +114,9 @@ export class PAGView extends NativePAGView {
       this.flushingNextFrame = false;
     } catch (e: any) {
       this.flushingNextFrame = false;
+      if (e.message !== 'The play() request was interrupted because the document was hidden!') {
+        this.clearTimer();
+      }
       console.error(e);
     }
   }

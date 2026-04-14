@@ -24,9 +24,10 @@
 #include "cli/CommandFont.h"
 #include "cli/CommandFormat.h"
 #include "cli/CommandImport.h"
-#include "cli/CommandOptimize.h"
+#include "cli/CommandLayout.h"
 #include "cli/CommandRender.h"
-#include "cli/CommandValidator.h"
+#include "cli/CommandResolve.h"
+#include "cli/CommandVerify.h"
 
 #ifndef PAGX_CLI_VERSION
 #define PAGX_CLI_VERSION "0.0.0-dev"
@@ -38,18 +39,21 @@ static void PrintUsage() {
             << "Usage: pagx <command> [options] <file>\n"
             << "\n"
             << "Commands:\n"
-            << "  validate   Validate PAGX structure against the specification\n"
-            << "  render     Render PAGX to an image file (supports crop and scale)\n"
-            << "  bounds     Query the precise bounds of a node or layer\n"
-            << "  font       Query font metrics or embed fonts into a PAGX file\n"
-            << "  format     Format a PAGX file (indentation and attribute ordering)\n"
-            << "  optimize   Validate, optimize, and format a PAGX file in one step\n"
-            << "  import     Import from another format (e.g. SVG) to PAGX\n"
-            << "  export     Export a PAGX file to another format (e.g. SVG)\n"
+            << "  verify         Resolve imports, check all issues, render screenshot + layout\n"
+            << "  resolve        Resolve import directives (inline SVG, external imports)\n"
+            << "  layout         Display layout tree with bounds\n"
+            << "  render         Render PAGX to an image file (supports crop and scale)\n"
+            << "  bounds         Query rendered pixel bounds of layers (for crop regions)\n"
+            << "  font           Query font metrics or embed fonts into a PAGX file\n"
+            << "  format         Format a PAGX file (indentation and attribute ordering)\n"
+            << "  import         Import from another format (e.g. SVG) to PAGX\n"
+            << "  export         Export a PAGX file to another format (e.g. SVG)\n"
             << "\n"
             << "Options:\n"
             << "  --help, -h       Show help\n"
-            << "  --version, -v    Show version\n";
+            << "  --version, -v    Show version\n"
+            << "\n"
+            << "Run 'pagx <command> --help' for detailed options and usage of each command.\n";
 }
 
 int main(int argc, char* argv[]) {
@@ -70,8 +74,11 @@ int main(int argc, char* argv[]) {
     return 0;
   }
 
-  if (command == "validate") {
-    return pagx::cli::RunValidate(argc - 1, argv + 1);
+  if (command == "verify") {
+    return pagx::cli::RunVerify(argc - 1, argv + 1);
+  }
+  if (command == "layout") {
+    return pagx::cli::RunLayout(argc - 1, argv + 1);
   }
   if (command == "render") {
     return pagx::cli::RunRender(argc - 1, argv + 1);
@@ -85,11 +92,11 @@ int main(int argc, char* argv[]) {
   if (command == "format") {
     return pagx::cli::RunFormat(argc - 1, argv + 1);
   }
-  if (command == "optimize") {
-    return pagx::cli::RunOptimize(argc - 1, argv + 1);
-  }
   if (command == "import") {
     return pagx::cli::RunImport(argc - 1, argv + 1);
+  }
+  if (command == "resolve") {
+    return pagx::cli::RunResolve(argc - 1, argv + 1);
   }
   if (command == "export") {
     return pagx::cli::RunExport(argc - 1, argv + 1);

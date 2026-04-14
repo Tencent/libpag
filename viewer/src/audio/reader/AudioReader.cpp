@@ -125,27 +125,22 @@ std::shared_ptr<PAGAudioSample> AudioReader::mergeSamples(
     return mergedSample;
   }
 
-  size_t maxLengthIndex = 0;
-  size_t maxLength = samples[maxLengthIndex]->length();
-  for (size_t index = 1; index < samples.size(); index++) {
-    if (samples[index]->length() > samples[maxLengthIndex]->length()) {
-      maxLengthIndex = index;
-      maxLength = samples[index]->length();
-    }
+  size_t maxLength = 0;
+  for (const auto& sample : samples) {
+    maxLength = std::max(maxLength, sample->length());
   }
 
-  mergedSample->length = samples[maxLengthIndex]->length();
-  mergedSample->data = samples[maxLengthIndex];
-  auto data = mergedSample->data->data();
-  for (size_t index = 0; index < maxLength; index++) {
-    int16_t value = 0;
-    for (size_t sampleIndex = 0; sampleIndex < samples.size(); sampleIndex++) {
-      if (sampleIndex == maxLengthIndex) {
-        continue;
-      }
-      const auto& sample = samples[sampleIndex];
-      if (index < sample->length()) {
-        value += sample->data()[index];
+  mergedSample->length = maxLength;
+  mergedSample->data = ByteData::Make(maxLength);
+  auto outputData = reinterpret_cast<int16_t*>(mergedSample->data->data());
+  size_t sampleCount = maxLength / sizeof(int16_t);
+  for (size_t index = 0; index < sampleCount; index++) {
+    int32_t value = 0;
+    for (const auto& sample : samples) {
+      size_t sampleByteLength = sample->length();
+      if (index * sizeof(int16_t) < sampleByteLength) {
+        auto sampleData = reinterpret_cast<const int16_t*>(sample->data());
+        value += sampleData[index];
       }
     }
     if (value > SHRT_MAX) {
@@ -153,7 +148,7 @@ std::shared_ptr<PAGAudioSample> AudioReader::mergeSamples(
     } else if (value < SHRT_MIN) {
       value = SHRT_MIN;
     }
-    data[index] = value;
+    outputData[index] = static_cast<int16_t>(value);
   }
   return mergedSample;
 }

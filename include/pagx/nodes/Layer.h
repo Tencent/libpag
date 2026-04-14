@@ -18,16 +18,22 @@
 
 #pragma once
 
+#include <cmath>
 #include <string>
 #include <vector>
+#include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/LayerFilter.h"
 #include "pagx/nodes/LayerStyle.h"
 #include "pagx/nodes/Node.h"
+#include "pagx/types/Alignment.h"
+#include "pagx/types/Arrangement.h"
 #include "pagx/types/BlendMode.h"
+#include "pagx/types/LayoutMode.h"
 #include "pagx/types/MaskType.h"
 #include "pagx/types/Matrix.h"
 #include "pagx/types/Matrix3D.h"
+#include "pagx/types/Padding.h"
 #include "pagx/types/Rect.h"
 
 namespace pagx {
@@ -38,7 +44,7 @@ class Composition;
  * Layer represents a layer node that can contain vector elements, layer styles, filters, and child
  * layers. It is the main building block for composing visual content in a PAGX document.
  */
-class Layer : public Node {
+class Layer : public Node, public LayoutNode {
  public:
   /**
    * The display name of the layer.
@@ -91,9 +97,9 @@ class Layer : public Node {
   bool antiAlias = true;
 
   /**
-   * Whether to use group opacity mode for the layer and its children. The default value is false.
+   * Whether to use group opacity mode for the layer and its children. The default value is true.
    */
-  bool groupOpacity = false;
+  bool groupOpacity = true;
 
   /**
    * Whether layer effects pass through to the background. The default value is true.
@@ -109,6 +115,13 @@ class Layer : public Node {
    * Whether a scroll rectangle is applied to the layer. The default value is false.
    */
   bool hasScrollRect = false;
+
+  /**
+   * Whether the layer clips its content to its own bounds. When true, auto layout expands this into
+   * a scrollRect using the layer's resolved width and height. Ignored if the layer already has a
+   * scrollRect or if both dimensions are unresolved. The default value is false.
+   */
+  bool clipToBounds = false;
 
   /**
    * A reference to a mask layer.
@@ -146,12 +159,105 @@ class Layer : public Node {
    */
   std::vector<Layer*> children = {};
 
+  /**
+   * The layout width of the layer. When set, enables constraint positioning for contents. NaN means
+   * not set.
+   */
+  float width = NAN;
+
+  /**
+   * The layout height of the layer. When set, enables constraint positioning for contents. NaN means
+   * not set.
+   */
+  float height = NAN;
+
+  /**
+   * The container layout mode for arranging child layers. When set to Horizontal or Vertical,
+   * child layers are automatically positioned along this axis. The default value is None.
+   */
+  LayoutMode layout = LayoutMode::None;
+
+  /**
+   * The spacing between adjacent child layers in the layout direction. The default value is 0.
+   */
+  float gap = 0.0f;
+
+  /**
+   * The flex grow factor for this layer within a container layout. When a child has no explicit
+   * main-axis size: flex=0 (default) uses content-measured size; flex>0 distributes remaining space
+   * proportionally among flex children by weight. Ignored when an explicit width/height is set.
+   */
+  float flex = 0.0f;
+
+  /**
+   * The inner padding of the layout container. The default value is zero on all sides.
+   */
+  Padding padding = {};
+
+  /**
+   * The alignment of child elements along the cross axis. The default value is Stretch.
+   */
+  Alignment alignment = Alignment::Stretch;
+
+  /**
+   * The arrangement of child elements along the main axis. The default value is Start.
+   */
+  Arrangement arrangement = Arrangement::Start;
+
+  /**
+   * Whether this layer participates in its parent's container layout. When false, the layer is
+   * excluded from the layout flow (not measured, not positioned) but remains visible at its own
+   * x/y coordinates. The default value is true.
+   */
+  bool includeInLayout = true;
+
+  // ── Import directives (resolved by `pagx resolve`) ──
+
+  /**
+   * Describes an import directive on this Layer. When source or content is non-empty, the Layer
+   * contains unresolved imported content that must be expanded by `pagx resolve`.
+   */
+  struct ImportDirective {
+    /**
+     * Path to an external file to import (e.g., SVG). Relative to the PAGX file.
+     */
+    std::string source = {};
+
+    /**
+     * Forced import format (e.g., "svg"). When empty, inferred from file extension (external)
+     * or child element tag name (inline).
+     */
+    std::string format = {};
+
+    /**
+     * Raw XML text of inline import content (e.g., `<svg>...</svg>`). Populated by the parser
+     * when inline content such as `<svg>` is found inside the Layer.
+     */
+    std::string content = {};
+
+    /**
+     * Description of the import source after resolution (e.g., "inline svg",
+     * "assets/logo.svg"). Set by `pagx resolve`; used by the exporter to emit an XML comment.
+     */
+    std::string resolvedFrom = {};
+  };
+
+  ImportDirective importDirective = {};
+
   NodeType nodeType() const override {
     return NodeType::Layer;
   }
 
  private:
   Layer() = default;
+
+  void performContainerLayout(LayoutContext* context);
+
+  void updateSize(LayoutContext* context) override;
+  void onMeasure(LayoutContext* context) override;
+  void setLayoutSize(LayoutContext* context, float width, float height) override;
+  void setLayoutPosition(LayoutContext* context, float x, float y) override;
+  void updateLayout(LayoutContext* context) override;
 
   friend class PAGXDocument;
 };

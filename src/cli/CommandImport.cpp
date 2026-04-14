@@ -26,13 +26,118 @@
 
 namespace pagx::cli {
 
+//--------------------------------------------------------------------------------------------------
+// Format-specific option parsing
+//--------------------------------------------------------------------------------------------------
+
+void ParseFormatOptions(int argc, char* argv[], ImportFormatOptions* options) {
+  for (int i = 0; i < argc; i++) {
+    std::string arg = argv[i];
+    if (arg == "--svg-no-expand-use") {
+      options->svgExpandUse = false;
+    } else if (arg == "--svg-flatten-transforms") {
+      options->svgFlattenTransforms = true;
+    } else if (arg == "--svg-preserve-unknown") {
+      options->svgPreserveUnknown = true;
+    }
+  }
+}
+
+//--------------------------------------------------------------------------------------------------
+// Format inference
+//--------------------------------------------------------------------------------------------------
+
+static std::string InferFormatFromContent(const std::string& content) {
+  auto pos = content.find('<');
+  while (pos != std::string::npos) {
+    if (pos + 1 < content.size() && content[pos + 1] != '/' && content[pos + 1] != '!' &&
+        content[pos + 1] != '?') {
+      auto tagEnd = content.find_first_of(" \t\n/>", pos + 1);
+      if (tagEnd != std::string::npos) {
+        auto tagName = content.substr(pos + 1, tagEnd - pos - 1);
+        for (auto& ch : tagName) {
+          ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+        }
+        return tagName;
+      }
+    }
+    pos = content.find('<', pos + 1);
+  }
+  return {};
+}
+
+//--------------------------------------------------------------------------------------------------
+// Import functions
+//--------------------------------------------------------------------------------------------------
+
+static SVGImporter::Options ToSVGOptions(const ImportFormatOptions& formatOptions,
+                                         float targetWidth = NAN, float targetHeight = NAN) {
+  SVGImporter::Options svgOptions = {};
+  svgOptions.expandUseReferences = formatOptions.svgExpandUse;
+  svgOptions.flattenTransforms = formatOptions.svgFlattenTransforms;
+  svgOptions.preserveUnknownElements = formatOptions.svgPreserveUnknown;
+  svgOptions.targetWidth = targetWidth;
+  svgOptions.targetHeight = targetHeight;
+  return svgOptions;
+}
+
+static void InlinePathData(PAGXDocument* doc) {
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() == NodeType::PathData) {
+      node->id.clear();
+    }
+  }
+}
+
+ImportResult ImportFile(const std::string& filePath, const std::string& format,
+                        const ImportFormatOptions& formatOptions, float targetWidth,
+                        float targetHeight) {
+  ImportResult result = {};
+  auto effectiveFormat = format.empty() ? GetFileExtension(filePath) : format;
+  if (effectiveFormat != "svg") {
+    result.error = "unsupported format '" + effectiveFormat + "'";
+    return result;
+  }
+  result.document =
+      SVGImporter::Parse(filePath, ToSVGOptions(formatOptions, targetWidth, targetHeight));
+  if (result.document == nullptr) {
+    result.error = "failed to parse '" + filePath + "'";
+    return result;
+  }
+  InlinePathData(result.document.get());
+  result.warnings = std::move(result.document->errors);
+  return result;
+}
+
+ImportResult ImportString(const std::string& content, const std::string& format,
+                          const ImportFormatOptions& formatOptions, float targetWidth,
+                          float targetHeight) {
+  ImportResult result = {};
+  auto effectiveFormat = format.empty() ? InferFormatFromContent(content) : format;
+  if (effectiveFormat != "svg") {
+    result.error = "unsupported inline import format '" + effectiveFormat + "'";
+    return result;
+  }
+  result.document =
+      SVGImporter::ParseString(content, ToSVGOptions(formatOptions, targetWidth, targetHeight));
+  if (result.document == nullptr) {
+    result.error = "failed to parse inline content";
+    return result;
+  }
+  InlinePathData(result.document.get());
+  result.warnings = std::move(result.document->errors);
+  return result;
+}
+
+//--------------------------------------------------------------------------------------------------
+// CLI entry point
+//--------------------------------------------------------------------------------------------------
+
 struct ImportOptions {
   std::string inputFile = {};
   std::string outputFile = {};
   std::string format = {};
-  bool svgExpandUse = true;
-  bool svgFlattenTransforms = false;
-  bool svgPreserveUnknown = false;
+  ImportFormatOptions formatOptions = {};
 };
 
 static void PrintUsage() {
@@ -52,9 +157,7 @@ static void PrintUsage() {
             << "\n"
             << "Examples:\n"
             << "  pagx import --input icon.svg                     # SVG to icon.pagx\n"
-            << "  pagx import --input icon.svg --output out.pagx   # SVG to out.pagx\n"
-            << "  pagx import --format svg --input drawing.xml     # force treating drawing.xml as "
-               "SVG format\n";
+            << "  pagx import --input icon.svg --output out.pagx   # SVG to out.pagx\n";
 }
 
 static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
@@ -63,16 +166,13 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
     std::string arg = argv[i];
     if (arg == "--input" && i + 1 < argc) {
       options->inputFile = argv[++i];
-    } else if (arg == "--output" && i + 1 < argc) {
+    } else if ((arg == "--output" || arg == "-o") && i + 1 < argc) {
       options->outputFile = argv[++i];
     } else if (arg == "--format" && i + 1 < argc) {
       options->format = argv[++i];
-    } else if (arg == "--svg-no-expand-use") {
-      options->svgExpandUse = false;
-    } else if (arg == "--svg-flatten-transforms") {
-      options->svgFlattenTransforms = true;
-    } else if (arg == "--svg-preserve-unknown") {
-      options->svgPreserveUnknown = true;
+    } else if (arg == "--svg-no-expand-use" || arg == "--svg-flatten-transforms" ||
+               arg == "--svg-preserve-unknown") {
+      // Handled by ParseFormatOptions below.
     } else if (arg == "--help" || arg == "-h") {
       PrintUsage();
       return -1;
@@ -80,55 +180,22 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
       std::cerr << "pagx import: error: unknown option '" << arg << "'\n";
       return 1;
     } else {
-      std::cerr << "pagx import: error: unexpected argument '" << arg
-                << "', use --input to specify the input file\n";
+      std::cerr << "pagx import: error: unexpected argument '" << arg << "'\n";
       return 1;
     }
     i++;
   }
 
   if (options->inputFile.empty()) {
-    std::cerr << "pagx import: error: missing --input file\n";
+    std::cerr << "pagx import: error: missing --input\n";
     return 1;
-  }
-
-  if (options->format.empty()) {
-    options->format = GetFileExtension(options->inputFile);
   }
 
   if (options->outputFile.empty()) {
     options->outputFile = ReplaceExtension(options->inputFile, "pagx");
   }
 
-  return 0;
-}
-
-static int ImportFromSVG(const ImportOptions& options) {
-  SVGImporter::Options svgOptions = {};
-  svgOptions.expandUseReferences = options.svgExpandUse;
-  svgOptions.flattenTransforms = options.svgFlattenTransforms;
-  svgOptions.preserveUnknownElements = options.svgPreserveUnknown;
-
-  auto document = SVGImporter::Parse(options.inputFile, svgOptions);
-  if (document == nullptr) {
-    std::cerr << "pagx import: error: failed to parse '" << options.inputFile << "'\n";
-    return 1;
-  }
-  if (!document->errors.empty()) {
-    for (auto& error : document->errors) {
-      std::cerr << "pagx import: warning: " << error << "\n";
-    }
-  }
-
-  auto xml = PAGXExporter::ToXML(*document);
-  std::ofstream out(options.outputFile);
-  if (!out.is_open()) {
-    std::cerr << "pagx import: error: failed to write '" << options.outputFile << "'\n";
-    return 1;
-  }
-  out << xml;
-
-  std::cout << "pagx import: wrote " << options.outputFile << "\n";
+  ParseFormatOptions(argc, argv, &options->formatOptions);
   return 0;
 }
 
@@ -139,12 +206,25 @@ int RunImport(int argc, char* argv[]) {
     return parseResult == -1 ? 0 : parseResult;
   }
 
-  if (options.format == "svg") {
-    return ImportFromSVG(options);
+  auto result = ImportFile(options.inputFile, options.format, options.formatOptions);
+  if (!result.error.empty()) {
+    std::cerr << "pagx import: error: " << result.error << "\n";
+    return 1;
+  }
+  for (auto& warning : result.warnings) {
+    std::cerr << "pagx import: warning: " << warning << "\n";
   }
 
-  std::cerr << "pagx import: error: unsupported format '" << options.format << "'\n";
-  return 1;
+  auto xml = PAGXExporter::ToXML(*result.document);
+  std::ofstream out(options.outputFile);
+  if (!out.is_open()) {
+    std::cerr << "pagx import: error: failed to write '" << options.outputFile << "'\n";
+    return 1;
+  }
+  out << xml;
+
+  std::cout << "pagx import: wrote " << options.outputFile << "\n";
+  return 0;
 }
 
 }  // namespace pagx::cli

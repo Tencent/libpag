@@ -28,10 +28,10 @@
 #include <string>
 #include "cli/CliUtils.h"
 #include "cli/XPathQuery.h"
+#include "pagx/FontConfig.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Node.h"
 #include "renderer/LayerBuilder.h"
-#include "renderer/TextLayout.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
@@ -245,15 +245,19 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
       std::cerr << "pagx render: warning: " << error << "\n";
     }
   }
+  if (document->hasUnresolvedImports()) {
+    std::cerr << "pagx render: error: unresolved import directive, run 'pagx resolve' first\n";
+    return {};
+  }
 
-  TextLayout textLayout = {};
+  FontConfig fontConfig = {};
   for (const auto& fontFile : options.fontFiles) {
     auto typeface = tgfx::Typeface::MakeFromPath(fontFile);
     if (typeface == nullptr) {
       std::cerr << "pagx render: failed to load font '" << fontFile << "'\n";
       return {};
     }
-    textLayout.registerTypeface(typeface);
+    fontConfig.registerTypeface(typeface);
   }
   std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces = {};
   for (const auto& fallbackStr : options.fallbacks) {
@@ -262,26 +266,23 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
       std::cerr << "pagx render: fallback font '" << fallbackStr << "' not found\n";
       return {};
     }
-    textLayout.registerTypeface(typeface);
+    fontConfig.registerTypeface(typeface);
     fallbackTypefaces.push_back(typeface);
   }
   if (!fallbackTypefaces.empty()) {
-    textLayout.addFallbackTypefaces(std::move(fallbackTypefaces));
+    fontConfig.addFallbackTypefaces(std::move(fallbackTypefaces));
   }
-  auto systemFallbacks = SystemFonts::FallbackTypefaces();
-  for (const auto& loc : systemFallbacks) {
-    textLayout.addFallbackFont(loc.path, loc.ttcIndex, loc.fontFamily, loc.fontStyle);
-  }
+  document->applyLayout(&fontConfig);
   bool hasTarget = !options.id.empty() || !options.xpath.empty();
   std::shared_ptr<tgfx::Layer> rootLayer = nullptr;
   std::shared_ptr<tgfx::Layer> targetTgfxLayer = nullptr;
   LayerBuildResult buildResult = {};
 
   if (hasTarget) {
-    buildResult = LayerBuilder::BuildWithMap(document.get(), &textLayout);
+    buildResult = LayerBuilder::BuildWithMap(document.get());
     rootLayer = buildResult.root;
   } else {
-    rootLayer = LayerBuilder::Build(document.get(), &textLayout);
+    rootLayer = LayerBuilder::Build(document.get());
   }
   if (rootLayer == nullptr) {
     std::cerr << "pagx render: failed to build layer tree\n";

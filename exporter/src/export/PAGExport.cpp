@@ -278,7 +278,7 @@ std::shared_ptr<pag::File> PAGExport::exportAsFile() {
 
   auto compositions = session->compositions;
   if (session->exportAudio && session->configParam.isTagCodeSupport(pag::TagCode::AudioBytes)) {
-    GetAudioSequence(itemHandle, session->outputPath, compositions[compositions.size() - 1]);
+    GetAudioSequence(itemHandle, compositions[compositions.size() - 1]);
     CombineAudioMarkers(compositions);
   }
   if (session->stopExport) {
