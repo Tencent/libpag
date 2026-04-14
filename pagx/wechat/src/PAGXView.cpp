@@ -220,7 +220,7 @@ void PAGXView::buildLayers() {
   document->applyLayout(&fontConfig);
   double layoutMs = emscripten_get_now();
 
-  contentLayer = LayerBuilder::Build(document.get());
+  contentLayer = LayerBuilder::Build(document.get(), MAX_IMAGE_DIMENSION);
   double buildMs = emscripten_get_now();
 
   if (!contentLayer) {

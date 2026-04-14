@@ -124,7 +124,9 @@ static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI)
 // Build context that maintains state during layer tree construction
 class LayerBuilderContext {
  public:
-  LayerBuilderContext() = default;
+  explicit LayerBuilderContext(int maxImageDimension = 0)
+      : _maxImageDimension(maxImageDimension) {
+  }
 
   LayerBuildResult buildWithMap(const PAGXDocument& document) {
     auto root = build(document);
@@ -530,29 +532,74 @@ class LayerBuilderContext {
       return nullptr;
     }
 
-    auto imageNode = node->image;
+    auto image = getOrCreateImage(node->image);
+    if (!image) {
+      return nullptr;
+    }
+
+    auto patternMatrix = ToTGFX(node->matrix);
+    if (_maxImageDimension > 0) {
+      auto originalWidth = image->width();
+      auto originalHeight = image->height();
+      image = getOrCreateScaledImage(node->image, _maxImageDimension);
+      if (image->width() != originalWidth || image->height() != originalHeight) {
+        auto scaleX = static_cast<float>(originalWidth) / static_cast<float>(image->width());
+        auto scaleY = static_cast<float>(originalHeight) / static_cast<float>(image->height());
+        patternMatrix.preScale(scaleX, scaleY);
+      }
+    }
+
+    auto sampling = tgfx::SamplingOptions(ToTGFX(node->filterMode), ToTGFX(node->mipmapMode));
+    auto pattern =
+        tgfx::ImagePattern::Make(image, ToTGFX(node->tileModeX), ToTGFX(node->tileModeY), sampling);
+    if (pattern && !patternMatrix.isIdentity()) {
+      pattern->setMatrix(patternMatrix);
+    }
+
+    return pattern;
+  }
+
+  std::shared_ptr<tgfx::Image> getOrCreateImage(const Image* imageNode) {
+    auto it = _imageCache.find(imageNode);
+    if (it != _imageCache.end()) {
+      return it->second;
+    }
     std::shared_ptr<tgfx::Image> image = nullptr;
     if (imageNode->data) {
       image = tgfx::Image::MakeFromEncoded(ToTGFXData(imageNode->data));
     } else if (imageNode->filePath.find("data:") == 0) {
       image = ImageFromDataURI(imageNode->filePath);
     } else if (!imageNode->filePath.empty()) {
-      // External file path (already resolved to absolute during import)
       image = tgfx::Image::MakeFromFile(imageNode->filePath);
     }
+    _imageCache[imageNode] = image;
+    return image;
+  }
 
-    if (!image) {
-      return nullptr;
+  std::shared_ptr<tgfx::Image> getOrCreateScaledImage(const Image* imageNode, int maxDimension) {
+    auto it = _scaledImageCache.find(imageNode);
+    if (it != _scaledImageCache.end()) {
+      return it->second;
     }
-
-    auto sampling = tgfx::SamplingOptions(ToTGFX(node->filterMode), ToTGFX(node->mipmapMode));
-    auto pattern =
-        tgfx::ImagePattern::Make(image, ToTGFX(node->tileModeX), ToTGFX(node->tileModeY), sampling);
-    if (pattern && !node->matrix.isIdentity()) {
-      pattern->setMatrix(ToTGFX(node->matrix));
+    auto image = getOrCreateImage(imageNode);
+    if (image) {
+      image = constrainImageSize(image, maxDimension);
     }
+    _scaledImageCache[imageNode] = image;
+    return image;
+  }
 
-    return pattern;
+  static std::shared_ptr<tgfx::Image> constrainImageSize(std::shared_ptr<tgfx::Image> image,
+                                                         int maxDimension) {
+    if (image->width() <= maxDimension && image->height() <= maxDimension) {
+      return image;
+    }
+    float scale = static_cast<float>(maxDimension) /
+                  static_cast<float>(std::max(image->width(), image->height()));
+    int newWidth = std::max(1, static_cast<int>(static_cast<float>(image->width()) * scale));
+    int newHeight = std::max(1, static_cast<int>(static_cast<float>(image->height()) * scale));
+    auto scaled = image->makeScaled(newWidth, newHeight);
+    return scaled ? scaled : image;
   }
 
   std::shared_ptr<tgfx::TrimPath> convertTrimPath(const TrimPath* node) {
@@ -850,11 +897,14 @@ class LayerBuilderContext {
   std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>> _tgfxLayerByPagxLayer = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
       _pendingMasks = {};
+  int _maxImageDimension = 0;
+  std::unordered_map<const Image*, std::shared_ptr<tgfx::Image>> _imageCache = {};
+  std::unordered_map<const Image*, std::shared_ptr<tgfx::Image>> _scaledImageCache = {};
 };
 
 // Public API implementation
 
-std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document) {
+std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document, int maxImageDimension) {
   if (document == nullptr) {
     return nullptr;
   }
@@ -864,11 +914,11 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document) {
     return nullptr;
   }
 
-  LayerBuilderContext context;
+  LayerBuilderContext context(maxImageDimension);
   return context.build(*document);
 }
 
-LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document) {
+LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document, int maxImageDimension) {
   if (document == nullptr) {
     return {};
   }
@@ -880,7 +930,7 @@ LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document) {
     return {};
   }
 
-  LayerBuilderContext context;
+  LayerBuilderContext context(maxImageDimension);
   return context.buildWithMap(*document);
 }
 
