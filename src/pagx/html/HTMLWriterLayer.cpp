@@ -183,8 +183,8 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           auto tbBounds = tb->layoutBounds();
           float tbW = !std::isnan(tb->width) ? tb->width : tbBounds.width;
           float tbH = !std::isnan(tb->height) ? tb->height : tbBounds.height;
-          float tbLeft = !std::isnan(tb->width) ? (tb->position.x - tb->width * 0.5f) : tbBounds.x;
-          float tbTop = !std::isnan(tb->height) ? (tb->position.y - tb->height * 0.5f) : tbBounds.y;
+          float tbLeft = !std::isnan(tb->width) ? tb->position.x : tbBounds.x;
+          float tbTop = !std::isnan(tb->height) ? tb->position.y : tbBounds.y;
           std::string style = "position:absolute;left:" + FloatToString(tbLeft) +
                               "px;top:" + FloatToString(tbTop) + "px";
           if (!std::isnan(tbW) && tbW > 0) {
@@ -207,6 +207,9 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             } else if (tb->paragraphAlign == ParagraphAlign::Far) {
               style += ";justify-content:flex-end";
             }
+          }
+          if (tb->writingMode == WritingMode::Vertical) {
+            style += ";writing-mode:vertical-rl";
           }
           if (tb->lineHeight > 0) {
             style += ";line-height:" + FloatToString(tb->lineHeight) + "px";

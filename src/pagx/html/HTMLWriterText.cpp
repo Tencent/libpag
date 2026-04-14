@@ -423,8 +423,8 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
   if (tb) {
     float tbW = tb->width;
     float tbH = tb->height;
-    float tbLeft = !std::isnan(tbW) ? (tb->position.x - tbW * 0.5f) : tb->position.x;
-    float tbTop = !std::isnan(tbH) ? (tb->position.y - tbH * 0.5f) : tb->position.y;
+    float tbLeft = tb->position.x;
+    float tbTop = tb->position.y;
     style +=
         "position:absolute;left:" + FloatToString(tbLeft) + "px;top:" + FloatToString(tbTop) + "px";
     if (!std::isnan(tbW) && tbW > 0) {
