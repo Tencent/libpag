@@ -38,7 +38,12 @@ dashboards, tables, etc.). Skip for freeform artwork or illustrations.
    layout XML but is not visible in the screenshot.
 6. **Text truncation and clipping**: In the screenshot, check whether any text
    appears truncated, clipped, or overflowing its container. Also check for any
-   child content being unexpectedly clipped by its parent.
+   child content being unexpectedly clipped by its parent. **Layout XML check**:
+   for every TextBox, if the inner Text `bounds.width` exceeds the TextBox
+   `bounds.width`, the text must wrap — verify that TextBox `bounds.height` is
+   at least `fontSize × 2`. If TextBox height ≈ single line despite overflow,
+   flag as "TextBox wrapping failure — height not recomputed for constraint
+   width".
 7. **Text spacing**: In the screenshot, verify lines are not overlapping or
    excessively spaced, and letter spacing looks natural.
 8. **Text legibility**: Is all text readable? Check for insufficient contrast

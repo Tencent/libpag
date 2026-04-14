@@ -71,9 +71,26 @@ void TextBox::onMeasure(LayoutContext* context) {
   }
 }
 
-void TextBox::setLayoutSize(LayoutContext*, float width, float height) {
+void TextBox::setLayoutSize(LayoutContext* context, float width, float height) {
   layoutWidth = !std::isnan(width) ? width : preferredWidth;
   layoutHeight = !std::isnan(height) ? height : preferredHeight;
+  // When the constraint-derived width differs from the measured width and height is not
+  // constrained, re-typeset to compute the correct multi-line height.
+  if (!std::isnan(width) && std::isnan(height) && width != preferredWidth) {
+    bool hasPadding = !padding.isZero();
+    float boxW =
+        hasPadding ? std::max(0.0f, layoutWidth - padding.left - padding.right) : layoutWidth;
+    float boxH =
+        hasPadding ? std::max(0.0f, layoutHeight - padding.top - padding.bottom) : layoutHeight;
+    auto params = MakeTextLayoutParams(this, boxW, boxH);
+    std::vector<Text*> childText = {};
+    TextLayout::CollectTextElements(elements, childText);
+    auto result = TextLayout::Layout(childText, params, context);
+    layoutHeight = std::ceil(result.bounds.height);
+    if (hasPadding) {
+      layoutHeight += padding.top + padding.bottom;
+    }
+  }
 }
 
 void TextBox::updateLayout(LayoutContext* context) {

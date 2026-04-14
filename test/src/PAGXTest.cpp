@@ -2115,6 +2115,52 @@ PAGX_TEST(PAGXTest, LayoutConstraintStretchTextBox) {
   EXPECT_FLOAT_EQ(textBox->position.y, 20.0f);
 }
 
+/**
+ * TextBox with left+right constraints (no explicit width) should re-typeset in setLayoutSize to
+ * compute the correct multi-line height. Before the fix, layoutHeight stayed at single-line height
+ * because onMeasure had NaN boxWidth (no wrapping), and setLayoutSize did not re-typeset.
+ */
+PAGX_TEST(PAGXTest, TextBoxConstraintWidthMultilineHeight) {
+  auto doc = pagx::PAGXDocument::Make(400, 400);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 400;
+  layer->height = 400;
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+
+  // TextBox with left+right constraints, no explicit width. Text is long enough to wrap.
+  auto textBox = doc->makeNode<pagx::TextBox>();
+  textBox->left = 20;
+  textBox->right = 20;
+  // No explicit width or height — both are NaN.
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "ABCDEFGHIJ KLMNOPQRST UVWXYZ abcdefghij klmnopqrst uvwxyz 0123456789";
+  text->fontFamily = typeface->fontFamily();
+  text->fontStyle = typeface->fontStyle();
+  text->fontSize = 24;
+  textBox->elements.push_back(text);
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  textBox->elements.push_back(fill);
+
+  layer->contents.push_back(textBox);
+
+  pagx::FontConfig fontConfig;
+  fontConfig.registerTypeface(typeface);
+  doc->applyLayout(&fontConfig);
+
+  // TextBox width should be 400 - 20 - 20 = 360.
+  EXPECT_FLOAT_EQ(textBox->layoutWidth, 360.0f);
+  // layoutHeight should reflect multiple lines, not single-line height.
+  // Single line at fontSize 24 is approximately 28-34px depending on font metrics.
+  // The text at 360px width should wrap into at least 2 lines.
+  EXPECT_GT(textBox->layoutHeight, 50.0f);
+}
+
 // =====================================================================================
 // Auto Layout - Constraint Positioning - Proportional Scaling
 // =====================================================================================
