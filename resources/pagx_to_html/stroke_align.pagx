@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: StrokeAlign center, inside, outside — visual comparison with same width -->
-<pagx version="1.0" width="420" height="280">
+<pagx version="1.0" width="420" height="300">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -28,7 +28,7 @@
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
       <!-- Column: center -->
-      <Layer width="110" layout="vertical" gap="6" alignment="center" arrangement="center">
+      <Layer width="110" layout="vertical" gap="10" alignment="center" arrangement="center">
         <Layer height="14">
           <Text text="center" fontFamily="Arial" fontStyle="Bold" fontSize="12" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
@@ -49,7 +49,7 @@
       </Layer>
 
       <!-- Column: inside -->
-      <Layer width="110" layout="vertical" gap="6" alignment="center" arrangement="center">
+      <Layer width="110" layout="vertical" gap="10" alignment="center" arrangement="center">
         <Layer height="14">
           <Text text="inside" fontFamily="Arial" fontStyle="Bold" fontSize="12" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
@@ -70,7 +70,7 @@
       </Layer>
 
       <!-- Column: outside -->
-      <Layer width="110" layout="vertical" gap="6" alignment="center" arrangement="center">
+      <Layer width="110" layout="vertical" gap="10" alignment="center" arrangement="center">
         <Layer height="14">
           <Text text="outside" fontFamily="Arial" fontStyle="Bold" fontSize="12" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
