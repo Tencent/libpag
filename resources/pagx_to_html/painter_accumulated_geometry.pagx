@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Multi-geometry accumulated by one painter (each painter renders ALL accumulated geometries) -->
-<pagx version="1.0" width="320" height="285">
+<pagx version="1.0" width="320" height="340">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -22,35 +22,63 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="vertical" alignment="center" arrangement="center">
+    <Layer flex="1">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <Layer width="260" height="185">
-      <!-- Both shapes rendered by the same Fill+Stroke -->
-      <Layer name="item">
-        <Rectangle position="110,158" size="90,90" roundness="8"/>
-        <Ellipse position="210,158" size="90,90"/>
-        <!-- This Fill renders both shapes above -->
-        <Fill color="#8B5CF6"/>
-        <!-- This Stroke also renders both shapes -->
-        <Stroke color="#FFFFFF" width="2"/>
-      </Layer>
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16" gap="6" alignment="center" arrangement="center">
+        <!-- Both shapes rendered by the same Fill+Stroke -->
+        <Layer layout="horizontal" gap="12" alignment="center" arrangement="center">
+          <Layer layout="vertical" gap="4" alignment="center">
+            <Layer width="80" height="80">
+              <Layer name="rectDemo">
+                <Rectangle position="40,40" size="80,80" roundness="8"/>
+                <Fill color="#8B5CF6"/>
+                <Stroke color="#FFFFFF" width="2"/>
+              </Layer>
+            </Layer>
+            <Layer height="12">
+              <Text text="Rectangle" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
+          </Layer>
 
-      <!-- Labels -->
-      <Layer>
-        <Text text="Rectangle" fontFamily="Arial" fontSize="9" position="110,216" textAnchor="center"/>
-        <Fill color="#64748B"/>
-      </Layer>
-      <Layer>
-        <Text text="Ellipse" fontFamily="Arial" fontSize="9" position="210,216" textAnchor="center"/>
-        <Fill color="#64748B"/>
-      </Layer>
-      <Layer>
-        <Text text="Shared Fill + Stroke" fontFamily="Arial" fontSize="9" position="160,238" textAnchor="center"/>
-        <Fill color="#94A3B8"/>
-      </Layer>
+          <Layer height="20">
+            <Text text="+" fontFamily="Arial" fontStyle="Bold" fontSize="18" centerX="0" centerY="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+
+          <Layer layout="vertical" gap="4" alignment="center">
+            <Layer width="80" height="80">
+              <Layer name="ellipseDemo">
+                <Ellipse position="40,40" size="80,80"/>
+                <Fill color="#8B5CF6"/>
+                <Stroke color="#FFFFFF" width="2"/>
+              </Layer>
+            </Layer>
+            <Layer height="12">
+              <Text text="Ellipse" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
+          </Layer>
+        </Layer>
+
+        <!-- Combined: one Fill+Stroke paints both geometries -->
+        <Layer layout="vertical" gap="4" alignment="center">
+          <Layer width="160" height="80">
+            <Layer name="combined">
+              <Rectangle position="40,40" size="70,70" roundness="8"/>
+              <Ellipse position="120,40" size="70,70"/>
+              <Fill color="#8B5CF6"/>
+              <Stroke color="#FFFFFF" width="2"/>
+            </Layer>
+          </Layer>
+          <Layer height="12">
+            <Text text="Shared Fill + Stroke" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+        </Layer>
       </Layer>
     </Layer>
   </Layer>
