@@ -14,25 +14,28 @@ dashboards, tables, etc.). Skip for freeform artwork or illustrations.
 1. **Alignment and spacing**: Within each container, siblings should be aligned
    (sharing the same edge or center line) with consistent spacing between them.
    Spacing should reflect hierarchy — gaps between sections should not be smaller
-   than gaps between elements within a section. For elements with a visible
-   background, measure spacing from the background edge, not the inner content.
-2. **Cross-element alignment**: Elements at the same logical level across different
+   than gaps between elements within a section. When a sibling has a visible
+   background, measure the gap from that background's edge — flag if smaller than
+   the element's own internal padding.
+2. **Inset symmetry**: For every container with a visible background (card, button,
+   badge, icon container), compute insets from background bounds to content bounds
+   in the layout XML. Left/right should be equal; top/bottom should be equal.
+   Flag any pair differing by more than 2px. Cross-check the screenshot for
+   visually off-center content.
+3. **Cross-element alignment**: Elements at the same logical level across different
    containers should be aligned on the same edge or center line — e.g., headings
    in adjacent columns start at the same y, or centered elements share the same
    center x.
-3. **Repetition consistency**: Repeating structures (list items, cards, tabs) should
+4. **Repetition consistency**: Repeating structures (list items, cards, tabs) should
    have identical internal layout across every instance — same height, margins,
    padding, and spacing. Width may vary when sized by content (e.g., text-length
    buttons). Flag any instance whose internal structure deviates from the pattern.
 
 ### Content
 
-4. **Completeness**: Check the screenshot and layout XML against the design intent.
+5. **Completeness**: Check the screenshot and layout XML against the design intent.
    Flag any described feature missing entirely, or any element that has bounds in
    layout XML but is not visible in the screenshot.
-5. **Content centering in containers**: For containers with a background shape
-   and foreground content (icons, text), verify in the screenshot that the
-   foreground appears centered within the background shape.
 6. **Text truncation and clipping**: In the screenshot, check whether any text
    appears truncated, clipped, or overflowing its container. Also check for any
    child content being unexpectedly clipped by its parent.
@@ -41,8 +44,8 @@ dashboards, tables, etc.). Skip for freeform artwork or illustrations.
 8. **Text legibility**: Is all text readable? Check for insufficient contrast
    or unexpected weight.
 9. **Icon rendering**: In the screenshot, check each icon or small graphic for
-   path corruption (broken lines, missing segments, unexpected fills), distortion,
-   or poor clarity at the rendered size.
+    path corruption (broken lines, missing segments, unexpected fills), distortion,
+    or poor clarity at the rendered size.
 10. **Icon semantics**: Infer each icon's intended meaning from its Layer id/name
     and adjacent text. Then critically examine the screenshot — could the shape be
     mistaken for a different common icon? Flag any icon that is ambiguous,

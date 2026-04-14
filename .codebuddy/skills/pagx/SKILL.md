@@ -79,8 +79,11 @@ Do NOT start the next task until the current one is completed.
 1. Clarify requirements — ask the user if canvas size, visual style, text content, or
    color scheme is unclear or ambiguous.
 2. Establish a style sheet — color palette, spacing scale, roundness, font hierarchy.
-3. Decompose the visual — layer structure, rendering technique, color scheme, shape
-   vocabulary, text inventory.
+3. Decompose the visual into a **containment tree** — a hierarchical list of containers
+   and their direct children. Determine containment by reading the source description
+   paragraph by paragraph: elements described within the same block belong to that
+   container, not as siblings of it. This tree directly determines the section `id`s
+   and nesting used in Step 2.
 
 **Forbidden**: Do NOT write any PAGX code in this step.
 
@@ -135,12 +138,10 @@ alignment, color consistency, visual hierarchy — that only become apparent at 
 
 **Checks**:
 1. Run `pagx verify --scale 2 input.pagx` — fix diagnostics and re-run until clean.
-2. Launch a visual QA sub-agent as an **independent** adversarial reviewer — this is
-   the core of quality assurance. The sub-agent must have **full reasoning capability**
-   (not a fast/lite variant) and **no inherited conversation history** — only the
-   prompt below as input. **NEVER** read `references/checklist.md` yourself; it is
-   exclusively for the sub-agent. Use the following prompt, replacing placeholders
-   with absolute paths:
+2. Launch a sub-agent as an adversarial reviewer — this is the core of quality
+   assurance. **NEVER** read `references/checklist.md` yourself; it is exclusively
+   for the sub-agent. Use `subagent_type="general-purpose"` and `model="reasoning"`.
+   Use the following prompt, replacing placeholders with absolute paths:
 
    ```
    You are a strict, adversarial visual QA reviewer for a PAGX design file (an XML-based
@@ -158,7 +159,9 @@ alignment, color consistency, visual hierarchy — that only become apparent at 
    checklist. Report every issue you find.
    ```
 
-3. Review the sub-agent's issue list and fix real problems.
+3. Copy every reported issue into the Step 4 task description as a numbered list.
+   Work through each one: fix and mark `[FIXED]`, or mark `[NOT AN ISSUE: reason]`.
+   Do NOT mark the task completed until every item is resolved.
 
 Keep final `input.png` for reference (do not commit). If further edits are made after
 this step, re-run the full verify to regenerate it. Delete `input.layout.xml` and any

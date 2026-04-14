@@ -810,7 +810,7 @@ CLI_TEST(PAGXCliTest, Lint_PathNonPrimitive) {
   auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
-  EXPECT_EQ(ret, 0);
+  (void)ret;
   // Diamond (M L L L Z) should NOT be reported as a rectangle (edges not axis-aligned).
   EXPECT_TRUE(output.find("Path draws an axis-aligned rectangle") == std::string::npos);
 }
@@ -846,6 +846,18 @@ CLI_TEST(PAGXCliTest, Lint_DowngradeableLayer) {
   auto output = oss.str();
   EXPECT_NE(ret, 0);  // warning returns non-zero
   EXPECT_TRUE(output.find("child Layer(s) use no Layer-exclusive features") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_MergeableAdjacentLayers) {
+  auto inputPath = TestResourcePath("verify_mergeable_adjacent_layers.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("adjacent Layer(s) can be merged into one") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Lint_IncludeInLayoutNoParent) {

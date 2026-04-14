@@ -37,21 +37,21 @@
     </Group>
   </Layer>
   <Layer name="ReticleComplex" left="400" top="300">
-    <Layer>
+    <Layer name="TickMarks">
       <Rectangle left="-1" top="-227.5" size="2,15"/>
       <Fill color="#00CCFF" alpha="0.6"/>
       <Repeater copies="60" rotation="6"/>
     </Layer>
-    <Layer>
+    <Layer name="SubTickMarks">
       <Rectangle left="-0.5" top="-219" size="1,8"/>
       <Fill color="#00CCFF" alpha="0.3"/>
       <Repeater copies="60" offset="0.5" rotation="6"/>
     </Layer>
-    <Layer rotation="15">
+    <Layer name="OuterRing" rotation="15">
       <Ellipse left="-190" top="-190" size="380,380"/>
       <Stroke color="#0FF" width="1" alpha="0.4" dashes="60,40"/>
     </Layer>
-    <Layer rotation="-20">
+    <Layer name="InnerRing" rotation="-20">
       <Ellipse left="-180" top="-180" size="360,360"/>
       <Stroke color="#0088FF" width="2" alpha="0.5" dashes="10,80"/>
     </Layer>

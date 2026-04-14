@@ -1175,6 +1175,56 @@ static void DetectDowngradableLayers(const Layer* parentLayer,
 }
 
 // ============================================================================
+// Static Detection: Mergeable Adjacent Layers
+// ============================================================================
+
+static void DetectMergeableAdjacentLayers(const std::vector<Layer*>& layers, bool hasLayout,
+                                          bool hasContents,
+                                          std::vector<VerifyDiagnostic>& diagnostics) {
+  if (hasLayout) {
+    return;
+  }
+  if (layers.size() < 2) {
+    return;
+  }
+  // Skip when all children are downgradable and parent has no contents — already covered by
+  // DetectDowngradableLayers.
+  if (!hasContents) {
+    bool allDowngradable = true;
+    for (auto* layer : layers) {
+      if (!CanDowngradeLayerToGroup(layer)) {
+        allDowngradable = false;
+        break;
+      }
+    }
+    if (allDowngradable) {
+      return;
+    }
+  }
+  size_t runStart = 0;
+  while (runStart < layers.size()) {
+    if (!CanDowngradeLayerToGroup(layers[runStart])) {
+      runStart++;
+      continue;
+    }
+    auto runEnd = runStart + 1;
+    while (runEnd < layers.size() && CanDowngradeLayerToGroup(layers[runEnd])) {
+      runEnd++;
+    }
+    if (runEnd - runStart >= 2) {
+      std::vector<int> lines;
+      for (auto i = runStart; i < runEnd; i++) {
+        lines.push_back(layers[i]->sourceLine);
+      }
+      auto count = static_cast<int>(runEnd - runStart);
+      AddDiagnostic(diagnostics, lines,
+                    std::to_string(count) + " adjacent Layer(s) can be merged into one.");
+    }
+    runStart = runEnd;
+  }
+}
+
+// ============================================================================
 // Static Detection: Repeater Copies
 // ============================================================================
 
@@ -1445,6 +1495,8 @@ static void RunStaticDetectionOnLayer(const Layer* layer, float canvasWidth, flo
   DetectFullCanvasClipMask(layer, canvasWidth, canvasHeight, diagnostics);
   DetectIneffectiveLayoutAttrs(layer, parentHasLayout, diagnostics);
   DetectDowngradableLayers(layer, diagnostics);
+  DetectMergeableAdjacentLayers(layer->children, layer->layout != LayoutMode::None,
+                                !layer->contents.empty(), diagnostics);
   DetectLowOpacityHighCost(layer, diagnostics);
   DetectRectangularMask(layer, diagnostics);
 
@@ -1481,6 +1533,8 @@ static void RunStaticDetection(const PAGXDocument* doc, const LineNodeMap& lineN
     DetectDuplicatePathData(doc, lineNodeMap, diagnostics);
     DetectDuplicateGradients(doc, lineNodeMap, diagnostics);
     DetectStructurallyIdenticalLayers(doc, lineNodeMap, diagnostics);
+    // Root-level merge detection on doc->layers.
+    DetectMergeableAdjacentLayers(doc->layers, false, false, diagnostics);
     for (auto* layer : doc->layers) {
       RunStaticDetectionOnLayer(layer, doc->width, doc->height, false, lineNodeMap, diagnostics);
     }
