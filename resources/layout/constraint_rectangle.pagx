@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Constraint layout: Rectangle element constraint combinations -->
+<!-- Fully automatic layout: containers are flexible (no width) — auto-equal distribution -->
+<pagx version="1.0" width="820" height="600">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+
+  <!-- Grid layout: 2 rows, padding=30, gap=20 -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30">
+
+    <!-- Row 1 -->
+    <Layer flex="1" layout="horizontal" gap="20">
+
+      <!-- Container 1: Single-edge and center positioning -->
+      <Layer flex="1" height="260">
+        <!-- Border -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <!-- 1.1: left="15" top="15" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="15" top="15" size="60,60" roundness="10"/>
+          <Fill color="#6366F1"/>
+        </Layer>
+        <!-- 1.2: right="15" top="15" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle right="15" top="15" size="60,60" roundness="10"/>
+          <Fill color="#F43F5E"/>
+        </Layer>
+        <!-- 1.3: centerX="0" centerY="0" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle centerX="0" centerY="0" size="80,60" roundness="10"/>
+          <Fill color="#10B981"/>
+        </Layer>
+        <!-- 1.4: left="15" bottom="15" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="15" bottom="15" size="60,60" roundness="10"/>
+          <Fill color="#F59E0B"/>
+        </Layer>
+        <!-- 1.5: right="15" bottom="15" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle right="15" bottom="15" size="60,60" roundness="10"/>
+          <Fill color="#06B6D4"/>
+        </Layer>
+      </Layer>
+
+      <!-- Container 2: Horizontal stretch (left+right) -->
+      <Layer flex="1" height="260">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <!-- 2.1: left="20" right="20" top="20" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="20" right="20" top="20" size="1,50" roundness="8"/>
+          <Fill>
+            <LinearGradient startPoint="0,0" endPoint="320,0">
+              <ColorStop offset="0" color="#6366F1"/>
+              <ColorStop offset="1" color="#8B5CF6"/>
+            </LinearGradient>
+          </Fill>
+        </Layer>
+        <!-- 2.2: left="40" right="40" centerY="0" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="40" right="40" centerY="0" size="1,50" roundness="8"/>
+          <Fill>
+            <LinearGradient startPoint="0,0" endPoint="280,0">
+              <ColorStop offset="0" color="#F43F5E"/>
+              <ColorStop offset="1" color="#EC4899"/>
+            </LinearGradient>
+          </Fill>
+        </Layer>
+        <!-- 2.3: left="60" right="60" bottom="20" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="60" right="60" bottom="20" size="1,50" roundness="8"/>
+          <Fill>
+            <LinearGradient startPoint="0,0" endPoint="240,0">
+              <ColorStop offset="0" color="#10B981"/>
+              <ColorStop offset="1" color="#059669"/>
+            </LinearGradient>
+          </Fill>
+        </Layer>
+      </Layer>
+
+    </Layer>
+
+    <!-- Row 2 -->
+    <Layer flex="1" layout="horizontal" gap="20">
+
+      <!-- Container 3: Vertical stretch (top+bottom) -->
+      <Layer flex="1" height="260">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <!-- 3.1: left="15" top="20" bottom="20" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="15" top="20" bottom="20" size="50,1" roundness="8"/>
+          <Fill>
+            <LinearGradient startPoint="0,0" endPoint="0,220">
+              <ColorStop offset="0" color="#F59E0B"/>
+              <ColorStop offset="1" color="#D97706"/>
+            </LinearGradient>
+          </Fill>
+        </Layer>
+        <!-- 3.2: right="15" top="40" bottom="40" -->
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle right="15" top="40" bottom="40" size="50,1" roundness="8"/>
+          <Fill>
+            <LinearGradient startPoint="0,0" endPoint="0,180">
+              <ColorStop offset="0" color="#06B6D4"/>
+              <ColorStop offset="1" color="#0891B2"/>
+            </LinearGradient>
+          </Fill>
+        </Layer>
+      </Layer>
+
+      <!-- Container 4: Four-edge stretch -->
+      <Layer flex="1" height="260">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="20" right="20" top="20" bottom="20" size="1,1" roundness="12"/>
+          <Fill>
+            <LinearGradient startPoint="0,0" endPoint="240,220">
+              <ColorStop offset="0" color="#8B5CF6"/>
+              <ColorStop offset="1" color="#6D28D9"/>
+            </LinearGradient>
+          </Fill>
+        </Layer>
+      </Layer>
+
+      <!-- Container 5: Asymmetric stretch -->
+      <Layer flex="1" height="260">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="15" right="40" top="25" bottom="50" size="1,1" roundness="12"/>
+          <Fill>
+            <LinearGradient startPoint="0,0" endPoint="225,185">
+              <ColorStop offset="0" color="#EC4899"/>
+              <ColorStop offset="1" color="#BE185D"/>
+            </LinearGradient>
+          </Fill>
+        </Layer>
+      </Layer>
+
+    </Layer>
+
+  </Layer>
+</pagx>

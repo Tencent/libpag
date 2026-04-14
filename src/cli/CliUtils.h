@@ -23,8 +23,7 @@
 #include <cstdio>
 #include <string>
 #include <vector>
-#include "SystemFonts.h"
-#include "renderer/TextLayout.h"
+#include "pagx/FontConfig.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx::cli {
@@ -63,17 +62,6 @@ static inline std::shared_ptr<tgfx::Typeface> ResolveSystemTypeface(const std::s
 }
 
 /**
- * Adds system fallback fonts to the given TextLayout as deferred entries. Fonts are loaded on
- * demand during text shaping, not upfront.
- */
-inline void SetupSystemFallbackFonts(TextLayout& textLayout) {
-  auto locations = SystemFonts::FallbackTypefaces();
-  for (const auto& loc : locations) {
-    textLayout.addFallbackFont(loc.path, loc.ttcIndex, loc.fontFamily, loc.fontStyle);
-  }
-}
-
-/**
  * Resolves a fallback font specifier to a Typeface. Accepts either a font file path (containing
  * '/' or ending with a known font extension) or a font name in "family[,style]" format.
  */
@@ -95,6 +83,58 @@ inline std::shared_ptr<tgfx::Typeface> ResolveFallbackTypeface(const std::string
   auto family = commaPos != std::string::npos ? specifier.substr(0, commaPos) : specifier;
   auto style = commaPos != std::string::npos ? specifier.substr(commaPos + 1) : std::string();
   return ResolveSystemTypeface(family, style);
+}
+
+/**
+ * Extracts the file extension from a path (without the dot) in lowercase, or returns an empty
+ * string if none.
+ */
+inline std::string GetFileExtension(const std::string& path) {
+  auto dot = path.rfind('.');
+  if (dot != std::string::npos) {
+    auto ext = path.substr(dot + 1);
+    for (auto& ch : ext) {
+      ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+    }
+    return ext;
+  }
+  return {};
+}
+
+/**
+ * Replaces the file extension in a path with a new extension. If the path has no extension, appends
+ * the new extension.
+ */
+inline std::string ReplaceExtension(const std::string& path, const std::string& newExt) {
+  auto dot = path.rfind('.');
+  if (dot != std::string::npos) {
+    return path.substr(0, dot + 1) + newExt;
+  }
+  return path + "." + newExt;
+}
+
+/**
+ * Extracts the directory part of a path (including trailing slash), or returns "./" if none.
+ */
+inline std::string GetDirectory(const std::string& path) {
+  auto slash = path.rfind('/');
+  if (slash != std::string::npos) {
+    return path.substr(0, slash + 1);
+  }
+  return "./";
+}
+
+/**
+ * Extracts the base name from a path (filename without directory and extension).
+ */
+inline std::string GetBaseName(const std::string& path) {
+  auto slash = path.rfind('/');
+  auto base = (slash != std::string::npos) ? path.substr(slash + 1) : path;
+  auto dot = base.rfind('.');
+  if (dot != std::string::npos) {
+    return base.substr(0, dot);
+  }
+  return base;
 }
 
 inline std::string EscapeJson(const std::string& input) {

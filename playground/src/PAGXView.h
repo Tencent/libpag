@@ -21,8 +21,9 @@
 #include <deque>
 #include <emscripten/bind.h>
 #include "LayerBuilder.h"
-#include "TextLayout.h"
+#include "pagx/FontConfig.h"
 #include "pagx/PAGXDocument.h"
+#include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Recording.h"
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
 #include "GridBackground.h"
@@ -69,6 +70,7 @@ class PAGXView {
 
   std::string canvasID = {};
   std::shared_ptr<tgfx::Window> window = nullptr;
+  std::shared_ptr<tgfx::Surface> surface = nullptr;
   tgfx::DisplayList displayList = {};
   std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
   std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
@@ -77,7 +79,7 @@ class PAGXView {
   bool presentImmediately = true;
   float pagxWidth = 0.0f;
   float pagxHeight = 0.0f;
-  TextLayout textLayout = {};
+  FontConfig fontConfig = {};
   std::shared_ptr<PAGXDocument> document = nullptr;
 
   // Background layer cache

@@ -1,3 +1,6 @@
+# Python
+__pycache__/
+
 # Compiled Object files
 *.slo
 *.lo
@@ -48,6 +51,9 @@ local.properties
 # Local config
 *.local.json
 *.local.md
+
+# Claude worktrees
+.claude/worktrees/
 
 # Skill runtime cache
 .cr-cache/
@@ -111,4 +117,7 @@ cli/npm/linux
 cli/npm/win32
 cli/npm/node_modules
 cli/npm/package-lock.json
+
+# PAGX verify artifacts
+*.layout.xml
 

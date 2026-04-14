@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates TrimPath: separate vs continuous mode comparison -->
+<pagx version="1.0" width="400" height="400">
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" alignment="center" arrangement="spaceEvenly">
+    <!-- Row 1: Separate mode ellipses -->
+    <Layer>
+      <!-- Background rings -->
+      <Ellipse size="100,100"/>
+      <Ellipse left="160" size="100,100"/>
+      <Stroke color="#E2E8F0" width="8"/>
+      <!-- Trimmed: each ellipse trimmed independently to 0.2~0.9 -->
+      <Group>
+        <Ellipse size="100,100"/>
+        <Ellipse left="160" size="100,100"/>
+        <TrimPath start="0.2" end="0.9"/>
+        <Stroke width="10" cap="round">
+          <LinearGradient startPoint="0,0" endPoint="260,100">
+            <ColorStop offset="0" color="#06B6D4"/>
+            <ColorStop offset="1" color="#8B5CF6"/>
+          </LinearGradient>
+        </Stroke>
+      </Group>
+    </Layer>
+
+    <!-- Row 2: Separate mode label -->
+    <Layer>
+      <Text text="Separate (0.2–0.9)" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+      <Fill color="#475569"/>
+    </Layer>
+
+    <!-- Row 3: Continuous mode ellipses -->
+    <Layer>
+      <!-- Background rings -->
+      <Ellipse size="100,100"/>
+      <Ellipse left="160" size="100,100"/>
+      <Stroke color="#E2E8F0" width="8"/>
+      <!-- Trimmed: both ellipses treated as one path, 0.2~0.9 of total length -->
+      <Group>
+        <Ellipse size="100,100"/>
+        <Ellipse left="160" size="100,100"/>
+        <TrimPath start="0.2" end="0.9" type="continuous"/>
+        <Stroke width="10" cap="round">
+          <LinearGradient startPoint="0,0" endPoint="260,100">
+            <ColorStop offset="0" color="#F59E0B"/>
+            <ColorStop offset="1" color="#F43F5E"/>
+          </LinearGradient>
+        </Stroke>
+      </Group>
+    </Layer>
+
+    <!-- Row 4: Continuous mode label -->
+    <Layer>
+      <Text text="Continuous (0.2–0.9)" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+      <Fill color="#475569"/>
+    </Layer>
+  </Layer>
+</pagx>

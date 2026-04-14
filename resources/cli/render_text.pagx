@@ -1,15 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="200" height="100">
-  <Layer>
-    <Rectangle position="100,50" size="200,100"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#1E293B"/>
   </Layer>
-  <Layer x="100" y="30">
-    <Text text="Hello PAGX" fontFamily="Helvetica" fontStyle="Bold" fontSize="24" textAnchor="center"/>
-    <Fill color="#FFFFFF"/>
-  </Layer>
-  <Layer x="100" y="65">
-    <Text text="Text Rendering" fontFamily="Helvetica" fontSize="16" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
+  <Layer centerX="0" centerY="0" layout="vertical" gap="6" alignment="center">
+    <Layer>
+      <TextBox textAlign="center">
+        <Text text="Hello PAGX" fontFamily="Helvetica" fontStyle="Bold" fontSize="24"/>
+        <Fill color="#FFFFFF"/>
+      </TextBox>
+    </Layer>
+    <Layer>
+      <TextBox textAlign="center">
+        <Text text="Text Rendering" fontFamily="Helvetica" fontSize="16"/>
+        <Fill color="#94A3B8"/>
+      </TextBox>
+    </Layer>
   </Layer>
 </pagx>

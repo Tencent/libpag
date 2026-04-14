@@ -17,10 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LayerBuilder.h"
-#include <chrono>
 #include <tuple>
 #include <unordered_map>
 #include "ToTGFX.h"
+#include "base/utils/Log.h"
+#include "pagx/PAGXDocument.h"
+#include "pagx/TextLayout.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -52,6 +54,7 @@
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
@@ -64,6 +67,7 @@
 #include "pagx/types/SelectorTypes.h"
 #include "pagx/types/TileMode.h"
 #include "pagx/utils/Base64.h"
+#include "renderer/GlyphRunRenderer.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Data.h"
@@ -105,14 +109,6 @@
 #include "tgfx/layers/vectors/TextSelector.h"
 #include "tgfx/layers/vectors/TrimPath.h"
 #include "tgfx/layers/vectors/VectorGroup.h"
-#include "tgfx/platform/Print.h"
-
-#ifdef DEBUG
-#include <cassert>
-#define DEBUG_ASSERT(x) assert(x)
-#else
-#define DEBUG_ASSERT(x)
-#endif
 
 namespace pagx {
 
@@ -125,14 +121,10 @@ static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI)
   return tgfx::Image::MakeFromEncoded(ToTGFXData(data));
 }
 
-namespace {
-
 // Build context that maintains state during layer tree construction
 class LayerBuilderContext {
  public:
-  LayerBuilderContext(const ShapedTextMap& shapedTextMap, int maxImageDimension)
-      : _shapedTextMap(shapedTextMap), _maxImageDimension(maxImageDimension) {
-  }
+  LayerBuilderContext() = default;
 
   LayerBuildResult buildWithMap(const PAGXDocument& document) {
     auto root = build(document);
@@ -145,10 +137,8 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::Layer> build(const PAGXDocument& document) {
     // Build layer tree.
     auto rootLayer = tgfx::Layer::Make();
-    // [TEMP] Completely disable scrollRect to verify if the tgfx clip processing causes binding
-    // error. If error disappears, the root cause is in tgfx ClipStack or applyClip.
-    // TODO: Remove this line after root cause is confirmed and fixed.
-    // rootLayer->setScrollRect(tgfx::Rect::MakeWH(document.width, document.height));
+    // Apply canvas clipping: the root layer clips to the canvas dimensions.
+    rootLayer->setScrollRect(tgfx::Rect::MakeWH(document.width, document.height));
     for (const auto& layer : document.layers) {
       auto childLayer = convertLayer(layer);
       if (childLayer) {
@@ -240,7 +230,36 @@ class LayerBuilderContext {
     return layer;
   }
 
-  std::shared_ptr<tgfx::VectorElement> convertVectorElement(const Element* node) {
+  // Generate TextBlob for a Text node using GlyphRunRenderer with the given inverse matrix.
+  // For standalone Text (not inside TextBox), inverseMatrix is Identity.
+  // For TextBox children, inverseMatrix cancels the cumulative Group transforms.
+  static void PrepareTextBlob(Text* text, const tgfx::Matrix& inverseMatrix) {
+    if (!text->glyphData->layoutRuns.empty()) {
+      text->glyphData->textBlob =
+          GlyphRunRenderer::BuildTextBlobFromLayoutRuns(text->glyphData->layoutRuns, inverseMatrix);
+    } else if (!text->glyphRuns.empty()) {
+      GlyphRunRenderer::BuildTextBlob(text, inverseMatrix);
+    }
+  }
+
+  // Prepare TextBlobs for all Text children of a TextBox by applying inverse matrices.
+  // This must happen at render time (not layout time) so that tgfx's StrokePainter can
+  // detect the Group transform via geometry->matrix changes between apply() and draw().
+  void prepareTextBoxTextBlobs(const TextBox* textBox) {
+    std::vector<Text*> childText;
+    std::vector<tgfx::Matrix> matrices;
+    TextLayout::CollectTextElements(textBox->elements, childText, matrices);
+
+    for (size_t i = 0; i < childText.size(); i++) {
+      tgfx::Matrix inverse = {};
+      if (!matrices[i].invert(&inverse)) {
+        continue;
+      }
+      PrepareTextBlob(childText[i], inverse);
+    }
+  }
+
+  std::shared_ptr<tgfx::VectorElement> convertVectorElement(Element* node) {
     if (!node) {
       return nullptr;
     }
@@ -255,7 +274,7 @@ class LayerBuilderContext {
       case NodeType::Path:
         return convertPath(static_cast<const Path*>(node));
       case NodeType::Text:
-        return convertText(static_cast<const Text*>(node));
+        return convertText(static_cast<Text*>(node));
       case NodeType::Fill:
         return convertFill(static_cast<const Fill*>(node));
       case NodeType::Stroke:
@@ -274,9 +293,14 @@ class LayerBuilderContext {
         return convertTextModifier(static_cast<const TextModifier*>(node));
       case NodeType::Group:
         return convertGroup(static_cast<const Group*>(node));
-      case NodeType::TextBox:
-        // TextBox is handled in convertGroup, not converted directly.
-        return nullptr;
+      case NodeType::TextBox: {
+        auto* textBox = static_cast<const TextBox*>(node);
+        if (textBox->elements.empty()) {
+          return nullptr;
+        }
+        prepareTextBoxTextBlobs(textBox);
+        return convertGroup(textBox);
+      }
       default:
         return nullptr;
     }
@@ -319,6 +343,7 @@ class LayerBuilderContext {
 
   std::shared_ptr<tgfx::ShapePath> convertPath(const Path* node) {
     auto shapePath = tgfx::ShapePath::Make();
+    shapePath->setPosition(ToTGFX(node->position));
     if (node->data) {
       shapePath->setPath(ToTGFX(*node->data));
     }
@@ -326,13 +351,16 @@ class LayerBuilderContext {
     return shapePath;
   }
 
-  std::shared_ptr<tgfx::Text> convertText(const Text* node) {
-    auto it = _shapedTextMap.find(node);
-    if (it == _shapedTextMap.end() || it->second.textBlob == nullptr) {
+  std::shared_ptr<tgfx::Text> convertText(Text* node) {
+    auto textBlob = node->glyphData->textBlob;
+    if (textBlob == nullptr) {
+      PrepareTextBlob(node, tgfx::Matrix::I());
+      textBlob = node->glyphData->textBlob;
+    }
+    if (textBlob == nullptr) {
       return nullptr;
     }
-    auto& shapedText = it->second;
-    auto tgfxText = tgfx::Text::Make(shapedText.textBlob, shapedText.anchors);
+    auto tgfxText = tgfx::Text::Make(textBlob, node->glyphData->anchors);
     if (tgfxText) {
       tgfxText->setPosition(tgfx::Point::Make(node->position.x, node->position.y));
     }
@@ -500,90 +528,29 @@ class LayerBuilderContext {
       return nullptr;
     }
 
-    auto image = getOrCreateImage(node->image);
-    if (!image) {
-      return nullptr;
+    auto imageNode = node->image;
+    std::shared_ptr<tgfx::Image> image = nullptr;
+    if (imageNode->data) {
+      image = tgfx::Image::MakeFromEncoded(ToTGFXData(imageNode->data));
+    } else if (imageNode->filePath.find("data:") == 0) {
+      image = ImageFromDataURI(imageNode->filePath);
+    } else if (!imageNode->filePath.empty()) {
+      // External file path (already resolved to absolute during import)
+      image = tgfx::Image::MakeFromFile(imageNode->filePath);
     }
 
-    auto patternMatrix = ToTGFX(node->matrix);
-    if (_maxImageDimension > 0) {
-      auto originalWidth = image->width();
-      auto originalHeight = image->height();
-      image = getOrCreateScaledImage(node->image, _maxImageDimension);
-      if (image->width() != originalWidth || image->height() != originalHeight) {
-        auto scaleX = static_cast<float>(originalWidth) / static_cast<float>(image->width());
-        auto scaleY = static_cast<float>(originalHeight) / static_cast<float>(image->height());
-        patternMatrix.preScale(scaleX, scaleY);
-      }
+    if (!image) {
+      return nullptr;
     }
 
     auto sampling = tgfx::SamplingOptions(ToTGFX(node->filterMode), ToTGFX(node->mipmapMode));
     auto pattern =
         tgfx::ImagePattern::Make(image, ToTGFX(node->tileModeX), ToTGFX(node->tileModeY), sampling);
-    if (pattern && !patternMatrix.isIdentity()) {
-      pattern->setMatrix(patternMatrix);
+    if (pattern && !node->matrix.isIdentity()) {
+      pattern->setMatrix(ToTGFX(node->matrix));
     }
 
     return pattern;
-  }
-
-  std::shared_ptr<tgfx::Image> getOrCreateImage(const Image* imageNode) {
-    auto it = _imageCache.find(imageNode);
-    if (it != _imageCache.end()) {
-      return it->second;
-    }
-    auto imgStart = std::chrono::high_resolution_clock::now();
-    std::shared_ptr<tgfx::Image> image = nullptr;
-    const char* source = "none";
-    if (imageNode->data) {
-      image = tgfx::Image::MakeFromEncoded(ToTGFXData(imageNode->data));
-      source = "data";
-    } else if (imageNode->filePath.find("data:") == 0) {
-      image = ImageFromDataURI(imageNode->filePath);
-      source = "dataURI";
-    } else if (!imageNode->filePath.empty()) {
-      image = tgfx::Image::MakeFromFile(imageNode->filePath);
-      source = "file";
-    }
-    auto imgEnd = std::chrono::high_resolution_clock::now();
-    auto imgMs = std::chrono::duration<double, std::milli>(imgEnd - imgStart).count();
-    if (imgMs > 1.0) {
-      if (image) {
-        tgfx::PrintLog("[PAGX Perf]     getOrCreateImage=%.1fms source=%s id=%s size=%dx%d\n",
-                       imgMs, source, imageNode->id.c_str(), image->width(), image->height());
-      } else {
-        tgfx::PrintLog("[PAGX Perf]     getOrCreateImage=%.1fms source=%s id=%s\n", imgMs, source,
-                       imageNode->id.c_str());
-      }
-    }
-    _imageCache[imageNode] = image;
-    return image;
-  }
-
-  std::shared_ptr<tgfx::Image> getOrCreateScaledImage(const Image* imageNode, int maxDimension) {
-    auto it = _scaledImageCache.find(imageNode);
-    if (it != _scaledImageCache.end()) {
-      return it->second;
-    }
-    auto image = getOrCreateImage(imageNode);
-    if (image) {
-      image = constrainImageSize(image, maxDimension);
-    }
-    _scaledImageCache[imageNode] = image;
-    return image;
-  }
-
-  static std::shared_ptr<tgfx::Image> constrainImageSize(std::shared_ptr<tgfx::Image> image,
-                                                         int maxDimension) {
-    if (image->width() <= maxDimension && image->height() <= maxDimension) {
-      return image;
-    }
-    float scale = static_cast<float>(maxDimension) /
-                  static_cast<float>(std::max(image->width(), image->height()));
-    int newWidth = std::max(1, static_cast<int>(static_cast<float>(image->width()) * scale));
-    int newHeight = std::max(1, static_cast<int>(static_cast<float>(image->height()) * scale));
-    auto scaled = image->makeScaled(newWidth, newHeight);
-    return scaled ? scaled : image;
   }
 
   std::shared_ptr<tgfx::TrimPath> convertTrimPath(const TrimPath* node) {
@@ -695,9 +662,13 @@ class LayerBuilderContext {
     elements.reserve(node->elements.size());
 
     for (const auto& element : node->elements) {
-      // Skip TextBox modifier - layout has been baked into GlyphRun positions by TextLayout
+      // Skip empty TextBox modifier (no children) - layout has been baked into GlyphRun positions
+      // by TextLayout. TextBox with children is rendered as a Group.
       if (element->nodeType() == NodeType::TextBox) {
-        continue;
+        auto* textBox = static_cast<const TextBox*>(element);
+        if (textBox->elements.empty()) {
+          continue;
+        }
       }
 
       auto tgfxElement = convertVectorElement(element);
@@ -762,13 +733,10 @@ class LayerBuilderContext {
     if (!node->antiAlias) {
       layer->setAllowsEdgeAntialiasing(false);
     }
-    if (node->groupOpacity) {
-      layer->setAllowsGroupOpacity(true);
-    }
+    layer->setAllowsGroupOpacity(node->groupOpacity);
     if (!node->passThroughBackground) {
       layer->setPassThroughBackground(false);
     }
-    // Apply scrollRect if present
     if (node->hasScrollRect) {
       layer->setScrollRect(ToTGFX(node->scrollRect));
     }
@@ -877,55 +845,40 @@ class LayerBuilderContext {
     }
   }
 
-  const ShapedTextMap& _shapedTextMap;
-  int _maxImageDimension = 0;
   std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>> _tgfxLayerByPagxLayer = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
       _pendingMasks = {};
-  std::unordered_map<const Image*, std::shared_ptr<tgfx::Image>> _imageCache = {};
-  std::unordered_map<const Image*, std::shared_ptr<tgfx::Image>> _scaledImageCache = {};
 };
-
-}  // namespace
 
 // Public API implementation
 
-static TextLayoutResult PerformTextLayout(PAGXDocument* document, TextLayout* textLayout) {
-  if (textLayout != nullptr) {
-    return textLayout->layout(document);
-  }
-  TextLayout defaultTextLayout;
-  return defaultTextLayout.layout(document);
-}
-
-std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document, TextLayout* textLayout,
-                                                 int maxImageDimension) {
+std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document) {
   if (document == nullptr) {
     return nullptr;
   }
-  auto start = std::chrono::high_resolution_clock::now();
-  auto layoutResult = PerformTextLayout(document, textLayout);
-  auto layoutEnd = std::chrono::high_resolution_clock::now();
-  LayerBuilderContext context(layoutResult.shapedTextMap, maxImageDimension);
-  auto result = context.build(*document);
-  auto buildEnd = std::chrono::high_resolution_clock::now();
-  auto layoutMs = std::chrono::duration<double, std::milli>(layoutEnd - start).count();
-  auto buildMs = std::chrono::duration<double, std::milli>(buildEnd - layoutEnd).count();
-  auto totalMs = std::chrono::duration<double, std::milli>(buildEnd - start).count();
-  tgfx::PrintLog(
-      "[PAGX Perf] LayerBuilder::Build total=%.1fms (textLayout=%.1fms "
-      "buildLayerTree=%.1fms) shapedTexts=%zu\n",
-      totalMs, layoutMs, buildMs, layoutResult.shapedTextMap.size());
-  return result;
+  if (!document->isLayoutApplied()) {
+    LOGE("LayerBuilder::Build() called before applyLayout(). Call document->applyLayout() first.");
+    DEBUG_ASSERT(false);
+    return nullptr;
+  }
+
+  LayerBuilderContext context;
+  return context.build(*document);
 }
 
-LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document, TextLayout* textLayout,
-                                            int maxImageDimension) {
+LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document) {
   if (document == nullptr) {
     return {};
   }
-  auto layoutResult = PerformTextLayout(document, textLayout);
-  LayerBuilderContext context(layoutResult.shapedTextMap, maxImageDimension);
+  if (!document->isLayoutApplied()) {
+    LOGE(
+        "LayerBuilder::BuildWithMap() called before applyLayout(). Call document->applyLayout() "
+        "first.");
+    DEBUG_ASSERT(false);
+    return {};
+  }
+
+  LayerBuilderContext context;
   return context.buildWithMap(*document);
 }
 

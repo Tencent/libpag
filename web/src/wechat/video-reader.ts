@@ -46,6 +46,7 @@ export class VideoReader {
   public isPlaying = false; // Web SDK use this property to check if video is playing
   public isDestroyed = false;
   private player: PAGPlayer | null = null;
+  private error: any = null;
 
   private readonly frameRate: number;
   private currentFrame: number;
@@ -85,15 +86,17 @@ export class VideoReader {
   }
 
   public async prepare(targetFrame: number) {
-    if (targetFrame === this.currentFrame) return;
+    if (this.isDestroyed || targetFrame === this.currentFrame) return;
     this.isSought = false;
     // Wait for videoDecoder ready
     await this.videoDecoderPromise;
+    if (this.isDestroyed) return;
     if (this.frameDataBuffers.length > 0) {
       const index = this.frameDataBuffers.findIndex((frameData) => frameData.id === targetFrame);
       if (index !== -1) {
         this.frameDataBuffers = this.frameDataBuffers.slice(index);
         this.arrayBufferImage.setFrameData(await this.getFrameData());
+        if (this.isDestroyed) return;
         this.currentFrame = targetFrame;
         return;
       }
@@ -105,9 +108,14 @@ export class VideoReader {
       this.isSought = true;
       this.bufferIndex = targetFrame;
       await this.videoDecoder.seek(Math.floor((targetFrame / this.frameRate) * 1000));
+      if (this.isDestroyed) {
+        this.seeking = false;
+        return;
+      }
       this.seeking = false;
     }
     this.arrayBufferImage.setFrameData(await this.getFrameData());
+    if (this.isDestroyed) return;
     this.currentFrame = targetFrame;
     return;
   }
@@ -133,11 +141,15 @@ export class VideoReader {
   }
 
   public getError(): any {
-    // Web SDK use this function to get video error.
-    return null;
+    return this.error;
   }
 
   public onDestroy() {
+    this.isDestroyed = true;
+    if (this.getFrameDataResolve) {
+      this.getFrameDataResolve({ id: -1, data: new ArrayBuffer(0), width: 0, height: 0 });
+      this.getFrameDataResolve = null;
+    }
     if (this.player) {
       this.player.unlinkVideoReader(this);
       this.player = null;
@@ -147,7 +159,6 @@ export class VideoReader {
     if (this.mp4Path) {
       removeFile(this.mp4Path);
     }
-    this.isDestroyed = true;
   }
 
   private getFrameData() {
@@ -176,10 +187,12 @@ export class VideoReader {
   }
 
   private getFrameDataLoop() {
+    if (this.isDestroyed) return;
     if (this.seeking) return;
     if (!this.videoDecoder) {
       this.clearFrameDataLoop();
-      throw new Error('VideoDecoder is not ready!');
+      this.error = 'VideoDecoder is not ready.';
+      return;
     }
     if (this.frameDataBuffers.length >= BUFFER_MAX_SIZE) {
       this.getFrameDataLooping = false;

@@ -20,7 +20,6 @@
 
 #include <memory>
 #include <unordered_map>
-#include "TextLayout.h"
 #include "pagx/PAGXDocument.h"
 #include "tgfx/layers/Layer.h"
 
@@ -37,43 +36,27 @@ struct LayerBuildResult {
 
 /**
  * LayerBuilder converts PAGXDocument to tgfx::Layer tree for rendering.
- * Text elements are rendered using the TextLayout to create ShapedText.
+ * The document must have applyLayout() called before building.
  */
 class LayerBuilder {
  public:
   /**
    * Builds a layer tree from a PAGXDocument.
-   * @param document The document to build from.
-   * @param textLayout Optional text layout for text rendering. If nullptr, a default TextLayout is
-   *                   created internally. Pass a custom TextLayout to use registered typefaces
-   *                   and fallback fonts.
-   * @param maxImageDimension Maximum allowed image dimension (width or height). Images exceeding
-   *                          this limit will be scaled down proportionally. A value of 0 means no
-   *                          limit. Useful for memory-constrained environments like WASM.
-   * @param preDecodedImages Optional map of pre-decoded images keyed by Image node ID. When
-   *                         provided, the builder uses these images directly instead of decoding
-   *                         from encoded bytes.
-   * @return The root layer of the built layer tree.
+   * @param document The document to build from. Must have had applyLayout() called.
+   * @return The root layer of the built layer tree, or nullptr if document is null or layout was
+   *         not applied.
    */
-  static std::shared_ptr<tgfx::Layer> Build(PAGXDocument* document,
-                                            TextLayout* textLayout = nullptr,
-                                            int maxImageDimension = 0);
+  static std::shared_ptr<tgfx::Layer> Build(PAGXDocument* document);
 
   /**
    * Builds a layer tree and returns a mapping from PAGX Layer nodes to tgfx::Layer objects. This
    * mapping allows callers to look up the rendered layer for any PAGX Layer node.
-   * @param document The document to build from.
-   * @param textLayout Optional text layout for text rendering. If nullptr, a default TextLayout is
-   *                   created internally. Pass a custom TextLayout to use registered typefaces
-   *                   and fallback fonts.
-   * @param maxImageDimension Maximum allowed image dimension (width or height). Images exceeding
-   *                          this limit will be scaled down proportionally. A value of 0 means no
-   *                          limit. Useful for memory-constrained environments like WASM.
+   * @param document The document to build from. Must have had applyLayout() called.
    * @return A LayerBuildResult containing the root layer and a mapping from PAGX Layer nodes to
-   *         their corresponding tgfx::Layer objects.
+   *         their corresponding tgfx::Layer objects. Returns empty result if document is null or
+   *         layout was not applied.
    */
-  static LayerBuildResult BuildWithMap(PAGXDocument* document, TextLayout* textLayout = nullptr,
-                                       int maxImageDimension = 0);
+  static LayerBuildResult BuildWithMap(PAGXDocument* document);
 };
 
 }  // namespace pagx

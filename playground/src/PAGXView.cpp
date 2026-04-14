@@ -105,7 +105,7 @@ void PAGXView::registerFonts(const val& fontVal, const val& emojiFontVal) {
       fallbackTypefaces.push_back(std::move(typeface));
     }
   }
-  textLayout.addFallbackTypefaces(std::move(fallbackTypefaces));
+  fontConfig.addFallbackTypefaces(std::move(fallbackTypefaces));
 }
 
 void PAGXView::loadPAGX(const val& pagxData) {
@@ -144,7 +144,8 @@ void PAGXView::buildLayers() {
   if (!document) {
     return;
   }
-  contentLayer = LayerBuilder::Build(document.get(), &textLayout);
+  document->applyLayout(&fontConfig);
+  contentLayer = LayerBuilder::Build(document.get());
   if (!contentLayer) {
     return;
   }
@@ -162,13 +163,13 @@ void PAGXView::updateSize() {
   if (window == nullptr) {
     return;
   }
-  window->invalidSize();
+  surface = nullptr;
   auto device = window->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
     return;
   }
-  auto surface = window->getSurface(context);
+  surface = tgfx::Surface::MakeFrom(context, window);
   if (surface == nullptr) {
     device->unlock();
     return;
@@ -236,7 +237,8 @@ void PAGXView::draw() {
   double frameStartMs = emscripten_get_now();
   bool hasContentChanged = displayList.hasContentChanged();
   bool hasLastRecording = (lastRecording != nullptr);
-  if (!hasContentChanged && !hasLastRecording) {
+  bool needsInitialFrame = presentImmediately || backgroundLayer == nullptr;
+  if (!hasContentChanged && !hasLastRecording && !needsInitialFrame) {
     return;
   }
   auto device = window->getDevice();
@@ -244,7 +246,9 @@ void PAGXView::draw() {
   if (context == nullptr) {
     return;
   }
-  auto surface = window->getSurface(context);
+  if (surface == nullptr) {
+    surface = tgfx::Surface::MakeFrom(context, window);
+  }
   if (surface == nullptr) {
     device->unlock();
     return;
@@ -271,13 +275,11 @@ void PAGXView::draw() {
     presentImmediately = false;
     if (recording) {
       context->submit(std::move(recording));
-      window->present(context);
     }
   } else {
     std::swap(lastRecording, recording);
     if (recording) {
       context->submit(std::move(recording));
-      window->present(context);
     }
   }
   device->unlock();

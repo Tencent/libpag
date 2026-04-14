@@ -1,0 +1,20 @@
+<pagx version="1.0" width="400" height="300">
+  <Layer width="400" height="300" layout="horizontal">
+    <Layer id="ok1" width="100" height="100">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#10B981"/>
+    </Layer>
+    <Layer id="ok2" width="100" height="100">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#3B82F6"/>
+    </Layer>
+    <Layer id="bad" width="0" height="100">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#EF4444"/>
+    </Layer>
+    <Layer id="ok3" width="100" height="100">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#F59E0B"/>
+    </Layer>
+  </Layer>
+</pagx>

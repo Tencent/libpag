@@ -175,6 +175,11 @@ For each issue you receive:
    context that makes this a non-issue (e.g., invariants guaranteed by callers, platform
    constraints, intentional design)? Does the code actually behave as the reviewer
    claims? Look for the strongest counter-argument you can find.
+   - For cross-module "inconsistency" claims: read the type definitions at both
+     locations — different libraries may use different conventions (coordinate systems,
+     sign conventions) that make surface-level differences correct. REJECT if the
+     reviewer's evidence is limited to "these two snippets look different" without
+     confirming both operate under the same conventions.
 3. Output for each issue:
    - Verdict: REJECT or CONFIRM
    - Reasoning: for REJECT, state the concrete counter-argument. For CONFIRM, briefly

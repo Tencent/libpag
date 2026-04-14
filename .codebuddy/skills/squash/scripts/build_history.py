@@ -249,9 +249,12 @@ def append_extra_commits(worktree_path, repo_dir, base_commit, end_commit):
     merging is involved — each commit simply takes the exact tree from the
     original commit.
 
+    Collects ALL commits in the range (no --first-parent), including commits
+    reachable through merge branches, to avoid losing sideline histories.
+
     Returns the number of commits appended.
     """
-    commits_raw = git(repo_dir, "log", "--first-parent", "--format=%H",
+    commits_raw = git(repo_dir, "log", "--format=%H",
                       f"{base_commit}..{end_commit}")
     if not commits_raw:
         return 0
@@ -308,11 +311,26 @@ def main():
     squash_end = decision["squash_end"]
     actions = decision["actions"]
     session_dir = decision["session_dir"]
+
+    # Validate that the branch exists (prevent operating on a wrong branch
+    # if decision.json was manually modified).
+    try:
+        git(repo_dir, "rev-parse", "--verify", f"refs/heads/{branch}")
+    except GitError:
+        print(f"ERROR: Branch '{branch}' not found in repository.",
+              file=sys.stderr)
+        sys.exit(1)
+
     tmp_branch = TMP_PREFIX + branch.replace("/", "-")
     worktree_path = os.path.join(session_dir, "worktree")
 
     # --- Validate environment ---
-    is_shallow = git(repo_dir, "rev-parse", "--is-shallow-repository")
+    try:
+        is_shallow = git(repo_dir, "rev-parse", "--is-shallow-repository")
+    except GitError:
+        # Older git versions don't support this check; assume not shallow
+        is_shallow = "false"
+    
     if is_shallow == "true":
         print(
             "ERROR: Shallow clone detected. Cannot safely rewrite history.\n"
@@ -383,8 +401,11 @@ def main():
 
     # --- Auto-append commits added after squash_end ---
     branch_ref = f"refs/heads/{branch}"
-    current_head = git(repo_dir, "rev-parse", branch_ref)
     appended_count = 0
+
+    # Re-read current_head immediately before appending to minimize window.
+    # If new commits were added to the branch since we started, append them.
+    current_head = git(repo_dir, "rev-parse", branch_ref)
 
     if current_head != squash_end:
         try:

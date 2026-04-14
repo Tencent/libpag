@@ -28,6 +28,7 @@
 #include "pagx/svg/SVGBlendMode.h"
 #include "pagx/svg/SVGParserContext.h"
 #include "pagx/svg/SVGPathParser.h"
+#include "pagx/types/TextBaseline.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
 
@@ -107,31 +108,52 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
   }
 
   // Parse viewBox and dimensions.
-  // When viewBox is present, use viewBox dimensions for the PAGX document size,
-  // because PAGX doesn't support viewBox and all SVG coordinates are in viewBox space.
-  // The explicit width/height with unit conversions (e.g., "1080pt" -> 1440px) are ignored
-  // to avoid coordinate mismatch.
+  // viewBox defines the content coordinate space (sourceW × sourceH). The final document
+  // size (targetW × targetH) is determined by: external target > SVG width/height > viewBox.
+  // When targetW × targetH differs from sourceW × sourceH, a uniform scale + center offset
+  // matrix is applied to map content into the target area.
   auto viewBox = parseViewBox(getAttribute(root, "viewBox"));
-  float width = 0;
-  float height = 0;
+  float sourceW = 0;
+  float sourceH = 0;
 
   if (viewBox.size() >= 4) {
     _viewBoxWidth = viewBox[2];
     _viewBoxHeight = viewBox[3];
-    width = _viewBoxWidth;
-    height = _viewBoxHeight;
+    sourceW = _viewBoxWidth;
+    sourceH = _viewBoxHeight;
   } else {
-    width = parseLength(getAttribute(root, "width"), 0);
-    height = parseLength(getAttribute(root, "height"), 0);
-    _viewBoxWidth = width;
-    _viewBoxHeight = height;
+    sourceW = parseLength(getAttribute(root, "width"), 0);
+    sourceH = parseLength(getAttribute(root, "height"), 0);
+    _viewBoxWidth = sourceW;
+    _viewBoxHeight = sourceH;
   }
 
-  if (width <= 0 || height <= 0) {
+  if (sourceW <= 0 || sourceH <= 0) {
     return nullptr;
   }
 
-  _document = PAGXDocument::Make(width, height);
+  // Determine target dimensions: external target > SVG explicit size > viewBox size.
+  float targetW = sourceW;
+  float targetH = sourceH;
+  bool hasExternalTarget = !std::isnan(_options.targetWidth) && !std::isnan(_options.targetHeight);
+  if (hasExternalTarget) {
+    targetW = _options.targetWidth;
+    targetH = _options.targetHeight;
+  } else if (viewBox.size() >= 4) {
+    // When viewBox is present, check if SVG has explicit width/height that differ.
+    float svgW = parseLength(getAttribute(root, "width"), 0);
+    float svgH = parseLength(getAttribute(root, "height"), 0);
+    if (svgW > 0 && svgH > 0) {
+      targetW = svgW;
+      targetH = svgH;
+    }
+  }
+
+  if (targetW <= 0 || targetH <= 0) {
+    return nullptr;
+  }
+
+  _document = PAGXDocument::Make(targetW, targetH);
   parseCustomData(root, _document.get());
 
   // Collect all IDs from the SVG to avoid conflicts when generating new IDs.
@@ -168,18 +190,21 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
   // This determines which ColorSources should be extracted to resources.
   countColorSourceReferences(root);
 
-  // Handle viewBox offset if present (viewBox origin is not 0,0).
-  bool needsViewBoxTransform = false;
-  Matrix viewBoxMatrix = Matrix::Identity();
-  if (viewBox.size() >= 4) {
-    float viewBoxX = viewBox[0];
-    float viewBoxY = viewBox[1];
+  // Compute content transform matrix for viewBox mapping.
+  // This handles viewBox origin offset, uniform scaling, and centering in one matrix.
+  float viewBoxX = (viewBox.size() >= 4) ? viewBox[0] : 0;
+  float viewBoxY = (viewBox.size() >= 4) ? viewBox[1] : 0;
+  bool needsContentTransform = false;
+  Matrix contentMatrix = Matrix::Identity();
 
-    if (viewBoxX != 0 || viewBoxY != 0) {
-      // Only translate for non-zero viewBox origin.
-      viewBoxMatrix = Matrix::Translate(-viewBoxX, -viewBoxY);
-      needsViewBoxTransform = true;
-    }
+  if (targetW != sourceW || targetH != sourceH || viewBoxX != 0 || viewBoxY != 0) {
+    float scaleX = targetW / sourceW;
+    float scaleY = targetH / sourceH;
+    float scale = std::min(scaleX, scaleY);
+    float offsetX = (targetW - sourceW * scale) / 2.0f - viewBoxX * scale;
+    float offsetY = (targetH - sourceH * scale) / 2.0f - viewBoxY * scale;
+    contentMatrix = {scale, 0, 0, scale, offsetX, offsetY};
+    needsContentTransform = !contentMatrix.isIdentity();
   }
 
   // Compute initial inherited style from the root <svg> element.
@@ -212,15 +237,27 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
   // Merge adjacent layers with the same geometry (optimize Fill + Stroke into one Layer).
   mergeAdjacentLayers(convertedLayers);
 
-  // If viewBox transform is needed, wrap in a root layer with the transform.
-  // Otherwise, add layers directly to document (no root wrapper).
-  if (needsViewBoxTransform) {
-    auto rootLayer = _document->makeNode<Layer>();
-    rootLayer->matrix = viewBoxMatrix;
-    for (auto& layer : convertedLayers) {
-      rootLayer->children.push_back(layer);
+  // Apply content transform if needed. When there is exactly one converted layer, embed
+  // the transform as a Group inside that layer (avoids an extra wrapper layer). Otherwise,
+  // wrap all layers in a root layer with the transform matrix.
+  if (needsContentTransform) {
+    if (convertedLayers.size() == 1) {
+      auto* singleLayer = convertedLayers[0];
+      auto* group = _document->makeNode<Group>();
+      group->elements = std::move(singleLayer->contents);
+      group->position = {contentMatrix.tx, contentMatrix.ty};
+      group->scale = {contentMatrix.a, contentMatrix.d};
+      singleLayer->contents.clear();
+      singleLayer->contents.push_back(group);
+      _document->layers.push_back(singleLayer);
+    } else {
+      auto rootLayer = _document->makeNode<Layer>();
+      rootLayer->matrix = contentMatrix;
+      for (auto& layer : convertedLayers) {
+        rootLayer->children.push_back(layer);
+      }
+      _document->layers.push_back(rootLayer);
     }
-    _document->layers.push_back(rootLayer);
   } else {
     for (auto& layer : convertedLayers) {
       _document->layers.push_back(layer);
@@ -784,6 +821,8 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
 
     // Font size already resolved above.
     text->fontSize = currentFontSize;
+    // SVG <text> y attribute specifies the alphabetic baseline position.
+    text->baseline = TextBaseline::Alphabetic;
 
     // Font weight: element attribute > inherited style.
     // SVG font-weight maps to fontStyle in PAGX (e.g., "Bold", "Light").

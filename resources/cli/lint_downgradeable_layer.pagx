@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test file for lint: child Layers that use no Layer-exclusive features -->
+<pagx version="1.0" width="400" height="300">
+  <Layer name="root" width="400" height="300">
+    <Layer name="parent" width="300" height="200">
+      <Layer>
+        <Rectangle size="100,50"/>
+        <Fill color="#FF0000"/>
+      </Layer>
+      <Layer>
+        <Rectangle size="100,50"/>
+        <Fill color="#0000FF"/>
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>
