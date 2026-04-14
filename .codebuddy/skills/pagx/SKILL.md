@@ -55,7 +55,7 @@ all other CLI commands (`render`, `format`, `layout`, `bounds`, `font`, `import`
 ## Generation Workflow
 
 **When**: User asks to create, write, design, or modify a PAGX file from a text
-description, reference image, or design spec.
+description, reference image, or design intent.
 
 Before writing any PAGX code, read `references/guide.md` (spec rules, techniques,
 and especially §Common Pitfalls) and `references/patterns.md` (structural patterns
