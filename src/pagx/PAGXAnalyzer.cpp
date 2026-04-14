@@ -81,6 +81,9 @@ bool PAGXAnalyzer::CanDowngradeLayerToGroup(const Layer* layer) {
       !std::isnan(layer->bottom) || !std::isnan(layer->centerX) || !std::isnan(layer->centerY)) {
     return false;
   }
+  if (layer->alpha != 1.0f) {
+    return false;
+  }
   return layer->includeInLayout;
 }
 

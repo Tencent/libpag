@@ -22,9 +22,13 @@
 #include <unordered_map>
 #include <unordered_set>
 #include "pagx/PAGXAnalyzer.h"
-#include "pagx/nodes/Ellipse.h"
+#include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
+#include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/Path.h"
@@ -32,6 +36,7 @@
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/Text.h"
 
 namespace pagx {
 
@@ -118,7 +123,6 @@ static bool HaveSamePainterSuffix(const Group* a, const Group* b) {
 static bool RemoveEmptyGroups(std::vector<Element*>& elements);
 static bool UnwrapRedundantFirstChildGroup(std::vector<Element*>& elements);
 static bool MergeConsecutiveGroups(std::vector<Element*>& elements);
-static bool ConvertPathsToPrimitives(std::vector<Element*>& elements, PAGXDocument* doc);
 
 static void OptimizeElements(std::vector<Element*>& elements, PAGXDocument* doc, bool& changed) {
   for (auto* element : elements) {
@@ -135,9 +139,6 @@ static void OptimizeElements(std::vector<Element*>& elements, PAGXDocument* doc,
     changed = true;
   }
   if (MergeConsecutiveGroups(elements)) {
-    changed = true;
-  }
-  if (ConvertPathsToPrimitives(elements, doc)) {
     changed = true;
   }
 }
@@ -219,48 +220,6 @@ static bool MergeConsecutiveGroups(std::vector<Element*>& elements) {
       changed = true;
     }
     i = j;
-  }
-  return changed;
-}
-
-static void CopyShapeAttrs(const Path* src, LayoutNode* dst) {
-  dst->left = src->left;
-  dst->right = src->right;
-  dst->top = src->top;
-  dst->bottom = src->bottom;
-  dst->centerX = src->centerX;
-  dst->centerY = src->centerY;
-}
-
-static bool ConvertPathsToPrimitives(std::vector<Element*>& elements, PAGXDocument* doc) {
-  bool changed = false;
-  for (size_t i = 0; i < elements.size(); i++) {
-    if (elements[i]->nodeType() != NodeType::Path) {
-      continue;
-    }
-    auto* path = static_cast<Path*>(elements[i]);
-    RectInfo rectInfo;
-    EllipseInfo ellipseInfo;
-    auto primitive = PAGXAnalyzer::DetectPathPrimitive(path, &rectInfo, &ellipseInfo);
-    if (primitive == PathPrimitive::Rectangle) {
-      auto* rect = doc->makeNode<Rectangle>();
-      rect->position = {rectInfo.cx + path->position.x, rectInfo.cy + path->position.y};
-      rect->size = {rectInfo.w, rectInfo.h};
-      rect->reversed = path->reversed;
-      rect->customData = path->customData;
-      CopyShapeAttrs(path, rect);
-      elements[i] = rect;
-      changed = true;
-    } else if (primitive == PathPrimitive::Ellipse) {
-      auto* ellipse = doc->makeNode<Ellipse>();
-      ellipse->position = {ellipseInfo.cx + path->position.x, ellipseInfo.cy + path->position.y};
-      ellipse->size = {ellipseInfo.w, ellipseInfo.h};
-      ellipse->reversed = path->reversed;
-      ellipse->customData = path->customData;
-      CopyShapeAttrs(path, ellipse);
-      elements[i] = ellipse;
-      changed = true;
-    }
   }
   return changed;
 }
@@ -465,6 +424,34 @@ static bool DeduplicatePathData(PAGXDocument* document) {
 // Unreferenced resource cleanup
 // ============================================================================
 
+static void CollectRefsFromColorSource(const ColorSource* color, std::unordered_set<Node*>& refs) {
+  if (color == nullptr) {
+    return;
+  }
+  refs.insert(const_cast<ColorSource*>(color));
+  if (color->nodeType() == NodeType::ImagePattern) {
+    auto* pattern = static_cast<const ImagePattern*>(color);
+    if (pattern->image != nullptr) {
+      refs.insert(pattern->image);
+    }
+  }
+}
+
+static void CollectRefsFromFont(const Font* font, std::unordered_set<Node*>& refs) {
+  if (font == nullptr) {
+    return;
+  }
+  refs.insert(const_cast<Font*>(font));
+  for (auto* glyph : font->glyphs) {
+    if (glyph->path != nullptr) {
+      refs.insert(glyph->path);
+    }
+    if (glyph->image != nullptr) {
+      refs.insert(glyph->image);
+    }
+  }
+}
+
 static void CollectRefsFromElements(const std::vector<Element*>& elements,
                                     std::unordered_set<Node*>& refs) {
   for (auto* element : elements) {
@@ -479,13 +466,15 @@ static void CollectRefsFromElements(const std::vector<Element*>& elements,
       CollectRefsFromElements(group->elements, refs);
     } else if (type == NodeType::Fill) {
       auto* fill = static_cast<Fill*>(element);
-      if (fill->color != nullptr) {
-        refs.insert(fill->color);
-      }
+      CollectRefsFromColorSource(fill->color, refs);
     } else if (type == NodeType::Stroke) {
       auto* stroke = static_cast<Stroke*>(element);
-      if (stroke->color != nullptr) {
-        refs.insert(stroke->color);
+      CollectRefsFromColorSource(stroke->color, refs);
+    } else if (type == NodeType::Text) {
+      auto* text = static_cast<Text*>(element);
+      for (auto* glyphRun : text->glyphRuns) {
+        refs.insert(glyphRun);
+        CollectRefsFromFont(glyphRun->font, refs);
       }
     }
   }
@@ -500,6 +489,9 @@ static void CollectRefsFromLayer(Layer* layer, std::unordered_set<Node*>& refs) 
   if (layer->mask != nullptr) {
     refs.insert(layer->mask);
     CollectRefsFromLayer(layer->mask, refs);
+  }
+  if (layer->composition != nullptr) {
+    refs.insert(layer->composition);
   }
 }
 

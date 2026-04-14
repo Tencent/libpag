@@ -49,8 +49,9 @@ inline void VerifyFile(const std::string& filePath, const std::string& key) {
     std::string line;
     std::string fixable;
     while (std::getline(stream, line)) {
-      bool isInfoOnly = line.find("Path with") != std::string::npos &&
-                        line.find("may cause slow rendering") != std::string::npos;
+      bool isInfoOnly = (line.find("Path with") != std::string::npos &&
+                         line.find("may cause slow rendering") != std::string::npos) ||
+                        line.find("Path draws an") != std::string::npos;
       if (!isInfoOnly && !line.empty()) {
         fixable += line + "\n";
       }

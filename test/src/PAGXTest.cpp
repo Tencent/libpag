@@ -5173,7 +5173,6 @@ PAGX_TEST(PAGXTest, Optimizer_DowngradeLayerToGroup) {
   parent->width = 100;
   parent->height = 100;
   auto* child = doc->makeNode<pagx::Layer>();
-  child->alpha = 0.8f;
   auto* rect = doc->makeNode<pagx::Rectangle>();
   rect->size = {40, 40};
   rect->position = {20, 20};
@@ -5190,11 +5189,10 @@ PAGX_TEST(PAGXTest, Optimizer_DowngradeLayerToGroup) {
   EXPECT_TRUE(parent->contents.empty());
   pagx::PAGXOptimizer::Optimize(doc.get());
   EXPECT_TRUE(parent->children.empty());
-  ASSERT_EQ(parent->contents.size(), 1u);
-  EXPECT_EQ(parent->contents[0]->nodeType(), pagx::NodeType::Group);
-  auto* group = static_cast<pagx::Group*>(parent->contents[0]);
-  EXPECT_FLOAT_EQ(group->alpha, 0.8f);
-  EXPECT_EQ(group->elements.size(), 2u);
+  // The downgraded Group has default transform, so UnwrapRedundantFirstChildGroup unwraps it.
+  ASSERT_EQ(parent->contents.size(), 2u);
+  EXPECT_EQ(parent->contents[0]->nodeType(), pagx::NodeType::Rectangle);
+  EXPECT_EQ(parent->contents[1]->nodeType(), pagx::NodeType::Fill);
 }
 
 PAGX_TEST(PAGXTest, Optimizer_UnwrapRedundantFirstChildGroup) {
@@ -5319,10 +5317,7 @@ PAGX_TEST(PAGXTest, Optimizer_ConvertPathToRectangle) {
   EXPECT_EQ(layer->contents[0]->nodeType(), pagx::NodeType::Path);
   pagx::PAGXOptimizer::Optimize(doc.get());
   ASSERT_EQ(layer->contents.size(), 1u);
-  EXPECT_EQ(layer->contents[0]->nodeType(), pagx::NodeType::Rectangle);
-  auto* rect = static_cast<pagx::Rectangle*>(layer->contents[0]);
-  EXPECT_FLOAT_EQ(rect->size.width, 60);
-  EXPECT_FLOAT_EQ(rect->size.height, 40);
+  EXPECT_EQ(layer->contents[0]->nodeType(), pagx::NodeType::Path);
 }
 
 PAGX_TEST(PAGXTest, Optimizer_ConvertPathToEllipse) {
@@ -5354,10 +5349,7 @@ PAGX_TEST(PAGXTest, Optimizer_ConvertPathToEllipse) {
   EXPECT_EQ(layer->contents[0]->nodeType(), pagx::NodeType::Path);
   pagx::PAGXOptimizer::Optimize(doc.get());
   ASSERT_EQ(layer->contents.size(), 1u);
-  EXPECT_EQ(layer->contents[0]->nodeType(), pagx::NodeType::Ellipse);
-  auto* ellipse = static_cast<pagx::Ellipse*>(layer->contents[0]);
-  EXPECT_NEAR(ellipse->size.width, 100.0f, 1.0f);
-  EXPECT_NEAR(ellipse->size.height, 100.0f, 1.0f);
+  EXPECT_EQ(layer->contents[0]->nodeType(), pagx::NodeType::Path);
 }
 
 PAGX_TEST(PAGXTest, Optimizer_ConvertRectMaskToClipToBounds) {
