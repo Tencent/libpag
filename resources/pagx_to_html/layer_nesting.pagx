@@ -22,39 +22,44 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="vertical" alignment="center" arrangement="center">
+    <Layer flex="1">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <Layer width="300" height="190">
-  <!-- Nesting demo -->
-  <Layer name="Parent" x="60" y="78">
-    <Rectangle position="80,80" size="140,140" roundness="16"/>
-    <Fill color="#E2E8F0"/>
-    <Layer name="Child1" x="10" y="10">
-      <Rectangle position="30,30" size="50,50" roundness="6"/>
-      <Fill color="#3B82F6"/>
-    </Layer>
-    <Layer name="Child2" x="40" y="40">
-      <Rectangle position="30,30" size="50,50" roundness="6"/>
-      <Fill color="#EF4444"/>
-    </Layer>
-  </Layer>
+      <!-- Content: shapes left, labels right -->
+      <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" padding="16" gap="12" alignment="center" arrangement="center">
+        <!-- Nesting demo -->
+        <Layer width="150" height="150">
+          <Layer name="Parent" x="0" y="0">
+            <Rectangle position="75,75" size="130,130" roundness="16"/>
+            <Fill color="#E2E8F0"/>
+            <Layer name="Child1" x="10" y="10">
+              <Rectangle position="30,30" size="50,50" roundness="6"/>
+              <Fill color="#3B82F6"/>
+            </Layer>
+            <Layer name="Child2" x="40" y="40">
+              <Rectangle position="30,30" size="50,50" roundness="6"/>
+              <Fill color="#EF4444"/>
+            </Layer>
+          </Layer>
+        </Layer>
 
-  <!-- Labels -->
-  <Layer>
-    <Text text="Parent (gray)" fontFamily="Arial" fontSize="9" position="220,135"/>
-    <Fill color="#64748B"/>
-  </Layer>
-  <Layer>
-    <Text text="Child1 (blue)" fontFamily="Arial" fontSize="9" position="220,150"/>
-    <Fill color="#3B82F6"/>
-  </Layer>
-  <Layer>
-    <Text text="Child2 (red, on top)" fontFamily="Arial" fontSize="9" position="220,165"/>
-    <Fill color="#EF4444"/>
-  </Layer>
+        <!-- Labels -->
+        <Layer layout="vertical" gap="6" alignment="start" arrangement="center">
+          <Layer height="14">
+            <Text text="Parent (gray)" fontFamily="Arial" fontSize="9" position="0,0"/>
+            <Fill color="#64748B"/>
+          </Layer>
+          <Layer height="14">
+            <Text text="Child1 (blue)" fontFamily="Arial" fontSize="9" position="0,0"/>
+            <Fill color="#3B82F6"/>
+          </Layer>
+          <Layer height="14">
+            <Text text="Child2 (red, on top)" fontFamily="Arial" fontSize="9" position="0,0"/>
+            <Fill color="#EF4444"/>
+          </Layer>
+        </Layer>
       </Layer>
     </Layer>
   </Layer>
