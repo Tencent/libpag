@@ -1179,7 +1179,7 @@ static void DetectDowngradableLayers(const Layer* parentLayer,
 // ============================================================================
 
 static void DetectMergeableAdjacentLayers(const std::vector<Layer*>& layers, bool hasLayout,
-                                          bool hasContents,
+                                          bool dedupWithDowngrade,
                                           std::vector<VerifyDiagnostic>& diagnostics) {
   if (hasLayout) {
     return;
@@ -1187,9 +1187,9 @@ static void DetectMergeableAdjacentLayers(const std::vector<Layer*>& layers, boo
   if (layers.size() < 2) {
     return;
   }
-  // Skip when all children are downgradable and parent has no contents — already covered by
-  // DetectDowngradableLayers.
-  if (!hasContents) {
+  // When DetectDowngradableLayers already covers this parent (no contents, no layout), skip if
+  // all children are downgradable to avoid duplicate diagnostics.
+  if (dedupWithDowngrade) {
     bool allDowngradable = true;
     for (auto* layer : layers) {
       if (!CanDowngradeLayerToGroup(layer)) {
@@ -1495,8 +1495,10 @@ static void RunStaticDetectionOnLayer(const Layer* layer, float canvasWidth, flo
   DetectFullCanvasClipMask(layer, canvasWidth, canvasHeight, diagnostics);
   DetectIneffectiveLayoutAttrs(layer, parentHasLayout, diagnostics);
   DetectDowngradableLayers(layer, diagnostics);
+  // Dedup with DetectDowngradableLayers: it fires when parent has no contents and no layout.
+  bool dedupWithDowngrade = layer->contents.empty() && layer->layout == LayoutMode::None;
   DetectMergeableAdjacentLayers(layer->children, layer->layout != LayoutMode::None,
-                                !layer->contents.empty(), diagnostics);
+                                dedupWithDowngrade, diagnostics);
   DetectLowOpacityHighCost(layer, diagnostics);
   DetectRectangularMask(layer, diagnostics);
 
@@ -1533,7 +1535,8 @@ static void RunStaticDetection(const PAGXDocument* doc, const LineNodeMap& lineN
     DetectDuplicatePathData(doc, lineNodeMap, diagnostics);
     DetectDuplicateGradients(doc, lineNodeMap, diagnostics);
     DetectStructurallyIdenticalLayers(doc, lineNodeMap, diagnostics);
-    // Root-level merge detection on doc->layers.
+    // Root-level merge detection on doc->layers. No dedup needed — DetectDowngradableLayers
+    // does not run at root level.
     DetectMergeableAdjacentLayers(doc->layers, false, false, diagnostics);
     for (auto* layer : doc->layers) {
       RunStaticDetectionOnLayer(layer, doc->width, doc->height, false, lineNodeMap, diagnostics);
