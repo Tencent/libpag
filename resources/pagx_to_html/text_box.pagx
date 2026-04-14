@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: TextBox → div with text-align, paragraphAlign, writingMode, lineHeight, wordWrap, overflow, size -->
-<pagx version="1.0" width="450" height="460">
+<pagx version="1.0" width="450" height="480">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -21,96 +21,116 @@
       </Layer>
     </Layer>
 
-    <!-- Card - internal content uses absolute positioning for TextBox demos -->
+    <!-- Card -->
     <Layer flex="1">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <!-- Horizontal text box: textAlign=center, paragraphAlign=middle -->
-      <Layer>
-        <Rectangle position="110,120" size="160,100" roundness="8"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-      </Layer>
-      <Layer>
-        <Text text="Centered in Box" fontFamily="Arial" fontSize="18" position="10,10"/>
-        <TextBox position="30,70" size="160,100" textAlign="center" paragraphAlign="middle"/>
-        <Fill color="#1F2937"/>
-      </Layer>
-      <Layer>
-        <Text text="center + middle" fontFamily="Arial" fontSize="8" position="110,180" textAnchor="center"/>
-        <Fill color="#94A3B8"/>
-      </Layer>
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16" gap="12" alignment="stretch">
 
-      <!-- textAlign=justify + lineHeight -->
-      <Layer>
-        <Rectangle position="310,120" size="160,100" roundness="8"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-      </Layer>
-      <Layer>
-        <Text text="This is a longer text that should wrap and be justified in the box." fontFamily="Arial" fontSize="14" position="10,10"/>
-        <TextBox position="230,70" size="160,100" textAlign="justify" lineHeight="22"/>
-        <Fill color="#3B82F6"/>
-      </Layer>
-      <Layer>
-        <Text text="justify + lineHeight" fontFamily="Arial" fontSize="8" position="310,180" textAnchor="center"/>
-        <Fill color="#94A3B8"/>
-      </Layer>
+        <!-- Row 1: center+middle | justify+lineHeight -->
+        <Layer layout="horizontal" gap="16" alignment="stretch" arrangement="center">
 
-      <!-- writingMode=vertical -->
-      <Layer>
-        <Rectangle position="60,278" size="60,150" roundness="8"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-      </Layer>
-      <Layer>
-        <Text text="竖排文字" fontFamily="Arial" fontSize="18" position="10,10"/>
-        <TextBox position="30,203" size="60,150" writingMode="vertical"/>
-        <Fill color="#8B5CF6"/>
-      </Layer>
-      <Layer>
-        <Text text="vertical" fontFamily="Arial" fontSize="8" position="60,363" textAnchor="center"/>
-        <Fill color="#94A3B8"/>
-      </Layer>
+          <!-- textAlign=center, paragraphAlign=middle -->
+          <Layer flex="1" layout="vertical" gap="4" alignment="center">
+            <Layer width="160" height="100">
+              <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+              <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+              <TextBox left="0" right="0" top="0" bottom="0" textAlign="center" paragraphAlign="middle">
+                <Text text="Centered in Box" fontFamily="Arial" fontSize="18"/>
+                <Fill color="#1F2937"/>
+              </TextBox>
+            </Layer>
+            <Layer height="10">
+              <Text text="center + middle" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#94A3B8"/>
+            </Layer>
+          </Layer>
 
-      <!-- overflow=hidden -->
-      <Layer>
-        <Rectangle position="170,258" size="120,60" roundness="8"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-      </Layer>
-      <Layer>
-        <Text text="This long text should be clipped by overflow hidden." fontFamily="Arial" fontSize="14" position="10,10"/>
-        <TextBox position="110,228" size="120,60" overflow="hidden" paragraphAlign="far"/>
-        <Fill color="#EF4444"/>
-      </Layer>
-      <Layer>
-        <Text text="overflow=hidden" fontFamily="Arial" fontSize="8" position="170,298" textAnchor="center"/>
-        <Fill color="#94A3B8"/>
-      </Layer>
+          <!-- textAlign=justify + lineHeight -->
+          <Layer flex="1" layout="vertical" gap="4" alignment="center">
+            <Layer width="160" height="100">
+              <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+              <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+              <TextBox left="0" right="0" top="0" bottom="0" textAlign="justify" lineHeight="22">
+                <Text text="This is a longer text that should wrap and be justified in the box." fontFamily="Arial" fontSize="14"/>
+                <Fill color="#3B82F6"/>
+              </TextBox>
+            </Layer>
+            <Layer height="10">
+              <Text text="justify + lineHeight" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#94A3B8"/>
+            </Layer>
+          </Layer>
+        </Layer>
 
-      <!-- size=0,0 → auto dimensions -->
-      <Layer>
-        <Text text="Auto sized box" fontFamily="Arial" fontSize="16" position="10,10"/>
-        <TextBox position="120,320" size="0,0"/>
-        <Fill color="#10B981"/>
-      </Layer>
-      <Layer>
-        <Text text="auto size" fontFamily="Arial" fontSize="8" position="170,348" textAnchor="center"/>
-        <Fill color="#94A3B8"/>
-      </Layer>
+        <!-- Row 2: vertical | overflow=hidden | wordWrap=false -->
+        <Layer layout="horizontal" gap="16" alignment="stretch" arrangement="center">
 
-      <!-- wordWrap=false -->
-      <Layer>
-        <Rectangle position="320,285" size="100,40" roundness="8"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-      </Layer>
-      <Layer>
-        <Text text="No word wrap long text" fontFamily="Arial" fontSize="14" position="10,10"/>
-        <TextBox position="270,265" size="100,40" wordWrap="false"/>
-        <Fill color="#F59E0B"/>
-      </Layer>
-      <Layer>
-        <Text text="no wrap" fontFamily="Arial" fontSize="8" position="320,315" textAnchor="center"/>
-        <Fill color="#94A3B8"/>
+          <!-- writingMode=vertical -->
+          <Layer layout="vertical" gap="4" alignment="center">
+            <Layer width="60" height="150">
+              <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+              <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+              <TextBox left="0" right="0" top="0" bottom="0" writingMode="vertical">
+                <Text text="竖排文字" fontFamily="Arial" fontSize="18"/>
+                <Fill color="#8B5CF6"/>
+              </TextBox>
+            </Layer>
+            <Layer height="10">
+              <Text text="vertical" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#94A3B8"/>
+            </Layer>
+          </Layer>
+
+          <!-- overflow=hidden -->
+          <Layer layout="vertical" gap="4" alignment="center">
+            <Layer width="120" height="60">
+              <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+              <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+              <TextBox left="0" right="0" top="0" bottom="0" overflow="hidden" paragraphAlign="far">
+                <Text text="This long text should be clipped by overflow hidden." fontFamily="Arial" fontSize="14"/>
+                <Fill color="#EF4444"/>
+              </TextBox>
+            </Layer>
+            <Layer height="10">
+              <Text text="overflow=hidden" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#94A3B8"/>
+            </Layer>
+          </Layer>
+
+          <!-- wordWrap=false -->
+          <Layer layout="vertical" gap="4" alignment="center">
+            <Layer width="100" height="40">
+              <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+              <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+              <TextBox left="0" right="0" top="0" bottom="0" wordWrap="false">
+                <Text text="No word wrap long text" fontFamily="Arial" fontSize="14"/>
+                <Fill color="#F59E0B"/>
+              </TextBox>
+            </Layer>
+            <Layer height="10">
+              <Text text="no wrap" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#94A3B8"/>
+            </Layer>
+          </Layer>
+        </Layer>
+
+        <!-- Row 3: auto size -->
+        <Layer layout="horizontal" gap="16" alignment="center" arrangement="center">
+          <Layer layout="vertical" gap="4" alignment="center">
+            <Layer>
+              <Text text="Auto sized box" fontFamily="Arial" fontSize="16"/>
+              <Fill color="#10B981"/>
+            </Layer>
+            <Layer height="10">
+              <Text text="auto size (no TextBox)" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#94A3B8"/>
+            </Layer>
+          </Layer>
+        </Layer>
+
       </Layer>
     </Layer>
   </Layer>
