@@ -810,7 +810,7 @@ CLI_TEST(PAGXCliTest, Verify_PathNonPrimitive) {
   auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
-  (void)ret;
+  EXPECT_NE(ret, 0);
   // Diamond (M L L L Z) should NOT be reported as a rectangle (edges not axis-aligned).
   EXPECT_TRUE(output.find("Path draws an axis-aligned rectangle") == std::string::npos);
 }
@@ -2620,9 +2620,10 @@ CLI_TEST(PAGXCliTest, Verify_PainterLeakClean) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
+  EXPECT_NE(ret, 0);
   EXPECT_EQ(output.find("painter leaks geometry"), std::string::npos);
 }
 
