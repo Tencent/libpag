@@ -29,10 +29,10 @@
 
       <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="14" gap="6" alignment="center" arrangement="center">
         <!-- Both shapes rendered by the same Fill+Stroke -->
-        <Layer width="210" height="110">
-          <Layer name="item">
-            <Rectangle position="58,55" size="90,90" roundness="8"/>
-            <Ellipse position="152,55" size="90,90"/>
+        <Layer flex="1">
+          <Layer name="item" centerX="0" centerY="0">
+            <Rectangle position="45,45" size="90,90" roundness="8"/>
+            <Ellipse position="135,45" size="90,90"/>
             <Fill color="#8B5CF6"/>
             <Stroke color="#FFFFFF" width="2"/>
           </Layer>
