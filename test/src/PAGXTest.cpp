@@ -23,7 +23,6 @@
 #include <fstream>
 #include <unordered_map>
 #include "cli/CommandResolve.h"
-#include "cli/CommandVerify.h"
 #include "pagx/FontConfig.h"
 #include "pagx/LayoutContext.h"
 #include "pagx/PAGXDocument.h"
@@ -74,20 +73,12 @@
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
 #include "utils/Baseline.h"
+#include "utils/PAGXTestUtils.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestUtils.h"
 
 namespace pag {
 using namespace tgfx;
-
-static int CallRun(int (*fn)(int, char*[]), std::vector<std::string> args) {
-  std::vector<char*> argv = {};
-  argv.reserve(args.size());
-  for (auto& arg : args) {
-    argv.push_back(arg.data());
-  }
-  return fn(static_cast<int>(argv.size()), argv.data());
-}
 
 static std::shared_ptr<pagx::PAGXDocument> LoadAndResolve(const std::string& filePath) {
   auto doc = pagx::PAGXImporter::FromFile(filePath);
@@ -96,30 +87,6 @@ static std::shared_ptr<pagx::PAGXDocument> LoadAndResolve(const std::string& fil
     doc = pagx::PAGXImporter::FromFile(filePath);
   }
   return doc;
-}
-
-static void VerifyFile(const std::string& filePath, const std::string& key) {
-  std::streambuf* oldErr = std::cerr.rdbuf();
-  std::ostringstream verifyErr;
-  std::cerr.rdbuf(verifyErr.rdbuf());
-  auto verifyRet =
-      CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", filePath});
-  std::cerr.rdbuf(oldErr);
-  if (verifyRet != 0) {
-    // Filter out informational warnings that cannot be auto-fixed (e.g. high path complexity).
-    auto output = verifyErr.str();
-    std::istringstream stream(output);
-    std::string line;
-    std::string fixable;
-    while (std::getline(stream, line)) {
-      bool isInfoOnly = line.find("Path with") != std::string::npos &&
-                        line.find("may cause slow rendering") != std::string::npos;
-      if (!isInfoOnly && !line.empty()) {
-        fixable += line + "\n";
-      }
-    }
-    EXPECT_TRUE(fixable.empty()) << "pagx verify failed for " << key << ":\n" << fixable;
-  }
 }
 
 static pagx::Layer* MakeTextLayer(pagx::PAGXDocument* doc, const std::string& content,

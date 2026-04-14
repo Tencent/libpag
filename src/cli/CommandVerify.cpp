@@ -34,6 +34,7 @@
 #include "cli/CommandResolve.h"
 #include "cli/FormatUtils.h"
 #include "cli/LayoutUtils.h"
+#include "pagx/PAGXAnalyzer.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
@@ -123,40 +124,18 @@ static std::string FormatBounds(float x, float y, float w, float h) {
 
 static void DetectEmptyLayer(const Layer* layer, bool parentHasLayout,
                              std::vector<VerifyDiagnostic>& diagnostics) {
-  if (!layer->contents.empty() || !layer->children.empty() || layer->composition != nullptr) {
-    return;
+  if (PAGXAnalyzer::IsEmptyLayer(layer, parentHasLayout)) {
+    AddDiagnostic(diagnostics, layer->sourceLine,
+                  "empty Layer with no content, children, or composition. "
+                  "Fix: check if this Layer is needed");
   }
-  if (!std::isnan(layer->width) || !std::isnan(layer->height)) {
-    return;
-  }
-  bool hasSizeDependentConstraint = (!std::isnan(layer->right) || !std::isnan(layer->bottom) ||
-                                     !std::isnan(layer->centerX) || !std::isnan(layer->centerY));
-  if (hasSizeDependentConstraint) {
-    return;
-  }
-  bool inParentLayout = parentHasLayout && layer->includeInLayout;
-  if (inParentLayout) {
-    return;
-  }
-  AddDiagnostic(diagnostics, layer->sourceLine,
-                "empty Layer with no content, children, or composition. "
-                "Fix: check if this Layer is needed");
 }
 
 static void DetectEmptyGroup(const Group* group, std::vector<VerifyDiagnostic>& diagnostics) {
-  if (!group->elements.empty()) {
-    return;
+  if (PAGXAnalyzer::IsEmptyGroup(group)) {
+    AddDiagnostic(diagnostics, group->sourceLine,
+                  "empty Group with no elements. Fix: check if this Group is needed");
   }
-  if (!std::isnan(group->width) || !std::isnan(group->height)) {
-    return;
-  }
-  bool hasSizeDependentConstraint = (!std::isnan(group->right) || !std::isnan(group->bottom) ||
-                                     !std::isnan(group->centerX) || !std::isnan(group->centerY));
-  if (hasSizeDependentConstraint) {
-    return;
-  }
-  AddDiagnostic(diagnostics, group->sourceLine,
-                "empty Group with no elements. Fix: check if this Group is needed");
 }
 
 static void DetectZeroStrokeWidth(const Stroke* stroke,
@@ -465,31 +444,6 @@ static void DetectDuplicateGradients(const PAGXDocument* doc, const LineNodeMap&
 // Static Detection: Mergeable Consecutive Groups
 // ============================================================================
 
-static bool HasDefaultGroupTransform(const Group* group) {
-  if (group->anchor.x != 0 || group->anchor.y != 0) {
-    return false;
-  }
-  if (group->position.x != 0 || group->position.y != 0) {
-    return false;
-  }
-  if (group->rotation != 0) {
-    return false;
-  }
-  if (group->scale.x != 1 || group->scale.y != 1) {
-    return false;
-  }
-  if (group->skew != 0) {
-    return false;
-  }
-  if (group->alpha != 1) {
-    return false;
-  }
-  if (!std::isnan(group->width) || !std::isnan(group->height)) {
-    return false;
-  }
-  return true;
-}
-
 static std::string SerializePainterSignature(xmlNodePtr groupNode) {
   std::string sig;
   bool foundPainter = false;
@@ -520,7 +474,7 @@ static void DetectMergeableGroups(const std::vector<Element*>& elements,
       continue;
     }
     auto* group = static_cast<const Group*>(current);
-    if (!HasDefaultGroupTransform(group)) {
+    if (!PAGXAnalyzer::HasDefaultGroupTransform(group)) {
       i++;
       continue;
     }
@@ -541,7 +495,7 @@ static void DetectMergeableGroups(const std::vector<Element*>& elements,
         break;
       }
       auto* nextGroup = static_cast<const Group*>(next);
-      if (!HasDefaultGroupTransform(nextGroup)) {
+      if (!PAGXAnalyzer::HasDefaultGroupTransform(nextGroup)) {
         break;
       }
       auto* nextXmlNode = FindXmlNode(lineNodeMap, nextGroup->sourceLine, "Group");
@@ -565,45 +519,6 @@ static void DetectMergeableGroups(const std::vector<Element*>& elements,
 // Static Detection: Redundant First-Child Group
 // ============================================================================
 
-static bool CanUnwrapFirstChildGroup(const Group* group) {
-  if (group->alpha != 1.0f) {
-    return false;
-  }
-  if (group->position.x != 0 || group->position.y != 0) {
-    return false;
-  }
-  if (group->anchor.x != 0 || group->anchor.y != 0) {
-    return false;
-  }
-  if (group->rotation != 0) {
-    return false;
-  }
-  if (group->scale.x != 1 || group->scale.y != 1) {
-    return false;
-  }
-  if (group->skew != 0) {
-    return false;
-  }
-  if (!std::isnan(group->width) || !std::isnan(group->height)) {
-    return false;
-  }
-  if (!std::isnan(group->left) || !std::isnan(group->right) || !std::isnan(group->top) ||
-      !std::isnan(group->bottom) || !std::isnan(group->centerX) || !std::isnan(group->centerY)) {
-    return false;
-  }
-  for (auto* child : group->elements) {
-    auto* layoutNode = LayoutNode::AsLayoutNode(child);
-    if (layoutNode == nullptr) {
-      continue;
-    }
-    if (!std::isnan(layoutNode->right) || !std::isnan(layoutNode->bottom) ||
-        !std::isnan(layoutNode->centerX) || !std::isnan(layoutNode->centerY)) {
-      return false;
-    }
-  }
-  return true;
-}
-
 static void DetectRedundantFirstChildGroup(const std::vector<Element*>& elements,
                                            std::vector<VerifyDiagnostic>& diagnostics) {
   if (elements.empty()) {
@@ -614,7 +529,7 @@ static void DetectRedundantFirstChildGroup(const std::vector<Element*>& elements
     return;
   }
   auto* group = static_cast<const Group*>(first);
-  if (CanUnwrapFirstChildGroup(group)) {
+  if (PAGXAnalyzer::CanUnwrapFirstChildGroup(group)) {
     AddDiagnostic(diagnostics, group->sourceLine,
                   "redundant first-child Group, no painter isolation needed. "
                   "Fix: unwrap — move children into parent scope");
@@ -626,120 +541,14 @@ static void DetectRedundantFirstChildGroup(const std::vector<Element*>& elements
 // ============================================================================
 
 static void DetectPathToPrimitives(const Path* path, std::vector<VerifyDiagnostic>& diagnostics) {
-  if (path->data == nullptr || path->data->isEmpty()) {
-    return;
-  }
-  if (!std::isnan(path->left) || !std::isnan(path->right) || !std::isnan(path->top) ||
-      !std::isnan(path->bottom) || !std::isnan(path->centerX) || !std::isnan(path->centerY)) {
-    return;
-  }
-  auto& verbs = path->data->verbs();
-  if (verbs.size() == 5 || verbs.size() == 6) {
-    bool allLine = true;
-    for (size_t i = 1; i < verbs.size() - 1; i++) {
-      if (verbs[i] != PathVerb::Line) {
-        allLine = false;
-        break;
-      }
-    }
-    if (allLine && verbs[0] == PathVerb::Move && verbs.back() == PathVerb::Close) {
-      auto& pts = path->data->points();
-      bool axisAligned = true;
-      size_t pointCount = pts.size();
-      for (size_t i = 0; i < pointCount && axisAligned; i++) {
-        auto& p1 = pts[i];
-        auto& p2 = pts[(i + 1) % pointCount];
-        float dx = std::abs(p2.x - p1.x);
-        float dy = std::abs(p2.y - p1.y);
-        if (dx > 0.01f && dy > 0.01f) {
-          axisAligned = false;
-        }
-      }
-      if (axisAligned) {
-        AddDiagnostic(diagnostics, path->sourceLine,
-                      "Path draws an axis-aligned rectangle. "
-                      "Fix: replace with <Rectangle> for better performance");
-        return;
-      }
-    }
-  }
-  if (verbs.size() == 6 && verbs[0] == PathVerb::Move && verbs[1] == PathVerb::Cubic &&
-      verbs[2] == PathVerb::Cubic && verbs[3] == PathVerb::Cubic && verbs[4] == PathVerb::Cubic &&
-      verbs[5] == PathVerb::Close) {
-    auto& pts = path->data->points();
-    // M(1) + 4*C(3 each) = 13 points minimum.
-    if (pts.size() >= 13) {
-      Point onCurve[4];
-      onCurve[0] = pts[0];  // M point
-      onCurve[1] = pts[3];  // End of first C
-      onCurve[2] = pts[6];  // End of second C
-      onCurve[3] = pts[9];  // End of third C
-      float minX = onCurve[0].x, maxX = onCurve[0].x;
-      float minY = onCurve[0].y, maxY = onCurve[0].y;
-      for (int i = 1; i < 4; i++) {
-        minX = std::min(minX, onCurve[i].x);
-        maxX = std::max(maxX, onCurve[i].x);
-        minY = std::min(minY, onCurve[i].y);
-        maxY = std::max(maxY, onCurve[i].y);
-      }
-      float cx = (minX + maxX) / 2.0f;
-      float cy = (minY + maxY) / 2.0f;
-      float rx = (maxX - minX) / 2.0f;
-      float ry = (maxY - minY) / 2.0f;
-      bool isEllipse = rx >= 0.01f && ry >= 0.01f;
-      // Check that on-curve points are at the cardinal positions (top/right/bottom/left).
-      if (isEllipse) {
-        bool foundTop = false, foundBottom = false, foundLeft = false, foundRight = false;
-        static constexpr float TOLERANCE = 1.0f;
-        for (int i = 0; i < 4; i++) {
-          float dx = std::abs(onCurve[i].x - cx);
-          float dy = std::abs(onCurve[i].y - cy);
-          if (dx < TOLERANCE && std::abs(dy - ry) < TOLERANCE) {
-            if (onCurve[i].y < cy) {
-              foundTop = true;
-            } else {
-              foundBottom = true;
-            }
-          } else if (dy < TOLERANCE && std::abs(dx - rx) < TOLERANCE) {
-            if (onCurve[i].x < cx) {
-              foundLeft = true;
-            } else {
-              foundRight = true;
-            }
-          }
-        }
-        isEllipse = foundTop && foundBottom && foundLeft && foundRight;
-      }
-      // Verify control points match the kappa ratio for circular arcs.
-      // kappa ~ 0.5522847 -- control point offset from on-curve point for a quarter circle.
-      if (isEllipse) {
-        static constexpr float KAPPA = 0.5522847f;
-        static constexpr float CP_TOLERANCE = 2.0f;
-        float expectedCpOffsetX = rx * KAPPA;
-        float expectedCpOffsetY = ry * KAPPA;
-        for (int seg = 0; seg < 4 && isEllipse; seg++) {
-          Point cp1 = pts[1 + seg * 3];
-          Point cp2 = pts[2 + seg * 3];
-          Point segStart = (seg == 0) ? pts[0] : pts[seg * 3];
-          Point segEnd = pts[3 + seg * 3];
-          float cp1DistX = std::abs(cp1.x - segStart.x);
-          float cp1DistY = std::abs(cp1.y - segStart.y);
-          float cp2DistX = std::abs(cp2.x - segEnd.x);
-          float cp2DistY = std::abs(cp2.y - segEnd.y);
-          bool cp1Valid =
-              (cp1DistX < CP_TOLERANCE && std::abs(cp1DistY - expectedCpOffsetY) < CP_TOLERANCE) ||
-              (cp1DistY < CP_TOLERANCE && std::abs(cp1DistX - expectedCpOffsetX) < CP_TOLERANCE);
-          bool cp2Valid =
-              (cp2DistX < CP_TOLERANCE && std::abs(cp2DistY - expectedCpOffsetY) < CP_TOLERANCE) ||
-              (cp2DistY < CP_TOLERANCE && std::abs(cp2DistX - expectedCpOffsetX) < CP_TOLERANCE);
-          isEllipse = cp1Valid && cp2Valid;
-        }
-      }
-      if (isEllipse) {
-        AddDiagnostic(diagnostics, path->sourceLine,
-                      "Path draws an ellipse. Fix: replace with <Ellipse> for better performance");
-      }
-    }
+  auto primitive = PAGXAnalyzer::DetectPathPrimitive(path, nullptr, nullptr);
+  if (primitive == PathPrimitive::Rectangle) {
+    AddDiagnostic(diagnostics, path->sourceLine,
+                  "Path draws an axis-aligned rectangle. "
+                  "Fix: replace with <Rectangle> for better performance");
+  } else if (primitive == PathPrimitive::Ellipse) {
+    AddDiagnostic(diagnostics, path->sourceLine,
+                  "Path draws an ellipse. Fix: replace with <Ellipse> for better performance");
   }
 }
 
@@ -1032,71 +841,6 @@ static void DetectIneffectiveLayoutAttrs(const Layer* layer, bool parentHasLayou
 // Static Detection: Downgradable Layers
 // ============================================================================
 
-static bool CanDowngradeLayerToGroup(const Layer* layer) {
-  if (!layer->children.empty()) {
-    return false;
-  }
-  if (!layer->styles.empty()) {
-    return false;
-  }
-  if (!layer->filters.empty()) {
-    return false;
-  }
-  if (layer->mask != nullptr) {
-    return false;
-  }
-  if (layer->composition != nullptr) {
-    return false;
-  }
-  if (layer->blendMode != BlendMode::Normal) {
-    return false;
-  }
-  if (!layer->visible) {
-    return false;
-  }
-  if (layer->hasScrollRect) {
-    return false;
-  }
-  if (!layer->matrix.isIdentity()) {
-    return false;
-  }
-  if (!layer->matrix3D.isIdentity()) {
-    return false;
-  }
-  if (layer->preserve3D) {
-    return false;
-  }
-  if (!layer->groupOpacity) {
-    return false;
-  }
-  if (!layer->passThroughBackground) {
-    return false;
-  }
-  if (!layer->antiAlias) {
-    return false;
-  }
-  if (!layer->id.empty() || !layer->name.empty()) {
-    return false;
-  }
-  if (layer->layout != LayoutMode::None) {
-    return false;
-  }
-  if (layer->flex > 0) {
-    return false;
-  }
-  if (!std::isnan(layer->width) || !std::isnan(layer->height)) {
-    return false;
-  }
-  if (!std::isnan(layer->left) || !std::isnan(layer->right) || !std::isnan(layer->top) ||
-      !std::isnan(layer->bottom) || !std::isnan(layer->centerX) || !std::isnan(layer->centerY)) {
-    return false;
-  }
-  if (!layer->includeInLayout) {
-    return false;
-  }
-  return true;
-}
-
 static void DetectDowngradableLayers(const Layer* parentLayer,
                                      std::vector<VerifyDiagnostic>& diagnostics) {
   if (parentLayer->layout != LayoutMode::None) {
@@ -1112,7 +856,7 @@ static void DetectDowngradableLayers(const Layer* parentLayer,
   }
   // All children must be downgradable — partial downgrade changes paint order.
   for (auto* child : parentLayer->children) {
-    if (!CanDowngradeLayerToGroup(child)) {
+    if (!PAGXAnalyzer::CanDowngradeLayerToGroup(child)) {
       return;
     }
   }

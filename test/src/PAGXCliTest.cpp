@@ -39,6 +39,7 @@
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 #include "utils/Baseline.h"
+#include "utils/PAGXTestUtils.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestDir.h"
 
@@ -99,38 +100,6 @@ static bool RenderAndCompare(std::vector<std::string> args, const std::string& k
 static std::string ReadFile(const std::string& path) {
   std::ifstream in(path);
   return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
-
-static int CallRun(int (*fn)(int, char*[]), std::vector<std::string> args) {
-  std::vector<char*> argv = {};
-  argv.reserve(args.size());
-  for (auto& arg : args) {
-    argv.push_back(arg.data());
-  }
-  return fn(static_cast<int>(argv.size()), argv.data());
-}
-
-static void VerifyFile(const std::string& filePath, const std::string& key) {
-  std::streambuf* oldErr = std::cerr.rdbuf();
-  std::ostringstream verifyErr;
-  std::cerr.rdbuf(verifyErr.rdbuf());
-  auto verifyRet =
-      CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", filePath});
-  std::cerr.rdbuf(oldErr);
-  if (verifyRet != 0) {
-    auto output = verifyErr.str();
-    std::istringstream stream(output);
-    std::string line;
-    std::string fixable;
-    while (std::getline(stream, line)) {
-      bool isInfoOnly = line.find("Path with") != std::string::npos &&
-                        line.find("may cause slow rendering") != std::string::npos;
-      if (!isInfoOnly && !line.empty()) {
-        fixable += line + "\n";
-      }
-    }
-    EXPECT_TRUE(fixable.empty()) << "pagx verify failed for " << key << ":\n" << fixable;
-  }
 }
 
 static std::string ExportToSVG(const std::string& pagxResourceName, const std::string& svgTempName,
