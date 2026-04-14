@@ -22,34 +22,38 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="vertical" alignment="center" arrangement="center">
+    <Layer flex="1">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <Layer width="260" height="215">
-      <!-- Shape with multiple fills and strokes -->
-      <Layer name="item">
-        <Rectangle position="160,172" size="160,160" roundness="20"/>
-        <!-- First fill (bottom layer) -->
-        <Fill color="#3B82F6"/>
-        <!-- Second fill overlays the first -->
-        <Fill color="#EF444480" blendMode="multiply"/>
-        <!-- Stroke on top -->
-        <Stroke color="#10B981" width="4"/>
-        <!-- Second stroke with different style -->
-        <Stroke color="#F59E0B" width="2" dashes="8,4"/>
-      </Layer>
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="12" gap="6" alignment="center" arrangement="center">
+        <!-- Shape with multiple fills and strokes -->
+        <Layer width="170" height="170">
+          <Layer name="item">
+            <Rectangle position="85,85" size="160,160" roundness="20"/>
+            <!-- First fill (bottom layer) -->
+            <Fill color="#3B82F6"/>
+            <!-- Second fill overlays the first -->
+            <Fill color="#EF444480" blendMode="multiply"/>
+            <!-- Stroke on top -->
+            <Stroke color="#10B981" width="4"/>
+            <!-- Second stroke with different style -->
+            <Stroke color="#F59E0B" width="2" dashes="8,4"/>
+          </Layer>
+        </Layer>
 
-      <!-- Legend -->
-      <Layer>
-        <Text text="Fill #1 (blue) + Fill #2 (red multiply)" fontFamily="Arial" fontSize="8" position="160,265" textAnchor="center"/>
-        <Fill color="#64748B"/>
-      </Layer>
-      <Layer>
-        <Text text="Stroke #1 (green) + Stroke #2 (orange dashed)" fontFamily="Arial" fontSize="8" position="160,277" textAnchor="center"/>
-        <Fill color="#64748B"/>
-      </Layer>
+        <!-- Legend -->
+        <Layer layout="vertical" gap="2" alignment="center">
+          <Layer height="12">
+            <Text text="Fill #1 (blue) + Fill #2 (red multiply)" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+          <Layer height="12">
+            <Text text="Stroke #1 (green) + Stroke #2 (orange dashed)" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
       </Layer>
     </Layer>
   </Layer>

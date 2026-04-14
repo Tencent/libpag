@@ -22,27 +22,38 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="vertical" alignment="center" arrangement="center">
+    <Layer flex="1">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <Layer width="280" height="200">
-      <!-- 45° rotation + translate -->
-      <Layer matrix="0.707,0.707,-0.707,0.707,110,130">
-        <Rectangle position="10,10" size="80,80" roundness="8"/>
-        <Fill color="#F59E0B"/>
-      </Layer>
+      <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" padding="16" gap="12" alignment="center" arrangement="center">
+        <!-- Rotated shape -->
+        <Layer layout="vertical" gap="6" alignment="center" arrangement="center">
+          <Layer width="110" height="110">
+            <!-- 45° rotation around center: cos45=0.707, sin45=0.707, translate to center -->
+            <Layer matrix="0.707,0.707,-0.707,0.707,55,3">
+              <Rectangle position="0,0" size="80,80" roundness="8"/>
+              <Fill color="#F59E0B"/>
+            </Layer>
+          </Layer>
+          <Layer height="12">
+            <Text text="Rotated 45°" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#F59E0B"/>
+          </Layer>
+        </Layer>
 
-      <!-- Reference outline showing original position -->
-      <Layer alpha="0.2">
-        <Rectangle position="160,165" size="80,80" roundness="8"/>
-        <Stroke color="#94A3B8" width="1" dashes="4,3"/>
-      </Layer>
-      <Layer>
-        <Text text="Original position" fontFamily="Arial" fontSize="8" position="160,218" textAnchor="center"/>
-        <Fill color="#94A3B8"/>
-      </Layer>
+        <!-- Reference outline -->
+        <Layer layout="vertical" gap="6" alignment="center" arrangement="center">
+          <Layer width="110" height="110">
+            <Rectangle position="55,55" size="80,80" roundness="8"/>
+            <Stroke color="#94A3B8" width="1" dashes="4,3"/>
+          </Layer>
+          <Layer height="12">
+            <Text text="Original" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+        </Layer>
       </Layer>
     </Layer>
   </Layer>

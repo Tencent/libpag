@@ -23,55 +23,56 @@
     </Layer>
 
     <!-- Cards area -->
-    <Layer flex="1" layout="vertical" alignment="center" arrangement="center">
-      <Layer width="260" height="160">
-      <!-- Card 1: uses forward-referenced color -->
-      <Layer>
-        <Rectangle position="90,55" size="120,100" roundness="12"/>
-        <Fill color="@cardPurple"/>
-        <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#8B5CF630"/>
-      </Layer>
-      <Layer>
-        <Ellipse position="90,40" size="30,30"/>
-        <Fill color="#FFFFFF30"/>
-      </Layer>
-      <Layer>
-        <Text text="Color" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="90,67" textAnchor="center"/>
-        <Fill color="#FFFFFF"/>
-      </Layer>
-      <Layer>
-        <Text text="@cardPurple" fontFamily="Arial" fontSize="9" position="90,83" textAnchor="center"/>
-        <Fill color="#FFFFFFAA"/>
-      </Layer>
+    <Layer flex="1" layout="vertical" gap="8" alignment="center" arrangement="center">
+      <!-- Two cards side by side -->
+      <Layer layout="horizontal" gap="16" alignment="center" arrangement="center">
+        <!-- Card 1: uses forward-referenced color -->
+        <Layer layout="vertical" gap="0" alignment="center">
+          <Layer width="120" height="100">
+            <Rectangle position="60,50" size="120,100" roundness="12"/>
+            <Fill color="@cardPurple"/>
+            <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#8B5CF630"/>
+            <Layer>
+              <Ellipse position="60,30" size="30,30"/>
+              <Fill color="#FFFFFF30"/>
+            </Layer>
+            <Layer>
+              <Text text="Color" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="60,57" textAnchor="center"/>
+              <Fill color="#FFFFFF"/>
+            </Layer>
+            <Layer>
+              <Text text="@cardPurple" fontFamily="Arial" fontSize="9" position="60,73" textAnchor="center"/>
+              <Fill color="#FFFFFFAA"/>
+            </Layer>
+          </Layer>
+        </Layer>
 
-      <!-- Card 2: uses forward-referenced gradient -->
-      <Layer>
-        <Rectangle position="230,55" size="120,100" roundness="12"/>
-        <Fill color="@cardGrad"/>
-        <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#3B82F630"/>
-      </Layer>
-      <Layer>
-        <Polystar position="230,40" type="star" pointCount="5" outerRadius="15" innerRadius="7" rotation="-90"/>
-        <Fill color="#FFFFFF30"/>
-      </Layer>
-      <Layer>
-        <Text text="Gradient" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="230,67" textAnchor="center"/>
-        <Fill color="#FFFFFF"/>
-      </Layer>
-      <Layer>
-        <Text text="@cardGrad" fontFamily="Arial" fontSize="9" position="230,83" textAnchor="center"/>
-        <Fill color="#FFFFFFAA"/>
+        <!-- Card 2: uses forward-referenced gradient -->
+        <Layer layout="vertical" gap="0" alignment="center">
+          <Layer width="120" height="100">
+            <Rectangle position="60,50" size="120,100" roundness="12"/>
+            <Fill color="@cardGrad"/>
+            <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#3B82F630"/>
+            <Layer>
+              <Polystar position="60,30" type="star" pointCount="5" outerRadius="15" innerRadius="7" rotation="-90"/>
+              <Fill color="#FFFFFF30"/>
+            </Layer>
+            <Layer>
+              <Text text="Gradient" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="60,57" textAnchor="center"/>
+              <Fill color="#FFFFFF"/>
+            </Layer>
+            <Layer>
+              <Text text="@cardGrad" fontFamily="Arial" fontSize="9" position="60,73" textAnchor="center"/>
+              <Fill color="#FFFFFFAA"/>
+            </Layer>
+          </Layer>
+        </Layer>
       </Layer>
 
       <!-- Footer -->
-      <Layer>
-        <Path data="M 30,120 L 270,120"/>
-        <Stroke color="#E2E8F0" width="1"/>
-      </Layer>
-      <Layer>
-        <Text text="All @id references resolve to Resources block below" fontFamily="Arial" fontSize="9" position="160,148" textAnchor="center"/>
+      <Layer height="12">
+        <Text text="All @id references resolve to Resources block below" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
-      </Layer>
       </Layer>
     </Layer>
   </Layer>

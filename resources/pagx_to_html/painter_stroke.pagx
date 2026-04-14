@@ -22,130 +22,146 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="vertical" alignment="center" arrangement="center">
+    <Layer flex="1">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <Layer width="380" height="380">
-      <!-- Row 1: Basic stroke + Dashed + Cap styles -->
-      <Layer name="item">
-        <Rectangle position="90,140" size="90,90" roundness="12"/>
-        <Stroke color="#3B82F6" width="6" cap="round" join="round"/>
-      </Layer>
-      <Layer>
-        <Text text="round" fontFamily="Arial" fontSize="8" position="90,198" textAnchor="center"/>
-        <Fill color="#64748B"/>
-      </Layer>
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="12" gap="8" alignment="stretch" arrangement="center">
+        <!-- Row 1: Basic stroke + Dashed + Cap styles -->
+        <Layer layout="horizontal" gap="8" alignment="center" arrangement="spaceEvenly">
+          <!-- Round stroke -->
+          <Layer layout="vertical" gap="3" alignment="center">
+            <Layer width="80" height="80">
+              <Rectangle position="40,40" size="70,70" roundness="12"/>
+              <Stroke color="#3B82F6" width="6" cap="round" join="round"/>
+            </Layer>
+            <Layer height="10">
+              <Text text="round" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
+          </Layer>
 
-      <Layer>
-        <Ellipse position="220,140" size="90,90"/>
-        <Stroke color="#EF4444" width="4" dashes="12,6" dashOffset="4" cap="butt"/>
-      </Layer>
-      <Layer>
-        <Text text="Dashed" fontFamily="Arial" fontSize="8" position="220,198" textAnchor="center"/>
-        <Fill color="#64748B"/>
-      </Layer>
+          <!-- Dashed -->
+          <Layer layout="vertical" gap="3" alignment="center">
+            <Layer width="80" height="80">
+              <Ellipse position="40,40" size="70,70"/>
+              <Stroke color="#EF4444" width="4" dashes="12,6" dashOffset="4" cap="butt"/>
+            </Layer>
+            <Layer height="10">
+              <Text text="dashed" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
+          </Layer>
 
-      <!-- Cap styles -->
-      <Layer>
-        <Path data="M 300,105 L 360,105"/>
-        <Stroke color="#10B981" width="8" cap="butt"/>
-      </Layer>
-      <Layer>
-        <Text text="butt" fontFamily="Arial" fontSize="7" position="390,108" textAnchor="center"/>
-        <Fill color="#94A3B8"/>
-      </Layer>
-      <Layer>
-        <Path data="M 300,130 L 360,130"/>
-        <Stroke color="#10B981" width="8" cap="round"/>
-      </Layer>
-      <Layer>
-        <Text text="round" fontFamily="Arial" fontSize="7" position="390,133" textAnchor="center"/>
-        <Fill color="#94A3B8"/>
-      </Layer>
-      <Layer>
-        <Path data="M 300,155 L 360,155"/>
-        <Stroke color="#10B981" width="8" cap="square"/>
-      </Layer>
-      <Layer>
-        <Text text="square" fontFamily="Arial" fontSize="7" position="390,158" textAnchor="center"/>
-        <Fill color="#94A3B8"/>
-      </Layer>
+          <!-- Cap styles -->
+          <Layer layout="vertical" gap="3" alignment="center">
+            <Layer width="80" height="80">
+              <Path data="M 10,20 L 70,20"/>
+              <Stroke color="#10B981" width="8" cap="butt"/>
+              <Path data="M 10,40 L 70,40"/>
+              <Stroke color="#10B981" width="8" cap="round"/>
+              <Path data="M 10,60 L 70,60"/>
+              <Stroke color="#10B981" width="8" cap="square"/>
+            </Layer>
+            <Layer height="10">
+              <Text text="caps" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
+          </Layer>
+        </Layer>
 
-      <!-- Row 2: Join styles -->
-      <Layer>
-        <Path data="M 40,240 L 70,210 L 100,240"/>
-        <Stroke color="#F59E0B" width="6" join="miter" miterLimit="10"/>
-      </Layer>
-      <Layer>
-        <Text text="miter" fontFamily="Arial" fontSize="8" position="80,260" textAnchor="center"/>
-        <Fill color="#64748B"/>
-      </Layer>
+        <!-- Row 2: Join styles -->
+        <Layer layout="horizontal" gap="8" alignment="center" arrangement="spaceEvenly">
+          <Layer layout="vertical" gap="3" alignment="center">
+            <Layer width="80" height="60">
+              <Path data="M 10,50 L 40,10 L 70,50"/>
+              <Stroke color="#F59E0B" width="6" join="miter" miterLimit="10"/>
+            </Layer>
+            <Layer height="10">
+              <Text text="miter" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
+          </Layer>
 
-      <Layer>
-        <Path data="M 120,240 L 150,210 L 180,240"/>
-        <Stroke color="#F59E0B" width="6" join="round"/>
-      </Layer>
-      <Layer>
-        <Text text="round" fontFamily="Arial" fontSize="8" position="160,260" textAnchor="center"/>
-        <Fill color="#64748B"/>
-      </Layer>
+          <Layer layout="vertical" gap="3" alignment="center">
+            <Layer width="80" height="60">
+              <Path data="M 10,50 L 40,10 L 70,50"/>
+              <Stroke color="#F59E0B" width="6" join="round"/>
+            </Layer>
+            <Layer height="10">
+              <Text text="round" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
+          </Layer>
 
-      <Layer>
-        <Path data="M 200,240 L 230,210 L 260,240"/>
-        <Stroke color="#F59E0B" width="6" join="bevel"/>
-      </Layer>
-      <Layer>
-        <Text text="bevel" fontFamily="Arial" fontSize="8" position="240,260" textAnchor="center"/>
-        <Fill color="#64748B"/>
-      </Layer>
+          <Layer layout="vertical" gap="3" alignment="center">
+            <Layer width="80" height="60">
+              <Path data="M 10,50 L 40,10 L 70,50"/>
+              <Stroke color="#F59E0B" width="6" join="bevel"/>
+            </Layer>
+            <Layer height="10">
+              <Text text="bevel" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
+          </Layer>
+        </Layer>
 
-      <!-- Row 3: Stroke align -->
-      <Layer>
-        <Rectangle position="80,320" size="70,70" roundness="8"/>
-        <Fill color="#E2E8F0"/>
-        <Stroke color="#8B5CF6" width="8" align="center"/>
-      </Layer>
-      <Layer>
-        <Text text="center" fontFamily="Arial" fontSize="8" position="80,370" textAnchor="center"/>
-        <Fill color="#64748B"/>
-      </Layer>
+        <!-- Row 3: Stroke align -->
+        <Layer layout="horizontal" gap="8" alignment="center" arrangement="spaceEvenly">
+          <Layer layout="vertical" gap="3" alignment="center">
+            <Layer width="80" height="80">
+              <Rectangle position="40,40" size="60,60" roundness="8"/>
+              <Fill color="#E2E8F0"/>
+              <Stroke color="#8B5CF6" width="8" align="center"/>
+            </Layer>
+            <Layer height="10">
+              <Text text="center" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
+          </Layer>
 
-      <Layer>
-        <Rectangle position="200,320" size="70,70" roundness="8"/>
-        <Fill color="#E2E8F0"/>
-        <Stroke color="#8B5CF6" width="8" align="inside"/>
-      </Layer>
-      <Layer>
-        <Text text="inside" fontFamily="Arial" fontSize="8" position="200,370" textAnchor="center"/>
-        <Fill color="#64748B"/>
-      </Layer>
+          <Layer layout="vertical" gap="3" alignment="center">
+            <Layer width="80" height="80">
+              <Rectangle position="40,40" size="60,60" roundness="8"/>
+              <Fill color="#E2E8F0"/>
+              <Stroke color="#8B5CF6" width="8" align="inside"/>
+            </Layer>
+            <Layer height="10">
+              <Text text="inside" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
+          </Layer>
 
-      <Layer>
-        <Rectangle position="320,320" size="70,70" roundness="8"/>
-        <Fill color="#E2E8F0"/>
-        <Stroke color="#8B5CF6" width="8" align="outside"/>
-      </Layer>
-      <Layer>
-        <Text text="outside" fontFamily="Arial" fontSize="8" position="320,370" textAnchor="center"/>
-        <Fill color="#64748B"/>
-      </Layer>
+          <Layer layout="vertical" gap="3" alignment="center">
+            <Layer width="80" height="80">
+              <Rectangle position="40,40" size="60,60" roundness="8"/>
+              <Fill color="#E2E8F0"/>
+              <Stroke color="#8B5CF6" width="8" align="outside"/>
+            </Layer>
+            <Layer height="10">
+              <Text text="outside" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
+          </Layer>
+        </Layer>
 
-      <!-- Row 4: Gradient stroke -->
-      <Layer>
-        <Path data="M 40,405 Q 210,370 390,405"/>
-        <Stroke width="6" cap="round">
-          <LinearGradient startPoint="10,10" endPoint="370,10">
-            <ColorStop offset="0" color="#EC4899"/>
-            <ColorStop offset="1" color="#3B82F6"/>
-          </LinearGradient>
-        </Stroke>
-      </Layer>
-      <Layer>
-        <Text text="Gradient stroke" fontFamily="Arial" fontSize="8" position="220,420" textAnchor="center"/>
-        <Fill color="#64748B"/>
-      </Layer>
+        <!-- Row 4: Gradient stroke -->
+        <Layer layout="vertical" gap="3" alignment="center">
+          <Layer width="360" height="40">
+            <Path data="M 10,20 Q 180,0 350,20"/>
+            <Stroke width="6" cap="round">
+              <LinearGradient startPoint="10,10" endPoint="350,10">
+                <ColorStop offset="0" color="#EC4899"/>
+                <ColorStop offset="1" color="#3B82F6"/>
+              </LinearGradient>
+            </Stroke>
+          </Layer>
+          <Layer height="10">
+            <Text text="Gradient stroke" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
       </Layer>
     </Layer>
   </Layer>
