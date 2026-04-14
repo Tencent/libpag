@@ -339,7 +339,14 @@ struct ExportContext {
   std::unordered_map<std::string, std::string> pathDataContentToId;
   std::unordered_map<const PathData*, std::string> pathDataToOutputId;
   std::unordered_set<std::string> writtenResourceIds;
+  std::unordered_set<std::string> reservedIds;
   int pathDataIdCounter = 0;
+
+  void reserveId(const std::string& id) {
+    if (!id.empty()) {
+      reservedIds.insert(id);
+    }
+  }
 
   std::string getPathDataOutputId(const PathData* pathData) {
     if (pathData == nullptr) {
@@ -362,7 +369,10 @@ struct ExportContext {
       pathDataToOutputId[pathData] = contentIt->second;
       return contentIt->second;
     }
-    std::string newId = "__pd_" + std::to_string(pathDataIdCounter++);
+    std::string newId;
+    do {
+      newId = "__pd_" + std::to_string(pathDataIdCounter++);
+    } while (reservedIds.count(newId) > 0);
     pathDataContentToId[svgContent] = newId;
     pathDataToOutputId[pathData] = newId;
     return newId;
@@ -1429,6 +1439,11 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
 std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options) {
   XMLBuilder xml = {};
   ExportContext ctx = {};
+
+  // Reserve all existing resource IDs to avoid collision with generated IDs.
+  for (const auto& resource : doc.nodes) {
+    ctx.reserveId(resource->id);
+  }
 
   xml.appendDeclaration();
 

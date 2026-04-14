@@ -523,6 +523,61 @@ PAGX_TEST(PAGXTest, PathDataDeduplicationWithExistingId) {
 }
 
 /**
+ * Test case: PathData deduplication avoids ID collision with user-defined IDs
+ *
+ * Verifies that generated IDs skip over user-defined IDs that match the generation pattern.
+ */
+PAGX_TEST(PAGXTest, PathDataDeduplicationIdCollision) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+
+  auto layer = doc->makeNode<pagx::Layer>();
+
+  // User defines a PathData with ID "__pd_0" (matches the generation pattern)
+  auto userPathData = doc->makeNode<pagx::PathData>("__pd_0");
+  userPathData->moveTo(0, 0);
+  userPathData->lineTo(100, 0);
+  userPathData->lineTo(100, 100);
+  userPathData->close();
+
+  // Path using user-defined PathData
+  auto path1 = doc->makeNode<pagx::Path>();
+  path1->data = userPathData;
+  path1->position = {10, 10};
+  layer->contents.push_back(path1);
+
+  // Path with new PathData (should get "__pd_1", skipping "__pd_0")
+  auto path2 = doc->makeNode<pagx::Path>();
+  path2->data = doc->makeNode<pagx::PathData>();
+  path2->data->moveTo(0, 0);
+  path2->data->lineTo(50, 50);
+  path2->data->close();
+  path2->position = {150, 10};
+  layer->contents.push_back(path2);
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0, 1, 0, 1};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  doc->layers.push_back(layer);
+
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+
+  // path1 should reference user's "__pd_0"
+  EXPECT_NE(xml.find("data=\"@__pd_0\""), std::string::npos);
+
+  // path2 should get "__pd_1" (skipping "__pd_0" which is reserved)
+  EXPECT_NE(xml.find("data=\"@__pd_1\""), std::string::npos)
+      << "Generated ID should skip reserved '__pd_0' and use '__pd_1'";
+
+  // Both PathData resources should exist
+  EXPECT_NE(xml.find("<PathData id=\"__pd_0\""), std::string::npos);
+  EXPECT_NE(xml.find("<PathData id=\"__pd_1\""), std::string::npos);
+}
+
+/**
  * Test case: PAGXDocument creation and XML export
  */
 PAGX_TEST(PAGXTest, PAGXDocumentXMLExport) {
