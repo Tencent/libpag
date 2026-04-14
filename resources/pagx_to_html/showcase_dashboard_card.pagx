@@ -64,7 +64,7 @@
           <Rectangle position="25,10" size="50,20" roundness="10"/>
           <Fill color="#10B98130"/>
           <Layer>
-            <Text text="+12%" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="25,10" textAnchor="center"/>
+            <Text text="+12%" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="25,13" textAnchor="center"/>
             <Fill color="#10B981"/>
           </Layer>
         </Layer>
