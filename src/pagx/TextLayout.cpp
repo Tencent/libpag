@@ -18,6 +18,7 @@
 
 #include "TextLayout.h"
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include "LayoutContext.h"
 #include "TextLayoutParams.h"
@@ -33,6 +34,7 @@
 #include "tgfx/core/Font.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/core/UTF.h"
+#include "tgfx/platform/Print.h"
 
 namespace pagx {
 
@@ -1560,16 +1562,21 @@ TextLayoutResult TextLayout::Layout(const std::vector<Text*>& textElements,
   if (textElements.empty()) {
     return {};
   }
+  auto start = std::chrono::high_resolution_clock::now();
   TextLayoutContext layoutContext(context);
+  TextLayoutResult result = {};
   if (AllHaveEmbeddedGlyphRuns(textElements)) {
     // Embedded path: only compute bounds. TextBlob generation is deferred to the caller
     // (TextBox::updateLayout or LayerBuilder) which applies the inverse matrix.
-    TextLayoutResult result = {};
     result.bounds = MergeEmbeddedBounds(textElements);
-    return result;
+  } else {
+    auto mutableElements = textElements;
+    result = layoutContext.processTextWithLayout(mutableElements, params);
   }
-  auto mutableElements = textElements;
-  return layoutContext.processTextWithLayout(mutableElements, params);
+  auto end = std::chrono::high_resolution_clock::now();
+  auto ms = std::chrono::duration<double, std::milli>(end - start).count();
+  tgfx::PrintLog("[PAGX Perf] TextLayout::Layout=%.1fms textCount=%zu\n", ms, textElements.size());
+  return result;
 }
 
 }  // namespace pagx

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LayerBuilder.h"
+#include <chrono>
 #include <tuple>
 #include <unordered_map>
 #include "ToTGFX.h"
@@ -109,6 +110,7 @@
 #include "tgfx/layers/vectors/TextSelector.h"
 #include "tgfx/layers/vectors/TrimPath.h"
 #include "tgfx/layers/vectors/VectorGroup.h"
+#include "tgfx/platform/Print.h"
 
 namespace pagx {
 
@@ -124,8 +126,7 @@ static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI)
 // Build context that maintains state during layer tree construction
 class LayerBuilderContext {
  public:
-  explicit LayerBuilderContext(int maxImageDimension = 0)
-      : _maxImageDimension(maxImageDimension) {
+  explicit LayerBuilderContext(int maxImageDimension = 0) : _maxImageDimension(maxImageDimension) {
   }
 
   LayerBuildResult buildWithMap(const PAGXDocument& document) {
@@ -564,13 +565,29 @@ class LayerBuilderContext {
     if (it != _imageCache.end()) {
       return it->second;
     }
+    auto imgStart = std::chrono::high_resolution_clock::now();
     std::shared_ptr<tgfx::Image> image = nullptr;
+    const char* source = "none";
     if (imageNode->data) {
       image = tgfx::Image::MakeFromEncoded(ToTGFXData(imageNode->data));
+      source = "data";
     } else if (imageNode->filePath.find("data:") == 0) {
       image = ImageFromDataURI(imageNode->filePath);
+      source = "dataURI";
     } else if (!imageNode->filePath.empty()) {
       image = tgfx::Image::MakeFromFile(imageNode->filePath);
+      source = "file";
+    }
+    auto imgEnd = std::chrono::high_resolution_clock::now();
+    auto imgMs = std::chrono::duration<double, std::milli>(imgEnd - imgStart).count();
+    if (imgMs > 1.0) {
+      if (image) {
+        tgfx::PrintLog("[PAGX Perf]     getOrCreateImage=%.1fms source=%s id=%s size=%dx%d\n",
+                       imgMs, source, imageNode->id.c_str(), image->width(), image->height());
+      } else {
+        tgfx::PrintLog("[PAGX Perf]     getOrCreateImage=%.1fms source=%s id=%s\n", imgMs, source,
+                       imageNode->id.c_str());
+      }
     }
     _imageCache[imageNode] = image;
     return image;
@@ -914,8 +931,13 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document, int max
     return nullptr;
   }
 
+  auto start = std::chrono::high_resolution_clock::now();
   LayerBuilderContext context(maxImageDimension);
-  return context.build(*document);
+  auto result = context.build(*document);
+  auto end = std::chrono::high_resolution_clock::now();
+  auto totalMs = std::chrono::duration<double, std::milli>(end - start).count();
+  tgfx::PrintLog("[PAGX Perf] LayerBuilder::Build total=%.1fms\n", totalMs);
+  return result;
 }
 
 LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document, int maxImageDimension) {
@@ -930,8 +952,13 @@ LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document, int maxImage
     return {};
   }
 
+  auto start = std::chrono::high_resolution_clock::now();
   LayerBuilderContext context(maxImageDimension);
-  return context.buildWithMap(*document);
+  auto result = context.buildWithMap(*document);
+  auto end = std::chrono::high_resolution_clock::now();
+  auto totalMs = std::chrono::duration<double, std::milli>(end - start).count();
+  tgfx::PrintLog("[PAGX Perf] LayerBuilder::BuildWithMap total=%.1fms\n", totalMs);
+  return result;
 }
 
 }  // namespace pagx
