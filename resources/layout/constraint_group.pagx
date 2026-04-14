@@ -3,7 +3,7 @@
 <!-- Fully automatic layout: no manual width specification needed -->
 <!-- Containers are flexible (no width) — auto-equal distribution by layout engine -->
 <!-- Only height is specified for visual testing purposes -->
-<pagx version="1.0" width="820" height="700">
+<pagx width="820" height="700">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>

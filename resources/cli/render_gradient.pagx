@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Test gradient rendering accuracy -->
-<pagx version="1.0" width="300" height="100">
+<pagx width="300" height="100">
   <Layer>
     <Rectangle left="10" top="10" size="280,80" roundness="16"/>
     <Fill>

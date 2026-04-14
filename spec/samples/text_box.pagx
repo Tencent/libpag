@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates TextBox: word wrap, text alignment, vertical writing, paragraph alignment -->
-<pagx version="1.0" width="400" height="400">
+<pagx width="400" height="400">
   <Layer name="TextBoxGrid" width="400" height="400" layout="vertical" gap="12" padding="14">
     <Layer height="180" layout="horizontal" gap="12">
       <!-- Box 1 (top-left): horizontal justify + lineHeight -->

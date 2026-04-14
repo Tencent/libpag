@@ -1,4 +1,4 @@
-<pagx version="1.0" width="200" height="200">
+<pagx width="200" height="200">
   <Layer width="200" height="200">
     <Group width="100" height="100" centerX="0" centerY="0">
       <Path data="M 0 0 L 80 0 L 80 40 Z"/>

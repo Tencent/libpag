@@ -1,4 +1,4 @@
-<pagx version="1.0" width="200" height="200">
+<pagx width="200" height="200">
   <!-- TextBox anchor mode: explicit width="0" height="0" is intentional (point text).
        Should NOT trigger zero-size warning. -->
   <Layer width="200" height="200">

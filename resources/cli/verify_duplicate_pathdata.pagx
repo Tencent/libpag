@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Test file for lint: two identical PathData that can be merged -->
-<pagx version="1.0" width="200" height="200">
+<pagx width="200" height="200">
   <Resources>
     <PathData id="pd1" data="M 0,0 L 80,0 L 80,60 L 0,60 Z"/>
     <PathData id="pd2" data="M 0,0 L 80,0 L 80,60 L 0,60 Z"/>

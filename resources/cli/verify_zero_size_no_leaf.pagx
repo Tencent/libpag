@@ -1,4 +1,4 @@
-<pagx version="1.0" width="393" height="600">
+<pagx width="393" height="600">
   <!-- Skeleton-phase pattern: nested Layers with layout but no leaf content (no shapes/text).
        Painters like Fill/Stroke alone do not count as leaf content.
        Should NOT trigger zero-size diagnostics. -->

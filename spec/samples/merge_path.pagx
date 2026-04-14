@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="400" height="400">
+<pagx width="400" height="400">
   <Layer>
     <Rectangle left="60" top="60" size="180,180" roundness="24"/>
     <Ellipse left="160" top="160" size="180,180"/>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Test: child exceeds parent but parent has explicit clipping (should NOT trigger DetectChildExceedingParent) -->
-<pagx version="1.0" width="400" height="300">
+<pagx width="400" height="300">
   <!-- Case 1: clipToBounds suppresses child-exceeds-parent -->
   <Layer width="200" height="200" clipToBounds="true">
     <Layer width="250" height="100">

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- File with named layers for bounds query testing -->
-<pagx version="1.0" width="400" height="300">
+<pagx width="400" height="300">
   <Layer id="header" name="Header Bar">
     <Rectangle size="400,60"/>
     <Fill color="#2196F3"/>

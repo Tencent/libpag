@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="800" height="600">
+<pagx width="800" height="600">
   <Layer id="triangleMask" visible="false">
     <Polystar left="-40" type="polygon" pointCount="3" outerRadius="80" rotation="90"/>
     <Fill color="#FFF"/>
@@ -47,11 +47,11 @@
       <Fill color="#00CCFF" alpha="0.3"/>
       <Repeater copies="60" offset="0.5" rotation="6"/>
     </Layer>
-    <Layer name="OuterRing" rotation="15">
+    <Layer name="OuterRing">
       <Ellipse left="-190" top="-190" size="380,380"/>
       <Stroke color="#0FF" width="1" alpha="0.4" dashes="60,40"/>
     </Layer>
-    <Layer name="InnerRing" rotation="-20">
+    <Layer name="InnerRing">
       <Ellipse left="-180" top="-180" size="360,360"/>
       <Stroke color="#0088FF" width="2" alpha="0.5" dashes="10,80"/>
     </Layer>
@@ -196,7 +196,7 @@
       <Path data="M -70 0 L 70 0 M 0 -70 L 0 70"/>
       <Stroke color="#004488" width="1"/>
     </Group>
-    <Layer rotation="-45">
+    <Layer>
       <Ellipse left="-65" top="-65" size="130,130"/>
       <Fill>
         <ConicGradient endAngle="90">

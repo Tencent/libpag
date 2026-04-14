@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates layer filters: Blur and DropShadow -->
-<pagx version="1.0" width="400" height="400">
+<pagx width="400" height="400">
   <Layer left="70" top="70">
     <Rectangle size="260,260" roundness="40"/>
     <Fill>

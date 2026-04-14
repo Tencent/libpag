@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="640" height="520">
+<pagx width="640" height="520">
 
   <!-- Background: Gray 900 -->
   <Layer name="Background" left="320" top="260">

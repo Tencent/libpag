@@ -16,13 +16,13 @@ Spec rules, techniques, and common pitfalls for writing correct PAGX files.
 ## Root Node
 
 ```xml
-<pagx version="1.0" width="800" height="600">
+<pagx width="800" height="600">
   <Layer>...</Layer>
   <Resources>...</Resources>   <!-- optional, recommended at end -->
 </pagx>
 ```
 
-- `version`, `width`, `height` are **required**.
+- `width`, `height` are **required**.
 - **`<pagx>` direct children: ONLY `<Layer>` and `<Resources>`** — no other elements.
   VectorElements must be inside a `<Layer>`. `<Group>` as a direct child causes a parse error.
 - `<Composition>` has the same rule — top-level children must be `<Layer>` only.
@@ -58,7 +58,7 @@ Spec rules, techniques, and common pitfalls for writing correct PAGX files.
 ### Containment Hierarchy
 
 ```
-pagx (required: version, width, height)
+pagx (required: width, height)
 ├── Layer*
 │   ├── VectorElements* (geometry, modifiers, painters, Groups, TextBox)
 │   ├── <svg>* (import directive)

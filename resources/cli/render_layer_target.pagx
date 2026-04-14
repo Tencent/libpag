@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Test file for layer targeting (id and xpath) in render command.
      Each layer has distinct visual content to verify correct isolation. -->
-<pagx version="1.0" width="400" height="300">
+<pagx width="400" height="300">
   <!-- Red circle with a blue inner circle -->
   <Layer id="badge" left="80" top="80">
     <Ellipse left="-60" top="-60" size="120,120"/>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="1200" height="800">
+<pagx width="1200" height="800">
   <Layer id="sky" left="600" top="400">
 <Rectangle left="-600" top="-400" size="1200,800"/>
     <Fill>

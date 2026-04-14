@@ -19,6 +19,7 @@
 #include "cli/CommandVerify.h"
 #include <libxml/parser.h>
 #include <libxml/tree.h>
+#include <libxml/xmlschemas.h>
 #include <cfloat>
 #include <cmath>
 #include <cstdlib>
@@ -62,6 +63,7 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx_xsd.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 
@@ -338,6 +340,52 @@ static void BuildLineNodeMap(xmlNodePtr node, LineNodeMap& map) {
       BuildLineNodeMap(cur->children, map);
     }
   }
+}
+
+// ============================================================================
+// XSD Schema Validation
+// ============================================================================
+
+static void XsdValidationCallback(void* ctx, const xmlError* error) {
+  if (error == nullptr || error->message == nullptr) {
+    return;
+  }
+  // Skip errors about "data-*" attributes — PAGX allows custom data attributes on any element
+  // but XSD cannot express prefix-based wildcard attributes.
+  std::string msg(error->message);
+  if (msg.find("data-") != std::string::npos && msg.find("attribute") != std::string::npos) {
+    return;
+  }
+  // Trim trailing newline.
+  while (!msg.empty() && msg.back() == '\n') {
+    msg.pop_back();
+  }
+  auto* diags = static_cast<std::vector<VerifyDiagnostic>*>(ctx);
+  int line = error->line > 0 ? error->line : 0;
+  AddDiagnostic(*diags, line, msg);
+}
+
+static void RunXsdValidation(xmlDocPtr xmlDoc, std::vector<VerifyDiagnostic>& diagnostics) {
+  auto& xsdContent = PagxXsdContent();
+  auto* parserCtxt =
+      xmlSchemaNewMemParserCtxt(xsdContent.data(), static_cast<int>(xsdContent.size()));
+  if (parserCtxt == nullptr) {
+    return;
+  }
+  auto* schema = xmlSchemaParse(parserCtxt);
+  xmlSchemaFreeParserCtxt(parserCtxt);
+  if (schema == nullptr) {
+    return;
+  }
+  auto* validCtxt = xmlSchemaNewValidCtxt(schema);
+  if (validCtxt == nullptr) {
+    xmlSchemaFree(schema);
+    return;
+  }
+  xmlSchemaSetValidStructuredErrors(validCtxt, XsdValidationCallback, &diagnostics);
+  xmlSchemaValidateDoc(validCtxt, xmlDoc);
+  xmlSchemaFreeValidCtxt(validCtxt);
+  xmlSchemaFree(schema);
 }
 
 static xmlNodePtr FindXmlNode(const LineNodeMap& map, int sourceLine, const char* elementName) {
@@ -2604,6 +2652,9 @@ int RunVerify(int argc, char* argv[]) {
   }
 
   std::vector<VerifyDiagnostic> diagnostics;
+  if (xmlDoc != nullptr) {
+    RunXsdValidation(xmlDoc, diagnostics);
+  }
   RunStaticDetection(doc.get(), lineNodeMap, diagnostics, targetLayer);
   RunSpatialDetection(doc.get(), diagnostics, targetLayer);
 

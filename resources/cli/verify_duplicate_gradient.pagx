@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Test file for lint: two identical LinearGradient that can be merged -->
-<pagx version="1.0" width="200" height="200">
+<pagx width="200" height="200">
   <Layer name="shape1">
     <Rectangle size="100,100"/>
     <Fill>

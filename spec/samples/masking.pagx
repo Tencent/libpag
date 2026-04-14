@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates alpha masking -->
-<pagx version="1.0" width="400" height="400">
+<pagx width="400" height="400">
   <!-- Mask shape (invisible but used for masking) -->
   <Layer id="maskShape" visible="false">
     <Polystar left="50" top="50" type="star" pointCount="5" outerRadius="150" innerRadius="70"/>

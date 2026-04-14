@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Test file for lint: painter leaks geometry from prior painters -->
-<pagx version="1.0" width="200" height="200">
+<pagx width="200" height="200">
   <!-- CASE 1: Fill leaks Rectangle from prior Fill (should warn on 2nd Fill) -->
   <Layer name="leak-fill-fill">
     <Rectangle size="50,50"/>

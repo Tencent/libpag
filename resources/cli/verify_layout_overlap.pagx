@@ -1,4 +1,4 @@
-<pagx version="1.0" width="400" height="300">
+<pagx width="400" height="300">
   <!-- Manual-positioned Layers without container layout should NOT trigger overlap warnings. -->
   <Layer id="parent" width="400" height="300">
     <Layer id="box1" x="50" y="50" width="200" height="150">

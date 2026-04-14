@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Test file for C13: Simple rectangular mask (can use scrollRect instead) -->
-<pagx version="1.0" width="200" height="100">
+<pagx width="200" height="100">
   <Layer id="maskLayer" name="RectMask" visible="false">
     <Rectangle size="100,50"/>
     <Fill color="#FFFFFF"/>

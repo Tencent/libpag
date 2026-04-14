@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="400" height="400">
+<pagx width="400" height="400">
   <Layer>
     <Group left="200" top="200" anchor="110,110" rotation="12">
       <Rectangle size="220,220" roundness="32"/>

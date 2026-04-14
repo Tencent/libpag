@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates ImagePattern fill with different tile modes -->
-<pagx version="1.0" width="400" height="400">
+<pagx width="400" height="400">
   <!-- Clamp mode: original size, centered in 140x140 rect -->
   <!-- Rectangle left=40,top=40 size=140,140: left-top=(40,40), right-bottom=(180,180) -->
   <!-- Image 256x256, scale 0.5 = 128x128 -->

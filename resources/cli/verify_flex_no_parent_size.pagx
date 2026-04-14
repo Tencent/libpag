@@ -1,4 +1,4 @@
-<pagx version="1.0" width="400" height="300">
+<pagx width="400" height="300">
   <Layer layout="vertical">
     <Layer height="50">
       <Rectangle left="0" right="0" top="0" bottom="0"/>

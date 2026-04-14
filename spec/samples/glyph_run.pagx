@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="400" height="400">
+<pagx width="400" height="400">
   <Layer name="GlyphRunTitle">
     <Text text="GlyphRun" fontFamily="Arial" fontStyle="Bold" fontSize="72">
       <GlyphRun font="@font1" fontSize="72" glyphs="14,15,16,17,18,19,20,21" x="34" y="145" bounds="0,0,335,85"/>

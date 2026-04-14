@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Test file for lint: verify no false positives for painter leak -->
-<pagx version="1.0" width="200" height="200">
+<pagx width="200" height="200">
   <!-- Normal: all geometry before single painter -->
   <Layer name="normal-single-fill">
     <Rectangle size="50,50"/>

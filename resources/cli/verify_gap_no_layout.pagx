@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Test: gap/alignment/arrangement on Layer without layout (should warn) -->
 <!-- padding without layout should NOT warn (it works without layout). -->
-<pagx version="1.0" width="400" height="300">
+<pagx width="400" height="300">
   <!-- gap without layout: should warn -->
   <Layer id="gapNoLayout" width="200" height="100" gap="10">
     <Layer width="50" height="50">

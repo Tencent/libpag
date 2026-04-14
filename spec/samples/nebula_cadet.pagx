@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="800" height="600">
+<pagx width="800" height="600">
   <!-- ======== Decorations (not part of layout) ======== -->
   <Layer name="Decorations" left="0" right="0" top="0" bottom="0" clipToBounds="true">
     <!-- Background -->

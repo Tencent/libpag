@@ -1,4 +1,4 @@
-<pagx version="1.0" width="200" height="200">
+<pagx width="200" height="200">
   <!-- Polystar without explicit position should have layoutBounds starting at (0,0)
        via auto-position. Content-measured Layer should NOT report content-origin-offset. -->
   <Layer centerX="0" centerY="0">

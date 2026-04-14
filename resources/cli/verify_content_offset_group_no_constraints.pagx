@@ -1,4 +1,4 @@
-<pagx version="1.0" width="24" height="24">
+<pagx width="24" height="24">
   <Layer width="24" height="24">
     <Ellipse left="6" top="1" size="12,12"/>
     <Stroke color="#7F8C8D" width="1.8"/>

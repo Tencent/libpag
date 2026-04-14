@@ -510,25 +510,26 @@
   <!-- Rectangle -->
   <xs:complexType name="RectangleType">
     <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attributeGroup ref="ConstraintAttributes"/>
     <xs:attribute name="position" type="PointType"/>
     <xs:attribute name="size" type="SizeType" default="0,0"/>
     <xs:attribute name="roundness" type="xs:decimal" default="0"/>
     <xs:attribute name="reversed" type="BoolType" default="false"/>
-    <xs:attributeGroup ref="ConstraintAttributes"/>
   </xs:complexType>
 
   <!-- Ellipse -->
   <xs:complexType name="EllipseType">
     <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attributeGroup ref="ConstraintAttributes"/>
     <xs:attribute name="position" type="PointType"/>
     <xs:attribute name="size" type="SizeType" default="0,0"/>
     <xs:attribute name="reversed" type="BoolType" default="false"/>
-    <xs:attributeGroup ref="ConstraintAttributes"/>
   </xs:complexType>
 
   <!-- Polystar -->
   <xs:complexType name="PolystarType">
     <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attributeGroup ref="ConstraintAttributes"/>
     <xs:attribute name="position" type="PointType"/>
     <xs:attribute name="type" type="PolystarTypeType" default="star"/>
     <xs:attribute name="pointCount" type="xs:decimal" default="5"/>
@@ -538,16 +539,15 @@
     <xs:attribute name="outerRoundness" type="xs:decimal" default="0"/>
     <xs:attribute name="innerRoundness" type="xs:decimal" default="0"/>
     <xs:attribute name="reversed" type="BoolType" default="false"/>
-    <xs:attributeGroup ref="ConstraintAttributes"/>
   </xs:complexType>
 
   <!-- Path -->
   <xs:complexType name="PathType">
     <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attributeGroup ref="ConstraintAttributes"/>
+    <xs:attribute name="position" type="PointType" default="0,0"/>
     <xs:attribute name="data" type="xs:string" use="required"/>
     <xs:attribute name="reversed" type="BoolType" default="false"/>
-    <xs:attribute name="position" type="PointType" default="0,0"/>
-    <xs:attributeGroup ref="ConstraintAttributes"/>
   </xs:complexType>
 
   <!-- Text -->
@@ -557,6 +557,7 @@
     </xs:sequence>
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="text" type="xs:string"/>
+    <xs:attributeGroup ref="ConstraintAttributes"/>
     <xs:attribute name="position" type="PointType" default="0,0"/>
     <xs:attribute name="fontFamily" type="xs:string" default=""/>
     <xs:attribute name="fontStyle" type="xs:string" default=""/>
@@ -566,7 +567,6 @@
     <xs:attribute name="fauxItalic" type="BoolType" default="false"/>
     <xs:attribute name="textAnchor" type="TextAnchorType" default="start"/>
     <xs:attribute name="baseline" type="TextBaselineType" default="lineBox"/>
-    <xs:attributeGroup ref="ConstraintAttributes"/>
   </xs:complexType>
 
   <!-- ========================= Painters ========================= -->
@@ -948,7 +948,6 @@
         <xs:element name="Layer" type="LayerType"/>
       </xs:choice>
     </xs:sequence>
-    <xs:attribute name="version" type="xs:string" use="required"/>
     <xs:attribute name="width" type="xs:decimal" use="required"/>
     <xs:attribute name="height" type="xs:decimal" use="required"/>
   </xs:complexType>

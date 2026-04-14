@@ -1,4 +1,4 @@
-<pagx version="1.0" width="200" height="60">
+<pagx width="200" height="60">
   <Layer centerX="0" centerY="0">
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="22"/>
     <Fill color="#3B82F6"/>

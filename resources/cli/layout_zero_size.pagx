@@ -1,4 +1,4 @@
-<pagx version="1.0" width="400" height="300">
+<pagx width="400" height="300">
   <Layer id="parent" name="parent" width="400" height="300">
     <Layer id="zero_w" name="zero_w" width="0" height="100">
       <Rectangle left="0" right="0" top="0" bottom="0"/>

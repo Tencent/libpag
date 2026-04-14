@@ -1,4 +1,4 @@
-<pagx version="1.0" width="200" height="200">
+<pagx width="200" height="200">
   <!-- Layer with opposite-edge constraints derives size from constraints, not content.
        Path starting at (50,50) should NOT trigger content-origin-offset warning. -->
   <Layer left="10" right="10" top="10" bottom="10">

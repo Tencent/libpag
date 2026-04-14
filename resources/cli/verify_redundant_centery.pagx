@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Test file for layout: top/bottom overridden by centerY -->
-<pagx version="1.0" width="400" height="300">
+<pagx width="400" height="300">
   <Layer id="parent" width="400" height="300">
     <Layer id="child" width="100" height="50" top="10" bottom="20" centerY="150"/>
   </Layer>

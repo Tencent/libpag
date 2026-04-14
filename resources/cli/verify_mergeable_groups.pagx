@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Test file for lint: adjacent Groups with same painters can be merged -->
-<pagx version="1.0" width="200" height="200">
+<pagx width="200" height="200">
   <Layer name="container">
     <Group>
       <Rectangle size="50,50"/>

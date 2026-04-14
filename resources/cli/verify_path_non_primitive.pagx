@@ -1,4 +1,4 @@
-<pagx version="1.0" width="200" height="200">
+<pagx width="200" height="200">
   <!-- Heart shape: M C C C C Z verb pattern matches ellipse check, but geometry is NOT
        an ellipse. Should NOT suggest replacement with Ellipse.
        Diamond shape: M L L L Z verb pattern matches rectangle check, but edges are NOT

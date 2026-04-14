@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates TrimPath: separate vs continuous mode comparison -->
-<pagx version="1.0" width="400" height="400">
+<pagx width="400" height="400">
   <Layer left="0" right="0" top="0" bottom="0" layout="vertical" alignment="center" arrangement="spaceEvenly">
     <!-- Row 1: Separate mode ellipses -->
     <Layer>

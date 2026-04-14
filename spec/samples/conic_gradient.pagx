@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates conic (sweep) gradient -->
-<pagx version="1.0" width="400" height="400">
+<pagx width="400" height="400">
   <Layer>
     <Ellipse left="40" top="40" size="320,320"/>
     <Fill>

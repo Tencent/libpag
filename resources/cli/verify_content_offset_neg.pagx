@@ -1,4 +1,4 @@
-<pagx version="1.0" width="300" height="200">
+<pagx width="300" height="200">
   <Layer centerX="0" centerY="0">
     <Path data="M -20 0 L 80 0 L 80 60 L -20 60 Z"/>
     <Fill color="#F00"/>

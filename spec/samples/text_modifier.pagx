@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="400" height="400">
+<pagx width="400" height="400">
   <Layer left="0" right="0" top="0" bottom="0" layout="vertical" arrangement="spaceEvenly" alignment="center">
     <!-- Wave effect: triangle selector shifts characters vertically -->
     <Layer>

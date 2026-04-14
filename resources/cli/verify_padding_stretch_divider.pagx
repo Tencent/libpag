@@ -1,5 +1,5 @@
 <!-- Test: stretch-fill divider affected by horizontal padding -->
-<pagx version="1.0" width="400" height="200">
+<pagx width="400" height="200">
   <Layer width="400" height="200" padding="16">
     <Rectangle left="0" right="0" size="0,1"/>
     <Fill color="#ECF0F1"/>

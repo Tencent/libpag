@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Test: layer completely outside visible region at various nesting levels -->
-<pagx version="1.0" width="400" height="300">
+<pagx width="400" height="300">
   <!-- Case 1: direct child of canvas, completely off-canvas (x=500 > width=400) -->
   <Layer x="500">
     <Rectangle size="100,100"/>

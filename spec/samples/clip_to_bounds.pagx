@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates clipToBounds: clips overflowing content to layer bounds -->
-<pagx version="1.0" width="400" height="400">
+<pagx width="400" height="400">
   <Layer left="100" top="100" width="200" height="200" clipToBounds="true">
     <Ellipse left="-20" right="-20" top="-20" bottom="-20"/>
     <Fill>

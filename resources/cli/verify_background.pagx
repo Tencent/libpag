@@ -1,4 +1,4 @@
-<pagx version="1.0" width="400" height="300">
+<pagx width="400" height="300">
   <!-- Background Rectangle should NOT cause overlap warnings with child Layers. -->
   <Layer id="card" width="400" height="300" layout="vertical">
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>

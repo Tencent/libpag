@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Test file for lint: empty Layer and empty Group -->
-<pagx version="1.0" width="200" height="200">
+<pagx width="200" height="200">
   <!-- Should warn: pure empty shell -->
   <Layer name="emptyLayer"/>
   <Layer name="hasContent">
