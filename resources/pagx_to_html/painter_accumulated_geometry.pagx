@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Multi-geometry accumulated by one painter (each painter renders ALL accumulated geometries) -->
-<pagx version="1.0" width="320" height="340">
+<pagx version="1.0" width="320" height="300">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -27,57 +27,30 @@
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16" gap="6" alignment="center" arrangement="center">
-        <!-- Both shapes rendered by the same Fill+Stroke -->
-        <Layer layout="horizontal" gap="12" alignment="center" arrangement="center">
-          <Layer layout="vertical" gap="4" alignment="center">
-            <Layer width="80" height="80">
-              <Layer name="rectDemo">
-                <Rectangle position="40,40" size="80,80" roundness="8"/>
-                <Fill color="#8B5CF6"/>
-                <Stroke color="#FFFFFF" width="2"/>
-              </Layer>
-            </Layer>
-            <Layer height="12">
-              <Text text="Rectangle" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
-              <Fill color="#64748B"/>
-            </Layer>
-          </Layer>
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16" gap="8" alignment="center" arrangement="center">
+        <!-- Shapes: Rectangle + Ellipse sharing one Fill + one Stroke -->
+        <Layer width="200" height="100">
+          <Rectangle position="55,50" size="80,80" roundness="8"/>
+          <Ellipse position="145,50" size="80,80"/>
+          <Fill color="#8B5CF6"/>
+          <Stroke color="#FFFFFF" width="2"/>
+        </Layer>
 
-          <Layer height="20">
-            <Text text="+" fontFamily="Arial" fontStyle="Bold" fontSize="18" centerX="0" centerY="0" textAnchor="center"/>
-            <Fill color="#94A3B8"/>
+        <!-- Labels -->
+        <Layer layout="horizontal" gap="40" alignment="center" arrangement="center">
+          <Layer height="12">
+            <Text text="Rectangle" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
           </Layer>
-
-          <Layer layout="vertical" gap="4" alignment="center">
-            <Layer width="80" height="80">
-              <Layer name="ellipseDemo">
-                <Ellipse position="40,40" size="80,80"/>
-                <Fill color="#8B5CF6"/>
-                <Stroke color="#FFFFFF" width="2"/>
-              </Layer>
-            </Layer>
-            <Layer height="12">
-              <Text text="Ellipse" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
-              <Fill color="#64748B"/>
-            </Layer>
+          <Layer height="12">
+            <Text text="Ellipse" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
           </Layer>
         </Layer>
 
-        <!-- Combined: one Fill+Stroke paints both geometries -->
-        <Layer layout="vertical" gap="4" alignment="center">
-          <Layer width="160" height="80">
-            <Layer name="combined">
-              <Rectangle position="40,40" size="70,70" roundness="8"/>
-              <Ellipse position="120,40" size="70,70"/>
-              <Fill color="#8B5CF6"/>
-              <Stroke color="#FFFFFF" width="2"/>
-            </Layer>
-          </Layer>
-          <Layer height="12">
-            <Text text="Shared Fill + Stroke" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
-            <Fill color="#94A3B8"/>
-          </Layer>
+        <Layer height="12">
+          <Text text="Shared Fill + Stroke" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
+          <Fill color="#94A3B8"/>
         </Layer>
       </Layer>
     </Layer>
