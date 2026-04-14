@@ -106,7 +106,7 @@
               <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
               <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
               <TextBox left="0" right="0" top="0" bottom="0" wordWrap="false">
-                <Text text="No word wrap long text" fontFamily="Arial" fontSize="14"/>
+                <Text text="No wrap text" fontFamily="Arial" fontSize="14"/>
                 <Fill color="#F59E0B"/>
               </TextBox>
             </Layer>
