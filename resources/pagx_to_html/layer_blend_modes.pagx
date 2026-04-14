@@ -39,7 +39,7 @@
         </Fill>
 
         <!-- 3x6 grid of blend mode samples -->
-        <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="10" gap="6" alignment="stretch" arrangement="center">
+        <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="10" gap="14" alignment="stretch" arrangement="center">
           <!-- Row 1 -->
           <Layer layout="horizontal" gap="4" alignment="center" arrangement="spaceEvenly">
             <Layer layout="vertical" gap="2" alignment="center">
