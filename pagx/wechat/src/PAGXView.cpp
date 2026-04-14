@@ -143,7 +143,7 @@ void PAGXView::registerFonts(const val& fontVal, const val& emojiFontVal) {
     }
   }
   double parseEmojiMs = emscripten_get_now();
-  textLayout.addFallbackTypefaces(std::move(fallbackTypefaces));
+  fontConfig.addFallbackTypefaces(std::move(fallbackTypefaces));
   double endMs = emscripten_get_now();
   tgfx::PrintLog("[PAGX Perf] registerFonts total=%.1fms (copyFont=%.1fms parseFont=%.1fms "
          "copyEmoji=%.1fms parseEmoji=%.1fms)\n",
@@ -217,13 +217,16 @@ void PAGXView::buildLayers() {
   resolveAllImagePatternMatrices(document.get());
   double resolveMs = emscripten_get_now();
 
-  contentLayer = LayerBuilder::Build(document.get(), &textLayout, MAX_IMAGE_DIMENSION);
+  document->applyLayout(&fontConfig);
+  double layoutMs = emscripten_get_now();
+
+  contentLayer = LayerBuilder::Build(document.get());
   double buildMs = emscripten_get_now();
 
   if (!contentLayer) {
     tgfx::PrintLog("[PAGX Perf] buildLayers failed: LayerBuilder returned null "
-           "(resolve=%.1fms build=%.1fms)\n",
-           resolveMs - startMs, buildMs - resolveMs);
+           "(resolve=%.1fms layout=%.1fms build=%.1fms)\n",
+           resolveMs - startMs, layoutMs - resolveMs, buildMs - layoutMs);
     return;
   }
   hasRenderedFirstFrame = false;
@@ -236,8 +239,9 @@ void PAGXView::buildLayers() {
   double endMs = emscripten_get_now();
 
   tgfx::PrintLog("[PAGX Perf] buildLayers total=%.1fms (resolveImagePatterns=%.1fms "
-         "LayerBuilder::Build=%.1fms setupDisplayList=%.1fms)\n",
-         endMs - startMs, resolveMs - startMs, buildMs - resolveMs, endMs - buildMs);
+         "applyLayout=%.1fms LayerBuilder::Build=%.1fms setupDisplayList=%.1fms)\n",
+         endMs - startMs, resolveMs - startMs, layoutMs - resolveMs, 
+         buildMs - layoutMs, endMs - buildMs);
 }
 
 void PAGXView::applyDocumentCustomData() {

@@ -23,6 +23,7 @@
 #include "tgfx/core/Color.h"
 #include "tgfx/gpu/Recording.h"
 #include "tgfx/layers/DisplayList.h"
+#include "pagx/FontConfig.h"
 #include "pagx/PAGXDocument.h"
 #include "LayerBuilder.h"
 
@@ -185,7 +186,7 @@ class PAGXView {
   float pagxHeight = 0.0f;
   int _width = 0;
   int _height = 0;
-  TextLayout textLayout = {};
+  FontConfig fontConfig = {};
 
   // Background state from the PAGX document
   bool backgroundVisible = false;
