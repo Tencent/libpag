@@ -2,7 +2,7 @@
 <!-- Tests: Integration showcase — text-focused art combining TextModifier with anchor/skew/rotation/scale/fillColor,
      TextPath along circle, fauxBold/fauxItalic, TextBox writingMode="vertical", GlyphRun with per-glyph transforms,
      Stroke on text, RadialGradient fill on text, multiple RangeSelector, letterSpacing -->
-<pagx version="1.0" width="420" height="360">
+<pagx version="1.0" width="420" height="380">
   <Resources>
     <PathData id="circlePath" data="M 200,130 A 70,70 0 1,1 199.99,130"/>
     <RadialGradient id="textRadial" center="210,210" radius="180">
@@ -10,7 +10,7 @@
       <ColorStop offset="0.5" color="#C084FC"/>
       <ColorStop offset="1" color="#3B82F6"/>
     </RadialGradient>
-    <LinearGradient id="bgGrad" startPoint="10,10" endPoint="410,310">
+    <LinearGradient id="bgGrad" startPoint="10,10" endPoint="410,350">
       <ColorStop offset="0" color="#0F172A"/>
       <ColorStop offset="1" color="#1E1040"/>
     </LinearGradient>
@@ -41,77 +41,75 @@
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="@bgGrad"/>
 
-      <!-- Decorative grid dots -->
-      <Layer alpha="0.1">
-        <Ellipse position="50,40" size="4,4"/>
-        <Repeater copies="5" offset="0" position="75,10" rotation="0"/>
-        <Fill color="#FFFFFF"/>
-      </Layer>
-      <Layer alpha="0.1">
-        <Ellipse position="50,110" size="4,4"/>
-        <Repeater copies="5" offset="0" position="75,10" rotation="0"/>
-        <Fill color="#FFFFFF"/>
-      </Layer>
-      <Layer alpha="0.1">
-        <Ellipse position="50,180" size="4,4"/>
-        <Repeater copies="5" offset="0" position="75,10" rotation="0"/>
-        <Fill color="#FFFFFF"/>
-      </Layer>
+      <!-- Card inner layout: main area + bottom row -->
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16" gap="10" alignment="stretch">
 
-      <!-- Large display text "TYPE" -->
-      <Layer>
-        <Text text="TYPE" fontFamily="Arial" fontStyle="Bold" fontSize="72" position="180,195" textAnchor="center" letterSpacing="8"/>
-        <Fill color="@textRadial"/>
-        <Stroke color="#FFFFFF30" width="2"/>
-      </Layer>
+        <!-- Top section: circle text + TYPE + vertical ART -->
+        <Layer flex="1" layout="horizontal" gap="8" alignment="stretch">
 
-      <!-- TextPath: text along circle -->
-      <Layer>
-        <Text text="CREATIVE TYPOGRAPHY POSTER" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="10,10" letterSpacing="3"/>
-        <TextPath path="@circlePath" baselineOrigin="0,0" perpendicular="true" forceAlignment="true"/>
-        <Fill color="#C084FC"/>
-      </Layer>
+          <!-- Left column: TYPE + TextPath circle -->
+          <Layer flex="1" layout="vertical" gap="4" alignment="center" arrangement="center">
+            <!-- Large display text "TYPE" with gradient fill and stroke -->
+            <Layer height="60">
+              <Text text="TYPE" fontFamily="Arial" fontStyle="Bold" fontSize="52" centerX="0" textAnchor="center" letterSpacing="6"/>
+              <Fill color="@textRadial"/>
+              <Stroke color="#FFFFFF30" width="2"/>
+            </Layer>
 
-      <!-- TextModifier demo: wave text -->
-      <Layer>
-        <Text text="DESIGN" fontFamily="Arial" fontStyle="Bold" fontSize="24" position="180,245" textAnchor="center"/>
-        <TextModifier position="10,6" skew="15" rotation="5" fillColor="#FFE66D">
-          <RangeSelector start="0" end="1" shape="triangle" weight="1"/>
-          <RangeSelector start="0.3" end="0.7" shape="smooth" mode="add" weight="0.5"/>
-        </TextModifier>
-        <Fill color="#FF6B6B"/>
-      </Layer>
+            <!-- TextPath: text along circle -->
+            <Layer width="160" height="160">
+              <Text text="CREATIVE TYPOGRAPHY POSTER" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="10,10" letterSpacing="3"/>
+              <TextPath path="@circlePath" baselineOrigin="0,0" perpendicular="true" forceAlignment="true"/>
+              <Fill color="#C084FC"/>
+            </Layer>
+          </Layer>
 
-      <!-- Vertical text -->
-      <Layer>
-        <Text text="ART" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
-        <TextBox position="330,40" size="30,120" writingMode="vertical" textAlign="center" paragraphAlign="middle"/>
-        <Fill color="#4ECDC4"/>
-      </Layer>
+          <!-- Right column: vertical ART text -->
+          <Layer width="36" layout="vertical" alignment="center" arrangement="center">
+            <Layer name="artBox" width="36" height="120">
+              <Text text="ART" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+              <TextBox position="18,60" width="36" height="120" writingMode="vertical" textAlign="center" paragraphAlign="middle"/>
+              <Fill color="#4ECDC4"/>
+            </Layer>
+          </Layer>
+        </Layer>
 
-      <!-- FauxBold + FauxItalic -->
-      <Layer>
-        <Text text="Bold" fontFamily="Arial" fontSize="14" position="25,260" fauxBold="true"/>
-        <Fill color="#F59E0B"/>
-      </Layer>
-      <Layer>
-        <Text text="Italic" fontFamily="Arial" fontSize="14" position="78,260" fauxItalic="true"/>
-        <Fill color="#10B981"/>
-      </Layer>
+        <!-- Bottom row: TextModifier demos + faux styles -->
+        <Layer layout="horizontal" gap="12" alignment="center" arrangement="spaceEvenly">
 
-      <!-- TextModifier with scale and anchor offset -->
-      <Layer>
-        <Text text="SCALE" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="295,260" textAnchor="center" letterSpacing="2"/>
-        <TextModifier anchor="0,8" scale="1.3,1.3">
-          <RangeSelector start="0" end="1" shape="rampUp"/>
-        </TextModifier>
-        <Fill color="#3B82F6"/>
-      </Layer>
+          <!-- TextModifier demo: wave text -->
+          <Layer layout="vertical" gap="2" alignment="center">
+            <Layer height="24">
+              <Text text="DESIGN" fontFamily="Arial" fontStyle="Bold" fontSize="20" centerX="0" textAnchor="center"/>
+              <TextModifier position="8,4" skew="12" rotation="4" fillColor="#FFE66D">
+                <RangeSelector start="0" end="1" shape="triangle" weight="1"/>
+                <RangeSelector start="0.3" end="0.7" shape="smooth" mode="add" weight="0.5"/>
+              </TextModifier>
+              <Fill color="#FF6B6B"/>
+            </Layer>
+          </Layer>
 
-      <!-- Small decorative accent line -->
-      <Layer>
-        <Path data="M 20,265 L 340,265"/>
-        <Stroke color="#FFFFFF15" width="1"/>
+          <!-- FauxBold -->
+          <Layer height="18">
+            <Text text="Bold" fontFamily="Arial" fontSize="14" centerX="0" textAnchor="center" fauxBold="true"/>
+            <Fill color="#F59E0B"/>
+          </Layer>
+
+          <!-- FauxItalic -->
+          <Layer height="18">
+            <Text text="Italic" fontFamily="Arial" fontSize="14" centerX="0" textAnchor="center" fauxItalic="true"/>
+            <Fill color="#10B981"/>
+          </Layer>
+
+          <!-- TextModifier with scale -->
+          <Layer height="18">
+            <Text text="SCALE" fontFamily="Arial" fontStyle="Bold" fontSize="14" centerX="0" textAnchor="center" letterSpacing="2"/>
+            <TextModifier anchor="0,6" scale="1.3,1.3">
+              <RangeSelector start="0" end="1" shape="rampUp"/>
+            </TextModifier>
+            <Fill color="#3B82F6"/>
+          </Layer>
+        </Layer>
       </Layer>
     </Layer>
   </Layer>
