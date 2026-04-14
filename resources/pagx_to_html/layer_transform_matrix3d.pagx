@@ -2,31 +2,38 @@
 <!-- Tests: Layer matrix3D → transform: matrix3d(...), preserve3D → transform-style: preserve-3d -->
 <pagx version="1.0" width="360" height="290">
   <!-- Background -->
-  <Layer>
-    <Rectangle position="180,145" size="360,290"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
-  <!-- Title -->
-  <Layer>
-    <Text text="3D Matrix Transform" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="180,34" textAnchor="center"/>
-    <Fill color="#1E293B"/>
-  </Layer>
-  <Layer>
-    <Text text="matrix3D with preserve-3D enabled" fontFamily="Arial" fontSize="10" position="180,50" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="stretch">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="4" alignment="center">
+      <Layer height="20">
+        <Text text="3D Matrix Transform" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="matrix3D with preserve-3D enabled" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
 
-  <!-- Card -->
-  <Layer>
-    <Rectangle position="180,165" size="300,180" roundness="16"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
-  </Layer>
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-  <!-- 3D rotated rectangle -->
-  <Layer matrix3D="0.966,0,0.259,0,0,1,0,0,-0.259,0,0.966,0,120,140,0,1" preserve3D="true">
-    <Rectangle position="10,10" size="120,120" roundness="12"/>
-    <Fill color="#EC4899"/>
+      <!-- 3D rotated rectangle centered in card -->
+      <Layer width="130" height="130" centerX="0" centerY="0">
+        <Layer matrix3D="0.966,0,0.259,0,0,1,0,0,-0.259,0,0.966,0,5,5,0,1" preserve3D="true">
+          <Rectangle position="60,60" size="120,120" roundness="12"/>
+          <Fill color="#EC4899"/>
+        </Layer>
+      </Layer>
+    </Layer>
   </Layer>
 </pagx>
