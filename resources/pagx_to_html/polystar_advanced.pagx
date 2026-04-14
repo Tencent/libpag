@@ -23,17 +23,17 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="vertical" gap="10" padding="15,25,15,25" alignment="center" arrangement="center">
+    <Layer flex="1" layout="vertical" gap="10" padding="12,16,12,16" alignment="stretch" arrangement="center">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
       <!-- Row 1: 5.5pts, Flower, Reversed, Soft Hex -->
-      <Layer layout="horizontal" gap="16" arrangement="center">
+      <Layer layout="horizontal" gap="6" arrangement="spaceEvenly">
         <!-- Fractional 5.5 -->
-        <Layer width="96" layout="vertical" gap="4" alignment="center">
-          <Layer width="96" height="96">
-            <Polystar position="48,48" type="star" pointCount="5.5" outerRadius="45" innerRadius="20" rotation="-90"/>
+        <Layer flex="1" layout="vertical" gap="4" alignment="center">
+          <Layer width="80" height="80">
+            <Polystar position="40,40" type="star" pointCount="5.5" outerRadius="38" innerRadius="20" rotation="-90"/>
             <Fill color="#3B82F6"/>
           </Layer>
           <Layer height="12">
@@ -42,9 +42,9 @@
           </Layer>
         </Layer>
         <!-- Flower -->
-        <Layer width="96" layout="vertical" gap="4" alignment="center">
-          <Layer width="96" height="96">
-            <Polystar position="48,48" type="star" pointCount="8" outerRadius="45" innerRadius="22" outerRoundness="0.7" innerRoundness="0.8" rotation="0"/>
+        <Layer flex="1" layout="vertical" gap="4" alignment="center">
+          <Layer width="80" height="80">
+            <Polystar position="40,40" type="star" pointCount="8" outerRadius="38" innerRadius="22" outerRoundness="0.7" innerRoundness="0.8" rotation="0"/>
             <Fill color="#EC4899"/>
           </Layer>
           <Layer height="12">
@@ -53,9 +53,9 @@
           </Layer>
         </Layer>
         <!-- Reversed -->
-        <Layer width="96" layout="vertical" gap="4" alignment="center">
-          <Layer width="96" height="96">
-            <Polystar position="48,48" type="star" pointCount="6" outerRadius="45" innerRadius="25" rotation="-90" reversed="true"/>
+        <Layer flex="1" layout="vertical" gap="4" alignment="center">
+          <Layer width="80" height="80">
+            <Polystar position="40,40" type="star" pointCount="6" outerRadius="38" innerRadius="25" rotation="-90" reversed="true"/>
             <Fill color="#10B981"/>
           </Layer>
           <Layer height="12">
@@ -64,9 +64,9 @@
           </Layer>
         </Layer>
         <!-- Soft Hex -->
-        <Layer width="96" layout="vertical" gap="4" alignment="center">
-          <Layer width="96" height="96">
-            <Polystar position="48,48" type="polygon" pointCount="6" outerRadius="40" outerRoundness="0.6" rotation="-90"/>
+        <Layer flex="1" layout="vertical" gap="4" alignment="center">
+          <Layer width="80" height="80">
+            <Polystar position="40,40" type="polygon" pointCount="6" outerRadius="40" outerRoundness="0.6" rotation="-90"/>
             <Fill color="#F59E0B"/>
           </Layer>
           <Layer height="12">
@@ -77,11 +77,11 @@
       </Layer>
 
       <!-- Row 2: 3.7 polygon, Max round, Rev polygon, 2.3 pts -->
-      <Layer layout="horizontal" gap="16" arrangement="center">
+      <Layer layout="horizontal" gap="6" arrangement="spaceEvenly">
         <!-- 3.7 polygon -->
-        <Layer width="96" layout="vertical" gap="4" alignment="center">
-          <Layer width="96" height="60">
-            <Polystar position="48,30" type="polygon" pointCount="3.7" outerRadius="28" rotation="-90"/>
+        <Layer flex="1" layout="vertical" gap="4" alignment="center">
+          <Layer width="80" height="55">
+            <Polystar position="40,27" type="polygon" pointCount="3.7" outerRadius="28" rotation="-90"/>
             <Fill color="#8B5CF6"/>
           </Layer>
           <Layer height="12">
@@ -90,9 +90,9 @@
           </Layer>
         </Layer>
         <!-- Max round -->
-        <Layer width="96" layout="vertical" gap="4" alignment="center">
-          <Layer width="96" height="60">
-            <Polystar position="48,30" type="star" pointCount="5" outerRadius="28" innerRadius="14" outerRoundness="1" innerRoundness="1" rotation="-90"/>
+        <Layer flex="1" layout="vertical" gap="4" alignment="center">
+          <Layer width="80" height="55">
+            <Polystar position="40,27" type="star" pointCount="5" outerRadius="28" innerRadius="14" outerRoundness="1" innerRoundness="1" rotation="-90"/>
             <Fill color="#EF4444"/>
           </Layer>
           <Layer height="12">
@@ -101,9 +101,9 @@
           </Layer>
         </Layer>
         <!-- Rev polygon -->
-        <Layer width="96" layout="vertical" gap="4" alignment="center">
-          <Layer width="96" height="60">
-            <Polystar position="48,30" type="polygon" pointCount="5" outerRadius="28" rotation="-90" reversed="true"/>
+        <Layer flex="1" layout="vertical" gap="4" alignment="center">
+          <Layer width="80" height="55">
+            <Polystar position="40,27" type="polygon" pointCount="5" outerRadius="28" rotation="-90" reversed="true"/>
             <Fill color="#06B6D4"/>
           </Layer>
           <Layer height="12">
@@ -112,9 +112,9 @@
           </Layer>
         </Layer>
         <!-- 2.3 pts -->
-        <Layer width="96" layout="vertical" gap="4" alignment="center">
-          <Layer width="96" height="60">
-            <Polystar position="48,30" type="star" pointCount="2.3" outerRadius="28" innerRadius="12" rotation="-90"/>
+        <Layer flex="1" layout="vertical" gap="4" alignment="center">
+          <Layer width="80" height="55">
+            <Polystar position="40,27" type="star" pointCount="2.3" outerRadius="28" innerRadius="12" rotation="-90"/>
             <Fill color="#D946EF"/>
           </Layer>
           <Layer height="12">
