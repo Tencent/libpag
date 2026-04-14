@@ -86,11 +86,11 @@
 
           <!-- overflow=hidden -->
           <Layer layout="vertical" gap="4" alignment="center">
-            <Layer width="120" height="60">
+            <Layer width="120" height="50">
               <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
               <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-              <TextBox left="0" right="0" top="0" bottom="0" overflow="hidden" paragraphAlign="far">
-                <Text text="This long text should be clipped by overflow hidden." fontFamily="Arial" fontSize="14"/>
+              <TextBox left="0" right="0" top="0" bottom="0" overflow="hidden">
+                <Text text="Text line 1. Text line 2. Text line 3. Text line 4. Text line 5." fontFamily="Arial" fontSize="12"/>
                 <Fill color="#EF4444"/>
               </TextBox>
             </Layer>
