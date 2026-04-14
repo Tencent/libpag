@@ -1347,6 +1347,15 @@ static void DetectRectangularMask(const Layer* layer, std::vector<VerifyDiagnost
   if (!maskLayer->matrix.isIdentity()) {
     return;
   }
+  auto* rect = static_cast<Rectangle*>(maskLayer->contents[0]);
+  if (rect->roundness > 0.0f) {
+    return;
+  }
+  float maskLeft = rect->position.x - rect->size.width * 0.5f;
+  float maskTop = rect->position.y - rect->size.height * 0.5f;
+  if (std::abs(maskLeft) > 0.5f || std::abs(maskTop) > 0.5f) {
+    return;
+  }
   AddDiagnostic(diagnostics, layer->sourceLine,
                 "rectangular alpha mask can use clipToBounds instead. "
                 "Fix: check if clipToBounds=\"true\" can replace the mask for better performance");

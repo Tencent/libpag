@@ -110,6 +110,29 @@ static int CallRun(int (*fn)(int, char*[]), std::vector<std::string> args) {
   return fn(static_cast<int>(argv.size()), argv.data());
 }
 
+static void VerifyFile(const std::string& filePath, const std::string& key) {
+  std::streambuf* oldErr = std::cerr.rdbuf();
+  std::ostringstream verifyErr;
+  std::cerr.rdbuf(verifyErr.rdbuf());
+  auto verifyRet =
+      CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", filePath});
+  std::cerr.rdbuf(oldErr);
+  if (verifyRet != 0) {
+    auto output = verifyErr.str();
+    std::istringstream stream(output);
+    std::string line;
+    std::string fixable;
+    while (std::getline(stream, line)) {
+      bool isInfoOnly = line.find("Path with") != std::string::npos &&
+                        line.find("may cause slow rendering") != std::string::npos;
+      if (!isInfoOnly && !line.empty()) {
+        fixable += line + "\n";
+      }
+    }
+    EXPECT_TRUE(fixable.empty()) << "pagx verify failed for " << key << ":\n" << fixable;
+  }
+}
+
 static std::string ExportToSVG(const std::string& pagxResourceName, const std::string& svgTempName,
                                std::vector<std::string> extraExportArgs = {}) {
   auto pagxPath = TestResourcePath(pagxResourceName);
@@ -1024,6 +1047,7 @@ CLI_TEST(PAGXCliTest, Import_SvgToPagx_Basic) {
   auto output = ReadFile(outputPath);
   EXPECT_NE(output.find("<pagx"), std::string::npos);
   EXPECT_NE(output.find("</pagx>"), std::string::npos);
+  VerifyFile(outputPath, "Import_SvgToPagx_Basic");
 }
 
 CLI_TEST(PAGXCliTest, Import_SvgToPagx_Gradient) {
@@ -1033,6 +1057,7 @@ CLI_TEST(PAGXCliTest, Import_SvgToPagx_Gradient) {
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
   EXPECT_NE(output.find("<pagx"), std::string::npos);
+  VerifyFile(outputPath, "Import_SvgToPagx_Gradient");
 }
 
 CLI_TEST(PAGXCliTest, Import_SvgToPagx_Text) {
@@ -1043,6 +1068,7 @@ CLI_TEST(PAGXCliTest, Import_SvgToPagx_Text) {
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
   EXPECT_NE(output.find("<pagx"), std::string::npos);
+  VerifyFile(outputPath, "Import_SvgToPagx_Text");
 }
 
 CLI_TEST(PAGXCliTest, Import_SvgToPagx_RoundTrip) {
@@ -1050,6 +1076,7 @@ CLI_TEST(PAGXCliTest, Import_SvgToPagx_RoundTrip) {
   auto outputPath = TempDir() + "/ImportSVG_RoundTrip.pagx";
   auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
+  VerifyFile(outputPath, "Import_SvgToPagx_RoundTrip");
 }
 
 CLI_TEST(PAGXCliTest, Import_SvgToPagx_Scale) {
@@ -1059,6 +1086,7 @@ CLI_TEST(PAGXCliTest, Import_SvgToPagx_Scale) {
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
   EXPECT_NE(output.find("<pagx"), std::string::npos);
+  VerifyFile(outputPath, "Import_SvgToPagx_Scale");
 }
 
 CLI_TEST(PAGXCliTest, Import_ForceFormat) {
@@ -1069,6 +1097,7 @@ CLI_TEST(PAGXCliTest, Import_ForceFormat) {
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
   EXPECT_NE(output.find("<pagx"), std::string::npos);
+  VerifyFile(outputPath, "Import_ForceFormat");
 }
 
 CLI_TEST(PAGXCliTest, Import_DefaultOutput) {
@@ -1077,6 +1106,7 @@ CLI_TEST(PAGXCliTest, Import_DefaultOutput) {
   EXPECT_EQ(ret, 0);
   auto defaultOutput = TempDir() + "/ImportSVG_Default.pagx";
   EXPECT_TRUE(std::filesystem::exists(defaultOutput));
+  VerifyFile(defaultOutput, "Import_DefaultOutput");
 }
 
 CLI_TEST(PAGXCliTest, Import_MissingFile) {
@@ -1133,6 +1163,7 @@ CLI_TEST(PAGXCliTest, Import_SvgOptions) {
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
   EXPECT_NE(output.find("<pagx"), std::string::npos);
+  VerifyFile(outputPath, "Import_SvgOptions");
 }
 
 CLI_TEST(PAGXCliTest, Import_UnexpectedArgument) {

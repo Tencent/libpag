@@ -26,6 +26,7 @@
 #include "cli/CommandImport.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/PAGXOptimizer.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/LayoutNode.h"
@@ -329,6 +330,8 @@ int RunResolve(int argc, char* argv[]) {
   if (resolvedCount == 0 && errorCount == 0) {
     return 0;
   }
+
+  PAGXOptimizer::Optimize(doc.get());
 
   auto xml = PAGXExporter::ToXML(*doc);
   std::ofstream out(options.outputFile);
