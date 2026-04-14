@@ -22,55 +22,58 @@
       </Layer>
     </Layer>
 
-    <!-- Content area -->
-    <Layer flex="1" layout="vertical" alignment="center" arrangement="center">
-      <Layer width="260" height="135">
-      <!-- Visible layer: solid card with label -->
-      <Layer>
-        <Rectangle position="95,125" size="110,120" roundness="12"/>
-        <Fill color="#3B82F6"/>
-        <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#3B82F640"/>
-      </Layer>
-      <!-- Visible icon: eye open (circle + dot) -->
-      <Layer>
-        <Ellipse position="95,115" size="28,18"/>
-        <Stroke color="#FFFFFF" width="2"/>
-      </Layer>
-      <Layer>
-        <Ellipse position="95,115" size="8,8"/>
-        <Fill color="#FFFFFF"/>
-      </Layer>
-      <!-- "Visible" label -->
-      <Layer>
-        <Text text="Visible" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="95,149" textAnchor="center"/>
-        <Fill color="#FFFFFF"/>
-      </Layer>
-
-      <!-- Hidden layer: this should not render (visible=false) -->
-      <Layer visible="false">
-        <Rectangle position="225,125" size="110,120" roundness="12"/>
-        <Fill color="#EF4444"/>
+    <!-- Content area: two columns -->
+    <Layer flex="1" layout="horizontal" padding="10" gap="12" alignment="center" arrangement="spaceEvenly">
+      <!-- Left: Visible layer -->
+      <Layer layout="vertical" gap="6" alignment="center" arrangement="center">
+        <Layer width="110" height="100">
+          <!-- Solid card -->
+          <Rectangle position="55,50" size="110,100" roundness="12"/>
+          <Fill color="#3B82F6"/>
+          <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#3B82F640"/>
+          <!-- Eye icon -->
+          <Layer>
+            <Ellipse position="55,42" size="28,18"/>
+            <Stroke color="#FFFFFF" width="2"/>
+          </Layer>
+          <Layer>
+            <Ellipse position="55,42" size="8,8"/>
+            <Fill color="#FFFFFF"/>
+          </Layer>
+          <!-- Label -->
+          <Layer>
+            <Text text="Visible" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="55,68" textAnchor="center"/>
+            <Fill color="#FFFFFF"/>
+          </Layer>
+        </Layer>
       </Layer>
 
-      <!-- Ghost outline indicator for the hidden element (always visible) -->
-      <Layer>
-        <Rectangle position="225,125" size="110,120" roundness="12"/>
-        <Stroke color="#CBD5E1" width="2" dashes="6,4"/>
-      </Layer>
-      <!-- Crossed-out eye icon -->
-      <Layer>
-        <Ellipse position="225,115" size="28,18"/>
-        <Stroke color="#94A3B8" width="2"/>
-      </Layer>
-      <Layer>
-        <Path data="M 202,95 L 228,115"/>
-        <Stroke color="#94A3B8" width="2" cap="round"/>
-      </Layer>
-      <!-- "Hidden" label -->
-      <Layer>
-        <Text text="Hidden" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="225,149" textAnchor="center"/>
-        <Fill color="#94A3B8"/>
-      </Layer>
+      <!-- Right: Hidden layer -->
+      <Layer layout="vertical" gap="6" alignment="center" arrangement="center">
+        <Layer width="110" height="100">
+          <!-- Hidden card (should not render) -->
+          <Layer visible="false">
+            <Rectangle position="55,50" size="110,100" roundness="12"/>
+            <Fill color="#EF4444"/>
+          </Layer>
+          <!-- Ghost outline -->
+          <Rectangle position="55,50" size="110,100" roundness="12"/>
+          <Stroke color="#CBD5E1" width="2" dashes="6,4"/>
+          <!-- Crossed-out eye icon -->
+          <Layer>
+            <Ellipse position="55,42" size="28,18"/>
+            <Stroke color="#94A3B8" width="2"/>
+          </Layer>
+          <Layer>
+            <Path data="M 32,22 L 58,42"/>
+            <Stroke color="#94A3B8" width="2" cap="round"/>
+          </Layer>
+          <!-- Label -->
+          <Layer>
+            <Text text="Hidden" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="55,68" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+        </Layer>
       </Layer>
     </Layer>
 
