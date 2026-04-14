@@ -4,7 +4,7 @@
      Stroke with round cap and various widths -->
 <pagx version="1.0" width="420" height="460">
   <Resources>
-    <LinearGradient id="rainbowStroke" startPoint="0,-140" endPoint="0,140">
+    <ConicGradient id="rainbowConic" center="210,210" startAngle="0" endAngle="360">
       <ColorStop offset="0" color="#9333EA"/>
       <ColorStop offset="0.17" color="#DC2626"/>
       <ColorStop offset="0.33" color="#F59E0B"/>
@@ -12,7 +12,7 @@
       <ColorStop offset="0.67" color="#0EA5E9"/>
       <ColorStop offset="0.83" color="#8B5CF6"/>
       <ColorStop offset="1" color="#9333EA"/>
-    </LinearGradient>
+    </ConicGradient>
     <RadialGradient id="goldRadial" center="25,25" radius="25">
       <ColorStop offset="0" color="#F59E0B"/>
       <ColorStop offset="0.5" color="#D97706"/>
@@ -57,7 +57,7 @@
       <Layer blendMode="screen" alpha="0.8" x="180" y="180">
         <Ellipse position="0,-90" size="40,100"/>
         <Repeater copies="12" anchor="0,0" position="0,0" rotation="30"/>
-        <Stroke color="@rainbowStroke" width="2" cap="round"/>
+        <Stroke color="@rainbowConic" width="2" cap="round"/>
       </Layer>
 
       <!-- Middle ring: trimmed ellipses -->

@@ -1114,6 +1114,203 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
 void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
                            const Stroke* stroke, float alpha, BlendMode painterBlend,
                            const TrimPath* trim, MergePathMode) {
+  // When stroke uses ConicGradient, browsers cannot render it via SVG pattern+foreignObject.
+  // Instead, render fill normally (without stroke), then append a separate SVG that uses
+  // an inline <mask> (white stroke shapes) + <foreignObject> (CSS conic-gradient background).
+  // foreignObject as a direct SVG child with mask= works in browsers, unlike foreignObject
+  // inside <pattern> which is not supported for stroke/fill rendering.
+  bool conicStroke =
+      stroke && stroke->color && stroke->color->nodeType() == NodeType::ConicGradient;
+  if (conicStroke) {
+    // Render fill-only pass first (reuse standard SVG path with no stroke).
+    if (fill) {
+      renderSVG(out, geos, fill, nullptr, alpha, painterBlend, trim, MergePathMode::Append);
+    }
+    // Compute bounding box of all geometries including stroke padding.
+    float pad = (stroke->align != StrokeAlign::Center) ? stroke->width * 2.0f : stroke->width;
+    float x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
+    for (auto& g : geos) {
+      float gx = 0, gy = 0, gw = 0, gh = 0;
+      if (!g.modifiedPathData.empty()) {
+        PathData pd = PathDataFromSVGString(g.modifiedPathData);
+        if (!pd.isEmpty()) {
+          Rect b = pd.getBounds();
+          gx = b.x;
+          gy = b.y;
+          gw = b.width;
+          gh = b.height;
+        }
+      } else {
+        switch (g.type) {
+          case NodeType::Ellipse: {
+            auto e = static_cast<const Ellipse*>(g.element);
+            gx = e->position.x - e->size.width / 2;
+            gy = e->position.y - e->size.height / 2;
+            gw = e->size.width;
+            gh = e->size.height;
+            break;
+          }
+          case NodeType::Rectangle: {
+            auto r = static_cast<const Rectangle*>(g.element);
+            gx = r->position.x - r->size.width / 2;
+            gy = r->position.y - r->size.height / 2;
+            gw = r->size.width;
+            gh = r->size.height;
+            break;
+          }
+          default:
+            break;
+        }
+      }
+      x0 = std::min(x0, gx - pad);
+      y0 = std::min(y0, gy - pad);
+      x1 = std::max(x1, gx + gw + pad);
+      y1 = std::max(y1, gy + gh + pad);
+    }
+    float bw = x1 - x0;
+    float bh = y1 - y0;
+    if (bw <= 0 || bh <= 0) {
+      return;
+    }
+    // Build a new SVG containing: <defs><mask>(stroke shapes)</mask></defs>
+    //   + <foreignObject mask="url(#maskId)">(CSS conic-gradient div)</foreignObject>
+    std::string svgStyle =
+        "position:absolute;left:" + FloatToString(x0) + "px;top:" + FloatToString(y0) + "px";
+    if (painterBlend != BlendMode::Normal) {
+      auto blendStr = BlendModeToMixBlendMode(painterBlend);
+      if (blendStr) {
+        svgStyle += ";mix-blend-mode:";
+        svgStyle += blendStr;
+      }
+    }
+    if (alpha < 1.0f) {
+      svgStyle += ";opacity:" + FloatToString(alpha);
+    }
+    out.openTag("svg");
+    out.addAttr("xmlns", "http://www.w3.org/2000/svg");
+    out.addAttr("width", FloatToString(bw));
+    out.addAttr("height", FloatToString(bh));
+    out.addAttr("viewBox", FloatToString(x0) + " " + FloatToString(y0) + " " + FloatToString(bw) +
+                               " " + FloatToString(bh));
+    out.addAttr("style", svgStyle);
+    out.closeTagStart();
+    // Inline <mask> with stroke shapes rendered in white.
+    std::string maskId = _ctx->nextId("cmask");
+    out.openTag("defs");
+    out.closeTagStart();
+    out.openTag("mask");
+    out.addAttr("id", maskId);
+    out.addAttr("maskUnits", "userSpaceOnUse");
+    out.addAttr("x", FloatToString(x0));
+    out.addAttr("y", FloatToString(y0));
+    out.addAttr("width", FloatToString(bw));
+    out.addAttr("height", FloatToString(bh));
+    out.closeTagStart();
+    for (auto& g : geos) {
+      if (!g.modifiedPathData.empty()) {
+        out.openTag("path");
+        out.addAttr("d", g.modifiedPathData);
+        out.addAttr("fill", "none");
+        out.addAttr("stroke", "white");
+        out.addAttr("stroke-width", FloatToString(stroke->width));
+        if (stroke->cap == LineCap::Round) {
+          out.addAttr("stroke-linecap", "round");
+        }
+        out.closeTagSelfClosing();
+        continue;
+      }
+      switch (g.type) {
+        case NodeType::Ellipse: {
+          auto e = static_cast<const Ellipse*>(g.element);
+          out.openTag("ellipse");
+          out.addAttr("cx", FloatToString(e->position.x));
+          out.addAttr("cy", FloatToString(e->position.y));
+          out.addAttr("rx", FloatToString(e->size.width / 2));
+          out.addAttr("ry", FloatToString(e->size.height / 2));
+          out.addAttr("fill", "none");
+          out.addAttr("stroke", "white");
+          out.addAttr("stroke-width", FloatToString(stroke->width));
+          if (stroke->cap == LineCap::Round) {
+            out.addAttr("stroke-linecap", "round");
+          }
+          out.closeTagSelfClosing();
+          break;
+        }
+        case NodeType::Rectangle: {
+          auto r = static_cast<const Rectangle*>(g.element);
+          float rx = r->position.x - r->size.width / 2;
+          float ry = r->position.y - r->size.height / 2;
+          out.openTag("rect");
+          out.addAttr("x", FloatToString(rx));
+          out.addAttr("y", FloatToString(ry));
+          out.addAttr("width", FloatToString(r->size.width));
+          out.addAttr("height", FloatToString(r->size.height));
+          if (r->roundness > 0) {
+            out.addAttr("rx", FloatToString(r->roundness));
+          }
+          out.addAttr("fill", "none");
+          out.addAttr("stroke", "white");
+          out.addAttr("stroke-width", FloatToString(stroke->width));
+          out.closeTagSelfClosing();
+          break;
+        }
+        case NodeType::Path: {
+          auto p = static_cast<const Path*>(g.element);
+          std::string d = GetPathSVGString(p);
+          if (!d.empty()) {
+            out.openTag("path");
+            out.addAttr("d", d);
+            out.addAttr("fill", "none");
+            out.addAttr("stroke", "white");
+            out.addAttr("stroke-width", FloatToString(stroke->width));
+            if (stroke->cap == LineCap::Round) {
+              out.addAttr("stroke-linecap", "round");
+            }
+            out.closeTagSelfClosing();
+          }
+          break;
+        }
+        case NodeType::Polystar: {
+          auto ps = static_cast<const Polystar*>(g.element);
+          std::string d = BuildPolystarPath(ps);
+          if (!d.empty()) {
+            out.openTag("path");
+            out.addAttr("d", d);
+            out.addAttr("fill", "none");
+            out.addAttr("stroke", "white");
+            out.addAttr("stroke-width", FloatToString(stroke->width));
+            if (stroke->cap == LineCap::Round) {
+              out.addAttr("stroke-linecap", "round");
+            }
+            out.closeTagSelfClosing();
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    }
+    out.closeTag();  // </mask>
+    out.closeTag();  // </defs>
+    // foreignObject covering the viewBox, masked to stroke shape, with CSS conic-gradient.
+    auto css = colorToCSS(stroke->color, nullptr);
+    if (!css.empty()) {
+      out.openTag("foreignObject");
+      out.addAttr("x", FloatToString(x0));
+      out.addAttr("y", FloatToString(y0));
+      out.addAttr("width", FloatToString(bw));
+      out.addAttr("height", FloatToString(bh));
+      out.addAttr("mask", "url(#" + maskId + ")");
+      out.closeTagStart();
+      out.openTag("div");
+      out.addAttr("xmlns", "http://www.w3.org/1999/xhtml");
+      out.addAttr("style", "width:100%;height:100%;background:" + css);
+      out.closeTagSelfClosing();
+      out.closeTag();  // </foreignObject>
+    }
+    out.closeTag();  // </svg>
+    return;
+  }
   float pad = 0.0f;
   if (stroke) {
     pad = (stroke->align != StrokeAlign::Center) ? stroke->width * 2.0f : stroke->width;
