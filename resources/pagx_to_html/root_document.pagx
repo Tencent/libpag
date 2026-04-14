@@ -42,7 +42,7 @@
 
   <!-- Subtitle -->
   <Layer>
-    <Text text="Root Document Test" fontFamily="Arial" fontSize="12" position="160,115" textAnchor="center"/>
+    <Text text="Root Document Test" fontFamily="Arial" fontSize="12" position="160,120" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
