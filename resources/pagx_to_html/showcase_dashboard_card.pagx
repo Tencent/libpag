@@ -60,11 +60,11 @@
           </Layer>
         </Layer>
         <!-- Status badge -->
-        <Layer width="50" height="20" data-role="badge">
-          <Rectangle position="25,10" size="50,20" roundness="10"/>
+        <Layer width="50" height="20" layout="vertical" alignment="center" arrangement="center" data-role="badge">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
           <Fill color="#10B98130"/>
-          <Layer left="0" right="0" top="0" bottom="0">
-            <Text text="+12%" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="25,13" textAnchor="center"/>
+          <Layer height="12">
+            <Text text="+12%" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
             <Fill color="#10B981"/>
           </Layer>
         </Layer>
