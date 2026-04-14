@@ -27,13 +27,13 @@
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" padding="16" gap="12" alignment="center" arrangement="center">
+      <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" padding="16" gap="8" alignment="center" arrangement="center">
         <!-- Rotated shape -->
         <Layer layout="vertical" gap="6" alignment="center" arrangement="center">
-          <Layer width="110" height="110">
-            <!-- 45° rotation around center: cos45=0.707, sin45=0.707, translate to center -->
-            <Layer matrix="0.707,0.707,-0.707,0.707,55,3">
-              <Rectangle position="0,0" size="80,80" roundness="8"/>
+          <Layer width="120" height="120">
+            <!-- 45° rotation: translate center to (60,60) then rotate -->
+            <Layer matrix="0.707,0.707,-0.707,0.707,60,60">
+              <Rectangle position="0,0" size="70,70" roundness="8"/>
               <Fill color="#F59E0B"/>
             </Layer>
           </Layer>
@@ -45,8 +45,8 @@
 
         <!-- Reference outline -->
         <Layer layout="vertical" gap="6" alignment="center" arrangement="center">
-          <Layer width="110" height="110">
-            <Rectangle position="55,55" size="80,80" roundness="8"/>
+          <Layer width="120" height="120">
+            <Rectangle position="60,60" size="70,70" roundness="8"/>
             <Stroke color="#94A3B8" width="1" dashes="4,3"/>
           </Layer>
           <Layer height="12">
