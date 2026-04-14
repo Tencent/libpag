@@ -195,6 +195,7 @@ PAG_TEST(PAGDiskCacheTest, SequenceFile) {
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/3.bin"));
   EXPECT_TRUE(std::filesystem::exists(cacheDir + "/files/2.bin"));
   PAGDiskCache::SetMaxDiskSize(0);
+  DiskIOQueue::GetInstance()->waitAll();  // Wait for async file deletions to complete
   EXPECT_EQ(diskCache->totalDiskSize, sequenceFile->fileSize());
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/2.bin"));
   EXPECT_TRUE(std::filesystem::exists(cacheDir + "/files/4.bin"));
@@ -210,6 +211,7 @@ PAG_TEST(PAGDiskCacheTest, SequenceFile) {
   EXPECT_TRUE(std::filesystem::exists(cacheDir + "/files/5.bin"));
   sequenceFile = nullptr;
   sequenceFile2 = nullptr;
+  DiskIOQueue::GetInstance()->waitAll();  // Wait for async file deletions to complete
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/4.bin"));
   PAGDiskCache::SetMaxDiskSize(1073741824);  // 1GB
   pag::PAGDiskCache::RemoveAll();
@@ -325,18 +327,23 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoder) {
   auto files = Directory::FindFiles(cacheDir + "/files", ".bin");
   auto diskFileCount = files.size();
   decoder = nullptr;
+  DiskIOQueue::GetInstance()->waitAll();  // Wait for async file deletions to complete
   files = Directory::FindFiles(cacheDir + "/files", ".bin");
   EXPECT_EQ(files.size(), diskFileCount);
   decoder2 = nullptr;
+  DiskIOQueue::GetInstance()->waitAll();  // Wait for async file deletions to complete
   files = Directory::FindFiles(cacheDir + "/files", ".bin");
   EXPECT_EQ(files.size(), diskFileCount - 1);
   decoder3 = nullptr;
+  DiskIOQueue::GetInstance()->waitAll();  // Wait for async file deletions to complete
   files = Directory::FindFiles(cacheDir + "/files", ".bin");
   EXPECT_EQ(files.size(), diskFileCount - 1);
   decoder4 = nullptr;
+  DiskIOQueue::GetInstance()->waitAll();  // Wait for async file deletions to complete
   files = Directory::FindFiles(cacheDir + "/files", ".bin");
   EXPECT_EQ(files.size(), diskFileCount - 2);
   decoder5 = nullptr;
+  DiskIOQueue::GetInstance()->waitAll();  // Wait for async file deletions to complete
   files = Directory::FindFiles(cacheDir + "/files", ".bin");
   EXPECT_EQ(files.size(), diskFileCount - 3);
 

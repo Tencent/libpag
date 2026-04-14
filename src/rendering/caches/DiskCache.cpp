@@ -26,6 +26,88 @@
 
 namespace pag {
 
+// ============================================================================
+// DiskIOQueue Implementation
+// ============================================================================
+
+DiskIOQueue* DiskIOQueue::GetInstance() {
+  static auto& instance = *new DiskIOQueue();
+  return &instance;
+}
+
+DiskIOQueue::DiskIOQueue() {
+  workerThread = std::thread(&DiskIOQueue::workerLoop, this);
+}
+
+DiskIOQueue::~DiskIOQueue() {
+  {
+    std::lock_guard<std::mutex> lock(locker);
+    stopped = true;
+  }
+  condition.notify_one();
+  if (workerThread.joinable()) {
+    workerThread.join();
+  }
+}
+
+void DiskIOQueue::submit(std::function<void()> task) {
+  if (task == nullptr) {
+    return;
+  }
+  {
+    std::lock_guard<std::mutex> lock(locker);
+    tasks.push(std::move(task));
+  }
+  condition.notify_one();
+}
+
+void DiskIOQueue::waitAll() {
+  std::unique_lock<std::mutex> lock(locker);
+  // Wait until the queue is empty AND no task is currently executing.
+  idleCondition.wait(lock, [this] { return tasks.empty() && !executing; });
+}
+
+void DiskIOQueue::workerLoop() {
+  while (true) {
+    std::function<void()> task;
+    {
+      std::unique_lock<std::mutex> lock(locker);
+      condition.wait(lock, [this] { return stopped || !tasks.empty(); });
+      if (stopped && tasks.empty()) {
+        return;
+      }
+      task = std::move(tasks.front());
+      tasks.pop();
+      executing = true;
+    }
+    if (task) {
+      task();
+    }
+    {
+      std::lock_guard<std::mutex> lock(locker);
+      executing = false;
+      if (tasks.empty()) {
+        idleCondition.notify_all();
+      }
+    }
+  }
+}
+
+// ============================================================================
+// DiskCache Implementation
+// ============================================================================
+
+static void RemoveFileTask(std::string path) {
+  remove(path.c_str());
+}
+
+void DiskCache::removeFileAsync(const std::string& filePath) {
+  if (filePath.empty()) {
+    return;
+  }
+  DiskIOQueue::GetInstance()->submit(std::bind(RemoveFileTask, filePath));
+}
+
 class FileInfo {
  public:
   FileInfo(std::string cacheKey, uint32_t fileID, size_t fileSize = 0)
@@ -71,7 +153,7 @@ void DiskCache::setCacheDir(const std::string& dir) {
     cacheFolder = Directory::JoinPath(cacheDir, "files");
     if (!readConfig()) {
       Directory::VisitFiles(cacheFolder,
-                            [&](const std::string& path, size_t) { remove(path.c_str()); });
+                            [](const std::string& path, size_t) { removeFileAsync(path); });
     }
   }
 }
@@ -102,7 +184,7 @@ DiskCache::DiskCache() {
     cacheFolder = Directory::JoinPath(cacheDir, "files");
     if (!readConfig()) {
       Directory::VisitFiles(cacheFolder,
-                            [&](const std::string& path, size_t) { remove(path.c_str()); });
+                            [](const std::string& path, size_t) { removeFileAsync(path); });
     }
   }
 }
@@ -133,7 +215,7 @@ void DiskCache::removeAll() {
     if (openedFiles.count(fileID) > 0) {
       return;
     }
-    remove(path.c_str());
+    removeFileAsync(path);
   });
   cachedFileIDs.clear();
   cachedFiles.clear();
@@ -258,7 +340,7 @@ bool DiskCache::checkDiskSpace(size_t maxSize) {
       break;
     }
     auto filePath = fileIDToPath(fileInfo->fileID);
-    remove(filePath.c_str());
+    removeFileAsync(filePath);
     totalDiskSize -= fileInfo->fileSize;
     removeFromCachedFiles(fileInfo);
     changed = true;
@@ -332,7 +414,7 @@ bool DiskCache::readConfig() {
     auto fileID = filePathToID(path);
     auto result = cachedFileInfos.find(fileID);
     if (result == cachedFileInfos.end()) {
-      remove(path.c_str());
+      removeFileAsync(path);
     } else {
       result->second->fileSize = fileSize;
     }
@@ -355,17 +437,22 @@ bool DiskCache::readConfig() {
 }
 
 void DiskCache::saveConfig() {
-  Directory::CreateRecursively(Directory::GetParentDirectory(configPath));
-  auto file = fopen(configPath.c_str(), "wb");
-  if (file == nullptr) {
-    return;
-  }
+  // Serialize the config data in memory while still holding the lock (caller holds locker).
   size_t bufferSize = 0;
   for (auto& item : cachedFiles) {
     bufferSize += 8 + item->cacheKey.size();
   }
-  tgfx::Buffer buffer(bufferSize);
-  tgfx::DataView dataView(buffer.bytes(), buffer.size());
+  // If there's nothing to save, write an empty config file synchronously (it's fast).
+  if (bufferSize == 0) {
+    Directory::CreateRecursively(Directory::GetParentDirectory(configPath));
+    auto file = fopen(configPath.c_str(), "wb");
+    if (file != nullptr) {
+      fclose(file);
+    }
+    return;
+  }
+  auto data = std::make_shared<tgfx::Buffer>(bufferSize);
+  tgfx::DataView dataView(data->bytes(), data->size());
   size_t pos = 0;
   for (auto item = cachedFiles.rbegin(); item != cachedFiles.rend(); item++) {
     auto& fileInfo = *item;
@@ -376,8 +463,48 @@ void DiskCache::saveConfig() {
     memcpy(dataView.writableBytes() + pos, cacheKey.data(), cacheKey.size());
     pos += cacheKey.size();
   }
-  fwrite(buffer.data(), 1, bufferSize, file);
+  // Increment the version to coalesce multiple rapid saves. If a newer save is queued
+  // before this one executes, skip this write entirely.
+  auto currentVersion = ++configSaveVersion;
+  auto* versionPtr = &configSaveVersion;
+  // Write to disk asynchronously via DiskIOQueue to avoid blocking the calling thread on IO.
+  // Uses temp file + rename for atomic write to prevent corruption if app exits mid-write.
+  auto path = configPath;
+  auto tempPath = configPath + ".tmp";
+  DiskIOQueue::GetInstance()->submit(std::bind(&DiskCache::WriteConfigTask, path, tempPath, data,
+                                               bufferSize, currentVersion, versionPtr));
+}
+
+void DiskCache::WriteConfigTask(std::string path, std::string tempPath,
+                                std::shared_ptr<tgfx::Buffer> data, size_t bufferSize,
+                                uint32_t currentVersion, std::atomic<uint32_t>* versionPtr) {
+  // Skip this write if a newer version has been queued.
+  if (currentVersion != versionPtr->load(std::memory_order_acquire)) {
+    return;
+  }
+  Directory::CreateRecursively(Directory::GetParentDirectory(path));
+  auto file = fopen(tempPath.c_str(), "wb");
+  if (file == nullptr) {
+    return;
+  }
+  auto written = fwrite(data->data(), 1, bufferSize, file);
   fclose(file);
+  if (written == bufferSize) {
+    // Atomic rename to replace the config file.
+    rename(tempPath.c_str(), path.c_str());
+  } else {
+    // Write failed, remove the incomplete temp file.
+    remove(tempPath.c_str());
+  }
+}
+
+void DiskCache::CloseFileTask(FILE* fileToClose, DiskCache* cache, uint32_t id) {
+  if (fileToClose != nullptr) {
+    fclose(fileToClose);
+  }
+  if (cache != nullptr) {
+    cache->notifyFileClosed(id);
+  }
 }
 
 uint32_t DiskCache::getFileID(const std::string& key) {
@@ -423,7 +550,7 @@ void DiskCache::notifyFileClosed(uint32_t fileID) {
   auto result = cachedFileInfos.find(fileID);
   if (result == cachedFileInfos.end()) {
     auto filePath = fileIDToPath(fileID);
-    remove(filePath.c_str());
+    removeFileAsync(filePath);
   } else {
     auto fileInfo = result->second;
     moveToBeforeOpenedFiles(fileInfo);

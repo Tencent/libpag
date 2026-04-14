@@ -93,11 +93,24 @@ SequenceFile::SequenceFile(const std::string& filePath, const tgfx::ImageInfo& i
 }
 
 SequenceFile::~SequenceFile() {
-  if (file != nullptr) {
-    fclose(file);
+  // Move the synchronous file IO (fclose flushes buffers) and the DiskCache notification (which
+  // may trigger further disk operations like checkDiskSpace/saveConfig) to the DiskIOQueue to
+  // avoid blocking the calling thread (which could be the main/render thread).
+  FILE* fileToClose = nullptr;
+  DiskCache* cache = nullptr;
+  uint32_t id = 0;
+  {
+    // Lock to safely read and clear file/diskCache, preventing races with writeFrame().
+    std::lock_guard<std::mutex> autoLock(locker);
+    fileToClose = file;
+    cache = diskCache;
+    id = fileID;
+    file = nullptr;
+    diskCache = nullptr;
   }
-  if (diskCache) {
-    diskCache->notifyFileClosed(fileID);
+  if (fileToClose != nullptr || cache != nullptr) {
+    DiskIOQueue::GetInstance()->submit(
+        std::bind(&DiskCache::CloseFileTask, fileToClose, cache, id));
   }
 }
 
