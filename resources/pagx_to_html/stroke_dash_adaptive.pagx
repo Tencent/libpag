@@ -27,34 +27,39 @@
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <!-- Divider -->
-      <Layer>
-        <Path data="M 190,10 L 190,170"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-      </Layer>
+      <!-- Card inner layout: two columns side by side -->
+      <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" padding="16" alignment="stretch" arrangement="center">
 
-      <!-- Normal dashes label -->
-      <Layer>
-        <Text text="dashAdaptive=false" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="105,24" textAnchor="center"/>
-        <Fill color="#64748B"/>
-      </Layer>
+        <!-- Left column: normal dashes -->
+        <Layer flex="1" layout="vertical" gap="10" alignment="center" arrangement="center">
+          <Layer height="14">
+            <Text text="dashAdaptive=false" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+          <Layer width="120" height="120">
+            <Ellipse position="60,60" size="110,110"/>
+            <Stroke color="#3B82F6" width="4" dashes="10,5" cap="round"/>
+          </Layer>
+        </Layer>
 
-      <!-- Normal dashes -->
-      <Layer>
-        <Ellipse position="105,92" size="110,110"/>
-        <Stroke color="#3B82F6" width="4" dashes="10,5" cap="round"/>
-      </Layer>
+        <!-- Vertical divider -->
+        <Layer width="1">
+          <Rectangle left="0" right="0" top="8" bottom="8"/>
+          <Fill color="#CBD5E1"/>
+        </Layer>
 
-      <!-- Adaptive dashes label -->
-      <Layer>
-        <Text text="dashAdaptive=true" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="295,24" textAnchor="center"/>
-        <Fill color="#64748B"/>
-      </Layer>
+        <!-- Right column: adaptive dashes -->
+        <Layer flex="1" layout="vertical" gap="10" alignment="center" arrangement="center">
+          <Layer height="14">
+            <Text text="dashAdaptive=true" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+          <Layer width="120" height="120">
+            <Ellipse position="60,60" size="110,110"/>
+            <Stroke color="#EF4444" width="4" dashes="10,5" dashAdaptive="true" cap="round"/>
+          </Layer>
+        </Layer>
 
-      <!-- dashAdaptive=true: dashes are scaled to fit path evenly -->
-      <Layer>
-        <Ellipse position="295,92" size="110,110"/>
-        <Stroke color="#EF4444" width="4" dashes="10,5" dashAdaptive="true" cap="round"/>
       </Layer>
     </Layer>
   </Layer>
