@@ -524,7 +524,16 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     }
     // Absolute-positioned layers need explicit size when they have contents that use inset:0,
     // or when they are flex containers that need a reference frame for child layout.
-    if (isFlexContainer || !layer->contents.empty()) {
+    // Skip size output when contents contain a Repeater, because the measured bounds only
+    // cover the original geometry, not all repeated copies after rotation/scale transforms.
+    bool hasRepeater = false;
+    for (auto* e : layer->contents) {
+      if (e->nodeType() == NodeType::Repeater) {
+        hasRepeater = true;
+        break;
+      }
+    }
+    if (!hasRepeater && (isFlexContainer || !layer->contents.empty())) {
       auto bounds = layer->layoutBounds();
       if (bounds.width > 0) {
         style += ";width:" + FloatToString(bounds.width) + "px";
