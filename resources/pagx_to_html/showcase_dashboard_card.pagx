@@ -119,7 +119,7 @@
       <!-- Progress bar -->
       <Layer height="8" data-role="progress-track">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Fill color="#1E293B"/>
+        <Fill color="#334155"/>
         <!-- Fill 68%: left=0 width=68% of parent -->
         <Layer top="0" bottom="0" width="190" data-role="progress-fill" data-percentage="68">
           <Rectangle left="0" right="0" top="0" bottom="0"/>
