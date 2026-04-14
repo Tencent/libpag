@@ -22,47 +22,54 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="vertical" alignment="center" arrangement="center">
+    <Layer flex="1">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <Layer width="300" height="200">
-  <!-- Divider -->
-  <Layer>
-    <Path data="M 170,70 L 170,250"/>
-    <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-  </Layer>
+      <!-- Two columns -->
+      <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" padding="16" gap="8" alignment="stretch">
+        <!-- Left: passThroughBackground=true -->
+        <Layer flex="1" layout="vertical" gap="6" alignment="center" arrangement="center">
+          <Layer height="14">
+            <Text text="passThrough=true" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+          <Layer name="demoTrue" width="120" height="120">
+            <!-- Reference pattern behind -->
+            <Ellipse position="60,60" size="80,80"/>
+            <Fill color="#F59E0B4D"/>
+            <!-- passThrough=true layer -->
+            <Layer name="ptTrue" passThroughBackground="true" alpha="0.8">
+              <Rectangle position="60,60" size="100,100" roundness="8"/>
+              <Fill color="#3B82F680"/>
+            </Layer>
+          </Layer>
+        </Layer>
 
-  <!-- Reference pattern behind both -->
-  <Layer alpha="0.3">
-    <Ellipse position="95,165" size="80,80"/>
-    <Fill color="#F59E0B"/>
-  </Layer>
-  <Layer alpha="0.3">
-    <Ellipse position="265,165" size="80,80"/>
-    <Fill color="#F59E0B"/>
-  </Layer>
+        <!-- Divider -->
+        <Layer width="1">
+          <Rectangle left="0" right="0" top="8" bottom="8"/>
+          <Fill color="#CBD5E1"/>
+        </Layer>
 
-  <!-- passThroughBackground=true -->
-  <Layer>
-    <Text text="passThrough=true" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="95,88" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-  <Layer passThroughBackground="true" alpha="0.8">
-    <Rectangle position="95,165" size="100,100" roundness="8"/>
-    <Fill color="#3B82F680"/>
-  </Layer>
-
-  <!-- passThroughBackground=false -->
-  <Layer>
-    <Text text="passThrough=false" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="265,88" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-  <Layer passThroughBackground="false" alpha="0.8">
-    <Rectangle position="265,165" size="100,100" roundness="8"/>
-    <Fill color="#EF444480"/>
-  </Layer>
+        <!-- Right: passThroughBackground=false -->
+        <Layer flex="1" layout="vertical" gap="6" alignment="center" arrangement="center">
+          <Layer height="14">
+            <Text text="passThrough=false" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+          <Layer name="demoFalse" width="120" height="120">
+            <!-- Reference pattern behind -->
+            <Ellipse position="60,60" size="80,80"/>
+            <Fill color="#F59E0B4D"/>
+            <!-- passThrough=false layer -->
+            <Layer name="ptFalse" passThroughBackground="false" alpha="0.8">
+              <Rectangle position="60,60" size="100,100" roundness="8"/>
+              <Fill color="#EF444480"/>
+            </Layer>
+          </Layer>
+        </Layer>
       </Layer>
     </Layer>
   </Layer>
