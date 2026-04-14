@@ -326,6 +326,203 @@ PAGX_TEST(PAGXTest, PathDataForEach) {
 }
 
 /**
+ * Test case: PathData deduplication during export
+ *
+ * Verifies that:
+ * 1. Multiple Path elements with identical PathData content share the same ID in output
+ * 2. PathData resources are written only once in the Resources section
+ * 3. Export output is deterministic (same input produces same output)
+ */
+PAGX_TEST(PAGXTest, PathDataDeduplication) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+
+  // Create a layer with three Path elements using identical PathData content
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->id = "dedup_layer";
+
+  // Path 1: Triangle at position (10, 10)
+  auto path1 = doc->makeNode<pagx::Path>();
+  path1->data = doc->makeNode<pagx::PathData>();
+  path1->data->moveTo(0, 0);
+  path1->data->lineTo(50, 0);
+  path1->data->lineTo(25, 40);
+  path1->data->close();
+  path1->position = {10, 10};
+  layer->contents.push_back(path1);
+
+  // Path 2: Same triangle shape at different position (100, 10)
+  auto path2 = doc->makeNode<pagx::Path>();
+  path2->data = doc->makeNode<pagx::PathData>();
+  path2->data->moveTo(0, 0);
+  path2->data->lineTo(50, 0);
+  path2->data->lineTo(25, 40);
+  path2->data->close();
+  path2->position = {100, 10};
+  layer->contents.push_back(path2);
+
+  // Path 3: Different shape (rectangle)
+  auto path3 = doc->makeNode<pagx::Path>();
+  path3->data = doc->makeNode<pagx::PathData>();
+  path3->data->moveTo(0, 0);
+  path3->data->lineTo(60, 0);
+  path3->data->lineTo(60, 30);
+  path3->data->lineTo(0, 30);
+  path3->data->close();
+  path3->position = {200, 10};
+  layer->contents.push_back(path3);
+
+  // Path 4: Same as path1/path2 (third instance of triangle)
+  auto path4 = doc->makeNode<pagx::Path>();
+  path4->data = doc->makeNode<pagx::PathData>();
+  path4->data->moveTo(0, 0);
+  path4->data->lineTo(50, 0);
+  path4->data->lineTo(25, 40);
+  path4->data->close();
+  path4->position = {10, 100};
+  layer->contents.push_back(path4);
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0, 0, 1, 1};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  doc->layers.push_back(layer);
+
+  // Export to XML
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+
+  // Verify deduplication: All Path elements should reference PathData by ID
+  // Path 1, 2, 4 have identical content, should share "__pd_0"
+  // Path 3 has different content, should get "__pd_1"
+
+  // Count occurrences of PathData references in Path elements
+  size_t pd0RefCount = 0;
+  size_t pd1RefCount = 0;
+  size_t pos = 0;
+  while ((pos = xml.find("data=\"@__pd_0\"", pos)) != std::string::npos) {
+    pd0RefCount++;
+    pos++;
+  }
+  pos = 0;
+  while ((pos = xml.find("data=\"@__pd_1\"", pos)) != std::string::npos) {
+    pd1RefCount++;
+    pos++;
+  }
+
+  // path1, path2, path4 should reference __pd_0 (3 references)
+  // path3 should reference __pd_1 (1 reference)
+  EXPECT_EQ(pd0RefCount, 3u) << "Triangle paths should share __pd_0";
+  EXPECT_EQ(pd1RefCount, 1u) << "Rectangle path should use __pd_1";
+
+  // Verify PathData resources are written only once each in Resources section
+  size_t pd0DefCount = 0;
+  size_t pd1DefCount = 0;
+  pos = 0;
+  while ((pos = xml.find("<PathData id=\"__pd_0\"", pos)) != std::string::npos) {
+    pd0DefCount++;
+    pos++;
+  }
+  pos = 0;
+  while ((pos = xml.find("<PathData id=\"__pd_1\"", pos)) != std::string::npos) {
+    pd1DefCount++;
+    pos++;
+  }
+
+  EXPECT_EQ(pd0DefCount, 1u) << "PathData __pd_0 should be defined exactly once";
+  EXPECT_EQ(pd1DefCount, 1u) << "PathData __pd_1 should be defined exactly once";
+
+  // Verify deterministic output: export again and compare
+  std::string xml2 = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_EQ(xml, xml2) << "Export should be deterministic";
+
+  // Verify round-trip: import and re-export should preserve structure
+  auto doc2 = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc2 != nullptr);
+  EXPECT_TRUE(doc2->errors.empty());
+  ASSERT_EQ(doc2->layers.size(), 1u);
+
+  // The imported document should have the same number of Path elements
+  auto* importedLayer = doc2->layers[0];
+  int pathCount = 0;
+  for (const auto* element : importedLayer->contents) {
+    if (element->nodeType() == pagx::NodeType::Path) {
+      pathCount++;
+    }
+  }
+  EXPECT_EQ(pathCount, 4) << "Should have 4 Path elements after import";
+}
+
+/**
+ * Test case: PathData deduplication with existing IDs
+ *
+ * Verifies that PathData with user-defined IDs are preserved and not deduplicated.
+ */
+PAGX_TEST(PAGXTest, PathDataDeduplicationWithExistingId) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+
+  auto layer = doc->makeNode<pagx::Layer>();
+
+  // Create a PathData with explicit ID (makeNode already adds it to doc->nodes)
+  auto sharedPathData = doc->makeNode<pagx::PathData>("myTriangle");
+  sharedPathData->moveTo(0, 0);
+  sharedPathData->lineTo(40, 0);
+  sharedPathData->lineTo(20, 30);
+  sharedPathData->close();
+
+  // Path 1: Uses the shared PathData by reference
+  auto path1 = doc->makeNode<pagx::Path>();
+  path1->data = sharedPathData;
+  path1->position = {10, 10};
+  layer->contents.push_back(path1);
+
+  // Path 2: Uses the same shared PathData
+  auto path2 = doc->makeNode<pagx::Path>();
+  path2->data = sharedPathData;
+  path2->position = {100, 10};
+  layer->contents.push_back(path2);
+
+  // Path 3: Has identical content but created separately (no ID)
+  auto path3 = doc->makeNode<pagx::Path>();
+  path3->data = doc->makeNode<pagx::PathData>();
+  path3->data->moveTo(0, 0);
+  path3->data->lineTo(40, 0);
+  path3->data->lineTo(20, 30);
+  path3->data->close();
+  path3->position = {200, 10};
+  layer->contents.push_back(path3);
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  doc->layers.push_back(layer);
+
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+
+  // path1 and path2 should reference "@myTriangle" (the explicit ID)
+  size_t myTriangleRefCount = 0;
+  size_t pos = 0;
+  while ((pos = xml.find("data=\"@myTriangle\"", pos)) != std::string::npos) {
+    myTriangleRefCount++;
+    pos++;
+  }
+  EXPECT_EQ(myTriangleRefCount, 2u) << "Paths using shared PathData should reference @myTriangle";
+
+  // path3 should get a generated ID like "__pd_0"
+  EXPECT_NE(xml.find("data=\"@__pd_0\""), std::string::npos)
+      << "Path with unnamed PathData should get generated ID";
+
+  // Verify the explicit PathData resource exists
+  EXPECT_NE(xml.find("<PathData id=\"myTriangle\""), std::string::npos)
+      << "User-defined PathData should be in Resources";
+}
+
+/**
  * Test case: PAGXDocument creation and XML export
  */
 PAGX_TEST(PAGXTest, PAGXDocumentXMLExport) {

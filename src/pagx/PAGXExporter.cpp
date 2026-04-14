@@ -17,8 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXExporter.h"
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 #include "pagx/PAGXDefaults.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
@@ -328,6 +332,50 @@ static bool ShouldSkipPosition(const Point& position, const Point& defaultPos, f
   return (hasH && hasV) || isDefault;
 }
 
+/**
+ * Export-time state for PathData deduplication without modifying the original document.
+ */
+struct ExportContext {
+  std::unordered_map<std::string, std::string> pathDataContentToId;
+  std::unordered_map<const PathData*, std::string> pathDataToOutputId;
+  std::unordered_set<std::string> writtenResourceIds;
+  int pathDataIdCounter = 0;
+
+  std::string getPathDataOutputId(const PathData* pathData) {
+    if (pathData == nullptr) {
+      return "";
+    }
+    auto it = pathDataToOutputId.find(pathData);
+    if (it != pathDataToOutputId.end()) {
+      return it->second;
+    }
+    if (!pathData->id.empty()) {
+      pathDataToOutputId[pathData] = pathData->id;
+      return pathData->id;
+    }
+    std::string svgContent = PathDataToSVGString(*pathData);
+    if (svgContent.empty()) {
+      return "";
+    }
+    auto contentIt = pathDataContentToId.find(svgContent);
+    if (contentIt != pathDataContentToId.end()) {
+      pathDataToOutputId[pathData] = contentIt->second;
+      return contentIt->second;
+    }
+    std::string newId = "__pd_" + std::to_string(pathDataIdCounter++);
+    pathDataContentToId[svgContent] = newId;
+    pathDataToOutputId[pathData] = newId;
+    return newId;
+  }
+
+  bool markResourceWritten(const std::string& id) {
+    if (id.empty()) {
+      return false;
+    }
+    return writtenResourceIds.insert(id).second;
+  }
+};
+
 //==============================================================================
 // Forward declarations
 //==============================================================================
@@ -335,11 +383,14 @@ static bool ShouldSkipPosition(const Point& position, const Point& defaultPos, f
 using Options = PAGXExporter::Options;
 
 static void WriteColorSource(XMLBuilder& xml, const ColorSource* node);
-static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Options& options);
+static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Options& options,
+                               ExportContext& ctx);
 static void WriteLayerStyle(XMLBuilder& xml, const LayerStyle* node);
 static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node);
-static void WriteResource(XMLBuilder& xml, const Node* node, const Options& options);
-static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& options);
+static void WriteResource(XMLBuilder& xml, const Node* node, const Options& options,
+                          ExportContext& ctx);
+static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& options,
+                       ExportContext& ctx);
 
 static void WriteCustomData(XMLBuilder& xml, const Node* node) {
   for (const auto& [key, value] : node->customData) {
@@ -496,7 +547,8 @@ static void WriteColorSource(XMLBuilder& xml, const ColorSource* node) {
 // VectorElement writing
 //==============================================================================
 
-static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Options& options) {
+static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Options& options,
+                               ExportContext& ctx) {
   switch (node->nodeType()) {
     case NodeType::Rectangle: {
       auto rect = static_cast<const Rectangle*>(node);
@@ -577,12 +629,13 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Path: {
       auto path = static_cast<const Path*>(node);
       xml.openElement("Path");
-      if (path->data != nullptr && !path->data->id.empty()) {
-        // Use the reference to PathData resource.
-        xml.addAttribute("data", "@" + path->data->id);
-      } else if (path->data != nullptr && !path->data->isEmpty()) {
-        // Inline the path data.
-        xml.addAttribute("data", PathDataToSVGString(*path->data));
+      if (path->data != nullptr && !path->data->isEmpty()) {
+        std::string outputId = ctx.getPathDataOutputId(path->data);
+        if (!outputId.empty()) {
+          xml.addAttribute("data", "@" + outputId);
+        } else {
+          xml.addAttribute("data", PathDataToSVGString(*path->data));
+        }
       }
       xml.addAttribute("reversed", path->reversed, Default<Path>().reversed);
       if (!ShouldSkipPosition(path->position, {0, 0}, path->left, path->top, path->right,
@@ -859,12 +912,13 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::TextPath: {
       auto textPath = static_cast<const TextPath*>(node);
       xml.openElement("TextPath");
-      if (textPath->path != nullptr && !textPath->path->id.empty()) {
-        // Use the reference to PathData resource.
-        xml.addAttribute("path", "@" + textPath->path->id);
-      } else if (textPath->path != nullptr && !textPath->path->isEmpty()) {
-        // Inline the path data.
-        xml.addAttribute("path", PathDataToSVGString(*textPath->path));
+      if (textPath->path != nullptr && !textPath->path->isEmpty()) {
+        std::string outputId = ctx.getPathDataOutputId(textPath->path);
+        if (!outputId.empty()) {
+          xml.addAttribute("path", "@" + outputId);
+        } else {
+          xml.addAttribute("path", PathDataToSVGString(*textPath->path));
+        }
       }
       if (textPath->baselineOrigin != Default<TextPath>().baselineOrigin) {
         xml.addAttribute("baselineOrigin", PointToString(textPath->baselineOrigin));
@@ -940,7 +994,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       } else {
         xml.closeElementStart();
         for (const auto& element : textBox->elements) {
-          WriteVectorElement(xml, element, options);
+          WriteVectorElement(xml, element, options, ctx);
         }
         xml.closeElement();
       }
@@ -1004,7 +1058,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       } else {
         xml.closeElementStart();
         for (const auto& element : group->elements) {
-          WriteVectorElement(xml, element, options);
+          WriteVectorElement(xml, element, options, ctx);
         }
         xml.closeElement();
       }
@@ -1148,7 +1202,8 @@ static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
 // Resource writing
 //==============================================================================
 
-static void WriteResource(XMLBuilder& xml, const Node* node, const Options& options) {
+static void WriteResource(XMLBuilder& xml, const Node* node, const Options& options,
+                          ExportContext& ctx) {
   switch (node->nodeType()) {
     case NodeType::Image: {
       auto image = static_cast<const Image*>(node);
@@ -1185,7 +1240,7 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       } else {
         xml.closeElementStart();
         for (const auto& layer : comp->layers) {
-          WriteLayer(xml, layer, options);
+          WriteLayer(xml, layer, options, ctx);
         }
         xml.closeElement();
       }
@@ -1253,7 +1308,8 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
 // Layer writing
 //==============================================================================
 
-static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& options) {
+static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& options,
+                       ExportContext& ctx) {
   xml.openElement("Layer");
   if (!node->id.empty()) {
     xml.addAttribute("id", node->id);
@@ -1345,7 +1401,7 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
 
   // Write VectorElement (contents) directly without container node.
   for (const auto& element : node->contents) {
-    WriteVectorElement(xml, element, options);
+    WriteVectorElement(xml, element, options, ctx);
   }
 
   // Write LayerStyle (styles) directly without container node.
@@ -1360,7 +1416,7 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
 
   // Write child Layers.
   for (const auto& child : node->children) {
-    WriteLayer(xml, child, options);
+    WriteLayer(xml, child, options, ctx);
   }
 
   xml.closeElement();
@@ -1372,6 +1428,8 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
 
 std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options) {
   XMLBuilder xml = {};
+  ExportContext ctx = {};
+
   xml.appendDeclaration();
 
   xml.openElement("pagx");
@@ -1381,30 +1439,49 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
   WriteCustomData(xml, &doc);
   xml.closeElementStart();
 
-  // Write Layers first (for better readability)
   for (const auto& layer : doc.layers) {
-    WriteLayer(xml, layer, options);
+    WriteLayer(xml, layer, options, ctx);
   }
 
-  // Write Resources section at the end (only if there are exportable resources)
-  bool hasResources = false;
+  bool hasOriginalResources = false;
   for (const auto& resource : doc.nodes) {
     if (!resource->id.empty()) {
       if (options.skipGlyphData && resource->nodeType() == NodeType::Font) {
         continue;
       }
-      hasResources = true;
+      hasOriginalResources = true;
       break;
     }
   }
+  bool hasDedupPathData = !ctx.pathDataContentToId.empty();
+  bool hasResources = hasOriginalResources || hasDedupPathData;
+
   if (hasResources) {
     xml.openElement("Resources");
     xml.closeElementStart();
 
     for (const auto& resource : doc.nodes) {
       if (!resource->id.empty()) {
-        WriteResource(xml, resource.get(), options);
+        if (!ctx.markResourceWritten(resource->id)) {
+          continue;
+        }
+        WriteResource(xml, resource.get(), options, ctx);
       }
+    }
+
+    // Write deduplicated PathData, sorted by ID for deterministic output.
+    std::vector<std::pair<std::string, std::string>> sortedPathData(ctx.pathDataContentToId.begin(),
+                                                                    ctx.pathDataContentToId.end());
+    std::sort(sortedPathData.begin(), sortedPathData.end(),
+              [](const auto& a, const auto& b) { return a.second < b.second; });
+    for (const auto& [svgContent, pathId] : sortedPathData) {
+      if (!ctx.markResourceWritten(pathId)) {
+        continue;
+      }
+      xml.openElement("PathData");
+      xml.addAttribute("id", pathId);
+      xml.addAttribute("data", svgContent);
+      xml.closeElementSelfClosing();
     }
 
     xml.closeElement();
