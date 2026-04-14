@@ -137,8 +137,10 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::Layer> build(const PAGXDocument& document) {
     // Build layer tree.
     auto rootLayer = tgfx::Layer::Make();
-    // Apply canvas clipping: the root layer clips to the canvas dimensions.
-    rootLayer->setScrollRect(tgfx::Rect::MakeWH(document.width, document.height));
+    // [TEMP] Completely disable scrollRect to verify if the tgfx clip processing causes binding
+    // error. If error disappears, the root cause is in tgfx ClipStack or applyClip.
+    // TODO: Remove this line after root cause is confirmed and fixed.
+    // rootLayer->setScrollRect(tgfx::Rect::MakeWH(document.width, document.height));
     for (const auto& layer : document.layers) {
       auto childLayer = convertLayer(layer);
       if (childLayer) {
