@@ -460,6 +460,52 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
   }
 }
 
+static std::string clipPathFromContents(const Layer* layer) {
+  auto layerBounds = layer->layoutBounds();
+  float containerW = layerBounds.width;
+  float containerH = layerBounds.height;
+  if (containerW <= 0 || containerH <= 0) {
+    return {};
+  }
+  for (auto* e : layer->contents) {
+    if (e->nodeType() == NodeType::Rectangle) {
+      auto r = static_cast<const Rectangle*>(e);
+      auto bounds = r->layoutBounds();
+      if (bounds.isEmpty()) {
+        continue;
+      }
+      float top = bounds.y;
+      float left = bounds.x;
+      float bottom = containerH - (bounds.y + bounds.height);
+      float right = containerW - (bounds.x + bounds.width);
+      if (top < 0) top = 0;
+      if (left < 0) left = 0;
+      if (bottom < 0) bottom = 0;
+      if (right < 0) right = 0;
+      std::string clip = ";clip-path:inset(" + FloatToString(top) + "px " + FloatToString(right) +
+                         "px " + FloatToString(bottom) + "px " + FloatToString(left) + "px";
+      if (r->roundness > 0) {
+        clip += " round " + FloatToString(r->roundness) + "px";
+      }
+      clip += ")";
+      return clip;
+    }
+    if (e->nodeType() == NodeType::Ellipse) {
+      auto el = static_cast<const Ellipse*>(e);
+      auto bounds = el->layoutBounds();
+      if (bounds.isEmpty()) {
+        continue;
+      }
+      float cx = bounds.x + bounds.width / 2;
+      float cy = bounds.y + bounds.height / 2;
+      return ";clip-path:ellipse(" + FloatToString(bounds.width / 2) + "px " +
+             FloatToString(bounds.height / 2) + "px at " + FloatToString(cx) + "px " +
+             FloatToString(cy) + "px)";
+    }
+  }
+  return {};
+}
+
 void HTMLWriter::writeLayerContents(HTMLBuilder& out, const Layer* layer, float alpha,
                                     bool distribute, LayerPlacement targetPlacement) {
   writeElements(out, layer->contents, alpha, distribute, targetPlacement);
@@ -947,6 +993,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         std::string blurStyle = "position:absolute;inset:0;backdrop-filter:blur(" +
                                 FloatToString(avg) + "px);-webkit-backdrop-filter:blur(" +
                                 FloatToString(avg) + "px)";
+        blurStyle += clipPathFromContents(layer);
         if (blendStr) {
           blurStyle += ";mix-blend-mode:";
           blurStyle += blendStr;
@@ -966,7 +1013,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         out.openTag("div");
         out.addAttr("style", "position:absolute;inset:0;backdrop-filter:blur(" +
                                  FloatToString(avg) + "px);-webkit-backdrop-filter:blur(" +
-                                 FloatToString(avg) + "px)");
+                                 FloatToString(avg) + "px)" + clipPathFromContents(layer));
         out.closeTagSelfClosing();
       }
     }
