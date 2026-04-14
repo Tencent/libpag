@@ -18,7 +18,7 @@
         <Stroke color="#FFFFFF" width="2" cap="round" join="round"/>
       </Layer>
     </Composition>
-    <LinearGradient id="fadeMask" startPoint="0,400" endPoint="0,500">
+    <LinearGradient id="fadeMask" startPoint="0,0" endPoint="0,30">
       <ColorStop offset="0" color="#FFFFFF"/>
       <ColorStop offset="1" color="#FFFFFF00"/>
     </LinearGradient>
@@ -44,7 +44,6 @@
     <Layer height="80">
       <Rectangle left="0" right="0" top="0" bottom="0"/>
       <Fill color="@headerGrad"/>
-
       <!-- TextPath: curved banner title -->
       <Layer>
         <Text text="FEATURE SHOWCASE" fontFamily="Arial" fontStyle="Bold" fontSize="18" position="0,0" textAnchor="center"/>
@@ -60,134 +59,158 @@
 
     <!-- Pattern strip -->
     <Layer height="6">
-      <Rectangle position="200,3" size="360,6" roundness="3"/>
+      <Rectangle left="20" right="20" top="0" bottom="0" roundness="3"/>
       <Fill color="@checkerPattern"/>
     </Layer>
 
     <!-- Rich text block -->
-    <Layer height="30">
-      <TextBox position="20,0" size="360,30" textAlign="center"/>
-      <Group>
-        <Text text="Modern " fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
+    <Layer height="30" layout="horizontal" alignment="center" arrangement="center">
+      <Layer height="26">
+        <Text text="Modern " fontFamily="Arial" fontStyle="Bold" fontSize="22" position="0,0"/>
         <Fill color="#FF6B6B"/>
-      </Group>
-      <Group>
-        <Text text="Infographic " fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
+      </Layer>
+      <Layer height="26">
+        <Text text="Infographic " fontFamily="Arial" fontStyle="Bold" fontSize="22" position="0,0"/>
         <Fill color="#4ECDC4"/>
-      </Group>
-      <Group>
-        <Text text="Design" fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
+      </Layer>
+      <Layer height="26">
+        <Text text="Design" fontFamily="Arial" fontStyle="Bold" fontSize="22" position="0,0"/>
         <Fill color="#FFE66D"/>
-      </Group>
+      </Layer>
     </Layer>
 
-    <!-- Description -->
-    <Layer height="40">
-      <Text text="Combining multiple PAGX features into a cohesive visual layout with rich typography and icons." fontFamily="Arial" fontSize="11" position="0,0"/>
-      <TextBox position="40,0" size="320,40" textAlign="center" paragraphAlign="near" lineHeight="16"/>
-      <Fill color="#7F8C8D"/>
+    <!-- Description with TextBox word wrap -->
+    <Layer height="40" layout="vertical" alignment="center" arrangement="center">
+      <Layer width="320" height="36">
+        <TextBox left="0" right="0" top="0" bottom="0" textAlign="center" lineHeight="16" wordWrap="true">
+          <Text text="Combining multiple PAGX features into a cohesive visual layout with rich typography and icons." fontFamily="Arial" fontSize="11"/>
+          <Fill color="#7F8C8D"/>
+        </TextBox>
+      </Layer>
     </Layer>
 
-    <!-- Feature rows with padding -->
-    <Layer flex="1" layout="vertical" gap="10" padding="20,30,10,30" alignment="stretch">
+    <!-- Feature rows -->
+    <Layer flex="1" layout="vertical" gap="10" padding="10,30,10,30" alignment="stretch" arrangement="center">
       <!-- Feature row 1 -->
-      <Layer height="50">
-        <Rectangle position="170,25" size="340,50" roundness="10"/>
+      <Layer height="50" layout="horizontal" gap="10" padding="12,14,12,14" alignment="center">
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
         <Fill color="#FFFFFF"/>
         <InnerShadowStyle offsetX="0" offsetY="2" blurX="6" blurY="6" color="#00000010"/>
-        <Layer composition="@checkIcon" x="18" y="13"/>
-        <Layer>
-          <Text text="Vector Graphics" fontFamily="Arial" fontStyle="Bold" fontSize="13" position="50,14"/>
-          <Fill color="#2C3E50"/>
+        <Layer width="24" height="24">
+          <Layer composition="@checkIcon" x="0" y="0"/>
         </Layer>
-        <Layer>
-          <Text text="Shapes, paths, gradients, and patterns" fontFamily="Arial" fontSize="10" position="50,30"/>
-          <Fill color="#95A5A6"/>
+        <Layer flex="1" layout="vertical" gap="2">
+          <Layer height="16">
+            <Text text="Vector Graphics" fontFamily="Arial" fontStyle="Bold" fontSize="13" position="0,0"/>
+            <Fill color="#2C3E50"/>
+          </Layer>
+          <Layer height="12">
+            <Text text="Shapes, paths, gradients, and patterns" fontFamily="Arial" fontSize="10" position="0,0"/>
+            <Fill color="#95A5A6"/>
+          </Layer>
         </Layer>
-        <Layer x="310" y="14">
-          <Rectangle position="0,0" size="16,6"/>
-          <Rectangle position="0,0" size="6,16"/>
-          <MergePath mode="union"/>
-          <RoundCorner radius="2"/>
-          <Fill color="#FF6B6B"/>
+        <Layer width="16" height="16">
+          <Layer name="plus1" x="0" y="0">
+            <Rectangle position="8,8" size="16,6"/>
+            <Rectangle position="8,8" size="6,16"/>
+            <MergePath mode="union"/>
+            <RoundCorner radius="2"/>
+            <Fill color="#FF6B6B"/>
+          </Layer>
         </Layer>
       </Layer>
 
       <!-- Feature row 2 -->
-      <Layer height="50">
-        <Rectangle position="170,25" size="340,50" roundness="10"/>
+      <Layer height="50" layout="horizontal" gap="10" padding="12,14,12,14" alignment="center">
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
         <Fill color="#FFFFFF"/>
         <InnerShadowStyle offsetX="0" offsetY="2" blurX="6" blurY="6" color="#00000010"/>
-        <Layer composition="@checkIcon" x="18" y="13"/>
-        <Layer>
-          <Text text="Text Layout" fontFamily="Arial" fontStyle="Bold" fontSize="13" position="50,14"/>
-          <Fill color="#2C3E50"/>
+        <Layer width="24" height="24">
+          <Layer composition="@checkIcon" x="0" y="0"/>
         </Layer>
-        <Layer>
-          <Text text="Rich text, text path, and text boxes" fontFamily="Arial" fontSize="10" position="50,30"/>
-          <Fill color="#95A5A6"/>
+        <Layer flex="1" layout="vertical" gap="2">
+          <Layer height="16">
+            <Text text="Text Layout" fontFamily="Arial" fontStyle="Bold" fontSize="13" position="0,0"/>
+            <Fill color="#2C3E50"/>
+          </Layer>
+          <Layer height="12">
+            <Text text="Rich text, text path, and text boxes" fontFamily="Arial" fontSize="10" position="0,0"/>
+            <Fill color="#95A5A6"/>
+          </Layer>
         </Layer>
-        <Layer x="310" y="14">
-          <Rectangle position="0,0" size="16,6"/>
-          <Rectangle position="0,0" size="6,16"/>
-          <MergePath mode="union"/>
-          <RoundCorner radius="2"/>
-          <Fill color="#4ECDC4"/>
+        <Layer width="16" height="16">
+          <Layer name="plus2" x="0" y="0">
+            <Rectangle position="8,8" size="16,6"/>
+            <Rectangle position="8,8" size="6,16"/>
+            <MergePath mode="union"/>
+            <RoundCorner radius="2"/>
+            <Fill color="#4ECDC4"/>
+          </Layer>
         </Layer>
       </Layer>
 
       <!-- Feature row 3 -->
-      <Layer height="50">
-        <Rectangle position="170,25" size="340,50" roundness="10"/>
+      <Layer height="50" layout="horizontal" gap="10" padding="12,14,12,14" alignment="center">
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
         <Fill color="#FFFFFF"/>
         <InnerShadowStyle offsetX="0" offsetY="2" blurX="6" blurY="6" color="#00000010"/>
-        <Layer composition="@checkIcon" x="18" y="13"/>
-        <Layer>
-          <Text text="Visual Effects" fontFamily="Arial" fontStyle="Bold" fontSize="13" position="50,14"/>
-          <Fill color="#2C3E50"/>
+        <Layer width="24" height="24">
+          <Layer composition="@checkIcon" x="0" y="0"/>
         </Layer>
-        <Layer>
-          <Text text="Shadows, masks, blurs, and blend modes" fontFamily="Arial" fontSize="10" position="50,30"/>
-          <Fill color="#95A5A6"/>
+        <Layer flex="1" layout="vertical" gap="2">
+          <Layer height="16">
+            <Text text="Visual Effects" fontFamily="Arial" fontStyle="Bold" fontSize="13" position="0,0"/>
+            <Fill color="#2C3E50"/>
+          </Layer>
+          <Layer height="12">
+            <Text text="Shadows, masks, blurs, and blend modes" fontFamily="Arial" fontSize="10" position="0,0"/>
+            <Fill color="#95A5A6"/>
+          </Layer>
         </Layer>
-        <Layer x="310" y="14">
-          <Rectangle position="0,0" size="16,6"/>
-          <Rectangle position="0,0" size="6,16"/>
-          <MergePath mode="union"/>
-          <RoundCorner radius="2"/>
-          <Fill color="#FFE66D"/>
+        <Layer width="16" height="16">
+          <Layer name="plus3" x="0" y="0">
+            <Rectangle position="8,8" size="16,6"/>
+            <Rectangle position="8,8" size="6,16"/>
+            <MergePath mode="union"/>
+            <RoundCorner radius="2"/>
+            <Fill color="#FFE66D"/>
+          </Layer>
         </Layer>
       </Layer>
     </Layer>
 
-    <!-- Bottom CTA section -->
-    <Layer height="60">
-      <Rectangle position="200,30" size="340,60" roundness="12"/>
-      <Fill color="@coralGrad"/>
-      <Fill color="#FFFFFF08" placement="foreground"/>
-      <Layer>
-        <Text text="Get Started Today" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="200,22" textAnchor="center"/>
-        <Fill color="#FFFFFF"/>
-      </Layer>
-      <Layer>
-        <Text text="Build amazing visuals with PAGX" fontFamily="Arial" fontSize="11" position="200,42" textAnchor="center"/>
-        <Fill color="#FFFFFFCC"/>
+    <!-- Bottom CTA button -->
+    <Layer height="50" layout="vertical" alignment="stretch" arrangement="center" padding="0,30,0,30">
+      <Layer height="50" layout="vertical" alignment="center" arrangement="center">
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+        <Fill color="@coralGrad"/>
+        <Fill color="#FFFFFF08" placement="foreground"/>
+        <Layer height="18">
+          <Text text="Get Started Today" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+          <Fill color="#FFFFFF"/>
+        </Layer>
+        <Layer height="14">
+          <Text text="Build amazing visuals with PAGX" fontFamily="Arial" fontSize="11" centerX="0" textAnchor="center"/>
+          <Fill color="#FFFFFFCC"/>
+        </Layer>
       </Layer>
     </Layer>
 
-    <!-- Fade mask at bottom -->
-    <Layer height="40">
+    <!-- Footer with fade mask -->
+    <Layer height="30">
       <Layer id="fadeMaskLayer">
-        <Rectangle position="200,20" size="400,40"/>
+        <Rectangle left="0" right="0" top="0" bottom="0"/>
         <Fill color="@fadeMask"/>
       </Layer>
       <Layer mask="@fadeMaskLayer">
-        <Rectangle position="200,20" size="400,40"/>
+        <Rectangle left="0" right="0" top="0" bottom="0"/>
         <Fill color="#F8F9FA"/>
       </Layer>
-      <Layer>
-        <Text text="PAGX v1.0" fontFamily="Arial" fontSize="9" position="200,32" textAnchor="center"/>
-        <Fill color="#BDC3C7"/>
+      <Layer layout="vertical" alignment="center" arrangement="center" left="0" right="0" top="0" bottom="0">
+        <Layer height="12">
+          <Text text="PAGX v1.0" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+          <Fill color="#BDC3C7"/>
+        </Layer>
       </Layer>
     </Layer>
   </Layer>
