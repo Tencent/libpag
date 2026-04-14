@@ -524,16 +524,84 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     }
     // Absolute-positioned layers need explicit size when they have contents that use inset:0,
     // or when they are flex containers that need a reference frame for child layout.
-    // Skip size output when contents contain a Repeater, because the measured bounds only
-    // cover the original geometry, not all repeated copies after rotation/scale transforms.
-    bool hasRepeater = false;
+    // When contents contain a Repeater, compute the union bounds of all repeated copies
+    // instead of using layoutBounds(), which only covers the original (un-repeated) geometry.
+    const Repeater* repeater = nullptr;
     for (auto* e : layer->contents) {
       if (e->nodeType() == NodeType::Repeater) {
-        hasRepeater = true;
+        repeater = static_cast<const Repeater*>(e);
         break;
       }
     }
-    if (!hasRepeater && (isFlexContainer || !layer->contents.empty())) {
+    if (repeater && repeater->copies > 0) {
+      // Collect bounds of geometry elements before the Repeater.
+      float geoL = 1e9f, geoT = 1e9f, geoR = -1e9f, geoB = -1e9f;
+      bool hasGeo = false;
+      for (auto* e : layer->contents) {
+        if (e == repeater) {
+          break;
+        }
+        auto* node = LayoutNode::AsLayoutNode(e);
+        if (!node) {
+          continue;
+        }
+        auto nb = node->layoutBounds();
+        if (nb.isEmpty()) {
+          continue;
+        }
+        geoL = std::min(geoL, nb.x);
+        geoT = std::min(geoT, nb.y);
+        geoR = std::max(geoR, nb.x + nb.width);
+        geoB = std::max(geoB, nb.y + nb.height);
+        hasGeo = true;
+      }
+      if (hasGeo) {
+        // Transform this rect through every Repeater copy matrix and compute union bounds.
+        float uL = 1e9f, uT = 1e9f, uR = -1e9f, uB = -1e9f;
+        int n = static_cast<int>(std::ceil(repeater->copies));
+        for (int i = 0; i < n; i++) {
+          float prog = static_cast<float>(i) + repeater->offset;
+          Matrix m = {};
+          if (repeater->anchor.x != 0 || repeater->anchor.y != 0) {
+            m = Matrix::Translate(-repeater->anchor.x, -repeater->anchor.y);
+          }
+          float sx = std::pow(repeater->scale.x, prog);
+          float sy = std::pow(repeater->scale.y, prog);
+          if (sx != 1.0f || sy != 1.0f) {
+            m = Matrix::Scale(sx, sy) * m;
+          }
+          float rot = repeater->rotation * prog;
+          if (rot != 0) {
+            m = Matrix::Rotate(rot) * m;
+          }
+          float px = repeater->position.x * prog;
+          float py = repeater->position.y * prog;
+          if (px != 0 || py != 0) {
+            m = Matrix::Translate(px, py) * m;
+          }
+          if (repeater->anchor.x != 0 || repeater->anchor.y != 0) {
+            m = Matrix::Translate(repeater->anchor.x, repeater->anchor.y) * m;
+          }
+          // Map the 4 corners of the geometry rect.
+          Point corners[4] = {{geoL, geoT}, {geoR, geoT}, {geoR, geoB}, {geoL, geoB}};
+          for (auto& c : corners) {
+            auto p = m.mapPoint(c);
+            uL = std::min(uL, p.x);
+            uT = std::min(uT, p.y);
+            uR = std::max(uR, p.x);
+            uB = std::max(uB, p.y);
+          }
+        }
+        float uw = uR - uL;
+        float uh = uB - uT;
+        if (uw > 0) {
+          style += ";width:" + FloatToString(uw) + "px";
+        }
+        if (uh > 0) {
+          style += ";height:" + FloatToString(uh) + "px";
+        }
+      }
+    } else if (isFlexContainer || !layer->contents.empty()) {
       auto bounds = layer->layoutBounds();
       if (bounds.width > 0) {
         style += ";width:" + FloatToString(bounds.width) + "px";
