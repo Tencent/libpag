@@ -63,7 +63,7 @@
         <Layer width="50" height="20" data-role="badge">
           <Rectangle position="25,10" size="50,20" roundness="10"/>
           <Fill color="#10B98130"/>
-          <Layer>
+          <Layer left="0" right="0" top="0" bottom="0">
             <Text text="+12%" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="25,13" textAnchor="center"/>
             <Fill color="#10B981"/>
           </Layer>
@@ -81,6 +81,8 @@
         <Text text="$24,580" fontFamily="Arial" fontStyle="Bold" fontSize="40" position="0,0"/>
         <Fill color="#F8FAFC"/>
       </Layer>
+
+      <Layer height="4"/>
 
       <!-- Comparison text -->
       <Layer height="16">
