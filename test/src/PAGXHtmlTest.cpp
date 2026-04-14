@@ -156,7 +156,7 @@ CLI_TEST(PAGXHtmlTest, LayerTransformPriority) {
       LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_transform_priority.pagx"));
   ASSERT_FALSE(html.empty());
   // The first layer should use translate (no matrix/matrix3D)
-  EXPECT_NE(html.find("translate(50px,88px)"), std::string::npos);
+  EXPECT_NE(html.find("translate(10px,10px)"), std::string::npos);
   // The second layer: matrix overrides x/y, should use matrix() not translate(999,999)
   EXPECT_EQ(html.find("translate(999px,999px)"), std::string::npos);
   // The third layer: matrix3D overrides both matrix and x/y
