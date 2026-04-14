@@ -18,13 +18,53 @@
 
 #pragma once
 
+#include <atomic>
+#include <condition_variable>
+#include <functional>
 #include <list>
+#include <mutex>
+#include <queue>
+#include <thread>
 #include <unordered_map>
 #include "SequenceFile.h"
 #include "pag/types.h"
 
 namespace pag {
 class FileInfo;
+
+/**
+ * A simple serial task queue that executes disk IO tasks on a dedicated background thread.
+ * This ensures ordered execution and provides the ability to wait for all pending tasks.
+ */
+class DiskIOQueue {
+ public:
+  static DiskIOQueue* GetInstance();
+
+  ~DiskIOQueue();
+
+  /**
+   * Submits a task for asynchronous execution on the background thread.
+   */
+  void submit(std::function<void()> task);
+
+  /**
+   * Waits for all pending tasks to complete. Useful during app shutdown.
+   */
+  void waitAll();
+
+ private:
+  DiskIOQueue();
+
+  void workerLoop();
+
+  std::mutex locker;
+  std::condition_variable condition;
+  std::condition_variable idleCondition;
+  std::queue<std::function<void()>> tasks;
+  std::thread workerThread;
+  std::atomic<bool> stopped{false};
+  bool executing = false;  // Tracks if a task is currently being executed
+};
 
 class DiskCache {
  public:
@@ -87,6 +127,18 @@ class DiskCache {
   uint32_t filePathToID(const std::string& path);
   void notifyFileClosed(uint32_t fileID);
   void notifyFileSizeChanged(uint32_t fileID, size_t fileSize);
+
+  /**
+   * Removes the file at the given path asynchronously on the DiskIOQueue to avoid blocking the
+   * calling thread (which may be the main/render thread) on synchronous IO.
+   */
+  static void removeFileAsync(const std::string& filePath);
+
+  /**
+   * Version counter for saveConfig(). Incremented on each call to allow coalescing multiple
+   * rapid saves into a single disk write. Atomic to allow safe access from the IO thread.
+   */
+  std::atomic<uint32_t> configSaveVersion{0};
 
   friend class SequenceFile;
   friend class PAGDiskCache;
