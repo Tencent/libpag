@@ -1132,68 +1132,7 @@ static void DetectIneffectiveLayoutAttrs(const Layer* layer, bool parentHasLayou
 // ============================================================================
 
 static bool CanDowngradeLayerToGroup(const Layer* layer) {
-  if (!layer->children.empty()) {
-    return false;
-  }
-  if (!layer->styles.empty()) {
-    return false;
-  }
-  if (!layer->filters.empty()) {
-    return false;
-  }
-  if (layer->mask != nullptr) {
-    return false;
-  }
-  if (layer->composition != nullptr) {
-    return false;
-  }
-  if (layer->blendMode != BlendMode::Normal) {
-    return false;
-  }
-  if (!layer->visible) {
-    return false;
-  }
-  if (layer->hasScrollRect) {
-    return false;
-  }
-  if (!layer->matrix.isIdentity()) {
-    return false;
-  }
-  if (!layer->matrix3D.isIdentity()) {
-    return false;
-  }
-  if (layer->preserve3D) {
-    return false;
-  }
-  if (!layer->groupOpacity) {
-    return false;
-  }
-  if (!layer->passThroughBackground) {
-    return false;
-  }
-  if (!layer->antiAlias) {
-    return false;
-  }
-  if (!layer->id.empty() || !layer->name.empty()) {
-    return false;
-  }
-  if (layer->layout != LayoutMode::None) {
-    return false;
-  }
-  if (layer->flex > 0) {
-    return false;
-  }
-  if (!std::isnan(layer->width) || !std::isnan(layer->height)) {
-    return false;
-  }
-  if (!std::isnan(layer->left) || !std::isnan(layer->right) || !std::isnan(layer->top) ||
-      !std::isnan(layer->bottom) || !std::isnan(layer->centerX) || !std::isnan(layer->centerY)) {
-    return false;
-  }
-  if (!layer->includeInLayout) {
-    return false;
-  }
-  return true;
+  return layer->children.empty() && pagx::cli::IsLayerShell(layer);
 }
 
 static void DetectDowngradableLayers(const Layer* parentLayer,
@@ -2676,7 +2615,9 @@ int RunVerify(int argc, char* argv[]) {
   if (!opts.skipLayout) {
     std::string layoutPath = baseName + suffix + ".layout.xml";
     auto layoutXml = GenerateLayoutXml(doc.get(), targetLayer);
-    WriteStringToFile(layoutXml, layoutPath, "pagx verify");
+    if (!WriteStringToFile(layoutXml, layoutPath, "pagx verify")) {
+      return 1;
+    }
   }
 
   if (opts.skipRender) {

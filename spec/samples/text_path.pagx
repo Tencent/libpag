@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="400" height="400">
-  <Layer name="CurvedText">
+  <Layer>
     <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="56"/>
     <TextPath path="@curve" forceAlignment="true"/>
     <Fill>
@@ -10,15 +10,15 @@
         <ColorStop offset="1" color="#EC4899"/>
       </LinearGradient>
     </Fill>
-  </Layer>
-  <Layer name="GuidePath">
-    <Path data="@curve"/>
-    <Stroke color="#64748B" width="1" dashes="6,4"/>
-  </Layer>
-  <Layer name="SmallText">
-    <Text text="TextPath" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
-    <TextPath path="M 80,320 Q 200,250 320,320" forceAlignment="true"/>
-    <Fill color="#475569"/>
+    <Group>
+      <Path data="@curve"/>
+      <Stroke color="#64748B" width="1" dashes="6,4"/>
+    </Group>
+    <Group>
+      <Text text="TextPath" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+      <TextPath path="M 80,320 Q 200,250 320,320" forceAlignment="true"/>
+      <Fill color="#475569"/>
+    </Group>
   </Layer>
   <Resources>
     <PathData id="curve" data="M 60,230 Q 200,30 340,230"/>
