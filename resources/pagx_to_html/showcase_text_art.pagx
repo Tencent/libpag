@@ -58,7 +58,7 @@
 
             <!-- TextPath: text along circle -->
             <Layer width="160" height="160">
-              <Text text="CREATIVE TYPOGRAPHY POSTER" fontFamily="Arial" fontStyle="Bold" fontSize="10" letterSpacing="3"/>
+              <Text text="CREATIVE  TYPOGRAPHY  POSTER  " fontFamily="Arial" fontStyle="Bold" fontSize="10" letterSpacing="3"/>
               <TextPath path="@circlePath" baselineOrigin="0,0" perpendicular="true" forceAlignment="true"/>
               <Fill color="#C084FC"/>
             </Layer>
