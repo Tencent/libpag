@@ -600,6 +600,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         if (uh > 0) {
           style += ";height:" + FloatToString(uh) + "px";
         }
+        style += ";overflow:visible";
       }
     } else if (isFlexContainer || !layer->contents.empty()) {
       auto bounds = layer->layoutBounds();
