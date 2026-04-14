@@ -268,7 +268,7 @@ class XMLBuilder {
 
  private:
   std::string _buf;
-  std::vector<const char*> _tags;
+  std::vector<std::string> _tags;
   bool _prettyPrint;
   int _indentSpaces;
   int _indent = 0;

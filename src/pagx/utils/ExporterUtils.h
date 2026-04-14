@@ -31,7 +31,9 @@
 #include "pagx/types/Matrix.h"
 
 namespace tgfx {
+class Context;
 class Data;
+class Device;
 class Layer;
 }  // namespace tgfx
 
@@ -82,6 +84,10 @@ bool GetImageDPI(const Image* image, float* dpiX, float* dpiY);
 
 bool IsJPEG(const uint8_t* data, size_t size);
 
+bool IsWebP(const uint8_t* data, size_t size);
+
+std::shared_ptr<tgfx::Data> ConvertWebPToPNG(const std::shared_ptr<tgfx::Data>& webpData);
+
 std::shared_ptr<tgfx::Data> GetImageData(const Image* image);
 
 bool HasNonASCII(const std::string& str);
@@ -89,10 +95,30 @@ bool HasNonASCII(const std::string& str);
 std::string UTF8ToUTF16BEHex(const std::string& utf8);
 
 /**
+ * Manages a lazily-created GPU device and context for off-screen rendering.
+ * Reuse a single instance across multiple render calls to avoid repeated GL context creation.
+ */
+class GPUContext {
+ public:
+  ~GPUContext();
+
+  GPUContext(const GPUContext&) = delete;
+  GPUContext& operator=(const GPUContext&) = delete;
+  GPUContext() = default;
+
+  tgfx::Context* lockContext();
+  void unlock();
+
+ private:
+  std::shared_ptr<tgfx::Device> _device = nullptr;
+};
+
+/**
  * Rasterizes a tgfx layer (including any masks) to a PNG-encoded Data object.
  * Returns nullptr if the layer has zero bounds or rasterization fails.
  */
-std::shared_ptr<tgfx::Data> RenderMaskedLayer(const std::shared_ptr<tgfx::Layer>& root,
+std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,
+                                              const std::shared_ptr<tgfx::Layer>& root,
                                               const std::shared_ptr<tgfx::Layer>& targetLayer);
 
 class ImagePattern;
@@ -102,8 +128,8 @@ class ImagePattern;
  * The image is drawn with the pattern's tile modes and matrix (offset relative to shapeBounds).
  * Returns nullptr if rendering fails.
  */
-std::shared_ptr<tgfx::Data> RenderTiledPattern(const ImagePattern* pattern, int width, int height,
-                                               float offsetX, float offsetY);
+std::shared_ptr<tgfx::Data> RenderTiledPattern(GPUContext* gpu, const ImagePattern* pattern,
+                                               int width, int height, float offsetX, float offsetY);
 
 /**
  * Strips surrounding double-quote characters from a string.

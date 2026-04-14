@@ -52,9 +52,15 @@ class PPTWriterContext {
     if (!data || data->size() == 0) {
       return {};
     }
+    bool jpeg = IsJPEG(data->bytes(), data->size());
+    if (!jpeg && IsWebP(data->bytes(), data->size())) {
+      data = ConvertWebPToPNG(data);
+      if (!data) {
+        return {};
+      }
+    }
     int idx = static_cast<int>(_images.size()) + 1;
     std::string relId = "rId" + std::to_string(_nextRelId++);
-    bool jpeg = IsJPEG(data->bytes(), data->size());
     std::string ext = jpeg ? "jpeg" : "png";
     std::string mediaPath = "ppt/media/image" + std::to_string(idx) + "." + ext;
     _images.push_back({image, std::move(data), relId, mediaPath, jpeg});

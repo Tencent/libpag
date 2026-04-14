@@ -193,6 +193,7 @@ class PPTWriter {
   bool _bakeMask = true;
   bool _bakeTiledPattern = true;
   bool _bridgeContours = true;
+  GPUContext _gpu;
   LayerBuildResult _buildResult = {};
   bool _buildResultReady = false;
 
@@ -351,10 +352,7 @@ void PPTWriter::endShape(XMLBuilder& out) {
   out.openElement("a:bodyPr").closeElementSelfClosing();
   out.openElement("a:lstStyle").closeElementSelfClosing();
   out.openElement("a:p").closeElementStart();
-  out.openElement("a:endParaRPr")
-      .addRequiredAttribute("lang", "zh-CN")
-      .addRequiredAttribute("altLang", "en-US")
-      .closeElementSelfClosing();
+  out.openElement("a:endParaRPr").addRequiredAttribute("lang", "en-US").closeElementSelfClosing();
   out.closeElement();  // a:p
   out.closeElement();  // p:txBody
   out.closeElement();  // p:sp
@@ -619,7 +617,7 @@ void PPTWriter::writeImagePatternFill(XMLBuilder& out, const ImagePattern* patte
     int h = static_cast<int>(ceilf(shapeBounds.height));
     float offsetX = pattern->matrix.tx - shapeBounds.x;
     float offsetY = pattern->matrix.ty - shapeBounds.y;
-    auto tiledPng = RenderTiledPattern(pattern, w, h, offsetX, offsetY);
+    auto tiledPng = RenderTiledPattern(&_gpu, pattern, w, h, offsetX, offsetY);
     if (tiledPng) {
       auto relId = _ctx->addRawImage(std::move(tiledPng));
       out.openElement("a:blipFill").closeElementStart();
@@ -650,8 +648,8 @@ void PPTWriter::writeImagePatternFill(XMLBuilder& out, const ImagePattern* patte
     GetImageDPI(pattern->image, &imgDpiX, &imgDpiY);
     double dpiCorrX = static_cast<double>(imgDpiX) / 96.0;
     double dpiCorrY = static_cast<double>(imgDpiY) / 96.0;
-    auto sx = static_cast<int>(std::round(M.a * dpiCorrX * 100000.0));
-    auto sy = static_cast<int>(std::round(M.d * dpiCorrY * 100000.0));
+    auto sx = static_cast<int>(std::round(std::sqrt(M.a * M.a + M.b * M.b) * dpiCorrX * 100000.0));
+    auto sy = static_cast<int>(std::round(std::sqrt(M.c * M.c + M.d * M.d) * dpiCorrY * 100000.0));
     auto tx = PxToEMU(M.tx - shapeBounds.x);
     auto ty = PxToEMU(M.ty - shapeBounds.y);
     bool flipX = (pattern->tileModeX == TileMode::Mirror);
@@ -1270,7 +1268,7 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& pa
     auto it = buildResult.layerMap.find(layer);
     if (it != buildResult.layerMap.end()) {
       auto tgfxLayer = it->second;
-      auto pngData = RenderMaskedLayer(buildResult.root, tgfxLayer);
+      auto pngData = RenderMaskedLayer(&_gpu, buildResult.root, tgfxLayer);
       if (pngData) {
         auto bounds = tgfxLayer->getBounds(buildResult.root.get(), true);
         auto offX = PxToEMU(bounds.left);

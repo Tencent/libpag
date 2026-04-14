@@ -46,7 +46,7 @@ namespace pagx {
 using pag::DegreesToRadians;
 using pag::FloatNearlyZero;
 
-static const uint8_t kPNGSignature[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+static const uint8_t PNG_SIGNATURE[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
 
 FillStrokeInfo CollectFillStroke(const std::vector<Element*>& contents) {
   FillStrokeInfo info = {};
@@ -206,11 +206,15 @@ bool GetPNGDimensions(const uint8_t* data, size_t size, int* width, int* height)
   if (size < 24) {
     return false;
   }
-  if (memcmp(data, kPNGSignature, 8) != 0) {
+  if (memcmp(data, PNG_SIGNATURE, 8) != 0) {
     return false;
   }
-  *width = static_cast<int>((data[16] << 24) | (data[17] << 16) | (data[18] << 8) | data[19]);
-  *height = static_cast<int>((data[20] << 24) | (data[21] << 16) | (data[22] << 8) | data[23]);
+  *width = static_cast<int>((static_cast<uint32_t>(data[16]) << 24) |
+                            (static_cast<uint32_t>(data[17]) << 16) |
+                            (static_cast<uint32_t>(data[18]) << 8) | data[19]);
+  *height = static_cast<int>((static_cast<uint32_t>(data[20]) << 24) |
+                             (static_cast<uint32_t>(data[21]) << 16) |
+                             (static_cast<uint32_t>(data[22]) << 8) | data[23]);
   return *width > 0 && *height > 0;
 }
 
@@ -320,18 +324,24 @@ bool GetImageDimensions(const Image* image, int* width, int* height) {
 }
 
 static bool GetPNGDPI(const uint8_t* data, size_t size, float* dpiX, float* dpiY) {
-  if (size < 8 || memcmp(data, kPNGSignature, 8) != 0) {
+  if (size < 8 || memcmp(data, PNG_SIGNATURE, 8) != 0) {
     return false;
   }
   size_t offset = 8;
   while (offset + 12 <= size) {
-    auto chunkLen = static_cast<uint32_t>((data[offset] << 24) | (data[offset + 1] << 16) |
-                                          (data[offset + 2] << 8) | data[offset + 3]);
+    auto chunkLen =
+        static_cast<uint32_t>((static_cast<uint32_t>(data[offset]) << 24) |
+                              (static_cast<uint32_t>(data[offset + 1]) << 16) |
+                              (static_cast<uint32_t>(data[offset + 2]) << 8) | data[offset + 3]);
     if (memcmp(data + offset + 4, "pHYs", 4) == 0) {
       if (chunkLen == 9 && offset + 8 + 9 <= size) {
         const uint8_t* d = data + offset + 8;
-        auto ppuX = static_cast<uint32_t>((d[0] << 24) | (d[1] << 16) | (d[2] << 8) | d[3]);
-        auto ppuY = static_cast<uint32_t>((d[4] << 24) | (d[5] << 16) | (d[6] << 8) | d[7]);
+        auto ppuX = static_cast<uint32_t>((static_cast<uint32_t>(d[0]) << 24) |
+                                          (static_cast<uint32_t>(d[1]) << 16) |
+                                          (static_cast<uint32_t>(d[2]) << 8) | d[3]);
+        auto ppuY = static_cast<uint32_t>((static_cast<uint32_t>(d[4]) << 24) |
+                                          (static_cast<uint32_t>(d[5]) << 16) |
+                                          (static_cast<uint32_t>(d[6]) << 8) | d[7]);
         uint8_t unit = d[8];
         if (unit == 1 && ppuX > 0 && ppuY > 0) {
           *dpiX = static_cast<float>(ppuX) * 0.0254f;
@@ -399,6 +409,29 @@ bool GetImageDPI(const Image* image, float* dpiX, float* dpiY) {
 
 bool IsJPEG(const uint8_t* data, size_t size) {
   return size >= 2 && data[0] == 0xFF && data[1] == 0xD8;
+}
+
+bool IsWebP(const uint8_t* data, size_t size) {
+  return size >= 12 && memcmp(data, "RIFF", 4) == 0 && memcmp(data + 8, "WEBP", 4) == 0;
+}
+
+std::shared_ptr<tgfx::Data> ConvertWebPToPNG(const std::shared_ptr<tgfx::Data>& webpData) {
+  if (!webpData) {
+    return nullptr;
+  }
+  auto codec = tgfx::ImageCodec::MakeFrom(webpData);
+  if (!codec) {
+    return nullptr;
+  }
+  tgfx::Bitmap bitmap(codec->width(), codec->height(), false, false);
+  if (bitmap.isEmpty()) {
+    return nullptr;
+  }
+  tgfx::Pixmap pixmap(bitmap);
+  if (!codec->readPixels(pixmap.info(), pixmap.writablePixels())) {
+    return nullptr;
+  }
+  return tgfx::ImageCodec::Encode(pixmap, tgfx::EncodedFormat::PNG, 100);
 }
 
 std::shared_ptr<tgfx::Data> GetImageData(const Image* image) {
@@ -484,19 +517,36 @@ static std::shared_ptr<tgfx::Data> DoRenderMaskedLayer(
   return tgfx::ImageCodec::Encode(pixmap, tgfx::EncodedFormat::PNG, 100);
 }
 
-std::shared_ptr<tgfx::Data> RenderMaskedLayer(const std::shared_ptr<tgfx::Layer>& root,
+GPUContext::~GPUContext() {
+  _device = nullptr;
+}
+
+tgfx::Context* GPUContext::lockContext() {
+  if (!_device) {
+    _device = tgfx::GLDevice::Make();
+    if (!_device) {
+      return nullptr;
+    }
+  }
+  return _device->lockContext();
+}
+
+void GPUContext::unlock() {
+  if (_device) {
+    _device->unlock();
+  }
+}
+
+std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,
+                                              const std::shared_ptr<tgfx::Layer>& root,
                                               const std::shared_ptr<tgfx::Layer>& targetLayer) {
   auto globalBounds = targetLayer->getBounds(root.get(), true);
-  auto device = tgfx::GLDevice::Make();
-  if (device == nullptr) {
-    return nullptr;
-  }
-  auto context = device->lockContext();
+  auto context = gpu->lockContext();
   if (context == nullptr) {
     return nullptr;
   }
   auto result = DoRenderMaskedLayer(context, root, targetLayer, globalBounds);
-  device->unlock();
+  gpu->unlock();
   return result;
 }
 
@@ -534,8 +584,9 @@ static std::shared_ptr<tgfx::Data> DoRenderTiledPattern(tgfx::Context* context,
   return tgfx::ImageCodec::Encode(pixmap, tgfx::EncodedFormat::PNG, 100);
 }
 
-std::shared_ptr<tgfx::Data> RenderTiledPattern(const ImagePattern* pattern, int width, int height,
-                                               float offsetX, float offsetY) {
+std::shared_ptr<tgfx::Data> RenderTiledPattern(GPUContext* gpu, const ImagePattern* pattern,
+                                               int width, int height, float offsetX,
+                                               float offsetY) {
   if (width <= 0 || height <= 0 || !pattern || !pattern->image) {
     return nullptr;
   }
@@ -558,16 +609,12 @@ std::shared_ptr<tgfx::Data> RenderTiledPattern(const ImagePattern* pattern, int 
   if (!shader) {
     return nullptr;
   }
-  auto device = tgfx::GLDevice::Make();
-  if (!device) {
-    return nullptr;
-  }
-  auto context = device->lockContext();
+  auto context = gpu->lockContext();
   if (!context) {
     return nullptr;
   }
   auto result = DoRenderTiledPattern(context, std::move(shader), width, height);
-  device->unlock();
+  gpu->unlock();
   return result;
 }
 

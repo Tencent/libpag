@@ -32,6 +32,9 @@ Point SegEndpoint(const PathSeg& seg) {
   return seg.pts[0];
 }
 
+// Approximates the signed area using segment endpoints only (polygon approximation).
+// For paths with few high-curvature bezier segments (e.g., a circle from 4 cubics),
+// the winding direction may be inaccurate.
 float ComputeSignedArea(const PathContour& contour) {
   float area = 0;
   Point prev = contour.start;
@@ -45,6 +48,9 @@ float ComputeSignedArea(const PathContour& contour) {
 }
 
 void ReverseContour(PathContour& c) {
+  if (c.segs.empty()) {
+    return;
+  }
   size_t n = c.segs.size();
   Point originalStart = c.start;
   c.start = SegEndpoint(c.segs[n - 1]);
@@ -73,6 +79,9 @@ void ReverseContour(PathContour& c) {
   c.segs = std::move(rev);
 }
 
+// Tests point containment using endpoint polygon approximation (ray casting).
+// For paths with few high-curvature bezier segments, the result may be inaccurate
+// near curved edges.
 bool PointInsideContour(const Point& pt, const PathContour& contour) {
   bool inside = false;
   auto testEdge = [&](const Point& pi, const Point& pj) {

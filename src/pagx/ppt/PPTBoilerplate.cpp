@@ -108,7 +108,7 @@ std::string GeneratePresentation(float w, float h) {
        "\" type=\"custom\"/>";
   s += "<p:notesSz cx=\"" + std::to_string(cx) + "\" cy=\"" + std::to_string(cy) + "\"/>";
   s += "<p:defaultTextStyle>"
-       "<a:defPPr><a:defRPr lang=\"zh-CN\"/></a:defPPr>";
+       "<a:defPPr><a:defRPr lang=\"en-US\"/></a:defPPr>";
   for (int lvl = 1; lvl <= 9; lvl++) {
     int marL = (lvl - 1) * 457200;
     s += "<a:lvl" + std::to_string(lvl) + "pPr marL=\"" + std::to_string(marL) +
@@ -219,7 +219,7 @@ std::string GenerateSlideMaster() {
          "</p:bodyStyle>"
          "<p:otherStyle>"
          "<a:defPPr>"
-         "<a:defRPr lang=\"zh-CN\"/>"
+         "<a:defRPr lang=\"en-US\"/>"
          "</a:defPPr>"
          "</p:otherStyle>"
          "</p:txStyles>"
