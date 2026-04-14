@@ -154,19 +154,21 @@ PathPrimitive PAGXAnalyzer::DetectPathPrimitive(const Path* path, RectInfo* rect
           axisAligned = false;
         }
       }
-      if (axisAligned && rectOut != nullptr) {
-        float minX = pts[0].x, maxX = pts[0].x;
-        float minY = pts[0].y, maxY = pts[0].y;
-        for (size_t i = 1; i < pointCount; i++) {
-          minX = std::min(minX, pts[i].x);
-          maxX = std::max(maxX, pts[i].x);
-          minY = std::min(minY, pts[i].y);
-          maxY = std::max(maxY, pts[i].y);
+      if (axisAligned) {
+        if (rectOut != nullptr) {
+          float minX = pts[0].x, maxX = pts[0].x;
+          float minY = pts[0].y, maxY = pts[0].y;
+          for (size_t i = 1; i < pointCount; i++) {
+            minX = std::min(minX, pts[i].x);
+            maxX = std::max(maxX, pts[i].x);
+            minY = std::min(minY, pts[i].y);
+            maxY = std::max(maxY, pts[i].y);
+          }
+          rectOut->w = maxX - minX;
+          rectOut->h = maxY - minY;
+          rectOut->cx = (minX + maxX) / 2.0f;
+          rectOut->cy = (minY + maxY) / 2.0f;
         }
-        rectOut->w = maxX - minX;
-        rectOut->h = maxY - minY;
-        rectOut->cx = (minX + maxX) / 2.0f;
-        rectOut->cy = (minY + maxY) / 2.0f;
         return PathPrimitive::Rectangle;
       }
     }
@@ -239,11 +241,13 @@ PathPrimitive PAGXAnalyzer::DetectPathPrimitive(const Path* path, RectInfo* rect
         isEllipse = cp1Valid && cp2Valid;
       }
     }
-    if (isEllipse && ellipseOut != nullptr) {
-      ellipseOut->cx = cx;
-      ellipseOut->cy = cy;
-      ellipseOut->w = rx * 2.0f;
-      ellipseOut->h = ry * 2.0f;
+    if (isEllipse) {
+      if (ellipseOut != nullptr) {
+        ellipseOut->cx = cx;
+        ellipseOut->cy = cy;
+        ellipseOut->w = rx * 2.0f;
+        ellipseOut->h = ry * 2.0f;
+      }
       return PathPrimitive::Ellipse;
     }
   }
