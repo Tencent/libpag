@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tests: TextBox textAlign — start, center, end, justify in sibling mode -->
+<!-- Tests: TextBox textAlign — start, center, end, justify in container mode -->
 <pagx version="1.0" width="420" height="340">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
@@ -33,9 +33,10 @@
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
           <Fill color="#F8FAFC"/>
           <Stroke color="#E2E8F0" width="1"/>
-          <Text text="Hello World from the start side" fontFamily="Arial" fontSize="10"/>
-          <TextBox position="40,55" width="80" height="110" textAlign="start" lineHeight="15"/>
-          <Fill color="#1E293B"/>
+          <TextBox left="4" right="4" top="4" bottom="4" textAlign="start" lineHeight="15">
+            <Text text="Hello World from the start side" fontFamily="Arial" fontSize="10"/>
+            <Fill color="#1E293B"/>
+          </TextBox>
         </Layer>
         <Layer height="12">
           <Text text="start" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
@@ -49,9 +50,10 @@
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
           <Fill color="#F8FAFC"/>
           <Stroke color="#E2E8F0" width="1"/>
-          <Text text="Hello World from the center" fontFamily="Arial" fontSize="10"/>
-          <TextBox position="40,55" width="80" height="110" textAlign="center" lineHeight="15"/>
-          <Fill color="#1E293B"/>
+          <TextBox left="4" right="4" top="4" bottom="4" textAlign="center" lineHeight="15">
+            <Text text="Hello World from the center" fontFamily="Arial" fontSize="10"/>
+            <Fill color="#1E293B"/>
+          </TextBox>
         </Layer>
         <Layer height="12">
           <Text text="center" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
@@ -65,9 +67,10 @@
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
           <Fill color="#F8FAFC"/>
           <Stroke color="#E2E8F0" width="1"/>
-          <Text text="Hello World from the end side" fontFamily="Arial" fontSize="10"/>
-          <TextBox position="40,55" width="80" height="110" textAlign="end" lineHeight="15"/>
-          <Fill color="#1E293B"/>
+          <TextBox left="4" right="4" top="4" bottom="4" textAlign="end" lineHeight="15">
+            <Text text="Hello World from the end side" fontFamily="Arial" fontSize="10"/>
+            <Fill color="#1E293B"/>
+          </TextBox>
         </Layer>
         <Layer height="12">
           <Text text="end" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
@@ -81,9 +84,10 @@
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
           <Fill color="#F8FAFC"/>
           <Stroke color="#E2E8F0" width="1"/>
-          <Text text="Hello World from the justify mode" fontFamily="Arial" fontSize="10"/>
-          <TextBox position="40,55" width="80" height="110" textAlign="justify" lineHeight="15"/>
-          <Fill color="#1E293B"/>
+          <TextBox left="4" right="4" top="4" bottom="4" textAlign="justify" lineHeight="15">
+            <Text text="Hello World from the justify mode" fontFamily="Arial" fontSize="10"/>
+            <Fill color="#1E293B"/>
+          </TextBox>
         </Layer>
         <Layer height="12">
           <Text text="justify" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
