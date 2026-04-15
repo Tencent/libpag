@@ -117,7 +117,7 @@ void PAGFileInfoModel::setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> pagxD
     fileInfos.emplace_back("Layers");
     fileInfos.emplace_back("Nodes");
     fileInfos.emplace_back("Images");
-    endResetModel()
+    endResetModel();
     return;
   }
   fileInfos.emplace_back("Width", Utils::ToQString(static_cast<int>(pagxDocument->width)));
