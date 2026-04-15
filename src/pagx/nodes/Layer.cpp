@@ -153,6 +153,29 @@ void Layer::updateLayout(LayoutContext* context) {
   auto contentNodes = LayoutNode::CollectLayoutNodes(contents, false);
   LayoutNode::PerformConstraintLayout(contentNodes, layoutWidth, layoutHeight, padding, context);
 
+  // When height is content-measured, VectorElements may have grown after constraint layout
+  // (e.g., TextBox re-typesets for a narrower width and needs more lines). Update layoutHeight
+  // to reflect the actual content bounds.
+  if (std::isnan(height) && !contentNodes.empty()) {
+    bool hasPadding = !padding.isZero();
+    float maxBottom = 0;
+    for (auto* node : contentNodes) {
+      auto bounds = node->layoutBounds();
+      float bottom = bounds.y - (std::isnan(layoutY) ? 0 : layoutY) + bounds.height;
+      if (hasPadding) {
+        bottom -= padding.top;
+      }
+      maxBottom = std::max(maxBottom, bottom);
+    }
+    if (hasPadding) {
+      maxBottom += padding.top + padding.bottom;
+    }
+    maxBottom = std::ceil(maxBottom);
+    if (maxBottom > layoutHeight) {
+      layoutHeight = maxBottom;
+    }
+  }
+
   // Child Layers not in flex flow: use padding-inset bounds.
   std::vector<LayoutNode*> childNodes;
   for (auto* child : children) {
@@ -336,6 +359,16 @@ void Layer::performContainerLayout(LayoutContext* context) {
 
     // Recursively lay out child's children.
     child->updateLayout(context);
+
+    // After layout, content-measured children may have grown on the main axis (e.g., a child
+    // Layer containing a TextBox that re-typesets for the resolved width). Use the actual layout
+    // size for positioning subsequent siblings.
+    if (sizeMode[idx] == SizeMode::ContentMeasured) {
+      float actualMain = horizontal ? child->layoutWidth : child->layoutHeight;
+      if (actualMain > childMain) {
+        childMain = actualMain;
+      }
+    }
 
     mainOffset += childMain;
     if (arrangement == Arrangement::SpaceBetween || arrangement == Arrangement::SpaceEvenly ||

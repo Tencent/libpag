@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="200" height="120">
+  <Layer width="200" height="120" layout="vertical" gap="8" padding="12">
+    <!-- White background -->
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#FFFFFF"/>
+    <!-- Text layer: TextBox uses left+right constraints, no explicit width -->
+    <Layer>
+      <TextBox left="0" right="0">
+        <Text text="AAAA BBBB CCCC DDDD EEEE FFFF" fontFamily="Noto Sans SC" fontSize="16"/>
+        <Fill color="#000000"/>
+      </TextBox>
+    </Layer>
+    <!-- Blue rectangle: should appear below all wrapped text lines -->
+    <Layer height="24">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#1DA1F2"/>
+    </Layer>
+  </Layer>
+</pagx>
