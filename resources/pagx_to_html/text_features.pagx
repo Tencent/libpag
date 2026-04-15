@@ -99,7 +99,7 @@ Line 3]]>
             <Layer width="140" height="50">
               <Rectangle left="0" right="0" top="0" bottom="0"/>
               <Stroke color="#F59E0B" width="1" dashes="4,3"/>
-              <TextBox left="0" right="0" top="0" bottom="0" overflow="visible">
+              <TextBox left="0" right="0" top="0" bottom="0" overflow="visible" lineHeight="17">
                 <Text text="This text overflows the small box and remains visible beyond its boundaries." fontFamily="Arial" fontSize="14"/>
                 <Fill color="#F59E0B"/>
               </TextBox>
