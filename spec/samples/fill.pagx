@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates different fill types -->
-<pagx version="1.0" width="400" height="400">
+<pagx width="400" height="400">
   <Layer width="400" height="400" layout="vertical">
     <!-- Row 1: solid and gradient fills -->
     <Layer flex="1" layout="horizontal">
@@ -15,8 +15,8 @@
         <Rectangle centerX="0" centerY="0" size="140,140" roundness="24"/>
         <Fill>
           <LinearGradient startPoint="0,0" endPoint="140,140">
-            <ColorStop offset="0" color="#6366F1"/>
-            <ColorStop offset="1" color="#8B5CF6"/>
+            <ColorStop color="#6366F1" offset="0"/>
+            <ColorStop color="#8B5CF6" offset="1"/>
           </LinearGradient>
         </Fill>
         <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#8B5CF650"/>
@@ -26,9 +26,9 @@
       <Ellipse centerX="0" centerY="0" size="320,140"/>
       <Fill>
         <RadialGradient center="160,70" radius="170">
-          <ColorStop offset="0" color="#FFF"/>
-          <ColorStop offset="0.5" color="#06B6D4"/>
-          <ColorStop offset="1" color="#0891B2"/>
+          <ColorStop color="#FFF" offset="0"/>
+          <ColorStop color="#06B6D4" offset="0.5"/>
+          <ColorStop color="#0891B2" offset="1"/>
         </RadialGradient>
       </Fill>
       <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#06B6D450"/>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="700" height="600">
+<pagx width="700" height="600">
   <!-- Box A: Digits rotated 90° in vertical text (date format) -->
   <Layer left="30" top="20">
     <Rectangle size="60,250"/>
@@ -14,7 +14,7 @@
   <Layer left="110" top="20">
     <Rectangle size="100,250"/>
     <Stroke/>
-    <TextBox width="100" height="250" writingMode="vertical" textAlign="center">
+    <TextBox width="100" height="250" textAlign="center" writingMode="vertical">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[価格 $99.50 元 税込 $110.00]]></Text>
       <Fill/>
     </TextBox>
@@ -54,7 +54,7 @@
   <Layer left="540" top="20">
     <Rectangle size="60,250"/>
     <Stroke/>
-    <TextBox width="60" height="250" writingMode="vertical" paragraphAlign="middle">
+    <TextBox width="60" height="250" paragraphAlign="middle" writingMode="vertical">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[竖排 Middle 对齐]]></Text>
       <Fill/>
     </TextBox>
@@ -64,7 +64,7 @@
   <Layer left="620" top="20">
     <Rectangle size="60,250"/>
     <Stroke/>
-    <TextBox width="60" height="250" writingMode="vertical" paragraphAlign="far">
+    <TextBox width="60" height="250" paragraphAlign="far" writingMode="vertical">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[竖排 Far 对齐]]></Text>
       <Fill/>
     </TextBox>
@@ -84,7 +84,7 @@
   <Layer left="150" top="300">
     <Rectangle size="100,250"/>
     <Stroke/>
-    <TextBox width="100" height="250" writingMode="vertical" textAlign="end">
+    <TextBox width="100" height="250" textAlign="end" writingMode="vertical">
       <Text text="你好 Hello&#10;世界大地" fontFamily="NotoSansSC" fontSize="24"/>
       <Fill/>
     </TextBox>
@@ -94,7 +94,7 @@
   <Layer left="270" top="300">
     <Rectangle size="100,250"/>
     <Stroke/>
-    <TextBox width="100" height="250" writingMode="vertical" textAlign="justify" lineHeight="50">
+    <TextBox width="100" height="250" textAlign="justify" writingMode="vertical" lineHeight="50">
       <Text text="春眠 Not 觉晓&#10;处处 Hear 啼鸟" fontFamily="NotoSansSC" fontSize="24"/>
       <Fill/>
     </TextBox>

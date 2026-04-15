@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test file for C7: BlurFilter with high blur radius -->
+<pagx width="200" height="100">
+  <Layer name="HighBlur" left="10" top="10">
+    <Rectangle size="100,50"/>
+    <Fill color="#FF0000"/>
+    <BlurFilter blurX="280" blurY="260"/>
+  </Layer>
+</pagx>

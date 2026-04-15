@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Constraint layout: Text element with fontSize scaling -->
 <!-- Fully automatic layout: containers are flexible (no width) — auto-equal distribution -->
-<pagx version="1.0" width="800" height="520">
+<pagx width="800" height="520">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -60,8 +60,8 @@
             <Text left="20" right="20" centerY="0" text="WIDE TEXT" fontFamily="Arial" fontStyle="Bold" fontSize="80" textAnchor="center"/>
             <Fill>
               <LinearGradient startPoint="0,0" endPoint="320,0">
-                <ColorStop offset="0" color="#EC4899"/>
-                <ColorStop offset="1" color="#F472B6"/>
+                <ColorStop color="#EC4899" offset="0"/>
+                <ColorStop color="#F472B6" offset="1"/>
               </LinearGradient>
             </Fill>
           </Layer>
@@ -77,8 +77,8 @@
             <Text left="20" right="20" centerY="0" text="MEDIUM" fontFamily="Arial" fontStyle="Bold" fontSize="80" textAnchor="center"/>
             <Fill>
               <LinearGradient startPoint="0,0" endPoint="220,0">
-                <ColorStop offset="0" color="#8B5CF6"/>
-                <ColorStop offset="1" color="#A78BFA"/>
+                <ColorStop color="#8B5CF6" offset="0"/>
+                <ColorStop color="#A78BFA" offset="1"/>
               </LinearGradient>
             </Fill>
           </Layer>
@@ -94,8 +94,8 @@
             <Text left="15" right="15" centerY="0" text="NARROW" fontFamily="Arial" fontStyle="Bold" fontSize="80" textAnchor="center"/>
             <Fill>
               <LinearGradient startPoint="0,0" endPoint="130,0">
-                <ColorStop offset="0" color="#10B981"/>
-                <ColorStop offset="1" color="#059669"/>
+                <ColorStop color="#10B981" offset="0"/>
+                <ColorStop color="#059669" offset="1"/>
               </LinearGradient>
             </Fill>
           </Layer>
@@ -119,8 +119,8 @@
           <Text top="0" bottom="0" centerX="0" text="Ǘy" fontFamily="Arial" fontStyle="Bold" fontSize="200" textAnchor="center"/>
           <Fill>
             <LinearGradient startPoint="0,0" endPoint="0,180">
-              <ColorStop offset="0" color="#FBBF24"/>
-              <ColorStop offset="1" color="#F59E0B"/>
+              <ColorStop color="#FBBF24" offset="0"/>
+              <ColorStop color="#F59E0B" offset="1"/>
             </LinearGradient>
           </Fill>
         </Layer>
@@ -137,8 +137,8 @@
           <Text left="0" right="0" centerY="0" text="Horizontal" fontFamily="Arial" fontStyle="Bold" fontSize="200" textAnchor="center"/>
           <Fill>
             <LinearGradient startPoint="0,0" endPoint="160,180">
-              <ColorStop offset="0" color="#06B6D4"/>
-              <ColorStop offset="1" color="#0891B2"/>
+              <ColorStop color="#06B6D4" offset="0"/>
+              <ColorStop color="#0891B2" offset="1"/>
             </LinearGradient>
           </Fill>
         </Layer>
@@ -155,8 +155,8 @@
           <Text left="30" right="30" top="20" bottom="20" text="Fit" fontFamily="Arial" fontStyle="Bold" fontSize="200" textAnchor="center"/>
           <Fill>
             <LinearGradient startPoint="0,0" endPoint="300,180">
-              <ColorStop offset="0" color="#EC4899"/>
-              <ColorStop offset="1" color="#BE185D"/>
+              <ColorStop color="#EC4899" offset="0"/>
+              <ColorStop color="#BE185D" offset="1"/>
             </LinearGradient>
           </Fill>
         </Layer>

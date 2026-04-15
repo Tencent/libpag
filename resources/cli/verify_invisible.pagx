@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test: layer completely outside visible region at various nesting levels -->
+<pagx width="400" height="300">
+  <!-- Case 1: direct child of canvas, completely off-canvas (x=500 > width=400) -->
+  <Layer x="500">
+    <Rectangle size="100,100"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+  <!-- Case 2: grandchild outside clipToBounds parent (clip region propagates) -->
+  <Layer width="200" height="200" clipToBounds="true">
+    <Layer>
+      <Layer x="300">
+        <Rectangle size="100,100"/>
+        <Fill color="#00FF00"/>
+      </Layer>
+    </Layer>
+  </Layer>
+  <!-- Case 3: child inside scrollRect parent but positioned outside -->
+  <Layer width="200" height="200" scrollRect="0,0,200,200">
+    <Layer x="300">
+      <Rectangle size="100,100"/>
+      <Fill color="#0000FF"/>
+    </Layer>
+  </Layer>
+  <!-- Case 4 (negative): child partially inside clip region should NOT be reported -->
+  <Layer width="200" height="200" clipToBounds="true">
+    <Layer x="150">
+      <Rectangle size="100,100"/>
+      <Fill color="#FFFF00"/>
+    </Layer>
+  </Layer>
+  <!-- Case 5: nested clip regions, child outside inner clip -->
+  <Layer width="300" height="300" clipToBounds="true">
+    <Layer x="50" width="200" height="200" clipToBounds="true">
+      <Layer x="250">
+        <Rectangle size="100,100"/>
+        <Fill color="#FF00FF"/>
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>

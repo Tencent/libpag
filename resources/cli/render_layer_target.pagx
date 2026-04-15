@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Test file for layer targeting (id and xpath) in render command.
      Each layer has distinct visual content to verify correct isolation. -->
-<pagx version="1.0" width="400" height="300">
+<pagx width="400" height="300">
   <!-- Red circle with a blue inner circle -->
   <Layer id="badge" left="80" top="80">
     <Ellipse left="-60" top="-60" size="120,120"/>
@@ -25,8 +25,8 @@
     <Rectangle left="-180" top="-40" size="360,80" roundness="12"/>
     <Fill>
       <LinearGradient startPoint="-180,0" endPoint="180,0">
-        <ColorStop offset="0" color="#7B1FA2"/>
-        <ColorStop offset="1" color="#FF6F00"/>
+        <ColorStop color="#7B1FA2" offset="0"/>
+        <ColorStop color="#FF6F00" offset="1"/>
       </LinearGradient>
     </Fill>
     <Layer id="dot_left" left="-100">

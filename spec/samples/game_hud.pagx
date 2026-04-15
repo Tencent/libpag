@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="800" height="600">
+<pagx width="800" height="600">
   <Layer id="triangleMask" visible="false">
     <Polystar left="-40" type="polygon" pointCount="3" outerRadius="80" rotation="90"/>
     <Fill color="#FFF"/>
@@ -8,9 +8,9 @@
     <Rectangle size="800,600"/>
     <Fill>
       <RadialGradient center="400,300" radius="500">
-        <ColorStop offset="0" color="#001122"/>
-        <ColorStop offset="0.7" color="#000811"/>
-        <ColorStop offset="1" color="#000"/>
+        <ColorStop color="#001122" offset="0"/>
+        <ColorStop color="#000811" offset="0.7"/>
+        <ColorStop color="#000" offset="1"/>
       </RadialGradient>
     </Fill>
     <Layer alpha="0.15">
@@ -26,45 +26,45 @@
       </Group>
       <Fill color="#0066AA"/>
     </Layer>
-    <Rectangle size="800,600"/>
-    <Fill>
-      <RadialGradient center="400,300" radius="600">
-        <ColorStop offset="0.6" color="#00000000"/>
-        <ColorStop offset="1" color="#00000080"/>
-      </RadialGradient>
-    </Fill>
+    <Group>
+      <Rectangle size="800,600"/>
+      <Fill>
+        <RadialGradient center="400,300" radius="600">
+          <ColorStop color="#00000000" offset="0.6"/>
+          <ColorStop color="#00000080" offset="1"/>
+        </RadialGradient>
+      </Fill>
+    </Group>
   </Layer>
   <Layer name="ReticleComplex" left="400" top="300">
-    <Layer>
-      <Rectangle left="-1" top="-227.5" size="2,15"/>
-      <Fill color="#00CCFF" alpha="0.6"/>
-      <Repeater copies="60" rotation="6"/>
-    </Layer>
-    <Layer>
+    <Rectangle left="-1" top="-227.5" size="2,15"/>
+    <Fill color="#00CCFF" alpha="0.6"/>
+    <Repeater copies="60" rotation="6"/>
+    <Group>
       <Rectangle left="-0.5" top="-219" size="1,8"/>
       <Fill color="#00CCFF" alpha="0.3"/>
       <Repeater copies="60" offset="0.5" rotation="6"/>
-    </Layer>
-    <Layer rotation="15">
+    </Group>
+    <Group>
       <Ellipse left="-190" top="-190" size="380,380"/>
       <Stroke color="#0FF" width="1" alpha="0.4" dashes="60,40"/>
-    </Layer>
-    <Layer rotation="-20">
+    </Group>
+    <Group>
       <Ellipse left="-180" top="-180" size="360,360"/>
       <Stroke color="#0088FF" width="2" alpha="0.5" dashes="10,80"/>
-    </Layer>
+    </Group>
     <Layer>
       <Ellipse left="-150" top="-150" size="300,300"/>
       <Stroke color="#00CCFF" width="3"/>
       <DropShadowStyle blurX="8" blurY="8" color="#00CCFF80"/>
     </Layer>
     <Layer>
-      <Polystar position="0,0" type="polygon" pointCount="3" outerRadius="80" rotation="90"/>
+      <Polystar type="polygon" pointCount="3" outerRadius="80" rotation="90" position="0,0"/>
       <Stroke color="#FFAA00" width="4"/>
       <Fill>
         <RadialGradient radius="80">
-          <ColorStop offset="0" color="#FFAA0040"/>
-          <ColorStop offset="1" color="#FFAA0010"/>
+          <ColorStop color="#FFAA0040" offset="0"/>
+          <ColorStop color="#FFAA0010" offset="1"/>
         </RadialGradient>
       </Fill>
       <DropShadowStyle blurX="25" blurY="25" color="#FFAA00"/>
@@ -73,17 +73,19 @@
       <Rectangle left="-50" top="-50" size="100,100"/>
       <Fill>
         <LinearGradient startPoint="-50,0" endPoint="50,0">
-          <ColorStop offset="0" color="#FFAA0000"/>
-          <ColorStop offset="0.5" color="#FFAA0040"/>
-          <ColorStop offset="1" color="#FFAA0000"/>
+          <ColorStop color="#FFAA0000" offset="0"/>
+          <ColorStop color="#FFAA0040" offset="0.5"/>
+          <ColorStop color="#FFAA0000" offset="1"/>
         </LinearGradient>
       </Fill>
     </Layer>
     <Layer>
       <Ellipse left="-3" top="-3" size="6,6"/>
       <Fill color="#FFF"/>
-      <Path data="M -20 0 L 20 0 M 0 -20 L 0 20"/>
-      <Stroke color="#FFF" width="1" alpha="0.5"/>
+      <Group>
+        <Path data="M -20 0 L 20 0 M 0 -20 L 0 20"/>
+        <Stroke color="#FFF" width="1" alpha="0.5"/>
+      </Group>
     </Layer>
   </Layer>
   <Layer name="LeftSide" left="400" top="0" bottom="0">
@@ -95,15 +97,15 @@
       <Path data="@healthArc"/>
       <Stroke width="20" cap="butt" dashes="4,2">
         <LinearGradient startPoint="0,200" endPoint="0,0">
-          <ColorStop offset="0" color="#F00"/>
-          <ColorStop offset="0.5" color="#FF0"/>
-          <ColorStop offset="1" color="#0F0"/>
+          <ColorStop color="#F00" offset="0"/>
+          <ColorStop color="#FF0" offset="0.5"/>
+          <ColorStop color="#0F0" offset="1"/>
         </LinearGradient>
       </Stroke>
       <TrimPath end="0.85"/>
       <DropShadowStyle blurX="5" blurY="5" color="#FF000040"/>
     </Layer>
-    <Layer name="HealthText" left="-440" width="200" centerY="0" layout="vertical" alignment="end">
+    <Layer name="HealthText" left="-440" centerY="0" width="200" layout="vertical" alignment="end">
       <Layer>
         <Text text="100%" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
         <Fill color="#FFF"/>
@@ -137,8 +139,8 @@
       <Path data="@energyArc"/>
       <Stroke width="20" cap="butt" dashes="10,2">
         <LinearGradient startPoint="36,0" endPoint="36,200">
-          <ColorStop offset="0" color="#0FF"/>
-          <ColorStop offset="1" color="#0044FF"/>
+          <ColorStop color="#0FF" offset="0"/>
+          <ColorStop color="#0044FF" offset="1"/>
         </LinearGradient>
       </Stroke>
       <TrimPath end="0.6"/>
@@ -172,32 +174,32 @@
         <Fill color="#FFAA00"/>
       </Layer>
     </Layer>
-    <Layer top="70">
-        <Rectangle left="180" top="-2" size="40,4"/>
-        <Fill color="#004488"/>
-      <Group>
-        <Rectangle left="165" top="-2" size="10,4"/>
-        <Rectangle left="225" top="-2" size="10,4"/>
-        <Fill color="#002244"/>
-      </Group>
-    </Layer>
+  </Layer>
+  <Layer left="200" top="550">
+    <Rectangle left="180" top="-2" size="40,4"/>
+    <Fill color="#004488"/>
+    <Group>
+      <Rectangle left="165" top="-2" size="10,4"/>
+      <Rectangle left="225" top="-2" size="10,4"/>
+      <Fill color="#002244"/>
+    </Group>
   </Layer>
   <Layer name="Radar" left="100" top="500">
-      <Ellipse left="-70" top="-70" size="140,140"/>
-      <Fill color="#001122" alpha="0.9"/>
-      <Stroke color="#0066AA" width="2"/>
+    <Ellipse left="-70" top="-70" size="140,140"/>
+    <Fill color="#001122" alpha="0.9"/>
+    <Stroke color="#0066AA" width="2"/>
     <Group>
       <Ellipse left="-50" top="-50" size="100,100"/>
       <Ellipse left="-25" top="-25" size="50,50"/>
       <Path data="M -70 0 L 70 0 M 0 -70 L 0 70"/>
       <Stroke color="#004488" width="1"/>
     </Group>
-    <Layer rotation="-45">
+    <Layer>
       <Ellipse left="-65" top="-65" size="130,130"/>
       <Fill>
         <ConicGradient endAngle="90">
-          <ColorStop offset="0" color="#00FF0000"/>
-          <ColorStop offset="1" color="#00FF0080"/>
+          <ColorStop color="#00FF0000" offset="0"/>
+          <ColorStop color="#00FF0080" offset="1"/>
         </ConicGradient>
       </Fill>
     </Layer>
@@ -212,9 +214,8 @@
       <Fill color="#FFF"/>
     </Layer>
   </Layer>
-  <Layer name="Objectives" centerX="0" top="36">
-    <Text text="MISSION OBJECTIVES:  [ ] INFILTRATE BASE  [ ] HACK TERMINAL  [x] SECURE PERIMETER" fontFamily="Arial"
-          fontStyle="Bold" fontSize="12"/>
+  <Layer name="Objectives" top="36" centerX="0">
+    <Text text="MISSION OBJECTIVES:  [ ] INFILTRATE BASE  [ ] HACK TERMINAL  [x] SECURE PERIMETER" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
     <Fill color="#FFF"/>
     <DropShadowStyle blurX="2" blurY="2" color="#000"/>
   </Layer>
@@ -245,8 +246,7 @@
     </Layer>
   </Layer>
   <Layer name="Corners">
-    <Path
-        data="M 40 100 L 40 40 L 100 40 M 760 100 L 760 40 L 700 40 M 40 500 L 40 560 L 100 560 M 760 500 L 760 560 L 700 560"/>
+    <Path data="M 40 100 L 40 40 L 100 40 M 760 100 L 760 40 L 700 40 M 40 500 L 40 560 L 100 560 M 760 500 L 760 560 L 700 560"/>
     <Stroke color="#00CCFF" width="4"/>
   </Layer>
   <Resources>

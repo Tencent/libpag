@@ -1375,7 +1375,6 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
   xml.appendDeclaration();
 
   xml.openElement("pagx");
-  xml.addAttribute("version", doc.version);
   xml.addAttribute("width", doc.width);
   xml.addAttribute("height", doc.height);
   WriteCustomData(xml, &doc);

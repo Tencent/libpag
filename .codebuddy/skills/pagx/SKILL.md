@@ -52,35 +52,10 @@ all other CLI commands (`render`, `format`, `layout`, `bounds`, `font`, `import`
 
 ---
 
-## Verify Checklist
-
-After each `pagx verify` run, systematically check the `.layout.xml` output and the
-screenshot against the design intent. Do NOT glance and move on.
-
-**Layout checks** (read `.layout.xml` — each node has `line` and `bounds`):
-- **Bounds accuracy**: For every key element, verify that `bounds` (x, y, width,
-  height) match the design spec — padding offsets produce the expected x/y
-  coordinates, container widths/heights are correct, spacing between siblings equals
-  the intended `gap`, and centered elements have the expected coordinates.
-- **Visibility**: No element has zero width or height unless intentionally hidden.
-  Every element described in the design has a corresponding node with non-zero bounds.
-- **Containment**: No child element's bounds extend beyond its parent's bounds
-  (unless intentional overflow like a scrollable card row).
-
-**Visual checks** (inspect the screenshot):
-- **Stacking order**: No element is accidentally covering another — e.g., a background
-  obscuring text, or painter leaks causing unwanted fills on unrelated shapes.
-- **Color accuracy**: Fill colors, gradients, and text colors match the design spec.
-  No leftover default black fills or white-on-white invisible elements.
-- **Visual hierarchy**: Primary content stands out over secondary. Active/selected
-  states visually distinct from inactive.
-
----
-
 ## Generation Workflow
 
 **When**: User asks to create, write, design, or modify a PAGX file from a text
-description, reference image, or design spec.
+description, reference image, or design intent.
 
 Before writing any PAGX code, read `references/guide.md` (spec rules, techniques,
 and especially §Common Pitfalls) and `references/patterns.md` (structural patterns
@@ -93,7 +68,7 @@ At the start of every generation task, create a task list to track progress:
 - One task per section for Step 3 (e.g., "Fill section: heroCard", "Fill section: tabBar")
 - One task for Step 4 (Polish)
 
-Mark each task in-progress before starting it and completed after its gate passes.
+Mark each task in-progress before starting it and completed after all checks pass.
 Do NOT start the next task until the current one is completed.
 
 ---
@@ -104,8 +79,11 @@ Do NOT start the next task until the current one is completed.
 1. Clarify requirements — ask the user if canvas size, visual style, text content, or
    color scheme is unclear or ambiguous.
 2. Establish a style sheet — color palette, spacing scale, roundness, font hierarchy.
-3. Decompose the visual — layer structure, rendering technique, color scheme, shape
-   vocabulary, text inventory.
+3. Decompose the visual into a **containment tree** — a hierarchical list of containers
+   and their direct children. Determine containment by reading the source description
+   paragraph by paragraph: elements described within the same block belong to that
+   container, not as siblings of it. This tree directly determines the section `id`s
+   and nesting used in Step 2.
 
 **Forbidden**: Do NOT write any PAGX code in this step.
 
@@ -119,12 +97,14 @@ Do NOT start the next task until the current one is completed.
 (see `guide.md` §Container Layout). Assign `id` to every structural section for scoped
 verification in Step 3.
 
-**Gate**:
-1. Run `pagx verify input.pagx`. Fix all diagnostics until clean.
-2. Read `.layout.xml` and screenshot, check against §Verify Checklist. Fix any
-   issues found and re-run verify.
+**Checks**:
+1. Run `pagx verify input.pagx` — fix diagnostics and re-run until clean.
+2. Read the `.layout.xml` and verify each section's bounds match the intended sizes
+   and positions. Fix any issues.
+3. Read the screenshot and confirm backgrounds, dividers, and section proportions
+   match the design intent. Fix any issues.
 
-**Forbidden**: Do NOT proceed to Step 3 until the gate passes.
+**Forbidden**: Do NOT proceed to Step 3 until all checks pass.
 
 ---
 
@@ -134,17 +114,20 @@ For each section (identified by `id`), one at a time:
 
 **Do**: Fill in all visual content for this section only.
 
-**Gate**:
-1. Run `pagx verify --scale 2 --id "sectionId" input.pagx`. Fix all diagnostics
-   until clean.
-2. Read `.layout.xml` and screenshot, check against §Verify Checklist. Fix any
-   issues found and re-run verify.
+**Checks**:
+1. Run `pagx verify --scale 2 --id "sectionId" input.pagx` — fix diagnostics and
+   re-run until clean.
+2. Read the section `.layout.xml` and verify element bounds match the design intent
+   — check sizes (e.g., input height, icon dimensions), spacing, and that nothing
+   has zero or unexpected dimensions. Fix any issues.
+3. Read the section screenshot and verify against the design intent — check that
+   colors, font sizes, text content, and icons are correct. Fix any issues.
 
-**Cleanup**: After the gate passes, delete that section's scoped artifacts
+**Cleanup**: After all checks pass, delete that section's scoped artifacts
 (`input.{id}.png`, `input.{id}.layout.xml`) before moving on.
 
 **Forbidden**: Do NOT edit other sections. Do NOT proceed to the next section until
-this section's gate passes.
+all checks pass.
 
 ---
 
@@ -153,13 +136,33 @@ this section's gate passes.
 **Do**: Review the full design holistically and refine cross-section details — spacing,
 alignment, color consistency, visual hierarchy — that only become apparent at full scale.
 
-**Gate**:
-1. Run `pagx verify --scale 2 input.pagx`. Fix all diagnostics until clean.
-2. Read `.layout.xml` and screenshot, check against §Verify Checklist. Fix any
-   issues found and re-run verify.
-3. Read `guide.md` §Common Pitfalls, scan the entire PAGX source against every
-   listed anti-pattern.
+**Checks**:
+1. Run `pagx verify --scale 2 input.pagx` — fix diagnostics and re-run until clean.
+2. Launch a sub-agent as an adversarial reviewer — this is the core of quality
+   assurance. **NEVER** read `references/checklist.md` yourself; it is exclusively
+   for the sub-agent. Use `subagent_type="general-purpose"` and `model="reasoning"`.
+   Use the following prompt, replacing placeholders with absolute paths:
 
-Keep final `input.png` and `input.layout.xml` for reference (do not commit). If further
-edits are made after this step, re-run the full verify to regenerate them. Delete any
+   ```
+   You are a strict, adversarial visual QA reviewer for a PAGX design file (an XML-based
+   vector graphics format). Find every problem you can. Assume something is wrong until
+   you prove it correct.
+
+   Design intent: {design_intent}
+
+   Files:
+   - PAGX source: {pagx_path}
+   - Layout XML: {layout_path}
+   - Screenshot: {screenshot_path}
+
+   Read all three files and {checklist_path}, then check every item in the
+   checklist. Report every issue you find.
+   ```
+
+3. Copy every reported issue into the Step 4 task description as a numbered list.
+   Work through each one: fix and mark `[FIXED]`, or mark `[NOT AN ISSUE: reason]`.
+   Do NOT mark the task completed until every item is resolved.
+
+Keep final `input.png` for reference (do not commit). If further edits are made after
+this step, re-run the full verify to regenerate it. Delete `input.layout.xml` and any
 scoped `{id}` artifacts produced during the fix.

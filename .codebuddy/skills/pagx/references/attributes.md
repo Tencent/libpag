@@ -13,7 +13,7 @@ they **must not** be omitted.
 
 | Element | Required Attributes |
 |---------|---------------------|
-| **pagx** | `version`, `width`, `height` |
+| **pagx** | `width`, `height` |
 | **Composition** | `width`, `height` |
 | **Image** | `source` |
 | **PathData** | `data` |

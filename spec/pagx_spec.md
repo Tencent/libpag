@@ -266,7 +266,6 @@ PAGX uses a standard 2D Cartesian coordinate system:
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `version` | string | (required) | Format version |
 | `width` | float | (required) | Canvas width |
 | `height` | float | (required) | Canvas height |
 
@@ -2188,7 +2187,7 @@ This appendix describes node categorization and nesting rules.
 The root element `<pagx>` **only accepts `<Layer>` and `<Resources>` as direct children**. Geometry elements, painters, and other elements must be nested inside a `<Layer>`.
 
 ```
-pagx (required attributes: version, width, height)
+pagx (required attributes: width, height)
 ├── Layer*                      ← Direct children MUST be Layer
 │   ├── VectorElement* (see A.3)
 │   ├── <svg>* (import directive, see §7)
