@@ -332,11 +332,13 @@ static bool ShouldSkipPosition(const Point& position, const Point& defaultPos, f
   return (hasH && hasV) || isDefault;
 }
 
+namespace {
+
 /**
  * Export-time state for PathData deduplication without modifying the original document.
  */
 struct ExportContext {
-  std::unordered_map<std::string, std::string> pathDataContentToId;
+  std::unordered_map<std::string, std::string> pathDataContentToOutputId;
   std::unordered_map<const PathData*, std::string> pathDataToOutputId;
   std::unordered_set<std::string> writtenResourceIds;
   std::unordered_set<std::string> reservedIds;
@@ -359,7 +361,7 @@ struct ExportContext {
     if (!pathData->id.empty()) {
       std::string svgContent = PathDataToSVGString(*pathData);
       if (!svgContent.empty()) {
-        pathDataContentToId[svgContent] = pathData->id;
+        pathDataContentToOutputId[svgContent] = pathData->id;
       }
       pathDataToOutputId[pathData] = pathData->id;
       return pathData->id;
@@ -368,8 +370,8 @@ struct ExportContext {
     if (svgContent.empty()) {
       return "";
     }
-    auto contentIt = pathDataContentToId.find(svgContent);
-    if (contentIt != pathDataContentToId.end()) {
+    auto contentIt = pathDataContentToOutputId.find(svgContent);
+    if (contentIt != pathDataContentToOutputId.end()) {
       pathDataToOutputId[pathData] = contentIt->second;
       return contentIt->second;
     }
@@ -383,7 +385,7 @@ struct ExportContext {
         break;
       }
     }
-    pathDataContentToId[svgContent] = newId;
+    pathDataContentToOutputId[svgContent] = newId;
     pathDataToOutputId[pathData] = newId;
     return newId;
   }
@@ -395,6 +397,8 @@ struct ExportContext {
     return writtenResourceIds.insert(id).second;
   }
 };
+
+}  // namespace
 
 //==============================================================================
 // Forward declarations
@@ -1478,7 +1482,7 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
       break;
     }
   }
-  bool hasDedupPathData = !ctx.pathDataContentToId.empty();
+  bool hasDedupPathData = !ctx.pathDataContentToOutputId.empty();
   bool hasResources = hasOriginalResources || hasDedupPathData;
 
   if (hasResources) {
@@ -1495,11 +1499,18 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
     }
 
     // Write deduplicated PathData, sorted by ID for deterministic output.
-    std::vector<std::pair<std::string, std::string>> sortedPathData(ctx.pathDataContentToId.begin(),
-                                                                    ctx.pathDataContentToId.end());
+    using MapEntry = std::unordered_map<std::string, std::string>::const_iterator;
+    std::vector<MapEntry> sortedPathData;
+    sortedPathData.reserve(ctx.pathDataContentToOutputId.size());
+    for (auto it = ctx.pathDataContentToOutputId.cbegin();
+         it != ctx.pathDataContentToOutputId.cend(); ++it) {
+      sortedPathData.push_back(it);
+    }
     std::sort(sortedPathData.begin(), sortedPathData.end(),
-              [](const auto& a, const auto& b) { return a.second < b.second; });
-    for (const auto& [svgContent, pathId] : sortedPathData) {
+              [](const MapEntry& a, const MapEntry& b) { return a->second < b->second; });
+    for (const auto& entry : sortedPathData) {
+      const auto& svgContent = entry->first;
+      const auto& pathId = entry->second;
       if (!ctx.markResourceWritten(pathId)) {
         continue;
       }

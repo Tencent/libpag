@@ -21,6 +21,8 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <map>
+#include <set>
 #include <unordered_map>
 #include "cli/CommandResolve.h"
 #include "cli/CommandVerify.h"
@@ -397,59 +399,79 @@ PAGX_TEST(PAGXTest, PathDataDeduplication) {
   // Path 1, 2, 4 have identical content, should share "__pd_0"
   // Path 3 has different content, should get "__pd_1"
 
-  // Count occurrences of PathData references in Path elements
-  size_t pd0RefCount = 0;
-  size_t pd1RefCount = 0;
+  // Verify deduplication by behavior: count unique PathData IDs referenced and defined.
+  // Extract all data="@..." references from Path elements.
+  std::set<std::string> referencedIds;
+  std::map<std::string, int> referenceCount;
   size_t pos = 0;
-  while ((pos = xml.find("data=\"@__pd_0\"", pos)) != std::string::npos) {
-    pd0RefCount++;
-    pos++;
-  }
-  pos = 0;
-  while ((pos = xml.find("data=\"@__pd_1\"", pos)) != std::string::npos) {
-    pd1RefCount++;
-    pos++;
-  }
-
-  // path1, path2, path4 should reference __pd_0 (3 references)
-  // path3 should reference __pd_1 (1 reference)
-  EXPECT_EQ(pd0RefCount, 3u) << "Triangle paths should share __pd_0";
-  EXPECT_EQ(pd1RefCount, 1u) << "Rectangle path should use __pd_1";
-
-  // Verify PathData resources are written only once each in Resources section
-  size_t pd0DefCount = 0;
-  size_t pd1DefCount = 0;
-  pos = 0;
-  while ((pos = xml.find("<PathData id=\"__pd_0\"", pos)) != std::string::npos) {
-    pd0DefCount++;
-    pos++;
-  }
-  pos = 0;
-  while ((pos = xml.find("<PathData id=\"__pd_1\"", pos)) != std::string::npos) {
-    pd1DefCount++;
-    pos++;
+  while (pos < xml.size()) {
+    size_t found = xml.find("data=\"@", pos);
+    if (found == std::string::npos) {
+      break;
+    }
+    size_t idStart = found + 7;
+    size_t idEnd = xml.find('"', idStart);
+    if (idEnd == std::string::npos) {
+      break;
+    }
+    std::string id = xml.substr(idStart, idEnd - idStart);
+    referencedIds.insert(id);
+    referenceCount[id]++;
+    pos = idEnd + 1;
   }
 
-  EXPECT_EQ(pd0DefCount, 1u) << "PathData __pd_0 should be defined exactly once";
-  EXPECT_EQ(pd1DefCount, 1u) << "PathData __pd_1 should be defined exactly once";
+  // path1, path2, path4 share identical content -> one shared ID with 3 references
+  // path3 has different content -> a separate ID with 1 reference
+  EXPECT_EQ(referencedIds.size(), 2u) << "Should deduplicate to exactly 2 unique PathData IDs";
+  bool foundSharedId = false;
+  bool foundUniqueId = false;
+  for (const auto& [id, count] : referenceCount) {
+    if (count == 3) {
+      foundSharedId = true;
+    }
+    if (count == 1) {
+      foundUniqueId = true;
+    }
+  }
+  EXPECT_TRUE(foundSharedId) << "Triangle paths should share one PathData ID (3 references)";
+  EXPECT_TRUE(foundUniqueId) << "Rectangle path should have its own PathData ID (1 reference)";
+
+  // Verify each referenced PathData is defined exactly once in Resources.
+  for (const auto& id : referencedIds) {
+    std::string tag = "<PathData id=\"" + id + "\"";
+    size_t defCount = 0;
+    size_t defPos = 0;
+    while ((defPos = xml.find(tag, defPos)) != std::string::npos) {
+      defCount++;
+      defPos++;
+    }
+    EXPECT_EQ(defCount, 1u) << "PathData " << id << " should be defined exactly once";
+  }
 
   // Verify deterministic output: export again and compare
   std::string xml2 = pagx::PAGXExporter::ToXML(*doc);
   EXPECT_EQ(xml, xml2) << "Export should be deterministic";
 
-  // Verify round-trip: import and re-export should preserve structure
+  // Verify round-trip: import and re-export should preserve structure and path content.
   auto doc2 = pagx::PAGXImporter::FromXML(xml);
   ASSERT_TRUE(doc2 != nullptr);
   EXPECT_TRUE(doc2->errors.empty());
   ASSERT_EQ(doc2->layers.size(), 1u);
 
-  // The imported document should have the same number of Path elements
   auto* importedLayer = doc2->layers[0];
   int pathCount = 0;
   for (const auto* element : importedLayer->contents) {
-    if (element->nodeType() == pagx::NodeType::Path) {
-      pathCount++;
+    if (element->nodeType() != pagx::NodeType::Path) {
+      continue;
     }
+    pathCount++;
+    auto* importedPath = static_cast<const pagx::Path*>(element);
+    ASSERT_TRUE(importedPath->data != nullptr);
+    // Each imported path data must be non-empty and have the triangle (4 verbs) or
+    // rectangle (5 verbs) shape.
+    const auto& verbs = importedPath->data->verbs();
+    EXPECT_TRUE(verbs.size() == 4u || verbs.size() == 5u)
+        << "Imported path should have triangle (4 verbs) or rectangle (5 verbs) shape";
   }
   EXPECT_EQ(pathCount, 4) << "Should have 4 Path elements after import";
 }
@@ -513,9 +535,12 @@ PAGX_TEST(PAGXTest, PathDataDeduplicationWithExistingId) {
   }
   EXPECT_EQ(myTriangleRefCount, 2u) << "Paths using shared PathData should reference @myTriangle";
 
-  // path3 should get a generated ID like "__pd_0"
-  EXPECT_NE(xml.find("data=\"@__pd_0\""), std::string::npos)
-      << "Path with unnamed PathData should get generated ID";
+  // path3 has identical content to sharedPathData -> should be merged and reference myTriangle.
+  EXPECT_NE(xml.find("data=\"@myTriangle\""), std::string::npos)
+      << "Path with unnamed but identical PathData should reference the named PathData";
+  // There should be no extra generated PathData IDs in Resources.
+  EXPECT_EQ(xml.find("<PathData id=\"__pd_"), std::string::npos)
+      << "No generated PathData IDs should exist when all content matches named PathData";
 
   // Verify the explicit PathData resource exists
   EXPECT_NE(xml.find("<PathData id=\"myTriangle\""), std::string::npos)
@@ -575,6 +600,89 @@ PAGX_TEST(PAGXTest, PathDataDeduplicationIdCollision) {
   // Both PathData resources should exist
   EXPECT_NE(xml.find("<PathData id=\"__pd_0\""), std::string::npos);
   EXPECT_NE(xml.find("<PathData id=\"__pd_1\""), std::string::npos);
+}
+
+/**
+ * Test case: PathData deduplication for TextPath elements
+ *
+ * Verifies that TextPath elements sharing identical PathData content are deduplicated
+ * in the same way as Path elements.
+ */
+PAGX_TEST(PAGXTest, PathDataDeduplicationTextPath) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+
+  auto layer = doc->makeNode<pagx::Layer>();
+
+  // TextPath 1: curve at top
+  auto textPath1 = doc->makeNode<pagx::TextPath>();
+  textPath1->path = doc->makeNode<pagx::PathData>();
+  textPath1->path->moveTo(0, 100);
+  textPath1->path->lineTo(400, 100);
+
+  // TextPath 2: identical curve
+  auto textPath2 = doc->makeNode<pagx::TextPath>();
+  textPath2->path = doc->makeNode<pagx::PathData>();
+  textPath2->path->moveTo(0, 100);
+  textPath2->path->lineTo(400, 100);
+
+  // TextPath 3: different curve
+  auto textPath3 = doc->makeNode<pagx::TextPath>();
+  textPath3->path = doc->makeNode<pagx::PathData>();
+  textPath3->path->moveTo(0, 200);
+  textPath3->path->lineTo(400, 200);
+
+  layer->contents.push_back(textPath1);
+  layer->contents.push_back(textPath2);
+  layer->contents.push_back(textPath3);
+  doc->layers.push_back(layer);
+
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+
+  // Collect all path="@..." references from TextPath elements.
+  std::map<std::string, int> referenceCount;
+  size_t pos = 0;
+  while (pos < xml.size()) {
+    size_t found = xml.find("path=\"@", pos);
+    if (found == std::string::npos) {
+      break;
+    }
+    size_t idStart = found + 7;
+    size_t idEnd = xml.find('"', idStart);
+    if (idEnd == std::string::npos) {
+      break;
+    }
+    referenceCount[xml.substr(idStart, idEnd - idStart)]++;
+    pos = idEnd + 1;
+  }
+
+  // textPath1 and textPath2 share identical content -> one shared ID with 2 references.
+  // textPath3 has different content -> a separate ID with 1 reference.
+  EXPECT_EQ(referenceCount.size(), 2u) << "Should deduplicate to exactly 2 unique PathData IDs";
+  bool foundSharedId = false;
+  bool foundUniqueId = false;
+  for (const auto& [id, count] : referenceCount) {
+    if (count == 2) {
+      foundSharedId = true;
+    }
+    if (count == 1) {
+      foundUniqueId = true;
+    }
+  }
+  EXPECT_TRUE(foundSharedId) << "Identical TextPath curves should share one PathData ID";
+  EXPECT_TRUE(foundUniqueId) << "Different TextPath curve should have its own PathData ID";
+
+  // Each referenced PathData must be defined exactly once in Resources.
+  for (const auto& [id, count] : referenceCount) {
+    std::string tag = "<PathData id=\"" + id + "\"";
+    size_t defCount = 0;
+    size_t defPos = 0;
+    while ((defPos = xml.find(tag, defPos)) != std::string::npos) {
+      defCount++;
+      defPos++;
+    }
+    EXPECT_EQ(defCount, 1u) << "PathData " << id << " should be defined exactly once";
+  }
 }
 
 /**
