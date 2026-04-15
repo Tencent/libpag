@@ -28,7 +28,7 @@ relevant reference:
 Before running any `pagx` command, ensure it is installed and meets the minimum version:
 
 ```bash
-PAGX_MIN="0.2.13"
+PAGX_MIN="0.2.15"
 if ! command -v pagx &>/dev/null; then
   npm install -g @libpag/pagx
 elif [ "$(printf '%s\n' "$PAGX_MIN" "$(pagx -v | awk '{print $2}')" | sort -V | head -1)" != "$PAGX_MIN" ]; then
