@@ -25,6 +25,7 @@
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
+#include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/SolidColor.h"
@@ -1120,6 +1121,28 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
           if (fill->color->nodeType() == NodeType::SolidColor) {
             auto sc = static_cast<const SolidColor*>(fill->color);
             charStyle += ";color:" + ColorToRGBA(sc->color, fill->alpha);
+          } else if (fill->color->nodeType() == NodeType::LinearGradient) {
+            auto lg = static_cast<const LinearGradient*>(fill->color);
+            if (!lg->colorStops.empty()) {
+              float t = effectiveLength > 0 ? charCenterArc / effectiveLength : 0;
+              if (t < 0) t = 0;
+              if (t > 1) t = 1;
+              Color sampled = lg->colorStops[0]->color;
+              for (size_t si = 0; si + 1 < lg->colorStops.size(); si++) {
+                float o0 = lg->colorStops[si]->offset;
+                float o1 = lg->colorStops[si + 1]->offset;
+                if (t >= o0 && t <= o1 && o1 > o0) {
+                  float f = (t - o0) / (o1 - o0);
+                  auto& c0 = lg->colorStops[si]->color;
+                  auto& c1 = lg->colorStops[si + 1]->color;
+                  sampled.red = c0.red + (c1.red - c0.red) * f;
+                  sampled.green = c0.green + (c1.green - c0.green) * f;
+                  sampled.blue = c0.blue + (c1.blue - c0.blue) * f;
+                  break;
+                }
+              }
+              charStyle += ";color:" + ColorToRGBA(sampled, fill->alpha);
+            }
           } else {
             auto css = colorToCSS(fill->color, nullptr);
             if (!css.empty()) {
