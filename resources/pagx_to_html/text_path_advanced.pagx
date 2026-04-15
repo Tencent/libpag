@@ -5,7 +5,7 @@
   <Resources>
     <PathData id="bannerArc" data="M 30,100 C 80,25 220,25 270,100"/>
     <PathData id="linePath" data="M 10,20 L 140,20"/>
-    <PathData id="circlePath" data="M 90,45 A 40,40 0 1,1 89.99,45 Z"/>
+    <PathData id="circlePath" data="M 90,50 A 40,40 0 1,1 89.99,50 Z"/>
     <PathData id="wavyPath" data="M 20,30 Q 85,0 150,30 Q 215,60 280,30"/>
   </Resources>
 
