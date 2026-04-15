@@ -207,7 +207,7 @@ if (PAG_BUILD_PAGX)
 
     if (PAG_BUILD_SVG)
         list(APPEND PAG_FILES src/pagx/svg/SVGImporter.cpp src/pagx/svg/SVGParserContext.h)
-        list(APPEND PAG_FILES src/pagx/svg/SVGExporter.cpp src/pagx/svg/SVGTextLayout.cpp)
+        list(APPEND PAG_FILES src/pagx/svg/SVGExporter.cpp)
     endif ()
 
     if (PAG_BUILD_PPT)
