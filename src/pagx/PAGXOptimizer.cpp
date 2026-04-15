@@ -211,11 +211,10 @@ static bool MergeConsecutiveGroups(std::vector<Element*>& elements) {
         break;
       }
       size_t nextPainterStart = FindPainterSuffixStart(next->elements);
-      for (size_t k = 0; k < nextPainterStart; k++) {
-        current->elements.insert(current->elements.begin() + static_cast<long>(painterStart),
-                                 next->elements[k]);
-        painterStart++;
-      }
+      current->elements.insert(current->elements.begin() + static_cast<long>(painterStart),
+                               next->elements.begin(),
+                               next->elements.begin() + static_cast<long>(nextPainterStart));
+      painterStart += nextPainterStart;
       elements.erase(elements.begin() + static_cast<long>(j));
       changed = true;
     }
@@ -303,13 +302,12 @@ static bool ConvertRectMaskToClipToBounds(Layer* layer) {
   return true;
 }
 
-static void OptimizeLayerRecursive(Layer* layer, PAGXDocument* doc, bool /*parentHasLayout*/,
-                                   bool& changed) {
+static void OptimizeLayerRecursive(Layer* layer, PAGXDocument* doc, bool& changed) {
   bool thisHasLayout = layer->layout != LayoutMode::None;
   auto it = layer->children.begin();
   while (it != layer->children.end()) {
     auto* child = *it;
-    OptimizeLayerRecursive(child, doc, thisHasLayout, changed);
+    OptimizeLayerRecursive(child, doc, changed);
     if (PAGXAnalyzer::IsEmptyLayer(child, thisHasLayout)) {
       it = layer->children.erase(it);
       changed = true;
@@ -538,7 +536,7 @@ bool PAGXOptimizer::Optimize(PAGXDocument* document) {
 
   // Pass 1: Recursive layer optimization (bottom-up).
   for (auto* layer : document->layers) {
-    OptimizeLayerRecursive(layer, document, false, changed);
+    OptimizeLayerRecursive(layer, document, changed);
   }
 
   // Pass 2: Remove top-level empty layers.

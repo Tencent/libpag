@@ -95,16 +95,7 @@ bool PAGXAnalyzer::HasDefaultGroupTransform(const Group* group) {
 }
 
 bool PAGXAnalyzer::CanUnwrapFirstChildGroup(const Group* group) {
-  if (group->alpha != 1.0f || group->position.x != 0 || group->position.y != 0) {
-    return false;
-  }
-  if (group->anchor.x != 0 || group->anchor.y != 0 || group->rotation != 0) {
-    return false;
-  }
-  if (group->scale.x != 1 || group->scale.y != 1 || group->skew != 0) {
-    return false;
-  }
-  if (!std::isnan(group->width) || !std::isnan(group->height)) {
+  if (!HasDefaultGroupTransform(group)) {
     return false;
   }
   if (!std::isnan(group->left) || !std::isnan(group->right) || !std::isnan(group->top) ||
@@ -124,8 +115,7 @@ bool PAGXAnalyzer::CanUnwrapFirstChildGroup(const Group* group) {
   return true;
 }
 
-PathPrimitive PAGXAnalyzer::DetectPathPrimitive(const Path* path, RectInfo* rectOut,
-                                                EllipseInfo* ellipseOut) {
+PathPrimitive PAGXAnalyzer::DetectPathPrimitive(const Path* path, PrimitiveInfo* infoOut) {
   if (path->data == nullptr || path->data->isEmpty()) {
     return PathPrimitive::None;
   }
@@ -158,7 +148,7 @@ PathPrimitive PAGXAnalyzer::DetectPathPrimitive(const Path* path, RectInfo* rect
         }
       }
       if (axisAligned) {
-        if (rectOut != nullptr) {
+        if (infoOut != nullptr) {
           float minX = pts[0].x, maxX = pts[0].x;
           float minY = pts[0].y, maxY = pts[0].y;
           for (size_t i = 1; i < pointCount; i++) {
@@ -167,10 +157,10 @@ PathPrimitive PAGXAnalyzer::DetectPathPrimitive(const Path* path, RectInfo* rect
             minY = std::min(minY, pts[i].y);
             maxY = std::max(maxY, pts[i].y);
           }
-          rectOut->w = maxX - minX;
-          rectOut->h = maxY - minY;
-          rectOut->cx = (minX + maxX) / 2.0f;
-          rectOut->cy = (minY + maxY) / 2.0f;
+          infoOut->w = maxX - minX;
+          infoOut->h = maxY - minY;
+          infoOut->cx = (minX + maxX) / 2.0f;
+          infoOut->cy = (minY + maxY) / 2.0f;
         }
         return PathPrimitive::Rectangle;
       }
@@ -245,11 +235,11 @@ PathPrimitive PAGXAnalyzer::DetectPathPrimitive(const Path* path, RectInfo* rect
       }
     }
     if (isEllipse) {
-      if (ellipseOut != nullptr) {
-        ellipseOut->cx = cx;
-        ellipseOut->cy = cy;
-        ellipseOut->w = rx * 2.0f;
-        ellipseOut->h = ry * 2.0f;
+      if (infoOut != nullptr) {
+        infoOut->cx = cx;
+        infoOut->cy = cy;
+        infoOut->w = rx * 2.0f;
+        infoOut->h = ry * 2.0f;
       }
       return PathPrimitive::Ellipse;
     }

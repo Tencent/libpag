@@ -26,14 +26,7 @@ namespace pagx {
 
 enum class PathPrimitive { None, Rectangle, Ellipse };
 
-struct RectInfo {
-  float cx = 0;
-  float cy = 0;
-  float w = 0;
-  float h = 0;
-};
-
-struct EllipseInfo {
+struct PrimitiveInfo {
   float cx = 0;
   float cy = 0;
   float w = 0;
@@ -51,8 +44,7 @@ class PAGXAnalyzer {
   static bool CanDowngradeLayerToGroup(const Layer* layer);
   static bool HasDefaultGroupTransform(const Group* group);
   static bool CanUnwrapFirstChildGroup(const Group* group);
-  static PathPrimitive DetectPathPrimitive(const Path* path, RectInfo* rectOut,
-                                           EllipseInfo* ellipseOut);
+  static PathPrimitive DetectPathPrimitive(const Path* path, PrimitiveInfo* infoOut);
 };
 
 }  // namespace pagx

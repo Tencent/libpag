@@ -5116,6 +5116,20 @@ PAGX_TEST(PAGXTest, TextBoxPaddingRoundTrip) {
 // PAGXOptimizer unit tests — one per optimization rule
 //==============================================================================
 
+static pagx::Group* MakePaintedGroup(pagx::PAGXDocument* doc, float x, float y) {
+  auto* group = doc->makeNode<pagx::Group>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {20, 20};
+  rect->position = {x, y};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  group->elements.push_back(rect);
+  group->elements.push_back(fill);
+  return group;
+}
+
 PAGX_TEST(PAGXTest, Optimizer_RemoveEmptyGroup) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto* layer = doc->makeNode<pagx::Layer>();
@@ -5227,26 +5241,12 @@ PAGX_TEST(PAGXTest, Optimizer_MergeConsecutiveGroups) {
   layer->width = 100;
   layer->height = 100;
 
-  auto makePaintedGroup = [&](float x, float y) -> pagx::Group* {
-    auto* group = doc->makeNode<pagx::Group>();
-    auto* rect = doc->makeNode<pagx::Rectangle>();
-    rect->size = {20, 20};
-    rect->position = {x, y};
-    auto* fill = doc->makeNode<pagx::Fill>();
-    auto* solid = doc->makeNode<pagx::SolidColor>();
-    solid->color = {1, 0, 0, 1};
-    fill->color = solid;
-    group->elements.push_back(rect);
-    group->elements.push_back(fill);
-    return group;
-  };
-
   auto* placeholder = doc->makeNode<pagx::Rectangle>();
   placeholder->size = {5, 5};
   placeholder->position = {0, 0};
   layer->contents.push_back(placeholder);
-  layer->contents.push_back(makePaintedGroup(10, 10));
-  layer->contents.push_back(makePaintedGroup(40, 40));
+  layer->contents.push_back(MakePaintedGroup(doc.get(), 10, 10));
+  layer->contents.push_back(MakePaintedGroup(doc.get(), 40, 40));
   doc->layers.push_back(layer);
 
   EXPECT_EQ(layer->contents.size(), 3u);
@@ -5302,33 +5302,20 @@ PAGX_TEST(PAGXTest, Optimizer_NoMergeWhenPaintersDiffer) {
   EXPECT_EQ(layer->contents.size(), 3u);
 }
 
-PAGX_TEST(PAGXTest, Optimizer_ConvertPathToRectangle) {
+PAGX_TEST(PAGXTest, Optimizer_PreservePathAsIs) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto* layer = doc->makeNode<pagx::Layer>();
   layer->width = 100;
   layer->height = 100;
-  auto* path = doc->makeNode<pagx::Path>();
-  auto* pathData = doc->makeNode<pagx::PathData>();
-  *pathData = pagx::PathDataFromSVGString("M0 0 L60 0 L60 40 L0 40 Z");
-  path->data = pathData;
-  layer->contents.push_back(path);
-  doc->layers.push_back(layer);
 
-  EXPECT_EQ(layer->contents[0]->nodeType(), pagx::NodeType::Path);
-  pagx::PAGXOptimizer::Optimize(doc.get());
-  ASSERT_EQ(layer->contents.size(), 1u);
-  EXPECT_EQ(layer->contents[0]->nodeType(), pagx::NodeType::Path);
-}
+  auto* rectPath = doc->makeNode<pagx::Path>();
+  auto* rectPathData = doc->makeNode<pagx::PathData>();
+  *rectPathData = pagx::PathDataFromSVGString("M0 0 L60 0 L60 40 L0 40 Z");
+  rectPath->data = rectPathData;
+  layer->contents.push_back(rectPath);
 
-PAGX_TEST(PAGXTest, Optimizer_ConvertPathToEllipse) {
-  auto doc = pagx::PAGXDocument::Make(100, 100);
-  auto* layer = doc->makeNode<pagx::Layer>();
-  layer->width = 100;
-  layer->height = 100;
-  auto* path = doc->makeNode<pagx::Path>();
-  auto* pathData = doc->makeNode<pagx::PathData>();
-  // Standard SVG ellipse arc: 4 cubic bezier segments approximating a circle of radius 50
-  // centered at (50, 50).
+  auto* ellipsePath = doc->makeNode<pagx::Path>();
+  auto* ellipsePathData = doc->makeNode<pagx::PathData>();
   static constexpr float R = 50.0f;
   static constexpr float K = 0.5522847f * R;
   std::string d =
@@ -5341,15 +5328,16 @@ PAGX_TEST(PAGXTest, Optimizer_ConvertPathToEllipse) {
       std::to_string(50.0f + K) + " " + std::to_string(0.0f) + " " + std::to_string(50.0f) + " C" +
       std::to_string(0.0f) + " " + std::to_string(50.0f - K) + " " + std::to_string(50.0f - K) +
       " " + std::to_string(0.0f) + " " + std::to_string(50.0f) + " " + std::to_string(0.0f) + " Z";
-  *pathData = pagx::PathDataFromSVGString(d);
-  path->data = pathData;
-  layer->contents.push_back(path);
+  *ellipsePathData = pagx::PathDataFromSVGString(d);
+  ellipsePath->data = ellipsePathData;
+  layer->contents.push_back(ellipsePath);
+
   doc->layers.push_back(layer);
 
-  EXPECT_EQ(layer->contents[0]->nodeType(), pagx::NodeType::Path);
   pagx::PAGXOptimizer::Optimize(doc.get());
-  ASSERT_EQ(layer->contents.size(), 1u);
+  ASSERT_EQ(layer->contents.size(), 2u);
   EXPECT_EQ(layer->contents[0]->nodeType(), pagx::NodeType::Path);
+  EXPECT_EQ(layer->contents[1]->nodeType(), pagx::NodeType::Path);
 }
 
 PAGX_TEST(PAGXTest, Optimizer_ConvertRectMaskToClipToBounds) {

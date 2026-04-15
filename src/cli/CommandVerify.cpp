@@ -541,7 +541,7 @@ static void DetectRedundantFirstChildGroup(const std::vector<Element*>& elements
 // ============================================================================
 
 static void DetectPathToPrimitives(const Path* path, std::vector<VerifyDiagnostic>& diagnostics) {
-  auto primitive = PAGXAnalyzer::DetectPathPrimitive(path, nullptr, nullptr);
+  auto primitive = PAGXAnalyzer::DetectPathPrimitive(path, nullptr);
   if (primitive == PathPrimitive::Rectangle) {
     AddDiagnostic(diagnostics, path->sourceLine,
                   "Path draws an axis-aligned rectangle. "
