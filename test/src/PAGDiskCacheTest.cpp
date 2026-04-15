@@ -436,4 +436,59 @@ PAG_TEST(PAGDiskCacheTest, FileCache) {
   pag::PAGDiskCache::RemoveAll();
 }
 
+/**
+ * Tests for DiskIOWorker: serial execution order and waitAll behavior.
+ */
+PAG_TEST(PAGDiskCacheTest, DiskIOWorker) {
+  auto worker = DiskIOWorker::GetInstance();
+
+  // Test 1: Verify serial execution order
+  std::vector<int> executionOrder;
+  std::mutex orderMutex;
+  for (int i = 0; i < 5; i++) {
+    worker->submit([i, &executionOrder, &orderMutex]() {
+      std::lock_guard<std::mutex> lock(orderMutex);
+      executionOrder.push_back(i);
+    });
+  }
+  worker->waitAll();
+  ASSERT_EQ(executionOrder.size(), 5u);
+  for (int i = 0; i < 5; i++) {
+    EXPECT_EQ(executionOrder[i], i);
+  }
+
+  // Test 2: Verify waitAll blocks until all tasks complete
+  std::atomic<int> counter{0};
+  for (int i = 0; i < 10; i++) {
+    worker->submit([&counter]() {
+      std::this_thread::sleep_for(std::chrono::milliseconds(5));
+      counter++;
+    });
+  }
+  // Before waitAll, counter may not be 10 yet
+  worker->waitAll();
+  // After waitAll, all tasks must be complete
+  EXPECT_EQ(counter.load(), 10);
+
+  // Test 3: Verify nullptr task is safely ignored
+  worker->submit(nullptr);
+  worker->waitAll();  // Should not crash
+
+  // Test 4: Verify concurrent submit from multiple threads
+  counter = 0;
+  std::vector<std::thread> threads;
+  for (int i = 0; i < 4; i++) {
+    threads.emplace_back([worker, &counter]() {
+      for (int j = 0; j < 25; j++) {
+        worker->submit([&counter]() { counter++; });
+      }
+    });
+  }
+  for (auto& t : threads) {
+    t.join();
+  }
+  worker->waitAll();
+  EXPECT_EQ(counter.load(), 100);
+}
+
 }  // namespace pag
