@@ -23,6 +23,7 @@
 #include <climits>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <iostream>
 #include <string>
 #include "cli/CliUtils.h"
@@ -105,8 +106,13 @@ int RunFormat(int argc, char* argv[]) {
 
   ReorderAttributesRecursive(root);
 
-  std::string output = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-  SerializeNode(output, root, 0, indentSpaces);
+  std::string output;
+  std::ifstream probe(inputPath);
+  std::string firstLine;
+  if (std::getline(probe, firstLine) && firstLine.find("<?xml") != std::string::npos) {
+    output = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+  }
+  SerializeNode(output, doc->children, 0, indentSpaces);
 
   xmlFreeDoc(doc);
 

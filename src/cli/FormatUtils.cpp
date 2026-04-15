@@ -293,6 +293,15 @@ void SerializeNode(std::string& output, xmlNodePtr node, int indentLevel, int in
       } else {
         output += "/>\n";
       }
+    } else if (cur->type == XML_COMMENT_NODE) {
+      auto indent = std::string(static_cast<size_t>(indentLevel * indentSpaces), ' ');
+      auto* content = reinterpret_cast<const char*>(cur->content);
+      if (content != nullptr) {
+        output += indent;
+        output += "<!--";
+        output += content;
+        output += "-->\n";
+      }
     }
   }
 }
