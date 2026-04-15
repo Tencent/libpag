@@ -1013,8 +1013,28 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
           }
         }
       }
-      float spacingScale =
-          textPath->forceAlignment && totalAdvance > 0 ? effectiveLength / totalAdvance : 1.0f;
+      size_t glyphCount = 0;
+      for (auto* run : text->glyphRuns) {
+        if (!run->font) {
+          continue;
+        }
+        for (size_t i = 0; i < run->glyphs.size(); i++) {
+          uint16_t glyphId = run->glyphs[i];
+          if (glyphId == 0) {
+            continue;
+          }
+          auto* glyph = (glyphId > 0 && glyphId <= run->font->glyphs.size())
+                            ? run->font->glyphs[glyphId - 1]
+                            : nullptr;
+          if (glyph) {
+            glyphCount++;
+          }
+        }
+      }
+      float extraSpacing = 0.0f;
+      if (textPath->forceAlignment && glyphCount > 1 && totalAdvance > 0) {
+        extraSpacing = (effectiveLength - totalAdvance) / static_cast<float>(glyphCount - 1);
+      }
       float currentArcPos = textPath->firstMargin;
       for (auto* run : text->glyphRuns) {
         if (!run->font) {
@@ -1032,7 +1052,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
           if (!glyph || !glyph->path) {
             continue;
           }
-          float glyphAdvance = glyph->advance * scale * spacingScale;
+          float glyphAdvance = glyph->advance * scale;
           float glyphCenterArc = currentArcPos + glyphAdvance / 2.0f;
           Point pos = {};
           float tangent = 0;
@@ -1055,7 +1075,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
           out.addAttr("transform", MatrixToCSS(m));
           out.addAttr("d", PathDataToSVGString(*glyph->path));
           out.closeTagSelfClosing();
-          currentArcPos += glyphAdvance;
+          currentArcPos += glyphAdvance + extraSpacing;
         }
       }
       out.closeTag();  // </g>
@@ -1072,8 +1092,21 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         totalWidth += EstimateCharAdvanceHTML(ch, text->fontSize) + text->letterSpacing;
         p += len;
       }
-      float spacingScale =
-          textPath->forceAlignment && totalWidth > 0 ? effectiveLength / totalWidth : 1.0f;
+      size_t charCount = 0;
+      const char* q = text->text.c_str();
+      while (*q) {
+        int32_t ch = 0;
+        size_t len = SVGDecodeUTF8Char(q, text->text.size() - (q - text->text.c_str()), &ch);
+        if (len == 0) {
+          break;
+        }
+        charCount++;
+        q += len;
+      }
+      float extraSpacing = 0.0f;
+      if (textPath->forceAlignment && charCount > 1 && totalWidth > 0) {
+        extraSpacing = (effectiveLength - totalWidth) / static_cast<float>(charCount - 1);
+      }
       float currentArcPos = textPath->firstMargin;
       p = text->text.c_str();
       while (*p) {
@@ -1082,8 +1115,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         if (len == 0) {
           break;
         }
-        float charWidth =
-            (EstimateCharAdvanceHTML(ch, text->fontSize) + text->letterSpacing) * spacingScale;
+        float charWidth = EstimateCharAdvanceHTML(ch, text->fontSize) + text->letterSpacing;
         float charCenterArc = currentArcPos + charWidth / 2.0f;
         Point pos = {};
         float tangent = 0;
@@ -1158,7 +1190,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         out.openTag("span");
         out.addAttr("style", charStyle);
         out.closeTagWithText(charStr);
-        currentArcPos += charWidth;
+        currentArcPos += charWidth + extraSpacing;
         p += len;
       }
     }
