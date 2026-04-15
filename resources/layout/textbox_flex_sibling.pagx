@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Content-measured child with TextBox mixed with a flex sibling. The flex child should get
+     the remaining space after the TextBox wrapping height is determined. -->
+<pagx width="200" height="400">
+  <Layer width="200" height="400" layout="vertical">
+    <!-- Content-measured child with wrapping TextBox -->
+    <Layer>
+      <TextBox left="0" right="0">
+        <Text text="AAAA BBBB CCCC DDDD EEEE FFFF GGGG HHHH" fontFamily="Noto Sans SC" fontSize="16"/>
+        <Fill color="#000000"/>
+      </TextBox>
+    </Layer>
+    <!-- Flex child fills remaining space -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#1DA1F2"/>
+    </Layer>
+  </Layer>
+</pagx>

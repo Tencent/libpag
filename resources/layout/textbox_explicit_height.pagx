@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- TextBox with explicit height=55 and left+right constraints. The explicit height should be
+     preserved even when the constraint-derived width triggers re-typesetting. -->
+<pagx width="400" height="100">
+  <Layer width="400" height="100">
+    <TextBox left="20" right="20" height="55">
+      <Text text="ABCDEFGHIJ KLMNOPQRST UVWXYZ abcdefghij klmnopqrst uvwxyz" fontFamily="Noto Sans SC" fontSize="24"/>
+      <Fill color="#14171A"/>
+    </TextBox>
+  </Layer>
+</pagx>
