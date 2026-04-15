@@ -56,11 +56,11 @@ class DiskIOWorker {
 
   void runLoop();
 
-  std::mutex locker;
-  std::condition_variable condition;
-  std::condition_variable idleCondition;
-  std::queue<std::function<void()>> tasks;
-  std::thread workerThread;
+  std::mutex locker = {};
+  std::condition_variable condition = {};
+  std::condition_variable idleCondition = {};
+  std::queue<std::function<void()>> tasks = {};
+  std::thread workerThread = {};
   std::atomic<bool> stopped{false};
   // Tracks if a task is currently being executed. Always accessed under locker, no atomic needed.
   bool executing = false;
