@@ -203,16 +203,20 @@ bool WriteStringToFile(const std::string& content, const std::string& filePath,
 
 /**
  * Returns true if the Layer uses any feature that Group does not support at all (e.g. blendMode,
- * styles, filters, mask, 3D transforms, container layout, composition). Does NOT check contents or
- * children (callers handle those based on context), nor attributes that Group also has (alpha, 2D
- * matrix/position, width/height, padding, constraint positioning). When a new attribute is added to
- * Layer, it is treated as Layer-only by default unless explicitly whitelisted here.
+ * styles, filters, mask, 3D transforms, container layout, composition, alpha with offscreen
+ * semantics). Does NOT check contents or children (callers handle those based on context), nor
+ * attributes whose values can be mechanically transferred to a Group (2D matrix, x/y position,
+ * width/height, padding, constraint positioning). When adding a new Layer-only attribute, add a corresponding
+ * check here; otherwise the attribute will be silently ignored.
  */
 inline bool HasLayerOnlyFeatures(const Layer* layer) {
   if (!layer->id.empty() || !layer->name.empty()) {
     return true;
   }
   if (!layer->visible) {
+    return true;
+  }
+  if (layer->alpha != 1.0f) {
     return true;
   }
   if (layer->blendMode != BlendMode::Normal) {
@@ -263,9 +267,6 @@ inline bool HasLayerOnlyFeatures(const Layer* layer) {
   if (layer->flex != 0.0f) {
     return true;
   }
-  if (!layer->padding.isZero()) {
-    return true;
-  }
   if (layer->alignment != Alignment::Stretch) {
     return true;
   }
@@ -281,13 +282,10 @@ inline bool HasLayerOnlyFeatures(const Layer* layer) {
 /**
  * Returns true if the Layer is a plain shell — all attributes are at their default values. Does
  * NOT check contents (the payload to retain). Stricter than HasLayerOnlyFeatures: also requires
- * attributes that Group supports (alpha, 2D matrix, position, size, constraints) to be default.
+ * attributes transferable to Group (x/y position, 2D matrix, size, padding, constraints) to be default.
  */
 inline bool IsLayerShell(const Layer* layer) {
   if (HasLayerOnlyFeatures(layer)) {
-    return false;
-  }
-  if (layer->alpha != 1.0f) {
     return false;
   }
   if (layer->x != 0.0f || layer->y != 0.0f) {
@@ -297,6 +295,9 @@ inline bool IsLayerShell(const Layer* layer) {
     return false;
   }
   if (!std::isnan(layer->width) || !std::isnan(layer->height)) {
+    return false;
+  }
+  if (!layer->padding.isZero()) {
     return false;
   }
   if (!std::isnan(layer->left) || !std::isnan(layer->right) || !std::isnan(layer->top) ||

@@ -195,7 +195,7 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
     for (size_t i = 0; i < elementLayers.size(); i++) {
       auto* elemLayer = elementLayers[i];
       bool unpackFirst = false;
-      if (i == 0 && elemLayer->matrix.isIdentity() && elemLayer->alpha == 1.0f) {
+      if (i == 0 && elemLayer->matrix.isIdentity()) {
         unpackFirst = true;
         for (auto* child : elemLayer->contents) {
           auto* layoutNode = LayoutNode::AsLayoutNode(child);
@@ -236,7 +236,6 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
             group->rotation = rot;
           }
         }
-        group->alpha = elemLayer->alpha;
         layer->contents.push_back(group);
       }
     }
