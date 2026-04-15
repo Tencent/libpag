@@ -21,10 +21,14 @@
 #include <cstdio>
 #include <cstring>
 #include <fstream>
+#include <memory>
 #include <string>
 #include <vector>
+#include "pagx/LayoutContext.h"
+#include "pagx/TextLayoutParams.h"
 #include "base/utils/MathUtil.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/TextLayout.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
@@ -47,7 +51,6 @@
 #include "pagx/nodes/TextBox.h"
 #include "pagx/svg/SVGBlendMode.h"
 #include "pagx/svg/SVGPathParser.h"
-#include "pagx/svg/SVGTextLayout.h"
 #include "pagx/types/Rect.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/ExporterUtils.h"
@@ -181,9 +184,9 @@ class SVGWriterContext {
 class SVGWriter {
  public:
   SVGWriter(SVGBuilder* defs, SVGWriterContext* context, int indentSpaces = 2,
-            bool convertTextToPath = true)
+            bool convertTextToPath = true, LayoutContext* layoutContext = nullptr)
       : _defs(defs), _context(context), _indentSpaces(indentSpaces),
-        _convertTextToPath(convertTextToPath) {
+        _convertTextToPath(convertTextToPath), _layoutContext(layoutContext) {
   }
 
   void writeLayer(SVGBuilder& out, const Layer* layer);
@@ -193,6 +196,7 @@ class SVGWriter {
   SVGWriterContext* _context = nullptr;
   int _indentSpaces = 2;
   bool _convertTextToPath = true;
+  LayoutContext* _layoutContext = nullptr;
 
   std::string generateId(const std::string& prefix) {
     return _context->generateId(prefix);
@@ -214,6 +218,10 @@ class SVGWriter {
                  const std::string& transform = "");
   void writeTextAsPath(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
                        const std::string& transform = "");
+  void writeTextWithLayout(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
+                           const TextLayoutResult& layoutResult, const std::string& transform);
+  void writeTextBoxGroup(SVGBuilder& out, const Group* textBox,
+                         const std::vector<Element*>& elements, const Matrix& transform);
 
   // Gradient / pattern defs (write to _defs)
   void writeGradientStops(const std::vector<ColorStop*>& stops);
@@ -624,7 +632,7 @@ std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, const char* ta
     _defs->addAttribute("style", "mask-type:alpha");
   }
   _defs->closeElementStart();
-  SVGWriter nestedWriter(&paintDefs, _context, _indentSpaces, _convertTextToPath);
+  SVGWriter nestedWriter(&paintDefs, _context, _indentSpaces, _convertTextToPath, _layoutContext);
   (nestedWriter.*writer)(*_defs, maskLayer);
   _defs->closeElement();
   std::string paintDefsStr = paintDefs.release();
@@ -860,6 +868,139 @@ void SVGWriter::writeTextAsPath(SVGBuilder& out, const Text* text, const FillStr
 
 // ── writeText ───────────────────────────────────────────────────────────────
 
+static void WriteSharedTextAttrs(SVGBuilder& out, const Text* text, TextAnchor anchor) {
+  if (!text->fontFamily.empty()) {
+    out.addAttribute("font-family", text->fontFamily);
+  }
+  out.addAttribute("font-size", FloatToString(text->fontSize));
+  if (text->letterSpacing != 0.0f) {
+    out.addAttribute("letter-spacing", FloatToString(text->letterSpacing));
+  }
+  if (anchor == TextAnchor::Center) {
+    out.addAttribute("text-anchor", "middle");
+  } else if (anchor == TextAnchor::End) {
+    out.addAttribute("text-anchor", "end");
+  }
+  if (!text->fontStyle.empty()) {
+    bool hasBold = text->fontStyle.find("Bold") != std::string::npos;
+    bool hasItalic = text->fontStyle.find("Italic") != std::string::npos;
+    if (hasBold) {
+      out.addAttribute("font-weight", "bold");
+    }
+    if (hasItalic) {
+      out.addAttribute("font-style", "italic");
+    }
+  }
+}
+
+void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
+                                    const TextLayoutResult& layoutResult,
+                                    const std::string& transform) {
+  auto* mutableText = const_cast<Text*>(text);
+  auto* lines = layoutResult.getTextLines(mutableText);
+  if (!lines || lines->empty()) {
+    return;
+  }
+
+  TextAnchor anchor = TextAnchor::Start;
+  float anchorX = 0;
+  float offsetY = 0;
+  if (fs.textBox) {
+    float paddingLeft = fs.textBox->padding.left;
+    float paddingTop = fs.textBox->padding.top;
+    switch (fs.textBox->textAlign) {
+      case TextAlign::Center:
+        anchor = TextAnchor::Center;
+        anchorX = fs.textBox->position.x + paddingLeft +
+                  (fs.textBox->width - paddingLeft - fs.textBox->padding.right) / 2;
+        break;
+      case TextAlign::End:
+        anchor = TextAnchor::End;
+        anchorX = fs.textBox->position.x + fs.textBox->width - fs.textBox->padding.right;
+        break;
+      default:
+        anchorX = fs.textBox->position.x + paddingLeft;
+        break;
+    }
+    offsetY = fs.textBox->position.y + paddingTop;
+  } else {
+    anchor = text->textAnchor;
+    anchorX = text->position.x;
+    offsetY = text->position.y;
+  }
+
+  for (auto& lineInfo : *lines) {
+    if (lineInfo.byteStart >= lineInfo.byteEnd) {
+      continue;
+    }
+    std::string lineText =
+        text->text.substr(lineInfo.byteStart, lineInfo.byteEnd - lineInfo.byteStart);
+    if (lineText.empty()) {
+      continue;
+    }
+    out.openElement("text");
+    if (!transform.empty()) {
+      out.addAttribute("transform", transform);
+    }
+    WriteSharedTextAttrs(out, text, anchor);
+    std::string p3Style;
+    applyFillAttributes(out, fs.fill, {}, &p3Style);
+    applyStrokeAttributes(out, fs.stroke, {}, &p3Style);
+    applyP3Style(out, p3Style);
+    out.addRequiredAttribute("x", anchorX);
+    out.addRequiredAttribute("y", offsetY + lineInfo.baselineY);
+    out.closeElementWithText(lineText);
+  }
+}
+
+void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const Group* textBox,
+                                  const std::vector<Element*>& elements, const Matrix& transform) {
+  auto* box = static_cast<const TextBox*>(textBox);
+  auto fs = CollectFillStroke(elements);
+  std::vector<Text*> childTexts;
+  auto mutableElements = elements;
+  TextLayout::CollectTextElements(mutableElements, childTexts);
+  if (childTexts.empty()) {
+    return;
+  }
+
+  bool hasPadding = !box->padding.isZero();
+  float boxW = box->width;
+  float boxH = box->height;
+  if (hasPadding) {
+    if (!std::isnan(boxW)) {
+      boxW = std::max(0.0f, boxW - box->padding.left - box->padding.right);
+    }
+    if (!std::isnan(boxH)) {
+      boxH = std::max(0.0f, boxH - box->padding.top - box->padding.bottom);
+    }
+  }
+
+  TextLayoutParams params = {};
+  params.boxWidth = boxW;
+  params.boxHeight = boxH;
+  params.textAlign = box->textAlign;
+  params.paragraphAlign = box->paragraphAlign;
+  params.writingMode = box->writingMode;
+  params.lineHeight = box->lineHeight;
+  params.wordWrap = box->wordWrap;
+  params.overflow = box->overflow;
+
+  auto layoutResult = TextLayout::Layout(childTexts, params, _layoutContext);
+  std::string transformStr = MatrixToSVGTransform(transform);
+
+  // Build a temporary FillStrokeInfo with the TextBox position/padding for writeTextWithLayout.
+  FillStrokeInfo boxFs = fs;
+  boxFs.textBox = box;
+
+  for (auto* childText : childTexts) {
+    if (childText->text.empty()) {
+      continue;
+    }
+    writeTextWithLayout(out, childText, boxFs, layoutResult, transformStr);
+  }
+}
+
 void SVGWriter::writeText(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
                           const std::string& transform) {
   if (text->text.empty()) {
@@ -871,76 +1012,62 @@ void SVGWriter::writeText(SVGBuilder& out, const Text* text, const FillStrokeInf
     return;
   }
 
-  auto layout = ComputeTextLayout({&text->text, text->fontSize, text->letterSpacing, text->position,
-                                   text->textAnchor, fs.textBox});
-
-  if (layout.isMultiLine && layout.lines.empty()) {
+  TextLayoutParams params = {};
+  if (fs.textBox) {
+    bool hasPadding = !fs.textBox->padding.isZero();
+    float boxW = fs.textBox->width;
+    float boxH = fs.textBox->height;
+    if (hasPadding) {
+      if (!std::isnan(boxW)) {
+        boxW = std::max(0.0f, boxW - fs.textBox->padding.left - fs.textBox->padding.right);
+      }
+      if (!std::isnan(boxH)) {
+        boxH = std::max(0.0f, boxH - fs.textBox->padding.top - fs.textBox->padding.bottom);
+      }
+    }
+    params.boxWidth = boxW;
+    params.boxHeight = boxH;
+    params.textAlign = fs.textBox->textAlign;
+    params.paragraphAlign = fs.textBox->paragraphAlign;
+    params.writingMode = fs.textBox->writingMode;
+    params.lineHeight = fs.textBox->lineHeight;
+    params.wordWrap = fs.textBox->wordWrap;
+    params.overflow = fs.textBox->overflow;
+  } else {
+    params.baseline = text->baseline;
+    switch (text->textAnchor) {
+      case TextAnchor::Start:
+        params.textAlign = TextAlign::Start;
+        break;
+      case TextAnchor::Center:
+        params.textAlign = TextAlign::Center;
+        break;
+      case TextAnchor::End:
+        params.textAlign = TextAlign::End;
+        break;
+    }
+  }
+  auto mutableText = const_cast<Text*>(text);
+  auto layoutResult = TextLayout::Layout({mutableText}, params, _layoutContext);
+  auto* textLines = layoutResult.getTextLines(mutableText);
+  if (textLines && !textLines->empty()) {
+    writeTextWithLayout(out, text, fs, layoutResult, transform);
     return;
   }
 
-  float x = layout.x;
-  float y = layout.y;
-  TextAnchor anchor = layout.anchor;
-
-  auto writeSharedTextAttrs = [&]() {
-    if (!transform.empty()) {
-      out.addAttribute("transform", transform);
-    }
-    if (!text->fontFamily.empty()) {
-      out.addAttribute("font-family", text->fontFamily);
-    }
-    out.addAttribute("font-size", FloatToString(text->fontSize));
-    if (text->letterSpacing != 0.0f) {
-      out.addAttribute("letter-spacing", FloatToString(text->letterSpacing));
-    }
-    if (anchor == TextAnchor::Center) {
-      out.addAttribute("text-anchor", "middle");
-    } else if (anchor == TextAnchor::End) {
-      out.addAttribute("text-anchor", "end");
-    }
-    if (!text->fontStyle.empty()) {
-      bool hasBold = text->fontStyle.find("Bold") != std::string::npos;
-      bool hasItalic = text->fontStyle.find("Italic") != std::string::npos;
-      if (hasBold) {
-        out.addAttribute("font-weight", "bold");
-      }
-      if (hasItalic) {
-        out.addAttribute("font-style", "italic");
-      }
-    }
-    std::string p3Style;
-    applyFillAttributes(out, fs.fill, {}, &p3Style);
-    applyStrokeAttributes(out, fs.stroke, {}, &p3Style);
-    applyP3Style(out, p3Style);
-  };
-
-  // ── Write content ──
-  if (layout.isMultiLine) {
-    float currentY = layout.firstLineY;
-    bool isFirst = true;
-    for (size_t i = 0; i < layout.lines.size(); i++) {
-      auto& line = layout.lines[i];
-      std::string lineText = ExtractLineText(text->text, layout.chars, line);
-      if (lineText.empty() && i < layout.lines.size() - 1) {
-        continue;
-      }
-      if (!isFirst) {
-        currentY += layout.lineHeight;
-      }
-      out.openElement("text");
-      writeSharedTextAttrs();
-      out.addRequiredAttribute("x", x);
-      out.addRequiredAttribute("y", currentY);
-      out.closeElementWithText(lineText);
-      isFirst = false;
-    }
-  } else {
-    out.openElement("text");
-    writeSharedTextAttrs();
-    out.addAttributeIfNonZero("x", x);
-    out.addAttributeIfNonZero("y", y);
-    out.closeElementWithText(text->text);
+  // Fallback for when TextLayout produces no line info (e.g. empty text after shaping).
+  out.openElement("text");
+  if (!transform.empty()) {
+    out.addAttribute("transform", transform);
   }
+  WriteSharedTextAttrs(out, text, text->textAnchor);
+  std::string p3Style;
+  applyFillAttributes(out, fs.fill, {}, &p3Style);
+  applyStrokeAttributes(out, fs.stroke, {}, &p3Style);
+  applyP3Style(out, p3Style);
+  out.addAttributeIfNonZero("x", text->position.x);
+  out.addAttributeIfNonZero("y", text->position.y);
+  out.closeElementWithText(text->text);
 }
 
 //==============================================================================
@@ -954,7 +1081,16 @@ void SVGWriter::writeElements(SVGBuilder& out, const std::vector<Element*>& elem
 
   for (const auto* element : elements) {
     auto type = element->nodeType();
-    if (type == NodeType::Fill || type == NodeType::Stroke || type == NodeType::TextBox) {
+    if (type == NodeType::Fill || type == NodeType::Stroke) {
+      continue;
+    }
+    if (type == NodeType::TextBox) {
+      auto* group = static_cast<const Group*>(element);
+      if (!group->elements.empty() && !_convertTextToPath) {
+        Matrix groupMatrix = BuildGroupMatrix(group);
+        Matrix combined = transform * groupMatrix;
+        writeTextBoxGroup(out, group, group->elements, combined);
+      }
       continue;
     }
     switch (type) {
@@ -1091,7 +1227,9 @@ std::string SVGExporter::ToSVG(const PAGXDocument& doc, const Options& options) 
   SVGBuilder svg(true, options.indent);
   SVGBuilder defs(true, options.indent, 2);
   SVGWriterContext context;
-  SVGWriter writer(&defs, &context, options.indent, options.convertTextToPath);
+  auto layoutContext = std::make_unique<LayoutContext>(options.fontConfig);
+  SVGWriter writer(&defs, &context, options.indent, options.convertTextToPath,
+                   layoutContext.get());
 
   if (options.xmlDeclaration) {
     svg.appendDeclaration();

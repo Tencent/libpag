@@ -23,6 +23,8 @@
 
 namespace pagx {
 
+class FontConfig;
+
 /**
  * Export options for SVGExporter.
  */
@@ -44,6 +46,13 @@ struct SVGExportOptions {
    * elements when glyph outline data is unavailable. The default value is false.
    */
   bool convertTextToPath = false;
+
+  /**
+   * Optional FontConfig for text layout. When provided, registered and fallback fonts from the
+   * FontConfig are used for text shaping and layout. When nullptr, the exporter falls back to
+   * system fonts via platform-native font lookup.
+   */
+  FontConfig* fontConfig = nullptr;
 };
 
 /**
