@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: TextModifier + RangeSelector → per-glyph transforms and style overrides -->
-<pagx version="1.0" width="420" height="420">
+<pagx version="1.0" width="420" height="440">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -27,48 +27,67 @@
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <!-- Position shift with triangle shape selector -->
-      <Layer>
-        <Text text="WAVE" fontFamily="Arial" fontStyle="Bold" fontSize="48" position="210,68" textAnchor="center"/>
-        <TextModifier position="10,-10">
-          <RangeSelector start="0" end="1" shape="triangle"/>
-        </TextModifier>
-        <Fill color="#3B82F6"/>
-      </Layer>
-      <Layer>
-        <Text text="position + triangle" fontFamily="Arial" fontSize="8" position="210,98" textAnchor="center"/>
-        <Fill color="#94A3B8"/>
-      </Layer>
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16" gap="8" alignment="center" arrangement="center">
 
-      <!-- Rotation with rampUp selector -->
-      <Layer>
-        <Text text="ROTATE" fontFamily="Arial" fontStyle="Bold" fontSize="36" position="210,148" textAnchor="center"/>
-        <TextModifier rotation="45">
-          <RangeSelector start="0" end="1" shape="rampUp"/>
-        </TextModifier>
-        <Fill color="#10B981"/>
-      </Layer>
-      <Layer>
-        <Text text="rotation + rampUp" fontFamily="Arial" fontSize="8" position="210,176" textAnchor="center"/>
-        <Fill color="#94A3B8"/>
-      </Layer>
+        <!-- Position shift with triangle shape selector -->
+        <Layer layout="vertical" gap="4" alignment="center">
+          <Layer height="52">
+            <Text text="WAVE" fontFamily="Arial" fontStyle="Bold" fontSize="48" centerX="0" textAnchor="center"/>
+            <TextModifier position="10,-10">
+              <RangeSelector start="0" end="1" shape="triangle"/>
+            </TextModifier>
+            <Fill color="#3B82F6"/>
+          </Layer>
+          <Layer height="10">
+            <Text text="position + triangle" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+        </Layer>
 
-      <!-- Scale + alpha with smooth selector -->
-      <Layer>
-        <Text text="SCALE" fontFamily="Arial" fontStyle="Bold" fontSize="36" position="210,228" textAnchor="center"/>
-        <TextModifier scale="1.5,1.5" alpha="0.3">
-          <RangeSelector start="0.2" end="0.8" shape="smooth" easeIn="0.5" easeOut="0.5"/>
-        </TextModifier>
-        <Fill color="#EF4444"/>
-      </Layer>
+        <!-- Rotation with rampUp selector -->
+        <Layer layout="vertical" gap="4" alignment="center">
+          <Layer height="44">
+            <Text text="ROTATE" fontFamily="Arial" fontStyle="Bold" fontSize="36" centerX="0" textAnchor="center"/>
+            <TextModifier rotation="45">
+              <RangeSelector start="0" end="1" shape="rampUp"/>
+            </TextModifier>
+            <Fill color="#10B981"/>
+          </Layer>
+          <Layer height="10">
+            <Text text="rotation + rampUp" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+        </Layer>
 
-      <!-- fillColor override -->
-      <Layer>
-        <Text text="COLOR" fontFamily="Arial" fontStyle="Bold" fontSize="40" position="210,296" textAnchor="center"/>
-        <TextModifier fillColor="#EC4899">
-          <RangeSelector start="0" end="1" shape="rampDown"/>
-        </TextModifier>
-        <Fill color="#8B5CF6"/>
+        <!-- Scale + alpha with smooth selector -->
+        <Layer layout="vertical" gap="4" alignment="center">
+          <Layer height="44">
+            <Text text="SCALE" fontFamily="Arial" fontStyle="Bold" fontSize="36" centerX="0" textAnchor="center"/>
+            <TextModifier scale="1.5,1.5" alpha="0.3">
+              <RangeSelector start="0.2" end="0.8" shape="smooth" easeIn="0.5" easeOut="0.5"/>
+            </TextModifier>
+            <Fill color="#EF4444"/>
+          </Layer>
+          <Layer height="10">
+            <Text text="scale + alpha + smooth" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+        </Layer>
+
+        <!-- fillColor override -->
+        <Layer layout="vertical" gap="4" alignment="center">
+          <Layer height="44">
+            <Text text="COLOR" fontFamily="Arial" fontStyle="Bold" fontSize="40" centerX="0" textAnchor="center"/>
+            <TextModifier fillColor="#EC4899">
+              <RangeSelector start="0" end="1" shape="rampDown"/>
+            </TextModifier>
+            <Fill color="#8B5CF6"/>
+          </Layer>
+          <Layer height="10">
+            <Text text="fillColor + rampDown" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+        </Layer>
       </Layer>
     </Layer>
   </Layer>
