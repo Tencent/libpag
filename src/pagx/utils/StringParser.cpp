@@ -20,6 +20,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 #include <unordered_map>
 #include "base/utils/Log.h"
 
@@ -300,10 +301,9 @@ std::string ColorToHexString(const Color& color, bool withAlpha) {
 //==============================================================================
 
 std::string MatrixToString(const Matrix& matrix) {
-  char buf[256] = {};
-  snprintf(buf, sizeof(buf), "%g,%g,%g,%g,%g,%g", matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx,
-           matrix.ty);
-  return std::string(buf);
+  return FloatToString(matrix.a) + "," + FloatToString(matrix.b) + "," + FloatToString(matrix.c) +
+         "," + FloatToString(matrix.d) + "," + FloatToString(matrix.tx) + "," +
+         FloatToString(matrix.ty);
 }
 
 Matrix MatrixFromString(const std::string& str) {
@@ -352,8 +352,17 @@ std::vector<float> ParseFloatList(const std::string& str) {
 }
 
 std::string FloatToString(float value) {
-  char buf[32] = {};
+  char buf[64] = {};
   snprintf(buf, sizeof(buf), "%g", value);
+  if (std::strchr(buf, 'e') == nullptr && std::strchr(buf, 'E') == nullptr) {
+    return std::string(buf);
+  }
+  snprintf(buf, sizeof(buf), "%.10f", static_cast<double>(value));
+  auto len = std::strlen(buf);
+  while (len > 1 && buf[len - 1] == '0' && buf[len - 2] != '.') {
+    len--;
+  }
+  buf[len] = '\0';
   return std::string(buf);
 }
 

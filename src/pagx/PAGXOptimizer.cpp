@@ -227,6 +227,42 @@ static bool MergeConsecutiveGroups(std::vector<Element*>& elements) {
 // Optimization passes — layer-level
 // ============================================================================
 
+static bool MergeAdjacentShellLayers(std::vector<Layer*>& layers, PAGXDocument* doc) {
+  if (layers.size() < 2) {
+    return false;
+  }
+  bool changed = false;
+  size_t i = 0;
+  while (i < layers.size()) {
+    if (!PAGXAnalyzer::CanDowngradeLayerToGroup(layers[i])) {
+      i++;
+      continue;
+    }
+    size_t runEnd = i + 1;
+    while (runEnd < layers.size() && PAGXAnalyzer::CanDowngradeLayerToGroup(layers[runEnd])) {
+      runEnd++;
+    }
+    if (runEnd - i >= 2) {
+      auto* merged = doc->makeNode<Layer>();
+      for (size_t j = i; j < runEnd; j++) {
+        auto* group = doc->makeNode<Group>();
+        group->elements = std::move(layers[j]->contents);
+        merged->contents.push_back(group);
+      }
+      bool dummy = false;
+      OptimizeElements(merged->contents, doc, dummy);
+      layers.erase(layers.begin() + static_cast<long>(i),
+                   layers.begin() + static_cast<long>(runEnd));
+      layers.insert(layers.begin() + static_cast<long>(i), merged);
+      changed = true;
+      i++;
+    } else {
+      i = runEnd;
+    }
+  }
+  return changed;
+}
+
 static bool DowngradeChildLayersToGroups(Layer* parentLayer, PAGXDocument* doc) {
   if (parentLayer->layout != LayoutMode::None || parentLayer->children.empty()) {
     return false;
@@ -317,6 +353,10 @@ static void OptimizeLayerRecursive(Layer* layer, PAGXDocument* doc, bool& change
   }
 
   if (DowngradeChildLayersToGroups(layer, doc)) {
+    changed = true;
+  }
+
+  if (MergeAdjacentShellLayers(layer->children, doc)) {
     changed = true;
   }
 
@@ -539,7 +579,12 @@ bool PAGXOptimizer::Optimize(PAGXDocument* document) {
     OptimizeLayerRecursive(layer, document, changed);
   }
 
-  // Pass 2: Remove top-level empty layers.
+  // Pass 2: Merge adjacent shell layers at root level.
+  if (MergeAdjacentShellLayers(document->layers, document)) {
+    changed = true;
+  }
+
+  // Pass 3: Remove top-level empty layers.
   auto it = document->layers.begin();
   while (it != document->layers.end()) {
     if (PAGXAnalyzer::IsEmptyLayer(*it, false)) {
@@ -550,12 +595,12 @@ bool PAGXOptimizer::Optimize(PAGXDocument* document) {
     }
   }
 
-  // Pass 3: Deduplicate PathData references.
+  // Pass 4: Deduplicate PathData references.
   if (DeduplicatePathData(document)) {
     changed = true;
   }
 
-  // Pass 4: Remove unreferenced resources orphaned by earlier passes.
+  // Pass 5: Remove unreferenced resources orphaned by earlier passes.
   if (RemoveUnreferencedResources(document)) {
     changed = true;
   }
