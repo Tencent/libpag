@@ -369,17 +369,6 @@ struct ExportContext {
     auto digest = MD5::Calculate(svgContent.data(), svgContent.size());
     std::string digestKey(reinterpret_cast<const char*>(digest.data()), digest.size());
     if (!pathData->id.empty()) {
-      auto existing = pathDataContentToOutputId.find(digestKey);
-      if (existing != pathDataContentToOutputId.end() && existing->second != pathData->id) {
-        // An unnamed PathData with the same content was registered first under a generated ID.
-        // Retarget all cached pointers that point to the old generated ID to use the named ID.
-        const std::string& oldId = existing->second;
-        for (auto& entry : pathDataToOutputId) {
-          if (entry.second == oldId) {
-            entry.second = pathData->id;
-          }
-        }
-      }
       pathDataContentToOutputId[digestKey] = pathData->id;
       pathDataToOutputId[pathData] = pathData->id;
       return pathData->id;
@@ -1471,6 +1460,48 @@ static bool ComparePtrEntryById(const PtrEntry& a, const PtrEntry& b) {
   return a->second < b->second;
 }
 
+static void CollectElementPathData(const Element* node, ExportContext& ctx);
+
+static void CollectLayerPathData(const Layer* layer, ExportContext& ctx) {
+  for (const auto& element : layer->contents) {
+    CollectElementPathData(element, ctx);
+  }
+  for (const auto& child : layer->children) {
+    CollectLayerPathData(child, ctx);
+  }
+}
+
+static void CollectElementPathData(const Element* node, ExportContext& ctx) {
+  switch (node->nodeType()) {
+    case NodeType::Path: {
+      auto path = static_cast<const Path*>(node);
+      ctx.getPathDataOutputId(path->data);
+      break;
+    }
+    case NodeType::TextPath: {
+      auto textPath = static_cast<const TextPath*>(node);
+      ctx.getPathDataOutputId(textPath->path);
+      break;
+    }
+    case NodeType::Group: {
+      auto group = static_cast<const Group*>(node);
+      for (const auto& element : group->elements) {
+        CollectElementPathData(element, ctx);
+      }
+      break;
+    }
+    case NodeType::TextBox: {
+      auto textBox = static_cast<const TextBox*>(node);
+      for (const auto& element : textBox->elements) {
+        CollectElementPathData(element, ctx);
+      }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options) {
   XMLBuilder xml = {};
   ExportContext ctx = {};
@@ -1478,6 +1509,18 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
   // Reserve all existing resource IDs to avoid collision with generated IDs.
   for (const auto& resource : doc.nodes) {
     ctx.reserveId(resource->id);
+  }
+
+  // Phase 0: pre-collect all PathData references before writing any XML so that named PathData
+  // nodes are registered first, preventing unnamed same-content PathData from claiming a
+  // generated ID that would then appear in the Layer XML before the named ID is known.
+  for (const auto& resource : doc.nodes) {
+    if (resource->nodeType() == NodeType::PathData && !resource->id.empty()) {
+      ctx.getPathDataOutputId(static_cast<const PathData*>(resource.get()));
+    }
+  }
+  for (const auto& layer : doc.layers) {
+    CollectLayerPathData(layer, ctx);
   }
 
   xml.appendDeclaration();
