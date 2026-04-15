@@ -1,20 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Nested Layer containing TextBox with left+right constraints in a vertical flex layout.
-     The intermediate Layer should grow to fit the wrapped text, and the sibling Layer
-     should be positioned below without overlapping. -->
-<pagx width="200" height="300">
-  <Layer width="200" height="300" layout="vertical" gap="10">
+<!-- Nested Layer containing TextBox with left+right constraints in vertical layout.
+     The red bar should appear below all wrapped text, not overlap. -->
+<pagx width="300" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="12" padding="20">
     <!-- Intermediate Layer (content-measured) containing TextBox -->
     <Layer>
-      <TextBox left="0" right="0">
-        <Text text="AAAA BBBB CCCC DDDD EEEE FFFF GGGG" fontFamily="Noto Sans SC" fontSize="16"/>
-        <Fill color="#000000"/>
-      </TextBox>
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+      <Fill color="#FFFFFF"/>
+      <Layer left="0" right="0" top="0" bottom="0" padding="12">
+        <TextBox left="0" right="0">
+          <Text text="AAAA BBBB CCCC DDDD EEEE FFFF GGGG" fontFamily="Noto Sans SC" fontSize="16"/>
+          <Fill color="#1E293B"/>
+        </TextBox>
+      </Layer>
     </Layer>
-    <!-- Sibling with fixed height and visible color -->
-    <Layer height="30">
-      <Rectangle left="0" right="0" top="0" bottom="0"/>
-      <Fill color="#E0245E"/>
+    <!-- Red bar sibling -->
+    <Layer height="32">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+      <Fill color="#F43F5E"/>
     </Layer>
   </Layer>
 </pagx>

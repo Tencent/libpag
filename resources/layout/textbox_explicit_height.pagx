@@ -1,11 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- TextBox with explicit height=55 and left+right constraints. The explicit height should be
-     preserved even when the constraint-derived width triggers re-typesetting. -->
-<pagx width="400" height="100">
-  <Layer width="400" height="100">
-    <TextBox left="20" right="20" height="55">
-      <Text text="ABCDEFGHIJ KLMNOPQRST UVWXYZ abcdefghij klmnopqrst uvwxyz" fontFamily="Noto Sans SC" fontSize="24"/>
-      <Fill color="#14171A"/>
+<!-- TextBox with explicit height=60 and left+right constraints. Height should be preserved. -->
+<pagx width="300" height="140">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer centerX="0" centerY="0" width="260" height="100">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+    <Fill color="#E2E8F0"/>
+    <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+    <TextBox left="12" right="12" top="12" bottom="12" height="60">
+      <Text text="ABCDEFGHIJ KLMNOPQRST UVWXYZ abcdefghij klmnopqrst" fontFamily="Noto Sans SC" fontSize="14"/>
+      <Fill color="#1E293B"/>
     </TextBox>
   </Layer>
 </pagx>
