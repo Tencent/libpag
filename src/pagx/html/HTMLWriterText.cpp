@@ -1088,13 +1088,8 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         float tangent = 0;
         SampleArcLengthLUT(lut, charCenterArc, &pos, &tangent, isClosed);
         std::string charStr(p, len);
-        float ascent = text->fontSize * 0.8f;
-        float normalSign = textPath->reversed ? 1.0f : -1.0f;
-        float normalAngle = tangent + static_cast<float>(M_PI) / 2.0f;
-        float offsetX = normalSign * ascent * std::cos(normalAngle);
-        float offsetY = normalSign * ascent * std::sin(normalAngle);
-        std::string charStyle = "position:absolute;left:" + FloatToString(pos.x + offsetX) +
-                                "px;top:" + FloatToString(pos.y + offsetY) + "px";
+        std::string charStyle = "position:absolute;left:" + FloatToString(pos.x) +
+                                "px;top:" + FloatToString(pos.y) + "px";
         charStyle += ";display:inline-block";
         if (!text->fontFamily.empty()) {
           std::string escapedFamilyTP = text->fontFamily;
