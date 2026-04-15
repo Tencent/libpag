@@ -3,9 +3,9 @@
      bezier arc, straight line with margins, S-curve, forceAlignment -->
 <pagx version="1.0" width="420" height="420">
   <Resources>
-    <PathData id="arcPath" data="M 70,130 Q 210,20 350,130"/>
-    <PathData id="linePath" data="M 70,210 L 350,210"/>
-    <PathData id="sCurve" data="M 70,290 C 120,255 170,325 210,290 C 250,255 300,325 350,290"/>
+    <PathData id="arcPath" data="M 60,130 Q 190,20 320,130"/>
+    <PathData id="linePath" data="M 60,210 L 340,210"/>
+    <PathData id="sCurve" data="M 60,290 C 110,255 155,325 200,290 C 245,255 290,325 320,290"/>
   </Resources>
 
   <!-- Background -->
@@ -43,7 +43,7 @@
         <Text text="ALONG A PATH" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
         <TextPath path="@arcPath" forceAlignment="true"/>
         <Fill>
-          <LinearGradient startPoint="70,0" endPoint="350,0">
+          <LinearGradient startPoint="60,0" endPoint="320,0">
             <ColorStop offset="0" color="#06B6D4"/>
             <ColorStop offset="0.5" color="#8B5CF6"/>
             <ColorStop offset="1" color="#EC4899"/>
