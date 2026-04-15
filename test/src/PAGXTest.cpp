@@ -549,6 +549,70 @@ PAGX_TEST(PAGXTest, PathDataDeduplicationWithExistingId) {
 }
 
 /**
+ * Test case: PathData deduplication when unnamed PathData is processed before named same-content
+ *
+ * Verifies that if an unnamed PathData with the same content as a named PathData is encountered
+ * first during export, the output still uses the named ID for both, without producing duplicate
+ * PathData resources.
+ */
+PAGX_TEST(PAGXTest, PathDataDeduplicationUnnamedBeforeNamed) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+
+  auto layer = doc->makeNode<pagx::Layer>();
+
+  // Create a PathData with explicit ID in doc->nodes (registered as a resource)
+  auto namedPathData = doc->makeNode<pagx::PathData>("myTriangle");
+  namedPathData->moveTo(0, 0);
+  namedPathData->lineTo(40, 0);
+  namedPathData->lineTo(20, 30);
+  namedPathData->close();
+
+  // Path 1: Uses an UNNAMED PathData with identical content (unnamed comes FIRST in layer)
+  auto path1 = doc->makeNode<pagx::Path>();
+  path1->data = doc->makeNode<pagx::PathData>();
+  path1->data->moveTo(0, 0);
+  path1->data->lineTo(40, 0);
+  path1->data->lineTo(20, 30);
+  path1->data->close();
+  path1->position = {10, 10};
+  layer->contents.push_back(path1);
+
+  // Path 2: Uses the named PathData (named comes SECOND in layer)
+  auto path2 = doc->makeNode<pagx::Path>();
+  path2->data = namedPathData;
+  path2->position = {100, 10};
+  layer->contents.push_back(path2);
+
+  doc->layers.push_back(layer);
+
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+
+  // Both paths should reference "@myTriangle": unnamed is merged to named ID.
+  size_t refCount = 0;
+  size_t pos = 0;
+  while ((pos = xml.find("data=\"@myTriangle\"", pos)) != std::string::npos) {
+    refCount++;
+    pos++;
+  }
+  EXPECT_EQ(refCount, 2u) << "Both paths should reference @myTriangle";
+
+  // There should be no generated __pd_ IDs in Resources.
+  EXPECT_EQ(xml.find("<PathData id=\"__pd_"), std::string::npos)
+      << "No generated PathData IDs should exist when all content matches named PathData";
+
+  // The named PathData resource should appear exactly once.
+  std::string tag = "<PathData id=\"myTriangle\"";
+  size_t defCount = 0;
+  size_t defPos = 0;
+  while ((defPos = xml.find(tag, defPos)) != std::string::npos) {
+    defCount++;
+    defPos++;
+  }
+  EXPECT_EQ(defCount, 1u) << "Named PathData should be defined exactly once in Resources";
+}
+
+/**
  * Test case: PathData deduplication avoids ID collision with user-defined IDs
  *
  * Verifies that generated IDs skip over user-defined IDs that match the generation pattern.
