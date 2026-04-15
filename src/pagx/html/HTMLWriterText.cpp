@@ -1135,15 +1135,14 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
           charStyle += ";font-family:'" + escapedFamilyTP + "'";
         }
         charStyle += ";font-size:" + FloatToString(text->fontSize) + "px";
-        float ascent = text->fontSize * 0.8f;
         std::string transform;
         if (textPath->perpendicular) {
           float angleDeg = tangent * 180.0f / static_cast<float>(M_PI) - textPath->baselineAngle;
           transform += "rotate(" + FloatToString(angleDeg) + "deg) ";
         }
-        transform += "translate(-50%,-" + FloatToString(ascent) + "px)";
+        transform += "translate(-50%,-" + FloatToString(text->fontSize) + "px)";
         charStyle += ";transform:" + transform;
-        charStyle += ";transform-origin:center " + FloatToString(ascent) + "px";
+        charStyle += ";transform-origin:0 0";
         if (fill && fill->color) {
           if (fill->color->nodeType() == NodeType::SolidColor) {
             auto sc = static_cast<const SolidColor*>(fill->color);

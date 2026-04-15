@@ -31,7 +31,7 @@
   </Layer>
   <Layer>
     <Text text="CLOCKWISE" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
-    <TextPath path="M 200,175 A 55,55 0 0,1 90,175 A 55,55 0 0,1 200,175 Z" forceAlignment="true"/>
+    <TextPath path="M 200,175 A 55,55 0 0,1 90,175 A 55,55 0 0,1 200,175 Z" forceAlignment="true" firstMargin="25"/>
     <Fill color="#3B82F6"/>
   </Layer>
 
@@ -42,7 +42,7 @@
   </Layer>
   <Layer>
     <Text text="REVERSED" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
-    <TextPath path="M 340,175 A 55,55 0 0,1 230,175 A 55,55 0 0,1 340,175 Z" reversed="true" forceAlignment="true"/>
+    <TextPath path="M 340,175 A 55,55 0 0,1 230,175 A 55,55 0 0,1 340,175 Z" reversed="true" forceAlignment="true" firstMargin="28"/>
     <Fill color="#EF4444"/>
   </Layer>
 
@@ -52,8 +52,8 @@
     <Stroke color="#8B5CF6" width="1" dashes="4,3"/>
   </Layer>
   <Layer>
-    <Text text="ELLIPSE PATH" fontFamily="Arial" fontStyle="Bold" fontSize="10"/>
-    <TextPath path="M 230,345 A 75,40 0 0,1 80,345 A 75,40 0 0,1 230,345 Z" forceAlignment="true"/>
+    <Text text="ELLIPSEPATH" fontFamily="Arial" fontStyle="Bold" fontSize="10"/>
+    <TextPath path="M 230,345 A 75,40 0 0,1 80,345 A 75,40 0 0,1 230,345 Z" forceAlignment="true" firstMargin="22"/>
     <Fill color="#8B5CF6"/>
   </Layer>
 
@@ -64,7 +64,7 @@
   </Layer>
   <Layer>
     <Text text="MARGINS" fontFamily="Arial" fontSize="9"/>
-    <TextPath path="M 338,345 A 38,38 0 0,1 262,345 A 38,38 0 0,1 338,345 Z" forceAlignment="true" firstMargin="15" lastMargin="15"/>
+    <TextPath path="M 338,345 A 38,38 0 0,1 262,345 A 38,38 0 0,1 338,345 Z" forceAlignment="true" firstMargin="22"/>
     <Fill color="#10B981"/>
   </Layer>
 </pagx>
