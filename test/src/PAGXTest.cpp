@@ -526,14 +526,15 @@ PAGX_TEST(PAGXTest, PathDataDeduplicationWithExistingId) {
   std::string xml = pagx::PAGXExporter::ToXML(*doc);
   ASSERT_FALSE(xml.empty());
 
-  // path1 and path2 should reference "@myTriangle" (the explicit ID)
+  // path1, path2, and path3 should all reference "@myTriangle": path1/path2 share the same
+  // PathData object, and path3 has identical content so it is merged to the named ID.
   size_t myTriangleRefCount = 0;
   size_t pos = 0;
   while ((pos = xml.find("data=\"@myTriangle\"", pos)) != std::string::npos) {
     myTriangleRefCount++;
     pos++;
   }
-  EXPECT_EQ(myTriangleRefCount, 2u) << "Paths using shared PathData should reference @myTriangle";
+  EXPECT_EQ(myTriangleRefCount, 3u) << "All three paths should reference @myTriangle";
 
   // path3 has identical content to sharedPathData -> should be merged and reference myTriangle.
   EXPECT_NE(xml.find("data=\"@myTriangle\""), std::string::npos)
