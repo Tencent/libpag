@@ -29,6 +29,18 @@
 
 namespace pagx {
 
+static float ComputeCrossTarget(Alignment alignment, bool horizontal, const Layer* child,
+                                float alignCrossSize) {
+  if (alignment != Alignment::Stretch) {
+    return NAN;
+  }
+  float explicitCross = horizontal ? child->height : child->width;
+  if (std::isnan(explicitCross)) {
+    return alignCrossSize;
+  }
+  return NAN;
+}
+
 void Layer::updateSize(LayoutContext* context) {
   for (auto* element : contents) {
     auto* node = LayoutNode::AsLayoutNode(element);
@@ -276,13 +288,7 @@ void Layer::performContainerLayout(LayoutContext* context) {
     auto* child = children[idx];
 
     // Cross-axis: only stretch is forced by the parent.
-    float crossTarget = NAN;
-    if (this->alignment == Alignment::Stretch) {
-      float explicitCross = horizontal ? child->height : child->width;
-      if (std::isnan(explicitCross)) {
-        crossTarget = alignCrossSize;
-      }
-    }
+    float crossTarget = ComputeCrossTarget(alignment, horizontal, child, alignCrossSize);
 
     // Explicit main-axis size takes priority over flex.
     float explicitMain = horizontal ? child->width : child->height;
@@ -321,13 +327,7 @@ void Layer::performContainerLayout(LayoutContext* context) {
   // setLayoutSize for flex children: main-axis forced, cross-axis stretch or NaN.
   for (auto idx : flexIndices) {
     auto* child = children[idx];
-    float crossTarget = NAN;
-    if (this->alignment == Alignment::Stretch) {
-      float explicitCross = horizontal ? child->height : child->width;
-      if (std::isnan(explicitCross)) {
-        crossTarget = alignCrossSize;
-      }
-    }
+    float crossTarget = ComputeCrossTarget(alignment, horizontal, child, alignCrossSize);
     float targetW = horizontal ? childMainSizes[idx] : crossTarget;
     float targetH = horizontal ? crossTarget : childMainSizes[idx];
     child->setLayoutSize(context, targetW, targetH);
