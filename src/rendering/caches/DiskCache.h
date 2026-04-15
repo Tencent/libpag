@@ -35,6 +35,10 @@ class FileInfo;
 /**
  * A simple serial task queue that executes disk IO tasks on a dedicated background thread.
  * This ensures ordered execution and provides the ability to wait for all pending tasks.
+ *
+ * Lock ordering: DiskIOQueue::locker must be acquired BEFORE DiskCache::locker.
+ * IMPORTANT: Never call waitAll() while holding DiskCache::locker, as tasks executed by
+ * DiskIOQueue (e.g., CloseFileTask) may acquire DiskCache::locker, causing deadlock.
  */
 class DiskIOQueue {
  public:
@@ -63,7 +67,8 @@ class DiskIOQueue {
   std::queue<std::function<void()>> tasks;
   std::thread workerThread;
   std::atomic<bool> stopped{false};
-  bool executing = false;  // Tracks if a task is currently being executed
+  // Tracks if a task is currently being executed. Always accessed under locker, no atomic needed.
+  bool executing = false;
 };
 
 class DiskCache {

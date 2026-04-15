@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DiskCache.h"
+#include "base/utils/Log.h"
 #include "pag/pag.h"
 #include "platform/Platform.h"
 #include "rendering/utils/Directory.h"
@@ -31,6 +32,8 @@ namespace pag {
 // ============================================================================
 
 DiskIOQueue* DiskIOQueue::GetInstance() {
+  // Intentional leak: using *new to avoid static destruction order issues at program exit.
+  // The destructor is implemented correctly but will never be called in this singleton pattern.
   static auto& instance = *new DiskIOQueue();
   return &instance;
 }
@@ -98,7 +101,9 @@ void DiskIOQueue::workerLoop() {
 // ============================================================================
 
 static void RemoveFileTask(std::string path) {
-  remove(path.c_str());
+  if (remove(path.c_str()) != 0) {
+    LOGE("Failed to remove cached file: %s", path.c_str());
+  }
 }
 
 void DiskCache::removeFileAsync(const std::string& filePath) {
