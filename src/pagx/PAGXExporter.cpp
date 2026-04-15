@@ -1463,6 +1463,12 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
 // Main Export function
 //==============================================================================
 
+using PtrEntry = std::unordered_map<const PathData*, std::string>::const_iterator;
+
+static bool ComparePtrEntryById(const PtrEntry& a, const PtrEntry& b) {
+  return a->second < b->second;
+}
+
 std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options) {
   XMLBuilder xml = {};
   ExportContext ctx = {};
@@ -1512,14 +1518,12 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
     }
 
     // Write deduplicated PathData, sorted by ID for deterministic output.
-    using PtrEntry = std::unordered_map<const PathData*, std::string>::const_iterator;
     std::vector<PtrEntry> sortedPathData;
     sortedPathData.reserve(ctx.pathDataToOutputId.size());
     for (auto it = ctx.pathDataToOutputId.cbegin(); it != ctx.pathDataToOutputId.cend(); ++it) {
       sortedPathData.push_back(it);
     }
-    std::sort(sortedPathData.begin(), sortedPathData.end(),
-              [](const PtrEntry& a, const PtrEntry& b) { return a->second < b->second; });
+    std::sort(sortedPathData.begin(), sortedPathData.end(), ComparePtrEntryById);
     for (const auto& entry : sortedPathData) {
       const PathData* pathData = entry->first;
       const auto& pathId = entry->second;
