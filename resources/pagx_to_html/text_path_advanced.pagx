@@ -87,23 +87,15 @@
           <!-- Badge: reversed circle -->
           <Layer layout="vertical" gap="4" alignment="center">
             <Layer width="80" height="80">
-              <Layer name="badgeGuide" alpha="0.15">
-                <Ellipse position="40,40" size="70,70"/>
-                <Stroke color="#EF4444" width="1"/>
-              </Layer>
-              <Layer name="badgeBg">
-                <Ellipse position="40,40" size="50,50"/>
-                <Fill color="#FEF3C7"/>
-              </Layer>
-              <Layer name="badgeInner">
-                <Ellipse position="40,40" size="40,40"/>
-                <Fill color="#FFFFFF"/>
-              </Layer>
-              <Layer name="badgeText">
-                <Text text="BADGE" fontFamily="Arial" fontStyle="Bold" fontSize="8"/>
-                <TextPath path="M 75,40 A 35,35 0 1,1 74.99,40 Z" reversed="true" forceAlignment="true"/>
-                <Fill color="#EF4444"/>
-              </Layer>
+              <Ellipse position="40,40" size="70,70"/>
+              <Stroke color="#EF4444" width="1" alpha="0.15"/>
+              <Ellipse position="40,40" size="50,50"/>
+              <Fill color="#FEF3C7"/>
+              <Ellipse position="40,40" size="40,40"/>
+              <Fill color="#FFFFFF"/>
+              <Text text="BADGE" fontFamily="Arial" fontStyle="Bold" fontSize="8"/>
+              <TextPath path="M 75,40 A 35,35 0 1,1 74.99,40 Z" reversed="true" forceAlignment="true"/>
+              <Fill color="#EF4444"/>
             </Layer>
             <Layer height="10">
               <Text text="reversed circle" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
