@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: GlyphRun with pre-laid-out font paths; xOffsets, rotations, scales -->
-<pagx version="1.0" width="420" height="300">
+<pagx version="1.0" width="420" height="360">
   <Resources>
     <Font id="font1" unitsPerEm="1000">
       <Glyph id="gA" advance="600" path="M 50,-800 L 300,0 L 550,-800 Z M 175,-300 L 425,-300"/>
@@ -9,49 +9,75 @@
   </Resources>
 
   <!-- Background -->
-  <Layer>
-    <Rectangle position="210,150" size="420,300"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
-  <!-- Title -->
-  <Layer>
-    <Text text="Glyph Run" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="210,34" textAnchor="center"/>
-    <Fill color="#1E293B"/>
-  </Layer>
-  <Layer>
-    <Text text="Custom font glyphs with per-glyph transforms" fontFamily="Arial" fontSize="10" position="210,50" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="stretch">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Glyph Run" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="Custom font glyphs with per-glyph transforms" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
 
-  <!-- Card -->
-  <Layer>
-    <Rectangle position="210,172" size="360,190" roundness="16"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
-  </Layer>
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-  <!-- Layer 1: GlyphRun with xOffsets (horizontal positioning) -->
-  <Layer>
-    <Text text="xOffsets positioning" fontFamily="Arial" fontSize="10" position="40,86"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
-  <Layer>
-    <Text>
-      <GlyphRun font="@font1" fontSize="48" glyphs="1,2" x="40" y="128" xOffsets="0,30"/>
-    </Text>
-    <Fill color="#1F2937"/>
-  </Layer>
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16" gap="12" alignment="stretch">
 
-  <!-- Layer 2: GlyphRun with per-glyph rotations and scales -->
-  <Layer>
-    <Text text="rotations + scales" fontFamily="Arial" fontSize="10" position="40,180"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
-  <Layer>
-    <Text>
-      <GlyphRun font="@font1" fontSize="36" glyphs="1,2" x="40" y="218" rotations="15,-15" scales="1,1;1.2,1.2"/>
-    </Text>
-    <Fill color="#EF4444"/>
+        <!-- Row 1: xOffsets positioning -->
+        <Layer layout="vertical" gap="4">
+          <Layer height="12">
+            <Text text="xOffsets positioning" fontFamily="Arial" fontSize="10"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+          <Layer height="50">
+            <Text>
+              <GlyphRun font="@font1" fontSize="48" glyphs="1,2" x="10" y="48" xOffsets="0,30"/>
+            </Text>
+            <Fill color="#1F2937"/>
+          </Layer>
+        </Layer>
+
+        <!-- Row 2: per-glyph rotations and scales -->
+        <Layer layout="vertical" gap="4">
+          <Layer height="12">
+            <Text text="rotations + scales" fontFamily="Arial" fontSize="10"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+          <Layer height="50">
+            <Text>
+              <GlyphRun font="@font1" fontSize="36" glyphs="1,2" x="30" y="40" rotations="15,-15" scales="1,1;1.2,1.2"/>
+            </Text>
+            <Fill color="#EF4444"/>
+          </Layer>
+        </Layer>
+
+        <!-- Row 3: larger scale demo -->
+        <Layer layout="vertical" gap="4">
+          <Layer height="12">
+            <Text text="scaled up glyphs" fontFamily="Arial" fontSize="10"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+          <Layer height="50">
+            <Text>
+              <GlyphRun font="@font1" fontSize="48" glyphs="1,2,1" x="10" y="48" scales="0.8,0.8;1,1;1.2,1.2"/>
+            </Text>
+            <Fill color="#3B82F6"/>
+          </Layer>
+        </Layer>
+      </Layer>
+    </Layer>
   </Layer>
 </pagx>
