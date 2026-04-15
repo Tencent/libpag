@@ -98,7 +98,7 @@ class DiskCache {
    * Removes the file at the given path asynchronously on the DiskIOWorker to avoid blocking the
    * calling thread (which may be the main/render thread) on synchronous IO.
    */
-  static void removeFileAsync(const std::string& filePath);
+  static void RemoveFileAsync(const std::string& filePath);
 
   static void WriteConfigTask(const std::string& path, const std::string& tempPath,
                               std::shared_ptr<tgfx::Buffer> data, uint32_t currentVersion);

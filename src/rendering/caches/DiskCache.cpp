@@ -39,7 +39,7 @@ static void RemoveFileTask(std::string path) {
   }
 }
 
-void DiskCache::removeFileAsync(const std::string& filePath) {
+void DiskCache::RemoveFileAsync(const std::string& filePath) {
   if (filePath.empty()) {
     return;
   }
@@ -91,7 +91,7 @@ void DiskCache::setCacheDir(const std::string& dir) {
     cacheFolder = Directory::JoinPath(cacheDir, "files");
     if (!readConfig()) {
       Directory::VisitFiles(cacheFolder,
-                            [](const std::string& path, size_t) { removeFileAsync(path); });
+                            [](const std::string& path, size_t) { RemoveFileAsync(path); });
     }
   }
 }
@@ -122,7 +122,7 @@ DiskCache::DiskCache() {
     cacheFolder = Directory::JoinPath(cacheDir, "files");
     if (!readConfig()) {
       Directory::VisitFiles(cacheFolder,
-                            [](const std::string& path, size_t) { removeFileAsync(path); });
+                            [](const std::string& path, size_t) { RemoveFileAsync(path); });
     }
   }
 }
@@ -153,7 +153,7 @@ void DiskCache::removeAll() {
     if (openedFiles.count(fileID) > 0) {
       return;
     }
-    removeFileAsync(path);
+    RemoveFileAsync(path);
   });
   cachedFileIDs.clear();
   cachedFiles.clear();
@@ -278,7 +278,7 @@ bool DiskCache::checkDiskSpace(size_t maxSize) {
       break;
     }
     auto filePath = fileIDToPath(fileInfo->fileID);
-    removeFileAsync(filePath);
+    RemoveFileAsync(filePath);
     totalDiskSize -= fileInfo->fileSize;
     removeFromCachedFiles(fileInfo);
     changed = true;
@@ -352,7 +352,7 @@ bool DiskCache::readConfig() {
     auto fileID = filePathToID(path);
     auto result = cachedFileInfos.find(fileID);
     if (result == cachedFileInfos.end()) {
-      removeFileAsync(path);
+      RemoveFileAsync(path);
     } else {
       result->second->fileSize = fileSize;
     }
@@ -490,7 +490,7 @@ void DiskCache::notifyFileClosed(uint32_t fileID) {
   auto result = cachedFileInfos.find(fileID);
   if (result == cachedFileInfos.end()) {
     auto filePath = fileIDToPath(fileID);
-    removeFileAsync(filePath);
+    RemoveFileAsync(filePath);
   } else {
     auto fileInfo = result->second;
     moveToBeforeOpenedFiles(fileInfo);
