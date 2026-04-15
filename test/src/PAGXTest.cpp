@@ -2161,6 +2161,92 @@ PAGX_TEST(PAGXTest, TextBoxConstraintWidthMultilineHeight) {
   EXPECT_GT(textBox->layoutHeight, 50.0f);
 }
 
+/**
+ * Screenshot test: TextBox with constraint width wraps text correctly and sibling elements do not
+ * overlap the wrapped lines. A vertical layout contains a TextBox (using left+right constraints for
+ * width) followed by a colored rectangle. If wrapping height is correct, the rectangle appears below
+ * all text lines; if not, it covers the second line.
+ */
+PAGX_TEST(PAGXTest, TextBoxConstraintWidthWrapRender) {
+  auto doc = pagx::PAGXDocument::Make(200, 120);
+  auto root = doc->makeNode<pagx::Layer>();
+  root->width = 200;
+  root->height = 120;
+  root->layout = pagx::LayoutMode::Vertical;
+  root->gap = 8;
+  root->padding = pagx::Padding{12, 12, 12, 12};
+  doc->layers.push_back(root);
+
+  // Background
+  auto bg = doc->makeNode<pagx::Layer>();
+  bg->left = 0;
+  bg->right = 0;
+  bg->top = 0;
+  bg->bottom = 0;
+  auto bgRect = doc->makeNode<pagx::Rectangle>();
+  bgRect->left = 0;
+  bgRect->right = 0;
+  bgRect->top = 0;
+  bgRect->bottom = 0;
+  auto bgFill = doc->makeNode<pagx::Fill>();
+  auto bgColor = doc->makeNode<pagx::SolidColor>();
+  bgColor->color = {1, 1, 1, 1};
+  bgFill->color = bgColor;
+  bg->contents = {bgRect, bgFill};
+  bg->includeInLayout = false;
+  root->children.push_back(bg);
+
+  // Child layer containing TextBox with left+right constraints
+  auto textLayer = doc->makeNode<pagx::Layer>();
+  auto textBox = doc->makeNode<pagx::TextBox>();
+  textBox->left = 0;
+  textBox->right = 0;
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "AAAA BBBB CCCC DDDD EEEE FFFF";
+  text->fontSize = 16;
+  auto textFill = doc->makeNode<pagx::Fill>();
+  auto textColor = doc->makeNode<pagx::SolidColor>();
+  textColor->color = {0, 0, 0, 1};
+  textFill->color = textColor;
+  textBox->elements = {text, textFill};
+  textLayer->contents.push_back(textBox);
+  root->children.push_back(textLayer);
+
+  // Colored rectangle sibling — should appear below all wrapped text
+  auto rectLayer = doc->makeNode<pagx::Layer>();
+  rectLayer->height = 24;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->left = 0;
+  rect->right = 0;
+  rect->top = 0;
+  rect->bottom = 0;
+  auto rectFill = doc->makeNode<pagx::Fill>();
+  auto rectColor = doc->makeNode<pagx::SolidColor>();
+  rectColor->color = {0.11f, 0.63f, 0.95f, 1};
+  rectFill->color = rectColor;
+  rectLayer->contents = {rect, rectFill};
+  root->children.push_back(rectLayer);
+
+  pagx::FontConfig fontConfig;
+  fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
+  doc->applyLayout(&fontConfig);
+  pagx::FontEmbedder().embed(doc.get());
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  auto pagxPath = SavePAGXFile(xml, "PAGXTest/TextBoxConstraintWidthWrapRender.pagx");
+  auto reloadedDoc = pagx::PAGXImporter::FromFile(pagxPath);
+  ASSERT_TRUE(reloadedDoc != nullptr);
+  reloadedDoc->applyLayout();
+  auto tgfxLayer = pagx::LayerBuilder::Build(reloadedDoc.get());
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto surface = Surface::Make(context, 200, 120);
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/TextBoxConstraintWidthWrapRender"));
+}
+
 // =====================================================================================
 // Auto Layout - Constraint Positioning - Proportional Scaling
 // =====================================================================================
