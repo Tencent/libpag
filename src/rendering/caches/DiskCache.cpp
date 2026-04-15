@@ -17,6 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DiskCache.h"
+#ifdef _WIN32
+#include <process.h>
+#define getpid _getpid
+#else
+#include <unistd.h>
+#endif
 #include "base/utils/Log.h"
 #include "pag/pag.h"
 #include "platform/Platform.h"
@@ -473,8 +479,9 @@ void DiskCache::saveConfig() {
   auto currentVersion = ++configSaveVersion;
   // Write to disk asynchronously via DiskIOWorker to avoid blocking the calling thread on IO.
   // Uses temp file + rename for atomic write to prevent corruption if app exits mid-write.
+  // Include PID in temp filename to avoid conflicts when multiple processes share the cache dir.
   auto path = configPath;
-  auto tempPath = configPath + ".tmp";
+  auto tempPath = configPath + ".tmp." + std::to_string(getpid());
   DiskIOWorker::GetInstance()->submit(
       std::bind(&DiskCache::WriteConfigTask, path, tempPath, data, currentVersion));
 }
