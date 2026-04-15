@@ -64,7 +64,7 @@
           </Layer>
           <Layer name="lineDemo">
             <Text text="Straight Path with Margins" fontFamily="Arial" fontSize="12"/>
-            <TextPath path="@linePath" firstMargin="20" lastMargin="20"/>
+            <TextPath path="@linePath" firstMargin="20" lastMargin="20" forceAlignment="true"/>
             <Fill color="#10B981"/>
           </Layer>
         </Layer>
