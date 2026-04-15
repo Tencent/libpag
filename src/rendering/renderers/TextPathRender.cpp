@@ -31,6 +31,7 @@ struct TextPathLayout {
   float lastMargin = 0;
   float layoutWidth = 0;
   float pathLength = 0;
+  bool pathClosed = false;
   PathData pathData;
 };
 
@@ -65,6 +66,7 @@ static TextPathLayout CreateTextPathLayout(const TextDocument* textDocument,
   auto meas = tgfx::PathMeasure::MakeFrom(ToPath(pathData));
   auto pathLength = meas->getLength();
   textPathLayout.pathLength = pathLength;
+  textPathLayout.pathClosed = pathData.isClosed();
 
   return textPathLayout;
 }
@@ -176,7 +178,7 @@ static float CalculateForceAlignmentLetterSpacing(const TextPathLayout& layout,
     totalGlyphAdvance += info->getAdvance();
   }
   // 这里count指的是spacing数量即文字间隔数量
-  auto count = static_cast<float>(line.size() - 1);
+  auto count = static_cast<float>(layout.pathClosed ? line.size() : line.size() - 1);
   float spacing = 0;
   if (count > 0) {
     if (layout.firstMargin <= layout.pathLength + layout.lastMargin) {
