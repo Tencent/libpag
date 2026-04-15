@@ -83,9 +83,10 @@
             <Rectangle position="140,25" size="280,50"/>
             <Stroke color="#94A3B8" width="1" dashes="4,3"/>
             <Layer scrollRect="0,0,280,50" x="0" y="0">
-              <Text text="This is a long text that extends well beyond the scroll rect boundary and should be clipped." fontFamily="Arial" fontSize="14" position="10,20"/>
-              <TextBox position="250,25" width="500" height="50" wordWrap="false"/>
-              <Fill color="#1F2937"/>
+              <TextBox left="0" top="0" width="500" height="50" wordWrap="false">
+                <Text text="This is a long text that extends well beyond the scroll rect boundary and should be clipped." fontFamily="Arial" fontSize="14"/>
+                <Fill color="#1F2937"/>
+              </TextBox>
             </Layer>
           </Layer>
           <Layer height="12">
