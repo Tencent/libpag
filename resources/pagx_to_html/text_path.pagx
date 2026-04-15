@@ -3,9 +3,9 @@
      simple arc, perpendicular=false, multiple paths, firstMargin/lastMargin -->
 <pagx version="1.0" width="420" height="380">
   <Resources>
-    <PathData id="arcPath" data="M 20,80 C 90,10 230,10 300,80"/>
-    <PathData id="straightLine" data="M 10,20 L 310,20"/>
-    <PathData id="sCurve" data="M 10,30 C 70,0 120,60 170,30 C 220,0 280,60 330,30"/>
+    <PathData id="arcPath" data="M 50,80 C 120,10 300,10 370,80"/>
+    <PathData id="straightLine" data="M 50,180 L 370,180"/>
+    <PathData id="sCurve" data="M 50,260 C 110,230 160,290 210,260 C 260,230 320,290 370,260"/>
   </Resources>
 
   <!-- Background -->
@@ -34,64 +34,55 @@
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16" gap="12" alignment="center" arrangement="center">
+      <!-- Ghost path for arc -->
+      <Layer name="ghostArc" alpha="0.15">
+        <Path data="M 50,80 C 120,10 300,10 370,80"/>
+        <Stroke color="#3B82F6" width="1"/>
+      </Layer>
+      <!-- Text along bezier curve -->
+      <Layer name="textArc">
+        <Text text="Along a Path" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+        <TextPath path="@arcPath" perpendicular="true" firstMargin="20"/>
+        <Fill color="#3B82F6"/>
+      </Layer>
+      <!-- Label -->
+      <Layer>
+        <Text text="perpendicular + firstMargin" fontFamily="Arial" fontSize="8" position="180,105" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
 
-        <!-- Arc path demo -->
-        <Layer layout="vertical" gap="4" alignment="center">
-          <Layer width="320" height="90">
-            <!-- Ghost path -->
-            <Layer name="ghostArc" alpha="0.15">
-              <Stroke color="#3B82F6" width="1"/>
-            </Layer>
-            <!-- Text along bezier curve -->
-            <Layer name="textArc">
-              <TextPath path="@arcPath" perpendicular="true" firstMargin="20"/>
-              <Fill color="#3B82F6"/>
-            </Layer>
-          </Layer>
-          <Layer height="10">
-            <Text text="perpendicular + firstMargin" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
-            <Fill color="#94A3B8"/>
-          </Layer>
-        </Layer>
+      <!-- Ghost path for straight line -->
+      <Layer name="ghostLine" alpha="0.15">
+        <Path data="M 50,180 L 370,180"/>
+        <Stroke color="#10B981" width="1"/>
+      </Layer>
+      <!-- Text on straight line -->
+      <Layer name="textLine">
+        <Text text="Straight Path" fontFamily="Arial" fontSize="14"/>
+        <TextPath path="@straightLine" firstMargin="30" lastMargin="30"/>
+        <Fill color="#10B981"/>
+      </Layer>
+      <!-- Label -->
+      <Layer>
+        <Text text="firstMargin + lastMargin" fontFamily="Arial" fontSize="8" position="180,200" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
 
-        <!-- Straight line demo -->
-        <Layer layout="vertical" gap="4" alignment="center">
-          <Layer width="320" height="40">
-            <!-- Ghost path -->
-            <Layer name="ghostLine" alpha="0.15">
-              <Stroke color="#10B981" width="1"/>
-            </Layer>
-            <!-- Text on straight line -->
-            <Layer name="textLine">
-              <TextPath path="@straightLine" firstMargin="30" lastMargin="30"/>
-              <Fill color="#10B981"/>
-            </Layer>
-          </Layer>
-          <Layer height="10">
-            <Text text="firstMargin + lastMargin" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
-            <Fill color="#94A3B8"/>
-          </Layer>
-        </Layer>
-
-        <!-- S-curve demo -->
-        <Layer layout="vertical" gap="4" alignment="center">
-          <Layer width="340" height="60">
-            <!-- Ghost path -->
-            <Layer name="ghostSCurve" alpha="0.15">
-              <Stroke color="#8B5CF6" width="1"/>
-            </Layer>
-            <!-- Text along S-curve -->
-            <Layer name="textSCurve">
-              <TextPath path="@sCurve"/>
-              <Fill color="#8B5CF6"/>
-            </Layer>
-          </Layer>
-          <Layer height="10">
-            <Text text="S-curve path" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
-            <Fill color="#94A3B8"/>
-          </Layer>
-        </Layer>
+      <!-- Ghost path for S-curve -->
+      <Layer name="ghostSCurve" alpha="0.15">
+        <Path data="M 50,260 C 110,230 160,290 210,260 C 260,230 320,290 370,260"/>
+        <Stroke color="#8B5CF6" width="1"/>
+      </Layer>
+      <!-- Text along S-curve -->
+      <Layer name="textSCurve">
+        <Text text="S-CURVE" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+        <TextPath path="@sCurve"/>
+        <Fill color="#8B5CF6"/>
+      </Layer>
+      <!-- Label -->
+      <Layer>
+        <Text text="S-curve path" fontFamily="Arial" fontSize="8" position="180,290" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
   </Layer>
