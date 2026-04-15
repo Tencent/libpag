@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Test file for verify: extractable Composition detection -->
-<pagx version="1.0" width="800" height="600">
+<pagx width="800" height="600">
 
   <!-- Case 1: Two consecutive sibling Layers with child subtrees — should WARN -->
   <Layer name="case1" width="800" height="200">

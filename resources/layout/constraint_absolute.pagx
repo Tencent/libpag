@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Layer constraint with includeInLayout=false: overlay positioned by constraints -->
-<pagx version="1.0" width="336" height="200">
+<pagx width="336" height="200">
   <!-- Background -->
   <Layer>
     <Rectangle size="336,200"/>

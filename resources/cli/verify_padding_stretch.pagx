@@ -1,0 +1,7 @@
+<!-- Test: stretch-fill Rectangle affected by padding -->
+<pagx width="400" height="200">
+  <Layer width="400" height="200" padding="16">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+    <Fill color="#F8F9FA"/>
+  </Layer>
+</pagx>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates Polystar shape (star and polygon) -->
-<pagx version="1.0" width="400" height="400">
+<pagx width="400" height="400">
   <Layer width="400" height="400" layout="vertical">
     <!-- Row 1: stars -->
     <Layer flex="1" layout="horizontal">
@@ -9,8 +9,8 @@
         <Polystar centerX="0" centerY="0" type="star" pointCount="5" outerRadius="60" innerRadius="28"/>
         <Fill>
           <LinearGradient startPoint="0,0" endPoint="120,120">
-            <ColorStop offset="0" color="#FBBF24"/>
-            <ColorStop offset="1" color="#F59E0B"/>
+            <ColorStop color="#FBBF24" offset="0"/>
+            <ColorStop color="#F59E0B" offset="1"/>
           </LinearGradient>
         </Fill>
       </Layer>
@@ -19,8 +19,8 @@
         <Polystar centerX="0" centerY="0" type="star" pointCount="6" outerRadius="60" innerRadius="32"/>
         <Fill>
           <LinearGradient startPoint="0,0" endPoint="120,120">
-            <ColorStop offset="0" color="#F43F5E"/>
-            <ColorStop offset="1" color="#E11D48"/>
+            <ColorStop color="#F43F5E" offset="0"/>
+            <ColorStop color="#E11D48" offset="1"/>
           </LinearGradient>
         </Fill>
       </Layer>
@@ -32,8 +32,8 @@
         <Polystar centerX="0" centerY="0" type="polygon" pointCount="6" outerRadius="64"/>
         <Fill>
           <LinearGradient startPoint="0,0" endPoint="128,128">
-            <ColorStop offset="0" color="#06B6D4"/>
-            <ColorStop offset="1" color="#0891B2"/>
+            <ColorStop color="#06B6D4" offset="0"/>
+            <ColorStop color="#0891B2" offset="1"/>
           </LinearGradient>
         </Fill>
       </Layer>
@@ -42,8 +42,8 @@
         <Polystar centerX="0" centerY="0" type="polygon" pointCount="5" outerRadius="64"/>
         <Fill>
           <LinearGradient startPoint="0,0" endPoint="128,128">
-            <ColorStop offset="0" color="#8B5CF6"/>
-            <ColorStop offset="1" color="#7C3AED"/>
+            <ColorStop color="#8B5CF6" offset="0"/>
+            <ColorStop color="#7C3AED" offset="1"/>
           </LinearGradient>
         </Fill>
       </Layer>

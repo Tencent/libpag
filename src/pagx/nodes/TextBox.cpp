@@ -71,9 +71,39 @@ void TextBox::onMeasure(LayoutContext* context) {
   }
 }
 
-void TextBox::setLayoutSize(LayoutContext*, float width, float height) {
+void TextBox::setLayoutSize(LayoutContext* context, float width, float height) {
   layoutWidth = !std::isnan(width) ? width : preferredWidth;
   layoutHeight = !std::isnan(height) ? height : preferredHeight;
+  updateLayout(context);
+  // An axis is content-measured when neither the parent nor the element itself specifies its size.
+  bool widthFromContent = std::isnan(width) && std::isnan(this->width);
+  bool heightFromContent = std::isnan(height) && std::isnan(this->height);
+  // For TextBox, only a change in the wrap axis (width for horizontal, height for vertical)
+  // can affect the cross axis measurement. Re-typeset to compute the correct cross-axis size.
+  bool horizontal = (writingMode == WritingMode::Horizontal);
+  bool wrapAxisChanged = horizontal ? (!std::isnan(width) && width != preferredWidth)
+                                    : (!std::isnan(height) && height != preferredHeight);
+  bool crossAxisFromContent = horizontal ? heightFromContent : widthFromContent;
+  if (crossAxisFromContent && wrapAxisChanged) {
+    bool hasPadding = !padding.isZero();
+    float boxW =
+        hasPadding ? std::max(0.0f, layoutWidth - padding.left - padding.right) : layoutWidth;
+    float boxH =
+        hasPadding ? std::max(0.0f, layoutHeight - padding.top - padding.bottom) : layoutHeight;
+    auto params = MakeTextLayoutParams(this, boxW, boxH);
+    std::vector<Text*> childText = {};
+    TextLayout::CollectTextElements(elements, childText);
+    auto result = TextLayout::Layout(childText, params, context);
+    float crossSize = std::ceil(horizontal ? result.bounds.height : result.bounds.width);
+    if (hasPadding) {
+      crossSize += horizontal ? (padding.top + padding.bottom) : (padding.left + padding.right);
+    }
+    if (horizontal) {
+      layoutHeight = crossSize;
+    } else {
+      layoutWidth = crossSize;
+    }
+  }
 }
 
 void TextBox::updateLayout(LayoutContext* context) {

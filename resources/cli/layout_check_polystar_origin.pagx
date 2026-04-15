@@ -1,8 +1,0 @@
-<pagx version="1.0" width="200" height="200">
-  <!-- Polystar without explicit position should have layoutBounds starting at (0,0)
-       via auto-position. Content-measured Layer should NOT report content-origin-offset. -->
-  <Layer centerX="0" centerY="0">
-    <Polystar type="star" pointCount="5" outerRadius="40" innerRadius="18"/>
-    <Fill color="#F59E0B"/>
-  </Layer>
-</pagx>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="600" height="600">
+<pagx width="600" height="600">
   <!-- Box A: Basic emoji mixed with Latin text -->
   <Layer left="50" top="50">
     <Rectangle size="200,60"/>

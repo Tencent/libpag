@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Constraint layout: Ellipse element constraint combinations -->
 <!-- Fully automatic layout: containers are flexible (no width) — auto-equal distribution -->
-<pagx version="1.0" width="820" height="600">
+<pagx width="820" height="600">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -58,8 +58,8 @@
           <Ellipse left="25" right="25" top="30" size="1,50"/>
           <Fill>
             <LinearGradient startPoint="0,0" endPoint="310,0">
-              <ColorStop offset="0" color="#EC4899"/>
-              <ColorStop offset="1" color="#F472B6"/>
+              <ColorStop color="#EC4899" offset="0"/>
+              <ColorStop color="#F472B6" offset="1"/>
             </LinearGradient>
           </Fill>
         </Layer>
@@ -68,8 +68,8 @@
           <Ellipse left="50" right="50" centerY="0" size="1,60"/>
           <Fill>
             <LinearGradient startPoint="0,0" endPoint="260,0">
-              <ColorStop offset="0" color="#8B5CF6"/>
-              <ColorStop offset="1" color="#A78BFA"/>
+              <ColorStop color="#8B5CF6" offset="0"/>
+              <ColorStop color="#A78BFA" offset="1"/>
             </LinearGradient>
           </Fill>
         </Layer>
@@ -78,8 +78,8 @@
           <Ellipse left="80" right="80" bottom="30" size="1,50"/>
           <Fill>
             <LinearGradient startPoint="0,0" endPoint="200,0">
-              <ColorStop offset="0" color="#3B82F6"/>
-              <ColorStop offset="1" color="#1D4ED8"/>
+              <ColorStop color="#3B82F6" offset="0"/>
+              <ColorStop color="#1D4ED8" offset="1"/>
             </LinearGradient>
           </Fill>
         </Layer>
@@ -101,8 +101,8 @@
           <Ellipse left="20" top="25" bottom="25" size="55,1"/>
           <Fill>
             <LinearGradient startPoint="0,0" endPoint="0,210">
-              <ColorStop offset="0" color="#FBBF24"/>
-              <ColorStop offset="1" color="#F59E0B"/>
+              <ColorStop color="#FBBF24" offset="0"/>
+              <ColorStop color="#F59E0B" offset="1"/>
             </LinearGradient>
           </Fill>
         </Layer>
@@ -111,8 +111,8 @@
           <Ellipse right="20" top="50" bottom="50" size="55,1"/>
           <Fill>
             <LinearGradient startPoint="0,0" endPoint="0,160">
-              <ColorStop offset="0" color="#A16207"/>
-              <ColorStop offset="1" color="#7C2D12"/>
+              <ColorStop color="#A16207" offset="0"/>
+              <ColorStop color="#7C2D12" offset="1"/>
             </LinearGradient>
           </Fill>
         </Layer>
@@ -128,8 +128,8 @@
           <Ellipse left="25" right="25" top="25" bottom="25" size="1,1"/>
           <Fill>
             <LinearGradient startPoint="0,0" endPoint="230,210">
-              <ColorStop offset="0" color="#EC4899"/>
-              <ColorStop offset="1" color="#BE185D"/>
+              <ColorStop color="#EC4899" offset="0"/>
+              <ColorStop color="#BE185D" offset="1"/>
             </LinearGradient>
           </Fill>
         </Layer>
@@ -145,8 +145,8 @@
           <Ellipse left="20" right="50" top="30" bottom="60" size="1,1"/>
           <Fill>
             <LinearGradient startPoint="0,0" endPoint="210,170">
-              <ColorStop offset="0" color="#06B6D4"/>
-              <ColorStop offset="1" color="#0369A1"/>
+              <ColorStop color="#06B6D4" offset="0"/>
+              <ColorStop color="#0369A1" offset="1"/>
             </LinearGradient>
           </Fill>
         </Layer>

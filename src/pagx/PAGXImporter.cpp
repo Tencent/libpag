@@ -2123,7 +2123,6 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const uint8_t* data, size_t 
 }
 
 static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
-  doc->version = GetAttribute(root, "version", "1.0");
   doc->width = GetFloatAttribute(root, "width", 0, doc);
   doc->height = GetFloatAttribute(root, "height", 0, doc);
   ParseCustomData(root, doc);

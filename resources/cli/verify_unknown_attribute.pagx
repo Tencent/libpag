@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test file for lint: unknown attribute on Layer -->
+<pagx width="400" height="300">
+  <Layer name="root" width="400" height="300">
+    <Layer rotation="15">
+      <Ellipse size="100,100"/>
+      <Fill color="#FF0000"/>
+    </Layer>
+  </Layer>
+</pagx>

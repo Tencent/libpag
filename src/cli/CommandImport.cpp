@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CommandImport.h"
-#include <fstream>
 #include <iostream>
 #include <string>
 #include "cli/CliUtils.h"
@@ -219,14 +218,10 @@ int RunImport(int argc, char* argv[]) {
   PAGXOptimizer::Optimize(result.document.get());
 
   auto xml = PAGXExporter::ToXML(*result.document);
-  std::ofstream out(options.outputFile);
-  if (!out.is_open()) {
-    std::cerr << "pagx import: error: failed to write '" << options.outputFile << "'\n";
+  if (!WriteStringToFile(xml, options.outputFile, "pagx import")) {
     return 1;
   }
-  out << xml;
 
-  std::cout << "pagx import: wrote " << options.outputFile << "\n";
   return 0;
 }
 

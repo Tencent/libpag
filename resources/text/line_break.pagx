@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="580" height="650">
+<pagx width="580" height="650">
   <!-- All boxes use NotoSansSC fontSize=24. Measured advances:
        CJK/…/「/」/ー/"/"/￥ = 24px, — = 21px, % = 22px,
        space = 5px, hyphen = 8px, slash = 9px, digits 0-9 = 13px.

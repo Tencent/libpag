@@ -158,10 +158,8 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
   // element layers. Otherwise, keep the wrapper itself.
   std::vector<Layer*> elementLayers;
   for (auto* svgLayer : svgDoc->layers) {
-    bool isPlainWrapper = svgLayer->contents.empty() && !svgLayer->children.empty() &&
-                          svgLayer->matrix.isIdentity() && svgLayer->alpha == 1.0f &&
-                          svgLayer->blendMode == BlendMode::Normal && svgLayer->mask == nullptr &&
-                          svgLayer->styles.empty() && svgLayer->filters.empty();
+    bool isPlainWrapper =
+        IsLayerShell(svgLayer) && svgLayer->contents.empty() && !svgLayer->children.empty();
     if (isPlainWrapper) {
       for (auto* child : svgLayer->children) {
         elementLayers.push_back(child);
@@ -180,14 +178,11 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
   bool canDowngradeAll = false;
   if (elementLayers.size() == 1) {
     auto* single = elementLayers[0];
-    canUnpack = single->matrix.isIdentity() && single->alpha == 1.0f &&
-                single->blendMode == BlendMode::Normal && single->mask == nullptr &&
-                single->styles.empty() && single->filters.empty() && single->children.empty();
+    canUnpack = IsLayerShell(single) && single->children.empty();
   } else if (elementLayers.size() > 1) {
     canDowngradeAll = true;
     for (auto* el : elementLayers) {
-      if (!el->children.empty() || !el->styles.empty() || !el->filters.empty() ||
-          el->mask != nullptr || el->composition != nullptr) {
+      if (!el->children.empty() || HasLayerOnlyFeatures(el)) {
         canDowngradeAll = false;
         break;
       }
@@ -202,7 +197,7 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
     for (size_t i = 0; i < elementLayers.size(); i++) {
       auto* elemLayer = elementLayers[i];
       bool unpackFirst = false;
-      if (i == 0 && elemLayer->matrix.isIdentity() && elemLayer->alpha == 1.0f) {
+      if (i == 0 && elemLayer->matrix.isIdentity()) {
         unpackFirst = true;
         for (auto* child : elemLayer->contents) {
           auto* layoutNode = LayoutNode::AsLayoutNode(child);
@@ -243,7 +238,6 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
             group->rotation = rot;
           }
         }
-        group->alpha = elemLayer->alpha;
         layer->contents.push_back(group);
       }
     }
@@ -301,15 +295,9 @@ int RunResolve(int argc, char* argv[]) {
     return parseResult == -1 ? 0 : parseResult;
   }
 
-  auto doc = PAGXImporter::FromFile(options.inputFile);
+  auto doc = LoadDocument(options.inputFile, "pagx resolve");
   if (doc == nullptr) {
-    std::cerr << "pagx resolve: error: failed to load '" << options.inputFile << "'\n";
     return 1;
-  }
-  if (!doc->errors.empty()) {
-    for (auto& error : doc->errors) {
-      std::cerr << "pagx resolve: warning: " << error << "\n";
-    }
   }
 
   auto baseDir = GetDirectory(options.inputFile);

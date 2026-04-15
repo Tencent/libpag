@@ -117,7 +117,6 @@ void PAGFileInfoModel::setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> pagxD
     fileInfos.emplace_back("Layers");
     fileInfos.emplace_back("Nodes");
     fileInfos.emplace_back("Images");
-    fileInfos.emplace_back("Version");
     endResetModel();
     return;
   }
@@ -126,7 +125,6 @@ void PAGFileInfoModel::setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> pagxD
   fileInfos.emplace_back("Layers", Utils::ToQString(static_cast<int>(pagxDocument->layers.size())));
   fileInfos.emplace_back("Nodes", Utils::ToQString(static_cast<int>(pagxDocument->nodes.size())));
   fileInfos.emplace_back("Images", Utils::ToQString(CountImageNodes(pagxDocument)));
-  fileInfos.emplace_back("Version", QString::fromStdString(pagxDocument->version));
   endResetModel();
 }
 

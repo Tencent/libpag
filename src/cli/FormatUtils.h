@@ -21,6 +21,8 @@
 #include <libxml/tree.h>
 #include <ostream>
 #include <string>
+#include <unordered_map>
+#include <vector>
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Alignment.h"
 #include "pagx/types/Arrangement.h"
@@ -28,6 +30,12 @@
 #include "pagx/types/Padding.h"
 
 namespace pagx::cli {
+
+/**
+ * Returns the canonical attribute order map for all PAGX element types. The map is parsed from the
+ * embedded XSD schema on first call and cached.
+ */
+const std::unordered_map<std::string, std::vector<std::string>>& GetAttributeOrderMap();
 
 /**
  * Reorders attributes of a single XML element node to match the canonical attribute order defined

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Padding unified semantics: VectorElements, Group padding, TextBox padding -->
-<pagx version="1.0" width="820" height="520">
+<pagx width="820" height="520">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
