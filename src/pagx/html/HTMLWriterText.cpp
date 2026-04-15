@@ -1116,9 +1116,18 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         }
         charStyle += ";transform:" + transform;
         charStyle += ";transform-origin:center center";
-        if (fill && fill->color && fill->color->nodeType() == NodeType::SolidColor) {
-          auto sc = static_cast<const SolidColor*>(fill->color);
-          charStyle += ";color:" + ColorToRGBA(sc->color, fill->alpha);
+        if (fill && fill->color) {
+          if (fill->color->nodeType() == NodeType::SolidColor) {
+            auto sc = static_cast<const SolidColor*>(fill->color);
+            charStyle += ";color:" + ColorToRGBA(sc->color, fill->alpha);
+          } else {
+            auto css = colorToCSS(fill->color, nullptr);
+            if (!css.empty()) {
+              charStyle += ";background:" + css;
+              charStyle += ";-webkit-background-clip:text;background-clip:text";
+              charStyle += ";-webkit-text-fill-color:transparent";
+            }
+          }
         }
         if (alpha < 1.0f) {
           charStyle += ";opacity:" + FloatToString(alpha);
