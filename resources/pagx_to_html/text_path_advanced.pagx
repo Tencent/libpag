@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tests: TextPath advanced attributes: baselineOrigin, baselineAngle, lastMargin,
-     reversed="true", forceAlignment="true", perpendicular="false" -->
-<pagx version="1.0" width="420" height="460">
+<!-- Tests: TextPath advanced attributes: forceAlignment, perpendicular=false, margins -->
+<pagx version="1.0" width="420" height="440">
   <Resources>
-    <PathData id="bannerArc" data="M 20,80 C 60,15 200,15 240,80"/>
-    <PathData id="uprightArc" data="M 30,25 C 70,5 190,5 230,25"/>
-    <PathData id="linePath" data="M 5,15 L 130,15"/>
-    <PathData id="wavyPath" data="M 15,25 Q 70,0 130,25 Q 190,50 250,25"/>
+    <PathData id="bannerArc" data="M 10,80 Q 130,0 260,80"/>
+    <PathData id="uprightArc" data="M 20,25 Q 130,0 240,25"/>
+    <PathData id="linePath" data="M 10,15 L 150,15"/>
+    <PathData id="wavyPath" data="M 10,25 Q 65,0 120,25 Q 175,50 230,25"/>
+    <PathData id="sPath" data="M 10,30 C 50,0 90,60 130,30 C 170,0 210,60 250,30"/>
   </Resources>
 
   <!-- Background -->
@@ -24,7 +24,7 @@
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Reversed, force alignment, perpendicular, margins" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="Force alignment, perpendicular, margins, S-curve" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -35,94 +35,61 @@
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <Layer width="260" layout="vertical" gap="12" alignment="center" arrangement="center">
+      <Layer width="270" layout="vertical" gap="12" alignment="center" arrangement="center">
 
         <!-- Banner arc: forceAlignment -->
-        <Layer width="260" height="90">
+        <Layer width="270" height="90">
           <Layer name="arcGuide" alpha="0.15">
             <Path data="@bannerArc"/>
             <Stroke color="#3B82F6" width="1"/>
           </Layer>
-          <Layer name="bannerDemo">
-            <Text text="BANNER" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
-            <TextPath path="@bannerArc" forceAlignment="true"/>
-            <Fill color="#3B82F6"/>
-          </Layer>
+          <Text text="BANNER" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
+          <TextPath path="@bannerArc" forceAlignment="true"/>
+          <Fill color="#3B82F6"/>
         </Layer>
 
         <!-- Perpendicular=false -->
-        <Layer width="260" height="35">
+        <Layer width="270" height="35">
           <Layer name="uprightGuide" alpha="0.15">
             <Path data="@uprightArc"/>
             <Stroke color="#8B5CF6" width="1" dashes="4,3"/>
           </Layer>
-          <Layer name="uprightDemo">
-            <Text text="UPRIGHT" fontFamily="Arial" fontStyle="Bold" fontSize="10"/>
-            <TextPath path="@uprightArc" perpendicular="false" forceAlignment="true"/>
-            <Fill color="#8B5CF6"/>
-          </Layer>
+          <Text text="UPRIGHT" fontFamily="Arial" fontStyle="Bold" fontSize="10"/>
+          <TextPath path="@uprightArc" perpendicular="false" forceAlignment="true"/>
+          <Fill color="#8B5CF6"/>
         </Layer>
 
-        <!-- Margins line + Badge circle side by side -->
-        <Layer layout="horizontal" gap="12" alignment="center" arrangement="center">
-          <!-- Straight line margins -->
-          <Layer layout="vertical" gap="4" alignment="center">
-            <Layer width="140" height="25">
-              <Layer name="lineGuide" alpha="0.15">
-                <Path data="@linePath"/>
-                <Stroke color="#EC4899" width="1"/>
-              </Layer>
-              <Layer name="marginDemo">
-                <Text text="MARGINS" fontFamily="Arial" fontSize="10"/>
-                <TextPath path="@linePath" forceAlignment="true" firstMargin="5" lastMargin="5"/>
-                <Fill color="#EC4899"/>
-              </Layer>
-            </Layer>
-            <Layer height="10">
-              <Text text="firstMargin + lastMargin" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
-              <Fill color="#94A3B8"/>
-            </Layer>
+        <!-- Margins line: firstMargin + lastMargin -->
+        <Layer width="160" height="25">
+          <Layer name="lineGuide" alpha="0.15">
+            <Path data="@linePath"/>
+            <Stroke color="#EC4899" width="1"/>
           </Layer>
+          <Text text="MARGINS" fontFamily="Arial" fontSize="10"/>
+          <TextPath path="@linePath" forceAlignment="true" firstMargin="5" lastMargin="5"/>
+          <Fill color="#EC4899"/>
+        </Layer>
 
-          <!-- Badge: reversed circle -->
-          <Layer layout="vertical" gap="4" alignment="center">
-            <Layer width="80" height="80">
-              <!-- Circle rings as child Layers -->
-              <Layer name="badgeRing" alpha="0.15">
-                <Ellipse position="40,40" size="70,70"/>
-                <Stroke color="#EF4444" width="1"/>
-              </Layer>
-              <Layer name="badgeBg">
-                <Ellipse position="40,40" size="50,50"/>
-                <Fill color="#FEF3C7"/>
-              </Layer>
-              <Layer name="badgeInner">
-                <Ellipse position="40,40" size="40,40"/>
-                <Fill color="#FFFFFF"/>
-              </Layer>
-              <!-- TextPath must be direct contents of this Layer, no sub-Layer wrapping -->
-              <Text text="BADGE" fontFamily="Arial" fontStyle="Bold" fontSize="8"/>
-              <TextPath path="M 75,40 A 35,35 0 1,1 74.99,40 Z" reversed="true" forceAlignment="true"/>
-              <Fill color="#EF4444"/>
-            </Layer>
-            <Layer height="10">
-              <Text text="reversed circle" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
-              <Fill color="#94A3B8"/>
-            </Layer>
+        <!-- S-curve: forceAlignment -->
+        <Layer width="260" height="60">
+          <Layer name="sGuide" alpha="0.15">
+            <Path data="@sPath"/>
+            <Stroke color="#F59E0B" width="1"/>
           </Layer>
+          <Text text="S-CURVE PATH" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
+          <TextPath path="@sPath" forceAlignment="true"/>
+          <Fill color="#F59E0B"/>
         </Layer>
 
         <!-- Wavy path: forceAlignment -->
-        <Layer width="260" height="55">
+        <Layer width="240" height="55">
           <Layer name="wavyGuide" alpha="0.15">
             <Path data="@wavyPath"/>
             <Stroke color="#10B981" width="1"/>
           </Layer>
-          <Layer name="wavyDemo">
-            <Text text="FORCE ALIGN" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
-            <TextPath path="@wavyPath" forceAlignment="true"/>
-            <Fill color="#10B981"/>
-          </Layer>
+          <Text text="FORCE ALIGN" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
+          <TextPath path="@wavyPath" forceAlignment="true"/>
+          <Fill color="#10B981"/>
         </Layer>
 
       </Layer>
