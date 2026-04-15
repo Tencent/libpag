@@ -3,7 +3,7 @@
 <pagx width="400" height="400">
   <!-- Rectangle size=320x320, half=160. Diamond radius=160 so corners touch rect edges exactly -->
   <Layer>
-    <Rectangle left="40" top="40" roundness="24" size="320,320"/>
+    <Rectangle left="40" top="40" size="320,320" roundness="24"/>
     <Fill>
       <DiamondGradient center="200,200" radius="160">
         <ColorStop color="#FBBF24" offset="0"/>
@@ -12,6 +12,6 @@
         <ColorStop color="#1E293B" offset="1"/>
       </DiamondGradient>
     </Fill>
-    <DropShadowStyle blurX="40" blurY="40" color="#F59E0B50" offsetY="12"/>
+    <DropShadowStyle offsetY="12" blurX="40" blurY="40" color="#F59E0B50"/>
   </Layer>
 </pagx>

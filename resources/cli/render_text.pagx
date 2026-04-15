@@ -7,13 +7,13 @@
   <Layer centerX="0" centerY="0" layout="vertical" gap="6" alignment="center">
     <Layer>
       <TextBox textAlign="center">
-        <Text fontFamily="Helvetica" fontSize="24" fontStyle="Bold" text="Hello PAGX"/>
+        <Text text="Hello PAGX" fontFamily="Helvetica" fontStyle="Bold" fontSize="24"/>
         <Fill color="#FFFFFF"/>
       </TextBox>
     </Layer>
     <Layer>
       <TextBox textAlign="center">
-        <Text fontFamily="Helvetica" fontSize="16" text="Text Rendering"/>
+        <Text text="Text Rendering" fontFamily="Helvetica" fontSize="16"/>
         <Fill color="#94A3B8"/>
       </TextBox>
     </Layer>

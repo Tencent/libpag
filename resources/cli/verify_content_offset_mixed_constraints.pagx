@@ -3,7 +3,7 @@
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="22"/>
     <Fill color="#3B82F6"/>
     <Group centerX="0" centerY="0">
-      <Text left="40" right="40" top="12" bottom="12" fontFamily="Arial" fontSize="14" fontStyle="Bold" text="Button"/>
+      <Text left="40" right="40" top="12" bottom="12" text="Button" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
       <Fill color="#FFF"/>
     </Group>
   </Layer>

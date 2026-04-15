@@ -18,31 +18,31 @@
       <Layer flex="1" height="220">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         </Layer>
         <!-- 1.1: left="25" top="25" -->
         <Layer left="0" right="0" top="0" bottom="0">
-          <Text left="25" top="25" fontFamily="Arial" fontSize="20" fontStyle="Bold" text="Left" textAnchor="start"/>
+          <Text left="25" top="25" text="Left" fontFamily="Arial" fontStyle="Bold" fontSize="20" textAnchor="start"/>
           <Fill color="#6366F1"/>
         </Layer>
         <!-- 1.2: right="25" top="25" -->
         <Layer left="0" right="0" top="0" bottom="0">
-          <Text right="25" top="25" fontFamily="Arial" fontSize="20" fontStyle="Bold" text="Right" textAnchor="end"/>
+          <Text right="25" top="25" text="Right" fontFamily="Arial" fontStyle="Bold" fontSize="20" textAnchor="end"/>
           <Fill color="#F43F5E"/>
         </Layer>
         <!-- 1.3: centerX="0" centerY="0" -->
         <Layer left="0" right="0" top="0" bottom="0">
-          <Text centerX="0" centerY="0" fontFamily="Arial" fontSize="24" fontStyle="Bold" text="Center" textAnchor="center"/>
+          <Text centerX="0" centerY="0" text="Center" fontFamily="Arial" fontStyle="Bold" fontSize="24" textAnchor="center"/>
           <Fill color="#10B981"/>
         </Layer>
         <!-- 1.4: left="25" bottom="25" -->
         <Layer left="0" right="0" top="0" bottom="0">
-          <Text left="25" bottom="25" fontFamily="Arial" fontSize="18" fontStyle="Bold" text="Bottom L" textAnchor="start"/>
+          <Text left="25" bottom="25" text="Bottom L" fontFamily="Arial" fontStyle="Bold" fontSize="18" textAnchor="start"/>
           <Fill color="#F59E0B"/>
         </Layer>
         <!-- 1.5: right="25" bottom="25" -->
         <Layer left="0" right="0" top="0" bottom="0">
-          <Text right="25" bottom="25" fontFamily="Arial" fontSize="18" fontStyle="Bold" text="Bottom R" textAnchor="end"/>
+          <Text right="25" bottom="25" text="Bottom R" fontFamily="Arial" fontStyle="Bold" fontSize="18" textAnchor="end"/>
           <Fill color="#06B6D4"/>
         </Layer>
       </Layer>
@@ -54,12 +54,12 @@
         <Layer height="60">
           <Layer left="0" right="0" top="0" bottom="0">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-            <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
+            <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
           </Layer>
           <Layer left="0" right="0" top="0" bottom="0">
-            <Text left="20" right="20" centerY="0" fontFamily="Arial" fontSize="80" fontStyle="Bold" text="WIDE TEXT" textAnchor="center"/>
+            <Text left="20" right="20" centerY="0" text="WIDE TEXT" fontFamily="Arial" fontStyle="Bold" fontSize="80" textAnchor="center"/>
             <Fill>
-              <LinearGradient endPoint="320,0" startPoint="0,0">
+              <LinearGradient startPoint="0,0" endPoint="320,0">
                 <ColorStop color="#EC4899" offset="0"/>
                 <ColorStop color="#F472B6" offset="1"/>
               </LinearGradient>
@@ -71,12 +71,12 @@
         <Layer width="260" height="60">
           <Layer left="0" right="0" top="0" bottom="0">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-            <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
+            <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
           </Layer>
           <Layer left="0" right="0" top="0" bottom="0">
-            <Text left="20" right="20" centerY="0" fontFamily="Arial" fontSize="80" fontStyle="Bold" text="MEDIUM" textAnchor="center"/>
+            <Text left="20" right="20" centerY="0" text="MEDIUM" fontFamily="Arial" fontStyle="Bold" fontSize="80" textAnchor="center"/>
             <Fill>
-              <LinearGradient endPoint="220,0" startPoint="0,0">
+              <LinearGradient startPoint="0,0" endPoint="220,0">
                 <ColorStop color="#8B5CF6" offset="0"/>
                 <ColorStop color="#A78BFA" offset="1"/>
               </LinearGradient>
@@ -88,12 +88,12 @@
         <Layer width="160" height="60">
           <Layer left="0" right="0" top="0" bottom="0">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-            <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
+            <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
           </Layer>
           <Layer left="0" right="0" top="0" bottom="0">
-            <Text left="15" right="15" centerY="0" fontFamily="Arial" fontSize="80" fontStyle="Bold" text="NARROW" textAnchor="center"/>
+            <Text left="15" right="15" centerY="0" text="NARROW" fontFamily="Arial" fontStyle="Bold" fontSize="80" textAnchor="center"/>
             <Fill>
-              <LinearGradient endPoint="130,0" startPoint="0,0">
+              <LinearGradient startPoint="0,0" endPoint="130,0">
                 <ColorStop color="#10B981" offset="0"/>
                 <ColorStop color="#059669" offset="1"/>
               </LinearGradient>
@@ -112,13 +112,13 @@
       <Layer flex="1" height="220">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         </Layer>
         <!-- 3.1: top="20" bottom="20" centerX="0" -->
         <Layer left="0" right="0" top="0" bottom="0">
-          <Text top="0" bottom="0" centerX="0" fontFamily="Arial" fontSize="200" fontStyle="Bold" text="Ǘy" textAnchor="center"/>
+          <Text top="0" bottom="0" centerX="0" text="Ǘy" fontFamily="Arial" fontStyle="Bold" fontSize="200" textAnchor="center"/>
           <Fill>
-            <LinearGradient endPoint="0,180" startPoint="0,0">
+            <LinearGradient startPoint="0,0" endPoint="0,180">
               <ColorStop color="#FBBF24" offset="0"/>
               <ColorStop color="#F59E0B" offset="1"/>
             </LinearGradient>
@@ -130,13 +130,13 @@
       <Layer flex="1" height="220">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         </Layer>
         <!-- 4.1: all edges, scales to fit minimum axis -->
         <Layer left="0" right="0" top="0" bottom="0">
-          <Text left="0" right="0" centerY="0" fontFamily="Arial" fontSize="200" fontStyle="Bold" text="Horizontal" textAnchor="center"/>
+          <Text left="0" right="0" centerY="0" text="Horizontal" fontFamily="Arial" fontStyle="Bold" fontSize="200" textAnchor="center"/>
           <Fill>
-            <LinearGradient endPoint="160,180" startPoint="0,0">
+            <LinearGradient startPoint="0,0" endPoint="160,180">
               <ColorStop color="#06B6D4" offset="0"/>
               <ColorStop color="#0891B2" offset="1"/>
             </LinearGradient>
@@ -148,13 +148,13 @@
       <Layer flex="1" height="220">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         </Layer>
         <!-- 5.1: fit in wide container (height is limiting axis) -->
         <Layer left="0" right="0" top="0" bottom="0">
-          <Text left="30" right="30" top="20" bottom="20" fontFamily="Arial" fontSize="200" fontStyle="Bold" text="Fit" textAnchor="center"/>
+          <Text left="30" right="30" top="20" bottom="20" text="Fit" fontFamily="Arial" fontStyle="Bold" fontSize="200" textAnchor="center"/>
           <Fill>
-            <LinearGradient endPoint="300,180" startPoint="0,0">
+            <LinearGradient startPoint="0,0" endPoint="300,180">
               <ColorStop color="#EC4899" offset="0"/>
               <ColorStop color="#BE185D" offset="1"/>
             </LinearGradient>

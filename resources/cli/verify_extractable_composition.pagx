@@ -122,7 +122,7 @@
       <Rectangle left="0" right="0" top="0" bottom="0"/>
       <Stroke/>
       <TextBox width="200" height="50">
-        <Text fontFamily="Arial" fontSize="16" text="Hello"/>
+        <Text text="Hello" fontFamily="Arial" fontSize="16"/>
         <Fill/>
       </TextBox>
     </Layer>
@@ -130,7 +130,7 @@
       <Rectangle left="0" right="0" top="0" bottom="0"/>
       <Stroke/>
       <TextBox width="200" height="50">
-        <Text fontFamily="Arial" fontSize="16" text="World"/>
+        <Text text="World" fontFamily="Arial" fontSize="16"/>
         <Fill/>
       </TextBox>
     </Layer>

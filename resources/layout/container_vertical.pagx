@@ -14,7 +14,7 @@
       <Layer width="180" height="220" layout="vertical" gap="10" arrangement="center">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Fill color="#E2E8F0"/>
-        <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer width="160" height="60">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
           <Fill color="#6366F1"/>
@@ -29,7 +29,7 @@
       <Layer width="180" height="220" layout="vertical" gap="10" arrangement="end">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Fill color="#E2E8F0"/>
-        <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer width="160" height="60">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
           <Fill color="#6366F1"/>
@@ -47,7 +47,7 @@
       <Layer width="180" height="220" layout="vertical" gap="10" alignment="center">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Fill color="#E2E8F0"/>
-        <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer width="80" height="60">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
           <Fill color="#10B981"/>
@@ -66,7 +66,7 @@
       <Layer width="180" height="220" layout="vertical" gap="10" alignment="end">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Fill color="#E2E8F0"/>
-        <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer width="80" height="60">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
           <Fill color="#10B981"/>

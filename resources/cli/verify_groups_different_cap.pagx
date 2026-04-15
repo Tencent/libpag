@@ -4,11 +4,11 @@
   <Layer name="container">
     <Group>
       <Rectangle size="50,50"/>
-      <Stroke cap="round" color="#FF0000" width="2"/>
+      <Stroke color="#FF0000" width="2" cap="round"/>
     </Group>
     <Group>
       <Rectangle size="80,40"/>
-      <Stroke cap="square" color="#FF0000" width="2"/>
+      <Stroke color="#FF0000" width="2" cap="square"/>
     </Group>
   </Layer>
 </pagx>

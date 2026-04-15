@@ -5,65 +5,65 @@
     <Layer height="180" layout="horizontal" gap="12">
       <!-- Box 1 (top-left): horizontal justify + lineHeight -->
       <Layer flex="1">
-        <Rectangle roundness="6" size="180,180"/>
-        <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
-        <TextBox width="180" height="180" lineHeight="28" textAlign="justify">
-          <Text fontFamily="Arial" fontSize="18" text="Justify aligns words evenly 分布在 each full line."/>
+        <Rectangle size="180,180" roundness="6"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <TextBox width="180" height="180" textAlign="justify" lineHeight="28">
+          <Text text="Justify aligns words evenly 分布在 each full line." fontFamily="Arial" fontSize="18"/>
           <Fill>
-            <LinearGradient endPoint="180,0" startPoint="0,0">
+            <LinearGradient startPoint="0,0" endPoint="180,0">
               <ColorStop color="#6366F1" offset="0"/>
               <ColorStop color="#8B5CF6" offset="1"/>
             </LinearGradient>
           </Fill>
         </TextBox>
-        <DropShadowStyle blurX="24" blurY="24" color="#6366F130" offsetY="8"/>
+        <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#6366F130"/>
       </Layer>
       <!-- Box 2 (top-right): horizontal textAlign center + paragraphAlign middle -->
       <Layer flex="1">
-        <Rectangle roundness="6" size="180,180"/>
-        <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
-        <TextBox width="180" height="180" paragraphAlign="middle" textAlign="center">
-          <Text fontFamily="Arial" fontSize="18" fontStyle="Bold" text="Centered&#10;Horizontally&#10;&amp;&#10;Vertically"/>
+        <Rectangle size="180,180" roundness="6"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <TextBox width="180" height="180" textAlign="center" paragraphAlign="middle">
+          <Text text="Centered&#10;Horizontally&#10;&amp;&#10;Vertically" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
           <Fill>
-            <LinearGradient endPoint="180,100" startPoint="0,0">
+            <LinearGradient startPoint="0,0" endPoint="180,100">
               <ColorStop color="#F43F5E" offset="0"/>
               <ColorStop color="#EC4899" offset="1"/>
             </LinearGradient>
           </Fill>
         </TextBox>
-        <DropShadowStyle blurX="24" blurY="24" color="#F43F5E30" offsetY="8"/>
+        <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F43F5E30"/>
       </Layer>
     </Layer>
     <Layer height="180" layout="horizontal" gap="12">
       <!-- Box 3 (bottom-left): vertical writing -->
       <Layer flex="1">
-        <Rectangle roundness="6" size="180,180"/>
-        <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
+        <Rectangle size="180,180" roundness="6"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <TextBox width="180" height="180" textAlign="justify" writingMode="vertical">
-          <Text fontFamily="Arial" fontSize="18" fontStyle="Bold" text="春眠不觉 Dawn 处处闻啼鸟 Night 来风雨声花落知多少"/>
+          <Text text="春眠不觉 Dawn 处处闻啼鸟 Night 来风雨声花落知多少" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
           <Fill>
-            <LinearGradient endPoint="0,180" startPoint="180,0">
+            <LinearGradient startPoint="180,0" endPoint="0,180">
               <ColorStop color="#F59E0B" offset="0"/>
               <ColorStop color="#F43F5E" offset="1"/>
             </LinearGradient>
           </Fill>
         </TextBox>
-        <DropShadowStyle blurX="24" blurY="24" color="#F59E0B30" offsetY="8"/>
+        <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F59E0B30"/>
       </Layer>
       <!-- Box 4 (bottom-right): vertical textAlign center + paragraphAlign middle -->
       <Layer flex="1">
-        <Rectangle roundness="6" size="180,180"/>
-        <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
-        <TextBox width="180" height="180" paragraphAlign="middle" textAlign="center" writingMode="vertical">
-          <Text fontFamily="Arial" fontSize="18" fontStyle="Bold" text="竖排文本&#10;居中对齐"/>
+        <Rectangle size="180,180" roundness="6"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <TextBox width="180" height="180" textAlign="center" paragraphAlign="middle" writingMode="vertical">
+          <Text text="竖排文本&#10;居中对齐" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
           <Fill>
-            <LinearGradient endPoint="180,180" startPoint="0,0">
+            <LinearGradient startPoint="0,0" endPoint="180,180">
               <ColorStop color="#06B6D4" offset="0"/>
               <ColorStop color="#10B981" offset="1"/>
             </LinearGradient>
           </Fill>
         </TextBox>
-        <DropShadowStyle blurX="24" blurY="24" color="#06B6D430" offsetY="8"/>
+        <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#06B6D430"/>
       </Layer>
     </Layer>
   </Layer>

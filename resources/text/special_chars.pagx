@@ -16,7 +16,7 @@
     <Rectangle size="220,50"/>
     <Stroke/>
     <TextBox width="220" height="50">
-      <Text fontFamily="NotoSansSC" fontSize="20" text="你好&#9;World&#9;测试"/>
+      <Text text="你好&#9;World&#9;测试" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill/>
     </TextBox>
   </Layer>

@@ -3,9 +3,9 @@
 <pagx width="400" height="400">
   <!-- Parent layer with nested child -->
   <Layer name="Parent" left="50" top="50">
-    <Rectangle left="20" top="20" roundness="32" size="260,260"/>
+    <Rectangle left="20" top="20" size="260,260" roundness="32"/>
     <Fill>
-      <LinearGradient endPoint="260,260" startPoint="0,0">
+      <LinearGradient startPoint="0,0" endPoint="260,260">
         <ColorStop color="#F43F5E" offset="0"/>
         <ColorStop color="#EC4899" offset="1"/>
       </LinearGradient>
@@ -13,8 +13,8 @@
     <Layer name="Child">
       <Ellipse left="90" top="90" size="120,120"/>
       <Fill color="#FFF"/>
-      <DropShadowStyle blurX="16" blurY="16" color="#00000030" offsetY="4"/>
+      <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#00000030"/>
     </Layer>
-    <DropShadowStyle blurX="40" blurY="40" color="#F43F5E60" offsetY="16"/>
+    <DropShadowStyle offsetY="16" blurX="40" blurY="40" color="#F43F5E60"/>
   </Layer>
 </pagx>

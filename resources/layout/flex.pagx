@@ -14,7 +14,7 @@
       <Layer width="370" height="150">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Fill color="#E6E6E6"/>
-        <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="10" padding="10">
           <Layer flex="1" height="130">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
@@ -35,7 +35,7 @@
       <Layer width="370" height="150" layout="horizontal" gap="0" alignment="center" arrangement="spaceBetween">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Fill color="#E6E6E6"/>
-        <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer width="60" height="60">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
           <Fill color="#3366E6"/>
@@ -61,7 +61,7 @@
       <Layer width="370" height="150">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Fill color="#E6E6E6"/>
-        <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="10" padding="10">
           <!-- Fixed 80px -->
           <Layer width="80" height="130">
@@ -90,7 +90,7 @@
       <Layer width="370" height="150">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Fill color="#E6E6E6"/>
-        <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="10" padding="10">
           <Layer width="60" height="130">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>

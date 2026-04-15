@@ -3,7 +3,7 @@
   <Layer name="background" left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill>
-      <LinearGradient endPoint="800,520" startPoint="0,0">
+      <LinearGradient startPoint="0,0" endPoint="800,520">
         <ColorStop color="#0F172A" offset="0"/>
         <ColorStop color="#1E293B" offset="1"/>
       </LinearGradient>
@@ -20,21 +20,21 @@
     <BlurFilter blurX="40" blurY="40"/>
   </Layer>
   <Layer name="Title" width="800">
-    <Text centerX="0" fontFamily="Arial" fontSize="56" fontStyle="Bold" text="PAGX"/>
+    <Text centerX="0" text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="56"/>
     <Fill color="@titleGradient"/>
   </Layer>
   <Layer name="Subtitle">
-    <Text fontFamily="Arial" fontSize="14" text="Portable Animated Graphics XML"/>
-    <TextPath forceAlignment="true" path="M 220,135 Q 400,65 580,135"/>
+    <Text text="Portable Animated Graphics XML" fontFamily="Arial" fontSize="14"/>
+    <TextPath path="M 220,135 Q 400,65 580,135" forceAlignment="true"/>
     <Fill color="#64748B"/>
   </Layer>
   <Layer name="Cards" left="110" top="155" width="580" height="80" layout="horizontal" gap="20">
     <Layer name="Card1" width="100">
       <Layer composition="@cardBg"/>
       <Layer left="50" top="40">
-        <Rectangle left="-25" top="-17.5" roundness="8" size="50,35"/>
+        <Rectangle left="-25" top="-17.5" size="50,35" roundness="8"/>
         <Fill color="@coral"/>
-        <DropShadowStyle blurX="12" blurY="12" color="#F43F5E80" offsetY="4"/>
+        <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#F43F5E80"/>
       </Layer>
     </Layer>
     <Layer name="Card2" width="100">
@@ -42,23 +42,23 @@
       <Layer left="50" top="40">
         <Ellipse left="-25" top="-17.5" size="50,35"/>
         <Fill color="@purple"/>
-        <InnerShadowStyle blurX="6" blurY="6" color="#00000080" offsetX="2" offsetY="2"/>
+        <InnerShadowStyle offsetX="2" offsetY="2" blurX="6" blurY="6" color="#00000080"/>
       </Layer>
     </Layer>
     <Layer name="Card3" width="100">
       <Layer composition="@cardBg"/>
       <Layer left="50" top="40">
-        <Polystar left="-24" top="-24" innerRadius="11" outerRadius="24" pointCount="5" type="star"/>
+        <Polystar left="-24" top="-24" type="star" pointCount="5" outerRadius="24" innerRadius="11"/>
         <Fill color="@amber"/>
-        <DropShadowStyle blurX="12" blurY="12" color="#F59E0B80" offsetY="4"/>
+        <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#F59E0B80"/>
       </Layer>
     </Layer>
     <Layer name="Card4" width="100">
       <Layer composition="@cardBg"/>
       <Layer left="50" top="40">
-        <Polystar left="-26" top="-26" outerRadius="26" pointCount="6" type="polygon"/>
+        <Polystar left="-26" top="-26" type="polygon" pointCount="6" outerRadius="26"/>
         <Fill color="@diamond"/>
-        <DropShadowStyle blurX="12" blurY="12" color="#14B8A680" offsetY="4"/>
+        <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#14B8A680"/>
       </Layer>
     </Layer>
     <Layer name="Card5" width="100">
@@ -66,23 +66,23 @@
       <Layer left="50" top="40">
         <Path data="M-20 -15L0 -25L20 -15L20 15L0 25L-20 15Z"/>
         <Fill color="@orange"/>
-        <DropShadowStyle blurX="12" blurY="12" color="#F9731680" offsetY="4"/>
+        <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#F9731680"/>
       </Layer>
     </Layer>
   </Layer>
   <Layer name="GetStartedButton" left="88" top="307">
-    <Rectangle roundness="18" size="120,36"/>
+    <Rectangle size="120,36" roundness="18"/>
     <Fill color="@buttonGradient"/>
-    <DropShadowStyle blurX="12" blurY="12" color="#6366F180" offsetY="4"/>
+    <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#6366F180"/>
     <Group centerX="0" centerY="0">
-      <Text fontFamily="Arial" fontSize="13" fontStyle="Bold" text="Get Started"/>
+      <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
       <Fill color="#FFF"/>
     </Group>
   </Layer>
   <Layer name="Modifiers" top="325">
     <Path left="258" top="-20" data="@wavePath"/>
     <TrimPath end="0.75"/>
-    <Stroke cap="round" color="@cyan" width="3"/>
+    <Stroke color="@cyan" width="3" cap="round"/>
     <Group left="368">
       <Rectangle left="-30" top="-20" size="60,40"/>
       <RoundCorner radius="10"/>
@@ -113,14 +113,14 @@
     <Fill color="@rainbow"/>
   </Layer>
   <Layer left="130" top="430">
-    <Rectangle left="-40" top="-30" roundness="10" size="80,60"/>
+    <Rectangle left="-40" top="-30" size="80,60" roundness="10"/>
     <Fill color="@emerald"/>
     <BlurFilter blurX="3" blurY="3"/>
   </Layer>
   <Layer left="260" top="430">
-    <Rectangle left="-40" top="-30" roundness="10" size="80,60"/>
+    <Rectangle left="-40" top="-30" size="80,60" roundness="10"/>
     <Fill color="@cyan"/>
-    <DropShadowFilter blurX="12" blurY="12" color="#00000080" offsetX="4" offsetY="4"/>
+    <DropShadowFilter offsetX="4" offsetY="4" blurX="12" blurY="12" color="#00000080"/>
   </Layer>
   <Layer left="390" top="430">
     <Ellipse left="-27.5" top="-27.5" size="55,55"/>
@@ -128,21 +128,21 @@
     <ColorMatrixFilter matrix="0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0,0,0,1,0"/>
   </Layer>
   <Layer left="520" top="430">
-    <Rectangle left="-40" top="-30" roundness="10" size="80,60"/>
+    <Rectangle left="-40" top="-30" size="80,60" roundness="10"/>
     <Fill color="@coral"/>
-    <BlendFilter blendMode="overlay" color="#6366F160"/>
+    <BlendFilter color="#6366F160" blendMode="overlay"/>
   </Layer>
   <Layer left="670" top="430">
-    <Rectangle left="-45" top="-30" roundness="8" size="90,60"/>
+    <Rectangle left="-45" top="-30" size="90,60" roundness="8"/>
     <Fill>
       <ImagePattern image="pag_logo.png" matrix="0.23,0,0,0.23,-30,-30" tileModeX="clamp" tileModeY="clamp"/>
     </Fill>
     <Stroke color="#FFFFFF20" width="1"/>
-    <DropShadowStyle blurX="16" blurY="16" color="#00000060" offsetY="6"/>
+    <DropShadowStyle offsetY="6" blurX="16" blurY="16" color="#00000060"/>
   </Layer>
   <Layer left="400" top="500">
     <Text fontFamily="Arial" fontSize="18">
-      <GlyphRun bounds="0,0,80,18" font="@iconFont" glyphs="1,2,3" xOffsets="0,28,56" y="0"/>
+      <GlyphRun font="@iconFont" glyphs="1,2,3" y="0" xOffsets="0,28,56" bounds="0,0,80,18"/>
     </Text>
     <Fill color="#64748B"/>
   </Layer>
@@ -161,12 +161,12 @@
       <ColorStop color="#06B6D450" offset="0"/>
       <ColorStop color="#06B6D400" offset="1"/>
     </RadialGradient>
-    <LinearGradient id="titleGradient" endPoint="-200,0" startPoint="-400,0">
+    <LinearGradient id="titleGradient" startPoint="-400,0" endPoint="-200,0">
       <ColorStop color="#FFF" offset="0"/>
       <ColorStop color="#8B5CF6" offset="0.5"/>
       <ColorStop color="#06B6D4" offset="1"/>
     </LinearGradient>
-    <LinearGradient id="buttonGradient" endPoint="120,0" startPoint="0,0">
+    <LinearGradient id="buttonGradient" startPoint="0,0" endPoint="120,0">
       <ColorStop color="#6366F1" offset="0"/>
       <ColorStop color="#8B5CF6" offset="1"/>
     </LinearGradient>

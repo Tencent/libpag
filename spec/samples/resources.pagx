@@ -2,9 +2,9 @@
 <!-- Demonstrates resource definitions and references -->
 <pagx width="400" height="400">
   <Layer>
-    <Rectangle left="40" top="40" roundness="32" size="320,320"/>
+    <Rectangle left="40" top="40" size="320,320" roundness="32"/>
     <Fill color="@oceanGradient"/>
-    <DropShadowStyle blurX="40" blurY="40" color="#06B6D450" offsetY="12"/>
+    <DropShadowStyle offsetY="12" blurX="40" blurY="40" color="#06B6D450"/>
   </Layer>
   <!-- Shape using solid color resource reference -->
   <Layer>
@@ -13,7 +13,7 @@
   </Layer>
   <Resources>
     <SolidColor id="coral" color="#F43F5E"/>
-    <LinearGradient id="oceanGradient" endPoint="320,320" startPoint="0,0">
+    <LinearGradient id="oceanGradient" startPoint="0,0" endPoint="320,320">
       <ColorStop color="#06B6D4" offset="0"/>
       <ColorStop color="#3B82F6" offset="1"/>
     </LinearGradient>

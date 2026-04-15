@@ -7,7 +7,7 @@
     <!-- Text layer: TextBox uses left+right constraints, no explicit width -->
     <Layer>
       <TextBox left="0" right="0">
-        <Text fontFamily="Noto Sans SC" fontSize="16" text="AAAA BBBB CCCC DDDD EEEE FFFF"/>
+        <Text text="AAAA BBBB CCCC DDDD EEEE FFFF" fontFamily="Noto Sans SC" fontSize="16"/>
         <Fill color="#000000"/>
       </TextBox>
     </Layer>

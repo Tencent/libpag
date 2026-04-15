@@ -12,9 +12,9 @@
       <Group>
         <Ellipse size="100,100"/>
         <Ellipse left="160" size="100,100"/>
-        <TrimPath end="0.9" start="0.2"/>
-        <Stroke cap="round" width="10">
-          <LinearGradient endPoint="260,100" startPoint="0,0">
+        <TrimPath start="0.2" end="0.9"/>
+        <Stroke width="10" cap="round">
+          <LinearGradient startPoint="0,0" endPoint="260,100">
             <ColorStop color="#06B6D4" offset="0"/>
             <ColorStop color="#8B5CF6" offset="1"/>
           </LinearGradient>
@@ -24,7 +24,7 @@
 
     <!-- Row 2: Separate mode label -->
     <Layer>
-      <Text fontFamily="Arial" fontSize="18" fontStyle="Bold" text="Separate (0.2–0.9)"/>
+      <Text text="Separate (0.2–0.9)" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
       <Fill color="#475569"/>
     </Layer>
 
@@ -38,9 +38,9 @@
       <Group>
         <Ellipse size="100,100"/>
         <Ellipse left="160" size="100,100"/>
-        <TrimPath end="0.9" start="0.2" type="continuous"/>
-        <Stroke cap="round" width="10">
-          <LinearGradient endPoint="260,100" startPoint="0,0">
+        <TrimPath start="0.2" end="0.9" type="continuous"/>
+        <Stroke width="10" cap="round">
+          <LinearGradient startPoint="0,0" endPoint="260,100">
             <ColorStop color="#F59E0B" offset="0"/>
             <ColorStop color="#F43F5E" offset="1"/>
           </LinearGradient>
@@ -50,7 +50,7 @@
 
     <!-- Row 4: Continuous mode label -->
     <Layer>
-      <Text fontFamily="Arial" fontSize="18" fontStyle="Bold" text="Continuous (0.2–0.9)"/>
+      <Text text="Continuous (0.2–0.9)" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
       <Fill color="#475569"/>
     </Layer>
   </Layer>

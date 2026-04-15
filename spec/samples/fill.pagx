@@ -6,20 +6,20 @@
     <Layer flex="1" layout="horizontal">
       <!-- Solid color fill -->
       <Layer flex="1">
-        <Rectangle centerX="0" centerY="0" roundness="24" size="140,140"/>
+        <Rectangle centerX="0" centerY="0" size="140,140" roundness="24"/>
         <Fill color="#F43F5E"/>
-        <DropShadowStyle blurX="24" blurY="24" color="#F43F5E50" offsetY="8"/>
+        <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F43F5E50"/>
       </Layer>
       <!-- Linear gradient fill -->
       <Layer flex="1">
-        <Rectangle centerX="0" centerY="0" roundness="24" size="140,140"/>
+        <Rectangle centerX="0" centerY="0" size="140,140" roundness="24"/>
         <Fill>
-          <LinearGradient endPoint="140,140" startPoint="0,0">
+          <LinearGradient startPoint="0,0" endPoint="140,140">
             <ColorStop color="#6366F1" offset="0"/>
             <ColorStop color="#8B5CF6" offset="1"/>
           </LinearGradient>
         </Fill>
-        <DropShadowStyle blurX="24" blurY="24" color="#8B5CF650" offsetY="8"/>
+        <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#8B5CF650"/>
       </Layer>
     </Layer>
     <Layer flex="1">
@@ -31,7 +31,7 @@
           <ColorStop color="#0891B2" offset="1"/>
         </RadialGradient>
       </Fill>
-      <DropShadowStyle blurX="24" blurY="24" color="#06B6D450" offsetY="8"/>
+      <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#06B6D450"/>
     </Layer>
   </Layer>
 </pagx>

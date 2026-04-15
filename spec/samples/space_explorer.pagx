@@ -3,7 +3,7 @@
   <Layer id="sky" left="600" top="400">
     <Rectangle left="-600" top="-400" size="1200,800"/>
     <Fill>
-      <LinearGradient endPoint="0,400" startPoint="0,-400">
+      <LinearGradient startPoint="0,-400" endPoint="0,400">
         <ColorStop color="#020810" offset="0"/>
         <ColorStop color="#06122E" offset="0.15"/>
         <ColorStop color="#0E1450" offset="0.35"/>
@@ -257,7 +257,7 @@
   <Layer id="mountains" alpha="0.55">
     <Path data="M0 560L50 515L100 535L180 475L230 498L300 452L360 485L420 442L480 465L540 422L580 450L650 412L700 438L760 408L820 432L880 402L940 428L1000 392L1050 418L1100 398L1150 422L1200 405L1200 560Z"/>
     <Fill>
-      <LinearGradient endPoint="600,85" startPoint="600,-85">
+      <LinearGradient startPoint="600,-85" endPoint="600,85">
         <ColorStop color="#1A0F3A" offset="0"/>
         <ColorStop color="#150C30" offset="0.5"/>
         <ColorStop color="#100825" offset="1"/>
@@ -271,7 +271,7 @@
   <Layer id="terrain">
     <Path data="M0 800L0 605C60 595 120 580 200 575C300 568 380 585 440 570C500 550 540 560 600 545C660 530 720 545 780 538C840 530 900 550 960 540C1020 530 1080 545 1140 538L1200 535L1200 800Z"/>
     <Fill>
-      <LinearGradient endPoint="600,135" startPoint="600,-135">
+      <LinearGradient startPoint="600,-135" endPoint="600,135">
         <ColorStop color="#2D1854" offset="0"/>
         <ColorStop color="#1F1240" offset="0.3"/>
         <ColorStop color="#150D30" offset="0.7"/>
@@ -333,7 +333,7 @@
   <Layer id="crystal1" left="140" top="563">
     <Path data="M-8 25L-15 0L-5 -50L5 -60L12 -10L8 25Z"/>
     <Fill>
-      <LinearGradient endPoint="10,0" startPoint="-10,0">
+      <LinearGradient startPoint="-10,0" endPoint="10,0">
         <ColorStop color="#4C1D95" offset="0"/>
         <ColorStop color="#6D28D9" offset="0.5"/>
         <ColorStop color="#4C1D95" offset="1"/>
@@ -345,7 +345,7 @@
     </Group>
     <Group>
       <Path data="M-2 -55L0 -65L2 -55"/>
-      <Stroke cap="round" color="#A78BFA" width="2"/>
+      <Stroke color="#A78BFA" width="2" cap="round"/>
     </Group>
     <Group>
       <Ellipse left="-8" top="-70" size="16,16"/>
@@ -360,7 +360,7 @@
   <Layer id="crystal2" left="1060" top="516">
     <Path data="M-12 22L-18 -10L-8 -55L0 -65L8 -50L15 -5L10 22Z"/>
     <Fill>
-      <LinearGradient endPoint="12,0" startPoint="-12,0">
+      <LinearGradient startPoint="-12,0" endPoint="12,0">
         <ColorStop color="#7E22CE" offset="0"/>
         <ColorStop color="#A855F7" offset="0.5"/>
         <ColorStop color="#7E22CE" offset="1"/>
@@ -369,7 +369,7 @@
     <Group>
       <Path data="M18 22L22 -5L28 -35L32 -42L36 -22L34 22Z"/>
       <Fill>
-        <LinearGradient endPoint="36,0" startPoint="22,0">
+        <LinearGradient startPoint="22,0" endPoint="36,0">
           <ColorStop color="#6D28D9" offset="0"/>
           <ColorStop color="#8B5CF6" offset="0.5"/>
           <ColorStop color="#6D28D9" offset="1"/>
@@ -379,7 +379,7 @@
     <Group>
       <Path data="M-22 22L-28 5L-24 -18L-20 -24L-16 -12L-18 22Z"/>
       <Fill>
-        <LinearGradient endPoint="-16,0" startPoint="-28,0">
+        <LinearGradient startPoint="-28,0" endPoint="-16,0">
           <ColorStop color="#5B21B6" offset="0"/>
           <ColorStop color="#7C3AED" offset="0.5"/>
           <ColorStop color="#5B21B6" offset="1"/>
@@ -427,7 +427,7 @@
   </Layer>
   <Layer left="260" top="568">
     <Path data="M0 10C-2 -5 2 -20 -3 -38C-5 -45 -2 -52 0 -58"/>
-    <Stroke cap="round" color="#10B981" width="3"/>
+    <Stroke color="#10B981" width="3" cap="round"/>
     <Group>
       <Path data="M-3 -25C-22 -38 -28 -22 -14 -19"/>
       <Path data="M2 -38C20 -50 25 -34 12 -31"/>
@@ -460,7 +460,7 @@
   </Layer>
   <Layer id="vine" left="910" top="542">
     <Path data="M0 10C3 -8 -1 -25 2 -42C4 -50 1 -58 0 -65"/>
-    <Stroke cap="round" color="#14B8A6" width="2.5"/>
+    <Stroke color="#14B8A6" width="2.5" cap="round"/>
     <Group>
       <Path data="M-1 -20C-18 -30 -22 -16 -10 -14M2 -40C17 -50 20 -36 10 -34M-2 -52C-14 -58 -16 -48 -8 -46"/>
       <Fill color="#0D9488"/>
@@ -488,10 +488,10 @@
   </Layer>
   <Layer id="plant2" left="1130" top="538">
     <Path data="M0 8C-1 -5 1 -20 -2 -32"/>
-    <Stroke cap="round" color="#10B981" width="2"/>
+    <Stroke color="#10B981" width="2" cap="round"/>
     <Group>
       <Path data="M14 8C16 -3 13 -18 15 -26"/>
-      <Stroke cap="round" color="#14B8A6" width="2"/>
+      <Stroke color="#14B8A6" width="2" cap="round"/>
     </Group>
     <Group>
       <Ellipse left="-3.5" top="-39" size="7,8"/>
@@ -513,7 +513,7 @@
   </Layer>
   <Layer id="plant1" left="455" top="565">
     <Path data="M0 6C1 -4 -1 -14 0 -22"/>
-    <Stroke cap="round" color="#10B981" width="2"/>
+    <Stroke color="#10B981" width="2" cap="round"/>
     <Group>
       <Path data="M-1 -12C-10 -18 -12 -10 -6 -9"/>
       <Fill color="#059669"/>
@@ -553,7 +553,7 @@
     </Group>
     <Group>
       <Path data="M-3 -7C-6 -15 -8 -18 -10 -22M3 -7C6 -15 8 -18 10 -22"/>
-      <Stroke cap="round" color="#A78BFA" width="1.5"/>
+      <Stroke color="#A78BFA" width="1.5" cap="round"/>
     </Group>
     <Group>
       <Ellipse left="-12.5" top="-24.5" size="5,5"/>
@@ -562,7 +562,7 @@
     </Group>
     <Group>
       <Path data="M-6 5L-8 12M6 5L8 12M-2 6L-3 13M2 6L3 13"/>
-      <Stroke cap="round" color="#7C3AED" width="2"/>
+      <Stroke color="#7C3AED" width="2" cap="round"/>
     </Group>
   </Layer>
   <Layer id="alien2" left="330" top="573">
@@ -586,7 +586,7 @@
     </Group>
     <Group>
       <Path data="M-2 -5C-4 -12 -3 -15 -5 -18M2 -5C4 -12 3 -15 5 -18"/>
-      <Stroke cap="round" color="#22D3EE" width="1.5"/>
+      <Stroke color="#22D3EE" width="1.5" cap="round"/>
     </Group>
     <Group>
       <Ellipse left="-6.5" top="-19.5" size="3,3"/>
@@ -597,7 +597,7 @@
   <Layer id="ship" left="280" top="310">
     <Path data="M-15 30C-28 58 -12 95 0 120C12 95 28 58 15 30"/>
     <Fill>
-      <LinearGradient endPoint="0,120" startPoint="0,30">
+      <LinearGradient startPoint="0,30" endPoint="0,120">
         <ColorStop color="#38BDF890" offset="0"/>
         <ColorStop color="#06B6D460" offset="0.3"/>
         <ColorStop color="#0891B230" offset="0.6"/>
@@ -607,7 +607,7 @@
     <Group>
       <Path data="M-38 10C-42 0 -32 -16 -22 -24C-12 -30 12 -30 22 -24C32 -16 42 0 38 10C28 20 -28 20 -38 10Z"/>
       <Fill>
-        <LinearGradient endPoint="0,20" startPoint="0,-28">
+        <LinearGradient startPoint="0,-28" endPoint="0,20">
           <ColorStop color="#94A3B8" offset="0"/>
           <ColorStop color="#CBD5E1" offset="0.3"/>
           <ColorStop color="#E2E8F0" offset="0.6"/>
@@ -622,7 +622,7 @@
     <Group>
       <Path data="M-14 -24C-14 -38 14 -38 14 -24"/>
       <Fill>
-        <LinearGradient endPoint="14,-24" startPoint="-14,-38">
+        <LinearGradient startPoint="-14,-38" endPoint="14,-24">
           <ColorStop color="#38BDF8" offset="0"/>
           <ColorStop color="#7DD3FC" offset="0.5"/>
           <ColorStop color="#38BDF8" offset="1"/>
@@ -631,7 +631,7 @@
     </Group>
     <Group>
       <Path data="M-7 -33C-7 -36 2 -37 4 -35"/>
-      <Stroke cap="round" color="#FFFFFF80" width="1.5"/>
+      <Stroke color="#FFFFFF80" width="1.5" cap="round"/>
     </Group>
     <Group>
       <Path data="M-32 10C-22 16 22 16 32 10"/>
@@ -652,7 +652,7 @@
         </RadialGradient>
       </Fill>
     </Group>
-    <DropShadowStyle blurX="18" blurY="18" color="#38BDF850" offsetY="5"/>
+    <DropShadowStyle offsetY="5" blurX="18" blurY="18" color="#38BDF850"/>
   </Layer>
   <Layer left="499" top="344">
     <Path data="M-9 7L-11 -3L-4 -9L6 -7L11 1L8 9Z"/>
@@ -677,7 +677,7 @@
     <Fill color="#301A58"/>
   </Layer>
   <Layer id="station" left="1130" top="395" alpha="0.65">
-    <Rectangle left="-6" top="-4" roundness="2" size="12,8"/>
+    <Rectangle left="-6" top="-4" size="12,8" roundness="2"/>
     <Fill color="#94A3B8"/>
     <Group>
       <Rectangle left="-20" top="-2" size="12,4"/>
@@ -704,9 +704,9 @@
     </Fill>
   </Layer>
   <Layer id="astronaut" left="600" top="433">
-    <Rectangle left="10" top="-19" roundness="6" size="30,54"/>
+    <Rectangle left="10" top="-19" size="30,54" roundness="6"/>
     <Fill>
-      <LinearGradient endPoint="40,0" startPoint="10,0">
+      <LinearGradient startPoint="10,0" endPoint="40,0">
         <ColorStop color="#94A3B8" offset="0"/>
         <ColorStop color="#CBD5E1" offset="0.5"/>
         <ColorStop color="#94A3B8" offset="1"/>
@@ -723,7 +723,7 @@
     </Group>
     <Group>
       <Path data="M32 -16L34 -38L36 -42"/>
-      <Stroke cap="round" color="#94A3B8" width="2"/>
+      <Stroke color="#94A3B8" width="2" cap="round"/>
     </Group>
     <Group>
       <Ellipse left="33.5" top="-44.5" size="5,5"/>
@@ -741,7 +741,7 @@
     <Group>
       <Path data="M-22 -22C-27 -10 -27 16 -24 32C-22 42 -16 48 0 50C16 48 22 42 24 32C27 16 27 -10 22 -22C12 -27 -12 -27 -22 -22Z"/>
       <Fill>
-        <LinearGradient endPoint="27,0" startPoint="-27,0">
+        <LinearGradient startPoint="-27,0" endPoint="27,0">
           <ColorStop color="#94A3B8" offset="0"/>
           <ColorStop color="#CBD5E1" offset="0.15"/>
           <ColorStop color="#F1F5F9" offset="0.5"/>
@@ -763,7 +763,7 @@
       <Fill color="#3B82F6"/>
     </Group>
     <Group>
-      <Rectangle left="-11" top="-4" roundness="3" size="22,18"/>
+      <Rectangle left="-11" top="-4" size="22,18" roundness="3"/>
       <Fill color="#475569"/>
     </Group>
     <Group>
@@ -783,11 +783,11 @@
       <Fill color="#EF4444"/>
     </Group>
     <Group>
-      <Rectangle left="-7" top="12" roundness="1" size="14,4"/>
+      <Rectangle left="-7" top="12" size="14,4" roundness="1"/>
       <Fill color="#0F172A"/>
     </Group>
     <Group>
-      <Rectangle left="-5" top="13" roundness="1" size="6,2"/>
+      <Rectangle left="-5" top="13" size="6,2" roundness="1"/>
       <Fill color="#22D3EE60"/>
     </Group>
     <Group>
@@ -795,22 +795,22 @@
       <Stroke color="#64748B" width="4"/>
     </Group>
     <Group>
-      <Rectangle left="-5" top="30" roundness="2" size="10,8"/>
+      <Rectangle left="-5" top="30" size="10,8" roundness="2"/>
       <Fill color="#94A3B8"/>
     </Group>
     <Group>
-      <Rectangle left="-18" top="33" roundness="2" size="8,6"/>
-      <Rectangle left="10" top="33" roundness="2" size="8,6"/>
+      <Rectangle left="-18" top="33" size="8,6" roundness="2"/>
+      <Rectangle left="10" top="33" size="8,6" roundness="2"/>
       <Fill color="#64748B"/>
     </Group>
     <Group>
       <Path data="M-22 -12C-30 -15 -38 -20 -44 -26C-46 -28 -46 -30 -46 -32"/>
-      <Stroke cap="round" color="#CBD5E1" join="round" width="14"/>
+      <Stroke color="#CBD5E1" width="14" cap="round" join="round"/>
     </Group>
     <Group>
       <Ellipse left="-54" top="-54" size="16,18"/>
       <Fill>
-        <LinearGradient endPoint="-38,-45" startPoint="-54,-45">
+        <LinearGradient startPoint="-54,-45" endPoint="-38,-45">
           <ColorStop color="#94A3B8" offset="0"/>
           <ColorStop color="#E2E8F0" offset="0.5"/>
           <ColorStop color="#94A3B8" offset="1"/>
@@ -819,7 +819,7 @@
     </Group>
     <Group>
       <Path data="M-50 -52L-50 -58M-46 -53L-46 -60M-42 -52L-42 -58"/>
-      <Stroke cap="round" color="#CBD5E1" width="3"/>
+      <Stroke color="#CBD5E1" width="3" cap="round"/>
     </Group>
     <Group>
       <Ellipse left="-54" top="-39" size="16,6"/>
@@ -827,12 +827,12 @@
     </Group>
     <Group>
       <Path data="M22 -12C32 -5 40 12 44 28"/>
-      <Stroke cap="round" color="#CBD5E1" join="round" width="14"/>
+      <Stroke color="#CBD5E1" width="14" cap="round" join="round"/>
     </Group>
     <Group>
       <Ellipse left="36" top="21" size="16,18"/>
       <Fill>
-        <LinearGradient endPoint="52,30" startPoint="36,30">
+        <LinearGradient startPoint="36,30" endPoint="52,30">
           <ColorStop color="#94A3B8" offset="0"/>
           <ColorStop color="#E2E8F0" offset="0.5"/>
           <ColorStop color="#94A3B8" offset="1"/>
@@ -844,11 +844,11 @@
       <Fill color="#64748B"/>
     </Group>
     <Group>
-      <Rectangle left="40" top="7" roundness="2" size="8,22"/>
+      <Rectangle left="40" top="7" size="8,22" roundness="2"/>
       <Fill color="#475569"/>
     </Group>
     <Group>
-      <Rectangle left="41" top="6" roundness="1" size="6,6"/>
+      <Rectangle left="41" top="6" size="6,6" roundness="1"/>
       <Fill color="#0F172A"/>
     </Group>
     <Group>
@@ -866,7 +866,7 @@
     </Group>
     <Group>
       <Path data="M-12 48C-14 64 -16 78 -18 94M12 48C14 64 16 78 18 94"/>
-      <Stroke cap="round" color="#CBD5E1" width="14"/>
+      <Stroke color="#CBD5E1" width="14" cap="round"/>
     </Group>
     <Group>
       <Ellipse left="-20" top="66" size="10,8"/>
@@ -876,7 +876,7 @@
     <Group>
       <Path data="M-24 92C-26 99 -26 106 -22 109C-18 112 -8 112 -6 109C-4 104 -10 96 -14 92"/>
       <Fill>
-        <LinearGradient endPoint="-6,109" startPoint="-26,92">
+        <LinearGradient startPoint="-26,92" endPoint="-6,109">
           <ColorStop color="#64748B" offset="0"/>
           <ColorStop color="#94A3B8" offset="0.5"/>
           <ColorStop color="#64748B" offset="1"/>
@@ -886,7 +886,7 @@
     <Group>
       <Path data="M14 92C12 99 12 106 16 109C20 112 28 112 30 109C32 104 24 96 18 92"/>
       <Fill>
-        <LinearGradient endPoint="30,109" startPoint="12,92">
+        <LinearGradient startPoint="12,92" endPoint="30,109">
           <ColorStop color="#64748B" offset="0"/>
           <ColorStop color="#94A3B8" offset="0.5"/>
           <ColorStop color="#64748B" offset="1"/>
@@ -899,12 +899,12 @@
     </Group>
     <Group>
       <Path data="M-21 110L-19 110M-16 110L-14 110M-11 110L-9 110M17 110L19 110M21 110L23 110M25 110L27 110"/>
-      <Stroke cap="round" color="#475569" width="1.5"/>
+      <Stroke color="#475569" width="1.5" cap="round"/>
     </Group>
     <Group>
       <Ellipse left="-27" top="-71" size="54,54"/>
       <Fill>
-        <LinearGradient endPoint="27,-17" startPoint="-27,-71">
+        <LinearGradient startPoint="-27,-71" endPoint="27,-17">
           <ColorStop color="#E2E8F0" offset="0"/>
           <ColorStop color="#F8FAFC" offset="0.3"/>
           <ColorStop color="#E2E8F0" offset="0.7"/>
@@ -915,7 +915,7 @@
     <Group>
       <Ellipse left="-21" top="-63" size="42,38"/>
       <Fill>
-        <LinearGradient endPoint="21,-25" startPoint="-21,-63">
+        <LinearGradient startPoint="-21,-63" endPoint="21,-25">
           <ColorStop color="#1E293B" offset="0"/>
           <ColorStop color="#334155" offset="0.25"/>
           <ColorStop color="#1E3A5F" offset="0.5"/>
@@ -926,15 +926,15 @@
     </Group>
     <Group>
       <Path data="M-15 -58C-8 -61 5 -60 12 -57"/>
-      <Stroke cap="round" color="#FFFFFF50" width="2"/>
+      <Stroke color="#FFFFFF50" width="2" cap="round"/>
     </Group>
     <Group>
       <Path data="M-11 -55C-4 -57 6 -56 11 -54"/>
-      <Stroke cap="round" color="#FFFFFF30" width="1.5"/>
+      <Stroke color="#FFFFFF30" width="1.5" cap="round"/>
     </Group>
     <Group>
       <Path data="M11 -48C15 -42 16 -37 14 -32"/>
-      <Stroke cap="round" color="#F9731630" width="3"/>
+      <Stroke color="#F9731630" width="3" cap="round"/>
     </Group>
     <Group>
       <Ellipse left="-9" top="-41" size="2,2"/>
@@ -949,7 +949,7 @@
       <Stroke color="#94A3B8" width="2"/>
     </Group>
     <Group>
-      <Rectangle left="-4" top="-72.5" roundness="2" size="8,5"/>
+      <Rectangle left="-4" top="-72.5" size="8,5" roundness="2"/>
       <Fill color="#475569"/>
     </Group>
     <Group>
@@ -963,16 +963,16 @@
     </Group>
     <Group>
       <Path data="M-19 -21C-24 -16 -26 0 -24 10M19 -21C24 -16 26 0 24 10"/>
-      <Stroke cap="round" color="#94A3B8" width="3"/>
+      <Stroke color="#94A3B8" width="3" cap="round"/>
     </Group>
     <Group>
       <Path data="M38 -16L38 -44"/>
-      <Stroke cap="round" color="#94A3B8" width="2"/>
+      <Stroke color="#94A3B8" width="2" cap="round"/>
     </Group>
     <Group>
       <Path data="M38 -44L54 -42L54 -32L38 -34Z"/>
       <Fill>
-        <LinearGradient endPoint="54,-32" startPoint="38,-44">
+        <LinearGradient startPoint="38,-44" endPoint="54,-32">
           <ColorStop color="#1E293B" offset="0"/>
           <ColorStop color="#0F172A" offset="0.5"/>
           <ColorStop color="#1E293B" offset="1"/>
@@ -989,7 +989,7 @@
     </Group>
   </Layer>
   <Layer id="hologram" left="505" top="385" alpha="0.75">
-    <Rectangle left="-30" top="-22.5" roundness="3" size="60,45"/>
+    <Rectangle left="-30" top="-22.5" size="60,45" roundness="3"/>
     <Stroke color="#22D3EE55" width="1.5"/>
     <Group>
       <Path data="M-30 -10L30 -10M-30 5L30 5"/>
@@ -1000,15 +1000,15 @@
       <Stroke color="#22D3EE20"/>
     </Group>
     <Group>
-      <Rectangle left="-22" top="-18" roundness="1" size="8,4"/>
+      <Rectangle left="-22" top="-18" size="8,4" roundness="1"/>
       <Fill color="#22D3EE40"/>
     </Group>
     <Group>
-      <Rectangle left="-12" top="-18" roundness="1" size="12,4"/>
+      <Rectangle left="-12" top="-18" size="12,4" roundness="1"/>
       <Fill color="#34D39940"/>
     </Group>
     <Group>
-      <Rectangle left="5" top="-18" roundness="1" size="6,4"/>
+      <Rectangle left="5" top="-18" size="6,4" roundness="1"/>
       <Fill color="#FBBF2440"/>
     </Group>
     <Group>
@@ -1020,15 +1020,15 @@
       <Stroke color="#22D3EE30"/>
     </Group>
     <Group>
-      <Rectangle left="-16" top="13" roundness="1" size="16,2"/>
+      <Rectangle left="-16" top="13" size="16,2" roundness="1"/>
       <Fill color="#22D3EE30"/>
     </Group>
     <Group>
-      <Rectangle left="3" top="13" roundness="1" size="10,2"/>
+      <Rectangle left="3" top="13" size="10,2" roundness="1"/>
       <Fill color="#22D3EE25"/>
     </Group>
     <Group>
-      <Rectangle left="-14" top="17" roundness="1" size="20,2"/>
+      <Rectangle left="-14" top="17" size="20,2" roundness="1"/>
       <Fill color="#22D3EE20"/>
     </Group>
     <Group>
@@ -1044,7 +1044,7 @@
   <Layer id="scanner" left="644" top="442" alpha="0.45">
     <Path data="M0 0L40 100L-15 108Z"/>
     <Fill>
-      <LinearGradient endPoint="12,108" startPoint="0,0">
+      <LinearGradient startPoint="0,0" endPoint="12,108">
         <ColorStop color="#22D3EE70" offset="0"/>
         <ColorStop color="#22D3EE40" offset="0.3"/>
         <ColorStop color="#22D3EE18" offset="0.6"/>
@@ -1065,7 +1065,7 @@
     </Group>
   </Layer>
   <Layer id="beacon" left="780" top="510">
-    <Rectangle left="-2" top="-5" roundness="1" size="4,30"/>
+    <Rectangle left="-2" top="-5" size="4,30" roundness="1"/>
     <Fill color="#64748B"/>
     <Group>
       <Ellipse left="-7" top="22.5" size="14,5"/>
@@ -1155,7 +1155,7 @@
   <Layer>
     <Path data="M0 800L0 710C50 700 120 690 200 695C300 702 400 685 500 690C600 695 700 682 800 688C900 694 1000 680 1100 685L1200 682L1200 800Z"/>
     <Fill>
-      <LinearGradient endPoint="600,58" startPoint="600,-58">
+      <LinearGradient startPoint="600,-58" endPoint="600,58">
         <ColorStop color="#120B28" offset="0"/>
         <ColorStop color="#0D0820" offset="0.5"/>
         <ColorStop color="#080515" offset="1"/>
@@ -1176,7 +1176,7 @@
     <Group>
       <Path data="M1168 745L1160 715L1175 700L1188 720L1184 748Z"/>
       <Fill>
-        <LinearGradient endPoint="1188,722" startPoint="1160,722">
+        <LinearGradient startPoint="1160,722" endPoint="1188,722">
           <ColorStop color="#5B21B6" offset="0"/>
           <ColorStop color="#7C3AED" offset="0.5"/>
           <ColorStop color="#5B21B6" offset="1"/>
@@ -1186,7 +1186,7 @@
   </Layer>
   <Layer left="40" top="710">
     <Path data="M0 0C-1 -30 2 -65 -2 -95"/>
-    <Stroke cap="round" color="#7C3AED" width="6"/>
+    <Stroke color="#7C3AED" width="6" cap="round"/>
     <Group>
       <Ellipse left="-22" top="-113" size="40,30"/>
       <Fill>
@@ -1213,11 +1213,11 @@
     </Group>
     <Group>
       <Path data="M-2 -83C-14 -74 -22 -58 -18 -42"/>
-      <Stroke cap="round" color="#A78BFA55" width="3"/>
+      <Stroke color="#A78BFA55" width="3" cap="round"/>
     </Group>
     <Group>
       <Path data="M-2 -83C10 -74 18 -58 14 -42"/>
-      <Stroke cap="round" color="#A78BFA40" width="3"/>
+      <Stroke color="#A78BFA40" width="3" cap="round"/>
     </Group>
     <Group>
       <Ellipse left="-23" top="-43" size="10,10"/>
@@ -1230,7 +1230,7 @@
   </Layer>
   <Layer left="80" top="720">
     <Path data="M0 0C1 -18 -1 -38 0 -52"/>
-    <Stroke cap="round" color="#6D28D9" width="4"/>
+    <Stroke color="#6D28D9" width="4" cap="round"/>
     <Group>
       <Ellipse left="-14" top="-66" size="28,22"/>
       <Fill>
@@ -1257,7 +1257,7 @@
   </Layer>
   <Layer left="180" top="725">
     <Path data="M0 0C-3 -20 2 -45 -2 -70"/>
-    <Stroke cap="round" color="#059669" width="5"/>
+    <Stroke color="#059669" width="5" cap="round"/>
     <Group>
       <Path data="M-2 -35C-16 -44 -24 -36 -18 -26"/>
       <Fill color="#10B981"/>
@@ -1286,7 +1286,7 @@
   </Layer>
   <Layer left="1080" top="695" alpha="0.9">
     <Path data="M0 0C-2 -25 1 -55 -1 -80"/>
-    <Stroke cap="round" color="#6D28D9" width="7"/>
+    <Stroke color="#6D28D9" width="7" cap="round"/>
     <Group>
       <Ellipse left="-23" top="-101" size="44,34"/>
       <Fill>
@@ -1313,11 +1313,11 @@
     </Group>
     <Group>
       <Path data="M-1 -67C-12 -55 -18 -40 -14 -28"/>
-      <Stroke cap="round" color="#D946EF40" width="2.5"/>
+      <Stroke color="#D946EF40" width="2.5" cap="round"/>
     </Group>
     <Group>
       <Path data="M-1 -67C10 -55 16 -40 12 -28"/>
-      <Stroke cap="round" color="#D946EF30" width="2.5"/>
+      <Stroke color="#D946EF30" width="2.5" cap="round"/>
     </Group>
     <Group>
       <Ellipse left="-18" top="-28" size="8,8"/>
@@ -1330,14 +1330,14 @@
   </Layer>
   <Layer left="1160" top="708" alpha="0.9">
     <Path data="M0 0C-2 -18 1 -40 -1 -58"/>
-    <Stroke cap="round" color="#0891B2" width="5"/>
+    <Stroke color="#0891B2" width="5" cap="round"/>
     <Group>
       <Path data="M16 0C18 -14 15 -32 17 -46"/>
-      <Stroke cap="round" color="#06B6D4" width="4"/>
+      <Stroke color="#06B6D4" width="4" cap="round"/>
     </Group>
     <Group>
       <Path data="M-12 0C-14 -12 -11 -28 -13 -40"/>
-      <Stroke cap="round" color="#14B8A6" width="4"/>
+      <Stroke color="#14B8A6" width="4" cap="round"/>
     </Group>
     <Group>
       <Ellipse left="-9" top="-70" size="16,16"/>
@@ -1363,7 +1363,7 @@
   </Layer>
   <Layer left="320" top="715" alpha="0.85">
     <Path data="M0 0C-2 -16 1 -35 -1 -50"/>
-    <Stroke cap="round" color="#7C3AED" width="5"/>
+    <Stroke color="#7C3AED" width="5" cap="round"/>
     <Group>
       <Path data="M-1 -50C-12 -60 -8 -70 0 -65"/>
       <Fill color="#D946EF"/>
@@ -1392,14 +1392,14 @@
   </Layer>
   <Layer left="500" top="710" alpha="0.8">
     <Path data="M0 0C-6 -15 -18 -35 -28 -48C-34 -54 -30 -42 -24 -30"/>
-    <Stroke cap="round" color="#8B5CF6" width="4"/>
+    <Stroke color="#8B5CF6" width="4" cap="round"/>
     <Group>
       <Path data="M0 0C6 -18 16 -40 26 -55C32 -62 28 -48 22 -34"/>
-      <Stroke cap="round" color="#7C3AED" width="4"/>
+      <Stroke color="#7C3AED" width="4" cap="round"/>
     </Group>
     <Group>
       <Path data="M0 0C-1 -22 0 -48 -2 -68"/>
-      <Stroke cap="round" color="#6D28D9" width="6"/>
+      <Stroke color="#6D28D9" width="6" cap="round"/>
     </Group>
     <Group>
       <Ellipse left="-33" top="-58" size="10,12"/>
@@ -1425,7 +1425,7 @@
   </Layer>
   <Layer left="640" top="718" alpha="0.8">
     <Path data="M0 0C-2 -12 1 -28 -1 -40"/>
-    <Stroke cap="round" color="#7C3AED" width="4"/>
+    <Stroke color="#7C3AED" width="4" cap="round"/>
     <Group>
       <Ellipse left="-12" top="-53" size="22,18"/>
       <Fill>
@@ -1452,7 +1452,7 @@
   </Layer>
   <Layer left="770" top="705" alpha="0.85">
     <Path data="M0 0C2 -24 -1 -52 1 -72"/>
-    <Stroke cap="round" color="#059669" width="5"/>
+    <Stroke color="#059669" width="5" cap="round"/>
     <Group>
       <Path data="M1 -30C-14 -38 -24 -30 -18 -20"/>
       <Fill color="#10B981"/>
@@ -1485,14 +1485,14 @@
   </Layer>
   <Layer left="930" top="715" alpha="0.75">
     <Path data="M0 0C-8 -12 -22 -22 -32 -28C-36 -30 -32 -20 -26 -10"/>
-    <Stroke cap="round" color="#0891B2" width="3.5"/>
+    <Stroke color="#0891B2" width="3.5" cap="round"/>
     <Group>
       <Path data="M0 0C8 -14 20 -28 30 -35C34 -37 30 -26 24 -16"/>
-      <Stroke cap="round" color="#06B6D4" width="3.5"/>
+      <Stroke color="#06B6D4" width="3.5" cap="round"/>
     </Group>
     <Group>
       <Path data="M0 0C0 -16 -1 -38 0 -52"/>
-      <Stroke cap="round" color="#0E7490" width="5"/>
+      <Stroke color="#0E7490" width="5" cap="round"/>
     </Group>
     <Group>
       <Ellipse left="-6" top="-63" size="12,14"/>
@@ -1538,10 +1538,10 @@
   </Layer>
   <Layer left="220" top="738" alpha="0.7">
     <Path data="M0 0C-1 -10 0 -22 -1 -30"/>
-    <Stroke cap="round" color="#10B981" width="3"/>
+    <Stroke color="#10B981" width="3" cap="round"/>
     <Group>
       <Path data="M8 0C9 -8 7 -18 8 -24"/>
-      <Stroke cap="round" color="#059669" width="2.5"/>
+      <Stroke color="#059669" width="2.5" cap="round"/>
     </Group>
     <Group>
       <Ellipse left="-4" top="-38" size="8,8"/>
@@ -1667,7 +1667,7 @@
   <Layer left="700" top="110" alpha="0.7">
     <Path data="M0 0L85 0"/>
     <Stroke>
-      <LinearGradient endPoint="85,0" startPoint="0,0">
+      <LinearGradient startPoint="0,0" endPoint="85,0">
         <ColorStop color="#FFFFFF00" offset="0"/>
         <ColorStop color="#FFFFFF40" offset="0.3"/>
         <ColorStop color="#FFFFFFCC" offset="0.7"/>
@@ -1682,7 +1682,7 @@
   <Layer left="400" top="205" alpha="0.45">
     <Path data="M0 0L50 0"/>
     <Stroke>
-      <LinearGradient endPoint="50,0" startPoint="0,0">
+      <LinearGradient startPoint="0,0" endPoint="50,0">
         <ColorStop color="#FFFFFF00" offset="0"/>
         <ColorStop color="#FFFFFF30" offset="0.4"/>
         <ColorStop color="#FFFFFFAA" offset="1"/>
@@ -1696,7 +1696,7 @@
   <Layer left="1150" top="48" alpha="0.5">
     <Path data="M0 0L45 0"/>
     <Stroke>
-      <LinearGradient endPoint="45,0" startPoint="0,0">
+      <LinearGradient startPoint="0,0" endPoint="45,0">
         <ColorStop color="#67E8F900" offset="0"/>
         <ColorStop color="#67E8F940" offset="0.5"/>
         <ColorStop color="#67E8F9" offset="1"/>

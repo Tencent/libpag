@@ -4,12 +4,12 @@
   <Layer>
     <Path data="M 60,200 Q 200,60 340,200 Q 200,340 60,200"/>
     <!-- Outer glow -->
-    <Stroke cap="round" color="#8B5CF615" join="round" width="48"/>
+    <Stroke color="#8B5CF615" width="48" cap="round" join="round"/>
     <!-- Middle glow -->
-    <Stroke cap="round" color="#8B5CF640" join="round" width="28"/>
+    <Stroke color="#8B5CF640" width="28" cap="round" join="round"/>
     <!-- Core stroke -->
-    <Stroke cap="round" join="round" width="8">
-      <LinearGradient endPoint="280,0" startPoint="0,0">
+    <Stroke width="8" cap="round" join="round">
+      <LinearGradient startPoint="0,0" endPoint="280,0">
         <ColorStop color="#6366F1" offset="0"/>
         <ColorStop color="#8B5CF6" offset="0.5"/>
         <ColorStop color="#EC4899" offset="1"/>

@@ -3,13 +3,13 @@
 <pagx width="400" height="400">
   <!-- Mask shape (invisible but used for masking) -->
   <Layer id="maskShape" visible="false">
-    <Polystar left="50" top="50" innerRadius="70" outerRadius="150" pointCount="5" type="star"/>
+    <Polystar left="50" top="50" type="star" pointCount="5" outerRadius="150" innerRadius="70"/>
     <Fill color="#FFF"/>
   </Layer>
   <Layer mask="@maskShape">
     <Rectangle left="20" top="20" size="360,360"/>
     <Fill>
-      <LinearGradient endPoint="360,360" startPoint="0,0">
+      <LinearGradient startPoint="0,0" endPoint="360,360">
         <ColorStop color="#6366F1" offset="0"/>
         <ColorStop color="#8B5CF6" offset="0.33"/>
         <ColorStop color="#EC4899" offset="0.66"/>

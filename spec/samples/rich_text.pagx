@@ -2,72 +2,72 @@
 <!-- Demonstrates rich text with mixed styles -->
 <pagx width="400" height="400">
   <Layer left="0" right="0" top="0" bottom="0">
-    <TextBox left="0" right="0" top="0" bottom="0" lineHeight="48" paragraphAlign="middle" textAlign="center">
-      <Text fontFamily="Arial" fontSize="42" fontStyle="Bold" text="Rich Text&#10;"/>
+    <TextBox left="0" right="0" top="0" bottom="0" textAlign="center" paragraphAlign="middle" lineHeight="48">
+      <Text text="Rich Text&#10;" fontFamily="Arial" fontStyle="Bold" fontSize="42"/>
       <Fill>
-        <LinearGradient endPoint="300,0" startPoint="100,0">
+        <LinearGradient startPoint="100,0" endPoint="300,0">
           <ColorStop color="#8B5CF6" offset="0"/>
           <ColorStop color="#EC4899" offset="1"/>
         </LinearGradient>
       </Fill>
       <Group>
-        <Text fontFamily="Arial" fontSize="20" text="Supports "/>
+        <Text text="Supports " fontFamily="Arial" fontSize="20"/>
         <Fill color="#475569"/>
       </Group>
       <Group>
-        <Text fontFamily="Arial" fontSize="20" fontStyle="Bold" text="bold"/>
+        <Text text="bold" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
         <Fill color="#F43F5E"/>
       </Group>
       <Group>
-        <Text fontFamily="Arial" fontSize="20" text=", "/>
+        <Text text=", " fontFamily="Arial" fontSize="20"/>
         <Fill color="#475569"/>
       </Group>
       <Group>
-        <Text fontFamily="Arial" fontSize="20" fontStyle="Italic" text="italic"/>
+        <Text text="italic" fontFamily="Arial" fontStyle="Italic" fontSize="20"/>
         <Fill color="#10B981"/>
       </Group>
       <Group>
-        <Text fontFamily="Arial" fontSize="20" text=" and "/>
+        <Text text=" and " fontFamily="Arial" fontSize="20"/>
         <Fill color="#475569"/>
       </Group>
       <Group>
-        <Text fontFamily="Arial" fontSize="20" fontStyle="Bold" text="colored"/>
+        <Text text="colored" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
         <Fill color="#06B6D4"/>
       </Group>
       <Group>
-        <Text fontFamily="Arial" fontSize="20" text=" text.&#10;"/>
-        <Text fontFamily="Arial" fontSize="16" text="Mix "/>
+        <Text text=" text.&#10;" fontFamily="Arial" fontSize="20"/>
+        <Text text="Mix " fontFamily="Arial" fontSize="16"/>
         <Fill color="#475569"/>
       </Group>
       <Group>
-        <Text fontFamily="Arial" fontSize="24" fontStyle="Bold" text="different"/>
+        <Text text="different" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
         <Fill color="#F59E0B"/>
       </Group>
       <Group>
-        <Text fontFamily="Arial" fontSize="16" text=" sizes "/>
+        <Text text=" sizes " fontFamily="Arial" fontSize="16"/>
         <Fill color="#475569"/>
       </Group>
       <Group>
-        <Text fontFamily="Arial" fontSize="24" fontStyle="Bold Italic" text="freely"/>
+        <Text text="freely" fontFamily="Arial" fontStyle="Bold Italic" fontSize="24"/>
         <Fill color="#8B5CF6"/>
       </Group>
       <Group>
-        <Text fontFamily="Arial" fontSize="16" text=" within one line.&#10;"/>
-        <Text fontFamily="Arial" fontSize="20" text="Center "/>
+        <Text text=" within one line.&#10;" fontFamily="Arial" fontSize="16"/>
+        <Text text="Center " fontFamily="Arial" fontSize="20"/>
         <Fill color="#475569"/>
       </Group>
       <Group>
-        <Text fontFamily="Arial" fontSize="20" fontStyle="Bold" text="aligned"/>
+        <Text text="aligned" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
         <Fill color="#EC4899"/>
       </Group>
       <Group>
-        <Text fontFamily="Arial" fontSize="20" text=" rich text.&#10;"/>
+        <Text text=" rich text.&#10;" fontFamily="Arial" fontSize="20"/>
         <Fill color="#475569"/>
       </Group>
       <Group>
-        <Text fontFamily="Arial" fontSize="28" fontStyle="Bold" text="Gradient Fill"/>
+        <Text text="Gradient Fill" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
         <Fill>
-          <LinearGradient endPoint="300,0" startPoint="100,0">
+          <LinearGradient startPoint="100,0" endPoint="300,0">
             <ColorStop color="#F43F5E" offset="0"/>
             <ColorStop color="#F59E0B" offset="0.5"/>
             <ColorStop color="#10B981" offset="1"/>

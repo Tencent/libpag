@@ -15,9 +15,9 @@
       <!-- 1. Polystar centered within padding-inset area -->
       <Layer flex="1" height="220">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer left="0" right="0" top="0" bottom="0" padding="30">
-          <Polystar centerX="0" centerY="0" innerRadius="25" outerRadius="60" pointCount="5"/>
+          <Polystar centerX="0" centerY="0" pointCount="5" outerRadius="60" innerRadius="25"/>
           <Fill color="#3B82F6"/>
         </Layer>
       </Layer>
@@ -25,9 +25,9 @@
       <!-- 2. Unconstrained Rectangle starts at padding origin -->
       <Layer flex="1" height="220">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer left="0" right="0" top="0" bottom="0" padding="30">
-          <Rectangle roundness="8" size="80,60"/>
+          <Rectangle size="80,60" roundness="8"/>
           <Fill color="#F59E0B"/>
         </Layer>
       </Layer>
@@ -38,11 +38,11 @@
         <Fill color="#6366F1"/>
         <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="8" padding="20" alignment="center" arrangement="center">
           <Layer>
-            <Text fontFamily="Arial" fontSize="16" fontStyle="Bold" text="Card Title"/>
+            <Text text="Card Title" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
             <Fill color="#FFF"/>
           </Layer>
           <Layer>
-            <Text fontFamily="Arial" fontSize="12" text="Subtitle"/>
+            <Text text="Subtitle" fontFamily="Arial" fontSize="12"/>
             <Fill color="#C4B5FD"/>
           </Layer>
         </Layer>
@@ -56,9 +56,9 @@
       <!-- 4. Group padding insets child elements -->
       <Layer flex="1" height="220">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Group centerX="0" centerY="0" padding="20">
-          <Rectangle roundness="8" size="80,60"/>
+          <Rectangle size="80,60" roundness="8"/>
           <Fill color="#10B981"/>
         </Group>
       </Layer>
@@ -66,12 +66,12 @@
       <!-- 5. Button with Group padding (content-measured) -->
       <Layer flex="1" height="220">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer centerX="0" centerY="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="24"/>
           <Fill color="#EC4899"/>
           <Group centerX="0" centerY="0" padding="12,24">
-            <Text fontFamily="Arial" fontSize="14" fontStyle="Bold" text="Button"/>
+            <Text text="Button" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
             <Fill color="#FFF"/>
           </Group>
         </Layer>
@@ -80,12 +80,12 @@
       <!-- 6. TextBox with padding -->
       <Layer flex="1" height="220">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer left="20" top="20" width="200" height="120">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
           <Fill color="#FFF7ED"/>
           <TextBox left="0" right="0" top="0" bottom="0" padding="16" textAlign="start">
-            <Text fontFamily="Arial" fontSize="13" text="TextBox with padding. The text area is inset by 16px on all sides."/>
+            <Text text="TextBox with padding. The text area is inset by 16px on all sides." fontFamily="Arial" fontSize="13"/>
             <Fill color="#9A3412"/>
           </TextBox>
         </Layer>

@@ -13,18 +13,18 @@
             <ColorStop color="#F59E0B" offset="1"/>
           </RadialGradient>
         </Fill>
-        <DropShadowStyle blurX="24" blurY="24" color="#F59E0B60" offsetY="8"/>
+        <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F59E0B60"/>
       </Layer>
       <!-- Horizontal ellipse -->
       <Layer flex="1">
         <Ellipse centerX="0" centerY="0" size="160,100"/>
         <Fill>
-          <LinearGradient endPoint="160,100" startPoint="0,0">
+          <LinearGradient startPoint="0,0" endPoint="160,100">
             <ColorStop color="#EC4899" offset="0"/>
             <ColorStop color="#DB2777" offset="1"/>
           </LinearGradient>
         </Fill>
-        <DropShadowStyle blurX="24" blurY="24" color="#EC489950" offsetY="8"/>
+        <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#EC489950"/>
       </Layer>
     </Layer>
     <Layer flex="1" layout="horizontal">
@@ -32,12 +32,12 @@
       <Layer flex="1">
         <Ellipse centerX="0" centerY="0" size="100,160"/>
         <Fill>
-          <LinearGradient endPoint="100,160" startPoint="0,0">
+          <LinearGradient startPoint="0,0" endPoint="100,160">
             <ColorStop color="#06B6D4" offset="0"/>
             <ColorStop color="#0891B2" offset="1"/>
           </LinearGradient>
         </Fill>
-        <DropShadowStyle blurX="24" blurY="24" color="#06B6D450" offsetY="8"/>
+        <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#06B6D450"/>
       </Layer>
       <!-- Large ellipse -->
       <Layer flex="1">
@@ -48,7 +48,7 @@
             <ColorStop color="#8B5CF6" offset="1"/>
           </RadialGradient>
         </Fill>
-        <DropShadowStyle blurX="24" blurY="24" color="#8B5CF650" offsetY="8"/>
+        <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#8B5CF650"/>
       </Layer>
     </Layer>
   </Layer>

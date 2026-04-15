@@ -13,11 +13,11 @@
     <Rectangle left="100" top="60" size="300,240"/>
     <Fill color="#ECEFF1"/>
     <Layer id="card1" name="Card 1">
-      <Rectangle left="-120" top="-50" roundness="8" size="120,100"/>
+      <Rectangle left="-120" top="-50" size="120,100" roundness="8"/>
       <Fill color="#FFFFFF"/>
     </Layer>
     <Layer id="card2" name="Card 2">
-      <Rectangle left="20" top="-50" roundness="8" size="120,100"/>
+      <Rectangle left="20" top="-50" size="120,100" roundness="8"/>
       <Fill color="#FFFFFF"/>
     </Layer>
   </Layer>

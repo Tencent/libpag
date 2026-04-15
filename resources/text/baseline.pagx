@@ -10,9 +10,9 @@
     <Stroke color="#999999" width="2"/>
     <Group>
       <!-- LineBox baseline (default) -->
-      <Text fontFamily="NotoSansSC" fontSize="48" position="50,100" text="Hello"/>
+      <Text text="Hello" fontFamily="NotoSansSC" fontSize="48" position="50,100"/>
       <!-- Alphabetic baseline -->
-      <Text baseline="alphabetic" fontFamily="NotoSansSC" fontSize="48" position="220,100" text="Hello"/>
+      <Text text="Hello" fontFamily="NotoSansSC" fontSize="48" position="220,100" baseline="alphabetic"/>
       <Fill/>
     </Group>
   </Layer>

@@ -4,7 +4,7 @@
   <Layer name="shape1">
     <Rectangle size="100,100"/>
     <Fill>
-      <LinearGradient endPoint="100,0" startPoint="0,0">
+      <LinearGradient startPoint="0,0" endPoint="100,0">
         <ColorStop color="#FF0000" offset="0"/>
         <ColorStop color="#0000FF" offset="1"/>
       </LinearGradient>
@@ -13,7 +13,7 @@
   <Layer name="shape2">
     <Rectangle size="100,100"/>
     <Fill>
-      <LinearGradient endPoint="100,0" startPoint="0,0">
+      <LinearGradient startPoint="0,0" endPoint="100,0">
         <ColorStop color="#FF0000" offset="0"/>
         <ColorStop color="#0000FF" offset="1"/>
       </LinearGradient>

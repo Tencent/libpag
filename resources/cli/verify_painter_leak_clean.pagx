@@ -12,7 +12,7 @@
   <Layer name="normal-multi-fill">
     <Rectangle size="50,50"/>
     <Fill color="#FF0000"/>
-    <Fill alpha="0.5" color="#0000FF"/>
+    <Fill color="#0000FF" alpha="0.5"/>
   </Layer>
 
   <!-- Normal: Fill then Stroke on same geometry -->

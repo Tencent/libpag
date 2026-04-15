@@ -11,7 +11,7 @@
   <Layer width="336" height="200">
     <!-- Container border -->
     <Rectangle size="336,200"/>
-    <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
+    <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
 
     <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="12" padding="12">
       <!-- Child 1: Participates in horizontal layout -->

@@ -8,10 +8,10 @@
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#6366F1"/>
       <Group centerX="0" centerY="0">
-        <Text fontFamily="Arial" fontSize="16" fontStyle="Bold" text="Design Review"/>
+        <Text text="Design Review" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
         <Fill color="#FFF"/>
       </Group>
-      <DropShadowStyle blurX="24" blurY="24" color="#6366F150" offsetY="8"/>
+      <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#6366F150"/>
     </Layer>
 
     <!-- Card 2 -->
@@ -19,10 +19,10 @@
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#10B981"/>
       <Group centerX="0" centerY="0">
-        <Text fontFamily="Arial" fontSize="16" fontStyle="Bold" text="Sprint Planning"/>
+        <Text text="Sprint Planning" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
         <Fill color="#FFF"/>
       </Group>
-      <DropShadowStyle blurX="24" blurY="24" color="#10B98150" offsetY="8"/>
+      <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#10B98150"/>
     </Layer>
 
     <!-- Card 3 -->
@@ -30,10 +30,10 @@
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#F59E0B"/>
       <Group centerX="0" centerY="0">
-        <Text fontFamily="Arial" fontSize="16" fontStyle="Bold" text="Bug Report #42"/>
+        <Text text="Bug Report #42" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
         <Fill color="#FFF"/>
       </Group>
-      <DropShadowStyle blurX="24" blurY="24" color="#F59E0B50" offsetY="8"/>
+      <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F59E0B50"/>
     </Layer>
 
     <!-- Notification badge: a Layer leaves the layout flow -->
@@ -41,10 +41,10 @@
       <Ellipse left="0" right="0" top="0" bottom="0"/>
       <Fill color="#EF4444"/>
       <Group centerX="0" centerY="0">
-        <Text fontFamily="Arial" fontSize="16" fontStyle="Bold" text="3"/>
+        <Text text="3" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
         <Fill color="#FFF"/>
       </Group>
-      <DropShadowStyle blurX="12" blurY="12" color="#EF444460" offsetY="4"/>
+      <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#EF444460"/>
     </Layer>
   </Layer>
 </pagx>

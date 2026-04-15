@@ -3,13 +3,13 @@
 <pagx width="400" height="400">
   <!-- Main content card with modern gradient -->
   <Layer name="content">
-    <Rectangle left="80" top="80" roundness="40" size="240,240"/>
+    <Rectangle left="80" top="80" size="240,240" roundness="40"/>
     <Fill>
-      <LinearGradient endPoint="240,240" startPoint="0,0">
+      <LinearGradient startPoint="0,0" endPoint="240,240">
         <ColorStop color="#6366F1" offset="0"/>
         <ColorStop color="#8B5CF6" offset="1"/>
       </LinearGradient>
     </Fill>
-    <DropShadowStyle blurX="48" blurY="48" color="#6366F160" offsetY="16"/>
+    <DropShadowStyle offsetY="16" blurX="48" blurY="48" color="#6366F160"/>
   </Layer>
 </pagx>
