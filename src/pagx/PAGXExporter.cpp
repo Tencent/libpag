@@ -368,6 +368,17 @@ struct ExportContext {
     auto digest = MD5::Calculate(svgContent.data(), svgContent.size());
     std::string digestKey(reinterpret_cast<const char*>(digest.data()), digest.size());
     if (!pathData->id.empty()) {
+      auto existing = pathDataContentToOutputId.find(digestKey);
+      if (existing != pathDataContentToOutputId.end() && existing->second != pathData->id) {
+        // An unnamed PathData with the same content was registered first under a generated ID.
+        // Retarget all cached pointers that point to the old generated ID to use the named ID.
+        const std::string& oldId = existing->second;
+        for (auto& entry : pathDataToOutputId) {
+          if (entry.second == oldId) {
+            entry.second = pathData->id;
+          }
+        }
+      }
       pathDataContentToOutputId[digestKey] = pathData->id;
       pathDataToOutputId[pathData] = pathData->id;
       return pathData->id;
