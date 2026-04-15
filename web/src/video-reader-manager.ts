@@ -104,6 +104,7 @@ export class VideoReaderManager {
      */
     public async prepareTargetFrame() {
         for (const id of this.videoIDs) {
+            if (this.isDestroyed) return;
             // Get the target frame index from WASM
             const targetFrame = this.wasmIns._getTargetFrameByID(id) as number;
             if (targetFrame < 0) {

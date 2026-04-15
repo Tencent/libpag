@@ -35,6 +35,7 @@ class PAGAudioReader : public QThread {
   ~PAGAudioReader() override;
 
   bool isEmpty() const;
+  int64_t getDuration() const;
   void setComposition(std::shared_ptr<PAGComposition> newComposition);
   void setAudioRender(std::shared_ptr<PAGAudioRender> audioRender);
   std::shared_ptr<PAGAudioSample> readNextSample();
@@ -44,6 +45,7 @@ class PAGAudioReader : public QThread {
 
   Q_SLOT void onPAGProgressChanged(int64_t progress);
   Q_SLOT void onSetIsPlaying(bool isPlaying);
+  Q_SLOT void onSetComposition(std::shared_ptr<PAGComposition> newComposition);
 
  protected:
   void run() override;
@@ -54,6 +56,7 @@ class PAGAudioReader : public QThread {
   void syncAudio(int64_t sampleTime);
 
   Q_SIGNAL void read();
+  Q_SIGNAL void compositionChangeRequested(std::shared_ptr<PAGComposition> newComposition);
 
   Q_SLOT void onRead();
 

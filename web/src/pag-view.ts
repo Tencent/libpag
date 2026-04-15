@@ -425,7 +425,7 @@ export class PAGView {
   }
 
   protected async flushLoop(force = false) {
-    if (!this.isPlaying) {
+    if (!this.isPlaying || this.isDestroyed) {
       return;
     }
     this.setTimer();

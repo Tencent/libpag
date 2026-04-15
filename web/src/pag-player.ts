@@ -64,11 +64,11 @@ export class PAGPlayer {
             callback(res);
             return res;
         }, this.wasmIns);
-        // Check if any video reader has error.
+        // Log video reader errors but don't throw - video decoding failures shouldn't stop playback
         for (const videoReader of this.videoReaders) {
             const error = await videoReader.getError();
             if (error !== null) {
-                throw error;
+                console.warn('[PAGPlayer] VideoReader error:', error);
             }
         }
         return res;
