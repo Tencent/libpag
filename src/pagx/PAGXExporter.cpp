@@ -346,6 +346,7 @@ struct ExportContext {
   std::unordered_set<std::string> writtenResourceIds;
   std::unordered_set<std::string> reservedIds;
   int pathDataIdCounter = 0;
+  bool hasAnonymousPathData = false;
 
   void reserveId(const std::string& id) {
     if (!id.empty()) {
@@ -400,6 +401,7 @@ struct ExportContext {
     }
     pathDataContentToOutputId[digestKey] = newId;
     pathDataToOutputId[pathData] = newId;
+    hasAnonymousPathData = true;
     return newId;
   }
 
@@ -1501,7 +1503,7 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
       break;
     }
   }
-  bool hasDedupPathData = !ctx.pathDataContentToOutputId.empty();
+  bool hasDedupPathData = ctx.hasAnonymousPathData;
   bool hasResources = hasOriginalResources || hasDedupPathData;
 
   if (hasResources) {
