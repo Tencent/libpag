@@ -91,7 +91,7 @@ int RunFormat(int argc, char* argv[]) {
     outputPath = inputPath;
   }
 
-  auto doc = xmlReadFile(inputPath.c_str(), nullptr, XML_PARSE_NONET | XML_PARSE_NOBLANKS);
+  auto doc = xmlReadFile(inputPath.c_str(), nullptr, XML_PARSE_NONET);
   if (doc == nullptr) {
     std::cerr << "pagx format: failed to parse '" << inputPath << "'\n";
     return 1;

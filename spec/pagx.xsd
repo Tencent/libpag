@@ -881,6 +881,16 @@
       <xs:group ref="LayerChildGroup" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
     <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="width" type="xs:decimal"/>
+    <xs:attribute name="height" type="xs:decimal"/>
+    <xs:attribute name="layout" type="LayoutModeType" default="none"/>
+    <xs:attribute name="gap" type="xs:decimal" default="0"/>
+    <xs:attribute name="flex" type="xs:decimal" default="0"/>
+    <xs:attribute name="padding" type="PaddingType"/>
+    <xs:attribute name="alignment" type="AlignmentType" default="stretch"/>
+    <xs:attribute name="arrangement" type="ArrangementType" default="start"/>
+    <xs:attribute name="includeInLayout" type="BoolType" default="true"/>
+    <xs:attributeGroup ref="ConstraintAttributes"/>
     <xs:attribute name="name" type="xs:string" default=""/>
     <xs:attribute name="visible" type="BoolType" default="true"/>
     <xs:attribute name="alpha" type="xs:decimal" default="1"/>
@@ -898,16 +908,6 @@
     <xs:attribute name="mask" type="IdRefType"/>
     <xs:attribute name="maskType" type="MaskTypeType" default="alpha"/>
     <xs:attribute name="composition" type="IdRefType"/>
-    <xs:attribute name="width" type="xs:decimal"/>
-    <xs:attribute name="height" type="xs:decimal"/>
-    <xs:attribute name="layout" type="LayoutModeType" default="none"/>
-    <xs:attribute name="gap" type="xs:decimal" default="0"/>
-    <xs:attribute name="flex" type="xs:decimal" default="0"/>
-    <xs:attribute name="padding" type="PaddingType"/>
-    <xs:attribute name="alignment" type="AlignmentType" default="stretch"/>
-    <xs:attribute name="arrangement" type="ArrangementType" default="start"/>
-    <xs:attribute name="includeInLayout" type="BoolType" default="true"/>
-    <xs:attributeGroup ref="ConstraintAttributes"/>
     <xs:attribute name="import" type="xs:string"/>
     <xs:attribute name="importFormat" type="xs:string"/>
   </xs:complexType>

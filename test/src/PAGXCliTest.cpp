@@ -226,6 +226,21 @@ CLI_TEST(PAGXCliTest, Format_IndentZero) {
   EXPECT_TRUE(output.find("  <Layer") == std::string::npos);
 }
 
+// Formatting preserves XML comments, blank lines between elements, and does not insert an XML
+// declaration when the original file has none.
+CLI_TEST(PAGXCliTest, Format_PreserveCommentsAndBlankLines) {
+  auto inputPath = TestResourcePath("format_comments.pagx");
+  auto outputPath = TempDir() + "/format_comments_out.pagx";
+  auto ret = CallRun(pagx::cli::RunFormat, {"format", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  EXPECT_TRUE(output.find("<!-- Top-level comment describing the file -->") != std::string::npos);
+  EXPECT_TRUE(output.find("<!-- Section A -->") != std::string::npos);
+  EXPECT_TRUE(output.find("<!-- Section B -->") != std::string::npos);
+  EXPECT_TRUE(output.find("</Layer>\n\n  <!-- Section B -->") != std::string::npos);
+  EXPECT_TRUE(output.find("<?xml") == std::string::npos);
+}
+
 CLI_TEST(PAGXCliTest, Format_InvalidFile) {
   auto inputPath = TestResourcePath("verify_not_xml.pagx");
   auto outputPath = TempDir() + "/format_invalid_out.pagx";

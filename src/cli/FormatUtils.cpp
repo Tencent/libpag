@@ -302,6 +302,23 @@ void SerializeNode(std::string& output, xmlNodePtr node, int indentLevel, int in
         output += content;
         output += "-->\n";
       }
+    } else if (cur->type == XML_TEXT_NODE) {
+      auto* text = reinterpret_cast<const char*>(cur->content);
+      if (text != nullptr) {
+        int newlines = 0;
+        bool blankOnly = true;
+        for (auto* p = text; *p != '\0'; p++) {
+          if (*p == '\n') {
+            newlines++;
+          } else if (*p != ' ' && *p != '\t' && *p != '\r') {
+            blankOnly = false;
+            break;
+          }
+        }
+        if (blankOnly && newlines >= 2) {
+          output += "\n";
+        }
+      }
     }
   }
 }
