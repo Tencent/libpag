@@ -28,21 +28,21 @@
 namespace pag {
 
 // ============================================================================
-// DiskIOQueue Implementation
+// DiskIOWorker Implementation
 // ============================================================================
 
-DiskIOQueue* DiskIOQueue::GetInstance() {
+DiskIOWorker* DiskIOWorker::GetInstance() {
   // Intentional leak: using *new to avoid static destruction order issues at program exit.
   // The destructor is implemented correctly but will never be called in this singleton pattern.
-  static auto& instance = *new DiskIOQueue();
+  static auto& instance = *new DiskIOWorker();
   return &instance;
 }
 
-DiskIOQueue::DiskIOQueue() {
-  workerThread = std::thread(&DiskIOQueue::workerLoop, this);
+DiskIOWorker::DiskIOWorker() {
+  workerThread = std::thread(&DiskIOWorker::runLoop, this);
 }
 
-DiskIOQueue::~DiskIOQueue() {
+DiskIOWorker::~DiskIOWorker() {
   {
     std::lock_guard<std::mutex> lock(locker);
     stopped = true;
@@ -53,7 +53,7 @@ DiskIOQueue::~DiskIOQueue() {
   }
 }
 
-void DiskIOQueue::submit(std::function<void()> task) {
+void DiskIOWorker::submit(std::function<void()> task) {
   if (task == nullptr) {
     return;
   }
@@ -64,13 +64,13 @@ void DiskIOQueue::submit(std::function<void()> task) {
   condition.notify_one();
 }
 
-void DiskIOQueue::waitAll() {
+void DiskIOWorker::waitAll() {
   std::unique_lock<std::mutex> lock(locker);
   // Wait until the queue is empty AND no task is currently executing.
   idleCondition.wait(lock, [this] { return tasks.empty() && !executing; });
 }
 
-void DiskIOQueue::workerLoop() {
+void DiskIOWorker::runLoop() {
   while (true) {
     std::function<void()> task;
     {
@@ -110,7 +110,7 @@ void DiskCache::removeFileAsync(const std::string& filePath) {
   if (filePath.empty()) {
     return;
   }
-  DiskIOQueue::GetInstance()->submit(std::bind(RemoveFileTask, filePath));
+  DiskIOWorker::GetInstance()->submit(std::bind(RemoveFileTask, filePath));
 }
 
 class FileInfo {
@@ -472,12 +472,12 @@ void DiskCache::saveConfig() {
   // before this one executes, skip this write entirely.
   auto currentVersion = ++configSaveVersion;
   auto* versionPtr = &configSaveVersion;
-  // Write to disk asynchronously via DiskIOQueue to avoid blocking the calling thread on IO.
+  // Write to disk asynchronously via DiskIOWorker to avoid blocking the calling thread on IO.
   // Uses temp file + rename for atomic write to prevent corruption if app exits mid-write.
   auto path = configPath;
   auto tempPath = configPath + ".tmp";
-  DiskIOQueue::GetInstance()->submit(std::bind(&DiskCache::WriteConfigTask, path, tempPath, data,
-                                               bufferSize, currentVersion, versionPtr));
+  DiskIOWorker::GetInstance()->submit(std::bind(&DiskCache::WriteConfigTask, path, tempPath, data,
+                                                bufferSize, currentVersion, versionPtr));
 }
 
 void DiskCache::WriteConfigTask(std::string path, std::string tempPath,

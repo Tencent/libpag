@@ -33,18 +33,18 @@ namespace pag {
 class FileInfo;
 
 /**
- * A simple serial task queue that executes disk IO tasks on a dedicated background thread.
- * This ensures ordered execution and provides the ability to wait for all pending tasks.
+ * A dedicated background worker thread that executes disk IO tasks serially.
+ * Tasks are queued and executed in order on a single thread, avoiding main thread blocking.
  *
- * Lock ordering: DiskIOQueue::locker must be acquired BEFORE DiskCache::locker.
+ * Lock ordering: DiskIOWorker::locker must be acquired BEFORE DiskCache::locker.
  * IMPORTANT: Never call waitAll() while holding DiskCache::locker, as tasks executed by
- * DiskIOQueue (e.g., CloseFileTask) may acquire DiskCache::locker, causing deadlock.
+ * DiskIOWorker (e.g., CloseFileTask) may acquire DiskCache::locker, causing deadlock.
  */
-class DiskIOQueue {
+class DiskIOWorker {
  public:
-  static DiskIOQueue* GetInstance();
+  static DiskIOWorker* GetInstance();
 
-  ~DiskIOQueue();
+  ~DiskIOWorker();
 
   /**
    * Submits a task for asynchronous execution on the background thread.
@@ -57,9 +57,9 @@ class DiskIOQueue {
   void waitAll();
 
  private:
-  DiskIOQueue();
+  DiskIOWorker();
 
-  void workerLoop();
+  void runLoop();
 
   std::mutex locker;
   std::condition_variable condition;
@@ -137,7 +137,7 @@ class DiskCache {
   void notifyFileSizeChanged(uint32_t fileID, size_t fileSize);
 
   /**
-   * Removes the file at the given path asynchronously on the DiskIOQueue to avoid blocking the
+   * Removes the file at the given path asynchronously on the DiskIOWorker to avoid blocking the
    * calling thread (which may be the main/render thread) on synchronous IO.
    */
   static void removeFileAsync(const std::string& filePath);
