@@ -61,6 +61,7 @@
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/utils/Base64.h"
+#include "pagx/utils/MD5.h"
 #include "pagx/utils/StringParser.h"
 
 namespace pagx {
@@ -338,6 +339,8 @@ namespace {
  * Export-time state for PathData deduplication without modifying the original document.
  */
 struct ExportContext {
+  // Maps MD5 digest of SVG content (16-byte string) to output ID, used for deduplication.
+  // Storing only the digest avoids holding large SVG strings in memory.
   std::unordered_map<std::string, std::string> pathDataContentToOutputId;
   std::unordered_map<const PathData*, std::string> pathDataToOutputId;
   std::unordered_set<std::string> writtenResourceIds;
@@ -358,19 +361,18 @@ struct ExportContext {
     if (it != pathDataToOutputId.end()) {
       return it->second;
     }
-    if (!pathData->id.empty()) {
-      std::string svgContent = PathDataToSVGString(*pathData);
-      if (!svgContent.empty()) {
-        pathDataContentToOutputId[svgContent] = pathData->id;
-      }
-      pathDataToOutputId[pathData] = pathData->id;
-      return pathData->id;
-    }
     std::string svgContent = PathDataToSVGString(*pathData);
     if (svgContent.empty()) {
       return "";
     }
-    auto contentIt = pathDataContentToOutputId.find(svgContent);
+    auto digest = MD5::Calculate(svgContent.data(), svgContent.size());
+    std::string digestKey(reinterpret_cast<const char*>(digest.data()), digest.size());
+    if (!pathData->id.empty()) {
+      pathDataContentToOutputId[digestKey] = pathData->id;
+      pathDataToOutputId[pathData] = pathData->id;
+      return pathData->id;
+    }
+    auto contentIt = pathDataContentToOutputId.find(digestKey);
     if (contentIt != pathDataContentToOutputId.end()) {
       pathDataToOutputId[pathData] = contentIt->second;
       return contentIt->second;
@@ -385,7 +387,7 @@ struct ExportContext {
         break;
       }
     }
-    pathDataContentToOutputId[svgContent] = newId;
+    pathDataContentToOutputId[digestKey] = newId;
     pathDataToOutputId[pathData] = newId;
     return newId;
   }
@@ -1499,19 +1501,22 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
     }
 
     // Write deduplicated PathData, sorted by ID for deterministic output.
-    using MapEntry = std::unordered_map<std::string, std::string>::const_iterator;
-    std::vector<MapEntry> sortedPathData;
-    sortedPathData.reserve(ctx.pathDataContentToOutputId.size());
-    for (auto it = ctx.pathDataContentToOutputId.cbegin();
-         it != ctx.pathDataContentToOutputId.cend(); ++it) {
+    using PtrEntry = std::unordered_map<const PathData*, std::string>::const_iterator;
+    std::vector<PtrEntry> sortedPathData;
+    sortedPathData.reserve(ctx.pathDataToOutputId.size());
+    for (auto it = ctx.pathDataToOutputId.cbegin(); it != ctx.pathDataToOutputId.cend(); ++it) {
       sortedPathData.push_back(it);
     }
     std::sort(sortedPathData.begin(), sortedPathData.end(),
-              [](const MapEntry& a, const MapEntry& b) { return a->second < b->second; });
+              [](const PtrEntry& a, const PtrEntry& b) { return a->second < b->second; });
     for (const auto& entry : sortedPathData) {
-      const auto& svgContent = entry->first;
+      const PathData* pathData = entry->first;
       const auto& pathId = entry->second;
       if (!ctx.markResourceWritten(pathId)) {
+        continue;
+      }
+      std::string svgContent = PathDataToSVGString(*pathData);
+      if (svgContent.empty()) {
         continue;
       }
       xml.openElement("PathData");
