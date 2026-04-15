@@ -357,6 +357,10 @@ struct ExportContext {
       return it->second;
     }
     if (!pathData->id.empty()) {
+      std::string svgContent = PathDataToSVGString(*pathData);
+      if (!svgContent.empty()) {
+        pathDataContentToId[svgContent] = pathData->id;
+      }
       pathDataToOutputId[pathData] = pathData->id;
       return pathData->id;
     }
@@ -370,9 +374,15 @@ struct ExportContext {
       return contentIt->second;
     }
     std::string newId;
-    do {
+    // At most reservedIds.size() + 1 attempts are needed: in the worst case all reserved IDs
+    // match the __pd_N pattern consecutively, so we skip at most reservedIds.size() of them.
+    size_t maxAttempts = reservedIds.size() + 1;
+    for (size_t i = 0; i < maxAttempts; i++) {
       newId = "__pd_" + std::to_string(pathDataIdCounter++);
-    } while (reservedIds.count(newId) > 0);
+      if (reservedIds.count(newId) == 0) {
+        break;
+      }
+    }
     pathDataContentToId[svgContent] = newId;
     pathDataToOutputId[pathData] = newId;
     return newId;
