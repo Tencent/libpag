@@ -284,12 +284,24 @@ void SerializeNode(std::string& output, xmlNodePtr node, int indentLevel, int in
       }
 
       if (cur->children != nullptr) {
-        output += ">\n";
-        SerializeNode(output, cur->children, indentLevel + 1, indentSpaces);
-        output += indent;
-        output += "</";
-        output += reinterpret_cast<const char*>(cur->name);
-        output += ">\n";
+        auto* only = cur->children;
+        if (only->next == nullptr && only->type == XML_CDATA_SECTION_NODE) {
+          output += "><![CDATA[";
+          auto* content = reinterpret_cast<const char*>(only->content);
+          if (content != nullptr) {
+            output += content;
+          }
+          output += "]]></";
+          output += reinterpret_cast<const char*>(cur->name);
+          output += ">\n";
+        } else {
+          output += ">\n";
+          SerializeNode(output, cur->children, indentLevel + 1, indentSpaces);
+          output += indent;
+          output += "</";
+          output += reinterpret_cast<const char*>(cur->name);
+          output += ">\n";
+        }
       } else {
         output += "/>\n";
       }

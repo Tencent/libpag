@@ -8,7 +8,7 @@
 
   <!-- Section B -->
   <Layer>
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Text fontFamily="Arial" fontSize="24"><![CDATA[Hello & <World>]]></Text>
     <Fill color="#0000FF"/>
   </Layer>
 </pagx>

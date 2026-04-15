@@ -226,7 +226,7 @@ CLI_TEST(PAGXCliTest, Format_IndentZero) {
   EXPECT_TRUE(output.find("  <Layer") == std::string::npos);
 }
 
-// Formatting preserves XML comments, blank lines between elements, and does not insert an XML
+// Formatting preserves XML comments, blank lines, CDATA sections, and does not insert an XML
 // declaration when the original file has none.
 CLI_TEST(PAGXCliTest, Format_PreserveCommentsAndBlankLines) {
   auto inputPath = TestResourcePath("format_comments.pagx");
@@ -238,6 +238,7 @@ CLI_TEST(PAGXCliTest, Format_PreserveCommentsAndBlankLines) {
   EXPECT_TRUE(output.find("<!-- Section A -->") != std::string::npos);
   EXPECT_TRUE(output.find("<!-- Section B -->") != std::string::npos);
   EXPECT_TRUE(output.find("</Layer>\n\n  <!-- Section B -->") != std::string::npos);
+  EXPECT_TRUE(output.find("<![CDATA[Hello & <World>]]>") != std::string::npos);
   EXPECT_TRUE(output.find("<?xml") == std::string::npos);
 }
 

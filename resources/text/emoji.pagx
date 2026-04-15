@@ -5,8 +5,7 @@
     <Rectangle size="200,60"/>
     <Stroke/>
     <TextBox width="200" height="60">
-      <Text fontFamily="NotoSansSC" fontSize="24">
-      </Text>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[Hello😀World🎉Test]]></Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -16,8 +15,7 @@
     <Rectangle size="200,120"/>
     <Stroke/>
     <TextBox width="200" height="120">
-      <Text fontFamily="NotoSansSC" fontSize="24">
-      </Text>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[你好😀世界🌍天气🌤真好👍]]></Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -27,8 +25,7 @@
     <Rectangle size="200,60"/>
     <Stroke/>
     <TextBox width="200" height="60">
-      <Text fontFamily="NotoSansSC" fontSize="24">
-      </Text>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[Family👨‍👩‍👧‍👦Here]]></Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -38,8 +35,7 @@
     <Rectangle size="200,120"/>
     <Stroke/>
     <TextBox width="200" height="120">
-      <Text fontFamily="NotoSansSC" fontSize="24">
-      </Text>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[Wave👋🏻Hi👋🏿Bye]]></Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -49,8 +45,7 @@
     <Rectangle size="250,60"/>
     <Stroke/>
     <TextBox width="250" height="60">
-      <Text fontFamily="NotoSansSC" fontSize="24">
-      </Text>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[🇨🇳中国🇺🇸美国🇯🇵日本]]></Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -60,8 +55,7 @@
     <Rectangle size="80,200"/>
     <Stroke/>
     <TextBox width="80" height="200" writingMode="vertical">
-      <Text fontFamily="NotoSansSC" fontSize="20">
-      </Text>
+      <Text fontFamily="NotoSansSC" fontSize="20"><![CDATA[你好世界😀]]></Text>
       <Fill/>
     </TextBox>
   </Layer>

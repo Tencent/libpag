@@ -2,7 +2,7 @@
 <!-- Test: Layers at different positions with identical structure should be detected -->
 <pagx width="800" height="200">
   <Layer name="container" width="800" height="200">
-    <Layer width="100" height="100" x="10" y="10">
+    <Layer x="10" y="10" width="100" height="100">
       <Layer left="0" right="0" top="0" bottom="0">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
         <Fill color="#FF0000"/>
@@ -13,7 +13,7 @@
       <Fill color="#00FF00"/>
     </Layer>
     <!-- Same pair at different position -->
-    <Layer width="100" height="100" x="200" y="50">
+    <Layer x="200" y="50" width="100" height="100">
       <Layer left="0" right="0" top="0" bottom="0">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
         <Fill color="#FF0000"/>

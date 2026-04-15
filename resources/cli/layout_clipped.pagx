@@ -2,7 +2,7 @@
   <Layer id="parent" name="parent" width="200" height="200" clipToBounds="true">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F1F5F9"/>
-    <Layer id="overflow" name="overflow" width="100" height="100" x="150" y="150">
+    <Layer id="overflow" name="overflow" x="150" y="150" width="100" height="100">
       <Rectangle left="0" right="0" top="0" bottom="0"/>
       <Fill color="#EF4444"/>
     </Layer>

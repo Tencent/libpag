@@ -5,8 +5,7 @@
     <Rectangle size="60,250"/>
     <Stroke/>
     <TextBox width="60" height="250" writingMode="vertical">
-      <Text fontFamily="NotoSansSC" fontSize="24">
-      </Text>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[2024 年 12 月 31 日]]></Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -16,8 +15,7 @@
     <Rectangle size="100,250"/>
     <Stroke/>
     <TextBox width="100" height="250" textAlign="center" writingMode="vertical">
-      <Text fontFamily="NotoSansSC" fontSize="24">
-      </Text>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[価格 $99.50 元 税込 $110.00]]></Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -37,8 +35,7 @@
     <Rectangle size="80,200"/>
     <Stroke/>
     <TextBox width="80" height="200" writingMode="vertical" overflow="hidden">
-      <Text fontFamily="NotoSansSC" fontSize="24">
-      </Text>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[春眠不觉晓处处闻啼鸟夜来风雨声花落知多少]]></Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -48,8 +45,7 @@
     <Rectangle size="60,250"/>
     <Stroke/>
     <TextBox width="60" height="250" writingMode="vertical">
-      <Text fontFamily="NotoSansSC" fontSize="24">
-      </Text>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[竖排 Near 对齐]]></Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -59,8 +55,7 @@
     <Rectangle size="60,250"/>
     <Stroke/>
     <TextBox width="60" height="250" paragraphAlign="middle" writingMode="vertical">
-      <Text fontFamily="NotoSansSC" fontSize="24">
-      </Text>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[竖排 Middle 对齐]]></Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -70,8 +65,7 @@
     <Rectangle size="60,250"/>
     <Stroke/>
     <TextBox width="60" height="250" paragraphAlign="far" writingMode="vertical">
-      <Text fontFamily="NotoSansSC" fontSize="24">
-      </Text>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[竖排 Far 对齐]]></Text>
       <Fill/>
     </TextBox>
   </Layer>

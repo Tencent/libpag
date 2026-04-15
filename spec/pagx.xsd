@@ -883,6 +883,8 @@
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="name" type="xs:string" default=""/>
     <xs:attributeGroup ref="ConstraintAttributes"/>
+    <xs:attribute name="x" type="xs:decimal" default="0"/>
+    <xs:attribute name="y" type="xs:decimal" default="0"/>
     <xs:attribute name="flex" type="xs:decimal" default="0"/>
     <xs:attribute name="width" type="xs:decimal"/>
     <xs:attribute name="height" type="xs:decimal"/>
@@ -892,8 +894,6 @@
     <xs:attribute name="alignment" type="AlignmentType" default="stretch"/>
     <xs:attribute name="arrangement" type="ArrangementType" default="start"/>
     <xs:attribute name="includeInLayout" type="BoolType" default="true"/>
-    <xs:attribute name="x" type="xs:decimal" default="0"/>
-    <xs:attribute name="y" type="xs:decimal" default="0"/>
     <xs:attribute name="visible" type="BoolType" default="true"/>
     <xs:attribute name="alpha" type="xs:decimal" default="1"/>
     <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
