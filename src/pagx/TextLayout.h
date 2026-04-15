@@ -71,6 +71,17 @@ struct VerticalPositionedGlyph {
   tgfx::RSXform xform = {};
 };
 
+/**
+ * Line-level metadata for a single Text element within a layout. Records the baseline position,
+ * alignment-adjusted x offset, and byte range in the source Text::text string.
+ */
+struct TextLayoutLineInfo {
+  float baselineY = 0;
+  float startX = 0;
+  uint32_t byteStart = 0;
+  uint32_t byteEnd = 0;
+};
+
 class TextLayoutResult {
  public:
   Rect bounds = {};
@@ -94,11 +105,20 @@ class TextLayoutResult {
    */
   std::vector<TextLayoutGlyphRun> extractLayoutRuns(Text* text);
 
+ /**
+  * Returns the line-level metadata for a specific Text element. Each entry corresponds to one
+  * line of text with baseline position, alignment offset, and byte range in the source string.
+  * Returns nullptr if no line info is available for this text (e.g. vertical layout or embedded
+  * glyph runs).
+  */
+ const std::vector<TextLayoutLineInfo>* getTextLines(Text* text) const;
+
  private:
   std::unordered_map<Text*, std::vector<PositionedGlyph>> horizontalGlyphs = {};
   std::unordered_map<Text*, std::vector<VerticalPositionedGlyph>> verticalGlyphs = {};
   std::unordered_map<Text*, Rect> perTextBounds = {};
   std::unordered_map<Text*, std::vector<TextLayoutGlyphRun>> layoutGlyphRuns = {};
+  std::unordered_map<Text*, std::vector<TextLayoutLineInfo>> textLines = {};
   friend class TextLayoutContext;
 };
 
