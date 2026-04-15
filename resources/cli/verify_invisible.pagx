@@ -31,7 +31,7 @@
   </Layer>
   <!-- Case 5: nested clip regions, child outside inner clip -->
   <Layer width="300" height="300" clipToBounds="true">
-    <Layer x="50" width="200" height="200" clipToBounds="true">
+    <Layer width="200" height="200" clipToBounds="true" x="50">
       <Layer x="250">
         <Rectangle size="100,100"/>
         <Fill color="#FF00FF"/>

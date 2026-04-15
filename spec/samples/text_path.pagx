@@ -1,22 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="400" height="400">
   <Layer>
-    <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="56"/>
-    <TextPath path="@curve" forceAlignment="true"/>
+    <Text fontFamily="Arial" fontSize="56" fontStyle="Bold" text="PAGX"/>
+    <TextPath forceAlignment="true" path="@curve"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="300,0">
-        <ColorStop offset="0" color="#06B6D4"/>
-        <ColorStop offset="0.5" color="#8B5CF6"/>
-        <ColorStop offset="1" color="#EC4899"/>
+      <LinearGradient endPoint="300,0" startPoint="0,0">
+        <ColorStop color="#06B6D4" offset="0"/>
+        <ColorStop color="#8B5CF6" offset="0.5"/>
+        <ColorStop color="#EC4899" offset="1"/>
       </LinearGradient>
     </Fill>
     <Group>
       <Path data="@curve"/>
-      <Stroke color="#64748B" width="1" dashes="6,4"/>
+      <Stroke color="#64748B" dashes="6,4" width="1"/>
     </Group>
     <Group>
-      <Text text="TextPath" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
-      <TextPath path="M 80,320 Q 200,250 320,320" forceAlignment="true"/>
+      <Text fontFamily="Arial" fontSize="28" fontStyle="Bold" text="TextPath"/>
+      <TextPath forceAlignment="true" path="M 80,320 Q 200,250 320,320"/>
       <Fill color="#475569"/>
     </Group>
   </Layer>

@@ -18,26 +18,26 @@
       <Layer flex="1" height="220">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
-          <Polystar left="15" top="15" type="star" pointCount="5" outerRadius="30" innerRadius="12"/>
+          <Polystar left="15" top="15" innerRadius="12" outerRadius="30" pointCount="5" type="star"/>
           <Fill color="#6366F1"/>
         </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
-          <Polystar right="15" top="15" type="star" pointCount="5" outerRadius="30" innerRadius="12"/>
+          <Polystar right="15" top="15" innerRadius="12" outerRadius="30" pointCount="5" type="star"/>
           <Fill color="#F43F5E"/>
         </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
-          <Polystar centerX="0" centerY="0" type="polygon" pointCount="6" outerRadius="35"/>
+          <Polystar centerX="0" centerY="0" outerRadius="35" pointCount="6" type="polygon"/>
           <Fill color="#10B981"/>
         </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
-          <Polystar left="15" bottom="15" type="polygon" pointCount="5" outerRadius="30"/>
+          <Polystar left="15" bottom="15" outerRadius="30" pointCount="5" type="polygon"/>
           <Fill color="#F59E0B"/>
         </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
-          <Polystar right="15" bottom="15" type="star" pointCount="4" outerRadius="30" innerRadius="12"/>
+          <Polystar right="15" bottom="15" innerRadius="12" outerRadius="30" pointCount="4" type="star"/>
           <Fill color="#06B6D4"/>
         </Layer>
       </Layer>
@@ -46,14 +46,14 @@
       <Layer flex="1" height="220">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
-          <Polystar left="60" right="60" top="40" bottom="40" type="star" pointCount="5" outerRadius="100" innerRadius="38"/>
+          <Polystar left="60" right="60" top="40" bottom="40" innerRadius="38" outerRadius="100" pointCount="5" type="star"/>
           <Fill>
-            <LinearGradient startPoint="0,0" endPoint="300,160">
-              <ColorStop offset="0" color="#EC4899"/>
-              <ColorStop offset="1" color="#F472B6"/>
+            <LinearGradient endPoint="300,160" startPoint="0,0">
+              <ColorStop color="#EC4899" offset="0"/>
+              <ColorStop color="#F472B6" offset="1"/>
             </LinearGradient>
           </Fill>
         </Layer>
@@ -68,14 +68,14 @@
       <Layer flex="1" height="220">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
-          <Polystar left="0" right="0" centerY="0" type="star" pointCount="5" outerRadius="100" innerRadius="38"/>
+          <Polystar left="0" right="0" centerY="0" innerRadius="38" outerRadius="100" pointCount="5" type="star"/>
           <Fill>
-            <LinearGradient startPoint="0,0" endPoint="200,150">
-              <ColorStop offset="0" color="#FBBF24"/>
-              <ColorStop offset="1" color="#F59E0B"/>
+            <LinearGradient endPoint="200,150" startPoint="0,0">
+              <ColorStop color="#FBBF24" offset="0"/>
+              <ColorStop color="#F59E0B" offset="1"/>
             </LinearGradient>
           </Fill>
         </Layer>
@@ -85,14 +85,14 @@
       <Layer flex="1" height="220">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
-          <Polystar top="0" bottom="0" centerX="0" type="star" pointCount="5" outerRadius="100" innerRadius="38"/>
+          <Polystar top="0" bottom="0" centerX="0" innerRadius="38" outerRadius="100" pointCount="5" type="star"/>
           <Fill>
-            <LinearGradient startPoint="0,0" endPoint="200,240">
-              <ColorStop offset="0" color="#06B6D4"/>
-              <ColorStop offset="1" color="#0891B2"/>
+            <LinearGradient endPoint="200,240" startPoint="0,0">
+              <ColorStop color="#06B6D4" offset="0"/>
+              <ColorStop color="#0891B2" offset="1"/>
             </LinearGradient>
           </Fill>
         </Layer>
@@ -102,14 +102,14 @@
       <Layer width="355" height="220">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
-          <Polystar left="0" right="0" top="0" bottom="0" type="star" pointCount="5" outerRadius="100" innerRadius="38"/>
+          <Polystar left="0" right="0" top="0" bottom="0" innerRadius="38" outerRadius="100" pointCount="5" type="star"/>
           <Fill>
-            <LinearGradient startPoint="0,0" endPoint="300,240">
-              <ColorStop offset="0" color="#EC4899"/>
-              <ColorStop offset="1" color="#BE185D"/>
+            <LinearGradient endPoint="300,240" startPoint="0,0">
+              <ColorStop color="#EC4899" offset="0"/>
+              <ColorStop color="#BE185D" offset="1"/>
             </LinearGradient>
           </Fill>
         </Layer>

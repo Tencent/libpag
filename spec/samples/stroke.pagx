@@ -4,22 +4,22 @@
     <!-- Row 1: stroke styles -->
     <Layer flex="1" layout="horizontal">
       <Layer flex="1">
-        <Rectangle centerX="0" centerY="0" size="130,130" roundness="20"/>
-        <Stroke color="#06B6D4" width="8" cap="round" join="round"/>
+        <Rectangle centerX="0" centerY="0" roundness="20" size="130,130"/>
+        <Stroke cap="round" color="#06B6D4" join="round" width="8"/>
       </Layer>
       <Layer flex="1">
-        <Rectangle centerX="0" centerY="0" size="130,130" roundness="20"/>
-        <Stroke color="#8B5CF6" width="6" dashes="12,8" cap="round"/>
+        <Rectangle centerX="0" centerY="0" roundness="20" size="130,130"/>
+        <Stroke cap="round" color="#8B5CF6" dashes="12,8" width="6"/>
       </Layer>
     </Layer>
     <!-- Row 2: gradient stroke on path -->
     <Layer flex="1">
       <Path centerX="0" data="M 0,120 Q 150,0 300,120"/>
-      <Stroke width="10" cap="round">
-        <LinearGradient startPoint="0,0" endPoint="300,0">
-          <ColorStop offset="0" color="#F43F5E"/>
-          <ColorStop offset="0.5" color="#EC4899"/>
-          <ColorStop offset="1" color="#8B5CF6"/>
+      <Stroke cap="round" width="10">
+        <LinearGradient endPoint="300,0" startPoint="0,0">
+          <ColorStop color="#F43F5E" offset="0"/>
+          <ColorStop color="#EC4899" offset="0.5"/>
+          <ColorStop color="#8B5CF6" offset="1"/>
         </LinearGradient>
       </Stroke>
     </Layer>

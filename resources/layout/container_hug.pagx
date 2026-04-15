@@ -13,7 +13,7 @@
       <!-- 1. Horizontal HUG: basic (three children, no padding) -->
       <Layer flex="1" layout="horizontal" gap="10">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         <Layer width="70" height="120">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
           <Fill color="#6366F1"/>
@@ -31,7 +31,7 @@
       <!-- 2. Horizontal HUG: with padding -->
       <Layer flex="1">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         <Layer layout="horizontal" gap="10" padding="15">
           <Layer width="70" height="120">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
@@ -51,7 +51,7 @@
       <!-- 3. Horizontal HUG: varied child widths -->
       <Layer flex="1">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         <Layer layout="horizontal" gap="10" padding="15">
           <Layer width="50" height="120">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
@@ -73,7 +73,7 @@
     <Layer flex="1" layout="horizontal" gap="20" alignment="start">
       <Layer flex="1">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         <Layer layout="vertical" gap="10" padding="15" alignment="start">
           <Layer width="150" height="60">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
@@ -92,7 +92,7 @@
 
       <Layer flex="1">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         <Layer layout="vertical" gap="10" padding="15" alignment="start">
           <Layer width="150" height="40">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
@@ -112,7 +112,7 @@
       <!-- 6. Vertical HUG: alignment=center with varied child widths -->
       <Layer flex="1">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         <Layer layout="vertical" gap="10" padding="15" alignment="center">
           <Layer width="150" height="60">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
@@ -132,11 +132,11 @@
       <!-- 7. Nested HUG: outer vertical, inner horizontal -->
       <Layer flex="1">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         <Layer layout="vertical" gap="15" padding="15" alignment="start">
           <Layer flex="1">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
-            <Stroke color="#CBD5E1" width="1" dashes="3,2"/>
+            <Stroke color="#CBD5E1" dashes="3,2" width="1"/>
             <Layer layout="horizontal" gap="10" padding="10">
               <Layer width="50" height="50">
                 <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
@@ -150,7 +150,7 @@
           </Layer>
           <Layer flex="1">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
-            <Stroke color="#CBD5E1" width="1" dashes="3,2"/>
+            <Stroke color="#CBD5E1" dashes="3,2" width="1"/>
             <Layer layout="horizontal" gap="10" padding="10">
               <Layer width="50" height="50">
                 <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>

@@ -5,7 +5,8 @@
     <Rectangle size="60,250"/>
     <Stroke/>
     <TextBox width="60" height="250" writingMode="vertical">
-      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[2024 年 12 月 31 日]]></Text>
+      <Text fontFamily="NotoSansSC" fontSize="24">
+      </Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -14,8 +15,9 @@
   <Layer left="110" top="20">
     <Rectangle size="100,250"/>
     <Stroke/>
-    <TextBox width="100" height="250" writingMode="vertical" textAlign="center">
-      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[価格 $99.50 元 税込 $110.00]]></Text>
+    <TextBox width="100" height="250" textAlign="center" writingMode="vertical">
+      <Text fontFamily="NotoSansSC" fontSize="24">
+      </Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -25,7 +27,7 @@
     <Rectangle size="100,250"/>
     <Stroke/>
     <TextBox width="100" height="250" writingMode="vertical">
-      <Text text="Testing 123 你好&#10;World 456 世界 End" fontFamily="NotoSansSC" fontSize="22"/>
+      <Text fontFamily="NotoSansSC" fontSize="22" text="Testing 123 你好&#10;World 456 世界 End"/>
       <Fill/>
     </TextBox>
   </Layer>
@@ -34,8 +36,9 @@
   <Layer left="350" top="20">
     <Rectangle size="80,200"/>
     <Stroke/>
-    <TextBox width="80" height="200" writingMode="vertical" overflow="hidden">
-      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[春眠不觉晓处处闻啼鸟夜来风雨声花落知多少]]></Text>
+    <TextBox width="80" height="200" overflow="hidden" writingMode="vertical">
+      <Text fontFamily="NotoSansSC" fontSize="24">
+      </Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -45,7 +48,8 @@
     <Rectangle size="60,250"/>
     <Stroke/>
     <TextBox width="60" height="250" writingMode="vertical">
-      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[竖排 Near 对齐]]></Text>
+      <Text fontFamily="NotoSansSC" fontSize="24">
+      </Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -54,8 +58,9 @@
   <Layer left="540" top="20">
     <Rectangle size="60,250"/>
     <Stroke/>
-    <TextBox width="60" height="250" writingMode="vertical" paragraphAlign="middle">
-      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[竖排 Middle 对齐]]></Text>
+    <TextBox width="60" height="250" paragraphAlign="middle" writingMode="vertical">
+      <Text fontFamily="NotoSansSC" fontSize="24">
+      </Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -64,8 +69,9 @@
   <Layer left="620" top="20">
     <Rectangle size="60,250"/>
     <Stroke/>
-    <TextBox width="60" height="250" writingMode="vertical" paragraphAlign="far">
-      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[竖排 Far 对齐]]></Text>
+    <TextBox width="60" height="250" paragraphAlign="far" writingMode="vertical">
+      <Text fontFamily="NotoSansSC" fontSize="24">
+      </Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -75,7 +81,7 @@
     <Rectangle size="100,250"/>
     <Stroke/>
     <TextBox width="100" height="250" writingMode="vertical">
-      <Text text="你好 Hello&#10;世界大地" fontFamily="NotoSansSC" fontSize="24"/>
+      <Text fontFamily="NotoSansSC" fontSize="24" text="你好 Hello&#10;世界大地"/>
       <Fill/>
     </TextBox>
   </Layer>
@@ -84,8 +90,8 @@
   <Layer left="150" top="300">
     <Rectangle size="100,250"/>
     <Stroke/>
-    <TextBox width="100" height="250" writingMode="vertical" textAlign="end">
-      <Text text="你好 Hello&#10;世界大地" fontFamily="NotoSansSC" fontSize="24"/>
+    <TextBox width="100" height="250" textAlign="end" writingMode="vertical">
+      <Text fontFamily="NotoSansSC" fontSize="24" text="你好 Hello&#10;世界大地"/>
       <Fill/>
     </TextBox>
   </Layer>
@@ -94,8 +100,8 @@
   <Layer left="270" top="300">
     <Rectangle size="100,250"/>
     <Stroke/>
-    <TextBox width="100" height="250" writingMode="vertical" textAlign="justify" lineHeight="50">
-      <Text text="春眠 Not 觉晓&#10;处处 Hear 啼鸟" fontFamily="NotoSansSC" fontSize="24"/>
+    <TextBox width="100" height="250" lineHeight="50" textAlign="justify" writingMode="vertical">
+      <Text fontFamily="NotoSansSC" fontSize="24" text="春眠 Not 觉晓&#10;处处 Hear 啼鸟"/>
       <Fill/>
     </TextBox>
   </Layer>
@@ -105,7 +111,7 @@
     <Rectangle size="100,250"/>
     <Stroke/>
     <TextBox width="100" height="250" writingMode="vertical">
-      <Text text="Hello World Test More Text Here" fontFamily="NotoSansSC" fontSize="24"/>
+      <Text fontFamily="NotoSansSC" fontSize="24" text="Hello World Test More Text Here"/>
       <Fill/>
     </TextBox>
   </Layer>

@@ -18,7 +18,7 @@
       <Layer flex="1" height="250">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         </Layer>
         <!-- 1.1: left="20" top="20" (arrow shape) -->
         <Layer left="0" right="0" top="0" bottom="0">
@@ -41,15 +41,15 @@
       <Layer flex="1" height="250">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         </Layer>
         <!-- 2.1: left="30" right="30" top="30" (horizontal scale, top position) -->
         <Layer left="0" right="0" top="0" bottom="0">
           <Path left="30" right="30" top="30" data="M 0,0 L 100,0 L 100,40 L 0,40 Z"/>
           <Fill>
-            <LinearGradient startPoint="0,0" endPoint="300,0">
-              <ColorStop offset="0" color="#F59E0B"/>
-              <ColorStop offset="1" color="#D97706"/>
+            <LinearGradient endPoint="300,0" startPoint="0,0">
+              <ColorStop color="#F59E0B" offset="0"/>
+              <ColorStop color="#D97706" offset="1"/>
             </LinearGradient>
           </Fill>
         </Layer>
@@ -57,9 +57,9 @@
         <Layer left="0" right="0" top="0" bottom="0">
           <Path left="50" right="50" bottom="30" data="M 0,0 L 80,0 L 80,40 L 0,40 Z"/>
           <Fill>
-            <LinearGradient startPoint="0,0" endPoint="260,0">
-              <ColorStop offset="0" color="#10B981"/>
-              <ColorStop offset="1" color="#059669"/>
+            <LinearGradient endPoint="260,0" startPoint="0,0">
+              <ColorStop color="#10B981" offset="0"/>
+              <ColorStop color="#059669" offset="1"/>
             </LinearGradient>
           </Fill>
         </Layer>
@@ -74,15 +74,15 @@
       <Layer flex="1" height="250">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         </Layer>
         <!-- 3.1: top="20" bottom="20" centerX="0" (vertical scale fills height with margins) -->
         <Layer left="0" right="0" top="0" bottom="0">
           <Path top="20" bottom="20" centerX="0" data="M 0,0 L 40,0 L 40,60 L 0,60 Z"/>
           <Fill>
-            <LinearGradient startPoint="0,0" endPoint="0,210">
-              <ColorStop offset="0" color="#06B6D4"/>
-              <ColorStop offset="1" color="#0369A1"/>
+            <LinearGradient endPoint="0,210" startPoint="0,0">
+              <ColorStop color="#06B6D4" offset="0"/>
+              <ColorStop color="#0369A1" offset="1"/>
             </LinearGradient>
           </Fill>
         </Layer>
@@ -92,15 +92,15 @@
       <Layer flex="1" height="250">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         </Layer>
         <!-- 4.1: asymmetric margins: top="20" bottom="60" (top tighter than bottom) -->
         <Layer left="0" right="0" top="0" bottom="0">
           <Path left="25" right="25" top="20" bottom="60" data="M 0,0 L 60,0 L 60,60 L 0,60 Z"/>
           <Fill>
-            <LinearGradient startPoint="0,0" endPoint="150,170">
-              <ColorStop offset="0" color="#8B5CF6"/>
-              <ColorStop offset="1" color="#6D28D9"/>
+            <LinearGradient endPoint="150,170" startPoint="0,0">
+              <ColorStop color="#8B5CF6" offset="0"/>
+              <ColorStop color="#6D28D9" offset="1"/>
             </LinearGradient>
           </Fill>
         </Layer>
@@ -110,15 +110,15 @@
       <Layer flex="1" height="250">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         </Layer>
         <!-- 5.1: asymmetric margins: top="60" bottom="20" (top wider than bottom) -->
         <Layer left="0" right="0" top="0" bottom="0">
           <Path left="30" right="30" top="60" bottom="20" data="M 0,0 L 100,0 L 100,50 L 0,50 Z"/>
           <Fill>
-            <LinearGradient startPoint="0,0" endPoint="300,170">
-              <ColorStop offset="0" color="#EC4899"/>
-              <ColorStop offset="1" color="#BE185D"/>
+            <LinearGradient endPoint="300,170" startPoint="0,0">
+              <ColorStop color="#EC4899" offset="0"/>
+              <ColorStop color="#BE185D" offset="1"/>
             </LinearGradient>
           </Fill>
         </Layer>

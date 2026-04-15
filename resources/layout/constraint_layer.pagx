@@ -11,7 +11,7 @@
   <Layer width="600" height="400">
     <!-- Container border -->
     <Rectangle left="0" right="0" top="0" bottom="0"/>
-    <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+    <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
 
     <!-- Box 1: top-left corner (left=20, top=20) -->
     <Layer left="20" top="20" width="80" height="60">

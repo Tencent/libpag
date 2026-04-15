@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="200" height="200">
   <Layer name="text-layer">
-    <Text text="Hello&#10;World" fontFamily="Noto Sans SC" fontSize="24"/>
+    <Text fontFamily="Noto Sans SC" fontSize="24" text="Hello&#10;World"/>
     <Fill color="#000000"/>
   </Layer>
 </pagx>

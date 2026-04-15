@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="400" height="400">
   <Layer>
-    <Rectangle left="60" top="60" size="180,180" roundness="24"/>
+    <Rectangle left="60" top="60" roundness="24" size="180,180"/>
     <Ellipse left="160" top="160" size="180,180"/>
     <MergePath mode="union"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="280,280">
-        <ColorStop offset="0" color="#6366F1"/>
-        <ColorStop offset="0.5" color="#8B5CF6"/>
-        <ColorStop offset="1" color="#EC4899"/>
+      <LinearGradient endPoint="280,280" startPoint="0,0">
+        <ColorStop color="#6366F1" offset="0"/>
+        <ColorStop color="#8B5CF6" offset="0.5"/>
+        <ColorStop color="#EC4899" offset="1"/>
       </LinearGradient>
     </Fill>
-    <DropShadowStyle offsetY="12" blurX="40" blurY="40" color="#8B5CF660"/>
+    <DropShadowStyle blurX="40" blurY="40" color="#8B5CF660" offsetY="12"/>
   </Layer>
 </pagx>

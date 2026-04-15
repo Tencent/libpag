@@ -5,7 +5,8 @@
     <Rectangle size="250,50"/>
     <Stroke/>
     <TextBox width="250" height="50">
-      <Text fontFamily="NotoSansSC" fontSize="22"><![CDATA[שלום עולם]]></Text>
+      <Text fontFamily="NotoSansSC" fontSize="22">
+      </Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -15,7 +16,8 @@
     <Rectangle size="220,50"/>
     <Stroke/>
     <TextBox width="220" height="50">
-      <Text fontFamily="NotoSansSC" fontSize="20"><![CDATA[מחיר: $99.50]]></Text>
+      <Text fontFamily="NotoSansSC" fontSize="20">
+      </Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -25,7 +27,8 @@
     <Rectangle size="400,50"/>
     <Stroke/>
     <TextBox width="400" height="50">
-      <Text fontFamily="NotoSansSC" fontSize="20"><![CDATA[שלום Hello עולם World]]></Text>
+      <Text fontFamily="NotoSansSC" fontSize="20">
+      </Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -35,7 +38,8 @@
     <Rectangle size="400,50"/>
     <Stroke/>
     <TextBox width="400" height="50">
-      <Text fontFamily="NotoSansSC" fontSize="20"><![CDATA[版本 v2.0.1 发布 共 123 项更新]]></Text>
+      <Text fontFamily="NotoSansSC" fontSize="20">
+      </Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -45,7 +49,8 @@
     <Rectangle size="300,100"/>
     <Stroke/>
     <TextBox width="300" height="100">
-      <Text fontFamily="NotoSansSC" fontSize="18"><![CDATA[שלום Hello 你好 World עולם 世界]]></Text>
+      <Text fontFamily="NotoSansSC" fontSize="18">
+      </Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -55,7 +60,8 @@
     <Rectangle size="200,100"/>
     <Stroke/>
     <TextBox width="200" height="100">
-      <Text fontFamily="NotoSansSC" fontSize="18"><![CDATA[זהו טקסט ארוך בעברית שצריך לעבור שורה]]></Text>
+      <Text fontFamily="NotoSansSC" fontSize="18">
+      </Text>
       <Fill/>
     </TextBox>
   </Layer>

@@ -12,22 +12,22 @@
 
   <!-- Main container: vertical layout, padding=30, gap=20 -->
   <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30">
-    
+
     <!-- Row 1: 4 equal-width containers (flexible, no width specified) -->
     <Layer flex="1" layout="horizontal" gap="20">
       <!-- Container 1 -->
       <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
           <Group centerX="0" centerY="0" width="135" height="120">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
             <Fill>
-              <LinearGradient startPoint="0,0" endPoint="135,120">
-                <ColorStop offset="0" color="#6366F1"/>
-                <ColorStop offset="1" color="#8B5CF6"/>
+              <LinearGradient endPoint="135,120" startPoint="0,0">
+                <ColorStop color="#6366F1" offset="0"/>
+                <ColorStop color="#8B5CF6" offset="1"/>
               </LinearGradient>
             </Fill>
           </Group>
@@ -38,15 +38,15 @@
       <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
           <Group left="20" right="20" top="40" height="120">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
             <Fill>
-              <LinearGradient startPoint="0,0" endPoint="135,120">
-                <ColorStop offset="0" color="#F43F5E"/>
-                <ColorStop offset="1" color="#EC4899"/>
+              <LinearGradient endPoint="135,120" startPoint="0,0">
+                <ColorStop color="#F43F5E" offset="0"/>
+                <ColorStop color="#EC4899" offset="1"/>
               </LinearGradient>
             </Fill>
           </Group>
@@ -57,15 +57,15 @@
       <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
           <Group left="20" top="20" bottom="20" width="135">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
             <Fill>
-              <LinearGradient startPoint="0,0" endPoint="135,160">
-                <ColorStop offset="0" color="#10B981"/>
-                <ColorStop offset="1" color="#059669"/>
+              <LinearGradient endPoint="135,160" startPoint="0,0">
+                <ColorStop color="#10B981" offset="0"/>
+                <ColorStop color="#059669" offset="1"/>
               </LinearGradient>
             </Fill>
           </Group>
@@ -76,15 +76,15 @@
       <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
           <Group left="20" right="20" top="20" bottom="20">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
             <Fill>
-              <LinearGradient startPoint="0,0" endPoint="135,160">
-                <ColorStop offset="0" color="#F59E0B"/>
-                <ColorStop offset="1" color="#D97706"/>
+              <LinearGradient endPoint="135,160" startPoint="0,0">
+                <ColorStop color="#F59E0B" offset="0"/>
+                <ColorStop color="#D97706" offset="1"/>
               </LinearGradient>
             </Fill>
           </Group>
@@ -98,7 +98,7 @@
       <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
           <Group left="20" right="20" top="20" bottom="20">
@@ -120,15 +120,15 @@
       <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
           <Group centerX="0" centerY="0" width="200" height="160">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
             <Fill>
-              <LinearGradient startPoint="0,0" endPoint="200,160">
-                <ColorStop offset="0" color="#8B5CF6"/>
-                <ColorStop offset="1" color="#6D28D9"/>
+              <LinearGradient endPoint="200,160" startPoint="0,0">
+                <ColorStop color="#8B5CF6" offset="0"/>
+                <ColorStop color="#6D28D9" offset="1"/>
               </LinearGradient>
             </Fill>
           </Group>
@@ -139,16 +139,16 @@
       <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
           <Group>
             <Group centerX="0" centerY="0" width="200" height="160">
               <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
               <Fill>
-                <LinearGradient startPoint="0,0" endPoint="200,160">
-                  <ColorStop offset="0" color="#10B981"/>
-                  <ColorStop offset="1" color="#047857"/>
+                <LinearGradient endPoint="200,160" startPoint="0,0">
+                  <ColorStop color="#10B981" offset="0"/>
+                  <ColorStop color="#047857" offset="1"/>
                 </LinearGradient>
               </Fill>
             </Group>
@@ -163,7 +163,7 @@
       <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
           <Group left="20" right="20" top="20" bottom="20">
@@ -171,7 +171,7 @@
             <Fill color="#F0F9FF"/>
           </Group>
           <Group left="20" right="20" top="20" bottom="20">
-            <Rectangle left="20" right="20" top="15" size="1,50" roundness="8"/>
+            <Rectangle left="20" right="20" top="15" roundness="8" size="1,50"/>
             <Fill color="#3B82F6"/>
           </Group>
           <Group left="20" right="20" top="20" bottom="20">
@@ -185,7 +185,7 @@
       <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
           <Group left="20" right="20" top="20" bottom="20">
@@ -194,18 +194,18 @@
             <Group left="5" top="10" width="90" height="140">
               <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
               <Fill>
-                <LinearGradient startPoint="0,0" endPoint="90,140">
-                  <ColorStop offset="0" color="#6366F1"/>
-                  <ColorStop offset="1" color="#8B5CF6"/>
+                <LinearGradient endPoint="90,140" startPoint="0,0">
+                  <ColorStop color="#6366F1" offset="0"/>
+                  <ColorStop color="#8B5CF6" offset="1"/>
                 </LinearGradient>
               </Fill>
             </Group>
             <Group right="5" top="10" width="90" height="140">
               <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
               <Fill>
-                <LinearGradient startPoint="0,0" endPoint="90,140">
-                  <ColorStop offset="0" color="#EC4899"/>
-                  <ColorStop offset="1" color="#F472B6"/>
+                <LinearGradient endPoint="90,140" startPoint="0,0">
+                  <ColorStop color="#EC4899" offset="0"/>
+                  <ColorStop color="#F472B6" offset="1"/>
                 </LinearGradient>
               </Fill>
             </Group>
@@ -217,15 +217,15 @@
       <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
           <Group left="20" right="20" top="20" bottom="20">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
             <Fill>
-              <LinearGradient startPoint="0,0" endPoint="200,160">
-                <ColorStop offset="0" color="#F59E0B"/>
-                <ColorStop offset="1" color="#D97706"/>
+              <LinearGradient endPoint="200,160" startPoint="0,0">
+                <ColorStop color="#F59E0B" offset="0"/>
+                <ColorStop color="#D97706" offset="1"/>
               </LinearGradient>
             </Fill>
           </Group>

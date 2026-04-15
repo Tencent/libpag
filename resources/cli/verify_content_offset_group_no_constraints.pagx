@@ -4,7 +4,7 @@
     <Stroke color="#7F8C8D" width="1.8"/>
     <Group>
       <Path data="M2 22C2 17 6 13 12 13C18 13 22 17 22 22"/>
-      <Stroke color="#7F8C8D" width="1.8" cap="round"/>
+      <Stroke cap="round" color="#7F8C8D" width="1.8"/>
     </Group>
   </Layer>
 </pagx>

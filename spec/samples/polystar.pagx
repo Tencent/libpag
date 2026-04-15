@@ -6,21 +6,21 @@
     <Layer flex="1" layout="horizontal">
       <!-- 5-pointed star -->
       <Layer flex="1">
-        <Polystar centerX="0" centerY="0" type="star" pointCount="5" outerRadius="60" innerRadius="28"/>
+        <Polystar centerX="0" centerY="0" innerRadius="28" outerRadius="60" pointCount="5" type="star"/>
         <Fill>
-          <LinearGradient startPoint="0,0" endPoint="120,120">
-            <ColorStop offset="0" color="#FBBF24"/>
-            <ColorStop offset="1" color="#F59E0B"/>
+          <LinearGradient endPoint="120,120" startPoint="0,0">
+            <ColorStop color="#FBBF24" offset="0"/>
+            <ColorStop color="#F59E0B" offset="1"/>
           </LinearGradient>
         </Fill>
       </Layer>
       <!-- 6-pointed star -->
       <Layer flex="1">
-        <Polystar centerX="0" centerY="0" type="star" pointCount="6" outerRadius="60" innerRadius="32"/>
+        <Polystar centerX="0" centerY="0" innerRadius="32" outerRadius="60" pointCount="6" type="star"/>
         <Fill>
-          <LinearGradient startPoint="0,0" endPoint="120,120">
-            <ColorStop offset="0" color="#F43F5E"/>
-            <ColorStop offset="1" color="#E11D48"/>
+          <LinearGradient endPoint="120,120" startPoint="0,0">
+            <ColorStop color="#F43F5E" offset="0"/>
+            <ColorStop color="#E11D48" offset="1"/>
           </LinearGradient>
         </Fill>
       </Layer>
@@ -29,25 +29,25 @@
     <Layer flex="1" layout="horizontal">
       <!-- Hexagon -->
       <Layer flex="1">
-        <Polystar centerX="0" centerY="0" type="polygon" pointCount="6" outerRadius="64"/>
+        <Polystar centerX="0" centerY="0" outerRadius="64" pointCount="6" type="polygon"/>
         <Fill>
-          <LinearGradient startPoint="0,0" endPoint="128,128">
-            <ColorStop offset="0" color="#06B6D4"/>
-            <ColorStop offset="1" color="#0891B2"/>
+          <LinearGradient endPoint="128,128" startPoint="0,0">
+            <ColorStop color="#06B6D4" offset="0"/>
+            <ColorStop color="#0891B2" offset="1"/>
           </LinearGradient>
         </Fill>
       </Layer>
       <!-- Pentagon -->
       <Layer flex="1">
-        <Polystar centerX="0" centerY="0" type="polygon" pointCount="5" outerRadius="64"/>
+        <Polystar centerX="0" centerY="0" outerRadius="64" pointCount="5" type="polygon"/>
         <Fill>
-          <LinearGradient startPoint="0,0" endPoint="128,128">
-            <ColorStop offset="0" color="#8B5CF6"/>
-            <ColorStop offset="1" color="#7C3AED"/>
+          <LinearGradient endPoint="128,128" startPoint="0,0">
+            <ColorStop color="#8B5CF6" offset="0"/>
+            <ColorStop color="#7C3AED" offset="1"/>
           </LinearGradient>
         </Fill>
       </Layer>
     </Layer>
-    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#00000050"/>
+    <DropShadowStyle blurX="24" blurY="24" color="#00000050" offsetY="8"/>
   </Layer>
 </pagx>

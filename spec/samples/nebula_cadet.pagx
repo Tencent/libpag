@@ -5,18 +5,18 @@
     <!-- Background -->
     <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="0,600">
-        <ColorStop offset="0" color="#0B1026"/>
-        <ColorStop offset="0.6" color="#0F1C3D"/>
-        <ColorStop offset="1" color="#1B1140"/>
+      <LinearGradient endPoint="0,600" startPoint="0,0">
+        <ColorStop color="#0B1026" offset="0"/>
+        <ColorStop color="#0F1C3D" offset="0.6"/>
+        <ColorStop color="#1B1140" offset="1"/>
       </LinearGradient>
     </Fill>
     <Layer name="NebulaLeft">
       <Ellipse left="-20" top="70" size="360,300"/>
       <Fill>
         <RadialGradient center="160,220" radius="220">
-          <ColorStop offset="0" color="#1D4ED880"/>
-          <ColorStop offset="1" color="#1D4ED800"/>
+          <ColorStop color="#1D4ED880" offset="0"/>
+          <ColorStop color="#1D4ED800" offset="1"/>
         </RadialGradient>
       </Fill>
     </Layer>
@@ -24,8 +24,8 @@
       <Ellipse left="460" top="40" size="360,280"/>
       <Fill>
         <RadialGradient center="640,180" radius="220">
-          <ColorStop offset="0" color="#C026D380"/>
-          <ColorStop offset="1" color="#C026D300"/>
+          <ColorStop color="#C026D380" offset="0"/>
+          <ColorStop color="#C026D300" offset="1"/>
         </RadialGradient>
       </Fill>
     </Layer>
@@ -33,23 +33,23 @@
       <Ellipse left="100" top="395" size="600,220"/>
       <Fill>
         <RadialGradient center="400,505" radius="260">
-          <ColorStop offset="0" color="#22D3EE60"/>
-          <ColorStop offset="1" color="#22D3EE00"/>
+          <ColorStop color="#22D3EE60" offset="0"/>
+          <ColorStop color="#22D3EE00" offset="1"/>
         </RadialGradient>
       </Fill>
     </Layer>
     <Layer name="Stars" alpha="0.9">
-        <Ellipse left="119" top="79" size="2,2"/>
-        <Ellipse left="178.5" top="108.5" size="3,3"/>
-        <Ellipse left="259" top="89" size="2,2"/>
-        <Ellipse left="339" top="69" size="2,2"/>
-        <Ellipse left="418.5" top="108.5" size="3,3"/>
-        <Ellipse left="519" top="79" size="2,2"/>
-        <Ellipse left="609" top="119" size="2,2"/>
-        <Ellipse left="699" top="89" size="2,2"/>
-        <Ellipse left="738.5" top="148.5" size="3,3"/>
-        <Ellipse left="89" top="159" size="2,2"/>
-        <Fill color="#FFFFFFCC"/>
+      <Ellipse left="119" top="79" size="2,2"/>
+      <Ellipse left="178.5" top="108.5" size="3,3"/>
+      <Ellipse left="259" top="89" size="2,2"/>
+      <Ellipse left="339" top="69" size="2,2"/>
+      <Ellipse left="418.5" top="108.5" size="3,3"/>
+      <Ellipse left="519" top="79" size="2,2"/>
+      <Ellipse left="609" top="119" size="2,2"/>
+      <Ellipse left="699" top="89" size="2,2"/>
+      <Ellipse left="738.5" top="148.5" size="3,3"/>
+      <Ellipse left="89" top="159" size="2,2"/>
+      <Fill color="#FFFFFFCC"/>
       <Group>
         <Ellipse left="149" top="199" size="2,2"/>
         <Ellipse left="239" top="169" size="2,2"/>
@@ -65,89 +65,89 @@
     </Layer>
     <Layer name="StarBursts">
       <Layer>
-        <Polystar left="212" top="122" type="star" pointCount="4" outerRadius="8" innerRadius="3" rotation="45"/>
+        <Polystar left="212" top="122" innerRadius="3" outerRadius="8" pointCount="4" rotation="45" type="star"/>
         <Fill color="#FFFFFFEE"/>
         <DropShadowStyle blurX="6" blurY="6" color="#7DD3FC80"/>
       </Layer>
       <Layer>
-        <Polystar left="613" top="203" type="star" pointCount="4" outerRadius="7" innerRadius="3" rotation="45"/>
+        <Polystar left="613" top="203" innerRadius="3" outerRadius="7" pointCount="4" rotation="45" type="star"/>
         <Fill color="#FFFFFFDD"/>
         <DropShadowStyle blurX="6" blurY="6" color="#C084FC80"/>
       </Layer>
       <Layer>
-        <Polystar left="694" top="414" type="star" pointCount="4" outerRadius="6" innerRadius="2" rotation="45"/>
+        <Polystar left="694" top="414" innerRadius="2" outerRadius="6" pointCount="4" rotation="45" type="star"/>
         <Fill color="#FFFFFFCC"/>
         <DropShadowStyle blurX="5" blurY="5" color="#22D3EE80"/>
       </Layer>
     </Layer>
     <Layer name="HudRings" left="400" top="310" alpha="0.7">
-        <Ellipse left="-240" top="-240" size="480,480"/>
-        <Stroke color="#1E3A8A" width="2" dashes="10,12"/>
+      <Ellipse left="-240" top="-240" size="480,480"/>
+      <Stroke color="#1E3A8A" dashes="10,12" width="2"/>
       <Group>
         <Ellipse left="-210" top="-210" size="420,420"/>
-        <TrimPath start="0.1" end="0.4" offset="40"/>
-        <Stroke width="4" cap="round">
+        <TrimPath end="0.4" offset="40" start="0.1"/>
+        <Stroke cap="round" width="4">
           <ConicGradient>
-            <ColorStop offset="0" color="#38BDF8"/>
-            <ColorStop offset="0.5" color="#22D3EE"/>
-            <ColorStop offset="1" color="#7C3AED"/>
+            <ColorStop color="#38BDF8" offset="0"/>
+            <ColorStop color="#22D3EE" offset="0.5"/>
+            <ColorStop color="#7C3AED" offset="1"/>
           </ConicGradient>
         </Stroke>
       </Group>
       <Group>
         <Ellipse left="-180" top="-180" size="360,360"/>
-        <TrimPath start="0.55" end="0.85" offset="-30"/>
-        <Stroke color="#38BDF8" width="3" alpha="0.8" cap="round"/>
+        <TrimPath end="0.85" offset="-30" start="0.55"/>
+        <Stroke alpha="0.8" cap="round" color="#38BDF8" width="3"/>
       </Group>
     </Layer>
     <Layer name="MainPanel">
-      <Rectangle left="60" top="130" size="680,360" roundness="28"/>
+      <Rectangle left="60" top="130" roundness="28" size="680,360"/>
       <Fill>
-        <LinearGradient startPoint="60,310" endPoint="740,310">
-          <ColorStop offset="0" color="#0F1C3DCC"/>
-          <ColorStop offset="0.5" color="#12244ACC"/>
-          <ColorStop offset="1" color="#0C1B33CC"/>
+        <LinearGradient endPoint="740,310" startPoint="60,310">
+          <ColorStop color="#0F1C3DCC" offset="0"/>
+          <ColorStop color="#12244ACC" offset="0.5"/>
+          <ColorStop color="#0C1B33CC" offset="1"/>
         </LinearGradient>
       </Fill>
       <Stroke width="1.5">
-        <LinearGradient startPoint="60,310" endPoint="740,310">
-          <ColorStop offset="0" color="#3B82F6AA"/>
-          <ColorStop offset="0.5" color="#22D3EE88"/>
-          <ColorStop offset="1" color="#A78BFAAA"/>
+        <LinearGradient endPoint="740,310" startPoint="60,310">
+          <ColorStop color="#3B82F6AA" offset="0"/>
+          <ColorStop color="#22D3EE88" offset="0.5"/>
+          <ColorStop color="#A78BFAAA" offset="1"/>
         </LinearGradient>
       </Stroke>
       <BackgroundBlurStyle blurX="24" blurY="24" tileMode="mirror"/>
-      <DropShadowStyle offsetY="12" blurX="20" blurY="20" color="#00000066"/>
+      <DropShadowStyle blurX="20" blurY="20" color="#00000066" offsetY="12"/>
     </Layer>
     <Layer name="TopBar">
-      <Rectangle left="20" top="20" size="760,90" roundness="22"/>
+      <Rectangle left="20" top="20" roundness="22" size="760,90"/>
       <Fill>
-        <LinearGradient startPoint="20,65" endPoint="780,65">
-          <ColorStop offset="0" color="#0C1B33EE"/>
-          <ColorStop offset="1" color="#10284CEE"/>
+        <LinearGradient endPoint="780,65" startPoint="20,65">
+          <ColorStop color="#0C1B33EE" offset="0"/>
+          <ColorStop color="#10284CEE" offset="1"/>
         </LinearGradient>
       </Fill>
       <Stroke width="1">
-        <LinearGradient startPoint="20,65" endPoint="780,65">
-          <ColorStop offset="0" color="#1D4ED8AA"/>
-          <ColorStop offset="1" color="#38BDF8AA"/>
+        <LinearGradient endPoint="780,65" startPoint="20,65">
+          <ColorStop color="#1D4ED8AA" offset="0"/>
+          <ColorStop color="#38BDF8AA" offset="1"/>
         </LinearGradient>
       </Stroke>
-      <DropShadowStyle offsetY="8" blurX="16" blurY="16" color="#00000055"/>
+      <DropShadowStyle blurX="16" blurY="16" color="#00000055" offsetY="8"/>
     </Layer>
     <Layer name="BottomBar">
-      <Rectangle left="20" top="510" size="760,70" roundness="20"/>
+      <Rectangle left="20" top="510" roundness="20" size="760,70"/>
       <Fill>
-        <LinearGradient startPoint="20,545" endPoint="780,545">
-          <ColorStop offset="0" color="#0B1A33CC"/>
-          <ColorStop offset="1" color="#10284ECC"/>
+        <LinearGradient endPoint="780,545" startPoint="20,545">
+          <ColorStop color="#0B1A33CC" offset="0"/>
+          <ColorStop color="#10284ECC" offset="1"/>
         </LinearGradient>
       </Fill>
       <Stroke color="#1D4ED8AA" width="1"/>
     </Layer>
     <Layer name="TechLines" alpha="0.6">
-        <Path data="M 80 130 L 160 130 L 200 170"/>
-        <Stroke color="#38BDF8" width="1"/>
+      <Path data="M 80 130 L 160 130 L 200 170"/>
+      <Stroke color="#38BDF8" width="1"/>
       <Group>
         <Path data="M 720 130 L 640 130 L 600 170"/>
         <Stroke color="#A78BFA" width="1"/>
@@ -162,35 +162,34 @@
       </Group>
     </Layer>
     <Layer name="HexDecor" alpha="0.6">
-        <Polystar left="106" top="186" type="polygon" pointCount="6" outerRadius="14" rotation="30"/>
-        <Stroke color="#1D4ED8" width="1"/>
+      <Polystar left="106" top="186" outerRadius="14" pointCount="6" rotation="30" type="polygon"/>
+      <Stroke color="#1D4ED8" width="1"/>
       <Group>
-        <Polystar left="668" top="228" type="polygon" pointCount="6" outerRadius="12" rotation="30"/>
+        <Polystar left="668" top="228" outerRadius="12" pointCount="6" rotation="30" type="polygon"/>
         <Stroke color="#38BDF8" width="1"/>
       </Group>
       <Group>
-        <Polystar left="170" top="410" type="polygon" pointCount="6" outerRadius="10" rotation="30"/>
+        <Polystar left="170" top="410" outerRadius="10" pointCount="6" rotation="30" type="polygon"/>
         <Stroke color="#22D3EE" width="1"/>
       </Group>
       <Group>
-        <Polystar left="628" top="408" type="polygon" pointCount="6" outerRadius="12" rotation="30"/>
+        <Polystar left="628" top="408" outerRadius="12" pointCount="6" rotation="30" type="polygon"/>
         <Stroke color="#A78BFA" width="1"/>
       </Group>
     </Layer>
   </Layer>
   <!-- ======== Content Container (vertical layout) ======== -->
-  <Layer name="ContentContainer" layout="vertical" alignment="center" arrangement="spaceEvenly"
-         left="0" right="0" top="0" bottom="0">
+  <Layer name="ContentContainer" left="0" right="0" top="0" bottom="0" layout="vertical" alignment="center" arrangement="spaceEvenly">
     <!-- Top Bar Area -->
     <Layer name="TopBarArea" width="760" height="90">
       <Layer name="Avatar">
-          <Polystar position="50,45" type="polygon" pointCount="6" outerRadius="36" rotation="30"/>
-          <Stroke width="2">
-            <LinearGradient startPoint="14,9" endPoint="86,81">
-              <ColorStop offset="0" color="#38BDF8"/>
-              <ColorStop offset="1" color="#A78BFA"/>
-            </LinearGradient>
-          </Stroke>
+        <Polystar outerRadius="36" pointCount="6" position="50,45" rotation="30" type="polygon"/>
+        <Stroke width="2">
+          <LinearGradient endPoint="86,81" startPoint="14,9">
+            <ColorStop color="#38BDF8" offset="0"/>
+            <ColorStop color="#A78BFA" offset="1"/>
+          </LinearGradient>
+        </Stroke>
         <Group>
           <Ellipse left="22" top="17" size="56,56"/>
           <Fill color="#0B1225"/>
@@ -199,8 +198,8 @@
           <Ellipse left="26" top="21" size="48,48"/>
           <Fill>
             <RadialGradient center="50,45" radius="30">
-              <ColorStop offset="0" color="#38BDF8AA"/>
-              <ColorStop offset="1" color="#0B122500"/>
+              <ColorStop color="#38BDF8AA" offset="0"/>
+              <ColorStop color="#0B122500" offset="1"/>
             </RadialGradient>
           </Fill>
         </Group>
@@ -208,52 +207,52 @@
       </Layer>
       <Layer name="PlayerName">
         <TextBox left="100" top="9">
-          <Text text="NEBULA CADET" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
+          <Text fontFamily="Arial" fontSize="16" fontStyle="Bold" text="NEBULA CADET"/>
           <Fill color="#E2E8F0"/>
         </TextBox>
       </Layer>
       <Layer name="PlayerIdRow">
         <TextBox left="100" top="32">
-          <Text text="#A17X9" fontFamily="Arial" fontSize="11"/>
+          <Text fontFamily="Arial" fontSize="11" text="#A17X9"/>
           <Fill color="#7DD3FC"/>
         </TextBox>
         <Layer name="LevelBadge">
-          <Rectangle left="151" top="33" size="48,14" roundness="7"/>
+          <Rectangle left="151" top="33" roundness="7" size="48,14"/>
           <Fill>
-            <LinearGradient startPoint="151,40" endPoint="199,40">
-              <ColorStop offset="0" color="#0EA5E9"/>
-              <ColorStop offset="1" color="#22D3EE"/>
+            <LinearGradient endPoint="199,40" startPoint="151,40">
+              <ColorStop color="#0EA5E9" offset="0"/>
+              <ColorStop color="#22D3EE" offset="1"/>
             </LinearGradient>
           </Fill>
           <Stroke color="#7DD3FC" width="1"/>
-          <TextBox left="151" top="33" width="48" height="14" textAlign="center" paragraphAlign="middle">
-            <Text text="LV 27" fontFamily="Arial" fontStyle="Bold" fontSize="9"/>
+          <TextBox left="151" top="33" width="48" height="14" paragraphAlign="middle" textAlign="center">
+            <Text fontFamily="Arial" fontSize="9" fontStyle="Bold" text="LV 27"/>
             <Fill color="#E0F2FE"/>
           </TextBox>
         </Layer>
       </Layer>
       <Layer name="ExpBar">
-          <Rectangle left="100" top="54" size="280,10" roundness="5"/>
-          <Fill color="#1E293B"/>
+        <Rectangle left="100" top="54" roundness="5" size="280,10"/>
+        <Fill color="#1E293B"/>
         <Group>
-          <Rectangle left="100" top="56" size="190,6" roundness="3"/>
+          <Rectangle left="100" top="56" roundness="3" size="190,6"/>
           <Fill>
-            <LinearGradient startPoint="100,59" endPoint="290,59">
-              <ColorStop offset="0" color="#22D3EE"/>
-              <ColorStop offset="1" color="#3B82F6"/>
+            <LinearGradient endPoint="290,59" startPoint="100,59">
+              <ColorStop color="#22D3EE" offset="0"/>
+              <ColorStop color="#3B82F6" offset="1"/>
             </LinearGradient>
           </Fill>
         </Group>
       </Layer>
       <Layer name="EnergyBar">
-          <Rectangle left="100" top="70" size="280,10" roundness="5"/>
-          <Fill color="#172437"/>
+        <Rectangle left="100" top="70" roundness="5" size="280,10"/>
+        <Fill color="#172437"/>
         <Group>
-          <Rectangle left="100" top="72" size="160,6" roundness="3"/>
+          <Rectangle left="100" top="72" roundness="3" size="160,6"/>
           <Fill>
-            <LinearGradient startPoint="100,75" endPoint="260,75">
-              <ColorStop offset="0" color="#34D399"/>
-              <ColorStop offset="1" color="#10B981"/>
+            <LinearGradient endPoint="260,75" startPoint="100,75">
+              <ColorStop color="#34D399" offset="0"/>
+              <ColorStop color="#10B981" offset="1"/>
             </LinearGradient>
           </Fill>
         </Group>
@@ -266,9 +265,9 @@
           <Group>
             <Ellipse left="12" top="6" size="16,16"/>
             <Fill>
-              <LinearGradient startPoint="12,14" endPoint="28,14">
-                <ColorStop offset="0" color="#FFE29A"/>
-                <ColorStop offset="1" color="#F59E0B"/>
+              <LinearGradient endPoint="28,14" startPoint="12,14">
+                <ColorStop color="#FFE29A" offset="0"/>
+                <ColorStop color="#F59E0B" offset="1"/>
               </LinearGradient>
             </Fill>
           </Group>
@@ -277,7 +276,7 @@
             <Stroke color="#F8D477" width="1"/>
           </Group>
           <TextBox left="40" top="0" width="110" height="28" paragraphAlign="middle">
-            <Text text="12,450" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
+            <Text fontFamily="Arial" fontSize="13" fontStyle="Bold" text="12,450"/>
             <Fill color="#F8FAFC"/>
           </TextBox>
         </Layer>
@@ -288,14 +287,14 @@
           <Group left="12" top="6">
             <Path data="@IconDiamond"/>
             <Fill>
-              <LinearGradient startPoint="0,8" endPoint="16,8">
-                <ColorStop offset="0" color="#7DD3FC"/>
-                <ColorStop offset="1" color="#A78BFA"/>
+              <LinearGradient endPoint="16,8" startPoint="0,8">
+                <ColorStop color="#7DD3FC" offset="0"/>
+                <ColorStop color="#A78BFA" offset="1"/>
               </LinearGradient>
             </Fill>
           </Group>
           <TextBox left="40" top="0" width="110" height="28" paragraphAlign="middle">
-            <Text text="860" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
+            <Text fontFamily="Arial" fontSize="13" fontStyle="Bold" text="860"/>
             <Fill color="#F8FAFC"/>
           </TextBox>
         </Layer>
@@ -305,17 +304,17 @@
     <Layer name="MainPanelArea" width="680" height="360">
       <Layer name="MenuButtons" centerX="0" centerY="0" width="340" height="262" layout="vertical" gap="14">
         <Layer name="StartButton" height="78">
-          <Rectangle size="340,78" roundness="28"/>
+          <Rectangle roundness="28" size="340,78"/>
           <Fill>
-            <LinearGradient startPoint="0,39" endPoint="340,39">
-              <ColorStop offset="0" color="#00FFC6"/>
-              <ColorStop offset="0.5" color="#00C2FF"/>
-              <ColorStop offset="1" color="#00FFA6"/>
+            <LinearGradient endPoint="340,39" startPoint="0,39">
+              <ColorStop color="#00FFC6" offset="0"/>
+              <ColorStop color="#00C2FF" offset="0.5"/>
+              <ColorStop color="#00FFA6" offset="1"/>
             </LinearGradient>
           </Fill>
           <Stroke color="#5AFADF" width="2"/>
           <Group>
-            <Rectangle left="15" top="12" size="310,34" roundness="18"/>
+            <Rectangle left="15" top="12" roundness="18" size="310,34"/>
             <Fill color="#FFFFFF22"/>
           </Group>
           <Group left="50" top="27">
@@ -323,20 +322,20 @@
             <Fill color="#ECFEFF"/>
           </Group>
           <Layer left="0" right="0" top="0" bottom="0">
-            <TextBox left="0" right="0" top="0" bottom="0" textAlign="center" paragraphAlign="middle">
-              <Text text="START" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+            <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle" textAlign="center">
+              <Text fontFamily="Arial" fontSize="24" fontStyle="Bold" text="START"/>
               <Fill color="#F0FFFD"/>
             </TextBox>
-            <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#0F172A80"/>
+            <DropShadowStyle blurX="6" blurY="6" color="#0F172A80" offsetY="2"/>
           </Layer>
-          <DropShadowStyle offsetY="12" blurX="18" blurY="18" color="#00FFC066"/>
+          <DropShadowStyle blurX="18" blurY="18" color="#00FFC066" offsetY="12"/>
         </Layer>
         <Layer name="ShopButton" height="78">
-          <Rectangle size="340,78" roundness="28"/>
+          <Rectangle roundness="28" size="340,78"/>
           <Fill>
-            <LinearGradient startPoint="0,39" endPoint="340,39">
-              <ColorStop offset="0" color="#FFD166"/>
-              <ColorStop offset="1" color="#FF8C42"/>
+            <LinearGradient endPoint="340,39" startPoint="0,39">
+              <ColorStop color="#FFD166" offset="0"/>
+              <ColorStop color="#FF8C42" offset="1"/>
             </LinearGradient>
           </Fill>
           <Stroke color="#FFD166" width="1.5"/>
@@ -344,18 +343,18 @@
             <Path data="@IconCart"/>
             <Fill color="#FFF7ED"/>
           </Group>
-          <TextBox left="0" right="0" top="0" bottom="0" textAlign="center" paragraphAlign="middle">
-            <Text text="SHOP" fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
+          <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle" textAlign="center">
+            <Text fontFamily="Arial" fontSize="22" fontStyle="Bold" text="SHOP"/>
             <Fill color="#FFF7ED"/>
           </TextBox>
-          <DropShadowStyle offsetY="10" blurX="16" blurY="16" color="#F59E0B66"/>
+          <DropShadowStyle blurX="16" blurY="16" color="#F59E0B66" offsetY="10"/>
         </Layer>
         <Layer name="RankButton" height="78">
-          <Rectangle size="340,78" roundness="28"/>
+          <Rectangle roundness="28" size="340,78"/>
           <Fill>
-            <LinearGradient startPoint="0,39" endPoint="340,39">
-              <ColorStop offset="0" color="#7C3AED"/>
-              <ColorStop offset="1" color="#EC4899"/>
+            <LinearGradient endPoint="340,39" startPoint="0,39">
+              <ColorStop color="#7C3AED" offset="0"/>
+              <ColorStop color="#EC4899" offset="1"/>
             </LinearGradient>
           </Fill>
           <Stroke color="#C084FC" width="1.5"/>
@@ -363,11 +362,11 @@
             <Path data="@IconCrown"/>
             <Fill color="#FDF2F8"/>
           </Group>
-          <TextBox left="0" right="0" top="0" bottom="0" textAlign="center" paragraphAlign="middle">
-            <Text text="RANK" fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
+          <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle" textAlign="center">
+            <Text fontFamily="Arial" fontSize="22" fontStyle="Bold" text="RANK"/>
             <Fill color="#FDF2F8"/>
           </TextBox>
-          <DropShadowStyle offsetY="10" blurX="16" blurY="16" color="#C084FC66"/>
+          <DropShadowStyle blurX="16" blurY="16" color="#C084FC66" offsetY="10"/>
         </Layer>
       </Layer>
     </Layer>
@@ -377,8 +376,8 @@
         <Layer name="BottomButtonSettings" width="46">
           <Layer composition="@navButton"/>
           <Layer left="11" top="11">
-              <Polystar left="2" top="2" type="star" pointCount="8" outerRadius="10" innerRadius="6"/>
-              <Stroke color="#93C5FD" width="2"/>
+            <Polystar left="2" top="2" innerRadius="6" outerRadius="10" pointCount="8" type="star"/>
+            <Stroke color="#93C5FD" width="2"/>
             <Group>
               <Ellipse left="9" top="9" size="6,6"/>
               <Fill color="#93C5FD"/>
@@ -403,9 +402,9 @@
     </Layer>
   </Layer>
   <Resources>
-    <LinearGradient id="chipGradient" startPoint="0,14" endPoint="150,14">
-      <ColorStop offset="0" color="#0F1A33CC"/>
-      <ColorStop offset="1" color="#14244ACC"/>
+    <LinearGradient id="chipGradient" endPoint="150,14" startPoint="0,14">
+      <ColorStop color="#0F1A33CC" offset="0"/>
+      <ColorStop color="#14244ACC" offset="1"/>
     </LinearGradient>
     <PathData id="IconPlay" data="M 0 0 L 24 12 L 0 24 Z"/>
     <PathData id="IconCart" data="M 0 0 L 15 0 L 13 8 L 2 8 Z M 4 12 A 2 2 0 1 0 4 16 A 2 2 0 1 0 4 12 Z M 11 12 A 2 2 0 1 0 11 16 A 2 2 0 1 0 11 12 Z"/>
@@ -417,9 +416,9 @@
       <Layer width="46" height="46">
         <Ellipse left="0" right="0" top="0" bottom="0"/>
         <Fill>
-          <LinearGradient startPoint="0,23" endPoint="46,23">
-            <ColorStop offset="0" color="#0D2038CC"/>
-            <ColorStop offset="1" color="#162B4DCC"/>
+          <LinearGradient endPoint="46,23" startPoint="0,23">
+            <ColorStop color="#0D2038CC" offset="0"/>
+            <ColorStop color="#162B4DCC" offset="1"/>
           </LinearGradient>
         </Fill>
         <Stroke color="#3B82F6" width="1"/>

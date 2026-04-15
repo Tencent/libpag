@@ -6,12 +6,12 @@
       <!-- RadialGradient uses canvas coordinates. Ellipse center is at 200,200, 
            highlight offset should be relative to that. 140,140 creates top-left highlight -->
       <RadialGradient center="140,140" radius="200">
-        <ColorStop offset="0" color="#FFF"/>
-        <ColorStop offset="0.4" color="#06B6D4"/>
-        <ColorStop offset="1" color="#0891B2"/>
+        <ColorStop color="#FFF" offset="0"/>
+        <ColorStop color="#06B6D4" offset="0.4"/>
+        <ColorStop color="#0891B2" offset="1"/>
       </RadialGradient>
     </Fill>
     <Stroke color="#0E7490" width="8"/>
-    <DropShadowStyle offsetX="0" offsetY="8" blurX="32" blurY="32" color="#06B6D460"/>
+    <DropShadowStyle blurX="32" blurY="32" color="#06B6D460" offsetX="0" offsetY="8"/>
   </Layer>
 </pagx>

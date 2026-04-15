@@ -3,7 +3,7 @@
 <pagx width="200" height="100">
   <Layer name="DashedStroke" left="10" top="10">
     <Rectangle left="-7.5" top="-7.5" size="15,15"/>
-    <Stroke color="#000000" width="1" dashes="5,3"/>
+    <Stroke color="#000000" dashes="5,3" width="1"/>
     <Repeater copies="10" position="20,0"/>
   </Layer>
 </pagx>

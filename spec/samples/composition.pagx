@@ -11,15 +11,15 @@
       <Layer name="button" width="200" height="60">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="30"/>
         <Fill>
-          <LinearGradient startPoint="0,0" endPoint="200,0">
-            <ColorStop offset="0" color="#6366F1"/>
-            <ColorStop offset="1" color="#8B5CF6"/>
+          <LinearGradient endPoint="200,0" startPoint="0,0">
+            <ColorStop color="#6366F1" offset="0"/>
+            <ColorStop color="#8B5CF6" offset="1"/>
           </LinearGradient>
         </Fill>
-        <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#6366F180"/>
+        <DropShadowStyle blurX="24" blurY="24" color="#6366F180" offsetY="8"/>
       </Layer>
       <Layer name="label" width="200" height="60">
-        <Text text="Button" fontFamily="Arial" fontStyle="Bold" fontSize="22" centerX="0" centerY="0"/>
+        <Text centerX="0" centerY="0" fontFamily="Arial" fontSize="22" fontStyle="Bold" text="Button"/>
         <Fill color="#FFF"/>
       </Layer>
     </Composition>

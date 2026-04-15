@@ -7,9 +7,9 @@
   <Layer left="20" top="20">
     <Rectangle size="200,100"/>
     <Stroke/>
-    <TextBox width="200" height="100" textAlign="center" paragraphAlign="middle">
+    <TextBox width="200" height="100" paragraphAlign="middle" textAlign="center">
       <Group position="50,30">
-        <Text text="Position" fontFamily="NotoSansSC" fontSize="24"/>
+        <Text fontFamily="NotoSansSC" fontSize="24" text="Position"/>
         <Fill/>
       </Group>
     </TextBox>
@@ -19,9 +19,9 @@
   <Layer left="240" top="20">
     <Rectangle size="200,100"/>
     <Stroke/>
-    <TextBox width="200" height="100" textAlign="center" paragraphAlign="middle">
+    <TextBox width="200" height="100" paragraphAlign="middle" textAlign="center">
       <Group scale="2,2">
-        <Text text="Scale" fontFamily="NotoSansSC" fontSize="24"/>
+        <Text fontFamily="NotoSansSC" fontSize="24" text="Scale"/>
         <Fill/>
       </Group>
     </TextBox>
@@ -31,10 +31,10 @@
   <Layer left="20" top="140">
     <Rectangle size="200,100"/>
     <Stroke/>
-    <TextBox width="200" height="100" textAlign="center" paragraphAlign="middle">
+    <TextBox width="200" height="100" paragraphAlign="middle" textAlign="center">
       <Group position="20,10">
         <Group position="30,20">
-          <Text text="Nested" fontFamily="NotoSansSC" fontSize="24"/>
+          <Text fontFamily="NotoSansSC" fontSize="24" text="Nested"/>
           <Fill/>
         </Group>
       </Group>
@@ -45,9 +45,9 @@
   <Layer left="240" top="140">
     <Rectangle size="200,100"/>
     <Stroke/>
-    <TextBox width="200" height="100" textAlign="center" paragraphAlign="middle">
+    <TextBox width="200" height="100" paragraphAlign="middle" textAlign="center">
       <Group scale="2,1">
-        <Text text="NonUniform" fontFamily="NotoSansSC" fontSize="24"/>
+        <Text fontFamily="NotoSansSC" fontSize="24" text="NonUniform"/>
         <Fill/>
       </Group>
     </TextBox>
@@ -57,10 +57,10 @@
   <Layer left="20" top="260">
     <Rectangle size="200,100"/>
     <Stroke/>
-    <TextBox width="200" height="100" textAlign="center" paragraphAlign="middle">
+    <TextBox width="200" height="100" paragraphAlign="middle" textAlign="center">
       <Group position="30,20" rotation="15">
         <Group scale="1,2">
-          <Text text="Complex" fontFamily="NotoSansSC" fontSize="24"/>
+          <Text fontFamily="NotoSansSC" fontSize="24" text="Complex"/>
           <Fill/>
         </Group>
       </Group>

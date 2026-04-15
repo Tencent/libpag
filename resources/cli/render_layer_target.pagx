@@ -13,7 +13,7 @@
   </Layer>
   <!-- Green rounded rectangle with a yellow circle inside -->
   <Layer id="card" left="280" top="80">
-    <Rectangle left="-80" top="-60" size="160,120" roundness="16"/>
+    <Rectangle left="-80" top="-60" roundness="16" size="160,120"/>
     <Fill color="#43A047"/>
     <Layer id="icon">
       <Ellipse left="-25" top="-25" size="50,50"/>
@@ -22,11 +22,11 @@
   </Layer>
   <!-- Bottom banner: gradient bar with two colored circles -->
   <Layer id="banner" left="200" top="240">
-    <Rectangle left="-180" top="-40" size="360,80" roundness="12"/>
+    <Rectangle left="-180" top="-40" roundness="12" size="360,80"/>
     <Fill>
-      <LinearGradient startPoint="-180,0" endPoint="180,0">
-        <ColorStop offset="0" color="#7B1FA2"/>
-        <ColorStop offset="1" color="#FF6F00"/>
+      <LinearGradient endPoint="180,0" startPoint="-180,0">
+        <ColorStop color="#7B1FA2" offset="0"/>
+        <ColorStop color="#FF6F00" offset="1"/>
       </LinearGradient>
     </Fill>
     <Layer id="dot_left" left="-100">

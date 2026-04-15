@@ -15,7 +15,7 @@
     <Rectangle size="100,140"/>
     <Stroke/>
     <TextBox width="100" height="140">
-      <Text text="Supercalifragilisticexpialidocious" fontFamily="NotoSansSC" fontSize="24"/>
+      <Text fontFamily="NotoSansSC" fontSize="24" text="Supercalifragilisticexpialidocious"/>
       <Fill/>
     </TextBox>
   </Layer>
@@ -26,7 +26,7 @@
     <Rectangle size="132,70"/>
     <Stroke/>
     <TextBox width="132" height="70">
-      <Text text="Hello World Test" fontFamily="NotoSansSC" fontSize="24"/>
+      <Text fontFamily="NotoSansSC" fontSize="24" text="Hello World Test"/>
       <Fill/>
     </TextBox>
   </Layer>
@@ -39,7 +39,7 @@
     <Rectangle size="132,105"/>
     <Stroke/>
     <TextBox width="132" height="105">
-      <Text text="well-known self-driving" fontFamily="NotoSansSC" fontSize="24"/>
+      <Text fontFamily="NotoSansSC" fontSize="24" text="well-known self-driving"/>
       <Fill/>
     </TextBox>
   </Layer>
@@ -52,7 +52,7 @@
     <Rectangle size="96,105"/>
     <Stroke/>
     <TextBox width="96" height="105">
-      <Text text="path/to/some/file" fontFamily="NotoSansSC" fontSize="24"/>
+      <Text fontFamily="NotoSansSC" fontSize="24" text="path/to/some/file"/>
       <Fill/>
     </TextBox>
   </Layer>
@@ -71,7 +71,8 @@
     <Rectangle size="90,140"/>
     <Stroke/>
     <TextBox width="90" height="140">
-      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[Compre­hensive over­view]]></Text>
+      <Text fontFamily="NotoSansSC" fontSize="24">
+      </Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -83,7 +84,8 @@
     <Rectangle left="0.5" size="67,140"/>
     <Stroke/>
     <TextBox width="67" height="140">
-      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[Super​Long​Word​Here]]></Text>
+      <Text fontFamily="NotoSansSC" fontSize="24">
+      </Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -96,7 +98,8 @@
     <Rectangle size="90,70"/>
     <Stroke/>
     <TextBox width="90" height="70">
-      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[AB⁠CD⁠EF GH IJ]]></Text>
+      <Text fontFamily="NotoSansSC" fontSize="24">
+      </Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -115,7 +118,8 @@
     <Rectangle left="0.5" top="0.5" size="49,105"/>
     <Stroke/>
     <TextBox width="49" height="105">
-      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[好￥9吧]]></Text>
+      <Text fontFamily="NotoSansSC" fontSize="24">
+      </Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -130,7 +134,8 @@
     <Rectangle left="0.5" top="0.5" size="49,105"/>
     <Stroke/>
     <TextBox width="49" height="105">
-      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[好9%吧]]></Text>
+      <Text fontFamily="NotoSansSC" fontSize="24">
+      </Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -145,7 +150,8 @@
     <Rectangle left="0.5" top="0.5" size="73,105"/>
     <Stroke/>
     <TextBox width="73" height="105">
-      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[等等……好]]></Text>
+      <Text fontFamily="NotoSansSC" fontSize="24">
+      </Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -160,7 +166,8 @@
     <Rectangle top="0.5" size="70,105"/>
     <Stroke/>
     <TextBox width="70" height="105">
-      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[前言——正]]></Text>
+      <Text fontFamily="NotoSansSC" fontSize="24">
+      </Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -180,7 +187,8 @@
     <Rectangle left="0.5" top="0.5" size="97,105"/>
     <Stroke/>
     <TextBox width="97" height="105">
-      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[说完了「引用」好]]></Text>
+      <Text fontFamily="NotoSansSC" fontSize="24">
+      </Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -195,7 +203,8 @@
     <Rectangle left="0.5" size="73,70"/>
     <Stroke/>
     <TextBox width="73" height="70">
-      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[是的」然后]]></Text>
+      <Text fontFamily="NotoSansSC" fontSize="24">
+      </Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -210,7 +219,8 @@
     <Rectangle left="0.5" size="49,70"/>
     <Stroke/>
     <TextBox width="49" height="70">
-      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[ゲーム好]]></Text>
+      <Text fontFamily="NotoSansSC" fontSize="24">
+      </Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -224,7 +234,8 @@
     <Rectangle left="0.5" size="97,70"/>
     <Stroke/>
     <TextBox width="97" height="70">
-      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[说"好"吧]]></Text>
+      <Text fontFamily="NotoSansSC" fontSize="24">
+      </Text>
       <Fill/>
     </TextBox>
   </Layer>

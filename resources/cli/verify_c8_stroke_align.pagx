@@ -3,7 +3,7 @@
 <pagx width="200" height="100">
   <Layer name="StrokeAlign" left="10" top="10">
     <Rectangle left="-10" top="-10" size="20,20"/>
-    <Stroke color="#000000" width="2" align="inside"/>
+    <Stroke align="inside" color="#000000" width="2"/>
     <Repeater copies="10" position="25,0"/>
   </Layer>
 </pagx>

@@ -2,15 +2,15 @@
 <pagx width="400" height="400">
   <Layer>
     <Group left="200" top="200" anchor="110,110" rotation="12">
-      <Rectangle size="220,220" roundness="32"/>
+      <Rectangle roundness="32" size="220,220"/>
       <Fill>
-        <LinearGradient startPoint="0,0" endPoint="220,220">
-          <ColorStop offset="0" color="#F43F5E"/>
-          <ColorStop offset="0.5" color="#EC4899"/>
-          <ColorStop offset="1" color="#8B5CF6"/>
+        <LinearGradient endPoint="220,220" startPoint="0,0">
+          <ColorStop color="#F43F5E" offset="0"/>
+          <ColorStop color="#EC4899" offset="0.5"/>
+          <ColorStop color="#8B5CF6" offset="1"/>
         </LinearGradient>
       </Fill>
     </Group>
-    <DropShadowStyle offsetY="12" blurX="40" blurY="40" color="#EC489960"/>
+    <DropShadowStyle blurX="40" blurY="40" color="#EC489960" offsetY="12"/>
   </Layer>
 </pagx>

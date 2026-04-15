@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="200" height="200">
-  <Layer id="noImport" width="100" height="100" centerX="0" centerY="0">
+  <Layer id="noImport" centerX="0" centerY="0" width="100" height="100">
     <Rectangle size="100,100"/>
     <Fill color="#00FF00"/>
   </Layer>

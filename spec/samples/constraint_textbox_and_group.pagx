@@ -5,11 +5,11 @@
   <Layer left="20" top="20" width="360" height="170">
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
     <Fill color="#6366F1"/>
-    <TextBox left="24" right="24" top="24" bottom="24" textAlign="center" paragraphAlign="middle">
-      <Text text="TextBox stretches its typesetting area using constraint attributes" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+    <TextBox left="24" right="24" top="24" bottom="24" paragraphAlign="middle" textAlign="center">
+      <Text fontFamily="Arial" fontSize="18" fontStyle="Bold" text="TextBox stretches its typesetting area using constraint attributes"/>
       <Fill color="#FFF"/>
     </TextBox>
-    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#6366F150"/>
+    <DropShadowStyle blurX="24" blurY="24" color="#6366F150" offsetY="8"/>
   </Layer>
 
   <!-- Lower card: content directly in Layer -->
@@ -17,9 +17,9 @@
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
     <Fill color="#10B981"/>
     <TextBox centerX="0" centerY="0">
-      <Text text="Group Layout" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+      <Text fontFamily="Arial" fontSize="24" fontStyle="Bold" text="Group Layout"/>
       <Fill color="#FFF"/>
     </TextBox>
-    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#00000050"/>
+    <DropShadowStyle blurX="24" blurY="24" color="#00000050" offsetY="8"/>
   </Layer>
 </pagx>

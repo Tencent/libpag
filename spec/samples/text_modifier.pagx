@@ -1,37 +1,37 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="400" height="400">
-  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" arrangement="spaceEvenly" alignment="center">
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" alignment="center" arrangement="spaceEvenly">
     <!-- Wave effect: triangle selector shifts characters vertically -->
     <Layer>
-      <Text text="WAVE" fontFamily="Arial" fontStyle="Bold" fontSize="72"/>
+      <Text fontFamily="Arial" fontSize="72" fontStyle="Bold" text="WAVE"/>
       <TextModifier position="0,-30">
-        <RangeSelector start="0" end="1" shape="triangle"/>
+        <RangeSelector end="1" shape="triangle" start="0"/>
       </TextModifier>
       <Fill>
-        <LinearGradient startPoint="-200,0" endPoint="80,0">
-          <ColorStop offset="0" color="#06B6D4"/>
-          <ColorStop offset="1" color="#3B82F6"/>
+        <LinearGradient endPoint="80,0" startPoint="-200,0">
+          <ColorStop color="#06B6D4" offset="0"/>
+          <ColorStop color="#3B82F6" offset="1"/>
         </LinearGradient>
       </Fill>
     </Layer>
     <!-- Rotation effect: each character rotated with rampUp selector -->
     <Layer>
-      <Text text="ROTATE" fontFamily="Arial" fontStyle="Bold" fontSize="56"/>
+      <Text fontFamily="Arial" fontSize="56" fontStyle="Bold" text="ROTATE"/>
       <TextModifier rotation="30">
-        <RangeSelector start="0" end="1" shape="rampUp"/>
+        <RangeSelector end="1" shape="rampUp" start="0"/>
       </TextModifier>
       <Fill>
-        <LinearGradient startPoint="-200,0" endPoint="80,0">
-          <ColorStop offset="0" color="#F59E0B"/>
-          <ColorStop offset="1" color="#F43F5E"/>
+        <LinearGradient endPoint="80,0" startPoint="-200,0">
+          <ColorStop color="#F59E0B" offset="0"/>
+          <ColorStop color="#F43F5E" offset="1"/>
         </LinearGradient>
       </Fill>
     </Layer>
     <!-- Color override effect: characters with gradient color override -->
     <Layer>
-      <Text text="COLOR" fontFamily="Arial" fontStyle="Bold" fontSize="64"/>
+      <Text fontFamily="Arial" fontSize="64" fontStyle="Bold" text="COLOR"/>
       <TextModifier fillColor="#EC4899">
-        <RangeSelector start="0" end="1" shape="triangle"/>
+        <RangeSelector end="1" shape="triangle" start="0"/>
       </TextModifier>
       <Fill color="#8B5CF6"/>
     </Layer>

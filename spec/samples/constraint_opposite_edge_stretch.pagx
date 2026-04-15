@@ -4,27 +4,27 @@
   <Layer left="20" top="20" width="360" height="360">
     <!-- Dashed container border -->
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-    <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+    <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
 
     <!-- Rectangle stretches to fill with 20px margins -->
     <Layer left="0" right="0" top="0" bottom="0">
       <Rectangle left="20" right="20" top="20" bottom="20" roundness="20"/>
       <Fill color="#6366F1"/>
-      <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#6366F150"/>
+      <DropShadowStyle blurX="24" blurY="24" color="#6366F150" offsetY="8"/>
     </Layer>
 
     <!-- Ellipse stretches horizontally and vertically with larger margins -->
     <Layer left="0" right="0" top="0" bottom="0">
       <Ellipse left="40" right="40" top="120" bottom="120"/>
       <Fill color="#F43F5E"/>
-      <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F43F5E50"/>
+      <DropShadowStyle blurX="24" blurY="24" color="#F43F5E50" offsetY="8"/>
     </Layer>
 
     <!-- Small centered white rectangle as accent -->
     <Layer left="0" right="0" top="0" bottom="0">
-      <Rectangle centerX="0" centerY="0" size="60,60" roundness="10"/>
+      <Rectangle centerX="0" centerY="0" roundness="10" size="60,60"/>
       <Fill color="#FFF"/>
-      <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#00000020"/>
+      <DropShadowStyle blurX="16" blurY="16" color="#00000020" offsetY="4"/>
     </Layer>
   </Layer>
 </pagx>

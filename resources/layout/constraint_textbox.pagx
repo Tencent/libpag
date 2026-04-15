@@ -19,32 +19,32 @@
       <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         </Layer>
         <!-- 1.1: left="20" top="20" -->
         <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="20" top="20" size="100,40" roundness="2"/>
-          <Stroke color="#6366F1" width="1" dashes="2,2"/>
+          <Rectangle left="20" top="20" roundness="2" size="100,40"/>
+          <Stroke color="#6366F1" dashes="2,2" width="1"/>
           <TextBox left="20" top="20" width="100" height="40">
-            <Text text="Left Top" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+            <Text fontFamily="Arial" fontSize="14" fontStyle="Bold" text="Left Top"/>
             <Fill color="#334155"/>
           </TextBox>
         </Layer>
         <!-- 1.2: right="20" bottom="20" -->
         <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle right="20" bottom="20" size="100,40" roundness="2"/>
-          <Stroke color="#6366F1" width="1" dashes="2,2"/>
-          <TextBox right="20" bottom="20" width="100" height="40" textAlign="end" paragraphAlign="far">
-            <Text text="Right Bottom" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+          <Rectangle right="20" bottom="20" roundness="2" size="100,40"/>
+          <Stroke color="#6366F1" dashes="2,2" width="1"/>
+          <TextBox right="20" bottom="20" width="100" height="40" paragraphAlign="far" textAlign="end">
+            <Text fontFamily="Arial" fontSize="14" fontStyle="Bold" text="Right Bottom"/>
             <Fill color="#334155"/>
           </TextBox>
         </Layer>
         <!-- 1.3: centerX="0" centerY="0" -->
         <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle centerX="0" centerY="0" size="100,40" roundness="2"/>
-          <Stroke color="#6366F1" width="1" dashes="2,2"/>
-          <TextBox centerX="0" centerY="0" width="100" height="40" textAlign="center" paragraphAlign="middle">
-            <Text text="Centered" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
+          <Rectangle centerX="0" centerY="0" roundness="2" size="100,40"/>
+          <Stroke color="#6366F1" dashes="2,2" width="1"/>
+          <TextBox centerX="0" centerY="0" width="100" height="40" paragraphAlign="middle" textAlign="center">
+            <Text fontFamily="Arial" fontSize="16" fontStyle="Bold" text="Centered"/>
             <Fill color="#6366F1"/>
           </TextBox>
         </Layer>
@@ -54,32 +54,32 @@
       <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         </Layer>
         <!-- 2.1: left="20" right="20" top="10" — widest box -->
         <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="20" right="20" top="10" size="1,55" roundness="2"/>
-          <Stroke color="#6366F1" width="1" dashes="2,2"/>
+          <Rectangle left="20" right="20" top="10" roundness="2" size="1,55"/>
+          <Stroke color="#6366F1" dashes="2,2" width="1"/>
           <TextBox left="20" right="20" top="10" width="1" height="55">
-            <Text text="The quick brown fox jumps over the lazy dog near the river bank" fontFamily="Arial" fontSize="12"/>
+            <Text fontFamily="Arial" fontSize="12" text="The quick brown fox jumps over the lazy dog near the river bank"/>
             <Fill color="#334155"/>
           </TextBox>
         </Layer>
         <!-- 2.2: left="40" right="40" centerY="0" — narrower box -->
         <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="40" right="40" centerY="0" size="1,55" roundness="2"/>
-          <Stroke color="#10B981" width="1" dashes="2,2"/>
+          <Rectangle left="40" right="40" centerY="0" roundness="2" size="1,55"/>
+          <Stroke color="#10B981" dashes="2,2" width="1"/>
           <TextBox left="40" right="40" centerY="0" width="1" height="55" paragraphAlign="middle">
-            <Text text="The quick brown fox jumps over the lazy dog near the river bank" fontFamily="Arial" fontSize="12"/>
+            <Text fontFamily="Arial" fontSize="12" text="The quick brown fox jumps over the lazy dog near the river bank"/>
             <Fill color="#334155"/>
           </TextBox>
         </Layer>
         <!-- 2.3: left="60" right="60" bottom="10" — narrowest box -->
         <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="60" right="60" bottom="10" size="1,55" roundness="2"/>
-          <Stroke color="#F59E0B" width="1" dashes="2,2"/>
+          <Rectangle left="60" right="60" bottom="10" roundness="2" size="1,55"/>
+          <Stroke color="#F59E0B" dashes="2,2" width="1"/>
           <TextBox left="60" right="60" bottom="10" width="1" height="55" paragraphAlign="far">
-            <Text text="The quick brown fox jumps over the lazy dog near the river bank" fontFamily="Arial" fontSize="12"/>
+            <Text fontFamily="Arial" fontSize="12" text="The quick brown fox jumps over the lazy dog near the river bank"/>
             <Fill color="#334155"/>
           </TextBox>
         </Layer>
@@ -94,14 +94,14 @@
       <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         </Layer>
         <!-- 3.1: left="15" top="20" bottom="20" -->
         <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="15" top="20" bottom="20" size="130,1" roundness="2"/>
-          <Stroke color="#6366F1" width="1" dashes="2,2"/>
+          <Rectangle left="15" top="20" bottom="20" roundness="2" size="130,1"/>
+          <Stroke color="#6366F1" dashes="2,2" width="1"/>
           <TextBox left="15" top="20" bottom="20" width="130" height="1" paragraphAlign="middle">
-            <Text text="Vertical stretch makes this text box tall enough to show multiple lines clearly" fontFamily="Arial" fontSize="12"/>
+            <Text fontFamily="Arial" fontSize="12" text="Vertical stretch makes this text box tall enough to show multiple lines clearly"/>
             <Fill color="#334155"/>
           </TextBox>
         </Layer>
@@ -111,14 +111,14 @@
       <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         </Layer>
         <!-- 4.1: all edges stretch -->
         <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="20" right="20" top="20" bottom="20" size="1,1" roundness="2"/>
-          <Stroke color="#6366F1" width="1" dashes="2,2"/>
-          <TextBox left="20" right="20" top="20" bottom="20" width="1" height="1" textAlign="center" paragraphAlign="middle">
-            <Text text="Full stretch fills entire area with equal margins on all four edges" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+          <Rectangle left="20" right="20" top="20" bottom="20" roundness="2" size="1,1"/>
+          <Stroke color="#6366F1" dashes="2,2" width="1"/>
+          <TextBox left="20" right="20" top="20" bottom="20" width="1" height="1" paragraphAlign="middle" textAlign="center">
+            <Text fontFamily="Arial" fontSize="14" fontStyle="Bold" text="Full stretch fills entire area with equal margins on all four edges"/>
             <Fill color="#6366F1"/>
           </TextBox>
         </Layer>
@@ -128,14 +128,14 @@
       <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+          <Stroke color="#CBD5E1" dashes="4,3" width="1"/>
         </Layer>
         <!-- 5.1: asymmetric margins -->
         <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="15" right="40" top="25" bottom="50" size="1,1" roundness="2"/>
-          <Stroke color="#6366F1" width="1" dashes="2,2"/>
+          <Rectangle left="15" right="40" top="25" bottom="50" roundness="2" size="1,1"/>
+          <Stroke color="#6366F1" dashes="2,2" width="1"/>
           <TextBox left="15" right="40" top="25" bottom="50" width="1" height="1" paragraphAlign="middle">
-            <Text text="Asymmetric margins show different spacing on each edge of the text box" fontFamily="Arial" fontSize="12"/>
+            <Text fontFamily="Arial" fontSize="12" text="Asymmetric margins show different spacing on each edge of the text box"/>
             <Fill color="#334155"/>
           </TextBox>
         </Layer>

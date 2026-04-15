@@ -8,47 +8,47 @@
       <Layer flex="1">
         <Rectangle centerX="0" centerY="0" size="140,140"/>
         <Fill>
-          <LinearGradient startPoint="0,0" endPoint="140,140">
-            <ColorStop offset="0" color="#F43F5E"/>
-            <ColorStop offset="1" color="#E11D48"/>
+          <LinearGradient endPoint="140,140" startPoint="0,0">
+            <ColorStop color="#F43F5E" offset="0"/>
+            <ColorStop color="#E11D48" offset="1"/>
           </LinearGradient>
         </Fill>
-        <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F43F5E50"/>
+        <DropShadowStyle blurX="24" blurY="24" color="#F43F5E50" offsetY="8"/>
       </Layer>
       <!-- Medium rounded rectangle -->
       <Layer flex="1">
-        <Rectangle centerX="0" centerY="0" size="140,140" roundness="24"/>
+        <Rectangle centerX="0" centerY="0" roundness="24" size="140,140"/>
         <Fill>
-          <LinearGradient startPoint="0,0" endPoint="140,140">
-            <ColorStop offset="0" color="#8B5CF6"/>
-            <ColorStop offset="1" color="#7C3AED"/>
+          <LinearGradient endPoint="140,140" startPoint="0,0">
+            <ColorStop color="#8B5CF6" offset="0"/>
+            <ColorStop color="#7C3AED" offset="1"/>
           </LinearGradient>
         </Fill>
-        <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#8B5CF650"/>
+        <DropShadowStyle blurX="24" blurY="24" color="#8B5CF650" offsetY="8"/>
       </Layer>
     </Layer>
     <Layer flex="1" layout="horizontal">
       <!-- Fully rounded rectangle (pill shape) -->
       <Layer flex="1">
-        <Rectangle centerX="0" centerY="0" size="140,140" roundness="70"/>
+        <Rectangle centerX="0" centerY="0" roundness="70" size="140,140"/>
         <Fill>
-          <LinearGradient startPoint="0,0" endPoint="140,140">
-            <ColorStop offset="0" color="#06B6D4"/>
-            <ColorStop offset="1" color="#0891B2"/>
+          <LinearGradient endPoint="140,140" startPoint="0,0">
+            <ColorStop color="#06B6D4" offset="0"/>
+            <ColorStop color="#0891B2" offset="1"/>
           </LinearGradient>
         </Fill>
-        <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#06B6D450"/>
+        <DropShadowStyle blurX="24" blurY="24" color="#06B6D450" offsetY="8"/>
       </Layer>
       <!-- Wide rectangle -->
       <Layer flex="1">
-        <Rectangle centerX="0" centerY="0" size="140,100" roundness="16"/>
+        <Rectangle centerX="0" centerY="0" roundness="16" size="140,100"/>
         <Fill>
-          <LinearGradient startPoint="0,0" endPoint="140,100">
-            <ColorStop offset="0" color="#10B981"/>
-            <ColorStop offset="1" color="#059669"/>
+          <LinearGradient endPoint="140,100" startPoint="0,0">
+            <ColorStop color="#10B981" offset="0"/>
+            <ColorStop color="#059669" offset="1"/>
           </LinearGradient>
         </Fill>
-        <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#10B98150"/>
+        <DropShadowStyle blurX="24" blurY="24" color="#10B98150" offsetY="8"/>
       </Layer>
     </Layer>
   </Layer>

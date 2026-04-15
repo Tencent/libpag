@@ -4,18 +4,18 @@
   <Layer name="shape1">
     <Rectangle size="100,100"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="100,0">
-        <ColorStop offset="0" color="#FF0000"/>
-        <ColorStop offset="1" color="#0000FF"/>
+      <LinearGradient endPoint="100,0" startPoint="0,0">
+        <ColorStop color="#FF0000" offset="0"/>
+        <ColorStop color="#0000FF" offset="1"/>
       </LinearGradient>
     </Fill>
   </Layer>
   <Layer name="shape2">
     <Rectangle size="100,100"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="100,0">
-        <ColorStop offset="0" color="#FF0000"/>
-        <ColorStop offset="1" color="#0000FF"/>
+      <LinearGradient endPoint="100,0" startPoint="0,0">
+        <ColorStop color="#FF0000" offset="0"/>
+        <ColorStop color="#0000FF" offset="1"/>
       </LinearGradient>
     </Fill>
   </Layer>

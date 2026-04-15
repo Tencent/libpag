@@ -2,6 +2,6 @@
 <!-- Test file for layout: top/bottom overridden by centerY -->
 <pagx width="400" height="300">
   <Layer id="parent" width="400" height="300">
-    <Layer id="child" width="100" height="50" top="10" bottom="20" centerY="150"/>
+    <Layer id="child" top="10" bottom="20" centerY="150" width="100" height="50"/>
   </Layer>
 </pagx>
