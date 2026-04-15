@@ -21,10 +21,14 @@
 #include <cmath>
 #include <cstdio>
 #include <limits>
+#include <memory>
 #include <string>
 #include <vector>
 #include "base/utils/MathUtil.h"
+#include "pagx/LayoutContext.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/TextLayout.h"
+#include "pagx/TextLayoutParams.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -191,13 +195,14 @@ static bool ComputeImagePatternRect(const ImagePattern* pattern, int imgW, int i
 
 class PPTWriter {
  public:
-  PPTWriter(PPTWriterContext* ctx, PAGXDocument* doc, const PPTExporter::Options& options)
+  PPTWriter(PPTWriterContext* ctx, PAGXDocument* doc, const PPTExporter::Options& options,
+            LayoutContext* layoutContext)
       : _ctx(ctx), _doc(doc), _convertTextToPath(options.convertTextToPath),
         _bakeMask(options.bakeMask), _bakeTiledPattern(options.bakeTiledPattern),
         _bridgeContours(options.bridgeContours), _resolveModifiers(options.resolveModifiers),
         _rasterizeUnsupportedBlend(options.rasterizeUnsupportedBlend),
         _rasterizeWideGamut(options.rasterizeWideGamut), _rasterDPI(options.rasterDPI),
-        _resolver(doc) {
+        _layoutContext(layoutContext), _resolver(doc) {
   }
 
   void writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& parentMatrix = {},
@@ -220,6 +225,7 @@ class PPTWriter {
   // current rasterization path always uses the GPU surface's native scale; the
   // option is retained for forward compatibility.
   [[maybe_unused]] int _rasterDPI = 192;
+  LayoutContext* _layoutContext = nullptr;
   GPUContext _gpu;
   LayerBuildResult _buildResult = {};
   bool _buildResultReady = false;
@@ -248,6 +254,10 @@ class PPTWriter {
   void writeNativeText(XMLBuilder& out, const Text* text, const FillStrokeInfo& fs, const Matrix& m,
                        float alpha, const std::vector<LayerFilter*>& filters,
                        const std::vector<LayerStyle*>& styles);
+  void writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
+                         const std::vector<Element*>& elements, const Matrix& transform,
+                         float alpha, const std::vector<LayerFilter*>& filters,
+                         const std::vector<LayerStyle*>& styles);
 
   // Shape envelope helpers
   void beginShape(XMLBuilder& out, const char* name, int64_t offX, int64_t offY, int64_t extCX,
@@ -1330,24 +1340,76 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
     return;
   }
 
-  float estWidth = static_cast<float>(CountUTF8Characters(text->text)) * text->fontSize * 0.6f;
-  float estHeight = text->fontSize * 1.4f;
-  float posX = text->position.x;
-  float posY = text->position.y - text->fontSize * 0.85f;
+  TextLayoutParams params = {};
   bool hasTextBox = false;
-
   if (fs.textBox && !std::isnan(fs.textBox->width) && fs.textBox->width > 0) {
     hasTextBox = true;
+    bool hasPadding = !fs.textBox->padding.isZero();
+    float boxW = fs.textBox->width;
+    float boxH = fs.textBox->height;
+    if (hasPadding) {
+      if (!std::isnan(boxW)) {
+        boxW = std::max(0.0f, boxW - fs.textBox->padding.left - fs.textBox->padding.right);
+      }
+      if (!std::isnan(boxH)) {
+        boxH = std::max(0.0f, boxH - fs.textBox->padding.top - fs.textBox->padding.bottom);
+      }
+    }
+    params.boxWidth = boxW;
+    params.boxHeight = boxH;
+    params.textAlign = fs.textBox->textAlign;
+    params.paragraphAlign = fs.textBox->paragraphAlign;
+    params.writingMode = fs.textBox->writingMode;
+    params.lineHeight = fs.textBox->lineHeight;
+    params.wordWrap = fs.textBox->wordWrap;
+    params.overflow = fs.textBox->overflow;
+  } else {
+    params.baseline = text->baseline;
+    switch (text->textAnchor) {
+      case TextAnchor::Start:
+        params.textAlign = TextAlign::Start;
+        break;
+      case TextAnchor::Center:
+        params.textAlign = TextAlign::Center;
+        break;
+      case TextAnchor::End:
+        params.textAlign = TextAlign::End;
+        break;
+    }
+  }
+
+  auto* mutableText = const_cast<Text*>(text);
+  auto layoutResult = TextLayout::Layout({mutableText}, params, _layoutContext);
+  auto* lines = layoutResult.getTextLines(mutableText);
+
+  float posX = 0;
+  float posY = 0;
+  float estWidth = 0;
+  float estHeight = 0;
+
+  if (hasTextBox) {
     posX = fs.textBox->position.x;
     posY = fs.textBox->position.y;
     estWidth = fs.textBox->width;
     estHeight = (!std::isnan(fs.textBox->height) && fs.textBox->height > 0) ? fs.textBox->height
                                                                             : text->fontSize * 1.4f;
   } else {
-    if (text->textAnchor == TextAnchor::Center) {
-      posX -= estWidth / 2.0f;
-    } else if (text->textAnchor == TextAnchor::End) {
-      posX -= estWidth;
+    auto textBounds = layoutResult.getTextBounds(mutableText);
+    if (textBounds.width > 0 && textBounds.height > 0) {
+      posX = text->position.x + textBounds.x;
+      posY = text->position.y + textBounds.y;
+      estWidth = textBounds.width;
+      estHeight = textBounds.height;
+    } else {
+      estWidth = static_cast<float>(CountUTF8Characters(text->text)) * text->fontSize * 0.6f;
+      estHeight = text->fontSize * 1.4f;
+      posX = text->position.x;
+      posY = text->position.y - text->fontSize * 0.85f;
+      if (text->textAnchor == TextAnchor::Center) {
+        posX -= estWidth / 2.0f;
+      } else if (text->textAnchor == TextAnchor::End) {
+        posX -= estWidth;
+      }
     }
   }
 
@@ -1424,63 +1486,159 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   float fillAlpha = hasFillColor ? fs.fill->alpha * alpha : 0;
   std::string typeface = text->fontFamily.empty() ? std::string() : StripQuotes(text->fontFamily);
 
-  const std::string& remaining = text->text;
-  size_t pos = 0;
-  while (pos <= remaining.size()) {
-    size_t nl = remaining.find('\n', pos);
-    std::string line =
-        (nl == std::string::npos) ? remaining.substr(pos) : remaining.substr(pos, nl - pos);
-    out.openElement("a:p").closeElementStart();
-
-    if (algn) {
-      out.openElement("a:pPr").addRequiredAttribute("algn", algn).closeElementSelfClosing();
+  if (lines && !lines->empty()) {
+    for (const auto& lineInfo : *lines) {
+      if (lineInfo.byteStart >= lineInfo.byteEnd) {
+        continue;
+      }
+      std::string line =
+          text->text.substr(lineInfo.byteStart, lineInfo.byteEnd - lineInfo.byteStart);
+      if (line.empty()) {
+        continue;
+      }
+      out.openElement("a:p").closeElementStart();
+      if (algn) {
+        out.openElement("a:pPr").addRequiredAttribute("algn", algn).closeElementSelfClosing();
+      }
+      out.openElement("a:r").closeElementStart();
+      out.openElement("a:rPr")
+          .addRequiredAttribute("lang", "en-US")
+          .addRequiredAttribute("sz", fontSize);
+      if (hasBold) {
+        out.addRequiredAttribute("b", "1");
+      }
+      if (hasItalic) {
+        out.addRequiredAttribute("i", "1");
+      }
+      if (text->letterSpacing != 0.0f) {
+        out.addRequiredAttribute("spc", letterSpc);
+      }
+      out.closeElementStart();
+      if (hasFillColor) {
+        // For gradient fills, shape bounds are unknown at the run level; pass an empty
+        // rect so writeColorSource falls back to the gradient's own coordinate space.
+        writeColorSource(out, fs.fill->color, fillAlpha);
+      }
+      writeEffects(out, filters, styles);
+      if (!typeface.empty()) {
+        out.openElement("a:latin")
+            .addRequiredAttribute("typeface", typeface)
+            .closeElementSelfClosing();
+        out.openElement("a:ea")
+            .addRequiredAttribute("typeface", typeface)
+            .closeElementSelfClosing();
+      }
+      out.closeElement();  // a:rPr
+      out.openElement("a:t").closeElementStart();
+      out.addTextContent(line);
+      out.closeElement();  // a:t
+      out.closeElement();  // a:r
+      out.closeElement();  // a:p
     }
-
-    out.openElement("a:r").closeElementStart();
-    out.openElement("a:rPr")
-        .addRequiredAttribute("lang", "en-US")
-        .addRequiredAttribute("sz", fontSize);
-    if (hasBold) {
-      out.addRequiredAttribute("b", "1");
+  } else {
+    const std::string& remaining = text->text;
+    size_t pos = 0;
+    while (pos <= remaining.size()) {
+      size_t nl = remaining.find('\n', pos);
+      std::string line =
+          (nl == std::string::npos) ? remaining.substr(pos) : remaining.substr(pos, nl - pos);
+      out.openElement("a:p").closeElementStart();
+      if (algn) {
+        out.openElement("a:pPr").addRequiredAttribute("algn", algn).closeElementSelfClosing();
+      }
+      out.openElement("a:r").closeElementStart();
+      out.openElement("a:rPr")
+          .addRequiredAttribute("lang", "en-US")
+          .addRequiredAttribute("sz", fontSize);
+      if (hasBold) {
+        out.addRequiredAttribute("b", "1");
+      }
+      if (hasItalic) {
+        out.addRequiredAttribute("i", "1");
+      }
+      if (text->letterSpacing != 0.0f) {
+        out.addRequiredAttribute("spc", letterSpc);
+      }
+      out.closeElementStart();
+      if (hasFillColor) {
+        // For gradient fills, shape bounds are unknown at the run level; pass an empty
+        // rect so writeColorSource falls back to the gradient's own coordinate space.
+        writeColorSource(out, fs.fill->color, fillAlpha);
+      }
+      writeEffects(out, filters, styles);
+      if (!typeface.empty()) {
+        out.openElement("a:latin")
+            .addRequiredAttribute("typeface", typeface)
+            .closeElementSelfClosing();
+        out.openElement("a:ea")
+            .addRequiredAttribute("typeface", typeface)
+            .closeElementSelfClosing();
+      }
+      out.closeElement();  // a:rPr
+      out.openElement("a:t").closeElementStart();
+      out.addTextContent(line);
+      out.closeElement();  // a:t
+      out.closeElement();  // a:r
+      out.closeElement();  // a:p
+      if (nl == std::string::npos) {
+        break;
+      }
+      pos = nl + 1;
     }
-    if (hasItalic) {
-      out.addRequiredAttribute("i", "1");
-    }
-    if (text->letterSpacing != 0.0f) {
-      out.addRequiredAttribute("spc", letterSpc);
-    }
-    out.closeElementStart();
-
-    if (hasFillColor) {
-      // For gradient fills, shape bounds are unknown at the run level; pass an empty
-      // rect so writeColorSource falls back to the gradient's own coordinate space.
-      writeColorSource(out, fs.fill->color, fillAlpha);
-    }
-
-    writeEffects(out, filters, styles);
-
-    if (!typeface.empty()) {
-      out.openElement("a:latin")
-          .addRequiredAttribute("typeface", typeface)
-          .closeElementSelfClosing();
-      out.openElement("a:ea").addRequiredAttribute("typeface", typeface).closeElementSelfClosing();
-    }
-
-    out.closeElement();  // a:rPr
-    out.openElement("a:t").closeElementStart();
-    out.addTextContent(line);
-    out.closeElement();  // a:t
-    out.closeElement();  // a:r
-    out.closeElement();  // a:p
-
-    if (nl == std::string::npos) {
-      break;
-    }
-    pos = nl + 1;
   }
 
   out.closeElement();  // p:txBody
   out.closeElement();  // p:sp
+}
+
+// ── TextBox group ──────────────────────────────────────────────────────────
+
+void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
+                                  const std::vector<Element*>& elements, const Matrix& transform,
+                                  float alpha, const std::vector<LayerFilter*>& filters,
+                                  const std::vector<LayerStyle*>& styles) {
+  auto* box = static_cast<const TextBox*>(textBox);
+  auto fs = CollectFillStroke(elements);
+  std::vector<Text*> childTexts;
+  auto mutableElements = elements;
+  TextLayout::CollectTextElements(mutableElements, childTexts);
+  if (childTexts.empty()) {
+    return;
+  }
+
+  bool hasPadding = !box->padding.isZero();
+  float boxW = box->width;
+  float boxH = box->height;
+  if (hasPadding) {
+    if (!std::isnan(boxW)) {
+      boxW = std::max(0.0f, boxW - box->padding.left - box->padding.right);
+    }
+    if (!std::isnan(boxH)) {
+      boxH = std::max(0.0f, boxH - box->padding.top - box->padding.bottom);
+    }
+  }
+
+  TextLayoutParams params = {};
+  params.boxWidth = boxW;
+  params.boxHeight = boxH;
+  params.textAlign = box->textAlign;
+  params.paragraphAlign = box->paragraphAlign;
+  params.writingMode = box->writingMode;
+  params.lineHeight = box->lineHeight;
+  params.wordWrap = box->wordWrap;
+  params.overflow = box->overflow;
+
+  auto layoutResult = TextLayout::Layout(childTexts, params, _layoutContext);
+
+  FillStrokeInfo boxFs = fs;
+  boxFs.textBox = box;
+
+  for (auto* childText : childTexts) {
+    if (childText->text.empty()) {
+      continue;
+    }
+    writeNativeText(out, childText, boxFs, transform, alpha, filters, styles);
+  }
 }
 
 // ── Element / layer traversal ──────────────────────────────────────────────
@@ -1509,6 +1667,23 @@ void PPTWriter::writeElements(XMLBuilder& out, const std::vector<Element*>& elem
     if (type == NodeType::Fill || type == NodeType::Stroke) {
       continue;
     }
+    if (type == NodeType::TextBox) {
+      auto* tb = static_cast<const TextBox*>(element);
+      if (!tb->elements.empty()) {
+        Matrix tbMatrix = BuildGroupMatrix(tb);
+        Matrix combined = transform * tbMatrix;
+        float tbAlpha = alpha * tb->alpha;
+        if (_convertTextToPath) {
+          // When text is converted to path geometry, recurse so each child Text is
+          // rendered via writeTextAsPath; the TextBox metadata is propagated as
+          // parentTextBox so child glyph runs still pick up box-level alignment.
+          writeElements(out, tb->elements, combined, tbAlpha, filters, styles, tb);
+        } else {
+          writeTextBoxGroup(out, tb, tb->elements, combined, tbAlpha, filters, styles);
+        }
+      }
+      continue;
+    }
     switch (type) {
       case NodeType::Rectangle:
         writeRectangle(out, static_cast<const Rectangle*>(element), fs, transform, alpha, filters,
@@ -1528,17 +1703,6 @@ void PPTWriter::writeElements(XMLBuilder& out, const std::vector<Element*>& elem
         } else {
           writeNativeText(out, text, fs, transform, alpha, filters, styles);
         }
-        break;
-      }
-      case NodeType::TextBox: {
-        auto* tb = static_cast<const TextBox*>(element);
-        if (tb->elements.empty()) {
-          break;
-        }
-        Matrix tbMatrix = BuildGroupMatrix(tb);
-        Matrix combined = transform * tbMatrix;
-        float tbAlpha = alpha * tb->alpha;
-        writeElements(out, tb->elements, combined, tbAlpha, filters, styles, tb);
         break;
       }
       case NodeType::Group: {
@@ -1667,8 +1831,10 @@ bool PPTExporter::ToFile(PAGXDocument& doc, const std::string& filePath, const O
     doc.applyLayout();
   }
 
+  auto layoutContext = std::make_unique<LayoutContext>(options.fontConfig);
+
   PPTWriterContext context;
-  PPTWriter writer(&context, &doc, options);
+  PPTWriter writer(&context, &doc, options, layoutContext.get());
 
   // Build slide body content
   XMLBuilder body(false, 2, 0, 16384);

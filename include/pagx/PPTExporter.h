@@ -23,6 +23,8 @@
 
 namespace pagx {
 
+class FontConfig;
+
 /**
  * Export options for PPTExporter.
  */
@@ -88,6 +90,13 @@ struct PPTExportOptions {
    * images at the cost of file size. The default value is 192 (2x of the default 96 DPI).
    */
   int rasterDPI = 192;
+
+  /**
+   * Optional FontConfig for text layout. When provided, registered and fallback fonts from the
+   * FontConfig are used for text shaping and measurement, producing accurate text bounding boxes.
+   * When nullptr, the exporter falls back to system fonts via platform-native font lookup.
+   */
+  FontConfig* fontConfig = nullptr;
 };
 
 /**
