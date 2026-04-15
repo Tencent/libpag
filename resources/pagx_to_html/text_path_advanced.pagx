@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: TextPath advanced attributes: baselineOrigin, baselineAngle, lastMargin,
      reversed="true", forceAlignment="true", perpendicular="false" -->
-<pagx version="1.0" width="420" height="430">
+<pagx version="1.0" width="420" height="460">
   <Resources>
-    <PathData id="bannerArc" data="M 10,110 C 70,30 260,30 320,110"/>
-    <PathData id="linePath" data="M 10,20 L 150,20"/>
-    <PathData id="circlePath" data="M 265,55 A 45,45 0 1,1 264.99,55 Z"/>
-    <PathData id="wavyPath" data="M 10,30 Q 85,0 160,30 Q 235,60 310,30"/>
+    <PathData id="bannerArc" data="M 30,100 C 80,25 220,25 270,100"/>
+    <PathData id="linePath" data="M 10,20 L 140,20"/>
+    <PathData id="circlePath" data="M 90,45 A 40,40 0 1,1 89.99,45 Z"/>
+    <PathData id="wavyPath" data="M 20,30 Q 85,0 150,30 Q 215,60 280,30"/>
   </Resources>
 
   <!-- Background -->
@@ -38,8 +38,8 @@
       <!-- Centered content wrapper -->
       <Layer width="330" layout="vertical" gap="14" alignment="center" arrangement="center">
 
-        <!-- Row 1: Banner arc (forceAlignment + firstMargin/lastMargin) -->
-        <Layer width="330" height="120">
+        <!-- Row 1: Banner arc -->
+        <Layer width="300" height="110">
           <Layer name="arcGuide" alpha="0.15">
             <Path data="@bannerArc"/>
             <Stroke color="#3B82F6" width="1"/>
@@ -51,15 +51,15 @@
           </Layer>
         </Layer>
 
-        <!-- Row 2: Perpendicular=false (glyphs stay upright on arc) -->
-        <Layer width="330" height="50">
+        <!-- Row 2: Perpendicular=false -->
+        <Layer width="300" height="45">
           <Layer name="uprightGuide" alpha="0.15">
-            <Path data="M 40,30 C 100,5 230,5 290,30"/>
+            <Path data="M 30,25 C 80,5 220,5 270,25"/>
             <Stroke color="#8B5CF6" width="1" dashes="4,3"/>
           </Layer>
           <Layer name="uprightDemo">
             <Text text="UPRIGHT" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
-            <TextPath path="M 40,30 C 100,5 230,5 290,30" perpendicular="false" forceAlignment="true"/>
+            <TextPath path="M 30,25 C 80,5 220,5 270,25" perpendicular="false" forceAlignment="true"/>
             <Fill color="#8B5CF6"/>
           </Layer>
         </Layer>
@@ -87,17 +87,17 @@
 
           <!-- Badge: reversed circle -->
           <Layer layout="vertical" gap="4" alignment="center">
-            <Layer width="110" height="110">
+            <Layer width="100" height="100">
               <Layer name="badgeGuide" alpha="0.15">
-                <Ellipse position="55,55" size="90,90"/>
+                <Ellipse position="50,50" size="80,80"/>
                 <Stroke color="#EF4444" width="1"/>
               </Layer>
               <Layer name="badgeBg">
-                <Ellipse position="55,55" size="60,60"/>
+                <Ellipse position="50,50" size="55,55"/>
                 <Fill color="#FEF3C7"/>
               </Layer>
               <Layer name="badgeInner">
-                <Ellipse position="55,55" size="50,50"/>
+                <Ellipse position="50,50" size="45,45"/>
                 <Fill color="#FFFFFF"/>
               </Layer>
               <Layer name="badgeText">
@@ -113,8 +113,8 @@
           </Layer>
         </Layer>
 
-        <!-- Row 3: Wavy path (forceAlignment) -->
-        <Layer width="320" height="60">
+        <!-- Row 3: Wavy path -->
+        <Layer width="300" height="60">
           <Layer name="wavyGuide" alpha="0.15">
             <Path data="@wavyPath"/>
             <Stroke color="#10B981" width="1"/>
