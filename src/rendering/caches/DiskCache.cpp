@@ -471,20 +471,19 @@ void DiskCache::saveConfig() {
   // Increment the version to coalesce multiple rapid saves. If a newer save is queued
   // before this one executes, skip this write entirely.
   auto currentVersion = ++configSaveVersion;
-  auto* versionPtr = &configSaveVersion;
   // Write to disk asynchronously via DiskIOWorker to avoid blocking the calling thread on IO.
   // Uses temp file + rename for atomic write to prevent corruption if app exits mid-write.
   auto path = configPath;
   auto tempPath = configPath + ".tmp";
-  DiskIOWorker::GetInstance()->submit(std::bind(&DiskCache::WriteConfigTask, path, tempPath, data,
-                                                bufferSize, currentVersion, versionPtr));
+  DiskIOWorker::GetInstance()->submit(
+      std::bind(&DiskCache::WriteConfigTask, path, tempPath, data, bufferSize, currentVersion));
 }
 
 void DiskCache::WriteConfigTask(std::string path, std::string tempPath,
                                 std::shared_ptr<tgfx::Buffer> data, size_t bufferSize,
-                                uint32_t currentVersion, std::atomic<uint32_t>* versionPtr) {
+                                uint32_t currentVersion) {
   // Skip this write if a newer version has been queued.
-  if (currentVersion != versionPtr->load(std::memory_order_acquire)) {
+  if (currentVersion != GetInstance()->configSaveVersion.load(std::memory_order_acquire)) {
     return;
   }
   Directory::CreateRecursively(Directory::GetParentDirectory(path));
