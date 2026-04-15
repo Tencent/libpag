@@ -31,6 +31,7 @@ PAGFileInfoModel::PAGFileInfoModel() : QAbstractListModel(nullptr) {
 }
 
 PAGFileInfoModel::PAGFileInfoModel(QObject* parent) : QAbstractListModel(parent) {
+  beginResetModel();
   fileInfos.emplace_back("Duration", "", "s");
   fileInfos.emplace_back("FrameRate", "", "FPS");
   fileInfos.emplace_back("Width");
@@ -39,7 +40,6 @@ PAGFileInfoModel::PAGFileInfoModel(QObject* parent) : QAbstractListModel(parent)
   fileInfos.emplace_back("Videos");
   fileInfos.emplace_back("Layers");
   fileInfos.emplace_back("SDK Version");
-  beginResetModel();
   endResetModel();
 }
 
@@ -69,7 +69,20 @@ int PAGFileInfoModel::rowCount(const QModelIndex& parent) const {
 }
 
 void PAGFileInfoModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
+  beginResetModel();
   fileInfos.clear();
+  if (pagFile == nullptr) {
+    fileInfos.emplace_back("Duration", "", "s");
+    fileInfos.emplace_back("FrameRate", "", "FPS");
+    fileInfos.emplace_back("Width");
+    fileInfos.emplace_back("Height");
+    fileInfos.emplace_back("Graphics");
+    fileInfos.emplace_back("Videos");
+    fileInfos.emplace_back("Layers");
+    fileInfos.emplace_back("SDK Version");
+    endResetModel();
+    return;
+  }
   fileInfos.emplace_back("Duration", Utils::ToQString(pagFile->duration() / 1000000.0), "s");
   fileInfos.emplace_back("FrameRate", Utils::ToQString(pagFile->frameRate()), "FPS");
   fileInfos.emplace_back("Width", Utils::ToQString(pagFile->width()));
@@ -81,7 +94,37 @@ void PAGFileInfoModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
   fileInfos.emplace_back("Layers", Utils::ToQString(pagFile->getFile()->numLayers()));
   auto version = Utils::TagCodeToVersion(pagFile->tagLevel());
   fileInfos.emplace_back("SDK Version", version.c_str());
+  endResetModel();
+}
+
+static int CountImageNodes(const std::shared_ptr<pagx::PAGXDocument>& document) {
+  int count = 0;
+  for (const auto& node : document->nodes) {
+    auto type = node->nodeType();
+    if (type == pagx::NodeType::Image || type == pagx::NodeType::ImagePattern) {
+      count++;
+    }
+  }
+  return count;
+}
+
+void PAGFileInfoModel::setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> pagxDocument) {
   beginResetModel();
+  fileInfos.clear();
+  if (pagxDocument == nullptr) {
+    fileInfos.emplace_back("Width");
+    fileInfos.emplace_back("Height");
+    fileInfos.emplace_back("Layers");
+    fileInfos.emplace_back("Nodes");
+    fileInfos.emplace_back("Images");
+    endResetModel()
+    return;
+  }
+  fileInfos.emplace_back("Width", Utils::ToQString(static_cast<int>(pagxDocument->width)));
+  fileInfos.emplace_back("Height", Utils::ToQString(static_cast<int>(pagxDocument->height)));
+  fileInfos.emplace_back("Layers", Utils::ToQString(static_cast<int>(pagxDocument->layers.size())));
+  fileInfos.emplace_back("Nodes", Utils::ToQString(static_cast<int>(pagxDocument->nodes.size())));
+  fileInfos.emplace_back("Images", Utils::ToQString(CountImageNodes(pagxDocument)));
   endResetModel();
 }
 
