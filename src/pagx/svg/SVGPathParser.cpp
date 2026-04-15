@@ -32,7 +32,7 @@ using pag::PI;
 static std::string FloatToString(float value) {
   char buf[32];
   snprintf(buf, sizeof(buf), "%.9g", value);
-  // Normalize exponent to always use 2 digits (e.g. "e-06" not "e-006") for cross-platform
+  // Strip leading zeros from exponent (e.g. "e-006" → "e-6", "e-06" → "e-6") for cross-platform
   // consistency.
   char* e = strchr(buf, 'e');
   if (e != nullptr) {
