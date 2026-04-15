@@ -488,6 +488,7 @@ void DiskCache::WriteConfigTask(const std::string& path, const std::string& temp
   Directory::CreateRecursively(Directory::GetParentDirectory(path));
   auto file = fopen(tempPath.c_str(), "wb");
   if (file == nullptr) {
+    LOGE("Failed to open config file for writing: %s", tempPath.c_str());
     return;
   }
   auto written = fwrite(data->data(), 1, data->size(), file);
@@ -497,6 +498,8 @@ void DiskCache::WriteConfigTask(const std::string& path, const std::string& temp
     rename(tempPath.c_str(), path.c_str());
   } else {
     // Write failed, remove the incomplete temp file.
+    LOGE("Failed to write config file: %s (written %zu of %zu bytes)", tempPath.c_str(), written,
+         data->size());
     remove(tempPath.c_str());
   }
 }
