@@ -193,6 +193,19 @@ static bool ComputeImagePatternRect(const ImagePattern* pattern, int imgW, int i
 // PPTWriter – converts PAGX nodes to PPTX XML
 //==============================================================================
 
+struct PPTRunStyle {
+  const char* algn = nullptr;
+  int fontSize = 0;
+  int64_t letterSpc = 0;
+  bool hasBold = false;
+  bool hasItalic = false;
+  bool hasLetterSpacing = false;
+  bool hasFillColor = false;
+  float fillAlpha = 0;
+  const ColorSource* fillColor = nullptr;
+  std::string typeface = {};
+};
+
 class PPTWriter {
  public:
   PPTWriter(PPTWriterContext* ctx, PAGXDocument* doc, const PPTExporter::Options& options,
@@ -253,7 +266,11 @@ class PPTWriter {
                        const std::vector<LayerStyle*>& styles);
   void writeNativeText(XMLBuilder& out, const Text* text, const FillStrokeInfo& fs, const Matrix& m,
                        float alpha, const std::vector<LayerFilter*>& filters,
-                       const std::vector<LayerStyle*>& styles);
+                       const std::vector<LayerStyle*>& styles,
+                       const TextLayoutResult* precomputed = nullptr);
+  void writeParagraph(XMLBuilder& out, const std::string& lineText, const PPTRunStyle& style,
+                      const std::vector<LayerFilter*>& filters,
+                      const std::vector<LayerStyle*>& styles);
   void writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
                          const std::vector<Element*>& elements, const Matrix& transform,
                          float alpha, const std::vector<LayerFilter*>& filters,
@@ -1335,52 +1352,22 @@ void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStr
 void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStrokeInfo& fs,
                                 const Matrix& m, float alpha,
                                 const std::vector<LayerFilter*>& filters,
-                                const std::vector<LayerStyle*>& styles) {
+                                const std::vector<LayerStyle*>& styles,
+                                const TextLayoutResult* precomputed) {
   if (text->text.empty()) {
     return;
   }
 
-  TextLayoutParams params = {};
-  bool hasTextBox = false;
-  if (fs.textBox && !std::isnan(fs.textBox->width) && fs.textBox->width > 0) {
-    hasTextBox = true;
-    bool hasPadding = !fs.textBox->padding.isZero();
-    float boxW = fs.textBox->width;
-    float boxH = fs.textBox->height;
-    if (hasPadding) {
-      if (!std::isnan(boxW)) {
-        boxW = std::max(0.0f, boxW - fs.textBox->padding.left - fs.textBox->padding.right);
-      }
-      if (!std::isnan(boxH)) {
-        boxH = std::max(0.0f, boxH - fs.textBox->padding.top - fs.textBox->padding.bottom);
-      }
-    }
-    params.boxWidth = boxW;
-    params.boxHeight = boxH;
-    params.textAlign = fs.textBox->textAlign;
-    params.paragraphAlign = fs.textBox->paragraphAlign;
-    params.writingMode = fs.textBox->writingMode;
-    params.lineHeight = fs.textBox->lineHeight;
-    params.wordWrap = fs.textBox->wordWrap;
-    params.overflow = fs.textBox->overflow;
-  } else {
-    params.baseline = text->baseline;
-    switch (text->textAnchor) {
-      case TextAnchor::Start:
-        params.textAlign = TextAlign::Start;
-        break;
-      case TextAnchor::Center:
-        params.textAlign = TextAlign::Center;
-        break;
-      case TextAnchor::End:
-        params.textAlign = TextAlign::End;
-        break;
-    }
-  }
-
   auto* mutableText = const_cast<Text*>(text);
-  auto layoutResult = TextLayout::Layout({mutableText}, params, _layoutContext);
-  auto* lines = layoutResult.getTextLines(mutableText);
+  bool hasTextBox = fs.textBox && !std::isnan(fs.textBox->width) && fs.textBox->width > 0;
+
+  TextLayoutResult localResult;
+  if (!precomputed) {
+    auto params = hasTextBox ? MakeTextBoxParams(fs.textBox) : MakeStandaloneParams(text);
+    localResult = TextLayout::Layout({mutableText}, params, _layoutContext);
+    precomputed = &localResult;
+  }
+  auto* lines = precomputed->getTextLines(mutableText);
 
   float posX = 0;
   float posY = 0;
@@ -1394,7 +1381,7 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
     estHeight = (!std::isnan(fs.textBox->height) && fs.textBox->height > 0) ? fs.textBox->height
                                                                             : text->fontSize * 1.4f;
   } else {
-    auto textBounds = layoutResult.getTextBounds(mutableText);
+    auto textBounds = precomputed->getTextBounds(mutableText);
     if (textBounds.width > 0 && textBounds.height > 0) {
       posX = text->position.x + textBounds.x;
       posY = text->position.y + textBounds.y;
@@ -1457,34 +1444,38 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   bodyPr.closeElementSelfClosing();
   out.openElement("a:lstStyle").closeElementSelfClosing();
 
-  const char* algn = nullptr;
+  PPTRunStyle style = {};
+  style.algn = nullptr;
   if (text->textAnchor == TextAnchor::Center) {
-    algn = "ctr";
+    style.algn = "ctr";
   } else if (text->textAnchor == TextAnchor::End) {
-    algn = "r";
+    style.algn = "r";
   }
   if (fs.textBox) {
     if (fs.textBox->textAlign == TextAlign::Center) {
-      algn = "ctr";
+      style.algn = "ctr";
     } else if (fs.textBox->textAlign == TextAlign::End) {
-      algn = "r";
+      style.algn = "r";
     }
   }
-  bool hasBold = text->fontStyle.find("Bold") != std::string::npos;
-  bool hasItalic = text->fontStyle.find("Italic") != std::string::npos;
-  int fontSize = FontSizeToPPT(text->fontSize);
-  int64_t letterSpc = static_cast<int64_t>(std::round(text->letterSpacing * 75.0));
+  style.hasBold = text->fontStyle.find("Bold") != std::string::npos;
+  style.hasItalic = text->fontStyle.find("Italic") != std::string::npos;
+  style.fontSize = FontSizeToPPT(text->fontSize);
+  style.letterSpc = static_cast<int64_t>(std::round(text->letterSpacing * 75.0));
+  style.hasLetterSpacing = text->letterSpacing != 0.0f;
   // a:rPr supports a:solidFill and a:gradFill but not a:blipFill, so ImagePattern
   // fills are skipped (text falls back to the renderer default).
-  bool hasFillColor = false;
+  style.hasFillColor = false;
   if (fs.fill && fs.fill->color) {
     auto type = fs.fill->color->nodeType();
-    hasFillColor = (type == NodeType::SolidColor || type == NodeType::LinearGradient ||
-                    type == NodeType::RadialGradient || type == NodeType::ConicGradient ||
-                    type == NodeType::DiamondGradient);
+    style.hasFillColor =
+        (type == NodeType::SolidColor || type == NodeType::LinearGradient ||
+         type == NodeType::RadialGradient || type == NodeType::ConicGradient ||
+         type == NodeType::DiamondGradient);
   }
-  float fillAlpha = hasFillColor ? fs.fill->alpha * alpha : 0;
-  std::string typeface = text->fontFamily.empty() ? std::string() : StripQuotes(text->fontFamily);
+  style.fillAlpha = style.hasFillColor ? fs.fill->alpha * alpha : 0;
+  style.fillColor = style.hasFillColor ? fs.fill->color : nullptr;
+  style.typeface = text->fontFamily.empty() ? std::string() : StripQuotes(text->fontFamily);
 
   if (lines && !lines->empty()) {
     for (const auto& lineInfo : *lines) {
@@ -1496,44 +1487,7 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
       if (line.empty()) {
         continue;
       }
-      out.openElement("a:p").closeElementStart();
-      if (algn) {
-        out.openElement("a:pPr").addRequiredAttribute("algn", algn).closeElementSelfClosing();
-      }
-      out.openElement("a:r").closeElementStart();
-      out.openElement("a:rPr")
-          .addRequiredAttribute("lang", "en-US")
-          .addRequiredAttribute("sz", fontSize);
-      if (hasBold) {
-        out.addRequiredAttribute("b", "1");
-      }
-      if (hasItalic) {
-        out.addRequiredAttribute("i", "1");
-      }
-      if (text->letterSpacing != 0.0f) {
-        out.addRequiredAttribute("spc", letterSpc);
-      }
-      out.closeElementStart();
-      if (hasFillColor) {
-        // For gradient fills, shape bounds are unknown at the run level; pass an empty
-        // rect so writeColorSource falls back to the gradient's own coordinate space.
-        writeColorSource(out, fs.fill->color, fillAlpha);
-      }
-      writeEffects(out, filters, styles);
-      if (!typeface.empty()) {
-        out.openElement("a:latin")
-            .addRequiredAttribute("typeface", typeface)
-            .closeElementSelfClosing();
-        out.openElement("a:ea")
-            .addRequiredAttribute("typeface", typeface)
-            .closeElementSelfClosing();
-      }
-      out.closeElement();  // a:rPr
-      out.openElement("a:t").closeElementStart();
-      out.addTextContent(line);
-      out.closeElement();  // a:t
-      out.closeElement();  // a:r
-      out.closeElement();  // a:p
+      writeParagraph(out, line, style, filters, styles);
     }
   } else {
     const std::string& remaining = text->text;
@@ -1542,44 +1496,7 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
       size_t nl = remaining.find('\n', pos);
       std::string line =
           (nl == std::string::npos) ? remaining.substr(pos) : remaining.substr(pos, nl - pos);
-      out.openElement("a:p").closeElementStart();
-      if (algn) {
-        out.openElement("a:pPr").addRequiredAttribute("algn", algn).closeElementSelfClosing();
-      }
-      out.openElement("a:r").closeElementStart();
-      out.openElement("a:rPr")
-          .addRequiredAttribute("lang", "en-US")
-          .addRequiredAttribute("sz", fontSize);
-      if (hasBold) {
-        out.addRequiredAttribute("b", "1");
-      }
-      if (hasItalic) {
-        out.addRequiredAttribute("i", "1");
-      }
-      if (text->letterSpacing != 0.0f) {
-        out.addRequiredAttribute("spc", letterSpc);
-      }
-      out.closeElementStart();
-      if (hasFillColor) {
-        // For gradient fills, shape bounds are unknown at the run level; pass an empty
-        // rect so writeColorSource falls back to the gradient's own coordinate space.
-        writeColorSource(out, fs.fill->color, fillAlpha);
-      }
-      writeEffects(out, filters, styles);
-      if (!typeface.empty()) {
-        out.openElement("a:latin")
-            .addRequiredAttribute("typeface", typeface)
-            .closeElementSelfClosing();
-        out.openElement("a:ea")
-            .addRequiredAttribute("typeface", typeface)
-            .closeElementSelfClosing();
-      }
-      out.closeElement();  // a:rPr
-      out.openElement("a:t").closeElementStart();
-      out.addTextContent(line);
-      out.closeElement();  // a:t
-      out.closeElement();  // a:r
-      out.closeElement();  // a:p
+      writeParagraph(out, line, style, filters, styles);
       if (nl == std::string::npos) {
         break;
       }
@@ -1589,6 +1506,50 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
 
   out.closeElement();  // p:txBody
   out.closeElement();  // p:sp
+}
+
+void PPTWriter::writeParagraph(XMLBuilder& out, const std::string& lineText,
+                               const PPTRunStyle& style,
+                               const std::vector<LayerFilter*>& filters,
+                               const std::vector<LayerStyle*>& styles) {
+  out.openElement("a:p").closeElementStart();
+  if (style.algn) {
+    out.openElement("a:pPr").addRequiredAttribute("algn", style.algn).closeElementSelfClosing();
+  }
+  out.openElement("a:r").closeElementStart();
+  out.openElement("a:rPr")
+      .addRequiredAttribute("lang", "en-US")
+      .addRequiredAttribute("sz", style.fontSize);
+  if (style.hasBold) {
+    out.addRequiredAttribute("b", "1");
+  }
+  if (style.hasItalic) {
+    out.addRequiredAttribute("i", "1");
+  }
+  if (style.hasLetterSpacing) {
+    out.addRequiredAttribute("spc", style.letterSpc);
+  }
+  out.closeElementStart();
+  if (style.hasFillColor) {
+    // For gradient fills, shape bounds are unknown at the run level; pass an empty
+    // rect so writeColorSource falls back to the gradient's own coordinate space.
+    writeColorSource(out, style.fillColor, style.fillAlpha);
+  }
+  writeEffects(out, filters, styles);
+  if (!style.typeface.empty()) {
+    out.openElement("a:latin")
+        .addRequiredAttribute("typeface", style.typeface)
+        .closeElementSelfClosing();
+    out.openElement("a:ea")
+        .addRequiredAttribute("typeface", style.typeface)
+        .closeElementSelfClosing();
+  }
+  out.closeElement();  // a:rPr
+  out.openElement("a:t").closeElementStart();
+  out.addTextContent(lineText);
+  out.closeElement();  // a:t
+  out.closeElement();  // a:r
+  out.closeElement();  // a:p
 }
 
 // ── TextBox group ──────────────────────────────────────────────────────────
@@ -1606,28 +1567,7 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
     return;
   }
 
-  bool hasPadding = !box->padding.isZero();
-  float boxW = box->width;
-  float boxH = box->height;
-  if (hasPadding) {
-    if (!std::isnan(boxW)) {
-      boxW = std::max(0.0f, boxW - box->padding.left - box->padding.right);
-    }
-    if (!std::isnan(boxH)) {
-      boxH = std::max(0.0f, boxH - box->padding.top - box->padding.bottom);
-    }
-  }
-
-  TextLayoutParams params = {};
-  params.boxWidth = boxW;
-  params.boxHeight = boxH;
-  params.textAlign = box->textAlign;
-  params.paragraphAlign = box->paragraphAlign;
-  params.writingMode = box->writingMode;
-  params.lineHeight = box->lineHeight;
-  params.wordWrap = box->wordWrap;
-  params.overflow = box->overflow;
-
+  auto params = MakeTextBoxParams(box);
   auto layoutResult = TextLayout::Layout(childTexts, params, _layoutContext);
 
   FillStrokeInfo boxFs = fs;
@@ -1637,7 +1577,7 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
     if (childText->text.empty()) {
       continue;
     }
-    writeNativeText(out, childText, boxFs, transform, alpha, filters, styles);
+    writeNativeText(out, childText, boxFs, transform, alpha, filters, styles, &layoutResult);
   }
 }
 

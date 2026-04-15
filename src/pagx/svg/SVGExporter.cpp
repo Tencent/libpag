@@ -24,11 +24,11 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "pagx/LayoutContext.h"
-#include "pagx/TextLayoutParams.h"
 #include "base/utils/MathUtil.h"
+#include "pagx/LayoutContext.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/TextLayout.h"
+#include "pagx/TextLayoutParams.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
@@ -964,27 +964,7 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const Group* textBox,
     return;
   }
 
-  bool hasPadding = !box->padding.isZero();
-  float boxW = box->width;
-  float boxH = box->height;
-  if (hasPadding) {
-    if (!std::isnan(boxW)) {
-      boxW = std::max(0.0f, boxW - box->padding.left - box->padding.right);
-    }
-    if (!std::isnan(boxH)) {
-      boxH = std::max(0.0f, boxH - box->padding.top - box->padding.bottom);
-    }
-  }
-
-  TextLayoutParams params = {};
-  params.boxWidth = boxW;
-  params.boxHeight = boxH;
-  params.textAlign = box->textAlign;
-  params.paragraphAlign = box->paragraphAlign;
-  params.writingMode = box->writingMode;
-  params.lineHeight = box->lineHeight;
-  params.wordWrap = box->wordWrap;
-  params.overflow = box->overflow;
+  auto params = MakeTextBoxParams(box);
 
   auto layoutResult = TextLayout::Layout(childTexts, params, _layoutContext);
   std::string transformStr = MatrixToSVGTransform(transform);
@@ -1012,41 +992,7 @@ void SVGWriter::writeText(SVGBuilder& out, const Text* text, const FillStrokeInf
     return;
   }
 
-  TextLayoutParams params = {};
-  if (fs.textBox) {
-    bool hasPadding = !fs.textBox->padding.isZero();
-    float boxW = fs.textBox->width;
-    float boxH = fs.textBox->height;
-    if (hasPadding) {
-      if (!std::isnan(boxW)) {
-        boxW = std::max(0.0f, boxW - fs.textBox->padding.left - fs.textBox->padding.right);
-      }
-      if (!std::isnan(boxH)) {
-        boxH = std::max(0.0f, boxH - fs.textBox->padding.top - fs.textBox->padding.bottom);
-      }
-    }
-    params.boxWidth = boxW;
-    params.boxHeight = boxH;
-    params.textAlign = fs.textBox->textAlign;
-    params.paragraphAlign = fs.textBox->paragraphAlign;
-    params.writingMode = fs.textBox->writingMode;
-    params.lineHeight = fs.textBox->lineHeight;
-    params.wordWrap = fs.textBox->wordWrap;
-    params.overflow = fs.textBox->overflow;
-  } else {
-    params.baseline = text->baseline;
-    switch (text->textAnchor) {
-      case TextAnchor::Start:
-        params.textAlign = TextAlign::Start;
-        break;
-      case TextAnchor::Center:
-        params.textAlign = TextAlign::Center;
-        break;
-      case TextAnchor::End:
-        params.textAlign = TextAlign::End;
-        break;
-    }
-  }
+  TextLayoutParams params = fs.textBox ? MakeTextBoxParams(fs.textBox) : MakeStandaloneParams(text);
   auto mutableText = const_cast<Text*>(text);
   auto layoutResult = TextLayout::Layout({mutableText}, params, _layoutContext);
   auto* textLines = layoutResult.getTextLines(mutableText);
@@ -1228,8 +1174,7 @@ std::string SVGExporter::ToSVG(const PAGXDocument& doc, const Options& options) 
   SVGBuilder defs(true, options.indent, 2);
   SVGWriterContext context;
   auto layoutContext = std::make_unique<LayoutContext>(options.fontConfig);
-  SVGWriter writer(&defs, &context, options.indent, options.convertTextToPath,
-                   layoutContext.get());
+  SVGWriter writer(&defs, &context, options.indent, options.convertTextToPath, layoutContext.get());
 
   if (options.xmlDeclaration) {
     svg.appendDeclaration();

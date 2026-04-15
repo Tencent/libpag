@@ -22,6 +22,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "pagx/TextLayoutParams.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
@@ -138,6 +139,16 @@ class ImagePattern;
  */
 std::shared_ptr<tgfx::Data> RenderTiledPattern(GPUContext* gpu, const ImagePattern* pattern,
                                                int width, int height, float offsetX, float offsetY);
+
+/**
+ * Builds TextLayoutParams from a TextBox's attributes with padding-adjusted content dimensions.
+ */
+TextLayoutParams MakeTextBoxParams(const TextBox* box);
+
+/**
+ * Builds TextLayoutParams from a standalone Text element's attributes.
+ */
+TextLayoutParams MakeStandaloneParams(const Text* text);
 
 /**
  * Strips surrounding double-quote characters from a string.

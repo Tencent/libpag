@@ -624,6 +624,47 @@ std::shared_ptr<tgfx::Data> RenderTiledPattern(GPUContext* gpu, const ImagePatte
   return result;
 }
 
+TextLayoutParams MakeTextBoxParams(const TextBox* box) {
+  bool hasPadding = !box->padding.isZero();
+  float boxW = box->width;
+  float boxH = box->height;
+  if (hasPadding) {
+    if (!std::isnan(boxW)) {
+      boxW = std::max(0.0f, boxW - box->padding.left - box->padding.right);
+    }
+    if (!std::isnan(boxH)) {
+      boxH = std::max(0.0f, boxH - box->padding.top - box->padding.bottom);
+    }
+  }
+  TextLayoutParams params = {};
+  params.boxWidth = boxW;
+  params.boxHeight = boxH;
+  params.textAlign = box->textAlign;
+  params.paragraphAlign = box->paragraphAlign;
+  params.writingMode = box->writingMode;
+  params.lineHeight = box->lineHeight;
+  params.wordWrap = box->wordWrap;
+  params.overflow = box->overflow;
+  return params;
+}
+
+TextLayoutParams MakeStandaloneParams(const Text* text) {
+  TextLayoutParams params = {};
+  params.baseline = text->baseline;
+  switch (text->textAnchor) {
+    case TextAnchor::Start:
+      params.textAlign = TextAlign::Start;
+      break;
+    case TextAnchor::Center:
+      params.textAlign = TextAlign::Center;
+      break;
+    case TextAnchor::End:
+      params.textAlign = TextAlign::End;
+      break;
+  }
+  return params;
+}
+
 std::string StripQuotes(const std::string& s) {
   if (s.size() >= 2 && s.front() == '"' && s.back() == '"') {
     return s.substr(1, s.size() - 2);
