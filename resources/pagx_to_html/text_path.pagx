@@ -1,72 +1,98 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: TextPath — text along curves with various configurations:
      simple arc, perpendicular=false, multiple paths, firstMargin/lastMargin -->
-<pagx version="1.0" width="420" height="340">
+<pagx version="1.0" width="420" height="380">
   <Resources>
-    <PathData id="arcPath" data="M 50,150 C 120,70 300,70 370,150"/>
-    <PathData id="straightLine" data="M 50,220 L 370,220"/>
-    <PathData id="sCurve" data="M 50,280 C 110,250 160,310 210,280 C 260,250 320,310 370,280"/>
+    <PathData id="arcPath" data="M 20,80 C 90,10 230,10 300,80"/>
+    <PathData id="straightLine" data="M 10,20 L 310,20"/>
+    <PathData id="sCurve" data="M 10,30 C 70,0 120,60 170,30 C 220,0 280,60 330,30"/>
   </Resources>
 
   <!-- Background -->
-  <Layer>
-    <Rectangle position="210,170" size="420,340"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
-  <!-- Title -->
-  <Layer>
-    <Text text="Text Path" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="210,34" textAnchor="center"/>
-    <Fill color="#1E293B"/>
-  </Layer>
-  <Layer>
-    <Text text="Text along curves and straight paths" fontFamily="Arial" fontSize="10" position="210,50" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="10" alignment="stretch">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="4" alignment="center">
+      <Layer height="20">
+        <Text text="Text Path" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="Text along curves and straight paths" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
 
-  <!-- Card -->
-  <Layer>
-    <Rectangle position="210,192" size="370,230" roundness="16"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
-  </Layer>
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-  <!-- Ghost path for arc -->
-  <Layer alpha="0.15">
-    <Path data="M 50,150 C 120,70 300,70 370,150"/>
-    <Stroke color="#3B82F6" width="1"/>
-  </Layer>
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16" gap="12" alignment="center" arrangement="center">
 
-  <!-- Text along bezier curve (perpendicular=true) -->
-  <Layer>
-    <Text text="Along a Path" fontFamily="Arial" fontStyle="Bold" fontSize="18" position="10,10"/>
-    <TextPath path="@arcPath" perpendicular="true" firstMargin="20"/>
-    <Fill color="#3B82F6"/>
-  </Layer>
+        <!-- Arc path demo -->
+        <Layer layout="vertical" gap="4" alignment="center">
+          <Layer width="320" height="90">
+            <!-- Ghost path -->
+            <Layer name="ghostArc" alpha="0.15">
+              <Stroke color="#3B82F6" width="1"/>
+            </Layer>
+            <!-- Text along bezier curve -->
+            <Layer name="textArc">
+              <TextPath path="@arcPath" perpendicular="true" firstMargin="20"/>
+              <Fill color="#3B82F6"/>
+            </Layer>
+          </Layer>
+          <Layer height="10">
+            <Text text="perpendicular + firstMargin" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+        </Layer>
 
-  <!-- Ghost path for straight line -->
-  <Layer alpha="0.15">
-    <Path data="M 50,220 L 370,220"/>
-    <Stroke color="#10B981" width="1"/>
-  </Layer>
+        <!-- Straight line demo -->
+        <Layer layout="vertical" gap="4" alignment="center">
+          <Layer width="320" height="40">
+            <!-- Ghost path -->
+            <Layer name="ghostLine" alpha="0.15">
+              <Stroke color="#10B981" width="1"/>
+            </Layer>
+            <!-- Text on straight line -->
+            <Layer name="textLine">
+              <TextPath path="@straightLine" firstMargin="30" lastMargin="30"/>
+              <Fill color="#10B981"/>
+            </Layer>
+          </Layer>
+          <Layer height="10">
+            <Text text="firstMargin + lastMargin" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+        </Layer>
 
-  <!-- Text on straight line with margins -->
-  <Layer>
-    <Text text="Straight Path" fontFamily="Arial" fontSize="14" position="10,10"/>
-    <TextPath path="@straightLine" firstMargin="30" lastMargin="30"/>
-    <Fill color="#10B981"/>
-  </Layer>
-
-  <!-- Ghost path for S-curve -->
-  <Layer alpha="0.15">
-    <Path data="M 50,280 C 110,250 160,310 210,280 C 260,250 320,310 370,280"/>
-    <Stroke color="#8B5CF6" width="1"/>
-  </Layer>
-
-  <!-- S-curve path -->
-  <Layer>
-    <Text text="S-CURVE" fontFamily="Arial" fontStyle="Bold" fontSize="14" position="10,10"/>
-    <TextPath path="@sCurve"/>
-    <Fill color="#8B5CF6"/>
+        <!-- S-curve demo -->
+        <Layer layout="vertical" gap="4" alignment="center">
+          <Layer width="340" height="60">
+            <!-- Ghost path -->
+            <Layer name="ghostSCurve" alpha="0.15">
+              <Stroke color="#8B5CF6" width="1"/>
+            </Layer>
+            <!-- Text along S-curve -->
+            <Layer name="textSCurve">
+              <TextPath path="@sCurve"/>
+              <Fill color="#8B5CF6"/>
+            </Layer>
+          </Layer>
+          <Layer height="10">
+            <Text text="S-curve path" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+        </Layer>
+      </Layer>
+    </Layer>
   </Layer>
 </pagx>
