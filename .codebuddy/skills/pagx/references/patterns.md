@@ -294,7 +294,7 @@ Button cells use Group with `padding` for centered text (no layout needed). This
 
 ```xml
 <pagx width="280" height="50">
-  <Layer centerX="0" centerY="0" width="260" height="40">
+  <Layer width="260" height="40" centerX="0" centerY="0">
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
     <Fill color="#FFF"/>
     <Stroke color="#CBD5E1" width="1"/>

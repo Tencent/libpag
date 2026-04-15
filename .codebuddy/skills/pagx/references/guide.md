@@ -17,8 +17,11 @@ Spec rules, techniques, and common pitfalls for writing correct PAGX files.
 
 ```xml
 <pagx width="800" height="600">
-  <Layer>...</Layer>
-  <Resources>...</Resources>   <!-- optional, recommended at end -->
+  <Layer>
+  </Layer>
+  <Resources>
+  </Resources>
+  <!-- optional, recommended at end -->
 </pagx>
 ```
 
