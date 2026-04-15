@@ -103,6 +103,9 @@ static size_t CountUTF8Characters(const std::string& str) {
 // Dash pattern → OOXML preset dash mapping
 //==============================================================================
 
+// Maps dash-to-stroke-width ratios to OOXML preset dash types (ISO/IEC 29500-1,
+// §20.1.10.48 ST_PresetLineDashVal).  Thresholds approximate the boundary between
+// dot (≤1.5×), dash (≤4.5×), and long-dash (>4.5×) categories.
 static const char* MatchPresetDash(const std::vector<float>& dashes, float strokeWidth) {
   if (dashes.empty() || strokeWidth <= 0) {
     return nullptr;
@@ -352,6 +355,7 @@ void PPTWriter::endShape(XMLBuilder& out) {
   out.openElement("a:bodyPr").closeElementSelfClosing();
   out.openElement("a:lstStyle").closeElementSelfClosing();
   out.openElement("a:p").closeElementStart();
+  // Default to en-US as a language-neutral fallback.
   out.openElement("a:endParaRPr").addRequiredAttribute("lang", "en-US").closeElementSelfClosing();
   out.closeElement();  // a:p
   out.closeElement();  // p:txBody
@@ -499,10 +503,18 @@ bool PPTWriter::writeImagePatternAsPicture(XMLBuilder& out, const Fill* fill,
   WriteBlip(out, relId, effectiveAlpha);
   if (hasSrcRect) {
     auto& src = out.openElement("a:srcRect");
-    if (ipr.srcL != 0) src.addRequiredAttribute("l", ipr.srcL);
-    if (ipr.srcT != 0) src.addRequiredAttribute("t", ipr.srcT);
-    if (ipr.srcR != 0) src.addRequiredAttribute("r", ipr.srcR);
-    if (ipr.srcB != 0) src.addRequiredAttribute("b", ipr.srcB);
+    if (ipr.srcL != 0) {
+      src.addRequiredAttribute("l", ipr.srcL);
+    }
+    if (ipr.srcT != 0) {
+      src.addRequiredAttribute("t", ipr.srcT);
+    }
+    if (ipr.srcR != 0) {
+      src.addRequiredAttribute("r", ipr.srcR);
+    }
+    if (ipr.srcB != 0) {
+      src.addRequiredAttribute("b", ipr.srcB);
+    }
     src.closeElementSelfClosing();
   }
   WriteDefaultStretch(out);
@@ -675,10 +687,18 @@ void PPTWriter::writeImagePatternFill(XMLBuilder& out, const ImagePattern* patte
     ImagePatternRect ipr = {};
     if (hasTransform && ComputeImagePatternRect(pattern, imgW, imgH, shapeBounds, &ipr)) {
       auto& src = out.openElement("a:srcRect");
-      if (ipr.srcL != 0) src.addRequiredAttribute("l", ipr.srcL);
-      if (ipr.srcT != 0) src.addRequiredAttribute("t", ipr.srcT);
-      if (ipr.srcR != 0) src.addRequiredAttribute("r", ipr.srcR);
-      if (ipr.srcB != 0) src.addRequiredAttribute("b", ipr.srcB);
+      if (ipr.srcL != 0) {
+        src.addRequiredAttribute("l", ipr.srcL);
+      }
+      if (ipr.srcT != 0) {
+        src.addRequiredAttribute("t", ipr.srcT);
+      }
+      if (ipr.srcR != 0) {
+        src.addRequiredAttribute("r", ipr.srcR);
+      }
+      if (ipr.srcB != 0) {
+        src.addRequiredAttribute("b", ipr.srcB);
+      }
       src.closeElementSelfClosing();
       int fillL =
           static_cast<int>(std::round((ipr.visL - shapeBounds.x) / shapeBounds.width * 100000.0f));
@@ -690,10 +710,18 @@ void PPTWriter::writeImagePatternFill(XMLBuilder& out, const ImagePattern* patte
                                               shapeBounds.height * 100000.0f));
       out.openElement("a:stretch").closeElementStart();
       auto& fr = out.openElement("a:fillRect");
-      if (fillL != 0) fr.addRequiredAttribute("l", fillL);
-      if (fillT != 0) fr.addRequiredAttribute("t", fillT);
-      if (fillR != 0) fr.addRequiredAttribute("r", fillR);
-      if (fillB != 0) fr.addRequiredAttribute("b", fillB);
+      if (fillL != 0) {
+        fr.addRequiredAttribute("l", fillL);
+      }
+      if (fillT != 0) {
+        fr.addRequiredAttribute("t", fillT);
+      }
+      if (fillR != 0) {
+        fr.addRequiredAttribute("r", fillR);
+      }
+      if (fillB != 0) {
+        fr.addRequiredAttribute("b", fillB);
+      }
       fr.closeElementSelfClosing();
       out.closeElement();  // a:stretch
     } else {
@@ -1015,6 +1043,9 @@ void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStr
     return;
   }
 
+  // Compute bounding box using segment endpoints only (polygon approximation).
+  // For cubic bezier segments the actual curve may exceed the endpoint hull, but
+  // glyph outlines are dense enough that the deviation is negligible in practice.
   float minX = std::numeric_limits<float>::max();
   float minY = std::numeric_limits<float>::max();
   float maxX = std::numeric_limits<float>::lowest();
@@ -1333,6 +1364,7 @@ bool PPTExporter::ToFile(PAGXDocument& doc, const std::string& filePath, const O
 
   // Assemble slide XML
   std::string slide;
+  slide.reserve(2048 + bodyContent.size());
   slide += "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>";
   slide +=
       "<p:sld xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" "

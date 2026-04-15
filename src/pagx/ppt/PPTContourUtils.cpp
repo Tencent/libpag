@@ -167,6 +167,11 @@ void AdjustWindingForEvenOdd(std::vector<PathContour>& contours, const std::vect
   }
 }
 
+// Assigns each inner contour to the first (by array order) depth-0 contour that
+// contains it.  If multiple disjoint outer contours exist and the endpoint-polygon
+// approximation in PointInsideContour produces a false positive, an inner contour
+// may be assigned to the wrong parent.  This is unlikely in practice because outer
+// contours are typically non-overlapping.
 std::vector<std::vector<size_t>> GroupContoursByOutermost(const std::vector<PathContour>& contours,
                                                           const std::vector<int>& depths) {
   std::vector<int> parent(contours.size(), -1);

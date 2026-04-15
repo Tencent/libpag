@@ -28,7 +28,7 @@ namespace pagx {
 class XMLBuilder;
 
 // 1 px = 1/96 inch = 914400/96 = 9525 EMU (English Metric Units).
-static constexpr double EMU_PER_PX = 9525.0;
+inline constexpr double EMU_PER_PX = 9525.0;
 
 int64_t PxToEMU(float px);
 
