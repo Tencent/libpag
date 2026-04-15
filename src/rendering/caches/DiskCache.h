@@ -142,9 +142,8 @@ class DiskCache {
    */
   static void removeFileAsync(const std::string& filePath);
 
-  static void WriteConfigTask(std::string path, std::string tempPath,
-                              std::shared_ptr<tgfx::Buffer> data, size_t bufferSize,
-                              uint32_t currentVersion);
+  static void WriteConfigTask(const std::string& path, const std::string& tempPath,
+                              std::shared_ptr<tgfx::Buffer> data, uint32_t currentVersion);
 
   static void CloseFileTask(FILE* fileToClose, DiskCache* cache, uint32_t id);
 

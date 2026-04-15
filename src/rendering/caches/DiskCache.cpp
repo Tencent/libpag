@@ -476,12 +476,11 @@ void DiskCache::saveConfig() {
   auto path = configPath;
   auto tempPath = configPath + ".tmp";
   DiskIOWorker::GetInstance()->submit(
-      std::bind(&DiskCache::WriteConfigTask, path, tempPath, data, bufferSize, currentVersion));
+      std::bind(&DiskCache::WriteConfigTask, path, tempPath, data, currentVersion));
 }
 
-void DiskCache::WriteConfigTask(std::string path, std::string tempPath,
-                                std::shared_ptr<tgfx::Buffer> data, size_t bufferSize,
-                                uint32_t currentVersion) {
+void DiskCache::WriteConfigTask(const std::string& path, const std::string& tempPath,
+                                std::shared_ptr<tgfx::Buffer> data, uint32_t currentVersion) {
   // Skip this write if a newer version has been queued.
   if (currentVersion != GetInstance()->configSaveVersion.load(std::memory_order_acquire)) {
     return;
@@ -491,9 +490,9 @@ void DiskCache::WriteConfigTask(std::string path, std::string tempPath,
   if (file == nullptr) {
     return;
   }
-  auto written = fwrite(data->data(), 1, bufferSize, file);
+  auto written = fwrite(data->data(), 1, data->size(), file);
   fclose(file);
-  if (written == bufferSize) {
+  if (written == data->size()) {
     // Atomic rename to replace the config file.
     rename(tempPath.c_str(), path.c_str());
   } else {
