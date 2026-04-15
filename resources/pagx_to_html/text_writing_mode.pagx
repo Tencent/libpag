@@ -16,11 +16,10 @@
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
         <Fill color="#FFF7ED"/>
         <Stroke color="#FDBA74" width="1"/>
-        <Layer left="8" right="8" top="10" bottom="10">
+        <TextBox left="8" right="8" top="10" bottom="10" writingMode="vertical" textAlign="start" lineHeight="30">
           <Text text="竖排文字测试用例" fontFamily="Arial" fontSize="20"/>
-          <TextBox left="0" right="0" top="0" bottom="0" writingMode="vertical" textAlign="start" lineHeight="30"/>
           <Fill color="#9A3412"/>
-        </Layer>
+        </TextBox>
       </Layer>
 
       <!-- Right column: paragraphAlign variants -->
@@ -30,22 +29,20 @@
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
           <Fill color="#EFF6FF"/>
           <Stroke color="#93C5FD" width="1"/>
-          <Layer left="5" right="5" top="5" bottom="5">
+          <TextBox left="5" right="5" top="5" bottom="5" writingMode="vertical" paragraphAlign="middle">
             <Text text="居中对齐" fontFamily="Arial" fontSize="18"/>
-            <TextBox left="0" right="0" top="0" bottom="0" writingMode="vertical" paragraphAlign="middle"/>
             <Fill color="#1E40AF"/>
-          </Layer>
+          </TextBox>
         </Layer>
         <!-- Vertical with paragraphAlign="far" -->
         <Layer flex="1">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
           <Fill color="#F0FDF4"/>
           <Stroke color="#86EFAC" width="1"/>
-          <Layer left="5" right="5" top="5" bottom="5">
+          <TextBox left="5" right="5" top="5" bottom="5" writingMode="vertical" paragraphAlign="far">
             <Text text="远端" fontFamily="Arial" fontSize="16"/>
-            <TextBox left="0" right="0" top="0" bottom="0" writingMode="vertical" paragraphAlign="far"/>
             <Fill color="#166534"/>
-          </Layer>
+          </TextBox>
         </Layer>
       </Layer>
     </Layer>
@@ -57,22 +54,20 @@
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
         <Fill color="#FEF2F2"/>
         <Stroke color="#FCA5A5" width="1"/>
-        <Layer left="5" right="5" top="5" bottom="5">
+        <TextBox left="5" right="5" top="5" bottom="5" paragraphAlign="far" textAlign="center">
           <Text text="Bottom aligned" fontFamily="Arial" fontSize="12"/>
-          <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="far" textAlign="center"/>
           <Fill color="#991B1B"/>
-        </Layer>
+        </TextBox>
       </Layer>
       <!-- Custom line height with middle paragraph alignment -->
       <Layer flex="1">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
         <Fill color="#FDF4FF"/>
         <Stroke color="#D8B4FE" width="1"/>
-        <Layer left="5" right="5" top="5" bottom="5">
+        <TextBox left="5" right="5" top="5" bottom="5" textAlign="center" paragraphAlign="middle" lineHeight="20">
           <Text text="Custom line height with middle paragraph alignment." fontFamily="Arial" fontSize="12"/>
-          <TextBox left="0" right="0" top="0" bottom="0" textAlign="center" paragraphAlign="middle" lineHeight="20"/>
           <Fill color="#7E22CE"/>
-        </Layer>
+        </TextBox>
       </Layer>
     </Layer>
   </Layer>

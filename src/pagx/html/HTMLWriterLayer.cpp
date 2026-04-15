@@ -222,35 +222,90 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           if (tb->overflow == Overflow::Hidden) {
             style += ";overflow:hidden";
           }
-          const Fill* childFill = nullptr;
-          const Text* childText = nullptr;
+          // Collect text spans from TextBox children (Text+Fill at top level, and Group children)
+          struct TBSpan {
+            const Text* text = nullptr;
+            const Fill* fill = nullptr;
+            const Stroke* stroke = nullptr;
+          };
+          std::vector<TBSpan> tbSpans;
+          const Fill* topFill = nullptr;
+          const Stroke* topStroke = nullptr;
           for (auto* childElem : tb->elements) {
             if (childElem->nodeType() == NodeType::Fill) {
-              childFill = static_cast<const Fill*>(childElem);
+              topFill = static_cast<const Fill*>(childElem);
+            } else if (childElem->nodeType() == NodeType::Stroke) {
+              topStroke = static_cast<const Stroke*>(childElem);
             } else if (childElem->nodeType() == NodeType::Text) {
-              childText = static_cast<const Text*>(childElem);
+              tbSpans.push_back({static_cast<const Text*>(childElem), topFill, topStroke});
+            } else if (childElem->nodeType() == NodeType::Group) {
+              auto grp = static_cast<const Group*>(childElem);
+              const Text* grpText = nullptr;
+              const Fill* grpFill = nullptr;
+              const Stroke* grpStroke = nullptr;
+              for (auto* ge : grp->elements) {
+                if (ge->nodeType() == NodeType::Text) {
+                  grpText = static_cast<const Text*>(ge);
+                } else if (ge->nodeType() == NodeType::Fill) {
+                  grpFill = static_cast<const Fill*>(ge);
+                } else if (ge->nodeType() == NodeType::Stroke) {
+                  grpStroke = static_cast<const Stroke*>(ge);
+                }
+              }
+              if (grpText) {
+                tbSpans.push_back({grpText, grpFill, grpStroke});
+              }
             }
           }
-          if (childText && childFill) {
-            if (!childText->fontFamily.empty()) {
-              style += ";font-family:'" + childText->fontFamily + "'";
-            }
-            style += ";font-size:" + FloatToString(childText->fontSize) + "px";
-            if (!childText->fontStyle.empty()) {
-              if (childText->fontStyle.find("Bold") != std::string::npos) {
-                style += ";font-weight:bold";
-              }
-              if (childText->fontStyle.find("Italic") != std::string::npos) {
-                style += ";font-style:italic";
-              }
-            }
-            auto colorStr = colorToCSS(childFill->color, nullptr);
-            if (!colorStr.empty()) {
-              style += ";color:" + colorStr;
-            }
-            out.openTag("span");
+          if (!tbSpans.empty()) {
+            out.openTag("div");
             out.addAttr("style", style);
-            out.closeTagWithText(childText->text);
+            out.closeTagStart();
+            bool needsInnerWrap = tb->paragraphAlign != ParagraphAlign::Near;
+            if (needsInnerWrap) {
+              out.openTag("div");
+              out.closeTagStart();
+            }
+            for (auto& span : tbSpans) {
+              std::string spanStyle;
+              if (!span.text->fontFamily.empty()) {
+                spanStyle += "font-family:'" + span.text->fontFamily + "'";
+              }
+              if (!spanStyle.empty()) {
+                spanStyle += ";";
+              }
+              spanStyle += "font-size:" + FloatToString(span.text->fontSize) + "px";
+              if (!span.text->fontStyle.empty()) {
+                if (span.text->fontStyle.find("Bold") != std::string::npos) {
+                  spanStyle += ";font-weight:bold";
+                }
+                if (span.text->fontStyle.find("Italic") != std::string::npos) {
+                  spanStyle += ";font-style:italic";
+                }
+              }
+              if (span.text->letterSpacing != 0.0f) {
+                spanStyle += ";letter-spacing:" + FloatToString(span.text->letterSpacing) + "px";
+              }
+              if (span.fill && span.fill->color &&
+                  span.fill->color->nodeType() == NodeType::SolidColor) {
+                auto sc = static_cast<const SolidColor*>(span.fill->color);
+                spanStyle += ";color:" + ColorToRGBA(sc->color, span.fill->alpha);
+              }
+              if (span.stroke && span.stroke->color &&
+                  span.stroke->color->nodeType() == NodeType::SolidColor) {
+                auto sc = static_cast<const SolidColor*>(span.stroke->color);
+                spanStyle += ";-webkit-text-stroke:" + FloatToString(span.stroke->width) + "px " +
+                             ColorToRGBA(sc->color, span.stroke->alpha);
+                spanStyle += ";paint-order:stroke fill";
+              }
+              out.openTag("span");
+              out.addAttr("style", spanStyle);
+              out.closeTagWithText(span.text->text);
+            }
+            if (needsInnerWrap) {
+              out.closeTag();
+            }
+            out.closeTag();
           }
         } else if (useRichText && !richTextSpans.empty()) {
           auto tb = curTextBox;
