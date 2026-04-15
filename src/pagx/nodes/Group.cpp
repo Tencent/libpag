@@ -58,15 +58,16 @@ void Group::setLayoutSize(LayoutContext* context, float width, float height) {
   if ((widthFromContent || heightFromContent) && sizeChanged) {
     float maxX = 0;
     float maxY = 0;
+    // Re-measure elements using layout sizes (mirrors MeasureChildNodes semantics).
     for (auto* element : elements) {
       auto* node = AsLayoutNode(element);
       if (node == nullptr) {
         continue;
       }
-      float extX = node->hasConstraints() ? node->constraintExtentX() : 0;
-      float extY = node->hasConstraints() ? node->constraintExtentY() : 0;
-      extX += node->layoutBounds().width;
-      extY += node->layoutBounds().height;
+      float extX = (node->hasConstraints() ? node->constraintExtentX() : node->preferredX) +
+                   node->layoutWidth;
+      float extY = (node->hasConstraints() ? node->constraintExtentY() : node->preferredY) +
+                   node->layoutHeight;
       maxX = std::max(maxX, extX);
       maxY = std::max(maxY, extY);
     }
