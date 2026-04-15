@@ -49,15 +49,18 @@
             <TextPath path="@bannerArc" forceAlignment="true" firstMargin="20" lastMargin="20"/>
             <Fill color="#3B82F6"/>
           </Layer>
-          <!-- Perpendicular=false overlay -->
+        </Layer>
+
+        <!-- Row 2: Perpendicular=false (glyphs stay upright on arc) -->
+        <Layer width="330" height="50">
           <Layer name="uprightGuide" alpha="0.15">
-            <Path data="@bannerArc"/>
+            <Path data="M 40,30 C 100,5 230,5 290,30"/>
             <Stroke color="#8B5CF6" width="1" dashes="4,3"/>
           </Layer>
           <Layer name="uprightDemo">
             <Text text="UPRIGHT" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
-            <TextPath path="@bannerArc" perpendicular="false" forceAlignment="true" firstMargin="90" lastMargin="90"/>
-            <Fill color="#8B5CF680"/>
+            <TextPath path="M 40,30 C 100,5 230,5 290,30" perpendicular="false" forceAlignment="true"/>
+            <Fill color="#8B5CF6"/>
           </Layer>
         </Layer>
 
