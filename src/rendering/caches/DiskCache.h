@@ -18,8 +18,11 @@
 
 #pragma once
 
+#include <atomic>
 #include <list>
+#include <mutex>
 #include <unordered_map>
+#include "DiskIOWorker.h"
 #include "SequenceFile.h"
 #include "pag/types.h"
 
@@ -87,6 +90,23 @@ class DiskCache {
   uint32_t filePathToID(const std::string& path);
   void notifyFileClosed(uint32_t fileID);
   void notifyFileSizeChanged(uint32_t fileID, size_t fileSize);
+
+  /**
+   * Removes the file at the given path asynchronously on the DiskIOWorker to avoid blocking the
+   * calling thread (which may be the main/render thread) on synchronous IO.
+   */
+  static void RemoveFileAsync(const std::string& filePath);
+
+  static void WriteConfigTask(const std::string& path, const std::string& tempPath,
+                              std::shared_ptr<tgfx::Buffer> data, uint32_t currentVersion);
+
+  static void CloseFileTask(FILE* fileToClose, DiskCache* cache, uint32_t id);
+
+  /**
+   * Version counter for saveConfig(). Incremented on each call to allow coalescing multiple
+   * rapid saves into a single disk write. Atomic to allow safe access from the IO thread.
+   */
+  std::atomic<uint32_t> configSaveVersion{0};
 
   friend class SequenceFile;
   friend class PAGDiskCache;
