@@ -2180,8 +2180,8 @@ PAGX_TEST(PAGXTest, TextBoxConstraintWidthWrapRender) {
   auto layer = pagx::LayerBuilder::Build(doc.get());
   ASSERT_TRUE(layer != nullptr);
 
-  auto surface = Surface::Make(context, static_cast<int>(doc->width),
-                               static_cast<int>(doc->height));
+  auto surface =
+      Surface::Make(context, static_cast<int>(doc->width), static_cast<int>(doc->height));
   DisplayList displayList;
   displayList.root()->addChild(layer);
   displayList.render(surface.get(), false);

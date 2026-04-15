@@ -153,10 +153,11 @@ void Layer::updateLayout(LayoutContext* context) {
   auto contentNodes = LayoutNode::CollectLayoutNodes(contents, false);
   LayoutNode::PerformConstraintLayout(contentNodes, layoutWidth, layoutHeight, padding, context);
 
-  // When height is content-measured, VectorElements may have grown after constraint layout
-  // (e.g., TextBox re-typesets for a narrower width and needs more lines). Update layoutHeight
-  // to reflect the actual content bounds.
-  if (std::isnan(height) && !contentNodes.empty()) {
+  // When height is purely content-measured (no explicit height AND no top+bottom constraint pair),
+  // VectorElements may have grown after constraint layout (e.g., TextBox re-typesets for a narrower
+  // width and needs more lines). Update layoutHeight to reflect the actual content bounds.
+  bool heightIsContentMeasured = std::isnan(height) && (std::isnan(top) || std::isnan(bottom));
+  if (heightIsContentMeasured && !contentNodes.empty()) {
     bool hasPadding = !padding.isZero();
     float maxBottom = 0;
     for (auto* node : contentNodes) {
