@@ -121,6 +121,7 @@ static bool HaveSamePainterSuffix(const Group* a, const Group* b) {
 // ============================================================================
 
 static bool RemoveEmptyGroups(std::vector<Element*>& elements);
+static bool RemoveZeroWidthStrokes(std::vector<Element*>& elements);
 static bool UnwrapRedundantFirstChildGroup(std::vector<Element*>& elements);
 static bool MergeConsecutiveGroups(std::vector<Element*>& elements);
 
@@ -133,6 +134,9 @@ static void OptimizeElements(std::vector<Element*>& elements, PAGXDocument* doc,
     }
   }
   if (RemoveEmptyGroups(elements)) {
+    changed = true;
+  }
+  if (RemoveZeroWidthStrokes(elements)) {
     changed = true;
   }
   if (UnwrapRedundantFirstChildGroup(elements)) {
@@ -150,6 +154,23 @@ static bool RemoveEmptyGroups(std::vector<Element*>& elements) {
     if ((*it)->nodeType() == NodeType::Group) {
       auto* group = static_cast<Group*>(*it);
       if (PAGXAnalyzer::IsEmptyGroup(group)) {
+        it = elements.erase(it);
+        changed = true;
+        continue;
+      }
+    }
+    ++it;
+  }
+  return changed;
+}
+
+static bool RemoveZeroWidthStrokes(std::vector<Element*>& elements) {
+  bool changed = false;
+  auto it = elements.begin();
+  while (it != elements.end()) {
+    if ((*it)->nodeType() == NodeType::Stroke) {
+      auto* stroke = static_cast<Stroke*>(*it);
+      if (stroke->width <= 0.0f) {
         it = elements.erase(it);
         changed = true;
         continue;
@@ -279,6 +300,35 @@ static bool DowngradeChildLayersToGroups(Layer* parentLayer, PAGXDocument* doc) 
   return true;
 }
 
+static bool RemoveFullCanvasClipMask(Layer* layer, float canvasWidth, float canvasHeight) {
+  if (layer->mask == nullptr) {
+    return false;
+  }
+  auto* maskLayer = layer->mask;
+  if (maskLayer->x != 0 || maskLayer->y != 0) {
+    return false;
+  }
+  if (!maskLayer->matrix.isIdentity()) {
+    return false;
+  }
+  if (maskLayer->contents.size() != 1) {
+    return false;
+  }
+  if (maskLayer->contents[0]->nodeType() != NodeType::Rectangle) {
+    return false;
+  }
+  auto* rect = static_cast<Rectangle*>(maskLayer->contents[0]);
+  float left = rect->position.x - rect->size.width * 0.5f;
+  float top = rect->position.y - rect->size.height * 0.5f;
+  float right = rect->position.x + rect->size.width * 0.5f;
+  float bottom = rect->position.y + rect->size.height * 0.5f;
+  if (left <= 0 && top <= 0 && right >= canvasWidth && bottom >= canvasHeight) {
+    layer->mask = nullptr;
+    return true;
+  }
+  return false;
+}
+
 static bool ConvertRectMaskToClipToBounds(Layer* layer) {
   if (layer->mask == nullptr || layer->maskType != MaskType::Alpha) {
     return false;
@@ -331,12 +381,13 @@ static bool ConvertRectMaskToClipToBounds(Layer* layer) {
   return true;
 }
 
-static void OptimizeLayerRecursive(Layer* layer, PAGXDocument* doc, bool& changed) {
+static void OptimizeLayerRecursive(Layer* layer, PAGXDocument* doc, float canvasWidth,
+                                   float canvasHeight, bool& changed) {
   bool thisHasLayout = layer->layout != LayoutMode::None;
   auto it = layer->children.begin();
   while (it != layer->children.end()) {
     auto* child = *it;
-    OptimizeLayerRecursive(child, doc, changed);
+    OptimizeLayerRecursive(child, doc, canvasWidth, canvasHeight, changed);
     if (PAGXAnalyzer::IsEmptyLayer(child, thisHasLayout)) {
       it = layer->children.erase(it);
       changed = true;
@@ -350,6 +401,10 @@ static void OptimizeLayerRecursive(Layer* layer, PAGXDocument* doc, bool& change
   }
 
   if (MergeAdjacentShellLayers(layer->children, doc)) {
+    changed = true;
+  }
+
+  if (RemoveFullCanvasClipMask(layer, canvasWidth, canvasHeight)) {
     changed = true;
   }
 
@@ -560,9 +615,12 @@ bool PAGXOptimizer::Optimize(PAGXDocument* document) {
 
   bool changed = false;
 
+  float canvasWidth = static_cast<float>(document->width);
+  float canvasHeight = static_cast<float>(document->height);
+
   // Pass 1: Recursive layer optimization (bottom-up).
   for (auto* layer : document->layers) {
-    OptimizeLayerRecursive(layer, document, changed);
+    OptimizeLayerRecursive(layer, document, canvasWidth, canvasHeight, changed);
   }
 
   // Pass 2: Merge adjacent shell layers at root level.

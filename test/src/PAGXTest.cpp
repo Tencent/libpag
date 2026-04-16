@@ -5496,4 +5496,139 @@ PAGX_TEST(PAGXTest, Optimizer_PreserveGroupWithTransform) {
   EXPECT_EQ(layer->contents[0]->nodeType(), pagx::NodeType::Group);
 }
 
+PAGX_TEST(PAGXTest, Optimizer_RemoveZeroWidthStroke) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->width = 100;
+  layer->height = 100;
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {50, 50};
+  rect->position = {25, 25};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  auto* zeroStroke = doc->makeNode<pagx::Stroke>();
+  zeroStroke->width = 0.0f;
+  auto* normalStroke = doc->makeNode<pagx::Stroke>();
+  normalStroke->width = 2.0f;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  layer->contents.push_back(zeroStroke);
+  layer->contents.push_back(normalStroke);
+  doc->layers.push_back(layer);
+
+  EXPECT_EQ(layer->contents.size(), 4u);
+  bool changed = pagx::PAGXOptimizer::Optimize(doc.get());
+  EXPECT_TRUE(changed);
+  EXPECT_EQ(layer->contents.size(), 3u);
+  EXPECT_EQ(layer->contents[0]->nodeType(), pagx::NodeType::Rectangle);
+  EXPECT_EQ(layer->contents[1]->nodeType(), pagx::NodeType::Fill);
+  EXPECT_EQ(layer->contents[2]->nodeType(), pagx::NodeType::Stroke);
+  EXPECT_FLOAT_EQ(static_cast<pagx::Stroke*>(layer->contents[2])->width, 2.0f);
+}
+
+PAGX_TEST(PAGXTest, Optimizer_RemoveFullCanvasClipMask) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->width = 100;
+  layer->height = 100;
+  auto* content = doc->makeNode<pagx::Rectangle>();
+  content->size = {80, 80};
+  content->position = {40, 40};
+  layer->contents.push_back(content);
+
+  auto* maskLayer = doc->makeNode<pagx::Layer>();
+  auto* maskRect = doc->makeNode<pagx::Rectangle>();
+  maskRect->size = {100, 100};
+  maskRect->position = {50, 50};
+  maskLayer->contents.push_back(maskRect);
+  layer->mask = maskLayer;
+  doc->layers.push_back(layer);
+
+  EXPECT_NE(layer->mask, nullptr);
+  pagx::PAGXOptimizer::Optimize(doc.get());
+  EXPECT_EQ(layer->mask, nullptr);
+}
+
+PAGX_TEST(PAGXTest, Optimizer_PreservePartialClipMask) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->width = 100;
+  layer->height = 100;
+  auto* content = doc->makeNode<pagx::Rectangle>();
+  content->size = {80, 80};
+  content->position = {40, 40};
+  layer->contents.push_back(content);
+
+  auto* maskLayer = doc->makeNode<pagx::Layer>();
+  auto* maskRect = doc->makeNode<pagx::Rectangle>();
+  maskRect->size = {50, 50};
+  maskRect->position = {25, 25};
+  maskLayer->contents.push_back(maskRect);
+  layer->mask = maskLayer;
+  doc->layers.push_back(layer);
+
+  pagx::PAGXOptimizer::Optimize(doc.get());
+  EXPECT_NE(layer->mask, nullptr);
+}
+
+PAGX_TEST(PAGXTest, Optimizer_RemoveUnreferencedResources) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->width = 100;
+  layer->height = 100;
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {50, 50};
+  rect->position = {25, 25};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto* orphanPathData = doc->makeNode<pagx::PathData>("orphanPath");
+  *orphanPathData = pagx::PathDataFromSVGString("M0 0 L10 10 Z");
+
+  size_t nodesBefore = doc->nodes.size();
+  bool changed = pagx::PAGXOptimizer::Optimize(doc.get());
+  EXPECT_TRUE(changed);
+  EXPECT_LT(doc->nodes.size(), nodesBefore);
+}
+
+PAGX_TEST(PAGXTest, Optimizer_MergeAdjacentShellLayers) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* parent = doc->makeNode<pagx::Layer>();
+  parent->width = 100;
+  parent->height = 100;
+
+  // Parent needs existing contents so DowngradeChildLayersToGroups doesn't fire first.
+  auto* bg = doc->makeNode<pagx::Rectangle>();
+  bg->size = {100, 100};
+  bg->position = {50, 50};
+  parent->contents.push_back(bg);
+
+  auto* shell1 = doc->makeNode<pagx::Layer>();
+  auto* rect1 = doc->makeNode<pagx::Rectangle>();
+  rect1->size = {30, 30};
+  rect1->position = {15, 15};
+  shell1->contents.push_back(rect1);
+
+  auto* shell2 = doc->makeNode<pagx::Layer>();
+  auto* rect2 = doc->makeNode<pagx::Rectangle>();
+  rect2->size = {30, 30};
+  rect2->position = {50, 50};
+  shell2->contents.push_back(rect2);
+
+  parent->children.push_back(shell1);
+  parent->children.push_back(shell2);
+  doc->layers.push_back(parent);
+
+  EXPECT_EQ(parent->children.size(), 2u);
+  pagx::PAGXOptimizer::Optimize(doc.get());
+  EXPECT_EQ(parent->children.size(), 1u);
+}
+
 }  // namespace pag
