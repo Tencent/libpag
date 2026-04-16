@@ -126,6 +126,7 @@ static bool RemoveZeroWidthStrokes(std::vector<Element*>& elements);
 static bool UnwrapRedundantFirstChildGroup(std::vector<Element*>& elements);
 static bool MergeConsecutiveGroups(std::vector<Element*>& elements);
 static bool ConvertPathsToPrimitives(std::vector<Element*>& elements, PAGXDocument* doc);
+static bool SplitHighComplexityPaths(std::vector<Element*>& elements, PAGXDocument* doc);
 
 static void OptimizeElements(std::vector<Element*>& elements, PAGXDocument* doc, bool& changed) {
   for (auto* element : elements) {
@@ -148,6 +149,9 @@ static void OptimizeElements(std::vector<Element*>& elements, PAGXDocument* doc,
     changed = true;
   }
   if (ConvertPathsToPrimitives(elements, doc)) {
+    changed = true;
+  }
+  if (SplitHighComplexityPaths(elements, doc)) {
     changed = true;
   }
 }
@@ -275,6 +279,217 @@ static bool ConvertPathsToPrimitives(std::vector<Element*>& elements, PAGXDocume
       elements[i] = ellipse;
       changed = true;
     }
+  }
+  return changed;
+}
+
+// ============================================================================
+// Optimization passes — split high-complexity paths
+// ============================================================================
+
+static constexpr size_t kHighPathVerbThreshold = 500;
+
+struct ContourInfo {
+  size_t verbStart;
+  size_t verbEnd;
+  size_t pointStart;
+  size_t pointEnd;
+  Rect bounds;
+};
+
+static bool BoundsOverlap(const Rect& a, const Rect& b) {
+  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height &&
+         b.y < a.y + a.height;
+}
+
+static size_t UnionFind(std::vector<size_t>& parent, size_t x) {
+  while (parent[x] != x) {
+    parent[x] = parent[parent[x]];
+    x = parent[x];
+  }
+  return x;
+}
+
+static void UnionMerge(std::vector<size_t>& parent, size_t a, size_t b) {
+  a = UnionFind(parent, a);
+  b = UnionFind(parent, b);
+  if (a != b) {
+    parent[a] = b;
+  }
+}
+
+/**
+ * Splits a Path whose PathData exceeds kHighPathVerbThreshold verbs into multiple Path elements.
+ *
+ * To preserve rendering, contours that may form fill-rule holes (e.g. the counter of the letter
+ * "O") must stay in the same PathData. Two contours whose bounding boxes overlap are assumed to
+ * participate in a hole relationship and are clustered together via union-find. Only spatially
+ * disjoint clusters are eligible for splitting into separate Path elements.
+ *
+ * Single-contour paths are never split — subdividing a contour mid-stream would create visible
+ * seams (fill) or cap artifacts (stroke).
+ */
+static bool SplitHighComplexityPaths(std::vector<Element*>& elements, PAGXDocument* doc) {
+  bool changed = false;
+  size_t i = 0;
+  while (i < elements.size()) {
+    if (elements[i]->nodeType() != NodeType::Path) {
+      i++;
+      continue;
+    }
+    auto* path = static_cast<Path*>(elements[i]);
+    if (path->data == nullptr) {
+      i++;
+      continue;
+    }
+    const auto& verbs = path->data->verbs();
+    if (verbs.size() <= kHighPathVerbThreshold) {
+      i++;
+      continue;
+    }
+
+    // --- Step 1: identify contours and compute per-contour bounding boxes ---
+    const auto& points = path->data->points();
+    std::vector<ContourInfo> contours;
+    size_t pointIdx = 0;
+    for (size_t v = 0; v < verbs.size(); v++) {
+      if (verbs[v] == PathVerb::Move) {
+        if (!contours.empty()) {
+          contours.back().verbEnd = v;
+          contours.back().pointEnd = pointIdx;
+        }
+        contours.push_back({v, 0, pointIdx, 0, {}});
+      }
+      pointIdx += static_cast<size_t>(PathData::PointsPerVerb(verbs[v]));
+    }
+    if (!contours.empty()) {
+      contours.back().verbEnd = verbs.size();
+      contours.back().pointEnd = pointIdx;
+    }
+    if (contours.size() <= 1) {
+      i++;
+      continue;
+    }
+    for (auto& c : contours) {
+      if (c.pointStart >= c.pointEnd) {
+        c.bounds = {};
+        continue;
+      }
+      float minX = points[c.pointStart].x;
+      float minY = points[c.pointStart].y;
+      float maxX = minX;
+      float maxY = minY;
+      for (size_t p = c.pointStart + 1; p < c.pointEnd; p++) {
+        minX = std::min(minX, points[p].x);
+        minY = std::min(minY, points[p].y);
+        maxX = std::max(maxX, points[p].x);
+        maxY = std::max(maxY, points[p].y);
+      }
+      c.bounds = Rect::MakeLTRB(minX, minY, maxX, maxY);
+    }
+
+    // --- Step 2: cluster contours whose bounding boxes overlap (union-find) ---
+    std::vector<size_t> parent(contours.size());
+    for (size_t c = 0; c < contours.size(); c++) {
+      parent[c] = c;
+    }
+    for (size_t a = 0; a < contours.size(); a++) {
+      for (size_t b = a + 1; b < contours.size(); b++) {
+        if (BoundsOverlap(contours[a].bounds, contours[b].bounds)) {
+          UnionMerge(parent, a, b);
+        }
+      }
+    }
+
+    // Collect clusters ordered by their earliest contour index.
+    struct Cluster {
+      std::vector<size_t> contourIndices;
+      size_t verbCount = 0;
+    };
+    std::unordered_map<size_t, size_t> rootToCluster;
+    std::vector<Cluster> clusters;
+    for (size_t c = 0; c < contours.size(); c++) {
+      size_t root = UnionFind(parent, c);
+      auto it = rootToCluster.find(root);
+      if (it == rootToCluster.end()) {
+        rootToCluster[root] = clusters.size();
+        clusters.push_back({});
+        it = rootToCluster.find(root);
+      }
+      auto& cluster = clusters[it->second];
+      cluster.contourIndices.push_back(c);
+      cluster.verbCount += contours[c].verbEnd - contours[c].verbStart;
+    }
+    if (clusters.size() <= 1) {
+      i++;
+      continue;
+    }
+    std::sort(clusters.begin(), clusters.end(), [](const Cluster& a, const Cluster& b) {
+      return a.contourIndices.front() < b.contourIndices.front();
+    });
+
+    // --- Step 3: greedily pack clusters into chunks under the threshold ---
+    struct Chunk {
+      std::vector<size_t> contourIndices;
+    };
+    std::vector<Chunk> chunks;
+    size_t curVerbCount = 0;
+    chunks.push_back({});
+    for (auto& cluster : clusters) {
+      if (curVerbCount > 0 && curVerbCount + cluster.verbCount > kHighPathVerbThreshold) {
+        chunks.push_back({});
+        curVerbCount = 0;
+      }
+      for (auto ci : cluster.contourIndices) {
+        chunks.back().contourIndices.push_back(ci);
+      }
+      curVerbCount += cluster.verbCount;
+    }
+    if (chunks.size() <= 1) {
+      i++;
+      continue;
+    }
+
+    // --- Step 4: build a new PathData + Path for each chunk ---
+    std::vector<Element*> newPaths;
+    for (auto& chunk : chunks) {
+      std::sort(chunk.contourIndices.begin(), chunk.contourIndices.end());
+      auto* newData = doc->makeNode<PathData>();
+      for (auto ci : chunk.contourIndices) {
+        size_t pIdx = contours[ci].pointStart;
+        for (size_t v = contours[ci].verbStart; v < contours[ci].verbEnd; v++) {
+          const Point* pts = points.data() + pIdx;
+          switch (verbs[v]) {
+            case PathVerb::Move:
+              newData->moveTo(pts[0].x, pts[0].y);
+              break;
+            case PathVerb::Line:
+              newData->lineTo(pts[0].x, pts[0].y);
+              break;
+            case PathVerb::Quad:
+              newData->quadTo(pts[0].x, pts[0].y, pts[1].x, pts[1].y);
+              break;
+            case PathVerb::Cubic:
+              newData->cubicTo(pts[0].x, pts[0].y, pts[1].x, pts[1].y, pts[2].x, pts[2].y);
+              break;
+            case PathVerb::Close:
+              newData->close();
+              break;
+          }
+          pIdx += static_cast<size_t>(PathData::PointsPerVerb(verbs[v]));
+        }
+      }
+      auto* newPath = doc->makeNode<Path>();
+      newPath->data = newData;
+      newPath->position = path->position;
+      newPath->reversed = path->reversed;
+      newPaths.push_back(newPath);
+    }
+
+    elements.erase(elements.begin() + static_cast<long>(i));
+    elements.insert(elements.begin() + static_cast<long>(i), newPaths.begin(), newPaths.end());
+    i += newPaths.size();
+    changed = true;
   }
   return changed;
 }
