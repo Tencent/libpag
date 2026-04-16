@@ -122,9 +122,9 @@
             <Text text="bitmap glyphs (star with offset, heart without)" fontFamily="Arial" fontSize="10"/>
             <Fill color="#94A3B8"/>
           </Layer>
-          <Layer height="36">
+          <Layer height="44">
             <Text>
-              <GlyphRun font="@bmpFont" fontSize="80" glyphs="1,2,1,2,1" x="8" y="30"/>
+              <GlyphRun font="@bmpFont" fontSize="120" glyphs="1,2,1" x="8" y="34"/>
             </Text>
             <Fill color="#F59E0B"/>
           </Layer>

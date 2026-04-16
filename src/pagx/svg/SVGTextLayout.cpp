@@ -335,7 +335,7 @@ std::vector<SVGGlyphPath> ComputeGlyphPaths(const Text& text, float textPosX, fl
         }
         if (hasSkew) {
           Matrix shear = {};
-          shear.c = std::tan(pag::DegreesToRadians(run->skews[i]));
+          shear.c = -std::tan(pag::DegreesToRadians(run->skews[i]));
           perGlyph = shear * perGlyph;
         }
         if (hasGlyphScale) {
