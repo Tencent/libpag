@@ -122,6 +122,16 @@ struct DiamondGradientInfo {
   float height = 0;
 };
 
+struct ImagePatternCanvasInfo {
+  std::string canvasId;
+  std::string imageSrc;
+  int wrapS = 0x2901;
+  int wrapT = 0x2901;
+  int filter = 0x2601;
+  float width = 0;
+  float height = 0;
+};
+
 //==============================================================================
 // HTMLWriterContext
 //==============================================================================
@@ -132,6 +142,7 @@ class HTMLWriterContext {
   float docHeight = 0;
   std::unordered_set<const Composition*> visitedCompositions = {};
   std::vector<DiamondGradientInfo> diamondGradients = {};
+  std::vector<ImagePatternCanvasInfo> imagePatternCanvases = {};
 
   std::string nextId(const std::string& prefix) {
     return prefix + std::to_string(_id++);
@@ -182,6 +193,8 @@ class HTMLWriter {
                     BlendMode painterBlend);
   void renderDiamondCanvas(HTMLBuilder& out, const GeoInfo& geo, const Fill* fill, float alpha,
                            BlendMode painterBlend);
+  void renderImagePatternCanvas(HTMLBuilder& out, const GeoInfo& geo, const Fill* fill, float alpha,
+                                BlendMode painterBlend);
   void renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
                  const Stroke* stroke, float alpha, BlendMode painterBlend,
                  const TrimPath* trim = nullptr, MergePathMode mergeMode = MergePathMode::Append);

@@ -499,6 +499,52 @@ static std::string GenerateDiamondGradientScript(
   return s;
 }
 
+static std::string GenerateImagePatternScript(const std::vector<ImagePatternCanvasInfo>& patterns) {
+  if (patterns.empty()) {
+    return "";
+  }
+  std::string s;
+  s += "<script>\n(function(){\n";
+  s += "var VS='#version 300 es\\n";
+  s += "in vec2 a;out vec2 v;";
+  s += "void main(){v=a*.5+.5;v.y=1.-v.y;gl_Position=vec4(a,0,1);}';\n";
+  s += "var FS='#version 300 es\\nprecision highp float;";
+  s += "in vec2 v;out vec4 o;uniform sampler2D u_tex;uniform vec2 u_scale;";
+  s += "void main(){o=texture(u_tex,v*u_scale);}';\n";
+  s += "function initIP(id,src,ws,wt,fl,cw,ch){\n";
+  s += "var img=new Image();img.onload=function(){\n";
+  s += "var c=document.getElementById(id);if(!c)return;\n";
+  s += "var g=c.getContext('webgl2');if(!g)return;\n";
+  s += "function cs(t,s){var sh=g.createShader(t);g.shaderSource(sh,s);g.compileShader(sh);return "
+       "sh;}\n";
+  s += "var p=g.createProgram();\n";
+  s += "g.attachShader(p,cs(g.VERTEX_SHADER,VS));g.attachShader(p,cs(g.FRAGMENT_SHADER,FS));\n";
+  s += "g.linkProgram(p);g.useProgram(p);\n";
+  s += "var b=g.createBuffer();g.bindBuffer(g.ARRAY_BUFFER,b);\n";
+  s += "g.bufferData(g.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),g.STATIC_DRAW);\n";
+  s += "var a=g.getAttribLocation(p,'a');g.enableVertexAttribArray(a);\n";
+  s += "g.vertexAttribPointer(a,2,g.FLOAT,false,0,0);\n";
+  s += "var t=g.createTexture();g.bindTexture(g.TEXTURE_2D,t);\n";
+  s += "g.texImage2D(g.TEXTURE_2D,0,g.RGBA,g.RGBA,g.UNSIGNED_BYTE,img);\n";
+  s += "g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_S,ws);\n";
+  s += "g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_T,wt);\n";
+  s += "g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MIN_FILTER,fl);\n";
+  s += "g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MAG_FILTER,fl);\n";
+  s += "g.uniform2f(g.getUniformLocation(p,'u_scale'),cw/img.naturalWidth,ch/"
+       "img.naturalHeight);\n";
+  s += "g.viewport(0,0,c.width,c.height);g.drawArrays(g.TRIANGLE_STRIP,0,4);\n";
+  s += "};img.src=src;}\n";
+
+  for (auto& info : patterns) {
+    s += "initIP('" + info.canvasId + "','" + info.imageSrc + "'," + std::to_string(info.wrapS) +
+         "," + std::to_string(info.wrapT) + "," + std::to_string(info.filter) + "," +
+         FloatToString(info.width) + "," + FloatToString(info.height) + ");\n";
+  }
+
+  s += "})();\n</script>\n";
+  return s;
+}
+
 std::string HTMLExporter::ToHTML(const PAGXDocument& doc, const Options& options) {
   HTMLBuilder html(options.indent);
   HTMLBuilder defs(options.indent, 2);
@@ -541,6 +587,12 @@ std::string HTMLExporter::ToHTML(const PAGXDocument& doc, const Options& options
   std::string dgScript = GenerateDiamondGradientScript(ctx.diamondGradients);
   if (!dgScript.empty()) {
     html.addRawContent(dgScript);
+  }
+
+  // Inject WebGL2 image pattern script if needed
+  std::string ipScript = GenerateImagePatternScript(ctx.imagePatternCanvases);
+  if (!ipScript.empty()) {
+    html.addRawContent(ipScript);
   }
 
   html.closeTag();  // </div>

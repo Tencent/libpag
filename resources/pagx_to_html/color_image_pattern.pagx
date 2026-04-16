@@ -2,8 +2,8 @@
 <!-- Tests: ImagePattern → CSS background-image; tile modes (repeat/mirror/clamp/decal), filterMode -->
 <pagx version="1.0" width="420" height="220">
   <Resources>
-    <!-- 8x8 red/white checkerboard pattern for clearly visible tiling -->
-    <Image id="checker" source="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAGUlEQVR4nGO4o6b2HwRw0Qz4JEE0w7AwAQBB48RhdF1gGQAAAABJRU5ErkJggg=="/>
+    <!-- 16x16 red/white checkerboard with 4px cells -->
+    <Image id="checker" source="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAPklEQVR4nGO8o6b2nwEJKN+8icxluKuuzoBPnomBQsA04AYw/v///z8pfkaXZ6LUBUwDbgDjaDpgGE0HDAwAbjceY/dvRuYAAAAASUVORK5CYII="/>
   </Resources>
 
   <!-- Main container -->
