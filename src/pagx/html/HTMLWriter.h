@@ -216,10 +216,10 @@ class HTMLWriter {
   void paintGeos(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
                  const Stroke* stroke, const TextBox* textBox, float alpha, bool hasTrim,
                  const TrimPath* curTrim, bool hasMerge, MergePathMode mergeMode);
-  void applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim, bool isEllipse = false);
+  void applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim);
   void applyTrimAttrsContinuous(HTMLBuilder& builder, const TrimPath* trim,
                                 const std::vector<float>& pathLengths, float totalLength,
-                                size_t geoIndex, bool isEllipse = false);
+                                size_t geoIndex);
   float computeGeoPathLength(const GeoInfo& geo);
 
   // Filter defs

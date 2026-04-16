@@ -1195,7 +1195,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
 // HTMLWriter – trim & group/repeater/composition
 //==============================================================================
 
-void HTMLWriter::applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim, bool isEllipse) {
+void HTMLWriter::applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim) {
   if (!trim) {
     return;
   }
@@ -1203,9 +1203,6 @@ void HTMLWriter::applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim, bool
     return;
   }
   builder.addAttr("pathLength", "1");
-  // PAGX ellipse starts at 12 o'clock CCW; SVG ellipse starts at 3 o'clock CW.
-  // Offset = 0.75 accounts for both the starting point difference and direction reversal.
-  float ellipseAdj = isEllipse ? 0.75f : 0.0f;
   float offsetFrac = trim->offset / 360.0f;
   float s = trim->start + offsetFrac;
   float e = trim->end + offsetFrac;
@@ -1220,7 +1217,7 @@ void HTMLWriter::applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim, bool
     float visible = e - s;
     float gap = 1.0f - visible;
     builder.addAttr("stroke-dasharray", FloatToString(visible) + " " + FloatToString(gap));
-    builder.addAttr("stroke-dashoffset", FloatToString(-(s + ellipseAdj)));
+    builder.addAttr("stroke-dashoffset", FloatToString(-s));
   } else {
     float seg1 = 1.0f - s;
     float seg2 = (e > 1.0f) ? (e - 1.0f) : e;
@@ -1228,7 +1225,7 @@ void HTMLWriter::applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim, bool
     // Use 4-value dasharray to avoid SVG odd-count auto-duplication.
     builder.addAttr("stroke-dasharray", FloatToString(seg1) + " " + FloatToString(gap) + " " +
                                             FloatToString(seg2) + " 0");
-    builder.addAttr("stroke-dashoffset", FloatToString(-(s + ellipseAdj)));
+    builder.addAttr("stroke-dashoffset", FloatToString(-s));
   }
 }
 
@@ -1277,7 +1274,7 @@ float HTMLWriter::computeGeoPathLength(const GeoInfo& geo) {
 
 void HTMLWriter::applyTrimAttrsContinuous(HTMLBuilder& builder, const TrimPath* trim,
                                           const std::vector<float>& pathLengths, float totalLength,
-                                          size_t geoIndex, bool isEllipse) {
+                                          size_t geoIndex) {
   if (!trim || trim->type != TrimType::Continuous) {
     applyTrimAttrs(builder, trim);
     return;
@@ -1343,23 +1340,17 @@ void HTMLWriter::applyTrimAttrsContinuous(HTMLBuilder& builder, const TrimPath* 
   }
 
   builder.addAttr("pathLength", "1");
-  // PAGX ellipse starts at 12 o'clock CCW; SVG ellipse starts at 3 o'clock CW.
-  // Offset = 0.75 accounts for both the starting point difference and direction reversal.
-  float ellipseAdj = isEllipse ? 0.75f : 0.0f;
   if (localEnd <= 1.0f) {
     float visible = localEnd - localStart;
     float gap = 1.0f - visible;
     builder.addAttr("stroke-dasharray", FloatToString(visible) + " " + FloatToString(gap));
-    builder.addAttr("stroke-dashoffset", FloatToString(-(localStart + ellipseAdj)));
+    builder.addAttr("stroke-dashoffset", FloatToString(-localStart));
   } else {
     float seg1 = 1.0f - localStart;
     float seg2 = localEnd - 1.0f;
     float gap = 1.0f - seg1 - seg2;
     builder.addAttr("stroke-dasharray",
                     FloatToString(seg2) + " " + FloatToString(gap) + " " + FloatToString(seg1));
-    if (!FloatNearlyZero(ellipseAdj)) {
-      builder.addAttr("stroke-dashoffset", FloatToString(-ellipseAdj));
-    }
   }
 }
 

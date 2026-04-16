@@ -605,21 +605,26 @@ void GeoToPathData(const Element* element, NodeType type, PathData& pathData) {
       float w = r->size.width;
       float h = r->size.height;
       if (r->roundness <= 0) {
-        pathData.moveTo(x, y);
+        // Match native (tgfx) start point: top-right corner, CW direction.
+        pathData.moveTo(x + w, y);
         if (r->reversed) {
+          pathData.lineTo(x, y);
           pathData.lineTo(x, y + h);
           pathData.lineTo(x + w, y + h);
-          pathData.lineTo(x + w, y);
         } else {
-          pathData.lineTo(x + w, y);
           pathData.lineTo(x + w, y + h);
           pathData.lineTo(x, y + h);
+          pathData.lineTo(x, y);
         }
         pathData.close();
       } else {
         float rn = std::min(r->roundness, std::min(w / 2, h / 2));
-        pathData.moveTo(x + rn, y);
+        // Match native (tgfx) RRect startIndex=2: start at right edge top-rn, CW direction.
+        pathData.moveTo(x + w, y + rn);
         if (r->reversed) {
+          pathData.cubicTo(x + w, y + rn * (1 - kBezierKappa), x + w - rn * (1 - kBezierKappa), y,
+                           x + w - rn, y);
+          pathData.lineTo(x + rn, y);
           pathData.cubicTo(x + rn * (1 - kBezierKappa), y, x, y + rn * (1 - kBezierKappa), x,
                            y + rn);
           pathData.lineTo(x, y + h - rn);
@@ -628,13 +633,7 @@ void GeoToPathData(const Element* element, NodeType type, PathData& pathData) {
           pathData.lineTo(x + w - rn, y + h);
           pathData.cubicTo(x + w - rn * (1 - kBezierKappa), y + h, x + w,
                            y + h - rn * (1 - kBezierKappa), x + w, y + h - rn);
-          pathData.lineTo(x + w, y + rn);
-          pathData.cubicTo(x + w, y + rn * (1 - kBezierKappa), x + w - rn * (1 - kBezierKappa), y,
-                           x + w - rn, y);
         } else {
-          pathData.lineTo(x + w - rn, y);
-          pathData.cubicTo(x + w - rn * (1 - kBezierKappa), y, x + w, y + rn * (1 - kBezierKappa),
-                           x + w, y + rn);
           pathData.lineTo(x + w, y + h - rn);
           pathData.cubicTo(x + w, y + h - rn * (1 - kBezierKappa), x + w - rn * (1 - kBezierKappa),
                            y + h, x + w - rn, y + h);
@@ -644,6 +643,9 @@ void GeoToPathData(const Element* element, NodeType type, PathData& pathData) {
           pathData.lineTo(x, y + rn);
           pathData.cubicTo(x, y + rn * (1 - kBezierKappa), x + rn * (1 - kBezierKappa), y, x + rn,
                            y);
+          pathData.lineTo(x + w - rn, y);
+          pathData.cubicTo(x + w - rn * (1 - kBezierKappa), y, x + w, y + rn * (1 - kBezierKappa),
+                           x + w, y + rn);
         }
         pathData.close();
       }
@@ -657,17 +659,18 @@ void GeoToPathData(const Element* element, NodeType type, PathData& pathData) {
       float ry = e->size.height / 2;
       float kx = rx * kBezierKappa;
       float ky = ry * kBezierKappa;
-      pathData.moveTo(cx - rx, cy);
+      // Match native (tgfx/Skia) start point: top center (12 o'clock), CW direction.
+      pathData.moveTo(cx, cy - ry);
       if (e->reversed) {
+        pathData.cubicTo(cx - kx, cy - ry, cx - rx, cy - ky, cx - rx, cy);
         pathData.cubicTo(cx - rx, cy + ky, cx - kx, cy + ry, cx, cy + ry);
         pathData.cubicTo(cx + kx, cy + ry, cx + rx, cy + ky, cx + rx, cy);
         pathData.cubicTo(cx + rx, cy - ky, cx + kx, cy - ry, cx, cy - ry);
-        pathData.cubicTo(cx - kx, cy - ry, cx - rx, cy - ky, cx - rx, cy);
       } else {
-        pathData.cubicTo(cx - rx, cy - ky, cx - kx, cy - ry, cx, cy - ry);
         pathData.cubicTo(cx + kx, cy - ry, cx + rx, cy - ky, cx + rx, cy);
         pathData.cubicTo(cx + rx, cy + ky, cx + kx, cy + ry, cx, cy + ry);
         pathData.cubicTo(cx - kx, cy + ry, cx - rx, cy + ky, cx - rx, cy);
+        pathData.cubicTo(cx - rx, cy - ky, cx - kx, cy - ry, cx, cy - ry);
       }
       pathData.close();
       break;
@@ -1626,10 +1629,10 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         applySVGFill(out, trim ? nullptr : fill);
         if (isContinuousTrim) {
           applySVGStroke(out, stroke, computeGeoPathLength(g));
-          applyTrimAttrsContinuous(out, trim, pathLengths, totalPathLength, geoIdx, true);
+          applyTrimAttrsContinuous(out, trim, pathLengths, totalPathLength, geoIdx);
         } else {
           applySVGStroke(out, stroke);
-          applyTrimAttrs(out, trim, true);
+          applyTrimAttrs(out, trim);
         }
         out.closeTagSelfClosing();
         break;
