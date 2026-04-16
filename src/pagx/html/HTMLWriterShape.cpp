@@ -433,14 +433,23 @@ void ApplyRoundCorner(const PathData& pathData, float radius, PathData& output) 
       Point p1 = {vertex.x - dx1 * t1, vertex.y - dy1 * t1};
       Point p2 = {vertex.x + dx2 * t2, vertex.y + dy2 * t2};
 
-      // Angle-adaptive bezier handle length: (4*(1-cos(θ/2)))/(3*sin(θ/2)) where θ is the
-      // arc's sweep angle (π - full angle between edges).
+      // Angle-adaptive bezier handle length matching Skia's ArcCubicBezierHandleLength:
+      // 1. Compute the chord between the two tangent points.
+      // 2. Derive the circle radius from chord and the angle between the tangent vectors.
+      // 3. handleLength = (4*(1-cos(α/2)))/(3*sin(α/2)) * circleRadius
+      // The tangent vectors at p1 (toward vertex) and p2 (away from vertex) subtend angle
+      // = π - interiorAngle = arcAngle, which is also the arc's sweep angle.
       float arcAngle = static_cast<float>(M_PI) - 2.0f * halfAngle;
       float sinHalfArc = std::sin(arcAngle / 2.0f);
       float cosHalfArc = std::cos(arcAngle / 2.0f);
-      float handleFraction = (std::abs(sinHalfArc) > 1e-6f)
-                                 ? (4.0f * (1.0f - cosHalfArc)) / (3.0f * sinHalfArc) * tangentDist
-                                 : tangentDist * kBezierKappa;
+      float handleFraction = 0;
+      if (std::abs(sinHalfArc) > 1e-6f) {
+        float chordX = p2.x - p1.x;
+        float chordY = p2.y - p1.y;
+        float chord = std::sqrt(chordX * chordX + chordY * chordY);
+        float circleRadius = (chord / 2.0f) / sinHalfArc;
+        handleFraction = (4.0f * (1.0f - cosHalfArc)) / (3.0f * sinHalfArc) * circleRadius;
+      }
       Point cp1 = {p1.x - ndx1 * handleFraction, p1.y - ndy1 * handleFraction};
       Point cp2 = {p2.x - ndx2 * handleFraction, p2.y - ndy2 * handleFraction};
 
