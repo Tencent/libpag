@@ -637,10 +637,27 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     }
   } else {
     style += "position:absolute";
-    std::string transform = LayerTransformCSS(layer);
-    if (!transform.empty()) {
-      style += ";transform:" + transform;
-      style += ";transform-origin:0 0";
+    bool hasInsetConstraint = !std::isnan(layer->left) || !std::isnan(layer->right) ||
+                              !std::isnan(layer->top) || !std::isnan(layer->bottom);
+    if (!layer->includeInLayout && hasInsetConstraint) {
+      if (!std::isnan(layer->left)) {
+        style += ";left:" + FloatToString(layer->left) + "px";
+      }
+      if (!std::isnan(layer->right)) {
+        style += ";right:" + FloatToString(layer->right) + "px";
+      }
+      if (!std::isnan(layer->top)) {
+        style += ";top:" + FloatToString(layer->top) + "px";
+      }
+      if (!std::isnan(layer->bottom)) {
+        style += ";bottom:" + FloatToString(layer->bottom) + "px";
+      }
+    } else {
+      std::string transform = LayerTransformCSS(layer);
+      if (!transform.empty()) {
+        style += ";transform:" + transform;
+        style += ";transform-origin:0 0";
+      }
     }
     // Absolute-positioned layers need explicit size when they have contents that use inset:0,
     // or when they are flex containers that need a reference frame for child layout.
