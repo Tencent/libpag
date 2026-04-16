@@ -31,9 +31,7 @@ bool PAGXAnalyzer::IsEmptyLayer(const Layer* layer, bool parentHasLayout) {
   if (!std::isnan(layer->width) || !std::isnan(layer->height)) {
     return false;
   }
-  bool hasSizeDependentConstraint = (!std::isnan(layer->right) || !std::isnan(layer->bottom) ||
-                                     !std::isnan(layer->centerX) || !std::isnan(layer->centerY));
-  if (hasSizeDependentConstraint) {
+  if (layer->hasConstraints()) {
     return false;
   }
   return !(parentHasLayout && layer->includeInLayout);
@@ -46,9 +44,7 @@ bool PAGXAnalyzer::IsEmptyGroup(const Group* group) {
   if (!std::isnan(group->width) || !std::isnan(group->height)) {
     return false;
   }
-  bool hasSizeDependentConstraint = (!std::isnan(group->right) || !std::isnan(group->bottom) ||
-                                     !std::isnan(group->centerX) || !std::isnan(group->centerY));
-  return !hasSizeDependentConstraint;
+  return !group->hasConstraints();
 }
 
 bool PAGXAnalyzer::HasLayerOnlyFeatures(const Layer* layer) {
@@ -137,11 +133,7 @@ bool PAGXAnalyzer::IsLayerShell(const Layer* layer) {
   if (!layer->padding.isZero()) {
     return false;
   }
-  if (!std::isnan(layer->left) || !std::isnan(layer->right) || !std::isnan(layer->top) ||
-      !std::isnan(layer->bottom) || !std::isnan(layer->centerX) || !std::isnan(layer->centerY)) {
-    return false;
-  }
-  return true;
+  return !layer->hasConstraints();
 }
 
 bool PAGXAnalyzer::CanDowngradeLayerToGroup(const Layer* layer) {
@@ -159,8 +151,7 @@ bool PAGXAnalyzer::CanUnwrapFirstChildGroup(const Group* group) {
   if (!HasDefaultGroupTransform(group)) {
     return false;
   }
-  if (!std::isnan(group->left) || !std::isnan(group->right) || !std::isnan(group->top) ||
-      !std::isnan(group->bottom) || !std::isnan(group->centerX) || !std::isnan(group->centerY)) {
+  if (group->hasConstraints()) {
     return false;
   }
   for (auto* child : group->elements) {
@@ -180,8 +171,7 @@ PathPrimitive PAGXAnalyzer::DetectPathPrimitive(const Path* path, PrimitiveInfo*
   if (path->data == nullptr || path->data->isEmpty()) {
     return PathPrimitive::None;
   }
-  if (!std::isnan(path->left) || !std::isnan(path->right) || !std::isnan(path->top) ||
-      !std::isnan(path->bottom) || !std::isnan(path->centerX) || !std::isnan(path->centerY)) {
+  if (path->hasConstraints()) {
     return PathPrimitive::None;
   }
   auto& verbs = path->data->verbs();

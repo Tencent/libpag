@@ -136,24 +136,12 @@ static void OptimizeElements(std::vector<Element*>& elements, PAGXDocument* doc,
       OptimizeElements(group->elements, doc, changed);
     }
   }
-  if (RemoveEmptyGroups(elements)) {
-    changed = true;
-  }
-  if (RemoveZeroWidthStrokes(elements)) {
-    changed = true;
-  }
-  if (UnwrapRedundantFirstChildGroup(elements)) {
-    changed = true;
-  }
-  if (MergeConsecutiveGroups(elements)) {
-    changed = true;
-  }
-  if (ConvertPathsToPrimitives(elements, doc)) {
-    changed = true;
-  }
-  if (SplitHighComplexityPaths(elements, doc)) {
-    changed = true;
-  }
+  changed |= RemoveEmptyGroups(elements);
+  changed |= RemoveZeroWidthStrokes(elements);
+  changed |= UnwrapRedundantFirstChildGroup(elements);
+  changed |= MergeConsecutiveGroups(elements);
+  changed |= ConvertPathsToPrimitives(elements, doc);
+  changed |= SplitHighComplexityPaths(elements, doc);
 }
 
 static bool RemoveEmptyGroups(std::vector<Element*>& elements) {
@@ -409,11 +397,9 @@ static bool SplitHighComplexityPaths(std::vector<Element*>& elements, PAGXDocume
     std::vector<Cluster> clusters;
     for (size_t c = 0; c < contours.size(); c++) {
       size_t root = UnionFind(parent, c);
-      auto it = rootToCluster.find(root);
-      if (it == rootToCluster.end()) {
-        rootToCluster[root] = clusters.size();
+      auto [it, inserted] = rootToCluster.emplace(root, clusters.size());
+      if (inserted) {
         clusters.push_back({});
-        it = rootToCluster.find(root);
       }
       auto& cluster = clusters[it->second];
       cluster.contourIndices.push_back(c);
@@ -651,21 +637,10 @@ static void OptimizeLayerRecursive(Layer* layer, PAGXDocument* doc, float canvas
     ++it;
   }
 
-  if (DowngradeChildLayersToGroups(layer, doc)) {
-    changed = true;
-  }
-
-  if (MergeAdjacentShellLayers(layer->children, doc)) {
-    changed = true;
-  }
-
-  if (RemoveFullCanvasClipMask(layer, canvasWidth, canvasHeight)) {
-    changed = true;
-  }
-
-  if (ConvertRectMaskToClipToBounds(layer)) {
-    changed = true;
-  }
+  changed |= DowngradeChildLayersToGroups(layer, doc);
+  changed |= MergeAdjacentShellLayers(layer->children, doc);
+  changed |= RemoveFullCanvasClipMask(layer, canvasWidth, canvasHeight);
+  changed |= ConvertRectMaskToClipToBounds(layer);
 
   OptimizeElements(layer->contents, doc, changed);
 }
@@ -879,30 +854,26 @@ bool PAGXOptimizer::Optimize(PAGXDocument* document) {
   }
 
   // Pass 2: Merge adjacent shell layers at root level.
-  if (MergeAdjacentShellLayers(document->layers, document)) {
-    changed = true;
-  }
+  changed |= MergeAdjacentShellLayers(document->layers, document);
 
   // Pass 3: Remove top-level empty layers.
-  auto it = document->layers.begin();
-  while (it != document->layers.end()) {
-    if (PAGXAnalyzer::IsEmptyLayer(*it, false)) {
-      it = document->layers.erase(it);
-      changed = true;
-    } else {
-      ++it;
+  {
+    auto it = document->layers.begin();
+    while (it != document->layers.end()) {
+      if (PAGXAnalyzer::IsEmptyLayer(*it, false)) {
+        it = document->layers.erase(it);
+        changed = true;
+      } else {
+        ++it;
+      }
     }
   }
 
   // Pass 4: Deduplicate PathData references.
-  if (DeduplicatePathData(document)) {
-    changed = true;
-  }
+  changed |= DeduplicatePathData(document);
 
   // Pass 5: Remove unreferenced resources orphaned by earlier passes.
-  if (RemoveUnreferencedResources(document)) {
-    changed = true;
-  }
+  changed |= RemoveUnreferencedResources(document);
 
   return changed;
 }
