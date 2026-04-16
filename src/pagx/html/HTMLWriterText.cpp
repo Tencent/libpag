@@ -1286,7 +1286,7 @@ void HTMLWriter::applyTrimAttrsContinuous(HTMLBuilder& builder, const TrimPath* 
   float shapeLength = pathLengths[geoIndex];
   float shapeEnd = shapeStart + shapeLength;
   if (shapeLength <= 0.0f) {
-    builder.addAttr("stroke-dasharray", "0");
+    builder.addAttr("stroke-dasharray", "0 1");
     return;
   }
 
@@ -1332,7 +1332,7 @@ void HTMLWriter::applyTrimAttrsContinuous(HTMLBuilder& builder, const TrimPath* 
   }
 
   if (!hasSegment) {
-    builder.addAttr("stroke-dasharray", "0");
+    builder.addAttr("stroke-dasharray", "0 1");
     return;
   }
 
