@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates clipToBounds: clips overflowing content to layer bounds -->
-<pagx version="1.0" width="400" height="400">
+<pagx width="400" height="400">
   <Layer left="100" top="100" width="200" height="200" clipToBounds="true">
     <Ellipse left="-20" right="-20" top="-20" bottom="-20"/>
     <Fill>
       <RadialGradient center="100,100" radius="120">
-        <ColorStop offset="0" color="#F43F5E"/>
-        <ColorStop offset="0.6" color="#EC4899"/>
-        <ColorStop offset="1" color="#8B5CF6"/>
+        <ColorStop color="#F43F5E" offset="0"/>
+        <ColorStop color="#EC4899" offset="0.6"/>
+        <ColorStop color="#8B5CF6" offset="1"/>
       </RadialGradient>
     </Fill>
   </Layer>

@@ -45,11 +45,6 @@ class PAGXDocument : public Node {
   static std::shared_ptr<PAGXDocument> Make(float width, float height);
 
   /**
-   * Format version.
-   */
-  std::string version = "1.0";
-
-  /**
    * Canvas width.
    */
   float width = 0;

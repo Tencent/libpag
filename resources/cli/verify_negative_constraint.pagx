@@ -1,0 +1,6 @@
+<pagx width="400" height="300">
+  <Layer width="100" height="100">
+    <Rectangle left="60" right="60" top="0" bottom="0"/>
+    <Fill color="#3B82F6"/>
+  </Layer>
+</pagx>

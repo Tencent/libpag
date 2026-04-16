@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="64" height="64">
-  <Layer width="64" height="64">
-    <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
-    <Fill color="#EFF6FF"/>
-    <Layer id="icon" centerX="0" centerY="0"/>
-  </Layer>
-</pagx>

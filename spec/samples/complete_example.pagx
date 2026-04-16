@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="800" height="520">
+<pagx width="800" height="520">
   <Layer name="background" left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="800,520">
-        <ColorStop offset="0" color="#0F172A"/>
-        <ColorStop offset="1" color="#1E293B"/>
+        <ColorStop color="#0F172A" offset="0"/>
+        <ColorStop color="#1E293B" offset="1"/>
       </LinearGradient>
     </Fill>
   </Layer>
@@ -135,7 +135,7 @@
   <Layer left="670" top="430">
     <Rectangle left="-45" top="-30" size="90,60" roundness="8"/>
     <Fill>
-      <ImagePattern image="pag_logo.png" tileModeX="clamp" tileModeY="clamp" matrix="0.23,0,0,0.23,-30,-30"/>
+      <ImagePattern image="pag_logo.png" matrix="0.23,0,0,0.23,-30,-30" tileModeX="clamp" tileModeY="clamp"/>
     </Fill>
     <Stroke color="#FFFFFF20" width="1"/>
     <DropShadowStyle offsetY="6" blurX="16" blurY="16" color="#00000060"/>
@@ -149,33 +149,33 @@
   <Resources>
     <PathData id="wavePath" data="M 0 20 Q 30 0 60 20 T 120 20 T 180 20"/>
     <Font id="iconFont">
-      <Glyph path="M 0 -8 L 8 8 L -8 8 Z" advance="20"/>
-      <Glyph path="M -8 -8 L 8 -8 L 8 8 L -8 8 Z" advance="20"/>
-      <Glyph path="M 0 -10 A 10 10 0 1 1 0 10 A 10 10 0 1 1 0 -10" advance="24"/>
+      <Glyph advance="20" path="M 0 -8 L 8 8 L -8 8 Z"/>
+      <Glyph advance="20" path="M -8 -8 L 8 -8 L 8 8 L -8 8 Z"/>
+      <Glyph advance="24" path="M 0 -10 A 10 10 0 1 1 0 10 A 10 10 0 1 1 0 -10"/>
     </Font>
     <RadialGradient id="glowPurple" center="160,160" radius="160">
-      <ColorStop offset="0" color="#8B5CF660"/>
-      <ColorStop offset="1" color="#8B5CF600"/>
+      <ColorStop color="#8B5CF660" offset="0"/>
+      <ColorStop color="#8B5CF600" offset="1"/>
     </RadialGradient>
     <RadialGradient id="glowCyan" center="200,200" radius="200">
-      <ColorStop offset="0" color="#06B6D450"/>
-      <ColorStop offset="1" color="#06B6D400"/>
+      <ColorStop color="#06B6D450" offset="0"/>
+      <ColorStop color="#06B6D400" offset="1"/>
     </RadialGradient>
     <LinearGradient id="titleGradient" startPoint="-400,0" endPoint="-200,0">
-      <ColorStop offset="0" color="#FFF"/>
-      <ColorStop offset="0.5" color="#8B5CF6"/>
-      <ColorStop offset="1" color="#06B6D4"/>
+      <ColorStop color="#FFF" offset="0"/>
+      <ColorStop color="#8B5CF6" offset="0.5"/>
+      <ColorStop color="#06B6D4" offset="1"/>
     </LinearGradient>
     <LinearGradient id="buttonGradient" startPoint="0,0" endPoint="120,0">
-      <ColorStop offset="0" color="#6366F1"/>
-      <ColorStop offset="1" color="#8B5CF6"/>
+      <ColorStop color="#6366F1" offset="0"/>
+      <ColorStop color="#8B5CF6" offset="1"/>
     </LinearGradient>
     <ConicGradient id="rainbow" center="25,25">
-      <ColorStop offset="0" color="#F43F5E"/>
-      <ColorStop offset="0.25" color="#8B5CF6"/>
-      <ColorStop offset="0.5" color="#06B6D4"/>
-      <ColorStop offset="0.75" color="#10B981"/>
-      <ColorStop offset="1" color="#F43F5E"/>
+      <ColorStop color="#F43F5E" offset="0"/>
+      <ColorStop color="#8B5CF6" offset="0.25"/>
+      <ColorStop color="#06B6D4" offset="0.5"/>
+      <ColorStop color="#10B981" offset="0.75"/>
+      <ColorStop color="#F43F5E" offset="1"/>
     </ConicGradient>
     <SolidColor id="coral" color="#F43F5E"/>
     <SolidColor id="purple" color="#8B5CF6"/>
@@ -184,8 +184,8 @@
     <SolidColor id="cyan" color="#06B6D4"/>
     <SolidColor id="emerald" color="#10B981"/>
     <DiamondGradient id="diamond" center="26,26" radius="26">
-      <ColorStop offset="0" color="#14B8A6"/>
-      <ColorStop offset="1" color="#0F766E"/>
+      <ColorStop color="#14B8A6" offset="0"/>
+      <ColorStop color="#0F766E" offset="1"/>
     </DiamondGradient>
     <Composition id="cardBg" width="100" height="80">
       <Layer width="100" height="80">

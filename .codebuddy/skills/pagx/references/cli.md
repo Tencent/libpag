@@ -190,11 +190,16 @@ pagx layout --depth 1 input.pagx                             # only one level of
 </layout>
 ```
 
-Layer attributes output when non-default: `layout`, `gap`, `flex`, `padding`, `alignment`,
+**Node attributes:**
+
+- `line` — source file line number.
+- `bounds` — resolved position and size as `x,y,width,height` in canvas coordinates.
+
+Layout attributes output when non-default: `layout`, `gap`, `flex`, `padding`, `alignment`,
 `arrangement`, `includeInLayout="false"`, `clipToBounds="true"`.
 
 `pagx verify` outputs the same format to `input.layout.xml` (or `input.{id}.layout.xml`
-when scoped with `--id`). See `pagx verify` for details.
+when scoped with `--id`), with bounds in canvas coordinates matching `pagx layout` format.
 
 ---
 

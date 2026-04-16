@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Test file for layout: top=0 with no opposite constraint is redundant -->
-<pagx version="1.0" width="400" height="300">
-  <Layer id="parent" width="400" height="300">
-    <Layer id="child" width="100" height="50" top="0"/>
-  </Layer>
-</pagx>

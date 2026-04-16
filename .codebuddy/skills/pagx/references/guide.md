@@ -16,13 +16,16 @@ Spec rules, techniques, and common pitfalls for writing correct PAGX files.
 ## Root Node
 
 ```xml
-<pagx version="1.0" width="800" height="600">
-  <Layer>...</Layer>
-  <Resources>...</Resources>   <!-- optional, recommended at end -->
+<pagx width="800" height="600">
+  <Layer>
+  </Layer>
+  <Resources>
+  </Resources>
+  <!-- optional, recommended at end -->
 </pagx>
 ```
 
-- `version`, `width`, `height` are **required**.
+- `width`, `height` are **required**.
 - **`<pagx>` direct children: ONLY `<Layer>` and `<Resources>`** — no other elements.
   VectorElements must be inside a `<Layer>`. `<Group>` as a direct child causes a parse error.
 - `<Composition>` has the same rule — top-level children must be `<Layer>` only.
@@ -58,7 +61,7 @@ Spec rules, techniques, and common pitfalls for writing correct PAGX files.
 ### Containment Hierarchy
 
 ```
-pagx (required: version, width, height)
+pagx (required: width, height)
 ├── Layer*
 │   ├── VectorElements* (geometry, modifiers, painters, Groups, TextBox)
 │   ├── <svg>* (import directive)
@@ -589,6 +592,10 @@ otherwise require `Path` / `PathData`, since those typically represent complex o
 better expressed as SVG. Place the `<svg>` inside a Layer and use constraint positioning
 on the Layer.
 
+**Import restrictions**: `<svg>` and `import` can only be direct children of `<Layer>`
+— not `<Group>` or `<TextBox>`. The Layer must not contain VectorElements or child
+Layers, because resolve replaces them.
+
 ---
 
 # Common Pitfalls
@@ -800,3 +807,45 @@ finalizing any PAGX output, verify that none of these anti-patterns appear in yo
     </Layer>
   </Layer>
   ```
+
+- **NEVER** place `<svg>` or `import` inside a `<Group>` or `<TextBox>` — they can only be
+  direct children of `<Layer>`. Also **NEVER** add VectorElements or child Layers to a
+  Layer that contains `<svg>` or `import`, because resolve replaces them.
+
+  ```xml
+  <!-- ❌ svg inside Group — not allowed -->
+  <Layer width="44" height="44">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
+    <Fill color="#DBEAFE"/>
+    <Group centerX="0" centerY="0">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2" stroke-linejoin="round">
+        <path d="M12 4L20 20H4Z"/>
+      </svg>
+    </Group>
+  </Layer>
+
+  <!-- ❌ svg mixed with other children in the same Layer -->
+  <Layer width="44" height="44">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
+    <Fill color="#DBEAFE"/>
+    <svg viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2" stroke-linejoin="round">
+      <path d="M12 4L20 20H4Z"/>
+    </svg>
+  </Layer>
+
+  <!-- ✅ Separate Layer for background, dedicated child Layer for svg -->
+  <Layer width="44" height="44">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
+    <Fill color="#DBEAFE"/>
+    <Layer centerX="0" centerY="0">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2" stroke-linejoin="round">
+        <path d="M12 4L20 20H4Z"/>
+      </svg>
+    </Layer>
+  </Layer>
+  ```
+
+- **NEVER** use Text characters as icon substitutes — characters like `+`, `−`, `×`, `<`,
+  `>`, `↑`, `↓`, `⋯` render with inconsistent metrics across fonts and cannot be styled
+  precisely. Always draw icons with inline `<svg>` paths, even for simple shapes like a
+  plus sign or an arrow.

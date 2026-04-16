@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates horizontal and vertical container layouts -->
-<pagx version="1.0" width="400" height="400">
+<pagx width="400" height="400">
   <!-- Horizontal layout boundary -->
   <Layer left="20" top="20" width="360" height="170">
     <Layer composition="@boundary"/>

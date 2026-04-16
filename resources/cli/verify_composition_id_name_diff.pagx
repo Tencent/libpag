@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Test: Layers with different id/name but identical structure should be detected -->
-<pagx version="1.0" width="800" height="200">
+<pagx width="800" height="200">
   <Layer name="container" width="800" height="200">
     <Layer id="card1" name="first" width="100" height="100">
       <Layer left="0" right="0" top="0" bottom="0">

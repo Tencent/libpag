@@ -121,8 +121,6 @@ void LayoutNode::PerformConstraintLayout(const std::vector<LayoutNode*>& nodes, 
     } else if (hasPadding) {
       child->setLayoutPosition(context, std::round(padding.left), std::round(padding.top));
     }
-    // Phase 5: recursively lay out children (containers only, leaf nodes no-op).
-    child->updateLayout(context);
   }
 }
 

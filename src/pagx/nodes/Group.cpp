@@ -44,9 +44,43 @@ void Group::onMeasure(LayoutContext*) {
   }
 }
 
-void Group::setLayoutSize(LayoutContext*, float width, float height) {
+void Group::setLayoutSize(LayoutContext* context, float width, float height) {
   layoutWidth = !std::isnan(width) ? width : preferredWidth;
   layoutHeight = !std::isnan(height) ? height : preferredHeight;
+  updateLayout(context);
+  // An axis is content-measured when neither the parent nor the element itself specifies its size.
+  // When a content-measured axis exists and another axis changed from its measured value,
+  // re-measure the content-measured axis from children's actual layout sizes.
+  bool widthFromContent = std::isnan(width) && std::isnan(this->width);
+  bool heightFromContent = std::isnan(height) && std::isnan(this->height);
+  bool sizeChanged = (!std::isnan(width) && width != preferredWidth) ||
+                     (!std::isnan(height) && height != preferredHeight);
+  if ((widthFromContent || heightFromContent) && sizeChanged) {
+    float maxX = 0;
+    float maxY = 0;
+    for (auto* element : elements) {
+      auto* node = AsLayoutNode(element);
+      if (node == nullptr) {
+        continue;
+      }
+      float extX = node->hasConstraints() ? node->constraintExtentX() : 0;
+      float extY = node->hasConstraints() ? node->constraintExtentY() : 0;
+      extX += node->layoutBounds().width;
+      extY += node->layoutBounds().height;
+      maxX = std::max(maxX, extX);
+      maxY = std::max(maxY, extY);
+    }
+    if (!padding.isZero()) {
+      maxX += padding.left + padding.right;
+      maxY += padding.top + padding.bottom;
+    }
+    if (widthFromContent) {
+      layoutWidth = std::ceil(maxX);
+    }
+    if (heightFromContent) {
+      layoutHeight = std::ceil(maxY);
+    }
+  }
 }
 
 void Group::setLayoutPosition(LayoutContext*, float x, float y) {

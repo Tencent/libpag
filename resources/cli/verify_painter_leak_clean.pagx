@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test file for lint: verify no false positives for painter leak -->
+<pagx width="200" height="200">
+  <!-- Normal: all geometry before single painter -->
+  <Layer name="normal-single-fill">
+    <Rectangle size="50,50"/>
+    <Ellipse size="30,30"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+
+  <!-- Normal: multi-fill on same geometry (no geometry between Fills) -->
+  <Layer name="normal-multi-fill">
+    <Rectangle size="50,50"/>
+    <Fill color="#FF0000"/>
+    <Fill color="#0000FF" alpha="0.5"/>
+  </Layer>
+
+  <!-- Normal: Fill then Stroke on same geometry -->
+  <Layer name="normal-fill-stroke">
+    <Rectangle size="50,50"/>
+    <Fill color="#FF0000"/>
+    <Stroke color="#000000" width="2"/>
+  </Layer>
+
+  <!-- Normal: properly grouped shapes -->
+  <Layer name="normal-grouped">
+    <Group>
+      <Rectangle size="50,50"/>
+      <Fill color="#FF0000"/>
+    </Group>
+    <Group>
+      <Ellipse size="30,30"/>
+      <Fill color="#0000FF"/>
+    </Group>
+  </Layer>
+</pagx>

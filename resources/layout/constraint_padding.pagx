@@ -2,7 +2,7 @@
 <!-- Constraint layout: padding on Layers WITHOUT container layout -->
 <!-- Verifies that padding insets the constraint reference frame for both child Layers -->
 <!-- and VectorElements (both reference the padding-inset area). -->
-<pagx version="1.0" width="820" height="600">
+<pagx width="820" height="600">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
