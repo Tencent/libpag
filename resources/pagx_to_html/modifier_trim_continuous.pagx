@@ -34,7 +34,7 @@
     <!-- Ellipse outline -->
     <Ellipse position="120,80" size="50,40"/>
     <!-- Straight line -->
-    <Path data="M 140,70 L 180,70"/>
+    <Path data="M 140,80 L 180,80"/>
     <!-- Single TrimPath continuous across all shapes -->
     <TrimPath start="0" end="0.6" type="continuous"/>
     <Stroke color="@gradContinuous" width="4" cap="round" join="round"/>
@@ -44,7 +44,7 @@
   <Layer alpha="0.15">
     <Rectangle position="50,80" size="40,40"/>
     <Ellipse position="120,80" size="50,40"/>
-    <Path data="M 140,70 L 180,70"/>
+    <Path data="M 140,80 L 180,80"/>
     <Stroke color="#8B5CF6" width="4" cap="round" join="round"/>
   </Layer>
 
@@ -52,7 +52,7 @@
   <Layer>
     <Rectangle position="250,80" size="40,40"/>
     <Ellipse position="320,80" size="50,40"/>
-    <Path data="M 340,70 L 380,70"/>
+    <Path data="M 340,80 L 380,80"/>
     <TrimPath start="0" end="0.6" type="separate"/>
     <Stroke color="@gradSeparate" width="4" cap="round" join="round"/>
   </Layer>
@@ -61,7 +61,7 @@
   <Layer alpha="0.15">
     <Rectangle position="250,80" size="40,40"/>
     <Ellipse position="320,80" size="50,40"/>
-    <Path data="M 340,70 L 380,70"/>
+    <Path data="M 340,80 L 380,80"/>
     <Stroke color="#3B82F6" width="4" cap="round" join="round"/>
   </Layer>
 
@@ -86,7 +86,7 @@
   <Layer>
     <Rectangle position="50,170" size="40,40"/>
     <Ellipse position="120,170" size="50,40"/>
-    <Path data="M 140,160 L 180,160"/>
+    <Path data="M 140,170 L 180,170"/>
     <TrimPath start="0" end="0.5" offset="90" type="continuous"/>
     <Stroke color="@gradContinuous" width="4" cap="round" join="round"/>
   </Layer>
@@ -95,7 +95,7 @@
   <Layer alpha="0.15">
     <Rectangle position="50,170" size="40,40"/>
     <Ellipse position="120,170" size="50,40"/>
-    <Path data="M 140,160 L 180,160"/>
+    <Path data="M 140,170 L 180,170"/>
     <Stroke color="#8B5CF6" width="4" cap="round" join="round"/>
   </Layer>
 
@@ -103,7 +103,7 @@
   <Layer>
     <Rectangle position="250,170" size="40,40"/>
     <Ellipse position="320,170" size="50,40"/>
-    <Path data="M 340,160 L 380,160"/>
+    <Path data="M 340,170 L 380,170"/>
     <TrimPath start="0" end="0.5" offset="90" type="separate"/>
     <Stroke color="@gradSeparate" width="4" cap="round" join="round"/>
   </Layer>
@@ -112,7 +112,7 @@
   <Layer alpha="0.15">
     <Rectangle position="250,170" size="40,40"/>
     <Ellipse position="320,170" size="50,40"/>
-    <Path data="M 340,160 L 380,160"/>
+    <Path data="M 340,170 L 380,170"/>
     <Stroke color="#3B82F6" width="4" cap="round" join="round"/>
   </Layer>
 
