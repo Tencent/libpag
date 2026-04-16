@@ -450,7 +450,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             break;
           }
         }
-        if (hasPainter) {
+        if (hasPainter && group->alpha < 1.0f) {
           writeGroup(out, group, alpha, distribute);
         } else {
           Matrix gm = BuildGroupMatrix(group);
@@ -467,6 +467,22 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               }
             } else if (gt == NodeType::Text) {
               geos.push_back({gt, ge, {}});
+            } else if (gt == NodeType::Fill) {
+              auto fill = static_cast<const Fill*>(ge);
+              curFill = fill;
+              if (fill->placement == targetPlacement && !hasUpcomingRepeater) {
+                float a = distribute ? alpha : 1.0f;
+                paintGeos(out, geos, curFill, nullptr, curTextBox, a, hasTrim, curTrim, hasMerge,
+                          mergeMode);
+              }
+            } else if (gt == NodeType::Stroke) {
+              auto stroke = static_cast<const Stroke*>(ge);
+              curStroke = stroke;
+              if (stroke->placement == targetPlacement && !hasUpcomingRepeater) {
+                float a = distribute ? alpha : 1.0f;
+                paintGeos(out, geos, curFill, curStroke, curTextBox, a, hasTrim, curTrim, hasMerge,
+                          mergeMode);
+              }
             } else if (gt == NodeType::Group) {
               writeGroup(out, static_cast<const Group*>(ge), alpha, distribute);
             }
