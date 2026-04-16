@@ -77,7 +77,7 @@
           <!-- Cell 4: Offset 90deg -->
           <Layer width="150" layout="vertical" gap="6" alignment="center">
             <Layer width="120" height="120">
-              <Ellipse centerX="0" centerY="-8" size="80,80"/>
+              <Ellipse centerX="0" centerY="-10" size="80,80"/>
               <TrimPath start="0" end="0.5" offset="90"/>
               <Stroke color="#F59E0B" width="6" cap="round"/>
             </Layer>
