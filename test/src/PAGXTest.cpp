@@ -5598,6 +5598,74 @@ PAGX_TEST(PAGXTest, Optimizer_RemoveUnreferencedResources) {
   EXPECT_LT(doc->nodes.size(), nodesBefore);
 }
 
+PAGX_TEST(PAGXTest, Optimizer_SplitHighComplexityPaths) {
+  auto doc = pagx::PAGXDocument::Make(1000, 1000);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->width = 1000;
+  layer->height = 1000;
+
+  auto* path = doc->makeNode<pagx::Path>();
+  auto* pathData = doc->makeNode<pagx::PathData>();
+  // Build a multi-contour path with > 500 verbs total, spread across spatially disjoint contours.
+  for (int i = 0; i < 60; i++) {
+    float baseX = static_cast<float>(i * 15);
+    float baseY = 0;
+    pathData->moveTo(baseX, baseY);
+    for (int j = 0; j < 10; j++) {
+      pathData->lineTo(baseX + static_cast<float>(j), baseY + static_cast<float>(j));
+    }
+    pathData->close();
+  }
+  EXPECT_GT(pathData->verbs().size(), 500u);
+  path->data = pathData;
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents.push_back(path);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  EXPECT_EQ(layer->contents.size(), 2u);
+  pagx::PAGXOptimizer::Optimize(doc.get());
+  // The path should have been split into multiple paths, each under the 500 verb threshold.
+  // The Fill painter stays at the end.
+  EXPECT_GT(layer->contents.size(), 2u);
+  for (size_t i = 0; i < layer->contents.size() - 1; i++) {
+    EXPECT_EQ(layer->contents[i]->nodeType(), pagx::NodeType::Path);
+    auto* splitPath = static_cast<pagx::Path*>(layer->contents[i]);
+    EXPECT_LE(splitPath->data->verbs().size(), 500u);
+  }
+  EXPECT_EQ(layer->contents.back()->nodeType(), pagx::NodeType::Fill);
+}
+
+PAGX_TEST(PAGXTest, Optimizer_PreserveSingleContourPath) {
+  auto doc = pagx::PAGXDocument::Make(1000, 1000);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->width = 1000;
+  layer->height = 1000;
+
+  auto* path = doc->makeNode<pagx::Path>();
+  auto* pathData = doc->makeNode<pagx::PathData>();
+  // Build a single-contour path with > 500 verbs — should NOT be split.
+  pathData->moveTo(0, 0);
+  for (int i = 1; i <= 600; i++) {
+    pathData->lineTo(static_cast<float>(i), static_cast<float>(i % 100));
+  }
+  pathData->close();
+  EXPECT_GT(pathData->verbs().size(), 500u);
+  path->data = pathData;
+
+  layer->contents.push_back(path);
+  doc->layers.push_back(layer);
+
+  EXPECT_EQ(layer->contents.size(), 1u);
+  pagx::PAGXOptimizer::Optimize(doc.get());
+  EXPECT_EQ(layer->contents.size(), 1u);
+  EXPECT_EQ(layer->contents[0]->nodeType(), pagx::NodeType::Path);
+}
+
 PAGX_TEST(PAGXTest, Optimizer_MergeAdjacentShellLayers) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto* parent = doc->makeNode<pagx::Layer>();
