@@ -60,6 +60,12 @@ class PAGXAnalyzer {
   static bool HasDefaultGroupTransform(const Group* group);
   static bool CanUnwrapFirstChildGroup(const Group* group);
   static PathPrimitive DetectPathPrimitive(const Path* path, PrimitiveInfo* infoOut);
+
+  /**
+   * Returns true if the PathData contains at most one contour (i.e. zero or one Move verb).
+   * Single-contour paths cannot be split without creating visible seams.
+   */
+  static bool IsSingleContourPath(const PathData* data);
 };
 
 }  // namespace pagx

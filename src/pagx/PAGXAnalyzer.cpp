@@ -298,4 +298,20 @@ PathPrimitive PAGXAnalyzer::DetectPathPrimitive(const Path* path, PrimitiveInfo*
   return PathPrimitive::None;
 }
 
+bool PAGXAnalyzer::IsSingleContourPath(const PathData* data) {
+  if (data == nullptr) {
+    return true;
+  }
+  size_t moveCount = 0;
+  for (auto verb : data->verbs()) {
+    if (verb == PathVerb::Move) {
+      moveCount++;
+      if (moveCount > 1) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 }  // namespace pagx

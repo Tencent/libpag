@@ -43,21 +43,7 @@ inline void VerifyFile(const std::string& filePath, const std::string& key) {
   auto verifyRet =
       CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", filePath});
   std::cerr.rdbuf(oldErr);
-  if (verifyRet != 0) {
-    auto output = verifyErr.str();
-    std::istringstream stream(output);
-    std::string line;
-    std::string fixable;
-    while (std::getline(stream, line)) {
-      bool isInfoOnly = (line.find("Path with") != std::string::npos &&
-                         line.find("may cause slow rendering") != std::string::npos) ||
-                        line.find("Path draws an") != std::string::npos;
-      if (!isInfoOnly && !line.empty()) {
-        fixable += line + "\n";
-      }
-    }
-    EXPECT_TRUE(fixable.empty()) << "pagx verify failed for " << key << ":\n" << fixable;
-  }
+  EXPECT_EQ(verifyRet, 0) << "pagx verify failed for " << key << ":\n" << verifyErr.str();
 }
 
 }  // namespace pag
