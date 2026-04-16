@@ -1,71 +1,93 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: TrimPath separate/continuous, start/end/offset, edge cases (start>end, wrap-around) -->
-<pagx version="1.0" width="460" height="360">
+<pagx version="1.0" width="460" height="420">
   <!-- Background -->
-  <Layer>
-    <Rectangle position="230,180" size="460,360"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F1F5F9"/>
   </Layer>
 
-  <!-- Title -->
-  <Layer>
-    <Text text="Trim Path" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="230,34" textAnchor="center"/>
-    <Fill color="#1E293B"/>
-  </Layer>
-  <Layer>
-    <Text text="Separate, continuous, wrap-around, and offset" fontFamily="Arial" fontSize="10" position="230,50" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="12" alignment="center">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="6" alignment="center">
+      <Layer height="20">
+        <Text text="Trim Path" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="Separate, continuous, wrap-around, and offset" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
 
-  <!-- Card -->
-  <Layer>
-    <Rectangle position="230,202" size="400,250" roundness="16"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
-  </Layer>
+    <!-- Card -->
+    <Layer flex="1" left="0" right="0" layout="vertical" padding="20,28,20,28" alignment="center" arrangement="center">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-  <!-- Separate mode: each shape trimmed independently -->
-  <Layer>
-    <Ellipse position="120,150" size="110,110"/>
-    <TrimPath start="0" end="0.75" type="separate"/>
-    <Stroke color="#3B82F6" width="6" cap="round"/>
-  </Layer>
-  <Layer>
-    <Text text="Separate 75%" fontFamily="Arial" fontSize="8" position="120,218" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
+      <!-- 2x2 grid -->
+      <Layer layout="vertical" gap="12" alignment="center">
+        <!-- Row 1: Separate 75% + Wrap-around -->
+        <Layer layout="horizontal" gap="30" alignment="center">
+          <!-- Cell 1: Separate 75% -->
+          <Layer width="150" layout="vertical" gap="6" alignment="center">
+            <Layer width="120" height="120">
+              <Ellipse centerX="0" centerY="0" size="110,110"/>
+              <TrimPath start="0" end="0.75" type="separate"/>
+              <Stroke color="#3B82F6" width="6" cap="round"/>
+            </Layer>
+            <Layer height="12">
+              <Text text="Separate 75%" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
+          </Layer>
 
-  <!-- start > end → wraps around -->
-  <Layer>
-    <Ellipse position="300,150" size="110,110"/>
-    <TrimPath start="0.7" end="0.3"/>
-    <Stroke color="#EF4444" width="6" cap="round"/>
-  </Layer>
-  <Layer>
-    <Text text="Wrap-around" fontFamily="Arial" fontSize="8" position="300,218" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
+          <!-- Cell 2: Wrap-around -->
+          <Layer width="150" layout="vertical" gap="6" alignment="center">
+            <Layer width="120" height="120">
+              <Ellipse centerX="0" centerY="0" size="110,110"/>
+              <TrimPath start="0.7" end="0.3"/>
+              <Stroke color="#EF4444" width="6" cap="round"/>
+            </Layer>
+            <Layer height="12">
+              <Text text="Wrap-around" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
+          </Layer>
+        </Layer>
 
-  <!-- Continuous mode: shapes treated as one path -->
-  <Layer>
-    <Rectangle position="85,275" size="55,55"/>
-    <Ellipse position="160,275" size="55,55"/>
-    <TrimPath start="0.1" end="0.8" type="continuous"/>
-    <Stroke color="#10B981" width="4" cap="round"/>
-  </Layer>
-  <Layer>
-    <Text text="Continuous" fontFamily="Arial" fontSize="8" position="125,315" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
+        <!-- Row 2: Continuous + Offset 90deg -->
+        <Layer layout="horizontal" gap="30" alignment="center">
+          <!-- Cell 3: Continuous -->
+          <Layer width="150" layout="vertical" gap="6" alignment="center">
+            <Layer width="120" height="120">
+              <Rectangle centerX="-20" centerY="0" size="55,55"/>
+              <Ellipse centerX="35" centerY="0" size="55,55"/>
+              <TrimPath start="0.1" end="0.8" type="continuous"/>
+              <Stroke color="#10B981" width="4" cap="round"/>
+            </Layer>
+            <Layer height="12">
+              <Text text="Continuous" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
+          </Layer>
 
-  <!-- With offset (in degrees) -->
-  <Layer>
-    <Ellipse position="320,275" size="80,80"/>
-    <TrimPath start="0" end="0.5" offset="90"/>
-    <Stroke color="#F59E0B" width="6" cap="round"/>
-  </Layer>
-  <Layer>
-    <Text text="Offset 90deg" fontFamily="Arial" fontSize="8" position="320,315" textAnchor="center"/>
-    <Fill color="#64748B"/>
+          <!-- Cell 4: Offset 90deg -->
+          <Layer width="150" layout="vertical" gap="6" alignment="center">
+            <Layer width="120" height="120">
+              <Ellipse centerX="0" centerY="0" size="80,80"/>
+              <TrimPath start="0" end="0.5" offset="90"/>
+              <Stroke color="#F59E0B" width="6" cap="round"/>
+            </Layer>
+            <Layer height="12">
+              <Text text="Offset 90deg" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
+          </Layer>
+        </Layer>
+      </Layer>
+    </Layer>
   </Layer>
 </pagx>
