@@ -1593,20 +1593,28 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     switch (g.type) {
       case NodeType::Rectangle: {
         auto r = static_cast<const Rectangle*>(g.element);
-        float x = r->position.x - r->size.width / 2;
-        float y = r->position.y - r->size.height / 2;
-        out.openTag("rect");
-        if (!FloatNearlyZero(x)) {
-          out.addAttr("x", FloatToString(x));
-        }
-        if (!FloatNearlyZero(y)) {
-          out.addAttr("y", FloatToString(y));
-        }
-        out.addAttr("width", FloatToString(r->size.width));
-        out.addAttr("height", FloatToString(r->size.height));
-        if (r->roundness > 0) {
-          out.addAttr("rx", FloatToString(r->roundness));
-          out.addAttr("ry", FloatToString(r->roundness));
+        if (trim) {
+          PathData pathData = PathDataFromSVGString("");
+          GeoToPathData(g.element, g.type, pathData);
+          std::string d = PathDataToSVGString(pathData);
+          out.openTag("path");
+          out.addAttr("d", d);
+        } else {
+          float x = r->position.x - r->size.width / 2;
+          float y = r->position.y - r->size.height / 2;
+          out.openTag("rect");
+          if (!FloatNearlyZero(x)) {
+            out.addAttr("x", FloatToString(x));
+          }
+          if (!FloatNearlyZero(y)) {
+            out.addAttr("y", FloatToString(y));
+          }
+          out.addAttr("width", FloatToString(r->size.width));
+          out.addAttr("height", FloatToString(r->size.height));
+          if (r->roundness > 0) {
+            out.addAttr("rx", FloatToString(r->roundness));
+            out.addAttr("ry", FloatToString(r->roundness));
+          }
         }
         applySVGFill(out, trim ? nullptr : fill);
         if (isContinuousTrim) {
@@ -1620,12 +1628,20 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         break;
       }
       case NodeType::Ellipse: {
-        auto e = static_cast<const Ellipse*>(g.element);
-        out.openTag("ellipse");
-        out.addAttr("cx", FloatToString(e->position.x));
-        out.addAttr("cy", FloatToString(e->position.y));
-        out.addAttr("rx", FloatToString(e->size.width / 2));
-        out.addAttr("ry", FloatToString(e->size.height / 2));
+        if (trim) {
+          PathData pathData = PathDataFromSVGString("");
+          GeoToPathData(g.element, g.type, pathData);
+          std::string d = PathDataToSVGString(pathData);
+          out.openTag("path");
+          out.addAttr("d", d);
+        } else {
+          auto e = static_cast<const Ellipse*>(g.element);
+          out.openTag("ellipse");
+          out.addAttr("cx", FloatToString(e->position.x));
+          out.addAttr("cy", FloatToString(e->position.y));
+          out.addAttr("rx", FloatToString(e->size.width / 2));
+          out.addAttr("ry", FloatToString(e->size.height / 2));
+        }
         applySVGFill(out, trim ? nullptr : fill);
         if (isContinuousTrim) {
           applySVGStroke(out, stroke, computeGeoPathLength(g));
