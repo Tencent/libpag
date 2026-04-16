@@ -168,15 +168,9 @@ static bool UnwrapRedundantFirstChildGroup(std::vector<Element*>& elements) {
   if (!PAGXAnalyzer::CanUnwrapFirstChildGroup(group)) {
     return false;
   }
-  std::vector<Element*> newElements;
-  newElements.reserve(group->elements.size() + elements.size() - 1);
-  for (auto* child : group->elements) {
-    newElements.push_back(child);
-  }
-  for (size_t i = 1; i < elements.size(); i++) {
-    newElements.push_back(elements[i]);
-  }
-  elements = std::move(newElements);
+  auto children = std::move(group->elements);
+  elements.erase(elements.begin());
+  elements.insert(elements.begin(), children.begin(), children.end());
   return true;
 }
 
@@ -278,7 +272,6 @@ static bool DowngradeChildLayersToGroups(Layer* parentLayer, PAGXDocument* doc) 
   for (auto* child : parentLayer->children) {
     auto* group = doc->makeNode<Group>();
     group->elements = std::move(child->contents);
-    group->alpha = child->alpha;
     group->customData = std::move(child->customData);
     parentLayer->contents.push_back(group);
   }
@@ -372,15 +365,8 @@ static void OptimizeLayerRecursive(Layer* layer, PAGXDocument* doc, bool& change
 // ============================================================================
 
 static bool PathDataEquals(const PathData* a, const PathData* b) {
-  auto& av = a->verbs();
-  auto& bv = b->verbs();
-  if (av.size() != bv.size()) {
+  if (a->verbs() != b->verbs()) {
     return false;
-  }
-  for (size_t i = 0; i < av.size(); i++) {
-    if (av[i] != bv[i]) {
-      return false;
-    }
   }
   auto& ap = a->points();
   auto& bp = b->points();
