@@ -5302,7 +5302,7 @@ PAGX_TEST(PAGXTest, Optimizer_NoMergeWhenPaintersDiffer) {
   EXPECT_EQ(layer->contents.size(), 3u);
 }
 
-PAGX_TEST(PAGXTest, Optimizer_PreservePathAsIs) {
+PAGX_TEST(PAGXTest, Optimizer_ConvertPathToPrimitive) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto* layer = doc->makeNode<pagx::Layer>();
   layer->width = 100;
@@ -5336,8 +5336,8 @@ PAGX_TEST(PAGXTest, Optimizer_PreservePathAsIs) {
 
   pagx::PAGXOptimizer::Optimize(doc.get());
   ASSERT_EQ(layer->contents.size(), 2u);
-  EXPECT_EQ(layer->contents[0]->nodeType(), pagx::NodeType::Path);
-  EXPECT_EQ(layer->contents[1]->nodeType(), pagx::NodeType::Path);
+  EXPECT_EQ(layer->contents[0]->nodeType(), pagx::NodeType::Rectangle);
+  EXPECT_EQ(layer->contents[1]->nodeType(), pagx::NodeType::Ellipse);
 }
 
 PAGX_TEST(PAGXTest, Optimizer_ConvertRectMaskToClipToBounds) {

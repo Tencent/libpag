@@ -23,6 +23,7 @@
 #include <unordered_set>
 #include "pagx/PAGXAnalyzer.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
@@ -124,6 +125,7 @@ static bool RemoveEmptyGroups(std::vector<Element*>& elements);
 static bool RemoveZeroWidthStrokes(std::vector<Element*>& elements);
 static bool UnwrapRedundantFirstChildGroup(std::vector<Element*>& elements);
 static bool MergeConsecutiveGroups(std::vector<Element*>& elements);
+static bool ConvertPathsToPrimitives(std::vector<Element*>& elements, PAGXDocument* doc);
 
 static void OptimizeElements(std::vector<Element*>& elements, PAGXDocument* doc, bool& changed) {
   for (auto* element : elements) {
@@ -143,6 +145,9 @@ static void OptimizeElements(std::vector<Element*>& elements, PAGXDocument* doc,
     changed = true;
   }
   if (MergeConsecutiveGroups(elements)) {
+    changed = true;
+  }
+  if (ConvertPathsToPrimitives(elements, doc)) {
     changed = true;
   }
 }
@@ -234,6 +239,42 @@ static bool MergeConsecutiveGroups(std::vector<Element*>& elements) {
       changed = true;
     }
     i = j;
+  }
+  return changed;
+}
+
+static bool ConvertPathsToPrimitives(std::vector<Element*>& elements, PAGXDocument* doc) {
+  for (auto* element : elements) {
+    auto type = element->nodeType();
+    if (type == NodeType::TrimPath || type == NodeType::MergePath) {
+      return false;
+    }
+  }
+  bool changed = false;
+  for (size_t i = 0; i < elements.size(); i++) {
+    if (elements[i]->nodeType() != NodeType::Path) {
+      continue;
+    }
+    auto* path = static_cast<Path*>(elements[i]);
+    PrimitiveInfo info;
+    auto primitive = PAGXAnalyzer::DetectPathPrimitive(path, &info);
+    if (primitive == PathPrimitive::Rectangle) {
+      auto* rect = doc->makeNode<Rectangle>();
+      rect->position = {info.cx + path->position.x, info.cy + path->position.y};
+      rect->size = {info.w, info.h};
+      rect->reversed = path->reversed;
+      rect->customData = std::move(path->customData);
+      elements[i] = rect;
+      changed = true;
+    } else if (primitive == PathPrimitive::Ellipse) {
+      auto* ellipse = doc->makeNode<Ellipse>();
+      ellipse->position = {info.cx + path->position.x, info.cy + path->position.y};
+      ellipse->size = {info.w, info.h};
+      ellipse->reversed = path->reversed;
+      ellipse->customData = std::move(path->customData);
+      elements[i] = ellipse;
+      changed = true;
+    }
   }
   return changed;
 }
