@@ -411,15 +411,37 @@ void ApplyRoundCorner(const PathData& pathData, float radius, PathData& output) 
         continue;
       }
 
-      float effectiveRadius = std::min({radius, len1 / 2.0f, len2 / 2.0f});
-      float t1 = effectiveRadius / len1;
-      float t2 = effectiveRadius / len2;
+      // Compute the angle between the two edge vectors using dot product.
+      // dir1 = normalized direction from vertex toward prevVertex (incoming edge).
+      // dir2 = normalized direction from vertex toward nextVertex (outgoing edge).
+      float ndx1 = dx1 / len1, ndy1 = dy1 / len1;
+      float ndx2 = dx2 / len2, ndy2 = dy2 / len2;
+      float dot = ndx1 * ndx2 + ndy1 * ndy2;
+      dot = std::max(-1.0f, std::min(1.0f, dot));
+      float halfAngle = std::acos(dot) / 2.0f;
+      float sinHalf = std::sin(halfAngle);
+      float cosHalf = std::cos(halfAngle);
+      float tanHalf = (sinHalf > 1e-6f) ? (sinHalf / cosHalf) : 1e9f;
+
+      // tangentDistance = radius / tan(halfAngle): distance from vertex along each edge to the
+      // arc tangent point. Clamp so it doesn't exceed half the edge length.
+      float tangentDist = radius / tanHalf;
+      tangentDist = std::min({tangentDist, len1 / 2.0f, len2 / 2.0f});
+      float t1 = tangentDist / len1;
+      float t2 = tangentDist / len2;
       Point p1 = {vertex.x - dx1 * t1, vertex.y - dy1 * t1};
       Point p2 = {vertex.x + dx2 * t2, vertex.y + dy2 * t2};
-      Point cp1 = {p1.x + (vertex.x - p1.x) * kBezierKappa,
-                   p1.y + (vertex.y - p1.y) * kBezierKappa};
-      Point cp2 = {p2.x + (vertex.x - p2.x) * kBezierKappa,
-                   p2.y + (vertex.y - p2.y) * kBezierKappa};
+
+      // Angle-adaptive bezier handle length: (4*(1-cos(θ/2)))/(3*sin(θ/2)) where θ is the
+      // arc's sweep angle (π - full angle between edges).
+      float arcAngle = static_cast<float>(M_PI) - 2.0f * halfAngle;
+      float sinHalfArc = std::sin(arcAngle / 2.0f);
+      float cosHalfArc = std::cos(arcAngle / 2.0f);
+      float handleFraction = (std::abs(sinHalfArc) > 1e-6f)
+                                 ? (4.0f * (1.0f - cosHalfArc)) / (3.0f * sinHalfArc) * tangentDist
+                                 : tangentDist * kBezierKappa;
+      Point cp1 = {p1.x + ndx1 * handleFraction, p1.y + ndy1 * handleFraction};
+      Point cp2 = {p2.x - ndx2 * handleFraction, p2.y - ndy2 * handleFraction};
 
       if (firstOutput) {
         output.moveTo(p1.x, p1.y);
