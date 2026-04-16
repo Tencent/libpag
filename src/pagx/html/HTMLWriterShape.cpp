@@ -411,10 +411,11 @@ void ApplyRoundCorner(const PathData& pathData, float radius, PathData& output) 
         continue;
       }
 
-      // Compute the angle between the two edge vectors using dot product.
-      // dir1 = normalized direction from vertex toward prevVertex (incoming edge).
+      // Compute the angle between the two edge directions emanating from the vertex.
+      // Skia reverses the incoming tangent so both vectors point away from the vertex:
+      // dir1 = normalized direction from vertex toward prevVertex (reversed incoming edge).
       // dir2 = normalized direction from vertex toward nextVertex (outgoing edge).
-      float ndx1 = dx1 / len1, ndy1 = dy1 / len1;
+      float ndx1 = -dx1 / len1, ndy1 = -dy1 / len1;
       float ndx2 = dx2 / len2, ndy2 = dy2 / len2;
       float dot = ndx1 * ndx2 + ndy1 * ndy2;
       dot = std::max(-1.0f, std::min(1.0f, dot));
@@ -440,7 +441,7 @@ void ApplyRoundCorner(const PathData& pathData, float radius, PathData& output) 
       float handleFraction = (std::abs(sinHalfArc) > 1e-6f)
                                  ? (4.0f * (1.0f - cosHalfArc)) / (3.0f * sinHalfArc) * tangentDist
                                  : tangentDist * kBezierKappa;
-      Point cp1 = {p1.x + ndx1 * handleFraction, p1.y + ndy1 * handleFraction};
+      Point cp1 = {p1.x - ndx1 * handleFraction, p1.y - ndy1 * handleFraction};
       Point cp2 = {p2.x - ndx2 * handleFraction, p2.y - ndy2 * handleFraction};
 
       if (firstOutput) {
