@@ -1,101 +1,136 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tests: GlyphRun advanced — positions, anchors, skews, bitmap Glyph (image + offset) -->
-<pagx version="1.0" width="420" height="320">
+<!-- Tests: GlyphRun advanced — positions, anchors, skews, combined transforms, bitmap glyphs -->
+<pagx version="1.0" width="420" height="400">
   <Resources>
-    <!-- Vector font for positions/anchors/skews testing -->
+    <!-- Vector font with P, A, G, X glyphs -->
     <Font id="vecFont" unitsPerEm="1000">
-      <!-- H: two vertical bars + horizontal crossbar, closed outlines -->
-      <Glyph id="gH" advance="600" path="M 60,0 L 60,-700 L 140,-700 L 140,-390 L 460,-390 L 460,-700 L 540,-700 L 540,0 L 460,0 L 460,-310 L 140,-310 L 140,0 Z"/>
-      <!-- E: vertical bar + 3 horizontal bars, closed outline -->
-      <Glyph id="gE" advance="520" path="M 60,0 L 60,-700 L 460,-700 L 460,-620 L 140,-620 L 140,-390 L 390,-390 L 390,-310 L 140,-310 L 140,-80 L 460,-80 L 460,0 Z"/>
-      <!-- L: vertical bar + bottom bar, closed outline -->
-      <Glyph id="gL" advance="480" path="M 60,0 L 60,-700 L 140,-700 L 140,-80 L 420,-80 L 420,0 Z"/>
+      <!-- P: vertical bar + upper bowl -->
+      <Glyph id="gP" advance="580" path="M 80,0 L 80,-800 L 350,-800 C 520,-800 520,-400 350,-400 L 180,-400 L 180,0 Z M 180,-500 L 330,-500 C 400,-500 420,-550 420,-600 C 420,-650 400,-700 330,-700 L 180,-700 Z"/>
+      <!-- A: triangle with crossbar -->
+      <Glyph id="gA" advance="650" path="M 0,0 L 220,-800 L 430,-800 L 650,0 L 530,0 L 470,-200 L 180,-200 L 120,0 Z M 210,-310 L 440,-310 L 325,-720 Z"/>
+      <!-- G: C-shape with horizontal midline arm -->
+      <Glyph id="gG" advance="640" path="M 530,-680 L 460,-590 C 410,-650 340,-700 260,-700 C 140,-700 90,-580 90,-400 C 90,-220 140,-100 260,-100 C 310,-100 350,-110 390,-140 L 390,-340 L 300,-340 L 300,-440 L 530,-440 L 530,-20 C 470,10 370,30 270,30 C 80,30 0,-130 0,-400 C 0,-670 80,-830 270,-830 C 380,-830 470,-780 530,-680 Z"/>
+      <!-- X: two diagonal strokes -->
+      <Glyph id="gX" advance="600" path="M 0,0 L 200,-400 L 0,-800 L 130,-800 L 300,-460 L 470,-800 L 600,-800 L 400,-400 L 600,0 L 470,0 L 300,-340 L 130,0 Z"/>
     </Font>
 
-    <!-- Bitmap font for Glyph.image and Glyph.offset testing -->
+    <!-- Bitmap font for image glyph testing -->
     <Font id="bmpFont" unitsPerEm="100">
-      <!-- Bitmap glyph with image and offset: GlyphID=1 -->
-      <Glyph id="gBmp1" advance="110" image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAFUlEQVR4nGN84zHzPwMSYELmECcAALhBAtSu4mlgAAAAAElFTkSuQmCC" offset="0,-5"/>
-      <!-- Bitmap glyph with image only: GlyphID=2 -->
-      <Glyph id="gBmp2" advance="110" image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAFUlEQVR4nGO0bvr2nwEJMCFziBMAALB/ArpuFzvFAAAAAElFTkSuQmCC"/>
+      <!-- Star glyph with offset -->
+      <Glyph id="gStar" advance="120" image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAWElEQVR4nGNgoDX4PcnmPz55JkotYKLEdqJd8BuPQYzE2oQNsOYdYWSCMcjRDHcBMiDkGnTLmAgpICTHxEAhYCLFC9jkmCh1ASMuG9D9i08OrxPJUUNfAADF5ihsTYj3gwAAAABJRU5ErkJggg==" offset="0,-8"/>
+      <!-- Heart glyph without offset -->
+      <Glyph id="gHeart" advance="120" image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAWElEQVR4nGNgGPKAEV3gjcfM/8h8kR3pjNjEsBrwBk0hPgAzhIkczcjqmRgoBEyDxwARpJAlKxBJMQRZHRM+SUKasRrAgMcQbOI4AxFdMalhBAekJjCSAQDfciCBuorkSgAAAABJRU5ErkJggg=="/>
     </Font>
   </Resources>
 
   <!-- Background -->
-  <Layer>
-    <Rectangle position="210,160" size="420,320"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F8FAFC"/>
   </Layer>
 
-  <!-- Title -->
-  <Layer>
-    <Text text="GlyphRun Advanced" fontFamily="Arial" fontStyle="Bold" fontSize="14" position="210,30" textAnchor="center"/>
-    <Fill color="#1E293B"/>
-  </Layer>
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16,24,16,24" gap="6" alignment="stretch">
+    <!-- Title -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="GlyphRun Advanced" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="12">
+        <Text text="positions, anchors, skews, combined, bitmap" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
 
-  <!-- 1. GlyphRun with positions (per-glyph x,y offsets) -->
-  <Layer>
-    <Text text="positions" fontFamily="Arial" fontSize="9" position="40,60"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
-  <Layer>
-    <Text>
-      <GlyphRun font="@vecFont" fontSize="36" glyphs="1,2,3" x="30" y="85" positions="0,0;5,-10;10,5"/>
-    </Text>
-    <Fill color="#3B82F6"/>
-    <Stroke color="#1D4ED8" width="1.5"/>
-  </Layer>
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="2" blurX="12" blurY="12" color="#1E293B12"/>
 
-  <!-- 2. GlyphRun with anchors + rotations -->
-  <Layer>
-    <Text text="anchors + rot" fontFamily="Arial" fontSize="9" position="230,60"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
-  <Layer>
-    <Text>
-      <GlyphRun font="@vecFont" fontSize="36" glyphs="1,2,3" x="220" y="85" anchors="0,0;5,-12;-5,8" rotations="10,-10,15"/>
-    </Text>
-    <Fill color="#10B981"/>
-  </Layer>
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="14" gap="8" alignment="stretch">
 
-  <!-- 3. GlyphRun with skews -->
-  <Layer>
-    <Text text="skews" fontFamily="Arial" fontSize="9" position="40,140"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
-  <Layer>
-    <Text>
-      <GlyphRun font="@vecFont" fontSize="36" glyphs="1,2,3" x="30" y="170" skews="15,-10,20"/>
-    </Text>
-    <Fill color="#8B5CF6"/>
-  </Layer>
+        <!-- Row 1: positions -->
+        <Layer layout="vertical" gap="3">
+          <Layer height="12">
+            <Text text="positions" fontFamily="Arial" fontSize="10"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+          <Layer height="44">
+            <Text>
+              <GlyphRun font="@vecFont" fontSize="36" glyphs="1,2,3,4" x="8" y="40" xOffsets="0,29,60,91" positions="0,0;3,-6;-2,4;5,-3"/>
+            </Text>
+            <Fill color="#3B82F6"/>
+            <Stroke color="#1D4ED8" width="1"/>
+          </Layer>
+        </Layer>
 
-  <!-- 4. GlyphRun with all combined: positions + anchors + skews + scales + rotations -->
-  <Layer>
-    <Text text="all combined" fontFamily="Arial" fontSize="9" position="230,140"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
-  <Layer>
-    <Text>
-      <GlyphRun font="@vecFont" fontSize="30" glyphs="1,2,3" x="220" y="170"
-                 positions="0,0;8,-6;-4,8"
-                 anchors="0,-10;5,0;-5,5"
-                 skews="10,-5,15"
-                 scales="1.1,1.1;0.9,1.2;1,0.8"
-                 rotations="5,-8,12"/>
-    </Text>
-    <Fill color="#EC4899"/>
-  </Layer>
+        <!-- Row 2: anchors + rotations -->
+        <Layer layout="horizontal" gap="16" alignment="stretch">
+          <Layer flex="1" layout="vertical" gap="3">
+            <Layer height="12">
+              <Text text="anchors + rotations" fontFamily="Arial" fontSize="10"/>
+              <Fill color="#94A3B8"/>
+            </Layer>
+            <Layer height="44">
+              <Text>
+                <GlyphRun font="@vecFont" fontSize="28" glyphs="1,2,3,4" x="4" y="36" xOffsets="0,22,46,70" anchors="0,0;4,-10;-3,6;0,-8" rotations="8,-6,10,-5"/>
+              </Text>
+              <Fill color="#10B981"/>
+            </Layer>
+          </Layer>
 
-  <!-- 5. Bitmap glyph rendering (Glyph.image + Glyph.offset) -->
-  <Layer>
-    <Text text="bitmap glyphs" fontFamily="Arial" fontSize="9" position="40,230"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
-  <Layer>
-    <Text>
-      <GlyphRun font="@bmpFont" fontSize="60" glyphs="1,2" x="30" y="270"/>
-    </Text>
-    <Fill color="#F59E0B"/>
+          <!-- Row 2 right: skews -->
+          <Layer flex="1" layout="vertical" gap="3">
+            <Layer height="12">
+              <Text text="skews" fontFamily="Arial" fontSize="10"/>
+              <Fill color="#94A3B8"/>
+            </Layer>
+            <Layer height="44">
+              <Text>
+                <GlyphRun font="@vecFont" fontSize="28" glyphs="1,2,3,4" x="4" y="36" xOffsets="0,22,46,70" skews="12,-8,15,-10"/>
+              </Text>
+              <Fill color="#8B5CF6"/>
+            </Layer>
+          </Layer>
+        </Layer>
+
+        <!-- Row 3: all combined -->
+        <Layer layout="vertical" gap="3">
+          <Layer height="12">
+            <Text text="combined: positions + anchors + skews + scales + rotations" fontFamily="Arial" fontSize="10"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+          <Layer height="48">
+            <Text>
+              <GlyphRun font="@vecFont" fontSize="32" glyphs="1,2,3,4" x="8" y="42"
+                         xOffsets="0,26,53,81"
+                         positions="0,0;4,-4;-3,5;6,-2"
+                         anchors="0,-8;3,0;-4,4;0,-6"
+                         skews="8,-4,10,-6"
+                         scales="1.1,1;0.9,1.1;1,0.9;1.05,1.05"
+                         rotations="5,-7,9,-4"/>
+            </Text>
+            <Fill color="#EC4899"/>
+          </Layer>
+        </Layer>
+
+        <!-- Row 4: bitmap glyphs -->
+        <Layer layout="vertical" gap="3">
+          <Layer height="12">
+            <Text text="bitmap glyphs (star with offset, heart without)" fontFamily="Arial" fontSize="10"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+          <Layer height="36">
+            <Text>
+              <GlyphRun font="@bmpFont" fontSize="80" glyphs="1,2,1,2,1" x="8" y="30"/>
+            </Text>
+            <Fill color="#F59E0B"/>
+          </Layer>
+        </Layer>
+
+      </Layer>
+    </Layer>
   </Layer>
 </pagx>
