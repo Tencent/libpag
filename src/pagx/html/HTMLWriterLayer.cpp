@@ -233,9 +233,21 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           const Stroke* topStroke = nullptr;
           for (auto* childElem : tb->elements) {
             if (childElem->nodeType() == NodeType::Fill) {
-              topFill = static_cast<const Fill*>(childElem);
+              auto fill = static_cast<const Fill*>(childElem);
+              topFill = fill;
+              for (auto& s : tbSpans) {
+                if (!s.fill) {
+                  s.fill = fill;
+                }
+              }
             } else if (childElem->nodeType() == NodeType::Stroke) {
-              topStroke = static_cast<const Stroke*>(childElem);
+              auto stroke = static_cast<const Stroke*>(childElem);
+              topStroke = stroke;
+              for (auto& s : tbSpans) {
+                if (!s.stroke) {
+                  s.stroke = stroke;
+                }
+              }
             } else if (childElem->nodeType() == NodeType::Text) {
               tbSpans.push_back({static_cast<const Text*>(childElem), topFill, topStroke});
             } else if (childElem->nodeType() == NodeType::Group) {
@@ -245,7 +257,9 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               const Stroke* grpStroke = nullptr;
               for (auto* ge : grp->elements) {
                 if (ge->nodeType() == NodeType::Text) {
-                  grpText = static_cast<const Text*>(ge);
+                  if (!grpText) {
+                    grpText = static_cast<const Text*>(ge);
+                  }
                 } else if (ge->nodeType() == NodeType::Fill) {
                   grpFill = static_cast<const Fill*>(ge);
                 } else if (ge->nodeType() == NodeType::Stroke) {
@@ -253,7 +267,8 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                 }
               }
               if (grpText) {
-                tbSpans.push_back({grpText, grpFill, grpStroke});
+                tbSpans.push_back(
+                    {grpText, grpFill ? grpFill : topFill, grpStroke ? grpStroke : topStroke});
               }
             }
           }
@@ -286,10 +301,20 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               if (span.text->letterSpacing != 0.0f) {
                 spanStyle += ";letter-spacing:" + FloatToString(span.text->letterSpacing) + "px";
               }
-              if (span.fill && span.fill->color &&
-                  span.fill->color->nodeType() == NodeType::SolidColor) {
-                auto sc = static_cast<const SolidColor*>(span.fill->color);
-                spanStyle += ";color:" + ColorToRGBA(sc->color, span.fill->alpha);
+              if (span.fill && span.fill->color) {
+                auto ct = span.fill->color->nodeType();
+                if (ct == NodeType::SolidColor) {
+                  auto sc = static_cast<const SolidColor*>(span.fill->color);
+                  spanStyle += ";color:" + ColorToRGBA(sc->color, span.fill->alpha);
+                } else {
+                  float ca = 1.0f;
+                  std::string css = colorToCSS(span.fill->color, &ca);
+                  if (!css.empty()) {
+                    spanStyle += ";background:" + css;
+                    spanStyle += ";-webkit-background-clip:text;background-clip:text";
+                    spanStyle += ";-webkit-text-fill-color:transparent";
+                  }
+                }
               }
               if (span.stroke && span.stroke->color &&
                   span.stroke->color->nodeType() == NodeType::SolidColor) {
@@ -363,10 +388,20 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             if (span.text->letterSpacing != 0.0f) {
               spanStyle += ";letter-spacing:" + FloatToString(span.text->letterSpacing) + "px";
             }
-            if (span.fill && span.fill->color &&
-                span.fill->color->nodeType() == NodeType::SolidColor) {
-              auto sc = static_cast<const SolidColor*>(span.fill->color);
-              spanStyle += ";color:" + ColorToRGBA(sc->color, span.fill->alpha);
+            if (span.fill && span.fill->color) {
+              auto ct = span.fill->color->nodeType();
+              if (ct == NodeType::SolidColor) {
+                auto sc = static_cast<const SolidColor*>(span.fill->color);
+                spanStyle += ";color:" + ColorToRGBA(sc->color, span.fill->alpha);
+              } else {
+                float ca = 1.0f;
+                std::string css = colorToCSS(span.fill->color, &ca);
+                if (!css.empty()) {
+                  spanStyle += ";background:" + css;
+                  spanStyle += ";-webkit-background-clip:text;background-clip:text";
+                  spanStyle += ";-webkit-text-fill-color:transparent";
+                }
+              }
             }
             if (span.stroke && span.stroke->color &&
                 span.stroke->color->nodeType() == NodeType::SolidColor) {
