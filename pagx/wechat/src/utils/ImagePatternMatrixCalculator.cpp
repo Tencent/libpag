@@ -17,10 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ImagePatternMatrixCalculator.h"
-#include <chrono>
 #include <cmath>
 #include <cstdlib>
-#include <tgfx/platform/Print.h>
 
 #include "pagx/nodes/Image.h"
 #include "tgfx/core/Data.h"
@@ -176,20 +174,12 @@ void resolveAllImagePatternMatrices(pagx::PAGXDocument* document) {
   if (!document) {
     return;
   }
-  auto start = std::chrono::high_resolution_clock::now();
-  int count = 0;
   for (const auto& nodePtr : document->nodes) {
     if (!nodePtr || nodePtr->nodeType() != pagx::NodeType::ImagePattern) {
       continue;
     }
     auto* pattern = static_cast<pagx::ImagePattern*>(nodePtr.get());
     resolveImagePatternMatrix(pattern);
-    count++;
-  }
-  auto end = std::chrono::high_resolution_clock::now();
-  auto ms = std::chrono::duration<double, std::milli>(end - start).count();
-  if (count > 0) {
-    tgfx::PrintLog("[PAGX Perf] resolveAllImagePatternMatrices=%.1fms patterns=%d\n", ms, count);
   }
 }
 

@@ -64,7 +64,6 @@ export class View {
     canvas: WxCanvas,
     options: PAGXViewOptions = {}
   ): Promise<View> {
-    const initStart = Date.now();
     const view = new View(module, canvas);
     view.pagViewOptions = { ...view.pagViewOptions, ...options };
 
@@ -95,7 +94,6 @@ export class View {
       view.startRendering();
     }
 
-    console.log(`[PAGX Perf] View.init total=${Date.now() - initStart}ms canvas=${canvas.width}x${canvas.height}`);
     return view;
   }
 
@@ -127,11 +125,9 @@ export class View {
     if (!this.nativeView) {
       throw new Error('Native view not initialized');
     }
-    const start = Date.now();
     this.backendContext!.makeCurrent(this.module);
     this.nativeView.registerFonts(fontData, emojiFontData);
     this.backendContext!.clearCurrent(this.module);
-    console.log(`[PAGX Perf] registerFonts total=${Date.now() - start}ms fontSize=${(fontData.byteLength / 1024).toFixed(0)}KB emojiSize=${(emojiFontData.byteLength / 1024).toFixed(0)}KB`);
   }
 
   /**
@@ -144,10 +140,8 @@ export class View {
     if (!this.nativeView) {
       throw new Error('Native view not initialized');
     }
-    const start = Date.now();
     this.firstFrameCallbackFired = false;
     this.nativeView.loadPAGX(pagxData);
-    console.log(`[PAGX Perf] loadPAGX total=${Date.now() - start}ms dataSize=${(pagxData.byteLength / 1024).toFixed(0)}KB`);
   }
 
   /**
@@ -160,10 +154,8 @@ export class View {
     if (!this.nativeView) {
       throw new Error('Native view not initialized');
     }
-    const start = Date.now();
     this.firstFrameCallbackFired = false;
     this.nativeView.parsePAGX(pagxData);
-    console.log(`[PAGX Perf] parsePAGX total=${Date.now() - start}ms dataSize=${(pagxData.byteLength / 1024).toFixed(0)}KB`);
   }
 
   /**
@@ -197,10 +189,7 @@ export class View {
     if (!this.nativeView) {
       throw new Error('Native view not initialized');
     }
-    const start = Date.now();
-    const result = this.nativeView.loadFileData(filePath, fileData);
-    console.log(`[PAGX Perf] loadFileData path=${filePath} size=${(fileData.byteLength / 1024).toFixed(0)}KB result=${result} time=${Date.now() - start}ms`);
-    return result;
+    return this.nativeView.loadFileData(filePath, fileData);
   }
 
   /**
@@ -211,9 +200,7 @@ export class View {
     if (!this.nativeView) {
       throw new Error('Native view not initialized');
     }
-    const start = Date.now();
     this.nativeView.buildLayers();
-    console.log(`[PAGX Perf] buildLayers total=${Date.now() - start}ms`);
   }
 
   /**
@@ -416,18 +403,12 @@ export class View {
       this.pagViewOptions.onBeforeRender();
     }
 
-    const isFirstFrame = !this.firstFrameCallbackFired && !this.nativeView!.firstFrameRendered();
-    const drawStart = isFirstFrame ? Date.now() : 0;
-
     this.backendContext.makeCurrent(this.module);
     this.nativeView!.draw();
     this.backendContext.clearCurrent(this.module);
 
     if (!this.firstFrameCallbackFired && this.nativeView!.firstFrameRendered()) {
       this.firstFrameCallbackFired = true;
-      if (isFirstFrame) {
-        console.log(`[PAGX Perf] firstFrame draw=${Date.now() - drawStart}ms`);
-      }
       if (this.pagViewOptions.onFirstFrame) {
         this.pagViewOptions.onFirstFrame();
       }

@@ -20,7 +20,6 @@
 #include <emscripten/html5.h>
 #include <GLES3/gl31.h>
 #include <tgfx/gpu/opengl/GLDevice.h>
-#include <tgfx/platform/Print.h>
 #include "GridBackground.h"
 #include "utils/StringParser.h"
 #include "tgfx/core/Data.h"
@@ -110,12 +109,6 @@ static std::shared_ptr<Data> GetPagxDataFromEmscripten(const val& emscriptenData
 
 PAGXView::PAGXView(std::shared_ptr<tgfx::Device> device, int width, int height)
 : device(device), _width(width), _height(height) {
-  // Print SIMD status for debugging
-#if defined(__wasm_simd128__)
-  tgfx::PrintLog("[PAGX Perf] WASM SIMD enabled (compiled with -msimd128)");
-#else
-  tgfx::PrintLog("[PAGX Perf] WASM SIMD disabled (scalar fallback)");
-#endif
   displayList.setRenderMode(tgfx::RenderMode::Tiled);
   displayList.setAllowZoomBlur(true);
   displayList.setMaxTileCount(256);
@@ -123,64 +116,36 @@ PAGXView::PAGXView(std::shared_ptr<tgfx::Device> device, int width, int height)
 }
 
 void PAGXView::registerFonts(const val& fontVal, const val& emojiFontVal) {
-  double startMs = emscripten_get_now();
   std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces;
   auto fontData = GetDataFromEmscripten(fontVal);
-  double copyFontMs = emscripten_get_now();
   if (fontData) {
     auto typeface = tgfx::Typeface::MakeFromData(fontData, 0);
     if (typeface) {
       fallbackTypefaces.push_back(std::move(typeface));
     }
   }
-  double parseFontMs = emscripten_get_now();
   auto emojiFontData = GetDataFromEmscripten(emojiFontVal);
-  double copyEmojiMs = emscripten_get_now();
   if (emojiFontData) {
     auto typeface = tgfx::Typeface::MakeFromData(emojiFontData, 0);
     if (typeface) {
       fallbackTypefaces.push_back(std::move(typeface));
     }
   }
-  double parseEmojiMs = emscripten_get_now();
   fontConfig.addFallbackTypefaces(std::move(fallbackTypefaces));
-  double endMs = emscripten_get_now();
-  tgfx::PrintLog("[PAGX Perf] registerFonts total=%.1fms (copyFont=%.1fms parseFont=%.1fms "
-         "copyEmoji=%.1fms parseEmoji=%.1fms)\n",
-         endMs - startMs, copyFontMs - startMs, parseFontMs - copyFontMs,
-         copyEmojiMs - parseFontMs, parseEmojiMs - copyEmojiMs);
 }
 
 void PAGXView::loadPAGX(const val& pagxData) {
-  double startMs = emscripten_get_now();
   parsePAGX(pagxData);
-  double parseEndMs = emscripten_get_now();
   buildLayers();
-  double endMs = emscripten_get_now();
-  tgfx::PrintLog("[PAGX Perf] loadPAGX total=%.1fms (parsePAGX=%.1fms buildLayers=%.1fms)\n",
-         endMs - startMs, parseEndMs - startMs, endMs - parseEndMs);
 }
 
 void PAGXView::parsePAGX(const val& pagxData) {
-  double startMs = emscripten_get_now();
   document = nullptr;
   auto data = GetPagxDataFromEmscripten(pagxData);
-  double copyMs = emscripten_get_now();
   if (!data) {
-    tgfx::PrintLog("[PAGX Perf] parsePAGX failed: data copy returned null (%.1fms)\n",
-           copyMs - startMs);
     return;
   }
-  tgfx::PrintLog("[PAGX Perf] parsePAGX dataCopy=%.1fms dataSize=%zuKB\n",
-         copyMs - startMs, data->size() / 1024);
   document = PAGXImporter::FromXML(data->bytes(), data->size());
-  double endMs = emscripten_get_now();
-  if (document) {
-    tgfx::PrintLog("[PAGX Perf] parsePAGX xmlParse=%.1fms (nodes=%zu layers=%zu canvas=%.0fx%.0f)\n",
-           endMs - copyMs, document->nodes.size(), document->layers.size(),
-           document->width, document->height);
-  }
-  tgfx::PrintLog("[PAGX Perf] parsePAGX total=%.1fms\n", endMs - startMs);
 }
 
 std::vector<std::string> PAGXView::getExternalFilePaths() const {
@@ -206,8 +171,6 @@ void PAGXView::buildLayers() {
     return;
   }
 
-  double startMs = emscripten_get_now();
-
   // PAGX files exported by CoCraft reference images by hash, so actual pixel dimensions are
   // unavailable at export time. The exporter stores a normalized transform and scale parameters in
   // customData instead. Now that images are downloaded, combine them with actual pixel dimensions
@@ -215,18 +178,12 @@ void PAGXView::buildLayers() {
   // directly and do not need this step.
   // TODO: Integrate this into LayerBuilder so all PAGX renderers get it automatically.
   resolveAllImagePatternMatrices(document.get());
-  double resolveMs = emscripten_get_now();
 
   document->applyLayout(&fontConfig);
-  double layoutMs = emscripten_get_now();
 
   contentLayer = LayerBuilder::Build(document.get(), MAX_IMAGE_DIMENSION);
-  double buildMs = emscripten_get_now();
 
   if (!contentLayer) {
-    tgfx::PrintLog("[PAGX Perf] buildLayers failed: LayerBuilder returned null "
-           "(resolve=%.1fms layout=%.1fms build=%.1fms)\n",
-           resolveMs - startMs, layoutMs - resolveMs, buildMs - layoutMs);
     return;
   }
   hasRenderedFirstFrame = false;
@@ -236,12 +193,6 @@ void PAGXView::buildLayers() {
   displayList.root()->removeChildren();
   displayList.root()->addChild(contentLayer);
   applyCenteringTransform();
-  double endMs = emscripten_get_now();
-
-  tgfx::PrintLog("[PAGX Perf] buildLayers total=%.1fms (resolveImagePatterns=%.1fms "
-         "applyLayout=%.1fms LayerBuilder::Build=%.1fms setupDisplayList=%.1fms)\n",
-         endMs - startMs, resolveMs - startMs, layoutMs - resolveMs, 
-         buildMs - layoutMs, endMs - buildMs);
 }
 
 void PAGXView::applyDocumentCustomData() {
@@ -400,7 +351,6 @@ bool PAGXView::draw() {
     return false;
   }
 
-  bool isFirstFrame = !hasRenderedFirstFrame;
   double frameStartMs = emscripten_get_now();
 
   if (displayList.hasContentChanged()) {
@@ -408,7 +358,6 @@ bool PAGXView::draw() {
     if (context == nullptr) {
       return false;
     }
-    double lockMs = emscripten_get_now();
 
     if (surface == nullptr || surface->width() != _width || surface->height() != _height) {
       context->setCacheLimit(MAX_CACHE_LIMIT);
@@ -423,7 +372,6 @@ bool PAGXView::draw() {
         return false;
       }
     }
-    double surfaceMs = emscripten_get_now();
 
     auto canvas = surface->getCanvas();
     canvas->clear();
@@ -433,31 +381,17 @@ bool PAGXView::draw() {
     } else {
       DrawBackground(canvas, _width, _height, 1.0f);
     }
-    double bgMs = emscripten_get_now();
 
     displayList.render(surface.get(), false);
-    double renderMs = emscripten_get_now();
 
     auto recording = context->flush();
-    double flushMs = emscripten_get_now();
     if (recording) {
       context->submit(std::move(recording));
       if (!hasRenderedFirstFrame) {
         hasRenderedFirstFrame = true;
       }
     }
-    double submitMs = emscripten_get_now();
     device->unlock();
-    double unlockMs = emscripten_get_now();
-
-    if (isFirstFrame) {
-      tgfx::PrintLog("[PAGX Perf] draw firstFrame total=%.1fms (lockContext=%.1fms surface=%.1fms "
-             "background=%.1fms displayList.render=%.1fms flush=%.1fms submit=%.1fms "
-             "unlock=%.1fms)\n",
-             unlockMs - frameStartMs, lockMs - frameStartMs, surfaceMs - lockMs,
-             bgMs - surfaceMs, renderMs - bgMs, flushMs - renderMs,
-             submitMs - flushMs, unlockMs - submitMs);
-    }
   }
 
   double frameEndMs = emscripten_get_now();

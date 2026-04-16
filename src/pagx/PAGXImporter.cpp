@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXImporter.h"
-#include <chrono>
 #include <climits>
 #include <cstdlib>
 #include <cstring>
@@ -66,7 +65,6 @@
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
-#include "tgfx/platform/Print.h"
 
 namespace pagx {
 
@@ -320,25 +318,16 @@ static bool ParseResource(const DOMNode* node, PAGXDocument* doc) {
 }
 
 static void ParseResources(const DOMNode* node, PAGXDocument* doc) {
-  auto preRegStart = std::chrono::high_resolution_clock::now();
   // First pass: pre-register all resource IDs so that cross-references via '@id' resolve
   // regardless of XML declaration order.
   auto child = node->firstChild;
-  int resourceCount = 0;
   while (child) {
     if (child->type == DOMNodeType::Element) {
       PreRegisterResource(child.get(), doc);
-      resourceCount++;
     }
     child = child->nextSibling;
   }
-  auto preRegEnd = std::chrono::high_resolution_clock::now();
 
-  int imageCount = 0;
-  int pathDataCount = 0;
-  int colorSourceCount = 0;
-  int fontCount = 0;
-  int compositionCount = 0;
   // Second pass: fully parse each resource. Pre-registered nodes are reused by makeNodeFromXML.
   child = node->firstChild;
   while (child) {
@@ -346,17 +335,6 @@ static void ParseResources(const DOMNode* node, PAGXDocument* doc) {
     child = child->nextSibling;
     if (current->type != DOMNodeType::Element) {
       continue;
-    }
-    if (current->name == "Image") {
-      imageCount++;
-    } else if (current->name == "PathData") {
-      pathDataCount++;
-    } else if (current->name == "Font") {
-      fontCount++;
-    } else if (current->name == "Composition") {
-      compositionCount++;
-    } else {
-      colorSourceCount++;
     }
     if (!ParseResource(current.get(), doc)) {
       ReportError(doc, current.get(),
@@ -367,14 +345,6 @@ static void ParseResources(const DOMNode* node, PAGXDocument* doc) {
                       " ConicGradient, DiamondGradient, ImagePattern.");
     }
   }
-  auto parseEnd = std::chrono::high_resolution_clock::now();
-  auto preRegMs = std::chrono::duration<double, std::milli>(preRegEnd - preRegStart).count();
-  auto parseMs = std::chrono::duration<double, std::milli>(parseEnd - preRegEnd).count();
-  tgfx::PrintLog(
-      "[PAGX Perf]     parseResources preReg=%.1fms parse=%.1fms total=%d "
-      "(Image=%d PathData=%d ColorSource=%d Font=%d Composition=%d)\n",
-      preRegMs, parseMs, resourceCount, imageCount, pathDataCount, colorSourceCount, fontCount,
-      compositionCount);
 }
 
 // Forward declarations for helper functions defined later in the file.
@@ -2140,9 +2110,7 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const std::string& xmlConten
 }
 
 std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const uint8_t* data, size_t length) {
-  auto totalStart = std::chrono::high_resolution_clock::now();
   auto dom = XMLDOM::Make(data, length);
-  auto domEnd = std::chrono::high_resolution_clock::now();
   if (!dom) {
     return nullptr;
   }
@@ -2152,19 +2120,10 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const uint8_t* data, size_t 
   }
   auto doc = std::shared_ptr<PAGXDocument>(new PAGXDocument());
   ParseDocument(root.get(), doc.get());
-  auto parseEnd = std::chrono::high_resolution_clock::now();
-  auto domMs = std::chrono::duration<double, std::milli>(domEnd - totalStart).count();
-  auto parseMs = std::chrono::duration<double, std::milli>(parseEnd - domEnd).count();
-  auto totalMs = std::chrono::duration<double, std::milli>(parseEnd - totalStart).count();
-  tgfx::PrintLog(
-      "[PAGX Perf] PAGXImporter::FromXML total=%.1fms (XMLDOM::Make=%.1fms "
-      "parseDocument=%.1fms) dataSize=%zuKB\n",
-      totalMs, domMs, parseMs, length / 1024);
   return doc;
 }
 
 static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
-  auto docStart = std::chrono::high_resolution_clock::now();
   doc->version = GetAttribute(root, "version", "1.0");
   doc->width = GetFloatAttribute(root, "width", 0, doc);
   doc->height = GetFloatAttribute(root, "height", 0, doc);
@@ -2175,26 +2134,16 @@ static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
   if (child) {
     ParseResources(child.get(), doc);
   }
-  auto resourceEnd = std::chrono::high_resolution_clock::now();
 
   // Second pass: Parse Layers.
   child = root->firstChild;
-  int layerIndex = 0;
   while (child) {
     if (child->type == DOMNodeType::Element) {
       if (child->name == "Layer") {
-        auto layerStart = std::chrono::high_resolution_clock::now();
-        auto nodesBefore = doc->nodes.size();
         auto layer = ParseLayer(child.get(), doc);
-        auto layerEnd = std::chrono::high_resolution_clock::now();
-        auto layerMs = std::chrono::duration<double, std::milli>(layerEnd - layerStart).count();
-        auto nodesCreated = doc->nodes.size() - nodesBefore;
-        tgfx::PrintLog("[PAGX Perf]     parseLayer[%d] name=\"%s\" time=%.1fms nodes=%zu\n",
-                       layerIndex, layer ? layer->name.c_str() : "null", layerMs, nodesCreated);
         if (layer) {
           doc->layers.push_back(layer);
         }
-        layerIndex++;
       } else if (child->name != "Resources") {
         ReportError(
             doc, child.get(),
@@ -2203,13 +2152,6 @@ static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
     }
     child = child->nextSibling;
   }
-  auto layerEnd = std::chrono::high_resolution_clock::now();
-  auto resMs = std::chrono::duration<double, std::milli>(resourceEnd - docStart).count();
-  auto layerMs = std::chrono::duration<double, std::milli>(layerEnd - resourceEnd).count();
-  tgfx::PrintLog(
-      "[PAGX Perf]   parseDocument (parseResources=%.1fms parseLayers=%.1fms "
-      "nodes=%zu layers=%zu)\n",
-      resMs, layerMs, doc->nodes.size(), doc->layers.size());
 }
 
 }  // namespace pagx

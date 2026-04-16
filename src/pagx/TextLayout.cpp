@@ -18,7 +18,6 @@
 
 #include "TextLayout.h"
 #include <algorithm>
-#include <chrono>
 #include <cmath>
 #include "LayoutContext.h"
 #include "TextLayoutParams.h"
@@ -34,7 +33,6 @@
 #include "tgfx/core/Font.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/core/UTF.h"
-#include "tgfx/platform/Print.h"
 
 namespace pagx {
 
@@ -1562,7 +1560,6 @@ TextLayoutResult TextLayout::Layout(const std::vector<Text*>& textElements,
   if (textElements.empty()) {
     return {};
   }
-  auto start = std::chrono::high_resolution_clock::now();
   TextLayoutContext layoutContext(context);
   TextLayoutResult result = {};
   if (AllHaveEmbeddedGlyphRuns(textElements)) {
@@ -1573,9 +1570,6 @@ TextLayoutResult TextLayout::Layout(const std::vector<Text*>& textElements,
     auto mutableElements = textElements;
     result = layoutContext.processTextWithLayout(mutableElements, params);
   }
-  auto end = std::chrono::high_resolution_clock::now();
-  auto ms = std::chrono::duration<double, std::milli>(end - start).count();
-  tgfx::PrintLog("[PAGX Perf] TextLayout::Layout=%.1fms textCount=%zu\n", ms, textElements.size());
   return result;
 }
 
