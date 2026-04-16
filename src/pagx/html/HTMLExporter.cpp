@@ -433,23 +433,25 @@ static std::string GenerateDiamondGradientScript(
   if (gradients.empty()) {
     return "";
   }
-  // Self-contained WebGL2 shader script. The shader code and initDG function are emitted once;
-  // each DiamondGradient instance gets a single initDG() call with its parameters.
+  // Self-contained WebGL2 diamond gradient renderer.
+  // The precomputed unit matrix (combining translate, gradientMatrix, center offset,
+  // scale(sqrt2/radius), and rotate(45)) is passed directly. The shader only needs
+  // t = max(|transformed.x|, |transformed.y|) for the Chebyshev distance.
   std::string s;
   s += "<script>\n(function(){\n";
   s += "var VS='#version 300 es\\n";
   s += "in vec2 a;out vec2 v;uniform vec2 u_s;";
   s += "void main(){vec2 u=a*.5+.5;v=vec2(u.x*u_s.x,(1.-u.y)*u_s.y);gl_Position=vec4(a,0,1);}';\n";
   s += "var FS='#version 300 es\\nprecision highp float;";
-  s += "in vec2 v;out vec4 o;uniform vec2 u_c;uniform float u_r;uniform mat3 u_m;";
+  s += "in vec2 v;out vec4 o;uniform mat3 u_m;";
   s += "uniform int u_n;uniform float u_o[8];uniform vec4 u_cl[8];";
   s += "vec4 sg(float t){t=clamp(t,0.,1.);if(t<=u_o[0])return u_cl[0];";
   s += "for(int i=1;i<8;i++){if(i>=u_n)break;if(t<=u_o[i]){";
   s += "float f=(t-u_o[i-1])/(u_o[i]-u_o[i-1]);return mix(u_cl[i-1],u_cl[i],f);}}";
   s += "return u_cl[u_n-1];}";
-  s += "void main(){vec3 p=u_m*vec3(v,1);vec2 d=p.xy-u_c;";
-  s += "float t=(abs(d.x)+abs(d.y))/u_r;o=sg(t);}';\n";
-  s += "function initDG(id,cx,cy,r,m,st){\n";
+  s += "void main(){vec2 p=(u_m*vec3(v,1)).xy;";
+  s += "float t=max(abs(p.x),abs(p.y));o=sg(t);}';\n";
+  s += "function initDG(id,m,st){\n";
   s += "var c=document.getElementById(id);if(!c)return;\n";
   s += "var g=c.getContext('webgl2');if(!g)return;\n";
   s += "function cs(t,s){var sh=g.createShader(t);g.shaderSource(sh,s);g.compileShader(sh);return "
@@ -462,40 +464,33 @@ static std::string GenerateDiamondGradientScript(
   s += "var a=g.getAttribLocation(p,'a');g.enableVertexAttribArray(a);\n";
   s += "g.vertexAttribPointer(a,2,g.FLOAT,false,0,0);\n";
   s += "g.uniform2f(g.getUniformLocation(p,'u_s'),c.width,c.height);\n";
-  s += "g.uniform2f(g.getUniformLocation(p,'u_c'),cx,cy);g.uniform1f(g.getUniformLocation(p,'u_r'),"
-       "r);\n";
   s += "g.uniformMatrix3fv(g.getUniformLocation(p,'u_m'),false,new Float32Array(m));\n";
   s += "g.uniform1i(g.getUniformLocation(p,'u_n'),st.length);\n";
   s += "var of=new Float32Array(8),cl=new Float32Array(32);\n";
   s += "for(var "
-       "i=0;i<st.length;i++){of[i]=st[i][0];cl[i*4]=st[i][1];cl[i*4+1]=st[i][2];cl[i*4+2]=st[i][3];"
-       "cl[i*4+3]=st[i][4];}\n";
+       "i=0;i<st.length;i++){of[i]=st[i][0];cl[i*4]=st[i][1];cl[i*4+1]=st[i][2];cl[i*4+2]=st[i]["
+       "3];cl[i*4+3]=st[i][4];}\n";
   s += "g.uniform1fv(g.getUniformLocation(p,'u_o'),of);\n";
   s += "g.uniform4fv(g.getUniformLocation(p,'u_cl'),cl);\n";
   s += "g.viewport(0,0,c.width,c.height);g.drawArrays(g.TRIANGLE_STRIP,0,4);}\n";
 
   for (auto& info : gradients) {
-    auto g = info.gradient;
-    // The canvas coordinate system has origin at (left,top) of the element.
-    // Gradient center is in PAGX document coordinates, so subtract the element's position.
-    float cx = g->center.x - info.left;
-    float cy = g->center.y - info.top;
-    // Build the gradient matrix as column-major mat3 for GLSL.
-    // When matrix is identity, pass identity mat3.
-    auto& m = g->matrix;
-    s += "initDG('" + info.canvasId + "'," + FloatToString(cx) + "," + FloatToString(cy) + "," +
-         FloatToString(g->radius) + ",[";
-    // mat3 column-major: [col0.x, col0.y, 0, col1.x, col1.y, 0, col2.x, col2.y, 1]
-    s += FloatToString(m.a) + "," + FloatToString(m.c) + ",0," + FloatToString(m.b) + "," +
-         FloatToString(m.d) + ",0," + FloatToString(m.tx) + "," + FloatToString(m.ty) + ",1],[";
-    for (size_t i = 0; i < g->colorStops.size(); i++) {
+    s += "initDG('" + info.canvasId + "',[";
+    for (int i = 0; i < 9; i++) {
       if (i > 0) {
         s += ",";
       }
-      auto* stop = g->colorStops[i];
-      s += "[" + FloatToString(stop->offset) + "," + FloatToString(stop->color.red) + "," +
-           FloatToString(stop->color.green) + "," + FloatToString(stop->color.blue) + "," +
-           FloatToString(stop->color.alpha) + "]";
+      s += FloatToString(info.unitMatrix[i]);
+    }
+    s += "],[";
+    for (size_t i = 0; i < info.stops.size(); i++) {
+      if (i > 0) {
+        s += ",";
+      }
+      auto& stop = info.stops[i];
+      s += "[" + FloatToString(stop.first) + "," + FloatToString(stop.second.red) + "," +
+           FloatToString(stop.second.green) + "," + FloatToString(stop.second.blue) + "," +
+           FloatToString(stop.second.alpha) + "]";
     }
     s += "]);\n";
   }

@@ -116,9 +116,8 @@ void SampleArcLengthLUT(const ArcLengthLUT& lut, float arcLength, Point* outPos,
 
 struct DiamondGradientInfo {
   std::string canvasId;
-  const DiamondGradient* gradient = nullptr;
-  float left = 0;
-  float top = 0;
+  float unitMatrix[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
+  std::vector<std::pair<float, Color>> stops;
   float width = 0;
   float height = 0;
 };

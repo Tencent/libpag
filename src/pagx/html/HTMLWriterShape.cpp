@@ -2025,11 +2025,93 @@ void HTMLWriter::renderDiamondCanvas(HTMLBuilder& out, const GeoInfo& geo, const
 
   DiamondGradientInfo info;
   info.canvasId = canvasId;
-  info.gradient = dg;
-  info.left = left;
-  info.top = top;
   info.width = w;
   info.height = h;
+
+  // Precompute the combined unit matrix that replicates native tgfx rendering:
+  // Step 1: Translate canvas pixel to PAGX document coordinates (add element offset)
+  // Step 2: Apply gradient matrix inverse (if non-identity)
+  // Step 3: Translate to gradient center
+  // Step 4: Scale by sqrt(2)/radius and rotate 45 degrees
+  // The shader then computes t = max(|x|, |y|) on the transformed coordinates.
+  //
+  // Native equivalent: totalMatrix = DiamondRadiusToUnitMatrix(center, radius) * inv(gradMatrix)
+  // We also prepend a translation by (left, top) to map from canvas-local to document coords.
+  float cx = dg->center.x;
+  float cy = dg->center.y;
+  float inv = 1.4142135624f / dg->radius;
+  float c45 = 0.70710678118f;
+  float s45 = 0.70710678118f;
+
+  // DiamondRadiusToUnitMatrix: translate(-cx,-cy), scale(inv), rotate(45)
+  // As combined 3x3: R * S * T
+  //   T = [1 0 -cx; 0 1 -cy; 0 0 1]
+  //   S = [inv 0 0; 0 inv 0; 0 0 1]
+  //   R = [c45 -s45 0; s45 c45 0; 0 0 1]
+  // Combined = R * S * T:
+  //   a = c45*inv, b = -s45*inv, tx = (-cx*c45 + cy*s45)*inv
+  //   c = s45*inv, d =  c45*inv, ty = (-cx*s45 - cy*c45)*inv
+  float dA = c45 * inv;
+  float dB = -s45 * inv;
+  float dC = s45 * inv;
+  float dD = c45 * inv;
+  float dTx = (-cx * c45 + cy * s45) * inv;
+  float dTy = (-cx * s45 - cy * c45) * inv;
+
+  // Native rendering applies: totalMatrix = diamondUnit * inverse(gradientMatrix)
+  // (MatrixShader inverts the gradient matrix before passing it as uvMatrix to the gradient shader)
+  // We also prepend a translation by (left, top) to map canvas-local to document coords.
+  // Final: combined = diamondUnit * inverse(gradientMatrix) * translate(left, top)
+  auto& gm = dg->matrix;
+  // Compute inverse of gradient matrix: inv(gm)
+  float det = gm.a * gm.d - gm.b * gm.c;
+  float iA, iB, iC, iD, iTx, iTy;
+  if (std::abs(det) < 1e-10f) {
+    iA = 1;
+    iB = 0;
+    iC = 0;
+    iD = 1;
+    iTx = 0;
+    iTy = 0;
+  } else {
+    float invDet = 1.0f / det;
+    iA = gm.d * invDet;
+    iB = -gm.c * invDet;
+    iC = -gm.b * invDet;
+    iD = gm.a * invDet;
+    iTx = (gm.c * gm.ty - gm.d * gm.tx) * invDet;
+    iTy = (gm.b * gm.tx - gm.a * gm.ty) * invDet;
+  }
+  // inverse(gradMatrix) * translate(left, top):
+  float gA = iA;
+  float gB = iB;
+  float gC = iC;
+  float gD = iD;
+  float gTx = iA * left + iB * top + iTx;
+  float gTy = iC * left + iD * top + iTy;
+
+  // diamondUnit * (inverse(gradMatrix) * translate):
+  float fA = dA * gA + dB * gC;
+  float fB = dA * gB + dB * gD;
+  float fTx = dA * gTx + dB * gTy + dTx;
+  float fC = dC * gA + dD * gC;
+  float fD = dC * gB + dD * gD;
+  float fTy = dC * gTx + dD * gTy + dTy;
+
+  // Store as column-major mat3 for GLSL
+  info.unitMatrix[0] = fA;
+  info.unitMatrix[1] = fC;
+  info.unitMatrix[2] = 0;
+  info.unitMatrix[3] = fB;
+  info.unitMatrix[4] = fD;
+  info.unitMatrix[5] = 0;
+  info.unitMatrix[6] = fTx;
+  info.unitMatrix[7] = fTy;
+  info.unitMatrix[8] = 1;
+
+  for (auto* stop : dg->colorStops) {
+    info.stops.emplace_back(stop->offset, stop->color);
+  }
   _ctx->diamondGradients.push_back(info);
 }
 
