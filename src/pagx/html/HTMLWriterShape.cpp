@@ -1961,11 +1961,76 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     out.closeTag();
     return;
   }
+  if (fill && fill->color && fill->color->nodeType() == NodeType::DiamondGradient &&
+      geos.size() == 1 && !stroke) {
+    renderDiamondCanvas(out, geos[0], fill, alpha, painterBlend);
+    return;
+  }
   if (canCSS(geos, fill, stroke, hasTrim, false)) {
     renderCSSDiv(out, geos[0], fill, alpha, painterBlend);
   } else {
     renderSVG(out, geos, fill, stroke, alpha, painterBlend, trim, mergeMode);
   }
+}
+
+void HTMLWriter::renderDiamondCanvas(HTMLBuilder& out, const GeoInfo& geo, const Fill* fill,
+                                     float alpha, BlendMode painterBlend) {
+  auto dg = static_cast<const DiamondGradient*>(fill->color);
+  float left = 0, top = 0, w = 0, h = 0;
+  float roundness = 0;
+  if (geo.type == NodeType::Rectangle) {
+    auto r = static_cast<const Rectangle*>(geo.element);
+    left = r->position.x - r->size.width / 2;
+    top = r->position.y - r->size.height / 2;
+    w = r->size.width;
+    h = r->size.height;
+    roundness = std::min(r->roundness, std::min(w / 2, h / 2));
+  } else if (geo.type == NodeType::Ellipse) {
+    auto e = static_cast<const Ellipse*>(geo.element);
+    left = e->position.x - e->size.width / 2;
+    top = e->position.y - e->size.height / 2;
+    w = e->size.width;
+    h = e->size.height;
+  }
+  if (w <= 0 || h <= 0) {
+    return;
+  }
+
+  std::string canvasId = _ctx->nextId("dgc");
+  std::string style =
+      "position:absolute;left:" + FloatToString(left) + "px;top:" + FloatToString(top) + "px";
+  if (roundness > 0) {
+    style += ";border-radius:" + FloatToString(roundness) + "px";
+  }
+  if (geo.type == NodeType::Ellipse) {
+    style += ";border-radius:50%";
+  }
+  if (alpha < 1.0f) {
+    style += ";opacity:" + FloatToString(alpha);
+  }
+  if (painterBlend != BlendMode::Normal) {
+    auto blendStr = BlendModeToMixBlendMode(painterBlend);
+    if (blendStr) {
+      style += ";mix-blend-mode:";
+      style += blendStr;
+    }
+  }
+
+  out.openTag("canvas");
+  out.addAttr("id", canvasId);
+  out.addAttr("width", std::to_string(static_cast<int>(std::ceil(w))));
+  out.addAttr("height", std::to_string(static_cast<int>(std::ceil(h))));
+  out.addAttr("style", style);
+  out.closeTagSelfClosing();
+
+  DiamondGradientInfo info;
+  info.canvasId = canvasId;
+  info.gradient = dg;
+  info.left = left;
+  info.top = top;
+  info.width = w;
+  info.height = h;
+  _ctx->diamondGradients.push_back(info);
 }
 
 }  // namespace pagx

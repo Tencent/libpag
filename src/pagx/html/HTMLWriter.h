@@ -25,6 +25,7 @@
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/DiamondGradient.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Image.h"
@@ -113,6 +114,15 @@ ArcLengthLUT BuildArcLengthLUT(const PathData& pathData, int samplesPerSegment =
 void SampleArcLengthLUT(const ArcLengthLUT& lut, float arcLength, Point* outPos, float* outTangent,
                         bool closed = false);
 
+struct DiamondGradientInfo {
+  std::string canvasId;
+  const DiamondGradient* gradient = nullptr;
+  float left = 0;
+  float top = 0;
+  float width = 0;
+  float height = 0;
+};
+
 //==============================================================================
 // HTMLWriterContext
 //==============================================================================
@@ -122,6 +132,7 @@ class HTMLWriterContext {
   float docWidth = 0;
   float docHeight = 0;
   std::unordered_set<const Composition*> visitedCompositions = {};
+  std::vector<DiamondGradientInfo> diamondGradients = {};
 
   std::string nextId(const std::string& prefix) {
     return prefix + std::to_string(_id++);
@@ -170,6 +181,8 @@ class HTMLWriter {
               bool hasTrim, bool hasMerge);
   void renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* fill, float alpha,
                     BlendMode painterBlend);
+  void renderDiamondCanvas(HTMLBuilder& out, const GeoInfo& geo, const Fill* fill, float alpha,
+                           BlendMode painterBlend);
   void renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
                  const Stroke* stroke, float alpha, BlendMode painterBlend,
                  const TrimPath* trim = nullptr, MergePathMode mergeMode = MergePathMode::Append);
