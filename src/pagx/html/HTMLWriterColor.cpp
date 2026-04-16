@@ -120,16 +120,30 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha) {
                FloatToString(c.x) + "px " + FloatToString(c.y) + "px," + CSSStops(g->colorStops) +
                ")";
       }
-      // Partial sweep: map stop offsets to explicit angle positions
+      // Partial sweep: use absolute CSS angles (PAGX angle + 90°) without 'from' keyword.
+      // Native clamp behavior (PAGX coordinate, 0°=right):
+      //   0° → startAngle: first stop color (clamp t=0)
+      //   startAngle → endAngle: gradient
+      //   endAngle → 360°: last stop color (clamp t=1)
+      // CSS 0° is top (12 o'clock), so CSS 0°→90° (12→3 o'clock) maps to PAGX 270°→360°,
+      // which is in the endAngle→360° clamp region, filled with lastColor.
+      float cssOrigin = 90.0f + matRotation;
+      float cssEndAng = g->endAngle + 90.0f + matRotation;
+      std::string firstColor =
+          g->colorStops.empty() ? "transparent" : ColorToRGBA(g->colorStops.front()->color);
+      std::string lastColor =
+          g->colorStops.empty() ? "transparent" : ColorToRGBA(g->colorStops.back()->color);
       std::string stops;
+      stops += lastColor + " " + FloatToString(cssOrigin) + "deg";
+      stops += "," + firstColor + " " + FloatToString(cssOrigin) + "deg";
+      stops += "," + firstColor + " " + FloatToString(cssStartAng) + "deg";
       for (size_t i = 0; i < g->colorStops.size(); i++) {
-        if (i > 0) {
-          stops += ',';
-        }
+        stops += ',';
         stops += ColorToRGBA(g->colorStops[i]->color);
         float angle = cssStartAng + g->colorStops[i]->offset * sweepRange;
         stops += ' ' + FloatToString(angle) + "deg";
       }
+      stops += "," + lastColor + " " + FloatToString(cssEndAng) + "deg";
       return "conic-gradient(at " + FloatToString(c.x) + "px " + FloatToString(c.y) + "px," +
              stops + ")";
     }
