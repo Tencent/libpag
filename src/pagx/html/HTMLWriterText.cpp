@@ -1269,6 +1269,39 @@ float HTMLWriter::computeGeoPathLength(const GeoInfo& geo) {
   }
 }
 
+bool HTMLWriter::isContinuousTrimVisible(const TrimPath* trim,
+                                         const std::vector<float>& pathLengths, float totalLength,
+                                         size_t geoIndex) {
+  if (!trim || trim->type != TrimType::Continuous || totalLength <= 0.0f ||
+      geoIndex >= pathLengths.size()) {
+    return true;
+  }
+  float shapeStart = 0.0f;
+  for (size_t i = 0; i < geoIndex; i++) {
+    shapeStart += pathLengths[i];
+  }
+  float shapeLength = pathLengths[geoIndex];
+  if (shapeLength <= 0.0f) {
+    return false;
+  }
+  float shapeEnd = shapeStart + shapeLength;
+  float offsetFrac = trim->offset / 360.0f;
+  float start = trim->start + offsetFrac;
+  float end = trim->end + offsetFrac;
+  float shift = std::floor(start);
+  start -= shift;
+  end -= shift;
+  float trimStart = start * totalLength;
+  float trimEnd = end * totalLength;
+  if (trimEnd <= totalLength) {
+    return trimStart < shapeEnd && trimEnd > shapeStart;
+  }
+  float seg1End = totalLength;
+  float seg2End = trimEnd - totalLength;
+  return (trimStart < shapeEnd && seg1End > shapeStart) ||
+         (0.0f < shapeEnd && seg2End > shapeStart);
+}
+
 void HTMLWriter::applyTrimAttrsContinuous(HTMLBuilder& builder, const TrimPath* trim,
                                           const std::vector<float>& pathLengths, float totalLength,
                                           size_t geoIndex) {

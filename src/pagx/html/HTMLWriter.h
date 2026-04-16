@@ -220,6 +220,8 @@ class HTMLWriter {
   void applyTrimAttrsContinuous(HTMLBuilder& builder, const TrimPath* trim,
                                 const std::vector<float>& pathLengths, float totalLength,
                                 size_t geoIndex);
+  bool isContinuousTrimVisible(const TrimPath* trim, const std::vector<float>& pathLengths,
+                               float totalLength, size_t geoIndex);
   float computeGeoPathLength(const GeoInfo& geo);
 
   // Filter defs

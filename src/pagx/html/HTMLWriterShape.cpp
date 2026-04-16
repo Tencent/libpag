@@ -1576,6 +1576,9 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
 
   for (size_t geoIdx = 0; geoIdx < geos.size(); geoIdx++) {
     auto& g = geos[geoIdx];
+    if (isContinuousTrim && !isContinuousTrimVisible(trim, pathLengths, totalPathLength, geoIdx)) {
+      continue;
+    }
     if (!g.modifiedPathData.empty()) {
       out.openTag("path");
       out.addAttr("d", g.modifiedPathData);
