@@ -1101,8 +1101,7 @@ static void DetectHighPathComplexity(const Path* path, std::vector<VerifyDiagnos
     return;
   }
   auto verbCount = path->data->verbs().size();
-  // Single-contour paths cannot be split without creating visible seams, so skip the warning.
-  if (verbCount > 500 && !PAGXAnalyzer::IsSingleContourPath(path->data)) {
+  if (verbCount > 500) {
     AddDiagnostic(diagnostics, path->sourceLine,
                   "Path with " + std::to_string(verbCount) +
                       " verbs (> 500), may cause slow rendering. "
