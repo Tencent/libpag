@@ -940,10 +940,6 @@ static void DetectIneffectiveLayoutAttrs(const Layer* layer, bool parentHasLayou
 // Static Detection: Downgradable Layers
 // ============================================================================
 
-static bool CanDowngradeLayerToGroup(const Layer* layer) {
-  return layer->children.empty() && pagx::cli::IsLayerShell(layer);
-}
-
 static void DetectDowngradableLayers(const Layer* parentLayer,
                                      std::vector<VerifyDiagnostic>& diagnostics) {
   if (parentLayer->layout != LayoutMode::None) {
@@ -988,7 +984,7 @@ static void DetectMergeableAdjacentLayers(const std::vector<Layer*>& layers, boo
   if (dedupWithDowngrade) {
     bool allDowngradable = true;
     for (auto* layer : layers) {
-      if (!CanDowngradeLayerToGroup(layer)) {
+      if (!PAGXAnalyzer::CanDowngradeLayerToGroup(layer)) {
         allDowngradable = false;
         break;
       }
@@ -999,12 +995,12 @@ static void DetectMergeableAdjacentLayers(const std::vector<Layer*>& layers, boo
   }
   size_t runStart = 0;
   while (runStart < layers.size()) {
-    if (!CanDowngradeLayerToGroup(layers[runStart])) {
+    if (!PAGXAnalyzer::CanDowngradeLayerToGroup(layers[runStart])) {
       runStart++;
       continue;
     }
     auto runEnd = runStart + 1;
-    while (runEnd < layers.size() && CanDowngradeLayerToGroup(layers[runEnd])) {
+    while (runEnd < layers.size() && PAGXAnalyzer::CanDowngradeLayerToGroup(layers[runEnd])) {
       runEnd++;
     }
     if (runEnd - runStart >= 2) {

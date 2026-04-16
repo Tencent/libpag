@@ -24,6 +24,7 @@
 #include "base/utils/MathUtil.h"
 #include "cli/CliUtils.h"
 #include "cli/CommandImport.h"
+#include "pagx/PAGXAnalyzer.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/PAGXOptimizer.h"
@@ -158,8 +159,8 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
   // element layers. Otherwise, keep the wrapper itself.
   std::vector<Layer*> elementLayers;
   for (auto* svgLayer : svgDoc->layers) {
-    bool isPlainWrapper =
-        IsLayerShell(svgLayer) && svgLayer->contents.empty() && !svgLayer->children.empty();
+    bool isPlainWrapper = PAGXAnalyzer::IsLayerShell(svgLayer) && svgLayer->contents.empty() &&
+                          !svgLayer->children.empty();
     if (isPlainWrapper) {
       for (auto* child : svgLayer->children) {
         elementLayers.push_back(child);
@@ -178,11 +179,11 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
   bool canDowngradeAll = false;
   if (elementLayers.size() == 1) {
     auto* single = elementLayers[0];
-    canUnpack = IsLayerShell(single) && single->children.empty();
+    canUnpack = PAGXAnalyzer::IsLayerShell(single) && single->children.empty();
   } else if (elementLayers.size() > 1) {
     canDowngradeAll = true;
     for (auto* el : elementLayers) {
-      if (!el->children.empty() || HasLayerOnlyFeatures(el)) {
+      if (!el->children.empty() || PAGXAnalyzer::HasLayerOnlyFeatures(el)) {
         canDowngradeAll = false;
         break;
       }

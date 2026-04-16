@@ -41,6 +41,21 @@ class PAGXAnalyzer {
  public:
   static bool IsEmptyLayer(const Layer* layer, bool parentHasLayout);
   static bool IsEmptyGroup(const Group* group);
+
+  /**
+   * Returns true if the Layer uses any feature that Group does not support (e.g. blendMode, styles,
+   * filters, mask, 3D transforms, container layout, composition, alpha with offscreen semantics).
+   * Does NOT check contents or children, nor attributes transferable to a Group.
+   */
+  static bool HasLayerOnlyFeatures(const Layer* layer);
+
+  /**
+   * Returns true if the Layer is a plain shell with all attributes at default values. Stricter than
+   * HasLayerOnlyFeatures: also requires transferable attributes (x/y, matrix, size, padding,
+   * constraints) to be default. Does NOT check contents.
+   */
+  static bool IsLayerShell(const Layer* layer);
+
   static bool CanDowngradeLayerToGroup(const Layer* layer);
   static bool HasDefaultGroupTransform(const Group* group);
   static bool CanUnwrapFirstChildGroup(const Group* group);

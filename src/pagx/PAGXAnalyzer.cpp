@@ -51,40 +51,101 @@ bool PAGXAnalyzer::IsEmptyGroup(const Group* group) {
   return !hasSizeDependentConstraint;
 }
 
-bool PAGXAnalyzer::CanDowngradeLayerToGroup(const Layer* layer) {
-  if (!layer->children.empty() || !layer->styles.empty() || !layer->filters.empty()) {
-    return false;
-  }
-  if (layer->mask != nullptr || layer->composition != nullptr) {
-    return false;
-  }
-  if (layer->blendMode != BlendMode::Normal || !layer->visible || layer->hasScrollRect) {
-    return false;
-  }
-  if (!layer->matrix.isIdentity() || !layer->matrix3D.isIdentity()) {
-    return false;
-  }
-  if (layer->preserve3D || !layer->groupOpacity || !layer->passThroughBackground ||
-      !layer->antiAlias) {
-    return false;
-  }
+bool PAGXAnalyzer::HasLayerOnlyFeatures(const Layer* layer) {
   if (!layer->id.empty() || !layer->name.empty()) {
+    return true;
+  }
+  if (!layer->visible) {
+    return true;
+  }
+  if (layer->alpha != 1.0f) {
+    return true;
+  }
+  if (layer->blendMode != BlendMode::Normal) {
+    return true;
+  }
+  if (!layer->matrix3D.isIdentity()) {
+    return true;
+  }
+  if (layer->preserve3D) {
+    return true;
+  }
+  if (!layer->antiAlias) {
+    return true;
+  }
+  if (!layer->groupOpacity) {
+    return true;
+  }
+  if (!layer->passThroughBackground) {
+    return true;
+  }
+  if (layer->hasScrollRect) {
+    return true;
+  }
+  if (layer->clipToBounds) {
+    return true;
+  }
+  if (layer->mask != nullptr) {
+    return true;
+  }
+  if (layer->maskType != MaskType::Alpha) {
+    return true;
+  }
+  if (layer->composition != nullptr) {
+    return true;
+  }
+  if (!layer->styles.empty()) {
+    return true;
+  }
+  if (!layer->filters.empty()) {
+    return true;
+  }
+  if (layer->layout != LayoutMode::None) {
+    return true;
+  }
+  if (layer->gap != 0.0f) {
+    return true;
+  }
+  if (layer->flex != 0.0f) {
+    return true;
+  }
+  if (layer->alignment != Alignment::Stretch) {
+    return true;
+  }
+  if (layer->arrangement != Arrangement::Start) {
+    return true;
+  }
+  if (!layer->includeInLayout) {
+    return true;
+  }
+  return false;
+}
+
+bool PAGXAnalyzer::IsLayerShell(const Layer* layer) {
+  if (HasLayerOnlyFeatures(layer)) {
     return false;
   }
-  if (layer->layout != LayoutMode::None || layer->flex > 0) {
+  if (layer->x != 0.0f || layer->y != 0.0f) {
+    return false;
+  }
+  if (!layer->matrix.isIdentity()) {
     return false;
   }
   if (!std::isnan(layer->width) || !std::isnan(layer->height)) {
+    return false;
+  }
+  if (!layer->padding.isZero()) {
     return false;
   }
   if (!std::isnan(layer->left) || !std::isnan(layer->right) || !std::isnan(layer->top) ||
       !std::isnan(layer->bottom) || !std::isnan(layer->centerX) || !std::isnan(layer->centerY)) {
     return false;
   }
-  if (layer->alpha != 1.0f) {
-    return false;
-  }
-  return layer->includeInLayout;
+  return true;
+}
+
+bool PAGXAnalyzer::CanDowngradeLayerToGroup(const Layer* layer) {
+  return layer->children.empty() && IsLayerShell(layer);
 }
 
 bool PAGXAnalyzer::HasDefaultGroupTransform(const Group* group) {
