@@ -1240,17 +1240,14 @@ float HTMLWriter::computeGeoPathLength(const GeoInfo& geo) {
       if (r->roundness <= 0) {
         return 2 * (r->size.width + r->size.height);
       }
-      float rn = std::min(r->roundness, std::min(r->size.width / 2, r->size.height / 2));
-      float straightLen = 2 * (r->size.width + r->size.height - 4 * rn);
-      float arcLen = 2 * static_cast<float>(M_PI) * rn;
-      return straightLen + arcLen;
+      PathData pathData = PathDataFromSVGString("");
+      GeoToPathData(geo.element, geo.type, pathData);
+      return ComputePathLength(pathData);
     }
     case NodeType::Ellipse: {
-      auto e = static_cast<const Ellipse*>(geo.element);
-      float rx = e->size.width / 2;
-      float ry = e->size.height / 2;
-      float h = ((rx - ry) * (rx - ry)) / ((rx + ry) * (rx + ry));
-      return static_cast<float>(M_PI) * (rx + ry) * (1 + 3 * h / (10 + std::sqrt(4 - 3 * h)));
+      PathData pathData = PathDataFromSVGString("");
+      GeoToPathData(geo.element, geo.type, pathData);
+      return ComputePathLength(pathData);
     }
     case NodeType::Path: {
       auto p = static_cast<const Path*>(geo.element);
