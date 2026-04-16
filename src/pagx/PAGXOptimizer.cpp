@@ -298,8 +298,7 @@ struct ContourInfo {
 };
 
 static bool BoundsOverlap(const Rect& a, const Rect& b) {
-  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height &&
-         b.y < a.y + a.height;
+  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 }
 
 static size_t UnionFind(std::vector<size_t>& parent, size_t x) {
