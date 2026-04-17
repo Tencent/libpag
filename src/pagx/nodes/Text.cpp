@@ -69,6 +69,8 @@ void Text::setLayoutSize(LayoutContext* context, float width, float height) {
     glyphData->layoutRuns = result.extractLayoutRuns(this);
     textBounds = result.bounds;
   }
+  // Use mathematically scaled dimensions instead of textBounds from re-typesetting, because font
+  // hinting may cause slight differences. renderPosition() compensates via centering.
   layoutWidth = measuredWidth * scale;
   layoutHeight = measuredHeight * scale;
 }
