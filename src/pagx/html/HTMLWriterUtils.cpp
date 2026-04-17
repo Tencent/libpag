@@ -188,11 +188,9 @@ std::string LayerTransformCSS(const Layer* layer) {
   if (!layer->matrix3D.isIdentity()) {
     return Matrix3DToCSS(layer->matrix3D);
   }
-  // x/y translation is combined with matrix: Translate(x,y) * matrix.
+  // x/y are input attributes resolved via Layer::renderPosition(); they are emitted as
+  // left/top by the caller and must not be baked into the transform matrix here.
   Matrix m = layer->matrix;
-  if (!FloatNearlyZero(layer->x) || !FloatNearlyZero(layer->y)) {
-    m = Matrix::Translate(layer->x, layer->y) * m;
-  }
   if (m.isIdentity()) {
     return {};
   }

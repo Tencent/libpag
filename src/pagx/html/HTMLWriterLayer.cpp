@@ -698,9 +698,15 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     }
   } else {
     style += "position:absolute";
+    auto renderPos = layer->renderPosition();
     std::string transform = LayerTransformCSS(layer);
-    if (!transform.empty()) {
+    if (!FloatNearlyZero(renderPos.x) || !FloatNearlyZero(renderPos.y)) {
+      style +=
+          ";left:" + FloatToString(renderPos.x) + "px;top:" + FloatToString(renderPos.y) + "px";
+    } else if (!transform.empty()) {
       style += ";left:0;top:0";
+    }
+    if (!transform.empty()) {
       style += ";transform:" + transform;
       style += ";transform-origin:0 0";
     }
