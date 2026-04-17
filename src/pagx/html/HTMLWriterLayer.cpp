@@ -502,6 +502,9 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           curStroke = nullptr;
           hasTrim = false;
           curTrim = nullptr;
+          auto savedGeos = std::move(geos);
+          geos.clear();
+          std::vector<GeoInfo> groupGeos;
           Matrix gm = BuildGroupMatrix(group);
           for (auto* ge : group->elements) {
             auto gt = ge->nodeType();
@@ -512,10 +515,14 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               if (!pathData.isEmpty()) {
                 std::string svgPath = gm.isIdentity() ? PathDataToSVGString(pathData)
                                                       : TransformPathDataToSVG(pathData, gm);
-                geos.push_back({gt, ge, svgPath});
+                GeoInfo info = {gt, ge, svgPath};
+                geos.push_back(info);
+                groupGeos.push_back(info);
               }
             } else if (gt == NodeType::Text) {
-              geos.push_back({gt, ge, {}});
+              GeoInfo info = {gt, ge, {}};
+              geos.push_back(info);
+              groupGeos.push_back(info);
             } else if (gt == NodeType::Fill) {
               auto fill = static_cast<const Fill*>(ge);
               curFill = fill;
@@ -545,6 +552,8 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           curStroke = savedStroke;
           hasTrim = savedHasTrim;
           curTrim = savedTrim;
+          savedGeos.insert(savedGeos.end(), groupGeos.begin(), groupGeos.end());
+          geos = std::move(savedGeos);
         }
         break;
       }
