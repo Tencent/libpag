@@ -19,9 +19,10 @@
 #include "PAGWindow.h"
 #include <QQmlContext>
 #include <QSettings>
-#include "PAGRenderThread.h"
+#include "ContentViewModel.h"
 #include "PAGViewer.h"
 #include "PAGWindowHelper.h"
+#include "RenderThread.h"
 #include "profiling/PAGRunTimeDataModel.h"
 #include "task/PAGTaskFactory.h"
 
@@ -33,7 +34,10 @@ PAGWindow::PAGWindow(QObject* parent) : QObject(parent) {
 }
 
 void PAGWindow::openFile(QString path) {
-  bool result = pagView->setFile(path);
+  if (contentView == nullptr) {
+    return;
+  }
+  bool result = contentView->getViewModel()->loadFile(path);
   if (!result) {
     return;
   }
@@ -44,6 +48,100 @@ void PAGWindow::openFile(QString path) {
 
 void PAGWindow::onPAGViewerDestroyed() {
   Q_EMIT destroyWindow(this);
+}
+
+void PAGWindow::notifyContentViewChanged(ContentView* newContentView) {
+  if (newContentView == contentView) {
+    return;
+  }
+  disconnectContentViewSignals();
+  contentView = newContentView;
+  connectContentViewSignals();
+}
+
+void PAGWindow::disconnectContentViewSignals() {
+  if (contentView == nullptr) {
+    return;
+  }
+  auto* viewModel = contentView->getViewModel();
+  auto* hostWindow = contentView->window();
+  auto* taskFactory = hostWindow ? hostWindow->findChild<PAGTaskFactory*>("taskFactory") : nullptr;
+  if (taskFactory) {
+    disconnect(viewModel, &ContentViewModel::filePathChanged, taskFactory,
+               &PAGTaskFactory::setFilePath);
+  }
+  if (auto* pagVM = qobject_cast<PAGViewModel*>(viewModel)) {
+    disconnect(pagVM, &PAGViewModel::fileChanged, treeViewModel.get(), &PAGTreeViewModel::setFile);
+    disconnect(pagVM, &PAGViewModel::pagFileChanged, editAttributeModel.get(),
+               &PAGEditAttributeModel::setPAGFile);
+    disconnect(pagVM, &PAGViewModel::pagFileChanged, runTimeDataModel.get(),
+               &PAGRunTimeDataModel::setPAGFile);
+    disconnect(pagVM, &PAGViewModel::pagFileChanged, textLayerModel.get(),
+               &PAGTextLayerModel::setPAGFile);
+    disconnect(pagVM, &PAGViewModel::pagFileChanged, imageLayerModel.get(),
+               &PAGImageLayerModel::setPAGFile);
+  } else if (auto* pagxVM = qobject_cast<PAGXViewModel*>(viewModel)) {
+    disconnect(pagxVM, &PAGXViewModel::pagxDocumentChanged, treeViewModel.get(),
+               &PAGTreeViewModel::setPAGXDocument);
+    disconnect(pagxVM, &PAGXViewModel::pagxDocumentChanged, runTimeDataModel.get(),
+               &PAGRunTimeDataModel::setPAGXDocument);
+  }
+
+  auto* renderThread = contentView->getRenderThread();
+  if (renderThread != nullptr) {
+    disconnect(textLayerModel.get(), &PAGTextLayerModel::textChanged, renderThread,
+               &RenderThread::flush);
+    disconnect(imageLayerModel.get(), &PAGImageLayerModel::imageChanged, renderThread,
+               &RenderThread::flush);
+    disconnect(renderThread, &RenderThread::renderMetricsReady, runTimeDataModel.get(),
+               &PAGRunTimeDataModel::updateMetrics);
+  }
+  if (hostWindow) {
+    disconnect(hostWindow, &QQuickWindow::afterRendering, contentView, &ContentView::flush);
+  }
+}
+
+void PAGWindow::connectContentViewSignals() {
+  if (contentView == nullptr) {
+    return;
+  }
+  auto* viewModel = contentView->getViewModel();
+  auto* hostWindow = contentView->window();
+  auto* taskFactory = hostWindow ? hostWindow->findChild<PAGTaskFactory*>("taskFactory") : nullptr;
+  if (taskFactory) {
+    connect(viewModel, &ContentViewModel::filePathChanged, taskFactory,
+            &PAGTaskFactory::setFilePath);
+  }
+  if (auto* pagVM = qobject_cast<PAGViewModel*>(viewModel)) {
+    connect(pagVM, &PAGViewModel::fileChanged, treeViewModel.get(), &PAGTreeViewModel::setFile,
+            Qt::QueuedConnection);
+    connect(pagVM, &PAGViewModel::pagFileChanged, editAttributeModel.get(),
+            &PAGEditAttributeModel::setPAGFile);
+    connect(pagVM, &PAGViewModel::pagFileChanged, runTimeDataModel.get(),
+            &PAGRunTimeDataModel::setPAGFile);
+    connect(pagVM, &PAGViewModel::pagFileChanged, textLayerModel.get(),
+            &PAGTextLayerModel::setPAGFile);
+    connect(pagVM, &PAGViewModel::pagFileChanged, imageLayerModel.get(),
+            &PAGImageLayerModel::setPAGFile);
+  } else if (auto* pagxVM = qobject_cast<PAGXViewModel*>(viewModel)) {
+    connect(pagxVM, &PAGXViewModel::pagxDocumentChanged, treeViewModel.get(),
+            &PAGTreeViewModel::setPAGXDocument, Qt::QueuedConnection);
+    connect(pagxVM, &PAGXViewModel::pagxDocumentChanged, runTimeDataModel.get(),
+            &PAGRunTimeDataModel::setPAGXDocument);
+  }
+
+  auto* renderThread = contentView->getRenderThread();
+  if (renderThread != nullptr) {
+    connect(textLayerModel.get(), &PAGTextLayerModel::textChanged, renderThread,
+            &RenderThread::flush);
+    connect(imageLayerModel.get(), &PAGImageLayerModel::imageChanged, renderThread,
+            &RenderThread::flush);
+    connect(renderThread, &RenderThread::renderMetricsReady, runTimeDataModel.get(),
+            &PAGRunTimeDataModel::updateMetrics);
+  }
+  if (hostWindow) {
+    connect(hostWindow, &QQuickWindow::afterRendering, contentView, &ContentView::flush);
+  }
 }
 
 void PAGWindow::open() {
@@ -64,6 +162,7 @@ void PAGWindow::open() {
 
   auto context = engine->rootContext();
   context->setContextProperty("windowHelper", windowHelper.get());
+  context->setContextProperty("pagWindow", this);
   context->setContextProperty("treeViewModel", treeViewModel.get());
   context->setContextProperty("runTimeDataModel", runTimeDataModel.get());
   context->setContextProperty("editAttributeModel", editAttributeModel.get());
@@ -74,7 +173,6 @@ void PAGWindow::open() {
   auto viewer = static_cast<PAGViewer*>(qApp);
   context->setContextProperty("checkUpdateModel", viewer->getCheckUpdateModel());
 
-  // Image Provider will be managed by QML
   auto imageProvider = new PAGImageProvider();
   imageProvider->setImageLayerModel(imageLayerModel.get());
   engine->addImageProvider(QLatin1String("PAGImageProvider"), imageProvider);
@@ -88,28 +186,12 @@ void PAGWindow::open() {
   surfaceFormat.setSwapInterval(1);
   window->setFormat(surfaceFormat);
 
-  pagView = window->findChild<pag::PAGView*>("pagView");
-  auto* taskFactory = window->findChild<PAGTaskFactory*>("taskFactory");
-  PAGRenderThread* renderThread = pagView->getRenderThread();
+  contentView = window->findChild<ContentView*>("contentView");
 
   connect(window, SIGNAL(closing(QQuickCloseEvent*)), this, SLOT(onPAGViewerDestroyed()),
           Qt::QueuedConnection);
-  connect(window, &QQuickWindow::afterRendering, pagView, &PAGView::flush);
-  connect(pagView, &PAGView::filePathChanged, taskFactory, &PAGTaskFactory::setFilePath);
-  connect(pagView, &PAGView::fileChanged, treeViewModel.get(), &PAGTreeViewModel::setFile);
-  connect(pagView, &PAGView::pagFileChanged, editAttributeModel.get(),
-          &PAGEditAttributeModel::setPAGFile);
-  connect(pagView, &PAGView::pagFileChanged, runTimeDataModel.get(),
-          &PAGRunTimeDataModel::setPAGFile);
-  connect(pagView, &PAGView::pagFileChanged, textLayerModel.get(), &PAGTextLayerModel::setPAGFile);
-  connect(textLayerModel.get(), &PAGTextLayerModel::textChanged, renderThread,
-          &PAGRenderThread::flush);
-  connect(pagView, &PAGView::pagFileChanged, imageLayerModel.get(),
-          &PAGImageLayerModel::setPAGFile);
-  connect(imageLayerModel.get(), &PAGImageLayerModel::imageChanged, renderThread,
-          &PAGRenderThread::flush);
-  connect(renderThread, &PAGRenderThread::frameTimeMetricsReady, runTimeDataModel.get(),
-          &PAGRunTimeDataModel::updateData);
+
+  connectContentViewSignals();
 }
 
 bool PAGWindow::isUseEnglish() {

@@ -29,7 +29,6 @@
 #include "cli/CliUtils.h"
 #include "cli/XPathQuery.h"
 #include "pagx/FontConfig.h"
-#include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Node.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/core/Bitmap.h"
@@ -235,43 +234,18 @@ static bool WriteDataToFile(const std::string& filePath, const std::shared_ptr<t
 }
 
 static tgfx::Bitmap RenderCore(const RenderOptions& options) {
-  auto document = PAGXImporter::FromFile(options.inputFile);
+  auto document = LoadDocument(options.inputFile, "pagx render");
   if (document == nullptr) {
-    std::cerr << "pagx render: failed to load '" << options.inputFile << "'\n";
     return {};
   }
-  if (!document->errors.empty()) {
-    for (auto& error : document->errors) {
-      std::cerr << "pagx render: warning: " << error << "\n";
-    }
-  }
   if (document->hasUnresolvedImports()) {
-    std::cerr
-        << "pagx render: error: unresolved <Import> node, run 'pagx import --resolve' first\n";
+    std::cerr << "pagx render: error: unresolved import directive, run 'pagx resolve' first\n";
     return {};
   }
 
   FontConfig fontConfig = {};
-  for (const auto& fontFile : options.fontFiles) {
-    auto typeface = tgfx::Typeface::MakeFromPath(fontFile);
-    if (typeface == nullptr) {
-      std::cerr << "pagx render: failed to load font '" << fontFile << "'\n";
-      return {};
-    }
-    fontConfig.registerTypeface(typeface);
-  }
-  std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces = {};
-  for (const auto& fallbackStr : options.fallbacks) {
-    auto typeface = ResolveFallbackTypeface(fallbackStr);
-    if (typeface == nullptr) {
-      std::cerr << "pagx render: fallback font '" << fallbackStr << "' not found\n";
-      return {};
-    }
-    fontConfig.registerTypeface(typeface);
-    fallbackTypefaces.push_back(typeface);
-  }
-  if (!fallbackTypefaces.empty()) {
-    fontConfig.addFallbackTypefaces(std::move(fallbackTypefaces));
+  if (!LoadFontConfig(&fontConfig, options.fontFiles, options.fallbacks, "pagx render")) {
+    return {};
   }
   document->applyLayout(&fontConfig);
   bool hasTarget = !options.id.empty() || !options.xpath.empty();

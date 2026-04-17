@@ -196,14 +196,7 @@ enum class NodeType {
   /**
    * A precomposed glyph run for text rendering.
    */
-  GlyphRun,
-
-  // Build Directives
-  /**
-   * A build directive that embeds external content (e.g., SVG) into a PAGX file. Must be resolved
-   * into native PAGX nodes by `pagx import --resolve` before layout or rendering.
-   */
-  Import
+  GlyphRun
 };
 
 /**
@@ -233,23 +226,6 @@ class Node {
    * PAGXImporter during parsing.
    */
   int sourceLine = -1;
-
-  /**
-   * Returns true if the given key is a valid custom data key. A valid key contains only lowercase
-   * letters ('a'-'z'), digits ('0'-'9'), and hyphens ('-'), must not be empty, and must not end
-   * with a hyphen. The key should not include the "data-" prefix.
-   */
-  static bool IsValidCustomDataKey(const std::string& key) {
-    if (key.empty() || key.front() == '-' || key.back() == '-') {
-      return false;
-    }
-    for (auto c : key) {
-      if ((c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '-') {
-        return false;
-      }
-    }
-    return true;
-  }
 
   virtual ~Node() = default;
 

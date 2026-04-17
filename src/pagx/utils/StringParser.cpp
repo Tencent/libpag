@@ -396,6 +396,18 @@ std::string PaddingToString(const Padding& padding) {
          FloatToString(padding.bottom) + "," + FloatToString(padding.left);
 }
 
+bool IsValidCustomDataKey(const std::string& key) {
+  if (key.empty() || key.front() == '-' || key.back() == '-') {
+    return false;
+  }
+  for (auto c : key) {
+    if ((c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '-') {
+      return false;
+    }
+  }
+  return true;
+}
+
 #undef DEFINE_ENUM_CONVERSION
 
 }  // namespace pagx

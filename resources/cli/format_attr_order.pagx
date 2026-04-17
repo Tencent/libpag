@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="200" height="200">
+<pagx width="200" height="200">
   <Layer name="test" alpha="0.5">
     <Rectangle left="50" size="200,200"/>
     <Fill color="#336699"/>

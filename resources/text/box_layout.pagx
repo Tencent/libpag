@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="700" height="1200">
+<pagx width="700" height="1200">
   <!-- === Row 1: Basic box text layout === -->
 
   <!-- Box A: CJK auto word wrap -->
@@ -205,7 +205,7 @@
     <Text text="Line One&#10;Line Two&#10;Line Three" fontFamily="NotoSansSC" fontSize="24"/>
     <Fill/>
     <Group>
-<Ellipse left="-3" top="-3" size="6,6"/>
+      <Ellipse left="-3" top="-3" size="6,6"/>
       <Fill color="#F00"/>
     </Group>
   </Layer>
@@ -215,7 +215,7 @@
     <Text text="Center A&#10;Center BB&#10;Center CCC" fontFamily="NotoSansSC" fontSize="24" textAnchor="center"/>
     <Fill/>
     <Group>
-<Ellipse left="-3" top="-3" size="6,6"/>
+      <Ellipse left="-3" top="-3" size="6,6"/>
       <Fill color="#F00"/>
     </Group>
   </Layer>
@@ -225,7 +225,7 @@
     <Text text="End X&#10;End YY&#10;End ZZZ" fontFamily="NotoSansSC" fontSize="24" textAnchor="end"/>
     <Fill/>
     <Group>
-<Ellipse left="-3" top="-3" size="6,6"/>
+      <Ellipse left="-3" top="-3" size="6,6"/>
       <Fill color="#F00"/>
     </Group>
   </Layer>
@@ -241,7 +241,7 @@
       <Fill/>
     </TextBox>
     <Group>
-<Ellipse left="-3" top="-3" size="6,6"/>
+      <Ellipse left="-3" top="-3" size="6,6"/>
       <Fill color="#F00"/>
     </Group>
 

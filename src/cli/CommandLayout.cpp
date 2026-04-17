@@ -23,10 +23,10 @@
 #include <iostream>
 #include <sstream>
 #include <vector>
+#include "cli/CliUtils.h"
 #include "cli/FormatUtils.h"
 #include "cli/XPathQuery.h"
 #include "pagx/PAGXDocument.h"
-#include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LayoutNode.h"
@@ -211,6 +211,34 @@ static void PrintNodeXml(std::ostream& os, const CheckNode& node, int indent) {
 }
 
 // ============================================================================
+// Public API
+// ============================================================================
+
+std::string GenerateLayoutXml(const PAGXDocument* doc, const Layer* targetLayer) {
+  std::ostringstream oss;
+  oss << "<layout>\n";
+  if (targetLayer != nullptr) {
+    auto lb = targetLayer->layoutBounds();
+    auto node = BuildLayoutTree(targetLayer, -lb.x, -lb.y, 0, 0);
+    if (node) {
+      PrintNodeXml(oss, *node, 1);
+    }
+  } else {
+    oss << "  <pagx width=\"" << static_cast<int>(doc->width) << "\" height=\""
+        << static_cast<int>(doc->height) << "\">\n";
+    for (int i = 0; i < static_cast<int>(doc->layers.size()); ++i) {
+      auto node = BuildLayoutTree(doc->layers[i], 0, 0, i, 0);
+      if (node) {
+        PrintNodeXml(oss, *node, 2);
+      }
+    }
+    oss << "  </pagx>\n";
+  }
+  oss << "</layout>\n";
+  return oss.str();
+}
+
+// ============================================================================
 // Command
 // ============================================================================
 
@@ -218,7 +246,7 @@ static void PrintUsage() {
   std::cout << "Usage: pagx layout [options] <file.pagx>\n"
             << "\n"
             << "Display layout structure of a PAGX file in XML format. Outputs the full\n"
-            << "layout tree with bounds for all Layers and elements.\n"
+            << "layout tree with bounds (x,y,width,height) for all Layers and elements.\n"
             << "\n"
             << "Options:\n"
             << "  --id <id>             Limit scope to the Layer with the specified id\n"
@@ -275,17 +303,12 @@ int RunLayout(int argc, char* argv[]) {
     return rc == -1 ? 0 : rc;
   }
 
-  auto document = PAGXImporter::FromFile(opts.inputFile);
+  auto document = LoadDocument(opts.inputFile, "pagx layout");
   if (document == nullptr) {
-    std::cerr << "pagx layout: failed to load '" << opts.inputFile << "'\n";
     return 1;
   }
-  for (const auto& err : document->errors) {
-    std::cerr << "pagx layout: warning: " << err << "\n";
-  }
   if (document->hasUnresolvedImports()) {
-    std::cerr
-        << "pagx layout: error: unresolved <Import> node, run 'pagx import --resolve' first\n";
+    std::cerr << "pagx layout: error: unresolved import directive, run 'pagx resolve' first\n";
     return 1;
   }
 

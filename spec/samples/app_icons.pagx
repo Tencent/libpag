@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="640" height="520">
+<pagx width="640" height="520">
 
   <!-- Background: Gray 900 -->
   <Layer name="Background" left="320" top="260">
@@ -42,7 +42,7 @@
   <Layer name="IconGrid" width="640" height="520" layout="vertical" padding="50" arrangement="spaceBetween">
     <!-- Row 1 -->
     <Layer layout="horizontal" arrangement="spaceBetween">
-      <Layer name="Home" layout="vertical" gap="10"  alignment="center">
+      <Layer name="Home" layout="vertical" gap="10" alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
           <Layer centerX="0" centerY="0">
@@ -56,7 +56,7 @@
         </Layer>
       </Layer>
 
-      <Layer name="Search" layout="vertical" gap="10"  alignment="center">
+      <Layer name="Search" layout="vertical" gap="10" alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
           <Layer centerX="0" centerY="0">
@@ -74,7 +74,7 @@
         </Layer>
       </Layer>
 
-      <Layer name="Bell" layout="vertical" gap="10"  alignment="center">
+      <Layer name="Bell" layout="vertical" gap="10" alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
           <Layer centerX="0" centerY="0">
@@ -96,7 +96,7 @@
         </Layer>
       </Layer>
 
-      <Layer name="Heart" layout="vertical" gap="10"  alignment="center">
+      <Layer name="Heart" layout="vertical" gap="10" alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
           <Layer centerX="0" centerY="0">
@@ -113,12 +113,11 @@
 
     <!-- Row 2 -->
     <Layer layout="horizontal" arrangement="spaceBetween">
-      <Layer name="Chat" layout="vertical" gap="10"  alignment="center">
+      <Layer name="Chat" layout="vertical" gap="10" alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
           <Layer centerX="0" centerY="0">
-            <Path
-                data="M0 7C0 2 3 0 8 0L28 0C33 0 36 2 36 7L36 22C36 27 33 29 28 29L20 29L8 34L14 29L8 29C3 29 0 27 0 22Z"/>
+            <Path data="M0 7C0 2 3 0 8 0L28 0C33 0 36 2 36 7L36 22C36 27 33 29 28 29L20 29L8 34L14 29L8 29C3 29 0 27 0 22Z"/>
             <Fill color="#10B981"/>
             <Group>
               <Ellipse left="9" top="12" size="4,4"/>
@@ -134,7 +133,7 @@
         </Layer>
       </Layer>
 
-      <Layer name="Camera" layout="vertical" gap="10"  alignment="center">
+      <Layer name="Camera" layout="vertical" gap="10" alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
           <Layer centerX="0" centerY="0">
@@ -157,12 +156,11 @@
         </Layer>
       </Layer>
 
-      <Layer name="Settings" layout="vertical" gap="10"  alignment="center">
+      <Layer name="Settings" layout="vertical" gap="10" alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
           <Layer centerX="0" centerY="0">
-            <Path
-                data="M17 0L22.6 0L23.3 6.2L26.9 7.7L31.8 3.8L35.8 7.8L31.9 12.7L33.4 16.3L39.6 17L39.6 22.6L33.4 23.3L31.9 26.9L35.8 31.8L31.8 35.8L26.9 31.9L23.3 33.4L22.6 39.6L17 39.6L16.3 33.4L12.7 31.9L7.8 35.8L3.8 31.8L7.7 26.9L6.2 23.3L0 22.6L0 17L6.2 16.3L7.7 12.7L3.8 7.8L7.8 3.8L12.7 7.7L16.3 6.2Z"/>
+            <Path data="M17 0L22.6 0L23.3 6.2L26.9 7.7L31.8 3.8L35.8 7.8L31.9 12.7L33.4 16.3L39.6 17L39.6 22.6L33.4 23.3L31.9 26.9L35.8 31.8L31.8 35.8L26.9 31.9L23.3 33.4L22.6 39.6L17 39.6L16.3 33.4L12.7 31.9L7.8 35.8L3.8 31.8L7.7 26.9L6.2 23.3L0 22.6L0 17L6.2 16.3L7.7 12.7L3.8 7.8L7.8 3.8L12.7 7.7L16.3 6.2Z"/>
             <Fill color="#8B5CF6"/>
             <Group>
               <Ellipse left="12.8" top="12.8" size="14,14"/>
@@ -180,7 +178,7 @@
         </Layer>
       </Layer>
 
-      <Layer name="User" layout="vertical" gap="10"  alignment="center">
+      <Layer name="User" layout="vertical" gap="10" alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
           <Layer centerX="0" centerY="0">
@@ -202,7 +200,7 @@
 
     <!-- Row 3 -->
     <Layer layout="horizontal" arrangement="spaceBetween">
-      <Layer name="Calendar" layout="vertical" gap="10"  alignment="center">
+      <Layer name="Calendar" layout="vertical" gap="10" alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
           <Layer centerX="0" centerY="0">
@@ -214,7 +212,7 @@
               <Rectangle left="4" top="16" size="30,22" roundness="3"/>
               <Fill color="#1E2433"/>
             </Group>
-            <Group centerX="0" top="15">
+            <Group top="15" centerX="0">
               <Text text="17" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
               <Fill color="#EF4444"/>
             </Group>
@@ -226,7 +224,7 @@
         </Layer>
       </Layer>
 
-      <Layer name="Lock" layout="vertical" gap="10"  alignment="center">
+      <Layer name="Lock" layout="vertical" gap="10" alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
           <Layer centerX="0" centerY="0">
@@ -249,7 +247,7 @@
         </Layer>
       </Layer>
 
-      <Layer name="Music" layout="vertical" gap="10"  alignment="center">
+      <Layer name="Music" layout="vertical" gap="10" alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
           <Layer centerX="0" centerY="0">
@@ -268,7 +266,7 @@
         </Layer>
       </Layer>
 
-      <Layer name="Download" layout="vertical" gap="10"  alignment="center">
+      <Layer name="Download" layout="vertical" gap="10" alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
           <Layer centerX="0" centerY="0">

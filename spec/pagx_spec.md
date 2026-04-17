@@ -29,7 +29,7 @@ This specification is organized in the following order:
 - **Auto Layout**: Defines layout size, container layout, and constraint positioning mechanisms
 - **Layer System**: Defines layers and their related features (styles, filters, masks)
 - **VectorElement System**: Defines vector elements within layers and their processing model
-- **Build Directives**: Defines build-time preprocessing directives (Import)
+- **Import Directives**: Defines import directives for embedding external content (inline `<svg>` elements and the `import` attribute on Layer)
 
 **Appendices** (for quick reference):
 
@@ -266,7 +266,6 @@ PAGX uses a standard 2D Cartesian coordinate system:
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `version` | string | (required) | Format version |
 | `width` | float | (required) | Canvas width |
 | `height` | float | (required) | Canvas height |
 
@@ -582,7 +581,7 @@ All three child Layers have no `width` set and `flex="1"`, equally sharing avail
 | `layout` | LayoutMode | none | Container layout mode for child layer arrangement |
 | `gap` | float | 0 | Spacing between adjacent child Layers |
 | `flex` | float | 0 | Flex weight for main-axis sizing. When a child has no explicit main-axis size: `flex=0` (default) uses content-measured size; `flex>0` takes a proportional share of remaining space by weight. Ignored when explicit `width`/`height` is set on the main axis |
-| `padding` | float or "t,r,b,l" | 0 | Insets both the layout content area and the constraint reference frame for child Layers (VectorElements unaffected). Works with or without `layout`. Supports single value (uniform), two values (vertical,horizontal), four values (top,right,bottom,left), consistent with CSS shorthand |
+| `padding` | float or "t,r,b,l" | 0 | Insets the layout content area and the constraint reference frame for all contents (VectorElements and child Layers). Supports single value (uniform), two values (vertical,horizontal), four values (top,right,bottom,left), consistent with CSS shorthand |
 | `alignment` | Alignment | stretch | Cross-axis alignment |
 | `arrangement` | Arrangement | start | Main-axis arrangement |
 | `includeInLayout` | bool | true | Whether to participate in parent container layout; set to false to leave the layout flow |
@@ -629,11 +628,23 @@ Cross-axis: Uses explicit `width`/`height` if set; when the parent has `alignmen
 
 Content area is `width × height` minus `padding` on each side.
 
-#### Padding Without Container Layout
+#### Background with Padding
 
-When `padding` is set on a Layer without `layout`, it insets the constraint reference frame for every child Layer, including `includeInLayout="false"` overlays: `left="0"` aligns to the padding-inset left edge, `centerX="0"` centers within the inset area, and `left="0" right="0"` stretches to fill the inset width. VectorElements (Rectangle, Ellipse, Path, Text, etc.) are unaffected — their constraints always reference the full Layer bounds, allowing backgrounds to extend under the padding area. This is consistent with CSS, where padding defines the content box for positioned children while backgrounds extend to the padding edge.
+Since `padding` insets the constraint reference frame for all contents, a background Rectangle with `left="0" right="0" top="0" bottom="0"` inside a padded Layer will only fill the inset area, not the full Layer bounds. When a background needs to fill the entire Layer, use a two-layer structure: the outer Layer holds the background, and the inner layer carries `padding`:
 
-For content-measured Layers (no explicit `width`/`height`), padding is added to the measured size, so a Layer wrapping a 100×50 child Layer with `padding="20"` measures as 140×90.
+```xml
+<Layer width="300" height="200">
+  <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+  <Fill color="#FFF"/>
+  <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="8" padding="16">
+    <!-- content here -->
+  </Layer>
+</Layer>
+```
+
+Choose the inner container type based on need: use `Layer` when container layout (`layout`, `gap`, `alignment`, `arrangement`) is required; use `Group` for a lighter-weight container that only needs `padding` to inset VectorElements.
+
+For content-measured containers (no explicit `width`/`height`), padding is added to the measured size, so a Group wrapping a 100×50 Rectangle with `padding="20"` measures as 140×90.
 
 `gap`, `alignment`, and `arrangement` still require `layout` to take effect.
 
@@ -689,7 +700,7 @@ Constraint attributes allow content nodes to declare positional relationships wi
 
 **Combination rules**: On each axis, only one of the following may be used: a single-edge constraint (`left`, `right`, or `centerX`), or an opposite-edge pair (`left` + `right`). The vertical axis follows the same pattern (`top` / `bottom` / `centerY`, or `top` + `bottom`). If multiple combinations are set on the same axis, the engine resolves conflicts in this priority order: `centerX` > `left`+`right` > `left` > `right` (same for vertical axis: `centerY` > `top`+`bottom` > `top` > `bottom`). Lower-priority constraints are silently ignored.
 
-**Activation**: Constraint attributes reference the **immediate parent container** (Layer or Group)'s layout size, propagating level by level — each container resolves its own size first, then its children's constraints use that size as the reference frame. For **child Layers** inside a parent with `padding`, the reference frame is inset by the padding amount (see §4.2 "Padding Without Container Layout"). **VectorElements** always reference the full layout size regardless of padding. Since the engine automatically measures container sizes (see §4.1), constraints can generally always take effect. Different constraints have different levels of dependence on container size: `left`/`top` used alone have positioning formulas that do not involve container size (e.g., `tx = left - bounds.x`) and work correctly in any situation; `right`/`bottom`/`centerX`/`centerY` and opposite-edge constraints need to reference container size to calculate position.
+**Activation**: Constraint attributes reference the **immediate parent container** (Layer or Group)'s layout size, propagating level by level — each container resolves its own size first, then its children's constraints use that size as the reference frame. When the parent has `padding`, the reference frame is inset by the padding amount. Since the engine automatically measures container sizes (see §4.1), constraints can generally always take effect. Different constraints have different levels of dependence on container size: `left`/`top` used alone have positioning formulas that do not involve container size (e.g., `tx = left - bounds.x`) and work correctly in any situation; `right`/`bottom`/`centerX`/`centerY` and opposite-edge constraints need to reference container size to calculate position.
 
 **Content Bounds**: "Edges" in constraints refer to the edges of an element's content bounds. The starting point differs by element type:
 
@@ -1208,6 +1219,8 @@ Rectangles are defined from center point with uniform corner rounding support.
 | `roundness` | float | 0 | Corner radius |
 | `reversed` | bool | false | Reverse path direction |
 
+Rectangle supports all constraint attributes (see §4.1).
+
 **Calculation Rules**:
 ```
 rect.left   = position.x - size.width / 2
@@ -1239,6 +1252,8 @@ Ellipses are defined from center point.
 | `position` | Point | (center of bounding box) | Center point coordinate, computed from constraint attributes when set. When not set, defaults to `(size.width/2, size.height/2)`, placing the top-left corner at the origin. Prefer constraint attributes (`left`/`top`) for positioning |
 | `size` | Size | 0,0 | Dimensions "width,height" |
 | `reversed` | bool | false | Reverse path direction |
+
+Ellipse supports all constraint attributes (see §4.1).
 
 **Calculation Rules**:
 ```
@@ -1879,7 +1894,7 @@ As a container, TextBox processes its child Text elements and text modifiers (Te
 | `wordWrap` | bool | true | Enable automatic word wrapping at the box width boundary (horizontal mode) or height boundary (vertical mode). Has no effect when that dimension is NaN |
 | `overflow` | Overflow | visible | Overflow behavior when text exceeds the box height (horizontal mode) or width (vertical mode). Has no effect when that dimension is NaN |
 
-TextBox inherits all Group attributes (`position`, `anchor`, `rotation`, `scale`, `skew`, `skewAxis`, `alpha`) and constraint attributes. The `position` attribute specifies the top-left corner of the text area in the parent coordinate system. Prefer constraint attributes (`left`/`top`) for positioning — when constraints are set, `position` is computed automatically.
+TextBox inherits all Group attributes (`position`, `anchor`, `rotation`, `scale`, `skew`, `skewAxis`, `alpha`, `padding`) and constraint attributes (see §4.1). The `padding` attribute insets the text layout area and the constraint reference frame for non-Text child elements. The `position` attribute specifies the top-left corner of the text area in the parent coordinate system. Prefer constraint attributes (`left`/`top`) for positioning — when constraints are set, `position` is computed automatically.
 
 **TextAlign (Text Alignment)**:
 
@@ -2011,6 +2026,9 @@ Group is a VectorElement container with transform properties.
 | `alpha` | float | 1 | Opacity 0~1 |
 | `width` | float | - | Layout width (see §4) |
 | `height` | float | - | Layout height (see §4) |
+| `padding` | float or "t,r,b,l" | 0 | Insets the constraint reference frame for child elements. Supports single value (uniform), two values (vertical,horizontal), four values (top,right,bottom,left) |
+
+Group supports all constraint attributes (see §4.1).
 
 #### Transform Order
 
@@ -2074,81 +2092,79 @@ Since painters do not clear the geometry list, the same geometry can have multip
 
 ---
 
-## 7. Build Directives
+## 7. Import Directives
 
-Build directives are preprocessing instructions embedded in a PAGX file. They are **not
-rendered directly** — they must be resolved into native PAGX nodes by a build tool before
-the file can be rendered or validated.
+Import directives embed external content (currently SVG) into a PAGX file. They are **not
+rendered directly** — they must be resolved into native PAGX nodes by `pagx resolve`
+before the file can be rendered or validated.
 
-### 7.1 Import
+### 7.1 Inline SVG
 
-The `<Import>` element embeds external content (e.g., SVG) into a PAGX file. It appears
-inside a `<Layer>` at the VectorElement level and is resolved by `pagx import --resolve`
-into native PAGX nodes.
+A `<Layer>` may contain an `<svg>` element as a direct child. The parser reads only the
+`<svg>` root node and treats it as opaque external content — child nodes of `<svg>` are
+not expanded or validated as PAGX nodes.
+
+```xml
+<Layer id="shareIcon" centerX="0" centerY="0">
+  <svg viewBox="0 0 24 24">
+    <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8" fill="none"
+          stroke="#7F8C8D" stroke-width="1.5" stroke-linecap="round"/>
+    <polyline points="16,6 12,2 8,6" fill="none"
+             stroke="#7F8C8D" stroke-width="1.5" stroke-linecap="round"
+             stroke-linejoin="round"/>
+    <line x1="12" y1="2" x2="12" y2="15" fill="none"
+          stroke="#7F8C8D" stroke-width="1.5" stroke-linecap="round"/>
+  </svg>
+</Layer>
+```
+
+### 7.2 External Import
+
+The `import` attribute on a `<Layer>` references an external file to be imported. The format
+is inferred from the file extension. When the extension is ambiguous, the `importFormat`
+attribute can be used to explicitly specify the format.
 
 #### Attributes
 
 | Attribute | Type | Default | Required | Description |
 |-----------|------|---------|----------|-------------|
-| `source` | string | — | No | Path to external file, relative to the PAGX file. When omitted, content is provided inline as child elements. |
-| `format` | string | — | No | Force input format (e.g., `svg`). When omitted, inferred from child element tag name (inline) or `source` file extension (external). |
-
-#### Inline Mode
-
-When `source` is omitted, the `<Import>` element contains the external content as child
-elements. The format is inferred from the root child element's tag name (e.g., `<svg>`).
+| `import` | string | — | No | Path to an external file, relative to the PAGX file. |
+| `importFormat` | string | — | No | Force input format (e.g., `svg`). When omitted, inferred from the `import` file extension. |
 
 ```xml
-<Layer id="shareIcon" centerX="0" centerY="0">
-  <Import>
-    <svg viewBox="0 0 24 24">
-      <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8" fill="none"
-            stroke="#7F8C8D" stroke-width="1.5" stroke-linecap="round"/>
-      <polyline points="16,6 12,2 8,6" fill="none"
-               stroke="#7F8C8D" stroke-width="1.5" stroke-linecap="round"
-               stroke-linejoin="round"/>
-      <line x1="12" y1="2" x2="12" y2="15" fill="none"
-            stroke="#7F8C8D" stroke-width="1.5" stroke-linecap="round"/>
-    </svg>
-  </Import>
-</Layer>
-```
-
-#### External Mode
-
-When `source` is set, the `<Import>` element references an external file. The format is
-inferred from the file extension unless `format` is explicitly specified.
-
-```xml
-<Layer id="logoIcon" centerX="0" centerY="0">
-  <Import source="assets/logo.svg"/>
-</Layer>
+<Layer id="logoIcon" centerX="0" centerY="0" import="assets/logo.svg"/>
 
 <!-- Explicit format when extension is ambiguous -->
-<Layer id="icon" centerX="0" centerY="0">
-  <Import source="assets/drawing.xml" format="svg"/>
-</Layer>
+<Layer id="icon" centerX="0" centerY="0" import="assets/drawing.xml" importFormat="svg"/>
 ```
 
-#### Resolution
+### 7.3 Resolution
 
-The `pagx import --resolve` command processes all `<Import>` nodes in a PAGX file:
+The `pagx resolve` command processes all import directives in a PAGX file:
 
-1. For each `<Import>` node, reads the content (inline child elements or external file)
-2. Converts the content into native PAGX nodes (e.g., SVG elements become Rectangle,
+1. For each Layer with an inline `<svg>` child or an `import` attribute, reads the
+   content (inline element or external file)
+2. Converts the SVG content into native PAGX nodes (e.g., SVG elements become Rectangle,
    Ellipse, Path, Fill, Stroke, Group nodes)
-3. Replaces the `<Import>` element with the converted nodes
-4. Sets the parent Layer's `width` and `height` from the source dimensions (e.g., SVG
-   `viewBox` or `width`/`height` attributes)
+3. Replaces the `<svg>` element or removes the `import`/`importFormat` attributes, and
+   inserts the converted nodes as children of the Layer
+4. If the Layer has explicit `width` and `height`, content is uniformly scaled to fit
+   within those dimensions (centered, preserving aspect ratio). If the Layer has no explicit
+   size, sets `width` and `height` from the source dimensions (e.g., SVG `viewBox`
+   or `width`/`height` attributes)
+5. Inserts a comment in the Layer's children indicating the original source:
+   - Inline SVG: `<!-- Resolved from: inline svg -->`
+   - External file: `<!-- Resolved from: assets/logo.svg -->`
 
-After resolution, the file contains only native PAGX nodes — no `<Import>` elements remain.
+After resolution, the file contains only native PAGX nodes — no `<svg>` elements or
+`import` attributes remain.
 
 #### Tool Behavior
 
-Tools that process PAGX files report an error when encountering unresolved `<Import>` nodes:
+Tools that process PAGX files handle unresolved import directives as follows:
 
-- **`pagx verify`**: Automatically resolves all `<Import>` nodes before checking. If resolve fails, reports the error.
-- **`pagx render`**: Reports error — `unresolved <Import> node`, refuses to render.
+- **`pagx verify`**: Automatically resolves all imports before checking. If resolve fails, reports the error.
+- **`pagx render`**: Reports error — `unresolved import`, refuses to render.
 
 ---
 
@@ -2170,17 +2186,17 @@ This appendix describes node categorization and nesting rules.
 | **Geometry Elements** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` | Drawable shapes and text. Must be inside Layer/Group. |
 | **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `TextBox`, `Repeater` | Transform or combine geometry and text. |
 | **Painters** | `Fill`, `Stroke` | Apply color/gradient to geometry. Must be inside Layer/Group. |
-| **Build Directives** | `Import` | Build-time preprocessing directive. Resolved by `pagx import --resolve` into native PAGX nodes. Must be inside Layer. |
+| **Import Directives** | (inline `<svg>`, `import` attribute) | Import directives on Layer. Inline `<svg>` child elements and the `import`/`importFormat` attributes are resolved by `pagx resolve` into native PAGX nodes. |
 
 ### A.2 Document Containment
 
 The root element `<pagx>` **only accepts `<Layer>` and `<Resources>` as direct children**. Geometry elements, painters, and other elements must be nested inside a `<Layer>`.
 
 ```
-pagx (required attributes: version, width, height)
+pagx (required attributes: width, height)
 ├── Layer*                      ← Direct children MUST be Layer
 │   ├── VectorElement* (see A.3)
-│   ├── Import* (build directive, see §7)
+│   ├── <svg>* (import directive, see §7)
 │   ├── DropShadowStyle*
 │   ├── InnerShadowStyle*
 │   ├── BackgroundBlurStyle*
@@ -2233,9 +2249,10 @@ Layer / Group
 ├── TextPath
 ├── TextBox
 ├── Repeater
-├── Group* (recursive)
-└── Import (build directive, see §7)
+└── Group* (recursive)
 ```
+
+Additionally, `Layer` (but not `Group`) may contain `<svg>` as an import directive (see §7).
 
 ---
 

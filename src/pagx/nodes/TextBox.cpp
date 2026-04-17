@@ -44,23 +44,78 @@ void TextBox::onMeasure(LayoutContext* context) {
     preferredHeight = height;
     return;
   }
-  auto params = MakeTextLayoutParams(this, width, height);
+  bool hasPadding = !padding.isZero();
+  float boxW = width;
+  float boxH = height;
+  if (hasPadding) {
+    if (!std::isnan(boxW)) {
+      boxW = std::max(0.0f, boxW - padding.left - padding.right);
+    }
+    if (!std::isnan(boxH)) {
+      boxH = std::max(0.0f, boxH - padding.top - padding.bottom);
+    }
+  }
+  auto params = MakeTextLayoutParams(this, boxW, boxH);
   std::vector<Text*> childText = {};
   TextLayout::CollectTextElements(elements, childText);
   auto result = TextLayout::Layout(childText, params, context);
   preferredWidth = std::isnan(width) ? result.bounds.width : width;
   preferredHeight = std::isnan(height) ? result.bounds.height : height;
+  if (hasPadding) {
+    if (std::isnan(width)) {
+      preferredWidth += padding.left + padding.right;
+    }
+    if (std::isnan(height)) {
+      preferredHeight += padding.top + padding.bottom;
+    }
+  }
 }
 
-void TextBox::setLayoutSize(LayoutContext*, float width, float height) {
+void TextBox::setLayoutSize(LayoutContext* context, float width, float height) {
   layoutWidth = !std::isnan(width) ? width : preferredWidth;
   layoutHeight = !std::isnan(height) ? height : preferredHeight;
+  updateLayout(context);
+  // An axis is content-measured when neither the parent nor the element itself specifies its size.
+  bool widthFromContent = std::isnan(width) && std::isnan(this->width);
+  bool heightFromContent = std::isnan(height) && std::isnan(this->height);
+  // For TextBox, only a change in the wrap axis (width for horizontal, height for vertical)
+  // can affect the cross axis measurement. Re-typeset to compute the correct cross-axis size.
+  bool horizontal = (writingMode == WritingMode::Horizontal);
+  bool wrapAxisChanged = horizontal ? (!std::isnan(width) && width != preferredWidth)
+                                    : (!std::isnan(height) && height != preferredHeight);
+  bool crossAxisFromContent = horizontal ? heightFromContent : widthFromContent;
+  if (crossAxisFromContent && wrapAxisChanged) {
+    bool hasPadding = !padding.isZero();
+    float boxW =
+        hasPadding ? std::max(0.0f, layoutWidth - padding.left - padding.right) : layoutWidth;
+    float boxH =
+        hasPadding ? std::max(0.0f, layoutHeight - padding.top - padding.bottom) : layoutHeight;
+    auto params = MakeTextLayoutParams(this, boxW, boxH);
+    std::vector<Text*> childText = {};
+    TextLayout::CollectTextElements(elements, childText);
+    auto result = TextLayout::Layout(childText, params, context);
+    float crossSize = std::ceil(horizontal ? result.bounds.height : result.bounds.width);
+    if (hasPadding) {
+      crossSize += horizontal ? (padding.top + padding.bottom) : (padding.left + padding.right);
+    }
+    if (horizontal) {
+      layoutHeight = crossSize;
+    } else {
+      layoutWidth = crossSize;
+    }
+  }
 }
 
 void TextBox::updateLayout(LayoutContext* context) {
+  bool hasPadding = !padding.isZero();
+  float cw = hasPadding ? std::max(0.0f, layoutWidth - padding.left - padding.right) : layoutWidth;
+  float ch =
+      hasPadding ? std::max(0.0f, layoutHeight - padding.top - padding.bottom) : layoutHeight;
+  // Non-Text elements: constraint layout with padding.
   auto nodes = CollectLayoutNodes(elements, true);
-  PerformConstraintLayout(nodes, layoutWidth, layoutHeight, context);
-  auto params = MakeTextLayoutParams(this, layoutWidth, layoutHeight);
+  PerformConstraintLayout(nodes, layoutWidth, layoutHeight, padding, context);
+  // Text elements: typeset with inset bounds, then offset positions by padding.
+  auto params = MakeTextLayoutParams(this, cw, ch);
   std::vector<Text*> childText = {};
   TextLayout::CollectTextElements(elements, childText);
   auto result = TextLayout::Layout(childText, params, context);
@@ -68,6 +123,20 @@ void TextBox::updateLayout(LayoutContext* context) {
     childText[i]->textBounds = result.getTextBounds(childText[i]);
     childText[i]->glyphData->layoutRuns = result.extractLayoutRuns(childText[i]);
     childText[i]->glyphData->fontLineHeight = result.getFontLineHeight(childText[i]);
+    if (hasPadding) {
+      childText[i]->textBounds.x += padding.left;
+      childText[i]->textBounds.y += padding.top;
+      for (auto& run : childText[i]->glyphData->layoutRuns) {
+        for (auto& pos : run.positions) {
+          pos.x += padding.left;
+          pos.y += padding.top;
+        }
+        for (auto& xf : run.xforms) {
+          xf.tx += padding.left;
+          xf.ty += padding.top;
+        }
+      }
+    }
   }
 }
 

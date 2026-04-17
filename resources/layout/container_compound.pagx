@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Container layout: compound scenarios -->
-<pagx version="1.0" width="840" height="520">
+<pagx width="840" height="520">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -44,32 +44,36 @@
       </Layer>
 
       <!-- 3. Horizontal padding (two values: v,h) -->
-      <Layer width="180" height="220" layout="horizontal" gap="8" padding="10,20">
+      <Layer width="180" height="220">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        <Layer width="45">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-          <Fill color="#06B6D4"/>
-        </Layer>
-        <Layer width="45">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-          <Fill color="#0891B2"/>
+        <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="8" padding="10,20">
+          <Layer width="45">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Fill color="#06B6D4"/>
+          </Layer>
+          <Layer width="45">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Fill color="#0891B2"/>
+          </Layer>
         </Layer>
       </Layer>
 
       <!-- 4. Vertical padding (four values: t,r,b,l) -->
-      <Layer width="180" height="220" layout="vertical" gap="10" padding="10,15,20,25">
+      <Layer width="180" height="220">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        <Layer width="120" height="60">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-          <Fill color="#EC4899"/>
-        </Layer>
-        <Layer width="120" height="60">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-          <Fill color="#F472B6"/>
+        <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="10" padding="10,15,20,25">
+          <Layer width="120" height="60">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Fill color="#EC4899"/>
+          </Layer>
+          <Layer width="120" height="60">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Fill color="#F472B6"/>
+          </Layer>
         </Layer>
       </Layer>
 

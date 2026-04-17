@@ -22,7 +22,7 @@
 #include <filesystem>
 #include <fstream>
 #include <unordered_map>
-#include "cli/CommandImport.h"
+#include "cli/CommandResolve.h"
 #include "cli/CommandVerify.h"
 #include "pagx/FontConfig.h"
 #include "pagx/HTMLExporter.h"
@@ -92,7 +92,7 @@ static int CallRun(int (*fn)(int, char*[]), std::vector<std::string> args) {
 static std::shared_ptr<pagx::PAGXDocument> LoadAndResolve(const std::string& filePath) {
   auto doc = pagx::PAGXImporter::FromFile(filePath);
   if (doc && doc->hasUnresolvedImports()) {
-    CallRun(pagx::cli::RunImport, {"import", "--resolve", filePath});
+    CallRun(pagx::cli::RunResolve, {"resolve", filePath});
     doc = pagx::PAGXImporter::FromFile(filePath);
   }
   return doc;
@@ -648,6 +648,17 @@ static std::vector<std::pair<std::string, std::string>> ExtractMarkdownPatterns(
         if (pos != std::string::npos) {
           trimmed = trimmed.substr(pos);
         }
+        // Skip XML declaration if present
+        if (trimmed.substr(0, 5) == "<?xml") {
+          pos = trimmed.find('\n');
+          if (pos != std::string::npos) {
+            trimmed = trimmed.substr(pos + 1);
+            pos = trimmed.find_first_not_of(" \t\n\r");
+            if (pos != std::string::npos) {
+              trimmed = trimmed.substr(pos);
+            }
+          }
+        }
         if (trimmed.substr(0, 5) == "<pagx" && !currentTitle.empty()) {
           auto baseKey = TitleToKey(currentTitle);
           auto count = ++keyCounts[baseKey];
@@ -1140,23 +1151,23 @@ PAGX_TEST(PAGXTest, CustomDataSVGRootElement) {
 
 PAGX_TEST(PAGXTest, CustomDataKeyValidation) {
   // Valid keys.
-  EXPECT_TRUE(pagx::Node::IsValidCustomDataKey("role"));
-  EXPECT_TRUE(pagx::Node::IsValidCustomDataKey("figma-node"));
-  EXPECT_TRUE(pagx::Node::IsValidCustomDataKey("v2"));
-  EXPECT_TRUE(pagx::Node::IsValidCustomDataKey("a"));
-  EXPECT_TRUE(pagx::Node::IsValidCustomDataKey("abc-123-def"));
+  EXPECT_TRUE(pagx::IsValidCustomDataKey("role"));
+  EXPECT_TRUE(pagx::IsValidCustomDataKey("figma-node"));
+  EXPECT_TRUE(pagx::IsValidCustomDataKey("v2"));
+  EXPECT_TRUE(pagx::IsValidCustomDataKey("a"));
+  EXPECT_TRUE(pagx::IsValidCustomDataKey("abc-123-def"));
 
   // Invalid keys.
-  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey(""));
-  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("-leading"));
-  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("trailing-"));
-  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("-"));
-  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("UPPER"));
-  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("has space"));
-  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("under_score"));
-  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("dot.name"));
-  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("a<b"));
-  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("a\"b"));
+  EXPECT_FALSE(pagx::IsValidCustomDataKey(""));
+  EXPECT_FALSE(pagx::IsValidCustomDataKey("-leading"));
+  EXPECT_FALSE(pagx::IsValidCustomDataKey("trailing-"));
+  EXPECT_FALSE(pagx::IsValidCustomDataKey("-"));
+  EXPECT_FALSE(pagx::IsValidCustomDataKey("UPPER"));
+  EXPECT_FALSE(pagx::IsValidCustomDataKey("has space"));
+  EXPECT_FALSE(pagx::IsValidCustomDataKey("under_score"));
+  EXPECT_FALSE(pagx::IsValidCustomDataKey("dot.name"));
+  EXPECT_FALSE(pagx::IsValidCustomDataKey("a<b"));
+  EXPECT_FALSE(pagx::IsValidCustomDataKey("a\"b"));
 
   // Verify invalid keys are rejected during PAGX import.
   // Note: XML attribute names with uppercase (data-INVALID) and underscores (data-has_underscore)
@@ -4497,7 +4508,7 @@ PAGX_TEST(PAGXTest, VerifyNestedFlexNoFalsePositive) {
   // When a parent container gets its main-axis size from flex in a grandparent layout, child flex
   // items should not trigger the "flex has no effect" diagnostic.
   std::string xml = R"(<?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="400" height="300">
+<pagx width="400" height="300">
   <Layer width="400" height="300" layout="vertical" gap="10">
     <Layer height="40">
       <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -5045,6 +5056,84 @@ PAGX_TEST(PAGXTest, TextBoundsDirectValidation) {
   auto boxTextBounds = boxText->textBounds;
   EXPECT_GT(boxTextBounds.width, 0);
   EXPECT_GT(boxTextBounds.height, 0);
+}
+
+// =====================================================================================
+// Padding Unified Semantics — Round-Trip Tests
+// =====================================================================================
+
+// Group padding round-trip through export/import.
+PAGX_TEST(PAGXTest, GroupPaddingRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 200;
+  layer->height = 100;
+
+  auto group = doc->makeNode<pagx::Group>();
+  group->padding = pagx::Padding{5, 10, 15, 20};
+  layer->contents.push_back(group);
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {50, 30};
+  group->elements.push_back(rect);
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  group->elements.push_back(fill);
+
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+
+  auto doc2 = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc2 != nullptr);
+  ASSERT_GE(doc2->layers.size(), 1u);
+
+  auto* layer2 = doc2->layers[0];
+  ASSERT_FALSE(layer2->contents.empty());
+  auto* group2 = static_cast<pagx::Group*>(layer2->contents[0]);
+  EXPECT_FLOAT_EQ(group2->padding.top, 5);
+  EXPECT_FLOAT_EQ(group2->padding.right, 10);
+  EXPECT_FLOAT_EQ(group2->padding.bottom, 15);
+  EXPECT_FLOAT_EQ(group2->padding.left, 20);
+}
+
+// TextBox padding round-trip through export/import.
+PAGX_TEST(PAGXTest, TextBoxPaddingRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 200;
+  layer->height = 100;
+
+  auto textBox = doc->makeNode<pagx::TextBox>();
+  textBox->width = 180;
+  textBox->height = 60;
+  textBox->padding = pagx::Padding{8, 12, 8, 12};
+  layer->contents.push_back(textBox);
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Test";
+  text->fontFamily = "Arial";
+  text->fontSize = 14;
+  textBox->elements.push_back(text);
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  textBox->elements.push_back(fill);
+
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+
+  auto doc2 = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc2 != nullptr);
+  ASSERT_GE(doc2->layers.size(), 1u);
+
+  auto* layer2 = doc2->layers[0];
+  ASSERT_FALSE(layer2->contents.empty());
+  auto* textBox2 = static_cast<pagx::TextBox*>(layer2->contents[0]);
+  EXPECT_FLOAT_EQ(textBox2->padding.top, 8);
+  EXPECT_FLOAT_EQ(textBox2->padding.right, 12);
+  EXPECT_FLOAT_EQ(textBox2->padding.bottom, 8);
+  EXPECT_FLOAT_EQ(textBox2->padding.left, 12);
 }
 
 /**

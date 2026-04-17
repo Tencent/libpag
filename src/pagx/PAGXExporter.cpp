@@ -37,7 +37,6 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
-#include "pagx/nodes/Import.h"
 #include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/LinearGradient.h"
@@ -170,6 +169,31 @@ class XMLBuilder {
 
   void writeRaw(const std::string& content) {
     buffer += content;
+  }
+
+  void writeRawLine(const std::string& content) {
+    // Handle multi-line content by indenting each line individually.
+    size_t start = 0;
+    while (start < content.size()) {
+      auto end = content.find('\n', start);
+      if (end == std::string::npos) {
+        writeIndent();
+        buffer.append(content, start, content.size() - start);
+        buffer += "\n";
+        break;
+      }
+      writeIndent();
+      buffer.append(content, start, end - start);
+      buffer += "\n";
+      start = end + 1;
+    }
+  }
+
+  void writeComment(const std::string& text) {
+    writeIndent();
+    buffer += "<!-- ";
+    buffer += text;
+    buffer += " -->\n";
   }
 
   std::string release() {
@@ -319,7 +343,7 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
 
 static void WriteCustomData(XMLBuilder& xml, const Node* node) {
   for (const auto& [key, value] : node->customData) {
-    if (Node::IsValidCustomDataKey(key)) {
+    if (IsValidCustomDataKey(key)) {
       xml.addAttribute(("data-" + key).c_str(), value);
     }
   }
@@ -884,6 +908,9 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       // Layout dimensions
       xml.addOptionalAttribute("width", textBox->width);
       xml.addOptionalAttribute("height", textBox->height);
+      if (!textBox->padding.isZero()) {
+        xml.addAttribute("padding", PaddingToString(textBox->padding));
+      }
       // TextBox typography properties
       if (textBox->textAlign != Default<TextBox>().textAlign) {
         xml.addAttribute("textAlign", TextAlignToString(textBox->textAlign));
@@ -962,6 +989,9 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.addAttribute("alpha", group->alpha, Default<Group>().alpha);
       xml.addOptionalAttribute("width", group->width);
       xml.addOptionalAttribute("height", group->height);
+      if (!group->padding.isZero()) {
+        xml.addAttribute("padding", PaddingToString(group->padding));
+      }
       xml.addOptionalAttribute("left", group->left);
       xml.addOptionalAttribute("right", group->right);
       xml.addOptionalAttribute("top", group->top);
@@ -976,21 +1006,6 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
         for (const auto& element : group->elements) {
           WriteVectorElement(xml, element, options);
         }
-        xml.closeElement();
-      }
-      break;
-    }
-    case NodeType::Import: {
-      auto* imp = static_cast<const Import*>(node);
-      xml.openElement("Import");
-      xml.addAttribute("source", imp->source);
-      xml.addAttribute("format", imp->format);
-      WriteCustomData(xml, node);
-      if (imp->rawContent.empty()) {
-        xml.closeElementSelfClosing();
-      } else {
-        xml.closeElementStart();
-        xml.writeRaw(imp->rawContent);
         xml.closeElement();
       }
       break;
@@ -1301,17 +1316,32 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
     xml.addAttribute("composition", "@" + node->composition->id);
   }
 
+  // Build directive attributes.
+  xml.addAttribute("import", node->importDirective.source);
+  xml.addAttribute("importFormat", node->importDirective.format);
+
   // Write custom data as data-* attributes.
   WriteCustomData(xml, node);
 
   bool hasChildren = !node->contents.empty() || !node->styles.empty() || !node->filters.empty() ||
-                     !node->children.empty();
+                     !node->children.empty() || !node->importDirective.content.empty() ||
+                     !node->importDirective.resolvedFrom.empty();
   if (!hasChildren) {
     xml.closeElementSelfClosing();
     return;
   }
 
   xml.closeElementStart();
+
+  // Write resolved-from comment if present.
+  if (!node->importDirective.resolvedFrom.empty()) {
+    xml.writeComment("Resolved from: " + node->importDirective.resolvedFrom);
+  }
+
+  // Write inline import content (e.g., <svg>...</svg>) if present.
+  if (!node->importDirective.content.empty()) {
+    xml.writeRawLine(node->importDirective.content);
+  }
 
   // Write VectorElement (contents) directly without container node.
   for (const auto& element : node->contents) {
@@ -1345,7 +1375,6 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
   xml.appendDeclaration();
 
   xml.openElement("pagx");
-  xml.addAttribute("version", doc.version);
   xml.addAttribute("width", doc.width);
   xml.addAttribute("height", doc.height);
   WriteCustomData(xml, &doc);

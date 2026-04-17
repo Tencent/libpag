@@ -1,0 +1,6 @@
+<pagx width="200" height="200">
+  <Layer centerX="0" centerY="0">
+    <Ellipse centerX="0" centerY="0" size="30,30"/>
+    <Fill color="#F00"/>
+  </Layer>
+</pagx>

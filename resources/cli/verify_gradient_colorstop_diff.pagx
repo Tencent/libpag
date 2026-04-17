@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Test: Gradients with different ColorStop should NOT be detected as duplicates -->
-<pagx version="1.0" width="200" height="200">
+<pagx width="200" height="200">
   <Layer name="shape1">
     <Rectangle size="100,100"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="100,0">
-        <ColorStop offset="0" color="#FF0000"/>
-        <ColorStop offset="1" color="#0000FF"/>
+        <ColorStop color="#FF0000" offset="0"/>
+        <ColorStop color="#0000FF" offset="1"/>
       </LinearGradient>
     </Fill>
   </Layer>
@@ -14,8 +14,8 @@
     <Rectangle size="100,100"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="100,0">
-        <ColorStop offset="0" color="#FF0000"/>
-        <ColorStop offset="1" color="#00FF00"/>
+        <ColorStop color="#FF0000" offset="0"/>
+        <ColorStop color="#00FF00" offset="1"/>
       </LinearGradient>
     </Fill>
   </Layer>

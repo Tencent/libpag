@@ -20,6 +20,7 @@
 
 #include <cmath>
 #include <vector>
+#include "pagx/types/Padding.h"
 #include "pagx/types/Rect.h"
 
 namespace pagx {
@@ -114,10 +115,12 @@ class LayoutNode {
    * @param nodes the list of layout nodes to lay out
    * @param containerW the available container width
    * @param containerH the available container height
+   * @param padding padding to inset the constraint reference frame
    * @param context the current layout context
    */
   static void PerformConstraintLayout(const std::vector<LayoutNode*>& nodes, float containerW,
-                                      float containerH, LayoutContext* context);
+                                      float containerH, const Padding& padding,
+                                      LayoutContext* context);
 
   /** Casts an Element to LayoutNode if the element participates in layout. Returns nullptr
    * otherwise. */

@@ -20,10 +20,14 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstdio>
+#include <memory>
 #include <string>
 #include <vector>
 #include "pagx/FontConfig.h"
+#include "pagx/PAGXDocument.h"
+#include "pagx/nodes/Layer.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx::cli {
@@ -176,5 +180,42 @@ inline std::string EscapeJson(const std::string& input) {
   }
   return result;
 }
+
+/**
+ * Loads a PAGX document from a file. Prints load errors and warnings to stderr using the given
+ * command name as prefix. Returns nullptr on failure.
+ */
+std::shared_ptr<PAGXDocument> LoadDocument(const std::string& filePath, const std::string& command);
+
+/**
+ * Loads font files and fallback typefaces into a FontConfig. Prints errors to stderr using the
+ * given command name as prefix. Returns false on failure.
+ */
+bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& fontFiles,
+                    const std::vector<std::string>& fallbacks, const std::string& command);
+
+/**
+ * Writes a string to a file. Prints errors to stderr using the given command name as prefix.
+ * On success, prints a "wrote <path>" message to stdout and returns true.
+ */
+bool WriteStringToFile(const std::string& content, const std::string& filePath,
+                       const std::string& command);
+
+/**
+ * Returns true if the Layer uses any feature that Group does not support at all (e.g. blendMode,
+ * styles, filters, mask, 3D transforms, container layout, composition, alpha with offscreen
+ * semantics). Does NOT check contents or children (callers handle those based on context), nor
+ * attributes whose values can be mechanically transferred to a Group (2D matrix, x/y position,
+ * width/height, padding, constraint positioning). When adding a new Layer-only attribute, add a corresponding
+ * check here; otherwise the attribute will be silently ignored.
+ */
+bool HasLayerOnlyFeatures(const Layer* layer);
+
+/**
+ * Returns true if the Layer is a plain shell — all attributes are at their default values. Does
+ * NOT check contents (the payload to retain). Stricter than HasLayerOnlyFeatures: also requires
+ * attributes transferable to Group (x/y position, 2D matrix, size, padding, constraints) to be default.
+ */
+bool IsLayerShell(const Layer* layer);
 
 }  // namespace pagx::cli

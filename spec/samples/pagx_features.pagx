@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="1600" height="1200">
+<pagx width="1600" height="1200">
   <Layer name="Background" left="0" right="0" top="0" bottom="0">
-    <Rectangle left="0" top="0" right="0" bottom="0"/>
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="@bgGradient"/>
   </Layer>
   <Layer name="GlowB" alpha="0.22">
@@ -14,7 +14,7 @@
     <Fill color="#10B981"/>
     <BlurFilter blurX="180" blurY="130"/>
   </Layer>
-  <Layer name="OrbitRing" alpha="0.18" left="800" top="530">
+  <Layer name="OrbitRing" left="800" top="530" alpha="0.18">
     <Ellipse left="-380" top="-380" size="760,760"/>
     <Stroke color="#334155" width="1"/>
   </Layer>
@@ -26,8 +26,8 @@
     </Group>
     <Repeater copies="10" position="0,120"/>
   </Layer>
-  <Layer name="Core" width="326" height="326" centerX="0" centerY="-70">
-    <Layer alpha="0.2" left="0" right="0" top="0" bottom="0">
+  <Layer name="Core" centerX="0" centerY="-70" width="326" height="326">
+    <Layer left="0" right="0" top="0" bottom="0" alpha="0.2">
       <Ellipse centerX="0" centerY="0" size="320,320"/>
       <Fill color="#3B82F6"/>
       <BlurFilter blurX="80" blurY="80"/>
@@ -36,22 +36,22 @@
       <Ellipse centerX="0" centerY="0" size="260,260"/>
       <Stroke color="#475569" width="2"/>
     </Layer>
-    <Layer alpha="0.7" left="0" right="0" top="0" bottom="0">
+    <Layer left="0" right="0" top="0" bottom="0" alpha="0.7">
       <Ellipse centerX="0" centerY="0" size="310,310"/>
       <TrimPath end="0.77"/>
       <Stroke width="2.5" cap="round">
         <ConicGradient center="163,163">
-          <ColorStop offset="0" color="#06B6D400"/>
-          <ColorStop offset="0.77" color="#06B6D4"/>
-          <ColorStop offset="1" color="#06B6D400"/>
+          <ColorStop color="#06B6D400" offset="0"/>
+          <ColorStop color="#06B6D4" offset="0.77"/>
+          <ColorStop color="#06B6D400" offset="1"/>
         </ConicGradient>
       </Stroke>
     </Layer>
-    <Layer alpha="0.4" left="0" right="0" top="0" bottom="0">
+    <Layer left="0" right="0" top="0" bottom="0" alpha="0.4">
       <Path centerX="0" centerY="0" data="M 0 -155 L 0 -163 M 155 0 L 163 0 M 0 155 L 0 163 M -155 0 L -163 0"/>
       <Stroke color="#94A3B8" width="1.5" cap="round"/>
     </Layer>
-    <Layer layout="vertical" gap="4" alignment="center" centerX="0" centerY="0">
+    <Layer centerX="0" centerY="0" layout="vertical" gap="4" alignment="center">
       <Layer>
         <TextBox textAlign="center">
           <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="52"/>
@@ -67,7 +67,7 @@
       </Layer>
     </Layer>
     <Text text="An XML-based markup language for describing animated vector graphics." fontFamily="Arial" fontSize="12"/>
-    <TextPath path="M -141 0 A 141 141 0 0 0 141 0" forceAlignment="true" centerX="0" top="163"/>
+    <TextPath top="163" centerX="0" path="M -141 0 A 141 141 0 0 0 141 0" forceAlignment="true"/>
     <Fill color="#64748B60"/>
   </Layer>
   <Layer name="ConnectorDots" alpha="0.7">
@@ -91,9 +91,9 @@
       <Path left="20" top="0" data="@cardTopLine"/>
       <Stroke width="1">
         <LinearGradient startPoint="0,0" endPoint="360,0">
-          <ColorStop offset="0" color="#F43F5E00"/>
-          <ColorStop offset="0.5" color="#F43F5E"/>
-          <ColorStop offset="1" color="#F43F5E00"/>
+          <ColorStop color="#F43F5E00" offset="0"/>
+          <ColorStop color="#F43F5E" offset="0.5"/>
+          <ColorStop color="#F43F5E00" offset="1"/>
         </LinearGradient>
       </Stroke>
     </Layer>
@@ -114,7 +114,7 @@
         <Stroke color="#F43F5E" width="1.5" cap="round"/>
       </Group>
     </Layer>
-    <Layer layout="vertical" left="150" top="34">
+    <Layer left="150" top="34" layout="vertical">
       <Layer>
         <TextBox>
           <Text text="Readable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
@@ -138,9 +138,9 @@
       <Path left="20" top="0" data="@cardTopLine"/>
       <Stroke width="1">
         <LinearGradient startPoint="0,0" endPoint="360,0">
-          <ColorStop offset="0" color="#38BDF800"/>
-          <ColorStop offset="0.5" color="#38BDF8"/>
-          <ColorStop offset="1" color="#38BDF800"/>
+          <ColorStop color="#38BDF800" offset="0"/>
+          <ColorStop color="#38BDF8" offset="0.5"/>
+          <ColorStop color="#38BDF800" offset="1"/>
         </LinearGradient>
       </Stroke>
     </Layer>
@@ -159,7 +159,7 @@
         <Fill color="#38BDF810"/>
       </Group>
     </Layer>
-    <Layer layout="vertical" left="150" top="34">
+    <Layer left="150" top="34" layout="vertical">
       <Layer>
         <TextBox>
           <Text text="Comprehensive" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
@@ -183,9 +183,9 @@
       <Path left="20" top="0" data="@cardTopLine"/>
       <Stroke width="1">
         <LinearGradient startPoint="0,0" endPoint="360,0">
-          <ColorStop offset="0" color="#A855F700"/>
-          <ColorStop offset="0.5" color="#A855F7"/>
-          <ColorStop offset="1" color="#A855F700"/>
+          <ColorStop color="#A855F700" offset="0"/>
+          <ColorStop color="#A855F7" offset="0.5"/>
+          <ColorStop color="#A855F700" offset="1"/>
         </LinearGradient>
       </Stroke>
     </Layer>
@@ -215,7 +215,7 @@
         <Fill color="#A855F715"/>
       </Group>
     </Layer>
-    <Layer layout="vertical" left="150" top="34">
+    <Layer left="150" top="34" layout="vertical">
       <Layer>
         <TextBox>
           <Text text="Expressive" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
@@ -239,9 +239,9 @@
       <Path left="20" top="0" data="@cardTopLine"/>
       <Stroke width="1">
         <LinearGradient startPoint="0,0" endPoint="360,0">
-          <ColorStop offset="0" color="#10B98100"/>
-          <ColorStop offset="0.5" color="#10B981"/>
-          <ColorStop offset="1" color="#10B98100"/>
+          <ColorStop color="#10B98100" offset="0"/>
+          <ColorStop color="#10B981" offset="0.5"/>
+          <ColorStop color="#10B98100" offset="1"/>
         </LinearGradient>
       </Stroke>
     </Layer>
@@ -258,7 +258,7 @@
         <Stroke color="#10B981" width="1" dashes="3,3"/>
       </Group>
     </Layer>
-    <Layer layout="vertical" left="150" top="34">
+    <Layer left="150" top="34" layout="vertical">
       <Layer>
         <TextBox>
           <Text text="Interoperable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
@@ -282,9 +282,9 @@
       <Path left="20" top="0" data="@cardTopLine"/>
       <Stroke width="1">
         <LinearGradient startPoint="0,0" endPoint="360,0">
-          <ColorStop offset="0" color="#FBBF2400"/>
-          <ColorStop offset="0.5" color="#FBBF24"/>
-          <ColorStop offset="1" color="#FBBF2400"/>
+          <ColorStop color="#FBBF2400" offset="0"/>
+          <ColorStop color="#FBBF24" offset="0.5"/>
+          <ColorStop color="#FBBF2400" offset="1"/>
         </LinearGradient>
       </Stroke>
     </Layer>
@@ -306,7 +306,7 @@
         <Stroke color="#FB923C" width="2" cap="round" join="round"/>
       </Group>
     </Layer>
-    <Layer layout="vertical" left="150" top="34">
+    <Layer left="150" top="34" layout="vertical">
       <Layer>
         <TextBox>
           <Text text="Deployable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
@@ -326,11 +326,11 @@
       <Path data="M -400 -40 L 400 -40"/>
       <Stroke width="1">
         <LinearGradient startPoint="-400,0" endPoint="400,0">
-          <ColorStop offset="0" color="#6366F100"/>
-          <ColorStop offset="0.2" color="#6366F1"/>
-          <ColorStop offset="0.5" color="#8B5CF6"/>
-          <ColorStop offset="0.8" color="#EC4899"/>
-          <ColorStop offset="1" color="#EC489900"/>
+          <ColorStop color="#6366F100" offset="0"/>
+          <ColorStop color="#6366F1" offset="0.2"/>
+          <ColorStop color="#8B5CF6" offset="0.5"/>
+          <ColorStop color="#EC4899" offset="0.8"/>
+          <ColorStop color="#EC489900" offset="1"/>
         </LinearGradient>
       </Stroke>
     </Group>
@@ -389,13 +389,13 @@
   </Layer>
   <Resources>
     <LinearGradient id="bgGradient" startPoint="0,0" endPoint="0,1200">
-      <ColorStop offset="0" color="#0F172A"/>
-      <ColorStop offset="0.4" color="#0B1228"/>
-      <ColorStop offset="1" color="#0F172A"/>
+      <ColorStop color="#0F172A" offset="0"/>
+      <ColorStop color="#0B1228" offset="0.4"/>
+      <ColorStop color="#0F172A" offset="1"/>
     </LinearGradient>
     <LinearGradient id="accentLine" startPoint="-120,0" endPoint="120,0">
-      <ColorStop offset="0" color="#06B6D4"/>
-      <ColorStop offset="1" color="#3B82F6"/>
+      <ColorStop color="#06B6D4" offset="0"/>
+      <ColorStop color="#3B82F6" offset="1"/>
     </LinearGradient>
     <PathData id="cardTopLine" data="M 0 0 L 360 0"/>
     <PathData id="arrowRight" data="M 0 6 L 25 6 M 19 0 L 27 6 L 19 12"/>

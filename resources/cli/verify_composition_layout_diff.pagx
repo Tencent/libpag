@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Test: Layers with different layout should NOT be detected as identical -->
-<pagx version="1.0" width="400" height="200">
+<pagx width="400" height="200">
   <Layer name="container" width="400" height="200">
     <Layer width="100" height="100" layout="horizontal">
       <Layer left="0" right="0" top="0" bottom="0">

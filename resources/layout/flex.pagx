@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Flex layout: equal distribution, spaceBetween, mixed fixed/flex, and grid -->
-<pagx version="1.0" width="820" height="380">
+<pagx width="820" height="380">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -11,21 +11,23 @@
     <!-- Row 1 -->
     <Layer layout="horizontal" gap="20">
       <!-- 1. Horizontal flex: 3 equal-width cards with gap and padding -->
-      <Layer width="370" height="150" layout="horizontal" gap="10" padding="10">
+      <Layer width="370" height="150">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Fill color="#E6E6E6"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        <Layer flex="1" height="130">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-          <Fill color="#3366E6"/>
-        </Layer>
-        <Layer flex="1" height="130">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-          <Fill color="#E63333"/>
-        </Layer>
-        <Layer flex="1" height="130">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-          <Fill color="#33CC4D"/>
+        <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="10" padding="10">
+          <Layer flex="1" height="130">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Fill color="#3366E6"/>
+          </Layer>
+          <Layer flex="1" height="130">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Fill color="#E63333"/>
+          </Layer>
+          <Layer flex="1" height="130">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Fill color="#33CC4D"/>
+          </Layer>
         </Layer>
       </Layer>
 
@@ -56,52 +58,56 @@
     <!-- Row 2 -->
     <Layer layout="horizontal" gap="20">
       <!-- 3. Mixed fixed-width and flex items -->
-      <Layer width="370" height="150" layout="horizontal" gap="10" padding="10">
+      <Layer width="370" height="150">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Fill color="#E6E6E6"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        <!-- Fixed 80px -->
-        <Layer width="80" height="130">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-          <Fill color="#3366E6"/>
-        </Layer>
-        <!-- Flex (no width) -->
-        <Layer flex="1" height="130">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-          <Fill color="#E63333"/>
-        </Layer>
-        <!-- Fixed 80px -->
-        <Layer width="80" height="130">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-          <Fill color="#33CC4D"/>
-        </Layer>
-        <!-- Flex (no width) -->
-        <Layer flex="1" height="130">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-          <Fill color="#F2D926"/>
+        <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="10" padding="10">
+          <!-- Fixed 80px -->
+          <Layer width="80" height="130">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Fill color="#3366E6"/>
+          </Layer>
+          <!-- Flex (no width) -->
+          <Layer flex="1" height="130">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Fill color="#E63333"/>
+          </Layer>
+          <!-- Fixed 80px -->
+          <Layer width="80" height="130">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Fill color="#33CC4D"/>
+          </Layer>
+          <!-- Flex (no width) -->
+          <Layer flex="1" height="130">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Fill color="#F2D926"/>
+          </Layer>
         </Layer>
       </Layer>
 
       <!-- 4. 3x3 Grid: vertical outer with 3 horizontal rows -->
-      <Layer width="370" height="150" layout="horizontal" gap="10" padding="10">
+      <Layer width="370" height="150">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Fill color="#E6E6E6"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        <Layer width="60" height="130">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-          <Fill color="#3366E6"/>
-        </Layer>
-        <Layer width="60" height="130">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-          <Fill color="#E63333"/>
-        </Layer>
-        <Layer width="60" height="130">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-          <Fill color="#33CC4D"/>
-        </Layer>
-        <Layer width="60" height="130">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-          <Fill color="#F2D926"/>
+        <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="10" padding="10">
+          <Layer width="60" height="130">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Fill color="#3366E6"/>
+          </Layer>
+          <Layer width="60" height="130">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Fill color="#E63333"/>
+          </Layer>
+          <Layer width="60" height="130">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Fill color="#33CC4D"/>
+          </Layer>
+          <Layer width="60" height="130">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Fill color="#F2D926"/>
+          </Layer>
         </Layer>
       </Layer>
     </Layer>

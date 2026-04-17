@@ -19,13 +19,11 @@
 #include "cli/CommandFont.h"
 #include <cmath>
 #include <cstring>
-#include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
 #include "cli/CliUtils.h"
 #include "pagx/PAGXExporter.h"
-#include "pagx/PAGXImporter.h"
 #include "renderer/FontEmbedder.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Typeface.h"
@@ -230,41 +228,18 @@ static int RunFontEmbed(int argc, char* argv[]) {
     return parseResult == -1 ? 0 : parseResult;
   }
 
-  auto document = PAGXImporter::FromFile(options.inputFile);
+  auto document = LoadDocument(options.inputFile, "pagx font embed");
   if (document == nullptr) {
-    std::cerr << "pagx font embed: failed to load '" << options.inputFile << "'\n";
     return 1;
   }
   if (document->hasUnresolvedImports()) {
-    std::cerr
-        << "pagx font embed: error: unresolved <Import> node, run 'pagx import --resolve' first\n";
+    std::cerr << "pagx font embed: error: unresolved import directive, run 'pagx resolve' first\n";
     return 1;
   }
 
-  // Load font files.
   FontConfig fontConfig = {};
-  for (const auto& fontFile : options.fontFiles) {
-    auto typeface = tgfx::Typeface::MakeFromPath(fontFile);
-    if (typeface == nullptr) {
-      std::cerr << "pagx font embed: failed to load font '" << fontFile << "'\n";
-      return 1;
-    }
-    fontConfig.registerTypeface(typeface);
-  }
-
-  // Resolve fallback typefaces: user-specified first, then system fallbacks.
-  std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces = {};
-  for (const auto& fallbackStr : options.fallbacks) {
-    auto typeface = ResolveFallbackTypeface(fallbackStr);
-    if (typeface == nullptr) {
-      std::cerr << "pagx font embed: fallback font '" << fallbackStr << "' not found\n";
-      return 1;
-    }
-    fontConfig.registerTypeface(typeface);
-    fallbackTypefaces.push_back(typeface);
-  }
-  if (!fallbackTypefaces.empty()) {
-    fontConfig.addFallbackTypefaces(std::move(fallbackTypefaces));
+  if (!LoadFontConfig(&fontConfig, options.fontFiles, options.fallbacks, "pagx font embed")) {
+    return 1;
   }
 
   FontEmbedder::ClearEmbeddedGlyphRuns(document.get());
@@ -277,20 +252,10 @@ static int RunFontEmbed(int argc, char* argv[]) {
   }
 
   auto xml = PAGXExporter::ToXML(*document);
-
-  std::ofstream out(options.outputFile);
-  if (!out.is_open()) {
-    std::cerr << "pagx font embed: failed to write '" << options.outputFile << "'\n";
-    return 1;
-  }
-  out << xml;
-  out.close();
-  if (out.fail()) {
-    std::cerr << "pagx font embed: error writing to '" << options.outputFile << "'\n";
+  if (!WriteStringToFile(xml, options.outputFile, "pagx font embed")) {
     return 1;
   }
 
-  std::cout << "pagx font embed: wrote " << options.outputFile << "\n";
   return 0;
 }
 

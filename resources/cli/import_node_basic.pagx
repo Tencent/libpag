@@ -1,11 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="200" height="200">
-  <Layer id="iconLayer" centerX="0" centerY="0">
-    <Import source="import_external.svg"/>
-  </Layer>
+  <Layer id="iconLayer" centerX="0" centerY="0" import="import_external.svg"/>
   <Layer id="inlineLayer" centerX="0" centerY="0">
-    <Import>
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#FF0000"/></svg>
-    </Import>
+    <svg viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10" fill="#FF0000"/>
+    </svg>
   </Layer>
 </pagx>

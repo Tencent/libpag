@@ -18,7 +18,8 @@ Layers in rows or columns, and constraint positioning for positioning elements w
 ### Divider
 
 ```xml
-<pagx version="1.0" width="300" height="20">
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="300" height="20">
   <Layer centerX="0" centerY="0">
     <Rectangle size="260,1"/>
     <Fill color="#E2E8F0"/>
@@ -32,32 +33,33 @@ Layers in rows or columns, and constraint positioning for positioning elements w
 ### Button / Badge
 
 ```xml
-<pagx version="1.0" width="200" height="80">
-  <Layer centerX="0" centerY="0" padding="10,15">
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="200" height="80">
+  <Layer centerX="0" centerY="0">
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
     <Fill color="#3B82F6"/>
-    <Layer centerX="0" centerY="0">
+    <Group centerX="0" centerY="0" padding="10,15">
       <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
       <Fill color="#FFF"/>
-    </Layer>
+    </Group>
     <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#3B82F640"/>
   </Layer>
 </pagx>
 ```
 
-**Pattern**: Content-driven button (also for badges/tags). `padding` on the outer Layer
-defines inner spacing; the child Layer (Text) is centered within the padding-inset area via
-`centerX`/`centerY`. Rectangle (VectorElement) stretches to fill the full bounds as
-background, unaffected by padding. The outer Layer is content-measured: its size =
-child Layer size + padding, so the button auto-sizes to fit text. Text linebox is taller
-than glyphs (CSS linebox model), so use larger horizontal than vertical padding for visually
-equal spacing.
+**Pattern**: Content-driven button (also for badges/tags). The outer Layer holds the
+background Rectangle (stretching to full bounds); the inner Group has `padding` which
+insets the constraint reference frame, and `centerX`/`centerY` for centering within the
+outer Layer. The outer Layer is content-measured: its size = Group size (including
+padding), so the button auto-sizes to fit text. Text linebox is taller than glyphs (CSS
+linebox model), so use larger horizontal than vertical padding for visually equal spacing.
 
 ### Icon + Label Row
 
 ```xml
-<pagx version="1.0" width="120" height="40">
-  <Layer layout="horizontal" gap="8" alignment="center" padding="8">
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="120" height="40">
+  <Layer layout="horizontal" gap="8" padding="8" alignment="center">
     <Layer>
       <Ellipse size="24,24"/>
       <Fill color="#10B981"/>
@@ -77,7 +79,8 @@ icon + text, avatar + name, or label + value row.
 ### Progress Bar
 
 ```xml
-<pagx version="1.0" width="260" height="30">
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="260" height="30">
   <Layer centerX="0" centerY="0">
     <!-- Track -->
     <Rectangle size="240,8" roundness="4"/>
@@ -98,13 +101,14 @@ sliders and loading indicators.
 ### Gradient Text
 
 ```xml
-<pagx version="1.0" width="300" height="80">
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="300" height="80">
   <Layer centerX="0" centerY="0">
     <Text text="Premium" fontFamily="Arial" fontStyle="Bold" fontSize="48"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="200,0">
-        <ColorStop offset="0" color="#6366F1"/>
-        <ColorStop offset="1" color="#EC4899"/>
+        <ColorStop color="#6366F1" offset="0"/>
+        <ColorStop color="#EC4899" offset="1"/>
       </LinearGradient>
     </Fill>
   </Layer>
@@ -118,7 +122,8 @@ No Group needed when only one painter scope exists.
 ### Text Decoration (Strikethrough & Underline)
 
 ```xml
-<pagx version="1.0" width="200" height="80">
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="200" height="80">
   <Layer centerX="0" centerY="0" layout="vertical" gap="16" alignment="center">
     <!-- Underline: same color — Text + Rectangle + single Fill -->
     <Layer>
@@ -146,21 +151,20 @@ Same color: single Fill. Different colors: wrap the line in a Group to isolate i
 ### Image Placeholder
 
 ```xml
-<pagx version="1.0" width="343" height="200">
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="343" height="200">
   <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="8" alignment="center" arrangement="center">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="343,200">
-        <ColorStop offset="0" color="#F0F4FF"/>
-        <ColorStop offset="1" color="#E8EEFF"/>
+        <ColorStop color="#F0F4FF" offset="0"/>
+        <ColorStop color="#E8EEFF" offset="1"/>
       </LinearGradient>
     </Fill>
     <Layer width="48" height="48" alpha="0.4">
-      <Import>
-        <svg viewBox="0 0 48 48" fill="none" stroke="#BDC3C7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M10 6H38C40.2 6 42 7.8 42 10V38C42 40.2 40.2 42 38 42H10C7.8 42 6 40.2 6 38V10C6 7.8 7.8 6 10 6Z M17 20A3 3 0 1 0 17 14A3 3 0 1 0 17 20 M42 30L32 20L10 42"/>
-        </svg>
-      </Import>
+      <svg viewBox="0 0 48 48" fill="none" stroke="#BDC3C7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10 6H38C40.2 6 42 7.8 42 10V38C42 40.2 40.2 42 38 42H10C7.8 42 6 40.2 6 38V10C6 7.8 7.8 6 10 6Z M17 20A3 3 0 1 0 17 14A3 3 0 1 0 17 20 M42 30L32 20L10 42"/>
+      </svg>
     </Layer>
     <Layer>
       <Text text="Image Description" fontFamily="Arial" fontSize="12"/>
@@ -171,14 +175,15 @@ Same color: single Fill. Different colors: wrap the line in a Group to isolate i
 ```
 
 **Pattern**: When no image is available — soft gradient background + inline SVG icon +
-label. Icon uses `<Import>` with inline SVG (see §Tab Bar for the same technique). Vary
+label. Icon uses inline `<svg>` in a Layer (see §Tab Bar for the same technique). Vary
 gradient hues across placeholders (`#F0F4FF→#E8EEFF`, `#FFF0E8→#FFE8D8`,
 `#F0FFF4→#E8FFE8`).
 
 ### Avatar with Circular Clip
 
 ```xml
-<pagx version="1.0" width="130" height="130">
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="130" height="130">
   <Layer centerX="0" centerY="0">
     <Ellipse size="110,110"/>
     <Fill>
@@ -196,23 +201,24 @@ DropShadowStyle for depth. For square avatars, use Rectangle with `roundness`.
 ### Notification Badge (includeInLayout)
 
 ```xml
-<pagx version="1.0" width="200" height="96">
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="200" height="96">
   <Layer width="200" height="96" layout="vertical" gap="8" padding="12">
-    <Layer padding="8,12">
+    <Layer>
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
       <Fill color="#6366F1"/>
-      <Layer centerX="0" centerY="0">
+      <Group centerX="0" centerY="0" padding="8,12">
         <Text text="Messages" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
         <Fill color="#FFF"/>
-      </Layer>
+      </Group>
     </Layer>
-    <Layer padding="8,12">
+    <Layer>
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
       <Fill color="#F1F5F9"/>
-      <Layer centerX="0" centerY="0">
+      <Group centerX="0" centerY="0" padding="8,12">
         <Text text="Settings" fontFamily="Arial" fontSize="13"/>
         <Fill color="#334155"/>
-      </Layer>
+      </Group>
     </Layer>
     <!-- Red dot: excluded from layout, positioned outside parent bounds -->
     <Layer right="-6" top="-6" includeInLayout="false">
@@ -234,39 +240,42 @@ corner decorations.
 A card with vertical container layout, text header, and action buttons.
 
 ```xml
-<pagx version="1.0" width="324" height="184">
-  <Layer centerX="0" centerY="0" width="300" height="160" layout="vertical" padding="16">
-    <!-- Background: VectorElements don't participate in layout -->
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="324" height="184">
+  <Layer centerX="0" centerY="0" width="300" height="160">
+    <!-- Background -->
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
     <Fill color="#FFF"/>
-    <!-- Title + Value: flex="1" absorbs remaining space -->
-    <Layer flex="1" layout="vertical">
-      <Layer>
-        <Text text="Account Balance" fontFamily="Arial" fontSize="14"/>
-        <Fill color="#64748B"/>
-      </Layer>
-      <Layer>
-        <Text text="$12,580" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
-        <Fill color="#1E293B"/>
-      </Layer>
-    </Layer>
-    <!-- Action buttons: two equal-width buttons with flex distribution -->
-    <Layer height="40" layout="horizontal" gap="16">
-      <Layer flex="1" padding="16">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
-        <Fill color="#6366F1"/>
-        <Layer centerX="0" centerY="0">
-          <Text text="Send" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-          <Fill color="#FFF"/>
+    <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16">
+      <!-- Title + Value: flex="1" absorbs remaining space -->
+      <Layer flex="1" layout="vertical">
+        <Layer>
+          <Text text="Account Balance" fontFamily="Arial" fontSize="14"/>
+          <Fill color="#64748B"/>
+        </Layer>
+        <Layer>
+          <Text text="$12,580" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+          <Fill color="#1E293B"/>
         </Layer>
       </Layer>
-      <Layer flex="1" padding="16">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
-        <Fill color="#F1F5F9"/>
-        <Stroke color="#CBD5E1" width="1" align="inside"/>
-        <Layer centerX="0" centerY="0">
-          <Text text="Request" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-          <Fill color="#1E293B"/>
+      <!-- Action buttons: two equal-width buttons with flex distribution -->
+      <Layer height="40" layout="horizontal" gap="16">
+        <Layer flex="1">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
+          <Fill color="#6366F1"/>
+          <Group centerX="0" centerY="0" padding="16">
+            <Text text="Send" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+            <Fill color="#FFF"/>
+          </Group>
+        </Layer>
+        <Layer flex="1">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
+          <Fill color="#F1F5F9"/>
+          <Stroke color="#CBD5E1" width="1" align="inside"/>
+          <Group centerX="0" centerY="0" padding="16">
+            <Text text="Request" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+            <Fill color="#1E293B"/>
+          </Group>
         </Layer>
       </Layer>
     </Layer>
@@ -275,15 +284,16 @@ A card with vertical container layout, text header, and action buttons.
 </pagx>
 ```
 
-**Pattern**: VectorElements (background) on a `layout` Layer don't participate in layout —
-only child Layers do. `flex="1"` absorbs remaining space; multiple `flex="1"` siblings
-distribute equally. This structure (background + header + flex content + fixed footer) is
-the standard card/panel/screen template.
+**Pattern**: Nested container structure separates background from padded content. The outer Layer
+holds the background Rectangle; the inner Layer with `padding` and `layout` manages content.
+`flex="1"` absorbs remaining space; multiple `flex="1"` siblings distribute equally.
+Button cells use Group with `padding` for centered text (no layout needed). This structure
+(outer background + inner padded container) is the standard card/panel/screen template.
 
 ### Input Field (InnerShadowStyle)
 
 ```xml
-<pagx version="1.0" width="280" height="50">
+<pagx width="280" height="50">
   <Layer centerX="0" centerY="0" width="260" height="40">
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
     <Fill color="#FFF"/>
@@ -304,15 +314,18 @@ Same structure for text inputs, search bars, dropdowns, and text areas (adjust h
 ### Card Grid (Composition)
 
 ```xml
-<pagx version="1.0" width="500" height="120">
-  <Layer width="500" height="120" layout="horizontal" gap="20" padding="20">
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="500" height="120">
+  <Layer width="500" height="120">
     <!-- Light background to make white cards visible -->
     <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F1F5F9"/>
-    <!-- Reference Composition instances -->
-    <Layer composition="@card" flex="1"/>
-    <Layer composition="@card" flex="1"/>
-    <Layer composition="@card" flex="1"/>
+    <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="20" padding="20">
+      <!-- Reference Composition instances -->
+      <Layer flex="1" composition="@card"/>
+      <Layer flex="1" composition="@card"/>
+      <Layer flex="1" composition="@card"/>
+    </Layer>
   </Layer>
   <Resources>
     <Composition id="card" width="140" height="80">
@@ -334,27 +347,25 @@ any repeated element: cards, list items, grid cells.
 ### Tab Bar (Partial Roundness)
 
 ```xml
-<pagx version="1.0" width="430" height="123">
-  <Layer width="430" height="123" padding="20">
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="430" height="123">
+  <Layer width="430" height="123">
     <!-- Light background to make white tab bar visible -->
     <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F1F5F9"/>
-    <Layer left="0" right="0" top="0" bottom="0">
-      <!-- Top-round shape: intersect rounded rect with straight rect to flatten bottom corners -->
-      <Rectangle left="0" right="0" top="0" bottom="-20" roundness="20"/>
-      <Rectangle left="0" right="0" top="0" bottom="0"/>
-      <MergePath mode="intersect"/>
-      <Fill color="#FFF"/>
-      <!-- Tab items -->
-      <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" arrangement="spaceAround" alignment="center">
+    <Layer left="0" right="0" top="0" bottom="0" padding="20">
+      <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" alignment="center" arrangement="spaceAround">
+        <!-- Top-round shape: intersect rounded rect with straight rect to flatten bottom -->
+        <Rectangle left="0" right="0" top="0" bottom="-20" roundness="20"/>
+        <Rectangle left="0" right="0" top="0" bottom="0"/>
+        <MergePath mode="intersect"/>
+        <Fill color="#FFF"/>
         <!-- Home: filled (active) -->
         <Layer layout="vertical" gap="2" alignment="center">
           <Layer>
-            <Import>
-              <svg viewBox="0 0 24 24" fill="#6366F1">
-                <path d="M12 0L0 12L3 12L3 22L9 22L9 15L15 15L15 22L21 22L21 12L24 12Z"/>
-              </svg>
-            </Import>
+            <svg viewBox="0 0 24 24" fill="#6366F1">
+              <path d="M12 0L0 12L3 12L3 22L9 22L9 15L15 15L15 22L21 22L21 12L24 12Z"/>
+            </svg>
           </Layer>
           <Layer>
             <Text text="Home" fontFamily="Arial" fontStyle="Bold" fontSize="10"/>
@@ -364,12 +375,10 @@ any repeated element: cards, list items, grid cells.
         <!-- Search: stroke (inactive) -->
         <Layer layout="vertical" gap="2" alignment="center">
           <Layer>
-            <Import>
-              <svg viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2">
-                <ellipse cx="8" cy="8" rx="8" ry="8"/>
-                <path d="M14 14L20 20" stroke-width="2.5" stroke-linecap="round"/>
-              </svg>
-            </Import>
+            <svg viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2">
+              <ellipse cx="8" cy="8" rx="8" ry="8"/>
+              <path d="M14 14L20 20" stroke-width="2.5" stroke-linecap="round"/>
+            </svg>
           </Layer>
           <Layer>
             <Text text="Search" fontFamily="Arial" fontSize="10"/>
@@ -379,20 +388,18 @@ any repeated element: cards, list items, grid cells.
         <!-- Profile: stroke (inactive) -->
         <Layer layout="vertical" gap="2" alignment="center">
           <Layer>
-            <Import>
-              <svg viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.8">
-                <ellipse cx="11" cy="6" rx="5" ry="5"/>
-                <path d="M1 22C1 17 5 13 11 13C17 13 21 17 21 22" stroke-linecap="round"/>
-              </svg>
-            </Import>
+            <svg viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.8">
+              <ellipse cx="11" cy="6" rx="5" ry="5"/>
+              <path d="M1 22C1 17 5 13 11 13C17 13 21 17 21 22" stroke-linecap="round"/>
+            </svg>
           </Layer>
           <Layer>
             <Text text="Profile" fontFamily="Arial" fontSize="10"/>
             <Fill color="#94A3B8"/>
           </Layer>
         </Layer>
+        <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000020"/>
       </Layer>
-      <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000020"/>
     </Layer>
   </Layer>
 </pagx>
@@ -401,7 +408,7 @@ any repeated element: cards, list items, grid cells.
 **Pattern**: `MergePath mode="intersect"` creates partial roundness by clipping a rounded
 rect with a straight rect. Tabs use vertical layout (icon + label) distributed by
 `arrangement="spaceAround"`. Active tab = filled icon + bold color; inactive = stroked
-icon + muted color. Icons use `<Import>` with inline SVG — use native PAGX geometry
+icon + muted color. Icons use inline `<svg>` in Layers — use native PAGX geometry
 (Rectangle, Ellipse, Path) for simple shapes (backgrounds, dividers, progress bars), and
 inline SVG for multi-part icons. Same structure for bottom navigation, segmented controls,
 toolbar items.
@@ -409,25 +416,28 @@ toolbar items.
 ### Data Table
 
 ```xml
-<pagx version="1.0" width="520" height="170">
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="520" height="170">
   <Layer centerX="0" centerY="0" width="480" height="146" layout="vertical">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#FFF"/>
     <!-- Header row -->
-    <Layer height="44" layout="horizontal" padding="0,16,0,16" alignment="center">
+    <Layer height="44">
       <Rectangle left="0" right="0" top="0" bottom="0"/>
       <Fill color="#F8FAFC"/>
-      <Layer width="130">
-        <Text text="Name" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
-        <Fill color="#64748B"/>
-      </Layer>
-      <Layer flex="1">
-        <Text text="Email" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
-        <Fill color="#64748B"/>
-      </Layer>
-      <Layer width="70">
-        <Text text="Status" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
-        <Fill color="#64748B"/>
+      <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" padding="0,16,0,16" alignment="center">
+        <Layer width="130">
+          <Text text="Name" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
+          <Fill color="#64748B"/>
+        </Layer>
+        <Layer flex="1">
+          <Text text="Email" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
+          <Fill color="#64748B"/>
+        </Layer>
+        <Layer width="70">
+          <Text text="Status" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
+          <Fill color="#64748B"/>
+        </Layer>
       </Layer>
     </Layer>
     <!-- Row divider -->
@@ -445,13 +455,13 @@ toolbar items.
         <Text text="alice@example.com" fontFamily="Arial" fontSize="14"/>
         <Fill color="#1E293B"/>
       </Layer>
-      <Layer width="70" padding="4,8">
+      <Layer width="70">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
         <Fill color="#ECFDF5"/>
-        <Layer centerX="0" centerY="0">
+        <Group centerX="0" centerY="0" padding="4,8">
           <Text text="Active" fontFamily="Arial" fontSize="12"/>
           <Fill color="#10B981"/>
-        </Layer>
+        </Group>
       </Layer>
     </Layer>
     <!-- Row divider -->
@@ -469,13 +479,13 @@ toolbar items.
         <Text text="bob@example.com" fontFamily="Arial" fontSize="14"/>
         <Fill color="#1E293B"/>
       </Layer>
-      <Layer width="70" padding="4,8">
+      <Layer width="70">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
         <Fill color="#FEF3C7"/>
-        <Layer centerX="0" centerY="0">
+        <Group centerX="0" centerY="0" padding="4,8">
           <Text text="Pending" fontFamily="Arial" fontSize="12"/>
           <Fill color="#D97706"/>
-        </Layer>
+        </Group>
       </Layer>
     </Layer>
     <DropShadowStyle offsetY="2" blurX="8" blurY="8" color="#0000000A"/>
@@ -500,7 +510,8 @@ goes clockwise — use Group `rotation` to reposition the start point.
 ### Bar Chart
 
 ```xml
-<pagx version="1.0" width="300" height="200">
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="300" height="200">
   <!-- Bars: horizontal layout with bottom alignment -->
   <Layer left="30" right="30" top="30" bottom="30" layout="horizontal" alignment="end" arrangement="spaceBetween">
     <Layer>
@@ -525,8 +536,8 @@ goes clockwise — use Group `rotation` to reposition the start point.
     </Layer>
   </Layer>
   <!-- Baseline -->
-  <Layer left="30" right="30"  bottom="30" height="1">
-    <Rectangle left="0" right="0"  top="0" bottom="0"/>
+  <Layer left="30" right="30" bottom="30" height="1">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#CBD5E1"/>
   </Layer>
 </pagx>
@@ -539,7 +550,8 @@ Layer. Cannot use Repeater when heights differ — list each bar individually.
 ### Line Chart
 
 ```xml
-<pagx version="1.0" width="300" height="200">
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="300" height="200">
   <!-- Chart area with margins -->
   <Layer centerX="0" centerY="0">
     <!-- Grid lines: 5 horizontal lines at 35px intervals -->
@@ -576,7 +588,8 @@ stroked Path; area fill = same path closed to bottom with semi-transparent Fill.
 ### Donut Chart (TrimPath)
 
 ```xml
-<pagx version="1.0" width="200" height="200">
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="200" height="200">
   <Layer width="200" height="200">
     <!-- Segment 1: 40% (0 to 0.4) -->
     <Ellipse centerX="0" centerY="0" size="130,130"/>
@@ -612,7 +625,8 @@ of Stroke) and ring progress indicators. For legends, use the Icon + Label Row p
 ### Circular Gauge (TrimPath + Repeater)
 
 ```xml
-<pagx version="1.0" width="200" height="200">
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="200" height="200">
   <Layer centerX="0" centerY="0">
     <!-- Background track: 270-degree arc with gap at bottom -->
     <Ellipse size="140,140"/>
@@ -628,7 +642,7 @@ of Stroke) and ring progress indicators. For legends, use the Icon + Label Row p
     <Group>
       <Rectangle left="69" top="6" size="2,8"/>
       <Fill color="#94A3B8"/>
-      <Repeater copies="10" anchor="70,70" position="0,0" rotation="30" offset="7.5"/>
+      <Repeater copies="10" offset="7.5" anchor="70,70" position="0,0" rotation="30"/>
     </Group>
     <!-- Center percentage text -->
     <Group centerX="0" centerY="0">
@@ -654,8 +668,9 @@ frosted glass.
 ### Glow Orbs (BlurFilter)
 
 ```xml
-<pagx version="1.0" width="400" height="300">
-  <Layer width="400" height="300">
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="400" height="300">
+  <Layer width="400" height="300" clipToBounds="true">
     <!-- Dark background -->
     <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#0F172A"/>
@@ -682,14 +697,15 @@ frosted glass.
 ### Frosted Panel (BackgroundBlurStyle)
 
 ```xml
-<pagx version="1.0" width="400" height="300">
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="400" height="300">
   <Layer width="400" height="300">
     <!-- Content behind the panel -->
     <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="400,300">
-        <ColorStop offset="0" color="#6366F1"/>
-        <ColorStop offset="1" color="#EC4899"/>
+        <ColorStop color="#6366F1" offset="0"/>
+        <ColorStop color="#EC4899" offset="1"/>
       </LinearGradient>
     </Fill>
     <!-- Frosted glass panel -->
@@ -715,13 +731,14 @@ Badges often combine Polystar with gradients and layer styles for depth.
 ### Star Badge (Polystar)
 
 ```xml
-<pagx version="1.0" width="200" height="200">
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="200" height="200">
   <Layer width="200" height="200">
     <Polystar centerX="0" centerY="0" pointCount="5" outerRadius="80" innerRadius="35"/>
     <Fill>
       <RadialGradient radius="80">
-        <ColorStop offset="0" color="#FBBF24"/>
-        <ColorStop offset="1" color="#F59E0B"/>
+        <ColorStop color="#FBBF24" offset="0"/>
+        <ColorStop color="#F59E0B" offset="1"/>
       </RadialGradient>
     </Fill>
     <DropShadowStyle offsetY="6" blurX="16" blurY="16" color="#F59E0B60"/>

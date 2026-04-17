@@ -25,6 +25,9 @@ PAGAudioPlayer::PAGAudioPlayer() {
   audioReader =
       PAGAudioReader::Make(config.sampleRate, config.outputSamplesCount, config.channels, 1.0);
   audioRender = PAGAudioRender::Make(config.sampleRate, config.channels);
+  if (audioRender == nullptr) {
+    return;
+  }
   audioReader->setAudioRender(audioRender);
   connect(this, &PAGAudioPlayer::volumeChanged, audioRender.get(), &PAGAudioRender::setAudioVolume);
   connect(this, &PAGAudioPlayer::isPlayingChanged, audioReader.get(),
@@ -43,20 +46,27 @@ void PAGAudioPlayer::setVolume(float volume) {
 }
 
 void PAGAudioPlayer::setProgress(double percent) {
-  if (pagFile == nullptr) {
+  if (audioReader == nullptr) {
     return;
   }
-  auto time = static_cast<int64_t>(percent * pagFile->duration());
+  auto fileDuration = audioReader->getDuration();
+  if (fileDuration == 0) {
+    return;
+  }
+  auto time = static_cast<int64_t>(percent * fileDuration);
   Q_EMIT progressChanged(time);
 }
 
 void PAGAudioPlayer::setIsPlaying(bool isPlaying) {
-  Q_EMIT isPlayingChanged(isPlaying);
+  if (audioReader != nullptr || audioRender != nullptr) {
+    Q_EMIT isPlayingChanged(isPlaying);
+  }
 }
 
 void PAGAudioPlayer::setComposition(std::shared_ptr<PAGFile> pagFile) {
-  this->pagFile = std::move(pagFile);
-  audioReader->setComposition(std::dynamic_pointer_cast<PAGComposition>(this->pagFile));
+  if (audioReader != nullptr) {
+    audioReader->setComposition(std::dynamic_pointer_cast<PAGComposition>(pagFile));
+  }
 }
 
 bool PAGAudioPlayer::isEmpty() const {
@@ -64,7 +74,11 @@ bool PAGAudioPlayer::isEmpty() const {
 }
 
 void PAGAudioPlayer::onAudioTimeChanged(int64_t audioTime) {
-  if (pagFile != nullptr && audioTime > pagFile->duration()) {
+  if (audioReader == nullptr) {
+    return;
+  }
+  auto fileDuration = audioReader->getDuration();
+  if (fileDuration > 0 && audioTime > fileDuration) {
     audioTime = 0;
     setProgress(0);
   }

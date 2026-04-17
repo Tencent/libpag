@@ -209,7 +209,43 @@ $FfmoviePath = Join-Path $SourceDir "vendor" |
                Join-Path -ChildPath "ffmovie.dll"
 Copy-Item -Path $FfmoviePath -Destination $ExeDir -Force
 
-# 3.5 Install InnoSetup
+# 3.5 Copy VC++ Runtime DLLs
+Print-Text "[ Copy VC++ Runtime DLLs ]"
+$VCRedistDir = Join-Path $VSPath "VC\Redist\MSVC"
+if (-not (Test-Path $VCRedistDir)) {
+    Write-Host "VC++ Redist directory not found: $VCRedistDir" -ForegroundColor Red
+    exit 1
+}
+$LatestRedistVersion = (Get-ChildItem $VCRedistDir -Directory | Where-Object { $_.Name -match "^\d+\." } | Sort-Object Name -Descending | Select-Object -First 1).Name
+$VCRuntimeDir = Join-Path $VCRedistDir $LatestRedistVersion | Join-Path -ChildPath "x64" | Join-Path -ChildPath "Microsoft.VC143.CRT"
+if (-not (Test-Path $VCRuntimeDir)) {
+    # Fallback to VC142 if VC143 not found
+    $VCRuntimeDir = Join-Path $VCRedistDir $LatestRedistVersion | Join-Path -ChildPath "x64" | Join-Path -ChildPath "Microsoft.VC142.CRT"
+}
+if (-not (Test-Path $VCRuntimeDir)) {
+    Write-Host "VC++ Runtime directory not found: $VCRuntimeDir" -ForegroundColor Red
+    exit 1
+}
+Write-Host "VC++ Runtime directory: $VCRuntimeDir"
+
+$VCRuntimeDlls = @(
+    "msvcp140.dll",
+    "msvcp140_1.dll",
+    "msvcp140_2.dll",
+    "vcruntime140.dll",
+    "vcruntime140_1.dll"
+)
+foreach ($dll in $VCRuntimeDlls) {
+    $DllPath = Join-Path $VCRuntimeDir $dll
+    if (-not (Test-Path $DllPath)) {
+        Write-Host "VC++ Runtime DLL not found: $DllPath" -ForegroundColor Red
+        exit 1
+    }
+    Copy-Item -Path $DllPath -Destination $ExeDir -Force
+    Write-Host "Copied $dll"
+}
+
+# 3.6 Install InnoSetup
 Print-Text "[ Install InnoSetup ]"
 $UninstallInnoSetup = $false
 $InnoSetupDir = Join-Path $SourceDir "tools" | 
