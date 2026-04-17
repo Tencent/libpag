@@ -181,10 +181,11 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           // TextBox with child elements: render as a positioned container with text styling.
           auto tb = curTextBox;
           auto tbBounds = tb->layoutBounds();
+          auto tbPos = tb->renderPosition();
           float tbW = !std::isnan(tb->width) ? tb->width : tbBounds.width;
           float tbH = !std::isnan(tb->height) ? tb->height : tbBounds.height;
-          float tbLeft = !std::isnan(tb->width) ? tb->position.x : tbBounds.x;
-          float tbTop = !std::isnan(tb->height) ? tb->position.y : tbBounds.y;
+          float tbLeft = tbPos.x;
+          float tbTop = tbPos.y;
           std::string style = "position:absolute;left:" + FloatToString(tbLeft) +
                               "px;top:" + FloatToString(tbTop) + "px";
           if (!std::isnan(tbW) && tbW > 0) {
@@ -289,7 +290,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               if (!spanStyle.empty()) {
                 spanStyle += ";";
               }
-              spanStyle += "font-size:" + FloatToString(span.text->fontSize) + "px";
+              spanStyle += "font-size:" + FloatToString(span.text->renderFontSize()) + "px";
               if (!span.text->fontStyle.empty()) {
                 if (span.text->fontStyle.find("Bold") != std::string::npos) {
                   spanStyle += ";font-weight:bold";
@@ -334,8 +335,9 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           }
         } else if (useRichText && !richTextSpans.empty()) {
           auto tb = curTextBox;
-          std::string style = "position:absolute;left:" + FloatToString(tb->position.x) +
-                              "px;top:" + FloatToString(tb->position.y) + "px";
+          auto tbPos = tb->renderPosition();
+          std::string style = "position:absolute;left:" + FloatToString(tbPos.x) +
+                              "px;top:" + FloatToString(tbPos.y) + "px";
           if (!std::isnan(tb->width)) {
             style += ";width:" + FloatToString(tb->width) + "px";
           }
@@ -376,7 +378,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             if (!span.text->fontFamily.empty()) {
               spanStyle += ";font-family:'" + span.text->fontFamily + "'";
             }
-            spanStyle += ";font-size:" + FloatToString(span.text->fontSize) + "px";
+            spanStyle += ";font-size:" + FloatToString(span.text->renderFontSize()) + "px";
             if (!span.text->fontStyle.empty()) {
               if (span.text->fontStyle.find("Bold") != std::string::npos) {
                 spanStyle += ";font-weight:bold";
