@@ -647,6 +647,17 @@ static std::vector<std::pair<std::string, std::string>> ExtractMarkdownPatterns(
         if (pos != std::string::npos) {
           trimmed = trimmed.substr(pos);
         }
+        // Skip XML declaration if present
+        if (trimmed.substr(0, 5) == "<?xml") {
+          pos = trimmed.find('\n');
+          if (pos != std::string::npos) {
+            trimmed = trimmed.substr(pos + 1);
+            pos = trimmed.find_first_not_of(" \t\n\r");
+            if (pos != std::string::npos) {
+              trimmed = trimmed.substr(pos);
+            }
+          }
+        }
         if (trimmed.substr(0, 5) == "<pagx" && !currentTitle.empty()) {
           auto baseKey = TitleToKey(currentTitle);
           auto count = ++keyCounts[baseKey];
