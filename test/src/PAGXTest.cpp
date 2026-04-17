@@ -2263,7 +2263,7 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextBothAxes) {
 
 PAGX_TEST(PAGXTest, LayoutConstraintScaleTextCentered) {
   // Text with both-axis constraints where aspect ratios differ. The text is wider than tall,
-  // so the uniform scale is limited by height, leaving horizontal space for centering.
+  // so the uniform scale is limited by width, leaving vertical space for centering.
   auto doc = pagx::PAGXDocument::Make(400, 400);
   auto layer = doc->makeNode<pagx::Layer>();
   doc->layers.push_back(layer);
