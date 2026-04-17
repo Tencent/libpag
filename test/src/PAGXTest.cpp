@@ -73,20 +73,12 @@
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
 #include "utils/Baseline.h"
+#include "utils/PAGXTestUtils.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestUtils.h"
 
 namespace pag {
 using namespace tgfx;
-
-static int CallRun(int (*fn)(int, char*[]), std::vector<std::string> args) {
-  std::vector<char*> argv = {};
-  argv.reserve(args.size());
-  for (auto& arg : args) {
-    argv.push_back(arg.data());
-  }
-  return fn(static_cast<int>(argv.size()), argv.data());
-}
 
 static std::shared_ptr<pagx::PAGXDocument> LoadAndResolve(const std::string& filePath) {
   auto doc = pagx::PAGXImporter::FromFile(filePath);
@@ -95,26 +87,6 @@ static std::shared_ptr<pagx::PAGXDocument> LoadAndResolve(const std::string& fil
     doc = pagx::PAGXImporter::FromFile(filePath);
   }
   return doc;
-}
-
-static void VerifyFile(const std::string& filePath, const std::string& key,
-                       bool skipPathComplexity = false) {
-  std::streambuf* oldErr = std::cerr.rdbuf();
-  std::streambuf* oldOut = std::cout.rdbuf();
-  std::ostringstream verifyErr;
-  std::ostringstream verifyOut;
-  std::cerr.rdbuf(verifyErr.rdbuf());
-  std::cout.rdbuf(verifyOut.rdbuf());
-  std::vector<std::string> args = {"verify", "--skip-render", "--skip-layout"};
-  if (skipPathComplexity) {
-    args.push_back("--skip-path-complexity");
-  }
-  args.push_back(filePath);
-  auto verifyRet = CallRun(pagx::cli::RunVerify, args);
-  std::cerr.rdbuf(oldErr);
-  std::cout.rdbuf(oldOut);
-  EXPECT_EQ(verifyRet, 0) << "pagx verify failed for " << key << ":\n"
-                          << verifyErr.str() << verifyOut.str();
 }
 
 static pagx::Layer* MakeTextLayer(pagx::PAGXDocument* doc, const std::string& content,
