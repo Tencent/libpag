@@ -935,10 +935,10 @@ Layer child elements are automatically categorized into four collections by type
 
 **preserve3D**: When `false` (default), child layers with 3D transforms are flattened into the parent's 2D plane before compositing. When `true`, child layers retain their 3D positions and are rendered in a shared 3D space, enabling depth-based intersections and correct z-ordering among siblings. Similar to CSS `transform-style: preserve-3d`.
 
-**Transform Attribute Priority**: `x`/`y`, `matrix`, and `matrix3D` have an override relationship:
-- Only `x`/`y` set: Uses `x`/`y` for translation
-- `matrix` set: `matrix` overrides `x`/`y` values
-- `matrix3D` set: `matrix3D` overrides both `matrix` and `x`/`y` values
+**Transform Composition**: `x`/`y`, `matrix`, and `matrix3D` are composed (not overridden):
+- `x`/`y` provides a base translation, `matrix` applies an additional 2D transform on top
+- Final 2D transform: `translate(x, y) × matrix`
+- When `matrix3D` is set, it replaces the 2D transform entirely
 
 **MaskType**:
 
