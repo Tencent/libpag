@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Remaining coverage gaps — ImagePattern.mipmapMode (non-default), Repeater.offset (non-zero),
      textAnchor="end", RangeSelector.offset (non-zero), TextPath.baselineAngle (non-zero) -->
-<pagx version="1.0" width="440" height="420">
+<pagx version="1.0" width="460" height="440">
   <Resources>
     <Image id="tinyImg" source="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAFUlEQVR4nGP8Oo/7PwMSYELmECcAAKy6AqWSorM1AAAAAElFTkSuQmCC"/>
     <PathData id="wavePath" data="M 0,30 C 40,0 80,60 120,30 C 160,0 200,60 240,30"/>
@@ -14,115 +14,118 @@
   </Layer>
 
   <!-- Main container -->
-  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="stretch">
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="12" alignment="center">
     <!-- Title area -->
-    <Layer layout="vertical" gap="2" alignment="center">
+    <Layer layout="vertical" gap="6" alignment="center">
       <Layer height="20">
         <Text text="Coverage Gaps" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="mipmapMode, Repeater offset, textAlign, RangeSelector, baselineAngle" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+        <Text text="mipmapMode, Repeater offset, textAlign, RangeSelector, baselineAngle" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="vertical" gap="12" padding="15" alignment="stretch">
+    <Layer flex="1" left="0" right="0" layout="vertical" padding="20,28,20,28" alignment="center" arrangement="center">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <!-- Row 1: ImagePattern mipmapMode -->
-      <Layer layout="horizontal" gap="20" alignment="center" arrangement="center">
-        <!-- mipmapMode=nearest -->
-        <Layer layout="vertical" gap="4" alignment="center">
-          <Layer width="100" height="70">
-            <Rectangle position="50,35" size="100,70" roundness="6"/>
-            <Fill>
-              <ImagePattern image="@tinyImg" tileModeX="repeat" tileModeY="repeat" mipmapMode="nearest" matrix="4,0,0,4,0,0"/>
-            </Fill>
-            <Stroke color="#CBD5E1" width="1"/>
-          </Layer>
-          <Layer height="12">
-            <Text text="mipmapMode=nearest" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
-            <Fill color="#64748B"/>
-          </Layer>
-        </Layer>
-        <!-- mipmapMode=none -->
-        <Layer layout="vertical" gap="4" alignment="center">
-          <Layer width="100" height="70">
-            <Rectangle position="50,35" size="100,70" roundness="6"/>
-            <Fill>
-              <ImagePattern image="@tinyImg" tileModeX="repeat" tileModeY="repeat" mipmapMode="none" matrix="4,0,0,4,0,0"/>
-            </Fill>
-            <Stroke color="#CBD5E1" width="1"/>
-          </Layer>
-          <Layer height="12">
-            <Text text="mipmapMode=none" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
-            <Fill color="#64748B"/>
-          </Layer>
-        </Layer>
-      </Layer>
-
-      <!-- Row 2: Repeater offset + TextBox textAlign=end -->
-      <Layer layout="horizontal" gap="20" alignment="center" arrangement="center">
-        <!-- Repeater with offset (non-zero) -->
-        <Layer layout="vertical" gap="4" alignment="center">
-          <Layer width="140" height="60">
-            <Rectangle position="30,30" size="24,24" roundness="4"/>
-            <Fill color="#3B82F6"/>
-            <Repeater copies="4" offset="0.5" position="28,0" rotation="8" anchor="12,12"/>
-          </Layer>
-          <Layer height="12">
-            <Text text="Repeater offset=0.5" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
-            <Fill color="#64748B"/>
-          </Layer>
-        </Layer>
-        <!-- textAnchor="end" right-aligned text -->
-        <Layer layout="vertical" gap="4" alignment="center">
-          <Layer width="160" height="60">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
-            <Fill color="#F1F5F9"/>
-            <Stroke color="#CBD5E1" width="1"/>
-            <Layer left="5" right="5" top="5" bottom="5">
-              <Text text="End aligned text" fontFamily="Arial" fontSize="11" position="150,5" textAnchor="end"/>
-              <Fill color="#1E293B"/>
+      <!-- Content grid -->
+      <Layer layout="vertical" gap="16" alignment="center">
+        <!-- Row 1: ImagePattern mipmapMode -->
+        <Layer layout="horizontal" gap="20" alignment="center">
+          <!-- mipmapMode=nearest -->
+          <Layer width="150" layout="vertical" gap="4" alignment="center">
+            <Layer width="100" height="70">
+              <Rectangle position="50,35" size="100,70" roundness="6"/>
+              <Fill>
+                <ImagePattern image="@tinyImg" tileModeX="repeat" tileModeY="repeat" mipmapMode="nearest" matrix="4,0,0,4,0,0"/>
+              </Fill>
+              <Stroke color="#CBD5E1" width="1"/>
+            </Layer>
+            <Layer height="12">
+              <Text text="mipmapMode=nearest" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
             </Layer>
           </Layer>
-          <Layer height="12">
-            <Text text="textAnchor=end" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
-            <Fill color="#64748B"/>
+          <!-- mipmapMode=none -->
+          <Layer width="150" layout="vertical" gap="4" alignment="center">
+            <Layer width="100" height="70">
+              <Rectangle position="50,35" size="100,70" roundness="6"/>
+              <Fill>
+                <ImagePattern image="@tinyImg" tileModeX="repeat" tileModeY="repeat" mipmapMode="none" matrix="4,0,0,4,0,0"/>
+              </Fill>
+              <Stroke color="#CBD5E1" width="1"/>
+            </Layer>
+            <Layer height="12">
+              <Text text="mipmapMode=none" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
           </Layer>
         </Layer>
-      </Layer>
 
-      <!-- Row 3: RangeSelector offset + TextPath baselineAngle -->
-      <Layer layout="horizontal" gap="20" alignment="center" arrangement="center">
-        <!-- RangeSelector with offset (non-zero) -->
-        <Layer layout="vertical" gap="6" alignment="center">
-          <Layer width="150" height="40">
-            <Text text="OFFSET SEL" fontFamily="Arial" fontStyle="Bold" fontSize="24" position="75,20" textAnchor="center"/>
-            <TextModifier position="8,0" fillColor="#EC4899">
-              <RangeSelector start="0" end="0.5" offset="0.3" shape="triangle"/>
-            </TextModifier>
-            <Fill color="#3B82F6"/>
+        <!-- Row 2: Repeater offset + TextBox textAlign=end -->
+        <Layer layout="horizontal" gap="20" alignment="center">
+          <!-- Repeater with offset (non-zero) -->
+          <Layer width="150" layout="vertical" gap="4" alignment="center">
+            <Layer width="140" height="60">
+              <Rectangle position="30,30" size="24,24" roundness="4"/>
+              <Fill color="#3B82F6"/>
+              <Repeater copies="4" offset="0.5" position="28,0" rotation="8" anchor="12,12"/>
+            </Layer>
+            <Layer height="12">
+              <Text text="Repeater offset=0.5" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
           </Layer>
-          <Layer height="12">
-            <Text text="RangeSelector offset=0.3" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
-            <Fill color="#64748B"/>
+          <!-- textAnchor="end" right-aligned text -->
+          <Layer width="150" layout="vertical" gap="4" alignment="center">
+            <Layer width="150" height="60">
+              <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
+              <Fill color="#F1F5F9"/>
+              <Stroke color="#CBD5E1" width="1"/>
+              <Layer left="5" right="5" top="5" bottom="5">
+                <Text text="End aligned text" fontFamily="Arial" fontSize="11" position="140,5" textAnchor="end"/>
+                <Fill color="#1E293B"/>
+              </Layer>
+            </Layer>
+            <Layer height="12">
+              <Text text="textAnchor=end" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
           </Layer>
         </Layer>
-        <!-- TextPath with baselineAngle (non-zero) -->
-        <Layer layout="vertical" gap="6" alignment="center">
-          <Layer width="160" height="50">
-            <Text text="ANGLED BASE" fontFamily="Arial" fontStyle="Bold" fontSize="14" position="80,25"/>
-            <TextPath path="@wavePath" baselineOrigin="80,25" baselineAngle="15" firstMargin="5"/>
-            <Fill color="#10B981"/>
+
+        <!-- Row 3: RangeSelector offset + TextPath baselineAngle -->
+        <Layer layout="horizontal" gap="20" alignment="center">
+          <!-- RangeSelector with offset (non-zero) -->
+          <Layer width="150" layout="vertical" gap="10" alignment="center">
+            <Layer width="150" height="48">
+              <Text text="OFFSET SEL" fontFamily="Arial" fontStyle="Bold" fontSize="24" position="75,20" textAnchor="center"/>
+              <TextModifier position="8,0" fillColor="#EC4899">
+                <RangeSelector start="0" end="0.5" offset="0.3" shape="triangle"/>
+              </TextModifier>
+              <Fill color="#3B82F6"/>
+            </Layer>
+            <Layer height="12">
+              <Text text="RangeSelector offset=0.3" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
           </Layer>
-          <Layer height="12">
-            <Text text="baselineAngle=15" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
-            <Fill color="#64748B"/>
+          <!-- TextPath with baselineAngle (non-zero) -->
+          <Layer width="150" layout="vertical" gap="6" alignment="center">
+            <Layer width="150" height="50">
+              <Text text="ANGLED BASE" fontFamily="Arial" fontStyle="Bold" fontSize="14" position="75,25"/>
+              <TextPath path="@wavePath" baselineOrigin="75,25" baselineAngle="15" firstMargin="5"/>
+              <Fill color="#10B981"/>
+            </Layer>
+            <Layer height="12">
+              <Text text="baselineAngle=15" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
           </Layer>
         </Layer>
       </Layer>
