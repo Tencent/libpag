@@ -469,7 +469,8 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       ty -= text->fontSize * 0.8f;
     }
     style += "position:absolute;left:" + FloatToString(text->position.x) +
-             "px;top:" + FloatToString(ty) + "px;white-space:pre";
+             "px;top:" + FloatToString(ty) +
+             "px;white-space:pre;line-height:" + FloatToString(text->fontSize) + "px";
   }
   std::string textTransform;
   if (!tb) {
@@ -834,7 +835,7 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
       }
       std::string containerStyle =
           "position:absolute;white-space:nowrap;left:" + FloatToString(text->position.x) +
-          "px;top:" + FloatToString(ty) + "px";
+          "px;top:" + FloatToString(ty) + "px;line-height:" + FloatToString(text->fontSize) + "px";
       if (text->textAnchor == TextAnchor::Center) {
         containerStyle += ";transform:translateX(-50%)";
       } else if (text->textAnchor == TextAnchor::End) {
