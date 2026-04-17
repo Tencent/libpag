@@ -98,13 +98,14 @@ Do NOT start the next task until the current one is completed.
 verification in Step 3.
 
 **Checks**:
-1. Run `pagx verify input.pagx` — fix diagnostics and re-run until clean.
+1. Run `pagx verify input.pagx` — **ALL diagnostics MUST be fixed**. Re-run until exit
+   code is 0 with no diagnostic output. Do NOT proceed while any diagnostic remains.
 2. Read the `.layout.xml` and verify each section's bounds match the intended sizes
    and positions. Fix any issues.
 3. Read the screenshot and confirm backgrounds, dividers, and section proportions
    match the design intent. Fix any issues.
 
-**Forbidden**: Do NOT proceed to Step 3 until all checks pass.
+**Forbidden**: Do NOT proceed to Step 3 until verify exits cleanly with zero diagnostics.
 
 ---
 
@@ -115,8 +116,8 @@ For each section (identified by `id`), one at a time:
 **Do**: Fill in all visual content for this section only.
 
 **Checks**:
-1. Run `pagx verify --scale 2 --id "sectionId" input.pagx` — fix diagnostics and
-   re-run until clean.
+1. Run `pagx verify --scale 2 --id "sectionId" input.pagx` — **ALL diagnostics MUST be
+   fixed**. Re-run until exit code is 0 with no diagnostic output.
 2. Read the section `.layout.xml` and verify element bounds match the design intent
    — check sizes (e.g., input height, icon dimensions), spacing, and that nothing
    has zero or unexpected dimensions. Fix any issues.
@@ -127,7 +128,7 @@ For each section (identified by `id`), one at a time:
 (`input.{id}.png`, `input.{id}.layout.xml`) before moving on.
 
 **Forbidden**: Do NOT edit other sections. Do NOT proceed to the next section until
-all checks pass.
+verify exits cleanly with zero diagnostics.
 
 ---
 
@@ -137,7 +138,8 @@ all checks pass.
 alignment, color consistency, visual hierarchy — that only become apparent at full scale.
 
 **Checks**:
-1. Run `pagx verify --scale 2 input.pagx` — fix diagnostics and re-run until clean.
+1. Run `pagx verify --scale 2 input.pagx` — **ALL diagnostics MUST be fixed**. Re-run
+   until exit code is 0 with no diagnostic output.
 2. Launch a sub-agent as an adversarial reviewer — this is the core of quality
    assurance. **NEVER** read `references/checklist.md` yourself; it is exclusively
    for the sub-agent. Use `subagent_type="general-purpose"` and `model="reasoning"`.
@@ -160,8 +162,13 @@ alignment, color consistency, visual hierarchy — that only become apparent at 
    ```
 
 3. Copy every reported issue into the Step 4 task description as a numbered list.
-   Work through each one: fix and mark `[FIXED]`, or mark `[NOT AN ISSUE: reason]`.
-   Do NOT mark the task completed until every item is resolved.
+   Work through each one: default to fixing; only mark `[FALSE POSITIVE]` if you
+   can prove QA misread the file (e.g., layout.xml shows correct bounds). Do NOT
+   dismiss issues as "minor", "looks okay", or "design constraint".
+
+**Final verification**: After all fixes, run `pagx verify` one last time. If ANY diagnostic
+appears, the task is NOT complete — fix it. Only mark Step 4 complete when verify exits
+with code 0 and produces no diagnostic output.
 
 Keep final `input.png` for reference (do not commit). If further edits are made after
 this step, re-run the full verify to regenerate it. Delete `input.layout.xml` and any
