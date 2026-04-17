@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: GlyphRun advanced — positions, anchors, skews, combined transforms, bitmap glyphs -->
-<pagx version="1.0" width="420" height="400">
+<pagx version="1.0" width="420" height="430">
   <Resources>
     <!-- Vector font with P, A, G, X glyphs -->
     <Font id="vecFont" unitsPerEm="1000">
@@ -17,9 +17,9 @@
     <!-- Bitmap font for image glyph testing -->
     <Font id="bmpFont" unitsPerEm="100">
       <!-- Star glyph with offset -->
-      <Glyph id="gStar" advance="120" image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAWElEQVR4nGNgoDX4PcnmPz55JkotYKLEdqJd8BuPQYzE2oQNsOYdYWSCMcjRDHcBMiDkGnTLmAgpICTHxEAhYCLFC9jkmCh1ASMuG9D9i08OrxPJUUNfAADF5ihsTYj3gwAAAABJRU5ErkJggg==" offset="0,-8"/>
+      <Glyph id="gStar" advance="50" image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAACZ0lEQVR4nO1bUZHDIBCtg0qohEqohEqIhEqIhEjI1+mohEqIhEjYwmWZo7kUAgHeJsObeTP3VfZtFngs3OlUUQED/Zxumug4YFDie010HBAo4RdFYl7Q8RSHEt1ZCejQ8RSFEnxWHK0E6L/P6LiKQYltLPGGDTquYlBih4UEDOi4ikAJvS+IN7yj48sOJfLpSMATHV9WKIFXh3jDKzrObGDj40vAMY0Rb30+8YbH2xKVqDYgAS063uSYGR8fR3S8SfHF+Ph4HGP0xfj4eAxjRNOZP1S84f57BR7j4+M+jRFvefrLu2zvWt75t2RsjRzMjRc2vbV1/JWfgSt9LEdrvI5jaChFe42/nBHWWgPFLGJoDlb8Rk/jrSRaZ1f3ynU2+6BJCDtjUJx5kco4U3WQJGxzlDSd4Uus7qmpY07TW9hhEtKJt5Kgt8iXAHE+6hjzmKYdJCGf+FkSegFi5+yzi58lQlISMH1ENfBDgPgHRLyVhAYoXkbXiKYja8ltUo8l6xap8HTAlv0S6PO+PzflvSegba2vUMprlRUU/0u03g/Qts5vLOV0jAnjB+QshIRxhXJukQnTNJVxc0Rh196pib8roDSXH7HEu0EKu/f/KGH6u2SJnUL4dwQUboDGpcA5kaHnCbwhCgy6d81bCm+2YB9S0LpXX8RVstq48LRYW1m4V2Xk7wXo6og+s/Pv+yoM1xPwlGvrKveAMc7kXmhxhoiWO8S6dJO//6fp/wuWpsUr9VghQdmBDCHzfMOY/7bN3GO6AjHzvPjBhKYDmFkfyp8MeV46t7UCMZhtE2+IKioqKioqKnaHN731UHSLB5IuAAAAAElFTkSuQmCC" offset="0,-4"/>
       <!-- Heart glyph without offset -->
-      <Glyph id="gHeart" advance="120" image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAWElEQVR4nGNgGPKAEV3gjcfM/8h8kR3pjNjEsBrwBk0hPgAzhIkczcjqmRgoBEyDxwARpJAlKxBJMQRZHRM+SUKasRrAgMcQbOI4AxFdMalhBAekJjCSAQDfciCBuorkSgAAAABJRU5ErkJggg=="/>
+      <Glyph id="gHeart" advance="50" image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAACN0lEQVR4nO1by43DIBBNBynBJaSEXPeWElJCSnAJOe+JElICJbgENzCSS8jCGkusFzv8ZzCM9KQcYvPe4z/g08ky4Ou7E3gKjAJvS3CBu8DZthytvLN6ljuUNyqOnWt5n4S7kDBhEmA2xFR5TD0TUiYPNkK84BFIwmREv1NeH0H4Gg9f8SwyER2DXjuq1oeE5TFK4vXW0CnErnV/EzKJ11tCypp3M0H84ZaRDBZuW+LltJOjKWJDavw/LcM8f2KTy4VnrbVvbgUQf74vAQ/dgJwjMRUMi/iOABksdLVMfVu4LetvbCJY6KUBnAARLPBmANQ5AywYTgRIoEIaUNMKcI2pjQHNgLwJEGpgbSEEbSn8mwvAJoKF87IjHAmQyY2x1nTYgqduQI3jwN/sMNS1IpxaVthgQEeAWC6YT42hjmUxN4pXBlwJEEyN66YBFbSC7dqvpBXs175mAiNANjbsL0nA8c4KzSfCH0w40nmh9z0hToB8KD4PfDsGlN4V3Ju+wYSSN0rm6zAeJvQExLhi8z6irwmMgChbuN0LtDRAjgclHKNJjmH9vmAT0okvwIT04gmbkE88QRPyi1+Z8EIU/0ITvzKCIYiPP9WFBMyft+QSf8fWawxB7AJpT5nkuy/YOncj4bhAo7/bBsz5hBg7SfkOv/08dkD4F2fy2XifwGEF+GWXyqz1rVADpM3CaSA/0IUE7OcW4u7hqQbMZw/6ACl/2+XsjxKqS0wKx23ye6FMqFN8CyLxA4AW7KoCBy56AAAAAElFTkSuQmCC"/>
     </Font>
   </Resources>
 
@@ -122,9 +122,9 @@
             <Text text="bitmap glyphs (star with offset, heart without)" fontFamily="Arial" fontSize="10"/>
             <Fill color="#94A3B8"/>
           </Layer>
-          <Layer height="44">
+          <Layer height="70">
             <Text>
-              <GlyphRun font="@bmpFont" fontSize="120" glyphs="1,2,1" x="8" y="34"/>
+              <GlyphRun font="@bmpFont" fontSize="100" glyphs="1,2,1" x="30" y="30" xOffsets="0,70,140"/>
             </Text>
             <Fill color="#F59E0B"/>
           </Layer>
