@@ -58,7 +58,8 @@ static tgfx::Matrix ComputeGroupMatrix(const Group* group) {
     matrix.postConcat(temp);
   }
   matrix.postRotate(group->rotation);
-  matrix.postTranslate(group->position.x, group->position.y);
+  auto pos = group->renderPosition();
+  matrix.postTranslate(pos.x, pos.y);
   return matrix;
 }
 

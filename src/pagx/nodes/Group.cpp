@@ -33,6 +33,8 @@ void Group::updateSize(LayoutContext* context) {
 }
 
 void Group::onMeasure(LayoutContext*) {
+  measuredX = position.x;
+  measuredY = position.y;
   MeasureChildNodes(elements, width, height, measuredWidth, measuredHeight);
   if (!padding.isZero()) {
     if (std::isnan(width)) {
