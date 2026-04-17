@@ -224,4 +224,9 @@ Matrix MatrixFromString(const std::string& str);
 std::vector<float> ParseFloatList(const std::string& str);
 std::string FloatToString(float value);
 
+//==============================================================================
+// Custom data key validation
+//==============================================================================
+bool IsValidCustomDataKey(const std::string& key);
+
 }  // namespace pagx
