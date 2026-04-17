@@ -343,16 +343,25 @@ class LayerBuilderContext {
     return polystar;
   }
 
+  tgfx::Path getScaledPath(const PathData* pathData, float scale) {
+    PathCacheKey key = {pathData, scale};
+    auto it = _scaledPathCache.find(key);
+    if (it != _scaledPathCache.end()) {
+      return it->second;
+    }
+    auto path = ToTGFX(*pathData);
+    if (scale != 1.0f) {
+      path.transform(tgfx::Matrix::MakeScale(scale));
+    }
+    _scaledPathCache[key] = path;
+    return path;
+  }
+
   std::shared_ptr<tgfx::ShapePath> convertPath(const Path* node) {
     auto shapePath = tgfx::ShapePath::Make();
     shapePath->setPosition(ToTGFX(node->renderPosition()));
     if (node->data) {
-      auto path = ToTGFX(*node->data);
-      float scale = node->renderScale();
-      if (scale != 1.0f) {
-        path.transform(tgfx::Matrix::MakeScale(scale));
-      }
-      shapePath->setPath(std::move(path));
+      shapePath->setPath(getScaledPath(node->data, node->renderScale()));
     }
     shapePath->setReversed(node->reversed);
     return shapePath;
@@ -575,16 +584,10 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::TextPath> convertTextPath(const TextPath* node) {
     auto textPath = tgfx::TextPath::Make();
     if (node->path != nullptr) {
-      auto path = ToTGFX(*node->path);
-      float scale = node->renderScale();
+      auto path = getScaledPath(node->path, node->renderScale());
       auto pos = node->renderPosition();
-      tgfx::Matrix matrix = {};
-      matrix.setTranslate(pos.x, pos.y);
-      if (scale != 1.0f) {
-        matrix.preScale(scale, scale);
-      }
-      if (!matrix.isIdentity()) {
-        path.transform(matrix);
+      if (pos.x != 0 || pos.y != 0) {
+        path.transform(tgfx::Matrix::MakeTrans(pos.x, pos.y));
       }
       textPath->setPath(std::move(path));
     }
@@ -866,6 +869,21 @@ class LayerBuilderContext {
     }
   }
 
+  struct PathCacheKey {
+    const PathData* data;
+    float scale;
+    bool operator==(const PathCacheKey& other) const {
+      return data == other.data && scale == other.scale;
+    }
+  };
+  struct PathCacheHash {
+    size_t operator()(const PathCacheKey& key) const {
+      auto h1 = std::hash<const void*>{}(key.data);
+      auto h2 = std::hash<float>{}(key.scale);
+      return h1 ^ (h2 << 1);
+    }
+  };
+  std::unordered_map<PathCacheKey, tgfx::Path, PathCacheHash> _scaledPathCache = {};
   std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>> _tgfxLayerByPagxLayer = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
       _pendingMasks = {};
