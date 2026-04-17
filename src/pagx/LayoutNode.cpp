@@ -96,6 +96,20 @@ void LayoutNode::setLayoutPosition(LayoutContext*, float x, float y) {
   }
 }
 
+Point LayoutNode::computeRenderPosition(const Rect& contentBounds) const {
+  auto bounds = layoutBounds();
+  float scale = ComputeUniformScale(measuredWidth, measuredHeight, bounds.width, bounds.height);
+  float offsetX = (bounds.width - contentBounds.width * scale) * 0.5f;
+  float offsetY = (bounds.height - contentBounds.height * scale) * 0.5f;
+  return {bounds.x + offsetX - contentBounds.x * scale,
+          bounds.y + offsetY - contentBounds.y * scale};
+}
+
+float LayoutNode::computeRenderScale() const {
+  auto bounds = layoutBounds();
+  return ComputeUniformScale(measuredWidth, measuredHeight, bounds.width, bounds.height);
+}
+
 void LayoutNode::PerformConstraintLayout(const std::vector<LayoutNode*>& nodes, float containerW,
                                          float containerH, const Padding& padding,
                                          LayoutContext* context) {

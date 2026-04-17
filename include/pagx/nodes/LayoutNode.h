@@ -21,6 +21,7 @@
 #include <cmath>
 #include <vector>
 #include "pagx/types/Padding.h"
+#include "pagx/types/Point.h"
 #include "pagx/types/Rect.h"
 
 namespace pagx {
@@ -165,6 +166,12 @@ class LayoutNode {
   /** Writes measuredX/measuredY/measuredWidth/measuredHeight. Called by updateSize when not yet measured. */
   virtual void onMeasure(LayoutContext*) {
   }
+
+  /** Computes the render position by centering contentBounds within layoutBounds after uniform scaling. */
+  Point computeRenderPosition(const Rect& contentBounds) const;
+
+  /** Computes the uniform scale factor from measured size to layout size. */
+  float computeRenderScale() const;
 
  private:
   // Measured position and size (written by onMeasure during updateSize, read-only after that).

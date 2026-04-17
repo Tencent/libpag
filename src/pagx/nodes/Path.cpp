@@ -42,19 +42,11 @@ void Path::setLayoutSize(LayoutContext*, float width, float height) {
 }
 
 Point Path::renderPosition() const {
-  auto bounds = layoutBounds();
-  auto dataBounds = data ? data->getBounds() : Rect{};
-  float scale =
-      LayoutNode::ComputeUniformScale(measuredWidth, measuredHeight, bounds.width, bounds.height);
-  float offsetX = (bounds.width - dataBounds.width * scale) * 0.5f;
-  float offsetY = (bounds.height - dataBounds.height * scale) * 0.5f;
-  return {bounds.x + offsetX - dataBounds.x * scale, bounds.y + offsetY - dataBounds.y * scale};
+  return computeRenderPosition(data ? data->getBounds() : Rect{});
 }
 
 float Path::renderScale() const {
-  auto bounds = layoutBounds();
-  return LayoutNode::ComputeUniformScale(measuredWidth, measuredHeight, bounds.width,
-                                         bounds.height);
+  return computeRenderScale();
 }
 
 }  // namespace pagx

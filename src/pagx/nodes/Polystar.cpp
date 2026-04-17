@@ -78,19 +78,11 @@ void Polystar::setLayoutSize(LayoutContext*, float width, float height) {
 }
 
 Point Polystar::renderPosition() const {
-  auto bounds = layoutBounds();
-  auto contentBounds = getContentBounds();
-  float scale = renderScale();
-  float offsetX = (bounds.width - contentBounds.width * scale) * 0.5f;
-  float offsetY = (bounds.height - contentBounds.height * scale) * 0.5f;
-  return {bounds.x + offsetX - contentBounds.x * scale,
-          bounds.y + offsetY - contentBounds.y * scale};
+  return computeRenderPosition(getContentBounds());
 }
 
 float Polystar::renderScale() const {
-  auto bounds = layoutBounds();
-  return LayoutNode::ComputeUniformScale(measuredWidth, measuredHeight, bounds.width,
-                                         bounds.height);
+  return computeRenderScale();
 }
 
 float Polystar::renderOuterRadius() const {

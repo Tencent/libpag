@@ -42,19 +42,11 @@ void TextPath::setLayoutSize(LayoutContext*, float width, float height) {
 }
 
 Point TextPath::renderPosition() const {
-  auto bounds = layoutBounds();
-  auto pathBounds = path ? path->getBounds() : Rect{};
-  float scale =
-      LayoutNode::ComputeUniformScale(measuredWidth, measuredHeight, bounds.width, bounds.height);
-  float offsetX = (bounds.width - pathBounds.width * scale) * 0.5f;
-  float offsetY = (bounds.height - pathBounds.height * scale) * 0.5f;
-  return {bounds.x + offsetX - pathBounds.x * scale, bounds.y + offsetY - pathBounds.y * scale};
+  return computeRenderPosition(path ? path->getBounds() : Rect{});
 }
 
 float TextPath::renderScale() const {
-  auto bounds = layoutBounds();
-  return LayoutNode::ComputeUniformScale(measuredWidth, measuredHeight, bounds.width,
-                                         bounds.height);
+  return computeRenderScale();
 }
 
 Point TextPath::renderBaselineOrigin() const {
