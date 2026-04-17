@@ -63,8 +63,11 @@ std::string BuildPolystarPath(const Polystar* ps) {
   if (ps->pointCount <= 0.0f) {
     return {};
   }
-  float centerX = ps->position.x;
-  float centerY = ps->position.y;
+  auto psCenter = ps->renderPosition();
+  float centerX = psCenter.x;
+  float centerY = psCenter.y;
+  float outerR = ps->renderOuterRadius();
+  float innerR = ps->renderInnerRadius();
   bool isStar = ps->type == PolystarType::Star;
 
   if (isStar) {
@@ -79,8 +82,8 @@ std::string BuildPolystarPath(const Polystar* ps) {
       currentAngle -= angleStep * decimalPart * 2.0f;
     }
 
-    float firstDx = ps->outerRadius * std::cos(currentAngle);
-    float firstDy = ps->outerRadius * std::sin(currentAngle);
+    float firstDx = outerR * std::cos(currentAngle);
+    float firstDy = outerR * std::sin(currentAngle);
     float lastDx = firstDx;
     float lastDy = firstDy;
 
@@ -97,9 +100,9 @@ std::string BuildPolystarPath(const Polystar* ps) {
         dx = firstDx;
         dy = firstDy;
       } else {
-        float radius = outerFlag ? ps->outerRadius : ps->innerRadius;
+        float radius = outerFlag ? outerR : innerR;
         if (i == decimalIndex || i == decimalIndex + 1) {
-          radius = ps->innerRadius + decimalPart * (radius - ps->innerRadius);
+          radius = innerR + decimalPart * (radius - innerR);
           angleDelta *= decimalPart;
         }
         currentAngle += angleDelta;
@@ -131,8 +134,8 @@ std::string BuildPolystarPath(const Polystar* ps) {
   float angleStep = static_cast<float>(M_PI) * 2.0f / static_cast<float>(numPoints);
   float currentAngle = (ps->rotation - 90.0f) * static_cast<float>(M_PI) / 180.0f;
 
-  float firstDx = ps->outerRadius * std::cos(currentAngle);
-  float firstDy = ps->outerRadius * std::sin(currentAngle);
+  float firstDx = outerR * std::cos(currentAngle);
+  float firstDy = outerR * std::sin(currentAngle);
   float lastDx = firstDx;
   float lastDy = firstDy;
 
@@ -143,8 +146,8 @@ std::string BuildPolystarPath(const Polystar* ps) {
   float angleDelta = angleStep * direction;
   for (int i = 1; i < numPoints; i++) {
     currentAngle += angleDelta;
-    float dx = ps->outerRadius * std::cos(currentAngle);
-    float dy = ps->outerRadius * std::sin(currentAngle);
+    float dx = outerR * std::cos(currentAngle);
+    float dy = outerR * std::sin(currentAngle);
     if (ps->outerRoundness != 0.0f) {
       AppendPolystarCurve(d, centerX, centerY, angleDelta * 0.25f, lastDx, lastDy,
                           ps->outerRoundness, dx, dy, ps->outerRoundness);
@@ -600,10 +603,12 @@ void GeoToPathData(const Element* element, NodeType type, PathData& pathData) {
   switch (type) {
     case NodeType::Rectangle: {
       auto r = static_cast<const Rectangle*>(element);
-      float x = r->position.x - r->size.width / 2;
-      float y = r->position.y - r->size.height / 2;
-      float w = r->size.width;
-      float h = r->size.height;
+      auto pos = r->renderPosition();
+      auto size = r->renderSize();
+      float x = pos.x - size.width / 2;
+      float y = pos.y - size.height / 2;
+      float w = size.width;
+      float h = size.height;
       if (r->roundness <= 0) {
         // Match native (tgfx) start point: top-right corner, CW direction.
         pathData.moveTo(x + w, y);
@@ -653,10 +658,12 @@ void GeoToPathData(const Element* element, NodeType type, PathData& pathData) {
     }
     case NodeType::Ellipse: {
       auto e = static_cast<const Ellipse*>(element);
-      float cx = e->position.x;
-      float cy = e->position.y;
-      float rx = e->size.width / 2;
-      float ry = e->size.height / 2;
+      auto pos = e->renderPosition();
+      auto size = e->renderSize();
+      float cx = pos.x;
+      float cy = pos.y;
+      float rx = size.width / 2;
+      float ry = size.height / 2;
       float kx = rx * kBezierKappa;
       float ky = ry * kBezierKappa;
       // Match native (tgfx/Skia) start point: top center (12 o'clock), CW direction.
@@ -683,6 +690,14 @@ void GeoToPathData(const Element* element, NodeType type, PathData& pathData) {
         } else {
           pathData = *p->data;
         }
+        float scale = p->renderScale();
+        auto pos = p->renderPosition();
+        if (scale != 1.0f || pos.x != 0.0f || pos.y != 0.0f) {
+          Matrix m = Matrix::Scale(scale, scale);
+          m.tx = pos.x;
+          m.ty = pos.y;
+          pathData.transform(m);
+        }
       }
       break;
     }
@@ -700,10 +715,12 @@ void GeoToPathData(const Element* element, NodeType type, PathData& pathData) {
 }
 
 std::string RectToPathData(const Rectangle* r) {
-  float x = r->position.x - r->size.width / 2;
-  float y = r->position.y - r->size.height / 2;
-  float w = r->size.width;
-  float h = r->size.height;
+  auto pos = r->renderPosition();
+  auto size = r->renderSize();
+  float x = pos.x - size.width / 2;
+  float y = pos.y - size.height / 2;
+  float w = size.width;
+  float h = size.height;
   if (r->roundness <= 0) {
     if (r->reversed) {
       return "M" + FloatToString(x) + "," + FloatToString(y) + "V" + FloatToString(y + h) + "H" +
@@ -748,10 +765,12 @@ std::string RectToPathData(const Rectangle* r) {
 }
 
 std::string EllipseToPathData(const Ellipse* e) {
-  float cx = e->position.x;
-  float cy = e->position.y;
-  float rx = e->size.width / 2;
-  float ry = e->size.height / 2;
+  auto pos = e->renderPosition();
+  auto size = e->renderSize();
+  float cx = pos.x;
+  float cy = pos.y;
+  float rx = size.width / 2;
+  float ry = size.height / 2;
   const char* sweep = e->reversed ? "0" : "1";
   return "M" + FloatToString(cx - rx) + "," + FloatToString(cy) + "A" + FloatToString(rx) + "," +
          FloatToString(ry) + " 0 1 " + sweep + " " + FloatToString(cx + rx) + "," +
@@ -866,10 +885,25 @@ std::string GetPathSVGString(const Path* path) {
   if (!path->data || path->data->isEmpty()) {
     return {};
   }
-  if (path->reversed) {
-    return ReversePathDataToSVGString(*path->data);
+  float scale = path->renderScale();
+  auto pos = path->renderPosition();
+  bool needsTransform = scale != 1.0f || pos.x != 0.0f || pos.y != 0.0f;
+  if (!needsTransform) {
+    if (path->reversed) {
+      return ReversePathDataToSVGString(*path->data);
+    }
+    return PathDataToSVGString(*path->data);
   }
-  return PathDataToSVGString(*path->data);
+  PathData transformed = PathDataFromSVGString("");
+  transformed = *path->data;
+  Matrix m = Matrix::Scale(scale, scale);
+  m.tx = pos.x;
+  m.ty = pos.y;
+  transformed.transform(m);
+  if (path->reversed) {
+    return ReversePathDataToSVGString(transformed);
+  }
+  return PathDataToSVGString(transformed);
 }
 
 //==============================================================================
@@ -1020,17 +1054,21 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
 
   if (isRect) {
     auto rect = static_cast<const Rectangle*>(geo.element);
-    left = rect->position.x - rect->size.width / 2;
-    top = rect->position.y - rect->size.height / 2;
-    w = rect->size.width;
-    h = rect->size.height;
+    auto pos = rect->renderPosition();
+    auto size = rect->renderSize();
+    left = pos.x - size.width / 2;
+    top = pos.y - size.height / 2;
+    w = size.width;
+    h = size.height;
     roundness = std::min(rect->roundness, std::min(w / 2, h / 2));
   } else {
     auto el = static_cast<const Ellipse*>(geo.element);
-    left = el->position.x - el->size.width / 2;
-    top = el->position.y - el->size.height / 2;
-    w = el->size.width;
-    h = el->size.height;
+    auto pos = el->renderPosition();
+    auto size = el->renderSize();
+    left = pos.x - size.width / 2;
+    top = pos.y - size.height / 2;
+    w = size.width;
+    h = size.height;
     isEllipse = true;
   }
 
@@ -1179,18 +1217,22 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         switch (g.type) {
           case NodeType::Ellipse: {
             auto e = static_cast<const Ellipse*>(g.element);
-            gx = e->position.x - e->size.width / 2;
-            gy = e->position.y - e->size.height / 2;
-            gw = e->size.width;
-            gh = e->size.height;
+            auto pos = e->renderPosition();
+            auto size = e->renderSize();
+            gx = pos.x - size.width / 2;
+            gy = pos.y - size.height / 2;
+            gw = size.width;
+            gh = size.height;
             break;
           }
           case NodeType::Rectangle: {
             auto r = static_cast<const Rectangle*>(g.element);
-            gx = r->position.x - r->size.width / 2;
-            gy = r->position.y - r->size.height / 2;
-            gw = r->size.width;
-            gh = r->size.height;
+            auto pos = r->renderPosition();
+            auto size = r->renderSize();
+            gx = pos.x - size.width / 2;
+            gy = pos.y - size.height / 2;
+            gw = size.width;
+            gh = size.height;
             break;
           }
           default:
@@ -1257,11 +1299,13 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
       switch (g.type) {
         case NodeType::Ellipse: {
           auto e = static_cast<const Ellipse*>(g.element);
+          auto pos = e->renderPosition();
+          auto size = e->renderSize();
           out.openTag("ellipse");
-          out.addAttr("cx", FloatToString(e->position.x));
-          out.addAttr("cy", FloatToString(e->position.y));
-          out.addAttr("rx", FloatToString(e->size.width / 2));
-          out.addAttr("ry", FloatToString(e->size.height / 2));
+          out.addAttr("cx", FloatToString(pos.x));
+          out.addAttr("cy", FloatToString(pos.y));
+          out.addAttr("rx", FloatToString(size.width / 2));
+          out.addAttr("ry", FloatToString(size.height / 2));
           out.addAttr("fill", "none");
           out.addAttr("stroke", "white");
           out.addAttr("stroke-width", FloatToString(stroke->width));
@@ -1273,13 +1317,15 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         }
         case NodeType::Rectangle: {
           auto r = static_cast<const Rectangle*>(g.element);
-          float rx = r->position.x - r->size.width / 2;
-          float ry = r->position.y - r->size.height / 2;
+          auto pos = r->renderPosition();
+          auto size = r->renderSize();
+          float rx = pos.x - size.width / 2;
+          float ry = pos.y - size.height / 2;
           out.openTag("rect");
           out.addAttr("x", FloatToString(rx));
           out.addAttr("y", FloatToString(ry));
-          out.addAttr("width", FloatToString(r->size.width));
-          out.addAttr("height", FloatToString(r->size.height));
+          out.addAttr("width", FloatToString(size.width));
+          out.addAttr("height", FloatToString(size.height));
           if (r->roundness > 0) {
             out.addAttr("rx", FloatToString(r->roundness));
           }
@@ -1366,36 +1412,43 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
       switch (g.type) {
         case NodeType::Rectangle: {
           auto r = static_cast<const Rectangle*>(g.element);
-          gx = r->position.x - r->size.width / 2;
-          gy = r->position.y - r->size.height / 2;
-          gw = r->size.width;
-          gh = r->size.height;
+          auto pos = r->renderPosition();
+          auto size = r->renderSize();
+          gx = pos.x - size.width / 2;
+          gy = pos.y - size.height / 2;
+          gw = size.width;
+          gh = size.height;
           break;
         }
         case NodeType::Ellipse: {
           auto e = static_cast<const Ellipse*>(g.element);
-          gx = e->position.x - e->size.width / 2;
-          gy = e->position.y - e->size.height / 2;
-          gw = e->size.width;
-          gh = e->size.height;
+          auto pos = e->renderPosition();
+          auto size = e->renderSize();
+          gx = pos.x - size.width / 2;
+          gy = pos.y - size.height / 2;
+          gw = size.width;
+          gh = size.height;
           break;
         }
         case NodeType::Path: {
           auto p = static_cast<const Path*>(g.element);
           if (p->data && !p->data->isEmpty()) {
             Rect b = p->data->getBounds();
-            gx = b.x;
-            gy = b.y;
-            gw = b.width;
-            gh = b.height;
+            float scale = p->renderScale();
+            auto ppos = p->renderPosition();
+            gx = ppos.x + b.x * scale;
+            gy = ppos.y + b.y * scale;
+            gw = b.width * scale;
+            gh = b.height * scale;
           }
           break;
         }
         case NodeType::Polystar: {
           auto ps = static_cast<const Polystar*>(g.element);
-          float r = std::max(ps->outerRadius, ps->innerRadius);
-          gx = ps->position.x - r;
-          gy = ps->position.y - r;
+          auto ppos = ps->renderPosition();
+          float r = std::max(ps->renderOuterRadius(), ps->renderInnerRadius());
+          gx = ppos.x - r;
+          gy = ppos.y - r;
           gw = r * 2;
           gh = r * 2;
           break;
@@ -1501,8 +1554,10 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         switch (g.type) {
           case NodeType::Rectangle: {
             auto r = static_cast<const Rectangle*>(g.element);
-            float cx = r->position.x - r->size.width / 2;
-            float cy = r->position.y - r->size.height / 2;
+            auto pos = r->renderPosition();
+            auto size = r->renderSize();
+            float cx = pos.x - size.width / 2;
+            float cy = pos.y - size.height / 2;
             out.openTag("rect");
             if (!FloatNearlyZero(cx)) {
               out.addAttr("x", FloatToString(cx));
@@ -1510,8 +1565,8 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
             if (!FloatNearlyZero(cy)) {
               out.addAttr("y", FloatToString(cy));
             }
-            out.addAttr("width", FloatToString(r->size.width));
-            out.addAttr("height", FloatToString(r->size.height));
+            out.addAttr("width", FloatToString(size.width));
+            out.addAttr("height", FloatToString(size.height));
             if (r->roundness > 0) {
               out.addAttr("rx", FloatToString(r->roundness));
             }
@@ -1520,11 +1575,13 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           }
           case NodeType::Ellipse: {
             auto e = static_cast<const Ellipse*>(g.element);
+            auto pos = e->renderPosition();
+            auto size = e->renderSize();
             out.openTag("ellipse");
-            out.addAttr("cx", FloatToString(e->position.x));
-            out.addAttr("cy", FloatToString(e->position.y));
-            out.addAttr("rx", FloatToString(e->size.width / 2));
-            out.addAttr("ry", FloatToString(e->size.height / 2));
+            out.addAttr("cx", FloatToString(pos.x));
+            out.addAttr("cy", FloatToString(pos.y));
+            out.addAttr("rx", FloatToString(size.width / 2));
+            out.addAttr("ry", FloatToString(size.height / 2));
             out.closeTagSelfClosing();
             break;
           }
@@ -1603,8 +1660,10 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           out.openTag("path");
           out.addAttr("d", d);
         } else {
-          float x = r->position.x - r->size.width / 2;
-          float y = r->position.y - r->size.height / 2;
+          auto pos = r->renderPosition();
+          auto size = r->renderSize();
+          float x = pos.x - size.width / 2;
+          float y = pos.y - size.height / 2;
           out.openTag("rect");
           if (!FloatNearlyZero(x)) {
             out.addAttr("x", FloatToString(x));
@@ -1612,8 +1671,8 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           if (!FloatNearlyZero(y)) {
             out.addAttr("y", FloatToString(y));
           }
-          out.addAttr("width", FloatToString(r->size.width));
-          out.addAttr("height", FloatToString(r->size.height));
+          out.addAttr("width", FloatToString(size.width));
+          out.addAttr("height", FloatToString(size.height));
           if (r->roundness > 0) {
             out.addAttr("rx", FloatToString(r->roundness));
             out.addAttr("ry", FloatToString(r->roundness));
@@ -1639,11 +1698,13 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           out.addAttr("d", d);
         } else {
           auto e = static_cast<const Ellipse*>(g.element);
+          auto pos = e->renderPosition();
+          auto size = e->renderSize();
           out.openTag("ellipse");
-          out.addAttr("cx", FloatToString(e->position.x));
-          out.addAttr("cy", FloatToString(e->position.y));
-          out.addAttr("rx", FloatToString(e->size.width / 2));
-          out.addAttr("ry", FloatToString(e->size.height / 2));
+          out.addAttr("cx", FloatToString(pos.x));
+          out.addAttr("cy", FloatToString(pos.y));
+          out.addAttr("rx", FloatToString(size.width / 2));
+          out.addAttr("ry", FloatToString(size.height / 2));
         }
         applySVGFill(out, trim ? nullptr : fill);
         if (isContinuousTrim) {
@@ -1730,36 +1791,43 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         switch (g.type) {
           case NodeType::Rectangle: {
             auto r = static_cast<const Rectangle*>(g.element);
-            gx = r->position.x - r->size.width / 2;
-            gy = r->position.y - r->size.height / 2;
-            gw = r->size.width;
-            gh = r->size.height;
+            auto pos = r->renderPosition();
+            auto size = r->renderSize();
+            gx = pos.x - size.width / 2;
+            gy = pos.y - size.height / 2;
+            gw = size.width;
+            gh = size.height;
             break;
           }
           case NodeType::Ellipse: {
             auto e = static_cast<const Ellipse*>(g.element);
-            gx = e->position.x - e->size.width / 2;
-            gy = e->position.y - e->size.height / 2;
-            gw = e->size.width;
-            gh = e->size.height;
+            auto pos = e->renderPosition();
+            auto size = e->renderSize();
+            gx = pos.x - size.width / 2;
+            gy = pos.y - size.height / 2;
+            gw = size.width;
+            gh = size.height;
             break;
           }
           case NodeType::Path: {
             auto p = static_cast<const Path*>(g.element);
             if (p->data && !p->data->isEmpty()) {
               Rect b = p->data->getBounds();
-              gx = b.x;
-              gy = b.y;
-              gw = b.width;
-              gh = b.height;
+              float scale = p->renderScale();
+              auto ppos = p->renderPosition();
+              gx = ppos.x + b.x * scale;
+              gy = ppos.y + b.y * scale;
+              gw = b.width * scale;
+              gh = b.height * scale;
             }
             break;
           }
           case NodeType::Polystar: {
             auto ps = static_cast<const Polystar*>(g.element);
-            float r = std::max(ps->outerRadius, ps->innerRadius);
-            gx = ps->position.x - r;
-            gy = ps->position.y - r;
+            auto ppos = ps->renderPosition();
+            float r = std::max(ps->renderOuterRadius(), ps->renderInnerRadius());
+            gx = ppos.x - r;
+            gy = ppos.y - r;
             gw = r * 2;
             gh = r * 2;
             break;
@@ -1937,36 +2005,43 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
       switch (g.type) {
         case NodeType::Rectangle: {
           auto r = static_cast<const Rectangle*>(g.element);
-          gx = r->position.x - r->size.width / 2;
-          gy = r->position.y - r->size.height / 2;
-          gw = r->size.width;
-          gh = r->size.height;
+          auto pos = r->renderPosition();
+          auto size = r->renderSize();
+          gx = pos.x - size.width / 2;
+          gy = pos.y - size.height / 2;
+          gw = size.width;
+          gh = size.height;
           break;
         }
         case NodeType::Ellipse: {
           auto e = static_cast<const Ellipse*>(g.element);
-          gx = e->position.x - e->size.width / 2;
-          gy = e->position.y - e->size.height / 2;
-          gw = e->size.width;
-          gh = e->size.height;
+          auto pos = e->renderPosition();
+          auto size = e->renderSize();
+          gx = pos.x - size.width / 2;
+          gy = pos.y - size.height / 2;
+          gw = size.width;
+          gh = size.height;
           break;
         }
         case NodeType::Path: {
           auto p = static_cast<const Path*>(g.element);
           if (p->data && !p->data->isEmpty()) {
             Rect b = p->data->getBounds();
-            gx = b.x;
-            gy = b.y;
-            gw = b.width;
-            gh = b.height;
+            float scale = p->renderScale();
+            auto ppos = p->renderPosition();
+            gx = ppos.x + b.x * scale;
+            gy = ppos.y + b.y * scale;
+            gw = b.width * scale;
+            gh = b.height * scale;
           }
           break;
         }
         case NodeType::Polystar: {
           auto ps = static_cast<const Polystar*>(g.element);
-          float r = std::max(ps->outerRadius, ps->innerRadius);
-          gx = ps->position.x - r;
-          gy = ps->position.y - r;
+          auto ppos = ps->renderPosition();
+          float r = std::max(ps->renderOuterRadius(), ps->renderInnerRadius());
+          gx = ppos.x - r;
+          gy = ppos.y - r;
           gw = r * 2;
           gh = r * 2;
           break;
@@ -2042,17 +2117,21 @@ void HTMLWriter::renderDiamondCanvas(HTMLBuilder& out, const GeoInfo& geo, const
   float roundness = 0;
   if (geo.type == NodeType::Rectangle) {
     auto r = static_cast<const Rectangle*>(geo.element);
-    left = r->position.x - r->size.width / 2;
-    top = r->position.y - r->size.height / 2;
-    w = r->size.width;
-    h = r->size.height;
+    auto pos = r->renderPosition();
+    auto size = r->renderSize();
+    left = pos.x - size.width / 2;
+    top = pos.y - size.height / 2;
+    w = size.width;
+    h = size.height;
     roundness = std::min(r->roundness, std::min(w / 2, h / 2));
   } else if (geo.type == NodeType::Ellipse) {
     auto e = static_cast<const Ellipse*>(geo.element);
-    left = e->position.x - e->size.width / 2;
-    top = e->position.y - e->size.height / 2;
-    w = e->size.width;
-    h = e->size.height;
+    auto pos = e->renderPosition();
+    auto size = e->renderSize();
+    left = pos.x - size.width / 2;
+    top = pos.y - size.height / 2;
+    w = size.width;
+    h = size.height;
   }
   if (w <= 0 || h <= 0) {
     return;
@@ -2201,17 +2280,21 @@ void HTMLWriter::renderImagePatternCanvas(HTMLBuilder& out, const GeoInfo& geo, 
   float roundness = 0;
   if (geo.type == NodeType::Rectangle) {
     auto r = static_cast<const Rectangle*>(geo.element);
-    left = r->position.x - r->size.width / 2;
-    top = r->position.y - r->size.height / 2;
-    w = r->size.width;
-    h = r->size.height;
+    auto pos = r->renderPosition();
+    auto size = r->renderSize();
+    left = pos.x - size.width / 2;
+    top = pos.y - size.height / 2;
+    w = size.width;
+    h = size.height;
     roundness = std::min(r->roundness, std::min(w / 2, h / 2));
   } else if (geo.type == NodeType::Ellipse) {
     auto e = static_cast<const Ellipse*>(geo.element);
-    left = e->position.x - e->size.width / 2;
-    top = e->position.y - e->size.height / 2;
-    w = e->size.width;
-    h = e->size.height;
+    auto pos = e->renderPosition();
+    auto size = e->renderSize();
+    left = pos.x - size.width / 2;
+    top = pos.y - size.height / 2;
+    w = size.width;
+    h = size.height;
   }
   if (w <= 0 || h <= 0) {
     return;
