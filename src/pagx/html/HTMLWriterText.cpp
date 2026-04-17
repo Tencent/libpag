@@ -468,8 +468,9 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
   if (tb) {
     float tbW = tb->width;
     float tbH = tb->height;
-    float tbLeft = tb->position.x;
-    float tbTop = tb->position.y;
+    auto tbRenderPos = tb->renderPosition();
+    float tbLeft = tbRenderPos.x;
+    float tbTop = tbRenderPos.y;
     style +=
         "position:absolute;left:" + FloatToString(tbLeft) + "px;top:" + FloatToString(tbTop) + "px";
     if (!std::isnan(tbW) && tbW > 0) {
@@ -508,12 +509,14 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       style += ";overflow:hidden";
     }
   } else {
-    float ty = text->position.y;
+    auto renderPos = text->renderPosition();
+    auto renderFont = text->renderFontSize();
+    float ty = renderPos.y;
     if (text->baseline == TextBaseline::Alphabetic) {
-      ty -= text->fontSize * 0.8f;
+      ty -= renderFont * 0.8f;
     }
-    auto lineHeight = text->fontLineHeight() > 0 ? text->fontLineHeight() : text->fontSize;
-    style += "position:absolute;left:" + FloatToString(text->position.x) +
+    auto lineHeight = text->fontLineHeight() > 0 ? text->fontLineHeight() : renderFont;
+    style += "position:absolute;left:" + FloatToString(renderPos.x) +
              "px;top:" + FloatToString(ty) +
              "px;white-space:pre;line-height:" + FloatToString(lineHeight) + "px";
   }
@@ -541,7 +544,7 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     }
     style += ";font-family:'" + escapedFamily + "'";
   }
-  style += ";font-size:" + FloatToString(text->fontSize) + "px";
+  style += ";font-size:" + FloatToString(text->renderFontSize()) + "px";
   if (text->letterSpacing != 0.0f) {
     style += ";letter-spacing:" + FloatToString(text->letterSpacing) + "px";
   }
@@ -593,7 +596,8 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
 
 void HTMLWriter::writeGlyphRunSVG(HTMLBuilder& out, const Text* text, const Fill* fill,
                                   const Stroke* stroke, float alpha) {
-  auto paths = ComputeGlyphPaths(*text, text->position.x, text->position.y);
+  auto renderPos = text->renderPosition();
+  auto paths = ComputeGlyphPaths(*text, renderPos.x, renderPos.y);
   bool hasBitmapGlyphs = false;
   for (auto* run : text->glyphRuns) {
     if (!run->font) {
@@ -643,8 +647,8 @@ void HTMLWriter::writeGlyphRunSVG(HTMLBuilder& out, const Text* text, const Fill
     out.closeTag();  // </g>
   }
   if (hasBitmapGlyphs) {
-    float textPosX = text->position.x;
-    float textPosY = text->position.y;
+    float textPosX = renderPos.x;
+    float textPosY = renderPos.y;
     for (auto* run : text->glyphRuns) {
       if (!run->font) {
         continue;
@@ -874,13 +878,15 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
       }
       out.closeTag();  // </svg>
     } else {
-      float ty = text->position.y;
+      auto renderPos = text->renderPosition();
+      auto renderFont = text->renderFontSize();
+      float ty = renderPos.y;
       if (text->baseline == TextBaseline::Alphabetic) {
-        ty -= text->fontSize * 0.8f;
+        ty -= renderFont * 0.8f;
       }
-      auto lineHeight = text->fontLineHeight() > 0 ? text->fontLineHeight() : text->fontSize;
+      auto lineHeight = text->fontLineHeight() > 0 ? text->fontLineHeight() : renderFont;
       std::string containerStyle =
-          "position:absolute;white-space:nowrap;left:" + FloatToString(text->position.x) +
+          "position:absolute;white-space:nowrap;left:" + FloatToString(renderPos.x) +
           "px;top:" + FloatToString(ty) + "px;line-height:" + FloatToString(lineHeight) + "px";
       if (text->textAnchor == TextAnchor::Center) {
         containerStyle += ";transform:translateX(-50%)";
@@ -915,7 +921,7 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
       out.openTag("div");
       out.addAttr("style", containerStyle);
       out.closeTagStart();
-      std::string fontSizeStr = FloatToString(text->fontSize) + "px";
+      std::string fontSizeStr = FloatToString(renderFont) + "px";
       const char* p = text->text.c_str();
       size_t charIdx = 0;
       while (*p) {
@@ -1142,6 +1148,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
       out.closeTag();  // </g>
       out.closeTag();  // </svg>
     } else {
+      auto renderFont = text->renderFontSize();
       float totalWidth = 0.0f;
       const char* p = text->text.c_str();
       while (*p) {
@@ -1150,7 +1157,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         if (len == 0) {
           break;
         }
-        totalWidth += EstimateCharAdvanceHTML(ch, text->fontSize) + text->letterSpacing;
+        totalWidth += EstimateCharAdvanceHTML(ch, renderFont) + text->letterSpacing;
         p += len;
       }
       size_t charCount = 0;
@@ -1176,7 +1183,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         if (len == 0) {
           break;
         }
-        float charWidth = EstimateCharAdvanceHTML(ch, text->fontSize) + text->letterSpacing;
+        float charWidth = EstimateCharAdvanceHTML(ch, renderFont) + text->letterSpacing;
         float charCenterArc = currentArcPos + charWidth / 2.0f;
         Point pos = {};
         float tangent = 0;
@@ -1195,13 +1202,13 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
           }
           charStyle += ";font-family:'" + escapedFamilyTP + "'";
         }
-        charStyle += ";font-size:" + FloatToString(text->fontSize) + "px";
+        charStyle += ";font-size:" + FloatToString(renderFont) + "px";
         std::string transform;
         if (textPath->perpendicular) {
           float angleDeg = tangent * 180.0f / static_cast<float>(M_PI) - textPath->baselineAngle;
           transform += "rotate(" + FloatToString(angleDeg) + "deg) ";
         }
-        transform += "translate(-50%,-" + FloatToString(text->fontSize) + "px)";
+        transform += "translate(-50%,-" + FloatToString(renderFont) + "px)";
         charStyle += ";transform:" + transform;
         charStyle += ";transform-origin:0 0";
         if (fill && fill->color) {
