@@ -19,7 +19,7 @@
 #include "pagx/PAGXOptimizer.h"
 #include <algorithm>
 #include <cmath>
-#include <sstream>
+#include <cstring>
 #include <unordered_map>
 #include <unordered_set>
 #include "pagx/nodes/Composition.h"
@@ -39,54 +39,18 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/types/PathVerb.h"
+#include "pagx/utils/VerifyUtils.h"
 
 namespace pagx {
 
 // ============================================================================
-// Helpers (mirrors of cli::IsLayerShell / HasLayerOnlyFeatures, kept inline here
-// so the optimizer does not depend on the cli module).
+// Local helpers. `HasLayerOnlyFeatures`, `IsLayerShell`, `IsPainter`, and
+// `ContainsPainter` are the shared definitions from pagx/utils/VerifyUtils.h
+// (same semantics used by the cli verify / resolve commands) — keeping them in
+// one place avoids silent drift when new Layer attributes are introduced.
 // ============================================================================
 
 namespace {
-
-bool HasLayerOnlyFeatures(const Layer* layer) {
-  if (!layer->id.empty() || !layer->name.empty()) return true;
-  if (!layer->visible) return true;
-  if (layer->alpha != 1.0f) return true;
-  if (layer->blendMode != BlendMode::Normal) return true;
-  if (!layer->matrix3D.isIdentity()) return true;
-  if (layer->preserve3D) return true;
-  if (!layer->antiAlias) return true;
-  if (!layer->groupOpacity) return true;
-  if (!layer->passThroughBackground) return true;
-  if (layer->hasScrollRect) return true;
-  if (layer->clipToBounds) return true;
-  if (layer->mask != nullptr) return true;
-  if (layer->maskType != MaskType::Alpha) return true;
-  if (layer->composition != nullptr) return true;
-  if (!layer->styles.empty()) return true;
-  if (!layer->filters.empty()) return true;
-  if (layer->layout != LayoutMode::None) return true;
-  if (layer->gap != 0.0f) return true;
-  if (layer->flex != 0.0f) return true;
-  if (layer->alignment != Alignment::Stretch) return true;
-  if (layer->arrangement != Arrangement::Start) return true;
-  if (!layer->includeInLayout) return true;
-  return false;
-}
-
-bool IsLayerShell(const Layer* layer) {
-  if (HasLayerOnlyFeatures(layer)) return false;
-  if (layer->x != 0.0f || layer->y != 0.0f) return false;
-  if (!layer->matrix.isIdentity()) return false;
-  if (!std::isnan(layer->width) || !std::isnan(layer->height)) return false;
-  if (!layer->padding.isZero()) return false;
-  if (!std::isnan(layer->left) || !std::isnan(layer->right) || !std::isnan(layer->top) ||
-      !std::isnan(layer->bottom) || !std::isnan(layer->centerX) || !std::isnan(layer->centerY)) {
-    return false;
-  }
-  return true;
-}
 
 bool HasUnresolvedImport(const Layer* layer) {
   return !layer->importDirective.source.empty() || !layer->importDirective.content.empty();
@@ -124,14 +88,6 @@ bool IsDefaultTransformGroup(const Group* group) {
     return false;
   }
   return true;
-}
-
-bool ContainsPainter(const std::vector<Element*>& elements) {
-  for (auto* el : elements) {
-    auto type = el->nodeType();
-    if (type == NodeType::Fill || type == NodeType::Stroke) return true;
-  }
-  return false;
 }
 
 void CollectMaskRefs(const std::vector<Layer*>& layers, std::unordered_set<const Layer*>& refs);
@@ -459,8 +415,7 @@ PainterSignature ComputePainterSignature(const Group* group) {
   PainterSignature sig;
   bool foundPainter = false;
   for (auto* el : group->elements) {
-    bool isPainter = el->nodeType() == NodeType::Fill || el->nodeType() == NodeType::Stroke;
-    if (isPainter) {
+    if (IsPainter(el->nodeType())) {
       foundPainter = true;
       sig.painters.push_back(el);
     } else if (foundPainter) {
@@ -493,8 +448,7 @@ bool PainterSignaturesEqual(const PainterSignature& a, const PainterSignature& b
 
 // Recursively prune empty Layers (no contents/children/composition, no constraints, not
 // referenced as a mask, not a layout participant) and empty Groups.
-bool PruneEmptyInLayer(Layer* layer, bool parentHasLayout,
-                       const std::unordered_set<const Layer*>& maskRefs);
+bool PruneEmptyInLayer(Layer* layer, const std::unordered_set<const Layer*>& maskRefs);
 bool PruneEmptyInGroup(Group* group);
 
 bool PruneEmptyInElements(std::vector<Element*>& elements) {
@@ -526,8 +480,7 @@ bool PruneEmptyInGroup(Group* group) {
   return PruneEmptyInElements(group->elements);
 }
 
-bool PruneEmptyInLayer(Layer* layer, bool parentHasLayout,
-                       const std::unordered_set<const Layer*>& maskRefs) {
+bool PruneEmptyInLayer(Layer* layer, const std::unordered_set<const Layer*>& maskRefs) {
   bool changed = false;
   changed |= PruneEmptyInElements(layer->contents);
   bool layerHasLayout = layer->layout != LayoutMode::None;
@@ -535,7 +488,7 @@ bool PruneEmptyInLayer(Layer* layer, bool parentHasLayout,
   size_t writeIdx = 0;
   for (size_t i = 0; i < layer->children.size(); i++) {
     auto* child = layer->children[i];
-    changed |= PruneEmptyInLayer(child, layerHasLayout, maskRefs);
+    changed |= PruneEmptyInLayer(child, maskRefs);
     bool empty = child->contents.empty() && child->children.empty() &&
                  child->composition == nullptr && std::isnan(child->width) &&
                  std::isnan(child->height) && !LayoutNodeHasConstraints(child) &&
@@ -552,7 +505,6 @@ bool PruneEmptyInLayer(Layer* layer, bool parentHasLayout,
     layer->children.resize(writeIdx);
     changed = true;
   }
-  (void)parentHasLayout;
   return changed;
 }
 
@@ -562,7 +514,7 @@ bool PruneEmptyTopLevel(std::vector<Layer*>& layers, bool parentHasLayout,
   size_t writeIdx = 0;
   for (size_t i = 0; i < layers.size(); i++) {
     auto* layer = layers[i];
-    changed |= PruneEmptyInLayer(layer, parentHasLayout, maskRefs);
+    changed |= PruneEmptyInLayer(layer, maskRefs);
     bool empty = layer->contents.empty() && layer->children.empty() &&
                  layer->composition == nullptr && std::isnan(layer->width) &&
                  std::isnan(layer->height) && !LayoutNodeHasConstraints(layer) &&
@@ -680,13 +632,21 @@ bool MergeAdjacentShellLayersInList(PAGXDocument* doc, std::vector<Layer*>& laye
                                    !HasUnresolvedImport(l));
   };
 
+  // The common case is "no adjacent shell run" — we want to avoid allocating a throwaway
+  // result vector for that case. Defer allocation until the first merge is detected, then
+  // backfill everything we've seen so far into the result.
   std::vector<Layer*> result;
-  result.reserve(layers.size());
   bool changed = false;
+  auto beginMutation = [&](size_t upTo) {
+    if (changed) return;
+    changed = true;
+    result.reserve(layers.size());
+    result.insert(result.end(), layers.begin(), layers.begin() + static_cast<ptrdiff_t>(upTo));
+  };
   size_t i = 0;
   while (i < layers.size()) {
     if (!isMergeable(layers[i])) {
-      result.push_back(layers[i]);
+      if (changed) result.push_back(layers[i]);
       i++;
       continue;
     }
@@ -695,10 +655,11 @@ bool MergeAdjacentShellLayersInList(PAGXDocument* doc, std::vector<Layer*>& laye
       j++;
     }
     if (j - i < 2) {
-      result.push_back(layers[i]);
+      if (changed) result.push_back(layers[i]);
       i++;
       continue;
     }
+    beginMutation(i);
     // Build a new wrapper layer containing one Group per source.
     auto* wrapper = doc->makeNode<Layer>();
     wrapper->sourceLine = layers[i]->sourceLine;
@@ -710,18 +671,15 @@ bool MergeAdjacentShellLayersInList(PAGXDocument* doc, std::vector<Layer*>& laye
       auto* group = WrapShellLayerAsGroup(doc, src);
       wrapper->contents.push_back(group);
     }
-    if (wrapper->contents.empty()) {
-      // Everything dropped; skip the wrapper too.
-    } else {
+    // If every source was empty, skip the wrapper too.
+    if (!wrapper->contents.empty()) {
       result.push_back(wrapper);
     }
-    changed = true;
     i = j;
   }
-  if (changed) {
-    layers = std::move(result);
-  }
-  return changed;
+  if (!changed) return false;
+  layers = std::move(result);
+  return true;
 }
 
 bool MergeAdjacentShellLayersRecursive(PAGXDocument* doc, std::vector<Layer*>& layers,
@@ -802,26 +760,37 @@ bool UnwrapRedundantFirstGroupInLayer(Layer* layer) {
 
 bool MergeAdjacentGroupsInElements(std::vector<Element*>& elements) {
   if (elements.size() < 2) return false;
+  // Defer allocating `result` until the first merge actually occurs: most sibling lists don't
+  // contain a mergeable pair, so in the common case we skip the vector entirely.
   std::vector<Element*> result;
-  result.reserve(elements.size());
   bool changed = false;
+  auto beginMutation = [&](size_t upTo) {
+    if (changed) return;
+    changed = true;
+    result.reserve(elements.size());
+    result.insert(result.end(), elements.begin(),
+                  elements.begin() + static_cast<ptrdiff_t>(upTo));
+  };
+  auto keepCurrent = [&](Element* el) {
+    if (changed) result.push_back(el);
+  };
   size_t i = 0;
   while (i < elements.size()) {
     auto* el = elements[i];
     if (el->nodeType() != NodeType::Group) {
-      result.push_back(el);
+      keepCurrent(el);
       i++;
       continue;
     }
     auto* baseGroup = static_cast<Group*>(el);
     if (!IsDefaultTransformGroup(baseGroup) || !baseGroup->customData.empty()) {
-      result.push_back(el);
+      keepCurrent(el);
       i++;
       continue;
     }
     auto baseSig = ComputePainterSignature(baseGroup);
     if (!baseSig.valid) {
-      result.push_back(el);
+      keepCurrent(el);
       i++;
       continue;
     }
@@ -839,8 +808,7 @@ bool MergeAdjacentGroupsInElements(std::vector<Element*>& elements) {
       // the first painter in baseGroup's elements.
       size_t firstPainterIdx = baseGroup->elements.size();
       for (size_t k = 0; k < baseGroup->elements.size(); k++) {
-        auto type = baseGroup->elements[k]->nodeType();
-        if (type == NodeType::Fill || type == NodeType::Stroke) {
+        if (IsPainter(baseGroup->elements[k]->nodeType())) {
           firstPainterIdx = k;
           break;
         }
@@ -848,8 +816,7 @@ bool MergeAdjacentGroupsInElements(std::vector<Element*>& elements) {
       // Geometry slice from nextGroup: everything before its painters.
       size_t nextFirstPainterIdx = nextGroup->elements.size();
       for (size_t k = 0; k < nextGroup->elements.size(); k++) {
-        auto type = nextGroup->elements[k]->nodeType();
-        if (type == NodeType::Fill || type == NodeType::Stroke) {
+        if (IsPainter(nextGroup->elements[k]->nodeType())) {
           nextFirstPainterIdx = k;
           break;
         }
@@ -863,16 +830,15 @@ bool MergeAdjacentGroupsInElements(std::vector<Element*>& elements) {
       }
       baseGroup->elements = std::move(updated);
       // Drop nextGroup entirely (its painters were duplicates of baseGroup's).
-      changed = true;
+      beginMutation(i);
       j++;
     }
-    result.push_back(baseGroup);
+    if (changed) result.push_back(baseGroup);
     i = j;
   }
-  if (changed) {
-    elements = std::move(result);
-  }
-  return changed;
+  if (!changed) return false;
+  elements = std::move(result);
+  return true;
 }
 
 bool MergeAdjacentGroupsRecursive(std::vector<Element*>& elements) {
@@ -1173,17 +1139,25 @@ bool SimplifyPathsInLayer(PAGXDocument* doc, Layer* layer, float tolerance) {
 
 // Build a content-only signature for a PathData (verbs + points). Distinct ids /
 // names / sourceLines do not contribute, so structurally equal resources collide.
+// Packed binary layout (verb bytes, then raw float bits for each point) is used instead of a
+// textual encoding: it is dramatically faster than ostringstream-based formatting and preserves
+// exact bit equality, so two paths collide only when every coordinate matches to the last bit.
 std::string PathDataSignature(const PathData* data) {
-  std::ostringstream os;
-  os << "v";
-  for (auto v : data->verbs()) {
-    os << static_cast<int>(v) << ',';
+  static_assert(sizeof(Point) == 2 * sizeof(float), "Point must be packed {x,y}; signature relies on it");
+  const auto& verbs = data->verbs();
+  const auto& pts = data->points();
+  const size_t pointBytes = pts.size() * sizeof(Point);
+  std::string sig;
+  sig.resize(verbs.size() + 1 + pointBytes);
+  char* out = sig.data();
+  for (auto v : verbs) {
+    *out++ = static_cast<char>(v);
   }
-  os << "|p";
-  for (const auto& pt : data->points()) {
-    os << pt.x << ',' << pt.y << ';';
+  *out++ = '|';
+  if (pointBytes != 0) {
+    std::memcpy(out, pts.data(), pointBytes);
   }
-  return os.str();
+  return sig;
 }
 
 void RewritePathDataInElements(std::vector<Element*>& elements,

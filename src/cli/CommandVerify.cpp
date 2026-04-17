@@ -620,10 +620,6 @@ static bool IsGeometryElement(NodeType type) {
          type == NodeType::Path || type == NodeType::Text;
 }
 
-static bool IsPainterElement(NodeType type) {
-  return type == NodeType::Fill || type == NodeType::Stroke;
-}
-
 static bool ContainsRepeater(const std::vector<Element*>& elements) {
   for (auto* element : elements) {
     if (element->nodeType() == NodeType::Repeater) {
@@ -641,7 +637,7 @@ static void DetectPainterLeak(const std::vector<Element*>& elements,
   int lastPainterIndex = -1;
   for (size_t i = 0; i < elements.size(); i++) {
     auto type = elements[i]->nodeType();
-    if (!IsPainterElement(type)) {
+    if (!IsPainter(type)) {
       continue;
     }
     if (lastPainterIndex >= 0) {
@@ -703,15 +699,6 @@ static bool CanUnwrapFirstChildGroup(const Group* group) {
     }
   }
   return true;
-}
-
-static bool ContainsPainter(const std::vector<Element*>& elements) {
-  for (auto* el : elements) {
-    if (IsPainterElement(el->nodeType())) {
-      return true;
-    }
-  }
-  return false;
 }
 
 static void DetectRedundantFirstChildGroup(const std::vector<Element*>& elements,
@@ -1154,7 +1141,7 @@ static void DetectIneffectiveLayoutAttrs(const Layer* layer, bool parentHasLayou
 // ============================================================================
 
 static bool CanDowngradeLayerToGroup(const Layer* layer) {
-  return layer->children.empty() && pagx::cli::IsLayerShell(layer);
+  return layer->children.empty() && pagx::IsLayerShell(layer);
 }
 
 static void DetectDowngradableLayers(const Layer* parentLayer,
@@ -1313,16 +1300,26 @@ static void CollectRepeaterProducts(const std::vector<Element*>& elements, Repea
 // Static Detection: High Path Complexity
 // ============================================================================
 
+// The verb-count threshold above which a Path is flagged as "too complex". Shared with the
+// --skip-path-complexity filter at the end of RunVerify so the two stay in sync; also exposed
+// in the user-facing message.
+static constexpr size_t kHighPathComplexityThreshold = 500;
+// Stable marker substring embedded in the diagnostic message. The filter matches on this
+// (rather than on the numeric threshold) so future tweaks to kHighPathComplexityThreshold
+// don't silently break --skip-path-complexity.
+static constexpr const char* kHighPathComplexityMarker = "may cause slow rendering";
+
 static void DetectHighPathComplexity(const Path* path, std::vector<VerifyDiagnostic>& diagnostics) {
   if (path->data == nullptr) {
     return;
   }
   auto verbCount = path->data->verbs().size();
-  if (verbCount > 500) {
+  if (verbCount > kHighPathComplexityThreshold) {
     AddDiagnostic(diagnostics, path->sourceLine,
-                  "Path with " + std::to_string(verbCount) +
-                      " verbs (> 500), may cause slow rendering. "
-                      "Fix: check if path can be simplified or split");
+                  "Path with " + std::to_string(verbCount) + " verbs (> " +
+                      std::to_string(kHighPathComplexityThreshold) +
+                      "), " + kHighPathComplexityMarker +
+                      ". Fix: check if path can be simplified or split");
   }
 }
 
@@ -2636,7 +2633,8 @@ int RunVerify(int argc, char* argv[]) {
   if (opts.skipPathComplexity) {
     diagnostics.erase(std::remove_if(diagnostics.begin(), diagnostics.end(),
                                      [](const VerifyDiagnostic& d) {
-                                       return d.message.find(" verbs (> 500)") != std::string::npos;
+                                       return d.message.find(kHighPathComplexityMarker) !=
+                                              std::string::npos;
                                      }),
                       diagnostics.end());
   }
