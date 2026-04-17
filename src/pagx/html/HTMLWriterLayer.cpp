@@ -785,7 +785,9 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     } else {
       style += ";flex-direction:column";
     }
-    if (layer->gap > 0) {
+    if (layer->gap > 0 && layer->arrangement != Arrangement::SpaceBetween &&
+        layer->arrangement != Arrangement::SpaceEvenly &&
+        layer->arrangement != Arrangement::SpaceAround) {
       style += ";gap:" + FloatToString(layer->gap) + "px";
     }
     if (!layer->padding.isZero()) {
