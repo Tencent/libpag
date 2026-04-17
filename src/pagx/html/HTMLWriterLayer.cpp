@@ -663,8 +663,8 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       }
       style += "height:" + FloatToString(outputH) + "px";
     }
-    // Flex item needs position:relative for absolute-positioned contents.
-    if (isFlexContainer || needsSize) {
+    // Flex item needs position:relative for absolute-positioned contents or child layers.
+    if (isFlexContainer || needsSize || !layer->children.empty()) {
       if (!style.empty()) {
         style += ';';
       }
