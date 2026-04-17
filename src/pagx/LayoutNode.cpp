@@ -80,10 +80,6 @@ void LayoutNode::updateSize(LayoutContext* context) {
     return;
   }
   onMeasure(context);
-  // Snap measured sizes up to the nearest pixel to prevent content clipping when constraint
-  // layout rounds the derived container size. Matches the EUI setMeasuredSize() convention.
-  measuredWidth = std::ceil(measuredWidth);
-  measuredHeight = std::ceil(measuredHeight);
 }
 
 void LayoutNode::setLayoutSize(LayoutContext*, float, float) {

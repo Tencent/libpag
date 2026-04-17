@@ -2149,12 +2149,11 @@ PAGX_TEST(PAGXTest, LayoutConstraintScalePolystarHorizontal) {
 
   doc->applyLayout();
 
-  // Polystar bounds (computed from precise vertex positions, not simplified square):
-  // For Star with pointCount=5, rotation=0, width ≈ 2.0 * outerRadius, height ≈ 1.809 * outerRadius
-  // bounds.width ≈ 57.06 → ceil → 58, area width = 400 - 50 - 50 = 300
-  // scale = 300 / 58 ≈ 5.172
-  EXPECT_FLOAT_EQ(star->renderOuterRadius(), 155.17241f);
-  EXPECT_FLOAT_EQ(star->renderInnerRadius(), 77.586205f);
+  // area width = 400 - 50 - 50 = 300, scale from content bounds width.
+  auto bounds = star->getContentBounds();
+  float scale = 300.0f / bounds.width;
+  EXPECT_FLOAT_EQ(star->renderOuterRadius(), 30 * scale);
+  EXPECT_FLOAT_EQ(star->renderInnerRadius(), 15 * scale);
   EXPECT_NEAR(star->renderPosition().x, 200.0f, 0.5f);
 }
 
@@ -2177,12 +2176,11 @@ PAGX_TEST(PAGXTest, LayoutConstraintScalePolystarVertical) {
 
   doc->applyLayout();
 
-  // Polystar bounds (computed from precise vertex positions):
-  // bounds.height ≈ 1.809 * outerRadius ≈ 45.225 → ceil → 46
-  // area height = 200 - 20 - 20 = 160
-  // scale = 160 / 46 ≈ 3.478
-  EXPECT_FLOAT_EQ(star->renderOuterRadius(), 86.95652f);
-  EXPECT_FLOAT_EQ(star->renderInnerRadius(), 34.782608f);
+  // area height = 200 - 20 - 20 = 160, scale from content bounds height.
+  auto bounds = star->getContentBounds();
+  float scale = 160.0f / bounds.height;
+  EXPECT_FLOAT_EQ(star->renderOuterRadius(), 25 * scale);
+  EXPECT_FLOAT_EQ(star->renderInnerRadius(), 10 * scale);
   EXPECT_NEAR(star->renderPosition().y, 108.0f, 0.5f);
 }
 
@@ -2207,18 +2205,11 @@ PAGX_TEST(PAGXTest, LayoutConstraintScalePolystarBothAxes) {
 
   doc->applyLayout();
 
-  // Polystar bounds (computed from precise vertex positions):
-  // bounds.width ≈ 38.042 → ceil → 39, bounds.height ≈ 36.180 → ceil → 37
-  // areaWidth = 360, areaHeight = 180
-  // scaleX = 360 / 39 ≈ 9.231, scaleY = 180 / 37 ≈ 4.865
-  // scale = min(9.231, 4.865) ≈ 4.865
-  EXPECT_FLOAT_EQ(star->renderOuterRadius(), 97.297295f);
-  EXPECT_FLOAT_EQ(star->renderInnerRadius(), 48.648647f);
-  // Scaled bounds = (-99.5, -90, 199, 180)
-  // Horizontal: tx = 20 + (360 - 199) * 0.5 - (-99.5) = 200, position.x = 200
-  // Vertical: ty = 10 + (180 - 180) * 0.5 - (-90) = 100, position.y = 100
-  // Scaled bounds are computed from trigonometric vertex positions, so position values
-  // are not exact integers after subtracting bounds offset.
+  // areaWidth = 360, areaHeight = 180, scale = min(360/bounds.width, 180/bounds.height).
+  auto bounds = star->getContentBounds();
+  float scale = std::min(360.0f / bounds.width, 180.0f / bounds.height);
+  EXPECT_FLOAT_EQ(star->renderOuterRadius(), 20 * scale);
+  EXPECT_FLOAT_EQ(star->renderInnerRadius(), 10 * scale);
   EXPECT_NEAR(star->renderPosition().x, 200.0f, 0.5f);
   EXPECT_NEAR(star->renderPosition().y, 109.5f, 0.5f);
 }
@@ -2262,10 +2253,9 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextBothAxes) {
 
   doc->applyLayout(&fontConfig);
 
-  // Proportional scaling: areaWidth = 360, areaHeight = 180
-  // measuredWidth/Height are ceil'd before scaling.
-  float scaleX = 360 / std::ceil(origWidth);
-  float scaleY = 180 / std::ceil(origHeight);
+  // Proportional scaling: areaWidth = 360, areaHeight = 180.
+  float scaleX = 360 / origWidth;
+  float scaleY = 180 / origHeight;
   float scale = std::min(scaleX, scaleY);
   float expectedFontSize = 24 * scale;
   EXPECT_FLOAT_EQ(text->renderFontSize(), expectedFontSize);
@@ -2307,8 +2297,8 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextSingleAxis) {
 
   doc->applyLayout(&fontConfig);
 
-  // areaWidth = 380, scale = 380 / ceil(origWidth)
-  float expectedFontSize = 50 * 380 / std::ceil(origWidth);
+  // areaWidth = 380, scale = 380 / origWidth.
+  float expectedFontSize = 50 * 380 / origWidth;
   EXPECT_FLOAT_EQ(text->renderFontSize(), expectedFontSize);
 }
 
@@ -2324,9 +2314,6 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleExactFit) {
   star->outerRadius = 50;
   star->innerRadius = 25;
   star->position = {0, 0};
-  // Polystar bounds: bounds.width ≈ 95.106 → ceil → 96
-  // areaWidth = 400 - 150 - 150 = 100
-  // scale = 100 / 96 ≈ 1.0417 (not 1.0, so scaling applies)
   star->left = 150;
   star->right = 150;
 
@@ -2334,9 +2321,11 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleExactFit) {
 
   doc->applyLayout();
 
-  // scale ≈ 1.0417
-  EXPECT_FLOAT_EQ(star->renderOuterRadius(), 52.083332f);
-  EXPECT_FLOAT_EQ(star->renderInnerRadius(), 26.041666f);
+  // area width = 400 - 150 - 150 = 100, scale from content bounds width.
+  auto bounds = star->getContentBounds();
+  float scale = 100.0f / bounds.width;
+  EXPECT_FLOAT_EQ(star->renderOuterRadius(), 50 * scale);
+  EXPECT_FLOAT_EQ(star->renderInnerRadius(), 25 * scale);
   EXPECT_NEAR(star->renderPosition().x, 200.0f, 0.5f);
 }
 
