@@ -8,9 +8,9 @@
   </Layer>
 
   <!-- Main container -->
-  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="stretch">
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="center">
     <!-- Title area -->
-    <Layer layout="vertical" gap="2" alignment="stretch">
+    <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
         <Text text="Clip and Mask" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
@@ -22,91 +22,94 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="vertical" gap="16" padding="30" alignment="center" arrangement="center">
+    <Layer flex="1" left="0" right="0" layout="vertical" gap="16" padding="30" alignment="center" arrangement="center">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <!-- Row 1: scrollRect + alpha mask -->
-      <Layer layout="horizontal" gap="20" arrangement="center">
-        <!-- scrollRect clipping -->
-        <Layer width="120" layout="vertical" gap="4" alignment="stretch">
-          <Layer height="110">
-            <Layer scrollRect="15,15,110,110">
-              <Rectangle position="70,70" size="140,140" roundness="20"/>
-              <Fill>
-                <LinearGradient startPoint="0,0" endPoint="140,140">
-                  <ColorStop offset="0" color="#3B82F6"/>
-                  <ColorStop offset="1" color="#EC4899"/>
-                </LinearGradient>
-              </Fill>
+      <!-- Content grid -->
+      <Layer layout="vertical" gap="16" alignment="center">
+        <!-- Row 1: scrollRect + alpha mask -->
+        <Layer layout="horizontal" gap="20" alignment="center">
+          <!-- scrollRect clipping -->
+          <Layer width="120" layout="vertical" gap="4" alignment="center">
+            <Layer width="110" height="110">
+              <Layer scrollRect="15,15,110,110">
+                <Rectangle position="70,70" size="140,140" roundness="20"/>
+                <Fill>
+                  <LinearGradient startPoint="0,0" endPoint="140,140">
+                    <ColorStop offset="0" color="#3B82F6"/>
+                    <ColorStop offset="1" color="#EC4899"/>
+                  </LinearGradient>
+                </Fill>
+              </Layer>
+            </Layer>
+            <Layer height="12">
+              <Text text="scrollRect" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
             </Layer>
           </Layer>
-          <Layer height="12">
-            <Text text="scrollRect" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
-            <Fill color="#64748B"/>
+
+          <!-- Alpha mask -->
+          <Layer width="120" layout="vertical" gap="4" alignment="center">
+            <Layer width="110" height="110">
+              <Layer id="alphaMask" visible="false">
+                <Ellipse position="55,55" size="110,110"/>
+                <Fill color="#FFFFFF"/>
+              </Layer>
+              <Layer mask="@alphaMask" maskType="alpha">
+                <Rectangle position="55,55" size="110,110"/>
+                <Fill color="#10B981"/>
+              </Layer>
+            </Layer>
+            <Layer height="12">
+              <Text text="Alpha Mask" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
           </Layer>
         </Layer>
 
-        <!-- Alpha mask -->
-        <Layer width="120" layout="vertical" gap="4" alignment="stretch">
-          <Layer height="110">
-            <Layer id="alphaMask" visible="false">
-              <Ellipse position="55,55" size="110,110"/>
-              <Fill color="#FFFFFF"/>
+        <!-- Row 2: luminance + contour mask -->
+        <Layer layout="horizontal" gap="20" alignment="center">
+          <!-- Luminance mask -->
+          <Layer width="120" layout="vertical" gap="4" alignment="center">
+            <Layer width="110" height="110">
+              <Layer id="lumMask" visible="false">
+                <Ellipse position="55,55" size="110,110"/>
+                <Fill>
+                  <RadialGradient center="55,55" radius="55">
+                    <ColorStop offset="0" color="#FFFFFF"/>
+                    <ColorStop offset="1" color="#000000"/>
+                  </RadialGradient>
+                </Fill>
+              </Layer>
+              <Layer mask="@lumMask" maskType="luminance">
+                <Rectangle position="55,55" size="110,110"/>
+                <Fill color="#EF4444"/>
+              </Layer>
             </Layer>
-            <Layer mask="@alphaMask" maskType="alpha">
-              <Rectangle position="55,55" size="110,110"/>
-              <Fill color="#10B981"/>
+            <Layer height="12">
+              <Text text="Luminance" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
             </Layer>
           </Layer>
-          <Layer height="12">
-            <Text text="Alpha Mask" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
-            <Fill color="#64748B"/>
-          </Layer>
-        </Layer>
-      </Layer>
 
-      <!-- Row 2: luminance + contour mask -->
-      <Layer layout="horizontal" gap="20" arrangement="center">
-        <!-- Luminance mask -->
-        <Layer width="120" layout="vertical" gap="4" alignment="stretch">
-          <Layer height="110">
-            <Layer id="lumMask" visible="false">
-              <Ellipse position="55,55" size="110,110"/>
-              <Fill>
-                <RadialGradient center="55,55" radius="55">
-                  <ColorStop offset="0" color="#FFFFFF"/>
-                  <ColorStop offset="1" color="#000000"/>
-                </RadialGradient>
-              </Fill>
+          <!-- Contour mask → clipPath -->
+          <Layer width="120" layout="vertical" gap="4" alignment="center">
+            <Layer width="110" height="110">
+              <Layer id="contourMask" visible="false">
+                <Polystar position="55,55" type="star" pointCount="5" outerRadius="55" innerRadius="25" rotation="-90"/>
+                <Fill color="#FFF"/>
+              </Layer>
+              <Layer mask="@contourMask" maskType="contour">
+                <Rectangle position="55,55" size="110,110"/>
+                <Fill color="#F59E0B"/>
+              </Layer>
             </Layer>
-            <Layer mask="@lumMask" maskType="luminance">
-              <Rectangle position="55,55" size="110,110"/>
-              <Fill color="#EF4444"/>
+            <Layer height="12">
+              <Text text="Contour" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
             </Layer>
-          </Layer>
-          <Layer height="12">
-            <Text text="Luminance" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
-            <Fill color="#64748B"/>
-          </Layer>
-        </Layer>
-
-        <!-- Contour mask → clipPath -->
-        <Layer width="120" layout="vertical" gap="4" alignment="stretch">
-          <Layer height="110">
-            <Layer id="contourMask" visible="false">
-              <Polystar position="55,55" type="star" pointCount="5" outerRadius="55" innerRadius="25" rotation="-90"/>
-              <Fill color="#FFF"/>
-            </Layer>
-            <Layer mask="@contourMask" maskType="contour">
-              <Rectangle position="55,55" size="110,110"/>
-              <Fill color="#F59E0B"/>
-            </Layer>
-          </Layer>
-          <Layer height="12">
-            <Text text="Contour" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
-            <Fill color="#64748B"/>
           </Layer>
         </Layer>
       </Layer>
