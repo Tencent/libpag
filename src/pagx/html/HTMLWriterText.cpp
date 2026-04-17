@@ -212,58 +212,101 @@ float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphInde
   if (totalGlyphs == 0) {
     return 0.0f;
   }
-  float glyphPos = 0.0f;
-  if (selector->unit == SelectorUnit::Percentage) {
-    float denom = totalGlyphs > 1 ? static_cast<float>(totalGlyphs - 1) : 1.0f;
-    glyphPos = static_cast<float>(glyphIndex) / denom;
-  } else {
-    glyphPos = static_cast<float>(glyphIndex);
+  auto textCount = static_cast<float>(totalGlyphs);
+  auto textStart = static_cast<float>(glyphIndex) / textCount;
+  auto textEnd = static_cast<float>(glyphIndex + 1) / textCount;
+  auto textCenter = (textStart + textEnd) * 0.5f;
+
+  float rangeStart = selector->start;
+  float rangeEnd = selector->end;
+  if (selector->unit == SelectorUnit::Index) {
+    rangeStart = rangeStart / textCount;
+    rangeEnd = rangeEnd / textCount;
   }
   float offset = selector->offset;
-  if (selector->unit == SelectorUnit::Percentage) {
-    glyphPos -= offset;
-  } else {
-    glyphPos -= offset;
+  if (selector->unit == SelectorUnit::Index) {
+    offset = offset / textCount;
   }
-  if (selector->unit == SelectorUnit::Percentage) {
-    if (glyphPos < 0.0f || glyphPos > 1.0f) {
-      glyphPos = std::fmod(glyphPos, 1.0f);
-      if (glyphPos < 0) {
-        glyphPos += 1.0f;
+  rangeStart += offset;
+  rangeEnd += offset;
+  if (rangeStart > rangeEnd) {
+    std::swap(rangeStart, rangeEnd);
+  }
+
+  float factor = 0.0f;
+  float rangeSize = rangeEnd - rangeStart;
+  if (rangeSize <= 0) {
+    if (textCenter >= rangeStart && textCenter <= rangeEnd) {
+      factor = 1.0f;
+    } else {
+      factor = 0.0f;
+    }
+  } else {
+    switch (selector->shape) {
+      case SelectorShape::RampUp: {
+        factor = (textCenter - rangeStart) / rangeSize;
+        break;
+      }
+      case SelectorShape::RampDown: {
+        factor = (rangeEnd - textCenter) / rangeSize;
+        break;
+      }
+      case SelectorShape::Triangle: {
+        float mid = (rangeStart + rangeEnd) * 0.5f;
+        if (textCenter <= mid) {
+          factor = (textCenter - rangeStart) / (mid - rangeStart);
+        } else {
+          factor = (rangeEnd - textCenter) / (rangeEnd - mid);
+        }
+        break;
+      }
+      case SelectorShape::Round: {
+        float mid = (rangeStart + rangeEnd) * 0.5f;
+        float radius = rangeSize * 0.5f;
+        float dist = std::abs(textCenter - mid);
+        if (dist >= radius) {
+          factor = 0.0f;
+        } else {
+          factor = std::sqrt(1.0f - (dist * dist) / (radius * radius));
+        }
+        break;
+      }
+      case SelectorShape::Smooth: {
+        float t = (textCenter - rangeStart) / rangeSize;
+        t = std::clamp(t, 0.0f, 1.0f);
+        factor = t * t * (3.0f - 2.0f * t);
+        break;
+      }
+      default: {
+        if (textStart >= rangeEnd || textEnd <= rangeStart) {
+          factor = 0.0f;
+        } else {
+          auto ts = std::max(textStart, rangeStart);
+          auto te = std::min(textEnd, rangeEnd);
+          factor = (te - ts) / (textEnd - textStart);
+        }
+        break;
       }
     }
   }
-  if (selector->unit == SelectorUnit::Index) {
-    glyphPos = glyphPos / static_cast<float>(totalGlyphs);
-    glyphPos = std::fmod(glyphPos, 1.0f);
-    if (glyphPos < 0) {
-      glyphPos += 1.0f;
+  if (factor < 0.0f) {
+    factor = 0.0f;
+  } else if (factor > 1.0f) {
+    factor = 1.0f;
+  }
+  if (selector->easeIn > 0 || selector->easeOut > 0) {
+    float t = rangeSize > 0 ? (textCenter - rangeStart) / rangeSize : 0.5f;
+    t = std::clamp(t, 0.0f, 1.0f);
+    if (selector->easeIn > 0 && t < 0.5f) {
+      float easeT = t * 2.0f;
+      factor *= 1.0f - (1.0f - easeT) * selector->easeIn;
+    }
+    if (selector->easeOut > 0 && t > 0.5f) {
+      float easeT = (t - 0.5f) * 2.0f;
+      factor *= 1.0f - easeT * selector->easeOut;
     }
   }
-  float start = selector->start;
-  float end = selector->end;
-  if (selector->unit == SelectorUnit::Index) {
-    start = start / static_cast<float>(totalGlyphs);
-    end = end / static_cast<float>(totalGlyphs);
-  }
-  if (glyphPos < start || glyphPos > end) {
-    return 0.0f;
-  }
-  float rangeSize = end - start;
-  if (rangeSize <= 0) {
-    return 1.0f;
-  }
-  float t = (glyphPos - start) / rangeSize;
-  float rawInfluence = ApplySelectorShape(selector->shape, t);
-  if (selector->easeIn > 0 && t < 0.5f) {
-    float easeT = t * 2.0f;
-    rawInfluence *= 1.0f - (1.0f - easeT) * selector->easeIn;
-  }
-  if (selector->easeOut > 0 && t > 0.5f) {
-    float easeT = (t - 0.5f) * 2.0f;
-    rawInfluence *= 1.0f - easeT * selector->easeOut;
-  }
-  return rawInfluence * selector->weight;
+  return factor * selector->weight;
 }
 
 //==============================================================================
@@ -930,6 +973,8 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           } else {
             charStyle += ";color:" + ColorToRGBA(sc->color, fill->alpha);
           }
+        } else if (!fill && stroke) {
+          charStyle += ";color:transparent";
         }
         if (stroke) {
           Color strokeColor = {};
