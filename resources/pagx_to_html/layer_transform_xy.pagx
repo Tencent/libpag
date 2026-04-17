@@ -116,7 +116,7 @@
 
   <!-- Footer note -->
   <Layer>
-    <Text text="Each square positioned via Layer x/y attributes" fontFamily="Arial" fontSize="9" position="170,345" textAnchor="center"/>
+    <Text text="Each square positioned via Layer x/y attributes" fontFamily="Arial" fontSize="9" position="170,338" textAnchor="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 </pagx>
