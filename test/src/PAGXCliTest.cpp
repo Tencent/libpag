@@ -2639,7 +2639,7 @@ CLI_TEST(PAGXCliTest, Verify_PainterLeakClean) {
   auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
-  EXPECT_NE(ret, 0);
+  EXPECT_EQ(ret, 0);
   EXPECT_EQ(output.find("painter leaks geometry"), std::string::npos);
 }
 
