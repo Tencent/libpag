@@ -25,6 +25,7 @@
 #include "cli/CliUtils.h"
 #include "cli/CommandImport.h"
 #include "pagx/PAGXExporter.h"
+#include "pagx/PAGXOptimizer.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/LayoutNode.h"
@@ -316,6 +317,11 @@ int RunResolve(int argc, char* argv[]) {
   if (resolvedCount == 0 && errorCount == 0) {
     return 0;
   }
+
+  // Auto-simplify the merged structure now that imports have been expanded. The optimizer is
+  // conservative: any Layer carrying id/name/customData/layout/constraints (typical hand-
+  // authored content) is untouched, so this only cleans up the newly inlined import payload.
+  PAGXOptimizer::Optimize(doc.get());
 
   auto xml = PAGXExporter::ToXML(*doc);
   std::ofstream out(options.outputFile);

@@ -300,10 +300,9 @@ std::string ColorToHexString(const Color& color, bool withAlpha) {
 //==============================================================================
 
 std::string MatrixToString(const Matrix& matrix) {
-  char buf[256] = {};
-  snprintf(buf, sizeof(buf), "%g,%g,%g,%g,%g,%g", matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx,
-           matrix.ty);
-  return std::string(buf);
+  return FloatToString(matrix.a) + "," + FloatToString(matrix.b) + "," + FloatToString(matrix.c) +
+         "," + FloatToString(matrix.d) + "," + FloatToString(matrix.tx) + "," +
+         FloatToString(matrix.ty);
 }
 
 Matrix MatrixFromString(const std::string& str) {
@@ -352,9 +351,30 @@ std::vector<float> ParseFloatList(const std::string& str) {
 }
 
 std::string FloatToString(float value) {
-  char buf[32] = {};
+  // Snap denormal/near-zero noise (typically from matrix decompositions like sin/cos around
+  // multiples of pi/2) to exactly zero. Anything below 1e-4 is well below pixel precision and
+  // would otherwise serialize as scientific notation, which the schema's number patterns reject.
+  if (value == 0.0f || std::abs(value) < 1e-4f) {
+    return "0";
+  }
+  char buf[64] = {};
   snprintf(buf, sizeof(buf), "%g", value);
-  return std::string(buf);
+  std::string s(buf);
+  // %g may still pick scientific notation for very large or very small magnitudes. Re-emit those
+  // in fixed form so the result always matches the schema's decimal patterns.
+  if (s.find('e') != std::string::npos || s.find('E') != std::string::npos) {
+    snprintf(buf, sizeof(buf), "%.6f", value);
+    s = buf;
+    auto dot = s.find('.');
+    if (dot != std::string::npos) {
+      auto last = s.find_last_not_of('0');
+      if (last == dot) {
+        last--;  // strip trailing dot
+      }
+      s = s.substr(0, last + 1);
+    }
+  }
+  return s;
 }
 
 Padding PaddingFromString(const std::string& str) {

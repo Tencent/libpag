@@ -97,14 +97,24 @@ static std::shared_ptr<pagx::PAGXDocument> LoadAndResolve(const std::string& fil
   return doc;
 }
 
-static void VerifyFile(const std::string& filePath, const std::string& key) {
+static void VerifyFile(const std::string& filePath, const std::string& key,
+                       bool skipPathComplexity = false) {
   std::streambuf* oldErr = std::cerr.rdbuf();
+  std::streambuf* oldOut = std::cout.rdbuf();
   std::ostringstream verifyErr;
+  std::ostringstream verifyOut;
   std::cerr.rdbuf(verifyErr.rdbuf());
-  auto verifyRet =
-      CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", filePath});
+  std::cout.rdbuf(verifyOut.rdbuf());
+  std::vector<std::string> args = {"verify", "--skip-render", "--skip-layout"};
+  if (skipPathComplexity) {
+    args.push_back("--skip-path-complexity");
+  }
+  args.push_back(filePath);
+  auto verifyRet = CallRun(pagx::cli::RunVerify, args);
   std::cerr.rdbuf(oldErr);
-  EXPECT_EQ(verifyRet, 0) << "pagx verify failed for " << key << ":\n" << verifyErr.str();
+  std::cout.rdbuf(oldOut);
+  EXPECT_EQ(verifyRet, 0) << "pagx verify failed for " << key << ":\n"
+                          << verifyErr.str() << verifyOut.str();
 }
 
 static pagx::Layer* MakeTextLayer(pagx::PAGXDocument* doc, const std::string& content,
@@ -209,6 +219,11 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
     std::string xml = pagx::PAGXExporter::ToXML(*doc);
     auto key = "svg_" + baseName;
     std::string pagxPath = SavePAGXFile(xml, "PAGXTest/" + key + ".pagx");
+
+    // Step 3b: The PAGXOptimizer is responsible for eliminating every structural warning
+    // verify can flag. Path-complexity warnings reflect inherent SVG content (font glyphs
+    // rendered as paths, etc.) and are excluded from the assertion.
+    VerifyFile(pagxPath, key, /*skipPathComplexity=*/true);
 
     // Step 4: Load PAGX file and build layer tree (this is the viewer's actual path)
     auto reloadedDoc = pagx::PAGXImporter::FromFile(pagxPath);

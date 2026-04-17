@@ -20,6 +20,7 @@
 #include <libxml/parser.h>
 #include <libxml/tree.h>
 #include <libxml/xmlschemas.h>
+#include <algorithm>
 #include <cfloat>
 #include <cmath>
 #include <cstdlib>
@@ -85,6 +86,7 @@ struct VerifyOptions {
   bool skipRender = false;
   bool skipLayout = false;
   bool jsonOutput = false;
+  bool skipPathComplexity = false;
 };
 
 // ============================================================================
@@ -703,6 +705,15 @@ static bool CanUnwrapFirstChildGroup(const Group* group) {
   return true;
 }
 
+static bool ContainsPainter(const std::vector<Element*>& elements) {
+  for (auto* el : elements) {
+    if (IsPainterElement(el->nodeType())) {
+      return true;
+    }
+  }
+  return false;
+}
+
 static void DetectRedundantFirstChildGroup(const std::vector<Element*>& elements,
                                            std::vector<VerifyDiagnostic>& diagnostics) {
   if (elements.empty()) {
@@ -713,11 +724,22 @@ static void DetectRedundantFirstChildGroup(const std::vector<Element*>& elements
     return;
   }
   auto* group = static_cast<const Group*>(first);
-  if (CanUnwrapFirstChildGroup(group)) {
-    AddDiagnostic(diagnostics, group->sourceLine,
-                  "redundant first-child Group, no painter isolation needed. "
-                  "Fix: unwrap — move children into parent scope");
+  if (!CanUnwrapFirstChildGroup(group)) {
+    return;
   }
+  // Groups with customData carry intentional metadata that would be lost if unwrapped.
+  if (!group->customData.empty()) {
+    return;
+  }
+  // If there are following siblings AND the group contains painters, unwrapping would let those
+  // painters bleed onto subsequent geometry. The Group is therefore providing real painter
+  // isolation and should not be flagged.
+  if (elements.size() > 1 && ContainsPainter(group->elements)) {
+    return;
+  }
+  AddDiagnostic(diagnostics, group->sourceLine,
+                "redundant first-child Group, no painter isolation needed. "
+                "Fix: unwrap — move children into parent scope");
 }
 
 // ============================================================================
@@ -1426,6 +1448,12 @@ static void DetectRectangularMask(const Layer* layer, std::vector<VerifyDiagnost
   }
   if (maskLayer->contents[0]->nodeType() != NodeType::Rectangle ||
       maskLayer->contents[1]->nodeType() != NodeType::Fill) {
+    return;
+  }
+  auto* rect = static_cast<Rectangle*>(maskLayer->contents[0]);
+  // A rounded or reversed rectangle is NOT clip-equivalent to a plain rectangular bounds clip,
+  // so suggesting scrollRect/clipToBounds would change the rendered output.
+  if (rect->roundness != 0 || rect->reversed) {
     return;
   }
   auto* fill = static_cast<Fill*>(maskLayer->contents[1]);
@@ -2498,6 +2526,8 @@ static void PrintUsage() {
             << "  --skip-render       Skip screenshot generation\n"
             << "  --skip-layout       Skip layout XML generation\n"
             << "  --json              Output diagnostics in JSON format\n"
+            << "  --skip-path-complexity\n"
+            << "                      Suppress 'Path with N verbs' warnings (content-only)\n"
             << "  -h, --help          Show this help message\n";
 }
 
@@ -2525,6 +2555,8 @@ static int ParseOptions(int argc, char* argv[], VerifyOptions* opts) {
       opts->skipLayout = true;
     } else if (strcmp(argv[i], "--json") == 0) {
       opts->jsonOutput = true;
+    } else if (strcmp(argv[i], "--skip-path-complexity") == 0) {
+      opts->skipPathComplexity = true;
     } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
       PrintUsage();
       return -1;
@@ -2599,6 +2631,14 @@ int RunVerify(int argc, char* argv[]) {
 
   if (xmlDoc != nullptr) {
     xmlFreeDoc(xmlDoc);
+  }
+
+  if (opts.skipPathComplexity) {
+    diagnostics.erase(std::remove_if(diagnostics.begin(), diagnostics.end(),
+                                     [](const VerifyDiagnostic& d) {
+                                       return d.message.find(" verbs (> 500)") != std::string::npos;
+                                     }),
+                      diagnostics.end());
   }
 
   SortDiagnostics(diagnostics);

@@ -20,6 +20,8 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
+#include "cli/CommandVerify.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
@@ -547,6 +549,30 @@ PAGX_TEST(PAGXSVGTest, SVGExport_ToFile) {
  * Test multiple SVG <-> PAGX round-trips.
  * Each iteration feeds the previous output back as input: SVG -> PAGX -> SVG -> PAGX -> ...
  */
+static int CallVerify(const std::vector<std::string>& argsIn) {
+  std::vector<std::string> args = argsIn;
+  std::vector<char*> argv;
+  argv.reserve(args.size());
+  for (auto& s : args) {
+    argv.push_back(s.data());
+  }
+  return pagx::cli::RunVerify(static_cast<int>(argv.size()), argv.data());
+}
+
+static void VerifyPagxFile(const std::string& path, const std::string& tag) {
+  std::streambuf* oldErr = std::cerr.rdbuf();
+  std::streambuf* oldOut = std::cout.rdbuf();
+  std::ostringstream errBuf;
+  std::ostringstream outBuf;
+  std::cerr.rdbuf(errBuf.rdbuf());
+  std::cout.rdbuf(outBuf.rdbuf());
+  int rc = CallVerify(
+      {"verify", "--skip-render", "--skip-layout", "--skip-path-complexity", path});
+  std::cerr.rdbuf(oldErr);
+  std::cout.rdbuf(oldOut);
+  EXPECT_EQ(rc, 0) << "verify failed for " << tag << ":\n" << errBuf.str() << outBuf.str();
+}
+
 PAGX_TEST(PAGXSVGTest, SVGExport_MultiRoundTrip) {
   constexpr int NumRoundTrips = 3;
   std::string svgDir = ProjectPath::Absolute("resources/svg");
@@ -576,6 +602,8 @@ PAGX_TEST(PAGXSVGTest, SVGExport_MultiRoundTrip) {
       auto pagxXml = pagx::PAGXExporter::ToXML(*doc);
       ASSERT_FALSE(pagxXml.empty()) << baseName << " round " << round << " PAGX export failed";
       auto pagxPath = SaveFile(pagxXml, "PAGXSVGTest/multi_roundtrip_" + baseName + ".pagx");
+
+      VerifyPagxFile(pagxPath, baseName + " round " + round);
 
       doc = pagx::PAGXImporter::FromFile(pagxPath);
       ASSERT_NE(doc, nullptr) << baseName << " round " << round << " PAGX import failed";
