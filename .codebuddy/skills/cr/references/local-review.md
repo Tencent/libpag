@@ -18,9 +18,14 @@ issues, and lets the user interactively choose which ones to fix.
 
 Determine the diff to review based on `$ARGUMENTS` and working tree state:
 
-- **Empty `$ARGUMENTS`**: find the base branch by checking common base branches
-  in order: `main`, `master`. Use the first one that exists. Fetch the full diff
-  from merge-base to the working tree (committed + uncommitted changes):
+- **Empty `$ARGUMENTS`**, **on main/master branch**: scope is uncommitted
+  changes only. Fetch with `git diff HEAD` (staged + unstaged tracked files).
+  Also check for untracked files with `git status --porcelain` (`??` lines)
+  and read their contents for review.
+- **Empty `$ARGUMENTS`**, **on a feature branch**: find the base branch by
+  checking common base branches in order: `main`, `master`. Use the first one
+  that exists. Fetch the full diff from merge-base to the working tree
+  (committed + uncommitted changes):
   ```
   git merge-base origin/{base_branch} HEAD
   git diff <merge-base-sha>
