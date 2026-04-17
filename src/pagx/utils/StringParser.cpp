@@ -351,19 +351,21 @@ std::vector<float> ParseFloatList(const std::string& str) {
 }
 
 std::string FloatToString(float value) {
-  // Snap denormal/near-zero noise (typically from matrix decompositions like sin/cos around
-  // multiples of pi/2) to exactly zero. Anything below 1e-4 is well below pixel precision and
-  // would otherwise serialize as scientific notation, which the schema's number patterns reject.
-  if (value == 0.0f || std::abs(value) < 1e-4f) {
+  if (value == 0.0f) {
     return "0";
   }
   char buf[64] = {};
   snprintf(buf, sizeof(buf), "%g", value);
   std::string s(buf);
-  // %g may still pick scientific notation for very large or very small magnitudes. Re-emit those
-  // in fixed form so the result always matches the schema's decimal patterns.
+  // %g may pick scientific notation for very large or very small magnitudes. Re-emit those
+  // in fixed form so the result always matches the schema's decimal patterns. We deliberately
+  // do NOT snap small magnitudes to zero here: even sub-pixel residuals (e.g. sin/cos of an
+  // angle that almost lines up with a multiple of pi/2) still round-trip through XML losslessly
+  // and changing them would alter rendered output for baseline-sensitive callers.
   if (s.find('e') != std::string::npos || s.find('E') != std::string::npos) {
-    snprintf(buf, sizeof(buf), "%.6f", value);
+    // Pick a width that can fully represent the smallest float magnitude that still survives
+    // the round-trip; %.9f gives nine fractional digits, enough for any non-denormal float.
+    snprintf(buf, sizeof(buf), "%.9f", value);
     s = buf;
     auto dot = s.find('.');
     if (dot != std::string::npos) {

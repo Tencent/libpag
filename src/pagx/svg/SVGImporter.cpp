@@ -39,6 +39,21 @@ using pag::DegreesToRadians;
 
 static constexpr float DEFAULT_FONT_SIZE = 16.0f;
 
+// Subset of PAGXOptimizer rules that are guaranteed to leave rasterization output bit-identical:
+// only structural simplifications and resource cleanup. Path geometry rewrites
+// (`canonicalizePaths`, `simplifyPaths`) and the `mask`->`scrollRect` rewrite all alter the
+// rendering pipeline (different code paths, sub-pixel anti-aliasing, or path geometry tolerances)
+// and therefore would invalidate baseline images. SVG-imported documents prioritize visual
+// fidelity to the source file, so we skip those three; the higher-level resolve / authoring flow
+// can still opt into the full optimizer.
+static PAGXOptimizer::Options MakeRenderingPreservingOptions() {
+  PAGXOptimizer::Options opts;
+  opts.canonicalizePaths = false;
+  opts.simplifyPaths = false;
+  opts.rectMaskToScrollRect = false;
+  return opts;
+}
+
 std::shared_ptr<PAGXDocument> SVGImporter::Parse(const std::string& filePath,
                                                  const Options& options) {
   SVGParserContext parser(options);
@@ -62,7 +77,7 @@ std::shared_ptr<PAGXDocument> SVGImporter::Parse(const std::string& filePath,
         }
       }
     }
-    PAGXOptimizer::Optimize(doc.get());
+    PAGXOptimizer::Optimize(doc.get(), MakeRenderingPreservingOptions());
   }
   return doc;
 }
@@ -72,7 +87,7 @@ std::shared_ptr<PAGXDocument> SVGImporter::Parse(const uint8_t* data, size_t len
   SVGParserContext parser(options);
   auto doc = parser.parse(data, length);
   if (doc) {
-    PAGXOptimizer::Optimize(doc.get());
+    PAGXOptimizer::Optimize(doc.get(), MakeRenderingPreservingOptions());
   }
   return doc;
 }

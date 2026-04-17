@@ -362,12 +362,21 @@ bool TryConvertRectMaskToScrollRect(Layer* layer) {
   if (!layer->matrix.isIdentity()) return false;
   if (!layer->matrix3D.isIdentity()) return false;
   if (LayoutNodeHasConstraints(layer)) return false;
+  // If the layer already declares an explicit frame size, leave it alone — overwriting an
+  // author-supplied width/height could change layout semantics for downstream consumers.
+  if (!std::isnan(layer->width) || !std::isnan(layer->height)) return false;
   float left = rect->position.x - rect->size.width * 0.5f;
   float top = rect->position.y - rect->size.height * 0.5f;
   layer->scrollRect = {left, top, rect->size.width, rect->size.height};
   layer->hasScrollRect = true;
   layer->x += left;
   layer->y += top;
+  // The displayed area collapses to exactly the scrollRect's size after this rewrite. Pin the
+  // layer's frame to those dimensions so layoutBounds() reflects the visible region instead of
+  // the (much larger) un-clipped child extent — otherwise verify's child-exceeds-parent check
+  // (which only suppresses on the parent's clip, not the child's) would fire false positives.
+  layer->width = rect->size.width;
+  layer->height = rect->size.height;
   layer->mask = nullptr;
   return true;
 }
