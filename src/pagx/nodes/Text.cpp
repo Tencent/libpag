@@ -53,8 +53,8 @@ void Text::onMeasure(LayoutContext* context) {
   auto result = TextLayout::Layout({this}, params, context);
   glyphData->layoutRuns = result.extractLayoutRuns(this);
   textBounds = result.bounds;
-  measuredX = position.x + textBounds.x;
-  measuredY = position.y + textBounds.y;
+  measuredX = position.x;
+  measuredY = position.y;
   measuredWidth = textBounds.width;
   measuredHeight = textBounds.height;
 }

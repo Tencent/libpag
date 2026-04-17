@@ -120,12 +120,13 @@ void TextBox::updateLayout(LayoutContext* context) {
   TextLayout::CollectTextElements(elements, childText);
   auto result = TextLayout::Layout(childText, params, context);
   for (size_t i = 0; i < childText.size(); i++) {
-    childText[i]->textBounds = result.getTextBounds(childText[i]);
-    childText[i]->glyphData->layoutRuns = result.extractLayoutRuns(childText[i]);
+    auto* text = childText[i];
+    text->textBounds = result.getTextBounds(text);
+    text->glyphData->layoutRuns = result.extractLayoutRuns(text);
     if (hasPadding) {
-      childText[i]->textBounds.x += padding.left;
-      childText[i]->textBounds.y += padding.top;
-      for (auto& run : childText[i]->glyphData->layoutRuns) {
+      text->textBounds.x += padding.left;
+      text->textBounds.y += padding.top;
+      for (auto& run : text->glyphData->layoutRuns) {
         for (auto& pos : run.positions) {
           pos.x += padding.left;
           pos.y += padding.top;
