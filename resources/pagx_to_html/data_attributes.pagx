@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: data-* custom attributes on various elements, id and name attributes -->
-<pagx version="1.0" width="320" height="220">
+<pagx version="1.0" width="340" height="240">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -8,7 +8,7 @@
   </Layer>
 
   <!-- Main container -->
-  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20" gap="0" alignment="stretch">
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="0" alignment="stretch">
     <!-- Card -->
     <Layer flex="1" layout="vertical" gap="0" alignment="stretch" data-figma-id="1:42" data-exported-by="PAGExporter" data-category="ui-card">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="12" data-role="container"/>

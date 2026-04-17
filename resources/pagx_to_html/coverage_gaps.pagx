@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Remaining coverage gaps — ImagePattern.mipmapMode (non-default), Repeater.offset (non-zero),
      textAnchor="end", RangeSelector.offset (non-zero), TextPath.baselineAngle (non-zero) -->
-<pagx version="1.0" width="460" height="440">
+<pagx version="1.0" width="460" height="500">
   <Resources>
     <Image id="tinyImg" source="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAFUlEQVR4nGP8Oo/7PwMSYELmECcAAKy6AqWSorM1AAAAAElFTkSuQmCC"/>
     <PathData id="wavePath" data="M 0,30 C 40,0 80,60 120,30 C 160,0 200,60 240,30"/>
@@ -28,7 +28,7 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" left="0" right="0" layout="vertical" padding="20,28,20,28" alignment="center" arrangement="center">
+    <Layer flex="1" layout="vertical" padding="20,30,20,30" alignment="center" arrangement="center">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>

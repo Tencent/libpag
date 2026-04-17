@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: StrokeAlign center, inside, outside — visual comparison with same width -->
-<pagx version="1.0" width="420" height="300">
+<pagx version="1.0" width="460" height="320">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -22,7 +22,7 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="horizontal" gap="10" padding="15" alignment="stretch" arrangement="center">
+    <Layer flex="1" layout="horizontal" gap="10" padding="20" alignment="stretch" arrangement="center">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>

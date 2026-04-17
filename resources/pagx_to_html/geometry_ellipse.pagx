@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Ellipse → CSS div + border-radius:50%; center-point positioning -->
-<pagx version="1.0" width="400" height="270">
+<pagx version="1.0" width="420" height="280">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
