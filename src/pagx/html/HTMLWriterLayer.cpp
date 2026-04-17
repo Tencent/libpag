@@ -494,6 +494,10 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         if (hasPainter && group->alpha < 1.0f) {
           writeGroup(out, group, alpha, distribute);
         } else {
+          auto savedFill = curFill;
+          auto savedStroke = curStroke;
+          curFill = nullptr;
+          curStroke = nullptr;
           Matrix gm = BuildGroupMatrix(group);
           for (auto* ge : group->elements) {
             auto gt = ge->nodeType();
@@ -530,6 +534,8 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               writeGroup(out, static_cast<const Group*>(ge), alpha, distribute);
             }
           }
+          curFill = savedFill;
+          curStroke = savedStroke;
         }
         break;
       }
