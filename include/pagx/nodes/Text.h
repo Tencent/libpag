@@ -103,10 +103,10 @@ class Text : public Element, public LayoutNode {
 
   ~Text() override;
 
-  /// Returns the text position adjusted to the layout bounds.
+  /** Returns the text position adjusted to the layout bounds. */
   Point renderPosition() const;
 
-  /// Returns the effective font size after layout scaling.
+  /** Returns the effective font size after layout scaling. */
   float renderFontSize() const;
 
   NodeType nodeType() const override {

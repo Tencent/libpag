@@ -249,7 +249,7 @@ class Layer : public Node, public LayoutNode {
     return NodeType::Layer;
   }
 
-  /// Returns the layer position adjusted to the layout bounds.
+  /** Returns the layer position adjusted to the layout bounds. */
   Point renderPosition() const;
 
  private:

@@ -97,7 +97,7 @@ class Group : public Element, public LayoutNode {
     return NodeType::Group;
   }
 
-  /// Returns the group position adjusted to the layout bounds.
+  /** Returns the group position adjusted to the layout bounds. */
   Point renderPosition() const;
 
  protected:
