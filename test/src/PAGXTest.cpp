@@ -2366,11 +2366,13 @@ PAGX_TEST(PAGXTest, LayoutConstraintScalePath) {
   // Proportional scaling: scale = 360 / 60 = 6.0
   // Scaled points: (0,0)->(360,0)->(180,240), new bounds = (0, 0, 360, 240)
   EXPECT_FLOAT_EQ(path->renderPosition().x, 20.0f);
-  // Verify points were actually scaled
+  // Verify the render scale is correct (original data is not modified)
+  EXPECT_FLOAT_EQ(path->renderScale(), 6.0f);
+  // Original points should remain unchanged
   auto& points = path->data->points();
-  EXPECT_FLOAT_EQ(points[1].x, 360.0f);  // 60 * 6
-  EXPECT_FLOAT_EQ(points[2].x, 180.0f);  // 30 * 6
-  EXPECT_FLOAT_EQ(points[2].y, 240.0f);  // 40 * 6
+  EXPECT_FLOAT_EQ(points[1].x, 60.0f);
+  EXPECT_FLOAT_EQ(points[2].x, 30.0f);
+  EXPECT_FLOAT_EQ(points[2].y, 40.0f);
 }
 
 PAGX_TEST(PAGXTest, LayoutConstraintScalePathBothAxes) {
@@ -2403,9 +2405,11 @@ PAGX_TEST(PAGXTest, LayoutConstraintScalePathBothAxes) {
   // areaHeight = 200, scaleY = 200 / 50 = 4.0
   // scale = min(3.0, 4.0) = 3.0
   // Scaled bounds: (0, 0, 300, 150)
+  // Verify the render scale is correct (original data is not modified)
+  EXPECT_FLOAT_EQ(path->renderScale(), 3.0f);
   auto& points = path->data->points();
-  EXPECT_FLOAT_EQ(points[1].x, 300.0f);  // 100 * 3
-  EXPECT_FLOAT_EQ(points[2].y, 150.0f);  // 50 * 3
+  EXPECT_FLOAT_EQ(points[1].x, 100.0f);
+  EXPECT_FLOAT_EQ(points[2].y, 50.0f);
   // Centered vertically: 50 + (200 - 150) * 0.5 - 0 = 75
   EXPECT_FLOAT_EQ(path->renderPosition().x, 50.0f);
   EXPECT_FLOAT_EQ(path->renderPosition().y, 75.0f);
@@ -4142,7 +4146,8 @@ PAGX_TEST(PAGXTest, GroupChildConstraintAffectsMeasurement) {
 
   // Group measured width should be 260 (0..100 for ellipse1, 160..260 for ellipse2).
   // With alignment=center, row.x = (400 - 260) / 2 = 70.
-  EXPECT_FLOAT_EQ(row->renderPosition().x, 70.0f) << "Group child left constraint should contribute to measurement";
+  EXPECT_FLOAT_EQ(row->renderPosition().x, 70.0f)
+      << "Group child left constraint should contribute to measurement";
   EXPECT_FLOAT_EQ(row->layoutWidth, 260.0f)
       << "Row width should be measured as 260 from Group contents";
 }

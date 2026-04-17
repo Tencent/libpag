@@ -26,10 +26,10 @@ namespace pagx {
 void TextPath::onMeasure(LayoutContext*) {
   if (path) {
     auto bounds = path->getBounds();
-    preferredX = bounds.x;
-    preferredY = bounds.y;
-    preferredWidth = bounds.width;
-    preferredHeight = bounds.height;
+    measuredX = bounds.x;
+    measuredY = bounds.y;
+    measuredWidth = bounds.width;
+    measuredHeight = bounds.height;
   }
 }
 
@@ -37,7 +37,7 @@ void TextPath::setLayoutSize(LayoutContext*, float width, float height) {
   if (!path) {
     return;
   }
-  float scale = LayoutNode::ComputeUniformScale(preferredWidth, preferredHeight, width, height);
+  float scale = LayoutNode::ComputeUniformScale(measuredWidth, measuredHeight, width, height);
   if (scale != 1.0f) {
     path->transform(Matrix::Scale(scale, scale));
     baselineOrigin.x *= scale;

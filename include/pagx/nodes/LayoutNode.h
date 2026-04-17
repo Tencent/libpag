@@ -163,16 +163,16 @@ class LayoutNode {
  protected:
   LayoutNode() = default;
 
-  /** Writes preferredWidth/preferredHeight. Called by updateSize when not yet measured. */
+  /** Writes measuredWidth/measuredHeight. Called by updateSize when not yet measured. */
   virtual void onMeasure(LayoutContext*) {
   }
 
  private:
-  // Preferred position and size (written by onMeasure during updateSize, read-only after that).
-  float preferredX = 0;
-  float preferredY = 0;
-  float preferredWidth = NAN;
-  float preferredHeight = NAN;
+  // Measured position and size (written by onMeasure during updateSize, read-only after that).
+  float measuredX = 0;
+  float measuredY = 0;
+  float measuredWidth = NAN;
+  float measuredHeight = NAN;
 
   // Layout-resolved position and size (written during layout phase, readable via layoutBounds()).
   float layoutX = NAN;

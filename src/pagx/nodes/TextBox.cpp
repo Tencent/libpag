@@ -40,8 +40,8 @@ static TextLayoutParams MakeTextLayoutParams(const TextBox* textBox, float boxWi
 
 void TextBox::onMeasure(LayoutContext* context) {
   if (!std::isnan(width) && !std::isnan(height)) {
-    preferredWidth = width;
-    preferredHeight = height;
+    measuredWidth = width;
+    measuredHeight = height;
     return;
   }
   bool hasPadding = !padding.isZero();
@@ -59,21 +59,21 @@ void TextBox::onMeasure(LayoutContext* context) {
   std::vector<Text*> childText = {};
   TextLayout::CollectTextElements(elements, childText);
   auto result = TextLayout::Layout(childText, params, context);
-  preferredWidth = std::isnan(width) ? result.bounds.width : width;
-  preferredHeight = std::isnan(height) ? result.bounds.height : height;
+  measuredWidth = std::isnan(width) ? result.bounds.width : width;
+  measuredHeight = std::isnan(height) ? result.bounds.height : height;
   if (hasPadding) {
     if (std::isnan(width)) {
-      preferredWidth += padding.left + padding.right;
+      measuredWidth += padding.left + padding.right;
     }
     if (std::isnan(height)) {
-      preferredHeight += padding.top + padding.bottom;
+      measuredHeight += padding.top + padding.bottom;
     }
   }
 }
 
 void TextBox::setLayoutSize(LayoutContext* context, float width, float height) {
-  layoutWidth = !std::isnan(width) ? width : preferredWidth;
-  layoutHeight = !std::isnan(height) ? height : preferredHeight;
+  layoutWidth = !std::isnan(width) ? width : measuredWidth;
+  layoutHeight = !std::isnan(height) ? height : measuredHeight;
   updateLayout(context);
   // An axis is content-measured when neither the parent nor the element itself specifies its size.
   bool widthFromContent = std::isnan(width) && std::isnan(this->width);
@@ -81,8 +81,8 @@ void TextBox::setLayoutSize(LayoutContext* context, float width, float height) {
   // For TextBox, only a change in the wrap axis (width for horizontal, height for vertical)
   // can affect the cross axis measurement. Re-typeset to compute the correct cross-axis size.
   bool horizontal = (writingMode == WritingMode::Horizontal);
-  bool wrapAxisChanged = horizontal ? (!std::isnan(width) && width != preferredWidth)
-                                    : (!std::isnan(height) && height != preferredHeight);
+  bool wrapAxisChanged = horizontal ? (!std::isnan(width) && width != measuredWidth)
+                                    : (!std::isnan(height) && height != measuredHeight);
   bool crossAxisFromContent = horizontal ? heightFromContent : widthFromContent;
   if (crossAxisFromContent && wrapAxisChanged) {
     bool hasPadding = !padding.isZero();

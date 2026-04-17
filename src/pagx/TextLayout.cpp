@@ -227,7 +227,7 @@ class TextLayoutContext {
     auto metrics = GetFontMetrics(font);
     GlyphInfo gi = {};
     gi.unichar = '\n';
-    gi.fontSize = text->fontSize;
+    gi.fontSize = font.getSize();
     gi.ascent = metrics.ascent;
     gi.descent = metrics.descent;
     gi.fontLineHeight = std::max(0.0f, fabsf(metrics.ascent) + metrics.descent + metrics.leading);
@@ -250,7 +250,7 @@ class TextLayoutContext {
     gi.unichar = '\t';
     gi.advance = tabAdvance;
     gi.xPosition = xPosition;
-    gi.fontSize = text->fontSize;
+    gi.fontSize = font.getSize();
     gi.ascent = metrics.ascent;
     gi.descent = metrics.descent;
     gi.fontLineHeight = std::max(0.0f, fabsf(metrics.ascent) + metrics.descent + metrics.leading);
@@ -295,7 +295,7 @@ class TextLayoutContext {
       ShapedInfo info = {};
       info.text = text;
       if (!text->text.empty()) {
-        shapeText(text, info, params.writingMode == WritingMode::Vertical);
+        shapeText(text, info, params.writingMode == WritingMode::Vertical, params.fontScale);
         if (!directionResolved) {
           paragraphRTL = info.paragraphRTL;
           directionResolved = true;
@@ -372,7 +372,7 @@ class TextLayoutContext {
     return result;
   }
 
-  void shapeText(Text* text, ShapedInfo& info, bool vertical = false) {
+  void shapeText(Text* text, ShapedInfo& info, bool vertical = false, float fontScale = 1.0f) {
     auto primaryTypeface = findTypeface(text->fontFamily, text->fontStyle);
 
     // When the primary typeface is not found, find a fallback typeface for font metrics used by
@@ -382,10 +382,11 @@ class TextLayoutContext {
       metricsTypeface = layoutContext_->fallbackTypeface('A', nullptr);
     }
 
-    tgfx::Font primaryFont(primaryTypeface, text->fontSize);
+    float effectiveFontSize = text->fontSize * fontScale;
+    tgfx::Font primaryFont(primaryTypeface, effectiveFontSize);
     primaryFont.setFauxBold(text->fauxBold);
     primaryFont.setFauxItalic(text->fauxItalic);
-    tgfx::Font metricsFont(metricsTypeface, text->fontSize);
+    tgfx::Font metricsFont(metricsTypeface, effectiveFontSize);
     metricsFont.setFauxBold(text->fauxBold);
     metricsFont.setFauxItalic(text->fauxItalic);
     float currentX = 0;
@@ -403,7 +404,7 @@ class TextLayoutContext {
     }
 
     std::shared_ptr<tgfx::Typeface> currentTypeface = nullptr;
-    float tabWidth = text->fontSize * 4;
+    float tabWidth = effectiveFontSize * 4;
 
     for (auto& seg : segments) {
       if (seg.isNewline) {
@@ -460,7 +461,7 @@ class TextLayoutContext {
         gi.advance = sg.xAdvance;
         gi.xPosition = currentX;
         gi.unichar = unichar;
-        gi.fontSize = text->fontSize;
+        gi.fontSize = effectiveFontSize;
         gi.ascent = metrics.ascent;
         gi.descent = metrics.descent;
         gi.fontLineHeight =

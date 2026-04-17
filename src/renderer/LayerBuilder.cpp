@@ -308,8 +308,9 @@ class LayerBuilderContext {
 
   std::shared_ptr<tgfx::Rectangle> convertRectangle(const Rectangle* node) {
     auto rect = tgfx::Rectangle::Make();
-    rect->setPosition(ToTGFX(node->position));
-    rect->setSize({node->size.width, node->size.height});
+    rect->setPosition(ToTGFX(node->renderPosition()));
+    auto size = node->renderSize();
+    rect->setSize({size.width, size.height});
     rect->setRoundness(node->roundness);
     rect->setReversed(node->reversed);
     return rect;
@@ -317,18 +318,19 @@ class LayerBuilderContext {
 
   std::shared_ptr<tgfx::Ellipse> convertEllipse(const Ellipse* node) {
     auto ellipse = tgfx::Ellipse::Make();
-    ellipse->setPosition(ToTGFX(node->position));
-    ellipse->setSize({node->size.width, node->size.height});
+    ellipse->setPosition(ToTGFX(node->renderPosition()));
+    auto size = node->renderSize();
+    ellipse->setSize({size.width, size.height});
     ellipse->setReversed(node->reversed);
     return ellipse;
   }
 
   std::shared_ptr<tgfx::Polystar> convertPolystar(const Polystar* node) {
     auto polystar = tgfx::Polystar::Make();
-    polystar->setPosition(ToTGFX(node->position));
+    polystar->setPosition(ToTGFX(node->renderPosition()));
     polystar->setPointCount(node->pointCount);
-    polystar->setOuterRadius(node->outerRadius);
-    polystar->setInnerRadius(node->innerRadius);
+    polystar->setOuterRadius(node->renderOuterRadius());
+    polystar->setInnerRadius(node->renderInnerRadius());
     polystar->setOuterRoundness(node->outerRoundness);
     polystar->setInnerRoundness(node->innerRoundness);
     polystar->setRotation(node->rotation);
@@ -343,9 +345,14 @@ class LayerBuilderContext {
 
   std::shared_ptr<tgfx::ShapePath> convertPath(const Path* node) {
     auto shapePath = tgfx::ShapePath::Make();
-    shapePath->setPosition(ToTGFX(node->position));
+    shapePath->setPosition(ToTGFX(node->renderPosition()));
     if (node->data) {
-      shapePath->setPath(ToTGFX(*node->data));
+      auto path = ToTGFX(*node->data);
+      float scale = node->renderScale();
+      if (scale != 1.0f) {
+        path.transform(tgfx::Matrix::MakeScale(scale));
+      }
+      shapePath->setPath(std::move(path));
     }
     shapePath->setReversed(node->reversed);
     return shapePath;
@@ -362,7 +369,8 @@ class LayerBuilderContext {
     }
     auto tgfxText = tgfx::Text::Make(textBlob, node->glyphData->anchors);
     if (tgfxText) {
-      tgfxText->setPosition(tgfx::Point::Make(node->position.x, node->position.y));
+      auto pos = node->renderPosition();
+      tgfxText->setPosition(tgfx::Point::Make(pos.x, pos.y));
     }
     return tgfxText;
   }
@@ -683,8 +691,9 @@ class LayerBuilderContext {
     if (node->anchor.x != 0 || node->anchor.y != 0) {
       group->setAnchor(ToTGFX(node->anchor));
     }
-    if (node->position.x != 0 || node->position.y != 0) {
-      group->setPosition(ToTGFX(node->position));
+    auto renderPos = node->renderPosition();
+    if (renderPos.x != 0 || renderPos.y != 0) {
+      group->setPosition(ToTGFX(renderPos));
     }
     if (node->scale.x != 1 || node->scale.y != 1) {
       group->setScale(ToTGFX(node->scale));
@@ -714,8 +723,9 @@ class LayerBuilderContext {
 
     // Apply transformation: combine x/y translation with matrix
     auto matrix = ToTGFX(node->matrix);
-    if (node->x != 0 || node->y != 0) {
-      matrix = tgfx::Matrix::MakeTrans(node->x, node->y) * matrix;
+    auto layerPos = node->renderPosition();
+    if (layerPos.x != 0 || layerPos.y != 0) {
+      matrix = tgfx::Matrix::MakeTrans(layerPos.x, layerPos.y) * matrix;
     }
     if (!matrix.isIdentity()) {
       layer->setMatrix(matrix);

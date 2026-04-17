@@ -48,21 +48,23 @@ static TextLayoutParams MakeStandaloneParams(const Text* text) {
 }
 
 void Text::onMeasure(LayoutContext* context) {
+  fontScale_ = 1.0f;
   auto params = MakeStandaloneParams(this);
   auto result = TextLayout::Layout({this}, params, context);
   glyphData->layoutRuns = result.extractLayoutRuns(this);
   textBounds = result.bounds;
-  preferredX = textBounds.x;
-  preferredY = textBounds.y;
-  preferredWidth = textBounds.width;
-  preferredHeight = textBounds.height;
+  measuredX = position.x + textBounds.x;
+  measuredY = position.y + textBounds.y;
+  measuredWidth = textBounds.width;
+  measuredHeight = textBounds.height;
 }
 
 void Text::setLayoutSize(LayoutContext* context, float width, float height) {
-  float scale = LayoutNode::ComputeUniformScale(preferredWidth, preferredHeight, width, height);
+  float scale = LayoutNode::ComputeUniformScale(measuredWidth, measuredHeight, width, height);
   if (scale != 1.0f) {
-    fontSize = fontSize * scale;
+    fontScale_ = scale;
     auto params = MakeStandaloneParams(this);
+    params.fontScale = scale;
     auto result = TextLayout::Layout({this}, params, context);
     glyphData->layoutRuns = result.extractLayoutRuns(this);
     textBounds = result.bounds;
@@ -73,13 +75,20 @@ void Text::setLayoutSize(LayoutContext* context, float width, float height) {
 
 void Text::setLayoutPosition(LayoutContext*, float x, float y) {
   if (!std::isnan(x)) {
-    position.x = x - textBounds.x;
     layoutX = x;
   }
   if (!std::isnan(y)) {
-    position.y = y - textBounds.y;
     layoutY = y;
   }
+}
+
+Point Text::renderPosition() const {
+  auto bounds = layoutBounds();
+  return {bounds.x - textBounds.x, bounds.y - textBounds.y};
+}
+
+float Text::renderFontSize() const {
+  return fontSize * fontScale_;
 }
 
 }  // namespace pagx

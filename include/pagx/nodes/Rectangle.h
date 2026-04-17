@@ -32,10 +32,10 @@ namespace pagx {
 class Rectangle : public Element, public LayoutNode {
  public:
   /**
-   * The center point of the rectangle. When not explicitly set, defaults to the center of the
-   * bounding box so that the top-left corner aligns with the origin (0, 0).
+   * The center point of the rectangle. Animatable. May be overridden by constraint attributes
+   * during layout. NaN means not explicitly set, defaults to (size.width/2, size.height/2).
    */
-  Point position = {};
+  Point position = {NAN, NAN};
 
   /**
    * The size of the rectangle. The default value is {0, 0}.
@@ -55,6 +55,16 @@ class Rectangle : public Element, public LayoutNode {
   NodeType nodeType() const override {
     return NodeType::Rectangle;
   }
+
+  /**
+   * Returns the final center position for rendering, computed from layoutBounds.
+   */
+  Point renderPosition() const;
+
+  /**
+   * Returns the final size for rendering, computed from layoutBounds.
+   */
+  Size renderSize() const;
 
  protected:
   void onMeasure(LayoutContext* context) override;

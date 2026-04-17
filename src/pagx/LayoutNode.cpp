@@ -38,12 +38,11 @@ bool LayoutNode::hasConstraints() const {
 }
 
 Rect LayoutNode::layoutBounds() const {
-  float x = std::isnan(layoutX) ? preferredX : layoutX;
-  float y = std::isnan(layoutY) ? preferredY : layoutY;
-  float w =
-      std::isnan(layoutWidth) ? (std::isnan(preferredWidth) ? 0 : preferredWidth) : layoutWidth;
+  float x = std::isnan(layoutX) ? measuredX : layoutX;
+  float y = std::isnan(layoutY) ? measuredY : layoutY;
+  float w = std::isnan(layoutWidth) ? (std::isnan(measuredWidth) ? 0 : measuredWidth) : layoutWidth;
   float h =
-      std::isnan(layoutHeight) ? (std::isnan(preferredHeight) ? 0 : preferredHeight) : layoutHeight;
+      std::isnan(layoutHeight) ? (std::isnan(measuredHeight) ? 0 : measuredHeight) : layoutHeight;
   return Rect::MakeXYWH(x, y, w, h);
 }
 
@@ -76,15 +75,15 @@ float LayoutNode::constraintExtentY() const {
 }
 
 void LayoutNode::updateSize(LayoutContext* context) {
-  // If both preferred dimensions are already measured, skip onMeasure.
-  if (!std::isnan(preferredWidth) && !std::isnan(preferredHeight)) {
+  // If both measured dimensions are already set, skip onMeasure.
+  if (!std::isnan(measuredWidth) && !std::isnan(measuredHeight)) {
     return;
   }
   onMeasure(context);
   // Snap measured sizes up to the nearest pixel to prevent content clipping when constraint
   // layout rounds the derived container size. Matches the EUI setMeasuredSize() convention.
-  preferredWidth = std::ceil(preferredWidth);
-  preferredHeight = std::ceil(preferredHeight);
+  measuredWidth = std::ceil(measuredWidth);
+  measuredHeight = std::ceil(measuredHeight);
 }
 
 void LayoutNode::setLayoutSize(LayoutContext*, float, float) {
@@ -232,13 +231,13 @@ void LayoutNode::MeasureChildNodes(const std::vector<Element*>& elements, float 
   float maxY = 0;
   for (auto* element : elements) {
     auto* node = AsLayoutNode(element);
-    if (node == nullptr || std::isnan(node->preferredWidth) || std::isnan(node->preferredHeight)) {
+    if (node == nullptr || std::isnan(node->measuredWidth) || std::isnan(node->measuredHeight)) {
       continue;
     }
-    float extX = node->hasConstraints() ? node->constraintExtentX() : node->preferredX;
-    float extY = node->hasConstraints() ? node->constraintExtentY() : node->preferredY;
-    extX += node->preferredWidth;
-    extY += node->preferredHeight;
+    float extX = node->hasConstraints() ? node->constraintExtentX() : node->measuredX;
+    float extY = node->hasConstraints() ? node->constraintExtentY() : node->measuredY;
+    extX += node->measuredWidth;
+    extY += node->measuredHeight;
     maxX = std::max(maxX, extX);
     maxY = std::max(maxY, extY);
   }

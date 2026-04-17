@@ -43,6 +43,7 @@ struct TextLayoutParams {
   bool wordWrap = true;
   Overflow overflow = Overflow::Visible;
   TextBaseline baseline = TextBaseline::LineBox;
+  float fontScale = 1.0f;
 };
 
 }  // namespace pagx

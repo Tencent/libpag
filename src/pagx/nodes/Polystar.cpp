@@ -65,33 +65,50 @@ Rect Polystar::getContentBounds() const {
 
 void Polystar::onMeasure(LayoutContext*) {
   auto bounds = getContentBounds();
-  preferredX = position.x + bounds.x;
-  preferredY = position.y + bounds.y;
-  preferredWidth = bounds.width;
-  preferredHeight = bounds.height;
+  measuredX = std::isnan(position.x) ? 0 : (position.x + bounds.x);
+  measuredY = std::isnan(position.y) ? 0 : (position.y + bounds.y);
+  measuredWidth = bounds.width;
+  measuredHeight = bounds.height;
 }
 
 void Polystar::setLayoutSize(LayoutContext*, float width, float height) {
-  float scale = LayoutNode::ComputeUniformScale(preferredWidth, preferredHeight, width, height);
-  if (scale != 1.0f) {
-    outerRadius = outerRadius * scale;
-    innerRadius = innerRadius * scale;
-  }
-  auto bounds = getContentBounds();
-  layoutWidth = bounds.width;
-  layoutHeight = bounds.height;
+  float scale = LayoutNode::ComputeUniformScale(measuredWidth, measuredHeight, width, height);
+  layoutWidth = measuredWidth * scale;
+  layoutHeight = measuredHeight * scale;
 }
 
 void Polystar::setLayoutPosition(LayoutContext*, float x, float y) {
-  auto bounds = getContentBounds();
   if (!std::isnan(x)) {
-    position.x = x - bounds.x;
     layoutX = x;
   }
   if (!std::isnan(y)) {
-    position.y = y - bounds.y;
     layoutY = y;
   }
+}
+
+Point Polystar::renderPosition() const {
+  auto bounds = layoutBounds();
+  auto contentBounds = getContentBounds();
+  float scale =
+      LayoutNode::ComputeUniformScale(measuredWidth, measuredHeight, bounds.width, bounds.height);
+  float offsetX = (bounds.width - contentBounds.width * scale) * 0.5f;
+  float offsetY = (bounds.height - contentBounds.height * scale) * 0.5f;
+  return {bounds.x + offsetX - contentBounds.x * scale,
+          bounds.y + offsetY - contentBounds.y * scale};
+}
+
+float Polystar::renderOuterRadius() const {
+  auto bounds = layoutBounds();
+  float scale =
+      LayoutNode::ComputeUniformScale(measuredWidth, measuredHeight, bounds.width, bounds.height);
+  return outerRadius * scale;
+}
+
+float Polystar::renderInnerRadius() const {
+  auto bounds = layoutBounds();
+  float scale =
+      LayoutNode::ComputeUniformScale(measuredWidth, measuredHeight, bounds.width, bounds.height);
+  return innerRadius * scale;
 }
 
 }  // namespace pagx
