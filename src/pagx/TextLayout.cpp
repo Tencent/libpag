@@ -98,6 +98,7 @@ class TextLayoutContext {
     float ascent = 0;
     float descent = 0;
     float fontLineHeight = 0;
+    float letterSpacing = 0;
     Text* sourceText = nullptr;
     uint32_t cluster = 0;
     float xOffset = 0;
@@ -392,7 +393,8 @@ class TextLayoutContext {
     metricsFont.setFauxItalic(text->fauxItalic);
     float currentX = 0;
     const std::string& content = text->text;
-    bool hasLetterSpacing = !FloatNearlyEqual(text->letterSpacing, 0.0f);
+    float effectiveLetterSpacing = text->letterSpacing * textScale;
+    bool hasLetterSpacing = !FloatNearlyEqual(effectiveLetterSpacing, 0.0f);
 
     // Collect newline and tab positions, then shape non-special segments.
     std::vector<TextSegment> segments = {};
@@ -471,16 +473,17 @@ class TextLayoutContext {
         gi.cluster = static_cast<uint32_t>(seg.start) + sg.cluster;
         gi.xOffset = sg.xOffset;
         gi.yOffset = sg.yOffset;
+        gi.letterSpacing = effectiveLetterSpacing;
         gi.bidiLevel = seg.bidiLevel;
         info.allGlyphs.push_back(gi);
 
-        currentX += sg.xAdvance + text->letterSpacing;
+        currentX += sg.xAdvance + effectiveLetterSpacing;
       }
     }
 
     // Remove the extra letterSpacing after the last glyph.
     if (hasLetterSpacing && currentX > 0) {
-      currentX -= text->letterSpacing;
+      currentX -= effectiveLetterSpacing;
     }
     info.totalWidth = currentX;
   }
@@ -510,7 +513,7 @@ class TextLayoutContext {
         continue;
       }
 
-      float letterSpacing = (glyph.sourceText != nullptr) ? glyph.sourceText->letterSpacing : 0;
+      float letterSpacing = glyph.letterSpacing;
       float glyphEndX = currentLineWidth + glyph.advance;
 
       // Auto-wrap check
@@ -538,8 +541,7 @@ class TextLayoutContext {
           currentLineWidth = 0;
           for (size_t j = skipCount; j < overflow.size(); j++) {
             overflow[j].xPosition = currentLineWidth;
-            float ls =
-                (overflow[j].sourceText != nullptr) ? overflow[j].sourceText->letterSpacing : 0;
+            float ls = overflow[j].letterSpacing;
             currentLineWidth += overflow[j].advance + ls;
             currentLine->glyphs.push_back(overflow[j]);
           }
@@ -677,8 +679,7 @@ class TextLayoutContext {
       for (size_t i = 0; i < glyphCount; i++) {
         line.glyphs[i].xPosition = xPos - leadingSquash[i];
         float effectiveAdvance = line.glyphs[i].advance - leadingSquash[i] - trailingSquash[i];
-        float ls =
-            (line.glyphs[i].sourceText != nullptr) ? line.glyphs[i].sourceText->letterSpacing : 0;
+        float ls = line.glyphs[i].letterSpacing;
         xPos += effectiveAdvance + ls;
       }
 
@@ -983,7 +984,7 @@ class TextLayoutContext {
         float xPos = 0;
         for (auto& g : visualGlyphs) {
           g.xPosition = xPos;
-          float letterSpacing = (g.sourceText != nullptr) ? g.sourceText->letterSpacing : 0;
+          float letterSpacing = g.letterSpacing;
           xPos += g.advance + letterSpacing;
         }
       }
@@ -1044,9 +1045,7 @@ class TextLayoutContext {
     if (lastVG.glyphs.empty()) {
       return;
     }
-    float ls = (lastVG.glyphs.front().sourceText != nullptr)
-                   ? lastVG.glyphs.front().sourceText->letterSpacing
-                   : 0;
+    float ls = lastVG.glyphs.front().letterSpacing;
     if (ls != 0) {
       lastVG.height -= ls;
     }
@@ -1091,7 +1090,7 @@ class TextLayoutContext {
         continue;
       }
 
-      float letterSpacing = (glyph.sourceText != nullptr) ? glyph.sourceText->letterSpacing : 0;
+      float letterSpacing = glyph.letterSpacing;
       auto orientation = VerticalTextUtils::GetOrientation(glyph.unichar);
 
       {
