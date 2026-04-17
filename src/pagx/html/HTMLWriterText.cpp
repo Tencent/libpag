@@ -854,6 +854,14 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         containerStyle += ";font-family:'" + escapedFamilyM + "'";
       }
       containerStyle += ";font-size:0";
+      if (!text->fontStyle.empty()) {
+        if (text->fontStyle.find("Bold") != std::string::npos) {
+          containerStyle += ";font-weight:bold";
+        }
+        if (text->fontStyle.find("Italic") != std::string::npos) {
+          containerStyle += ";font-style:italic";
+        }
+      }
       if (text->letterSpacing != 0.0f) {
         containerStyle += ";letter-spacing:" + FloatToString(text->letterSpacing) + "px";
       }
@@ -875,6 +883,10 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         float f = (charIdx < factors.size()) ? factors[charIdx] : 0.0f;
         float absF = std::abs(f);
         std::string charStr(p, len);
+        bool isSpace = (ch == ' ');
+        if (isSpace) {
+          charStr = "\u00A0";
+        }
         std::string charStyle = "display:inline-block;font-size:" + fontSizeStr;
         std::string transform;
         if (!FloatNearlyZero(modifier->position.x * f) ||
