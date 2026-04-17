@@ -40,12 +40,12 @@
       </Layer>
 
       <!-- Labels -->
-      <Layer left="15" bottom="15" width="80" height="12">
-        <Text text="alpha=0.3" fontFamily="Arial" fontSize="9"/>
+      <Layer centerX="-35" bottom="15" width="80" height="12">
+        <Text text="alpha=0.3" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
         <Fill color="#64748B"/>
       </Layer>
-      <Layer right="15" bottom="15" width="80" height="12">
-        <Text text="alpha=0.7" fontFamily="Arial" fontSize="9" textAnchor="end"/>
+      <Layer centerX="35" bottom="15" width="80" height="12">
+        <Text text="alpha=0.7" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
         <Fill color="#64748B"/>
       </Layer>
     </Layer>
