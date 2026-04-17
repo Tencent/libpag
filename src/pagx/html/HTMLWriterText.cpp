@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <random>
 #include <string>
 #include "base/utils/MathUtil.h"
 #include "pagx/html/HTMLWriter.h"
@@ -180,14 +181,14 @@ static int GetRandomIndex(int textCount) {
 }
 
 static std::vector<size_t> CalculateRandomIndices(uint16_t seed, size_t textCount) {
-  srand(seed);
-  std::vector<std::pair<int, size_t>> randList;
+  std::mt19937 rng(seed);
+  std::vector<std::pair<uint32_t, size_t>> randList;
   randList.reserve(textCount);
   for (size_t i = 0; i < textCount; i++) {
-    randList.push_back({rand(), i});
+    randList.push_back({rng(), i});
   }
   std::sort(randList.begin(), randList.end(),
-            [](const std::pair<int, size_t>& a, const std::pair<int, size_t>& b) {
+            [](const std::pair<uint32_t, size_t>& a, const std::pair<uint32_t, size_t>& b) {
               return a.first < b.first;
             });
   std::vector<size_t> indices(textCount);
