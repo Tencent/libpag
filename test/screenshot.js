@@ -26,19 +26,20 @@ const scale = args.length >= 5 ? parseInt(args[4], 10) : 1;
 
 (async () => {
   const browser = await puppeteer.launch({
-    headless: true,
-    protocolTimeout: 30000,
+    headless: 'shell',
+    protocolTimeout: 120000,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--hide-scrollbars'],
   });
   const page = await browser.newPage();
   await page.setViewport({ width, height, deviceScaleFactor: scale });
   const fileUrl = 'file://' + path.resolve(htmlFile);
-  await page.goto(fileUrl, { waitUntil: 'networkidle0', timeout: 15000 });
+  await page.goto(fileUrl, { waitUntil: 'networkidle0', timeout: 60000 });
   await page.screenshot({
     path: path.resolve(outputPng),
     type: 'png',
     omitBackground: true,
     clip: { x: 0, y: 0, width, height },
+    timeout: 60000,
   });
   await browser.close();
 })();
