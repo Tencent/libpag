@@ -575,9 +575,14 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::TextPath> convertTextPath(const TextPath* node) {
     auto textPath = tgfx::TextPath::Make();
     if (node->path != nullptr) {
-      textPath->setPath(ToTGFX(*node->path));
+      auto path = ToTGFX(*node->path);
+      float scale = node->renderScale();
+      if (scale != 1.0f) {
+        path.transform(tgfx::Matrix::MakeScale(scale));
+      }
+      textPath->setPath(std::move(path));
     }
-    textPath->setBaselineOrigin(ToTGFX(node->baselineOrigin));
+    textPath->setBaselineOrigin(ToTGFX(node->renderBaselineOrigin()));
     textPath->setBaselineAngle(node->baselineAngle);
     textPath->setFirstMargin(node->firstMargin);
     textPath->setLastMargin(node->lastMargin);
