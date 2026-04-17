@@ -150,14 +150,11 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           float a = distribute ? alpha : 1.0f;
           if (curTextModifier && !geos.empty()) {
             writeTextModifier(out, geos, curTextModifier, curFill, nullptr, curTextBox, a);
-            geos.clear();
           } else if (curTextPath && !geos.empty()) {
             writeTextPath(out, geos, curTextPath, curFill, nullptr, curTextBox, a);
-            geos.clear();
           } else {
             paintGeos(out, geos, curFill, nullptr, curTextBox, a, hasTrim, curTrim, hasMerge,
                       mergeMode);
-            geos.clear();
           }
         }
         break;
@@ -169,14 +166,11 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           float a = distribute ? alpha : 1.0f;
           if (curTextModifier && !geos.empty()) {
             writeTextModifier(out, geos, curTextModifier, nullptr, curStroke, curTextBox, a);
-            geos.clear();
           } else if (curTextPath && !geos.empty()) {
             writeTextPath(out, geos, curTextPath, nullptr, curStroke, curTextBox, a);
-            geos.clear();
           } else {
             paintGeos(out, geos, nullptr, curStroke, curTextBox, a, hasTrim, curTrim, hasMerge,
                       mergeMode);
-            geos.clear();
           }
         }
         break;
@@ -530,7 +524,6 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                 float a = distribute ? alpha : 1.0f;
                 paintGeos(out, geos, curFill, nullptr, curTextBox, a, hasTrim, curTrim, hasMerge,
                           mergeMode);
-                geos.clear();
               }
             } else if (gt == NodeType::Stroke) {
               auto stroke = static_cast<const Stroke*>(ge);
@@ -539,7 +532,6 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                 float a = distribute ? alpha : 1.0f;
                 paintGeos(out, geos, curFill, curStroke, curTextBox, a, hasTrim, curTrim, hasMerge,
                           mergeMode);
-                geos.clear();
               }
             } else if (gt == NodeType::TrimPath) {
               hasTrim = true;
