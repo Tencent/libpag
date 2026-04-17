@@ -31,19 +31,15 @@
           <Rectangle position="55,50" size="110,100" roundness="12"/>
           <Fill color="#3B82F6"/>
           <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#3B82F640"/>
-          <!-- Eye icon -->
+          <!-- Eye icon + Label -->
           <Layer>
             <Ellipse position="55,42" size="28,18"/>
             <Stroke color="#FFFFFF" width="2"/>
-          </Layer>
-          <Layer>
-            <Ellipse position="55,42" size="8,8"/>
-            <Fill color="#FFFFFF"/>
-          </Layer>
-          <!-- Label -->
-          <Layer>
-            <Text text="Visible" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="55,68" textAnchor="center"/>
-            <Fill color="#FFFFFF"/>
+            <Group>
+              <Ellipse position="55,42" size="8,8"/>
+              <Text text="Visible" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="55,68" textAnchor="center"/>
+              <Fill color="#FFFFFF"/>
+            </Group>
           </Layer>
         </Layer>
       </Layer>
@@ -59,19 +55,18 @@
           <!-- Ghost outline -->
           <Rectangle position="55,50" size="110,100" roundness="12"/>
           <Stroke color="#CBD5E1" width="2" dashes="6,4"/>
-          <!-- Crossed-out eye icon -->
+          <!-- Crossed-out eye icon + Label -->
           <Layer>
             <Ellipse position="55,42" size="28,18"/>
             <Stroke color="#94A3B8" width="2"/>
-          </Layer>
-          <Layer>
-            <Path data="M 32,22 L 58,42"/>
-            <Stroke color="#94A3B8" width="2" cap="round"/>
-          </Layer>
-          <!-- Label -->
-          <Layer>
-            <Text text="Hidden" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="55,68" textAnchor="center"/>
-            <Fill color="#94A3B8"/>
+            <Group>
+              <Path data="M 32,22 L 58,42"/>
+              <Stroke color="#94A3B8" width="2" cap="round"/>
+            </Group>
+            <Group>
+              <Text text="Hidden" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="55,68" textAnchor="center"/>
+              <Fill color="#94A3B8"/>
+            </Group>
           </Layer>
         </Layer>
       </Layer>

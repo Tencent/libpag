@@ -16,28 +16,22 @@
     </LinearGradient>
   </Resources>
 
-  <!-- Label: Continuous -->
+  <!-- Labels + Continuous mode: trim spans across all 3 shapes as one path -->
   <Layer>
     <Text text="continuous" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="120,28" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-  <!-- Label: Separate -->
-  <Layer>
     <Text text="separate" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="320,28" textAnchor="center"/>
     <Fill color="#64748B"/>
-  </Layer>
-
-  <!-- Continuous mode: trim spans across all 3 shapes as one path -->
-  <Layer>
-    <!-- Rectangle outline -->
-    <Rectangle position="50,80" size="40,40"/>
-    <!-- Ellipse outline -->
-    <Ellipse position="120,80" size="50,40"/>
-    <!-- Straight line -->
-    <Path data="M 147,80 L 190,80"/>
-    <!-- Single TrimPath continuous across all shapes -->
-    <TrimPath start="0" end="0.6" type="continuous"/>
-    <Stroke color="@gradContinuous" width="4" cap="round" join="round"/>
+    <Group>
+      <!-- Rectangle outline -->
+      <Rectangle position="50,80" size="40,40"/>
+      <!-- Ellipse outline -->
+      <Ellipse position="120,80" size="50,40"/>
+      <!-- Straight line -->
+      <Path data="M 147,80 L 190,80"/>
+      <!-- Single TrimPath continuous across all shapes -->
+      <TrimPath start="0" end="0.6" type="continuous"/>
+      <Stroke color="@gradContinuous" width="4" cap="round" join="round"/>
+    </Group>
   </Layer>
 
   <!-- Ghost shapes for continuous (full outlines at low opacity) -->
@@ -65,30 +59,22 @@
     <Stroke color="#3B82F6" width="4" cap="round" join="round"/>
   </Layer>
 
-  <!-- Divider line -->
+  <!-- Divider line + Second row labels + Continuous with offset=90 -->
   <Layer>
     <Path data="M 200,25 L 200,100"/>
     <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-  </Layer>
-
-  <!-- Second row: offset demonstration -->
-  <!-- Label -->
-  <Layer>
-    <Text text="continuous + offset" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="120,130" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-  <Layer>
-    <Text text="separate + offset" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="320,130" textAnchor="center"/>
-    <Fill color="#64748B"/>
-  </Layer>
-
-  <!-- Continuous with offset=90 -->
-  <Layer>
-    <Rectangle position="50,170" size="40,40"/>
-    <Ellipse position="120,170" size="50,40"/>
-    <Path data="M 147,170 L 190,170"/>
-    <TrimPath start="0" end="0.5" offset="90" type="continuous"/>
-    <Stroke color="@gradContinuous" width="4" cap="round" join="round"/>
+    <Group>
+      <Text text="continuous + offset" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="120,130" textAnchor="center"/>
+      <Text text="separate + offset" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="320,130" textAnchor="center"/>
+      <Fill color="#64748B"/>
+    </Group>
+    <Group>
+      <Rectangle position="50,170" size="40,40"/>
+      <Ellipse position="120,170" size="50,40"/>
+      <Path data="M 147,170 L 190,170"/>
+      <TrimPath start="0" end="0.5" offset="90" type="continuous"/>
+      <Stroke color="@gradContinuous" width="4" cap="round" join="round"/>
+    </Group>
   </Layer>
 
   <!-- Ghost shapes for continuous offset -->

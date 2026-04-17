@@ -44,16 +44,15 @@
     <Layer height="80">
       <Rectangle left="0" right="0" top="0" bottom="0"/>
       <Fill color="@headerGrad"/>
-      <!-- TextPath: curved banner title -->
+      <!-- TextPath: curved banner title + Subtitle -->
       <Layer>
         <Text text="FEATURE SHOWCASE" fontFamily="Arial" fontStyle="Bold" fontSize="18" position="0,0" textAnchor="center"/>
         <TextPath path="@bannerCurve" baselineOrigin="0,0" perpendicular="true" forceAlignment="true"/>
         <Fill color="#FFE66D"/>
-      </Layer>
-      <!-- Subtitle in header -->
-      <Layer>
-        <Text text="Everything you need to know" fontFamily="Arial" fontSize="11" position="200,62" textAnchor="center"/>
-        <Fill color="#BDC3C7"/>
+        <Group>
+          <Text text="Everything you need to know" fontFamily="Arial" fontSize="11" position="200,62" textAnchor="center"/>
+          <Fill color="#BDC3C7"/>
+        </Group>
       </Layer>
     </Layer>
 
@@ -92,88 +91,94 @@
     <!-- Feature rows -->
     <Layer flex="1" layout="vertical" gap="10" padding="10,30,10,30" alignment="stretch" arrangement="center">
       <!-- Feature row 1 -->
-      <Layer height="50" layout="horizontal" gap="10" padding="12,14,12,14" alignment="center">
+      <Layer height="50">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
         <Fill color="#FFFFFF"/>
         <InnerShadowStyle offsetX="0" offsetY="2" blurX="6" blurY="6" color="#00000010"/>
-        <Layer width="24" height="24">
-          <Layer composition="@checkIcon" x="0" y="0"/>
-        </Layer>
-        <Layer flex="1" layout="vertical" gap="2">
-          <Layer height="16">
-            <Text text="Vector Graphics" fontFamily="Arial" fontStyle="Bold" fontSize="13" position="0,0"/>
-            <Fill color="#2C3E50"/>
+        <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="10" padding="12,14,12,14" alignment="center">
+          <Layer width="24" height="24">
+            <Layer composition="@checkIcon" x="0" y="0"/>
           </Layer>
-          <Layer height="12">
-            <Text text="Shapes, paths, gradients, and patterns" fontFamily="Arial" fontSize="10" position="0,0"/>
-            <Fill color="#95A5A6"/>
+          <Layer flex="1" layout="vertical" gap="2">
+            <Layer height="16">
+              <Text text="Vector Graphics" fontFamily="Arial" fontStyle="Bold" fontSize="13" position="0,0"/>
+              <Fill color="#2C3E50"/>
+            </Layer>
+            <Layer height="12">
+              <Text text="Shapes, paths, gradients, and patterns" fontFamily="Arial" fontSize="10" position="0,0"/>
+              <Fill color="#95A5A6"/>
+            </Layer>
           </Layer>
-        </Layer>
-        <Layer width="16" height="16">
-          <Layer name="plus1" x="0" y="0">
-            <Rectangle position="8,8" size="16,6"/>
-            <Rectangle position="8,8" size="6,16"/>
-            <MergePath mode="union"/>
-            <RoundCorner radius="2"/>
-            <Fill color="#FF6B6B"/>
+          <Layer width="16" height="16">
+            <Layer name="plus1" x="0" y="0">
+              <Rectangle position="8,8" size="16,6"/>
+              <Rectangle position="8,8" size="6,16"/>
+              <MergePath mode="union"/>
+              <RoundCorner radius="2"/>
+              <Fill color="#FF6B6B"/>
+            </Layer>
           </Layer>
         </Layer>
       </Layer>
 
       <!-- Feature row 2 -->
-      <Layer height="50" layout="horizontal" gap="10" padding="12,14,12,14" alignment="center">
+      <Layer height="50">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
         <Fill color="#FFFFFF"/>
         <InnerShadowStyle offsetX="0" offsetY="2" blurX="6" blurY="6" color="#00000010"/>
-        <Layer width="24" height="24">
-          <Layer composition="@checkIcon" x="0" y="0"/>
-        </Layer>
-        <Layer flex="1" layout="vertical" gap="2">
-          <Layer height="16">
-            <Text text="Text Layout" fontFamily="Arial" fontStyle="Bold" fontSize="13" position="0,0"/>
-            <Fill color="#2C3E50"/>
+        <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="10" padding="12,14,12,14" alignment="center">
+          <Layer width="24" height="24">
+            <Layer composition="@checkIcon" x="0" y="0"/>
           </Layer>
-          <Layer height="12">
-            <Text text="Rich text, text path, and text boxes" fontFamily="Arial" fontSize="10" position="0,0"/>
-            <Fill color="#95A5A6"/>
+          <Layer flex="1" layout="vertical" gap="2">
+            <Layer height="16">
+              <Text text="Text Layout" fontFamily="Arial" fontStyle="Bold" fontSize="13" position="0,0"/>
+              <Fill color="#2C3E50"/>
+            </Layer>
+            <Layer height="12">
+              <Text text="Rich text, text path, and text boxes" fontFamily="Arial" fontSize="10" position="0,0"/>
+              <Fill color="#95A5A6"/>
+            </Layer>
           </Layer>
-        </Layer>
-        <Layer width="16" height="16">
-          <Layer name="plus2" x="0" y="0">
-            <Rectangle position="8,8" size="16,6"/>
-            <Rectangle position="8,8" size="6,16"/>
-            <MergePath mode="union"/>
-            <RoundCorner radius="2"/>
-            <Fill color="#4ECDC4"/>
+          <Layer width="16" height="16">
+            <Layer name="plus2" x="0" y="0">
+              <Rectangle position="8,8" size="16,6"/>
+              <Rectangle position="8,8" size="6,16"/>
+              <MergePath mode="union"/>
+              <RoundCorner radius="2"/>
+              <Fill color="#4ECDC4"/>
+            </Layer>
           </Layer>
         </Layer>
       </Layer>
 
       <!-- Feature row 3 -->
-      <Layer height="50" layout="horizontal" gap="10" padding="12,14,12,14" alignment="center">
+      <Layer height="50">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
         <Fill color="#FFFFFF"/>
         <InnerShadowStyle offsetX="0" offsetY="2" blurX="6" blurY="6" color="#00000010"/>
-        <Layer width="24" height="24">
-          <Layer composition="@checkIcon" x="0" y="0"/>
-        </Layer>
-        <Layer flex="1" layout="vertical" gap="2">
-          <Layer height="16">
-            <Text text="Visual Effects" fontFamily="Arial" fontStyle="Bold" fontSize="13" position="0,0"/>
-            <Fill color="#2C3E50"/>
+        <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="10" padding="12,14,12,14" alignment="center">
+          <Layer width="24" height="24">
+            <Layer composition="@checkIcon" x="0" y="0"/>
           </Layer>
-          <Layer height="12">
-            <Text text="Shadows, masks, blurs, and blend modes" fontFamily="Arial" fontSize="10" position="0,0"/>
-            <Fill color="#95A5A6"/>
+          <Layer flex="1" layout="vertical" gap="2">
+            <Layer height="16">
+              <Text text="Visual Effects" fontFamily="Arial" fontStyle="Bold" fontSize="13" position="0,0"/>
+              <Fill color="#2C3E50"/>
+            </Layer>
+            <Layer height="12">
+              <Text text="Shadows, masks, blurs, and blend modes" fontFamily="Arial" fontSize="10" position="0,0"/>
+              <Fill color="#95A5A6"/>
+            </Layer>
           </Layer>
-        </Layer>
-        <Layer width="16" height="16">
-          <Layer name="plus3" x="0" y="0">
-            <Rectangle position="8,8" size="16,6"/>
-            <Rectangle position="8,8" size="6,16"/>
-            <MergePath mode="union"/>
-            <RoundCorner radius="2"/>
-            <Fill color="#FFE66D"/>
+          <Layer width="16" height="16">
+            <Layer name="plus3" x="0" y="0">
+              <Rectangle position="8,8" size="16,6"/>
+              <Rectangle position="8,8" size="6,16"/>
+              <MergePath mode="union"/>
+              <RoundCorner radius="2"/>
+              <Fill color="#FFE66D"/>
+            </Layer>
           </Layer>
         </Layer>
       </Layer>

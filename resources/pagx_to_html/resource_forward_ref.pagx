@@ -35,14 +35,14 @@
             <Layer>
               <Ellipse position="60,30" size="30,30"/>
               <Fill color="#FFFFFF30"/>
-            </Layer>
-            <Layer>
-              <Text text="Color" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="60,57" textAnchor="center"/>
-              <Fill color="#FFFFFF"/>
-            </Layer>
-            <Layer>
-              <Text text="@cardPurple" fontFamily="Arial" fontSize="9" position="60,73" textAnchor="center"/>
-              <Fill color="#FFFFFFAA"/>
+              <Group>
+                <Text text="Color" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="60,57" textAnchor="center"/>
+                <Fill color="#FFFFFF"/>
+              </Group>
+              <Group>
+                <Text text="@cardPurple" fontFamily="Arial" fontSize="9" position="60,73" textAnchor="center"/>
+                <Fill color="#FFFFFFAA"/>
+              </Group>
             </Layer>
           </Layer>
         </Layer>
@@ -56,14 +56,14 @@
             <Layer>
               <Polystar position="60,30" type="star" pointCount="5" outerRadius="15" innerRadius="7" rotation="-90"/>
               <Fill color="#FFFFFF30"/>
-            </Layer>
-            <Layer>
-              <Text text="Gradient" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="60,57" textAnchor="center"/>
-              <Fill color="#FFFFFF"/>
-            </Layer>
-            <Layer>
-              <Text text="@cardGrad" fontFamily="Arial" fontSize="9" position="60,73" textAnchor="center"/>
-              <Fill color="#FFFFFFAA"/>
+              <Group>
+                <Text text="Gradient" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="60,57" textAnchor="center"/>
+                <Fill color="#FFFFFF"/>
+              </Group>
+              <Group>
+                <Text text="@cardGrad" fontFamily="Arial" fontSize="9" position="60,73" textAnchor="center"/>
+                <Fill color="#FFFFFFAA"/>
+              </Group>
             </Layer>
           </Layer>
         </Layer>
