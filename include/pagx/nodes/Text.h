@@ -123,7 +123,7 @@ class Text : public Element, public LayoutNode {
   struct GlyphData;
   GlyphData* glyphData;
   Rect textBounds = {};
-  float fontScale_ = 1.0f;
+  float fontScale = 1.0f;
 
   friend class FontEmbedder;
   friend class GlyphRunRenderer;
