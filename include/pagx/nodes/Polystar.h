@@ -95,6 +95,11 @@ class Polystar : public Element, public LayoutNode {
   Point renderPosition() const;
 
   /**
+   * Returns the scale factor for rendering, computed from layoutBounds and intrinsic size.
+   */
+  float renderScale() const;
+
+  /**
    * Returns the outer radius for rendering, accounting for layout scaling.
    */
   float renderOuterRadius() const;
@@ -107,7 +112,6 @@ class Polystar : public Element, public LayoutNode {
  protected:
   void onMeasure(LayoutContext* context) override;
   void setLayoutSize(LayoutContext* context, float width, float height) override;
-  void setLayoutPosition(LayoutContext* context, float x, float y) override;
 
  private:
   Polystar() = default;

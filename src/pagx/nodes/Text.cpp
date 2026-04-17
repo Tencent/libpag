@@ -73,15 +73,6 @@ void Text::setLayoutSize(LayoutContext* context, float width, float height) {
   layoutHeight = textBounds.height;
 }
 
-void Text::setLayoutPosition(LayoutContext*, float x, float y) {
-  if (!std::isnan(x)) {
-    layoutX = x;
-  }
-  if (!std::isnan(y)) {
-    layoutY = y;
-  }
-}
-
 Point Text::renderPosition() const {
   auto bounds = layoutBounds();
   return {bounds.x - textBounds.x, bounds.y - textBounds.y};

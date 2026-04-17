@@ -85,15 +85,6 @@ void Group::setLayoutSize(LayoutContext* context, float width, float height) {
   }
 }
 
-void Group::setLayoutPosition(LayoutContext*, float x, float y) {
-  if (!std::isnan(x)) {
-    layoutX = x;
-  }
-  if (!std::isnan(y)) {
-    layoutY = y;
-  }
-}
-
 Point Group::renderPosition() const {
   auto bounds = layoutBounds();
   return {bounds.x, bounds.y};

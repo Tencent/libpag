@@ -41,18 +41,6 @@ void TextPath::setLayoutSize(LayoutContext*, float width, float height) {
   layoutHeight = measuredHeight * scale;
 }
 
-void TextPath::setLayoutPosition(LayoutContext*, float x, float y) {
-  if (!path) {
-    return;
-  }
-  if (!std::isnan(x)) {
-    layoutX = x;
-  }
-  if (!std::isnan(y)) {
-    layoutY = y;
-  }
-}
-
 Point TextPath::renderPosition() const {
   auto bounds = layoutBounds();
   auto pathBounds = path ? path->getBounds() : Rect{};

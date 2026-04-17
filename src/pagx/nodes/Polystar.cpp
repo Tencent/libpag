@@ -77,38 +77,28 @@ void Polystar::setLayoutSize(LayoutContext*, float width, float height) {
   layoutHeight = measuredHeight * scale;
 }
 
-void Polystar::setLayoutPosition(LayoutContext*, float x, float y) {
-  if (!std::isnan(x)) {
-    layoutX = x;
-  }
-  if (!std::isnan(y)) {
-    layoutY = y;
-  }
-}
-
 Point Polystar::renderPosition() const {
   auto bounds = layoutBounds();
   auto contentBounds = getContentBounds();
-  float scale =
-      LayoutNode::ComputeUniformScale(measuredWidth, measuredHeight, bounds.width, bounds.height);
+  float scale = renderScale();
   float offsetX = (bounds.width - contentBounds.width * scale) * 0.5f;
   float offsetY = (bounds.height - contentBounds.height * scale) * 0.5f;
   return {bounds.x + offsetX - contentBounds.x * scale,
           bounds.y + offsetY - contentBounds.y * scale};
 }
 
-float Polystar::renderOuterRadius() const {
+float Polystar::renderScale() const {
   auto bounds = layoutBounds();
-  float scale =
-      LayoutNode::ComputeUniformScale(measuredWidth, measuredHeight, bounds.width, bounds.height);
-  return outerRadius * scale;
+  return LayoutNode::ComputeUniformScale(measuredWidth, measuredHeight, bounds.width,
+                                         bounds.height);
+}
+
+float Polystar::renderOuterRadius() const {
+  return outerRadius * renderScale();
 }
 
 float Polystar::renderInnerRadius() const {
-  auto bounds = layoutBounds();
-  float scale =
-      LayoutNode::ComputeUniformScale(measuredWidth, measuredHeight, bounds.width, bounds.height);
-  return innerRadius * scale;
+  return innerRadius * renderScale();
 }
 
 }  // namespace pagx

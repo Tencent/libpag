@@ -214,15 +214,6 @@ void Layer::setLayoutSize(LayoutContext* context, float width, float height) {
   }
 }
 
-void Layer::setLayoutPosition(LayoutContext*, float x, float y) {
-  if (!std::isnan(x)) {
-    layoutX = x;
-  }
-  if (!std::isnan(y)) {
-    layoutY = y;
-  }
-}
-
 Point Layer::renderPosition() const {
   auto bounds = layoutBounds();
   return {bounds.x, bounds.y};

@@ -87,6 +87,15 @@ void LayoutNode::setLayoutSize(LayoutContext*, float, float) {
   // layoutWidth/layoutHeight remain NAN (leaf nodes without specific behavior).
 }
 
+void LayoutNode::setLayoutPosition(LayoutContext*, float x, float y) {
+  if (!std::isnan(x)) {
+    layoutX = x;
+  }
+  if (!std::isnan(y)) {
+    layoutY = y;
+  }
+}
+
 void LayoutNode::PerformConstraintLayout(const std::vector<LayoutNode*>& nodes, float containerW,
                                          float containerH, const Padding& padding,
                                          LayoutContext* context) {

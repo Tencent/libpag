@@ -41,18 +41,6 @@ void Path::setLayoutSize(LayoutContext*, float width, float height) {
   layoutHeight = measuredHeight * scale;
 }
 
-void Path::setLayoutPosition(LayoutContext*, float x, float y) {
-  if (!data) {
-    return;
-  }
-  if (!std::isnan(x)) {
-    layoutX = x;
-  }
-  if (!std::isnan(y)) {
-    layoutY = y;
-  }
-}
-
 Point Path::renderPosition() const {
   auto bounds = layoutBounds();
   auto dataBounds = data ? data->getBounds() : Rect{};

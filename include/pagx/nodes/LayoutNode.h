@@ -98,9 +98,8 @@ class LayoutNode {
    */
   virtual void setLayoutSize(LayoutContext* context, float width, float height);
 
-  /** Writes self position and layoutX/layoutY. */
-  virtual void setLayoutPosition(LayoutContext* /*context*/, float /*x*/, float /*y*/) {
-  }
+  /** Writes layoutX/layoutY from constraint-resolved position. */
+  virtual void setLayoutPosition(LayoutContext* context, float x, float y);
 
   /**
    * Lays out children using layoutWidth/layoutHeight as container size.

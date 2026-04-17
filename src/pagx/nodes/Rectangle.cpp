@@ -33,15 +33,6 @@ void Rectangle::setLayoutSize(LayoutContext*, float width, float height) {
   layoutHeight = !std::isnan(height) ? height : measuredHeight;
 }
 
-void Rectangle::setLayoutPosition(LayoutContext*, float x, float y) {
-  if (!std::isnan(x)) {
-    layoutX = x;
-  }
-  if (!std::isnan(y)) {
-    layoutY = y;
-  }
-}
-
 Point Rectangle::renderPosition() const {
   auto bounds = layoutBounds();
   return {bounds.x + bounds.width * 0.5f, bounds.y + bounds.height * 0.5f};
