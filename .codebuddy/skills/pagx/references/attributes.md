@@ -73,7 +73,7 @@ Basic container for content, child layers, styles, and filters.
 | `importFormat` | string | — | Force import format (e.g., `svg`); inferred from file extension when omitted |
 | `maskType` | MaskType | alpha | Mask type (alpha, luminance, or contour) |
 
-Layer also supports all constraint attributes (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`). See §Constraint Attributes below.
+Layer also supports all constraint attributes. See §Constraint Attributes below.
 
 ### Composition
 
@@ -107,7 +107,7 @@ VectorElement container with transform properties, creating isolated scopes for 
 | `skewAxis` | float | 0 | Skew axis angle in degrees |
 | `alpha` | float | 1 | Opacity 0~1 |
 
-Group also supports all constraint attributes (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`). See §Constraint Attributes below.
+Group also supports all constraint attributes. See §Constraint Attributes below.
 
 ### Rectangle
 
@@ -162,7 +162,7 @@ Geometry element defining arbitrary shapes using SVG path syntax or PathData res
 | `position` | Point | 0,0 | Offset of the path coordinate system origin (prefer constraint attributes) |
 | `reversed` | bool | false | Reverse path direction |
 
-Path supports all constraint attributes (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`). When opposite-edge constraints are set, the path is scaled to fit. See §Constraint Attributes below.
+Path supports all constraint attributes. When opposite-edge constraints are set, the path is scaled to fit. See §Constraint Attributes below.
 
 > `position` is the **coordinate system origin**. Prefer constraint attributes (`left`/`top`) for positioning. When `position="0,0"`, path data coordinates directly define drawing positions.
 
@@ -438,7 +438,7 @@ Geometry element providing text shapes; produces a glyph list after shaping.
 | `textAnchor` | TextAnchor | start | Text anchor alignment relative to the origin |
 | `baseline` | TextBaseline | lineBox | Baseline mode: lineBox (y = linebox top) or alphabetic (y = baseline) |
 
-Text supports all constraint attributes (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`). When opposite-edge constraints are set, the text is scaled to fit. See §Constraint Attributes below.
+Text supports all constraint attributes. When opposite-edge constraints are set, the text is scaled to fit. See §Constraint Attributes below.
 
 ### TextModifier
 
@@ -490,7 +490,7 @@ Text modifier that arranges text along a specified path curve, mapping glyph pos
 | `reversed` | bool | false | Reverse path direction for text flow |
 | `forceAlignment` | bool | false | Force stretch text to fill available path length |
 
-TextPath supports all constraint attributes (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`). When opposite-edge constraints are set, the path is scaled to fit. See §Constraint Attributes below.
+TextPath supports all constraint attributes. When opposite-edge constraints are set, the path is scaled to fit. See §Constraint Attributes below.
 
 ### Constraint Attributes (Geometry Elements, TextPath, TextBox, Groups, and Child Layers)
 
