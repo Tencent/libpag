@@ -137,6 +137,8 @@ void TextBox::updateLayout(LayoutContext* context) {
         }
       }
     }
+    text->measuredX = text->textBounds.x;
+    text->measuredY = text->textBounds.y;
   }
 }
 
