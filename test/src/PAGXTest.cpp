@@ -2261,6 +2261,63 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextBothAxes) {
   EXPECT_FLOAT_EQ(text->renderFontSize(), expectedFontSize);
 }
 
+PAGX_TEST(PAGXTest, LayoutConstraintScaleTextCentered) {
+  // Text with both-axis constraints where aspect ratios differ. The text is wider than tall,
+  // so the uniform scale is limited by height, leaving horizontal space for centering.
+  auto doc = pagx::PAGXDocument::Make(400, 400);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+
+  layer->width = 400;
+  layer->height = 400;
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+  auto fontFamily = typeface->fontFamily();
+  auto fontStyle = typeface->fontStyle();
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Hello World Test";
+  text->fontFamily = fontFamily;
+  text->fontStyle = fontStyle;
+  text->fontSize = 20;
+  text->position = {0, 0};
+  text->left = 50;
+  text->right = 50;
+  text->top = 50;
+  text->bottom = 50;
+
+  pagx::FontConfig fontConfig;
+  fontConfig.registerTypeface(typeface);
+  pagx::LayoutContext layoutContext(&fontConfig);
+  pagx::TextLayoutParams params = {};
+  params.baseline = text->baseline;
+  auto origBounds = pagx::TextLayout::Layout({text}, params, &layoutContext);
+  float origWidth = origBounds.bounds.width;
+  float origHeight = origBounds.bounds.height;
+
+  layer->contents.push_back(text);
+
+  doc->applyLayout(&fontConfig);
+
+  // area = 300x300. The text is wider than tall, so height axis has higher scale.
+  float scaleX = 300 / origWidth;
+  float scaleY = 300 / origHeight;
+  float scale = std::min(scaleX, scaleY);
+  ASSERT_LT(scale, scaleY);
+  // layoutWidth = origWidth * scale, layoutHeight = origHeight * scale.
+  // CalculateConstrainedPosition centers the layout rect within the constraint area.
+  float layoutW = origWidth * scale;
+  float layoutH = origHeight * scale;
+  float expectedX = 50 + (300 - layoutW) * 0.5f;
+  float expectedY = 50 + (300 - layoutH) * 0.5f;
+  EXPECT_NEAR(text->layoutBounds().x, expectedX, 1);
+  EXPECT_NEAR(text->layoutBounds().y, expectedY, 1);
+  EXPECT_NEAR(text->layoutBounds().width, layoutW, 1);
+  EXPECT_NEAR(text->layoutBounds().height, layoutH, 1);
+}
+
 PAGX_TEST(PAGXTest, LayoutConstraintScaleTextSingleAxis) {
   auto doc = pagx::PAGXDocument::Make(400, 200);
   auto layer = doc->makeNode<pagx::Layer>();

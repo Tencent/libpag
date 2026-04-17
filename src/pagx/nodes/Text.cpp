@@ -69,13 +69,15 @@ void Text::setLayoutSize(LayoutContext* context, float width, float height) {
     glyphData->layoutRuns = result.extractLayoutRuns(this);
     textBounds = result.bounds;
   }
-  layoutWidth = textBounds.width;
-  layoutHeight = textBounds.height;
+  layoutWidth = measuredWidth * scale;
+  layoutHeight = measuredHeight * scale;
 }
 
 Point Text::renderPosition() const {
   auto bounds = layoutBounds();
-  return {bounds.x - textBounds.x, bounds.y - textBounds.y};
+  float offsetX = (bounds.width - textBounds.width) * 0.5f;
+  float offsetY = (bounds.height - textBounds.height) * 0.5f;
+  return {bounds.x + offsetX - textBounds.x, bounds.y + offsetY - textBounds.y};
 }
 
 float Text::renderFontSize() const {

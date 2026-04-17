@@ -139,6 +139,13 @@ void TextBox::updateLayout(LayoutContext* context) {
     }
     text->measuredX = text->textBounds.x;
     text->measuredY = text->textBounds.y;
+    text->measuredWidth = text->textBounds.width;
+    text->measuredHeight = text->textBounds.height;
+    // Reset layoutWidth/Height so layoutBounds() falls back to measured values. This is necessary
+    // because Group::updateLayout may have called setLayoutSize(NAN,NAN) on this Text before
+    // TextBox re-typesets it, leaving stale layoutWidth/Height from the old measured size.
+    text->layoutWidth = NAN;
+    text->layoutHeight = NAN;
   }
 }
 
