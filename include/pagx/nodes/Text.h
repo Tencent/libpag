@@ -109,6 +109,12 @@ class Text : public Element, public LayoutNode {
 
   ~Text() override;
 
+  /** Returns the text position adjusted to the layout bounds. */
+  Point renderPosition() const;
+
+  /** Returns the effective font size after layout scaling. */
+  float renderFontSize() const;
+
   NodeType nodeType() const override {
     return NodeType::Text;
   }
@@ -116,7 +122,6 @@ class Text : public Element, public LayoutNode {
  protected:
   void onMeasure(LayoutContext* context) override;
   void setLayoutSize(LayoutContext* context, float width, float height) override;
-  void setLayoutPosition(LayoutContext* context, float x, float y) override;
 
  private:
   Text();
@@ -124,6 +129,7 @@ class Text : public Element, public LayoutNode {
   struct GlyphData;
   GlyphData* glyphData;
   Rect textBounds = {};
+  float textScale = 1.0f;
 
   friend class FontEmbedder;
   friend class GlyphRunRenderer;

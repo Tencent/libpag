@@ -52,40 +52,44 @@ static TextLayoutParams MakeStandaloneParams(const Text* text) {
 }
 
 void Text::onMeasure(LayoutContext* context) {
+  textScale = 1.0f;
   auto params = MakeStandaloneParams(this);
   auto result = TextLayout::Layout({this}, params, context);
   glyphData->layoutRuns = result.extractLayoutRuns(this);
   glyphData->fontLineHeight = result.getFontLineHeight(this);
   textBounds = result.bounds;
-  preferredX = textBounds.x;
-  preferredY = textBounds.y;
-  preferredWidth = textBounds.width;
-  preferredHeight = textBounds.height;
+  measuredX = position.x + textBounds.x;
+  measuredY = position.y + textBounds.y;
+  measuredWidth = textBounds.width;
+  measuredHeight = textBounds.height;
 }
 
 void Text::setLayoutSize(LayoutContext* context, float width, float height) {
-  float scale = LayoutNode::ComputeUniformScale(preferredWidth, preferredHeight, width, height);
+  float scale = LayoutNode::ComputeUniformScale(measuredWidth, measuredHeight, width, height);
   if (scale != 1.0f) {
-    fontSize = fontSize * scale;
+    textScale = scale;
     auto params = MakeStandaloneParams(this);
+    params.textScale = scale;
     auto result = TextLayout::Layout({this}, params, context);
     glyphData->layoutRuns = result.extractLayoutRuns(this);
     glyphData->fontLineHeight = result.getFontLineHeight(this);
     textBounds = result.bounds;
   }
-  layoutWidth = textBounds.width;
-  layoutHeight = textBounds.height;
+  // Use mathematically scaled dimensions instead of textBounds from re-typesetting, because font
+  // hinting may cause slight differences. renderPosition() compensates via centering.
+  layoutWidth = measuredWidth * scale;
+  layoutHeight = measuredHeight * scale;
 }
 
-void Text::setLayoutPosition(LayoutContext*, float x, float y) {
-  if (!std::isnan(x)) {
-    position.x = x - textBounds.x;
-    layoutX = x;
-  }
-  if (!std::isnan(y)) {
-    position.y = y - textBounds.y;
-    layoutY = y;
-  }
+Point Text::renderPosition() const {
+  auto bounds = layoutBounds();
+  float offsetX = (bounds.width - textBounds.width) * 0.5f;
+  float offsetY = (bounds.height - textBounds.height) * 0.5f;
+  return {bounds.x + offsetX - textBounds.x, bounds.y + offsetY - textBounds.y};
+}
+
+float Text::renderFontSize() const {
+  return fontSize * textScale;
 }
 
 }  // namespace pagx
