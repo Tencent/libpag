@@ -577,8 +577,14 @@ class LayerBuilderContext {
     if (node->path != nullptr) {
       auto path = ToTGFX(*node->path);
       float scale = node->renderScale();
+      auto pos = node->renderPosition();
+      tgfx::Matrix matrix = {};
+      matrix.setTranslate(pos.x, pos.y);
       if (scale != 1.0f) {
-        path.transform(tgfx::Matrix::MakeScale(scale));
+        matrix.preScale(scale, scale);
+      }
+      if (!matrix.isIdentity()) {
+        path.transform(matrix);
       }
       textPath->setPath(std::move(path));
     }
