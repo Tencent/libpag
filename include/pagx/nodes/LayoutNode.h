@@ -162,7 +162,7 @@ class LayoutNode {
  protected:
   LayoutNode() = default;
 
-  /** Writes measuredWidth/measuredHeight. Called by updateSize when not yet measured. */
+  /** Writes measuredX/measuredY/measuredWidth/measuredHeight. Called by updateSize when not yet measured. */
   virtual void onMeasure(LayoutContext*) {
   }
 
