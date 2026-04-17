@@ -32,10 +32,10 @@ namespace pagx {
 class Polystar : public Element, public LayoutNode {
  public:
   /**
-   * The center point of the polystar. When not explicitly set, defaults to the negative of the
-   * bounding box origin so that the top-left pixel aligns with the origin (0, 0).
+   * The center point of the polystar. NaN means not explicitly set, in which case the polystar
+   * is positioned so that its top-left corner aligns with the layout origin.
    */
-  Point position = {};
+  Point position = {NAN, NAN};
 
   /**
    * The type of polystar shape, either Star or Polygon. The default value is Star.
@@ -89,10 +89,29 @@ class Polystar : public Element, public LayoutNode {
    */
   Rect getContentBounds() const;
 
+  /**
+   * Returns the final center position for rendering, computed from layoutBounds and contentBounds.
+   */
+  Point renderPosition() const;
+
+  /**
+   * Returns the scale factor for rendering, computed from layoutBounds and intrinsic size.
+   */
+  float renderScale() const;
+
+  /**
+   * Returns the outer radius for rendering, accounting for layout scaling.
+   */
+  float renderOuterRadius() const;
+
+  /**
+   * Returns the inner radius for rendering, accounting for layout scaling.
+   */
+  float renderInnerRadius() const;
+
  protected:
   void onMeasure(LayoutContext* context) override;
   void setLayoutSize(LayoutContext* context, float width, float height) override;
-  void setLayoutPosition(LayoutContext* context, float x, float y) override;
 
  private:
   Polystar() = default;

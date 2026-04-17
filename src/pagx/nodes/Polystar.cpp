@@ -65,33 +65,32 @@ Rect Polystar::getContentBounds() const {
 
 void Polystar::onMeasure(LayoutContext*) {
   auto bounds = getContentBounds();
-  preferredX = position.x + bounds.x;
-  preferredY = position.y + bounds.y;
-  preferredWidth = bounds.width;
-  preferredHeight = bounds.height;
+  measuredX = std::isnan(position.x) ? 0 : (position.x + bounds.x);
+  measuredY = std::isnan(position.y) ? 0 : (position.y + bounds.y);
+  measuredWidth = bounds.width;
+  measuredHeight = bounds.height;
 }
 
 void Polystar::setLayoutSize(LayoutContext*, float width, float height) {
-  float scale = LayoutNode::ComputeUniformScale(preferredWidth, preferredHeight, width, height);
-  if (scale != 1.0f) {
-    outerRadius = outerRadius * scale;
-    innerRadius = innerRadius * scale;
-  }
-  auto bounds = getContentBounds();
-  layoutWidth = bounds.width;
-  layoutHeight = bounds.height;
+  float scale = LayoutNode::ComputeUniformScale(measuredWidth, measuredHeight, width, height);
+  layoutWidth = measuredWidth * scale;
+  layoutHeight = measuredHeight * scale;
 }
 
-void Polystar::setLayoutPosition(LayoutContext*, float x, float y) {
-  auto bounds = getContentBounds();
-  if (!std::isnan(x)) {
-    position.x = x - bounds.x;
-    layoutX = x;
-  }
-  if (!std::isnan(y)) {
-    position.y = y - bounds.y;
-    layoutY = y;
-  }
+Point Polystar::renderPosition() const {
+  return computeRenderPosition(getContentBounds());
+}
+
+float Polystar::renderScale() const {
+  return computeRenderScale();
+}
+
+float Polystar::renderOuterRadius() const {
+  return outerRadius * renderScale();
+}
+
+float Polystar::renderInnerRadius() const {
+  return innerRadius * renderScale();
 }
 
 }  // namespace pagx

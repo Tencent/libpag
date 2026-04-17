@@ -55,12 +55,12 @@ void Layer::updateSize(LayoutContext* context) {
 }
 
 void Layer::onMeasure(LayoutContext*) {
-  preferredX = x;
-  preferredY = y;
+  measuredX = x;
+  measuredY = y;
   // If both dimensions are explicit, use them directly.
   if (!std::isnan(width) && !std::isnan(height)) {
-    preferredWidth = width;
-    preferredHeight = height;
+    measuredWidth = width;
+    measuredHeight = height;
     return;
   }
 
@@ -89,8 +89,8 @@ void Layer::onMeasure(LayoutContext*) {
         continue;
       }
       visibleChildCount++;
-      float childMain = horizontal ? child->preferredWidth : child->preferredHeight;
-      float childCross = horizontal ? child->preferredHeight : child->preferredWidth;
+      float childMain = horizontal ? child->measuredWidth : child->measuredHeight;
+      float childCross = horizontal ? child->measuredHeight : child->measuredWidth;
       totalMain += childMain;
       maxCross = std::max(maxCross, childCross);
     }
@@ -120,8 +120,8 @@ void Layer::onMeasure(LayoutContext*) {
       if (!child->includeInLayout) {
         continue;
       }
-      float cx = child->preferredWidth + child->constraintExtentX();
-      float cy = child->preferredHeight + child->constraintExtentY();
+      float cx = child->measuredWidth + child->constraintExtentX();
+      float cy = child->measuredHeight + child->constraintExtentY();
       measuredW = std::max(measuredW, cx);
       measuredH = std::max(measuredH, cy);
     }
@@ -131,13 +131,13 @@ void Layer::onMeasure(LayoutContext*) {
   }
 
   // Use explicit value if set, otherwise use measured value.
-  preferredWidth = !std::isnan(width) ? width : measuredW;
-  preferredHeight = !std::isnan(height) ? height : measuredH;
+  measuredWidth = !std::isnan(width) ? width : measuredW;
+  measuredHeight = !std::isnan(height) ? height : measuredH;
 }
 
 void Layer::setLayoutSize(LayoutContext* context, float width, float height) {
-  layoutWidth = !std::isnan(width) ? width : preferredWidth;
-  layoutHeight = !std::isnan(height) ? height : preferredHeight;
+  layoutWidth = !std::isnan(width) ? width : measuredWidth;
+  layoutHeight = !std::isnan(height) ? height : measuredHeight;
   if (clipToBounds && !hasScrollRect && !std::isnan(layoutWidth) && !std::isnan(layoutHeight)) {
     scrollRect = Rect::MakeXYWH(0, 0, layoutWidth, layoutHeight);
     hasScrollRect = true;
@@ -148,8 +148,8 @@ void Layer::setLayoutSize(LayoutContext* context, float width, float height) {
   // re-measure the content-measured axis from children's actual layout sizes.
   bool widthFromContent = std::isnan(width) && std::isnan(this->width);
   bool heightFromContent = std::isnan(height) && std::isnan(this->height);
-  bool sizeChanged = (!std::isnan(width) && width != preferredWidth) ||
-                     (!std::isnan(height) && height != preferredHeight);
+  bool sizeChanged = (!std::isnan(width) && width != measuredWidth) ||
+                     (!std::isnan(height) && height != measuredHeight);
   if ((widthFromContent || heightFromContent) && sizeChanged) {
     float maxX = 0;
     float maxY = 0;
@@ -214,15 +214,9 @@ void Layer::setLayoutSize(LayoutContext* context, float width, float height) {
   }
 }
 
-void Layer::setLayoutPosition(LayoutContext*, float x, float y) {
-  if (!std::isnan(x)) {
-    this->x = x;
-    layoutX = x;
-  }
-  if (!std::isnan(y)) {
-    this->y = y;
-    layoutY = y;
-  }
+Point Layer::renderPosition() const {
+  auto bounds = layoutBounds();
+  return {bounds.x, bounds.y};
 }
 
 void Layer::updateLayout(LayoutContext* context) {

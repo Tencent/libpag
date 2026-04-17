@@ -58,7 +58,8 @@ static tgfx::Matrix ComputeGroupMatrix(const Group* group) {
     matrix.postConcat(temp);
   }
   matrix.postRotate(group->rotation);
-  matrix.postTranslate(group->position.x, group->position.y);
+  auto pos = group->renderPosition();
+  matrix.postTranslate(pos.x, pos.y);
   return matrix;
 }
 
@@ -97,6 +98,7 @@ class TextLayoutContext {
     float ascent = 0;
     float descent = 0;
     float fontLineHeight = 0;
+    float letterSpacing = 0;
     Text* sourceText = nullptr;
     uint32_t cluster = 0;
     float xOffset = 0;
@@ -227,7 +229,7 @@ class TextLayoutContext {
     auto metrics = GetFontMetrics(font);
     GlyphInfo gi = {};
     gi.unichar = '\n';
-    gi.fontSize = text->fontSize;
+    gi.fontSize = font.getSize();
     gi.ascent = metrics.ascent;
     gi.descent = metrics.descent;
     gi.fontLineHeight = std::max(0.0f, fabsf(metrics.ascent) + metrics.descent + metrics.leading);
@@ -250,7 +252,7 @@ class TextLayoutContext {
     gi.unichar = '\t';
     gi.advance = tabAdvance;
     gi.xPosition = xPosition;
-    gi.fontSize = text->fontSize;
+    gi.fontSize = font.getSize();
     gi.ascent = metrics.ascent;
     gi.descent = metrics.descent;
     gi.fontLineHeight = std::max(0.0f, fabsf(metrics.ascent) + metrics.descent + metrics.leading);
@@ -295,7 +297,7 @@ class TextLayoutContext {
       ShapedInfo info = {};
       info.text = text;
       if (!text->text.empty()) {
-        shapeText(text, info, params.writingMode == WritingMode::Vertical);
+        shapeText(text, info, params.writingMode == WritingMode::Vertical, params.textScale);
         if (!directionResolved) {
           paragraphRTL = info.paragraphRTL;
           directionResolved = true;
@@ -372,7 +374,7 @@ class TextLayoutContext {
     return result;
   }
 
-  void shapeText(Text* text, ShapedInfo& info, bool vertical = false) {
+  void shapeText(Text* text, ShapedInfo& info, bool vertical = false, float textScale = 1.0f) {
     auto primaryTypeface = findTypeface(text->fontFamily, text->fontStyle);
 
     // When the primary typeface is not found, find a fallback typeface for font metrics used by
@@ -382,15 +384,17 @@ class TextLayoutContext {
       metricsTypeface = layoutContext_->fallbackTypeface('A', nullptr);
     }
 
-    tgfx::Font primaryFont(primaryTypeface, text->fontSize);
+    float effectiveFontSize = text->fontSize * textScale;
+    tgfx::Font primaryFont(primaryTypeface, effectiveFontSize);
     primaryFont.setFauxBold(text->fauxBold);
     primaryFont.setFauxItalic(text->fauxItalic);
-    tgfx::Font metricsFont(metricsTypeface, text->fontSize);
+    tgfx::Font metricsFont(metricsTypeface, effectiveFontSize);
     metricsFont.setFauxBold(text->fauxBold);
     metricsFont.setFauxItalic(text->fauxItalic);
     float currentX = 0;
     const std::string& content = text->text;
-    bool hasLetterSpacing = !FloatNearlyEqual(text->letterSpacing, 0.0f);
+    float effectiveLetterSpacing = text->letterSpacing * textScale;
+    bool hasLetterSpacing = !FloatNearlyEqual(effectiveLetterSpacing, 0.0f);
 
     // Collect newline and tab positions, then shape non-special segments.
     std::vector<TextSegment> segments = {};
@@ -403,7 +407,7 @@ class TextLayoutContext {
     }
 
     std::shared_ptr<tgfx::Typeface> currentTypeface = nullptr;
-    float tabWidth = text->fontSize * 4;
+    float tabWidth = effectiveFontSize * 4;
 
     for (auto& seg : segments) {
       if (seg.isNewline) {
@@ -460,7 +464,7 @@ class TextLayoutContext {
         gi.advance = sg.xAdvance;
         gi.xPosition = currentX;
         gi.unichar = unichar;
-        gi.fontSize = text->fontSize;
+        gi.fontSize = effectiveFontSize;
         gi.ascent = metrics.ascent;
         gi.descent = metrics.descent;
         gi.fontLineHeight =
@@ -469,16 +473,17 @@ class TextLayoutContext {
         gi.cluster = static_cast<uint32_t>(seg.start) + sg.cluster;
         gi.xOffset = sg.xOffset;
         gi.yOffset = sg.yOffset;
+        gi.letterSpacing = effectiveLetterSpacing;
         gi.bidiLevel = seg.bidiLevel;
         info.allGlyphs.push_back(gi);
 
-        currentX += sg.xAdvance + text->letterSpacing;
+        currentX += sg.xAdvance + effectiveLetterSpacing;
       }
     }
 
     // Remove the extra letterSpacing after the last glyph.
     if (hasLetterSpacing && currentX > 0) {
-      currentX -= text->letterSpacing;
+      currentX -= effectiveLetterSpacing;
     }
     info.totalWidth = currentX;
   }
@@ -508,7 +513,7 @@ class TextLayoutContext {
         continue;
       }
 
-      float letterSpacing = (glyph.sourceText != nullptr) ? glyph.sourceText->letterSpacing : 0;
+      float letterSpacing = glyph.letterSpacing;
       float glyphEndX = currentLineWidth + glyph.advance;
 
       // Auto-wrap check
@@ -536,8 +541,7 @@ class TextLayoutContext {
           currentLineWidth = 0;
           for (size_t j = skipCount; j < overflow.size(); j++) {
             overflow[j].xPosition = currentLineWidth;
-            float ls =
-                (overflow[j].sourceText != nullptr) ? overflow[j].sourceText->letterSpacing : 0;
+            float ls = overflow[j].letterSpacing;
             currentLineWidth += overflow[j].advance + ls;
             currentLine->glyphs.push_back(overflow[j]);
           }
@@ -675,8 +679,7 @@ class TextLayoutContext {
       for (size_t i = 0; i < glyphCount; i++) {
         line.glyphs[i].xPosition = xPos - leadingSquash[i];
         float effectiveAdvance = line.glyphs[i].advance - leadingSquash[i] - trailingSquash[i];
-        float ls =
-            (line.glyphs[i].sourceText != nullptr) ? line.glyphs[i].sourceText->letterSpacing : 0;
+        float ls = line.glyphs[i].letterSpacing;
         xPos += effectiveAdvance + ls;
       }
 
@@ -981,7 +984,7 @@ class TextLayoutContext {
         float xPos = 0;
         for (auto& g : visualGlyphs) {
           g.xPosition = xPos;
-          float letterSpacing = (g.sourceText != nullptr) ? g.sourceText->letterSpacing : 0;
+          float letterSpacing = g.letterSpacing;
           xPos += g.advance + letterSpacing;
         }
       }
@@ -1042,9 +1045,7 @@ class TextLayoutContext {
     if (lastVG.glyphs.empty()) {
       return;
     }
-    float ls = (lastVG.glyphs.front().sourceText != nullptr)
-                   ? lastVG.glyphs.front().sourceText->letterSpacing
-                   : 0;
+    float ls = lastVG.glyphs.front().letterSpacing;
     if (ls != 0) {
       lastVG.height -= ls;
     }
@@ -1089,7 +1090,7 @@ class TextLayoutContext {
         continue;
       }
 
-      float letterSpacing = (glyph.sourceText != nullptr) ? glyph.sourceText->letterSpacing : 0;
+      float letterSpacing = glyph.letterSpacing;
       auto orientation = VerticalTextUtils::GetOrientation(glyph.unichar);
 
       {
