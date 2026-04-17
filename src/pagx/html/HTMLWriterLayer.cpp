@@ -496,8 +496,12 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         } else {
           auto savedFill = curFill;
           auto savedStroke = curStroke;
+          auto savedHasTrim = hasTrim;
+          auto savedTrim = curTrim;
           curFill = nullptr;
           curStroke = nullptr;
+          hasTrim = false;
+          curTrim = nullptr;
           Matrix gm = BuildGroupMatrix(group);
           for (auto* ge : group->elements) {
             auto gt = ge->nodeType();
@@ -530,12 +534,17 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                           mergeMode);
                 geos.clear();
               }
+            } else if (gt == NodeType::TrimPath) {
+              hasTrim = true;
+              curTrim = static_cast<const TrimPath*>(ge);
             } else if (gt == NodeType::Group) {
               writeGroup(out, static_cast<const Group*>(ge), alpha, distribute);
             }
           }
           curFill = savedFill;
           curStroke = savedStroke;
+          hasTrim = savedHasTrim;
+          curTrim = savedTrim;
         }
         break;
       }
