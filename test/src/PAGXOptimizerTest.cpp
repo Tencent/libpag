@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/PAGXOptimizer.h"
 #include "base/PAGTest.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/PAGXOptimizer.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"

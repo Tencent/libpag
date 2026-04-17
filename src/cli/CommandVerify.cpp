@@ -1317,8 +1317,8 @@ static void DetectHighPathComplexity(const Path* path, std::vector<VerifyDiagnos
   if (verbCount > kHighPathComplexityThreshold) {
     AddDiagnostic(diagnostics, path->sourceLine,
                   "Path with " + std::to_string(verbCount) + " verbs (> " +
-                      std::to_string(kHighPathComplexityThreshold) +
-                      "), " + kHighPathComplexityMarker +
+                      std::to_string(kHighPathComplexityThreshold) + "), " +
+                      kHighPathComplexityMarker +
                       ". Fix: check if path can be simplified or split");
   }
 }

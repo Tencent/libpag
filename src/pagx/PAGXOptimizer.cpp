@@ -627,9 +627,9 @@ bool MergeAdjacentShellLayersInList(PAGXDocument* doc, std::vector<Layer*>& laye
   if (layers.size() < 2) return false;
 
   auto isMergeable = [&](const Layer* l) {
-    return !l->children.empty() ? false
-                                : (IsLayerShell(l) && !LayerNeedsKeeping(l, maskRefs) &&
-                                   !HasUnresolvedImport(l));
+    return !l->children.empty()
+               ? false
+               : (IsLayerShell(l) && !LayerNeedsKeeping(l, maskRefs) && !HasUnresolvedImport(l));
   };
 
   // The common case is "no adjacent shell run" — we want to avoid allocating a throwaway
@@ -768,8 +768,7 @@ bool MergeAdjacentGroupsInElements(std::vector<Element*>& elements) {
     if (changed) return;
     changed = true;
     result.reserve(elements.size());
-    result.insert(result.end(), elements.begin(),
-                  elements.begin() + static_cast<ptrdiff_t>(upTo));
+    result.insert(result.end(), elements.begin(), elements.begin() + static_cast<ptrdiff_t>(upTo));
   };
   auto keepCurrent = [&](Element* el) {
     if (changed) result.push_back(el);
@@ -930,8 +929,7 @@ bool PointsAlmostEqual(const Point& a, const Point& b) {
   return std::abs(a.x - b.x) < 1e-3f && std::abs(a.y - b.y) < 1e-3f;
 }
 
-PathData* SimplifyPathData(PAGXDocument* doc, const PathData* src, float tolerance,
-                           bool* mutated) {
+PathData* SimplifyPathData(PAGXDocument* doc, const PathData* src, float tolerance, bool* mutated) {
   *mutated = false;
   // Pass 1: cubic/quad → line; drop zero-length lines/curves.
   std::vector<PathVerb> verbs1;
@@ -1143,7 +1141,8 @@ bool SimplifyPathsInLayer(PAGXDocument* doc, Layer* layer, float tolerance) {
 // textual encoding: it is dramatically faster than ostringstream-based formatting and preserves
 // exact bit equality, so two paths collide only when every coordinate matches to the last bit.
 std::string PathDataSignature(const PathData* data) {
-  static_assert(sizeof(Point) == 2 * sizeof(float), "Point must be packed {x,y}; signature relies on it");
+  static_assert(sizeof(Point) == 2 * sizeof(float),
+                "Point must be packed {x,y}; signature relies on it");
   const auto& verbs = data->verbs();
   const auto& pts = data->points();
   const size_t pointBytes = pts.size() * sizeof(Point);

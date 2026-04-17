@@ -566,8 +566,7 @@ static void VerifyPagxFile(const std::string& path, const std::string& tag) {
   std::ostringstream outBuf;
   std::cerr.rdbuf(errBuf.rdbuf());
   std::cout.rdbuf(outBuf.rdbuf());
-  int rc = CallVerify(
-      {"verify", "--skip-render", "--skip-layout", "--skip-path-complexity", path});
+  int rc = CallVerify({"verify", "--skip-render", "--skip-layout", "--skip-path-complexity", path});
   std::cerr.rdbuf(oldErr);
   std::cout.rdbuf(oldOut);
   EXPECT_EQ(rc, 0) << "verify failed for " << tag << ":\n" << errBuf.str() << outBuf.str();
