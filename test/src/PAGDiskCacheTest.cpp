@@ -100,6 +100,7 @@ PAG_TEST(PAGDiskCacheTest, SequenceFile) {
   EXPECT_FALSE(sequenceFile->isComplete());
   EXPECT_EQ(sequenceFile->cachedFrames, 11);
   auto diskCache = sequenceFile->diskCache;
+  DiskIOWorker::GetInstance()->waitAll();  // Wait for async file deletions during readConfig()
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/4.bin"));
   EXPECT_TRUE(diskCache->openedFiles.size() == 1);
   EXPECT_TRUE(diskCache->cachedFileInfos.size() == 2);
@@ -192,6 +193,7 @@ PAG_TEST(PAGDiskCacheTest, SequenceFile) {
   EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/SequenceFile_22"));
   EXPECT_EQ(diskCache->totalDiskSize,
             lastTotalDiskSize + sequenceFile->fileSize() - halfSequenceFileSize);
+  DiskIOWorker::GetInstance()->waitAll();  // Wait for async file deletions from checkDiskSpace()
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/3.bin"));
   EXPECT_TRUE(std::filesystem::exists(cacheDir + "/files/2.bin"));
   PAGDiskCache::SetMaxDiskSize(0);
