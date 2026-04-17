@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Constraint layout: Text dual-axis centering within constraint area -->
+<!-- When text has both left+right and top+bottom constraints, it scales uniformly and centers -->
+<pagx width="600" height="400">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+
+  <!-- Row of two containers -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="20" padding="20">
+
+    <!-- Container 1: Wide text in square area — scale limited by width, centered vertically -->
+    <Layer flex="1" height="360">
+      <!-- Constraint area border -->
+      <Layer left="0" right="0" top="0" bottom="0">
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+      </Layer>
+      <!-- Text with dual-axis constraints -->
+      <Layer left="0" right="0" top="0" bottom="0">
+        <Text left="20" right="20" top="20" bottom="20" text="Wide Text" fontFamily="Arial" fontStyle="Bold" fontSize="200" textAnchor="center"/>
+        <Fill color="#6366F1"/>
+      </Layer>
+    </Layer>
+
+    <!-- Container 2: Tall text in wide area — scale limited by height, centered horizontally -->
+    <Layer flex="1" height="360">
+      <!-- Constraint area border -->
+      <Layer left="0" right="0" top="0" bottom="0">
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+      </Layer>
+      <!-- Text with dual-axis constraints and large padding to create asymmetric area -->
+      <Layer left="0" right="0" top="0" bottom="0">
+        <Text left="10" right="10" top="80" bottom="80" text="Hy" fontFamily="Arial" fontStyle="Bold" fontSize="300" textAnchor="center"/>
+        <Fill color="#EC4899"/>
+      </Layer>
+    </Layer>
+
+  </Layer>
+</pagx>
