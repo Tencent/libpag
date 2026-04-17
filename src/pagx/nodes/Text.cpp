@@ -30,6 +30,10 @@ Text::~Text() {
 Text::Text() : glyphData(new GlyphData()) {
 }
 
+float Text::fontLineHeight() const {
+  return glyphData->fontLineHeight;
+}
+
 static TextLayoutParams MakeStandaloneParams(const Text* text) {
   TextLayoutParams params = {};
   params.baseline = text->baseline;
@@ -51,6 +55,7 @@ void Text::onMeasure(LayoutContext* context) {
   auto params = MakeStandaloneParams(this);
   auto result = TextLayout::Layout({this}, params, context);
   glyphData->layoutRuns = result.extractLayoutRuns(this);
+  glyphData->fontLineHeight = result.getFontLineHeight(this);
   textBounds = result.bounds;
   preferredX = textBounds.x;
   preferredY = textBounds.y;
@@ -65,6 +70,7 @@ void Text::setLayoutSize(LayoutContext* context, float width, float height) {
     auto params = MakeStandaloneParams(this);
     auto result = TextLayout::Layout({this}, params, context);
     glyphData->layoutRuns = result.extractLayoutRuns(this);
+    glyphData->fontLineHeight = result.getFontLineHeight(this);
     textBounds = result.bounds;
   }
   layoutWidth = textBounds.width;

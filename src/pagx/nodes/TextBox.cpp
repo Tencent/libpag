@@ -67,6 +67,7 @@ void TextBox::updateLayout(LayoutContext* context) {
   for (size_t i = 0; i < childText.size(); i++) {
     childText[i]->textBounds = result.getTextBounds(childText[i]);
     childText[i]->glyphData->layoutRuns = result.extractLayoutRuns(childText[i]);
+    childText[i]->glyphData->fontLineHeight = result.getFontLineHeight(childText[i]);
   }
 }
 

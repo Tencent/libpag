@@ -101,6 +101,12 @@ class Text : public Element, public LayoutNode {
    */
   TextBaseline baseline = TextBaseline::LineBox;
 
+  /**
+   * Returns the font metrics line height (|ascent| + descent + leading) computed during layout.
+   * Returns 0 if layout has not been performed.
+   */
+  float fontLineHeight() const;
+
   ~Text() override;
 
   NodeType nodeType() const override {
