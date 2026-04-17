@@ -227,23 +227,6 @@ class Node {
    */
   int sourceLine = -1;
 
-  /**
-   * Returns true if the given key is a valid custom data key. A valid key contains only lowercase
-   * letters ('a'-'z'), digits ('0'-'9'), and hyphens ('-'), must not be empty, and must not end
-   * with a hyphen. The key should not include the "data-" prefix.
-   */
-  static bool IsValidCustomDataKey(const std::string& key) {
-    if (key.empty() || key.front() == '-' || key.back() == '-') {
-      return false;
-    }
-    for (auto c : key) {
-      if ((c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '-') {
-        return false;
-      }
-    }
-    return true;
-  }
-
   virtual ~Node() = default;
 
   /**

@@ -343,7 +343,7 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
 
 static void WriteCustomData(XMLBuilder& xml, const Node* node) {
   for (const auto& [key, value] : node->customData) {
-    if (Node::IsValidCustomDataKey(key)) {
+    if (IsValidCustomDataKey(key)) {
       xml.addAttribute(("data-" + key).c_str(), value);
     }
   }

@@ -1150,23 +1150,23 @@ PAGX_TEST(PAGXTest, CustomDataSVGRootElement) {
 
 PAGX_TEST(PAGXTest, CustomDataKeyValidation) {
   // Valid keys.
-  EXPECT_TRUE(pagx::Node::IsValidCustomDataKey("role"));
-  EXPECT_TRUE(pagx::Node::IsValidCustomDataKey("figma-node"));
-  EXPECT_TRUE(pagx::Node::IsValidCustomDataKey("v2"));
-  EXPECT_TRUE(pagx::Node::IsValidCustomDataKey("a"));
-  EXPECT_TRUE(pagx::Node::IsValidCustomDataKey("abc-123-def"));
+  EXPECT_TRUE(pagx::IsValidCustomDataKey("role"));
+  EXPECT_TRUE(pagx::IsValidCustomDataKey("figma-node"));
+  EXPECT_TRUE(pagx::IsValidCustomDataKey("v2"));
+  EXPECT_TRUE(pagx::IsValidCustomDataKey("a"));
+  EXPECT_TRUE(pagx::IsValidCustomDataKey("abc-123-def"));
 
   // Invalid keys.
-  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey(""));
-  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("-leading"));
-  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("trailing-"));
-  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("-"));
-  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("UPPER"));
-  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("has space"));
-  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("under_score"));
-  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("dot.name"));
-  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("a<b"));
-  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("a\"b"));
+  EXPECT_FALSE(pagx::IsValidCustomDataKey(""));
+  EXPECT_FALSE(pagx::IsValidCustomDataKey("-leading"));
+  EXPECT_FALSE(pagx::IsValidCustomDataKey("trailing-"));
+  EXPECT_FALSE(pagx::IsValidCustomDataKey("-"));
+  EXPECT_FALSE(pagx::IsValidCustomDataKey("UPPER"));
+  EXPECT_FALSE(pagx::IsValidCustomDataKey("has space"));
+  EXPECT_FALSE(pagx::IsValidCustomDataKey("under_score"));
+  EXPECT_FALSE(pagx::IsValidCustomDataKey("dot.name"));
+  EXPECT_FALSE(pagx::IsValidCustomDataKey("a<b"));
+  EXPECT_FALSE(pagx::IsValidCustomDataKey("a\"b"));
 
   // Verify invalid keys are rejected during PAGX import.
   // Note: XML attribute names with uppercase (data-INVALID) and underscores (data-has_underscore)
