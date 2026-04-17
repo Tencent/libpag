@@ -48,7 +48,7 @@ static TextLayoutParams MakeStandaloneParams(const Text* text) {
 }
 
 void Text::onMeasure(LayoutContext* context) {
-  fontScale = 1.0f;
+  textScale = 1.0f;
   auto params = MakeStandaloneParams(this);
   auto result = TextLayout::Layout({this}, params, context);
   glyphData->layoutRuns = result.extractLayoutRuns(this);
@@ -62,9 +62,9 @@ void Text::onMeasure(LayoutContext* context) {
 void Text::setLayoutSize(LayoutContext* context, float width, float height) {
   float scale = LayoutNode::ComputeUniformScale(measuredWidth, measuredHeight, width, height);
   if (scale != 1.0f) {
-    fontScale = scale;
+    textScale = scale;
     auto params = MakeStandaloneParams(this);
-    params.fontScale = scale;
+    params.textScale = scale;
     auto result = TextLayout::Layout({this}, params, context);
     glyphData->layoutRuns = result.extractLayoutRuns(this);
     textBounds = result.bounds;
@@ -83,7 +83,7 @@ Point Text::renderPosition() const {
 }
 
 float Text::renderFontSize() const {
-  return fontSize * fontScale;
+  return fontSize * textScale;
 }
 
 }  // namespace pagx

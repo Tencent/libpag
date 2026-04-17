@@ -296,7 +296,7 @@ class TextLayoutContext {
       ShapedInfo info = {};
       info.text = text;
       if (!text->text.empty()) {
-        shapeText(text, info, params.writingMode == WritingMode::Vertical, params.fontScale);
+        shapeText(text, info, params.writingMode == WritingMode::Vertical, params.textScale);
         if (!directionResolved) {
           paragraphRTL = info.paragraphRTL;
           directionResolved = true;
@@ -373,7 +373,7 @@ class TextLayoutContext {
     return result;
   }
 
-  void shapeText(Text* text, ShapedInfo& info, bool vertical = false, float fontScale = 1.0f) {
+  void shapeText(Text* text, ShapedInfo& info, bool vertical = false, float textScale = 1.0f) {
     auto primaryTypeface = findTypeface(text->fontFamily, text->fontStyle);
 
     // When the primary typeface is not found, find a fallback typeface for font metrics used by
@@ -383,7 +383,7 @@ class TextLayoutContext {
       metricsTypeface = layoutContext_->fallbackTypeface('A', nullptr);
     }
 
-    float effectiveFontSize = text->fontSize * fontScale;
+    float effectiveFontSize = text->fontSize * textScale;
     tgfx::Font primaryFont(primaryTypeface, effectiveFontSize);
     primaryFont.setFauxBold(text->fauxBold);
     primaryFont.setFauxItalic(text->fauxItalic);
