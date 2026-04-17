@@ -22,44 +22,46 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="horizontal" gap="20" padding="20,30,20,30" alignment="center" arrangement="center">
+    <Layer flex="1">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <!-- Circle: equal width/height -->
-      <Layer layout="vertical" gap="6" alignment="center">
-        <Layer width="80" height="80">
-          <Ellipse position="40,40" size="80,80"/>
-          <Fill color="#3B82F6"/>
+      <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="20" padding="20,30,20,30" alignment="center" arrangement="center">
+          <!-- Circle: equal width/height -->
+        <Layer layout="vertical" gap="6" alignment="center">
+          <Layer width="80" height="80">
+            <Ellipse position="40,40" size="80,80"/>
+            <Fill color="#3B82F6"/>
+          </Layer>
+          <Layer height="12">
+            <Text text="Circle" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
         </Layer>
-        <Layer height="12">
-          <Text text="Circle" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
-          <Fill color="#64748B"/>
-        </Layer>
-      </Layer>
 
-      <!-- Horizontal ellipse -->
-      <Layer layout="vertical" gap="6" alignment="center">
-        <Layer width="110" height="65">
-          <Ellipse position="55,32" size="110,65"/>
-          <Fill color="#10B981"/>
+        <!-- Horizontal ellipse -->
+        <Layer layout="vertical" gap="6" alignment="center">
+          <Layer width="110" height="65">
+            <Ellipse position="55,32" size="110,65"/>
+            <Fill color="#10B981"/>
+          </Layer>
+          <Layer height="12">
+            <Text text="Horizontal" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
         </Layer>
-        <Layer height="12">
-          <Text text="Horizontal" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
-          <Fill color="#64748B"/>
-        </Layer>
-      </Layer>
 
-      <!-- Vertical ellipse, reversed -->
-      <Layer layout="vertical" gap="6" alignment="center">
-        <Layer width="50" height="75">
-          <Ellipse position="25,37" size="50,75" reversed="true"/>
-          <Fill color="#EC4899"/>
-        </Layer>
-        <Layer height="12">
-          <Text text="Reversed" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
-          <Fill color="#64748B"/>
+        <!-- Vertical ellipse, reversed -->
+        <Layer layout="vertical" gap="6" alignment="center">
+          <Layer width="50" height="75">
+            <Ellipse position="25,37" size="50,75" reversed="true"/>
+            <Fill color="#EC4899"/>
+          </Layer>
+          <Layer height="12">
+            <Text text="Reversed" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
         </Layer>
       </Layer>
     </Layer>

@@ -22,70 +22,72 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="vertical" gap="12" padding="20" alignment="center" arrangement="center">
+    <Layer flex="1">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <!-- Row 1: Sharp, Rounded, Pill -->
-      <Layer layout="horizontal" gap="20" arrangement="center">
-        <!-- Sharp -->
-        <Layer width="80" layout="vertical" gap="4" alignment="center">
-          <Layer width="80" height="60">
-            <Rectangle left="0" right="0" top="0" bottom="0"/>
-            <Fill color="#3B82F6"/>
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="12" padding="20" alignment="center" arrangement="center">
+        <!-- Row 1: Sharp, Rounded, Pill -->
+        <Layer layout="horizontal" gap="20" arrangement="center">
+          <!-- Sharp -->
+          <Layer width="80" layout="vertical" gap="4" alignment="center">
+            <Layer width="80" height="60">
+              <Rectangle left="0" right="0" top="0" bottom="0"/>
+              <Fill color="#3B82F6"/>
+            </Layer>
+            <Layer height="12">
+              <Text text="Sharp" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
           </Layer>
-          <Layer height="12">
-            <Text text="Sharp" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
-            <Fill color="#64748B"/>
+          <!-- Rounded -->
+          <Layer width="80" layout="vertical" gap="4" alignment="center">
+            <Layer width="80" height="60">
+              <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+              <Fill color="#10B981"/>
+            </Layer>
+            <Layer height="12">
+              <Text text="Rounded" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
+          </Layer>
+          <!-- Pill -->
+          <Layer width="80" layout="vertical" gap="4" alignment="center">
+            <Layer width="80" height="60">
+              <Rectangle left="0" right="0" top="0" bottom="0" roundness="100"/>
+              <Fill color="#F59E0B"/>
+            </Layer>
+            <Layer height="12">
+              <Text text="Pill" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
           </Layer>
         </Layer>
-        <!-- Rounded -->
-        <Layer width="80" layout="vertical" gap="4" alignment="center">
-          <Layer width="80" height="60">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
-            <Fill color="#10B981"/>
-          </Layer>
-          <Layer height="12">
-            <Text text="Rounded" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
-            <Fill color="#64748B"/>
-          </Layer>
-        </Layer>
-        <!-- Pill -->
-        <Layer width="80" layout="vertical" gap="4" alignment="center">
-          <Layer width="80" height="60">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="100"/>
-            <Fill color="#F59E0B"/>
-          </Layer>
-          <Layer height="12">
-            <Text text="Pill" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
-            <Fill color="#64748B"/>
-          </Layer>
-        </Layer>
-      </Layer>
 
-      <!-- Row 2: Reversed, Large -->
-      <Layer layout="horizontal" gap="20" arrangement="center">
-        <!-- Reversed -->
-        <Layer width="80" layout="vertical" gap="4" alignment="center">
-          <Layer width="80" height="60">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="12" reversed="true"/>
-            <Fill color="#EF4444"/>
+        <!-- Row 2: Reversed, Large -->
+        <Layer layout="horizontal" gap="20" arrangement="center">
+          <!-- Reversed -->
+          <Layer width="80" layout="vertical" gap="4" alignment="center">
+            <Layer width="80" height="60">
+              <Rectangle left="0" right="0" top="0" bottom="0" roundness="12" reversed="true"/>
+              <Fill color="#EF4444"/>
+            </Layer>
+            <Layer height="12">
+              <Text text="Reversed" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
           </Layer>
-          <Layer height="12">
-            <Text text="Reversed" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
-            <Fill color="#64748B"/>
-          </Layer>
-        </Layer>
-        <!-- Large -->
-        <Layer width="120" layout="vertical" gap="4" alignment="center">
-          <Layer width="120" height="60">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-            <Fill color="#8B5CF6"/>
-          </Layer>
-          <Layer height="12">
-            <Text text="Large" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
-            <Fill color="#64748B"/>
+          <!-- Large -->
+          <Layer width="120" layout="vertical" gap="4" alignment="center">
+            <Layer width="120" height="60">
+              <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+              <Fill color="#8B5CF6"/>
+            </Layer>
+            <Layer height="12">
+              <Text text="Large" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
           </Layer>
         </Layer>
       </Layer>

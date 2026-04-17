@@ -512,7 +512,7 @@
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attributeGroup ref="ConstraintAttributes"/>
     <xs:attribute name="size" type="SizeType" default="0,0"/>
-    <xs:attribute name="roundness" type="xs:decimal" default="0"/>
+    <xs:attribute name="roundness" type="FloatListType" default="0"/>
     <xs:attribute name="position" type="PointType"/>
     <xs:attribute name="reversed" type="BoolType" default="false"/>
   </xs:complexType>

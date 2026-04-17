@@ -22,12 +22,13 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="horizontal" gap="10" padding="20" alignment="stretch" arrangement="center">
+    <Layer flex="1">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <!-- Column: center -->
+      <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="10" padding="20" alignment="stretch" arrangement="center">
+        <!-- Column: center -->
       <Layer width="110" layout="vertical" gap="10" alignment="center" arrangement="center">
         <Layer height="14">
           <Text text="center" fontFamily="Arial" fontStyle="Bold" fontSize="12" centerX="0" textAnchor="center"/>
@@ -38,8 +39,10 @@
           <Fill color="#DBEAFE"/>
           <Stroke color="#3B82F6" width="8" align="center"/>
           <!-- Reference line overlay -->
-          <Rectangle position="48,48" size="80,80" roundness="10"/>
-          <Stroke color="#EF444440" width="1" align="center"/>
+          <Group>
+            <Rectangle position="48,48" size="80,80" roundness="10"/>
+            <Stroke color="#EF444440" width="1" align="center"/>
+          </Group>
         </Layer>
         <Layer width="60" height="60">
           <Ellipse position="30,30" size="50,50"/>
@@ -59,8 +62,10 @@
           <Fill color="#DBEAFE"/>
           <Stroke color="#3B82F6" width="8" align="inside"/>
           <!-- Reference line overlay -->
-          <Rectangle position="48,48" size="80,80" roundness="10"/>
-          <Stroke color="#EF444440" width="1" align="center"/>
+          <Group>
+            <Rectangle position="48,48" size="80,80" roundness="10"/>
+            <Stroke color="#EF444440" width="1" align="center"/>
+          </Group>
         </Layer>
         <Layer width="60" height="60">
           <Ellipse position="30,30" size="50,50"/>
@@ -80,14 +85,17 @@
           <Fill color="#DBEAFE"/>
           <Stroke color="#3B82F6" width="8" align="outside"/>
           <!-- Reference line overlay -->
-          <Rectangle position="48,48" size="80,80" roundness="10"/>
-          <Stroke color="#EF444440" width="1" align="center"/>
+          <Group>
+            <Rectangle position="48,48" size="80,80" roundness="10"/>
+            <Stroke color="#EF444440" width="1" align="center"/>
+          </Group>
         </Layer>
         <Layer width="60" height="60">
           <Ellipse position="30,30" size="50,50"/>
           <Fill color="#FEF3C7"/>
           <Stroke color="#F59E0B" width="4" align="outside"/>
         </Layer>
+      </Layer>
       </Layer>
     </Layer>
   </Layer>

@@ -22,21 +22,23 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="vertical" padding="15" alignment="center" arrangement="center">
+    <Layer flex="1">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <!-- Diamond gradient shape -->
-      <Layer width="180" height="120">
-        <Rectangle position="90,60" size="180,120" roundness="8"/>
-        <Fill>
-          <DiamondGradient center="90,60" radius="80">
-            <ColorStop offset="0" color="#FFFFFF"/>
-            <ColorStop offset="0.5" color="#8B5CF6"/>
-            <ColorStop offset="1" color="#1E1B4B"/>
-          </DiamondGradient>
-        </Fill>
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="15" alignment="center" arrangement="center">
+        <!-- Diamond gradient shape -->
+        <Layer width="180" height="120">
+          <Rectangle position="90,60" size="180,120" roundness="8"/>
+          <Fill>
+            <DiamondGradient center="90,60" radius="80">
+              <ColorStop offset="0" color="#FFFFFF"/>
+              <ColorStop offset="0.5" color="#8B5CF6"/>
+              <ColorStop offset="1" color="#1E1B4B"/>
+            </DiamondGradient>
+          </Fill>
+        </Layer>
       </Layer>
     </Layer>
   </Layer>

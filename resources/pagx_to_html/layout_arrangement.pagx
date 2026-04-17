@@ -22,12 +22,13 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="vertical" padding="20" alignment="stretch" arrangement="center">
+    <Layer flex="1">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <!-- includeInLayout=false overlay badge in top-right corner -->
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20" alignment="stretch" arrangement="center">
+        <!-- includeInLayout=false overlay badge in top-right corner -->
       <Layer right="8" top="8" width="80" height="18" includeInLayout="false">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="9"/>
         <Fill color="#EF4444"/>
@@ -194,6 +195,7 @@
           </Layer>
         </Layer>
 
+      </Layer>
       </Layer>
     </Layer>
   </Layer>

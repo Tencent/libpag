@@ -33,8 +33,8 @@
         <Layer layout="vertical" gap="4" alignment="center" arrangement="center">
           <Layer width="90" height="80">
             <Layer name="append">
-              <Rectangle position="35,40" size="60,60"/>
-              <Ellipse position="65,40" size="60,60"/>
+              <Rectangle position="30,40" size="60,60"/>
+              <Ellipse position="60,40" size="60,60"/>
               <MergePath mode="append"/>
               <Fill color="#3B82F6"/>
             </Layer>
@@ -49,8 +49,8 @@
         <Layer layout="vertical" gap="4" alignment="center" arrangement="center">
           <Layer width="90" height="80">
             <Layer name="union">
-              <Rectangle position="35,40" size="60,60"/>
-              <Ellipse position="65,40" size="60,60"/>
+              <Rectangle position="30,40" size="60,60"/>
+              <Ellipse position="60,40" size="60,60"/>
               <MergePath mode="union"/>
               <Fill color="#10B981"/>
             </Layer>
@@ -65,8 +65,8 @@
         <Layer layout="vertical" gap="4" alignment="center" arrangement="center">
           <Layer width="90" height="80">
             <Layer name="intersect">
-              <Rectangle position="35,40" size="60,60"/>
-              <Ellipse position="65,40" size="60,60"/>
+              <Rectangle position="30,40" size="60,60"/>
+              <Ellipse position="60,40" size="60,60"/>
               <MergePath mode="intersect"/>
               <Fill color="#F59E0B"/>
             </Layer>
@@ -81,8 +81,8 @@
         <Layer layout="vertical" gap="4" alignment="center" arrangement="center">
           <Layer width="90" height="80">
             <Layer name="xor">
-              <Rectangle position="35,40" size="60,60"/>
-              <Ellipse position="65,40" size="60,60"/>
+              <Rectangle position="30,40" size="60,60"/>
+              <Ellipse position="60,40" size="60,60"/>
               <MergePath mode="xor"/>
               <Fill color="#EF4444"/>
             </Layer>

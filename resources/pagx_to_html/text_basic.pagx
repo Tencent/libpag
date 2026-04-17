@@ -22,12 +22,13 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="vertical" gap="6" padding="20,24,20,24" alignment="stretch">
+    <Layer flex="1">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <!-- Basic text: textAnchor=start (default) -->
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="6" padding="20,24,20,24" alignment="stretch">
+        <!-- Basic text: textAnchor=start (default) -->
       <Layer layout="vertical" gap="2">
         <Layer height="28">
           <Text text="Hello World" fontFamily="Arial" fontSize="24"/>
@@ -86,6 +87,7 @@
         <Text text="Bold Italic" fontFamily="Arial" fontStyle="Bold Italic" fontSize="24"/>
         <Fill color="#EC4899"/>
       </Layer>
+    </Layer>
     </Layer>
   </Layer>
 </pagx>

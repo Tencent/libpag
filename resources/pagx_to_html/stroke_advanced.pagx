@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Stroke advanced — blendMode="multiply", miterLimit="2", dashAdaptive true vs false -->
-<pagx version="1.0" width="420" height="300">
+<pagx version="1.0" width="440" height="300">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -97,13 +97,13 @@
               <Text text="dashAdaptive=false" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
               <Fill color="#94A3B8"/>
             </Layer>
-            <Layer width="160" height="55">
+            <Layer width="160" height="58">
               <Layer name="curveNoAdapt">
-                <Path data="M 5,20 C 40,0 100,50 155,15"/>
+                <Path data="M 5,22 C 40,2 100,52 155,17"/>
                 <Stroke color="#10B981" width="3" cap="round" dashes="12,8" dashAdaptive="false"/>
               </Layer>
               <Layer name="lineNoAdapt">
-                <Path data="M 5,45 L 155,45"/>
+                <Path data="M 5,47 L 155,47"/>
                 <Stroke color="#10B981" width="2" cap="round" dashes="12,8" dashAdaptive="false"/>
               </Layer>
             </Layer>
@@ -121,13 +121,13 @@
               <Text text="dashAdaptive=true" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
               <Fill color="#94A3B8"/>
             </Layer>
-            <Layer width="160" height="55">
+            <Layer width="160" height="58">
               <Layer name="curveAdapt">
-                <Path data="M 5,20 C 40,0 100,50 155,15"/>
+                <Path data="M 5,22 C 40,2 100,52 155,17"/>
                 <Stroke color="#F59E0B" width="3" cap="round" dashes="12,8" dashAdaptive="true"/>
               </Layer>
               <Layer name="lineAdapt">
-                <Path data="M 5,45 L 155,45"/>
+                <Path data="M 5,47 L 155,47"/>
                 <Stroke color="#F59E0B" width="2" cap="round" dashes="12,8" dashAdaptive="true"/>
               </Layer>
             </Layer>

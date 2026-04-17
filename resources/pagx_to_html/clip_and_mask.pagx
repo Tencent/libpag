@@ -22,7 +22,7 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" left="0" right="0">
+    <Layer flex="1">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
@@ -33,11 +33,11 @@
         <Layer layout="horizontal" gap="20" alignment="center">
           <!-- scrollRect clipping -->
           <Layer width="120" layout="vertical" gap="4" alignment="center">
-            <Layer width="110" height="110">
+            <Layer width="110" height="110" clipToBounds="true">
               <Layer scrollRect="15,15,110,110">
-                <Rectangle position="70,70" size="140,140" roundness="20"/>
+                <Rectangle position="55,55" size="110,110" roundness="20"/>
                 <Fill>
-                  <LinearGradient startPoint="0,0" endPoint="140,140">
+                  <LinearGradient startPoint="0,0" endPoint="110,110">
                     <ColorStop offset="0" color="#3B82F6"/>
                     <ColorStop offset="1" color="#EC4899"/>
                   </LinearGradient>

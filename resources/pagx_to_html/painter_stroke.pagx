@@ -59,10 +59,14 @@
             <Layer width="80" height="80">
               <Path data="M 10,20 L 70,20"/>
               <Stroke color="#10B981" width="8" cap="butt"/>
-              <Path data="M 10,40 L 70,40"/>
-              <Stroke color="#10B981" width="8" cap="round"/>
-              <Path data="M 10,60 L 70,60"/>
-              <Stroke color="#10B981" width="8" cap="square"/>
+              <Group>
+                <Path data="M 10,40 L 70,40"/>
+                <Stroke color="#10B981" width="8" cap="round"/>
+              </Group>
+              <Group>
+                <Path data="M 10,60 L 70,60"/>
+                <Stroke color="#10B981" width="8" cap="square"/>
+              </Group>
             </Layer>
             <Layer height="10">
               <Text text="caps" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
@@ -148,10 +152,10 @@
 
         <!-- Row 4: Gradient stroke -->
         <Layer layout="vertical" gap="3" alignment="center">
-          <Layer width="360" height="40">
-            <Path data="M 10,20 Q 180,0 350,20"/>
+          <Layer width="356" height="46">
+            <Path data="M 10,23 Q 178,3 346,23"/>
             <Stroke width="6" cap="round">
-              <LinearGradient startPoint="10,10" endPoint="350,10">
+              <LinearGradient startPoint="10,13" endPoint="346,13">
                 <ColorStop offset="0" color="#EC4899"/>
                 <ColorStop offset="1" color="#3B82F6"/>
               </LinearGradient>

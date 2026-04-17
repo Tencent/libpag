@@ -22,13 +22,14 @@
     </Layer>
 
     <!-- Card: internal content uses absolute positioning for Group transforms -->
-    <Layer flex="1" layout="horizontal" gap="10" padding="15" alignment="stretch" arrangement="center">
+    <Layer flex="1">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <!-- Column 1: Rotate+Scale and Skew -->
-      <Layer flex="1" layout="vertical" gap="10" alignment="center" arrangement="center">
+      <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="10" padding="15" alignment="stretch" arrangement="center">
+        <!-- Column 1: Rotate+Scale and Skew -->
+        <Layer flex="1" layout="vertical" gap="10" alignment="center" arrangement="center">
         <!-- Rotate+Scale -->
         <Layer width="140" layout="vertical" gap="4" alignment="center">
           <Layer width="140" height="100">
@@ -87,6 +88,7 @@
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
+      </Layer>
       </Layer>
     </Layer>
   </Layer>

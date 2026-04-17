@@ -23,12 +23,13 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="vertical" gap="10" padding="12,16,12,16" alignment="stretch" arrangement="center">
+    <Layer flex="1">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <!-- Row 1: 5.5pts, Flower, Reversed, Soft Hex -->
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="10" padding="12,16,12,16" alignment="stretch" arrangement="center">
+        <!-- Row 1: 5.5pts, Flower, Reversed, Soft Hex -->
       <Layer layout="horizontal" gap="6" arrangement="spaceEvenly">
         <!-- Fractional 5.5 -->
         <Layer flex="1" layout="vertical" gap="4" alignment="center">
@@ -122,6 +123,7 @@
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
+      </Layer>
       </Layer>
     </Layer>
   </Layer>

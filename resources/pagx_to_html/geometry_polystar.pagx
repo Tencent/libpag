@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Polystar → always SVG path; polygon/star types, roundness -->
-<pagx version="1.0" width="460" height="360">
+<pagx version="1.0" width="460" height="390">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -22,10 +22,12 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="vertical" gap="12" padding="20,30,20,30" alignment="center" arrangement="center">
+    <Layer flex="1">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="12" padding="20,30,20,30" alignment="center" arrangement="center">
 
       <!-- Row 1: Pentagon, Star, Rounded -->
       <Layer layout="horizontal" gap="30" arrangement="center">
@@ -99,6 +101,7 @@
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
+      </Layer>
       </Layer>
     </Layer>
   </Layer>

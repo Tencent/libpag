@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Gradient matrix transforms — ConicGradient.matrix, DiamondGradient.matrix -->
-<pagx version="1.0" width="360" height="280">
+<pagx version="1.0" width="380" height="280">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -22,45 +22,47 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="horizontal" gap="20" padding="20,30,20,30" alignment="center" arrangement="center">
+    <Layer flex="1">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <!-- ConicGradient with matrix -->
-      <Layer width="120" layout="vertical" gap="6" alignment="center">
-        <Layer width="120" height="120">
-          <Rectangle position="60,60" size="120,120" roundness="12"/>
-          <Fill>
-            <ConicGradient center="70,70" startAngle="0" endAngle="360" matrix="0.707,-0.707,0.707,0.707,0,0">
-              <ColorStop offset="0" color="#3B82F6"/>
-              <ColorStop offset="0.33" color="#10B981"/>
-              <ColorStop offset="0.66" color="#F59E0B"/>
-              <ColorStop offset="1" color="#3B82F6"/>
-            </ConicGradient>
-          </Fill>
+      <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="20" padding="20,30,20,30" alignment="center" arrangement="center">
+        <!-- ConicGradient with matrix -->
+        <Layer width="120" layout="vertical" gap="6" alignment="center">
+          <Layer width="120" height="120">
+            <Rectangle position="60,60" size="120,120" roundness="12"/>
+            <Fill>
+              <ConicGradient center="70,70" startAngle="0" endAngle="360" matrix="0.707,-0.707,0.707,0.707,0,0">
+                <ColorStop offset="0" color="#3B82F6"/>
+                <ColorStop offset="0.33" color="#10B981"/>
+                <ColorStop offset="0.66" color="#F59E0B"/>
+                <ColorStop offset="1" color="#3B82F6"/>
+              </ConicGradient>
+            </Fill>
+          </Layer>
+          <Layer height="12">
+            <Text text="Conic + matrix" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
         </Layer>
-        <Layer height="12">
-          <Text text="Conic + matrix" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
-          <Fill color="#64748B"/>
-        </Layer>
-      </Layer>
 
-      <!-- DiamondGradient with matrix -->
-      <Layer width="120" layout="vertical" gap="6" alignment="center">
-        <Layer width="120" height="120">
-          <Rectangle position="60,60" size="120,120" roundness="12"/>
-          <Fill>
-            <DiamondGradient center="70,70" radius="60" matrix="1.2,0.3,-0.3,1.2,0,0">
-              <ColorStop offset="0" color="#FFFFFF"/>
-              <ColorStop offset="0.5" color="#EC4899"/>
-              <ColorStop offset="1" color="#1E1B4B"/>
-            </DiamondGradient>
-          </Fill>
-        </Layer>
-        <Layer height="12">
-          <Text text="Diamond + matrix" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
-          <Fill color="#64748B"/>
+        <!-- DiamondGradient with matrix -->
+        <Layer width="120" layout="vertical" gap="6" alignment="center">
+          <Layer width="120" height="120">
+            <Rectangle position="60,60" size="120,120" roundness="12"/>
+            <Fill>
+              <DiamondGradient center="70,70" radius="60" matrix="1.2,0.3,-0.3,1.2,0,0">
+                <ColorStop offset="0" color="#FFFFFF"/>
+                <ColorStop offset="0.5" color="#EC4899"/>
+                <ColorStop offset="1" color="#1E1B4B"/>
+              </DiamondGradient>
+            </Fill>
+          </Layer>
+          <Layer height="12">
+            <Text text="Diamond + matrix" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
         </Layer>
       </Layer>
     </Layer>

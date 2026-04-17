@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: fillRule comparison — winding vs evenOdd on identical overlapping paths -->
-<pagx version="1.0" width="320" height="280">
+<pagx version="1.0" width="320" height="305">
   <Resources>
     <!-- Star path with self-intersections (pentagram), positive coordinates -->
     <PathData id="starPath" data="M 40,0 L 50,27 L 80,27 L 56,44 L 65,75 L 40,56 L 15,75 L 24,44 L 0,27 L 30,27 Z"/>
@@ -29,10 +29,12 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="vertical" gap="0" padding="16" alignment="stretch" arrangement="center">
+    <Layer flex="1">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="0" padding="16" alignment="stretch" arrangement="center">
 
       <!-- Column headers -->
       <Layer layout="horizontal" gap="0" alignment="center">
@@ -54,10 +56,14 @@
             <Fill color="#94A3B8"/>
           </Layer>
           <Layer height="80">
-            <Path data="@starPath" centerX="0" centerY="0"/>
-            <Fill color="#8B5CF6" fillRule="winding"/>
-            <Path data="@starPath" centerX="0" centerY="0"/>
-            <Stroke color="#6D28D9" width="1"/>
+            <Group centerX="0" centerY="0">
+              <Path data="@starPath"/>
+              <Fill color="#8B5CF6" fillRule="winding"/>
+            </Group>
+            <Group centerX="0" centerY="0">
+              <Path data="@starPath"/>
+              <Stroke color="#6D28D9" width="1"/>
+            </Group>
           </Layer>
         </Layer>
         <Layer flex="1" layout="vertical" gap="6" alignment="center">
@@ -66,10 +72,14 @@
             <Fill color="#94A3B8"/>
           </Layer>
           <Layer height="80">
-            <Path data="@starPath" centerX="0" centerY="0"/>
-            <Fill color="#EC4899" fillRule="evenOdd"/>
-            <Path data="@starPath" centerX="0" centerY="0"/>
-            <Stroke color="#BE185D" width="1"/>
+            <Group centerX="0" centerY="0">
+              <Path data="@starPath"/>
+              <Fill color="#EC4899" fillRule="evenOdd"/>
+            </Group>
+            <Group centerX="0" centerY="0">
+              <Path data="@starPath"/>
+              <Stroke color="#BE185D" width="1"/>
+            </Group>
           </Layer>
         </Layer>
       </Layer>
@@ -82,10 +92,14 @@
             <Fill color="#94A3B8"/>
           </Layer>
           <Layer height="55">
-            <Path data="@overlapCircles" centerX="0" centerY="0"/>
-            <Fill color="#3B82F6" fillRule="winding"/>
-            <Path data="@overlapCircles" centerX="0" centerY="0"/>
-            <Stroke color="#1D4ED8" width="1"/>
+            <Group centerX="0" centerY="0">
+              <Path data="@overlapCircles"/>
+              <Fill color="#3B82F6" fillRule="winding"/>
+            </Group>
+            <Group centerX="0" centerY="0">
+              <Path data="@overlapCircles"/>
+              <Stroke color="#1D4ED8" width="1"/>
+            </Group>
           </Layer>
         </Layer>
         <Layer flex="1" layout="vertical" gap="6" alignment="center">
@@ -94,12 +108,17 @@
             <Fill color="#94A3B8"/>
           </Layer>
           <Layer height="55">
-            <Path data="@overlapCircles" centerX="0" centerY="0"/>
-            <Fill color="#10B981" fillRule="evenOdd"/>
-            <Path data="@overlapCircles" centerX="0" centerY="0"/>
-            <Stroke color="#047857" width="1"/>
+            <Group centerX="0" centerY="0">
+              <Path data="@overlapCircles"/>
+              <Fill color="#10B981" fillRule="evenOdd"/>
+            </Group>
+            <Group centerX="0" centerY="0">
+              <Path data="@overlapCircles"/>
+              <Stroke color="#047857" width="1"/>
+            </Group>
           </Layer>
         </Layer>
+      </Layer>
       </Layer>
     </Layer>
   </Layer>

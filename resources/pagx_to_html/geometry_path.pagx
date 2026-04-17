@@ -26,10 +26,12 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="horizontal" gap="0" padding="15" alignment="center" arrangement="center">
+    <Layer flex="1">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="0" padding="15" alignment="center" arrangement="center">
 
       <!-- Inline path data -->
       <Layer flex="1" layout="vertical" gap="6" alignment="center">
@@ -53,6 +55,7 @@
           <Text text="@id reference" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
+      </Layer>
       </Layer>
     </Layer>
   </Layer>

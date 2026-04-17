@@ -22,42 +22,44 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="horizontal" gap="30" padding="20,30,20,30" alignment="center" arrangement="center">
+    <Layer flex="1">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <!-- Simple radial gradient (circle) -->
-      <Layer layout="vertical" gap="6" alignment="center">
-        <Layer width="120" height="140">
-          <Rectangle position="60,70" size="120,140" roundness="8"/>
-          <Fill>
-            <RadialGradient center="60,70" radius="80">
-              <ColorStop offset="0" color="#FFFFFF"/>
-              <ColorStop offset="1" color="#3B82F6"/>
-            </RadialGradient>
-          </Fill>
+      <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="30" padding="20,30,20,30" alignment="center" arrangement="center">
+          <!-- Simple radial gradient (circle) -->
+        <Layer layout="vertical" gap="6" alignment="center">
+          <Layer width="120" height="140">
+            <Rectangle position="60,70" size="120,140" roundness="8"/>
+            <Fill>
+              <RadialGradient center="60,70" radius="80">
+                <ColorStop offset="0" color="#FFFFFF"/>
+                <ColorStop offset="1" color="#3B82F6"/>
+              </RadialGradient>
+            </Fill>
+          </Layer>
+          <Layer height="12">
+            <Text text="Circle" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
         </Layer>
-        <Layer height="12">
-          <Text text="Circle" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
-          <Fill color="#64748B"/>
-        </Layer>
-      </Layer>
 
-      <!-- Radial with matrix: ellipse -->
-      <Layer layout="vertical" gap="6" alignment="center">
-        <Layer width="120" height="140">
-          <Rectangle position="60,70" size="120,140" roundness="8"/>
-          <Fill>
-            <RadialGradient center="40,70" radius="60" matrix="1.5,0,0,1,0,0">
-              <ColorStop offset="0" color="#FFFFFF"/>
-              <ColorStop offset="1" color="#EF4444"/>
-            </RadialGradient>
-          </Fill>
-        </Layer>
-        <Layer height="12">
-          <Text text="Ellipse (matrix)" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
-          <Fill color="#64748B"/>
+        <!-- Radial with matrix: ellipse -->
+        <Layer layout="vertical" gap="6" alignment="center">
+          <Layer width="120" height="140">
+            <Rectangle position="60,70" size="120,140" roundness="8"/>
+            <Fill>
+              <RadialGradient center="40,70" radius="60" matrix="1.5,0,0,1,0,0">
+                <ColorStop offset="0" color="#FFFFFF"/>
+                <ColorStop offset="1" color="#EF4444"/>
+              </RadialGradient>
+            </Fill>
+          </Layer>
+          <Layer height="12">
+            <Text text="Ellipse (matrix)" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
         </Layer>
       </Layer>
     </Layer>

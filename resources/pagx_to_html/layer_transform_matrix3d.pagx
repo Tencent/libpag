@@ -29,8 +29,8 @@
 
       <!-- 3D rotated rectangle centered in card -->
       <Layer width="130" height="130" centerX="0" centerY="0">
-        <Layer matrix3D="0.966,0,0.259,0,0,1,0,0,-0.259,0,0.966,0,5,5,0,1" preserve3D="true">
-          <Rectangle position="60,60" size="120,120" roundness="12"/>
+        <Layer matrix3D="0.966,0,0.259,0,0,1,0,0,-0.259,0,0.966,0,0,0,0,1" preserve3D="true">
+          <Rectangle position="65,65" size="120,120" roundness="12"/>
           <Fill color="#EC4899"/>
         </Layer>
       </Layer>

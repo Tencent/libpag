@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Text baseline modes (lineBox vs alphabetic) and all textAnchor values (start, center, end) -->
-<pagx version="1.0" width="420" height="280">
+<pagx version="1.0" width="460" height="280">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -22,17 +22,18 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="vertical" gap="16" padding="20,30,20,30" alignment="stretch" arrangement="center">
+    <Layer flex="1">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <!-- Row 1: Baseline comparison -->
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="16" padding="20,30,20,30" alignment="stretch" arrangement="center">
+        <!-- Row 1: Baseline comparison -->
       <Layer layout="horizontal" gap="30" arrangement="center" alignment="start">
         <!-- LineBox baseline (default) -->
         <Layer width="150" layout="vertical" gap="4" alignment="stretch">
           <Layer height="40">
-            <Text text="LineBox (default)" fontFamily="Arial" fontSize="16" baseline="lineBox" centerX="0" textAnchor="center"/>
+            <Text text="LineBox (default)" fontFamily="Arial" fontSize="16" baseline="lineBox" centerX="0" centerY="0" textAnchor="center"/>
             <Fill color="#3B82F6"/>
           </Layer>
           <Layer height="12">
@@ -43,7 +44,7 @@
         <!-- Alphabetic baseline -->
         <Layer width="150" layout="vertical" gap="4" alignment="stretch">
           <Layer height="40">
-            <Text text="Alphabetic" fontFamily="Arial" fontSize="16" baseline="alphabetic" centerX="0" textAnchor="center"/>
+            <Text text="Alphabetic" fontFamily="Arial" fontSize="16" baseline="alphabetic" centerX="0" centerY="0" textAnchor="center"/>
             <Fill color="#EF4444"/>
           </Layer>
           <Layer height="12">
@@ -56,7 +57,7 @@
       <!-- Row 2: textAnchor comparison -->
       <Layer layout="horizontal" gap="10" arrangement="center" alignment="start">
         <!-- textAnchor=start -->
-        <Layer width="110" layout="vertical" gap="4" alignment="stretch">
+        <Layer width="100" layout="vertical" gap="4" alignment="stretch">
           <Layer height="35">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
             <Fill color="#DBEAFE"/>
@@ -71,7 +72,7 @@
           </Layer>
         </Layer>
         <!-- textAnchor=center -->
-        <Layer width="110" layout="vertical" gap="4" alignment="stretch">
+        <Layer width="100" layout="vertical" gap="4" alignment="stretch">
           <Layer height="35">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
             <Fill color="#DCFCE7"/>
@@ -86,7 +87,7 @@
           </Layer>
         </Layer>
         <!-- textAnchor=end -->
-        <Layer width="110" layout="vertical" gap="4" alignment="stretch">
+        <Layer width="100" layout="vertical" gap="4" alignment="stretch">
           <Layer height="35">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
             <Fill color="#FEF3C7"/>
@@ -100,6 +101,7 @@
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
+      </Layer>
       </Layer>
     </Layer>
   </Layer>

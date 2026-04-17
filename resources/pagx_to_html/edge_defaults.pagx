@@ -23,10 +23,12 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="vertical" gap="10" padding="12" alignment="stretch" arrangement="center">
+    <Layer flex="1">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="10" padding="12" alignment="stretch" arrangement="center">
 
       <!-- Row 1: Rectangle defaults, Ellipse defaults, Stroke defaults, Polystar defaults -->
       <Layer layout="horizontal" gap="10" alignment="center" arrangement="spaceEvenly">
@@ -85,8 +87,10 @@
             <Rectangle position="30,30" size="60,60" roundness="6"/>
             <Fill color="#FEF2F2"/>
             <Stroke color="#FECACA" width="1"/>
-            <Text text="0x0" fontSize="14" position="30,30" textAnchor="center"/>
-            <Fill color="#EF4444"/>
+            <Group>
+              <Text text="0x0" fontSize="14" position="30,30" textAnchor="center"/>
+              <Fill color="#EF4444"/>
+            </Group>
           </Layer>
           <Layer height="10">
             <Text text="Zero-size" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
@@ -116,8 +120,10 @@
             <Rectangle position="30,30" size="60,60" roundness="6"/>
             <Fill color="#F8FAFC"/>
             <Stroke color="#E2E8F0" width="1"/>
-            <Text text="Hi" fontSize="18" position="30,30" textAnchor="center"/>
-            <Fill color="#64748B"/>
+            <Group>
+              <Text text="Hi" fontSize="18" position="30,30" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Group>
           </Layer>
           <Layer height="10">
             <Text text="Minimal" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
@@ -174,15 +180,18 @@
           <Layer width="60" height="60">
             <Rectangle position="30,30" size="60,60" roundness="6"/>
             <Fill color="#F8FAFC"/>
-            <Stroke color="#E2E8F0" width="1" dashArray="4,4"/>
-            <Text text="empty" fontSize="10" position="30,30" textAnchor="center"/>
-            <Fill color="#CBD5E1"/>
+            <Stroke color="#E2E8F0" width="1" dashes="4,4"/>
+            <Group>
+              <Text text="empty" fontSize="10" position="30,30" textAnchor="center"/>
+              <Fill color="#CBD5E1"/>
+            </Group>
           </Layer>
           <Layer height="10">
             <Text text="Empty" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
         </Layer>
+      </Layer>
       </Layer>
     </Layer>
   </Layer>

@@ -22,12 +22,13 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="vertical" padding="20,30,20,30" alignment="center" arrangement="center">
+    <Layer flex="1">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <!-- 2x2 grid -->
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" alignment="center" arrangement="center">
+        <!-- 2x2 grid -->
       <Layer layout="vertical" gap="12" alignment="center">
         <!-- Row 1: Separate 75% + Wrap-around -->
         <Layer layout="horizontal" gap="30" alignment="center">
@@ -87,6 +88,7 @@
             </Layer>
           </Layer>
         </Layer>
+      </Layer>
       </Layer>
     </Layer>
   </Layer>

@@ -22,12 +22,13 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="horizontal" gap="12" padding="16" alignment="stretch" arrangement="center">
+    <Layer flex="1">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
-      <!-- textAlign=start -->
+      <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="12" padding="16" alignment="stretch" arrangement="center">
+        <!-- textAlign=start -->
       <Layer flex="1" layout="vertical" gap="4" alignment="stretch">
         <Layer flex="1">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
@@ -93,6 +94,7 @@
           <Text text="justify" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
+      </Layer>
       </Layer>
     </Layer>
   </Layer>

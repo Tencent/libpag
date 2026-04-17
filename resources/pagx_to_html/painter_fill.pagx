@@ -59,8 +59,10 @@
             <Layer width="90" height="90">
               <Rectangle position="45,45" size="90,90" roundness="12"/>
               <Fill color="#3B82F6"/>
-              <Rectangle position="45,45" size="70,70"/>
-              <Fill color="#EF4444" blendMode="multiply"/>
+              <Group>
+                <Rectangle position="45,45" size="70,70"/>
+                <Fill color="#EF4444" blendMode="multiply"/>
+              </Group>
             </Layer>
             <Layer height="12">
               <Text text="multiply" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
