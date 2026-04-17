@@ -38,28 +38,14 @@ inline int CallRun(int (*fn)(int, char*[]), std::vector<std::string> args) {
   return fn(static_cast<int>(argv.size()), argv.data());
 }
 
-// Runs `pagx verify --skip-render --skip-layout [--skip-path-complexity] <filePath>` and
-// asserts it exits with 0. stdout/stderr are captured so they only surface on failure.
-// `skipPathComplexity` is opt-in because some inputs (e.g. SVGs with font glyphs expanded
-// into paths) will always flag path-complexity warnings that the optimizer cannot remove.
-inline void VerifyFile(const std::string& filePath, const std::string& key,
-                       bool skipPathComplexity = false) {
+inline static void VerifyFile(const std::string& filePath, const std::string& key) {
   std::streambuf* oldErr = std::cerr.rdbuf();
-  std::streambuf* oldOut = std::cout.rdbuf();
   std::ostringstream verifyErr;
-  std::ostringstream verifyOut;
   std::cerr.rdbuf(verifyErr.rdbuf());
-  std::cout.rdbuf(verifyOut.rdbuf());
-  std::vector<std::string> args = {"verify", "--skip-render", "--skip-layout"};
-  if (skipPathComplexity) {
-    args.push_back("--skip-path-complexity");
-  }
-  args.push_back(filePath);
-  int rc = CallRun(pagx::cli::RunVerify, std::move(args));
+  auto verifyRet =
+      CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", filePath});
   std::cerr.rdbuf(oldErr);
-  std::cout.rdbuf(oldOut);
-  EXPECT_EQ(rc, 0) << "pagx verify failed for " << key << ":\n"
-                   << verifyErr.str() << verifyOut.str();
+  EXPECT_EQ(verifyRet, 0) << "pagx verify failed for " << key << ":\n" << verifyErr.str();
 }
 
 }  // namespace pag

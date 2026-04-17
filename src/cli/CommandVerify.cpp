@@ -86,7 +86,6 @@ struct VerifyOptions {
   bool skipRender = false;
   bool skipLayout = false;
   bool jsonOutput = false;
-  bool skipPathComplexity = false;
 };
 
 // ============================================================================
@@ -1300,26 +1299,16 @@ static void CollectRepeaterProducts(const std::vector<Element*>& elements, Repea
 // Static Detection: High Path Complexity
 // ============================================================================
 
-// The verb-count threshold above which a Path is flagged as "too complex". Shared with the
-// --skip-path-complexity filter at the end of RunVerify so the two stay in sync; also exposed
-// in the user-facing message.
-static constexpr size_t kHighPathComplexityThreshold = 500;
-// Stable marker substring embedded in the diagnostic message. The filter matches on this
-// (rather than on the numeric threshold) so future tweaks to kHighPathComplexityThreshold
-// don't silently break --skip-path-complexity.
-static constexpr const char* kHighPathComplexityMarker = "may cause slow rendering";
-
 static void DetectHighPathComplexity(const Path* path, std::vector<VerifyDiagnostic>& diagnostics) {
   if (path->data == nullptr) {
     return;
   }
   auto verbCount = path->data->verbs().size();
-  if (verbCount > kHighPathComplexityThreshold) {
+  if (verbCount > 500) {
     AddDiagnostic(diagnostics, path->sourceLine,
-                  "Path with " + std::to_string(verbCount) + " verbs (> " +
-                      std::to_string(kHighPathComplexityThreshold) + "), " +
-                      kHighPathComplexityMarker +
-                      ". Fix: check if path can be simplified or split");
+                  "Path with " + std::to_string(verbCount) +
+                      " verbs (> 500), may cause slow rendering. "
+                      "Fix: check if path can be simplified or split");
   }
 }
 
@@ -2523,8 +2512,6 @@ static void PrintUsage() {
             << "  --skip-render       Skip screenshot generation\n"
             << "  --skip-layout       Skip layout XML generation\n"
             << "  --json              Output diagnostics in JSON format\n"
-            << "  --skip-path-complexity\n"
-            << "                      Suppress 'Path with N verbs' warnings (content-only)\n"
             << "  -h, --help          Show this help message\n";
 }
 
@@ -2552,8 +2539,6 @@ static int ParseOptions(int argc, char* argv[], VerifyOptions* opts) {
       opts->skipLayout = true;
     } else if (strcmp(argv[i], "--json") == 0) {
       opts->jsonOutput = true;
-    } else if (strcmp(argv[i], "--skip-path-complexity") == 0) {
-      opts->skipPathComplexity = true;
     } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
       PrintUsage();
       return -1;
@@ -2628,15 +2613,6 @@ int RunVerify(int argc, char* argv[]) {
 
   if (xmlDoc != nullptr) {
     xmlFreeDoc(xmlDoc);
-  }
-
-  if (opts.skipPathComplexity) {
-    diagnostics.erase(std::remove_if(diagnostics.begin(), diagnostics.end(),
-                                     [](const VerifyDiagnostic& d) {
-                                       return d.message.find(kHighPathComplexityMarker) !=
-                                              std::string::npos;
-                                     }),
-                      diagnostics.end());
   }
 
   SortDiagnostics(diagnostics);

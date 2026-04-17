@@ -193,9 +193,8 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
     std::string pagxPath = SavePAGXFile(xml, "PAGXTest/" + key + ".pagx");
 
     // Step 3b: The PAGXOptimizer is responsible for eliminating every structural warning
-    // verify can flag. Path-complexity warnings reflect inherent SVG content (font glyphs
-    // rendered as paths, etc.) and are excluded from the assertion.
-    VerifyFile(pagxPath, key, /*skipPathComplexity=*/true);
+    // verify can flag.
+    VerifyFile(pagxPath, key);
 
     // Step 4: Load PAGX file and build layer tree (this is the viewer's actual path)
     auto reloadedDoc = pagx::PAGXImporter::FromFile(pagxPath);

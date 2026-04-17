@@ -579,7 +579,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_MultiRoundTrip) {
       ASSERT_FALSE(pagxXml.empty()) << baseName << " round " << round << " PAGX export failed";
       auto pagxPath = SaveFile(pagxXml, "PAGXSVGTest/multi_roundtrip_" + baseName + ".pagx");
 
-      VerifyFile(pagxPath, baseName + " round " + round, /*skipPathComplexity=*/true);
+      VerifyFile(pagxPath, baseName + " round " + round);
 
       doc = pagx::PAGXImporter::FromFile(pagxPath);
       ASSERT_NE(doc, nullptr) << baseName << " round " << round << " PAGX import failed";

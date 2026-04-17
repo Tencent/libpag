@@ -53,11 +53,6 @@ class PAGXOptimizer {
     bool canonicalizePaths = true;
     /** Replace alpha-rectangle masks with an equivalent scrollRect on the parent layer. */
     bool rectMaskToScrollRect = true;
-    /** Reduce verb count of Path data by collapsing colinear segments and degenerate curves
-     *  whose deviation from a straight line is below `pathSimplifyTolerance`. */
-    bool simplifyPaths = true;
-    /** Maximum perpendicular deviation (in pixels) tolerated when simplifying path geometry. */
-    float pathSimplifyTolerance = 0.25f;
     /** Collapse PathData resources with identical contents into a single instance. */
     bool dedupPathData = true;
     /** Drop resources from `<Resources>` that no longer have any reference in the layer tree. */

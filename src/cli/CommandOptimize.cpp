@@ -43,13 +43,12 @@ void PrintOptimizeUsage() {
       << "\n"
       << "Simplifies the structure of a PAGX file without changing rendered output. Collapses\n"
       << "redundant Layers/Groups, merges adjacent shell Layers, rewrites Path nodes that\n"
-      << "describe axis-aligned rectangles or ellipses, simplifies Path geometry below a\n"
-      << "tolerance, and deduplicates shared PathData resources. Any Layer carrying id, name,\n"
-      << "layout, or constraint attributes is left untouched.\n"
+      << "describe axis-aligned rectangles or ellipses, and deduplicates shared PathData\n"
+      << "resources. Any Layer carrying id, name, layout, or constraint attributes is left\n"
+      << "untouched.\n"
       << "\n"
       << "Options:\n"
       << "  -o, --output <path>       Output file path (default: overwrite input)\n"
-      << "  --tolerance <float>       Path simplification tolerance in pixels (default: 0.25)\n"
       << "  --max-iterations <n>      Max rewrite iterations (default: 8)\n"
       << "  --no-prune-empty          Do not remove empty Layers/Groups\n"
       << "  --no-downgrade-shell      Do not downgrade shell children to Groups\n"
@@ -58,21 +57,9 @@ void PrintOptimizeUsage() {
       << "  --no-merge-groups         Do not merge adjacent Groups with identical painters\n"
       << "  --no-canonicalize-paths   Do not rewrite Paths as Rectangle/Ellipse when possible\n"
       << "  --no-rect-mask            Do not convert rect masks to scrollRect\n"
-      << "  --no-simplify-paths       Do not simplify Path geometry\n"
       << "  --no-dedup-paths          Do not deduplicate PathData resources\n"
       << "  --no-prune-resources      Do not drop unreferenced resources\n"
       << "  -h, --help                Show this help message\n";
-}
-
-bool ParseFloatArg(const char* text, float* out) {
-  char* endPtr = nullptr;
-  errno = 0;
-  double value = std::strtod(text, &endPtr);
-  if (errno != 0 || endPtr == text || *endPtr != '\0') {
-    return false;
-  }
-  *out = static_cast<float>(value);
-  return true;
 }
 
 bool ParseIntArg(const char* text, int* out) {
@@ -95,15 +82,6 @@ int ParseOptimizeOptions(int argc, char* argv[], OptimizeOptions* options) {
     }
     if ((arg == "-o" || arg == "--output") && i + 1 < argc) {
       options->outputFile = argv[++i];
-      continue;
-    }
-    if (arg == "--tolerance" && i + 1 < argc) {
-      float value = 0.0f;
-      if (!ParseFloatArg(argv[++i], &value) || value < 0.0f) {
-        std::cerr << "pagx optimize: invalid --tolerance value '" << argv[i] << "'\n";
-        return 1;
-      }
-      options->optimizerOptions.pathSimplifyTolerance = value;
       continue;
     }
     if (arg == "--max-iterations" && i + 1 < argc) {
@@ -141,10 +119,6 @@ int ParseOptimizeOptions(int argc, char* argv[], OptimizeOptions* options) {
     }
     if (arg == "--no-rect-mask") {
       options->optimizerOptions.rectMaskToScrollRect = false;
-      continue;
-    }
-    if (arg == "--no-simplify-paths") {
-      options->optimizerOptions.simplifyPaths = false;
       continue;
     }
     if (arg == "--no-dedup-paths") {
