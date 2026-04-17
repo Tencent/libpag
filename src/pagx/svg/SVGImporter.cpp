@@ -48,9 +48,7 @@ static constexpr float DEFAULT_FONT_SIZE = 16.0f;
 // can still opt into the full optimizer.
 static PAGXOptimizer::Options MakeRenderingPreservingOptions() {
   PAGXOptimizer::Options opts;
-  opts.canonicalizePaths = false;
   opts.simplifyPaths = false;
-  opts.rectMaskToScrollRect = false;
   return opts;
 }
 
