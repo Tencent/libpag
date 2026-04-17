@@ -143,6 +143,46 @@ pagx format --indent 4 input.pagx       # 4-space indent (default: 2)
 
 ---
 
+## pagx optimize
+
+Simplify the structure of a PAGX file without changing rendered output. Collapses redundant
+Layers/Groups, merges adjacent shell Layers, rewrites Path nodes that describe axis-aligned
+rectangles or ellipses, simplifies Path geometry below a tolerance, and deduplicates shared
+PathData resources. The optimizer is conservative: any Layer carrying `id`, `name`,
+`customData`, layout, or constraint attributes is left untouched.
+
+`pagx resolve` already applies this optimizer automatically after expanding imports; run
+`pagx optimize` directly when you need to re-simplify a hand-authored or manually edited
+PAGX file.
+
+```bash
+pagx optimize design.pagx                        # optimize in place
+pagx optimize design.pagx -o out.pagx            # write to a new file
+pagx optimize --tolerance 0.5 design.pagx        # looser path simplification
+pagx optimize --no-simplify-paths design.pagx    # keep path geometry exact
+```
+
+| Option | Description |
+|--------|-------------|
+| `-o, --output <path>` | Output file path (default: overwrite input) |
+| `--tolerance <float>` | Path simplification tolerance in pixels (default: 0.25) |
+| `--max-iterations <n>` | Maximum rewrite iterations to reach a fixed point (default: 8) |
+| `--no-prune-empty` | Do not remove empty Layers and Groups |
+| `--no-downgrade-shell` | Do not downgrade shell Layer children to inline Groups |
+| `--no-merge-shell-layers` | Do not merge runs of adjacent shell Layers |
+| `--no-unwrap-first-group` | Do not unwrap leading redundant Groups |
+| `--no-merge-groups` | Do not merge adjacent Groups with identical painters |
+| `--no-canonicalize-paths` | Do not rewrite Path nodes as Rectangle/Ellipse when possible |
+| `--no-rect-mask` | Do not convert rectangular alpha masks to `scrollRect` |
+| `--no-simplify-paths` | Do not simplify Path geometry |
+| `--no-dedup-paths` | Do not deduplicate PathData resources |
+| `--no-prune-resources` | Do not drop unreferenced `<Resources>` entries |
+
+Rendering output is preserved exactly; the optimizer never changes painter scoping, mask
+references, or `customData`.
+
+---
+
 ## pagx layout
 
 Display the layout structure of a PAGX file in XML format. Outputs the full layout tree with

@@ -25,6 +25,7 @@
 #include "cli/CommandFormat.h"
 #include "cli/CommandImport.h"
 #include "cli/CommandLayout.h"
+#include "cli/CommandOptimize.h"
 #include "cli/CommandRender.h"
 #include "cli/CommandResolve.h"
 #include "cli/CommandVerify.h"
@@ -46,6 +47,7 @@ static void PrintUsage() {
             << "  bounds         Query rendered pixel bounds of layers (for crop regions)\n"
             << "  font           Query font metrics or embed fonts into a PAGX file\n"
             << "  format         Format a PAGX file (indentation and attribute ordering)\n"
+            << "  optimize       Simplify PAGX structure without changing rendered output\n"
             << "  import         Import from another format (e.g. SVG) to PAGX\n"
             << "  export         Export a PAGX file to another format (e.g. SVG)\n"
             << "\n"
@@ -91,6 +93,9 @@ int main(int argc, char* argv[]) {
   }
   if (command == "format") {
     return pagx::cli::RunFormat(argc - 1, argv + 1);
+  }
+  if (command == "optimize") {
+    return pagx::cli::RunOptimize(argc - 1, argv + 1);
   }
   if (command == "import") {
     return pagx::cli::RunImport(argc - 1, argv + 1);
