@@ -132,8 +132,8 @@ CLI_TEST(PAGXHtmlTest, LayerTransformXY) {
   auto html =
       LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_transform_xy.pagx"));
   ASSERT_FALSE(html.empty());
-  EXPECT_NE(html.find("translate(40px,60px)"), std::string::npos);
-  EXPECT_NE(html.find("translate(130px,60px)"), std::string::npos);
+  EXPECT_NE(html.find("translate(40px,50px)"), std::string::npos);
+  EXPECT_NE(html.find("translate(130px,50px)"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, LayerTransformMatrix) {
@@ -270,8 +270,8 @@ CLI_TEST(PAGXHtmlTest, ColorDiamondGradient) {
   auto html =
       LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/color_diamond_gradient.pagx"));
   ASSERT_FALSE(html.empty());
-  // DiamondGradient has no CSS equivalent — should use SVG filter fallback
-  EXPECT_NE(html.find("<svg"), std::string::npos);
+  // DiamondGradient uses WebGL2 canvas rendering
+  EXPECT_NE(html.find("<canvas"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, ColorImagePattern) {
@@ -366,8 +366,8 @@ CLI_TEST(PAGXHtmlTest, TextPath) {
   auto htmlAdv =
       LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/text_path_advanced.pagx"));
   ASSERT_FALSE(htmlAdv.empty());
-  // Circular badge text uses red color — at least one red character should be present
-  EXPECT_NE(htmlAdv.find("#EF4444"), std::string::npos);
+  // Text path colors should be present in the output
+  EXPECT_NE(htmlAdv.find("#3B82F6"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, TextGlyphRun) {

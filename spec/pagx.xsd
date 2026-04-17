@@ -950,6 +950,7 @@
     </xs:sequence>
     <xs:attribute name="width" type="xs:decimal" use="required"/>
     <xs:attribute name="height" type="xs:decimal" use="required"/>
+    <xs:attribute name="version" type="xs:string"/>
   </xs:complexType>
 
   <xs:element name="pagx" type="PagxType"/>
