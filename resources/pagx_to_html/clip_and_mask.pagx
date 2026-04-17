@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: scrollRect → clip-path:inset(); mask (alpha/luminance/contour) → CSS mask/clip-path -->
-<pagx version="1.0" width="400" height="440">
+<pagx version="1.0" width="420" height="440">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -22,13 +22,13 @@
     </Layer>
 
     <!-- Card -->
-    <Layer flex="1" layout="vertical" gap="10" padding="20" alignment="center" arrangement="center">
+    <Layer flex="1" layout="vertical" gap="16" padding="30" alignment="center" arrangement="center">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
       <!-- Row 1: scrollRect + alpha mask -->
-      <Layer layout="horizontal" gap="30" arrangement="center">
+      <Layer layout="horizontal" gap="20" arrangement="center">
         <!-- scrollRect clipping -->
         <Layer width="120" layout="vertical" gap="4" alignment="stretch">
           <Layer height="110">
@@ -68,7 +68,7 @@
       </Layer>
 
       <!-- Row 2: luminance + contour mask -->
-      <Layer layout="horizontal" gap="30" arrangement="center">
+      <Layer layout="horizontal" gap="20" arrangement="center">
         <!-- Luminance mask -->
         <Layer width="120" layout="vertical" gap="4" alignment="stretch">
           <Layer height="110">
