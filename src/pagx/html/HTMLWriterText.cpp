@@ -1290,7 +1290,12 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
           float angleDeg = tangent * 180.0f / static_cast<float>(M_PI) - textPath->baselineAngle;
           transform += "rotate(" + FloatToString(angleDeg) + "deg) ";
         }
-        transform += "translate(-50%,-" + FloatToString(renderFont) + "px)";
+        // Align the character baseline to the path sample point. The sampled (pos.x, pos.y) is
+        // where tgfx places the glyph baseline; we translate the span upward by the font ascent
+        // so the baseline lands on pos.y. For Arial the typographic ascender is ~0.905em. Using
+        // the full fontSize (1em) would place the span's bottom edge at pos.y, shifting glyphs
+        // upward by ~0.1em.
+        transform += "translate(-50%,-" + FloatToString(renderFont * 0.905f) + "px)";
         charStyle += ";transform:" + transform;
         charStyle += ";transform-origin:0 0";
         if (fill && fill->color) {
