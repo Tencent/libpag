@@ -1102,6 +1102,13 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
       if (textPath->forceAlignment && glyphCount > 1 && totalAdvance > 0) {
         extraSpacing = (effectiveLength - totalAdvance) / static_cast<float>(glyphCount - 1);
       }
+      // Normal mode uses per-glyph anchor decomposition relative to baselineOrigin; forceAlignment
+      // mode uses consecutive arc-length layout. See tgfx/src/layers/vectors/TextPath.cpp.
+      float baselineAngleRad = textPath->baselineAngle * static_cast<float>(M_PI) / 180.0f;
+      float baselineCos = std::cos(baselineAngleRad);
+      float baselineSin = std::sin(baselineAngleRad);
+      auto textRenderPos = text->renderPosition();
+      auto baselineOrigin = textPath->renderBaselineOrigin();
       float currentArcPos = textPath->firstMargin;
       for (auto* run : text->glyphRuns) {
         if (!run->font) {
@@ -1120,17 +1127,44 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
             continue;
           }
           float glyphAdvance = glyph->advance * scale;
-          float glyphCenterArc = currentArcPos + glyphAdvance / 2.0f;
-          Point pos = {};
+          float pathOffset = 0.0f;
+          float normalOffset = 0.0f;
           float tangent = 0;
-          SampleArcLengthLUT(lut, glyphCenterArc, &pos, &tangent, isClosed);
-          float yOffset = 0;
-          if (i < run->positions.size()) {
-            yOffset = run->positions[i].y;
+          Point pos = {};
+          if (textPath->forceAlignment) {
+            float glyphCenterArc = currentArcPos + glyphAdvance / 2.0f;
+            SampleArcLengthLUT(lut, glyphCenterArc, &pos, &tangent, isClosed);
+            if (i < run->positions.size()) {
+              normalOffset = run->positions[i].y;
+            }
+            pathOffset = glyphCenterArc;
+          } else {
+            // Compute the glyph anchor in layer space, then decompose its offset from
+            // baselineOrigin along the baseline angle into tangent (arc distance) and normal
+            // (perpendicular-to-curve offset) components.
+            float glyphAnchorX = textRenderPos.x + run->x + glyphAdvance * 0.5f;
+            float glyphAnchorY = textRenderPos.y + run->y;
+            if (i < run->positions.size()) {
+              glyphAnchorX += run->positions[i].x;
+              glyphAnchorY += run->positions[i].y;
+            }
+            if (i < run->xOffsets.size()) {
+              glyphAnchorX += run->xOffsets[i];
+            }
+            if (i < run->anchors.size()) {
+              glyphAnchorX += run->anchors[i].x;
+              glyphAnchorY += run->anchors[i].y;
+            }
+            float dx = glyphAnchorX - baselineOrigin.x;
+            float dy = glyphAnchorY - baselineOrigin.y;
+            float tangentDistance = dx * baselineCos + dy * baselineSin;
+            normalOffset = dy * baselineCos - dx * baselineSin;
+            pathOffset = textPath->firstMargin + tangentDistance;
+            SampleArcLengthLUT(lut, pathOffset, &pos, &tangent, isClosed);
           }
           float normalAngle = tangent + static_cast<float>(M_PI) / 2.0f;
-          pos.x += yOffset * std::cos(normalAngle);
-          pos.y += yOffset * std::sin(normalAngle);
+          pos.x += normalOffset * std::cos(normalAngle);
+          pos.y += normalOffset * std::sin(normalAngle);
           Matrix m = Matrix::Scale(scale, scale);
           m = Matrix::Translate(-glyph->advance / 2.0f, 0) * m;
           if (textPath->perpendicular) {
@@ -1175,6 +1209,21 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
       if (textPath->forceAlignment && charCount > 1 && totalWidth > 0) {
         extraSpacing = (effectiveLength - totalWidth) / static_cast<float>(charCount - 1);
       }
+      // Normal mode uses per-character anchor decomposition relative to baselineOrigin (see
+      // tgfx/src/layers/vectors/TextPath.cpp). The baseline here is approximated: character
+      // anchor y sits at the alphabetic baseline (renderPos.y + renderFont * 0.8 when
+      // baseline=LineBox), while anchor x is the character's advance center relative to the
+      // Text origin.
+      float baselineAngleRad = textPath->baselineAngle * static_cast<float>(M_PI) / 180.0f;
+      float baselineCos = std::cos(baselineAngleRad);
+      float baselineSin = std::sin(baselineAngleRad);
+      auto textRenderPos = text->renderPosition();
+      auto baselineOrigin = textPath->renderBaselineOrigin();
+      float characterAnchorY = textRenderPos.y;
+      if (text->baseline == TextBaseline::LineBox) {
+        characterAnchorY += renderFont * 0.8f;
+      }
+      float characterCursorX = textRenderPos.x;
       float currentArcPos = textPath->firstMargin;
       p = text->text.c_str();
       while (*p) {
@@ -1184,10 +1233,26 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
           break;
         }
         float charWidth = EstimateCharAdvanceHTML(ch, renderFont) + text->letterSpacing;
-        float charCenterArc = currentArcPos + charWidth / 2.0f;
-        Point pos = {};
+        float pathOffset = 0.0f;
+        float normalOffset = 0.0f;
         float tangent = 0;
-        SampleArcLengthLUT(lut, charCenterArc, &pos, &tangent, isClosed);
+        Point pos = {};
+        float charCenterArc = currentArcPos + charWidth / 2.0f;
+        if (textPath->forceAlignment) {
+          SampleArcLengthLUT(lut, charCenterArc, &pos, &tangent, isClosed);
+          pathOffset = charCenterArc;
+        } else {
+          float anchorX = characterCursorX + charWidth * 0.5f;
+          float dx = anchorX - baselineOrigin.x;
+          float dy = characterAnchorY - baselineOrigin.y;
+          float tangentDistance = dx * baselineCos + dy * baselineSin;
+          normalOffset = dy * baselineCos - dx * baselineSin;
+          pathOffset = textPath->firstMargin + tangentDistance;
+          SampleArcLengthLUT(lut, pathOffset, &pos, &tangent, isClosed);
+        }
+        float normalAngle = tangent + static_cast<float>(M_PI) / 2.0f;
+        pos.x += normalOffset * std::cos(normalAngle);
+        pos.y += normalOffset * std::sin(normalAngle);
         std::string charStr(p, len);
         std::string charStyle = "position:absolute;left:" + FloatToString(pos.x) +
                                 "px;top:" + FloatToString(pos.y) + "px";
@@ -1253,6 +1318,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         out.addAttr("style", charStyle);
         out.closeTagWithText(charStr);
         currentArcPos += charWidth + extraSpacing;
+        characterCursorX += charWidth;
         p += len;
       }
     }
