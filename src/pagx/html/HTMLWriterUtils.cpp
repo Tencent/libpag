@@ -205,7 +205,11 @@ std::string LayerTransformCSS(const Layer* layer) {
 
 Matrix BuildGroupMatrix(const Group* group) {
   bool hasAnchor = !FloatNearlyZero(group->anchor.x) || !FloatNearlyZero(group->anchor.y);
-  bool hasPosition = !FloatNearlyZero(group->position.x) || !FloatNearlyZero(group->position.y);
+  // renderPosition() returns the layout-resolved top-left (incorporates constraint layout such as
+  // centerX/centerY/left/right). When the group has no layout constraints, renderPosition equals
+  // (position.x, position.y), so this subsumes the explicit position property.
+  auto renderPos = group->renderPosition();
+  bool hasPosition = !FloatNearlyZero(renderPos.x) || !FloatNearlyZero(renderPos.y);
   bool hasRotation = !FloatNearlyZero(group->rotation);
   bool hasScale =
       !FloatNearlyZero(group->scale.x - 1.0f) || !FloatNearlyZero(group->scale.y - 1.0f);
@@ -233,7 +237,7 @@ Matrix BuildGroupMatrix(const Group* group) {
     m = Matrix::Rotate(group->rotation) * m;
   }
   if (hasPosition) {
-    m = Matrix::Translate(group->position.x, group->position.y) * m;
+    m = Matrix::Translate(renderPos.x, renderPos.y) * m;
   }
 
   return m;
