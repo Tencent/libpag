@@ -1268,6 +1268,17 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
           charStyle += ";font-family:'" + escapedFamilyTP + "'";
         }
         charStyle += ";font-size:" + FloatToString(renderFont) + "px";
+        if (!text->fontStyle.empty()) {
+          if (text->fontStyle.find("Bold") != std::string::npos) {
+            charStyle += ";font-weight:bold";
+          }
+          if (text->fontStyle.find("Italic") != std::string::npos) {
+            charStyle += ";font-style:italic";
+          }
+        }
+        if (text->letterSpacing != 0.0f) {
+          charStyle += ";letter-spacing:" + FloatToString(text->letterSpacing) + "px";
+        }
         std::string transform;
         if (textPath->perpendicular) {
           float angleDeg = tangent * 180.0f / static_cast<float>(M_PI) - textPath->baselineAngle;
