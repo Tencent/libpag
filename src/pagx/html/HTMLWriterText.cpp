@@ -967,6 +967,12 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         }
         if (!transform.empty()) {
           charStyle += ";transform:" + transform;
+          // Align transform pivot with the glyph baseline & advance center (tgfx uses
+          // glyph.anchor = (advance/2, 0) on the alphabetic baseline). Without this,
+          // rotation/scale would pivot around the inline-block center (50% 50%), shifting
+          // glyphs incorrectly. 50% aligns with advance center; 0.8em approximates Arial
+          // ascent, placing the origin on the baseline.
+          charStyle += ";transform-origin:50% 0.8em";
         }
         if (modifier->alpha < 1.0f) {
           float charAlpha = std::max(0.0f, 1.0f + (modifier->alpha - 1.0f) * absF);
