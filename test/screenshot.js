@@ -26,7 +26,7 @@ const scale = args.length >= 5 ? parseInt(args[4], 10) : 1;
 
 (async () => {
   const browser = await puppeteer.launch({
-    headless: 'shell',
+    headless: true,
     protocolTimeout: 120000,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--hide-scrollbars'],
   });
