@@ -150,6 +150,28 @@ static std::vector<std::shared_ptr<Typeface>> GetFallbackTypefaces() {
   return typefaces;
 }
 
+// Registers system fonts referenced by PAGX test resources. Fonts are looked up by well-known
+// file paths on each platform. When a platform does not provide a font, the lookup silently
+// falls back to the existing Noto fallback typefaces, preserving legacy rendering behavior.
+static void RegisterSystemFonts(pagx::FontConfig& fontConfig) {
+#ifdef __APPLE__
+  const char* arialPaths[] = {
+      "/System/Library/Fonts/Supplemental/Arial.ttf",
+      "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+      "/System/Library/Fonts/Supplemental/Arial Italic.ttf",
+      "/System/Library/Fonts/Supplemental/Arial Bold Italic.ttf",
+  };
+  for (const char* path : arialPaths) {
+    auto typeface = Typeface::MakeFromPath(path);
+    if (typeface) {
+      fontConfig.registerTypeface(std::move(typeface));
+    }
+  }
+#else
+  (void)fontConfig;
+#endif
+}
+
 static std::string SavePAGXFile(const std::string& xml, const std::string& key) {
   auto outPath = ProjectPath::Absolute("test/out/" + key);
   auto dirPath = std::filesystem::path(outPath).parent_path();
@@ -184,6 +206,7 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
   // Create FontConfig for text layout
   pagx::FontConfig svgFontConfig;
   svgFontConfig.addFallbackTypefaces(GetFallbackTypefaces());
+  RegisterSystemFonts(svgFontConfig);
 
   for (const auto& svgPath : svgFiles) {
     std::string baseName = std::filesystem::path(svgPath).stem().string();
@@ -506,6 +529,7 @@ PAGX_TEST(PAGXTest, PrecomposedTextRender) {
 
   pagx::FontConfig embedFontConfig;
   embedFontConfig.addFallbackTypefaces(GetFallbackTypefaces());
+  RegisterSystemFonts(embedFontConfig);
   doc->applyLayout(&embedFontConfig);
   pagx::FontEmbedder().embed(doc.get());
 
@@ -690,6 +714,7 @@ static void TestMarkdownPatterns(tgfx::Context* context, const std::string& mark
 
   pagx::FontConfig fontConfig;
   fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
+  RegisterSystemFonts(fontConfig);
 
   for (const auto& [name, xmlContent] : patterns) {
     auto key = prefix + name;
@@ -753,6 +778,7 @@ static void TestPAGXDirectory(tgfx::Context* context, const std::string& directo
 
   pagx::FontConfig fontConfig;
   fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
+  RegisterSystemFonts(fontConfig);
 
   for (const auto& filePath : files) {
     auto key = prefix + std::filesystem::path(filePath).stem().string();
@@ -5213,6 +5239,7 @@ PAGX_TEST(PAGXTest, GenerateComparisonPage) {
 
   pagx::FontConfig fontConfig;
   fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
+  RegisterSystemFonts(fontConfig);
 
   // Build comparison page
   std::string page = R"(<!DOCTYPE html>
