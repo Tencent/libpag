@@ -44,11 +44,10 @@
       <!-- Card inner layout: main area + bottom row -->
       <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16" gap="10" alignment="stretch">
 
-        <!-- Top section: circle text + TYPE + vertical ART -->
-        <Layer flex="1" layout="horizontal" gap="8" alignment="stretch">
-
-          <!-- Left column: TYPE + TextPath circle -->
-          <Layer flex="1" layout="vertical" gap="4" alignment="center" arrangement="center">
+        <!-- Top section: circle text + TYPE horizontally centered; ART pinned to the right -->
+        <Layer flex="1">
+          <!-- Centered column: TYPE + TextPath circle (spans full width so text anchors at card center) -->
+          <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="4" alignment="center" arrangement="center">
             <!-- Large display text "TYPE" with gradient fill and stroke -->
             <Layer height="60">
               <Text text="TYPE" fontFamily="Arial" fontStyle="Bold" fontSize="52" centerX="0" textAnchor="center" letterSpacing="6"/>
@@ -64,8 +63,8 @@
             </Layer>
           </Layer>
 
-          <!-- Right column: vertical ART text using TextBox container with writingMode -->
-          <Layer width="36" layout="vertical" alignment="center" arrangement="center">
+          <!-- Right side: vertical ART text using TextBox container with writingMode -->
+          <Layer width="36" right="0" centerY="0">
             <TextBox width="36" height="120" writingMode="vertical" textAlign="center" paragraphAlign="middle" centerX="0" centerY="0">
               <Text text="ART" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
               <Fill color="#4ECDC4"/>
