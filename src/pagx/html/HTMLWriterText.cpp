@@ -959,7 +959,18 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           transform += "scale(" + FloatToString(sx) + "," + FloatToString(sy) + ") ";
         }
         if (!FloatNearlyZero(modifier->skew * absF)) {
+          // tgfx TextModifier::ApplySkew rotates by -skewAxis, applies skewX, then rotates back by
+          // +skewAxis. This skews along an arbitrary axis (skewAxis=90 becomes a vertical skew).
+          // CSS transform applies right-to-left on the point, so the equivalent sequence is
+          // rotate(+axis) skewX(-skew) rotate(-axis). Skip the rotations when skewAxis is 0 to
+          // keep the simpler output for the common pure-horizontal-skew case.
+          if (!FloatNearlyZero(modifier->skewAxis)) {
+            transform += "rotate(" + FloatToString(modifier->skewAxis) + "deg) ";
+          }
           transform += "skewX(" + FloatToString(-modifier->skew * absF) + "deg) ";
+          if (!FloatNearlyZero(modifier->skewAxis)) {
+            transform += "rotate(" + FloatToString(-modifier->skewAxis) + "deg) ";
+          }
         }
         if (!FloatNearlyZero(anchorX) || !FloatNearlyZero(anchorY)) {
           transform +=
