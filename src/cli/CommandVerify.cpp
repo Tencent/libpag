@@ -2165,8 +2165,10 @@ static void DetectContainerOverflow(const Layer* parentLayer,
     if (!std::isnan(childExplicitMain)) {
       totalFixed += childExplicitMain;
     } else if (!std::isnan(childPercentMain)) {
-      // A percentage-sized child scales with the parent; overflow cannot be determined statically.
-      return;
+      // A percentage-sized child scales with the parent; its exact contribution cannot be
+      // determined statically. Treat it as 0 (optimistic) so fixed-child overflow from the
+      // remaining siblings is still detectable.
+      continue;
     } else if (child->flex > 0) {
       hasFlex = true;
     } else {
