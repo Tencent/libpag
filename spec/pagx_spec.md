@@ -548,7 +548,7 @@ For child Layers, container layout and constraint positioning are **mutually exc
 
 **With constraint positioning** (no container layout or `includeInLayout="false"`):
 1. **Opposite-pair constraints** (`left`+`right` or `top`+`bottom`) derive size from parent container (e.g., `width = parent.width - left - right`), **always overriding** explicit size
-2. **Explicit `width`/`height`** (including percentage values): Directly setting `width`/`height` attributes. Percentage values (e.g., `50%`) derive size from parent container (e.g., `width = parent.width × 0.5`)
+2. **Explicit `width`/`height`** (including percentage values): Directly setting `width`/`height` attributes. Percentage values (e.g., `50%`) derive size from the parent container's layout size **inside padding** (e.g., `width = (parent.width - parent.padding.left - parent.padding.right) × 0.5`). If the parent's corresponding axis is still being resolved (pass 1 of a content-measured parent), percentage values cannot be resolved yet and the child falls back to its preferred size for that axis.
 3. **Content measurement**: When none of the above are set, the engine automatically computes size from content bounds — the container grows to fit its content.
 
    For Group and Layer, the measured size spans from the local origin (0,0) to the bottom-right extent of all internal elements' content bounds (including constraint-contributed margins), ensuring the measurement result is independent of how elements are positioned inside. For Text, the measured size is the line-box bounds (advance width sum × font metrics line height).
