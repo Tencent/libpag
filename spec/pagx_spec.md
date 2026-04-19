@@ -82,7 +82,7 @@ The following attributes are available on any element and are not repeated in in
 
 ```xml
 <Layer data-name="Background Layer" data-figma-id="12:34" data-exported-by="PAGExporter">
-  <Rectangle size="100,100"/>
+  <Rectangle width="100" height="100"/>
   <Fill color="#FF0000"/>
 </Layer>
 ```
@@ -548,8 +548,8 @@ For child Layers, container layout and constraint positioning are **mutually exc
 
 **With constraint positioning** (no container layout or `includeInLayout="false"`):
 1. **Opposite-pair constraints** (`left`+`right` or `top`+`bottom`) derive size from parent container (e.g., `width = parent.width - left - right`), **always overriding** explicit size
-2. **Explicit declaration**: Directly setting `width`/`height` attributes
-3. **Content measurement**: When neither explicit size nor opposite-pair constraints are set, the engine automatically computes size from content bounds — the container grows to fit its content.
+2. **Explicit `width`/`height`** (including percentage values): Directly setting `width`/`height` attributes. Percentage values (e.g., `50%`) derive size from parent container (e.g., `width = parent.width × 0.5`)
+3. **Content measurement**: When none of the above are set, the engine automatically computes size from content bounds — the container grows to fit its content.
 
    For Group and Layer, the measured size spans from the local origin (0,0) to the bottom-right extent of all internal elements' content bounds (including constraint-contributed margins), ensuring the measurement result is independent of how elements are positioned inside. For Text, the measured size is the line-box bounds (advance width sum × font metrics line height).
 
@@ -630,13 +630,13 @@ Content area is `width × height` minus `padding` on each side.
 
 #### Background with Padding
 
-Since `padding` insets the constraint reference frame for all contents, a background Rectangle with `left="0" right="0" top="0" bottom="0"` inside a padded Layer will only fill the inset area, not the full Layer bounds. When a background needs to fill the entire Layer, use a two-layer structure: the outer Layer holds the background, and the inner layer carries `padding`:
+Since `padding` insets the constraint reference frame for all contents, a background Rectangle with `width="100%" height="100%"` inside a padded Layer will only fill the inset area, not the full Layer bounds. When a background needs to fill the entire Layer, use a two-layer structure: the outer Layer holds the background, and the inner layer carries `padding`:
 
 ```xml
 <Layer width="300" height="200">
-  <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+  <Rectangle width="100%" height="100%" roundness="12"/>
   <Fill color="#FFF"/>
-  <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="8" padding="16">
+  <Layer width="100%" height="100%" layout="horizontal" gap="8" padding="16">
     <!-- content here -->
   </Layer>
 </Layer>
@@ -660,7 +660,7 @@ When a Layer has container layout (`layout="horizontal"` or `"vertical"`), all c
   <Layer><!-- Participates in layout --></Layer>
   <!-- Badge: leaves the layout flow, uses left/top constraint positioning -->
   <Layer left="370" top="10" includeInLayout="false">
-    <Ellipse size="24,24"/>
+    <Ellipse width="24" height="24"/>
     <Fill color="#EF4444"/>
   </Layer>
 </Layer>
@@ -697,6 +697,8 @@ Constraint attributes allow content nodes to declare positional relationships wi
 | `bottom` | float | - | Distance from bottom edge to container's bottom edge |
 | `centerX` | float | - | Horizontal offset from container center (0 = horizontally centered) |
 | `centerY` | float | - | Vertical offset from container center (0 = vertically centered) |
+| `width` | Dimension | - | Layout width; supports pixels (e.g., `100`) or percentage (e.g., `50%`) relative to container |
+| `height` | Dimension | - | Layout height; supports pixels (e.g., `100`) or percentage (e.g., `50%`) relative to container |
 
 **Combination rules**: On each axis, only one of the following may be used: a single-edge constraint (`left`, `right`, or `centerX`), or an opposite-edge pair (`left` + `right`). The vertical axis follows the same pattern (`top` / `bottom` / `centerY`, or `top` + `bottom`). If multiple combinations are set on the same axis, the engine resolves conflicts in this priority order: `centerX` > `left`+`right` > `left` > `right` (same for vertical axis: `centerY` > `top`+`bottom` > `top` > `bottom`). Lower-priority constraints are silently ignored.
 
@@ -735,12 +737,12 @@ Where `B` is the element's content bounds and `W`/`H` is the container's layout 
 
 > [Sample](samples/constraint_single_edge_center.pagx)
 
-#### Opposite-Edge Constraints
+#### Opposite-Edge Constraints and Percentage Dimensions
 
-Setting both `left` + `right` (or `top` + `bottom`) defines a target area (container size minus both insets). Different node types respond differently:
+Setting both `left` + `right` (or `top` + `bottom`) defines a target area (container size minus both insets). Similarly, percentage dimensions (e.g., `width="50%"`) calculate size from the container. Different node types respond differently:
 
-| Element | Opposite-Edge Behavior | Description |
-|---------|----------------------|-------------|
+| Element | Behavior | Description |
+|---------|----------|-------------|
 | Rectangle, Ellipse | Stretch shape | Modify `size` to fill the target area, changing rendered shape |
 | TextBox | Stretch typesetting area | Modify `width` and `height` to fill the target area, changing text layout bounds |
 | Group | Derive layout dimensions | Align to the target area and set layout dimensions; children re-layout according to the new size, no effect on rendering |
@@ -935,10 +937,10 @@ Layer child elements are automatically categorized into four collections by type
 
 **preserve3D**: When `false` (default), child layers with 3D transforms are flattened into the parent's 2D plane before compositing. When `true`, child layers retain their 3D positions and are rendered in a shared 3D space, enabling depth-based intersections and correct z-ordering among siblings. Similar to CSS `transform-style: preserve-3d`.
 
-**Transform Composition**: `x`/`y` and `matrix` are composed (not overridden). `matrix3D` replaces the combined 2D result:
-- `x`/`y` provides a base translation, `matrix` applies an additional 2D transform on top
-- Final 2D transform: `translate(x, y) × matrix`
-- When `matrix3D` is set, it replaces the 2D transform entirely
+**Transform Attribute Priority**: `x`/`y`, `matrix`, and `matrix3D` have an override relationship:
+- Only `x`/`y` set: Uses `x`/`y` for translation
+- `matrix` set: `matrix` overrides `x`/`y` values
+- `matrix3D` set: `matrix3D` overrides both `matrix` and `x`/`y` values
 
 **MaskType**:
 
@@ -1209,13 +1211,13 @@ Geometry elements provide renderable shapes. All geometry elements, as well as T
 Rectangles are defined from center point with uniform corner rounding support.
 
 ```xml
-<Rectangle size="200,150" roundness="10" reversed="false"/>
+<Rectangle width="200" height="150" roundness="10" reversed="false"/>
 ```
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `position` | Point | (center of bounding box) | Center point coordinate, computed from constraint attributes when set. When not set, defaults to `(size.width/2, size.height/2)`, placing the top-left corner at the origin. Prefer constraint attributes (`left`/`top`) for positioning |
-| `size` | Size | 0,0 | Dimensions "width,height" |
+| `position` | Point | (center of bounding box) | Center point coordinate; animatable. Computed from constraint attributes when set. When not set, defaults to `(size.width/2, size.height/2)`, placing the top-left corner at the origin. Prefer constraint attributes for static layout |
+| `size` | Size | 0,0 | Dimensions "width,height"; animatable. Prefer `width`/`height` attributes for static layout |
 | `roundness` | float | 0 | Corner radius |
 | `reversed` | bool | false | Reverse path direction |
 
@@ -1244,13 +1246,13 @@ rect.bottom = position.y + size.height / 2
 Ellipses are defined from center point.
 
 ```xml
-<Ellipse size="100,60" reversed="false"/>
+<Ellipse width="100" height="60" reversed="false"/>
 ```
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `position` | Point | (center of bounding box) | Center point coordinate, computed from constraint attributes when set. When not set, defaults to `(size.width/2, size.height/2)`, placing the top-left corner at the origin. Prefer constraint attributes (`left`/`top`) for positioning |
-| `size` | Size | 0,0 | Dimensions "width,height" |
+| `position` | Point | (center of bounding box) | Center point coordinate; animatable. Computed from constraint attributes when set. When not set, defaults to `(size.width/2, size.height/2)`, placing the top-left corner at the origin. Prefer constraint attributes for static layout |
+| `size` | Size | 0,0 | Dimensions "width,height"; animatable. Prefer `width`/`height` attributes for static layout |
 | `reversed` | bool | false | Reverse path direction |
 
 Ellipse supports all constraint attributes (see §4.1).
@@ -1885,8 +1887,6 @@ As a container, TextBox processes its child Text elements and text modifiers (Te
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `width` | float | NaN | Layout width. NaN means no boundary in this dimension, which may cause wordWrap or overflow to have no effect |
-| `height` | float | NaN | Layout height. NaN means no boundary in this dimension, which may cause wordWrap or overflow to have no effect |
 | `textAlign` | TextAlign | start | Text alignment along the inline direction |
 | `paragraphAlign` | ParagraphAlign | near | Paragraph alignment along the block-flow direction |
 | `writingMode` | WritingMode | horizontal | Layout direction |
@@ -1894,7 +1894,7 @@ As a container, TextBox processes its child Text elements and text modifiers (Te
 | `wordWrap` | bool | true | Enable automatic word wrapping at the box width boundary (horizontal mode) or height boundary (vertical mode). Has no effect when that dimension is NaN |
 | `overflow` | Overflow | visible | Overflow behavior when text exceeds the box height (horizontal mode) or width (vertical mode). Has no effect when that dimension is NaN |
 
-TextBox inherits all Group attributes (`position`, `anchor`, `rotation`, `scale`, `skew`, `skewAxis`, `alpha`, `padding`) and constraint attributes (see §4.1). The `padding` attribute insets the text layout area and the constraint reference frame for non-Text child elements. The `position` attribute specifies the top-left corner of the text area in the parent coordinate system. Prefer constraint attributes (`left`/`top`) for positioning — when constraints are set, `position` is computed automatically.
+TextBox inherits all Group attributes (`position`, `anchor`, `rotation`, `scale`, `skew`, `skewAxis`, `alpha`, `padding`) and constraint attributes (see §4.1). For TextBox, `width`/`height` default to NaN (no boundary, auto-sizing); NaN means no boundary in that dimension, which may cause `wordWrap` or `overflow` to have no effect. The `padding` attribute insets the text layout area and the constraint reference frame for non-Text child elements. The `position` attribute specifies the top-left corner of the text area in the parent coordinate system. Prefer constraint attributes (`left`/`top`) for positioning — when constraints are set, `position` is computed automatically.
 
 **TextAlign (Text Alignment)**:
 
@@ -2024,8 +2024,6 @@ Group is a VectorElement container with transform properties.
 | `skew` | float | 0 | Skew amount |
 | `skewAxis` | float | 0 | Skew axis angle |
 | `alpha` | float | 1 | Opacity 0~1 |
-| `width` | float | - | Layout width (see §4) |
-| `height` | float | - | Layout height (see §4) |
 | `padding` | float or "t,r,b,l" | 0 | Insets the constraint reference frame for child elements. Supports single value (uniform), two values (vertical,horizontal), four values (top,right,bottom,left) |
 
 Group supports all constraint attributes (see §4.1).
