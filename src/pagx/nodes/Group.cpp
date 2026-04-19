@@ -33,30 +33,33 @@ void Group::updateSize(LayoutContext* context) {
 }
 
 void Group::onMeasure(LayoutContext*) {
-  measuredX = position.x;
-  measuredY = position.y;
-  MeasureChildNodes(elements, width, height, measuredWidth, measuredHeight);
+  preferredX = position.x;
+  preferredY = position.y;
+  // Preferred size: authored width/height overrides the content-measured size. percentWidth/
+  // percentHeight are not consulted here; they are resolved by the parent via
+  // PerformConstraintLayout.
+  MeasureChildNodes(elements, width, height, preferredWidth, preferredHeight);
   if (!padding.isZero()) {
     if (std::isnan(width)) {
-      measuredWidth += padding.left + padding.right;
+      preferredWidth += padding.left + padding.right;
     }
     if (std::isnan(height)) {
-      measuredHeight += padding.top + padding.bottom;
+      preferredHeight += padding.top + padding.bottom;
     }
   }
 }
 
-void Group::setLayoutSize(LayoutContext* context, float width, float height) {
-  layoutWidth = !std::isnan(width) ? width : measuredWidth;
-  layoutHeight = !std::isnan(height) ? height : measuredHeight;
+void Group::setLayoutSize(LayoutContext* context, float targetWidth, float targetHeight) {
+  layoutWidth = !std::isnan(targetWidth) ? targetWidth : preferredWidth;
+  layoutHeight = !std::isnan(targetHeight) ? targetHeight : preferredHeight;
   updateLayout(context);
-  // An axis is content-measured when neither the parent nor the element itself specifies its size.
-  // When a content-measured axis exists and another axis changed from its measured value,
-  // re-measure the content-measured axis from children's actual layout sizes.
-  bool widthFromContent = std::isnan(width) && std::isnan(this->width);
-  bool heightFromContent = std::isnan(height) && std::isnan(this->height);
-  bool sizeChanged = (!std::isnan(width) && width != measuredWidth) ||
-                     (!std::isnan(height) && height != measuredHeight);
+  // When the axis is content-measured (no target from parent AND no authored size) but the other
+  // axis forced a different size, recompute the content-measured axis from children's actual
+  // layout sizes.
+  bool widthFromContent = std::isnan(targetWidth) && std::isnan(this->width);
+  bool heightFromContent = std::isnan(targetHeight) && std::isnan(this->height);
+  bool sizeChanged = (!std::isnan(targetWidth) && targetWidth != preferredWidth) ||
+                     (!std::isnan(targetHeight) && targetHeight != preferredHeight);
   if ((widthFromContent || heightFromContent) && sizeChanged) {
     float maxX = 0;
     float maxY = 0;

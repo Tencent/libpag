@@ -68,7 +68,7 @@ class Rectangle : public Element, public LayoutNode {
 
  protected:
   void onMeasure(LayoutContext* context) override;
-  void setLayoutSize(LayoutContext* context, float width, float height) override;
+  void setLayoutSize(LayoutContext* context, float targetWidth, float targetHeight) override;
 
  private:
   Rectangle() = default;

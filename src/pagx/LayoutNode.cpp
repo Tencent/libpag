@@ -38,11 +38,12 @@ bool LayoutNode::hasConstraints() const {
 }
 
 Rect LayoutNode::layoutBounds() const {
-  float x = std::isnan(layoutX) ? measuredX : layoutX;
-  float y = std::isnan(layoutY) ? measuredY : layoutY;
-  float w = std::isnan(layoutWidth) ? (std::isnan(measuredWidth) ? 0 : measuredWidth) : layoutWidth;
+  float x = std::isnan(layoutX) ? preferredX : layoutX;
+  float y = std::isnan(layoutY) ? preferredY : layoutY;
+  float w =
+      std::isnan(layoutWidth) ? (std::isnan(preferredWidth) ? 0 : preferredWidth) : layoutWidth;
   float h =
-      std::isnan(layoutHeight) ? (std::isnan(measuredHeight) ? 0 : measuredHeight) : layoutHeight;
+      std::isnan(layoutHeight) ? (std::isnan(preferredHeight) ? 0 : preferredHeight) : layoutHeight;
   return Rect::MakeXYWH(x, y, w, h);
 }
 
@@ -75,8 +76,8 @@ float LayoutNode::constraintExtentY() const {
 }
 
 void LayoutNode::updateSize(LayoutContext* context) {
-  // If both measured dimensions are already set, skip onMeasure.
-  if (!std::isnan(measuredWidth) && !std::isnan(measuredHeight)) {
+  // If both preferred dimensions are already set, skip onMeasure.
+  if (!std::isnan(preferredWidth) && !std::isnan(preferredHeight)) {
     return;
   }
   onMeasure(context);
@@ -96,18 +97,19 @@ void LayoutNode::setLayoutPosition(LayoutContext*, float x, float y) {
   }
 }
 
-Point LayoutNode::computeRenderPosition(const Rect& contentBounds) const {
+Point LayoutNode::computeRenderPosition(const Rect& contentBounds, float intrinsicWidth,
+                                        float intrinsicHeight) const {
   auto bounds = layoutBounds();
-  float scale = ComputeUniformScale(measuredWidth, measuredHeight, bounds.width, bounds.height);
+  float scale = ComputeUniformScale(intrinsicWidth, intrinsicHeight, bounds.width, bounds.height);
   float offsetX = (bounds.width - contentBounds.width * scale) * 0.5f;
   float offsetY = (bounds.height - contentBounds.height * scale) * 0.5f;
   return {bounds.x + offsetX - contentBounds.x * scale,
           bounds.y + offsetY - contentBounds.y * scale};
 }
 
-float LayoutNode::computeRenderScale() const {
+float LayoutNode::computeRenderScale(float intrinsicWidth, float intrinsicHeight) const {
   auto bounds = layoutBounds();
-  return ComputeUniformScale(measuredWidth, measuredHeight, bounds.width, bounds.height);
+  return ComputeUniformScale(intrinsicWidth, intrinsicHeight, bounds.width, bounds.height);
 }
 
 void LayoutNode::PerformConstraintLayout(const std::vector<LayoutNode*>& nodes, float containerW,
@@ -117,14 +119,21 @@ void LayoutNode::PerformConstraintLayout(const std::vector<LayoutNode*>& nodes, 
   float cw = hasPadding ? std::max(0.0f, containerW - padding.left - padding.right) : containerW;
   float ch = hasPadding ? std::max(0.0f, containerH - padding.top - padding.bottom) : containerH;
   for (auto* child : nodes) {
-    // Phase 1: compute target size from opposite-edge constraints.
+    // Phase 1: compute target size from parent-side inputs only.
+    //   opposite-edge constraints > percentWidth/Height > NAN (child uses its preferred size)
+    // An authored width/height is NOT considered here: the child already folds it into its
+    // preferred size during onMeasure(), so passing NAN lets setLayoutSize fall back to it.
     float targetW = NAN;
-    float targetH = NAN;
     if (!std::isnan(child->left) && !std::isnan(child->right)) {
       targetW = std::max(0.0f, std::ceil(cw - child->left - child->right));
+    } else if (!std::isnan(child->percentWidth)) {
+      targetW = std::ceil(cw * child->percentWidth / 100.0f);
     }
+    float targetH = NAN;
     if (!std::isnan(child->top) && !std::isnan(child->bottom)) {
       targetH = std::max(0.0f, std::ceil(ch - child->top - child->bottom));
+    } else if (!std::isnan(child->percentHeight)) {
+      targetH = std::ceil(ch * child->percentHeight / 100.0f);
     }
     // Phase 2: write self rendering attributes and layoutWidth/layoutHeight.
     child->setLayoutSize(context, targetW, targetH);
@@ -250,13 +259,13 @@ void LayoutNode::MeasureChildNodes(const std::vector<Element*>& elements, float 
   float maxY = 0;
   for (auto* element : elements) {
     auto* node = AsLayoutNode(element);
-    if (node == nullptr || std::isnan(node->measuredWidth) || std::isnan(node->measuredHeight)) {
+    if (node == nullptr || std::isnan(node->preferredWidth) || std::isnan(node->preferredHeight)) {
       continue;
     }
-    float extX = node->hasConstraints() ? node->constraintExtentX() : node->measuredX;
-    float extY = node->hasConstraints() ? node->constraintExtentY() : node->measuredY;
-    extX += node->measuredWidth;
-    extY += node->measuredHeight;
+    float extX = node->hasConstraints() ? node->constraintExtentX() : node->preferredX;
+    float extY = node->hasConstraints() ? node->constraintExtentY() : node->preferredY;
+    extX += node->preferredWidth;
+    extY += node->preferredHeight;
     maxX = std::max(maxX, extX);
     maxY = std::max(maxY, extY);
   }

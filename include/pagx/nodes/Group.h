@@ -76,18 +76,6 @@ class Group : public Element, public LayoutNode {
   std::vector<Element*> elements = {};
 
   /**
-   * The layout width of the group. When set, the group becomes a constraint positioning reference
-   * frame for its child elements. Does not affect rendering behavior. NaN means not set.
-   */
-  float width = NAN;
-
-  /**
-   * The layout height of the group. When set, the group becomes a constraint positioning reference
-   * frame for its child elements. Does not affect rendering behavior. NaN means not set.
-   */
-  float height = NAN;
-
-  /**
    * The inner padding of the group. Insets the constraint reference frame for child elements.
    * The default value is zero on all sides.
    */
@@ -105,7 +93,7 @@ class Group : public Element, public LayoutNode {
 
   void updateSize(LayoutContext* context) override;
   void onMeasure(LayoutContext* context) override;
-  void setLayoutSize(LayoutContext* context, float width, float height) override;
+  void setLayoutSize(LayoutContext* context, float targetWidth, float targetHeight) override;
   void updateLayout(LayoutContext* context) override;
 
   friend class PAGXDocument;

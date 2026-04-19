@@ -161,18 +161,6 @@ class Layer : public Node, public LayoutNode {
   std::vector<Layer*> children = {};
 
   /**
-   * The layout width of the layer. When set, enables constraint positioning for contents. NaN means
-   * not set.
-   */
-  float width = NAN;
-
-  /**
-   * The layout height of the layer. When set, enables constraint positioning for contents. NaN means
-   * not set.
-   */
-  float height = NAN;
-
-  /**
    * The container layout mode for arranging child layers. When set to Horizontal or Vertical,
    * child layers are automatically positioned along this axis. The default value is None.
    */
@@ -259,7 +247,7 @@ class Layer : public Node, public LayoutNode {
 
   void updateSize(LayoutContext* context) override;
   void onMeasure(LayoutContext* context) override;
-  void setLayoutSize(LayoutContext* context, float width, float height) override;
+  void setLayoutSize(LayoutContext* context, float targetWidth, float targetHeight) override;
   void updateLayout(LayoutContext* context) override;
 
   friend class PAGXDocument;

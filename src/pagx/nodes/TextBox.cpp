@@ -39,11 +39,10 @@ static TextLayoutParams MakeTextLayoutParams(const TextBox* textBox, float boxWi
 }
 
 void TextBox::onMeasure(LayoutContext* context) {
-  if (!std::isnan(width) && !std::isnan(height)) {
-    measuredWidth = width;
-    measuredHeight = height;
-    return;
-  }
+  // TextBox keeps width/height as the authored text-box dimensions for shaping. this->width /
+  // this->height constrain the shaping box and also become the preferred size when set; otherwise
+  // the shaped text bounds drive the preferred size. percentWidth/percentHeight are not consulted
+  // here; they are resolved by the parent via PerformConstraintLayout.
   bool hasPadding = !padding.isZero();
   float boxW = width;
   float boxH = height;
@@ -59,30 +58,31 @@ void TextBox::onMeasure(LayoutContext* context) {
   std::vector<Text*> childText = {};
   TextLayout::CollectTextElements(elements, childText);
   auto result = TextLayout::Layout(childText, params, context);
-  measuredWidth = std::isnan(width) ? result.bounds.width : width;
-  measuredHeight = std::isnan(height) ? result.bounds.height : height;
+  preferredWidth = std::isnan(width) ? result.bounds.width : width;
+  preferredHeight = std::isnan(height) ? result.bounds.height : height;
   if (hasPadding) {
     if (std::isnan(width)) {
-      measuredWidth += padding.left + padding.right;
+      preferredWidth += padding.left + padding.right;
     }
     if (std::isnan(height)) {
-      measuredHeight += padding.top + padding.bottom;
+      preferredHeight += padding.top + padding.bottom;
     }
   }
 }
 
-void TextBox::setLayoutSize(LayoutContext* context, float width, float height) {
-  layoutWidth = !std::isnan(width) ? width : measuredWidth;
-  layoutHeight = !std::isnan(height) ? height : measuredHeight;
+void TextBox::setLayoutSize(LayoutContext* context, float targetWidth, float targetHeight) {
+  layoutWidth = !std::isnan(targetWidth) ? targetWidth : preferredWidth;
+  layoutHeight = !std::isnan(targetHeight) ? targetHeight : preferredHeight;
   updateLayout(context);
-  // An axis is content-measured when neither the parent nor the element itself specifies its size.
-  bool widthFromContent = std::isnan(width) && std::isnan(this->width);
-  bool heightFromContent = std::isnan(height) && std::isnan(this->height);
+  // An axis is content-measured when neither the parent nor the TextBox authored its size.
+  bool widthFromContent = std::isnan(targetWidth) && std::isnan(this->width);
+  bool heightFromContent = std::isnan(targetHeight) && std::isnan(this->height);
   // For TextBox, only a change in the wrap axis (width for horizontal, height for vertical)
   // can affect the cross axis measurement. Re-typeset to compute the correct cross-axis size.
   bool horizontal = (writingMode == WritingMode::Horizontal);
-  bool wrapAxisChanged = horizontal ? (!std::isnan(width) && width != measuredWidth)
-                                    : (!std::isnan(height) && height != measuredHeight);
+  bool wrapAxisChanged = horizontal
+                             ? (!std::isnan(targetWidth) && targetWidth != preferredWidth)
+                             : (!std::isnan(targetHeight) && targetHeight != preferredHeight);
   bool crossAxisFromContent = horizontal ? heightFromContent : widthFromContent;
   if (crossAxisFromContent && wrapAxisChanged) {
     bool hasPadding = !padding.isZero();
@@ -137,13 +137,13 @@ void TextBox::updateLayout(LayoutContext* context) {
         }
       }
     }
-    text->measuredX = text->textBounds.x;
-    text->measuredY = text->textBounds.y;
-    text->measuredWidth = text->textBounds.width;
-    text->measuredHeight = text->textBounds.height;
-    // Reset layoutWidth/Height so layoutBounds() falls back to measured values. This is necessary
+    text->preferredX = text->textBounds.x;
+    text->preferredY = text->textBounds.y;
+    text->preferredWidth = text->textBounds.width;
+    text->preferredHeight = text->textBounds.height;
+    // Reset layoutWidth/Height so layoutBounds() falls back to preferred values. This is necessary
     // because Group::updateLayout may have called setLayoutSize(NAN,NAN) on this Text before
-    // TextBox re-typesets it, leaving stale layoutWidth/Height from the old measured size.
+    // TextBox re-typesets it, leaving stale layoutWidth/Height from the old preferred size.
     text->layoutWidth = NAN;
     text->layoutHeight = NAN;
   }
