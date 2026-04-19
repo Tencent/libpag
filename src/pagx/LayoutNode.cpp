@@ -34,7 +34,8 @@ namespace pagx {
 
 bool LayoutNode::hasConstraints() const {
   return !std::isnan(left) || !std::isnan(right) || !std::isnan(top) || !std::isnan(bottom) ||
-         !std::isnan(centerX) || !std::isnan(centerY);
+         !std::isnan(centerX) || !std::isnan(centerY) || !std::isnan(percentWidth) ||
+         !std::isnan(percentHeight);
 }
 
 Rect LayoutNode::layoutBounds() const {
@@ -137,16 +138,17 @@ void LayoutNode::PerformConstraintLayout(const std::vector<LayoutNode*>& nodes, 
     }
     // Phase 2: write self rendering attributes and layoutWidth/layoutHeight.
     child->setLayoutSize(context, targetW, targetH);
-    // Phase 3: compute position from layoutWidth/layoutHeight.
-    if (child->hasConstraints()) {
+    // Phase 3: compute position from layoutWidth/layoutHeight. Any axis without a positional
+    // constraint defaults to 0 relative to the padding origin, so padding always applies.
+    if (child->hasConstraints() || hasPadding) {
       auto pos =
           CalculateConstrainedPosition(cw, ch, child->layoutWidth, child->layoutHeight, *child);
-      float finalX = hasPadding ? std::round(pos.x + padding.left) : std::round(pos.x);
-      float finalY = hasPadding ? std::round(pos.y + padding.top) : std::round(pos.y);
+      float relX = std::isnan(pos.x) ? 0.0f : pos.x;
+      float relY = std::isnan(pos.y) ? 0.0f : pos.y;
+      float finalX = hasPadding ? std::round(relX + padding.left) : std::round(relX);
+      float finalY = hasPadding ? std::round(relY + padding.top) : std::round(relY);
       // Phase 4: write self position and layoutX/layoutY.
       child->setLayoutPosition(context, finalX, finalY);
-    } else if (hasPadding) {
-      child->setLayoutPosition(context, std::round(padding.left), std::round(padding.top));
     }
   }
 }
