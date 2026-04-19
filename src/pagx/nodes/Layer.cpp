@@ -117,7 +117,8 @@ void Layer::onMeasure(LayoutContext*) {
     measuredH = std::max(measuredH, composition->height);
   }
 
-  // Measure from flex container children along the layout axis.
+  // Measure from flex container children along the layout axis. The flex path folds padding into
+  // mainSize / crossSize directly since flex children live inside the padded box.
   if (layout != LayoutMode::None && !children.empty()) {
     bool horizontal = (layout == LayoutMode::Horizontal);
     float paddingMainStart = horizontal ? padding.left : padding.top;
@@ -154,14 +155,12 @@ void Layer::onMeasure(LayoutContext*) {
     }
   }
 
-  // Measure from contents elements (merge via max to preserve flex-measured values above).
-  float contentsW = 0;
-  float contentsH = 0;
-  MeasureChildNodes(contents, NAN, NAN, contentsW, contentsH);
-  measuredW = std::max(measuredW, contentsW);
-  measuredH = std::max(measuredH, contentsH);
-
-  // Measure from non-flex child Layers (skip children excluded from layout).
+  // Measure from constraint-laid-out descendants: all contents (VectorElements) plus non-flex
+  // child Layers. These share the padded content box, so padding is added once to their combined
+  // extent.
+  float constraintW = 0;
+  float constraintH = 0;
+  MeasureChildNodes(contents, NAN, NAN, constraintW, constraintH);
   if (layout == LayoutMode::None) {
     for (auto* child : children) {
       if (!child->includeInLayout) {
@@ -169,13 +168,14 @@ void Layer::onMeasure(LayoutContext*) {
       }
       float cx = child->preferredWidth + child->constraintExtentX();
       float cy = child->preferredHeight + child->constraintExtentY();
-      measuredW = std::max(measuredW, cx);
-      measuredH = std::max(measuredH, cy);
+      constraintW = std::max(constraintW, cx);
+      constraintH = std::max(constraintH, cy);
     }
-    // Add padding to content measurement, consistent with layout mode behavior.
-    measuredW += padding.left + padding.right;
-    measuredH += padding.top + padding.bottom;
   }
+  constraintW += padding.left + padding.right;
+  constraintH += padding.top + padding.bottom;
+  measuredW = std::max(measuredW, constraintW);
+  measuredH = std::max(measuredH, constraintH);
 
   preferredWidth = !std::isnan(width) ? width : measuredW;
   preferredHeight = !std::isnan(height) ? height : measuredH;
