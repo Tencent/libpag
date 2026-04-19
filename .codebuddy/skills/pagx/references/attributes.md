@@ -488,7 +488,7 @@ Text modifier that arranges text along a specified path curve, mapping glyph pos
 
 TextPath supports all constraint attributes. When opposite-edge constraints or percentage dimensions are set, the path is scaled to fit. See §Constraint Attributes below.
 
-### Constraint Attributes (Geometry Elements, TextPath, TextBox, Groups, and Child Layers)
+### Constraint Attributes (Geometry Elements, TextPath, TextBox, Groups, and Layers)
 
 These attributes position or stretch an element relative to its container.
 The container's size comes from explicit `width`/`height`, parent layout assignment, or
