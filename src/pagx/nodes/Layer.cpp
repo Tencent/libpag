@@ -183,32 +183,26 @@ void Layer::onMeasure(LayoutContext*) {
 
 void Layer::setLayoutSize(LayoutContext* context, float targetWidth, float targetHeight) {
   // A content-measured axis is one the parent did not constrain and the layer did not author.
-  // For a non-flex layer, keep such axes NaN during the first updateLayout so percent-sized
-  // descendants fall back to their preferred size instead of locking onto a provisional value
-  // derived from this layer's onMeasure. After the first pass, refine the axis from children's
-  // actual bounds and run updateLayout again so size-dependent descendants pick up the final
-  // container size. Flex layers keep the provisional size on both axes because their child
-  // allocation logic requires numeric main-axis dimensions.
+  // For a non-flex Layer without a composition backing, defer such axes to NaN during pass 1 so
+  // percent-sized descendants fall back to their preferred size instead of locking onto a
+  // provisional value derived from onMeasure. Pass 2 refines the axis from children's actual
+  // bounds and runs updateLayout again so size-dependent descendants pick up the final size.
+  // Flex Layers and composition-backed Layers keep numeric sizes throughout: flex child
+  // allocation requires numeric main-axis dimensions, and a composition dictates size directly.
   bool widthFromContent = std::isnan(targetWidth) && std::isnan(this->width);
   bool heightFromContent = std::isnan(targetHeight) && std::isnan(this->height);
-  // A Layer that references a Composition takes its preferred size from that Composition, so it
-  // is not a content-measured axis; do not defer in that case.
   bool canDefer = layout == LayoutMode::None && composition == nullptr;
   bool deferWidth = widthFromContent && canDefer;
   bool deferHeight = heightFromContent && canDefer;
   layoutWidth = deferWidth ? NAN : (!std::isnan(targetWidth) ? targetWidth : preferredWidth);
   layoutHeight = deferHeight ? NAN : (!std::isnan(targetHeight) ? targetHeight : preferredHeight);
-  if (clipToBounds && !hasScrollRect && !std::isnan(layoutWidth) && !std::isnan(layoutHeight)) {
-    scrollRect = Rect::MakeXYWH(0, 0, layoutWidth, layoutHeight);
-    hasScrollRect = true;
-  }
+  updateScrollRect();
   updateLayout(context);
-  // An axis is content-measured when neither the parent nor this layer authored its size. When
-  // one axis was forced by the parent, re-measure the content-measured axis from children's
-  // actual layout sizes to reflect wrapping / flex redistribution.
   bool sizeChanged = (!std::isnan(targetWidth) && targetWidth != preferredWidth) ||
                      (!std::isnan(targetHeight) && targetHeight != preferredHeight);
-  if (!(widthFromContent || heightFromContent) || (!deferWidth && !deferHeight && !sizeChanged)) {
+  bool needRefine =
+      deferWidth || deferHeight || ((widthFromContent || heightFromContent) && sizeChanged);
+  if (!needRefine) {
     return;
   }
   float maxX = 0;
@@ -218,9 +212,8 @@ void Layer::setLayoutSize(LayoutContext* context, float targetWidth, float targe
     if (node == nullptr) {
       continue;
     }
-    // Match Layer::onMeasure / MeasureChildNodes: unconstrained nodes use their preferredX/Y as
-    // extent origin (so an element authored with a negative preferredY like a centered Path is
-    // not measured as if it started at 0).
+    // Match MeasureChildNodes: unconstrained nodes use their preferredX/Y as extent origin (so
+    // an element with a negative preferredY such as a centered Path is not over-measured).
     float extX = node->hasConstraints() ? node->constraintExtentX() : node->preferredX;
     float extY = node->hasConstraints() ? node->constraintExtentY() : node->preferredY;
     extX += node->layoutBounds().width;
@@ -276,20 +269,23 @@ void Layer::setLayoutSize(LayoutContext* context, float targetWidth, float targe
   if (heightFromContent) {
     layoutHeight = maxY;
   }
-  // If we deferred an axis to NaN in pass 1, we must run updateLayout again with the refined
-  // numeric value so size-dependent descendants (e.g. width/height=100%) pick it up.
+  // Pass 2: if an axis was deferred and the refined value differs from the NaN placeholder, run
+  // updateLayout again so descendants that depend on the container size (width/height=100%, etc.)
+  // pick up the final value.
   bool needSecondPass = (deferWidth && !std::isnan(layoutWidth) && layoutWidth != prevW) ||
                         (deferHeight && !std::isnan(layoutHeight) && layoutHeight != prevH);
   if (needSecondPass) {
-    if (clipToBounds && hasScrollRect) {
-      scrollRect = Rect::MakeXYWH(0, 0, layoutWidth, layoutHeight);
-    } else if (clipToBounds && !hasScrollRect && !std::isnan(layoutWidth) &&
-               !std::isnan(layoutHeight)) {
-      scrollRect = Rect::MakeXYWH(0, 0, layoutWidth, layoutHeight);
-      hasScrollRect = true;
-    }
+    updateScrollRect();
     updateLayout(context);
   }
+}
+
+void Layer::updateScrollRect() {
+  if (!clipToBounds || std::isnan(layoutWidth) || std::isnan(layoutHeight)) {
+    return;
+  }
+  scrollRect = Rect::MakeXYWH(0, 0, layoutWidth, layoutHeight);
+  hasScrollRect = true;
 }
 
 Point Layer::renderPosition() const {

@@ -51,8 +51,8 @@ void Group::onMeasure(LayoutContext*) {
 
 void Group::setLayoutSize(LayoutContext* context, float targetWidth, float targetHeight) {
   // Mirror Layer::setLayoutSize: keep content-measured axes NaN during pass 1 so percent
-  // descendants fall back to their preferred size, refine after, then run updateLayout again so
-  // size-dependent descendants pick up the refined container size.
+  // descendants fall back to their preferred size; refine from children's actual bounds and run
+  // updateLayout again so size-dependent descendants pick up the refined container size.
   bool widthFromContent = std::isnan(targetWidth) && std::isnan(this->width);
   bool heightFromContent = std::isnan(targetHeight) && std::isnan(this->height);
   layoutWidth = widthFromContent ? NAN : (!std::isnan(targetWidth) ? targetWidth : preferredWidth);
@@ -69,8 +69,7 @@ void Group::setLayoutSize(LayoutContext* context, float targetWidth, float targe
     if (node == nullptr) {
       continue;
     }
-    // Match Group::onMeasure / MeasureChildNodes: unconstrained nodes use their preferredX/Y
-    // as extent origin (so a centered element with negative preferredY is not over-measured).
+    // Match MeasureChildNodes: unconstrained nodes use their preferredX/Y as extent origin.
     float extX = node->hasConstraints() ? node->constraintExtentX() : node->preferredX;
     float extY = node->hasConstraints() ? node->constraintExtentY() : node->preferredY;
     extX += node->layoutBounds().width;

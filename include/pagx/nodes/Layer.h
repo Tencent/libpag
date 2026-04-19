@@ -244,6 +244,7 @@ class Layer : public Node, public LayoutNode {
   Layer() = default;
 
   void performContainerLayout(LayoutContext* context);
+  void updateScrollRect();
 
   void updateSize(LayoutContext* context) override;
   void onMeasure(LayoutContext* context) override;
