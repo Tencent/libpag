@@ -70,16 +70,18 @@ class LayoutNode {
   float centerY = NAN;
 
   /**
-   * Width as a percentage (0-100) of the parent container layout width (inside padding). NaN means
-   * not set. Takes priority over explicit width. Overridden by opposite-edge constraints
-   * (left + right) when both are set.
+   * Width as a percentage of the parent container layout width (inside padding). Expected range is
+   * [0, 100]; values outside this range produce undefined layout. NaN means the percentage is
+   * unspecified and the authored width (if any) is used instead. Takes priority over explicit
+   * width. Overridden by opposite-edge constraints (left + right) when both are set.
    */
   float percentWidth = NAN;
 
   /**
-   * Height as a percentage (0-100) of the parent container layout height (inside padding). NaN
-   * means not set. Takes priority over explicit height. Overridden by opposite-edge constraints
-   * (top + bottom) when both are set.
+   * Height as a percentage of the parent container layout height (inside padding). Expected range
+   * is [0, 100]; values outside this range produce undefined layout. NaN means the percentage is
+   * unspecified and the authored height (if any) is used instead. Takes priority over explicit
+   * height. Overridden by opposite-edge constraints (top + bottom) when both are set.
    */
   float percentHeight = NAN;
 
