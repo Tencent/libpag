@@ -362,10 +362,10 @@ static float GetFloatAttributeOrNaN(const DOMNode* node, const std::string& name
 // - When the value ends with "%": sets *outPercent to the numeric part and *outAbsolute to NaN.
 // - Otherwise: sets *outAbsolute to the numeric value and *outPercent to NaN.
 // Inputs forbidden by the XSD DimensionType pattern "[0-9]*\.?[0-9]+%?" (leading whitespace,
-// sign, hex prefix, non-finite, negative, whitespace around the "%") are treated as absent:
-// both outputs are set to NaN without reporting an error.
+// sign, hex prefix, non-finite, negative, whitespace around the "%") report an error and leave
+// both outputs as NaN. Absent attributes also leave both outputs as NaN but do not report.
 static void ReadDimension(const DOMNode* node, const std::string& name, float* outAbsolute,
-                          float* outPercent, PAGXDocument* /*doc*/) {
+                          float* outPercent, PAGXDocument* doc) {
   *outAbsolute = NAN;
   *outPercent = NAN;
   auto* str = node->findAttribute(name);
@@ -376,24 +376,29 @@ static void ReadDimension(const DOMNode* node, const std::string& name, float* o
   // Reject leading whitespace, sign, and hex prefix; strtof would otherwise accept them.
   char first = cstr[0];
   if (first == ' ' || first == '\t' || first == '+' || first == '-') {
+    ReportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
     return;
   }
   if (first == '0' && (cstr[1] == 'x' || cstr[1] == 'X')) {
+    ReportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
     return;
   }
   char* endPtr = nullptr;
   float value = strtof(cstr, &endPtr);
   if (endPtr == cstr || !std::isfinite(value) || value < 0) {
+    ReportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
     return;
   }
   if (*endPtr == '%') {
     if (endPtr[1] != '\0') {
+      ReportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
       return;
     }
     *outPercent = value;
     return;
   }
   if (*endPtr != '\0') {
+    ReportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
     return;
   }
   *outAbsolute = value;
