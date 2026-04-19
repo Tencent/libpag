@@ -2278,9 +2278,9 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextBothAxes) {
   doc->applyLayout(&fontConfig);
 
   // Proportional scaling: areaWidth = 360, areaHeight = 180
-  // measuredWidth/Height are ceil'd before scaling.
-  float scaleX = 360 / std::ceil(origWidth);
-  float scaleY = 180 / std::ceil(origHeight);
+  // measured text bounds are not ceiled before scaling.
+  float scaleX = 360 / origWidth;
+  float scaleY = 180 / origHeight;
   float scale = std::min(scaleX, scaleY);
   float expectedFontSize = 24 * scale;
   EXPECT_FLOAT_EQ(text->renderFontSize(), expectedFontSize);
