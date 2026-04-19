@@ -4090,7 +4090,7 @@ PAGX_TEST(PAGXTest, LayoutNestedContainers) {
   EXPECT_FLOAT_EQ(bottomItem->layoutHeight, 100.0f) << "Bottom item keeps explicit height";
   EXPECT_FLOAT_EQ(topItem->layoutHeight, 300.0f)
       << "Top item flex=1 gets remaining: 400 - 100 = 300";
-  EXPECT_FLOAT_EQ(topItem->y, 0.0f) << "centerY ignored in container layout";
+  EXPECT_FLOAT_EQ(topItem->renderPosition().y, 0.0f) << "centerY ignored in container layout";
   EXPECT_FLOAT_EQ(bottomItem->renderPosition().y, 300.0f) << "Bottom item positioned after top";
 }
 
