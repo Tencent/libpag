@@ -33,8 +33,8 @@ namespace pagx {
 
 using pag::FloatNearlyZero;
 
-std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, float boxWidth,
-                                   float boxHeight) {
+std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, float boxLeft,
+                                   float boxTop, float boxWidth, float boxHeight) {
   if (!src) {
     if (outAlpha) {
       *outAlpha = 1.0f;
@@ -71,12 +71,12 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
 
       // CSS linear-gradient's 0% and 100% anchors sit on the gradient line drawn through the
       // box centre; the line's length L = |w * sin(angle)| + |h * cos(angle)|. PAGX's
-      // startPoint/endPoint are arbitrary points in element-local coordinates. Project both
-      // onto the CSS gradient line to obtain their percentages, then emit additional clamp
-      // stops so the gradient matches tgfx's semantics (first stop everywhere before
-      // startPoint, last stop everywhere after endPoint). When the box size is unknown,
-      // fall back to the plain angle form — still wrong geometrically but matches legacy
-      // output for callers that cannot provide a size (e.g. SVG path fills).
+      // startPoint/endPoint live in the parent Layer's coordinate space, but the element
+      // drawing the background (a Rectangle div) usually has a non-zero top-left offset
+      // within that space. Translate start/end into the element's local box coordinates
+      // before projecting so the stops align correctly. When the box size is unknown, fall
+      // back to the plain angle form — still wrong geometrically but matches legacy output
+      // for callers that cannot provide a size (e.g. SVG path fills).
       if (boxWidth > 0 && boxHeight > 0 && !g->colorStops.empty()) {
         float angleRad = ang * static_cast<float>(M_PI) / 180.0f;
         // CSS gradient direction: 0deg points up, 90deg points right. The unit vector
@@ -85,14 +85,22 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
         float dirY = -std::cos(angleRad);
         float lineLength = std::abs(boxWidth * dirX) + std::abs(boxHeight * dirY);
         if (lineLength > 0) {
+          // Shift PAGX points into the element's local box coordinates (where the CSS
+          // gradient line is defined). The box's top-left is (boxLeft, boxTop) in the
+          // PAGX coordinate system.
+          float sxLocal = s.x - boxLeft;
+          float syLocal = s.y - boxTop;
+          float exLocal = e.x - boxLeft;
+          float eyLocal = e.y - boxTop;
           float cx = boxWidth * 0.5f;
           float cy = boxHeight * 0.5f;
           // 0% end of the CSS gradient line in element-local coords.
           float lineStartX = cx - dirX * lineLength * 0.5f;
           float lineStartY = cy - dirY * lineLength * 0.5f;
           // Project PAGX start/end points onto the line and normalise to [0, 1].
-          float startT = ((s.x - lineStartX) * dirX + (s.y - lineStartY) * dirY) / lineLength;
-          float endT = ((e.x - lineStartX) * dirX + (e.y - lineStartY) * dirY) / lineLength;
+          float startT =
+              ((sxLocal - lineStartX) * dirX + (syLocal - lineStartY) * dirY) / lineLength;
+          float endT = ((exLocal - lineStartX) * dirX + (eyLocal - lineStartY) * dirY) / lineLength;
           if (std::abs(endT - startT) > 1e-4f) {
             auto* firstStop = g->colorStops.front();
             auto* lastStop = g->colorStops.back();
