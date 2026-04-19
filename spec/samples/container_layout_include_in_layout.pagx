@@ -5,7 +5,7 @@
   <Layer left="20" top="20" width="360" height="360" layout="vertical" gap="16" padding="20">
     <!-- Card 1 -->
     <Layer flex="1">
-      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Rectangle width="100%" height="100%" roundness="16"/>
       <Fill color="#6366F1"/>
       <Group centerX="0" centerY="0">
         <Text text="Design Review" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
@@ -16,7 +16,7 @@
 
     <!-- Card 2 -->
     <Layer flex="1">
-      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Rectangle width="100%" height="100%" roundness="16"/>
       <Fill color="#10B981"/>
       <Group centerX="0" centerY="0">
         <Text text="Sprint Planning" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
@@ -27,7 +27,7 @@
 
     <!-- Card 3 -->
     <Layer flex="1">
-      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Rectangle width="100%" height="100%" roundness="16"/>
       <Fill color="#F59E0B"/>
       <Group centerX="0" centerY="0">
         <Text text="Bug Report #42" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
@@ -38,7 +38,7 @@
 
     <!-- Notification badge: a Layer leaves the layout flow -->
     <Layer right="-16" top="-16" width="32" height="32" includeInLayout="false">
-      <Ellipse left="0" right="0" top="0" bottom="0"/>
+      <Ellipse width="100%" height="100%"/>
       <Fill color="#EF4444"/>
       <Group centerX="0" centerY="0">
         <Text text="3" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>

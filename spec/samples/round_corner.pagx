@@ -2,11 +2,11 @@
 <pagx width="400" height="400">
   <!-- Original sharp rectangle (reference) -->
   <Layer>
-    <Rectangle left="50" top="50" size="140,140"/>
+    <Rectangle left="50" top="50" width="140" height="140"/>
     <Stroke color="#94A3B840" width="2" dashes="4,4"/>
   </Layer>
   <Layer>
-    <Rectangle left="50" top="50" size="140,140"/>
+    <Rectangle left="50" top="50" width="140" height="140"/>
     <RoundCorner radius="30"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="140,140">
