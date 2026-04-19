@@ -1458,6 +1458,24 @@ static void DetectRectangularMask(const Layer* layer, std::vector<VerifyDiagnost
 // Static Detection: Run All
 // ============================================================================
 
+// For Rectangle/Ellipse, detect when 'size' is fully overridden by width/height or opposite-edge
+// constraints on both axes — the animatable 'size' value then becomes dead data.
+static void DetectSizeIgnoredForRectOrEllipse(const LayoutNode* node, const Size& size,
+                                              int sourceLine,
+                                              std::vector<VerifyDiagnostic>& diagnostics) {
+  bool hasExplicitW = !std::isnan(node->width) || !std::isnan(node->percentWidth);
+  bool hasExplicitH = !std::isnan(node->height) || !std::isnan(node->percentHeight);
+  bool wFromConstraints = !std::isnan(node->left) && !std::isnan(node->right);
+  bool hFromConstraints = !std::isnan(node->top) && !std::isnan(node->bottom);
+  bool wIgnored = hasExplicitW || wFromConstraints;
+  bool hIgnored = hasExplicitH || hFromConstraints;
+  bool hasSizeAttribute = size.width != 0 || size.height != 0;
+  if (wIgnored && hIgnored && hasSizeAttribute) {
+    AddDiagnostic(diagnostics, sourceLine,
+                  "size ignored, width/height or constraints take priority. Fix: remove size");
+  }
+}
+
 static void RunStaticDetectionOnElements(const std::vector<Element*>& elements,
                                          const LineNodeMap& lineNodeMap,
                                          std::vector<VerifyDiagnostic>& diagnostics) {
@@ -1471,34 +1489,12 @@ static void RunStaticDetectionOnElements(const std::vector<Element*>& elements,
 
   for (auto* element : elements) {
     auto type = element->nodeType();
-    // For Rectangle/Ellipse, detect when 'size' is fully overridden by width/height or
-    // opposite-edge constraints on both axes — the animatable 'size' value then becomes dead data.
     if (type == NodeType::Rectangle) {
       auto* rect = static_cast<const Rectangle*>(element);
-      bool hasExplicitW = !std::isnan(rect->width) || !std::isnan(rect->percentWidth);
-      bool hasExplicitH = !std::isnan(rect->height) || !std::isnan(rect->percentHeight);
-      bool wFromConstraints = !std::isnan(rect->left) && !std::isnan(rect->right);
-      bool hFromConstraints = !std::isnan(rect->top) && !std::isnan(rect->bottom);
-      bool wIgnored = hasExplicitW || wFromConstraints;
-      bool hIgnored = hasExplicitH || hFromConstraints;
-      bool hasSizeAttribute = rect->size.width != 0 || rect->size.height != 0;
-      if (wIgnored && hIgnored && hasSizeAttribute) {
-        AddDiagnostic(diagnostics, element->sourceLine,
-                      "size ignored, width/height or constraints take priority. Fix: remove size");
-      }
+      DetectSizeIgnoredForRectOrEllipse(rect, rect->size, element->sourceLine, diagnostics);
     } else if (type == NodeType::Ellipse) {
       auto* ellipse = static_cast<const Ellipse*>(element);
-      bool hasExplicitW = !std::isnan(ellipse->width) || !std::isnan(ellipse->percentWidth);
-      bool hasExplicitH = !std::isnan(ellipse->height) || !std::isnan(ellipse->percentHeight);
-      bool wFromConstraints = !std::isnan(ellipse->left) && !std::isnan(ellipse->right);
-      bool hFromConstraints = !std::isnan(ellipse->top) && !std::isnan(ellipse->bottom);
-      bool wIgnored = hasExplicitW || wFromConstraints;
-      bool hIgnored = hasExplicitH || hFromConstraints;
-      bool hasSizeAttribute = ellipse->size.width != 0 || ellipse->size.height != 0;
-      if (wIgnored && hIgnored && hasSizeAttribute) {
-        AddDiagnostic(diagnostics, element->sourceLine,
-                      "size ignored, width/height or constraints take priority. Fix: remove size");
-      }
+      DetectSizeIgnoredForRectOrEllipse(ellipse, ellipse->size, element->sourceLine, diagnostics);
     }
     if (type == NodeType::Group) {
       auto* group = static_cast<const Group*>(element);
