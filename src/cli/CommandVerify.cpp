@@ -2057,6 +2057,24 @@ static void DetectConstraintConflicts(const LayoutNode* node, int sourceLine,
   }
 }
 
+// Flag explicit width/height that is shadowed by opposite-edge constraints. The layout priority is
+// left+right > percentWidth > authored width (top+bottom analogous for height), so when both
+// opposite edges are set the authored width/height contributes nothing. percentWidth/percentHeight
+// collisions are reported by DetectConstraintConflicts for all LayoutNode types.
+static void DetectExplicitSizeShadowedByOppositeEdge(
+    const LayoutNode* node, int sourceLine, std::vector<VerifyDiagnostic>& diagnostics) {
+  bool wFromConstraints = !std::isnan(node->left) && !std::isnan(node->right);
+  bool hFromConstraints = !std::isnan(node->top) && !std::isnan(node->bottom);
+  if (wFromConstraints && !std::isnan(node->width)) {
+    AddDiagnostic(diagnostics, sourceLine,
+                  "width ignored, left+right constraints take priority. Fix: remove width");
+  }
+  if (hFromConstraints && !std::isnan(node->height)) {
+    AddDiagnostic(diagnostics, sourceLine,
+                  "height ignored, top+bottom constraints take priority. Fix: remove height");
+  }
+}
+
 static void DetectRedundantZeroConstraints(const LayoutNode* node, int sourceLine,
                                            std::vector<VerifyDiagnostic>& diagnostics) {
   if (!std::isnan(node->left) && node->left == 0.0f && std::isnan(node->right) &&
@@ -2487,23 +2505,14 @@ static void RunSpatialDetectionOnElements(const std::vector<Element*>& elements,
       DetectNegativeConstraintSizeForElement(layoutNode, element->sourceLine, containerW,
                                              containerH, diagnostics);
       DetectRedundantZeroConstraints(layoutNode, element->sourceLine, diagnostics);
-      // Flag explicit width/height that is shadowed by opposite-edge constraints on
-      // Rectangle / Ellipse / Group. TextBox keeps this->width/height as the authored text-box
-      // dimensions for shaping (independent semantic), so it is excluded here. Path / Polystar /
-      // Text / TextPath use width/height to drive uniform scaling, still useful alongside edge
-      // constraints; they are also excluded. Note: percentWidth/Height collisions with opposite
-      // edges are reported by DetectConstraintConflicts for all LayoutNode types.
+      // Only Rectangle / Ellipse / Group use width/height purely for layout sizing. TextBox keeps
+      // this->width/height as the authored text-box dimensions for shaping (independent semantic),
+      // so it is excluded here. Path / Polystar / Text / TextPath use width/height to drive
+      // uniform scaling, still useful alongside edge constraints; they are also excluded. Note:
+      // percentWidth/Height collisions with opposite edges are reported by
+      // DetectConstraintConflicts for all LayoutNode types.
       if (type == NodeType::Rectangle || type == NodeType::Ellipse || type == NodeType::Group) {
-        bool wFromConstraints = !std::isnan(layoutNode->left) && !std::isnan(layoutNode->right);
-        bool hFromConstraints = !std::isnan(layoutNode->top) && !std::isnan(layoutNode->bottom);
-        if (wFromConstraints && !std::isnan(layoutNode->width)) {
-          AddDiagnostic(diagnostics, element->sourceLine,
-                        "width ignored, left+right constraints take priority. Fix: remove width");
-        }
-        if (hFromConstraints && !std::isnan(layoutNode->height)) {
-          AddDiagnostic(diagnostics, element->sourceLine,
-                        "height ignored, top+bottom constraints take priority. Fix: remove height");
-        }
+        DetectExplicitSizeShadowedByOppositeEdge(layoutNode, element->sourceLine, diagnostics);
       }
     }
     if (type == NodeType::Group) {
@@ -2558,20 +2567,7 @@ static void RunSpatialDetectionOnLayer(const Layer* layer, const Layer* parentLa
   DetectContentCenteringAsymmetry(layer, parentLayer, diagnostics);
   DetectOverlappingSiblings(layer, diagnostics);
   DetectConstraintConflicts(layer, layer->sourceLine, diagnostics);
-  // Flag explicit width/height that is shadowed by opposite-edge constraints. percentWidth/Height
-  // collisions are reported by DetectConstraintConflicts.
-  {
-    bool wFromConstraints = !std::isnan(layer->left) && !std::isnan(layer->right);
-    bool hFromConstraints = !std::isnan(layer->top) && !std::isnan(layer->bottom);
-    if (wFromConstraints && !std::isnan(layer->width)) {
-      AddDiagnostic(diagnostics, layer->sourceLine,
-                    "width ignored, left+right constraints take priority. Fix: remove width");
-    }
-    if (hFromConstraints && !std::isnan(layer->height)) {
-      AddDiagnostic(diagnostics, layer->sourceLine,
-                    "height ignored, top+bottom constraints take priority. Fix: remove height");
-    }
-  }
+  DetectExplicitSizeShadowedByOppositeEdge(layer, layer->sourceLine, diagnostics);
   DetectRedundantZeroConstraints(layer, layer->sourceLine, diagnostics);
   DetectStretchFillAffectedByPadding(layer->contents, layer->padding, diagnostics);
   DetectChildExceedingParent(layer, diagnostics);
