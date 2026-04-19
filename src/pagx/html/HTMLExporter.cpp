@@ -17,9 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/HTMLExporter.h"
+#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <unordered_map>
 #include "pagx/html/HTMLBuilder.h"
 #include "pagx/html/HTMLWriter.h"
 #include "pagx/utils/StringParser.h"
@@ -365,21 +367,158 @@ static std::string ReplaceHTMLComments(const std::string& html) {
   return result;
 }
 
+// Rewrites kebab-case SVG attribute names to the camelCase form React/JSX expects. React
+// treats DOM attributes as React props and only recognises the camelCase spelling for SVG
+// presentation attributes (stop-color → stopColor etc.); kebab-case would be dropped with a
+// "Invalid DOM property" warning and the visual (dashes, gradient stops, stroke widths...)
+// would disappear. The transform preserves data-* and aria-* attributes, which React allows
+// in their dashed form.
+static std::string TransformSVGAttributeNames(const std::string& jsx) {
+  static const std::unordered_map<std::string, std::string> kKebabToCamel = {
+      {"clip-path", "clipPath"},
+      {"clip-rule", "clipRule"},
+      {"color-interpolation-filters", "colorInterpolationFilters"},
+      {"fill-opacity", "fillOpacity"},
+      {"fill-rule", "fillRule"},
+      {"flood-color", "floodColor"},
+      {"flood-opacity", "floodOpacity"},
+      {"stop-color", "stopColor"},
+      {"stop-opacity", "stopOpacity"},
+      {"stroke-dasharray", "strokeDasharray"},
+      {"stroke-dashoffset", "strokeDashoffset"},
+      {"stroke-linecap", "strokeLinecap"},
+      {"stroke-linejoin", "strokeLinejoin"},
+      {"stroke-miterlimit", "strokeMiterlimit"},
+      {"stroke-opacity", "strokeOpacity"},
+      {"stroke-width", "strokeWidth"},
+      {"text-anchor", "textAnchor"},
+      {"dominant-baseline", "dominantBaseline"},
+      {"alignment-baseline", "alignmentBaseline"},
+      {"gradient-units", "gradientUnits"},
+      {"gradient-transform", "gradientTransform"},
+      {"pattern-units", "patternUnits"},
+      {"pattern-content-units", "patternContentUnits"},
+      {"pattern-transform", "patternTransform"},
+  };
+
+  std::string result;
+  result.reserve(jsx.size());
+  size_t pos = 0;
+  while (pos < jsx.size()) {
+    char c = jsx[pos];
+    if (c != '<') {
+      result += c;
+      pos++;
+      continue;
+    }
+
+    size_t tagClose = jsx.find('>', pos);
+    if (tagClose == std::string::npos) {
+      result += jsx.substr(pos);
+      break;
+    }
+
+    // Skip comment/CDATA/processing-instruction tokens that just happen to start with '<'.
+    if (pos + 1 < jsx.size() && (jsx[pos + 1] == '!' || jsx[pos + 1] == '?')) {
+      result += jsx.substr(pos, tagClose - pos + 1);
+      pos = tagClose + 1;
+      continue;
+    }
+
+    std::string tagContent = jsx.substr(pos, tagClose - pos + 1);
+    std::string rewritten;
+    rewritten.reserve(tagContent.size());
+    size_t i = 0;
+    while (i < tagContent.size()) {
+      char ch = tagContent[i];
+      // Attribute names begin after whitespace and are terminated by '=' or whitespace or '>'.
+      // Names always start with a letter; look for kebab identifiers and rewrite if matched.
+      if ((ch == ' ' || ch == '\t' || ch == '\n') && i + 1 < tagContent.size() &&
+          (std::isalpha(static_cast<unsigned char>(tagContent[i + 1])) ||
+           tagContent[i + 1] == '-')) {
+        rewritten += ch;
+        i++;
+        size_t nameStart = i;
+        while (i < tagContent.size()) {
+          char nc = tagContent[i];
+          if (std::isalnum(static_cast<unsigned char>(nc)) || nc == '-' || nc == '_' || nc == ':') {
+            i++;
+          } else {
+            break;
+          }
+        }
+        std::string name = tagContent.substr(nameStart, i - nameStart);
+        auto it = kKebabToCamel.find(name);
+        if (it != kKebabToCamel.end()) {
+          rewritten += it->second;
+        } else {
+          rewritten += name;
+        }
+        continue;
+      }
+      rewritten += ch;
+      i++;
+    }
+
+    result += rewritten;
+    pos = tagClose + 1;
+  }
+  return result;
+}
+
+// Indents every line of a JS body by `indent` spaces. Used when the body is embedded inside
+// a useEffect/onMounted closure so the output is still readable.
+static std::string IndentJS(const std::string& js, const std::string& indent) {
+  if (js.empty()) {
+    return "";
+  }
+  std::string result;
+  result.reserve(js.size() + indent.size() * 32);
+  size_t lineStart = 0;
+  while (lineStart < js.size()) {
+    size_t lineEnd = js.find('\n', lineStart);
+    if (lineEnd == std::string::npos) {
+      lineEnd = js.size();
+    }
+    if (lineEnd > lineStart) {
+      result += indent;
+      result += js.substr(lineStart, lineEnd - lineStart);
+    }
+    if (lineEnd < js.size()) {
+      result += '\n';
+    }
+    lineStart = lineEnd + 1;
+  }
+  return result;
+}
+
 static std::string SerializeToReactJSX(const std::string& nativeHTML,
+                                       const std::string& canvasInitJS,
                                        const HTMLExportOptions& options) {
   std::string jsx = nativeHTML;
 
   jsx = ReplaceClassWithClassName(jsx);
   jsx = ReplaceHTMLComments(jsx);
+  jsx = TransformSVGAttributeNames(jsx);
   jsx = TransformStyleAttributes(jsx, true);
 
   std::string indentStr(static_cast<size_t>(options.indent * 2), ' ');
   std::string singleIndent(static_cast<size_t>(options.indent), ' ');
 
   std::string result;
-  result.reserve(jsx.size() + 200);
+  result.reserve(jsx.size() + canvasInitJS.size() + 400);
   result += kGeneratedCommentJS;
+  if (!canvasInitJS.empty()) {
+    result += "import { useEffect } from 'react';\n\n";
+  }
   result += "export default function " + options.componentName + "() {\n";
+  if (!canvasInitJS.empty()) {
+    // Run the canvas init JS once after mount. React strips DOM <script> children, so this
+    // is the only reliable way to get the WebGL setup to execute.
+    result += singleIndent + "useEffect(() => {\n";
+    result += IndentJS(canvasInitJS, indentStr);
+    result += singleIndent + "}, []);\n\n";
+  }
   result += singleIndent + "return (\n";
 
   size_t lineStart = 0;
@@ -400,14 +539,14 @@ static std::string SerializeToReactJSX(const std::string& nativeHTML,
   return result;
 }
 
-static std::string SerializeToVueSFC(const std::string& nativeHTML,
+static std::string SerializeToVueSFC(const std::string& nativeHTML, const std::string& canvasInitJS,
                                      const HTMLExportOptions& options) {
   std::string vue = TransformStyleAttributes(nativeHTML, false);
 
   std::string singleIndent(static_cast<size_t>(options.indent), ' ');
 
   std::string result;
-  result.reserve(vue.size() + 200);
+  result.reserve(vue.size() + canvasInitJS.size() + 400);
   result += "<!-- Generated by PAGX HTMLExporter. Do not edit. -->\n";
   result += "<template>\n";
 
@@ -425,7 +564,16 @@ static std::string SerializeToVueSFC(const std::string& nativeHTML,
 
   result += "</template>\n\n";
   result += "<script setup>\n";
-  result += "// Generated by PAGX HTMLExporter\n";
+  if (canvasInitJS.empty()) {
+    result += "// No setup logic required for this component.\n";
+  } else {
+    // Run the canvas init JS once after mount. Vue, like React, does not execute DOM
+    // <script> children inside <template>; onMounted is the idiomatic hook for this.
+    result += "import { onMounted } from 'vue';\n\n";
+    result += "onMounted(() => {\n";
+    result += IndentJS(canvasInitJS, singleIndent);
+    result += "});\n";
+  }
   result += "</script>\n";
 
   return result;
@@ -521,8 +669,10 @@ static std::string RoundCoordinatesInHTML(const std::string& html) {
 // File header
 //==============================================================================
 
-static std::string GenerateDiamondGradientScript(
-    const std::vector<DiamondGradientInfo>& gradients) {
+// Returns the bare JavaScript body (no <script> or IIFE wrapper) that renders every diamond
+// gradient canvas. Callers wrap it appropriately: native HTML wraps it in <script>, React in
+// useEffect, Vue in onMounted.
+static std::string BuildDiamondGradientJS(const std::vector<DiamondGradientInfo>& gradients) {
   if (gradients.empty()) {
     return "";
   }
@@ -531,7 +681,6 @@ static std::string GenerateDiamondGradientScript(
   // scale(sqrt2/radius), and rotate(45)) is passed directly. The shader only needs
   // t = max(|transformed.x|, |transformed.y|) for the Chebyshev distance.
   std::string s;
-  s += "<script>\n(function(){\n";
   s += "var VS='#version 300 es\\n";
   s += "in vec2 a;out vec2 v;uniform vec2 u_s;";
   s += "void main(){vec2 u=a*.5+.5;v=vec2(u.x*u_s.x,(1.-u.y)*u_s.y);gl_Position=vec4(a,0,1);}';\n";
@@ -587,17 +736,16 @@ static std::string GenerateDiamondGradientScript(
     }
     s += "]);\n";
   }
-
-  s += "})();\n</script>\n";
   return s;
 }
 
-static std::string GenerateImagePatternScript(const std::vector<ImagePatternCanvasInfo>& patterns) {
+// Returns the bare JavaScript body (no <script> or IIFE wrapper) that renders every image
+// pattern canvas. See BuildDiamondGradientJS for wrapping notes.
+static std::string BuildImagePatternJS(const std::vector<ImagePatternCanvasInfo>& patterns) {
   if (patterns.empty()) {
     return "";
   }
   std::string s;
-  s += "<script>\n(function(){\n";
   s += "var VS='#version 300 es\\n";
   s += "in vec2 a;out vec2 v;";
   s += "void main(){v=a*.5+.5;v.y=1.-v.y;gl_Position=vec4(a,0,1);}';\n";
@@ -633,9 +781,25 @@ static std::string GenerateImagePatternScript(const std::vector<ImagePatternCanv
          "," + std::to_string(info.wrapT) + "," + std::to_string(info.filter) + "," +
          FloatToString(info.width) + "," + FloatToString(info.height) + ");\n";
   }
-
-  s += "})();\n</script>\n";
   return s;
+}
+
+// Concatenates any WebGL init scripts this document needs. Returns empty if none.
+static std::string BuildCanvasInitJS(const HTMLWriterContext& ctx) {
+  std::string js;
+  js += BuildDiamondGradientJS(ctx.diamondGradients);
+  js += BuildImagePatternJS(ctx.imagePatternCanvases);
+  return js;
+}
+
+// Wraps a JS body in a browser <script> IIFE. Used only for native HTML output; React/Vue
+// output runs the same body inside useEffect/onMounted instead of a DOM <script> node,
+// because React refuses to mount and execute <script> children.
+static std::string WrapJSInScriptTag(const std::string& js) {
+  if (js.empty()) {
+    return "";
+  }
+  return "<script>\n(function(){\n" + js + "})();\n</script>\n";
 }
 
 std::string HTMLExporter::ToHTML(const PAGXDocument& doc, const Options& options) {
@@ -676,16 +840,13 @@ std::string HTMLExporter::ToHTML(const PAGXDocument& doc, const Options& options
 
   html.addRawContent(body.release());
 
-  // Inject WebGL2 diamond gradient script if needed
-  std::string dgScript = GenerateDiamondGradientScript(ctx.diamondGradients);
-  if (!dgScript.empty()) {
-    html.addRawContent(dgScript);
-  }
-
-  // Inject WebGL2 image pattern script if needed
-  std::string ipScript = GenerateImagePatternScript(ctx.imagePatternCanvases);
-  if (!ipScript.empty()) {
-    html.addRawContent(ipScript);
+  // Collect WebGL init JS for canvases (diamond gradients and image patterns). Native HTML
+  // wraps it in a plain <script> tag; React and Vue instead embed the body inside a
+  // useEffect/onMounted hook (see the serializers below) because they do not execute DOM
+  // <script> children after mount.
+  std::string canvasInitJS = BuildCanvasInitJS(ctx);
+  if (options.framework == HTMLFramework::Native) {
+    html.addRawContent(WrapJSInScriptTag(canvasInitJS));
   }
 
   html.closeTag();  // </div>
@@ -695,9 +856,9 @@ std::string HTMLExporter::ToHTML(const PAGXDocument& doc, const Options& options
   // Apply framework-specific transformation
   switch (options.framework) {
     case HTMLFramework::React:
-      return SerializeToReactJSX(nativeHTML, options);
+      return SerializeToReactJSX(nativeHTML, canvasInitJS, options);
     case HTMLFramework::Vue:
-      return SerializeToVueSFC(nativeHTML, options);
+      return SerializeToVueSFC(nativeHTML, canvasInitJS, options);
     case HTMLFramework::Native:
     default:
       return std::string(kGeneratedCommentNative) + nativeHTML;
