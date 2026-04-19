@@ -129,16 +129,16 @@ Layer or Group — use Layer when it needs `layout` or child Layers, use Group o
 ```xml
 <!-- Outer: background (no padding). Inner: padded layout content. -->
 <Layer>
-  <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+  <Rectangle width="100%" height="100%" roundness="12"/>
   <Fill color="#FFF"/>
-  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="8" padding="16">
+  <Layer width="100%" height="100%" layout="vertical" gap="8" padding="16">
     <!-- content here -->
   </Layer>
 </Layer>
 
 <!-- Button: outer background, inner Group for padded text -->
 <Layer centerX="0" centerY="0">
-  <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+  <Rectangle width="100%" height="100%" roundness="8"/>
   <Fill color="#3B82F6"/>
   <Group centerX="0" centerY="0" padding="10,15">
     <Text text="Click" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
@@ -224,12 +224,13 @@ Prefer `arrangement` over empty spacer Layers.
 
 ## Constraint Positioning
 
-Constraint attributes (`left`, `right`, `top`, `bottom`, `centerX`, `centerY`) position
-elements relative to their parent container. Supported by: Rectangle, Ellipse, Polystar,
-Path, Text, Group, TextBox, TextPath, and Layer. Always available for VectorElements; for
-child Layers only when parent has no `layout` or child has `includeInLayout="false"`.
-Top-level Layers (direct children of `<pagx>` or `<Composition>`) can also use
-constraints — the document/composition `width`×`height` serves as their container size.
+Constraint attributes (`left`, `right`, `top`, `bottom`, `centerX`, `centerY`, `width`,
+`height`) position and size elements relative to their parent container. Supported by:
+Rectangle, Ellipse, Polystar, Path, Text, Group, TextBox, TextPath, and Layer. Always
+available for VectorElements; for child Layers only when parent has no `layout` or child
+has `includeInLayout="false"`. Top-level Layers (direct children of `<pagx>` or
+`<Composition>`) can also use constraints — the document/composition `width`×`height`
+serves as their container size.
 
 | Attribute | Effect |
 |-----------|--------|
@@ -239,6 +240,8 @@ constraints — the document/composition `width`×`height` serves as their conta
 | `bottom` | Distance from element bottom edge to container bottom edge |
 | `centerX` | Horizontal offset from container center (0 = centered) |
 | `centerY` | Vertical offset from container center (0 = centered) |
+| `width` | Layout width; pixels (e.g., `100`) or percentage (e.g., `50%`) relative to container |
+| `height` | Layout height; pixels (e.g., `100`) or percentage (e.g., `50%`) relative to container |
 
 **Per-axis rules** — use only one combination per axis:
 - Single edge alone → position only
@@ -247,7 +250,7 @@ constraints — the document/composition `width`×`height` serves as their conta
 
 **Priority**: `centerX` > `left`+`right` > `left` > `right` (same for vertical).
 
-**Opposite-pair behavior** by element type:
+**Opposite-pair / percentage dimension behavior** by element type:
 
 | Element Type | Behavior |
 |--------------|----------|
@@ -257,16 +260,21 @@ constraints — the document/composition `width`×`height` serves as their conta
 | Group | **Derive size** for child constraint reference |
 | Child Layer | **Override** width/height |
 
-**Size priority** (highest first): opposite-pair → explicit size → content measurement.
+**Size priority** (highest first): opposite-pair constraints → explicit `width`/`height`
+(including percentages) → `size` → content measurement.
+
+Percentage values (e.g., `width="50%"`) are calculated relative to the container's layout
+size (minus padding). They behave identically to opposite-pair constraints for each element
+type (see table above).
 
 **Choose by design intent**: `right`+`top` for top-right corner, `centerX`+`bottom` for
-bottom-center, `left="0" right="0" top="0" bottom="0"` to fill parent.
+bottom-center, `width="100%" height="100%"` to fill parent.
 
 **Examples**:
 
 ```xml
 <!-- Background: stretch to fill -->
-<Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+<Rectangle width="100%" height="100%" roundness="12"/>
 
 <!-- Centered text -->
 <TextBox centerX="0" centerY="0">
@@ -283,21 +291,22 @@ bottom-center, `left="0" right="0" top="0" bottom="0"` to fill parent.
 
 ## Container Sizing
 
-When VectorElements use opposite-pair constraints to stretch-fill, the container **must**
-have a determinate size. Three ways: explicit `width`/`height`, parent layout (flex/stretch),
-or opposite-pair constraints from parent.
+When VectorElements use percentage dimensions (`width="50%"`) or opposite-pair constraints
+to stretch-fill, the container **must** have a determinate size. Three ways: explicit
+`width`/`height`, parent layout (flex/stretch), or constraints from parent (opposite-pair
+or percentage).
 
 ```xml
 <!-- 1. Explicit -->
 <Layer width="300" height="200">
-  <Rectangle left="0" right="0" top="0" bottom="0"/>
+  <Rectangle width="100%" height="100%"/>
   <Fill color="#F00"/>
 </Layer>
 
 <!-- 2. Flex from parent -->
 <Layer width="600" height="400" layout="horizontal">
   <Layer flex="1">
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Rectangle width="100%" height="100%"/>
     <Fill color="#F00"/>
   </Layer>
 </Layer>
@@ -305,7 +314,7 @@ or opposite-pair constraints from parent.
 <!-- 3. Constraints from parent -->
 <Layer width="600" height="400">
   <Layer left="20" right="20" top="20" bottom="20">
-    <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+    <Rectangle width="100%" height="100%" roundness="12"/>
     <Fill color="#F00"/>
   </Layer>
 </Layer>
@@ -395,19 +404,19 @@ constraints on the **Group itself**, not on inner elements. Group also supports 
 ```xml
 <!-- ✅ Correct: first content directly, Group isolates AND positions subsequent content -->
 <Layer width="200" height="200">
-  <Rectangle left="0" right="0" top="0" bottom="0"/>
+  <Rectangle width="100%" height="100%"/>
   <Fill color="#F00"/>
   <Group centerX="0" centerY="0">
-    <Ellipse size="30,30"/>
+    <Ellipse width="30" height="30"/>
     <Stroke color="#000" width="1"/>
   </Group>
 </Layer>
 
 <!-- ❌ Wrong: missing Group — Stroke leaks onto Rectangle -->
 <Layer width="200" height="200">
-  <Rectangle left="0" right="0" top="0" bottom="0"/>
+  <Rectangle width="100%" height="100%"/>
   <Fill color="#F00"/>
-  <Ellipse left="35" top="35" size="30,30"/>
+  <Ellipse left="35" top="35" width="30" height="30"/>
   <Stroke color="#000" width="1"/>  <!-- applies to BOTH Rectangle and Ellipse -->
 </Layer>
 ```
@@ -529,7 +538,7 @@ discards **entire lines**, not pixels). TextBox overrides child Text's `position
 **Rich text**: multiple Text + Fill in one TextBox, using Groups for different styles:
 
 ```xml
-<TextBox left="0" right="0" top="0" bottom="0" textAlign="start">
+<TextBox width="100%" height="100%" textAlign="start">
   <Text text="Bold part " fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
   <Fill color="#000"/>
   <Group>
@@ -543,8 +552,8 @@ discards **entire lines**, not pixels). TextBox overrides child Text's `position
 `bottom="0"` for underline. See `patterns.md` §Text Decoration.
 
 **TextPath**: maps glyphs onto a curved path. Supports constraint positioning (opposite-pair
-uses scale-to-fit). Text-to-shape conversion is triggered by shape modifiers in the same
-scope — use separate Groups if you need both.
+constraints and percentage dimensions use scale-to-fit). Text-to-shape conversion is
+triggered by shape modifiers in the same scope — use separate Groups if you need both.
 
 ---
 
@@ -653,7 +662,7 @@ finalizing any PAGX output, verify that none of these anti-patterns appear in yo
   <Layer width="100" height="50"/>
 
   <!-- ✅ Or pair with opposite edge to stretch -->
-  <Layer left="0" right="0" top="0" bottom="0"/>
+  <Layer width="100%" height="100%"/>
   ```
 
 - **NEVER** assume `visible="false"` removes a Layer from layout — a hidden Layer still
@@ -666,13 +675,13 @@ finalizing any PAGX output, verify that none of these anti-patterns appear in yo
   <!-- ❌ Wrong: content starts at (50,50), container measures from (0,0) to (150,150)
        but actual content is only 100x100 -->
   <Layer>
-    <Rectangle left="50" top="50" size="100,100"/>
+    <Rectangle left="50" top="50" width="100" height="100"/>
     <Fill color="#F00"/>
   </Layer>
 
   <!-- ✅ Correct: content starts at (0,0) -->
   <Layer>
-    <Rectangle size="100,100"/>
+    <Rectangle width="100" height="100"/>
     <Fill color="#F00"/>
   </Layer>
   ```
@@ -714,21 +723,21 @@ finalizing any PAGX output, verify that none of these anti-patterns appear in yo
   <!-- ❌ First Group is redundant — no earlier content to isolate from -->
   <Layer width="200" height="200">
     <Group>
-      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Rectangle width="100%" height="100%"/>
       <Fill color="#F00"/>
     </Group>
     <Group centerX="0" centerY="0">
-      <Ellipse size="30,30"/>
+      <Ellipse width="30" height="30"/>
       <Stroke color="#000" width="1"/>
     </Group>
   </Layer>
 
   <!-- ✅ First content placed directly, only second needs Group -->
   <Layer width="200" height="200">
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Rectangle width="100%" height="100%"/>
     <Fill color="#F00"/>
     <Group centerX="0" centerY="0">
-      <Ellipse size="30,30"/>
+      <Ellipse width="30" height="30"/>
       <Stroke color="#000" width="1"/>
     </Group>
   </Layer>
@@ -740,18 +749,18 @@ finalizing any PAGX output, verify that none of these anti-patterns appear in yo
   ```xml
   <!-- ❌ Two Groups with the same Fill -->
   <Group>
-    <Rectangle size="100,40"/>
+    <Rectangle width="100" height="40"/>
     <Fill color="#F00"/>
   </Group>
   <Group>
-    <Ellipse left="120" size="40,40"/>
+    <Ellipse left="120" width="40" height="40"/>
     <Fill color="#F00"/>
   </Group>
 
   <!-- ✅ Merged into one Group -->
   <Group>
-    <Rectangle size="100,40"/>
-    <Ellipse left="120" size="40,40"/>
+    <Rectangle width="100" height="40"/>
+    <Ellipse left="120" width="40" height="40"/>
     <Fill color="#F00"/>
   </Group>
   ```
@@ -785,7 +794,7 @@ finalizing any PAGX output, verify that none of these anti-patterns appear in yo
   ```
 
 - **NEVER** put `padding` on a Layer that also has stretch-fill background VectorElements
-  (`left="0" right="0" top="0" bottom="0"`) — `padding` insets the constraint reference
+  (`width="100%" height="100%"`) — `padding` insets the constraint reference
   frame for **all contents** including VectorElements, so the background shrinks away from
   the Layer edges instead of filling them. MUST use nested container structure: outer Layer
   for edge-to-edge background (no padding), inner Layer for padded content layout.
@@ -793,16 +802,16 @@ finalizing any PAGX output, verify that none of these anti-patterns appear in yo
   ```xml
   <!-- ❌ padding shrinks the Rectangle — background has 12px gap around all edges -->
   <Layer layout="vertical" gap="8" padding="12">
-    <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+    <Rectangle width="100%" height="100%" roundness="8"/>
     <Fill color="#F8F9FA"/>
     <!-- content starts at same offset as background — no visual padding -->
   </Layer>
 
   <!-- ✅ Outer holds background, inner carries padding -->
   <Layer>
-    <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+    <Rectangle width="100%" height="100%" roundness="8"/>
     <Fill color="#F8F9FA"/>
-    <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="8" padding="12">
+    <Layer width="100%" height="100%" layout="vertical" gap="8" padding="12">
       <!-- content has 12px visual padding inside the background -->
     </Layer>
   </Layer>
@@ -815,7 +824,7 @@ finalizing any PAGX output, verify that none of these anti-patterns appear in yo
   ```xml
   <!-- ❌ svg inside Group — not allowed -->
   <Layer width="44" height="44">
-    <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
+    <Rectangle width="100%" height="100%" roundness="10"/>
     <Fill color="#DBEAFE"/>
     <Group centerX="0" centerY="0">
       <svg viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2" stroke-linejoin="round">
@@ -826,7 +835,7 @@ finalizing any PAGX output, verify that none of these anti-patterns appear in yo
 
   <!-- ❌ svg mixed with other children in the same Layer -->
   <Layer width="44" height="44">
-    <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
+    <Rectangle width="100%" height="100%" roundness="10"/>
     <Fill color="#DBEAFE"/>
     <svg viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2" stroke-linejoin="round">
       <path d="M12 4L20 20H4Z"/>
@@ -835,7 +844,7 @@ finalizing any PAGX output, verify that none of these anti-patterns appear in yo
 
   <!-- ✅ Separate Layer for background, dedicated child Layer for svg -->
   <Layer width="44" height="44">
-    <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
+    <Rectangle width="100%" height="100%" roundness="10"/>
     <Fill color="#DBEAFE"/>
     <Layer centerX="0" centerY="0">
       <svg viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2" stroke-linejoin="round">
