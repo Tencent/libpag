@@ -78,7 +78,8 @@ void TextBox::setLayoutSize(LayoutContext* context, float targetWidth, float tar
   bool widthFromContent = std::isnan(targetWidth) && std::isnan(this->width);
   bool heightFromContent = std::isnan(targetHeight) && std::isnan(this->height);
   // For TextBox, only a change in the wrap axis (width for horizontal, height for vertical)
-  // can affect the cross axis measurement. Re-typeset to compute the correct cross-axis size.
+  // can affect the cross axis measurement. Re-typeset to compute the correct cross-axis size,
+  // then re-run updateLayout so non-Text descendants pick up the refined container size.
   bool horizontal = (writingMode == WritingMode::Horizontal);
   bool wrapAxisChanged = horizontal
                              ? (!std::isnan(targetWidth) && targetWidth != preferredWidth)
@@ -98,10 +99,14 @@ void TextBox::setLayoutSize(LayoutContext* context, float targetWidth, float tar
     if (hasPadding) {
       crossSize += horizontal ? (padding.top + padding.bottom) : (padding.left + padding.right);
     }
+    float prevCross = horizontal ? layoutHeight : layoutWidth;
     if (horizontal) {
       layoutHeight = crossSize;
     } else {
       layoutWidth = crossSize;
+    }
+    if (crossSize != prevCross) {
+      updateLayout(context);
     }
   }
 }

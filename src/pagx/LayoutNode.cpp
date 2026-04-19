@@ -117,8 +117,17 @@ void LayoutNode::PerformConstraintLayout(const std::vector<LayoutNode*>& nodes, 
                                          float containerH, const Padding& padding,
                                          LayoutContext* context) {
   bool hasPadding = !padding.isZero();
-  float cw = hasPadding ? std::max(0.0f, containerW - padding.left - padding.right) : containerW;
-  float ch = hasPadding ? std::max(0.0f, containerH - padding.top - padding.bottom) : containerH;
+  // A NaN container axis means the parent is still resolving that axis (pass 1 of a
+  // content-measured parent). Propagate NaN downward so percent children fall back to their
+  // preferred size instead of locking onto a provisional value.
+  float cw =
+      std::isnan(containerW)
+          ? NAN
+          : (hasPadding ? std::max(0.0f, containerW - padding.left - padding.right) : containerW);
+  float ch =
+      std::isnan(containerH)
+          ? NAN
+          : (hasPadding ? std::max(0.0f, containerH - padding.top - padding.bottom) : containerH);
   for (auto* child : nodes) {
     // Phase 1: compute target size from parent-side inputs only.
     //   opposite-edge constraints > percentWidth/Height > NAN (child uses its preferred size)

@@ -50,41 +50,48 @@ void Group::onMeasure(LayoutContext*) {
 }
 
 void Group::setLayoutSize(LayoutContext* context, float targetWidth, float targetHeight) {
-  layoutWidth = !std::isnan(targetWidth) ? targetWidth : preferredWidth;
-  layoutHeight = !std::isnan(targetHeight) ? targetHeight : preferredHeight;
-  updateLayout(context);
-  // When the axis is content-measured (no target from parent AND no authored size) but the other
-  // axis forced a different size, recompute the content-measured axis from children's actual
-  // layout sizes.
+  // Mirror Layer::setLayoutSize: keep content-measured axes NaN during pass 1 so percent
+  // descendants fall back to their preferred size, refine after, then run updateLayout again so
+  // size-dependent descendants pick up the refined container size.
   bool widthFromContent = std::isnan(targetWidth) && std::isnan(this->width);
   bool heightFromContent = std::isnan(targetHeight) && std::isnan(this->height);
-  bool sizeChanged = (!std::isnan(targetWidth) && targetWidth != preferredWidth) ||
-                     (!std::isnan(targetHeight) && targetHeight != preferredHeight);
-  if ((widthFromContent || heightFromContent) && sizeChanged) {
-    float maxX = 0;
-    float maxY = 0;
-    for (auto* element : elements) {
-      auto* node = AsLayoutNode(element);
-      if (node == nullptr) {
-        continue;
-      }
-      float extX = node->hasConstraints() ? node->constraintExtentX() : 0;
-      float extY = node->hasConstraints() ? node->constraintExtentY() : 0;
-      extX += node->layoutBounds().width;
-      extY += node->layoutBounds().height;
-      maxX = std::max(maxX, extX);
-      maxY = std::max(maxY, extY);
+  layoutWidth = widthFromContent ? NAN : (!std::isnan(targetWidth) ? targetWidth : preferredWidth);
+  layoutHeight =
+      heightFromContent ? NAN : (!std::isnan(targetHeight) ? targetHeight : preferredHeight);
+  updateLayout(context);
+  if (!widthFromContent && !heightFromContent) {
+    return;
+  }
+  float maxX = 0;
+  float maxY = 0;
+  for (auto* element : elements) {
+    auto* node = AsLayoutNode(element);
+    if (node == nullptr) {
+      continue;
     }
-    if (!padding.isZero()) {
-      maxX += padding.left + padding.right;
-      maxY += padding.top + padding.bottom;
-    }
-    if (widthFromContent) {
-      layoutWidth = std::ceil(maxX);
-    }
-    if (heightFromContent) {
-      layoutHeight = std::ceil(maxY);
-    }
+    // Match Group::onMeasure / MeasureChildNodes: unconstrained nodes use their preferredX/Y
+    // as extent origin (so a centered element with negative preferredY is not over-measured).
+    float extX = node->hasConstraints() ? node->constraintExtentX() : node->preferredX;
+    float extY = node->hasConstraints() ? node->constraintExtentY() : node->preferredY;
+    extX += node->layoutBounds().width;
+    extY += node->layoutBounds().height;
+    maxX = std::max(maxX, extX);
+    maxY = std::max(maxY, extY);
+  }
+  if (!padding.isZero()) {
+    maxX += padding.left + padding.right;
+    maxY += padding.top + padding.bottom;
+  }
+  float prevW = layoutWidth;
+  float prevH = layoutHeight;
+  if (widthFromContent) {
+    layoutWidth = maxX;
+  }
+  if (heightFromContent) {
+    layoutHeight = maxY;
+  }
+  if ((widthFromContent && layoutWidth != prevW) || (heightFromContent && layoutHeight != prevH)) {
+    updateLayout(context);
   }
 }
 

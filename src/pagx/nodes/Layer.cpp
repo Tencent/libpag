@@ -182,8 +182,22 @@ void Layer::onMeasure(LayoutContext*) {
 }
 
 void Layer::setLayoutSize(LayoutContext* context, float targetWidth, float targetHeight) {
-  layoutWidth = !std::isnan(targetWidth) ? targetWidth : preferredWidth;
-  layoutHeight = !std::isnan(targetHeight) ? targetHeight : preferredHeight;
+  // A content-measured axis is one the parent did not constrain and the layer did not author.
+  // For a non-flex layer, keep such axes NaN during the first updateLayout so percent-sized
+  // descendants fall back to their preferred size instead of locking onto a provisional value
+  // derived from this layer's onMeasure. After the first pass, refine the axis from children's
+  // actual bounds and run updateLayout again so size-dependent descendants pick up the final
+  // container size. Flex layers keep the provisional size on both axes because their child
+  // allocation logic requires numeric main-axis dimensions.
+  bool widthFromContent = std::isnan(targetWidth) && std::isnan(this->width);
+  bool heightFromContent = std::isnan(targetHeight) && std::isnan(this->height);
+  // A Layer that references a Composition takes its preferred size from that Composition, so it
+  // is not a content-measured axis; do not defer in that case.
+  bool canDefer = layout == LayoutMode::None && composition == nullptr;
+  bool deferWidth = widthFromContent && canDefer;
+  bool deferHeight = heightFromContent && canDefer;
+  layoutWidth = deferWidth ? NAN : (!std::isnan(targetWidth) ? targetWidth : preferredWidth);
+  layoutHeight = deferHeight ? NAN : (!std::isnan(targetHeight) ? targetHeight : preferredHeight);
   if (clipToBounds && !hasScrollRect && !std::isnan(layoutWidth) && !std::isnan(layoutHeight)) {
     scrollRect = Rect::MakeXYWH(0, 0, layoutWidth, layoutHeight);
     hasScrollRect = true;
@@ -192,71 +206,89 @@ void Layer::setLayoutSize(LayoutContext* context, float targetWidth, float targe
   // An axis is content-measured when neither the parent nor this layer authored its size. When
   // one axis was forced by the parent, re-measure the content-measured axis from children's
   // actual layout sizes to reflect wrapping / flex redistribution.
-  bool widthFromContent = std::isnan(targetWidth) && std::isnan(this->width);
-  bool heightFromContent = std::isnan(targetHeight) && std::isnan(this->height);
   bool sizeChanged = (!std::isnan(targetWidth) && targetWidth != preferredWidth) ||
                      (!std::isnan(targetHeight) && targetHeight != preferredHeight);
-  if ((widthFromContent || heightFromContent) && sizeChanged) {
-    float maxX = 0;
-    float maxY = 0;
-    for (auto* element : contents) {
-      auto* node = LayoutNode::AsLayoutNode(element);
-      if (node == nullptr) {
+  if (!(widthFromContent || heightFromContent) || (!deferWidth && !deferHeight && !sizeChanged)) {
+    return;
+  }
+  float maxX = 0;
+  float maxY = 0;
+  for (auto* element : contents) {
+    auto* node = LayoutNode::AsLayoutNode(element);
+    if (node == nullptr) {
+      continue;
+    }
+    // Match Layer::onMeasure / MeasureChildNodes: unconstrained nodes use their preferredX/Y as
+    // extent origin (so an element authored with a negative preferredY like a centered Path is
+    // not measured as if it started at 0).
+    float extX = node->hasConstraints() ? node->constraintExtentX() : node->preferredX;
+    float extY = node->hasConstraints() ? node->constraintExtentY() : node->preferredY;
+    extX += node->layoutBounds().width;
+    extY += node->layoutBounds().height;
+    maxX = std::max(maxX, extX);
+    maxY = std::max(maxY, extY);
+  }
+  if (layout != LayoutMode::None && !children.empty()) {
+    bool horizontal = (layout == LayoutMode::Horizontal);
+    float totalMain = 0;
+    float maxCross = 0;
+    size_t visibleCount = 0;
+    for (auto* child : children) {
+      if (!child->includeInLayout) {
         continue;
       }
-      float extX = node->hasConstraints() ? node->constraintExtentX() : 0;
-      float extY = node->hasConstraints() ? node->constraintExtentY() : 0;
-      extX += node->layoutBounds().width;
-      extY += node->layoutBounds().height;
+      visibleCount++;
+      float childMain = horizontal ? child->layoutWidth : child->layoutHeight;
+      float childCross = horizontal ? child->layoutHeight : child->layoutWidth;
+      totalMain += childMain;
+      maxCross = std::max(maxCross, childCross);
+    }
+    float totalGap = gap * static_cast<float>(visibleCount > 1 ? visibleCount - 1 : 0);
+    float mainSize = totalMain + totalGap +
+                     (horizontal ? padding.left + padding.right : padding.top + padding.bottom);
+    float crossSize =
+        maxCross + (horizontal ? padding.top + padding.bottom : padding.left + padding.right);
+    if (horizontal) {
+      maxX = std::max(maxX, mainSize);
+      maxY = std::max(maxY, crossSize);
+    } else {
+      maxY = std::max(maxY, mainSize);
+      maxX = std::max(maxX, crossSize);
+    }
+  } else {
+    for (auto* child : children) {
+      if (!child->includeInLayout) {
+        continue;
+      }
+      float extX = child->constraintExtentX() + child->layoutWidth;
+      float extY = child->constraintExtentY() + child->layoutHeight;
       maxX = std::max(maxX, extX);
       maxY = std::max(maxY, extY);
     }
-    if (layout != LayoutMode::None && !children.empty()) {
-      bool horizontal = (layout == LayoutMode::Horizontal);
-      float totalMain = 0;
-      float maxCross = 0;
-      size_t visibleCount = 0;
-      for (auto* child : children) {
-        if (!child->includeInLayout) {
-          continue;
-        }
-        visibleCount++;
-        float childMain = horizontal ? child->layoutWidth : child->layoutHeight;
-        float childCross = horizontal ? child->layoutHeight : child->layoutWidth;
-        totalMain += childMain;
-        maxCross = std::max(maxCross, childCross);
-      }
-      float totalGap = gap * static_cast<float>(visibleCount > 1 ? visibleCount - 1 : 0);
-      float mainSize = totalMain + totalGap +
-                       (horizontal ? padding.left + padding.right : padding.top + padding.bottom);
-      float crossSize =
-          maxCross + (horizontal ? padding.top + padding.bottom : padding.left + padding.right);
-      if (horizontal) {
-        maxX = std::max(maxX, mainSize);
-        maxY = std::max(maxY, crossSize);
-      } else {
-        maxY = std::max(maxY, mainSize);
-        maxX = std::max(maxX, crossSize);
-      }
-    } else {
-      for (auto* child : children) {
-        if (!child->includeInLayout) {
-          continue;
-        }
-        float extX = child->constraintExtentX() + child->layoutWidth;
-        float extY = child->constraintExtentY() + child->layoutHeight;
-        maxX = std::max(maxX, extX);
-        maxY = std::max(maxY, extY);
-      }
-      maxX += padding.left + padding.right;
-      maxY += padding.top + padding.bottom;
+    maxX += padding.left + padding.right;
+    maxY += padding.top + padding.bottom;
+  }
+  float prevW = layoutWidth;
+  float prevH = layoutHeight;
+  if (widthFromContent) {
+    layoutWidth = maxX;
+  }
+  if (heightFromContent) {
+    layoutHeight = maxY;
+  }
+  // If we deferred an axis to NaN in pass 1, we must run updateLayout again with the refined
+  // numeric value so size-dependent descendants (e.g. width/height=100%) pick it up.
+  bool needSecondPass = (deferWidth && !std::isnan(layoutWidth) && layoutWidth != prevW) ||
+                        (deferHeight && !std::isnan(layoutHeight) && layoutHeight != prevH);
+  if (needSecondPass) {
+    if (clipToBounds && hasScrollRect) {
+      scrollRect = Rect::MakeXYWH(0, 0, layoutWidth, layoutHeight);
+    } else if (clipToBounds && !hasScrollRect && !std::isnan(layoutWidth) &&
+               !std::isnan(layoutHeight)) {
+      scrollRect = Rect::MakeXYWH(0, 0, layoutWidth, layoutHeight);
+      hasScrollRect = true;
     }
-    if (widthFromContent) {
-      layoutWidth = std::ceil(maxX);
-    }
-    if (heightFromContent) {
-      layoutHeight = std::ceil(maxY);
-    }
+    updateLayout(context);
   }
 }
 
