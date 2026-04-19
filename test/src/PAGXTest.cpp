@@ -5266,6 +5266,13 @@ h1{text-align:center;color:#1e293b;margin-bottom:4px}
 )";
 
   int count = 0;
+  // Collect HTML screenshot jobs here and submit them to screenshot.js in a single batch
+  // once all PAGX files are processed. Launching Chromium per file used to dominate the
+  // runtime (~2-4s startup x 70+ files) and produced sporadic `Page.captureScreenshot timed
+  // out` failures; a single-browser batch fixes both.
+  std::string screenshotTasks;
+  int screenshotTaskCount = 0;
+
   for (const auto& dirInfo : directories) {
     std::vector<std::string> files;
     if (!std::filesystem::exists(dirInfo.path)) {
@@ -5343,14 +5350,17 @@ h1{text-align:center;color:#1e293b;margin-bottom:4px}
         hf.write(htmlContent.data(), static_cast<std::streamsize>(htmlContent.size()));
       }
 
-      // Generate HTML screenshot at 2x resolution
+      // Queue the HTML screenshot job. Actual Chromium work happens once per batch below.
       auto htmlPngHires = outDir + "/" + baseName + "_html2x.png";
       if (std::filesystem::exists(htmlPath)) {
-        auto scriptPath = ProjectPath::Absolute("test/screenshot.js");
-        auto cmd = "node " + scriptPath + " " + htmlPath + " " + htmlPngHires + " " +
-                   std::to_string(w) + " " + std::to_string(h) + " " + std::to_string(scale) +
-                   " 2>&1";
-        std::system(cmd.c_str());
+        if (screenshotTaskCount > 0) {
+          screenshotTasks += ",";
+        }
+        screenshotTasks += "{\"html\":\"" + htmlPath + "\",\"png\":\"" + htmlPngHires +
+                           "\",\"width\":" + std::to_string(w) +
+                           ",\"height\":" + std::to_string(h) +
+                           ",\"scale\":" + std::to_string(scale) + "}";
+        screenshotTaskCount++;
       }
 
       page += "<div class=\"card\" id=\"" + baseName + "\">\n";
@@ -5365,6 +5375,18 @@ h1{text-align:center;color:#1e293b;margin-bottom:4px}
       page += "  </div>\n</div>\n";
       count++;
     }
+  }
+
+  // Execute all HTML screenshots in a single Chromium session. Falling back to per-file
+  // calls here would reintroduce the cold-start flakiness we just eliminated.
+  if (screenshotTaskCount > 0) {
+    auto tasksPath = outDir + "/screenshot_tasks.json";
+    std::ofstream tf(tasksPath, std::ios::binary);
+    tf << "[" << screenshotTasks << "]";
+    tf.close();
+    auto scriptPath = ProjectPath::Absolute("test/screenshot.js");
+    auto cmd = "node " + scriptPath + " --batch " + tasksPath;
+    std::system(cmd.c_str());
   }
 
   page += "<p class=\"sub\">" + std::to_string(count) + " files compared</p></body></html>";
