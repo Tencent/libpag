@@ -174,8 +174,11 @@ class HTMLWriter {
     std::string modifiedPathData = {};
   };
 
-  // Color source conversions
-  std::string colorToCSS(const ColorSource* src, float* outAlpha);
+  // Color source conversions. `boxWidth`/`boxHeight` are the element box the CSS background
+  // will paint into; they are used by linear-gradient to emulate PAGX's startPoint/endPoint
+  // clamping behaviour. Pass 0 when the box is unknown or irrelevant (e.g. SVG paths).
+  std::string colorToCSS(const ColorSource* src, float* outAlpha, float boxWidth = 0,
+                         float boxHeight = 0);
   std::string colorToSVGFill(const ColorSource* src, float* outAlpha);
   void writeSVGGradientDef(const ColorSource* src, const std::string& id);
 

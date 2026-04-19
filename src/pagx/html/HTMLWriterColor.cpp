@@ -33,7 +33,8 @@ namespace pagx {
 
 using pag::FloatNearlyZero;
 
-std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha) {
+std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, float boxWidth,
+                                   float boxHeight) {
   if (!src) {
     if (outAlpha) {
       *outAlpha = 1.0f;
@@ -67,6 +68,59 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha) {
       Point s = g->matrix.mapPoint(g->startPoint);
       Point e = g->matrix.mapPoint(g->endPoint);
       float ang = std::atan2(e.y - s.y, e.x - s.x) * 180.0f / static_cast<float>(M_PI) + 90.0f;
+
+      // CSS linear-gradient's 0% and 100% anchors sit on the gradient line drawn through the
+      // box centre; the line's length L = |w * sin(angle)| + |h * cos(angle)|. PAGX's
+      // startPoint/endPoint are arbitrary points in element-local coordinates. Project both
+      // onto the CSS gradient line to obtain their percentages, then emit additional clamp
+      // stops so the gradient matches tgfx's semantics (first stop everywhere before
+      // startPoint, last stop everywhere after endPoint). When the box size is unknown,
+      // fall back to the plain angle form — still wrong geometrically but matches legacy
+      // output for callers that cannot provide a size (e.g. SVG path fills).
+      if (boxWidth > 0 && boxHeight > 0 && !g->colorStops.empty()) {
+        float angleRad = ang * static_cast<float>(M_PI) / 180.0f;
+        // CSS gradient direction: 0deg points up, 90deg points right. The unit vector
+        // along the gradient line (pointing from 0% to 100%) is (sin(a), -cos(a)).
+        float dirX = std::sin(angleRad);
+        float dirY = -std::cos(angleRad);
+        float lineLength = std::abs(boxWidth * dirX) + std::abs(boxHeight * dirY);
+        if (lineLength > 0) {
+          float cx = boxWidth * 0.5f;
+          float cy = boxHeight * 0.5f;
+          // 0% end of the CSS gradient line in element-local coords.
+          float lineStartX = cx - dirX * lineLength * 0.5f;
+          float lineStartY = cy - dirY * lineLength * 0.5f;
+          // Project PAGX start/end points onto the line and normalise to [0, 1].
+          float startT = ((s.x - lineStartX) * dirX + (s.y - lineStartY) * dirY) / lineLength;
+          float endT = ((e.x - lineStartX) * dirX + (e.y - lineStartY) * dirY) / lineLength;
+          if (std::abs(endT - startT) > 1e-4f) {
+            auto* firstStop = g->colorStops.front();
+            auto* lastStop = g->colorStops.back();
+            std::string stops;
+            // Leading clamp region: 0%..startT filled with the first stop colour.
+            if (startT > 0.0f) {
+              stops += ColorToRGBA(firstStop->color) + " 0%," + ColorToRGBA(firstStop->color) +
+                       " " + FloatToString(startT * 100.0f) + "%";
+            }
+            // Re-emit stops mapped onto [startT, endT].
+            for (size_t i = 0; i < g->colorStops.size(); i++) {
+              float mapped = startT + g->colorStops[i]->offset * (endT - startT);
+              if (!stops.empty()) {
+                stops += ",";
+              }
+              stops +=
+                  ColorToRGBA(g->colorStops[i]->color) + " " + FloatToString(mapped * 100.0f) + "%";
+            }
+            // Trailing clamp region: endT..100% filled with the last stop colour.
+            if (endT < 1.0f) {
+              stops += "," + ColorToRGBA(lastStop->color) + " " + FloatToString(endT * 100.0f) +
+                       "%," + ColorToRGBA(lastStop->color) + " 100%";
+            }
+            return "linear-gradient(" + FloatToString(ang) + "deg," + stops + ")";
+          }
+        }
+      }
+
       return "linear-gradient(" + FloatToString(ang) + "deg," + CSSStops(g->colorStops) + ")";
     }
     case NodeType::RadialGradient: {

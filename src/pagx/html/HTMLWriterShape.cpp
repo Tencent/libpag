@@ -1104,7 +1104,7 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
   if (fill) {
     if (fill->color) {
       float ca = 1.0f;
-      std::string css = colorToCSS(fill->color, &ca);
+      std::string css = colorToCSS(fill->color, &ca, w, h);
       auto ct = fill->color->nodeType();
       if (ct == NodeType::LinearGradient || ct == NodeType::RadialGradient ||
           ct == NodeType::ConicGradient) {
