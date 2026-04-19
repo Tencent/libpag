@@ -1582,6 +1582,15 @@ static bool RectsOverlap(const SpatialRect& a, const SpatialRect& b) {
   return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
 }
 
+// Sibling overlap needs a small tolerance because auto-layout rounds child positions to integers
+// while child sizes can carry fractional text-measurement remainders. Adjacent siblings may then
+// appear to overlap by a fraction of a pixel even though the layout is visually correct.
+static bool SiblingsOverlap(const SpatialRect& a, const SpatialRect& b) {
+  constexpr float TOLERANCE = 0.5f;
+  return a.x + TOLERANCE < b.x + b.width && a.x + a.width > b.x + TOLERANCE &&
+         a.y + TOLERANCE < b.y + b.height && a.y + a.height > b.y + TOLERANCE;
+}
+
 static bool IsFullyContained(const SpatialRect& parent, const SpatialRect& child) {
   static constexpr float TOLERANCE = 0.5f;
   return (child.x + TOLERANCE) >= parent.x && (child.y + TOLERANCE) >= parent.y &&
@@ -1886,7 +1895,7 @@ static void DetectOverlappingSiblings(const Layer* parentLayer,
   }
   for (size_t i = 0; i < layoutChildren.size(); i++) {
     for (size_t j = i + 1; j < layoutChildren.size(); j++) {
-      if (RectsOverlap(layoutChildren[i].second, layoutChildren[j].second)) {
+      if (SiblingsOverlap(layoutChildren[i].second, layoutChildren[j].second)) {
         auto& a = layoutChildren[i];
         auto& b = layoutChildren[j];
         std::vector<int> lines = {a.first->sourceLine, b.first->sourceLine};
