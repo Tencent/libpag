@@ -71,12 +71,25 @@ void TextBox::onMeasure(LayoutContext* context) {
 }
 
 void TextBox::setLayoutSize(LayoutContext* context, float targetWidth, float targetHeight) {
-  layoutWidth = !std::isnan(targetWidth) ? targetWidth : preferredWidth;
-  layoutHeight = !std::isnan(targetHeight) ? targetHeight : preferredHeight;
-  updateLayout(context);
-  // An axis is content-measured when neither the parent nor the TextBox authored its size.
+  // Mirror Group::setLayoutSize: keep content-measured axes NaN during pass 1 so percent
+  // descendants fall back to their preferred size instead of locking onto a provisional value.
   bool widthFromContent = std::isnan(targetWidth) && std::isnan(this->width);
   bool heightFromContent = std::isnan(targetHeight) && std::isnan(this->height);
+  layoutWidth = widthFromContent ? NAN : (!std::isnan(targetWidth) ? targetWidth : preferredWidth);
+  layoutHeight =
+      heightFromContent ? NAN : (!std::isnan(targetHeight) ? targetHeight : preferredHeight);
+  updateLayout(context);
+  // Settle deferred axes to the preferred size and re-run updateLayout so descendants pick up
+  // the numeric container size before the cross-axis re-typesetting below.
+  if (widthFromContent || heightFromContent) {
+    if (widthFromContent) {
+      layoutWidth = preferredWidth;
+    }
+    if (heightFromContent) {
+      layoutHeight = preferredHeight;
+    }
+    updateLayout(context);
+  }
   // For TextBox, only a change in the wrap axis (width for horizontal, height for vertical)
   // can affect the cross axis measurement. Re-typeset to compute the correct cross-axis size,
   // then re-run updateLayout so non-Text descendants pick up the refined container size.
