@@ -135,13 +135,13 @@ void LayoutNode::PerformConstraintLayout(const std::vector<LayoutNode*>& nodes, 
     // preferred size during onMeasure(), so passing NAN lets setLayoutSize fall back to it.
     float targetW = NAN;
     if (!std::isnan(child->left) && !std::isnan(child->right)) {
-      targetW = std::max(0.0f, std::ceil(cw - child->left - child->right));
+      targetW = std::isnan(cw) ? NAN : std::max(0.0f, std::ceil(cw - child->left - child->right));
     } else if (!std::isnan(child->percentWidth)) {
       targetW = std::ceil(cw * child->percentWidth / 100.0f);
     }
     float targetH = NAN;
     if (!std::isnan(child->top) && !std::isnan(child->bottom)) {
-      targetH = std::max(0.0f, std::ceil(ch - child->top - child->bottom));
+      targetH = std::isnan(ch) ? NAN : std::max(0.0f, std::ceil(ch - child->top - child->bottom));
     } else if (!std::isnan(child->percentHeight)) {
       targetH = std::ceil(ch * child->percentHeight / 100.0f);
     }
