@@ -246,6 +246,8 @@ serves as their container size.
 **Per-axis rules** — use only one combination per axis:
 - Single edge alone → position only
 - Opposite pair (`left`+`right`) → derives size AND positions
+- `width` alone (pixels or `%`) → sets size only; position defaults to the container origin (inside padding)
+- Single edge + `width` (e.g., `left="10" width="100"`) → edge positions, `width` sizes (the opposite edge/centerX is unused)
 - `centerX` overrides `left`/`right` silently (avoid mixing)
 
 **Priority**: `centerX` > `left`+`right` > `left` > `right` (same for vertical).
