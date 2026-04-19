@@ -184,12 +184,16 @@ class Layer : public Node, public LayoutNode {
   Padding padding = {};
 
   /**
-   * The alignment of child elements along the cross axis. The default value is Stretch.
+   * The alignment of child elements along the cross axis. The default value is Stretch. A flex
+   * child with an explicit or percentage main/cross size retains that size and is not stretched
+   * by `Stretch` alignment.
    */
   Alignment alignment = Alignment::Stretch;
 
   /**
-   * The arrangement of child elements along the main axis. The default value is Start.
+   * The arrangement of child elements along the main axis. The default value is Start. A flex
+   * child with an explicit or percentage main/cross size retains that size and is not stretched
+   * by `Stretch` alignment.
    */
   Arrangement arrangement = Arrangement::Start;
 
