@@ -360,6 +360,19 @@ std::string FloatToString(float value) {
   return std::string(buf);
 }
 
+std::string CoordToString(float value) {
+  if (std::isnan(value) || std::isinf(value)) {
+    return "0";
+  }
+  float rounded = std::round(value * 100.0f) / 100.0f;
+  if (rounded == 0.0f) {
+    rounded = 0.0f;
+  }
+  char buf[32] = {};
+  snprintf(buf, sizeof(buf), "%g", rounded);
+  return std::string(buf);
+}
+
 Padding PaddingFromString(const std::string& str) {
   auto values = ParseFloatList(str);
   Padding p = {};
