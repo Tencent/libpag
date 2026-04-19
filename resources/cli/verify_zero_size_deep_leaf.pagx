@@ -4,7 +4,7 @@
   <Layer width="400" height="300">
     <Layer width="0" height="100" layout="vertical">
       <Layer flex="1">
-        <Rectangle size="80,40"/>
+        <Rectangle width="80" height="40"/>
         <Fill color="#EF4444"/>
       </Layer>
     </Layer>

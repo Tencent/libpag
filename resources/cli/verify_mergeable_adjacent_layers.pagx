@@ -3,23 +3,23 @@
 <pagx width="400" height="300">
   <Layer name="root" width="400" height="300">
     <Layer>
-      <Rectangle size="100,50"/>
+      <Rectangle width="100" height="50"/>
       <Fill color="#FF0000"/>
     </Layer>
     <Layer>
-      <Rectangle size="100,50"/>
+      <Rectangle width="100" height="50"/>
       <Fill color="#00FF00"/>
     </Layer>
     <Layer name="important" blendMode="multiply">
-      <Rectangle size="100,50"/>
+      <Rectangle width="100" height="50"/>
       <Fill color="#0000FF"/>
     </Layer>
     <Layer>
-      <Rectangle size="80,40"/>
+      <Rectangle width="80" height="40"/>
       <Fill color="#FFFF00"/>
     </Layer>
     <Layer>
-      <Rectangle size="80,40"/>
+      <Rectangle width="80" height="40"/>
       <Fill color="#FF00FF"/>
     </Layer>
   </Layer>

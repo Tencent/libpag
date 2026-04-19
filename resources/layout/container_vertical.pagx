@@ -2,40 +2,40 @@
 <!-- Vertical layout: arrangement and alignment combinations -->
 <pagx width="440" height="520">
   <!-- Background -->
-  <Layer left="0" right="0" top="0" bottom="0">
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
+  <Layer width="100%" height="100%">
+    <Rectangle width="100%" height="100%"/>
     <Fill color="#F8FAFC"/>
   </Layer>
 
-  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30">
+  <Layer width="100%" height="100%" layout="vertical" gap="20" padding="30">
     <!-- Row 1 -->
     <Layer flex="1" layout="horizontal" gap="20">
       <!-- 1. Vertical arrangement=center: two items centered vertically -->
       <Layer width="180" height="220" layout="vertical" gap="10" arrangement="center">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Rectangle width="100%" height="100%" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer width="160" height="60">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Rectangle width="100%" height="100%" roundness="8"/>
           <Fill color="#6366F1"/>
         </Layer>
         <Layer width="160" height="80">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Rectangle width="100%" height="100%" roundness="8"/>
           <Fill color="#F43F5E"/>
         </Layer>
       </Layer>
 
       <!-- 2. Vertical arrangement=end: two items pushed to bottom -->
       <Layer width="180" height="220" layout="vertical" gap="10" arrangement="end">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Rectangle width="100%" height="100%" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer width="160" height="60">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Rectangle width="100%" height="100%" roundness="8"/>
           <Fill color="#6366F1"/>
         </Layer>
         <Layer width="160" height="80">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Rectangle width="100%" height="100%" roundness="8"/>
           <Fill color="#F43F5E"/>
         </Layer>
       </Layer>
@@ -45,38 +45,38 @@
     <Layer flex="1" layout="horizontal" gap="20">
       <!-- 3. Vertical alignment=center: cross-axis (X) centering with different widths -->
       <Layer width="180" height="220" layout="vertical" gap="10" alignment="center">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Rectangle width="100%" height="100%" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer width="80" height="60">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Rectangle width="100%" height="100%" roundness="8"/>
           <Fill color="#10B981"/>
         </Layer>
         <Layer width="140" height="60">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Rectangle width="100%" height="100%" roundness="8"/>
           <Fill color="#F59E0B"/>
         </Layer>
         <Layer width="60" height="60">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Rectangle width="100%" height="100%" roundness="8"/>
           <Fill color="#06B6D4"/>
         </Layer>
       </Layer>
 
       <!-- 4. Vertical alignment=end: cross-axis (X) right-aligned -->
       <Layer width="180" height="220" layout="vertical" gap="10" alignment="end">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Rectangle width="100%" height="100%" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer width="80" height="60">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Rectangle width="100%" height="100%" roundness="8"/>
           <Fill color="#10B981"/>
         </Layer>
         <Layer width="140" height="60">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Rectangle width="100%" height="100%" roundness="8"/>
           <Fill color="#F59E0B"/>
         </Layer>
         <Layer width="60" height="60">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Rectangle width="100%" height="100%" roundness="8"/>
           <Fill color="#06B6D4"/>
         </Layer>
       </Layer>

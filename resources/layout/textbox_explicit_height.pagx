@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- TextBox with explicit height=60 and left+right constraints. Height should be preserved. -->
 <pagx width="300" height="140">
-  <Layer left="0" right="0" top="0" bottom="0">
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
+  <Layer width="100%" height="100%">
+    <Rectangle width="100%" height="100%"/>
     <Fill color="#F8FAFC"/>
   </Layer>
   <Layer centerX="0" centerY="0" width="260" height="100">
-    <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+    <Rectangle width="100%" height="100%" roundness="8"/>
     <Fill color="#E2E8F0"/>
     <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
     <TextBox left="12" right="12" top="12" bottom="12" height="60">
