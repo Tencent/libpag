@@ -59,7 +59,7 @@ linebox model), so use larger horizontal than vertical padding for visually equa
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="120" height="40">
-  <Layer layout="horizontal" gap="8" padding="12" alignment="center">
+  <Layer layout="horizontal" gap="8" padding="8" alignment="center">
     <Layer>
       <Ellipse width="24" height="24"/>
       <Fill color="#10B981"/>
