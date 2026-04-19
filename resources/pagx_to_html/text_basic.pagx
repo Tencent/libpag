@@ -53,13 +53,13 @@
       </Layer>
 
       <!-- textAnchor=end -->
-      <Layer layout="vertical" gap="2" alignment="end">
+      <Layer layout="vertical" gap="2">
         <Layer height="28">
-          <Text text="Right Aligned" fontFamily="Arial" fontSize="24" textAnchor="end"/>
+          <Text text="Right Aligned" fontFamily="Arial" fontSize="24" right="0" textAnchor="end"/>
           <Fill color="#10B981"/>
         </Layer>
         <Layer height="10">
-          <Text text="end" fontFamily="Arial" fontSize="8" textAnchor="end"/>
+          <Text text="end" fontFamily="Arial" fontSize="8" right="0" textAnchor="end"/>
           <Fill color="#94A3B8"/>
         </Layer>
       </Layer>
