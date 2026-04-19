@@ -1654,6 +1654,32 @@ static bool ElementsHaveLeafContent(const std::vector<Element*>& elements) {
   return false;
 }
 
+// Checks whether a child LayoutNode's width/height depends on its parent's resolved size through
+// opposite-edge, centering, or percent constraints. Accumulates the result into the provided
+// output flags (existing true values are preserved).
+static void UpdateSizeDependenciesFromLayoutNode(const LayoutNode* node, bool* outDependsOnW,
+                                                 bool* outDependsOnH) {
+  if (!std::isnan(node->right) || !std::isnan(node->centerX) || !std::isnan(node->percentWidth)) {
+    *outDependsOnW = true;
+  }
+  if (!std::isnan(node->bottom) || !std::isnan(node->centerY) || !std::isnan(node->percentHeight)) {
+    *outDependsOnH = true;
+  }
+}
+
+// Walks a list of child elements and accumulates whether any of them depend on the parent's
+// resolved size through size-sensitive layout constraints.
+static void CollectChildrenSizeDependencies(const std::vector<Element*>& elements,
+                                            bool* outDependsOnW, bool* outDependsOnH) {
+  for (auto* element : elements) {
+    auto* node = LayoutNode::AsLayoutNode(element);
+    if (node == nullptr) {
+      continue;
+    }
+    UpdateSizeDependenciesFromLayoutNode(node, outDependsOnW, outDependsOnH);
+  }
+}
+
 static void DetectZeroSizeGroup(const Group* group, std::vector<VerifyDiagnostic>& diagnostics) {
   auto bounds = group->layoutBounds();
   if (bounds.width != 0 && bounds.height != 0) {
@@ -1676,19 +1702,7 @@ static void DetectZeroSizeGroup(const Group* group, std::vector<VerifyDiagnostic
   // or percent).
   bool childrenDependOnWidth = false;
   bool childrenDependOnHeight = false;
-  for (auto* element : group->elements) {
-    auto* node = LayoutNode::AsLayoutNode(element);
-    if (node == nullptr) {
-      continue;
-    }
-    if (!std::isnan(node->right) || !std::isnan(node->centerX) || !std::isnan(node->percentWidth)) {
-      childrenDependOnWidth = true;
-    }
-    if (!std::isnan(node->bottom) || !std::isnan(node->centerY) ||
-        !std::isnan(node->percentHeight)) {
-      childrenDependOnHeight = true;
-    }
-  }
+  CollectChildrenSizeDependencies(group->elements, &childrenDependOnWidth, &childrenDependOnHeight);
   bool zeroWidthMatters = bounds.width == 0 && childrenDependOnWidth;
   bool zeroHeightMatters = bounds.height == 0 && childrenDependOnHeight;
   if (!zeroWidthMatters && !zeroHeightMatters) {
@@ -1728,14 +1742,7 @@ static void DetectZeroSize(const Layer* layer, const Layer* parentLayer,
   bool childrenDependOnWidth = false;
   bool childrenDependOnHeight = false;
   for (auto* child : layer->children) {
-    if (!std::isnan(child->right) || !std::isnan(child->centerX) ||
-        !std::isnan(child->percentWidth)) {
-      childrenDependOnWidth = true;
-    }
-    if (!std::isnan(child->bottom) || !std::isnan(child->centerY) ||
-        !std::isnan(child->percentHeight)) {
-      childrenDependOnHeight = true;
-    }
+    UpdateSizeDependenciesFromLayoutNode(child, &childrenDependOnWidth, &childrenDependOnHeight);
     if (child->flex > 0 && layer->layout == LayoutMode::Horizontal) {
       childrenDependOnWidth = true;
     }
@@ -1745,19 +1752,7 @@ static void DetectZeroSize(const Layer* layer, const Layer* parentLayer,
   }
   // VectorElements in layer->contents also consult the parent size for opposite-edge or percent
   // constraints — treat them as size-dependent too.
-  for (auto* element : layer->contents) {
-    auto* node = LayoutNode::AsLayoutNode(element);
-    if (node == nullptr) {
-      continue;
-    }
-    if (!std::isnan(node->right) || !std::isnan(node->centerX) || !std::isnan(node->percentWidth)) {
-      childrenDependOnWidth = true;
-    }
-    if (!std::isnan(node->bottom) || !std::isnan(node->centerY) ||
-        !std::isnan(node->percentHeight)) {
-      childrenDependOnHeight = true;
-    }
-  }
+  CollectChildrenSizeDependencies(layer->contents, &childrenDependOnWidth, &childrenDependOnHeight);
   bool zeroWidthMatters = bounds.width == 0 && (hasLayoutChildren || childrenDependOnWidth);
   bool zeroHeightMatters = bounds.height == 0 && (hasLayoutChildren || childrenDependOnHeight);
   if (!zeroWidthMatters && !zeroHeightMatters && !inParentLayout) {
@@ -2061,8 +2056,8 @@ static void DetectConstraintConflicts(const LayoutNode* node, int sourceLine,
 // left+right > percentWidth > authored width (top+bottom analogous for height), so when both
 // opposite edges are set the authored width/height contributes nothing. percentWidth/percentHeight
 // collisions are reported by DetectConstraintConflicts for all LayoutNode types.
-static void DetectExplicitSizeShadowedByOppositeEdge(
-    const LayoutNode* node, int sourceLine, std::vector<VerifyDiagnostic>& diagnostics) {
+static void DetectExplicitSizeShadowedByOppositeEdge(const LayoutNode* node, int sourceLine,
+                                                     std::vector<VerifyDiagnostic>& diagnostics) {
   bool wFromConstraints = !std::isnan(node->left) && !std::isnan(node->right);
   bool hFromConstraints = !std::isnan(node->top) && !std::isnan(node->bottom);
   if (wFromConstraints && !std::isnan(node->width)) {
