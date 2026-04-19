@@ -18,6 +18,7 @@
 
 #include "pagx/PAGXImporter.h"
 #include <climits>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -359,44 +360,40 @@ static float GetFloatAttributeOrNaN(const DOMNode* node, const std::string& name
 // Parses a dimension attribute that may contain a percentage suffix (e.g. "100" or "50%").
 // - When the value ends with "%": writes the numeric part to *outPercent and returns NAN.
 // - Otherwise: writes NAN to *outPercent and returns the numeric value.
-// Invalid values report an error and return NAN on both outputs.
+// Inputs forbidden by the XSD DimensionType pattern "[0-9]*\.?[0-9]+%?" (leading whitespace,
+// sign, hex prefix, non-finite, negative, whitespace around the "%") are treated as absent:
+// both outputs are set to NaN without reporting an error.
 static float GetDimensionAttribute(const DOMNode* node, const std::string& name, float* outPercent,
-                                   PAGXDocument* doc) {
+                                   PAGXDocument* /*doc*/) {
+  *outPercent = NAN;
   auto* str = node->findAttribute(name);
   if (str == nullptr || str->empty()) {
-    *outPercent = NAN;
     return NAN;
   }
   const char* cstr = str->c_str();
-  char* endPtr = nullptr;
-  float value = strtof(cstr, &endPtr);
-  if (endPtr == cstr) {
-    ReportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
-    *outPercent = NAN;
+  // Reject leading whitespace, sign, and hex prefix; strtof would otherwise accept them.
+  char first = cstr[0];
+  if (first == ' ' || first == '\t' || first == '+' || first == '-') {
     return NAN;
   }
-  while (*endPtr == ' ' || *endPtr == '\t') {
-    endPtr++;
+  if (first == '0' && (cstr[1] == 'x' || cstr[1] == 'X')) {
+    return NAN;
+  }
+  char* endPtr = nullptr;
+  float value = strtof(cstr, &endPtr);
+  if (endPtr == cstr || !std::isfinite(value) || value < 0) {
+    return NAN;
   }
   if (*endPtr == '%') {
-    endPtr++;
-    while (*endPtr == ' ' || *endPtr == '\t') {
-      endPtr++;
-    }
-    if (*endPtr != '\0') {
-      ReportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
-      *outPercent = NAN;
+    if (endPtr[1] != '\0') {
       return NAN;
     }
     *outPercent = value;
     return NAN;
   }
   if (*endPtr != '\0') {
-    ReportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
-    *outPercent = NAN;
     return NAN;
   }
-  *outPercent = NAN;
   return value;
 }
 
