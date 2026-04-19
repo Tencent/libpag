@@ -84,10 +84,10 @@ void Group::setLayoutSize(LayoutContext* context, float targetWidth, float targe
   float prevW = layoutWidth;
   float prevH = layoutHeight;
   if (widthFromContent) {
-    layoutWidth = maxX;
+    layoutWidth = std::ceil(maxX);
   }
   if (heightFromContent) {
-    layoutHeight = maxY;
+    layoutHeight = std::ceil(maxY);
   }
   if ((widthFromContent && layoutWidth != prevW) || (heightFromContent && layoutHeight != prevH)) {
     updateLayout(context);
