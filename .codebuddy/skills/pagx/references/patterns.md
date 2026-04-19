@@ -20,7 +20,7 @@ Layers in rows or columns, and constraint positioning for positioning elements w
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="300" height="20">
-  <Layer width="260" centerX="0" centerY="0">
+  <Layer centerX="0" centerY="0" width="260">
     <Rectangle width="100%" height="1"/>
     <Fill color="#E2E8F0"/>
   </Layer>
@@ -128,14 +128,14 @@ No Group needed when only one painter scope exists.
     <!-- Underline: same color — Text + Rectangle + single Fill -->
     <Layer>
       <Text text="View All" fontFamily="Arial" fontSize="14"/>
-      <Rectangle width="100%" bottom="0" height="1"/>
+      <Rectangle bottom="0" width="100%" height="1"/>
       <Fill color="#3B82F6"/>
     </Layer>
     <!-- Strikethrough: different colors — Group isolates line's Fill -->
     <Layer>
       <Text text="¥599" fontFamily="Arial" fontSize="16"/>
       <Fill color="#BDC3C7"/>
-      <Group width="100%" centerY="0">
+      <Group centerY="0" width="100%">
         <Rectangle width="100%" height="1"/>
         <Fill color="#FF4757"/>
       </Group>
@@ -356,7 +356,7 @@ any repeated element: cards, list items, grid cells.
     <Layer width="100%" height="100%" padding="20">
       <Layer width="100%" height="100%" layout="horizontal" alignment="center" arrangement="spaceAround">
         <!-- Top-round shape: intersect rounded rect with straight rect to flatten bottom -->
-        <Rectangle width="100%" top="0" bottom="-20" roundness="20"/>
+        <Rectangle top="0" bottom="-20" width="100%" roundness="20"/>
         <Rectangle width="100%" height="100%"/>
         <MergePath mode="intersect"/>
         <Fill color="#FFF"/>
