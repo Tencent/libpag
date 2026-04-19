@@ -1204,7 +1204,7 @@ Different modifiers have different scopes over elements in the geometry list:
 
 ### 6.2 Geometry Elements
 
-Geometry elements provide renderable shapes. All geometry elements, as well as TextPath, TextBox, and Group, support constraint attributes (`left`, `right`, `top`, `bottom`, `centerX`, `centerY`) for positioning within their container — see §4.3 for definitions and behavior. Constraint attributes are not repeated in individual element tables below.
+Geometry elements provide renderable shapes. All geometry elements, as well as TextPath, TextBox, and Group, support constraint attributes for positioning within their container — see §4.3 for the full attribute list, definitions, and behavior. Constraint attributes are not repeated in individual element tables below.
 
 #### 6.2.1 Rectangle
 
@@ -1220,8 +1220,6 @@ Rectangles are defined from center point with uniform corner rounding support.
 | `size` | Size | 0,0 | Dimensions "width,height"; animatable. Prefer `width`/`height` attributes for static layout |
 | `roundness` | float | 0 | Corner radius |
 | `reversed` | bool | false | Reverse path direction |
-
-Rectangle supports all constraint attributes (see §4.1).
 
 **Calculation Rules**:
 ```
@@ -1254,8 +1252,6 @@ Ellipses are defined from center point.
 | `position` | Point | (center of bounding box) | Center point coordinate; animatable. Computed from constraint attributes when set. When not set, defaults to `(size.width/2, size.height/2)`, placing the top-left corner at the origin. Prefer constraint attributes for static layout |
 | `size` | Size | 0,0 | Dimensions "width,height"; animatable. Prefer `width`/`height` attributes for static layout |
 | `reversed` | bool | false | Reverse path direction |
-
-Ellipse supports all constraint attributes (see §4.1).
 
 **Calculation Rules**:
 ```
@@ -1894,7 +1890,7 @@ As a container, TextBox processes its child Text elements and text modifiers (Te
 | `wordWrap` | bool | true | Enable automatic word wrapping at the box width boundary (horizontal mode) or height boundary (vertical mode). Has no effect when that dimension is NaN |
 | `overflow` | Overflow | visible | Overflow behavior when text exceeds the box height (horizontal mode) or width (vertical mode). Has no effect when that dimension is NaN |
 
-TextBox inherits all Group attributes (`position`, `anchor`, `rotation`, `scale`, `skew`, `skewAxis`, `alpha`, `padding`) and constraint attributes (see §4.1). For TextBox, `width`/`height` default to NaN (no boundary, auto-sizing); NaN means no boundary in that dimension, which may cause `wordWrap` or `overflow` to have no effect. The `padding` attribute insets the text layout area and the constraint reference frame for non-Text child elements. The `position` attribute specifies the top-left corner of the text area in the parent coordinate system. Prefer constraint attributes (`left`/`top`) for positioning — when constraints are set, `position` is computed automatically.
+TextBox inherits all Group attributes (`position`, `anchor`, `rotation`, `scale`, `skew`, `skewAxis`, `alpha`, `padding`) and constraint attributes (see §4.3). For TextBox, `width`/`height` default to NaN (no boundary, auto-sizing); NaN means no boundary in that dimension, which may cause `wordWrap` or `overflow` to have no effect. The `padding` attribute insets the text layout area and the constraint reference frame for non-Text child elements. The `position` attribute specifies the top-left corner of the text area in the parent coordinate system. Prefer constraint attributes (`left`/`top`) for positioning — when constraints are set, `position` is computed automatically.
 
 **TextAlign (Text Alignment)**:
 
@@ -2025,8 +2021,6 @@ Group is a VectorElement container with transform properties.
 | `skewAxis` | float | 0 | Skew axis angle |
 | `alpha` | float | 1 | Opacity 0~1 |
 | `padding` | float or "t,r,b,l" | 0 | Insets the constraint reference frame for child elements. Supports single value (uniform), two values (vertical,horizontal), four values (top,right,bottom,left) |
-
-Group supports all constraint attributes (see §4.1).
 
 #### Transform Order
 
