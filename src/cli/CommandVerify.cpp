@@ -2044,6 +2044,21 @@ static void DetectConstraintConflicts(const LayoutNode* node, int sourceLine,
                     "bottom ignored, centerY takes priority. Fix: remove bottom");
     }
   }
+  // Priority on the width axis: left+right > percentWidth > authored width. Explicit width vs
+  // percentWidth cannot coexist in XML (single attribute with or without '%'), so only the
+  // opposite-edge vs percent collision is reportable here.
+  bool wFromOpposite = !std::isnan(node->left) && !std::isnan(node->right);
+  if (wFromOpposite && !std::isnan(node->percentWidth)) {
+    AddDiagnostic(diagnostics, sourceLine,
+                  "percentWidth ignored, left+right constraints take priority. "
+                  "Fix: remove percentWidth");
+  }
+  bool hFromOpposite = !std::isnan(node->top) && !std::isnan(node->bottom);
+  if (hFromOpposite && !std::isnan(node->percentHeight)) {
+    AddDiagnostic(diagnostics, sourceLine,
+                  "percentHeight ignored, top+bottom constraints take priority. "
+                  "Fix: remove percentHeight");
+  }
 }
 
 static void DetectRedundantZeroConstraints(const LayoutNode* node, int sourceLine,
@@ -2474,22 +2489,20 @@ static void RunSpatialDetectionOnElements(const std::vector<Element*>& elements,
       DetectNegativeConstraintSizeForElement(layoutNode, element->sourceLine, containerW,
                                              containerH, diagnostics);
       DetectRedundantZeroConstraints(layoutNode, element->sourceLine, diagnostics);
-      // Flag explicit width/height (or percentage) that is shadowed by opposite-edge constraints
-      // on Rectangle / Ellipse / Group. TextBox keeps this->width/height as the authored text-box
+      // Flag explicit width/height that is shadowed by opposite-edge constraints on
+      // Rectangle / Ellipse / Group. TextBox keeps this->width/height as the authored text-box
       // dimensions for shaping (independent semantic), so it is excluded here. Path / Polystar /
       // Text / TextPath use width/height to drive uniform scaling, still useful alongside edge
-      // constraints; they are also excluded.
+      // constraints; they are also excluded. Note: percentWidth/Height collisions with opposite
+      // edges are reported by DetectConstraintConflicts for all LayoutNode types.
       if (type == NodeType::Rectangle || type == NodeType::Ellipse || type == NodeType::Group) {
         bool wFromConstraints = !std::isnan(layoutNode->left) && !std::isnan(layoutNode->right);
         bool hFromConstraints = !std::isnan(layoutNode->top) && !std::isnan(layoutNode->bottom);
-        bool hasExplicitW = !std::isnan(layoutNode->width) || !std::isnan(layoutNode->percentWidth);
-        bool hasExplicitH =
-            !std::isnan(layoutNode->height) || !std::isnan(layoutNode->percentHeight);
-        if (wFromConstraints && hasExplicitW) {
+        if (wFromConstraints && !std::isnan(layoutNode->width)) {
           AddDiagnostic(diagnostics, element->sourceLine,
                         "width ignored, left+right constraints take priority. Fix: remove width");
         }
-        if (hFromConstraints && hasExplicitH) {
+        if (hFromConstraints && !std::isnan(layoutNode->height)) {
           AddDiagnostic(diagnostics, element->sourceLine,
                         "height ignored, top+bottom constraints take priority. Fix: remove height");
         }
@@ -2547,17 +2560,16 @@ static void RunSpatialDetectionOnLayer(const Layer* layer, const Layer* parentLa
   DetectContentCenteringAsymmetry(layer, parentLayer, diagnostics);
   DetectOverlappingSiblings(layer, diagnostics);
   DetectConstraintConflicts(layer, layer->sourceLine, diagnostics);
-  // Flag explicit width/height (or percentage) that is shadowed by opposite-edge constraints.
+  // Flag explicit width/height that is shadowed by opposite-edge constraints. percentWidth/Height
+  // collisions are reported by DetectConstraintConflicts.
   {
     bool wFromConstraints = !std::isnan(layer->left) && !std::isnan(layer->right);
     bool hFromConstraints = !std::isnan(layer->top) && !std::isnan(layer->bottom);
-    bool hasExplicitW = !std::isnan(layer->width) || !std::isnan(layer->percentWidth);
-    bool hasExplicitH = !std::isnan(layer->height) || !std::isnan(layer->percentHeight);
-    if (wFromConstraints && hasExplicitW) {
+    if (wFromConstraints && !std::isnan(layer->width)) {
       AddDiagnostic(diagnostics, layer->sourceLine,
                     "width ignored, left+right constraints take priority. Fix: remove width");
     }
-    if (hFromConstraints && hasExplicitH) {
+    if (hFromConstraints && !std::isnan(layer->height)) {
       AddDiagnostic(diagnostics, layer->sourceLine,
                     "height ignored, top+bottom constraints take priority. Fix: remove height");
     }
