@@ -281,7 +281,7 @@ void Layer::setLayoutSize(LayoutContext* context, float targetWidth, float targe
 }
 
 void Layer::updateScrollRect() {
-  if (!clipToBounds || std::isnan(layoutWidth) || std::isnan(layoutHeight)) {
+  if (!clipToBounds || hasScrollRect || std::isnan(layoutWidth) || std::isnan(layoutHeight)) {
     return;
   }
   scrollRect = Rect::MakeXYWH(0, 0, layoutWidth, layoutHeight);
