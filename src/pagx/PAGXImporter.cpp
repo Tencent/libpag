@@ -356,6 +356,50 @@ static float GetFloatAttributeOrNaN(const DOMNode* node, const std::string& name
   return value.has_value() ? *value : NAN;
 }
 
+// Parses a dimension attribute that may contain a percentage suffix (e.g. "100" or "50%").
+// - When the value ends with "%": writes the numeric part to *outPercent and returns NAN.
+// - Otherwise: writes NAN to *outPercent and returns the numeric value.
+// Invalid values report an error and return NAN on both outputs.
+static float GetDimensionAttribute(const DOMNode* node, const std::string& name, float* outPercent,
+                                   PAGXDocument* doc) {
+  auto* str = node->findAttribute(name);
+  if (str == nullptr || str->empty()) {
+    *outPercent = NAN;
+    return NAN;
+  }
+  const char* cstr = str->c_str();
+  char* endPtr = nullptr;
+  float value = strtof(cstr, &endPtr);
+  if (endPtr == cstr) {
+    ReportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
+    *outPercent = NAN;
+    return NAN;
+  }
+  while (*endPtr == ' ' || *endPtr == '\t') {
+    endPtr++;
+  }
+  if (*endPtr == '%') {
+    endPtr++;
+    while (*endPtr == ' ' || *endPtr == '\t') {
+      endPtr++;
+    }
+    if (*endPtr != '\0') {
+      ReportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
+      *outPercent = NAN;
+      return NAN;
+    }
+    *outPercent = value;
+    return NAN;
+  }
+  if (*endPtr != '\0') {
+    ReportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
+    *outPercent = NAN;
+    return NAN;
+  }
+  *outPercent = NAN;
+  return value;
+}
+
 static Padding GetPaddingAttribute(const DOMNode* node, PAGXDocument* doc) {
   auto& str = GetAttribute(node, "padding");
   if (str.empty()) {
@@ -380,8 +424,8 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
   layer->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
   layer->x = GetFloatAttribute(node, "x", Default<Layer>().x, doc);
   layer->y = GetFloatAttribute(node, "y", Default<Layer>().y, doc);
-  layer->width = GetFloatAttributeOrNaN(node, "width", doc);
-  layer->height = GetFloatAttributeOrNaN(node, "height", doc);
+  layer->width = GetDimensionAttribute(node, "width", &layer->percentWidth, doc);
+  layer->height = GetDimensionAttribute(node, "height", &layer->percentHeight, doc);
   layer->layout = GET_ENUM(node, "layout", "none", doc, LayoutMode);
   layer->gap = GetFloatAttribute(node, "gap", Default<Layer>().gap, doc);
   layer->flex = GetFloatAttribute(node, "flex", Default<Layer>().flex, doc);
@@ -705,6 +749,8 @@ static Rectangle* ParseRectangle(const DOMNode* node, PAGXDocument* doc) {
   rect->bottom = GetFloatAttributeOrNaN(node, "bottom", doc);
   rect->centerX = GetFloatAttributeOrNaN(node, "centerX", doc);
   rect->centerY = GetFloatAttributeOrNaN(node, "centerY", doc);
+  rect->width = GetDimensionAttribute(node, "width", &rect->percentWidth, doc);
+  rect->height = GetDimensionAttribute(node, "height", &rect->percentHeight, doc);
   return rect;
 }
 
@@ -722,6 +768,8 @@ static Ellipse* ParseEllipse(const DOMNode* node, PAGXDocument* doc) {
   ellipse->bottom = GetFloatAttributeOrNaN(node, "bottom", doc);
   ellipse->centerX = GetFloatAttributeOrNaN(node, "centerX", doc);
   ellipse->centerY = GetFloatAttributeOrNaN(node, "centerY", doc);
+  ellipse->width = GetDimensionAttribute(node, "width", &ellipse->percentWidth, doc);
+  ellipse->height = GetDimensionAttribute(node, "height", &ellipse->percentHeight, doc);
   return ellipse;
 }
 
@@ -749,6 +797,8 @@ static Polystar* ParsePolystar(const DOMNode* node, PAGXDocument* doc) {
   polystar->bottom = GetFloatAttributeOrNaN(node, "bottom", doc);
   polystar->centerX = GetFloatAttributeOrNaN(node, "centerX", doc);
   polystar->centerY = GetFloatAttributeOrNaN(node, "centerY", doc);
+  polystar->width = GetDimensionAttribute(node, "width", &polystar->percentWidth, doc);
+  polystar->height = GetDimensionAttribute(node, "height", &polystar->percentHeight, doc);
   return polystar;
 }
 
@@ -780,6 +830,8 @@ static Path* ParsePath(const DOMNode* node, PAGXDocument* doc) {
   path->bottom = GetFloatAttributeOrNaN(node, "bottom", doc);
   path->centerX = GetFloatAttributeOrNaN(node, "centerX", doc);
   path->centerY = GetFloatAttributeOrNaN(node, "centerY", doc);
+  path->width = GetDimensionAttribute(node, "width", &path->percentWidth, doc);
+  path->height = GetDimensionAttribute(node, "height", &path->percentHeight, doc);
   return path;
 }
 
@@ -836,6 +888,8 @@ static Text* ParseText(const DOMNode* node, PAGXDocument* doc) {
   text->bottom = GetFloatAttributeOrNaN(node, "bottom", doc);
   text->centerX = GetFloatAttributeOrNaN(node, "centerX", doc);
   text->centerY = GetFloatAttributeOrNaN(node, "centerY", doc);
+  text->width = GetDimensionAttribute(node, "width", &text->percentWidth, doc);
+  text->height = GetDimensionAttribute(node, "height", &text->percentHeight, doc);
   return text;
 }
 
@@ -1044,6 +1098,8 @@ static TextPath* ParseTextPath(const DOMNode* node, PAGXDocument* doc) {
   textPath->bottom = GetFloatAttributeOrNaN(node, "bottom", doc);
   textPath->centerX = GetFloatAttributeOrNaN(node, "centerX", doc);
   textPath->centerY = GetFloatAttributeOrNaN(node, "centerY", doc);
+  textPath->width = GetDimensionAttribute(node, "width", &textPath->percentWidth, doc);
+  textPath->height = GetDimensionAttribute(node, "height", &textPath->percentHeight, doc);
   return textPath;
 }
 
@@ -1060,8 +1116,8 @@ static TextBox* ParseTextBox(const DOMNode* node, PAGXDocument* doc) {
   textBox->skew = GetFloatAttribute(node, "skew", Default<TextBox>().skew, doc);
   textBox->skewAxis = GetFloatAttribute(node, "skewAxis", Default<TextBox>().skewAxis, doc);
   textBox->alpha = GetFloatAttribute(node, "alpha", Default<TextBox>().alpha, doc);
-  textBox->width = GetFloatAttributeOrNaN(node, "width", doc);
-  textBox->height = GetFloatAttributeOrNaN(node, "height", doc);
+  textBox->width = GetDimensionAttribute(node, "width", &textBox->percentWidth, doc);
+  textBox->height = GetDimensionAttribute(node, "height", &textBox->percentHeight, doc);
   textBox->padding = GetPaddingAttribute(node, doc);
   // TextBox typography properties
   textBox->textAlign = GET_ENUM(node, "textAlign", "start", doc, TextAlign);
@@ -1128,8 +1184,8 @@ static Group* ParseGroup(const DOMNode* node, PAGXDocument* doc) {
   group->skew = GetFloatAttribute(node, "skew", Default<Group>().skew, doc);
   group->skewAxis = GetFloatAttribute(node, "skewAxis", Default<Group>().skewAxis, doc);
   group->alpha = GetFloatAttribute(node, "alpha", Default<Group>().alpha, doc);
-  group->width = GetFloatAttributeOrNaN(node, "width", doc);
-  group->height = GetFloatAttributeOrNaN(node, "height", doc);
+  group->width = GetDimensionAttribute(node, "width", &group->percentWidth, doc);
+  group->height = GetDimensionAttribute(node, "height", &group->percentHeight, doc);
   group->padding = GetPaddingAttribute(node, doc);
   group->left = GetFloatAttributeOrNaN(node, "left", doc);
   group->right = GetFloatAttributeOrNaN(node, "right", doc);
