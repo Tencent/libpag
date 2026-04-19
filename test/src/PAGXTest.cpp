@@ -4564,7 +4564,7 @@ PAGX_TEST(PAGXTest, VerifyNestedFlexNoFalsePositive) {
 // Auto Layout - Edge Case Fixes (P2)
 // =====================================================================================
 
-PAGX_TEST(PAGXTest, ZeroSizeElementWithConstraint) {
+PAGX_TEST(PAGXTest, DefaultSizeElementWithOppositeEdgeConstraint) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto layer = doc->makeNode<pagx::Layer>();
   doc->layers.push_back(layer);
@@ -4572,7 +4572,7 @@ PAGX_TEST(PAGXTest, ZeroSizeElementWithConstraint) {
   layer->height = 200;
 
   auto rect = doc->makeNode<pagx::Rectangle>();
-  // Default size is {NaN,NaN}, with left+right+top+bottom should stretch to fill.
+  // Default width/height are NaN; left+right+top+bottom should stretch the element to fill.
   rect->left = 20;
   rect->right = 20;
   rect->top = 30;
@@ -4582,6 +4582,8 @@ PAGX_TEST(PAGXTest, ZeroSizeElementWithConstraint) {
   doc->applyLayout();
 
   // Original size should remain NaN (not modified by layout).
+  EXPECT_TRUE(std::isnan(rect->width));
+  EXPECT_TRUE(std::isnan(rect->height));
   // Layout dimensions should be computed from constraints.
   auto bounds = rect->layoutBounds();
   EXPECT_FLOAT_EQ(bounds.width, 160);
