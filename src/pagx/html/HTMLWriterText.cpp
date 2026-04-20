@@ -46,6 +46,27 @@ namespace pagx {
 using pag::DegreesToRadians;
 using pag::FloatNearlyZero;
 
+// Mirrors tgfx/src/core/utils/FauxBoldScale.cpp so HTML export can emit a stroke width that
+// matches the native PAGX render. tgfx strokes the glyph path with `fontSize * FauxBoldScale`
+// and unions it with the original fill; `-webkit-text-stroke` is also a centered stroke, so
+// using the same width produces the same visible thickening. Keep in sync with tgfx.
+static float FauxBoldStrokeWidth(float fontSize) {
+  constexpr float keySmall = 9.0f;
+  constexpr float keyLarge = 36.0f;
+  constexpr float valSmall = 1.0f / 24.0f;
+  constexpr float valLarge = 1.0f / 32.0f;
+  float scale;
+  if (fontSize <= keySmall) {
+    scale = valSmall;
+  } else if (fontSize >= keyLarge) {
+    scale = valLarge;
+  } else {
+    float t = (fontSize - keySmall) / (keyLarge - keySmall);
+    scale = valSmall + (valLarge - valSmall) * t;
+  }
+  return fontSize * scale;
+}
+
 //==============================================================================
 // Text helper statics
 //==============================================================================
@@ -557,7 +578,8 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     }
   }
   if (text->fauxBold && !stroke) {
-    style += ";-webkit-text-stroke:0.02em currentColor";
+    style += ";-webkit-text-stroke:" + FloatToString(FauxBoldStrokeWidth(text->renderFontSize())) +
+             "px currentColor";
   }
   if (fill && fill->color) {
     auto ct = fill->color->nodeType();
