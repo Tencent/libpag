@@ -832,9 +832,12 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     } else {
       style += ";flex-direction:column";
     }
-    if (layer->gap > 0 && layer->arrangement != Arrangement::SpaceBetween &&
-        layer->arrangement != Arrangement::SpaceEvenly &&
-        layer->arrangement != Arrangement::SpaceAround) {
+    if (layer->gap > 0) {
+      // Emit `gap` even when arrangement is space-between / space-evenly / space-around.
+      // CSS flex treats `gap` as the minimum spacing between items; space-* justify adds
+      // additional distribution only if there's leftover space. Without `gap`, rows whose
+      // content width equals the container width (common when a parent uses align-items:center,
+      // which shrinks rows to content-size) collapse their items against each other.
       style += ";gap:" + FloatToString(layer->gap) + "px";
     }
     if (!layer->padding.isZero()) {
