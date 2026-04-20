@@ -1233,6 +1233,8 @@ Rectangles are defined from center point with uniform corner rounding support.
 | `roundness` | float | 0 | Corner radius |
 | `reversed` | bool | false | Reverse path direction |
 
+Rectangle supports all constraint attributes (see §4.3).
+
 **Calculation Rules**:
 ```
 rect.left   = position.x - size.width / 2
@@ -1264,6 +1266,8 @@ Ellipses are defined from center point.
 | `position` | Point | (center of bounding box) | Center point coordinate; animatable. Computed from constraint attributes when set. When not set, defaults to `(size.width/2, size.height/2)`, placing the top-left corner at the origin. Prefer constraint attributes for static layout |
 | `size` | Size | 0,0 | Dimensions "width,height"; animatable. Prefer `width`/`height` attributes for static layout |
 | `reversed` | bool | false | Reverse path direction |
+
+Ellipse supports all constraint attributes (see §4.3).
 
 **Calculation Rules**:
 ```
@@ -2033,6 +2037,8 @@ Group is a VectorElement container with transform properties.
 | `skewAxis` | float | 0 | Skew axis angle |
 | `alpha` | float | 1 | Opacity 0~1 |
 | `padding` | float or "t,r,b,l" | 0 | Insets the constraint reference frame for child elements. Supports single value (uniform), two values (vertical,horizontal), four values (top,right,bottom,left) |
+
+Group supports all constraint attributes (see §4.3).
 
 #### Transform Order
 
