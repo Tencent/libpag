@@ -51,6 +51,33 @@ struct HTMLExportOptions {
    * This option is only used when framework is React or Vue.
    */
   std::string componentName = "PagxComponent";
+
+  /**
+   * Absolute directory path where the exporter writes PNG files for shapes filled with color
+   * sources that CSS cannot express natively (DiamondGradient and tiled ImagePattern). The
+   * exporter creates the directory if it does not exist. When left empty, such shapes are
+   * silently skipped in the HTML output.
+   */
+  std::string staticImgDir = {};
+
+  /**
+   * URL prefix used for <img src="..."> references to the generated static images, relative to
+   * the HTML document's location. The default is "static-img/", matching the convention that
+   * static-img/ sits next to the HTML file.
+   */
+  std::string staticImgUrlPrefix = "static-img/";
+
+  /**
+   * Filename prefix applied to every generated static image, useful when multiple HTML documents
+   * share a single static-img directory and need to avoid name collisions (e.g., "doc_name-").
+   */
+  std::string staticImgNamePrefix = {};
+
+  /**
+   * Device pixel ratio used when rasterizing static images. A value of 2 produces @2x assets,
+   * which keeps visual parity with the browser's 2x comparison output. The default is 2.
+   */
+  float staticImgPixelRatio = 2.0f;
 };
 
 /**

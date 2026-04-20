@@ -268,11 +268,19 @@ CLI_TEST(PAGXHtmlTest, ColorConicGradient) {
 }
 
 CLI_TEST(PAGXHtmlTest, ColorDiamondGradient) {
-  auto html =
-      LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/color_diamond_gradient.pagx"));
+  auto outDir = ProjectPath::Absolute("test/out/PAGXHtmlTest");
+  std::filesystem::create_directories(outDir);
+  pagx::HTMLExportOptions opts;
+  opts.staticImgDir = outDir + "/static-img";
+  opts.staticImgUrlPrefix = "static-img/";
+  opts.staticImgNamePrefix = "color_diamond_gradient-";
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/color_diamond_gradient.pagx"), opts);
   ASSERT_FALSE(html.empty());
-  // DiamondGradient uses WebGL2 canvas rendering
-  EXPECT_NE(html.find("<canvas"), std::string::npos);
+  // DiamondGradient rasterizes to a PNG because CSS has no native diamond shape; the HTML
+  // references that PNG through an <img> tag.
+  EXPECT_NE(html.find("<img"), std::string::npos);
+  EXPECT_NE(html.find("static-img/color_diamond_gradient-"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, ColorImagePattern) {
@@ -640,8 +648,8 @@ static bool BatchCaptureHtmlScreenshots(
         tasksFile << ",";
       }
       const auto& [html, png, w, h] = tasks[i];
-      tasksFile << "{\"html\":\"" << html << "\",\"png\":\"" << png
-                << "\",\"width\":" << w << ",\"height\":" << h << ",\"scale\":1}";
+      tasksFile << "{\"html\":\"" << html << "\",\"png\":\"" << png << "\",\"width\":" << w
+                << ",\"height\":" << h << ",\"scale\":1}";
     }
     tasksFile << "]";
   }
@@ -688,14 +696,20 @@ CLI_TEST(PAGXHtmlTest, HtmlScreenshotCompare) {
       continue;
     }
 
-    auto html = pagx::HTMLExporter::ToHTML(*doc);
+    auto htmlPath = outDir + "/" + baseName + ".html";
+    pagx::HTMLExportOptions opts;
+    // Rasterize Diamond/tiled-ImagePattern fills into PNG next to the HTML so that browser
+    // screenshots pick up the exact pixels tgfx produced, instead of a WebGL approximation.
+    opts.staticImgDir = outDir + "/static-img";
+    opts.staticImgUrlPrefix = "static-img/";
+    opts.staticImgNamePrefix = baseName + "-";
+    auto html = pagx::HTMLExporter::ToHTML(*doc, opts);
     if (html.empty()) {
       ADD_FAILURE() << "Failed to export HTML: " << baseName;
       continue;
     }
 
     auto fullHtml = WrapHtmlDocument(html, width, height);
-    auto htmlPath = outDir + "/" + baseName + ".html";
     {
       std::ofstream htmlFile(htmlPath, std::ios::binary);
       htmlFile.write(fullHtml.data(), static_cast<std::streamsize>(fullHtml.size()));
@@ -706,8 +720,7 @@ CLI_TEST(PAGXHtmlTest, HtmlScreenshotCompare) {
   }
 
   // Phase 2: take all screenshots in a single Chromium session.
-  ASSERT_TRUE(BatchCaptureHtmlScreenshots(screenshotTasks))
-      << "Batch screenshot capture failed";
+  ASSERT_TRUE(BatchCaptureHtmlScreenshots(screenshotTasks)) << "Batch screenshot capture failed";
 
   // Phase 3: baseline-compare each produced PNG.
   for (const auto& entry : entries) {

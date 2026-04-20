@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tests: DiamondGradient → CSS cannot represent, rendered via WebGL2 canvas -->
+<!-- Tests: DiamondGradient → CSS cannot represent, rasterized to PNG via offline tgfx render -->
 <pagx version="1.0" width="320" height="270">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
@@ -16,7 +16,7 @@
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Rendered via WebGL2 canvas" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="Rasterized to PNG via tgfx" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>

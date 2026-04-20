@@ -5339,7 +5339,15 @@ h1{text-align:center;color:#1e293b;margin-bottom:4px}
       // Generate HTML for this file
       auto htmlPath = outDir + "/" + baseName + ".html";
       doc->applyLayout();
-      auto htmlFragment = pagx::HTMLExporter::ToHTML(*doc);
+      pagx::HTMLExporter::Options htmlOpts;
+      // Rasterize Diamond/ImagePattern fills to PNG next to the HTML file. Using a single
+      // shared static-img/ directory with a per-document filename prefix avoids name collisions
+      // when multiple HTMLs live in the same folder.
+      htmlOpts.staticImgDir = outDir + "/static-img";
+      htmlOpts.staticImgUrlPrefix = "static-img/";
+      htmlOpts.staticImgNamePrefix = baseName + "-";
+      htmlOpts.staticImgPixelRatio = static_cast<float>(scale);
+      auto htmlFragment = pagx::HTMLExporter::ToHTML(*doc, htmlOpts);
       if (!htmlFragment.empty()) {
         auto htmlContent =
             "<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"></head>\n"

@@ -118,24 +118,6 @@ ArcLengthLUT BuildArcLengthLUT(const PathData& pathData, int samplesPerSegment =
 void SampleArcLengthLUT(const ArcLengthLUT& lut, float arcLength, Point* outPos, float* outTangent,
                         bool closed = false);
 
-struct DiamondGradientInfo {
-  std::string canvasId;
-  float unitMatrix[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
-  std::vector<std::pair<float, Color>> stops;
-  float width = 0;
-  float height = 0;
-};
-
-struct ImagePatternCanvasInfo {
-  std::string canvasId;
-  std::string imageSrc;
-  int wrapS = 0x2901;
-  int wrapT = 0x2901;
-  int filter = 0x2601;
-  float width = 0;
-  float height = 0;
-};
-
 //==============================================================================
 // HTMLWriterContext
 //==============================================================================
@@ -145,8 +127,14 @@ class HTMLWriterContext {
   float docWidth = 0;
   float docHeight = 0;
   std::unordered_set<const Composition*> visitedCompositions = {};
-  std::vector<DiamondGradientInfo> diamondGradients = {};
-  std::vector<ImagePatternCanvasInfo> imagePatternCanvases = {};
+
+  // Static-image rasterization config, forwarded from HTMLExportOptions. Empty `staticImgDir`
+  // disables rasterization entirely; the writer then emits nothing for Diamond/tiled-pattern
+  // fills (they are CSS-inexpressible without the PNG).
+  std::string staticImgDir = {};
+  std::string staticImgUrlPrefix = "static-img/";
+  std::string staticImgNamePrefix = {};
+  float staticImgPixelRatio = 2.0f;
 
   std::string nextId(const std::string& prefix) {
     return prefix + std::to_string(_id++);

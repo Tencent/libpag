@@ -18,9 +18,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 #include <string>
 #include <vector>
 #include "base/utils/MathUtil.h"
+#include "pagx/html/HTMLStaticImageRenderer.h"
 #include "pagx/html/HTMLWriter.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DiamondGradient.h"
@@ -2112,6 +2114,11 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
 
 void HTMLWriter::renderDiamondCanvas(HTMLBuilder& out, const GeoInfo& geo, const Fill* fill,
                                      float alpha, BlendMode painterBlend) {
+  if (_ctx->staticImgDir.empty()) {
+    // Rasterization disabled; silently skip. Caller can enable it by setting staticImgDir in
+    // HTMLExportOptions.
+    return;
+  }
   auto dg = static_cast<const DiamondGradient*>(fill->color);
   float left = 0, top = 0, w = 0, h = 0;
   float roundness = 0;
@@ -2137,15 +2144,30 @@ void HTMLWriter::renderDiamondCanvas(HTMLBuilder& out, const GeoInfo& geo, const
     return;
   }
 
-  std::string canvasId = _ctx->nextId("dgc");
-  std::string style =
-      "position:absolute;left:" + FloatToString(left) + "px;top:" + FloatToString(top) + "px";
-  if (roundness > 0) {
-    style += ";border-radius:" + FloatToString(roundness) + "px";
+  std::string imgId = _ctx->nextId("dgc");
+  std::string fileName = _ctx->staticImgNamePrefix + imgId + ".png";
+  std::filesystem::create_directories(_ctx->staticImgDir);
+  std::string absPath = _ctx->staticImgDir;
+  if (!absPath.empty() && absPath.back() != '/') {
+    absPath += "/";
   }
+  absPath += fileName;
+
+  bool ok = false;
   if (geo.type == NodeType::Ellipse) {
-    style += ";border-radius:50%";
+    ok = HTMLStaticImageRenderer::RenderDiamondEllipseToPng(left, top, w, h, dg,
+                                                            _ctx->staticImgPixelRatio, absPath);
+  } else {
+    ok = HTMLStaticImageRenderer::RenderDiamondToPng(left, top, w, h, roundness, dg,
+                                                     _ctx->staticImgPixelRatio, absPath);
   }
+  if (!ok) {
+    return;
+  }
+
+  std::string style = "position:absolute;left:" + FloatToString(left) +
+                      "px;top:" + FloatToString(top) + "px;width:" + FloatToString(w) +
+                      "px;height:" + FloatToString(h) + "px";
   if (alpha < 1.0f) {
     style += ";opacity:" + FloatToString(alpha);
   }
@@ -2157,121 +2179,17 @@ void HTMLWriter::renderDiamondCanvas(HTMLBuilder& out, const GeoInfo& geo, const
     }
   }
 
-  out.openTag("canvas");
-  out.addAttr("id", canvasId);
-  out.addAttr("width", std::to_string(static_cast<int>(std::ceil(w))));
-  out.addAttr("height", std::to_string(static_cast<int>(std::ceil(h))));
+  out.openTag("img");
+  out.addAttr("src", _ctx->staticImgUrlPrefix + fileName);
   out.addAttr("style", style);
   out.closeTagSelfClosing();
-
-  DiamondGradientInfo info;
-  info.canvasId = canvasId;
-  info.width = w;
-  info.height = h;
-
-  // Precompute the combined unit matrix that replicates native tgfx rendering:
-  // Step 1: Translate canvas pixel to PAGX document coordinates (add element offset)
-  // Step 2: Apply gradient matrix inverse (if non-identity)
-  // Step 3: Translate to gradient center
-  // Step 4: Scale by sqrt(2)/radius and rotate 45 degrees
-  // The shader then computes t = max(|x|, |y|) on the transformed coordinates.
-  //
-  // Native equivalent: totalMatrix = DiamondRadiusToUnitMatrix(center, radius) * inv(gradMatrix)
-  // We also prepend a translation by (left, top) to map from canvas-local to document coords.
-  float cx = dg->center.x;
-  float cy = dg->center.y;
-  float inv = 1.4142135624f / dg->radius;
-  float c45 = 0.70710678118f;
-  float s45 = 0.70710678118f;
-
-  // DiamondRadiusToUnitMatrix: translate(-cx,-cy), scale(inv), rotate(45)
-  // As combined 3x3: R * S * T
-  //   T = [1 0 -cx; 0 1 -cy; 0 0 1]
-  //   S = [inv 0 0; 0 inv 0; 0 0 1]
-  //   R = [c45 -s45 0; s45 c45 0; 0 0 1]
-  // Combined = R * S * T:
-  //   a = c45*inv, b = -s45*inv, tx = (-cx*c45 + cy*s45)*inv
-  //   c = s45*inv, d =  c45*inv, ty = (-cx*s45 - cy*c45)*inv
-  float dA = c45 * inv;
-  float dB = -s45 * inv;
-  float dC = s45 * inv;
-  float dD = c45 * inv;
-  float dTx = (-cx * c45 + cy * s45) * inv;
-  float dTy = (-cx * s45 - cy * c45) * inv;
-
-  // Native rendering applies: totalMatrix = diamondUnit * inverse(gradientMatrix)
-  // (MatrixShader inverts the gradient matrix before passing it as uvMatrix to the gradient shader)
-  // We also prepend a translation by (left, top) to map canvas-local to document coords.
-  // Final: combined = diamondUnit * inverse(gradientMatrix) * translate(left, top)
-  auto& gm = dg->matrix;
-  // Compute inverse of gradient matrix: inv(gm)
-  float det = gm.a * gm.d - gm.b * gm.c;
-  float iA, iB, iC, iD, iTx, iTy;
-  if (std::abs(det) < 1e-10f) {
-    iA = 1;
-    iB = 0;
-    iC = 0;
-    iD = 1;
-    iTx = 0;
-    iTy = 0;
-  } else {
-    float invDet = 1.0f / det;
-    iA = gm.d * invDet;
-    iB = -gm.c * invDet;
-    iC = -gm.b * invDet;
-    iD = gm.a * invDet;
-    iTx = (gm.c * gm.ty - gm.d * gm.tx) * invDet;
-    iTy = (gm.b * gm.tx - gm.a * gm.ty) * invDet;
-  }
-  // inverse(gradMatrix) * translate(left, top):
-  float gA = iA;
-  float gB = iB;
-  float gC = iC;
-  float gD = iD;
-  float gTx = iA * left + iB * top + iTx;
-  float gTy = iC * left + iD * top + iTy;
-
-  // diamondUnit * (inverse(gradMatrix) * translate):
-  float fA = dA * gA + dB * gC;
-  float fB = dA * gB + dB * gD;
-  float fTx = dA * gTx + dB * gTy + dTx;
-  float fC = dC * gA + dD * gC;
-  float fD = dC * gB + dD * gD;
-  float fTy = dC * gTx + dD * gTy + dTy;
-
-  // Store as column-major mat3 for GLSL
-  info.unitMatrix[0] = fA;
-  info.unitMatrix[1] = fC;
-  info.unitMatrix[2] = 0;
-  info.unitMatrix[3] = fB;
-  info.unitMatrix[4] = fD;
-  info.unitMatrix[5] = 0;
-  info.unitMatrix[6] = fTx;
-  info.unitMatrix[7] = fTy;
-  info.unitMatrix[8] = 1;
-
-  for (auto* stop : dg->colorStops) {
-    info.stops.emplace_back(stop->offset, stop->color);
-  }
-  _ctx->diamondGradients.push_back(info);
-}
-
-static int TileModeToGL(TileMode mode) {
-  switch (mode) {
-    case TileMode::Repeat:
-      return 0x2901;  // GL_REPEAT
-    case TileMode::Mirror:
-      return 0x8370;  // GL_MIRRORED_REPEAT
-    case TileMode::Clamp:
-      return 0x812F;  // GL_CLAMP_TO_EDGE
-    case TileMode::Decal:
-    default:
-      return 0x812F;  // GL_CLAMP_TO_EDGE
-  }
 }
 
 void HTMLWriter::renderImagePatternCanvas(HTMLBuilder& out, const GeoInfo& geo, const Fill* fill,
                                           float alpha, BlendMode painterBlend) {
+  if (_ctx->staticImgDir.empty()) {
+    return;
+  }
   auto p = static_cast<const ImagePattern*>(fill->color);
   if (!p->image) {
     return;
@@ -2300,15 +2218,30 @@ void HTMLWriter::renderImagePatternCanvas(HTMLBuilder& out, const GeoInfo& geo, 
     return;
   }
 
-  std::string canvasId = _ctx->nextId("ipc");
-  std::string style =
-      "position:absolute;left:" + FloatToString(left) + "px;top:" + FloatToString(top) + "px";
-  if (roundness > 0) {
-    style += ";border-radius:" + FloatToString(roundness) + "px";
+  std::string imgId = _ctx->nextId("ipc");
+  std::string fileName = _ctx->staticImgNamePrefix + imgId + ".png";
+  std::filesystem::create_directories(_ctx->staticImgDir);
+  std::string absPath = _ctx->staticImgDir;
+  if (!absPath.empty() && absPath.back() != '/') {
+    absPath += "/";
   }
+  absPath += fileName;
+
+  bool ok = false;
   if (geo.type == NodeType::Ellipse) {
-    style += ";border-radius:50%";
+    ok = HTMLStaticImageRenderer::RenderImagePatternEllipseToPng(
+        left, top, w, h, p, _ctx->staticImgPixelRatio, absPath);
+  } else {
+    ok = HTMLStaticImageRenderer::RenderImagePatternToPng(left, top, w, h, roundness, p,
+                                                          _ctx->staticImgPixelRatio, absPath);
   }
+  if (!ok) {
+    return;
+  }
+
+  std::string style = "position:absolute;left:" + FloatToString(left) +
+                      "px;top:" + FloatToString(top) + "px;width:" + FloatToString(w) +
+                      "px;height:" + FloatToString(h) + "px";
   if (alpha < 1.0f) {
     style += ";opacity:" + FloatToString(alpha);
   }
@@ -2319,27 +2252,14 @@ void HTMLWriter::renderImagePatternCanvas(HTMLBuilder& out, const GeoInfo& geo, 
       style += blendStr;
     }
   }
-
   if (p->filterMode == FilterMode::Nearest) {
     style += ";image-rendering:pixelated";
   }
 
-  out.openTag("canvas");
-  out.addAttr("id", canvasId);
-  out.addAttr("width", std::to_string(static_cast<int>(std::ceil(w))));
-  out.addAttr("height", std::to_string(static_cast<int>(std::ceil(h))));
+  out.openTag("img");
+  out.addAttr("src", _ctx->staticImgUrlPrefix + fileName);
   out.addAttr("style", style);
   out.closeTagSelfClosing();
-
-  ImagePatternCanvasInfo info;
-  info.canvasId = canvasId;
-  info.imageSrc = GetImageSrc(p->image);
-  info.wrapS = TileModeToGL(p->tileModeX);
-  info.wrapT = TileModeToGL(p->tileModeY);
-  info.filter = (p->filterMode == FilterMode::Nearest) ? 0x2600 : 0x2601;
-  info.width = w;
-  info.height = h;
-  _ctx->imagePatternCanvases.push_back(info);
 }
 
 }  // namespace pagx
