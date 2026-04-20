@@ -258,16 +258,16 @@ container's layout size inside `padding`.
 | Group, Layer | Adopt the size as layout bounds for children |
 
 ```xml
-<!-- Background filling the parent -->
+<!-- Background: stretch to fill -->
 <Rectangle width="100%" height="100%" roundness="12"/>
 
-<!-- Centered label -->
+<!-- Centered text -->
 <TextBox centerX="0" centerY="0">
-  <Text text="Label" fontFamily="Arial" fontSize="14"/>
+  <Text text="Label" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
   <Fill color="#FFF"/>
 </TextBox>
 
-<!-- Right-aligned price tag -->
+<!-- Right-aligned, vertically centered -->
 <TextBox right="16" centerY="0">
   <Text text="$99" fontFamily="Arial" fontSize="20"/>
   <Fill color="#10B981"/>
