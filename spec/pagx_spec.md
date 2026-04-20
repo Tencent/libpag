@@ -97,7 +97,7 @@ The following attributes are available on any element and are not repeated in in
 | `string` | String | `"Arial"`, `"myLayer"` |
 | `enum` | Enumeration value | `normal`, `multiply` |
 | `idref` | ID reference | `@gradientId`, `@maskLayer` |
-| `Dimension` | A non-negative floating-point number in pixels, or the same number followed by `%` to denote a percentage of the parent container's corresponding axis (inside padding). Grammar matches the xsd `DimensionType` pattern `[0-9]*\.?[0-9]+%?` | `100`, `0.5`, `50%`, `100%` |
+| `Dimension` | A non-negative floating-point number in pixels, or the same number followed by `%` to denote a percentage of the parent container's corresponding axis (inside padding). Grammar matches the pattern `[0-9]*\.?[0-9]+%?` | `100`, `0.5`, `50%`, `100%` |
 
 ### 2.5 Point
 
