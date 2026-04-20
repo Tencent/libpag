@@ -615,12 +615,41 @@ static bool NodeAvailable() {
   return std::system("node --version > /dev/null 2>&1") == 0;
 }
 
-static bool TakeHtmlScreenshot(const std::string& htmlPath, const std::string& pngPath, int width,
-                               int height) {
+// Emits a tasks.json describing every {html, png, width, height} capture and invokes
+// `screenshot.js --batch` so all screenshots share a single Chromium process. macOS
+// Chromium becomes unstable across repeated cold-starts (see
+// `feedback_puppeteer_screenshot_hang.md`), which fails this test after just a few
+// per-sample Puppeteer launches. Reusing one browser mirrors what
+// PAGXTest.GenerateComparisonPage already does for the comparison page.
+static bool BatchCaptureHtmlScreenshots(
+    const std::vector<std::tuple<std::string, std::string, int, int>>& tasks) {
+  if (tasks.empty()) {
+    return true;
+  }
   auto scriptPath = ProjectPath::Absolute("test/screenshot.js");
-  auto cmd = "node " + scriptPath + " " + htmlPath + " " + pngPath + " " + std::to_string(width) +
-             " " + std::to_string(height) + " 2>&1";
-  return std::system(cmd.c_str()) == 0;
+  auto outDir = ProjectPath::Absolute("test/out/PAGXHtmlTest");
+  auto tasksPath = outDir + "/screenshot_tasks.json";
+  {
+    std::ofstream tasksFile(tasksPath, std::ios::binary);
+    if (!tasksFile.is_open()) {
+      return false;
+    }
+    tasksFile << "[";
+    for (size_t i = 0; i < tasks.size(); i++) {
+      if (i > 0) {
+        tasksFile << ",";
+      }
+      const auto& [html, png, w, h] = tasks[i];
+      tasksFile << "{\"html\":\"" << html << "\",\"png\":\"" << png
+                << "\",\"width\":" << w << ",\"height\":" << h << ",\"scale\":1}";
+    }
+    tasksFile << "]";
+  }
+  auto cmd = "node " + scriptPath + " --batch " + tasksPath + " 2>&1";
+  int rc = std::system(cmd.c_str());
+  std::error_code ec;
+  std::filesystem::remove(tasksPath, ec);
+  return rc == 0;
 }
 
 CLI_TEST(PAGXHtmlTest, HtmlScreenshotCompare) {
@@ -634,6 +663,15 @@ CLI_TEST(PAGXHtmlTest, HtmlScreenshotCompare) {
   auto outDir = ProjectPath::Absolute("test/out/PAGXHtmlTest");
   std::filesystem::create_directories(outDir);
 
+  // Phase 1: export every sample's HTML and collect the screenshot task list.
+  struct Entry {
+    std::string baseName;
+    std::string pngPath;
+  };
+  std::vector<Entry> entries;
+  std::vector<std::tuple<std::string, std::string, int, int>> screenshotTasks;
+  entries.reserve(files.size());
+  screenshotTasks.reserve(files.size());
   for (const auto& filePath : files) {
     auto baseName = std::filesystem::path(filePath).stem().string();
 
@@ -662,27 +700,31 @@ CLI_TEST(PAGXHtmlTest, HtmlScreenshotCompare) {
       std::ofstream htmlFile(htmlPath, std::ios::binary);
       htmlFile.write(fullHtml.data(), static_cast<std::streamsize>(fullHtml.size()));
     }
-
     auto pngPath = outDir + "/" + baseName + ".png";
-    if (!TakeHtmlScreenshot(htmlPath, pngPath, width, height)) {
-      ADD_FAILURE() << "Screenshot failed: " << baseName;
-      continue;
-    }
+    screenshotTasks.emplace_back(htmlPath, pngPath, width, height);
+    entries.push_back({baseName, pngPath});
+  }
 
-    auto codec = tgfx::ImageCodec::MakeFrom(pngPath);
+  // Phase 2: take all screenshots in a single Chromium session.
+  ASSERT_TRUE(BatchCaptureHtmlScreenshots(screenshotTasks))
+      << "Batch screenshot capture failed";
+
+  // Phase 3: baseline-compare each produced PNG.
+  for (const auto& entry : entries) {
+    auto codec = tgfx::ImageCodec::MakeFrom(entry.pngPath);
     if (!codec) {
-      ADD_FAILURE() << "Failed to load screenshot PNG: " << baseName;
+      ADD_FAILURE() << "Failed to load screenshot PNG: " << entry.baseName;
       continue;
     }
 
     tgfx::Bitmap bitmap(codec->width(), codec->height(), false, false);
     tgfx::Pixmap pixmap(bitmap);
     if (!codec->readPixels(pixmap.info(), pixmap.writablePixels())) {
-      ADD_FAILURE() << "Failed to decode screenshot: " << baseName;
+      ADD_FAILURE() << "Failed to decode screenshot: " << entry.baseName;
       continue;
     }
 
-    EXPECT_TRUE(Baseline::Compare(pixmap, "PAGXTest/html/" + baseName)) << baseName;
+    EXPECT_TRUE(Baseline::Compare(pixmap, "PAGXTest/html/" + entry.baseName)) << entry.baseName;
   }
 }
 
