@@ -1304,10 +1304,10 @@ static void DetectHighPathComplexity(const Path* path, std::vector<VerifyDiagnos
     return;
   }
   auto verbCount = path->data->verbs().size();
-  if (verbCount > 500) {
+  if (verbCount > 1024) {
     AddDiagnostic(diagnostics, path->sourceLine,
                   "Path with " + std::to_string(verbCount) +
-                      " verbs (> 500), may cause slow rendering. "
+                      " verbs (> 1024), may cause slow rendering. "
                       "Fix: check if path can be simplified or split");
   }
 }

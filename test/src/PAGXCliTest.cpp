@@ -619,7 +619,7 @@ CLI_TEST(PAGXCliTest, Verify_C10_ComplexPath) {
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
-  EXPECT_TRUE(output.find("verbs (> 500)") != std::string::npos);
+  EXPECT_TRUE(output.find("verbs (> 1024)") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Verify_C11_LowOpacityHighCost) {
