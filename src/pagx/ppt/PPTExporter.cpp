@@ -25,22 +25,30 @@
 #include <vector>
 #include "base/utils/MathUtil.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/ColorStop.h"
+#include "pagx/nodes/Composition.h"
+#include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/DiamondGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
+#include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/InnerShadowFilter.h"
+#include "pagx/nodes/InnerShadowStyle.h"
+#include "pagx/nodes/LayerStyle.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
@@ -204,18 +212,25 @@ class PPTWriter {
 
   void writeElements(XMLBuilder& out, const std::vector<Element*>& elements,
                      const Matrix& transform, float alpha,
-                     const std::vector<LayerFilter*>& filters);
+                     const std::vector<LayerFilter*>& filters,
+                     const std::vector<LayerStyle*>& styles,
+                     const TextBox* parentTextBox = nullptr);
 
   void writeRectangle(XMLBuilder& out, const Rectangle* rect, const FillStrokeInfo& fs,
-                      const Matrix& m, float alpha, const std::vector<LayerFilter*>& filters);
+                      const Matrix& m, float alpha, const std::vector<LayerFilter*>& filters,
+                      const std::vector<LayerStyle*>& styles);
   void writeEllipse(XMLBuilder& out, const Ellipse* ellipse, const FillStrokeInfo& fs,
-                    const Matrix& m, float alpha, const std::vector<LayerFilter*>& filters);
+                    const Matrix& m, float alpha, const std::vector<LayerFilter*>& filters,
+                    const std::vector<LayerStyle*>& styles);
   void writePath(XMLBuilder& out, const Path* path, const FillStrokeInfo& fs, const Matrix& m,
-                 float alpha, const std::vector<LayerFilter*>& filters);
+                 float alpha, const std::vector<LayerFilter*>& filters,
+                 const std::vector<LayerStyle*>& styles);
   void writeTextAsPath(XMLBuilder& out, const Text* text, const FillStrokeInfo& fs, const Matrix& m,
-                       float alpha, const std::vector<LayerFilter*>& filters);
+                       float alpha, const std::vector<LayerFilter*>& filters,
+                       const std::vector<LayerStyle*>& styles);
   void writeNativeText(XMLBuilder& out, const Text* text, const FillStrokeInfo& fs, const Matrix& m,
-                       float alpha, const std::vector<LayerFilter*>& filters);
+                       float alpha, const std::vector<LayerFilter*>& filters,
+                       const std::vector<LayerStyle*>& styles);
 
   // Shape envelope helpers
   void beginShape(XMLBuilder& out, const char* name, int64_t offX, int64_t offY, int64_t extCX,
@@ -230,7 +245,8 @@ class PPTWriter {
                              const Rect& shapeBounds);
   void writeGradientStops(XMLBuilder& out, const std::vector<ColorStop*>& stops);
   void writeStroke(XMLBuilder& out, const Stroke* stroke, float alpha);
-  void writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& filters);
+  void writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& filters,
+                    const std::vector<LayerStyle*>& styles = {});
   void writeShadowElement(XMLBuilder& out, const char* tag, float blurX, float blurY, float offsetX,
                           float offsetY, const Color& color, bool includeAlign);
 
@@ -241,7 +257,8 @@ class PPTWriter {
 
   void writeShapeTail(XMLBuilder& out, const FillStrokeInfo& fs, float alpha,
                       const Rect& shapeBounds, bool imageWritten,
-                      const std::vector<LayerFilter*>& filters);
+                      const std::vector<LayerFilter*>& filters,
+                      const std::vector<LayerStyle*>& styles = {});
 
   // Custom geometry from PathData
   void writeCustomGeom(XMLBuilder& out, const PathData* data, float ofsX, float ofsY, float boundsW,
@@ -366,14 +383,15 @@ void PPTWriter::writeGlyphShape(XMLBuilder& out, const Fill* fill, float alpha) 
 
 void PPTWriter::writeShapeTail(XMLBuilder& out, const FillStrokeInfo& fs, float alpha,
                                const Rect& shapeBounds, bool imageWritten,
-                               const std::vector<LayerFilter*>& filters) {
+                               const std::vector<LayerFilter*>& filters,
+                               const std::vector<LayerStyle*>& styles) {
   if (imageWritten) {
     out.openElement("a:noFill").closeElementSelfClosing();
   } else {
     writeFill(out, fs.fill, alpha, shapeBounds);
   }
   writeStroke(out, fs.stroke, alpha);
-  writeEffects(out, filters);
+  writeEffects(out, filters, styles);
   endShape(out);
 }
 
@@ -606,6 +624,72 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
         r = 100000 - l;
         b = 100000 - t;
       }
+      out.openElement("a:fillToRect")
+          .addRequiredAttribute("l", l)
+          .addRequiredAttribute("t", t)
+          .addRequiredAttribute("r", r)
+          .addRequiredAttribute("b", b)
+          .closeElementSelfClosing();
+      out.closeElement();  // a:path
+      out.closeElement();  // a:gradFill
+      break;
+    }
+    case NodeType::ConicGradient: {
+      // OOXML has no conic/sweep gradient. Approximate as a circular path
+      // gradient through the same color stops; the visible color sequence
+      // matches at the gradient ring although the angular distribution flattens.
+      auto* grad = static_cast<const ConicGradient*>(source);
+      out.openElement("a:gradFill")
+          .addRequiredAttribute("rotWithShape", "1")
+          .closeElementStart();
+      writeGradientStops(out, grad->colorStops);
+      int l = 50000;
+      int t = 50000;
+      int r = 50000;
+      int b = 50000;
+      if (shapeBounds.width > 0 && shapeBounds.height > 0) {
+        Point centerDoc = grad->matrix.mapPoint(grad->center);
+        float relX = (centerDoc.x - shapeBounds.x) / shapeBounds.width;
+        float relY = (centerDoc.y - shapeBounds.y) / shapeBounds.height;
+        l = std::clamp(static_cast<int>(std::round(relX * 100000.0f)), 0, 100000);
+        t = std::clamp(static_cast<int>(std::round(relY * 100000.0f)), 0, 100000);
+        r = 100000 - l;
+        b = 100000 - t;
+      }
+      out.openElement("a:path").addRequiredAttribute("path", "circle").closeElementStart();
+      out.openElement("a:fillToRect")
+          .addRequiredAttribute("l", l)
+          .addRequiredAttribute("t", t)
+          .addRequiredAttribute("r", r)
+          .addRequiredAttribute("b", b)
+          .closeElementSelfClosing();
+      out.closeElement();  // a:path
+      out.closeElement();  // a:gradFill
+      break;
+    }
+    case NodeType::DiamondGradient: {
+      // OOXML has no diamond gradient primitive. The closest preset is a
+      // rectangular path gradient, which produces an axis-aligned diamond-like
+      // pattern when the focus rect is collapsed to the center point.
+      auto* grad = static_cast<const DiamondGradient*>(source);
+      out.openElement("a:gradFill")
+          .addRequiredAttribute("rotWithShape", "1")
+          .closeElementStart();
+      writeGradientStops(out, grad->colorStops);
+      int l = 50000;
+      int t = 50000;
+      int r = 50000;
+      int b = 50000;
+      if (shapeBounds.width > 0 && shapeBounds.height > 0) {
+        Point centerDoc = grad->matrix.mapPoint(grad->center);
+        float relX = (centerDoc.x - shapeBounds.x) / shapeBounds.width;
+        float relY = (centerDoc.y - shapeBounds.y) / shapeBounds.height;
+        l = std::clamp(static_cast<int>(std::round(relX * 100000.0f)), 0, 100000);
+        t = std::clamp(static_cast<int>(std::round(relY * 100000.0f)), 0, 100000);
+        r = 100000 - l;
+        b = 100000 - t;
+      }
+      out.openElement("a:path").addRequiredAttribute("path", "rect").closeElementStart();
       out.openElement("a:fillToRect")
           .addRequiredAttribute("l", l)
           .addRequiredAttribute("t", t)
@@ -858,7 +942,8 @@ static const char* BlendModeToPPT(BlendMode mode) {
   }
 }
 
-void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& filters) {
+void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& filters,
+                             const std::vector<LayerStyle*>& styles) {
   bool hasEffects = false;
   for (const auto* f : filters) {
     auto type = f->nodeType();
@@ -866,6 +951,16 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
         type == NodeType::BlurFilter || type == NodeType::BlendFilter) {
       hasEffects = true;
       break;
+    }
+  }
+  if (!hasEffects) {
+    for (const auto* s : styles) {
+      auto type = s->nodeType();
+      if (type == NodeType::DropShadowStyle || type == NodeType::InnerShadowStyle ||
+          type == NodeType::BackgroundBlurStyle) {
+        hasEffects = true;
+        break;
+      }
     }
   }
   if (!hasEffects) {
@@ -877,6 +972,10 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
   // OOXML effectLst requires this element order (§20.1.8.20):
   // blur, fillOverlay, glow, innerShdw, outerShdw, prstShdw, reflection, softEdge
 
+  // BlurFilter (filter) takes precedence over BackgroundBlurStyle. PPT has no native
+  // background-blur primitive; we emit a:blur as a best-effort approximation that
+  // blurs the shape itself rather than the background behind it.
+  bool blurEmitted = false;
   for (const auto* f : filters) {
     if (f->nodeType() == NodeType::BlurFilter) {
       auto* blur = static_cast<const BlurFilter*>(f);
@@ -886,8 +985,24 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
             .addRequiredAttribute("rad", PxToEMU(avgBlur))
             .addRequiredAttribute("grow", "0")
             .closeElementSelfClosing();
+        blurEmitted = true;
       }
       break;
+    }
+  }
+  if (!blurEmitted) {
+    for (const auto* s : styles) {
+      if (s->nodeType() == NodeType::BackgroundBlurStyle) {
+        auto* bg = static_cast<const BackgroundBlurStyle*>(s);
+        float avgBlur = (bg->blurX + bg->blurY) / 2.0f;
+        if (avgBlur > 0) {
+          out.openElement("a:blur")
+              .addRequiredAttribute("rad", PxToEMU(avgBlur))
+              .addRequiredAttribute("grow", "0")
+              .closeElementSelfClosing();
+        }
+        break;
+      }
     }
   }
 
@@ -925,11 +1040,25 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
                          false);
     }
   }
+  for (const auto* s : styles) {
+    if (s->nodeType() == NodeType::InnerShadowStyle) {
+      auto* st = static_cast<const InnerShadowStyle*>(s);
+      writeShadowElement(out, "a:innerShdw", st->blurX, st->blurY, st->offsetX, st->offsetY,
+                         st->color, false);
+    }
+  }
   for (const auto* f : filters) {
     if (f->nodeType() == NodeType::DropShadowFilter) {
       auto* s = static_cast<const DropShadowFilter*>(f);
       writeShadowElement(out, "a:outerShdw", s->blurX, s->blurY, s->offsetX, s->offsetY, s->color,
                          true);
+    }
+  }
+  for (const auto* s : styles) {
+    if (s->nodeType() == NodeType::DropShadowStyle) {
+      auto* st = static_cast<const DropShadowStyle*>(s);
+      writeShadowElement(out, "a:outerShdw", st->blurX, st->blurY, st->offsetX, st->offsetY,
+                         st->color, true);
     }
   }
 
@@ -991,13 +1120,14 @@ void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofs
 
 void PPTWriter::writeRectangle(XMLBuilder& out, const Rectangle* rect, const FillStrokeInfo& fs,
                                const Matrix& m, float alpha,
-                               const std::vector<LayerFilter*>& filters) {
+                               const std::vector<LayerFilter*>& filters,
+                               const std::vector<LayerStyle*>& styles) {
   float x = rect->position.x - rect->size.width / 2.0f;
   float y = rect->position.y - rect->size.height / 2.0f;
   Rect shapeBounds = Rect::MakeXYWH(x, y, rect->size.width, rect->size.height);
 
   bool imageWritten = writeImagePatternAsPicture(out, fs.fill, shapeBounds, m, alpha);
-  if (imageWritten && !fs.stroke && filters.empty()) {
+  if (imageWritten && !fs.stroke && filters.empty() && styles.empty()) {
     return;
   }
 
@@ -1023,12 +1153,13 @@ void PPTWriter::writeRectangle(XMLBuilder& out, const Rectangle* rect, const Fil
     out.closeElement();
   }
 
-  writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters);
+  writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters, styles);
 }
 
 void PPTWriter::writeEllipse(XMLBuilder& out, const Ellipse* ellipse, const FillStrokeInfo& fs,
                              const Matrix& m, float alpha,
-                             const std::vector<LayerFilter*>& filters) {
+                             const std::vector<LayerFilter*>& filters,
+                             const std::vector<LayerStyle*>& styles) {
   float rx = ellipse->size.width / 2.0f;
   float ry = ellipse->size.height / 2.0f;
   float x = ellipse->position.x - rx;
@@ -1036,7 +1167,7 @@ void PPTWriter::writeEllipse(XMLBuilder& out, const Ellipse* ellipse, const Fill
   Rect shapeBounds = Rect::MakeXYWH(x, y, ellipse->size.width, ellipse->size.height);
 
   bool imageWritten = writeImagePatternAsPicture(out, fs.fill, shapeBounds, m, alpha);
-  if (imageWritten && !fs.stroke && filters.empty()) {
+  if (imageWritten && !fs.stroke && filters.empty() && styles.empty()) {
     return;
   }
 
@@ -1047,11 +1178,12 @@ void PPTWriter::writeEllipse(XMLBuilder& out, const Ellipse* ellipse, const Fill
   out.openElement("a:avLst").closeElementSelfClosing();
   out.closeElement();
 
-  writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters);
+  writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters, styles);
 }
 
 void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInfo& fs,
-                          const Matrix& m, float alpha, const std::vector<LayerFilter*>& filters) {
+                          const Matrix& m, float alpha, const std::vector<LayerFilter*>& filters,
+                          const std::vector<LayerStyle*>& styles) {
   if (!path->data || path->data->isEmpty()) {
     return;
   }
@@ -1069,7 +1201,7 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
   Rect shapeBounds = Rect::MakeXYWH(adjustedX, adjustedY, adjustedW, adjustedH);
 
   bool imageWritten = writeImagePatternAsPicture(out, fs.fill, shapeBounds, m, alpha);
-  if (imageWritten && !fs.stroke && filters.empty()) {
+  if (imageWritten && !fs.stroke && filters.empty() && styles.empty()) {
     return;
   }
 
@@ -1086,7 +1218,7 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
       for (const auto& group : groups) {
         beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
         EmitGroupCustGeom(out, contours, group, pw, ph, 1.0f, 1.0f, adjustedX, adjustedY);
-        writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters);
+        writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters, styles);
       }
       return;
     }
@@ -1096,12 +1228,13 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
   int64_t pw = std::max(int64_t(1), PxToEMU(adjustedW));
   int64_t ph = std::max(int64_t(1), PxToEMU(adjustedH));
   WriteContourGeom(out, contours, pw, ph, 1.0f, 1.0f, adjustedX, adjustedY, fillRule);
-  writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters);
+  writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters, styles);
 }
 
 void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStrokeInfo& fs,
                                 const Matrix& m, float alpha,
-                                const std::vector<LayerFilter*>& /*filters*/) {
+                                const std::vector<LayerFilter*>& /*filters*/,
+                                const std::vector<LayerStyle*>& /*styles*/) {
   auto glyphPaths = ComputeGlyphPaths(*text, text->position.x, text->position.y);
   if (glyphPaths.empty()) {
     return;
@@ -1174,7 +1307,8 @@ void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStr
 
 void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStrokeInfo& fs,
                                 const Matrix& m, float alpha,
-                                const std::vector<LayerFilter*>& filters) {
+                                const std::vector<LayerFilter*>& filters,
+                                const std::vector<LayerStyle*>& styles) {
   if (text->text.empty()) {
     return;
   }
@@ -1267,7 +1401,8 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   if (fs.fill && fs.fill->color) {
     auto type = fs.fill->color->nodeType();
     hasFillColor = (type == NodeType::SolidColor || type == NodeType::LinearGradient ||
-                    type == NodeType::RadialGradient);
+                    type == NodeType::RadialGradient || type == NodeType::ConicGradient ||
+                    type == NodeType::DiamondGradient);
   }
   float fillAlpha = hasFillColor ? fs.fill->alpha * alpha : 0;
   std::string typeface = text->fontFamily.empty() ? std::string() : StripQuotes(text->fontFamily);
@@ -1305,7 +1440,7 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
       writeColorSource(out, fs.fill->color, fillAlpha);
     }
 
-    writeEffects(out, filters);
+    writeEffects(out, filters, styles);
 
     if (!typeface.empty()) {
       out.openElement("a:latin")
@@ -1335,31 +1470,65 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
 
 void PPTWriter::writeElements(XMLBuilder& out, const std::vector<Element*>& elements,
                               const Matrix& transform, float alpha,
-                              const std::vector<LayerFilter*>& filters) {
+                              const std::vector<LayerFilter*>& filters,
+                              const std::vector<LayerStyle*>& styles,
+                              const TextBox* parentTextBox) {
   auto fs = CollectFillStroke(elements);
+  // When recursing into a TextBox, propagate the TextBox as the layout context
+  // for its inner Text elements (the inner element list never contains a TextBox
+  // itself, so CollectFillStroke would otherwise lose this info).
+  if (parentTextBox != nullptr && fs.textBox == nullptr) {
+    fs.textBox = parentTextBox;
+  }
 
-  for (const auto* element : elements) {
+  // Track the most recently emitted shape index so a trailing Repeater can
+  // duplicate it. Repeater applies to "preceding elements"; we approximate by
+  // re-emitting the immediately preceding shape with progressive transforms.
+  size_t lastShapeIndex = elements.size();
+
+  for (size_t i = 0; i < elements.size(); ++i) {
+    const auto* element = elements[i];
     auto type = element->nodeType();
-    if (type == NodeType::Fill || type == NodeType::Stroke || type == NodeType::TextBox) {
+    if (type == NodeType::Fill || type == NodeType::Stroke) {
       continue;
     }
     switch (type) {
       case NodeType::Rectangle:
-        writeRectangle(out, static_cast<const Rectangle*>(element), fs, transform, alpha, filters);
+        writeRectangle(out, static_cast<const Rectangle*>(element), fs, transform, alpha, filters,
+                       styles);
+        lastShapeIndex = i;
         break;
       case NodeType::Ellipse:
-        writeEllipse(out, static_cast<const Ellipse*>(element), fs, transform, alpha, filters);
+        writeEllipse(out, static_cast<const Ellipse*>(element), fs, transform, alpha, filters,
+                     styles);
+        lastShapeIndex = i;
         break;
       case NodeType::Path:
-        writePath(out, static_cast<const Path*>(element), fs, transform, alpha, filters);
+        writePath(out, static_cast<const Path*>(element), fs, transform, alpha, filters, styles);
+        lastShapeIndex = i;
         break;
       case NodeType::Text: {
         auto* text = static_cast<const Text*>(element);
         if (_convertTextToPath && !text->glyphRuns.empty()) {
-          writeTextAsPath(out, text, fs, transform, alpha, filters);
+          writeTextAsPath(out, text, fs, transform, alpha, filters, styles);
         } else {
-          writeNativeText(out, text, fs, transform, alpha, filters);
+          writeNativeText(out, text, fs, transform, alpha, filters, styles);
         }
+        lastShapeIndex = i;
+        break;
+      }
+      case NodeType::TextBox: {
+        // A TextBox is a Group that lays out inline Text children. Descend so the
+        // child Text elements are emitted; their fill comes from the TextBox's
+        // own contents and the TextBox itself is propagated as positioning context.
+        auto* tb = static_cast<const TextBox*>(element);
+        if (tb->elements.empty()) {
+          break;  // empty TextBox is just metadata for sibling Text elements
+        }
+        Matrix tbMatrix = BuildGroupMatrix(tb);
+        Matrix combined = transform * tbMatrix;
+        float tbAlpha = alpha * tb->alpha;
+        writeElements(out, tb->elements, combined, tbAlpha, filters, styles, tb);
         break;
       }
       case NodeType::Group: {
@@ -1367,7 +1536,64 @@ void PPTWriter::writeElements(XMLBuilder& out, const std::vector<Element*>& elem
         Matrix groupMatrix = BuildGroupMatrix(group);
         Matrix combined = transform * groupMatrix;
         float groupAlpha = alpha * group->alpha;
-        writeElements(out, group->elements, combined, groupAlpha, filters);
+        writeElements(out, group->elements, combined, groupAlpha, filters, styles, parentTextBox);
+        break;
+      }
+      case NodeType::Repeater: {
+        // Approximate Repeater by re-emitting the immediately preceding shape
+        // with progressive transforms. Reuses the layer-level fs so each copy
+        // inherits the same fill/stroke and effects.
+        if (lastShapeIndex >= elements.size()) {
+          break;
+        }
+        auto* rep = static_cast<const Repeater*>(element);
+        int copies = std::max(0, static_cast<int>(rep->copies));
+        if (copies <= 1) {
+          break;
+        }
+        const auto* base = elements[lastShapeIndex];
+        for (int c = 1; c < copies; ++c) {
+          float t = static_cast<float>(c) - rep->offset;
+          float angleRad = rep->rotation * t * static_cast<float>(M_PI) / 180.0f;
+          float sx = std::pow(rep->scale.x, t);
+          float sy = std::pow(rep->scale.y, t);
+          Matrix copyMatrix = Matrix::Translate(rep->anchor.x, rep->anchor.y);
+          copyMatrix = copyMatrix * Matrix::Rotate(angleRad);
+          copyMatrix = copyMatrix * Matrix::Scale(sx, sy);
+          copyMatrix = copyMatrix * Matrix::Translate(-rep->anchor.x, -rep->anchor.y);
+          copyMatrix = copyMatrix * Matrix::Translate(rep->position.x * t, rep->position.y * t);
+          Matrix combined = transform * copyMatrix;
+          float copyAlpha = alpha;
+          if (copies > 1 && (rep->startAlpha != 1.0f || rep->endAlpha != 1.0f)) {
+            float frac = static_cast<float>(c) / static_cast<float>(copies - 1);
+            copyAlpha *= rep->startAlpha + (rep->endAlpha - rep->startAlpha) * frac;
+          }
+          switch (base->nodeType()) {
+            case NodeType::Rectangle:
+              writeRectangle(out, static_cast<const Rectangle*>(base), fs, combined, copyAlpha,
+                             filters, styles);
+              break;
+            case NodeType::Ellipse:
+              writeEllipse(out, static_cast<const Ellipse*>(base), fs, combined, copyAlpha,
+                           filters, styles);
+              break;
+            case NodeType::Path:
+              writePath(out, static_cast<const Path*>(base), fs, combined, copyAlpha, filters,
+                        styles);
+              break;
+            case NodeType::Text: {
+              auto* text = static_cast<const Text*>(base);
+              if (_convertTextToPath && !text->glyphRuns.empty()) {
+                writeTextAsPath(out, text, fs, combined, copyAlpha, filters, styles);
+              } else {
+                writeNativeText(out, text, fs, combined, copyAlpha, filters, styles);
+              }
+              break;
+            }
+            default:
+              break;
+          }
+        }
         break;
       }
       default:
@@ -1399,12 +1625,21 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& pa
         auto extCY = std::max(int64_t(1), PxToEMU(bounds.height()));
         auto relId = _ctx->addRawImage(std::move(pngData));
         writePicture(out, relId, offX, offY, extCX, extCY);
+        return;
       }
     }
-    return;
+    // Bake fell through (zero bounds, no GPU, etc.) - fall through to writing
+    // the layer as a regular layer so its content is at least visible without
+    // the mask effect.
   }
 
-  writeElements(out, layer->contents, layerMatrix, layerAlpha, layer->filters);
+  writeElements(out, layer->contents, layerMatrix, layerAlpha, layer->filters, layer->styles);
+
+  if (layer->composition != nullptr) {
+    for (const auto* compLayer : layer->composition->layers) {
+      writeLayer(out, compLayer, layerMatrix, layerAlpha);
+    }
+  }
 
   for (const auto* child : layer->children) {
     writeLayer(out, child, layerMatrix, layerAlpha);
