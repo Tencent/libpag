@@ -50,7 +50,7 @@ using pag::FloatNearlyZero;
 // matches the native PAGX render. tgfx strokes the glyph path with `fontSize * FauxBoldScale`
 // and unions it with the original fill; `-webkit-text-stroke` is also a centered stroke, so
 // using the same width produces the same visible thickening. Keep in sync with tgfx.
-static float FauxBoldStrokeWidth(float fontSize) {
+float FauxBoldStrokeWidth(float fontSize) {
   constexpr float keySmall = 9.0f;
   constexpr float keyLarge = 36.0f;
   constexpr float valSmall = 1.0f / 24.0f;

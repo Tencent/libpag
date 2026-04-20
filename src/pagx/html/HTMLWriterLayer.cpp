@@ -317,6 +317,11 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                   }
                 }
               }
+              if (span.text->fauxBold && !span.stroke) {
+                spanStyle += ";-webkit-text-stroke:" +
+                             FloatToString(FauxBoldStrokeWidth(span.text->renderFontSize())) +
+                             "px currentColor";
+              }
               if (span.stroke && span.stroke->color &&
                   span.stroke->color->nodeType() == NodeType::SolidColor) {
                 auto sc = static_cast<const SolidColor*>(span.stroke->color);
@@ -404,6 +409,11 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                   spanStyle += ";-webkit-text-fill-color:transparent";
                 }
               }
+            }
+            if (span.text->fauxBold && !span.stroke) {
+              spanStyle += ";-webkit-text-stroke:" +
+                           FloatToString(FauxBoldStrokeWidth(span.text->renderFontSize())) +
+                           "px currentColor";
             }
             if (span.stroke && span.stroke->color &&
                 span.stroke->color->nodeType() == NodeType::SolidColor) {

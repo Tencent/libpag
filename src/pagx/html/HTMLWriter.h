@@ -77,6 +77,10 @@ std::string PaddingToCSS(const Padding& padding);
 
 std::string GetImageSrc(const Image* image);
 const char* DetectImageMime(const uint8_t* bytes, size_t size);
+
+// Mirrors tgfx/src/core/utils/FauxBoldScale.cpp. Returns the stroke width (in px) that produces
+// the same visible thickening as tgfx's faux-bold path rendering at the given fontSize.
+float FauxBoldStrokeWidth(float fontSize);
 std::string EscapeCSSUrl(const std::string& url);
 
 std::string BuildPolystarPath(const Polystar* ps);
