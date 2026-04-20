@@ -53,6 +53,30 @@ class PAGXOptimizer {
     bool canonicalizePaths = true;
     /** Replace alpha-rectangle masks with an equivalent scrollRect on the parent layer. */
     bool rectMaskToScrollRect = true;
+    /**
+     * Split Path elements whose PathData verb count exceeds `pathVerbThreshold` into multiple
+     * sibling Paths at sub-path boundaries. Hole sub-paths (bounding-box-contained) are kept
+     * together with their outer contour so fill-rule rendering is preserved exactly. Skipped
+     * for reversed paths, paths with layout constraints or customData, and Paths whose
+     * PathData is a shared/named resource.
+     *
+     * Off by default because the resulting Paths each carry their own PathData and slightly
+     * inflate the document; enable when targeting a renderer that warns on high-verb paths.
+     */
+    bool splitLongPaths = false;
+    /** Verb count above which a Path becomes eligible for splitting. Matches the warning
+     * threshold used by `pagx verify` (`> 1024`). */
+    int pathVerbThreshold = 1024;
+    /** Maximum verbs allowed in an emitted chunk; must be strictly less than the threshold. */
+    int maxVerbsPerPath = 900;
+    /**
+     * Allow the splitter to chord-split a single closed sub-path that exceeds the threshold
+     * by inserting an internal straight chord, producing two filled halves whose union
+     * matches the original area. The chord runs inside the contour so it is invisible for
+     * solid fills but may be perceptible on stroked or alpha-composited paths. Off by
+     * default — opt in for assets where you have verified the affected paths are filled.
+     */
+    bool enableChordSplit = false;
     /** Collapse PathData resources with identical contents into a single instance. */
     bool dedupPathData = true;
     /** Drop resources from `<Resources>` that no longer have any reference in the layer tree. */

@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <functional>
 #include "base/PAGTest.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXOptimizer.h"
@@ -337,6 +338,346 @@ CLI_TEST(PAGXOptimizerTest, PreservesCustomDataOnGroup) {
   ASSERT_EQ(doc->layers[0]->contents[0]->nodeType(), NodeType::Group);
   auto* g = static_cast<Group*>(doc->layers[0]->contents[0]);
   EXPECT_EQ(g->customData.count("data-tag"), 1u);
+}
+
+// ---------------------------------------------------------------------------
+// SplitLongPaths
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// Build a PathData that packs `count` unit squares along the x axis. Each square contributes
+// 5 verbs (M, L, L, L, Z), so the total verb count is exactly `count * 5`. Squares live at
+// distinct x positions so their bounding boxes never overlap — the clustering pass will therefore
+// treat each square as its own standalone cluster.
+PathData* MakeRepeatedSquares(PAGXDocument* doc, int count) {
+  auto* data = doc->makeNode<PathData>();
+  for (int i = 0; i < count; i++) {
+    float x = static_cast<float>(i * 10);
+    data->moveTo(x, 0);
+    data->lineTo(x + 5, 0);
+    data->lineTo(x + 5, 5);
+    data->lineTo(x, 5);
+    data->close();
+  }
+  return data;
+}
+
+// Glyph-with-hole geometry: a large outer square followed by a small square completely inside
+// it (the "hole"). Any split must keep the hole attached to its outer, which means this path
+// packs into a single cluster. With a smaller second outer+hole separated from the first
+// horizontally, we expose a two-cluster layout that can be split between them but never
+// between an outer and its inner hole.
+PathData* MakeGlyphsWithHoles(PAGXDocument* doc, int pairCount, int extraSubpathsPerPair) {
+  auto* data = doc->makeNode<PathData>();
+  for (int i = 0; i < pairCount; i++) {
+    float x = static_cast<float>(i * 100);
+    // Outer.
+    data->moveTo(x, 0);
+    data->lineTo(x + 50, 0);
+    data->lineTo(x + 50, 50);
+    data->lineTo(x, 50);
+    data->close();
+    // Hole (fully inside outer).
+    data->moveTo(x + 20, 20);
+    data->lineTo(x + 30, 20);
+    data->lineTo(x + 30, 30);
+    data->lineTo(x + 20, 30);
+    data->close();
+    // Extra small squares inside the outer to pad up the verb count without creating new
+    // clusters (they are each contained by the outer, so they attach as holes).
+    for (int k = 0; k < extraSubpathsPerPair; k++) {
+      float ox = x + 5 + k * 0.5f;
+      float oy = 5 + k * 0.5f;
+      data->moveTo(ox, oy);
+      data->lineTo(ox + 1, oy);
+      data->lineTo(ox + 1, oy + 1);
+      data->lineTo(ox, oy + 1);
+      data->close();
+    }
+  }
+  return data;
+}
+
+int TotalVerbCount(const PathData* data) {
+  return static_cast<int>(data->verbs().size());
+}
+
+// Default Options + splitLongPaths enabled. The pass is opt-in by default, so every
+// SplitLongPaths* test must request it explicitly.
+PAGXOptimizer::Options SplitOptions(bool enableChordSplit = false) {
+  PAGXOptimizer::Options options;
+  options.splitLongPaths = true;
+  options.enableChordSplit = enableChordSplit;
+  return options;
+}
+
+}  // namespace
+
+CLI_TEST(PAGXOptimizerTest, SplitLongPathsLeavesSmallPathAlone) {
+  auto doc = PAGXDocument::Make(200, 50);
+  auto* layer = AddTopLayer(doc.get());
+  auto* path = doc->makeNode<Path>();
+  path->data = MakeRepeatedSquares(doc.get(), 10);  // 50 verbs — well under threshold
+  layer->contents.push_back(path);
+  layer->contents.push_back(MakeSolidFill(doc.get(), 1, 0, 0));
+
+  PAGXOptimizer::Optimize(doc.get(), SplitOptions());
+  ASSERT_EQ(doc->layers.size(), 1u);
+  ASSERT_EQ(doc->layers[0]->contents.size(), 2u);
+  EXPECT_EQ(doc->layers[0]->contents[0]->nodeType(), NodeType::Path);
+}
+
+CLI_TEST(PAGXOptimizerTest, SplitLongPathsSplitsIntoChunks) {
+  auto doc = PAGXDocument::Make(2000, 50);
+  auto* layer = AddTopLayer(doc.get());
+  auto* path = doc->makeNode<Path>();
+  // 240 squares × 5 verbs = 1200 verbs — above default threshold of 1024.
+  path->data = MakeRepeatedSquares(doc.get(), 240);
+  layer->contents.push_back(path);
+  layer->contents.push_back(MakeSolidFill(doc.get(), 1, 0, 0));
+  int originalVerbs = TotalVerbCount(path->data);
+
+  PAGXOptimizer::Optimize(doc.get(), SplitOptions());
+
+  ASSERT_EQ(doc->layers.size(), 1u);
+  auto& contents = doc->layers[0]->contents;
+  // Collect every resulting Path; the terminating Fill keeps its slot.
+  std::vector<Path*> resultingPaths;
+  for (auto* el : contents) {
+    if (el->nodeType() == NodeType::Path) resultingPaths.push_back(static_cast<Path*>(el));
+  }
+  ASSERT_GE(resultingPaths.size(), 2u);
+  int totalVerbs = 0;
+  for (auto* p : resultingPaths) {
+    ASSERT_NE(p->data, nullptr);
+    int verbs = TotalVerbCount(p->data);
+    EXPECT_LE(verbs, 900);  // default maxVerbsPerPath
+    totalVerbs += verbs;
+  }
+  EXPECT_EQ(totalVerbs, originalVerbs);
+}
+
+CLI_TEST(PAGXOptimizerTest, SplitLongPathsKeepsHolesAttached) {
+  auto doc = PAGXDocument::Make(2000, 50);
+  auto* layer = AddTopLayer(doc.get());
+  auto* path = doc->makeNode<Path>();
+  // Each pair = 1 outer + 1 main hole + 20 padding holes = 22 sub-paths (110 verbs). With 10
+  // pairs we sit at 1100 verbs — above the 1024 threshold and enough that the first-fit packer
+  // must close the bucket at 8 pairs (880 verbs) and open a second for the remaining 2.
+  path->data = MakeGlyphsWithHoles(doc.get(), 10, 20);
+  int subPathsPerPair = 22;  // 1 outer + 1 main hole + 20 padding holes
+  layer->contents.push_back(path);
+  layer->contents.push_back(MakeSolidFill(doc.get(), 1, 0, 0));
+  int originalVerbs = TotalVerbCount(path->data);
+
+  PAGXOptimizer::Optimize(doc.get(), SplitOptions());
+
+  std::vector<Path*> resultingPaths;
+  for (auto* el : doc->layers[0]->contents) {
+    if (el->nodeType() == NodeType::Path) resultingPaths.push_back(static_cast<Path*>(el));
+  }
+  ASSERT_GE(resultingPaths.size(), 2u);
+  int totalVerbs = 0;
+  for (auto* p : resultingPaths) {
+    totalVerbs += TotalVerbCount(p->data);
+    // Every pair contributes exactly `subPathsPerPair` Move verbs; since clusters stay intact,
+    // each chunk's Move count must be a multiple of `subPathsPerPair`.
+    int moveCount = 0;
+    for (auto v : p->data->verbs()) {
+      if (v == pagx::PathVerb::Move) moveCount++;
+    }
+    EXPECT_EQ(moveCount % subPathsPerPair, 0);
+  }
+  EXPECT_EQ(totalVerbs, originalVerbs);
+}
+
+CLI_TEST(PAGXOptimizerTest, SplitLongPathsSkipsWhenCustomDataSet) {
+  auto doc = PAGXDocument::Make(2000, 50);
+  auto* layer = AddTopLayer(doc.get());
+  auto* path = doc->makeNode<Path>();
+  path->data = MakeRepeatedSquares(doc.get(), 240);  // 1200 verbs, above threshold
+  path->customData["role"] = "icon-outline";
+  layer->contents.push_back(path);
+  layer->contents.push_back(MakeSolidFill(doc.get(), 1, 0, 0));
+
+  PAGXOptimizer::Optimize(doc.get(), SplitOptions());
+
+  int pathCount = 0;
+  for (auto* el : doc->layers[0]->contents) {
+    if (el->nodeType() == NodeType::Path) pathCount++;
+  }
+  // customData must not be duplicated across splits; the path is preserved as-is.
+  EXPECT_EQ(pathCount, 1);
+}
+
+CLI_TEST(PAGXOptimizerTest, SplitLongPathsSkipsWhenPathDataIsShared) {
+  auto doc = PAGXDocument::Make(2000, 50);
+  auto* layer = AddTopLayer(doc.get());
+  // Simulate a shared PathData resource by giving it an id. Per contract of the optimizer,
+  // shared resources are left untouched so other Path references stay valid.
+  auto* shared = MakeRepeatedSquares(doc.get(), 240);  // 1200 verbs, above threshold
+  shared->id = "shared-long-path";
+  auto* path = doc->makeNode<Path>();
+  path->data = shared;
+  layer->contents.push_back(path);
+  layer->contents.push_back(MakeSolidFill(doc.get(), 1, 0, 0));
+
+  PAGXOptimizer::Optimize(doc.get(), SplitOptions());
+
+  int pathCount = 0;
+  for (auto* el : doc->layers[0]->contents) {
+    if (el->nodeType() == NodeType::Path) pathCount++;
+  }
+  EXPECT_EQ(pathCount, 1);
+}
+
+// Regression: an earlier rebuild-into-result implementation lost siblings that lived before
+// a Group whose deep descendant was the only thing that actually changed. Mirrors the
+// in-place tree walk in `tools/optimize_svg_paths.py::_walk_and_split`.
+CLI_TEST(PAGXOptimizerTest, SplitLongPathsPreservesSiblingsAroundChangedGroup) {
+  auto doc = PAGXDocument::Make(2000, 50);
+  auto* layer = AddTopLayer(doc.get());
+
+  // Sibling 1 — short Path that the splitter must leave in place.
+  auto* sibling1 = doc->makeNode<Path>();
+  sibling1->data = MakeRepeatedSquares(doc.get(), 10);  // 50 verbs
+  layer->contents.push_back(sibling1);
+
+  // Group whose nested child contains the only oversized path.
+  auto* outer = doc->makeNode<Group>();
+  auto* inner = doc->makeNode<Group>();
+  auto* longPath = doc->makeNode<Path>();
+  longPath->data = MakeRepeatedSquares(doc.get(), 240);  // 1200 verbs — splits
+  inner->elements.push_back(longPath);
+  inner->elements.push_back(MakeSolidFill(doc.get(), 1, 0, 0));
+  outer->elements.push_back(inner);
+  layer->contents.push_back(outer);
+
+  // Sibling 2 — short Path after the Group; must also survive.
+  auto* sibling2 = doc->makeNode<Path>();
+  sibling2->data = MakeRepeatedSquares(doc.get(), 10);
+  layer->contents.push_back(sibling2);
+
+  PAGXOptimizer::Optimize(doc.get(), SplitOptions());
+
+  // Outer layer.contents should keep all three slots: the Group + both sibling Paths in
+  // their original relative order. Some passes may merge fills around the Group, but the
+  // Path siblings and the Group itself must be present.
+  ASSERT_EQ(doc->layers.size(), 1u);
+  auto& contents = doc->layers[0]->contents;
+  int siblingPathCount = 0;
+  bool foundGroup = false;
+  for (auto* el : contents) {
+    if (el->nodeType() == NodeType::Path) siblingPathCount++;
+    if (el->nodeType() == NodeType::Group) foundGroup = true;
+  }
+  EXPECT_EQ(siblingPathCount, 2);
+  EXPECT_TRUE(foundGroup);
+
+  // The deep oversized path must have been split.
+  std::function<void(Group*, std::vector<Path*>&)> collectInner = [&](Group* g,
+                                                                      std::vector<Path*>& out) {
+    for (auto* el : g->elements) {
+      if (el->nodeType() == NodeType::Path) out.push_back(static_cast<Path*>(el));
+      if (el->nodeType() == NodeType::Group) collectInner(static_cast<Group*>(el), out);
+    }
+  };
+  std::vector<Path*> deepPaths;
+  for (auto* el : contents) {
+    if (el->nodeType() == NodeType::Group) collectInner(static_cast<Group*>(el), deepPaths);
+  }
+  EXPECT_GE(deepPaths.size(), 2u);
+}
+
+CLI_TEST(PAGXOptimizerTest, SplitLongPathsChordSplitDisabledByDefault) {
+  // A single closed sub-path with > threshold verbs and no natural break points: only the
+  // chord-split fallback could shrink it, and that fallback is off by default. We turn on
+  // splitLongPaths to actually exercise the splitter — chord-split is the only thing that
+  // could touch this path, so an unchanged path count proves the chord-split gate held.
+  auto doc = PAGXDocument::Make(1000, 1000);
+  auto* layer = AddTopLayer(doc.get());
+  auto* data = doc->makeNode<PathData>();
+  data->moveTo(0, 0);
+  // 1100 cubic segments (1 Move + 1100 Cubic + 1 Close = 1102 verbs).
+  for (int i = 0; i < 1100; i++) {
+    float t = static_cast<float>(i + 1);
+    data->cubicTo(t, 0, t, t, t, t);
+  }
+  data->close();
+  auto* path = doc->makeNode<Path>();
+  path->data = data;
+  layer->contents.push_back(path);
+  layer->contents.push_back(MakeSolidFill(doc.get(), 0, 0, 1));
+
+  PAGXOptimizer::Optimize(doc.get(), SplitOptions(/*enableChordSplit=*/false));
+
+  int pathCount = 0;
+  for (auto* el : doc->layers[0]->contents) {
+    if (el->nodeType() == NodeType::Path) pathCount++;
+  }
+  EXPECT_EQ(pathCount, 1);  // untouched — chord-split is opt-in
+}
+
+CLI_TEST(PAGXOptimizerTest, SplitLongPathsChordSplitEnabledHalvesLargeClosedSubPath) {
+  auto doc = PAGXDocument::Make(1000, 1000);
+  auto* layer = AddTopLayer(doc.get());
+  auto* data = doc->makeNode<PathData>();
+  data->moveTo(0, 0);
+  // 1100 cubic segments (1 Move + 1100 Cubic + 1 Close = 1102 verbs).
+  for (int i = 0; i < 1100; i++) {
+    float t = static_cast<float>(i + 1);
+    data->cubicTo(t, 0, t, t, t, t);
+  }
+  data->close();
+  auto* path = doc->makeNode<Path>();
+  path->data = data;
+  layer->contents.push_back(path);
+  layer->contents.push_back(MakeSolidFill(doc.get(), 0, 0, 1));
+
+  PAGXOptimizer::Optimize(doc.get(), SplitOptions(/*enableChordSplit=*/true));
+
+  std::vector<Path*> resultingPaths;
+  for (auto* el : doc->layers[0]->contents) {
+    if (el->nodeType() == NodeType::Path) resultingPaths.push_back(static_cast<Path*>(el));
+  }
+  ASSERT_EQ(resultingPaths.size(), 2u);
+  for (auto* p : resultingPaths) {
+    ASSERT_NE(p->data, nullptr);
+    int verbs = TotalVerbCount(p->data);
+    EXPECT_LE(verbs, 900);
+    // Each emitted half must start with Move and end with Close.
+    EXPECT_EQ(p->data->verbs().front(), pagx::PathVerb::Move);
+    EXPECT_EQ(p->data->verbs().back(), pagx::PathVerb::Close);
+  }
+}
+
+CLI_TEST(PAGXOptimizerTest, SplitLongPathsChordSplitSkipsOpenSubPath) {
+  // Open (un-closed) single sub-path with > threshold verbs: chord split needs a closed
+  // contour to keep the fill area unchanged, so the splitter must leave it alone even
+  // when chord-split is enabled.
+  auto doc = PAGXDocument::Make(1000, 1000);
+  auto* layer = AddTopLayer(doc.get());
+  auto* data = doc->makeNode<PathData>();
+  data->moveTo(0, 0);
+  // 1100 cubic segments (1 Move + 1100 Cubic = 1101 verbs, no Close).
+  for (int i = 0; i < 1100; i++) {
+    float t = static_cast<float>(i + 1);
+    data->cubicTo(t, 0, t, t, t, t);
+  }
+  // Note: no close().
+  auto* path = doc->makeNode<Path>();
+  path->data = data;
+  layer->contents.push_back(path);
+  layer->contents.push_back(MakeSolidFill(doc.get(), 0, 0, 1));
+
+  PAGXOptimizer::Optimize(doc.get(), SplitOptions(/*enableChordSplit=*/true));
+
+  int pathCount = 0;
+  for (auto* el : doc->layers[0]->contents) {
+    if (el->nodeType() == NodeType::Path) pathCount++;
+  }
+  EXPECT_EQ(pathCount, 1);
 }
 
 // ---------------------------------------------------------------------------

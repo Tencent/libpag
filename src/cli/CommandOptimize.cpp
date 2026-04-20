@@ -57,6 +57,12 @@ void PrintOptimizeUsage() {
       << "  --no-merge-groups         Do not merge adjacent Groups with identical painters\n"
       << "  --no-canonicalize-paths   Do not rewrite Paths as Rectangle/Ellipse when possible\n"
       << "  --no-rect-mask            Do not convert rect masks to scrollRect\n"
+      << "  --split-long-paths        Split Paths whose verb count exceeds the threshold into\n"
+      << "                            multiple sibling Paths (off by default)\n"
+      << "  --path-verb-threshold <n> Verb count at which long-path splitting triggers (1024)\n"
+      << "  --max-verbs-per-path <n>  Max verbs in each emitted chunk; must be < threshold (900)\n"
+      << "  --chord-split             With --split-long-paths, chord-split a single oversized\n"
+      << "                            closed sub-path; only safe for filled (non-stroked) paths\n"
       << "  --no-dedup-paths          Do not deduplicate PathData resources\n"
       << "  --no-prune-resources      Do not drop unreferenced resources\n"
       << "  -h, --help                Show this help message\n";
@@ -119,6 +125,32 @@ int ParseOptimizeOptions(int argc, char* argv[], OptimizeOptions* options) {
     }
     if (arg == "--no-rect-mask") {
       options->optimizerOptions.rectMaskToScrollRect = false;
+      continue;
+    }
+    if (arg == "--split-long-paths") {
+      options->optimizerOptions.splitLongPaths = true;
+      continue;
+    }
+    if (arg == "--path-verb-threshold" && i + 1 < argc) {
+      int value = 0;
+      if (!ParseIntArg(argv[++i], &value)) {
+        std::cerr << "pagx optimize: invalid --path-verb-threshold value '" << argv[i] << "'\n";
+        return 1;
+      }
+      options->optimizerOptions.pathVerbThreshold = value;
+      continue;
+    }
+    if (arg == "--max-verbs-per-path" && i + 1 < argc) {
+      int value = 0;
+      if (!ParseIntArg(argv[++i], &value)) {
+        std::cerr << "pagx optimize: invalid --max-verbs-per-path value '" << argv[i] << "'\n";
+        return 1;
+      }
+      options->optimizerOptions.maxVerbsPerPath = value;
+      continue;
+    }
+    if (arg == "--chord-split") {
+      options->optimizerOptions.enableChordSplit = true;
       continue;
     }
     if (arg == "--no-dedup-paths") {
