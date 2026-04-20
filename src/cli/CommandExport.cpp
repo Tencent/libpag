@@ -36,6 +36,7 @@ struct ExportOptions {
   // Defaults mirror PPTExporter::Options so the CLI flags can disable each
   // feature without inverting the value at assignment time.
   bool pptBakeMask = true;
+  bool pptBakeScrollRect = true;
   bool pptBakeTiledPattern = true;
   bool pptBridgeContours = true;
 };
@@ -60,6 +61,8 @@ static void PrintUsage() {
       << "PPT options:\n"
       << "  --ppt-no-bake-mask          Export masked layers as vector shapes instead of\n"
       << "                              rasterizing to bitmap\n"
+      << "  --ppt-no-bake-scroll-rect   Drop scrollRect clipping instead of rasterizing\n"
+      << "                              clipped layers to bitmap\n"
       << "  --ppt-no-bake-tiled-pattern Use native OOXML a:tile instead of rasterizing\n"
       << "                              tiled image patterns to bitmap\n"
       << "  --ppt-no-bridge-contours    Emit each contour as a separate sub-path instead\n"
@@ -99,6 +102,8 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
       options->textToPath = true;
     } else if (arg == "--ppt-no-bake-mask") {
       options->pptBakeMask = false;
+    } else if (arg == "--ppt-no-bake-scroll-rect") {
+      options->pptBakeScrollRect = false;
     } else if (arg == "--ppt-no-bake-tiled-pattern") {
       options->pptBakeTiledPattern = false;
     } else if (arg == "--ppt-no-bridge-contours") {
@@ -187,6 +192,7 @@ static int ExportToPPT(const ExportOptions& options) {
   PPTExporter::Options pptOptions = {};
   pptOptions.convertTextToPath = options.textToPath;
   pptOptions.bakeMask = options.pptBakeMask;
+  pptOptions.bakeScrollRect = options.pptBakeScrollRect;
   pptOptions.bakeTiledPattern = options.pptBakeTiledPattern;
   pptOptions.bridgeContours = options.pptBridgeContours;
 

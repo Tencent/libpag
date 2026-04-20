@@ -45,6 +45,15 @@ struct PPTExportOptions {
   bool bakeMask = true;
 
   /**
+   * Whether to rasterize layers that carry a scrollRect (either set explicitly or generated from
+   * clipToBounds during layout) into bitmap images. OOXML has no general-purpose clipping
+   * primitive for arbitrary shape children, so the only way to honour the clip is to bake the
+   * layer (with its scrollRect applied) to PNG. When disabled, the scrollRect is silently dropped
+   * and the layer content is exported as unclipped editable shapes. The default value is true.
+   */
+  bool bakeScrollRect = true;
+
+  /**
    * Whether to rasterize tiled image patterns into bitmap images. When enabled, ImagePattern fills
    * with repeat or mirror tile modes are pre-rendered at the shape size and embedded as stretched
    * images, ensuring identical rendering across PowerPoint and Keynote regardless of DPI settings.
