@@ -225,67 +225,49 @@ Prefer `arrangement` over empty spacer Layers.
 ## Constraint Positioning
 
 Constraint attributes (`left`, `right`, `top`, `bottom`, `centerX`, `centerY`, `width`,
-`height`) position and size elements relative to their parent container. Supported by:
-Rectangle, Ellipse, Polystar, Path, Text, Group, TextBox, TextPath, and Layer. Always
-available for VectorElements; for child Layers only when parent has no `layout` or child
-has `includeInLayout="false"`. Top-level Layers (direct children of `<pagx>` or
-`<Composition>`) can also use constraints — the document/composition `width`×`height`
-serves as their container size.
+`height`) place and size elements relative to their container. Distances are measured from
+the named edge to the container edge (minus `padding`). Supported by Rectangle, Ellipse,
+Polystar, Path, Text, Group, TextBox, TextPath, and Layer — always on VectorElements;
+on child Layers only when the parent has no `layout` or the child has
+`includeInLayout="false"`.
 
-| Attribute | Effect |
-|-----------|--------|
-| `left` | Distance from element left edge to container left edge |
-| `right` | Distance from element right edge to container right edge |
-| `top` | Distance from element top edge to container top edge |
-| `bottom` | Distance from element bottom edge to container bottom edge |
-| `centerX` | Horizontal offset from container center (0 = centered) |
-| `centerY` | Vertical offset from container center (0 = centered) |
-| `width` | Layout width; pixels (e.g., `100`) or percentage (e.g., `50%`) relative to container |
-| `height` | Layout height; pixels (e.g., `100`) or percentage (e.g., `50%`) relative to container |
+**Pick by design intent**:
 
-**Positioning rules** (per axis) — use only one combination per axis:
-- Single edge alone (e.g., `left="10"`) → positions only; size comes from size rules below
-- Opposite pair (e.g., `left="10" right="10"`) → positions AND sizes (overrides explicit size)
-- `centerX` → centers with offset; overrides `left`/`right` silently (avoid mixing)
+| Intent | Attributes |
+|--------|-----------|
+| Fixed size at fixed position | `left`+`top`+`width`+`height` |
+| Fill the container | `width="100%" height="100%"` |
+| Stretch with margin | `left="M" right="M" top="M" bottom="M"` |
+| Pin to a corner | `right`+`top` (top-right), `right`+`bottom` (bottom-right), etc. |
+| Centered | `centerX="0" centerY="0"` |
+| Fixed-size element anchored to one edge | `left="M" width="W"` or `right="M" width="W"` |
 
-**Priority**: `centerX` > `left`+`right` > `left` > `right` (same for vertical).
+Positional rules per axis (pick one combination):
+`left` alone / `right` alone / `centerX` alone — position only;
+`left`+`right` — positions AND stretches to fill, **overriding any `width`**.
+`width` accepts pixels (`100`) or percentage (`50%`); percentages resolve against the
+container's layout size inside `padding`.
 
-**Explicit size** (`width` / `height`) — accepts pixels (`100`) or percentage (`50%`):
-- Percentage values resolve against the container's layout size inside padding
-  (`width = (parent.width - parent.padding.left - parent.padding.right) × N / 100`)
-- Without positional constraints, the element is placed at the container origin (inside
-  padding); with a single edge (e.g., `left="10" width="100"`), that edge positions it
+**Size behavior by element type** (applies to both pixels and percentages):
 
-**Size behavior by element type** (same for pixels and percentages):
-
-| Element Type | Behavior |
-|--------------|----------|
-| Rectangle, Ellipse | **Stretch** to fill target size (changes `size`) |
-| TextBox | **Stretch** text layout region |
-| Path, Polystar, Text, TextPath | **Scale to fit** proportionally |
-| Group | **Derive size** for child constraint reference |
-| Layer | **Override** layout width/height |
-
-**Size source priority** (highest first): opposite-pair constraints → explicit
-`width`/`height` (pixels or percentages) → `size` (Rectangle/Ellipse only) → content
-measurement.
-
-**Choose by design intent**: `right`+`top` for top-right corner, `centerX`+`bottom` for
-bottom-center, `width="100%" height="100%"` to fill parent.
-
-**Examples**:
+| Element | Effect of explicit size |
+|---------|------------------------|
+| Rectangle, Ellipse | Stretch shape to fill target size |
+| TextBox | Stretch text layout region |
+| Path, Polystar, Text, TextPath | Scale drawing to fit (proportional) |
+| Group, Layer | Adopt the size as layout bounds for children |
 
 ```xml
-<!-- Background: stretch to fill -->
+<!-- Background filling the parent -->
 <Rectangle width="100%" height="100%" roundness="12"/>
 
-<!-- Centered text -->
+<!-- Centered label -->
 <TextBox centerX="0" centerY="0">
-  <Text text="Label" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+  <Text text="Label" fontFamily="Arial" fontSize="14"/>
   <Fill color="#FFF"/>
 </TextBox>
 
-<!-- Right-aligned, vertically centered -->
+<!-- Right-aligned price tag -->
 <TextBox right="16" centerY="0">
   <Text text="$99" fontFamily="Arial" fontSize="20"/>
   <Fill color="#10B981"/>
