@@ -3,9 +3,8 @@
 Command-line tool for working with [PAGX](https://pag.io/pagx/latest/) files — an XML-based vector
 animation format that is human-readable, diff-friendly, and designed for AI-assisted generation.
 
-Use this tool to validate PAGX files against the specification, render them to images, optimize
-file structure and size, format for consistent style, query layer bounds, and manage font
-embedding.
+Use this tool to validate PAGX files against the specification, render them to images, format for
+consistent style, query layer bounds, and manage font embedding.
 
 ## Install
 
@@ -19,7 +18,6 @@ npm install -g @libpag/pagx
 |---------|-------------|
 | `pagx validate` | Validate a PAGX file against the specification schema |
 | `pagx render` | Render a PAGX file to an image (PNG, WebP, or JPEG) |
-| `pagx optimize` | Validate, optimize, and format in one step |
 | `pagx format` | Format a PAGX file with consistent indentation and attribute ordering |
 | `pagx bounds` | Query the precise rendered bounds of layers |
 | `pagx font info` | Query font identity and metrics from a file or system font |
@@ -45,12 +43,6 @@ pagx render --id badge -o badge.png input.pagx
 
 # Render only a specific layer by XPath
 pagx render --xpath "//Layer[@id='card']" -o card.png input.pagx
-
-# Optimize (validate + structural optimization + format)
-pagx optimize input.pagx
-
-# Preview optimizations without writing
-pagx optimize --dry-run input.pagx
 
 # Format with 4-space indentation
 pagx format --indent 4 input.pagx
@@ -100,28 +92,6 @@ Render a PAGX file to an image.
 | `--background <color>` | Background color (`#RRGGBB` or `#RRGGBBAA`) |
 | `--font <path>` | Register a font file (repeatable) |
 | `--fallback <path\|name>` | Add a fallback font file or system font name (repeatable) |
-
-### `pagx optimize [options] <file.pagx>`
-
-Validate, optimize, and format a PAGX file in one step. Aborts if the input fails validation.
-
-Optimizations applied:
-
-1. Remove empty elements (empty Layer/Group, zero-width Stroke)
-2. Deduplicate PathData resources
-3. Deduplicate gradient resources
-4. Merge adjacent Groups with identical painters
-5. Replace Path with Rectangle/Ellipse where possible
-6. Remove full-canvas clip masks
-7. Remove off-canvas invisible layers
-8. Localize layer coordinates
-9. Extract duplicate layers to compositions
-10. Remove unreferenced resources
-
-| Option | Description |
-|--------|-------------|
-| `-o, --output <path>` | Output file path (default: overwrite input) |
-| `--dry-run` | Print optimization report without writing output |
 
 ### `pagx format [options] <file.pagx>`
 
