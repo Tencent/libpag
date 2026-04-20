@@ -287,6 +287,7 @@ class PPTWriter {
   void writeFill(XMLBuilder& out, const Fill* fill, float alpha, const Rect& shapeBounds = {});
   void writeColorSource(XMLBuilder& out, const ColorSource* source, float alpha,
                         const Rect& shapeBounds = {});
+  void writeSolidColorFill(XMLBuilder& out, const Color& color, float alpha);
   void writeImagePatternFill(XMLBuilder& out, const ImagePattern* pattern, float alpha,
                              const Rect& shapeBounds);
   void writeGradientStops(XMLBuilder& out, const std::vector<ColorStop*>& stops);
@@ -614,19 +615,7 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
   switch (source->nodeType()) {
     case NodeType::SolidColor: {
       auto* solid = static_cast<const SolidColor*>(source);
-      float effectiveAlpha = solid->color.alpha * alpha;
-      out.openElement("a:solidFill").closeElementStart();
-      out.openElement("a:srgbClr").addRequiredAttribute("val", ColorToHex6(solid->color));
-      if (effectiveAlpha < 1.0f) {
-        out.closeElementStart();
-        out.openElement("a:alpha")
-            .addRequiredAttribute("val", AlphaToPct(effectiveAlpha))
-            .closeElementSelfClosing();
-        out.closeElement();
-      } else {
-        out.closeElementSelfClosing();
-      }
-      out.closeElement();  // a:solidFill
+      writeSolidColorFill(out, solid->color, alpha);
       break;
     }
     case NodeType::LinearGradient: {
@@ -878,12 +867,33 @@ void PPTWriter::writeImagePatternFill(XMLBuilder& out, const ImagePattern* patte
 
 // ── Fill / stroke ──────────────────────────────────────────────────────────
 
+void PPTWriter::writeSolidColorFill(XMLBuilder& out, const Color& color, float alpha) {
+  float effectiveAlpha = color.alpha * alpha;
+  out.openElement("a:solidFill").closeElementStart();
+  out.openElement("a:srgbClr").addRequiredAttribute("val", ColorToHex6(color));
+  if (effectiveAlpha < 1.0f) {
+    out.closeElementStart();
+    out.openElement("a:alpha")
+        .addRequiredAttribute("val", AlphaToPct(effectiveAlpha))
+        .closeElementSelfClosing();
+    out.closeElement();
+  } else {
+    out.closeElementSelfClosing();
+  }
+  out.closeElement();  // a:solidFill
+}
+
 void PPTWriter::writeFill(XMLBuilder& out, const Fill* fill, float alpha, const Rect& shapeBounds) {
-  if (!fill || !fill->color) {
+  if (!fill) {
     out.openElement("a:noFill").closeElementSelfClosing();
     return;
   }
   float effectiveAlpha = fill->alpha * alpha;
+  if (!fill->color) {
+    // Per PAGX spec, Fill defaults to opaque black (#000000) when no color is specified.
+    writeSolidColorFill(out, Color{}, effectiveAlpha);
+    return;
+  }
   writeColorSource(out, fill->color, effectiveAlpha, shapeBounds);
 }
 
@@ -908,7 +918,8 @@ void PPTWriter::writeStroke(XMLBuilder& out, const Stroke* stroke, float alpha) 
   if (stroke->color) {
     writeColorSource(out, stroke->color, effectiveAlpha);
   } else {
-    out.openElement("a:noFill").closeElementSelfClosing();
+    // Per PAGX spec, Stroke defaults to opaque black (#000000) when no color is specified.
+    writeSolidColorFill(out, Color{}, effectiveAlpha);
   }
 
   if (!stroke->dashes.empty()) {
