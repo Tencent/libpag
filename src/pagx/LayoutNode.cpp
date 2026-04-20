@@ -133,6 +133,10 @@ void LayoutNode::PerformConstraintLayout(const std::vector<LayoutNode*>& nodes, 
     //   opposite-edge constraints > percentWidth/Height > NAN (child uses its preferred size)
     // An authored width/height is NOT considered here: the child already folds it into its
     // preferred size during onMeasure(), so passing NAN lets setLayoutSize fall back to it.
+    // Rounding policy: `targetW` / `targetH` produced here are layout-allocated sizes (the
+    // engine derived them from constraints or percent), so we ceil them to whole pixels. Authored
+    // widths/heights and content-measured preferred sizes keep their exact values — they are
+    // carried through setLayoutSize's NaN fallback, not through this branch.
     float targetW = NAN;
     if (!std::isnan(child->left) && !std::isnan(child->right)) {
       targetW = std::isnan(cw) ? NAN : std::max(0.0f, std::ceil(cw - child->left - child->right));

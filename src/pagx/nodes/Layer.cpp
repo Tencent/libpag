@@ -263,6 +263,12 @@ void Layer::setLayoutSize(LayoutContext* context, float targetWidth, float targe
   }
   float prevW = layoutWidth;
   float prevH = layoutHeight;
+  // Content-measured refinement: `maxX` / `maxY` are measurement results derived from children's
+  // actual layout bounds (or flex main-axis totals), not sizes allocated by the layout engine.
+  // Keep them un-ceiled so the container mirrors the exact extent of its children — rounding here
+  // would drift the container away from authored child sizes. Rounding is applied only at
+  // layout-allocation sites (PerformConstraintLayout's targetW/H, ComputeExplicitMainSize/CrossSize
+  // for percent dimensions, TextBox cross-axis re-typesetting).
   if (widthFromContent) {
     layoutWidth = maxX;
   }

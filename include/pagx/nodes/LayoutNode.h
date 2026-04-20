@@ -124,6 +124,14 @@ class LayoutNode {
 
   /**
    * Writes self rendering attributes and layoutWidth/layoutHeight. Does not touch children.
+   *
+   * Rounding policy: the measure phase (`onMeasure` / `preferredWidth` / `preferredHeight`) must
+   * preserve authored values exactly, so it does not round. Only sizes allocated by the layout
+   * phase — constraint-resolved `targetWidth`/`targetHeight` — are ceiled (in
+   * `PerformConstraintLayout`) to keep each allocation on whole-pixel boundaries. When
+   * `setLayoutSize` falls back to `preferredWidth`/`preferredHeight` (NaN target), it passes that
+   * value through without rounding so the authored or content-measured size stays exact.
+   *
    * @param context the current layout context
    * @param targetWidth target width from parent constraints, NaN means use preferred size
    * @param targetHeight target height from parent constraints, NaN means use preferred size
