@@ -108,7 +108,9 @@ void TextBox::setLayoutSize(LayoutContext* context, float targetWidth, float tar
     std::vector<Text*> childText = {};
     TextLayout::CollectTextElements(elements, childText);
     auto result = TextLayout::Layout(childText, params, context);
-    float crossSize = std::ceil(horizontal ? result.bounds.height : result.bounds.width);
+    // Measurement result: keep un-rounded so the TextBox mirrors the exact typeset extent.
+    // Rounding is reserved for layout-allocation sites (see LayoutNode::setLayoutSize contract).
+    float crossSize = horizontal ? result.bounds.height : result.bounds.width;
     if (hasPadding) {
       crossSize += horizontal ? (padding.top + padding.bottom) : (padding.left + padding.right);
     }
