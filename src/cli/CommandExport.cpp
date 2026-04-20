@@ -33,9 +33,11 @@ struct ExportOptions {
   int svgIndent = 2;
   bool svgNoXmlDeclaration = false;
   bool textToPath = false;
-  bool pptNoBakeMask = false;
-  bool pptNoBakeTiledPattern = false;
-  bool pptNoBridgeContours = false;
+  // Defaults mirror PPTExporter::Options so the CLI flags can disable each
+  // feature without inverting the value at assignment time.
+  bool pptBakeMask = true;
+  bool pptBakeTiledPattern = true;
+  bool pptBridgeContours = true;
 };
 
 static void PrintUsage() {
@@ -96,11 +98,11 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
     } else if (arg == "--text-to-path") {
       options->textToPath = true;
     } else if (arg == "--ppt-no-bake-mask") {
-      options->pptNoBakeMask = true;
+      options->pptBakeMask = false;
     } else if (arg == "--ppt-no-bake-tiled-pattern") {
-      options->pptNoBakeTiledPattern = true;
+      options->pptBakeTiledPattern = false;
     } else if (arg == "--ppt-no-bridge-contours") {
-      options->pptNoBridgeContours = true;
+      options->pptBridgeContours = false;
     } else if (arg == "--help" || arg == "-h") {
       PrintUsage();
       return -1;
@@ -184,9 +186,9 @@ static int ExportToPPT(const ExportOptions& options) {
 
   PPTExporter::Options pptOptions = {};
   pptOptions.convertTextToPath = options.textToPath;
-  pptOptions.bakeMask = !options.pptNoBakeMask;
-  pptOptions.bakeTiledPattern = !options.pptNoBakeTiledPattern;
-  pptOptions.bridgeContours = !options.pptNoBridgeContours;
+  pptOptions.bakeMask = options.pptBakeMask;
+  pptOptions.bakeTiledPattern = options.pptBakeTiledPattern;
+  pptOptions.bridgeContours = options.pptBridgeContours;
 
   if (!PPTExporter::ToFile(*document, options.outputFile, pptOptions)) {
     std::cerr << "pagx export: error: failed to write '" << options.outputFile << "'\n";

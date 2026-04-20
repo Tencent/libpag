@@ -392,6 +392,99 @@ PAGX_TEST(PAGXUtilsTest, IsJPEG_EmptyBuffer) {
 }
 
 // ---------------------------------------------------------------------------
+// DecomposeScale
+// ---------------------------------------------------------------------------
+
+PAGX_TEST(PAGXUtilsTest, DecomposeScale_Identity) {
+  pagx::Matrix m = {};
+  m.a = 1.0f;
+  m.d = 1.0f;
+  float sx = -1.0f;
+  float sy = -1.0f;
+  pagx::DecomposeScale(m, &sx, &sy);
+  EXPECT_NEAR(sx, 1.0f, 1e-5f);
+  EXPECT_NEAR(sy, 1.0f, 1e-5f);
+}
+
+PAGX_TEST(PAGXUtilsTest, DecomposeScale_UniformScale) {
+  pagx::Matrix m = {};
+  m.a = 2.0f;
+  m.d = 2.0f;
+  float sx = 0.0f;
+  float sy = 0.0f;
+  pagx::DecomposeScale(m, &sx, &sy);
+  EXPECT_NEAR(sx, 2.0f, 1e-5f);
+  EXPECT_NEAR(sy, 2.0f, 1e-5f);
+}
+
+PAGX_TEST(PAGXUtilsTest, DecomposeScale_NonUniformScale) {
+  pagx::Matrix m = {};
+  m.a = 3.0f;
+  m.d = 5.0f;
+  float sx = 0.0f;
+  float sy = 0.0f;
+  pagx::DecomposeScale(m, &sx, &sy);
+  EXPECT_NEAR(sx, 3.0f, 1e-5f);
+  EXPECT_NEAR(sy, 5.0f, 1e-5f);
+}
+
+PAGX_TEST(PAGXUtilsTest, DecomposeScale_Rotation90) {
+  // 90-degree rotation: a=0, b=1, c=-1, d=0
+  pagx::Matrix m = {};
+  m.a = 0.0f;
+  m.b = 1.0f;
+  m.c = -1.0f;
+  m.d = 0.0f;
+  float sx = 0.0f;
+  float sy = 0.0f;
+  pagx::DecomposeScale(m, &sx, &sy);
+  EXPECT_NEAR(sx, 1.0f, 1e-5f);
+  EXPECT_NEAR(sy, 1.0f, 1e-5f);
+}
+
+PAGX_TEST(PAGXUtilsTest, DecomposeScale_RotatedAndScaled) {
+  // Rotate 45 degrees and scale by 2.
+  float c = std::cos(static_cast<float>(M_PI) / 4.0f) * 2.0f;
+  float s = std::sin(static_cast<float>(M_PI) / 4.0f) * 2.0f;
+  pagx::Matrix m = {};
+  m.a = c;
+  m.b = s;
+  m.c = -s;
+  m.d = c;
+  float sx = 0.0f;
+  float sy = 0.0f;
+  pagx::DecomposeScale(m, &sx, &sy);
+  EXPECT_NEAR(sx, 2.0f, 1e-5f);
+  EXPECT_NEAR(sy, 2.0f, 1e-5f);
+}
+
+PAGX_TEST(PAGXUtilsTest, DecomposeScale_MirroredHorizontally) {
+  // Horizontal mirror: a=-1, d=1.  sx is the magnitude of (a,b), sy stays positive.
+  pagx::Matrix m = {};
+  m.a = -1.0f;
+  m.d = 1.0f;
+  float sx = 0.0f;
+  float sy = 0.0f;
+  pagx::DecomposeScale(m, &sx, &sy);
+  EXPECT_NEAR(sx, 1.0f, 1e-5f);
+  EXPECT_NEAR(sy, 1.0f, 1e-5f);
+}
+
+PAGX_TEST(PAGXUtilsTest, DecomposeScale_Degenerate) {
+  // A fully zero matrix collapses both axes; sx and sy should report zero.
+  pagx::Matrix m = {};
+  m.a = 0.0f;
+  m.b = 0.0f;
+  m.c = 0.0f;
+  m.d = 0.0f;
+  float sx = 1.0f;
+  float sy = 1.0f;
+  pagx::DecomposeScale(m, &sx, &sy);
+  EXPECT_EQ(sx, 0.0f);
+  EXPECT_EQ(sy, 0.0f);
+}
+
+// ---------------------------------------------------------------------------
 // HasNonASCII
 // ---------------------------------------------------------------------------
 

@@ -202,6 +202,12 @@ FillRule DetectMaskFillRule(const Layer* maskLayer) {
   return FillRule::Winding;
 }
 
+void DecomposeScale(const Matrix& m, float* sx, float* sy) {
+  *sx = std::sqrt(m.a * m.a + m.b * m.b);
+  float det = m.a * m.d - m.b * m.c;
+  *sy = (*sx > 0) ? std::abs(det) / *sx : 0;
+}
+
 bool GetPNGDimensions(const uint8_t* data, size_t size, int* width, int* height) {
   if (size < 24) {
     return false;

@@ -279,12 +279,6 @@ class PPTWriter {
                                   const Matrix& m, float alpha);
 };
 
-static void DecomposeScale(const Matrix& m, float* sx, float* sy) {
-  *sx = std::sqrt(m.a * m.a + m.b * m.b);
-  float det = m.a * m.d - m.b * m.c;
-  *sy = (*sx > 0) ? std::abs(det) / *sx : 0;
-}
-
 // ── Transform decomposition ────────────────────────────────────────────────
 
 PPTWriter::Xform PPTWriter::decomposeXform(float localX, float localY, float localW, float localH,
@@ -594,11 +588,29 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
       out.openElement("a:gradFill").closeElementStart();
       writeGradientStops(out, grad->colorStops);
       out.openElement("a:path").addRequiredAttribute("path", "circle").closeElementStart();
+      // Map the gradient center through its matrix to document space and convert to
+      // fillToRect insets (1/1000 percent) relative to the shape bounds.  OOXML
+      // radial gradients always span the whole bounding box, so radius cannot be
+      // honoured exactly; only the focus position is preserved.  When shapeBounds
+      // is empty (e.g. text fills) fall back to the shape center.
+      int l = 50000;
+      int t = 50000;
+      int r = 50000;
+      int b = 50000;
+      if (shapeBounds.width > 0 && shapeBounds.height > 0) {
+        Point centerDoc = grad->matrix.mapPoint(grad->center);
+        float relX = (centerDoc.x - shapeBounds.x) / shapeBounds.width;
+        float relY = (centerDoc.y - shapeBounds.y) / shapeBounds.height;
+        l = std::clamp(static_cast<int>(std::round(relX * 100000.0f)), 0, 100000);
+        t = std::clamp(static_cast<int>(std::round(relY * 100000.0f)), 0, 100000);
+        r = 100000 - l;
+        b = 100000 - t;
+      }
       out.openElement("a:fillToRect")
-          .addRequiredAttribute("l", 50000)
-          .addRequiredAttribute("t", 50000)
-          .addRequiredAttribute("r", 50000)
-          .addRequiredAttribute("b", 50000)
+          .addRequiredAttribute("l", l)
+          .addRequiredAttribute("t", t)
+          .addRequiredAttribute("r", r)
+          .addRequiredAttribute("b", b)
           .closeElementSelfClosing();
       out.closeElement();  // a:path
       out.closeElement();  // a:gradFill
@@ -1143,7 +1155,9 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   out.openElement("a:ln").closeElementStart();
   out.openElement("a:noFill").closeElementSelfClosing();
   out.closeElement();
-  writeEffects(out, filters);
+  // Shadow effects on the surrounding p:spPr would apply to the text-box rectangle
+  // rather than the text itself; emit them inside a:rPr below so the shadow follows
+  // the actual glyph outlines.
   out.closeElement();  // p:spPr
 
   out.openElement("p:txBody").closeElementStart();
@@ -1180,8 +1194,14 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   bool hasItalic = text->fontStyle.find("Italic") != std::string::npos;
   int fontSize = FontSizeToPPT(text->fontSize);
   int64_t letterSpc = static_cast<int64_t>(std::round(text->letterSpacing * 75.0));
-  bool hasFillColor =
-      fs.fill && fs.fill->color && fs.fill->color->nodeType() == NodeType::SolidColor;
+  // a:rPr supports a:solidFill and a:gradFill but not a:blipFill, so ImagePattern
+  // fills are skipped (text falls back to the renderer default).
+  bool hasFillColor = false;
+  if (fs.fill && fs.fill->color) {
+    auto type = fs.fill->color->nodeType();
+    hasFillColor = (type == NodeType::SolidColor || type == NodeType::LinearGradient ||
+                    type == NodeType::RadialGradient);
+  }
   float fillAlpha = hasFillColor ? fs.fill->alpha * alpha : 0;
   std::string typeface = text->fontFamily.empty() ? std::string() : StripQuotes(text->fontFamily);
 
@@ -1213,8 +1233,12 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
     out.closeElementStart();
 
     if (hasFillColor) {
+      // For gradient fills, shape bounds are unknown at the run level; pass an empty
+      // rect so writeColorSource falls back to the gradient's own coordinate space.
       writeColorSource(out, fs.fill->color, fillAlpha);
     }
+
+    writeEffects(out, filters);
 
     if (!typeface.empty()) {
       out.openElement("a:latin")

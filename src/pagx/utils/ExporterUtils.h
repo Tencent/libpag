@@ -68,6 +68,14 @@ std::vector<GlyphPath> ComputeGlyphPaths(const Text& text, float textPosX, float
 
 FillRule DetectMaskFillRule(const Layer* maskLayer);
 
+/**
+ * Decomposes the X and Y scale factors of a 2D affine matrix.  The X scale is the
+ * length of the (a, b) basis vector; the Y scale is derived from |det(m)| / sx so
+ * that sx * sy equals the absolute area scale of the matrix (and sy stays positive
+ * even when the matrix is mirrored).  Returns sx = sy = 0 for degenerate matrices.
+ */
+void DecomposeScale(const Matrix& m, float* sx, float* sy);
+
 bool GetPNGDimensions(const uint8_t* data, size_t size, int* width, int* height);
 
 bool GetPNGDimensionsFromPath(const std::string& path, int* width, int* height);
