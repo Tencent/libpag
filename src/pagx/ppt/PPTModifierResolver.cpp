@@ -443,55 +443,70 @@ std::vector<Element*> PPTModifierResolver::resolve(const std::vector<Element*>& 
       }
       case NodeType::Repeater: {
         auto* rep = static_cast<const Repeater*>(element);
-        int copies = std::max(0, static_cast<int>(std::round(rep->copies)));
-        if (copies <= 1 || shapeSlots.empty()) {
+        float copiesF = rep->copies;
+        if (copiesF < 0.0f) {
           break;
         }
-        // Snapshot the shape elements that are subject to the repeater. We wrap
-        // the snapshot in a Group per copy so the per-copy transform is a
-        // single, atomic transform. The original copy (index 0) is kept in
-        // place to avoid double-painting; copies 1..n-1 get their own groups.
-        std::vector<Element*> body;
-        body.reserve(shapeSlots.size());
-        for (auto idx : shapeSlots) {
-          body.push_back(output[idx]);
+        if (copiesF == 0.0f) {
+          // Mirrors ShapeRenderer::ApplyRepeater: copies==0 clears the entire
+          // group's content, so nothing in the current scope renders. Painters
+          // that sit alone wouldn't paint anything anyway, so dropping them too
+          // matches the renderer behaviour exactly.
+          output.clear();
+          shapeSlots.clear();
+          break;
+        }
+        if (output.empty()) {
+          break;
         }
 
+        // Snapshot the entire current scope (shapes + painters + nested groups
+        // + anything else accumulated so far) as the body of every copy. This
+        // matches ShapeRenderer::ApplyRepeater which clones the parent group
+        // for each copy. Without this, copies that didn't include the Fill /
+        // Stroke siblings would render colourless because the writer's
+        // CollectFillStroke walks only the top level of each Group.
+        std::vector<Element*> body = output;
+
+        int maxCount = static_cast<int>(std::ceil(copiesF));
         std::vector<Element*> generated;
-        generated.reserve(static_cast<size_t>(copies - 1));
-        for (int c = 1; c < copies; ++c) {
-          float t = static_cast<float>(c) - rep->offset;
-          float rotation = rep->rotation * t;
-          float sx = std::pow(rep->scale.x, t);
-          float sy = std::pow(rep->scale.y, t);
-          float copyAlpha = 1.0f;
-          if (copies > 1 && (rep->startAlpha != 1.0f || rep->endAlpha != 1.0f)) {
-            float frac = static_cast<float>(c) / static_cast<float>(copies - 1);
-            copyAlpha = rep->startAlpha + (rep->endAlpha - rep->startAlpha) * frac;
+        generated.reserve(static_cast<size_t>(maxCount));
+        for (int i = 0; i < maxCount; ++i) {
+          float progress = static_cast<float>(i) + rep->offset;
+          float sx = std::pow(rep->scale.x, progress);
+          float sy = std::pow(rep->scale.y, progress);
+          float rotation = rep->rotation * progress;
+          float tx = rep->position.x * progress;
+          float ty = rep->position.y * progress;
+          float frac = progress / static_cast<float>(maxCount);
+          float copyAlpha = rep->startAlpha + (rep->endAlpha - rep->startAlpha) * frac;
+          // Fractional copies: the last copy gets a partial alpha multiplier
+          // so the cumulative opacity matches the fractional copy count.
+          if (i == maxCount - 1 && static_cast<float>(maxCount) != copiesF) {
+            copyAlpha *= (copiesF - static_cast<float>(i));
           }
-          auto* g = MakeCopyGroup(_doc, body, rep->position.x * t, rep->position.y * t, rotation,
-                                  sx, sy, rep->anchor.x, rep->anchor.y, copyAlpha);
+          auto* g = MakeCopyGroup(_doc, body, tx, ty, rotation, sx, sy, rep->anchor.x,
+                                  rep->anchor.y, copyAlpha);
           generated.push_back(g);
         }
 
-        // Insert the generated copies before/after the existing shape slots so
-        // RepeaterOrder is honoured. BelowOriginal -> generated copies come
-        // first (drawn before) so the original is on top.
-        size_t insertPos = (rep->order == RepeaterOrder::BelowOriginal) ? shapeSlots.front()
-                                                                       : (shapeSlots.back() + 1);
-        output.insert(output.begin() + static_cast<long>(insertPos), generated.begin(),
-                      generated.end());
-
-        // Bump every existing slot index that was at or after insertPos.
-        for (auto& s : shapeSlots) {
-          if (s >= insertPos) {
-            s += generated.size();
-          }
+        // Drawing order:
+        //   BelowOriginal -> [c0, c1, ..., cN-1]: c0 drawn first (bottom),
+        //     cN-1 drawn last (top). The original (smallest progress) sits at
+        //     the bottom of the stack, copies layered above.
+        //   AboveOriginal -> [cN-1, ..., c1, c0]: c0 drawn last (top). The
+        //     original sits on top of the stack.
+        if (rep->order == RepeaterOrder::AboveOriginal) {
+          std::reverse(generated.begin(), generated.end());
         }
-        // Generated groups should themselves participate as shape slots in case
-        // a later modifier (e.g. a downstream Trim) operates on them. Skip this
-        // for simplicity — chained modifiers after a Repeater are rare and the
-        // current tgfx semantics flatten the repeater after modifiers anyway.
+
+        // Replace the current scope with the copies. Subsequent siblings (after
+        // the Repeater in source order) will be appended after these copies as
+        // the surrounding loop continues. Generated groups are not added back
+        // to shapeSlots: chained modifiers after a Repeater are rare and the
+        // tgfx renderer flattens the repeater after modifiers anyway.
+        output = std::move(generated);
+        shapeSlots.clear();
         break;
       }
       default:

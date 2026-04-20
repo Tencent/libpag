@@ -1657,9 +1657,10 @@ void PPTWriter::writeElements(XMLBuilder& out, const std::vector<Element*>& elem
       }
       case NodeType::Repeater:
         // Reaching this case means the resolver was disabled or the input
-        // contained a Repeater that couldn't be expanded; silently skip so the
-        // remaining content still renders (matches V1 behaviour for other
-        // unresolved modifiers like TrimPath / RoundCorner / MergePath).
+        // contained a Repeater inside an empty scope (output cleared by a
+        // copies==0 case, etc.); silently skip so the remaining content still
+        // renders (matches the behaviour for other unresolved modifiers like
+        // TrimPath / RoundCorner / MergePath).
         break;
       default:
         // Fill, Stroke, TextPath, TextModifier, RangeSelector, Polystar (when
