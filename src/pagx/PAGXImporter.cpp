@@ -234,7 +234,7 @@ static void ParseCustomData(const DOMNode* xmlNode, Node* node) {
   for (const auto& attr : xmlNode->attributes) {
     if (attr.name.length() > 5 && attr.name.compare(0, 5, "data-") == 0) {
       auto key = attr.name.substr(5);
-      if (Node::IsValidCustomDataKey(key)) {
+      if (IsValidCustomDataKey(key)) {
         node->customData[std::move(key)] = attr.value;
       }
     }
@@ -696,12 +696,7 @@ static Rectangle* ParseRectangle(const DOMNode* node, PAGXDocument* doc) {
     return nullptr;
   }
   rect->size = GetSizeAttribute(node, "size", {0, 0}, doc);
-  auto* posAttr = node->findAttribute("position");
-  if (posAttr && !posAttr->empty()) {
-    rect->position = GetPointAttribute(node, "position", Default<Rectangle>().position, doc);
-  } else {
-    rect->position = {rect->size.width * 0.5f, rect->size.height * 0.5f};
-  }
+  rect->position = GetPointAttribute(node, "position", Default<Rectangle>().position, doc);
   rect->roundness = GetFloatAttribute(node, "roundness", Default<Rectangle>().roundness, doc);
   rect->reversed = GetBoolAttribute(node, "reversed", Default<Rectangle>().reversed, doc);
   rect->left = GetFloatAttributeOrNaN(node, "left", doc);
@@ -719,12 +714,7 @@ static Ellipse* ParseEllipse(const DOMNode* node, PAGXDocument* doc) {
     return nullptr;
   }
   ellipse->size = GetSizeAttribute(node, "size", {0, 0}, doc);
-  auto* posAttr = node->findAttribute("position");
-  if (posAttr && !posAttr->empty()) {
-    ellipse->position = GetPointAttribute(node, "position", Default<Ellipse>().position, doc);
-  } else {
-    ellipse->position = {ellipse->size.width * 0.5f, ellipse->size.height * 0.5f};
-  }
+  ellipse->position = GetPointAttribute(node, "position", Default<Ellipse>().position, doc);
   ellipse->reversed = GetBoolAttribute(node, "reversed", Default<Ellipse>().reversed, doc);
   ellipse->left = GetFloatAttributeOrNaN(node, "left", doc);
   ellipse->right = GetFloatAttributeOrNaN(node, "right", doc);
@@ -752,13 +742,7 @@ static Polystar* ParsePolystar(const DOMNode* node, PAGXDocument* doc) {
   polystar->innerRoundness =
       GetFloatAttribute(node, "innerRoundness", Default<Polystar>().innerRoundness, doc);
   polystar->reversed = GetBoolAttribute(node, "reversed", Default<Polystar>().reversed, doc);
-  auto* posAttr = node->findAttribute("position");
-  if (posAttr && !posAttr->empty()) {
-    polystar->position = GetPointAttribute(node, "position", Default<Polystar>().position, doc);
-  } else {
-    auto bounds = polystar->getContentBounds();
-    polystar->position = {-bounds.x, -bounds.y};
-  }
+  polystar->position = GetPointAttribute(node, "position", Default<Polystar>().position, doc);
   polystar->left = GetFloatAttributeOrNaN(node, "left", doc);
   polystar->right = GetFloatAttributeOrNaN(node, "right", doc);
   polystar->top = GetFloatAttributeOrNaN(node, "top", doc);

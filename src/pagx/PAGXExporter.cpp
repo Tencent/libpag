@@ -324,8 +324,11 @@ static bool ShouldSkipPosition(const Point& position, const Point& defaultPos, f
                                float top, float right, float bottom, float centerX, float centerY) {
   bool hasH = !std::isnan(left) || !std::isnan(right) || !std::isnan(centerX);
   bool hasV = !std::isnan(top) || !std::isnan(bottom) || !std::isnan(centerY);
-  bool isDefault = (position.x == defaultPos.x && position.y == defaultPos.y);
-  return (hasH && hasV) || isDefault;
+  bool xIsDefault =
+      (std::isnan(defaultPos.x) && std::isnan(position.x)) || position.x == defaultPos.x;
+  bool yIsDefault =
+      (std::isnan(defaultPos.y) && std::isnan(position.y)) || position.y == defaultPos.y;
+  return (hasH && hasV) || (xIsDefault && yIsDefault);
 }
 
 //==============================================================================
@@ -343,7 +346,7 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
 
 static void WriteCustomData(XMLBuilder& xml, const Node* node) {
   for (const auto& [key, value] : node->customData) {
-    if (Node::IsValidCustomDataKey(key)) {
+    if (IsValidCustomDataKey(key)) {
       xml.addAttribute(("data-" + key).c_str(), value);
     }
   }
@@ -501,9 +504,8 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Rectangle: {
       auto rect = static_cast<const Rectangle*>(node);
       xml.openElement("Rectangle");
-      Point rectDefaultPos = {rect->size.width * 0.5f, rect->size.height * 0.5f};
-      if (!ShouldSkipPosition(rect->position, rectDefaultPos, rect->left, rect->top, rect->right,
-                              rect->bottom, rect->centerX, rect->centerY)) {
+      if (!ShouldSkipPosition(rect->position, Default<Rectangle>().position, rect->left, rect->top,
+                              rect->right, rect->bottom, rect->centerX, rect->centerY)) {
         xml.addAttribute("position", PointToString(rect->position));
       }
       if (rect->size.width != 0 || rect->size.height != 0) {
@@ -524,9 +526,8 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Ellipse: {
       auto ellipse = static_cast<const Ellipse*>(node);
       xml.openElement("Ellipse");
-      Point ellipseDefaultPos = {ellipse->size.width * 0.5f, ellipse->size.height * 0.5f};
-      if (!ShouldSkipPosition(ellipse->position, ellipseDefaultPos, ellipse->left, ellipse->top,
-                              ellipse->right, ellipse->bottom, ellipse->centerX,
+      if (!ShouldSkipPosition(ellipse->position, Default<Ellipse>().position, ellipse->left,
+                              ellipse->top, ellipse->right, ellipse->bottom, ellipse->centerX,
                               ellipse->centerY)) {
         xml.addAttribute("position", PointToString(ellipse->position));
       }
@@ -547,10 +548,8 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Polystar: {
       auto polystar = static_cast<const Polystar*>(node);
       xml.openElement("Polystar");
-      auto polyBounds = polystar->getContentBounds();
-      Point polyDefaultPos = {-polyBounds.x, -polyBounds.y};
-      if (!ShouldSkipPosition(polystar->position, polyDefaultPos, polystar->left, polystar->top,
-                              polystar->right, polystar->bottom, polystar->centerX,
+      if (!ShouldSkipPosition(polystar->position, Default<Polystar>().position, polystar->left,
+                              polystar->top, polystar->right, polystar->bottom, polystar->centerX,
                               polystar->centerY)) {
         xml.addAttribute("position", PointToString(polystar->position));
       }

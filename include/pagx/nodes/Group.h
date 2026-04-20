@@ -97,13 +97,15 @@ class Group : public Element, public LayoutNode {
     return NodeType::Group;
   }
 
+  /** Returns the group position adjusted to the layout bounds. */
+  Point renderPosition() const;
+
  protected:
   Group() = default;
 
   void updateSize(LayoutContext* context) override;
   void onMeasure(LayoutContext* context) override;
   void setLayoutSize(LayoutContext* context, float width, float height) override;
-  void setLayoutPosition(LayoutContext* context, float x, float y) override;
   void updateLayout(LayoutContext* context) override;
 
   friend class PAGXDocument;

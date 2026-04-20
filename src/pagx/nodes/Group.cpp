@@ -33,28 +33,30 @@ void Group::updateSize(LayoutContext* context) {
 }
 
 void Group::onMeasure(LayoutContext*) {
-  MeasureChildNodes(elements, width, height, preferredWidth, preferredHeight);
+  measuredX = position.x;
+  measuredY = position.y;
+  MeasureChildNodes(elements, width, height, measuredWidth, measuredHeight);
   if (!padding.isZero()) {
     if (std::isnan(width)) {
-      preferredWidth += padding.left + padding.right;
+      measuredWidth += padding.left + padding.right;
     }
     if (std::isnan(height)) {
-      preferredHeight += padding.top + padding.bottom;
+      measuredHeight += padding.top + padding.bottom;
     }
   }
 }
 
 void Group::setLayoutSize(LayoutContext* context, float width, float height) {
-  layoutWidth = !std::isnan(width) ? width : preferredWidth;
-  layoutHeight = !std::isnan(height) ? height : preferredHeight;
+  layoutWidth = !std::isnan(width) ? width : measuredWidth;
+  layoutHeight = !std::isnan(height) ? height : measuredHeight;
   updateLayout(context);
   // An axis is content-measured when neither the parent nor the element itself specifies its size.
   // When a content-measured axis exists and another axis changed from its measured value,
   // re-measure the content-measured axis from children's actual layout sizes.
   bool widthFromContent = std::isnan(width) && std::isnan(this->width);
   bool heightFromContent = std::isnan(height) && std::isnan(this->height);
-  bool sizeChanged = (!std::isnan(width) && width != preferredWidth) ||
-                     (!std::isnan(height) && height != preferredHeight);
+  bool sizeChanged = (!std::isnan(width) && width != measuredWidth) ||
+                     (!std::isnan(height) && height != measuredHeight);
   if ((widthFromContent || heightFromContent) && sizeChanged) {
     float maxX = 0;
     float maxY = 0;
@@ -83,15 +85,9 @@ void Group::setLayoutSize(LayoutContext* context, float width, float height) {
   }
 }
 
-void Group::setLayoutPosition(LayoutContext*, float x, float y) {
-  if (!std::isnan(x)) {
-    position.x = x;
-    layoutX = x;
-  }
-  if (!std::isnan(y)) {
-    position.y = y;
-    layoutY = y;
-  }
+Point Group::renderPosition() const {
+  auto bounds = layoutBounds();
+  return {bounds.x, bounds.y};
 }
 
 void Group::updateLayout(LayoutContext* context) {

@@ -935,10 +935,10 @@ Layer child elements are automatically categorized into four collections by type
 
 **preserve3D**: When `false` (default), child layers with 3D transforms are flattened into the parent's 2D plane before compositing. When `true`, child layers retain their 3D positions and are rendered in a shared 3D space, enabling depth-based intersections and correct z-ordering among siblings. Similar to CSS `transform-style: preserve-3d`.
 
-**Transform Attribute Priority**: `x`/`y`, `matrix`, and `matrix3D` have an override relationship:
-- Only `x`/`y` set: Uses `x`/`y` for translation
-- `matrix` set: `matrix` overrides `x`/`y` values
-- `matrix3D` set: `matrix3D` overrides both `matrix` and `x`/`y` values
+**Transform Composition**: `x`/`y` and `matrix` are composed (not overridden). `matrix3D` replaces the combined 2D result:
+- `x`/`y` provides a base translation, `matrix` applies an additional 2D transform on top
+- Final 2D transform: `translate(x, y) × matrix`
+- When `matrix3D` is set, it replaces the 2D transform entirely
 
 **MaskType**:
 
@@ -1219,6 +1219,8 @@ Rectangles are defined from center point with uniform corner rounding support.
 | `roundness` | float | 0 | Corner radius |
 | `reversed` | bool | false | Reverse path direction |
 
+Rectangle supports all constraint attributes (see §4.1).
+
 **Calculation Rules**:
 ```
 rect.left   = position.x - size.width / 2
@@ -1250,6 +1252,8 @@ Ellipses are defined from center point.
 | `position` | Point | (center of bounding box) | Center point coordinate, computed from constraint attributes when set. When not set, defaults to `(size.width/2, size.height/2)`, placing the top-left corner at the origin. Prefer constraint attributes (`left`/`top`) for positioning |
 | `size` | Size | 0,0 | Dimensions "width,height" |
 | `reversed` | bool | false | Reverse path direction |
+
+Ellipse supports all constraint attributes (see §4.1).
 
 **Calculation Rules**:
 ```
@@ -1890,7 +1894,7 @@ As a container, TextBox processes its child Text elements and text modifiers (Te
 | `wordWrap` | bool | true | Enable automatic word wrapping at the box width boundary (horizontal mode) or height boundary (vertical mode). Has no effect when that dimension is NaN |
 | `overflow` | Overflow | visible | Overflow behavior when text exceeds the box height (horizontal mode) or width (vertical mode). Has no effect when that dimension is NaN |
 
-TextBox inherits all Group attributes (`position`, `anchor`, `rotation`, `scale`, `skew`, `skewAxis`, `alpha`, `padding`) and constraint attributes. The `padding` attribute insets the text layout area and the constraint reference frame for non-Text child elements. The `position` attribute specifies the top-left corner of the text area in the parent coordinate system. Prefer constraint attributes (`left`/`top`) for positioning — when constraints are set, `position` is computed automatically.
+TextBox inherits all Group attributes (`position`, `anchor`, `rotation`, `scale`, `skew`, `skewAxis`, `alpha`, `padding`) and constraint attributes (see §4.1). The `padding` attribute insets the text layout area and the constraint reference frame for non-Text child elements. The `position` attribute specifies the top-left corner of the text area in the parent coordinate system. Prefer constraint attributes (`left`/`top`) for positioning — when constraints are set, `position` is computed automatically.
 
 **TextAlign (Text Alignment)**:
 
@@ -2023,6 +2027,8 @@ Group is a VectorElement container with transform properties.
 | `width` | float | - | Layout width (see §4) |
 | `height` | float | - | Layout height (see §4) |
 | `padding` | float or "t,r,b,l" | 0 | Insets the constraint reference frame for child elements. Supports single value (uniform), two values (vertical,horizontal), four values (top,right,bottom,left) |
+
+Group supports all constraint attributes (see §4.1).
 
 #### Transform Order
 

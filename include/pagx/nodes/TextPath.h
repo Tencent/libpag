@@ -85,10 +85,24 @@ class TextPath : public Element, public LayoutNode {
     return NodeType::TextPath;
   }
 
+  /**
+   * Returns the final position offset for rendering, computed from layoutBounds and path bounds.
+   */
+  Point renderPosition() const;
+
+  /**
+   * Returns the scale factor for rendering, computed from layoutBounds and intrinsic size.
+   */
+  float renderScale() const;
+
+  /**
+   * Returns the baseline origin for rendering, accounting for layout scaling and positioning.
+   */
+  Point renderBaselineOrigin() const;
+
  protected:
   void onMeasure(LayoutContext* context) override;
   void setLayoutSize(LayoutContext* context, float width, float height) override;
-  void setLayoutPosition(LayoutContext* context, float x, float y) override;
 
  private:
   TextPath() = default;
