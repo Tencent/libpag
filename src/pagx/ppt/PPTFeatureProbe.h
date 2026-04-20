@@ -63,9 +63,11 @@ struct PPTFeatureFlags {
 };
 
 /**
- * Walks the layer's content tree (including nested Group elements, Composition layers, and child
- * layers) and returns the union of feature flags found. Stops descending through a Layer's mask
- * (the mask is rasterized separately by the caller).
+ * Examines a single layer in isolation: its own blend mode and filters, plus the elements it
+ * directly owns (recursing through nested Group / TextBox elements). Composition layers and
+ * child layers are NOT traversed -- they are visited independently by the writer and probed at
+ * their own scope, which keeps any required rasterization fallback localized to the smallest
+ * layer that actually contains the unsupported feature.
  */
 PPTFeatureFlags ProbeLayerFeatures(const Layer* layer);
 

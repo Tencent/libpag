@@ -20,7 +20,6 @@
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/ColorStop.h"
-#include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DiamondGradient.h"
 #include "pagx/nodes/Fill.h"
@@ -189,16 +188,15 @@ PPTFeatureFlags ProbeLayerFeatures(const Layer* layer) {
     }
   }
 
+  // Only probe the layer's own contents (groups / text boxes are emitted as
+  // part of this layer in writeElements). Composition layers and child layers
+  // are visited separately by writeLayer, so each one gets its own probe and
+  // can be rasterized at its own scope. Aggregating descendant flags here
+  // would force the smallest enclosing layer that has any unsupported feature
+  // anywhere in its sub-tree to bake the entire sub-tree into one PNG, which
+  // both blows up the output size and turns surrounding native content (e.g.
+  // an underlying gradient) into a non-editable raster.
   Merge(&out, ProbeElementsFeatures(layer->contents));
-
-  if (layer->composition != nullptr) {
-    for (const auto* compLayer : layer->composition->layers) {
-      Merge(&out, ProbeLayerFeatures(compLayer));
-    }
-  }
-  for (const auto* child : layer->children) {
-    Merge(&out, ProbeLayerFeatures(child));
-  }
   return out;
 }
 
