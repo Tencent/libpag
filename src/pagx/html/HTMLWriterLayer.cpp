@@ -329,6 +329,12 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                              ColorToRGBA(sc->color, span.stroke->alpha);
                 spanStyle += ";paint-order:stroke fill";
               }
+              if (span.text->fauxItalic) {
+                // `transform` is a no-op on pure inline boxes, so promote the span to
+                // inline-block. Each tbSpan is a short text run, so losing word-wrap inside
+                // the span is acceptable and matches the single-run expectation of fauxItalic.
+                spanStyle += ";display:inline-block;transform:skewX(-12deg)";
+              }
               out.openTag("span");
               out.addAttr("style", spanStyle);
               out.closeTagWithText(span.text->text);
@@ -421,6 +427,13 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               spanStyle += ";-webkit-text-stroke:" + FloatToString(span.stroke->width) + "px " +
                            ColorToRGBA(sc->color, span.stroke->alpha);
               spanStyle += ";paint-order:stroke fill";
+            }
+            if (span.text->fauxItalic) {
+              // `transform` is a no-op on pure inline boxes, so promote the span to
+              // inline-block. Each rich-text span is a short text run, so losing word-wrap
+              // inside the span is acceptable and matches the single-run expectation of
+              // fauxItalic.
+              spanStyle += ";display:inline-block;transform:skewX(-12deg)";
             }
             out.openTag("span");
             out.addAttr("style", spanStyle);
