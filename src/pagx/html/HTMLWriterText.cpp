@@ -299,9 +299,44 @@ float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphInde
         break;
       }
       case SelectorShape::Smooth: {
-        float t = (textCenter - rangeStart) / rangeSize;
-        t = std::clamp(t, 0.0f, 1.0f);
-        factor = t * t * (3.0f - 2.0f * t);
+        // Mirrors tgfx TextSelector.cpp CalculateSmoothFactor: a symmetric peak centered on
+        // the range's midpoint, shaped by the cubic bezier (0.5, 0.0, 0.5, 1.0). tgfx's
+        // Smooth ignores easeIn/easeOut (those only affect Triangle). Emitting a monotonic
+        // smoothstep here would let the right half of the range stay opaque instead of
+        // fading back to zero at rangeEnd.
+        if (textCenter <= rangeStart || textCenter >= rangeEnd) {
+          factor = 0.0f;
+          break;
+        }
+        float rangeCenter = (rangeStart + rangeEnd) * 0.5f;
+        float x = textCenter < rangeCenter ? (textCenter - rangeStart) / (rangeCenter - rangeStart)
+                                           : (rangeEnd - textCenter) / (rangeEnd - rangeCenter);
+        x = std::clamp(x, 0.0f, 1.0f);
+        // Cubic bezier easing with control points (0.5, 0.0) and (0.5, 1.0): solve for t
+        // from x via Newton-Raphson, then evaluate y(t).
+        constexpr float cx1 = 0.5f, cy1 = 0.0f, cx2 = 0.5f, cy2 = 1.0f;
+        float t = x;
+        for (int i = 0; i < 8; i++) {
+          float tt = t * t;
+          float ttt = tt * t;
+          float mt = 1.0f - t;
+          float mt2 = mt * mt;
+          float xt = 3.0f * mt2 * t * cx1 + 3.0f * mt * tt * cx2 + ttt;
+          float dx = xt - x;
+          if (std::abs(dx) < 1e-6f) {
+            break;
+          }
+          float dxt = 3.0f * mt2 * cx1 + 6.0f * mt * t * (cx2 - cx1) + 3.0f * tt * (1.0f - cx2);
+          if (std::abs(dxt) < 1e-6f) {
+            break;
+          }
+          t = std::clamp(t - dx / dxt, 0.0f, 1.0f);
+        }
+        float tt = t * t;
+        float ttt = tt * t;
+        float mt = 1.0f - t;
+        float mt2 = mt * mt;
+        factor = 3.0f * mt2 * t * cy1 + 3.0f * mt * tt * cy2 + ttt;
         break;
       }
       default: {
@@ -321,7 +356,12 @@ float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphInde
   } else if (factor > 1.0f) {
     factor = 1.0f;
   }
-  if (selector->easeIn > 0 || selector->easeOut > 0) {
+  // easeIn/easeOut only affect Triangle in tgfx (see TextSelector.cpp CalculateTriangleFactor).
+  // Applying them to other shapes warps results that the tgfx side leaves alone — e.g. Smooth
+  // is already a symmetric peak, so the multiplicative tweak here would pull the right half
+  // back down below the left half. Keep this pass bound to Triangle.
+  if (selector->shape == SelectorShape::Triangle &&
+      (selector->easeIn > 0 || selector->easeOut > 0)) {
     float t = rangeSize > 0 ? (textCenter - rangeStart) / rangeSize : 0.5f;
     t = std::clamp(t, 0.0f, 1.0f);
     if (selector->easeIn > 0 && t < 0.5f) {
