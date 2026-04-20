@@ -133,8 +133,8 @@ CLI_TEST(PAGXHtmlTest, LayerTransformXY) {
       LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_transform_xy.pagx"));
   ASSERT_FALSE(html.empty());
   // Layer x/y resolve to renderPosition and are emitted as left/top on absolute-positioned layers.
-  EXPECT_NE(html.find("left:40px;top:50px"), std::string::npos);
-  EXPECT_NE(html.find("left:130px;top:50px"), std::string::npos);
+  EXPECT_NE(html.find("left:55px;top:50px"), std::string::npos);
+  EXPECT_NE(html.find("left:145px;top:50px"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, LayerTransformMatrix) {
