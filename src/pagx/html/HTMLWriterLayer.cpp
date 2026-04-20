@@ -661,6 +661,62 @@ static std::string clipPathFromContents(const Layer* layer) {
   return {};
 }
 
+// Returns a CSS border-radius value string (without the property prefix, e.g. "20px" or "50%")
+// when the layer's visual contour can be expressed by applying border-radius directly to the
+// layer's own <div>. Only matches the narrow case where the first contents child is a Rectangle
+// or Ellipse that fully covers the layer: this is the only shape whose box-shadow outline must
+// trace a plain rounded rectangle. Returns empty string when no matching shape exists.
+//
+// Used exclusively by the DropShadowStyle + BackgroundBlurStyle coexistence workaround: CSS
+// `filter: drop-shadow()` establishes an isolated stacking context that breaks the sibling
+// `backdrop-filter` sampling path. `box-shadow` does not establish that context, but it paints
+// along the element's own border-box — only correct when we can also put the matching
+// border-radius on that border-box.
+static std::string layerBoxShadowBorderRadius(const Layer* layer) {
+  auto layerBounds = layer->layoutBounds();
+  float containerW = layerBounds.width;
+  float containerH = layerBounds.height;
+  if (containerW <= 0 || containerH <= 0) {
+    return {};
+  }
+  for (auto* e : layer->contents) {
+    if (e->nodeType() == NodeType::Rectangle) {
+      auto r = static_cast<const Rectangle*>(e);
+      auto bounds = r->layoutBounds();
+      if (bounds.isEmpty()) {
+        continue;
+      }
+      // Rectangle must fully cover the layer (same logic as clipPathFromContents: top/left/
+      // bottom/right insets are all zero). Otherwise box-shadow would trace the wrong outline.
+      if (bounds.x > 0.5f || bounds.y > 0.5f || bounds.x + bounds.width < containerW - 0.5f ||
+          bounds.y + bounds.height < containerH - 0.5f) {
+        return {};
+      }
+      if (r->roundness > 0) {
+        return FloatToString(r->roundness) + "px";
+      }
+      return "0";
+    }
+    if (e->nodeType() == NodeType::Ellipse) {
+      auto el = static_cast<const Ellipse*>(e);
+      auto bounds = el->layoutBounds();
+      if (bounds.isEmpty()) {
+        continue;
+      }
+      // Ellipse must exactly match the layer bounds (centered, full size).
+      if (bounds.x > 0.5f || bounds.y > 0.5f || bounds.x + bounds.width < containerW - 0.5f ||
+          bounds.y + bounds.height < containerH - 0.5f) {
+        return {};
+      }
+      return "50%";
+    }
+    // Non-primitive first element (Group, Path, Text, etc.) cannot be represented as a simple
+    // rounded box-shadow outline, so leave the caller to fall back to filter:drop-shadow.
+    return {};
+  }
+  return {};
+}
+
 void HTMLWriter::writeLayerContents(HTMLBuilder& out, const Layer* layer, float alpha,
                                     bool distribute, LayerPlacement targetPlacement) {
   writeElements(out, layer->contents, alpha, distribute, targetPlacement);
@@ -884,11 +940,11 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   if (distributeAlpha) {
     layerAlpha *= parentAlpha;
   }
+  // Tentatively set up distribution; box-shadow fallback may override further below because
+  // CSS `opacity < 1` creates a stacking context that breaks the sibling `backdrop-filter`
+  // sampling path, which defeats the whole point of using box-shadow in the first place.
   bool childDistribute = !groupOp && layerAlpha < 1.0f;
-
-  if (groupOp && layerAlpha < 1.0f) {
-    style += ";opacity:" + FloatToString(layerAlpha);
-  }
+  bool suppressGroupOpacity = false;  // set by the box-shadow fallback path below
 
   if (layer->blendMode != BlendMode::Normal) {
     auto blendStr = BlendModeToMixBlendMode(layer->blendMode);
@@ -918,6 +974,32 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   std::vector<std::pair<NodeType, const LayerStyle*>> belowStyles = {};
   std::vector<std::pair<NodeType, const LayerStyle*>> aboveStyles = {};
 
+  // Chromium evaluates `backdrop-filter` against the nearest enclosing stacking context that
+  // does NOT itself have a `filter`. When a layer has BOTH BackgroundBlurStyle (which renders
+  // via child `backdrop-filter` divs) and DropShadowStyle (which usually renders via the
+  // parent's `filter: drop-shadow`), the drop-shadow creates an isolated stacking context and
+  // the child backdrop-filter samples the empty group surface instead of the page below.
+  // Visual symptom: glass cards fail to blur whatever is behind them.
+  //
+  // Swap drop-shadow for `box-shadow` in that specific combination. `box-shadow` paints into
+  // the same stacking context as the element's siblings, so the child backdrop-filter still
+  // sees the pre-layer backdrop. `box-shadow` only reproduces the right outline when the
+  // layer's visible contour IS the element's rounded border-box, which we detect via
+  // layerBoxShadowBorderRadius.
+  bool hasBackdropBlurFill = false;
+  for (auto* ls : layer->styles) {
+    if (ls->nodeType() == NodeType::BackgroundBlurStyle && ls->blendMode == BlendMode::Normal) {
+      auto blur = static_cast<const BackgroundBlurStyle*>(ls);
+      if ((blur->blurX + blur->blurY) * 0.5f > 0) {
+        hasBackdropBlurFill = true;
+        break;
+      }
+    }
+  }
+  std::string boxShadowValue;  // non-empty when the drop-shadow branch is redirected here
+  std::string
+      boxShadowBorderRadius;  // border-radius to apply on the layer div when using box-shadow
+
   for (auto* ls : layer->styles) {
     bool hasBlendMode = ls->blendMode != BlendMode::Normal;
 
@@ -926,12 +1008,25 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       if (hasBlendMode) {
         belowStyles.push_back({NodeType::DropShadowStyle, ls});
       } else if (ds->blurX == ds->blurY && ds->showBehindLayer) {
-        if (!filterValues.empty()) {
-          filterValues += ' ';
+        std::string radius = hasBackdropBlurFill && boxShadowValue.empty()
+                                 ? layerBoxShadowBorderRadius(layer)
+                                 : std::string();
+        if (!radius.empty()) {
+          // box-shadow fallback: preserves the sibling backdrop-filter sampling path. Also
+          // propagate group opacity down to children, because `opacity < 1` on the layer div
+          // would re-introduce the stacking context we just eliminated.
+          boxShadowValue = FloatToString(ds->offsetX) + "px " + FloatToString(ds->offsetY) + "px " +
+                           FloatToString(ds->blurX) + "px " + ColorToRGBA(ds->color);
+          boxShadowBorderRadius = radius;
+          suppressGroupOpacity = true;
+        } else {
+          if (!filterValues.empty()) {
+            filterValues += ' ';
+          }
+          filterValues += "drop-shadow(" + FloatToString(ds->offsetX) + "px " +
+                          FloatToString(ds->offsetY) + "px " + FloatToString(ds->blurX) + "px " +
+                          ColorToRGBA(ds->color) + ")";
         }
-        filterValues += "drop-shadow(" + FloatToString(ds->offsetX) + "px " +
-                        FloatToString(ds->offsetY) + "px " + FloatToString(ds->blurX) + "px " +
-                        ColorToRGBA(ds->color) + ")";
       } else {
         std::string fid = _ctx->nextId("filter");
         _defs->openTag("filter");
@@ -1085,6 +1180,20 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   if (!filterValues.empty()) {
     style += ";filter:" + filterValues;
   }
+  if (!boxShadowValue.empty()) {
+    style += ";border-radius:" + boxShadowBorderRadius;
+    style += ";box-shadow:" + boxShadowValue;
+  }
+  // Now that we know whether the box-shadow fallback fired, apply group opacity. Under the
+  // fallback path we switch to child alpha distribution so the layer div itself stays opaque,
+  // preserving backdrop-filter semantics.
+  if (groupOp && layerAlpha < 1.0f) {
+    if (suppressGroupOpacity) {
+      childDistribute = true;
+    } else {
+      style += ";opacity:" + FloatToString(layerAlpha);
+    }
+  }
 
   bool needScrollRectWrapper = layer->hasScrollRect;
 
@@ -1210,10 +1319,17 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       auto blur = static_cast<const BackgroundBlurStyle*>(ls);
       float avg = (blur->blurX + blur->blurY) / 2.0f;
       if (avg > 0) {
+        std::string blurStyle = "position:absolute;inset:0;backdrop-filter:blur(" +
+                                FloatToString(avg) + "px);-webkit-backdrop-filter:blur(" +
+                                FloatToString(avg) + "px)" + clipPathFromContents(layer);
+        // The box-shadow fallback pushes group opacity down to siblings. The backdrop-filter
+        // div is its own sibling, so it also needs the distributed alpha; otherwise the blurred
+        // backdrop renders at full strength while the glass/inner content appear dimmed.
+        if (suppressGroupOpacity && layerAlpha < 1.0f) {
+          blurStyle += ";opacity:" + FloatToString(layerAlpha);
+        }
         out.openTag("div");
-        out.addAttr("style", "position:absolute;inset:0;backdrop-filter:blur(" +
-                                 FloatToString(avg) + "px);-webkit-backdrop-filter:blur(" +
-                                 FloatToString(avg) + "px)" + clipPathFromContents(layer));
+        out.addAttr("style", blurStyle);
         out.closeTagSelfClosing();
       }
     }
