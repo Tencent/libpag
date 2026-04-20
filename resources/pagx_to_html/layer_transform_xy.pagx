@@ -18,20 +18,20 @@
   <Layer alpha="0.15">
     <!-- Vertical lines -->
     <Path data="M 80,40 L 80,310"/>
-    <Path data="M 160,40 L 160,310"/>
-    <Path data="M 240,40 L 240,310"/>
+    <Path data="M 170,40 L 170,310"/>
+    <Path data="M 260,40 L 260,310"/>
     <Stroke color="#64748B" width="1" dashes="4,4"/>
   </Layer>
   <Layer alpha="0.15">
     <!-- Horizontal lines -->
-    <Path data="M 20,105 L 300,105"/>
-    <Path data="M 20,195 L 300,195"/>
-    <Path data="M 20,285 L 300,285"/>
+    <Path data="M 30,105 L 310,105"/>
+    <Path data="M 30,195 L 310,195"/>
+    <Path data="M 30,285 L 310,285"/>
     <Stroke color="#64748B" width="1" dashes="4,4"/>
   </Layer>
 
-  <!-- Position (40, 50) — top-left area -->
-  <Layer x="40" y="50" layout="vertical" gap="6" alignment="center">
+  <!-- Position (55, 50) — top-left area -->
+  <Layer x="55" y="50" layout="vertical" gap="6" alignment="center">
     <Layer width="50" height="50">
       <Rectangle position="25,25" size="50,50" roundness="8"/>
       <Fill color="#3B82F6"/>
@@ -42,8 +42,8 @@
     </Layer>
   </Layer>
 
-  <!-- Position (130, 50) — top-center -->
-  <Layer x="130" y="50" layout="vertical" gap="6" alignment="center">
+  <!-- Position (145, 50) — top-center -->
+  <Layer x="145" y="50" layout="vertical" gap="6" alignment="center">
     <Layer width="50" height="50">
       <Rectangle position="25,25" size="50,50" roundness="8"/>
       <Fill color="#10B981"/>
@@ -54,8 +54,8 @@
     </Layer>
   </Layer>
 
-  <!-- Position (220, 50) — top-right -->
-  <Layer x="220" y="50" layout="vertical" gap="6" alignment="center">
+  <!-- Position (235, 50) — top-right -->
+  <Layer x="235" y="50" layout="vertical" gap="6" alignment="center">
     <Layer width="50" height="50">
       <Rectangle position="25,25" size="50,50" roundness="8"/>
       <Fill color="#8B5CF6"/>
@@ -66,8 +66,8 @@
     </Layer>
   </Layer>
 
-  <!-- Position (40, 140) — mid-left -->
-  <Layer x="40" y="140" layout="vertical" gap="6" alignment="center">
+  <!-- Position (55, 140) — mid-left -->
+  <Layer x="55" y="140" layout="vertical" gap="6" alignment="center">
     <Layer width="50" height="50">
       <Rectangle position="25,25" size="50,50" roundness="8"/>
       <Fill color="#F59E0B"/>
@@ -78,8 +78,8 @@
     </Layer>
   </Layer>
 
-  <!-- Position (130, 140) — center -->
-  <Layer x="130" y="140" layout="vertical" gap="6" alignment="center">
+  <!-- Position (145, 140) — center -->
+  <Layer x="145" y="140" layout="vertical" gap="6" alignment="center">
     <Layer width="50" height="50">
       <Rectangle position="25,25" size="50,50" roundness="8"/>
       <Fill color="#EF4444"/>
@@ -90,8 +90,8 @@
     </Layer>
   </Layer>
 
-  <!-- Position (220, 140) — mid-right -->
-  <Layer x="220" y="140" layout="vertical" gap="6" alignment="center">
+  <!-- Position (235, 140) — mid-right -->
+  <Layer x="235" y="140" layout="vertical" gap="6" alignment="center">
     <Layer width="50" height="50">
       <Rectangle position="25,25" size="50,50" roundness="8"/>
       <Fill color="#EC4899"/>
@@ -102,8 +102,8 @@
     </Layer>
   </Layer>
 
-  <!-- Position (130, 230) — bottom-center -->
-  <Layer x="130" y="230" layout="vertical" gap="6" alignment="center">
+  <!-- Position (145, 230) — bottom-center -->
+  <Layer x="145" y="230" layout="vertical" gap="6" alignment="center">
     <Layer width="50" height="50">
       <Rectangle position="25,25" size="50,50" roundness="8"/>
       <Fill color="#14B8A6"/>
