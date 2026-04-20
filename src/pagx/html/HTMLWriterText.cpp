@@ -48,8 +48,13 @@ using pag::FloatNearlyZero;
 
 // Mirrors tgfx/src/core/utils/FauxBoldScale.cpp so HTML export can emit a stroke width that
 // matches the native PAGX render. tgfx strokes the glyph path with `fontSize * FauxBoldScale`
-// and unions it with the original fill; `-webkit-text-stroke` is also a centered stroke, so
-// using the same width produces the same visible thickening. Keep in sync with tgfx.
+// and unions it with the original fill, which is a path-level operation that reliably
+// thickens glyphs even at sub-pixel widths. Chromium's `-webkit-text-stroke` raster pipeline
+// silently drops sub-pixel strokes (values below ~1px produce zero visible thickening), so
+// using the raw tgfx value as the CSS stroke width leaves small-font fauxBold invisible in
+// HTML. Add a 0.5px bias to clear Chromium's activation threshold; the resulting visible
+// thickening matches the tgfx render across the common fontSize range (empirically verified
+// for fontSize 9..36 against Chromium on macOS at 2x device pixel ratio).
 float FauxBoldStrokeWidth(float fontSize) {
   constexpr float keySmall = 9.0f;
   constexpr float keyLarge = 36.0f;
@@ -64,7 +69,7 @@ float FauxBoldStrokeWidth(float fontSize) {
     float t = (fontSize - keySmall) / (keyLarge - keySmall);
     scale = valSmall + (valLarge - valSmall) * t;
   }
-  return fontSize * scale;
+  return fontSize * scale + 0.5f;
 }
 
 //==============================================================================
