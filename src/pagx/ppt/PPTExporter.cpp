@@ -681,9 +681,11 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
       break;
     }
     case NodeType::ConicGradient: {
-      // OOXML has no conic/sweep gradient. Approximate as a circular path
-      // gradient through the same color stops; the visible color sequence
-      // matches at the gradient ring although the angular distribution flattens.
+      // OOXML has no conic/sweep gradient primitive. Layers containing one are
+      // normally escalated to a layer-level rasterization fallback by
+      // PPTFeatureProbe; this branch is only reached when the rasterizer is
+      // unavailable (e.g. no GPU) and emits a circular path gradient as a
+      // last-resort fallback so something visible still ends up on the slide.
       auto* grad = static_cast<const ConicGradient*>(source);
       out.openElement("a:gradFill")
           .addRequiredAttribute("rotWithShape", "1")

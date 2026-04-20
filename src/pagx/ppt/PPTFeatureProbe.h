@@ -41,15 +41,19 @@ struct PPTFeatureFlags {
                                      // Lighten} on a layer or BlendFilter in the layer chain.
   bool hasColorMatrix = false;       // ColorMatrixFilter on the layer.
   bool hasWideGamutColor = false;    // Any ColorSource references a non-sRGB color space.
-  bool hasDiamondGradient = false;   // OOXML has no diamond-gradient primitive.
-  bool hasConicGradient = false;     // OOXML's conic gradient (path effect) is too crude for
-                                     // arbitrary sweep ranges and stop counts.
+  bool hasDiamondGradient = false;   // OOXML has no diamond-gradient primitive; the closest preset
+                                     // (rectangular path gradient) does not produce a diamond
+                                     // pattern and must be rasterized for a faithful result.
+  bool hasConicGradient = false;     // OOXML has no sweep/angular gradient primitive; any path
+                                     // gradient approximation collapses the angular distribution
+                                     // and must be rasterized for a faithful result.
 
   /**
    * Returns true when at least one unsupported feature is present.
    */
   bool needsRasterization(bool rasterizeUnsupportedBlend, bool rasterizeWideGamut) const {
-    if (hasTextPath || hasTextModifier || hasColorMatrix) {
+    if (hasTextPath || hasTextModifier || hasColorMatrix || hasConicGradient ||
+        hasDiamondGradient) {
       return true;
     }
     if (rasterizeUnsupportedBlend && hasUnsupportedBlend) {
