@@ -833,75 +833,45 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       style += ";flex-direction:column";
     }
 
-    // PAGX's space-* arrangement absorbs the declared gap into a single redistribution:
-    // `extraGap = totalGap / denom` where denom depends on the arrangement, and the declared
-    // `gap` is not preserved as a minimum. CSS flex treats `gap` as a hard minimum that
-    // coexists with `justify-content`, so emitting them together produces a larger spacing
-    // than PAGX's layout. To match PAGX, translate space-* arrangements into CSS
-    // flex-start + computed per-pair gap + leading padding, so the HTML rows look identical
-    // to the tgfx render even when the row is shrink-to-fit inside its parent.
-    size_t visibleCount = 0;
-    for (auto* childLayer : layer->children) {
-      if (childLayer && childLayer->includeInLayout) {
-        visibleCount++;
-      }
-    }
+    // Space-* arrangement handling. PAGX's layout fully absorbs the declared gap into the
+    // redistribution (extraGap = (availableMain - totalChildMain) / denom). CSS flex instead
+    // treats `gap` as a minimum and adds justify-content's distribution on top. To make CSS
+    // match PAGX, emit `justify-content:space-*` natively but *drop* the declared gap, then
+    // make sure the container has a concrete main-axis size equal to PAGX's measured layout
+    // size (totalChildMain + totalGap when shrink-to-fit; the stretched parent size when
+    // stretched). Without the explicit size, a shrink-to-fit flex container would collapse to
+    // the children's bare total width and space-* would have no room to distribute.
     bool isSpace = layer->arrangement == Arrangement::SpaceBetween ||
                    layer->arrangement == Arrangement::SpaceEvenly ||
                    layer->arrangement == Arrangement::SpaceAround;
-    if (isSpace && visibleCount >= 2 && layer->gap > 0) {
-      float totalGap = layer->gap * static_cast<float>(visibleCount - 1);
-      float effectiveGap = 0;
-      float leadingPad = 0;
-      switch (layer->arrangement) {
-        case Arrangement::SpaceBetween:
-          effectiveGap = layer->gap;
-          break;
-        case Arrangement::SpaceEvenly:
-          effectiveGap = totalGap / static_cast<float>(visibleCount + 1);
-          leadingPad = effectiveGap;
-          break;
-        case Arrangement::SpaceAround:
-          effectiveGap = totalGap / static_cast<float>(visibleCount);
-          leadingPad = effectiveGap * 0.5f;
-          break;
-        default:
-          break;
-      }
-      if (effectiveGap > 0) {
-        style += ";gap:" + FloatToString(effectiveGap) + "px";
-      }
-      // Apply leading padding along the main axis; this reproduces PAGX's starting offset.
-      if (leadingPad > 0) {
-        auto padding = layer->padding;
-        if (layer->layout == LayoutMode::Horizontal) {
-          padding.left += leadingPad;
-          padding.right += leadingPad;
-        } else {
-          padding.top += leadingPad;
-          padding.bottom += leadingPad;
-        }
-        if (!padding.isZero()) {
-          style += ";padding:" + PaddingToCSS(padding);
-        }
-      } else if (!layer->padding.isZero()) {
-        style += ";padding:" + PaddingToCSS(layer->padding);
-      }
-    } else {
-      if (layer->gap > 0) {
-        style += ";gap:" + FloatToString(layer->gap) + "px";
-      }
-      if (!layer->padding.isZero()) {
-        style += ";padding:" + PaddingToCSS(layer->padding);
-      }
+    if (!isSpace && layer->gap > 0) {
+      style += ";gap:" + FloatToString(layer->gap) + "px";
+    }
+    if (!layer->padding.isZero()) {
+      style += ";padding:" + PaddingToCSS(layer->padding);
     }
     if (layer->alignment != Alignment::Stretch) {
       style += ";align-items:";
       style += AlignmentToCSS(layer->alignment);
     }
-    if (layer->arrangement != Arrangement::Start && !isSpace) {
+    if (layer->arrangement != Arrangement::Start) {
       style += ";justify-content:";
       style += ArrangementToCSS(layer->arrangement);
+    }
+    // If a space-* row doesn't already carry an explicit main-axis size, pin it to the pagx
+    // measured size so CSS has the same distribution budget as the tgfx layout.
+    if (isSpace && isFlexItem && layer->flex <= 0) {
+      bool horizontal = layer->layout == LayoutMode::Horizontal;
+      auto bounds = layer->layoutBounds();
+      if (horizontal && std::isnan(layer->width) && bounds.width > 0) {
+        if (style.find("width:") == std::string::npos) {
+          style += ";width:" + FloatToString(bounds.width) + "px";
+        }
+      } else if (!horizontal && std::isnan(layer->height) && bounds.height > 0) {
+        if (style.find("height:") == std::string::npos) {
+          style += ";height:" + FloatToString(bounds.height) + "px";
+        }
+      }
     }
   }
 
