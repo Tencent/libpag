@@ -5241,7 +5241,10 @@ PAGX_TEST(PAGXTest, GenerateComparisonPage) {
   fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
   RegisterSystemFonts(fontConfig);
 
-  // Build comparison page
+  // Build comparison page. The HTML column embeds live iframes so reviewers can F12 into
+  // each sample instead of inspecting a flattened screenshot; this also eliminates the
+  // Puppeteer/Chromium screenshot pipeline from this test path, keeping regeneration under
+  // a second and letting the page reflect whatever browser the user opens it in.
   std::string page = R"(<!DOCTYPE html>
 <html><head><meta charset="utf-8">
 <title>PAGX vs HTML Rendering Comparison</title>
@@ -5260,18 +5263,13 @@ h1{text-align:center;color:#1e293b;margin-bottom:4px}
 .cmp>div:first-child{border-right:1px solid #e2e8f0}
 .cmp label{display:block;font-size:11px;color:#94a3b8;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
 .cmp img{max-width:100%;height:auto;border:1px solid #e2e8f0;border-radius:4px;background:repeating-conic-gradient(#f0f0f0 0% 25%,white 0% 50%) 50%/16px 16px}
+.cmp iframe{max-width:100%;border:1px solid #e2e8f0;border-radius:4px;background:repeating-conic-gradient(#f0f0f0 0% 25%,white 0% 50%) 50%/16px 16px;display:block;margin:0 auto}
 </style></head><body>
 <h1>PAGX vs HTML Rendering Comparison</h1>
-<p class="sub">Left: PAGX native rendering &nbsp;|&nbsp; Right: HTML rendering in browser</p>
+<p class="sub">Left: PAGX native rendering &nbsp;|&nbsp; Right: live HTML in this browser (open DevTools on the iframe to inspect)</p>
 )";
 
   int count = 0;
-  // Collect HTML screenshot jobs here and submit them to screenshot.js in a single batch
-  // once all PAGX files are processed. Launching Chromium per file used to dominate the
-  // runtime (~2-4s startup x 70+ files) and produced sporadic `Page.captureScreenshot timed
-  // out` failures; a single-browser batch fixes both.
-  std::string screenshotTasks;
-  int screenshotTaskCount = 0;
 
   for (const auto& dirInfo : directories) {
     std::vector<std::string> files;
@@ -5358,19 +5356,6 @@ h1{text-align:center;color:#1e293b;margin-bottom:4px}
         hf.write(htmlContent.data(), static_cast<std::streamsize>(htmlContent.size()));
       }
 
-      // Queue the HTML screenshot job. Actual Chromium work happens once per batch below.
-      auto htmlPngHires = outDir + "/" + baseName + "_html2x.png";
-      if (std::filesystem::exists(htmlPath)) {
-        if (screenshotTaskCount > 0) {
-          screenshotTasks += ",";
-        }
-        screenshotTasks += "{\"html\":\"" + htmlPath + "\",\"png\":\"" + htmlPngHires +
-                           "\",\"width\":" + std::to_string(w) +
-                           ",\"height\":" + std::to_string(h) +
-                           ",\"scale\":" + std::to_string(scale) + "}";
-        screenshotTaskCount++;
-      }
-
       page += "<div class=\"card\" id=\"" + baseName + "\">\n";
       page += "  <div class=\"hd\"><h3>" + std::to_string(count + 1) + ". " + baseName +
               "</h3><span class=\"sz\">" + std::to_string(w) + "x" + std::to_string(h) + " @" +
@@ -5378,23 +5363,15 @@ h1{text-align:center;color:#1e293b;margin-bottom:4px}
       page += "  <div class=\"cmp\">\n";
       page += "    <div><label>PAGX Native</label><img src=\"" + baseName + "_pagx.png\" width=\"" +
               std::to_string(w) + "\"></div>\n";
-      page += "    <div><label>HTML (Browser)</label><img src=\"" + baseName +
-              "_html2x.png\" width=\"" + std::to_string(w) + "\"></div>\n";
+      // `loading=\"lazy\"` keeps the initial page open quickly when the sample count grows;
+      // sandbox=\"allow-same-origin\" is deliberately omitted so each iframe stays in its own
+      // origin and its styles/scripts cannot leak into the comparison page chrome.
+      page += "    <div><label>HTML (Browser)</label><iframe src=\"" + baseName +
+              ".html\" width=\"" + std::to_string(w) + "\" height=\"" + std::to_string(h) +
+              "\" loading=\"lazy\" scrolling=\"no\"></iframe></div>\n";
       page += "  </div>\n</div>\n";
       count++;
     }
-  }
-
-  // Execute all HTML screenshots in a single Chromium session. Falling back to per-file
-  // calls here would reintroduce the cold-start flakiness we just eliminated.
-  if (screenshotTaskCount > 0) {
-    auto tasksPath = outDir + "/screenshot_tasks.json";
-    std::ofstream tf(tasksPath, std::ios::binary);
-    tf << "[" << screenshotTasks << "]";
-    tf.close();
-    auto scriptPath = ProjectPath::Absolute("test/screenshot.js");
-    auto cmd = "node " + scriptPath + " --batch " + tasksPath;
-    std::system(cmd.c_str());
   }
 
   page += "<p class=\"sub\">" + std::to_string(count) + " files compared</p></body></html>";
