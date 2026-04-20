@@ -832,22 +832,74 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     } else {
       style += ";flex-direction:column";
     }
-    if (layer->gap > 0) {
-      // Emit `gap` even when arrangement is space-between / space-evenly / space-around.
-      // CSS flex treats `gap` as the minimum spacing between items; space-* justify adds
-      // additional distribution only if there's leftover space. Without `gap`, rows whose
-      // content width equals the container width (common when a parent uses align-items:center,
-      // which shrinks rows to content-size) collapse their items against each other.
-      style += ";gap:" + FloatToString(layer->gap) + "px";
+
+    // PAGX's space-* arrangement absorbs the declared gap into a single redistribution:
+    // `extraGap = totalGap / denom` where denom depends on the arrangement, and the declared
+    // `gap` is not preserved as a minimum. CSS flex treats `gap` as a hard minimum that
+    // coexists with `justify-content`, so emitting them together produces a larger spacing
+    // than PAGX's layout. To match PAGX, translate space-* arrangements into CSS
+    // flex-start + computed per-pair gap + leading padding, so the HTML rows look identical
+    // to the tgfx render even when the row is shrink-to-fit inside its parent.
+    size_t visibleCount = 0;
+    for (auto* childLayer : layer->children) {
+      if (childLayer && childLayer->includeInLayout) {
+        visibleCount++;
+      }
     }
-    if (!layer->padding.isZero()) {
-      style += ";padding:" + PaddingToCSS(layer->padding);
+    bool isSpace = layer->arrangement == Arrangement::SpaceBetween ||
+                   layer->arrangement == Arrangement::SpaceEvenly ||
+                   layer->arrangement == Arrangement::SpaceAround;
+    if (isSpace && visibleCount >= 2 && layer->gap > 0) {
+      float totalGap = layer->gap * static_cast<float>(visibleCount - 1);
+      float effectiveGap = 0;
+      float leadingPad = 0;
+      switch (layer->arrangement) {
+        case Arrangement::SpaceBetween:
+          effectiveGap = layer->gap;
+          break;
+        case Arrangement::SpaceEvenly:
+          effectiveGap = totalGap / static_cast<float>(visibleCount + 1);
+          leadingPad = effectiveGap;
+          break;
+        case Arrangement::SpaceAround:
+          effectiveGap = totalGap / static_cast<float>(visibleCount);
+          leadingPad = effectiveGap * 0.5f;
+          break;
+        default:
+          break;
+      }
+      if (effectiveGap > 0) {
+        style += ";gap:" + FloatToString(effectiveGap) + "px";
+      }
+      // Apply leading padding along the main axis; this reproduces PAGX's starting offset.
+      if (leadingPad > 0) {
+        auto padding = layer->padding;
+        if (layer->layout == LayoutMode::Horizontal) {
+          padding.left += leadingPad;
+          padding.right += leadingPad;
+        } else {
+          padding.top += leadingPad;
+          padding.bottom += leadingPad;
+        }
+        if (!padding.isZero()) {
+          style += ";padding:" + PaddingToCSS(padding);
+        }
+      } else if (!layer->padding.isZero()) {
+        style += ";padding:" + PaddingToCSS(layer->padding);
+      }
+    } else {
+      if (layer->gap > 0) {
+        style += ";gap:" + FloatToString(layer->gap) + "px";
+      }
+      if (!layer->padding.isZero()) {
+        style += ";padding:" + PaddingToCSS(layer->padding);
+      }
     }
     if (layer->alignment != Alignment::Stretch) {
       style += ";align-items:";
       style += AlignmentToCSS(layer->alignment);
     }
-    if (layer->arrangement != Arrangement::Start) {
+    if (layer->arrangement != Arrangement::Start && !isSpace) {
       style += ";justify-content:";
       style += ArrangementToCSS(layer->arrangement);
     }
