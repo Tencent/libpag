@@ -841,31 +841,98 @@ void PPTWriter::writeShadowElement(XMLBuilder& out, const char* tag, float blurX
   out.closeElement();  // tag
 }
 
+static const char* BlendModeToPPT(BlendMode mode) {
+  switch (mode) {
+    case BlendMode::Normal:
+      return "over";
+    case BlendMode::Multiply:
+      return "mult";
+    case BlendMode::Screen:
+      return "screen";
+    case BlendMode::Darken:
+      return "darken";
+    case BlendMode::Lighten:
+      return "lighten";
+    default:
+      return nullptr;
+  }
+}
+
 void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& filters) {
-  bool hasShadow = false;
+  bool hasEffects = false;
   for (const auto* f : filters) {
-    if (f->nodeType() == NodeType::DropShadowFilter ||
-        f->nodeType() == NodeType::InnerShadowFilter) {
-      hasShadow = true;
+    auto type = f->nodeType();
+    if (type == NodeType::DropShadowFilter || type == NodeType::InnerShadowFilter ||
+        type == NodeType::BlurFilter || type == NodeType::BlendFilter) {
+      hasEffects = true;
       break;
     }
   }
-  if (!hasShadow) {
+  if (!hasEffects) {
     return;
   }
 
   out.openElement("a:effectLst").closeElementStart();
+
+  // OOXML effectLst requires this element order (§20.1.8.20):
+  // blur, fillOverlay, glow, innerShdw, outerShdw, prstShdw, reflection, softEdge
+
   for (const auto* f : filters) {
-    if (f->nodeType() == NodeType::DropShadowFilter) {
-      auto* s = static_cast<const DropShadowFilter*>(f);
-      writeShadowElement(out, "a:outerShdw", s->blurX, s->blurY, s->offsetX, s->offsetY, s->color,
-                         true);
-    } else if (f->nodeType() == NodeType::InnerShadowFilter) {
+    if (f->nodeType() == NodeType::BlurFilter) {
+      auto* blur = static_cast<const BlurFilter*>(f);
+      float avgBlur = (blur->blurX + blur->blurY) / 2.0f;
+      if (avgBlur > 0) {
+        out.openElement("a:blur")
+            .addRequiredAttribute("rad", PxToEMU(avgBlur))
+            .addRequiredAttribute("grow", "0")
+            .closeElementSelfClosing();
+      }
+      break;
+    }
+  }
+
+  for (const auto* f : filters) {
+    if (f->nodeType() == NodeType::BlendFilter) {
+      auto* blend = static_cast<const BlendFilter*>(f);
+      const char* blendStr = BlendModeToPPT(blend->blendMode);
+      if (blendStr) {
+        out.openElement("a:fillOverlay")
+            .addRequiredAttribute("blend", blendStr)
+            .closeElementStart();
+        out.openElement("a:solidFill").closeElementStart();
+        out.openElement("a:srgbClr")
+            .addRequiredAttribute("val", ColorToHex6(blend->color));
+        if (blend->color.alpha < 1.0f) {
+          out.closeElementStart();
+          out.openElement("a:alpha")
+              .addRequiredAttribute("val", AlphaToPct(blend->color.alpha))
+              .closeElementSelfClosing();
+          out.closeElement();  // a:srgbClr
+        } else {
+          out.closeElementSelfClosing();
+        }
+        out.closeElement();  // a:solidFill
+        out.closeElement();  // a:fillOverlay
+      }
+      break;
+    }
+  }
+
+  for (const auto* f : filters) {
+    if (f->nodeType() == NodeType::InnerShadowFilter) {
       auto* s = static_cast<const InnerShadowFilter*>(f);
       writeShadowElement(out, "a:innerShdw", s->blurX, s->blurY, s->offsetX, s->offsetY, s->color,
                          false);
     }
   }
+  for (const auto* f : filters) {
+    if (f->nodeType() == NodeType::DropShadowFilter) {
+      auto* s = static_cast<const DropShadowFilter*>(f);
+      writeShadowElement(out, "a:outerShdw", s->blurX, s->blurY, s->offsetX, s->offsetY, s->color,
+                         true);
+    }
+  }
+
   out.closeElement();  // a:effectLst
 }
 
