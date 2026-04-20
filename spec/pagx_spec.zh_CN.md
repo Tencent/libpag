@@ -935,10 +935,10 @@ Layer 的子元素按类型自动归类为四个集合：
 
 **preserve3D**：当值为 `false`（默认）时，具有 3D 变换的子图层在合成前会被压平到父级的 2D 平面。当值为 `true` 时，子图层保留其 3D 位置，在共享的 3D 空间中渲染，实现基于深度的交叉和正确的兄弟层 Z 排序。类似于 CSS 的 `transform-style: preserve-3d`。
 
-**变换属性优先级**：`x`/`y`、`matrix`、`matrix3D` 三者存在覆盖关系：
-- 仅设置 `x`/`y`：使用 `x`/`y` 作为平移
-- 设置 `matrix`：`matrix` 覆盖 `x`/`y` 的值
-- 设置 `matrix3D`：`matrix3D` 覆盖 `matrix` 和 `x`/`y` 的值
+**变换属性组合**：`x`/`y` 和 `matrix` 是组合关系（非覆盖），`matrix3D` 替换组合后的 2D 变换结果：
+- `x`/`y` 提供基础平移，`matrix` 在此基础上叠加额外的 2D 变换
+- 最终 2D 变换：`translate(x, y) × matrix`
+- 设置 `matrix3D` 时，将完全替换 2D 变换
 
 **MaskType（遮罩类型）**：
 

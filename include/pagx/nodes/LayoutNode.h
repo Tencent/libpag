@@ -21,6 +21,7 @@
 #include <cmath>
 #include <vector>
 #include "pagx/types/Padding.h"
+#include "pagx/types/Point.h"
 #include "pagx/types/Rect.h"
 
 namespace pagx {
@@ -98,9 +99,8 @@ class LayoutNode {
    */
   virtual void setLayoutSize(LayoutContext* context, float width, float height);
 
-  /** Writes self position and layoutX/layoutY. */
-  virtual void setLayoutPosition(LayoutContext* /*context*/, float /*x*/, float /*y*/) {
-  }
+  /** Writes layoutX/layoutY from constraint-resolved position. */
+  virtual void setLayoutPosition(LayoutContext* context, float x, float y);
 
   /**
    * Lays out children using layoutWidth/layoutHeight as container size.
@@ -163,16 +163,22 @@ class LayoutNode {
  protected:
   LayoutNode() = default;
 
-  /** Writes preferredWidth/preferredHeight. Called by updateSize when not yet measured. */
+  /** Writes measuredX/measuredY/measuredWidth/measuredHeight. Called by updateSize when not yet measured. */
   virtual void onMeasure(LayoutContext*) {
   }
 
+  /** Computes the render position by centering contentBounds within layoutBounds after uniform scaling. */
+  Point computeRenderPosition(const Rect& contentBounds) const;
+
+  /** Computes the uniform scale factor from measured size to layout size. */
+  float computeRenderScale() const;
+
  private:
-  // Preferred position and size (written by onMeasure during updateSize, read-only after that).
-  float preferredX = 0;
-  float preferredY = 0;
-  float preferredWidth = NAN;
-  float preferredHeight = NAN;
+  // Measured position and size (written by onMeasure during updateSize, read-only after that).
+  float measuredX = 0;
+  float measuredY = 0;
+  float measuredWidth = NAN;
+  float measuredHeight = NAN;
 
   // Layout-resolved position and size (written during layout phase, readable via layoutBounds()).
   float layoutX = NAN;

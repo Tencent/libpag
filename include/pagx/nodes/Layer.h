@@ -34,6 +34,7 @@
 #include "pagx/types/Matrix.h"
 #include "pagx/types/Matrix3D.h"
 #include "pagx/types/Padding.h"
+#include "pagx/types/Point.h"
 #include "pagx/types/Rect.h"
 
 namespace pagx {
@@ -248,6 +249,9 @@ class Layer : public Node, public LayoutNode {
     return NodeType::Layer;
   }
 
+  /** Returns the layer position adjusted to the layout bounds. */
+  Point renderPosition() const;
+
  private:
   Layer() = default;
 
@@ -256,7 +260,6 @@ class Layer : public Node, public LayoutNode {
   void updateSize(LayoutContext* context) override;
   void onMeasure(LayoutContext* context) override;
   void setLayoutSize(LayoutContext* context, float width, float height) override;
-  void setLayoutPosition(LayoutContext* context, float x, float y) override;
   void updateLayout(LayoutContext* context) override;
 
   friend class PAGXDocument;

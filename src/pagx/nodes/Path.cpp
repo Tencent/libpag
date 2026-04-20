@@ -19,17 +19,16 @@
 #include "pagx/nodes/Path.h"
 #include <cmath>
 #include "pagx/nodes/LayoutNode.h"
-#include "pagx/types/Matrix.h"
 
 namespace pagx {
 
 void Path::onMeasure(LayoutContext*) {
   if (data) {
     auto bounds = data->getBounds();
-    preferredX = bounds.x;
-    preferredY = bounds.y;
-    preferredWidth = bounds.width;
-    preferredHeight = bounds.height;
+    measuredX = position.x + bounds.x;
+    measuredY = position.y + bounds.y;
+    measuredWidth = bounds.width;
+    measuredHeight = bounds.height;
   }
 }
 
@@ -37,28 +36,17 @@ void Path::setLayoutSize(LayoutContext*, float width, float height) {
   if (!data) {
     return;
   }
-  float scale = LayoutNode::ComputeUniformScale(preferredWidth, preferredHeight, width, height);
-  if (scale != 1.0f) {
-    data->transform(Matrix::Scale(scale, scale));
-  }
-  auto bounds = data->getBounds();
-  layoutWidth = bounds.width;
-  layoutHeight = bounds.height;
+  float scale = LayoutNode::ComputeUniformScale(measuredWidth, measuredHeight, width, height);
+  layoutWidth = measuredWidth * scale;
+  layoutHeight = measuredHeight * scale;
 }
 
-void Path::setLayoutPosition(LayoutContext*, float x, float y) {
-  if (!data) {
-    return;
-  }
-  auto bounds = data->getBounds();
-  if (!std::isnan(x)) {
-    position.x = x - bounds.x;
-    layoutX = x;
-  }
-  if (!std::isnan(y)) {
-    position.y = y - bounds.y;
-    layoutY = y;
-  }
+Point Path::renderPosition() const {
+  return computeRenderPosition(data ? data->getBounds() : Rect{});
+}
+
+float Path::renderScale() const {
+  return computeRenderScale();
 }
 
 }  // namespace pagx

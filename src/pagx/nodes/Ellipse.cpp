@@ -22,32 +22,25 @@
 namespace pagx {
 
 void Ellipse::onMeasure(LayoutContext*) {
-  preferredX = position.x - size.width * 0.5f;
-  preferredY = position.y - size.height * 0.5f;
-  preferredWidth = size.width;
-  preferredHeight = size.height;
+  measuredX = std::isnan(position.x) ? 0 : (position.x - size.width * 0.5f);
+  measuredY = std::isnan(position.y) ? 0 : (position.y - size.height * 0.5f);
+  measuredWidth = size.width;
+  measuredHeight = size.height;
 }
 
 void Ellipse::setLayoutSize(LayoutContext*, float width, float height) {
-  if (!std::isnan(width)) {
-    size.width = width;
-  }
-  if (!std::isnan(height)) {
-    size.height = height;
-  }
-  layoutWidth = size.width;
-  layoutHeight = size.height;
+  layoutWidth = !std::isnan(width) ? width : measuredWidth;
+  layoutHeight = !std::isnan(height) ? height : measuredHeight;
 }
 
-void Ellipse::setLayoutPosition(LayoutContext*, float x, float y) {
-  if (!std::isnan(x)) {
-    position.x = x + size.width * 0.5f;
-    layoutX = x;
-  }
-  if (!std::isnan(y)) {
-    position.y = y + size.height * 0.5f;
-    layoutY = y;
-  }
+Point Ellipse::renderPosition() const {
+  auto bounds = layoutBounds();
+  return {bounds.x + bounds.width * 0.5f, bounds.y + bounds.height * 0.5f};
+}
+
+Size Ellipse::renderSize() const {
+  auto bounds = layoutBounds();
+  return {bounds.width, bounds.height};
 }
 
 }  // namespace pagx
