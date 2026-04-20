@@ -942,8 +942,19 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         _defs->addAttr("height", "200%");
         _defs->addAttr("color-interpolation-filters", "sRGB");
         _defs->closeTagStart();
-        _defs->openTag("feGaussianBlur");
+        // Saturate SourceAlpha into a binary silhouette so both the shadow shape and the
+        // erase mask below operate on the layer contour, as required by the spec
+        // (§5.3.1: "Computes shadow shape based on opaque layer content"; showBehindLayer=false
+        // "use layer contour as erase mask"). Without this, semi-transparent fills would
+        // produce a weaker shadow and leave partially-visible shadow inside the layer.
+        _defs->openTag("feColorMatrix");
         _defs->addAttr("in", "SourceAlpha");
+        _defs->addAttr("type", "matrix");
+        _defs->addAttr("values", "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 255 0");
+        _defs->addAttr("result", "opaqueAlpha");
+        _defs->closeTagSelfClosing();
+        _defs->openTag("feGaussianBlur");
+        _defs->addAttr("in", "opaqueAlpha");
         _defs->addAttr("stdDeviation", FloatToString(ds->blurX) + " " + FloatToString(ds->blurY));
         _defs->addAttr("result", "blur");
         _defs->closeTagSelfClosing();
@@ -969,7 +980,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         if (!ds->showBehindLayer) {
           _defs->openTag("feComposite");
           _defs->addAttr("in", "shadow");
-          _defs->addAttr("in2", "SourceAlpha");
+          _defs->addAttr("in2", "opaqueAlpha");
           _defs->addAttr("operator", "out");
           _defs->addAttr("result", "shadowClipped");
           _defs->closeTagSelfClosing();
