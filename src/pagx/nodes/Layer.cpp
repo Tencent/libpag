@@ -264,10 +264,10 @@ void Layer::setLayoutSize(LayoutContext* context, float targetWidth, float targe
   float prevW = layoutWidth;
   float prevH = layoutHeight;
   if (widthFromContent) {
-    layoutWidth = std::ceil(maxX);
+    layoutWidth = maxX;
   }
   if (heightFromContent) {
-    layoutHeight = std::ceil(maxY);
+    layoutHeight = maxY;
   }
   // Pass 2: if an axis was deferred and the refined value differs from the NaN placeholder, run
   // updateLayout again so descendants that depend on the container size (width/height=100%, etc.)
