@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="1200" height="800">
   <Layer id="sky" left="600" top="400">
-    <Rectangle left="-600" top="-400" size="1200,800"/>
+    <Rectangle left="-600" top="-400" width="1200" height="800"/>
     <Fill>
       <LinearGradient startPoint="0,-400" endPoint="0,400">
         <ColorStop color="#020810" offset="0"/>
@@ -16,7 +16,7 @@
     </Fill>
   </Layer>
   <Layer left="600" top="250" alpha="0.22" blendMode="screen">
-    <Ellipse left="-600" top="-100" size="1200,200"/>
+    <Ellipse left="-600" top="-100" width="1200" height="200"/>
     <Fill>
       <RadialGradient radius="600">
         <ColorStop color="#C4B5FD55" offset="0"/>
@@ -28,7 +28,7 @@
     <BlurFilter blurX="50" blurY="25"/>
   </Layer>
   <Layer left="150" top="200" alpha="0.5" blendMode="screen">
-    <Ellipse left="-275" top="-225" size="550,450"/>
+    <Ellipse left="-275" top="-225" width="550" height="450"/>
     <Fill>
       <RadialGradient radius="275">
         <ColorStop color="#7C3AED90" offset="0"/>
@@ -40,7 +40,7 @@
     <BlurFilter blurX="45" blurY="45"/>
   </Layer>
   <Layer left="1000" top="120" alpha="0.45" blendMode="screen">
-    <Ellipse left="-240" top="-180" size="480,360"/>
+    <Ellipse left="-240" top="-180" width="480" height="360"/>
     <Fill>
       <RadialGradient radius="240">
         <ColorStop color="#06B6D470" offset="0"/>
@@ -52,7 +52,7 @@
     <BlurFilter blurX="40" blurY="40"/>
   </Layer>
   <Layer left="550" top="90" alpha="0.28" blendMode="screen">
-    <Ellipse left="-200" top="-110" size="400,220"/>
+    <Ellipse left="-200" top="-110" width="400" height="220"/>
     <Fill>
       <RadialGradient radius="200">
         <ColorStop color="#EC489955" offset="0"/>
@@ -68,7 +68,7 @@
   <Layer left="340" top="175" composition="@comp1"/>
   <Layer left="420" top="68" composition="@comp6"/>
   <Layer left="530" top="22">
-    <Ellipse left="-2" top="-2" size="4,4"/>
+    <Ellipse left="-2" top="-2" width="4" height="4"/>
     <Fill color="#FFFFFF"/>
   </Layer>
   <Layer left="610" top="150" composition="@comp4"/>
@@ -96,10 +96,10 @@
   <Layer left="30" top="450" composition="@comp7"/>
   <Layer left="680" top="350" composition="@comp2"/>
   <Layer left="300" top="95" alpha="0.9">
-    <Ellipse left="-3" top="-3" size="6,6"/>
+    <Ellipse left="-3" top="-3" width="6" height="6"/>
     <Fill color="#FFFFFF"/>
     <Group>
-      <Ellipse left="-11" top="-11" size="22,22"/>
+      <Ellipse left="-11" top="-11" width="22" height="22"/>
       <Fill>
         <RadialGradient radius="11">
           <ColorStop color="#FFFFFF60" offset="0"/>
@@ -113,10 +113,10 @@
     </Group>
   </Layer>
   <Layer left="820" top="65" alpha="0.85">
-    <Ellipse left="-2.5" top="-2.5" size="5,5"/>
+    <Ellipse left="-2.5" top="-2.5" width="5" height="5"/>
     <Fill color="#FFFFFF"/>
     <Group>
-      <Ellipse left="-9" top="-9" size="18,18"/>
+      <Ellipse left="-9" top="-9" width="18" height="18"/>
       <Fill>
         <RadialGradient radius="9">
           <ColorStop color="#FFFFFF50" offset="0"/>
@@ -130,10 +130,10 @@
     </Group>
   </Layer>
   <Layer left="1100" top="295" alpha="0.8">
-    <Ellipse left="-2.5" top="-2.5" size="5,5"/>
+    <Ellipse left="-2.5" top="-2.5" width="5" height="5"/>
     <Fill color="#FFE4B5"/>
     <Group>
-      <Ellipse left="-8" top="-8" size="16,16"/>
+      <Ellipse left="-8" top="-8" width="16" height="16"/>
       <Fill>
         <RadialGradient radius="8">
           <ColorStop color="#FFE4B540" offset="0"/>
@@ -143,10 +143,10 @@
     </Group>
   </Layer>
   <Layer left="550" top="180" alpha="0.75">
-    <Ellipse left="-2" top="-2" size="4,4"/>
+    <Ellipse left="-2" top="-2" width="4" height="4"/>
     <Fill color="#E0E7FF"/>
     <Group>
-      <Ellipse left="-7" top="-7" size="14,14"/>
+      <Ellipse left="-7" top="-7" width="14" height="14"/>
       <Fill>
         <RadialGradient radius="7">
           <ColorStop color="#E0E7FF40" offset="0"/>
@@ -160,7 +160,7 @@
     </Group>
   </Layer>
   <Layer left="1020" top="140">
-    <Ellipse left="-65" top="-65" size="130,130"/>
+    <Ellipse left="-65" top="-65" width="130" height="130"/>
     <Fill>
       <RadialGradient center="-20,-20" radius="80">
         <ColorStop color="#F97316" offset="0"/>
@@ -182,15 +182,15 @@
       <Stroke color="#FBBF2415" width="3"/>
     </Group>
     <Group rotation="-20">
-      <Ellipse left="-100" top="-21" size="200,42"/>
+      <Ellipse left="-100" top="-21" width="200" height="42"/>
       <Stroke color="#F9731660" width="5"/>
     </Group>
     <Group rotation="-20">
-      <Ellipse left="-85" top="-15" size="170,30"/>
+      <Ellipse left="-85" top="-15" width="170" height="30"/>
       <Stroke color="#FB923C40" width="3"/>
     </Group>
     <Group>
-      <Ellipse left="-75" top="-75" size="150,150"/>
+      <Ellipse left="-75" top="-75" width="150" height="150"/>
       <Fill>
         <RadialGradient radius="75">
           <ColorStop color="#F9731600" offset="0.7"/>
@@ -200,7 +200,7 @@
     </Group>
   </Layer>
   <Layer left="420" top="105">
-    <Ellipse left="-14" top="-14" size="28,28"/>
+    <Ellipse left="-14" top="-14" width="28" height="28"/>
     <Fill>
       <RadialGradient center="-4,-4" radius="16">
         <ColorStop color="#A78BFA" offset="0"/>
@@ -209,7 +209,7 @@
       </RadialGradient>
     </Fill>
     <Group>
-      <Ellipse left="-18" top="-18" size="36,36"/>
+      <Ellipse left="-18" top="-18" width="36" height="36"/>
       <Fill>
         <RadialGradient radius="18">
           <ColorStop color="#A78BFA00" offset="0.7"/>
@@ -219,7 +219,7 @@
     </Group>
   </Layer>
   <Layer id="planet" left="60" top="580">
-    <Ellipse left="-210" top="-210" size="420,420"/>
+    <Ellipse left="-210" top="-210" width="420" height="420"/>
     <Fill>
       <RadialGradient center="-40,-60" radius="230">
         <ColorStop color="#3B82F6" offset="0"/>
@@ -245,7 +245,7 @@
       <Stroke color="#93C5FD15" width="6"/>
     </Group>
     <Group>
-      <Ellipse left="-225" top="-225" size="450,450"/>
+      <Ellipse left="-225" top="-225" width="450" height="450"/>
       <Fill>
         <RadialGradient radius="225">
           <ColorStop color="#3B82F600" offset="0.8"/>
@@ -300,7 +300,7 @@
     </Group>
   </Layer>
   <Layer id="crater1" left="400" top="570">
-    <Ellipse left="-40" top="-10" size="80,20"/>
+    <Ellipse left="-40" top="-10" width="80" height="20"/>
     <Fill>
       <RadialGradient radius="40">
         <ColorStop color="#0A0618" offset="0"/>
@@ -310,7 +310,7 @@
     </Fill>
     <Stroke color="#8B5CF625" width="1.5"/>
     <Group>
-      <Ellipse left="-28" top="-4" size="56,12"/>
+      <Ellipse left="-28" top="-4" width="56" height="12"/>
       <Fill>
         <RadialGradient center="0,2" radius="28">
           <ColorStop color="#050310" offset="0"/>
@@ -320,7 +320,7 @@
     </Group>
   </Layer>
   <Layer id="crater2" left="760" top="539">
-    <Ellipse left="-25" top="-7" size="50,14"/>
+    <Ellipse left="-25" top="-7" width="50" height="14"/>
     <Fill>
       <RadialGradient radius="25">
         <ColorStop color="#0A0618" offset="0"/>
@@ -348,7 +348,7 @@
       <Stroke color="#A78BFA" width="2" cap="round"/>
     </Group>
     <Group>
-      <Ellipse left="-8" top="-70" size="16,16"/>
+      <Ellipse left="-8" top="-70" width="16" height="16"/>
       <Fill>
         <RadialGradient center="0,-62" radius="8">
           <ColorStop color="#A78BFA80" offset="0"/>
@@ -387,7 +387,7 @@
       </Fill>
     </Group>
     <Group>
-      <Ellipse left="-9" top="-74" size="18,18"/>
+      <Ellipse left="-9" top="-74" width="18" height="18"/>
       <Fill>
         <RadialGradient center="0,-65" radius="9">
           <ColorStop color="#C4B5FDA0" offset="0"/>
@@ -396,7 +396,7 @@
       </Fill>
     </Group>
     <Group>
-      <Ellipse left="25" top="-49" size="14,14"/>
+      <Ellipse left="25" top="-49" width="14" height="14"/>
       <Fill>
         <RadialGradient center="32,-42" radius="7">
           <ColorStop color="#C4B5FD80" offset="0"/>
@@ -438,7 +438,7 @@
       <Fill color="#047857"/>
     </Group>
     <Group>
-      <Ellipse left="-5" top="-67" size="10,12"/>
+      <Ellipse left="-5" top="-67" width="10" height="12"/>
       <Fill>
         <RadialGradient center="0,-61" radius="6">
           <ColorStop color="#34D399" offset="0"/>
@@ -448,7 +448,7 @@
       </Fill>
     </Group>
     <Group>
-      <Ellipse left="-17" top="-78" size="34,34"/>
+      <Ellipse left="-17" top="-78" width="34" height="34"/>
       <Fill>
         <RadialGradient center="0,-61" radius="17">
           <ColorStop color="#34D39968" offset="0"/>
@@ -466,7 +466,7 @@
       <Fill color="#0D9488"/>
     </Group>
     <Group>
-      <Ellipse left="-4" top="-73" size="8,10"/>
+      <Ellipse left="-4" top="-73" width="8" height="10"/>
       <Fill>
         <RadialGradient center="0,-68" radius="5">
           <ColorStop color="#2DD4BF" offset="0"/>
@@ -476,7 +476,7 @@
       </Fill>
     </Group>
     <Group>
-      <Ellipse left="-14" top="-82" size="28,28"/>
+      <Ellipse left="-14" top="-82" width="28" height="28"/>
       <Fill>
         <RadialGradient center="0,-68" radius="14">
           <ColorStop color="#2DD4BF58" offset="0"/>
@@ -494,15 +494,15 @@
       <Stroke color="#14B8A6" width="2" cap="round"/>
     </Group>
     <Group>
-      <Ellipse left="-3.5" top="-39" size="7,8"/>
+      <Ellipse left="-3.5" top="-39" width="7" height="8"/>
       <Fill color="#34D399"/>
     </Group>
     <Group>
-      <Ellipse left="11" top="-32.5" size="6,7"/>
+      <Ellipse left="11" top="-32.5" width="6" height="7"/>
       <Fill color="#2DD4BF"/>
     </Group>
     <Group>
-      <Ellipse left="-7" top="-45" size="26,26"/>
+      <Ellipse left="-7" top="-45" width="26" height="26"/>
       <Fill>
         <RadialGradient center="6,-32" radius="13">
           <ColorStop color="#34D39958" offset="0"/>
@@ -519,11 +519,11 @@
       <Fill color="#059669"/>
     </Group>
     <Group>
-      <Ellipse left="-3" top="-29" size="6,8"/>
+      <Ellipse left="-3" top="-29" width="6" height="8"/>
       <Fill color="#34D399"/>
     </Group>
     <Group>
-      <Ellipse left="-10" top="-35" size="20,20"/>
+      <Ellipse left="-10" top="-35" width="20" height="20"/>
       <Fill>
         <RadialGradient center="0,-25" radius="10">
           <ColorStop color="#34D39955" offset="0"/>
@@ -533,7 +533,7 @@
     </Group>
   </Layer>
   <Layer id="alien1" left="860" top="523">
-    <Ellipse left="-9" top="-7" size="18,14"/>
+    <Ellipse left="-9" top="-7" width="18" height="14"/>
     <Fill>
       <RadialGradient radius="9">
         <ColorStop color="#A78BFA" offset="0"/>
@@ -542,13 +542,13 @@
       </RadialGradient>
     </Fill>
     <Group>
-      <Ellipse left="-6.5" top="-6" size="5,6"/>
-      <Ellipse left="1.5" top="-6" size="5,6"/>
+      <Ellipse left="-6.5" top="-6" width="5" height="6"/>
+      <Ellipse left="1.5" top="-6" width="5" height="6"/>
       <Fill color="#E0E7FF"/>
     </Group>
     <Group>
-      <Ellipse left="-5" top="-4.5" size="2,3"/>
-      <Ellipse left="3" top="-4.5" size="2,3"/>
+      <Ellipse left="-5" top="-4.5" width="2" height="3"/>
+      <Ellipse left="3" top="-4.5" width="2" height="3"/>
       <Fill color="#1E1B4B"/>
     </Group>
     <Group>
@@ -556,8 +556,8 @@
       <Stroke color="#A78BFA" width="1.5" cap="round"/>
     </Group>
     <Group>
-      <Ellipse left="-12.5" top="-24.5" size="5,5"/>
-      <Ellipse left="7.5" top="-24.5" size="5,5"/>
+      <Ellipse left="-12.5" top="-24.5" width="5" height="5"/>
+      <Ellipse left="7.5" top="-24.5" width="5" height="5"/>
       <Fill color="#C4B5FD"/>
     </Group>
     <Group>
@@ -566,7 +566,7 @@
     </Group>
   </Layer>
   <Layer id="alien2" left="330" top="573">
-    <Ellipse left="-7" top="-5" size="14,10"/>
+    <Ellipse left="-7" top="-5" width="14" height="10"/>
     <Fill>
       <RadialGradient radius="7">
         <ColorStop color="#67E8F9" offset="0"/>
@@ -575,13 +575,13 @@
       </RadialGradient>
     </Fill>
     <Group>
-      <Ellipse left="-5" top="-4.5" size="4,5"/>
-      <Ellipse left="1" top="-4.5" size="4,5"/>
+      <Ellipse left="-5" top="-4.5" width="4" height="5"/>
+      <Ellipse left="1" top="-4.5" width="4" height="5"/>
       <Fill color="#E0F2FE"/>
     </Group>
     <Group>
-      <Ellipse left="-4" top="-3" size="2,2"/>
-      <Ellipse left="2" top="-3" size="2,2"/>
+      <Ellipse left="-4" top="-3" width="2" height="2"/>
+      <Ellipse left="2" top="-3" width="2" height="2"/>
       <Fill color="#164E63"/>
     </Group>
     <Group>
@@ -589,8 +589,8 @@
       <Stroke color="#22D3EE" width="1.5" cap="round"/>
     </Group>
     <Group>
-      <Ellipse left="-6.5" top="-19.5" size="3,3"/>
-      <Ellipse left="3.5" top="-19.5" size="3,3"/>
+      <Ellipse left="-6.5" top="-19.5" width="3" height="3"/>
+      <Ellipse left="3.5" top="-19.5" width="3" height="3"/>
       <Fill color="#67E8F9"/>
     </Group>
   </Layer>
@@ -638,13 +638,13 @@
       <Stroke color="#64748B" width="2"/>
     </Group>
     <Group>
-      <Ellipse left="-22" top="12.5" size="4,3"/>
-      <Ellipse left="-2" top="14.5" size="4,3"/>
-      <Ellipse left="18" top="12.5" size="4,3"/>
+      <Ellipse left="-22" top="12.5" width="4" height="3"/>
+      <Ellipse left="-2" top="14.5" width="4" height="3"/>
+      <Ellipse left="18" top="12.5" width="4" height="3"/>
       <Fill color="#FBBF24"/>
     </Group>
     <Group>
-      <Ellipse left="-47.5" top="-27.5" size="95,55"/>
+      <Ellipse left="-47.5" top="-27.5" width="95" height="55"/>
       <Fill>
         <RadialGradient radius="48">
           <ColorStop color="#38BDF800" offset="0.6"/>
@@ -677,11 +677,11 @@
     <Fill color="#301A58"/>
   </Layer>
   <Layer id="station" left="1130" top="395" alpha="0.65">
-    <Rectangle left="-6" top="-4" size="12,8" roundness="2"/>
+    <Rectangle left="-6" top="-4" width="12" height="8" roundness="2"/>
     <Fill color="#94A3B8"/>
     <Group>
-      <Rectangle left="-20" top="-2" size="12,4"/>
-      <Rectangle left="8" top="-2" size="12,4"/>
+      <Rectangle left="-20" top="-2" width="12" height="4"/>
+      <Rectangle left="8" top="-2" width="12" height="4"/>
       <Fill color="#38BDF8"/>
     </Group>
     <Group>
@@ -689,12 +689,12 @@
       <Stroke color="#94A3B8"/>
     </Group>
     <Group>
-      <Ellipse left="-1" top="-6" size="2,2"/>
+      <Ellipse left="-1" top="-6" width="2" height="2"/>
       <Fill color="#EF4444"/>
     </Group>
   </Layer>
   <Layer id="shadow" left="600" top="545">
-    <Ellipse left="-70" top="-12.5" size="140,25"/>
+    <Ellipse left="-70" top="-12.5" width="140" height="25"/>
     <Fill>
       <RadialGradient radius="70">
         <ColorStop color="#00000060" offset="0"/>
@@ -704,7 +704,7 @@
     </Fill>
   </Layer>
   <Layer id="astronaut" left="600" top="433">
-    <Rectangle left="10" top="-19" size="30,54" roundness="6"/>
+    <Rectangle left="10" top="-19" width="30" height="54" roundness="6"/>
     <Fill>
       <LinearGradient startPoint="10,0" endPoint="40,0">
         <ColorStop color="#94A3B8" offset="0"/>
@@ -717,8 +717,8 @@
       <Stroke color="#64748B"/>
     </Group>
     <Group>
-      <Ellipse left="17" top="28" size="6,4"/>
-      <Ellipse left="27" top="28" size="6,4"/>
+      <Ellipse left="17" top="28" width="6" height="4"/>
+      <Ellipse left="27" top="28" width="6" height="4"/>
       <Fill color="#475569"/>
     </Group>
     <Group>
@@ -726,11 +726,11 @@
       <Stroke color="#94A3B8" width="2" cap="round"/>
     </Group>
     <Group>
-      <Ellipse left="33.5" top="-44.5" size="5,5"/>
+      <Ellipse left="33.5" top="-44.5" width="5" height="5"/>
       <Fill color="#EF4444"/>
     </Group>
     <Group>
-      <Ellipse left="29" top="-49" size="14,14"/>
+      <Ellipse left="29" top="-49" width="14" height="14"/>
       <Fill>
         <RadialGradient center="36,-42" radius="7">
           <ColorStop color="#EF444470" offset="0"/>
@@ -755,39 +755,39 @@
       <Stroke color="#E2E8F0" width="3"/>
     </Group>
     <Group>
-      <Ellipse left="-22" top="-17" size="8,6"/>
+      <Ellipse left="-22" top="-17" width="8" height="6"/>
       <Fill color="#EF4444"/>
     </Group>
     <Group>
-      <Ellipse left="14" top="-17" size="8,6"/>
+      <Ellipse left="14" top="-17" width="8" height="6"/>
       <Fill color="#3B82F6"/>
     </Group>
     <Group>
-      <Rectangle left="-11" top="-4" size="22,18" roundness="3"/>
+      <Rectangle left="-11" top="-4" width="22" height="18" roundness="3"/>
       <Fill color="#475569"/>
     </Group>
     <Group>
-      <Ellipse left="-6" size="4,4"/>
+      <Ellipse left="-6" width="4" height="4"/>
       <Fill color="#22C55E"/>
     </Group>
     <Group>
-      <Ellipse left="2" size="4,4"/>
+      <Ellipse left="2" width="4" height="4"/>
       <Fill color="#EAB308"/>
     </Group>
     <Group>
-      <Ellipse left="-6" top="6" size="4,4"/>
+      <Ellipse left="-6" top="6" width="4" height="4"/>
       <Fill color="#3B82F6"/>
     </Group>
     <Group>
-      <Ellipse left="2" top="6" size="4,4"/>
+      <Ellipse left="2" top="6" width="4" height="4"/>
       <Fill color="#EF4444"/>
     </Group>
     <Group>
-      <Rectangle left="-7" top="12" size="14,4" roundness="1"/>
+      <Rectangle left="-7" top="12" width="14" height="4" roundness="1"/>
       <Fill color="#0F172A"/>
     </Group>
     <Group>
-      <Rectangle left="-5" top="13" size="6,2" roundness="1"/>
+      <Rectangle left="-5" top="13" width="6" height="2" roundness="1"/>
       <Fill color="#22D3EE60"/>
     </Group>
     <Group>
@@ -795,12 +795,12 @@
       <Stroke color="#64748B" width="4"/>
     </Group>
     <Group>
-      <Rectangle left="-5" top="30" size="10,8" roundness="2"/>
+      <Rectangle left="-5" top="30" width="10" height="8" roundness="2"/>
       <Fill color="#94A3B8"/>
     </Group>
     <Group>
-      <Rectangle left="-18" top="33" size="8,6" roundness="2"/>
-      <Rectangle left="10" top="33" size="8,6" roundness="2"/>
+      <Rectangle left="-18" top="33" width="8" height="6" roundness="2"/>
+      <Rectangle left="10" top="33" width="8" height="6" roundness="2"/>
       <Fill color="#64748B"/>
     </Group>
     <Group>
@@ -808,7 +808,7 @@
       <Stroke color="#CBD5E1" width="14" cap="round" join="round"/>
     </Group>
     <Group>
-      <Ellipse left="-54" top="-54" size="16,18"/>
+      <Ellipse left="-54" top="-54" width="16" height="18"/>
       <Fill>
         <LinearGradient startPoint="-54,-45" endPoint="-38,-45">
           <ColorStop color="#94A3B8" offset="0"/>
@@ -822,7 +822,7 @@
       <Stroke color="#CBD5E1" width="3" cap="round"/>
     </Group>
     <Group>
-      <Ellipse left="-54" top="-39" size="16,6"/>
+      <Ellipse left="-54" top="-39" width="16" height="6"/>
       <Fill color="#64748B"/>
     </Group>
     <Group>
@@ -830,7 +830,7 @@
       <Stroke color="#CBD5E1" width="14" cap="round" join="round"/>
     </Group>
     <Group>
-      <Ellipse left="36" top="21" size="16,18"/>
+      <Ellipse left="36" top="21" width="16" height="18"/>
       <Fill>
         <LinearGradient startPoint="36,30" endPoint="52,30">
           <ColorStop color="#94A3B8" offset="0"/>
@@ -840,23 +840,23 @@
       </Fill>
     </Group>
     <Group>
-      <Ellipse left="36" top="17" size="16,6"/>
+      <Ellipse left="36" top="17" width="16" height="6"/>
       <Fill color="#64748B"/>
     </Group>
     <Group>
-      <Rectangle left="40" top="7" size="8,22" roundness="2"/>
+      <Rectangle left="40" top="7" width="8" height="22" roundness="2"/>
       <Fill color="#475569"/>
     </Group>
     <Group>
-      <Rectangle left="41" top="6" size="6,6" roundness="1"/>
+      <Rectangle left="41" top="6" width="6" height="6" roundness="1"/>
       <Fill color="#0F172A"/>
     </Group>
     <Group>
-      <Ellipse left="42" top="7" size="4,4"/>
+      <Ellipse left="42" top="7" width="4" height="4"/>
       <Fill color="#22D3EE"/>
     </Group>
     <Group>
-      <Ellipse left="36" top="1" size="16,16"/>
+      <Ellipse left="36" top="1" width="16" height="16"/>
       <Fill>
         <RadialGradient center="44,9" radius="8">
           <ColorStop color="#22D3EE55" offset="0"/>
@@ -869,8 +869,8 @@
       <Stroke color="#CBD5E1" width="14" cap="round"/>
     </Group>
     <Group>
-      <Ellipse left="-20" top="66" size="10,8"/>
-      <Ellipse left="10" top="66" size="10,8"/>
+      <Ellipse left="-20" top="66" width="10" height="8"/>
+      <Ellipse left="10" top="66" width="10" height="8"/>
       <Fill color="#94A3B8"/>
     </Group>
     <Group>
@@ -902,7 +902,7 @@
       <Stroke color="#475569" width="1.5" cap="round"/>
     </Group>
     <Group>
-      <Ellipse left="-27" top="-71" size="54,54"/>
+      <Ellipse left="-27" top="-71" width="54" height="54"/>
       <Fill>
         <LinearGradient startPoint="-27,-71" endPoint="27,-17">
           <ColorStop color="#E2E8F0" offset="0"/>
@@ -913,7 +913,7 @@
       </Fill>
     </Group>
     <Group>
-      <Ellipse left="-21" top="-63" size="42,38"/>
+      <Ellipse left="-21" top="-63" width="42" height="38"/>
       <Fill>
         <LinearGradient startPoint="-21,-63" endPoint="21,-25">
           <ColorStop color="#1E293B" offset="0"/>
@@ -937,27 +937,27 @@
       <Stroke color="#F9731630" width="3" cap="round"/>
     </Group>
     <Group>
-      <Ellipse left="-9" top="-41" size="2,2"/>
+      <Ellipse left="-9" top="-41" width="2" height="2"/>
       <Fill color="#FFFFFF30"/>
     </Group>
     <Group>
-      <Ellipse left="4.5" top="-48.5" size="1,1"/>
+      <Ellipse left="4.5" top="-48.5" width="1" height="1"/>
       <Fill color="#FFFFFF25"/>
     </Group>
     <Group>
-      <Ellipse left="-27" top="-71" size="54,54"/>
+      <Ellipse left="-27" top="-71" width="54" height="54"/>
       <Stroke color="#94A3B8" width="2"/>
     </Group>
     <Group>
-      <Rectangle left="-4" top="-72.5" size="8,5" roundness="2"/>
+      <Rectangle left="-4" top="-72.5" width="8" height="5" roundness="2"/>
       <Fill color="#475569"/>
     </Group>
     <Group>
-      <Ellipse left="-2" top="-71.5" size="4,3"/>
+      <Ellipse left="-2" top="-71.5" width="4" height="3"/>
       <Fill color="#FBBF24"/>
     </Group>
     <Group>
-      <Ellipse left="-19" top="-27" size="38,12"/>
+      <Ellipse left="-19" top="-27" width="38" height="12"/>
       <Fill color="#94A3B8"/>
       <Stroke color="#64748B" width="1.5"/>
     </Group>
@@ -984,12 +984,12 @@
       <Fill color="#E2E8F0"/>
     </Group>
     <Group>
-      <Ellipse left="43" top="-37.5" size="6,3"/>
+      <Ellipse left="43" top="-37.5" width="6" height="3"/>
       <Stroke color="#E2E8F0" width="0.8"/>
     </Group>
   </Layer>
   <Layer id="hologram" left="505" top="385" alpha="0.75">
-    <Rectangle left="-30" top="-22.5" size="60,45" roundness="3"/>
+    <Rectangle left="-30" top="-22.5" width="60" height="45" roundness="3"/>
     <Stroke color="#22D3EE55" width="1.5"/>
     <Group>
       <Path data="M-30 -10L30 -10M-30 5L30 5"/>
@@ -1000,39 +1000,39 @@
       <Stroke color="#22D3EE20"/>
     </Group>
     <Group>
-      <Rectangle left="-22" top="-18" size="8,4" roundness="1"/>
+      <Rectangle left="-22" top="-18" width="8" height="4" roundness="1"/>
       <Fill color="#22D3EE40"/>
     </Group>
     <Group>
-      <Rectangle left="-12" top="-18" size="12,4" roundness="1"/>
+      <Rectangle left="-12" top="-18" width="12" height="4" roundness="1"/>
       <Fill color="#34D39940"/>
     </Group>
     <Group>
-      <Rectangle left="5" top="-18" size="6,4" roundness="1"/>
+      <Rectangle left="5" top="-18" width="6" height="4" roundness="1"/>
       <Fill color="#FBBF2440"/>
     </Group>
     <Group>
-      <Ellipse left="-7" top="-7" size="14,14"/>
+      <Ellipse left="-7" top="-7" width="14" height="14"/>
       <Stroke color="#22D3EE50"/>
     </Group>
     <Group>
-      <Ellipse left="-7" top="-3" size="14,6"/>
+      <Ellipse left="-7" top="-3" width="14" height="6"/>
       <Stroke color="#22D3EE30"/>
     </Group>
     <Group>
-      <Rectangle left="-16" top="13" size="16,2" roundness="1"/>
+      <Rectangle left="-16" top="13" width="16" height="2" roundness="1"/>
       <Fill color="#22D3EE30"/>
     </Group>
     <Group>
-      <Rectangle left="3" top="13" size="10,2" roundness="1"/>
+      <Rectangle left="3" top="13" width="10" height="2" roundness="1"/>
       <Fill color="#22D3EE25"/>
     </Group>
     <Group>
-      <Rectangle left="-14" top="17" size="20,2" roundness="1"/>
+      <Rectangle left="-14" top="17" width="20" height="2" roundness="1"/>
       <Fill color="#22D3EE20"/>
     </Group>
     <Group>
-      <Ellipse left="-37.5" top="-29" size="75,58"/>
+      <Ellipse left="-37.5" top="-29" width="75" height="58"/>
       <Fill>
         <RadialGradient radius="38">
           <ColorStop color="#22D3EE00" offset="0.5"/>
@@ -1065,18 +1065,18 @@
     </Group>
   </Layer>
   <Layer id="beacon" left="780" top="510">
-    <Rectangle left="-2" top="-5" size="4,30" roundness="1"/>
+    <Rectangle left="-2" top="-5" width="4" height="30" roundness="1"/>
     <Fill color="#64748B"/>
     <Group>
-      <Ellipse left="-7" top="22.5" size="14,5"/>
+      <Ellipse left="-7" top="22.5" width="14" height="5"/>
       <Fill color="#475569"/>
     </Group>
     <Group>
-      <Ellipse left="-4" top="-9" size="8,8"/>
+      <Ellipse left="-4" top="-9" width="8" height="8"/>
       <Fill color="#22C55E"/>
     </Group>
     <Group>
-      <Ellipse left="-11" top="-16" size="22,22"/>
+      <Ellipse left="-11" top="-16" width="22" height="22"/>
       <Fill>
         <RadialGradient center="0,-5" radius="11">
           <ColorStop color="#22C55E55" offset="0"/>
@@ -1086,70 +1086,70 @@
       </Fill>
     </Group>
     <Group>
-      <Ellipse left="-15" top="-20" size="30,30"/>
+      <Ellipse left="-15" top="-20" width="30" height="30"/>
       <Stroke color="#22C55E18"/>
     </Group>
     <Group>
-      <Ellipse left="-21" top="-26" size="42,42"/>
+      <Ellipse left="-21" top="-26" width="42" height="42"/>
       <Stroke color="#22C55E10"/>
     </Group>
   </Layer>
   <Layer left="500" top="470" alpha="0.5">
-    <Ellipse left="-1.5" top="-1.5" size="3,3"/>
+    <Ellipse left="-1.5" top="-1.5" width="3" height="3"/>
     <Fill color="#A78BFA"/>
   </Layer>
   <Layer left="520" top="490" alpha="0.4">
-    <Ellipse left="-1" top="-1" size="2,2"/>
+    <Ellipse left="-1" top="-1" width="2" height="2"/>
     <Fill color="#C4B5FD"/>
   </Layer>
   <Layer left="700" top="500" alpha="0.5">
-    <Ellipse left="-1.5" top="-1.5" size="3,3"/>
+    <Ellipse left="-1.5" top="-1.5" width="3" height="3"/>
     <Fill color="#22D3EE"/>
   </Layer>
   <Layer left="740" top="480" alpha="0.35">
-    <Ellipse left="-1" top="-1" size="2,2"/>
+    <Ellipse left="-1" top="-1" width="2" height="2"/>
     <Fill color="#67E8F9"/>
   </Layer>
   <Layer left="560" top="520" alpha="0.45">
-    <Ellipse left="-1" top="-1" size="2,2"/>
+    <Ellipse left="-1" top="-1" width="2" height="2"/>
     <Fill color="#34D399"/>
   </Layer>
   <Layer left="660" top="530" alpha="0.4" composition="@comp3"/>
   <Layer left="450" top="510" alpha="0.3">
-    <Ellipse left="-1" top="-1" size="2,2"/>
+    <Ellipse left="-1" top="-1" width="2" height="2"/>
     <Fill color="#C4B5FD"/>
   </Layer>
   <Layer left="770" top="520" alpha="0.5">
-    <Ellipse left="-1" top="-1" size="2,2"/>
+    <Ellipse left="-1" top="-1" width="2" height="2"/>
     <Fill color="#22D3EE"/>
   </Layer>
   <Layer left="580" top="430" alpha="0.35">
-    <Ellipse left="-1" top="-1" size="2,2"/>
+    <Ellipse left="-1" top="-1" width="2" height="2"/>
     <Fill color="#FBBF24"/>
   </Layer>
   <Layer left="630" top="410" alpha="0.3">
-    <Ellipse left="-1" top="-1" size="2,2"/>
+    <Ellipse left="-1" top="-1" width="2" height="2"/>
     <Fill color="#F97316"/>
   </Layer>
   <Layer left="540" top="455" alpha="0.4" composition="@comp3"/>
   <Layer left="670" top="445" alpha="0.3">
-    <Ellipse left="-1" top="-1" size="2,2"/>
+    <Ellipse left="-1" top="-1" width="2" height="2"/>
     <Fill color="#34D399"/>
   </Layer>
   <Layer left="480" top="435" alpha="0.35">
-    <Ellipse left="-1" top="-1" size="2,2"/>
+    <Ellipse left="-1" top="-1" width="2" height="2"/>
     <Fill color="#C4B5FD"/>
   </Layer>
   <Layer left="465" top="548" alpha="0.3">
-    <Ellipse left="-6" top="-8" size="12,16"/>
+    <Ellipse left="-6" top="-8" width="12" height="16"/>
     <Fill color="#1A1040"/>
   </Layer>
   <Layer left="510" top="550" alpha="0.25">
-    <Ellipse left="-6" top="-8" size="12,16"/>
+    <Ellipse left="-6" top="-8" width="12" height="16"/>
     <Fill color="#1A1040"/>
   </Layer>
   <Layer left="548" top="546" alpha="0.2">
-    <Ellipse left="-6" top="-8" size="12,16"/>
+    <Ellipse left="-6" top="-8" width="12" height="16"/>
     <Fill color="#1A1040"/>
   </Layer>
   <Layer>
@@ -1188,7 +1188,7 @@
     <Path data="M0 0C-1 -30 2 -65 -2 -95"/>
     <Stroke color="#7C3AED" width="6" cap="round"/>
     <Group>
-      <Ellipse left="-22" top="-113" size="40,30"/>
+      <Ellipse left="-22" top="-113" width="40" height="30"/>
       <Fill>
         <RadialGradient center="-2,-98" radius="20">
           <ColorStop color="#DDD6FE" offset="0"/>
@@ -1199,11 +1199,11 @@
       </Fill>
     </Group>
     <Group>
-      <Ellipse left="-10" top="-104" size="16,12"/>
+      <Ellipse left="-10" top="-104" width="16" height="12"/>
       <Fill color="#EDE9FE90"/>
     </Group>
     <Group>
-      <Ellipse left="-30" top="-119" size="56,42"/>
+      <Ellipse left="-30" top="-119" width="56" height="42"/>
       <Fill>
         <RadialGradient center="-2,-98" radius="28">
           <ColorStop color="#C4B5FD55" offset="0"/>
@@ -1220,11 +1220,11 @@
       <Stroke color="#A78BFA40" width="3" cap="round"/>
     </Group>
     <Group>
-      <Ellipse left="-23" top="-43" size="10,10"/>
+      <Ellipse left="-23" top="-43" width="10" height="10"/>
       <Fill color="#C4B5FD60"/>
     </Group>
     <Group>
-      <Ellipse left="10" top="-42" size="8,8"/>
+      <Ellipse left="10" top="-42" width="8" height="8"/>
       <Fill color="#A78BFA50"/>
     </Group>
   </Layer>
@@ -1232,7 +1232,7 @@
     <Path data="M0 0C1 -18 -1 -38 0 -52"/>
     <Stroke color="#6D28D9" width="4" cap="round"/>
     <Group>
-      <Ellipse left="-14" top="-66" size="28,22"/>
+      <Ellipse left="-14" top="-66" width="28" height="22"/>
       <Fill>
         <RadialGradient center="0,-55" radius="14">
           <ColorStop color="#C4B5FD" offset="0"/>
@@ -1242,11 +1242,11 @@
       </Fill>
     </Group>
     <Group>
-      <Ellipse left="-5" top="-59" size="10,8"/>
+      <Ellipse left="-5" top="-59" width="10" height="8"/>
       <Fill color="#EDE9FE80"/>
     </Group>
     <Group>
-      <Ellipse left="-20" top="-71" size="40,32"/>
+      <Ellipse left="-20" top="-71" width="40" height="32"/>
       <Fill>
         <RadialGradient center="0,-55" radius="20">
           <ColorStop color="#C4B5FD40" offset="0"/>
@@ -1271,11 +1271,11 @@
       <Fill color="#14B8A6"/>
     </Group>
     <Group>
-      <Ellipse left="-9" top="-81" size="14,14"/>
+      <Ellipse left="-9" top="-81" width="14" height="14"/>
       <Fill color="#34D399"/>
     </Group>
     <Group>
-      <Ellipse left="-20" top="-90" size="36,36"/>
+      <Ellipse left="-20" top="-90" width="36" height="36"/>
       <Fill>
         <RadialGradient center="-2,-72" radius="18">
           <ColorStop color="#34D39960" offset="0"/>
@@ -1288,7 +1288,7 @@
     <Path data="M0 0C-2 -25 1 -55 -1 -80"/>
     <Stroke color="#6D28D9" width="7" cap="round"/>
     <Group>
-      <Ellipse left="-23" top="-101" size="44,34"/>
+      <Ellipse left="-23" top="-101" width="44" height="34"/>
       <Fill>
         <RadialGradient center="-1,-84" radius="22">
           <ColorStop color="#F0ABFC" offset="0"/>
@@ -1299,11 +1299,11 @@
       </Fill>
     </Group>
     <Group>
-      <Ellipse left="-10" top="-91" size="18,14"/>
+      <Ellipse left="-10" top="-91" width="18" height="14"/>
       <Fill color="#FDF4FF90"/>
     </Group>
     <Group>
-      <Ellipse left="-32" top="-108" size="62,48"/>
+      <Ellipse left="-32" top="-108" width="62" height="48"/>
       <Fill>
         <RadialGradient center="-1,-84" radius="31">
           <ColorStop color="#F0ABFC50" offset="0"/>
@@ -1320,11 +1320,11 @@
       <Stroke color="#D946EF30" width="2.5" cap="round"/>
     </Group>
     <Group>
-      <Ellipse left="-18" top="-28" size="8,8"/>
+      <Ellipse left="-18" top="-28" width="8" height="8"/>
       <Fill color="#F0ABFC50"/>
     </Group>
     <Group>
-      <Ellipse left="8.5" top="-27.5" size="7,7"/>
+      <Ellipse left="8.5" top="-27.5" width="7" height="7"/>
       <Fill color="#D946EF40"/>
     </Group>
   </Layer>
@@ -1340,19 +1340,19 @@
       <Stroke color="#14B8A6" width="4" cap="round"/>
     </Group>
     <Group>
-      <Ellipse left="-9" top="-70" size="16,16"/>
+      <Ellipse left="-9" top="-70" width="16" height="16"/>
       <Fill color="#22D3EE"/>
     </Group>
     <Group>
-      <Ellipse left="10" top="-57" size="14,14"/>
+      <Ellipse left="10" top="-57" width="14" height="14"/>
       <Fill color="#2DD4BF"/>
     </Group>
     <Group>
-      <Ellipse left="-19" top="-50" size="12,12"/>
+      <Ellipse left="-19" top="-50" width="12" height="12"/>
       <Fill color="#5EEAD4"/>
     </Group>
     <Group>
-      <Ellipse left="-25.5" top="-79.5" size="55,55"/>
+      <Ellipse left="-25.5" top="-79.5" width="55" height="55"/>
       <Fill>
         <RadialGradient center="2,-52" radius="28">
           <ColorStop color="#22D3EE50" offset="0"/>
@@ -1377,11 +1377,11 @@
       <Fill color="#C084FC"/>
     </Group>
     <Group>
-      <Ellipse left="-5" top="-56" size="8,8"/>
+      <Ellipse left="-5" top="-56" width="8" height="8"/>
       <Fill color="#FBBF24"/>
     </Group>
     <Group>
-      <Ellipse left="-13" top="-64" size="24,24"/>
+      <Ellipse left="-13" top="-64" width="24" height="24"/>
       <Fill>
         <RadialGradient center="-1,-52" radius="12">
           <ColorStop color="#FBBF2440" offset="0"/>
@@ -1402,19 +1402,19 @@
       <Stroke color="#6D28D9" width="6" cap="round"/>
     </Group>
     <Group>
-      <Ellipse left="-33" top="-58" size="10,12"/>
+      <Ellipse left="-33" top="-58" width="10" height="12"/>
       <Fill color="#C4B5FD"/>
     </Group>
     <Group>
-      <Ellipse left="21" top="-64" size="10,12"/>
+      <Ellipse left="21" top="-64" width="10" height="12"/>
       <Fill color="#A78BFA"/>
     </Group>
     <Group>
-      <Ellipse left="-9" top="-80" size="14,16"/>
+      <Ellipse left="-9" top="-80" width="14" height="16"/>
       <Fill color="#DDD6FE"/>
     </Group>
     <Group>
-      <Ellipse left="-27" top="-91" size="50,50"/>
+      <Ellipse left="-27" top="-91" width="50" height="50"/>
       <Fill>
         <RadialGradient center="-2,-66" radius="25">
           <ColorStop color="#C4B5FD45" offset="0"/>
@@ -1427,7 +1427,7 @@
     <Path data="M0 0C-2 -12 1 -28 -1 -40"/>
     <Stroke color="#7C3AED" width="4" cap="round"/>
     <Group>
-      <Ellipse left="-12" top="-53" size="22,18"/>
+      <Ellipse left="-12" top="-53" width="22" height="18"/>
       <Fill>
         <RadialGradient center="-1,-44" radius="11">
           <ColorStop color="#F0ABFC" offset="0"/>
@@ -1437,11 +1437,11 @@
       </Fill>
     </Group>
     <Group>
-      <Ellipse left="-6" top="-48" size="10,8"/>
+      <Ellipse left="-6" top="-48" width="10" height="8"/>
       <Fill color="#FDF4FF90"/>
     </Group>
     <Group>
-      <Ellipse left="-19" top="-59" size="36,30"/>
+      <Ellipse left="-19" top="-59" width="36" height="30"/>
       <Fill>
         <RadialGradient center="-1,-44" radius="18">
           <ColorStop color="#F0ABFC50" offset="0"/>
@@ -1470,11 +1470,11 @@
       <Fill color="#2DD4BF"/>
     </Group>
     <Group>
-      <Ellipse left="-5" top="-82" size="12,12"/>
+      <Ellipse left="-5" top="-82" width="12" height="12"/>
       <Fill color="#34D399"/>
     </Group>
     <Group>
-      <Ellipse left="-18" top="-93" size="38,38"/>
+      <Ellipse left="-18" top="-93" width="38" height="38"/>
       <Fill>
         <RadialGradient center="1,-74" radius="19">
           <ColorStop color="#34D39960" offset="0"/>
@@ -1495,19 +1495,19 @@
       <Stroke color="#0E7490" width="5" cap="round"/>
     </Group>
     <Group>
-      <Ellipse left="-6" top="-63" size="12,14"/>
+      <Ellipse left="-6" top="-63" width="12" height="14"/>
       <Fill color="#22D3EE"/>
     </Group>
     <Group>
-      <Ellipse left="-36" top="-35" size="8,10"/>
+      <Ellipse left="-36" top="-35" width="8" height="10"/>
       <Fill color="#67E8F9"/>
     </Group>
     <Group>
-      <Ellipse left="26" top="-43" size="8,10"/>
+      <Ellipse left="26" top="-43" width="8" height="10"/>
       <Fill color="#5EEAD4"/>
     </Group>
     <Group>
-      <Ellipse left="-22" top="-68" size="44,44"/>
+      <Ellipse left="-22" top="-68" width="44" height="44"/>
       <Fill>
         <RadialGradient center="0,-46" radius="22">
           <ColorStop color="#22D3EE45" offset="0"/>
@@ -1544,15 +1544,15 @@
       <Stroke color="#059669" width="2.5" cap="round"/>
     </Group>
     <Group>
-      <Ellipse left="-4" top="-38" size="8,8"/>
+      <Ellipse left="-4" top="-38" width="8" height="8"/>
       <Fill color="#34D399"/>
     </Group>
     <Group>
-      <Ellipse left="4.5" top="-31.5" size="7,7"/>
+      <Ellipse left="4.5" top="-31.5" width="7" height="7"/>
       <Fill color="#2DD4BF"/>
     </Group>
     <Group>
-      <Ellipse left="-10" top="-44" size="28,28"/>
+      <Ellipse left="-10" top="-44" width="28" height="28"/>
       <Fill>
         <RadialGradient center="4,-30" radius="14">
           <ColorStop color="#34D39950" offset="0"/>
@@ -1562,7 +1562,7 @@
     </Group>
   </Layer>
   <Layer left="550" top="735" alpha="0.5">
-    <Ellipse left="-15" top="-6" size="30,12"/>
+    <Ellipse left="-15" top="-6" width="30" height="12"/>
     <Fill>
       <RadialGradient radius="15">
         <ColorStop color="#22D3EE40" offset="0"/>
@@ -1571,7 +1571,7 @@
       </RadialGradient>
     </Fill>
     <Group>
-      <Ellipse left="10" top="-2" size="24,10"/>
+      <Ellipse left="10" top="-2" width="24" height="10"/>
       <Fill>
         <RadialGradient center="22,3" radius="12">
           <ColorStop color="#A78BFA35" offset="0"/>
@@ -1581,7 +1581,7 @@
       </Fill>
     </Group>
     <Group>
-      <Ellipse left="-28" size="20,8"/>
+      <Ellipse left="-28" width="20" height="8"/>
       <Fill>
         <RadialGradient center="-18,4" radius="10">
           <ColorStop color="#34D39930" offset="0"/>
@@ -1591,7 +1591,7 @@
     </Group>
   </Layer>
   <Layer left="130" top="748" alpha="0.4">
-    <Ellipse left="-13" top="-5" size="26,10"/>
+    <Ellipse left="-13" top="-5" width="26" height="10"/>
     <Fill>
       <RadialGradient radius="13">
         <ColorStop color="#A78BFA35" offset="0"/>
@@ -1600,7 +1600,7 @@
     </Fill>
   </Layer>
   <Layer left="700" top="740" alpha="0.4">
-    <Ellipse left="-11" top="-4" size="22,8"/>
+    <Ellipse left="-11" top="-4" width="22" height="8"/>
     <Fill>
       <RadialGradient radius="11">
         <ColorStop color="#22D3EE30" offset="0"/>
@@ -1629,7 +1629,7 @@
     <Fill color="#2D6B5A"/>
   </Layer>
   <Layer alpha="0.2">
-    <Ellipse left="75" top="565" size="450,50"/>
+    <Ellipse left="75" top="565" width="450" height="50"/>
     <Fill>
       <RadialGradient center="300,590" radius="225">
         <ColorStop color="#8B5CF6" offset="0"/>
@@ -1637,7 +1637,7 @@
       </RadialGradient>
     </Fill>
     <Group>
-      <Ellipse left="410" top="558" size="380,40"/>
+      <Ellipse left="410" top="558" width="380" height="40"/>
       <Fill>
         <RadialGradient center="600,578" radius="190">
           <ColorStop color="#A78BFA" offset="0"/>
@@ -1646,7 +1646,7 @@
       </Fill>
     </Group>
     <Group>
-      <Ellipse left="680" top="549" size="400,42"/>
+      <Ellipse left="680" top="549" width="400" height="42"/>
       <Fill>
         <RadialGradient center="880,570" radius="200">
           <ColorStop color="#06B6D4" offset="0"/>
@@ -1655,7 +1655,7 @@
       </Fill>
     </Group>
     <Group>
-      <Ellipse left="-10" top="582.5" size="280,35"/>
+      <Ellipse left="-10" top="582.5" width="280" height="35"/>
       <Fill>
         <RadialGradient center="130,600" radius="140">
           <ColorStop color="#7C3AED" offset="0"/>
@@ -1675,7 +1675,7 @@
       </LinearGradient>
     </Stroke>
     <Group>
-      <Ellipse left="83" top="-2" size="4,4"/>
+      <Ellipse left="83" top="-2" width="4" height="4"/>
       <Fill color="#FFFFFF"/>
     </Group>
   </Layer>
@@ -1689,7 +1689,7 @@
       </LinearGradient>
     </Stroke>
     <Group>
-      <Ellipse left="48.5" top="-1.5" size="3,3"/>
+      <Ellipse left="48.5" top="-1.5" width="3" height="3"/>
       <Fill color="#FFFFFFAA"/>
     </Group>
   </Layer>
@@ -1703,11 +1703,11 @@
       </LinearGradient>
     </Stroke>
     <Group>
-      <Ellipse left="42" top="-3" size="6,6"/>
+      <Ellipse left="42" top="-3" width="6" height="6"/>
       <Fill color="#67E8F9"/>
     </Group>
     <Group>
-      <Ellipse left="38" top="-7" size="14,14"/>
+      <Ellipse left="38" top="-7" width="14" height="14"/>
       <Fill>
         <RadialGradient center="45,0" radius="7">
           <ColorStop color="#67E8F945" offset="0"/>
@@ -1719,43 +1719,43 @@
   <Resources>
     <Composition id="comp1" width="3" height="3">
       <Layer>
-        <Ellipse left="-1.5" top="-1.5" size="3,3"/>
+        <Ellipse left="-1.5" top="-1.5" width="3" height="3"/>
         <Fill color="#FFFFFF"/>
       </Layer>
     </Composition>
     <Composition id="comp2" width="3" height="3">
       <Layer>
-        <Ellipse left="-1.5" top="-1.5" size="3,3"/>
+        <Ellipse left="-1.5" top="-1.5" width="3" height="3"/>
         <Fill color="#FFFFFFBB"/>
       </Layer>
     </Composition>
     <Composition id="comp3" width="3" height="3">
       <Layer>
-        <Ellipse left="-1.5" top="-1.5" size="3,3"/>
+        <Ellipse left="-1.5" top="-1.5" width="3" height="3"/>
         <Fill color="#A78BFA"/>
       </Layer>
     </Composition>
     <Composition id="comp4" width="2" height="2">
       <Layer>
-        <Ellipse left="-1" top="-1" size="2,2"/>
+        <Ellipse left="-1" top="-1" width="2" height="2"/>
         <Fill color="#FFFFFFCC"/>
       </Layer>
     </Composition>
     <Composition id="comp5" width="2" height="2">
       <Layer>
-        <Ellipse left="-1" top="-1" size="2,2"/>
+        <Ellipse left="-1" top="-1" width="2" height="2"/>
         <Fill color="#FFFFFFAA"/>
       </Layer>
     </Composition>
     <Composition id="comp6" width="2" height="2">
       <Layer>
-        <Ellipse left="-1" top="-1" size="2,2"/>
+        <Ellipse left="-1" top="-1" width="2" height="2"/>
         <Fill color="#FFFFFFBB"/>
       </Layer>
     </Composition>
     <Composition id="comp7" width="2" height="2">
       <Layer>
-        <Ellipse left="-1" top="-1" size="2,2"/>
+        <Ellipse left="-1" top="-1" width="2" height="2"/>
         <Fill color="#FFFFFF"/>
       </Layer>
     </Composition>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="400" height="400">
   <Layer>
-    <Ellipse left="60" top="60" size="280,280"/>
+    <Ellipse left="60" top="60" width="280" height="280"/>
     <Fill>
       <!-- RadialGradient uses canvas coordinates. Ellipse center is at 200,200, 
            highlight offset should be relative to that. 140,140 creates top-left highlight -->

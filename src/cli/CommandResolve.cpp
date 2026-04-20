@@ -142,11 +142,11 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
 
   auto& svgDoc = result.document;
 
-  // Update Layer dimensions from source.
-  if (std::isnan(layer->width) && svgDoc->width > 0) {
+  // Update Layer dimensions from source. Keep existing absolute or percentage values untouched.
+  if (std::isnan(layer->width) && std::isnan(layer->percentWidth) && svgDoc->width > 0) {
     layer->width = svgDoc->width;
   }
-  if (std::isnan(layer->height) && svgDoc->height > 0) {
+  if (std::isnan(layer->height) && std::isnan(layer->percentHeight) && svgDoc->height > 0) {
     layer->height = svgDoc->height;
   }
 

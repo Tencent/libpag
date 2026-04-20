@@ -5,7 +5,7 @@
     <Fill color="#FFF"/>
   </Layer>
   <Layer name="Background">
-    <Rectangle size="800,600"/>
+    <Rectangle width="800" height="600"/>
     <Fill>
       <RadialGradient center="400,300" radius="500">
         <ColorStop color="#001122" offset="0"/>
@@ -14,20 +14,20 @@
       </RadialGradient>
     </Fill>
     <Layer alpha="0.15">
-      <Rectangle top="-0.5" size="800,1"/>
+      <Rectangle top="-0.5" width="800" height="1"/>
       <Repeater copies="35" position="0,17"/>
       <Group left="400" top="300" rotation="60">
-        <Rectangle left="-600" top="-510.5" size="1200,1"/>
+        <Rectangle left="-600" top="-510.5" width="1200" height="1"/>
         <Repeater copies="60" position="0,17"/>
       </Group>
       <Group left="400" top="300" rotation="-60">
-        <Rectangle left="-600" top="-510.5" size="1200,1"/>
+        <Rectangle left="-600" top="-510.5" width="1200" height="1"/>
         <Repeater copies="60" position="0,17"/>
       </Group>
       <Fill color="#0066AA"/>
     </Layer>
     <Group>
-      <Rectangle size="800,600"/>
+      <Rectangle width="800" height="600"/>
       <Fill>
         <RadialGradient center="400,300" radius="600">
           <ColorStop color="#00000000" offset="0.6"/>
@@ -37,24 +37,24 @@
     </Group>
   </Layer>
   <Layer name="ReticleComplex" left="400" top="300">
-    <Rectangle left="-1" top="-227.5" size="2,15"/>
+    <Rectangle left="-1" top="-227.5" width="2" height="15"/>
     <Fill color="#00CCFF" alpha="0.6"/>
     <Repeater copies="60" rotation="6"/>
     <Group>
-      <Rectangle left="-0.5" top="-219" size="1,8"/>
+      <Rectangle left="-0.5" top="-219" width="1" height="8"/>
       <Fill color="#00CCFF" alpha="0.3"/>
       <Repeater copies="60" offset="0.5" rotation="6"/>
     </Group>
     <Group>
-      <Ellipse left="-190" top="-190" size="380,380"/>
+      <Ellipse left="-190" top="-190" width="380" height="380"/>
       <Stroke color="#0FF" width="1" alpha="0.4" dashes="60,40"/>
     </Group>
     <Group>
-      <Ellipse left="-180" top="-180" size="360,360"/>
+      <Ellipse left="-180" top="-180" width="360" height="360"/>
       <Stroke color="#0088FF" width="2" alpha="0.5" dashes="10,80"/>
     </Group>
     <Layer>
-      <Ellipse left="-150" top="-150" size="300,300"/>
+      <Ellipse left="-150" top="-150" width="300" height="300"/>
       <Stroke color="#00CCFF" width="3"/>
       <DropShadowStyle blurX="8" blurY="8" color="#00CCFF80"/>
     </Layer>
@@ -70,7 +70,7 @@
       <DropShadowStyle blurX="25" blurY="25" color="#FFAA00"/>
     </Layer>
     <Layer mask="@triangleMask">
-      <Rectangle left="-50" top="-50" size="100,100"/>
+      <Rectangle left="-50" top="-50" width="100" height="100"/>
       <Fill>
         <LinearGradient startPoint="-50,0" endPoint="50,0">
           <ColorStop color="#FFAA0000" offset="0"/>
@@ -80,7 +80,7 @@
       </Fill>
     </Layer>
     <Layer>
-      <Ellipse left="-3" top="-3" size="6,6"/>
+      <Ellipse left="-3" top="-3" width="6" height="6"/>
       <Fill color="#FFF"/>
       <Group>
         <Path data="M -20 0 L 20 0 M 0 -20 L 0 20"/>
@@ -176,26 +176,26 @@
     </Layer>
   </Layer>
   <Layer left="200" top="550">
-    <Rectangle left="180" top="-2" size="40,4"/>
+    <Rectangle left="180" top="-2" width="40" height="4"/>
     <Fill color="#004488"/>
     <Group>
-      <Rectangle left="165" top="-2" size="10,4"/>
-      <Rectangle left="225" top="-2" size="10,4"/>
+      <Rectangle left="165" top="-2" width="10" height="4"/>
+      <Rectangle left="225" top="-2" width="10" height="4"/>
       <Fill color="#002244"/>
     </Group>
   </Layer>
   <Layer name="Radar" left="100" top="500">
-    <Ellipse left="-70" top="-70" size="140,140"/>
+    <Ellipse left="-70" top="-70" width="140" height="140"/>
     <Fill color="#001122" alpha="0.9"/>
     <Stroke color="#0066AA" width="2"/>
     <Group>
-      <Ellipse left="-50" top="-50" size="100,100"/>
-      <Ellipse left="-25" top="-25" size="50,50"/>
+      <Ellipse left="-50" top="-50" width="100" height="100"/>
+      <Ellipse left="-25" top="-25" width="50" height="50"/>
       <Path data="M -70 0 L 70 0 M 0 -70 L 0 70"/>
       <Stroke color="#004488" width="1"/>
     </Group>
     <Layer>
-      <Ellipse left="-65" top="-65" size="130,130"/>
+      <Ellipse left="-65" top="-65" width="130" height="130"/>
       <Fill>
         <ConicGradient endAngle="90">
           <ColorStop color="#00FF0000" offset="0"/>
@@ -204,13 +204,13 @@
       </Fill>
     </Layer>
     <Layer>
-      <Ellipse left="27" top="-23" size="6,6"/>
-      <Ellipse left="-43" top="7" size="6,6"/>
+      <Ellipse left="27" top="-23" width="6" height="6"/>
+      <Ellipse left="-43" top="7" width="6" height="6"/>
       <Fill color="#F00"/>
       <DropShadowStyle blurX="4" blurY="4" color="#F00"/>
     </Layer>
     <Layer>
-      <Ellipse left="-2" top="-2" size="4,4"/>
+      <Ellipse left="-2" top="-2" width="4" height="4"/>
       <Fill color="#FFF"/>
     </Layer>
   </Layer>
@@ -220,7 +220,7 @@
     <DropShadowStyle blurX="2" blurY="2" color="#000"/>
   </Layer>
   <Layer name="StatusIcons" left="706" top="70">
-    <Rectangle left="-4" top="-4" size="8,8"/>
+    <Rectangle left="-4" top="-4" width="8" height="8"/>
     <Stroke color="#FFAA00" width="1"/>
     <Repeater copies="3" position="15,0"/>
     <DropShadowStyle blurX="5" blurY="5" color="#FFAA00"/>

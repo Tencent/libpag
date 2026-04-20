@@ -6,13 +6,13 @@
     <Layer flex="1" layout="horizontal">
       <!-- Solid color fill -->
       <Layer flex="1">
-        <Rectangle centerX="0" centerY="0" size="140,140" roundness="24"/>
+        <Rectangle centerX="0" centerY="0" width="140" height="140" roundness="24"/>
         <Fill color="#F43F5E"/>
         <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F43F5E50"/>
       </Layer>
       <!-- Linear gradient fill -->
       <Layer flex="1">
-        <Rectangle centerX="0" centerY="0" size="140,140" roundness="24"/>
+        <Rectangle centerX="0" centerY="0" width="140" height="140" roundness="24"/>
         <Fill>
           <LinearGradient startPoint="0,0" endPoint="140,140">
             <ColorStop color="#6366F1" offset="0"/>
@@ -23,7 +23,7 @@
       </Layer>
     </Layer>
     <Layer flex="1">
-      <Ellipse centerX="0" centerY="0" size="320,140"/>
+      <Ellipse centerX="0" centerY="0" width="320" height="140"/>
       <Fill>
         <RadialGradient center="160,70" radius="170">
           <ColorStop color="#FFF" offset="0"/>

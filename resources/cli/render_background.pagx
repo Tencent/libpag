@@ -2,7 +2,7 @@
 <!-- Test background color with semi-transparent content -->
 <pagx width="200" height="200">
   <Layer alpha="0.5">
-    <Ellipse left="20" top="20" size="160,160"/>
+    <Ellipse left="20" top="20" width="160" height="160"/>
     <Fill color="#FF0000"/>
   </Layer>
 </pagx>

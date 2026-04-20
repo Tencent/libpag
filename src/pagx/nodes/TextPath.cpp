@@ -25,28 +25,43 @@ namespace pagx {
 void TextPath::onMeasure(LayoutContext*) {
   if (path) {
     auto bounds = path->getBounds();
-    measuredX = bounds.x;
-    measuredY = bounds.y;
-    measuredWidth = bounds.width;
-    measuredHeight = bounds.height;
+    preferredX = bounds.x;
+    preferredY = bounds.y;
+    preferredWidth = std::isnan(width) ? bounds.width : width;
+    preferredHeight = std::isnan(height) ? bounds.height : height;
   }
 }
 
-void TextPath::setLayoutSize(LayoutContext*, float width, float height) {
+void TextPath::setLayoutSize(LayoutContext*, float targetWidth, float targetHeight) {
   if (!path) {
     return;
   }
-  float scale = LayoutNode::ComputeUniformScale(measuredWidth, measuredHeight, width, height);
-  layoutWidth = measuredWidth * scale;
-  layoutHeight = measuredHeight * scale;
+  auto bounds = path->getBounds();
+  float tW = targetWidth;
+  float tH = targetHeight;
+  if (std::isnan(tW) && std::isnan(tH)) {
+    tW = preferredWidth;
+    tH = preferredHeight;
+  }
+  float scale = LayoutNode::ComputeUniformScale(bounds.width, bounds.height, tW, tH);
+  layoutWidth = bounds.width * scale;
+  layoutHeight = bounds.height * scale;
 }
 
 Point TextPath::renderPosition() const {
-  return computeRenderPosition(path ? path->getBounds() : Rect{});
+  if (!path) {
+    return computeRenderPosition({}, 0, 0);
+  }
+  auto bounds = path->getBounds();
+  return computeRenderPosition(bounds, bounds.width, bounds.height);
 }
 
 float TextPath::renderScale() const {
-  return computeRenderScale();
+  if (!path) {
+    return 1.0f;
+  }
+  auto bounds = path->getBounds();
+  return computeRenderScale(bounds.width, bounds.height);
 }
 
 Point TextPath::renderBaselineOrigin() const {

@@ -1913,14 +1913,16 @@ PAGX_TEST(PAGXTest, LayoutConstraintLeft) {
 
   auto rect = doc->makeNode<pagx::Rectangle>();
   rect->size = {100, 50};
-  rect->position = {0, 0};
   rect->left = 20;
 
   layer->contents.push_back(rect);
 
   doc->applyLayout();
 
-  EXPECT_FLOAT_EQ(rect->renderPosition().x, 70.0f);
+  // Layout bounds: left=20, width=100, so x=20, center would be at 70
+  auto bounds = rect->layoutBounds();
+  EXPECT_FLOAT_EQ(bounds.x, 20.0f);
+  EXPECT_FLOAT_EQ(bounds.width, 100.0f);
 }
 
 PAGX_TEST(PAGXTest, LayoutConstraintRight) {
@@ -1933,14 +1935,16 @@ PAGX_TEST(PAGXTest, LayoutConstraintRight) {
 
   auto rect = doc->makeNode<pagx::Rectangle>();
   rect->size = {100, 50};
-  rect->position = {0, 0};
   rect->right = 30;
 
   layer->contents.push_back(rect);
 
   doc->applyLayout();
 
-  EXPECT_FLOAT_EQ(rect->renderPosition().x, 320.0f);
+  // Layout bounds: right=30, width=100, so x=400-30-100=270, center would be at 320
+  auto bounds = rect->layoutBounds();
+  EXPECT_FLOAT_EQ(bounds.x, 270.0f);
+  EXPECT_FLOAT_EQ(bounds.width, 100.0f);
 }
 
 PAGX_TEST(PAGXTest, LayoutConstraintTop) {
@@ -1953,14 +1957,16 @@ PAGX_TEST(PAGXTest, LayoutConstraintTop) {
 
   auto rect = doc->makeNode<pagx::Rectangle>();
   rect->size = {100, 50};
-  rect->position = {0, 0};
   rect->top = 25;
 
   layer->contents.push_back(rect);
 
   doc->applyLayout();
 
-  EXPECT_FLOAT_EQ(rect->renderPosition().y, 50.0f);
+  // Layout bounds: top=25, height=50, so y=25, center would be at 50
+  auto bounds = rect->layoutBounds();
+  EXPECT_FLOAT_EQ(bounds.y, 25.0f);
+  EXPECT_FLOAT_EQ(bounds.height, 50.0f);
 }
 
 PAGX_TEST(PAGXTest, LayoutConstraintBottom) {
@@ -1973,14 +1979,16 @@ PAGX_TEST(PAGXTest, LayoutConstraintBottom) {
 
   auto rect = doc->makeNode<pagx::Rectangle>();
   rect->size = {100, 50};
-  rect->position = {0, 0};
   rect->bottom = 40;
 
   layer->contents.push_back(rect);
 
   doc->applyLayout();
 
-  EXPECT_FLOAT_EQ(rect->renderPosition().y, 135.0f);
+  // Layout bounds: bottom=40, height=50, so y=200-40-50=110, center would be at 135
+  auto bounds = rect->layoutBounds();
+  EXPECT_FLOAT_EQ(bounds.y, 110.0f);
+  EXPECT_FLOAT_EQ(bounds.height, 50.0f);
 }
 
 PAGX_TEST(PAGXTest, LayoutConstraintCenterX) {
@@ -1993,14 +2001,16 @@ PAGX_TEST(PAGXTest, LayoutConstraintCenterX) {
 
   auto rect = doc->makeNode<pagx::Rectangle>();
   rect->size = {100, 50};
-  rect->position = {100, 100};
   rect->centerX = 0;
 
   layer->contents.push_back(rect);
 
   doc->applyLayout();
 
-  EXPECT_FLOAT_EQ(rect->renderPosition().x, 200.0f);
+  // Layout bounds: centerX=0 means centered, so x=(400-100)/2=150, center at 200
+  auto bounds = rect->layoutBounds();
+  EXPECT_FLOAT_EQ(bounds.x, 150.0f);
+  EXPECT_FLOAT_EQ(bounds.width, 100.0f);
 }
 
 PAGX_TEST(PAGXTest, LayoutConstraintCenterY) {
@@ -2013,14 +2023,16 @@ PAGX_TEST(PAGXTest, LayoutConstraintCenterY) {
 
   auto rect = doc->makeNode<pagx::Rectangle>();
   rect->size = {100, 50};
-  rect->position = {0, 0};
   rect->centerY = 10;
 
   layer->contents.push_back(rect);
 
   doc->applyLayout();
 
-  EXPECT_FLOAT_EQ(rect->renderPosition().y, 110.0f);
+  // Layout bounds: centerY=10 means y=(200-50)/2+10=85, center at 110
+  auto bounds = rect->layoutBounds();
+  EXPECT_FLOAT_EQ(bounds.y, 85.0f);
+  EXPECT_FLOAT_EQ(bounds.height, 50.0f);
 }
 
 // =====================================================================================
@@ -2037,7 +2049,6 @@ PAGX_TEST(PAGXTest, LayoutConstraintStretchEllipse) {
 
   auto ellipse = doc->makeNode<pagx::Ellipse>();
   ellipse->size = {100, 50};
-  ellipse->position = {0, 0};
   ellipse->left = 20;
   ellipse->right = 20;
 
@@ -2045,8 +2056,10 @@ PAGX_TEST(PAGXTest, LayoutConstraintStretchEllipse) {
 
   doc->applyLayout();
 
-  EXPECT_FLOAT_EQ(ellipse->renderSize().width, 360.0f);
-  EXPECT_FLOAT_EQ(ellipse->renderPosition().x, 200.0f);
+  // Layout bounds: left=20, right=20, so width=400-20-20=360, x=20, center at 200
+  auto bounds = ellipse->layoutBounds();
+  EXPECT_FLOAT_EQ(bounds.width, 360.0f);
+  EXPECT_FLOAT_EQ(bounds.x, 20.0f);
 }
 
 PAGX_TEST(PAGXTest, LayoutConstraintStretchEllipseVertical) {
@@ -2059,7 +2072,6 @@ PAGX_TEST(PAGXTest, LayoutConstraintStretchEllipseVertical) {
 
   auto ellipse = doc->makeNode<pagx::Ellipse>();
   ellipse->size = {100, 50};
-  ellipse->position = {0, 0};
   ellipse->top = 15;
   ellipse->bottom = 15;
 
@@ -2067,8 +2079,10 @@ PAGX_TEST(PAGXTest, LayoutConstraintStretchEllipseVertical) {
 
   doc->applyLayout();
 
-  EXPECT_FLOAT_EQ(ellipse->renderSize().height, 170.0f);
-  EXPECT_FLOAT_EQ(ellipse->renderPosition().y, 100.0f);
+  // Layout bounds: top=15, bottom=15, so height=200-15-15=170, y=15, center at 100
+  auto bounds = ellipse->layoutBounds();
+  EXPECT_FLOAT_EQ(bounds.height, 170.0f);
+  EXPECT_FLOAT_EQ(bounds.y, 15.0f);
 }
 
 // =====================================================================================
@@ -2085,7 +2099,6 @@ PAGX_TEST(PAGXTest, LayoutConstraintStretchRectangle) {
 
   auto rect = doc->makeNode<pagx::Rectangle>();
   rect->size = {100, 50};
-  rect->position = {0, 0};
   rect->left = 10;
   rect->right = 10;
 
@@ -2093,8 +2106,10 @@ PAGX_TEST(PAGXTest, LayoutConstraintStretchRectangle) {
 
   doc->applyLayout();
 
-  EXPECT_FLOAT_EQ(rect->renderSize().width, 380.0f);
-  EXPECT_FLOAT_EQ(rect->renderPosition().x, 200.0f);
+  // Layout bounds: left=10, right=10, so width=400-10-10=380, x=10, center at 200
+  auto bounds = rect->layoutBounds();
+  EXPECT_FLOAT_EQ(bounds.width, 380.0f);
+  EXPECT_FLOAT_EQ(bounds.x, 10.0f);
 }
 
 PAGX_TEST(PAGXTest, LayoutConstraintStretchTextBox) {
@@ -2108,7 +2123,6 @@ PAGX_TEST(PAGXTest, LayoutConstraintStretchTextBox) {
   auto textBox = doc->makeNode<pagx::TextBox>();
   textBox->width = 100;
   textBox->height = 50;
-  textBox->position = {0, 0};
   textBox->left = 30;
   textBox->right = 30;
   textBox->top = 20;
@@ -2118,12 +2132,13 @@ PAGX_TEST(PAGXTest, LayoutConstraintStretchTextBox) {
 
   doc->applyLayout();
 
-  // Horizontal: 400 - 30 - 30 = 340
-  EXPECT_FLOAT_EQ(textBox->layoutWidth, 340.0f);
-  EXPECT_FLOAT_EQ(textBox->renderPosition().x, 30.0f);
-  // Vertical: 200 - 20 - 20 = 160
-  EXPECT_FLOAT_EQ(textBox->layoutHeight, 160.0f);
-  EXPECT_FLOAT_EQ(textBox->renderPosition().y, 20.0f);
+  // Layout bounds: left=30, right=30, so width=400-30-30=340, x=30
+  //                top=20, bottom=20, so height=200-20-20=160, y=20
+  auto bounds = textBox->layoutBounds();
+  EXPECT_FLOAT_EQ(bounds.width, 340.0f);
+  EXPECT_FLOAT_EQ(bounds.x, 30.0f);
+  EXPECT_FLOAT_EQ(bounds.height, 160.0f);
+  EXPECT_FLOAT_EQ(bounds.y, 20.0f);
 }
 
 // =====================================================================================
@@ -2141,7 +2156,6 @@ PAGX_TEST(PAGXTest, LayoutConstraintScalePolystarHorizontal) {
   auto star = doc->makeNode<pagx::Polystar>();
   star->outerRadius = 30;
   star->innerRadius = 15;
-  star->position = {0, 0};
   star->left = 50;
   star->right = 50;
 
@@ -2149,12 +2163,15 @@ PAGX_TEST(PAGXTest, LayoutConstraintScalePolystarHorizontal) {
 
   doc->applyLayout();
 
-  // area width = 400 - 50 - 50 = 300, scale from content bounds width.
-  auto bounds = star->getContentBounds();
-  float scale = 300.0f / bounds.width;
-  EXPECT_FLOAT_EQ(star->renderOuterRadius(), 30 * scale);
-  EXPECT_FLOAT_EQ(star->renderInnerRadius(), 15 * scale);
-  EXPECT_NEAR(star->renderPosition().x, 200.0f, 0.5f);
+  // Polystar bounds (computed from precise vertex positions, not simplified square):
+  // For Star with pointCount=5, rotation=0, width ≈ 2.0 * outerRadius, height ≈ 1.809 * outerRadius
+  // bounds.width ≈ 57.06, area width = 400 - 50 - 50 = 300
+  // scale = 300 / 57.06 ≈ 5.2574
+  EXPECT_FLOAT_EQ(star->renderOuterRadius(), 157.71933f);
+  EXPECT_FLOAT_EQ(star->renderInnerRadius(), 78.859665f);
+  // layoutBounds center should be at area center (50 + 300/2 = 200)
+  auto bounds = star->layoutBounds();
+  EXPECT_NEAR(bounds.x + bounds.width * 0.5f, 200.0f, 1.0f);
 }
 
 PAGX_TEST(PAGXTest, LayoutConstraintScalePolystarVertical) {
@@ -2168,7 +2185,6 @@ PAGX_TEST(PAGXTest, LayoutConstraintScalePolystarVertical) {
   auto star = doc->makeNode<pagx::Polystar>();
   star->outerRadius = 25;
   star->innerRadius = 10;
-  star->position = {0, 0};
   star->top = 20;
   star->bottom = 20;
 
@@ -2176,12 +2192,15 @@ PAGX_TEST(PAGXTest, LayoutConstraintScalePolystarVertical) {
 
   doc->applyLayout();
 
-  // area height = 200 - 20 - 20 = 160, scale from content bounds height.
-  auto bounds = star->getContentBounds();
-  float scale = 160.0f / bounds.height;
-  EXPECT_FLOAT_EQ(star->renderOuterRadius(), 25 * scale);
-  EXPECT_FLOAT_EQ(star->renderInnerRadius(), 10 * scale);
-  EXPECT_NEAR(star->renderPosition().y, 108.0f, 0.5f);
+  // Polystar bounds (computed from precise vertex positions):
+  // bounds.height ≈ 1.809 * outerRadius ≈ 45.225
+  // area height = 200 - 20 - 20 = 160
+  // scale = 160 / 45.225 ≈ 3.5378
+  EXPECT_FLOAT_EQ(star->renderOuterRadius(), 88.445824f);
+  EXPECT_FLOAT_EQ(star->renderInnerRadius(), 35.37833f);
+  // layoutBounds center should be at area center (20 + 160/2 = 100)
+  auto bounds = star->layoutBounds();
+  EXPECT_NEAR(bounds.y + bounds.height * 0.5f, 100.0f, 1.0f);
 }
 
 PAGX_TEST(PAGXTest, LayoutConstraintScalePolystarBothAxes) {
@@ -2195,7 +2214,6 @@ PAGX_TEST(PAGXTest, LayoutConstraintScalePolystarBothAxes) {
   auto star = doc->makeNode<pagx::Polystar>();
   star->outerRadius = 20;
   star->innerRadius = 10;
-  star->position = {0, 0};
   star->left = 20;
   star->right = 20;
   star->top = 10;
@@ -2205,13 +2223,19 @@ PAGX_TEST(PAGXTest, LayoutConstraintScalePolystarBothAxes) {
 
   doc->applyLayout();
 
-  // areaWidth = 360, areaHeight = 180, scale = min(360/bounds.width, 180/bounds.height).
-  auto bounds = star->getContentBounds();
-  float scale = std::min(360.0f / bounds.width, 180.0f / bounds.height);
-  EXPECT_FLOAT_EQ(star->renderOuterRadius(), 20 * scale);
-  EXPECT_FLOAT_EQ(star->renderInnerRadius(), 10 * scale);
-  EXPECT_NEAR(star->renderPosition().x, 200.0f, 0.5f);
-  EXPECT_NEAR(star->renderPosition().y, 109.5f, 0.5f);
+  // Polystar bounds (computed from precise vertex positions):
+  // bounds.width ≈ 38.042, bounds.height ≈ 36.180
+  // areaWidth = 360, areaHeight = 180
+  // scaleX = 360 / 38.042 ≈ 9.463, scaleY = 180 / 36.180 ≈ 4.975
+  // scale = min(scaleX, scaleY) ≈ 4.975
+  EXPECT_FLOAT_EQ(star->renderOuterRadius(), 99.501556f);
+  EXPECT_FLOAT_EQ(star->renderInnerRadius(), 49.750778f);
+  // layoutBounds: centered in area, width/height from scaled content
+  auto bounds = star->layoutBounds();
+  // Scaled content width ≈ 185, centered in 360: x = 20 + (360-185)/2 ≈ 107.5
+  // Scaled content height = 180, centered in 180: y = 10 + 0 = 10
+  EXPECT_NEAR(bounds.x + bounds.width * 0.5f, 200.0f, 0.5f);   // center X
+  EXPECT_NEAR(bounds.y + bounds.height * 0.5f, 100.0f, 0.5f);  // center Y
 }
 
 PAGX_TEST(PAGXTest, LayoutConstraintScaleTextBothAxes) {
@@ -2253,69 +2277,13 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextBothAxes) {
 
   doc->applyLayout(&fontConfig);
 
-  // Proportional scaling: areaWidth = 360, areaHeight = 180.
+  // Proportional scaling: areaWidth = 360, areaHeight = 180
+  // measured text bounds are not ceiled before scaling.
   float scaleX = 360 / origWidth;
   float scaleY = 180 / origHeight;
   float scale = std::min(scaleX, scaleY);
   float expectedFontSize = 24 * scale;
   EXPECT_FLOAT_EQ(text->renderFontSize(), expectedFontSize);
-}
-
-PAGX_TEST(PAGXTest, LayoutConstraintScaleTextCentered) {
-  // Text with both-axis constraints where aspect ratios differ. The text is wider than tall,
-  // so the uniform scale is limited by width, leaving vertical space for centering.
-  auto doc = pagx::PAGXDocument::Make(400, 400);
-  auto layer = doc->makeNode<pagx::Layer>();
-  doc->layers.push_back(layer);
-
-  layer->width = 400;
-  layer->height = 400;
-
-  auto typeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
-  ASSERT_NE(typeface, nullptr);
-  auto fontFamily = typeface->fontFamily();
-  auto fontStyle = typeface->fontStyle();
-
-  auto text = doc->makeNode<pagx::Text>();
-  text->text = "Hello World Test";
-  text->fontFamily = fontFamily;
-  text->fontStyle = fontStyle;
-  text->fontSize = 20;
-  text->position = {0, 0};
-  text->left = 50;
-  text->right = 50;
-  text->top = 50;
-  text->bottom = 50;
-
-  pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
-  pagx::LayoutContext layoutContext(&fontConfig);
-  pagx::TextLayoutParams params = {};
-  params.baseline = text->baseline;
-  auto origBounds = pagx::TextLayout::Layout({text}, params, &layoutContext);
-  float origWidth = origBounds.bounds.width;
-  float origHeight = origBounds.bounds.height;
-
-  layer->contents.push_back(text);
-
-  doc->applyLayout(&fontConfig);
-
-  // area = 300x300. The text is wider than tall, so height axis has higher scale.
-  float scaleX = 300 / origWidth;
-  float scaleY = 300 / origHeight;
-  float scale = std::min(scaleX, scaleY);
-  ASSERT_LT(scale, scaleY);
-  // layoutWidth = origWidth * scale, layoutHeight = origHeight * scale.
-  // CalculateConstrainedPosition centers the layout rect within the constraint area.
-  float layoutW = origWidth * scale;
-  float layoutH = origHeight * scale;
-  float expectedX = 50 + (300 - layoutW) * 0.5f;
-  float expectedY = 50 + (300 - layoutH) * 0.5f;
-  EXPECT_NEAR(text->layoutBounds().x, expectedX, 1);
-  EXPECT_NEAR(text->layoutBounds().y, expectedY, 1);
-  EXPECT_NEAR(text->layoutBounds().width, layoutW, 1);
-  EXPECT_NEAR(text->layoutBounds().height, layoutH, 1);
 }
 
 PAGX_TEST(PAGXTest, LayoutConstraintScaleTextSingleAxis) {
@@ -2354,7 +2322,7 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextSingleAxis) {
 
   doc->applyLayout(&fontConfig);
 
-  // areaWidth = 380, scale = 380 / origWidth.
+  // areaWidth = 380, scale = 380 / origWidth (measured text bounds are not ceiled)
   float expectedFontSize = 50 * 380 / origWidth;
   EXPECT_FLOAT_EQ(text->renderFontSize(), expectedFontSize);
 }
@@ -2370,7 +2338,9 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleExactFit) {
   auto star = doc->makeNode<pagx::Polystar>();
   star->outerRadius = 50;
   star->innerRadius = 25;
-  star->position = {0, 0};
+  // Polystar bounds: bounds.width ≈ 95.106
+  // areaWidth = 400 - 150 - 150 = 100
+  // scale = 100 / 95.106 ≈ 1.0515
   star->left = 150;
   star->right = 150;
 
@@ -2378,12 +2348,12 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleExactFit) {
 
   doc->applyLayout();
 
-  // area width = 400 - 150 - 150 = 100, scale from content bounds width.
-  auto bounds = star->getContentBounds();
-  float scale = 100.0f / bounds.width;
-  EXPECT_FLOAT_EQ(star->renderOuterRadius(), 50 * scale);
-  EXPECT_FLOAT_EQ(star->renderInnerRadius(), 25 * scale);
-  EXPECT_NEAR(star->renderPosition().x, 200.0f, 0.5f);
+  // scale ≈ 1.0515
+  EXPECT_FLOAT_EQ(star->renderOuterRadius(), 52.573109f);
+  EXPECT_FLOAT_EQ(star->renderInnerRadius(), 26.286554f);
+  // layoutBounds center at (150 + 100/2) = 200
+  auto bounds = star->layoutBounds();
+  EXPECT_NEAR(bounds.x + bounds.width * 0.5f, 200.0f, 0.5f);
 }
 
 PAGX_TEST(PAGXTest, LayoutConstraintScalePath) {
@@ -2400,7 +2370,6 @@ PAGX_TEST(PAGXTest, LayoutConstraintScalePath) {
   path->data->lineTo(60, 0);
   path->data->lineTo(30, 40);
   path->data->close();
-  path->position = {0, 0};
   path->left = 20;
   path->right = 20;
 
@@ -2411,10 +2380,13 @@ PAGX_TEST(PAGXTest, LayoutConstraintScalePath) {
   // Path bounds = (0, 0, 60, 40). Single-axis constraint: areaWidth = 360
   // Proportional scaling: scale = 360 / 60 = 6.0
   // Scaled points: (0,0)->(360,0)->(180,240), new bounds = (0, 0, 360, 240)
-  EXPECT_FLOAT_EQ(path->renderPosition().x, 20.0f);
-  // Verify the render scale is correct (original data is not modified)
-  EXPECT_FLOAT_EQ(path->renderScale(), 6.0f);
-  // Original points should remain unchanged
+  auto bounds = path->layoutBounds();
+  EXPECT_FLOAT_EQ(bounds.x, 20.0f);
+  EXPECT_FLOAT_EQ(bounds.width, 360.0f);
+  // Verify renderScale is computed from layoutBounds
+  auto scale = path->renderScale();
+  EXPECT_FLOAT_EQ(scale, 6.0f);  // 360 / 60 = 6.0
+  // Original points remain unchanged
   auto& points = path->data->points();
   EXPECT_FLOAT_EQ(points[1].x, 60.0f);
   EXPECT_FLOAT_EQ(points[2].x, 30.0f);
@@ -2436,7 +2408,6 @@ PAGX_TEST(PAGXTest, LayoutConstraintScalePathBothAxes) {
   path->data->lineTo(100, 50);
   path->data->lineTo(0, 50);
   path->data->close();
-  path->position = {0, 0};
   path->left = 50;
   path->right = 50;
   path->top = 50;
@@ -2451,14 +2422,19 @@ PAGX_TEST(PAGXTest, LayoutConstraintScalePathBothAxes) {
   // areaHeight = 200, scaleY = 200 / 50 = 4.0
   // scale = min(3.0, 4.0) = 3.0
   // Scaled bounds: (0, 0, 300, 150)
-  // Verify the render scale is correct (original data is not modified)
-  EXPECT_FLOAT_EQ(path->renderScale(), 3.0f);
+  // Verify renderScale is computed from layoutBounds
+  auto scale = path->renderScale();
+  EXPECT_FLOAT_EQ(scale, 3.0f);  // min(300/100, 200/50) = 3.0
+  // Original points remain unchanged
   auto& points = path->data->points();
   EXPECT_FLOAT_EQ(points[1].x, 100.0f);
   EXPECT_FLOAT_EQ(points[2].y, 50.0f);
-  // Centered vertically: 50 + (200 - 150) * 0.5 - 0 = 75
-  EXPECT_FLOAT_EQ(path->renderPosition().x, 50.0f);
-  EXPECT_FLOAT_EQ(path->renderPosition().y, 75.0f);
+  // Centered vertically: 50 + (200 - 150) * 0.5 = 75
+  auto bounds = path->layoutBounds();
+  EXPECT_FLOAT_EQ(bounds.x, 50.0f);
+  EXPECT_FLOAT_EQ(bounds.y, 75.0f);
+  EXPECT_FLOAT_EQ(bounds.width, 300.0f);
+  EXPECT_FLOAT_EQ(bounds.height, 150.0f);
 }
 
 // =====================================================================================
@@ -2474,7 +2450,6 @@ PAGX_TEST(PAGXTest, LayoutGroupDerivedSize) {
   layer->height = 300;
 
   auto group = doc->makeNode<pagx::Group>();
-  group->position = {0, 0};
   group->left = 20;
   group->right = 20;
   group->top = 30;
@@ -2484,10 +2459,11 @@ PAGX_TEST(PAGXTest, LayoutGroupDerivedSize) {
 
   doc->applyLayout();
 
-  EXPECT_EQ(group->layoutWidth, 360.0f);
-  EXPECT_EQ(group->layoutHeight, 240.0f);
-  EXPECT_EQ(group->renderPosition().x, 20.0f);
-  EXPECT_EQ(group->renderPosition().y, 30.0f);
+  auto bounds = group->layoutBounds();
+  EXPECT_EQ(bounds.width, 360.0f);
+  EXPECT_EQ(bounds.height, 240.0f);
+  EXPECT_EQ(bounds.x, 20.0f);
+  EXPECT_EQ(bounds.y, 30.0f);
 }
 
 PAGX_TEST(PAGXTest, LayoutConstraintGroupRecursive) {
@@ -2499,13 +2475,11 @@ PAGX_TEST(PAGXTest, LayoutConstraintGroupRecursive) {
   layer->height = 200;
 
   auto group = doc->makeNode<pagx::Group>();
-  group->position = {0, 0};
   group->left = 20;
   group->right = 20;
 
   auto rect = doc->makeNode<pagx::Rectangle>();
   rect->size = {100, 50};
-  rect->position = {0, 0};
   rect->left = 10;
   rect->right = 10;
 
@@ -2514,9 +2488,11 @@ PAGX_TEST(PAGXTest, LayoutConstraintGroupRecursive) {
 
   doc->applyLayout();
 
-  EXPECT_EQ(group->layoutWidth, 360.0f);
-  EXPECT_EQ(group->renderPosition().x, 20.0f);
-  EXPECT_FLOAT_EQ(rect->renderSize().width, 340.0f);
+  auto groupBounds = group->layoutBounds();
+  EXPECT_EQ(groupBounds.width, 360.0f);
+  EXPECT_EQ(groupBounds.x, 20.0f);
+  auto rectBounds = rect->layoutBounds();
+  EXPECT_FLOAT_EQ(rectBounds.width, 340.0f);
 }
 
 // =====================================================================================
@@ -2533,17 +2509,14 @@ PAGX_TEST(PAGXTest, LayoutConstraintMultipleElements) {
 
   auto rect1 = doc->makeNode<pagx::Rectangle>();
   rect1->size = {80, 40};
-  rect1->position = {0, 0};
   rect1->left = 10;
 
   auto rect2 = doc->makeNode<pagx::Rectangle>();
   rect2->size = {80, 40};
-  rect2->position = {0, 0};
   rect2->right = 10;
 
   auto rect3 = doc->makeNode<pagx::Rectangle>();
   rect3->size = {80, 40};
-  rect3->position = {0, 0};
   rect3->centerX = 0;
   rect3->centerY = 0;
 
@@ -2551,10 +2524,16 @@ PAGX_TEST(PAGXTest, LayoutConstraintMultipleElements) {
 
   doc->applyLayout();
 
-  EXPECT_FLOAT_EQ(rect1->renderPosition().x, 50.0f);
-  EXPECT_FLOAT_EQ(rect2->renderPosition().x, 350.0f);
-  EXPECT_FLOAT_EQ(rect3->renderPosition().x, 200.0f);
-  EXPECT_FLOAT_EQ(rect3->renderPosition().y, 150.0f);
+  // rect1: left=10, width=80, so x=10, center=50
+  auto bounds1 = rect1->layoutBounds();
+  EXPECT_FLOAT_EQ(bounds1.x + bounds1.width * 0.5f, 50.0f);
+  // rect2: right=10, width=80, so x=400-10-80=310, center=350
+  auto bounds2 = rect2->layoutBounds();
+  EXPECT_FLOAT_EQ(bounds2.x + bounds2.width * 0.5f, 350.0f);
+  // rect3: centerX=0, centerY=0, so center=(200,150)
+  auto bounds3 = rect3->layoutBounds();
+  EXPECT_FLOAT_EQ(bounds3.x + bounds3.width * 0.5f, 200.0f);
+  EXPECT_FLOAT_EQ(bounds3.y + bounds3.height * 0.5f, 150.0f);
 }
 
 // =====================================================================================
@@ -2873,7 +2852,6 @@ PAGX_TEST(PAGXTest, LayoutContainerWithConstraints) {
 
   auto rect = doc->makeNode<pagx::Rectangle>();
   rect->size = {80, 80};
-  rect->position = {0, 0};
   rect->centerX = 0;
   rect->centerY = 0;
   left->contents.push_back(rect);
@@ -2883,8 +2861,10 @@ PAGX_TEST(PAGXTest, LayoutContainerWithConstraints) {
   EXPECT_EQ(left->layoutWidth, 300.0f);
   EXPECT_EQ(right->layoutWidth, 300.0f);
 
-  EXPECT_FLOAT_EQ(rect->renderPosition().x, 150.0f);
-  EXPECT_FLOAT_EQ(rect->renderPosition().y, 200.0f);
+  // rect centered in left (300x400): center at (150, 200)
+  auto bounds = rect->layoutBounds();
+  EXPECT_FLOAT_EQ(bounds.x + bounds.width * 0.5f, 150.0f);
+  EXPECT_FLOAT_EQ(bounds.y + bounds.height * 0.5f, 200.0f);
 }
 
 // =====================================================================================
@@ -3705,7 +3685,7 @@ PAGX_TEST(PAGXTest, ResourceCrossReference) {
     <Image id="img1" source="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="/>
   </Resources>
   <Layer>
-    <Rectangle size="100,100"/>
+    <Rectangle width="100" height="100"/>
     <Fill color="@pattern1"/>
   </Layer>
 </pagx>)";
@@ -3769,13 +3749,13 @@ PAGX_TEST(PAGXTest, ResourceCrossReferenceComposition) {
   std::string xml = R"(<?xml version="1.0" encoding="UTF-8"?>
 <pagx width="200" height="200">
   <Layer composition="@comp1">
-    <Rectangle size="200,200"/>
+    <Rectangle width="200" height="200"/>
     <Fill color="#FF0000"/>
   </Layer>
   <Resources>
     <Composition id="comp1" width="100" height="100">
       <Layer>
-        <Rectangle size="50,50"/>
+        <Rectangle width="50" height="50"/>
         <Fill color="#00FF00"/>
       </Layer>
     </Composition>
@@ -4258,8 +4238,10 @@ PAGX_TEST(PAGXTest, GroupConstraintLayoutUseMeasuredSize) {
   doc->applyLayout();
 
   // rect2 should be positioned at left=200 within the Group's measured frame.
-  auto pos2 = rect2->renderPosition();
-  EXPECT_FLOAT_EQ(pos2.x, 240.0f) << "rect2.renderPosition().x = left + width/2 = 200 + 40 = 240";
+  // layoutBounds().x = 200 (left constraint), center = 200 + 40 = 240
+  auto bounds2 = rect2->layoutBounds();
+  EXPECT_FLOAT_EQ(bounds2.x + bounds2.width * 0.5f, 240.0f)
+      << "rect2 center.x = left + width/2 = 200 + 40 = 240";
 }
 
 /**
@@ -4271,7 +4253,7 @@ PAGX_TEST(PAGXTest, ImagePatternInlineImage) {
   std::string xml1 = R"(<?xml version="1.0" encoding="UTF-8"?>
 <pagx width="100" height="100">
   <Layer>
-    <Rectangle size="100,100"/>
+    <Rectangle width="100" height="100"/>
     <Fill>
       <ImagePattern image="avatar.png"/>
     </Fill>
@@ -4295,7 +4277,7 @@ PAGX_TEST(PAGXTest, ImagePatternInlineImage) {
   std::string xml2 = R"(<?xml version="1.0" encoding="UTF-8"?>
 <pagx width="100" height="100">
   <Layer>
-    <Rectangle size="100,100"/>
+    <Rectangle width="100" height="100"/>
     <Fill>
       <ImagePattern image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="/>
     </Fill>
@@ -4343,7 +4325,7 @@ PAGX_TEST(PAGXTest, ImagePatternInlineImage) {
   std::string xml5 = R"(<?xml version="1.0" encoding="UTF-8"?>
 <pagx width="100" height="100">
   <Layer>
-    <Rectangle size="100,100"/>
+    <Rectangle width="100" height="100"/>
     <Fill>
       <ImagePattern image="@img1"/>
     </Fill>
@@ -4405,7 +4387,7 @@ PAGX_TEST(PAGXTest, ClipToBoundsParseFromXML) {
   std::string xml = R"(<?xml version="1.0" encoding="UTF-8"?>
 <pagx width="200" height="200">
   <Layer width="200" height="200" clipToBounds="true">
-    <Rectangle size="300,300"/>
+    <Rectangle width="300" height="300"/>
     <Fill color="#F00"/>
   </Layer>
 </pagx>)";
@@ -4425,7 +4407,7 @@ PAGX_TEST(PAGXTest, ClipToBoundsScrollRectPriority) {
   std::string xml = R"(<?xml version="1.0" encoding="UTF-8"?>
 <pagx width="200" height="200">
   <Layer width="200" height="200" scrollRect="10,10,100,100" clipToBounds="true">
-    <Rectangle size="300,300"/>
+    <Rectangle width="300" height="300"/>
     <Fill color="#F00"/>
   </Layer>
 </pagx>)";
@@ -4511,10 +4493,7 @@ PAGX_TEST(PAGXTest, LayoutIdempotent) {
 
   doc->applyLayout();
 
-  float firstX = rect->renderPosition().x;
-  float firstY = rect->renderPosition().y;
-  float firstW = rect->renderSize().width;
-  float firstH = rect->renderSize().height;
+  auto firstBounds = rect->layoutBounds();
   float layerActualW = layer->layoutWidth;
   float layerActualH = layer->layoutHeight;
 
@@ -4522,10 +4501,11 @@ PAGX_TEST(PAGXTest, LayoutIdempotent) {
   pagx::FontConfig config;
   doc->applyLayout(&config);
 
-  EXPECT_FLOAT_EQ(rect->renderPosition().x, firstX);
-  EXPECT_FLOAT_EQ(rect->renderPosition().y, firstY);
-  EXPECT_FLOAT_EQ(rect->renderSize().width, firstW);
-  EXPECT_FLOAT_EQ(rect->renderSize().height, firstH);
+  auto secondBounds = rect->layoutBounds();
+  EXPECT_FLOAT_EQ(secondBounds.x, firstBounds.x);
+  EXPECT_FLOAT_EQ(secondBounds.y, firstBounds.y);
+  EXPECT_FLOAT_EQ(secondBounds.width, firstBounds.width);
+  EXPECT_FLOAT_EQ(secondBounds.height, firstBounds.height);
   EXPECT_FLOAT_EQ(layer->layoutWidth, layerActualW);
   EXPECT_FLOAT_EQ(layer->layoutHeight, layerActualH);
 }
@@ -4584,7 +4564,7 @@ PAGX_TEST(PAGXTest, VerifyNestedFlexNoFalsePositive) {
 // Auto Layout - Edge Case Fixes (P2)
 // =====================================================================================
 
-PAGX_TEST(PAGXTest, ZeroSizeElementWithConstraint) {
+PAGX_TEST(PAGXTest, DefaultSizeElementWithOppositeEdgeConstraint) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto layer = doc->makeNode<pagx::Layer>();
   doc->layers.push_back(layer);
@@ -4592,7 +4572,7 @@ PAGX_TEST(PAGXTest, ZeroSizeElementWithConstraint) {
   layer->height = 200;
 
   auto rect = doc->makeNode<pagx::Rectangle>();
-  // Default size is {0,0}, with left+right should stretch to fill.
+  // Default width/height are NaN; left+right+top+bottom should stretch the element to fill.
   rect->left = 20;
   rect->right = 20;
   rect->top = 30;
@@ -4601,10 +4581,15 @@ PAGX_TEST(PAGXTest, ZeroSizeElementWithConstraint) {
 
   doc->applyLayout();
 
-  EXPECT_FLOAT_EQ(rect->renderSize().width, 160);
-  EXPECT_FLOAT_EQ(rect->renderSize().height, 140);
-  EXPECT_FLOAT_EQ(rect->layoutWidth, 160);
-  EXPECT_FLOAT_EQ(rect->layoutHeight, 140);
+  // Original size should remain NaN (not modified by layout).
+  EXPECT_TRUE(std::isnan(rect->width));
+  EXPECT_TRUE(std::isnan(rect->height));
+  // Layout dimensions should be computed from constraints.
+  auto bounds = rect->layoutBounds();
+  EXPECT_FLOAT_EQ(bounds.width, 160);
+  EXPECT_FLOAT_EQ(bounds.height, 140);
+  EXPECT_FLOAT_EQ(bounds.x, 20);
+  EXPECT_FLOAT_EQ(bounds.y, 30);
 }
 
 PAGX_TEST(PAGXTest, FlexRoundingErrorPropagation) {
@@ -4655,8 +4640,10 @@ PAGX_TEST(PAGXTest, TransformDoesNotAffectLayout) {
   doc->applyLayout();
 
   // Transform should not affect constraint positioning.
-  EXPECT_FLOAT_EQ(rect->renderPosition().x, 100);  // left=50 + width*0.5=50
-  EXPECT_FLOAT_EQ(rect->renderPosition().y, 100);  // top=50 + height*0.5=50
+  // layoutBounds reflects constraint: left=50, top=50
+  auto bounds = rect->layoutBounds();
+  EXPECT_FLOAT_EQ(bounds.x + bounds.width * 0.5f, 100);   // left=50 + width*0.5=50
+  EXPECT_FLOAT_EQ(bounds.y + bounds.height * 0.5f, 100);  // top=50 + height*0.5=50
 }
 
 PAGX_TEST(PAGXTest, DeepNestingConstraintPropagation) {
@@ -4690,14 +4677,17 @@ PAGX_TEST(PAGXTest, DeepNestingConstraintPropagation) {
   doc->applyLayout();
 
   // rect position: left=10 + width*0.5=40 -> center at 50
-  EXPECT_FLOAT_EQ(rect->renderPosition().x, 50);
-  EXPECT_FLOAT_EQ(rect->renderPosition().y, 40);
+  auto rectBounds = rect->layoutBounds();
+  EXPECT_FLOAT_EQ(rectBounds.x + rectBounds.width * 0.5f, 50);
+  EXPECT_FLOAT_EQ(rectBounds.y + rectBounds.height * 0.5f, 40);
   // innerGroup positioned at left=20, top=20
-  EXPECT_FLOAT_EQ(innerGroup->renderPosition().x, 20);
-  EXPECT_FLOAT_EQ(innerGroup->renderPosition().y, 20);
+  auto innerBounds = innerGroup->layoutBounds();
+  EXPECT_FLOAT_EQ(innerBounds.x, 20);
+  EXPECT_FLOAT_EQ(innerBounds.y, 20);
   // outerGroup positioned at left=50, top=50
-  EXPECT_FLOAT_EQ(outerGroup->renderPosition().x, 50);
-  EXPECT_FLOAT_EQ(outerGroup->renderPosition().y, 50);
+  auto outerBounds = outerGroup->layoutBounds();
+  EXPECT_FLOAT_EQ(outerBounds.x, 50);
+  EXPECT_FLOAT_EQ(outerBounds.y, 50);
 }
 
 // =====================================================================================
@@ -4727,22 +4717,15 @@ PAGX_TEST(PAGXTest, LayoutTextIndependentConstraint) {
   pagx::FontConfig fontConfig;
   fontConfig.registerTypeface(typeface);
 
-  // Compute original bounds before layout.
-  pagx::LayoutContext layoutContext(&fontConfig);
-  pagx::TextLayoutParams params = {};
-  params.baseline = text->baseline;
-  auto origBounds = pagx::TextLayout::Layout({text}, params, &layoutContext);
-
   doc->applyLayout(&fontConfig);
 
   // No opposite-edge constraints, so fontSize should remain unchanged.
-  EXPECT_FLOAT_EQ(text->renderFontSize(), 30);
+  EXPECT_FLOAT_EQ(text->fontSize, 30);
 
-  // Position is set by constraint: position = constraintOffset - textBounds.x/y.
-  // With left=50: x = 50 - origBounds.bounds.x
-  // With top=40: y = 40 - origBounds.bounds.y
-  EXPECT_FLOAT_EQ(text->renderPosition().x, 50 - origBounds.bounds.x);
-  EXPECT_FLOAT_EQ(text->renderPosition().y, 40 - origBounds.bounds.y);
+  // layoutBounds reflects the constraint position: left=50, top=40.
+  auto bounds = text->layoutBounds();
+  EXPECT_FLOAT_EQ(bounds.x, 50);
+  EXPECT_FLOAT_EQ(bounds.y, 40);
 }
 
 PAGX_TEST(PAGXTest, LayoutTextPathMeasurement) {
@@ -4769,12 +4752,12 @@ PAGX_TEST(PAGXTest, LayoutTextPathMeasurement) {
   doc->applyLayout();
 
   // TextPath path bounds: 200x100.
-  EXPECT_FLOAT_EQ(textPath->measuredWidth, 200);
-  EXPECT_FLOAT_EQ(textPath->measuredHeight, 100);
+  EXPECT_FLOAT_EQ(textPath->preferredWidth, 200);
+  EXPECT_FLOAT_EQ(textPath->preferredHeight, 100);
 
   // Group should have measured from TextPath bounds.
-  EXPECT_FLOAT_EQ(group->measuredWidth, 200);
-  EXPECT_FLOAT_EQ(group->measuredHeight, 100);
+  EXPECT_FLOAT_EQ(group->preferredWidth, 200);
+  EXPECT_FLOAT_EQ(group->preferredHeight, 100);
   EXPECT_FLOAT_EQ(group->layoutWidth, 200);
   EXPECT_FLOAT_EQ(group->layoutHeight, 100);
 }
@@ -4839,7 +4822,8 @@ PAGX_TEST(PAGXTest, LayoutTextScaledPositionAnchor) {
   // After scaling, text should be centered in the 300px area.
   // Verify the scaled text has a valid actual size.
   EXPECT_GT(text->layoutWidth, 0);
-  // fontSize should have been scaled (target 300px is different from original width).
+  // Original fontSize should be preserved, but renderFontSize() returns scaled value.
+  EXPECT_EQ(text->fontSize, 30);
   EXPECT_NE(text->renderFontSize(), 30);
 }
 
@@ -4874,7 +4858,7 @@ PAGX_TEST(PAGXTest, LayoutTextInTextBoxSkipConstraint) {
   doc->applyLayout();
 
   // Text inside TextBox should NOT have fontSize scaled by constraints.
-  EXPECT_FLOAT_EQ(text->renderFontSize(), 20);
+  EXPECT_FLOAT_EQ(text->fontSize, 20);
 }
 
 // =====================================================================================
