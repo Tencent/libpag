@@ -66,6 +66,20 @@ FillStrokeInfo CollectFillStroke(const std::vector<Element*>& contents) {
 }
 
 Matrix BuildLayerMatrix(const Layer* layer) {
+  // matrix3D > matrix > x/y. When matrix3D is non-identity it overrides
+  // both matrix and x/y. We project it onto the z=0 plane to get the
+  // equivalent 2D affine transform used by the 2D exporters (PPT/SVG).
+  if (!layer->matrix3D.isIdentity()) {
+    const float* v = layer->matrix3D.values;
+    Matrix m = {};
+    m.a = v[0];
+    m.b = v[1];
+    m.c = v[4];
+    m.d = v[5];
+    m.tx = v[12];
+    m.ty = v[13];
+    return m;
+  }
   Matrix m = layer->matrix;
   if (layer->x != 0.0f || layer->y != 0.0f) {
     m = Matrix::Translate(layer->x, layer->y) * m;
