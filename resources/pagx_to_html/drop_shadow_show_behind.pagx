@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: DropShadowStyle showBehindLayer=true/false pair and excludeChildEffects combinations.
+     Uses semi-transparent fills so the shadow under the layer is visible in showBehindLayer=true
+     but erased in showBehindLayer=false. -->
+<pagx version="1.0" width="420" height="420">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="stretch">
+    <!-- Title -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="DropShadow Semantics" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="showBehindLayer true/false, excludeChildEffects true/false" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
+
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="18,20,18,20" gap="14" alignment="stretch" arrangement="center">
+        <!-- Row 1: showBehindLayer comparison. Shape has alpha=0.55, making shadow behind it visible. -->
+        <Layer layout="vertical" gap="6" alignment="center">
+          <Layer height="12">
+            <Text text="showBehindLayer: true (shadow shows through translucent fill) vs false (erased under shape)" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+          <Layer height="120" layout="horizontal" gap="40" arrangement="center" alignment="center">
+            <!-- showBehindLayer=true -->
+            <Layer width="110" height="110">
+              <Rectangle left="10" right="10" top="10" bottom="10" roundness="16"/>
+              <Fill color="#3B82F680"/>
+              <DropShadowStyle offsetX="0" offsetY="0" blurX="12" blurY="12" color="#1E3A8AC0" showBehindLayer="true"/>
+            </Layer>
+            <!-- showBehindLayer=false -->
+            <Layer width="110" height="110">
+              <Rectangle left="10" right="10" top="10" bottom="10" roundness="16"/>
+              <Fill color="#3B82F680"/>
+              <DropShadowStyle offsetX="0" offsetY="0" blurX="12" blurY="12" color="#1E3A8AC0" showBehindLayer="false"/>
+            </Layer>
+          </Layer>
+        </Layer>
+
+        <!-- Row 2: excludeChildEffects comparison. Child layer has its own DropShadowStyle,
+             the outer layer computes its shadow from layer content. With excludeChildEffects=false
+             (default), the inner shadow is baked into the outer shadow shape; with true, only
+             the base geometry of children is used. -->
+        <Layer layout="vertical" gap="6" alignment="center">
+          <Layer height="12">
+            <Text text="excludeChildEffects: false (child shadows seen by outer) vs true (only base child shapes)" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+          <Layer height="120" layout="horizontal" gap="40" arrangement="center" alignment="center">
+            <!-- excludeChildEffects=false -->
+            <Layer width="130" height="110">
+              <Rectangle left="8" right="8" top="8" bottom="8" roundness="12"/>
+              <Fill color="#FFFFFF"/>
+              <DropShadowStyle offsetX="0" offsetY="8" blurX="18" blurY="18" color="#DC2626A0" excludeChildEffects="false"/>
+              <Layer left="20" right="20" top="20" bottom="20">
+                <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+                <Fill color="#F59E0B"/>
+                <DropShadowStyle offsetX="4" offsetY="4" blurX="6" blurY="6" color="#111827C0"/>
+              </Layer>
+            </Layer>
+            <!-- excludeChildEffects=true -->
+            <Layer width="130" height="110">
+              <Rectangle left="8" right="8" top="8" bottom="8" roundness="12"/>
+              <Fill color="#FFFFFF"/>
+              <DropShadowStyle offsetX="0" offsetY="8" blurX="18" blurY="18" color="#DC2626A0" excludeChildEffects="true"/>
+              <Layer left="20" right="20" top="20" bottom="20">
+                <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+                <Fill color="#F59E0B"/>
+                <DropShadowStyle offsetX="4" offsetY="4" blurX="6" blurY="6" color="#111827C0"/>
+              </Layer>
+            </Layer>
+          </Layer>
+        </Layer>
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>

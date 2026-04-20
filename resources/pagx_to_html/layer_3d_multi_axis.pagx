@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Layer matrix3D rotations around X / Y / Z axes (each 30°), and preserve3D nesting
+     where siblings with different matrix3D transforms share a 3D space and depth-intersect. -->
+<pagx version="1.0" width="420" height="400">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="stretch">
+    <!-- Title -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="3D matrix3D Axes" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="RotateX 30, RotateY 30, RotateZ 30, then preserve3D intersecting planes" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
+
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16,20,16,20" gap="12" alignment="stretch" arrangement="center">
+        <!-- Row 1: three single-axis rotations side by side -->
+        <Layer height="110" layout="horizontal" gap="20" arrangement="spaceEvenly" alignment="center">
+          <!-- rotateX 30° -->
+          <Layer width="90" height="90" layout="vertical" gap="6" alignment="center" arrangement="center">
+            <Layer width="80" height="60" centerX="0" centerY="0">
+              <!-- column-major: Rx(30°) -->
+              <Layer matrix3D="1,0,0,0, 0,0.866,0.5,0, 0,-0.5,0.866,0, 0,0,0,1" preserve3D="true">
+                <Rectangle position="40,30" size="80,60" roundness="8"/>
+                <Fill color="#3B82F6"/>
+              </Layer>
+            </Layer>
+            <Layer height="12">
+              <Text text="rotateX 30" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
+          </Layer>
+
+          <!-- rotateY 30° -->
+          <Layer width="90" height="90" layout="vertical" gap="6" alignment="center" arrangement="center">
+            <Layer width="80" height="60" centerX="0" centerY="0">
+              <!-- column-major: Ry(30°) -->
+              <Layer matrix3D="0.866,0,-0.5,0, 0,1,0,0, 0.5,0,0.866,0, 0,0,0,1" preserve3D="true">
+                <Rectangle position="40,30" size="80,60" roundness="8"/>
+                <Fill color="#10B981"/>
+              </Layer>
+            </Layer>
+            <Layer height="12">
+              <Text text="rotateY 30" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
+          </Layer>
+
+          <!-- rotateZ 30° -->
+          <Layer width="90" height="90" layout="vertical" gap="6" alignment="center" arrangement="center">
+            <Layer width="80" height="60" centerX="0" centerY="0">
+              <!-- column-major: Rz(30°) -->
+              <Layer matrix3D="0.866,0.5,0,0, -0.5,0.866,0,0, 0,0,1,0, 0,0,0,1" preserve3D="true">
+                <Rectangle position="40,30" size="80,60" roundness="8"/>
+                <Fill color="#EC4899"/>
+              </Layer>
+            </Layer>
+            <Layer height="12">
+              <Text text="rotateZ 30" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
+          </Layer>
+        </Layer>
+
+        <!-- Row 2: preserve3D scene — two planes rotated on different axes share a 3D space.
+             preserve3D lets them intersect in depth instead of being pre-flattened by the parent. -->
+        <Layer layout="vertical" gap="6" alignment="center">
+          <Layer height="12">
+            <Text text="preserve3D: two planes in shared 3D space" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+          <Layer width="200" height="120" centerX="0" preserve3D="true">
+            <!-- Plane A: rotateY 45° -->
+            <Layer matrix3D="0.707,0,-0.707,0, 0,1,0,0, 0.707,0,0.707,0, 0,0,0,1">
+              <Rectangle position="100,60" size="160,90" roundness="10"/>
+              <Fill color="#F59E0B"/>
+            </Layer>
+            <!-- Plane B: rotateX 60° -->
+            <Layer matrix3D="1,0,0,0, 0,0.5,0.866,0, 0,-0.866,0.5,0, 0,0,0,1">
+              <Rectangle position="100,60" size="160,90" roundness="10"/>
+              <Fill color="#8B5CF6"/>
+            </Layer>
+          </Layer>
+        </Layer>
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>
