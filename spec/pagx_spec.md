@@ -740,24 +740,19 @@ Where `B` is the element's content bounds and `W`/`H` is the container's layout 
 
 #### Opposite-Edge Constraints and Percentage Dimensions
 
-Setting both `left` + `right` (or `top` + `bottom`) defines a target area (container size minus both insets). Similarly, percentage dimensions (e.g., `width="50%"`) calculate size from the container. Different node types respond differently:
+Both opposite-edge constraints and percentage dimensions derive a target size from the container:
+
+- **Opposite-edge pair** (`left` + `right` or `top` + `bottom`): `target = container - L - R`
+- **Percentage dimension** (`width="N%"` / `height="N%"`): `target = container_inner × N / 100`, where `container_inner` is the container's layout size on that axis minus `padding`
+
+Different node types respond to a derived target differently:
 
 | Element | Behavior | Description |
 |---------|----------|-------------|
 | Rectangle, Ellipse | Stretch shape | Modify `size` to fill the target area, changing rendered shape |
 | TextBox | Stretch typesetting area | Modify `width` and `height` to fill the target area, changing text layout bounds |
-| Group | Derive layout dimensions | Align to the target area and set layout dimensions; children re-layout according to the new size, no effect on rendering |
-| Child Layer | Derive dimensions or position | Always derive dimensions from parent (`width = parent.width - left - right`), overriding any explicit `width`/`height` |
+| Group, Layer | Derive layout dimensions | Set layout width/height to the target; children re-layout against the new size, no effect on rendering. For child Layers, this overrides any explicit `width`/`height` |
 | Polystar, Path, Text, TextPath | Scale to fit | Single-axis: scale to exactly fill that axis, other axis scales proportionally; both-axis: use the smaller scale factor (fit mode), center along the longer axis. Polystar uses its frame bounds (outerRadius×2 × outerRadius×2) for scaling calculations |
-
-Percentage dimensions produce a target size per axis without using `left`/`right`/`top`/`bottom`. The target is computed as `target = parent_inner × N / 100`, where `parent_inner` is the parent container's layout size on that axis minus `padding`. Per-element behavior mirrors the opposite-edge table but is driven by the percentage target rather than two insets:
-
-| Element | `width="N%"` / `height="N%"` Behavior | Description |
-|---------|--------------------------------------|-------------|
-| Rectangle, Ellipse | Stretch shape | `size.width = parent_inner_w × N / 100` on that axis, changing rendered shape |
-| TextBox | Stretch typesetting area | `width`/`height` set to the percentage target, changing text layout bounds |
-| Group, Layer | Derive layout dimensions | Set layout width/height on that axis to the percentage target; children re-layout against the new size |
-| Polystar, Path, Text, TextPath | Scale to fit | Treat the percentage target as the target size on that axis and scale the element uniformly (same formula as the single-axis opposite-edge case; if both axes have percentages set, use the smaller scale factor — fit mode) |
 
 When both a percentage dimension and an opposite-edge pair are set on the same axis, the opposite-edge pair wins (see step 1 in §4.1). When only a percentage dimension is set on one axis, the other axis falls back to its preferred size unless a separate constraint sizes it.
 
