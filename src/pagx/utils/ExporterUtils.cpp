@@ -638,10 +638,28 @@ std::shared_ptr<tgfx::Data> RenderTiledPattern(GPUContext* gpu, const ImagePatte
   return result;
 }
 
+float EffectiveTextBoxWidth(const TextBox* box) {
+  if (!std::isnan(box->width)) {
+    return box->width;
+  }
+  // Use the layout-resolved width (set by the constraint layout pass) so TextBoxes
+  // sized via left/right/centerX still wrap and lay out as the author intended.
+  float resolved = box->layoutBounds().width;
+  return resolved > 0 ? resolved : NAN;
+}
+
+float EffectiveTextBoxHeight(const TextBox* box) {
+  if (!std::isnan(box->height)) {
+    return box->height;
+  }
+  float resolved = box->layoutBounds().height;
+  return resolved > 0 ? resolved : NAN;
+}
+
 TextLayoutParams MakeTextBoxParams(const TextBox* box) {
   bool hasPadding = !box->padding.isZero();
-  float boxW = box->width;
-  float boxH = box->height;
+  float boxW = EffectiveTextBoxWidth(box);
+  float boxH = EffectiveTextBoxHeight(box);
   if (hasPadding) {
     if (!std::isnan(boxW)) {
       boxW = std::max(0.0f, boxW - box->padding.left - box->padding.right);

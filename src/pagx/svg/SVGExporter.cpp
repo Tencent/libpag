@@ -908,15 +908,16 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
   if (fs.textBox) {
     float paddingLeft = fs.textBox->padding.left;
     float paddingTop = fs.textBox->padding.top;
+    float effectiveWidth = EffectiveTextBoxWidth(fs.textBox);
     switch (fs.textBox->textAlign) {
       case TextAlign::Center:
         anchor = TextAnchor::Center;
         anchorX = fs.textBox->position.x + paddingLeft +
-                  (fs.textBox->width - paddingLeft - fs.textBox->padding.right) / 2;
+                  (effectiveWidth - paddingLeft - fs.textBox->padding.right) / 2;
         break;
       case TextAlign::End:
         anchor = TextAnchor::End;
-        anchorX = fs.textBox->position.x + fs.textBox->width - fs.textBox->padding.right;
+        anchorX = fs.textBox->position.x + effectiveWidth - fs.textBox->padding.right;
         break;
       default:
         anchorX = fs.textBox->position.x + paddingLeft;

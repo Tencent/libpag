@@ -141,6 +141,15 @@ std::shared_ptr<tgfx::Data> RenderTiledPattern(GPUContext* gpu, const ImagePatte
                                                int width, int height, float offsetX, float offsetY);
 
 /**
+ * Returns the effective width/height of a TextBox for typesetting and shape sizing.
+ * Falls back to the layout-resolved dimensions when no explicit width/height was supplied
+ * (e.g. when the TextBox is positioned via left/right/top/bottom constraints), and returns
+ * NaN when neither an explicit nor a resolved value is available (auto-sized in that axis).
+ */
+float EffectiveTextBoxWidth(const TextBox* box);
+float EffectiveTextBoxHeight(const TextBox* box);
+
+/**
  * Builds TextLayoutParams from a TextBox's attributes with padding-adjusted content dimensions.
  */
 TextLayoutParams MakeTextBoxParams(const TextBox* box);

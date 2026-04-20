@@ -1361,7 +1361,9 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   }
 
   auto* mutableText = const_cast<Text*>(text);
-  bool hasTextBox = fs.textBox && !std::isnan(fs.textBox->width) && fs.textBox->width > 0;
+  float boxWidth = fs.textBox ? EffectiveTextBoxWidth(fs.textBox) : NAN;
+  float boxHeight = fs.textBox ? EffectiveTextBoxHeight(fs.textBox) : NAN;
+  bool hasTextBox = fs.textBox && !std::isnan(boxWidth) && boxWidth > 0;
 
   TextLayoutResult localResult;
   if (!precomputed) {
@@ -1379,9 +1381,9 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   if (hasTextBox) {
     posX = fs.textBox->position.x;
     posY = fs.textBox->position.y;
-    estWidth = fs.textBox->width;
-    estHeight = (!std::isnan(fs.textBox->height) && fs.textBox->height > 0) ? fs.textBox->height
-                                                                            : text->fontSize * 1.4f;
+    estWidth = boxWidth;
+    estHeight =
+        (!std::isnan(boxHeight) && boxHeight > 0) ? boxHeight : text->fontSize * 1.4f;
   } else {
     auto textBounds = precomputed->getTextBounds(mutableText);
     if (textBounds.width > 0 && textBounds.height > 0) {
