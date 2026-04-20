@@ -59,6 +59,35 @@ struct PPTExportOptions {
    * value is true.
    */
   bool bridgeContours = true;
+
+  /**
+   * Whether to resolve path-modifier elements (TrimPath, RoundCorner, MergePath, Polystar) into
+   * editable custom geometry by applying the modifier through tgfx::Path operations and emitting
+   * the resulting path as a:custGeom. When disabled, modifiers are dropped on the floor (matching
+   * V1 behavior). When enabled, the modifier itself is no longer live but the resulting shape
+   * remains a fully editable PPT shape. The default value is true.
+   */
+  bool resolveModifiers = true;
+
+  /**
+   * Whether to rasterize layers that use blend modes outside of Normal/Multiply/Screen/Darken/
+   * Lighten (the only ones expressible in OOXML a:fillOverlay). When false, the blend mode is
+   * silently dropped and the layer is rendered as Normal. The default value is true.
+   */
+  bool rasterizeUnsupportedBlend = true;
+
+  /**
+   * Whether to rasterize layers whose color sources reference wide-gamut color spaces (DisplayP3,
+   * etc.) so the visual appearance is preserved. OOXML colors are always sRGB. When false, the
+   * wide-gamut color is clamped to sRGB and rendered as a solid fill. The default value is true.
+   */
+  bool rasterizeWideGamut = true;
+
+  /**
+   * Pixel DPI used when a layer has to be rasterized to PNG. Higher values give crisper fallback
+   * images at the cost of file size. The default value is 192 (2x of the default 96 DPI).
+   */
+  int rasterDPI = 192;
 };
 
 /**

@@ -55,7 +55,10 @@
 #include "pagx/nodes/TextBox.h"
 #include "pagx/ppt/PPTBoilerplate.h"
 #include "pagx/ppt/PPTContourUtils.h"
+#include "pagx/ppt/PPTFeatureProbe.h"
 #include "pagx/ppt/PPTGeomEmitter.h"
+#include "pagx/ppt/PPTModifierResolver.h"
+#include "pagx/ppt/PPTRasterizer.h"
 #include "pagx/ppt/PPTWriterContext.h"
 #include "pagx/types/Rect.h"
 #include "pagx/utils/ExporterUtils.h"
@@ -188,25 +191,39 @@ static bool ComputeImagePatternRect(const ImagePattern* pattern, int imgW, int i
 
 class PPTWriter {
  public:
-  PPTWriter(PPTWriterContext* ctx, PAGXDocument* doc, bool convertTextToPath, bool bakeMask,
-            bool bakeTiledPattern, bool bridgeContours)
-      : _ctx(ctx), _doc(doc), _convertTextToPath(convertTextToPath), _bakeMask(bakeMask),
-        _bakeTiledPattern(bakeTiledPattern), _bridgeContours(bridgeContours) {
+  PPTWriter(PPTWriterContext* ctx, PAGXDocument* doc, const PPTExporter::Options& options)
+      : _ctx(ctx), _doc(doc), _convertTextToPath(options.convertTextToPath),
+        _bakeMask(options.bakeMask), _bakeTiledPattern(options.bakeTiledPattern),
+        _bridgeContours(options.bridgeContours), _resolveModifiers(options.resolveModifiers),
+        _rasterizeUnsupportedBlend(options.rasterizeUnsupportedBlend),
+        _rasterizeWideGamut(options.rasterizeWideGamut), _rasterDPI(options.rasterDPI),
+        _resolver(doc) {
   }
 
   void writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& parentMatrix = {},
                   float parentAlpha = 1.0f);
 
  private:
+  // Returns true iff the layer was successfully rasterized and emitted as p:pic.
+  bool rasterizeLayerAsPicture(XMLBuilder& out, const Layer* layer);
+
   PPTWriterContext* _ctx = nullptr;
   PAGXDocument* _doc = nullptr;
   bool _convertTextToPath = true;
   bool _bakeMask = true;
   bool _bakeTiledPattern = true;
   bool _bridgeContours = true;
+  bool _resolveModifiers = true;
+  bool _rasterizeUnsupportedBlend = true;
+  bool _rasterizeWideGamut = true;
+  // _rasterDPI is wired through to PPTRasterizer via the GPUContext but the
+  // current rasterization path always uses the GPU surface's native scale; the
+  // option is retained for forward compatibility.
+  [[maybe_unused]] int _rasterDPI = 192;
   GPUContext _gpu;
   LayerBuildResult _buildResult = {};
   bool _buildResultReady = false;
+  PPTModifierResolver _resolver;
 
   const LayerBuildResult& ensureBuildResult();
 
@@ -1473,21 +1490,21 @@ void PPTWriter::writeElements(XMLBuilder& out, const std::vector<Element*>& elem
                               const std::vector<LayerFilter*>& filters,
                               const std::vector<LayerStyle*>& styles,
                               const TextBox* parentTextBox) {
-  auto fs = CollectFillStroke(elements);
-  // When recursing into a TextBox, propagate the TextBox as the layout context
-  // for its inner Text elements (the inner element list never contains a TextBox
-  // itself, so CollectFillStroke would otherwise lose this info).
+  // Bake every path-modifier (Polystar -> Path, Repeater -> grouped copies,
+  // TrimPath / RoundCorner / MergePath -> editable Path via tgfx). Painters
+  // (Fill / Stroke) and text-related elements pass through unchanged so
+  // CollectFillStroke and the per-element switch below behave exactly as in
+  // the unresolved case.
+  const std::vector<Element*>& walked =
+      _resolveModifiers ? _resolver.resolve(elements) : elements;
+
+  auto fs = CollectFillStroke(walked);
   if (parentTextBox != nullptr && fs.textBox == nullptr) {
     fs.textBox = parentTextBox;
   }
 
-  // Track the most recently emitted shape index so a trailing Repeater can
-  // duplicate it. Repeater applies to "preceding elements"; we approximate by
-  // re-emitting the immediately preceding shape with progressive transforms.
-  size_t lastShapeIndex = elements.size();
-
-  for (size_t i = 0; i < elements.size(); ++i) {
-    const auto* element = elements[i];
+  for (size_t i = 0; i < walked.size(); ++i) {
+    const auto* element = walked[i];
     auto type = element->nodeType();
     if (type == NodeType::Fill || type == NodeType::Stroke) {
       continue;
@@ -1496,16 +1513,13 @@ void PPTWriter::writeElements(XMLBuilder& out, const std::vector<Element*>& elem
       case NodeType::Rectangle:
         writeRectangle(out, static_cast<const Rectangle*>(element), fs, transform, alpha, filters,
                        styles);
-        lastShapeIndex = i;
         break;
       case NodeType::Ellipse:
         writeEllipse(out, static_cast<const Ellipse*>(element), fs, transform, alpha, filters,
                      styles);
-        lastShapeIndex = i;
         break;
       case NodeType::Path:
         writePath(out, static_cast<const Path*>(element), fs, transform, alpha, filters, styles);
-        lastShapeIndex = i;
         break;
       case NodeType::Text: {
         auto* text = static_cast<const Text*>(element);
@@ -1514,16 +1528,12 @@ void PPTWriter::writeElements(XMLBuilder& out, const std::vector<Element*>& elem
         } else {
           writeNativeText(out, text, fs, transform, alpha, filters, styles);
         }
-        lastShapeIndex = i;
         break;
       }
       case NodeType::TextBox: {
-        // A TextBox is a Group that lays out inline Text children. Descend so the
-        // child Text elements are emitted; their fill comes from the TextBox's
-        // own contents and the TextBox itself is propagated as positioning context.
         auto* tb = static_cast<const TextBox*>(element);
         if (tb->elements.empty()) {
-          break;  // empty TextBox is just metadata for sibling Text elements
+          break;
         }
         Matrix tbMatrix = BuildGroupMatrix(tb);
         Matrix combined = transform * tbMatrix;
@@ -1539,67 +1549,47 @@ void PPTWriter::writeElements(XMLBuilder& out, const std::vector<Element*>& elem
         writeElements(out, group->elements, combined, groupAlpha, filters, styles, parentTextBox);
         break;
       }
-      case NodeType::Repeater: {
-        // Approximate Repeater by re-emitting the immediately preceding shape
-        // with progressive transforms. Reuses the layer-level fs so each copy
-        // inherits the same fill/stroke and effects.
-        if (lastShapeIndex >= elements.size()) {
-          break;
-        }
-        auto* rep = static_cast<const Repeater*>(element);
-        int copies = std::max(0, static_cast<int>(rep->copies));
-        if (copies <= 1) {
-          break;
-        }
-        const auto* base = elements[lastShapeIndex];
-        for (int c = 1; c < copies; ++c) {
-          float t = static_cast<float>(c) - rep->offset;
-          float angleRad = rep->rotation * t * static_cast<float>(M_PI) / 180.0f;
-          float sx = std::pow(rep->scale.x, t);
-          float sy = std::pow(rep->scale.y, t);
-          Matrix copyMatrix = Matrix::Translate(rep->anchor.x, rep->anchor.y);
-          copyMatrix = copyMatrix * Matrix::Rotate(angleRad);
-          copyMatrix = copyMatrix * Matrix::Scale(sx, sy);
-          copyMatrix = copyMatrix * Matrix::Translate(-rep->anchor.x, -rep->anchor.y);
-          copyMatrix = copyMatrix * Matrix::Translate(rep->position.x * t, rep->position.y * t);
-          Matrix combined = transform * copyMatrix;
-          float copyAlpha = alpha;
-          if (copies > 1 && (rep->startAlpha != 1.0f || rep->endAlpha != 1.0f)) {
-            float frac = static_cast<float>(c) / static_cast<float>(copies - 1);
-            copyAlpha *= rep->startAlpha + (rep->endAlpha - rep->startAlpha) * frac;
-          }
-          switch (base->nodeType()) {
-            case NodeType::Rectangle:
-              writeRectangle(out, static_cast<const Rectangle*>(base), fs, combined, copyAlpha,
-                             filters, styles);
-              break;
-            case NodeType::Ellipse:
-              writeEllipse(out, static_cast<const Ellipse*>(base), fs, combined, copyAlpha,
-                           filters, styles);
-              break;
-            case NodeType::Path:
-              writePath(out, static_cast<const Path*>(base), fs, combined, copyAlpha, filters,
-                        styles);
-              break;
-            case NodeType::Text: {
-              auto* text = static_cast<const Text*>(base);
-              if (_convertTextToPath && !text->glyphRuns.empty()) {
-                writeTextAsPath(out, text, fs, combined, copyAlpha, filters, styles);
-              } else {
-                writeNativeText(out, text, fs, combined, copyAlpha, filters, styles);
-              }
-              break;
-            }
-            default:
-              break;
-          }
-        }
+      case NodeType::Repeater:
+        // Reaching this case means the resolver was disabled or the input
+        // contained a Repeater that couldn't be expanded; silently skip so the
+        // remaining content still renders (matches V1 behaviour for other
+        // unresolved modifiers like TrimPath / RoundCorner / MergePath).
         break;
-      }
       default:
+        // Fill, Stroke, TextPath, TextModifier, RangeSelector, Polystar (when
+        // the resolver is disabled), and any unrecognized element type fall
+        // through silently. The layer-level rasterization probe runs in
+        // writeLayer to escalate cases where dropping these elements would
+        // change the visual result.
         break;
     }
   }
+}
+
+// Rasterize the entire layer (including its sub-tree) to a single embedded PNG
+// and emit it as a positioned p:pic. Returns true if a picture was emitted.
+bool PPTWriter::rasterizeLayerAsPicture(XMLBuilder& out, const Layer* layer) {
+  auto& buildResult = ensureBuildResult();
+  auto it = buildResult.layerMap.find(layer);
+  if (it == buildResult.layerMap.end() || !buildResult.root) {
+    return false;
+  }
+  auto tgfxLayer = it->second;
+  if (!tgfxLayer) {
+    return false;
+  }
+  auto pngData = RenderMaskedLayer(&_gpu, buildResult.root, tgfxLayer);
+  if (!pngData) {
+    return false;
+  }
+  auto bounds = tgfxLayer->getBounds(buildResult.root.get(), true);
+  auto offX = PxToEMU(bounds.left);
+  auto offY = PxToEMU(bounds.top);
+  auto extCX = std::max(int64_t(1), PxToEMU(bounds.width()));
+  auto extCY = std::max(int64_t(1), PxToEMU(bounds.height()));
+  auto relId = _ctx->addRawImage(std::move(pngData));
+  writePicture(out, relId, offX, offY, extCX, extCY);
+  return true;
 }
 
 void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& parentMatrix,
@@ -1612,25 +1602,25 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& pa
   float layerAlpha = parentAlpha * layer->alpha;
 
   if (layer->mask != nullptr && _bakeMask) {
-    auto& buildResult = ensureBuildResult();
-    auto it = buildResult.layerMap.find(layer);
-    if (it != buildResult.layerMap.end()) {
-      auto tgfxLayer = it->second;
-      auto pngData = RenderMaskedLayer(&_gpu, buildResult.root, tgfxLayer);
-      if (pngData) {
-        auto bounds = tgfxLayer->getBounds(buildResult.root.get(), true);
-        auto offX = PxToEMU(bounds.left);
-        auto offY = PxToEMU(bounds.top);
-        auto extCX = std::max(int64_t(1), PxToEMU(bounds.width()));
-        auto extCY = std::max(int64_t(1), PxToEMU(bounds.height()));
-        auto relId = _ctx->addRawImage(std::move(pngData));
-        writePicture(out, relId, offX, offY, extCX, extCY);
-        return;
-      }
+    if (rasterizeLayerAsPicture(out, layer)) {
+      return;
     }
     // Bake fell through (zero bounds, no GPU, etc.) - fall through to writing
     // the layer as a regular layer so its content is at least visible without
     // the mask effect.
+  }
+
+  // Probe the layer for features that OOXML cannot represent natively. When
+  // anything trips the probe AND the corresponding rasterize-* option is on,
+  // bake the whole layer to a PNG so the visual result is preserved. The
+  // alternative (silently dropping unsupported elements) was the V1 behaviour
+  // and produced obviously wrong slides for documents with TextPath, complex
+  // blends, ColorMatrix filters, or wide-gamut colors.
+  auto features = ProbeLayerFeatures(layer);
+  if (features.needsRasterization(_rasterizeUnsupportedBlend, _rasterizeWideGamut)) {
+    if (rasterizeLayerAsPicture(out, layer)) {
+      return;
+    }
   }
 
   writeElements(out, layer->contents, layerMatrix, layerAlpha, layer->filters, layer->styles);
@@ -1678,8 +1668,7 @@ bool PPTExporter::ToFile(PAGXDocument& doc, const std::string& filePath, const O
   }
 
   PPTWriterContext context;
-  PPTWriter writer(&context, &doc, options.convertTextToPath, options.bakeMask,
-                   options.bakeTiledPattern, options.bridgeContours);
+  PPTWriter writer(&context, &doc, options);
 
   // Build slide body content
   XMLBuilder body(false, 2, 0, 16384);
