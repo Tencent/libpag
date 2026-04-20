@@ -243,31 +243,32 @@ serves as their container size.
 | `width` | Layout width; pixels (e.g., `100`) or percentage (e.g., `50%`) relative to container |
 | `height` | Layout height; pixels (e.g., `100`) or percentage (e.g., `50%`) relative to container |
 
-**Per-axis rules** — use only one combination per axis:
-- Single edge alone → position only
-- Opposite pair (`left`+`right`) → derives size AND positions
-- `width` alone (pixels or `%`) → sets size only; position defaults to the container origin (inside padding)
-- Single edge + `width` (e.g., `left="10" width="100"`) → edge positions, `width` sizes (the opposite edge/centerX is unused)
-- `centerX` overrides `left`/`right` silently (avoid mixing)
+**Positioning rules** (per axis) — use only one combination per axis:
+- Single edge alone (e.g., `left="10"`) → positions only; size comes from size rules below
+- Opposite pair (e.g., `left="10" right="10"`) → positions AND sizes (overrides explicit size)
+- `centerX` → centers with offset; overrides `left`/`right` silently (avoid mixing)
 
 **Priority**: `centerX` > `left`+`right` > `left` > `right` (same for vertical).
 
-**Opposite-pair / percentage dimension behavior** by element type:
+**Explicit size** (`width` / `height`) — accepts pixels (`100`) or percentage (`50%`):
+- Percentage values resolve against the container's layout size inside padding
+  (`width = (parent.width - parent.padding.left - parent.padding.right) × N / 100`)
+- Without positional constraints, the element is placed at the container origin (inside
+  padding); with a single edge (e.g., `left="10" width="100"`), that edge positions it
+
+**Size behavior by element type** (same for pixels and percentages):
 
 | Element Type | Behavior |
 |--------------|----------|
-| Rectangle, Ellipse | **Stretch** to fill |
-| TextBox | **Stretch** as text layout region |
+| Rectangle, Ellipse | **Stretch** to fill target size (changes `size`) |
+| TextBox | **Stretch** text layout region |
 | Path, Polystar, Text, TextPath | **Scale to fit** proportionally |
 | Group | **Derive size** for child constraint reference |
-| Child Layer | **Override** width/height |
+| Layer | **Override** layout width/height |
 
-**Size priority** (highest first): opposite-pair constraints → explicit `width`/`height`
-(including percentages) → `size` → content measurement.
-
-Percentage values (e.g., `width="50%"`) are calculated relative to the container's layout
-size (minus padding). They behave identically to opposite-pair constraints for each element
-type (see table above).
+**Size source priority** (highest first): opposite-pair constraints → explicit
+`width`/`height` (pixels or percentages) → `size` (Rectangle/Ellipse only) → content
+measurement.
 
 **Choose by design intent**: `right`+`top` for top-right corner, `centerX`+`bottom` for
 bottom-center, `width="100%" height="100%"` to fill parent.
