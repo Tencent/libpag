@@ -325,6 +325,13 @@ struct PPTRunStyle {
   float fillAlpha = 0;
   const ColorSource* fillColor = nullptr;
   std::string typeface = {};
+  // Stroke painter that paired with this run, if any. PowerPoint expresses a
+  // glyph stroke via <a:ln> nested inside <a:rPr>; emitting it here lets a
+  // single text shape carry both the fill and the outline (and avoids stacking
+  // a stroke-only shape that would otherwise hide the fill in renderers that
+  // treat a missing rPr fill as opaque black, e.g. LibreOffice).
+  const Stroke* stroke = nullptr;
+  float strokeAlpha = 1.0f;
 };
 
 // a:rPr supports a:solidFill and a:gradFill but not a:blipFill, so ImagePattern
@@ -347,8 +354,10 @@ static bool IsRunCompatibleColorSource(const ColorSource* color) {
 
 // Builds the per-run style fields shared by writeNativeText and writeTextBoxGroup.
 // Alignment lives on a:pPr (not a:rPr), so callers set `algn` separately when
-// needed.
-static PPTRunStyle BuildRunStyle(const Text* text, const Fill* fill, float alpha) {
+// needed. `stroke` is the optional Stroke painter that should be folded into
+// the same run (renders as <a:ln> inside <a:rPr>).
+static PPTRunStyle BuildRunStyle(const Text* text, const Fill* fill, const Stroke* stroke,
+                                 float alpha) {
   PPTRunStyle style = {};
   style.hasBold = text->fauxBold || text->fontStyle.find("Bold") != std::string::npos;
   style.hasItalic = text->fauxItalic || text->fontStyle.find("Italic") != std::string::npos;
@@ -359,6 +368,8 @@ static PPTRunStyle BuildRunStyle(const Text* text, const Fill* fill, float alpha
   style.fillAlpha = style.hasFillColor ? fill->alpha * alpha : 0;
   style.fillColor = style.hasFillColor ? fill->color : nullptr;
   style.typeface = text->fontFamily.empty() ? std::string() : StripQuotes(text->fontFamily);
+  style.stroke = stroke;
+  style.strokeAlpha = alpha;
   return style;
 }
 
@@ -1627,7 +1638,7 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   out.closeElementSelfClosing();
   out.openElement("a:lstStyle").closeElementSelfClosing();
 
-  PPTRunStyle style = BuildRunStyle(text, fs.fill, alpha);
+  PPTRunStyle style = BuildRunStyle(text, fs.fill, fs.stroke, alpha);
   if (text->textAnchor == TextAnchor::Center) {
     style.algn = "ctr";
   } else if (text->textAnchor == TextAnchor::End) {
@@ -1707,10 +1718,26 @@ void PPTWriter::writeParagraphRun(XMLBuilder& out, const std::string& runText,
     out.addRequiredAttribute("spc", style.letterSpc);
   }
   out.closeElementStart();
+  // OOXML rPr child order is: a:ln, then EG_FillProperties, then a:effectLst,
+  // then a:latin/a:ea. Emit the stroke first so the run carries both an
+  // outline and a fill in a single text shape — this matches the PAGX
+  // painter sequence (Fill then Stroke) without requiring a stacked second
+  // shape that would otherwise cover the gradient text in renderers that do
+  // not honour <a:noFill/> inside an rPr (notably LibreOffice).
+  if (style.stroke) {
+    writeStroke(out, style.stroke, style.strokeAlpha);
+  }
   if (style.hasFillColor) {
     // For gradient fills, shape bounds are unknown at the run level; pass an empty
     // rect so writeColorSource falls back to the gradient's own coordinate space.
     writeColorSource(out, style.fillColor, style.fillAlpha);
+  } else if (style.stroke) {
+    // Stroke-only run: emit a fully transparent solid fill so the underlying
+    // text from a previous Fill painter (rendered in a separate p:sp at the
+    // same coordinates) shows through. <a:noFill/> would be the spec-correct
+    // way to express "no glyph fill", but LibreOffice renders it as the
+    // default theme colour (black) which hides the gradient text below.
+    writeSolidColorFill(out, Color{0.0f, 0.0f, 0.0f, 0.0f}, 1.0f);
   }
   writeEffects(out, filters, styles);
   if (!style.typeface.empty()) {
@@ -1770,32 +1797,36 @@ void PPTWriter::writeParagraph(XMLBuilder& out, const std::string& lineText,
 
 namespace {
 
-// One "run" inside a rich TextBox: a Text element together with the Fill that
-// applies to it (either the Group's own Fill or, when the Text is a direct
-// child of the TextBox, the TextBox's top-level Fill).
+// One "run" inside a rich TextBox: a Text element together with the Fill and
+// Stroke painters that apply to it (either the Group's own Fill/Stroke or,
+// when the Text is a direct child of the TextBox, the TextBox's top-level
+// Fill/Stroke).
 struct RichTextRun {
   const Text* text = nullptr;
   const Fill* fill = nullptr;
+  const Stroke* stroke = nullptr;
 };
 
 // Walks the TextBox children in source order, pairing every Text with its
-// nearest enclosing Fill. Direct Text children inherit `parentFill`; Texts
-// nested inside a Group use that Group's locally-collected Fill (falling back
-// to `parentFill` when the Group has none).
+// nearest enclosing Fill/Stroke. Direct Text children inherit `parentFill`
+// and `parentStroke`; Texts nested inside a Group use that Group's
+// locally-collected Fill/Stroke (falling back to the parent's when the Group
+// supplies none).
 void CollectRichTextRuns(const std::vector<Element*>& elements, const Fill* parentFill,
-                         std::vector<RichTextRun>& outRuns) {
+                         const Stroke* parentStroke, std::vector<RichTextRun>& outRuns) {
   for (auto* element : elements) {
     auto type = element->nodeType();
     if (type == NodeType::Text) {
       auto* t = static_cast<const Text*>(element);
       if (!t->text.empty()) {
-        outRuns.push_back({t, parentFill});
+        outRuns.push_back({t, parentFill, parentStroke});
       }
     } else if (type == NodeType::Group) {
       auto* g = static_cast<const Group*>(element);
       auto groupFs = CollectFillStroke(g->elements);
       const Fill* effectiveFill = groupFs.fill ? groupFs.fill : parentFill;
-      CollectRichTextRuns(g->elements, effectiveFill, outRuns);
+      const Stroke* effectiveStroke = groupFs.stroke ? groupFs.stroke : parentStroke;
+      CollectRichTextRuns(g->elements, effectiveFill, effectiveStroke, outRuns);
     }
   }
 }
@@ -1810,7 +1841,7 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
   auto topLevelFs = CollectFillStroke(elements);
 
   std::vector<RichTextRun> runs;
-  CollectRichTextRuns(elements, topLevelFs.fill, runs);
+  CollectRichTextRuns(elements, topLevelFs.fill, topLevelFs.stroke, runs);
   if (runs.empty()) {
     return;
   }
@@ -1942,7 +1973,7 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
   std::vector<PPTRunStyle> runStyles;
   runStyles.reserve(runs.size());
   for (const auto& run : runs) {
-    runStyles.push_back(BuildRunStyle(run.text, run.fill, alpha));
+    runStyles.push_back(BuildRunStyle(run.text, run.fill, run.stroke, alpha));
   }
 
   bool paragraphOpen = false;
