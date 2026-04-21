@@ -280,6 +280,19 @@ export class View {
   }
 
   /**
+   * Looks up a node by ID and returns its position relative to the canvas.
+   * @param nodeId The unique identifier of the node to look up.
+   * @returns An object with { found: boolean, x: number, y: number }.
+   *          If the node is not found or has no position data, found is false and x/y are 0.
+   */
+  public getNodePosition(nodeId: string): { found: boolean; x: number; y: number } {
+    if (!this.nativeView) {
+      return { found: false, x: 0, y: 0 };
+    }
+    return this.nativeView.getNodePosition(nodeId);
+  }
+
+  /**
    * Get content width.
    */
   public contentWidth(): number {

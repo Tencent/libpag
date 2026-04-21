@@ -1,0 +1,97 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #1a1a1a;
+  color: #f0f0f0;
+  padding: 24rpx;
+  box-sizing: border-box;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  margin-bottom: 16rpx;
+}
+
+.title {
+  font-size: 36rpx;
+  font-weight: 600;
+}
+
+.subtitle {
+  font-size: 24rpx;
+  color: #9aa0a6;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+  margin-bottom: 16rpx;
+}
+
+.btn {
+  background: #2d6cdf;
+  color: white;
+  font-size: 28rpx;
+  padding: 16rpx 0;
+  border-radius: 8rpx;
+}
+
+.btn-secondary {
+  background: #454a54;
+}
+
+.btn[disabled] {
+  opacity: 0.5;
+}
+
+.hidden-canvas {
+  width: 2rpx;
+  height: 2rpx;
+  position: absolute;
+  left: -9999rpx;
+  top: -9999rpx;
+  pointer-events: none;
+}
+
+.log-panel {
+  flex: 1;
+  background: #0d0d0d;
+  border: 1rpx solid #333;
+  border-radius: 8rpx;
+  padding: 12rpx;
+  font-family: Menlo, Consolas, monospace;
+  font-size: 22rpx;
+  line-height: 1.5;
+}
+
+.log-line {
+  word-break: break-all;
+  white-space: pre-wrap;
+  margin-bottom: 4rpx;
+}
+
+.log-info {
+  color: #d0d4da;
+}
+
+.log-ok {
+  color: #52c41a;
+}
+
+.log-warn {
+  color: #faad14;
+}
+
+.log-err {
+  color: #ff4d4f;
+}
+
+.log-step {
+  color: #69c0ff;
+  font-weight: 600;
+  margin-top: 8rpx;
+}

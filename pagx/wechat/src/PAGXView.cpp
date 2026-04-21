@@ -140,7 +140,11 @@ void PAGXView::loadPAGX(const val& pagxData) {
 }
 
 void PAGXView::parsePAGX(const val& pagxData) {
+  // Release old resources early to reduce peak memory usage when switching pages.
+  displayList.root()->removeChildren();
+  contentLayer = nullptr;
   document = nullptr;
+
   auto data = GetPagxDataFromEmscripten(pagxData);
   if (!data) {
     return;
@@ -190,7 +194,6 @@ void PAGXView::buildLayers() {
   pagxWidth = document->width;
   pagxHeight = document->height;
   applyDocumentCustomData();
-  displayList.root()->removeChildren();
   displayList.root()->addChild(contentLayer);
   applyCenteringTransform();
 }
@@ -300,6 +303,46 @@ val PAGXView::getContentTransform() const {
   return result;
 }
 
+val PAGXView::getNodePosition(const std::string& nodeId) const {
+  val result = val::object();
+  result.set("found", false);
+  result.set("x", 0.0f);
+  result.set("y", 0.0f);
+
+  if (!document || nodeId.empty()) {
+    return result;
+  }
+
+  auto* node = document->findNode(nodeId);
+  if (!node) {
+    return result;
+  }
+
+  auto it = node->customData.find("page-offset");
+  if (it == node->customData.end()) {
+    return result;
+  }
+
+  const std::string& value = it->second;
+  auto commaPos = value.find(',');
+  if (commaPos == std::string::npos) {
+    return result;
+  }
+
+  char* endX = nullptr;
+  char* endY = nullptr;
+  float x = std::strtof(value.c_str(), &endX);
+  float y = std::strtof(value.c_str() + commaPos + 1, &endY);
+
+  if (endX != value.c_str() && endY != value.c_str() + commaPos + 1) {
+    result.set("found", true);
+    result.set("x", x);
+    result.set("y", y);
+  }
+
+  return result;
+}
+
 void PAGXView::updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY) {
   bool zoomChanged = (std::abs(zoom - lastZoom) > 0.001f);
   if (zoom <= 1.0f) {
@@ -315,16 +358,16 @@ void PAGXView::updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY
       accumulatedZoomChange = 0.0f;
       updateAdaptiveTileRefinement();
     }
-    
+
     // Accumulate zoom change to determine overall direction
     float currentChange = zoom - lastZoom;
     accumulatedZoomChange += currentChange;
-    
+
     // Determine direction based on accumulated change (ignoring noise < 0.01)
     if (std::abs(accumulatedZoomChange) > 0.01f) {
       isZoomingIn = (accumulatedZoomChange > 0.0f);
     }
-    
+
     lastZoomUpdateTimestampMs = emscripten_get_now();
   }
 
@@ -402,7 +445,7 @@ bool PAGXView::draw() {
   if (isZooming && lastZoomUpdateTimestampMs > 0.0) {
     double currentTimeoutMs = isZoomingIn ? ZOOM_IN_END_TIMEOUT_MS : ZOOM_OUT_END_TIMEOUT_MS;
     double timeSinceLastUpdate = frameStartMs - lastZoomUpdateTimestampMs;
-    
+
     if (timeSinceLastUpdate >= currentTimeoutMs) {
       onZoomEnd();
     }

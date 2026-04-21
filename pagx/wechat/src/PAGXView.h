@@ -157,6 +157,15 @@ class PAGXView {
   emscripten::val getContentTransform() const;
 
   /**
+   * Looks up a node by ID and returns its position relative to the canvas.
+   * The position is read from the node's "page-offset" custom data in "x,y" format.
+   * @param nodeId The unique identifier of the node to look up.
+   * @return A JavaScript object with { found: boolean, x: number, y: number }.
+   *         If the node is not found or has no position data, found is false and x/y are 0.
+   */
+  emscripten::val getNodePosition(const std::string& nodeId) const;
+
+  /**
    * Returns the width of the canvas in pixels.
    */
   int width() const;

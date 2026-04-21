@@ -1,5 +1,6 @@
 {
   "pages": [
+    "pages/image-decode-poc/poc",
     "pages/viewer/viewer"
   ],
   "window": {

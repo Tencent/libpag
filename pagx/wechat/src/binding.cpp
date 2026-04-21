@@ -43,5 +43,6 @@ EMSCRIPTEN_BINDINGS(PAGXView) {
       .function("contentWidth", &PAGXView::contentWidth)
       .function("contentHeight", &PAGXView::contentHeight)
       .function("setBoundsOrigin", &PAGXView::setBoundsOrigin)
-      .function("getContentTransform", &PAGXView::getContentTransform);
+      .function("getContentTransform", &PAGXView::getContentTransform)
+      .function("getNodePosition", &PAGXView::getNodePosition);
 }

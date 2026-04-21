@@ -1,0 +1,25 @@
+<view class="container">
+  <view class="header">
+    <text class="title">Image Decode POC</text>
+    <text class="subtitle">验证 JS 侧异步解码 + WebGL 直消费路径</text>
+  </view>
+
+  <view class="actions">
+    <button class="btn" bindtap="runQ1" disabled="{{running}}">Q1: createImage 能解 webp？</button>
+    <button class="btn" bindtap="runQ2" disabled="{{running}}">Q2: WebGL 能直消费 WxImage？</button>
+    <button class="btn" bindtap="runQ3" disabled="{{running}}">Q3: 多图 onload 是否并行？</button>
+    <button class="btn" bindtap="runQ4" disabled="{{running}}">Q4: 冷下载 vs 热缓存（切分网络/解码）</button>
+    <button class="btn" bindtap="runAll" disabled="{{running}}">跑全部 Q1~Q4</button>
+    <button class="btn btn-secondary" bindtap="clearLog" disabled="{{running}}">清空日志</button>
+  </view>
+
+  <!-- 隐藏 canvas：仅用于 createImage() 与 WebGL 测试 -->
+  <canvas type="2d" id="poc-canvas2d" class="hidden-canvas"></canvas>
+  <canvas type="webgl" id="poc-canvas-webgl" class="hidden-canvas"></canvas>
+
+  <scroll-view class="log-panel" scroll-y scroll-into-view="{{logAnchor}}">
+    <view wx:for="{{logs}}" wx:key="idx" id="log-{{item.idx}}" class="log-line log-{{item.level}}">
+      <text>{{item.text}}</text>
+    </view>
+  </scroll-view>
+</view>

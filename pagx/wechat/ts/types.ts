@@ -56,6 +56,8 @@ export interface PAGXViewNative {
     setBoundsOrigin: (x: number, y: number) => void;
     /** Returns content transform parameters for mapping cocraft coordinates to canvas positions. */
     getContentTransform: () => ContentTransform;
+    /** Looks up a node by ID and returns its position relative to the canvas. */
+    getNodePosition: (nodeId: string) => NodePosition;
     /** Releases the native C++ object. */
     delete: () => void;
 }
@@ -87,6 +89,19 @@ export interface ContentTransform {
     centerOffsetX: number;
     /** Vertical pixel offset for centering the scaled content in the canvas. */
     centerOffsetY: number;
+}
+
+/**
+ * Result of looking up a node's position relative to the canvas.
+ * Returned by View.getNodePosition().
+ */
+export interface NodePosition {
+    /** Whether the node was found and has valid position data. */
+    found: boolean;
+    /** The x coordinate of the node relative to the canvas (0 if not found). */
+    x: number;
+    /** The y coordinate of the node relative to the canvas (0 if not found). */
+    y: number;
 }
 
 /**
