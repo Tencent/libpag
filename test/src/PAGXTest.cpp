@@ -5262,8 +5262,9 @@ h1{text-align:center;color:#1e293b;margin-bottom:4px}
 .cmp>div{flex:1;padding:12px;text-align:center}
 .cmp>div:first-child{border-right:1px solid #e2e8f0}
 .cmp label{display:block;font-size:11px;color:#94a3b8;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
-.cmp .lbl{position:relative}
-.cmp .lbl .open{position:absolute;top:-2px;right:0;font-size:11px;color:#2563eb;text-decoration:none;padding:2px 8px;border:1px solid #bfdbfe;border-radius:10px;background:#eff6ff;text-transform:none;letter-spacing:0;font-weight:500;white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.cmp .lbl{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:6px;flex-wrap:wrap}
+.cmp .lbl label{margin:0}
+.cmp .lbl .open{max-width:100%;font-size:11px;color:#2563eb;text-decoration:none;padding:2px 8px;border:1px solid #bfdbfe;border-radius:10px;background:#eff6ff;text-transform:none;letter-spacing:0;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .cmp .lbl .open:hover{background:#dbeafe;border-color:#60a5fa}
 .cmp img{max-width:100%;height:auto;border:1px solid #e2e8f0;border-radius:4px;background:repeating-conic-gradient(#f0f0f0 0% 25%,white 0% 50%) 50%/16px 16px}
 .cmp iframe{max-width:100%;border:1px solid #e2e8f0;border-radius:4px;background:repeating-conic-gradient(#f0f0f0 0% 25%,white 0% 50%) 50%/16px 16px;display:block;margin:0 auto}
@@ -5372,9 +5373,9 @@ h1{text-align:center;color:#1e293b;margin-bottom:4px}
       // link next to the label opens the sample in a new tab so reviewers can jump straight to a
       // full-viewport render when the iframe thumbnail is too small to debug in.
       page += "    <div><div class=\"lbl\"><label>HTML (Browser)</label><a class=\"open\" href=\"" +
-              baseName + ".html\" target=\"_blank\" rel=\"noopener\">" + baseName +
-              ".html</a></div><iframe src=\"" + baseName + ".html\" width=\"" + std::to_string(w) +
-              "\" height=\"" + std::to_string(h) +
+              baseName + ".html\" target=\"_blank\" rel=\"noopener\" title=\"" + baseName +
+              ".html\">" + baseName + ".html</a></div><iframe src=\"" + baseName +
+              ".html\" width=\"" + std::to_string(w) + "\" height=\"" + std::to_string(h) +
               "\" loading=\"lazy\" scrolling=\"no\"></iframe></div>\n";
       page += "  </div>\n</div>\n";
       count++;
