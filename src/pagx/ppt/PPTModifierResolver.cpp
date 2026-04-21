@@ -257,12 +257,17 @@ static tgfx::Path PrimitiveToTGFXPath(const Element* el) {
     float halfH = r->size.height * 0.5f;
     tgfx::Rect rect = tgfx::Rect::MakeLTRB(r->position.x - halfW, r->position.y - halfH,
                                            r->position.x + halfW, r->position.y + halfH);
-    if (r->roundness > 0.0f) {
-      float rad = std::min({r->roundness, halfW, halfH});
-      tp.addRoundRect(rect, rad, rad, r->reversed);
-    } else {
-      tp.addRect(rect, r->reversed);
+    float rad = std::min({r->roundness, halfW, halfH});
+    if (rad < 0.0f) {
+      rad = 0.0f;
     }
+    // Mirror the tgfx renderer (Rectangle::apply): always go through
+    // addRoundRect with startIndex=2 so a TrimPath / RoundCorner downstream
+    // sees the same vertex order. Using addRect (default startIndex=0) starts
+    // the contour at the top-left corner instead of mid-right, which made
+    // trimmed rectangles render at a different position than the tgfx
+    // baseline.
+    tp.addRoundRect(rect, rad, rad, r->reversed, 2);
     return tp;
   }
   if (type == NodeType::Ellipse) {
@@ -272,6 +277,8 @@ static tgfx::Path PrimitiveToTGFXPath(const Element* el) {
     tgfx::Rect rect = tgfx::Rect::MakeLTRB(e->position.x - halfW, e->position.y - halfH,
                                            e->position.x + halfW, e->position.y + halfH);
     tgfx::Path tp = {};
+    // Mirrors tgfx Ellipse::apply: addOval with default startIndex=0 (top
+    // centre point), so the trim's start anchor matches the renderer.
     tp.addOval(rect, e->reversed);
     return tp;
   }

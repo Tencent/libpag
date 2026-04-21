@@ -2296,7 +2296,12 @@ void PPTWriter::processVectorScope(XMLBuilder& out, const std::vector<Element*>&
           // child Text is added to the accumulator with the box's transform/alpha
           // and box-level params surface as their textBox. Geometry still
           // propagates upward like Group, and an outer Painter can render it.
-          processVectorScope(out, tb->elements, tbMatrix, tbAlpha, filters, styles, tb, accumulator,
+          // Path-modifier resolution is scoped per Group/TextBox so that a
+          // TrimPath / RoundCorner / MergePath / Repeater nested inside the
+          // box only sees its sibling shapes (matches the renderer behaviour).
+          const std::vector<Element*>& innerWalked =
+              _resolveModifiers ? _resolver.resolve(tb->elements) : tb->elements;
+          processVectorScope(out, innerWalked, tbMatrix, tbAlpha, filters, styles, tb, accumulator,
                              accumulator.size());
         } else {
           // Native PowerPoint text rendering still goes through the dedicated
@@ -2315,7 +2320,14 @@ void PPTWriter::processVectorScope(XMLBuilder& out, const std::vector<Element*>&
         // added from this point forward. After the recursive call returns the
         // accumulator still contains the Group's geometry, so outer Painters
         // can render it (geometry propagates upward across Group boundaries).
-        processVectorScope(out, group->elements, groupMatrix, groupAlpha, filters, styles,
+        // Re-run the path-modifier resolver on the inner element list so that
+        // TrimPath / RoundCorner / MergePath / Repeater nested inside this
+        // Group are baked into editable geometry. Group is a scope boundary —
+        // these modifiers only operate on sibling shapes inside the same
+        // Group, matching the tgfx renderer's per-Group VectorContext.
+        const std::vector<Element*>& innerWalked =
+            _resolveModifiers ? _resolver.resolve(group->elements) : group->elements;
+        processVectorScope(out, innerWalked, groupMatrix, groupAlpha, filters, styles,
                            localTextBox, accumulator, accumulator.size());
         break;
       }
