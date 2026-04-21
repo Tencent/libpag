@@ -128,11 +128,23 @@ std::vector<PathContour> ParsePathContours(const PathData* data) {
   return contours;
 }
 
+// A contour can only contain another when it is a closed loop with at least
+// one segment. Pre-computing this validity bit avoids re-evaluating it on
+// every i/j pair of the O(n²) containment scans below.
+static std::vector<bool> ComputeContainerValidity(const std::vector<PathContour>& contours) {
+  std::vector<bool> valid(contours.size(), false);
+  for (size_t i = 0; i < contours.size(); i++) {
+    valid[i] = contours[i].closed && !contours[i].segs.empty();
+  }
+  return valid;
+}
+
 std::vector<int> ComputeContainmentDepths(const std::vector<PathContour>& contours) {
   std::vector<int> depths(contours.size(), 0);
+  auto valid = ComputeContainerValidity(contours);
   for (size_t i = 0; i < contours.size(); i++) {
     for (size_t j = 0; j < contours.size(); j++) {
-      if (i == j || !contours[j].closed || contours[j].segs.empty()) {
+      if (i == j || !valid[j]) {
         continue;
       }
       if (PointInsideContour(contours[i].start, contours[j])) {
@@ -174,22 +186,32 @@ void AdjustWindingForEvenOdd(std::vector<PathContour>& contours, const std::vect
 // contours are typically non-overlapping.
 std::vector<std::vector<size_t>> GroupContoursByOutermost(const std::vector<PathContour>& contours,
                                                           const std::vector<int>& depths) {
+  // Cache (closed && non-empty) once and pre-collect the outermost (depth-0)
+  // candidates so the inner search becomes O(n_outer) per inner contour
+  // instead of O(n) with an extra validity check on every iteration.
+  auto valid = ComputeContainerValidity(contours);
+  std::vector<size_t> outerIndices;
+  outerIndices.reserve(contours.size());
+  for (size_t i = 0; i < contours.size(); i++) {
+    if (depths[i] == 0 && valid[i]) {
+      outerIndices.push_back(i);
+    }
+  }
+
   std::vector<int> parent(contours.size(), -1);
   for (size_t i = 0; i < contours.size(); i++) {
     if (depths[i] == 0) {
       parent[i] = static_cast<int>(i);
-    } else {
-      for (size_t j = 0; j < contours.size(); j++) {
-        if (depths[j] == 0 && j != i && contours[j].closed && !contours[j].segs.empty()) {
-          if (PointInsideContour(contours[i].start, contours[j])) {
-            parent[i] = static_cast<int>(j);
-            break;
-          }
-        }
+      continue;
+    }
+    for (size_t j : outerIndices) {
+      if (j != i && PointInsideContour(contours[i].start, contours[j])) {
+        parent[i] = static_cast<int>(j);
+        break;
       }
-      if (parent[i] < 0) {
-        parent[i] = static_cast<int>(i);
-      }
+    }
+    if (parent[i] < 0) {
+      parent[i] = static_cast<int>(i);
     }
   }
 

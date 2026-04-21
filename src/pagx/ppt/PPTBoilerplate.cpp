@@ -110,8 +110,9 @@ std::string GeneratePresentation(float w, float h) {
   s += "<p:defaultTextStyle>"
        "<a:defPPr><a:defRPr lang=\"en-US\"/></a:defPPr>";
   for (int lvl = 1; lvl <= 9; lvl++) {
-    int marL = (lvl - 1) * 457200;
-    s += "<a:lvl" + std::to_string(lvl) + "pPr marL=\"" + std::to_string(marL) +
+    auto lvlStr = std::to_string(lvl);
+    auto marL = std::to_string((lvl - 1) * 457200);
+    s += "<a:lvl" + lvlStr + "pPr marL=\"" + marL +
          "\" algn=\"l\" defTabSz=\"914400\" rtl=\"0\" eaLnBrk=\"1\" "
          "latinLnBrk=\"0\" hangingPunct=\"1\">"
          "<a:defRPr sz=\"1800\" kern=\"1200\">"
@@ -119,7 +120,7 @@ std::string GeneratePresentation(float w, float h) {
          "<a:latin typeface=\"+mn-lt\"/><a:ea typeface=\"+mn-ea\"/>"
          "<a:cs typeface=\"+mn-cs\"/>"
          "</a:defRPr></a:lvl" +
-         std::to_string(lvl) + "pPr>";
+         lvlStr + "pPr>";
   }
   s += "</p:defaultTextStyle>";
   s += "</p:presentation>";

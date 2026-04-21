@@ -103,6 +103,23 @@ static int FontSizeToPPT(float px) {
   return std::max(100, static_cast<int>(std::round(px * 75.0)));
 }
 
+// Emits an `<a:srgbClr val="..."/>` element, expanding into
+// `<a:srgbClr val="..."><a:alpha val="..."/></a:srgbClr>` when the effective
+// alpha is below 1.0. Centralizes the alpha-emission idiom shared by gradient
+// stops, solid fills, and blend overlays.
+static void WriteSrgbClr(XMLBuilder& out, const Color& color, float effectiveAlpha) {
+  out.openElement("a:srgbClr").addRequiredAttribute("val", ColorToHex6(color));
+  if (effectiveAlpha < 1.0f) {
+    out.closeElementStart();
+    out.openElement("a:alpha")
+        .addRequiredAttribute("val", AlphaToPct(effectiveAlpha))
+        .closeElementSelfClosing();
+    out.closeElement();  // a:srgbClr
+  } else {
+    out.closeElementSelfClosing();
+  }
+}
+
 static size_t CountUTF8Characters(const std::string& str) {
   size_t count = 0;
   for (size_t i = 0; i < str.size(); ++i) {
@@ -542,12 +559,9 @@ class PPTWriter {
                       const std::vector<LayerFilter*>& filters,
                       const std::vector<LayerStyle*>& styles = {});
 
-  // Custom geometry from PathData
-  void writeCustomGeom(XMLBuilder& out, const PathData* data, float ofsX, float ofsY, float boundsW,
-                       float boundsH, FillRule fillRule = FillRule::Winding,
-                       float coordScaleX = 1.0f, float coordScaleY = 1.0f);
-
-  // Shared contour-to-custGeom emitter used by writeCustomGeom and writeTextAsPath
+  // Shared contour-to-custGeom emitter used by writePath and writeTextAsPath
+  // for the non-bridged or single-group case (when callers haven't already
+  // prepared per-group emission themselves).
   void WriteContourGeom(XMLBuilder& out, std::vector<PathContour>& contours, int64_t pathWidth,
                         int64_t pathHeight, float scaleX, float scaleY, float scaledOfsX,
                         float scaledOfsY, FillRule fillRule);
@@ -817,16 +831,7 @@ void PPTWriter::writeGradientStops(XMLBuilder& out, const std::vector<ColorStop*
   for (const auto* stop : stops) {
     int pos = std::clamp(static_cast<int>(std::round(stop->offset * 100000.0f)), 0, 100000);
     out.openElement("a:gs").addRequiredAttribute("pos", pos).closeElementStart();
-    out.openElement("a:srgbClr").addRequiredAttribute("val", ColorToHex6(stop->color));
-    if (stop->color.alpha < 1.0f) {
-      out.closeElementStart();
-      out.openElement("a:alpha")
-          .addRequiredAttribute("val", AlphaToPct(stop->color.alpha))
-          .closeElementSelfClosing();
-      out.closeElement();  // a:srgbClr
-    } else {
-      out.closeElementSelfClosing();
-    }
+    WriteSrgbClr(out, stop->color, stop->color.alpha);
     out.closeElement();  // a:gs
   }
   out.closeElement();  // a:gsLst
@@ -1023,18 +1028,8 @@ void PPTWriter::writeImagePatternFill(XMLBuilder& out, const ImagePattern* patte
 // ── Fill / stroke ──────────────────────────────────────────────────────────
 
 void PPTWriter::writeSolidColorFill(XMLBuilder& out, const Color& color, float alpha) {
-  float effectiveAlpha = color.alpha * alpha;
   out.openElement("a:solidFill").closeElementStart();
-  out.openElement("a:srgbClr").addRequiredAttribute("val", ColorToHex6(color));
-  if (effectiveAlpha < 1.0f) {
-    out.closeElementStart();
-    out.openElement("a:alpha")
-        .addRequiredAttribute("val", AlphaToPct(effectiveAlpha))
-        .closeElementSelfClosing();
-    out.closeElement();
-  } else {
-    out.closeElementSelfClosing();
-  }
+  WriteSrgbClr(out, color, color.alpha * alpha);
   out.closeElement();  // a:solidFill
 }
 
@@ -1229,16 +1224,7 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
             .addRequiredAttribute("blend", blendStr)
             .closeElementStart();
         out.openElement("a:solidFill").closeElementStart();
-        out.openElement("a:srgbClr").addRequiredAttribute("val", ColorToHex6(blend->color));
-        if (blend->color.alpha < 1.0f) {
-          out.closeElementStart();
-          out.openElement("a:alpha")
-              .addRequiredAttribute("val", AlphaToPct(blend->color.alpha))
-              .closeElementSelfClosing();
-          out.closeElement();  // a:srgbClr
-        } else {
-          out.closeElementSelfClosing();
-        }
+        WriteSrgbClr(out, blend->color, blend->color.alpha);
         out.closeElement();  // a:solidFill
         out.closeElement();  // a:fillOverlay
       }
@@ -1283,50 +1269,14 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
 void PPTWriter::WriteContourGeom(XMLBuilder& out, std::vector<PathContour>& contours,
                                  int64_t pathWidth, int64_t pathHeight, float scaleX, float scaleY,
                                  float scaledOfsX, float scaledOfsY, FillRule fillRule) {
-  EmitCustGeomHeader(out);
-  out.openElement("a:pathLst").closeElementStart();
-
   if (_bridgeContours && contours.size() > 1) {
-    auto depths = ComputeContainmentDepths(contours);
-    if (fillRule == FillRule::EvenOdd) {
-      AdjustWindingForEvenOdd(contours, depths);
-    }
-    auto groups = GroupContoursByOutermost(contours, depths);
-    for (const auto& group : groups) {
-      out.openElement("a:path")
-          .addRequiredAttribute("w", pathWidth)
-          .addRequiredAttribute("h", pathHeight)
-          .closeElementStart();
-      if (group.size() > 1) {
-        EmitBridgedGroup(out, contours, group, scaleX, scaleY, scaledOfsX, scaledOfsY);
-      } else {
-        EmitContour(out, contours[group[0]], scaleX, scaleY, scaledOfsX, scaledOfsY);
-      }
-      out.closeElement();  // a:path
-    }
-  } else {
-    out.openElement("a:path")
-        .addRequiredAttribute("w", pathWidth)
-        .addRequiredAttribute("h", pathHeight)
-        .closeElementStart();
-    for (auto& c : contours) {
-      EmitContour(out, c, scaleX, scaleY, scaledOfsX, scaledOfsY);
-    }
-    out.closeElement();  // a:path
+    auto groups = PrepareContourGroups(contours, fillRule);
+    EmitContourGeomFromGroups(out, contours, groups, pathWidth, pathHeight, scaleX, scaleY,
+                              scaledOfsX, scaledOfsY);
+    return;
   }
-
-  out.closeElement();  // a:pathLst
-  out.closeElement();  // a:custGeom
-}
-
-void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofsX, float ofsY,
-                                float boundsW, float boundsH, FillRule fillRule, float coordScaleX,
-                                float coordScaleY) {
-  int64_t pw = std::max(int64_t(1), PxToEMU(boundsW * coordScaleX));
-  int64_t ph = std::max(int64_t(1), PxToEMU(boundsH * coordScaleY));
-  auto contours = ParsePathContours(data);
-  WriteContourGeom(out, contours, pw, ph, coordScaleX, coordScaleY, ofsX * coordScaleX,
-                   ofsY * coordScaleY, fillRule);
+  EmitFlatContourGeom(out, contours, pathWidth, pathHeight, scaleX, scaleY, scaledOfsX,
+                      scaledOfsY);
 }
 
 // ── Shape writers ──────────────────────────────────────────────────────────
@@ -1438,12 +1388,12 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
   FillRule fillRule = (fs.fill) ? fs.fill->fillRule : FillRule::Winding;
 
   auto contours = ParsePathContours(path->data);
+  int64_t pw = std::max(int64_t(1), PxToEMU(adjustedW));
+  int64_t ph = std::max(int64_t(1), PxToEMU(adjustedH));
 
   if (_bridgeContours && contours.size() > 1) {
     auto groups = PrepareContourGroups(contours, fillRule);
     if (groups.size() > 1) {
-      int64_t pw = std::max(int64_t(1), PxToEMU(adjustedW));
-      int64_t ph = std::max(int64_t(1), PxToEMU(adjustedH));
       for (const auto& group : groups) {
         beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
         EmitGroupCustGeom(out, contours, group, pw, ph, 1.0f, 1.0f, adjustedX, adjustedY);
@@ -1451,11 +1401,15 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
       }
       return;
     }
+    // Single bridged group: skip the redundant grouping pass that
+    // WriteContourGeom would otherwise perform and emit directly.
+    beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
+    EmitContourGeomFromGroups(out, contours, groups, pw, ph, 1.0f, 1.0f, adjustedX, adjustedY);
+    writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters, styles);
+    return;
   }
 
   beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
-  int64_t pw = std::max(int64_t(1), PxToEMU(adjustedW));
-  int64_t ph = std::max(int64_t(1), PxToEMU(adjustedH));
   WriteContourGeom(out, contours, pw, ph, 1.0f, 1.0f, adjustedX, adjustedY, fillRule);
   writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters, styles);
 }

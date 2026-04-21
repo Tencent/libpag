@@ -129,6 +129,55 @@ void EmitBridgedGroup(XMLBuilder& out, const std::vector<PathContour>& contours,
   out.openElement("a:close").closeElementSelfClosing();
 }
 
+// Emits one <a:path> for the given group: bridged when the group has nested
+// inner contours, plain otherwise. Caller is responsible for the surrounding
+// <a:pathLst> / <a:custGeom>.
+static void EmitGroupPath(XMLBuilder& out, const std::vector<PathContour>& contours,
+                          const std::vector<size_t>& group, int64_t pathWidth, int64_t pathHeight,
+                          float scaleX, float scaleY, float scaledOfsX, float scaledOfsY) {
+  out.openElement("a:path")
+      .addRequiredAttribute("w", pathWidth)
+      .addRequiredAttribute("h", pathHeight)
+      .closeElementStart();
+  if (group.size() > 1) {
+    EmitBridgedGroup(out, contours, group, scaleX, scaleY, scaledOfsX, scaledOfsY);
+  } else {
+    EmitContour(out, contours[group[0]], scaleX, scaleY, scaledOfsX, scaledOfsY);
+  }
+  out.closeElement();  // a:path
+}
+
+void EmitContourGeomFromGroups(XMLBuilder& out, const std::vector<PathContour>& contours,
+                               const std::vector<std::vector<size_t>>& groups, int64_t pathWidth,
+                               int64_t pathHeight, float scaleX, float scaleY, float scaledOfsX,
+                               float scaledOfsY) {
+  EmitCustGeomHeader(out);
+  out.openElement("a:pathLst").closeElementStart();
+  for (const auto& group : groups) {
+    EmitGroupPath(out, contours, group, pathWidth, pathHeight, scaleX, scaleY, scaledOfsX,
+                  scaledOfsY);
+  }
+  out.closeElement();  // a:pathLst
+  out.closeElement();  // a:custGeom
+}
+
+void EmitFlatContourGeom(XMLBuilder& out, const std::vector<PathContour>& contours,
+                         int64_t pathWidth, int64_t pathHeight, float scaleX, float scaleY,
+                         float scaledOfsX, float scaledOfsY) {
+  EmitCustGeomHeader(out);
+  out.openElement("a:pathLst").closeElementStart();
+  out.openElement("a:path")
+      .addRequiredAttribute("w", pathWidth)
+      .addRequiredAttribute("h", pathHeight)
+      .closeElementStart();
+  for (const auto& c : contours) {
+    EmitContour(out, c, scaleX, scaleY, scaledOfsX, scaledOfsY);
+  }
+  out.closeElement();  // a:path
+  out.closeElement();  // a:pathLst
+  out.closeElement();  // a:custGeom
+}
+
 void EmitCustGeomHeader(XMLBuilder& out) {
   out.openElement("a:custGeom").closeElementStart();
   out.openElement("a:avLst").closeElementSelfClosing();
@@ -177,16 +226,8 @@ void EmitGroupCustGeom(XMLBuilder& out, const std::vector<PathContour>& contours
   out.closeElement();
   out.closeElement();  // a:path (bounds marker)
 
-  out.openElement("a:path")
-      .addRequiredAttribute("w", pathWidth)
-      .addRequiredAttribute("h", pathHeight)
-      .closeElementStart();
-  if (group.size() > 1) {
-    EmitBridgedGroup(out, contours, group, scaleX, scaleY, scaledOfsX, scaledOfsY);
-  } else {
-    EmitContour(out, contours[group[0]], scaleX, scaleY, scaledOfsX, scaledOfsY);
-  }
-  out.closeElement();  // a:path
+  EmitGroupPath(out, contours, group, pathWidth, pathHeight, scaleX, scaleY, scaledOfsX,
+                scaledOfsY);
   out.closeElement();  // a:pathLst
   out.closeElement();  // a:custGeom
 }

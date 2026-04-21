@@ -54,6 +54,27 @@ void EmitGroupCustGeom(XMLBuilder& out, const std::vector<PathContour>& contours
                        const std::vector<size_t>& group, int64_t pathWidth, int64_t pathHeight,
                        float scaleX, float scaleY, float scaledOfsX, float scaledOfsY);
 
+/**
+ * Emits a single `<a:custGeom>` whose `<a:pathLst>` contains one `<a:path>` per
+ * precomputed group (each group is bridged into one path). Unlike
+ * `EmitGroupCustGeom` this does not insert the zero-length bounds-marker path
+ * that pins multi-shape group bounds — callers that emit a single shape can
+ * use this to skip the redundant marker, while callers that emit one shape
+ * per group should keep using `EmitGroupCustGeom`.
+ */
+void EmitContourGeomFromGroups(XMLBuilder& out, const std::vector<PathContour>& contours,
+                               const std::vector<std::vector<size_t>>& groups, int64_t pathWidth,
+                               int64_t pathHeight, float scaleX, float scaleY, float scaledOfsX,
+                               float scaledOfsY);
+
+/**
+ * Emits a single `<a:custGeom>` whose `<a:pathLst>` contains one `<a:path>`
+ * with every contour concatenated (no bridging, no per-group splitting).
+ */
+void EmitFlatContourGeom(XMLBuilder& out, const std::vector<PathContour>& contours,
+                         int64_t pathWidth, int64_t pathHeight, float scaleX, float scaleY,
+                         float scaledOfsX, float scaledOfsY);
+
 void EmitCustGeomHeader(XMLBuilder& out);
 
 }  // namespace pagx

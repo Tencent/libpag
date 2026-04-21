@@ -33,7 +33,11 @@ const LayerBuildResult& PPTRasterizer::ensureBuild() {
 }
 
 std::shared_ptr<tgfx::Layer> PPTRasterizer::getMappedLayer(const Layer* layer) {
-  const auto& build = ensureBuild();
+  return lookupMappedLayer(ensureBuild(), layer);
+}
+
+std::shared_ptr<tgfx::Layer> PPTRasterizer::lookupMappedLayer(const LayerBuildResult& build,
+                                                              const Layer* layer) {
   auto it = build.layerMap.find(layer);
   if (it == build.layerMap.end()) {
     return nullptr;
@@ -43,11 +47,7 @@ std::shared_ptr<tgfx::Layer> PPTRasterizer::getMappedLayer(const Layer* layer) {
 
 std::shared_ptr<tgfx::Data> PPTRasterizer::renderLayer(const Layer* layer, Rect* outBounds) {
   const auto& build = ensureBuild();
-  auto it = build.layerMap.find(layer);
-  if (it == build.layerMap.end()) {
-    return nullptr;
-  }
-  auto target = it->second;
+  auto target = lookupMappedLayer(build, layer);
   if (!target || !build.root) {
     return nullptr;
   }

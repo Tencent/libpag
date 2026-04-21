@@ -48,6 +48,13 @@ using pag::FloatNearlyZero;
 
 static const uint8_t PNG_SIGNATURE[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
 
+// Reads a big-endian 32-bit unsigned integer at `data + offset`.
+// Used by PNG (chunk lengths, IHDR width/height, pHYs ppm) decoders.
+static uint32_t ReadBE32(const uint8_t* data) {
+  return (static_cast<uint32_t>(data[0]) << 24) | (static_cast<uint32_t>(data[1]) << 16) |
+         (static_cast<uint32_t>(data[2]) << 8) | static_cast<uint32_t>(data[3]);
+}
+
 FillStrokeInfo CollectFillStroke(const std::vector<Element*>& contents) {
   FillStrokeInfo info = {};
   for (const auto* element : contents) {
@@ -81,9 +88,11 @@ Matrix BuildLayerMatrix(const Layer* layer) {
     return m;
   }
   Matrix m = layer->matrix;
-  if (layer->x != 0.0f || layer->y != 0.0f) {
-    m = Matrix::Translate(layer->x, layer->y) * m;
-  }
+  // T(x,y) * m only shifts the translation column, so apply it directly to
+  // avoid the full 6-multiply Matrix::operator* dance for the common case
+  // where layer->x / layer->y carry the layer position.
+  m.tx += layer->x;
+  m.ty += layer->y;
   return m;
 }
 
@@ -286,12 +295,8 @@ bool GetPNGDimensions(const uint8_t* data, size_t size, int* width, int* height)
   if (memcmp(data, PNG_SIGNATURE, 8) != 0) {
     return false;
   }
-  *width = static_cast<int>((static_cast<uint32_t>(data[16]) << 24) |
-                            (static_cast<uint32_t>(data[17]) << 16) |
-                            (static_cast<uint32_t>(data[18]) << 8) | data[19]);
-  *height = static_cast<int>((static_cast<uint32_t>(data[20]) << 24) |
-                             (static_cast<uint32_t>(data[21]) << 16) |
-                             (static_cast<uint32_t>(data[22]) << 8) | data[23]);
+  *width = static_cast<int>(ReadBE32(data + 16));
+  *height = static_cast<int>(ReadBE32(data + 20));
   return *width > 0 && *height > 0;
 }
 
@@ -406,19 +411,12 @@ static bool GetPNGDPI(const uint8_t* data, size_t size, float* dpiX, float* dpiY
   }
   size_t offset = 8;
   while (offset + 12 <= size) {
-    auto chunkLen =
-        static_cast<uint32_t>((static_cast<uint32_t>(data[offset]) << 24) |
-                              (static_cast<uint32_t>(data[offset + 1]) << 16) |
-                              (static_cast<uint32_t>(data[offset + 2]) << 8) | data[offset + 3]);
+    auto chunkLen = ReadBE32(data + offset);
     if (memcmp(data + offset + 4, "pHYs", 4) == 0) {
       if (chunkLen == 9 && offset + 8 + 9 <= size) {
         const uint8_t* d = data + offset + 8;
-        auto ppuX = static_cast<uint32_t>((static_cast<uint32_t>(d[0]) << 24) |
-                                          (static_cast<uint32_t>(d[1]) << 16) |
-                                          (static_cast<uint32_t>(d[2]) << 8) | d[3]);
-        auto ppuY = static_cast<uint32_t>((static_cast<uint32_t>(d[4]) << 24) |
-                                          (static_cast<uint32_t>(d[5]) << 16) |
-                                          (static_cast<uint32_t>(d[6]) << 8) | d[7]);
+        auto ppuX = ReadBE32(d);
+        auto ppuY = ReadBE32(d + 4);
         uint8_t unit = d[8];
         if (unit == 1 && ppuX > 0 && ppuY > 0) {
           *dpiX = static_cast<float>(ppuX) * 0.0254f;

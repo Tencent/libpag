@@ -72,6 +72,11 @@ class PPTRasterizer {
   bool _buildResultReady = false;
 
   const LayerBuildResult& ensureBuild();
+
+  // Pulls the tgfx::Layer counterpart out of the build map, returning nullptr
+  // when the layer has no mapping (invisible / composition instance / etc.).
+  static std::shared_ptr<tgfx::Layer> lookupMappedLayer(const LayerBuildResult& build,
+                                                        const Layer* layer);
 };
 
 }  // namespace pagx

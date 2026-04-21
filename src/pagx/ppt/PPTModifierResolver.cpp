@@ -344,6 +344,25 @@ static tgfx::PathOp MergeModeToPathOp(MergePathMode mode) {
   }
 }
 
+// Collapses every shape slot in `output` into a single path placed at the first
+// slot's position, then rewrites `shapeSlots` to reference only that surviving
+// slot. Used by TrimPath (Continuous) and MergePath which fuse all in-scope
+// shapes into one resolved geometry.
+static void CollapseShapeSlotsToSinglePath(std::vector<Element*>& output,
+                                           std::vector<size_t>& shapeSlots, Element* replacement) {
+  size_t firstSlot = shapeSlots.front();
+  output[firstSlot] = replacement;
+  // Erase right-to-left so earlier indices remain valid; shapeSlots is built
+  // in ascending order during traversal.
+  for (auto it = shapeSlots.rbegin(); it != shapeSlots.rend(); ++it) {
+    if (*it != firstSlot) {
+      output.erase(output.begin() + static_cast<long>(*it));
+    }
+  }
+  shapeSlots.clear();
+  shapeSlots.push_back(firstSlot);
+}
+
 //==============================================================================
 // Repeater expansion. Each generated copy reuses the source element pointer; the
 // transform is folded into a fresh wrapping Group.
@@ -424,19 +443,8 @@ std::vector<Element*> PPTModifierResolver::resolve(const std::vector<Element*>& 
           float offset = trim->offset / 360.0f;
           auto effect = tgfx::PathEffect::MakeTrim(trim->start + offset, trim->end + offset);
           if (effect != nullptr && effect->filterPath(&combined)) {
-            auto* pd = MakePathDataFromTGFX(_doc, combined);
-            auto* path = makePathFromData(pd);
-            // Replace the first slot with the merged trimmed path; remove the
-            // remaining slots from output (right-to-left to keep indices valid).
-            size_t firstSlot = shapeSlots.front();
-            output[firstSlot] = path;
-            for (auto it = shapeSlots.rbegin(); it != shapeSlots.rend(); ++it) {
-              if (*it != firstSlot) {
-                output.erase(output.begin() + static_cast<long>(*it));
-              }
-            }
-            shapeSlots.clear();
-            shapeSlots.push_back(firstSlot);
+            auto* path = makePathFromData(MakePathDataFromTGFX(_doc, combined));
+            CollapseShapeSlotsToSinglePath(output, shapeSlots, path);
           }
         }
         break;
@@ -458,17 +466,8 @@ std::vector<Element*> PPTModifierResolver::resolve(const std::vector<Element*>& 
         for (size_t i = 1; i < shapeSlots.size(); ++i) {
           combined.addPath(PrimitiveToTGFXPath(output[shapeSlots[i]]), op);
         }
-        auto* pd = MakePathDataFromTGFX(_doc, combined);
-        auto* path = makePathFromData(pd);
-        size_t firstSlot = shapeSlots.front();
-        output[firstSlot] = path;
-        for (auto it = shapeSlots.rbegin(); it != shapeSlots.rend(); ++it) {
-          if (*it != firstSlot) {
-            output.erase(output.begin() + static_cast<long>(*it));
-          }
-        }
-        shapeSlots.clear();
-        shapeSlots.push_back(firstSlot);
+        auto* path = makePathFromData(MakePathDataFromTGFX(_doc, combined));
+        CollapseShapeSlotsToSinglePath(output, shapeSlots, path);
         break;
       }
       case NodeType::Repeater: {

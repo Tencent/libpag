@@ -64,12 +64,8 @@ class PPTWriterContext {
     std::string ext = jpeg ? "jpeg" : "png";
     std::string mediaPath = "ppt/media/image" + std::to_string(idx) + "." + ext;
     _images.push_back({image, std::move(data), relId, mediaPath, jpeg});
-    _imageMap[image] = relId;
-    if (jpeg) {
-      _hasJPEG = true;
-    } else {
-      _hasPNG = true;
-    }
+    _imageMap.emplace(image, relId);
+    (jpeg ? _hasJPEG : _hasPNG) = true;
     return relId;
   }
 
