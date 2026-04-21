@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tests: Layer matrix3D rotations around X / Y / Z axes (each 30°), and preserve3D nesting
-     where siblings with different matrix3D transforms share a 3D space and depth-intersect. -->
+<!-- Tests: Layer matrix3D rotations around X / Y / Z axes (each 60°), and preserve3D nesting
+     where siblings with different matrix3D transforms share a 3D space. Rotations are bumped
+     to 60° so the orthographic foreshortening on X/Y is visually obvious (PAGX doesn't expose
+     a perspective/camera primitive), and the preserve3D planes use translucent fills so the
+     overlap of the two rotation-plane silhouettes is legible even without depth intersection. -->
 <pagx version="1.0" width="420" height="400">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
@@ -17,7 +20,7 @@
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="RotateX 30, RotateY 30, RotateZ 30, then preserve3D intersecting planes" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="RotateX 60, RotateY 60, RotateZ 60, then preserve3D translucent planes" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -31,69 +34,71 @@
       <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16,20,16,20" gap="12" alignment="stretch" arrangement="center">
         <!-- Row 1: three single-axis rotations side by side -->
         <Layer height="110" layout="horizontal" gap="20" arrangement="spaceEvenly" alignment="center">
-          <!-- rotateX 30° -->
+          <!-- rotateX 60° -->
           <Layer width="90" height="90" layout="vertical" gap="6" alignment="center" arrangement="center">
             <Layer width="80" height="60" centerX="0" centerY="0">
-              <!-- column-major: Rx(30°) -->
-              <Layer matrix3D="1,0,0,0, 0,0.866,0.5,0, 0,-0.5,0.866,0, 0,0,0,1" preserve3D="true">
+              <!-- column-major: Rx(60°). cos60=0.5, sin60=0.866 -->
+              <Layer matrix3D="1,0,0,0, 0,0.5,0.866,0, 0,-0.866,0.5,0, 0,0,0,1" preserve3D="true">
                 <Rectangle position="40,30" size="80,60" roundness="8"/>
                 <Fill color="#3B82F6"/>
               </Layer>
             </Layer>
             <Layer height="12">
-              <Text text="rotateX 30" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+              <Text text="rotateX 60" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
 
-          <!-- rotateY 30° -->
+          <!-- rotateY 60° -->
           <Layer width="90" height="90" layout="vertical" gap="6" alignment="center" arrangement="center">
             <Layer width="80" height="60" centerX="0" centerY="0">
-              <!-- column-major: Ry(30°) -->
-              <Layer matrix3D="0.866,0,-0.5,0, 0,1,0,0, 0.5,0,0.866,0, 0,0,0,1" preserve3D="true">
+              <!-- column-major: Ry(60°) -->
+              <Layer matrix3D="0.5,0,-0.866,0, 0,1,0,0, 0.866,0,0.5,0, 0,0,0,1" preserve3D="true">
                 <Rectangle position="40,30" size="80,60" roundness="8"/>
                 <Fill color="#10B981"/>
               </Layer>
             </Layer>
             <Layer height="12">
-              <Text text="rotateY 30" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+              <Text text="rotateY 60" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
 
-          <!-- rotateZ 30° -->
+          <!-- rotateZ 60° -->
           <Layer width="90" height="90" layout="vertical" gap="6" alignment="center" arrangement="center">
             <Layer width="80" height="60" centerX="0" centerY="0">
-              <!-- column-major: Rz(30°) -->
-              <Layer matrix3D="0.866,0.5,0,0, -0.5,0.866,0,0, 0,0,1,0, 0,0,0,1" preserve3D="true">
+              <!-- column-major: Rz(60°) -->
+              <Layer matrix3D="0.5,0.866,0,0, -0.866,0.5,0,0, 0,0,1,0, 0,0,0,1" preserve3D="true">
                 <Rectangle position="40,30" size="80,60" roundness="8"/>
                 <Fill color="#EC4899"/>
               </Layer>
             </Layer>
             <Layer height="12">
-              <Text text="rotateZ 30" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+              <Text text="rotateZ 60" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
         </Layer>
 
-        <!-- Row 2: preserve3D scene — two planes rotated on different axes share a 3D space.
-             preserve3D lets them intersect in depth instead of being pre-flattened by the parent. -->
+        <!-- Row 2: preserve3D scene — two translucent planes rotated on different axes share a
+             3D space. preserve3D keeps their 3D transforms composable with the parent; the
+             70%-alpha fills make the overlap visible even though the 2D compositor doesn't do
+             per-pixel depth intersection. -->
         <Layer layout="vertical" gap="6" alignment="center">
           <Layer height="12">
-            <Text text="preserve3D: two planes in shared 3D space" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="preserve3D: two translucent planes sharing 3D space" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
           <Layer width="200" height="120" centerX="0" preserve3D="true">
             <!-- Plane A: rotateY 45° -->
             <Layer matrix3D="0.707,0,-0.707,0, 0,1,0,0, 0.707,0,0.707,0, 0,0,0,1">
               <Rectangle position="100,60" size="160,90" roundness="10"/>
-              <Fill color="#F59E0B"/>
+              <Fill color="#F59E0BB3"/>
             </Layer>
             <!-- Plane B: rotateX 60° -->
             <Layer matrix3D="1,0,0,0, 0,0.5,0.866,0, 0,-0.866,0.5,0, 0,0,0,1">
               <Rectangle position="100,60" size="160,90" roundness="10"/>
-              <Fill color="#8B5CF6"/>
+              <Fill color="#8B5CF6B3"/>
             </Layer>
           </Layer>
         </Layer>
