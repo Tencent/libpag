@@ -93,66 +93,87 @@ Element* PPTModifierResolver::makePathFromData(PathData* data) const {
 }
 
 //==============================================================================
-// Polystar -> tgfx::Path (mirrors tgfx/src/layers/vectors/Polystar.cpp).
-// PAGX uses degrees for rotation; tgfx::Polystar internals use radians too.
+// Polystar -> tgfx::Path. Mirrors tgfx/src/layers/vectors/Polystar.cpp so the
+// emitted geometry matches what the PAG renderer would produce for the same
+// pagx::Polystar (fractional pointCount, roundness, and reversed all behave
+// identically).
 //==============================================================================
 
-static constexpr float kStarRoundnessKnot = 0.47829f;
+static void AddPolystarCurve(tgfx::Path* path, float centerX, float centerY, float angleDelta,
+                             float dx1, float dy1, float roundness1, float dx2, float dy2,
+                             float roundness2) {
+  float control1X = dx1 - dy1 * roundness1 * angleDelta + centerX;
+  float control1Y = dy1 + dx1 * roundness1 * angleDelta + centerY;
+  float control2X = dx2 + dy2 * roundness2 * angleDelta + centerX;
+  float control2Y = dy2 - dx2 * roundness2 * angleDelta + centerY;
+  path->cubicTo(control1X, control1Y, control2X, control2Y, dx2 + centerX, dy2 + centerY);
+}
 
 static tgfx::Path StarToTGFXPath(const Polystar* star) {
   tgfx::Path path = {};
-  int points = std::max(2, static_cast<int>(std::round(star->pointCount)));
+  float points = star->pointCount;
+  if (points <= 0.0f) {
+    return path;
+  }
+  float centerX = star->position.x;
+  float centerY = star->position.y;
+  float innerRadius = star->innerRadius;
+  float outerRadius = star->outerRadius;
+  float innerRoundness = star->innerRoundness;
+  float outerRoundness = star->outerRoundness;
+  float direction = star->reversed ? -1.0f : 1.0f;
+  float angleStep = static_cast<float>(M_PI) / points;
   float currentAngle = (star->rotation - 90.0f) * static_cast<float>(M_PI) / 180.0f;
-  float anglePerPoint = static_cast<float>(M_PI) / static_cast<float>(points);
-  bool longSegment = false;
-  float longRound = star->outerRoundness * 0.01f;
-  float shortRound = star->innerRoundness * 0.01f;
-  float longRadius = star->outerRadius;
-  float shortRadius = star->innerRadius;
-
-  if (star->reversed) {
-    anglePerPoint = -anglePerPoint;
+  int numPoints = static_cast<int>(std::ceil(points)) * 2;
+  float decimalPart = points - std::floor(points);
+  int decimalIndex = -2;
+  if (decimalPart != 0.0f) {
+    decimalIndex = direction > 0.0f ? 1 : numPoints - 3;
+    currentAngle -= angleStep * decimalPart * 2.0f;
   }
 
-  float x = longRadius * std::cos(currentAngle) + star->position.x;
-  float y = longRadius * std::sin(currentAngle) + star->position.y;
-  path.moveTo(x, y);
-  currentAngle += anglePerPoint;
+  float firstDx = outerRadius * std::cos(currentAngle);
+  float firstDy = outerRadius * std::sin(currentAngle);
+  float lastDx = firstDx;
+  float lastDy = firstDy;
+  path.moveTo(lastDx + centerX, lastDy + centerY);
 
-  int totalPoints = points * 2;
-  float prevDx = 0.0f;
-  float prevDy = 0.0f;
-  for (int i = 0; i < totalPoints; ++i) {
-    float radius = longSegment ? longRadius : shortRadius;
-    float roundness = longSegment ? longRound : shortRound;
-    float prevRadius = longSegment ? shortRadius : longRadius;
-    float prevRoundness = longSegment ? shortRound : longRound;
-
-    float nx = radius * std::cos(currentAngle) + star->position.x;
-    float ny = radius * std::sin(currentAngle) + star->position.y;
-
-    if (roundness == 0.0f && prevRoundness == 0.0f) {
-      path.lineTo(nx, ny);
+  bool outerFlag = false;
+  for (int i = 0; i < numPoints; ++i) {
+    float angleDelta = angleStep * direction;
+    float dx;
+    float dy;
+    if (i == numPoints - 1) {
+      dx = firstDx;
+      dy = firstDy;
     } else {
-      float cp1x = x - prevDx * prevRoundness * prevRadius * kStarRoundnessKnot;
-      float cp1y = y - prevDy * prevRoundness * prevRadius * kStarRoundnessKnot;
-      float ndx = -std::sin(currentAngle);
-      float ndy = std::cos(currentAngle);
-      if (star->reversed) {
-        ndx = -ndx;
-        ndy = -ndy;
+      float radius = outerFlag ? outerRadius : innerRadius;
+      if (i == decimalIndex || i == decimalIndex + 1) {
+        radius = innerRadius + decimalPart * (radius - innerRadius);
+        angleDelta *= decimalPart;
       }
-      float cp2x = nx + ndx * roundness * radius * kStarRoundnessKnot;
-      float cp2y = ny + ndy * roundness * radius * kStarRoundnessKnot;
-      path.cubicTo(cp1x, cp1y, cp2x, cp2y, nx, ny);
-      prevDx = ndx;
-      prevDy = ndy;
+      currentAngle += angleDelta;
+      dx = radius * std::cos(currentAngle);
+      dy = radius * std::sin(currentAngle);
     }
-
-    x = nx;
-    y = ny;
-    currentAngle += anglePerPoint;
-    longSegment = !longSegment;
+    if (innerRoundness != 0.0f || outerRoundness != 0.0f) {
+      float lastRoundness;
+      float roundness;
+      if (outerFlag) {
+        lastRoundness = innerRoundness;
+        roundness = outerRoundness;
+      } else {
+        lastRoundness = outerRoundness;
+        roundness = innerRoundness;
+      }
+      AddPolystarCurve(&path, centerX, centerY, angleDelta * 0.5f, lastDx, lastDy, lastRoundness,
+                       dx, dy, roundness);
+      lastDx = dx;
+      lastDy = dy;
+    } else {
+      path.lineTo(dx + centerX, dy + centerY);
+    }
+    outerFlag = !outerFlag;
   }
   path.close();
   return path;
@@ -160,46 +181,48 @@ static tgfx::Path StarToTGFXPath(const Polystar* star) {
 
 static tgfx::Path PolygonToTGFXPath(const Polystar* poly) {
   tgfx::Path path = {};
-  int points = std::max(3, static_cast<int>(std::round(poly->pointCount)));
-  float currentAngle = (poly->rotation - 90.0f) * static_cast<float>(M_PI) / 180.0f;
-  float anglePerPoint = 2.0f * static_cast<float>(M_PI) / static_cast<float>(points);
-  float radius = poly->outerRadius;
-  float roundness = poly->outerRoundness * 0.01f;
-
-  if (poly->reversed) {
-    anglePerPoint = -anglePerPoint;
+  float points = poly->pointCount;
+  if (points <= 0.0f) {
+    return path;
   }
+  int numPoints = static_cast<int>(std::floor(points));
+  if (numPoints < 3) {
+    return path;
+  }
+  float centerX = poly->position.x;
+  float centerY = poly->position.y;
+  float radius = poly->outerRadius;
+  float roundness = poly->outerRoundness;
+  float direction = poly->reversed ? -1.0f : 1.0f;
+  float angleStep = 2.0f * static_cast<float>(M_PI) / static_cast<float>(numPoints);
+  float currentAngle = (poly->rotation - 90.0f) * static_cast<float>(M_PI) / 180.0f;
 
-  float x = radius * std::cos(currentAngle) + poly->position.x;
-  float y = radius * std::sin(currentAngle) + poly->position.y;
-  path.moveTo(x, y);
-  currentAngle += anglePerPoint;
+  float firstDx = radius * std::cos(currentAngle);
+  float firstDy = radius * std::sin(currentAngle);
+  float lastDx = firstDx;
+  float lastDy = firstDy;
+  path.moveTo(lastDx + centerX, lastDy + centerY);
 
-  for (int i = 0; i < points; ++i) {
-    float nx = radius * std::cos(currentAngle) + poly->position.x;
-    float ny = radius * std::sin(currentAngle) + poly->position.y;
-    if (roundness == 0.0f) {
-      path.lineTo(nx, ny);
+  for (int i = 0; i < numPoints; ++i) {
+    float angleDelta = angleStep * direction;
+    float dx;
+    float dy;
+    if (i == numPoints - 1) {
+      dx = firstDx;
+      dy = firstDy;
     } else {
-      float dx = -std::sin(currentAngle - anglePerPoint);
-      float dy = std::cos(currentAngle - anglePerPoint);
-      float ndx = -std::sin(currentAngle);
-      float ndy = std::cos(currentAngle);
-      if (poly->reversed) {
-        dx = -dx;
-        dy = -dy;
-        ndx = -ndx;
-        ndy = -ndy;
-      }
-      float cp1x = x - dx * roundness * radius * kStarRoundnessKnot;
-      float cp1y = y - dy * roundness * radius * kStarRoundnessKnot;
-      float cp2x = nx + ndx * roundness * radius * kStarRoundnessKnot;
-      float cp2y = ny + ndy * roundness * radius * kStarRoundnessKnot;
-      path.cubicTo(cp1x, cp1y, cp2x, cp2y, nx, ny);
+      currentAngle += angleDelta;
+      dx = radius * std::cos(currentAngle);
+      dy = radius * std::sin(currentAngle);
     }
-    x = nx;
-    y = ny;
-    currentAngle += anglePerPoint;
+    if (roundness != 0.0f) {
+      AddPolystarCurve(&path, centerX, centerY, angleDelta * 0.25f, lastDx, lastDy, roundness, dx,
+                       dy, roundness);
+      lastDx = dx;
+      lastDy = dy;
+    } else {
+      path.lineTo(dx + centerX, dy + centerY);
+    }
   }
   path.close();
   return path;
