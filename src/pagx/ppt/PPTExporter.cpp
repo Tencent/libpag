@@ -1452,6 +1452,18 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
                      .addRequiredAttribute("rIns", "0")
                      .addRequiredAttribute("bIns", "0");
   if (fs.textBox) {
+    // CJK vertical writing: characters stay upright, columns stack right-to-left.
+    // "eaVert" matches the WritingMode::Vertical contract (East Asian vertical
+    // text). Latin "vert"/"vert270" rotate glyphs sideways which is wrong here.
+    if (fs.textBox->writingMode == WritingMode::Vertical) {
+      bodyPr.addRequiredAttribute("vert", "eaVert");
+    }
+    // OOXML's "anchor" describes alignment along the block-flow axis, which
+    // matches paragraphAlign in both writing modes:
+    //   - Horizontal: block axis is top→bottom (Near=top, Far=bottom).
+    //   - Vertical (eaVert): block axis is right→left (Near=right column,
+    //     Far=left column). PowerPoint maps t/ctr/b to start/center/end of
+    //     that axis, so the same enum→string mapping applies.
     if (fs.textBox->paragraphAlign == ParagraphAlign::Middle) {
       bodyPr.addRequiredAttribute("anchor", "ctr");
     } else if (fs.textBox->paragraphAlign == ParagraphAlign::Far) {
