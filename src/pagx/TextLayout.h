@@ -105,13 +105,13 @@ class TextLayoutResult {
    */
   std::vector<TextLayoutGlyphRun> extractLayoutRuns(Text* text);
 
- /**
+  /**
   * Returns the line-level metadata for a specific Text element. Each entry corresponds to one
   * line of text with baseline position, alignment offset, and byte range in the source string.
   * Returns nullptr if no line info is available for this text (e.g. vertical layout or embedded
   * glyph runs).
   */
- const std::vector<TextLayoutLineInfo>* getTextLines(Text* text) const;
+  const std::vector<TextLayoutLineInfo>* getTextLines(Text* text) const;
 
  private:
   std::unordered_map<Text*, std::vector<PositionedGlyph>> horizontalGlyphs = {};

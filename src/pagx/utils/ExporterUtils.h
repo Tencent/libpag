@@ -55,6 +55,14 @@ struct GlyphPath {
   const PathData* pathData = nullptr;
 };
 
+struct GlyphImage {
+  // Maps the image's pixel-coord rect (0,0,imageWidth,imageHeight) to
+  // layer-space coords. The glyph's design-space `offset` is already baked into
+  // this matrix so callers don't need to know about it.
+  Matrix transform;
+  const Image* image = nullptr;
+};
+
 FillStrokeInfo CollectFillStroke(const std::vector<Element*>& contents);
 
 Matrix BuildLayerMatrix(const Layer* layer);
@@ -62,10 +70,19 @@ Matrix BuildLayerMatrix(const Layer* layer);
 Matrix BuildGroupMatrix(const Group* group);
 
 /**
- * Converts text glyph runs into a list of glyph paths with transform matrices.
+ * Converts text glyph runs into a list of vector glyph paths with transform matrices.
+ * Image-only glyphs are skipped — use ComputeGlyphImages for those.
  * textPosX/textPosY are the base position for glyph placement.
  */
 std::vector<GlyphPath> ComputeGlyphPaths(const Text& text, float textPosX, float textPosY);
+
+/**
+ * Converts text glyph runs into a list of bitmap glyphs with transform matrices.
+ * Vector glyphs (without an `image`) are skipped — use ComputeGlyphPaths for those.
+ * textPosX/textPosY are the base position for glyph placement (same conventions
+ * as ComputeGlyphPaths so vector and bitmap glyphs in the same run line up).
+ */
+std::vector<GlyphImage> ComputeGlyphImages(const Text& text, float textPosX, float textPosY);
 
 FillRule DetectMaskFillRule(const Layer* maskLayer);
 

@@ -123,8 +123,18 @@ Matrix BuildGroupMatrix(const Group* group) {
   return m;
 }
 
-std::vector<GlyphPath> ComputeGlyphPaths(const Text& text, float textPosX, float textPosY) {
-  std::vector<GlyphPath> result;
+namespace {
+
+// Shared per-glyph walker — both ComputeGlyphPaths (vector outlines) and
+// ComputeGlyphImages (bitmap glyphs) need exactly the same positioning logic
+// (positions / xOffsets / per-glyph anchor + rotation / skew / scale) and only
+// differ in which glyph kind they emit. Keeping the math in one place ensures
+// path glyphs and image glyphs in the same GlyphRun stay perfectly aligned.
+//
+// `visit` is called for every glyph in document order with the layer-space
+// glyphMatrix already composed; the visitor decides whether to keep that entry.
+template <typename Visitor>
+void ForEachGlyph(const Text& text, float textPosX, float textPosY, Visitor&& visit) {
   for (const auto* run : text.glyphRuns) {
     if (!run->font || run->glyphs.empty()) {
       continue;
@@ -141,7 +151,7 @@ std::vector<GlyphPath> ComputeGlyphPaths(const Text& text, float textPosX, float
         continue;
       }
       auto* glyph = run->font->glyphs[glyphIndex];
-      if (!glyph || !glyph->path || glyph->path->isEmpty()) {
+      if (!glyph) {
         continue;
       }
 
@@ -160,13 +170,17 @@ std::vector<GlyphPath> ComputeGlyphPaths(const Text& text, float textPosX, float
         posX = currentX;
         posY = textPosY + run->y;
       }
+      // Advance the cursor for the no-positions / no-xOffsets fallback path
+      // even when this particular glyph is later filtered out, so subsequent
+      // glyphs land where the renderer expects them.
       currentX += glyph->advance * scale;
 
-      // Mirror GlyphRunRenderer::BuildTextBlob's per-glyph transform: anchor lives
-      // in user (post-font-scale) units and the rotation/skew/scale are composed
-      // around T(pos)*T(anchor) instead of around the glyph's em-space anchor.
-      // Matching the renderer's matrix order keeps scaled-up glyphs from collapsing
-      // onto each other (which made the PPT/SVG output disagree with the PNG).
+      // Mirror GlyphRunRenderer::BuildTextBlob's per-glyph transform: anchor
+      // lives in user (post-font-scale) units and the rotation/skew/scale are
+      // composed around T(pos)*T(anchor) instead of around the glyph's em-space
+      // anchor. Matching the renderer's matrix order keeps scaled-up glyphs from
+      // collapsing onto each other (which made the PPT/SVG output disagree with
+      // the PNG).
       Matrix glyphMatrix = Matrix::Scale(scale, scale);
       glyphMatrix = Matrix::Translate(posX, posY) * glyphMatrix;
 
@@ -188,9 +202,9 @@ std::vector<GlyphPath> ComputeGlyphPaths(const Text& text, float textPosX, float
           glyphMatrix = Matrix::Rotate(run->rotations[i]) * glyphMatrix;
         }
         if (hasSkew) {
-          // Match GlyphRunRenderer::BuildTextBlob: skewX = -tan(angle). The sign
-          // is what makes positive skew tilt the glyph forward (top-right) once
-          // it's combined with the ascender-negative-Y glyph path coords.
+          // Match GlyphRunRenderer::BuildTextBlob: skewX = -tan(angle). The
+          // sign is what makes positive skew tilt the glyph forward (top-right)
+          // once it's combined with the ascender-negative-Y glyph path coords.
           Matrix shear = {};
           shear.c = -std::tan(pag::DegreesToRadians(run->skews[i]));
           glyphMatrix = shear * glyphMatrix;
@@ -201,9 +215,44 @@ std::vector<GlyphPath> ComputeGlyphPaths(const Text& text, float textPosX, float
         glyphMatrix = Matrix::Translate(-anchorX, -anchorY) * glyphMatrix;
       }
 
-      result.push_back({glyphMatrix, glyph->path});
+      visit(*glyph, glyphMatrix, scale);
     }
   }
+}
+
+}  // namespace
+
+std::vector<GlyphPath> ComputeGlyphPaths(const Text& text, float textPosX, float textPosY) {
+  std::vector<GlyphPath> result;
+  ForEachGlyph(text, textPosX, textPosY,
+               [&](const Glyph& glyph, const Matrix& glyphMatrix, float /*scale*/) {
+                 if (!glyph.path || glyph.path->isEmpty()) {
+                   return;
+                 }
+                 result.push_back({glyphMatrix, glyph.path});
+               });
+  return result;
+}
+
+std::vector<GlyphImage> ComputeGlyphImages(const Text& text, float textPosX, float textPosY) {
+  std::vector<GlyphImage> result;
+  ForEachGlyph(text, textPosX, textPosY,
+               [&](const Glyph& glyph, const Matrix& glyphMatrix, float /*scale*/) {
+                 if (!glyph.image) {
+                   return;
+                 }
+                 // Image pixel coords (0,0)-(W,H) live in design space, with the
+                 // top-left translated by `glyph.offset` (also design space).
+                 // Pre-translating by the offset puts pixel (0,0) at the image's
+                 // top-left in the same coordinate system glyphMatrix consumes,
+                 // so callers can map the image rect (0,0,W,H) through the
+                 // resulting transform to get layer-space coords.
+                 Matrix imageMatrix = glyphMatrix;
+                 if (glyph.offset.x != 0 || glyph.offset.y != 0) {
+                   imageMatrix = imageMatrix * Matrix::Translate(glyph.offset.x, glyph.offset.y);
+                 }
+                 result.push_back({imageMatrix, glyph.image});
+               });
   return result;
 }
 

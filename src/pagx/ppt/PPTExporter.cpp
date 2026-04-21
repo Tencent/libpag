@@ -287,22 +287,18 @@ class PPTWriter {
   };
 
   void writeElements(XMLBuilder& out, const std::vector<Element*>& elements,
-                     const Matrix& transform, float alpha,
-                     const std::vector<LayerFilter*>& filters,
+                     const Matrix& transform, float alpha, const std::vector<LayerFilter*>& filters,
                      const std::vector<LayerStyle*>& styles,
                      const TextBox* parentTextBox = nullptr);
 
   void processVectorScope(XMLBuilder& out, const std::vector<Element*>& elements,
                           const Matrix& transform, float alpha,
                           const std::vector<LayerFilter*>& filters,
-                          const std::vector<LayerStyle*>& styles,
-                          const TextBox* parentTextBox,
-                          std::vector<AccumulatedGeometry>& accumulator,
-                          size_t scopeStart);
+                          const std::vector<LayerStyle*>& styles, const TextBox* parentTextBox,
+                          std::vector<AccumulatedGeometry>& accumulator, size_t scopeStart);
 
   void emitGeometryWithFs(XMLBuilder& out, const AccumulatedGeometry& entry,
-                          const FillStrokeInfo& fs,
-                          const std::vector<LayerFilter*>& filters,
+                          const FillStrokeInfo& fs, const std::vector<LayerFilter*>& filters,
                           const std::vector<LayerStyle*>& styles);
 
   void writeRectangle(XMLBuilder& out, const Rectangle* rect, const FillStrokeInfo& fs,
@@ -730,9 +726,7 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
       // unavailable (e.g. no GPU) and emits a circular path gradient as a
       // last-resort fallback so something visible still ends up on the slide.
       auto* grad = static_cast<const ConicGradient*>(source);
-      out.openElement("a:gradFill")
-          .addRequiredAttribute("rotWithShape", "1")
-          .closeElementStart();
+      out.openElement("a:gradFill").addRequiredAttribute("rotWithShape", "1").closeElementStart();
       writeGradientStops(out, grad->colorStops);
       int l = 50000;
       int t = 50000;
@@ -763,9 +757,7 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
       // rectangular path gradient, which produces an axis-aligned diamond-like
       // pattern when the focus rect is collapsed to the center point.
       auto* grad = static_cast<const DiamondGradient*>(source);
-      out.openElement("a:gradFill")
-          .addRequiredAttribute("rotWithShape", "1")
-          .closeElementStart();
+      out.openElement("a:gradFill").addRequiredAttribute("rotWithShape", "1").closeElementStart();
       writeGradientStops(out, grad->colorStops);
       int l = 50000;
       int t = 50000;
@@ -1128,8 +1120,7 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
             .addRequiredAttribute("blend", blendStr)
             .closeElementStart();
         out.openElement("a:solidFill").closeElementStart();
-        out.openElement("a:srgbClr")
-            .addRequiredAttribute("val", ColorToHex6(blend->color));
+        out.openElement("a:srgbClr").addRequiredAttribute("val", ColorToHex6(blend->color));
         if (blend->color.alpha < 1.0f) {
           out.closeElementStart();
           out.openElement("a:alpha")
@@ -1271,9 +1262,8 @@ void PPTWriter::writeRectangle(XMLBuilder& out, const Rectangle* rect, const Fil
 
   if (roundness > 0) {
     float minSide = std::min(w, h);
-    int adj = (minSide > 0)
-                  ? std::clamp(static_cast<int>(roundness * 100000.0f / minSide), 0, 50000)
-                  : 0;
+    int adj =
+        (minSide > 0) ? std::clamp(static_cast<int>(roundness * 100000.0f / minSide), 0, 50000) : 0;
     out.openElement("a:prstGeom").addRequiredAttribute("prst", "roundRect").closeElementStart();
     out.openElement("a:avLst").closeElementStart();
     out.openElement("a:gd")
@@ -1292,8 +1282,7 @@ void PPTWriter::writeRectangle(XMLBuilder& out, const Rectangle* rect, const Fil
 }
 
 void PPTWriter::writeEllipse(XMLBuilder& out, const Ellipse* ellipse, const FillStrokeInfo& fs,
-                             const Matrix& m, float alpha,
-                             const std::vector<LayerFilter*>& filters,
+                             const Matrix& m, float alpha, const std::vector<LayerFilter*>& filters,
                              const std::vector<LayerStyle*>& styles) {
   float rx = ellipse->size.width / 2.0f;
   float ry = ellipse->size.height / 2.0f;
@@ -1388,6 +1377,41 @@ void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStr
                                 const std::vector<LayerFilter*>& /*filters*/,
                                 const std::vector<LayerStyle*>& /*styles*/) {
   auto glyphPaths = ComputeGlyphPaths(*text, text->position.x, text->position.y);
+  auto glyphImages = ComputeGlyphImages(*text, text->position.x, text->position.y);
+  if (glyphPaths.empty() && glyphImages.empty()) {
+    return;
+  }
+
+  // ── Bitmap glyphs ─────────────────────────────────────────────────────────
+  // Each bitmap glyph is emitted as its own p:pic; the glyph's image lives in
+  // pixel coords, so we compose the per-glyph transform with the outer matrix
+  // and let decomposeXform turn the image rect into <a:xfrm>. Per-glyph skew
+  // can't be expressed in OOXML and is silently dropped (matches the behaviour
+  // for other unsupported transform components elsewhere in this exporter).
+  for (const auto& gi : glyphImages) {
+    if (!gi.image) {
+      continue;
+    }
+    int imgW = 0;
+    int imgH = 0;
+    if (!GetImageDimensions(gi.image, &imgW, &imgH) || imgW <= 0 || imgH <= 0) {
+      continue;
+    }
+    std::string relId = _ctx->addImage(gi.image);
+    if (relId.empty()) {
+      continue;
+    }
+    Matrix combined = m * gi.transform;
+    auto xf =
+        decomposeXform(0.0f, 0.0f, static_cast<float>(imgW), static_cast<float>(imgH), combined);
+    beginPicture(out, "GlyphImage");
+    out.openElement("p:blipFill").closeElementStart();
+    WriteBlip(out, relId, alpha);
+    WriteDefaultStretch(out);
+    out.closeElement();  // p:blipFill
+    endPicture(out, xf);
+  }
+
   if (glyphPaths.empty()) {
     return;
   }
@@ -1488,8 +1512,7 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
     posX = fs.textBox->position.x;
     posY = fs.textBox->position.y;
     estWidth = boxWidth;
-    estHeight =
-        (!std::isnan(boxHeight) && boxHeight > 0) ? boxHeight : text->fontSize * 1.4f;
+    estHeight = (!std::isnan(boxHeight) && boxHeight > 0) ? boxHeight : text->fontSize * 1.4f;
   } else {
     auto textBounds = precomputed->getTextBounds(mutableText);
     if (textBounds.width > 0 && textBounds.height > 0) {
@@ -1582,10 +1605,8 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
       style.algn = "just";
     }
   }
-  style.hasBold =
-      text->fauxBold || text->fontStyle.find("Bold") != std::string::npos;
-  style.hasItalic =
-      text->fauxItalic || text->fontStyle.find("Italic") != std::string::npos;
+  style.hasBold = text->fauxBold || text->fontStyle.find("Bold") != std::string::npos;
+  style.hasItalic = text->fauxItalic || text->fontStyle.find("Italic") != std::string::npos;
   style.fontSize = FontSizeToPPT(text->fontSize);
   style.letterSpc = static_cast<int64_t>(std::round(text->letterSpacing * 75.0));
   style.hasLetterSpacing = text->letterSpacing != 0.0f;
@@ -1594,10 +1615,9 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   style.hasFillColor = false;
   if (fs.fill && fs.fill->color) {
     auto type = fs.fill->color->nodeType();
-    style.hasFillColor =
-        (type == NodeType::SolidColor || type == NodeType::LinearGradient ||
-         type == NodeType::RadialGradient || type == NodeType::ConicGradient ||
-         type == NodeType::DiamondGradient);
+    style.hasFillColor = (type == NodeType::SolidColor || type == NodeType::LinearGradient ||
+                          type == NodeType::RadialGradient || type == NodeType::ConicGradient ||
+                          type == NodeType::DiamondGradient);
   }
   style.fillAlpha = style.hasFillColor ? fs.fill->alpha * alpha : 0;
   style.fillColor = style.hasFillColor ? fs.fill->color : nullptr;
@@ -1674,8 +1694,7 @@ void PPTWriter::writeParagraphRun(XMLBuilder& out, const std::string& runText,
 }
 
 void PPTWriter::writeParagraph(XMLBuilder& out, const std::string& lineText,
-                               const PPTRunStyle& style,
-                               const std::vector<LayerFilter*>& filters,
+                               const PPTRunStyle& style, const std::vector<LayerFilter*>& filters,
                                const std::vector<LayerStyle*>& styles) {
   out.openElement("a:p").closeElementStart();
   if (style.algn) {
@@ -1759,8 +1778,8 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
     estWidth = static_cast<float>(CountUTF8Characters(runs.front().text->text)) *
                runs.front().text->fontSize * 0.6f;
   }
-  float estHeight = (!std::isnan(boxHeight) && boxHeight > 0) ? boxHeight
-                                                              : layoutResult.bounds.height;
+  float estHeight =
+      (!std::isnan(boxHeight) && boxHeight > 0) ? boxHeight : layoutResult.bounds.height;
   if (estHeight <= 0) {
     estHeight = runs.front().text->fontSize * 1.4f;
   }
@@ -1825,8 +1844,7 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
   for (const auto& run : runs) {
     ResolvedRunStyle rs;
     rs.style.algn = nullptr;  // alignment lives on a:pPr, not a:rPr
-    rs.style.hasBold =
-        run.text->fauxBold || run.text->fontStyle.find("Bold") != std::string::npos;
+    rs.style.hasBold = run.text->fauxBold || run.text->fontStyle.find("Bold") != std::string::npos;
     rs.style.hasItalic =
         run.text->fauxItalic || run.text->fontStyle.find("Italic") != std::string::npos;
     rs.style.fontSize = FontSizeToPPT(run.text->fontSize);
@@ -1970,8 +1988,8 @@ void PPTWriter::emitGeometryWithFs(XMLBuilder& out, const AccumulatedGeometry& e
                    entry.alpha, filters, styles);
       break;
     case NodeType::Path:
-      writePath(out, static_cast<const Path*>(entry.element), localFs, entry.transform,
-                entry.alpha, filters, styles);
+      writePath(out, static_cast<const Path*>(entry.element), localFs, entry.transform, entry.alpha,
+                filters, styles);
       break;
     case NodeType::Text: {
       auto* text = static_cast<const Text*>(entry.element);
@@ -2056,8 +2074,8 @@ void PPTWriter::processVectorScope(XMLBuilder& out, const std::vector<Element*>&
           // child Text is added to the accumulator with the box's transform/alpha
           // and box-level params surface as their textBox. Geometry still
           // propagates upward like Group, and an outer Painter can render it.
-          processVectorScope(out, tb->elements, tbMatrix, tbAlpha, filters, styles, tb,
-                             accumulator, accumulator.size());
+          processVectorScope(out, tb->elements, tbMatrix, tbAlpha, filters, styles, tb, accumulator,
+                             accumulator.size());
         } else {
           // Native PowerPoint text rendering still goes through the dedicated
           // multi-run text-box writer: PPTX represents multi-style text with
@@ -2106,8 +2124,7 @@ void PPTWriter::writeElements(XMLBuilder& out, const std::vector<Element*>& elem
   // TrimPath / RoundCorner / MergePath -> editable Path via tgfx). Painters
   // (Fill / Stroke), Group, and text-related elements pass through unchanged
   // so the accumulator walk below behaves exactly as in the unresolved case.
-  const std::vector<Element*>& walked =
-      _resolveModifiers ? _resolver.resolve(elements) : elements;
+  const std::vector<Element*>& walked = _resolveModifiers ? _resolver.resolve(elements) : elements;
 
   std::vector<AccumulatedGeometry> accumulator;
   accumulator.reserve(walked.size());

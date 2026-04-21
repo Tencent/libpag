@@ -59,7 +59,7 @@ static void AppendPathDataFromTGFX(PathData* out, const tgfx::Path& tp) {
       case tgfx::PathVerb::Conic: {
         // PathData has no conic verb; flatten to a small fan of quads.
         auto quads = tgfx::Path::ConvertConicToQuads(seg.points[0], seg.points[1], seg.points[2],
-                                                    seg.conicWeight, 1);
+                                                     seg.conicWeight, 1);
         for (size_t i = 1; i + 1 < quads.size(); i += 2) {
           out->quadTo(quads[i].x, quads[i].y, quads[i + 1].x, quads[i + 1].y);
         }
