@@ -162,7 +162,13 @@ std::vector<GlyphPath> ComputeGlyphPaths(const Text& text, float textPosX, float
       }
       currentX += glyph->advance * scale;
 
-      Matrix glyphMatrix = Matrix::Translate(posX, posY) * Matrix::Scale(scale, scale);
+      // Mirror GlyphRunRenderer::BuildTextBlob's per-glyph transform: anchor lives
+      // in user (post-font-scale) units and the rotation/skew/scale are composed
+      // around T(pos)*T(anchor) instead of around the glyph's em-space anchor.
+      // Matching the renderer's matrix order keeps scaled-up glyphs from collapsing
+      // onto each other (which made the PPT/SVG output disagree with the PNG).
+      Matrix glyphMatrix = Matrix::Scale(scale, scale);
+      glyphMatrix = Matrix::Translate(posX, posY) * glyphMatrix;
 
       bool hasRotation = i < run->rotations.size() && run->rotations[i] != 0;
       bool hasGlyphScale =
@@ -170,27 +176,29 @@ std::vector<GlyphPath> ComputeGlyphPaths(const Text& text, float textPosX, float
       bool hasSkew = i < run->skews.size() && run->skews[i] != 0;
 
       if (hasRotation || hasGlyphScale || hasSkew) {
-        float anchorX = glyph->advance * 0.5f;
+        float anchorX = glyph->advance * 0.5f * scale;
         float anchorY = 0;
         if (i < run->anchors.size()) {
           anchorX += run->anchors[i].x;
           anchorY += run->anchors[i].y;
         }
 
-        Matrix perGlyph = Matrix::Translate(-anchorX, -anchorY);
-        if (hasGlyphScale) {
-          perGlyph = Matrix::Scale(run->scales[i].x, run->scales[i].y) * perGlyph;
+        glyphMatrix = Matrix::Translate(anchorX, anchorY) * glyphMatrix;
+        if (hasRotation) {
+          glyphMatrix = Matrix::Rotate(run->rotations[i]) * glyphMatrix;
         }
         if (hasSkew) {
+          // Match GlyphRunRenderer::BuildTextBlob: skewX = -tan(angle). The sign
+          // is what makes positive skew tilt the glyph forward (top-right) once
+          // it's combined with the ascender-negative-Y glyph path coords.
           Matrix shear = {};
-          shear.c = std::tan(pag::DegreesToRadians(run->skews[i]));
-          perGlyph = shear * perGlyph;
+          shear.c = -std::tan(pag::DegreesToRadians(run->skews[i]));
+          glyphMatrix = shear * glyphMatrix;
         }
-        if (hasRotation) {
-          perGlyph = Matrix::Rotate(run->rotations[i]) * perGlyph;
+        if (hasGlyphScale) {
+          glyphMatrix = Matrix::Scale(run->scales[i].x, run->scales[i].y) * glyphMatrix;
         }
-        perGlyph = Matrix::Translate(anchorX, anchorY) * perGlyph;
-        glyphMatrix = glyphMatrix * perGlyph;
+        glyphMatrix = Matrix::Translate(-anchorX, -anchorY) * glyphMatrix;
       }
 
       result.push_back({glyphMatrix, glyph->path});

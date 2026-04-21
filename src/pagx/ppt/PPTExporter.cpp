@@ -1492,8 +1492,10 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
       style.algn = "just";
     }
   }
-  style.hasBold = text->fontStyle.find("Bold") != std::string::npos;
-  style.hasItalic = text->fontStyle.find("Italic") != std::string::npos;
+  style.hasBold =
+      text->fauxBold || text->fontStyle.find("Bold") != std::string::npos;
+  style.hasItalic =
+      text->fauxItalic || text->fontStyle.find("Italic") != std::string::npos;
   style.fontSize = FontSizeToPPT(text->fontSize);
   style.letterSpc = static_cast<int64_t>(std::round(text->letterSpacing * 75.0));
   style.hasLetterSpacing = text->letterSpacing != 0.0f;
@@ -1733,8 +1735,10 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
   for (const auto& run : runs) {
     ResolvedRunStyle rs;
     rs.style.algn = nullptr;  // alignment lives on a:pPr, not a:rPr
-    rs.style.hasBold = run.text->fontStyle.find("Bold") != std::string::npos;
-    rs.style.hasItalic = run.text->fontStyle.find("Italic") != std::string::npos;
+    rs.style.hasBold =
+        run.text->fauxBold || run.text->fontStyle.find("Bold") != std::string::npos;
+    rs.style.hasItalic =
+        run.text->fauxItalic || run.text->fontStyle.find("Italic") != std::string::npos;
     rs.style.fontSize = FontSizeToPPT(run.text->fontSize);
     rs.style.letterSpc = static_cast<int64_t>(std::round(run.text->letterSpacing * 75.0));
     rs.style.hasLetterSpacing = run.text->letterSpacing != 0.0f;
