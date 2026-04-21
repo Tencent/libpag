@@ -248,11 +248,37 @@ class PPTWriter {
 
   const LayerBuildResult& ensureBuildResult();
 
+  // One geometry instance captured during the scope walk in writeElements.
+  // Transform/alpha are baked at collection time so that later painters can
+  // emit the geometry without knowing about the surrounding Group/TextBox
+  // stack. `textBox` carries the in-scope <TextBox> modifier so Text
+  // geometry still picks up box-level layout when rendered by a downstream
+  // Fill or Stroke (matches the legacy CollectFillStroke().textBox rule).
+  struct AccumulatedGeometry {
+    const Element* element = nullptr;
+    Matrix transform = {};
+    float alpha = 1.0f;
+    const TextBox* textBox = nullptr;
+  };
+
   void writeElements(XMLBuilder& out, const std::vector<Element*>& elements,
                      const Matrix& transform, float alpha,
                      const std::vector<LayerFilter*>& filters,
                      const std::vector<LayerStyle*>& styles,
                      const TextBox* parentTextBox = nullptr);
+
+  void processVectorScope(XMLBuilder& out, const std::vector<Element*>& elements,
+                          const Matrix& transform, float alpha,
+                          const std::vector<LayerFilter*>& filters,
+                          const std::vector<LayerStyle*>& styles,
+                          const TextBox* parentTextBox,
+                          std::vector<AccumulatedGeometry>& accumulator,
+                          size_t scopeStart);
+
+  void emitGeometryWithFs(XMLBuilder& out, const AccumulatedGeometry& entry,
+                          const FillStrokeInfo& fs,
+                          const std::vector<LayerFilter*>& filters,
+                          const std::vector<LayerStyle*>& styles);
 
   void writeRectangle(XMLBuilder& out, const Rectangle* rect, const FillStrokeInfo& fs,
                       const Matrix& m, float alpha, const std::vector<LayerFilter*>& filters,
@@ -1814,80 +1840,179 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
 }
 
 // ── Element / layer traversal ──────────────────────────────────────────────
+//
+// PAGX's vector-element model is "accumulate-render": each Layer maintains an
+// implicit geometry list that grows as Rectangle / Ellipse / Path / Text
+// elements are encountered in document order. A Painter (Fill or Stroke)
+// renders every geometry currently in scope; geometry stays in the list, so
+// subsequent painters can render it again (multi-fill / multi-stroke).
+//
+// Group is a *one-way* scope:
+//   * Painters declared inside a Group only see geometry added inside that
+//     same Group (the scope_start index in `processVectorScope` enforces this).
+//   * Geometry added inside a Group propagates upward when the Group exits, so
+//     painters at the outer scope can still render that geometry — this is how
+//     `<Group><Rect/></Group><Fill/>` ends up filling the rect (the
+//     "Propagation" case in samples/group.pagx).
+//
+// PowerPoint shapes only carry a single fill + single stroke, so each painter
+// emits its own copy of every visible geometry (`emitGeometryWithFs`); shapes
+// rendered later overlap earlier ones, matching PAGX's "later painter renders
+// on top" rule. This is also what makes the multi-fill / multi-stroke samples
+// render correctly.
+//
+// Layer is the accumulation boundary — geometry never crosses a Layer boundary,
+// so the accumulator is created fresh per `writeElements` call.
 
-void PPTWriter::writeElements(XMLBuilder& out, const std::vector<Element*>& elements,
-                              const Matrix& transform, float alpha,
-                              const std::vector<LayerFilter*>& filters,
-                              const std::vector<LayerStyle*>& styles,
-                              const TextBox* parentTextBox) {
-  // Bake every path-modifier (Polystar -> Path, Repeater -> grouped copies,
-  // TrimPath / RoundCorner / MergePath -> editable Path via tgfx). Painters
-  // (Fill / Stroke) and text-related elements pass through unchanged so
-  // CollectFillStroke and the per-element switch below behave exactly as in
-  // the unresolved case.
-  const std::vector<Element*>& walked =
-      _resolveModifiers ? _resolver.resolve(elements) : elements;
+namespace {
 
-  auto fs = CollectFillStroke(walked);
-  if (parentTextBox != nullptr && fs.textBox == nullptr) {
-    fs.textBox = parentTextBox;
+// Look for the first non-container <TextBox> in `elements` so it can be
+// associated with sibling Text geometry (matches the legacy
+// CollectFillStroke().textBox behaviour). Container TextBoxes (those with
+// children) are handled separately as scopes by processVectorScope.
+const TextBox* FindModifierTextBox(const std::vector<Element*>& elements) {
+  for (auto* e : elements) {
+    if (e->nodeType() == NodeType::TextBox) {
+      auto* tb = static_cast<const TextBox*>(e);
+      if (tb->elements.empty()) {
+        return tb;
+      }
+    }
+  }
+  return nullptr;
+}
+
+}  // namespace
+
+// Dispatch a single accumulated geometry through the appropriate per-shape
+// writer with the given Painter applied. Each painter that renders a geometry
+// goes through this function so that multi-fill / multi-stroke produces one
+// PowerPoint shape per painter (overlapping in document order).
+void PPTWriter::emitGeometryWithFs(XMLBuilder& out, const AccumulatedGeometry& entry,
+                                   const FillStrokeInfo& fs,
+                                   const std::vector<LayerFilter*>& filters,
+                                   const std::vector<LayerStyle*>& styles) {
+  FillStrokeInfo localFs = fs;
+  if (localFs.textBox == nullptr) {
+    localFs.textBox = entry.textBox;
+  }
+  switch (entry.element->nodeType()) {
+    case NodeType::Rectangle:
+      writeRectangle(out, static_cast<const Rectangle*>(entry.element), localFs, entry.transform,
+                     entry.alpha, filters, styles);
+      break;
+    case NodeType::Ellipse:
+      writeEllipse(out, static_cast<const Ellipse*>(entry.element), localFs, entry.transform,
+                   entry.alpha, filters, styles);
+      break;
+    case NodeType::Path:
+      writePath(out, static_cast<const Path*>(entry.element), localFs, entry.transform,
+                entry.alpha, filters, styles);
+      break;
+    case NodeType::Text: {
+      auto* text = static_cast<const Text*>(entry.element);
+      // GlyphRun-only Text (no readable text content) carries pre-shaped glyph
+      // outlines from a custom font; PowerPoint's native a:r runs can't express
+      // arbitrary glyph IDs + per-glyph transforms, so the only way to render
+      // these is via path geometry — regardless of the convertTextToPath flag.
+      bool glyphRunOnly = text->text.empty() && !text->glyphRuns.empty();
+      if ((_convertTextToPath || glyphRunOnly) && !text->glyphRuns.empty()) {
+        writeTextAsPath(out, text, localFs, entry.transform, entry.alpha, filters, styles);
+      } else {
+        writeNativeText(out, text, localFs, entry.transform, entry.alpha, filters, styles);
+      }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+// Walk a single scope's element list, growing `accumulator` with new geometry
+// and emitting a copy of every visible geometry whenever a Painter is hit.
+// `scopeStart` is the index where the current Group's scope begins — Painters
+// inside this scope can only render entries from [scopeStart, end), enforcing
+// the "Painters within the group only render geometry accumulated within the
+// group" rule from the spec while allowing geometry to propagate upward when
+// the scope unwinds.
+void PPTWriter::processVectorScope(XMLBuilder& out, const std::vector<Element*>& elements,
+                                   const Matrix& transform, float alpha,
+                                   const std::vector<LayerFilter*>& filters,
+                                   const std::vector<LayerStyle*>& styles,
+                                   const TextBox* parentTextBox,
+                                   std::vector<AccumulatedGeometry>& accumulator,
+                                   size_t scopeStart) {
+  // The TextBox modifier-association rule is "first <TextBox> in this element
+  // list applies to all sibling Text geometry"; we pre-scan once to mirror the
+  // legacy CollectFillStroke().textBox behaviour, then fall back to the
+  // parent's TextBox so Text inside a Group still inherits an outer one.
+  const TextBox* localTextBox = FindModifierTextBox(elements);
+  if (localTextBox == nullptr) {
+    localTextBox = parentTextBox;
   }
 
-  for (size_t i = 0; i < walked.size(); ++i) {
-    const auto* element = walked[i];
+  for (auto* element : elements) {
     auto type = element->nodeType();
-    if (type == NodeType::Fill || type == NodeType::Stroke) {
-      continue;
-    }
-    if (type == NodeType::TextBox) {
-      auto* tb = static_cast<const TextBox*>(element);
-      if (!tb->elements.empty()) {
-        Matrix tbMatrix = BuildGroupMatrix(tb);
-        Matrix combined = transform * tbMatrix;
+    switch (type) {
+      case NodeType::Fill:
+      case NodeType::Stroke: {
+        FillStrokeInfo painterFs = {};
+        if (type == NodeType::Fill) {
+          painterFs.fill = static_cast<const Fill*>(element);
+        } else {
+          painterFs.stroke = static_cast<const Stroke*>(element);
+        }
+        for (size_t i = scopeStart; i < accumulator.size(); ++i) {
+          emitGeometryWithFs(out, accumulator[i], painterFs, filters, styles);
+        }
+        break;
+      }
+      case NodeType::Rectangle:
+      case NodeType::Ellipse:
+      case NodeType::Path:
+      case NodeType::Text: {
+        AccumulatedGeometry entry;
+        entry.element = element;
+        entry.transform = transform;
+        entry.alpha = alpha;
+        entry.textBox = localTextBox;
+        accumulator.push_back(entry);
+        break;
+      }
+      case NodeType::TextBox: {
+        auto* tb = static_cast<const TextBox*>(element);
+        if (tb->elements.empty()) {
+          // Modifier-only TextBox — already captured by FindModifierTextBox above.
+          break;
+        }
+        Matrix tbMatrix = transform * BuildGroupMatrix(tb);
         float tbAlpha = alpha * tb->alpha;
         if (_convertTextToPath) {
-          // When text is converted to path geometry, recurse so each child Text is
-          // rendered via writeTextAsPath; the TextBox metadata is propagated as
-          // parentTextBox so child glyph runs still pick up box-level alignment.
-          writeElements(out, tb->elements, combined, tbAlpha, filters, styles, tb);
+          // Container TextBox under glyph-path mode: process as its own scope so
+          // child Text is added to the accumulator with the box's transform/alpha
+          // and box-level params surface as their textBox. Geometry still
+          // propagates upward like Group, and an outer Painter can render it.
+          processVectorScope(out, tb->elements, tbMatrix, tbAlpha, filters, styles, tb,
+                             accumulator, accumulator.size());
         } else {
-          writeTextBoxGroup(out, tb, tb->elements, combined, tbAlpha, filters, styles);
-        }
-      }
-      continue;
-    }
-    switch (type) {
-      case NodeType::Rectangle:
-        writeRectangle(out, static_cast<const Rectangle*>(element), fs, transform, alpha, filters,
-                       styles);
-        break;
-      case NodeType::Ellipse:
-        writeEllipse(out, static_cast<const Ellipse*>(element), fs, transform, alpha, filters,
-                     styles);
-        break;
-      case NodeType::Path:
-        writePath(out, static_cast<const Path*>(element), fs, transform, alpha, filters, styles);
-        break;
-      case NodeType::Text: {
-        auto* text = static_cast<const Text*>(element);
-        // GlyphRun-only Text (no readable text content) carries pre-shaped glyph
-        // outlines from a custom font; PowerPoint's native a:r runs can't express
-        // arbitrary glyph IDs + per-glyph transforms, so the only way to render
-        // these is via path geometry — regardless of the convertTextToPath flag.
-        bool glyphRunOnly = text->text.empty() && !text->glyphRuns.empty();
-        if ((_convertTextToPath || glyphRunOnly) && !text->glyphRuns.empty()) {
-          writeTextAsPath(out, text, fs, transform, alpha, filters, styles);
-        } else {
-          writeNativeText(out, text, fs, transform, alpha, filters, styles);
+          // Native PowerPoint text rendering still goes through the dedicated
+          // multi-run text-box writer: PPTX represents multi-style text with
+          // its own a:p/a:r runs and we don't accumulate Text geometry into
+          // the surrounding scope in that mode.
+          writeTextBoxGroup(out, tb, tb->elements, tbMatrix, tbAlpha, filters, styles);
         }
         break;
       }
       case NodeType::Group: {
         auto* group = static_cast<const Group*>(element);
-        Matrix groupMatrix = BuildGroupMatrix(group);
-        Matrix combined = transform * groupMatrix;
+        Matrix groupMatrix = transform * BuildGroupMatrix(group);
         float groupAlpha = alpha * group->alpha;
-        writeElements(out, group->elements, combined, groupAlpha, filters, styles, parentTextBox);
+        // New scope start: Painters inside the Group can only see geometry
+        // added from this point forward. After the recursive call returns the
+        // accumulator still contains the Group's geometry, so outer Painters
+        // can render it (geometry propagates upward across Group boundaries).
+        processVectorScope(out, group->elements, groupMatrix, groupAlpha, filters, styles,
+                           localTextBox, accumulator, accumulator.size());
         break;
       }
       case NodeType::Repeater:
@@ -1898,14 +2023,32 @@ void PPTWriter::writeElements(XMLBuilder& out, const std::vector<Element*>& elem
         // TrimPath / RoundCorner / MergePath).
         break;
       default:
-        // Fill, Stroke, TextPath, TextModifier, RangeSelector, Polystar (when
-        // the resolver is disabled), and any unrecognized element type fall
-        // through silently. The layer-level rasterization probe runs in
-        // writeLayer to escalate cases where dropping these elements would
-        // change the visual result.
+        // TextPath, TextModifier, RangeSelector, Polystar (when the resolver
+        // is disabled), and any unrecognized element type fall through
+        // silently. The layer-level rasterization probe runs in writeLayer to
+        // escalate cases where dropping these elements would change the
+        // visual result.
         break;
     }
   }
+}
+
+void PPTWriter::writeElements(XMLBuilder& out, const std::vector<Element*>& elements,
+                              const Matrix& transform, float alpha,
+                              const std::vector<LayerFilter*>& filters,
+                              const std::vector<LayerStyle*>& styles,
+                              const TextBox* parentTextBox) {
+  // Bake every path-modifier (Polystar -> Path, Repeater -> grouped copies,
+  // TrimPath / RoundCorner / MergePath -> editable Path via tgfx). Painters
+  // (Fill / Stroke), Group, and text-related elements pass through unchanged
+  // so the accumulator walk below behaves exactly as in the unresolved case.
+  const std::vector<Element*>& walked =
+      _resolveModifiers ? _resolver.resolve(elements) : elements;
+
+  std::vector<AccumulatedGeometry> accumulator;
+  accumulator.reserve(walked.size());
+  processVectorScope(out, walked, transform, alpha, filters, styles, parentTextBox, accumulator,
+                     /*scopeStart=*/0);
 }
 
 // Rasterize the entire layer (including its sub-tree) to a single embedded PNG
