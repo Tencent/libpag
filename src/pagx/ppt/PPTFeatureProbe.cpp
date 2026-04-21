@@ -83,6 +83,15 @@ static void Merge(PPTFeatureFlags* dst, const PPTFeatureFlags& src) {
   dst->hasShearTransform |= src.hasShearTransform;
 }
 
+static bool GradientHasWideGamutStop(const std::vector<ColorStop*>& stops) {
+  for (const auto* stop : stops) {
+    if (stop && ColorIsWideGamut(stop->color)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 static void ProbeColorSource(const ColorSource* source, PPTFeatureFlags* out) {
   if (source == nullptr) {
     return;
@@ -93,48 +102,28 @@ static void ProbeColorSource(const ColorSource* source, PPTFeatureFlags* out) {
         out->hasWideGamutColor = true;
       }
       break;
-    case NodeType::LinearGradient: {
-      auto* g = static_cast<const LinearGradient*>(source);
-      for (const auto* stop : g->colorStops) {
-        if (stop && ColorIsWideGamut(stop->color)) {
-          out->hasWideGamutColor = true;
-          break;
-        }
+    case NodeType::LinearGradient:
+      if (GradientHasWideGamutStop(static_cast<const LinearGradient*>(source)->colorStops)) {
+        out->hasWideGamutColor = true;
       }
       break;
-    }
-    case NodeType::RadialGradient: {
-      auto* g = static_cast<const RadialGradient*>(source);
-      for (const auto* stop : g->colorStops) {
-        if (stop && ColorIsWideGamut(stop->color)) {
-          out->hasWideGamutColor = true;
-          break;
-        }
+    case NodeType::RadialGradient:
+      if (GradientHasWideGamutStop(static_cast<const RadialGradient*>(source)->colorStops)) {
+        out->hasWideGamutColor = true;
       }
       break;
-    }
-    case NodeType::ConicGradient: {
+    case NodeType::ConicGradient:
       out->hasConicGradient = true;
-      auto* g = static_cast<const ConicGradient*>(source);
-      for (const auto* stop : g->colorStops) {
-        if (stop && ColorIsWideGamut(stop->color)) {
-          out->hasWideGamutColor = true;
-          break;
-        }
+      if (GradientHasWideGamutStop(static_cast<const ConicGradient*>(source)->colorStops)) {
+        out->hasWideGamutColor = true;
       }
       break;
-    }
-    case NodeType::DiamondGradient: {
+    case NodeType::DiamondGradient:
       out->hasDiamondGradient = true;
-      auto* g = static_cast<const DiamondGradient*>(source);
-      for (const auto* stop : g->colorStops) {
-        if (stop && ColorIsWideGamut(stop->color)) {
-          out->hasWideGamutColor = true;
-          break;
-        }
+      if (GradientHasWideGamutStop(static_cast<const DiamondGradient*>(source)->colorStops)) {
+        out->hasWideGamutColor = true;
       }
       break;
-    }
     default:
       break;
   }

@@ -139,6 +139,29 @@ static float StrokeAlignInset(const Stroke* stroke) {
   }
 }
 
+// Applies the stroke-inset to an axis-aligned shape rect. Clamps the inset so
+// the geometry never collapses past the centre (the OOXML stroke would draw
+// against zero-extent geometry otherwise). `roundness` is also reduced so
+// rounded-rectangle corners stay visually consistent after the inset.
+static void ApplyStrokeBoxInset(const Stroke* stroke, float& x, float& y, float& w, float& h,
+                                float* roundness = nullptr) {
+  float inset = StrokeAlignInset(stroke);
+  if (inset == 0.0f) {
+    return;
+  }
+  float maxInset = std::min(w, h) / 2.0f;
+  if (inset > maxInset) {
+    inset = maxInset;
+  }
+  x += inset;
+  y += inset;
+  w -= inset * 2.0f;
+  h -= inset * 2.0f;
+  if (roundness) {
+    *roundness = std::max(0.0f, *roundness - inset);
+  }
+}
+
 //==============================================================================
 // Dash pattern → OOXML preset dash mapping
 //==============================================================================
@@ -188,6 +211,62 @@ struct ImagePatternRect {
   int srcB = 0;
 };
 
+// Maps a gradient center point through its matrix and emits OOXML's
+// <a:fillToRect> in 1/1000-percent insets relative to shapeBounds. When the
+// shape bounds are unknown (e.g. a text fill where the bounds aren't computed
+// at the run level) the focus collapses to the geometric centre.
+template <typename Gradient>
+static void WriteFillToRectFromCenter(XMLBuilder& out, const Gradient* grad,
+                                      const Rect& shapeBounds) {
+  int l = 50000;
+  int t = 50000;
+  int r = 50000;
+  int b = 50000;
+  if (shapeBounds.width > 0 && shapeBounds.height > 0) {
+    Point centerDoc = grad->matrix.mapPoint(grad->center);
+    float relX = (centerDoc.x - shapeBounds.x) / shapeBounds.width;
+    float relY = (centerDoc.y - shapeBounds.y) / shapeBounds.height;
+    l = std::clamp(static_cast<int>(std::round(relX * 100000.0f)), 0, 100000);
+    t = std::clamp(static_cast<int>(std::round(relY * 100000.0f)), 0, 100000);
+    r = 100000 - l;
+    b = 100000 - t;
+  }
+  out.openElement("a:fillToRect")
+      .addRequiredAttribute("l", l)
+      .addRequiredAttribute("t", t)
+      .addRequiredAttribute("r", r)
+      .addRequiredAttribute("b", b)
+      .closeElementSelfClosing();
+}
+
+// Adds non-zero l/t/r/b inset attributes (in OOXML's 1/1000-percent units) to
+// the currently-open element. Used by both <a:srcRect> and <a:fillRect> in
+// image-pattern fills, where omitting a zero inset keeps the OOXML tidy.
+struct LTRBInsets {
+  int l = 0;
+  int t = 0;
+  int r = 0;
+  int b = 0;
+  bool any() const {
+    return l != 0 || t != 0 || r != 0 || b != 0;
+  }
+};
+
+static void AddLTRBAttrs(XMLBuilder& out, const LTRBInsets& insets) {
+  if (insets.l != 0) {
+    out.addRequiredAttribute("l", insets.l);
+  }
+  if (insets.t != 0) {
+    out.addRequiredAttribute("t", insets.t);
+  }
+  if (insets.r != 0) {
+    out.addRequiredAttribute("r", insets.r);
+  }
+  if (insets.b != 0) {
+    out.addRequiredAttribute("b", insets.b);
+  }
+}
+
 static bool ComputeImagePatternRect(const ImagePattern* pattern, int imgW, int imgH,
                                     const Rect& shapeBounds, ImagePatternRect* result) {
   const auto& M = pattern->matrix;
@@ -230,6 +309,108 @@ struct PPTRunStyle {
   const ColorSource* fillColor = nullptr;
   std::string typeface = {};
 };
+
+// a:rPr supports a:solidFill and a:gradFill but not a:blipFill, so ImagePattern
+// fills are skipped (the run falls back to the renderer default).
+static bool IsRunCompatibleColorSource(const ColorSource* color) {
+  if (color == nullptr) {
+    return false;
+  }
+  switch (color->nodeType()) {
+    case NodeType::SolidColor:
+    case NodeType::LinearGradient:
+    case NodeType::RadialGradient:
+    case NodeType::ConicGradient:
+    case NodeType::DiamondGradient:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// Builds the per-run style fields shared by writeNativeText and writeTextBoxGroup.
+// Alignment lives on a:pPr (not a:rPr), so callers set `algn` separately when
+// needed.
+static PPTRunStyle BuildRunStyle(const Text* text, const Fill* fill, float alpha) {
+  PPTRunStyle style = {};
+  style.hasBold = text->fauxBold || text->fontStyle.find("Bold") != std::string::npos;
+  style.hasItalic = text->fauxItalic || text->fontStyle.find("Italic") != std::string::npos;
+  style.fontSize = FontSizeToPPT(text->fontSize);
+  style.letterSpc = static_cast<int64_t>(std::round(text->letterSpacing * 75.0));
+  style.hasLetterSpacing = text->letterSpacing != 0.0f;
+  style.hasFillColor = fill && IsRunCompatibleColorSource(fill->color);
+  style.fillAlpha = style.hasFillColor ? fill->alpha * alpha : 0;
+  style.fillColor = style.hasFillColor ? fill->color : nullptr;
+  style.typeface = text->fontFamily.empty() ? std::string() : StripQuotes(text->fontFamily);
+  return style;
+}
+
+// PAGX `lineHeight` is an absolute pixel value; PPT's <a:lnSpc><a:spcPts>
+// takes hundredths of a point. Convert px -> pt with the same 96 DPI ratio
+// (x72/96 = x0.75) used elsewhere in this writer, then multiply by 100.
+static int64_t LineHeightToSpcPts(float lineHeightPx) {
+  return lineHeightPx > 0 ? static_cast<int64_t>(std::round(lineHeightPx * 75.0)) : 0;
+}
+
+// Emits an <a:pPr> with optional alignment and line-spacing. Skips emission
+// entirely when neither attribute is set, matching the previous inline blocks
+// in writeNativeText / writeParagraph / writeTextBoxGroup.
+static void WriteParagraphProperties(XMLBuilder& out, const char* algn, int64_t lnSpcPts) {
+  if (!algn && lnSpcPts <= 0) {
+    return;
+  }
+  auto& pPr = out.openElement("a:pPr");
+  if (algn) {
+    pPr.addRequiredAttribute("algn", algn);
+  }
+  if (lnSpcPts > 0) {
+    pPr.closeElementStart();
+    out.openElement("a:lnSpc").closeElementStart();
+    out.openElement("a:spcPts").addRequiredAttribute("val", lnSpcPts).closeElementSelfClosing();
+    out.closeElement();  // a:lnSpc
+    out.closeElement();  // a:pPr
+  } else {
+    pPr.closeElementSelfClosing();
+  }
+}
+
+// Adds the TextBox-derived attributes to a currently-open <a:bodyPr>: vertical
+// writing mode, paragraph anchoring, and the vertical-mode anchorCtr override
+// for TextAlign::Center. Returns true when the box uses vertical writing mode.
+static bool AddBodyPrAttrsForTextBox(XMLBuilder& out, const TextBox* box) {
+  if (box == nullptr) {
+    return false;
+  }
+  bool isVertical = (box->writingMode == WritingMode::Vertical);
+  // CJK vertical writing: characters stay upright, columns stack right-to-left.
+  // "eaVert" matches the WritingMode::Vertical contract (East Asian vertical
+  // text). Latin "vert"/"vert270" rotate glyphs sideways which is wrong here.
+  if (isVertical) {
+    out.addRequiredAttribute("vert", "eaVert");
+  }
+  // OOXML's "anchor" describes alignment along the block-flow axis, which
+  // matches paragraphAlign in both writing modes:
+  //   - Horizontal: block axis is top->bottom (Near=top, Far=bottom).
+  //   - Vertical (eaVert): block axis is right->left (Near=right column,
+  //     Far=left column). PowerPoint maps t/ctr/b to start/center/end of
+  //     that axis, so the same enum->string mapping applies.
+  if (box->paragraphAlign == ParagraphAlign::Middle) {
+    out.addRequiredAttribute("anchor", "ctr");
+  } else if (box->paragraphAlign == ParagraphAlign::Far) {
+    out.addRequiredAttribute("anchor", "b");
+  }
+  // In vertical writing mode the bodyPr@anchor controls placement perpendicular
+  // to the text-flow axis (i.e. horizontal placement of the column block), so
+  // textAlign="center" cannot be expressed via pPr@algn -- both PowerPoint and
+  // LibreOffice ignore algn for vertical-axis centering of the text within a
+  // column. anchorCtr="1" toggles the "center on the perpendicular axis" flag,
+  // which in vertical mode produces the desired vertical centering of the text
+  // within its column.
+  if (isVertical && box->textAlign == TextAlign::Center) {
+    out.addRequiredAttribute("anchorCtr", "1");
+  }
+  return isVertical;
+}
 
 class PPTWriter {
  public:
@@ -615,20 +796,9 @@ bool PPTWriter::writeImagePatternAsPicture(XMLBuilder& out, const Fill* fill,
   out.openElement("p:blipFill").closeElementStart();
   WriteBlip(out, relId, effectiveAlpha);
   if (hasSrcRect) {
-    auto& src = out.openElement("a:srcRect");
-    if (ipr.srcL != 0) {
-      src.addRequiredAttribute("l", ipr.srcL);
-    }
-    if (ipr.srcT != 0) {
-      src.addRequiredAttribute("t", ipr.srcT);
-    }
-    if (ipr.srcR != 0) {
-      src.addRequiredAttribute("r", ipr.srcR);
-    }
-    if (ipr.srcB != 0) {
-      src.addRequiredAttribute("b", ipr.srcB);
-    }
-    src.closeElementSelfClosing();
+    out.openElement("a:srcRect");
+    AddLTRBAttrs(out, {ipr.srcL, ipr.srcT, ipr.srcR, ipr.srcB});
+    out.closeElementSelfClosing();
   }
   WriteDefaultStretch(out);
   out.closeElement();  // p:blipFill
@@ -691,34 +861,16 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
       break;
     }
     case NodeType::RadialGradient: {
-      auto* grad = static_cast<const RadialGradient*>(source);
-      out.openElement("a:gradFill").closeElementStart();
-      writeGradientStops(out, grad->colorStops);
-      out.openElement("a:path").addRequiredAttribute("path", "circle").closeElementStart();
       // Map the gradient center through its matrix to document space and convert to
       // fillToRect insets (1/1000 percent) relative to the shape bounds.  OOXML
       // radial gradients always span the whole bounding box, so radius cannot be
       // honoured exactly; only the focus position is preserved.  When shapeBounds
       // is empty (e.g. text fills) fall back to the shape center.
-      int l = 50000;
-      int t = 50000;
-      int r = 50000;
-      int b = 50000;
-      if (shapeBounds.width > 0 && shapeBounds.height > 0) {
-        Point centerDoc = grad->matrix.mapPoint(grad->center);
-        float relX = (centerDoc.x - shapeBounds.x) / shapeBounds.width;
-        float relY = (centerDoc.y - shapeBounds.y) / shapeBounds.height;
-        l = std::clamp(static_cast<int>(std::round(relX * 100000.0f)), 0, 100000);
-        t = std::clamp(static_cast<int>(std::round(relY * 100000.0f)), 0, 100000);
-        r = 100000 - l;
-        b = 100000 - t;
-      }
-      out.openElement("a:fillToRect")
-          .addRequiredAttribute("l", l)
-          .addRequiredAttribute("t", t)
-          .addRequiredAttribute("r", r)
-          .addRequiredAttribute("b", b)
-          .closeElementSelfClosing();
+      auto* grad = static_cast<const RadialGradient*>(source);
+      out.openElement("a:gradFill").closeElementStart();
+      writeGradientStops(out, grad->colorStops);
+      out.openElement("a:path").addRequiredAttribute("path", "circle").closeElementStart();
+      WriteFillToRectFromCenter(out, grad, shapeBounds);
       out.closeElement();  // a:path
       out.closeElement();  // a:gradFill
       break;
@@ -732,26 +884,8 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
       auto* grad = static_cast<const ConicGradient*>(source);
       out.openElement("a:gradFill").addRequiredAttribute("rotWithShape", "1").closeElementStart();
       writeGradientStops(out, grad->colorStops);
-      int l = 50000;
-      int t = 50000;
-      int r = 50000;
-      int b = 50000;
-      if (shapeBounds.width > 0 && shapeBounds.height > 0) {
-        Point centerDoc = grad->matrix.mapPoint(grad->center);
-        float relX = (centerDoc.x - shapeBounds.x) / shapeBounds.width;
-        float relY = (centerDoc.y - shapeBounds.y) / shapeBounds.height;
-        l = std::clamp(static_cast<int>(std::round(relX * 100000.0f)), 0, 100000);
-        t = std::clamp(static_cast<int>(std::round(relY * 100000.0f)), 0, 100000);
-        r = 100000 - l;
-        b = 100000 - t;
-      }
       out.openElement("a:path").addRequiredAttribute("path", "circle").closeElementStart();
-      out.openElement("a:fillToRect")
-          .addRequiredAttribute("l", l)
-          .addRequiredAttribute("t", t)
-          .addRequiredAttribute("r", r)
-          .addRequiredAttribute("b", b)
-          .closeElementSelfClosing();
+      WriteFillToRectFromCenter(out, grad, shapeBounds);
       out.closeElement();  // a:path
       out.closeElement();  // a:gradFill
       break;
@@ -763,26 +897,8 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
       auto* grad = static_cast<const DiamondGradient*>(source);
       out.openElement("a:gradFill").addRequiredAttribute("rotWithShape", "1").closeElementStart();
       writeGradientStops(out, grad->colorStops);
-      int l = 50000;
-      int t = 50000;
-      int r = 50000;
-      int b = 50000;
-      if (shapeBounds.width > 0 && shapeBounds.height > 0) {
-        Point centerDoc = grad->matrix.mapPoint(grad->center);
-        float relX = (centerDoc.x - shapeBounds.x) / shapeBounds.width;
-        float relY = (centerDoc.y - shapeBounds.y) / shapeBounds.height;
-        l = std::clamp(static_cast<int>(std::round(relX * 100000.0f)), 0, 100000);
-        t = std::clamp(static_cast<int>(std::round(relY * 100000.0f)), 0, 100000);
-        r = 100000 - l;
-        b = 100000 - t;
-      }
       out.openElement("a:path").addRequiredAttribute("path", "rect").closeElementStart();
-      out.openElement("a:fillToRect")
-          .addRequiredAttribute("l", l)
-          .addRequiredAttribute("t", t)
-          .addRequiredAttribute("r", r)
-          .addRequiredAttribute("b", b)
-          .closeElementSelfClosing();
+      WriteFillToRectFromCenter(out, grad, shapeBounds);
       out.closeElement();  // a:path
       out.closeElement();  // a:gradFill
       break;
@@ -869,43 +985,22 @@ void PPTWriter::writeImagePatternFill(XMLBuilder& out, const ImagePattern* patte
     bool hasTransform = hasDimensions && !shapeBounds.isEmpty() && !pattern->matrix.isIdentity();
     ImagePatternRect ipr = {};
     if (hasTransform && ComputeImagePatternRect(pattern, imgW, imgH, shapeBounds, &ipr)) {
-      auto& src = out.openElement("a:srcRect");
-      if (ipr.srcL != 0) {
-        src.addRequiredAttribute("l", ipr.srcL);
-      }
-      if (ipr.srcT != 0) {
-        src.addRequiredAttribute("t", ipr.srcT);
-      }
-      if (ipr.srcR != 0) {
-        src.addRequiredAttribute("r", ipr.srcR);
-      }
-      if (ipr.srcB != 0) {
-        src.addRequiredAttribute("b", ipr.srcB);
-      }
-      src.closeElementSelfClosing();
-      int fillL =
+      out.openElement("a:srcRect");
+      AddLTRBAttrs(out, {ipr.srcL, ipr.srcT, ipr.srcR, ipr.srcB});
+      out.closeElementSelfClosing();
+      LTRBInsets fill;
+      fill.l =
           static_cast<int>(std::round((ipr.visL - shapeBounds.x) / shapeBounds.width * 100000.0f));
-      int fillT =
+      fill.t =
           static_cast<int>(std::round((ipr.visT - shapeBounds.y) / shapeBounds.height * 100000.0f));
-      int fillR = static_cast<int>(std::round((shapeBounds.x + shapeBounds.width - ipr.visR) /
-                                              shapeBounds.width * 100000.0f));
-      int fillB = static_cast<int>(std::round((shapeBounds.y + shapeBounds.height - ipr.visB) /
-                                              shapeBounds.height * 100000.0f));
+      fill.r = static_cast<int>(std::round((shapeBounds.x + shapeBounds.width - ipr.visR) /
+                                           shapeBounds.width * 100000.0f));
+      fill.b = static_cast<int>(std::round((shapeBounds.y + shapeBounds.height - ipr.visB) /
+                                           shapeBounds.height * 100000.0f));
       out.openElement("a:stretch").closeElementStart();
-      auto& fr = out.openElement("a:fillRect");
-      if (fillL != 0) {
-        fr.addRequiredAttribute("l", fillL);
-      }
-      if (fillT != 0) {
-        fr.addRequiredAttribute("t", fillT);
-      }
-      if (fillR != 0) {
-        fr.addRequiredAttribute("r", fillR);
-      }
-      if (fillB != 0) {
-        fr.addRequiredAttribute("b", fillB);
-      }
-      fr.closeElementSelfClosing();
+      out.openElement("a:fillRect");
+      AddLTRBAttrs(out, fill);
+      out.closeElementSelfClosing();
       out.closeElement();  // a:stretch
     } else {
       WriteDefaultStretch(out);
@@ -1241,18 +1336,7 @@ void PPTWriter::writeRectangle(XMLBuilder& out, const Rectangle* rect, const Fil
   // out by half the stroke width.  Fill-only painters skip this branch (they
   // see fs.stroke == nullptr from processVectorScope), so the fill geometry
   // remains untouched.
-  float inset = StrokeAlignInset(fs.stroke);
-  if (inset != 0.0f) {
-    float maxInset = std::min(w, h) / 2.0f;
-    if (inset > maxInset) {
-      inset = maxInset;
-    }
-    x += inset;
-    y += inset;
-    w -= inset * 2.0f;
-    h -= inset * 2.0f;
-    roundness = std::max(0.0f, roundness - inset);
-  }
+  ApplyStrokeBoxInset(fs.stroke, x, y, w, h, &roundness);
 
   Rect shapeBounds = Rect::MakeXYWH(x, y, w, h);
 
@@ -1297,17 +1381,7 @@ void PPTWriter::writeEllipse(XMLBuilder& out, const Ellipse* ellipse, const Fill
 
   // See writeRectangle: emulate StrokeAlign::Inside / Outside by inset/outset
   // because OOXML can only draw centre-aligned strokes on the geometry.
-  float inset = StrokeAlignInset(fs.stroke);
-  if (inset != 0.0f) {
-    float maxInset = std::min(w, h) / 2.0f;
-    if (inset > maxInset) {
-      inset = maxInset;
-    }
-    x += inset;
-    y += inset;
-    w -= inset * 2.0f;
-    h -= inset * 2.0f;
-  }
+  ApplyStrokeBoxInset(fs.stroke, x, y, w, h);
 
   Rect shapeBounds = Rect::MakeXYWH(x, y, w, h);
 
@@ -1578,46 +1652,18 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   bool justifyAlign = fs.textBox && fs.textBox->textAlign == TextAlign::Justify;
 
   out.openElement("p:txBody").closeElementStart();
-  auto& bodyPr = out.openElement("a:bodyPr")
-                     .addRequiredAttribute("wrap", useLineLayout
-                                                       ? (justifyAlign ? "square" : "none")
-                                                       : (hasTextBox ? "square" : "none"))
-                     .addRequiredAttribute("lIns", "0")
-                     .addRequiredAttribute("tIns", "0")
-                     .addRequiredAttribute("rIns", "0")
-                     .addRequiredAttribute("bIns", "0");
-  bool isVertical = false;
-  if (fs.textBox) {
-    isVertical = (fs.textBox->writingMode == WritingMode::Vertical);
-    // CJK vertical writing: characters stay upright, columns stack right-to-left.
-    // "eaVert" matches the WritingMode::Vertical contract (East Asian vertical
-    // text). Latin "vert"/"vert270" rotate glyphs sideways which is wrong here.
-    if (isVertical) {
-      bodyPr.addRequiredAttribute("vert", "eaVert");
-    }
-    // OOXML's "anchor" describes alignment along the block-flow axis, which
-    // matches paragraphAlign in both writing modes:
-    //   - Horizontal: block axis is top→bottom (Near=top, Far=bottom).
-    //   - Vertical (eaVert): block axis is right→left (Near=right column,
-    //     Far=left column). PowerPoint maps t/ctr/b to start/center/end of
-    //     that axis, so the same enum→string mapping applies.
-    if (fs.textBox->paragraphAlign == ParagraphAlign::Middle) {
-      bodyPr.addRequiredAttribute("anchor", "ctr");
-    } else if (fs.textBox->paragraphAlign == ParagraphAlign::Far) {
-      bodyPr.addRequiredAttribute("anchor", "b");
-    }
-    // See writeTextBoxGroup for the rationale: in vertical mode, anchorCtr="1"
-    // is the only attribute that actually centres text along the column's
-    // inline (vertical) axis in both PowerPoint and LibreOffice.
-    if (isVertical && fs.textBox->textAlign == TextAlign::Center) {
-      bodyPr.addRequiredAttribute("anchorCtr", "1");
-    }
-  }
-  bodyPr.closeElementSelfClosing();
+  out.openElement("a:bodyPr")
+      .addRequiredAttribute("wrap", useLineLayout ? (justifyAlign ? "square" : "none")
+                                                  : (hasTextBox ? "square" : "none"))
+      .addRequiredAttribute("lIns", "0")
+      .addRequiredAttribute("tIns", "0")
+      .addRequiredAttribute("rIns", "0")
+      .addRequiredAttribute("bIns", "0");
+  AddBodyPrAttrsForTextBox(out, fs.textBox);
+  out.closeElementSelfClosing();
   out.openElement("a:lstStyle").closeElementSelfClosing();
 
-  PPTRunStyle style = {};
-  style.algn = nullptr;
+  PPTRunStyle style = BuildRunStyle(text, fs.fill, alpha);
   if (text->textAnchor == TextAnchor::Center) {
     style.algn = "ctr";
   } else if (text->textAnchor == TextAnchor::End) {
@@ -1632,30 +1678,8 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
       style.algn = "just";
     }
   }
-  style.hasBold = text->fauxBold || text->fontStyle.find("Bold") != std::string::npos;
-  style.hasItalic = text->fauxItalic || text->fontStyle.find("Italic") != std::string::npos;
-  style.fontSize = FontSizeToPPT(text->fontSize);
-  style.letterSpc = static_cast<int64_t>(std::round(text->letterSpacing * 75.0));
-  style.hasLetterSpacing = text->letterSpacing != 0.0f;
-  // a:rPr supports a:solidFill and a:gradFill but not a:blipFill, so ImagePattern
-  // fills are skipped (text falls back to the renderer default).
-  style.hasFillColor = false;
-  if (fs.fill && fs.fill->color) {
-    auto type = fs.fill->color->nodeType();
-    style.hasFillColor = (type == NodeType::SolidColor || type == NodeType::LinearGradient ||
-                          type == NodeType::RadialGradient || type == NodeType::ConicGradient ||
-                          type == NodeType::DiamondGradient);
-  }
-  style.fillAlpha = style.hasFillColor ? fs.fill->alpha * alpha : 0;
-  style.fillColor = style.hasFillColor ? fs.fill->color : nullptr;
-  style.typeface = text->fontFamily.empty() ? std::string() : StripQuotes(text->fontFamily);
 
-  // PAGX `lineHeight` is an absolute pixel value; PPT's <a:lnSpc><a:spcPts>
-  // takes hundredths of a point. Convert px → pt with the same 96 DPI ratio
-  // (×72/96 = ×0.75) used elsewhere in this writer, then multiply by 100.
-  int64_t lnSpcPts = (fs.textBox && fs.textBox->lineHeight > 0)
-                         ? static_cast<int64_t>(std::round(fs.textBox->lineHeight * 75.0))
-                         : 0;
+  int64_t lnSpcPts = fs.textBox ? LineHeightToSpcPts(fs.textBox->lineHeight) : 0;
 
   if (useLineLayout) {
     // Emit ALL visual lines inside a single <a:p> separated by soft <a:br/>
@@ -1665,23 +1689,7 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
     // except the semantically last participate in justify.
     bool wroteAny = false;
     out.openElement("a:p").closeElementStart();
-    if (style.algn || lnSpcPts > 0) {
-      auto& pPr = out.openElement("a:pPr");
-      if (style.algn) {
-        pPr.addRequiredAttribute("algn", style.algn);
-      }
-      if (lnSpcPts > 0) {
-        pPr.closeElementStart();
-        out.openElement("a:lnSpc").closeElementStart();
-        out.openElement("a:spcPts")
-            .addRequiredAttribute("val", lnSpcPts)
-            .closeElementSelfClosing();
-        out.closeElement();  // a:lnSpc
-        out.closeElement();  // a:pPr
-      } else {
-        pPr.closeElementSelfClosing();
-      }
-    }
+    WriteParagraphProperties(out, style.algn, lnSpcPts);
     for (const auto& lineInfo : *lines) {
       if (lineInfo.byteStart >= lineInfo.byteEnd) {
         continue;
@@ -1789,21 +1797,7 @@ void PPTWriter::writeParagraph(XMLBuilder& out, const std::string& lineText,
                                const PPTRunStyle& style, const std::vector<LayerFilter*>& filters,
                                const std::vector<LayerStyle*>& styles, int64_t lnSpcPts) {
   out.openElement("a:p").closeElementStart();
-  if (style.algn || lnSpcPts > 0) {
-    auto& pPr = out.openElement("a:pPr");
-    if (style.algn) {
-      pPr.addRequiredAttribute("algn", style.algn);
-    }
-    if (lnSpcPts > 0) {
-      pPr.closeElementStart();
-      out.openElement("a:lnSpc").closeElementStart();
-      out.openElement("a:spcPts").addRequiredAttribute("val", lnSpcPts).closeElementSelfClosing();
-      out.closeElement();  // a:lnSpc
-      out.closeElement();  // a:pPr
-    } else {
-      pPr.closeElementSelfClosing();
-    }
-  }
+  WriteParagraphProperties(out, style.algn, lnSpcPts);
   writeParagraphRun(out, lineText, style, filters, styles);
   out.closeElement();  // a:p
 }
@@ -1965,90 +1959,26 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
   bool justifyAlign = (algn != nullptr && std::string(algn) == "just");
 
   out.openElement("p:txBody").closeElementStart();
-  auto& bodyPr = out.openElement("a:bodyPr")
-                     .addRequiredAttribute("wrap", useLineLayout
-                                                       ? (justifyAlign ? "square" : "none")
-                                                       : (hasBoxWidth ? "square" : "none"))
-                     .addRequiredAttribute("lIns", "0")
-                     .addRequiredAttribute("tIns", "0")
-                     .addRequiredAttribute("rIns", "0")
-                     .addRequiredAttribute("bIns", "0");
-  bool isVertical = (box->writingMode == WritingMode::Vertical);
-  if (isVertical) {
-    bodyPr.addRequiredAttribute("vert", "eaVert");
-  }
-  if (box->paragraphAlign == ParagraphAlign::Middle) {
-    bodyPr.addRequiredAttribute("anchor", "ctr");
-  } else if (box->paragraphAlign == ParagraphAlign::Far) {
-    bodyPr.addRequiredAttribute("anchor", "b");
-  }
-  // In vertical writing mode the bodyPr@anchor controls placement perpendicular
-  // to the text-flow axis (i.e. horizontal placement of the column block), so
-  // textAlign="center" cannot be expressed via pPr@algn — both PowerPoint and
-  // LibreOffice ignore algn for vertical-axis centering of the text within a
-  // column. anchorCtr="1" toggles the "center on the perpendicular axis" flag,
-  // which in vertical mode produces the desired vertical centering of the text
-  // within its column.
-  if (isVertical && box->textAlign == TextAlign::Center) {
-    bodyPr.addRequiredAttribute("anchorCtr", "1");
-  }
-  bodyPr.closeElementSelfClosing();
+  out.openElement("a:bodyPr")
+      .addRequiredAttribute("wrap", useLineLayout ? (justifyAlign ? "square" : "none")
+                                                  : (hasBoxWidth ? "square" : "none"))
+      .addRequiredAttribute("lIns", "0")
+      .addRequiredAttribute("tIns", "0")
+      .addRequiredAttribute("rIns", "0")
+      .addRequiredAttribute("bIns", "0");
+  AddBodyPrAttrsForTextBox(out, box);
+  out.closeElementSelfClosing();
   out.openElement("a:lstStyle").closeElementSelfClosing();
-  // PAGX `lineHeight` is an absolute pixel value; PPT's <a:lnSpc><a:spcPts>
-  // takes hundredths of a point. Convert px → pt with the same 96 DPI ratio
-  // (×72/96 = ×0.75) used elsewhere in this writer, then multiply by 100.
-  int64_t lnSpcPts =
-      box->lineHeight > 0 ? static_cast<int64_t>(std::round(box->lineHeight * 75.0)) : 0;
+  int64_t lnSpcPts = LineHeightToSpcPts(box->lineHeight);
 
-  auto writePPr = [&]() {
-    if (!algn && lnSpcPts <= 0) {
-      return;
-    }
-    auto& pPr = out.openElement("a:pPr");
-    if (algn) {
-      pPr.addRequiredAttribute("algn", algn);
-    }
-    if (lnSpcPts > 0) {
-      pPr.closeElementStart();
-      out.openElement("a:lnSpc").closeElementStart();
-      out.openElement("a:spcPts").addRequiredAttribute("val", lnSpcPts).closeElementSelfClosing();
-      out.closeElement();  // a:lnSpc
-      out.closeElement();  // a:pPr
-    } else {
-      pPr.closeElementSelfClosing();
-    }
-  };
+  auto writePPr = [&]() { WriteParagraphProperties(out, algn, lnSpcPts); };
 
   // Build per-run styles up-front (font/size/bold/italic/color/typeface).
-  struct ResolvedRunStyle {
-    PPTRunStyle style = {};
-  };
-  std::vector<ResolvedRunStyle> runStyles;
+  // Alignment lives on a:pPr (not a:rPr) so we leave style.algn at nullptr here.
+  std::vector<PPTRunStyle> runStyles;
   runStyles.reserve(runs.size());
   for (const auto& run : runs) {
-    ResolvedRunStyle rs;
-    rs.style.algn = nullptr;  // alignment lives on a:pPr, not a:rPr
-    rs.style.hasBold = run.text->fauxBold || run.text->fontStyle.find("Bold") != std::string::npos;
-    rs.style.hasItalic =
-        run.text->fauxItalic || run.text->fontStyle.find("Italic") != std::string::npos;
-    rs.style.fontSize = FontSizeToPPT(run.text->fontSize);
-    rs.style.letterSpc = static_cast<int64_t>(std::round(run.text->letterSpacing * 75.0));
-    rs.style.hasLetterSpacing = run.text->letterSpacing != 0.0f;
-    rs.style.hasFillColor = false;
-    if (run.fill && run.fill->color) {
-      auto type = run.fill->color->nodeType();
-      // a:rPr supports a:solidFill and a:gradFill but not a:blipFill, so ImagePattern
-      // fills are skipped (the run falls back to the renderer default).
-      rs.style.hasFillColor =
-          (type == NodeType::SolidColor || type == NodeType::LinearGradient ||
-           type == NodeType::RadialGradient || type == NodeType::ConicGradient ||
-           type == NodeType::DiamondGradient);
-    }
-    rs.style.fillAlpha = rs.style.hasFillColor ? run.fill->alpha * alpha : 0;
-    rs.style.fillColor = rs.style.hasFillColor ? run.fill->color : nullptr;
-    rs.style.typeface =
-        run.text->fontFamily.empty() ? std::string() : StripQuotes(run.text->fontFamily);
-    runStyles.push_back(std::move(rs));
+    runStyles.push_back(BuildRunStyle(run.text, run.fill, alpha));
   }
 
   bool paragraphOpen = false;
@@ -2063,14 +1993,14 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
       paragraphOpen = false;
     }
   };
-  auto emitRun = [&](const std::string& fragment, const ResolvedRunStyle& rs) {
+  auto emitRun = [&](const std::string& fragment, const PPTRunStyle& rs) {
     if (fragment.empty()) {
       return;
     }
     if (!paragraphOpen) {
       openParagraph();
     }
-    writeParagraphRun(out, fragment, rs.style, filters, styles);
+    writeParagraphRun(out, fragment, rs, filters, styles);
   };
 
   if (useLineLayout) {
@@ -2096,7 +2026,7 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
     while (i < lineEntries.size()) {
       float baseline = lineEntries[i].baselineY;
       if (!firstLine) {
-        writeLineBreak(out, runStyles[lineEntries[i].runIndex].style);
+        writeLineBreak(out, runStyles[lineEntries[i].runIndex]);
       }
       firstLine = false;
       while (i < lineEntries.size() &&
