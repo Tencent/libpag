@@ -273,6 +273,9 @@ class PPTWriter {
   void writeParagraph(XMLBuilder& out, const std::string& lineText, const PPTRunStyle& style,
                       const std::vector<LayerFilter*>& filters,
                       const std::vector<LayerStyle*>& styles);
+  void writeParagraphRun(XMLBuilder& out, const std::string& runText, const PPTRunStyle& style,
+                         const std::vector<LayerFilter*>& filters,
+                         const std::vector<LayerStyle*>& styles);
   void writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
                          const std::vector<Element*>& elements, const Matrix& transform,
                          float alpha, const std::vector<LayerFilter*>& filters,
@@ -1537,14 +1540,10 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   out.closeElement();  // p:sp
 }
 
-void PPTWriter::writeParagraph(XMLBuilder& out, const std::string& lineText,
-                               const PPTRunStyle& style,
-                               const std::vector<LayerFilter*>& filters,
-                               const std::vector<LayerStyle*>& styles) {
-  out.openElement("a:p").closeElementStart();
-  if (style.algn) {
-    out.openElement("a:pPr").addRequiredAttribute("algn", style.algn).closeElementSelfClosing();
-  }
+void PPTWriter::writeParagraphRun(XMLBuilder& out, const std::string& runText,
+                                  const PPTRunStyle& style,
+                                  const std::vector<LayerFilter*>& filters,
+                                  const std::vector<LayerStyle*>& styles) {
   out.openElement("a:r").closeElementStart();
   out.openElement("a:rPr")
       .addRequiredAttribute("lang", "en-US")
@@ -1575,39 +1574,235 @@ void PPTWriter::writeParagraph(XMLBuilder& out, const std::string& lineText,
   }
   out.closeElement();  // a:rPr
   out.openElement("a:t").closeElementStart();
-  out.addTextContent(lineText);
+  out.addTextContent(runText);
   out.closeElement();  // a:t
   out.closeElement();  // a:r
+}
+
+void PPTWriter::writeParagraph(XMLBuilder& out, const std::string& lineText,
+                               const PPTRunStyle& style,
+                               const std::vector<LayerFilter*>& filters,
+                               const std::vector<LayerStyle*>& styles) {
+  out.openElement("a:p").closeElementStart();
+  if (style.algn) {
+    out.openElement("a:pPr").addRequiredAttribute("algn", style.algn).closeElementSelfClosing();
+  }
+  writeParagraphRun(out, lineText, style, filters, styles);
   out.closeElement();  // a:p
 }
 
 // ── TextBox group ──────────────────────────────────────────────────────────
+
+namespace {
+
+// One "run" inside a rich TextBox: a Text element together with the Fill that
+// applies to it (either the Group's own Fill or, when the Text is a direct
+// child of the TextBox, the TextBox's top-level Fill).
+struct RichTextRun {
+  const Text* text = nullptr;
+  const Fill* fill = nullptr;
+};
+
+// Walks the TextBox children in source order, pairing every Text with its
+// nearest enclosing Fill. Direct Text children inherit `parentFill`; Texts
+// nested inside a Group use that Group's locally-collected Fill (falling back
+// to `parentFill` when the Group has none).
+void CollectRichTextRuns(const std::vector<Element*>& elements, const Fill* parentFill,
+                         std::vector<RichTextRun>& outRuns) {
+  for (auto* element : elements) {
+    auto type = element->nodeType();
+    if (type == NodeType::Text) {
+      auto* t = static_cast<const Text*>(element);
+      if (!t->text.empty()) {
+        outRuns.push_back({t, parentFill});
+      }
+    } else if (type == NodeType::Group) {
+      auto* g = static_cast<const Group*>(element);
+      auto groupFs = CollectFillStroke(g->elements);
+      const Fill* effectiveFill = groupFs.fill ? groupFs.fill : parentFill;
+      CollectRichTextRuns(g->elements, effectiveFill, outRuns);
+    }
+  }
+}
+
+}  // namespace
 
 void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
                                   const std::vector<Element*>& elements, const Matrix& transform,
                                   float alpha, const std::vector<LayerFilter*>& filters,
                                   const std::vector<LayerStyle*>& styles) {
   auto* box = static_cast<const TextBox*>(textBox);
-  auto fs = CollectFillStroke(elements);
-  std::vector<Text*> childTexts;
-  auto mutableElements = elements;
-  TextLayout::CollectTextElements(mutableElements, childTexts);
-  if (childTexts.empty()) {
+  auto topLevelFs = CollectFillStroke(elements);
+
+  std::vector<RichTextRun> runs;
+  CollectRichTextRuns(elements, topLevelFs.fill, runs);
+  if (runs.empty()) {
     return;
   }
 
-  auto params = MakeTextBoxParams(box);
-  auto layoutResult = TextLayout::Layout(childTexts, params, _layoutContext);
-
-  FillStrokeInfo boxFs = fs;
-  boxFs.textBox = box;
-
-  for (auto* childText : childTexts) {
-    if (childText->text.empty()) {
-      continue;
-    }
-    writeNativeText(out, childText, boxFs, transform, alpha, filters, styles, &layoutResult);
+  // Run a layout pass purely to obtain the textbox's resolved bounds; we let
+  // PowerPoint perform its own line wrapping inside the shape so that mixed
+  // run-styles (font/size/color) don't have to be threaded through PAGX's
+  // line-break offsets.
+  std::vector<Text*> mutableTexts;
+  mutableTexts.reserve(runs.size());
+  for (const auto& run : runs) {
+    mutableTexts.push_back(const_cast<Text*>(run.text));
   }
+  auto params = MakeTextBoxParams(box);
+  auto layoutResult = TextLayout::Layout(mutableTexts, params, _layoutContext);
+
+  float boxWidth = EffectiveTextBoxWidth(box);
+  float boxHeight = EffectiveTextBoxHeight(box);
+  bool hasBoxWidth = !std::isnan(boxWidth) && boxWidth > 0;
+
+  // `transform` already incorporates BuildGroupMatrix(box) (applied by the
+  // caller in writeElements), so the local origin here is (0, 0). Adding
+  // box->position again would double-offset the shape, pushing the text-box
+  // away from the centered position the layout assigned to it.
+  float estWidth = hasBoxWidth ? boxWidth : layoutResult.bounds.width;
+  if (estWidth <= 0) {
+    estWidth = static_cast<float>(CountUTF8Characters(runs.front().text->text)) *
+               runs.front().text->fontSize * 0.6f;
+  }
+  float estHeight = (!std::isnan(boxHeight) && boxHeight > 0) ? boxHeight
+                                                              : layoutResult.bounds.height;
+  if (estHeight <= 0) {
+    estHeight = runs.front().text->fontSize * 1.4f;
+  }
+
+  auto xf = decomposeXform(0.0f, 0.0f, estWidth, estHeight, transform);
+
+  int id = _ctx->nextShapeId();
+  out.openElement("p:sp").closeElementStart();
+  out.openElement("p:nvSpPr").closeElementStart();
+  out.openElement("p:cNvPr")
+      .addRequiredAttribute("id", id)
+      .addRequiredAttribute("name", "TextBox")
+      .closeElementSelfClosing();
+  out.openElement("p:cNvSpPr").addRequiredAttribute("txBox", "1").closeElementSelfClosing();
+  out.openElement("p:nvPr").closeElementSelfClosing();
+  out.closeElement();  // p:nvSpPr
+
+  out.openElement("p:spPr").closeElementStart();
+  WriteXfrm(out, xf);
+  out.openElement("a:prstGeom").addRequiredAttribute("prst", "rect").closeElementStart();
+  out.openElement("a:avLst").closeElementSelfClosing();
+  out.closeElement();
+  out.openElement("a:noFill").closeElementSelfClosing();
+  out.openElement("a:ln").closeElementStart();
+  out.openElement("a:noFill").closeElementSelfClosing();
+  out.closeElement();
+  out.closeElement();  // p:spPr
+
+  out.openElement("p:txBody").closeElementStart();
+  auto& bodyPr = out.openElement("a:bodyPr")
+                     .addRequiredAttribute("wrap", hasBoxWidth ? "square" : "none")
+                     .addRequiredAttribute("lIns", "0")
+                     .addRequiredAttribute("tIns", "0")
+                     .addRequiredAttribute("rIns", "0")
+                     .addRequiredAttribute("bIns", "0");
+  if (box->writingMode == WritingMode::Vertical) {
+    bodyPr.addRequiredAttribute("vert", "eaVert");
+  }
+  if (box->paragraphAlign == ParagraphAlign::Middle) {
+    bodyPr.addRequiredAttribute("anchor", "ctr");
+  } else if (box->paragraphAlign == ParagraphAlign::Far) {
+    bodyPr.addRequiredAttribute("anchor", "b");
+  }
+  bodyPr.closeElementSelfClosing();
+  out.openElement("a:lstStyle").closeElementSelfClosing();
+
+  const char* algn = nullptr;
+  if (box->textAlign == TextAlign::Center) {
+    algn = "ctr";
+  } else if (box->textAlign == TextAlign::End) {
+    algn = "r";
+  }
+
+  // Build per-run styles up-front (font/size/bold/italic/color/typeface).
+  struct ResolvedRunStyle {
+    PPTRunStyle style = {};
+  };
+  std::vector<ResolvedRunStyle> runStyles;
+  runStyles.reserve(runs.size());
+  for (const auto& run : runs) {
+    ResolvedRunStyle rs;
+    rs.style.algn = nullptr;  // alignment lives on a:pPr, not a:rPr
+    rs.style.hasBold = run.text->fontStyle.find("Bold") != std::string::npos;
+    rs.style.hasItalic = run.text->fontStyle.find("Italic") != std::string::npos;
+    rs.style.fontSize = FontSizeToPPT(run.text->fontSize);
+    rs.style.letterSpc = static_cast<int64_t>(std::round(run.text->letterSpacing * 75.0));
+    rs.style.hasLetterSpacing = run.text->letterSpacing != 0.0f;
+    rs.style.hasFillColor = false;
+    if (run.fill && run.fill->color) {
+      auto type = run.fill->color->nodeType();
+      // a:rPr supports a:solidFill and a:gradFill but not a:blipFill, so ImagePattern
+      // fills are skipped (the run falls back to the renderer default).
+      rs.style.hasFillColor =
+          (type == NodeType::SolidColor || type == NodeType::LinearGradient ||
+           type == NodeType::RadialGradient || type == NodeType::ConicGradient ||
+           type == NodeType::DiamondGradient);
+    }
+    rs.style.fillAlpha = rs.style.hasFillColor ? run.fill->alpha * alpha : 0;
+    rs.style.fillColor = rs.style.hasFillColor ? run.fill->color : nullptr;
+    rs.style.typeface =
+        run.text->fontFamily.empty() ? std::string() : StripQuotes(run.text->fontFamily);
+    runStyles.push_back(std::move(rs));
+  }
+
+  // Stream runs into paragraphs, splitting on '\n'. A single Text element may
+  // carry multiple newlines internally, in which case it contributes to several
+  // consecutive paragraphs.
+  bool paragraphOpen = false;
+  auto openParagraph = [&]() {
+    out.openElement("a:p").closeElementStart();
+    if (algn) {
+      out.openElement("a:pPr").addRequiredAttribute("algn", algn).closeElementSelfClosing();
+    }
+    paragraphOpen = true;
+  };
+  auto closeParagraph = [&]() {
+    if (paragraphOpen) {
+      out.closeElement();  // a:p
+      paragraphOpen = false;
+    }
+  };
+  auto emitRun = [&](const std::string& fragment, const ResolvedRunStyle& rs) {
+    if (fragment.empty()) {
+      return;
+    }
+    if (!paragraphOpen) {
+      openParagraph();
+    }
+    writeParagraphRun(out, fragment, rs.style, filters, styles);
+  };
+
+  for (size_t i = 0; i < runs.size(); ++i) {
+    const std::string& s = runs[i].text->text;
+    const auto& rs = runStyles[i];
+    size_t pos = 0;
+    while (pos <= s.size()) {
+      size_t nl = s.find('\n', pos);
+      if (nl == std::string::npos) {
+        emitRun(s.substr(pos), rs);
+        break;
+      }
+      emitRun(s.substr(pos, nl - pos), rs);
+      // Newline terminates the current paragraph; if the paragraph is still
+      // empty (e.g. consecutive '\n's), open and immediately close it so the
+      // blank line is preserved.
+      if (!paragraphOpen) {
+        openParagraph();
+      }
+      closeParagraph();
+      pos = nl + 1;
+    }
+  }
+  closeParagraph();
+
+  out.closeElement();  // p:txBody
+  out.closeElement();  // p:sp
 }
 
 // ── Element / layer traversal ──────────────────────────────────────────────
