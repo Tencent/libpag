@@ -764,8 +764,11 @@ bool PPTWriter::writeImagePatternAsPicture(XMLBuilder& out, const Fill* fill,
   if (!pattern->image) {
     return false;
   }
-  if (pattern->tileModeX == TileMode::Repeat || pattern->tileModeX == TileMode::Mirror ||
-      pattern->tileModeY == TileMode::Repeat || pattern->tileModeY == TileMode::Mirror) {
+  // Repeat/Mirror need OOXML <a:tile> (or a baked tiled PNG); Clamp needs the
+  // image's edge pixels to extend across the whole shape, which can't be
+  // expressed by drawing a single <p:pic> at the natural extent.  Only Decal
+  // (transparent outside the natural extent) maps cleanly onto a <p:pic>.
+  if (pattern->tileModeX != TileMode::Decal || pattern->tileModeY != TileMode::Decal) {
     return false;
   }
 
@@ -919,11 +922,18 @@ void PPTWriter::writeImagePatternFill(XMLBuilder& out, const ImagePattern* patte
     return;
   }
 
-  bool needsTiling =
+  bool needsNativeTile =
       (pattern->tileModeX == TileMode::Repeat || pattern->tileModeX == TileMode::Mirror ||
        pattern->tileModeY == TileMode::Repeat || pattern->tileModeY == TileMode::Mirror);
+  // Clamp also needs the bake path: OOXML can't express "extend edge pixels"
+  // natively, and emitting just <a:srcRect>/<a:fillRect> would either tile
+  // (wrong) or stretch the whole image (also wrong).  Repeat/Mirror prefer the
+  // bake too because it preserves the pattern's shader matrix exactly.
+  bool needsBake =
+      needsNativeTile || pattern->tileModeX == TileMode::Clamp ||
+      pattern->tileModeY == TileMode::Clamp;
 
-  if (needsTiling && _bakeTiledPattern && !shapeBounds.isEmpty()) {
+  if (needsBake && _bakeTiledPattern && !shapeBounds.isEmpty()) {
     int w = static_cast<int>(ceilf(shapeBounds.width));
     int h = static_cast<int>(ceilf(shapeBounds.height));
     float offsetX = pattern->matrix.tx - shapeBounds.x;
@@ -952,7 +962,7 @@ void PPTWriter::writeImagePatternFill(XMLBuilder& out, const ImagePattern* patte
   out.openElement("a:blipFill").closeElementStart();
   WriteBlip(out, relId, alpha);
 
-  if (needsTiling && hasDimensions && !shapeBounds.isEmpty()) {
+  if (needsNativeTile && hasDimensions && !shapeBounds.isEmpty()) {
     const auto& M = pattern->matrix;
     float imgDpiX = 72.0f;
     float imgDpiY = 72.0f;
