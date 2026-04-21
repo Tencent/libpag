@@ -1862,7 +1862,12 @@ void PPTWriter::writeElements(XMLBuilder& out, const std::vector<Element*>& elem
         break;
       case NodeType::Text: {
         auto* text = static_cast<const Text*>(element);
-        if (_convertTextToPath && !text->glyphRuns.empty()) {
+        // GlyphRun-only Text (no readable text content) carries pre-shaped glyph
+        // outlines from a custom font; PowerPoint's native a:r runs can't express
+        // arbitrary glyph IDs + per-glyph transforms, so the only way to render
+        // these is via path geometry — regardless of the convertTextToPath flag.
+        bool glyphRunOnly = text->text.empty() && !text->glyphRuns.empty();
+        if ((_convertTextToPath || glyphRunOnly) && !text->glyphRuns.empty()) {
           writeTextAsPath(out, text, fs, transform, alpha, filters, styles);
         } else {
           writeNativeText(out, text, fs, transform, alpha, filters, styles);
