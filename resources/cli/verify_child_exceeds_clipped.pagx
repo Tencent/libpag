@@ -4,14 +4,14 @@
   <!-- Case 1: clipToBounds suppresses child-exceeds-parent -->
   <Layer width="200" height="200" clipToBounds="true">
     <Layer width="250" height="100">
-      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Rectangle width="100%" height="100%"/>
       <Fill color="#FF0000"/>
     </Layer>
   </Layer>
   <!-- Case 2: scrollRect suppresses child-exceeds-parent -->
   <Layer width="200" height="200" scrollRect="0,0,200,200">
     <Layer width="250" height="100">
-      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Rectangle width="100%" height="100%"/>
       <Fill color="#00FF00"/>
     </Layer>
   </Layer>

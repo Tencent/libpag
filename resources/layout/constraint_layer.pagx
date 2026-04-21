@@ -2,68 +2,68 @@
 <!-- Layer constraint layout in absolute mode: child Layers positioned by constraints within parent -->
 <pagx width="600" height="400">
   <!-- Background -->
-  <Layer left="0" right="0" top="0" bottom="0">
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
+  <Layer width="100%" height="100%">
+    <Rectangle width="100%" height="100%"/>
     <Fill color="#F8FAFC"/>
   </Layer>
 
   <!-- Parent container with explicit size, default absolute layout -->
   <Layer width="600" height="400">
     <!-- Container border -->
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Rectangle width="100%" height="100%"/>
     <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
 
     <!-- Box 1: top-left corner (left=20, top=20) -->
     <Layer left="20" top="20" width="80" height="60">
-      <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+      <Rectangle width="100%" height="100%" roundness="8"/>
       <Fill color="#FF6B6B"/>
     </Layer>
 
     <!-- Box 2: top-right corner (right=20, top=20) -->
     <Layer right="20" top="20" width="80" height="60">
-      <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+      <Rectangle width="100%" height="100%" roundness="8"/>
       <Fill color="#4ECDC4"/>
     </Layer>
 
     <!-- Box 3: bottom-left corner (left=20, bottom=20) -->
     <Layer left="20" bottom="20" width="80" height="60">
-      <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+      <Rectangle width="100%" height="100%" roundness="8"/>
       <Fill color="#45B7D1"/>
     </Layer>
 
     <!-- Box 4: bottom-right corner (right=20, bottom=20) -->
     <Layer right="20" bottom="20" width="80" height="60">
-      <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+      <Rectangle width="100%" height="100%" roundness="8"/>
       <Fill color="#FFA07A"/>
     </Layer>
 
     <!-- Box 5: centered (centerX=0, centerY=0) -->
     <Layer centerX="0" centerY="0" width="100" height="80">
-      <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+      <Rectangle width="100%" height="100%" roundness="8"/>
       <Fill color="#95E1D3"/>
     </Layer>
 
     <!-- Box 6: horizontal stretch between top-left and top-right boxes, centered on their Y midline -->
     <Layer left="120" right="120" top="35" height="30">
-      <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+      <Rectangle width="100%" height="100%" roundness="4"/>
       <Fill color="#F38181"/>
     </Layer>
 
     <!-- Box 7: horizontal stretch between bottom-left and bottom-right boxes, centered on their Y midline -->
     <Layer left="120" right="120" top="335" height="30">
-      <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+      <Rectangle width="100%" height="100%" roundness="4"/>
       <Fill color="#F38181"/>
     </Layer>
 
     <!-- Box 8: vertical stretch between top-left and bottom-left boxes, centered on their X midline -->
     <Layer left="45" top="100" bottom="100" width="30">
-      <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+      <Rectangle width="100%" height="100%" roundness="4"/>
       <Fill color="#AA96DA"/>
     </Layer>
 
     <!-- Box 9: vertical stretch between top-right and bottom-right boxes, centered on their X midline -->
     <Layer right="45" top="100" bottom="100" width="30">
-      <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+      <Rectangle width="100%" height="100%" roundness="4"/>
       <Fill color="#AA96DA"/>
     </Layer>
   </Layer>

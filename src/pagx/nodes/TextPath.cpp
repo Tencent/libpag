@@ -19,7 +19,6 @@
 #include "pagx/nodes/TextPath.h"
 #include <cmath>
 #include "pagx/nodes/LayoutNode.h"
-#include "pagx/types/Matrix.h"
 
 namespace pagx {
 
@@ -28,44 +27,47 @@ void TextPath::onMeasure(LayoutContext*) {
     auto bounds = path->getBounds();
     preferredX = bounds.x;
     preferredY = bounds.y;
-    preferredWidth = bounds.width;
-    preferredHeight = bounds.height;
+    preferredWidth = std::isnan(width) ? bounds.width : width;
+    preferredHeight = std::isnan(height) ? bounds.height : height;
   }
 }
 
-void TextPath::setLayoutSize(LayoutContext*, float width, float height) {
-  if (!path) {
-    return;
-  }
-  float scale = LayoutNode::ComputeUniformScale(preferredWidth, preferredHeight, width, height);
-  if (scale != 1.0f) {
-    path->transform(Matrix::Scale(scale, scale));
-    baselineOrigin.x *= scale;
-    baselineOrigin.y *= scale;
-  }
-  auto bounds = path->getBounds();
-  layoutWidth = bounds.width;
-  layoutHeight = bounds.height;
-}
-
-void TextPath::setLayoutPosition(LayoutContext*, float x, float y) {
+void TextPath::setLayoutSize(LayoutContext*, float targetWidth, float targetHeight) {
   if (!path) {
     return;
   }
   auto bounds = path->getBounds();
-  float tx = std::isnan(x) ? 0 : x - bounds.x;
-  float ty = std::isnan(y) ? 0 : y - bounds.y;
-  if (tx != 0 || ty != 0) {
-    path->transform(Matrix::Translate(tx, ty));
-    baselineOrigin.x += tx;
-    baselineOrigin.y += ty;
+  float tW = targetWidth;
+  float tH = targetHeight;
+  if (std::isnan(tW) && std::isnan(tH)) {
+    tW = preferredWidth;
+    tH = preferredHeight;
   }
-  if (!std::isnan(x)) {
-    layoutX = x;
+  float scale = LayoutNode::ComputeUniformScale(bounds.width, bounds.height, tW, tH);
+  layoutWidth = bounds.width * scale;
+  layoutHeight = bounds.height * scale;
+}
+
+Point TextPath::renderPosition() const {
+  if (!path) {
+    return computeRenderPosition({}, 0, 0);
   }
-  if (!std::isnan(y)) {
-    layoutY = y;
+  auto bounds = path->getBounds();
+  return computeRenderPosition(bounds, bounds.width, bounds.height);
+}
+
+float TextPath::renderScale() const {
+  if (!path) {
+    return 1.0f;
   }
+  auto bounds = path->getBounds();
+  return computeRenderScale(bounds.width, bounds.height);
+}
+
+Point TextPath::renderBaselineOrigin() const {
+  auto pos = renderPosition();
+  float scale = renderScale();
+  return {pos.x + baselineOrigin.x * scale, pos.y + baselineOrigin.y * scale};
 }
 
 }  // namespace pagx

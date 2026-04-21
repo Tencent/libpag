@@ -18,18 +18,20 @@ issues, and lets the user interactively choose which ones to fix.
 
 Determine the diff to review based on `$ARGUMENTS` and working tree state:
 
-- **Empty `$ARGUMENTS`**, **uncommitted changes exist**: scope is
-  uncommitted changes only. Fetch with `git diff HEAD` (staged + unstaged
-  tracked files). Also check for untracked files with `git status --porcelain`
-  (`??` lines) and read their contents for review.
-- **Empty `$ARGUMENTS`**, **no uncommitted changes**: find the base branch by
+- **Empty `$ARGUMENTS`**, **on main/master branch**: scope is uncommitted
+  changes only. Fetch with `git diff HEAD` (staged + unstaged tracked files).
+  Also check for untracked files with `git status --porcelain` (`??` lines)
+  and read their contents for review.
+- **Empty `$ARGUMENTS`**, **on a feature branch**: find the base branch by
   checking common base branches in order: `main`, `master`. Use the first one
-  that exists. Fetch the branch diff:
+  that exists. Fetch the full diff from merge-base to the working tree
+  (committed + uncommitted changes):
   ```
   git merge-base origin/{base_branch} HEAD
   git diff <merge-base-sha>
   ```
-  Also check for untracked files with `git status --porcelain` (`??` lines).
+  Also check for untracked files with `git status --porcelain` (`??` lines)
+  and read their contents for review.
 - **Commit hash** (e.g., `abc123`): validate with `git rev-parse --verify`,
   then `git show`.
 - **Commit range** (e.g., `abc123..def456` or `abc123...def456`): validate both

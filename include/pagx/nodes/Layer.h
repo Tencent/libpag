@@ -34,6 +34,7 @@
 #include "pagx/types/Matrix.h"
 #include "pagx/types/Matrix3D.h"
 #include "pagx/types/Padding.h"
+#include "pagx/types/Point.h"
 #include "pagx/types/Rect.h"
 
 namespace pagx {
@@ -160,18 +161,6 @@ class Layer : public Node, public LayoutNode {
   std::vector<Layer*> children = {};
 
   /**
-   * The layout width of the layer. When set, enables constraint positioning for contents. NaN means
-   * not set.
-   */
-  float width = NAN;
-
-  /**
-   * The layout height of the layer. When set, enables constraint positioning for contents. NaN means
-   * not set.
-   */
-  float height = NAN;
-
-  /**
    * The container layout mode for arranging child layers. When set to Horizontal or Vertical,
    * child layers are automatically positioned along this axis. The default value is None.
    */
@@ -195,12 +184,16 @@ class Layer : public Node, public LayoutNode {
   Padding padding = {};
 
   /**
-   * The alignment of child elements along the cross axis. The default value is Stretch.
+   * The alignment of child elements along the cross axis. The default value is Stretch. A flex
+   * child with an explicit or percentage cross-axis size retains that size and is not stretched
+   * by `Stretch` alignment.
    */
   Alignment alignment = Alignment::Stretch;
 
   /**
-   * The arrangement of child elements along the main axis. The default value is Start.
+   * The arrangement of child elements along the main axis. The default value is Start. A flex
+   * child with an explicit or percentage main-axis size reserves that size first; only the
+   * remaining space is distributed to `flex` children according to this arrangement.
    */
   Arrangement arrangement = Arrangement::Start;
 
@@ -248,15 +241,18 @@ class Layer : public Node, public LayoutNode {
     return NodeType::Layer;
   }
 
+  /** Returns the layer position adjusted to the layout bounds. */
+  Point renderPosition() const;
+
  private:
   Layer() = default;
 
   void performContainerLayout(LayoutContext* context);
+  void updateScrollRect();
 
   void updateSize(LayoutContext* context) override;
   void onMeasure(LayoutContext* context) override;
-  void setLayoutSize(LayoutContext* context, float width, float height) override;
-  void setLayoutPosition(LayoutContext* context, float x, float y) override;
+  void setLayoutSize(LayoutContext* context, float targetWidth, float targetHeight) override;
   void updateLayout(LayoutContext* context) override;
 
   friend class PAGXDocument;

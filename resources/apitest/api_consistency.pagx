@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="100" height="100">
   <Layer>
-    <Rectangle left="20" top="20" size="60,60"/>
+    <Rectangle left="20" top="20" width="60" height="60"/>
     <Fill color="#FF5500"/>
   </Layer>
 </pagx>

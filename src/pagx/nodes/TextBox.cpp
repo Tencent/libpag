@@ -39,11 +39,10 @@ static TextLayoutParams MakeTextLayoutParams(const TextBox* textBox, float boxWi
 }
 
 void TextBox::onMeasure(LayoutContext* context) {
-  if (!std::isnan(width) && !std::isnan(height)) {
-    preferredWidth = width;
-    preferredHeight = height;
-    return;
-  }
+  // TextBox keeps width/height as the authored text-box dimensions for shaping. this->width /
+  // this->height constrain the shaping box and also become the preferred size when set; otherwise
+  // the shaped text bounds drive the preferred size. percentWidth/percentHeight are not consulted
+  // here; they are resolved by the parent via PerformConstraintLayout.
   bool hasPadding = !padding.isZero();
   float boxW = width;
   float boxH = height;
@@ -71,18 +70,33 @@ void TextBox::onMeasure(LayoutContext* context) {
   }
 }
 
-void TextBox::setLayoutSize(LayoutContext* context, float width, float height) {
-  layoutWidth = !std::isnan(width) ? width : preferredWidth;
-  layoutHeight = !std::isnan(height) ? height : preferredHeight;
+void TextBox::setLayoutSize(LayoutContext* context, float targetWidth, float targetHeight) {
+  // Mirror Group::setLayoutSize: keep content-measured axes NaN during pass 1 so percent
+  // descendants fall back to their preferred size instead of locking onto a provisional value.
+  bool widthFromContent = std::isnan(targetWidth) && std::isnan(this->width);
+  bool heightFromContent = std::isnan(targetHeight) && std::isnan(this->height);
+  layoutWidth = widthFromContent ? NAN : (!std::isnan(targetWidth) ? targetWidth : preferredWidth);
+  layoutHeight =
+      heightFromContent ? NAN : (!std::isnan(targetHeight) ? targetHeight : preferredHeight);
   updateLayout(context);
-  // An axis is content-measured when neither the parent nor the element itself specifies its size.
-  bool widthFromContent = std::isnan(width) && std::isnan(this->width);
-  bool heightFromContent = std::isnan(height) && std::isnan(this->height);
+  // Settle deferred axes to the preferred size and re-run updateLayout so descendants pick up
+  // the numeric container size before the cross-axis re-typesetting below.
+  if (widthFromContent || heightFromContent) {
+    if (widthFromContent) {
+      layoutWidth = preferredWidth;
+    }
+    if (heightFromContent) {
+      layoutHeight = preferredHeight;
+    }
+    updateLayout(context);
+  }
   // For TextBox, only a change in the wrap axis (width for horizontal, height for vertical)
-  // can affect the cross axis measurement. Re-typeset to compute the correct cross-axis size.
+  // can affect the cross axis measurement. Re-typeset to compute the correct cross-axis size,
+  // then re-run updateLayout so non-Text descendants pick up the refined container size.
   bool horizontal = (writingMode == WritingMode::Horizontal);
-  bool wrapAxisChanged = horizontal ? (!std::isnan(width) && width != preferredWidth)
-                                    : (!std::isnan(height) && height != preferredHeight);
+  bool wrapAxisChanged = horizontal
+                             ? (!std::isnan(targetWidth) && targetWidth != preferredWidth)
+                             : (!std::isnan(targetHeight) && targetHeight != preferredHeight);
   bool crossAxisFromContent = horizontal ? heightFromContent : widthFromContent;
   if (crossAxisFromContent && wrapAxisChanged) {
     bool hasPadding = !padding.isZero();
@@ -94,14 +108,20 @@ void TextBox::setLayoutSize(LayoutContext* context, float width, float height) {
     std::vector<Text*> childText = {};
     TextLayout::CollectTextElements(elements, childText);
     auto result = TextLayout::Layout(childText, params, context);
-    float crossSize = std::ceil(horizontal ? result.bounds.height : result.bounds.width);
+    // Measurement result: keep un-rounded so the TextBox mirrors the exact typeset extent.
+    // Rounding is reserved for layout-allocation sites (see LayoutNode::setLayoutSize contract).
+    float crossSize = horizontal ? result.bounds.height : result.bounds.width;
     if (hasPadding) {
       crossSize += horizontal ? (padding.top + padding.bottom) : (padding.left + padding.right);
     }
+    float prevCross = horizontal ? layoutHeight : layoutWidth;
     if (horizontal) {
       layoutHeight = crossSize;
     } else {
       layoutWidth = crossSize;
+    }
+    if (crossSize != prevCross) {
+      updateLayout(context);
     }
   }
 }
@@ -120,12 +140,13 @@ void TextBox::updateLayout(LayoutContext* context) {
   TextLayout::CollectTextElements(elements, childText);
   auto result = TextLayout::Layout(childText, params, context);
   for (size_t i = 0; i < childText.size(); i++) {
-    childText[i]->textBounds = result.getTextBounds(childText[i]);
-    childText[i]->glyphData->layoutRuns = result.extractLayoutRuns(childText[i]);
+    auto* text = childText[i];
+    text->textBounds = result.getTextBounds(text);
+    text->glyphData->layoutRuns = result.extractLayoutRuns(text);
     if (hasPadding) {
-      childText[i]->textBounds.x += padding.left;
-      childText[i]->textBounds.y += padding.top;
-      for (auto& run : childText[i]->glyphData->layoutRuns) {
+      text->textBounds.x += padding.left;
+      text->textBounds.y += padding.top;
+      for (auto& run : text->glyphData->layoutRuns) {
         for (auto& pos : run.positions) {
           pos.x += padding.left;
           pos.y += padding.top;
@@ -136,6 +157,15 @@ void TextBox::updateLayout(LayoutContext* context) {
         }
       }
     }
+    text->preferredX = text->textBounds.x;
+    text->preferredY = text->textBounds.y;
+    text->preferredWidth = text->textBounds.width;
+    text->preferredHeight = text->textBounds.height;
+    // Reset layoutWidth/Height so layoutBounds() falls back to preferred values. This is necessary
+    // because Group::updateLayout may have called setLayoutSize(NAN,NAN) on this Text before
+    // TextBox re-typesets it, leaving stale layoutWidth/Height from the old preferred size.
+    text->layoutWidth = NAN;
+    text->layoutHeight = NAN;
   }
 }
 
