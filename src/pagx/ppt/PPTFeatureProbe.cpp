@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/ppt/PPTFeatureProbe.h"
+#include <cmath>
+#include "base/utils/MathUtil.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/ColorStop.h"
@@ -32,8 +34,26 @@
 #include "pagx/nodes/TextBox.h"
 #include "pagx/types/BlendMode.h"
 #include "pagx/types/Color.h"
+#include "pagx/types/Matrix.h"
 
 namespace pagx {
+
+using pag::FloatNearlyZero;
+
+// A 2D affine matrix is representable by OOXML's <a:xfrm> (translation +
+// rotation + axis-aligned scale/flip) iff its column basis vectors are
+// orthogonal -- i.e. (a, b) . (c, d) == 0 after normalization. Any non-zero
+// shear breaks that, and the matrix decomposition in PPTExporter silently
+// drops the shear component, producing visibly wrong geometry.
+static bool MatrixHasShear(const Matrix& m) {
+  float lenA = std::sqrt(m.a * m.a + m.b * m.b);
+  float lenC = std::sqrt(m.c * m.c + m.d * m.d);
+  if (lenA <= 0 || lenC <= 0) {
+    return false;
+  }
+  float dot = (m.a * m.c + m.b * m.d) / (lenA * lenC);
+  return std::fabs(dot) > 1e-3f;
+}
 
 static bool IsSupportedBlend(BlendMode mode) {
   switch (mode) {
@@ -60,6 +80,7 @@ static void Merge(PPTFeatureFlags* dst, const PPTFeatureFlags& src) {
   dst->hasWideGamutColor |= src.hasWideGamutColor;
   dst->hasDiamondGradient |= src.hasDiamondGradient;
   dst->hasConicGradient |= src.hasConicGradient;
+  dst->hasShearTransform |= src.hasShearTransform;
 }
 
 static void ProbeColorSource(const ColorSource* source, PPTFeatureFlags* out) {
@@ -151,6 +172,9 @@ PPTFeatureFlags ProbeElementsFeatures(const std::vector<Element*>& elements) {
       }
       case NodeType::Group: {
         auto* g = static_cast<const Group*>(el);
+        if (!FloatNearlyZero(g->skew)) {
+          out.hasShearTransform = true;
+        }
         Merge(&out, ProbeElementsFeatures(g->elements));
         break;
       }
@@ -173,6 +197,9 @@ PPTFeatureFlags ProbeLayerFeatures(const Layer* layer) {
   }
   if (!IsSupportedBlend(layer->blendMode)) {
     out.hasUnsupportedBlend = true;
+  }
+  if (!layer->matrix.isIdentity() && MatrixHasShear(layer->matrix)) {
+    out.hasShearTransform = true;
   }
   for (const auto* filter : layer->filters) {
     if (filter == nullptr) {

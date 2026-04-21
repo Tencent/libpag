@@ -47,13 +47,18 @@ struct PPTFeatureFlags {
   bool hasConicGradient = false;     // OOXML has no sweep/angular gradient primitive; any path
                                      // gradient approximation collapses the angular distribution
                                      // and must be rasterized for a faithful result.
+  bool hasShearTransform = false;    // A Group (or Layer matrix) carries a shear/skew that the
+                                     // OOXML <a:xfrm> primitive cannot represent (it only supports
+                                     // translation, rotation, and axis-aligned scale/flip). The
+                                     // exporter's matrix decomposition silently drops the shear,
+                                     // producing a visibly wrong shape unless the layer is baked.
 
   /**
    * Returns true when at least one unsupported feature is present.
    */
   bool needsRasterization(bool rasterizeUnsupportedBlend, bool rasterizeWideGamut) const {
     if (hasTextPath || hasTextModifier || hasColorMatrix || hasConicGradient ||
-        hasDiamondGradient) {
+        hasDiamondGradient || hasShearTransform) {
       return true;
     }
     if (rasterizeUnsupportedBlend && hasUnsupportedBlend) {
