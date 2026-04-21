@@ -36,9 +36,9 @@
         <Layer height="110" layout="horizontal" gap="20" arrangement="spaceEvenly" alignment="center">
           <!-- rotateX 60° -->
           <Layer width="90" height="90" layout="vertical" gap="6" alignment="center" arrangement="center">
-            <Layer width="80" height="60" centerX="0" centerY="0">
+            <Layer width="80" height="60">
               <!-- column-major: Rx(60°). cos60=0.5, sin60=0.866 -->
-              <Layer matrix3D="1,0,0,0, 0,0.5,0.866,0, 0,-0.866,0.5,0, 0,0,0,1" preserve3D="true">
+              <Layer matrix3D="1,0,0,0,0,0.5,0.866,0,0,-0.866,0.5,0,0,0,0,1" preserve3D="true">
                 <Rectangle position="40,30" size="80,60" roundness="8"/>
                 <Fill color="#3B82F6"/>
               </Layer>
@@ -51,9 +51,9 @@
 
           <!-- rotateY 60° -->
           <Layer width="90" height="90" layout="vertical" gap="6" alignment="center" arrangement="center">
-            <Layer width="80" height="60" centerX="0" centerY="0">
+            <Layer width="80" height="60">
               <!-- column-major: Ry(60°) -->
-              <Layer matrix3D="0.5,0,-0.866,0, 0,1,0,0, 0.866,0,0.5,0, 0,0,0,1" preserve3D="true">
+              <Layer matrix3D="0.5,0,-0.866,0,0,1,0,0,0.866,0,0.5,0,0,0,0,1" preserve3D="true">
                 <Rectangle position="40,30" size="80,60" roundness="8"/>
                 <Fill color="#10B981"/>
               </Layer>
@@ -66,9 +66,9 @@
 
           <!-- rotateZ 60° -->
           <Layer width="90" height="90" layout="vertical" gap="6" alignment="center" arrangement="center">
-            <Layer width="80" height="60" centerX="0" centerY="0">
+            <Layer width="80" height="60">
               <!-- column-major: Rz(60°) -->
-              <Layer matrix3D="0.5,0.866,0,0, -0.866,0.5,0,0, 0,0,1,0, 0,0,0,1" preserve3D="true">
+              <Layer matrix3D="0.5,0.866,0,0,-0.866,0.5,0,0,0,0,1,0,0,0,0,1" preserve3D="true">
                 <Rectangle position="40,30" size="80,60" roundness="8"/>
                 <Fill color="#EC4899"/>
               </Layer>
@@ -89,14 +89,14 @@
             <Text text="preserve3D: two translucent planes sharing 3D space" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
-          <Layer width="200" height="120" centerX="0" preserve3D="true">
+          <Layer width="200" height="120" preserve3D="true">
             <!-- Plane A: rotateY 45° -->
-            <Layer matrix3D="0.707,0,-0.707,0, 0,1,0,0, 0.707,0,0.707,0, 0,0,0,1">
+            <Layer matrix3D="0.707,0,-0.707,0,0,1,0,0,0.707,0,0.707,0,0,0,0,1">
               <Rectangle position="100,60" size="160,90" roundness="10"/>
               <Fill color="#F59E0BB3"/>
             </Layer>
             <!-- Plane B: rotateX 60° -->
-            <Layer matrix3D="1,0,0,0, 0,0.5,0.866,0, 0,-0.866,0.5,0, 0,0,0,1">
+            <Layer matrix3D="1,0,0,0,0,0.5,0.866,0,0,-0.866,0.5,0,0,0,0,1">
               <Rectangle position="100,60" size="160,90" roundness="10"/>
               <Fill color="#8B5CF6B3"/>
             </Layer>
