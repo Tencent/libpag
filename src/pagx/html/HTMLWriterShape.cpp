@@ -723,35 +723,43 @@ std::string RectToPathData(const Rectangle* r) {
   float y = pos.y - size.height / 2;
   float w = size.width;
   float h = size.height;
+  // tgfx starts its rectangle path at the top-right corner (SkRRect startIndex=2) and walks
+  // clockwise. For non-dashed fills/strokes this is invisible, but `stroke-dasharray` relies
+  // on absolute path length from the starting point, so we must match tgfx's start corner
+  // verbatim or dashes land at different phases on each edge.
   if (r->roundness <= 0) {
     if (r->reversed) {
-      return "M" + FloatToString(x) + "," + FloatToString(y) + "V" + FloatToString(y + h) + "H" +
-             FloatToString(x + w) + "V" + FloatToString(y) + "Z";
+      // Counter-clockwise from top-right: (x+w,y) -> (x+w,y+h) -> (x,y+h) -> (x,y) -> close.
+      return "M" + FloatToString(x + w) + "," + FloatToString(y) + "V" + FloatToString(y + h) +
+             "H" + FloatToString(x) + "V" + FloatToString(y) + "Z";
     }
-    return "M" + FloatToString(x) + "," + FloatToString(y) + "H" + FloatToString(x + w) + "V" +
-           FloatToString(y + h) + "H" + FloatToString(x) + "Z";
+    // Clockwise from top-right: (x+w,y) -> (x,y) -> (x,y+h) -> (x+w,y+h) -> close.
+    return "M" + FloatToString(x + w) + "," + FloatToString(y) + "H" + FloatToString(x) + "V" +
+           FloatToString(y + h) + "H" + FloatToString(x + w) + "Z";
   }
   float rn = std::min(r->roundness, std::min(w / 2, h / 2));
   std::string d;
   if (r->reversed) {
-    d += "M" + FloatToString(x + rn) + "," + FloatToString(y);
-    d += "A" + FloatToString(rn) + "," + FloatToString(rn) + " 0 0 0 " + FloatToString(x) + "," +
-         FloatToString(y + rn);
+    // Counter-clockwise from top-right, starting just past the top-right round corner.
+    d += "M" + FloatToString(x + w) + "," + FloatToString(y + rn);
     d += "V" + FloatToString(y + h - rn);
-    d += "A" + FloatToString(rn) + "," + FloatToString(rn) + " 0 0 0 " + FloatToString(x + rn) +
+    d += "A" + FloatToString(rn) + "," + FloatToString(rn) + " 0 0 0 " + FloatToString(x + w - rn) +
          "," + FloatToString(y + h);
+    d += "H" + FloatToString(x + rn);
+    d += "A" + FloatToString(rn) + "," + FloatToString(rn) + " 0 0 0 " + FloatToString(x) + "," +
+         FloatToString(y + h - rn);
+    d += "V" + FloatToString(y + rn);
+    d += "A" + FloatToString(rn) + "," + FloatToString(rn) + " 0 0 0 " + FloatToString(x + rn) +
+         "," + FloatToString(y);
     d += "H" + FloatToString(x + w - rn);
     d += "A" + FloatToString(rn) + "," + FloatToString(rn) + " 0 0 0 " + FloatToString(x + w) +
-         "," + FloatToString(y + h - rn);
-    d += "V" + FloatToString(y + rn);
-    d += "A" + FloatToString(rn) + "," + FloatToString(rn) + " 0 0 0 " + FloatToString(x + w - rn) +
-         "," + FloatToString(y);
+         "," + FloatToString(y + rn);
     d += "Z";
   } else {
-    d += "M" + FloatToString(x + rn) + "," + FloatToString(y);
-    d += "H" + FloatToString(x + w - rn);
-    d += "A" + FloatToString(rn) + "," + FloatToString(rn) + " 0 0 1 " + FloatToString(x + w) +
-         "," + FloatToString(y + rn);
+    // Clockwise from top-right, starting just past the top-right round corner (SkRRect
+    // startIndex=2 puts the move-to at the corner's bottom tangent and walks along the right
+    // edge downward first).
+    d += "M" + FloatToString(x + w) + "," + FloatToString(y + rn);
     d += "V" + FloatToString(y + h - rn);
     d += "A" + FloatToString(rn) + "," + FloatToString(rn) + " 0 0 1 " + FloatToString(x + w - rn) +
          "," + FloatToString(y + h);
@@ -761,6 +769,9 @@ std::string RectToPathData(const Rectangle* r) {
     d += "V" + FloatToString(y + rn);
     d += "A" + FloatToString(rn) + "," + FloatToString(rn) + " 0 0 1 " + FloatToString(x + rn) +
          "," + FloatToString(y);
+    d += "H" + FloatToString(x + w - rn);
+    d += "A" + FloatToString(rn) + "," + FloatToString(rn) + " 0 0 1 " + FloatToString(x + w) +
+         "," + FloatToString(y + rn);
     d += "Z";
   }
   return d;
@@ -987,7 +998,13 @@ void HTMLWriter::applySVGStroke(HTMLBuilder& out, const Stroke* stroke, float pa
     out.addAttr("stroke-dasharray", d);
   }
   if (stroke->dashOffset != 0.0f) {
-    out.addAttr("stroke-dashoffset", FloatToString(stroke->dashOffset));
+    // SVG `stroke-dashoffset` and tgfx's Skia `SkDashPathEffect` phase specify opposite
+    // directions along the path. tgfx interprets a positive phase as shifting the dash pattern
+    // FORWARD (the first "on" segment starts `phase` units into the pattern and the path
+    // start lands mid-dash), while SVG interprets a positive offset as shifting the pattern
+    // BACKWARD (the path start lies `offset` units past where the first "on" segment began).
+    // Emit the negated value so the HTML render matches the PAGX render phase-for-phase.
+    out.addAttr("stroke-dashoffset", FloatToString(-stroke->dashOffset));
   }
 }
 
@@ -1655,10 +1672,20 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     switch (g.type) {
       case NodeType::Rectangle: {
         auto r = static_cast<const Rectangle*>(g.element);
-        if (trim) {
-          PathData pathData = PathDataFromSVGString("");
-          GeoToPathData(g.element, g.type, pathData);
-          std::string d = PathDataToSVGString(pathData);
+        // `<rect>` doesn't let us control the path-start corner, but `stroke-dasharray`
+        // phase depends on where the path begins. tgfx uses top-right as the start corner
+        // (via SkRRect startIndex=2), so emit a `<path>` whenever a dashed stroke exists
+        // and let RectToPathData produce the matching start.
+        bool needsPathForDash = stroke && !stroke->dashes.empty();
+        if (trim || needsPathForDash) {
+          std::string d;
+          if (needsPathForDash && !trim) {
+            d = RectToPathData(r);
+          } else {
+            PathData pathData = PathDataFromSVGString("");
+            GeoToPathData(g.element, g.type, pathData);
+            d = PathDataToSVGString(pathData);
+          }
           out.openTag("path");
           out.addAttr("d", d);
         } else {
