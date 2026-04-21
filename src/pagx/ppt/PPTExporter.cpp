@@ -1586,11 +1586,13 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
                      .addRequiredAttribute("tIns", "0")
                      .addRequiredAttribute("rIns", "0")
                      .addRequiredAttribute("bIns", "0");
+  bool isVertical = false;
   if (fs.textBox) {
+    isVertical = (fs.textBox->writingMode == WritingMode::Vertical);
     // CJK vertical writing: characters stay upright, columns stack right-to-left.
     // "eaVert" matches the WritingMode::Vertical contract (East Asian vertical
     // text). Latin "vert"/"vert270" rotate glyphs sideways which is wrong here.
-    if (fs.textBox->writingMode == WritingMode::Vertical) {
+    if (isVertical) {
       bodyPr.addRequiredAttribute("vert", "eaVert");
     }
     // OOXML's "anchor" describes alignment along the block-flow axis, which
@@ -1603,6 +1605,12 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
       bodyPr.addRequiredAttribute("anchor", "ctr");
     } else if (fs.textBox->paragraphAlign == ParagraphAlign::Far) {
       bodyPr.addRequiredAttribute("anchor", "b");
+    }
+    // See writeTextBoxGroup for the rationale: in vertical mode, anchorCtr="1"
+    // is the only attribute that actually centres text along the column's
+    // inline (vertical) axis in both PowerPoint and LibreOffice.
+    if (isVertical && fs.textBox->textAlign == TextAlign::Center) {
+      bodyPr.addRequiredAttribute("anchorCtr", "1");
     }
   }
   bodyPr.closeElementSelfClosing();
@@ -1965,13 +1973,24 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
                      .addRequiredAttribute("tIns", "0")
                      .addRequiredAttribute("rIns", "0")
                      .addRequiredAttribute("bIns", "0");
-  if (box->writingMode == WritingMode::Vertical) {
+  bool isVertical = (box->writingMode == WritingMode::Vertical);
+  if (isVertical) {
     bodyPr.addRequiredAttribute("vert", "eaVert");
   }
   if (box->paragraphAlign == ParagraphAlign::Middle) {
     bodyPr.addRequiredAttribute("anchor", "ctr");
   } else if (box->paragraphAlign == ParagraphAlign::Far) {
     bodyPr.addRequiredAttribute("anchor", "b");
+  }
+  // In vertical writing mode the bodyPr@anchor controls placement perpendicular
+  // to the text-flow axis (i.e. horizontal placement of the column block), so
+  // textAlign="center" cannot be expressed via pPr@algn — both PowerPoint and
+  // LibreOffice ignore algn for vertical-axis centering of the text within a
+  // column. anchorCtr="1" toggles the "center on the perpendicular axis" flag,
+  // which in vertical mode produces the desired vertical centering of the text
+  // within its column.
+  if (isVertical && box->textAlign == TextAlign::Center) {
+    bodyPr.addRequiredAttribute("anchorCtr", "1");
   }
   bodyPr.closeElementSelfClosing();
   out.openElement("a:lstStyle").closeElementSelfClosing();
