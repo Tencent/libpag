@@ -1007,10 +1007,9 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       auto ds = static_cast<const DropShadowStyle*>(ls);
       if (hasBlendMode) {
         belowStyles.push_back({NodeType::DropShadowStyle, ls});
-      } else if (ds->blurX == ds->blurY && ds->showBehindLayer) {
-        std::string radius = hasBackdropBlurFill && boxShadowValue.empty()
-                                 ? layerBoxShadowBorderRadius(layer)
-                                 : std::string();
+      } else if (ds->blurX == ds->blurY && ds->showBehindLayer && hasBackdropBlurFill &&
+                 boxShadowValue.empty()) {
+        std::string radius = layerBoxShadowBorderRadius(layer);
         if (!radius.empty()) {
           // box-shadow fallback: preserves the sibling backdrop-filter sampling path. Also
           // propagate group opacity down to children, because `opacity < 1` on the layer div
@@ -1019,15 +1018,13 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
                            FloatToString(ds->blurX) + "px " + ColorToRGBA(ds->color);
           boxShadowBorderRadius = radius;
           suppressGroupOpacity = true;
-        } else {
-          if (!filterValues.empty()) {
-            filterValues += ' ';
-          }
-          filterValues += "drop-shadow(" + FloatToString(ds->offsetX) + "px " +
-                          FloatToString(ds->offsetY) + "px " + FloatToString(ds->blurX) + "px " +
-                          ColorToRGBA(ds->color) + ")";
+          continue;
         }
-      } else {
+        // Fall through to the SVG filter path below; CSS `filter: drop-shadow()` is avoided
+        // because it reads source alpha as-is, so semi-transparent fills produce proportionally
+        // weaker shadows while PAGX's shadow shape comes from a saturated opaque silhouette.
+      }
+      {
         std::string fid = _ctx->nextId("filter");
         _defs->openTag("filter");
         _defs->addAttr("id", fid);
