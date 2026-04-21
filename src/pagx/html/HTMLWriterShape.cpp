@@ -47,6 +47,23 @@ using pag::FloatNearlyZero;
 // Static path helpers
 //==============================================================================
 
+// Returns true when this ImagePattern's tile semantics and matrix form can be faithfully
+// expressed by CSS background-{image,repeat,size,position} without rasterization. Mirror has no
+// CSS equivalent and Clamp's edge-pixel extension is not expressible either, so both must continue
+// through the PNG path. Rotated or skewed matrices also fall back to PNG. Pure scale, pure
+// translation, and identity all map cleanly onto CSS.
+static bool imagePatternCSSable(const ImagePattern* p) {
+  bool xOk = (p->tileModeX == TileMode::Repeat || p->tileModeX == TileMode::Decal);
+  bool yOk = (p->tileModeY == TileMode::Repeat || p->tileModeY == TileMode::Decal);
+  if (!xOk || !yOk) {
+    return false;
+  }
+  if (!FloatNearlyZero(p->matrix.b) || !FloatNearlyZero(p->matrix.c)) {
+    return false;
+  }
+  return true;
+}
+
 // Emit a cubic Bezier segment with control points perpendicular to the radial direction,
 // matching the native renderer's AddCurveToPath algorithm.
 static void AppendPolystarCurve(std::string& d, float centerX, float centerY, float angleDelta,
@@ -1135,37 +1152,42 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
       } else if (ct == NodeType::ImagePattern) {
         auto p = static_cast<const ImagePattern*>(fill->color);
         style += ";background-image:" + css;
-        std::string repeatX = "no-repeat";
-        std::string repeatY = "no-repeat";
-        if (p->tileModeX == TileMode::Repeat || p->tileModeX == TileMode::Mirror) {
-          repeatX = "repeat";
-        }
-        if (p->tileModeY == TileMode::Repeat || p->tileModeY == TileMode::Mirror) {
-          repeatY = "repeat";
-        }
+        // The dispatcher in paintGeos gates Mirror/Clamp to the PNG path, so we should only see
+        // Repeat and Decal here. Map defensively: anything that is not Repeat becomes no-repeat
+        // rather than silently aliasing Mirror onto repeat (which was a latent bug before the
+        // gate fix because the code path was unreachable in practice).
+        auto repeatFor = [](TileMode m) -> const char* {
+          return m == TileMode::Repeat ? "repeat" : "no-repeat";
+        };
+        std::string repeatX = repeatFor(p->tileModeX);
+        std::string repeatY = repeatFor(p->tileModeY);
         if (repeatX == repeatY) {
           style += ";background-repeat:" + repeatX;
         } else {
           style += ";background-repeat:" + repeatX + " " + repeatY;
         }
-        if (!p->matrix.isIdentity()) {
-          float sx = std::sqrt(p->matrix.a * p->matrix.a + p->matrix.b * p->matrix.b);
-          float sy = std::sqrt(p->matrix.c * p->matrix.c + p->matrix.d * p->matrix.d);
-          if (!FloatNearlyZero(sx - 1.0f) || !FloatNearlyZero(sy - 1.0f)) {
-            style += ";background-size:" + FloatToString(sx * 100.0f) + "% " +
-                     FloatToString(sy * 100.0f) + "%";
+        // When any axis tiles, the tile unit on screen must equal (sx*imgW, sy*imgH) CSS pixels
+        // to mirror tgfx's pattern->setMatrix() inverse texture-coordinate transform. That needs
+        // the image's native dimensions; emit background-size in absolute pixels when we can
+        // decode them, otherwise leave it off and let the browser use the natural image size
+        // (which is correct for identity matrices and a graceful degradation otherwise).
+        bool anyRepeat = (p->tileModeX == TileMode::Repeat) || (p->tileModeY == TileMode::Repeat);
+        if (anyRepeat) {
+          auto size = GetImageNativeSize(p->image);
+          if (size.first > 0 && size.second > 0) {
+            float sx = std::sqrt(p->matrix.a * p->matrix.a + p->matrix.b * p->matrix.b);
+            float sy = std::sqrt(p->matrix.c * p->matrix.c + p->matrix.d * p->matrix.d);
+            float tileW = sx * static_cast<float>(size.first);
+            float tileH = sy * static_cast<float>(size.second);
+            style +=
+                ";background-size:" + FloatToString(tileW) + "px " + FloatToString(tileH) + "px";
           }
-          if (!FloatNearlyZero(p->matrix.tx) || !FloatNearlyZero(p->matrix.ty)) {
-            style += ";background-position:" + FloatToString(p->matrix.tx) + "px " +
-                     FloatToString(p->matrix.ty) + "px";
-          }
-        } else {
-          // For non-tiling modes (Clamp/Decal), do not set background-size.
-          // The image stays at its natural size with no-repeat (closest to Decal behavior).
-          // CSS has no equivalent for Clamp (edge pixel extension).
         }
-        // TODO: ImagePattern.mipmapMode is ignored. CSS/SVG has no direct control over mipmap
-        // sampling; browsers handle mipmap generation internally.
+        if (!FloatNearlyZero(p->matrix.tx) || !FloatNearlyZero(p->matrix.ty)) {
+          style += ";background-position:" + FloatToString(p->matrix.tx) + "px " +
+                   FloatToString(p->matrix.ty) + "px";
+        }
+        // ImagePattern.mipmapMode has no CSS equivalent; browsers pick internal mipmap policy.
         if (p->filterMode == FilterMode::Nearest) {
           style += ";image-rendering:pixelated";
         }
@@ -2127,7 +2149,11 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
   if (fill && fill->color && fill->color->nodeType() == NodeType::ImagePattern &&
       geos.size() == 1 && !stroke) {
     auto p = static_cast<const ImagePattern*>(fill->color);
-    if (p->tileModeX != TileMode::Decal || p->tileModeY != TileMode::Decal) {
+    // Only patterns whose tile semantics have no CSS equivalent (Mirror, Clamp) or whose matrix
+    // carries rotation/skew need the PNG rasterization path. Pure-scale repeat and all decal
+    // variants fall through to the CSS branch below, which keeps the HTML DOM-inspectable and
+    // avoids writing PNGs for simple tiled fills.
+    if (p->image && !imagePatternCSSable(p)) {
       renderImagePatternCanvas(out, geos[0], fill, alpha, painterBlend);
       return;
     }

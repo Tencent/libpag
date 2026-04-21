@@ -20,6 +20,7 @@
 
 #include <string>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 #include "pagx/html/HTMLBuilder.h"
 #include "pagx/nodes/ColorSource.h"
@@ -77,6 +78,14 @@ std::string PaddingToCSS(const Padding& padding);
 
 std::string GetImageSrc(const Image* image);
 const char* DetectImageMime(const uint8_t* bytes, size_t size);
+
+/**
+ * Decodes just the header of the given image to recover its native pixel dimensions. Returns
+ * {0, 0} when the image is missing, unreadable, or in a format tgfx cannot decode. Used by the
+ * CSS ImagePattern branch to emit `background-size` in absolute pixels so repeat tiling matches
+ * tgfx's texture-coordinate transform exactly.
+ */
+std::pair<int, int> GetImageNativeSize(const Image* image);
 
 // Mirrors tgfx/src/core/utils/FauxBoldScale.cpp. Returns the stroke width (in px) that produces
 // the same visible thickening as tgfx's faux-bold path rendering at the given fontSize.

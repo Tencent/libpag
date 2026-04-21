@@ -32,6 +32,8 @@
 #include "pagx/types/Padding.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/StringParser.h"
+#include "tgfx/core/Data.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace pagx {
 
@@ -116,6 +118,23 @@ std::string GetImageSrc(const Image* image) {
            Base64Encode(image->data->bytes(), image->data->size());
   }
   return EscapeCSSUrl(image->filePath);
+}
+
+std::pair<int, int> GetImageNativeSize(const Image* image) {
+  if (!image) {
+    return {0, 0};
+  }
+  std::shared_ptr<tgfx::ImageCodec> codec;
+  if (image->data && image->data->size() > 0) {
+    auto td = tgfx::Data::MakeWithCopy(image->data->bytes(), image->data->size());
+    codec = tgfx::ImageCodec::MakeFrom(std::move(td));
+  } else if (!image->filePath.empty()) {
+    codec = tgfx::ImageCodec::MakeFrom(image->filePath);
+  }
+  if (!codec) {
+    return {0, 0};
+  }
+  return {codec->width(), codec->height()};
 }
 
 std::string CSSStops(const std::vector<ColorStop*>& stops) {
