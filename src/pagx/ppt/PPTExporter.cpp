@@ -1488,6 +1488,8 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
       style.algn = "ctr";
     } else if (fs.textBox->textAlign == TextAlign::End) {
       style.algn = "r";
+    } else if (fs.textBox->textAlign == TextAlign::Justify) {
+      style.algn = "just";
     }
   }
   style.hasBold = text->fontStyle.find("Bold") != std::string::npos;
@@ -1718,6 +1720,8 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
     algn = "ctr";
   } else if (box->textAlign == TextAlign::End) {
     algn = "r";
+  } else if (box->textAlign == TextAlign::Justify) {
+    algn = "just";
   }
 
   // Build per-run styles up-front (font/size/bold/italic/color/typeface).
