@@ -156,40 +156,54 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
       case NodeType::InnerShadowFilter: {
         auto s = static_cast<const InnerShadowFilter*>(f);
         std::string i = std::to_string(si++);
-        _defs->openTag("feOffset");
+        // Invert source alpha so that exterior becomes opaque and interior becomes transparent.
+        // Blurring the inverted alpha produces a falloff that bleeds into the shape from every
+        // edge, then offsetting and clipping back to the source mask yields the inner shadow.
+        // The arithmetic "SourceAlpha - offsetAlpha" variant only keeps a one-sided edge band
+        // whose blurred energy is too faint to match tgfx's InnerShadowImageFilter.
+        _defs->openTag("feComponentTransfer");
         _defs->addAttr("in", currentAlpha);
-        if (!FloatNearlyZero(s->offsetX)) {
-          _defs->addAttr("dx", FloatToString(s->offsetX));
-        }
-        if (!FloatNearlyZero(s->offsetY)) {
-          _defs->addAttr("dy", FloatToString(s->offsetY));
-        }
-        _defs->addAttr("result", "iOff" + i);
+        _defs->addAttr("result", "iInv" + i);
+        _defs->closeTagStart();
+        _defs->openTag("feFuncA");
+        _defs->addAttr("type", "table");
+        _defs->addAttr("tableValues", "1 0");
         _defs->closeTagSelfClosing();
-        _defs->openTag("feComposite");
-        _defs->addAttr("in", currentAlpha);
-        _defs->addAttr("in2", "iOff" + i);
-        _defs->addAttr("operator", "arithmetic");
-        _defs->addAttr("k2", "-1");
-        _defs->addAttr("k3", "1");
-        _defs->addAttr("result", "iComp" + i);
-        _defs->closeTagSelfClosing();
+        _defs->closeTag();
         std::string sd = FloatToString(s->blurX);
         if (s->blurX != s->blurY) {
           sd += " " + FloatToString(s->blurY);
         }
         _defs->openTag("feGaussianBlur");
-        _defs->addAttr("in", "iComp" + i);
+        _defs->addAttr("in", "iInv" + i);
         _defs->addAttr("stdDeviation", sd);
         _defs->addAttr("result", "iBlur" + i);
         _defs->closeTagSelfClosing();
-        _defs->openTag("feColorMatrix");
-        _defs->addAttr("in", "iBlur" + i);
-        _defs->addAttr("type", "matrix");
-        _defs->addAttr("values", "0 0 0 0 " + FloatToString(s->color.red) + " 0 0 0 0 " +
-                                     FloatToString(s->color.green) + " 0 0 0 0 " +
-                                     FloatToString(s->color.blue) + " 0 0 0 " +
-                                     FloatToString(s->color.alpha) + " 0");
+        std::string blurredResult = "iBlur" + i;
+        if (!FloatNearlyZero(s->offsetX) || !FloatNearlyZero(s->offsetY)) {
+          _defs->openTag("feOffset");
+          _defs->addAttr("in", blurredResult);
+          if (!FloatNearlyZero(s->offsetX)) {
+            _defs->addAttr("dx", FloatToString(s->offsetX));
+          }
+          if (!FloatNearlyZero(s->offsetY)) {
+            _defs->addAttr("dy", FloatToString(s->offsetY));
+          }
+          _defs->addAttr("result", "iOff" + i);
+          _defs->closeTagSelfClosing();
+          blurredResult = "iOff" + i;
+        }
+        _defs->openTag("feFlood");
+        _defs->addAttr("flood-color", ColorToSVGHex(s->color));
+        if (s->color.alpha < 1.0f) {
+          _defs->addAttr("flood-opacity", FloatToString(s->color.alpha));
+        }
+        _defs->addAttr("result", "iFlood" + i);
+        _defs->closeTagSelfClosing();
+        _defs->openTag("feComposite");
+        _defs->addAttr("in", "iFlood" + i);
+        _defs->addAttr("in2", blurredResult);
+        _defs->addAttr("operator", "in");
         _defs->addAttr("result", "iShadow" + i);
         _defs->closeTagSelfClosing();
         _defs->openTag("feComposite");
