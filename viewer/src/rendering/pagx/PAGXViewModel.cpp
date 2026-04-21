@@ -152,7 +152,7 @@ void PAGXViewModel::markNeedsRender() {
 
 PAGXViewModel::RenderState PAGXViewModel::getRenderState() {
   std::lock_guard<std::mutex> lock(renderMutex);
-  return {displayList, pagxContentLayer, pagxWidth, pagxHeight};
+  return {displayList, pagxRootLayer, pagxWidth, pagxHeight};
 }
 
 bool PAGXViewModel::hasContent() {
@@ -230,7 +230,7 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
     pagxDocument = document;
     pagxWidth = static_cast<int>(document->width);
     pagxHeight = static_cast<int>(document->height);
-    pagxContentLayer = newContainer;
+    pagxRootLayer = newContainer;
     updateAnimationState();
     displayList = std::move(newDisplayList);
     needsRender = true;
@@ -287,7 +287,7 @@ void PAGXViewModel::previousFrame() {
 
 void PAGXViewModel::clearContent() {
   pagxDocument = nullptr;
-  pagxContentLayer = nullptr;
+  pagxRootLayer = nullptr;
   displayList = nullptr;
 }
 
@@ -329,7 +329,7 @@ QString PAGXViewModel::applyXmlChanges(const QString& newXml) {
     pagxDocument = document;
     pagxWidth = static_cast<int>(document->width);
     pagxHeight = static_cast<int>(document->height);
-    pagxContentLayer = newContainer;
+    pagxRootLayer = newContainer;
     updateAnimationState();
     displayList = std::move(newDisplayList);
     needsRender = true;
