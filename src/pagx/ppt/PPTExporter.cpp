@@ -319,10 +319,14 @@ class PPTWriter {
                        const TextLayoutResult* precomputed = nullptr);
   void writeParagraph(XMLBuilder& out, const std::string& lineText, const PPTRunStyle& style,
                       const std::vector<LayerFilter*>& filters,
-                      const std::vector<LayerStyle*>& styles);
+                      const std::vector<LayerStyle*>& styles, int64_t lnSpcPts = 0);
   void writeParagraphRun(XMLBuilder& out, const std::string& runText, const PPTRunStyle& style,
                          const std::vector<LayerFilter*>& filters,
                          const std::vector<LayerStyle*>& styles);
+  // Soft line break inside an a:p. The rPr is needed so the line break inherits
+  // the same font/size as the following run (otherwise PowerPoint uses its
+  // default size and the line-height of that break is wrong).
+  void writeLineBreak(XMLBuilder& out, const PPTRunStyle& style);
   void writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
                          const std::vector<Element*>& elements, const Matrix& transform,
                          float alpha, const std::vector<LayerFilter*>& filters,
@@ -1560,9 +1564,24 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   // the actual glyph outlines.
   out.closeElement();  // p:spPr
 
+  // When PAGX layout produced explicit per-line byte ranges we emit them as
+  // soft <a:br/> breaks within a single paragraph ourselves, so PowerPoint
+  // shouldn't perform additional line-wrapping on top (its font metrics differ
+  // slightly from PAGX's, which would shift the break points). Vertical layout
+  // has no line info; fall back to PowerPoint-driven wrapping in that case.
+  bool useLineLayout = (lines != nullptr) && !lines->empty();
+  // Justify alignment requires PowerPoint to know a target line width; with
+  // wrap="none" the text is unbounded so PPT silently falls back to start
+  // alignment. Use wrap="square" in that case so PPT can justify within the
+  // shape's text area (our PAGX-determined visual lines should fit, so PPT
+  // shouldn't introduce additional wraps).
+  bool justifyAlign = fs.textBox && fs.textBox->textAlign == TextAlign::Justify;
+
   out.openElement("p:txBody").closeElementStart();
   auto& bodyPr = out.openElement("a:bodyPr")
-                     .addRequiredAttribute("wrap", hasTextBox ? "square" : "none")
+                     .addRequiredAttribute("wrap", useLineLayout
+                                                       ? (justifyAlign ? "square" : "none")
+                                                       : (hasTextBox ? "square" : "none"))
                      .addRequiredAttribute("lIns", "0")
                      .addRequiredAttribute("tIns", "0")
                      .addRequiredAttribute("rIns", "0")
@@ -1623,7 +1642,38 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   style.fillColor = style.hasFillColor ? fs.fill->color : nullptr;
   style.typeface = text->fontFamily.empty() ? std::string() : StripQuotes(text->fontFamily);
 
-  if (lines && !lines->empty()) {
+  // PAGX `lineHeight` is an absolute pixel value; PPT's <a:lnSpc><a:spcPts>
+  // takes hundredths of a point. Convert px → pt with the same 96 DPI ratio
+  // (×72/96 = ×0.75) used elsewhere in this writer, then multiply by 100.
+  int64_t lnSpcPts = (fs.textBox && fs.textBox->lineHeight > 0)
+                         ? static_cast<int64_t>(std::round(fs.textBox->lineHeight * 75.0))
+                         : 0;
+
+  if (useLineLayout) {
+    // Emit ALL visual lines inside a single <a:p> separated by soft <a:br/>
+    // breaks. OOXML's algn="just" never justifies the last line of a
+    // paragraph, so isolating each line in its own paragraph would disable
+    // justify entirely; soft breaks within one paragraph make all lines
+    // except the semantically last participate in justify.
+    bool wroteAny = false;
+    out.openElement("a:p").closeElementStart();
+    if (style.algn || lnSpcPts > 0) {
+      auto& pPr = out.openElement("a:pPr");
+      if (style.algn) {
+        pPr.addRequiredAttribute("algn", style.algn);
+      }
+      if (lnSpcPts > 0) {
+        pPr.closeElementStart();
+        out.openElement("a:lnSpc").closeElementStart();
+        out.openElement("a:spcPts")
+            .addRequiredAttribute("val", lnSpcPts)
+            .closeElementSelfClosing();
+        out.closeElement();  // a:lnSpc
+        out.closeElement();  // a:pPr
+      } else {
+        pPr.closeElementSelfClosing();
+      }
+    }
     for (const auto& lineInfo : *lines) {
       if (lineInfo.byteStart >= lineInfo.byteEnd) {
         continue;
@@ -1633,8 +1683,13 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
       if (line.empty()) {
         continue;
       }
-      writeParagraph(out, line, style, filters, styles);
+      if (wroteAny) {
+        writeLineBreak(out, style);
+      }
+      writeParagraphRun(out, line, style, filters, styles);
+      wroteAny = true;
     }
+    out.closeElement();  // a:p
   } else {
     const std::string& remaining = text->text;
     size_t pos = 0;
@@ -1642,7 +1697,7 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
       size_t nl = remaining.find('\n', pos);
       std::string line =
           (nl == std::string::npos) ? remaining.substr(pos) : remaining.substr(pos, nl - pos);
-      writeParagraph(out, line, style, filters, styles);
+      writeParagraph(out, line, style, filters, styles, lnSpcPts);
       if (nl == std::string::npos) {
         break;
       }
@@ -1693,12 +1748,53 @@ void PPTWriter::writeParagraphRun(XMLBuilder& out, const std::string& runText,
   out.closeElement();  // a:r
 }
 
+void PPTWriter::writeLineBreak(XMLBuilder& out, const PPTRunStyle& style) {
+  // <a:br><a:rPr sz="..."/></a:br> — the rPr controls the line-height of the
+  // break so it matches the surrounding text size (PowerPoint otherwise uses
+  // its default body font size, producing visibly mismatched line spacing).
+  out.openElement("a:br").closeElementStart();
+  out.openElement("a:rPr")
+      .addRequiredAttribute("lang", "en-US")
+      .addRequiredAttribute("sz", style.fontSize);
+  if (style.hasBold) {
+    out.addRequiredAttribute("b", "1");
+  }
+  if (style.hasItalic) {
+    out.addRequiredAttribute("i", "1");
+  }
+  if (!style.typeface.empty()) {
+    out.closeElementStart();
+    out.openElement("a:latin")
+        .addRequiredAttribute("typeface", style.typeface)
+        .closeElementSelfClosing();
+    out.openElement("a:ea")
+        .addRequiredAttribute("typeface", style.typeface)
+        .closeElementSelfClosing();
+    out.closeElement();  // a:rPr
+  } else {
+    out.closeElementSelfClosing();
+  }
+  out.closeElement();  // a:br
+}
+
 void PPTWriter::writeParagraph(XMLBuilder& out, const std::string& lineText,
                                const PPTRunStyle& style, const std::vector<LayerFilter*>& filters,
-                               const std::vector<LayerStyle*>& styles) {
+                               const std::vector<LayerStyle*>& styles, int64_t lnSpcPts) {
   out.openElement("a:p").closeElementStart();
-  if (style.algn) {
-    out.openElement("a:pPr").addRequiredAttribute("algn", style.algn).closeElementSelfClosing();
+  if (style.algn || lnSpcPts > 0) {
+    auto& pPr = out.openElement("a:pPr");
+    if (style.algn) {
+      pPr.addRequiredAttribute("algn", style.algn);
+    }
+    if (lnSpcPts > 0) {
+      pPr.closeElementStart();
+      out.openElement("a:lnSpc").closeElementStart();
+      out.openElement("a:spcPts").addRequiredAttribute("val", lnSpcPts).closeElementSelfClosing();
+      out.closeElement();  // a:lnSpc
+      out.closeElement();  // a:pPr
+    } else {
+      pPr.closeElementSelfClosing();
+    }
   }
   writeParagraphRun(out, lineText, style, filters, styles);
   out.closeElement();  // a:p
@@ -1753,10 +1849,11 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
     return;
   }
 
-  // Run a layout pass purely to obtain the textbox's resolved bounds; we let
-  // PowerPoint perform its own line wrapping inside the shape so that mixed
-  // run-styles (font/size/color) don't have to be threaded through PAGX's
-  // line-break offsets.
+  // Run a layout pass to obtain the textbox's resolved bounds AND its
+  // per-Text line-break decisions. We use those line breaks as paragraph
+  // boundaries below so PowerPoint reproduces the same wrapping that PAGX
+  // computed (PPT's font metrics differ slightly, so leaving wrapping to
+  // PowerPoint produces visibly different break points).
   std::vector<Text*> mutableTexts;
   mutableTexts.reserve(runs.size());
   for (const auto& run : runs) {
@@ -1808,9 +1905,62 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
   out.closeElement();
   out.closeElement();  // p:spPr
 
+  // Per-Text line metadata produced by PAGX's own layout. Use these line
+  // breaks as authoritative paragraph boundaries (rather than letting
+  // PowerPoint re-wrap with its own font metrics, which doesn't match the
+  // PAGX renderer) so the PPT output matches the PAGX rendering exactly.
+  // `getTextLines` returns nullptr for layouts where line info isn't tracked
+  // (notably vertical writing mode); those fall back to legacy '\n'-splitting
+  // and PowerPoint-driven wrapping.
+  struct LineEntry {
+    size_t runIndex = 0;
+    float baselineY = 0;
+    uint32_t byteStart = 0;
+    uint32_t byteEnd = 0;
+  };
+  std::vector<LineEntry> lineEntries;
+  bool useLineLayout = !runs.empty() && box->writingMode != WritingMode::Vertical;
+  if (useLineLayout) {
+    for (size_t i = 0; i < runs.size(); ++i) {
+      auto* mt = const_cast<Text*>(runs[i].text);
+      auto* lines = layoutResult.getTextLines(mt);
+      if (lines == nullptr) {
+        useLineLayout = false;
+        lineEntries.clear();
+        break;
+      }
+      for (const auto& li : *lines) {
+        if (li.byteStart >= li.byteEnd) {
+          continue;
+        }
+        lineEntries.push_back({i, li.baselineY, li.byteStart, li.byteEnd});
+      }
+    }
+    if (useLineLayout && lineEntries.empty()) {
+      useLineLayout = false;
+    }
+  }
+
+  const char* algn = nullptr;
+  if (box->textAlign == TextAlign::Center) {
+    algn = "ctr";
+  } else if (box->textAlign == TextAlign::End) {
+    algn = "r";
+  } else if (box->textAlign == TextAlign::Justify) {
+    algn = "just";
+  }
+  // Justify alignment requires PowerPoint to know a target line width; with
+  // wrap="none" the text is unbounded so PPT silently falls back to start
+  // alignment. Use wrap="square" in that case so PPT can justify within the
+  // shape's text area. Our PAGX-determined visual lines should already fit
+  // within the shape, so PPT shouldn't introduce additional wraps.
+  bool justifyAlign = (algn != nullptr && std::string(algn) == "just");
+
   out.openElement("p:txBody").closeElementStart();
   auto& bodyPr = out.openElement("a:bodyPr")
-                     .addRequiredAttribute("wrap", hasBoxWidth ? "square" : "none")
+                     .addRequiredAttribute("wrap", useLineLayout
+                                                       ? (justifyAlign ? "square" : "none")
+                                                       : (hasBoxWidth ? "square" : "none"))
                      .addRequiredAttribute("lIns", "0")
                      .addRequiredAttribute("tIns", "0")
                      .addRequiredAttribute("rIns", "0")
@@ -1825,15 +1975,30 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
   }
   bodyPr.closeElementSelfClosing();
   out.openElement("a:lstStyle").closeElementSelfClosing();
+  // PAGX `lineHeight` is an absolute pixel value; PPT's <a:lnSpc><a:spcPts>
+  // takes hundredths of a point. Convert px → pt with the same 96 DPI ratio
+  // (×72/96 = ×0.75) used elsewhere in this writer, then multiply by 100.
+  int64_t lnSpcPts =
+      box->lineHeight > 0 ? static_cast<int64_t>(std::round(box->lineHeight * 75.0)) : 0;
 
-  const char* algn = nullptr;
-  if (box->textAlign == TextAlign::Center) {
-    algn = "ctr";
-  } else if (box->textAlign == TextAlign::End) {
-    algn = "r";
-  } else if (box->textAlign == TextAlign::Justify) {
-    algn = "just";
-  }
+  auto writePPr = [&]() {
+    if (!algn && lnSpcPts <= 0) {
+      return;
+    }
+    auto& pPr = out.openElement("a:pPr");
+    if (algn) {
+      pPr.addRequiredAttribute("algn", algn);
+    }
+    if (lnSpcPts > 0) {
+      pPr.closeElementStart();
+      out.openElement("a:lnSpc").closeElementStart();
+      out.openElement("a:spcPts").addRequiredAttribute("val", lnSpcPts).closeElementSelfClosing();
+      out.closeElement();  // a:lnSpc
+      out.closeElement();  // a:pPr
+    } else {
+      pPr.closeElementSelfClosing();
+    }
+  };
 
   // Build per-run styles up-front (font/size/bold/italic/color/typeface).
   struct ResolvedRunStyle {
@@ -1867,15 +2032,10 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
     runStyles.push_back(std::move(rs));
   }
 
-  // Stream runs into paragraphs, splitting on '\n'. A single Text element may
-  // carry multiple newlines internally, in which case it contributes to several
-  // consecutive paragraphs.
   bool paragraphOpen = false;
   auto openParagraph = [&]() {
     out.openElement("a:p").closeElementStart();
-    if (algn) {
-      out.openElement("a:pPr").addRequiredAttribute("algn", algn).closeElementSelfClosing();
-    }
+    writePPr();
     paragraphOpen = true;
   };
   auto closeParagraph = [&]() {
@@ -1894,28 +2054,71 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
     writeParagraphRun(out, fragment, rs.style, filters, styles);
   };
 
-  for (size_t i = 0; i < runs.size(); ++i) {
-    const std::string& s = runs[i].text->text;
-    const auto& rs = runStyles[i];
-    size_t pos = 0;
-    while (pos <= s.size()) {
-      size_t nl = s.find('\n', pos);
-      if (nl == std::string::npos) {
-        emitRun(s.substr(pos), rs);
-        break;
+  if (useLineLayout) {
+    // Stable-sort entries by baselineY so that runs from different Text
+    // elements sharing the same visual line stay in source order (rich text
+    // flows left-to-right within a baseline). Then group consecutive entries
+    // with matching baselineY into one visual line.
+    std::stable_sort(lineEntries.begin(), lineEntries.end(),
+                     [](const LineEntry& a, const LineEntry& b) {
+                       return a.baselineY < b.baselineY;
+                     });
+    constexpr float kBaselineEpsilon = 0.5f;
+    // Emit ALL visual lines inside a single <a:p> separated by soft <a:br/>
+    // breaks (rather than one <a:p> per line). This is required for justify
+    // alignment to behave: OOXML's algn="just" never justifies the last line
+    // of a paragraph, so isolating each visual line in its own paragraph
+    // turns every line into a "last line" and disables justify entirely.
+    // Soft breaks within a single paragraph make all lines except the
+    // semantically last one participate in justify.
+    openParagraph();
+    bool firstLine = true;
+    size_t i = 0;
+    while (i < lineEntries.size()) {
+      float baseline = lineEntries[i].baselineY;
+      if (!firstLine) {
+        writeLineBreak(out, runStyles[lineEntries[i].runIndex].style);
       }
-      emitRun(s.substr(pos, nl - pos), rs);
-      // Newline terminates the current paragraph; if the paragraph is still
-      // empty (e.g. consecutive '\n's), open and immediately close it so the
-      // blank line is preserved.
-      if (!paragraphOpen) {
-        openParagraph();
+      firstLine = false;
+      while (i < lineEntries.size() &&
+             std::fabs(lineEntries[i].baselineY - baseline) < kBaselineEpsilon) {
+        const auto& entry = lineEntries[i];
+        const std::string& src = runs[entry.runIndex].text->text;
+        emitRun(src.substr(entry.byteStart, entry.byteEnd - entry.byteStart),
+                runStyles[entry.runIndex]);
+        ++i;
       }
-      closeParagraph();
-      pos = nl + 1;
     }
+    closeParagraph();
+  } else {
+    // Fallback path: stream runs into paragraphs, splitting only on '\n'. A
+    // single Text element may carry multiple newlines internally, in which
+    // case it contributes to several consecutive paragraphs. PowerPoint
+    // performs its own wrapping inside the shape if a paragraph exceeds the
+    // box width.
+    for (size_t i = 0; i < runs.size(); ++i) {
+      const std::string& s = runs[i].text->text;
+      const auto& rs = runStyles[i];
+      size_t pos = 0;
+      while (pos <= s.size()) {
+        size_t nl = s.find('\n', pos);
+        if (nl == std::string::npos) {
+          emitRun(s.substr(pos), rs);
+          break;
+        }
+        emitRun(s.substr(pos, nl - pos), rs);
+        // Newline terminates the current paragraph; if the paragraph is still
+        // empty (e.g. consecutive '\n's), open and immediately close it so the
+        // blank line is preserved.
+        if (!paragraphOpen) {
+          openParagraph();
+        }
+        closeParagraph();
+        pos = nl + 1;
+      }
+    }
+    closeParagraph();
   }
-  closeParagraph();
 
   out.closeElement();  // p:txBody
   out.closeElement();  // p:sp
