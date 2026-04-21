@@ -115,6 +115,31 @@ static size_t CountUTF8Characters(const std::string& str) {
 }
 
 //==============================================================================
+// Stroke-alignment geometry compensation
+//==============================================================================
+
+// PowerPoint's <a:ln> always centres the stroke on the path geometry, so the
+// only way to emulate StrokeAlign::Inside / StrokeAlign::Outside is to inset
+// (or outset) the geometry that backs the stroke painter by half the stroke
+// width before emitting it.  Returns the per-side offset to apply: positive
+// shrinks the geometry (Inside), negative grows it (Outside), and zero leaves
+// the geometry unchanged (Center, no stroke, or zero width).
+static float StrokeAlignInset(const Stroke* stroke) {
+  if (stroke == nullptr || stroke->width <= 0) {
+    return 0.0f;
+  }
+  switch (stroke->align) {
+    case StrokeAlign::Inside:
+      return stroke->width / 2.0f;
+    case StrokeAlign::Outside:
+      return -stroke->width / 2.0f;
+    case StrokeAlign::Center:
+    default:
+      return 0.0f;
+  }
+}
+
+//==============================================================================
 // Dash pattern → OOXML preset dash mapping
 //==============================================================================
 
@@ -1212,20 +1237,42 @@ void PPTWriter::writeRectangle(XMLBuilder& out, const Rectangle* rect, const Fil
                                const std::vector<LayerStyle*>& styles) {
   float x = rect->position.x - rect->size.width / 2.0f;
   float y = rect->position.y - rect->size.height / 2.0f;
-  Rect shapeBounds = Rect::MakeXYWH(x, y, rect->size.width, rect->size.height);
+  float w = rect->size.width;
+  float h = rect->size.height;
+  float roundness = rect->roundness;
+
+  // OOXML strokes are always centre-aligned on the geometry, so to mimic
+  // StrokeAlign::Inside / Outside we shift this stroke painter's geometry in /
+  // out by half the stroke width.  Fill-only painters skip this branch (they
+  // see fs.stroke == nullptr from processVectorScope), so the fill geometry
+  // remains untouched.
+  float inset = StrokeAlignInset(fs.stroke);
+  if (inset != 0.0f) {
+    float maxInset = std::min(w, h) / 2.0f;
+    if (inset > maxInset) {
+      inset = maxInset;
+    }
+    x += inset;
+    y += inset;
+    w -= inset * 2.0f;
+    h -= inset * 2.0f;
+    roundness = std::max(0.0f, roundness - inset);
+  }
+
+  Rect shapeBounds = Rect::MakeXYWH(x, y, w, h);
 
   bool imageWritten = writeImagePatternAsPicture(out, fs.fill, shapeBounds, m, alpha);
   if (imageWritten && !fs.stroke && filters.empty() && styles.empty()) {
     return;
   }
 
-  auto xf = decomposeXform(x, y, rect->size.width, rect->size.height, m);
+  auto xf = decomposeXform(x, y, w, h, m);
   beginShape(out, "Rectangle", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
 
-  if (rect->roundness > 0) {
-    float minSide = std::min(rect->size.width, rect->size.height);
+  if (roundness > 0) {
+    float minSide = std::min(w, h);
     int adj = (minSide > 0)
-                  ? std::clamp(static_cast<int>(rect->roundness * 100000.0f / minSide), 0, 50000)
+                  ? std::clamp(static_cast<int>(roundness * 100000.0f / minSide), 0, 50000)
                   : 0;
     out.openElement("a:prstGeom").addRequiredAttribute("prst", "roundRect").closeElementStart();
     out.openElement("a:avLst").closeElementStart();
@@ -1252,14 +1299,31 @@ void PPTWriter::writeEllipse(XMLBuilder& out, const Ellipse* ellipse, const Fill
   float ry = ellipse->size.height / 2.0f;
   float x = ellipse->position.x - rx;
   float y = ellipse->position.y - ry;
-  Rect shapeBounds = Rect::MakeXYWH(x, y, ellipse->size.width, ellipse->size.height);
+  float w = ellipse->size.width;
+  float h = ellipse->size.height;
+
+  // See writeRectangle: emulate StrokeAlign::Inside / Outside by inset/outset
+  // because OOXML can only draw centre-aligned strokes on the geometry.
+  float inset = StrokeAlignInset(fs.stroke);
+  if (inset != 0.0f) {
+    float maxInset = std::min(w, h) / 2.0f;
+    if (inset > maxInset) {
+      inset = maxInset;
+    }
+    x += inset;
+    y += inset;
+    w -= inset * 2.0f;
+    h -= inset * 2.0f;
+  }
+
+  Rect shapeBounds = Rect::MakeXYWH(x, y, w, h);
 
   bool imageWritten = writeImagePatternAsPicture(out, fs.fill, shapeBounds, m, alpha);
   if (imageWritten && !fs.stroke && filters.empty() && styles.empty()) {
     return;
   }
 
-  auto xf = decomposeXform(x, y, ellipse->size.width, ellipse->size.height, m);
+  auto xf = decomposeXform(x, y, w, h, m);
   beginShape(out, "Ellipse", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
 
   out.openElement("a:prstGeom").addRequiredAttribute("prst", "ellipse").closeElementStart();
