@@ -945,9 +945,8 @@ void PPTWriter::writeImagePatternFill(XMLBuilder& out, const ImagePattern* patte
   // natively, and emitting just <a:srcRect>/<a:fillRect> would either tile
   // (wrong) or stretch the whole image (also wrong).  Repeat/Mirror prefer the
   // bake too because it preserves the pattern's shader matrix exactly.
-  bool needsBake =
-      needsNativeTile || pattern->tileModeX == TileMode::Clamp ||
-      pattern->tileModeY == TileMode::Clamp;
+  bool needsBake = needsNativeTile || pattern->tileModeX == TileMode::Clamp ||
+                   pattern->tileModeY == TileMode::Clamp;
 
   if (needsBake && _bakeTiledPattern && !shapeBounds.isEmpty()) {
     int w = static_cast<int>(ceilf(shapeBounds.width));
@@ -1286,8 +1285,7 @@ void PPTWriter::WriteContourGeom(XMLBuilder& out, std::vector<PathContour>& cont
                               scaledOfsX, scaledOfsY);
     return;
   }
-  EmitFlatContourGeom(out, contours, pathWidth, pathHeight, scaleX, scaleY, scaledOfsX,
-                      scaledOfsY);
+  EmitFlatContourGeom(out, contours, pathWidth, pathHeight, scaleX, scaleY, scaledOfsX, scaledOfsY);
 }
 
 // ── Shape writers ──────────────────────────────────────────────────────────
@@ -2003,10 +2001,9 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
     // elements sharing the same visual line stay in source order (rich text
     // flows left-to-right within a baseline). Then group consecutive entries
     // with matching baselineY into one visual line.
-    std::stable_sort(lineEntries.begin(), lineEntries.end(),
-                     [](const LineEntry& a, const LineEntry& b) {
-                       return a.baselineY < b.baselineY;
-                     });
+    std::stable_sort(
+        lineEntries.begin(), lineEntries.end(),
+        [](const LineEntry& a, const LineEntry& b) { return a.baselineY < b.baselineY; });
     constexpr float kBaselineEpsilon = 0.5f;
     // Emit ALL visual lines inside a single <a:p> separated by soft <a:br/>
     // breaks (rather than one <a:p> per line). This is required for justify
@@ -2252,8 +2249,8 @@ void PPTWriter::processVectorScope(XMLBuilder& out, const std::vector<Element*>&
         // Group, matching the tgfx renderer's per-Group VectorContext.
         const std::vector<Element*>& innerWalked =
             _resolveModifiers ? _resolver.resolve(group->elements) : group->elements;
-        processVectorScope(out, innerWalked, groupMatrix, groupAlpha, filters, styles,
-                           localTextBox, accumulator, accumulator.size());
+        processVectorScope(out, innerWalked, groupMatrix, groupAlpha, filters, styles, localTextBox,
+                           accumulator, accumulator.size());
         break;
       }
       case NodeType::Repeater:

@@ -48,7 +48,14 @@ using pag::FloatNearlyZero;
 
 static const uint8_t PNG_SIGNATURE[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
 
-// Reads a big-endian 32-bit unsigned integer at `data + offset`.
+// Reads a big-endian 16-bit unsigned integer at `data`.
+// Used by JPEG (segment length, SOF width/height, JFIF density) decoders.
+static uint16_t ReadBE16(const uint8_t* data) {
+  return static_cast<uint16_t>((static_cast<uint16_t>(data[0]) << 8) |
+                               static_cast<uint16_t>(data[1]));
+}
+
+// Reads a big-endian 32-bit unsigned integer at `data`.
 // Used by PNG (chunk lengths, IHDR width/height, pHYs ppm) decoders.
 static uint32_t ReadBE32(const uint8_t* data) {
   return (static_cast<uint32_t>(data[0]) << 24) | (static_cast<uint32_t>(data[1]) << 16) |
@@ -134,16 +141,22 @@ Matrix BuildGroupMatrix(const Group* group) {
 
 namespace {
 
+struct PositionedGlyph {
+  const Glyph* glyph = nullptr;
+  Matrix transform;
+};
+
 // Shared per-glyph walker — both ComputeGlyphPaths (vector outlines) and
 // ComputeGlyphImages (bitmap glyphs) need exactly the same positioning logic
 // (positions / xOffsets / per-glyph anchor + rotation / skew / scale) and only
 // differ in which glyph kind they emit. Keeping the math in one place ensures
 // path glyphs and image glyphs in the same GlyphRun stay perfectly aligned.
 //
-// `visit` is called for every glyph in document order with the layer-space
-// glyphMatrix already composed; the visitor decides whether to keep that entry.
-template <typename Visitor>
-void ForEachGlyph(const Text& text, float textPosX, float textPosY, Visitor&& visit) {
+// Returns every non-zero glyph in document order with the layer-space glyph
+// matrix already composed. Callers filter for the kind they need (path vs.
+// image) instead of the walker knowing about either.
+static std::vector<PositionedGlyph> WalkGlyphs(const Text& text, float textPosX, float textPosY) {
+  std::vector<PositionedGlyph> result;
   for (const auto* run : text.glyphRuns) {
     if (!run->font || run->glyphs.empty()) {
       continue;
@@ -224,44 +237,47 @@ void ForEachGlyph(const Text& text, float textPosX, float textPosY, Visitor&& vi
         glyphMatrix = Matrix::Translate(-anchorX, -anchorY) * glyphMatrix;
       }
 
-      visit(*glyph, glyphMatrix, scale);
+      result.push_back({glyph, glyphMatrix});
     }
   }
+  return result;
 }
 
 }  // namespace
 
 std::vector<GlyphPath> ComputeGlyphPaths(const Text& text, float textPosX, float textPosY) {
+  auto positioned = WalkGlyphs(text, textPosX, textPosY);
   std::vector<GlyphPath> result;
-  ForEachGlyph(text, textPosX, textPosY,
-               [&](const Glyph& glyph, const Matrix& glyphMatrix, float /*scale*/) {
-                 if (!glyph.path || glyph.path->isEmpty()) {
-                   return;
-                 }
-                 result.push_back({glyphMatrix, glyph.path});
-               });
+  result.reserve(positioned.size());
+  for (const auto& entry : positioned) {
+    if (!entry.glyph->path || entry.glyph->path->isEmpty()) {
+      continue;
+    }
+    result.push_back({entry.transform, entry.glyph->path});
+  }
   return result;
 }
 
 std::vector<GlyphImage> ComputeGlyphImages(const Text& text, float textPosX, float textPosY) {
+  auto positioned = WalkGlyphs(text, textPosX, textPosY);
   std::vector<GlyphImage> result;
-  ForEachGlyph(text, textPosX, textPosY,
-               [&](const Glyph& glyph, const Matrix& glyphMatrix, float /*scale*/) {
-                 if (!glyph.image) {
-                   return;
-                 }
-                 // Image pixel coords (0,0)-(W,H) live in design space, with the
-                 // top-left translated by `glyph.offset` (also design space).
-                 // Pre-translating by the offset puts pixel (0,0) at the image's
-                 // top-left in the same coordinate system glyphMatrix consumes,
-                 // so callers can map the image rect (0,0,W,H) through the
-                 // resulting transform to get layer-space coords.
-                 Matrix imageMatrix = glyphMatrix;
-                 if (glyph.offset.x != 0 || glyph.offset.y != 0) {
-                   imageMatrix = imageMatrix * Matrix::Translate(glyph.offset.x, glyph.offset.y);
-                 }
-                 result.push_back({imageMatrix, glyph.image});
-               });
+  result.reserve(positioned.size());
+  for (const auto& entry : positioned) {
+    const auto* glyph = entry.glyph;
+    if (!glyph->image) {
+      continue;
+    }
+    // Image pixel coords (0,0)-(W,H) live in design space, with the top-left
+    // translated by `glyph.offset` (also design space). Pre-translating by the
+    // offset puts pixel (0,0) at the image's top-left in the same coordinate
+    // system the glyph matrix consumes, so callers can map the image rect
+    // (0,0,W,H) through the resulting transform to get layer-space coords.
+    Matrix imageMatrix = entry.transform;
+    if (glyph->offset.x != 0 || glyph->offset.y != 0) {
+      imageMatrix = imageMatrix * Matrix::Translate(glyph->offset.x, glyph->offset.y);
+    }
+    result.push_back({imageMatrix, glyph->image});
+  }
   return result;
 }
 
@@ -342,11 +358,11 @@ bool GetJPEGDimensions(const uint8_t* data, size_t size, int* width, int* height
     if (marker == 0xD9 || marker == 0xDA) {
       break;
     }
-    auto segmentLength = static_cast<size_t>((data[offset + 2] << 8) | data[offset + 3]) + 2;
+    auto segmentLength = static_cast<size_t>(ReadBE16(data + offset + 2)) + 2;
     // SOF0..SOF3 markers contain image dimensions.
     if (marker >= 0xC0 && marker <= 0xC3 && offset + 9 < size) {
-      *height = static_cast<int>((data[offset + 5] << 8) | data[offset + 6]);
-      *width = static_cast<int>((data[offset + 7] << 8) | data[offset + 8]);
+      *height = static_cast<int>(ReadBE16(data + offset + 5));
+      *width = static_cast<int>(ReadBE16(data + offset + 7));
       return *width > 0 && *height > 0;
     }
     offset += segmentLength;
@@ -447,12 +463,12 @@ static bool GetJPEGDPI(const uint8_t* data, size_t size, float* dpiX, float* dpi
     if (marker == 0xD9 || marker == 0xDA) {
       break;
     }
-    auto segLen = static_cast<uint16_t>((data[offset + 2] << 8) | data[offset + 3]);
+    auto segLen = ReadBE16(data + offset + 2);
     if (marker == 0xE0 && segLen >= 16 && offset + 2 + segLen <= size) {
       if (memcmp(data + offset + 4, "JFIF\0", 5) == 0) {
         uint8_t units = data[offset + 11];
-        auto xDensity = static_cast<uint16_t>((data[offset + 12] << 8) | data[offset + 13]);
-        auto yDensity = static_cast<uint16_t>((data[offset + 14] << 8) | data[offset + 15]);
+        auto xDensity = ReadBE16(data + offset + 12);
+        auto yDensity = ReadBE16(data + offset + 14);
         if (xDensity > 0 && yDensity > 0) {
           if (units == 1) {
             *dpiX = static_cast<float>(xDensity);
@@ -564,6 +580,22 @@ std::string UTF8ToUTF16BEHex(const std::string& utf8) {
   return hex;
 }
 
+// Shared tail for off-screen render helpers: reads the surface contents into a
+// tightly packed pixmap and encodes it as PNG. Returns nullptr if the backing
+// bitmap could not be allocated or the surface read failed.
+static std::shared_ptr<tgfx::Data> EncodeSurfaceToPNG(const std::shared_ptr<tgfx::Surface>& surface,
+                                                      int width, int height) {
+  tgfx::Bitmap bitmap(width, height, false, false);
+  if (bitmap.isEmpty()) {
+    return nullptr;
+  }
+  tgfx::Pixmap pixmap(bitmap);
+  if (!surface->readPixels(pixmap.info(), pixmap.writablePixels())) {
+    return nullptr;
+  }
+  return tgfx::ImageCodec::Encode(pixmap, tgfx::EncodedFormat::PNG, 100);
+}
+
 static std::shared_ptr<tgfx::Data> DoRenderMaskedLayer(
     tgfx::Context* context, const std::shared_ptr<tgfx::Layer>& root,
     const std::shared_ptr<tgfx::Layer>& targetLayer, const tgfx::Rect& globalBounds) {
@@ -580,16 +612,7 @@ static std::shared_ptr<tgfx::Data> DoRenderMaskedLayer(
   canvas->translate(-globalBounds.left, -globalBounds.top);
   canvas->concat(targetLayer->getRelativeMatrix(root.get()));
   targetLayer->draw(canvas);
-
-  tgfx::Bitmap bitmap(width, height, false, false);
-  if (bitmap.isEmpty()) {
-    return nullptr;
-  }
-  tgfx::Pixmap pixmap(bitmap);
-  if (!surface->readPixels(pixmap.info(), pixmap.writablePixels())) {
-    return nullptr;
-  }
-  return tgfx::ImageCodec::Encode(pixmap, tgfx::EncodedFormat::PNG, 100);
+  return EncodeSurfaceToPNG(surface, width, height);
 }
 
 GPUContext::~GPUContext() {
@@ -648,15 +671,7 @@ static std::shared_ptr<tgfx::Data> DoRenderTiledPattern(tgfx::Context* context,
   tgfx::Paint paint;
   paint.setShader(std::move(shader));
   surface->getCanvas()->drawRect(tgfx::Rect::MakeWH(width, height), paint);
-  tgfx::Bitmap bitmap(width, height, false, false);
-  if (bitmap.isEmpty()) {
-    return nullptr;
-  }
-  tgfx::Pixmap pixmap(bitmap);
-  if (!surface->readPixels(pixmap.info(), pixmap.writablePixels())) {
-    return nullptr;
-  }
-  return tgfx::ImageCodec::Encode(pixmap, tgfx::EncodedFormat::PNG, 100);
+  return EncodeSurfaceToPNG(surface, width, height);
 }
 
 std::shared_ptr<tgfx::Data> RenderTiledPattern(GPUContext* gpu, const ImagePattern* pattern,

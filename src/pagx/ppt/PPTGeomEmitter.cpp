@@ -27,6 +27,8 @@ int64_t PxToEMU(float px) {
   return static_cast<int64_t>(std::round(static_cast<double>(px) * EMU_PER_PX));
 }
 
+namespace {
+
 void EmitPoint(XMLBuilder& out, const char* tag, float x, float y, float ofsX, float ofsY) {
   out.openElement(tag).closeElementStart();
   out.openElement("a:pt")
@@ -132,9 +134,9 @@ void EmitBridgedGroup(XMLBuilder& out, const std::vector<PathContour>& contours,
 // Emits one <a:path> for the given group: bridged when the group has nested
 // inner contours, plain otherwise. Caller is responsible for the surrounding
 // <a:pathLst> / <a:custGeom>.
-static void EmitGroupPath(XMLBuilder& out, const std::vector<PathContour>& contours,
-                          const std::vector<size_t>& group, int64_t pathWidth, int64_t pathHeight,
-                          float scaleX, float scaleY, float scaledOfsX, float scaledOfsY) {
+void EmitGroupPath(XMLBuilder& out, const std::vector<PathContour>& contours,
+                   const std::vector<size_t>& group, int64_t pathWidth, int64_t pathHeight,
+                   float scaleX, float scaleY, float scaledOfsX, float scaledOfsY) {
   out.openElement("a:path")
       .addRequiredAttribute("w", pathWidth)
       .addRequiredAttribute("h", pathHeight)
@@ -146,6 +148,22 @@ static void EmitGroupPath(XMLBuilder& out, const std::vector<PathContour>& conto
   }
   out.closeElement();  // a:path
 }
+
+void EmitCustGeomHeader(XMLBuilder& out) {
+  out.openElement("a:custGeom").closeElementStart();
+  out.openElement("a:avLst").closeElementSelfClosing();
+  out.openElement("a:gdLst").closeElementSelfClosing();
+  out.openElement("a:ahLst").closeElementSelfClosing();
+  out.openElement("a:cxnLst").closeElementSelfClosing();
+  out.openElement("a:rect")
+      .addRequiredAttribute("l", "0")
+      .addRequiredAttribute("t", "0")
+      .addRequiredAttribute("r", "r")
+      .addRequiredAttribute("b", "b")
+      .closeElementSelfClosing();
+}
+
+}  // namespace
 
 void EmitContourGeomFromGroups(XMLBuilder& out, const std::vector<PathContour>& contours,
                                const std::vector<std::vector<size_t>>& groups, int64_t pathWidth,
@@ -176,20 +194,6 @@ void EmitFlatContourGeom(XMLBuilder& out, const std::vector<PathContour>& contou
   out.closeElement();  // a:path
   out.closeElement();  // a:pathLst
   out.closeElement();  // a:custGeom
-}
-
-void EmitCustGeomHeader(XMLBuilder& out) {
-  out.openElement("a:custGeom").closeElementStart();
-  out.openElement("a:avLst").closeElementSelfClosing();
-  out.openElement("a:gdLst").closeElementSelfClosing();
-  out.openElement("a:ahLst").closeElementSelfClosing();
-  out.openElement("a:cxnLst").closeElementSelfClosing();
-  out.openElement("a:rect")
-      .addRequiredAttribute("l", "0")
-      .addRequiredAttribute("t", "0")
-      .addRequiredAttribute("r", "r")
-      .addRequiredAttribute("b", "b")
-      .closeElementSelfClosing();
 }
 
 void EmitGroupCustGeom(XMLBuilder& out, const std::vector<PathContour>& contours,
