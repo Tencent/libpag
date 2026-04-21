@@ -33,7 +33,7 @@
         <!-- Row 1: showBehindLayer comparison. Shape has alpha=0.55, making shadow behind it visible. -->
         <Layer layout="vertical" gap="6" alignment="center">
           <Layer height="12">
-            <Text text="showBehindLayer: true (shadow shows through translucent fill) vs false (erased under shape)" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="showBehindLayer: true (shows through fill) vs false (erased under shape)" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
           <Layer height="120" layout="horizontal" gap="40" arrangement="center" alignment="center">
@@ -58,7 +58,7 @@
              the base geometry of children is used. -->
         <Layer layout="vertical" gap="6" alignment="center">
           <Layer height="12">
-            <Text text="excludeChildEffects: false (child shadows seen by outer) vs true (only base child shapes)" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="excludeChildEffects: false (child effects baked) vs true (base only)" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
           <Layer height="120" layout="horizontal" gap="40" arrangement="center" alignment="center">
