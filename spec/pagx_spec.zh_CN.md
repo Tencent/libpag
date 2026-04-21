@@ -97,7 +97,7 @@ PAGX 是纯 XML 文件（`.pagx`），可引用外部资源文件（图片、视
 | `string` | 字符串 | `"Arial"`、`"myLayer"` |
 | `enum` | 枚举值 | `normal`、`multiply` |
 | `idref` | ID 引用 | `@gradientId`、`@maskLayer` |
-| `Dimension` | 非负浮点数（像素），或其后跟 `%` 表示相对父容器对应轴（内缩 padding 后）的百分比。语法匹配 xsd `DimensionType` 模式 `[0-9]*\.?[0-9]+%?` | `100`、`0.5`、`50%`、`100%` |
+| `Dimension` | 非负浮点数（像素），或其后跟 `%` 表示相对父容器对应轴（内缩 padding 后）的百分比。 | `100`、`0.5`、`50%`、`100%` |
 
 ### 2.5 点（Point）
 
