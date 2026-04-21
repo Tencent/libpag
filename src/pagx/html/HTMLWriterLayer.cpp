@@ -274,6 +274,21 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             }
           }
           if (!tbSpans.empty()) {
+            // Pin font-size on the container so Chromium's line-box strut uses this value
+            // instead of the inherited ancestor default (typically 16px body), which would
+            // otherwise inflate each line-box above the declared `line-height` and push every
+            // text line further down than tgfx renders it. Use the smallest span font-size so
+            // the strut contribution never exceeds what any child span would produce on its own.
+            float strutSize = tbSpans[0].text->renderFontSize();
+            for (const auto& s : tbSpans) {
+              float fs = s.text->renderFontSize();
+              if (fs > 0 && fs < strutSize) {
+                strutSize = fs;
+              }
+            }
+            if (strutSize > 0) {
+              style += ";font-size:" + FloatToString(strutSize) + "px";
+            }
             out.openTag("div");
             out.addAttr("style", style);
             out.closeTagStart();
