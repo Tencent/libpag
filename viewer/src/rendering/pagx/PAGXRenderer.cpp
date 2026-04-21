@@ -34,6 +34,7 @@ bool PAGXRenderer::isReady() const {
 
 void PAGXRenderer::updateSize() {
   if (drawable != nullptr) {
+    drawable->freeSurface();
     drawable->updateSize();
   }
 }

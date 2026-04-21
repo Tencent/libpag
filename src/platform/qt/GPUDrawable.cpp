@@ -38,13 +38,8 @@ GPUDrawable::GPUDrawable(QQuickItem* quickItem, std::shared_ptr<tgfx::QGLWindow>
 void GPUDrawable::updateSize() {
   auto nativeWindow = quickItem->window();
   auto pixelRatio = nativeWindow ? nativeWindow->devicePixelRatio() : 1.0f;
-  auto newWidth = static_cast<int>(ceil(quickItem->width() * pixelRatio));
-  auto newHeight = static_cast<int>(ceil(quickItem->height() * pixelRatio));
-  if (newWidth != _width || newHeight != _height) {
-    _width = newWidth;
-    _height = newHeight;
-    freeSurface();
-  }
+  _width = static_cast<int>(ceil(quickItem->width() * pixelRatio));
+  _height = static_cast<int>(ceil(quickItem->height() * pixelRatio));
 }
 
 std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
