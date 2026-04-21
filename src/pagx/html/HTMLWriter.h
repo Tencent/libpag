@@ -19,10 +19,12 @@
 #pragma once
 
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
 #include "pagx/html/HTMLBuilder.h"
+#include "pagx/html/HTMLPlusDarkerRenderer.h"
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
@@ -145,6 +147,12 @@ class HTMLWriterContext {
   std::string staticImgNamePrefix = {};
   float staticImgPixelRatio = 2.0f;
 
+  // Per-plusDarker-Layer backdrop data registered by HTMLPlusDarkerRenderer before the writer
+  // walks the tree. When a Layer pointer is present here, the writer emits an SVG filter that
+  // composites the backdrop via feImage + feComposite arithmetic instead of the mix-blend-mode
+  // approximation.
+  std::unordered_map<const Layer*, PlusDarkerBackdrop> plusDarkerBackdrops = {};
+
   std::string nextId(const std::string& prefix) {
     return prefix + std::to_string(_id++);
   }
@@ -190,6 +198,11 @@ class HTMLWriter {
                           LayerPlacement targetPlacement);
   void writeElements(HTMLBuilder& out, const std::vector<Element*>& elements, float alpha,
                      bool distribute, LayerPlacement targetPlacement);
+  // Appends an SVG <filter> definition that composites the layer's pre-rendered backdrop with its
+  // own pixels using feComposite arithmetic (k1=0, k2=1, k3=1, k4=-1), yielding PlusDarker
+  // semantics: clamp(Sc + Dc - 1, 0, 1). Called once per plusDarker layer at the point the
+  // layer's <div> is emitted.
+  void emitPlusDarkerFilterDef(const PlusDarkerBackdrop& backdrop);
   void renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
                  const Stroke* stroke, float alpha, bool hasTrim, const TrimPath* trim,
                  bool hasMerge, MergePathMode mergeMode = MergePathMode::Append);

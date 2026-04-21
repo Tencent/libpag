@@ -633,6 +633,19 @@ std::string HTMLExporter::ToHTML(const PAGXDocument& doc, const Options& options
   ctx.staticImgUrlPrefix = options.staticImgUrlPrefix;
   ctx.staticImgNamePrefix = options.staticImgNamePrefix;
   ctx.staticImgPixelRatio = options.staticImgPixelRatio;
+
+  // Pre-pass: for every compatible PlusDarker Layer, render a cropped backdrop PNG with the layer
+  // temporarily hidden. The resulting base64 data URLs are consumed by writeLayer below to emit an
+  // SVG filter (feImage + feComposite arithmetic) that matches tgfx PlusDarker pixel-for-pixel.
+  // Gated on staticImgDir like the other rasterization paths (DiamondGradient, ImagePattern
+  // mirror/clamp); when empty, writeLayer falls back to the existing mix-blend-mode:darken
+  // approximation.
+  if (!options.staticImgDir.empty()) {
+    HTMLPlusDarkerRenderer::RenderAll(doc, options.staticImgDir, options.staticImgUrlPrefix,
+                                      options.staticImgNamePrefix, options.staticImgPixelRatio,
+                                      ctx.plusDarkerBackdrops);
+  }
+
   HTMLWriter writer(&defs, &ctx);
 
   // Root div

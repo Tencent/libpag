@@ -962,10 +962,23 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   bool suppressGroupOpacity = false;  // set by the box-shadow fallback path below
 
   if (layer->blendMode != BlendMode::Normal) {
-    auto blendStr = BlendModeToMixBlendMode(layer->blendMode);
-    if (blendStr) {
-      style += ";mix-blend-mode:";
-      style += blendStr;
+    // PlusDarker takes a dedicated filter-based path when the pre-pass has rendered a backdrop
+    // for this layer; otherwise it falls through to the mix-blend-mode:darken approximation.
+    bool emittedPlusDarkerFilter = false;
+    if (layer->blendMode == BlendMode::PlusDarker) {
+      auto it = _ctx->plusDarkerBackdrops.find(layer);
+      if (it != _ctx->plusDarkerBackdrops.end()) {
+        emitPlusDarkerFilterDef(it->second);
+        style += ";filter:url(#" + it->second.filterId + ")";
+        emittedPlusDarkerFilter = true;
+      }
+    }
+    if (!emittedPlusDarkerFilter) {
+      auto blendStr = BlendModeToMixBlendMode(layer->blendMode);
+      if (blendStr) {
+        style += ";mix-blend-mode:";
+        style += blendStr;
+      }
     }
   }
 
@@ -1457,6 +1470,43 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   }
 
   out.closeTag();
+}
+
+void HTMLWriter::emitPlusDarkerFilterDef(const PlusDarkerBackdrop& backdrop) {
+  // filterUnits/primitiveUnits default to "objectBoundingBox" / "userSpaceOnUse" respectively in
+  // SVG, which makes percentage widths refer to the bounding box while primitive widths refer to
+  // user-space units (pixels) — a mix that is hard to reason about. We pin both to userSpaceOnUse
+  // so all coordinates are plain CSS pixels; the filter region matches the layer's cropped bbox
+  // exactly, and feImage's width/height match the backdrop PNG dimensions 1:1.
+  _defs->openTag("filter");
+  _defs->addAttr("id", backdrop.filterId);
+  _defs->addAttr("x", "0");
+  _defs->addAttr("y", "0");
+  _defs->addAttr("width", FloatToString(backdrop.cropWidth));
+  _defs->addAttr("height", FloatToString(backdrop.cropHeight));
+  _defs->addAttr("filterUnits", "userSpaceOnUse");
+  _defs->addAttr("primitiveUnits", "userSpaceOnUse");
+  _defs->addAttr("color-interpolation-filters", "sRGB");
+  _defs->closeTagStart();
+  _defs->openTag("feImage");
+  _defs->addAttr("href", backdrop.backdropDataURL);
+  _defs->addAttr("x", "0");
+  _defs->addAttr("y", "0");
+  _defs->addAttr("width", FloatToString(backdrop.cropWidth));
+  _defs->addAttr("height", FloatToString(backdrop.cropHeight));
+  _defs->addAttr("preserveAspectRatio", "none");
+  _defs->addAttr("result", "bg");
+  _defs->closeTagSelfClosing();
+  _defs->openTag("feComposite");
+  _defs->addAttr("in", "SourceGraphic");
+  _defs->addAttr("in2", "bg");
+  _defs->addAttr("operator", "arithmetic");
+  _defs->addAttr("k1", "0");
+  _defs->addAttr("k2", "1");
+  _defs->addAttr("k3", "1");
+  _defs->addAttr("k4", "-1");
+  _defs->closeTagSelfClosing();
+  _defs->closeTag();
 }
 
 }  // namespace pagx
