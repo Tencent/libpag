@@ -36,14 +36,21 @@
           <Stroke color="#FFFFFF" width="2"/>
         </Layer>
 
-        <!-- Labels -->
-        <Layer layout="horizontal" gap="40" alignment="center" arrangement="center">
-          <Layer height="12">
-            <Text text="Rectangle" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+        <!-- Labels. Each label wraps a fixed-width cell equal to its matching shape's width
+             (80px), and the gap between cells equals the gap between the two shape centers
+             minus one shape width (145 - 55 - 80 = 10). That keeps each label's cell center
+             aligned to its shape center even though the label row is narrower than the shape
+             row; without the per-cell width matching, the two labels would bunch up near the
+             label row's center and no longer sit under their shapes. Font size 10 matches the
+             subtitle's size — at 9px Chromium's anti-aliasing visibly thinned the glyphs
+             compared to tgfx's hinted rasterization. -->
+        <Layer layout="horizontal" gap="10" alignment="center" arrangement="center">
+          <Layer width="80" height="12">
+            <Text text="Rectangle" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
-          <Layer height="12">
-            <Text text="Ellipse" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+          <Layer width="80" height="12">
+            <Text text="Ellipse" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
