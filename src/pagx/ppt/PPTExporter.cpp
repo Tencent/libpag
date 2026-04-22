@@ -442,6 +442,28 @@ static bool AddBodyPrAttrsForTextBox(XMLBuilder& out, const TextBox* box) {
 
 class PPTWriter {
  public:
+  // One "run" inside a rich TextBox: a Text element together with the Fill
+  // and Stroke painters that apply to it. Exposed publicly so anonymous-
+  // namespace helpers in this file (CollectRichTextRuns) can reference it;
+  // the surrounding PPTWriter class itself is .cpp-local so this does not
+  // escape the translation unit.
+  struct RichTextRun {
+    const Text* text = nullptr;
+    const Fill* fill = nullptr;
+    const Stroke* stroke = nullptr;
+  };
+
+  // One entry in the PAGX-authoritative line list consumed by
+  // writeTextBoxGroup. `runIndex` points back into the RichTextRun array, and
+  // `byteStart`/`byteEnd` are byte offsets into that run's UTF-8 text.
+  // Public for the same reason as RichTextRun.
+  struct LineEntry {
+    size_t runIndex = 0;
+    float baselineY = 0;
+    uint32_t byteStart = 0;
+    uint32_t byteEnd = 0;
+  };
+
   PPTWriter(PPTWriterContext* ctx, PAGXDocument* doc, const PPTExporter::Options& options,
             LayoutContext* layoutContext)
       : _ctx(ctx), _doc(doc), _convertTextToPath(options.convertTextToPath),
@@ -533,6 +555,29 @@ class PPTWriter {
                        float alpha, const std::vector<LayerFilter*>& filters,
                        const std::vector<LayerStyle*>& styles,
                        const TextLayoutResult* precomputed = nullptr);
+
+  // Geometry inputs needed to build the native-text shape frame: the shape's
+  // top-left, its estimated content size, and whether the source has a text
+  // box (controls wrap="square" vs. "none"). Populated by
+  // computeNativeTextGeometry and consumed by emitNativeTextShapeFrame.
+  struct NativeTextGeometry {
+    float posX = 0;
+    float posY = 0;
+    float estWidth = 0;
+    float estHeight = 0;
+    bool hasTextBox = false;
+  };
+
+  NativeTextGeometry computeNativeTextGeometry(const Text* text, Text* mutableText,
+                                               const FillStrokeInfo& fs,
+                                               const TextLayoutResult* precomputed);
+  void emitNativeTextShapeFrame(XMLBuilder& out, const Matrix& m, const NativeTextGeometry& geom,
+                                const TextBox* textBox, bool useLineLayout);
+  void emitNativeTextBody(XMLBuilder& out, const Text* text,
+                          const std::vector<TextLayoutLineInfo>* lines, const PPTRunStyle& style,
+                          int64_t lnSpcPts, bool useLineLayout,
+                          const std::vector<LayerFilter*>& filters,
+                          const std::vector<LayerStyle*>& styles);
   void writeParagraph(XMLBuilder& out, const std::string& lineText, const PPTRunStyle& style,
                       const std::vector<LayerFilter*>& filters,
                       const std::vector<LayerStyle*>& styles, int64_t lnSpcPts = 0);
@@ -566,7 +611,15 @@ class PPTWriter {
     void openParagraph();
     void closeParagraph();
     void emitRun(const std::string& fragment, const PPTRunStyle& style);
+    void emitLineBreak(const PPTRunStyle& style);
   };
+
+  void emitTextBoxShapeFrame(XMLBuilder& out, const TextBox* box, const Matrix& transform,
+                             float estWidth, float estHeight, bool useLineLayout, bool hasBoxWidth);
+  void emitTextBoxBody(const std::vector<RichTextRun>& runs,
+                       const std::vector<PPTRunStyle>& runStyles,
+                       std::vector<LineEntry>& lineEntries, bool useLineLayout,
+                       ParagraphEmitter& emitter);
 
   // Shape envelope helpers
   void beginShape(XMLBuilder& out, const char* name, int64_t offX, int64_t offY, int64_t extCX,
@@ -1190,28 +1243,79 @@ static const char* BlendModeToPPT(BlendMode mode) {
   }
 }
 
+namespace {
+
+// Grouped effect sources used by writeEffects. Collecting into one struct in
+// a single pass over filters + styles avoids the original "scan twice to
+// decide whether anything needs emitting, then scan again per effect type"
+// pattern. Order of emission is fixed by OOXML §20.1.8.20 (blur → fillOverlay
+// → innerShdw → outerShdw) and applied by the consumer, not by collection.
+struct EffectSources {
+  const BlurFilter* blur = nullptr;
+  const BackgroundBlurStyle* backgroundBlur = nullptr;
+  const BlendFilter* blend = nullptr;
+  std::vector<const InnerShadowFilter*> innerShadowFilters;
+  std::vector<const InnerShadowStyle*> innerShadowStyles;
+  std::vector<const DropShadowFilter*> dropShadowFilters;
+  std::vector<const DropShadowStyle*> dropShadowStyles;
+
+  bool empty() const {
+    return !blur && !backgroundBlur && !blend && innerShadowFilters.empty() &&
+           innerShadowStyles.empty() && dropShadowFilters.empty() && dropShadowStyles.empty();
+  }
+};
+
+static EffectSources CollectEffectSources(const std::vector<LayerFilter*>& filters,
+                                          const std::vector<LayerStyle*>& styles) {
+  EffectSources sources;
+  for (const auto* f : filters) {
+    switch (f->nodeType()) {
+      case NodeType::BlurFilter:
+        if (!sources.blur) {
+          sources.blur = static_cast<const BlurFilter*>(f);
+        }
+        break;
+      case NodeType::BlendFilter:
+        if (!sources.blend) {
+          sources.blend = static_cast<const BlendFilter*>(f);
+        }
+        break;
+      case NodeType::InnerShadowFilter:
+        sources.innerShadowFilters.push_back(static_cast<const InnerShadowFilter*>(f));
+        break;
+      case NodeType::DropShadowFilter:
+        sources.dropShadowFilters.push_back(static_cast<const DropShadowFilter*>(f));
+        break;
+      default:
+        break;
+    }
+  }
+  for (const auto* s : styles) {
+    switch (s->nodeType()) {
+      case NodeType::BackgroundBlurStyle:
+        if (!sources.backgroundBlur) {
+          sources.backgroundBlur = static_cast<const BackgroundBlurStyle*>(s);
+        }
+        break;
+      case NodeType::InnerShadowStyle:
+        sources.innerShadowStyles.push_back(static_cast<const InnerShadowStyle*>(s));
+        break;
+      case NodeType::DropShadowStyle:
+        sources.dropShadowStyles.push_back(static_cast<const DropShadowStyle*>(s));
+        break;
+      default:
+        break;
+    }
+  }
+  return sources;
+}
+
+}  // namespace
+
 void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& filters,
                              const std::vector<LayerStyle*>& styles) {
-  bool hasEffects = false;
-  for (const auto* f : filters) {
-    auto type = f->nodeType();
-    if (type == NodeType::DropShadowFilter || type == NodeType::InnerShadowFilter ||
-        type == NodeType::BlurFilter || type == NodeType::BlendFilter) {
-      hasEffects = true;
-      break;
-    }
-  }
-  if (!hasEffects) {
-    for (const auto* s : styles) {
-      auto type = s->nodeType();
-      if (type == NodeType::DropShadowStyle || type == NodeType::InnerShadowStyle ||
-          type == NodeType::BackgroundBlurStyle) {
-        hasEffects = true;
-        break;
-      }
-    }
-  }
-  if (!hasEffects) {
+  auto sources = CollectEffectSources(filters, styles);
+  if (sources.empty()) {
     return;
   }
 
@@ -1226,81 +1330,45 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
   // grow="1" allows the blur to extend beyond the original shape bounds — required
   // for solid-filled shapes, otherwise PowerPoint clips the blurred edges back to
   // the original bounds and the effect becomes invisible.
-  bool blurEmitted = false;
-  for (const auto* f : filters) {
-    if (f->nodeType() == NodeType::BlurFilter) {
-      auto* blur = static_cast<const BlurFilter*>(f);
-      float avgBlur = (blur->blurX + blur->blurY) / 2.0f;
-      if (avgBlur > 0) {
-        out.openElement("a:blur")
-            .addRequiredAttribute("rad", PxToEMU(avgBlur))
-            .addRequiredAttribute("grow", "1")
-            .closeElementSelfClosing();
-        blurEmitted = true;
-      }
-      break;
-    }
+  float avgBlur = 0;
+  if (sources.blur) {
+    avgBlur = (sources.blur->blurX + sources.blur->blurY) / 2.0f;
+  } else if (sources.backgroundBlur) {
+    avgBlur = (sources.backgroundBlur->blurX + sources.backgroundBlur->blurY) / 2.0f;
   }
-  if (!blurEmitted) {
-    for (const auto* s : styles) {
-      if (s->nodeType() == NodeType::BackgroundBlurStyle) {
-        auto* bg = static_cast<const BackgroundBlurStyle*>(s);
-        float avgBlur = (bg->blurX + bg->blurY) / 2.0f;
-        if (avgBlur > 0) {
-          out.openElement("a:blur")
-              .addRequiredAttribute("rad", PxToEMU(avgBlur))
-              .addRequiredAttribute("grow", "1")
-              .closeElementSelfClosing();
-        }
-        break;
-      }
+  if (avgBlur > 0) {
+    out.openElement("a:blur")
+        .addRequiredAttribute("rad", PxToEMU(avgBlur))
+        .addRequiredAttribute("grow", "1")
+        .closeElementSelfClosing();
+  }
+
+  if (sources.blend) {
+    const char* blendStr = BlendModeToPPT(sources.blend->blendMode);
+    if (blendStr) {
+      out.openElement("a:fillOverlay").addRequiredAttribute("blend", blendStr).closeElementStart();
+      out.openElement("a:solidFill").closeElementStart();
+      WriteSrgbClr(out, sources.blend->color, sources.blend->color.alpha);
+      out.closeElement();  // a:solidFill
+      out.closeElement();  // a:fillOverlay
     }
   }
 
-  for (const auto* f : filters) {
-    if (f->nodeType() == NodeType::BlendFilter) {
-      auto* blend = static_cast<const BlendFilter*>(f);
-      const char* blendStr = BlendModeToPPT(blend->blendMode);
-      if (blendStr) {
-        out.openElement("a:fillOverlay")
-            .addRequiredAttribute("blend", blendStr)
-            .closeElementStart();
-        out.openElement("a:solidFill").closeElementStart();
-        WriteSrgbClr(out, blend->color, blend->color.alpha);
-        out.closeElement();  // a:solidFill
-        out.closeElement();  // a:fillOverlay
-      }
-      break;
-    }
+  for (const auto* s : sources.innerShadowFilters) {
+    writeShadowElement(out, "a:innerShdw", s->blurX, s->blurY, s->offsetX, s->offsetY, s->color,
+                       false);
   }
-
-  for (const auto* f : filters) {
-    if (f->nodeType() == NodeType::InnerShadowFilter) {
-      auto* s = static_cast<const InnerShadowFilter*>(f);
-      writeShadowElement(out, "a:innerShdw", s->blurX, s->blurY, s->offsetX, s->offsetY, s->color,
-                         false);
-    }
+  for (const auto* st : sources.innerShadowStyles) {
+    writeShadowElement(out, "a:innerShdw", st->blurX, st->blurY, st->offsetX, st->offsetY,
+                       st->color, false);
   }
-  for (const auto* s : styles) {
-    if (s->nodeType() == NodeType::InnerShadowStyle) {
-      auto* st = static_cast<const InnerShadowStyle*>(s);
-      writeShadowElement(out, "a:innerShdw", st->blurX, st->blurY, st->offsetX, st->offsetY,
-                         st->color, false);
-    }
+  for (const auto* s : sources.dropShadowFilters) {
+    writeShadowElement(out, "a:outerShdw", s->blurX, s->blurY, s->offsetX, s->offsetY, s->color,
+                       true);
   }
-  for (const auto* f : filters) {
-    if (f->nodeType() == NodeType::DropShadowFilter) {
-      auto* s = static_cast<const DropShadowFilter*>(f);
-      writeShadowElement(out, "a:outerShdw", s->blurX, s->blurY, s->offsetX, s->offsetY, s->color,
-                         true);
-    }
-  }
-  for (const auto* s : styles) {
-    if (s->nodeType() == NodeType::DropShadowStyle) {
-      auto* st = static_cast<const DropShadowStyle*>(s);
-      writeShadowElement(out, "a:outerShdw", st->blurX, st->blurY, st->offsetX, st->offsetY,
-                         st->color, true);
-    }
+  for (const auto* st : sources.dropShadowStyles) {
+    writeShadowElement(out, "a:outerShdw", st->blurX, st->blurY, st->offsetX, st->offsetY,
+                       st->color, true);
   }
 
   out.closeElement();  // a:effectLst
@@ -1564,60 +1632,50 @@ void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStr
   }
 }
 
-void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStrokeInfo& fs,
-                                const Matrix& m, float alpha,
-                                const std::vector<LayerFilter*>& filters,
-                                const std::vector<LayerStyle*>& styles,
-                                const TextLayoutResult* precomputed) {
-  if (text->text.empty()) {
-    return;
-  }
-
-  auto* mutableText = const_cast<Text*>(text);
+PPTWriter::NativeTextGeometry PPTWriter::computeNativeTextGeometry(
+    const Text* text, Text* mutableText, const FillStrokeInfo& fs,
+    const TextLayoutResult* precomputed) {
+  NativeTextGeometry geom;
   float boxWidth = fs.textBox ? EffectiveTextBoxWidth(fs.textBox) : NAN;
   float boxHeight = fs.textBox ? EffectiveTextBoxHeight(fs.textBox) : NAN;
-  bool hasTextBox = fs.textBox && !std::isnan(boxWidth) && boxWidth > 0;
+  geom.hasTextBox = fs.textBox && !std::isnan(boxWidth) && boxWidth > 0;
 
-  TextLayoutResult localResult;
-  if (!precomputed) {
-    auto params = hasTextBox ? MakeTextBoxParams(fs.textBox) : MakeStandaloneParams(text);
-    localResult = TextLayout::Layout({mutableText}, params, _layoutContext);
-    precomputed = &localResult;
-  }
-  auto* lines = precomputed->getTextLines(mutableText);
-
-  float posX = 0;
-  float posY = 0;
-  float estWidth = 0;
-  float estHeight = 0;
-
-  if (hasTextBox) {
-    posX = fs.textBox->position.x;
-    posY = fs.textBox->position.y;
-    estWidth = boxWidth;
-    estHeight = (!std::isnan(boxHeight) && boxHeight > 0) ? boxHeight : text->fontSize * 1.4f;
-  } else {
-    auto textBounds = precomputed->getTextBounds(mutableText);
-    if (textBounds.width > 0 && textBounds.height > 0) {
-      posX = text->position.x + textBounds.x;
-      posY = text->position.y + textBounds.y;
-      estWidth = textBounds.width;
-      estHeight = textBounds.height;
-    } else {
-      estWidth = static_cast<float>(CountUTF8Characters(text->text)) * text->fontSize * 0.6f;
-      estHeight = text->fontSize * 1.4f;
-      posX = text->position.x;
-      posY = text->position.y - text->fontSize * 0.85f;
-      if (text->textAnchor == TextAnchor::Center) {
-        posX -= estWidth / 2.0f;
-      } else if (text->textAnchor == TextAnchor::End) {
-        posX -= estWidth;
-      }
-    }
+  if (geom.hasTextBox) {
+    geom.posX = fs.textBox->position.x;
+    geom.posY = fs.textBox->position.y;
+    geom.estWidth = boxWidth;
+    geom.estHeight = (!std::isnan(boxHeight) && boxHeight > 0) ? boxHeight : text->fontSize * 1.4f;
+    return geom;
   }
 
-  auto xf = decomposeXform(posX, posY, estWidth, estHeight, m);
+  auto textBounds = precomputed->getTextBounds(mutableText);
+  if (textBounds.width > 0 && textBounds.height > 0) {
+    geom.posX = text->position.x + textBounds.x;
+    geom.posY = text->position.y + textBounds.y;
+    geom.estWidth = textBounds.width;
+    geom.estHeight = textBounds.height;
+    return geom;
+  }
 
+  // Fallback when layout produced no usable bounds (e.g. font metrics missing):
+  // estimate from font size and adjust for the textAnchor that the missing
+  // layout would otherwise apply.
+  geom.estWidth = static_cast<float>(CountUTF8Characters(text->text)) * text->fontSize * 0.6f;
+  geom.estHeight = text->fontSize * 1.4f;
+  geom.posX = text->position.x;
+  geom.posY = text->position.y - text->fontSize * 0.85f;
+  if (text->textAnchor == TextAnchor::Center) {
+    geom.posX -= geom.estWidth / 2.0f;
+  } else if (text->textAnchor == TextAnchor::End) {
+    geom.posX -= geom.estWidth;
+  }
+  return geom;
+}
+
+void PPTWriter::emitNativeTextShapeFrame(XMLBuilder& out, const Matrix& m,
+                                         const NativeTextGeometry& geom, const TextBox* textBox,
+                                         bool useLineLayout) {
+  auto xf = decomposeXform(geom.posX, geom.posY, geom.estWidth, geom.estHeight, m);
   int id = _ctx->nextShapeId();
   out.openElement("p:sp").closeElementStart();
   out.openElement("p:nvSpPr").closeElementStart();
@@ -1643,49 +1701,30 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   // the actual glyph outlines.
   out.closeElement();  // p:spPr
 
-  // When PAGX layout produced explicit per-line byte ranges we emit them as
-  // soft <a:br/> breaks within a single paragraph ourselves, so PowerPoint
-  // shouldn't perform additional line-wrapping on top (its font metrics differ
-  // slightly from PAGX's, which would shift the break points). Vertical layout
-  // has no line info; fall back to PowerPoint-driven wrapping in that case.
-  bool useLineLayout = (lines != nullptr) && !lines->empty();
   // Justify alignment requires PowerPoint to know a target line width; with
   // wrap="none" the text is unbounded so PPT silently falls back to start
   // alignment. Use wrap="square" in that case so PPT can justify within the
   // shape's text area (our PAGX-determined visual lines should fit, so PPT
   // shouldn't introduce additional wraps).
-  bool justifyAlign = fs.textBox && fs.textBox->textAlign == TextAlign::Justify;
-
+  bool justifyAlign = textBox && textBox->textAlign == TextAlign::Justify;
   out.openElement("p:txBody").closeElementStart();
   out.openElement("a:bodyPr")
       .addRequiredAttribute("wrap", useLineLayout ? (justifyAlign ? "square" : "none")
-                                                  : (hasTextBox ? "square" : "none"))
+                                                  : (geom.hasTextBox ? "square" : "none"))
       .addRequiredAttribute("lIns", "0")
       .addRequiredAttribute("tIns", "0")
       .addRequiredAttribute("rIns", "0")
       .addRequiredAttribute("bIns", "0");
-  AddBodyPrAttrsForTextBox(out, fs.textBox);
+  AddBodyPrAttrsForTextBox(out, textBox);
   out.closeElementSelfClosing();
   out.openElement("a:lstStyle").closeElementSelfClosing();
+}
 
-  PPTRunStyle style = BuildRunStyle(text, fs.fill, fs.stroke, alpha);
-  if (text->textAnchor == TextAnchor::Center) {
-    style.algn = "ctr";
-  } else if (text->textAnchor == TextAnchor::End) {
-    style.algn = "r";
-  }
-  if (fs.textBox) {
-    if (fs.textBox->textAlign == TextAlign::Center) {
-      style.algn = "ctr";
-    } else if (fs.textBox->textAlign == TextAlign::End) {
-      style.algn = "r";
-    } else if (fs.textBox->textAlign == TextAlign::Justify) {
-      style.algn = "just";
-    }
-  }
-
-  int64_t lnSpcPts = fs.textBox ? LineHeightToSpcPts(fs.textBox->lineHeight) : 0;
-
+void PPTWriter::emitNativeTextBody(XMLBuilder& out, const Text* text,
+                                   const std::vector<TextLayoutLineInfo>* lines,
+                                   const PPTRunStyle& style, int64_t lnSpcPts, bool useLineLayout,
+                                   const std::vector<LayerFilter*>& filters,
+                                   const std::vector<LayerStyle*>& styles) {
   if (useLineLayout) {
     // Emit ALL visual lines inside a single <a:p> separated by soft <a:br/>
     // breaks. OOXML's algn="just" never justifies the last line of a
@@ -1711,20 +1750,73 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
       wroteAny = true;
     }
     out.closeElement();  // a:p
-  } else {
-    const std::string& remaining = text->text;
-    size_t pos = 0;
-    while (pos <= remaining.size()) {
-      size_t nl = remaining.find('\n', pos);
-      std::string line =
-          (nl == std::string::npos) ? remaining.substr(pos) : remaining.substr(pos, nl - pos);
-      writeParagraph(out, line, style, filters, styles, lnSpcPts);
-      if (nl == std::string::npos) {
-        break;
-      }
-      pos = nl + 1;
+    return;
+  }
+
+  const std::string& remaining = text->text;
+  size_t pos = 0;
+  while (pos <= remaining.size()) {
+    size_t nl = remaining.find('\n', pos);
+    std::string line =
+        (nl == std::string::npos) ? remaining.substr(pos) : remaining.substr(pos, nl - pos);
+    writeParagraph(out, line, style, filters, styles, lnSpcPts);
+    if (nl == std::string::npos) {
+      break;
+    }
+    pos = nl + 1;
+  }
+}
+
+void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStrokeInfo& fs,
+                                const Matrix& m, float alpha,
+                                const std::vector<LayerFilter*>& filters,
+                                const std::vector<LayerStyle*>& styles,
+                                const TextLayoutResult* precomputed) {
+  if (text->text.empty()) {
+    return;
+  }
+
+  auto* mutableText = const_cast<Text*>(text);
+  float boxWidth = fs.textBox ? EffectiveTextBoxWidth(fs.textBox) : NAN;
+  bool hasTextBox = fs.textBox && !std::isnan(boxWidth) && boxWidth > 0;
+
+  TextLayoutResult localResult;
+  if (!precomputed) {
+    auto params = hasTextBox ? MakeTextBoxParams(fs.textBox) : MakeStandaloneParams(text);
+    localResult = TextLayout::Layout({mutableText}, params, _layoutContext);
+    precomputed = &localResult;
+  }
+  auto* lines = precomputed->getTextLines(mutableText);
+
+  auto geom = computeNativeTextGeometry(text, mutableText, fs, precomputed);
+
+  // When PAGX layout produced explicit per-line byte ranges we emit them as
+  // soft <a:br/> breaks within a single paragraph ourselves, so PowerPoint
+  // shouldn't perform additional line-wrapping on top (its font metrics differ
+  // slightly from PAGX's, which would shift the break points). Vertical layout
+  // has no line info; fall back to PowerPoint-driven wrapping in that case.
+  bool useLineLayout = (lines != nullptr) && !lines->empty();
+
+  emitNativeTextShapeFrame(out, m, geom, fs.textBox, useLineLayout);
+
+  PPTRunStyle style = BuildRunStyle(text, fs.fill, fs.stroke, alpha);
+  if (text->textAnchor == TextAnchor::Center) {
+    style.algn = "ctr";
+  } else if (text->textAnchor == TextAnchor::End) {
+    style.algn = "r";
+  }
+  if (fs.textBox) {
+    if (fs.textBox->textAlign == TextAlign::Center) {
+      style.algn = "ctr";
+    } else if (fs.textBox->textAlign == TextAlign::End) {
+      style.algn = "r";
+    } else if (fs.textBox->textAlign == TextAlign::Justify) {
+      style.algn = "just";
     }
   }
+  int64_t lnSpcPts = fs.textBox ? LineHeightToSpcPts(fs.textBox->lineHeight) : 0;
+
+  emitNativeTextBody(out, text, lines, style, lnSpcPts, useLineLayout, filters, styles);
 
   out.closeElement();  // p:txBody
   out.closeElement();  // p:sp
@@ -1827,29 +1919,9 @@ void PPTWriter::writeParagraph(XMLBuilder& out, const std::string& lineText,
 
 namespace {
 
-// One "run" inside a rich TextBox: a Text element together with the Fill and
-// Stroke painters that apply to it (either the Group's own Fill/Stroke or,
-// when the Text is a direct child of the TextBox, the TextBox's top-level
-// Fill/Stroke).
-struct RichTextRun {
-  const Text* text = nullptr;
-  const Fill* fill = nullptr;
-  const Stroke* stroke = nullptr;
-};
-
-// One entry in the PAGX-authoritative line list consumed by writeTextBoxGroup.
-// `runIndex` points back into the RichTextRun array, and `byteStart`/`byteEnd`
-// are byte offsets into that run's UTF-8 text.
-struct LineEntry {
-  size_t runIndex = 0;
-  float baselineY = 0;
-  uint32_t byteStart = 0;
-  uint32_t byteEnd = 0;
-};
-
-// Stable-sort comparator for LineEntry. Defined as a named function (not a
-// lambda) per project convention.
-bool CompareLineEntryByBaselineY(const LineEntry& a, const LineEntry& b) {
+// Stable-sort comparator for PPTWriter::LineEntry. Defined as a named function
+// (not a lambda) per project convention.
+bool CompareLineEntryByBaselineY(const PPTWriter::LineEntry& a, const PPTWriter::LineEntry& b) {
   return a.baselineY < b.baselineY;
 }
 
@@ -1859,7 +1931,7 @@ bool CompareLineEntryByBaselineY(const LineEntry& a, const LineEntry& b) {
 // locally-collected Fill/Stroke (falling back to the parent's when the Group
 // supplies none).
 void CollectRichTextRuns(const std::vector<Element*>& elements, const Fill* parentFill,
-                         const Stroke* parentStroke, std::vector<RichTextRun>& outRuns) {
+                         const Stroke* parentStroke, std::vector<PPTWriter::RichTextRun>& outRuns) {
   for (auto* element : elements) {
     auto type = element->nodeType();
     if (type == NodeType::Text) {
@@ -1906,6 +1978,129 @@ void PPTWriter::ParagraphEmitter::emitRun(const std::string& fragment, const PPT
   writer->writeParagraphRun(out, fragment, style, filters, styles);
 }
 
+void PPTWriter::ParagraphEmitter::emitLineBreak(const PPTRunStyle& style) {
+  writer->writeLineBreak(out, style);
+}
+
+void PPTWriter::emitTextBoxShapeFrame(XMLBuilder& out, const TextBox* box, const Matrix& transform,
+                                      float estWidth, float estHeight, bool useLineLayout,
+                                      bool hasBoxWidth) {
+  // `transform` already incorporates BuildGroupMatrix(box) (applied by the
+  // caller in writeElements), so the local origin here is (0, 0). Adding
+  // box->position again would double-offset the shape, pushing the text-box
+  // away from the centered position the layout assigned to it.
+  auto xf = decomposeXform(0.0f, 0.0f, estWidth, estHeight, transform);
+
+  int id = _ctx->nextShapeId();
+  out.openElement("p:sp").closeElementStart();
+  out.openElement("p:nvSpPr").closeElementStart();
+  out.openElement("p:cNvPr")
+      .addRequiredAttribute("id", id)
+      .addRequiredAttribute("name", "TextBox")
+      .closeElementSelfClosing();
+  out.openElement("p:cNvSpPr").addRequiredAttribute("txBox", "1").closeElementSelfClosing();
+  out.openElement("p:nvPr").closeElementSelfClosing();
+  out.closeElement();  // p:nvSpPr
+
+  out.openElement("p:spPr").closeElementStart();
+  WriteXfrm(out, xf);
+  out.openElement("a:prstGeom").addRequiredAttribute("prst", "rect").closeElementStart();
+  out.openElement("a:avLst").closeElementSelfClosing();
+  out.closeElement();
+  out.openElement("a:noFill").closeElementSelfClosing();
+  out.openElement("a:ln").closeElementStart();
+  out.openElement("a:noFill").closeElementSelfClosing();
+  out.closeElement();
+  out.closeElement();  // p:spPr
+
+  // Justify alignment requires PowerPoint to know a target line width; with
+  // wrap="none" the text is unbounded so PPT silently falls back to start
+  // alignment. Use wrap="square" in that case so PPT can justify within the
+  // shape's text area. Our PAGX-determined visual lines should already fit
+  // within the shape, so PPT shouldn't introduce additional wraps.
+  bool justifyAlign = box->textAlign == TextAlign::Justify;
+  out.openElement("p:txBody").closeElementStart();
+  out.openElement("a:bodyPr")
+      .addRequiredAttribute("wrap", useLineLayout ? (justifyAlign ? "square" : "none")
+                                                  : (hasBoxWidth ? "square" : "none"))
+      .addRequiredAttribute("lIns", "0")
+      .addRequiredAttribute("tIns", "0")
+      .addRequiredAttribute("rIns", "0")
+      .addRequiredAttribute("bIns", "0");
+  AddBodyPrAttrsForTextBox(out, box);
+  out.closeElementSelfClosing();
+  out.openElement("a:lstStyle").closeElementSelfClosing();
+}
+
+void PPTWriter::emitTextBoxBody(const std::vector<RichTextRun>& runs,
+                                const std::vector<PPTRunStyle>& runStyles,
+                                std::vector<LineEntry>& lineEntries, bool useLineLayout,
+                                ParagraphEmitter& emitter) {
+  if (useLineLayout) {
+    // Stable-sort entries by baselineY so that runs from different Text
+    // elements sharing the same visual line stay in source order (rich text
+    // flows left-to-right within a baseline). Then group consecutive entries
+    // with matching baselineY into one visual line.
+    std::stable_sort(lineEntries.begin(), lineEntries.end(), CompareLineEntryByBaselineY);
+    constexpr float kBaselineEpsilon = 0.5f;
+    // Emit ALL visual lines inside a single <a:p> separated by soft <a:br/>
+    // breaks (rather than one <a:p> per line). This is required for justify
+    // alignment to behave: OOXML's algn="just" never justifies the last line
+    // of a paragraph, so isolating each visual line in its own paragraph
+    // turns every line into a "last line" and disables justify entirely.
+    // Soft breaks within a single paragraph make all lines except the
+    // semantically last one participate in justify.
+    emitter.openParagraph();
+    bool firstLine = true;
+    size_t i = 0;
+    while (i < lineEntries.size()) {
+      float baseline = lineEntries[i].baselineY;
+      if (!firstLine) {
+        emitter.emitLineBreak(runStyles[lineEntries[i].runIndex]);
+      }
+      firstLine = false;
+      while (i < lineEntries.size() &&
+             std::fabs(lineEntries[i].baselineY - baseline) < kBaselineEpsilon) {
+        const auto& entry = lineEntries[i];
+        const std::string& src = runs[entry.runIndex].text->text;
+        emitter.emitRun(src.substr(entry.byteStart, entry.byteEnd - entry.byteStart),
+                        runStyles[entry.runIndex]);
+        ++i;
+      }
+    }
+    emitter.closeParagraph();
+    return;
+  }
+
+  // Fallback path: stream runs into paragraphs, splitting only on '\n'. A
+  // single Text element may carry multiple newlines internally, in which
+  // case it contributes to several consecutive paragraphs. PowerPoint
+  // performs its own wrapping inside the shape if a paragraph exceeds the
+  // box width.
+  for (size_t i = 0; i < runs.size(); ++i) {
+    const std::string& s = runs[i].text->text;
+    const auto& rs = runStyles[i];
+    size_t pos = 0;
+    while (pos <= s.size()) {
+      size_t nl = s.find('\n', pos);
+      if (nl == std::string::npos) {
+        emitter.emitRun(s.substr(pos), rs);
+        break;
+      }
+      emitter.emitRun(s.substr(pos, nl - pos), rs);
+      // Newline terminates the current paragraph; if the paragraph is still
+      // empty (e.g. consecutive '\n's), open and immediately close it so the
+      // blank line is preserved.
+      if (!emitter.paragraphOpen) {
+        emitter.openParagraph();
+      }
+      emitter.closeParagraph();
+      pos = nl + 1;
+    }
+  }
+  emitter.closeParagraph();
+}
+
 void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
                                   const std::vector<Element*>& elements, const Matrix& transform,
                                   float alpha, const std::vector<LayerFilter*>& filters,
@@ -1935,11 +2130,6 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
   float boxWidth = EffectiveTextBoxWidth(box);
   float boxHeight = EffectiveTextBoxHeight(box);
   bool hasBoxWidth = !std::isnan(boxWidth) && boxWidth > 0;
-
-  // `transform` already incorporates BuildGroupMatrix(box) (applied by the
-  // caller in writeElements), so the local origin here is (0, 0). Adding
-  // box->position again would double-offset the shape, pushing the text-box
-  // away from the centered position the layout assigned to it.
   float estWidth = hasBoxWidth ? boxWidth : layoutResult.bounds.width;
   if (estWidth <= 0) {
     estWidth = static_cast<float>(CountUTF8Characters(runs.front().text->text)) *
@@ -1951,30 +2141,6 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
     estHeight = runs.front().text->fontSize * 1.4f;
   }
 
-  auto xf = decomposeXform(0.0f, 0.0f, estWidth, estHeight, transform);
-
-  int id = _ctx->nextShapeId();
-  out.openElement("p:sp").closeElementStart();
-  out.openElement("p:nvSpPr").closeElementStart();
-  out.openElement("p:cNvPr")
-      .addRequiredAttribute("id", id)
-      .addRequiredAttribute("name", "TextBox")
-      .closeElementSelfClosing();
-  out.openElement("p:cNvSpPr").addRequiredAttribute("txBox", "1").closeElementSelfClosing();
-  out.openElement("p:nvPr").closeElementSelfClosing();
-  out.closeElement();  // p:nvSpPr
-
-  out.openElement("p:spPr").closeElementStart();
-  WriteXfrm(out, xf);
-  out.openElement("a:prstGeom").addRequiredAttribute("prst", "rect").closeElementStart();
-  out.openElement("a:avLst").closeElementSelfClosing();
-  out.closeElement();
-  out.openElement("a:noFill").closeElementSelfClosing();
-  out.openElement("a:ln").closeElementStart();
-  out.openElement("a:noFill").closeElementSelfClosing();
-  out.closeElement();
-  out.closeElement();  // p:spPr
-
   // Per-Text line metadata produced by PAGX's own layout. Use these line
   // breaks as authoritative paragraph boundaries (rather than letting
   // PowerPoint re-wrap with its own font metrics, which doesn't match the
@@ -1983,7 +2149,7 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
   // (notably vertical writing mode); those fall back to legacy '\n'-splitting
   // and PowerPoint-driven wrapping.
   std::vector<LineEntry> lineEntries;
-  bool useLineLayout = !runs.empty() && box->writingMode != WritingMode::Vertical;
+  bool useLineLayout = box->writingMode != WritingMode::Vertical;
   if (useLineLayout) {
     for (size_t i = 0; i < runs.size(); ++i) {
       auto* mt = const_cast<Text*>(runs[i].text);
@@ -2005,6 +2171,8 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
     }
   }
 
+  emitTextBoxShapeFrame(out, box, transform, estWidth, estHeight, useLineLayout, hasBoxWidth);
+
   const char* algn = nullptr;
   if (box->textAlign == TextAlign::Center) {
     algn = "ctr";
@@ -2013,24 +2181,6 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
   } else if (box->textAlign == TextAlign::Justify) {
     algn = "just";
   }
-  // Justify alignment requires PowerPoint to know a target line width; with
-  // wrap="none" the text is unbounded so PPT silently falls back to start
-  // alignment. Use wrap="square" in that case so PPT can justify within the
-  // shape's text area. Our PAGX-determined visual lines should already fit
-  // within the shape, so PPT shouldn't introduce additional wraps.
-  bool justifyAlign = (algn != nullptr && std::string(algn) == "just");
-
-  out.openElement("p:txBody").closeElementStart();
-  out.openElement("a:bodyPr")
-      .addRequiredAttribute("wrap", useLineLayout ? (justifyAlign ? "square" : "none")
-                                                  : (hasBoxWidth ? "square" : "none"))
-      .addRequiredAttribute("lIns", "0")
-      .addRequiredAttribute("tIns", "0")
-      .addRequiredAttribute("rIns", "0")
-      .addRequiredAttribute("bIns", "0");
-  AddBodyPrAttrsForTextBox(out, box);
-  out.closeElementSelfClosing();
-  out.openElement("a:lstStyle").closeElementSelfClosing();
   int64_t lnSpcPts = LineHeightToSpcPts(box->lineHeight);
 
   // Build per-run styles up-front (font/size/bold/italic/color/typeface).
@@ -2042,69 +2192,7 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
   }
 
   ParagraphEmitter emitter{this, out, algn, lnSpcPts, filters, styles};
-
-  if (useLineLayout) {
-    // Stable-sort entries by baselineY so that runs from different Text
-    // elements sharing the same visual line stay in source order (rich text
-    // flows left-to-right within a baseline). Then group consecutive entries
-    // with matching baselineY into one visual line.
-    std::stable_sort(lineEntries.begin(), lineEntries.end(), CompareLineEntryByBaselineY);
-    constexpr float kBaselineEpsilon = 0.5f;
-    // Emit ALL visual lines inside a single <a:p> separated by soft <a:br/>
-    // breaks (rather than one <a:p> per line). This is required for justify
-    // alignment to behave: OOXML's algn="just" never justifies the last line
-    // of a paragraph, so isolating each visual line in its own paragraph
-    // turns every line into a "last line" and disables justify entirely.
-    // Soft breaks within a single paragraph make all lines except the
-    // semantically last one participate in justify.
-    emitter.openParagraph();
-    bool firstLine = true;
-    size_t i = 0;
-    while (i < lineEntries.size()) {
-      float baseline = lineEntries[i].baselineY;
-      if (!firstLine) {
-        writeLineBreak(out, runStyles[lineEntries[i].runIndex]);
-      }
-      firstLine = false;
-      while (i < lineEntries.size() &&
-             std::fabs(lineEntries[i].baselineY - baseline) < kBaselineEpsilon) {
-        const auto& entry = lineEntries[i];
-        const std::string& src = runs[entry.runIndex].text->text;
-        emitter.emitRun(src.substr(entry.byteStart, entry.byteEnd - entry.byteStart),
-                        runStyles[entry.runIndex]);
-        ++i;
-      }
-    }
-    emitter.closeParagraph();
-  } else {
-    // Fallback path: stream runs into paragraphs, splitting only on '\n'. A
-    // single Text element may carry multiple newlines internally, in which
-    // case it contributes to several consecutive paragraphs. PowerPoint
-    // performs its own wrapping inside the shape if a paragraph exceeds the
-    // box width.
-    for (size_t i = 0; i < runs.size(); ++i) {
-      const std::string& s = runs[i].text->text;
-      const auto& rs = runStyles[i];
-      size_t pos = 0;
-      while (pos <= s.size()) {
-        size_t nl = s.find('\n', pos);
-        if (nl == std::string::npos) {
-          emitter.emitRun(s.substr(pos), rs);
-          break;
-        }
-        emitter.emitRun(s.substr(pos, nl - pos), rs);
-        // Newline terminates the current paragraph; if the paragraph is still
-        // empty (e.g. consecutive '\n's), open and immediately close it so the
-        // blank line is preserved.
-        if (!emitter.paragraphOpen) {
-          emitter.openParagraph();
-        }
-        emitter.closeParagraph();
-        pos = nl + 1;
-      }
-    }
-    emitter.closeParagraph();
-  }
+  emitTextBoxBody(runs, runStyles, lineEntries, useLineLayout, emitter);
 
   out.closeElement();  // p:txBody
   out.closeElement();  // p:sp
