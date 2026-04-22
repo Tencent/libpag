@@ -1225,11 +1225,11 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   if (!filterValues.empty()) {
     style += ";filter:" + filterValues;
   }
-  if (useMirrorTile) {
-    // Clip the mirrored tile grid (3x3 = width/height * 3, positioned at (-W,-H)) back to the
-    // source layer's box, so only the center tile's post-blur pixels are visible.
-    style += ";overflow:hidden";
-  }
+  // Note: for useMirrorTile we intentionally do NOT add `overflow:hidden` on this outer layer
+  // div. The clip is instead applied on an inner wrapper whose bounds are expanded outward by
+  // `2 * blur-radius` on each side, so the mirror blur halo can extend beyond the layer's
+  // original rect (matching tgfx's BlurFilter output bounds = layer rect outset by 2*sigma),
+  // while the flex/layout-relevant outer div keeps its original W x H.
   if (!boxShadowValue.empty()) {
     style += ";border-radius:" + boxShadowBorderRadius;
     style += ";box-shadow:" + boxShadowValue;
@@ -1400,50 +1400,67 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   float contentAlpha = childDistribute ? layerAlpha : 1.0f;
 
   if (useMirrorTile) {
-    // Simulate BlurFilter.tileMode=Mirror by duplicating the layer's inner DOM into a 3x3 grid
-    // where the 8 surrounding tiles are mirrored copies of the center tile. A single CSS blur
-    // on the grid wrapper lets the convolution sample across tile boundaries, matching tgfx's
-    // MirrorRepeat semantics. The outer layer div's `overflow:hidden` (added above) clips the
-    // result to the original W x H, so only the center tile's post-blur pixels remain visible.
+    // Simulate BlurFilter.tileMode=Mirror with a 3-layer DOM:
+    //   <clip>      position:absolute, left:-margin, top:-margin, size=(W+2m) x (H+2m),
+    //               overflow:hidden — the visible blur-halo window (matches tgfx's
+    //               filterBounds = rect.makeOutset(2*sigma, 2*sigma)).
+    //   <grid>        position:absolute, size=(W+2m) x (H+2m), filter:blur(radius) —
+    //                 receives the 9 mirrored tiles; the blur convolves across tile seams.
+    //     <tile[0..8]> 9 copies of the layer's inner content, flipped via scale(±1,±1) and
+    //                  translated into a 3x3 arrangement. Center tile sits at (margin, margin),
+    //                  so after the overflow:hidden clip the visible rect is exactly the
+    //                  layer's original W x H plus a `margin`-wide halo on every side.
     auto* bf = static_cast<const BlurFilter*>(layer->filters[0]);
     float blurRadius =
         bf->blurX;  // needsMirrorTiling only matches uniform blur (filters.size()==1)
+    // Match tgfx's GaussianBlurImageFilter::onFilterBounds which outsets by 2*sigma. Using the
+    // same margin keeps HTML's visible halo bbox consistent with PAGX native rendering.
+    float margin = 2.0f * blurRadius;
+    float clipW = mirrorTileWidth + 2.0f * margin;
+    float clipH = mirrorTileHeight + 2.0f * margin;
+
     out.openTag("div");
-    // Grid container is the same size as the layer's visible rect, anchored at (0, 0) inside
-    // the overflow-hidden outer div. Each of the 9 tiles translates from (0,0) into its slot
-    // in a 3x3 arrangement that extends from (-W, -H) to (2W, 2H); the overflow:hidden on the
-    // outer div clips the result to the visible rect.
-    std::string gridStyle =
-        "position:absolute;left:0;top:0;width:" + FloatToString(mirrorTileWidth) +
-        "px;height:" + FloatToString(mirrorTileHeight) + "px;filter:blur(" +
-        FloatToString(blurRadius) + "px)";
+    std::string clipStyle = "position:absolute;left:" + FloatToString(-margin) +
+                            "px;top:" + FloatToString(-margin) +
+                            "px;width:" + FloatToString(clipW) +
+                            "px;height:" + FloatToString(clipH) + "px;overflow:hidden";
+    out.addAttr("style", clipStyle);
+    out.closeTagStart();
+
+    out.openTag("div");
+    std::string gridStyle = "position:absolute;left:0;top:0;width:" + FloatToString(clipW) +
+                            "px;height:" + FloatToString(clipH) + "px;filter:blur(" +
+                            FloatToString(blurRadius) + "px)";
     out.addAttr("style", gridStyle);
     out.closeTagStart();
-    // Tile positions and mirror transforms. Each tile's wrapper div is anchored at (0,0) with
-    // size W x H; the `transform: translate(tx, ty) scale(sx, sy)` places it at its slot in the
-    // 3x3 grid AFTER flipping its inner content in place. Because CSS applies scale with the
-    // default transform-origin (box center), a scale(-1,1) flips the tile's pixels around its
-    // vertical centerline without changing the bounding box, so `translate(-W, 0) scale(-1, 1)`
-    // leaves the tile's right edge (now showing the source's x=0 column) adjacent to the center
-    // tile's left edge (also x=0) — exactly the mirror-repeat boundary.
+
+    // Tile positions and mirror transforms. Tile wrappers are anchored at (0,0) with size
+    // W x H; `transform: translate(tx, ty) scale(sx, sy)` places them in a 3x3 grid whose
+    // center tile lands at (margin, margin) inside the clip+grid wrapper. Because CSS applies
+    // scale with the default origin (box center), scale(-1,1) flips pixels around the tile's
+    // vertical midline without changing its bounding box, and `translate(-W + margin, margin)
+    // scale(-1, 1)` places the flipped tile so its right edge (now source x=0) is adjacent to
+    // the center tile's left edge (source x=0) — the mirror-repeat seam.
     struct Tile {
       float tx, ty, sx, sy;
     };
+    const float W = mirrorTileWidth;
+    const float H = mirrorTileHeight;
     const Tile tiles[9] = {
-        {-mirrorTileWidth, -mirrorTileHeight, -1.0f, -1.0f},  // TL
-        {0, -mirrorTileHeight, 1.0f, -1.0f},                  // T
-        {mirrorTileWidth, -mirrorTileHeight, -1.0f, -1.0f},   // TR
-        {-mirrorTileWidth, 0, -1.0f, 1.0f},                   // L
-        {0, 0, 1.0f, 1.0f},                                   // C
-        {mirrorTileWidth, 0, -1.0f, 1.0f},                    // R
-        {-mirrorTileWidth, mirrorTileHeight, -1.0f, -1.0f},   // BL
-        {0, mirrorTileHeight, 1.0f, -1.0f},                   // B
-        {mirrorTileWidth, mirrorTileHeight, -1.0f, -1.0f},    // BR
+        {-W + margin, -H + margin, -1.0f, -1.0f},  // TL
+        {margin, -H + margin, 1.0f, -1.0f},        // T
+        {W + margin, -H + margin, -1.0f, -1.0f},   // TR
+        {-W + margin, margin, -1.0f, 1.0f},        // L
+        {margin, margin, 1.0f, 1.0f},              // C
+        {W + margin, margin, -1.0f, 1.0f},         // R
+        {-W + margin, H + margin, -1.0f, -1.0f},   // BL
+        {margin, H + margin, 1.0f, -1.0f},         // B
+        {W + margin, H + margin, -1.0f, -1.0f},    // BR
     };
     for (const auto& t : tiles) {
       out.openTag("div");
-      std::string ts = "position:absolute;left:0;top:0;width:" + FloatToString(mirrorTileWidth) +
-                       "px;height:" + FloatToString(mirrorTileHeight) + "px";
+      std::string ts = "position:absolute;left:0;top:0;width:" + FloatToString(W) +
+                       "px;height:" + FloatToString(H) + "px";
       if (t.tx != 0 || t.ty != 0 || t.sx != 1.0f || t.sy != 1.0f) {
         ts += ";transform:translate(" + FloatToString(t.tx) + "px," + FloatToString(t.ty) + "px)";
         if (t.sx != 1.0f || t.sy != 1.0f) {
@@ -1455,7 +1472,8 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       writeLayerInner(out, layer, contentAlpha, childDistribute, isFlexContainer);
       out.closeTag();
     }
-    out.closeTag();  // grid wrapper
+    out.closeTag();  // grid wrapper (blur)
+    out.closeTag();  // clip wrapper
   } else {
     writeLayerInner(out, layer, contentAlpha, childDistribute, isFlexContainer);
   }
