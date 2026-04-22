@@ -113,13 +113,34 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
   _defs->addAttr("height", "200%");
   _defs->addAttr("color-interpolation-filters", "sRGB");
   _defs->closeTagStart();
+
+  // Pipeline state: each filter consumes currentInput (the RGBA result of the preceding filter)
+  // and advances it to its own RGBA output. This mirrors tgfx's ImageFilter::MakeCompose, where a
+  // chain of filters is function composition: filter[n](filter[n-1](...filter[0](source)...)).
+  // alphaResult caches the name of a result whose alpha channel equals the current pipeline alpha;
+  // alphaDirty=true means it is stale and must be recomputed before the next filter that needs
+  // alpha (Drop/Inner), via feColorMatrix extracting the alpha of currentInput.
   int si = 0;
-  std::vector<std::string> dropRes = {};
-  std::vector<std::string> innerRes = {};
-  std::vector<std::string> blendRes = {};
-  bool needSrc = false;
   std::string currentInput = "SourceGraphic";
-  std::string currentAlpha = "SourceAlpha";
+  std::string alphaResult = "SourceAlpha";
+  bool alphaDirty = false;
+
+  auto ensureAlpha = [&]() -> std::string {
+    if (!alphaDirty) {
+      return alphaResult;
+    }
+    std::string aId = "a" + std::to_string(si++);
+    _defs->openTag("feColorMatrix");
+    _defs->addAttr("in", currentInput);
+    _defs->addAttr("type", "matrix");
+    _defs->addAttr("values", "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0");
+    _defs->addAttr("result", aId);
+    _defs->closeTagSelfClosing();
+    alphaResult = aId;
+    alphaDirty = false;
+    return alphaResult;
+  };
+
   for (auto* f : filters) {
     switch (f->nodeType()) {
       case NodeType::BlurFilter: {
@@ -137,13 +158,15 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
         _defs->addAttr("result", blurId);
         _defs->closeTagSelfClosing();
         currentInput = blurId;
+        alphaDirty = true;
         break;
       }
       case NodeType::DropShadowFilter: {
         auto s = static_cast<const DropShadowFilter*>(f);
         std::string i = std::to_string(si++);
+        std::string alphaIn = ensureAlpha();
         _defs->openTag("feGaussianBlur");
-        _defs->addAttr("in", currentAlpha);
+        _defs->addAttr("in", alphaIn);
         std::string sd = FloatToString(s->blurX);
         if (s->blurX != s->blurY) {
           sd += " " + FloatToString(s->blurY);
@@ -151,18 +174,22 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
         _defs->addAttr("stdDeviation", sd);
         _defs->addAttr("result", "sBlur" + i);
         _defs->closeTagSelfClosing();
-        _defs->openTag("feOffset");
-        _defs->addAttr("in", "sBlur" + i);
-        if (!FloatNearlyZero(s->offsetX)) {
-          _defs->addAttr("dx", FloatToString(s->offsetX));
+        std::string offsetRes = "sBlur" + i;
+        if (!FloatNearlyZero(s->offsetX) || !FloatNearlyZero(s->offsetY)) {
+          _defs->openTag("feOffset");
+          _defs->addAttr("in", offsetRes);
+          if (!FloatNearlyZero(s->offsetX)) {
+            _defs->addAttr("dx", FloatToString(s->offsetX));
+          }
+          if (!FloatNearlyZero(s->offsetY)) {
+            _defs->addAttr("dy", FloatToString(s->offsetY));
+          }
+          _defs->addAttr("result", "sOff" + i);
+          _defs->closeTagSelfClosing();
+          offsetRes = "sOff" + i;
         }
-        if (!FloatNearlyZero(s->offsetY)) {
-          _defs->addAttr("dy", FloatToString(s->offsetY));
-        }
-        _defs->addAttr("result", "sOff" + i);
-        _defs->closeTagSelfClosing();
         _defs->openTag("feColorMatrix");
-        _defs->addAttr("in", "sOff" + i);
+        _defs->addAttr("in", offsetRes);
         _defs->addAttr("type", "matrix");
         _defs->addAttr("values", "0 0 0 0 " + FloatToString(s->color.red) + " 0 0 0 0 " +
                                      FloatToString(s->color.green) + " 0 0 0 0 " +
@@ -170,22 +197,37 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
                                      FloatToString(s->color.alpha) + " 0");
         _defs->addAttr("result", "sDrop" + i);
         _defs->closeTagSelfClosing();
-        dropRes.push_back("sDrop" + i);
-        if (!s->shadowOnly) {
-          needSrc = true;
+        if (s->shadowOnly) {
+          // Pipeline becomes the shadow-colored offset alpha only.
+          currentInput = "sDrop" + i;
+        } else {
+          // Compose shadow underneath the source: feMerge stacks bottom-first.
+          _defs->openTag("feMerge");
+          _defs->addAttr("result", "sMerged" + i);
+          _defs->closeTagStart();
+          _defs->openTag("feMergeNode");
+          _defs->addAttr("in", "sDrop" + i);
+          _defs->closeTagSelfClosing();
+          _defs->openTag("feMergeNode");
+          _defs->addAttr("in", currentInput);
+          _defs->closeTagSelfClosing();
+          _defs->closeTag();
+          currentInput = "sMerged" + i;
         }
+        alphaDirty = true;
         break;
       }
       case NodeType::InnerShadowFilter: {
         auto s = static_cast<const InnerShadowFilter*>(f);
         std::string i = std::to_string(si++);
-        // Invert source alpha so that exterior becomes opaque and interior becomes transparent.
+        std::string alphaIn = ensureAlpha();
+        // Invert current alpha so that exterior becomes opaque and interior becomes transparent.
         // Blurring the inverted alpha produces a falloff that bleeds into the shape from every
         // edge, then offsetting and clipping back to the source mask yields the inner shadow.
         // The arithmetic "SourceAlpha - offsetAlpha" variant only keeps a one-sided edge band
         // whose blurred energy is too faint to match tgfx's InnerShadowImageFilter.
         _defs->openTag("feComponentTransfer");
-        _defs->addAttr("in", currentAlpha);
+        _defs->addAttr("in", alphaIn);
         _defs->addAttr("result", "iInv" + i);
         _defs->closeTagStart();
         _defs->openTag("feFuncA");
@@ -231,13 +273,32 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
         _defs->closeTagSelfClosing();
         _defs->openTag("feComposite");
         _defs->addAttr("in", "iShadow" + i);
-        _defs->addAttr("in2", currentAlpha);
+        _defs->addAttr("in2", alphaIn);
         _defs->addAttr("operator", "in");
         _defs->addAttr("result", "iClip" + i);
         _defs->closeTagSelfClosing();
-        innerRes.push_back("iClip" + i);
-        if (!s->shadowOnly) {
-          needSrc = true;
+        if (s->shadowOnly) {
+          currentInput = "iClip" + i;
+          alphaDirty = true;
+        } else {
+          // Compose inner shadow on top of source: feMerge stacks bottom-first, so
+          // currentInput first then iClip over it.
+          _defs->openTag("feMerge");
+          _defs->addAttr("result", "iMerged" + i);
+          _defs->closeTagStart();
+          _defs->openTag("feMergeNode");
+          _defs->addAttr("in", currentInput);
+          _defs->closeTagSelfClosing();
+          _defs->openTag("feMergeNode");
+          _defs->addAttr("in", "iClip" + i);
+          _defs->closeTagSelfClosing();
+          _defs->closeTag();
+          currentInput = "iMerged" + i;
+          // Alpha shape is unchanged by inner shadow (clipped to source), but
+          // the cached alphaResult may point to an upstream result that feMerge
+          // has now superseded; keep alphaIn valid by reusing it.
+          alphaResult = alphaIn;
+          alphaDirty = false;
         }
         break;
       }
@@ -258,11 +319,13 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
         _defs->addAttr("result", cmId);
         _defs->closeTagSelfClosing();
         currentInput = cmId;
+        alphaDirty = true;
         break;
       }
       case NodeType::BlendFilter: {
         auto bf = static_cast<const BlendFilter*>(f);
         std::string i = std::to_string(si++);
+        std::string alphaIn = ensureAlpha();
         _defs->openTag("feFlood");
         _defs->addAttr("flood-color", ColorToSVGHex(bf->color));
         if (bf->color.alpha < 1.0f) {
@@ -281,44 +344,19 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
         _defs->closeTagSelfClosing();
         _defs->openTag("feComposite");
         _defs->addAttr("in", "bBlend" + i);
-        _defs->addAttr("in2", currentAlpha);
+        _defs->addAttr("in2", alphaIn);
         _defs->addAttr("operator", "in");
         _defs->addAttr("result", "bClip" + i);
         _defs->closeTagSelfClosing();
-        blendRes.push_back("bClip" + i);
+        currentInput = "bClip" + i;
+        // Blend preserves the alpha shape it was clipped against.
+        alphaResult = alphaIn;
+        alphaDirty = false;
         break;
       }
       default:
         break;
     }
-  }
-  bool hasResults = !dropRes.empty() || !innerRes.empty() || !blendRes.empty();
-  bool multiResults = (dropRes.size() + innerRes.size() + blendRes.size() +
-                       static_cast<size_t>(needSrc ? 1 : 0)) > 1;
-  if (hasResults && (needSrc || multiResults)) {
-    _defs->openTag("feMerge");
-    _defs->closeTagStart();
-    for (auto& r : dropRes) {
-      _defs->openTag("feMergeNode");
-      _defs->addAttr("in", r);
-      _defs->closeTagSelfClosing();
-    }
-    if (needSrc) {
-      _defs->openTag("feMergeNode");
-      _defs->addAttr("in", currentInput);
-      _defs->closeTagSelfClosing();
-    }
-    for (auto& r : innerRes) {
-      _defs->openTag("feMergeNode");
-      _defs->addAttr("in", r);
-      _defs->closeTagSelfClosing();
-    }
-    for (auto& r : blendRes) {
-      _defs->openTag("feMergeNode");
-      _defs->addAttr("in", r);
-      _defs->closeTagSelfClosing();
-    }
-    _defs->closeTag();
   }
   _defs->closeTag();
   return "url(#" + fid + ")";
