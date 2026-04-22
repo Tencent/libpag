@@ -32,10 +32,18 @@
       <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
 
       <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16,20,16,20" gap="12" alignment="stretch" arrangement="center">
-        <!-- Row 1: three single-axis rotations side by side -->
-        <Layer height="110" layout="horizontal" gap="20" arrangement="spaceEvenly" alignment="center">
+        <!-- Row 1: three single-axis rotations side by side. Labels sit above their shapes
+             because a rotateZ=60° rectangle extends diagonally; with the label below, the
+             shape's lower-right corner would overlap the rotateZ label. Row height 140 (cell
+             height 120) gives rotateZ's diagonal (~91px) room without leaking into the row
+             below. -->
+        <Layer height="140" layout="horizontal" gap="20" arrangement="spaceEvenly" alignment="center">
           <!-- rotateX 60° -->
-          <Layer width="90" height="90" layout="vertical" gap="6" alignment="center" arrangement="center">
+          <Layer width="90" height="120" layout="vertical" gap="6" alignment="center" arrangement="center">
+            <Layer height="12">
+              <Text text="rotateX 60" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
             <Layer width="80" height="60">
               <!-- column-major: Rx(60°). cos60=0.5, sin60=0.866 -->
               <Layer matrix3D="1,0,0,0,0,0.5,0.866,0,0,-0.866,0.5,0,0,0,0,1" preserve3D="true">
@@ -43,14 +51,14 @@
                 <Fill color="#3B82F6"/>
               </Layer>
             </Layer>
-            <Layer height="12">
-              <Text text="rotateX 60" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
-              <Fill color="#64748B"/>
-            </Layer>
           </Layer>
 
           <!-- rotateY 60° -->
-          <Layer width="90" height="90" layout="vertical" gap="6" alignment="center" arrangement="center">
+          <Layer width="90" height="120" layout="vertical" gap="6" alignment="center" arrangement="center">
+            <Layer height="12">
+              <Text text="rotateY 60" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
             <Layer width="80" height="60">
               <!-- column-major: Ry(60°) -->
               <Layer matrix3D="0.5,0,-0.866,0,0,1,0,0,0.866,0,0.5,0,0,0,0,1" preserve3D="true">
@@ -58,24 +66,20 @@
                 <Fill color="#10B981"/>
               </Layer>
             </Layer>
-            <Layer height="12">
-              <Text text="rotateY 60" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
-              <Fill color="#64748B"/>
-            </Layer>
           </Layer>
 
           <!-- rotateZ 60° -->
-          <Layer width="90" height="90" layout="vertical" gap="6" alignment="center" arrangement="center">
+          <Layer width="90" height="120" layout="vertical" gap="6" alignment="center" arrangement="center">
+            <Layer height="12">
+              <Text text="rotateZ 60" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
             <Layer width="80" height="60">
               <!-- column-major: Rz(60°) -->
               <Layer matrix3D="0.5,0.866,0,0,-0.866,0.5,0,0,0,0,1,0,0,0,0,1" preserve3D="true">
                 <Rectangle position="40,30" size="80,60" roundness="8"/>
                 <Fill color="#EC4899"/>
               </Layer>
-            </Layer>
-            <Layer height="12">
-              <Text text="rotateZ 60" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
-              <Fill color="#64748B"/>
             </Layer>
           </Layer>
         </Layer>
