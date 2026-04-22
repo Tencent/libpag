@@ -733,6 +733,66 @@ static std::string layerBoxShadowBorderRadius(const Layer* layer) {
   return {};
 }
 
+// Describes the geometry of a layer's primary fill shape (the first Rectangle or Ellipse in
+// layer->contents) in layer-local coordinates, so a sibling <div> can reproduce just that outline
+// without inheriting the alpha of the layer's other descendants or filter outputs.
+//
+// Used by DropShadowStyle emission: rendering the shadow as a blurred sibling div whose alpha
+// comes from the layer's own geometry mirrors tgfx's DropShadowStyle (source = opaque content
+// silhouette), whereas applying `filter:drop-shadow` on the layer div would include every child
+// and every child's filter halo in the shadow source — producing a visibly stronger/larger
+// shadow, especially in nested DropShadow scenarios like drop_shadow_show_behind.pagx Row 2.
+struct ShadowShape {
+  float left = 0;
+  float top = 0;
+  float width = 0;
+  float height = 0;
+  // CSS border-radius value without the property name (e.g. "12px" or "50%"). Empty when the
+  // shape is a square-cornered Rectangle.
+  std::string radius;
+  bool valid = false;
+};
+
+static ShadowShape findLayerShadowShape(const Layer* layer) {
+  ShadowShape s = {};
+  for (auto* e : layer->contents) {
+    if (e->nodeType() == NodeType::Rectangle) {
+      auto r = static_cast<const Rectangle*>(e);
+      auto bounds = r->layoutBounds();
+      if (bounds.isEmpty()) {
+        continue;
+      }
+      s.left = bounds.x;
+      s.top = bounds.y;
+      s.width = bounds.width;
+      s.height = bounds.height;
+      if (r->roundness > 0) {
+        s.radius = FloatToString(r->roundness) + "px";
+      }
+      s.valid = true;
+      return s;
+    }
+    if (e->nodeType() == NodeType::Ellipse) {
+      auto el = static_cast<const Ellipse*>(e);
+      auto bounds = el->layoutBounds();
+      if (bounds.isEmpty()) {
+        continue;
+      }
+      s.left = bounds.x;
+      s.top = bounds.y;
+      s.width = bounds.width;
+      s.height = bounds.height;
+      s.radius = "50%";
+      s.valid = true;
+      return s;
+    }
+    // Non-primitive geometry (Path, Polystar, Text fill, Group, etc.) cannot be rendered as a
+    // simple CSS-styled div, so fall back to the SVG filter path.
+    return s;
+  }
+  return s;
+}
+
 void HTMLWriter::writeLayerContents(HTMLBuilder& out, const Layer* layer, float alpha,
                                     bool distribute, LayerPlacement targetPlacement) {
   writeElements(out, layer->contents, alpha, distribute, targetPlacement);
@@ -1047,6 +1107,13 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   std::string boxShadowValue;  // non-empty when the drop-shadow branch is redirected here
   std::string
       boxShadowBorderRadius;  // border-radius to apply on the layer div when using box-shadow
+  // DropShadowStyle emissions that avoid the `filter:url(...)` path. Each entry is the full
+  // `style=""` value for a sibling <div> placed below the layer's children in z-order. Using a
+  // sibling div (instead of the layer's own `filter`) keeps the shadow source confined to the
+  // layer's primary fill shape — critical for parity with tgfx when the layer has descendants
+  // that paint their own filters (otherwise those descendants leak into the shadow's alpha
+  // source and darken/widen the shadow beyond the layer silhouette).
+  std::vector<std::string> pendingSiblingShadows;
 
   for (auto* ls : layer->styles) {
     bool hasBlendMode = ls->blendMode != BlendMode::Normal;
@@ -1071,6 +1138,33 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         // Fall through to the SVG filter path below; CSS `filter: drop-shadow()` is avoided
         // because it reads source alpha as-is, so semi-transparent fills produce proportionally
         // weaker shadows while PAGX's shadow shape comes from a saturated opaque silhouette.
+      }
+      // Sibling-div shadow path: emit one <div> that reproduces the layer's primary fill shape
+      // (Rectangle/Ellipse), tinted with the shadow color and CSS-blurred. Avoids the
+      // filter-cascade darkening that a `filter:url(...)` on the layer div suffers when the
+      // layer has children painting their own filters. Only showBehindLayer=true is covered —
+      // false requires an erase-mask that CSS has no direct equivalent for, so it continues
+      // down the SVG filter path.
+      if (!hasBlendMode && ds->showBehindLayer) {
+        ShadowShape shape = findLayerShadowShape(layer);
+        if (shape.valid) {
+          std::string style = "position:absolute;left:" + FloatToString(shape.left + ds->offsetX) +
+                              "px;top:" + FloatToString(shape.top + ds->offsetY) +
+                              "px;width:" + FloatToString(shape.width) +
+                              "px;height:" + FloatToString(shape.height) +
+                              "px;background-color:" + ColorToRGBA(ds->color);
+          if (!shape.radius.empty()) {
+            style += ";border-radius:" + shape.radius;
+          }
+          // CSS filter:blur is Gaussian with the given radius; matches feGaussianBlur
+          // stdDeviation numerically when the values are equal.
+          float blurAvg = (ds->blurX + ds->blurY) * 0.5f;
+          if (blurAvg > 0) {
+            style += ";filter:blur(" + FloatToString(blurAvg) + "px)";
+          }
+          pendingSiblingShadows.push_back(style);
+          continue;
+        }
       }
       {
         std::string fid = _ctx->nextId("filter");
@@ -1279,6 +1373,14 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   }
 
   out.closeTagStart();
+
+  // Emit sibling-div DropShadow shadows first so they sit beneath both belowStyles-driven
+  // elements and the layer's own contents/children in painter's order.
+  for (const auto& shadowStyle : pendingSiblingShadows) {
+    out.openTag("div");
+    out.addAttr("style", shadowStyle);
+    out.closeTagSelfClosing();
+  }
 
   for (auto& [styleType, ls] : belowStyles) {
     auto blendStr = BlendModeToMixBlendMode(ls->blendMode);
