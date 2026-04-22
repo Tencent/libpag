@@ -1127,11 +1127,13 @@ void PPTWriter::writeShadowElement(XMLBuilder& out, const char* tag, float blurX
                                    bool includeAlign) {
   float blur = (blurX + blurY) / 2.0f;
   float dist = std::sqrt(offsetX * offsetX + offsetY * offsetY);
+  // OOXML `dir` measures clockwise from the +x axis in screen space (Y-down),
+  // matching atan2(offsetY, offsetX) directly — no axis swap needed.
   float dir = RadiansToDegrees(std::atan2(offsetY, offsetX));
   auto& builder = out.openElement(tag)
                       .addRequiredAttribute("blurRad", PxToEMU(blur))
                       .addRequiredAttribute("dist", PxToEMU(dist))
-                      .addRequiredAttribute("dir", AngleToPPT(dir + 90.0f));
+                      .addRequiredAttribute("dir", AngleToPPT(dir));
   if (includeAlign) {
     builder.addRequiredAttribute("algn", "ctr").addRequiredAttribute("rotWithShape", "0");
   }
