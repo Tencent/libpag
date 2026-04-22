@@ -146,7 +146,18 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
         // Cannot express rotated ellipse in CSS; caller should use SVG path
         return {};
       }
+      // PAGX RadialGradient.center lives in the enclosing layer's local coordinate space (same
+      // space as the shape being painted). tgfx samples the gradient directly at those layer
+      // coordinates. CSS `radial-gradient(... at X Y)` however interprets X/Y relative to the
+      // element's own top-left corner. Translate the gradient centre into element-local space
+      // by subtracting the box's top-left offset, otherwise a gradient declared at the layer
+      // origin stays stuck in the top-left corner of every div that uses it (e.g. mandala's
+      // tealGlow has center="50,50" but is painted inside an ellipse positioned around (180,180)
+      // — tgfx renders it as fully-transparent outer stop, but naive CSS would draw it centred
+      // on (50,50) within the div, introducing a visible teal glow the native render lacks).
       Point c = g->matrix.mapPoint(g->center);
+      c.x -= boxLeft;
+      c.y -= boxTop;
       float r = g->radius * sx;
       if (nonUniformScale) {
         float ry = g->radius * sy;
@@ -229,6 +240,8 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
         *outAlpha = 1.0f;
       }
       Point c = g->matrix.mapPoint(g->center);
+      c.x -= boxLeft;
+      c.y -= boxTop;
       float sx = std::sqrt(g->matrix.a * g->matrix.a + g->matrix.b * g->matrix.b);
       float r = g->radius * sx;
       return "radial-gradient(circle " + FloatToString(r) + "px at " + FloatToString(c.x) + "px " +
