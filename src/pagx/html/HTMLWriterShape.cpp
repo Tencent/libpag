@@ -740,19 +740,23 @@ std::string RectToPathData(const Rectangle* r) {
   float y = pos.y - size.height / 2;
   float w = size.width;
   float h = size.height;
-  // tgfx starts its rectangle path at the top-right corner (SkRRect startIndex=2) and walks
-  // clockwise. For non-dashed fills/strokes this is invisible, but `stroke-dasharray` relies
-  // on absolute path length from the starting point, so we must match tgfx's start corner
-  // verbatim or dashes land at different phases on each edge.
+  // tgfx starts its rectangle path at the top-right corner (SkRRect startIndex=2 degrades to
+  // SkPath::addRect with startIndex=1 for zero-roundness) and walks clockwise in screen space
+  // (y-axis down): top-right -> bottom-right -> bottom-left -> top-left -> close. For non-dashed
+  // fills/strokes this is invisible, but `stroke-dasharray` relies on absolute path length from
+  // the starting point, so we must match tgfx's start corner *and* traversal direction verbatim
+  // or dashes land at different phases on each edge (breaks stroke_dash_offset_cycle).
   if (r->roundness <= 0) {
     if (r->reversed) {
-      // Counter-clockwise from top-right: (x+w,y) -> (x+w,y+h) -> (x,y+h) -> (x,y) -> close.
-      return "M" + FloatToString(x + w) + "," + FloatToString(y) + "V" + FloatToString(y + h) +
-             "H" + FloatToString(x) + "V" + FloatToString(y) + "Z";
+      // Counter-clockwise in screen space from top-right:
+      // (x+w,y) -> (x,y) -> (x,y+h) -> (x+w,y+h) -> close.
+      return "M" + FloatToString(x + w) + "," + FloatToString(y) + "H" + FloatToString(x) + "V" +
+             FloatToString(y + h) + "H" + FloatToString(x + w) + "Z";
     }
-    // Clockwise from top-right: (x+w,y) -> (x,y) -> (x,y+h) -> (x+w,y+h) -> close.
-    return "M" + FloatToString(x + w) + "," + FloatToString(y) + "H" + FloatToString(x) + "V" +
-           FloatToString(y + h) + "H" + FloatToString(x + w) + "Z";
+    // Clockwise in screen space from top-right:
+    // (x+w,y) -> (x+w,y+h) -> (x,y+h) -> (x,y) -> close.
+    return "M" + FloatToString(x + w) + "," + FloatToString(y) + "V" + FloatToString(y + h) + "H" +
+           FloatToString(x) + "V" + FloatToString(y) + "Z";
   }
   float rn = std::min(r->roundness, std::min(w / 2, h / 2));
   std::string d;
