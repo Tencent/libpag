@@ -1394,10 +1394,12 @@ void PPTWriter::writeRectangle(XMLBuilder& out, const Rectangle* rect, const Fil
                                const Matrix& m, float alpha,
                                const std::vector<LayerFilter*>& filters,
                                const std::vector<LayerStyle*>& styles) {
-  float x = rect->position.x - rect->size.width / 2.0f;
-  float y = rect->position.y - rect->size.height / 2.0f;
-  float w = rect->size.width;
-  float h = rect->size.height;
+  auto renderPos = rect->renderPosition();
+  auto renderSize = rect->renderSize();
+  float x = renderPos.x - renderSize.width / 2.0f;
+  float y = renderPos.y - renderSize.height / 2.0f;
+  float w = renderSize.width;
+  float h = renderSize.height;
   float roundness = rect->roundness;
 
   // OOXML strokes are always centre-aligned on the geometry, so to mimic
@@ -1441,12 +1443,14 @@ void PPTWriter::writeRectangle(XMLBuilder& out, const Rectangle* rect, const Fil
 void PPTWriter::writeEllipse(XMLBuilder& out, const Ellipse* ellipse, const FillStrokeInfo& fs,
                              const Matrix& m, float alpha, const std::vector<LayerFilter*>& filters,
                              const std::vector<LayerStyle*>& styles) {
-  float rx = ellipse->size.width / 2.0f;
-  float ry = ellipse->size.height / 2.0f;
-  float x = ellipse->position.x - rx;
-  float y = ellipse->position.y - ry;
-  float w = ellipse->size.width;
-  float h = ellipse->size.height;
+  auto renderSize = ellipse->renderSize();
+  float rx = renderSize.width / 2.0f;
+  float ry = renderSize.height / 2.0f;
+  auto renderPos = ellipse->renderPosition();
+  float x = renderPos.x - rx;
+  float y = renderPos.y - ry;
+  float w = renderSize.width;
+  float h = renderSize.height;
 
   // See writeRectangle: emulate StrokeAlign::Inside / Outside by inset/outset
   // because OOXML can only draw centre-aligned strokes on the geometry.
@@ -1527,8 +1531,9 @@ void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStr
                                 const Matrix& m, float alpha,
                                 const std::vector<LayerFilter*>& /*filters*/,
                                 const std::vector<LayerStyle*>& /*styles*/) {
-  auto glyphPaths = ComputeGlyphPaths(*text, text->position.x, text->position.y);
-  auto glyphImages = ComputeGlyphImages(*text, text->position.x, text->position.y);
+  auto renderPos = text->renderPosition();
+  auto glyphPaths = ComputeGlyphPaths(*text, renderPos.x, renderPos.y);
+  auto glyphImages = ComputeGlyphImages(*text, renderPos.x, renderPos.y);
   if (glyphPaths.empty() && glyphImages.empty()) {
     return;
   }
@@ -1641,8 +1646,8 @@ PPTWriter::NativeTextGeometry PPTWriter::computeNativeTextGeometry(
   geom.hasTextBox = fs.textBox && !std::isnan(boxWidth) && boxWidth > 0;
 
   if (geom.hasTextBox) {
-    geom.posX = fs.textBox->position.x;
-    geom.posY = fs.textBox->position.y;
+    geom.posX = fs.textBox->renderPosition().x;
+    geom.posY = fs.textBox->renderPosition().y;
     geom.estWidth = boxWidth;
     geom.estHeight = (!std::isnan(boxHeight) && boxHeight > 0) ? boxHeight : text->fontSize * 1.4f;
     return geom;
@@ -1650,8 +1655,8 @@ PPTWriter::NativeTextGeometry PPTWriter::computeNativeTextGeometry(
 
   auto textBounds = precomputed->getTextBounds(mutableText);
   if (textBounds.width > 0 && textBounds.height > 0) {
-    geom.posX = text->position.x + textBounds.x;
-    geom.posY = text->position.y + textBounds.y;
+    geom.posX = text->renderPosition().x + textBounds.x;
+    geom.posY = text->renderPosition().y + textBounds.y;
     geom.estWidth = textBounds.width;
     geom.estHeight = textBounds.height;
     return geom;
@@ -1662,8 +1667,8 @@ PPTWriter::NativeTextGeometry PPTWriter::computeNativeTextGeometry(
   // layout would otherwise apply.
   geom.estWidth = static_cast<float>(CountUTF8Characters(text->text)) * text->fontSize * 0.6f;
   geom.estHeight = text->fontSize * 1.4f;
-  geom.posX = text->position.x;
-  geom.posY = text->position.y - text->fontSize * 0.85f;
+  geom.posX = text->renderPosition().x;
+  geom.posY = text->renderPosition().y - text->fontSize * 0.85f;
   if (text->textAnchor == TextAnchor::Center) {
     geom.posX -= geom.estWidth / 2.0f;
   } else if (text->textAnchor == TextAnchor::End) {

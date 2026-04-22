@@ -115,10 +115,11 @@ static tgfx::Path StarToTGFXPath(const Polystar* star) {
   if (points <= 0.0f) {
     return path;
   }
-  float centerX = star->position.x;
-  float centerY = star->position.y;
-  float innerRadius = star->innerRadius;
-  float outerRadius = star->outerRadius;
+  auto renderPos = star->renderPosition();
+  float centerX = renderPos.x;
+  float centerY = renderPos.y;
+  float innerRadius = star->renderInnerRadius();
+  float outerRadius = star->renderOuterRadius();
   float innerRoundness = star->innerRoundness;
   float outerRoundness = star->outerRoundness;
   float direction = star->reversed ? -1.0f : 1.0f;
@@ -189,9 +190,10 @@ static tgfx::Path PolygonToTGFXPath(const Polystar* poly) {
   if (numPoints < 3) {
     return path;
   }
-  float centerX = poly->position.x;
-  float centerY = poly->position.y;
-  float radius = poly->outerRadius;
+  auto renderPos = poly->renderPosition();
+  float centerX = renderPos.x;
+  float centerY = renderPos.y;
+  float radius = poly->renderOuterRadius();
   float roundness = poly->outerRoundness;
   float direction = poly->reversed ? -1.0f : 1.0f;
   float angleStep = 2.0f * static_cast<float>(M_PI) / static_cast<float>(numPoints);
@@ -241,8 +243,14 @@ static tgfx::Path PrimitiveToTGFXPath(const Element* el) {
       return tgfx::Path();
     }
     auto tp = ToTGFX(*p->data);
-    if (p->position.x != 0.0f || p->position.y != 0.0f) {
-      tgfx::Matrix m = tgfx::Matrix::MakeTrans(p->position.x, p->position.y);
+    auto scale = p->renderScale();
+    if (scale != 1.0f) {
+      tgfx::Matrix scaleM = tgfx::Matrix::MakeScale(scale, scale);
+      tp.transform(scaleM);
+    }
+    auto renderPos = p->renderPosition();
+    if (renderPos.x != 0.0f || renderPos.y != 0.0f) {
+      tgfx::Matrix m = tgfx::Matrix::MakeTrans(renderPos.x, renderPos.y);
       tp.transform(m);
     }
     if (p->reversed) {
@@ -253,10 +261,12 @@ static tgfx::Path PrimitiveToTGFXPath(const Element* el) {
   if (type == NodeType::Rectangle) {
     auto* r = static_cast<const Rectangle*>(el);
     tgfx::Path tp = {};
-    float halfW = r->size.width * 0.5f;
-    float halfH = r->size.height * 0.5f;
-    tgfx::Rect rect = tgfx::Rect::MakeLTRB(r->position.x - halfW, r->position.y - halfH,
-                                           r->position.x + halfW, r->position.y + halfH);
+    auto renderSize = r->renderSize();
+    auto renderPos = r->renderPosition();
+    float halfW = renderSize.width * 0.5f;
+    float halfH = renderSize.height * 0.5f;
+    tgfx::Rect rect = tgfx::Rect::MakeLTRB(renderPos.x - halfW, renderPos.y - halfH,
+                                           renderPos.x + halfW, renderPos.y + halfH);
     float rad = std::min({r->roundness, halfW, halfH});
     if (rad < 0.0f) {
       rad = 0.0f;
@@ -272,10 +282,12 @@ static tgfx::Path PrimitiveToTGFXPath(const Element* el) {
   }
   if (type == NodeType::Ellipse) {
     auto* e = static_cast<const Ellipse*>(el);
-    float halfW = e->size.width * 0.5f;
-    float halfH = e->size.height * 0.5f;
-    tgfx::Rect rect = tgfx::Rect::MakeLTRB(e->position.x - halfW, e->position.y - halfH,
-                                           e->position.x + halfW, e->position.y + halfH);
+    auto renderSize = e->renderSize();
+    auto renderPos = e->renderPosition();
+    float halfW = renderSize.width * 0.5f;
+    float halfH = renderSize.height * 0.5f;
+    tgfx::Rect rect = tgfx::Rect::MakeLTRB(renderPos.x - halfW, renderPos.y - halfH,
+                                           renderPos.x + halfW, renderPos.y + halfH);
     tgfx::Path tp = {};
     // Mirrors tgfx Ellipse::apply: addOval with default startIndex=0 (top
     // centre point), so the trim's start anchor matches the renderer.
