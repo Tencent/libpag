@@ -39,8 +39,6 @@ Basic container for content, child layers, styles, and filters.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `width` | float | — | Layout width for container layout and constraint positioning |
-| `height` | float | — | Layout height for container layout and constraint positioning |
 | `layout` | LayoutMode | none | Container layout mode for child layer arrangement |
 | `gap` | float | 0 | Spacing between adjacent child Layers |
 | `flex` | float | 0 | Flex weight for main-axis sizing in parent container layout |
@@ -93,8 +91,6 @@ VectorElement container with transform properties, creating isolated scopes for 
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `width` | float | — | Layout width for constraint positioning of children |
-| `height` | float | — | Layout height for constraint positioning of children |
 | `padding` | Padding | 0 | Insets the constraint reference frame for child elements. CSS shorthand: `"20"`, `"10,20"`, `"10,20,10,20"` |
 | `anchor` | Point | 0,0 | Anchor point for transforms |
 | `position` | Point | 0,0 | Position in parent coordinate system (prefer constraint attributes) |
@@ -115,10 +111,10 @@ Geometry element defined from center point with uniform corner rounding support.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `size` | Size | 0,0 | Dimensions "width,height" |
+| `size` | Size | 0,0 | Dimensions "width,height"; animatable, prefer `width`/`height` attributes for static layout |
 | `roundness` | float | 0 | Corner radius (auto-clamped to half the shorter side) |
 | `reversed` | bool | false | Reverse path direction |
-| `position` | Point | (center of bounding box) | Center point coordinate (prefer constraint attributes) |
+| `position` | Point | (center of bounding box) | Center point coordinate; animatable, prefer constraint attributes for static layout |
 
 Rectangle supports all constraint attributes. See §Constraint Attributes below.
 
@@ -128,9 +124,9 @@ Geometry element defined from center point for circles and ovals.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `size` | Size | 0,0 | Dimensions "width,height" |
+| `size` | Size | 0,0 | Dimensions "width,height"; animatable, prefer `width`/`height` attributes for static layout |
 | `reversed` | bool | false | Reverse path direction |
-| `position` | Point | (center of bounding box) | Center point coordinate (prefer constraint attributes) |
+| `position` | Point | (center of bounding box) | Center point coordinate; animatable, prefer constraint attributes for static layout |
 
 Ellipse supports all constraint attributes. See §Constraint Attributes below.
 
@@ -150,7 +146,7 @@ Geometry element supporting regular polygon and star modes.
 | `reversed` | bool | false | Reverse path direction |
 | `position` | Point | (-bounds.x, -bounds.y) | Center point coordinate (prefer constraint attributes) |
 
-Polystar supports all constraint attributes. When opposite-edge constraints are set, the star is scaled to fit. See §Constraint Attributes below.
+Polystar supports all constraint attributes. When opposite-edge constraints or percentage dimensions are set, the star is scaled to fit. See §Constraint Attributes below.
 
 ### Path
 
@@ -162,7 +158,7 @@ Geometry element defining arbitrary shapes using SVG path syntax or PathData res
 | `position` | Point | 0,0 | Offset of the path coordinate system origin (prefer constraint attributes) |
 | `reversed` | bool | false | Reverse path direction |
 
-Path supports all constraint attributes. When opposite-edge constraints are set, the path is scaled to fit. See §Constraint Attributes below.
+Path supports all constraint attributes. When opposite-edge constraints or percentage dimensions are set, the path is scaled to fit. See §Constraint Attributes below.
 
 > `position` is the **coordinate system origin**. Prefer constraint attributes (`left`/`top`) for positioning. When `position="0,0"`, path data coordinates directly define drawing positions.
 
@@ -438,7 +434,7 @@ Geometry element providing text shapes; produces a glyph list after shaping.
 | `textAnchor` | TextAnchor | start | Text anchor alignment relative to the origin |
 | `baseline` | TextBaseline | lineBox | Baseline mode: lineBox (y = linebox top) or alphabetic (y = baseline) |
 
-Text supports all constraint attributes. When opposite-edge constraints are set, the text is scaled to fit. See §Constraint Attributes below.
+Text supports all constraint attributes. When opposite-edge constraints or percentage dimensions are set, the text is scaled to fit. See §Constraint Attributes below.
 
 ### TextModifier
 
@@ -490,9 +486,9 @@ Text modifier that arranges text along a specified path curve, mapping glyph pos
 | `reversed` | bool | false | Reverse path direction for text flow |
 | `forceAlignment` | bool | false | Force stretch text to fill available path length |
 
-TextPath supports all constraint attributes. When opposite-edge constraints are set, the path is scaled to fit. See §Constraint Attributes below.
+TextPath supports all constraint attributes. When opposite-edge constraints or percentage dimensions are set, the path is scaled to fit. See §Constraint Attributes below.
 
-### Constraint Attributes (Geometry Elements, TextPath, TextBox, Groups, and Child Layers)
+### Constraint Attributes (Geometry Elements, TextPath, TextBox, Groups, and Layers)
 
 These attributes position or stretch an element relative to its container.
 The container's size comes from explicit `width`/`height`, parent layout assignment, or
@@ -514,6 +510,8 @@ For **child Layers**, constraints are only active when:
 | `bottom` | float | — | Distance from element bottom edge to container bottom edge |
 | `centerX` | float | — | Horizontal offset from container center (0 = centered) |
 | `centerY` | float | — | Vertical offset from container center (0 = centered) |
+| `width` | Dimension | — | Layout width; supports pixels (e.g., `100`) or percentage (e.g., `50%`) relative to container |
+| `height` | Dimension | — | Layout height; supports pixels (e.g., `100`) or percentage (e.g., `50%`) relative to container |
 
 ### TextBox
 
@@ -523,8 +521,6 @@ Text layout container that inherits from Group. Provides paragraph-level feature
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `width` | float | NaN | Layout width (NaN = no boundary, auto-sizing) |
-| `height` | float | NaN | Layout height (NaN = no boundary, auto-sizing) |
 | `anchor` | Point | 0,0 | Anchor point for transforms |
 | `position` | Point | 0,0 | Top-left corner in parent coordinate system (prefer constraint attributes) |
 | `rotation` | float | 0 | Rotation angle in degrees |
@@ -534,7 +530,7 @@ Text layout container that inherits from Group. Provides paragraph-level feature
 | `alpha` | float | 1 | Opacity 0~1 |
 | `padding` | Padding | 0 | Insets the text layout area and the constraint reference frame for non-Text child elements (inherited from Group). CSS shorthand: `"20"`, `"10,20"`, `"10,20,10,20"` |
 
-TextBox inherits all constraint attributes from Group. See §Constraint Attributes above.
+TextBox inherits all constraint attributes from Group. For TextBox, `width`/`height` default to NaN (no boundary, auto-sizing). See §Constraint Attributes above.
 
 **TextBox-specific:**
 

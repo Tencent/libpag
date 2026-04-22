@@ -33,55 +33,70 @@ void Group::updateSize(LayoutContext* context) {
 }
 
 void Group::onMeasure(LayoutContext*) {
-  measuredX = position.x;
-  measuredY = position.y;
-  MeasureChildNodes(elements, width, height, measuredWidth, measuredHeight);
+  preferredX = position.x;
+  preferredY = position.y;
+  // Preferred size: authored width/height overrides the content-measured size. percentWidth/
+  // percentHeight are not consulted here; they are resolved by the parent via
+  // PerformConstraintLayout.
+  MeasureChildNodes(elements, width, height, preferredWidth, preferredHeight);
   if (!padding.isZero()) {
     if (std::isnan(width)) {
-      measuredWidth += padding.left + padding.right;
+      preferredWidth += padding.left + padding.right;
     }
     if (std::isnan(height)) {
-      measuredHeight += padding.top + padding.bottom;
+      preferredHeight += padding.top + padding.bottom;
     }
   }
 }
 
-void Group::setLayoutSize(LayoutContext* context, float width, float height) {
-  layoutWidth = !std::isnan(width) ? width : measuredWidth;
-  layoutHeight = !std::isnan(height) ? height : measuredHeight;
+void Group::setLayoutSize(LayoutContext* context, float targetWidth, float targetHeight) {
+  // Mirror Layer::setLayoutSize: keep content-measured axes NaN during pass 1 so percent
+  // descendants fall back to their preferred size; refine from children's actual bounds and run
+  // updateLayout again so size-dependent descendants pick up the refined container size.
+  bool widthFromContent = std::isnan(targetWidth) && std::isnan(this->width);
+  bool heightFromContent = std::isnan(targetHeight) && std::isnan(this->height);
+  layoutWidth = widthFromContent ? NAN : (!std::isnan(targetWidth) ? targetWidth : preferredWidth);
+  layoutHeight =
+      heightFromContent ? NAN : (!std::isnan(targetHeight) ? targetHeight : preferredHeight);
   updateLayout(context);
-  // An axis is content-measured when neither the parent nor the element itself specifies its size.
-  // When a content-measured axis exists and another axis changed from its measured value,
-  // re-measure the content-measured axis from children's actual layout sizes.
-  bool widthFromContent = std::isnan(width) && std::isnan(this->width);
-  bool heightFromContent = std::isnan(height) && std::isnan(this->height);
-  bool sizeChanged = (!std::isnan(width) && width != measuredWidth) ||
-                     (!std::isnan(height) && height != measuredHeight);
-  if ((widthFromContent || heightFromContent) && sizeChanged) {
-    float maxX = 0;
-    float maxY = 0;
-    for (auto* element : elements) {
-      auto* node = AsLayoutNode(element);
-      if (node == nullptr) {
-        continue;
-      }
-      float extX = node->hasConstraints() ? node->constraintExtentX() : 0;
-      float extY = node->hasConstraints() ? node->constraintExtentY() : 0;
-      extX += node->layoutBounds().width;
-      extY += node->layoutBounds().height;
-      maxX = std::max(maxX, extX);
-      maxY = std::max(maxY, extY);
+  if (!widthFromContent && !heightFromContent) {
+    return;
+  }
+  float maxX = 0;
+  float maxY = 0;
+  for (auto* element : elements) {
+    auto* node = AsLayoutNode(element);
+    if (node == nullptr) {
+      continue;
     }
-    if (!padding.isZero()) {
-      maxX += padding.left + padding.right;
-      maxY += padding.top + padding.bottom;
-    }
-    if (widthFromContent) {
-      layoutWidth = std::ceil(maxX);
-    }
-    if (heightFromContent) {
-      layoutHeight = std::ceil(maxY);
-    }
+    // Match MeasureChildNodes: unconstrained nodes use their preferredX/Y as extent origin.
+    float extX = node->hasConstraints() ? node->constraintExtentX() : node->preferredX;
+    float extY = node->hasConstraints() ? node->constraintExtentY() : node->preferredY;
+    extX += node->layoutBounds().width;
+    extY += node->layoutBounds().height;
+    maxX = std::max(maxX, extX);
+    maxY = std::max(maxY, extY);
+  }
+  if (!padding.isZero()) {
+    maxX += padding.left + padding.right;
+    maxY += padding.top + padding.bottom;
+  }
+  float prevW = layoutWidth;
+  float prevH = layoutHeight;
+  // Content-measured refinement: `maxX` / `maxY` are measurement results derived from children's
+  // actual layout bounds, not sizes allocated by the layout engine. Keep them un-ceiled so the
+  // container mirrors the exact extent of its children — rounding here would drift the container
+  // away from authored child sizes. Rounding is applied only at layout-allocation sites
+  // (PerformConstraintLayout's targetW/H, Layer flex main/cross computation, TextBox cross-axis
+  // re-typesetting).
+  if (widthFromContent) {
+    layoutWidth = maxX;
+  }
+  if (heightFromContent) {
+    layoutHeight = maxY;
+  }
+  if ((widthFromContent && layoutWidth != prevW) || (heightFromContent && layoutHeight != prevH)) {
+    updateLayout(context);
   }
 }
 

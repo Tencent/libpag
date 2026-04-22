@@ -53,14 +53,28 @@ void Text::onMeasure(LayoutContext* context) {
   auto result = TextLayout::Layout({this}, params, context);
   glyphData->layoutRuns = result.extractLayoutRuns(this);
   textBounds = result.bounds;
-  measuredX = position.x + textBounds.x;
-  measuredY = position.y + textBounds.y;
-  measuredWidth = textBounds.width;
-  measuredHeight = textBounds.height;
+  // position is the text origin (x, baseline); textBounds is relative to position.
+  preferredX = position.x + textBounds.x;
+  preferredY = position.y + textBounds.y;
+  // Preferred size: authored width/height overrides the intrinsic text bounds when present.
+  preferredWidth = std::isnan(width) ? textBounds.width : width;
+  preferredHeight = std::isnan(height) ? textBounds.height : height;
 }
 
-void Text::setLayoutSize(LayoutContext* context, float width, float height) {
-  float scale = LayoutNode::ComputeUniformScale(measuredWidth, measuredHeight, width, height);
+void Text::setLayoutSize(LayoutContext* context, float targetWidth, float targetHeight) {
+  // Compute scale based on intrinsic text bounds (pre-scaling) and the requested target. NaN on
+  // an axis means the parent did not constrain that axis, so ComputeUniformScale skips it. When
+  // both axes are NaN, fall back to the preferred size so an authored width/height still drives
+  // scaling without parent constraints.
+  float tW = targetWidth;
+  float tH = targetHeight;
+  if (std::isnan(tW) && std::isnan(tH)) {
+    tW = preferredWidth;
+    tH = preferredHeight;
+  }
+  float scale = LayoutNode::ComputeUniformScale(textBounds.width, textBounds.height, tW, tH);
+  float origW = textBounds.width;
+  float origH = textBounds.height;
   if (scale != 1.0f) {
     textScale = scale;
     auto params = MakeStandaloneParams(this);
@@ -71,8 +85,8 @@ void Text::setLayoutSize(LayoutContext* context, float width, float height) {
   }
   // Use mathematically scaled dimensions instead of textBounds from re-typesetting, because font
   // hinting may cause slight differences. renderPosition() compensates via centering.
-  layoutWidth = measuredWidth * scale;
-  layoutHeight = measuredHeight * scale;
+  layoutWidth = origW * scale;
+  layoutHeight = origH * scale;
 }
 
 Point Text::renderPosition() const {

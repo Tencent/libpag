@@ -65,24 +65,35 @@ Rect Polystar::getContentBounds() const {
 
 void Polystar::onMeasure(LayoutContext*) {
   auto bounds = getContentBounds();
-  measuredX = std::isnan(position.x) ? 0 : (position.x + bounds.x);
-  measuredY = std::isnan(position.y) ? 0 : (position.y + bounds.y);
-  measuredWidth = bounds.width;
-  measuredHeight = bounds.height;
+  // position specifies the polystar center; when unset, top-left of the bounding box sits at (0,0).
+  preferredX = std::isnan(position.x) ? 0 : (position.x + bounds.x);
+  preferredY = std::isnan(position.y) ? 0 : (position.y + bounds.y);
+  // Preferred size: authored width/height overrides the intrinsic content bounds when present.
+  preferredWidth = std::isnan(width) ? bounds.width : width;
+  preferredHeight = std::isnan(height) ? bounds.height : height;
 }
 
-void Polystar::setLayoutSize(LayoutContext*, float width, float height) {
-  float scale = LayoutNode::ComputeUniformScale(measuredWidth, measuredHeight, width, height);
-  layoutWidth = measuredWidth * scale;
-  layoutHeight = measuredHeight * scale;
+void Polystar::setLayoutSize(LayoutContext*, float targetWidth, float targetHeight) {
+  auto bounds = getContentBounds();
+  float tW = targetWidth;
+  float tH = targetHeight;
+  if (std::isnan(tW) && std::isnan(tH)) {
+    tW = preferredWidth;
+    tH = preferredHeight;
+  }
+  float scale = LayoutNode::ComputeUniformScale(bounds.width, bounds.height, tW, tH);
+  layoutWidth = bounds.width * scale;
+  layoutHeight = bounds.height * scale;
 }
 
 Point Polystar::renderPosition() const {
-  return computeRenderPosition(getContentBounds());
+  auto bounds = getContentBounds();
+  return computeRenderPosition(bounds, bounds.width, bounds.height);
 }
 
 float Polystar::renderScale() const {
-  return computeRenderScale();
+  auto bounds = getContentBounds();
+  return computeRenderScale(bounds.width, bounds.height);
 }
 
 float Polystar::renderOuterRadius() const {
