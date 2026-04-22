@@ -1194,6 +1194,9 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
   // BlurFilter (filter) takes precedence over BackgroundBlurStyle. PPT has no native
   // background-blur primitive; we emit a:blur as a best-effort approximation that
   // blurs the shape itself rather than the background behind it.
+  // grow="1" allows the blur to extend beyond the original shape bounds — required
+  // for solid-filled shapes, otherwise PowerPoint clips the blurred edges back to
+  // the original bounds and the effect becomes invisible.
   bool blurEmitted = false;
   for (const auto* f : filters) {
     if (f->nodeType() == NodeType::BlurFilter) {
@@ -1202,7 +1205,7 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
       if (avgBlur > 0) {
         out.openElement("a:blur")
             .addRequiredAttribute("rad", PxToEMU(avgBlur))
-            .addRequiredAttribute("grow", "0")
+            .addRequiredAttribute("grow", "1")
             .closeElementSelfClosing();
         blurEmitted = true;
       }
@@ -1217,7 +1220,7 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
         if (avgBlur > 0) {
           out.openElement("a:blur")
               .addRequiredAttribute("rad", PxToEMU(avgBlur))
-              .addRequiredAttribute("grow", "0")
+              .addRequiredAttribute("grow", "1")
               .closeElementSelfClosing();
         }
         break;
