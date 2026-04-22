@@ -5262,7 +5262,7 @@ h1{text-align:center;color:#1e293b;margin-bottom:4px}
 .cmp>div{flex:1;padding:12px;text-align:center}
 .cmp>div:first-child{border-right:1px solid #e2e8f0}
 .cmp label{display:block;font-size:11px;color:#94a3b8;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
-.cmp .lbl{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:6px;flex-wrap:wrap}
+.cmp .lbl{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;min-height:19px}
 .cmp .lbl label{margin:0}
 .cmp .lbl .open{max-width:100%;font-size:11px;color:#2563eb;text-decoration:none;padding:2px 8px;border:1px solid #bfdbfe;border-radius:10px;background:#eff6ff;text-transform:none;letter-spacing:0;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .cmp .lbl .open:hover{background:#dbeafe;border-color:#60a5fa}
@@ -5365,7 +5365,7 @@ h1{text-align:center;color:#1e293b;margin-bottom:4px}
               "</h3><span class=\"sz\">" + std::to_string(w) + "x" + std::to_string(h) + " @" +
               std::to_string(scale) + "x</span></div>\n";
       page += "  <div class=\"cmp\">\n";
-      page += "    <div><label>PAGX Native</label><img src=\"" + baseName + "_pagx.png\" width=\"" +
+      page += "    <div><div class=\"lbl\"><label>PAGX Native</label></div><img src=\"" + baseName + "_pagx.png\" width=\"" +
               std::to_string(w) + "\"></div>\n";
       // `loading=\"lazy\"` keeps the initial page open quickly when the sample count grows;
       // sandbox=\"allow-same-origin\" is deliberately omitted so each iframe stays in its own
