@@ -241,7 +241,7 @@ class HTMLWriter {
   void writeGroup(HTMLBuilder& out, const Group* group, float alpha, bool distribute);
   void writeRepeater(HTMLBuilder& out, const Repeater* rep, const std::vector<GeoInfo>& geos,
                      const Fill* fill, const Stroke* stroke, float alpha,
-                     const TrimPath* trim = nullptr);
+                     const TrimPath* trim = nullptr, bool applyCopyAlphaDecay = true);
   void writeComposition(HTMLBuilder& out, const Composition* comp, float alpha = 1.0f,
                         bool distribute = false);
   void paintGeos(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,

@@ -1735,7 +1735,8 @@ void HTMLWriter::writeGroup(HTMLBuilder& out, const Group* group, float alpha, b
 
 void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
                                const std::vector<GeoInfo>& geos, const Fill* fill,
-                               const Stroke* stroke, float alpha, const TrimPath* trim) {
+                               const Stroke* stroke, float alpha, const TrimPath* trim,
+                               bool applyCopyAlphaDecay) {
   if (rep->copies <= 0) {
     return;
   }
@@ -1781,11 +1782,25 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
     // Using copies-1 as the denominator forces the last rendered copy to land exactly on
     // endAlpha, but tgfx lets only the asymptote (i == maxCount) reach endAlpha, so the final
     // copy at i = maxCount-1 sits at startAlpha + (endAlpha - startAlpha) * (N-1)/N.
-    float denom = std::max(std::ceil(rep->copies), 1.0f);
-    float np = std::clamp((static_cast<float>(idx) + rep->offset) / denom, 0.0f, 1.0f);
-    float ca = rep->startAlpha + (rep->endAlpha - rep->startAlpha) * np;
-    if (idx == n - 1 && frac > 0 && frac < 1.0f) {
-      ca *= frac;
+    // When the enclosing layer's Fill/Stroke was declared *after* the Repeater in PAGX order,
+    // tgfx applies copyAlpha onto an empty painter list (painters don't exist yet) and the
+    // later Fill/Stroke attaches to every clone with alpha=1.0. Honour that by skipping the
+    // per-copy opacity in that case (showcase_mandala Middle Ring: Stroke sits after the
+    // Repeater, so every petal must render at full alpha; otherwise petals appear to fade
+    // with the `endAlpha=0.5` ramp, producing colours that don't match PAGX native).
+    float ca = 1.0f;
+    if (applyCopyAlphaDecay) {
+      float denom = std::max(std::ceil(rep->copies), 1.0f);
+      float np = std::clamp((static_cast<float>(idx) + rep->offset) / denom, 0.0f, 1.0f);
+      ca = rep->startAlpha + (rep->endAlpha - rep->startAlpha) * np;
+      if (idx == n - 1 && frac > 0 && frac < 1.0f) {
+        ca *= frac;
+      }
+    } else if (idx == n - 1 && frac > 0 && frac < 1.0f) {
+      // Fractional last copy still contributes a partial coverage even when painters attach
+      // after the Repeater: tgfx's final-copy fractional bookkeeping is independent of the
+      // start/end alpha ramp.
+      ca = frac;
     }
     float ea = ca * alpha;
     if (!m.isIdentity() || ea < 1.0f) {

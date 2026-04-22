@@ -541,9 +541,9 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             // Mirror tgfx's line-break decisions with explicit <br> tags instead of relying on
             // Chromium's word-wrap (same rationale as the inline-TextBox path above).
             std::vector<TgfxWrappedLine> tgfxLines;
-            bool canSplit = tb->wordWrap &&
-                            TrySplitTextByTgfxLines(span.text->text,
-                                                    span.text->wrappedGlyphCounts(), tgfxLines);
+            bool canSplit =
+                tb->wordWrap && TrySplitTextByTgfxLines(span.text->text,
+                                                        span.text->wrappedGlyphCounts(), tgfxLines);
             if (canSplit) {
               out.closeTagStart();
               for (size_t li = 0; li < tgfxLines.size(); li++) {
@@ -552,8 +552,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                   out.closeTagSelfClosing();
                 }
                 auto& ln = tgfxLines[li];
-                out.addTextContent(
-                    span.text->text.substr(ln.byteStart, ln.byteEnd - ln.byteStart));
+                out.addTextContent(span.text->text.substr(ln.byteStart, ln.byteEnd - ln.byteStart));
               }
               out.closeTag();
             } else {
@@ -697,27 +696,39 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
       }
       case NodeType::Repeater: {
         auto rep = static_cast<const Repeater*>(element);
-        const Fill* repFill = curFill;
-        const Stroke* repStroke = curStroke;
-        if (!repFill || !repStroke) {
+        // tgfx's Repeater::apply multiplies `copyAlpha` onto the painters that already exist
+        // when the repeater runs, i.e. only Fill/Stroke nodes emitted *before* the Repeater.
+        // Painters added after the Repeater attach to every copy uniformly with alpha=1.0.
+        // Mirror this ordering so the HTML decay (div opacity per copy) only kicks in when
+        // the fill/stroke was declared before the Repeater (showcase_mandala Middle Ring has
+        // the Stroke after, so every petal must render at full alpha).
+        const Fill* repFillBefore = curFill;
+        const Stroke* repStrokeBefore = curStroke;
+        const Fill* repFillAfter = nullptr;
+        const Stroke* repStrokeAfter = nullptr;
+        if (!repFillBefore || !repStrokeBefore) {
           for (auto* e : elements) {
             if (e == element) {
               continue;
             }
-            if (e->nodeType() == NodeType::Fill && !repFill) {
+            if (e->nodeType() == NodeType::Fill && !repFillBefore && !repFillAfter) {
               auto f = static_cast<const Fill*>(e);
               if (f->placement == targetPlacement) {
-                repFill = f;
+                repFillAfter = f;
               }
-            } else if (e->nodeType() == NodeType::Stroke && !repStroke) {
+            } else if (e->nodeType() == NodeType::Stroke && !repStrokeBefore && !repStrokeAfter) {
               auto s = static_cast<const Stroke*>(e);
               if (s->placement == targetPlacement) {
-                repStroke = s;
+                repStrokeAfter = s;
               }
             }
           }
         }
-        writeRepeater(out, rep, geos, repFill, repStroke, distribute ? alpha : 1.0f, curTrim);
+        const Fill* repFill = repFillBefore ? repFillBefore : repFillAfter;
+        const Stroke* repStroke = repStrokeBefore ? repStrokeBefore : repStrokeAfter;
+        bool applyDecay = (repFillBefore != nullptr) || (repStrokeBefore != nullptr);
+        writeRepeater(out, rep, geos, repFill, repStroke, distribute ? alpha : 1.0f, curTrim,
+                      applyDecay);
         geos.clear();
         curFill = nullptr;
         curStroke = nullptr;
