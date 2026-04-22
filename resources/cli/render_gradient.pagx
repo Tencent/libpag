@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Test gradient rendering accuracy -->
-<pagx version="1.0" width="300" height="100">
+<pagx width="300" height="100">
   <Layer>
-    <Rectangle left="10" top="10" size="280,80" roundness="16"/>
+    <Rectangle left="10" top="10" width="280" height="80" roundness="16"/>
     <Fill>
       <LinearGradient startPoint="10,50" endPoint="290,50">
-        <ColorStop offset="0" color="#FF0000"/>
-        <ColorStop offset="0.25" color="#FFFF00"/>
-        <ColorStop offset="0.5" color="#00FF00"/>
-        <ColorStop offset="0.75" color="#00FFFF"/>
-        <ColorStop offset="1" color="#0000FF"/>
+        <ColorStop color="#FF0000" offset="0"/>
+        <ColorStop color="#FFFF00" offset="0.25"/>
+        <ColorStop color="#00FF00" offset="0.5"/>
+        <ColorStop color="#00FFFF" offset="0.75"/>
+        <ColorStop color="#0000FF" offset="1"/>
       </LinearGradient>
     </Fill>
   </Layer>

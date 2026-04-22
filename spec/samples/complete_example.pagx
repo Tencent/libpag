@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="800" height="520">
-  <Layer name="background" left="0" right="0" top="0" bottom="0">
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
+<pagx width="800" height="520">
+  <Layer name="background" width="100%" height="100%">
+    <Rectangle width="100%" height="100%"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="800,520">
-        <ColorStop offset="0" color="#0F172A"/>
-        <ColorStop offset="1" color="#1E293B"/>
+        <ColorStop color="#0F172A" offset="0"/>
+        <ColorStop color="#1E293B" offset="1"/>
       </LinearGradient>
     </Fill>
   </Layer>
   <Layer name="GlowTopLeft" blendMode="screen">
-    <Ellipse left="-80" top="-100" size="320,320"/>
+    <Ellipse left="-80" top="-100" width="320" height="320"/>
     <Fill color="@glowPurple"/>
     <BlurFilter blurX="30" blurY="30"/>
   </Layer>
   <Layer name="GlowBottomRight" blendMode="screen">
-    <Ellipse left="520" top="260" size="400,400"/>
+    <Ellipse left="520" top="260" width="400" height="400"/>
     <Fill color="@glowCyan"/>
     <BlurFilter blurX="40" blurY="40"/>
   </Layer>
@@ -32,7 +32,7 @@
     <Layer name="Card1" width="100">
       <Layer composition="@cardBg"/>
       <Layer left="50" top="40">
-        <Rectangle left="-25" top="-17.5" size="50,35" roundness="8"/>
+        <Rectangle left="-25" top="-17.5" width="50" height="35" roundness="8"/>
         <Fill color="@coral"/>
         <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#F43F5E80"/>
       </Layer>
@@ -40,7 +40,7 @@
     <Layer name="Card2" width="100">
       <Layer composition="@cardBg"/>
       <Layer left="50" top="40">
-        <Ellipse left="-25" top="-17.5" size="50,35"/>
+        <Ellipse left="-25" top="-17.5" width="50" height="35"/>
         <Fill color="@purple"/>
         <InnerShadowStyle offsetX="2" offsetY="2" blurX="6" blurY="6" color="#00000080"/>
       </Layer>
@@ -71,7 +71,7 @@
     </Layer>
   </Layer>
   <Layer name="GetStartedButton" left="88" top="307">
-    <Rectangle size="120,36" roundness="18"/>
+    <Rectangle width="120" height="36" roundness="18"/>
     <Fill color="@buttonGradient"/>
     <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#6366F180"/>
     <Group centerX="0" centerY="0">
@@ -84,58 +84,58 @@
     <TrimPath end="0.75"/>
     <Stroke color="@cyan" width="3" cap="round"/>
     <Group left="368">
-      <Rectangle left="-30" top="-20" size="60,40"/>
+      <Rectangle left="-30" top="-20" width="60" height="40"/>
       <RoundCorner radius="10"/>
       <Fill color="@emerald"/>
     </Group>
     <Group left="478">
-      <Rectangle left="-27.5" top="-17.5" size="35,35"/>
-      <Ellipse left="-7.5" top="-17.5" size="35,35"/>
+      <Rectangle left="-27.5" top="-17.5" width="35" height="35"/>
+      <Ellipse left="-7.5" top="-17.5" width="35" height="35"/>
       <MergePath mode="xor"/>
       <Fill color="@purple"/>
     </Group>
     <Group left="588">
-      <Ellipse left="16" top="-6" size="12,12"/>
+      <Ellipse left="16" top="-6" width="12" height="12"/>
       <Fill color="@cyan"/>
       <Repeater copies="5" position="0,0" rotation="72"/>
     </Group>
     <Group left="688">
-      <Rectangle left="-25" top="-25" size="50,50"/>
+      <Rectangle left="-25" top="-25" width="50" height="50"/>
       <Fill color="@rainbow"/>
     </Group>
   </Layer>
   <Layer id="circleMask" visible="false">
-    <Ellipse left="-22.5" top="-22.5" size="45,45"/>
+    <Ellipse left="-22.5" top="-22.5" width="45" height="45"/>
     <Fill color="#FFF"/>
   </Layer>
   <Layer name="MaskedLayer" left="688" top="325" mask="@circleMask">
-    <Rectangle left="-25" top="-25" size="50,50"/>
+    <Rectangle left="-25" top="-25" width="50" height="50"/>
     <Fill color="@rainbow"/>
   </Layer>
   <Layer left="130" top="430">
-    <Rectangle left="-40" top="-30" size="80,60" roundness="10"/>
+    <Rectangle left="-40" top="-30" width="80" height="60" roundness="10"/>
     <Fill color="@emerald"/>
     <BlurFilter blurX="3" blurY="3"/>
   </Layer>
   <Layer left="260" top="430">
-    <Rectangle left="-40" top="-30" size="80,60" roundness="10"/>
+    <Rectangle left="-40" top="-30" width="80" height="60" roundness="10"/>
     <Fill color="@cyan"/>
     <DropShadowFilter offsetX="4" offsetY="4" blurX="12" blurY="12" color="#00000080"/>
   </Layer>
   <Layer left="390" top="430">
-    <Ellipse left="-27.5" top="-27.5" size="55,55"/>
+    <Ellipse left="-27.5" top="-27.5" width="55" height="55"/>
     <Fill color="@purple"/>
     <ColorMatrixFilter matrix="0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0,0,0,1,0"/>
   </Layer>
   <Layer left="520" top="430">
-    <Rectangle left="-40" top="-30" size="80,60" roundness="10"/>
+    <Rectangle left="-40" top="-30" width="80" height="60" roundness="10"/>
     <Fill color="@coral"/>
     <BlendFilter color="#6366F160" blendMode="overlay"/>
   </Layer>
   <Layer left="670" top="430">
-    <Rectangle left="-45" top="-30" size="90,60" roundness="8"/>
+    <Rectangle left="-45" top="-30" width="90" height="60" roundness="8"/>
     <Fill>
-      <ImagePattern image="pag_logo.png" tileModeX="clamp" tileModeY="clamp" matrix="0.23,0,0,0.23,-30,-30"/>
+      <ImagePattern image="pag_logo.png" matrix="0.23,0,0,0.23,-30,-30" tileModeX="clamp" tileModeY="clamp"/>
     </Fill>
     <Stroke color="#FFFFFF20" width="1"/>
     <DropShadowStyle offsetY="6" blurX="16" blurY="16" color="#00000060"/>
@@ -149,33 +149,33 @@
   <Resources>
     <PathData id="wavePath" data="M 0 20 Q 30 0 60 20 T 120 20 T 180 20"/>
     <Font id="iconFont">
-      <Glyph path="M 0 -8 L 8 8 L -8 8 Z" advance="20"/>
-      <Glyph path="M -8 -8 L 8 -8 L 8 8 L -8 8 Z" advance="20"/>
-      <Glyph path="M 0 -10 A 10 10 0 1 1 0 10 A 10 10 0 1 1 0 -10" advance="24"/>
+      <Glyph advance="20" path="M 0 -8 L 8 8 L -8 8 Z"/>
+      <Glyph advance="20" path="M -8 -8 L 8 -8 L 8 8 L -8 8 Z"/>
+      <Glyph advance="24" path="M 0 -10 A 10 10 0 1 1 0 10 A 10 10 0 1 1 0 -10"/>
     </Font>
     <RadialGradient id="glowPurple" center="160,160" radius="160">
-      <ColorStop offset="0" color="#8B5CF660"/>
-      <ColorStop offset="1" color="#8B5CF600"/>
+      <ColorStop color="#8B5CF660" offset="0"/>
+      <ColorStop color="#8B5CF600" offset="1"/>
     </RadialGradient>
     <RadialGradient id="glowCyan" center="200,200" radius="200">
-      <ColorStop offset="0" color="#06B6D450"/>
-      <ColorStop offset="1" color="#06B6D400"/>
+      <ColorStop color="#06B6D450" offset="0"/>
+      <ColorStop color="#06B6D400" offset="1"/>
     </RadialGradient>
     <LinearGradient id="titleGradient" startPoint="-400,0" endPoint="-200,0">
-      <ColorStop offset="0" color="#FFF"/>
-      <ColorStop offset="0.5" color="#8B5CF6"/>
-      <ColorStop offset="1" color="#06B6D4"/>
+      <ColorStop color="#FFF" offset="0"/>
+      <ColorStop color="#8B5CF6" offset="0.5"/>
+      <ColorStop color="#06B6D4" offset="1"/>
     </LinearGradient>
     <LinearGradient id="buttonGradient" startPoint="0,0" endPoint="120,0">
-      <ColorStop offset="0" color="#6366F1"/>
-      <ColorStop offset="1" color="#8B5CF6"/>
+      <ColorStop color="#6366F1" offset="0"/>
+      <ColorStop color="#8B5CF6" offset="1"/>
     </LinearGradient>
     <ConicGradient id="rainbow" center="25,25">
-      <ColorStop offset="0" color="#F43F5E"/>
-      <ColorStop offset="0.25" color="#8B5CF6"/>
-      <ColorStop offset="0.5" color="#06B6D4"/>
-      <ColorStop offset="0.75" color="#10B981"/>
-      <ColorStop offset="1" color="#F43F5E"/>
+      <ColorStop color="#F43F5E" offset="0"/>
+      <ColorStop color="#8B5CF6" offset="0.25"/>
+      <ColorStop color="#06B6D4" offset="0.5"/>
+      <ColorStop color="#10B981" offset="0.75"/>
+      <ColorStop color="#F43F5E" offset="1"/>
     </ConicGradient>
     <SolidColor id="coral" color="#F43F5E"/>
     <SolidColor id="purple" color="#8B5CF6"/>
@@ -184,12 +184,12 @@
     <SolidColor id="cyan" color="#06B6D4"/>
     <SolidColor id="emerald" color="#10B981"/>
     <DiamondGradient id="diamond" center="26,26" radius="26">
-      <ColorStop offset="0" color="#14B8A6"/>
-      <ColorStop offset="1" color="#0F766E"/>
+      <ColorStop color="#14B8A6" offset="0"/>
+      <ColorStop color="#0F766E" offset="1"/>
     </DiamondGradient>
     <Composition id="cardBg" width="100" height="80">
       <Layer width="100" height="80">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+        <Rectangle width="100%" height="100%" roundness="12"/>
         <Fill color="#1E293B"/>
         <Stroke color="#334155" width="1"/>
       </Layer>

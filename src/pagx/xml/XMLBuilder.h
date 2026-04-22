@@ -155,6 +155,21 @@ class XMLBuilder {
     return *this;
   }
 
+  // Writes a dimension attribute that may be a percentage value. If percentValue is not NaN,
+  // writes it with a "%" suffix; otherwise writes absoluteValue. Skips when both are NaN.
+  XMLBuilder& addDimensionAttribute(const char* name, float absoluteValue, float percentValue) {
+    if (!std::isnan(percentValue)) {
+      _buf += ' ';
+      _buf += name;
+      _buf += "=\"";
+      _buf += formatFloat(percentValue);
+      _buf += "%\"";
+    } else if (!std::isnan(absoluteValue)) {
+      addRequiredAttribute(name, absoluteValue);
+    }
+    return *this;
+  }
+
   //--- Close Start Tag -------------------------------------------------------
 
   XMLBuilder& closeElementStart() {

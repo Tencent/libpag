@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test: includeInLayout=false on child Layer without parent container layout -->
+<pagx width="400" height="300">
+  <Layer id="noLayout">
+    <Layer id="excluded" left="10" top="10" includeInLayout="false">
+      <Rectangle width="100" height="50"/>
+      <Fill color="#FF0000"/>
+    </Layer>
+  </Layer>
+</pagx>

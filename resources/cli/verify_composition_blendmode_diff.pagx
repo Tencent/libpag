@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Test: Layers with different blendMode should NOT be detected as identical -->
-<pagx version="1.0" width="400" height="200">
+<pagx width="400" height="200">
   <Layer name="container" width="400" height="200">
     <Layer width="100" height="100" blendMode="multiply">
-      <Layer left="0" right="0" top="0" bottom="0">
-        <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Layer width="100%" height="100%">
+        <Rectangle width="100%" height="100%"/>
         <Fill color="#FF0000"/>
       </Layer>
     </Layer>
     <Layer width="100" height="100" blendMode="screen">
-      <Layer left="0" right="0" top="0" bottom="0">
-        <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Layer width="100%" height="100%">
+        <Rectangle width="100%" height="100%"/>
         <Fill color="#FF0000"/>
       </Layer>
     </Layer>

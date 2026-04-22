@@ -1,4 +1,4 @@
-<pagx version="1.0" width="40" height="40">
+<pagx width="40" height="40">
   <Layer centerX="0" centerY="0">
     <svg viewBox="0 0 20 20" fill="none">
       <path d="M3 3V7.5H7.5" stroke="#FF4757" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>

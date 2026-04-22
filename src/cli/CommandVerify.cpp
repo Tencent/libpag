@@ -19,6 +19,7 @@
 #include "cli/CommandVerify.h"
 #include <libxml/parser.h>
 #include <libxml/tree.h>
+#include <libxml/xmlschemas.h>
 #include <cfloat>
 #include <cmath>
 #include <cstdlib>
@@ -30,12 +31,12 @@
 #include <unordered_map>
 #include <unordered_set>
 #include "cli/CliUtils.h"
+#include "cli/CommandLayout.h"
 #include "cli/CommandRender.h"
 #include "cli/CommandResolve.h"
 #include "cli/FormatUtils.h"
 #include "cli/LayoutUtils.h"
 #include "pagx/PAGXDocument.h"
-#include "pagx/PAGXImporter.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/Composition.h"
@@ -62,6 +63,7 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx_xsd.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 
@@ -129,6 +131,9 @@ static void DetectEmptyLayer(const Layer* layer, bool parentHasLayout,
   if (!std::isnan(layer->width) || !std::isnan(layer->height)) {
     return;
   }
+  if (!std::isnan(layer->percentWidth) || !std::isnan(layer->percentHeight)) {
+    return;
+  }
   bool hasSizeDependentConstraint = (!std::isnan(layer->right) || !std::isnan(layer->bottom) ||
                                      !std::isnan(layer->centerX) || !std::isnan(layer->centerY));
   if (hasSizeDependentConstraint) {
@@ -150,13 +155,18 @@ static void DetectEmptyGroup(const Group* group, std::vector<VerifyDiagnostic>& 
   if (!std::isnan(group->width) || !std::isnan(group->height)) {
     return;
   }
+  if (!std::isnan(group->percentWidth) || !std::isnan(group->percentHeight)) {
+    return;
+  }
   bool hasSizeDependentConstraint = (!std::isnan(group->right) || !std::isnan(group->bottom) ||
                                      !std::isnan(group->centerX) || !std::isnan(group->centerY));
   if (hasSizeDependentConstraint) {
     return;
   }
+  const char* typeName = group->nodeType() == NodeType::TextBox ? "TextBox" : "Group";
   AddDiagnostic(diagnostics, group->sourceLine,
-                "empty Group with no elements. Fix: check if this Group is needed");
+                std::string("empty ") + typeName +
+                    " with no elements. Fix: check if this container is needed");
 }
 
 static void DetectZeroStrokeWidth(const Stroke* stroke,
@@ -340,6 +350,52 @@ static void BuildLineNodeMap(xmlNodePtr node, LineNodeMap& map) {
   }
 }
 
+// ============================================================================
+// XSD Schema Validation
+// ============================================================================
+
+static void XsdValidationCallback(void* ctx, const xmlError* error) {
+  if (error == nullptr || error->message == nullptr) {
+    return;
+  }
+  // Skip errors about "data-*" attributes — PAGX allows custom data attributes on any element
+  // but XSD cannot express prefix-based wildcard attributes.
+  std::string msg(error->message);
+  if (msg.find("data-") != std::string::npos && msg.find("attribute") != std::string::npos) {
+    return;
+  }
+  // Trim trailing newline.
+  while (!msg.empty() && msg.back() == '\n') {
+    msg.pop_back();
+  }
+  auto* diags = static_cast<std::vector<VerifyDiagnostic>*>(ctx);
+  int line = error->line > 0 ? error->line : 0;
+  AddDiagnostic(*diags, line, msg);
+}
+
+static void RunXsdValidation(xmlDocPtr xmlDoc, std::vector<VerifyDiagnostic>& diagnostics) {
+  auto& xsdContent = PagxXsdContent();
+  auto* parserCtxt =
+      xmlSchemaNewMemParserCtxt(xsdContent.data(), static_cast<int>(xsdContent.size()));
+  if (parserCtxt == nullptr) {
+    return;
+  }
+  auto* schema = xmlSchemaParse(parserCtxt);
+  xmlSchemaFreeParserCtxt(parserCtxt);
+  if (schema == nullptr) {
+    return;
+  }
+  auto* validCtxt = xmlSchemaNewValidCtxt(schema);
+  if (validCtxt == nullptr) {
+    xmlSchemaFree(schema);
+    return;
+  }
+  xmlSchemaSetValidStructuredErrors(validCtxt, XsdValidationCallback, &diagnostics);
+  xmlSchemaValidateDoc(validCtxt, xmlDoc);
+  xmlSchemaFreeValidCtxt(validCtxt);
+  xmlSchemaFree(schema);
+}
+
 static xmlNodePtr FindXmlNode(const LineNodeMap& map, int sourceLine, const char* elementName) {
   auto range = map.equal_range(sourceLine);
   for (auto it = range.first; it != range.second; ++it) {
@@ -487,6 +543,9 @@ static bool HasDefaultGroupTransform(const Group* group) {
   if (!std::isnan(group->width) || !std::isnan(group->height)) {
     return false;
   }
+  if (!std::isnan(group->percentWidth) || !std::isnan(group->percentHeight)) {
+    return false;
+  }
   return true;
 }
 
@@ -562,6 +621,57 @@ static void DetectMergeableGroups(const std::vector<Element*>& elements,
 }
 
 // ============================================================================
+// Static Detection: Painter Leak
+// ============================================================================
+
+static bool IsGeometryElement(NodeType type) {
+  return type == NodeType::Rectangle || type == NodeType::Ellipse || type == NodeType::Polystar ||
+         type == NodeType::Path || type == NodeType::Text;
+}
+
+static bool IsPainterElement(NodeType type) {
+  return type == NodeType::Fill || type == NodeType::Stroke;
+}
+
+static bool ContainsRepeater(const std::vector<Element*>& elements) {
+  for (auto* element : elements) {
+    if (element->nodeType() == NodeType::Repeater) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static void DetectPainterLeak(const std::vector<Element*>& elements,
+                              std::vector<VerifyDiagnostic>& diagnostics) {
+  if (ContainsRepeater(elements)) {
+    return;
+  }
+  int lastPainterIndex = -1;
+  for (size_t i = 0; i < elements.size(); i++) {
+    auto type = elements[i]->nodeType();
+    if (!IsPainterElement(type)) {
+      continue;
+    }
+    if (lastPainterIndex >= 0) {
+      bool hasGeometry = false;
+      for (int j = lastPainterIndex + 1; j < static_cast<int>(i); j++) {
+        if (IsGeometryElement(elements[j]->nodeType())) {
+          hasGeometry = true;
+          break;
+        }
+      }
+      if (hasGeometry) {
+        AddDiagnostic(diagnostics, elements[i]->sourceLine,
+                      "painter leaks geometry from prior painters. "
+                      "Fix: add a Group to isolate subsequent shape-painter pairs");
+      }
+    }
+    lastPainterIndex = static_cast<int>(i);
+  }
+}
+
+// ============================================================================
 // Static Detection: Redundant First-Child Group
 // ============================================================================
 
@@ -585,6 +695,9 @@ static bool CanUnwrapFirstChildGroup(const Group* group) {
     return false;
   }
   if (!std::isnan(group->width) || !std::isnan(group->height)) {
+    return false;
+  }
+  if (!std::isnan(group->percentWidth) || !std::isnan(group->percentHeight)) {
     return false;
   }
   if (!std::isnan(group->left) || !std::isnan(group->right) || !std::isnan(group->top) ||
@@ -1033,68 +1146,7 @@ static void DetectIneffectiveLayoutAttrs(const Layer* layer, bool parentHasLayou
 // ============================================================================
 
 static bool CanDowngradeLayerToGroup(const Layer* layer) {
-  if (!layer->children.empty()) {
-    return false;
-  }
-  if (!layer->styles.empty()) {
-    return false;
-  }
-  if (!layer->filters.empty()) {
-    return false;
-  }
-  if (layer->mask != nullptr) {
-    return false;
-  }
-  if (layer->composition != nullptr) {
-    return false;
-  }
-  if (layer->blendMode != BlendMode::Normal) {
-    return false;
-  }
-  if (!layer->visible) {
-    return false;
-  }
-  if (layer->hasScrollRect) {
-    return false;
-  }
-  if (!layer->matrix.isIdentity()) {
-    return false;
-  }
-  if (!layer->matrix3D.isIdentity()) {
-    return false;
-  }
-  if (layer->preserve3D) {
-    return false;
-  }
-  if (!layer->groupOpacity) {
-    return false;
-  }
-  if (!layer->passThroughBackground) {
-    return false;
-  }
-  if (!layer->antiAlias) {
-    return false;
-  }
-  if (!layer->id.empty() || !layer->name.empty()) {
-    return false;
-  }
-  if (layer->layout != LayoutMode::None) {
-    return false;
-  }
-  if (layer->flex > 0) {
-    return false;
-  }
-  if (!std::isnan(layer->width) || !std::isnan(layer->height)) {
-    return false;
-  }
-  if (!std::isnan(layer->left) || !std::isnan(layer->right) || !std::isnan(layer->top) ||
-      !std::isnan(layer->bottom) || !std::isnan(layer->centerX) || !std::isnan(layer->centerY)) {
-    return false;
-  }
-  if (!layer->includeInLayout) {
-    return false;
-  }
-  return true;
+  return layer->children.empty() && pagx::cli::IsLayerShell(layer);
 }
 
 static void DetectDowngradableLayers(const Layer* parentLayer,
@@ -1121,6 +1173,56 @@ static void DetectDowngradableLayers(const Layer* parentLayer,
                 std::to_string(count) +
                     " child Layer(s) use no Layer-exclusive features. "
                     "Fix: check if they can be replaced with <Group>");
+}
+
+// ============================================================================
+// Static Detection: Mergeable Adjacent Layers
+// ============================================================================
+
+static void DetectMergeableAdjacentLayers(const std::vector<Layer*>& layers, bool hasLayout,
+                                          bool dedupWithDowngrade,
+                                          std::vector<VerifyDiagnostic>& diagnostics) {
+  if (hasLayout) {
+    return;
+  }
+  if (layers.size() < 2) {
+    return;
+  }
+  // When DetectDowngradableLayers already covers this parent (no contents, no layout), skip if
+  // all children are downgradable to avoid duplicate diagnostics.
+  if (dedupWithDowngrade) {
+    bool allDowngradable = true;
+    for (auto* layer : layers) {
+      if (!CanDowngradeLayerToGroup(layer)) {
+        allDowngradable = false;
+        break;
+      }
+    }
+    if (allDowngradable) {
+      return;
+    }
+  }
+  size_t runStart = 0;
+  while (runStart < layers.size()) {
+    if (!CanDowngradeLayerToGroup(layers[runStart])) {
+      runStart++;
+      continue;
+    }
+    auto runEnd = runStart + 1;
+    while (runEnd < layers.size() && CanDowngradeLayerToGroup(layers[runEnd])) {
+      runEnd++;
+    }
+    if (runEnd - runStart >= 2) {
+      std::vector<int> lines;
+      for (auto i = runStart; i < runEnd; i++) {
+        lines.push_back(layers[i]->sourceLine);
+      }
+      auto count = static_cast<int>(runEnd - runStart);
+      AddDiagnostic(diagnostics, lines,
+                    std::to_string(count) + " adjacent Layer(s) can be merged into one.");
+    }
+    runStart = runEnd;
+  }
 }
 
 // ============================================================================
@@ -1356,10 +1458,29 @@ static void DetectRectangularMask(const Layer* layer, std::vector<VerifyDiagnost
 // Static Detection: Run All
 // ============================================================================
 
+// For Rectangle/Ellipse, detect when 'size' is fully overridden by width/height or opposite-edge
+// constraints on both axes — the animatable 'size' value then becomes dead data.
+static void DetectSizeIgnoredForRectOrEllipse(const LayoutNode* node, const Size& size,
+                                              int sourceLine,
+                                              std::vector<VerifyDiagnostic>& diagnostics) {
+  bool hasExplicitW = !std::isnan(node->width) || !std::isnan(node->percentWidth);
+  bool hasExplicitH = !std::isnan(node->height) || !std::isnan(node->percentHeight);
+  bool wFromConstraints = !std::isnan(node->left) && !std::isnan(node->right);
+  bool hFromConstraints = !std::isnan(node->top) && !std::isnan(node->bottom);
+  bool wIgnored = hasExplicitW || wFromConstraints;
+  bool hIgnored = hasExplicitH || hFromConstraints;
+  bool hasSizeAttribute = size.width != 0 || size.height != 0;
+  if (wIgnored && hIgnored && hasSizeAttribute) {
+    AddDiagnostic(diagnostics, sourceLine,
+                  "size ignored, width/height or constraints take priority. Fix: remove size");
+  }
+}
+
 static void RunStaticDetectionOnElements(const std::vector<Element*>& elements,
                                          const LineNodeMap& lineNodeMap,
                                          std::vector<VerifyDiagnostic>& diagnostics) {
   DetectMergeableGroups(elements, lineNodeMap, diagnostics);
+  DetectPainterLeak(elements, diagnostics);
   DetectRedundantFirstChildGroup(elements, diagnostics);
 
   RepeaterContext ctx;
@@ -1368,12 +1489,20 @@ static void RunStaticDetectionOnElements(const std::vector<Element*>& elements,
 
   for (auto* element : elements) {
     auto type = element->nodeType();
+    if (type == NodeType::Rectangle) {
+      auto* rect = static_cast<const Rectangle*>(element);
+      DetectSizeIgnoredForRectOrEllipse(rect, rect->size, element->sourceLine, diagnostics);
+    } else if (type == NodeType::Ellipse) {
+      auto* ellipse = static_cast<const Ellipse*>(element);
+      DetectSizeIgnoredForRectOrEllipse(ellipse, ellipse->size, element->sourceLine, diagnostics);
+    }
     if (type == NodeType::Group) {
       auto* group = static_cast<const Group*>(element);
       DetectEmptyGroup(group, diagnostics);
       RunStaticDetectionOnElements(group->elements, lineNodeMap, diagnostics);
     } else if (type == NodeType::TextBox) {
       auto* textBox = static_cast<const TextBox*>(element);
+      DetectEmptyGroup(textBox, diagnostics);
       RunStaticDetectionOnElements(textBox->elements, lineNodeMap, diagnostics);
     } else if (type == NodeType::Stroke) {
       auto* stroke = static_cast<const Stroke*>(element);
@@ -1393,6 +1522,10 @@ static void RunStaticDetectionOnLayer(const Layer* layer, float canvasWidth, flo
   DetectFullCanvasClipMask(layer, canvasWidth, canvasHeight, diagnostics);
   DetectIneffectiveLayoutAttrs(layer, parentHasLayout, diagnostics);
   DetectDowngradableLayers(layer, diagnostics);
+  // Dedup with DetectDowngradableLayers: it fires when parent has no contents and no layout.
+  bool dedupWithDowngrade = layer->contents.empty() && layer->layout == LayoutMode::None;
+  DetectMergeableAdjacentLayers(layer->children, layer->layout != LayoutMode::None,
+                                dedupWithDowngrade, diagnostics);
   DetectLowOpacityHighCost(layer, diagnostics);
   DetectRectangularMask(layer, diagnostics);
 
@@ -1429,6 +1562,9 @@ static void RunStaticDetection(const PAGXDocument* doc, const LineNodeMap& lineN
     DetectDuplicatePathData(doc, lineNodeMap, diagnostics);
     DetectDuplicateGradients(doc, lineNodeMap, diagnostics);
     DetectStructurallyIdenticalLayers(doc, lineNodeMap, diagnostics);
+    // Root-level merge detection on doc->layers. No dedup needed — DetectDowngradableLayers
+    // does not run at root level.
+    DetectMergeableAdjacentLayers(doc->layers, false, false, diagnostics);
     for (auto* layer : doc->layers) {
       RunStaticDetectionOnLayer(layer, doc->width, doc->height, false, lineNodeMap, diagnostics);
     }
@@ -1518,6 +1654,67 @@ static bool ElementsHaveLeafContent(const std::vector<Element*>& elements) {
   return false;
 }
 
+// Checks whether a child LayoutNode's width/height depends on its parent's resolved size through
+// opposite-edge, centering, or percent constraints. Accumulates the result into the provided
+// output flags (existing true values are preserved).
+static void UpdateSizeDependenciesFromLayoutNode(const LayoutNode* node, bool* outDependsOnW,
+                                                 bool* outDependsOnH) {
+  if (!std::isnan(node->right) || !std::isnan(node->centerX) || !std::isnan(node->percentWidth)) {
+    *outDependsOnW = true;
+  }
+  if (!std::isnan(node->bottom) || !std::isnan(node->centerY) || !std::isnan(node->percentHeight)) {
+    *outDependsOnH = true;
+  }
+}
+
+// Walks a list of child elements and accumulates whether any of them depend on the parent's
+// resolved size through size-sensitive layout constraints.
+static void CollectChildrenSizeDependencies(const std::vector<Element*>& elements,
+                                            bool* outDependsOnW, bool* outDependsOnH) {
+  for (auto* element : elements) {
+    auto* node = LayoutNode::AsLayoutNode(element);
+    if (node == nullptr) {
+      continue;
+    }
+    UpdateSizeDependenciesFromLayoutNode(node, outDependsOnW, outDependsOnH);
+  }
+}
+
+static void DetectZeroSizeGroup(const Group* group, std::vector<VerifyDiagnostic>& diagnostics) {
+  auto bounds = group->layoutBounds();
+  if (bounds.width != 0 && bounds.height != 0) {
+    return;
+  }
+  if (!ElementsHaveLeafContent(group->elements)) {
+    return;
+  }
+  // Skip when an explicit zero size is authored — the user intentionally collapsed this group.
+  bool explicitZeroW =
+      (bounds.width == 0 && !std::isnan(group->width) && group->width == 0) ||
+      (bounds.width == 0 && !std::isnan(group->percentWidth) && group->percentWidth == 0);
+  bool explicitZeroH =
+      (bounds.height == 0 && !std::isnan(group->height) && group->height == 0) ||
+      (bounds.height == 0 && !std::isnan(group->percentHeight) && group->percentHeight == 0);
+  if (explicitZeroW || explicitZeroH) {
+    return;
+  }
+  // Only report when at least one child depends on the group size (opposite-edge, centering,
+  // or percent).
+  bool childrenDependOnWidth = false;
+  bool childrenDependOnHeight = false;
+  CollectChildrenSizeDependencies(group->elements, &childrenDependOnWidth, &childrenDependOnHeight);
+  bool zeroWidthMatters = bounds.width == 0 && childrenDependOnWidth;
+  bool zeroHeightMatters = bounds.height == 0 && childrenDependOnHeight;
+  if (!zeroWidthMatters && !zeroHeightMatters) {
+    return;
+  }
+  std::ostringstream oss;
+  oss << "zero size (" << static_cast<int>(bounds.width) << "x" << static_cast<int>(bounds.height)
+      << "), children depend on this container for layout. Fix: check why this container has no "
+         "size";
+  AddDiagnostic(diagnostics, group->sourceLine, oss.str());
+}
+
 static void DetectZeroSize(const Layer* layer, const Layer* parentLayer,
                            std::vector<VerifyDiagnostic>& diagnostics) {
   auto bounds = layer->layoutBounds();
@@ -1530,8 +1727,12 @@ static void DetectZeroSize(const Layer* layer, const Layer* parentLayer,
   bool inParentLayout =
       parentLayer != nullptr && parentLayer->layout != LayoutMode::None && layer->includeInLayout;
   if (!inParentLayout) {
-    bool explicitZeroW = (bounds.width == 0 && !std::isnan(layer->width) && layer->width == 0);
-    bool explicitZeroH = (bounds.height == 0 && !std::isnan(layer->height) && layer->height == 0);
+    bool explicitZeroW =
+        (bounds.width == 0 && !std::isnan(layer->width) && layer->width == 0) ||
+        (bounds.width == 0 && !std::isnan(layer->percentWidth) && layer->percentWidth == 0);
+    bool explicitZeroH =
+        (bounds.height == 0 && !std::isnan(layer->height) && layer->height == 0) ||
+        (bounds.height == 0 && !std::isnan(layer->percentHeight) && layer->percentHeight == 0);
     if (explicitZeroW || explicitZeroH) {
       return;
     }
@@ -1541,12 +1742,7 @@ static void DetectZeroSize(const Layer* layer, const Layer* parentLayer,
   bool childrenDependOnWidth = false;
   bool childrenDependOnHeight = false;
   for (auto* child : layer->children) {
-    if (!std::isnan(child->right) || !std::isnan(child->centerX)) {
-      childrenDependOnWidth = true;
-    }
-    if (!std::isnan(child->bottom) || !std::isnan(child->centerY)) {
-      childrenDependOnHeight = true;
-    }
+    UpdateSizeDependenciesFromLayoutNode(child, &childrenDependOnWidth, &childrenDependOnHeight);
     if (child->flex > 0 && layer->layout == LayoutMode::Horizontal) {
       childrenDependOnWidth = true;
     }
@@ -1554,6 +1750,9 @@ static void DetectZeroSize(const Layer* layer, const Layer* parentLayer,
       childrenDependOnHeight = true;
     }
   }
+  // VectorElements in layer->contents also consult the parent size for opposite-edge or percent
+  // constraints — treat them as size-dependent too.
+  CollectChildrenSizeDependencies(layer->contents, &childrenDependOnWidth, &childrenDependOnHeight);
   bool zeroWidthMatters = bounds.width == 0 && (hasLayoutChildren || childrenDependOnWidth);
   bool zeroHeightMatters = bounds.height == 0 && (hasLayoutChildren || childrenDependOnHeight);
   if (!zeroWidthMatters && !zeroHeightMatters && !inParentLayout) {
@@ -1627,6 +1826,10 @@ static bool IsMainAxisContentMeasured(const Layer* layer, const Layer* parentLay
   if (!std::isnan(explicitMain)) {
     return false;
   }
+  float percentMain = horizontal ? layer->percentWidth : layer->percentHeight;
+  if (!std::isnan(percentMain)) {
+    return false;
+  }
   bool mainFromConstraints = horizontal ? (!std::isnan(layer->left) && !std::isnan(layer->right))
                                         : (!std::isnan(layer->top) && !std::isnan(layer->bottom));
   if (mainFromConstraints) {
@@ -1660,6 +1863,9 @@ static void DetectFlexInContentMeasuredParent(const Layer* layer, const Layer* p
   }
   bool horizontal = parentLayer->layout == LayoutMode::Horizontal;
   if (!std::isnan(horizontal ? layer->width : layer->height)) {
+    return;
+  }
+  if (!std::isnan(horizontal ? layer->percentWidth : layer->percentHeight)) {
     return;
   }
   if (!IsMainAxisContentMeasured(parentLayer, grandparentLayer)) {
@@ -1721,6 +1927,9 @@ static void DetectContentOriginOffset(const Layer* layer, const Layer* parentLay
   if (!std::isnan(layer->width) || !std::isnan(layer->height)) {
     return;
   }
+  if (!std::isnan(layer->percentWidth) || !std::isnan(layer->percentHeight)) {
+    return;
+  }
   bool sizeFromConstraints = (!std::isnan(layer->left) && !std::isnan(layer->right)) &&
                              (!std::isnan(layer->top) && !std::isnan(layer->bottom));
   if (sizeFromConstraints) {
@@ -1744,6 +1953,9 @@ static void DetectContentOriginOffset(const Layer* layer, const Layer* parentLay
 static void DetectContentOriginOffsetForGroup(const Group* group,
                                               std::vector<VerifyDiagnostic>& diagnostics) {
   if (!std::isnan(group->width) || !std::isnan(group->height)) {
+    return;
+  }
+  if (!std::isnan(group->percentWidth) || !std::isnan(group->percentHeight)) {
     return;
   }
   bool sizeFromConstraints = (!std::isnan(group->left) && !std::isnan(group->right)) &&
@@ -1823,6 +2035,39 @@ static void DetectConstraintConflicts(const LayoutNode* node, int sourceLine,
                     "bottom ignored, centerY takes priority. Fix: remove bottom");
     }
   }
+  // Priority on the width axis: left+right > percentWidth > authored width. Explicit width vs
+  // percentWidth cannot coexist in XML (single attribute with or without '%'), so only the
+  // opposite-edge vs percent collision is reportable here.
+  bool wFromOpposite = !std::isnan(node->left) && !std::isnan(node->right);
+  if (wFromOpposite && !std::isnan(node->percentWidth)) {
+    AddDiagnostic(diagnostics, sourceLine,
+                  "percentWidth ignored, left+right constraints take priority. "
+                  "Fix: remove percentWidth");
+  }
+  bool hFromOpposite = !std::isnan(node->top) && !std::isnan(node->bottom);
+  if (hFromOpposite && !std::isnan(node->percentHeight)) {
+    AddDiagnostic(diagnostics, sourceLine,
+                  "percentHeight ignored, top+bottom constraints take priority. "
+                  "Fix: remove percentHeight");
+  }
+}
+
+// Flag explicit width/height that is shadowed by opposite-edge constraints. The layout priority is
+// left+right > percentWidth > authored width (top+bottom analogous for height), so when both
+// opposite edges are set the authored width/height contributes nothing. percentWidth/percentHeight
+// collisions are reported by DetectConstraintConflicts for all LayoutNode types.
+static void DetectExplicitSizeShadowedByOppositeEdge(const LayoutNode* node, int sourceLine,
+                                                     std::vector<VerifyDiagnostic>& diagnostics) {
+  bool wFromConstraints = !std::isnan(node->left) && !std::isnan(node->right);
+  bool hFromConstraints = !std::isnan(node->top) && !std::isnan(node->bottom);
+  if (wFromConstraints && !std::isnan(node->width)) {
+    AddDiagnostic(diagnostics, sourceLine,
+                  "width ignored, left+right constraints take priority. Fix: remove width");
+  }
+  if (hFromConstraints && !std::isnan(node->height)) {
+    AddDiagnostic(diagnostics, sourceLine,
+                  "height ignored, top+bottom constraints take priority. Fix: remove height");
+  }
 }
 
 static void DetectRedundantZeroConstraints(const LayoutNode* node, int sourceLine,
@@ -1866,20 +2111,29 @@ static void DetectStretchFillAffectedByPadding(const std::vector<Element*>& elem
   }
 }
 
-static void DetectClippedContent(const Layer* parentLayer,
-                                 std::vector<VerifyDiagnostic>& diagnostics) {
-  if (!parentLayer->clipToBounds) {
+static void DetectChildExceedingParent(const Layer* parentLayer,
+                                       std::vector<VerifyDiagnostic>& diagnostics) {
+  if (parentLayer->clipToBounds || parentLayer->hasScrollRect || parentLayer->mask != nullptr) {
     return;
   }
   auto parentBounds = parentLayer->layoutBounds();
+  if (parentBounds.width <= 0 || parentBounds.height <= 0) {
+    return;
+  }
   SpatialRect parent = {0, 0, parentBounds.width, parentBounds.height};
   for (auto* child : parentLayer->children) {
     auto childBounds = child->layoutBounds();
+    if (childBounds.width <= 0 || childBounds.height <= 0) {
+      continue;
+    }
     SpatialRect childRect = {childBounds.x, childBounds.y, childBounds.width, childBounds.height};
     if (!IsFullyContained(parent, childRect)) {
-      AddDiagnostic(diagnostics, child->sourceLine,
-                    "extends beyond parent bounds, content will be clipped. Fix: check element "
-                    "size/position or parent clipToBounds setting");
+      AddDiagnostic(
+          diagnostics, child->sourceLine,
+          "child extends beyond parent bounds " +
+              FormatBounds(childBounds.x, childBounds.y, childBounds.width, childBounds.height) +
+              " outside " + FormatBounds(0, 0, parentBounds.width, parentBounds.height) +
+              ". Fix: adjust size/position, move child to a sibling layer, or add clipToBounds");
     }
   }
 }
@@ -1891,10 +2145,11 @@ static void DetectContainerOverflow(const Layer* parentLayer,
   }
   bool horizontal = parentLayer->layout == LayoutMode::Horizontal;
   float explicitMain = horizontal ? parentLayer->width : parentLayer->height;
+  float percentMain = horizontal ? parentLayer->percentWidth : parentLayer->percentHeight;
   bool mainFromConstraints =
       horizontal ? (!std::isnan(parentLayer->left) && !std::isnan(parentLayer->right))
                  : (!std::isnan(parentLayer->top) && !std::isnan(parentLayer->bottom));
-  if (std::isnan(explicitMain) && !mainFromConstraints) {
+  if (std::isnan(explicitMain) && std::isnan(percentMain) && !mainFromConstraints) {
     return;
   }
   auto parentBounds = parentLayer->layoutBounds();
@@ -1915,8 +2170,14 @@ static void DetectContainerOverflow(const Layer* parentLayer,
     }
     visibleCount++;
     float childExplicitMain = horizontal ? child->width : child->height;
+    float childPercentMain = horizontal ? child->percentWidth : child->percentHeight;
     if (!std::isnan(childExplicitMain)) {
       totalFixed += childExplicitMain;
+    } else if (!std::isnan(childPercentMain)) {
+      // A percentage-sized child scales with the parent; its exact contribution cannot be
+      // determined statically. Treat it as 0 (optimistic) so fixed-child overflow from the
+      // remaining siblings is still detectable.
+      continue;
     } else if (child->flex > 0) {
       hasFlex = true;
     } else {
@@ -2000,6 +2261,9 @@ static bool IsContentMeasuredContainer(const Group* group) {
   if (!std::isnan(group->width) || !std::isnan(group->height)) {
     return false;
   }
+  if (!std::isnan(group->percentWidth) || !std::isnan(group->percentHeight)) {
+    return false;
+  }
   bool wFromConstraints = !std::isnan(group->left) && !std::isnan(group->right);
   bool hFromConstraints = !std::isnan(group->top) && !std::isnan(group->bottom);
   return !wFromConstraints && !hFromConstraints;
@@ -2007,6 +2271,9 @@ static bool IsContentMeasuredContainer(const Group* group) {
 
 static bool IsContentMeasuredContainer(const Layer* layer, const Layer* parentLayer) {
   if (!std::isnan(layer->width) || !std::isnan(layer->height)) {
+    return false;
+  }
+  if (!std::isnan(layer->percentWidth) || !std::isnan(layer->percentHeight)) {
     return false;
   }
   bool wFromConstraints = !std::isnan(layer->left) && !std::isnan(layer->right);
@@ -2050,27 +2317,169 @@ static void DetectIneffectiveCentering(const std::vector<Element*>& elements,
   }
 }
 
+// Computes the union bounding box of all direct children (LayoutNodes) within a container, then
+// checks whether that union box is centered in the container. Applies when the container itself is
+// positioned with centerX="0" or centerY="0" — a visually off-center union bbox inside such a
+// container defeats the purpose of centering.
+static void CheckCenteringMargins(const Padding& padding, float containerW, float containerH,
+                                  float minX, float minY, float maxX, float maxY, bool checkX,
+                                  bool checkY, int sourceLine,
+                                  std::vector<VerifyDiagnostic>& diagnostics) {
+  static constexpr float TOLERANCE = 2.0f;
+  bool xAsymmetric = false;
+  bool yAsymmetric = false;
+  int leftM = 0, rightM = 0, topM = 0, bottomM = 0;
+  if (checkX && containerW > 0) {
+    float leftMargin = minX - padding.left;
+    float rightMargin = (containerW - padding.right) - maxX;
+    float diff = std::abs(leftMargin - rightMargin);
+    if (diff > TOLERANCE && (leftMargin > TOLERANCE || rightMargin > TOLERANCE)) {
+      xAsymmetric = true;
+      leftM = static_cast<int>(leftMargin);
+      rightM = static_cast<int>(rightMargin);
+    }
+  }
+  if (checkY && containerH > 0) {
+    float topMargin = minY - padding.top;
+    float bottomMargin = (containerH - padding.bottom) - maxY;
+    float diff = std::abs(topMargin - bottomMargin);
+    if (diff > TOLERANCE && (topMargin > TOLERANCE || bottomMargin > TOLERANCE)) {
+      yAsymmetric = true;
+      topM = static_cast<int>(topMargin);
+      bottomM = static_cast<int>(bottomMargin);
+    }
+  }
+  if (!xAsymmetric && !yAsymmetric) {
+    return;
+  }
+  std::string msg = "visual bounds of all contents not centered in container:";
+  if (xAsymmetric) {
+    msg += " left margin " + std::to_string(leftM) + " != right margin " + std::to_string(rightM);
+  }
+  if (xAsymmetric && yAsymmetric) {
+    msg += ",";
+  }
+  if (yAsymmetric) {
+    msg += " top margin " + std::to_string(topM) + " != bottom margin " + std::to_string(bottomM);
+  }
+  msg += ". Fix: adjust content to center within the container";
+  AddDiagnostic(diagnostics, sourceLine, msg);
+}
+
+// Recursively accumulates the pixel-level union bounding box of all leaf VectorElements within a
+// container, translating coordinates through nested Groups and child Layers. This gives the true
+// visual extent of rendered content, regardless of how many container layers are nested in between.
+static void AccumulatePixelBounds(const std::vector<Element*>& elements, float offsetX,
+                                  float offsetY, float& minX, float& minY, float& maxX, float& maxY,
+                                  bool& hasLeaf);
+
+static void AccumulatePixelBoundsForLayer(const Layer* layer, float offsetX, float offsetY,
+                                          float& minX, float& minY, float& maxX, float& maxY,
+                                          bool& hasLeaf) {
+  auto bounds = layer->layoutBounds();
+  float childOffsetX = offsetX + bounds.x;
+  float childOffsetY = offsetY + bounds.y;
+  AccumulatePixelBounds(layer->contents, childOffsetX, childOffsetY, minX, minY, maxX, maxY,
+                        hasLeaf);
+  for (auto* child : layer->children) {
+    AccumulatePixelBoundsForLayer(child, childOffsetX, childOffsetY, minX, minY, maxX, maxY,
+                                  hasLeaf);
+  }
+}
+
+static void AccumulatePixelBounds(const std::vector<Element*>& elements, float offsetX,
+                                  float offsetY, float& minX, float& minY, float& maxX, float& maxY,
+                                  bool& hasLeaf) {
+  for (auto* element : elements) {
+    auto type = element->nodeType();
+    if (type == NodeType::Group) {
+      auto* group = static_cast<const Group*>(element);
+      auto bounds = group->layoutBounds();
+      AccumulatePixelBounds(group->elements, offsetX + bounds.x, offsetY + bounds.y, minX, minY,
+                            maxX, maxY, hasLeaf);
+      continue;
+    }
+    auto* layoutNode = LayoutNode::AsLayoutNode(element);
+    if (layoutNode == nullptr) {
+      continue;
+    }
+    auto bounds = layoutNode->layoutBounds();
+    if (bounds.width <= 0 && bounds.height <= 0) {
+      continue;
+    }
+    float absX = offsetX + bounds.x;
+    float absY = offsetY + bounds.y;
+    minX = std::min(minX, absX);
+    minY = std::min(minY, absY);
+    maxX = std::max(maxX, absX + bounds.width);
+    maxY = std::max(maxY, absY + bounds.height);
+    hasLeaf = true;
+  }
+}
+
+static void DetectContentCenteringAsymmetry(const Layer* layer, const Layer* parentLayer,
+                                            std::vector<VerifyDiagnostic>& diagnostics) {
+  bool checkX = !std::isnan(layer->centerX) && layer->centerX == 0.0f;
+  bool checkY = !std::isnan(layer->centerY) && layer->centerY == 0.0f;
+  if (!checkX && !checkY) {
+    return;
+  }
+  if (IsContentMeasuredContainer(layer, parentLayer)) {
+    return;
+  }
+  auto layerBounds = layer->layoutBounds();
+  if (layerBounds.width <= 0 || layerBounds.height <= 0) {
+    return;
+  }
+  float minX = FLT_MAX;
+  float minY = FLT_MAX;
+  float maxX = -FLT_MAX;
+  float maxY = -FLT_MAX;
+  bool hasLeaf = false;
+  AccumulatePixelBounds(layer->contents, 0, 0, minX, minY, maxX, maxY, hasLeaf);
+  for (auto* child : layer->children) {
+    AccumulatePixelBoundsForLayer(child, 0, 0, minX, minY, maxX, maxY, hasLeaf);
+  }
+  if (!hasLeaf) {
+    return;
+  }
+  CheckCenteringMargins(layer->padding, layerBounds.width, layerBounds.height, minX, minY, maxX,
+                        maxY, checkX, checkY, layer->sourceLine, diagnostics);
+}
+
+static void DetectContentCenteringAsymmetry(const Group* group,
+                                            std::vector<VerifyDiagnostic>& diagnostics) {
+  bool checkX = !std::isnan(group->centerX) && group->centerX == 0.0f;
+  bool checkY = !std::isnan(group->centerY) && group->centerY == 0.0f;
+  if (!checkX && !checkY) {
+    return;
+  }
+  if (IsContentMeasuredContainer(group)) {
+    return;
+  }
+  auto groupBounds = group->layoutBounds();
+  if (groupBounds.width <= 0 || groupBounds.height <= 0) {
+    return;
+  }
+  float minX = FLT_MAX;
+  float minY = FLT_MAX;
+  float maxX = -FLT_MAX;
+  float maxY = -FLT_MAX;
+  bool hasLeaf = false;
+  AccumulatePixelBounds(group->elements, 0, 0, minX, minY, maxX, maxY, hasLeaf);
+  if (!hasLeaf) {
+    return;
+  }
+  CheckCenteringMargins(group->padding, groupBounds.width, groupBounds.height, minX, minY, maxX,
+                        maxY, checkX, checkY, group->sourceLine, diagnostics);
+}
+
 static void DetectNestedTextBox(const TextBox* textBox, const TextBox* parentTextBox,
                                 std::vector<VerifyDiagnostic>& diagnostics) {
   if (parentTextBox != nullptr) {
     AddDiagnostic(diagnostics, textBox->sourceLine,
                   "nested TextBox, inner layout overridden by outer TextBox. "
                   "Fix: check if inner TextBox should be removed");
-  }
-}
-
-static void DetectOffCanvas(const Layer* layer, float canvasWidth, float canvasHeight,
-                            std::vector<VerifyDiagnostic>& diagnostics) {
-  auto bounds = layer->layoutBounds();
-  if (bounds.width <= 0 || bounds.height <= 0) {
-    return;
-  }
-  bool intersects = bounds.x < canvasWidth && bounds.x + bounds.width > 0 &&
-                    bounds.y < canvasHeight && bounds.y + bounds.height > 0;
-  if (!intersects) {
-    AddDiagnostic(diagnostics, layer->sourceLine,
-                  "completely outside canvas bounds, not visible. "
-                  "Fix: check if this Layer should be repositioned or removed");
   }
 }
 
@@ -2090,13 +2499,25 @@ static void RunSpatialDetectionOnElements(const std::vector<Element*>& elements,
       DetectConstraintConflicts(layoutNode, element->sourceLine, diagnostics);
       DetectNegativeConstraintSizeForElement(layoutNode, element->sourceLine, containerW,
                                              containerH, diagnostics);
+      DetectRedundantZeroConstraints(layoutNode, element->sourceLine, diagnostics);
+      // Only Rectangle / Ellipse / Group use width/height purely for layout sizing. TextBox keeps
+      // this->width/height as the authored text-box dimensions for shaping (independent semantic),
+      // so it is excluded here. Path / Polystar / Text / TextPath use width/height to drive
+      // uniform scaling, still useful alongside edge constraints; they are also excluded. Note:
+      // percentWidth/Height collisions with opposite edges are reported by
+      // DetectConstraintConflicts for all LayoutNode types.
+      if (type == NodeType::Rectangle || type == NodeType::Ellipse || type == NodeType::Group) {
+        DetectExplicitSizeShadowedByOppositeEdge(layoutNode, element->sourceLine, diagnostics);
+      }
     }
     if (type == NodeType::Group) {
       auto* group = static_cast<const Group*>(element);
       if (IsContentMeasuredContainer(group)) {
         DetectIneffectiveCentering(group->elements, diagnostics);
       }
+      DetectZeroSizeGroup(group, diagnostics);
       DetectContentOriginOffsetForGroup(group, diagnostics);
+      DetectContentCenteringAsymmetry(group, diagnostics);
       DetectStretchFillAffectedByPadding(group->elements, group->padding, diagnostics);
       auto bounds = group->layoutBounds();
       RunSpatialDetectionOnElements(group->elements, parentTextBox, bounds.width, bounds.height,
@@ -2104,6 +2525,13 @@ static void RunSpatialDetectionOnElements(const std::vector<Element*>& elements,
     } else if (type == NodeType::TextBox) {
       auto* textBox = static_cast<const TextBox*>(element);
       DetectNestedTextBox(textBox, parentTextBox, diagnostics);
+      if (IsContentMeasuredContainer(textBox)) {
+        DetectIneffectiveCentering(textBox->elements, diagnostics);
+      }
+      DetectZeroSizeGroup(textBox, diagnostics);
+      DetectContentOriginOffsetForGroup(textBox, diagnostics);
+      DetectContentCenteringAsymmetry(textBox, diagnostics);
+      DetectStretchFillAffectedByPadding(textBox->elements, textBox->padding, diagnostics);
       auto bounds = textBox->layoutBounds();
       RunSpatialDetectionOnElements(textBox->elements, textBox, bounds.width, bounds.height,
                                     diagnostics);
@@ -2112,23 +2540,37 @@ static void RunSpatialDetectionOnElements(const std::vector<Element*>& elements,
 }
 
 static void RunSpatialDetectionOnLayer(const Layer* layer, const Layer* parentLayer,
-                                       const Layer* grandparentLayer, float canvasWidth,
-                                       float canvasHeight,
+                                       const Layer* grandparentLayer, const SpatialRect& clipRect,
                                        std::vector<VerifyDiagnostic>& diagnostics) {
+  auto layerBounds = layer->layoutBounds();
+
+  // Check if this layer is completely outside the inherited clip region.
+  if (layerBounds.width > 0 && layerBounds.height > 0 && clipRect.width > 0 &&
+      clipRect.height > 0 && HasLeafContent(layer)) {
+    SpatialRect layerRect = {layerBounds.x, layerBounds.y, layerBounds.width, layerBounds.height};
+    if (!RectsOverlap(layerRect, clipRect)) {
+      AddDiagnostic(diagnostics, layer->sourceLine,
+                    "completely outside visible region, not visible. "
+                    "Fix: check if this Layer should be repositioned or removed");
+    }
+  }
+
   DetectZeroSize(layer, parentLayer, diagnostics);
   DetectConstraintsIgnoredByLayout(layer, parentLayer, diagnostics);
   DetectFlexInContentMeasuredParent(layer, parentLayer, grandparentLayer, diagnostics);
   DetectContentOriginOffset(layer, parentLayer, diagnostics);
+  DetectContentCenteringAsymmetry(layer, parentLayer, diagnostics);
   DetectOverlappingSiblings(layer, diagnostics);
   DetectConstraintConflicts(layer, layer->sourceLine, diagnostics);
+  DetectExplicitSizeShadowedByOppositeEdge(layer, layer->sourceLine, diagnostics);
   DetectRedundantZeroConstraints(layer, layer->sourceLine, diagnostics);
   DetectStretchFillAffectedByPadding(layer->contents, layer->padding, diagnostics);
-  DetectClippedContent(layer, diagnostics);
+  DetectChildExceedingParent(layer, diagnostics);
   DetectContainerOverflow(layer, diagnostics);
 
   auto parentBounds = parentLayer != nullptr ? parentLayer->layoutBounds() : Rect{0, 0, 0, 0};
-  float containerW = parentLayer != nullptr ? parentBounds.width : canvasWidth;
-  float containerH = parentLayer != nullptr ? parentBounds.height : canvasHeight;
+  float containerW = parentLayer != nullptr ? parentBounds.width : clipRect.width;
+  float containerH = parentLayer != nullptr ? parentBounds.height : clipRect.height;
   if (parentLayer == nullptr ||
       (parentLayer->layout == LayoutMode::None || !layer->includeInLayout)) {
     DetectNegativeConstraintSize(layer, containerW, containerH, diagnostics);
@@ -2138,118 +2580,37 @@ static void RunSpatialDetectionOnLayer(const Layer* layer, const Layer* parentLa
     DetectIneffectiveCentering(layer->contents, diagnostics);
   }
 
-  auto layerBounds = layer->layoutBounds();
   RunSpatialDetectionOnElements(layer->contents, nullptr, layerBounds.width, layerBounds.height,
                                 diagnostics);
 
+  // Compute the clip region for children: translate to this layer's local coords,
+  // then intersect with this layer's bounds if it clips.
+  // For mask, this conservatively assumes the mask clips to the layer's bounds.
+  SpatialRect childClip = {clipRect.x - layerBounds.x, clipRect.y - layerBounds.y, clipRect.width,
+                           clipRect.height};
+  if (layer->clipToBounds || layer->hasScrollRect || layer->mask != nullptr) {
+    float cx1 = std::max(childClip.x, 0.0f);
+    float cy1 = std::max(childClip.y, 0.0f);
+    float cx2 = std::min(childClip.x + childClip.width, layerBounds.width);
+    float cy2 = std::min(childClip.y + childClip.height, layerBounds.height);
+    childClip = {cx1, cy1, std::max(cx2 - cx1, 0.0f), std::max(cy2 - cy1, 0.0f)};
+  }
+
   for (auto* child : layer->children) {
-    RunSpatialDetectionOnLayer(child, layer, parentLayer, canvasWidth, canvasHeight, diagnostics);
+    RunSpatialDetectionOnLayer(child, layer, parentLayer, childClip, diagnostics);
   }
 }
 
 static void RunSpatialDetection(const PAGXDocument* doc, std::vector<VerifyDiagnostic>& diagnostics,
                                 const Layer* targetLayer = nullptr) {
+  SpatialRect canvasClip = {0, 0, static_cast<float>(doc->width), static_cast<float>(doc->height)};
   if (targetLayer != nullptr) {
-    DetectOffCanvas(targetLayer, doc->width, doc->height, diagnostics);
-    RunSpatialDetectionOnLayer(targetLayer, nullptr, nullptr, doc->width, doc->height, diagnostics);
+    RunSpatialDetectionOnLayer(targetLayer, nullptr, nullptr, canvasClip, diagnostics);
   } else {
     for (auto* layer : doc->layers) {
-      DetectOffCanvas(layer, doc->width, doc->height, diagnostics);
-      RunSpatialDetectionOnLayer(layer, nullptr, nullptr, doc->width, doc->height, diagnostics);
+      RunSpatialDetectionOnLayer(layer, nullptr, nullptr, canvasClip, diagnostics);
     }
   }
-}
-
-// ============================================================================
-// Layout XML Output
-// ============================================================================
-
-static void WriteLayoutElement(std::ostream& os, const Element* element, int indent);
-static void WriteLayoutLayer(std::ostream& os, const Layer* layer, int indent);
-
-static void WriteLayoutElement(std::ostream& os, const Element* element, int indent) {
-  std::string pad(indent * 2, ' ');
-  auto type = element->nodeType();
-  std::string tagName = NodeTypeName(type);
-
-  os << pad << "<" << tagName;
-  if (element->sourceLine >= 0) {
-    os << " line=\"" << element->sourceLine << "\"";
-  }
-  if (!element->id.empty()) {
-    os << " id=\"" << EscapeXmlAttr(element->id) << "\"";
-  }
-
-  auto* layoutNode = LayoutNode::AsLayoutNode(const_cast<Element*>(element));
-  if (layoutNode != nullptr) {
-    auto bounds = layoutNode->layoutBounds();
-    WriteBoundsAttr(os, bounds.x, bounds.y, bounds.width, bounds.height);
-  }
-
-  if (type == NodeType::Group || type == NodeType::TextBox) {
-    auto* group = static_cast<const Group*>(element);
-    if (group->elements.empty()) {
-      os << "/>\n";
-    } else {
-      os << ">\n";
-      for (auto* child : group->elements) {
-        WriteLayoutElement(os, child, indent + 1);
-      }
-      os << pad << "</" << tagName << ">\n";
-    }
-  } else {
-    os << "/>\n";
-  }
-}
-
-static void WriteLayoutLayer(std::ostream& os, const Layer* layer, int indent) {
-  std::string pad(indent * 2, ' ');
-
-  os << pad << "<Layer";
-  if (layer->sourceLine >= 0) {
-    os << " line=\"" << layer->sourceLine << "\"";
-  }
-  if (!layer->id.empty()) {
-    os << " id=\"" << EscapeXmlAttr(layer->id) << "\"";
-  }
-
-  auto bounds = layer->layoutBounds();
-  WriteBoundsAttr(os, bounds.x, bounds.y, bounds.width, bounds.height);
-
-  WriteLayoutAttrs(os, layer->layout, layer->gap, layer->flex, layer->padding, layer->alignment,
-                   layer->arrangement, layer->includeInLayout, layer->clipToBounds);
-
-  bool hasChildren = !layer->contents.empty() || !layer->children.empty();
-  if (!hasChildren) {
-    os << "/>\n";
-    return;
-  }
-
-  os << ">\n";
-  for (auto* element : layer->contents) {
-    WriteLayoutElement(os, element, indent + 1);
-  }
-  for (auto* child : layer->children) {
-    WriteLayoutLayer(os, child, indent + 1);
-  }
-  os << pad << "</Layer>\n";
-}
-
-static std::string GenerateLayoutXml(const PAGXDocument* doc, const Layer* targetLayer) {
-  std::ostringstream oss;
-  oss << "<layout>\n";
-  if (targetLayer != nullptr) {
-    WriteLayoutLayer(oss, targetLayer, 1);
-  } else {
-    oss << "  <pagx width=\"" << static_cast<int>(doc->width) << "\" height=\""
-        << static_cast<int>(doc->height) << "\">\n";
-    for (auto* layer : doc->layers) {
-      WriteLayoutLayer(oss, layer, 2);
-    }
-    oss << "  </pagx>\n";
-  }
-  oss << "</layout>\n";
-  return oss.str();
 }
 
 // ============================================================================
@@ -2309,7 +2670,8 @@ static void PrintDiagnosticsJson(const std::vector<VerifyDiagnostic>& diagnostic
 static void PrintUsage() {
   std::cout << "Usage: pagx verify [options] <file.pagx>\n"
             << "\n"
-            << "Validate a PAGX file: run all checks, optionally output layout and render.\n"
+            << "Validate a PAGX file: run all checks, optionally output layout XML\n"
+            << "(with bounds) and render screenshot.\n"
             << "\n"
             << "Options:\n"
             << "  --id <id>           Limit scope to the Layer with the specified id\n"
@@ -2380,9 +2742,8 @@ int RunVerify(int argc, char* argv[]) {
   }
 
   // Step 2: Load document and compute layout.
-  auto doc = PAGXImporter::FromFile(opts.inputFile);
+  auto doc = LoadDocument(opts.inputFile, "pagx verify");
   if (doc == nullptr) {
-    std::cerr << "pagx verify: failed to load '" << opts.inputFile << "'\n";
     return 1;
   }
 
@@ -2411,6 +2772,9 @@ int RunVerify(int argc, char* argv[]) {
   }
 
   std::vector<VerifyDiagnostic> diagnostics;
+  if (xmlDoc != nullptr) {
+    RunXsdValidation(xmlDoc, diagnostics);
+  }
   RunStaticDetection(doc.get(), lineNodeMap, diagnostics, targetLayer);
   RunSpatialDetection(doc.get(), diagnostics, targetLayer);
 
@@ -2432,13 +2796,8 @@ int RunVerify(int argc, char* argv[]) {
   if (!opts.skipLayout) {
     std::string layoutPath = baseName + suffix + ".layout.xml";
     auto layoutXml = GenerateLayoutXml(doc.get(), targetLayer);
-    std::ofstream layoutFile(layoutPath);
-    if (layoutFile.is_open()) {
-      layoutFile << layoutXml;
-      layoutFile.close();
-      std::cerr << "Wrote " << layoutPath << "\n";
-    } else {
-      std::cerr << "pagx verify: failed to write " << layoutPath << "\n";
+    if (!WriteStringToFile(layoutXml, layoutPath, "pagx verify")) {
+      return 1;
     }
   }
 

@@ -1,0 +1,20 @@
+<pagx width="393" height="600">
+  <!-- Skeleton-phase pattern: nested Layers with layout but no leaf content (no shapes/text).
+       Painters like Fill/Stroke alone do not count as leaf content.
+       Should NOT trigger zero-size diagnostics. -->
+  <Layer width="393" height="600" layout="vertical">
+    <Layer layout="vertical" gap="8">
+      <Fill color="#F5F5F5"/>
+      <Layer>
+        <Fill color="#FFFFFF"/>
+      </Layer>
+    </Layer>
+    <Layer layout="horizontal" gap="12">
+      <Layer flex="1">
+        <Fill color="#3B82F6"/>
+        <Stroke color="#000000" width="1"/>
+      </Layer>
+      <Layer flex="1"/>
+    </Layer>
+  </Layer>
+</pagx>

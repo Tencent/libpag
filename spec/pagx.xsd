@@ -126,6 +126,13 @@
     </xs:restriction>
   </xs:simpleType>
 
+  <!-- DimensionType: supports absolute pixels (e.g., "100") or percentage (e.g., "50%"). -->
+  <xs:simpleType name="DimensionType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9]*\.?[0-9]+%?"/>
+    </xs:restriction>
+  </xs:simpleType>
+
   <!-- ========================= Enumeration Types ========================= -->
 
   <xs:simpleType name="BlendModeType">
@@ -370,6 +377,8 @@
     <xs:attribute name="bottom" type="xs:decimal"/>
     <xs:attribute name="centerX" type="xs:decimal"/>
     <xs:attribute name="centerY" type="xs:decimal"/>
+    <xs:attribute name="width" type="DimensionType"/>
+    <xs:attribute name="height" type="DimensionType"/>
   </xs:attributeGroup>
 
   <!-- ========================= Color Source Elements ========================= -->
@@ -377,8 +386,8 @@
   <!-- ColorStop -->
   <xs:complexType name="ColorStopType">
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="offset" type="xs:decimal" use="required"/>
     <xs:attribute name="color" type="ColorType" use="required"/>
+    <xs:attribute name="offset" type="xs:decimal" use="required"/>
   </xs:complexType>
 
   <!-- SolidColor -->
@@ -436,11 +445,11 @@
   <xs:complexType name="ImagePatternType">
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="image" type="xs:string" use="required"/>
-    <xs:attribute name="tileModeX" type="TileModeType" default="clamp"/>
-    <xs:attribute name="tileModeY" type="TileModeType" default="clamp"/>
+    <xs:attribute name="matrix" type="MatrixType"/>
     <xs:attribute name="filterMode" type="FilterModeType" default="linear"/>
     <xs:attribute name="mipmapMode" type="MipmapModeType" default="linear"/>
-    <xs:attribute name="matrix" type="MatrixType"/>
+    <xs:attribute name="tileModeX" type="TileModeType" default="clamp"/>
+    <xs:attribute name="tileModeY" type="TileModeType" default="clamp"/>
   </xs:complexType>
 
   <!-- Color source group for inline use in Fill/Stroke -->
@@ -510,26 +519,26 @@
   <!-- Rectangle -->
   <xs:complexType name="RectangleType">
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="position" type="PointType"/>
+    <xs:attributeGroup ref="ConstraintAttributes"/>
     <xs:attribute name="size" type="SizeType" default="0,0"/>
     <xs:attribute name="roundness" type="xs:decimal" default="0"/>
+    <xs:attribute name="position" type="PointType"/>
     <xs:attribute name="reversed" type="BoolType" default="false"/>
-    <xs:attributeGroup ref="ConstraintAttributes"/>
   </xs:complexType>
 
   <!-- Ellipse -->
   <xs:complexType name="EllipseType">
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="position" type="PointType"/>
-    <xs:attribute name="size" type="SizeType" default="0,0"/>
-    <xs:attribute name="reversed" type="BoolType" default="false"/>
     <xs:attributeGroup ref="ConstraintAttributes"/>
+    <xs:attribute name="size" type="SizeType" default="0,0"/>
+    <xs:attribute name="position" type="PointType"/>
+    <xs:attribute name="reversed" type="BoolType" default="false"/>
   </xs:complexType>
 
   <!-- Polystar -->
   <xs:complexType name="PolystarType">
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="position" type="PointType"/>
+    <xs:attributeGroup ref="ConstraintAttributes"/>
     <xs:attribute name="type" type="PolystarTypeType" default="star"/>
     <xs:attribute name="pointCount" type="xs:decimal" default="5"/>
     <xs:attribute name="outerRadius" type="xs:decimal" default="100"/>
@@ -537,17 +546,17 @@
     <xs:attribute name="rotation" type="xs:decimal" default="0"/>
     <xs:attribute name="outerRoundness" type="xs:decimal" default="0"/>
     <xs:attribute name="innerRoundness" type="xs:decimal" default="0"/>
+    <xs:attribute name="position" type="PointType"/>
     <xs:attribute name="reversed" type="BoolType" default="false"/>
-    <xs:attributeGroup ref="ConstraintAttributes"/>
   </xs:complexType>
 
   <!-- Path -->
   <xs:complexType name="PathType">
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="data" type="xs:string" use="required"/>
-    <xs:attribute name="reversed" type="BoolType" default="false"/>
-    <xs:attribute name="position" type="PointType" default="0,0"/>
     <xs:attributeGroup ref="ConstraintAttributes"/>
+    <xs:attribute name="data" type="xs:string" use="required"/>
+    <xs:attribute name="position" type="PointType" default="0,0"/>
+    <xs:attribute name="reversed" type="BoolType" default="false"/>
   </xs:complexType>
 
   <!-- Text -->
@@ -556,17 +565,17 @@
       <xs:element name="GlyphRun" type="GlyphRunType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
     <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attributeGroup ref="ConstraintAttributes"/>
     <xs:attribute name="text" type="xs:string"/>
-    <xs:attribute name="position" type="PointType" default="0,0"/>
     <xs:attribute name="fontFamily" type="xs:string" default=""/>
     <xs:attribute name="fontStyle" type="xs:string" default=""/>
     <xs:attribute name="fontSize" type="xs:decimal" default="12"/>
     <xs:attribute name="letterSpacing" type="xs:decimal" default="0"/>
+    <xs:attribute name="position" type="PointType" default="0,0"/>
+    <xs:attribute name="baseline" type="TextBaselineType" default="lineBox"/>
     <xs:attribute name="fauxBold" type="BoolType" default="false"/>
     <xs:attribute name="fauxItalic" type="BoolType" default="false"/>
     <xs:attribute name="textAnchor" type="TextAnchorType" default="start"/>
-    <xs:attribute name="baseline" type="TextBaselineType" default="lineBox"/>
-    <xs:attributeGroup ref="ConstraintAttributes"/>
   </xs:complexType>
 
   <!-- ========================= Painters ========================= -->
@@ -637,10 +646,10 @@
     <xs:attribute name="offset" type="xs:decimal" default="0"/>
     <xs:attribute name="unit" type="SelectorUnitType" default="percentage"/>
     <xs:attribute name="shape" type="SelectorShapeType" default="square"/>
-    <xs:attribute name="easeIn" type="xs:decimal" default="0"/>
-    <xs:attribute name="easeOut" type="xs:decimal" default="0"/>
     <xs:attribute name="mode" type="SelectorModeType" default="add"/>
     <xs:attribute name="weight" type="xs:decimal" default="1"/>
+    <xs:attribute name="easeIn" type="xs:decimal" default="0"/>
+    <xs:attribute name="easeOut" type="xs:decimal" default="0"/>
     <xs:attribute name="randomOrder" type="BoolType" default="false"/>
     <xs:attribute name="randomSeed" type="xs:integer" default="0"/>
   </xs:complexType>
@@ -666,6 +675,7 @@
   <!-- TextPath -->
   <xs:complexType name="TextPathType">
     <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attributeGroup ref="ConstraintAttributes"/>
     <xs:attribute name="path" type="xs:string" use="required"/>
     <xs:attribute name="baselineOrigin" type="PointType" default="0,0"/>
     <xs:attribute name="baselineAngle" type="xs:decimal" default="0"/>
@@ -674,7 +684,6 @@
     <xs:attribute name="perpendicular" type="BoolType" default="true"/>
     <xs:attribute name="reversed" type="BoolType" default="false"/>
     <xs:attribute name="forceAlignment" type="BoolType" default="false"/>
-    <xs:attributeGroup ref="ConstraintAttributes"/>
   </xs:complexType>
 
   <!-- TextBox -->
@@ -683,15 +692,7 @@
       <xs:group ref="VectorElementGroup" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="anchor" type="PointType" default="0,0"/>
-    <xs:attribute name="position" type="PointType" default="0,0"/>
-    <xs:attribute name="rotation" type="xs:decimal" default="0"/>
-    <xs:attribute name="scale" type="PointType" default="1,1"/>
-    <xs:attribute name="skew" type="xs:decimal" default="0"/>
-    <xs:attribute name="skewAxis" type="xs:decimal" default="0"/>
-    <xs:attribute name="alpha" type="xs:decimal" default="1"/>
-    <xs:attribute name="width" type="xs:decimal"/>
-    <xs:attribute name="height" type="xs:decimal"/>
+    <xs:attributeGroup ref="ConstraintAttributes"/>
     <xs:attribute name="padding" type="PaddingType"/>
     <xs:attribute name="textAlign" type="TextAlignType" default="start"/>
     <xs:attribute name="paragraphAlign" type="ParagraphAlignType" default="near"/>
@@ -699,7 +700,13 @@
     <xs:attribute name="lineHeight" type="xs:decimal" default="0"/>
     <xs:attribute name="wordWrap" type="BoolType" default="true"/>
     <xs:attribute name="overflow" type="OverflowType" default="visible"/>
-    <xs:attributeGroup ref="ConstraintAttributes"/>
+    <xs:attribute name="anchor" type="PointType" default="0,0"/>
+    <xs:attribute name="position" type="PointType" default="0,0"/>
+    <xs:attribute name="rotation" type="xs:decimal" default="0"/>
+    <xs:attribute name="scale" type="PointType" default="1,1"/>
+    <xs:attribute name="skew" type="xs:decimal" default="0"/>
+    <xs:attribute name="skewAxis" type="xs:decimal" default="0"/>
+    <xs:attribute name="alpha" type="xs:decimal" default="1"/>
   </xs:complexType>
 
   <!-- Repeater -->
@@ -721,36 +728,36 @@
   <!-- DropShadowStyle -->
   <xs:complexType name="DropShadowStyleType">
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
-    <xs:attribute name="excludeChildEffects" type="BoolType" default="false"/>
     <xs:attribute name="offsetX" type="xs:decimal" default="0"/>
     <xs:attribute name="offsetY" type="xs:decimal" default="0"/>
     <xs:attribute name="blurX" type="xs:decimal" default="0"/>
     <xs:attribute name="blurY" type="xs:decimal" default="0"/>
     <xs:attribute name="color" type="ColorType" default="#000000"/>
+    <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
     <xs:attribute name="showBehindLayer" type="BoolType" default="true"/>
+    <xs:attribute name="excludeChildEffects" type="BoolType" default="false"/>
   </xs:complexType>
 
   <!-- BackgroundBlurStyle -->
   <xs:complexType name="BackgroundBlurStyleType">
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
-    <xs:attribute name="excludeChildEffects" type="BoolType" default="false"/>
     <xs:attribute name="blurX" type="xs:decimal" default="0"/>
     <xs:attribute name="blurY" type="xs:decimal" default="0"/>
     <xs:attribute name="tileMode" type="TileModeType" default="mirror"/>
+    <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
+    <xs:attribute name="excludeChildEffects" type="BoolType" default="false"/>
   </xs:complexType>
 
   <!-- InnerShadowStyle -->
   <xs:complexType name="InnerShadowStyleType">
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
-    <xs:attribute name="excludeChildEffects" type="BoolType" default="false"/>
     <xs:attribute name="offsetX" type="xs:decimal" default="0"/>
     <xs:attribute name="offsetY" type="xs:decimal" default="0"/>
     <xs:attribute name="blurX" type="xs:decimal" default="0"/>
     <xs:attribute name="blurY" type="xs:decimal" default="0"/>
     <xs:attribute name="color" type="ColorType" default="#000000"/>
+    <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
+    <xs:attribute name="excludeChildEffects" type="BoolType" default="false"/>
   </xs:complexType>
 
   <!-- ========================= Layer Filters ========================= -->
@@ -834,6 +841,8 @@
       <xs:group ref="VectorElementGroup" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
     <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attributeGroup ref="ConstraintAttributes"/>
+    <xs:attribute name="padding" type="PaddingType"/>
     <xs:attribute name="anchor" type="PointType" default="0,0"/>
     <xs:attribute name="position" type="PointType" default="0,0"/>
     <xs:attribute name="rotation" type="xs:decimal" default="0"/>
@@ -841,10 +850,6 @@
     <xs:attribute name="skew" type="xs:decimal" default="0"/>
     <xs:attribute name="skewAxis" type="xs:decimal" default="0"/>
     <xs:attribute name="alpha" type="xs:decimal" default="1"/>
-    <xs:attribute name="width" type="xs:decimal"/>
-    <xs:attribute name="height" type="xs:decimal"/>
-    <xs:attribute name="padding" type="PaddingType"/>
-    <xs:attributeGroup ref="ConstraintAttributes"/>
   </xs:complexType>
 
   <!-- ========================= Import Directives ========================= -->
@@ -882,32 +887,30 @@
     </xs:sequence>
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="name" type="xs:string" default=""/>
+    <xs:attributeGroup ref="ConstraintAttributes"/>
+    <xs:attribute name="x" type="xs:decimal" default="0"/>
+    <xs:attribute name="y" type="xs:decimal" default="0"/>
+    <xs:attribute name="flex" type="xs:decimal" default="0"/>
+    <xs:attribute name="layout" type="LayoutModeType" default="none"/>
+    <xs:attribute name="gap" type="xs:decimal" default="0"/>
+    <xs:attribute name="padding" type="PaddingType"/>
+    <xs:attribute name="alignment" type="AlignmentType" default="stretch"/>
+    <xs:attribute name="arrangement" type="ArrangementType" default="start"/>
+    <xs:attribute name="includeInLayout" type="BoolType" default="true"/>
     <xs:attribute name="visible" type="BoolType" default="true"/>
     <xs:attribute name="alpha" type="xs:decimal" default="1"/>
     <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
-    <xs:attribute name="x" type="xs:decimal" default="0"/>
-    <xs:attribute name="y" type="xs:decimal" default="0"/>
+    <xs:attribute name="clipToBounds" type="BoolType" default="false"/>
+    <xs:attribute name="scrollRect" type="RectType"/>
+    <xs:attribute name="mask" type="IdRefType"/>
+    <xs:attribute name="maskType" type="MaskTypeType" default="alpha"/>
+    <xs:attribute name="composition" type="IdRefType"/>
     <xs:attribute name="matrix" type="MatrixType"/>
     <xs:attribute name="matrix3D" type="Matrix3DType"/>
     <xs:attribute name="preserve3D" type="BoolType" default="false"/>
     <xs:attribute name="antiAlias" type="BoolType" default="true"/>
     <xs:attribute name="groupOpacity" type="BoolType" default="true"/>
     <xs:attribute name="passThroughBackground" type="BoolType" default="true"/>
-    <xs:attribute name="scrollRect" type="RectType"/>
-    <xs:attribute name="clipToBounds" type="BoolType" default="false"/>
-    <xs:attribute name="mask" type="IdRefType"/>
-    <xs:attribute name="maskType" type="MaskTypeType" default="alpha"/>
-    <xs:attribute name="composition" type="IdRefType"/>
-    <xs:attribute name="width" type="xs:decimal"/>
-    <xs:attribute name="height" type="xs:decimal"/>
-    <xs:attribute name="layout" type="LayoutModeType" default="none"/>
-    <xs:attribute name="gap" type="xs:decimal" default="0"/>
-    <xs:attribute name="flex" type="xs:decimal" default="0"/>
-    <xs:attribute name="padding" type="PaddingType"/>
-    <xs:attribute name="alignment" type="AlignmentType" default="stretch"/>
-    <xs:attribute name="arrangement" type="ArrangementType" default="start"/>
-    <xs:attribute name="includeInLayout" type="BoolType" default="true"/>
-    <xs:attributeGroup ref="ConstraintAttributes"/>
     <xs:attribute name="import" type="xs:string"/>
     <xs:attribute name="importFormat" type="xs:string"/>
   </xs:complexType>
@@ -948,7 +951,6 @@
         <xs:element name="Layer" type="LayerType"/>
       </xs:choice>
     </xs:sequence>
-    <xs:attribute name="version" type="xs:string" use="required"/>
     <xs:attribute name="width" type="xs:decimal" use="required"/>
     <xs:attribute name="height" type="xs:decimal" use="required"/>
   </xs:complexType>

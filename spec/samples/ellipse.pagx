@@ -1,27 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates Ellipse shape -->
-<pagx version="1.0" width="400" height="400">
+<pagx width="400" height="400">
   <Layer width="400" height="400" layout="vertical">
     <!-- Row 1 -->
     <Layer flex="1" layout="horizontal">
       <!-- Perfect circle -->
       <Layer flex="1">
-        <Ellipse centerX="0" centerY="0" size="140,140"/>
+        <Ellipse centerX="0" centerY="0" width="140" height="140"/>
         <Fill>
           <RadialGradient center="50,50" radius="100">
-            <ColorStop offset="0" color="#FBBF24"/>
-            <ColorStop offset="1" color="#F59E0B"/>
+            <ColorStop color="#FBBF24" offset="0"/>
+            <ColorStop color="#F59E0B" offset="1"/>
           </RadialGradient>
         </Fill>
         <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F59E0B60"/>
       </Layer>
       <!-- Horizontal ellipse -->
       <Layer flex="1">
-        <Ellipse centerX="0" centerY="0" size="160,100"/>
+        <Ellipse centerX="0" centerY="0" width="160" height="100"/>
         <Fill>
           <LinearGradient startPoint="0,0" endPoint="160,100">
-            <ColorStop offset="0" color="#EC4899"/>
-            <ColorStop offset="1" color="#DB2777"/>
+            <ColorStop color="#EC4899" offset="0"/>
+            <ColorStop color="#DB2777" offset="1"/>
           </LinearGradient>
         </Fill>
         <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#EC489950"/>
@@ -30,22 +30,22 @@
     <Layer flex="1" layout="horizontal">
       <!-- Vertical ellipse -->
       <Layer flex="1">
-        <Ellipse centerX="0" centerY="0" size="100,160"/>
+        <Ellipse centerX="0" centerY="0" width="100" height="160"/>
         <Fill>
           <LinearGradient startPoint="0,0" endPoint="100,160">
-            <ColorStop offset="0" color="#06B6D4"/>
-            <ColorStop offset="1" color="#0891B2"/>
+            <ColorStop color="#06B6D4" offset="0"/>
+            <ColorStop color="#0891B2" offset="1"/>
           </LinearGradient>
         </Fill>
         <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#06B6D450"/>
       </Layer>
       <!-- Large ellipse -->
       <Layer flex="1">
-        <Ellipse centerX="0" centerY="0" size="150,150"/>
+        <Ellipse centerX="0" centerY="0" width="150" height="150"/>
         <Fill>
           <RadialGradient center="55,55" radius="100">
-            <ColorStop offset="0" color="#A78BFA"/>
-            <ColorStop offset="1" color="#8B5CF6"/>
+            <ColorStop color="#A78BFA" offset="0"/>
+            <ColorStop color="#8B5CF6" offset="1"/>
           </RadialGradient>
         </Fill>
         <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#8B5CF650"/>

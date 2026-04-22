@@ -1,0 +1,10 @@
+<pagx width="200" height="200">
+  <!-- TextBox anchor mode: explicit width="0" height="0" is intentional (point text).
+       Should NOT trigger zero-size warning. -->
+  <Layer width="200" height="200">
+    <TextBox left="100" top="100" width="0" height="0">
+      <Text text="Hello" fontFamily="Arial" fontSize="14"/>
+      <Fill color="#000"/>
+    </TextBox>
+  </Layer>
+</pagx>

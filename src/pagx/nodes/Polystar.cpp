@@ -65,33 +65,43 @@ Rect Polystar::getContentBounds() const {
 
 void Polystar::onMeasure(LayoutContext*) {
   auto bounds = getContentBounds();
-  preferredX = position.x + bounds.x;
-  preferredY = position.y + bounds.y;
-  preferredWidth = bounds.width;
-  preferredHeight = bounds.height;
+  // position specifies the polystar center; when unset, top-left of the bounding box sits at (0,0).
+  preferredX = std::isnan(position.x) ? 0 : (position.x + bounds.x);
+  preferredY = std::isnan(position.y) ? 0 : (position.y + bounds.y);
+  // Preferred size: authored width/height overrides the intrinsic content bounds when present.
+  preferredWidth = std::isnan(width) ? bounds.width : width;
+  preferredHeight = std::isnan(height) ? bounds.height : height;
 }
 
-void Polystar::setLayoutSize(LayoutContext*, float width, float height) {
-  float scale = LayoutNode::ComputeUniformScale(preferredWidth, preferredHeight, width, height);
-  if (scale != 1.0f) {
-    outerRadius = outerRadius * scale;
-    innerRadius = innerRadius * scale;
-  }
+void Polystar::setLayoutSize(LayoutContext*, float targetWidth, float targetHeight) {
   auto bounds = getContentBounds();
-  layoutWidth = bounds.width;
-  layoutHeight = bounds.height;
+  float tW = targetWidth;
+  float tH = targetHeight;
+  if (std::isnan(tW) && std::isnan(tH)) {
+    tW = preferredWidth;
+    tH = preferredHeight;
+  }
+  float scale = LayoutNode::ComputeUniformScale(bounds.width, bounds.height, tW, tH);
+  layoutWidth = bounds.width * scale;
+  layoutHeight = bounds.height * scale;
 }
 
-void Polystar::setLayoutPosition(LayoutContext*, float x, float y) {
+Point Polystar::renderPosition() const {
   auto bounds = getContentBounds();
-  if (!std::isnan(x)) {
-    position.x = x - bounds.x;
-    layoutX = x;
-  }
-  if (!std::isnan(y)) {
-    position.y = y - bounds.y;
-    layoutY = y;
-  }
+  return computeRenderPosition(bounds, bounds.width, bounds.height);
+}
+
+float Polystar::renderScale() const {
+  auto bounds = getContentBounds();
+  return computeRenderScale(bounds.width, bounds.height);
+}
+
+float Polystar::renderOuterRadius() const {
+  return outerRadius * renderScale();
+}
+
+float Polystar::renderInnerRadius() const {
+  return innerRadius * renderScale();
 }
 
 }  // namespace pagx

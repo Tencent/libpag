@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test file for lint: redundant first-child Group that can be unwrapped -->
+<pagx width="200" height="200">
+  <Layer name="container">
+    <Group>
+      <Rectangle width="100" height="100"/>
+      <Fill color="#FF0000"/>
+    </Group>
+    <Fill color="#00FF00"/>
+  </Layer>
+</pagx>

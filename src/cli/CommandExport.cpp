@@ -153,15 +153,9 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
 }
 
 static int ExportToSVG(const ExportOptions& options) {
-  auto document = PAGXImporter::FromFile(options.inputFile);
+  auto document = LoadDocument(options.inputFile, "pagx export");
   if (document == nullptr) {
-    std::cerr << "pagx export: error: failed to load '" << options.inputFile << "'\n";
     return 1;
-  }
-  if (!document->errors.empty()) {
-    for (auto& error : document->errors) {
-      std::cerr << "pagx export: warning: " << error << "\n";
-    }
   }
   if (document->hasUnresolvedImports()) {
     std::cerr << "pagx export: error: unresolved import directive, run 'pagx resolve' first\n";

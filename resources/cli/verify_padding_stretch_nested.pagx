@@ -1,0 +1,13 @@
+<!-- Test: nested container (correct pattern) should not trigger -->
+<pagx width="400" height="200">
+  <Layer width="400" height="200">
+    <Rectangle width="100%" height="100%" roundness="8"/>
+    <Fill color="#F8F9FA"/>
+    <Layer width="100%" height="100%" layout="vertical" padding="16">
+      <Layer height="40">
+        <Rectangle width="100%" height="100%"/>
+        <Fill color="#3B82F6"/>
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>

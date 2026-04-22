@@ -29,6 +29,59 @@
 
 namespace pagx {
 
+static float ComputeCrossTarget(Alignment alignment, bool horizontal, const Layer* child,
+                                float alignCrossSize) {
+  if (alignment != Alignment::Stretch) {
+    return NAN;
+  }
+  // Any explicit cross-axis size (absolute or percentage) opts out of stretch.
+  bool hasExplicitCross = horizontal
+                              ? (!std::isnan(child->height) || !std::isnan(child->percentHeight))
+                              : (!std::isnan(child->width) || !std::isnan(child->percentWidth));
+  if (hasExplicitCross) {
+    return NAN;
+  }
+  return alignCrossSize;
+}
+
+// Returns true if child has an explicit main-axis size (absolute or percentage).
+static bool HasExplicitMainSize(bool horizontal, const Layer* child) {
+  if (horizontal) {
+    return !std::isnan(child->percentWidth) || !std::isnan(child->width);
+  }
+  return !std::isnan(child->percentHeight) || !std::isnan(child->height);
+}
+
+// Returns the target main-axis size computed from explicit dimensions: percentage resolves against
+// containerMain; otherwise falls back to the absolute width/height. Returns NAN when neither is set.
+static float ComputeExplicitMainSize(bool horizontal, const Layer* child, float containerMain) {
+  if (horizontal) {
+    if (!std::isnan(child->percentWidth)) {
+      return std::ceil(containerMain * child->percentWidth / 100.0f);
+    }
+    return child->width;
+  }
+  if (!std::isnan(child->percentHeight)) {
+    return std::ceil(containerMain * child->percentHeight / 100.0f);
+  }
+  return child->height;
+}
+
+// Returns the target cross-axis size computed from explicit dimensions: percentage resolves against
+// containerCross; otherwise falls back to the absolute width/height. Returns NAN when neither is set.
+static float ComputeExplicitCrossSize(bool horizontal, const Layer* child, float containerCross) {
+  if (horizontal) {
+    if (!std::isnan(child->percentHeight)) {
+      return std::ceil(containerCross * child->percentHeight / 100.0f);
+    }
+    return child->height;
+  }
+  if (!std::isnan(child->percentWidth)) {
+    return std::ceil(containerCross * child->percentWidth / 100.0f);
+  }
+  return child->width;
+}
+
 void Layer::updateSize(LayoutContext* context) {
   for (auto* element : contents) {
     auto* node = LayoutNode::AsLayoutNode(element);
@@ -45,7 +98,10 @@ void Layer::updateSize(LayoutContext* context) {
 void Layer::onMeasure(LayoutContext*) {
   preferredX = x;
   preferredY = y;
-  // If both dimensions are explicit, use them directly.
+  // Preferred size: if both width/height are authored, use them directly (skip content
+  // measurement). Otherwise compute per-axis from composition/children/contents, letting an
+  // authored axis still override the content-measured value. percentWidth/percentHeight are not
+  // consulted here; they are resolved by the parent via PerformConstraintLayout.
   if (!std::isnan(width) && !std::isnan(height)) {
     preferredWidth = width;
     preferredHeight = height;
@@ -61,7 +117,8 @@ void Layer::onMeasure(LayoutContext*) {
     measuredH = std::max(measuredH, composition->height);
   }
 
-  // Measure from flex container children along the layout axis.
+  // Measure from flex container children along the layout axis. The flex path folds padding into
+  // mainSize / crossSize directly since flex children live inside the padded box.
   if (layout != LayoutMode::None && !children.empty()) {
     bool horizontal = (layout == LayoutMode::Horizontal);
     float paddingMainStart = horizontal ? padding.left : padding.top;
@@ -77,6 +134,9 @@ void Layer::onMeasure(LayoutContext*) {
         continue;
       }
       visibleChildCount++;
+      // preferredWidth/Height already folds in the child's authored width/height.
+      // percentWidth/percentHeight cannot participate because the parent's layout size is not
+      // known yet.
       float childMain = horizontal ? child->preferredWidth : child->preferredHeight;
       float childCross = horizontal ? child->preferredHeight : child->preferredWidth;
       totalMain += childMain;
@@ -95,14 +155,12 @@ void Layer::onMeasure(LayoutContext*) {
     }
   }
 
-  // Measure from contents elements (merge via max to preserve flex-measured values above).
-  float contentsW = 0;
-  float contentsH = 0;
-  MeasureChildNodes(contents, NAN, NAN, contentsW, contentsH);
-  measuredW = std::max(measuredW, contentsW);
-  measuredH = std::max(measuredH, contentsH);
-
-  // Measure from non-flex child Layers (skip children excluded from layout).
+  // Measure from constraint-laid-out descendants: all contents (VectorElements) plus non-flex
+  // child Layers. These share the padded content box, so padding is added once to their combined
+  // extent.
+  float constraintW = 0;
+  float constraintH = 0;
+  MeasureChildNodes(contents, NAN, NAN, constraintW, constraintH);
   if (layout == LayoutMode::None) {
     for (auto* child : children) {
       if (!child->includeInLayout) {
@@ -110,37 +168,135 @@ void Layer::onMeasure(LayoutContext*) {
       }
       float cx = child->preferredWidth + child->constraintExtentX();
       float cy = child->preferredHeight + child->constraintExtentY();
-      measuredW = std::max(measuredW, cx);
-      measuredH = std::max(measuredH, cy);
+      constraintW = std::max(constraintW, cx);
+      constraintH = std::max(constraintH, cy);
     }
-    // Add padding to content measurement, consistent with layout mode behavior.
-    measuredW += padding.left + padding.right;
-    measuredH += padding.top + padding.bottom;
   }
+  constraintW += padding.left + padding.right;
+  constraintH += padding.top + padding.bottom;
+  measuredW = std::max(measuredW, constraintW);
+  measuredH = std::max(measuredH, constraintH);
 
-  // Use explicit value if set, otherwise use measured value.
   preferredWidth = !std::isnan(width) ? width : measuredW;
   preferredHeight = !std::isnan(height) ? height : measuredH;
 }
 
-void Layer::setLayoutSize(LayoutContext*, float width, float height) {
-  layoutWidth = !std::isnan(width) ? width : preferredWidth;
-  layoutHeight = !std::isnan(height) ? height : preferredHeight;
-  if (clipToBounds && !hasScrollRect && !std::isnan(layoutWidth) && !std::isnan(layoutHeight)) {
-    scrollRect = Rect::MakeXYWH(0, 0, layoutWidth, layoutHeight);
-    hasScrollRect = true;
+void Layer::setLayoutSize(LayoutContext* context, float targetWidth, float targetHeight) {
+  // A content-measured axis is one the parent did not constrain and the layer did not author.
+  // For a non-flex Layer without a composition backing, defer such axes to NaN during pass 1 so
+  // percent-sized descendants fall back to their preferred size instead of locking onto a
+  // provisional value derived from onMeasure. Pass 2 refines the axis from children's actual
+  // bounds and runs updateLayout again so size-dependent descendants pick up the final size.
+  // Flex Layers and composition-backed Layers keep numeric sizes throughout: flex child
+  // allocation requires numeric main-axis dimensions, and a composition dictates size directly.
+  bool widthFromContent = std::isnan(targetWidth) && std::isnan(this->width);
+  bool heightFromContent = std::isnan(targetHeight) && std::isnan(this->height);
+  bool canDefer = layout == LayoutMode::None && composition == nullptr;
+  bool deferWidth = widthFromContent && canDefer;
+  bool deferHeight = heightFromContent && canDefer;
+  layoutWidth = deferWidth ? NAN : (!std::isnan(targetWidth) ? targetWidth : preferredWidth);
+  layoutHeight = deferHeight ? NAN : (!std::isnan(targetHeight) ? targetHeight : preferredHeight);
+  updateScrollRect();
+  updateLayout(context);
+  bool sizeChanged = (!std::isnan(targetWidth) && targetWidth != preferredWidth) ||
+                     (!std::isnan(targetHeight) && targetHeight != preferredHeight);
+  bool needRefine =
+      deferWidth || deferHeight || ((widthFromContent || heightFromContent) && sizeChanged);
+  if (!needRefine) {
+    return;
+  }
+  float maxX = 0;
+  float maxY = 0;
+  for (auto* element : contents) {
+    auto* node = LayoutNode::AsLayoutNode(element);
+    if (node == nullptr) {
+      continue;
+    }
+    // Match MeasureChildNodes: unconstrained nodes use their preferredX/Y as extent origin (so
+    // an element with a negative preferredY such as a centered Path is not over-measured).
+    float extX = node->hasConstraints() ? node->constraintExtentX() : node->preferredX;
+    float extY = node->hasConstraints() ? node->constraintExtentY() : node->preferredY;
+    extX += node->layoutBounds().width;
+    extY += node->layoutBounds().height;
+    maxX = std::max(maxX, extX);
+    maxY = std::max(maxY, extY);
+  }
+  if (layout != LayoutMode::None && !children.empty()) {
+    bool horizontal = (layout == LayoutMode::Horizontal);
+    float totalMain = 0;
+    float maxCross = 0;
+    size_t visibleCount = 0;
+    for (auto* child : children) {
+      if (!child->includeInLayout) {
+        continue;
+      }
+      visibleCount++;
+      float childMain = horizontal ? child->layoutWidth : child->layoutHeight;
+      float childCross = horizontal ? child->layoutHeight : child->layoutWidth;
+      totalMain += childMain;
+      maxCross = std::max(maxCross, childCross);
+    }
+    float totalGap = gap * static_cast<float>(visibleCount > 1 ? visibleCount - 1 : 0);
+    float mainSize = totalMain + totalGap +
+                     (horizontal ? padding.left + padding.right : padding.top + padding.bottom);
+    float crossSize =
+        maxCross + (horizontal ? padding.top + padding.bottom : padding.left + padding.right);
+    if (horizontal) {
+      maxX = std::max(maxX, mainSize);
+      maxY = std::max(maxY, crossSize);
+    } else {
+      maxY = std::max(maxY, mainSize);
+      maxX = std::max(maxX, crossSize);
+    }
+  } else {
+    for (auto* child : children) {
+      if (!child->includeInLayout) {
+        continue;
+      }
+      float extX = child->constraintExtentX() + child->layoutWidth;
+      float extY = child->constraintExtentY() + child->layoutHeight;
+      maxX = std::max(maxX, extX);
+      maxY = std::max(maxY, extY);
+    }
+    maxX += padding.left + padding.right;
+    maxY += padding.top + padding.bottom;
+  }
+  float prevW = layoutWidth;
+  float prevH = layoutHeight;
+  // Content-measured refinement: `maxX` / `maxY` are measurement results derived from children's
+  // actual layout bounds (or flex main-axis totals), not sizes allocated by the layout engine.
+  // Keep them un-ceiled so the container mirrors the exact extent of its children — rounding here
+  // would drift the container away from authored child sizes. Rounding is applied only at
+  // layout-allocation sites (PerformConstraintLayout's targetW/H, ComputeExplicitMainSize/CrossSize
+  // for percent dimensions, TextBox cross-axis re-typesetting).
+  if (widthFromContent) {
+    layoutWidth = maxX;
+  }
+  if (heightFromContent) {
+    layoutHeight = maxY;
+  }
+  // Pass 2: if an axis was deferred and the refined value differs from the NaN placeholder, run
+  // updateLayout again so descendants that depend on the container size (width/height=100%, etc.)
+  // pick up the final value.
+  bool needSecondPass = (deferWidth && !std::isnan(layoutWidth) && layoutWidth != prevW) ||
+                        (deferHeight && !std::isnan(layoutHeight) && layoutHeight != prevH);
+  if (needSecondPass) {
+    updateScrollRect();
+    updateLayout(context);
   }
 }
 
-void Layer::setLayoutPosition(LayoutContext*, float x, float y) {
-  if (!std::isnan(x)) {
-    this->x = x;
-    layoutX = x;
+void Layer::updateScrollRect() {
+  if (!clipToBounds || hasScrollRect || std::isnan(layoutWidth) || std::isnan(layoutHeight)) {
+    return;
   }
-  if (!std::isnan(y)) {
-    this->y = y;
-    layoutY = y;
-  }
+  scrollRect = Rect::MakeXYWH(0, 0, layoutWidth, layoutHeight);
+  hasScrollRect = true;
+}
+
+Point Layer::renderPosition() const {
+  auto bounds = layoutBounds();
+  return {bounds.x, bounds.y};
 }
 
 void Layer::updateLayout(LayoutContext* context) {
@@ -178,6 +334,7 @@ void Layer::performContainerLayout(LayoutContext* context) {
   float paddingCrossEnd = horizontal ? padding.bottom : padding.right;
 
   float availableMain = containerMainSize - paddingMainStart - paddingMainEnd;
+  float alignCrossSize = containerCrossSize - paddingCrossStart - paddingCrossEnd;
 
   size_t childCount = children.size();
 
@@ -195,71 +352,74 @@ void Layer::performContainerLayout(LayoutContext* context) {
   size_t visibleCount = indices.size();
   float totalGap = gap * static_cast<float>(visibleCount > 1 ? visibleCount - 1 : 0);
 
-  // Determine main-axis sizing: explicit > content-measured > flex.
-  enum class SizeMode { Fixed, ContentMeasured, Flex };
-  std::vector<SizeMode> sizeMode(childCount, SizeMode::Fixed);
+  // ==================== Pass 1: Determine sizes ====================
   std::vector<float> childMainSizes(childCount, 0);
   std::vector<float> childCrossSizes(childCount, 0);
+  std::vector<size_t> flexIndices = {};
+  float totalFlex = 0;
 
   for (auto idx : indices) {
     auto* child = children[idx];
-    float explicitMain = horizontal ? child->width : child->height;
-    if (!std::isnan(explicitMain)) {
-      sizeMode[idx] = SizeMode::Fixed;
-      childMainSizes[idx] = explicitMain;
-    } else if (child->flex > 0) {
-      sizeMode[idx] = SizeMode::Flex;
+
+    // Cross-axis: explicit percentage/absolute size takes priority over stretch alignment.
+    float explicitCross = ComputeExplicitCrossSize(horizontal, child, alignCrossSize);
+    float crossTarget = !std::isnan(explicitCross)
+                            ? explicitCross
+                            : ComputeCrossTarget(alignment, horizontal, child, alignCrossSize);
+
+    // Explicit main-axis size (percentage or absolute) takes priority over flex.
+    if (child->flex > 0 && !HasExplicitMainSize(horizontal, child)) {
+      flexIndices.push_back(idx);
+      totalFlex += child->flex;
       childMainSizes[idx] = 0;
     } else {
-      sizeMode[idx] = SizeMode::ContentMeasured;
-      childMainSizes[idx] = horizontal ? child->preferredWidth : child->preferredHeight;
+      // Non-flex: main-axis from explicit size (percentage/absolute) or NaN for child-sizing.
+      float explicitMain = ComputeExplicitMainSize(horizontal, child, availableMain);
+      float targetW = horizontal ? explicitMain : crossTarget;
+      float targetH = horizontal ? crossTarget : explicitMain;
+      child->setLayoutSize(context, targetW, targetH);
+      childMainSizes[idx] = horizontal ? child->layoutWidth : child->layoutHeight;
     }
-
-    float explicitCross = horizontal ? child->height : child->width;
-    if (!std::isnan(explicitCross)) {
-      childCrossSizes[idx] = explicitCross;
-    } else {
-      childCrossSizes[idx] = horizontal ? child->preferredHeight : child->preferredWidth;
-    }
+    childCrossSizes[idx] = horizontal ? child->layoutHeight : child->layoutWidth;
   }
 
-  // Distribute flex space.
+  // Distribute flex space. Non-flex children (including explicit-size children with flex > 0)
+  // already have their main sizes set; flex children have childMainSizes = 0.
   float nonFlexTotal = 0;
-  float totalFlex = 0;
-  std::vector<size_t> flexIndices = {};
   for (auto idx : indices) {
-    if (sizeMode[idx] == SizeMode::Flex) {
-      totalFlex += children[idx]->flex;
-      flexIndices.push_back(idx);
-    } else {
-      nonFlexTotal += childMainSizes[idx];
-    }
+    nonFlexTotal += childMainSizes[idx];
   }
 
   float totalFlexSpace = availableMain - nonFlexTotal - totalGap;
   if (!flexIndices.empty() && totalFlexSpace > 0 && totalFlex > 0) {
+    float roundOff = 0;
     for (auto idx : flexIndices) {
-      childMainSizes[idx] = totalFlexSpace * children[idx]->flex / totalFlex;
+      float rawSize = totalFlexSpace * children[idx]->flex / totalFlex;
+      float roundedSize = std::round(rawSize + roundOff);
+      roundOff += rawSize - roundedSize;
+      childMainSizes[idx] = roundedSize;
     }
   }
 
-  // Round flex sizes with error propagation.
-  float roundOff = 0;
+  // setLayoutSize for flex children: main-axis forced, cross-axis from explicit/stretch.
   for (auto idx : flexIndices) {
-    float rawSize = childMainSizes[idx];
-    float roundedSize = std::round(rawSize + roundOff);
-    roundOff += rawSize - roundedSize;
-    childMainSizes[idx] = roundedSize;
+    auto* child = children[idx];
+    float explicitCross = ComputeExplicitCrossSize(horizontal, child, alignCrossSize);
+    float crossTarget = !std::isnan(explicitCross)
+                            ? explicitCross
+                            : ComputeCrossTarget(alignment, horizontal, child, alignCrossSize);
+    float targetW = horizontal ? childMainSizes[idx] : crossTarget;
+    float targetH = horizontal ? crossTarget : childMainSizes[idx];
+    child->setLayoutSize(context, targetW, targetH);
+    childCrossSizes[idx] = horizontal ? child->layoutHeight : child->layoutWidth;
   }
 
-  // Calculate total main size.
-  float totalMain = 0;
+  // ==================== Pass 2: Position ====================
+  float totalMain = totalGap;
   for (auto idx : indices) {
     totalMain += childMainSizes[idx];
   }
-  totalMain += totalGap;
 
-  // Main-axis starting position based on arrangement.
   float mainOffset = paddingMainStart;
   float extraGap = 0;
 
@@ -295,16 +455,11 @@ void Layer::performContainerLayout(LayoutContext* context) {
     }
   }
 
-  float alignCrossSize = containerCrossSize - paddingCrossStart - paddingCrossEnd;
-
-  // Position each flex child via setLayoutSize + setLayoutPosition + updateLayout.
   for (auto idx : indices) {
     auto* child = children[idx];
-
     float childMain = childMainSizes[idx];
     float childCross = childCrossSizes[idx];
 
-    // Cross axis alignment.
     float crossPos = paddingCrossStart;
     switch (this->alignment) {
       case Alignment::Start:
@@ -315,27 +470,13 @@ void Layer::performContainerLayout(LayoutContext* context) {
       case Alignment::End:
         crossPos += (alignCrossSize - childCross);
         break;
-      case Alignment::Stretch: {
-        float explicitCross = horizontal ? child->height : child->width;
-        if (std::isnan(explicitCross)) {
-          childCross = alignCrossSize;
-        }
+      case Alignment::Stretch:
         break;
-      }
     }
 
-    // Set size via setLayoutSize (does not write back width/height user properties).
-    float targetW = horizontal ? childMain : childCross;
-    float targetH = horizontal ? childCross : childMain;
-    child->setLayoutSize(context, std::round(targetW), std::round(targetH));
-
-    // Set position via setLayoutPosition.
     float posX = horizontal ? mainOffset : crossPos;
     float posY = horizontal ? crossPos : mainOffset;
     child->setLayoutPosition(context, std::round(posX), std::round(posY));
-
-    // Recursively lay out child's children.
-    child->updateLayout(context);
 
     mainOffset += childMain;
     if (arrangement == Arrangement::SpaceBetween || arrangement == Arrangement::SpaceEvenly ||

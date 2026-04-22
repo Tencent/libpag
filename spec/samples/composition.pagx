@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates composition (reusable component) -->
-<pagx version="1.0" width="400" height="400">
+<pagx width="400" height="400">
   <Layer width="400" height="400" layout="vertical" padding="60" alignment="center" arrangement="spaceBetween">
     <Layer composition="@buttonComp"/>
     <Layer composition="@buttonComp"/>
@@ -9,17 +9,17 @@
   <Resources>
     <Composition id="buttonComp" width="200" height="60">
       <Layer name="button" width="200" height="60">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="30"/>
+        <Rectangle width="100%" height="100%" roundness="30"/>
         <Fill>
           <LinearGradient startPoint="0,0" endPoint="200,0">
-            <ColorStop offset="0" color="#6366F1"/>
-            <ColorStop offset="1" color="#8B5CF6"/>
+            <ColorStop color="#6366F1" offset="0"/>
+            <ColorStop color="#8B5CF6" offset="1"/>
           </LinearGradient>
         </Fill>
         <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#6366F180"/>
       </Layer>
       <Layer name="label" width="200" height="60">
-        <Text text="Button" fontFamily="Arial" fontStyle="Bold" fontSize="22" centerX="0" centerY="0"/>
+        <Text centerX="0" centerY="0" text="Button" fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
         <Fill color="#FFF"/>
       </Layer>
     </Composition>

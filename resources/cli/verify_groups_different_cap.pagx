@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Test: Groups with different Stroke cap should NOT be detected as mergeable -->
-<pagx version="1.0" width="200" height="200">
+<pagx width="200" height="200">
   <Layer name="container">
     <Group>
-      <Rectangle size="50,50"/>
+      <Rectangle width="50" height="50"/>
       <Stroke color="#FF0000" width="2" cap="round"/>
     </Group>
     <Group>
-      <Rectangle size="80,40"/>
+      <Rectangle width="80" height="40"/>
       <Stroke color="#FF0000" width="2" cap="square"/>
     </Group>
   </Layer>

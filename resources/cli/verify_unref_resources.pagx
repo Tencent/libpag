@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test file for lint: unreferenced PathData in Resources -->
+<pagx width="200" height="200">
+  <Layer name="box">
+    <Rectangle width="100" height="100"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+  <Resources>
+    <PathData id="unused" data="M 0,0 L 50,0 L 50,50 Z"/>
+  </Resources>
+</pagx>

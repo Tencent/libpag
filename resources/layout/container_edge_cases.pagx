@@ -2,50 +2,50 @@
 <!-- Container layout: edge cases and boundary conditions -->
 <!-- 1. Pixel grid alignment (non-divisible flex), 2. stretch mixed explicit/implicit cross-axis,
      3. Opposite-pair overrides explicit Layer dimensions, 4. Three-level nesting -->
-<pagx version="1.0" width="820" height="520">
+<pagx width="820" height="520">
   <!-- Background -->
-  <Layer left="0" right="0" top="0" bottom="0">
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
+  <Layer width="100%" height="100%">
+    <Rectangle width="100%" height="100%"/>
     <Fill color="#F8FAFC"/>
   </Layer>
 
-  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30" alignment="start">
+  <Layer width="100%" height="100%" layout="vertical" gap="20" padding="30" alignment="start">
 
     <Layer flex="1" layout="horizontal" gap="20" alignment="start">
 
       <!-- 1. Pixel grid alignment: 7 flex items in 500px yields non-integer widths -->
       <!-- Available = 500 - 10*2 - 8*6 = 432, each = 432/7 = 61.71... -->
       <Layer width="500" height="220">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Rectangle width="100%" height="100%" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="8" padding="10" alignment="start">
+        <Layer width="100%" height="100%" layout="horizontal" gap="8" padding="10" alignment="start">
           <Layer flex="1" height="200">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Rectangle width="100%" height="100%" roundness="8"/>
             <Fill color="#6366F1"/>
           </Layer>
           <Layer flex="1" height="200">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Rectangle width="100%" height="100%" roundness="8"/>
             <Fill color="#818CF8"/>
           </Layer>
           <Layer flex="1" height="200">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Rectangle width="100%" height="100%" roundness="8"/>
             <Fill color="#A78BFA"/>
           </Layer>
           <Layer flex="1" height="200">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Rectangle width="100%" height="100%" roundness="8"/>
             <Fill color="#C4B5FD"/>
           </Layer>
           <Layer flex="1" height="200">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Rectangle width="100%" height="100%" roundness="8"/>
             <Fill color="#8B5CF6"/>
           </Layer>
           <Layer flex="1" height="200">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Rectangle width="100%" height="100%" roundness="8"/>
             <Fill color="#7C3AED"/>
           </Layer>
           <Layer flex="1" height="200">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Rectangle width="100%" height="100%" roundness="8"/>
             <Fill color="#6D28D9"/>
           </Layer>
         </Layer>
@@ -54,23 +54,23 @@
       <!-- 2. Stretch mixed: some children have explicit cross-axis, some don't -->
       <!-- alignment defaults to stretch, only stretches children WITHOUT explicit height -->
       <Layer width="240" height="220">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Rectangle width="100%" height="100%" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="10" padding="10">
+        <Layer width="100%" height="100%" layout="horizontal" gap="10" padding="10">
           <!-- No height: should stretch to 200 (220-10-10) -->
           <Layer width="65">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Rectangle width="100%" height="100%" roundness="8"/>
             <Fill color="#F43F5E"/>
           </Layer>
           <!-- Explicit height=100: should remain 100 -->
           <Layer width="65" height="100">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Rectangle width="100%" height="100%" roundness="8"/>
             <Fill color="#10B981"/>
           </Layer>
           <!-- No height: should stretch to 200 -->
           <Layer width="65">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Rectangle width="100%" height="100%" roundness="8"/>
             <Fill color="#3B82F6"/>
           </Layer>
         </Layer>
@@ -83,21 +83,21 @@
       <!-- 3. Opposite-pair overrides explicit Layer width: left+right should win -->
       <Layer width="260" height="220">
         <!-- Border -->
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Rectangle width="100%" height="100%" roundness="4"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        <!-- Child has width=100 but left+right should override to 260-20-20=220 -->
-        <Layer left="20" right="20" top="15" width="100" height="50">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+        <!-- Child fills horizontally via left+right, fixed height -->
+        <Layer left="20" right="20" top="15" height="50">
+          <Rectangle width="100%" height="100%" roundness="8"/>
           <Fill color="#EC4899"/>
         </Layer>
-        <!-- Child has height=40 but top+bottom should override to 220-85-85=50 -->
-        <Layer left="20" top="85" bottom="85" width="80" height="40">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+        <!-- Child fills vertically via top+bottom, fixed width -->
+        <Layer left="20" top="85" bottom="85" width="80">
+          <Rectangle width="100%" height="100%" roundness="8"/>
           <Fill color="#8B5CF6"/>
         </Layer>
-        <!-- Child has width=50 height=50, both axes overridden: w=260-20-20=220, h=220-175-15=30 -->
-        <Layer left="20" right="20" bottom="15" width="50" height="50">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+        <!-- Child fills horizontally via left+right, anchored to bottom, fixed height -->
+        <Layer left="20" right="20" bottom="15" height="50">
+          <Rectangle width="100%" height="100%" roundness="8"/>
           <Fill color="#10B981"/>
         </Layer>
       </Layer>
@@ -105,38 +105,38 @@
       <!-- 4. Three-level nesting: vertical → horizontal → vertical -->
       <Layer width="200" height="220">
         <!-- Border -->
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Rectangle width="100%" height="100%" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="8" padding="10">
+        <Layer width="100%" height="100%" layout="vertical" gap="8" padding="10">
           <Layer height="40">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Rectangle width="100%" height="100%" roundness="8"/>
             <Fill color="#6366F1"/>
           </Layer>
           <Layer flex="1" layout="horizontal" gap="6">
             <Layer flex="1" layout="vertical" gap="4">
               <Layer width="80" height="30">
-                <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
+                <Rectangle width="100%" height="100%" roundness="6"/>
                 <Fill color="#F43F5E"/>
               </Layer>
               <Layer width="80" height="30">
-                <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
+                <Rectangle width="100%" height="100%" roundness="6"/>
                 <Fill color="#FB7185"/>
               </Layer>
             </Layer>
             <Layer flex="1" layout="vertical" gap="4">
               <Layer width="80" height="30">
-                <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
+                <Rectangle width="100%" height="100%" roundness="6"/>
                 <Fill color="#10B981"/>
               </Layer>
               <Layer width="80" height="30">
-                <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
+                <Rectangle width="100%" height="100%" roundness="6"/>
                 <Fill color="#34D399"/>
               </Layer>
             </Layer>
           </Layer>
           <Layer height="40">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Rectangle width="100%" height="100%" roundness="8"/>
             <Fill color="#3B82F6"/>
           </Layer>
         </Layer>
@@ -144,19 +144,19 @@
 
       <Layer flex="1">
         <!-- Border -->
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Rectangle width="100%" height="100%" roundness="4"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="10" padding="15" alignment="start">
+        <Layer width="100%" height="100%" layout="horizontal" gap="10" padding="15" alignment="start">
           <Layer width="60" height="120">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Rectangle width="100%" height="100%" roundness="8"/>
             <Fill color="#F59E0B"/>
           </Layer>
           <Layer width="100" height="80">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Rectangle width="100%" height="100%" roundness="8"/>
             <Fill color="#D97706"/>
           </Layer>
           <Layer width="50" height="120">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Rectangle width="100%" height="100%" roundness="8"/>
             <Fill color="#B45309"/>
           </Layer>
         </Layer>

@@ -1,6 +1,0 @@
-<pagx version="1.0" width="200" height="200">
-  <Layer>
-    <Path data="M 50 50 L 150 50 L 150 150 L 50 150 Z"/>
-    <Fill color="#F00"/>
-  </Layer>
-</pagx>
