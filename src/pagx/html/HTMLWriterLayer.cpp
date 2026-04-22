@@ -960,16 +960,15 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     style += "position:absolute";
     auto renderPos = layer->renderPosition();
     std::string transform = LayerTransformCSS(layer);
-    if (!FloatNearlyZero(renderPos.x) || !FloatNearlyZero(renderPos.y)) {
-      style +=
-          ";left:" + FloatToString(renderPos.x) + "px;top:" + FloatToString(renderPos.y) + "px";
-    } else if (!transform.empty()) {
-      style += ";left:0;top:0";
-    }
-    if (!transform.empty()) {
-      style += ";transform:" + transform;
-      style += ";transform-origin:0 0";
-    }
+    // `positionSet` becomes true after we emit `left/top`. The Repeater branch below may need
+    // to shift `renderPos` by the union-bounds offset (uL, uT) so the layer div extends into
+    // the negative quadrants of the layer origin (needed for stacking-context clipping like
+    // mix-blend-mode, which otherwise drops Repeater copies that live at negative x/y).
+    bool positionSet = false;
+    auto emitLeftTop = [&](float x, float y) {
+      style += ";left:" + FloatToString(x) + "px;top:" + FloatToString(y) + "px";
+      positionSet = true;
+    };
     // Absolute-positioned layers need explicit size when they have contents that use inset:0,
     // or when they are flex containers that need a reference frame for child layout.
     // When contents contain a Repeater, compute the union bounds of all repeated copies
@@ -981,6 +980,12 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         break;
       }
     }
+    // Repeater-copy origin offset: when union bounds extend into negative quadrants we shift
+    // the layer div by (uL, uT) so the layer origin sits at (-uL, -uT) inside the div; each
+    // Repeater copy then needs a compensating `translate(-uL, -uT)` prepended so its content
+    // still paints at the layer origin in world space. See `_ctx->repeaterOriginOffset`.
+    float repeaterOffsetX = 0;
+    float repeaterOffsetY = 0;
     if (repeater && repeater->copies > 0) {
       // Collect bounds of geometry elements before the Repeater.
       float geoL = 1e9f, geoT = 1e9f, geoR = -1e9f, geoB = -1e9f;
@@ -1042,6 +1047,16 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         }
         float uw = uR - uL;
         float uh = uB - uT;
+        // Shift the layer div so its border-box covers all Repeater copies, including those
+        // that sit in negative quadrants relative to the layer origin. Without this, the
+        // stacking context created by mix-blend-mode (seen in showcase_mandala's Middle/Outer
+        // Ring) clips copies whose bounds fall outside the border-box, producing the visible
+        // "half the petals disappear" artefact.
+        if (uL < 0 || uT < 0) {
+          repeaterOffsetX = uL;
+          repeaterOffsetY = uT;
+        }
+        emitLeftTop(renderPos.x + repeaterOffsetX, renderPos.y + repeaterOffsetY);
         if (uw > 0) {
           style += ";width:" + FloatToString(uw) + "px";
         }
@@ -1050,7 +1065,25 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         }
         style += ";overflow:visible";
       }
-    } else if (isFlexContainer || !layer->contents.empty()) {
+    }
+    if (!positionSet) {
+      if (!FloatNearlyZero(renderPos.x) || !FloatNearlyZero(renderPos.y)) {
+        emitLeftTop(renderPos.x, renderPos.y);
+      } else if (!transform.empty()) {
+        emitLeftTop(0, 0);
+      }
+    }
+    if (!transform.empty()) {
+      style += ";transform:" + transform;
+      style += ";transform-origin:0 0";
+    }
+    // Stash the Repeater origin offset so writeRepeater can prepend a compensating translate
+    // to each copy's transform; the matrix stays in layer-local coordinates as before.
+    _ctx->repeaterOriginOffsetX = repeaterOffsetX;
+    _ctx->repeaterOriginOffsetY = repeaterOffsetY;
+    // The legacy branch below handled non-Repeater layers and still runs when `repeater` is
+    // null. When a Repeater was present and sized the div above, skip this fallback.
+    if (!repeater && (isFlexContainer || !layer->contents.empty())) {
       auto bounds = layer->layoutBounds();
       if (bounds.width > 0) {
         style += ";width:" + FloatToString(bounds.width) + "px";

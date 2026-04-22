@@ -1739,6 +1739,13 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
   if (rep->copies <= 0) {
     return;
   }
+  // Grab and clear the parent layer's Repeater origin offset so recursive writeRepeater calls
+  // don't double-apply it. The offset is non-zero only when the enclosing layer shifted its
+  // div into negative quadrants to cover every copy's union bounds (see writeLayer).
+  float originOffsetX = _ctx->repeaterOriginOffsetX;
+  float originOffsetY = _ctx->repeaterOriginOffsetY;
+  _ctx->repeaterOriginOffsetX = 0;
+  _ctx->repeaterOriginOffsetY = 0;
   int n = static_cast<int>(std::ceil(rep->copies));
   float frac = rep->copies - std::floor(rep->copies);
   for (int i = 0; i < n; i++) {
@@ -1764,6 +1771,11 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
     }
     if (!FloatNearlyZero(rep->anchor.x) || !FloatNearlyZero(rep->anchor.y)) {
       m = Matrix::Translate(rep->anchor.x, rep->anchor.y) * m;
+    }
+    // Prepend the parent layer div's shift so the copy still paints at the layer origin
+    // inside the expanded div (see HTMLWriterContext::repeaterOriginOffsetX/Y).
+    if (!FloatNearlyZero(originOffsetX) || !FloatNearlyZero(originOffsetY)) {
+      m = Matrix::Translate(-originOffsetX, -originOffsetY) * m;
     }
     // Match tgfx Repeater::apply: alphaT = progress / maxCount, where maxCount == ceil(copies).
     // Using copies-1 as the denominator forces the last rendered copy to land exactly on

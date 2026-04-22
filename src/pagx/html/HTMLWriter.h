@@ -153,6 +153,13 @@ class HTMLWriterContext {
   // approximation.
   std::unordered_map<const Layer*, PlusDarkerBackdrop> plusDarkerBackdrops = {};
 
+  // Set by writeLayer before calling writeRepeater, when the layer div was shifted into
+  // negative quadrants to cover every Repeater copy's union bounds. Each copy's transform
+  // must be prepended with `translate(-repeaterOriginOffset)` so its in-content origin still
+  // maps to the layer origin in world space. Reset to (0, 0) when no shift was applied.
+  float repeaterOriginOffsetX = 0;
+  float repeaterOriginOffsetY = 0;
+
   std::string nextId(const std::string& prefix) {
     return prefix + std::to_string(_id++);
   }
