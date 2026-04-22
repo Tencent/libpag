@@ -80,8 +80,8 @@ FillStrokeInfo CollectFillStroke(const std::vector<Element*>& contents) {
 }
 
 Matrix BuildLayerMatrix(const Layer* layer) {
-  // matrix3D > matrix > x/y. When matrix3D is non-identity it overrides
-  // both matrix and x/y. We project it onto the z=0 plane to get the
+  // matrix3D > matrix > renderPosition. When matrix3D is non-identity it overrides
+  // both matrix and renderPosition. We project it onto the z=0 plane to get the
   // equivalent 2D affine transform used by the 2D exporters (PPT/SVG).
   if (!layer->matrix3D.isIdentity()) {
     const float* v = layer->matrix3D.values;
@@ -95,17 +95,26 @@ Matrix BuildLayerMatrix(const Layer* layer) {
     return m;
   }
   Matrix m = layer->matrix;
-  // T(x,y) * m only shifts the translation column, so apply it directly to
+  // T(px,py) * m only shifts the translation column, so apply it directly to
   // avoid the full 6-multiply Matrix::operator* dance for the common case
-  // where layer->x / layer->y carry the layer position.
-  m.tx += layer->x;
-  m.ty += layer->y;
+  // where the layer's render position carries the translation. The authored
+  // x/y attributes are layout inputs only; the layout pass resolves them
+  // (together with constraints like left/right/top/bottom, flex, padding) into
+  // renderPosition(), which is what the renderer uses.
+  auto renderPos = layer->renderPosition();
+  m.tx += renderPos.x;
+  m.ty += renderPos.y;
   return m;
 }
 
 Matrix BuildGroupMatrix(const Group* group) {
+  // The authored `position` attribute is a layout input only; the actual
+  // rendered translation comes from renderPosition() after constraints,
+  // padding, and flex allocation have been resolved. anchor, rotation,
+  // scale, and skew are not layout-owned and are read directly.
+  auto renderPos = group->renderPosition();
   bool hasAnchor = !FloatNearlyZero(group->anchor.x) || !FloatNearlyZero(group->anchor.y);
-  bool hasPosition = !FloatNearlyZero(group->position.x) || !FloatNearlyZero(group->position.y);
+  bool hasPosition = !FloatNearlyZero(renderPos.x) || !FloatNearlyZero(renderPos.y);
   bool hasRotation = !FloatNearlyZero(group->rotation);
   bool hasScale =
       !FloatNearlyZero(group->scale.x - 1.0f) || !FloatNearlyZero(group->scale.y - 1.0f);
@@ -133,7 +142,7 @@ Matrix BuildGroupMatrix(const Group* group) {
     m = Matrix::Rotate(group->rotation) * m;
   }
   if (hasPosition) {
-    m = Matrix::Translate(group->position.x, group->position.y) * m;
+    m = Matrix::Translate(renderPos.x, renderPos.y) * m;
   }
 
   return m;
