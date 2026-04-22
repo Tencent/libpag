@@ -48,6 +48,67 @@ namespace pagx {
 
 using pag::FloatNearlyZero;
 
+namespace {
+
+// Splits `text` into visible line segments based on where tgfx's text layout engine placed
+// line breaks, so the emitted HTML matches PAGX line-for-line instead of relying on Chromium's
+// word-wrap re-flow (which uses its own glyph advance measurements and often breaks one token
+// earlier or later than tgfx when a word lands near the TextBox right edge).
+//
+// Only single-byte ASCII sources are handled here: HarfBuzz cluster information is not kept
+// in TextLayoutGlyphRun, so we assume 1 glyph == 1 source byte and any multi-byte codepoint,
+// ligature, or RTL text falls back to CSS word-wrap by returning false.
+struct TgfxWrappedLine {
+  size_t byteStart = 0;
+  size_t byteEnd = 0;  // exclusive; trailing whitespace trimmed by tgfx is not included
+};
+
+bool TrySplitTextByTgfxLines(const std::string& text, const std::vector<size_t>& glyphsPerLine,
+                             std::vector<TgfxWrappedLine>& outLines) {
+  outLines.clear();
+  if (text.empty() || glyphsPerLine.size() <= 1) {
+    return false;
+  }
+  for (unsigned char c : text) {
+    if (c >= 0x80) {
+      return false;
+    }
+  }
+  size_t pos = 0;
+  size_t n = text.size();
+  for (size_t li = 0; li < glyphsPerLine.size(); li++) {
+    if (li > 0) {
+      // Skip leading spaces that tgfx trimmed from the previous line end.
+      while (pos < n && text[pos] == ' ') {
+        pos++;
+      }
+    }
+    size_t start = pos;
+    size_t needed = glyphsPerLine[li];
+    while (pos < n && needed > 0) {
+      needed--;
+      pos++;
+    }
+    if (needed > 0) {
+      return false;
+    }
+    size_t end = pos;
+    while (end > start && text[end - 1] == ' ') {
+      end--;
+    }
+    outLines.push_back({start, end});
+  }
+  while (pos < n && text[pos] == ' ') {
+    pos++;
+  }
+  if (pos != n) {
+    return false;
+  }
+  return true;
+}
+
+}  // namespace
+
 //==============================================================================
 // HTMLWriter – element processing
 //==============================================================================
@@ -353,7 +414,31 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               }
               out.openTag("span");
               out.addAttr("style", spanStyle);
-              out.closeTagWithText(span.text->text);
+              // Respect tgfx's wrap decisions when possible. CSS word-wrap uses Chromium's own
+              // glyph advance measurements, which differ from tgfx's HarfBuzz output by a few
+              // subpixels and can push the break point past/before a token near the TextBox
+              // edge (e.g. text_box "Text line 1..5", text_features "This text overflows...").
+              // Splitting the source string along tgfx's line boundaries and emitting one
+              // `<br>` per break forces Chromium to mirror tgfx's layout exactly.
+              std::vector<TgfxWrappedLine> tgfxLines;
+              bool canSplit = tb->wordWrap && !std::isnan(tbW) && tbW > 0 &&
+                              TrySplitTextByTgfxLines(span.text->text,
+                                                      span.text->wrappedGlyphCounts(), tgfxLines);
+              if (canSplit) {
+                out.closeTagStart();
+                for (size_t li = 0; li < tgfxLines.size(); li++) {
+                  if (li > 0) {
+                    out.openTag("br");
+                    out.closeTagSelfClosing();
+                  }
+                  auto& ln = tgfxLines[li];
+                  out.addTextContent(
+                      span.text->text.substr(ln.byteStart, ln.byteEnd - ln.byteStart));
+                }
+                out.closeTag();
+              } else {
+                out.closeTagWithText(span.text->text);
+              }
             }
             if (needsInnerWrap) {
               out.closeTag();
@@ -453,7 +538,27 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             }
             out.openTag("span");
             out.addAttr("style", spanStyle);
-            out.closeTagWithText(span.text->text);
+            // Mirror tgfx's line-break decisions with explicit <br> tags instead of relying on
+            // Chromium's word-wrap (same rationale as the inline-TextBox path above).
+            std::vector<TgfxWrappedLine> tgfxLines;
+            bool canSplit = tb->wordWrap &&
+                            TrySplitTextByTgfxLines(span.text->text,
+                                                    span.text->wrappedGlyphCounts(), tgfxLines);
+            if (canSplit) {
+              out.closeTagStart();
+              for (size_t li = 0; li < tgfxLines.size(); li++) {
+                if (li > 0) {
+                  out.openTag("br");
+                  out.closeTagSelfClosing();
+                }
+                auto& ln = tgfxLines[li];
+                out.addTextContent(
+                    span.text->text.substr(ln.byteStart, ln.byteEnd - ln.byteStart));
+              }
+              out.closeTag();
+            } else {
+              out.closeTagWithText(span.text->text);
+            }
           }
           if (needsInnerWrap) {
             out.closeTag();
@@ -1258,41 +1363,60 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         _defs->addAttr("height", "200%");
         _defs->addAttr("color-interpolation-filters", "sRGB");
         _defs->closeTagStart();
-        _defs->openTag("feOffset");
+        // Invert source alpha -> blur -> offset -> flood -> clip twice. Matches tgfx
+        // ImageFilter::InnerShadowOnly that InnerShadowStyle::onDraw uses; the old
+        // arithmetic "SourceAlpha - offsetAlpha" only produced a one-sided band that
+        // vanished for low-alpha shadow colours (e.g. showcase_infographic #00000010).
+        _defs->openTag("feComponentTransfer");
         _defs->addAttr("in", "SourceAlpha");
-        if (!FloatNearlyZero(is->offsetX)) {
-          _defs->addAttr("dx", FloatToString(is->offsetX));
-        }
-        if (!FloatNearlyZero(is->offsetY)) {
-          _defs->addAttr("dy", FloatToString(is->offsetY));
-        }
-        _defs->addAttr("result", "iOff");
+        _defs->addAttr("result", "iInv");
+        _defs->closeTagStart();
+        _defs->openTag("feFuncA");
+        _defs->addAttr("type", "table");
+        _defs->addAttr("tableValues", "1 0");
         _defs->closeTagSelfClosing();
-        _defs->openTag("feComposite");
-        _defs->addAttr("in", "SourceAlpha");
-        _defs->addAttr("in2", "iOff");
-        _defs->addAttr("operator", "arithmetic");
-        _defs->addAttr("k2", "-1");
-        _defs->addAttr("k3", "1");
-        _defs->addAttr("result", "iComp");
-        _defs->closeTagSelfClosing();
+        _defs->closeTag();
         std::string sd = FloatToString(is->blurX);
         if (is->blurX != is->blurY) {
           sd += " " + FloatToString(is->blurY);
         }
         _defs->openTag("feGaussianBlur");
-        _defs->addAttr("in", "iComp");
+        _defs->addAttr("in", "iInv");
         _defs->addAttr("stdDeviation", sd);
         _defs->addAttr("result", "iBlur");
         _defs->closeTagSelfClosing();
-        _defs->openTag("feColorMatrix");
-        _defs->addAttr("in", "iBlur");
-        _defs->addAttr("type", "matrix");
-        _defs->addAttr("values", "0 0 0 0 " + FloatToString(is->color.red) + " 0 0 0 0 " +
-                                     FloatToString(is->color.green) + " 0 0 0 0 " +
-                                     FloatToString(is->color.blue) + " 0 0 0 " +
-                                     FloatToString(is->color.alpha) + " 0");
+        std::string blurredResult = "iBlur";
+        if (!FloatNearlyZero(is->offsetX) || !FloatNearlyZero(is->offsetY)) {
+          _defs->openTag("feOffset");
+          _defs->addAttr("in", blurredResult);
+          if (!FloatNearlyZero(is->offsetX)) {
+            _defs->addAttr("dx", FloatToString(is->offsetX));
+          }
+          if (!FloatNearlyZero(is->offsetY)) {
+            _defs->addAttr("dy", FloatToString(is->offsetY));
+          }
+          _defs->addAttr("result", "iOff");
+          _defs->closeTagSelfClosing();
+          blurredResult = "iOff";
+        }
+        _defs->openTag("feFlood");
+        _defs->addAttr("flood-color", ColorToSVGHex(is->color));
+        if (is->color.alpha < 1.0f) {
+          _defs->addAttr("flood-opacity", FloatToString(is->color.alpha));
+        }
+        _defs->addAttr("result", "iFlood");
+        _defs->closeTagSelfClosing();
+        _defs->openTag("feComposite");
+        _defs->addAttr("in", "iFlood");
+        _defs->addAttr("in2", blurredResult);
+        _defs->addAttr("operator", "in");
         _defs->addAttr("result", "iShadow");
+        _defs->closeTagSelfClosing();
+        _defs->openTag("feComposite");
+        _defs->addAttr("in", "iShadow");
+        _defs->addAttr("in2", "SourceAlpha");
+        _defs->addAttr("operator", "in");
+        _defs->addAttr("result", "iClip");
         _defs->closeTagSelfClosing();
         _defs->openTag("feMerge");
         _defs->closeTagStart();
@@ -1300,7 +1424,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         _defs->addAttr("in", "SourceGraphic");
         _defs->closeTagSelfClosing();
         _defs->openTag("feMergeNode");
-        _defs->addAttr("in", "iShadow");
+        _defs->addAttr("in", "iClip");
         _defs->closeTagSelfClosing();
         _defs->closeTag();
         _defs->closeTag();

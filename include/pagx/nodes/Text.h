@@ -115,6 +115,16 @@ class Text : public Element, public LayoutNode {
   /** Returns the effective font size after layout scaling. */
   float renderFontSize() const;
 
+  /**
+   * Reports the number of visible glyphs on each line produced by the text layout engine,
+   * inspecting the y-coordinates of the laid-out glyphs. Returns an empty vector when layout
+   * has not been performed yet or when the text lays out to a single line. Callers that need
+   * to mirror tgfx's automatic line-break positions in an alternative renderer (e.g. the HTML
+   * exporter forcing Chromium to wrap at identical points) can walk the source string and
+   * consume this many non-whitespace characters per line.
+   */
+  std::vector<size_t> wrappedGlyphCounts() const;
+
   NodeType nodeType() const override {
     return NodeType::Text;
   }

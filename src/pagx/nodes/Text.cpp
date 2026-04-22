@@ -92,4 +92,40 @@ float Text::renderFontSize() const {
   return fontSize * textScale;
 }
 
+std::vector<size_t> Text::wrappedGlyphCounts() const {
+  std::vector<size_t> counts;
+  if (!glyphData) {
+    return counts;
+  }
+  const auto& runs = glyphData->layoutRuns;
+  if (runs.empty()) {
+    return counts;
+  }
+  // Layout runs are emitted in logical (LTR source) order, so concatenating their glyph
+  // positions gives us the whole line flow. A y increase between adjacent glyphs marks the
+  // boundary where tgfx's TextLayout wrapped onto the next line.
+  float curY = 0;
+  bool haveCur = false;
+  size_t count = 0;
+  for (const auto& run : runs) {
+    for (const auto& p : run.positions) {
+      if (!haveCur) {
+        curY = p.y;
+        haveCur = true;
+        count = 1;
+      } else if (p.y > curY + 0.5f) {
+        counts.push_back(count);
+        curY = p.y;
+        count = 1;
+      } else {
+        count++;
+      }
+    }
+  }
+  if (haveCur) {
+    counts.push_back(count);
+  }
+  return counts;
+}
+
 }  // namespace pagx
