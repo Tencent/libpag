@@ -90,10 +90,10 @@
 
     <!-- Feature rows -->
     <Layer flex="1" layout="vertical" gap="10" padding="10,30,10,30" alignment="stretch" arrangement="center">
-      <!-- Feature row 1 -->
+      <!-- Feature row 1 — coral tint to echo the red plus icon -->
       <Layer height="50">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
-        <Fill color="#FFFFFF"/>
+        <Fill color="#FFF5F5"/>
         <InnerShadowStyle offsetX="0" offsetY="2" blurX="6" blurY="6" color="#00000010"/>
         <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="10" padding="12,14,12,14" alignment="center">
           <Layer width="24" height="24">
@@ -121,10 +121,10 @@
         </Layer>
       </Layer>
 
-      <!-- Feature row 2 -->
+      <!-- Feature row 2 — teal tint to echo the teal plus icon -->
       <Layer height="50">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
-        <Fill color="#FFFFFF"/>
+        <Fill color="#EFFAF9"/>
         <InnerShadowStyle offsetX="0" offsetY="2" blurX="6" blurY="6" color="#00000010"/>
         <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="10" padding="12,14,12,14" alignment="center">
           <Layer width="24" height="24">
@@ -152,10 +152,10 @@
         </Layer>
       </Layer>
 
-      <!-- Feature row 3 -->
+      <!-- Feature row 3 — warm yellow tint to echo the yellow plus icon -->
       <Layer height="50">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
-        <Fill color="#FFFFFF"/>
+        <Fill color="#FFFBEA"/>
         <InnerShadowStyle offsetX="0" offsetY="2" blurX="6" blurY="6" color="#00000010"/>
         <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="10" padding="12,14,12,14" alignment="center">
           <Layer width="24" height="24">
