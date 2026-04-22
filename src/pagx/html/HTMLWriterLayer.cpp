@@ -23,6 +23,7 @@
 #include "base/utils/MathUtil.h"
 #include "pagx/html/HTMLWriter.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
+#include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Group.h"
@@ -992,7 +993,26 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
 
   std::string filterValues;
 
-  if (!layer->filters.empty()) {
+  // Detect BlurFilter.tileMode=Mirror: we switch to a 3x3 mirror-tile DOM emission path below
+  // so the layer's own `filter:` property should NOT carry the blur (it's applied on the inner
+  // grid wrapper instead), and the outer div gains `overflow:hidden` to clip the mirrored tiles
+  // back to the source layer's size. The tile geometry uses the layer's own size, falling back
+  // to its laid-out bounds when width/height are NaN.
+  bool useMirrorTile = needsMirrorTiling(layer);
+  float mirrorTileWidth = 0;
+  float mirrorTileHeight = 0;
+  if (useMirrorTile) {
+    auto bounds = layer->layoutBounds();
+    mirrorTileWidth = !std::isnan(layer->width) ? layer->width : bounds.width;
+    mirrorTileHeight = !std::isnan(layer->height) ? layer->height : bounds.height;
+    if (mirrorTileWidth <= 0 || mirrorTileHeight <= 0) {
+      // Fall back to decal (current behaviour) when size is indeterminate: the grid wrapper
+      // needs a concrete W/H to position the 9 tiles.
+      useMirrorTile = false;
+    }
+  }
+
+  if (!layer->filters.empty() && !useMirrorTile) {
     std::string filterCSS = writeFilterDefs(layer->filters);
     if (!filterCSS.empty()) {
       filterValues += filterCSS;
@@ -1205,6 +1225,11 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   if (!filterValues.empty()) {
     style += ";filter:" + filterValues;
   }
+  if (useMirrorTile) {
+    // Clip the mirrored tile grid (3x3 = width/height * 3, positioned at (-W,-H)) back to the
+    // source layer's box, so only the center tile's post-blur pixels are visible.
+    style += ";overflow:hidden";
+  }
   if (!boxShadowValue.empty()) {
     style += ";border-radius:" + boxShadowBorderRadius;
     style += ";box-shadow:" + boxShadowValue;
@@ -1374,34 +1399,65 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
 
   float contentAlpha = childDistribute ? layerAlpha : 1.0f;
 
-  bool hasForeground = false;
-  for (auto* e : layer->contents) {
-    if (e->nodeType() == NodeType::Fill) {
-      if (static_cast<const Fill*>(e)->placement == LayerPlacement::Foreground) {
-        hasForeground = true;
-        break;
+  if (useMirrorTile) {
+    // Simulate BlurFilter.tileMode=Mirror by duplicating the layer's inner DOM into a 3x3 grid
+    // where the 8 surrounding tiles are mirrored copies of the center tile. A single CSS blur
+    // on the grid wrapper lets the convolution sample across tile boundaries, matching tgfx's
+    // MirrorRepeat semantics. The outer layer div's `overflow:hidden` (added above) clips the
+    // result to the original W x H, so only the center tile's post-blur pixels remain visible.
+    auto* bf = static_cast<const BlurFilter*>(layer->filters[0]);
+    float blurRadius =
+        bf->blurX;  // needsMirrorTiling only matches uniform blur (filters.size()==1)
+    out.openTag("div");
+    // Grid container is the same size as the layer's visible rect, anchored at (0, 0) inside
+    // the overflow-hidden outer div. Each of the 9 tiles translates from (0,0) into its slot
+    // in a 3x3 arrangement that extends from (-W, -H) to (2W, 2H); the overflow:hidden on the
+    // outer div clips the result to the visible rect.
+    std::string gridStyle =
+        "position:absolute;left:0;top:0;width:" + FloatToString(mirrorTileWidth) +
+        "px;height:" + FloatToString(mirrorTileHeight) + "px;filter:blur(" +
+        FloatToString(blurRadius) + "px)";
+    out.addAttr("style", gridStyle);
+    out.closeTagStart();
+    // Tile positions and mirror transforms. Each tile's wrapper div is anchored at (0,0) with
+    // size W x H; the `transform: translate(tx, ty) scale(sx, sy)` places it at its slot in the
+    // 3x3 grid AFTER flipping its inner content in place. Because CSS applies scale with the
+    // default transform-origin (box center), a scale(-1,1) flips the tile's pixels around its
+    // vertical centerline without changing the bounding box, so `translate(-W, 0) scale(-1, 1)`
+    // leaves the tile's right edge (now showing the source's x=0 column) adjacent to the center
+    // tile's left edge (also x=0) — exactly the mirror-repeat boundary.
+    struct Tile {
+      float tx, ty, sx, sy;
+    };
+    const Tile tiles[9] = {
+        {-mirrorTileWidth, -mirrorTileHeight, -1.0f, -1.0f},  // TL
+        {0, -mirrorTileHeight, 1.0f, -1.0f},                  // T
+        {mirrorTileWidth, -mirrorTileHeight, -1.0f, -1.0f},   // TR
+        {-mirrorTileWidth, 0, -1.0f, 1.0f},                   // L
+        {0, 0, 1.0f, 1.0f},                                   // C
+        {mirrorTileWidth, 0, -1.0f, 1.0f},                    // R
+        {-mirrorTileWidth, mirrorTileHeight, -1.0f, -1.0f},   // BL
+        {0, mirrorTileHeight, 1.0f, -1.0f},                   // B
+        {mirrorTileWidth, mirrorTileHeight, -1.0f, -1.0f},    // BR
+    };
+    for (const auto& t : tiles) {
+      out.openTag("div");
+      std::string ts = "position:absolute;left:0;top:0;width:" + FloatToString(mirrorTileWidth) +
+                       "px;height:" + FloatToString(mirrorTileHeight) + "px";
+      if (t.tx != 0 || t.ty != 0 || t.sx != 1.0f || t.sy != 1.0f) {
+        ts += ";transform:translate(" + FloatToString(t.tx) + "px," + FloatToString(t.ty) + "px)";
+        if (t.sx != 1.0f || t.sy != 1.0f) {
+          ts += " scale(" + FloatToString(t.sx) + "," + FloatToString(t.sy) + ")";
+        }
       }
-    } else if (e->nodeType() == NodeType::Stroke) {
-      if (static_cast<const Stroke*>(e)->placement == LayerPlacement::Foreground) {
-        hasForeground = true;
-        break;
-      }
+      out.addAttr("style", ts);
+      out.closeTagStart();
+      writeLayerInner(out, layer, contentAlpha, childDistribute, isFlexContainer);
+      out.closeTag();
     }
-  }
-
-  writeLayerContents(out, layer, contentAlpha, childDistribute, LayerPlacement::Background);
-
-  if (layer->composition) {
-    writeComposition(out, layer->composition, contentAlpha, childDistribute);
-  }
-
-  for (auto* child : layer->children) {
-    bool childIsFlexItem = isFlexContainer && child->includeInLayout;
-    writeLayer(out, child, contentAlpha, childDistribute, childIsFlexItem);
-  }
-
-  if (hasForeground) {
-    writeLayerContents(out, layer, contentAlpha, childDistribute, LayerPlacement::Foreground);
+    out.closeTag();  // grid wrapper
+  } else {
+    writeLayerInner(out, layer, contentAlpha, childDistribute, isFlexContainer);
   }
 
   for (auto& [styleType, ls] : aboveStyles) {
@@ -1470,6 +1526,39 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   }
 
   out.closeTag();
+}
+
+void HTMLWriter::writeLayerInner(HTMLBuilder& out, const Layer* layer, float contentAlpha,
+                                 bool childDistribute, bool isFlexContainer) {
+  bool hasForeground = false;
+  for (auto* e : layer->contents) {
+    if (e->nodeType() == NodeType::Fill) {
+      if (static_cast<const Fill*>(e)->placement == LayerPlacement::Foreground) {
+        hasForeground = true;
+        break;
+      }
+    } else if (e->nodeType() == NodeType::Stroke) {
+      if (static_cast<const Stroke*>(e)->placement == LayerPlacement::Foreground) {
+        hasForeground = true;
+        break;
+      }
+    }
+  }
+
+  writeLayerContents(out, layer, contentAlpha, childDistribute, LayerPlacement::Background);
+
+  if (layer->composition) {
+    writeComposition(out, layer->composition, contentAlpha, childDistribute);
+  }
+
+  for (auto* child : layer->children) {
+    bool childIsFlexItem = isFlexContainer && child->includeInLayout;
+    writeLayer(out, child, contentAlpha, childDistribute, childIsFlexItem);
+  }
+
+  if (hasForeground) {
+    writeLayerContents(out, layer, contentAlpha, childDistribute, LayerPlacement::Foreground);
+  }
 }
 
 void HTMLWriter::emitPlusDarkerFilterDef(const PlusDarkerBackdrop& backdrop) {

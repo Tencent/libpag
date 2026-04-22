@@ -196,6 +196,11 @@ class HTMLWriter {
   // Rendering
   void writeLayerContents(HTMLBuilder& out, const Layer* layer, float alpha, bool distribute,
                           LayerPlacement targetPlacement);
+  // Emits only the layer's inner children (background contents, composition, child layers,
+  // foreground contents) without opening an outer <div.pagx-layer>. Extracted so the BlurFilter
+  // mirror-tile emission path can replay the same inner DOM inside each of the 9 mirrored tiles.
+  void writeLayerInner(HTMLBuilder& out, const Layer* layer, float contentAlpha,
+                       bool childDistribute, bool isFlexContainer);
   void writeElements(HTMLBuilder& out, const std::vector<Element*>& elements, float alpha,
                      bool distribute, LayerPlacement targetPlacement);
   // Appends an SVG <filter> definition that composites the layer's pre-rendered backdrop with its
@@ -245,6 +250,12 @@ class HTMLWriter {
 
   // Filter defs
   std::string writeFilterDefs(const std::vector<LayerFilter*>& filters);
+
+  // Returns true when the layer is a candidate for the 3x3 mirror-tile DOM emission path used
+  // to approximate BlurFilter.tileMode=Mirror in HTML. The path requires a single BlurFilter
+  // with tileMode=Mirror and no LayerStyles (drop shadows / inner shadows / backdrop blurs) on
+  // the same layer, because those would interact non-trivially with the duplicated subtree.
+  static bool needsMirrorTiling(const Layer* layer);
 
   // Mask/clip defs
   std::string writeMaskCSS(const Layer* mask, MaskType type);

@@ -39,6 +39,29 @@ namespace pagx {
 using pag::FloatNearlyZero;
 
 //==============================================================================
+// HTMLWriter – mirror-tile eligibility
+//==============================================================================
+
+bool HTMLWriter::needsMirrorTiling(const Layer* layer) {
+  // Guard: need exactly one filter that is a BlurFilter with tileMode=Mirror, and no layer
+  // styles (which would need to be applied outside the tile container and require separate
+  // stacking-context handling). Mixed filter chains also fall through because the tile wrapper
+  // would need to participate in those filter stages.
+  if (!layer->styles.empty()) {
+    return false;
+  }
+  if (layer->filters.size() != 1) {
+    return false;
+  }
+  auto* f = layer->filters[0];
+  if (f->nodeType() != NodeType::BlurFilter) {
+    return false;
+  }
+  auto* bf = static_cast<const BlurFilter*>(f);
+  return bf->tileMode == TileMode::Mirror;
+}
+
+//==============================================================================
 // HTMLWriter – filter defs
 //==============================================================================
 
