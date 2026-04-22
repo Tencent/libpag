@@ -1277,7 +1277,7 @@ CLI_TEST(PAGXCliTest, Export_PagxToPptx_NoConvertTextToPath) {
 }
 
 CLI_TEST(PAGXCliTest, Export_PagxToPptx_NoBakeMask) {
-  auto inputPath = TestResourcePath("validate_simple.pagx");
+  auto inputPath = TestResourcePath("verify_simple.pagx");
   auto outputPath = TempDir() + "/ExportPPTX_NoBakeMask.pptx";
   auto ret = CallRun(pagx::cli::RunExport, {"export", "--ppt-no-bake-mask", "--input", inputPath,
                                             "--output", outputPath});
@@ -1293,7 +1293,7 @@ CLI_TEST(PAGXCliTest, Export_PagxToPptx_MissingFile) {
 }
 
 CLI_TEST(PAGXCliTest, Export_PagxToPptx_InvalidFile) {
-  auto inputPath = TestResourcePath("validate_not_xml.pagx");
+  auto inputPath = TestResourcePath("verify_not_xml.pagx");
   auto outputPath = TempDir() + "/ExportPPTX_Invalid.pptx";
   auto ret =
       CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
@@ -1326,7 +1326,7 @@ CLI_TEST(PAGXCliTest, Export_PagxToPptx_Scale) {
 }
 
 CLI_TEST(PAGXCliTest, Export_PagxToPptx_ValidateSimple) {
-  auto inputPath = TestResourcePath("validate_simple.pagx");
+  auto inputPath = TestResourcePath("verify_simple.pagx");
   auto outputPath = TempDir() + "/ExportPPTX_ValidateSimple.pptx";
   auto ret =
       CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
