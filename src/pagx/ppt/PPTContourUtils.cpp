@@ -101,6 +101,25 @@ bool PointInsideContour(const Point& pt, const PathContour& contour) {
   return inside;
 }
 
+// Tests whether `inner` is spatially nested inside `outer`. Samples inner.start
+// plus the midpoint of inner's first segment chord and returns true if any
+// sample lies strictly inside `outer`. The midpoint fallback exists because
+// inner.start can coincide with a polygon-approximation vertex of `outer` when
+// both contours come from a path boolean (e.g. tgfx::PathOp::XOR emits an inner
+// hole whose start point is tangent to the outer boundary), and ray casting on
+// a boundary vertex is numerically unstable and often misses the containment.
+bool ContourInsideContour(const PathContour& inner, const PathContour& outer) {
+  if (PointInsideContour(inner.start, outer)) {
+    return true;
+  }
+  if (inner.segs.empty()) {
+    return false;
+  }
+  Point next = SegEndpoint(inner.segs.front());
+  Point midpoint = {(inner.start.x + next.x) * 0.5f, (inner.start.y + next.y) * 0.5f};
+  return PointInsideContour(midpoint, outer);
+}
+
 std::vector<PathContour> ParsePathContours(const PathData* data) {
   std::vector<PathContour> contours;
   const auto& verbs = data->verbs();
@@ -147,7 +166,7 @@ std::vector<int> ComputeContainmentDepths(const std::vector<PathContour>& contou
       if (i == j || !valid[j]) {
         continue;
       }
-      if (PointInsideContour(contours[i].start, contours[j])) {
+      if (ContourInsideContour(contours[i], contours[j])) {
         depths[i]++;
       }
     }
@@ -205,7 +224,7 @@ std::vector<std::vector<size_t>> GroupContoursByOutermost(const std::vector<Path
       continue;
     }
     for (size_t j : outerIndices) {
-      if (j != i && PointInsideContour(contours[i].start, contours[j])) {
+      if (j != i && ContourInsideContour(contours[i], contours[j])) {
         parent[i] = static_cast<int>(j);
         break;
       }

@@ -45,6 +45,8 @@ void ReverseContour(PathContour& c);
 
 bool PointInsideContour(const Point& pt, const PathContour& contour);
 
+bool ContourInsideContour(const PathContour& inner, const PathContour& outer);
+
 std::vector<PathContour> ParsePathContours(const PathData* data);
 
 std::vector<int> ComputeContainmentDepths(const std::vector<PathContour>& contours);
