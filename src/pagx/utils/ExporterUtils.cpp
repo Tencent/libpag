@@ -615,6 +615,32 @@ static std::shared_ptr<tgfx::Data> DoRenderMaskedLayer(
   return EncodeSurfaceToPNG(surface, width, height);
 }
 
+// Renders the entire scene from `root` downward into an off-screen surface,
+// cropped to the global bounds of `targetLayer`. Used when the target layer's
+// visual result depends on the backdrop pixels below it — e.g. a non-Normal
+// `Layer.blendMode`, which the tgfx renderer composites against whatever has
+// already been drawn underneath. Drawing only `targetLayer` against an empty
+// canvas (as DoRenderMaskedLayer does) blends it with transparent-black and
+// loses the intended composite; drawing `root` with a clip preserves it.
+static std::shared_ptr<tgfx::Data> DoRenderBackdropComposite(
+    tgfx::Context* context, const std::shared_ptr<tgfx::Layer>& root,
+    const tgfx::Rect& globalBounds) {
+  int width = static_cast<int>(ceilf(globalBounds.width()));
+  int height = static_cast<int>(ceilf(globalBounds.height()));
+  if (width <= 0 || height <= 0) {
+    return nullptr;
+  }
+  auto surface = tgfx::Surface::Make(context, width, height);
+  if (surface == nullptr) {
+    return nullptr;
+  }
+  auto canvas = surface->getCanvas();
+  canvas->translate(-globalBounds.left, -globalBounds.top);
+  canvas->clipRect(globalBounds);
+  root->draw(canvas);
+  return EncodeSurfaceToPNG(surface, width, height);
+}
+
 GPUContext::~GPUContext() {
   _device = nullptr;
 }
@@ -644,6 +670,19 @@ std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,
     return nullptr;
   }
   auto result = DoRenderMaskedLayer(context, root, targetLayer, globalBounds);
+  gpu->unlock();
+  return result;
+}
+
+std::shared_ptr<tgfx::Data> RenderLayerCompositeWithBackdrop(
+    GPUContext* gpu, const std::shared_ptr<tgfx::Layer>& root,
+    const std::shared_ptr<tgfx::Layer>& targetLayer) {
+  auto globalBounds = targetLayer->getBounds(root.get(), true);
+  auto context = gpu->lockContext();
+  if (context == nullptr) {
+    return nullptr;
+  }
+  auto result = DoRenderBackdropComposite(context, root, globalBounds);
   gpu->unlock();
   return result;
 }

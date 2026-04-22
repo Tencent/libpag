@@ -449,6 +449,7 @@ class PPTWriter {
         _bakeTiledPattern(options.bakeTiledPattern), _bridgeContours(options.bridgeContours),
         _resolveModifiers(options.resolveModifiers),
         _rasterizeUnsupportedBlend(options.rasterizeUnsupportedBlend),
+        _compositeBlendBackdrop(options.compositeBlendBackdrop),
         _rasterizeWideGamut(options.rasterizeWideGamut), _rasterDPI(options.rasterDPI),
         _layoutContext(layoutContext), _resolver(doc) {
   }
@@ -458,7 +459,12 @@ class PPTWriter {
 
  private:
   // Returns true iff the layer was successfully rasterized and emitted as p:pic.
-  bool rasterizeLayerAsPicture(XMLBuilder& out, const Layer* layer);
+  // When `withBackdrop` is true, the whole scene below `layer` is rendered into the
+  // PNG (clipped to the layer's global bounds) so that a non-Normal blend mode on
+  // the layer composites against the backdrop correctly; otherwise only the layer
+  // itself is rendered (used for mask / scrollRect fallbacks that don't depend on
+  // the backdrop pixels).
+  bool rasterizeLayerAsPicture(XMLBuilder& out, const Layer* layer, bool withBackdrop = false);
 
   PPTWriterContext* _ctx = nullptr;
   PAGXDocument* _doc = nullptr;
@@ -469,6 +475,7 @@ class PPTWriter {
   bool _bridgeContours = true;
   bool _resolveModifiers = true;
   bool _rasterizeUnsupportedBlend = true;
+  bool _compositeBlendBackdrop = false;
   bool _rasterizeWideGamut = true;
   // _rasterDPI is wired through to PPTRasterizer via the GPUContext but the
   // current rasterization path always uses the GPU surface's native scale; the
@@ -2295,7 +2302,7 @@ void PPTWriter::writeElements(XMLBuilder& out, const std::vector<Element*>& elem
 
 // Rasterize the entire layer (including its sub-tree) to a single embedded PNG
 // and emit it as a positioned p:pic. Returns true if a picture was emitted.
-bool PPTWriter::rasterizeLayerAsPicture(XMLBuilder& out, const Layer* layer) {
+bool PPTWriter::rasterizeLayerAsPicture(XMLBuilder& out, const Layer* layer, bool withBackdrop) {
   auto& buildResult = ensureBuildResult();
   auto it = buildResult.layerMap.find(layer);
   if (it == buildResult.layerMap.end() || !buildResult.root) {
@@ -2305,7 +2312,8 @@ bool PPTWriter::rasterizeLayerAsPicture(XMLBuilder& out, const Layer* layer) {
   if (!tgfxLayer) {
     return false;
   }
-  auto pngData = RenderMaskedLayer(&_gpu, buildResult.root, tgfxLayer);
+  auto pngData = withBackdrop ? RenderLayerCompositeWithBackdrop(&_gpu, buildResult.root, tgfxLayer)
+                              : RenderMaskedLayer(&_gpu, buildResult.root, tgfxLayer);
   if (!pngData) {
     return false;
   }
@@ -2359,7 +2367,17 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& pa
   // blends, ColorMatrix filters, or wide-gamut colors.
   auto features = ProbeLayerFeatures(layer);
   if (features.needsRasterization(_rasterizeUnsupportedBlend, _rasterizeWideGamut)) {
-    if (rasterizeLayerAsPicture(out, layer)) {
+    // For a non-Normal blend mode, compositing against the real backdrop
+    // requires rendering the whole scene clipped to the layer's bounds —
+    // opt-in via `compositeBlendBackdrop` because it turns any editable
+    // native content beneath the patch into baked pixels. Every other
+    // unsupported feature (TextPath, ColorMatrix, wide-gamut color,
+    // diamond/conic gradient, shear transform) is self-contained and renders
+    // fine against an empty canvas, so the default path stays matched to the
+    // pre-existing behaviour.
+    bool withBackdrop =
+        _compositeBlendBackdrop && features.hasUnsupportedBlend && _rasterizeUnsupportedBlend;
+    if (rasterizeLayerAsPicture(out, layer, withBackdrop)) {
       return;
     }
   }

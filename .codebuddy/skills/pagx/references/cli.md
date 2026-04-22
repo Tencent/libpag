@@ -346,6 +346,7 @@ pagx export --input icon.pagx --text-to-path     # convert text to paths
 pagx export --input icon.pagx --output out.pptx --ppt-no-bake-mask  # vector masks
 pagx export --input icon.pagx --output out.pptx --ppt-no-bake-tiled-pattern  # native a:tile
 pagx export --input icon.pagx --output out.pptx --ppt-no-bridge-contours  # separate sub-paths
+pagx export --input icon.pagx --output out.pptx --ppt-composite-blend-backdrop  # bake blend against scene
 ```
 
 | Option | Description |
@@ -359,5 +360,6 @@ pagx export --input icon.pagx --output out.pptx --ppt-no-bridge-contours  # sepa
 | `--ppt-no-bake-mask` | Export masked layers as editable vector shapes instead of rasterizing to bitmap |
 | `--ppt-no-bake-tiled-pattern` | Use native OOXML `a:tile` for tiled image patterns instead of rasterizing to bitmap (may produce inconsistent scaling across apps) |
 | `--ppt-no-bridge-contours` | Emit each contour as a separate sub-path instead of bridging nested contours (default: bridge on) |
+| `--ppt-composite-blend-backdrop` | When rasterizing a layer with an unsupported blend mode, include the backdrop pixels in the PNG patch so the blend composites against the real scene. Off by default — the layer is baked against an empty canvas, which keeps every pixel under the patch editable but makes the blend look near-flat |
 
 

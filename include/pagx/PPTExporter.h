@@ -88,6 +88,19 @@ struct PPTExportOptions {
   bool rasterizeUnsupportedBlend = true;
 
   /**
+   * Whether the rasterized PNG for a layer with an unsupported blend mode should include the
+   * backdrop pixels (every layer drawn beneath, clipped to the target layer's bounds) so the
+   * blend mode composites against the real backdrop. When false, only the layer itself is
+   * rasterized against a transparent canvas — the blend then has nothing to composite against
+   * and the result degenerates to a near-flat color patch. When true, the resulting PNG patch
+   * visually matches the tgfx renderer but loses editability for any native content (gradients,
+   * sibling shapes) that falls under the patch; surrounding content outside the layer's bounds
+   * stays fully editable. Only takes effect when `rasterizeUnsupportedBlend` is also true. The
+   * default value is false.
+   */
+  bool compositeBlendBackdrop = false;
+
+  /**
    * Whether to rasterize layers whose color sources reference wide-gamut color spaces (DisplayP3,
    * etc.) so the visual appearance is preserved. OOXML colors are always sRGB. When false, the
    * wide-gamut color is clamped to sRGB and rendered as a solid fill. The default value is true.

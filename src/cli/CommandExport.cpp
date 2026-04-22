@@ -39,6 +39,7 @@ struct ExportOptions {
   bool pptBakeScrollRect = true;
   bool pptBakeTiledPattern = true;
   bool pptBridgeContours = true;
+  bool pptCompositeBlendBackdrop = false;
 };
 
 static void PrintUsage() {
@@ -67,6 +68,12 @@ static void PrintUsage() {
       << "                              tiled image patterns to bitmap\n"
       << "  --ppt-no-bridge-contours    Emit each contour as a separate sub-path instead\n"
       << "                              of bridging nested contours (default: bridge on)\n"
+      << "  --ppt-composite-blend-backdrop\n"
+      << "                              When rasterizing a layer with an unsupported blend\n"
+      << "                              mode, include the backdrop pixels in the PNG patch\n"
+      << "                              so the blend composites correctly against the scene\n"
+      << "                              beneath (default: off, layer is baked against an\n"
+      << "                              empty canvas and the blend degenerates to near-flat)\n"
       << "\n"
       << "Examples:\n"
       << "  pagx export --input icon.pagx                    # PAGX to icon.svg\n"
@@ -108,6 +115,8 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
       options->pptBakeTiledPattern = false;
     } else if (arg == "--ppt-no-bridge-contours") {
       options->pptBridgeContours = false;
+    } else if (arg == "--ppt-composite-blend-backdrop") {
+      options->pptCompositeBlendBackdrop = true;
     } else if (arg == "--help" || arg == "-h") {
       PrintUsage();
       return -1;
@@ -195,6 +204,7 @@ static int ExportToPPT(const ExportOptions& options) {
   pptOptions.bakeScrollRect = options.pptBakeScrollRect;
   pptOptions.bakeTiledPattern = options.pptBakeTiledPattern;
   pptOptions.bridgeContours = options.pptBridgeContours;
+  pptOptions.compositeBlendBackdrop = options.pptCompositeBlendBackdrop;
 
   if (!PPTExporter::ToFile(*document, options.outputFile, pptOptions)) {
     std::cerr << "pagx export: error: failed to write '" << options.outputFile << "'\n";
