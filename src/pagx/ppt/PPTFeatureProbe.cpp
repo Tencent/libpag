@@ -19,6 +19,7 @@
 #include "pagx/ppt/PPTFeatureProbe.h"
 #include <cmath>
 #include "base/utils/MathUtil.h"
+#include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/ColorStop.h"
@@ -55,7 +56,9 @@ static bool MatrixHasShear(const Matrix& m) {
   return std::fabs(dot) > 1e-3f;
 }
 
-static bool IsSupportedBlend(BlendMode mode) {
+// BlendFilter emits via <a:fillOverlay>, which OOXML natively supports for a
+// small set of modes. Any other mode on a BlendFilter requires rasterization.
+static bool IsSupportedBlendFilterMode(BlendMode mode) {
   switch (mode) {
     case BlendMode::Normal:
     case BlendMode::Multiply:
@@ -66,6 +69,14 @@ static bool IsSupportedBlend(BlendMode mode) {
     default:
       return false;
   }
+}
+
+// Layer.blendMode, Fill.blendMode and Stroke.blendMode have no editable OOXML
+// encoding at all -- the writer emits plain fills/strokes and silently drops
+// the blend mode. Only Normal can survive the vector path; anything else must
+// be rasterized so the composite against the backdrop is preserved.
+static bool IsSupportedPaintBlendMode(BlendMode mode) {
+  return mode == BlendMode::Normal;
 }
 
 static bool ColorIsWideGamut(const Color& c) {
@@ -145,7 +156,7 @@ PPTFeatureFlags ProbeElementsFeatures(const std::vector<Element*>& elements) {
         break;
       case NodeType::Fill: {
         auto* fill = static_cast<const Fill*>(el);
-        if (!IsSupportedBlend(fill->blendMode)) {
+        if (!IsSupportedPaintBlendMode(fill->blendMode)) {
           out.hasUnsupportedBlend = true;
         }
         ProbeColorSource(fill->color, &out);
@@ -153,7 +164,7 @@ PPTFeatureFlags ProbeElementsFeatures(const std::vector<Element*>& elements) {
       }
       case NodeType::Stroke: {
         auto* stroke = static_cast<const Stroke*>(el);
-        if (!IsSupportedBlend(stroke->blendMode)) {
+        if (!IsSupportedPaintBlendMode(stroke->blendMode)) {
           out.hasUnsupportedBlend = true;
         }
         ProbeColorSource(stroke->color, &out);
@@ -184,7 +195,7 @@ PPTFeatureFlags ProbeLayerFeatures(const Layer* layer) {
   if (layer == nullptr || !layer->visible) {
     return out;
   }
-  if (!IsSupportedBlend(layer->blendMode)) {
+  if (!IsSupportedPaintBlendMode(layer->blendMode)) {
     out.hasUnsupportedBlend = true;
   }
   if (!layer->matrix.isIdentity() && MatrixHasShear(layer->matrix)) {
@@ -198,9 +209,10 @@ PPTFeatureFlags ProbeLayerFeatures(const Layer* layer) {
     if (type == NodeType::ColorMatrixFilter) {
       out.hasColorMatrix = true;
     } else if (type == NodeType::BlendFilter) {
-      // BlendFilter mixes the layer with another source via an arbitrary blend
-      // mode; OOXML cannot reproduce that, so always escalate to rasterization.
-      out.hasUnsupportedBlend = true;
+      auto* blend = static_cast<const BlendFilter*>(filter);
+      if (!IsSupportedBlendFilterMode(blend->blendMode)) {
+        out.hasUnsupportedBlend = true;
+      }
     }
   }
 
