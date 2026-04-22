@@ -157,12 +157,19 @@ struct PositionedGlyph {
 // image) instead of the walker knowing about either.
 static std::vector<PositionedGlyph> WalkGlyphs(const Text& text, float textPosX, float textPosY) {
   std::vector<PositionedGlyph> result;
+  size_t totalGlyphs = 0;
+  for (const auto* run : text.glyphRuns) {
+    totalGlyphs += run->glyphs.size();
+  }
+  result.reserve(totalGlyphs);
   for (const auto* run : text.glyphRuns) {
     if (!run->font || run->glyphs.empty()) {
       continue;
     }
     float scale = run->fontSize / static_cast<float>(run->font->unitsPerEm);
-    float currentX = textPosX + run->x;
+    float baseX = textPosX + run->x;
+    float baseY = textPosY + run->y;
+    float currentX = baseX;
     for (size_t i = 0; i < run->glyphs.size(); i++) {
       uint16_t glyphID = run->glyphs[i];
       if (glyphID == 0) {
@@ -180,17 +187,17 @@ static std::vector<PositionedGlyph> WalkGlyphs(const Text& text, float textPosX,
       float posX = 0;
       float posY = 0;
       if (i < run->positions.size()) {
-        posX = textPosX + run->x + run->positions[i].x;
-        posY = textPosY + run->y + run->positions[i].y;
+        posX = baseX + run->positions[i].x;
+        posY = baseY + run->positions[i].y;
         if (i < run->xOffsets.size()) {
           posX += run->xOffsets[i];
         }
       } else if (i < run->xOffsets.size()) {
-        posX = textPosX + run->x + run->xOffsets[i];
-        posY = textPosY + run->y;
+        posX = baseX + run->xOffsets[i];
+        posY = baseY;
       } else {
         posX = currentX;
-        posY = textPosY + run->y;
+        posY = baseY;
       }
       // Advance the cursor for the no-positions / no-xOffsets fallback path
       // even when this particular glyph is later filtered out, so subsequent

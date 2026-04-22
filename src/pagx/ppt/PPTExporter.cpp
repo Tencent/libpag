@@ -548,6 +548,26 @@ class PPTWriter {
                          float alpha, const std::vector<LayerFilter*>& filters,
                          const std::vector<LayerStyle*>& styles);
 
+  // Tracks the open/close state of an <a:p> element while writeTextBoxGroup
+  // streams runs into paragraphs. Replaces the previous lambda-based approach
+  // so the helpers become explicit methods (project convention forbids
+  // lambdas). Lifetime is tied to a single writeTextBoxGroup invocation; all
+  // reference members alias data owned by that call frame.
+  struct ParagraphEmitter {
+    PPTWriter* writer;
+    XMLBuilder& out;
+    const char* algn;
+    int64_t lnSpcPts;
+    const std::vector<LayerFilter*>& filters;
+    const std::vector<LayerStyle*>& styles;
+    bool paragraphOpen = false;
+
+    void writePPr();
+    void openParagraph();
+    void closeParagraph();
+    void emitRun(const std::string& fragment, const PPTRunStyle& style);
+  };
+
   // Shape envelope helpers
   void beginShape(XMLBuilder& out, const char* name, int64_t offX, int64_t offY, int64_t extCX,
                   int64_t extCY, int rot = 0);
@@ -1817,6 +1837,22 @@ struct RichTextRun {
   const Stroke* stroke = nullptr;
 };
 
+// One entry in the PAGX-authoritative line list consumed by writeTextBoxGroup.
+// `runIndex` points back into the RichTextRun array, and `byteStart`/`byteEnd`
+// are byte offsets into that run's UTF-8 text.
+struct LineEntry {
+  size_t runIndex = 0;
+  float baselineY = 0;
+  uint32_t byteStart = 0;
+  uint32_t byteEnd = 0;
+};
+
+// Stable-sort comparator for LineEntry. Defined as a named function (not a
+// lambda) per project convention.
+bool CompareLineEntryByBaselineY(const LineEntry& a, const LineEntry& b) {
+  return a.baselineY < b.baselineY;
+}
+
 // Walks the TextBox children in source order, pairing every Text with its
 // nearest enclosing Fill/Stroke. Direct Text children inherit `parentFill`
 // and `parentStroke`; Texts nested inside a Group use that Group's
@@ -1842,6 +1878,33 @@ void CollectRichTextRuns(const std::vector<Element*>& elements, const Fill* pare
 }
 
 }  // namespace
+
+void PPTWriter::ParagraphEmitter::writePPr() {
+  WriteParagraphProperties(out, algn, lnSpcPts);
+}
+
+void PPTWriter::ParagraphEmitter::openParagraph() {
+  out.openElement("a:p").closeElementStart();
+  writePPr();
+  paragraphOpen = true;
+}
+
+void PPTWriter::ParagraphEmitter::closeParagraph() {
+  if (paragraphOpen) {
+    out.closeElement();  // a:p
+    paragraphOpen = false;
+  }
+}
+
+void PPTWriter::ParagraphEmitter::emitRun(const std::string& fragment, const PPTRunStyle& style) {
+  if (fragment.empty()) {
+    return;
+  }
+  if (!paragraphOpen) {
+    openParagraph();
+  }
+  writer->writeParagraphRun(out, fragment, style, filters, styles);
+}
 
 void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
                                   const std::vector<Element*>& elements, const Matrix& transform,
@@ -1919,12 +1982,6 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
   // `getTextLines` returns nullptr for layouts where line info isn't tracked
   // (notably vertical writing mode); those fall back to legacy '\n'-splitting
   // and PowerPoint-driven wrapping.
-  struct LineEntry {
-    size_t runIndex = 0;
-    float baselineY = 0;
-    uint32_t byteStart = 0;
-    uint32_t byteEnd = 0;
-  };
   std::vector<LineEntry> lineEntries;
   bool useLineLayout = !runs.empty() && box->writingMode != WritingMode::Vertical;
   if (useLineLayout) {
@@ -1976,8 +2033,6 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
   out.openElement("a:lstStyle").closeElementSelfClosing();
   int64_t lnSpcPts = LineHeightToSpcPts(box->lineHeight);
 
-  auto writePPr = [&]() { WriteParagraphProperties(out, algn, lnSpcPts); };
-
   // Build per-run styles up-front (font/size/bold/italic/color/typeface).
   // Alignment lives on a:pPr (not a:rPr) so we leave style.algn at nullptr here.
   std::vector<PPTRunStyle> runStyles;
@@ -1986,36 +2041,14 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
     runStyles.push_back(BuildRunStyle(run.text, run.fill, run.stroke, alpha));
   }
 
-  bool paragraphOpen = false;
-  auto openParagraph = [&]() {
-    out.openElement("a:p").closeElementStart();
-    writePPr();
-    paragraphOpen = true;
-  };
-  auto closeParagraph = [&]() {
-    if (paragraphOpen) {
-      out.closeElement();  // a:p
-      paragraphOpen = false;
-    }
-  };
-  auto emitRun = [&](const std::string& fragment, const PPTRunStyle& rs) {
-    if (fragment.empty()) {
-      return;
-    }
-    if (!paragraphOpen) {
-      openParagraph();
-    }
-    writeParagraphRun(out, fragment, rs, filters, styles);
-  };
+  ParagraphEmitter emitter{this, out, algn, lnSpcPts, filters, styles};
 
   if (useLineLayout) {
     // Stable-sort entries by baselineY so that runs from different Text
     // elements sharing the same visual line stay in source order (rich text
     // flows left-to-right within a baseline). Then group consecutive entries
     // with matching baselineY into one visual line.
-    std::stable_sort(
-        lineEntries.begin(), lineEntries.end(),
-        [](const LineEntry& a, const LineEntry& b) { return a.baselineY < b.baselineY; });
+    std::stable_sort(lineEntries.begin(), lineEntries.end(), CompareLineEntryByBaselineY);
     constexpr float kBaselineEpsilon = 0.5f;
     // Emit ALL visual lines inside a single <a:p> separated by soft <a:br/>
     // breaks (rather than one <a:p> per line). This is required for justify
@@ -2024,7 +2057,7 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
     // turns every line into a "last line" and disables justify entirely.
     // Soft breaks within a single paragraph make all lines except the
     // semantically last one participate in justify.
-    openParagraph();
+    emitter.openParagraph();
     bool firstLine = true;
     size_t i = 0;
     while (i < lineEntries.size()) {
@@ -2037,12 +2070,12 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
              std::fabs(lineEntries[i].baselineY - baseline) < kBaselineEpsilon) {
         const auto& entry = lineEntries[i];
         const std::string& src = runs[entry.runIndex].text->text;
-        emitRun(src.substr(entry.byteStart, entry.byteEnd - entry.byteStart),
-                runStyles[entry.runIndex]);
+        emitter.emitRun(src.substr(entry.byteStart, entry.byteEnd - entry.byteStart),
+                        runStyles[entry.runIndex]);
         ++i;
       }
     }
-    closeParagraph();
+    emitter.closeParagraph();
   } else {
     // Fallback path: stream runs into paragraphs, splitting only on '\n'. A
     // single Text element may carry multiple newlines internally, in which
@@ -2056,21 +2089,21 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
       while (pos <= s.size()) {
         size_t nl = s.find('\n', pos);
         if (nl == std::string::npos) {
-          emitRun(s.substr(pos), rs);
+          emitter.emitRun(s.substr(pos), rs);
           break;
         }
-        emitRun(s.substr(pos, nl - pos), rs);
+        emitter.emitRun(s.substr(pos, nl - pos), rs);
         // Newline terminates the current paragraph; if the paragraph is still
         // empty (e.g. consecutive '\n's), open and immediately close it so the
         // blank line is preserved.
-        if (!paragraphOpen) {
-          openParagraph();
+        if (!emitter.paragraphOpen) {
+          emitter.openParagraph();
         }
-        closeParagraph();
+        emitter.closeParagraph();
         pos = nl + 1;
       }
     }
-    closeParagraph();
+    emitter.closeParagraph();
   }
 
   out.closeElement();  // p:txBody
