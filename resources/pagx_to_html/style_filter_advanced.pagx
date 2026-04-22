@@ -110,14 +110,14 @@
 
       <!-- BlurFilter tileMode + Path reversed -->
       <Layer flex="1" layout="vertical" gap="6" alignment="center" arrangement="center">
-        <Layer layout="horizontal" gap="8" alignment="center" arrangement="center">
+        <Layer layout="horizontal" gap="12" alignment="center" arrangement="center">
           <!-- Blur tileMode=mirror -->
           <Layer layout="vertical" gap="4" alignment="center">
-            <Layer width="100" height="60">
-              <Layer name="blurMirror" centerX="0" centerY="0">
-                <Rectangle position="50,30" size="100,60"/>
+            <Layer width="112" height="76">
+              <Layer name="blurMirror" width="88" height="52" centerX="0" centerY="0">
+                <Rectangle position="44,26" size="88,52"/>
                 <Fill>
-                  <LinearGradient startPoint="0,0" endPoint="100,0">
+                  <LinearGradient startPoint="0,0" endPoint="88,0">
                     <ColorStop offset="0" color="#06B6D4"/>
                     <ColorStop offset="0.33" color="#06B6D4"/>
                     <ColorStop offset="0.34" color="#EC4899"/>
