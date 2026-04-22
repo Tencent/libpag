@@ -426,14 +426,38 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                                                       span.text->wrappedGlyphCounts(), tgfxLines);
               if (canSplit) {
                 out.closeTagStart();
+                // For `textAlign=justify` we can't rely on `<br>`-separated inline runs: CSS
+                // treats the text before each `<br>` as a line break, i.e. the "last line" of
+                // that fragment, so `text-align:justify` leaves them start-aligned (matches
+                // `text-align-last:auto`). tgfx justifies every line except the final one by
+                // expanding the inter-word gaps, so we emit each non-final tgfx line as a
+                // block-level `<span>` with `text-align-last:justify` to force Chromium to
+                // distribute the leftover width, and keep the final line without the override
+                // so it stays start-aligned (mirrors TextLayout.cpp's `lineIdx < size-1` check).
+                bool justifyPerLine = tb->textAlign == TextAlign::Justify && tgfxLines.size() > 1;
                 for (size_t li = 0; li < tgfxLines.size(); li++) {
-                  if (li > 0) {
-                    out.openTag("br");
-                    out.closeTagSelfClosing();
-                  }
                   auto& ln = tgfxLines[li];
-                  out.addTextContent(
-                      span.text->text.substr(ln.byteStart, ln.byteEnd - ln.byteStart));
+                  std::string lineText =
+                      span.text->text.substr(ln.byteStart, ln.byteEnd - ln.byteStart);
+                  if (justifyPerLine) {
+                    out.openTag("span");
+                    bool isLast = li + 1 == tgfxLines.size();
+                    // `white-space:nowrap` keeps Chromium from re-wrapping the per-line slice
+                    // when its own glyph-advance measurement runs slightly wider than tgfx's
+                    // (a single word like "justify" hitting the edge will otherwise bump to a
+                    // new line and nullify the `text-align-last:justify` distribution).
+                    out.addAttr("style",
+                                isLast ? std::string("display:block")
+                                       : std::string("display:block;white-space:nowrap;text-align-"
+                                                     "last:justify"));
+                    out.closeTagWithText(lineText);
+                  } else {
+                    if (li > 0) {
+                      out.openTag("br");
+                      out.closeTagSelfClosing();
+                    }
+                    out.addTextContent(lineText);
+                  }
                 }
                 out.closeTag();
               } else {
@@ -546,13 +570,28 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                                                         span.text->wrappedGlyphCounts(), tgfxLines);
             if (canSplit) {
               out.closeTagStart();
+              // Same justify-aware per-line emission as the inline-TextBox path: block-level
+              // spans with `text-align-last:justify` on every non-final line let Chromium
+              // reproduce tgfx's "stretch every line except the last" justify semantics.
+              bool justifyPerLine = tb->textAlign == TextAlign::Justify && tgfxLines.size() > 1;
               for (size_t li = 0; li < tgfxLines.size(); li++) {
-                if (li > 0) {
-                  out.openTag("br");
-                  out.closeTagSelfClosing();
-                }
                 auto& ln = tgfxLines[li];
-                out.addTextContent(span.text->text.substr(ln.byteStart, ln.byteEnd - ln.byteStart));
+                std::string lineText =
+                    span.text->text.substr(ln.byteStart, ln.byteEnd - ln.byteStart);
+                if (justifyPerLine) {
+                  out.openTag("span");
+                  bool isLast = li + 1 == tgfxLines.size();
+                  out.addAttr("style", isLast ? std::string("display:block")
+                                              : std::string("display:block;white-space:nowrap;"
+                                                            "text-align-last:justify"));
+                  out.closeTagWithText(lineText);
+                } else {
+                  if (li > 0) {
+                    out.openTag("br");
+                    out.closeTagSelfClosing();
+                  }
+                  out.addTextContent(lineText);
+                }
               }
               out.closeTag();
             } else {
