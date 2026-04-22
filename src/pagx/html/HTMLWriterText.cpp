@@ -1765,7 +1765,11 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
     if (!FloatNearlyZero(rep->anchor.x) || !FloatNearlyZero(rep->anchor.y)) {
       m = Matrix::Translate(rep->anchor.x, rep->anchor.y) * m;
     }
-    float denom = std::max(std::ceil(rep->copies) - 1.0f, 1.0f);
+    // Match tgfx Repeater::apply: alphaT = progress / maxCount, where maxCount == ceil(copies).
+    // Using copies-1 as the denominator forces the last rendered copy to land exactly on
+    // endAlpha, but tgfx lets only the asymptote (i == maxCount) reach endAlpha, so the final
+    // copy at i = maxCount-1 sits at startAlpha + (endAlpha - startAlpha) * (N-1)/N.
+    float denom = std::max(std::ceil(rep->copies), 1.0f);
     float np = std::clamp((static_cast<float>(idx) + rep->offset) / denom, 0.0f, 1.0f);
     float ca = rep->startAlpha + (rep->endAlpha - rep->startAlpha) * np;
     if (idx == n - 1 && frac > 0 && frac < 1.0f) {
