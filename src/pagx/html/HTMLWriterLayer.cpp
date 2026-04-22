@@ -48,67 +48,6 @@ namespace pagx {
 
 using pag::FloatNearlyZero;
 
-namespace {
-
-// Splits `text` into visible line segments based on where tgfx's text layout engine placed
-// line breaks, so the emitted HTML matches PAGX line-for-line instead of relying on Chromium's
-// word-wrap re-flow (which uses its own glyph advance measurements and often breaks one token
-// earlier or later than tgfx when a word lands near the TextBox right edge).
-//
-// Only single-byte ASCII sources are handled here: HarfBuzz cluster information is not kept
-// in TextLayoutGlyphRun, so we assume 1 glyph == 1 source byte and any multi-byte codepoint,
-// ligature, or RTL text falls back to CSS word-wrap by returning false.
-struct TgfxWrappedLine {
-  size_t byteStart = 0;
-  size_t byteEnd = 0;  // exclusive; trailing whitespace trimmed by tgfx is not included
-};
-
-bool TrySplitTextByTgfxLines(const std::string& text, const std::vector<size_t>& glyphsPerLine,
-                             std::vector<TgfxWrappedLine>& outLines) {
-  outLines.clear();
-  if (text.empty() || glyphsPerLine.size() <= 1) {
-    return false;
-  }
-  for (unsigned char c : text) {
-    if (c >= 0x80) {
-      return false;
-    }
-  }
-  size_t pos = 0;
-  size_t n = text.size();
-  for (size_t li = 0; li < glyphsPerLine.size(); li++) {
-    if (li > 0) {
-      // Skip leading spaces that tgfx trimmed from the previous line end.
-      while (pos < n && text[pos] == ' ') {
-        pos++;
-      }
-    }
-    size_t start = pos;
-    size_t needed = glyphsPerLine[li];
-    while (pos < n && needed > 0) {
-      needed--;
-      pos++;
-    }
-    if (needed > 0) {
-      return false;
-    }
-    size_t end = pos;
-    while (end > start && text[end - 1] == ' ') {
-      end--;
-    }
-    outLines.push_back({start, end});
-  }
-  while (pos < n && text[pos] == ' ') {
-    pos++;
-  }
-  if (pos != n) {
-    return false;
-  }
-  return true;
-}
-
-}  // namespace
-
 //==============================================================================
 // HTMLWriter – element processing
 //==============================================================================
@@ -414,55 +353,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               }
               out.openTag("span");
               out.addAttr("style", spanStyle);
-              // Respect tgfx's wrap decisions when possible. CSS word-wrap uses Chromium's own
-              // glyph advance measurements, which differ from tgfx's HarfBuzz output by a few
-              // subpixels and can push the break point past/before a token near the TextBox
-              // edge (e.g. text_box "Text line 1..5", text_features "This text overflows...").
-              // Splitting the source string along tgfx's line boundaries and emitting one
-              // `<br>` per break forces Chromium to mirror tgfx's layout exactly.
-              std::vector<TgfxWrappedLine> tgfxLines;
-              bool canSplit = tb->wordWrap && !std::isnan(tbW) && tbW > 0 &&
-                              TrySplitTextByTgfxLines(span.text->text,
-                                                      span.text->wrappedGlyphCounts(), tgfxLines);
-              if (canSplit) {
-                out.closeTagStart();
-                // For `textAlign=justify` we can't rely on `<br>`-separated inline runs: CSS
-                // treats the text before each `<br>` as a line break, i.e. the "last line" of
-                // that fragment, so `text-align:justify` leaves them start-aligned (matches
-                // `text-align-last:auto`). tgfx justifies every line except the final one by
-                // expanding the inter-word gaps, so we emit each non-final tgfx line as a
-                // block-level `<span>` with `text-align-last:justify` to force Chromium to
-                // distribute the leftover width, and keep the final line without the override
-                // so it stays start-aligned (mirrors TextLayout.cpp's `lineIdx < size-1` check).
-                bool justifyPerLine = tb->textAlign == TextAlign::Justify && tgfxLines.size() > 1;
-                for (size_t li = 0; li < tgfxLines.size(); li++) {
-                  auto& ln = tgfxLines[li];
-                  std::string lineText =
-                      span.text->text.substr(ln.byteStart, ln.byteEnd - ln.byteStart);
-                  if (justifyPerLine) {
-                    out.openTag("span");
-                    bool isLast = li + 1 == tgfxLines.size();
-                    // `white-space:nowrap` keeps Chromium from re-wrapping the per-line slice
-                    // when its own glyph-advance measurement runs slightly wider than tgfx's
-                    // (a single word like "justify" hitting the edge will otherwise bump to a
-                    // new line and nullify the `text-align-last:justify` distribution).
-                    out.addAttr("style",
-                                isLast ? std::string("display:block")
-                                       : std::string("display:block;white-space:nowrap;text-align-"
-                                                     "last:justify"));
-                    out.closeTagWithText(lineText);
-                  } else {
-                    if (li > 0) {
-                      out.openTag("br");
-                      out.closeTagSelfClosing();
-                    }
-                    out.addTextContent(lineText);
-                  }
-                }
-                out.closeTag();
-              } else {
-                out.closeTagWithText(span.text->text);
-              }
+              out.closeTagWithText(span.text->text);
             }
             if (needsInnerWrap) {
               out.closeTag();
@@ -562,41 +453,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             }
             out.openTag("span");
             out.addAttr("style", spanStyle);
-            // Mirror tgfx's line-break decisions with explicit <br> tags instead of relying on
-            // Chromium's word-wrap (same rationale as the inline-TextBox path above).
-            std::vector<TgfxWrappedLine> tgfxLines;
-            bool canSplit =
-                tb->wordWrap && TrySplitTextByTgfxLines(span.text->text,
-                                                        span.text->wrappedGlyphCounts(), tgfxLines);
-            if (canSplit) {
-              out.closeTagStart();
-              // Same justify-aware per-line emission as the inline-TextBox path: block-level
-              // spans with `text-align-last:justify` on every non-final line let Chromium
-              // reproduce tgfx's "stretch every line except the last" justify semantics.
-              bool justifyPerLine = tb->textAlign == TextAlign::Justify && tgfxLines.size() > 1;
-              for (size_t li = 0; li < tgfxLines.size(); li++) {
-                auto& ln = tgfxLines[li];
-                std::string lineText =
-                    span.text->text.substr(ln.byteStart, ln.byteEnd - ln.byteStart);
-                if (justifyPerLine) {
-                  out.openTag("span");
-                  bool isLast = li + 1 == tgfxLines.size();
-                  out.addAttr("style", isLast ? std::string("display:block")
-                                              : std::string("display:block;white-space:nowrap;"
-                                                            "text-align-last:justify"));
-                  out.closeTagWithText(lineText);
-                } else {
-                  if (li > 0) {
-                    out.openTag("br");
-                    out.closeTagSelfClosing();
-                  }
-                  out.addTextContent(lineText);
-                }
-              }
-              out.closeTag();
-            } else {
-              out.closeTagWithText(span.text->text);
-            }
+            out.closeTagWithText(span.text->text);
           }
           if (needsInnerWrap) {
             out.closeTag();
