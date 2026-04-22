@@ -29,6 +29,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/PAGXOptimizer.h"
 #include "pagx/SVGImporter.h"
 #include "pagx/TextLayout.h"
 #include "pagx/TextLayoutParams.h"
@@ -182,6 +183,10 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
       ADD_FAILURE() << "Invalid dimensions in SVG: " << svgPath;
       continue;
     }
+
+    // Step 1b: Simplify the imported structure before layout so verify doesn't flag the raw
+    // Layer/Group tree produced by the SVG importer.
+    pagx::PAGXOptimizer::Optimize(doc.get());
 
     // Step 2: Layout and embed fonts
     doc->applyLayout(&svgFontConfig);

@@ -64,12 +64,27 @@ class PAGXOptimizer {
     }
   };
 
+  struct Result {
+    /**
+     * True when the rule set reached a fixed point within `maxIterations`. A false value means the
+     * optimizer was cut off by the iteration cap, which either indicates a rule set that is still
+     * making progress or (rarely) two rules oscillating against each other.
+     */
+    bool converged = true;
+    /**
+     * Number of rule iterations actually executed (both on the root layer list and on each
+     * Composition's layer list). Useful as a monotonic signal for regression / telemetry.
+     */
+    int iterationsUsed = 0;
+  };
+
   /**
    * Simplifies the structure of `doc` in place. Has no effect on rendering output.
    * Safe to call multiple times; the second call is a no-op once the document is already
-   * at a fixed point.
+   * at a fixed point. When the optimizer fails to converge within `options.maxIterations`, a
+   * warning is appended to `doc->errors` and `Result::converged` is set to false.
    */
-  static void Optimize(PAGXDocument* doc, const Options& options = Options());
+  static Result Optimize(PAGXDocument* doc, const Options& options = Options());
 };
 
 }  // namespace pagx

@@ -559,6 +559,12 @@ bool CanonicalizePathsInElements(PAGXDocument* doc, std::vector<Element*>& eleme
 bool CanonicalizePathsInLayer(PAGXDocument* doc, Layer* layer) {
   bool changed = false;
   changed |= CanonicalizePathsInElements(doc, layer->contents);
+  // Mask subtrees carry their own Path children (e.g. SVG <clipPath> typically imports each
+  // <rect> as Path data). Rewriting those Paths to Rectangle primitives is the prerequisite
+  // for TryConvertRectMaskToScrollRect to recognize the mask as an axis-aligned alpha rect.
+  if (layer->mask != nullptr) {
+    changed |= CanonicalizePathsInLayer(doc, layer->mask);
+  }
   for (auto* child : layer->children) {
     changed |= CanonicalizePathsInLayer(doc, child);
   }
@@ -620,38 +626,47 @@ bool DowngradeShellChildren(PAGXDocument* doc, std::vector<Layer*>& layers,
 // Layer, DowngradeShellChildren handles it earlier (no wrapper needed).
 // ----------------------------------------------------------------------------
 
+bool IsMergeableShellLayer(const Layer* layer, const std::unordered_set<const Layer*>& maskRefs) {
+  if (!layer->children.empty()) return false;
+  return IsLayerShell(layer) && !LayerNeedsKeeping(layer, maskRefs) && !HasUnresolvedImport(layer);
+}
+
+// Backfills `result` with the first `upTo` entries of `source` the first time a mutation happens.
+// Used by the adjacent-shell/group mergers, whose common case is "no change to the list" — we
+// want to avoid allocating a result vector until a mutation is actually detected.
+void BeginLayerMutation(std::vector<Layer*>& source, std::vector<Layer*>& result, size_t upTo,
+                        bool* changed) {
+  if (*changed) return;
+  *changed = true;
+  result.reserve(source.size());
+  result.insert(result.end(), source.begin(), source.begin() + static_cast<ptrdiff_t>(upTo));
+}
+
+void BeginElementMutation(std::vector<Element*>& source, std::vector<Element*>& result, size_t upTo,
+                          bool* changed) {
+  if (*changed) return;
+  *changed = true;
+  result.reserve(source.size());
+  result.insert(result.end(), source.begin(), source.begin() + static_cast<ptrdiff_t>(upTo));
+}
+
 bool MergeAdjacentShellLayersInList(PAGXDocument* doc, std::vector<Layer*>& layers,
                                     bool parentHasLayout,
                                     const std::unordered_set<const Layer*>& maskRefs) {
   if (parentHasLayout) return false;
   if (layers.size() < 2) return false;
 
-  auto isMergeable = [&](const Layer* l) {
-    return !l->children.empty()
-               ? false
-               : (IsLayerShell(l) && !LayerNeedsKeeping(l, maskRefs) && !HasUnresolvedImport(l));
-  };
-
-  // The common case is "no adjacent shell run" — we want to avoid allocating a throwaway
-  // result vector for that case. Defer allocation until the first merge is detected, then
-  // backfill everything we've seen so far into the result.
   std::vector<Layer*> result;
   bool changed = false;
-  auto beginMutation = [&](size_t upTo) {
-    if (changed) return;
-    changed = true;
-    result.reserve(layers.size());
-    result.insert(result.end(), layers.begin(), layers.begin() + static_cast<ptrdiff_t>(upTo));
-  };
   size_t i = 0;
   while (i < layers.size()) {
-    if (!isMergeable(layers[i])) {
+    if (!IsMergeableShellLayer(layers[i], maskRefs)) {
       if (changed) result.push_back(layers[i]);
       i++;
       continue;
     }
     size_t j = i + 1;
-    while (j < layers.size() && isMergeable(layers[j])) {
+    while (j < layers.size() && IsMergeableShellLayer(layers[j], maskRefs)) {
       j++;
     }
     if (j - i < 2) {
@@ -659,7 +674,7 @@ bool MergeAdjacentShellLayersInList(PAGXDocument* doc, std::vector<Layer*>& laye
       i++;
       continue;
     }
-    beginMutation(i);
+    BeginLayerMutation(layers, result, i, &changed);
     // Build a new wrapper layer containing one Group per source.
     auto* wrapper = doc->makeNode<Layer>();
     wrapper->sourceLine = layers[i]->sourceLine;
@@ -764,32 +779,23 @@ bool MergeAdjacentGroupsInElements(std::vector<Element*>& elements) {
   // contain a mergeable pair, so in the common case we skip the vector entirely.
   std::vector<Element*> result;
   bool changed = false;
-  auto beginMutation = [&](size_t upTo) {
-    if (changed) return;
-    changed = true;
-    result.reserve(elements.size());
-    result.insert(result.end(), elements.begin(), elements.begin() + static_cast<ptrdiff_t>(upTo));
-  };
-  auto keepCurrent = [&](Element* el) {
-    if (changed) result.push_back(el);
-  };
   size_t i = 0;
   while (i < elements.size()) {
     auto* el = elements[i];
     if (el->nodeType() != NodeType::Group) {
-      keepCurrent(el);
+      if (changed) result.push_back(el);
       i++;
       continue;
     }
     auto* baseGroup = static_cast<Group*>(el);
     if (!IsDefaultTransformGroup(baseGroup) || !baseGroup->customData.empty()) {
-      keepCurrent(el);
+      if (changed) result.push_back(el);
       i++;
       continue;
     }
     auto baseSig = ComputePainterSignature(baseGroup);
     if (!baseSig.valid) {
-      keepCurrent(el);
+      if (changed) result.push_back(el);
       i++;
       continue;
     }
@@ -829,7 +835,7 @@ bool MergeAdjacentGroupsInElements(std::vector<Element*>& elements) {
       }
       baseGroup->elements = std::move(updated);
       // Drop nextGroup entirely (its painters were duplicates of baseGroup's).
-      beginMutation(i);
+      BeginElementMutation(elements, result, i, &changed);
       j++;
     }
     if (changed) result.push_back(baseGroup);
@@ -1108,10 +1114,15 @@ bool PruneUnreferencedResources(PAGXDocument* doc) {
   return changed;
 }
 
-void OptimizeLayerList(PAGXDocument* doc, std::vector<Layer*>& layers,
-                       std::unordered_set<const Layer*>& maskRefs,
-                       const PAGXOptimizer::Options& options) {
-  for (int iter = 0; iter < options.maxIterations; iter++) {
+// Runs the per-layer-list rule loop until a fixed point or `options.maxIterations` is reached.
+// Returns the number of iterations that were actually executed — callers use this to sum up a
+// monotonic "iterations used" counter and to detect non-convergence (iteration count exactly
+// matches the cap while the last pass still reported changes).
+int OptimizeLayerList(PAGXDocument* doc, std::vector<Layer*>& layers,
+                      std::unordered_set<const Layer*>& maskRefs,
+                      const PAGXOptimizer::Options& options, bool* converged) {
+  int iter = 0;
+  for (; iter < options.maxIterations; iter++) {
     bool changed = false;
 
     if (options.canonicalizePaths) {
@@ -1148,23 +1159,30 @@ void OptimizeLayerList(PAGXDocument* doc, std::vector<Layer*>& layers,
     if (options.mergeAdjacentShellLayers) {
       changed |= MergeAdjacentShellLayers(doc, layers, maskRefs);
     }
-    if (!changed) break;
+    if (!changed) {
+      return iter + 1;
+    }
   }
+  *converged = false;
+  return iter;
 }
 
 }  // namespace
 
-void PAGXOptimizer::Optimize(PAGXDocument* doc, const Options& options) {
-  if (doc == nullptr) return;
+PAGXOptimizer::Result PAGXOptimizer::Optimize(PAGXDocument* doc, const Options& options) {
+  Result result;
+  if (doc == nullptr) return result;
 
   std::unordered_set<const Layer*> maskRefs;
   RecomputeMaskRefs(doc, maskRefs);
 
-  OptimizeLayerList(doc, doc->layers, maskRefs, options);
+  result.iterationsUsed +=
+      OptimizeLayerList(doc, doc->layers, maskRefs, options, &result.converged);
   for (auto& node : doc->nodes) {
     if (node->nodeType() == NodeType::Composition) {
       auto* comp = static_cast<Composition*>(node.get());
-      OptimizeLayerList(doc, comp->layers, maskRefs, options);
+      result.iterationsUsed +=
+          OptimizeLayerList(doc, comp->layers, maskRefs, options, &result.converged);
     }
   }
 
@@ -1176,6 +1194,13 @@ void PAGXOptimizer::Optimize(PAGXDocument* doc, const Options& options) {
   if (options.pruneUnreferencedResources) {
     PruneUnreferencedResources(doc);
   }
+
+  if (!result.converged) {
+    doc->errors.push_back("PAGXOptimizer: structural rules did not reach a fixed point within " +
+                          std::to_string(options.maxIterations) +
+                          " iterations — some simplifications may be missed");
+  }
+  return result;
 }
 
 }  // namespace pagx

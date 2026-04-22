@@ -23,7 +23,6 @@
 #include <cstring>
 #include "base/utils/MathUtil.h"
 #include "pagx/PAGXDocument.h"
-#include "pagx/PAGXOptimizer.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/svg/SVGBlendMode.h"
@@ -62,7 +61,6 @@ std::shared_ptr<PAGXDocument> SVGImporter::Parse(const std::string& filePath,
         }
       }
     }
-    PAGXOptimizer::Optimize(doc.get());
   }
   return doc;
 }
@@ -70,11 +68,7 @@ std::shared_ptr<PAGXDocument> SVGImporter::Parse(const std::string& filePath,
 std::shared_ptr<PAGXDocument> SVGImporter::Parse(const uint8_t* data, size_t length,
                                                  const Options& options) {
   SVGParserContext parser(options);
-  auto doc = parser.parse(data, length);
-  if (doc) {
-    PAGXOptimizer::Optimize(doc.get());
-  }
-  return doc;
+  return parser.parse(data, length);
 }
 
 std::shared_ptr<PAGXDocument> SVGImporter::ParseString(const std::string& svgContent,

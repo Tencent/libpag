@@ -24,6 +24,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/PAGXOptimizer.h"
 #include "pagx/SVGExporter.h"
 #include "pagx/SVGImporter.h"
 #include "pagx/TextLayout.h"
@@ -571,6 +572,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_MultiRoundTrip) {
     if (doc->width <= 0 || doc->height <= 0) {
       continue;
     }
+    pagx::PAGXOptimizer::Optimize(doc.get());
 
     for (int i = 0; i < NumRoundTrips; i++) {
       auto round = std::to_string(i + 1);
@@ -590,6 +592,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_MultiRoundTrip) {
 
       doc = pagx::SVGImporter::ParseString(svgStr);
       ASSERT_NE(doc, nullptr) << baseName << " round " << round << " SVG re-import failed";
+      pagx::PAGXOptimizer::Optimize(doc.get());
     }
   }
 }

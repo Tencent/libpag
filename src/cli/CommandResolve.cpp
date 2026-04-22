@@ -318,9 +318,10 @@ int RunResolve(int argc, char* argv[]) {
     return 0;
   }
 
-  // Auto-simplify the merged structure now that imports have been expanded. The optimizer is
-  // conservative: any Layer carrying id/name/customData/layout/constraints (typical hand-
-  // authored content) is untouched, so this only cleans up the newly inlined import payload.
+  // Always run the optimizer so the resolve output is stable regardless of whether the input
+  // contained imports or already-authored structure. The optimizer is conservative: any Layer
+  // carrying id/name/customData/layout/constraints (typical hand-authored content) is untouched,
+  // so this only cleans up the newly inlined import payload.
   PAGXOptimizer::Optimize(doc.get());
 
   auto xml = PAGXExporter::ToXML(*doc);

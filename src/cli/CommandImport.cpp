@@ -21,6 +21,7 @@
 #include <string>
 #include "cli/CliUtils.h"
 #include "pagx/PAGXExporter.h"
+#include "pagx/PAGXOptimizer.h"
 #include "pagx/SVGImporter.h"
 
 namespace pagx::cli {
@@ -213,6 +214,8 @@ int RunImport(int argc, char* argv[]) {
   for (auto& warning : result.warnings) {
     std::cerr << "pagx import: warning: " << warning << "\n";
   }
+
+  PAGXOptimizer::Optimize(result.document.get());
 
   auto xml = PAGXExporter::ToXML(*result.document);
   if (!WriteStringToFile(xml, options.outputFile, "pagx import")) {
