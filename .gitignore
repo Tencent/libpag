@@ -48,6 +48,9 @@ local.properties
 # CodeBuddy
 .codebuddy/designs/
 
+# GSD workflow (local-only planning docs)
+.planning/
+
 # Local config
 *.local.json
 *.local.md
