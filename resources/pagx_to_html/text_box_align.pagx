@@ -35,7 +35,7 @@
           <Fill color="#F8FAFC"/>
           <Stroke color="#E2E8F0" width="1"/>
           <TextBox left="4" right="4" top="4" bottom="4" textAlign="start" lineHeight="15">
-            <Text text="Hello World from the start side" fontFamily="Arial" fontSize="10"/>
+            <Text text="Hello World from the start side" fontFamily="Arial" fontSize="12"/>
             <Fill color="#1E293B"/>
           </TextBox>
         </Layer>
@@ -52,7 +52,7 @@
           <Fill color="#F8FAFC"/>
           <Stroke color="#E2E8F0" width="1"/>
           <TextBox left="4" right="4" top="4" bottom="4" textAlign="center" lineHeight="15">
-            <Text text="Hello World from the center" fontFamily="Arial" fontSize="10"/>
+            <Text text="Hello World from the center" fontFamily="Arial" fontSize="12"/>
             <Fill color="#1E293B"/>
           </TextBox>
         </Layer>
@@ -69,7 +69,7 @@
           <Fill color="#F8FAFC"/>
           <Stroke color="#E2E8F0" width="1"/>
           <TextBox left="4" right="4" top="4" bottom="4" textAlign="end" lineHeight="15">
-            <Text text="Hello World from the end side" fontFamily="Arial" fontSize="10"/>
+            <Text text="Hello World from the end side" fontFamily="Arial" fontSize="12"/>
             <Fill color="#1E293B"/>
           </TextBox>
         </Layer>
@@ -86,7 +86,7 @@
           <Fill color="#F8FAFC"/>
           <Stroke color="#E2E8F0" width="1"/>
           <TextBox left="4" right="4" top="4" bottom="4" textAlign="justify" lineHeight="15">
-            <Text text="Hello World from the justify mode" fontFamily="Arial" fontSize="10"/>
+            <Text text="Hello World from the justify mode" fontFamily="Arial" fontSize="12"/>
             <Fill color="#1E293B"/>
           </TextBox>
         </Layer>
