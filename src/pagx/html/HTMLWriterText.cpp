@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <random>
 #include <string>
@@ -234,6 +235,98 @@ static std::vector<size_t> CalculateRandomIndices(uint16_t seed, size_t textCoun
   return indices;
 }
 
+// Cubic equation solver used by the Triangle selector shape to invert its bezier
+// x-parameterisation and recover t from a given textCenter x-coordinate. Ported from tgfx
+// TextSelector.cpp (Shengjin's formula) so the HTML emission matches PAGX native pixel-for-pixel.
+struct CubicSolutions {
+  std::array<double, 3> values = {};
+  size_t count = 0;
+};
+
+static CubicSolutions SolveCubicEquation(double a, double b, double c, double d) {
+  CubicSolutions solutions = {};
+  if (a == 0) {
+    return solutions;
+  }
+  auto A = b * b - 3 * a * c;
+  auto B = b * c - 9 * a * d;
+  auto C = c * c - 3 * b * d;
+  auto delta = B * B - 4 * A * C;
+  if (A == 0 && B == 0) {
+    solutions.values[solutions.count++] = -b / (3 * a);
+  } else if (delta == 0 && A != 0) {
+    auto k = B / A;
+    solutions.values[solutions.count++] = -b / a + k;
+    solutions.values[solutions.count++] = -0.5 * k;
+  } else if (delta > 0) {
+    auto y1 = A * b + 1.5 * a * (-B + std::sqrt(delta));
+    auto y2 = A * b + 1.5 * a * (-B - std::sqrt(delta));
+    solutions.values[solutions.count++] = (-b - std::cbrt(y1) - std::cbrt(y2)) / (3 * a);
+  } else if (delta < 0 && A > 0) {
+    auto t = (A * b - 1.5 * a * B) / (A * std::sqrt(A));
+    if (-1 < t && t < 1) {
+      auto theta = std::acos(t);
+      auto sqrtA = std::sqrt(A);
+      auto cosA = std::cos(theta / 3);
+      auto sinA = std::sin(theta / 3);
+      solutions.values[solutions.count++] = (-b - 2 * sqrtA * cosA) / (3 * a);
+      solutions.values[solutions.count++] = (-b + sqrtA * (cosA + std::sqrt(3.0) * sinA)) / (3 * a);
+      solutions.values[solutions.count++] = (-b + sqrtA * (cosA - std::sqrt(3.0) * sinA)) / (3 * a);
+    }
+  }
+  return solutions;
+}
+
+// Triangle shape factor with bezier-shaped easeIn/easeOut, ported from tgfx
+// TextSelector.cpp CalculateTriangleFactor. Differs from a "linear triangle multiplied by
+// 1 - easeIn*(1 - t)" approximation: the tgfx form is a cubic bezier whose control points pull
+// the factor curve's knee toward the range center, flattening the peak and compressing the
+// transition band — that's why characters far from the center ("EAS" in "EASED MOTION" with
+// easeIn=easeOut=0.8) land at near-zero factor while the characters one step closer to the
+// center ("ED") pick up most of the peak offset.
+static float CalculateTriangleFactorBezier(float textCenter, float rangeStart, float rangeEnd,
+                                           float easeOut, float easeIn) {
+  if (rangeStart >= rangeEnd) {
+    return 0.0f;
+  }
+  double x = textCenter;
+  if (x < rangeStart || x > rangeEnd) {
+    return 0.0f;
+  }
+  double rangeCenter = (rangeStart + rangeEnd) * 0.5;
+  // Pick the half of the triangle that holds x, parameterising from its edge (y=0) to the
+  // center (y=1). Bezier control points mirror tgfx's layout exactly.
+  double x1 = x <= rangeCenter ? rangeStart : rangeEnd;
+  double y1 = 0;
+  double step = rangeCenter - x1;
+  double x2 = easeIn >= 0 ? x1 + easeIn * step : x1;
+  double y2 = easeIn >= 0 ? 0 : -easeIn;
+  double x3 = easeOut >= 0 ? rangeCenter - easeOut * step : rangeCenter;
+  double y3 = easeOut >= 0 ? 1 : 1 + easeOut;
+  double x4 = rangeCenter;
+  double y4 = 1;
+
+  // Invert the cubic bezier x(t)=((1-t)^3 x1 + 3(1-t)^2 t x2 + 3(1-t) t^2 x3 + t^3 x4) for t.
+  auto a = -x1 + 3 * x2 - 3 * x3 + x4;
+  auto b = 3 * (x1 - 2 * x2 + x3);
+  auto c = 3 * (-x1 + x2);
+  auto d = x1 - x;
+
+  double t = 0;
+  auto solutions = SolveCubicEquation(a, b, c, d);
+  for (size_t i = 0; i < solutions.count; i++) {
+    auto solution = solutions.values[i];
+    if ((solution >= 0 && solution <= 1) || std::abs(solution - 1) <= 1e-6) {
+      t = solution;
+      break;
+    }
+  }
+  double oneMinusT = 1 - t;
+  return static_cast<float>(oneMinusT * oneMinusT * oneMinusT * y1 +
+                            3 * oneMinusT * oneMinusT * t * y2 + 3 * oneMinusT * t * t * y3 +
+                            t * t * t * y4);
+}
+
 float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphIndex,
                                  size_t totalGlyphs) {
   if (totalGlyphs == 0) {
@@ -279,12 +372,12 @@ float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphInde
         break;
       }
       case SelectorShape::Triangle: {
-        float mid = (rangeStart + rangeEnd) * 0.5f;
-        if (textCenter <= mid) {
-          factor = (textCenter - rangeStart) / (mid - rangeStart);
-        } else {
-          factor = (rangeEnd - textCenter) / (rangeEnd - mid);
-        }
+        // Use the bezier-based Triangle factor so easeIn/easeOut affect the curve exactly as
+        // tgfx does — linear-triangle * post-multiplicative easing is a cheaper approximation
+        // that fails to reproduce the flattened peak and compressed transition visible e.g.
+        // in selector_advanced.pagx EASED MOTION (easeIn=easeOut=0.8).
+        factor = CalculateTriangleFactorBezier(textCenter, rangeStart, rangeEnd, selector->easeOut,
+                                               selector->easeIn);
         break;
       }
       case SelectorShape::Round: {
@@ -356,23 +449,9 @@ float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphInde
   } else if (factor > 1.0f) {
     factor = 1.0f;
   }
-  // easeIn/easeOut only affect Triangle in tgfx (see TextSelector.cpp CalculateTriangleFactor).
-  // Applying them to other shapes warps results that the tgfx side leaves alone — e.g. Smooth
-  // is already a symmetric peak, so the multiplicative tweak here would pull the right half
-  // back down below the left half. Keep this pass bound to Triangle.
-  if (selector->shape == SelectorShape::Triangle &&
-      (selector->easeIn > 0 || selector->easeOut > 0)) {
-    float t = rangeSize > 0 ? (textCenter - rangeStart) / rangeSize : 0.5f;
-    t = std::clamp(t, 0.0f, 1.0f);
-    if (selector->easeIn > 0 && t < 0.5f) {
-      float easeT = t * 2.0f;
-      factor *= 1.0f - (1.0f - easeT) * selector->easeIn;
-    }
-    if (selector->easeOut > 0 && t > 0.5f) {
-      float easeT = (t - 0.5f) * 2.0f;
-      factor *= 1.0f - easeT * selector->easeOut;
-    }
-  }
+  // Triangle handles easeIn/easeOut inside CalculateTriangleFactorBezier via bezier control
+  // points. Other shapes are untouched by easeIn/easeOut in tgfx — see TextSelector.cpp where
+  // only CalculateTriangleFactor consumes those attributes — so no post-scale is applied here.
   return factor * selector->weight;
 }
 
