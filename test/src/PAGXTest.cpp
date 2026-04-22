@@ -5365,8 +5365,8 @@ h1{text-align:center;color:#1e293b;margin-bottom:4px}
               "</h3><span class=\"sz\">" + std::to_string(w) + "x" + std::to_string(h) + " @" +
               std::to_string(scale) + "x</span></div>\n";
       page += "  <div class=\"cmp\">\n";
-      page += "    <div><div class=\"lbl\"><label>PAGX Native</label></div><img src=\"" + baseName + "_pagx.png\" width=\"" +
-              std::to_string(w) + "\"></div>\n";
+      page += "    <div><div class=\"lbl\"><label>PAGX Native</label></div><img src=\"" + baseName +
+              "_pagx.png\" width=\"" + std::to_string(w) + "\"></div>\n";
       // `loading=\"lazy\"` keeps the initial page open quickly when the sample count grows;
       // sandbox=\"allow-same-origin\" is deliberately omitted so each iframe stays in its own
       // origin and its styles/scripts cannot leak into the comparison page chrome. The `.open`
