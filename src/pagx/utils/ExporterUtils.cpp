@@ -146,6 +146,79 @@ struct PositionedGlyph {
   Matrix transform;
 };
 
+// Resolves the layer-space pen position for glyph `i` of `run`. The GlyphRun
+// exposes three positioning channels that take precedence in the order below;
+// only the highest-priority channel present for this glyph contributes.
+//   1. `positions[i]` — absolute offset from the run origin. When paired with
+//      `xOffsets[i]` the x-offset is additive on top.
+//   2. `xOffsets[i]` — absolute x offset from the run origin (y stays on the
+//      run baseline).
+//   3. Advance-accumulator fallback `currentX` — each glyph's pen position is
+//      the sum of all prior glyph advances in the same run.
+// `baseX`/`baseY` are the run origin (textPos + run->x / run->y) pre-hoisted
+// by WalkGlyphs so we don't re-add them per glyph.
+static void ResolveGlyphPosition(const GlyphRun* run, size_t i, float baseX, float baseY,
+                                 float currentX, float* posX, float* posY) {
+  if (i < run->positions.size()) {
+    *posX = baseX + run->positions[i].x;
+    *posY = baseY + run->positions[i].y;
+    if (i < run->xOffsets.size()) {
+      *posX += run->xOffsets[i];
+    }
+  } else if (i < run->xOffsets.size()) {
+    *posX = baseX + run->xOffsets[i];
+    *posY = baseY;
+  } else {
+    *posX = currentX;
+    *posY = baseY;
+  }
+}
+
+// Builds the layer-space transform for a single glyph, mirroring
+// GlyphRunRenderer::BuildTextBlob: the font scale is applied first, then the
+// pen translation, then (only if any of rotation/skew/glyph-scale is non-trivial)
+// the rotation/skew/scale are composed around T(pos)*T(anchor). Anchor lives in
+// user (post-font-scale) units. Matching this exact order is what keeps scaled
+// glyphs from collapsing onto each other in PPT/SVG output.
+static Matrix ComposeGlyphMatrix(const Glyph* glyph, const GlyphRun* run, size_t i, float scale,
+                                 float posX, float posY) {
+  Matrix glyphMatrix = Matrix::Scale(scale, scale);
+  glyphMatrix = Matrix::Translate(posX, posY) * glyphMatrix;
+
+  bool hasRotation = i < run->rotations.size() && run->rotations[i] != 0;
+  bool hasGlyphScale = i < run->scales.size() && (run->scales[i].x != 1 || run->scales[i].y != 1);
+  bool hasSkew = i < run->skews.size() && run->skews[i] != 0;
+
+  if (!hasRotation && !hasGlyphScale && !hasSkew) {
+    return glyphMatrix;
+  }
+
+  float anchorX = glyph->advance * 0.5f * scale;
+  float anchorY = 0;
+  if (i < run->anchors.size()) {
+    anchorX += run->anchors[i].x;
+    anchorY += run->anchors[i].y;
+  }
+
+  glyphMatrix = Matrix::Translate(anchorX, anchorY) * glyphMatrix;
+  if (hasRotation) {
+    glyphMatrix = Matrix::Rotate(run->rotations[i]) * glyphMatrix;
+  }
+  if (hasSkew) {
+    // Match GlyphRunRenderer::BuildTextBlob: skewX = -tan(angle). The
+    // sign is what makes positive skew tilt the glyph forward (top-right)
+    // once it's combined with the ascender-negative-Y glyph path coords.
+    Matrix shear = {};
+    shear.c = -std::tan(pag::DegreesToRadians(run->skews[i]));
+    glyphMatrix = shear * glyphMatrix;
+  }
+  if (hasGlyphScale) {
+    glyphMatrix = Matrix::Scale(run->scales[i].x, run->scales[i].y) * glyphMatrix;
+  }
+  glyphMatrix = Matrix::Translate(-anchorX, -anchorY) * glyphMatrix;
+  return glyphMatrix;
+}
+
 // Shared per-glyph walker — both ComputeGlyphPaths (vector outlines) and
 // ComputeGlyphImages (bitmap glyphs) need exactly the same positioning logic
 // (positions / xOffsets / per-glyph anchor + rotation / skew / scale) and only
@@ -186,65 +259,13 @@ static std::vector<PositionedGlyph> WalkGlyphs(const Text& text, float textPosX,
 
       float posX = 0;
       float posY = 0;
-      if (i < run->positions.size()) {
-        posX = baseX + run->positions[i].x;
-        posY = baseY + run->positions[i].y;
-        if (i < run->xOffsets.size()) {
-          posX += run->xOffsets[i];
-        }
-      } else if (i < run->xOffsets.size()) {
-        posX = baseX + run->xOffsets[i];
-        posY = baseY;
-      } else {
-        posX = currentX;
-        posY = baseY;
-      }
+      ResolveGlyphPosition(run, i, baseX, baseY, currentX, &posX, &posY);
       // Advance the cursor for the no-positions / no-xOffsets fallback path
       // even when this particular glyph is later filtered out, so subsequent
       // glyphs land where the renderer expects them.
       currentX += glyph->advance * scale;
 
-      // Mirror GlyphRunRenderer::BuildTextBlob's per-glyph transform: anchor
-      // lives in user (post-font-scale) units and the rotation/skew/scale are
-      // composed around T(pos)*T(anchor) instead of around the glyph's em-space
-      // anchor. Matching the renderer's matrix order keeps scaled-up glyphs from
-      // collapsing onto each other (which made the PPT/SVG output disagree with
-      // the PNG).
-      Matrix glyphMatrix = Matrix::Scale(scale, scale);
-      glyphMatrix = Matrix::Translate(posX, posY) * glyphMatrix;
-
-      bool hasRotation = i < run->rotations.size() && run->rotations[i] != 0;
-      bool hasGlyphScale =
-          i < run->scales.size() && (run->scales[i].x != 1 || run->scales[i].y != 1);
-      bool hasSkew = i < run->skews.size() && run->skews[i] != 0;
-
-      if (hasRotation || hasGlyphScale || hasSkew) {
-        float anchorX = glyph->advance * 0.5f * scale;
-        float anchorY = 0;
-        if (i < run->anchors.size()) {
-          anchorX += run->anchors[i].x;
-          anchorY += run->anchors[i].y;
-        }
-
-        glyphMatrix = Matrix::Translate(anchorX, anchorY) * glyphMatrix;
-        if (hasRotation) {
-          glyphMatrix = Matrix::Rotate(run->rotations[i]) * glyphMatrix;
-        }
-        if (hasSkew) {
-          // Match GlyphRunRenderer::BuildTextBlob: skewX = -tan(angle). The
-          // sign is what makes positive skew tilt the glyph forward (top-right)
-          // once it's combined with the ascender-negative-Y glyph path coords.
-          Matrix shear = {};
-          shear.c = -std::tan(pag::DegreesToRadians(run->skews[i]));
-          glyphMatrix = shear * glyphMatrix;
-        }
-        if (hasGlyphScale) {
-          glyphMatrix = Matrix::Scale(run->scales[i].x, run->scales[i].y) * glyphMatrix;
-        }
-        glyphMatrix = Matrix::Translate(-anchorX, -anchorY) * glyphMatrix;
-      }
-
-      result.push_back({glyph, glyphMatrix});
+      result.push_back({glyph, ComposeGlyphMatrix(glyph, run, i, scale, posX, posY)});
     }
   }
   return result;
@@ -603,11 +624,14 @@ static std::shared_ptr<tgfx::Data> EncodeSurfaceToPNG(const std::shared_ptr<tgfx
   return tgfx::ImageCodec::Encode(pixmap, tgfx::EncodedFormat::PNG, 100);
 }
 
-static std::shared_ptr<tgfx::Data> DoRenderMaskedLayer(
-    tgfx::Context* context, const std::shared_ptr<tgfx::Layer>& root,
-    const std::shared_ptr<tgfx::Layer>& targetLayer, const tgfx::Rect& globalBounds) {
-  int width = static_cast<int>(ceilf(globalBounds.width()));
-  int height = static_cast<int>(ceilf(globalBounds.height()));
+// Common skeleton shared by every off-screen GPU render path in this file.
+// Validates the requested size, allocates a Surface, hands the Canvas to
+// `drawer` for the caller-specific commands, then encodes to PNG. `Drawer`
+// must be callable as `drawer(tgfx::Canvas*)`; named functors defined below
+// supply the actual draw logic (the project forbids lambdas).
+template <typename Drawer>
+static std::shared_ptr<tgfx::Data> RenderToPNG(tgfx::Context* context, int width, int height,
+                                               Drawer drawer) {
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
@@ -615,38 +639,54 @@ static std::shared_ptr<tgfx::Data> DoRenderMaskedLayer(
   if (surface == nullptr) {
     return nullptr;
   }
-  auto canvas = surface->getCanvas();
-  canvas->translate(-globalBounds.left, -globalBounds.top);
-  canvas->concat(targetLayer->getRelativeMatrix(root.get()));
-  targetLayer->draw(canvas);
+  drawer(surface->getCanvas());
   return EncodeSurfaceToPNG(surface, width, height);
 }
 
-// Renders the entire scene from `root` downward into an off-screen surface,
-// cropped to the global bounds of `targetLayer`. Used when the target layer's
+// Draws `targetLayer` (and only that layer) into the off-screen canvas, with
+// the global bounds origin mapped to (0,0) so the emitted PNG is tightly
+// cropped. Used for mask / scrollRect bakes where the layer's visual result
+// does not depend on the backdrop.
+struct MaskedLayerDrawer {
+  const std::shared_ptr<tgfx::Layer>& root;
+  const std::shared_ptr<tgfx::Layer>& targetLayer;
+  const tgfx::Rect& globalBounds;
+  void operator()(tgfx::Canvas* canvas) const {
+    canvas->translate(-globalBounds.left, -globalBounds.top);
+    canvas->concat(targetLayer->getRelativeMatrix(root.get()));
+    targetLayer->draw(canvas);
+  }
+};
+
+// Draws the entire scene from `root` downward into the off-screen canvas,
+// clipped to the target layer's global bounds. Used when the target layer's
 // visual result depends on the backdrop pixels below it — e.g. a non-Normal
 // `Layer.blendMode`, which the tgfx renderer composites against whatever has
-// already been drawn underneath. Drawing only `targetLayer` against an empty
-// canvas (as DoRenderMaskedLayer does) blends it with transparent-black and
-// loses the intended composite; drawing `root` with a clip preserves it.
-static std::shared_ptr<tgfx::Data> DoRenderBackdropComposite(
-    tgfx::Context* context, const std::shared_ptr<tgfx::Layer>& root,
-    const tgfx::Rect& globalBounds) {
-  int width = static_cast<int>(ceilf(globalBounds.width()));
-  int height = static_cast<int>(ceilf(globalBounds.height()));
-  if (width <= 0 || height <= 0) {
-    return nullptr;
+// already been drawn underneath. Drawing only the target against an empty
+// canvas (as MaskedLayerDrawer does) would blend it with transparent-black
+// and lose the intended composite; drawing `root` with a clip preserves it.
+struct BackdropCompositeDrawer {
+  const std::shared_ptr<tgfx::Layer>& root;
+  const tgfx::Rect& globalBounds;
+  void operator()(tgfx::Canvas* canvas) const {
+    canvas->translate(-globalBounds.left, -globalBounds.top);
+    canvas->clipRect(globalBounds);
+    root->draw(canvas);
   }
-  auto surface = tgfx::Surface::Make(context, width, height);
-  if (surface == nullptr) {
-    return nullptr;
+};
+
+// Fills the entire canvas with a pre-built image shader to rasterize a tiled
+// pattern into a PNG tile.
+struct TiledPatternDrawer {
+  std::shared_ptr<tgfx::Shader> shader;
+  int width;
+  int height;
+  void operator()(tgfx::Canvas* canvas) const {
+    tgfx::Paint paint;
+    paint.setShader(shader);
+    canvas->drawRect(tgfx::Rect::MakeWH(width, height), paint);
   }
-  auto canvas = surface->getCanvas();
-  canvas->translate(-globalBounds.left, -globalBounds.top);
-  canvas->clipRect(globalBounds);
-  root->draw(canvas);
-  return EncodeSurfaceToPNG(surface, width, height);
-}
+};
 
 GPUContext::~GPUContext() {
   _device = nullptr;
@@ -676,7 +716,10 @@ std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,
   if (context == nullptr) {
     return nullptr;
   }
-  auto result = DoRenderMaskedLayer(context, root, targetLayer, globalBounds);
+  int width = static_cast<int>(ceilf(globalBounds.width()));
+  int height = static_cast<int>(ceilf(globalBounds.height()));
+  auto result =
+      RenderToPNG(context, width, height, MaskedLayerDrawer{root, targetLayer, globalBounds});
   gpu->unlock();
   return result;
 }
@@ -689,7 +732,9 @@ std::shared_ptr<tgfx::Data> RenderLayerCompositeWithBackdrop(
   if (context == nullptr) {
     return nullptr;
   }
-  auto result = DoRenderBackdropComposite(context, root, globalBounds);
+  int width = static_cast<int>(ceilf(globalBounds.width()));
+  int height = static_cast<int>(ceilf(globalBounds.height()));
+  auto result = RenderToPNG(context, width, height, BackdropCompositeDrawer{root, globalBounds});
   gpu->unlock();
   return result;
 }
@@ -705,19 +750,6 @@ static tgfx::TileMode ToTGFXTileMode(TileMode mode) {
     default:
       return tgfx::TileMode::Clamp;
   }
-}
-
-static std::shared_ptr<tgfx::Data> DoRenderTiledPattern(tgfx::Context* context,
-                                                        std::shared_ptr<tgfx::Shader> shader,
-                                                        int width, int height) {
-  auto surface = tgfx::Surface::Make(context, width, height);
-  if (!surface) {
-    return nullptr;
-  }
-  tgfx::Paint paint;
-  paint.setShader(std::move(shader));
-  surface->getCanvas()->drawRect(tgfx::Rect::MakeWH(width, height), paint);
-  return EncodeSurfaceToPNG(surface, width, height);
 }
 
 std::shared_ptr<tgfx::Data> RenderTiledPattern(GPUContext* gpu, const ImagePattern* pattern,
@@ -749,7 +781,8 @@ std::shared_ptr<tgfx::Data> RenderTiledPattern(GPUContext* gpu, const ImagePatte
   if (!context) {
     return nullptr;
   }
-  auto result = DoRenderTiledPattern(context, std::move(shader), width, height);
+  auto result =
+      RenderToPNG(context, width, height, TiledPatternDrawer{std::move(shader), width, height});
   gpu->unlock();
   return result;
 }
