@@ -1019,13 +1019,10 @@ void HTMLWriter::applySVGStroke(HTMLBuilder& out, const Stroke* stroke, float pa
     out.addAttr("stroke-dasharray", d);
   }
   if (stroke->dashOffset != 0.0f) {
-    // SVG `stroke-dashoffset` and tgfx's Skia `SkDashPathEffect` phase specify opposite
-    // directions along the path. tgfx interprets a positive phase as shifting the dash pattern
-    // FORWARD (the first "on" segment starts `phase` units into the pattern and the path
-    // start lands mid-dash), while SVG interprets a positive offset as shifting the pattern
-    // BACKWARD (the path start lies `offset` units past where the first "on" segment began).
-    // Emit the negated value so the HTML render matches the PAGX render phase-for-phase.
-    out.addAttr("stroke-dashoffset", FloatToString(-stroke->dashOffset));
+    // Both SVG `stroke-dashoffset` (SVG 1.1 §11.4) and tgfx's Skia `SkDashPathEffect` phase
+    // use the same sign convention: a positive value advances the dash pattern forward so
+    // the path start lies `offset` units into the pattern. Pass the value through verbatim.
+    out.addAttr("stroke-dashoffset", FloatToString(stroke->dashOffset));
   }
 }
 
