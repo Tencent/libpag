@@ -85,10 +85,19 @@ static PathData* MakePathDataFromTGFX(PAGXDocument* doc, const tgfx::Path& tp) {
 }
 
 // Build a pagx::Path element wrapping a fresh PathData.
+//
+// The path data already lives in the surrounding layer's coordinate space
+// (resolver helpers bake in renderPosition / renderScale of the source
+// primitive when emitting the geometry), so the wrapper Path keeps
+// position=(0,0) and we prime its preferred layout from the data bounds.
+// Without this, layoutBounds() reports an empty rect and any later modifier
+// that re-enters PrimitiveToTGFXPath sees renderScale()==0 — collapsing the
+// geometry to the origin and dropping the shape from the PPTX.
 Element* PPTModifierResolver::makePathFromData(PathData* data) const {
   auto* p = _doc->makeNode<Path>();
   p->data = data;
   p->position = {0.0f, 0.0f};
+  p->updateSize(nullptr);
   return p;
 }
 
@@ -305,7 +314,7 @@ static tgfx::Path PrimitiveToTGFXPath(const Element* el) {
 // Modifier appliers. Each returns the new pagx::Path replacement(s).
 //==============================================================================
 
-static Element* ApplyTrimToElement(PAGXDocument* doc, Element* shape, const TrimPath* trim) {
+Element* PPTModifierResolver::applyTrimToElement(Element* shape, const TrimPath* trim) const {
   auto tp = PrimitiveToTGFXPath(shape);
   if (tp.isEmpty()) {
     return shape;
@@ -315,14 +324,11 @@ static Element* ApplyTrimToElement(PAGXDocument* doc, Element* shape, const Trim
   if (effect == nullptr || !effect->filterPath(&tp)) {
     return shape;
   }
-  auto* pd = MakePathDataFromTGFX(doc, tp);
-  auto* p = doc->makeNode<Path>();
-  p->data = pd;
-  return p;
+  return makePathFromData(MakePathDataFromTGFX(_doc, tp));
 }
 
-static Element* ApplyRoundCornerToElement(PAGXDocument* doc, Element* shape,
-                                          const RoundCorner* corner) {
+Element* PPTModifierResolver::applyRoundCornerToElement(Element* shape,
+                                                        const RoundCorner* corner) const {
   if (corner->radius <= 0.0f) {
     return shape;
   }
@@ -334,10 +340,7 @@ static Element* ApplyRoundCornerToElement(PAGXDocument* doc, Element* shape,
   if (effect == nullptr || !effect->filterPath(&tp)) {
     return shape;
   }
-  auto* pd = MakePathDataFromTGFX(doc, tp);
-  auto* p = doc->makeNode<Path>();
-  p->data = pd;
-  return p;
+  return makePathFromData(MakePathDataFromTGFX(_doc, tp));
 }
 
 static tgfx::PathOp MergeModeToPathOp(MergePathMode mode) {
@@ -438,7 +441,7 @@ std::vector<Element*> PPTModifierResolver::resolve(const std::vector<Element*>& 
         }
         if (trim->type == TrimType::Separate) {
           for (auto idx : shapeSlots) {
-            output[idx] = ApplyTrimToElement(_doc, output[idx], trim);
+            output[idx] = applyTrimToElement(output[idx], trim);
           }
         } else {
           // Continuous: concatenate into a single tgfx::Path so the trim spans
@@ -464,7 +467,7 @@ std::vector<Element*> PPTModifierResolver::resolve(const std::vector<Element*>& 
       case NodeType::RoundCorner: {
         auto* rc = static_cast<const RoundCorner*>(element);
         for (auto idx : shapeSlots) {
-          output[idx] = ApplyRoundCornerToElement(_doc, output[idx], rc);
+          output[idx] = applyRoundCornerToElement(output[idx], rc);
         }
         break;
       }
