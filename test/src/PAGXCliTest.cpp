@@ -556,6 +556,33 @@ CLI_TEST(PAGXCliTest, Font_UnknownSubcommand) {
   EXPECT_NE(ret, 0);
 }
 
+CLI_TEST(PAGXCliTest, FontEmbed_Retired_PrintsRedirectError) {
+  const std::string expected =
+      "pagx font: 'embed' subcommand has been removed, use 'pagx embed' instead";
+
+  // Variant 1: with a positional argument
+  {
+    std::streambuf* oldCerr = std::cerr.rdbuf();
+    std::ostringstream capturedErr;
+    std::cerr.rdbuf(capturedErr.rdbuf());
+    auto ret = CallRun(pagx::cli::RunFont, {"font", "embed", "some.pagx"});
+    std::cerr.rdbuf(oldCerr);
+    EXPECT_EQ(ret, 1);
+    EXPECT_NE(capturedErr.str().find(expected), std::string::npos);
+  }
+
+  // Variant 2: no extra arguments
+  {
+    std::streambuf* oldCerr = std::cerr.rdbuf();
+    std::ostringstream capturedErr;
+    std::cerr.rdbuf(capturedErr.rdbuf());
+    auto ret = CallRun(pagx::cli::RunFont, {"font", "embed"});
+    std::cerr.rdbuf(oldCerr);
+    EXPECT_EQ(ret, 1);
+    EXPECT_NE(capturedErr.str().find(expected), std::string::npos);
+  }
+}
+
 //==============================================================================
 // Lint tests
 //==============================================================================
