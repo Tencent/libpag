@@ -6,7 +6,7 @@
     <Layer flex="1" layout="horizontal">
       <!-- Sharp rectangle -->
       <Layer flex="1">
-        <Rectangle centerX="0" centerY="0" size="140,140"/>
+        <Rectangle centerX="0" centerY="0" width="140" height="140"/>
         <Fill>
           <LinearGradient startPoint="0,0" endPoint="140,140">
             <ColorStop color="#F43F5E" offset="0"/>
@@ -17,7 +17,7 @@
       </Layer>
       <!-- Medium rounded rectangle -->
       <Layer flex="1">
-        <Rectangle centerX="0" centerY="0" size="140,140" roundness="24"/>
+        <Rectangle centerX="0" centerY="0" width="140" height="140" roundness="24"/>
         <Fill>
           <LinearGradient startPoint="0,0" endPoint="140,140">
             <ColorStop color="#8B5CF6" offset="0"/>
@@ -30,7 +30,7 @@
     <Layer flex="1" layout="horizontal">
       <!-- Fully rounded rectangle (pill shape) -->
       <Layer flex="1">
-        <Rectangle centerX="0" centerY="0" size="140,140" roundness="70"/>
+        <Rectangle centerX="0" centerY="0" width="140" height="140" roundness="70"/>
         <Fill>
           <LinearGradient startPoint="0,0" endPoint="140,140">
             <ColorStop color="#06B6D4" offset="0"/>
@@ -41,7 +41,7 @@
       </Layer>
       <!-- Wide rectangle -->
       <Layer flex="1">
-        <Rectangle centerX="0" centerY="0" size="140,100" roundness="16"/>
+        <Rectangle centerX="0" centerY="0" width="140" height="100" roundness="16"/>
         <Fill>
           <LinearGradient startPoint="0,0" endPoint="140,100">
             <ColorStop color="#10B981" offset="0"/>

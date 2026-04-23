@@ -151,11 +151,13 @@ CLI_TEST(PAGXCliTest, Format_AttributeReordering) {
   ASSERT_NE(namePos, std::string::npos);
   ASSERT_NE(alphaPos, std::string::npos);
   EXPECT_LT(namePos, alphaPos);
-  auto leftPos = output.find("left=");
-  auto sizePos = output.find("size=");
+  auto rectPos = output.find("<Rectangle");
+  ASSERT_NE(rectPos, std::string::npos);
+  auto leftPos = output.find("left=", rectPos);
+  auto widthPos = output.find("width=", rectPos);
   ASSERT_NE(leftPos, std::string::npos);
-  ASSERT_NE(sizePos, std::string::npos);
-  EXPECT_LT(leftPos, sizePos);
+  ASSERT_NE(widthPos, std::string::npos);
+  EXPECT_LT(leftPos, widthPos);
 }
 
 CLI_TEST(PAGXCliTest, Format_PreservesValues) {

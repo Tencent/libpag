@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates rich text with mixed styles -->
 <pagx width="400" height="400">
-  <Layer left="0" right="0" top="0" bottom="0">
-    <TextBox left="0" right="0" top="0" bottom="0" textAlign="center" paragraphAlign="middle" lineHeight="48">
+  <Layer width="100%" height="100%">
+    <TextBox width="100%" height="100%" textAlign="center" paragraphAlign="middle" lineHeight="48">
       <Text text="Rich Text&#10;" fontFamily="Arial" fontStyle="Bold" fontSize="42"/>
       <Fill>
         <LinearGradient startPoint="100,0" endPoint="300,0">

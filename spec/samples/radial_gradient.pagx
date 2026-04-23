@@ -2,7 +2,7 @@
 <!-- Demonstrates radial gradient -->
 <pagx width="400" height="400">
   <Layer>
-    <Ellipse left="40" top="40" size="320,320"/>
+    <Ellipse left="40" top="40" width="320" height="320"/>
     <Fill>
       <RadialGradient center="140,140" radius="260">
         <ColorStop color="#FFF" offset="0"/>

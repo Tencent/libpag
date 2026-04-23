@@ -2,7 +2,7 @@
 <!-- Demonstrates that color source coordinates are relative to geometry origin -->
 <pagx width="400" height="400">
   <Layer>
-    <Rectangle left="50" top="50" size="300,300" roundness="24"/>
+    <Rectangle left="50" top="50" width="300" height="300" roundness="24"/>
     <Fill color="@grad"/>
     <DropShadowStyle offsetY="12" blurX="40" blurY="40" color="#EC489950"/>
   </Layer>
