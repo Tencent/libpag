@@ -22,19 +22,22 @@ import commonJs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
 import alias from '@rollup/plugin-alias';
 import path from "path";
-import {readFileSync, readdirSync, unlinkSync} from "node:fs";
+import {readFileSync, readdirSync, unlinkSync, copyFileSync, mkdirSync, existsSync} from "node:fs";
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const fileHeaderPath = path.resolve(__dirname, '../../.idea/fileTemplates/includes/PAG File Header.h');
+// Path: playground/pagx-playground/script -> libpag root
+const libpagRoot = path.resolve(__dirname, '../../..');
+const playgroundRoot = path.resolve(__dirname, '..');
+const fileHeaderPath = path.resolve(libpagRoot, '.idea/fileTemplates/includes/PAG File Header.h');
 const banner = readFileSync(fileHeaderPath, 'utf-8');
 const isRelease = process.env.BUILD_MODE === 'release';
 
 // Clean up old source map files in release mode
 if (isRelease) {
-    const outputDir = path.resolve(__dirname, '../wasm-mt');
+    const outputDir = path.resolve(playgroundRoot, 'public');
     try {
         const files = readdirSync(outputDir);
         for (const file of files) {
@@ -47,32 +50,60 @@ if (isRelease) {
     }
 }
 
+// Copy fonts and other assets after build
+function copyAssetsPlugin() {
+    return {
+        name: 'copy-assets',
+        writeBundle() {
+            const publicDir = path.resolve(playgroundRoot, 'public');
+
+            // Copy fonts from resources/font
+            const fontsDir = path.join(publicDir, 'fonts');
+            if (!existsSync(fontsDir)) {
+                mkdirSync(fontsDir, { recursive: true });
+            }
+            const fontFiles = ['NotoSansSC-Regular.otf', 'NotoColorEmoji.ttf'];
+            for (const font of fontFiles) {
+                const fontSrc = path.resolve(libpagRoot, 'resources/font', font);
+                if (existsSync(fontSrc)) {
+                    copyFileSync(fontSrc, path.join(fontsDir, font));
+                }
+            }
+
+            console.log('Assets copied to public/');
+        }
+    };
+}
+
 const plugins = [
-    esbuild({tsconfig: path.resolve(__dirname, "../tsconfig.json"), minify: isRelease}),
+    esbuild({tsconfig: path.resolve(__dirname, "../src/tsconfig.json"), minify: isRelease}),
     json(),
     resolve({ extensions: ['.ts', '.js'] }),
     commonJs(),
     alias({
-        entries: [{ find: '@tgfx', replacement: path.resolve(__dirname, '../../third_party/tgfx/web/src') }],
+        entries: [
+            { find: '@tgfx', replacement: path.resolve(libpagRoot, 'third_party/tgfx/web/src') },
+            // { find: 'pagx-viewer', replacement: path.resolve(playgroundRoot, '../pagx-viewer/src/ts/pagx.ts') },
+        ],
     }),
     {
         name: 'preserve-import-meta-url',
-        resolveImportMeta(property, options) {
-            // Preserve the original behavior of `import.meta.url`.
+        resolveImportMeta(property) {
             if (property === 'url') {
                 return 'import.meta.url';
             }
             return null;
         },
     },
+    copyAssetsPlugin(),
 ];
 
 export default [
     {
-        input: path.resolve(__dirname, '../index.ts'),
+        input: path.resolve(__dirname, '../src/index.ts'),
         output: {
             banner,
-            file: path.resolve(__dirname, '../wasm-mt/index.js'),
+            file: path.resolve(playgroundRoot, 'public/wasm-mt/index.js'),
             format: 'esm',
             sourcemap: !isRelease
         },

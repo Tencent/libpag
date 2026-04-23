@@ -23,6 +23,7 @@
 #include "LayerBuilder.h"
 #include "pagx/FontConfig.h"
 #include "pagx/PAGXDocument.h"
+#include "tgfx/core/Color.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Recording.h"
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
@@ -50,6 +51,21 @@ class PAGXView {
   void updateSize();
 
   void updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY);
+
+  /**
+   * Sets a solid background color. When set, the solid color will be used instead of the default
+   * checkerboard pattern.
+   * @param alpha Alpha component (0.0 - 1.0).
+   * @param red Red component (0.0 - 1.0).
+   * @param green Green component (0.0 - 1.0).
+   * @param blue Blue component (0.0 - 1.0).
+   */
+  void setBackgroundColor(float alpha, float red, float green, float blue);
+
+  /**
+   * Clears the custom background color and reverts to the default checkerboard pattern.
+   */
+  void clearBackgroundColor();
 
   void draw();
 
@@ -87,6 +103,10 @@ class PAGXView {
   int lastBackgroundWidth = 0;
   int lastBackgroundHeight = 0;
   float lastBackgroundDensity = 0.0f;
+
+  // Custom background color (when useCustomBackgroundColor is true)
+  bool useCustomBackgroundColor = false;
+  tgfx::Color customBackgroundColor = tgfx::Color::Transparent();
 
   // Performance monitoring
   struct FrameRecord {

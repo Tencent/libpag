@@ -22,23 +22,25 @@
 using namespace emscripten;
 
 EMSCRIPTEN_BINDINGS(PAGXPlayground) {
-  class_<pagx::PAGXView>("PAGXView")
-      .smart_ptr<std::shared_ptr<pagx::PAGXView>>("PAGXView")
-      .class_function("MakeFrom", optional_override([](const std::string& canvasID) {
+  class_<pagx::PAGXView>("_PAGXView")
+      .smart_ptr<std::shared_ptr<pagx::PAGXView>>("_PAGXView")
+      .class_function("_MakeFrom", optional_override([](const std::string& canvasID) {
                         if (canvasID.empty()) {
                           return std::shared_ptr<pagx::PAGXView>(nullptr);
                         }
                         return std::make_shared<pagx::PAGXView>(canvasID);
                       }))
-      .function("registerFonts", &pagx::PAGXView::registerFonts)
-      .function("loadPAGX", &pagx::PAGXView::loadPAGX)
-      .function("parsePAGX", &pagx::PAGXView::parsePAGX)
-      .function("getExternalFilePaths", &pagx::PAGXView::getExternalFilePaths)
-      .function("loadFileData", &pagx::PAGXView::loadFileData)
-      .function("buildLayers", &pagx::PAGXView::buildLayers)
-      .function("updateSize", &pagx::PAGXView::updateSize)
-      .function("updateZoomScaleAndOffset", &pagx::PAGXView::updateZoomScaleAndOffset)
-      .function("draw", &pagx::PAGXView::draw)
-      .function("contentWidth", &pagx::PAGXView::contentWidth)
-      .function("contentHeight", &pagx::PAGXView::contentHeight);
+      .function("_registerFonts", &pagx::PAGXView::registerFonts)
+      .function("_loadPAGX", &pagx::PAGXView::loadPAGX)
+      .function("_parsePAGX", &pagx::PAGXView::parsePAGX)
+      .function("_getExternalFilePaths", &pagx::PAGXView::getExternalFilePaths)
+      .function("_loadFileData", &pagx::PAGXView::loadFileData)
+      .function("_buildLayers", &pagx::PAGXView::buildLayers)
+      .function("_updateSize", &pagx::PAGXView::updateSize)
+      .function("_updateZoomScaleAndOffset", &pagx::PAGXView::updateZoomScaleAndOffset)
+      .function("_setBackgroundColor", &pagx::PAGXView::setBackgroundColor)
+      .function("_clearBackgroundColor", &pagx::PAGXView::clearBackgroundColor)
+      .function("_draw", &pagx::PAGXView::draw)
+      .function("_contentWidth", &pagx::PAGXView::contentWidth)
+      .function("_contentHeight", &pagx::PAGXView::contentHeight);
 }

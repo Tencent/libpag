@@ -49,7 +49,8 @@ const __dirname = path.dirname(__filename);
 // Default paths
 const SCRIPT_DIR = __dirname;
 const PLAYGROUND_DIR = path.dirname(SCRIPT_DIR);
-const LIBPAG_DIR = path.dirname(PLAYGROUND_DIR);
+// PLAYGROUND_DIR is libpag/playground/pagx-playground, so go up two levels to get libpag root
+const LIBPAG_DIR = path.dirname(path.dirname(PLAYGROUND_DIR));
 const RESOURCES_FONT_DIR = path.join(LIBPAG_DIR, 'resources', 'font');
 const SAMPLES_DIR = path.join(LIBPAG_DIR, 'spec', 'samples');
 const SKILLS_DIR = path.join(LIBPAG_DIR, '.codebuddy', 'skills');
@@ -882,61 +883,48 @@ function main() {
     runCommand('npm run build:release', PLAYGROUND_DIR, 600000);
   } else {
     console.log('Step 1: Skipping build (--skip-build flag set)');
-    if (!fs.existsSync(path.join(PLAYGROUND_DIR, 'wasm-mt', 'pagx-playground.wasm'))) {
-      console.error('ERROR: wasm-mt/pagx-playground.wasm not found. Run build first or remove --skip-build flag');
+    if (!fs.existsSync(path.join(PLAYGROUND_DIR, 'public', 'wasm-mt', 'pagx-viewer.wasm'))) {
+      console.error('ERROR: public/wasm-mt/pagx-viewer.wasm not found. Run build first or remove --skip-build flag');
       process.exit(1);
     }
   }
 
-  // Copy index.html
+  // Copy static files from public/
   console.log('\nStep 2: Copy files...');
+  const publicDir = path.join(PLAYGROUND_DIR, 'public');
   copyFile(
-    path.join(PLAYGROUND_DIR, 'index.html'),
+    path.join(publicDir, 'index.html'),
     path.join(outputDir, 'index.html')
   );
 
   // Copy index.css
   copyFile(
-    path.join(PLAYGROUND_DIR, 'index.css'),
+    path.join(publicDir, 'index.css'),
     path.join(outputDir, 'index.css')
   );
 
   // Copy favicon and logo
   copyFile(
-    path.join(PLAYGROUND_DIR, 'favicon.png'),
+    path.join(publicDir, 'favicon.png'),
     path.join(outputDir, 'favicon.png')
   );
   copyFile(
-    path.join(PLAYGROUND_DIR, 'logo.png'),
+    path.join(publicDir, 'logo.png'),
     path.join(outputDir, 'logo.png')
   );
 
-  // Copy fonts from resources/font
+  // Copy fonts from public/fonts (already copied there by rollup build)
   console.log('\n  Copying fonts...');
-  copyFile(
-    path.join(RESOURCES_FONT_DIR, 'NotoSansSC-Regular.otf'),
-    path.join(outputDir, 'fonts', 'NotoSansSC-Regular.otf')
-  );
-  copyFile(
-    path.join(RESOURCES_FONT_DIR, 'NotoColorEmoji.ttf'),
-    path.join(outputDir, 'fonts', 'NotoColorEmoji.ttf')
+  copyDir(
+    path.join(publicDir, 'fonts'),
+    path.join(outputDir, 'fonts')
   );
 
-  // Copy wasm-mt directory
+  // Copy wasm-mt directory from public/wasm-mt (already copied there by rollup build)
   console.log('\n  Copying wasm-mt...');
-  const wasmDir = path.join(PLAYGROUND_DIR, 'wasm-mt');
-  const wasmOutputDir = path.join(outputDir, 'wasm-mt');
-  copyFile(
-    path.join(wasmDir, 'index.js'),
-    path.join(wasmOutputDir, 'index.js')
-  );
-  copyFile(
-    path.join(wasmDir, 'pagx-playground.js'),
-    path.join(wasmOutputDir, 'pagx-playground.js')
-  );
-  copyFile(
-    path.join(wasmDir, 'pagx-playground.wasm'),
-    path.join(wasmOutputDir, 'pagx-playground.wasm')
+  copyDir(
+    path.join(publicDir, 'wasm-mt'),
+    path.join(outputDir, 'wasm-mt')
   );
 
   // Copy samples directory and generate index.json

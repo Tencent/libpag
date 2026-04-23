@@ -5,3 +5,8 @@ wasm-mt/
 build-pagx-playground/
 .*.md5
 .build.lock
+lib/
+types/
+node_modules/
+public/wasm-mt
+package-lock.json

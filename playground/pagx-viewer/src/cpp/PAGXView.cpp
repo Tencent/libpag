@@ -227,6 +227,18 @@ void PAGXView::updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY
   lastZoom = zoom;
 }
 
+void PAGXView::setBackgroundColor(float alpha, float red, float green, float blue) {
+  useCustomBackgroundColor = true;
+  customBackgroundColor = tgfx::Color{red, green, blue, alpha};
+  presentImmediately = true;
+}
+
+void PAGXView::clearBackgroundColor() {
+  useCustomBackgroundColor = false;
+  customBackgroundColor = tgfx::Color::Transparent();
+  presentImmediately = true;
+}
+
 void PAGXView::draw() {
   if (window == nullptr) {
     window = tgfx::WebGLWindow::MakeFrom(canvasID);
@@ -237,7 +249,7 @@ void PAGXView::draw() {
   double frameStartMs = emscripten_get_now();
   bool hasContentChanged = displayList.hasContentChanged();
   bool hasLastRecording = (lastRecording != nullptr);
-  bool needsInitialFrame = presentImmediately || backgroundLayer == nullptr;
+  bool needsInitialFrame = presentImmediately || (!useCustomBackgroundColor && backgroundLayer == nullptr);
   if (!hasContentChanged && !hasLastRecording && !needsInitialFrame) {
     return;
   }
@@ -255,20 +267,26 @@ void PAGXView::draw() {
   }
   auto canvas = surface->getCanvas();
   canvas->clear();
-  int width = 0;
-  int height = 0;
-  emscripten_get_canvas_element_size(canvasID.c_str(), &width, &height);
-  auto density = width > 0 ? static_cast<float>(surface->width()) / static_cast<float>(width) : 1.0f;
-  int bgWidth = surface->width();
-  int bgHeight = surface->height();
-  if (!backgroundLayer || bgWidth != lastBackgroundWidth || bgHeight != lastBackgroundHeight ||
-      std::abs(density - lastBackgroundDensity) > 0.001f) {
-    backgroundLayer = GridBackgroundLayer::Make(bgWidth, bgHeight, density);
-    lastBackgroundWidth = bgWidth;
-    lastBackgroundHeight = bgHeight;
-    lastBackgroundDensity = density;
+
+  if (useCustomBackgroundColor) {
+    canvas->clear(customBackgroundColor);
+  } else {
+    int width = 0;
+    int height = 0;
+    emscripten_get_canvas_element_size(canvasID.c_str(), &width, &height);
+    auto density = width > 0 ? static_cast<float>(surface->width()) / static_cast<float>(width) : 1.0f;
+    int bgWidth = surface->width();
+    int bgHeight = surface->height();
+    if (!backgroundLayer || bgWidth != lastBackgroundWidth || bgHeight != lastBackgroundHeight ||
+        std::abs(density - lastBackgroundDensity) > 0.001f) {
+      backgroundLayer = GridBackgroundLayer::Make(bgWidth, bgHeight, density);
+      lastBackgroundWidth = bgWidth;
+      lastBackgroundHeight = bgHeight;
+      lastBackgroundDensity = density;
+    }
+    backgroundLayer->draw(canvas);
   }
-  backgroundLayer->draw(canvas);
+
   displayList.render(surface.get(), false);
   auto recording = context->flush();
   if (presentImmediately) {

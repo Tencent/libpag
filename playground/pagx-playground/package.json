@@ -6,12 +6,12 @@
   "description": "PAGX Playground",
   "type": "module",
   "scripts": {
-    "clean": "rimraf wasm-mt build-pagx-playground .*.md5",
-    "build": "node script/cmake.js -a wasm-mt && rollup -c ./script/rollup.js",
-    "build:debug": "node script/cmake.js -a wasm-mt --debug && rollup -c ./script/rollup.js",
-    "build:release": "node script/cmake.js -a wasm-mt && BUILD_MODE=release rollup -c ./script/rollup.js",
+    "clean": "rimraf public/wasm-mt/index.js public/wasm-mt/index.js.map public/fonts .*.md5",
+    "prebuild": "node script/prebuild.js",
+    "build": "npm run prebuild && rollup -c ./script/rollup.js",
+    "build:release": "node script/prebuild.js --release && BUILD_MODE=release rollup -c ./script/rollup.js",
     "publish": "node script/publish.js",
-    "server": "node server.js"
+    "server": "node public/server.js"
   },
   "devDependencies": {
     "@rollup/plugin-alias": "~5.1.1",
