@@ -29,7 +29,8 @@ static std::shared_ptr<pagx::Data> ReadFileToData(const std::string& path) {
   if (end <= 0) return nullptr;  // covers tellg failure and empty file
   auto size = static_cast<size_t>(end);
   in.seekg(0, std::ios::beg);
-  auto* buffer = new uint8_t[size];
+  auto* buffer = new (std::nothrow) uint8_t[size];
+  if (buffer == nullptr) return nullptr;
   in.read(reinterpret_cast<char*>(buffer), static_cast<std::streamsize>(size));
   if (!in || static_cast<size_t>(in.gcount()) != size) {
     delete[] buffer;
