@@ -46,6 +46,19 @@ FontSignature CollectUniformSignature(const std::vector<Element*>& contents) {
         return {};
       }
       texts.push_back(text);
+    } else if (type == NodeType::Group) {
+      // Group is not a Layer — it renders inside the same Layer <div>, so its Text
+      // nodes participate in the same CSS inheritance scope and must be included.
+      auto grp = static_cast<const Group*>(element);
+      for (auto* ge : grp->elements) {
+        if (ge->nodeType() == NodeType::Text) {
+          auto text = static_cast<const Text*>(ge);
+          if (!text->glyphRuns.empty()) {
+            return {};
+          }
+          texts.push_back(text);
+        }
+      }
     } else if (type == NodeType::TextBox) {
       auto tb = static_cast<const TextBox*>(element);
       if (tb->elements.empty()) {

@@ -69,8 +69,8 @@ FontSignature SignatureOf(const Text* text);
  * empty (default-constructed) FontSignature when the children have no Text nodes, when the
  * signatures differ, or when any Text renders as SVG instead of HTML.
  *
- * Nested Layers are not penetrated (they decide hoisting independently). TextBox children
- * are penetrated — their inner Text elements participate in the signature comparison.
+ * Nested Layers are not penetrated (they decide hoisting independently). Group and TextBox
+ * children are penetrated — their inner Text elements participate in the signature comparison.
  */
 FontSignature CollectUniformSignature(const std::vector<Element*>& contents);
 
