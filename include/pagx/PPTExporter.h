@@ -82,23 +82,17 @@ struct PPTExportOptions {
 
   /**
    * Whether to rasterize layers that use blend modes outside of Normal/Multiply/Screen/Darken/
-   * Lighten (the only ones expressible in OOXML a:fillOverlay). When false, the blend mode is
-   * silently dropped and the layer is rendered as Normal. The default value is true.
+   * Lighten (the only ones expressible in OOXML a:fillOverlay). When true, the layer and the
+   * backdrop beneath it (clipped to the layer's bounds) are rendered together into a PNG patch
+   * so the blend composites against the real scene and the resulting image visually matches the
+   * tgfx renderer — at the cost of turning any native content (gradients, sibling shapes) under
+   * the patch into baked pixels; surrounding content outside the layer's bounds stays fully
+   * editable. When false, the blend mode is silently dropped and the layer is rendered as Normal,
+   * preserving full editability but losing the blend effect. Rasterizing the layer without the
+   * backdrop is not offered because the result degenerates to a near-flat color patch that is
+   * visually wrong and still covers editable content beneath. The default value is false.
    */
-  bool rasterizeUnsupportedBlend = true;
-
-  /**
-   * Whether the rasterized PNG for a layer with an unsupported blend mode should include the
-   * backdrop pixels (every layer drawn beneath, clipped to the target layer's bounds) so the
-   * blend mode composites against the real backdrop. When false, only the layer itself is
-   * rasterized against a transparent canvas — the blend then has nothing to composite against
-   * and the result degenerates to a near-flat color patch. When true, the resulting PNG patch
-   * visually matches the tgfx renderer but loses editability for any native content (gradients,
-   * sibling shapes) that falls under the patch; surrounding content outside the layer's bounds
-   * stays fully editable. Only takes effect when `rasterizeUnsupportedBlend` is also true. The
-   * default value is false.
-   */
-  bool compositeBlendBackdrop = false;
+  bool rasterizeUnsupportedBlend = false;
 
   /**
    * Whether to rasterize layers whose color sources reference wide-gamut color spaces (DisplayP3,

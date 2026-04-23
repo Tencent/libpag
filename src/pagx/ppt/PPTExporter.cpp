@@ -470,7 +470,6 @@ class PPTWriter {
         _bakeTiledPattern(options.bakeTiledPattern), _bridgeContours(options.bridgeContours),
         _resolveModifiers(options.resolveModifiers),
         _rasterizeUnsupportedBlend(options.rasterizeUnsupportedBlend),
-        _compositeBlendBackdrop(options.compositeBlendBackdrop),
         _rasterizeWideGamut(options.rasterizeWideGamut), _rasterDPI(options.rasterDPI),
         _layoutContext(layoutContext), _resolver(doc) {
   }
@@ -495,8 +494,7 @@ class PPTWriter {
   bool _bakeTiledPattern = true;
   bool _bridgeContours = true;
   bool _resolveModifiers = true;
-  bool _rasterizeUnsupportedBlend = true;
-  bool _compositeBlendBackdrop = false;
+  bool _rasterizeUnsupportedBlend = false;
   bool _rasterizeWideGamut = true;
   // Ratio of raster DPI to the 96 DPI logical coordinate space. Drives the
   // off-screen Surface size of every PNG bake (masked layer, scrollRect bake,
@@ -2518,14 +2516,12 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& pa
   if (features.needsRasterization(_rasterizeUnsupportedBlend, _rasterizeWideGamut)) {
     // For a non-Normal blend mode, compositing against the real backdrop
     // requires rendering the whole scene clipped to the layer's bounds —
-    // opt-in via `compositeBlendBackdrop` because it turns any editable
-    // native content beneath the patch into baked pixels. Every other
-    // unsupported feature (TextPath, ColorMatrix, wide-gamut color,
-    // diamond/conic gradient, shear transform) is self-contained and renders
-    // fine against an empty canvas, so the default path stays matched to the
-    // pre-existing behaviour.
-    bool withBackdrop =
-        _compositeBlendBackdrop && features.hasUnsupportedBlend && _rasterizeUnsupportedBlend;
+    // this turns any editable native content beneath the patch into baked
+    // pixels, which is why `rasterizeUnsupportedBlend` defaults to false.
+    // Every other unsupported feature (TextPath, ColorMatrix, wide-gamut
+    // color, diamond/conic gradient, shear transform) is self-contained and
+    // renders fine against an empty canvas.
+    bool withBackdrop = features.hasUnsupportedBlend && _rasterizeUnsupportedBlend;
     if (rasterizeLayerAsPicture(out, layer, withBackdrop)) {
       return;
     }

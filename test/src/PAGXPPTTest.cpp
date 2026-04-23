@@ -3972,7 +3972,9 @@ PAGX_TEST(PAGXPPTTest, LayerNonNormalBlendModeEscalated) {
   fgLayer->contents.push_back(MakeSolidFill(doc.get(), {0.9f, 0.1f, 0.5f, 1.0f}));
   doc->layers.push_back(fgLayer);
 
-  ASSERT_TRUE(ExportAndVerify(*doc, "layer_blend_overlay"));
+  pagx::PPTExportOptions options;
+  options.rasterizeUnsupportedBlend = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "layer_blend_overlay", options));
 }
 
 PAGX_TEST(PAGXPPTTest, LayerNonNormalBlendWithBackdrop) {
@@ -3995,7 +3997,7 @@ PAGX_TEST(PAGXPPTTest, LayerNonNormalBlendWithBackdrop) {
   doc->layers.push_back(fg);
 
   pagx::PPTExportOptions options;
-  options.compositeBlendBackdrop = true;
+  options.rasterizeUnsupportedBlend = true;
   ASSERT_TRUE(ExportAndVerify(*doc, "layer_blend_with_backdrop", options));
 }
 
@@ -4015,7 +4017,9 @@ PAGX_TEST(PAGXPPTTest, FillBlendModeEscalated) {
   layer->contents.push_back(rect);
   layer->contents.push_back(fill);
   doc->layers.push_back(layer);
-  ASSERT_TRUE(ExportAndVerify(*doc, "fill_blend_hardlight"));
+  pagx::PPTExportOptions options;
+  options.rasterizeUnsupportedBlend = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "fill_blend_hardlight", options));
 }
 
 PAGX_TEST(PAGXPPTTest, RasterizeUnsupportedBlendDisabled) {
@@ -4067,7 +4071,9 @@ PAGX_TEST(PAGXPPTTest, BlendFilterUnsupportedMode) {
   layer->filters.push_back(bf);
 
   doc->layers.push_back(layer);
-  ASSERT_TRUE(ExportAndVerify(*doc, "blend_filter_unsupported"));
+  pagx::PPTExportOptions options;
+  options.rasterizeUnsupportedBlend = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "blend_filter_unsupported", options));
 }
 
 PAGX_TEST(PAGXPPTTest, WideGamutColorEscalated) {

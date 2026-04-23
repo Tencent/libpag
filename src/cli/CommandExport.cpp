@@ -39,7 +39,7 @@ struct ExportOptions {
   bool pptBakeScrollRect = true;
   bool pptBakeTiledPattern = true;
   bool pptBridgeContours = true;
-  bool pptCompositeBlendBackdrop = false;
+  bool pptRasterizeUnsupportedBlend = false;
 };
 
 static void PrintUsage() {
@@ -68,12 +68,13 @@ static void PrintUsage() {
       << "                              tiled image patterns to bitmap\n"
       << "  --ppt-no-bridge-contours    Emit each contour as a separate sub-path instead\n"
       << "                              of bridging nested contours (default: bridge on)\n"
-      << "  --ppt-composite-blend-backdrop\n"
-      << "                              When rasterizing a layer with an unsupported blend\n"
-      << "                              mode, include the backdrop pixels in the PNG patch\n"
-      << "                              so the blend composites correctly against the scene\n"
-      << "                              beneath (default: off, layer is baked against an\n"
-      << "                              empty canvas and the blend degenerates to near-flat)\n"
+      << "  --ppt-rasterize-blend       Rasterize layers whose blend mode is outside of\n"
+      << "                              Normal/Multiply/Screen/Darken/Lighten (the only ones\n"
+      << "                              OOXML can express) into a PNG patch that includes the\n"
+      << "                              backdrop beneath the layer, so the blend composites\n"
+      << "                              correctly at the cost of turning native content under\n"
+      << "                              the patch into baked pixels (default: off, the blend\n"
+      << "                              mode is silently dropped and the layer renders Normal)\n"
       << "\n"
       << "Examples:\n"
       << "  pagx export --input icon.pagx                    # PAGX to icon.svg\n"
@@ -115,8 +116,8 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
       options->pptBakeTiledPattern = false;
     } else if (arg == "--ppt-no-bridge-contours") {
       options->pptBridgeContours = false;
-    } else if (arg == "--ppt-composite-blend-backdrop") {
-      options->pptCompositeBlendBackdrop = true;
+    } else if (arg == "--ppt-rasterize-blend") {
+      options->pptRasterizeUnsupportedBlend = true;
     } else if (arg == "--help" || arg == "-h") {
       PrintUsage();
       return -1;
@@ -198,7 +199,7 @@ static int ExportToPPT(const ExportOptions& options) {
   pptOptions.bakeScrollRect = options.pptBakeScrollRect;
   pptOptions.bakeTiledPattern = options.pptBakeTiledPattern;
   pptOptions.bridgeContours = options.pptBridgeContours;
-  pptOptions.compositeBlendBackdrop = options.pptCompositeBlendBackdrop;
+  pptOptions.rasterizeUnsupportedBlend = options.pptRasterizeUnsupportedBlend;
 
   if (!PPTExporter::ToFile(*document, options.outputFile, pptOptions)) {
     std::cerr << "pagx export: error: failed to write '" << options.outputFile << "'\n";
