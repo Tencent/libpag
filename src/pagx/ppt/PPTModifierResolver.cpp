@@ -393,6 +393,15 @@ static Group* MakeCopyGroup(PAGXDocument* doc, const std::vector<Element*>& body
   g->rotation = rotation;
   g->scale = {sx, sy};
   g->alpha = alpha;
+  // Prime the wrapper's preferred layout from `position` so that
+  // BuildGroupMatrix's read of renderPosition() returns the per-copy offset.
+  // Without this, layoutBounds() falls back to preferredX/Y == 0 (these
+  // synthetic groups never participate in the document layout pass) and every
+  // copy collapses onto the origin, hiding all repeater offsets in the PPTX.
+  // Skip Group::updateSize's child recursion — body children were already
+  // measured by the document's layout pass — and call the base directly so
+  // virtual dispatch invokes Group::onMeasure to seed preferredX/Y.
+  g->LayoutNode::updateSize(nullptr);
   return g;
 }
 
