@@ -21,10 +21,7 @@
 #include <cstring>
 #include <iostream>
 #include <string>
-#include <vector>
 #include "cli/CliUtils.h"
-#include "pagx/PAGXExporter.h"
-#include "renderer/FontEmbedder.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Typeface.h"
 
@@ -162,103 +159,6 @@ static int RunFontInfo(int argc, char* argv[]) {
   return 0;
 }
 
-// ---- font embed ----
-
-struct FontEmbedOptions {
-  std::string inputFile = {};
-  std::string outputFile = {};
-  std::vector<std::string> fontFiles = {};
-  std::vector<std::string> fallbacks = {};
-};
-
-static void PrintFontEmbedUsage() {
-  std::cout
-      << "Usage: pagx font embed [options] <file.pagx>\n"
-      << "\n"
-      << "Embed fonts into a PAGX file by performing text layout and glyph extraction.\n"
-      << "\n"
-      << "Options:\n"
-      << "  -o, --output <path>              Output file path (default: overwrite input)\n"
-      << "  --file <path>                    Register a font file (can be specified multiple\n"
-      << "                                   times)\n"
-      << "  --fallback <path|name>           Add a fallback font file or system font name (can\n"
-      << "                                   be specified multiple times)\n"
-      << "  -h, --help                       Show this help message\n";
-}
-
-// Returns 0 on success, -1 if help was printed, 1 on error.
-static int ParseFontEmbedOptions(int argc, char* argv[], FontEmbedOptions* options) {
-  int i = 1;
-  while (i < argc) {
-    std::string arg = argv[i];
-    if ((arg == "-o" || arg == "--output") && i + 1 < argc) {
-      options->outputFile = argv[++i];
-    } else if (arg == "--file" && i + 1 < argc) {
-      options->fontFiles.push_back(argv[++i]);
-    } else if (arg == "--fallback" && i + 1 < argc) {
-      options->fallbacks.push_back(argv[++i]);
-    } else if (arg == "--help" || arg == "-h") {
-      PrintFontEmbedUsage();
-      return -1;
-    } else if (arg[0] == '-') {
-      std::cerr << "pagx font embed: unknown option '" << arg << "'\n";
-      return 1;
-    } else if (options->inputFile.empty()) {
-      options->inputFile = arg;
-    } else {
-      std::cerr << "pagx font embed: unexpected argument '" << arg << "'\n";
-      return 1;
-    }
-    i++;
-  }
-  if (options->inputFile.empty()) {
-    std::cerr << "pagx font embed: missing input file\n";
-    return 1;
-  }
-  if (options->outputFile.empty()) {
-    options->outputFile = options->inputFile;
-  }
-  return 0;
-}
-
-static int RunFontEmbed(int argc, char* argv[]) {
-  FontEmbedOptions options = {};
-  auto parseResult = ParseFontEmbedOptions(argc, argv, &options);
-  if (parseResult != 0) {
-    return parseResult == -1 ? 0 : parseResult;
-  }
-
-  auto document = LoadDocument(options.inputFile, "pagx font embed");
-  if (document == nullptr) {
-    return 1;
-  }
-  if (document->hasUnresolvedImports()) {
-    std::cerr << "pagx font embed: error: unresolved import directive, run 'pagx resolve' first\n";
-    return 1;
-  }
-
-  FontConfig fontConfig = {};
-  if (!LoadFontConfig(&fontConfig, options.fontFiles, options.fallbacks, "pagx font embed")) {
-    return 1;
-  }
-
-  FontEmbedder::ClearEmbeddedGlyphRuns(document.get());
-  document->applyLayout(&fontConfig);
-
-  FontEmbedder embedder = {};
-  if (!embedder.embed(document.get())) {
-    std::cerr << "pagx font embed: font embedding failed\n";
-    return 1;
-  }
-
-  auto xml = PAGXExporter::ToXML(*document);
-  if (!WriteStringToFile(xml, options.outputFile, "pagx font embed")) {
-    return 1;
-  }
-
-  return 0;
-}
-
 // ---- main entry ----
 
 static void PrintFontUsage() {
@@ -266,7 +166,6 @@ static void PrintFontUsage() {
             << "\n"
             << "Subcommands:\n"
             << "  info    Query font identity and metrics\n"
-            << "  embed   Embed fonts into a PAGX file\n"
             << "\n"
             << "Run 'pagx font <subcommand> --help' for details.\n";
 }
@@ -288,7 +187,8 @@ int RunFont(int argc, char* argv[]) {
     return RunFontInfo(argc - 1, argv + 1);
   }
   if (subcommand == "embed") {
-    return RunFontEmbed(argc - 1, argv + 1);
+    std::cerr << "pagx font: 'embed' subcommand has been removed, use 'pagx embed' instead\n";
+    return 1;
   }
 
   std::cerr << "pagx font: unknown subcommand '" << subcommand << "'\n";
