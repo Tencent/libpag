@@ -36,8 +36,8 @@
             <Text text="offset 0" fontFamily="Arial" fontSize="10" textAnchor="start" position="0,14"/>
             <Fill color="#64748B"/>
           </Layer>
-          <Layer flex="1" height="20">
-            <Rectangle left="0" right="0" top="9" bottom="9"/>
+          <Layer width="222" height="20">
+            <Path data="M 0,10 L 222,10"/>
             <Stroke color="#3B82F6" width="4" dashes="12,6" dashOffset="0" cap="butt"/>
           </Layer>
         </Layer>
@@ -48,8 +48,8 @@
             <Text text="offset 4.5" fontFamily="Arial" fontSize="10" textAnchor="start" position="0,14"/>
             <Fill color="#64748B"/>
           </Layer>
-          <Layer flex="1" height="20">
-            <Rectangle left="0" right="0" top="9" bottom="9"/>
+          <Layer width="222" height="20">
+            <Path data="M 0,10 L 222,10"/>
             <Stroke color="#3B82F6" width="4" dashes="12,6" dashOffset="4.5" cap="butt"/>
           </Layer>
         </Layer>
@@ -60,8 +60,8 @@
             <Text text="offset 9" fontFamily="Arial" fontSize="10" textAnchor="start" position="0,14"/>
             <Fill color="#64748B"/>
           </Layer>
-          <Layer flex="1" height="20">
-            <Rectangle left="0" right="0" top="9" bottom="9"/>
+          <Layer width="222" height="20">
+            <Path data="M 0,10 L 222,10"/>
             <Stroke color="#3B82F6" width="4" dashes="12,6" dashOffset="9" cap="butt"/>
           </Layer>
         </Layer>
@@ -72,8 +72,8 @@
             <Text text="offset 13.5" fontFamily="Arial" fontSize="10" textAnchor="start" position="0,14"/>
             <Fill color="#64748B"/>
           </Layer>
-          <Layer flex="1" height="20">
-            <Rectangle left="0" right="0" top="9" bottom="9"/>
+          <Layer width="222" height="20">
+            <Path data="M 0,10 L 222,10"/>
             <Stroke color="#3B82F6" width="4" dashes="12,6" dashOffset="13.5" cap="butt"/>
           </Layer>
         </Layer>
@@ -84,8 +84,8 @@
             <Text text="offset 18" fontFamily="Arial" fontSize="10" textAnchor="start" position="0,14"/>
             <Fill color="#64748B"/>
           </Layer>
-          <Layer flex="1" height="20">
-            <Rectangle left="0" right="0" top="9" bottom="9"/>
+          <Layer width="222" height="20">
+            <Path data="M 0,10 L 222,10"/>
             <Stroke color="#10B981" width="4" dashes="12,6" dashOffset="18" cap="butt"/>
           </Layer>
         </Layer>
