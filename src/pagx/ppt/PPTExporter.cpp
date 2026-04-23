@@ -62,7 +62,6 @@
 #include "pagx/ppt/PPTFeatureProbe.h"
 #include "pagx/ppt/PPTGeomEmitter.h"
 #include "pagx/ppt/PPTModifierResolver.h"
-#include "pagx/ppt/PPTRasterizer.h"
 #include "pagx/ppt/PPTWriterContext.h"
 #include "pagx/types/Rect.h"
 #include "pagx/utils/ExporterUtils.h"
@@ -499,9 +498,9 @@ class PPTWriter {
   bool _rasterizeUnsupportedBlend = true;
   bool _compositeBlendBackdrop = false;
   bool _rasterizeWideGamut = true;
-  // _rasterDPI is wired through to PPTRasterizer via the GPUContext but the
-  // current rasterization path always uses the GPU surface's native scale; the
-  // option is retained for forward compatibility.
+  // _rasterDPI is reserved for the rasterization path. The current GPU surface
+  // always uses its native scale; the option is retained for forward
+  // compatibility.
   [[maybe_unused]] int _rasterDPI = 192;
   LayoutContext* _layoutContext = nullptr;
   GPUContext _gpu;

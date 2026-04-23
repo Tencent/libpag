@@ -27,8 +27,7 @@ namespace pagx {
 /**
  * Result of probing a Layer (or a sub-tree of Elements) for features that the OOXML emitter
  * cannot losslessly represent. The PPT exporter consults this struct to decide whether a layer
- * needs to be rasterized as a fallback PNG (via `PPTRasterizer`) instead of being walked
- * element-by-element.
+ * needs to be rasterized as a fallback PNG instead of being walked element-by-element.
  *
  * The probe is intentionally conservative: it only flags features that are strictly impossible
  * to express in the slide XML. Features that have an approximate native mapping (e.g. radial

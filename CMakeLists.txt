@@ -216,8 +216,7 @@ if (PAG_BUILD_PAGX)
                 src/pagx/ppt/PPTContourUtils.cpp
                 src/pagx/ppt/PPTGeomEmitter.cpp
                 src/pagx/ppt/PPTFeatureProbe.cpp
-                src/pagx/ppt/PPTModifierResolver.cpp
-                src/pagx/ppt/PPTRasterizer.cpp)
+                src/pagx/ppt/PPTModifierResolver.cpp)
         set(MINIZIP_DIR ${TGFX_DIR}/third_party/zlib/contrib/minizip)
         list(APPEND PAG_FILES ${MINIZIP_DIR}/zip.c ${MINIZIP_DIR}/ioapi.c)
         list(APPEND PAG_INCLUDES ${MINIZIP_DIR})
