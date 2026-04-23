@@ -22,6 +22,7 @@
 #include <random>
 #include <string>
 #include "base/utils/MathUtil.h"
+#include "pagx/html/FontHoist.h"
 #include "pagx/html/HTMLWriter.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
@@ -608,6 +609,8 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
   if (text->text.empty()) {
     return;
   }
+  bool fontHoisted =
+      !_ctx->fontHoistSignature.fontFamily.empty() || _ctx->fontHoistSignature.renderFontSize > 0;
   std::string style;
   style.reserve(300);
   if (tb) {
@@ -660,10 +663,13 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     if (text->baseline == TextBaseline::Alphabetic) {
       ty -= renderFont * 0.8f;
     }
-    auto lineHeight = text->fontLineHeight() > 0 ? text->fontLineHeight() : renderFont;
     style += "position:absolute;left:" + FloatToString(renderPos.x) +
-             "px;top:" + FloatToString(ty) +
-             "px;white-space:pre;line-height:" + FloatToString(lineHeight) + "px";
+             "px;top:" + FloatToString(ty) + "px;white-space:pre";
+    // line-height is hoisted to the parent Layer when fontHoisted; otherwise emit it on the span.
+    if (!fontHoisted) {
+      auto lineHeight = text->fontLineHeight() > 0 ? text->fontLineHeight() : renderFont;
+      style += ";line-height:" + FloatToString(lineHeight) + "px";
+    }
   }
   std::string textTransform;
   if (!tb) {
@@ -682,23 +688,26 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
   if (!textTransform.empty()) {
     style += ";transform:" + textTransform;
   }
-  if (!text->fontFamily.empty()) {
-    std::string escapedFamily = text->fontFamily;
-    for (size_t pos = 0; (pos = escapedFamily.find('\'', pos)) != std::string::npos; pos += 2) {
-      escapedFamily.replace(pos, 1, "\\'");
+  // Font properties are hoisted to the parent Layer when fontHoisted; skip them on the span.
+  if (!fontHoisted) {
+    if (!text->fontFamily.empty()) {
+      std::string escapedFamily = text->fontFamily;
+      for (size_t pos = 0; (pos = escapedFamily.find('\'', pos)) != std::string::npos; pos += 2) {
+        escapedFamily.replace(pos, 1, "\\'");
+      }
+      style += ";font-family:'" + escapedFamily + "'";
     }
-    style += ";font-family:'" + escapedFamily + "'";
-  }
-  style += ";font-size:" + FloatToString(text->renderFontSize()) + "px";
-  if (text->letterSpacing != 0.0f) {
-    style += ";letter-spacing:" + FloatToString(text->letterSpacing) + "px";
-  }
-  if (!text->fontStyle.empty()) {
-    if (text->fontStyle.find("Bold") != std::string::npos) {
-      style += ";font-weight:bold";
+    style += ";font-size:" + FloatToString(text->renderFontSize()) + "px";
+    if (text->letterSpacing != 0.0f) {
+      style += ";letter-spacing:" + FloatToString(text->letterSpacing) + "px";
     }
-    if (text->fontStyle.find("Italic") != std::string::npos) {
-      style += ";font-style:italic";
+    if (!text->fontStyle.empty()) {
+      if (text->fontStyle.find("Bold") != std::string::npos) {
+        style += ";font-weight:bold";
+      }
+      if (text->fontStyle.find("Italic") != std::string::npos) {
+        style += ";font-style:italic";
+      }
     }
   }
   if (text->fauxBold && !stroke) {

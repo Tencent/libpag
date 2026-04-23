@@ -21,6 +21,7 @@
 #include <string>
 #include <vector>
 #include "base/utils/MathUtil.h"
+#include "pagx/html/FontHoist.h"
 #include "pagx/html/HTMLWriter.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -300,56 +301,64 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             }
             for (auto& span : tbSpans) {
               std::string spanStyle;
-              if (!span.text->fontFamily.empty()) {
-                spanStyle += "font-family:'" + span.text->fontFamily + "'";
-              }
-              if (!spanStyle.empty()) {
-                spanStyle += ";";
-              }
-              spanStyle += "font-size:" + FloatToString(span.text->renderFontSize()) + "px";
-              if (!span.text->fontStyle.empty()) {
-                if (span.text->fontStyle.find("Bold") != std::string::npos) {
-                  spanStyle += ";font-weight:bold";
+              bool spanFontHoisted = !_ctx->fontHoistSignature.fontFamily.empty() ||
+                                     _ctx->fontHoistSignature.renderFontSize > 0;
+              if (!spanFontHoisted) {
+                if (!span.text->fontFamily.empty()) {
+                  if (!spanStyle.empty()) spanStyle += ';';
+                  spanStyle += "font-family:'" + span.text->fontFamily + "'";
                 }
-                if (span.text->fontStyle.find("Italic") != std::string::npos) {
-                  spanStyle += ";font-style:italic";
+                if (!spanStyle.empty()) spanStyle += ';';
+                spanStyle += "font-size:" + FloatToString(span.text->renderFontSize()) + "px";
+                if (!span.text->fontStyle.empty()) {
+                  if (span.text->fontStyle.find("Bold") != std::string::npos) {
+                    spanStyle += ";font-weight:bold";
+                  }
+                  if (span.text->fontStyle.find("Italic") != std::string::npos) {
+                    spanStyle += ";font-style:italic";
+                  }
                 }
-              }
-              if (span.text->letterSpacing != 0.0f) {
-                spanStyle += ";letter-spacing:" + FloatToString(span.text->letterSpacing) + "px";
+                if (span.text->letterSpacing != 0.0f) {
+                  spanStyle += ";letter-spacing:" + FloatToString(span.text->letterSpacing) + "px";
+                }
               }
               if (span.fill && span.fill->color) {
                 auto ct = span.fill->color->nodeType();
                 if (ct == NodeType::SolidColor) {
                   auto sc = static_cast<const SolidColor*>(span.fill->color);
-                  spanStyle += ";color:" + ColorToRGBA(sc->color, span.fill->alpha);
+                  if (!spanStyle.empty()) spanStyle += ';';
+                  spanStyle += "color:" + ColorToRGBA(sc->color, span.fill->alpha);
                 } else {
                   float ca = 1.0f;
                   std::string css = colorToCSS(span.fill->color, &ca);
                   if (!css.empty()) {
-                    spanStyle += ";background:" + css;
+                    if (!spanStyle.empty()) spanStyle += ';';
+                    spanStyle += "background:" + css;
                     spanStyle += ";-webkit-background-clip:text;background-clip:text";
                     spanStyle += ";-webkit-text-fill-color:transparent";
                   }
                 }
               }
               if (span.text->fauxBold && !span.stroke) {
-                spanStyle += ";-webkit-text-stroke:" +
+                if (!spanStyle.empty()) spanStyle += ';';
+                spanStyle += "-webkit-text-stroke:" +
                              FloatToString(FauxBoldStrokeWidth(span.text->renderFontSize())) +
                              "px currentColor";
               }
               if (span.stroke && span.stroke->color &&
                   span.stroke->color->nodeType() == NodeType::SolidColor) {
                 auto sc = static_cast<const SolidColor*>(span.stroke->color);
-                spanStyle += ";-webkit-text-stroke:" + FloatToString(span.stroke->width) + "px " +
+                if (!spanStyle.empty()) spanStyle += ';';
+                spanStyle += "-webkit-text-stroke:" + FloatToString(span.stroke->width) + "px " +
                              ColorToRGBA(sc->color, span.stroke->alpha);
                 spanStyle += ";paint-order:stroke fill";
               }
               if (span.text->fauxItalic) {
+                if (!spanStyle.empty()) spanStyle += ';';
                 // `transform` is a no-op on pure inline boxes, so promote the span to
                 // inline-block. Each tbSpan is a short text run, so losing word-wrap inside
                 // the span is acceptable and matches the single-run expectation of fauxItalic.
-                spanStyle += ";display:inline-block;transform:skewX(-12deg)";
+                spanStyle += "display:inline-block;transform:skewX(-12deg)";
               }
               out.openTag("span");
               out.addAttr("style", spanStyle);
@@ -402,20 +411,24 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           }
           for (auto& span : richTextSpans) {
             std::string spanStyle = tb->wordWrap ? "white-space:pre-wrap" : "white-space:pre";
-            if (!span.text->fontFamily.empty()) {
-              spanStyle += ";font-family:'" + span.text->fontFamily + "'";
-            }
-            spanStyle += ";font-size:" + FloatToString(span.text->renderFontSize()) + "px";
-            if (!span.text->fontStyle.empty()) {
-              if (span.text->fontStyle.find("Bold") != std::string::npos) {
-                spanStyle += ";font-weight:bold";
+            bool spanFontHoisted = !_ctx->fontHoistSignature.fontFamily.empty() ||
+                                   _ctx->fontHoistSignature.renderFontSize > 0;
+            if (!spanFontHoisted) {
+              if (!span.text->fontFamily.empty()) {
+                spanStyle += ";font-family:'" + span.text->fontFamily + "'";
               }
-              if (span.text->fontStyle.find("Italic") != std::string::npos) {
-                spanStyle += ";font-style:italic";
+              spanStyle += ";font-size:" + FloatToString(span.text->renderFontSize()) + "px";
+              if (!span.text->fontStyle.empty()) {
+                if (span.text->fontStyle.find("Bold") != std::string::npos) {
+                  spanStyle += ";font-weight:bold";
+                }
+                if (span.text->fontStyle.find("Italic") != std::string::npos) {
+                  spanStyle += ";font-style:italic";
+                }
               }
-            }
-            if (span.text->letterSpacing != 0.0f) {
-              spanStyle += ";letter-spacing:" + FloatToString(span.text->letterSpacing) + "px";
+              if (span.text->letterSpacing != 0.0f) {
+                spanStyle += ";letter-spacing:" + FloatToString(span.text->letterSpacing) + "px";
+              }
             }
             if (span.fill && span.fill->color) {
               auto ct = span.fill->color->nodeType();
@@ -1414,6 +1427,23 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     }
   }
 
+  // Font hoist: when all direct-child Text nodes share the same font signature, append the
+  // shared font CSS to the Layer's style so child spans can inherit it. Skip when the Layer
+  // style already contains font-* properties (defensive guard against future extensions).
+  FontSignature fontSig = {};
+  bool fontHoisted = false;
+  if (style.find("font-") == std::string::npos) {
+    fontSig = CollectUniformSignature(layer->contents);
+    if (!fontSig.fontFamily.empty() || fontSig.renderFontSize > 0) {
+      std::string fontCss = FontSignatureToCss(fontSig);
+      if (!fontCss.empty()) {
+        style += ';';
+        style += fontCss;
+        fontHoisted = true;
+      }
+    }
+  }
+
   out.openTag("div");
   out.addAttr("class", "pagx-layer");
   if (!layer->id.empty()) {
@@ -1565,6 +1595,14 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
 
   float contentAlpha = childDistribute ? layerAlpha : 1.0f;
 
+  // Set font hoist context so writeText can skip inherited font properties.
+  auto savedFontHoistSig = _ctx->fontHoistSignature;
+  if (fontHoisted) {
+    _ctx->fontHoistSignature = fontSig;
+  } else {
+    _ctx->fontHoistSignature = {};
+  }
+
   if (useMirrorTile) {
     // Simulate BlurFilter.tileMode=Mirror with a 3-layer DOM:
     //   <clip>      position:absolute, left:-margin, top:-margin, size=(W+2m) x (H+2m),
@@ -1708,6 +1746,8 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     out.closeTag();  // inner offset div
     out.closeTag();  // clip wrapper div
   }
+
+  _ctx->fontHoistSignature = savedFontHoistSig;
 
   out.closeTag();
 }

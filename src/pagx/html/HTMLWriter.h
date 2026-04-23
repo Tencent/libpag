@@ -23,6 +23,7 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
+#include "pagx/html/FontHoist.h"
 #include "pagx/html/HTMLBuilder.h"
 #include "pagx/html/HTMLPlusDarkerRenderer.h"
 #include "pagx/nodes/ColorSource.h"
@@ -159,6 +160,11 @@ class HTMLWriterContext {
   // maps to the layer origin in world space. Reset to (0, 0) when no shift was applied.
   float repeaterOriginOffsetX = 0;
   float repeaterOriginOffsetY = 0;
+
+  // Set by writeLayer before emitting the layer's contents. When non-empty, the layer has hoisted
+  // font CSS onto its own style attribute, so child Text spans should skip the font-* properties
+  // that are already covered by this signature. Reset to empty when leaving the layer.
+  FontSignature fontHoistSignature = {};
 
   std::string nextId(const std::string& prefix) {
     return prefix + std::to_string(_id++);
