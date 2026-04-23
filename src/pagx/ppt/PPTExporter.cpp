@@ -634,7 +634,7 @@ class PPTWriter {
   void writeSolidColorFill(XMLBuilder& out, const Color& color, float alpha);
   void writeImagePatternFill(XMLBuilder& out, const ImagePattern* pattern, float alpha,
                              const Rect& shapeBounds);
-  void writeGradientStops(XMLBuilder& out, const std::vector<ColorStop*>& stops);
+  void writeGradientStops(XMLBuilder& out, const std::vector<ColorStop*>& stops, float alpha);
   void writeStroke(XMLBuilder& out, const Stroke* stroke, float alpha);
   void writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& filters,
                     const std::vector<LayerStyle*>& styles = {});
@@ -931,12 +931,13 @@ bool PPTWriter::writeImagePatternAsPicture(XMLBuilder& out, const Fill* fill,
 
 // ── Color source / gradient ────────────────────────────────────────────────
 
-void PPTWriter::writeGradientStops(XMLBuilder& out, const std::vector<ColorStop*>& stops) {
+void PPTWriter::writeGradientStops(XMLBuilder& out, const std::vector<ColorStop*>& stops,
+                                   float alpha) {
   out.openElement("a:gsLst").closeElementStart();
   for (const auto* stop : stops) {
     int pos = std::clamp(static_cast<int>(std::round(stop->offset * 100000.0f)), 0, 100000);
     out.openElement("a:gs").addRequiredAttribute("pos", pos).closeElementStart();
-    WriteSrgbClr(out, stop->color, stop->color.alpha);
+    WriteSrgbClr(out, stop->color, stop->color.alpha * alpha);
     out.closeElement();  // a:gs
   }
   out.closeElement();  // a:gsLst
@@ -965,7 +966,7 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
       int ang = AngleToPPT(angleDeg);
 
       out.openElement("a:gradFill").closeElementStart();
-      writeGradientStops(out, grad->colorStops);
+      writeGradientStops(out, grad->colorStops, alpha);
       out.openElement("a:lin")
           .addRequiredAttribute("ang", ang)
           .addRequiredAttribute("scaled", "1")
@@ -981,7 +982,7 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
       // is empty (e.g. text fills) fall back to the shape center.
       auto* grad = static_cast<const RadialGradient*>(source);
       out.openElement("a:gradFill").closeElementStart();
-      writeGradientStops(out, grad->colorStops);
+      writeGradientStops(out, grad->colorStops, alpha);
       out.openElement("a:path").addRequiredAttribute("path", "circle").closeElementStart();
       WriteFillToRectFromCenter(out, grad, shapeBounds);
       out.closeElement();  // a:path
@@ -996,7 +997,7 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
       // last-resort fallback so something visible still ends up on the slide.
       auto* grad = static_cast<const ConicGradient*>(source);
       out.openElement("a:gradFill").addRequiredAttribute("rotWithShape", "1").closeElementStart();
-      writeGradientStops(out, grad->colorStops);
+      writeGradientStops(out, grad->colorStops, alpha);
       out.openElement("a:path").addRequiredAttribute("path", "circle").closeElementStart();
       WriteFillToRectFromCenter(out, grad, shapeBounds);
       out.closeElement();  // a:path
@@ -1009,7 +1010,7 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
       // pattern when the focus rect is collapsed to the center point.
       auto* grad = static_cast<const DiamondGradient*>(source);
       out.openElement("a:gradFill").addRequiredAttribute("rotWithShape", "1").closeElementStart();
-      writeGradientStops(out, grad->colorStops);
+      writeGradientStops(out, grad->colorStops, alpha);
       out.openElement("a:path").addRequiredAttribute("path", "rect").closeElementStart();
       WriteFillToRectFromCenter(out, grad, shapeBounds);
       out.closeElement();  // a:path
