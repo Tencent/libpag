@@ -419,6 +419,14 @@ CLI_TEST(PAGXHtmlTest, ClipAndMask) {
   ASSERT_FALSE(html.empty());
   // scrollRect → clip-path or clip
   // mask → CSS mask or SVG mask/clipPath
+  // Mask SVG inside data: URLs must include xmlns — the browser parses it as a standalone SVG
+  // document, not as part of the HTML5 DOM where xmlns would be redundant.
+  EXPECT_NE(html.find("mask-image"), std::string::npos) << "clip_and_mask should use mask-image";
+  EXPECT_NE(html.find("xmlns="), std::string::npos)
+      << "mask-image data URL SVG must include xmlns for standalone parsing";
+  // Inline SVG elements in HTML5 should NOT have xmlns.
+  EXPECT_EQ(html.find("<svg xmlns="), std::string::npos)
+      << "Inline SVG elements should not have xmlns in HTML5";
 }
 
 // =============================================================================

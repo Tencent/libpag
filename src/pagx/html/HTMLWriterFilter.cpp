@@ -409,6 +409,9 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type) {
 
   HTMLBuilder svg(0);
   svg.openTag("svg");
+  // xmlns is required for SVG inside data: URLs — the browser parses this as a standalone SVG
+  // document, not as part of the HTML5 DOM where xmlns would be redundant.
+  svg.addAttr("xmlns", "http://www.w3.org/2000/svg");
   svg.addAttr("width", FloatToString(maxX));
   svg.addAttr("height", FloatToString(maxY));
   svg.addAttr("viewBox", "0 0 " + FloatToString(maxX) + " " + FloatToString(maxY));
