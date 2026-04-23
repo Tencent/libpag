@@ -10,7 +10,7 @@
   </Layer>
 
   <!-- Main container -->
-  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16,20,16,20" gap="6" alignment="stretch">
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16,20,16,20" gap="6" alignment="stretch" arrangement="center">
 
     <!-- Row 1: DropShadow blendMode + InnerShadow blendMode -->
     <Layer layout="horizontal" gap="10" alignment="stretch" arrangement="center">
