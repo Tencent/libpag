@@ -409,7 +409,6 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type) {
 
   HTMLBuilder svg(0);
   svg.openTag("svg");
-  svg.addAttr("xmlns", "http://www.w3.org/2000/svg");
   svg.addAttr("width", FloatToString(maxX));
   svg.addAttr("height", FloatToString(maxY));
   svg.addAttr("viewBox", "0 0 " + FloatToString(maxX) + " " + FloatToString(maxY));

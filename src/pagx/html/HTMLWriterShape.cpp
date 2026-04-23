@@ -1306,7 +1306,6 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
       svgStyle += ";opacity:" + FloatToString(alpha);
     }
     out.openTag("svg");
-    out.addAttr("xmlns", "http://www.w3.org/2000/svg");
     out.addAttr("width", FloatToString(bw));
     out.addAttr("height", FloatToString(bh));
     out.addAttr("viewBox", FloatToString(x0) + " " + FloatToString(y0) + " " + FloatToString(bw) +
@@ -1524,7 +1523,6 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
   }
 
   out.openTag("svg");
-  out.addAttr("xmlns", "http://www.w3.org/2000/svg");
   out.addAttr("width", FloatToString(sw));
   out.addAttr("height", FloatToString(sh));
   out.addAttr("viewBox", FloatToString(x0) + " " + FloatToString(y0) + " " + FloatToString(sw) +
@@ -1910,7 +1908,6 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         svgStyle += ";opacity:" + FloatToString(alpha);
       }
       out.openTag("svg");
-      out.addAttr("xmlns", "http://www.w3.org/2000/svg");
       out.addAttr("width", FloatToString(sw));
       out.addAttr("height", FloatToString(sh));
       out.addAttr("viewBox", FloatToString(x0) + " " + FloatToString(y0) + " " + FloatToString(sw) +
@@ -2124,7 +2121,6 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
       svgStyle += ";opacity:" + FloatToString(alpha);
     }
     out.openTag("svg");
-    out.addAttr("xmlns", "http://www.w3.org/2000/svg");
     out.addAttr("width", FloatToString(sw));
     out.addAttr("height", FloatToString(sh));
     out.addAttr("viewBox", FloatToString(x0) + " " + FloatToString(y0) + " " + FloatToString(sw) +

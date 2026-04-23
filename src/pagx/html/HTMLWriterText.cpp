@@ -785,7 +785,6 @@ void HTMLWriter::writeGlyphRunSVG(HTMLBuilder& out, const Text* text, const Fill
     svgStyle += ";opacity:" + FloatToString(alpha);
   }
   out.openTag("svg");
-  out.addAttr("xmlns", "http://www.w3.org/2000/svg");
   out.addAttr("style", svgStyle);
   out.closeTagStart();
   if (!paths.empty()) {
@@ -922,7 +921,6 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         svgStyle += ";opacity:" + FloatToString(alpha);
       }
       out.openTag("svg");
-      out.addAttr("xmlns", "http://www.w3.org/2000/svg");
       out.addAttr("style", svgStyle);
       out.closeTagStart();
       size_t glyphIdx = 0;
@@ -1226,7 +1224,6 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         svgStyle += ";opacity:" + FloatToString(alpha);
       }
       out.openTag("svg");
-      out.addAttr("xmlns", "http://www.w3.org/2000/svg");
       out.addAttr("style", svgStyle);
       out.closeTagStart();
       out.openTag("g");

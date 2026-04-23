@@ -78,8 +78,11 @@ static std::string RoundPxInStyle(const std::string& style) {
 
     std::string numStr = style.substr(numStart, j - numStart);
     float value = static_cast<float>(std::atof(numStr.c_str()));
-    result += CoordToString(value);
-    result += "px";
+    auto rounded = CoordToString(value);
+    result += rounded;
+    if (rounded != "0") {
+      result += "px";
+    }
     i = j + 2;
   }
   return result;
