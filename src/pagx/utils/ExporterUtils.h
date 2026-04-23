@@ -162,12 +162,16 @@ class GPUContext {
 };
 
 /**
- * Rasterizes a tgfx layer (including any masks) to a PNG-encoded Data object.
+ * Rasterizes a tgfx layer (including any masks) to a PNG-encoded Data object. `pixelScale` is the
+ * ratio of the desired output pixel density to the layer's logical coordinate space (e.g. 2.0 for
+ * 2x density). The encoded PNG has dimensions ceil(logicalSize * pixelScale); callers keep using
+ * the logical bounds when placing the PNG so that consumers scale it back up on display.
  * Returns nullptr if the layer has zero bounds or rasterization fails.
  */
 std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,
                                               const std::shared_ptr<tgfx::Layer>& root,
-                                              const std::shared_ptr<tgfx::Layer>& targetLayer);
+                                              const std::shared_ptr<tgfx::Layer>& targetLayer,
+                                              float pixelScale);
 
 /**
  * Rasterizes the full scene rooted at `root`, clipped to the global bounds of `targetLayer`, to
@@ -175,21 +179,24 @@ std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,
  * empty canvas), this renders every layer from `root` downward so that backdrop pixels
  * participate in the composite. Use when the target layer's visual result depends on pixels
  * drawn below it — e.g. a non-Normal `Layer.blendMode` that must blend against the backdrop.
+ * `pixelScale` controls the output pixel density (see RenderMaskedLayer).
  * Returns nullptr if the target has zero bounds or rasterization fails.
  */
 std::shared_ptr<tgfx::Data> RenderLayerCompositeWithBackdrop(
     GPUContext* gpu, const std::shared_ptr<tgfx::Layer>& root,
-    const std::shared_ptr<tgfx::Layer>& targetLayer);
+    const std::shared_ptr<tgfx::Layer>& targetLayer, float pixelScale);
 
 class ImagePattern;
 
 /**
- * Rasterizes a tiled ImagePattern fill to a PNG-encoded Data object at the given pixel dimensions.
- * The image is drawn with the pattern's tile modes and matrix (offset relative to shapeBounds).
- * Returns nullptr if rendering fails.
+ * Rasterizes a tiled ImagePattern fill to a PNG-encoded Data object. `width`/`height` describe
+ * the logical tile size and `offsetX`/`offsetY` the pattern matrix offset in the same logical
+ * space. `pixelScale` controls the output pixel density: the encoded PNG has dimensions
+ * ceil(width * pixelScale) × ceil(height * pixelScale). Returns nullptr if rendering fails.
  */
 std::shared_ptr<tgfx::Data> RenderTiledPattern(GPUContext* gpu, const ImagePattern* pattern,
-                                               int width, int height, float offsetX, float offsetY);
+                                               int width, int height, float offsetX, float offsetY,
+                                               float pixelScale);
 
 /**
  * Returns the effective width/height of a TextBox for typesetting and shape sizing.

@@ -498,10 +498,12 @@ class PPTWriter {
   bool _rasterizeUnsupportedBlend = true;
   bool _compositeBlendBackdrop = false;
   bool _rasterizeWideGamut = true;
-  // _rasterDPI is reserved for the rasterization path. The current GPU surface
-  // always uses its native scale; the option is retained for forward
-  // compatibility.
-  [[maybe_unused]] int _rasterDPI = 192;
+  // Ratio of raster DPI to the 96 DPI logical coordinate space. Drives the
+  // off-screen Surface size of every PNG bake (masked layer, scrollRect bake,
+  // blend/wide-gamut fallback, tiled pattern). The placed <p:pic>/<a:blipFill>
+  // keeps using logical EMU dimensions so the consumer stretches the denser
+  // bitmap over the same visible extent, yielding a crisper result.
+  int _rasterDPI = 192;
   LayoutContext* _layoutContext = nullptr;
   GPUContext _gpu;
   LayerBuildResult _buildResult = {};
@@ -1045,7 +1047,8 @@ void PPTWriter::writeImagePatternFill(XMLBuilder& out, const ImagePattern* patte
     int h = static_cast<int>(ceilf(shapeBounds.height));
     float offsetX = pattern->matrix.tx - shapeBounds.x;
     float offsetY = pattern->matrix.ty - shapeBounds.y;
-    auto tiledPng = RenderTiledPattern(&_gpu, pattern, w, h, offsetX, offsetY);
+    auto tiledPng = RenderTiledPattern(&_gpu, pattern, w, h, offsetX, offsetY,
+                                       static_cast<float>(_rasterDPI) / 96.0f);
     if (tiledPng) {
       auto relId = _ctx->addRawImage(std::move(tiledPng));
       out.openElement("a:blipFill").closeElementStart();
@@ -2455,8 +2458,10 @@ bool PPTWriter::rasterizeLayerAsPicture(XMLBuilder& out, const Layer* layer, boo
   if (!tgfxLayer) {
     return false;
   }
-  auto pngData = withBackdrop ? RenderLayerCompositeWithBackdrop(&_gpu, buildResult.root, tgfxLayer)
-                              : RenderMaskedLayer(&_gpu, buildResult.root, tgfxLayer);
+  auto pixelScale = static_cast<float>(_rasterDPI) / 96.0f;
+  auto pngData = withBackdrop ? RenderLayerCompositeWithBackdrop(&_gpu, buildResult.root, tgfxLayer,
+                                                                 pixelScale)
+                              : RenderMaskedLayer(&_gpu, buildResult.root, tgfxLayer, pixelScale);
   if (!pngData) {
     return false;
   }

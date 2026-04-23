@@ -108,8 +108,12 @@ struct PPTExportOptions {
   bool rasterizeWideGamut = true;
 
   /**
-   * Pixel DPI used when a layer has to be rasterized to PNG. Higher values give crisper fallback
-   * images at the cost of file size. The default value is 192 (2x of the default 96 DPI).
+   * Pixel DPI used when a layer has to be rasterized to PNG. The Surface behind every bake (masked
+   * layer, scrollRect fallback, blend/wide-gamut fallback, tiled pattern) is sized by
+   * `rasterDPI / 96` relative to the layer's logical extent, while the placed picture keeps the
+   * logical EMU dimensions — the consumer stretches the denser bitmap over the same visible area,
+   * giving a crisper result at the cost of file size. The default value is 192 (2x of the default
+   * 96 DPI).
    */
   int rasterDPI = 192;
 

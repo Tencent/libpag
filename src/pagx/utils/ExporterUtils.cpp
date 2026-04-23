@@ -664,22 +664,33 @@ static std::shared_ptr<tgfx::Data> EncodeSurfaceToPNG(const std::shared_ptr<tgfx
 }
 
 // Common skeleton shared by every off-screen GPU render path in this file.
-// Validates the requested size, allocates a Surface, hands the Canvas to
-// `drawer` for the caller-specific commands, then encodes to PNG. `Drawer`
-// must be callable as `drawer(tgfx::Canvas*)`; named functors defined below
-// supply the actual draw logic (the project forbids lambdas).
+// Validates the requested size, allocates a Surface at `width * pixelScale` by
+// `height * pixelScale` pixels, pre-applies a matching scale on the Canvas so
+// that drawer commands can stay in the caller's logical coordinate space, then
+// encodes the surface as PNG. The encoded PNG is the scaled pixel size — the
+// caller is responsible for placing it at the original logical extent so that
+// the consumer stretches the higher-density bitmap back over the same visible
+// area. `Drawer` must be callable as `drawer(tgfx::Canvas*)`; named functors
+// defined below supply the actual draw logic (the project forbids lambdas).
 template <typename Drawer>
 static std::shared_ptr<tgfx::Data> RenderToPNG(tgfx::Context* context, int width, int height,
-                                               Drawer drawer) {
-  if (width <= 0 || height <= 0) {
+                                               float pixelScale, Drawer drawer) {
+  if (width <= 0 || height <= 0 || pixelScale <= 0.0f) {
     return nullptr;
   }
-  auto surface = tgfx::Surface::Make(context, width, height);
+  int pixelWidth = static_cast<int>(std::ceil(static_cast<float>(width) * pixelScale));
+  int pixelHeight = static_cast<int>(std::ceil(static_cast<float>(height) * pixelScale));
+  if (pixelWidth <= 0 || pixelHeight <= 0) {
+    return nullptr;
+  }
+  auto surface = tgfx::Surface::Make(context, pixelWidth, pixelHeight);
   if (surface == nullptr) {
     return nullptr;
   }
-  drawer(surface->getCanvas());
-  return EncodeSurfaceToPNG(surface, width, height);
+  auto* canvas = surface->getCanvas();
+  canvas->scale(pixelScale, pixelScale);
+  drawer(canvas);
+  return EncodeSurfaceToPNG(surface, pixelWidth, pixelHeight);
 }
 
 // Draws `targetLayer` (and only that layer) into the off-screen canvas, with
@@ -749,7 +760,24 @@ void GPUContext::unlock() {
 
 std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,
                                               const std::shared_ptr<tgfx::Layer>& root,
-                                              const std::shared_ptr<tgfx::Layer>& targetLayer) {
+                                              const std::shared_ptr<tgfx::Layer>& targetLayer,
+                                              float pixelScale) {
+  auto globalBounds = targetLayer->getBounds(root.get(), true);
+  auto context = gpu->lockContext();
+  if (context == nullptr) {
+    return nullptr;
+  }
+  int width = static_cast<int>(ceilf(globalBounds.width()));
+  int height = static_cast<int>(ceilf(globalBounds.height()));
+  auto result = RenderToPNG(context, width, height, pixelScale,
+                            MaskedLayerDrawer{root, targetLayer, globalBounds});
+  gpu->unlock();
+  return result;
+}
+
+std::shared_ptr<tgfx::Data> RenderLayerCompositeWithBackdrop(
+    GPUContext* gpu, const std::shared_ptr<tgfx::Layer>& root,
+    const std::shared_ptr<tgfx::Layer>& targetLayer, float pixelScale) {
   auto globalBounds = targetLayer->getBounds(root.get(), true);
   auto context = gpu->lockContext();
   if (context == nullptr) {
@@ -758,22 +786,7 @@ std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,
   int width = static_cast<int>(ceilf(globalBounds.width()));
   int height = static_cast<int>(ceilf(globalBounds.height()));
   auto result =
-      RenderToPNG(context, width, height, MaskedLayerDrawer{root, targetLayer, globalBounds});
-  gpu->unlock();
-  return result;
-}
-
-std::shared_ptr<tgfx::Data> RenderLayerCompositeWithBackdrop(
-    GPUContext* gpu, const std::shared_ptr<tgfx::Layer>& root,
-    const std::shared_ptr<tgfx::Layer>& targetLayer) {
-  auto globalBounds = targetLayer->getBounds(root.get(), true);
-  auto context = gpu->lockContext();
-  if (context == nullptr) {
-    return nullptr;
-  }
-  int width = static_cast<int>(ceilf(globalBounds.width()));
-  int height = static_cast<int>(ceilf(globalBounds.height()));
-  auto result = RenderToPNG(context, width, height, BackdropCompositeDrawer{root, globalBounds});
+      RenderToPNG(context, width, height, pixelScale, BackdropCompositeDrawer{root, globalBounds});
   gpu->unlock();
   return result;
 }
@@ -792,8 +805,8 @@ static tgfx::TileMode ToTGFXTileMode(TileMode mode) {
 }
 
 std::shared_ptr<tgfx::Data> RenderTiledPattern(GPUContext* gpu, const ImagePattern* pattern,
-                                               int width, int height, float offsetX,
-                                               float offsetY) {
+                                               int width, int height, float offsetX, float offsetY,
+                                               float pixelScale) {
   if (width <= 0 || height <= 0 || !pattern || !pattern->image) {
     return nullptr;
   }
@@ -820,8 +833,8 @@ std::shared_ptr<tgfx::Data> RenderTiledPattern(GPUContext* gpu, const ImagePatte
   if (!context) {
     return nullptr;
   }
-  auto result =
-      RenderToPNG(context, width, height, TiledPatternDrawer{std::move(shader), width, height});
+  auto result = RenderToPNG(context, width, height, pixelScale,
+                            TiledPatternDrawer{std::move(shader), width, height});
   gpu->unlock();
   return result;
 }
