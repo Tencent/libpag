@@ -78,6 +78,26 @@ struct HTMLExportOptions {
    * which keeps visual parity with the browser's 2x comparison output. The default is 2.
    */
   float staticImgPixelRatio = 2.0f;
+
+  /**
+   * When true, all inline `style="..."` attributes are consolidated into a
+   * single internal stylesheet placed in the document <head>, and elements
+   * reference styles via generated class names (`.ps0`, `.ps1`, ...). This
+   * typically reduces HTML size by 10-25% for documents with repeated style
+   * declarations. When false, every style remains inline.
+   *
+   * The extracted output is semantically identical to the inline output: all
+   * computed styles render identically in any standards-compliant browser.
+   * Inline specificity (1000) becomes class specificity (10); this has no
+   * effect for self-contained documents produced by HTMLExporter because no
+   * user stylesheet exists to compete with the extracted rules.
+   *
+   * The document's <body> `style` attribute is always kept inline because it
+   * is unique per document and gains nothing from extraction.
+   *
+   * The default is true.
+   */
+  bool extractStyleSheet = true;
 };
 
 /**

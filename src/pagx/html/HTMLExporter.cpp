@@ -23,6 +23,7 @@
 #include <string>
 #include <unordered_map>
 #include "pagx/html/HTMLBuilder.h"
+#include "pagx/html/HTMLStyleExtractor.h"
 #include "pagx/html/HTMLWriter.h"
 #include "pagx/utils/StringParser.h"
 
@@ -681,6 +682,10 @@ std::string HTMLExporter::ToHTML(const PAGXDocument& doc, const Options& options
   html.closeTag();  // </div>
 
   std::string nativeHTML = RoundCoordinatesInHTML(html.release());
+
+  if (options.extractStyleSheet && options.framework == HTMLFramework::Native) {
+    nativeHTML = HTMLStyleExtractor::Extract(nativeHTML);
+  }
 
   // Apply framework-specific transformation
   switch (options.framework) {
