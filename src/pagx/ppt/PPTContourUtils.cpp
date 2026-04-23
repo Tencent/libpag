@@ -79,23 +79,29 @@ void ReverseContour(PathContour& c) {
   c.segs = std::move(rev);
 }
 
+// Half-edge ray-cast test: returns true when the horizontal ray from `pt` to +x
+// crosses the (pi, pj) edge. Caller XORs this into a running `inside` flag so
+// that an odd number of crossings means the point is inside the polygon.
+static bool RayCrossesEdge(const Point& pt, const Point& pi, const Point& pj) {
+  return ((pi.y > pt.y) != (pj.y > pt.y)) &&
+         (pt.x < (pj.x - pi.x) * (pt.y - pi.y) / (pj.y - pi.y) + pi.x);
+}
+
 // Tests point containment using endpoint polygon approximation (ray casting).
 // For paths with few high-curvature bezier segments, the result may be inaccurate
 // near curved edges.
 bool PointInsideContour(const Point& pt, const PathContour& contour) {
   bool inside = false;
-  auto testEdge = [&](const Point& pi, const Point& pj) {
-    if (((pi.y > pt.y) != (pj.y > pt.y)) &&
-        (pt.x < (pj.x - pi.x) * (pt.y - pi.y) / (pj.y - pi.y) + pi.x)) {
-      inside = !inside;
-    }
-  };
   Point lastVertex = contour.segs.empty() ? contour.start : SegEndpoint(contour.segs.back());
-  testEdge(contour.start, lastVertex);
+  if (RayCrossesEdge(pt, contour.start, lastVertex)) {
+    inside = !inside;
+  }
   Point prev = contour.start;
   for (const auto& seg : contour.segs) {
     Point cur = SegEndpoint(seg);
-    testEdge(cur, prev);
+    if (RayCrossesEdge(pt, cur, prev)) {
+      inside = !inside;
+    }
     prev = cur;
   }
   return inside;
@@ -158,9 +164,9 @@ static std::vector<bool> ComputeContainerValidity(const std::vector<PathContour>
   return valid;
 }
 
-std::vector<int> ComputeContainmentDepths(const std::vector<PathContour>& contours) {
+static std::vector<int> ComputeContainmentDepths(const std::vector<PathContour>& contours,
+                                                 const std::vector<bool>& valid) {
   std::vector<int> depths(contours.size(), 0);
-  auto valid = ComputeContainerValidity(contours);
   for (size_t i = 0; i < contours.size(); i++) {
     for (size_t j = 0; j < contours.size(); j++) {
       if (i == j || !valid[j]) {
@@ -174,10 +180,12 @@ std::vector<int> ComputeContainmentDepths(const std::vector<PathContour>& contou
   return depths;
 }
 
-void AdjustWindingForEvenOdd(std::vector<PathContour>& contours, const std::vector<int>& depths) {
+static void AdjustWindingForEvenOdd(std::vector<PathContour>& contours,
+                                    const std::vector<int>& depths,
+                                    const std::vector<bool>& valid) {
   int refSign = 0;
   for (size_t i = 0; i < contours.size(); i++) {
-    if (depths[i] == 0 && contours[i].closed && !contours[i].segs.empty()) {
+    if (depths[i] == 0 && valid[i]) {
       refSign = (ComputeSignedArea(contours[i]) >= 0) ? 1 : -1;
       break;
     }
@@ -186,7 +194,7 @@ void AdjustWindingForEvenOdd(std::vector<PathContour>& contours, const std::vect
     refSign = (ComputeSignedArea(contours[0]) >= 0) ? 1 : -1;
   }
   for (size_t i = 0; i < contours.size(); i++) {
-    if (!contours[i].closed || contours[i].segs.empty()) {
+    if (!valid[i]) {
       continue;
     }
     float area = ComputeSignedArea(contours[i]);
@@ -203,12 +211,12 @@ void AdjustWindingForEvenOdd(std::vector<PathContour>& contours, const std::vect
 // approximation in PointInsideContour produces a false positive, an inner contour
 // may be assigned to the wrong parent.  This is unlikely in practice because outer
 // contours are typically non-overlapping.
-std::vector<std::vector<size_t>> GroupContoursByOutermost(const std::vector<PathContour>& contours,
-                                                          const std::vector<int>& depths) {
-  // Cache (closed && non-empty) once and pre-collect the outermost (depth-0)
-  // candidates so the inner search becomes O(n_outer) per inner contour
-  // instead of O(n) with an extra validity check on every iteration.
-  auto valid = ComputeContainerValidity(contours);
+static std::vector<std::vector<size_t>> GroupContoursByOutermost(
+    const std::vector<PathContour>& contours, const std::vector<int>& depths,
+    const std::vector<bool>& valid) {
+  // Pre-collect the outermost (depth-0 && valid) candidates so the inner
+  // search becomes O(n_outer) per inner contour instead of O(n) with an extra
+  // validity check on every iteration.
   std::vector<size_t> outerIndices;
   outerIndices.reserve(contours.size());
   for (size_t i = 0; i < contours.size(); i++) {
@@ -250,24 +258,21 @@ std::vector<std::vector<size_t>> GroupContoursByOutermost(const std::vector<Path
 
 std::vector<std::vector<size_t>> PrepareContourGroups(std::vector<PathContour>& contours,
                                                       FillRule fillRule) {
-  auto depths = ComputeContainmentDepths(contours);
+  auto valid = ComputeContainerValidity(contours);
+  auto depths = ComputeContainmentDepths(contours, valid);
   if (fillRule == FillRule::EvenOdd) {
-    AdjustWindingForEvenOdd(contours, depths);
+    AdjustWindingForEvenOdd(contours, depths, valid);
   }
-  return GroupContoursByOutermost(contours, depths);
-}
-
-Point TransformPoint(const Matrix& t, const Point& p) {
-  return {t.a * p.x + t.c * p.y + t.tx, t.b * p.x + t.d * p.y + t.ty};
+  return GroupContoursByOutermost(contours, depths, valid);
 }
 
 void TransformContours(std::vector<PathContour>& contours, const Matrix& transform) {
   for (auto& c : contours) {
-    c.start = TransformPoint(transform, c.start);
+    c.start = transform.mapPoint(c.start);
     for (auto& seg : c.segs) {
       int ptCount = PathData::PointsPerVerb(seg.verb);
       for (int i = 0; i < ptCount; i++) {
-        seg.pts[i] = TransformPoint(transform, seg.pts[i]);
+        seg.pts[i] = transform.mapPoint(seg.pts[i]);
       }
     }
   }

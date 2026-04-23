@@ -640,6 +640,19 @@ class PPTWriter {
   void writeShadowElement(XMLBuilder& out, const char* tag, float blurX, float blurY, float offsetX,
                           float offsetY, const Color& color, bool includeAlign);
 
+  // Fans out a container of shadow sources (Inner/Drop shadow filters or
+  // styles) to writeShadowElement. The source structs are unrelated types that
+  // happen to share the same public field names, so a template extracts the
+  // shared emission logic without introducing a shim interface.
+  template <typename Container>
+  void writeShadowSources(XMLBuilder& out, const Container& sources, const char* tag,
+                          bool includeAlign) {
+    for (const auto* s : sources) {
+      writeShadowElement(out, tag, s->blurX, s->blurY, s->offsetX, s->offsetY, s->color,
+                         includeAlign);
+    }
+  }
+
   static void WriteBlip(XMLBuilder& out, const std::string& relId, float alpha);
   static void WriteDefaultStretch(XMLBuilder& out);
 
@@ -1052,16 +1065,32 @@ void PPTWriter::writeImagePatternFill(XMLBuilder& out, const ImagePattern* patte
 
   int imgW = 0;
   int imgH = 0;
-  bool hasDimensions = GetImageDimensions(pattern->image, &imgW, &imgH);
+  float imgDpiX = 72.0f;
+  float imgDpiY = 72.0f;
+  // Read the image bytes once and feed them to both the dimensions and DPI
+  // probes so pattern fills don't re-open the source file. Falls back to the
+  // header-only PNG path (GetImagePNGDimensions) when no byte stream is
+  // available — that path still honors the 24-byte fast read from file.
+  bool hasDimensions = false;
+  auto imageBytes = GetImageData(pattern->image);
+  if (imageBytes && imageBytes->size() > 0) {
+    const uint8_t* bytes = imageBytes->bytes();
+    size_t byteCount = imageBytes->size();
+    hasDimensions = GetPNGDimensions(bytes, byteCount, &imgW, &imgH) ||
+                    GetJPEGDimensions(bytes, byteCount, &imgW, &imgH) ||
+                    GetWebPDimensions(bytes, byteCount, &imgW, &imgH);
+    if (!GetPNGDPI(bytes, byteCount, &imgDpiX, &imgDpiY)) {
+      GetJPEGDPI(bytes, byteCount, &imgDpiX, &imgDpiY);
+    }
+  } else {
+    hasDimensions = GetImagePNGDimensions(pattern->image, &imgW, &imgH);
+  }
 
   out.openElement("a:blipFill").closeElementStart();
   WriteBlip(out, relId, alpha);
 
   if (needsNativeTile && hasDimensions && !shapeBounds.isEmpty()) {
     const auto& M = pattern->matrix;
-    float imgDpiX = 72.0f;
-    float imgDpiY = 72.0f;
-    GetImageDPI(pattern->image, &imgDpiX, &imgDpiY);
     double dpiCorrX = static_cast<double>(imgDpiX) / 96.0;
     double dpiCorrY = static_cast<double>(imgDpiY) / 96.0;
     auto sx = static_cast<int>(std::round(std::sqrt(M.a * M.a + M.b * M.b) * dpiCorrX * 100000.0));
@@ -1354,22 +1383,10 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
     }
   }
 
-  for (const auto* s : sources.innerShadowFilters) {
-    writeShadowElement(out, "a:innerShdw", s->blurX, s->blurY, s->offsetX, s->offsetY, s->color,
-                       false);
-  }
-  for (const auto* st : sources.innerShadowStyles) {
-    writeShadowElement(out, "a:innerShdw", st->blurX, st->blurY, st->offsetX, st->offsetY,
-                       st->color, false);
-  }
-  for (const auto* s : sources.dropShadowFilters) {
-    writeShadowElement(out, "a:outerShdw", s->blurX, s->blurY, s->offsetX, s->offsetY, s->color,
-                       true);
-  }
-  for (const auto* st : sources.dropShadowStyles) {
-    writeShadowElement(out, "a:outerShdw", st->blurX, st->blurY, st->offsetX, st->offsetY,
-                       st->color, true);
-  }
+  writeShadowSources(out, sources.innerShadowFilters, "a:innerShdw", false);
+  writeShadowSources(out, sources.innerShadowStyles, "a:innerShdw", false);
+  writeShadowSources(out, sources.dropShadowFilters, "a:outerShdw", true);
+  writeShadowSources(out, sources.dropShadowStyles, "a:outerShdw", true);
 
   out.closeElement();  // a:effectLst
 }
@@ -1532,8 +1549,9 @@ void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStr
                                 const std::vector<LayerFilter*>& /*filters*/,
                                 const std::vector<LayerStyle*>& /*styles*/) {
   auto renderPos = text->renderPosition();
-  auto glyphPaths = ComputeGlyphPaths(*text, renderPos.x, renderPos.y);
-  auto glyphImages = ComputeGlyphImages(*text, renderPos.x, renderPos.y);
+  std::vector<GlyphPath> glyphPaths;
+  std::vector<GlyphImage> glyphImages;
+  ComputeGlyphPathsAndImages(*text, renderPos.x, renderPos.y, &glyphPaths, &glyphImages);
   if (glyphPaths.empty() && glyphImages.empty()) {
     return;
   }
@@ -2047,7 +2065,7 @@ void PPTWriter::emitTextBoxBody(const std::vector<RichTextRun>& runs,
     // flows left-to-right within a baseline). Then group consecutive entries
     // with matching baselineY into one visual line.
     std::stable_sort(lineEntries.begin(), lineEntries.end(), CompareLineEntryByBaselineY);
-    constexpr float kBaselineEpsilon = 0.5f;
+    constexpr float baselineEpsilon = 0.5f;
     // Emit ALL visual lines inside a single <a:p> separated by soft <a:br/>
     // breaks (rather than one <a:p> per line). This is required for justify
     // alignment to behave: OOXML's algn="just" never justifies the last line
@@ -2065,7 +2083,7 @@ void PPTWriter::emitTextBoxBody(const std::vector<RichTextRun>& runs,
       }
       firstLine = false;
       while (i < lineEntries.size() &&
-             std::fabs(lineEntries[i].baselineY - baseline) < kBaselineEpsilon) {
+             std::fabs(lineEntries[i].baselineY - baseline) < baselineEpsilon) {
         const auto& entry = lineEntries[i];
         const std::string& src = runs[entry.runIndex].text->text;
         emitter.emitRun(src.substr(entry.byteStart, entry.byteEnd - entry.byteStart),

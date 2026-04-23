@@ -282,39 +282,69 @@ static std::vector<PositionedGlyph> WalkGlyphs(const Text& text, float textPosX,
 
 }  // namespace
 
-std::vector<GlyphPath> ComputeGlyphPaths(const Text& text, float textPosX, float textPosY) {
-  auto positioned = WalkGlyphs(text, textPosX, textPosY);
-  std::vector<GlyphPath> result;
-  result.reserve(positioned.size());
-  for (const auto& entry : positioned) {
-    if (!entry.glyph->path || entry.glyph->path->isEmpty()) {
-      continue;
-    }
-    result.push_back({entry.transform, entry.glyph->path});
+namespace {
+
+// Turns a PositionedGlyph into a GlyphImage entry if the glyph carries a
+// bitmap, applying the design-space offset so pixel (0,0) maps to the image's
+// top-left in layer space. Kept separate from the walker so ComputeGlyphImages
+// and the combined API share identical image-placement math.
+static bool TryMakeGlyphImage(const PositionedGlyph& entry, GlyphImage* out) {
+  const auto* glyph = entry.glyph;
+  if (!glyph->image) {
+    return false;
   }
+  Matrix imageMatrix = entry.transform;
+  if (glyph->offset.x != 0 || glyph->offset.y != 0) {
+    imageMatrix = imageMatrix * Matrix::Translate(glyph->offset.x, glyph->offset.y);
+  }
+  *out = {imageMatrix, glyph->image};
+  return true;
+}
+
+static bool TryMakeGlyphPath(const PositionedGlyph& entry, GlyphPath* out) {
+  if (!entry.glyph->path || entry.glyph->path->isEmpty()) {
+    return false;
+  }
+  *out = {entry.transform, entry.glyph->path};
+  return true;
+}
+
+}  // namespace
+
+void ComputeGlyphPathsAndImages(const Text& text, float textPosX, float textPosY,
+                                std::vector<GlyphPath>* paths, std::vector<GlyphImage>* images) {
+  auto positioned = WalkGlyphs(text, textPosX, textPosY);
+  if (paths) {
+    paths->reserve(paths->size() + positioned.size());
+  }
+  if (images) {
+    images->reserve(images->size() + positioned.size());
+  }
+  for (const auto& entry : positioned) {
+    if (paths) {
+      GlyphPath path = {};
+      if (TryMakeGlyphPath(entry, &path)) {
+        paths->push_back(path);
+      }
+    }
+    if (images) {
+      GlyphImage image = {};
+      if (TryMakeGlyphImage(entry, &image)) {
+        images->push_back(image);
+      }
+    }
+  }
+}
+
+std::vector<GlyphPath> ComputeGlyphPaths(const Text& text, float textPosX, float textPosY) {
+  std::vector<GlyphPath> result;
+  ComputeGlyphPathsAndImages(text, textPosX, textPosY, &result, nullptr);
   return result;
 }
 
 std::vector<GlyphImage> ComputeGlyphImages(const Text& text, float textPosX, float textPosY) {
-  auto positioned = WalkGlyphs(text, textPosX, textPosY);
   std::vector<GlyphImage> result;
-  result.reserve(positioned.size());
-  for (const auto& entry : positioned) {
-    const auto* glyph = entry.glyph;
-    if (!glyph->image) {
-      continue;
-    }
-    // Image pixel coords (0,0)-(W,H) live in design space, with the top-left
-    // translated by `glyph.offset` (also design space). Pre-translating by the
-    // offset puts pixel (0,0) at the image's top-left in the same coordinate
-    // system the glyph matrix consumes, so callers can map the image rect
-    // (0,0,W,H) through the resulting transform to get layer-space coords.
-    Matrix imageMatrix = entry.transform;
-    if (glyph->offset.x != 0 || glyph->offset.y != 0) {
-      imageMatrix = imageMatrix * Matrix::Translate(glyph->offset.x, glyph->offset.y);
-    }
-    result.push_back({imageMatrix, glyph->image});
-  }
+  ComputeGlyphPathsAndImages(text, textPosX, textPosY, nullptr, &result);
   return result;
 }
 
@@ -458,7 +488,7 @@ bool GetImageDimensions(const Image* image, int* width, int* height) {
   return false;
 }
 
-static bool GetPNGDPI(const uint8_t* data, size_t size, float* dpiX, float* dpiY) {
+bool GetPNGDPI(const uint8_t* data, size_t size, float* dpiX, float* dpiY) {
   if (size < 8 || memcmp(data, PNG_SIGNATURE, 8) != 0) {
     return false;
   }
@@ -487,7 +517,7 @@ static bool GetPNGDPI(const uint8_t* data, size_t size, float* dpiX, float* dpiY
   return false;
 }
 
-static bool GetJPEGDPI(const uint8_t* data, size_t size, float* dpiX, float* dpiY) {
+bool GetJPEGDPI(const uint8_t* data, size_t size, float* dpiX, float* dpiY) {
   if (size < 2 || data[0] != 0xFF || data[1] != 0xD8) {
     return false;
   }

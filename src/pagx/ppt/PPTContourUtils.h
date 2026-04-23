@@ -49,17 +49,8 @@ bool ContourInsideContour(const PathContour& inner, const PathContour& outer);
 
 std::vector<PathContour> ParsePathContours(const PathData* data);
 
-std::vector<int> ComputeContainmentDepths(const std::vector<PathContour>& contours);
-
-void AdjustWindingForEvenOdd(std::vector<PathContour>& contours, const std::vector<int>& depths);
-
-std::vector<std::vector<size_t>> GroupContoursByOutermost(const std::vector<PathContour>& contours,
-                                                          const std::vector<int>& depths);
-
 std::vector<std::vector<size_t>> PrepareContourGroups(std::vector<PathContour>& contours,
                                                       FillRule fillRule);
-
-Point TransformPoint(const Matrix& t, const Point& p);
 
 void TransformContours(std::vector<PathContour>& contours, const Matrix& transform);
 

@@ -84,6 +84,15 @@ std::vector<GlyphPath> ComputeGlyphPaths(const Text& text, float textPosX, float
  */
 std::vector<GlyphImage> ComputeGlyphImages(const Text& text, float textPosX, float textPosY);
 
+/**
+ * Computes both vector glyph paths and bitmap glyph images in a single traversal
+ * of `text`. Equivalent to calling ComputeGlyphPaths and ComputeGlyphImages in
+ * sequence, but walks the glyph runs once — use this when a caller needs both
+ * kinds from the same text element.
+ */
+void ComputeGlyphPathsAndImages(const Text& text, float textPosX, float textPosY,
+                                std::vector<GlyphPath>* paths, std::vector<GlyphImage>* images);
+
 FillRule DetectMaskFillRule(const Layer* maskLayer);
 
 /**
@@ -105,6 +114,19 @@ bool GetJPEGDimensions(const uint8_t* data, size_t size, int* width, int* height
 bool GetWebPDimensions(const uint8_t* data, size_t size, int* width, int* height);
 
 bool GetImageDimensions(const Image* image, int* width, int* height);
+
+/**
+ * Reads the physical DPI from a raw PNG byte stream. Returns false when the
+ * stream is not PNG, the pHYs chunk is absent, or the unit is not meters.
+ */
+bool GetPNGDPI(const uint8_t* data, size_t size, float* dpiX, float* dpiY);
+
+/**
+ * Reads the physical DPI from a raw JPEG byte stream via the JFIF APP0
+ * segment. Returns false when the stream is not JPEG or no JFIF density is
+ * declared.
+ */
+bool GetJPEGDPI(const uint8_t* data, size_t size, float* dpiX, float* dpiY);
 
 bool GetImageDPI(const Image* image, float* dpiX, float* dpiY);
 
