@@ -497,8 +497,13 @@ class LayerBuilderContext {
 
   static std::shared_ptr<tgfx::ColorSource> ApplyGradientMatrix(
       std::shared_ptr<tgfx::Gradient> gradient, const Matrix& matrix) {
-    if (gradient && !matrix.isIdentity()) {
-      gradient->setMatrix(ToTGFX(matrix));
+    if (gradient) {
+      // PAGX gradients operate in the geometry's local coordinate space, not the per-geometry
+      // normalized 0-1 space that tgfx defaults to.
+      gradient->setFitsToGeometry(false);
+      if (!matrix.isIdentity()) {
+        gradient->setMatrix(ToTGFX(matrix));
+      }
     }
     return gradient;
   }
@@ -563,8 +568,13 @@ class LayerBuilderContext {
     auto sampling = tgfx::SamplingOptions(ToTGFX(node->filterMode), ToTGFX(node->mipmapMode));
     auto pattern =
         tgfx::ImagePattern::Make(image, ToTGFX(node->tileModeX), ToTGFX(node->tileModeY), sampling);
-    if (pattern && !node->matrix.isIdentity()) {
-      pattern->setMatrix(ToTGFX(node->matrix));
+    if (pattern) {
+      // PAGX image patterns live in the geometry's local coordinate space; disable per-geometry
+      // fitting so the image is sampled directly in layer space.
+      pattern->setScaleMode(tgfx::ScaleMode::None);
+      if (!node->matrix.isIdentity()) {
+        pattern->setMatrix(ToTGFX(node->matrix));
+      }
     }
 
     return pattern;
