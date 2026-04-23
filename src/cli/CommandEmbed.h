@@ -22,13 +22,7 @@ namespace pagx::cli {
 
 /**
  * Embeds fonts and images into a PAGX file as base64, producing a self-contained output.
- *
- * Flags:
- *   -o, --output <path>     Output file path (default: overwrite input)
- *   --file <path>           Register a font file (repeatable)
- *   --fallback <path|name>  Add a fallback font file or system font name (repeatable)
- *   --skip-fonts            Skip the font-embed code path entirely
- *   --skip-images           Skip the image-embed code path entirely
+ * Run `pagx embed --help` for the full flag list.
  */
 int RunEmbed(int argc, char* argv[]);
 
