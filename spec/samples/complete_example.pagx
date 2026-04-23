@@ -3,7 +3,7 @@
   <Layer name="background" width="100%" height="100%">
     <Rectangle width="100%" height="100%"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="800,520" fitsToGeometry="false">
+      <LinearGradient>
         <ColorStop color="#0F172A" offset="0"/>
         <ColorStop color="#1E293B" offset="1"/>
       </LinearGradient>
@@ -11,17 +11,33 @@
   </Layer>
   <Layer name="GlowTopLeft" blendMode="screen">
     <Ellipse left="-80" top="-100" width="320" height="320"/>
-    <Fill color="@glowPurple"/>
+    <Fill>
+      <RadialGradient>
+        <ColorStop color="#8B5CF660" offset="0"/>
+        <ColorStop color="#8B5CF600" offset="1"/>
+      </RadialGradient>
+    </Fill>
     <BlurFilter blurX="30" blurY="30"/>
   </Layer>
   <Layer name="GlowBottomRight" blendMode="screen">
     <Ellipse left="520" top="260" width="400" height="400"/>
-    <Fill color="@glowCyan"/>
+    <Fill>
+      <RadialGradient>
+        <ColorStop color="#06B6D450" offset="0"/>
+        <ColorStop color="#06B6D400" offset="1"/>
+      </RadialGradient>
+    </Fill>
     <BlurFilter blurX="40" blurY="40"/>
   </Layer>
   <Layer name="Title" width="800">
     <Text centerX="0" text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="56"/>
-    <Fill color="@titleGradient"/>
+    <Fill>
+      <LinearGradient startPoint="-400,0" endPoint="-200,0" fitsToGeometry="false">
+        <ColorStop color="#FFF" offset="0"/>
+        <ColorStop color="#8B5CF6" offset="0.5"/>
+        <ColorStop color="#06B6D4" offset="1"/>
+      </LinearGradient>
+    </Fill>
   </Layer>
   <Layer name="Subtitle">
     <Text text="Portable Animated Graphics XML" fontFamily="Arial" fontSize="14"/>
@@ -57,7 +73,12 @@
       <Layer composition="@cardBg"/>
       <Layer left="50" top="40">
         <Polystar left="-26" top="-26" type="polygon" pointCount="6" outerRadius="26"/>
-        <Fill color="@diamond"/>
+        <Fill>
+          <DiamondGradient>
+            <ColorStop color="#14B8A6" offset="0"/>
+            <ColorStop color="#0F766E" offset="1"/>
+          </DiamondGradient>
+        </Fill>
         <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#14B8A680"/>
       </Layer>
     </Layer>
@@ -72,7 +93,12 @@
   </Layer>
   <Layer name="GetStartedButton" left="88" top="307">
     <Rectangle width="120" height="36" roundness="18"/>
-    <Fill color="@buttonGradient"/>
+    <Fill>
+      <LinearGradient endPoint="1,0">
+        <ColorStop color="#6366F1" offset="0"/>
+        <ColorStop color="#8B5CF6" offset="1"/>
+      </LinearGradient>
+    </Fill>
     <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#6366F180"/>
     <Group centerX="0" centerY="0">
       <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
@@ -99,10 +125,18 @@
       <Fill color="@cyan"/>
       <Repeater copies="5" position="0,0" rotation="72"/>
     </Group>
-    <Group left="688">
-      <Rectangle left="-25" top="-25" width="50" height="50"/>
-      <Fill color="@rainbow"/>
-    </Group>
+    <Layer left="663">
+      <Rectangle width="50" height="50"/>
+      <Fill>
+        <ConicGradient>
+          <ColorStop color="#F43F5E" offset="0"/>
+          <ColorStop color="#8B5CF6" offset="0.25"/>
+          <ColorStop color="#06B6D4" offset="0.5"/>
+          <ColorStop color="#10B981" offset="0.75"/>
+          <ColorStop color="#F43F5E" offset="1"/>
+        </ConicGradient>
+      </Fill>
+    </Layer>
   </Layer>
   <Layer id="circleMask" visible="false">
     <Ellipse left="-22.5" top="-22.5" width="45" height="45"/>
@@ -110,7 +144,12 @@
   </Layer>
   <Layer name="MaskedLayer" left="688" top="325" mask="@circleMask">
     <Rectangle left="-25" top="-25" width="50" height="50"/>
-    <Fill color="@rainbow"/>
+    <Fill>
+      <RadialGradient>
+        <ColorStop color="#F59E0B" offset="0"/>
+        <ColorStop color="#EC4899" offset="1"/>
+      </RadialGradient>
+    </Fill>
   </Layer>
   <Layer left="130" top="430">
     <Rectangle left="-40" top="-30" width="80" height="60" roundness="10"/>
@@ -153,40 +192,12 @@
       <Glyph advance="20" path="M -8 -8 L 8 -8 L 8 8 L -8 8 Z"/>
       <Glyph advance="24" path="M 0 -10 A 10 10 0 1 1 0 10 A 10 10 0 1 1 0 -10"/>
     </Font>
-    <RadialGradient id="glowPurple" center="160,160" radius="160" fitsToGeometry="false">
-      <ColorStop color="#8B5CF660" offset="0"/>
-      <ColorStop color="#8B5CF600" offset="1"/>
-    </RadialGradient>
-    <RadialGradient id="glowCyan" center="200,200" radius="200" fitsToGeometry="false">
-      <ColorStop color="#06B6D450" offset="0"/>
-      <ColorStop color="#06B6D400" offset="1"/>
-    </RadialGradient>
-    <LinearGradient id="titleGradient" startPoint="-400,0" endPoint="-200,0" fitsToGeometry="false">
-      <ColorStop color="#FFF" offset="0"/>
-      <ColorStop color="#8B5CF6" offset="0.5"/>
-      <ColorStop color="#06B6D4" offset="1"/>
-    </LinearGradient>
-    <LinearGradient id="buttonGradient" startPoint="0,0" endPoint="120,0" fitsToGeometry="false">
-      <ColorStop color="#6366F1" offset="0"/>
-      <ColorStop color="#8B5CF6" offset="1"/>
-    </LinearGradient>
-    <ConicGradient id="rainbow" center="25,25" fitsToGeometry="false">
-      <ColorStop color="#F43F5E" offset="0"/>
-      <ColorStop color="#8B5CF6" offset="0.25"/>
-      <ColorStop color="#06B6D4" offset="0.5"/>
-      <ColorStop color="#10B981" offset="0.75"/>
-      <ColorStop color="#F43F5E" offset="1"/>
-    </ConicGradient>
     <SolidColor id="coral" color="#F43F5E"/>
     <SolidColor id="purple" color="#8B5CF6"/>
     <SolidColor id="amber" color="#F59E0B"/>
     <SolidColor id="orange" color="#F97316"/>
     <SolidColor id="cyan" color="#06B6D4"/>
     <SolidColor id="emerald" color="#10B981"/>
-    <DiamondGradient id="diamond" center="26,26" radius="26" fitsToGeometry="false">
-      <ColorStop color="#14B8A6" offset="0"/>
-      <ColorStop color="#0F766E" offset="1"/>
-    </DiamondGradient>
     <Composition id="cardBg" width="100" height="80">
       <Layer width="100" height="80">
         <Rectangle width="100%" height="100%" roundness="12"/>
