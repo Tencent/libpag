@@ -33,7 +33,7 @@
         <!-- dashOffset 0 -->
         <Layer layout="horizontal" gap="10" alignment="center">
           <Layer width="80" height="20">
-            <Text text="offset 0" fontFamily="Arial" fontSize="10" textAnchor="start" position="0,14"/>
+            <Text text="offset 0" fontFamily="Arial" fontSize="10" textAnchor="start" position="0,4.25"/>
             <Fill color="#64748B"/>
           </Layer>
           <Layer width="222" height="20">
@@ -45,7 +45,7 @@
         <!-- dashOffset 4.5 (25% of period) -->
         <Layer layout="horizontal" gap="10" alignment="center">
           <Layer width="80" height="20">
-            <Text text="offset 4.5" fontFamily="Arial" fontSize="10" textAnchor="start" position="0,14"/>
+            <Text text="offset 4.5" fontFamily="Arial" fontSize="10" textAnchor="start" position="0,4.25"/>
             <Fill color="#64748B"/>
           </Layer>
           <Layer width="222" height="20">
@@ -57,7 +57,7 @@
         <!-- dashOffset 9 (50% of period) -->
         <Layer layout="horizontal" gap="10" alignment="center">
           <Layer width="80" height="20">
-            <Text text="offset 9" fontFamily="Arial" fontSize="10" textAnchor="start" position="0,14"/>
+            <Text text="offset 9" fontFamily="Arial" fontSize="10" textAnchor="start" position="0,4.25"/>
             <Fill color="#64748B"/>
           </Layer>
           <Layer width="222" height="20">
@@ -69,7 +69,7 @@
         <!-- dashOffset 13.5 (75% of period) -->
         <Layer layout="horizontal" gap="10" alignment="center">
           <Layer width="80" height="20">
-            <Text text="offset 13.5" fontFamily="Arial" fontSize="10" textAnchor="start" position="0,14"/>
+            <Text text="offset 13.5" fontFamily="Arial" fontSize="10" textAnchor="start" position="0,4.25"/>
             <Fill color="#64748B"/>
           </Layer>
           <Layer width="222" height="20">
@@ -81,7 +81,7 @@
         <!-- dashOffset 18 (full period, should match offset 0) -->
         <Layer layout="horizontal" gap="10" alignment="center">
           <Layer width="80" height="20">
-            <Text text="offset 18" fontFamily="Arial" fontSize="10" textAnchor="start" position="0,14"/>
+            <Text text="offset 18" fontFamily="Arial" fontSize="10" textAnchor="start" position="0,4.25"/>
             <Fill color="#64748B"/>
           </Layer>
           <Layer width="222" height="20">
