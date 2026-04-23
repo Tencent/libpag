@@ -10,7 +10,7 @@
         <TextBox width="180" height="180" textAlign="justify" lineHeight="28">
           <Text text="Justify aligns words evenly 分布在 each full line." fontFamily="Arial" fontSize="18"/>
           <Fill>
-            <LinearGradient startPoint="0,0" endPoint="180,0">
+            <LinearGradient endPoint="1,0">
               <ColorStop color="#6366F1" offset="0"/>
               <ColorStop color="#8B5CF6" offset="1"/>
             </LinearGradient>
@@ -25,7 +25,7 @@
         <TextBox width="180" height="180" textAlign="center" paragraphAlign="middle">
           <Text text="Centered&#10;Horizontally&#10;&amp;&#10;Vertically" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
           <Fill>
-            <LinearGradient startPoint="0,0" endPoint="180,100">
+            <LinearGradient>
               <ColorStop color="#F43F5E" offset="0"/>
               <ColorStop color="#EC4899" offset="1"/>
             </LinearGradient>
@@ -42,7 +42,7 @@
         <TextBox width="180" height="180" textAlign="justify" writingMode="vertical">
           <Text text="春眠不觉 Dawn 处处闻啼鸟 Night 来风雨声花落知多少" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
           <Fill>
-            <LinearGradient startPoint="180,0" endPoint="0,180">
+            <LinearGradient startPoint="1,0" endPoint="0,1">
               <ColorStop color="#F59E0B" offset="0"/>
               <ColorStop color="#F43F5E" offset="1"/>
             </LinearGradient>
@@ -57,7 +57,7 @@
         <TextBox width="180" height="180" textAlign="center" paragraphAlign="middle" writingMode="vertical">
           <Text text="竖排文本&#10;居中对齐" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
           <Fill>
-            <LinearGradient startPoint="0,0" endPoint="180,180">
+            <LinearGradient>
               <ColorStop color="#06B6D4" offset="0"/>
               <ColorStop color="#10B981" offset="1"/>
             </LinearGradient>

@@ -3,7 +3,7 @@
   <Layer name="background" width="100%" height="100%">
     <Rectangle width="100%" height="100%"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="800,520">
+      <LinearGradient>
         <ColorStop color="#0F172A" offset="0"/>
         <ColorStop color="#1E293B" offset="1"/>
       </LinearGradient>
@@ -135,7 +135,8 @@
   <Layer left="670" top="430">
     <Rectangle left="-45" top="-30" width="90" height="60" roundness="8"/>
     <Fill>
-      <ImagePattern image="pag_logo.png" matrix="0.23,0,0,0.23,-30,-30" tileModeX="clamp" tileModeY="clamp"/>
+      <ImagePattern image="pag_logo.png" scaleMode="none" tileModeX="clamp" tileModeY="clamp"
+                    matrix="0.23,0,0,0.23,-30,-30"/>
     </Fill>
     <Stroke color="#FFFFFF20" width="1"/>
     <DropShadowStyle offsetY="6" blurX="16" blurY="16" color="#00000060"/>
@@ -153,24 +154,24 @@
       <Glyph advance="20" path="M -8 -8 L 8 -8 L 8 8 L -8 8 Z"/>
       <Glyph advance="24" path="M 0 -10 A 10 10 0 1 1 0 10 A 10 10 0 1 1 0 -10"/>
     </Font>
-    <RadialGradient id="glowPurple" center="160,160" radius="160">
+    <RadialGradient id="glowPurple">
       <ColorStop color="#8B5CF660" offset="0"/>
       <ColorStop color="#8B5CF600" offset="1"/>
     </RadialGradient>
-    <RadialGradient id="glowCyan" center="200,200" radius="200">
+    <RadialGradient id="glowCyan">
       <ColorStop color="#06B6D450" offset="0"/>
       <ColorStop color="#06B6D400" offset="1"/>
     </RadialGradient>
-    <LinearGradient id="titleGradient" startPoint="-400,0" endPoint="-200,0">
+    <LinearGradient id="titleGradient" startPoint="-400,0" endPoint="-200,0" fitsToGeometry="false">
       <ColorStop color="#FFF" offset="0"/>
       <ColorStop color="#8B5CF6" offset="0.5"/>
       <ColorStop color="#06B6D4" offset="1"/>
     </LinearGradient>
-    <LinearGradient id="buttonGradient" startPoint="0,0" endPoint="120,0">
+    <LinearGradient id="buttonGradient" endPoint="1,0">
       <ColorStop color="#6366F1" offset="0"/>
       <ColorStop color="#8B5CF6" offset="1"/>
     </LinearGradient>
-    <ConicGradient id="rainbow" center="25,25">
+    <ConicGradient id="rainbow">
       <ColorStop color="#F43F5E" offset="0"/>
       <ColorStop color="#8B5CF6" offset="0.25"/>
       <ColorStop color="#06B6D4" offset="0.5"/>
@@ -183,7 +184,7 @@
     <SolidColor id="orange" color="#F97316"/>
     <SolidColor id="cyan" color="#06B6D4"/>
     <SolidColor id="emerald" color="#10B981"/>
-    <DiamondGradient id="diamond" center="26,26" radius="26">
+    <DiamondGradient id="diamond">
       <ColorStop color="#14B8A6" offset="0"/>
       <ColorStop color="#0F766E" offset="1"/>
     </DiamondGradient>

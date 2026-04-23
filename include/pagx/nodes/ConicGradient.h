@@ -18,23 +18,23 @@
 
 #pragma once
 
-#include <vector>
-#include "pagx/nodes/ColorSource.h"
-#include "pagx/nodes/ColorStop.h"
-#include "pagx/types/Matrix.h"
+#include "pagx/nodes/Gradient.h"
 #include "pagx/types/Point.h"
 
 namespace pagx {
 
 /**
  * A conic (sweep) gradient color source that produces a gradient sweeping around a center point.
+ * By default the center is interpreted in the geometry's normalized 0-1 bounding box space (see
+ * Gradient::fitsToGeometry).
  */
-class ConicGradient : public ColorSource {
+class ConicGradient : public Gradient {
  public:
   /**
-   * The center point of the gradient.
+   * The center point of the gradient. Defaults to (0.5, 0.5), the center of the geometry's
+   * normalized bounding box when fitsToGeometry is true.
    */
-  Point center = {};
+  Point center = {0.5f, 0.5f};
 
   /**
    * The starting angle of the gradient sweep in degrees. The default value is 0.
@@ -45,16 +45,6 @@ class ConicGradient : public ColorSource {
    * The ending angle of the gradient sweep in degrees. The default value is 360.
    */
   float endAngle = 360.0f;
-
-  /**
-   * The transformation matrix applied to the gradient.
-   */
-  Matrix matrix = {};
-
-  /**
-   * The color stops defining the gradient colors and positions.
-   */
-  std::vector<ColorStop*> colorStops = {};
 
   NodeType nodeType() const override {
     return NodeType::ConicGradient;

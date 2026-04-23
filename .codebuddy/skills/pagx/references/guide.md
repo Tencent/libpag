@@ -433,16 +433,21 @@ over `position`.
   `dashes` (comma-separated lengths, e.g., `"5,3"` = 5px solid + 3px gap),
   `align` (center/inside/outside)
 
-All gradient/pattern coordinates are **relative to the geometry element's local origin**
-(not canvas). `ConicGradient` angles follow PAGX convention (0° = right), which differs
-from CSS `conic-gradient` (0° = top) — subtract 90° to convert. `DiamondGradient`
-radiates from center toward four corners (`center`, `radius`). `ImagePattern` fills
-geometry with an image (see `patterns.md` §Avatar).
+By default all gradient/pattern coordinates are **relative to the geometry's normalized 0-1
+bounding box** (`fitsToGeometry="true"`, the default for gradients; `scaleMode!="none"` for
+ImagePattern). The fill automatically adapts to each shape's size. Set `fitsToGeometry="false"`
+on a gradient or `scaleMode="none"` on an ImagePattern to switch to the geometry's local
+coordinate space (absolute, shared across multiple shapes). `ConicGradient` angles follow
+PAGX convention (0° = right), which differs from CSS `conic-gradient` (0° = top) — subtract 90°
+to convert. `DiamondGradient` radiates from center toward four corners (`center`, `radius`).
+`ImagePattern` fills geometry with an image; `scaleMode` (none/stretch/letterBox/zoom) controls
+how the image is fitted into each geometry's bounding box (see `patterns.md` §Avatar).
 
 ```xml
-<!-- Inline gradient in Fill -->
+<!-- Inline gradient in Fill (default: 0-1 space, auto-fit to geometry,
+     startPoint=0,0 → endPoint=1,1 diagonal, so the gradient spans the full shape). -->
 <Fill>
-  <LinearGradient startPoint="0,0" endPoint="200,0">
+  <LinearGradient>
     <ColorStop offset="0" color="#6366F1"/>
     <ColorStop offset="1" color="#EC4899"/>
   </LinearGradient>
@@ -456,8 +461,8 @@ See `patterns.md` §Gradient Text for LinearGradient on text, §Star Badge for R
 
 | CSS | PAGX |
 |-----|------|
-| `linear-gradient(angle, stops)` | `<LinearGradient startPoint endPoint>` — convert angle to coordinates |
-| `radial-gradient(circle R at cx cy)` | `<RadialGradient center="cx,cy" radius="R">` |
+| `linear-gradient(angle, stops)` | `<LinearGradient startPoint endPoint>` in 0-1 space — convert angle to two points on the unit square |
+| `radial-gradient(circle closest-side at cx cy)` | `<RadialGradient center="cx,cy" radius="R">` in 0-1 space |
 
 ## Modifiers
 

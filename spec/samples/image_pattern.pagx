@@ -1,38 +1,39 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates ImagePattern fill with different tile modes -->
+<!-- Demonstrates ImagePattern fill with different scale modes and tile modes. -->
 <pagx width="400" height="400">
-  <!-- Clamp mode: original size, centered in 140x140 rect -->
-  <!-- Rectangle left=40,top=40 size=140,140: left-top=(40,40), right-bottom=(180,180) -->
-  <!-- Image 256x256, scale 0.5 = 128x128 -->
-  <!-- Center in rect: image offset in local coords = (140-128)/2 - 70 = -64 (from center origin) -->
-  <Layer name="ClampFill">
+  <!-- LetterBox: preserve aspect ratio, fit inside bounds, transparent empty areas (tileMode default = decal). -->
+  <Layer name="LetterBox">
     <Rectangle left="40" top="40" width="140" height="140" roundness="24"/>
     <Fill>
-      <ImagePattern image="@logo" matrix="0.5,0,0,0.5,46,46" tileModeX="clamp" tileModeY="clamp"/>
+      <ImagePattern image="@logo" scaleMode="letterBox"/>
     </Fill>
     <Stroke color="#FFF" width="2"/>
   </Layer>
 
-  <Layer name="RepeatFill">
+  <!-- Zoom: preserve aspect ratio, cover bounds (may crop). -->
+  <Layer name="Zoom">
     <Rectangle left="220" top="40" width="140" height="140" roundness="24"/>
     <Fill>
-      <ImagePattern image="@logo" matrix="0.24,0,0,0.24,0,0" tileModeX="repeat" tileModeY="repeat"/>
+      <ImagePattern image="@logo" scaleMode="zoom"/>
     </Fill>
     <Stroke color="#FFF" width="2"/>
   </Layer>
 
-  <Layer name="MirrorFill">
+  <!-- Stretch: ignore aspect ratio, fill bounds. -->
+  <Layer name="Stretch">
     <Rectangle left="40" top="220" width="140" height="140" roundness="24"/>
     <Fill>
-      <ImagePattern image="@logo" matrix="0.24,0,0,0.24,0,0" tileModeX="mirror" tileModeY="mirror"/>
+      <ImagePattern image="@logo" scaleMode="stretch"/>
     </Fill>
     <Stroke color="#FFF" width="2"/>
   </Layer>
 
+  <!-- None + repeat: disable per-geometry fitting; matrix + repeat tile in layer space. -->
   <Layer name="RepeatScaled">
     <Rectangle left="220" top="220" width="140" height="140" roundness="24"/>
     <Fill>
-      <ImagePattern image="@logo" matrix="0.35,0,0,0.35,0,0" tileModeX="repeat" tileModeY="repeat"/>
+      <ImagePattern image="@logo" scaleMode="none" tileModeX="repeat" tileModeY="repeat"
+                    matrix="0.24,0,0,0.24,220,220"/>
     </Fill>
     <Stroke color="#FFF" width="2"/>
   </Layer>

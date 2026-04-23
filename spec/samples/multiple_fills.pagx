@@ -3,7 +3,7 @@
   <Layer>
     <Rectangle left="50" top="100" width="300" height="200" roundness="32"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="300,200">
+      <LinearGradient>
         <ColorStop color="#F59E0B" offset="0"/>
         <ColorStop color="#F43F5E" offset="1"/>
       </LinearGradient>

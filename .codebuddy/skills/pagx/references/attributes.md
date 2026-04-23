@@ -243,8 +243,9 @@ Color source that interpolates along a line from start point to end point.
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `startPoint` | Point | `0,0` | Gradient start point |
-| `endPoint` | Point | (required) | Gradient end point |
+| `endPoint` | Point | `1,1` | Gradient end point |
 | `matrix` | Matrix | identity | Transform matrix for the gradient coordinate system |
+| `fitsToGeometry` | boolean | true | Whether the points are in the geometry's normalized 0-1 bounding box space (true) or local coordinate space (false) |
 
 ### ColorStop
 
@@ -266,9 +267,10 @@ Color source that radiates outward from a center point.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | Point | 0,0 | Gradient center point |
-| `radius` | float | (required) | Gradient radius |
+| `center` | Point | `0.5,0.5` | Gradient center point |
+| `radius` | float | `0.5` | Gradient radius |
 | `matrix` | Matrix | identity | Transform matrix for the gradient coordinate system |
+| `fitsToGeometry` | boolean | true | Whether center/radius are in the geometry's normalized 0-1 bounding box space (true) or local coordinate space (false) |
 
 ### ConicGradient
 
@@ -276,10 +278,11 @@ Color source (sweep gradient) that interpolates along the circumference between 
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | Point | 0,0 | Gradient center point |
+| `center` | Point | `0.5,0.5` | Gradient center point |
 | `startAngle` | float | 0 | Start angle in degrees (0° = right, clockwise positive) |
 | `endAngle` | float | 360 | End angle in degrees |
 | `matrix` | Matrix | identity | Transform matrix for the gradient coordinate system |
+| `fitsToGeometry` | boolean | true | Whether center is in the geometry's normalized 0-1 bounding box space (true) or local coordinate space (false) |
 
 ### DiamondGradient
 
@@ -287,9 +290,10 @@ Color source that radiates from center toward four corners using Chebyshev dista
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | Point | 0,0 | Gradient center point |
-| `radius` | float | (required) | Gradient radius |
+| `center` | Point | `0.5,0.5` | Gradient center point |
+| `radius` | float | `0.5` | Gradient radius |
 | `matrix` | Matrix | identity | Transform matrix for the gradient coordinate system |
+| `fitsToGeometry` | boolean | true | Whether center/radius are in the geometry's normalized 0-1 bounding box space (true) or local coordinate space (false) |
 
 ### ImagePattern
 
@@ -298,11 +302,12 @@ Color source that uses an image as a fill pattern with configurable tiling.
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `image` | string/idref | (required) | Image source: @id resource reference, file path, or data URI |
-| `tileModeX` | TileMode | clamp | X-direction tile mode |
-| `tileModeY` | TileMode | clamp | Y-direction tile mode |
+| `tileModeX` | TileMode | decal | X-direction tile mode |
+| `tileModeY` | TileMode | decal | Y-direction tile mode |
 | `filterMode` | FilterMode | linear | Texture filter mode |
 | `mipmapMode` | MipmapMode | linear | Mipmap mode |
-| `matrix` | Matrix | identity | Transform matrix for the pattern coordinate system |
+| `matrix` | Matrix | identity | Transform matrix applied to the image in its local coordinate space |
+| `scaleMode` | ScaleMode | letterBox | How the transformed image is fitted into each geometry's bounding box. Values: `none` (no per-geometry fitting; image placed directly in layer space), `stretch`, `letterBox`, `zoom` |
 
 ### DropShadowStyle
 

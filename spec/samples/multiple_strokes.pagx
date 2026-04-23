@@ -9,7 +9,7 @@
     <Stroke color="#8B5CF640" width="28" cap="round" join="round"/>
     <!-- Core stroke -->
     <Stroke width="8" cap="round" join="round">
-      <LinearGradient startPoint="0,0" endPoint="280,0">
+      <LinearGradient endPoint="1,0">
         <ColorStop color="#6366F1" offset="0"/>
         <ColorStop color="#8B5CF6" offset="0.5"/>
         <ColorStop color="#EC4899" offset="1"/>

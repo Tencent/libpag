@@ -22,6 +22,7 @@
 #include "pagx/types/FilterMode.h"
 #include "pagx/types/Matrix.h"
 #include "pagx/types/MipmapMode.h"
+#include "pagx/types/ScaleMode.h"
 #include "pagx/types/TileMode.h"
 
 namespace pagx {
@@ -29,7 +30,12 @@ namespace pagx {
 class Image;
 
 /**
- * An image pattern color source that tiles an image to fill shapes.
+ * An image pattern color source that uses an image as a fill. The image is first transformed by
+ * the matrix attribute in its local coordinate space (the original image rect with the origin at
+ * its top-left). When scaleMode is not ScaleMode::None, the transformed image is then fitted into
+ * each geometry's bounding box according to the scale mode. When scaleMode is ScaleMode::None,
+ * the transformed image is placed directly in the layer's coordinate space without per-geometry
+ * fitting.
  */
 class ImagePattern : public ColorSource {
  public:
@@ -39,14 +45,14 @@ class ImagePattern : public ColorSource {
   Image* image = nullptr;
 
   /**
-   * The tile mode for the horizontal direction. The default value is Clamp.
+   * The tile mode for the horizontal direction. The default value is Decal.
    */
-  TileMode tileModeX = TileMode::Clamp;
+  TileMode tileModeX = TileMode::Decal;
 
   /**
-   * The tile mode for the vertical direction. The default value is Clamp.
+   * The tile mode for the vertical direction. The default value is Decal.
    */
-  TileMode tileModeY = TileMode::Clamp;
+  TileMode tileModeY = TileMode::Decal;
 
   /**
    * The filter mode for texture sampling. The default value is Linear.
@@ -59,9 +65,17 @@ class ImagePattern : public ColorSource {
   MipmapMode mipmapMode = MipmapMode::Linear;
 
   /**
-   * The transformation matrix applied to the pattern.
+   * The transformation matrix applied to the pattern. The matrix operates on the image's local
+   * coordinate space (the original image rect with the origin at its top-left).
    */
   Matrix matrix = {};
+
+  /**
+   * The rule used to fit the transformed image into each geometry's bounding box. The default
+   * value is LetterBox. When set to ScaleMode::None, the image is placed directly in the layer's
+   * coordinate space without per-geometry fitting.
+   */
+  ScaleMode scaleMode = ScaleMode::LetterBox;
 
   NodeType nodeType() const override {
     return NodeType::ImagePattern;

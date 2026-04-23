@@ -335,8 +335,9 @@ Linear gradients interpolate along the direction from start point to end point.
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `startPoint` | Point | `0,0` | Start point |
-| `endPoint` | Point | (required) | End point |
+| `endPoint` | Point | `1,1` | End point |
 | `matrix` | Matrix | identity matrix | Transform matrix |
+| `fitsToGeometry` | boolean | true | Whether `startPoint`/`endPoint` are interpreted in the geometry's normalized 0-1 bounding box space. See [Color Source Coordinate System](#color-source-coordinate-system) |
 
 **Calculation**: For a point P, its color is determined by the projection position of P onto the line connecting start and end points.
 
@@ -348,9 +349,10 @@ Radial gradients radiate outward from the center.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | Point | 0,0 | Center point |
-| `radius` | float | (required) | Gradient radius |
+| `center` | Point | `0.5,0.5` | Center point |
+| `radius` | float | `0.5` | Gradient radius |
 | `matrix` | Matrix | identity matrix | Transform matrix |
+| `fitsToGeometry` | boolean | true | Whether `center`/`radius` are interpreted in the geometry's normalized 0-1 bounding box space. See [Color Source Coordinate System](#color-source-coordinate-system) |
 
 **Calculation**: For a point P, its color is determined by `distance(P, center) / radius`.
 
@@ -362,10 +364,11 @@ Conic gradients (also known as sweep gradients) interpolate along the circumfere
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | Point | 0,0 | Center point |
+| `center` | Point | `0.5,0.5` | Center point |
 | `startAngle` | float | 0 | Start angle |
 | `endAngle` | float | 360 | End angle |
 | `matrix` | Matrix | identity matrix | Transform matrix |
+| `fitsToGeometry` | boolean | true | Whether `center` is interpreted in the geometry's normalized 0-1 bounding box space. See [Color Source Coordinate System](#color-source-coordinate-system) |
 
 **Calculation**: For a point P, its color is determined by the ratio of `atan2(P.y - center.y, P.x - center.x)` within the `[startAngle, endAngle]` range.
 
@@ -386,9 +389,10 @@ Diamond gradients radiate from the center toward the four corners.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | Point | 0,0 | Center point |
-| `radius` | float | (required) | Gradient radius |
+| `center` | Point | `0.5,0.5` | Center point |
+| `radius` | float | `0.5` | Gradient radius |
 | `matrix` | Matrix | identity matrix | Transform matrix |
+| `fitsToGeometry` | boolean | true | Whether `center`/`radius` are interpreted in the geometry's normalized 0-1 bounding box space. See [Color Source Coordinate System](#color-source-coordinate-system) |
 
 **Calculation**: For a point P, its color is determined by the Chebyshev distance `max(|P.x - center.x|, |P.y - center.y|) / radius`.
 
@@ -424,11 +428,12 @@ Image patterns use an image as a color source.
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `image` | string | (required) | Image source: `@id` resource reference, file path, or data URI |
-| `tileModeX` | TileMode | clamp | X-direction tile mode |
-| `tileModeY` | TileMode | clamp | Y-direction tile mode |
+| `tileModeX` | TileMode | decal | X-direction tile mode |
+| `tileModeY` | TileMode | decal | Y-direction tile mode |
 | `filterMode` | FilterMode | linear | Texture filter mode |
 | `mipmapMode` | MipmapMode | linear | Mipmap mode |
-| `matrix` | Matrix | identity matrix | Transform matrix |
+| `matrix` | Matrix | identity matrix | Transform matrix applied to the image in its local coordinate space (the original image rect with the origin at its top-left) |
+| `scaleMode` | ScaleMode | letterBox | Rule used to fit the transformed image into each geometry's bounding box. When `none`, the image is placed directly in the layer's coordinate space without per-geometry fitting. See [Color Source Coordinate System](#color-source-coordinate-system) |
 
 **TileMode**: `clamp`, `repeat`, `mirror`, `decal`
 
@@ -436,26 +441,40 @@ Image patterns use an image as a color source.
 
 **MipmapMode**: `none`, `nearest`, `linear`
 
+**ScaleMode**: `none`, `stretch`, `letterBox`, `zoom`
+
 **Complete Example**: Demonstrates ImagePattern fill with different tile modes
 
 > [Sample](samples/image_pattern.pagx)
 
 ##### Color Source Coordinate System
 
-Except for solid colors, all color sources (gradients, image patterns) operate within a coordinate system **relative to the origin of the geometry element's local coordinate system**. The `matrix` attribute can be used to apply transforms to the color source coordinate system.
+Except for solid colors, all color sources (gradients, image patterns) support both a normalized coordinate space relative to each geometry's bounding box and the geometry's local coordinate space. The interpretation is controlled per color source:
+
+- **Gradients**: governed by the `fitsToGeometry` attribute (default `true`).
+- **ImagePattern**: governed by the `scaleMode` attribute. Any scale mode other than `none` fits the image into each geometry's bounding box; `scaleMode="none"` places the image directly in the layer's coordinate space.
+
+**Normalized bounding box space (default)**:
+
+Gradient parameters (`startPoint`, `endPoint`, `center`, `radius`, etc.) are interpreted in a `(0, 0)`-`(1, 1)` coordinate space that maps to each geometry's bounding box. ImagePattern images are fitted into each geometry's bounding box according to `scaleMode`. Color sources in this space **automatically adapt to the size of every geometry that uses them**, so multiple shapes of different sizes sharing the same gradient or pattern each receive a properly-fitted fill.
+
+**Local coordinate space** (opt-in):
+
+Set `fitsToGeometry="false"` on a gradient or `scaleMode="none"` on an ImagePattern to interpret parameters in the geometry's local coordinate space. In this mode the color source is positioned absolutely; multiple geometries sharing the same color source share a single continuous fill. The `matrix` attribute applies on top of the selected space.
 
 **Transform Behavior**:
 
 1. **External transforms affect both geometry and color source**: Group transforms, layer matrices, and other external transforms apply holistically to both the geometry element and its color source—they scale, rotate, and translate together.
 
-2. **Modifying geometry properties does not affect the color source**: Directly modifying geometry element properties (such as Rectangle's width/height or Path's path data) only changes the geometry content itself without affecting the color source coordinate system.
+2. **Modifying geometry properties affects normalized fills but not absolute fills**: Because normalized fills re-fit to the geometry's new bounds, changing a Rectangle's `width`/`height` automatically rescales the gradient or pattern to cover the updated shape. In local-space mode (`fitsToGeometry="false"` / `scaleMode="none"`), the color source's coordinates do not move with the geometry.
 
-**Example**: Drawing a diagonal linear gradient within a 300×300 region:
+**Example**: Drawing a diagonal linear gradient in local coordinate space:
 
 > [Sample](samples/color_source_coordinates.pagx)
 
-- Applying `scale(2, 2)` transform to this layer: The rectangle becomes 600×600, and the gradient scales accordingly, maintaining consistent visual appearance
-- Directly changing Rectangle's size to 600,600: The rectangle becomes 600×600, but the gradient coordinates remain unchanged, covering only the top-left quarter of the rectangle
+- With `fitsToGeometry="false"` and a 300×300 region: applying `scale(2, 2)` to the layer scales both the rectangle and the gradient together (rectangle becomes 600×600, gradient stays aligned)
+- With `fitsToGeometry="false"` and changing Rectangle's `width`/`height` to 600,600 directly: the rectangle becomes 600×600 but the gradient coordinates remain unchanged, covering only the top-left quarter
+- With the default `fitsToGeometry="true"`: the gradient automatically re-fits to whatever size the rectangle has, so the visual fill always spans the shape's bounding box
 
 #### 3.3.4 Composition
 

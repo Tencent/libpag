@@ -35,6 +35,7 @@
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
@@ -495,14 +496,12 @@ class LayerBuilderContext {
     }
   }
 
-  static std::shared_ptr<tgfx::ColorSource> ApplyGradientMatrix(
-      std::shared_ptr<tgfx::Gradient> gradient, const Matrix& matrix) {
+  static std::shared_ptr<tgfx::ColorSource> ApplyGradientProperties(
+      std::shared_ptr<tgfx::Gradient> gradient, const Gradient* node) {
     if (gradient) {
-      // PAGX gradients operate in the geometry's local coordinate space, not the per-geometry
-      // normalized 0-1 space that tgfx defaults to.
-      gradient->setFitsToGeometry(false);
-      if (!matrix.isIdentity()) {
-        gradient->setMatrix(ToTGFX(matrix));
+      gradient->setFitsToGeometry(node->fitsToGeometry);
+      if (!node->matrix.isIdentity()) {
+        gradient->setMatrix(ToTGFX(node->matrix));
       }
     }
     return gradient;
@@ -512,37 +511,35 @@ class LayerBuilderContext {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
     ExtractGradientStops(node->colorStops, &colors, &positions);
-    return ApplyGradientMatrix(
+    return ApplyGradientProperties(
         tgfx::Gradient::MakeLinear(ToTGFX(node->startPoint), ToTGFX(node->endPoint), colors,
                                    positions),
-        node->matrix);
+        node);
   }
 
   std::shared_ptr<tgfx::ColorSource> convertRadialGradient(const RadialGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
     ExtractGradientStops(node->colorStops, &colors, &positions);
-    return ApplyGradientMatrix(
-        tgfx::Gradient::MakeRadial(ToTGFX(node->center), node->radius, colors, positions),
-        node->matrix);
+    return ApplyGradientProperties(
+        tgfx::Gradient::MakeRadial(ToTGFX(node->center), node->radius, colors, positions), node);
   }
 
   std::shared_ptr<tgfx::ColorSource> convertConicGradient(const ConicGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
     ExtractGradientStops(node->colorStops, &colors, &positions);
-    return ApplyGradientMatrix(tgfx::Gradient::MakeConic(ToTGFX(node->center), node->startAngle,
-                                                         node->endAngle, colors, positions),
-                               node->matrix);
+    return ApplyGradientProperties(tgfx::Gradient::MakeConic(ToTGFX(node->center), node->startAngle,
+                                                             node->endAngle, colors, positions),
+                                   node);
   }
 
   std::shared_ptr<tgfx::ColorSource> convertDiamondGradient(const DiamondGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
     ExtractGradientStops(node->colorStops, &colors, &positions);
-    return ApplyGradientMatrix(
-        tgfx::Gradient::MakeDiamond(ToTGFX(node->center), node->radius, colors, positions),
-        node->matrix);
+    return ApplyGradientProperties(
+        tgfx::Gradient::MakeDiamond(ToTGFX(node->center), node->radius, colors, positions), node);
   }
 
   std::shared_ptr<tgfx::ColorSource> convertImagePattern(const ImagePattern* node) {
@@ -569,9 +566,7 @@ class LayerBuilderContext {
     auto pattern =
         tgfx::ImagePattern::Make(image, ToTGFX(node->tileModeX), ToTGFX(node->tileModeY), sampling);
     if (pattern) {
-      // PAGX image patterns live in the geometry's local coordinate space; disable per-geometry
-      // fitting so the image is sampled directly in layer space.
-      pattern->setScaleMode(tgfx::ScaleMode::None);
+      pattern->setScaleMode(ToTGFX(node->scaleMode));
       if (!node->matrix.isIdentity()) {
         pattern->setMatrix(ToTGFX(node->matrix));
       }
