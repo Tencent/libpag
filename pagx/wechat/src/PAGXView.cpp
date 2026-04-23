@@ -25,6 +25,7 @@
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
+#include "tgfx/platform/Print.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/types/Data.h"
 #include "utils/ImagePatternMatrixCalculator.h"
@@ -53,6 +54,10 @@ constexpr double UPGRADE_RETRY_DELAY_MS = 300.0;
 constexpr size_t MIN_RECOVERY_FRAMES_STATIC = 20;
 // Minimum frames to confirm recovery after zoom ends.
 constexpr size_t MIN_RECOVERY_FRAMES_ZOOM_END = 10;
+// Log a breakdown whenever a single draw() call takes longer than this threshold. Adjust this
+// constant to tune log verbosity. submit() is asynchronous in the WebGL backend, so its reported
+// time only reflects CPU-side command submission, not actual GPU execution.
+constexpr double SLOW_FRAME_LOG_THRESHOLD_MS = 200.0;
 
 std::shared_ptr<PAGXView> PAGXView::MakeFrom(int width, int height) {
   if (width <= 0 || height <= 0) {
@@ -396,12 +401,22 @@ bool PAGXView::draw() {
 
   double frameStartMs = emscripten_get_now();
 
-  if (displayList.hasContentChanged()) {
+  // Per-stage timings in milliseconds. Remain 0 for stages that are skipped in this frame.
+  double surfaceMs = 0.0;
+  double bgMs = 0.0;
+  double renderMs = 0.0;
+  double flushMs = 0.0;
+  double submitMs = 0.0;
+  double unlockMs = 0.0;
+  bool dirty = displayList.hasContentChanged();
+
+  if (dirty) {
     auto context = device->lockContext();
     if (context == nullptr) {
       return false;
     }
 
+    double surfaceStartMs = emscripten_get_now();
     if (surface == nullptr || surface->width() != _width || surface->height() != _height) {
       context->setCacheLimit(MAX_CACHE_LIMIT);
       context->setResourceExpirationFrames(EXPIRATION_FRAMES);
@@ -415,7 +430,9 @@ bool PAGXView::draw() {
         return false;
       }
     }
+    surfaceMs = emscripten_get_now() - surfaceStartMs;
 
+    double bgStartMs = emscripten_get_now();
     auto canvas = surface->getCanvas();
     canvas->clear();
 
@@ -424,21 +441,40 @@ bool PAGXView::draw() {
     } else {
       DrawBackground(canvas, _width, _height, 1.0f);
     }
+    bgMs = emscripten_get_now() - bgStartMs;
 
+    double renderStartMs = emscripten_get_now();
     displayList.render(surface.get(), false);
+    renderMs = emscripten_get_now() - renderStartMs;
 
+    double flushStartMs = emscripten_get_now();
     auto recording = context->flush();
+    flushMs = emscripten_get_now() - flushStartMs;
+
     if (recording) {
+      double submitStartMs = emscripten_get_now();
       context->submit(std::move(recording));
+      submitMs = emscripten_get_now() - submitStartMs;
       if (!hasRenderedFirstFrame) {
         hasRenderedFirstFrame = true;
       }
     }
+
+    double unlockStartMs = emscripten_get_now();
     device->unlock();
+    unlockMs = emscripten_get_now() - unlockStartMs;
   }
 
   double frameEndMs = emscripten_get_now();
   double frameDurationMs = frameEndMs - frameStartMs;
+
+  if (frameDurationMs > SLOW_FRAME_LOG_THRESHOLD_MS) {
+    tgfx::PrintLog(
+        "[PAGXView] slow frame: total=%.2fms surface=%.2fms bg=%.2fms render=%.2fms "
+        "flush=%.2fms submit=%.2fms unlock=%.2fms dirty=%d",
+        frameDurationMs, surfaceMs, bgMs, renderMs, flushMs, submitMs, unlockMs,
+        dirty ? 1 : 0);
+  }
 
   updatePerformanceState(frameDurationMs);
 
