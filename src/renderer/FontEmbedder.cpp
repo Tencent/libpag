@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <unordered_map>
+#include <unordered_set>
 #include "base/utils/Log.h"
 #include "base/utils/MathUtil.h"
 #include "pagx/TextLayout.h"
@@ -383,6 +384,10 @@ static void CollectSpacingGlyph(
   }
 }
 
+static bool IsFontNode(const std::shared_ptr<Node>& node) {
+  return node->nodeType() == NodeType::Font;
+}
+
 void FontEmbedder::ClearEmbeddedGlyphRuns(PAGXDocument* document) {
   if (document == nullptr) {
     return;
@@ -391,6 +396,33 @@ void FontEmbedder::ClearEmbeddedGlyphRuns(PAGXDocument* document) {
   for (auto* text : textOrder) {
     text->glyphRuns.clear();
   }
+  auto& nodes = document->nodes;
+  nodes.erase(std::remove_if(nodes.begin(), nodes.end(), IsFontNode), nodes.end());
+
+  std::unordered_set<Node*> toRemove = {};
+  for (auto& node : document->nodes) {
+    auto type = node->nodeType();
+    if (type == NodeType::Font) {
+      toRemove.insert(node.get());
+      auto* font = static_cast<Font*>(node.get());
+      for (auto* glyph : font->glyphs) {
+        toRemove.insert(glyph);
+        if (glyph->path != nullptr) {
+          toRemove.insert(glyph->path);
+        }
+        if (glyph->image != nullptr) {
+          toRemove.insert(glyph->image);
+        }
+      }
+    } else if (type == NodeType::GlyphRun) {
+      toRemove.insert(node.get());
+    }
+  }
+  document->nodes.erase(std::remove_if(document->nodes.begin(), document->nodes.end(),
+                                       [&toRemove](const std::unique_ptr<Node>& node) {
+                                         return toRemove.count(node.get()) > 0;
+                                       }),
+                        document->nodes.end());
 }
 
 bool FontEmbedder::embed(PAGXDocument* document) {
