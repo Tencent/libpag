@@ -106,12 +106,21 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
             auto* lastStop = g->colorStops.back();
             std::string stops;
             // Leading clamp region: 0%..startT filled with the first stop colour.
+            // When the first stop's offset is 0, it maps to startT and duplicates the clamp
+            // endpoint — skip it to avoid redundant stops.
+            size_t firstIndex = 0;
             if (startT > 0.0f) {
               stops += ColorToRGBA(firstStop->color) + " 0%," + ColorToRGBA(firstStop->color) +
                        " " + FloatToString(startT * 100.0f) + "%";
+              // When the first stop's offset is 0, it maps to startT and duplicates the clamp
+              // endpoint — start the loop from index 1 to skip it.
+              float mapped0 = startT + g->colorStops[0]->offset * (endT - startT);
+              if (std::abs(mapped0 - startT) <= 1e-4f) {
+                firstIndex = 1;
+              }
             }
             // Re-emit stops mapped onto [startT, endT].
-            for (size_t i = 0; i < g->colorStops.size(); i++) {
+            for (size_t i = firstIndex; i < g->colorStops.size(); i++) {
               float mapped = startT + g->colorStops[i]->offset * (endT - startT);
               if (!stops.empty()) {
                 stops += ",";
@@ -120,9 +129,15 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
                   ColorToRGBA(g->colorStops[i]->color) + " " + FloatToString(mapped * 100.0f) + "%";
             }
             // Trailing clamp region: endT..100% filled with the last stop colour.
+            // When the last stop's offset is 1, it maps to endT and duplicates the clamp
+            // start point — skip the endT stop.
             if (endT < 1.0f) {
-              stops += "," + ColorToRGBA(lastStop->color) + " " + FloatToString(endT * 100.0f) +
-                       "%," + ColorToRGBA(lastStop->color) + " 100%";
+              float mappedLast = startT + g->colorStops.back()->offset * (endT - startT);
+              if (std::abs(mappedLast - endT) > 1e-4f) {
+                stops +=
+                    "," + ColorToRGBA(lastStop->color) + " " + FloatToString(endT * 100.0f) + "%";
+              }
+              stops += "," + ColorToRGBA(lastStop->color) + " 100%";
             }
             return "linear-gradient(" + FloatToString(ang) + "deg," + stops + ")";
           }
@@ -210,7 +225,15 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
       stops += lastColor + " " + FloatToString(cssOrigin) + "deg";
       stops += "," + firstColor + " " + FloatToString(cssOrigin) + "deg";
       stops += "," + firstColor + " " + FloatToString(cssStartAng) + "deg";
+      // Skip the first stop if offset==0 (it maps to cssStartAng, already emitted above)
+      // and the last stop if offset==1 (it maps to cssEndAng, emitted below).
       for (size_t i = 0; i < g->colorStops.size(); i++) {
+        bool isFirst = (i == 0) && FloatNearlyZero(g->colorStops[i]->offset);
+        bool isLast =
+            (i == g->colorStops.size() - 1) && FloatNearlyZero(g->colorStops[i]->offset - 1.0f);
+        if (isFirst || isLast) {
+          continue;
+        }
         stops += ',';
         stops += ColorToRGBA(g->colorStops[i]->color);
         float angle = cssStartAng + g->colorStops[i]->offset * sweepRange;
