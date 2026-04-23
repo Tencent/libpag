@@ -1,0 +1,35 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#pragma once
+
+namespace pagx::cli {
+
+/**
+ * Embeds fonts and images into a PAGX file as base64, producing a self-contained output.
+ *
+ * Flags:
+ *   -o, --output <path>     Output file path (default: overwrite input)
+ *   --file <path>           Register a font file (repeatable)
+ *   --fallback <path|name>  Add a fallback font file or system font name (repeatable)
+ *   --skip-fonts            Skip the font-embed code path entirely
+ *   --skip-images           Skip the image-embed code path entirely
+ */
+int RunEmbed(int argc, char* argv[]);
+
+}  // namespace pagx::cli
