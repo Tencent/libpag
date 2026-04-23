@@ -412,11 +412,14 @@ void FontEmbedder::ClearEmbeddedGlyphRuns(PAGXDocument* document) {
       toRemove.insert(node.get());
     }
   }
-  document->nodes.erase(std::remove_if(document->nodes.begin(), document->nodes.end(),
-                                       [&toRemove](const std::unique_ptr<Node>& node) {
-                                         return toRemove.count(node.get()) > 0;
-                                       }),
-                        document->nodes.end());
+  auto& nodes = document->nodes;
+  size_t writeIdx = 0;
+  for (size_t readIdx = 0; readIdx < nodes.size(); readIdx++) {
+    if (toRemove.count(nodes[readIdx].get()) == 0) {
+      nodes[writeIdx++] = std::move(nodes[readIdx]);
+    }
+  }
+  nodes.resize(writeIdx);
 }
 
 bool FontEmbedder::embed(PAGXDocument* document) {
