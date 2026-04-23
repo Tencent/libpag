@@ -93,7 +93,7 @@
             <Text text="preserve3D: two translucent planes sharing 3D space" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
-          <Layer width="200" height="120" preserve3D="true">
+          <Layer width="200" height="114" preserve3D="true">
             <!-- Plane A: rotateY 45° -->
             <Layer matrix3D="0.707,0,-0.707,0,0,1,0,0,0.707,0,0.707,0,0,0,0,1">
               <Rectangle position="100,60" size="160,90" roundness="10"/>
