@@ -104,6 +104,9 @@ bool IsLayerShell(const Layer* layer) {
   if (!std::isnan(layer->width) || !std::isnan(layer->height)) {
     return false;
   }
+  if (!std::isnan(layer->percentWidth) || !std::isnan(layer->percentHeight)) {
+    return false;
+  }
   if (!layer->padding.isZero()) {
     return false;
   }
