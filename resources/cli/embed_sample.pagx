@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="200" height="200">
+  <Layer>
+    <Rectangle left="10" top="10" width="80" height="80"/>
+    <Fill>
+      <ImagePattern image="@sample" matrix="0.3,0,0,0.3,0,0" tileModeX="clamp" tileModeY="clamp"/>
+    </Fill>
+  </Layer>
+  <Layer>
+    <TextBox textAlign="center">
+      <Text text="Hello" fontFamily="Helvetica" fontSize="24"/>
+      <Fill color="#000000"/>
+    </TextBox>
+  </Layer>
+  <Resources>
+    <Image id="sample" source="embed_sample.png"/>
+  </Resources>
+</pagx>
