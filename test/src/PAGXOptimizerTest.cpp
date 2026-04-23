@@ -16,10 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <cmath>
 #include "base/PAGTest.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXOptimizer.h"
+#include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
@@ -29,24 +32,39 @@
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
+#include "pagx/utils/VerifyUtils.h"
 
 namespace pag {
 
+using pagx::Alignment;
+using pagx::Arrangement;
+using pagx::BlendMode;
+using pagx::BlurFilter;
 using pagx::Color;
 using pagx::Composition;
+using pagx::ContainsPainter;
+using pagx::DropShadowStyle;
 using pagx::Element;
 using pagx::Ellipse;
 using pagx::Fill;
 using pagx::Group;
+using pagx::HasLayerOnlyFeatures;
+using pagx::IsLayerShell;
+using pagx::IsPainter;
 using pagx::Layer;
+using pagx::LayoutMode;
 using pagx::MaskType;
+using pagx::Matrix;
+using pagx::Matrix3D;
 using pagx::NodeType;
+using pagx::Padding;
 using pagx::PAGXDocument;
 using pagx::PAGXOptimizer;
 using pagx::Path;
 using pagx::PathData;
 using pagx::Rectangle;
 using pagx::SolidColor;
+using pagx::Stroke;
 
 // ---------------------------------------------------------------------------
 // Builders kept tiny so each test stays focused on the rule under inspection.
@@ -785,6 +803,359 @@ CLI_TEST(PAGXOptimizerTest, OptimizeResultSignalsNonConvergenceAtIterationCap) {
     }
   }
   EXPECT_TRUE(warnedAboutOptimizer);
+}
+
+// ---------------------------------------------------------------------------
+// VerifyUtils: HasLayerOnlyFeatures — a freshly created Layer with all defaults
+// must return false. Every subsequent test mutates exactly one attribute to
+// prove each branch of the predicate.
+// ---------------------------------------------------------------------------
+
+static Layer* MakeDefaultLayer(PAGXDocument* doc) {
+  return doc->makeNode<Layer>();
+}
+
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesDefaultIsFalse) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  EXPECT_FALSE(HasLayerOnlyFeatures(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesIdSet) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->id = "layer-id";
+  EXPECT_TRUE(HasLayerOnlyFeatures(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesNameSet) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->name = "decoration";
+  EXPECT_TRUE(HasLayerOnlyFeatures(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesInvisible) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->visible = false;
+  EXPECT_TRUE(HasLayerOnlyFeatures(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesAlphaNotOne) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->alpha = 0.5f;
+  EXPECT_TRUE(HasLayerOnlyFeatures(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesNonNormalBlendMode) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->blendMode = BlendMode::Multiply;
+  EXPECT_TRUE(HasLayerOnlyFeatures(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesMatrix3DNonIdentity) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->matrix3D.setRowColumn(0, 3, 10);
+  EXPECT_TRUE(HasLayerOnlyFeatures(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesPreserve3D) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->preserve3D = true;
+  EXPECT_TRUE(HasLayerOnlyFeatures(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesAntiAliasDisabled) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->antiAlias = false;
+  EXPECT_TRUE(HasLayerOnlyFeatures(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesGroupOpacityDisabled) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->groupOpacity = false;
+  EXPECT_TRUE(HasLayerOnlyFeatures(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesPassThroughBackgroundDisabled) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->passThroughBackground = false;
+  EXPECT_TRUE(HasLayerOnlyFeatures(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesHasScrollRect) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->hasScrollRect = true;
+  EXPECT_TRUE(HasLayerOnlyFeatures(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesClipToBounds) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->clipToBounds = true;
+  EXPECT_TRUE(HasLayerOnlyFeatures(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesMaskSet) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* target = MakeDefaultLayer(doc.get());
+  auto* mask = MakeDefaultLayer(doc.get());
+  target->mask = mask;
+  EXPECT_TRUE(HasLayerOnlyFeatures(target));
+}
+
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesNonAlphaMaskType) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->maskType = MaskType::Luminance;
+  EXPECT_TRUE(HasLayerOnlyFeatures(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesCompositionSet) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->composition = doc->makeNode<Composition>();
+  EXPECT_TRUE(HasLayerOnlyFeatures(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesStylesNonEmpty) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->styles.push_back(doc->makeNode<DropShadowStyle>());
+  EXPECT_TRUE(HasLayerOnlyFeatures(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesFiltersNonEmpty) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->filters.push_back(doc->makeNode<BlurFilter>());
+  EXPECT_TRUE(HasLayerOnlyFeatures(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesLayoutNotNone) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->layout = LayoutMode::Horizontal;
+  EXPECT_TRUE(HasLayerOnlyFeatures(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesGapNonZero) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->gap = 4.0f;
+  EXPECT_TRUE(HasLayerOnlyFeatures(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesFlexNonZero) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->flex = 1.0f;
+  EXPECT_TRUE(HasLayerOnlyFeatures(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesAlignmentNotStretch) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->alignment = Alignment::Center;
+  EXPECT_TRUE(HasLayerOnlyFeatures(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesArrangementNotStart) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->arrangement = Arrangement::Center;
+  EXPECT_TRUE(HasLayerOnlyFeatures(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesIncludeInLayoutFalse) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->includeInLayout = false;
+  EXPECT_TRUE(HasLayerOnlyFeatures(layer));
+}
+
+// ---------------------------------------------------------------------------
+// VerifyUtils: IsLayerShell — a plain shell Layer returns true; any non-default
+// geometry, matrix, size, padding, or constraint attribute forces it to false.
+// Anything already covered by HasLayerOnlyFeatures also forces it to false.
+// ---------------------------------------------------------------------------
+
+CLI_TEST(VerifyUtilsTest, IsLayerShellDefaultIsTrue) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  EXPECT_TRUE(IsLayerShell(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, IsLayerShellWithLayerOnlyFeature) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->blendMode = BlendMode::Multiply;
+  EXPECT_FALSE(IsLayerShell(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, IsLayerShellXSet) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->x = 5.0f;
+  EXPECT_FALSE(IsLayerShell(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, IsLayerShellYSet) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->y = 5.0f;
+  EXPECT_FALSE(IsLayerShell(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, IsLayerShellMatrixNonIdentity) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->matrix = Matrix::Translate(3.0f, 4.0f);
+  EXPECT_FALSE(IsLayerShell(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, IsLayerShellWidthSet) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->width = 50.0f;
+  EXPECT_FALSE(IsLayerShell(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, IsLayerShellHeightSet) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->height = 60.0f;
+  EXPECT_FALSE(IsLayerShell(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, IsLayerShellPercentWidthSet) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->percentWidth = 50.0f;
+  EXPECT_FALSE(IsLayerShell(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, IsLayerShellPercentHeightSet) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->percentHeight = 50.0f;
+  EXPECT_FALSE(IsLayerShell(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, IsLayerShellPaddingSet) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->padding.left = 8.0f;
+  EXPECT_FALSE(IsLayerShell(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, IsLayerShellLeftConstraintSet) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->left = 10.0f;
+  EXPECT_FALSE(IsLayerShell(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, IsLayerShellRightConstraintSet) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->right = 10.0f;
+  EXPECT_FALSE(IsLayerShell(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, IsLayerShellTopConstraintSet) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->top = 10.0f;
+  EXPECT_FALSE(IsLayerShell(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, IsLayerShellBottomConstraintSet) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->bottom = 10.0f;
+  EXPECT_FALSE(IsLayerShell(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, IsLayerShellCenterXConstraintSet) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->centerX = 0.0f;
+  EXPECT_FALSE(IsLayerShell(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, IsLayerShellCenterYConstraintSet) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->centerY = 0.0f;
+  EXPECT_FALSE(IsLayerShell(layer));
+}
+
+// ---------------------------------------------------------------------------
+// VerifyUtils: ContainsPainter / IsPainter
+// ---------------------------------------------------------------------------
+
+CLI_TEST(VerifyUtilsTest, IsPainterFillTrue) {
+  EXPECT_TRUE(IsPainter(NodeType::Fill));
+}
+
+CLI_TEST(VerifyUtilsTest, IsPainterStrokeTrue) {
+  EXPECT_TRUE(IsPainter(NodeType::Stroke));
+}
+
+CLI_TEST(VerifyUtilsTest, IsPainterOtherTypesFalse) {
+  EXPECT_FALSE(IsPainter(NodeType::Rectangle));
+  EXPECT_FALSE(IsPainter(NodeType::Ellipse));
+  EXPECT_FALSE(IsPainter(NodeType::Group));
+  EXPECT_FALSE(IsPainter(NodeType::Layer));
+  EXPECT_FALSE(IsPainter(NodeType::Document));
+}
+
+CLI_TEST(VerifyUtilsTest, ContainsPainterEmptyVector) {
+  std::vector<Element*> empty;
+  EXPECT_FALSE(ContainsPainter(empty));
+}
+
+CLI_TEST(VerifyUtilsTest, ContainsPainterOnlyShapes) {
+  auto doc = PAGXDocument::Make(100, 100);
+  std::vector<Element*> elements;
+  elements.push_back(doc->makeNode<Rectangle>());
+  elements.push_back(doc->makeNode<Ellipse>());
+  elements.push_back(doc->makeNode<Group>());
+  EXPECT_FALSE(ContainsPainter(elements));
+}
+
+CLI_TEST(VerifyUtilsTest, ContainsPainterWithFill) {
+  auto doc = PAGXDocument::Make(100, 100);
+  std::vector<Element*> elements;
+  elements.push_back(doc->makeNode<Rectangle>());
+  elements.push_back(doc->makeNode<Fill>());
+  EXPECT_TRUE(ContainsPainter(elements));
+}
+
+CLI_TEST(VerifyUtilsTest, ContainsPainterWithStroke) {
+  auto doc = PAGXDocument::Make(100, 100);
+  std::vector<Element*> elements;
+  elements.push_back(doc->makeNode<Rectangle>());
+  elements.push_back(doc->makeNode<Stroke>());
+  EXPECT_TRUE(ContainsPainter(elements));
+}
+
+CLI_TEST(VerifyUtilsTest, ContainsPainterPainterAsFirstElement) {
+  auto doc = PAGXDocument::Make(100, 100);
+  std::vector<Element*> elements;
+  elements.push_back(doc->makeNode<Fill>());
+  elements.push_back(doc->makeNode<Rectangle>());
+  EXPECT_TRUE(ContainsPainter(elements));
 }
 
 }  // namespace pag
