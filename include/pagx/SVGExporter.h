@@ -65,14 +65,18 @@ class SVGExporter {
 
   /**
    * Exports a PAGXDocument to an SVG string.
+   * @param document the PAGXDocument to export. Passed as non-const because applyLayout() is run
+   *        on first use to resolve renderPosition() for layers and groups.
    */
-  static std::string ToSVG(const PAGXDocument& document, const Options& options = {});
+  static std::string ToSVG(PAGXDocument& document, const Options& options = {});
 
   /**
    * Exports a PAGXDocument to an SVG file.
-   * Returns true on success.
+   * @param document the PAGXDocument to export. Passed as non-const because applyLayout() is run
+   *        on first use to resolve renderPosition() for layers and groups.
+   * @return true on success.
    */
-  static bool ToFile(const PAGXDocument& document, const std::string& filePath,
+  static bool ToFile(PAGXDocument& document, const std::string& filePath,
                      const Options& options = {});
 };
 

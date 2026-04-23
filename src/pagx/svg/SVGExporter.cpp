@@ -1170,7 +1170,12 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
 // Main Export function
 //==============================================================================
 
-std::string SVGExporter::ToSVG(const PAGXDocument& doc, const Options& options) {
+std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options) {
+  // Mirror PPTExporter: resolve renderPosition() for every layer/group so authored x/y/position
+  // attributes flow into the matrix helpers (BuildLayerMatrix / BuildGroupMatrix).
+  if (!doc.isLayoutApplied()) {
+    doc.applyLayout(options.fontConfig);
+  }
   SVGBuilder svg(true, options.indent);
   SVGBuilder defs(true, options.indent, 2);
   SVGWriterContext context;
@@ -1209,7 +1214,7 @@ std::string SVGExporter::ToSVG(const PAGXDocument& doc, const Options& options) 
   return svg.release();
 }
 
-bool SVGExporter::ToFile(const PAGXDocument& document, const std::string& filePath,
+bool SVGExporter::ToFile(PAGXDocument& document, const std::string& filePath,
                          const Options& options) {
   auto svgContent = ToSVG(document, options);
   if (svgContent.empty()) {

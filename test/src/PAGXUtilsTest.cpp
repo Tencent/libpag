@@ -108,6 +108,9 @@ PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_WithPosition) {
   auto layer = doc->makeNode<pagx::Layer>();
   layer->x = 10.0f;
   layer->y = 20.0f;
+  // BuildLayerMatrix consumes the layout-resolved renderPosition(); run the layer's measure pass
+  // so the authored x/y propagate into preferredX/Y (and therefore layoutBounds()).
+  layer->updateSize(nullptr);
   auto m = pagx::BuildLayerMatrix(layer);
   EXPECT_FLOAT_EQ(m.tx, 10.0f);
   EXPECT_FLOAT_EQ(m.ty, 20.0f);
@@ -119,6 +122,7 @@ PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_WithMatrixAndPosition) {
   layer->matrix = pagx::Matrix::Scale(2.0f, 3.0f);
   layer->x = 5.0f;
   layer->y = 7.0f;
+  layer->updateSize(nullptr);
   auto m = pagx::BuildLayerMatrix(layer);
   auto expected = pagx::Matrix::Translate(5.0f, 7.0f) * pagx::Matrix::Scale(2.0f, 3.0f);
   EXPECT_FLOAT_EQ(m.a, expected.a);
@@ -131,6 +135,7 @@ PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_OnlyXNonZero) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto layer = doc->makeNode<pagx::Layer>();
   layer->x = 15.0f;
+  layer->updateSize(nullptr);
   auto m = pagx::BuildLayerMatrix(layer);
   EXPECT_FLOAT_EQ(m.tx, 15.0f);
   EXPECT_FLOAT_EQ(m.ty, 0.0f);
@@ -151,6 +156,9 @@ PAGX_TEST(PAGXUtilsTest, BuildGroupMatrix_PositionOnly) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto group = doc->makeNode<pagx::Group>();
   group->position = {50.0f, 30.0f};
+  // BuildGroupMatrix translates by renderPosition(); run the group's measure pass so the authored
+  // position propagates into preferredX/Y (and therefore layoutBounds()).
+  group->updateSize(nullptr);
   auto m = pagx::BuildGroupMatrix(group);
   EXPECT_FLOAT_EQ(m.tx, 50.0f);
   EXPECT_FLOAT_EQ(m.ty, 30.0f);
@@ -201,6 +209,7 @@ PAGX_TEST(PAGXUtilsTest, BuildGroupMatrix_AnchorPositionScaleRotation) {
   group->position = {100.0f, 100.0f};
   group->scale = {2.0f, 2.0f};
   group->rotation = 45.0f;
+  group->updateSize(nullptr);
   auto m = pagx::BuildGroupMatrix(group);
   EXPECT_FLOAT_EQ(m.tx, 100.0f);
   EXPECT_FLOAT_EQ(m.ty, 100.0f - 20.0f * std::sqrt(2.0f));
