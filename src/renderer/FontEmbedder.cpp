@@ -384,10 +384,6 @@ static void CollectSpacingGlyph(
   }
 }
 
-static bool IsFontNode(const std::shared_ptr<Node>& node) {
-  return node->nodeType() == NodeType::Font;
-}
-
 void FontEmbedder::ClearEmbeddedGlyphRuns(PAGXDocument* document) {
   if (document == nullptr) {
     return;
@@ -396,8 +392,6 @@ void FontEmbedder::ClearEmbeddedGlyphRuns(PAGXDocument* document) {
   for (auto* text : textOrder) {
     text->glyphRuns.clear();
   }
-  auto& nodes = document->nodes;
-  nodes.erase(std::remove_if(nodes.begin(), nodes.end(), IsFontNode), nodes.end());
 
   std::unordered_set<Node*> toRemove = {};
   for (auto& node : document->nodes) {
