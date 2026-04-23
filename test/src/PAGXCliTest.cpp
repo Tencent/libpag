@@ -24,6 +24,7 @@
 #include <vector>
 #include "base/PAGTest.h"
 #include "cli/CommandBounds.h"
+#include "cli/CommandEmbed.h"
 #include "cli/CommandExport.h"
 #include "cli/CommandFont.h"
 #include "cli/CommandFormat.h"
@@ -35,6 +36,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/nodes/Image.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
@@ -2643,6 +2645,176 @@ CLI_TEST(PAGXCliTest, Verify_PainterLeakClean) {
   auto output = oss.str();
   EXPECT_NE(ret, 0);
   EXPECT_EQ(output.find("painter leaks geometry"), std::string::npos);
+}
+
+//==============================================================================
+// Embed tests
+//==============================================================================
+
+CLI_TEST(PAGXCliTest, Embed_BothDefault_EmbedsFontsAndImages) {
+  auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_sample.pagx");
+  auto tempPng = CopyToTemp("embed_sample.png", "embed_sample.png");
+  auto outPagx = TempDir() + "/embed_both_out.pagx";
+  // EMBED-09 implicitly covered: embed_sample.pagx references embed_sample.png by relative path;
+  // resolution happens at PAGXImporter::FromFile load time per D1.2.
+  std::streambuf* oldCout = std::cout.rdbuf();
+  std::ostringstream capturedOut;
+  std::cout.rdbuf(capturedOut.rdbuf());
+  auto ret = CallRun(pagx::cli::RunEmbed, {"embed", tempPagx, "-o", outPagx});
+  std::cout.rdbuf(oldCout);
+  EXPECT_EQ(ret, 0);
+  EXPECT_NE(capturedOut.str().find("pagx embed: wrote"), std::string::npos);
+  auto document = pagx::PAGXImporter::FromFile(outPagx);
+  ASSERT_NE(document, nullptr);
+  EXPECT_TRUE(document->getExternalFilePaths().empty());
+  bool hasImageData = false;
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == pagx::NodeType::Image) {
+      auto* image = static_cast<pagx::Image*>(node.get());
+      if (image->data != nullptr) {
+        hasImageData = true;
+      }
+    }
+  }
+  EXPECT_TRUE(hasImageData);
+}
+
+CLI_TEST(PAGXCliTest, Embed_SkipFonts_ImagesOnly) {
+  auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_sample.pagx");
+  auto tempPng = CopyToTemp("embed_sample.png", "embed_sample.png");
+  auto outPagx = TempDir() + "/embed_skipfonts_out.pagx";
+  auto ret = CallRun(pagx::cli::RunEmbed, {"embed", "--skip-fonts", tempPagx, "-o", outPagx});
+  EXPECT_EQ(ret, 0);
+  auto document = pagx::PAGXImporter::FromFile(outPagx);
+  ASSERT_NE(document, nullptr);
+  bool hasImageData = false;
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == pagx::NodeType::Image) {
+      auto* image = static_cast<pagx::Image*>(node.get());
+      if (image->data != nullptr) {
+        hasImageData = true;
+      }
+    }
+  }
+  EXPECT_TRUE(hasImageData);
+}
+
+CLI_TEST(PAGXCliTest, Embed_SkipImages_FontsOnly) {
+  auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_sample.pagx");
+  auto tempPng = CopyToTemp("embed_sample.png", "embed_sample.png");
+  auto outPagx = TempDir() + "/embed_skipimgs_out.pagx";
+  auto ret = CallRun(pagx::cli::RunEmbed, {"embed", "--skip-images", tempPagx, "-o", outPagx});
+  EXPECT_EQ(ret, 0);
+  auto document = pagx::PAGXImporter::FromFile(outPagx);
+  ASSERT_NE(document, nullptr);
+  bool hasFilePath = false;
+  bool hasNoImageData = true;
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == pagx::NodeType::Image) {
+      auto* image = static_cast<pagx::Image*>(node.get());
+      if (!image->filePath.empty()) {
+        hasFilePath = true;
+      }
+      if (image->data != nullptr) {
+        hasNoImageData = false;
+      }
+    }
+  }
+  EXPECT_TRUE(hasFilePath);
+  EXPECT_TRUE(hasNoImageData);
+}
+
+CLI_TEST(PAGXCliTest, Embed_BothSkipFlags_ExitsWithError) {
+  auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_sample.pagx");
+  auto tempPng = CopyToTemp("embed_sample.png", "embed_sample.png");
+  auto contentBefore = ReadFile(tempPagx);
+  std::streambuf* oldCerr = std::cerr.rdbuf();
+  std::ostringstream capturedErr;
+  std::cerr.rdbuf(capturedErr.rdbuf());
+  auto ret = CallRun(pagx::cli::RunEmbed, {"embed", "--skip-fonts", "--skip-images", tempPagx});
+  std::cerr.rdbuf(oldCerr);
+  EXPECT_EQ(ret, 1);
+  EXPECT_NE(capturedErr.str().find("pagx embed: --skip-fonts and --skip-images cannot both be set"),
+            std::string::npos);
+  auto contentAfter = ReadFile(tempPagx);
+  EXPECT_EQ(contentBefore, contentAfter);
+}
+
+CLI_TEST(PAGXCliTest, Embed_FontFlags_AcceptedLikeOldSubcommand) {
+  auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_sample.pagx");
+  auto tempPng = CopyToTemp("embed_sample.png", "embed_sample.png");
+  auto outPagx = TempDir() + "/embed_fontflags_out.pagx";
+  auto fontPath = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
+  auto ret = CallRun(pagx::cli::RunEmbed, {"embed", "--file", fontPath, "-o", outPagx, tempPagx});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Embed_AlreadyEmbeddedImage_IsNoOp) {
+  auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_sample.pagx");
+  auto tempPng = CopyToTemp("embed_sample.png", "embed_sample.png");
+  auto out1 = TempDir() + "/embed_idempot_pass1.pagx";
+  auto out2 = TempDir() + "/embed_idempot_pass2.pagx";
+  auto ret1 = CallRun(pagx::cli::RunEmbed, {"embed", tempPagx, "-o", out1});
+  EXPECT_EQ(ret1, 0);
+  auto ret2 = CallRun(pagx::cli::RunEmbed, {"embed", out1, "-o", out2});
+  EXPECT_EQ(ret2, 0);
+  EXPECT_EQ(ReadFile(out1), ReadFile(out2));
+}
+
+CLI_TEST(PAGXCliTest, Embed_MissingImage_FailsLoud) {
+  auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_missing.pagx");
+  auto content = ReadFile(tempPagx);
+  auto pos = content.find("embed_sample.png");
+  ASSERT_NE(pos, std::string::npos);
+  content.replace(pos, strlen("embed_sample.png"), "missing.png");
+  std::ofstream out(tempPagx);
+  out << content;
+  out.close();
+  auto outPagx = TempDir() + "/embed_missing_out.pagx";
+  std::streambuf* oldCerr = std::cerr.rdbuf();
+  std::ostringstream capturedErr;
+  std::cerr.rdbuf(capturedErr.rdbuf());
+  auto ret = CallRun(pagx::cli::RunEmbed, {"embed", tempPagx, "-o", outPagx});
+  std::cerr.rdbuf(oldCerr);
+  EXPECT_EQ(ret, 1);
+  EXPECT_NE(capturedErr.str().find("pagx embed: failed to load image '"), std::string::npos);
+  EXPECT_FALSE(std::filesystem::exists(outPagx));
+}
+
+CLI_TEST(PAGXCliTest, Embed_Success_PrintsWroteAndExitsZero) {
+  auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_sample.pagx");
+  auto tempPng = CopyToTemp("embed_sample.png", "embed_sample.png");
+  auto outPagx = TempDir() + "/embed_success_out.pagx";
+  std::streambuf* oldCout = std::cout.rdbuf();
+  std::ostringstream capturedOut;
+  std::cout.rdbuf(capturedOut.rdbuf());
+  auto ret = CallRun(pagx::cli::RunEmbed, {"embed", tempPagx, "-o", outPagx});
+  std::cout.rdbuf(oldCout);
+  EXPECT_EQ(ret, 0);
+  auto output = capturedOut.str();
+  EXPECT_NE(output.find("pagx embed: wrote"), std::string::npos);
+  EXPECT_NE(output.find(outPagx), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Embed_Usage_NoInputErrors_HelpPrints) {
+  std::streambuf* oldCerr = std::cerr.rdbuf();
+  std::ostringstream capturedErr;
+  std::cerr.rdbuf(capturedErr.rdbuf());
+  auto ret = CallRun(pagx::cli::RunEmbed, {"embed"});
+  std::cerr.rdbuf(oldCerr);
+  EXPECT_EQ(ret, 1);
+  EXPECT_NE(capturedErr.str().find("pagx embed: missing input file"), std::string::npos);
+
+  std::streambuf* oldCout = std::cout.rdbuf();
+  std::ostringstream capturedOut;
+  std::cout.rdbuf(capturedOut.rdbuf());
+  auto helpRet = CallRun(pagx::cli::RunEmbed, {"embed", "--help"});
+  std::cout.rdbuf(oldCout);
+  EXPECT_EQ(helpRet, 0);
+  auto helpOutput = capturedOut.str();
+  EXPECT_NE(helpOutput.find("Usage: pagx embed"), std::string::npos);
+  EXPECT_NE(helpOutput.find("--skip-fonts"), std::string::npos);
+  EXPECT_NE(helpOutput.find("--skip-images"), std::string::npos);
 }
 
 }  // namespace pag
