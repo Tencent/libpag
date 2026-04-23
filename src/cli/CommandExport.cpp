@@ -34,43 +34,34 @@ struct ExportOptions {
   bool svgNoXmlDeclaration = false;
   bool svgNoConvertTextToPath = false;
   int htmlIndent = 2;
-  std::string htmlFramework = {};
-  std::string htmlComponentName = "PagxComponent";
 };
 
 static void PrintUsage() {
-  std::cout
-      << "Usage: pagx export [options]\n"
-      << "\n"
-      << "Export a PAGX file to another format.\n"
-      << "\n"
-      << "Options:\n"
-      << "  --input <file>              Input PAGX file (required)\n"
-      << "  --output <file>             Output file (default: <input>.<format>)\n"
-      << "  --format <format>           Output format (svg, html; inferred from --output "
-         "extension)\n"
-      << "\n"
-      << "SVG options:\n"
-      << "  --svg-indent <n>            Indentation spaces (default: 2, valid range: 0-16)\n"
-      << "  --svg-no-xml-declaration    Omit the <?xml ...?> declaration\n"
-      << "  --svg-no-convert-text-to-path\n"
-      << "                              Keep text as <text> elements instead of <path>\n"
-      << "\n"
-      << "HTML options:\n"
-      << "  --html-indent <n>           Indentation spaces (default: 2, valid range: 0-16)\n"
-      << "  --html-framework <fw>       Output framework: native, react, vue\n"
-      << "  --html-component-name <n>   Component name for React/Vue (default: PagxComponent)\n"
-      << "\n"
-      << "Examples:\n"
-      << "  pagx export --input icon.pagx                    # PAGX to icon.svg\n"
-      << "  pagx export --input icon.pagx --output out.svg   # PAGX to out.svg\n"
-      << "  pagx export --format svg --input icon.pagx       # force SVG output format\n"
-      << "  pagx export --input icon.pagx --svg-indent 4     # 4-space indent\n"
-      << "  pagx export --input icon.pagx --output icon.html # PAGX to native HTML\n"
-      << "  pagx export --input icon.pagx --output Icon.jsx  # PAGX to React JSX\n"
-      << "  pagx export --input icon.pagx --output Icon.vue  # PAGX to Vue SFC\n"
-      << "  pagx export --input icon.pagx --format html --html-framework react\n"
-      << "                                                   # PAGX to React JSX\n";
+  std::cout << "Usage: pagx export [options]\n"
+            << "\n"
+            << "Export a PAGX file to another format.\n"
+            << "\n"
+            << "Options:\n"
+            << "  --input <file>              Input PAGX file (required)\n"
+            << "  --output <file>             Output file (default: <input>.<format>)\n"
+            << "  --format <format>           Output format (svg, html; inferred from --output "
+               "extension)\n"
+            << "\n"
+            << "SVG options:\n"
+            << "  --svg-indent <n>            Indentation spaces (default: 2, valid range: 0-16)\n"
+            << "  --svg-no-xml-declaration    Omit the <?xml ...?> declaration\n"
+            << "  --svg-no-convert-text-to-path\n"
+            << "                              Keep text as <text> elements instead of <path>\n"
+            << "\n"
+            << "HTML options:\n"
+            << "  --html-indent <n>           Indentation spaces (default: 2, valid range: 0-16)\n"
+            << "\n"
+            << "Examples:\n"
+            << "  pagx export --input icon.pagx                    # PAGX to icon.svg\n"
+            << "  pagx export --input icon.pagx --output out.svg   # PAGX to out.svg\n"
+            << "  pagx export --format svg --input icon.pagx       # force SVG output format\n"
+            << "  pagx export --input icon.pagx --svg-indent 4     # 4-space indent\n"
+            << "  pagx export --input icon.pagx --output icon.html # PAGX to HTML\n";
 }
 
 static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
@@ -103,10 +94,6 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
         return 1;
       }
       options->htmlIndent = static_cast<int>(value);
-    } else if (arg == "--html-framework" && i + 1 < argc) {
-      options->htmlFramework = argv[++i];
-    } else if (arg == "--html-component-name" && i + 1 < argc) {
-      options->htmlComponentName = argv[++i];
     } else if (arg == "--help" || arg == "-h") {
       PrintUsage();
       return -1;
@@ -182,36 +169,6 @@ static int ExportToHTML(const ExportOptions& options) {
   htmlOptions.indent = options.htmlIndent;
 
   document->applyLayout();
-  htmlOptions.componentName = options.htmlComponentName;
-
-  std::string framework = options.htmlFramework;
-  if (framework.empty()) {
-    auto ext = GetFileExtension(options.outputFile);
-    if (ext == "jsx") {
-      framework = "react";
-    } else if (ext == "vue") {
-      framework = "vue";
-    } else if (ext == "html") {
-      framework = "native";
-    }
-  }
-
-  if (framework.empty()) {
-    // Default to native when format is html and no framework is specified
-    framework = "native";
-  }
-
-  if (framework == "native") {
-    htmlOptions.framework = HTMLFramework::Native;
-  } else if (framework == "react") {
-    htmlOptions.framework = HTMLFramework::React;
-  } else if (framework == "vue") {
-    htmlOptions.framework = HTMLFramework::Vue;
-  } else {
-    std::cerr << "pagx export: error: invalid HTML framework '" << framework
-              << "' (must be native/react/vue)\n";
-    return 1;
-  }
 
   if (!HTMLExporter::ToFile(*document, options.outputFile, htmlOptions)) {
     std::cerr << "pagx export: error: failed to write '" << options.outputFile << "'\n";
@@ -233,7 +190,7 @@ int RunExport(int argc, char* argv[]) {
     return ExportToSVG(options);
   }
 
-  if (options.format == "html" || options.format == "jsx" || options.format == "vue") {
+  if (options.format == "html") {
     return ExportToHTML(options);
   }
 

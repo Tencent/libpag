@@ -428,10 +428,9 @@ struct HTMLExportOptions {
 ```cpp
 std::string HTMLExporter::ToHTML(const PAGXDocument& document, const Options& options) {
   std::string nativeHTML = /* HTMLWriter emit + RoundCoordinatesInHTML */;
-  if (options.extractStyleSheet && options.framework == HTMLFramework::Native) {
+  if (options.extractStyleSheet) {
     nativeHTML = HTMLStyleExtractor::Extract(nativeHTML);
   }
-  // ... framework-specific transformation
 }
 ```
 
@@ -641,7 +640,7 @@ test/src/
 | FontSignature.bold | fontWeight 枚举 | bool bold | 实际只关心是否为 bold，简化为 bool |
 | FontSignatureToCss font-weight | 输出具体数值（如 700） | 输出 `bold` / 不输出 | 与 HTMLWriterText 现有 emit 一致 |
 | Pass 2 标签重写 | 字符串剪切（移除 style+插入 class） | 逐属性重建 | 字符串剪切依赖 class/style 属性顺序，导致边界错误；逐属性重建不依赖属性顺序 |
-| Phase 2 激活条件 | 仅 `extractStyleSheet` | `extractStyleSheet && framework == Native` | React/Vue 的 TransformStyleAttributes 将 inline style 转 style object，抽取无意义 |
+| Phase 2 激活条件 | 仅 `extractStyleSheet` | `extractStyleSheet` | React/Vue 输出已移除，抽取无条件生效 |
 | FontHoistTest 用例数 | 8 | 10 | 实施改为纯函数测试（Signature::equals + FontSignatureToCss），不含 Layer/Text 构造 |
 | HTMLStyleExtractorTest 用例数 | 20 | 19 | 合并/调整：SvgElementStyle 和 MetaTagNoChange 被其他用例覆盖；新增 StyleInsertedBeforeHeadClose 和 MultipleUniqueStyles |
 | ExtractStyleSheetRoundTrip | 有 | 未实施 | 视觉等价由现有截图测试覆盖 |

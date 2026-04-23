@@ -24,15 +24,6 @@
 namespace pagx {
 
 /**
- * Output framework for HTML export.
- */
-enum class HTMLFramework {
-  Native,  // Standard HTML output
-  React,   // React JSX output
-  Vue,     // Vue 3 SFC output
-};
-
-/**
  * Export options for HTMLExporter.
  */
 struct HTMLExportOptions {
@@ -40,17 +31,6 @@ struct HTMLExportOptions {
    * Indentation spaces for the output HTML. The default value is 2.
    */
   int indent = 2;
-
-  /**
-   * Output framework format. The default is Native HTML.
-   */
-  HTMLFramework framework = HTMLFramework::Native;
-
-  /**
-   * Component name for React/Vue output. The default is "PagxComponent".
-   * This option is only used when framework is React or Vue.
-   */
-  std::string componentName = "PagxComponent";
 
   /**
    * Absolute directory path where the exporter writes PNG files for shapes filled with color
@@ -85,12 +65,6 @@ struct HTMLExportOptions {
    * reference styles via generated class names (`.ps0`, `.ps1`, ...). This
    * typically reduces HTML size by 10-25% for documents with repeated style
    * declarations. When false, every style remains inline.
-   *
-   * The extracted output is semantically identical to the inline output: all
-   * computed styles render identically in any standards-compliant browser.
-   * Inline specificity (1000) becomes class specificity (10); this has no
-   * effect for self-contained documents produced by HTMLExporter because no
-   * user stylesheet exists to compete with the extracted rules.
    *
    * The document's <body> `style` attribute is always kept inline because it
    * is unique per document and gains nothing from extraction.
