@@ -26,6 +26,7 @@
 namespace pagx {
 
 // OOXML ST_SlideSizeCoordinate range: 914400 EMU (1") to 51206400 EMU (56").
+static constexpr int64_t MIN_SLIDE_SIZE_EMU = 914400;
 static constexpr int64_t MAX_SLIDE_SIZE_EMU = 51206400;
 
 // Standard OOXML part prelude used at the top of every generated XML part.
@@ -112,6 +113,12 @@ std::string GeneratePresentation(float w, float h) {
   if (cx > MAX_SLIDE_SIZE_EMU || cy > MAX_SLIDE_SIZE_EMU) {
     double scale = std::min(static_cast<double>(MAX_SLIDE_SIZE_EMU) / static_cast<double>(cx),
                             static_cast<double>(MAX_SLIDE_SIZE_EMU) / static_cast<double>(cy));
+    cx = static_cast<int64_t>(std::round(static_cast<double>(cx) * scale));
+    cy = static_cast<int64_t>(std::round(static_cast<double>(cy) * scale));
+  }
+  if (cx < MIN_SLIDE_SIZE_EMU || cy < MIN_SLIDE_SIZE_EMU) {
+    double scale = std::max(static_cast<double>(MIN_SLIDE_SIZE_EMU) / static_cast<double>(cx),
+                            static_cast<double>(MIN_SLIDE_SIZE_EMU) / static_cast<double>(cy));
     cx = static_cast<int64_t>(std::round(static_cast<double>(cx) * scale));
     cy = static_cast<int64_t>(std::round(static_cast<double>(cy) * scale));
   }
