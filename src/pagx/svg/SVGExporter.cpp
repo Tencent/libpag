@@ -659,6 +659,7 @@ std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& 
         _defs->addAttribute("result", floodResult);
         _defs->closeElementSelfClosing();
 
+        std::string blendResult = "blendResult" + idx;
         _defs->openElement("feBlend");
         _defs->addAttribute("in", "SourceGraphic");
         _defs->addAttribute("in2", floodResult);
@@ -666,6 +667,13 @@ std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& 
         if (modeStr) {
           _defs->addAttribute("mode", modeStr);
         }
+        _defs->addAttribute("result", blendResult);
+        _defs->closeElementSelfClosing();
+
+        _defs->openElement("feComposite");
+        _defs->addAttribute("in", blendResult);
+        _defs->addAttribute("in2", "SourceGraphic");
+        _defs->addAttribute("operator", "in");
         _defs->closeElementSelfClosing();
         break;
       }
