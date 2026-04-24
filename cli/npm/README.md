@@ -22,8 +22,8 @@ npm install -g @libpag/pagx
 | `pagx optimize` | Validate, optimize, and format in one step |
 | `pagx format` | Format a PAGX file with consistent indentation and attribute ordering |
 | `pagx bounds` | Query the precise rendered bounds of layers |
-| `pagx font info` | Query font identity and metrics from a file or system font |
-| `pagx font embed` | Embed fonts into a PAGX file with glyph extraction |
+| `pagx font` | Query a font file, a system font by name, or list system font families |
+| `pagx embed` | Embed fonts and images into a PAGX file as base64 |
 
 ## Usage Examples
 
@@ -65,13 +65,22 @@ pagx bounds --xpath "//Layer[@id='btn']" input.pagx
 pagx bounds --xpath "//Layer[@id='icon']" --relative "//Layer[@id='card']" --json input.pagx
 
 # Query system font metrics at 24pt
-pagx font info --name "Arial" --size 24
+pagx font --name "Arial" --size 24
 
 # Query font metrics from a file
-pagx font info --file CustomFont.ttf --json
+pagx font --file CustomFont.ttf --json
 
-# Embed fonts with a custom fallback
-pagx font embed --file BrandFont.ttf --fallback "Arial" input.pagx
+# List all installed system font families
+pagx font --list
+
+# Embed fonts and images into a PAGX file
+pagx embed input.pagx
+
+# Embed with a custom font file and fallback
+pagx embed --file BrandFont.ttf --fallback "Arial" input.pagx
+
+# Embed images only (skip font embedding)
+pagx embed --skip-fonts input.pagx
 ```
 
 ## Command Reference
@@ -147,26 +156,30 @@ coordinates by default.
 
 `--id` and `--xpath` are mutually exclusive. Without either, outputs bounds for all layers.
 
-### `pagx font info [options]`
+### `pagx font [options]`
 
-Query font identity and metrics. Requires either `--file` or `--name` (mutually exclusive).
+Query a font file, a system font by name, or list system font families. Exactly one of `--file`,
+`--name`, or `--list` must be specified.
 
 | Option | Description |
 |--------|-------------|
-| `--file <path>` | Font file path |
-| `--name <family,style>` | System font name (e.g., `"Arial"` or `"Arial,Bold"`) |
+| `--file <path>` | Query a font file |
+| `--name <family,style>` | Query a system font (e.g., `"Arial"` or `"Arial,Bold"`) |
 | `--size <pt>` | Font size in points (default: `12`) |
 | `--json` | Output in JSON format |
+| `--list` | List every installed system font family |
 
-### `pagx font embed [options] <file.pagx>`
+### `pagx embed [options] <file.pagx>`
 
-Embed fonts into a PAGX file by performing text layout and glyph extraction.
+Embed fonts and images into a PAGX file as base64.
 
 | Option | Description |
 |--------|-------------|
 | `-o, --output <path>` | Output file path (default: overwrite input) |
 | `--file <path>` | Register a font file (repeatable) |
 | `--fallback <path\|name>` | Add a fallback font file or system font name (repeatable) |
+| `--skip-fonts` | Do not embed fonts |
+| `--skip-images` | Do not embed images |
 
 ## Supported Platforms
 
