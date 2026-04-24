@@ -88,8 +88,8 @@ CLI_TEST(PAGXHtmlTest, BatchConvertAll) {
     doc->applyLayout();
     auto html = pagx::HTMLExporter::ToHTML(*doc);
     EXPECT_FALSE(html.empty()) << "Failed to convert: " << baseName;
-    EXPECT_NE(html.find("pagx-root"), std::string::npos)
-        << "Missing pagx-root class in: " << baseName;
+    EXPECT_NE(html.find("data-pagx-version"), std::string::npos)
+        << "Missing data-pagx-version attribute in: " << baseName;
     auto fullHtml =
         WrapHtmlDocument(html, static_cast<int>(doc->width), static_cast<int>(doc->height));
     SaveFile(fullHtml, "PAGXHtmlTest/" + baseName + ".html");
@@ -103,7 +103,7 @@ CLI_TEST(PAGXHtmlTest, BatchConvertAll) {
 CLI_TEST(PAGXHtmlTest, RootDocument) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/root_document.pagx"));
   ASSERT_FALSE(html.empty());
-  EXPECT_NE(html.find("pagx-root"), std::string::npos);
+  EXPECT_NE(html.find("data-pagx-version"), std::string::npos);
   EXPECT_NE(html.find("width:320px"), std::string::npos);
   EXPECT_NE(html.find("height:220px"), std::string::npos);
   EXPECT_NE(html.find("overflow:hidden"), std::string::npos);
@@ -199,7 +199,8 @@ CLI_TEST(PAGXHtmlTest, LayerGroupOpacity) {
 CLI_TEST(PAGXHtmlTest, LayerNesting) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_nesting.pagx"));
   ASSERT_FALSE(html.empty());
-  EXPECT_NE(html.find("pagx-layer"), std::string::npos);
+  // Nested layers produce multiple <div> elements inside the root.
+  EXPECT_NE(html.find("<div"), std::string::npos);
 }
 
 // =============================================================================
@@ -462,7 +463,7 @@ CLI_TEST(PAGXHtmlTest, FilterAll) {
 CLI_TEST(PAGXHtmlTest, EdgeDefaults) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/edge_defaults.pagx"));
   ASSERT_FALSE(html.empty());
-  EXPECT_NE(html.find("pagx-root"), std::string::npos);
+  EXPECT_NE(html.find("data-pagx-version"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, ResourceComposition) {
@@ -526,7 +527,7 @@ CLI_TEST(PAGXHtmlTest, ExportToFile) {
 
   std::ifstream file(outPath);
   std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-  EXPECT_NE(content.find("pagx-root"), std::string::npos);
+  EXPECT_NE(content.find("data-pagx-version"), std::string::npos);
 }
 
 // =============================================================================

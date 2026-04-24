@@ -169,9 +169,9 @@ CLI_TEST(HTMLStyleExtractorTest, MultipleUniqueStyles) {
 CLI_TEST(HTMLStyleExtractorTest, BaseModifierBlend) {
   std::string input =
       R"(<html><head></head><body>)"
-      R"(<div class="pagx-layer" style="position:absolute;width:48px;height:30px;mix-blend-mode:multiply">a</div>)"
-      R"(<div class="pagx-layer" style="position:absolute;width:48px;height:30px;mix-blend-mode:screen">b</div>)"
-      R"(<div class="pagx-layer" style="position:absolute;width:48px;height:30px;mix-blend-mode:overlay">c</div>)"
+      R"(<div style="position:absolute;width:48px;height:30px;mix-blend-mode:multiply">a</div>)"
+      R"(<div style="position:absolute;width:48px;height:30px;mix-blend-mode:screen">b</div>)"
+      R"(<div style="position:absolute;width:48px;height:30px;mix-blend-mode:overlay">c</div>)"
       R"(</body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
   // Base class with shared properties.
@@ -180,10 +180,10 @@ CLI_TEST(HTMLStyleExtractorTest, BaseModifierBlend) {
   EXPECT_NE(result.find(".blend1{mix-blend-mode:multiply}"), std::string::npos);
   EXPECT_NE(result.find(".blend2{mix-blend-mode:screen}"), std::string::npos);
   EXPECT_NE(result.find(".blend3{mix-blend-mode:overlay}"), std::string::npos);
-  // Elements should have base+modifier class pair.
-  EXPECT_NE(result.find("class=\"pagx-layer blend0 blend1\""), std::string::npos);
-  EXPECT_NE(result.find("class=\"pagx-layer blend0 blend2\""), std::string::npos);
-  EXPECT_NE(result.find("class=\"pagx-layer blend0 blend3\""), std::string::npos);
+  // Elements should have base+modifier class pair (layer detected via mix-blend-mode).
+  EXPECT_NE(result.find("class=\"blend0 blend1\""), std::string::npos);
+  EXPECT_NE(result.find("class=\"blend0 blend2\""), std::string::npos);
+  EXPECT_NE(result.find("class=\"blend0 blend3\""), std::string::npos);
   // No inline style should remain.
   EXPECT_EQ(result.find("style=\"position:absolute"), std::string::npos);
 }
@@ -191,18 +191,18 @@ CLI_TEST(HTMLStyleExtractorTest, BaseModifierBlend) {
 CLI_TEST(HTMLStyleExtractorTest, BaseModifierBgColor) {
   std::string input =
       R"(<html><head></head><body>)"
-      R"(<div class="pagx-layer" style="position:absolute;width:50px;height:40px;background-color:#FF0000">a</div>)"
-      R"(<div class="pagx-layer" style="position:absolute;width:50px;height:40px;background-color:#00FF00">b</div>)"
+      R"(<div style="position:absolute;width:50px;height:40px;background-color:#FF0000">a</div>)"
+      R"(<div style="position:absolute;width:50px;height:40px;background-color:#00FF00">b</div>)"
       R"(</body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
-  // Base class with shared properties.
+  // Base class with shared properties (layer detected via position:absolute + size, no inset).
   EXPECT_NE(result.find(".bg0{position:absolute;width:50px;height:40px}"), std::string::npos);
   // Modifier classes with individual background colors.
   EXPECT_NE(result.find(".bg1{background-color:#FF0000}"), std::string::npos);
   EXPECT_NE(result.find(".bg2{background-color:#00FF00}"), std::string::npos);
   // Elements should have base+modifier class pair.
-  EXPECT_NE(result.find("class=\"pagx-layer bg0 bg1\""), std::string::npos);
-  EXPECT_NE(result.find("class=\"pagx-layer bg0 bg2\""), std::string::npos);
+  EXPECT_NE(result.find("class=\"bg0 bg1\""), std::string::npos);
+  EXPECT_NE(result.find("class=\"bg0 bg2\""), std::string::npos);
 }
 
 CLI_TEST(HTMLStyleExtractorTest, BaseModifierText) {
@@ -237,9 +237,9 @@ CLI_TEST(HTMLStyleExtractorTest, SharedModifierClass) {
   // Two elements with the same varying value should share a modifier class.
   std::string input =
       R"(<html><head></head><body>)"
-      R"(<div class="pagx-layer" style="position:absolute;width:48px;height:30px;mix-blend-mode:multiply">a</div>)"
-      R"(<div class="pagx-layer" style="position:absolute;width:48px;height:30px;mix-blend-mode:screen">b</div>)"
-      R"(<div class="pagx-layer" style="position:absolute;width:48px;height:30px;mix-blend-mode:multiply">c</div>)"
+      R"(<div style="position:absolute;width:48px;height:30px;mix-blend-mode:multiply">a</div>)"
+      R"(<div style="position:absolute;width:48px;height:30px;mix-blend-mode:screen">b</div>)"
+      R"(<div style="position:absolute;width:48px;height:30px;mix-blend-mode:multiply">c</div>)"
       R"(</body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
   // Base class with shared properties.
@@ -272,7 +272,8 @@ CLI_TEST(HTMLStyleExtractorTest, GradientParenthesesParse) {
   EXPECT_NE(result.find("linear-gradient(135deg,rgba(255,0,0,0.5) 50%,#00FF00 100%)"),
             std::string::npos);
   // The gradient value must be intact (not split at internal ; or :).
-  EXPECT_NE(result.find(".div0{position:absolute;background:linear-gradient(135deg,rgba(255,0,0,0.5) 50%,#00FF00 100%)}"),
+  EXPECT_NE(result.find(".div0{position:absolute;background:linear-gradient(135deg,rgba(255,0,0,0."
+                        "5) 50%,#00FF00 100%)}"),
             std::string::npos);
   EXPECT_NE(result.find(".div1{color:#FFF}"), std::string::npos);
   EXPECT_NE(result.find(".div2{color:#000}"), std::string::npos);

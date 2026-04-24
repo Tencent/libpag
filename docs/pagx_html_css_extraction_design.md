@@ -1,5 +1,10 @@
 # PAGX → HTML CSS 抽取优化技术方案
 
+> 历史设计文档。文中示例使用的 `pagx-root` / `pagx-layer` 标记类已于后续迭代中移除，
+> 当前生成的 HTML 不再包含这两个类；根元素改用 `data-pagx-version` 属性标识，
+> layer 元素通过样式特征（mix-blend-mode、display:flex、position+size 无 inset 等）被识别。
+> 以最新 `spec/pagx_to_html.md` 为准。
+
 ## 背景
 
 当前 `HTMLExporter` 生成的 HTML 全部使用内联 `style="..."` 承载 CSS。实测 77 个样本：

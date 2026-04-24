@@ -85,13 +85,15 @@ PAGX XML → XML 解析 → 资源预处理（两遍解析）→ 图层树构建
 ### 2.2 输出结构
 
 ```html
-<div class="pagx-root" style="width:{w}px; height:{h}px; position:relative; overflow:hidden;">
+<div data-pagx-version="1.0" style="width:{w}px; height:{h}px; position:relative; overflow:hidden;">
   <svg style="position:absolute; width:0; height:0; overflow:hidden;">
     <defs><!-- 共享 SVG 定义：滤镜、遮罩、裁剪路径、渐变 --></defs>
   </svg>
   <!-- 图层树 -->
 </div>
 ```
+
+> 根元素通过 `data-pagx-version` 属性标识，不再使用 `class="pagx-root"` 标记类。
 
 ---
 
@@ -104,7 +106,7 @@ PAGX XML → XML 解析 → 资源预处理（两遍解析）→ 图层树构建
 ```
 →
 ```html
-<div class="pagx-root" data-pagx-version="1.0"
+<div data-pagx-version="1.0"
      style="position:relative; width:400px; height:400px; overflow:hidden;">
 ```
 
@@ -141,7 +143,7 @@ PAGX XML → XML 解析 → 资源预处理（两遍解析）→ 图层树构建
 
 ### 5.1 Layer → `<div>`
 
-每个 Layer 映射为 `<div class="pagx-layer">`，按渲染流水线六阶段组织子内容：
+每个 Layer 映射为一个 `<div>`，按渲染流水线六阶段组织子内容：
 
 1. Layer Styles (below) — DropShadowStyle, BackgroundBlurStyle
 2. Background Content — `placement="background"` 的 Fill/Stroke
@@ -826,7 +828,7 @@ CSS `backdrop-filter: blur({blur}px)`。
   <div style="filter:drop-shadow(...);"><!-- 阴影载体 --></div>
 </div>
 <!-- 图层内容 -->
-<div class="pagx-layer">...</div>
+<div>...</div>
 ```
 
 ---

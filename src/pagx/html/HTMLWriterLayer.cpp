@@ -831,7 +831,6 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
                             bool distributeAlpha, bool isFlexItem) {
   if (!layer->visible) {
     out.openTag("div");
-    out.addAttr("class", "pagx-layer");
     out.addAttr("style", "display:none");
     if (!layer->id.empty()) {
       out.addAttr("id", layer->id);
@@ -1445,7 +1444,6 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   }
 
   out.openTag("div");
-  out.addAttr("class", "pagx-layer");
   if (!layer->id.empty()) {
     out.addAttr("id", layer->id);
   }

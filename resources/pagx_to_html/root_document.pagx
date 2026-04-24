@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tests: root <pagx> element → div.pagx-root with width/height/overflow:hidden;
+<!-- Tests: root <pagx> element → <div data-pagx-version="1.0"> with width/height/overflow:hidden;
      demonstrates canvas dimensions, clipping at boundaries, and basic layer rendering -->
 <pagx version="1.0" width="320" height="220">
   <Resources>

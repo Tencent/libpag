@@ -92,7 +92,7 @@
 
 | 文件名 | 测试特性 | 是否降级 | 降级说明 | HTML 差异描述 |
 |--------|----------|---------|---------|---------------|
-| `root_document.pagx` | pagx 根元素 → div.pagx-root | 否 | - | overflow:hidden 实现画布裁剪 |
+| `root_document.pagx` | pagx 根元素 → 根 `<div data-pagx-version>` | 否 | - | overflow:hidden 实现画布裁剪 |
 | `layer_visibility.pagx` | visible=false → display:none | 否 | - | 隐藏层不渲染 |
 | `layer_alpha.pagx` | alpha → opacity | 否 | - | 直接映射 |
 | `layer_transform_xy.pagx` | x/y → transform: translate | 否 | - | 直接映射 |

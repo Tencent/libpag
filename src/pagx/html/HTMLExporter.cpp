@@ -153,7 +153,6 @@ std::string HTMLExporter::ToHTML(const PAGXDocument& doc, const Options& options
   std::string rootStyle = "position:relative;width:" + FloatToString(doc.width) +
                           "px;height:" + FloatToString(doc.height) + "px;overflow:hidden";
   html.openTag("div");
-  html.addAttr("class", "pagx-root");
   html.addAttr("data-pagx-version", "1.0");
   html.addAttr("style", rootStyle);
   html.closeTagStart();

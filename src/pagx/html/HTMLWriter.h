@@ -215,7 +215,7 @@ class HTMLWriter {
   void writeLayerContents(HTMLBuilder& out, const Layer* layer, float alpha, bool distribute,
                           LayerPlacement targetPlacement);
   // Emits only the layer's inner children (background contents, composition, child layers,
-  // foreground contents) without opening an outer <div.pagx-layer>. Extracted so the BlurFilter
+  // foreground contents) without opening an outer layer <div>. Extracted so the BlurFilter
   // mirror-tile emission path can replay the same inner DOM inside each of the 9 mirrored tiles.
   void writeLayerInner(HTMLBuilder& out, const Layer* layer, float contentAlpha,
                        bool childDistribute, bool isFlexContainer);

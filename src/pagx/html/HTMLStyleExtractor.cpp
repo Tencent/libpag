@@ -389,13 +389,17 @@ static PropertyClassification ClassifyGroupProperties(const std::vector<StyleEnt
   return result;
 }
 
-static bool StringContains(const std::string& haystack, const std::string& needle) {
-  return haystack.find(needle) != std::string::npos;
-}
-
 static bool HasPropNamed(const std::vector<CSSProperty>& props, const std::string& name) {
   for (const auto& p : props) {
     if (p.name == name) return true;
+  }
+  return false;
+}
+
+static bool HasPropValue(const std::vector<CSSProperty>& props, const std::string& name,
+                         const std::string& value) {
+  for (const auto& p : props) {
+    if (p.name == name && p.value == value) return true;
   }
   return false;
 }
@@ -407,30 +411,72 @@ static bool VectorContains(const std::vector<std::string>& vec, const std::strin
   return false;
 }
 
-static std::string InferSemanticPrefix(const std::string& tagName, const std::string& existingClass,
+// Recognizes the document root div by its style signature emitted by HTMLExporter:
+// "position:relative;width:{W}px;height:{H}px;overflow:hidden". The root is unique per document
+// and always the first tokenized div with all four properties.
+static bool IsRootStyle(const std::vector<CSSProperty>& props) {
+  return HasPropValue(props, "position", "relative") && HasPropNamed(props, "width") &&
+         HasPropNamed(props, "height") && HasPropValue(props, "overflow", "hidden");
+}
+
+// Recognizes layer divs emitted by HTMLWriterLayer. Layer divs carry layout/transform/filter
+// styles that fill divs never have. Fill divs use inset:0 to size themselves inside a layer
+// parent; presence of inset excludes a div from being a layer.
+static bool IsLayerStyle(const std::vector<CSSProperty>& baseProps,
+                         const std::vector<CSSProperty>& sampleProps,
+                         const std::vector<std::string>& varyingPropNames) {
+  bool hasInset = HasPropNamed(baseProps, "inset") || HasPropNamed(sampleProps, "inset");
+  // Strong positive signals: properties emitted only on layer divs.
+  if (HasPropValue(baseProps, "display", "flex") || HasPropValue(sampleProps, "display", "flex")) {
+    return true;
+  }
+  if (VectorContains(varyingPropNames, "mix-blend-mode")) return true;
+  if (HasPropNamed(baseProps, "mix-blend-mode") || HasPropNamed(sampleProps, "mix-blend-mode")) {
+    return true;
+  }
+  if (HasPropNamed(baseProps, "filter") || HasPropNamed(sampleProps, "filter")) return true;
+  if (HasPropNamed(baseProps, "opacity") || HasPropNamed(sampleProps, "opacity")) return true;
+  if (HasPropNamed(baseProps, "transform-origin") ||
+      HasPropNamed(sampleProps, "transform-origin")) {
+    return true;
+  }
+  if (HasPropNamed(baseProps, "flex") || HasPropNamed(sampleProps, "flex")) return true;
+  // Positional+size pattern (without inset) marks a layer wrapper.
+  bool hasAbsolute = HasPropValue(baseProps, "position", "absolute") ||
+                     HasPropValue(sampleProps, "position", "absolute");
+  bool hasRelative = HasPropValue(baseProps, "position", "relative") ||
+                     HasPropValue(sampleProps, "position", "relative");
+  bool hasSize = HasPropNamed(baseProps, "width") || HasPropNamed(sampleProps, "width") ||
+                 HasPropNamed(baseProps, "height") || HasPropNamed(sampleProps, "height");
+  if (!hasInset && hasSize && (hasAbsolute || hasRelative)) return true;
+  return false;
+}
+
+static std::string InferSemanticPrefix(const std::string& tagName,
                                        const std::vector<CSSProperty>& baseProps,
+                                       const std::vector<CSSProperty>& sampleProps,
                                        const std::vector<std::string>& varyingPropNames) {
-  if (StringContains(existingClass, "pagx-root")) return "root";
-  if (StringContains(existingClass, "pagx-layer")) {
+  if (tagName == "span") return "text";
+  if (tagName == "svg") return "svg";
+  if (tagName == "div" && IsLayerStyle(baseProps, sampleProps, varyingPropNames)) {
     if (VectorContains(varyingPropNames, "mix-blend-mode")) return "blend";
     if (VectorContains(varyingPropNames, "opacity")) return "alpha";
     if (VectorContains(varyingPropNames, "background-color")) return "bg";
-    if (HasPropNamed(baseProps, "display") && HasPropNamed(baseProps, "flex-wrap")) {
+    if (HasPropValue(baseProps, "display", "flex") ||
+        HasPropValue(sampleProps, "display", "flex")) {
       return "flex";
     }
     return "layer";
   }
-  if (tagName == "span") return "text";
-  if (tagName == "svg") return "svg";
   return "div";
 }
 
 static std::string InferStandalonePrefix(const std::string& tagName,
-                                         const std::string& existingClass) {
-  if (StringContains(existingClass, "pagx-root")) return "root";
-  if (StringContains(existingClass, "pagx-layer")) return "layer";
+                                         const std::vector<CSSProperty>& props) {
   if (tagName == "span") return "text";
   if (tagName == "svg") return "svg";
+  std::vector<std::string> emptyVarying;
+  if (tagName == "div" && IsLayerStyle(props, props, emptyVarying)) return "layer";
   return "div";
 }
 
@@ -441,11 +487,6 @@ static std::string BuildDeclarationsString(const std::vector<CSSProperty>& props
     result += props[i].name + ':' + props[i].value;
   }
   return result;
-}
-
-static std::string GetExistingClass(const std::string& html, const StartTagInfo& tag) {
-  if (!tag.hasClass) return "";
-  return html.substr(tag.classValueStart, tag.classValueEnd - tag.classValueStart);
 }
 
 //==============================================================================
@@ -502,6 +543,8 @@ std::string HTMLStyleExtractor::Extract(const std::string& html) {
   std::vector<ClassRule> classRules;
   // Per-prefix sequential counter.
   std::unordered_map<std::string, int> prefixCounters;
+  // Track whether the document root div has been assigned; only the first matching div wins.
+  bool rootAssigned = false;
 
   for (const auto& group : sortedGroups) {
     const auto& memberIndices = sigGroups[group.signature];
@@ -522,9 +565,8 @@ std::string HTMLStyleExtractor::Extract(const std::string& html) {
     if (shouldSplit) {
       // Use first tag for semantic prefix inference.
       const auto& firstTag = tags[members[0]->tagIndex];
-      auto existingClass = GetExistingClass(html, firstTag);
-      auto prefix = InferSemanticPrefix(firstTag.tagName, existingClass, classification.sharedProps,
-                                        classification.varyingPropNames);
+      auto prefix = InferSemanticPrefix(firstTag.tagName, classification.sharedProps,
+                                        members[0]->properties, classification.varyingPropNames);
       // Emit base class.
       auto baseName = prefix + std::to_string(prefixCounters[prefix]++);
       classRules.push_back({baseName, BuildDeclarationsString(classification.sharedProps)});
@@ -575,8 +617,13 @@ std::string HTMLStyleExtractor::Extract(const std::string& html) {
           tagClassNames[entry.tagIndex] = {it->second};
         } else {
           const auto& tag = tags[entry.tagIndex];
-          auto existingClass = GetExistingClass(html, tag);
-          auto prefix = InferStandalonePrefix(tag.tagName, existingClass);
+          std::string prefix;
+          if (!rootAssigned && tag.tagName == "div" && IsRootStyle(entry.properties)) {
+            prefix = "root";
+            rootAssigned = true;
+          } else {
+            prefix = InferStandalonePrefix(tag.tagName, entry.properties);
+          }
           auto className = prefix + std::to_string(prefixCounters[prefix]++);
           classRules.push_back({className, entry.decodedStyle});
           styleToClassName[entry.decodedStyle] = className;
