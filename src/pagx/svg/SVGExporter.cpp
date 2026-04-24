@@ -30,7 +30,6 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/TextLayout.h"
 #include "pagx/TextLayoutParams.h"
-#include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
@@ -244,12 +243,9 @@ class SVGWriter {
 
   const LayerBuildResult& ensureBuildResult();
 
-  // Rasterizes the given layer (optionally compositing it with the backdrop pixels underneath)
-  // to a PNG and emits it as a positioned <image>. Returns true iff a picture was emitted.
-  // withBackdrop is set only for layers carrying BackgroundBlurStyle where the visual depends
-  // on pixels drawn below; every other unsupported feature is self-contained and renders fine
-  // against an empty canvas.
-  bool rasterizeLayerAsImage(SVGBuilder& out, const Layer* layer, bool withBackdrop);
+  // Rasterizes the given layer to a PNG and emits it as a positioned <image>. Returns true iff a
+  // picture was emitted.
+  bool rasterizeLayerAsImage(SVGBuilder& out, const Layer* layer);
 
   // One geometry instance captured during the scope walk in writeElements.
   // Transform/alpha are baked at collection time so that later painters can
@@ -318,7 +314,6 @@ class SVGWriter {
   // Each one drains directly into the surrounding <filter> chain.
   void writeColorMatrixFilter(const ColorMatrixFilter* cm);
   void writeBlendFilter(const BlendFilter* blend, int& shadowIndex);
-  void writeBackgroundBlurStyle(const BackgroundBlurStyle* bb);
   // Collected per-filter state fed into the final feMerge aggregation.
   struct ShadowAggregate {
     std::vector<std::string> dropShadowResults;
@@ -735,21 +730,6 @@ void SVGWriter::writeBlendFilter(const BlendFilter* blend, int& shadowIndex) {
   _defs->closeElementSelfClosing();
 }
 
-void SVGWriter::writeBackgroundBlurStyle(const BackgroundBlurStyle* bb) {
-  // SVG lacks a widely-supported BackgroundImage / backdrop access: `<feGaussianBlur
-  // in="BackgroundImage">` requires `enable-background` on an ancestor, which has
-  // been dropped from the SVG spec and is not implemented by modern renderers.
-  // Degrade to blurring the source graphic so the layer at least shows a blur
-  // effect; authoring callers who need true background-blur should output HTML.
-  _defs->addRawContent(std::string(_indentSpaces, ' ') +
-                       "<!-- background-blur degraded to source-blur: "
-                       "SVG has no portable BackgroundImage source -->\n");
-  _defs->openElement("feGaussianBlur");
-  _defs->addAttribute("in", "SourceGraphic");
-  _defs->addAttribute("stdDeviation", FormatBlurStdDev(bb->blurX, bb->blurY));
-  _defs->closeElementSelfClosing();
-}
-
 void SVGWriter::writeFilterList(const std::vector<LayerFilter*>& filters, int& shadowIndex,
                                 ShadowAggregate& agg) {
   for (const auto* filter : filters) {
@@ -795,8 +775,9 @@ void SVGWriter::writeFilterList(const std::vector<LayerFilter*>& filters, int& s
 }
 
 // LayerStyle emission mirrors the Filter pass so DropShadowStyle / InnerShadowStyle
-// share the feMerge aggregation logic. BackgroundBlurStyle has no portable SVG
-// equivalent — see writeBackgroundBlurStyle for the degradation.
+// share the feMerge aggregation logic. BackgroundBlurStyle is silently skipped because SVG has
+// no portable backdrop-blur primitive (the deprecated enable-background is not supported by
+// modern renderers).
 void SVGWriter::writeStyleList(const std::vector<LayerStyle*>& styles, int& shadowIndex,
                                ShadowAggregate& agg) {
   for (const auto* style : styles) {
@@ -819,9 +800,6 @@ void SVGWriter::writeStyleList(const std::vector<LayerStyle*>& styles, int& shad
         agg.needSourceGraphic = true;
         break;
       }
-      case NodeType::BackgroundBlurStyle:
-        writeBackgroundBlurStyle(static_cast<const BackgroundBlurStyle*>(style));
-        break;
       default:
         break;
     }
@@ -1741,7 +1719,7 @@ const LayerBuildResult& SVGWriter::ensureBuildResult() {
   return _buildResult;
 }
 
-bool SVGWriter::rasterizeLayerAsImage(SVGBuilder& out, const Layer* layer, bool withBackdrop) {
+bool SVGWriter::rasterizeLayerAsImage(SVGBuilder& out, const Layer* layer) {
   auto& buildResult = ensureBuildResult();
   auto it = buildResult.layerMap.find(layer);
   if (it == buildResult.layerMap.end() || !buildResult.root) {
@@ -1760,10 +1738,7 @@ bool SVGWriter::rasterizeLayerAsImage(SVGBuilder& out, const Layer* layer, bool 
   auto coordinateSpace =
       tgfxLayer->parent() != nullptr ? tgfxLayer->parent() : buildResult.root.get();
   auto pixelScale = static_cast<float>(_rasterDPI) / 96.0f;
-  auto pngData = withBackdrop ? RenderLayerCompositeWithBackdrop(&_gpu, buildResult.root, tgfxLayer,
-                                                                 coordinateSpace, pixelScale)
-                              : RenderMaskedLayer(&_gpu, buildResult.root, tgfxLayer,
-                                                  coordinateSpace, pixelScale);
+  auto pngData = RenderMaskedLayer(&_gpu, buildResult.root, tgfxLayer, coordinateSpace, pixelScale);
   if (!pngData || pngData->size() == 0) {
     return false;
   }
@@ -1962,15 +1937,15 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   }
 
   // Probe for features SVG cannot losslessly represent (TextPath, TextModifier,
-  // diamond/conic gradient, BackgroundBlurStyle). If any trip AND rasterization
-  // is enabled, bake the whole layer to a PNG so the visual result is preserved.
-  // The alternative (silently dropping unsupported elements / degrading gradients
-  // to radial / degrading background blur to source blur) is what the vector
-  // path below does.
+  // diamond/conic gradient). If any trip AND rasterization is enabled, bake the whole layer to a
+  // PNG so the visual result is preserved. The alternative (silently dropping unsupported
+  // elements / degrading gradients to radial) is what the vector path below does.
+  // BackgroundBlurStyle is intentionally excluded: SVG has no portable backdrop-blur primitive,
+  // so the layer is kept as vector with the blur effect silently dropped.
   if (_rasterizeUnsupportedFeatures) {
     auto features = ProbeLayerFeaturesForSVG(layer);
     if (features.needsRasterization()) {
-      if (rasterizeLayerAsImage(out, layer, features.requiresBackdrop())) {
+      if (rasterizeLayerAsImage(out, layer)) {
         return;
       }
     }

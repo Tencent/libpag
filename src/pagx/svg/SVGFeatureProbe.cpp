@@ -17,11 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/svg/SVGFeatureProbe.h"
-#include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
-#include "pagx/nodes/LayerStyle.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/TextBox.h"
 
@@ -32,7 +30,6 @@ static void Merge(SVGFeatureFlags* dst, const SVGFeatureFlags& src) {
   dst->hasTextModifier |= src.hasTextModifier;
   dst->hasConicGradient |= src.hasConicGradient;
   dst->hasDiamondGradient |= src.hasDiamondGradient;
-  dst->hasBackgroundBlurStyle |= src.hasBackgroundBlurStyle;
 }
 
 static void ProbeColorSource(const ColorSource* source, SVGFeatureFlags* out) {
@@ -88,11 +85,6 @@ SVGFeatureFlags ProbeLayerFeaturesForSVG(const Layer* layer) {
   SVGFeatureFlags out;
   if (layer == nullptr || !layer->visible) {
     return out;
-  }
-  for (const auto* style : layer->styles) {
-    if (style != nullptr && style->nodeType() == NodeType::BackgroundBlurStyle) {
-      out.hasBackgroundBlurStyle = true;
-    }
   }
   // Aggregating descendant flags here would force the smallest enclosing layer to bake the
   // entire sub-tree into one PNG when any grandchild trips the probe, which both blows up the

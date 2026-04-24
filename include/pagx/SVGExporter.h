@@ -56,11 +56,12 @@ struct SVGExportOptions {
 
   /**
    * Whether to rasterize layers that carry features SVG cannot losslessly represent (TextPath,
-   * TextModifier, diamond/conic gradient, BackgroundBlurStyle). When true, such a layer is
-   * baked to an embedded PNG and emitted as an &lt;image&gt; so the visual result is preserved.
-   * When false, the exporter falls through to the vector path and those features degrade
-   * silently (text path / modifier drop, diamond/conic gradient fall back to radial,
-   * background blur falls back to a source blur). The default value is true.
+   * TextModifier, diamond/conic gradient). When true, such a layer is baked to an embedded PNG
+   * and emitted as an &lt;image&gt; so the visual result is preserved. When false, the exporter
+   * falls through to the vector path and those features degrade silently (text path / modifier
+   * drop, diamond/conic gradient fall back to radial). BackgroundBlurStyle is always kept as
+   * vector output with the blur effect silently dropped, since SVG has no portable backdrop-blur
+   * primitive. The default value is true.
    */
   bool rasterizeUnsupportedFeatures = true;
 

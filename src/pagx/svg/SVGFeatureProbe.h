@@ -39,32 +39,19 @@ struct SVGFeatureFlags {
   bool hasTextModifier = false;     // TextModifier / RangeSelector (per-glyph animation styling).
   bool hasConicGradient = false;    // No SVG conic/sweep gradient primitive.
   bool hasDiamondGradient = false;  // No SVG diamond gradient primitive.
-  bool hasBackgroundBlurStyle =
-      false;  // Needs backdrop pixels; SVG's feGaussianBlur on BackgroundImage requires the
-              // deprecated enable-background attribute that modern renderers ignore.
 
   /**
    * Returns true when at least one feature is present.
    */
   bool needsRasterization() const {
-    return hasTextPath || hasTextModifier || hasConicGradient || hasDiamondGradient ||
-           hasBackgroundBlurStyle;
-  }
-
-  /**
-   * BackgroundBlurStyle depends on the backdrop pixels below the layer, so the renderer must
-   * composite the whole scene clipped to the layer's bounds. Every other flagged feature is
-   * self-contained and renders correctly against an empty canvas.
-   */
-  bool requiresBackdrop() const {
-    return hasBackgroundBlurStyle;
+    return hasTextPath || hasTextModifier || hasConicGradient || hasDiamondGradient;
   }
 };
 
 /**
- * Examines a single layer in isolation: its own styles (BackgroundBlurStyle) plus the elements
- * it directly owns (recursing through nested Group / TextBox). Composition layers and child
- * layers are NOT traversed — they are visited independently by the writer.
+ * Examines a single layer in isolation: its own elements (recursing through nested Group /
+ * TextBox). Composition layers and child layers are NOT traversed — they are visited independently
+ * by the writer.
  */
 SVGFeatureFlags ProbeLayerFeaturesForSVG(const Layer* layer);
 
