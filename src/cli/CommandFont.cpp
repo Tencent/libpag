@@ -163,6 +163,9 @@ int RunFont(int argc, char* argv[]) {
   }
 
   if (options.listMode) {
+    if (options.fontSize != 12.0f) {
+      std::cerr << "pagx font: warning: --size is ignored in --list mode\n";
+    }
     auto entries = pagx::SystemFonts::AllFontFamilies();
     std::sort(entries.begin(), entries.end(), FontFamilyLess);
     if (options.jsonOutput) {
