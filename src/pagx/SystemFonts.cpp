@@ -557,8 +557,7 @@ std::vector<FontFamilyEntry> SystemFonts::AllFontFamilies() {
       entry.family = familyStr;
       entries.push_back(std::move(entry));
       seenStylesPerEntry.push_back({});
-      familyIndex[familyStr] = entries.size() - 1;
-      it = familyIndex.find(familyStr);
+      it = familyIndex.insert({familyStr, entries.size() - 1}).first;
     }
 
     FcChar8* styleRaw = nullptr;
