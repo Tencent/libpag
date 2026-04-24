@@ -1150,10 +1150,8 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
     float effectiveWidth = EffectiveTextBoxWidth(fs.textBox);
     float effectiveHeight = EffectiveTextBoxHeight(fs.textBox);
     TextAlign textAlign = fs.textBox->textAlign;
-    // The authored position is a layout input only; layout resolves it into
-    // renderPosition() together with constraints, padding, and flex
-    // allocation. Mirrors PPTWriter::computeNativeTextGeometry.
-    auto boxRenderPos = fs.textBox->renderPosition();
+    // The transform matrix (m) already includes renderPosition via BuildGroupMatrix,
+    // so x/y attributes are in TextBox-local coordinates starting from (0,0).
     if (isVertical) {
       // Vertical writing mode: textAlign controls the inline axis (vertical),
       // paragraphAlign controls the block axis (horizontal, columns right-to-left).
@@ -1167,63 +1165,61 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
       // Near = right edge, Far = left edge.
       switch (fs.textBox->paragraphAlign) {
         case ParagraphAlign::Middle:
-          anchorX =
-              boxRenderPos.x + paddingLeft + (innerWidth + contentWidth) / 2 - text->fontSize / 2;
+          anchorX = paddingLeft + (innerWidth + contentWidth) / 2 - text->fontSize / 2;
           break;
         case ParagraphAlign::Far:
-          anchorX = boxRenderPos.x + paddingLeft + contentWidth - text->fontSize / 2;
+          anchorX = paddingLeft + contentWidth - text->fontSize / 2;
           break;
         default:
-          anchorX = boxRenderPos.x + effectiveWidth - paddingRight - text->fontSize / 2;
+          anchorX = effectiveWidth - paddingRight - text->fontSize / 2;
           break;
       }
       // Inline axis (vertical): textAlign positions text top-to-bottom.
       switch (textAlign) {
         case TextAlign::Center:
           anchor = TextAnchor::Center;
-          offsetY = boxRenderPos.y + paddingTop + innerHeight / 2;
+          offsetY = paddingTop + innerHeight / 2;
           break;
         case TextAlign::End:
           anchor = TextAnchor::End;
-          offsetY = boxRenderPos.y + paddingTop + innerHeight;
+          offsetY = paddingTop + innerHeight;
           break;
         case TextAlign::Justify:
           anchor = TextAnchor::Start;
-          offsetY = boxRenderPos.y + paddingTop;
+          offsetY = paddingTop;
           out.addRawContent(std::string(_indentSpaces, ' ') +
                             "<!-- text-align=justify degraded to start -->\n");
           break;
         default:
           anchor = TextAnchor::Start;
-          offsetY = boxRenderPos.y + paddingTop;
+          offsetY = paddingTop;
           break;
       }
     } else {
       switch (textAlign) {
         case TextAlign::Center:
           anchor = TextAnchor::Center;
-          anchorX =
-              boxRenderPos.x + paddingLeft + (effectiveWidth - paddingLeft - paddingRight) / 2;
+          anchorX = paddingLeft + (effectiveWidth - paddingLeft - paddingRight) / 2;
           break;
         case TextAlign::End:
           anchor = TextAnchor::End;
-          anchorX = boxRenderPos.x + effectiveWidth - paddingRight;
+          anchorX = effectiveWidth - paddingRight;
           break;
         case TextAlign::Justify:
           // SVG's <text> element cannot justify runs — the only way to emulate
           // it is per-character kerning, which requires running the shaper
           // inline. Degrade to Start and leave a marker so authors can tell.
           anchor = TextAnchor::Start;
-          anchorX = boxRenderPos.x + paddingLeft;
+          anchorX = paddingLeft;
           out.addRawContent(std::string(_indentSpaces, ' ') +
                             "<!-- text-align=justify degraded to start -->\n");
           break;
         default:
           anchor = TextAnchor::Start;
-          anchorX = boxRenderPos.x + paddingLeft;
+          anchorX = paddingLeft;
           break;
       }
-      offsetY = boxRenderPos.y + paddingTop;
+      offsetY = paddingTop;
     }
   } else {
     anchor = text->textAnchor;
