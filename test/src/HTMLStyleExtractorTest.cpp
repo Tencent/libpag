@@ -279,4 +279,48 @@ CLI_TEST(HTMLStyleExtractorTest, GradientParenthesesParse) {
   EXPECT_NE(result.find(".div2{color:#000}"), std::string::npos);
 }
 
+CLI_TEST(HTMLStyleExtractorTest, FormatPretty) {
+  std::string input = R"(<html><head></head><body>)"
+                      R"(<div style="color:red;font-size:12px">a</div>)"
+                      R"(</body></html>)";
+  auto result = pagx::HTMLStyleExtractor::Extract(input, pagx::HTMLStyleExtractor::Format::Pretty);
+  // Selector on its own line with opening brace separated by a space.
+  EXPECT_NE(result.find(".div0 {\n"), std::string::npos);
+  // Each declaration on its own line, indented by two spaces, terminated by a semicolon.
+  EXPECT_NE(result.find("\n  color: red;\n"), std::string::npos);
+  EXPECT_NE(result.find("\n  font-size: 12px;\n"), std::string::npos);
+  // Closing brace on its own line.
+  EXPECT_NE(result.find("\n}\n"), std::string::npos);
+}
+
+CLI_TEST(HTMLStyleExtractorTest, FormatMinify) {
+  std::string input = R"(<html><head></head><body>)"
+                      R"(<div style="color:red">a</div>)"
+                      R"(<div style="color:blue">b</div>)"
+                      R"(</body></html>)";
+  auto result = pagx::HTMLStyleExtractor::Extract(input, pagx::HTMLStyleExtractor::Format::Minify);
+  // Style block must be on a single line with no newlines anywhere inside it.
+  auto styleStart = result.find("<style>");
+  auto styleEnd = result.find("</style>");
+  ASSERT_NE(styleStart, std::string::npos);
+  ASSERT_NE(styleEnd, std::string::npos);
+  auto styleBlock = result.substr(styleStart, styleEnd - styleStart + 8);
+  EXPECT_EQ(styleBlock.find('\n'), std::string::npos);
+  EXPECT_NE(styleBlock.find(".div0{color:red}"), std::string::npos);
+  EXPECT_NE(styleBlock.find(".div1{color:blue}"), std::string::npos);
+}
+
+CLI_TEST(HTMLStyleExtractorTest, FormatCompactIsDefault) {
+  // Calling without an explicit format argument must match explicit Compact.
+  std::string input = R"(<html><head></head><body>)"
+                      R"(<div style="color:red">a</div>)"
+                      R"(</body></html>)";
+  auto defaulted = pagx::HTMLStyleExtractor::Extract(input);
+  auto explicitCompact =
+      pagx::HTMLStyleExtractor::Extract(input, pagx::HTMLStyleExtractor::Format::Compact);
+  EXPECT_EQ(defaulted, explicitCompact);
+  // Compact shape: "<style>\n.div0{color:red}\n</style>\n".
+  EXPECT_NE(defaulted.find("<style>\n.div0{color:red}\n</style>\n"), std::string::npos);
+}
+
 }  // namespace pag

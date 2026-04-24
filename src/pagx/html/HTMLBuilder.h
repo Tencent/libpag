@@ -26,8 +26,9 @@ namespace pagx {
 
 class HTMLBuilder {
  public:
-  explicit HTMLBuilder(int indentSpaces, int initialLevel = 0, size_t reserve = 4096)
-      : _level(initialLevel), _spaces(indentSpaces) {
+  explicit HTMLBuilder(int indentSpaces, int initialLevel = 0, size_t reserve = 4096,
+                       bool minify = false)
+      : _level(initialLevel), _spaces(indentSpaces), _minify(minify) {
     _buf.reserve(reserve);
   }
 
@@ -50,7 +51,8 @@ class HTMLBuilder {
   }
 
   void closeTagStart() {
-    _buf += ">\n";
+    _buf += '>';
+    newline();
     _level++;
   }
 
@@ -59,10 +61,11 @@ class HTMLBuilder {
     if (std::strcmp(tag, "div") == 0 || std::strcmp(tag, "span") == 0) {
       _buf += "></";
       _buf += tag;
-      _buf += ">\n";
+      _buf += '>';
     } else {
-      _buf += "/>\n";
+      _buf += "/>";
     }
+    newline();
     _tags.pop_back();
   }
 
@@ -71,7 +74,8 @@ class HTMLBuilder {
     indent();
     _buf += "</";
     _buf += _tags.back();
-    _buf += ">\n";
+    _buf += '>';
+    newline();
     _tags.pop_back();
   }
 
@@ -80,7 +84,8 @@ class HTMLBuilder {
     _buf += escapeHTML(text);
     _buf += "</";
     _buf += _tags.back();
-    _buf += ">\n";
+    _buf += '>';
+    newline();
     _tags.pop_back();
   }
 
@@ -105,10 +110,20 @@ class HTMLBuilder {
   std::vector<const char*> _tags = {};
   int _level = 0;
   int _spaces = 2;
+  bool _minify = false;
 
   void indent() {
+    if (_minify) {
+      return;
+    }
     if (_level > 0) {
       _buf.append(static_cast<size_t>(_level * _spaces), ' ');
+    }
+  }
+
+  void newline() {
+    if (!_minify) {
+      _buf += '\n';
     }
   }
 

@@ -5352,10 +5352,10 @@ h1{text-align:center;color:#1e293b;margin-bottom:4px}
       auto htmlFragment = pagx::HTMLExporter::ToHTML(*doc, htmlOpts);
       if (!htmlFragment.empty()) {
         auto htmlContent =
-            "<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"></head>\n"
-            "<body style=\"margin:0;padding:0;background:transparent;width:" +
-            std::to_string(w) + "px;height:" + std::to_string(h) + "px;overflow:hidden\">\n" +
-            htmlFragment + "\n</body></html>";
+            "<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"><style>body{margin:0;padding:0;"
+            "background:transparent;width:" +
+            std::to_string(w) + "px;height:" + std::to_string(h) +
+            "px;overflow:hidden}</style></head>\n<body>\n" + htmlFragment + "\n</body></html>";
         std::ofstream hf(htmlPath, std::ios::binary);
         hf.write(htmlContent.data(), static_cast<std::streamsize>(htmlContent.size()));
       }

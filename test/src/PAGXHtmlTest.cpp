@@ -104,10 +104,10 @@ CLI_TEST(PAGXHtmlTest, RootDocument) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/root_document.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("data-pagx-version"), std::string::npos);
-  EXPECT_NE(html.find("width:320px"), std::string::npos);
-  EXPECT_NE(html.find("height:220px"), std::string::npos);
-  EXPECT_NE(html.find("overflow:hidden"), std::string::npos);
-  EXPECT_NE(html.find("position:relative"), std::string::npos);
+  EXPECT_NE(html.find("width: 320px"), std::string::npos);
+  EXPECT_NE(html.find("height: 220px"), std::string::npos);
+  EXPECT_NE(html.find("overflow: hidden"), std::string::npos);
+  EXPECT_NE(html.find("position: relative"), std::string::npos);
   EXPECT_NE(html.find("data-pagx-version"), std::string::npos);
 }
 
@@ -118,14 +118,14 @@ CLI_TEST(PAGXHtmlTest, RootDocument) {
 CLI_TEST(PAGXHtmlTest, LayerVisibility) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_visibility.pagx"));
   ASSERT_FALSE(html.empty());
-  EXPECT_NE(html.find("display:none"), std::string::npos);
+  EXPECT_NE(html.find("display: none"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, LayerAlpha) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_alpha.pagx"));
   ASSERT_FALSE(html.empty());
-  EXPECT_NE(html.find("opacity:0.3"), std::string::npos);
-  EXPECT_NE(html.find("opacity:0.7"), std::string::npos);
+  EXPECT_NE(html.find("opacity: 0.3"), std::string::npos);
+  EXPECT_NE(html.find("opacity: 0.7"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, LayerTransformXY) {
@@ -133,8 +133,9 @@ CLI_TEST(PAGXHtmlTest, LayerTransformXY) {
       LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_transform_xy.pagx"));
   ASSERT_FALSE(html.empty());
   // Layer x/y resolve to renderPosition and are emitted as left/top on absolute-positioned layers.
-  EXPECT_NE(html.find("left:55px;top:50px"), std::string::npos);
-  EXPECT_NE(html.find("left:145px;top:50px"), std::string::npos);
+  EXPECT_NE(html.find("left: 55px"), std::string::npos);
+  EXPECT_NE(html.find("left: 145px"), std::string::npos);
+  EXPECT_NE(html.find("top: 50px"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, LayerTransformMatrix) {
@@ -150,7 +151,7 @@ CLI_TEST(PAGXHtmlTest, LayerTransformMatrix3D) {
       LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_transform_matrix3d.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("matrix3d("), std::string::npos);
-  EXPECT_NE(html.find("transform-style:preserve-3d"), std::string::npos);
+  EXPECT_NE(html.find("transform-style: preserve-3d"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, LayerTransformPriority) {
@@ -169,21 +170,21 @@ CLI_TEST(PAGXHtmlTest, LayerBlendModes) {
   auto html =
       LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_blend_modes.pagx"));
   ASSERT_FALSE(html.empty());
-  EXPECT_NE(html.find("mix-blend-mode:multiply"), std::string::npos);
-  EXPECT_NE(html.find("mix-blend-mode:screen"), std::string::npos);
-  EXPECT_NE(html.find("mix-blend-mode:overlay"), std::string::npos);
-  EXPECT_NE(html.find("mix-blend-mode:darken"), std::string::npos);
-  EXPECT_NE(html.find("mix-blend-mode:lighten"), std::string::npos);
-  EXPECT_NE(html.find("mix-blend-mode:color-dodge"), std::string::npos);
-  EXPECT_NE(html.find("mix-blend-mode:color-burn"), std::string::npos);
-  EXPECT_NE(html.find("mix-blend-mode:hard-light"), std::string::npos);
-  EXPECT_NE(html.find("mix-blend-mode:soft-light"), std::string::npos);
-  EXPECT_NE(html.find("mix-blend-mode:difference"), std::string::npos);
-  EXPECT_NE(html.find("mix-blend-mode:exclusion"), std::string::npos);
-  EXPECT_NE(html.find("mix-blend-mode:hue"), std::string::npos);
-  EXPECT_NE(html.find("mix-blend-mode:saturation"), std::string::npos);
-  EXPECT_NE(html.find("mix-blend-mode:luminosity"), std::string::npos);
-  EXPECT_NE(html.find("mix-blend-mode:plus-lighter"), std::string::npos);
+  EXPECT_NE(html.find("mix-blend-mode: multiply"), std::string::npos);
+  EXPECT_NE(html.find("mix-blend-mode: screen"), std::string::npos);
+  EXPECT_NE(html.find("mix-blend-mode: overlay"), std::string::npos);
+  EXPECT_NE(html.find("mix-blend-mode: darken"), std::string::npos);
+  EXPECT_NE(html.find("mix-blend-mode: lighten"), std::string::npos);
+  EXPECT_NE(html.find("mix-blend-mode: color-dodge"), std::string::npos);
+  EXPECT_NE(html.find("mix-blend-mode: color-burn"), std::string::npos);
+  EXPECT_NE(html.find("mix-blend-mode: hard-light"), std::string::npos);
+  EXPECT_NE(html.find("mix-blend-mode: soft-light"), std::string::npos);
+  EXPECT_NE(html.find("mix-blend-mode: difference"), std::string::npos);
+  EXPECT_NE(html.find("mix-blend-mode: exclusion"), std::string::npos);
+  EXPECT_NE(html.find("mix-blend-mode: hue"), std::string::npos);
+  EXPECT_NE(html.find("mix-blend-mode: saturation"), std::string::npos);
+  EXPECT_NE(html.find("mix-blend-mode: luminosity"), std::string::npos);
+  EXPECT_NE(html.find("mix-blend-mode: plus-lighter"), std::string::npos);
   // plusDarker has no CSS equivalent — should have some fallback
 }
 
@@ -193,7 +194,7 @@ CLI_TEST(PAGXHtmlTest, LayerGroupOpacity) {
   ASSERT_FALSE(html.empty());
   // groupOpacity=true: opacity on the parent div
   // groupOpacity=false: opacity distributed to children
-  EXPECT_NE(html.find("opacity:0.5"), std::string::npos);
+  EXPECT_NE(html.find("opacity: 0.5"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, LayerNesting) {
@@ -214,13 +215,13 @@ CLI_TEST(PAGXHtmlTest, GeometryRectangle) {
   // CSS path: div with border-radius
   EXPECT_NE(html.find("border-radius"), std::string::npos);
   // Check center-point conversion: center=50,50 size=80,60 → left=10px, top=20px
-  EXPECT_NE(html.find("width:80px"), std::string::npos);
+  EXPECT_NE(html.find("width: 80px"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, GeometryEllipse) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/geometry_ellipse.pagx"));
   ASSERT_FALSE(html.empty());
-  EXPECT_NE(html.find("border-radius:50%"), std::string::npos);
+  EXPECT_NE(html.find("border-radius: 50%"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, GeometryPolystar) {
@@ -508,6 +509,64 @@ CLI_TEST(PAGXHtmlTest, ExportOptions_Indent) {
   ASSERT_FALSE(html.empty());
   // With 4-space indent, first child should be indented by 4 spaces
   EXPECT_NE(html.find("    "), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, ExportOptions_FormatPretty) {
+  auto doc = pagx::PAGXImporter::FromFile(
+      ProjectPath::Absolute("resources/pagx_to_html/root_document.pagx"));
+  ASSERT_TRUE(doc != nullptr);
+  doc->applyLayout();
+
+  pagx::HTMLExportOptions opts = {};
+  opts.format = pagx::HTMLFormat::Pretty;
+  auto html = pagx::HTMLExporter::ToHTML(*doc, opts);
+  ASSERT_FALSE(html.empty());
+  // Pretty CSS: selector on its own line, declarations indented.
+  EXPECT_NE(html.find(".root0 {\n"), std::string::npos);
+  EXPECT_NE(html.find("\n  position: relative;\n"), std::string::npos);
+  // Generated comment is still present in non-minify modes.
+  EXPECT_NE(html.find("Generated by PAGX HTMLExporter"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, ExportOptions_FormatMinify) {
+  auto doc = pagx::PAGXImporter::FromFile(
+      ProjectPath::Absolute("resources/pagx_to_html/root_document.pagx"));
+  ASSERT_TRUE(doc != nullptr);
+  doc->applyLayout();
+
+  pagx::HTMLExportOptions compactOpts = {};
+  auto compact = pagx::HTMLExporter::ToHTML(*doc, compactOpts);
+
+  pagx::HTMLExportOptions minifyOpts = {};
+  minifyOpts.format = pagx::HTMLFormat::Minify;
+  auto minified = pagx::HTMLExporter::ToHTML(*doc, minifyOpts);
+
+  ASSERT_FALSE(minified.empty());
+  // No generated comment in minify mode.
+  EXPECT_EQ(minified.find("Generated by PAGX HTMLExporter"), std::string::npos);
+  // No newlines anywhere in the minified output.
+  EXPECT_EQ(minified.find('\n'), std::string::npos);
+  // Style block is single-line with rules concatenated.
+  EXPECT_NE(minified.find("<style>.root0{"), std::string::npos);
+  // Minify output is strictly smaller than compact output.
+  EXPECT_LT(minified.size(), compact.size());
+}
+
+CLI_TEST(PAGXHtmlTest, ExportOptions_FormatPrettyIsDefault) {
+  auto doc = pagx::PAGXImporter::FromFile(
+      ProjectPath::Absolute("resources/pagx_to_html/root_document.pagx"));
+  ASSERT_TRUE(doc != nullptr);
+  doc->applyLayout();
+
+  pagx::HTMLExportOptions defaulted = {};
+  auto defaultedHtml = pagx::HTMLExporter::ToHTML(*doc, defaulted);
+
+  pagx::HTMLExportOptions explicitPretty = {};
+  explicitPretty.format = pagx::HTMLFormat::Pretty;
+  auto prettyHtml = pagx::HTMLExporter::ToHTML(*doc, explicitPretty);
+
+  // Default and explicit Pretty must produce byte-identical output.
+  EXPECT_EQ(defaultedHtml, prettyHtml);
 }
 
 CLI_TEST(PAGXHtmlTest, ExportToFile) {

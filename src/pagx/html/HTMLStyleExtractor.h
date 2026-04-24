@@ -24,6 +24,18 @@ namespace pagx {
 class HTMLStyleExtractor {
  public:
   /**
+   * Output formatting style for the generated <style> block.
+   */
+  enum class Format {
+    /** One rule per line, no indentation: ".cls{a:b;c:d}\n". */
+    Compact,
+    /** Multi-line with 2-space indented declarations for readability. */
+    Pretty,
+    /** Single-line, no whitespace: ".cls{a:b;c:d}". */
+    Minify,
+  };
+
+  /**
    * Consolidates every `style="..."` attribute in the input HTML into a
    * internal stylesheet injected immediately before `</head>`. Styles are
    * parsed into individual CSS properties, grouped by property-name signature,
@@ -49,11 +61,14 @@ class HTMLStyleExtractor {
    * parentheses (e.g., in data: URIs or gradient functions) are respected
    * during property splitting.
    *
+   * The `format` parameter controls the shape of the emitted <style> block;
+   * the class-extraction logic is identical for all three modes.
+   *
    * The input must be well-formed HTML produced by HTMLWriter. Behaviour on
    * malformed input is best-effort: the extractor will not crash but the
    * output is not guaranteed to be semantically identical.
    */
-  static std::string Extract(const std::string& html);
+  static std::string Extract(const std::string& html, Format format = Format::Compact);
 };
 
 }  // namespace pagx
