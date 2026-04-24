@@ -70,6 +70,7 @@ std::string ColorToSVGHex(const Color& color);
 std::string ColorToRGBA(const Color& color, float extra = 1.0f);
 std::string CSSStops(const std::vector<ColorStop*>& stops);
 std::string MatrixToCSS(const Matrix& m);
+std::string MatrixTransformToCSS(const Matrix& m);
 std::string Matrix3DToCSS(const Matrix3D& m);
 const char* BlendModeToMixBlendMode(BlendMode mode);
 Color LerpColor(const Color& a, const Color& b, float t);

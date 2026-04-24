@@ -141,7 +141,8 @@ CLI_TEST(PAGXHtmlTest, LayerTransformMatrix) {
   auto html =
       LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_transform_matrix.pagx"));
   ASSERT_FALSE(html.empty());
-  EXPECT_NE(html.find("matrix("), std::string::npos);
+  // A 45-degree rotation matrix is simplified to rotate(45deg) instead of matrix(...).
+  EXPECT_NE(html.find("rotate("), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, LayerTransformMatrix3D) {

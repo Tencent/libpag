@@ -1707,7 +1707,7 @@ void HTMLWriter::writeGroup(HTMLBuilder& out, const Group* group, float alpha, b
   Matrix gm = BuildGroupMatrix(group);
   std::string style = "position:relative";
   if (!gm.isIdentity()) {
-    style += ";transform:" + MatrixToCSS(gm);
+    style += ";transform:" + MatrixTransformToCSS(gm);
     style += ";transform-origin:0 0";
   }
   if (group->alpha < 1.0f) {
@@ -1813,7 +1813,7 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
       out.openTag("div");
       std::string s = "position:absolute";
       if (!m.isIdentity()) {
-        s += ";transform:" + MatrixToCSS(m);
+        s += ";transform:" + MatrixTransformToCSS(m);
         s += ";transform-origin:0 0";
       }
       if (ea < 1.0f) {

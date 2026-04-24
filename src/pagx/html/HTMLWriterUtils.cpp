@@ -166,6 +166,81 @@ std::string MatrixToCSS(const Matrix& m) {
   return r;
 }
 
+std::string MatrixTransformToCSS(const Matrix& m) {
+  // Decompose into simpler CSS transform functions when possible.
+  bool hasTranslate = !FloatNearlyZero(m.tx) || !FloatNearlyZero(m.ty);
+
+  // Pure translation: translate(tx, ty)
+  bool isPureTranslation = FloatNearlyZero(m.a - 1.0f) && FloatNearlyZero(m.b) &&
+                           FloatNearlyZero(m.c) && FloatNearlyZero(m.d - 1.0f);
+  if (isPureTranslation) {
+    if (!hasTranslate) {
+      return {};
+    }
+    return "translate(" + FloatToString(m.tx) + "px," + FloatToString(m.ty) + "px)";
+  }
+
+  // Uniform scale + rotation: matrix has the form [a, b, -b, a] (i.e. a==d, b==-c).
+  // This covers pure scale (b==0) and pure rotation (a²+b²==1) as special cases.
+  bool isUniformScaleRotation = FloatNearlyZero(m.a - m.d) && FloatNearlyZero(m.b + m.c);
+  if (isUniformScaleRotation) {
+    float s = std::sqrt(m.a * m.a + m.b * m.b);
+    float angle = std::atan2(m.b, m.a) * 180.0f / static_cast<float>(M_PI);
+
+    std::string r;
+    if (hasTranslate) {
+      r += "translate(" + FloatToString(m.tx) + "px," + FloatToString(m.ty) + "px)";
+    }
+    if (!FloatNearlyZero(angle)) {
+      if (!r.empty()) {
+        r += ' ';
+      }
+      r += "rotate(" + FloatToString(angle) + "deg)";
+    }
+    if (!FloatNearlyZero(s - 1.0f)) {
+      if (!r.empty()) {
+        r += ' ';
+      }
+      r += "scale(" + FloatToString(s) + ")";
+    }
+    if (!r.empty()) {
+      return r;
+    }
+  }
+
+  // Non-uniform scale (b==0, c==0 but a!=d): scale(sx, sy)
+  bool isNonUniformScale = FloatNearlyZero(m.b) && FloatNearlyZero(m.c);
+  if (isNonUniformScale) {
+    std::string r;
+    if (hasTranslate) {
+      r += "translate(" + FloatToString(m.tx) + "px," + FloatToString(m.ty) + "px)";
+    }
+    bool sxOne = FloatNearlyZero(m.a - 1.0f);
+    bool syOne = FloatNearlyZero(m.d - 1.0f);
+    if (!sxOne || !syOne) {
+      if (!r.empty()) {
+        r += ' ';
+      }
+      if (sxOne && !syOne) {
+        r += "scaleY(" + FloatToString(m.d) + ")";
+      } else if (!sxOne && syOne) {
+        r += "scaleX(" + FloatToString(m.a) + ")";
+      } else if (FloatNearlyZero(m.a - m.d)) {
+        r += "scale(" + FloatToString(m.a) + ")";
+      } else {
+        r += "scale(" + FloatToString(m.a) + "," + FloatToString(m.d) + ")";
+      }
+    }
+    if (!r.empty()) {
+      return r;
+    }
+  }
+
+  // Fallback: full matrix().
+  return "matrix(" + FloatToString(m.a) + ',' + FloatToString(m.b) + ',' + FloatToString(m.c) +
+         ',' + FloatToString(m.d) + ',' + FloatToString(m.tx) + ',' + FloatToString(m.ty) + ')';
+}
+
 std::string Matrix3DToCSS(const Matrix3D& m) {
   std::string r = "matrix3d(";
   for (int i = 0; i < 16; i++) {
@@ -207,19 +282,13 @@ std::string LayerTransformCSS(const Layer* layer) {
   if (!layer->matrix3D.isIdentity()) {
     return Matrix3DToCSS(layer->matrix3D);
   }
-  // x/y are input attributes resolved via Layer::renderPosition(); they are emitted as
-  // left/top by the caller and must not be baked into the transform matrix here.
+  // Layer position (x/y) is emitted as left/top by the caller. The matrix is applied on top of
+  // that position, following the tgfx rendering formula: Translate(renderPosition) * matrix.
   Matrix m = layer->matrix;
   if (m.isIdentity()) {
     return {};
   }
-  // Use translate() shorthand when the result is a pure translation.
-  bool isPureTranslation = FloatNearlyZero(m.a - 1.0f) && FloatNearlyZero(m.b) &&
-                           FloatNearlyZero(m.c) && FloatNearlyZero(m.d - 1.0f);
-  if (isPureTranslation) {
-    return "translate(" + FloatToString(m.tx) + "px," + FloatToString(m.ty) + "px)";
-  }
-  return MatrixToCSS(m);
+  return MatrixTransformToCSS(m);
 }
 
 Matrix BuildGroupMatrix(const Group* group) {
