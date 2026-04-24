@@ -68,10 +68,10 @@ static std::vector<std::string> GetHtmlTestFiles() {
 }
 
 static std::string WrapHtmlDocument(const std::string& fragment, int width, int height) {
-  return "<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"></head>\n"
-         "<body style=\"margin:0;padding:0;background:transparent;width:" +
-         std::to_string(width) + "px;height:" + std::to_string(height) + "px;overflow:hidden\">\n" +
-         fragment + "\n</body></html>";
+  return "<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"><style>body{margin:0;padding:0;"
+         "background:transparent;width:" +
+         std::to_string(width) + "px;height:" + std::to_string(height) +
+         "px;overflow:hidden}</style></head>\n<body>\n" + fragment + "\n</body></html>";
 }
 
 // =============================================================================
