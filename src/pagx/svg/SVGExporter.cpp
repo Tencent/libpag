@@ -1312,6 +1312,17 @@ void CollectSVGRichTextRuns(const std::vector<Element*>& elements, const Fill* p
   }
 }
 
+struct SVGLineEntry {
+  size_t runIndex = 0;
+  float baselineY = 0;
+  uint32_t byteStart = 0;
+  uint32_t byteEnd = 0;
+};
+
+bool CompareSVGLineEntryByBaselineY(const SVGLineEntry& a, const SVGLineEntry& b) {
+  return a.baselineY < b.baselineY;
+}
+
 }  // namespace
 
 void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
@@ -1333,18 +1344,124 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
   auto params = MakeTextBoxParams(textBox);
   auto layoutResult = TextLayout::Layout(mutableTexts, params, _layoutContext);
 
-  // Per-run Fill / Stroke pairing: each Text's nearest Fill/Stroke overrides
-  // the top-level ones collected above, matching the rich-text semantics of
-  // PPTWriter::writeTextBoxGroup.
-  for (const auto& run : runs) {
-    if (run.text->text.empty()) {
-      continue;
+  // Collect per-run line metadata from the layout result. Each run may span
+  // multiple visual lines (if it contains wrapping or newlines), and multiple
+  // runs may share the same visual line (rich text spans on one line).
+  bool useLineLayout = textBox->writingMode != WritingMode::Vertical;
+  std::vector<SVGLineEntry> lineEntries;
+  if (useLineLayout) {
+    for (size_t i = 0; i < runs.size(); ++i) {
+      auto* mt = const_cast<Text*>(runs[i].text);
+      auto* lines = layoutResult.getTextLines(mt);
+      if (lines == nullptr) {
+        useLineLayout = false;
+        lineEntries.clear();
+        break;
+      }
+      for (const auto& li : *lines) {
+        if (li.byteStart >= li.byteEnd) {
+          continue;
+        }
+        lineEntries.push_back({i, li.baselineY, li.byteStart, li.byteEnd});
+      }
     }
-    FillStrokeInfo runFs = {};
-    runFs.fill = run.fill ? run.fill : topLevelFs.fill;
-    runFs.stroke = run.stroke ? run.stroke : topLevelFs.stroke;
-    runFs.textBox = textBox;
-    writeTextWithLayout(out, run.text, runFs, layoutResult, transform, alpha);
+    if (useLineLayout && lineEntries.empty()) {
+      useLineLayout = false;
+    }
+  }
+
+  if (!useLineLayout) {
+    // Fallback: vertical writing mode or missing line info — emit per-run
+    // independent <text> elements (original behavior).
+    for (const auto& run : runs) {
+      if (run.text->text.empty()) {
+        continue;
+      }
+      FillStrokeInfo runFs = {};
+      runFs.fill = run.fill ? run.fill : topLevelFs.fill;
+      runFs.stroke = run.stroke ? run.stroke : topLevelFs.stroke;
+      runFs.textBox = textBox;
+      writeTextWithLayout(out, run.text, runFs, layoutResult, transform, alpha);
+    }
+    return;
+  }
+
+  // Compute TextBox-level positioning (shared by all lines).
+  float paddingLeft = textBox->padding.left;
+  float paddingTop = textBox->padding.top;
+  float paddingRight = textBox->padding.right;
+  float effectiveWidth = EffectiveTextBoxWidth(textBox);
+  TextAnchor anchor = TextAnchor::Start;
+  float anchorX = 0;
+  float offsetY = paddingTop;
+  switch (textBox->textAlign) {
+    case TextAlign::Center:
+      anchor = TextAnchor::Center;
+      anchorX = paddingLeft + (effectiveWidth - paddingLeft - paddingRight) / 2;
+      break;
+    case TextAlign::End:
+      anchor = TextAnchor::End;
+      anchorX = effectiveWidth - paddingRight;
+      break;
+    case TextAlign::Justify:
+      anchor = TextAnchor::Start;
+      anchorX = paddingLeft;
+      out.addRawContent(std::string(_indentSpaces, ' ') +
+                        "<!-- text-align=justify degraded to start -->\n");
+      break;
+    default:
+      anchor = TextAnchor::Start;
+      anchorX = paddingLeft;
+      break;
+  }
+  std::string svgTransform = MatrixToSVGTransform(transform);
+
+  // Stable-sort entries by baselineY so that runs from different Text
+  // elements sharing the same visual line stay in source order.
+  std::stable_sort(lineEntries.begin(), lineEntries.end(), CompareSVGLineEntryByBaselineY);
+  constexpr float baselineEpsilon = 0.5f;
+
+  // Group entries by visual line (matching baselineY) and emit one <text>
+  // per line with <tspan> children for each run fragment.
+  size_t i = 0;
+  while (i < lineEntries.size()) {
+    float baseline = lineEntries[i].baselineY;
+    out.openElement("text");
+    if (!svgTransform.empty()) {
+      out.addAttribute("transform", svgTransform);
+    }
+    if (anchor == TextAnchor::Center) {
+      out.addAttribute("text-anchor", "middle");
+    } else if (anchor == TextAnchor::End) {
+      out.addAttribute("text-anchor", "end");
+    }
+    ApplyTextBoxBodyAttrs(out, textBox);
+    out.addRequiredAttribute("x", anchorX);
+    out.addRequiredAttribute("y", offsetY + baseline);
+    out.closeElementStart();
+
+    while (i < lineEntries.size() &&
+           std::fabs(lineEntries[i].baselineY - baseline) < baselineEpsilon) {
+      const auto& entry = lineEntries[i];
+      const auto& run = runs[entry.runIndex];
+      const Fill* effectiveFill = run.fill ? run.fill : topLevelFs.fill;
+      const Stroke* effectiveStroke = run.stroke ? run.stroke : topLevelFs.stroke;
+      std::string lineText =
+          run.text->text.substr(entry.byteStart, entry.byteEnd - entry.byteStart);
+      if (lineText.empty()) {
+        ++i;
+        continue;
+      }
+      out.openElement("tspan");
+      WriteSharedTextAttrs(out, run.text, TextAnchor::Start);
+      std::string p3Style;
+      applyFillAttributes(out, effectiveFill, {}, &p3Style, alpha);
+      applyStrokeAttributes(out, effectiveStroke, {}, &p3Style, alpha);
+      applyP3Style(out, p3Style);
+      out.closeElementWithText(lineText);
+      ++i;
+    }
+    out.closeElement();
   }
 }
 
