@@ -596,6 +596,64 @@ CLI_TEST(PAGXCliTest, Font_HelpShowsNewSurface) {
   EXPECT_EQ(help.find("info"), std::string::npos);
 }
 
+CLI_TEST(PAGXCliTest, FontList_TextOutput) {
+  std::streambuf* oldCout = std::cout.rdbuf();
+  std::ostringstream capturedOut;
+  std::cout.rdbuf(capturedOut.rdbuf());
+  auto ret = CallRun(pagx::cli::RunFont, {"font", "--list"});
+  std::cout.rdbuf(oldCout);
+
+  EXPECT_EQ(ret, 0);
+  auto out = capturedOut.str();
+  EXPECT_FALSE(out.empty());
+  EXPECT_NE(out.find('\n'), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, FontList_JsonOutput) {
+  std::streambuf* oldCout = std::cout.rdbuf();
+  std::ostringstream capturedOut;
+  std::cout.rdbuf(capturedOut.rdbuf());
+  auto ret = CallRun(pagx::cli::RunFont, {"font", "--list", "--json"});
+  std::cout.rdbuf(oldCout);
+
+  EXPECT_EQ(ret, 0);
+  auto out = capturedOut.str();
+  EXPECT_FALSE(out.empty());
+  auto trimEnd = out.find_last_not_of(" \t\r\n");
+  ASSERT_NE(trimEnd, std::string::npos);
+  auto trimStart = out.find_first_not_of(" \t\r\n");
+  ASSERT_NE(trimStart, std::string::npos);
+  EXPECT_EQ(out[trimStart], '[');
+  EXPECT_EQ(out[trimEnd], ']');
+  EXPECT_NE(out.find("{\"family\":"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, FontList_MutualExclusive) {
+  const std::string expected = "pagx font: --list cannot be combined with --file or --name";
+
+  // Variant 1: --list + --file
+  {
+    std::streambuf* oldCerr = std::cerr.rdbuf();
+    std::ostringstream capturedErr;
+    std::cerr.rdbuf(capturedErr.rdbuf());
+    auto ret = CallRun(pagx::cli::RunFont, {"font", "--list", "--file", "x.otf"});
+    std::cerr.rdbuf(oldCerr);
+    EXPECT_EQ(ret, 1);
+    EXPECT_NE(capturedErr.str().find(expected), std::string::npos);
+  }
+
+  // Variant 2: --list + --name
+  {
+    std::streambuf* oldCerr = std::cerr.rdbuf();
+    std::ostringstream capturedErr;
+    std::cerr.rdbuf(capturedErr.rdbuf());
+    auto ret = CallRun(pagx::cli::RunFont, {"font", "--list", "--name", "Arial"});
+    std::cerr.rdbuf(oldCerr);
+    EXPECT_EQ(ret, 1);
+    EXPECT_NE(capturedErr.str().find(expected), std::string::npos);
+  }
+}
+
 CLI_TEST(PAGXCliTest, Font_UnknownSubcommand) {
   auto ret = CallRun(pagx::cli::RunFont, {"font", "xyz"});
   EXPECT_NE(ret, 0);
