@@ -522,51 +522,57 @@ std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern, const R
     // If baking failed, fall through to try native tiling for Repeat modes
   }
 
-  // Fall back to native SVG pattern handling for Repeat mode and non-bakeable cases
+  // Fall back to native SVG pattern handling for Repeat mode and non-bakeable cases.
+  // All paths use patternUnits="userSpaceOnUse" so that <image> width/height are in
+  // pixel coordinates — objectBoundingBox would reinterpret them as bbox fractions,
+  // making the raster content invisible or distorted.
   int imgW = 0;
   int imgH = 0;
-  GetImagePNGDimensions(pattern->image, &imgW, &imgH);
-  bool canUseOBB = !shapeBounds.isEmpty() && imgW > 0 && imgH > 0;
+  bool hasImageSize = GetImagePNGDimensions(pattern->image, &imgW, &imgH) && imgW > 0 && imgH > 0;
 
   _defs->openElement("pattern");
   _defs->addAttribute("id", defId);
+  _defs->addAttribute("patternUnits", "userSpaceOnUse");
 
-  if (canUseOBB) {
-    float W = shapeBounds.width;
-    float H = shapeBounds.height;
-    float X = shapeBounds.x;
-    float Y = shapeBounds.y;
-    const auto& M = pattern->matrix;
-    Matrix obbMatrix = {};
-    obbMatrix.a = M.a / W;
-    obbMatrix.b = M.b / H;
-    obbMatrix.c = M.c / W;
-    obbMatrix.d = M.d / H;
-    obbMatrix.tx = (M.tx - X) / W;
-    obbMatrix.ty = (M.ty - Y) / H;
-
-    _defs->addAttribute("patternContentUnits", "objectBoundingBox");
-    if (needsNativeTiling) {
-      _defs->addAttribute("width", static_cast<float>(imgW) * obbMatrix.a);
-      _defs->addAttribute("height", static_cast<float>(imgH) * obbMatrix.d);
-    } else {
-      _defs->addAttribute("width", 1.0f);
-      _defs->addAttribute("height", 1.0f);
+  if (hasImageSize && !shapeBounds.isEmpty() && needsNativeTiling) {
+    // Tile size equals the source image pixel dimensions; the pattern matrix is
+    // applied via patternTransform so the tile grid scales/rotates/translates
+    // correctly without distorting the raster content.
+    _defs->addRequiredAttribute("width", static_cast<float>(imgW));
+    _defs->addRequiredAttribute("height", static_cast<float>(imgH));
+    if (!pattern->matrix.isIdentity()) {
+      _defs->addAttribute("patternTransform", MatrixToSVGTransform(pattern->matrix));
     }
     _defs->closeElementStart();
     _defs->openElement("image");
     _defs->addAttribute("href", href);
     _defs->addRequiredAttribute("width", static_cast<float>(imgW));
     _defs->addRequiredAttribute("height", static_cast<float>(imgH));
-    _defs->addAttribute("transform", MatrixToSVGTransform(obbMatrix));
+  } else if (hasImageSize && !shapeBounds.isEmpty()) {
+    // Non-tiling fallback: single tile covers the entire shape bounds so the
+    // image appears exactly once. The pattern matrix positions the image inside.
+    _defs->addAttributeIfNonZero("x", shapeBounds.x);
+    _defs->addAttributeIfNonZero("y", shapeBounds.y);
+    _defs->addRequiredAttribute("width", shapeBounds.width);
+    _defs->addRequiredAttribute("height", shapeBounds.height);
+    _defs->closeElementStart();
+    _defs->openElement("image");
+    _defs->addAttribute("href", href);
+    _defs->addRequiredAttribute("width", static_cast<float>(imgW));
+    _defs->addRequiredAttribute("height", static_cast<float>(imgH));
+    if (!pattern->matrix.isIdentity()) {
+      Matrix localMatrix = pattern->matrix;
+      localMatrix.tx -= shapeBounds.x;
+      localMatrix.ty -= shapeBounds.y;
+      _defs->addAttribute("transform", MatrixToSVGTransform(localMatrix));
+    }
   } else {
-    _defs->addAttribute("patternUnits", "userSpaceOnUse");
     _defs->addAttribute("width", "100%");
     _defs->addAttribute("height", "100%");
     _defs->closeElementStart();
     _defs->openElement("image");
     _defs->addAttribute("href", href);
-    if (imgW > 0 && imgH > 0) {
+    if (hasImageSize) {
       _defs->addRequiredAttribute("width", static_cast<float>(imgW));
       _defs->addRequiredAttribute("height", static_cast<float>(imgH));
     }
