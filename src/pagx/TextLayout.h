@@ -78,6 +78,7 @@ struct VerticalPositionedGlyph {
 struct TextLayoutLineInfo {
   float baselineY = 0;
   float startX = 0;
+  float lineWidth = 0;
   uint32_t byteStart = 0;
   uint32_t byteEnd = 0;
 };

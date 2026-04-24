@@ -1131,6 +1131,17 @@ static void ApplyTextBoxBodyAttrs(SVGBuilder& out, const TextBox* box) {
   }
 }
 
+// Counts the number of word boundaries (spaces) in the text for word-spacing calculation.
+static int CountWordSpaces(const std::string& text) {
+  int count = 0;
+  for (char c : text) {
+    if (c == ' ') {
+      count++;
+    }
+  }
+  return count;
+}
+
 void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
                                     const TextLayoutResult& layoutResult, const Matrix& m,
                                     float alpha) {
@@ -1142,6 +1153,7 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
   TextAnchor anchor = TextAnchor::Start;
   float anchorX = 0;
   float offsetY = 0;
+  float justifyWidth = 0;
   if (fs.textBox) {
     float paddingLeft = fs.textBox->padding.left;
     float paddingTop = fs.textBox->padding.top;
@@ -1185,10 +1197,9 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
           offsetY = paddingTop + innerHeight;
           break;
         case TextAlign::Justify:
+          // Vertical mode has no textLines — SVG textLength cannot be applied.
           anchor = TextAnchor::Start;
           offsetY = paddingTop;
-          out.addRawContent(std::string(_indentSpaces, ' ') +
-                            "<!-- text-align=justify degraded to start -->\n");
           break;
         default:
           anchor = TextAnchor::Start;
@@ -1206,13 +1217,9 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
           anchorX = effectiveWidth - paddingRight;
           break;
         case TextAlign::Justify:
-          // SVG's <text> element cannot justify runs — the only way to emulate
-          // it is per-character kerning, which requires running the shaper
-          // inline. Degrade to Start and leave a marker so authors can tell.
           anchor = TextAnchor::Start;
           anchorX = paddingLeft;
-          out.addRawContent(std::string(_indentSpaces, ' ') +
-                            "<!-- text-align=justify degraded to start -->\n");
+          justifyWidth = effectiveWidth - paddingLeft - paddingRight;
           break;
         default:
           anchor = TextAnchor::Start;
@@ -1253,7 +1260,22 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
     return;
   }
 
-  for (auto& lineInfo : *lines) {
+  // Find the index of the last non-empty line for justify last-line detection.
+  size_t lastLineIndex = 0;
+  if (justifyWidth > 0 && lines && !lines->empty()) {
+    for (size_t li = 0; li < lines->size(); ++li) {
+      auto& info = (*lines)[li];
+      if (info.byteStart < info.byteEnd) {
+        std::string tmp = text->text.substr(info.byteStart, info.byteEnd - info.byteStart);
+        if (!tmp.empty()) {
+          lastLineIndex = li;
+        }
+      }
+    }
+  }
+
+  for (size_t lineIdx = 0; lineIdx < lines->size(); ++lineIdx) {
+    auto& lineInfo = (*lines)[lineIdx];
     if (lineInfo.byteStart >= lineInfo.byteEnd) {
       continue;
     }
@@ -1274,6 +1296,14 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
     applyP3Style(out, p3Style);
     out.addRequiredAttribute("x", anchorX);
     out.addRequiredAttribute("y", offsetY + lineInfo.baselineY);
+    if (justifyWidth > 0 && lineIdx != lastLineIndex) {
+      int spaceCount = CountWordSpaces(lineText);
+      if (spaceCount > 0) {
+        float extraSpace = justifyWidth - lineInfo.lineWidth;
+        float wordSpacing = extraSpace / static_cast<float>(spaceCount);
+        out.addAttribute("word-spacing", FloatToString(wordSpacing));
+      }
+    }
     out.closeElementWithText(lineText);
   }
 }
@@ -1315,6 +1345,7 @@ void CollectSVGRichTextRuns(const std::vector<Element*>& elements, const Fill* p
 struct SVGLineEntry {
   size_t runIndex = 0;
   float baselineY = 0;
+  float lineWidth = 0;
   uint32_t byteStart = 0;
   uint32_t byteEnd = 0;
 };
@@ -1362,7 +1393,7 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
         if (li.byteStart >= li.byteEnd) {
           continue;
         }
-        lineEntries.push_back({i, li.baselineY, li.byteStart, li.byteEnd});
+        lineEntries.push_back({i, li.baselineY, li.lineWidth, li.byteStart, li.byteEnd});
       }
     }
     if (useLineLayout && lineEntries.empty()) {
@@ -1406,13 +1437,15 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
     case TextAlign::Justify:
       anchor = TextAnchor::Start;
       anchorX = paddingLeft;
-      out.addRawContent(std::string(_indentSpaces, ' ') +
-                        "<!-- text-align=justify degraded to start -->\n");
       break;
     default:
       anchor = TextAnchor::Start;
       anchorX = paddingLeft;
       break;
+  }
+  float justifyWidth = 0;
+  if (textBox->textAlign == TextAlign::Justify) {
+    justifyWidth = effectiveWidth - paddingLeft - paddingRight;
   }
   std::string svgTransform = MatrixToSVGTransform(transform);
 
@@ -1421,11 +1454,30 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
   std::stable_sort(lineEntries.begin(), lineEntries.end(), CompareSVGLineEntryByBaselineY);
   constexpr float baselineEpsilon = 0.5f;
 
+  // Find the last visual line's baseline for justify last-line detection.
+  float lastBaseline = 0;
+  if (justifyWidth > 0 && !lineEntries.empty()) {
+    lastBaseline = lineEntries.back().baselineY;
+  }
+
   // Group entries by visual line (matching baselineY) and emit one <text>
   // per line with <tspan> children for each run fragment.
   size_t i = 0;
   while (i < lineEntries.size()) {
     float baseline = lineEntries[i].baselineY;
+    float lineWidth = lineEntries[i].lineWidth;
+    bool isLastLine = std::fabs(baseline - lastBaseline) < baselineEpsilon;
+    // Count word spaces across all runs on this visual line for word-spacing.
+    int totalSpaces = 0;
+    if (justifyWidth > 0 && !isLastLine) {
+      for (size_t j = i; j < lineEntries.size() &&
+                         std::fabs(lineEntries[j].baselineY - baseline) < baselineEpsilon;
+           ++j) {
+        const auto& e = lineEntries[j];
+        std::string t = runs[e.runIndex].text->text.substr(e.byteStart, e.byteEnd - e.byteStart);
+        totalSpaces += CountWordSpaces(t);
+      }
+    }
     out.openElement("text");
     if (!svgTransform.empty()) {
       out.addAttribute("transform", svgTransform);
@@ -1438,6 +1490,10 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
     ApplyTextBoxBodyAttrs(out, textBox);
     out.addRequiredAttribute("x", anchorX);
     out.addRequiredAttribute("y", offsetY + baseline);
+    if (justifyWidth > 0 && !isLastLine && totalSpaces > 0) {
+      float wordSpacing = (justifyWidth - lineWidth) / static_cast<float>(totalSpaces);
+      out.addAttribute("word-spacing", FloatToString(wordSpacing));
+    }
     out.closeElementStart();
 
     while (i < lineEntries.size() &&

@@ -806,7 +806,7 @@ class TextLayoutContext {
   // element that contributes glyphs to this line, computes the min/max cluster (byte offset in
   // the source UTF-8 string) and stores it together with the line's baseline Y and start X.
   static void RecordPerTextLineMetadata(const LineInfo& line, float baselineY, float xOffset,
-                                        TextLayoutResult& result) {
+                                        float lineWidth, TextLayoutResult& result) {
     std::unordered_map<Text*, std::pair<uint32_t, uint32_t>> perTextClusterRange;
     for (auto& g : line.glyphs) {
       if (g.unichar == '\n' || g.unichar == '\t' || g.sourceText == nullptr) {
@@ -831,6 +831,7 @@ class TextLayoutContext {
       TextLayoutLineInfo lineInfo = {};
       lineInfo.baselineY = baselineY;
       lineInfo.startX = xOffset;
+      lineInfo.lineWidth = lineWidth;
       lineInfo.byteStart = range.first;
       lineInfo.byteEnd = byteEnd;
       result.textLines[text].push_back(lineInfo);
@@ -1070,7 +1071,7 @@ class TextLayoutContext {
         }
       }
 
-      RecordPerTextLineMetadata(line, baselineY, xOffset, result);
+      RecordPerTextLineMetadata(line, baselineY, xOffset, line.width, result);
     }
   }
 
