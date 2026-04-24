@@ -8,7 +8,7 @@
       <Layer flex="1">
         <Ellipse centerX="0" centerY="0" width="140" height="140"/>
         <Fill>
-          <RadialGradient center="0.3571,0.3571" radius="0.7143">
+          <RadialGradient>
             <ColorStop color="#FBBF24" offset="0"/>
             <ColorStop color="#F59E0B" offset="1"/>
           </RadialGradient>
@@ -43,7 +43,7 @@
       <Layer flex="1">
         <Ellipse centerX="0" centerY="0" width="150" height="150"/>
         <Fill>
-          <RadialGradient center="0.3667,0.3667" radius="0.6667">
+          <RadialGradient>
             <ColorStop color="#A78BFA" offset="0"/>
             <ColorStop color="#8B5CF6" offset="1"/>
           </RadialGradient>
