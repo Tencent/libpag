@@ -1137,6 +1137,8 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
   auto* mutableText = const_cast<Text*>(text);
   auto* lines = layoutResult.getTextLines(mutableText);
 
+  bool isVertical = fs.textBox && fs.textBox->writingMode == WritingMode::Vertical;
+
   TextAnchor anchor = TextAnchor::Start;
   float anchorX = 0;
   float offsetY = 0;
@@ -1144,36 +1146,85 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
     float paddingLeft = fs.textBox->padding.left;
     float paddingTop = fs.textBox->padding.top;
     float paddingRight = fs.textBox->padding.right;
+    float paddingBottom = fs.textBox->padding.bottom;
     float effectiveWidth = EffectiveTextBoxWidth(fs.textBox);
+    float effectiveHeight = EffectiveTextBoxHeight(fs.textBox);
     TextAlign textAlign = fs.textBox->textAlign;
     // The authored position is a layout input only; layout resolves it into
     // renderPosition() together with constraints, padding, and flex
     // allocation. Mirrors PPTWriter::computeNativeTextGeometry.
     auto boxRenderPos = fs.textBox->renderPosition();
-    switch (textAlign) {
-      case TextAlign::Center:
-        anchor = TextAnchor::Center;
-        anchorX = boxRenderPos.x + paddingLeft + (effectiveWidth - paddingLeft - paddingRight) / 2;
-        break;
-      case TextAlign::End:
-        anchor = TextAnchor::End;
-        anchorX = boxRenderPos.x + effectiveWidth - paddingRight;
-        break;
-      case TextAlign::Justify:
-        // SVG's <text> element cannot justify runs — the only way to emulate
-        // it is per-character kerning, which requires running the shaper
-        // inline. Degrade to Start and leave a marker so authors can tell.
-        anchor = TextAnchor::Start;
-        anchorX = boxRenderPos.x + paddingLeft;
-        out.addRawContent(std::string(_indentSpaces, ' ') +
-                          "<!-- text-align=justify degraded to start -->\n");
-        break;
-      default:
-        anchor = TextAnchor::Start;
-        anchorX = boxRenderPos.x + paddingLeft;
-        break;
+    if (isVertical) {
+      // Vertical writing mode: textAlign controls the inline axis (vertical),
+      // paragraphAlign controls the block axis (horizontal, columns right-to-left).
+      // SVG text-anchor in writing-mode="tb" maps to the vertical inline axis.
+      auto textBounds = layoutResult.getTextBounds(const_cast<Text*>(text));
+      float contentWidth = textBounds.isEmpty() ? text->fontSize : textBounds.width;
+      float innerWidth = effectiveWidth - paddingLeft - paddingRight;
+      float innerHeight =
+          (!std::isnan(effectiveHeight)) ? effectiveHeight - paddingTop - paddingBottom : 0;
+      // Block axis (horizontal): paragraphAlign positions columns right-to-left.
+      // Near = right edge, Far = left edge.
+      switch (fs.textBox->paragraphAlign) {
+        case ParagraphAlign::Middle:
+          anchorX =
+              boxRenderPos.x + paddingLeft + (innerWidth + contentWidth) / 2 - text->fontSize / 2;
+          break;
+        case ParagraphAlign::Far:
+          anchorX = boxRenderPos.x + paddingLeft + contentWidth - text->fontSize / 2;
+          break;
+        default:
+          anchorX = boxRenderPos.x + effectiveWidth - paddingRight - text->fontSize / 2;
+          break;
+      }
+      // Inline axis (vertical): textAlign positions text top-to-bottom.
+      switch (textAlign) {
+        case TextAlign::Center:
+          anchor = TextAnchor::Center;
+          offsetY = boxRenderPos.y + paddingTop + innerHeight / 2;
+          break;
+        case TextAlign::End:
+          anchor = TextAnchor::End;
+          offsetY = boxRenderPos.y + paddingTop + innerHeight;
+          break;
+        case TextAlign::Justify:
+          anchor = TextAnchor::Start;
+          offsetY = boxRenderPos.y + paddingTop;
+          out.addRawContent(std::string(_indentSpaces, ' ') +
+                            "<!-- text-align=justify degraded to start -->\n");
+          break;
+        default:
+          anchor = TextAnchor::Start;
+          offsetY = boxRenderPos.y + paddingTop;
+          break;
+      }
+    } else {
+      switch (textAlign) {
+        case TextAlign::Center:
+          anchor = TextAnchor::Center;
+          anchorX =
+              boxRenderPos.x + paddingLeft + (effectiveWidth - paddingLeft - paddingRight) / 2;
+          break;
+        case TextAlign::End:
+          anchor = TextAnchor::End;
+          anchorX = boxRenderPos.x + effectiveWidth - paddingRight;
+          break;
+        case TextAlign::Justify:
+          // SVG's <text> element cannot justify runs — the only way to emulate
+          // it is per-character kerning, which requires running the shaper
+          // inline. Degrade to Start and leave a marker so authors can tell.
+          anchor = TextAnchor::Start;
+          anchorX = boxRenderPos.x + paddingLeft;
+          out.addRawContent(std::string(_indentSpaces, ' ') +
+                            "<!-- text-align=justify degraded to start -->\n");
+          break;
+        default:
+          anchor = TextAnchor::Start;
+          anchorX = boxRenderPos.x + paddingLeft;
+          break;
+      }
+      offsetY = boxRenderPos.y + paddingTop;
     }
-    offsetY = boxRenderPos.y + paddingTop;
   } else {
     anchor = text->textAnchor;
     auto renderPos = text->renderPosition();
@@ -1199,7 +1250,9 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
     applyStrokeAttributes(out, fs.stroke, {}, &p3Style, alpha);
     applyP3Style(out, p3Style);
     out.addRequiredAttribute("x", anchorX);
-    out.addRequiredAttribute("y", offsetY + text->fontSize);
+    // In vertical mode offsetY already points to the correct inline-axis start;
+    // in horizontal fallback the y coordinate needs a baseline shift by fontSize.
+    out.addRequiredAttribute("y", isVertical ? offsetY : offsetY + text->fontSize);
     out.closeElementWithText(text->text);
     return;
   }
