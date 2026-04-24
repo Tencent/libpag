@@ -68,6 +68,14 @@ static std::string CopyToTemp(const std::string& resourceName, const std::string
   return dst;
 }
 
+static std::string CopyResourceToTemp(const std::string& resourceRelPath,
+                                      const std::string& tempName) {
+  auto src = ProjectPath::Absolute(resourceRelPath);
+  auto dst = TempDir() + "/" + tempName;
+  std::filesystem::copy_file(src, dst, std::filesystem::copy_options::overwrite_existing);
+  return dst;
+}
+
 static bool CompareRenderedImage(const std::string& imagePath, const std::string& key) {
   auto codec = ImageCodec::MakeFrom(imagePath);
   if (codec == nullptr) {
@@ -2783,9 +2791,9 @@ CLI_TEST(PAGXCliTest, Verify_PainterLeakClean) {
 
 CLI_TEST(PAGXCliTest, Embed_BothDefault_EmbedsFontsAndImages) {
   auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_sample.pagx");
-  auto tempPng = CopyToTemp("embed_sample.png", "embed_sample.png");
+  auto tempPng = CopyResourceToTemp("resources/apitest/image_as_mask.png", "image_as_mask.png");
   auto outPagx = TempDir() + "/embed_both_out.pagx";
-  // EMBED-09 implicitly covered: embed_sample.pagx references embed_sample.png by relative path;
+  // EMBED-09 implicitly covered: embed_sample.pagx references image_as_mask.png by relative path;
   // resolution happens at PAGXImporter::FromFile load time per D1.2.
   std::streambuf* oldCout = std::cout.rdbuf();
   std::ostringstream capturedOut;
@@ -2811,7 +2819,7 @@ CLI_TEST(PAGXCliTest, Embed_BothDefault_EmbedsFontsAndImages) {
 
 CLI_TEST(PAGXCliTest, Embed_SkipFonts_ImagesOnly) {
   auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_sample.pagx");
-  auto tempPng = CopyToTemp("embed_sample.png", "embed_sample.png");
+  auto tempPng = CopyResourceToTemp("resources/apitest/image_as_mask.png", "image_as_mask.png");
   auto outPagx = TempDir() + "/embed_skipfonts_out.pagx";
   auto ret = CallRun(pagx::cli::RunEmbed, {"embed", "--skip-fonts", tempPagx, "-o", outPagx});
   EXPECT_EQ(ret, 0);
@@ -2836,7 +2844,7 @@ CLI_TEST(PAGXCliTest, Embed_SkipFonts_ImagesOnly) {
 
 CLI_TEST(PAGXCliTest, Embed_SkipImages_FontsOnly) {
   auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_sample.pagx");
-  auto tempPng = CopyToTemp("embed_sample.png", "embed_sample.png");
+  auto tempPng = CopyResourceToTemp("resources/apitest/image_as_mask.png", "image_as_mask.png");
   auto outPagx = TempDir() + "/embed_skipimgs_out.pagx";
   auto ret = CallRun(pagx::cli::RunEmbed, {"embed", "--skip-images", tempPagx, "-o", outPagx});
   EXPECT_EQ(ret, 0);
@@ -2866,7 +2874,7 @@ CLI_TEST(PAGXCliTest, Embed_SkipImages_FontsOnly) {
 
 CLI_TEST(PAGXCliTest, Embed_BothSkipFlags_ExitsWithError) {
   auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_sample.pagx");
-  auto tempPng = CopyToTemp("embed_sample.png", "embed_sample.png");
+  auto tempPng = CopyResourceToTemp("resources/apitest/image_as_mask.png", "image_as_mask.png");
   auto contentBefore = ReadFile(tempPagx);
   std::streambuf* oldCerr = std::cerr.rdbuf();
   std::ostringstream capturedErr;
@@ -2882,7 +2890,7 @@ CLI_TEST(PAGXCliTest, Embed_BothSkipFlags_ExitsWithError) {
 
 CLI_TEST(PAGXCliTest, Embed_FontFlags_AcceptedLikeOldSubcommand) {
   auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_sample.pagx");
-  auto tempPng = CopyToTemp("embed_sample.png", "embed_sample.png");
+  auto tempPng = CopyResourceToTemp("resources/apitest/image_as_mask.png", "image_as_mask.png");
   auto outPagx = TempDir() + "/embed_fontflags_out.pagx";
   auto fontPath = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
   auto ret = CallRun(pagx::cli::RunEmbed, {"embed", "--file", fontPath, "-o", outPagx, tempPagx});
@@ -2891,7 +2899,7 @@ CLI_TEST(PAGXCliTest, Embed_FontFlags_AcceptedLikeOldSubcommand) {
 
 CLI_TEST(PAGXCliTest, Embed_AlreadyEmbeddedImage_IsNoOp) {
   auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_sample.pagx");
-  auto tempPng = CopyToTemp("embed_sample.png", "embed_sample.png");
+  auto tempPng = CopyResourceToTemp("resources/apitest/image_as_mask.png", "image_as_mask.png");
   auto out1 = TempDir() + "/embed_idempot_pass1.pagx";
   auto out2 = TempDir() + "/embed_idempot_pass2.pagx";
   auto ret1 = CallRun(pagx::cli::RunEmbed, {"embed", tempPagx, "-o", out1});
@@ -2904,9 +2912,9 @@ CLI_TEST(PAGXCliTest, Embed_AlreadyEmbeddedImage_IsNoOp) {
 CLI_TEST(PAGXCliTest, Embed_MissingImage_FailsLoud) {
   auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_missing.pagx");
   auto content = ReadFile(tempPagx);
-  auto pos = content.find("embed_sample.png");
+  auto pos = content.find("image_as_mask.png");
   ASSERT_NE(pos, std::string::npos);
-  content.replace(pos, strlen("embed_sample.png"), "missing.png");
+  content.replace(pos, strlen("image_as_mask.png"), "missing.png");
   std::ofstream out(tempPagx);
   out << content;
   out.close();
@@ -2923,7 +2931,7 @@ CLI_TEST(PAGXCliTest, Embed_MissingImage_FailsLoud) {
 
 CLI_TEST(PAGXCliTest, Embed_Success_PrintsWroteAndExitsZero) {
   auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_sample.pagx");
-  auto tempPng = CopyToTemp("embed_sample.png", "embed_sample.png");
+  auto tempPng = CopyResourceToTemp("resources/apitest/image_as_mask.png", "image_as_mask.png");
   auto outPagx = TempDir() + "/embed_success_out.pagx";
   std::streambuf* oldCout = std::cout.rdbuf();
   std::ostringstream capturedOut;
