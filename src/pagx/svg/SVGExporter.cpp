@@ -902,6 +902,14 @@ void SVGWriter::applyFillAttributes(SVGBuilder& out, const Fill* fill, const Rec
   }
   if (p3Style) {
     AppendP3ColorStyle(*p3Style, "fill", fill->color, fillStr, effectiveAlpha);
+    if (fill->blendMode != BlendMode::Normal) {
+      auto blendStr = BlendModeToSVGString(fill->blendMode);
+      if (blendStr) {
+        *p3Style += "mix-blend-mode:";
+        *p3Style += blendStr;
+        *p3Style += ';';
+      }
+    }
   }
 }
 
@@ -951,6 +959,14 @@ void SVGWriter::applyStrokeAttributes(SVGBuilder& out, const Stroke* stroke,
   }
   if (p3Style) {
     AppendP3ColorStyle(*p3Style, "stroke", stroke->color, strokeStr, effectiveAlpha);
+    if (stroke->blendMode != BlendMode::Normal) {
+      auto blendStr = BlendModeToSVGString(stroke->blendMode);
+      if (blendStr) {
+        *p3Style += "mix-blend-mode:";
+        *p3Style += blendStr;
+        *p3Style += ';';
+      }
+    }
   }
 }
 
