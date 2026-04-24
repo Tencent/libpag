@@ -2844,6 +2844,7 @@ CLI_TEST(PAGXCliTest, Embed_SkipImages_FontsOnly) {
   ASSERT_NE(document, nullptr);
   bool hasFilePath = false;
   bool hasNoImageData = true;
+  bool hasFontNode = false;
   for (auto& node : document->nodes) {
     if (node->nodeType() == pagx::NodeType::Image) {
       auto* image = static_cast<pagx::Image*>(node.get());
@@ -2854,9 +2855,13 @@ CLI_TEST(PAGXCliTest, Embed_SkipImages_FontsOnly) {
         hasNoImageData = false;
       }
     }
+    if (node->nodeType() == pagx::NodeType::Font) {
+      hasFontNode = true;
+    }
   }
   EXPECT_TRUE(hasFilePath);
   EXPECT_TRUE(hasNoImageData);
+  EXPECT_TRUE(hasFontNode);
 }
 
 CLI_TEST(PAGXCliTest, Embed_BothSkipFlags_ExitsWithError) {
