@@ -845,6 +845,20 @@ std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& 
     return {};
   }
 
+  // BackgroundBlurStyle is silently skipped (SVG has no portable backdrop-blur). Check whether
+  // any style will actually produce SVG filter primitives so we don't emit an empty <filter>
+  // element, which would make the layer invisible.
+  bool hasEffectiveStyle = false;
+  for (const auto* style : styles) {
+    if (style->nodeType() != NodeType::BackgroundBlurStyle) {
+      hasEffectiveStyle = true;
+      break;
+    }
+  }
+  if (filters.empty() && !hasEffectiveStyle) {
+    return {};
+  }
+
   // Pre-scan all filters and styles to find the maximum extent the filter
   // region must cover beyond the source bounding box. Drop shadows expand
   // outward by ~3*stdDeviation + offset in each direction; blur filters
