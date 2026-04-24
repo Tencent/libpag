@@ -524,31 +524,76 @@ CLI_TEST(PAGXCliTest, Render_XPathNoMatch) {
 // Font tests
 //==============================================================================
 
-CLI_TEST(PAGXCliTest, FontInfo_FromFile) {
+CLI_TEST(PAGXCliTest, Font_FromFile) {
   auto fontPath = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
-  auto ret = CallRun(pagx::cli::RunFont, {"font", "info", "--file", fontPath});
+  auto ret = CallRun(pagx::cli::RunFont, {"font", "--file", fontPath});
   EXPECT_EQ(ret, 0);
 }
 
-CLI_TEST(PAGXCliTest, FontInfo_JsonOutput) {
+CLI_TEST(PAGXCliTest, Font_JsonOutput) {
   auto fontPath = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
-  auto ret = CallRun(pagx::cli::RunFont, {"font", "info", "--file", fontPath, "--json"});
+  auto ret = CallRun(pagx::cli::RunFont, {"font", "--file", fontPath, "--json"});
   EXPECT_EQ(ret, 0);
 }
 
-CLI_TEST(PAGXCliTest, FontInfo_FileNotFound) {
-  auto ret = CallRun(pagx::cli::RunFont, {"font", "info", "--file", "nonexistent.ttf"});
+CLI_TEST(PAGXCliTest, Font_FileNotFound) {
+  auto ret = CallRun(pagx::cli::RunFont, {"font", "--file", "nonexistent.ttf"});
   EXPECT_NE(ret, 0);
 }
 
-CLI_TEST(PAGXCliTest, FontInfo_MutualExclusive) {
-  auto ret = CallRun(pagx::cli::RunFont, {"font", "info", "--file", "x.ttf", "--name", "Arial"});
+CLI_TEST(PAGXCliTest, Font_MutualExclusive) {
+  auto ret = CallRun(pagx::cli::RunFont, {"font", "--file", "x.ttf", "--name", "Arial"});
   EXPECT_NE(ret, 0);
 }
 
-CLI_TEST(PAGXCliTest, FontInfo_NoSource) {
-  auto ret = CallRun(pagx::cli::RunFont, {"font", "info"});
+CLI_TEST(PAGXCliTest, Font_NoSource) {
+  auto ret = CallRun(pagx::cli::RunFont, {"font"});
   EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, FontInfo_Retired_PrintsRedirectError) {
+  const std::string expected =
+      "pagx font: 'info' subcommand has been removed, use 'pagx font' instead";
+
+  // Variant 1: with a positional argument
+  {
+    std::streambuf* oldCerr = std::cerr.rdbuf();
+    std::ostringstream capturedErr;
+    std::cerr.rdbuf(capturedErr.rdbuf());
+    auto ret = CallRun(pagx::cli::RunFont, {"font", "info", "--file", "x.otf"});
+    std::cerr.rdbuf(oldCerr);
+    EXPECT_EQ(ret, 1);
+    EXPECT_NE(capturedErr.str().find(expected), std::string::npos);
+  }
+
+  // Variant 2: no extra arguments
+  {
+    std::streambuf* oldCerr = std::cerr.rdbuf();
+    std::ostringstream capturedErr;
+    std::cerr.rdbuf(capturedErr.rdbuf());
+    auto ret = CallRun(pagx::cli::RunFont, {"font", "info"});
+    std::cerr.rdbuf(oldCerr);
+    EXPECT_EQ(ret, 1);
+    EXPECT_NE(capturedErr.str().find(expected), std::string::npos);
+  }
+}
+
+CLI_TEST(PAGXCliTest, Font_HelpShowsNewSurface) {
+  std::streambuf* oldCout = std::cout.rdbuf();
+  std::ostringstream capturedOut;
+  std::cout.rdbuf(capturedOut.rdbuf());
+  auto ret = CallRun(pagx::cli::RunFont, {"font", "--help"});
+  std::cout.rdbuf(oldCout);
+
+  EXPECT_EQ(ret, 0);
+  auto help = capturedOut.str();
+  EXPECT_NE(help.find("--list"), std::string::npos);
+  EXPECT_NE(help.find("--file"), std::string::npos);
+  EXPECT_NE(help.find("--name"), std::string::npos);
+  EXPECT_NE(help.find("--size"), std::string::npos);
+  EXPECT_NE(help.find("--json"), std::string::npos);
+  EXPECT_EQ(help.find("embed"), std::string::npos);
+  EXPECT_EQ(help.find("info"), std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Font_UnknownSubcommand) {
