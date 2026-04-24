@@ -26,6 +26,8 @@
 #include "renderer/FontEmbedder.h"
 #include "renderer/ImageEmbedder.h"
 
+namespace pagx::cli {
+
 struct EmbedOptions {
   std::string inputFile = {};
   std::string outputFile = {};
@@ -89,8 +91,6 @@ static int ParseEmbedOptions(int argc, char* argv[], EmbedOptions* options) {
   }
   return 0;
 }
-
-namespace pagx::cli {
 
 int RunEmbed(int argc, char* argv[]) {
   EmbedOptions options = {};
