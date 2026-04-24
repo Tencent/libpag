@@ -847,7 +847,9 @@ void SVGWriter::applyFillAttributes(SVGBuilder& out, const Fill* fill, const Rec
     return;
   }
   float alpha = 1.0f;
-  std::string fillStr = getColorSourceRef(fill->color, &alpha, shapeBounds);
+  // Per PAGX spec, Fill defaults to opaque black (#000000) when no color is specified.
+  std::string fillStr =
+      fill->color ? getColorSourceRef(fill->color, &alpha, shapeBounds) : "#000000";
   out.addAttribute("fill", fillStr);
   float effectiveAlpha = alpha * fill->alpha * alphaMultiplier;
   if (effectiveAlpha < 1.0f) {
@@ -868,7 +870,9 @@ void SVGWriter::applyStrokeAttributes(SVGBuilder& out, const Stroke* stroke,
     return;
   }
   float alpha = 1.0f;
-  std::string strokeStr = getColorSourceRef(stroke->color, &alpha, shapeBounds);
+  // Per PAGX spec, Stroke defaults to opaque black (#000000) when no color is specified.
+  std::string strokeStr =
+      stroke->color ? getColorSourceRef(stroke->color, &alpha, shapeBounds) : "#000000";
   out.addAttribute("stroke", strokeStr);
   float effectiveAlpha = alpha * stroke->alpha * alphaMultiplier;
   if (effectiveAlpha < 1.0f) {
