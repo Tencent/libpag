@@ -17,10 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CommandFont.h"
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <string>
+#include <vector>
 #include "cli/CliUtils.h"
+#include "pagx/SystemFonts.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Typeface.h"
 
@@ -33,6 +36,7 @@ struct FontOptions {
   std::string fontName = {};
   float fontSize = 12.0f;
   bool jsonOutput = false;
+  bool listMode = false;
 };
 
 static void PrintFontUsage() {
@@ -49,6 +53,45 @@ static void PrintFontUsage() {
             << "  -h, --help             Show this help\n"
             << "\n"
             << "Exactly one of --file, --name, or --list must be specified.\n";
+}
+
+static bool FontFamilyLess(const pagx::FontFamilyEntry& lhs, const pagx::FontFamilyEntry& rhs) {
+  return lhs.family < rhs.family;
+}
+
+static void FormatFontListText(const std::vector<pagx::FontFamilyEntry>& entries) {
+  for (const auto& entry : entries) {
+    if (entry.styles.empty()) {
+      std::cout << entry.family << "\n";
+      continue;
+    }
+    std::cout << entry.family << " (";
+    for (size_t i = 0; i < entry.styles.size(); i++) {
+      if (i > 0) {
+        std::cout << ", ";
+      }
+      std::cout << entry.styles[i];
+    }
+    std::cout << ")\n";
+  }
+}
+
+static void FormatFontListJson(const std::vector<pagx::FontFamilyEntry>& entries) {
+  std::cout << "[";
+  for (size_t i = 0; i < entries.size(); i++) {
+    if (i > 0) {
+      std::cout << ",";
+    }
+    std::cout << "{\"family\":\"" << EscapeJson(entries[i].family) << "\",\"styles\":[";
+    for (size_t j = 0; j < entries[i].styles.size(); j++) {
+      if (j > 0) {
+        std::cout << ",";
+      }
+      std::cout << "\"" << EscapeJson(entries[i].styles[j]) << "\"";
+    }
+    std::cout << "]}";
+  }
+  std::cout << "]\n";
 }
 
 int RunFont(int argc, char* argv[]) {
@@ -91,6 +134,8 @@ int RunFont(int argc, char* argv[]) {
       }
     } else if (arg == "--json") {
       options.jsonOutput = true;
+    } else if (arg == "--list") {
+      options.listMode = true;
     } else if (arg == "--help" || arg == "-h") {
       PrintFontUsage();
       return 0;
@@ -104,13 +149,28 @@ int RunFont(int argc, char* argv[]) {
     i++;
   }
 
+  if (options.listMode && (!options.fontFile.empty() || !options.fontName.empty())) {
+    std::cerr << "pagx font: --list cannot be combined with --file or --name\n";
+    return 1;
+  }
   if (!options.fontFile.empty() && !options.fontName.empty()) {
     std::cerr << "pagx font: --file and --name are mutually exclusive\n";
     return 1;
   }
-  if (options.fontFile.empty() && options.fontName.empty()) {
-    std::cerr << "pagx font: either --file or --name is required\n";
+  if (!options.listMode && options.fontFile.empty() && options.fontName.empty()) {
+    std::cerr << "pagx font: either --file, --name, or --list is required\n";
     return 1;
+  }
+
+  if (options.listMode) {
+    auto entries = pagx::SystemFonts::AllFontFamilies();
+    std::sort(entries.begin(), entries.end(), FontFamilyLess);
+    if (options.jsonOutput) {
+      FormatFontListJson(entries);
+    } else {
+      FormatFontListText(entries);
+    }
+    return 0;
   }
 
   std::shared_ptr<tgfx::Typeface> typeface = nullptr;
