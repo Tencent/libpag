@@ -313,6 +313,9 @@ static bool TryMakeGlyphPath(const PositionedGlyph& entry, GlyphPath* out) {
 
 void ComputeGlyphPathsAndImages(const Text& text, float textPosX, float textPosY,
                                 std::vector<GlyphPath>* paths, std::vector<GlyphImage>* images) {
+  if (paths == nullptr && images == nullptr) {
+    return;
+  }
   auto positioned = WalkGlyphs(text, textPosX, textPosY);
   if (paths) {
     paths->reserve(paths->size() + positioned.size());

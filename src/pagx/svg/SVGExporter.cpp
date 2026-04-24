@@ -90,18 +90,36 @@ static std::string ColorToSVGString(const Color& color) {
   return buf;
 }
 
-static std::string ColorToSVGStringWithAlpha(const Color& color, float* outAlpha) {
-  if (outAlpha) {
-    *outAlpha = color.alpha;
-  }
-  return ColorToSVGString(color);
-}
-
 // Emits a CSS color(display-p3 ...) value. Only used when the color source has
 // Display P3 color space values; sRGB colors use the standard #RRGGBB format.
 static std::string ColorToDisplayP3String(const Color& color) {
   return "color(display-p3 " + FloatToString(color.red) + " " + FloatToString(color.green) + " " +
          FloatToString(color.blue) + ")";
+}
+
+// feGaussianBlur stdDeviation string: one value when blurX == blurY, otherwise two.
+static std::string FormatBlurStdDev(float blurX, float blurY) {
+  std::string stdDev = FloatToString(blurX);
+  if (blurX != blurY) {
+    stdDev += " ";
+    stdDev += FloatToString(blurY);
+  }
+  return stdDev;
+}
+
+// mix-blend-mode CSS fragment appended to the inline style string when a blend mode
+// other than Normal is present on a Fill or Stroke. No-op for Normal.
+static void AppendBlendModeStyle(std::string& styleStr, BlendMode mode) {
+  if (mode == BlendMode::Normal) {
+    return;
+  }
+  auto blendStr = BlendModeToSVGString(mode);
+  if (!blendStr) {
+    return;
+  }
+  styleStr += "mix-blend-mode:";
+  styleStr += blendStr;
+  styleStr += ';';
 }
 
 // Appends Display P3 color via CSS color() function when the color source has
@@ -286,6 +304,32 @@ class SVGWriter {
                                 const std::string& blurResult, const std::string& offsetResult);
   void writeShadowColorMatrix(const Color& c, const std::string& inResult,
                               const std::string& outResult);
+  // Emits a drop-shadow fragment (blur + offset + color matrix) and returns the
+  // result name of the final colored shadow. Shared between DropShadowFilter and
+  // DropShadowStyle which differ only in source node type.
+  std::string writeDropShadowFragment(float blurX, float blurY, float offsetX, float offsetY,
+                                      const Color& color, int shadowIndex);
+  // Emits an inner-shadow fragment (blur + offset + invert composite + color matrix)
+  // and returns the result name of the final colored inner shadow. Shared between
+  // InnerShadowFilter and InnerShadowStyle.
+  std::string writeInnerShadowFragment(float blurX, float blurY, float offsetX, float offsetY,
+                                       const Color& color, int shadowIndex);
+  // Standalone filter primitives that don't take part in the feMerge aggregation.
+  // Each one drains directly into the surrounding <filter> chain.
+  void writeColorMatrixFilter(const ColorMatrixFilter* cm);
+  void writeBlendFilter(const BlendFilter* blend, int& shadowIndex);
+  void writeBackgroundBlurStyle(const BackgroundBlurStyle* bb);
+  // Collected per-filter state fed into the final feMerge aggregation.
+  struct ShadowAggregate {
+    std::vector<std::string> dropShadowResults;
+    std::vector<std::string> innerShadowResults;
+    bool needSourceGraphic = false;
+  };
+  void writeFilterList(const std::vector<LayerFilter*>& filters, int& shadowIndex,
+                       ShadowAggregate& agg);
+  void writeStyleList(const std::vector<LayerStyle*>& styles, int& shadowIndex,
+                      ShadowAggregate& agg);
+  void writeShadowMerge(const ShadowAggregate& agg);
   std::string writeFilterAndStyleDefs(const std::vector<LayerFilter*>& filters,
                                       const std::vector<LayerStyle*>& styles);
 
@@ -299,12 +343,27 @@ class SVGWriter {
                                      const Matrix& parentMatrix = {});
   std::string writeMaskDef(const Layer* maskLayer, MaskType maskType = MaskType::Alpha);
   std::string writeClipPathDef(const Layer* maskLayer);
+  // Emits a <clipPath> in _defs for layer->scrollRect and returns the generated id.
+  // Caller wires the id onto the group as clip-path="url(#...)".
+  std::string writeScrollRectClipDef(const Layer* layer);
+  // Writes the non-content attributes of a layer's <g> (id, data-*, transform,
+  // opacity, style, filter, mask/clipPath, scrollRect clip). Geometry and child
+  // layers are emitted separately after closeElementStart() in writeLayer.
+  void writeLayerGroupAttributes(SVGBuilder& out, const Layer* layer);
+  // Emits contents + composition layers + child layers. Used both for the
+  // needs-group path (inside the <g>) and for the bare-through path.
+  void writeLayerBody(SVGBuilder& out, const Layer* layer);
 
   // Fill / stroke attribute helpers
   void applyFillAttributes(SVGBuilder& out, const Fill* fill, const Rect& shapeBounds = {},
                            std::string* p3Style = nullptr, float alphaMultiplier = 1.0f);
   void applyStrokeAttributes(SVGBuilder& out, const Stroke* stroke, const Rect& shapeBounds = {},
                              std::string* p3Style = nullptr, float alphaMultiplier = 1.0f);
+  // Writes fill, stroke, and the optional collected P3 style fragment as SVG attributes.
+  // Every geometry writer ends with this three-call sequence so keeping it together
+  // avoids forgetting a step and makes the painter apply order explicit.
+  void applyPainters(SVGBuilder& out, const FillStrokeInfo& fs, const Rect& shapeBounds,
+                     float alpha);
   static void applyP3Style(SVGBuilder& out, const std::string& p3Style);
 };
 
@@ -527,7 +586,10 @@ std::string SVGWriter::getColorSourceRef(const ColorSource* source, float* outAl
   }
   if (source->nodeType() == NodeType::SolidColor) {
     auto solid = static_cast<const SolidColor*>(source);
-    return ColorToSVGStringWithAlpha(solid->color, outAlpha);
+    if (outAlpha) {
+      *outAlpha = solid->color.alpha;
+    }
+    return ColorToSVGString(solid->color);
   }
   if (source->nodeType() == NodeType::LinearGradient ||
       source->nodeType() == NodeType::RadialGradient ||
@@ -561,11 +623,7 @@ void SVGWriter::writeShadowBlurAndOffset(float blurX, float blurY, float offsetX
                                          const std::string& offsetResult) {
   _defs->openElement("feGaussianBlur");
   _defs->addAttribute("in", "SourceAlpha");
-  std::string stdDev = FloatToString(blurX);
-  if (blurX != blurY) {
-    stdDev += " " + FloatToString(blurY);
-  }
-  _defs->addAttribute("stdDeviation", stdDev);
+  _defs->addAttribute("stdDeviation", FormatBlurStdDev(blurX, blurY));
   _defs->addAttribute("result", blurResult);
   _defs->closeElementSelfClosing();
 
@@ -598,6 +656,205 @@ void SVGWriter::writeShadowColorMatrix(const Color& c, const std::string& inResu
   _defs->closeElementSelfClosing();
 }
 
+std::string SVGWriter::writeDropShadowFragment(float blurX, float blurY, float offsetX,
+                                               float offsetY, const Color& color, int shadowIndex) {
+  std::string idx = std::to_string(shadowIndex);
+  std::string offsetResult = "shadowOffset" + idx;
+  std::string shadowResult = "shadow" + idx;
+  writeShadowBlurAndOffset(blurX, blurY, offsetX, offsetY, "shadowBlur" + idx, offsetResult);
+  writeShadowColorMatrix(color, offsetResult, shadowResult);
+  return shadowResult;
+}
+
+std::string SVGWriter::writeInnerShadowFragment(float blurX, float blurY, float offsetX,
+                                                float offsetY, const Color& color,
+                                                int shadowIndex) {
+  std::string idx = std::to_string(shadowIndex);
+  std::string offsetResult = "innerOffset" + idx;
+  std::string compositeResult = "innerComposite" + idx;
+  std::string shadowResult = "innerShadow" + idx;
+  writeShadowBlurAndOffset(blurX, blurY, offsetX, offsetY, "innerBlur" + idx, offsetResult);
+
+  _defs->openElement("feComposite");
+  _defs->addAttribute("in", "SourceAlpha");
+  _defs->addAttribute("in2", offsetResult);
+  _defs->addAttribute("operator", "arithmetic");
+  _defs->addAttribute("k2", "-1");
+  _defs->addAttribute("k3", "1");
+  _defs->addAttribute("result", compositeResult);
+  _defs->closeElementSelfClosing();
+
+  writeShadowColorMatrix(color, compositeResult, shadowResult);
+  return shadowResult;
+}
+
+void SVGWriter::writeColorMatrixFilter(const ColorMatrixFilter* cm) {
+  _defs->openElement("feColorMatrix");
+  _defs->addAttribute("in", "SourceGraphic");
+  _defs->addAttribute("type", "matrix");
+  std::string values;
+  values.reserve(200);
+  for (size_t i = 0; i < cm->matrix.size(); i++) {
+    if (i > 0) {
+      values += " ";
+    }
+    values += FloatToString(cm->matrix[i]);
+  }
+  _defs->addAttribute("values", values);
+  _defs->closeElementSelfClosing();
+}
+
+void SVGWriter::writeBlendFilter(const BlendFilter* blend, int& shadowIndex) {
+  std::string idx = std::to_string(shadowIndex++);
+  std::string floodResult = "blendFlood" + idx;
+  _defs->openElement("feFlood");
+  _defs->addAttribute("flood-color", ColorToSVGString(blend->color));
+  if (blend->color.alpha < 1.0f) {
+    _defs->addAttribute("flood-opacity", FloatToString(blend->color.alpha));
+  }
+  _defs->addAttribute("result", floodResult);
+  _defs->closeElementSelfClosing();
+
+  std::string blendResult = "blendResult" + idx;
+  _defs->openElement("feBlend");
+  _defs->addAttribute("in", "SourceGraphic");
+  _defs->addAttribute("in2", floodResult);
+  auto modeStr = BlendModeToSVGString(blend->blendMode);
+  if (modeStr) {
+    _defs->addAttribute("mode", modeStr);
+  }
+  _defs->addAttribute("result", blendResult);
+  _defs->closeElementSelfClosing();
+
+  _defs->openElement("feComposite");
+  _defs->addAttribute("in", blendResult);
+  _defs->addAttribute("in2", "SourceGraphic");
+  _defs->addAttribute("operator", "in");
+  _defs->closeElementSelfClosing();
+}
+
+void SVGWriter::writeBackgroundBlurStyle(const BackgroundBlurStyle* bb) {
+  // SVG lacks a widely-supported BackgroundImage / backdrop access: `<feGaussianBlur
+  // in="BackgroundImage">` requires `enable-background` on an ancestor, which has
+  // been dropped from the SVG spec and is not implemented by modern renderers.
+  // Degrade to blurring the source graphic so the layer at least shows a blur
+  // effect; authoring callers who need true background-blur should output HTML.
+  _defs->addRawContent(std::string(_indentSpaces, ' ') +
+                       "<!-- background-blur degraded to source-blur: "
+                       "SVG has no portable BackgroundImage source -->\n");
+  _defs->openElement("feGaussianBlur");
+  _defs->addAttribute("in", "SourceGraphic");
+  _defs->addAttribute("stdDeviation", FormatBlurStdDev(bb->blurX, bb->blurY));
+  _defs->closeElementSelfClosing();
+}
+
+void SVGWriter::writeFilterList(const std::vector<LayerFilter*>& filters, int& shadowIndex,
+                                ShadowAggregate& agg) {
+  for (const auto* filter : filters) {
+    switch (filter->nodeType()) {
+      case NodeType::BlurFilter: {
+        auto blur = static_cast<const BlurFilter*>(filter);
+        _defs->openElement("feGaussianBlur");
+        _defs->addAttribute("in", "SourceGraphic");
+        _defs->addAttribute("stdDeviation", FormatBlurStdDev(blur->blurX, blur->blurY));
+        _defs->closeElementSelfClosing();
+        break;
+      }
+      case NodeType::DropShadowFilter: {
+        auto shadow = static_cast<const DropShadowFilter*>(filter);
+        agg.dropShadowResults.push_back(writeDropShadowFragment(shadow->blurX, shadow->blurY,
+                                                                shadow->offsetX, shadow->offsetY,
+                                                                shadow->color, shadowIndex++));
+        if (!shadow->shadowOnly) {
+          agg.needSourceGraphic = true;
+        }
+        break;
+      }
+      case NodeType::InnerShadowFilter: {
+        auto shadow = static_cast<const InnerShadowFilter*>(filter);
+        agg.innerShadowResults.push_back(writeInnerShadowFragment(shadow->blurX, shadow->blurY,
+                                                                  shadow->offsetX, shadow->offsetY,
+                                                                  shadow->color, shadowIndex++));
+        if (!shadow->shadowOnly) {
+          agg.needSourceGraphic = true;
+        }
+        break;
+      }
+      case NodeType::ColorMatrixFilter:
+        writeColorMatrixFilter(static_cast<const ColorMatrixFilter*>(filter));
+        break;
+      case NodeType::BlendFilter:
+        writeBlendFilter(static_cast<const BlendFilter*>(filter), shadowIndex);
+        break;
+      default:
+        break;
+    }
+  }
+}
+
+// LayerStyle emission mirrors the Filter pass so DropShadowStyle / InnerShadowStyle
+// share the feMerge aggregation logic. BackgroundBlurStyle has no portable SVG
+// equivalent — see writeBackgroundBlurStyle for the degradation.
+void SVGWriter::writeStyleList(const std::vector<LayerStyle*>& styles, int& shadowIndex,
+                               ShadowAggregate& agg) {
+  for (const auto* style : styles) {
+    switch (style->nodeType()) {
+      case NodeType::DropShadowStyle: {
+        auto shadow = static_cast<const DropShadowStyle*>(style);
+        agg.dropShadowResults.push_back(writeDropShadowFragment(shadow->blurX, shadow->blurY,
+                                                                shadow->offsetX, shadow->offsetY,
+                                                                shadow->color, shadowIndex++));
+        // DropShadowStyle always composites below the source graphic (it is a
+        // style layer, not a filter that can hide the source).
+        agg.needSourceGraphic = true;
+        break;
+      }
+      case NodeType::InnerShadowStyle: {
+        auto shadow = static_cast<const InnerShadowStyle*>(style);
+        agg.innerShadowResults.push_back(writeInnerShadowFragment(shadow->blurX, shadow->blurY,
+                                                                  shadow->offsetX, shadow->offsetY,
+                                                                  shadow->color, shadowIndex++));
+        agg.needSourceGraphic = true;
+        break;
+      }
+      case NodeType::BackgroundBlurStyle:
+        writeBackgroundBlurStyle(static_cast<const BackgroundBlurStyle*>(style));
+        break;
+      default:
+        break;
+    }
+  }
+}
+
+void SVGWriter::writeShadowMerge(const ShadowAggregate& agg) {
+  bool hasShadows = !agg.dropShadowResults.empty() || !agg.innerShadowResults.empty();
+  if (!hasShadows) {
+    return;
+  }
+  bool multipleShadows = (agg.dropShadowResults.size() + agg.innerShadowResults.size()) > 1;
+  if (!agg.needSourceGraphic && !multipleShadows) {
+    return;
+  }
+  _defs->openElement("feMerge");
+  _defs->closeElementStart();
+  for (const auto& result : agg.dropShadowResults) {
+    _defs->openElement("feMergeNode");
+    _defs->addAttribute("in", result);
+    _defs->closeElementSelfClosing();
+  }
+  if (agg.needSourceGraphic) {
+    _defs->openElement("feMergeNode");
+    _defs->addAttribute("in", "SourceGraphic");
+    _defs->closeElementSelfClosing();
+  }
+  for (const auto& result : agg.innerShadowResults) {
+    _defs->openElement("feMergeNode");
+    _defs->addAttribute("in", result);
+    _defs->closeElementSelfClosing();
+  }
+  _defs->closeElement();
+}
+
 std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& filters,
                                                const std::vector<LayerStyle*>& styles) {
   if (filters.empty() && styles.empty()) {
@@ -615,208 +872,10 @@ std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& 
   _defs->closeElementStart();
 
   int shadowIndex = 0;
-  std::vector<std::string> dropShadowResults;
-  std::vector<std::string> innerShadowResults;
-  bool needSourceGraphic = false;
-
-  for (const auto* filter : filters) {
-    switch (filter->nodeType()) {
-      case NodeType::BlurFilter: {
-        auto blur = static_cast<const BlurFilter*>(filter);
-        _defs->openElement("feGaussianBlur");
-        _defs->addAttribute("in", "SourceGraphic");
-        std::string stdDev = FloatToString(blur->blurX);
-        if (blur->blurX != blur->blurY) {
-          stdDev += " " + FloatToString(blur->blurY);
-        }
-        _defs->addAttribute("stdDeviation", stdDev);
-        _defs->closeElementSelfClosing();
-        break;
-      }
-      case NodeType::DropShadowFilter: {
-        auto shadow = static_cast<const DropShadowFilter*>(filter);
-        std::string idx = std::to_string(shadowIndex++);
-        std::string offsetResult = "shadowOffset" + idx;
-        std::string shadowResult = "shadow" + idx;
-        writeShadowBlurAndOffset(shadow->blurX, shadow->blurY, shadow->offsetX, shadow->offsetY,
-                                 "shadowBlur" + idx, offsetResult);
-        writeShadowColorMatrix(shadow->color, offsetResult, shadowResult);
-        dropShadowResults.push_back(shadowResult);
-        if (!shadow->shadowOnly) {
-          needSourceGraphic = true;
-        }
-        break;
-      }
-      case NodeType::InnerShadowFilter: {
-        auto shadow = static_cast<const InnerShadowFilter*>(filter);
-        std::string idx = std::to_string(shadowIndex++);
-        std::string offsetResult = "innerOffset" + idx;
-        std::string compositeResult = "innerComposite" + idx;
-        std::string shadowResult = "innerShadow" + idx;
-        writeShadowBlurAndOffset(shadow->blurX, shadow->blurY, shadow->offsetX, shadow->offsetY,
-                                 "innerBlur" + idx, offsetResult);
-
-        _defs->openElement("feComposite");
-        _defs->addAttribute("in", "SourceAlpha");
-        _defs->addAttribute("in2", offsetResult);
-        _defs->addAttribute("operator", "arithmetic");
-        _defs->addAttribute("k2", "-1");
-        _defs->addAttribute("k3", "1");
-        _defs->addAttribute("result", compositeResult);
-        _defs->closeElementSelfClosing();
-
-        writeShadowColorMatrix(shadow->color, compositeResult, shadowResult);
-        innerShadowResults.push_back(shadowResult);
-        if (!shadow->shadowOnly) {
-          needSourceGraphic = true;
-        }
-        break;
-      }
-      case NodeType::ColorMatrixFilter: {
-        auto cm = static_cast<const ColorMatrixFilter*>(filter);
-        _defs->openElement("feColorMatrix");
-        _defs->addAttribute("in", "SourceGraphic");
-        _defs->addAttribute("type", "matrix");
-        std::string values;
-        values.reserve(200);
-        for (size_t i = 0; i < cm->matrix.size(); i++) {
-          if (i > 0) {
-            values += " ";
-          }
-          values += FloatToString(cm->matrix[i]);
-        }
-        _defs->addAttribute("values", values);
-        _defs->closeElementSelfClosing();
-        break;
-      }
-      case NodeType::BlendFilter: {
-        auto blend = static_cast<const BlendFilter*>(filter);
-        std::string idx = std::to_string(shadowIndex++);
-        std::string floodResult = "blendFlood" + idx;
-        _defs->openElement("feFlood");
-        _defs->addAttribute("flood-color", ColorToSVGString(blend->color));
-        if (blend->color.alpha < 1.0f) {
-          _defs->addAttribute("flood-opacity", FloatToString(blend->color.alpha));
-        }
-        _defs->addAttribute("result", floodResult);
-        _defs->closeElementSelfClosing();
-
-        std::string blendResult = "blendResult" + idx;
-        _defs->openElement("feBlend");
-        _defs->addAttribute("in", "SourceGraphic");
-        _defs->addAttribute("in2", floodResult);
-        auto modeStr = BlendModeToSVGString(blend->blendMode);
-        if (modeStr) {
-          _defs->addAttribute("mode", modeStr);
-        }
-        _defs->addAttribute("result", blendResult);
-        _defs->closeElementSelfClosing();
-
-        _defs->openElement("feComposite");
-        _defs->addAttribute("in", blendResult);
-        _defs->addAttribute("in2", "SourceGraphic");
-        _defs->addAttribute("operator", "in");
-        _defs->closeElementSelfClosing();
-        break;
-      }
-      default:
-        break;
-    }
-  }
-
-  // LayerStyle emission mirrors the Filter pass so DropShadowStyle /
-  // InnerShadowStyle share the feMerge aggregation logic. BackgroundBlurStyle
-  // has no portable SVG equivalent (the CSS `backdrop-filter` is for HTML, and
-  // `<feGaussianBlur in="BackgroundImage">` relies on the deprecated
-  // `enable-background` attribute); degrade to a source blur with a comment.
-  for (const auto* style : styles) {
-    switch (style->nodeType()) {
-      case NodeType::DropShadowStyle: {
-        auto shadow = static_cast<const DropShadowStyle*>(style);
-        std::string idx = std::to_string(shadowIndex++);
-        std::string offsetResult = "shadowOffset" + idx;
-        std::string shadowResult = "shadow" + idx;
-        writeShadowBlurAndOffset(shadow->blurX, shadow->blurY, shadow->offsetX, shadow->offsetY,
-                                 "shadowBlur" + idx, offsetResult);
-        writeShadowColorMatrix(shadow->color, offsetResult, shadowResult);
-        dropShadowResults.push_back(shadowResult);
-        // DropShadowStyle always composites below the source graphic (it is a
-        // style layer, not a filter that can hide the source).
-        needSourceGraphic = true;
-        break;
-      }
-      case NodeType::InnerShadowStyle: {
-        auto shadow = static_cast<const InnerShadowStyle*>(style);
-        std::string idx = std::to_string(shadowIndex++);
-        std::string offsetResult = "innerOffset" + idx;
-        std::string compositeResult = "innerComposite" + idx;
-        std::string shadowResult = "innerShadow" + idx;
-        writeShadowBlurAndOffset(shadow->blurX, shadow->blurY, shadow->offsetX, shadow->offsetY,
-                                 "innerBlur" + idx, offsetResult);
-
-        _defs->openElement("feComposite");
-        _defs->addAttribute("in", "SourceAlpha");
-        _defs->addAttribute("in2", offsetResult);
-        _defs->addAttribute("operator", "arithmetic");
-        _defs->addAttribute("k2", "-1");
-        _defs->addAttribute("k3", "1");
-        _defs->addAttribute("result", compositeResult);
-        _defs->closeElementSelfClosing();
-
-        writeShadowColorMatrix(shadow->color, compositeResult, shadowResult);
-        innerShadowResults.push_back(shadowResult);
-        needSourceGraphic = true;
-        break;
-      }
-      case NodeType::BackgroundBlurStyle: {
-        // SVG lacks a widely-supported BackgroundImage / backdrop access: `<feGaussianBlur
-        // in="BackgroundImage">` requires `enable-background` on an ancestor, which has
-        // been dropped from the SVG spec and is not implemented by modern renderers.
-        // Degrade to blurring the source graphic so the layer at least shows a blur
-        // effect; authoring callers who need true background-blur should output HTML.
-        auto bb = static_cast<const BackgroundBlurStyle*>(style);
-        _defs->addRawContent(std::string(_indentSpaces, ' ') +
-                             "<!-- background-blur degraded to source-blur: "
-                             "SVG has no portable BackgroundImage source -->\n");
-        _defs->openElement("feGaussianBlur");
-        _defs->addAttribute("in", "SourceGraphic");
-        std::string stdDev = FloatToString(bb->blurX);
-        if (bb->blurX != bb->blurY) {
-          stdDev += " " + FloatToString(bb->blurY);
-        }
-        _defs->addAttribute("stdDeviation", stdDev);
-        _defs->closeElementSelfClosing();
-        break;
-      }
-      default:
-        break;
-    }
-  }
-
-  bool hasShadows = !dropShadowResults.empty() || !innerShadowResults.empty();
-  if (hasShadows) {
-    bool multipleShadows = (dropShadowResults.size() + innerShadowResults.size()) > 1;
-    if (needSourceGraphic || multipleShadows) {
-      _defs->openElement("feMerge");
-      _defs->closeElementStart();
-      for (const auto& result : dropShadowResults) {
-        _defs->openElement("feMergeNode");
-        _defs->addAttribute("in", result);
-        _defs->closeElementSelfClosing();
-      }
-      if (needSourceGraphic) {
-        _defs->openElement("feMergeNode");
-        _defs->addAttribute("in", "SourceGraphic");
-        _defs->closeElementSelfClosing();
-      }
-      for (const auto& result : innerShadowResults) {
-        _defs->openElement("feMergeNode");
-        _defs->addAttribute("in", result);
-        _defs->closeElementSelfClosing();
-      }
-      _defs->closeElement();
-    }
-  }
+  ShadowAggregate agg;
+  writeFilterList(filters, shadowIndex, agg);
+  writeStyleList(styles, shadowIndex, agg);
+  writeShadowMerge(agg);
 
   _defs->closeElement();  // </filter>
   return filterId;
@@ -902,14 +961,7 @@ void SVGWriter::applyFillAttributes(SVGBuilder& out, const Fill* fill, const Rec
   }
   if (p3Style) {
     AppendP3ColorStyle(*p3Style, "fill", fill->color, fillStr, effectiveAlpha);
-    if (fill->blendMode != BlendMode::Normal) {
-      auto blendStr = BlendModeToSVGString(fill->blendMode);
-      if (blendStr) {
-        *p3Style += "mix-blend-mode:";
-        *p3Style += blendStr;
-        *p3Style += ';';
-      }
-    }
+    AppendBlendModeStyle(*p3Style, fill->blendMode);
   }
 }
 
@@ -959,14 +1011,7 @@ void SVGWriter::applyStrokeAttributes(SVGBuilder& out, const Stroke* stroke,
   }
   if (p3Style) {
     AppendP3ColorStyle(*p3Style, "stroke", stroke->color, strokeStr, effectiveAlpha);
-    if (stroke->blendMode != BlendMode::Normal) {
-      auto blendStr = BlendModeToSVGString(stroke->blendMode);
-      if (blendStr) {
-        *p3Style += "mix-blend-mode:";
-        *p3Style += blendStr;
-        *p3Style += ';';
-      }
-    }
+    AppendBlendModeStyle(*p3Style, stroke->blendMode);
   }
 }
 
@@ -974,6 +1019,14 @@ void SVGWriter::applyP3Style(SVGBuilder& out, const std::string& p3Style) {
   if (!p3Style.empty()) {
     out.addAttribute("style", p3Style);
   }
+}
+
+void SVGWriter::applyPainters(SVGBuilder& out, const FillStrokeInfo& fs, const Rect& shapeBounds,
+                              float alpha) {
+  std::string p3Style;
+  applyFillAttributes(out, fs.fill, shapeBounds, &p3Style, alpha);
+  applyStrokeAttributes(out, fs.stroke, shapeBounds, &p3Style, alpha);
+  applyP3Style(out, p3Style);
 }
 
 //==============================================================================
@@ -1010,10 +1063,7 @@ void SVGWriter::writeRectangle(SVGBuilder& out, const Rectangle* rect, const Fil
     out.addAttribute("ry", roundness);
   }
   Rect bounds = Rect::MakeXYWH(x, y, w, h);
-  std::string p3Style;
-  applyFillAttributes(out, fs.fill, bounds, &p3Style, alpha);
-  applyStrokeAttributes(out, fs.stroke, bounds, &p3Style, alpha);
-  applyP3Style(out, p3Style);
+  applyPainters(out, fs, bounds, alpha);
   out.closeElementSelfClosing();
 }
 
@@ -1053,10 +1103,7 @@ void SVGWriter::writeEllipse(SVGBuilder& out, const Ellipse* ellipse, const Fill
     out.addRequiredAttribute("ry", ry);
   }
   Rect bounds = Rect::MakeXYWH(x, y, w, h);
-  std::string p3Style;
-  applyFillAttributes(out, fs.fill, bounds, &p3Style, alpha);
-  applyStrokeAttributes(out, fs.stroke, bounds, &p3Style, alpha);
-  applyP3Style(out, p3Style);
+  applyPainters(out, fs, bounds, alpha);
   out.closeElementSelfClosing();
 }
 
@@ -1082,10 +1129,7 @@ void SVGWriter::writePath(SVGBuilder& out, const Path* path, const FillStrokeInf
   }
   out.addAttribute("d", PathDataToSVGString(*path->data));
   Rect bounds = path->data->getBounds();
-  std::string p3Style;
-  applyFillAttributes(out, fs.fill, bounds, &p3Style, alpha);
-  applyStrokeAttributes(out, fs.stroke, bounds, &p3Style, alpha);
-  applyP3Style(out, p3Style);
+  applyPainters(out, fs, bounds, alpha);
   out.closeElementSelfClosing();
 }
 
@@ -1118,10 +1162,7 @@ void SVGWriter::writeTextAsPath(SVGBuilder& out, const Text* text, const FillStr
   // Fill/stroke here only apply to the vector glyph <path> children; <image>
   // children have an intrinsic bitmap and ignore fill. We still emit the group
   // attributes so SVG renderers inherit them onto the glyph paths.
-  std::string p3Style;
-  applyFillAttributes(out, fs.fill, {}, &p3Style, alpha);
-  applyStrokeAttributes(out, fs.stroke, {}, &p3Style, alpha);
-  applyP3Style(out, p3Style);
+  applyPainters(out, fs, {}, alpha);
   out.closeElementStart();
 
   for (const auto& gp : glyphPaths) {
@@ -1212,6 +1253,131 @@ static int CountWordSpaces(const std::string& text) {
   return count;
 }
 
+// The positioning/anchor parameters derived from a TextBox or a standalone Text.
+// Computed once by ResolveTextAnchorAndOffset and then consumed per-line by
+// writeTextWithLayout.
+struct TextAnchoring {
+  TextAnchor anchor = TextAnchor::Start;
+  float anchorX = 0;
+  float offsetY = 0;
+  float justifyWidth = 0;  // > 0 only when horizontal-justify is in effect.
+};
+
+// Vertical writing mode: textAlign controls the inline axis (vertical),
+// paragraphAlign controls the block axis (horizontal, columns right-to-left).
+static void ResolveVerticalAnchoring(const Text* text, const TextBox* box,
+                                     const TextLayoutResult& layoutResult, TextAnchoring* out) {
+  float paddingLeft = box->padding.left;
+  float paddingTop = box->padding.top;
+  float paddingRight = box->padding.right;
+  float paddingBottom = box->padding.bottom;
+  float effectiveWidth = EffectiveTextBoxWidth(box);
+  float effectiveHeight = EffectiveTextBoxHeight(box);
+  auto textBounds = layoutResult.getTextBounds(const_cast<Text*>(text));
+  float contentWidth = textBounds.isEmpty() ? text->fontSize : textBounds.width;
+  float innerWidth = effectiveWidth - paddingLeft - paddingRight;
+  float innerHeight =
+      (!std::isnan(effectiveHeight)) ? effectiveHeight - paddingTop - paddingBottom : 0;
+  // Block axis (horizontal): paragraphAlign positions columns right-to-left.
+  // Near = right edge, Far = left edge.
+  switch (box->paragraphAlign) {
+    case ParagraphAlign::Middle:
+      out->anchorX = paddingLeft + (innerWidth + contentWidth) / 2 - text->fontSize / 2;
+      break;
+    case ParagraphAlign::Far:
+      out->anchorX = paddingLeft + contentWidth - text->fontSize / 2;
+      break;
+    default:
+      out->anchorX = effectiveWidth - paddingRight - text->fontSize / 2;
+      break;
+  }
+  // Inline axis (vertical): textAlign positions text top-to-bottom.
+  switch (box->textAlign) {
+    case TextAlign::Center:
+      out->anchor = TextAnchor::Center;
+      out->offsetY = paddingTop + innerHeight / 2;
+      break;
+    case TextAlign::End:
+      out->anchor = TextAnchor::End;
+      out->offsetY = paddingTop + innerHeight;
+      break;
+    case TextAlign::Justify:
+      // Vertical mode has no textLines — SVG textLength cannot be applied.
+      out->anchor = TextAnchor::Start;
+      out->offsetY = paddingTop;
+      break;
+    default:
+      out->anchor = TextAnchor::Start;
+      out->offsetY = paddingTop;
+      break;
+  }
+}
+
+static void ResolveHorizontalAnchoring(const TextBox* box, TextAnchoring* out) {
+  float paddingLeft = box->padding.left;
+  float paddingTop = box->padding.top;
+  float paddingRight = box->padding.right;
+  float effectiveWidth = EffectiveTextBoxWidth(box);
+  switch (box->textAlign) {
+    case TextAlign::Center:
+      out->anchor = TextAnchor::Center;
+      out->anchorX = paddingLeft + (effectiveWidth - paddingLeft - paddingRight) / 2;
+      break;
+    case TextAlign::End:
+      out->anchor = TextAnchor::End;
+      out->anchorX = effectiveWidth - paddingRight;
+      break;
+    case TextAlign::Justify:
+      out->anchor = TextAnchor::Start;
+      out->anchorX = paddingLeft;
+      out->justifyWidth = effectiveWidth - paddingLeft - paddingRight;
+      break;
+    default:
+      out->anchor = TextAnchor::Start;
+      out->anchorX = paddingLeft;
+      break;
+  }
+  out->offsetY = paddingTop;
+}
+
+// The transform matrix passed into writeTextWithLayout already includes
+// renderPosition via BuildGroupMatrix, so anchor x/y are in TextBox-local
+// coordinates starting from (0,0). Standalone Text (no TextBox) uses the
+// element's own anchor / renderPosition directly.
+static TextAnchoring ResolveTextAnchorAndOffset(const Text* text, const TextBox* box,
+                                                const TextLayoutResult& layoutResult) {
+  TextAnchoring out;
+  if (box == nullptr) {
+    out.anchor = text->textAnchor;
+    auto renderPos = text->renderPosition();
+    out.anchorX = renderPos.x;
+    out.offsetY = renderPos.y;
+    return out;
+  }
+  if (box->writingMode == WritingMode::Vertical) {
+    ResolveVerticalAnchoring(text, box, layoutResult, &out);
+  } else {
+    ResolveHorizontalAnchoring(box, &out);
+  }
+  return out;
+}
+
+// Last non-empty line index for justify last-line detection.
+static size_t FindLastNonEmptyLineIndex(const std::string& text,
+                                        const std::vector<TextLayoutLineInfo>& lines) {
+  size_t lastLineIndex = 0;
+  for (size_t li = 0; li < lines.size(); ++li) {
+    const auto& info = lines[li];
+    if (info.byteStart < info.byteEnd &&
+        info.byteEnd - info.byteStart <= text.size() - info.byteStart) {
+      if (!text.substr(info.byteStart, info.byteEnd - info.byteStart).empty()) {
+        lastLineIndex = li;
+      }
+    }
+  }
+  return lastLineIndex;
+}
+
 void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
                                     const TextLayoutResult& layoutResult, const Matrix& m,
                                     float alpha) {
@@ -1219,91 +1385,7 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
   auto* lines = layoutResult.getTextLines(mutableText);
 
   bool isVertical = fs.textBox && fs.textBox->writingMode == WritingMode::Vertical;
-
-  TextAnchor anchor = TextAnchor::Start;
-  float anchorX = 0;
-  float offsetY = 0;
-  float justifyWidth = 0;
-  if (fs.textBox) {
-    float paddingLeft = fs.textBox->padding.left;
-    float paddingTop = fs.textBox->padding.top;
-    float paddingRight = fs.textBox->padding.right;
-    float paddingBottom = fs.textBox->padding.bottom;
-    float effectiveWidth = EffectiveTextBoxWidth(fs.textBox);
-    float effectiveHeight = EffectiveTextBoxHeight(fs.textBox);
-    TextAlign textAlign = fs.textBox->textAlign;
-    // The transform matrix (m) already includes renderPosition via BuildGroupMatrix,
-    // so x/y attributes are in TextBox-local coordinates starting from (0,0).
-    if (isVertical) {
-      // Vertical writing mode: textAlign controls the inline axis (vertical),
-      // paragraphAlign controls the block axis (horizontal, columns right-to-left).
-      // SVG text-anchor in writing-mode="tb" maps to the vertical inline axis.
-      auto textBounds = layoutResult.getTextBounds(const_cast<Text*>(text));
-      float contentWidth = textBounds.isEmpty() ? text->fontSize : textBounds.width;
-      float innerWidth = effectiveWidth - paddingLeft - paddingRight;
-      float innerHeight =
-          (!std::isnan(effectiveHeight)) ? effectiveHeight - paddingTop - paddingBottom : 0;
-      // Block axis (horizontal): paragraphAlign positions columns right-to-left.
-      // Near = right edge, Far = left edge.
-      switch (fs.textBox->paragraphAlign) {
-        case ParagraphAlign::Middle:
-          anchorX = paddingLeft + (innerWidth + contentWidth) / 2 - text->fontSize / 2;
-          break;
-        case ParagraphAlign::Far:
-          anchorX = paddingLeft + contentWidth - text->fontSize / 2;
-          break;
-        default:
-          anchorX = effectiveWidth - paddingRight - text->fontSize / 2;
-          break;
-      }
-      // Inline axis (vertical): textAlign positions text top-to-bottom.
-      switch (textAlign) {
-        case TextAlign::Center:
-          anchor = TextAnchor::Center;
-          offsetY = paddingTop + innerHeight / 2;
-          break;
-        case TextAlign::End:
-          anchor = TextAnchor::End;
-          offsetY = paddingTop + innerHeight;
-          break;
-        case TextAlign::Justify:
-          // Vertical mode has no textLines — SVG textLength cannot be applied.
-          anchor = TextAnchor::Start;
-          offsetY = paddingTop;
-          break;
-        default:
-          anchor = TextAnchor::Start;
-          offsetY = paddingTop;
-          break;
-      }
-    } else {
-      switch (textAlign) {
-        case TextAlign::Center:
-          anchor = TextAnchor::Center;
-          anchorX = paddingLeft + (effectiveWidth - paddingLeft - paddingRight) / 2;
-          break;
-        case TextAlign::End:
-          anchor = TextAnchor::End;
-          anchorX = effectiveWidth - paddingRight;
-          break;
-        case TextAlign::Justify:
-          anchor = TextAnchor::Start;
-          anchorX = paddingLeft;
-          justifyWidth = effectiveWidth - paddingLeft - paddingRight;
-          break;
-        default:
-          anchor = TextAnchor::Start;
-          anchorX = paddingLeft;
-          break;
-      }
-      offsetY = paddingTop;
-    }
-  } else {
-    anchor = text->textAnchor;
-    auto renderPos = text->renderPosition();
-    anchorX = renderPos.x;
-    offsetY = renderPos.y;
-  }
+  TextAnchoring anchoring = ResolveTextAnchorAndOffset(text, fs.textBox, layoutResult);
 
   std::string transform = MatrixToSVGTransform(m);
   if (!lines || lines->empty()) {
@@ -1316,33 +1398,20 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
     if (!transform.empty()) {
       out.addAttribute("transform", transform);
     }
-    WriteSharedTextAttrs(out, text, anchor);
+    WriteSharedTextAttrs(out, text, anchoring.anchor);
     ApplyTextBoxBodyAttrs(out, fs.textBox);
-    std::string p3Style;
-    applyFillAttributes(out, fs.fill, {}, &p3Style, alpha);
-    applyStrokeAttributes(out, fs.stroke, {}, &p3Style, alpha);
-    applyP3Style(out, p3Style);
-    out.addRequiredAttribute("x", anchorX);
+    applyPainters(out, fs, {}, alpha);
+    out.addRequiredAttribute("x", anchoring.anchorX);
     // In vertical mode offsetY already points to the correct inline-axis start;
     // in horizontal fallback the y coordinate needs a baseline shift by fontSize.
-    out.addRequiredAttribute("y", isVertical ? offsetY : offsetY + text->fontSize);
+    out.addRequiredAttribute("y",
+                             isVertical ? anchoring.offsetY : anchoring.offsetY + text->fontSize);
     out.closeElementWithText(text->text);
     return;
   }
 
-  // Find the index of the last non-empty line for justify last-line detection.
-  size_t lastLineIndex = 0;
-  if (justifyWidth > 0 && lines && !lines->empty()) {
-    for (size_t li = 0; li < lines->size(); ++li) {
-      auto& info = (*lines)[li];
-      if (info.byteStart < info.byteEnd) {
-        std::string tmp = text->text.substr(info.byteStart, info.byteEnd - info.byteStart);
-        if (!tmp.empty()) {
-          lastLineIndex = li;
-        }
-      }
-    }
-  }
+  size_t lastLineIndex =
+      anchoring.justifyWidth > 0 ? FindLastNonEmptyLineIndex(text->text, *lines) : 0;
 
   for (size_t lineIdx = 0; lineIdx < lines->size(); ++lineIdx) {
     auto& lineInfo = (*lines)[lineIdx];
@@ -1358,18 +1427,15 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
     if (!transform.empty()) {
       out.addAttribute("transform", transform);
     }
-    WriteSharedTextAttrs(out, text, anchor);
+    WriteSharedTextAttrs(out, text, anchoring.anchor);
     ApplyTextBoxBodyAttrs(out, fs.textBox);
-    std::string p3Style;
-    applyFillAttributes(out, fs.fill, {}, &p3Style, alpha);
-    applyStrokeAttributes(out, fs.stroke, {}, &p3Style, alpha);
-    applyP3Style(out, p3Style);
-    out.addRequiredAttribute("x", anchorX);
-    out.addRequiredAttribute("y", offsetY + lineInfo.baselineY);
-    if (justifyWidth > 0 && lineIdx != lastLineIndex) {
+    applyPainters(out, fs, {}, alpha);
+    out.addRequiredAttribute("x", anchoring.anchorX);
+    out.addRequiredAttribute("y", anchoring.offsetY + lineInfo.baselineY);
+    if (anchoring.justifyWidth > 0 && lineIdx != lastLineIndex) {
       int spaceCount = CountWordSpaces(lineText);
       if (spaceCount > 0) {
-        float extraSpace = justifyWidth - lineInfo.lineWidth;
+        float extraSpace = anchoring.justifyWidth - lineInfo.lineWidth;
         float wordSpacing = extraSpace / static_cast<float>(spaceCount);
         out.addAttribute("word-spacing", FloatToString(wordSpacing));
       }
@@ -1487,36 +1553,11 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
     return;
   }
 
-  // Compute TextBox-level positioning (shared by all lines).
-  float paddingLeft = textBox->padding.left;
-  float paddingTop = textBox->padding.top;
-  float paddingRight = textBox->padding.right;
-  float effectiveWidth = EffectiveTextBoxWidth(textBox);
-  TextAnchor anchor = TextAnchor::Start;
-  float anchorX = 0;
-  float offsetY = paddingTop;
-  switch (textBox->textAlign) {
-    case TextAlign::Center:
-      anchor = TextAnchor::Center;
-      anchorX = paddingLeft + (effectiveWidth - paddingLeft - paddingRight) / 2;
-      break;
-    case TextAlign::End:
-      anchor = TextAnchor::End;
-      anchorX = effectiveWidth - paddingRight;
-      break;
-    case TextAlign::Justify:
-      anchor = TextAnchor::Start;
-      anchorX = paddingLeft;
-      break;
-    default:
-      anchor = TextAnchor::Start;
-      anchorX = paddingLeft;
-      break;
-  }
-  float justifyWidth = 0;
-  if (textBox->textAlign == TextAlign::Justify) {
-    justifyWidth = effectiveWidth - paddingLeft - paddingRight;
-  }
+  // Compute TextBox-level positioning (shared by all lines). TextBox rich-text
+  // is always horizontal here (vertical falls back above), so ResolveHorizontalAnchoring
+  // gives us anchor/anchorX/offsetY/justifyWidth directly.
+  TextAnchoring anchoring;
+  ResolveHorizontalAnchoring(textBox, &anchoring);
   std::string svgTransform = MatrixToSVGTransform(transform);
 
   // Stable-sort entries by baselineY so that runs from different Text
@@ -1526,7 +1567,7 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
 
   // Find the last visual line's baseline for justify last-line detection.
   float lastBaseline = 0;
-  if (justifyWidth > 0 && !lineEntries.empty()) {
+  if (anchoring.justifyWidth > 0 && !lineEntries.empty()) {
     lastBaseline = lineEntries.back().baselineY;
   }
 
@@ -1539,7 +1580,7 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
     bool isLastLine = std::fabs(baseline - lastBaseline) < baselineEpsilon;
     // Count word spaces across all runs on this visual line for word-spacing.
     int totalSpaces = 0;
-    if (justifyWidth > 0 && !isLastLine) {
+    if (anchoring.justifyWidth > 0 && !isLastLine) {
       for (size_t j = i; j < lineEntries.size() &&
                          std::fabs(lineEntries[j].baselineY - baseline) < baselineEpsilon;
            ++j) {
@@ -1552,16 +1593,16 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
     if (!svgTransform.empty()) {
       out.addAttribute("transform", svgTransform);
     }
-    if (anchor == TextAnchor::Center) {
+    if (anchoring.anchor == TextAnchor::Center) {
       out.addAttribute("text-anchor", "middle");
-    } else if (anchor == TextAnchor::End) {
+    } else if (anchoring.anchor == TextAnchor::End) {
       out.addAttribute("text-anchor", "end");
     }
     ApplyTextBoxBodyAttrs(out, textBox);
-    out.addRequiredAttribute("x", anchorX);
-    out.addRequiredAttribute("y", offsetY + baseline);
-    if (justifyWidth > 0 && !isLastLine && totalSpaces > 0) {
-      float wordSpacing = (justifyWidth - lineWidth) / static_cast<float>(totalSpaces);
+    out.addRequiredAttribute("x", anchoring.anchorX);
+    out.addRequiredAttribute("y", anchoring.offsetY + baseline);
+    if (anchoring.justifyWidth > 0 && !isLastLine && totalSpaces > 0) {
+      float wordSpacing = (anchoring.justifyWidth - lineWidth) / static_cast<float>(totalSpaces);
       out.addAttribute("word-spacing", FloatToString(wordSpacing));
     }
     out.closeElementStart();
@@ -1580,10 +1621,10 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
       }
       out.openElement("tspan");
       WriteSharedTextAttrs(out, run.text, TextAnchor::Start);
-      std::string p3Style;
-      applyFillAttributes(out, effectiveFill, {}, &p3Style, alpha);
-      applyStrokeAttributes(out, effectiveStroke, {}, &p3Style, alpha);
-      applyP3Style(out, p3Style);
+      FillStrokeInfo runFs = {};
+      runFs.fill = effectiveFill;
+      runFs.stroke = effectiveStroke;
+      applyPainters(out, runFs, {}, alpha);
       out.closeElementWithText(lineText);
       ++i;
     }
@@ -1619,10 +1660,7 @@ void SVGWriter::writeText(SVGBuilder& out, const Text* text, const FillStrokeInf
   }
   WriteSharedTextAttrs(out, text, text->textAnchor);
   ApplyTextBoxBodyAttrs(out, fs.textBox);
-  std::string p3Style;
-  applyFillAttributes(out, fs.fill, {}, &p3Style, alpha);
-  applyStrokeAttributes(out, fs.stroke, {}, &p3Style, alpha);
-  applyP3Style(out, p3Style);
+  applyPainters(out, fs, {}, alpha);
   auto renderPos = text->renderPosition();
   out.addAttributeIfNonZero("x", renderPos.x);
   out.addAttributeIfNonZero("y", renderPos.y);
@@ -1884,20 +1922,56 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
                     layer->blendMode != BlendMode::Normal || layer->hasScrollRect;
 
   if (!needsGroup) {
-    writeLayerContents(out, layer);
-    if (layer->composition != nullptr) {
-      for (const auto* compLayer : layer->composition->layers) {
-        writeLayer(out, compLayer);
-      }
-    }
-    for (const auto* child : layer->children) {
-      writeLayer(out, child);
-    }
+    writeLayerBody(out, layer);
     return;
   }
 
   out.openElement("g");
+  writeLayerGroupAttributes(out, layer);
 
+  bool hasContent =
+      !layer->contents.empty() || !layer->children.empty() || layer->composition != nullptr;
+  if (!hasContent) {
+    out.closeElementSelfClosing();
+    return;
+  }
+
+  out.closeElementStart();
+
+  // When scrollRect is active, wrap all content in an inner <g> that shifts
+  // the content by (-scrollRect.x, -scrollRect.y) so that the scroll origin
+  // aligns with the viewport's (0,0).
+  bool hasScrollOffset =
+      layer->hasScrollRect && (layer->scrollRect.x != 0.0f || layer->scrollRect.y != 0.0f);
+  if (hasScrollOffset) {
+    out.openElement("g");
+    out.addAttribute("transform", "translate(" + FloatToString(-layer->scrollRect.x) + "," +
+                                      FloatToString(-layer->scrollRect.y) + ")");
+    out.closeElementStart();
+  }
+
+  writeLayerBody(out, layer);
+
+  if (hasScrollOffset) {
+    out.closeElement();
+  }
+
+  out.closeElement();
+}
+
+void SVGWriter::writeLayerBody(SVGBuilder& out, const Layer* layer) {
+  writeLayerContents(out, layer);
+  if (layer->composition != nullptr) {
+    for (const auto* compLayer : layer->composition->layers) {
+      writeLayer(out, compLayer);
+    }
+  }
+  for (const auto* child : layer->children) {
+    writeLayer(out, child);
+  }
+}
+
+void SVGWriter::writeLayerGroupAttributes(SVGBuilder& out, const Layer* layer) {
   if (!layer->id.empty()) {
     out.addAttribute("id", layer->id);
   }
@@ -1944,59 +2018,24 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   // scrollRect clips the layer's content to a viewport rectangle and offsets
   // the content by the scroll origin. Unlike PPT (which must bake to PNG),
   // SVG natively supports <clipPath> so we emit a vector clip.
-  std::string scrollClipId;
   if (layer->hasScrollRect) {
-    auto& sr = layer->scrollRect;
-    scrollClipId = generateId("scrollClip");
-    _defs->openElement("clipPath");
-    _defs->addAttribute("id", scrollClipId);
-    _defs->closeElementStart();
-    _defs->openElement("rect");
-    _defs->addRequiredAttribute("width", sr.width);
-    _defs->addRequiredAttribute("height", sr.height);
-    _defs->closeElementSelfClosing();
-    _defs->closeElement();
+    auto scrollClipId = writeScrollRectClipDef(layer);
     out.addAttribute("clip-path", "url(#" + scrollClipId + ")");
   }
+}
 
-  bool hasContent =
-      !layer->contents.empty() || !layer->children.empty() || layer->composition != nullptr;
-  if (!hasContent) {
-    out.closeElementSelfClosing();
-    return;
-  }
-
-  out.closeElementStart();
-
-  // When scrollRect is active, wrap all content in an inner <g> that shifts
-  // the content by (-scrollRect.x, -scrollRect.y) so that the scroll origin
-  // aligns with the viewport's (0,0).
-  bool hasScrollOffset =
-      layer->hasScrollRect && (layer->scrollRect.x != 0.0f || layer->scrollRect.y != 0.0f);
-  if (hasScrollOffset) {
-    out.openElement("g");
-    out.addAttribute("transform", "translate(" + FloatToString(-layer->scrollRect.x) + "," +
-                                      FloatToString(-layer->scrollRect.y) + ")");
-    out.closeElementStart();
-  }
-
-  writeLayerContents(out, layer);
-
-  if (layer->composition != nullptr) {
-    for (const auto* compLayer : layer->composition->layers) {
-      writeLayer(out, compLayer);
-    }
-  }
-
-  for (const auto* child : layer->children) {
-    writeLayer(out, child);
-  }
-
-  if (hasScrollOffset) {
-    out.closeElement();
-  }
-
-  out.closeElement();
+std::string SVGWriter::writeScrollRectClipDef(const Layer* layer) {
+  auto& sr = layer->scrollRect;
+  std::string scrollClipId = generateId("scrollClip");
+  _defs->openElement("clipPath");
+  _defs->addAttribute("id", scrollClipId);
+  _defs->closeElementStart();
+  _defs->openElement("rect");
+  _defs->addRequiredAttribute("width", sr.width);
+  _defs->addRequiredAttribute("height", sr.height);
+  _defs->closeElementSelfClosing();
+  _defs->closeElement();
+  return scrollClipId;
 }
 
 //==============================================================================
