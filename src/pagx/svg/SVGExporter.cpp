@@ -1128,31 +1128,34 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
     float paddingRight = fs.textBox->padding.right;
     float effectiveWidth = EffectiveTextBoxWidth(fs.textBox);
     TextAlign textAlign = fs.textBox->textAlign;
+    // The authored position is a layout input only; layout resolves it into
+    // renderPosition() together with constraints, padding, and flex
+    // allocation. Mirrors PPTWriter::computeNativeTextGeometry.
+    auto boxRenderPos = fs.textBox->renderPosition();
     switch (textAlign) {
       case TextAlign::Center:
         anchor = TextAnchor::Center;
-        anchorX = fs.textBox->position.x + paddingLeft +
-                  (effectiveWidth - paddingLeft - paddingRight) / 2;
+        anchorX = boxRenderPos.x + paddingLeft + (effectiveWidth - paddingLeft - paddingRight) / 2;
         break;
       case TextAlign::End:
         anchor = TextAnchor::End;
-        anchorX = fs.textBox->position.x + effectiveWidth - paddingRight;
+        anchorX = boxRenderPos.x + effectiveWidth - paddingRight;
         break;
       case TextAlign::Justify:
         // SVG's <text> element cannot justify runs — the only way to emulate
         // it is per-character kerning, which requires running the shaper
         // inline. Degrade to Start and leave a marker so authors can tell.
         anchor = TextAnchor::Start;
-        anchorX = fs.textBox->position.x + paddingLeft;
+        anchorX = boxRenderPos.x + paddingLeft;
         out.addRawContent(std::string(_indentSpaces, ' ') +
                           "<!-- text-align=justify degraded to start -->\n");
         break;
       default:
         anchor = TextAnchor::Start;
-        anchorX = fs.textBox->position.x + paddingLeft;
+        anchorX = boxRenderPos.x + paddingLeft;
         break;
     }
-    offsetY = fs.textBox->position.y + paddingTop;
+    offsetY = boxRenderPos.y + paddingTop;
   } else {
     anchor = text->textAnchor;
     auto renderPos = text->renderPosition();
@@ -1495,9 +1498,10 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
     return;
   }
 
+  auto renderPos = layer->renderPosition();
   bool needsGroup = !layer->matrix.isIdentity() || layer->alpha < 1.0f || !layer->id.empty() ||
                     !layer->filters.empty() || !layer->styles.empty() || layer->mask != nullptr ||
-                    layer->x != 0.0f || layer->y != 0.0f || !layer->customData.empty() ||
+                    renderPos.x != 0.0f || renderPos.y != 0.0f || !layer->customData.empty() ||
                     layer->blendMode != BlendMode::Normal;
 
   if (!needsGroup) {
