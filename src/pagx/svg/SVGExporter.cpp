@@ -508,6 +508,8 @@ std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern, const R
       _defs->openElement("pattern");
       _defs->addAttribute("id", defId);
       _defs->addAttribute("patternUnits", "userSpaceOnUse");
+      _defs->addAttributeIfNonZero("x", shapeBounds.x);
+      _defs->addAttributeIfNonZero("y", shapeBounds.y);
       _defs->addAttribute("width", static_cast<float>(w));
       _defs->addAttribute("height", static_cast<float>(h));
       _defs->closeElementStart();
