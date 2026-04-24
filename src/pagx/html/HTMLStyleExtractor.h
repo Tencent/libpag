@@ -24,19 +24,30 @@ namespace pagx {
 class HTMLStyleExtractor {
  public:
   /**
-   * Consolidates every `style="..."` attribute in the input HTML into a single
-   * internal stylesheet injected immediately before `</head>`. Each unique
-   * style value becomes a class rule named `.psN` (N starting at 0, in
-   * first-seen order). Existing `class="..."` attributes are preserved and the
-   * generated class name is appended after a space.
+   * Consolidates every `style="..."` attribute in the input HTML into a
+   * internal stylesheet injected immediately before `</head>`. Styles are
+   * parsed into individual CSS properties, grouped by property-name signature,
+   * and classified into shared (base) vs. varying (modifier) properties.
+   *
+   * When a group of 2+ elements shares the same property names and has ≥2
+   * shared properties and ≤2 varying properties, a base class containing the
+   * shared declarations is emitted alongside individual modifier classes for
+   * the varying properties. Elements in such groups receive two class names:
+   * `class="baseN modN"`.
+   *
+   * Styles that do not form viable groups fall back to exact-string
+   * deduplication. All class names use semantic prefixes derived from the
+   * element's tag name and existing class attribute (e.g., "blend", "layer",
+   * "text", "bg", "root", "svg", "div") instead of the opaque "ps" prefix.
    *
    * The document's <body> tag style is deliberately left inline: its style is
    * unique per document (canvas size differs) so deduplication has no benefit.
    *
-   * Style values are treated as opaque strings — no CSS parsing. HTML entities
-   * in the value (e.g. `&#39;`) are decoded before being written into the
-   * <style> block because the CSS parser does not reinterpret named or numeric
-   * character references inside a <style> element.
+   * HTML entities in style values (e.g. `&#39;`) are decoded before parsing
+   * because the CSS parser does not reinterpret named or numeric character
+   * references inside a <style> element. Semicolons and colons inside
+   * parentheses (e.g., in data: URIs or gradient functions) are respected
+   * during property splitting.
    *
    * The input must be well-formed HTML produced by HTMLWriter. Behaviour on
    * malformed input is best-effort: the extractor will not crash but the

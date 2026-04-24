@@ -16,6 +16,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/html/HTMLStyleExtractor.h"
+#include <algorithm>
 #include <unordered_map>
 #include <vector>
 
@@ -136,7 +137,6 @@ struct StartTagInfo {
   size_t classAttrEnd = 0;    // position after closing '"'
   size_t classValueStart = 0;
   size_t classValueEnd = 0;
-  int classIndex = -1;
 };
 
 static bool IsAlpha(char c) {
@@ -278,42 +278,327 @@ static std::vector<StartTagInfo> Tokenize(const std::string& html) {
 }
 
 //==============================================================================
+// CSS property parsing and classification
+//==============================================================================
+
+struct CSSProperty {
+  std::string name;
+  std::string value;
+};
+
+struct StyleEntry {
+  int tagIndex = -1;
+  std::vector<CSSProperty> properties;
+  std::string signature;
+  std::string decodedStyle;
+};
+
+struct ClassRule {
+  std::string className;
+  std::string declarations;
+};
+
+struct PropertyClassification {
+  std::vector<CSSProperty> sharedProps;
+  std::vector<std::string> varyingPropNames;
+};
+
+static std::string TrimString(const std::string& s) {
+  size_t start = 0;
+  while (start < s.size() && (s[start] == ' ' || s[start] == '\t')) {
+    start++;
+  }
+  size_t end = s.size();
+  while (end > start && (s[end - 1] == ' ' || s[end - 1] == '\t')) {
+    end--;
+  }
+  return s.substr(start, end - start);
+}
+
+static std::vector<CSSProperty> ParseStyleProperties(const std::string& decodedStyle) {
+  std::vector<CSSProperty> props;
+  int parenDepth = 0;
+  size_t segStart = 0;
+  for (size_t i = 0; i <= decodedStyle.size(); i++) {
+    char c = (i < decodedStyle.size()) ? decodedStyle[i] : ';';
+    if (c == '(') {
+      parenDepth++;
+    } else if (c == ')') {
+      if (parenDepth > 0) parenDepth--;
+    } else if (c == ';' && parenDepth == 0) {
+      auto segment = TrimString(decodedStyle.substr(segStart, i - segStart));
+      segStart = i + 1;
+      if (segment.empty()) continue;
+      size_t colonPos = segment.find(':');
+      if (colonPos == std::string::npos) continue;
+      CSSProperty prop;
+      prop.name = TrimString(segment.substr(0, colonPos));
+      prop.value = TrimString(segment.substr(colonPos + 1));
+      if (prop.name.empty() || prop.value.empty()) continue;
+      props.push_back(prop);
+    }
+  }
+  return props;
+}
+
+static std::string BuildPropertySignature(const std::vector<CSSProperty>& props) {
+  std::vector<std::string> names;
+  names.reserve(props.size());
+  for (const auto& p : props) {
+    names.push_back(p.name);
+  }
+  std::sort(names.begin(), names.end());
+  std::string sig;
+  for (size_t i = 0; i < names.size(); i++) {
+    if (i > 0) sig += ';';
+    sig += names[i];
+  }
+  return sig;
+}
+
+static PropertyClassification ClassifyGroupProperties(const std::vector<StyleEntry*>& members) {
+  PropertyClassification result;
+  if (members.empty()) return result;
+  const auto& firstProps = members[0]->properties;
+  // Build name→value map for each member.
+  std::vector<std::unordered_map<std::string, std::string>> memberMaps;
+  memberMaps.reserve(members.size());
+  for (const auto* m : members) {
+    std::unordered_map<std::string, std::string> map;
+    for (const auto& p : m->properties) {
+      map[p.name] = p.value;
+    }
+    memberMaps.push_back(map);
+  }
+  // Classify each property using the first member's property order.
+  for (const auto& prop : firstProps) {
+    bool allSame = true;
+    for (size_t m = 1; m < members.size(); m++) {
+      auto it = memberMaps[m].find(prop.name);
+      if (it == memberMaps[m].end() || it->second != prop.value) {
+        allSame = false;
+        break;
+      }
+    }
+    if (allSame) {
+      result.sharedProps.push_back(prop);
+    } else {
+      result.varyingPropNames.push_back(prop.name);
+    }
+  }
+  return result;
+}
+
+static bool StringContains(const std::string& haystack, const std::string& needle) {
+  return haystack.find(needle) != std::string::npos;
+}
+
+static bool HasPropNamed(const std::vector<CSSProperty>& props, const std::string& name) {
+  for (const auto& p : props) {
+    if (p.name == name) return true;
+  }
+  return false;
+}
+
+static bool VectorContains(const std::vector<std::string>& vec, const std::string& value) {
+  for (const auto& v : vec) {
+    if (v == value) return true;
+  }
+  return false;
+}
+
+static std::string InferSemanticPrefix(const std::string& tagName, const std::string& existingClass,
+                                       const std::vector<CSSProperty>& baseProps,
+                                       const std::vector<std::string>& varyingPropNames) {
+  if (StringContains(existingClass, "pagx-root")) return "root";
+  if (StringContains(existingClass, "pagx-layer")) {
+    if (VectorContains(varyingPropNames, "mix-blend-mode")) return "blend";
+    if (VectorContains(varyingPropNames, "opacity")) return "alpha";
+    if (VectorContains(varyingPropNames, "background-color")) return "bg";
+    if (HasPropNamed(baseProps, "display") && HasPropNamed(baseProps, "flex-wrap")) {
+      return "flex";
+    }
+    return "layer";
+  }
+  if (tagName == "span") return "text";
+  if (tagName == "svg") return "svg";
+  return "div";
+}
+
+static std::string InferStandalonePrefix(const std::string& tagName,
+                                         const std::string& existingClass) {
+  if (StringContains(existingClass, "pagx-root")) return "root";
+  if (StringContains(existingClass, "pagx-layer")) return "layer";
+  if (tagName == "span") return "text";
+  if (tagName == "svg") return "svg";
+  return "div";
+}
+
+static std::string BuildDeclarationsString(const std::vector<CSSProperty>& props) {
+  std::string result;
+  for (size_t i = 0; i < props.size(); i++) {
+    if (i > 0) result += ';';
+    result += props[i].name + ':' + props[i].value;
+  }
+  return result;
+}
+
+static std::string GetExistingClass(const std::string& html, const StartTagInfo& tag) {
+  if (!tag.hasClass) return "";
+  return html.substr(tag.classValueStart, tag.classValueEnd - tag.classValueStart);
+}
+
+//==============================================================================
 // Extract
 //==============================================================================
 
 std::string HTMLStyleExtractor::Extract(const std::string& html) {
   if (html.empty()) return html;
   auto tags = Tokenize(html);
-  // Pass 1: collect unique style values and assign class indices.
-  std::vector<std::string> orderedStyles;
-  std::unordered_map<std::string, int> styleToIndex;
-  for (auto& tag : tags) {
-    if (!tag.hasStyle) continue;
-    if (tag.tagName == "body") continue;
-    auto value = html.substr(tag.styleValueStart, tag.styleValueEnd - tag.styleValueStart);
-    if (value.empty()) continue;
-    auto it = styleToIndex.find(value);
-    if (it != styleToIndex.end()) {
-      tag.classIndex = it->second;
+
+  // Pass 1: parse style values into StyleEntry structures.
+  std::vector<StyleEntry> entries;
+  // Map from tag index to entry index (-1 means no entry).
+  std::vector<int> tagToEntry(tags.size(), -1);
+  for (size_t ti = 0; ti < tags.size(); ti++) {
+    const auto& tag = tags[ti];
+    if (!tag.hasStyle || tag.tagName == "body") continue;
+    auto rawValue = html.substr(tag.styleValueStart, tag.styleValueEnd - tag.styleValueStart);
+    if (rawValue.empty()) continue;
+    StyleEntry entry;
+    entry.tagIndex = static_cast<int>(ti);
+    entry.decodedStyle = DecodeHTMLEntities(rawValue);
+    entry.properties = ParseStyleProperties(entry.decodedStyle);
+    entry.signature = BuildPropertySignature(entry.properties);
+    tagToEntry[ti] = static_cast<int>(entries.size());
+    entries.push_back(entry);
+  }
+  if (entries.empty()) return html;
+
+  // Intermediate: group by signature, classify, and assign class names.
+  std::unordered_map<std::string, std::vector<int>> sigGroups;
+  for (size_t ei = 0; ei < entries.size(); ei++) {
+    sigGroups[entries[ei].signature].push_back(static_cast<int>(ei));
+  }
+
+  // Sort groups by first entry's tag position to maintain first-seen order.
+  struct GroupInfo {
+    std::string signature;
+    int firstEntryIndex;
+    int firstTagIndex;
+  };
+  std::vector<GroupInfo> sortedGroups;
+  for (const auto& pair : sigGroups) {
+    int firstEntry = pair.second[0];
+    sortedGroups.push_back({pair.first, firstEntry, entries[firstEntry].tagIndex});
+  }
+  std::sort(sortedGroups.begin(), sortedGroups.end(), [](const GroupInfo& a, const GroupInfo& b) {
+    return a.firstTagIndex < b.firstTagIndex;
+  });
+
+  // Per-tag class name list (may be 1 or 2 names for base+modifier).
+  std::vector<std::vector<std::string>> tagClassNames(tags.size());
+  // Ordered CSS rules for the <style> block.
+  std::vector<ClassRule> classRules;
+  // Per-prefix sequential counter.
+  std::unordered_map<std::string, int> prefixCounters;
+
+  for (const auto& group : sortedGroups) {
+    const auto& memberIndices = sigGroups[group.signature];
+    int groupSize = static_cast<int>(memberIndices.size());
+
+    // Build member pointers for classification.
+    std::vector<StyleEntry*> members;
+    members.reserve(memberIndices.size());
+    for (int ei : memberIndices) {
+      members.push_back(&entries[ei]);
+    }
+
+    auto classification = ClassifyGroupProperties(members);
+    bool shouldSplit = groupSize >= 2 && classification.sharedProps.size() >= 2 &&
+                       classification.varyingPropNames.size() >= 1 &&
+                       classification.varyingPropNames.size() <= 2;
+
+    if (shouldSplit) {
+      // Use first tag for semantic prefix inference.
+      const auto& firstTag = tags[members[0]->tagIndex];
+      auto existingClass = GetExistingClass(html, firstTag);
+      auto prefix = InferSemanticPrefix(firstTag.tagName, existingClass, classification.sharedProps,
+                                        classification.varyingPropNames);
+      // Emit base class.
+      auto baseName = prefix + std::to_string(prefixCounters[prefix]++);
+      classRules.push_back({baseName, BuildDeclarationsString(classification.sharedProps)});
+
+      // Emit modifier classes (dedup by varying-value key within this group).
+      std::unordered_map<std::string, std::string> varyingKeyToModifierName;
+      for (int mi = 0; mi < groupSize; mi++) {
+        const auto& entry = *members[mi];
+        // Build varying-value key.
+        std::string varyingKey;
+        for (size_t vi = 0; vi < classification.varyingPropNames.size(); vi++) {
+          if (vi > 0) varyingKey += ';';
+          for (const auto& p : entry.properties) {
+            if (p.name == classification.varyingPropNames[vi]) {
+              varyingKey += p.value;
+              break;
+            }
+          }
+        }
+        auto it = varyingKeyToModifierName.find(varyingKey);
+        std::string modName;
+        if (it != varyingKeyToModifierName.end()) {
+          modName = it->second;
+        } else {
+          // Collect the varying properties for this member.
+          std::vector<CSSProperty> varyingProps;
+          for (const auto& vname : classification.varyingPropNames) {
+            for (const auto& p : entry.properties) {
+              if (p.name == vname) {
+                varyingProps.push_back(p);
+                break;
+              }
+            }
+          }
+          modName = prefix + std::to_string(prefixCounters[prefix]++);
+          classRules.push_back({modName, BuildDeclarationsString(varyingProps)});
+          varyingKeyToModifierName[varyingKey] = modName;
+        }
+        tagClassNames[entry.tagIndex] = {baseName, modName};
+      }
     } else {
-      tag.classIndex = static_cast<int>(orderedStyles.size());
-      styleToIndex[value] = tag.classIndex;
-      orderedStyles.push_back(value);
+      // Fallback: exact-string dedup within the group.
+      std::unordered_map<std::string, std::string> styleToClassName;
+      for (int mi = 0; mi < groupSize; mi++) {
+        const auto& entry = *members[mi];
+        auto it = styleToClassName.find(entry.decodedStyle);
+        if (it != styleToClassName.end()) {
+          tagClassNames[entry.tagIndex] = {it->second};
+        } else {
+          const auto& tag = tags[entry.tagIndex];
+          auto existingClass = GetExistingClass(html, tag);
+          auto prefix = InferStandalonePrefix(tag.tagName, existingClass);
+          auto className = prefix + std::to_string(prefixCounters[prefix]++);
+          classRules.push_back({className, entry.decodedStyle});
+          styleToClassName[entry.decodedStyle] = className;
+          tagClassNames[entry.tagIndex] = {className};
+        }
+      }
     }
   }
-  if (orderedStyles.empty()) return html;
-  // Pass 2: rebuild output. For each tag that needs rewriting, build its new opening tag by
-  // iterating through the original attributes, dropping style and inserting/updating class.
+
+  // Pass 2: rebuild output HTML with class attributes replacing style attributes.
   std::string output;
   output.reserve(html.size());
   size_t prev = 0;
-  for (auto& tag : tags) {
-    if (!tag.hasStyle || tag.tagName == "body" || tag.classIndex < 0) continue;
-    auto value = html.substr(tag.styleValueStart, tag.styleValueEnd - tag.styleValueStart);
-    if (value.empty()) continue;
+  for (size_t ti = 0; ti < tags.size(); ti++) {
+    const auto& tag = tags[ti];
+    if (tagToEntry[ti] < 0) continue;
+    const auto& classNames = tagClassNames[ti];
+    if (classNames.empty()) continue;
+
     // Copy everything from prev to the start of this tag.
     output.append(html, prev, tag.tagStart - prev);
-    std::string className = "ps" + std::to_string(tag.classIndex);
+
     // Find the end of the tag name.
     size_t nameEnd = tag.tagStart + 1;
     while (nameEnd < html.size() && html[nameEnd] != ' ' && html[nameEnd] != '>' &&
@@ -322,24 +607,24 @@ std::string HTMLStyleExtractor::Extract(const std::string& html) {
     }
     // Copy '<tagName'.
     output.append(html, tag.tagStart, nameEnd - tag.tagStart);
-    // Emit class attribute.
+
+    // Build the class value string.
+    std::string classValue;
     if (tag.hasClass) {
-      std::string existingClass =
+      auto existingClass =
           html.substr(tag.classValueStart, tag.classValueEnd - tag.classValueStart);
-      output += " class=\"";
-      if (existingClass.empty()) {
-        output += className;
-      } else {
-        output += existingClass;
-        output += " ";
-        output += className;
+      if (!existingClass.empty()) {
+        classValue = existingClass + " ";
       }
-      output += "\"";
-    } else {
-      output += " class=\"";
-      output += className;
-      output += "\"";
     }
+    for (size_t ci = 0; ci < classNames.size(); ci++) {
+      if (ci > 0) classValue += " ";
+      classValue += classNames[ci];
+    }
+    output += " class=\"";
+    output += classValue;
+    output += "\"";
+
     // Re-emit all other attributes (skip class and style).
     size_t attrPos = nameEnd;
     while (attrPos < html.size()) {
@@ -377,8 +662,7 @@ std::string HTMLStyleExtractor::Extract(const std::string& html) {
         }
         continue;
       }
-      // Copy this attribute (including any leading whitespace we already skipped).
-      // Go back to include the leading whitespace.
+      // Copy this attribute including leading whitespace.
       size_t attrWithWsStart = attrNameStart;
       while (attrWithWsStart > nameEnd &&
              (html[attrWithWsStart - 1] == ' ' || html[attrWithWsStart - 1] == '\t')) {
@@ -410,10 +694,11 @@ std::string HTMLStyleExtractor::Extract(const std::string& html) {
     prev = tag.tagEnd;
   }
   output.append(html, prev, html.size() - prev);
+
   // Pass 3: insert <style> block before </head>.
   std::string styleBlock = "<style>\n";
-  for (size_t i = 0; i < orderedStyles.size(); i++) {
-    styleBlock += ".ps" + std::to_string(i) + "{" + DecodeHTMLEntities(orderedStyles[i]) + "}\n";
+  for (const auto& rule : classRules) {
+    styleBlock += "." + rule.className + "{" + rule.declarations + "}\n";
   }
   styleBlock += "</style>\n";
   size_t headEndPos = output.find("</head>");
