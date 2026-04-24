@@ -33,9 +33,11 @@
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Image.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
@@ -1051,6 +1053,183 @@ PAGX_TEST(PAGXSVGTest, SVGExport_RenderPositionFromConstraint) {
   EXPECT_NE(svg.find("height=\"80\""), std::string::npos);
   EXPECT_EQ(svg.find("width=\"10\""), std::string::npos);
   SaveFile(svg, "PAGXSVGTest/svg_export_render_position.svg");
+}
+
+
+// Helper function to create a minimal PNG image
+static pagx::Image* MakeTestPNGImage(pagx::PAGXDocument* doc) {
+  // Minimal valid 2x2 RGBA PNG (8-bit, non-interlaced)
+  static const uint8_t kMinimalPNG[] = {
+      0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,  // PNG signature
+      // IHDR
+      0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x02,
+      0x00, 0x00, 0x00, 0x02, 0x08, 0x02, 0x00, 0x00, 0x00, 0xFD, 0xD4, 0x9A,
+      0x73,
+      // IDAT (compressed pixel data)
+      0x00, 0x00, 0x00, 0x14, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x62, 0xF8,
+      0xCF, 0xC0, 0xF0, 0x1F, 0x01, 0x18, 0x18, 0x18, 0x00, 0x09, 0x04, 0x01,
+      0x01, 0xE2, 0x2D, 0x42, 0xA3,
+      // IEND
+      0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+  };
+  auto* image = doc->makeNode<pagx::Image>();
+  image->data = pagx::Data::MakeWithCopy(kMinimalPNG, sizeof(kMinimalPNG));
+  return image;
+}
+
+/**
+ * Test SVG export of ImagePattern with Repeat tile mode (default SVG support).
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_ImagePatternRepeat) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {200, 150};
+
+  auto* image = MakeTestPNGImage(doc.get());
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->tileModeX = pagx::TileMode::Repeat;
+  pattern->tileModeY = pagx::TileMode::Repeat;
+  pattern->matrix = {0.5f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  // Should contain pattern definition
+  EXPECT_NE(svg.find("<pattern"), std::string::npos);
+  EXPECT_NE(svg.find("url(#pattern"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_imagepattern_repeat.svg");
+}
+
+/**
+ * Test SVG export of ImagePattern with Mirror tile mode (requires baking).
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_ImagePatternMirror) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {200, 150};
+
+  auto* image = MakeTestPNGImage(doc.get());
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->tileModeX = pagx::TileMode::Mirror;
+  pattern->tileModeY = pagx::TileMode::Mirror;
+  pattern->matrix = {0.5f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  // Should contain baked pattern with data URI
+  EXPECT_NE(svg.find("<pattern"), std::string::npos);
+  EXPECT_NE(svg.find("data:image/png;base64,"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_imagepattern_mirror.svg");
+}
+
+/**
+ * Test SVG export of ImagePattern with Clamp tile mode (requires baking).
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_ImagePatternClamp) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {200, 150};
+
+  auto* image = MakeTestPNGImage(doc.get());
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->tileModeX = pagx::TileMode::Clamp;
+  pattern->tileModeY = pagx::TileMode::Clamp;
+  pattern->matrix = {0.5f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  // Should contain baked pattern with data URI
+  EXPECT_NE(svg.find("<pattern"), std::string::npos);
+  EXPECT_NE(svg.find("data:image/png;base64,"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_imagepattern_clamp.svg");
+}
+
+/**
+ * Test SVG export of ImagePattern with Decal tile mode (requires baking).
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_ImagePatternDecal) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {200, 150};
+
+  auto* image = MakeTestPNGImage(doc.get());
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->tileModeX = pagx::TileMode::Decal;
+  pattern->tileModeY = pagx::TileMode::Decal;
+  pattern->matrix = {0.5f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  // Should contain baked pattern with data URI
+  EXPECT_NE(svg.find("<pattern"), std::string::npos);
+  EXPECT_NE(svg.find("data:image/png;base64,"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_imagepattern_decal.svg");
+}
+
+/**
+ * Test SVG export of ImagePattern with mixed tile modes (X=Mirror, Y=Repeat).
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_ImagePatternMixedModes) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {200, 150};
+
+  auto* image = MakeTestPNGImage(doc.get());
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->tileModeX = pagx::TileMode::Mirror;
+  pattern->tileModeY = pagx::TileMode::Repeat;
+  pattern->matrix = {0.5f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  // Should contain baked pattern due to Mirror in X
+  EXPECT_NE(svg.find("<pattern"), std::string::npos);
+  EXPECT_NE(svg.find("data:image/png;base64,"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_imagepattern_mixed.svg");
 }
 
 }  // namespace pag

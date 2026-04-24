@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <cmath>
 #include <fstream>
 #include <memory>
 #include <string>
@@ -422,14 +423,55 @@ std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern, const R
   }
 
   std::string defId = generateId("pattern");
-  bool needsTiling =
+  
+  // Detect which tile modes we need to handle
+  bool needsNativeTiling =
       (pattern->tileModeX == TileMode::Repeat || pattern->tileModeY == TileMode::Repeat);
+  bool needsBaking =
+      (pattern->tileModeX == TileMode::Mirror || pattern->tileModeY == TileMode::Mirror ||
+       pattern->tileModeX == TileMode::Clamp || pattern->tileModeY == TileMode::Clamp ||
+       pattern->tileModeX == TileMode::Decal || pattern->tileModeY == TileMode::Decal);
 
+  // Try baking for unsupported tile modes (Mirror, Clamp, Decal)
+  if (needsBaking && !shapeBounds.isEmpty()) {
+    int w = static_cast<int>(ceilf(shapeBounds.width));
+    int h = static_cast<int>(ceilf(shapeBounds.height));
+    float offsetX = pattern->matrix.tx - shapeBounds.x;
+    float offsetY = pattern->matrix.ty - shapeBounds.y;
+    float pixelScale = static_cast<float>(_rasterDPI) / 96.0f;
+    
+    auto tiledPng = RenderTiledPattern(&_gpu, pattern, w, h, offsetX, offsetY, pixelScale);
+    if (tiledPng && tiledPng->size() > 0) {
+      // Successfully baked the pattern to PNG - embed as data URI
+      std::string base64Data = Base64Encode(tiledPng->bytes(), tiledPng->size());
+      href = "data:image/png;base64," + base64Data;
+      
+      _defs->openElement("pattern");
+      _defs->addAttribute("id", defId);
+      _defs->addAttribute("patternUnits", "userSpaceOnUse");
+      _defs->addAttribute("width", static_cast<float>(w));
+      _defs->addAttribute("height", static_cast<float>(h));
+      _defs->closeElementStart();
+      _defs->openElement("image");
+      _defs->addAttribute("href", href);
+      _defs->addAttribute("x", 0.0f);
+      _defs->addAttribute("y", 0.0f);
+      _defs->addAttribute("width", static_cast<float>(w));
+      _defs->addAttribute("height", static_cast<float>(h));
+      _defs->addAttribute("preserveAspectRatio", "none");
+      _defs->closeElementSelfClosing();
+      _defs->closeElement();
+      return "url(#" + defId + ")";
+    }
+    // If baking failed, fall through to try native tiling for Repeat modes
+  }
+
+  // Fall back to native SVG pattern handling for Repeat mode and non-bakeable cases
   int imgW = 0;
   int imgH = 0;
   bool canUseOBB = false;
   if (!shapeBounds.isEmpty()) {
-    canUseOBB = needsTiling ? GetImagePNGDimensions(pattern->image, &imgW, &imgH) : true;
+    canUseOBB = needsNativeTiling ? GetImagePNGDimensions(pattern->image, &imgW, &imgH) : true;
   }
 
   _defs->openElement("pattern");
@@ -450,7 +492,7 @@ std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern, const R
     obbMatrix.ty = (M.ty - Y) / H;
 
     _defs->addAttribute("patternContentUnits", "objectBoundingBox");
-    if (needsTiling) {
+    if (needsNativeTiling) {
       _defs->addAttribute("width", static_cast<float>(imgW) * obbMatrix.a);
       _defs->addAttribute("height", static_cast<float>(imgH) * obbMatrix.d);
     } else {
@@ -477,6 +519,7 @@ std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern, const R
   _defs->closeElement();
   return "url(#" + defId + ")";
 }
+
 
 std::string SVGWriter::getColorSourceRef(const ColorSource* source, float* outAlpha,
                                          const Rect& shapeBounds) {
