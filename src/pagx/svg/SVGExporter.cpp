@@ -1637,7 +1637,7 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   bool needsGroup = !layer->matrix.isIdentity() || layer->alpha < 1.0f || !layer->id.empty() ||
                     !layer->filters.empty() || !layer->styles.empty() || layer->mask != nullptr ||
                     renderPos.x != 0.0f || renderPos.y != 0.0f || !layer->customData.empty() ||
-                    layer->blendMode != BlendMode::Normal;
+                    layer->blendMode != BlendMode::Normal || layer->hasScrollRect;
 
   if (!needsGroup) {
     writeLayerContents(out, layer);
@@ -1697,6 +1697,24 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
     }
   }
 
+  // scrollRect clips the layer's content to a viewport rectangle and offsets
+  // the content by the scroll origin. Unlike PPT (which must bake to PNG),
+  // SVG natively supports <clipPath> so we emit a vector clip.
+  std::string scrollClipId;
+  if (layer->hasScrollRect) {
+    auto& sr = layer->scrollRect;
+    scrollClipId = generateId("scrollClip");
+    _defs->openElement("clipPath");
+    _defs->addAttribute("id", scrollClipId);
+    _defs->closeElementStart();
+    _defs->openElement("rect");
+    _defs->addRequiredAttribute("width", sr.width);
+    _defs->addRequiredAttribute("height", sr.height);
+    _defs->closeElementSelfClosing();
+    _defs->closeElement();
+    out.addAttribute("clip-path", "url(#" + scrollClipId + ")");
+  }
+
   bool hasContent =
       !layer->contents.empty() || !layer->children.empty() || layer->composition != nullptr;
   if (!hasContent) {
@@ -1705,6 +1723,18 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   }
 
   out.closeElementStart();
+
+  // When scrollRect is active, wrap all content in an inner <g> that shifts
+  // the content by (-scrollRect.x, -scrollRect.y) so that the scroll origin
+  // aligns with the viewport's (0,0).
+  bool hasScrollOffset =
+      layer->hasScrollRect && (layer->scrollRect.x != 0.0f || layer->scrollRect.y != 0.0f);
+  if (hasScrollOffset) {
+    out.openElement("g");
+    out.addAttribute("transform", "translate(" + FloatToString(-layer->scrollRect.x) + "," +
+                                      FloatToString(-layer->scrollRect.y) + ")");
+    out.closeElementStart();
+  }
 
   writeLayerContents(out, layer);
 
@@ -1716,6 +1746,10 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
 
   for (const auto* child : layer->children) {
     writeLayer(out, child);
+  }
+
+  if (hasScrollOffset) {
+    out.closeElement();
   }
 
   out.closeElement();
