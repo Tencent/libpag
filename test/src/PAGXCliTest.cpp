@@ -578,7 +578,7 @@ CLI_TEST(PAGXCliTest, FontInfo_Retired_PrintsRedirectError) {
   }
 }
 
-CLI_TEST(PAGXCliTest, Font_HelpShowsNewSurface) {
+CLI_TEST(PAGXCliTest, Font_HelpShowsCurrentFlags) {
   std::streambuf* oldCout = std::cout.rdbuf();
   std::ostringstream capturedOut;
   std::cout.rdbuf(capturedOut.rdbuf());
