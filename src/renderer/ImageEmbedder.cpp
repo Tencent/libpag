@@ -18,6 +18,7 @@
 
 #include "renderer/ImageEmbedder.h"
 #include <fstream>
+#include <unordered_set>
 #include "pagx/types/Data.h"
 
 namespace pagx {
@@ -42,9 +43,13 @@ static std::shared_ptr<pagx::Data> ReadFileToData(const std::string& path) {
 bool ImageEmbedder::embed(PAGXDocument* document) {
   if (document == nullptr) return false;
   auto paths = document->getExternalFilePaths();
+  std::unordered_set<std::string> loaded;
   for (const auto& path : paths) {
     if (path.find("://") != std::string::npos) {
       continue;  // URL per D1.3 — silently skip
+    }
+    if (!loaded.insert(path).second) {
+      continue;
     }
     auto data = ReadFileToData(path);
     if (data == nullptr) {
