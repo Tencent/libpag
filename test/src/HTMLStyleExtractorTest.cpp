@@ -228,9 +228,10 @@ CLI_TEST(HTMLStyleExtractorTest, FallbackNoSplit) {
                       R"(<div style="color:blue;font-size:14px;margin:20px">b</div>)"
                       R"(</body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
-  // All 3 properties differ → 3 varying > 2, so no split.
-  EXPECT_NE(result.find(".div0{color:red;font-size:12px;margin:10px}"), std::string::npos);
-  EXPECT_NE(result.find(".div1{color:blue;font-size:14px;margin:20px}"), std::string::npos);
+  // All 3 properties differ → 3 varying > 2, so no split. Declarations are emitted in
+  // canonical order: margin (box, 38) → color (typography, 90) → font-size (92).
+  EXPECT_NE(result.find(".div0{margin:10px;color:red;font-size:12px}"), std::string::npos);
+  EXPECT_NE(result.find(".div1{margin:20px;color:blue;font-size:14px}"), std::string::npos);
 }
 
 CLI_TEST(HTMLStyleExtractorTest, SharedModifierClass) {

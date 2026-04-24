@@ -480,11 +480,107 @@ static std::string InferStandalonePrefix(const std::string& tagName,
   return "div";
 }
 
+// Maps a CSS property name to a sort key grouping it with semantically related properties.
+// Professional front-end convention orders declarations by role: position → layout → box →
+// transform → visual → background → border → clipping → typography. Unknown names receive 999
+// so they're appended at the end in source order (via stable_sort). Vendor-prefixed variants
+// sit next to their standard counterpart (e.g., backdrop-filter 55 then -webkit-backdrop-filter 56).
+static int CSSPropertyOrder(const std::string& name) {
+  static const std::unordered_map<std::string, int> kOrder = {
+      // Position & flow
+      {"position", 10},
+      {"inset", 11},
+      {"top", 12},
+      {"right", 13},
+      {"bottom", 14},
+      {"left", 15},
+      {"z-index", 16},
+      // Display & layout
+      {"display", 20},
+      {"flex", 21},
+      {"flex-direction", 22},
+      {"flex-wrap", 23},
+      {"justify-content", 24},
+      {"align-items", 25},
+      {"align-content", 26},
+      {"align-self", 27},
+      {"gap", 28},
+      {"order", 29},
+      // Box model
+      {"box-sizing", 30},
+      {"width", 31},
+      {"height", 32},
+      {"min-width", 33},
+      {"max-width", 34},
+      {"min-height", 35},
+      {"max-height", 36},
+      {"padding", 37},
+      {"margin", 38},
+      // Transform
+      {"transform", 40},
+      {"transform-origin", 41},
+      {"transform-style", 42},
+      {"perspective", 43},
+      // Visual effects
+      {"opacity", 50},
+      {"visibility", 51},
+      {"mix-blend-mode", 52},
+      {"isolation", 53},
+      {"filter", 54},
+      {"backdrop-filter", 55},
+      {"-webkit-backdrop-filter", 56},
+      // Background
+      {"background", 60},
+      {"background-color", 61},
+      {"background-image", 62},
+      {"background-position", 63},
+      {"background-repeat", 64},
+      {"background-clip", 65},
+      {"-webkit-background-clip", 66},
+      // Border & shadow
+      {"border-radius", 70},
+      {"box-shadow", 71},
+      // Clipping & masking
+      {"overflow", 80},
+      {"clip-path", 81},
+      {"mask-image", 82},
+      {"mask-mode", 83},
+      {"mask-repeat", 84},
+      {"-webkit-mask-image", 85},
+      {"-webkit-mask-mode", 86},
+      {"-webkit-mask-repeat", 87},
+      // Typography
+      {"color", 90},
+      {"font-family", 91},
+      {"font-size", 92},
+      {"font-style", 93},
+      {"font-weight", 94},
+      {"line-height", 95},
+      {"text-align", 96},
+      {"letter-spacing", 97},
+      {"white-space", 98},
+      {"word-wrap", 99},
+      {"writing-mode", 100},
+      {"text-stroke", 101},
+      {"-webkit-text-stroke", 102},
+      {"-webkit-text-fill-color", 103},
+      {"paint-order", 104},
+      {"shape-rendering", 105},
+      {"image-rendering", 106},
+  };
+  auto it = kOrder.find(name);
+  return it != kOrder.end() ? it->second : 999;
+}
+
 static std::string BuildDeclarationsString(const std::vector<CSSProperty>& props) {
+  std::vector<CSSProperty> sorted(props);
+  std::stable_sort(sorted.begin(), sorted.end(), [](const CSSProperty& a, const CSSProperty& b) {
+    return CSSPropertyOrder(a.name) < CSSPropertyOrder(b.name);
+  });
   std::string result;
-  for (size_t i = 0; i < props.size(); i++) {
+  for (size_t i = 0; i < sorted.size(); i++) {
     if (i > 0) result += ';';
-    result += props[i].name + ':' + props[i].value;
+    result += sorted[i].name + ':' + sorted[i].value;
   }
   return result;
 }
@@ -625,7 +721,10 @@ std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) 
             prefix = InferStandalonePrefix(tag.tagName, entry.properties);
           }
           auto className = prefix + std::to_string(prefixCounters[prefix]++);
-          classRules.push_back({className, entry.decodedStyle});
+          // Normalize declaration order for professional front-end readability.
+          // dedup key (styleToClassName) continues to use decodedStyle: two tags with the
+          // same source style trivially map to the same sorted output, so the cache works.
+          classRules.push_back({className, BuildDeclarationsString(entry.properties)});
           styleToClassName[entry.decodedStyle] = className;
           tagClassNames[entry.tagIndex] = {className};
         }

@@ -572,8 +572,8 @@ CLI_TEST(PAGXHtmlTest, ExportOptions_FormatPrettyIsDefault) {
 CLI_TEST(PAGXHtmlTest, FilterDedup_ShowcaseInfographic) {
   // showcase_infographic.pagx has 3 layers with identical DropShadowStyle parameters.
   // The signature-keyed filter cache should emit one <filter> and reuse it.
-  auto html = LoadAndConvert(
-      ProjectPath::Absolute("resources/pagx_to_html/showcase_infographic.pagx"));
+  auto html =
+      LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/showcase_infographic.pagx"));
   ASSERT_FALSE(html.empty());
   size_t count = 0;
   for (size_t pos = 0; (pos = html.find("<filter ", pos)) != std::string::npos; pos++) {
