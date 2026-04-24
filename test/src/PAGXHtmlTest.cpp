@@ -569,6 +569,20 @@ CLI_TEST(PAGXHtmlTest, ExportOptions_FormatPrettyIsDefault) {
   EXPECT_EQ(defaultedHtml, prettyHtml);
 }
 
+CLI_TEST(PAGXHtmlTest, FilterDedup_ShowcaseInfographic) {
+  // showcase_infographic.pagx has 3 layers with identical DropShadowStyle parameters.
+  // The signature-keyed filter cache should emit one <filter> and reuse it.
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/showcase_infographic.pagx"));
+  ASSERT_FALSE(html.empty());
+  size_t count = 0;
+  for (size_t pos = 0; (pos = html.find("<filter ", pos)) != std::string::npos; pos++) {
+    count++;
+  }
+  EXPECT_EQ(count, static_cast<size_t>(1))
+      << "Expected exactly 1 <filter> node after dedup, got " << count;
+}
+
 CLI_TEST(PAGXHtmlTest, ExportToFile) {
   auto doc = pagx::PAGXImporter::FromFile(
       ProjectPath::Absolute("resources/pagx_to_html/root_document.pagx"));

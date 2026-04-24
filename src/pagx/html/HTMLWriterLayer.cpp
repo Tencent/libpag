@@ -1224,78 +1224,86 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         }
       }
       {
-        std::string fid = _ctx->nextId("filter");
-        _defs->openTag("filter");
-        _defs->addAttr("id", fid);
-        _defs->addAttr("x", "-50%");
-        _defs->addAttr("y", "-50%");
-        _defs->addAttr("width", "200%");
-        _defs->addAttr("height", "200%");
-        _defs->addAttr("color-interpolation-filters", "sRGB");
-        _defs->closeTagStart();
-        // Saturate SourceAlpha into a binary silhouette so both the shadow shape and the
-        // erase mask below operate on the layer contour, as required by the spec
-        // (§5.3.1: "Computes shadow shape based on opaque layer content"; showBehindLayer=false
-        // "use layer contour as erase mask"). Without this, semi-transparent fills would
-        // produce a weaker shadow and leave partially-visible shadow inside the layer.
-        _defs->openTag("feColorMatrix");
-        _defs->addAttr("in", "SourceAlpha");
-        _defs->addAttr("type", "matrix");
-        _defs->addAttr("values", "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 255 0");
-        _defs->addAttr("result", "opaqueAlpha");
-        _defs->closeTagSelfClosing();
-        _defs->openTag("feGaussianBlur");
-        _defs->addAttr("in", "opaqueAlpha");
-        _defs->addAttr("stdDeviation", FloatToString(ds->blurX) + " " + FloatToString(ds->blurY));
-        _defs->addAttr("result", "blur");
-        _defs->closeTagSelfClosing();
-        _defs->openTag("feOffset");
-        _defs->addAttr("in", "blur");
-        if (!FloatNearlyZero(ds->offsetX)) {
-          _defs->addAttr("dx", FloatToString(ds->offsetX));
-        }
-        if (!FloatNearlyZero(ds->offsetY)) {
-          _defs->addAttr("dy", FloatToString(ds->offsetY));
-        }
-        _defs->addAttr("result", "off");
-        _defs->closeTagSelfClosing();
-        _defs->openTag("feColorMatrix");
-        _defs->addAttr("in", "off");
-        _defs->addAttr("type", "matrix");
-        _defs->addAttr("values", "0 0 0 0 " + FloatToString(ds->color.red) + " 0 0 0 0 " +
-                                     FloatToString(ds->color.green) + " 0 0 0 0 " +
-                                     FloatToString(ds->color.blue) + " 0 0 0 " +
-                                     FloatToString(ds->color.alpha) + " 0");
-        _defs->addAttr("result", "shadow");
-        _defs->closeTagSelfClosing();
-        if (!ds->showBehindLayer) {
-          _defs->openTag("feComposite");
-          _defs->addAttr("in", "shadow");
-          _defs->addAttr("in2", "opaqueAlpha");
-          _defs->addAttr("operator", "out");
-          _defs->addAttr("result", "shadowClipped");
-          _defs->closeTagSelfClosing();
-          _defs->openTag("feMerge");
+        std::string signature = "dss:" + FloatToString(ds->offsetX) + "," +
+                                FloatToString(ds->offsetY) + "," + FloatToString(ds->blurX) + "," +
+                                FloatToString(ds->blurY) + "," + ColorToRGBA(ds->color) + "," +
+                                (ds->showBehindLayer ? "1" : "0");
+        std::string fid = lookupFilterId(signature);
+        if (fid.empty()) {
+          fid = _ctx->nextId("filter");
+          _defs->openTag("filter");
+          _defs->addAttr("id", fid);
+          _defs->addAttr("x", "-50%");
+          _defs->addAttr("y", "-50%");
+          _defs->addAttr("width", "200%");
+          _defs->addAttr("height", "200%");
+          _defs->addAttr("color-interpolation-filters", "sRGB");
           _defs->closeTagStart();
-          _defs->openTag("feMergeNode");
-          _defs->addAttr("in", "shadowClipped");
+          // Saturate SourceAlpha into a binary silhouette so both the shadow shape and the
+          // erase mask below operate on the layer contour, as required by the spec
+          // (§5.3.1: "Computes shadow shape based on opaque layer content"; showBehindLayer=false
+          // "use layer contour as erase mask"). Without this, semi-transparent fills would
+          // produce a weaker shadow and leave partially-visible shadow inside the layer.
+          _defs->openTag("feColorMatrix");
+          _defs->addAttr("in", "SourceAlpha");
+          _defs->addAttr("type", "matrix");
+          _defs->addAttr("values", "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 255 0");
+          _defs->addAttr("result", "opaqueAlpha");
           _defs->closeTagSelfClosing();
-          _defs->openTag("feMergeNode");
-          _defs->addAttr("in", "SourceGraphic");
+          _defs->openTag("feGaussianBlur");
+          _defs->addAttr("in", "opaqueAlpha");
+          _defs->addAttr("stdDeviation", FloatToString(ds->blurX) + " " + FloatToString(ds->blurY));
+          _defs->addAttr("result", "blur");
           _defs->closeTagSelfClosing();
+          _defs->openTag("feOffset");
+          _defs->addAttr("in", "blur");
+          if (!FloatNearlyZero(ds->offsetX)) {
+            _defs->addAttr("dx", FloatToString(ds->offsetX));
+          }
+          if (!FloatNearlyZero(ds->offsetY)) {
+            _defs->addAttr("dy", FloatToString(ds->offsetY));
+          }
+          _defs->addAttr("result", "off");
+          _defs->closeTagSelfClosing();
+          _defs->openTag("feColorMatrix");
+          _defs->addAttr("in", "off");
+          _defs->addAttr("type", "matrix");
+          _defs->addAttr("values", "0 0 0 0 " + FloatToString(ds->color.red) + " 0 0 0 0 " +
+                                       FloatToString(ds->color.green) + " 0 0 0 0 " +
+                                       FloatToString(ds->color.blue) + " 0 0 0 " +
+                                       FloatToString(ds->color.alpha) + " 0");
+          _defs->addAttr("result", "shadow");
+          _defs->closeTagSelfClosing();
+          if (!ds->showBehindLayer) {
+            _defs->openTag("feComposite");
+            _defs->addAttr("in", "shadow");
+            _defs->addAttr("in2", "opaqueAlpha");
+            _defs->addAttr("operator", "out");
+            _defs->addAttr("result", "shadowClipped");
+            _defs->closeTagSelfClosing();
+            _defs->openTag("feMerge");
+            _defs->closeTagStart();
+            _defs->openTag("feMergeNode");
+            _defs->addAttr("in", "shadowClipped");
+            _defs->closeTagSelfClosing();
+            _defs->openTag("feMergeNode");
+            _defs->addAttr("in", "SourceGraphic");
+            _defs->closeTagSelfClosing();
+            _defs->closeTag();
+          } else {
+            _defs->openTag("feMerge");
+            _defs->closeTagStart();
+            _defs->openTag("feMergeNode");
+            _defs->addAttr("in", "shadow");
+            _defs->closeTagSelfClosing();
+            _defs->openTag("feMergeNode");
+            _defs->addAttr("in", "SourceGraphic");
+            _defs->closeTagSelfClosing();
+            _defs->closeTag();
+          }
           _defs->closeTag();
-        } else {
-          _defs->openTag("feMerge");
-          _defs->closeTagStart();
-          _defs->openTag("feMergeNode");
-          _defs->addAttr("in", "shadow");
-          _defs->closeTagSelfClosing();
-          _defs->openTag("feMergeNode");
-          _defs->addAttr("in", "SourceGraphic");
-          _defs->closeTagSelfClosing();
-          _defs->closeTag();
+          registerFilterId(signature, fid);
         }
-        _defs->closeTag();
         if (!filterValues.empty()) {
           filterValues += ' ';
         }
@@ -1306,80 +1314,87 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       if (hasBlendMode) {
         aboveStyles.push_back({NodeType::InnerShadowStyle, ls});
       } else {
-        std::string fid = _ctx->nextId("filter");
-        _defs->openTag("filter");
-        _defs->addAttr("id", fid);
-        _defs->addAttr("x", "-50%");
-        _defs->addAttr("y", "-50%");
-        _defs->addAttr("width", "200%");
-        _defs->addAttr("height", "200%");
-        _defs->addAttr("color-interpolation-filters", "sRGB");
-        _defs->closeTagStart();
-        // Invert source alpha -> blur -> offset -> flood -> clip twice. Matches tgfx
-        // ImageFilter::InnerShadowOnly that InnerShadowStyle::onDraw uses; the old
-        // arithmetic "SourceAlpha - offsetAlpha" only produced a one-sided band that
-        // vanished for low-alpha shadow colours (e.g. showcase_infographic #00000010).
-        _defs->openTag("feComponentTransfer");
-        _defs->addAttr("in", "SourceAlpha");
-        _defs->addAttr("result", "iInv");
-        _defs->closeTagStart();
-        _defs->openTag("feFuncA");
-        _defs->addAttr("type", "table");
-        _defs->addAttr("tableValues", "1 0");
-        _defs->closeTagSelfClosing();
-        _defs->closeTag();
-        std::string sd = FloatToString(is->blurX);
-        if (is->blurX != is->blurY) {
-          sd += " " + FloatToString(is->blurY);
-        }
-        _defs->openTag("feGaussianBlur");
-        _defs->addAttr("in", "iInv");
-        _defs->addAttr("stdDeviation", sd);
-        _defs->addAttr("result", "iBlur");
-        _defs->closeTagSelfClosing();
-        std::string blurredResult = "iBlur";
-        if (!FloatNearlyZero(is->offsetX) || !FloatNearlyZero(is->offsetY)) {
-          _defs->openTag("feOffset");
-          _defs->addAttr("in", blurredResult);
-          if (!FloatNearlyZero(is->offsetX)) {
-            _defs->addAttr("dx", FloatToString(is->offsetX));
-          }
-          if (!FloatNearlyZero(is->offsetY)) {
-            _defs->addAttr("dy", FloatToString(is->offsetY));
-          }
-          _defs->addAttr("result", "iOff");
+        std::string signature = "iss:" + FloatToString(is->offsetX) + "," +
+                                FloatToString(is->offsetY) + "," + FloatToString(is->blurX) + "," +
+                                FloatToString(is->blurY) + "," + ColorToRGBA(is->color);
+        std::string fid = lookupFilterId(signature);
+        if (fid.empty()) {
+          fid = _ctx->nextId("filter");
+          _defs->openTag("filter");
+          _defs->addAttr("id", fid);
+          _defs->addAttr("x", "-50%");
+          _defs->addAttr("y", "-50%");
+          _defs->addAttr("width", "200%");
+          _defs->addAttr("height", "200%");
+          _defs->addAttr("color-interpolation-filters", "sRGB");
+          _defs->closeTagStart();
+          // Invert source alpha -> blur -> offset -> flood -> clip twice. Matches tgfx
+          // ImageFilter::InnerShadowOnly that InnerShadowStyle::onDraw uses; the old
+          // arithmetic "SourceAlpha - offsetAlpha" only produced a one-sided band that
+          // vanished for low-alpha shadow colours (e.g. showcase_infographic #00000010).
+          _defs->openTag("feComponentTransfer");
+          _defs->addAttr("in", "SourceAlpha");
+          _defs->addAttr("result", "iInv");
+          _defs->closeTagStart();
+          _defs->openTag("feFuncA");
+          _defs->addAttr("type", "table");
+          _defs->addAttr("tableValues", "1 0");
           _defs->closeTagSelfClosing();
-          blurredResult = "iOff";
+          _defs->closeTag();
+          std::string sd = FloatToString(is->blurX);
+          if (is->blurX != is->blurY) {
+            sd += " " + FloatToString(is->blurY);
+          }
+          _defs->openTag("feGaussianBlur");
+          _defs->addAttr("in", "iInv");
+          _defs->addAttr("stdDeviation", sd);
+          _defs->addAttr("result", "iBlur");
+          _defs->closeTagSelfClosing();
+          std::string blurredResult = "iBlur";
+          if (!FloatNearlyZero(is->offsetX) || !FloatNearlyZero(is->offsetY)) {
+            _defs->openTag("feOffset");
+            _defs->addAttr("in", blurredResult);
+            if (!FloatNearlyZero(is->offsetX)) {
+              _defs->addAttr("dx", FloatToString(is->offsetX));
+            }
+            if (!FloatNearlyZero(is->offsetY)) {
+              _defs->addAttr("dy", FloatToString(is->offsetY));
+            }
+            _defs->addAttr("result", "iOff");
+            _defs->closeTagSelfClosing();
+            blurredResult = "iOff";
+          }
+          _defs->openTag("feFlood");
+          _defs->addAttr("flood-color", ColorToSVGHex(is->color));
+          if (is->color.alpha < 1.0f) {
+            _defs->addAttr("flood-opacity", FloatToString(is->color.alpha));
+          }
+          _defs->addAttr("result", "iFlood");
+          _defs->closeTagSelfClosing();
+          _defs->openTag("feComposite");
+          _defs->addAttr("in", "iFlood");
+          _defs->addAttr("in2", blurredResult);
+          _defs->addAttr("operator", "in");
+          _defs->addAttr("result", "iShadow");
+          _defs->closeTagSelfClosing();
+          _defs->openTag("feComposite");
+          _defs->addAttr("in", "iShadow");
+          _defs->addAttr("in2", "SourceAlpha");
+          _defs->addAttr("operator", "in");
+          _defs->addAttr("result", "iClip");
+          _defs->closeTagSelfClosing();
+          _defs->openTag("feMerge");
+          _defs->closeTagStart();
+          _defs->openTag("feMergeNode");
+          _defs->addAttr("in", "SourceGraphic");
+          _defs->closeTagSelfClosing();
+          _defs->openTag("feMergeNode");
+          _defs->addAttr("in", "iClip");
+          _defs->closeTagSelfClosing();
+          _defs->closeTag();
+          _defs->closeTag();
+          registerFilterId(signature, fid);
         }
-        _defs->openTag("feFlood");
-        _defs->addAttr("flood-color", ColorToSVGHex(is->color));
-        if (is->color.alpha < 1.0f) {
-          _defs->addAttr("flood-opacity", FloatToString(is->color.alpha));
-        }
-        _defs->addAttr("result", "iFlood");
-        _defs->closeTagSelfClosing();
-        _defs->openTag("feComposite");
-        _defs->addAttr("in", "iFlood");
-        _defs->addAttr("in2", blurredResult);
-        _defs->addAttr("operator", "in");
-        _defs->addAttr("result", "iShadow");
-        _defs->closeTagSelfClosing();
-        _defs->openTag("feComposite");
-        _defs->addAttr("in", "iShadow");
-        _defs->addAttr("in2", "SourceAlpha");
-        _defs->addAttr("operator", "in");
-        _defs->addAttr("result", "iClip");
-        _defs->closeTagSelfClosing();
-        _defs->openTag("feMerge");
-        _defs->closeTagStart();
-        _defs->openTag("feMergeNode");
-        _defs->addAttr("in", "SourceGraphic");
-        _defs->closeTagSelfClosing();
-        _defs->openTag("feMergeNode");
-        _defs->addAttr("in", "iClip");
-        _defs->closeTagSelfClosing();
-        _defs->closeTag();
-        _defs->closeTag();
         if (!filterValues.empty()) {
           filterValues += ' ';
         }
@@ -1684,51 +1699,58 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     auto blendStr = BlendModeToMixBlendMode(ls->blendMode);
     if (styleType == NodeType::InnerShadowStyle) {
       auto is = static_cast<const InnerShadowStyle*>(ls);
-      std::string fid = _ctx->nextId("isf");
-      _defs->openTag("filter");
-      _defs->addAttr("id", fid);
-      _defs->addAttr("x", "-50%");
-      _defs->addAttr("y", "-50%");
-      _defs->addAttr("width", "200%");
-      _defs->addAttr("height", "200%");
-      _defs->addAttr("color-interpolation-filters", "sRGB");
-      _defs->closeTagStart();
-      _defs->openTag("feOffset");
-      _defs->addAttr("in", "SourceAlpha");
-      if (!FloatNearlyZero(is->offsetX)) {
-        _defs->addAttr("dx", FloatToString(is->offsetX));
+      std::string signature = "issb:" + FloatToString(is->offsetX) + "," +
+                              FloatToString(is->offsetY) + "," + FloatToString(is->blurX) + "," +
+                              FloatToString(is->blurY) + "," + ColorToRGBA(is->color);
+      std::string fid = lookupFilterId(signature);
+      if (fid.empty()) {
+        fid = _ctx->nextId("isf");
+        _defs->openTag("filter");
+        _defs->addAttr("id", fid);
+        _defs->addAttr("x", "-50%");
+        _defs->addAttr("y", "-50%");
+        _defs->addAttr("width", "200%");
+        _defs->addAttr("height", "200%");
+        _defs->addAttr("color-interpolation-filters", "sRGB");
+        _defs->closeTagStart();
+        _defs->openTag("feOffset");
+        _defs->addAttr("in", "SourceAlpha");
+        if (!FloatNearlyZero(is->offsetX)) {
+          _defs->addAttr("dx", FloatToString(is->offsetX));
+        }
+        if (!FloatNearlyZero(is->offsetY)) {
+          _defs->addAttr("dy", FloatToString(is->offsetY));
+        }
+        _defs->addAttr("result", "iOff");
+        _defs->closeTagSelfClosing();
+        _defs->openTag("feComposite");
+        _defs->addAttr("in", "SourceAlpha");
+        _defs->addAttr("in2", "iOff");
+        _defs->addAttr("operator", "arithmetic");
+        _defs->addAttr("k2", "-1");
+        _defs->addAttr("k3", "1");
+        _defs->addAttr("result", "iComp");
+        _defs->closeTagSelfClosing();
+        std::string sd = FloatToString(is->blurX);
+        if (is->blurX != is->blurY) {
+          sd += " " + FloatToString(is->blurY);
+        }
+        _defs->openTag("feGaussianBlur");
+        _defs->addAttr("in", "iComp");
+        _defs->addAttr("stdDeviation", sd);
+        _defs->addAttr("result", "iBlur");
+        _defs->closeTagSelfClosing();
+        _defs->openTag("feColorMatrix");
+        _defs->addAttr("in", "iBlur");
+        _defs->addAttr("type", "matrix");
+        _defs->addAttr("values", "0 0 0 0 " + FloatToString(is->color.red) + " 0 0 0 0 " +
+                                     FloatToString(is->color.green) + " 0 0 0 0 " +
+                                     FloatToString(is->color.blue) + " 0 0 0 " +
+                                     FloatToString(is->color.alpha) + " 0");
+        _defs->closeTagSelfClosing();
+        _defs->closeTag();
+        registerFilterId(signature, fid);
       }
-      if (!FloatNearlyZero(is->offsetY)) {
-        _defs->addAttr("dy", FloatToString(is->offsetY));
-      }
-      _defs->addAttr("result", "iOff");
-      _defs->closeTagSelfClosing();
-      _defs->openTag("feComposite");
-      _defs->addAttr("in", "SourceAlpha");
-      _defs->addAttr("in2", "iOff");
-      _defs->addAttr("operator", "arithmetic");
-      _defs->addAttr("k2", "-1");
-      _defs->addAttr("k3", "1");
-      _defs->addAttr("result", "iComp");
-      _defs->closeTagSelfClosing();
-      std::string sd = FloatToString(is->blurX);
-      if (is->blurX != is->blurY) {
-        sd += " " + FloatToString(is->blurY);
-      }
-      _defs->openTag("feGaussianBlur");
-      _defs->addAttr("in", "iComp");
-      _defs->addAttr("stdDeviation", sd);
-      _defs->addAttr("result", "iBlur");
-      _defs->closeTagSelfClosing();
-      _defs->openTag("feColorMatrix");
-      _defs->addAttr("in", "iBlur");
-      _defs->addAttr("type", "matrix");
-      _defs->addAttr("values", "0 0 0 0 " + FloatToString(is->color.red) + " 0 0 0 0 " +
-                                   FloatToString(is->color.green) + " 0 0 0 0 " +
-                                   FloatToString(is->color.blue) + " 0 0 0 " +
-                                   FloatToString(is->color.alpha) + " 0");
-      _defs->closeTagSelfClosing();
-      _defs->closeTag();
       std::string shadowStyle = "position:absolute;inset:0;filter:url(#" + fid + ")";
       if (blendStr) {
         shadowStyle += ";mix-blend-mode:";

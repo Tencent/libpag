@@ -104,6 +104,55 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
     }
     return css;
   }
+
+  // Build a signature for the entire filter chain so subsequent calls with identical
+  // parameters reuse the <filter> already emitted. Every field that influences the body
+  // emitted below must appear in the signature.
+  std::string signature = "chain:";
+  for (auto* f : filters) {
+    signature += std::to_string(static_cast<int>(f->nodeType())) + ":";
+    switch (f->nodeType()) {
+      case NodeType::BlurFilter: {
+        auto b = static_cast<const BlurFilter*>(f);
+        signature += FloatToString(b->blurX) + "," + FloatToString(b->blurY) + "," +
+                     std::to_string(static_cast<int>(b->tileMode));
+        break;
+      }
+      case NodeType::DropShadowFilter: {
+        auto s = static_cast<const DropShadowFilter*>(f);
+        signature += FloatToString(s->offsetX) + "," + FloatToString(s->offsetY) + "," +
+                     FloatToString(s->blurX) + "," + FloatToString(s->blurY) + "," +
+                     ColorToRGBA(s->color) + "," + (s->shadowOnly ? "1" : "0");
+        break;
+      }
+      case NodeType::InnerShadowFilter: {
+        auto s = static_cast<const InnerShadowFilter*>(f);
+        signature += FloatToString(s->offsetX) + "," + FloatToString(s->offsetY) + "," +
+                     FloatToString(s->blurX) + "," + FloatToString(s->blurY) + "," +
+                     ColorToRGBA(s->color) + "," + (s->shadowOnly ? "1" : "0");
+        break;
+      }
+      case NodeType::ColorMatrixFilter: {
+        auto c = static_cast<const ColorMatrixFilter*>(f);
+        for (int i = 0; i < 20; i++) {
+          signature += FloatToString(c->matrix[i]) + ",";
+        }
+        break;
+      }
+      case NodeType::BlendFilter: {
+        auto b = static_cast<const BlendFilter*>(f);
+        signature += std::to_string(static_cast<int>(b->blendMode)) + "," + ColorToRGBA(b->color);
+        break;
+      }
+      default:
+        break;
+    }
+    signature += "|";
+  }
+  auto cachedId = lookupFilterId(signature);
+  if (!cachedId.empty()) {
+    return "url(#" + cachedId + ")";
+  }
   std::string fid = _ctx->nextId("filter");
   _defs->openTag("filter");
   _defs->addAttr("id", fid);
@@ -359,7 +408,17 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
     }
   }
   _defs->closeTag();
+  registerFilterId(signature, fid);
   return "url(#" + fid + ")";
+}
+
+std::string HTMLWriter::lookupFilterId(const std::string& signature) const {
+  auto it = _ctx->filterDefIds.find(signature);
+  return it != _ctx->filterDefIds.end() ? it->second : std::string();
+}
+
+void HTMLWriter::registerFilterId(const std::string& signature, const std::string& id) {
+  _ctx->filterDefIds[signature] = id;
 }
 
 //==============================================================================

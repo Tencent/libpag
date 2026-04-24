@@ -171,6 +171,12 @@ class HTMLWriterContext {
   // (e.g. from Repeater nodes) by emitting <path id="p0" d="..."/> once and referencing via <use>.
   std::unordered_map<std::string, std::string> pathDefIds = {};
 
+  // Cache: filter signature → assigned ID in global <defs>. Used to deduplicate repeated
+  // <filter> definitions (e.g. multiple layers with identical DropShadowStyle or LayerFilter
+  // chain). Signature is a string concatenation of filter parameters, prefixed with the
+  // emission-site tag ("chain:", "dss:", "iss:", "issb:") so different sites never collide.
+  std::unordered_map<std::string, std::string> filterDefIds = {};
+
   std::string nextId(const std::string& prefix) {
     return prefix + std::to_string(_id++);
   }
@@ -289,6 +295,12 @@ class HTMLWriter {
   // fill/stroke) into _defs and caches the mapping. The caller applies fill/stroke on the
   // <use> element that references this definition.
   std::string getOrCreatePathDef(const std::string& d);
+
+  // Filter dedup helpers. Signatures are built by each emission site (writeFilterDefs,
+  // DropShadowStyle, InnerShadowStyle variants) from the filter parameters and a site-specific
+  // prefix. On cache hit, callers skip emission and reuse the cached id.
+  std::string lookupFilterId(const std::string& signature) const;
+  void registerFilterId(const std::string& signature, const std::string& id);
 };
 
 }  // namespace pagx
