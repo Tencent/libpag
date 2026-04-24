@@ -160,11 +160,93 @@ std::vector<FontLocation> SystemFonts::FallbackTypefaces() {
   return fallbacks;
 }
 
+std::vector<FontFamilyEntry> SystemFonts::AllFontFamilies() {
+  CFArrayRef familyNames = CTFontManagerCopyAvailableFontFamilyNames();
+  if (familyNames == nullptr) {
+    return {};
+  }
+
+  std::vector<FontFamilyEntry> entries = {};
+  CFIndex familyCount = CFArrayGetCount(familyNames);
+  entries.reserve(static_cast<size_t>(familyCount));
+
+  // Build a reusable mandatory-attributes set containing only kCTFontFamilyNameAttribute so that
+  // CTFontDescriptorCreateMatchingFontDescriptors returns every descriptor whose family name
+  // matches exactly — i.e. every member of the family.
+  const void* mandatoryKeys[] = {kCTFontFamilyNameAttribute};
+  CFSetRef mandatoryAttributes =
+      CFSetCreate(kCFAllocatorDefault, mandatoryKeys, 1, &kCFTypeSetCallBacks);
+
+  for (CFIndex i = 0; i < familyCount; i++) {
+    auto cfFamilyName = static_cast<CFStringRef>(CFArrayGetValueAtIndex(familyNames, i));
+    if (cfFamilyName == nullptr) {
+      continue;
+    }
+    auto familyStr = StringFromCFString(cfFamilyName);
+    if (familyStr.empty()) {
+      continue;
+    }
+
+    FontFamilyEntry entry = {};
+    entry.family = std::move(familyStr);
+
+    const void* attrKeys[] = {kCTFontFamilyNameAttribute};
+    const void* attrValues[] = {cfFamilyName};
+    CFDictionaryRef attributes =
+        CFDictionaryCreate(kCFAllocatorDefault, attrKeys, attrValues, 1,
+                           &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    if (attributes != nullptr) {
+      CTFontDescriptorRef familyDescriptor = CTFontDescriptorCreateWithAttributes(attributes);
+      CFRelease(attributes);
+      if (familyDescriptor != nullptr) {
+        CFArrayRef members =
+            CTFontDescriptorCreateMatchingFontDescriptors(familyDescriptor, mandatoryAttributes);
+        CFRelease(familyDescriptor);
+        if (members != nullptr) {
+          CFIndex memberCount = CFArrayGetCount(members);
+          std::set<std::string> seenStyles = {};
+          entry.styles.reserve(static_cast<size_t>(memberCount));
+
+          for (CFIndex j = 0; j < memberCount; j++) {
+            auto descriptor = static_cast<CTFontDescriptorRef>(CFArrayGetValueAtIndex(members, j));
+            if (descriptor == nullptr) {
+              continue;
+            }
+            auto cfStyle = static_cast<CFStringRef>(
+                CTFontDescriptorCopyAttribute(descriptor, kCTFontStyleNameAttribute));
+            if (cfStyle == nullptr) {
+              continue;
+            }
+            auto styleStr = StringFromCFString(cfStyle);
+            CFRelease(cfStyle);
+            if (styleStr.empty()) {
+              continue;
+            }
+            if (seenStyles.insert(styleStr).second) {
+              entry.styles.push_back(std::move(styleStr));
+            }
+          }
+          CFRelease(members);
+        }
+      }
+    }
+
+    entries.push_back(std::move(entry));
+  }
+
+  if (mandatoryAttributes != nullptr) {
+    CFRelease(mandatoryAttributes);
+  }
+  CFRelease(familyNames);
+  return entries;
+}
+
 }  // namespace pagx
 
 #elif defined(_WIN32)
 
 #include <dwrite.h>
+#include <set>
 #include <string>
 
 #pragma comment(lib, "dwrite.lib")
@@ -192,6 +274,37 @@ static std::string WideToUTF8(const wchar_t* wide, int length) {
 static std::string GetFamilyName(IDWriteFontFamily* fontFamily) {
   IDWriteLocalizedStrings* names = nullptr;
   HRESULT hr = fontFamily->GetFamilyNames(&names);
+  if (FAILED(hr) || names == nullptr) {
+    return {};
+  }
+
+  UINT32 index = 0;
+  BOOL exists = FALSE;
+  names->FindLocaleName(L"en-us", &index, &exists);
+  if (!exists) {
+    index = 0;
+  }
+
+  UINT32 length = 0;
+  hr = names->GetStringLength(index, &length);
+  if (FAILED(hr) || length == 0) {
+    SafeRelease(&names);
+    return {};
+  }
+
+  std::wstring wide(static_cast<size_t>(length) + 1, L'\0');
+  hr = names->GetString(index, wide.data(), length + 1);
+  SafeRelease(&names);
+  if (FAILED(hr)) {
+    return {};
+  }
+
+  return WideToUTF8(wide.c_str(), static_cast<int>(length));
+}
+
+static std::string GetFaceName(IDWriteFont* font) {
+  IDWriteLocalizedStrings* names = nullptr;
+  HRESULT hr = font->GetFaceNames(&names);
   if (FAILED(hr) || names == nullptr) {
     return {};
   }
@@ -262,12 +375,81 @@ std::vector<FontLocation> SystemFonts::FallbackTypefaces() {
   return fallbacks;
 }
 
+std::vector<FontFamilyEntry> SystemFonts::AllFontFamilies() {
+  IDWriteFactory* factory = nullptr;
+  HRESULT hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
+                                   reinterpret_cast<IUnknown**>(&factory));
+  if (FAILED(hr) || factory == nullptr) {
+    return {};
+  }
+
+  IDWriteFontCollection* fontCollection = nullptr;
+  hr = factory->GetSystemFontCollection(&fontCollection);
+  if (FAILED(hr) || fontCollection == nullptr) {
+    SafeRelease(&factory);
+    return {};
+  }
+
+  UINT32 familyCount = fontCollection->GetFontFamilyCount();
+  std::vector<FontFamilyEntry> entries = {};
+  entries.reserve(familyCount);
+
+  for (UINT32 i = 0; i < familyCount; i++) {
+    IDWriteFontFamily* fontFamily = nullptr;
+    hr = fontCollection->GetFontFamily(i, &fontFamily);
+    if (FAILED(hr) || fontFamily == nullptr) {
+      continue;
+    }
+
+    auto familyName = GetFamilyName(fontFamily);
+    if (familyName.empty()) {
+      SafeRelease(&fontFamily);
+      continue;
+    }
+
+    FontFamilyEntry entry = {};
+    entry.family = std::move(familyName);
+
+    UINT32 fontCount = fontFamily->GetFontCount();
+    std::set<std::string> seenStyles = {};
+    entry.styles.reserve(fontCount);
+
+    for (UINT32 j = 0; j < fontCount; j++) {
+      IDWriteFont* font = nullptr;
+      hr = fontFamily->GetFont(j, &font);
+      if (FAILED(hr) || font == nullptr) {
+        continue;
+      }
+      if (font->GetSimulations() != DWRITE_FONT_SIMULATIONS_NONE) {
+        SafeRelease(&font);
+        continue;
+      }
+      auto faceName = GetFaceName(font);
+      SafeRelease(&font);
+      if (faceName.empty()) {
+        continue;
+      }
+      if (seenStyles.insert(faceName).second) {
+        entry.styles.push_back(std::move(faceName));
+      }
+    }
+
+    SafeRelease(&fontFamily);
+    entries.push_back(std::move(entry));
+  }
+
+  SafeRelease(&fontCollection);
+  SafeRelease(&factory);
+  return entries;
+}
+
 }  // namespace pagx
 
 #elif defined(__linux__)
 
 #include <fontconfig/fontconfig.h>
 #include <unistd.h>
+#include <map>
 #include <set>
 #include <string>
 
@@ -336,6 +518,68 @@ std::vector<FontLocation> SystemFonts::FallbackTypefaces() {
   return fallbacks;
 }
 
+std::vector<FontFamilyEntry> SystemFonts::AllFontFamilies() {
+  FcPattern* pattern = FcPatternCreate();
+  if (pattern == nullptr) {
+    return {};
+  }
+  FcObjectSet* objectSet = FcObjectSetBuild(FC_FAMILY, FC_STYLE, (char*)0);
+  if (objectSet == nullptr) {
+    FcPatternDestroy(pattern);
+    return {};
+  }
+  FcFontSet* fontSet = FcFontList(nullptr, pattern, objectSet);
+  FcObjectSetDestroy(objectSet);
+  FcPatternDestroy(pattern);
+  if (fontSet == nullptr) {
+    return {};
+  }
+
+  std::vector<FontFamilyEntry> entries = {};
+  std::map<std::string, size_t> familyIndex = {};
+  std::vector<std::set<std::string> > seenStylesPerEntry = {};
+
+  for (int i = 0; i < fontSet->nfont; i++) {
+    FcPattern* font = fontSet->fonts[i];
+    FcChar8* familyRaw = nullptr;
+    if (FcPatternGetString(font, FC_FAMILY, 0, &familyRaw) != FcResultMatch ||
+        familyRaw == nullptr) {
+      continue;
+    }
+    std::string familyStr(reinterpret_cast<const char*>(familyRaw));
+    if (familyStr.empty()) {
+      continue;
+    }
+
+    auto it = familyIndex.find(familyStr);
+    if (it == familyIndex.end()) {
+      FontFamilyEntry entry = {};
+      entry.family = familyStr;
+      entries.push_back(std::move(entry));
+      seenStylesPerEntry.push_back({});
+      familyIndex[familyStr] = entries.size() - 1;
+      it = familyIndex.find(familyStr);
+    }
+
+    FcChar8* styleRaw = nullptr;
+    if (FcPatternGetString(font, FC_STYLE, 0, &styleRaw) != FcResultMatch || styleRaw == nullptr) {
+      continue;
+    }
+    std::string styleStr(reinterpret_cast<const char*>(styleRaw));
+    if (styleStr.empty()) {
+      continue;
+    }
+
+    size_t idx = it->second;
+    if (seenStylesPerEntry[idx].insert(styleStr).second) {
+      entries[idx].styles.push_back(std::move(styleStr));
+    }
+  }
+
+  FcFontSetDestroy(fontSet);
+  return entries;
+}
+
 }  // namespace pagx
 
 #else
@@ -343,6 +587,10 @@ std::vector<FontLocation> SystemFonts::FallbackTypefaces() {
 namespace pagx {
 
 std::vector<FontLocation> SystemFonts::FallbackTypefaces() {
+  return {};
+}
+
+std::vector<FontFamilyEntry> SystemFonts::AllFontFamilies() {
   return {};
 }
 
