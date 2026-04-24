@@ -21,10 +21,7 @@
 namespace pagx::cli {
 
 /**
- * Queries font metrics.
- *
- * Subcommands:
- *   info   - Query font identity and metrics from a file or system font
+ * Queries font metrics from a file or system font.
  */
 int RunFont(int argc, char* argv[]);
 
