@@ -525,10 +525,8 @@ std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern, const R
   // Fall back to native SVG pattern handling for Repeat mode and non-bakeable cases
   int imgW = 0;
   int imgH = 0;
-  bool canUseOBB = false;
-  if (!shapeBounds.isEmpty()) {
-    canUseOBB = needsNativeTiling ? GetImagePNGDimensions(pattern->image, &imgW, &imgH) : true;
-  }
+  GetImagePNGDimensions(pattern->image, &imgW, &imgH);
+  bool canUseOBB = !shapeBounds.isEmpty() && imgW > 0 && imgH > 0;
 
   _defs->openElement("pattern");
   _defs->addAttribute("id", defId);
@@ -558,6 +556,8 @@ std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern, const R
     _defs->closeElementStart();
     _defs->openElement("image");
     _defs->addAttribute("href", href);
+    _defs->addRequiredAttribute("width", static_cast<float>(imgW));
+    _defs->addRequiredAttribute("height", static_cast<float>(imgH));
     _defs->addAttribute("transform", MatrixToSVGTransform(obbMatrix));
   } else {
     _defs->addAttribute("patternUnits", "userSpaceOnUse");
@@ -566,6 +566,10 @@ std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern, const R
     _defs->closeElementStart();
     _defs->openElement("image");
     _defs->addAttribute("href", href);
+    if (imgW > 0 && imgH > 0) {
+      _defs->addRequiredAttribute("width", static_cast<float>(imgW));
+      _defs->addRequiredAttribute("height", static_cast<float>(imgH));
+    }
     if (!pattern->matrix.isIdentity()) {
       _defs->addAttribute("transform", MatrixToSVGTransform(pattern->matrix));
     }
