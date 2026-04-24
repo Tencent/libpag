@@ -663,8 +663,16 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     if (text->baseline == TextBaseline::Alphabetic) {
       ty -= renderFont * 0.8f;
     }
-    style += "position:absolute;left:" + FloatToString(renderPos.x) +
-             "px;top:" + FloatToString(ty) + "px;white-space:pre";
+    style += "position:absolute;top:" + FloatToString(ty) + "px;white-space:pre";
+    // Use text-align + width instead of transform:translateX to avoid creating a compositing
+    // layer, which disables subpixel antialiasing and makes text look thinner.
+    if (text->textAnchor == TextAnchor::Center) {
+      style += ";left:0;width:" + FloatToString(renderPos.x * 2) + "px;text-align:center";
+    } else if (text->textAnchor == TextAnchor::End) {
+      style += ";left:0;width:" + FloatToString(renderPos.x) + "px;text-align:right";
+    } else {
+      style += ";left:" + FloatToString(renderPos.x) + "px";
+    }
     // line-height is hoisted to the parent Layer when fontHoisted; otherwise emit it on the span.
     if (!fontHoisted) {
       auto lineHeight = text->fontLineHeight() > 0 ? text->fontLineHeight() : renderFont;
@@ -672,18 +680,8 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     }
   }
   std::string textTransform;
-  if (!tb) {
-    if (text->textAnchor == TextAnchor::Center) {
-      textTransform += "translateX(-50%)";
-    } else if (text->textAnchor == TextAnchor::End) {
-      textTransform += "translateX(-100%)";
-    }
-  }
   if (text->fauxItalic) {
-    if (!textTransform.empty()) {
-      textTransform += ' ';
-    }
-    textTransform += "skewX(-12deg)";
+    textTransform = "skewX(-12deg)";
   }
   if (!textTransform.empty()) {
     style += ";transform:" + textTransform;
@@ -1038,13 +1036,17 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         ty -= renderFont * 0.8f;
       }
       auto lineHeight = text->fontLineHeight() > 0 ? text->fontLineHeight() : renderFont;
-      std::string containerStyle =
-          "position:absolute;white-space:nowrap;left:" + FloatToString(renderPos.x) +
-          "px;top:" + FloatToString(ty) + "px;line-height:" + FloatToString(lineHeight) + "px";
+      std::string containerStyle = "position:absolute;white-space:nowrap;top:" + FloatToString(ty) +
+                                   "px;line-height:" + FloatToString(lineHeight) + "px";
+      // Use text-align + width instead of transform:translateX to avoid creating a compositing
+      // layer, which disables subpixel antialiasing and makes text look thinner.
       if (text->textAnchor == TextAnchor::Center) {
-        containerStyle += ";transform:translateX(-50%)";
+        containerStyle +=
+            ";left:0;width:" + FloatToString(renderPos.x * 2) + "px;text-align:center";
       } else if (text->textAnchor == TextAnchor::End) {
-        containerStyle += ";transform:translateX(-100%)";
+        containerStyle += ";left:0;width:" + FloatToString(renderPos.x) + "px;text-align:right";
+      } else {
+        containerStyle += ";left:" + FloatToString(renderPos.x) + "px";
       }
       if (!text->fontFamily.empty()) {
         std::string escapedFamilyM = text->fontFamily;
