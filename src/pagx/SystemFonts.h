@@ -35,6 +35,15 @@ struct FontLocation {
 };
 
 /**
+ * Describes a single system font family and its available styles. Returned by
+ * SystemFonts::AllFontFamilies for font enumeration purposes.
+ */
+struct FontFamilyEntry {
+  std::string family = {};
+  std::vector<std::string> styles = {};
+};
+
+/**
  * Provides access to system fallback fonts by querying native platform APIs. On macOS, this uses
  * CTFontCopyDefaultCascadeListForLanguages with the user's language preferences. On Linux, this
  * uses fontconfig's FcFontSort to enumerate system fonts in priority order. On Windows, this
@@ -47,6 +56,15 @@ class SystemFonts {
    * language preferences. No Typeface objects are created; callers should load fonts on demand.
    */
   static std::vector<FontLocation> FallbackTypefaces();
+
+  /**
+   * Returns every installed system font family with its available styles. On failure
+   * (platform API unavailable, enumeration fails), returns an empty vector silently.
+   * Styles within a family are deduplicated (first-occurrence-wins). Order within
+   * styles is platform-native order. Order of families across the vector is NOT
+   * guaranteed (callers should sort as needed).
+   */
+  static std::vector<FontFamilyEntry> AllFontFamilies();
 };
 
 }  // namespace pagx
