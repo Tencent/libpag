@@ -4,7 +4,7 @@
   <Layer>
     <Rectangle left="40" top="40" width="320" height="320" roundness="24"/>
     <Fill>
-      <DiamondGradient center="0.625,0.625" radius="0.5">
+      <DiamondGradient>
         <ColorStop color="#FBBF24" offset="0"/>
         <ColorStop color="#F59E0B" offset="0.4"/>
         <ColorStop color="#D97706" offset="0.7"/>
