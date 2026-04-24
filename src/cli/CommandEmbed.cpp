@@ -41,7 +41,7 @@ static void PrintEmbedUsage() {
   std::cout
       << "Usage: pagx embed [options] <file.pagx>\n"
       << "\n"
-      << "Embed fonts and images into a PAGX file as base64.\n"
+      << "Embed font glyphs and images into a PAGX file for self-contained output.\n"
       << "\n"
       << "Options:\n"
       << "  -o, --output <path>              Output file path (default: overwrite input)\n"
