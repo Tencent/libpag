@@ -560,7 +560,7 @@ class LayerBuilderContext {
 
     char* end = nullptr;
     int scaleModeInt = static_cast<int>(std::strtol(scaleModeIt->second.c_str(), &end, 10));
-    if (end == scaleModeIt->second.c_str()) {
+    if (end == scaleModeIt->second.c_str() || scaleModeInt < 0 || scaleModeInt > 3) {
       return identity;
     }
 
@@ -572,20 +572,36 @@ class LayerBuilderContext {
     auto nwIt = node->customData.find("node-width");
     auto nhIt = node->customData.find("node-height");
     if (nwIt != node->customData.end()) {
-      nodeWidth = std::strtof(nwIt->second.c_str(), nullptr);
+      char* nwEnd = nullptr;
+      float parsed = std::strtof(nwIt->second.c_str(), &nwEnd);
+      if (nwEnd != nwIt->second.c_str()) {
+        nodeWidth = parsed;
+      }
     }
     if (nhIt != node->customData.end()) {
-      nodeHeight = std::strtof(nhIt->second.c_str(), nullptr);
+      char* nhEnd = nullptr;
+      float parsed = std::strtof(nhIt->second.c_str(), &nhEnd);
+      if (nhEnd != nhIt->second.c_str()) {
+        nodeHeight = parsed;
+      }
     }
 
     float origImageWidth = 0.0f, origImageHeight = 0.0f;
     auto oiwIt = node->customData.find("orig-image-width");
     auto oihIt = node->customData.find("orig-image-height");
     if (oiwIt != node->customData.end()) {
-      origImageWidth = std::strtof(oiwIt->second.c_str(), nullptr);
+      char* oiwEnd = nullptr;
+      float parsed = std::strtof(oiwIt->second.c_str(), &oiwEnd);
+      if (oiwEnd != oiwIt->second.c_str()) {
+        origImageWidth = parsed;
+      }
     }
     if (oihIt != node->customData.end()) {
-      origImageHeight = std::strtof(oihIt->second.c_str(), nullptr);
+      char* oihEnd = nullptr;
+      float parsed = std::strtof(oihIt->second.c_str(), &oihEnd);
+      if (oihEnd != oihIt->second.c_str()) {
+        origImageHeight = parsed;
+      }
     }
 
     float scaleFactor = 0.5f;
