@@ -25,7 +25,7 @@
     <Layer flex="1">
       <Ellipse centerX="0" centerY="0" width="320" height="140"/>
       <Fill>
-        <RadialGradient radius="0.55">
+        <RadialGradient center="0.3,0.3" radius="0.55">
           <ColorStop color="#FFF" offset="0"/>
           <ColorStop color="#06B6D4" offset="0.5"/>
           <ColorStop color="#0891B2" offset="1"/>
