@@ -2818,6 +2818,7 @@ CLI_TEST(PAGXCliTest, Embed_SkipFonts_ImagesOnly) {
   auto document = pagx::PAGXImporter::FromFile(outPagx);
   ASSERT_NE(document, nullptr);
   bool hasImageData = false;
+  bool hasFontNode = false;
   for (auto& node : document->nodes) {
     if (node->nodeType() == pagx::NodeType::Image) {
       auto* image = static_cast<pagx::Image*>(node.get());
@@ -2825,8 +2826,12 @@ CLI_TEST(PAGXCliTest, Embed_SkipFonts_ImagesOnly) {
         hasImageData = true;
       }
     }
+    if (node->nodeType() == pagx::NodeType::Font) {
+      hasFontNode = true;
+    }
   }
   EXPECT_TRUE(hasImageData);
+  EXPECT_FALSE(hasFontNode);
 }
 
 CLI_TEST(PAGXCliTest, Embed_SkipImages_FontsOnly) {
