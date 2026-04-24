@@ -166,6 +166,10 @@ class HTMLWriterContext {
   // that are already covered by this signature. Reset to empty when leaving the layer.
   FontSignature fontHoistSignature = {};
 
+  // Cache: path d-string → assigned ID in global <defs>. Used to deduplicate repeated SVG paths
+  // (e.g. from Repeater nodes) by emitting <path id="p0" d="..."/> once and referencing via <use>.
+  std::unordered_map<std::string, std::string> pathDefIds = {};
+
   std::string nextId(const std::string& prefix) {
     return prefix + std::to_string(_id++);
   }
@@ -278,6 +282,12 @@ class HTMLWriter {
   // SVG fill/stroke attributes
   void applySVGFill(HTMLBuilder& out, const Fill* fill);
   void applySVGStroke(HTMLBuilder& out, const Stroke* stroke, float pathLength = 0.0f);
+
+  // Returns the ID for a path definition in the global <defs>. If the d-string was already
+  // defined, returns the existing ID. Otherwise, emits a bare <path id="id" d="d"/> (no
+  // fill/stroke) into _defs and caches the mapping. The caller applies fill/stroke on the
+  // <use> element that references this definition.
+  std::string getOrCreatePathDef(const std::string& d);
 };
 
 }  // namespace pagx

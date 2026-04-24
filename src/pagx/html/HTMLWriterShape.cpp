@@ -944,6 +944,20 @@ std::string GetPathSVGString(const Path* path) {
 // HTMLWriter – SVG fill/stroke helpers
 //==============================================================================
 
+std::string HTMLWriter::getOrCreatePathDef(const std::string& d) {
+  auto it = _ctx->pathDefIds.find(d);
+  if (it != _ctx->pathDefIds.end()) {
+    return it->second;
+  }
+  std::string id = _ctx->nextId("p");
+  _defs->openTag("path");
+  _defs->addAttr("id", id);
+  _defs->addAttr("d", d);
+  _defs->closeTagSelfClosing();
+  _ctx->pathDefIds[d] = id;
+  return id;
+}
+
 void HTMLWriter::applySVGFill(HTMLBuilder& out, const Fill* fill) {
   if (!fill) {
     out.addAttr("fill", "none");
@@ -1771,8 +1785,14 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         auto p = static_cast<const Path*>(g.element);
         std::string d = GetPathSVGString(p);
         if (!d.empty()) {
-          out.openTag("path");
-          out.addAttr("d", d);
+          if (!trim && g.modifiedPathData.empty()) {
+            auto defId = getOrCreatePathDef(d);
+            out.openTag("use");
+            out.addAttr("href", "#" + defId);
+          } else {
+            out.openTag("path");
+            out.addAttr("d", d);
+          }
           applySVGFill(out, trim ? nullptr : fill);
           if (isContinuousTrim) {
             applySVGStroke(out, stroke, computeGeoPathLength(g));
@@ -1789,8 +1809,14 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         auto ps = static_cast<const Polystar*>(g.element);
         std::string d = BuildPolystarPath(ps);
         if (!d.empty()) {
-          out.openTag("path");
-          out.addAttr("d", d);
+          if (!trim && g.modifiedPathData.empty()) {
+            auto defId = getOrCreatePathDef(d);
+            out.openTag("use");
+            out.addAttr("href", "#" + defId);
+          } else {
+            out.openTag("path");
+            out.addAttr("d", d);
+          }
           applySVGFill(out, trim ? nullptr : fill);
           if (isContinuousTrim) {
             applySVGStroke(out, stroke, computeGeoPathLength(g));
