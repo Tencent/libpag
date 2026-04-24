@@ -53,6 +53,24 @@ struct SVGExportOptions {
    * system fonts via platform-native font lookup.
    */
   FontConfig* fontConfig = nullptr;
+
+  /**
+   * Whether to rasterize layers that carry features SVG cannot losslessly represent (TextPath,
+   * TextModifier, diamond/conic gradient, BackgroundBlurStyle). When true, such a layer is
+   * baked to an embedded PNG and emitted as an &lt;image&gt; so the visual result is preserved.
+   * When false, the exporter falls through to the vector path and those features degrade
+   * silently (text path / modifier drop, diamond/conic gradient fall back to radial,
+   * background blur falls back to a source blur). The default value is true.
+   */
+  bool rasterizeUnsupportedFeatures = true;
+
+  /**
+   * Ratio of raster DPI to the 96 DPI logical coordinate space, driving the off-screen surface
+   * size of every PNG bake. The placed &lt;image&gt; keeps using logical dimensions so consumers
+   * stretch the denser bitmap over the same visible extent, yielding a crisper result.
+   * The default value is 192.
+   */
+  int rasterDPI = 192;
 };
 
 /**

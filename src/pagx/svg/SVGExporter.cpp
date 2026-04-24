@@ -57,6 +57,7 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/svg/SVGBlendMode.h"
+#include "pagx/svg/SVGFeatureProbe.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/Rect.h"
 #include "pagx/utils/Base64.h"
@@ -64,6 +65,7 @@
 #include "pagx/utils/ModifierResolver.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLBuilder.h"
+#include "renderer/LayerBuilder.h"
 
 namespace pagx {
 
@@ -193,10 +195,12 @@ class SVGWriter {
  public:
   SVGWriter(SVGBuilder* defs, SVGWriterContext* context, int indentSpaces = 2,
             bool convertTextToPath = true, LayoutContext* layoutContext = nullptr,
-            PAGXDocument* doc = nullptr)
+            PAGXDocument* doc = nullptr, bool rasterizeUnsupportedFeatures = true,
+            int rasterDPI = 192)
       : _defs(defs), _context(context), _indentSpaces(indentSpaces),
-        _convertTextToPath(convertTextToPath), _layoutContext(layoutContext), _resolver(doc),
-        _doc(doc) {
+        _convertTextToPath(convertTextToPath),
+        _rasterizeUnsupportedFeatures(rasterizeUnsupportedFeatures), _rasterDPI(rasterDPI),
+        _layoutContext(layoutContext), _resolver(doc), _doc(doc) {
   }
 
   void writeLayer(SVGBuilder& out, const Layer* layer);
@@ -206,13 +210,27 @@ class SVGWriter {
   SVGWriterContext* _context = nullptr;
   int _indentSpaces = 2;
   bool _convertTextToPath = true;
+  bool _rasterizeUnsupportedFeatures = true;
+  int _rasterDPI = 192;
   LayoutContext* _layoutContext = nullptr;
   ModifierResolver _resolver;
   PAGXDocument* _doc = nullptr;
+  GPUContext _gpu;
+  LayerBuildResult _buildResult = {};
+  bool _buildResultReady = false;
 
   std::string generateId(const std::string& prefix) {
     return _context->generateId(prefix);
   }
+
+  const LayerBuildResult& ensureBuildResult();
+
+  // Rasterizes the given layer (optionally compositing it with the backdrop pixels underneath)
+  // to a PNG and emits it as a positioned <image>. Returns true iff a picture was emitted.
+  // withBackdrop is set only for layers carrying BackgroundBlurStyle where the visual depends
+  // on pixels drawn below; every other unsupported feature is self-contained and renders fine
+  // against an empty canvas.
+  bool rasterizeLayerAsImage(SVGBuilder& out, const Layer* layer, bool withBackdrop);
 
   // One geometry instance captured during the scope walk in writeElements.
   // Transform/alpha are baked at collection time so that later painters can
@@ -1320,6 +1338,50 @@ void SVGWriter::writeText(SVGBuilder& out, const Text* text, const FillStrokeInf
 }
 
 //==============================================================================
+// SVGWriter – rasterization fallback for SVG-unsupported features
+//==============================================================================
+
+const LayerBuildResult& SVGWriter::ensureBuildResult() {
+  if (!_buildResultReady) {
+    _buildResult = LayerBuilder::BuildWithMap(_doc);
+    _buildResultReady = true;
+  }
+  return _buildResult;
+}
+
+bool SVGWriter::rasterizeLayerAsImage(SVGBuilder& out, const Layer* layer, bool withBackdrop) {
+  auto& buildResult = ensureBuildResult();
+  auto it = buildResult.layerMap.find(layer);
+  if (it == buildResult.layerMap.end() || !buildResult.root) {
+    return false;
+  }
+  auto tgfxLayer = it->second;
+  if (!tgfxLayer) {
+    return false;
+  }
+  auto pixelScale = static_cast<float>(_rasterDPI) / 96.0f;
+  auto pngData = withBackdrop ? RenderLayerCompositeWithBackdrop(&_gpu, buildResult.root, tgfxLayer,
+                                                                 pixelScale)
+                              : RenderMaskedLayer(&_gpu, buildResult.root, tgfxLayer, pixelScale);
+  if (!pngData || pngData->size() == 0) {
+    return false;
+  }
+  auto bounds = tgfxLayer->getBounds(buildResult.root.get(), true);
+  if (bounds.isEmpty()) {
+    return false;
+  }
+  std::string href = "data:image/png;base64," + Base64Encode(pngData->bytes(), pngData->size());
+  out.openElement("image");
+  out.addAttribute("href", href);
+  out.addRequiredAttribute("x", bounds.left);
+  out.addRequiredAttribute("y", bounds.top);
+  out.addRequiredAttribute("width", bounds.width());
+  out.addRequiredAttribute("height", bounds.height());
+  out.closeElementSelfClosing();
+  return true;
+}
+
+//==============================================================================
 // SVGWriter – element list and layer writing
 //==============================================================================
 
@@ -1498,6 +1560,21 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
     return;
   }
 
+  // Probe for features SVG cannot losslessly represent (TextPath, TextModifier,
+  // diamond/conic gradient, BackgroundBlurStyle). If any trip AND rasterization
+  // is enabled, bake the whole layer to a PNG so the visual result is preserved.
+  // The alternative (silently dropping unsupported elements / degrading gradients
+  // to radial / degrading background blur to source blur) is what the vector
+  // path below does.
+  if (_rasterizeUnsupportedFeatures) {
+    auto features = ProbeLayerFeaturesForSVG(layer);
+    if (features.needsRasterization()) {
+      if (rasterizeLayerAsImage(out, layer, features.requiresBackdrop())) {
+        return;
+      }
+    }
+  }
+
   auto renderPos = layer->renderPosition();
   bool needsGroup = !layer->matrix.isIdentity() || layer->alpha < 1.0f || !layer->id.empty() ||
                     !layer->filters.empty() || !layer->styles.empty() || layer->mask != nullptr ||
@@ -1601,7 +1678,7 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options) {
   SVGWriterContext context;
   auto layoutContext = std::make_unique<LayoutContext>(options.fontConfig);
   SVGWriter writer(&defs, &context, options.indent, options.convertTextToPath, layoutContext.get(),
-                   &doc);
+                   &doc, options.rasterizeUnsupportedFeatures, options.rasterDPI);
 
   if (options.xmlDeclaration) {
     svg.appendDeclaration();
