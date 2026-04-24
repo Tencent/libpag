@@ -1751,9 +1751,10 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   }
 
   auto renderPos = layer->renderPosition();
-  bool needsGroup = !layer->matrix.isIdentity() || layer->alpha < 1.0f || !layer->id.empty() ||
-                    !layer->filters.empty() || !layer->styles.empty() || layer->mask != nullptr ||
-                    renderPos.x != 0.0f || renderPos.y != 0.0f || !layer->customData.empty() ||
+  bool needsGroup = !layer->matrix.isIdentity() || !layer->matrix3D.isIdentity() ||
+                    layer->alpha < 1.0f || !layer->id.empty() || !layer->filters.empty() ||
+                    !layer->styles.empty() || layer->mask != nullptr || renderPos.x != 0.0f ||
+                    renderPos.y != 0.0f || !layer->customData.empty() ||
                     layer->blendMode != BlendMode::Normal || layer->hasScrollRect;
 
   if (!needsGroup) {
