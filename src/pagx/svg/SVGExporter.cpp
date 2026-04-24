@@ -195,7 +195,8 @@ class SVGWriter {
             bool convertTextToPath = true, LayoutContext* layoutContext = nullptr,
             PAGXDocument* doc = nullptr)
       : _defs(defs), _context(context), _indentSpaces(indentSpaces),
-        _convertTextToPath(convertTextToPath), _layoutContext(layoutContext), _resolver(doc) {
+        _convertTextToPath(convertTextToPath), _layoutContext(layoutContext), _resolver(doc),
+        _doc(doc) {
   }
 
   void writeLayer(SVGBuilder& out, const Layer* layer);
@@ -207,6 +208,7 @@ class SVGWriter {
   bool _convertTextToPath = true;
   LayoutContext* _layoutContext = nullptr;
   ModifierResolver _resolver;
+  PAGXDocument* _doc = nullptr;
 
   std::string generateId(const std::string& prefix) {
     return _context->generateId(prefix);
@@ -767,7 +769,8 @@ std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, const char* ta
     _defs->addAttribute("style", "mask-type:alpha");
   }
   _defs->closeElementStart();
-  SVGWriter nestedWriter(&paintDefs, _context, _indentSpaces, _convertTextToPath, _layoutContext);
+  SVGWriter nestedWriter(&paintDefs, _context, _indentSpaces, _convertTextToPath, _layoutContext,
+                         _doc);
   (nestedWriter.*writer)(*_defs, maskLayer);
   _defs->closeElement();
   std::string paintDefsStr = paintDefs.release();
