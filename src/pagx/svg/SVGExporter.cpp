@@ -18,9 +18,9 @@
 
 #include "pagx/SVGExporter.h"
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
-#include <cmath>
 #include <fstream>
 #include <memory>
 #include <string>
@@ -358,10 +358,10 @@ void SVGWriter::writeColorSourceDef(const ColorSource* source, const std::string
       auto grad = static_cast<const LinearGradient*>(source);
       _defs->openElement("linearGradient");
       _defs->addAttribute("id", id);
-      _defs->addAttribute("x1", grad->startPoint.x);
-      _defs->addAttribute("y1", grad->startPoint.y);
-      _defs->addAttribute("x2", grad->endPoint.x);
-      _defs->addAttribute("y2", grad->endPoint.y);
+      _defs->addRequiredAttribute("x1", grad->startPoint.x);
+      _defs->addRequiredAttribute("y1", grad->startPoint.y);
+      _defs->addRequiredAttribute("x2", grad->endPoint.x);
+      _defs->addRequiredAttribute("y2", grad->endPoint.y);
       finishGradientDef(grad->matrix, grad->colorStops);
       break;
     }
@@ -369,9 +369,9 @@ void SVGWriter::writeColorSourceDef(const ColorSource* source, const std::string
       auto grad = static_cast<const RadialGradient*>(source);
       _defs->openElement("radialGradient");
       _defs->addAttribute("id", id);
-      _defs->addAttribute("cx", grad->center.x);
-      _defs->addAttribute("cy", grad->center.y);
-      _defs->addAttribute("r", grad->radius);
+      _defs->addRequiredAttribute("cx", grad->center.x);
+      _defs->addRequiredAttribute("cy", grad->center.y);
+      _defs->addRequiredAttribute("r", grad->radius);
       finishGradientDef(grad->matrix, grad->colorStops);
       break;
     }
@@ -388,8 +388,8 @@ void SVGWriter::writeColorSourceDef(const ColorSource* source, const std::string
                            "<!-- conic gradient degraded to radial -->\n");
       _defs->openElement("radialGradient");
       _defs->addAttribute("id", id);
-      _defs->addAttribute("cx", grad->center.x);
-      _defs->addAttribute("cy", grad->center.y);
+      _defs->addRequiredAttribute("cx", grad->center.x);
+      _defs->addRequiredAttribute("cy", grad->center.y);
       _defs->addAttribute("r", 100.0f);
       finishGradientDef(grad->matrix, grad->colorStops);
       break;
@@ -402,9 +402,9 @@ void SVGWriter::writeColorSourceDef(const ColorSource* source, const std::string
                            "<!-- diamond gradient degraded to radial -->\n");
       _defs->openElement("radialGradient");
       _defs->addAttribute("id", id);
-      _defs->addAttribute("cx", grad->center.x);
-      _defs->addAttribute("cy", grad->center.y);
-      _defs->addAttribute("r", grad->radius);
+      _defs->addRequiredAttribute("cx", grad->center.x);
+      _defs->addRequiredAttribute("cy", grad->center.y);
+      _defs->addRequiredAttribute("r", grad->radius);
       finishGradientDef(grad->matrix, grad->colorStops);
       break;
     }
@@ -423,7 +423,7 @@ std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern, const R
   }
 
   std::string defId = generateId("pattern");
-  
+
   // Detect which tile modes we need to handle
   bool needsNativeTiling =
       (pattern->tileModeX == TileMode::Repeat || pattern->tileModeY == TileMode::Repeat);
@@ -439,13 +439,13 @@ std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern, const R
     float offsetX = pattern->matrix.tx - shapeBounds.x;
     float offsetY = pattern->matrix.ty - shapeBounds.y;
     float pixelScale = static_cast<float>(_rasterDPI) / 96.0f;
-    
+
     auto tiledPng = RenderTiledPattern(&_gpu, pattern, w, h, offsetX, offsetY, pixelScale);
     if (tiledPng && tiledPng->size() > 0) {
       // Successfully baked the pattern to PNG - embed as data URI
       std::string base64Data = Base64Encode(tiledPng->bytes(), tiledPng->size());
       href = "data:image/png;base64," + base64Data;
-      
+
       _defs->openElement("pattern");
       _defs->addAttribute("id", defId);
       _defs->addAttribute("patternUnits", "userSpaceOnUse");
@@ -519,7 +519,6 @@ std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern, const R
   _defs->closeElement();
   return "url(#" + defId + ")";
 }
-
 
 std::string SVGWriter::getColorSourceRef(const ColorSource* source, float* outAlpha,
                                          const Rect& shapeBounds) {
