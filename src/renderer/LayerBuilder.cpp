@@ -578,6 +578,14 @@ class LayerBuilderContext {
       image = tgfx::Image::MakeFromFile(imageNode->filePath);
       source = "file";
     }
+    // Enable mipmaps on every decoded image. ImagePattern already defaults to MipmapMode::Linear
+    // on the sampling side, so the render pipeline is ready to consume mipmap levels; before this
+    // call the image itself was not flagged as mipmapped, which silently disabled the benefit.
+    // With mipmaps the codec decodes at a single resolution once and hardware-generated levels
+    // cover every zoom ratio, eliminating the per-scale-level re-decode observed during zoom.
+    if (image) {
+      image = image->makeMipmapped(true);
+    }
     auto imgEnd = std::chrono::high_resolution_clock::now();
     auto imgMs = std::chrono::duration<double, std::milli>(imgEnd - imgStart).count();
     if (imgMs > 1.0) {

@@ -34,12 +34,32 @@ using namespace emscripten;
 
 namespace pagx {
 
-// Maximum cache limit: 256MB (reduced for WeChat MiniProgram WASM environment)
-constexpr size_t MAX_CACHE_LIMIT = 256U * 1024 * 1024;
+// Maximum GPU resource cache limit. Raised from the earlier 256MB after profiling showed the
+// previous value caused frequent LRU eviction of mipmapped textures: once a texture was evicted,
+// scrolling back to it triggered a full codec re-decode even though the data had not changed.
+// 512MB headroom keeps all typical PAGX documents (roughly 50 images, ~9MB mipmapped each)
+// resident so rebuild counts stay near zero during pan/zoom. Lower this again if memory-limited
+// devices start OOM-crashing.
+constexpr size_t MAX_CACHE_LIMIT = 512U * 1024 * 1024;
 // Maximum image dimension for LayerBuilder to constrain memory usage in WASM environment.
-constexpr int MAX_IMAGE_DIMENSION = 2048;
-// GPU resource expiration in frames. Resources unused beyond this threshold will be released.
-constexpr size_t EXPIRATION_FRAMES = 10 * 60;
+// 0 disables the constrain entirely: decoded images reach the GPU at codec resolution. This is
+// the preferred setup now that mipmaps are enabled on every CodecImage -- a mipmapped texture
+// already serves every zoom ratio from a single decode, so forcing a CPU-side BoxFilter downscale
+// is pure overhead that multiplies first-frame decode time on PNG images (PNG cannot scale-decode
+// so the downscale requires a full-resolution decode followed by a BoxFilter pass). Set back to a
+// positive value (e.g. 4096) only if oversized source images threaten to blow the GPU memory
+// budget on constrained devices.
+constexpr int MAX_IMAGE_DIMENSION = 0;
+// GPU resource expiration in frames. The previous value (10 * 60 = 600 frames) caused textures
+// to be evicted purely by age even when the cache had plenty of free bytes -- for example, an
+// image that moves out of view during panning and returns 600 frames later (only a few seconds
+// of continuous gesture input at 60fps+) would be decoded again despite never running into the
+// cache's byte ceiling. Setting this to tgfx's MAX_EXPIRATION_FRAMES effectively disables the
+// age-based eviction path, leaving the byte-capacity path as the only way a resource is
+// reclaimed; the intent is that 512MB of headroom now reliably translates into no re-decodes
+// during typical pan/zoom sessions. Revisit if real-world memory pressure requires an upper
+// bound on resource lifetime again.
+constexpr size_t EXPIRATION_FRAMES = 1000000;
 // Slow frame threshold in milliseconds (more lenient than desktop 32ms due to WeChat environment).
 constexpr double SLOW_FRAME_THRESHOLD_MS = 50.0;
 // Recovery time window in milliseconds (longer than desktop 2s to reduce jitter).
