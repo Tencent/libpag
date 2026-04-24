@@ -21,8 +21,9 @@
 namespace pagx::cli {
 
 /**
- * Embeds fonts and images into a PAGX file as base64, producing a self-contained output.
- * Run `pagx embed --help` for the full flag list.
+ * Embeds font glyphs and images into a PAGX file, producing a self-contained output.
+ * Font embedding extracts glyph paths/images from laid-out text; image embedding inlines
+ * external files as base64. Run `pagx embed --help` for the full flag list.
  */
 int RunEmbed(int argc, char* argv[]);
 
