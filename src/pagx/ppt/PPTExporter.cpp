@@ -2415,8 +2415,9 @@ bool PPTWriter::rasterizeLayerAsPicture(XMLBuilder& out, const Layer* layer, boo
   }
   auto pixelScale = static_cast<float>(_rasterDPI) / 96.0f;
   auto pngData = withBackdrop ? RenderLayerCompositeWithBackdrop(&_gpu, buildResult.root, tgfxLayer,
-                                                                 pixelScale)
-                              : RenderMaskedLayer(&_gpu, buildResult.root, tgfxLayer, pixelScale);
+                                                                 buildResult.root.get(), pixelScale)
+                              : RenderMaskedLayer(&_gpu, buildResult.root, tgfxLayer,
+                                                  buildResult.root.get(), pixelScale);
   if (!pngData) {
     return false;
   }

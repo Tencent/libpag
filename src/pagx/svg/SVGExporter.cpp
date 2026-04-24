@@ -1359,14 +1359,23 @@ bool SVGWriter::rasterizeLayerAsImage(SVGBuilder& out, const Layer* layer, bool 
   if (!tgfxLayer) {
     return false;
   }
+  // The <image> is emitted into `out`, which is the parent <g>'s body — that <g>'s transform
+  // chain already equals the ancestor transforms up to the target layer's parent. Compute the
+  // bounds and render the PNG in that parent coordinate space so the <image>'s x/y/width/height
+  // are naturally correct inside the parent <g>. Falls back to the document root when the layer
+  // has no parent (e.g. top-level layers attached directly to root — parent equals root there,
+  // so the behavior matches).
+  auto coordinateSpace =
+      tgfxLayer->parent() != nullptr ? tgfxLayer->parent() : buildResult.root.get();
   auto pixelScale = static_cast<float>(_rasterDPI) / 96.0f;
   auto pngData = withBackdrop ? RenderLayerCompositeWithBackdrop(&_gpu, buildResult.root, tgfxLayer,
-                                                                 pixelScale)
-                              : RenderMaskedLayer(&_gpu, buildResult.root, tgfxLayer, pixelScale);
+                                                                 coordinateSpace, pixelScale)
+                              : RenderMaskedLayer(&_gpu, buildResult.root, tgfxLayer,
+                                                  coordinateSpace, pixelScale);
   if (!pngData || pngData->size() == 0) {
     return false;
   }
-  auto bounds = tgfxLayer->getBounds(buildResult.root.get(), true);
+  auto bounds = tgfxLayer->getBounds(coordinateSpace, true);
   if (bounds.isEmpty()) {
     return false;
   }

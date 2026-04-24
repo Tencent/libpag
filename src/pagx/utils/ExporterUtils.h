@@ -166,25 +166,33 @@ class GPUContext {
  * ratio of the desired output pixel density to the layer's logical coordinate space (e.g. 2.0 for
  * 2x density). The encoded PNG has dimensions ceil(logicalSize * pixelScale); callers keep using
  * the logical bounds when placing the PNG so that consumers scale it back up on display.
+ * `targetCoordinateSpace` selects the coordinate space used both for sizing the PNG (via the
+ * target layer's AABB in that space) and for orienting the rendered pixels, so the returned PNG
+ * can be placed at the AABB's origin inside a container drawn in the same space. Pass `root` when
+ * the placement container is the document root (e.g. PPT slide body); pass the target layer's
+ * parent when the PNG is nested inside a group whose transform already matches the parent's
+ * coordinate space (e.g. SVG `<image>` emitted inside a parent `<g transform=...>`).
  * Returns nullptr if the layer has zero bounds or rasterization fails.
  */
 std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,
                                               const std::shared_ptr<tgfx::Layer>& root,
                                               const std::shared_ptr<tgfx::Layer>& targetLayer,
+                                              const tgfx::Layer* targetCoordinateSpace,
                                               float pixelScale);
 
 /**
- * Rasterizes the full scene rooted at `root`, clipped to the global bounds of `targetLayer`, to
- * a PNG-encoded Data object. Unlike RenderMaskedLayer (which draws only the target against an
- * empty canvas), this renders every layer from `root` downward so that backdrop pixels
- * participate in the composite. Use when the target layer's visual result depends on pixels
- * drawn below it — e.g. a non-Normal `Layer.blendMode` that must blend against the backdrop.
- * `pixelScale` controls the output pixel density (see RenderMaskedLayer).
+ * Rasterizes the full scene rooted at `root`, clipped to the bounds of `targetLayer` in
+ * `targetCoordinateSpace`, to a PNG-encoded Data object. Unlike RenderMaskedLayer (which draws
+ * only the target against an empty canvas), this renders every layer from `root` downward so that
+ * backdrop pixels participate in the composite. Use when the target layer's visual result depends
+ * on pixels drawn below it — e.g. a non-Normal `Layer.blendMode` that must blend against the
+ * backdrop. `pixelScale` and `targetCoordinateSpace` have the same meaning as in RenderMaskedLayer.
  * Returns nullptr if the target has zero bounds or rasterization fails.
  */
 std::shared_ptr<tgfx::Data> RenderLayerCompositeWithBackdrop(
     GPUContext* gpu, const std::shared_ptr<tgfx::Layer>& root,
-    const std::shared_ptr<tgfx::Layer>& targetLayer, float pixelScale);
+    const std::shared_ptr<tgfx::Layer>& targetLayer, const tgfx::Layer* targetCoordinateSpace,
+    float pixelScale);
 
 class ImagePattern;
 

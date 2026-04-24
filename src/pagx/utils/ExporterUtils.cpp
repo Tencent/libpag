@@ -694,33 +694,41 @@ static std::shared_ptr<tgfx::Data> RenderToPNG(tgfx::Context* context, int width
 }
 
 // Draws `targetLayer` (and only that layer) into the off-screen canvas, with
-// the global bounds origin mapped to (0,0) so the emitted PNG is tightly
-// cropped. Used for mask / scrollRect bakes where the layer's visual result
-// does not depend on the backdrop.
+// the bounds origin mapped to (0,0) so the emitted PNG is tightly cropped.
+// `bounds` and `coordinateSpace` describe the coordinate space chosen by the
+// caller: pixels are rendered so that `coordinateSpace`'s axes align with the
+// canvas axes, and the PNG can be placed at `bounds.left/top` inside any
+// container drawn in the same space. Used for mask / scrollRect bakes where
+// the layer's visual result does not depend on the backdrop.
 struct MaskedLayerDrawer {
-  const std::shared_ptr<tgfx::Layer>& root;
   const std::shared_ptr<tgfx::Layer>& targetLayer;
-  const tgfx::Rect& globalBounds;
+  const tgfx::Layer* coordinateSpace;
+  const tgfx::Rect& bounds;
   void operator()(tgfx::Canvas* canvas) const {
-    canvas->translate(-globalBounds.left, -globalBounds.top);
-    canvas->concat(targetLayer->getRelativeMatrix(root.get()));
+    canvas->translate(-bounds.left, -bounds.top);
+    canvas->concat(targetLayer->getRelativeMatrix(coordinateSpace));
     targetLayer->draw(canvas);
   }
 };
 
 // Draws the entire scene from `root` downward into the off-screen canvas,
-// clipped to the target layer's global bounds. Used when the target layer's
-// visual result depends on the backdrop pixels below it — e.g. a non-Normal
-// `Layer.blendMode`, which the tgfx renderer composites against whatever has
-// already been drawn underneath. Drawing only the target against an empty
-// canvas (as MaskedLayerDrawer does) would blend it with transparent-black
-// and lose the intended composite; drawing `root` with a clip preserves it.
+// clipped to the target layer's bounds expressed in `coordinateSpace`. Used
+// when the target layer's visual result depends on the backdrop pixels below
+// it — e.g. a non-Normal `Layer.blendMode`, which the tgfx renderer composites
+// against whatever has already been drawn underneath. Drawing only the target
+// against an empty canvas (as MaskedLayerDrawer does) would blend it with
+// transparent-black and lose the intended composite; drawing `root` with a
+// clip preserves it. The canvas is pre-translated so `bounds.left/top` maps
+// to (0,0), then concat'd with root's relative matrix to coordinateSpace so
+// the root is drawn in that space.
 struct BackdropCompositeDrawer {
   const std::shared_ptr<tgfx::Layer>& root;
-  const tgfx::Rect& globalBounds;
+  const tgfx::Layer* coordinateSpace;
+  const tgfx::Rect& bounds;
   void operator()(tgfx::Canvas* canvas) const {
-    canvas->translate(-globalBounds.left, -globalBounds.top);
-    canvas->clipRect(globalBounds);
+    canvas->translate(-bounds.left, -bounds.top);
+    canvas->concat(root->getRelativeMatrix(coordinateSpace));
+    canvas->clipRect(bounds);
     root->draw(canvas);
   }
 };
@@ -761,32 +769,36 @@ void GPUContext::unlock() {
 std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,
                                               const std::shared_ptr<tgfx::Layer>& root,
                                               const std::shared_ptr<tgfx::Layer>& targetLayer,
+                                              const tgfx::Layer* targetCoordinateSpace,
                                               float pixelScale) {
-  auto globalBounds = targetLayer->getBounds(root.get(), true);
+  auto coordinateSpace = targetCoordinateSpace != nullptr ? targetCoordinateSpace : root.get();
+  auto bounds = targetLayer->getBounds(coordinateSpace, true);
   auto context = gpu->lockContext();
   if (context == nullptr) {
     return nullptr;
   }
-  int width = static_cast<int>(ceilf(globalBounds.width()));
-  int height = static_cast<int>(ceilf(globalBounds.height()));
+  int width = static_cast<int>(ceilf(bounds.width()));
+  int height = static_cast<int>(ceilf(bounds.height()));
   auto result = RenderToPNG(context, width, height, pixelScale,
-                            MaskedLayerDrawer{root, targetLayer, globalBounds});
+                            MaskedLayerDrawer{targetLayer, coordinateSpace, bounds});
   gpu->unlock();
   return result;
 }
 
 std::shared_ptr<tgfx::Data> RenderLayerCompositeWithBackdrop(
     GPUContext* gpu, const std::shared_ptr<tgfx::Layer>& root,
-    const std::shared_ptr<tgfx::Layer>& targetLayer, float pixelScale) {
-  auto globalBounds = targetLayer->getBounds(root.get(), true);
+    const std::shared_ptr<tgfx::Layer>& targetLayer, const tgfx::Layer* targetCoordinateSpace,
+    float pixelScale) {
+  auto coordinateSpace = targetCoordinateSpace != nullptr ? targetCoordinateSpace : root.get();
+  auto bounds = targetLayer->getBounds(coordinateSpace, true);
   auto context = gpu->lockContext();
   if (context == nullptr) {
     return nullptr;
   }
-  int width = static_cast<int>(ceilf(globalBounds.width()));
-  int height = static_cast<int>(ceilf(globalBounds.height()));
-  auto result =
-      RenderToPNG(context, width, height, pixelScale, BackdropCompositeDrawer{root, globalBounds});
+  int width = static_cast<int>(ceilf(bounds.width()));
+  int height = static_cast<int>(ceilf(bounds.height()));
+  auto result = RenderToPNG(context, width, height, pixelScale,
+                            BackdropCompositeDrawer{root, coordinateSpace, bounds});
   gpu->unlock();
   return result;
 }
