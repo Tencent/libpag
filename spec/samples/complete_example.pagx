@@ -31,13 +31,7 @@
   </Layer>
   <Layer name="Title" width="800">
     <Text centerX="0" text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="56"/>
-    <Fill>
-      <LinearGradient startPoint="-400,0" endPoint="-200,0" fitsToGeometry="false">
-        <ColorStop color="#FFF" offset="0"/>
-        <ColorStop color="#8B5CF6" offset="0.5"/>
-        <ColorStop color="#06B6D4" offset="1"/>
-      </LinearGradient>
-    </Fill>
+    <Fill color="#06B6D4"/>
   </Layer>
   <Layer name="Subtitle">
     <Text text="Portable Animated Graphics XML" fontFamily="Arial" fontSize="14"/>
@@ -74,10 +68,13 @@
       <Layer left="50" top="40">
         <Polystar left="-26" top="-26" type="polygon" pointCount="6" outerRadius="26"/>
         <Fill>
-          <DiamondGradient>
-            <ColorStop color="#14B8A6" offset="0"/>
-            <ColorStop color="#0F766E" offset="1"/>
-          </DiamondGradient>
+          <ConicGradient>
+            <ColorStop color="#F43F5E" offset="0"/>
+            <ColorStop color="#8B5CF6" offset="0.25"/>
+            <ColorStop color="#06B6D4" offset="0.5"/>
+            <ColorStop color="#10B981" offset="0.75"/>
+            <ColorStop color="#F43F5E" offset="1"/>
+          </ConicGradient>
         </Fill>
         <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#14B8A680"/>
       </Layer>
@@ -125,18 +122,15 @@
       <Fill color="@cyan"/>
       <Repeater copies="5" position="0,0" rotation="72"/>
     </Group>
-    <Layer left="663">
-      <Rectangle width="50" height="50"/>
-      <Fill>
-        <ConicGradient>
-          <ColorStop color="#F43F5E" offset="0"/>
-          <ColorStop color="#8B5CF6" offset="0.25"/>
-          <ColorStop color="#06B6D4" offset="0.5"/>
-          <ColorStop color="#10B981" offset="0.75"/>
-          <ColorStop color="#F43F5E" offset="1"/>
-        </ConicGradient>
-      </Fill>
-    </Layer>
+  </Layer>
+  <Layer left="663" top="300">
+    <Rectangle width="50" height="50"/>
+    <Fill>
+      <DiamondGradient>
+        <ColorStop color="#14B8A6" offset="0"/>
+        <ColorStop color="#0F766E" offset="1"/>
+      </DiamondGradient>
+    </Fill>
   </Layer>
   <Layer id="circleMask" visible="false">
     <Ellipse left="-22.5" top="-22.5" width="45" height="45"/>
@@ -174,7 +168,7 @@
   <Layer left="670" top="430">
     <Rectangle left="-45" top="-30" width="90" height="60" roundness="8"/>
     <Fill>
-      <ImagePattern image="pag_logo.png" matrix="0.23,0,0,0.23,-30,-30" tileModeX="clamp" tileModeY="clamp" scaleMode="none"/>
+      <ImagePattern image="pag_logo.png"/>
     </Fill>
     <Stroke color="#FFFFFF20" width="1"/>
     <DropShadowStyle offsetY="6" blurX="16" blurY="16" color="#00000060"/>
