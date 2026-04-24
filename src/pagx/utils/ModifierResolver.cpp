@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/ppt/PPTModifierResolver.h"
+#include "pagx/utils/ModifierResolver.h"
 #include <algorithm>
 #include <cmath>
 #include <unordered_map>
@@ -92,8 +92,8 @@ static PathData* MakePathDataFromTGFX(PAGXDocument* doc, const tgfx::Path& tp) {
 // position=(0,0) and we prime its preferred layout from the data bounds.
 // Without this, layoutBounds() reports an empty rect and any later modifier
 // that re-enters PrimitiveToTGFXPath sees renderScale()==0 — collapsing the
-// geometry to the origin and dropping the shape from the PPTX.
-Element* PPTModifierResolver::makePathFromData(PathData* data) const {
+// geometry to the origin and dropping the shape from the output.
+Element* ModifierResolver::makePathFromData(PathData* data) const {
   auto* p = _doc->makeNode<Path>();
   p->data = data;
   p->position = {0.0f, 0.0f};
@@ -314,7 +314,7 @@ static tgfx::Path PrimitiveToTGFXPath(const Element* el) {
 // Modifier appliers. Each returns the new pagx::Path replacement(s).
 //==============================================================================
 
-Element* PPTModifierResolver::applyTrimToElement(Element* shape, const TrimPath* trim) const {
+Element* ModifierResolver::applyTrimToElement(Element* shape, const TrimPath* trim) const {
   auto tp = PrimitiveToTGFXPath(shape);
   if (tp.isEmpty()) {
     return shape;
@@ -327,8 +327,8 @@ Element* PPTModifierResolver::applyTrimToElement(Element* shape, const TrimPath*
   return makePathFromData(MakePathDataFromTGFX(_doc, tp));
 }
 
-Element* PPTModifierResolver::applyRoundCornerToElement(Element* shape,
-                                                        const RoundCorner* corner) const {
+Element* ModifierResolver::applyRoundCornerToElement(Element* shape,
+                                                     const RoundCorner* corner) const {
   if (corner->radius <= 0.0f) {
     return shape;
   }
@@ -397,7 +397,7 @@ static Group* MakeCopyGroup(PAGXDocument* doc, const std::vector<Element*>& body
   // BuildGroupMatrix's read of renderPosition() returns the per-copy offset.
   // Without this, layoutBounds() falls back to preferredX/Y == 0 (these
   // synthetic groups never participate in the document layout pass) and every
-  // copy collapses onto the origin, hiding all repeater offsets in the PPTX.
+  // copy collapses onto the origin, hiding all repeater offsets in the output.
   // Skip Group::updateSize's child recursion — body children were already
   // measured by the document's layout pass — and call the base directly so
   // virtual dispatch invokes Group::onMeasure to seed preferredX/Y.
@@ -409,7 +409,7 @@ static Group* MakeCopyGroup(PAGXDocument* doc, const std::vector<Element*>& body
 // resolve()
 //==============================================================================
 
-std::vector<Element*> PPTModifierResolver::resolve(const std::vector<Element*>& elements) {
+std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& elements) {
   std::vector<Element*> output;
   output.reserve(elements.size());
   // Indices into `output` of every shape-like element produced so far in this

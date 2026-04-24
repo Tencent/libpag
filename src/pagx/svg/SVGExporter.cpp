@@ -29,17 +29,24 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/TextLayout.h"
 #include "pagx/TextLayoutParams.h"
+#include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/ColorStop.h"
+#include "pagx/nodes/Composition.h"
+#include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/DiamondGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
+#include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/InnerShadowFilter.h"
+#include "pagx/nodes/InnerShadowStyle.h"
+#include "pagx/nodes/LayerStyle.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
@@ -54,6 +61,7 @@
 #include "pagx/types/Rect.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/ExporterUtils.h"
+#include "pagx/utils/ModifierResolver.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLBuilder.h"
 
@@ -184,9 +192,10 @@ class SVGWriterContext {
 class SVGWriter {
  public:
   SVGWriter(SVGBuilder* defs, SVGWriterContext* context, int indentSpaces = 2,
-            bool convertTextToPath = true, LayoutContext* layoutContext = nullptr)
+            bool convertTextToPath = true, LayoutContext* layoutContext = nullptr,
+            PAGXDocument* doc = nullptr)
       : _defs(defs), _context(context), _indentSpaces(indentSpaces),
-        _convertTextToPath(convertTextToPath), _layoutContext(layoutContext) {
+        _convertTextToPath(convertTextToPath), _layoutContext(layoutContext), _resolver(doc) {
   }
 
   void writeLayer(SVGBuilder& out, const Layer* layer);
@@ -197,31 +206,51 @@ class SVGWriter {
   int _indentSpaces = 2;
   bool _convertTextToPath = true;
   LayoutContext* _layoutContext = nullptr;
+  ModifierResolver _resolver;
 
   std::string generateId(const std::string& prefix) {
     return _context->generateId(prefix);
   }
 
+  // One geometry instance captured during the scope walk in writeElements.
+  // Transform/alpha are baked at collection time so that later painters can
+  // emit the geometry without knowing about the surrounding Group/TextBox
+  // stack. `textBox` carries the in-scope <TextBox> modifier so Text geometry
+  // still picks up box-level layout when rendered by a downstream painter
+  // (matches the legacy CollectFillStroke().textBox rule).
+  struct AccumulatedGeometry {
+    const Element* element = nullptr;
+    Matrix transform = {};
+    float alpha = 1.0f;
+    const TextBox* textBox = nullptr;
+  };
+
   // Layer / element writing
   void writeLayerContents(SVGBuilder& out, const Layer* layer, const Matrix& transform = {});
   void writeElements(SVGBuilder& out, const std::vector<Element*>& elements,
-                     const Matrix& transform = {});
+                     const Matrix& transform, float alpha, const TextBox* parentTextBox = nullptr);
+  void processVectorScope(SVGBuilder& out, const std::vector<Element*>& elements,
+                          const Matrix& transform, float alpha, const TextBox* parentTextBox,
+                          std::vector<AccumulatedGeometry>& accumulator, size_t scopeStart);
+  void emitGeometryWithFs(SVGBuilder& out, const AccumulatedGeometry& entry,
+                          const FillStrokeInfo& fs);
 
   // Shape writing
   void writeRectangle(SVGBuilder& out, const Rectangle* rect, const FillStrokeInfo& fs,
-                      const std::string& transform = "");
+                      const Matrix& m, float alpha);
   void writeEllipse(SVGBuilder& out, const Ellipse* ellipse, const FillStrokeInfo& fs,
-                    const std::string& transform = "");
-  void writePath(SVGBuilder& out, const Path* path, const FillStrokeInfo& fs,
-                 const std::string& transform = "");
-  void writeText(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
-                 const std::string& transform = "");
-  void writeTextAsPath(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
-                       const std::string& transform = "");
+                    const Matrix& m, float alpha);
+  void writePath(SVGBuilder& out, const Path* path, const FillStrokeInfo& fs, const Matrix& m,
+                 float alpha);
+  void writeText(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs, const Matrix& m,
+                 float alpha);
+  void writeTextAsPath(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs, const Matrix& m,
+                       float alpha);
   void writeTextWithLayout(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
-                           const TextLayoutResult& layoutResult, const std::string& transform);
-  void writeTextBoxGroup(SVGBuilder& out, const Group* textBox,
-                         const std::vector<Element*>& elements, const Matrix& transform);
+                           const TextLayoutResult& layoutResult, const Matrix& m, float alpha);
+  void writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
+                         const std::vector<Element*>& elements, const Matrix& transform,
+                         float alpha);
 
   // Gradient / pattern defs (write to _defs)
   void writeGradientStops(const std::vector<ColorStop*>& stops);
@@ -236,7 +265,8 @@ class SVGWriter {
                                 const std::string& blurResult, const std::string& offsetResult);
   void writeShadowColorMatrix(const Color& c, const std::string& inResult,
                               const std::string& outResult);
-  std::string writeFilterDefs(const std::vector<LayerFilter*>& filters);
+  std::string writeFilterAndStyleDefs(const std::vector<LayerFilter*>& filters,
+                                      const std::vector<LayerStyle*>& styles);
 
   // Mask / clip-path defs
   using ContentWriter = void (SVGWriter::*)(SVGBuilder&, const Layer*);
@@ -251,9 +281,9 @@ class SVGWriter {
 
   // Fill / stroke attribute helpers
   void applyFillAttributes(SVGBuilder& out, const Fill* fill, const Rect& shapeBounds = {},
-                           std::string* p3Style = nullptr);
+                           std::string* p3Style = nullptr, float alphaMultiplier = 1.0f);
   void applyStrokeAttributes(SVGBuilder& out, const Stroke* stroke, const Rect& shapeBounds = {},
-                             std::string* p3Style = nullptr);
+                             std::string* p3Style = nullptr, float alphaMultiplier = 1.0f);
   static void applyP3Style(SVGBuilder& out, const std::string& p3Style);
 };
 
@@ -316,6 +346,39 @@ void SVGWriter::writeColorSourceDef(const ColorSource* source, const std::string
     }
     case NodeType::RadialGradient: {
       auto grad = static_cast<const RadialGradient*>(source);
+      _defs->openElement("radialGradient");
+      _defs->addAttribute("id", id);
+      _defs->addAttribute("cx", grad->center.x);
+      _defs->addAttribute("cy", grad->center.y);
+      _defs->addAttribute("r", grad->radius);
+      finishGradientDef(grad->matrix, grad->colorStops);
+      break;
+    }
+    case NodeType::ConicGradient: {
+      // SVG has no conic/sweep gradient primitive (CSS `conic-gradient` is a
+      // paint only available in HTML). Degrade to a radial gradient centred
+      // at the conic's center so the stops still appear; the angular
+      // distribution is lost — matches PPT's path="circle" fallback. The
+      // conic has no radius; pick 50% of the viewport as a sensible default
+      // via gradientUnits="objectBoundingBox" would need a rework of the
+      // gradient machinery, so fall back to a fixed pixel radius here.
+      auto grad = static_cast<const ConicGradient*>(source);
+      _defs->addRawContent(std::string(_indentSpaces, ' ') +
+                           "<!-- conic gradient degraded to radial -->\n");
+      _defs->openElement("radialGradient");
+      _defs->addAttribute("id", id);
+      _defs->addAttribute("cx", grad->center.x);
+      _defs->addAttribute("cy", grad->center.y);
+      _defs->addAttribute("r", 100.0f);
+      finishGradientDef(grad->matrix, grad->colorStops);
+      break;
+    }
+    case NodeType::DiamondGradient: {
+      // SVG has no diamond gradient either; radial is the closest portable
+      // approximation. Same authoring caveat as ConicGradient.
+      auto grad = static_cast<const DiamondGradient*>(source);
+      _defs->addRawContent(std::string(_indentSpaces, ' ') +
+                           "<!-- diamond gradient degraded to radial -->\n");
       _defs->openElement("radialGradient");
       _defs->addAttribute("id", id);
       _defs->addAttribute("cx", grad->center.x);
@@ -405,7 +468,9 @@ std::string SVGWriter::getColorSourceRef(const ColorSource* source, float* outAl
     return ColorToSVGStringWithAlpha(solid->color, outAlpha);
   }
   if (source->nodeType() == NodeType::LinearGradient ||
-      source->nodeType() == NodeType::RadialGradient) {
+      source->nodeType() == NodeType::RadialGradient ||
+      source->nodeType() == NodeType::ConicGradient ||
+      source->nodeType() == NodeType::DiamondGradient) {
     std::string defId = generateId("grad");
     writeColorSourceDef(source, defId);
     if (outAlpha) {
@@ -471,8 +536,9 @@ void SVGWriter::writeShadowColorMatrix(const Color& c, const std::string& inResu
   _defs->closeElementSelfClosing();
 }
 
-std::string SVGWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters) {
-  if (filters.empty()) {
+std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& filters,
+                                               const std::vector<LayerStyle*>& styles) {
+  if (filters.empty() && styles.empty()) {
     return {};
   }
 
@@ -588,6 +654,75 @@ std::string SVGWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters)
     }
   }
 
+  // LayerStyle emission mirrors the Filter pass so DropShadowStyle /
+  // InnerShadowStyle share the feMerge aggregation logic. BackgroundBlurStyle
+  // has no portable SVG equivalent (the CSS `backdrop-filter` is for HTML, and
+  // `<feGaussianBlur in="BackgroundImage">` relies on the deprecated
+  // `enable-background` attribute); degrade to a source blur with a comment.
+  for (const auto* style : styles) {
+    switch (style->nodeType()) {
+      case NodeType::DropShadowStyle: {
+        auto shadow = static_cast<const DropShadowStyle*>(style);
+        std::string idx = std::to_string(shadowIndex++);
+        std::string offsetResult = "shadowOffset" + idx;
+        std::string shadowResult = "shadow" + idx;
+        writeShadowBlurAndOffset(shadow->blurX, shadow->blurY, shadow->offsetX, shadow->offsetY,
+                                 "shadowBlur" + idx, offsetResult);
+        writeShadowColorMatrix(shadow->color, offsetResult, shadowResult);
+        dropShadowResults.push_back(shadowResult);
+        // DropShadowStyle always composites below the source graphic (it is a
+        // style layer, not a filter that can hide the source).
+        needSourceGraphic = true;
+        break;
+      }
+      case NodeType::InnerShadowStyle: {
+        auto shadow = static_cast<const InnerShadowStyle*>(style);
+        std::string idx = std::to_string(shadowIndex++);
+        std::string offsetResult = "innerOffset" + idx;
+        std::string compositeResult = "innerComposite" + idx;
+        std::string shadowResult = "innerShadow" + idx;
+        writeShadowBlurAndOffset(shadow->blurX, shadow->blurY, shadow->offsetX, shadow->offsetY,
+                                 "innerBlur" + idx, offsetResult);
+
+        _defs->openElement("feComposite");
+        _defs->addAttribute("in", "SourceAlpha");
+        _defs->addAttribute("in2", offsetResult);
+        _defs->addAttribute("operator", "arithmetic");
+        _defs->addAttribute("k2", "-1");
+        _defs->addAttribute("k3", "1");
+        _defs->addAttribute("result", compositeResult);
+        _defs->closeElementSelfClosing();
+
+        writeShadowColorMatrix(shadow->color, compositeResult, shadowResult);
+        innerShadowResults.push_back(shadowResult);
+        needSourceGraphic = true;
+        break;
+      }
+      case NodeType::BackgroundBlurStyle: {
+        // SVG lacks a widely-supported BackgroundImage / backdrop access: `<feGaussianBlur
+        // in="BackgroundImage">` requires `enable-background` on an ancestor, which has
+        // been dropped from the SVG spec and is not implemented by modern renderers.
+        // Degrade to blurring the source graphic so the layer at least shows a blur
+        // effect; authoring callers who need true background-blur should output HTML.
+        auto bb = static_cast<const BackgroundBlurStyle*>(style);
+        _defs->addRawContent(std::string(_indentSpaces, ' ') +
+                             "<!-- background-blur degraded to source-blur: "
+                             "SVG has no portable BackgroundImage source -->\n");
+        _defs->openElement("feGaussianBlur");
+        _defs->addAttribute("in", "SourceGraphic");
+        std::string stdDev = FloatToString(bb->blurX);
+        if (bb->blurX != bb->blurY) {
+          stdDev += " " + FloatToString(bb->blurY);
+        }
+        _defs->addAttribute("stdDeviation", stdDev);
+        _defs->closeElementSelfClosing();
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
   bool hasShadows = !dropShadowResults.empty() || !innerShadowResults.empty();
   if (hasShadows) {
     bool multipleShadows = (dropShadowResults.size() + innerShadowResults.size()) > 1;
@@ -677,7 +812,7 @@ std::string SVGWriter::writeClipPathDef(const Layer* maskLayer) {
 //==============================================================================
 
 void SVGWriter::applyFillAttributes(SVGBuilder& out, const Fill* fill, const Rect& shapeBounds,
-                                    std::string* p3Style) {
+                                    std::string* p3Style, float alphaMultiplier) {
   if (!fill) {
     out.addAttribute("fill", "none");
     return;
@@ -685,7 +820,7 @@ void SVGWriter::applyFillAttributes(SVGBuilder& out, const Fill* fill, const Rec
   float alpha = 1.0f;
   std::string fillStr = getColorSourceRef(fill->color, &alpha, shapeBounds);
   out.addAttribute("fill", fillStr);
-  float effectiveAlpha = alpha * fill->alpha;
+  float effectiveAlpha = alpha * fill->alpha * alphaMultiplier;
   if (effectiveAlpha < 1.0f) {
     out.addAttribute("fill-opacity", FloatToString(effectiveAlpha));
   }
@@ -698,14 +833,15 @@ void SVGWriter::applyFillAttributes(SVGBuilder& out, const Fill* fill, const Rec
 }
 
 void SVGWriter::applyStrokeAttributes(SVGBuilder& out, const Stroke* stroke,
-                                      const Rect& shapeBounds, std::string* p3Style) {
+                                      const Rect& shapeBounds, std::string* p3Style,
+                                      float alphaMultiplier) {
   if (!stroke) {
     return;
   }
   float alpha = 1.0f;
   std::string strokeStr = getColorSourceRef(stroke->color, &alpha, shapeBounds);
   out.addAttribute("stroke", strokeStr);
-  float effectiveAlpha = alpha * stroke->alpha;
+  float effectiveAlpha = alpha * stroke->alpha * alphaMultiplier;
   if (effectiveAlpha < 1.0f) {
     out.addAttribute("stroke-opacity", FloatToString(effectiveAlpha));
   }
@@ -754,69 +890,97 @@ void SVGWriter::applyP3Style(SVGBuilder& out, const std::string& p3Style) {
 //==============================================================================
 
 void SVGWriter::writeRectangle(SVGBuilder& out, const Rectangle* rect, const FillStrokeInfo& fs,
-                               const std::string& transform) {
-  float x = rect->position.x - rect->size.width / 2;
-  float y = rect->position.y - rect->size.height / 2;
+                               const Matrix& m, float alpha) {
+  auto renderPos = rect->renderPosition();
+  auto renderSize = rect->renderSize();
+  float x = renderPos.x - renderSize.width / 2.0f;
+  float y = renderPos.y - renderSize.height / 2.0f;
+  float w = renderSize.width;
+  float h = renderSize.height;
+  float roundness = rect->roundness;
+  // SVG strokes, like OOXML, are always centred on the path geometry. Emulate
+  // StrokeAlign::Inside / Outside by shifting this stroke painter's geometry
+  // inward or outward by half the stroke width before emitting it. Fill-only
+  // painters (fs.stroke == nullptr) skip this branch so the fill geometry
+  // remains untouched.
+  ApplyStrokeBoxInset(fs.stroke, x, y, w, h, &roundness);
+
+  std::string transform = MatrixToSVGTransform(m);
   out.openElement("rect");
   if (!transform.empty()) {
     out.addAttribute("transform", transform);
   }
   out.addAttributeIfNonZero("x", x);
   out.addAttributeIfNonZero("y", y);
-  out.addRequiredAttribute("width", rect->size.width);
-  out.addRequiredAttribute("height", rect->size.height);
-  if (rect->roundness > 0) {
-    out.addAttribute("rx", rect->roundness);
-    out.addAttribute("ry", rect->roundness);
+  out.addRequiredAttribute("width", w);
+  out.addRequiredAttribute("height", h);
+  if (roundness > 0) {
+    out.addAttribute("rx", roundness);
+    out.addAttribute("ry", roundness);
   }
-  Rect bounds = Rect::MakeXYWH(x, y, rect->size.width, rect->size.height);
+  Rect bounds = Rect::MakeXYWH(x, y, w, h);
   std::string p3Style;
-  applyFillAttributes(out, fs.fill, bounds, &p3Style);
-  applyStrokeAttributes(out, fs.stroke, bounds, &p3Style);
+  applyFillAttributes(out, fs.fill, bounds, &p3Style, alpha);
+  applyStrokeAttributes(out, fs.stroke, bounds, &p3Style, alpha);
   applyP3Style(out, p3Style);
   out.closeElementSelfClosing();
 }
 
 void SVGWriter::writeEllipse(SVGBuilder& out, const Ellipse* ellipse, const FillStrokeInfo& fs,
-                             const std::string& transform) {
-  float rx = ellipse->size.width / 2;
-  float ry = ellipse->size.height / 2;
+                             const Matrix& m, float alpha) {
+  auto renderSize = ellipse->renderSize();
+  auto renderPos = ellipse->renderPosition();
+  float rx = renderSize.width / 2.0f;
+  float ry = renderSize.height / 2.0f;
+  float x = renderPos.x - rx;
+  float y = renderPos.y - ry;
+  float w = renderSize.width;
+  float h = renderSize.height;
+  ApplyStrokeBoxInset(fs.stroke, x, y, w, h);
+  rx = w / 2.0f;
+  ry = h / 2.0f;
+  float cx = x + rx;
+  float cy = y + ry;
+
+  std::string transform = MatrixToSVGTransform(m);
   if (FloatNearlyZero(rx - ry)) {
     out.openElement("circle");
     if (!transform.empty()) {
       out.addAttribute("transform", transform);
     }
-    out.addRequiredAttribute("cx", ellipse->position.x);
-    out.addRequiredAttribute("cy", ellipse->position.y);
+    out.addRequiredAttribute("cx", cx);
+    out.addRequiredAttribute("cy", cy);
     out.addRequiredAttribute("r", rx);
   } else {
     out.openElement("ellipse");
     if (!transform.empty()) {
       out.addAttribute("transform", transform);
     }
-    out.addRequiredAttribute("cx", ellipse->position.x);
-    out.addRequiredAttribute("cy", ellipse->position.y);
+    out.addRequiredAttribute("cx", cx);
+    out.addRequiredAttribute("cy", cy);
     out.addRequiredAttribute("rx", rx);
     out.addRequiredAttribute("ry", ry);
   }
-  Rect bounds = Rect::MakeXYWH(ellipse->position.x - rx, ellipse->position.y - ry, rx * 2, ry * 2);
+  Rect bounds = Rect::MakeXYWH(x, y, w, h);
   std::string p3Style;
-  applyFillAttributes(out, fs.fill, bounds, &p3Style);
-  applyStrokeAttributes(out, fs.stroke, bounds, &p3Style);
+  applyFillAttributes(out, fs.fill, bounds, &p3Style, alpha);
+  applyStrokeAttributes(out, fs.stroke, bounds, &p3Style, alpha);
   applyP3Style(out, p3Style);
   out.closeElementSelfClosing();
 }
 
 void SVGWriter::writePath(SVGBuilder& out, const Path* path, const FillStrokeInfo& fs,
-                          const std::string& transform) {
+                          const Matrix& m, float alpha) {
   if (!path->data || path->data->isEmpty()) {
     return;
   }
+  auto renderPos = path->renderPosition();
   out.openElement("path");
-  bool hasPosition = path->position.x != 0.0f || path->position.y != 0.0f;
+  std::string transform = MatrixToSVGTransform(m);
+  bool hasPosition = renderPos.x != 0.0f || renderPos.y != 0.0f;
   if (hasPosition) {
-    std::string posTransform = "translate(" + FloatToString(path->position.x) + "," +
-                               FloatToString(path->position.y) + ")";
+    std::string posTransform =
+        "translate(" + FloatToString(renderPos.x) + "," + FloatToString(renderPos.y) + ")";
     if (!transform.empty()) {
       out.addAttribute("transform", transform + " " + posTransform);
     } else {
@@ -828,8 +992,8 @@ void SVGWriter::writePath(SVGBuilder& out, const Path* path, const FillStrokeInf
   out.addAttribute("d", PathDataToSVGString(*path->data));
   Rect bounds = path->data->getBounds();
   std::string p3Style;
-  applyFillAttributes(out, fs.fill, bounds, &p3Style);
-  applyStrokeAttributes(out, fs.stroke, bounds, &p3Style);
+  applyFillAttributes(out, fs.fill, bounds, &p3Style, alpha);
+  applyStrokeAttributes(out, fs.stroke, bounds, &p3Style, alpha);
   applyP3Style(out, p3Style);
   out.closeElementSelfClosing();
 }
@@ -837,22 +1001,35 @@ void SVGWriter::writePath(SVGBuilder& out, const Path* path, const FillStrokeInf
 // ── writeTextAsPath ─────────────────────────────────────────────────────────
 
 void SVGWriter::writeTextAsPath(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
-                                const std::string& transform) {
-  float textPosX = text->position.x;
-  float textPosY = text->position.y;
-
-  auto glyphPaths = ComputeGlyphPaths(*text, textPosX, textPosY);
-  if (glyphPaths.empty()) {
+                                const Matrix& m, float alpha) {
+  auto renderPos = text->renderPosition();
+  // Apply TextBox padding as an additional offset (origin is top-left of box,
+  // not centred). Matches writeTextWithLayout's anchor computation.
+  if (fs.textBox) {
+    // For container-mode text inside a TextBox the caller has already composed
+    // the box transform; padding is applied here as an origin shift into the
+    // inset rect.
+    renderPos.x += fs.textBox->padding.left;
+    renderPos.y += fs.textBox->padding.top;
+  }
+  std::vector<GlyphPath> glyphPaths;
+  std::vector<GlyphImage> glyphImages;
+  ComputeGlyphPathsAndImages(*text, renderPos.x, renderPos.y, &glyphPaths, &glyphImages);
+  if (glyphPaths.empty() && glyphImages.empty()) {
     return;
   }
 
+  std::string transform = MatrixToSVGTransform(m);
   out.openElement("g");
   if (!transform.empty()) {
     out.addAttribute("transform", transform);
   }
+  // Fill/stroke here only apply to the vector glyph <path> children; <image>
+  // children have an intrinsic bitmap and ignore fill. We still emit the group
+  // attributes so SVG renderers inherit them onto the glyph paths.
   std::string p3Style;
-  applyFillAttributes(out, fs.fill, {}, &p3Style);
-  applyStrokeAttributes(out, fs.stroke, {}, &p3Style);
+  applyFillAttributes(out, fs.fill, {}, &p3Style, alpha);
+  applyStrokeAttributes(out, fs.stroke, {}, &p3Style, alpha);
   applyP3Style(out, p3Style);
   out.closeElementStart();
 
@@ -860,6 +1037,30 @@ void SVGWriter::writeTextAsPath(SVGBuilder& out, const Text* text, const FillStr
     out.openElement("path");
     out.addAttribute("transform", MatrixToSVGTransform(gp.transform));
     out.addAttribute("d", PathDataToSVGString(*gp.pathData));
+    out.closeElementSelfClosing();
+  }
+
+  // Bitmap glyphs (emoji / colour fonts). Each image is emitted as an <image>
+  // element transformed into its per-glyph pixel-space origin. Mirror PPT's
+  // writeTextAsPath bitmap loop (PPTExporter.cpp:1566).
+  for (const auto& gi : glyphImages) {
+    if (!gi.image) {
+      continue;
+    }
+    std::string href = GetImageHref(gi.image);
+    if (href.empty()) {
+      continue;
+    }
+    int imgW = 0;
+    int imgH = 0;
+    if (!GetImageDimensions(gi.image, &imgW, &imgH) || imgW <= 0 || imgH <= 0) {
+      continue;
+    }
+    out.openElement("image");
+    out.addAttribute("href", href);
+    out.addRequiredAttribute("width", static_cast<float>(imgW));
+    out.addRequiredAttribute("height", static_cast<float>(imgH));
+    out.addAttribute("transform", MatrixToSVGTransform(gi.transform));
     out.closeElementSelfClosing();
   }
 
@@ -881,26 +1082,39 @@ static void WriteSharedTextAttrs(SVGBuilder& out, const Text* text, TextAnchor a
   } else if (anchor == TextAnchor::End) {
     out.addAttribute("text-anchor", "end");
   }
-  if (!text->fontStyle.empty()) {
-    bool hasBold = text->fontStyle.find("Bold") != std::string::npos;
-    bool hasItalic = text->fontStyle.find("Italic") != std::string::npos;
-    if (hasBold) {
-      out.addAttribute("font-weight", "bold");
-    }
-    if (hasItalic) {
-      out.addAttribute("font-style", "italic");
-    }
+  // fauxBold / fauxItalic take precedence over the fontStyle name: a font may
+  // lack a real bold/italic face but the authoring tool still asks the
+  // renderer to synthesize one. Mirrors BuildRunStyle in PPTExporter.cpp.
+  bool hasBold = text->fauxBold || text->fontStyle.find("Bold") != std::string::npos;
+  bool hasItalic = text->fauxItalic || text->fontStyle.find("Italic") != std::string::npos;
+  if (hasBold) {
+    out.addAttribute("font-weight", "bold");
+  }
+  if (hasItalic) {
+    out.addAttribute("font-style", "italic");
+  }
+}
+
+// Emits writing-mode and text-align-last degradation notes on a <text> element.
+// Called inline inside every <text> in writeTextWithLayout / writeText fallback.
+static void ApplyTextBoxBodyAttrs(SVGBuilder& out, const TextBox* box) {
+  if (box == nullptr) {
+    return;
+  }
+  // CSS writing-mode "tb" (top-to-bottom) approximates PAGX's vertical CJK
+  // layout. The modern value "vertical-rl" produces the same column order but
+  // some older SVG renderers only understand the legacy "tb" keyword, so we
+  // emit it for broadest compatibility.
+  if (box->writingMode == WritingMode::Vertical) {
+    out.addAttribute("writing-mode", "tb");
   }
 }
 
 void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
-                                    const TextLayoutResult& layoutResult,
-                                    const std::string& transform) {
+                                    const TextLayoutResult& layoutResult, const Matrix& m,
+                                    float alpha) {
   auto* mutableText = const_cast<Text*>(text);
   auto* lines = layoutResult.getTextLines(mutableText);
-  if (!lines || lines->empty()) {
-    return;
-  }
 
   TextAnchor anchor = TextAnchor::Start;
   float anchorX = 0;
@@ -908,26 +1122,62 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
   if (fs.textBox) {
     float paddingLeft = fs.textBox->padding.left;
     float paddingTop = fs.textBox->padding.top;
+    float paddingRight = fs.textBox->padding.right;
     float effectiveWidth = EffectiveTextBoxWidth(fs.textBox);
-    switch (fs.textBox->textAlign) {
+    TextAlign textAlign = fs.textBox->textAlign;
+    switch (textAlign) {
       case TextAlign::Center:
         anchor = TextAnchor::Center;
         anchorX = fs.textBox->position.x + paddingLeft +
-                  (effectiveWidth - paddingLeft - fs.textBox->padding.right) / 2;
+                  (effectiveWidth - paddingLeft - paddingRight) / 2;
         break;
       case TextAlign::End:
         anchor = TextAnchor::End;
-        anchorX = fs.textBox->position.x + effectiveWidth - fs.textBox->padding.right;
+        anchorX = fs.textBox->position.x + effectiveWidth - paddingRight;
+        break;
+      case TextAlign::Justify:
+        // SVG's <text> element cannot justify runs — the only way to emulate
+        // it is per-character kerning, which requires running the shaper
+        // inline. Degrade to Start and leave a marker so authors can tell.
+        anchor = TextAnchor::Start;
+        anchorX = fs.textBox->position.x + paddingLeft;
+        out.addRawContent(std::string(_indentSpaces, ' ') +
+                          "<!-- text-align=justify degraded to start -->\n");
         break;
       default:
+        anchor = TextAnchor::Start;
         anchorX = fs.textBox->position.x + paddingLeft;
         break;
     }
     offsetY = fs.textBox->position.y + paddingTop;
   } else {
     anchor = text->textAnchor;
-    anchorX = text->position.x;
-    offsetY = text->position.y;
+    auto renderPos = text->renderPosition();
+    anchorX = renderPos.x;
+    offsetY = renderPos.y;
+  }
+
+  std::string transform = MatrixToSVGTransform(m);
+  if (!lines || lines->empty()) {
+    // Vertical writing mode skips horizontal line layout (see TextLayout.cpp:318),
+    // so textLines is nullptr and we must fall back to a single <text> element
+    // that carries the writing-mode attribute. The vertical-mode text flows
+    // top-to-bottom via CSS writing-mode="tb"; SVG renderers lay out the
+    // characters along the block-flow axis of the <text> element.
+    out.openElement("text");
+    if (!transform.empty()) {
+      out.addAttribute("transform", transform);
+    }
+    WriteSharedTextAttrs(out, text, anchor);
+    ApplyTextBoxBodyAttrs(out, fs.textBox);
+    std::string p3Style;
+    applyFillAttributes(out, fs.fill, {}, &p3Style, alpha);
+    applyStrokeAttributes(out, fs.stroke, {}, &p3Style, alpha);
+    applyP3Style(out, p3Style);
+    out.addRequiredAttribute("x", anchorX);
+    out.addRequiredAttribute("y", offsetY + text->fontSize);
+    out.closeElementWithText(text->text);
+    return;
   }
 
   for (auto& lineInfo : *lines) {
@@ -944,9 +1194,10 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
       out.addAttribute("transform", transform);
     }
     WriteSharedTextAttrs(out, text, anchor);
+    ApplyTextBoxBodyAttrs(out, fs.textBox);
     std::string p3Style;
-    applyFillAttributes(out, fs.fill, {}, &p3Style);
-    applyStrokeAttributes(out, fs.stroke, {}, &p3Style);
+    applyFillAttributes(out, fs.fill, {}, &p3Style, alpha);
+    applyStrokeAttributes(out, fs.stroke, {}, &p3Style, alpha);
     applyP3Style(out, p3Style);
     out.addRequiredAttribute("x", anchorX);
     out.addRequiredAttribute("y", offsetY + lineInfo.baselineY);
@@ -954,42 +1205,84 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
   }
 }
 
-void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const Group* textBox,
-                                  const std::vector<Element*>& elements, const Matrix& transform) {
-  auto* box = static_cast<const TextBox*>(textBox);
-  auto fs = CollectFillStroke(elements);
-  std::vector<Text*> childTexts;
-  auto mutableElements = elements;
-  TextLayout::CollectTextElements(mutableElements, childTexts);
-  if (childTexts.empty()) {
+// One "run" inside a rich TextBox: a Text together with the Fill and Stroke
+// painters that apply to it. Mirrors PPTWriter::RichTextRun so container-mode
+// TextBox reproduces per-run fill/stroke pairing.
+namespace {
+
+struct SVGRichTextRun {
+  const Text* text = nullptr;
+  const Fill* fill = nullptr;
+  const Stroke* stroke = nullptr;
+};
+
+// Walk TextBox children in source order, pairing every Text with its nearest
+// enclosing Fill/Stroke. Direct Text children inherit `parentFill`/`parentStroke`;
+// Texts nested in a Group use that Group's locally-collected Fill/Stroke,
+// falling back to the parent's. Same contract as PPTExporter::CollectRichTextRuns.
+void CollectSVGRichTextRuns(const std::vector<Element*>& elements, const Fill* parentFill,
+                            const Stroke* parentStroke, std::vector<SVGRichTextRun>& outRuns) {
+  for (auto* element : elements) {
+    auto type = element->nodeType();
+    if (type == NodeType::Text) {
+      auto* t = static_cast<const Text*>(element);
+      if (!t->text.empty()) {
+        outRuns.push_back({t, parentFill, parentStroke});
+      }
+    } else if (type == NodeType::Group) {
+      auto* g = static_cast<const Group*>(element);
+      auto groupFs = CollectFillStroke(g->elements);
+      const Fill* effectiveFill = groupFs.fill ? groupFs.fill : parentFill;
+      const Stroke* effectiveStroke = groupFs.stroke ? groupFs.stroke : parentStroke;
+      CollectSVGRichTextRuns(g->elements, effectiveFill, effectiveStroke, outRuns);
+    }
+  }
+}
+
+}  // namespace
+
+void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
+                                  const std::vector<Element*>& elements, const Matrix& transform,
+                                  float alpha) {
+  auto topLevelFs = CollectFillStroke(elements);
+  std::vector<SVGRichTextRun> runs;
+  CollectSVGRichTextRuns(elements, topLevelFs.fill, topLevelFs.stroke, runs);
+  if (runs.empty()) {
     return;
   }
 
-  auto params = MakeTextBoxParams(box);
+  std::vector<Text*> mutableTexts;
+  mutableTexts.reserve(runs.size());
+  for (const auto& run : runs) {
+    mutableTexts.push_back(const_cast<Text*>(run.text));
+  }
 
-  auto layoutResult = TextLayout::Layout(childTexts, params, _layoutContext);
-  std::string transformStr = MatrixToSVGTransform(transform);
+  auto params = MakeTextBoxParams(textBox);
+  auto layoutResult = TextLayout::Layout(mutableTexts, params, _layoutContext);
 
-  // Build a temporary FillStrokeInfo with the TextBox position/padding for writeTextWithLayout.
-  FillStrokeInfo boxFs = fs;
-  boxFs.textBox = box;
-
-  for (auto* childText : childTexts) {
-    if (childText->text.empty()) {
+  // Per-run Fill / Stroke pairing: each Text's nearest Fill/Stroke overrides
+  // the top-level ones collected above, matching the rich-text semantics of
+  // PPTWriter::writeTextBoxGroup.
+  for (const auto& run : runs) {
+    if (run.text->text.empty()) {
       continue;
     }
-    writeTextWithLayout(out, childText, boxFs, layoutResult, transformStr);
+    FillStrokeInfo runFs = {};
+    runFs.fill = run.fill ? run.fill : topLevelFs.fill;
+    runFs.stroke = run.stroke ? run.stroke : topLevelFs.stroke;
+    runFs.textBox = textBox;
+    writeTextWithLayout(out, run.text, runFs, layoutResult, transform, alpha);
   }
 }
 
 void SVGWriter::writeText(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
-                          const std::string& transform) {
+                          const Matrix& m, float alpha) {
   if (text->text.empty()) {
     return;
   }
 
   if (_convertTextToPath && !text->glyphRuns.empty()) {
-    writeTextAsPath(out, text, fs, transform);
+    writeTextAsPath(out, text, fs, m, alpha);
     return;
   }
 
@@ -998,22 +1291,25 @@ void SVGWriter::writeText(SVGBuilder& out, const Text* text, const FillStrokeInf
   auto layoutResult = TextLayout::Layout({mutableText}, params, _layoutContext);
   auto* textLines = layoutResult.getTextLines(mutableText);
   if (textLines && !textLines->empty()) {
-    writeTextWithLayout(out, text, fs, layoutResult, transform);
+    writeTextWithLayout(out, text, fs, layoutResult, m, alpha);
     return;
   }
 
   // Fallback for when TextLayout produces no line info (e.g. empty text after shaping).
+  std::string transform = MatrixToSVGTransform(m);
   out.openElement("text");
   if (!transform.empty()) {
     out.addAttribute("transform", transform);
   }
   WriteSharedTextAttrs(out, text, text->textAnchor);
+  ApplyTextBoxBodyAttrs(out, fs.textBox);
   std::string p3Style;
-  applyFillAttributes(out, fs.fill, {}, &p3Style);
-  applyStrokeAttributes(out, fs.stroke, {}, &p3Style);
+  applyFillAttributes(out, fs.fill, {}, &p3Style, alpha);
+  applyStrokeAttributes(out, fs.stroke, {}, &p3Style, alpha);
   applyP3Style(out, p3Style);
-  out.addAttributeIfNonZero("x", text->position.x);
-  out.addAttributeIfNonZero("y", text->position.y);
+  auto renderPos = text->renderPosition();
+  out.addAttributeIfNonZero("x", renderPos.x);
+  out.addAttributeIfNonZero("y", renderPos.y);
   out.closeElementWithText(text->text);
 }
 
@@ -1021,69 +1317,174 @@ void SVGWriter::writeText(SVGBuilder& out, const Text* text, const FillStrokeInf
 // SVGWriter – element list and layer writing
 //==============================================================================
 
-void SVGWriter::writeElements(SVGBuilder& out, const std::vector<Element*>& elements,
-                              const Matrix& transform) {
-  auto fs = CollectFillStroke(elements);
-  std::string transformStr = MatrixToSVGTransform(transform);
+namespace {
 
-  for (const auto* element : elements) {
-    auto type = element->nodeType();
-    if (type == NodeType::Fill || type == NodeType::Stroke) {
-      continue;
-    }
-    if (type == NodeType::TextBox) {
-      auto* group = static_cast<const Group*>(element);
-      if (!group->elements.empty() && !_convertTextToPath) {
-        Matrix groupMatrix = BuildGroupMatrix(group);
-        Matrix combined = transform * groupMatrix;
-        writeTextBoxGroup(out, group, group->elements, combined);
+// Look for the first modifier-only <TextBox> in `elements` so it can be
+// associated with sibling Text geometry (matches the legacy
+// CollectFillStroke().textBox behaviour). Container TextBoxes (those with
+// children) are handled separately as scopes by processVectorScope.
+const TextBox* FindModifierTextBox(const std::vector<Element*>& elements) {
+  for (auto* e : elements) {
+    if (e->nodeType() == NodeType::TextBox) {
+      auto* tb = static_cast<const TextBox*>(e);
+      if (tb->elements.empty()) {
+        return tb;
       }
-      continue;
     }
+  }
+  return nullptr;
+}
+
+}  // namespace
+
+// Dispatch a single accumulated geometry through the appropriate per-shape
+// writer with the given painter applied. Each painter that renders a geometry
+// goes through this function so that multi-fill / multi-stroke produces one
+// SVG element per painter (overlapping in document order). Mirrors
+// PPTWriter::emitGeometryWithFs.
+void SVGWriter::emitGeometryWithFs(SVGBuilder& out, const AccumulatedGeometry& entry,
+                                   const FillStrokeInfo& fs) {
+  FillStrokeInfo localFs = fs;
+  if (localFs.textBox == nullptr) {
+    localFs.textBox = entry.textBox;
+  }
+  switch (entry.element->nodeType()) {
+    case NodeType::Rectangle:
+      writeRectangle(out, static_cast<const Rectangle*>(entry.element), localFs, entry.transform,
+                     entry.alpha);
+      break;
+    case NodeType::Ellipse:
+      writeEllipse(out, static_cast<const Ellipse*>(entry.element), localFs, entry.transform,
+                   entry.alpha);
+      break;
+    case NodeType::Path:
+      writePath(out, static_cast<const Path*>(entry.element), localFs, entry.transform,
+                entry.alpha);
+      break;
+    case NodeType::Text: {
+      auto* text = static_cast<const Text*>(entry.element);
+      // GlyphRun-only Text (no readable content) carries pre-shaped glyph
+      // outlines; the only way to render these is via path geometry regardless
+      // of convertTextToPath — matches PPT's behaviour.
+      bool glyphRunOnly = text->text.empty() && !text->glyphRuns.empty();
+      if ((_convertTextToPath || glyphRunOnly) && !text->glyphRuns.empty()) {
+        writeTextAsPath(out, text, localFs, entry.transform, entry.alpha);
+      } else {
+        writeText(out, text, localFs, entry.transform, entry.alpha);
+      }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+// Walk a single scope's element list, growing `accumulator` with new geometry
+// and emitting a copy of every visible geometry whenever a painter is hit.
+// `scopeStart` is the index where the current Group's scope begins — painters
+// inside this scope can only render entries from [scopeStart, end), enforcing
+// the "painters within the group only render geometry accumulated within the
+// group" rule while allowing geometry to propagate upward when the scope
+// unwinds. Mirrors PPTWriter::processVectorScope.
+void SVGWriter::processVectorScope(SVGBuilder& out, const std::vector<Element*>& elements,
+                                   const Matrix& transform, float alpha,
+                                   const TextBox* parentTextBox,
+                                   std::vector<AccumulatedGeometry>& accumulator,
+                                   size_t scopeStart) {
+  const TextBox* localTextBox = FindModifierTextBox(elements);
+  if (localTextBox == nullptr) {
+    localTextBox = parentTextBox;
+  }
+
+  for (auto* element : elements) {
+    auto type = element->nodeType();
     switch (type) {
-      case NodeType::Rectangle:
-        writeRectangle(out, static_cast<const Rectangle*>(element), fs, transformStr);
-        break;
-      case NodeType::Ellipse:
-        writeEllipse(out, static_cast<const Ellipse*>(element), fs, transformStr);
-        break;
-      case NodeType::Path:
-        writePath(out, static_cast<const Path*>(element), fs, transformStr);
-        break;
-      case NodeType::Text:
-        writeText(out, static_cast<const Text*>(element), fs, transformStr);
-        break;
-      case NodeType::Group: {
-        auto* group = static_cast<const Group*>(element);
-        Matrix groupMatrix = BuildGroupMatrix(group);
-        bool hasGroupTransform = !groupMatrix.isIdentity();
-        bool hasAlpha = group->alpha < 1.0f;
-        if (hasGroupTransform || hasAlpha) {
-          out.openElement("g");
-          Matrix combined = transform * groupMatrix;
-          std::string combinedStr = MatrixToSVGTransform(combined);
-          if (!combinedStr.empty()) {
-            out.addAttribute("transform", combinedStr);
-          }
-          if (hasAlpha) {
-            out.addAttribute("opacity", FloatToString(group->alpha));
-          }
-          out.closeElementStart();
-          writeElements(out, group->elements, {});
-          out.closeElement();
+      case NodeType::Fill:
+      case NodeType::Stroke: {
+        FillStrokeInfo painterFs = {};
+        if (type == NodeType::Fill) {
+          painterFs.fill = static_cast<const Fill*>(element);
         } else {
-          writeElements(out, group->elements, transform);
+          painterFs.stroke = static_cast<const Stroke*>(element);
+        }
+        for (size_t i = scopeStart; i < accumulator.size(); ++i) {
+          emitGeometryWithFs(out, accumulator[i], painterFs);
         }
         break;
       }
+      case NodeType::Rectangle:
+      case NodeType::Ellipse:
+      case NodeType::Path:
+      case NodeType::Text: {
+        AccumulatedGeometry entry;
+        entry.element = element;
+        entry.transform = transform;
+        entry.alpha = alpha;
+        entry.textBox = localTextBox;
+        accumulator.push_back(entry);
+        break;
+      }
+      case NodeType::TextBox: {
+        auto* tb = static_cast<const TextBox*>(element);
+        if (tb->elements.empty()) {
+          // Modifier-only TextBox — already captured by FindModifierTextBox above.
+          break;
+        }
+        Matrix tbMatrix = transform * BuildGroupMatrix(tb);
+        float tbAlpha = alpha * tb->alpha;
+        if (_convertTextToPath) {
+          // Container TextBox under glyph-path mode: process as its own scope so
+          // child Text is added to the accumulator with the box's transform /
+          // alpha, and box-level params surface as their textBox. Resolve
+          // path modifiers nested inside the box before walking.
+          const std::vector<Element*> innerWalked = _resolver.resolve(tb->elements);
+          processVectorScope(out, innerWalked, tbMatrix, tbAlpha, tb, accumulator,
+                             accumulator.size());
+        } else {
+          // Native text-box rendering: container TextBox owns its own paragraph
+          // shaping and fill/stroke pairing. Don't add its child Text into the
+          // surrounding accumulator.
+          writeTextBoxGroup(out, tb, tb->elements, tbMatrix, tbAlpha);
+        }
+        break;
+      }
+      case NodeType::Group: {
+        auto* group = static_cast<const Group*>(element);
+        Matrix groupMatrix = transform * BuildGroupMatrix(group);
+        float groupAlpha = alpha * group->alpha;
+        const std::vector<Element*> innerWalked = _resolver.resolve(group->elements);
+        processVectorScope(out, innerWalked, groupMatrix, groupAlpha, localTextBox, accumulator,
+                           accumulator.size());
+        break;
+      }
+      case NodeType::Repeater:
+        // Any Repeater still surviving here means the resolver intentionally
+        // erased its scope (copies==0) or the content arrived already
+        // flattened; silently skip so the remaining content still renders.
+        break;
       default:
+        // TextPath, TextModifier, RangeSelector, Polystar (post-resolution
+        // should be gone), and unrecognized types fall through silently.
         break;
     }
   }
 }
 
+void SVGWriter::writeElements(SVGBuilder& out, const std::vector<Element*>& elements,
+                              const Matrix& transform, float alpha, const TextBox* parentTextBox) {
+  // Bake every path-modifier (Polystar -> Path, Repeater -> grouped copies,
+  // TrimPath / RoundCorner / MergePath -> editable Path). Painters, Group,
+  // Text, and TextBox pass through unchanged so the accumulator walk below
+  // operates on normalized geometry.
+  const std::vector<Element*> walked = _resolver.resolve(elements);
+
+  std::vector<AccumulatedGeometry> accumulator;
+  accumulator.reserve(walked.size());
+  processVectorScope(out, walked, transform, alpha, parentTextBox, accumulator, /*scopeStart=*/0);
+}
+
 void SVGWriter::writeLayerContents(SVGBuilder& out, const Layer* layer, const Matrix& transform) {
-  writeElements(out, layer->contents, transform);
+  writeElements(out, layer->contents, transform, 1.0f, nullptr);
 }
 
 void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
@@ -1092,12 +1493,17 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   }
 
   bool needsGroup = !layer->matrix.isIdentity() || layer->alpha < 1.0f || !layer->id.empty() ||
-                    !layer->filters.empty() || layer->mask != nullptr || layer->x != 0.0f ||
-                    layer->y != 0.0f || !layer->customData.empty() ||
+                    !layer->filters.empty() || !layer->styles.empty() || layer->mask != nullptr ||
+                    layer->x != 0.0f || layer->y != 0.0f || !layer->customData.empty() ||
                     layer->blendMode != BlendMode::Normal;
 
   if (!needsGroup) {
     writeLayerContents(out, layer);
+    if (layer->composition != nullptr) {
+      for (const auto* compLayer : layer->composition->layers) {
+        writeLayer(out, compLayer);
+      }
+    }
     for (const auto* child : layer->children) {
       writeLayer(out, child);
     }
@@ -1130,8 +1536,8 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
     }
   }
 
-  if (!layer->filters.empty()) {
-    auto filterId = writeFilterDefs(layer->filters);
+  if (!layer->filters.empty() || !layer->styles.empty()) {
+    auto filterId = writeFilterAndStyleDefs(layer->filters, layer->styles);
     if (!filterId.empty()) {
       out.addAttribute("filter", "url(#" + filterId + ")");
     }
@@ -1149,7 +1555,8 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
     }
   }
 
-  bool hasContent = !layer->contents.empty() || !layer->children.empty();
+  bool hasContent =
+      !layer->contents.empty() || !layer->children.empty() || layer->composition != nullptr;
   if (!hasContent) {
     out.closeElementSelfClosing();
     return;
@@ -1158,6 +1565,12 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   out.closeElementStart();
 
   writeLayerContents(out, layer);
+
+  if (layer->composition != nullptr) {
+    for (const auto* compLayer : layer->composition->layers) {
+      writeLayer(out, compLayer);
+    }
+  }
 
   for (const auto* child : layer->children) {
     writeLayer(out, child);
@@ -1180,7 +1593,8 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options) {
   SVGBuilder defs(true, options.indent, 2);
   SVGWriterContext context;
   auto layoutContext = std::make_unique<LayoutContext>(options.fontConfig);
-  SVGWriter writer(&defs, &context, options.indent, options.convertTextToPath, layoutContext.get());
+  SVGWriter writer(&defs, &context, options.indent, options.convertTextToPath, layoutContext.get(),
+                   &doc);
 
   if (options.xmlDeclaration) {
     svg.appendDeclaration();

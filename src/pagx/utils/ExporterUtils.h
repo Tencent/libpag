@@ -222,4 +222,20 @@ TextLayoutParams MakeStandaloneParams(const Text* text);
  */
 std::string StripQuotes(const std::string& s);
 
+/**
+ * Returns the per-side geometry inset that emulates StrokeAlign::Inside / StrokeAlign::Outside on
+ * exporters whose stroke primitive always centres the stroke on the geometry (OOXML, SVG without
+ * adding a separate clip). Positive values shrink the geometry (Inside), negative grow it
+ * (Outside), zero leaves it unchanged.
+ */
+float StrokeAlignInset(const Stroke* stroke);
+
+/**
+ * Applies the stroke-alignment inset to an axis-aligned shape rect. Clamps the inset so the
+ * geometry never collapses past the centre; `roundness` is reduced by the same amount when
+ * provided so rounded-rectangle corners stay visually consistent after the inset.
+ */
+void ApplyStrokeBoxInset(const Stroke* stroke, float& x, float& y, float& w, float& h,
+                         float* roundness = nullptr);
+
 }  // namespace pagx

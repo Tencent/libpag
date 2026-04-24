@@ -905,4 +905,38 @@ std::string StripQuotes(const std::string& s) {
   return s;
 }
 
+float StrokeAlignInset(const Stroke* stroke) {
+  if (stroke == nullptr || stroke->width <= 0) {
+    return 0.0f;
+  }
+  switch (stroke->align) {
+    case StrokeAlign::Inside:
+      return stroke->width / 2.0f;
+    case StrokeAlign::Outside:
+      return -stroke->width / 2.0f;
+    case StrokeAlign::Center:
+    default:
+      return 0.0f;
+  }
+}
+
+void ApplyStrokeBoxInset(const Stroke* stroke, float& x, float& y, float& w, float& h,
+                         float* roundness) {
+  float inset = StrokeAlignInset(stroke);
+  if (inset == 0.0f) {
+    return;
+  }
+  float maxInset = std::min(w, h) / 2.0f;
+  if (inset > maxInset) {
+    inset = maxInset;
+  }
+  x += inset;
+  y += inset;
+  w -= inset * 2.0f;
+  h -= inset * 2.0f;
+  if (roundness) {
+    *roundness = std::max(0.0f, *roundness - inset);
+  }
+}
+
 }  // namespace pagx

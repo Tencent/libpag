@@ -61,10 +61,10 @@
 #include "pagx/ppt/PPTContourUtils.h"
 #include "pagx/ppt/PPTFeatureProbe.h"
 #include "pagx/ppt/PPTGeomEmitter.h"
-#include "pagx/ppt/PPTModifierResolver.h"
 #include "pagx/ppt/PPTWriterContext.h"
 #include "pagx/types/Rect.h"
 #include "pagx/utils/ExporterUtils.h"
+#include "pagx/utils/ModifierResolver.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLBuilder.h"
 #include "renderer/LayerBuilder.h"
@@ -131,52 +131,8 @@ static size_t CountUTF8Characters(const std::string& str) {
 }
 
 //==============================================================================
-// Stroke-alignment geometry compensation
+// Stroke-alignment geometry compensation — now shared in ExporterUtils.
 //==============================================================================
-
-// PowerPoint's <a:ln> always centres the stroke on the path geometry, so the
-// only way to emulate StrokeAlign::Inside / StrokeAlign::Outside is to inset
-// (or outset) the geometry that backs the stroke painter by half the stroke
-// width before emitting it.  Returns the per-side offset to apply: positive
-// shrinks the geometry (Inside), negative grows it (Outside), and zero leaves
-// the geometry unchanged (Center, no stroke, or zero width).
-static float StrokeAlignInset(const Stroke* stroke) {
-  if (stroke == nullptr || stroke->width <= 0) {
-    return 0.0f;
-  }
-  switch (stroke->align) {
-    case StrokeAlign::Inside:
-      return stroke->width / 2.0f;
-    case StrokeAlign::Outside:
-      return -stroke->width / 2.0f;
-    case StrokeAlign::Center:
-    default:
-      return 0.0f;
-  }
-}
-
-// Applies the stroke-inset to an axis-aligned shape rect. Clamps the inset so
-// the geometry never collapses past the centre (the OOXML stroke would draw
-// against zero-extent geometry otherwise). `roundness` is also reduced so
-// rounded-rectangle corners stay visually consistent after the inset.
-static void ApplyStrokeBoxInset(const Stroke* stroke, float& x, float& y, float& w, float& h,
-                                float* roundness = nullptr) {
-  float inset = StrokeAlignInset(stroke);
-  if (inset == 0.0f) {
-    return;
-  }
-  float maxInset = std::min(w, h) / 2.0f;
-  if (inset > maxInset) {
-    inset = maxInset;
-  }
-  x += inset;
-  y += inset;
-  w -= inset * 2.0f;
-  h -= inset * 2.0f;
-  if (roundness) {
-    *roundness = std::max(0.0f, *roundness - inset);
-  }
-}
 
 //==============================================================================
 // Dash pattern → OOXML preset dash mapping
@@ -506,7 +462,7 @@ class PPTWriter {
   GPUContext _gpu;
   LayerBuildResult _buildResult = {};
   bool _buildResultReady = false;
-  PPTModifierResolver _resolver;
+  ModifierResolver _resolver;
 
   const LayerBuildResult& ensureBuildResult();
 

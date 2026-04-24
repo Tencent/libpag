@@ -29,8 +29,9 @@ class RoundCorner;
 class TrimPath;
 
 /**
- * PPTModifierResolver bakes path-modifier elements into editable geometry so the PPT exporter can
- * emit each shape as `a:custGeom` (or `a:prstGeom` for trivial shapes). The resolver:
+ * ModifierResolver bakes path-modifier elements into editable geometry so downstream exporters
+ * (PPT, SVG, ...) can emit each shape as native geometry without reimplementing the modifier
+ * semantics. The resolver:
  *
  * - Converts every `Polystar` into a `Path` whose `PathData` contains the analytical star/polygon
  *   geometry (mirroring the math used by `tgfx::Polystar`).
@@ -46,9 +47,9 @@ class TrimPath;
  * remain owned by the document for the lifetime of the export. It never mutates the original
  * elements.
  */
-class PPTModifierResolver {
+class ModifierResolver {
  public:
-  explicit PPTModifierResolver(PAGXDocument* doc) : _doc(doc) {
+  explicit ModifierResolver(PAGXDocument* doc) : _doc(doc) {
   }
 
   /**

@@ -28,7 +28,9 @@
 #include "pagx/TextLayout.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorStop.h"
+#include "pagx/nodes/Composition.h"
 #include "pagx/nodes/DropShadowFilter.h"
+#include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
@@ -36,11 +38,14 @@
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
+#include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextBox.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "renderer/FontEmbedder.h"
 #include "renderer/LayerBuilder.h"
@@ -765,6 +770,287 @@ PAGX_TEST(PAGXSVGTest, SVGExport_GroupSkew) {
   // skewX component (c) must be positive for positive skew angle.
   EXPECT_NEAR(c, std::tan(30 * static_cast<float>(M_PI) / 180), 0.001f);
   SaveFile(svg, "PAGXSVGTest/svg_export_group_skew.svg");
+}
+
+/**
+ * Multi-fill / multi-stroke: two Fills and two Strokes around one Rectangle
+ * should emit four separate <rect> elements (one per painter in source order).
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_MultiFillMultiStroke) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {80, 60};
+
+  auto fill1 = doc->makeNode<pagx::Fill>();
+  auto solid1 = doc->makeNode<pagx::SolidColor>();
+  solid1->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  fill1->color = solid1;
+
+  auto stroke1 = doc->makeNode<pagx::Stroke>();
+  auto solidS1 = doc->makeNode<pagx::SolidColor>();
+  solidS1->color = {0.0f, 1.0f, 0.0f, 1.0f};
+  stroke1->color = solidS1;
+  stroke1->width = 2;
+
+  auto fill2 = doc->makeNode<pagx::Fill>();
+  auto solid2 = doc->makeNode<pagx::SolidColor>();
+  solid2->color = {0.0f, 0.0f, 1.0f, 0.5f};
+  fill2->color = solid2;
+
+  auto stroke2 = doc->makeNode<pagx::Stroke>();
+  auto solidS2 = doc->makeNode<pagx::SolidColor>();
+  solidS2->color = {1.0f, 1.0f, 0.0f, 1.0f};
+  stroke2->color = solidS2;
+  stroke2->width = 4;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill1);
+  layer->contents.push_back(stroke1);
+  layer->contents.push_back(fill2);
+  layer->contents.push_back(stroke2);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  size_t pos = 0;
+  int rectCount = 0;
+  while ((pos = svg.find("<rect", pos)) != std::string::npos) {
+    ++rectCount;
+    ++pos;
+  }
+  EXPECT_EQ(rectCount, 4);
+  SaveFile(svg, "PAGXSVGTest/svg_export_multi_fill_stroke.svg");
+}
+
+/**
+ * StrokeAlign::Inside: the stroke geometry is shrunk by half the stroke width
+ * so the visible rect width equals the authored width minus the stroke width.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_StrokeAlignInside) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {100, 100};
+
+  auto stroke = doc->makeNode<pagx::Stroke>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  stroke->color = solid;
+  stroke->width = 20;
+  stroke->align = pagx::StrokeAlign::Inside;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(stroke);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  // Inside stroke shrinks the rect geometry by stroke->width total (half per side).
+  EXPECT_NE(svg.find("width=\"80\""), std::string::npos);
+  EXPECT_NE(svg.find("height=\"80\""), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_stroke_align_inside.svg");
+}
+
+/**
+ * Polystar: a 5-point star is resolved into a Path with a cubic / line contour.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_Polystar) {
+  auto doc = pagx::PAGXDocument::Make(300, 300);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto star = doc->makeNode<pagx::Polystar>();
+  star->type = pagx::PolystarType::Star;
+  star->position = {150, 150};
+  star->pointCount = 5;
+  star->outerRadius = 80;
+  star->innerRadius = 40;
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.8f, 0.0f, 1.0f};
+  fill->color = solid;
+
+  layer->contents.push_back(star);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<path"), std::string::npos);
+  EXPECT_NE(svg.find("d=\"M"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_polystar.svg");
+}
+
+/**
+ * Repeater: 3 copies of a Rectangle should produce three <rect> elements.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_Repeater) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 100};
+  rect->size = {40, 40};
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.3f, 0.7f, 0.5f, 1.0f};
+  fill->color = solid;
+
+  auto rep = doc->makeNode<pagx::Repeater>();
+  rep->copies = 3;
+  rep->position = {80, 0};
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  layer->contents.push_back(rep);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  size_t pos = 0;
+  int rectCount = 0;
+  while ((pos = svg.find("<rect", pos)) != std::string::npos) {
+    ++rectCount;
+    ++pos;
+  }
+  EXPECT_EQ(rectCount, 3);
+  SaveFile(svg, "PAGXSVGTest/svg_export_repeater.svg");
+}
+
+/**
+ * DropShadowStyle emits feOffset + feGaussianBlur + feMerge chain, just like
+ * DropShadowFilter. The style path goes through layer->styles, not filters.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_DropShadowStyle) {
+  auto doc = pagx::PAGXDocument::Make(300, 300);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {150, 150};
+  rect->size = {100, 100};
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.3f, 0.6f, 0.9f, 1.0f};
+  fill->color = solid;
+
+  auto ds = doc->makeNode<pagx::DropShadowStyle>();
+  ds->offsetX = 5;
+  ds->offsetY = 7;
+  ds->blurX = 4;
+  ds->blurY = 4;
+  ds->color = {0.0f, 0.0f, 0.0f, 0.5f};
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  layer->styles.push_back(ds);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<feGaussianBlur"), std::string::npos);
+  EXPECT_NE(svg.find("<feOffset"), std::string::npos);
+  EXPECT_NE(svg.find("<feMerge"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_dropshadow_style.svg");
+}
+
+/**
+ * WritingMode::Vertical emits writing-mode="tb" on the <text> element so CJK
+ * vertical layout appears correctly.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_WritingModeVertical) {
+  auto doc = pagx::PAGXDocument::Make(200, 300);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto textBox = doc->makeNode<pagx::TextBox>();
+  textBox->position = {50, 50};
+  textBox->width = 100;
+  textBox->height = 200;
+  textBox->writingMode = pagx::WritingMode::Vertical;
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Vert";
+  text->fontFamily = "Arial";
+  text->fontSize = 24;
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+
+  textBox->elements.push_back(text);
+  textBox->elements.push_back(fill);
+  layer->contents.push_back(textBox);
+  doc->layers.push_back(layer);
+
+  pagx::SVGExportOptions options;
+  options.convertTextToPath = false;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(svg.find("writing-mode=\"tb\""), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_writing_mode_vertical.svg");
+}
+
+/**
+ * Composition recursion: a Layer referencing a Composition emits the
+ * composition's inner layers into the same <g>, so the nested Rectangle
+ * appears in the output.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_CompositionChildLayer) {
+  auto doc = pagx::PAGXDocument::Make(300, 300);
+  auto comp = doc->makeNode<pagx::Composition>();
+  comp->width = 300;
+  comp->height = 300;
+  auto inner = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {150, 150};
+  rect->size = {120, 80};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.3f, 0.6f, 0.3f, 1.0f};
+  fill->color = solid;
+  inner->contents.push_back(rect);
+  inner->contents.push_back(fill);
+  comp->layers.push_back(inner);
+
+  auto outer = doc->makeNode<pagx::Layer>();
+  outer->composition = comp;
+  doc->layers.push_back(outer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  // The inner rect must surface in the SVG even though it lives under a
+  // composition rather than a direct contents/children relationship.
+  EXPECT_NE(svg.find("<rect"), std::string::npos);
+  EXPECT_NE(svg.find("width=\"120\""), std::string::npos);
+  EXPECT_NE(svg.find("height=\"80\""), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_composition_child.svg");
+}
+
+/**
+ * renderPosition() / renderSize(): a Rectangle with layout-override width and
+ * height on the LayoutNode base (not the intrinsic `size`) should surface the
+ * override in the emitted SVG. This proves the writer now reads through
+ * renderSize() rather than the raw `size` field.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_RenderPositionFromConstraint) {
+  auto doc = pagx::PAGXDocument::Make(400, 400);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  // Intrinsic size the legacy writer used to emit verbatim.
+  rect->size = {10, 10};
+  // LayoutNode overrides that renderSize() must honour.
+  rect->width = 150;
+  rect->height = 80;
+  rect->position = {200, 200};
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("width=\"150\""), std::string::npos);
+  EXPECT_NE(svg.find("height=\"80\""), std::string::npos);
+  EXPECT_EQ(svg.find("width=\"10\""), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_render_position.svg");
 }
 
 }  // namespace pag
