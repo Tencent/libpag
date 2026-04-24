@@ -722,16 +722,17 @@ struct MaskedLayerDrawer {
 // against an empty canvas (as MaskedLayerDrawer does) would blend it with
 // transparent-black and lose the intended composite; drawing `root` with a
 // clip preserves it. The canvas is pre-translated so `bounds.left/top` maps
-// to (0,0), then concat'd with root's relative matrix to coordinateSpace so
-// the root is drawn in that space.
+// to (0,0); clipRect is applied in that shifted coordinateSpace before
+// concat'ing root's relative matrix so the clip region aligns with the
+// canvas extent. concat then maps root-space drawing into coordinateSpace.
 struct BackdropCompositeDrawer {
   const std::shared_ptr<tgfx::Layer>& root;
   const tgfx::Layer* coordinateSpace;
   const tgfx::Rect& bounds;
   void operator()(tgfx::Canvas* canvas) const {
     canvas->translate(-bounds.left, -bounds.top);
-    canvas->concat(root->getRelativeMatrix(coordinateSpace));
     canvas->clipRect(bounds);
+    canvas->concat(root->getRelativeMatrix(coordinateSpace));
     root->draw(canvas);
   }
 };

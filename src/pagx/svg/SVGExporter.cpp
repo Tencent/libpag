@@ -861,13 +861,73 @@ std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& 
     return {};
   }
 
+  // Pre-scan all filters and styles to find the maximum extent the filter
+  // region must cover beyond the source bounding box. Drop shadows expand
+  // outward by ~3*stdDeviation + offset in each direction; blur filters
+  // expand symmetrically by ~3*stdDeviation. Inner shadows and background
+  // blur are clipped to the source and need no extra room.
+  // The SVG filter region is specified as a percentage of the source bbox,
+  // so we use a fixed baseline of 50% and bump it up when any effect needs
+  // more. Using percentages (rather than absolute pixels) keeps the region
+  // correct regardless of the element's actual size.
+  float marginLeft = 0;
+  float marginRight = 0;
+  float marginTop = 0;
+  float marginBottom = 0;
+  constexpr float BLUR_MULTIPLIER = 3.0f;
+
+  for (const auto* filter : filters) {
+    switch (filter->nodeType()) {
+      case NodeType::BlurFilter: {
+        auto blur = static_cast<const BlurFilter*>(filter);
+        float ex = blur->blurX * BLUR_MULTIPLIER;
+        float ey = blur->blurY * BLUR_MULTIPLIER;
+        marginLeft = std::max(marginLeft, ex);
+        marginRight = std::max(marginRight, ex);
+        marginTop = std::max(marginTop, ey);
+        marginBottom = std::max(marginBottom, ey);
+        break;
+      }
+      case NodeType::DropShadowFilter: {
+        auto shadow = static_cast<const DropShadowFilter*>(filter);
+        float ex = shadow->blurX * BLUR_MULTIPLIER;
+        float ey = shadow->blurY * BLUR_MULTIPLIER;
+        marginLeft = std::max(marginLeft, ex + std::max(0.0f, -shadow->offsetX));
+        marginRight = std::max(marginRight, ex + std::max(0.0f, shadow->offsetX));
+        marginTop = std::max(marginTop, ey + std::max(0.0f, -shadow->offsetY));
+        marginBottom = std::max(marginBottom, ey + std::max(0.0f, shadow->offsetY));
+        break;
+      }
+      default:
+        break;
+    }
+  }
+  for (const auto* style : styles) {
+    if (style->nodeType() == NodeType::DropShadowStyle) {
+      auto shadow = static_cast<const DropShadowStyle*>(style);
+      float ex = shadow->blurX * BLUR_MULTIPLIER;
+      float ey = shadow->blurY * BLUR_MULTIPLIER;
+      marginLeft = std::max(marginLeft, ex + std::max(0.0f, -shadow->offsetX));
+      marginRight = std::max(marginRight, ex + std::max(0.0f, shadow->offsetX));
+      marginTop = std::max(marginTop, ey + std::max(0.0f, -shadow->offsetY));
+      marginBottom = std::max(marginBottom, ey + std::max(0.0f, shadow->offsetY));
+    }
+  }
+
+  // Convert pixel margins to percentages, with a minimum of 50% per side to
+  // handle arbitrary element sizes gracefully.
+  float pctLeft = std::max(50.0f, std::ceil(marginLeft));
+  float pctRight = std::max(50.0f, std::ceil(marginRight));
+  float pctTop = std::max(50.0f, std::ceil(marginTop));
+  float pctBottom = std::max(50.0f, std::ceil(marginBottom));
+
   std::string filterId = generateId("filter");
   _defs->openElement("filter");
   _defs->addAttribute("id", filterId);
-  _defs->addAttribute("x", "-50%");
-  _defs->addAttribute("y", "-50%");
-  _defs->addAttribute("width", "200%");
-  _defs->addAttribute("height", "200%");
+  _defs->addAttribute("x", "-" + FloatToString(pctLeft) + "%");
+  _defs->addAttribute("y", "-" + FloatToString(pctTop) + "%");
+  _defs->addAttribute("width", FloatToString(100.0f + pctLeft + pctRight) + "%");
+  _defs->addAttribute("height", FloatToString(100.0f + pctTop + pctBottom) + "%");
   _defs->addAttribute("color-interpolation-filters", "sRGB");
   _defs->closeElementStart();
 
