@@ -96,7 +96,7 @@ const char* DetectImageMime(const uint8_t* bytes, size_t size) {
   if (size >= 4 && bytes[0] == 'G' && bytes[1] == 'I' && bytes[2] == 'F' && bytes[3] == '8') {
     return "image/gif";
   }
-  return "application/octet-stream";
+  return nullptr;
 }
 
 std::string EscapeCSSUrl(const std::string& url) {
@@ -147,6 +147,9 @@ static bool IsSafeImageUrl(const std::string& url) {
 std::string GetImageSrc(const Image* image) {
   if (image->data) {
     auto mime = DetectImageMime(image->data->bytes(), image->data->size());
+    if (!mime) {
+      return {};
+    }
     return "data:" + std::string(mime) + ";base64," +
            Base64Encode(image->data->bytes(), image->data->size());
   }
