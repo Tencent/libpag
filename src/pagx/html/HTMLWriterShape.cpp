@@ -48,6 +48,93 @@ static const char* TileModeToRepeatCss(TileMode m) {
   return m == TileMode::Repeat ? "repeat" : "no-repeat";
 }
 
+bool HTMLWriter::ComputeGeosBoundingBox(const std::vector<GeoInfo>& geos, float pad,
+                                        bool useModifiedPathData, float& outX, float& outY,
+                                        float& outW, float& outH) {
+  float x0 = 1e9f;
+  float y0 = 1e9f;
+  float x1 = -1e9f;
+  float y1 = -1e9f;
+  for (const auto& g : geos) {
+    float gx = 0, gy = 0, gw = 0, gh = 0;
+    bool handled = false;
+    if (useModifiedPathData && !g.modifiedPathData.empty()) {
+      PathData pd = PathDataFromSVGString(g.modifiedPathData);
+      if (!pd.isEmpty()) {
+        Rect b = pd.getBounds();
+        gx = b.x;
+        gy = b.y;
+        gw = b.width;
+        gh = b.height;
+        handled = true;
+      }
+    }
+    if (!handled) {
+      switch (g.type) {
+        case NodeType::Rectangle: {
+          auto r = static_cast<const Rectangle*>(g.element);
+          auto pos = r->renderPosition();
+          auto size = r->renderSize();
+          gx = pos.x - size.width / 2;
+          gy = pos.y - size.height / 2;
+          gw = size.width;
+          gh = size.height;
+          break;
+        }
+        case NodeType::Ellipse: {
+          auto e = static_cast<const Ellipse*>(g.element);
+          auto pos = e->renderPosition();
+          auto size = e->renderSize();
+          gx = pos.x - size.width / 2;
+          gy = pos.y - size.height / 2;
+          gw = size.width;
+          gh = size.height;
+          break;
+        }
+        case NodeType::Path: {
+          auto p = static_cast<const Path*>(g.element);
+          if (p->data && !p->data->isEmpty()) {
+            Rect b = p->data->getBounds();
+            float scale = p->renderScale();
+            auto ppos = p->renderPosition();
+            gx = ppos.x + b.x * scale;
+            gy = ppos.y + b.y * scale;
+            gw = b.width * scale;
+            gh = b.height * scale;
+          }
+          break;
+        }
+        case NodeType::Polystar: {
+          auto ps = static_cast<const Polystar*>(g.element);
+          auto ppos = ps->renderPosition();
+          float r = std::max(ps->renderOuterRadius(), ps->renderInnerRadius());
+          gx = ppos.x - r;
+          gy = ppos.y - r;
+          gw = r * 2;
+          gh = r * 2;
+          break;
+        }
+        default:
+          break;
+      }
+    }
+    x0 = std::min(x0, gx - pad);
+    y0 = std::min(y0, gy - pad);
+    x1 = std::max(x1, gx + gw + pad);
+    y1 = std::max(y1, gy + gh + pad);
+  }
+  float w = x1 - x0;
+  float h = y1 - y0;
+  if (w <= 0 || h <= 0) {
+    return false;
+  }
+  outX = x0;
+  outY = y0;
+  outW = w;
+  outH = h;
+  return true;
+}
+
 //==============================================================================
 // Static path helpers
 //==============================================================================
@@ -1294,52 +1381,8 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     }
     // Compute bounding box of all geometries including stroke padding.
     float pad = (stroke->align != StrokeAlign::Center) ? stroke->width * 2.0f : stroke->width;
-    float x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
-    for (auto& g : geos) {
-      float gx = 0, gy = 0, gw = 0, gh = 0;
-      if (!g.modifiedPathData.empty()) {
-        PathData pd = PathDataFromSVGString(g.modifiedPathData);
-        if (!pd.isEmpty()) {
-          Rect b = pd.getBounds();
-          gx = b.x;
-          gy = b.y;
-          gw = b.width;
-          gh = b.height;
-        }
-      } else {
-        switch (g.type) {
-          case NodeType::Ellipse: {
-            auto e = static_cast<const Ellipse*>(g.element);
-            auto pos = e->renderPosition();
-            auto size = e->renderSize();
-            gx = pos.x - size.width / 2;
-            gy = pos.y - size.height / 2;
-            gw = size.width;
-            gh = size.height;
-            break;
-          }
-          case NodeType::Rectangle: {
-            auto r = static_cast<const Rectangle*>(g.element);
-            auto pos = r->renderPosition();
-            auto size = r->renderSize();
-            gx = pos.x - size.width / 2;
-            gy = pos.y - size.height / 2;
-            gw = size.width;
-            gh = size.height;
-            break;
-          }
-          default:
-            break;
-        }
-      }
-      x0 = std::min(x0, gx - pad);
-      y0 = std::min(y0, gy - pad);
-      x1 = std::max(x1, gx + gw + pad);
-      y1 = std::max(y1, gy + gh + pad);
-    }
-    float bw = x1 - x0;
-    float bh = y1 - y0;
-    if (bw <= 0 || bh <= 0) {
+    float x0 = 0, y0 = 0, bw = 0, bh = 0;
+    if (!ComputeGeosBoundingBox(geos, pad, true, x0, y0, bw, bh)) {
       return;
     }
     // Build a new SVG containing: <defs><mask>(stroke shapes)</mask></defs>
@@ -1488,75 +1531,8 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
   if (stroke) {
     pad = (stroke->align != StrokeAlign::Center) ? stroke->width * 2.0f : stroke->width;
   }
-  float x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
-  for (auto& g : geos) {
-    float gx = 0, gy = 0, gw = 0, gh = 0;
-    if (!g.modifiedPathData.empty()) {
-      PathData pd = PathDataFromSVGString(g.modifiedPathData);
-      if (!pd.isEmpty()) {
-        Rect b = pd.getBounds();
-        gx = b.x;
-        gy = b.y;
-        gw = b.width;
-        gh = b.height;
-      }
-    } else {
-      switch (g.type) {
-        case NodeType::Rectangle: {
-          auto r = static_cast<const Rectangle*>(g.element);
-          auto pos = r->renderPosition();
-          auto size = r->renderSize();
-          gx = pos.x - size.width / 2;
-          gy = pos.y - size.height / 2;
-          gw = size.width;
-          gh = size.height;
-          break;
-        }
-        case NodeType::Ellipse: {
-          auto e = static_cast<const Ellipse*>(g.element);
-          auto pos = e->renderPosition();
-          auto size = e->renderSize();
-          gx = pos.x - size.width / 2;
-          gy = pos.y - size.height / 2;
-          gw = size.width;
-          gh = size.height;
-          break;
-        }
-        case NodeType::Path: {
-          auto p = static_cast<const Path*>(g.element);
-          if (p->data && !p->data->isEmpty()) {
-            Rect b = p->data->getBounds();
-            float scale = p->renderScale();
-            auto ppos = p->renderPosition();
-            gx = ppos.x + b.x * scale;
-            gy = ppos.y + b.y * scale;
-            gw = b.width * scale;
-            gh = b.height * scale;
-          }
-          break;
-        }
-        case NodeType::Polystar: {
-          auto ps = static_cast<const Polystar*>(g.element);
-          auto ppos = ps->renderPosition();
-          float r = std::max(ps->renderOuterRadius(), ps->renderInnerRadius());
-          gx = ppos.x - r;
-          gy = ppos.y - r;
-          gw = r * 2;
-          gh = r * 2;
-          break;
-        }
-        default:
-          break;
-      }
-    }
-    x0 = std::min(x0, gx - pad);
-    y0 = std::min(y0, gy - pad);
-    x1 = std::max(x1, gx + gw + pad);
-    y1 = std::max(y1, gy + gh + pad);
-  }
-  float sw = x1 - x0;
-  float sh = y1 - y0;
-  if (sw <= 0 || sh <= 0) {
+  float x0 = 0, y0 = 0, sw = 0, sh = 0;
+  if (!ComputeGeosBoundingBox(geos, pad, true, x0, y0, sw, sh)) {
     return;
   }
 
@@ -1898,64 +1874,8 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
       if (stroke) {
         pad = (stroke->align != StrokeAlign::Center) ? stroke->width * 2.0f : stroke->width;
       }
-      float x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
-      for (auto& g : geos) {
-        float gx = 0, gy = 0, gw = 0, gh = 0;
-        switch (g.type) {
-          case NodeType::Rectangle: {
-            auto r = static_cast<const Rectangle*>(g.element);
-            auto pos = r->renderPosition();
-            auto size = r->renderSize();
-            gx = pos.x - size.width / 2;
-            gy = pos.y - size.height / 2;
-            gw = size.width;
-            gh = size.height;
-            break;
-          }
-          case NodeType::Ellipse: {
-            auto e = static_cast<const Ellipse*>(g.element);
-            auto pos = e->renderPosition();
-            auto size = e->renderSize();
-            gx = pos.x - size.width / 2;
-            gy = pos.y - size.height / 2;
-            gw = size.width;
-            gh = size.height;
-            break;
-          }
-          case NodeType::Path: {
-            auto p = static_cast<const Path*>(g.element);
-            if (p->data && !p->data->isEmpty()) {
-              Rect b = p->data->getBounds();
-              float scale = p->renderScale();
-              auto ppos = p->renderPosition();
-              gx = ppos.x + b.x * scale;
-              gy = ppos.y + b.y * scale;
-              gw = b.width * scale;
-              gh = b.height * scale;
-            }
-            break;
-          }
-          case NodeType::Polystar: {
-            auto ps = static_cast<const Polystar*>(g.element);
-            auto ppos = ps->renderPosition();
-            float r = std::max(ps->renderOuterRadius(), ps->renderInnerRadius());
-            gx = ppos.x - r;
-            gy = ppos.y - r;
-            gw = r * 2;
-            gh = r * 2;
-            break;
-          }
-          default:
-            break;
-        }
-        x0 = std::min(x0, gx - pad);
-        y0 = std::min(y0, gy - pad);
-        x1 = std::max(x1, gx + gw + pad);
-        y1 = std::max(y1, gy + gh + pad);
-      }
-      float sw = x1 - x0;
-      float sh = y1 - y0;
-      if (sw <= 0 || sh <= 0) {
+      float x0 = 0, y0 = 0, sw = 0, sh = 0;
+      if (!ComputeGeosBoundingBox(geos, pad, false, x0, y0, sw, sh)) {
         return;
       }
       std::string svgStyle =
@@ -2111,64 +2031,8 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     if (stroke) {
       pad = (stroke->align != StrokeAlign::Center) ? stroke->width * 2.0f : stroke->width;
     }
-    float x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
-    for (auto& g : geos) {
-      float gx = 0, gy = 0, gw = 0, gh = 0;
-      switch (g.type) {
-        case NodeType::Rectangle: {
-          auto r = static_cast<const Rectangle*>(g.element);
-          auto pos = r->renderPosition();
-          auto size = r->renderSize();
-          gx = pos.x - size.width / 2;
-          gy = pos.y - size.height / 2;
-          gw = size.width;
-          gh = size.height;
-          break;
-        }
-        case NodeType::Ellipse: {
-          auto e = static_cast<const Ellipse*>(g.element);
-          auto pos = e->renderPosition();
-          auto size = e->renderSize();
-          gx = pos.x - size.width / 2;
-          gy = pos.y - size.height / 2;
-          gw = size.width;
-          gh = size.height;
-          break;
-        }
-        case NodeType::Path: {
-          auto p = static_cast<const Path*>(g.element);
-          if (p->data && !p->data->isEmpty()) {
-            Rect b = p->data->getBounds();
-            float scale = p->renderScale();
-            auto ppos = p->renderPosition();
-            gx = ppos.x + b.x * scale;
-            gy = ppos.y + b.y * scale;
-            gw = b.width * scale;
-            gh = b.height * scale;
-          }
-          break;
-        }
-        case NodeType::Polystar: {
-          auto ps = static_cast<const Polystar*>(g.element);
-          auto ppos = ps->renderPosition();
-          float r = std::max(ps->renderOuterRadius(), ps->renderInnerRadius());
-          gx = ppos.x - r;
-          gy = ppos.y - r;
-          gw = r * 2;
-          gh = r * 2;
-          break;
-        }
-        default:
-          break;
-      }
-      x0 = std::min(x0, gx - pad);
-      y0 = std::min(y0, gy - pad);
-      x1 = std::max(x1, gx + gw + pad);
-      y1 = std::max(y1, gy + gh + pad);
-    }
-    float sw = x1 - x0;
-    float sh = y1 - y0;
-    if (sw <= 0 || sh <= 0) {
+    float x0 = 0, y0 = 0, sw = 0, sh = 0;
+    if (!ComputeGeosBoundingBox(geos, pad, false, x0, y0, sw, sh)) {
       return;
     }
     std::string svgStyle =

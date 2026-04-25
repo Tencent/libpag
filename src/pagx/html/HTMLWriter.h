@@ -332,6 +332,16 @@ class HTMLWriter {
   // prefix. On cache hit, callers skip emission and reuse the cached id.
   std::string lookupFilterId(const std::string& signature) const;
   void registerFilterId(const std::string& signature, const std::string& id);
+
+  // Computes the axis-aligned bounding box of a geo list expanded by `pad` on every side. When
+  // `useModifiedPathData` is true, entries with non-empty `modifiedPathData` use the bounds of
+  // that modified path; otherwise the entry always falls through to the 4-type switch over the
+  // element's own render position and size (Rectangle / Ellipse / Path / Polystar). Returns
+  // true with outX / outY / outW / outH set when the resulting box has positive area; returns
+  // false when no geo contributed usable bounds (callers should skip emission).
+  static bool ComputeGeosBoundingBox(const std::vector<GeoInfo>& geos, float pad,
+                                     bool useModifiedPathData, float& outX, float& outY,
+                                     float& outW, float& outH);
 };
 
 }  // namespace pagx
