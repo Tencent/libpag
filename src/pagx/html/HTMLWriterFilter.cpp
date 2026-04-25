@@ -174,6 +174,11 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
   std::string alphaResult = "SourceAlpha";
   bool alphaDirty = false;
 
+  // Kept as a local lambda rather than extracted per the project's no-lambda rule because it
+  // forms a five-state machine (si / currentInput / alphaResult / alphaDirty / _defs) whose
+  // reads and writes are interleaved with the caller's own mutations of those same variables.
+  // Extracting it would require threading all five variables through every call site as
+  // in/out parameters, which is strictly uglier than a scoped closure.
   auto ensureAlpha = [&]() -> std::string {
     if (!alphaDirty) {
       return alphaResult;

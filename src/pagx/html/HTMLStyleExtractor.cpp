@@ -486,7 +486,7 @@ static std::string InferStandalonePrefix(const std::string& tagName,
 // so they're appended at the end in source order (via stable_sort). Vendor-prefixed variants
 // sit next to their standard counterpart (e.g., backdrop-filter 55 then -webkit-backdrop-filter 56).
 static int CSSPropertyOrder(const std::string& name) {
-  static const std::unordered_map<std::string, int> kOrder = {
+  static const std::unordered_map<std::string, int> ORDER = {
       // Position & flow
       {"position", 10},
       {"inset", 11},
@@ -568,15 +568,29 @@ static int CSSPropertyOrder(const std::string& name) {
       {"shape-rendering", 105},
       {"image-rendering", 106},
   };
-  auto it = kOrder.find(name);
-  return it != kOrder.end() ? it->second : 999;
+  auto it = ORDER.find(name);
+  return it != ORDER.end() ? it->second : 999;
+}
+
+static bool CompareCSSProperty(const CSSProperty& a, const CSSProperty& b) {
+  return CSSPropertyOrder(a.name) < CSSPropertyOrder(b.name);
+}
+
+namespace {
+struct GroupInfo {
+  std::string signature;
+  int firstEntryIndex;
+  int firstTagIndex;
+};
+}  // namespace
+
+static bool CompareGroupInfo(const GroupInfo& a, const GroupInfo& b) {
+  return a.firstTagIndex < b.firstTagIndex;
 }
 
 static std::string BuildDeclarationsString(const std::vector<CSSProperty>& props) {
   std::vector<CSSProperty> sorted(props);
-  std::stable_sort(sorted.begin(), sorted.end(), [](const CSSProperty& a, const CSSProperty& b) {
-    return CSSPropertyOrder(a.name) < CSSPropertyOrder(b.name);
-  });
+  std::stable_sort(sorted.begin(), sorted.end(), CompareCSSProperty);
   std::string result;
   for (size_t i = 0; i < sorted.size(); i++) {
     if (i > 0) result += ';';
@@ -619,19 +633,12 @@ std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) 
   }
 
   // Sort groups by first entry's tag position to maintain first-seen order.
-  struct GroupInfo {
-    std::string signature;
-    int firstEntryIndex;
-    int firstTagIndex;
-  };
   std::vector<GroupInfo> sortedGroups;
   for (const auto& pair : sigGroups) {
     int firstEntry = pair.second[0];
     sortedGroups.push_back({pair.first, firstEntry, entries[firstEntry].tagIndex});
   }
-  std::sort(sortedGroups.begin(), sortedGroups.end(), [](const GroupInfo& a, const GroupInfo& b) {
-    return a.firstTagIndex < b.firstTagIndex;
-  });
+  std::sort(sortedGroups.begin(), sortedGroups.end(), CompareGroupInfo);
 
   // Per-tag class name list (may be 1 or 2 names for base+modifier).
   std::vector<std::vector<std::string>> tagClassNames(tags.size());

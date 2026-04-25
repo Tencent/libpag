@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <functional>
 #include <random>
 #include <string>
 #include "base/utils/MathUtil.h"
@@ -101,7 +102,7 @@ float EstimateCharAdvanceHTML(int32_t ch, float fontSize) {
   // Per-character width ratios for ASCII printable range (Arial / Helvetica reference).
   if (ch >= '!' && ch <= '~') {
     // clang-format off
-    static const float kWidths[94] = {
+    static const float WIDTHS[94] = {
       // !      "      #      $      %      &      '      (      )      *
       0.28f, 0.36f, 0.56f, 0.56f, 0.89f, 0.67f, 0.19f, 0.33f, 0.33f, 0.39f,
       // +      ,      -      .      /      0      1      2      3      4
@@ -124,7 +125,7 @@ float EstimateCharAdvanceHTML(int32_t ch, float fontSize) {
       0.33f, 0.26f, 0.33f, 0.58f,
     };
     // clang-format on
-    return fontSize * kWidths[ch - '!'];
+    return fontSize * WIDTHS[ch - '!'];
   }
   // Fallback for non-ASCII Latin and other scripts.
   return fontSize * 0.55f;
@@ -208,6 +209,11 @@ static int GetRandomIndex(int textCount) {
   return 0;
 }
 
+static bool ComparePairByFirstU32(const std::pair<uint32_t, size_t>& a,
+                                  const std::pair<uint32_t, size_t>& b) {
+  return a.first < b.first;
+}
+
 static std::vector<size_t> CalculateRandomIndices(uint16_t seed, size_t textCount) {
   std::mt19937 rng(seed);
   std::vector<std::pair<uint32_t, size_t>> randList;
@@ -215,10 +221,7 @@ static std::vector<size_t> CalculateRandomIndices(uint16_t seed, size_t textCoun
   for (size_t i = 0; i < textCount; i++) {
     randList.push_back({rng(), i});
   }
-  std::sort(randList.begin(), randList.end(),
-            [](const std::pair<uint32_t, size_t>& a, const std::pair<uint32_t, size_t>& b) {
-              return a.first < b.first;
-            });
+  std::sort(randList.begin(), randList.end(), ComparePairByFirstU32);
   std::vector<size_t> indices(textCount);
   for (size_t i = 0; i < textCount; i++) {
     indices[i] = randList[i].second;
@@ -460,14 +463,14 @@ float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphInde
 // Arc-length LUT
 //==============================================================================
 
-ArcLengthLUT BuildArcLengthLUT(const PathData& pathData, int samplesPerSegment) {
-  ArcLengthLUT lut = {};
-  lut.arcLengths.push_back(0.0f);
-  Point startPoint = {};
-  Point currentPoint = {};
-  float cumLength = 0.0f;
-
-  pathData.forEach([&](PathVerb verb, const Point* pts) {
+namespace {
+struct ArcLengthLUTVisitor {
+  ArcLengthLUT& lut;
+  Point& startPoint;
+  Point& currentPoint;
+  float& cumLength;
+  int samplesPerSegment;
+  void operator()(PathVerb verb, const Point* pts) {
     switch (verb) {
       case PathVerb::Move:
         startPoint = pts[0];
@@ -557,7 +560,28 @@ ArcLengthLUT BuildArcLengthLUT(const PathData& pathData, int samplesPerSegment) 
         break;
       }
     }
-  });
+  }
+};
+
+struct PathClosedCheckVisitor {
+  bool& isClosed;
+  void operator()(PathVerb verb, const Point*) {
+    if (verb == PathVerb::Close) {
+      isClosed = true;
+    }
+  }
+};
+}  // namespace
+
+ArcLengthLUT BuildArcLengthLUT(const PathData& pathData, int samplesPerSegment) {
+  ArcLengthLUT lut = {};
+  lut.arcLengths.push_back(0.0f);
+  Point startPoint = {};
+  Point currentPoint = {};
+  float cumLength = 0.0f;
+
+  ArcLengthLUTVisitor visitor{lut, startPoint, currentPoint, cumLength, samplesPerSegment};
+  pathData.forEach(std::ref(visitor));
   lut.totalLength = cumLength;
   return lut;
 }
@@ -1185,11 +1209,8 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
   PathData pathData = PathDataFromSVGString("");
   pathData = *textPath->path;
   bool isClosed = false;
-  pathData.forEach([&](PathVerb verb, const Point*) {
-    if (verb == PathVerb::Close) {
-      isClosed = true;
-    }
-  });
+  PathClosedCheckVisitor isClosedVisitor{isClosed};
+  pathData.forEach(std::ref(isClosedVisitor));
   if (textPath->reversed) {
     PathData reversed = PathDataFromSVGString("");
     ReversePathData(pathData, reversed);

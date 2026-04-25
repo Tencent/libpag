@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
+#include <functional>
 #include <string>
 #include <vector>
 #include "base/utils/MathUtil.h"
@@ -42,6 +43,10 @@
 namespace pagx {
 
 using pag::FloatNearlyZero;
+
+static const char* TileModeToRepeatCss(TileMode m) {
+  return m == TileMode::Repeat ? "repeat" : "no-repeat";
+}
 
 //==============================================================================
 // Static path helpers
@@ -186,11 +191,12 @@ std::string BuildPolystarPath(const Polystar* ps) {
 
 // Compute signed area of a path to determine winding direction.
 // Positive = clockwise, negative = counter-clockwise.
-float ComputePathSignedArea(const PathData& pathData) {
+namespace {
+struct SignedAreaVisitor {
   float area = 0.0f;
   Point startPoint = {};
   Point currentPoint = {};
-  pathData.forEach([&](PathVerb verb, const Point* pts) {
+  void operator()(PathVerb verb, const Point* pts) {
     switch (verb) {
       case PathVerb::Move:
         startPoint = pts[0];
@@ -201,12 +207,10 @@ float ComputePathSignedArea(const PathData& pathData) {
         currentPoint = pts[0];
         break;
       case PathVerb::Quad:
-        // Approximate quadratic bezier as line to endpoint
         area += (currentPoint.x * pts[1].y - pts[1].x * currentPoint.y);
         currentPoint = pts[1];
         break;
       case PathVerb::Cubic:
-        // Approximate cubic bezier as line to endpoint
         area += (currentPoint.x * pts[2].y - pts[2].x * currentPoint.y);
         currentPoint = pts[2];
         break;
@@ -215,8 +219,14 @@ float ComputePathSignedArea(const PathData& pathData) {
         currentPoint = startPoint;
         break;
     }
-  });
-  return area / 2.0f;
+  }
+};
+}  // namespace
+
+float ComputePathSignedArea(const PathData& pathData) {
+  SignedAreaVisitor visitor;
+  pathData.forEach(std::ref(visitor));
+  return visitor.area / 2.0f;
 }
 
 bool IsPathClockwise(const PathData& pathData) {
@@ -256,11 +266,12 @@ float ComputeQuadBezierLength(Point p0, Point p1, Point p2) {
   return ComputeCubicBezierLength(p0, c1, c2, p2);
 }
 
-float ComputePathLength(const PathData& pathData) {
+namespace {
+struct PathLengthVisitor {
   float length = 0.0f;
   Point startPoint = {};
   Point currentPoint = {};
-  pathData.forEach([&](PathVerb verb, const Point* pts) {
+  void operator()(PathVerb verb, const Point* pts) {
     switch (verb) {
       case PathVerb::Move:
         startPoint = pts[0];
@@ -289,8 +300,14 @@ float ComputePathLength(const PathData& pathData) {
         break;
       }
     }
-  });
-  return length;
+  }
+};
+}  // namespace
+
+float ComputePathLength(const PathData& pathData) {
+  PathLengthVisitor visitor;
+  pathData.forEach(std::ref(visitor));
+  return visitor.length;
 }
 
 void ApplyRoundCorner(const PathData& pathData, float radius, PathData& output) {
@@ -313,45 +330,52 @@ void ApplyRoundCorner(const PathData& pathData, float radius, PathData& output) 
   Contour currentContour = {};
   bool hasContour = false;
 
-  pathData.forEach([&](PathVerb verb, const Point* pts) {
-    switch (verb) {
-      case PathVerb::Move:
-        if (hasContour) {
-          contours.push_back(std::move(currentContour));
-          currentContour = {};
+  struct Visitor {
+    std::vector<Contour>& contours;
+    Contour& currentContour;
+    bool& hasContour;
+    void operator()(PathVerb verb, const Point* pts) {
+      switch (verb) {
+        case PathVerb::Move:
+          if (hasContour) {
+            contours.push_back(std::move(currentContour));
+            currentContour = {};
+          }
+          currentContour.startPoint = pts[0];
+          hasContour = true;
+          break;
+        case PathVerb::Line: {
+          Segment seg = {};
+          seg.verb = PathVerb::Line;
+          seg.endPoint = pts[0];
+          currentContour.segments.push_back(seg);
+          break;
         }
-        currentContour.startPoint = pts[0];
-        hasContour = true;
-        break;
-      case PathVerb::Line: {
-        Segment seg = {};
-        seg.verb = PathVerb::Line;
-        seg.endPoint = pts[0];
-        currentContour.segments.push_back(seg);
-        break;
+        case PathVerb::Quad: {
+          Segment seg = {};
+          seg.verb = PathVerb::Quad;
+          seg.ctrl1 = pts[0];
+          seg.endPoint = pts[1];
+          currentContour.segments.push_back(seg);
+          break;
+        }
+        case PathVerb::Cubic: {
+          Segment seg = {};
+          seg.verb = PathVerb::Cubic;
+          seg.ctrl1 = pts[0];
+          seg.ctrl2 = pts[1];
+          seg.endPoint = pts[2];
+          currentContour.segments.push_back(seg);
+          break;
+        }
+        case PathVerb::Close:
+          currentContour.closed = true;
+          break;
       }
-      case PathVerb::Quad: {
-        Segment seg = {};
-        seg.verb = PathVerb::Quad;
-        seg.ctrl1 = pts[0];
-        seg.endPoint = pts[1];
-        currentContour.segments.push_back(seg);
-        break;
-      }
-      case PathVerb::Cubic: {
-        Segment seg = {};
-        seg.verb = PathVerb::Cubic;
-        seg.ctrl1 = pts[0];
-        seg.ctrl2 = pts[1];
-        seg.endPoint = pts[2];
-        currentContour.segments.push_back(seg);
-        break;
-      }
-      case PathVerb::Close:
-        currentContour.closed = true;
-        break;
     }
-  });
+  };
+  Visitor visitor{contours, currentContour, hasContour};
+  pathData.forEach(std::ref(visitor));
   if (hasContour) {
     contours.push_back(std::move(currentContour));
   }
@@ -510,36 +534,43 @@ void ReversePathData(const PathData& pathData, PathData& output) {
   Contour currentContour = {};
   bool hasContour = false;
 
-  pathData.forEach([&](PathVerb verb, const Point* pts) {
-    switch (verb) {
-      case PathVerb::Move:
-        if (hasContour) {
-          contours.push_back(std::move(currentContour));
-          currentContour = {};
+  struct Visitor {
+    std::vector<Contour>& contours;
+    Contour& currentContour;
+    bool& hasContour;
+    void operator()(PathVerb verb, const Point* pts) {
+      switch (verb) {
+        case PathVerb::Move:
+          if (hasContour) {
+            contours.push_back(std::move(currentContour));
+            currentContour = {};
+          }
+          currentContour.startPoint = pts[0];
+          hasContour = true;
+          break;
+        case PathVerb::Line: {
+          Segment seg = {PathVerb::Line, {pts[0]}};
+          currentContour.segments.push_back(std::move(seg));
+          break;
         }
-        currentContour.startPoint = pts[0];
-        hasContour = true;
-        break;
-      case PathVerb::Line: {
-        Segment seg = {PathVerb::Line, {pts[0]}};
-        currentContour.segments.push_back(std::move(seg));
-        break;
+        case PathVerb::Quad: {
+          Segment seg = {PathVerb::Quad, {pts[0], pts[1]}};
+          currentContour.segments.push_back(std::move(seg));
+          break;
+        }
+        case PathVerb::Cubic: {
+          Segment seg = {PathVerb::Cubic, {pts[0], pts[1], pts[2]}};
+          currentContour.segments.push_back(std::move(seg));
+          break;
+        }
+        case PathVerb::Close:
+          currentContour.closed = true;
+          break;
       }
-      case PathVerb::Quad: {
-        Segment seg = {PathVerb::Quad, {pts[0], pts[1]}};
-        currentContour.segments.push_back(std::move(seg));
-        break;
-      }
-      case PathVerb::Cubic: {
-        Segment seg = {PathVerb::Cubic, {pts[0], pts[1], pts[2]}};
-        currentContour.segments.push_back(std::move(seg));
-        break;
-      }
-      case PathVerb::Close:
-        currentContour.closed = true;
-        break;
     }
-  });
+  };
+  Visitor visitor{contours, currentContour, hasContour};
+  pathData.forEach(std::ref(visitor));
   if (hasContour) {
     contours.push_back(std::move(currentContour));
   }
@@ -582,30 +613,32 @@ void ReversePathData(const PathData& pathData, PathData& output) {
   }
 }
 
-std::string TransformPathDataToSVG(const PathData& pathData, const Matrix& m) {
-  PathData result = PathDataFromSVGString("");
-  pathData.forEach([&](PathVerb verb, const Point* pts) {
+namespace {
+struct TransformPathVisitor {
+  const Matrix& matrix;
+  PathData& result;
+  void operator()(PathVerb verb, const Point* pts) {
     switch (verb) {
       case PathVerb::Move: {
-        Point p = m.mapPoint(pts[0]);
+        Point p = matrix.mapPoint(pts[0]);
         result.moveTo(p.x, p.y);
         break;
       }
       case PathVerb::Line: {
-        Point p = m.mapPoint(pts[0]);
+        Point p = matrix.mapPoint(pts[0]);
         result.lineTo(p.x, p.y);
         break;
       }
       case PathVerb::Quad: {
-        Point c = m.mapPoint(pts[0]);
-        Point p = m.mapPoint(pts[1]);
+        Point c = matrix.mapPoint(pts[0]);
+        Point p = matrix.mapPoint(pts[1]);
         result.quadTo(c.x, c.y, p.x, p.y);
         break;
       }
       case PathVerb::Cubic: {
-        Point c1 = m.mapPoint(pts[0]);
-        Point c2 = m.mapPoint(pts[1]);
-        Point p = m.mapPoint(pts[2]);
+        Point c1 = matrix.mapPoint(pts[0]);
+        Point c2 = matrix.mapPoint(pts[1]);
+        Point p = matrix.mapPoint(pts[2]);
         result.cubicTo(c1.x, c1.y, c2.x, c2.y, p.x, p.y);
         break;
       }
@@ -613,7 +646,14 @@ std::string TransformPathDataToSVG(const PathData& pathData, const Matrix& m) {
         result.close();
         break;
     }
-  });
+  }
+};
+}  // namespace
+
+std::string TransformPathDataToSVG(const PathData& pathData, const Matrix& m) {
+  PathData result = PathDataFromSVGString("");
+  TransformPathVisitor visitor{m, result};
+  pathData.forEach(std::ref(visitor));
   return PathDataToSVGString(result);
 }
 
@@ -1171,11 +1211,8 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
         // Repeat and Decal here. Map defensively: anything that is not Repeat becomes no-repeat
         // rather than silently aliasing Mirror onto repeat (which was a latent bug before the
         // gate fix because the code path was unreachable in practice).
-        auto repeatFor = [](TileMode m) -> const char* {
-          return m == TileMode::Repeat ? "repeat" : "no-repeat";
-        };
-        std::string repeatX = repeatFor(p->tileModeX);
-        std::string repeatY = repeatFor(p->tileModeY);
+        auto repeatX = std::string(TileModeToRepeatCss(p->tileModeX));
+        auto repeatY = std::string(TileModeToRepeatCss(p->tileModeY));
         if (repeatX == repeatY) {
           style += ";background-repeat:" + repeatX;
         } else {

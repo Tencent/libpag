@@ -49,6 +49,11 @@ namespace pagx {
 
 using pag::FloatNearlyZero;
 
+static void EmitLeftTopCss(std::string& style, bool& positionSet, float x, float y) {
+  style += ";left:" + FloatToString(x) + "px;top:" + FloatToString(y) + "px";
+  positionSet = true;
+}
+
 //==============================================================================
 // HTMLWriter – element processing
 //==============================================================================
@@ -892,10 +897,6 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     // the negative quadrants of the layer origin (needed for stacking-context clipping like
     // mix-blend-mode, which otherwise drops Repeater copies that live at negative x/y).
     bool positionSet = false;
-    auto emitLeftTop = [&](float x, float y) {
-      style += ";left:" + FloatToString(x) + "px;top:" + FloatToString(y) + "px";
-      positionSet = true;
-    };
     // Absolute-positioned layers need explicit size when they have contents that use inset:0,
     // or when they are flex containers that need a reference frame for child layout.
     // When contents contain a Repeater, compute the union bounds of all repeated copies
@@ -983,7 +984,8 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
           repeaterOffsetX = uL;
           repeaterOffsetY = uT;
         }
-        emitLeftTop(renderPos.x + repeaterOffsetX, renderPos.y + repeaterOffsetY);
+        EmitLeftTopCss(style, positionSet, renderPos.x + repeaterOffsetX,
+                       renderPos.y + repeaterOffsetY);
         if (uw > 0) {
           style += ";width:" + FloatToString(uw) + "px";
         }
@@ -995,9 +997,9 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     }
     if (!positionSet) {
       if (!FloatNearlyZero(renderPos.x) || !FloatNearlyZero(renderPos.y)) {
-        emitLeftTop(renderPos.x, renderPos.y);
+        EmitLeftTopCss(style, positionSet, renderPos.x, renderPos.y);
       } else if (!transform.empty()) {
-        emitLeftTop(0, 0);
+        EmitLeftTopCss(style, positionSet, 0, 0);
       }
     }
     if (!transform.empty()) {
