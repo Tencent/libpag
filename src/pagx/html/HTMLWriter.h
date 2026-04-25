@@ -141,6 +141,12 @@ class HTMLWriterContext {
   float docHeight = 0;
   std::unordered_set<const Composition*> visitedCompositions = {};
 
+  // Guard against runaway recursion through writeLayer / writeGroup / writeComposition /
+  // writeElements. 512 frames keeps well below an 8 MB default thread stack even if each frame
+  // consumes a few KB. Exceeding this limit causes the current subtree to be silently skipped.
+  int recursionDepth = 0;
+  static constexpr int MAX_RECURSION_DEPTH = 512;
+
   // Static-image rasterization config, forwarded from HTMLExportOptions. Empty `staticImgDir`
   // disables rasterization entirely; the writer then emits nothing for Diamond/tiled-pattern
   // fills (they are CSS-inexpressible without the PNG).
@@ -183,6 +189,31 @@ class HTMLWriterContext {
 
  private:
   int _id = 0;
+};
+
+class RecursionGuard {
+ public:
+  explicit RecursionGuard(HTMLWriterContext* c) : _ctx(c) {
+    _overflowed = _ctx->recursionDepth >= HTMLWriterContext::MAX_RECURSION_DEPTH;
+    if (!_overflowed) {
+      _ctx->recursionDepth++;
+    }
+  }
+  ~RecursionGuard() {
+    if (!_overflowed) {
+      _ctx->recursionDepth--;
+    }
+  }
+  RecursionGuard(const RecursionGuard&) = delete;
+  RecursionGuard& operator=(const RecursionGuard&) = delete;
+
+  bool overflowed() const {
+    return _overflowed;
+  }
+
+ private:
+  HTMLWriterContext* _ctx = nullptr;
+  bool _overflowed = false;
 };
 
 //==============================================================================

@@ -82,6 +82,10 @@ void HTMLWriter::paintGeos(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
 
 void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& elements, float alpha,
                                bool distribute, LayerPlacement targetPlacement) {
+  RecursionGuard guard(_ctx);
+  if (guard.overflowed()) {
+    return;
+  }
   std::vector<GeoInfo> geos = {};
   const Fill* curFill = nullptr;
   const Stroke* curStroke = nullptr;
@@ -829,6 +833,10 @@ void HTMLWriter::writeLayerContents(HTMLBuilder& out, const Layer* layer, float 
 
 void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAlpha,
                             bool distributeAlpha, bool isFlexItem) {
+  RecursionGuard guard(_ctx);
+  if (guard.overflowed()) {
+    return;
+  }
   if (!layer->visible) {
     out.openTag("div");
     out.addAttr("style", "display:none");

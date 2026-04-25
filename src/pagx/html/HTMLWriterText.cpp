@@ -1688,6 +1688,10 @@ void HTMLWriter::applyTrimAttrsContinuous(HTMLBuilder& builder, const TrimPath* 
 }
 
 void HTMLWriter::writeGroup(HTMLBuilder& out, const Group* group, float alpha, bool distribute) {
+  RecursionGuard guard(_ctx);
+  if (guard.overflowed()) {
+    return;
+  }
   Matrix gm = BuildGroupMatrix(group);
   std::string style = "position:relative";
   if (!gm.isIdentity()) {
@@ -1815,6 +1819,10 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
 
 void HTMLWriter::writeComposition(HTMLBuilder& out, const Composition* comp, float alpha,
                                   bool distribute) {
+  RecursionGuard guard(_ctx);
+  if (guard.overflowed()) {
+    return;
+  }
   if (_ctx->visitedCompositions.count(comp)) {
     return;
   }
