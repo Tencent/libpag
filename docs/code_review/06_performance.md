@@ -521,3 +521,19 @@
 - 优化 PERF-10：~400ms（-50%）
 - 加 PERF-06 缓存（多次导出）：第 2+ 次 ~50ms（-94%）
 
+
+---
+
+## 2026-04-25 补注：profile 结果推翻上述四项估算
+
+对 `PAGXHtmlTest.BatchConvertAll` 用 macOS `sample` 采样 10 秒（Debug 构建，20 次 gtest 重复）。主线程 5342 个栈样本：
+
+| 占比 | 调用链 |
+|---:|---|
+| ~98% 的 BatchConvertAll 时间（2698 / 2739 样本） | `PAGXDocument::applyLayout()` |
+| 其中 ~72% (1947 / 2739) | `Text::onMeasure` → `TextLayout::Layout` → `findTypeface` → `SystemFonts::FallbackTypefaces` → macOS `CTFontManagerCreateFontDescriptorsFromURL` / `CGFontCopyURL`（系统字体目录扫描） |
+| <5%（未进入 top 20） | `HTMLExporter::ToHTML` 及其它 `src/pagx/html/` 内容 |
+
+**结论**：本报告中 PERF-01/02/06/10 的百分比估算（20–30%、30–60%、10–15%）与实测不一致。HTMLExporter 本身不是瓶颈。真实瓶颈在 PAGX Layout 模块的系统字体 fallback 扫描，属本评审范围之外。
+
+因此本文件的「短期/中期/长期」路线图**暂不实施**；若未来 profile 显示 HTML 模块确实成为瓶颈再重新开启。相关 backlog 项（PERF-01/02/06/10、EXT-01/02）保留作为历史 artifact，不从总 summary 移除，方便后续考古。
