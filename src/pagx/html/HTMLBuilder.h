@@ -57,6 +57,9 @@ class HTMLBuilder {
   }
 
   void closeTagSelfClosing() {
+    if (_tags.empty()) {
+      return;
+    }
     auto& tag = _tags.back();
     if (std::strcmp(tag, "div") == 0 || std::strcmp(tag, "span") == 0) {
       _buf += "></";
@@ -70,6 +73,9 @@ class HTMLBuilder {
   }
 
   void closeTag() {
+    if (_tags.empty()) {
+      return;
+    }
     _level--;
     indent();
     _buf += "</";
@@ -80,6 +86,9 @@ class HTMLBuilder {
   }
 
   void closeTagWithText(const std::string& text) {
+    if (_tags.empty()) {
+      return;
+    }
     _buf += '>';
     _buf += escapeHTML(text);
     _buf += "</";

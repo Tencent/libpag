@@ -306,7 +306,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               if (!spanFontHoisted) {
                 if (!span.text->fontFamily.empty()) {
                   if (!spanStyle.empty()) spanStyle += ';';
-                  spanStyle += "font-family:'" + span.text->fontFamily + "'";
+                  spanStyle += "font-family:'" + EscapeCssFontFamily(span.text->fontFamily) + "'";
                 }
                 if (!spanStyle.empty()) spanStyle += ';';
                 spanStyle += "font-size:" + FloatToString(span.text->renderFontSize()) + "px";
@@ -415,7 +415,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                                    _ctx->fontHoistSignature.renderFontSize > 0;
             if (!spanFontHoisted) {
               if (!span.text->fontFamily.empty()) {
-                spanStyle += ";font-family:'" + span.text->fontFamily + "'";
+                spanStyle += ";font-family:'" + EscapeCssFontFamily(span.text->fontFamily) + "'";
               }
               spanStyle += ";font-size:" + FloatToString(span.text->renderFontSize()) + "px";
               if (!span.text->fontStyle.empty()) {

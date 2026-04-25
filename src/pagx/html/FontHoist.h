@@ -81,4 +81,13 @@ FontSignature CollectUniformSignature(const std::vector<Element*>& contents);
  */
 std::string FontSignatureToCss(const FontSignature& sig);
 
+/**
+ * Escapes a font-family value for safe emission inside a CSS declaration wrapped in single
+ * quotes. Backslash-escapes single quotes and backslashes, and strips characters that would
+ * allow escaping the CSS context (';', '}', '<', '>') or control characters. The returned
+ * string is intended to be used as the content between single quotes in
+ * "font-family:'<escaped>'". Empty input yields an empty output.
+ */
+std::string EscapeCssFontFamily(const std::string& family);
+
 }  // namespace pagx

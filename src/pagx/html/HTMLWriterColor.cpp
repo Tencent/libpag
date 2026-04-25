@@ -104,6 +104,10 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
           if (std::abs(endT - startT) > 1e-4f) {
             auto* firstStop = g->colorStops.front();
             auto* lastStop = g->colorStops.back();
+            if (!firstStop || !lastStop) {
+              return "linear-gradient(" + FloatToString(ang) + "deg," + CSSStops(g->colorStops) +
+                     ")";
+            }
             std::string stops;
             // Leading clamp region: 0%..startT filled with the first stop colour.
             // When the first stop's offset is 0, it maps to startT and duplicates the clamp
@@ -121,6 +125,9 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
             }
             // Re-emit stops mapped onto [startT, endT].
             for (size_t i = firstIndex; i < g->colorStops.size(); i++) {
+              if (!g->colorStops[i]) {
+                continue;
+              }
               float mapped = startT + g->colorStops[i]->offset * (endT - startT);
               if (!stops.empty()) {
                 stops += ",";
@@ -217,10 +224,14 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
       // which is in the endAngle→360° clamp region, filled with lastColor.
       float cssOrigin = 90.0f + matRotation;
       float cssEndAng = g->endAngle + 90.0f + matRotation;
-      std::string firstColor =
-          g->colorStops.empty() ? "transparent" : ColorToRGBA(g->colorStops.front()->color);
-      std::string lastColor =
-          g->colorStops.empty() ? "transparent" : ColorToRGBA(g->colorStops.back()->color);
+      std::string firstColor = "transparent";
+      std::string lastColor = "transparent";
+      if (!g->colorStops.empty() && g->colorStops.front()) {
+        firstColor = ColorToRGBA(g->colorStops.front()->color);
+      }
+      if (!g->colorStops.empty() && g->colorStops.back()) {
+        lastColor = ColorToRGBA(g->colorStops.back()->color);
+      }
       std::string stops;
       stops += lastColor + " " + FloatToString(cssOrigin) + "deg";
       stops += "," + firstColor + " " + FloatToString(cssOrigin) + "deg";
@@ -228,6 +239,9 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
       // Skip the first stop if offset==0 (it maps to cssStartAng, already emitted above)
       // and the last stop if offset==1 (it maps to cssEndAng, emitted below).
       for (size_t i = 0; i < g->colorStops.size(); i++) {
+        if (!g->colorStops[i]) {
+          continue;
+        }
         bool isFirst = (i == 0) && FloatNearlyZero(g->colorStops[i]->offset);
         bool isLast =
             (i == g->colorStops.size() - 1) && FloatNearlyZero(g->colorStops[i]->offset - 1.0f);
@@ -332,10 +346,15 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha) 
                 ")";
     } else {
       std::string stops;
+      bool first = true;
       for (size_t i = 0; i < g->colorStops.size(); i++) {
-        if (i > 0) {
+        if (!g->colorStops[i]) {
+          continue;
+        }
+        if (!first) {
           stops += ',';
         }
+        first = false;
         stops += ColorToRGBA(g->colorStops[i]->color);
         float angle = cssStartAng + g->colorStops[i]->offset * sweepRange;
         stops += ' ' + FloatToString(angle) + "deg";
@@ -369,6 +388,9 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha) 
     }
     _defs->closeTagStart();
     for (auto* stop : g->colorStops) {
+      if (!stop) {
+        continue;
+      }
       _defs->openTag("stop");
       _defs->addAttr("offset", FloatToString(stop->offset));
       _defs->addAttr("stop-color", ColorToSVGHex(stop->color));
@@ -470,6 +492,9 @@ void HTMLWriter::writeSVGGradientDef(const ColorSource* src, const std::string& 
     }
     _defs->closeTagStart();
     for (auto* stop : g->colorStops) {
+      if (!stop) {
+        continue;
+      }
       _defs->openTag("stop");
       _defs->addAttr("offset", FloatToString(stop->offset));
       _defs->addAttr("stop-color", ColorToSVGHex(stop->color));
@@ -492,6 +517,9 @@ void HTMLWriter::writeSVGGradientDef(const ColorSource* src, const std::string& 
     }
     _defs->closeTagStart();
     for (auto* stop : g->colorStops) {
+      if (!stop) {
+        continue;
+      }
       _defs->openTag("stop");
       _defs->addAttr("offset", FloatToString(stop->offset));
       _defs->addAttr("stop-color", ColorToSVGHex(stop->color));

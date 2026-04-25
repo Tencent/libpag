@@ -689,11 +689,7 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
   // Font properties are hoisted to the parent Layer when fontHoisted; skip them on the span.
   if (!fontHoisted) {
     if (!text->fontFamily.empty()) {
-      std::string escapedFamily = text->fontFamily;
-      for (size_t pos = 0; (pos = escapedFamily.find('\'', pos)) != std::string::npos; pos += 2) {
-        escapedFamily.replace(pos, 1, "\\'");
-      }
-      style += ";font-family:'" + escapedFamily + "'";
+      style += ";font-family:'" + EscapeCssFontFamily(text->fontFamily) + "'";
     }
     style += ";font-size:" + FloatToString(text->renderFontSize()) + "px";
     if (text->letterSpacing != 0.0f) {
@@ -1049,14 +1045,7 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         containerStyle += ";left:" + FloatToString(renderPos.x) + "px";
       }
       if (!text->fontFamily.empty()) {
-        std::string escapedFamilyM = text->fontFamily;
-        for (size_t p = 0; p < escapedFamilyM.size(); p++) {
-          if (escapedFamilyM[p] == '\'') {
-            escapedFamilyM.replace(p, 1, "\\'");
-            p++;
-          }
-        }
-        containerStyle += ";font-family:'" + escapedFamilyM + "'";
+        containerStyle += ";font-family:'" + EscapeCssFontFamily(text->fontFamily) + "'";
       }
       containerStyle += ";font-size:0";
       if (!text->fontStyle.empty()) {
@@ -1429,14 +1418,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
                                 "px;top:" + FloatToString(pos.y) + "px";
         charStyle += ";display:inline-block";
         if (!text->fontFamily.empty()) {
-          std::string escapedFamilyTP = text->fontFamily;
-          for (size_t p = 0; p < escapedFamilyTP.size(); p++) {
-            if (escapedFamilyTP[p] == '\'') {
-              escapedFamilyTP.replace(p, 1, "\\'");
-              p++;
-            }
-          }
-          charStyle += ";font-family:'" + escapedFamilyTP + "'";
+          charStyle += ";font-family:'" + EscapeCssFontFamily(text->fontFamily) + "'";
         }
         charStyle += ";font-size:" + FloatToString(renderFont) + "px";
         if (!text->fontStyle.empty()) {

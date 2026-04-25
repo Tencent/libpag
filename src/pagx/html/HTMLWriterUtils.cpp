@@ -111,11 +111,47 @@ std::string EscapeCSSUrl(const std::string& url) {
   return r;
 }
 
+// Returns true when url has no scheme (relative path), or has a scheme on the safe allow-list
+// (http, https, data). Everything else (file://, javascript:, vbscript:, etc.) is rejected.
+// Scheme detection follows RFC 3986: a leading run of [a-zA-Z][a-zA-Z0-9+.-]* followed by ':'.
+static bool IsSafeImageUrl(const std::string& url) {
+  size_t colon = url.find(':');
+  if (colon == std::string::npos || colon == 0) {
+    return true;
+  }
+  char first = url[0];
+  bool isAlpha = (first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z');
+  if (!isAlpha) {
+    return true;
+  }
+  for (size_t i = 1; i < colon; i++) {
+    char c = url[i];
+    bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+              c == '+' || c == '.' || c == '-';
+    if (!ok) {
+      return true;
+    }
+  }
+  std::string scheme;
+  scheme.reserve(colon);
+  for (size_t i = 0; i < colon; i++) {
+    char c = url[i];
+    if (c >= 'A' && c <= 'Z') {
+      c = static_cast<char>(c - 'A' + 'a');
+    }
+    scheme += c;
+  }
+  return scheme == "http" || scheme == "https" || scheme == "data";
+}
+
 std::string GetImageSrc(const Image* image) {
   if (image->data) {
     auto mime = DetectImageMime(image->data->bytes(), image->data->size());
     return "data:" + std::string(mime) + ";base64," +
            Base64Encode(image->data->bytes(), image->data->size());
+  }
+  if (!IsSafeImageUrl(image->filePath)) {
+    return {};
   }
   return EscapeCSSUrl(image->filePath);
 }
@@ -141,16 +177,32 @@ std::string CSSStops(const std::vector<ColorStop*>& stops) {
   if (stops.empty()) {
     return "transparent,transparent";
   }
+  // Skip any null elements — malformed PAGX inputs can leave entries as nullptr.
+  const ColorStop* firstValid = nullptr;
+  for (auto* s : stops) {
+    if (s) {
+      firstValid = s;
+      break;
+    }
+  }
+  if (!firstValid) {
+    return "transparent,transparent";
+  }
   if (stops.size() == 1) {
-    auto c = ColorToRGBA(stops[0]->color);
+    auto c = ColorToRGBA(firstValid->color);
     return c + "," + c;
   }
   std::string r;
   r.reserve(stops.size() * 32);
+  bool first = true;
   for (size_t i = 0; i < stops.size(); i++) {
-    if (i > 0) {
+    if (!stops[i]) {
+      continue;
+    }
+    if (!first) {
       r += ',';
     }
+    first = false;
     r += ColorToRGBA(stops[i]->color);
     r += ' ';
     r += FloatToString(stops[i]->offset * 100.0f);
