@@ -101,7 +101,11 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
           float startT =
               ((sxLocal - lineStartX) * dirX + (syLocal - lineStartY) * dirY) / lineLength;
           float endT = ((exLocal - lineStartX) * dirX + (eyLocal - lineStartY) * dirY) / lineLength;
-          if (std::abs(endT - startT) > 1e-4f) {
+          // Epsilon for comparing gradient-line parameter values. Stops whose mapped parameter
+          // positions differ by less than this are treated as coincident so duplicate stops do
+          // not appear in the emitted CSS `linear-gradient(...)` declaration.
+          constexpr float GRADIENT_MAPPING_EPSILON = 1e-4f;
+          if (std::abs(endT - startT) > GRADIENT_MAPPING_EPSILON) {
             auto* firstStop = g->colorStops.front();
             auto* lastStop = g->colorStops.back();
             if (!firstStop || !lastStop) {
@@ -119,7 +123,7 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
               // When the first stop's offset is 0, it maps to startT and duplicates the clamp
               // endpoint — start the loop from index 1 to skip it.
               float mapped0 = startT + g->colorStops[0]->offset * (endT - startT);
-              if (std::abs(mapped0 - startT) <= 1e-4f) {
+              if (std::abs(mapped0 - startT) <= GRADIENT_MAPPING_EPSILON) {
                 firstIndex = 1;
               }
             }
@@ -140,7 +144,7 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
             // start point — skip the endT stop.
             if (endT < 1.0f) {
               float mappedLast = startT + g->colorStops.back()->offset * (endT - startT);
-              if (std::abs(mappedLast - endT) > 1e-4f) {
+              if (std::abs(mappedLast - endT) > GRADIENT_MAPPING_EPSILON) {
                 stops +=
                     "," + ColorToRGBA(lastStop->color) + " " + FloatToString(endT * 100.0f) + "%";
               }

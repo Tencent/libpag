@@ -49,6 +49,11 @@ namespace pagx {
 
 using pag::FloatNearlyZero;
 
+// Sentinel large value used to seed min/max accumulators when computing axis-aligned bounds.
+// Any realistic layer coordinate is many orders of magnitude smaller, so the first observation
+// always overwrites the seed. Mirrors the same sentinel used in HTMLWriter::ComputeGeosBoundingBox.
+static constexpr float BBOX_SENTINEL_LARGE = 1e9f;
+
 static void EmitLeftTopCss(std::string& style, bool& positionSet, float x, float y) {
   style += ";left:" + FloatToString(x) + "px;top:" + FloatToString(y) + "px";
   positionSet = true;
@@ -916,7 +921,8 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     float repeaterOffsetY = 0;
     if (repeater && repeater->copies > 0) {
       // Collect bounds of geometry elements before the Repeater.
-      float geoL = 1e9f, geoT = 1e9f, geoR = -1e9f, geoB = -1e9f;
+      float geoL = BBOX_SENTINEL_LARGE, geoT = BBOX_SENTINEL_LARGE, geoR = -BBOX_SENTINEL_LARGE,
+            geoB = -BBOX_SENTINEL_LARGE;
       bool hasGeo = false;
       for (auto* e : layer->contents) {
         if (e == repeater) {
@@ -938,7 +944,8 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       }
       if (hasGeo) {
         // Transform this rect through every Repeater copy matrix and compute union bounds.
-        float uL = 1e9f, uT = 1e9f, uR = -1e9f, uB = -1e9f;
+        float uL = BBOX_SENTINEL_LARGE, uT = BBOX_SENTINEL_LARGE, uR = -BBOX_SENTINEL_LARGE,
+              uB = -BBOX_SENTINEL_LARGE;
         int n = static_cast<int>(std::ceil(repeater->copies));
         for (int i = 0; i < n; i++) {
           float prog = static_cast<float>(i) + repeater->offset;
