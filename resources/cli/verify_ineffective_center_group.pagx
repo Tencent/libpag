@@ -1,6 +1,6 @@
 <pagx width="200" height="200">
   <Layer width="200" height="200">
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Rectangle width="100%" height="100%"/>
     <Fill color="#EEE"/>
     <Group>
       <Path centerX="0" centerY="0" data="M0 0 L10 5 L0 10 Z"/>

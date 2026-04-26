@@ -3,32 +3,32 @@
 <pagx width="336" height="200">
   <!-- Background -->
   <Layer>
-    <Rectangle size="336,200"/>
+    <Rectangle width="336" height="200"/>
     <Fill color="#F8FAFC"/>
   </Layer>
 
   <!-- Main container: Horizontal layout with 2 children + 1 overlay -->
   <Layer width="336" height="200">
     <!-- Container border -->
-    <Rectangle size="336,200"/>
+    <Rectangle width="336" height="200"/>
     <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
 
-    <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="12" padding="12">
+    <Layer width="100%" height="100%" layout="horizontal" gap="12" padding="12">
       <!-- Child 1: Participates in horizontal layout -->
       <Layer width="150" height="176">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+        <Rectangle width="100%" height="100%" roundness="8"/>
         <Fill color="#4ECDC4"/>
       </Layer>
 
       <!-- Child 2: Participates in horizontal layout -->
       <Layer width="150" height="176">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+        <Rectangle width="100%" height="100%" roundness="8"/>
         <Fill color="#45B7D1"/>
       </Layer>
 
       <!-- Overlay: Excluded from layout flow, red dot inside Child 2's bottom-right corner -->
       <Layer right="8" bottom="8" width="30" height="30" includeInLayout="false">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="15"/>
+        <Rectangle width="100%" height="100%" roundness="15"/>
         <Fill color="#FF6B6B"/>
       </Layer>
     </Layer>

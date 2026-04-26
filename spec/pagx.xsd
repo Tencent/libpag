@@ -126,6 +126,13 @@
     </xs:restriction>
   </xs:simpleType>
 
+  <!-- DimensionType: supports absolute pixels (e.g., "100") or percentage (e.g., "50%"). -->
+  <xs:simpleType name="DimensionType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9]*\.?[0-9]+%?"/>
+    </xs:restriction>
+  </xs:simpleType>
+
   <!-- ========================= Enumeration Types ========================= -->
 
   <xs:simpleType name="BlendModeType">
@@ -370,6 +377,8 @@
     <xs:attribute name="bottom" type="xs:decimal"/>
     <xs:attribute name="centerX" type="xs:decimal"/>
     <xs:attribute name="centerY" type="xs:decimal"/>
+    <xs:attribute name="width" type="DimensionType"/>
+    <xs:attribute name="height" type="DimensionType"/>
   </xs:attributeGroup>
 
   <!-- ========================= Color Source Elements ========================= -->
@@ -684,8 +693,6 @@
     </xs:sequence>
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attributeGroup ref="ConstraintAttributes"/>
-    <xs:attribute name="width" type="xs:decimal"/>
-    <xs:attribute name="height" type="xs:decimal"/>
     <xs:attribute name="padding" type="PaddingType"/>
     <xs:attribute name="textAlign" type="TextAlignType" default="start"/>
     <xs:attribute name="paragraphAlign" type="ParagraphAlignType" default="near"/>
@@ -835,8 +842,6 @@
     </xs:sequence>
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attributeGroup ref="ConstraintAttributes"/>
-    <xs:attribute name="width" type="xs:decimal"/>
-    <xs:attribute name="height" type="xs:decimal"/>
     <xs:attribute name="padding" type="PaddingType"/>
     <xs:attribute name="anchor" type="PointType" default="0,0"/>
     <xs:attribute name="position" type="PointType" default="0,0"/>
@@ -886,8 +891,6 @@
     <xs:attribute name="x" type="xs:decimal" default="0"/>
     <xs:attribute name="y" type="xs:decimal" default="0"/>
     <xs:attribute name="flex" type="xs:decimal" default="0"/>
-    <xs:attribute name="width" type="xs:decimal"/>
-    <xs:attribute name="height" type="xs:decimal"/>
     <xs:attribute name="layout" type="LayoutModeType" default="none"/>
     <xs:attribute name="gap" type="xs:decimal" default="0"/>
     <xs:attribute name="padding" type="PaddingType"/>

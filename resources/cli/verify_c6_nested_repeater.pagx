@@ -3,7 +3,7 @@
 <pagx width="400" height="100">
   <Layer name="NestedRepeaters" left="10" top="10">
     <Group>
-      <Rectangle left="-2.5" top="-5" size="5,10"/>
+      <Rectangle left="-2.5" top="-5" width="5" height="10"/>
       <Fill color="#FF0000"/>
       <Repeater copies="30" position="7,0"/>
     </Group>

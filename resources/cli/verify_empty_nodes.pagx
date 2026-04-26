@@ -6,7 +6,7 @@
   <Layer name="hasContent">
     <!-- Should warn: empty Group with no size or constraints -->
     <Group/>
-    <Rectangle size="100,100"/>
+    <Rectangle width="100" height="100"/>
     <Fill color="#FF0000"/>
   </Layer>
   <!-- Should NOT warn: has explicit size -->
@@ -20,13 +20,13 @@
   <!-- Should NOT warn: empty Group with explicit size -->
   <Layer name="groupSizedParent" width="100" height="100">
     <Group width="50" height="50"/>
-    <Rectangle size="100,100"/>
+    <Rectangle width="100" height="100"/>
     <Fill color="#FF0000"/>
   </Layer>
   <!-- Should NOT warn: empty Group with size-dependent constraint -->
   <Layer name="groupConstraintParent" width="100" height="100">
     <Group centerX="0"/>
-    <Rectangle size="100,100"/>
+    <Rectangle width="100" height="100"/>
     <Fill color="#FF0000"/>
   </Layer>
 </pagx>

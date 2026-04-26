@@ -148,6 +148,24 @@ class XMLBuilder {
     }
   }
 
+  // Writes a dimension attribute that may be a percentage value. If percentValue is not NaN,
+  // writes it with a "%" suffix; otherwise writes absoluteValue. Skips both NaN.
+  void addDimensionAttribute(const char* name, float absoluteValue, float percentValue) {
+    if (!std::isnan(percentValue)) {
+      buffer += " ";
+      buffer += name;
+      buffer += "=\"";
+      buffer += FloatToString(percentValue);
+      buffer += "%\"";
+    } else if (!std::isnan(absoluteValue)) {
+      buffer += " ";
+      buffer += name;
+      buffer += "=\"";
+      buffer += FloatToString(absoluteValue);
+      buffer += "\"";
+    }
+  }
+
   void closeElementStart() {
     buffer += ">\n";
     indentLevel++;
@@ -519,6 +537,8 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.addOptionalAttribute("bottom", rect->bottom);
       xml.addOptionalAttribute("centerX", rect->centerX);
       xml.addOptionalAttribute("centerY", rect->centerY);
+      xml.addDimensionAttribute("width", rect->width, rect->percentWidth);
+      xml.addDimensionAttribute("height", rect->height, rect->percentHeight);
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;
@@ -541,6 +561,8 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.addOptionalAttribute("bottom", ellipse->bottom);
       xml.addOptionalAttribute("centerX", ellipse->centerX);
       xml.addOptionalAttribute("centerY", ellipse->centerY);
+      xml.addDimensionAttribute("width", ellipse->width, ellipse->percentWidth);
+      xml.addDimensionAttribute("height", ellipse->height, ellipse->percentHeight);
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;
@@ -569,6 +591,8 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.addOptionalAttribute("bottom", polystar->bottom);
       xml.addOptionalAttribute("centerX", polystar->centerX);
       xml.addOptionalAttribute("centerY", polystar->centerY);
+      xml.addDimensionAttribute("width", polystar->width, polystar->percentWidth);
+      xml.addDimensionAttribute("height", polystar->height, polystar->percentHeight);
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;
@@ -594,6 +618,8 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.addOptionalAttribute("bottom", path->bottom);
       xml.addOptionalAttribute("centerX", path->centerX);
       xml.addOptionalAttribute("centerY", path->centerY);
+      xml.addDimensionAttribute("width", path->width, path->percentWidth);
+      xml.addDimensionAttribute("height", path->height, path->percentHeight);
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;
@@ -628,6 +654,8 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.addOptionalAttribute("bottom", text->bottom);
       xml.addOptionalAttribute("centerX", text->centerX);
       xml.addOptionalAttribute("centerY", text->centerY);
+      xml.addDimensionAttribute("width", text->width, text->percentWidth);
+      xml.addDimensionAttribute("height", text->height, text->percentHeight);
       WriteCustomData(xml, node);
       if (options.skipGlyphData || text->glyphRuns.empty()) {
         xml.closeElementSelfClosing();
@@ -881,6 +909,8 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.addOptionalAttribute("bottom", textPath->bottom);
       xml.addOptionalAttribute("centerX", textPath->centerX);
       xml.addOptionalAttribute("centerY", textPath->centerY);
+      xml.addDimensionAttribute("width", textPath->width, textPath->percentWidth);
+      xml.addDimensionAttribute("height", textPath->height, textPath->percentHeight);
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;
@@ -905,8 +935,8 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.addAttribute("skewAxis", textBox->skewAxis, Default<TextBox>().skewAxis);
       xml.addAttribute("alpha", textBox->alpha, Default<TextBox>().alpha);
       // Layout dimensions
-      xml.addOptionalAttribute("width", textBox->width);
-      xml.addOptionalAttribute("height", textBox->height);
+      xml.addDimensionAttribute("width", textBox->width, textBox->percentWidth);
+      xml.addDimensionAttribute("height", textBox->height, textBox->percentHeight);
       if (!textBox->padding.isZero()) {
         xml.addAttribute("padding", PaddingToString(textBox->padding));
       }
@@ -986,8 +1016,8 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.addAttribute("skew", group->skew, Default<Group>().skew);
       xml.addAttribute("skewAxis", group->skewAxis, Default<Group>().skewAxis);
       xml.addAttribute("alpha", group->alpha, Default<Group>().alpha);
-      xml.addOptionalAttribute("width", group->width);
-      xml.addOptionalAttribute("height", group->height);
+      xml.addDimensionAttribute("width", group->width, group->percentWidth);
+      xml.addDimensionAttribute("height", group->height, group->percentHeight);
       if (!group->padding.isZero()) {
         xml.addAttribute("padding", PaddingToString(group->padding));
       }
@@ -1265,8 +1295,8 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
   }
   xml.addAttribute("x", node->x, Default<Layer>().x);
   xml.addAttribute("y", node->y, Default<Layer>().y);
-  xml.addOptionalAttribute("width", node->width);
-  xml.addOptionalAttribute("height", node->height);
+  xml.addDimensionAttribute("width", node->width, node->percentWidth);
+  xml.addDimensionAttribute("height", node->height, node->percentHeight);
   if (node->layout != Default<Layer>().layout) {
     xml.addAttribute("layout", LayoutModeToString(node->layout));
   }

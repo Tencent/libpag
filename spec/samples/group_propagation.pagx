@@ -2,10 +2,10 @@
 <!-- Demonstrates style propagation: Fill outside Groups applies to all shapes -->
 <pagx width="400" height="400">
   <Layer>
-    <Rectangle left="60" top="120" size="160,160" roundness="24"/>
+    <Rectangle left="60" top="120" width="160" height="160" roundness="24"/>
     <Fill color="#F43F5E"/>
     <Group>
-      <Ellipse left="180" top="120" size="160,160"/>
+      <Ellipse left="180" top="120" width="160" height="160"/>
       <Fill color="#06B6D4"/>
     </Group>
     <!-- Semi-transparent overlay applied to both shapes -->

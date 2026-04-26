@@ -2,7 +2,7 @@
 <pagx width="400" height="400">
   <Layer>
     <Group left="200" top="200" anchor="110,110" rotation="12">
-      <Rectangle size="220,220" roundness="32"/>
+      <Rectangle width="220" height="220" roundness="32"/>
       <Fill>
         <LinearGradient startPoint="0,0" endPoint="220,220">
           <ColorStop color="#F43F5E" offset="0"/>

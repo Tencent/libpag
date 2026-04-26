@@ -1,74 +1,60 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Constraint layout: padding on Layers WITHOUT container layout -->
-<!-- Verifies that padding insets the constraint reference frame for both child Layers -->
-<!-- and VectorElements (both reference the padding-inset area). -->
+<!-- Verifies that padding insets the constraint reference frame for all children: -->
+<!-- both child Layers and VectorElements reference the padding-inset area. -->
 <pagx width="820" height="600">
   <!-- Background -->
-  <Layer left="0" right="0" top="0" bottom="0">
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
+  <Layer width="100%" height="100%">
+    <Rectangle width="100%" height="100%"/>
     <Fill color="#F8FAFC"/>
   </Layer>
 
   <!-- Grid layout: 2 rows, padding=30, gap=20 -->
-  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30">
+  <Layer width="100%" height="100%" layout="vertical" gap="20" padding="30">
 
     <!-- Row 1 -->
     <Layer flex="1" layout="horizontal" gap="20">
 
-      <!-- Case 1: padding + left/right/top/bottom on child Layer -->
-      <!-- Child Layer left="0" should be at x=30 (padding.left), not x=0 -->
+      <!-- Case 1: padding + width/height="100%" on child Layer -->
+      <!-- Child Layer should fill the padding-inset area, not the full parent bounds -->
       <Layer flex="1" height="260">
-        <!-- Dashed border (VectorElement: fills full bounds of outer Layer) -->
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <!-- Dashed border shows the full outer Layer bounds -->
+        <Rectangle width="100%" height="100%" roundness="4"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        <!-- Background showing the padding-inset area -->
-        <Group>
-          <Rectangle left="30" right="30" top="30" bottom="30" roundness="4"/>
-          <Fill color="#E8F4FF"/>
-        </Group>
-        <!-- Inner Layer with padding, containing only child Layers -->
-        <Layer left="0" right="0" top="0" bottom="0" padding="30">
-          <!-- Child Layer: left="0" right="0" top="0" bottom="0" should fill inset area -->
-          <Layer left="0" right="0" top="0" bottom="0">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+        <!-- Inner Layer with padding=30 -->
+        <Layer width="100%" height="100%" padding="30">
+          <!-- Child Layer: width="100%" height="100%" should fill the 30px-inset area -->
+          <Layer width="100%" height="100%">
+            <Rectangle width="100%" height="100%" roundness="8"/>
             <Fill color="#3B82F6"/>
           </Layer>
         </Layer>
       </Layer>
 
       <!-- Case 2: padding + centerX/centerY on child Layer -->
-      <!-- Child Layer centerX="0" centerY="0" should center within inset area -->
+      <!-- Child Layer centerX="0" centerY="0" should center within the inset area, -->
+      <!-- which coincides with centering in the full area (padding symmetric). -->
+      <!-- The inner fixed-size Rectangle demonstrates the centered position. -->
       <Layer flex="1" height="260">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Rectangle width="100%" height="100%" roundness="4"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        <Group>
-          <Rectangle left="30" right="30" top="30" bottom="30" roundness="4"/>
-          <Fill color="#FFF3E8"/>
-        </Group>
-        <Layer left="0" right="0" top="0" bottom="0" padding="30">
-          <!-- Child Layer: centered within inset area -->
+        <Layer width="100%" height="100%" padding="30">
           <Layer centerX="0" centerY="0">
-            <Rectangle size="80,60" roundness="8"/>
+            <Rectangle width="80" height="60" roundness="8"/>
             <Fill color="#F59E0B"/>
           </Layer>
         </Layer>
       </Layer>
 
-      <!-- Case 3: VectorElement with left/right/top/bottom (now ALSO affected by padding) -->
+      <!-- Case 3: padding on VectorElements (Rectangle with width/height="100%") -->
+      <!-- Rectangle is a VectorElement but should ALSO reference the inset bounds. -->
       <Layer flex="1" height="260">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Rectangle width="100%" height="100%" roundness="4"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        <Layer left="0" right="0" top="0" bottom="0" padding="30">
-          <!-- Rectangle is a VectorElement: now references inset bounds (same as child Layers) -->
-          <Group>
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-            <Fill color="#10B981"/>
-          </Group>
-          <!-- Child Layer with left/right for comparison: also references inset bounds -->
-          <Layer left="0" right="0" top="0" bottom="0">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-            <Fill color="#10B981" alpha="0.4"/>
-          </Layer>
+        <Layer width="100%" height="100%" padding="30">
+          <!-- Rectangle width="100%" height="100%" fills the inset area -->
+          <Rectangle width="100%" height="100%" roundness="8"/>
+          <Fill color="#10B981"/>
         </Layer>
       </Layer>
 
@@ -77,54 +63,43 @@
     <!-- Row 2 -->
     <Layer flex="1" layout="horizontal" gap="20">
 
-      <!-- Case 4: content-measured Layer with padding -->
-      <!-- Layer size should be childSize + padding -->
+      <!-- Case 4: content-measured Layer with Group padding -->
+      <!-- Group padding grows the Group to childSize + padding. -->
       <Layer flex="1" height="260">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Rectangle width="100%" height="100%" roundness="4"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        <!-- Content-measured child with padding and a child Layer -->
         <Layer left="20" top="20">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Rectangle width="100%" height="100%" roundness="8"/>
           <Fill color="#EDE9FE"/>
           <Group padding="20">
-            <Rectangle size="80,60" roundness="8"/>
+            <Rectangle width="80" height="60" roundness="8"/>
             <Fill color="#8B5CF6"/>
           </Group>
         </Layer>
       </Layer>
 
       <!-- Case 5: asymmetric padding (top=10, right=30, bottom=50, left=20) -->
+      <!-- Child Layer width="100%" height="100%" should fill the asymmetric inset area. -->
       <Layer flex="1" height="260">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Rectangle width="100%" height="100%" roundness="4"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        <!-- Show inset area -->
-        <Group>
-          <Rectangle left="20" right="30" top="10" bottom="50" roundness="4"/>
-          <Fill color="#FFE8EE"/>
-        </Group>
-        <Layer left="0" right="0" top="0" bottom="0" padding="10,30,50,20">
-          <!-- Child Layer: should fill the asymmetric inset area -->
-          <Layer left="0" right="0" top="0" bottom="0">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+        <Layer width="100%" height="100%" padding="10,30,50,20">
+          <Layer width="100%" height="100%">
+            <Rectangle width="100%" height="100%" roundness="8"/>
             <Fill color="#F43F5E"/>
           </Layer>
         </Layer>
       </Layer>
 
-      <!-- Case 6: no constraints on child Layer (should default to padding origin) -->
+      <!-- Case 6: no constraints on child element (should default to padding origin) -->
+      <!-- The Rectangle has no position constraints — it should appear at -->
+      <!-- (padding.left, padding.top) = (30, 30). -->
       <Layer flex="1" height="260">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Rectangle width="100%" height="100%" roundness="4"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        <Group>
-          <Rectangle left="30" right="30" top="30" bottom="30" roundness="4"/>
-          <Fill color="#E8F7F0"/>
-        </Group>
-        <Layer id="case6-padding" left="0" right="0" top="0" bottom="0" padding="30">
-          <!-- Child Layer: no constraints — should appear at (padding.left, padding.top) -->
-          <Layer id="case6-child">
-            <Rectangle size="80,60" roundness="8"/>
-            <Fill color="#06B6D4"/>
-          </Layer>
+        <Layer width="100%" height="100%" padding="30">
+          <Rectangle width="80" height="60" roundness="8"/>
+          <Fill color="#06B6D4"/>
         </Layer>
       </Layer>
 

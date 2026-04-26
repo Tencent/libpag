@@ -5,28 +5,28 @@
   <!-- gap without layout: should warn -->
   <Layer id="gapNoLayout" width="200" height="100" gap="10">
     <Layer width="50" height="50">
-      <Rectangle size="50,50"/>
+      <Rectangle width="50" height="50"/>
       <Fill color="#3B82F6"/>
     </Layer>
   </Layer>
   <!-- alignment without layout: should warn -->
   <Layer id="alignNoLayout" width="200" height="100" alignment="center">
     <Layer width="50" height="50">
-      <Rectangle size="50,50"/>
+      <Rectangle width="50" height="50"/>
       <Fill color="#10B981"/>
     </Layer>
   </Layer>
   <!-- arrangement without layout: should warn -->
   <Layer id="arrangeNoLayout" width="200" height="100" arrangement="center">
     <Layer width="50" height="50">
-      <Rectangle size="50,50"/>
+      <Rectangle width="50" height="50"/>
       <Fill color="#F59E0B"/>
     </Layer>
   </Layer>
   <!-- padding without layout: should NOT warn -->
   <Layer id="paddingNoLayout" width="200" height="100" padding="20">
     <Layer width="50" height="50">
-      <Rectangle size="50,50"/>
+      <Rectangle width="50" height="50"/>
       <Fill color="#8B5CF6"/>
     </Layer>
   </Layer>

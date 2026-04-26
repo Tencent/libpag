@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="400" height="400">
-  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" alignment="center" arrangement="spaceEvenly">
+  <Layer width="100%" height="100%" layout="vertical" alignment="center" arrangement="spaceEvenly">
     <!-- Wave effect: triangle selector shifts characters vertically -->
     <Layer>
       <Text text="WAVE" fontFamily="Arial" fontStyle="Bold" fontSize="72"/>

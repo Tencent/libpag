@@ -4,11 +4,11 @@
     <!-- Row 1: stroke styles -->
     <Layer flex="1" layout="horizontal">
       <Layer flex="1">
-        <Rectangle centerX="0" centerY="0" size="130,130" roundness="20"/>
+        <Rectangle centerX="0" centerY="0" width="130" height="130" roundness="20"/>
         <Stroke color="#06B6D4" width="8" cap="round" join="round"/>
       </Layer>
       <Layer flex="1">
-        <Rectangle centerX="0" centerY="0" size="130,130" roundness="20"/>
+        <Rectangle centerX="0" centerY="0" width="130" height="130" roundness="20"/>
         <Stroke color="#8B5CF6" width="6" cap="round" dashes="12,8"/>
       </Layer>
     </Layer>

@@ -6,7 +6,7 @@
     <Layer flex="1" layout="horizontal">
       <!-- Perfect circle -->
       <Layer flex="1">
-        <Ellipse centerX="0" centerY="0" size="140,140"/>
+        <Ellipse centerX="0" centerY="0" width="140" height="140"/>
         <Fill>
           <RadialGradient center="50,50" radius="100">
             <ColorStop color="#FBBF24" offset="0"/>
@@ -17,7 +17,7 @@
       </Layer>
       <!-- Horizontal ellipse -->
       <Layer flex="1">
-        <Ellipse centerX="0" centerY="0" size="160,100"/>
+        <Ellipse centerX="0" centerY="0" width="160" height="100"/>
         <Fill>
           <LinearGradient startPoint="0,0" endPoint="160,100">
             <ColorStop color="#EC4899" offset="0"/>
@@ -30,7 +30,7 @@
     <Layer flex="1" layout="horizontal">
       <!-- Vertical ellipse -->
       <Layer flex="1">
-        <Ellipse centerX="0" centerY="0" size="100,160"/>
+        <Ellipse centerX="0" centerY="0" width="100" height="160"/>
         <Fill>
           <LinearGradient startPoint="0,0" endPoint="100,160">
             <ColorStop color="#06B6D4" offset="0"/>
@@ -41,7 +41,7 @@
       </Layer>
       <!-- Large ellipse -->
       <Layer flex="1">
-        <Ellipse centerX="0" centerY="0" size="150,150"/>
+        <Ellipse centerX="0" centerY="0" width="150" height="150"/>
         <Fill>
           <RadialGradient center="55,55" radius="100">
             <ColorStop color="#A78BFA" offset="0"/>
