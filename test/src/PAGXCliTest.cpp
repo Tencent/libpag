@@ -649,7 +649,8 @@ CLI_TEST(PAGXCliTest, FontList_JsonOutput) {
   ASSERT_NE(trimStart, std::string::npos);
   EXPECT_EQ(out[trimStart], '[');
   EXPECT_EQ(out[trimEnd], ']');
-  EXPECT_NE(out.find("{\"family\":"), std::string::npos);
+  EXPECT_NE(out.find("\"family\""), std::string::npos);
+  EXPECT_NE(out.find("\"styles\""), std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, FontList_MutualExclusive) {
