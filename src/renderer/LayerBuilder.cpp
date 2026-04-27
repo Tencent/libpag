@@ -548,7 +548,7 @@ class LayerBuilderContext {
   // during export.  This function reproduces the same logic as the CLI renderer's
   // resolve_image_pattern_matrix() so that Playground / Desktop / Web renderers all produce
   // identical results.
-  static tgfx::Matrix resolveImagePatternMatrix(const ImagePattern* node,
+  static tgfx::Matrix ResolveImagePatternMatrix(const ImagePattern* node,
                                                 const std::shared_ptr<tgfx::Image>& image) {
     // Return identity by default so the caller can detect "no resolve happened".
     tgfx::Matrix identity = {};
@@ -748,7 +748,7 @@ class LayerBuilderContext {
     // When the exporter has stored image-scale-mode in customData, resolve the final matrix
     // from the actual image dimensions instead of using the raw paint transform.
     if (node->customData.count("image-scale-mode")) {
-      auto resolvedMatrix = resolveImagePatternMatrix(node, image);
+      auto resolvedMatrix = ResolveImagePatternMatrix(node, image);
       pattern->setMatrix(resolvedMatrix);
     } else if (!node->matrix.isIdentity()) {
       pattern->setMatrix(ToTGFX(node->matrix));
