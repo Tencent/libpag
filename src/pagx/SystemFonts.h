@@ -44,10 +44,11 @@ struct FontFamilyEntry {
 };
 
 /**
- * Provides access to system fallback fonts by querying native platform APIs. On macOS, this uses
- * CTFontCopyDefaultCascadeListForLanguages with the user's language preferences. On Linux, this
- * uses fontconfig's FcFontSort to enumerate system fonts in priority order. On Windows, this
- * enumerates the system font collection via DirectWrite.
+ * Provides access to system font metadata — fallback typefaces used during text rendering and
+ * the full list of installed font families. On macOS, this uses CoreText
+ * (CTFontCopyDefaultCascadeListForLanguages / CTFontManagerCopyAvailableFontFamilyNames). On
+ * Linux, this uses fontconfig (FcFontSort / FcFontList). On Windows, this uses DirectWrite
+ * (IDWriteFontCollection).
  */
 class SystemFonts {
  public:
