@@ -561,7 +561,9 @@ class LayerBuilderContext {
     char* end = nullptr;
     int scaleModeInt = static_cast<int>(std::strtol(scaleModeIt->second.c_str(), &end, 10));
     if (end == scaleModeIt->second.c_str() || scaleModeInt < 0 || scaleModeInt > 3) {
-      return identity;
+      // Malformed image-scale-mode value: fall back to the stored paint transform rather
+      // than identity, matching the dimension-invalid fallback below.
+      return ToTGFX(node->matrix);
     }
 
     // ImageScaleMode enum values: STRETCH=0, FIT=1, FILL=2, TILE=3
