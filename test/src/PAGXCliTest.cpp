@@ -615,6 +615,22 @@ CLI_TEST(PAGXCliTest, FontList_TextOutput) {
   auto out = capturedOut.str();
   EXPECT_FALSE(out.empty());
   EXPECT_NE(out.find('\n'), std::string::npos);
+  int nonEmptyLines = 0;
+  size_t start = 0;
+  while (start < out.size()) {
+    size_t end = out.find('\n', start);
+    if (end == std::string::npos) {
+      end = out.size();
+    }
+    if (end > start) {
+      std::string line = out.substr(start, end - start);
+      if (line.find_first_not_of(" \t\r") != std::string::npos) {
+        ++nonEmptyLines;
+      }
+    }
+    start = end + 1;
+  }
+  EXPECT_GE(nonEmptyLines, 2);
 }
 
 CLI_TEST(PAGXCliTest, FontList_JsonOutput) {
