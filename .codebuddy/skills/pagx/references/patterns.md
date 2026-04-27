@@ -750,5 +750,5 @@ Badges often combine Polystar with gradients and layer styles for depth.
 **Pattern**: Polystar generates regular stars/polygons from parameters — no manual Path
 needed. `type="polygon"` for regular polygons (hexagons, octagons). RadialGradient defaults to
 the 0-1 bounding box with `center="0.5,0.5"` and `radius="0.5"`, so no attributes are needed to
-fill the Polystar edge-to-edge. DropShadowStyle with a matching hue creates a colored glow. Use
+fill the star's bounding box. DropShadowStyle with a matching hue creates a colored glow. Use
 for rating stars, achievement badges, decorative shapes.
