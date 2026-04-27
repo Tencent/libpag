@@ -73,6 +73,11 @@ ImagePattern* CloneImagePatternShifted(PAGXDocument* doc, const ImagePattern* sr
   clone->tileModeY = src->tileModeY;
   clone->filterMode = src->filterMode;
   clone->mipmapMode = src->mipmapMode;
+  // Preserve scaleMode so the offline PNG render honors the source's absolute-vs-fit intent.
+  // Without this the clone inherits tgfx's new default (LetterBox), which stretches the image
+  // to cover the geometry and silently breaks mirror/clamp tile tests that expect absolute
+  // pattern coordinates.
+  clone->scaleMode = src->scaleMode;
   // New matrix = src->matrix * translate(-left, -top)
   auto m = src->matrix;
   // Let T = [1 0 -left; 0 1 -top; 0 0 1]. Then src->matrix * T has translation components
