@@ -310,10 +310,13 @@ class SVGWriter {
   // InnerShadowFilter and InnerShadowStyle.
   std::string writeInnerShadowFragment(float blurX, float blurY, float offsetX, float offsetY,
                                        const Color& color, int shadowIndex);
-  // Standalone filter primitives that don't take part in the feMerge aggregation.
-  // Each one drains directly into the surrounding <filter> chain.
-  void writeColorMatrixFilter(const ColorMatrixFilter* cm);
-  void writeBlendFilter(const BlendFilter* blend, int& shadowIndex);
+  // Image-transforming filter primitives. Each reads from `currentSource` and
+  // updates it to its own result so that a chain of filters (e.g. Blur →
+  // ColorMatrix → Blend) flows through consecutive primitives rather than
+  // each re-reading the original SourceGraphic.
+  void writeColorMatrixFilter(const ColorMatrixFilter* cm, int& colorMatrixIndex,
+                              std::string& currentSource);
+  void writeBlendFilter(const BlendFilter* blend, int& shadowIndex, std::string& currentSource);
   // Collected per-filter state fed into the final feMerge aggregation.
   struct ShadowAggregate {
     std::vector<std::string> dropShadowResults;
@@ -321,10 +324,10 @@ class SVGWriter {
     bool needSourceGraphic = false;
   };
   void writeFilterList(const std::vector<LayerFilter*>& filters, int& shadowIndex,
-                       ShadowAggregate& agg);
+                       ShadowAggregate& agg, std::string& currentSource);
   void writeStyleList(const std::vector<LayerStyle*>& styles, int& shadowIndex,
                       ShadowAggregate& agg);
-  void writeShadowMerge(const ShadowAggregate& agg);
+  void writeShadowMerge(const ShadowAggregate& agg, const std::string& currentSource);
   std::string writeFilterAndStyleDefs(const std::vector<LayerFilter*>& filters,
                                       const std::vector<LayerStyle*>& styles);
 
@@ -695,9 +698,12 @@ std::string SVGWriter::writeInnerShadowFragment(float blurX, float blurY, float 
   return shadowResult;
 }
 
-void SVGWriter::writeColorMatrixFilter(const ColorMatrixFilter* cm) {
+void SVGWriter::writeColorMatrixFilter(const ColorMatrixFilter* cm, int& colorMatrixIndex,
+                                       std::string& currentSource) {
+  std::string idx = std::to_string(colorMatrixIndex++);
+  std::string resultName = "colorMatrix" + idx;
   _defs->openElement("feColorMatrix");
-  _defs->addAttribute("in", "SourceGraphic");
+  _defs->addAttribute("in", currentSource);
   _defs->addAttribute("type", "matrix");
   std::string values;
   values.reserve(200);
@@ -708,10 +714,13 @@ void SVGWriter::writeColorMatrixFilter(const ColorMatrixFilter* cm) {
     values += FloatToString(cm->matrix[i]);
   }
   _defs->addAttribute("values", values);
+  _defs->addAttribute("result", resultName);
   _defs->closeElementSelfClosing();
+  currentSource = resultName;
 }
 
-void SVGWriter::writeBlendFilter(const BlendFilter* blend, int& shadowIndex) {
+void SVGWriter::writeBlendFilter(const BlendFilter* blend, int& shadowIndex,
+                                 std::string& currentSource) {
   std::string idx = std::to_string(shadowIndex++);
   std::string floodResult = "blendFlood" + idx;
   _defs->openElement("feFlood");
@@ -722,10 +731,15 @@ void SVGWriter::writeBlendFilter(const BlendFilter* blend, int& shadowIndex) {
   _defs->addAttribute("result", floodResult);
   _defs->closeElementSelfClosing();
 
+  // PAGX's BlendFilter treats the stored color as the source and the layer
+  // content as the destination (backdrop) — see
+  // tgfx::ColorFilter::Blend / ModeColorFilter::asFragmentProcessor. SVG's
+  // feBlend expects `in` to be the top/source and `in2` to be the bottom/dst,
+  // so the flood color is the `in` and the current chain result is the `in2`.
   std::string blendResult = "blendResult" + idx;
   _defs->openElement("feBlend");
-  _defs->addAttribute("in", "SourceGraphic");
-  _defs->addAttribute("in2", floodResult);
+  _defs->addAttribute("in", floodResult);
+  _defs->addAttribute("in2", currentSource);
   auto modeStr = BlendModeToSVGString(blend->blendMode);
   if (modeStr) {
     _defs->addAttribute("mode", modeStr);
@@ -733,23 +747,35 @@ void SVGWriter::writeBlendFilter(const BlendFilter* blend, int& shadowIndex) {
   _defs->addAttribute("result", blendResult);
   _defs->closeElementSelfClosing();
 
+  // Clip the blend output to the current chain's alpha so the solid flood
+  // rectangle is confined to the visible layer silhouette. Using
+  // `currentSource` as the mask keeps the blend correctly chained after
+  // upstream filters (e.g. Blur widens alpha → the blend follows).
+  std::string blendOut = "blendOut" + idx;
   _defs->openElement("feComposite");
   _defs->addAttribute("in", blendResult);
-  _defs->addAttribute("in2", "SourceGraphic");
+  _defs->addAttribute("in2", currentSource);
   _defs->addAttribute("operator", "in");
+  _defs->addAttribute("result", blendOut);
   _defs->closeElementSelfClosing();
+  currentSource = blendOut;
 }
 
 void SVGWriter::writeFilterList(const std::vector<LayerFilter*>& filters, int& shadowIndex,
-                                ShadowAggregate& agg) {
+                                ShadowAggregate& agg, std::string& currentSource) {
+  int colorMatrixIndex = 0;
+  int blurIndex = 0;
   for (const auto* filter : filters) {
     switch (filter->nodeType()) {
       case NodeType::BlurFilter: {
         auto blur = static_cast<const BlurFilter*>(filter);
+        std::string resultName = "blurred" + std::to_string(blurIndex++);
         _defs->openElement("feGaussianBlur");
-        _defs->addAttribute("in", "SourceGraphic");
+        _defs->addAttribute("in", currentSource);
         _defs->addAttribute("stdDeviation", FormatBlurStdDev(blur->blurX, blur->blurY));
+        _defs->addAttribute("result", resultName);
         _defs->closeElementSelfClosing();
+        currentSource = resultName;
         break;
       }
       case NodeType::DropShadowFilter: {
@@ -773,10 +799,11 @@ void SVGWriter::writeFilterList(const std::vector<LayerFilter*>& filters, int& s
         break;
       }
       case NodeType::ColorMatrixFilter:
-        writeColorMatrixFilter(static_cast<const ColorMatrixFilter*>(filter));
+        writeColorMatrixFilter(static_cast<const ColorMatrixFilter*>(filter), colorMatrixIndex,
+                               currentSource);
         break;
       case NodeType::BlendFilter:
-        writeBlendFilter(static_cast<const BlendFilter*>(filter), shadowIndex);
+        writeBlendFilter(static_cast<const BlendFilter*>(filter), shadowIndex, currentSource);
         break;
       default:
         break;
@@ -816,13 +843,22 @@ void SVGWriter::writeStyleList(const std::vector<LayerStyle*>& styles, int& shad
   }
 }
 
-void SVGWriter::writeShadowMerge(const ShadowAggregate& agg) {
+void SVGWriter::writeShadowMerge(const ShadowAggregate& agg, const std::string& currentSource) {
   bool hasShadows = !agg.dropShadowResults.empty() || !agg.innerShadowResults.empty();
   if (!hasShadows) {
+    // No shadows but upstream filters may have reshaped the source (Blur,
+    // ColorMatrix, Blend). In that case the chain already terminates in
+    // `currentSource`, which is the default implicit output — nothing to
+    // merge. Only when no image-transforming filter ran does currentSource
+    // remain "SourceGraphic", and the <filter> would have been empty anyway.
     return;
   }
   bool multipleShadows = (agg.dropShadowResults.size() + agg.innerShadowResults.size()) > 1;
   if (!agg.needSourceGraphic && !multipleShadows) {
+    // Single shadow with shadowOnly / no source overlay: the shadow primitive
+    // is the filter's implicit output. When upstream filters mutated the
+    // source (e.g. Blur before a shadowOnly InnerShadow) the mutated source
+    // is intentionally hidden — the authored shadowOnly semantics dominate.
     return;
   }
   _defs->openElement("feMerge");
@@ -834,7 +870,10 @@ void SVGWriter::writeShadowMerge(const ShadowAggregate& agg) {
   }
   if (agg.needSourceGraphic) {
     _defs->openElement("feMergeNode");
-    _defs->addAttribute("in", "SourceGraphic");
+    // Use the chain's current source so upstream Blur / ColorMatrix / Blend
+    // appear on top of the drop shadows rather than the original untouched
+    // graphic.
+    _defs->addAttribute("in", currentSource);
     _defs->closeElementSelfClosing();
   }
   for (const auto& result : agg.innerShadowResults) {
@@ -937,9 +976,10 @@ std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& 
 
   int shadowIndex = 0;
   ShadowAggregate agg;
-  writeFilterList(filters, shadowIndex, agg);
+  std::string currentSource = "SourceGraphic";
+  writeFilterList(filters, shadowIndex, agg, currentSource);
   writeStyleList(styles, shadowIndex, agg);
-  writeShadowMerge(agg);
+  writeShadowMerge(agg, currentSource);
 
   _defs->closeElement();  // </filter>
   return filterId;
