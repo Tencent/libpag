@@ -173,6 +173,9 @@ std::vector<FontFamilyEntry> SystemFonts::AllFontFamilies() {
   // Build a reusable mandatory-attributes set containing only kCTFontFamilyNameAttribute so that
   // CTFontDescriptorCreateMatchingFontDescriptors returns every descriptor whose family name
   // matches exactly — i.e. every member of the family.
+  // Uses CTFontDescriptorCreateMatchingFontDescriptors instead of
+  // CTFontManagerCopyAvailableMembersOfFontFamily for consistency with the descriptor-based
+  // workflow; both produce equivalent family-member sets.
   const void* mandatoryKeys[] = {kCTFontFamilyNameAttribute};
   CFSetRef mandatoryAttributes =
       CFSetCreate(kCFAllocatorDefault, mandatoryKeys, 1, &kCFTypeSetCallBacks);
