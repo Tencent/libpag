@@ -540,7 +540,7 @@ std::vector<FontFamilyEntry> SystemFonts::AllFontFamilies() {
 
   std::vector<FontFamilyEntry> entries = {};
   std::map<std::string, size_t> familyIndex = {};
-  std::vector<std::set<std::string> > seenStylesPerEntry = {};
+  std::vector<std::set<std::string>> seenStylesPerEntry = {};
 
   for (int i = 0; i < fontSet->nfont; i++) {
     FcPattern* font = fontSet->fonts[i];
