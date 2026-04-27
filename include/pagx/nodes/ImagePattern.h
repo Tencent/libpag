@@ -70,9 +70,9 @@ class ImagePattern : public ColorSource {
   /**
    * The rule used to place the transformed image into the geometry. The default is LetterBox,
    * which fits the image into each geometry's bounding box (so the fill auto-fits per geometry).
-   * When set to ScaleMode::None, the image is placed in the parent container's coordinate space
-   * (the owning Group or Layer, with its origin at (0, 0)) without per-geometry fitting, and
-   * multiple geometries in that container share one continuous fill.
+   * When set to ScaleMode::None, the image is placed in the parent container's (Layer or Group)
+   * coordinate space (origin at (0, 0)) without per-geometry fitting, and multiple geometries
+   * in that container share one continuous fill.
    */
   ScaleMode scaleMode = ScaleMode::LetterBox;
 

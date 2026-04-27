@@ -437,8 +437,8 @@ By default all gradient/pattern coordinates are **relative to each geometry's ow
 box**, in a normalized 0-1 space (`fitsToGeometry="true"` for gradients; any `scaleMode!="none"`
 for ImagePattern). The fill auto-fits per shape. Set `fitsToGeometry="false"` on a gradient or
 `scaleMode="none"` on an ImagePattern to switch to **absolute coordinates** in the parent
-container's coordinate space (the owning Group or Layer, origin at (0, 0)); multiple shapes
-inside that container then share one continuous fill.
+container's (Layer or Group) coordinate space (origin at (0, 0)); multiple shapes inside that
+container then share one continuous fill.
 `ConicGradient` angles follow PAGX convention (0° = right), which differs from CSS
 `conic-gradient` (0° = top) — subtract 90° to convert. `DiamondGradient` radiates from center
 toward four corners (`center`, `radius`). `ImagePattern` fills geometry with an image; see

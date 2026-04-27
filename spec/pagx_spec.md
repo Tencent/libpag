@@ -433,7 +433,7 @@ Image patterns use an image as a color source.
 | `filterMode` | FilterMode | linear | Texture filter mode |
 | `mipmapMode` | MipmapMode | linear | Mipmap mode |
 | `matrix` | Matrix | identity matrix | Transform matrix applied to the image in its local coordinate space (the original image rect with the origin at its top-left) |
-| `scaleMode` | ScaleMode | letterBox | Rule used to fit the transformed image into each geometry's bounding box. When `none`, the image is placed in the parent container's coordinate space without per-geometry fitting. See [Color Source Coordinate System](#color-source-coordinate-system) |
+| `scaleMode` | ScaleMode | letterBox | Rule used to fit the transformed image into each geometry's bounding box. When `none`, the image is placed in the parent container's (Layer or Group) coordinate space without per-geometry fitting. See [Color Source Coordinate System](#color-source-coordinate-system) |
 
 **TileMode**: `clamp`, `repeat`, `mirror`, `decal`
 
@@ -460,7 +460,7 @@ Gradient parameters (`startPoint`, `endPoint`, `center`, `radius`, etc.) live in
 
 **Absolute mode (opt-in — `fitsToGeometry="false"` / `scaleMode="none"`)**:
 
-Parameters live in **the parent container's coordinate space** (the owning Group or Layer, with its origin at `(0, 0)`). Multiple geometries inside the same container share one continuous fill; resizing a geometry no longer rescales its fill, but a transform on the parent container moves both together.
+Parameters live in **the parent container's (Layer or Group) coordinate space**, with its origin at `(0, 0)`. Multiple geometries inside the same container share one continuous fill; resizing a geometry no longer rescales its fill, but a transform on the parent container moves both together.
 
 The `matrix` attribute is applied on top of the selected space.
 

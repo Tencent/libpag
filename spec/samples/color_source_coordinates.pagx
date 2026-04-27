@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates fitsToGeometry="false": gradient parameters are in the parent container's
-     coordinate space (origin at the Layer's (0,0)). -->
+     (Layer or Group) coordinate space (origin at the parent Layer's (0,0)). -->
 <pagx width="400" height="400">
   <Layer>
     <Rectangle left="50" top="50" width="300" height="300" roundness="24"/>

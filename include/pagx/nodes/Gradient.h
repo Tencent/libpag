@@ -47,9 +47,9 @@ class Gradient : public ColorSource {
    * Selects the coordinate space for the gradient's geometric parameters (start/end points,
    * center, radius, etc.). When true (the default), the parameters live in a normalized
    * (0, 0)-(1, 1) space mapped to each geometry's bounding box, and the fill auto-fits per
-   * geometry. When false, the parameters live in the parent container's coordinate space (the
-   * owning Group or Layer, with its origin at (0, 0)), and multiple geometries in that
-   * container share one continuous fill.
+   * geometry. When false, the parameters live in the parent container's (Layer or Group)
+   * coordinate space (origin at (0, 0)), and multiple geometries in that container share one
+   * continuous fill.
    */
   bool fitsToGeometry = true;
 
