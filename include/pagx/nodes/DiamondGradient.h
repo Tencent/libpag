@@ -18,38 +18,29 @@
 
 #pragma once
 
-#include <vector>
-#include "pagx/nodes/ColorSource.h"
-#include "pagx/nodes/ColorStop.h"
-#include "pagx/types/Matrix.h"
+#include "pagx/nodes/Gradient.h"
 #include "pagx/types/Point.h"
 
 namespace pagx {
 
 /**
  * A diamond gradient color source that produces a gradient in a diamond shape from the center.
+ * By default the center and radius are interpreted in each geometry's normalized (0, 0)-(1, 1)
+ * bounding box space (see Gradient::fitsToGeometry).
  */
-class DiamondGradient : public ColorSource {
+class DiamondGradient : public Gradient {
  public:
   /**
-   * The center point of the gradient.
+   * The center point of the gradient. Defaults to (0.5, 0.5), the center of the geometry's
+   * normalized bounding box when fitsToGeometry is true.
    */
-  Point center = {};
+  Point center = {0.5f, 0.5f};
 
   /**
-   * Half the diagonal length of the diamond shape.
+   * Half the diagonal length of the diamond shape. Defaults to 0.5, reaching the bounding box
+   * edge along each axis when fitsToGeometry is true.
    */
-  float radius = 0.0f;
-
-  /**
-   * The transformation matrix applied to the gradient.
-   */
-  Matrix matrix = {};
-
-  /**
-   * The color stops defining the gradient colors and positions.
-   */
-  std::vector<ColorStop*> colorStops = {};
+  float radius = 0.5f;
 
   NodeType nodeType() const override {
     return NodeType::DiamondGradient;

@@ -18,39 +18,37 @@
 
 #pragma once
 
-#include "pagx/nodes/Gradient.h"
-#include "pagx/types/Point.h"
-
 namespace pagx {
 
 /**
- * A linear gradient color source that produces a gradient along a line between two points. By
- * default the start and end points are interpreted in each geometry's normalized (0, 0)-(1, 1)
- * bounding box space (see Gradient::fitsToGeometry).
+ * ScaleMode controls how an ImagePattern image is fitted into the geometry's bounding box.
  */
-class LinearGradient : public Gradient {
- public:
+enum class ScaleMode {
   /**
-   * The starting point of the gradient line. Defaults to (0, 0), the left edge of the
-   * geometry's normalized bounding box when fitsToGeometry is true.
+   * The image is not fitted into the geometry's bounding box. It is placed in the parent
+   * container's (Layer or Group) coordinate space (origin at (0, 0)) and extended outside the
+   * image bounds according to the pattern's tile modes. Use this mode to share one continuous
+   * image layout across multiple geometries instead of giving each its own fitted copy.
    */
-  Point startPoint = {0.0f, 0.0f};
+  None,
 
   /**
-   * The ending point of the gradient line. Defaults to (1, 0), the right edge of the
-   * geometry's normalized bounding box when fitsToGeometry is true, producing a horizontal
-   * left-to-right gradient by default.
+   * The image is stretched to fill the bounding box, ignoring its original aspect ratio.
    */
-  Point endPoint = {1.0f, 0.0f};
+  Stretch,
 
-  NodeType nodeType() const override {
-    return NodeType::LinearGradient;
-  }
+  /**
+   * The image is scaled uniformly to fit inside the bounding box while preserving its aspect
+   * ratio. The image is centered and empty areas may appear along one axis. This is the default
+   * value.
+   */
+  LetterBox,
 
- private:
-  LinearGradient() = default;
-
-  friend class PAGXDocument;
+  /**
+   * The image is scaled uniformly to cover the bounding box while preserving its aspect ratio.
+   * The image is centered and may be cropped along one axis.
+   */
+  Zoom
 };
 
 }  // namespace pagx

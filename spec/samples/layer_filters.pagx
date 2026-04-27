@@ -4,7 +4,7 @@
   <Layer left="70" top="70">
     <Rectangle width="260" height="260" roundness="40"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="260,260">
+      <LinearGradient endPoint="1,1">
         <ColorStop color="#8B5CF6" offset="0"/>
         <ColorStop color="#6366F1" offset="1"/>
       </LinearGradient>

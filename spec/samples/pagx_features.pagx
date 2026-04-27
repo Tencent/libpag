@@ -2,7 +2,13 @@
 <pagx width="1600" height="1200">
   <Layer name="Background" width="100%" height="100%">
     <Rectangle width="100%" height="100%"/>
-    <Fill color="@bgGradient"/>
+    <Fill>
+      <LinearGradient endPoint="0,1">
+        <ColorStop color="#0F172A" offset="0"/>
+        <ColorStop color="#0B1228" offset="0.4"/>
+        <ColorStop color="#0F172A" offset="1"/>
+      </LinearGradient>
+    </Fill>
   </Layer>
   <Layer name="GlowB" alpha="0.22">
     <Ellipse left="1210" top="25" width="700" height="550"/>
@@ -40,7 +46,7 @@
       <Ellipse centerX="0" centerY="0" width="310" height="310"/>
       <TrimPath end="0.77"/>
       <Stroke width="2.5" cap="round">
-        <ConicGradient center="163,163">
+        <ConicGradient>
           <ColorStop color="#06B6D400" offset="0"/>
           <ColorStop color="#06B6D4" offset="0.77"/>
           <ColorStop color="#06B6D400" offset="1"/>
@@ -80,7 +86,12 @@
   </Layer>
   <Layer name="Connectors" alpha="0.35">
     <Path data="M 800 375 L 800 240 M 954 511 L 1119 466 M 903 646 L 989 790 M 697 646 L 611 790 M 646 511 L 481 466"/>
-    <Stroke color="@accentLine" width="2" dashes="8,14"/>
+    <Stroke width="2" dashes="8,14">
+      <LinearGradient startPoint="-120,0" endPoint="120,0" fitsToGeometry="false">
+        <ColorStop color="#06B6D4" offset="0"/>
+        <ColorStop color="#3B82F6" offset="1"/>
+      </LinearGradient>
+    </Stroke>
   </Layer>
   <Layer name="CardReadable" left="600" top="80" width="400" height="160">
     <Rectangle width="100%" height="100%" roundness="20"/>
@@ -90,7 +101,7 @@
     <Layer width="100%" height="100%" alpha="0.08">
       <Path left="20" data="@cardTopLine"/>
       <Stroke width="1">
-        <LinearGradient startPoint="0,0" endPoint="360,0">
+        <LinearGradient>
           <ColorStop color="#F43F5E00" offset="0"/>
           <ColorStop color="#F43F5E" offset="0.5"/>
           <ColorStop color="#F43F5E00" offset="1"/>
@@ -137,7 +148,7 @@
     <Layer width="100%" height="100%" alpha="0.08">
       <Path left="20" data="@cardTopLine"/>
       <Stroke width="1">
-        <LinearGradient startPoint="0,0" endPoint="360,0">
+        <LinearGradient>
           <ColorStop color="#38BDF800" offset="0"/>
           <ColorStop color="#38BDF8" offset="0.5"/>
           <ColorStop color="#38BDF800" offset="1"/>
@@ -182,7 +193,7 @@
     <Layer width="100%" height="100%" alpha="0.08">
       <Path left="20" data="@cardTopLine"/>
       <Stroke width="1">
-        <LinearGradient startPoint="0,0" endPoint="360,0">
+        <LinearGradient>
           <ColorStop color="#A855F700" offset="0"/>
           <ColorStop color="#A855F7" offset="0.5"/>
           <ColorStop color="#A855F700" offset="1"/>
@@ -238,7 +249,7 @@
     <Layer width="100%" height="100%" alpha="0.08">
       <Path left="20" data="@cardTopLine"/>
       <Stroke width="1">
-        <LinearGradient startPoint="0,0" endPoint="360,0">
+        <LinearGradient>
           <ColorStop color="#10B98100" offset="0"/>
           <ColorStop color="#10B981" offset="0.5"/>
           <ColorStop color="#10B98100" offset="1"/>
@@ -281,7 +292,7 @@
     <Layer width="100%" height="100%" alpha="0.08">
       <Path left="20" data="@cardTopLine"/>
       <Stroke width="1">
-        <LinearGradient startPoint="0,0" endPoint="360,0">
+        <LinearGradient>
           <ColorStop color="#FBBF2400" offset="0"/>
           <ColorStop color="#FBBF24" offset="0.5"/>
           <ColorStop color="#FBBF2400" offset="1"/>
@@ -325,7 +336,7 @@
     <Group alpha="0.18">
       <Path data="M -400 -40 L 400 -40"/>
       <Stroke width="1">
-        <LinearGradient startPoint="-400,0" endPoint="400,0">
+        <LinearGradient>
           <ColorStop color="#6366F100" offset="0"/>
           <ColorStop color="#6366F1" offset="0.2"/>
           <ColorStop color="#8B5CF6" offset="0.5"/>
@@ -388,15 +399,6 @@
     </Group>
   </Layer>
   <Resources>
-    <LinearGradient id="bgGradient" startPoint="0,0" endPoint="0,1200">
-      <ColorStop color="#0F172A" offset="0"/>
-      <ColorStop color="#0B1228" offset="0.4"/>
-      <ColorStop color="#0F172A" offset="1"/>
-    </LinearGradient>
-    <LinearGradient id="accentLine" startPoint="-120,0" endPoint="120,0">
-      <ColorStop color="#06B6D4" offset="0"/>
-      <ColorStop color="#3B82F6" offset="1"/>
-    </LinearGradient>
     <PathData id="cardTopLine" data="M 0 0 L 360 0"/>
     <PathData id="arrowRight" data="M 0 6 L 25 6 M 19 0 L 27 6 L 19 12"/>
   </Resources>

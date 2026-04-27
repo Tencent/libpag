@@ -57,7 +57,7 @@
         <Layer width="100%" height="100%">
           <Ellipse left="25" right="25" top="30" height="50"/>
           <Fill>
-            <LinearGradient startPoint="0,0" endPoint="310,0">
+            <LinearGradient startPoint="0,0" endPoint="310,0" fitsToGeometry="false">
               <ColorStop color="#EC4899" offset="0"/>
               <ColorStop color="#F472B6" offset="1"/>
             </LinearGradient>
@@ -67,7 +67,7 @@
         <Layer width="100%" height="100%">
           <Ellipse left="50" right="50" centerY="0" height="60"/>
           <Fill>
-            <LinearGradient startPoint="0,0" endPoint="260,0">
+            <LinearGradient startPoint="0,0" endPoint="260,0" fitsToGeometry="false">
               <ColorStop color="#8B5CF6" offset="0"/>
               <ColorStop color="#A78BFA" offset="1"/>
             </LinearGradient>
@@ -77,7 +77,7 @@
         <Layer width="100%" height="100%">
           <Ellipse left="80" right="80" bottom="30" height="50"/>
           <Fill>
-            <LinearGradient startPoint="0,0" endPoint="200,0">
+            <LinearGradient startPoint="0,0" endPoint="200,0" fitsToGeometry="false">
               <ColorStop color="#3B82F6" offset="0"/>
               <ColorStop color="#1D4ED8" offset="1"/>
             </LinearGradient>
@@ -100,7 +100,7 @@
         <Layer width="100%" height="100%">
           <Ellipse left="20" top="25" bottom="25" width="55"/>
           <Fill>
-            <LinearGradient startPoint="0,0" endPoint="0,210">
+            <LinearGradient startPoint="0,0" endPoint="0,210" fitsToGeometry="false">
               <ColorStop color="#FBBF24" offset="0"/>
               <ColorStop color="#F59E0B" offset="1"/>
             </LinearGradient>
@@ -110,7 +110,7 @@
         <Layer width="100%" height="100%">
           <Ellipse right="20" top="50" bottom="50" width="55"/>
           <Fill>
-            <LinearGradient startPoint="0,0" endPoint="0,160">
+            <LinearGradient startPoint="0,0" endPoint="0,160" fitsToGeometry="false">
               <ColorStop color="#A16207" offset="0"/>
               <ColorStop color="#7C2D12" offset="1"/>
             </LinearGradient>
@@ -127,7 +127,7 @@
         <Layer width="100%" height="100%">
           <Ellipse left="25" right="25" top="25" bottom="25"/>
           <Fill>
-            <LinearGradient startPoint="0,0" endPoint="230,210">
+            <LinearGradient startPoint="0,0" endPoint="230,210" fitsToGeometry="false">
               <ColorStop color="#EC4899" offset="0"/>
               <ColorStop color="#BE185D" offset="1"/>
             </LinearGradient>
@@ -144,7 +144,7 @@
         <Layer width="100%" height="100%">
           <Ellipse left="20" right="50" top="30" bottom="60"/>
           <Fill>
-            <LinearGradient startPoint="0,0" endPoint="210,170">
+            <LinearGradient startPoint="0,0" endPoint="210,170" fitsToGeometry="false">
               <ColorStop color="#06B6D4" offset="0"/>
               <ColorStop color="#0369A1" offset="1"/>
             </LinearGradient>

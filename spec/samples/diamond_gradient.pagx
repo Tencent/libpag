@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates diamond gradient -->
 <pagx width="400" height="400">
-  <!-- Rectangle size=320x320, half=160. Diamond radius=160 so corners touch rect edges exactly -->
   <Layer>
     <Rectangle left="40" top="40" width="320" height="320" roundness="24"/>
     <Fill>
-      <DiamondGradient center="200,200" radius="160">
+      <DiamondGradient>
         <ColorStop color="#FBBF24" offset="0"/>
         <ColorStop color="#F59E0B" offset="0.4"/>
         <ColorStop color="#D97706" offset="0.7"/>

@@ -34,6 +34,7 @@
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
+#include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
@@ -400,16 +401,17 @@ static void WriteColorStops(XMLBuilder& xml, const std::vector<ColorStop*>& stop
   }
 }
 
-static void WriteGradientMatrixAndStops(XMLBuilder& xml, const Matrix& matrix,
-                                        const std::vector<ColorStop*>& colorStops) {
-  if (!matrix.isIdentity()) {
-    xml.addAttribute("matrix", MatrixToString(matrix));
+static void WriteGradientCommon(XMLBuilder& xml, const Gradient* gradient) {
+  xml.addAttribute("fitsToGeometry", gradient->fitsToGeometry,
+                   Default<LinearGradient>().fitsToGeometry);
+  if (!gradient->matrix.isIdentity()) {
+    xml.addAttribute("matrix", MatrixToString(gradient->matrix));
   }
-  if (colorStops.empty()) {
+  if (gradient->colorStops.empty()) {
     xml.closeElementSelfClosing();
   } else {
     xml.closeElementStart();
-    WriteColorStops(xml, colorStops);
+    WriteColorStops(xml, gradient->colorStops);
     xml.closeElement();
   }
 }
@@ -432,9 +434,11 @@ static void WriteColorSource(XMLBuilder& xml, const ColorSource* node) {
       if (grad->startPoint != Default<LinearGradient>().startPoint) {
         xml.addAttribute("startPoint", PointToString(grad->startPoint));
       }
-      xml.addRequiredAttribute("endPoint", PointToString(grad->endPoint));
+      if (grad->endPoint != Default<LinearGradient>().endPoint) {
+        xml.addAttribute("endPoint", PointToString(grad->endPoint));
+      }
       WriteCustomData(xml, node);
-      WriteGradientMatrixAndStops(xml, grad->matrix, grad->colorStops);
+      WriteGradientCommon(xml, grad);
       break;
     }
     case NodeType::RadialGradient: {
@@ -444,9 +448,9 @@ static void WriteColorSource(XMLBuilder& xml, const ColorSource* node) {
       if (grad->center != Default<RadialGradient>().center) {
         xml.addAttribute("center", PointToString(grad->center));
       }
-      xml.addRequiredAttribute("radius", grad->radius);
+      xml.addAttribute("radius", grad->radius, Default<RadialGradient>().radius);
       WriteCustomData(xml, node);
-      WriteGradientMatrixAndStops(xml, grad->matrix, grad->colorStops);
+      WriteGradientCommon(xml, grad);
       break;
     }
     case NodeType::ConicGradient: {
@@ -459,7 +463,7 @@ static void WriteColorSource(XMLBuilder& xml, const ColorSource* node) {
       xml.addAttribute("startAngle", grad->startAngle, Default<ConicGradient>().startAngle);
       xml.addAttribute("endAngle", grad->endAngle, Default<ConicGradient>().endAngle);
       WriteCustomData(xml, node);
-      WriteGradientMatrixAndStops(xml, grad->matrix, grad->colorStops);
+      WriteGradientCommon(xml, grad);
       break;
     }
     case NodeType::DiamondGradient: {
@@ -469,9 +473,9 @@ static void WriteColorSource(XMLBuilder& xml, const ColorSource* node) {
       if (grad->center != Default<DiamondGradient>().center) {
         xml.addAttribute("center", PointToString(grad->center));
       }
-      xml.addRequiredAttribute("radius", grad->radius);
+      xml.addAttribute("radius", grad->radius, Default<DiamondGradient>().radius);
       WriteCustomData(xml, node);
-      WriteGradientMatrixAndStops(xml, grad->matrix, grad->colorStops);
+      WriteGradientCommon(xml, grad);
       break;
     }
     case NodeType::ImagePattern: {
@@ -500,6 +504,9 @@ static void WriteColorSource(XMLBuilder& xml, const ColorSource* node) {
       }
       if (pattern->mipmapMode != Default<ImagePattern>().mipmapMode) {
         xml.addAttribute("mipmapMode", MipmapModeToString(pattern->mipmapMode));
+      }
+      if (pattern->scaleMode != Default<ImagePattern>().scaleMode) {
+        xml.addAttribute("scaleMode", ScaleModeToString(pattern->scaleMode));
       }
       if (!pattern->matrix.isIdentity()) {
         xml.addAttribute("matrix", MatrixToString(pattern->matrix));
