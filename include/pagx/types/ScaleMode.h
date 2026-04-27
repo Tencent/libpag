@@ -21,7 +21,8 @@
 namespace pagx {
 
 /**
- * ScaleMode controls how an ImagePattern image is fitted into the geometry's bounding box.
+ * ScaleMode selects the rule used to place an ImagePattern image, either by fitting it into each
+ * geometry's bounding box or by leaving it in the parent container's coordinate space.
  */
 enum class ScaleMode {
   /**
