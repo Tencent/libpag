@@ -551,7 +551,7 @@ class LayerBuilderContext {
   static tgfx::Matrix resolveImagePatternMatrix(const ImagePattern* node,
                                                 const std::shared_ptr<tgfx::Image>& image) {
     // Return identity by default so the caller can detect "no resolve happened".
-    tgfx::Matrix identity = tgfx::Matrix();
+    tgfx::Matrix identity = {};
 
     auto scaleModeIt = node->customData.find("image-scale-mode");
     if (scaleModeIt == node->customData.end()) {
@@ -636,7 +636,7 @@ class LayerBuilderContext {
     float imageRatio = imageWidth / imageHeight;
     float nodeRatio = nodeWidth / nodeHeight;
 
-    tgfx::Matrix result = tgfx::Matrix();
+    tgfx::Matrix result = {};
 
     switch (scaleMode) {
       case ImageScaleMode::FILL: {
