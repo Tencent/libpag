@@ -634,18 +634,10 @@ bool IsMergeableShellLayer(const Layer* layer, const std::unordered_set<const La
 // Backfills `result` with the first `upTo` entries of `source` the first time a mutation happens.
 // Used by the adjacent-shell/group mergers, whose common case is "no change to the list" — we
 // want to avoid allocating a result vector until a mutation is actually detected.
-void BeginLayerMutation(std::vector<Layer*>& source, std::vector<Layer*>& result, size_t upTo,
-                        bool* changed) {
-  if (*changed) return;
-  *changed = true;
-  result.reserve(source.size());
-  result.insert(result.end(), source.begin(), source.begin() + static_cast<ptrdiff_t>(upTo));
-}
-
-void BeginElementMutation(std::vector<Element*>& source, std::vector<Element*>& result, size_t upTo,
-                          bool* changed) {
-  if (*changed) return;
-  *changed = true;
+template <class T>
+void BeginMutation(std::vector<T>& source, std::vector<T>& result, size_t upTo, bool& changed) {
+  if (changed) return;
+  changed = true;
   result.reserve(source.size());
   result.insert(result.end(), source.begin(), source.begin() + static_cast<ptrdiff_t>(upTo));
 }
@@ -674,7 +666,7 @@ bool MergeAdjacentShellLayersInList(PAGXDocument* doc, std::vector<Layer*>& laye
       i++;
       continue;
     }
-    BeginLayerMutation(layers, result, i, &changed);
+    BeginMutation(layers, result, i, changed);
     // Build a new wrapper layer containing one Group per source.
     auto* wrapper = doc->makeNode<Layer>();
     wrapper->sourceLine = layers[i]->sourceLine;
@@ -835,7 +827,7 @@ bool MergeAdjacentGroupsInElements(std::vector<Element*>& elements) {
       }
       baseGroup->elements = std::move(updated);
       // Drop nextGroup entirely (its painters were duplicates of baseGroup's).
-      BeginElementMutation(elements, result, i, &changed);
+      BeginMutation(elements, result, i, changed);
       j++;
     }
     if (changed) result.push_back(baseGroup);
