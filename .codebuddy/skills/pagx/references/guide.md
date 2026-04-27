@@ -36,6 +36,9 @@ Spec rules, techniques, and common pitfalls for writing correct PAGX files.
 
 - **Origin**: top-left. **X**: right. **Y**: down. **Angles**: clockwise (0° = 3 o'clock).
 - **Units**: pixels (lengths), degrees (angles).
+- **Canvas clipping**: the `<pagx>` `width`/`height` define the rendering boundary — any
+  content extending beyond it is clipped. Allow margin for drop shadows, blurs, and
+  stroke half-widths that fall outside their geometry.
 
 ## Color Formats
 
@@ -494,7 +497,10 @@ if glyph lists are present (emoji silently discarded). Text modifiers silently s
 Fill/Stroke** in the scope. Isolate with Groups.
 
 **Repeater**: copies all accumulated geometry and styles. `copies=0` clears all.
-Nested Repeaters multiply: A × B total. See `patterns.md` §Circular Gauge.
+Nested Repeaters multiply: A × B total. Per-copy transforms are applied around `anchor`:
+`position` and `rotation` accumulate linearly (step N = N × value), `scale` accumulates
+exponentially (step N = value^N) — set `anchor` to the desired rotation/scale center
+(e.g., layer center for radial fan-out). See `patterns.md` §Circular Gauge.
 
 **TextModifier + RangeSelector**: applies per-glyph transforms (position, rotation, scale,
 alpha) to accumulated text. `RangeSelector` controls which glyphs are affected (`start`,
