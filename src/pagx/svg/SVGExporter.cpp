@@ -261,7 +261,8 @@ class SVGWriter {
   };
 
   // Layer / element writing
-  void writeLayerContents(SVGBuilder& out, const Layer* layer, const Matrix& transform = {});
+  void writeLayerContents(SVGBuilder& out, const Layer* layer, const Matrix& transform = {},
+                          float alpha = 1.0f);
   void writeElements(SVGBuilder& out, const std::vector<Element*>& elements,
                      const Matrix& transform, float alpha, const TextBox* parentTextBox = nullptr);
   void processVectorScope(SVGBuilder& out, const std::vector<Element*>& elements,
@@ -350,7 +351,7 @@ class SVGWriter {
   void writeLayerGroupAttributes(SVGBuilder& out, const Layer* layer);
   // Emits contents + composition layers + child layers. Used both for the
   // needs-group path (inside the <g>) and for the bare-through path.
-  void writeLayerBody(SVGBuilder& out, const Layer* layer);
+  void writeLayerBody(SVGBuilder& out, const Layer* layer, float perChildAlpha = 1.0f);
 
   // Fill / stroke attribute helpers
   void applyFillAttributes(SVGBuilder& out, const Fill* fill, const Rect& shapeBounds = {},
@@ -1995,8 +1996,9 @@ void SVGWriter::writeElements(SVGBuilder& out, const std::vector<Element*>& elem
   processVectorScope(out, walked, transform, alpha, parentTextBox, accumulator, /*scopeStart=*/0);
 }
 
-void SVGWriter::writeLayerContents(SVGBuilder& out, const Layer* layer, const Matrix& transform) {
-  writeElements(out, layer->contents, transform, 1.0f, nullptr);
+void SVGWriter::writeLayerContents(SVGBuilder& out, const Layer* layer, const Matrix& transform,
+                                   float alpha) {
+  writeElements(out, layer->contents, transform, alpha, nullptr);
 }
 
 void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
@@ -2026,8 +2028,14 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
                     renderPos.y != 0.0f || !layer->customData.empty() ||
                     layer->blendMode != BlendMode::Normal || layer->hasScrollRect;
 
+  // When groupOpacity is false, the layer's alpha is distributed to each child
+  // element individually rather than applied to the composited group. Compute
+  // the per-child alpha multiplier here so both the bare-through path and the
+  // needs-group path can forward it to writeLayerBody.
+  float perChildAlpha = (!layer->groupOpacity && layer->alpha < 1.0f) ? layer->alpha : 1.0f;
+
   if (!needsGroup) {
-    writeLayerBody(out, layer);
+    writeLayerBody(out, layer, perChildAlpha);
     return;
   }
 
@@ -2055,7 +2063,7 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
     out.closeElementStart();
   }
 
-  writeLayerBody(out, layer);
+  writeLayerBody(out, layer, perChildAlpha);
 
   if (hasScrollOffset) {
     out.closeElement();
@@ -2064,15 +2072,31 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   out.closeElement();
 }
 
-void SVGWriter::writeLayerBody(SVGBuilder& out, const Layer* layer) {
-  writeLayerContents(out, layer);
+void SVGWriter::writeLayerBody(SVGBuilder& out, const Layer* layer, float perChildAlpha) {
+  writeLayerContents(out, layer, {}, perChildAlpha);
   if (layer->composition != nullptr) {
     for (const auto* compLayer : layer->composition->layers) {
-      writeLayer(out, compLayer);
+      if (perChildAlpha < 1.0f) {
+        out.openElement("g");
+        out.addAttribute("opacity", FloatToString(perChildAlpha));
+        out.closeElementStart();
+        writeLayer(out, compLayer);
+        out.closeElement();
+      } else {
+        writeLayer(out, compLayer);
+      }
     }
   }
   for (const auto* child : layer->children) {
-    writeLayer(out, child);
+    if (perChildAlpha < 1.0f) {
+      out.openElement("g");
+      out.addAttribute("opacity", FloatToString(perChildAlpha));
+      out.closeElementStart();
+      writeLayer(out, child);
+      out.closeElement();
+    } else {
+      writeLayer(out, child);
+    }
   }
 }
 
@@ -2090,7 +2114,7 @@ void SVGWriter::writeLayerGroupAttributes(SVGBuilder& out, const Layer* layer) {
     out.addAttribute("transform", transform);
   }
 
-  if (layer->alpha < 1.0f) {
+  if (layer->alpha < 1.0f && layer->groupOpacity) {
     out.addAttribute("opacity", FloatToString(layer->alpha));
   }
 
