@@ -438,7 +438,9 @@ box**, in a normalized 0-1 space (`fitsToGeometry="true"` for gradients; any `sc
 for ImagePattern). The fill auto-fits per geometry. Set `fitsToGeometry="false"` on a gradient or
 `scaleMode="none"` on an ImagePattern to switch to **absolute coordinates** in the parent
 container's (Layer or Group) coordinate space (origin at (0, 0)); multiple geometries inside that
-container then share one continuous fill.
+container then share one continuous fill. This default contrasts with CSS/SVG, where gradient
+positions are pixel values; in PAGX, prefer the normalized form so a single gradient definition
+stays reusable across geometries of different sizes.
 `ConicGradient` angles follow PAGX convention (0° = right), which differs from CSS
 `conic-gradient` (0° = top) — subtract 90° to convert. `DiamondGradient` radiates from center
 toward four corners (`center`, `radius`). `ImagePattern` fills geometry with an image; see
@@ -459,11 +461,6 @@ toward four corners (`center`, `radius`). `ImagePattern` fills geometry with an 
 ```
 
 See `patterns.md` §Gradient Text for LinearGradient on text, §Star Badge for RadialGradient.
-
-| CSS | PAGX |
-|-----|------|
-| `linear-gradient(angle, stops)` | `<LinearGradient startPoint endPoint>` in 0-1 space — convert angle to two points on the unit square |
-| `radial-gradient(circle R at cx cy)` | `<RadialGradient center="cx,cy" radius="R">` — `cx`, `cy`, `R` must be normalized to 0-1 space |
 
 ## Modifiers
 
