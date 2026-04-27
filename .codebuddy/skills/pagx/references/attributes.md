@@ -19,9 +19,6 @@ they **must not** be omitted.
 | **PathData** | `data` |
 | **Glyph** | `advance` |
 | **SolidColor** | `color` |
-| **LinearGradient** | `endPoint` |
-| **RadialGradient** | `radius` |
-| **DiamondGradient** | `radius` |
 | **ColorStop** | `offset`, `color` |
 | **ImagePattern** | `image` |
 | **BlendFilter** | `color` |
@@ -243,8 +240,9 @@ Color source that interpolates along a line from start point to end point.
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `startPoint` | Point | `0,0` | Gradient start point |
-| `endPoint` | Point | (required) | Gradient end point |
-| `matrix` | Matrix | identity | Transform matrix for the gradient coordinate system |
+| `endPoint` | Point | `1,0` | Gradient end point (default: horizontal left-to-right) |
+| `matrix` | Matrix | identity | Transform matrix applied on top of the selected coordinate space |
+| `fitsToGeometry` | boolean | true | `true`: points are in each geometry's normalized 0-1 bounding box (auto-fit per geometry). `false`: points are in the parent container's (Layer or Group) coordinate space, origin at (0,0) |
 
 ### ColorStop
 
@@ -266,9 +264,10 @@ Color source that radiates outward from a center point.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | Point | 0,0 | Gradient center point |
-| `radius` | float | (required) | Gradient radius |
-| `matrix` | Matrix | identity | Transform matrix for the gradient coordinate system |
+| `center` | Point | `0.5,0.5` | Gradient center point |
+| `radius` | float | `0.5` | Gradient radius |
+| `matrix` | Matrix | identity | Transform matrix applied on top of the selected coordinate space |
+| `fitsToGeometry` | boolean | true | `true`: center/radius are in each geometry's normalized 0-1 bounding box (auto-fit per geometry). `false`: in the parent container's (Layer or Group) coordinate space, origin at (0,0) |
 
 ### ConicGradient
 
@@ -276,10 +275,11 @@ Color source (sweep gradient) that interpolates along the circumference between 
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | Point | 0,0 | Gradient center point |
+| `center` | Point | `0.5,0.5` | Gradient center point |
 | `startAngle` | float | 0 | Start angle in degrees (0° = right, clockwise positive) |
 | `endAngle` | float | 360 | End angle in degrees |
-| `matrix` | Matrix | identity | Transform matrix for the gradient coordinate system |
+| `matrix` | Matrix | identity | Transform matrix applied on top of the selected coordinate space |
+| `fitsToGeometry` | boolean | true | `true`: center is in each geometry's normalized 0-1 bounding box (auto-fit per geometry). `false`: in the parent container's (Layer or Group) coordinate space, origin at (0,0) |
 
 ### DiamondGradient
 
@@ -287,9 +287,10 @@ Color source that radiates from center toward four corners using Chebyshev dista
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | Point | 0,0 | Gradient center point |
-| `radius` | float | (required) | Gradient radius |
-| `matrix` | Matrix | identity | Transform matrix for the gradient coordinate system |
+| `center` | Point | `0.5,0.5` | Gradient center point |
+| `radius` | float | `0.5` | Gradient radius |
+| `matrix` | Matrix | identity | Transform matrix applied on top of the selected coordinate space |
+| `fitsToGeometry` | boolean | true | `true`: center/radius are in each geometry's normalized 0-1 bounding box (auto-fit per geometry). `false`: in the parent container's (Layer or Group) coordinate space, origin at (0,0) |
 
 ### ImagePattern
 
@@ -298,11 +299,12 @@ Color source that uses an image as a fill pattern with configurable tiling.
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `image` | string/idref | (required) | Image source: @id resource reference, file path, or data URI |
-| `tileModeX` | TileMode | clamp | X-direction tile mode |
-| `tileModeY` | TileMode | clamp | Y-direction tile mode |
+| `tileModeX` | TileMode | decal | X-direction tile mode |
+| `tileModeY` | TileMode | decal | Y-direction tile mode |
 | `filterMode` | FilterMode | linear | Texture filter mode |
 | `mipmapMode` | MipmapMode | linear | Mipmap mode |
-| `matrix` | Matrix | identity | Transform matrix for the pattern coordinate system |
+| `matrix` | Matrix | identity | Transform matrix applied to the image in its local coordinate space |
+| `scaleMode` | ScaleMode | letterBox | How the transformed image is fitted into each geometry's bounding box. Values: `stretch`, `letterBox`, `zoom` (auto-fit per geometry); `none` (no per-geometry fitting; image placed in the parent container's (Layer or Group) coordinate space, origin at (0,0)) |
 
 ### DropShadowStyle
 
@@ -419,7 +421,7 @@ Rendering data for a single glyph within a Font. Either `path` or `image` must b
 
 ### Text
 
-Geometry element providing text shapes; produces a glyph list after shaping.
+Geometry element providing text content; produces a glyph list after shaping.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|

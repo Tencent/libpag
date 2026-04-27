@@ -39,6 +39,7 @@
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
+#include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
@@ -1264,22 +1265,23 @@ static SolidColor* ParseSolidColor(const DOMNode* node, PAGXDocument* doc) {
   return solid;
 }
 
-static void ParseGradientCommon(const DOMNode* node, PAGXDocument* doc, Matrix& matrix,
-                                std::vector<ColorStop*>& colorStops) {
+static void ParseGradientCommon(const DOMNode* node, PAGXDocument* doc, Gradient* gradient) {
   auto matrixStr = GetAttribute(node, "matrix");
   if (!matrixStr.empty()) {
     if (ParseFloatList(matrixStr).size() < 6) {
       ReportError(doc, node, "Invalid value '" + matrixStr + "' for 'matrix' attribute.");
     } else {
-      matrix = MatrixFromString(matrixStr);
+      gradient->matrix = MatrixFromString(matrixStr);
     }
   }
+  gradient->fitsToGeometry =
+      GetBoolAttribute(node, "fitsToGeometry", Default<LinearGradient>().fitsToGeometry, doc);
   auto child = node->firstChild;
   while (child) {
     if (child->type == DOMNodeType::Element && child->name == "ColorStop") {
       auto stop = ParseColorStop(child.get(), doc);
       if (stop) {
-        colorStops.push_back(stop);
+        gradient->colorStops.push_back(stop);
       }
     } else if (child->type == DOMNodeType::Element) {
       ReportError(doc, child.get(),
@@ -1298,7 +1300,7 @@ static LinearGradient* ParseLinearGradient(const DOMNode* node, PAGXDocument* do
   gradient->startPoint =
       GetPointAttribute(node, "startPoint", Default<LinearGradient>().startPoint, doc);
   gradient->endPoint = GetPointAttribute(node, "endPoint", Default<LinearGradient>().endPoint, doc);
-  ParseGradientCommon(node, doc, gradient->matrix, gradient->colorStops);
+  ParseGradientCommon(node, doc, gradient);
   return gradient;
 }
 
@@ -1309,7 +1311,7 @@ static RadialGradient* ParseRadialGradient(const DOMNode* node, PAGXDocument* do
   }
   gradient->center = GetPointAttribute(node, "center", Default<RadialGradient>().center, doc);
   gradient->radius = GetFloatAttribute(node, "radius", Default<RadialGradient>().radius, doc);
-  ParseGradientCommon(node, doc, gradient->matrix, gradient->colorStops);
+  ParseGradientCommon(node, doc, gradient);
   return gradient;
 }
 
@@ -1322,7 +1324,7 @@ static ConicGradient* ParseConicGradient(const DOMNode* node, PAGXDocument* doc)
   gradient->startAngle =
       GetFloatAttribute(node, "startAngle", Default<ConicGradient>().startAngle, doc);
   gradient->endAngle = GetFloatAttribute(node, "endAngle", Default<ConicGradient>().endAngle, doc);
-  ParseGradientCommon(node, doc, gradient->matrix, gradient->colorStops);
+  ParseGradientCommon(node, doc, gradient);
   return gradient;
 }
 
@@ -1333,7 +1335,7 @@ static DiamondGradient* ParseDiamondGradient(const DOMNode* node, PAGXDocument* 
   }
   gradient->center = GetPointAttribute(node, "center", Default<DiamondGradient>().center, doc);
   gradient->radius = GetFloatAttribute(node, "radius", Default<DiamondGradient>().radius, doc);
-  ParseGradientCommon(node, doc, gradient->matrix, gradient->colorStops);
+  ParseGradientCommon(node, doc, gradient);
   return gradient;
 }
 
@@ -1360,10 +1362,11 @@ static ImagePattern* ParseImagePattern(const DOMNode* node, PAGXDocument* doc) {
       }
     }
   }
-  pattern->tileModeX = GET_ENUM(node, "tileModeX", "clamp", doc, TileMode);
-  pattern->tileModeY = GET_ENUM(node, "tileModeY", "clamp", doc, TileMode);
+  pattern->tileModeX = GET_ENUM(node, "tileModeX", "decal", doc, TileMode);
+  pattern->tileModeY = GET_ENUM(node, "tileModeY", "decal", doc, TileMode);
   pattern->filterMode = GET_ENUM(node, "filterMode", "linear", doc, FilterMode);
   pattern->mipmapMode = GET_ENUM(node, "mipmapMode", "linear", doc, MipmapMode);
+  pattern->scaleMode = GET_ENUM(node, "scaleMode", "letterBox", doc, ScaleMode);
   auto matrixStr = GetAttribute(node, "matrix");
   if (!matrixStr.empty()) {
     if (ParseFloatList(matrixStr).size() < 6) {
