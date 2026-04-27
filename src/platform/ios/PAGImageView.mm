@@ -378,32 +378,39 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 - (void)setBounds:(CGRect)bounds {
   CGRect oldBounds = self.bounds;
   [super setBounds:bounds];
-  self.viewSize = CGSizeMake(bounds.size.width, bounds.size.height);
-  if (oldBounds.size.width != bounds.size.width || oldBounds.size.height != bounds.size.height) {
-    std::lock_guard<std::mutex> autoLock(imageViewLock);
-    if (pagComposition || filePath) {
-      [self reset];
-      [self updatePAGDecoder];
-      if (oldBounds.size.width == 0 || oldBounds.size.height == 0) {
-        [animator update];
-      }
-    }
-  }
+  [self handleSizeChanged:oldBounds.size newSize:bounds.size];
 }
 
 - (void)setFrame:(CGRect)frame {
   CGRect oldRect = self.frame;
   [super setFrame:frame];
-  self.viewSize = CGSizeMake(frame.size.width, frame.size.height);
-  if (oldRect.size.width != frame.size.width || oldRect.size.height != frame.size.height) {
+  [self handleSizeChanged:oldRect.size newSize:frame.size];
+}
+
+// Resets and rebuilds the decoder for a size change, then triggers a one-off
+// animator update so the first frame is rendered at the new size.
+//
+// Thread safety note: [animator update] can synchronously flow back into
+// -[PAGImageView flush], which also acquires imageViewLock. The critical
+// section here only mutates internal state, and the animator update is
+// deliberately scheduled after the lock is released to prevent the same
+// thread from attempting to re-enter a non-recursive mutex and deadlock.
+- (void)handleSizeChanged:(CGSize)oldSize newSize:(CGSize)newSize {
+  self.viewSize = newSize;
+  if (oldSize.width == newSize.width && oldSize.height == newSize.height) {
+    return;
+  }
+  BOOL shouldUpdateAnimator = NO;
+  {
     std::lock_guard<std::mutex> autoLock(imageViewLock);
     if (pagComposition || filePath) {
       [self reset];
       [self updatePAGDecoder];
-      if (oldRect.size.width == 0 || oldRect.size.height == 0) {
-        [animator update];
-      }
+      shouldUpdateAnimator = (oldSize.width == 0 || oldSize.height == 0);
     }
+  }
+  if (shouldUpdateAnimator) {
+    [animator update];
   }
 }
 
