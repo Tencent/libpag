@@ -601,7 +601,9 @@ CLI_TEST(PAGXCliTest, Font_HelpShowsCurrentFlags) {
   EXPECT_NE(help.find("--size"), std::string::npos);
   EXPECT_NE(help.find("--json"), std::string::npos);
   EXPECT_EQ(help.find("embed"), std::string::npos);
-  EXPECT_EQ(help.find("info"), std::string::npos);
+  EXPECT_EQ(help.find(" info "), std::string::npos);
+  EXPECT_EQ(help.find(" info\n"), std::string::npos);
+  EXPECT_EQ(help.find("\n  info "), std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, FontList_TextOutput) {
