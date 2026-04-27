@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LayerBuilder.h"
-#include <cmath>
-#include <cstdlib>
 #include <tuple>
 #include <unordered_map>
 #include "ToTGFX.h"
@@ -542,182 +540,6 @@ class LayerBuilderContext {
         node->matrix);
   }
 
-  // Resolve the ImagePattern matrix using customData parameters written by the PAGX exporter.
-  // The exporter stores paint->transform() as a temporary matrix and defers the real matrix
-  // calculation to render time, because the actual image pixel dimensions are not available
-  // during export.  This function reproduces the same logic as the CLI renderer's
-  // resolve_image_pattern_matrix() so that Playground / Desktop / Web renderers all produce
-  // identical results.
-  static tgfx::Matrix ResolveImagePatternMatrix(const ImagePattern* node,
-                                                const std::shared_ptr<tgfx::Image>& image) {
-    // Return identity by default so the caller can detect "no resolve happened".
-    tgfx::Matrix identity = {};
-
-    auto scaleModeIt = node->customData.find("image-scale-mode");
-    if (scaleModeIt == node->customData.end()) {
-      return identity;
-    }
-
-    char* end = nullptr;
-    int scaleModeInt = static_cast<int>(std::strtol(scaleModeIt->second.c_str(), &end, 10));
-    if (end == scaleModeIt->second.c_str() || scaleModeInt < 0 || scaleModeInt > 3) {
-      // Malformed image-scale-mode value: fall back to the stored paint transform rather
-      // than identity, matching the dimension-invalid fallback below.
-      return ToTGFX(node->matrix);
-    }
-
-    // ImageScaleMode enum values: STRETCH=0, FIT=1, FILL=2, TILE=3
-    // Mirrors the string values emitted by PAGX exporters for custom attribute "image-scale-mode".
-    enum class ImageScaleMode : int { STRETCH = 0, FIT = 1, FILL = 2, TILE = 3 };
-    auto scaleMode = static_cast<ImageScaleMode>(scaleModeInt);
-
-    float nodeWidth = 0.0f, nodeHeight = 0.0f;
-    auto nwIt = node->customData.find("node-width");
-    auto nhIt = node->customData.find("node-height");
-    if (nwIt != node->customData.end()) {
-      char* nwEnd = nullptr;
-      float parsed = std::strtof(nwIt->second.c_str(), &nwEnd);
-      if (nwEnd != nwIt->second.c_str()) {
-        nodeWidth = parsed;
-      }
-    }
-    if (nhIt != node->customData.end()) {
-      char* nhEnd = nullptr;
-      float parsed = std::strtof(nhIt->second.c_str(), &nhEnd);
-      if (nhEnd != nhIt->second.c_str()) {
-        nodeHeight = parsed;
-      }
-    }
-
-    float origImageWidth = 0.0f, origImageHeight = 0.0f;
-    auto oiwIt = node->customData.find("orig-image-width");
-    auto oihIt = node->customData.find("orig-image-height");
-    if (oiwIt != node->customData.end()) {
-      char* oiwEnd = nullptr;
-      float parsed = std::strtof(oiwIt->second.c_str(), &oiwEnd);
-      if (oiwEnd != oiwIt->second.c_str()) {
-        origImageWidth = parsed;
-      }
-    }
-    if (oihIt != node->customData.end()) {
-      char* oihEnd = nullptr;
-      float parsed = std::strtof(oihIt->second.c_str(), &oihEnd);
-      if (oihEnd != oihIt->second.c_str()) {
-        origImageHeight = parsed;
-      }
-    }
-
-    float scaleFactor = 0.5f;
-    auto sfIt = node->customData.find("scale-factor");
-    if (sfIt != node->customData.end()) {
-      char* sfEnd = nullptr;
-      float parsed = std::strtof(sfIt->second.c_str(), &sfEnd);
-      if (sfEnd != sfIt->second.c_str()) {
-        scaleFactor = parsed;
-      }
-    }
-
-    // Use actual image pixel dimensions when available (preferred over Schema metadata).
-    float imageWidth = origImageWidth;
-    float imageHeight = origImageHeight;
-    if (image) {
-      int w = image->width();
-      int h = image->height();
-      if (w > 0 && h > 0) {
-        imageWidth = static_cast<float>(w);
-        imageHeight = static_cast<float>(h);
-      }
-    }
-
-    if (imageWidth <= 0 || imageHeight <= 0 || nodeWidth <= 0 || nodeHeight <= 0) {
-      // Fallback: use the stored paint transform as-is.
-      return ToTGFX(node->matrix);
-    }
-
-    float imageRatio = imageWidth / imageHeight;
-    float nodeRatio = nodeWidth / nodeHeight;
-
-    tgfx::Matrix result = {};
-
-    switch (scaleMode) {
-      case ImageScaleMode::FILL: {
-        float ratio =
-            (imageRatio > nodeRatio) ? (nodeHeight / imageHeight) : (nodeWidth / imageWidth);
-        float marginX = (nodeWidth - imageWidth * ratio) * 0.5f;
-        float marginY = (nodeHeight - imageHeight * ratio) * 0.5f;
-        result.setScaleX(ratio);
-        result.setScaleY(ratio);
-        result.setTranslateX(marginX);
-        result.setTranslateY(marginY);
-        break;
-      }
-      case ImageScaleMode::FIT: {
-        float ratio =
-            (nodeRatio > imageRatio) ? (nodeHeight / imageHeight) : (nodeWidth / imageWidth);
-        float marginX = (nodeWidth - imageWidth * ratio) * 0.5f;
-        float marginY = (nodeHeight - imageHeight * ratio) * 0.5f;
-        result.setScaleX(ratio);
-        result.setScaleY(ratio);
-        result.setTranslateX(marginX);
-        result.setTranslateY(marginY);
-        break;
-      }
-      case ImageScaleMode::STRETCH: {
-        auto paintTransform = ToTGFX(node->matrix);
-        if (!paintTransform.isIdentity()) {
-          float invNW = 1.0f / nodeWidth;
-          float invNH = 1.0f / nodeHeight;
-          // pagx::Matrix layout: | a  c  tx |
-          //                      | b  d  ty |
-          // tgfx::Matrix layout: | scaleX  skewX   transX |
-          //                      | skewY   scaleY  transY |
-          float s00 = paintTransform.getScaleX() * invNW;
-          float s01 = paintTransform.getSkewX() * invNH;
-          float s02 = paintTransform.getTranslateX();
-          float s10 = paintTransform.getSkewY() * invNW;
-          float s11 = paintTransform.getScaleY() * invNH;
-          float s12 = paintTransform.getTranslateY();
-
-          s00 *= imageWidth;
-          s01 *= imageWidth;
-          s02 *= imageWidth;
-          s10 *= imageHeight;
-          s11 *= imageHeight;
-          s12 *= imageHeight;
-
-          float det = s00 * s11 - s01 * s10;
-          if (std::abs(det) > 1e-10f) {
-            float invDet = 1.0f / det;
-            result.setScaleX(s11 * invDet);
-            result.setSkewX(-s01 * invDet);
-            result.setSkewY(-s10 * invDet);
-            result.setScaleY(s00 * invDet);
-            result.setTranslateX((s01 * s12 - s11 * s02) * invDet);
-            result.setTranslateY((s10 * s02 - s00 * s12) * invDet);
-          } else {
-            // Paint transform is near-singular; fall back to natural stretch so the image
-            // still fills the node instead of collapsing to identity.
-            result.setScaleX(nodeWidth / imageWidth);
-            result.setScaleY(nodeHeight / imageHeight);
-          }
-        } else {
-          result.setScaleX(nodeWidth / imageWidth);
-          result.setScaleY(nodeHeight / imageHeight);
-        }
-        break;
-      }
-      case ImageScaleMode::TILE: {
-        result.setScaleX(scaleFactor);
-        result.setScaleY(scaleFactor);
-        break;
-      }
-      default:
-        break;
-    }
-
-    return result;
-  }
-
   std::shared_ptr<tgfx::ColorSource> convertImagePattern(const ImagePattern* node) {
     if (!node || node->image == nullptr) {
       return nullptr;
@@ -741,16 +563,7 @@ class LayerBuilderContext {
     auto sampling = tgfx::SamplingOptions(ToTGFX(node->filterMode), ToTGFX(node->mipmapMode));
     auto pattern =
         tgfx::ImagePattern::Make(image, ToTGFX(node->tileModeX), ToTGFX(node->tileModeY), sampling);
-    if (!pattern) {
-      return nullptr;
-    }
-
-    // When the exporter has stored image-scale-mode in customData, resolve the final matrix
-    // from the actual image dimensions instead of using the raw paint transform.
-    if (node->customData.count("image-scale-mode")) {
-      auto resolvedMatrix = ResolveImagePatternMatrix(node, image);
-      pattern->setMatrix(resolvedMatrix);
-    } else if (!node->matrix.isIdentity()) {
+    if (pattern && !node->matrix.isIdentity()) {
       pattern->setMatrix(ToTGFX(node->matrix));
     }
 
