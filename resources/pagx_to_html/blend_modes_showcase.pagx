@@ -10,7 +10,7 @@
   <Layer left="20" right="20" top="20" bottom="20">
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
     <Fill>
-      <LinearGradient startPoint="20,20" endPoint="440,390">
+      <LinearGradient startPoint="0,0" endPoint="1,1">
         <ColorStop offset="0" color="#3B82F6"/>
         <ColorStop offset="0.5" color="#EF4444"/>
         <ColorStop offset="1" color="#10B981"/>

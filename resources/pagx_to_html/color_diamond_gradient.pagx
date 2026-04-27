@@ -32,7 +32,7 @@
         <Layer width="180" height="120">
           <Rectangle position="90,60" size="180,120" roundness="8"/>
           <Fill>
-            <DiamondGradient center="90,60" radius="80">
+            <DiamondGradient center="0.5,0.5" radius="1">
               <ColorStop offset="0" color="#FFFFFF"/>
               <ColorStop offset="0.5" color="#8B5CF6"/>
               <ColorStop offset="1" color="#1E1B4B"/>

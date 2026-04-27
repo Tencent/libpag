@@ -44,7 +44,7 @@
             <Layer width="100" height="70">
               <Rectangle position="50,35" size="100,70" roundness="6"/>
               <Fill>
-                <ImagePattern image="@tinyImg" tileModeX="repeat" tileModeY="repeat" mipmapMode="nearest" matrix="4,0,0,4,0,0"/>
+                <ImagePattern image="@tinyImg" tileModeX="repeat" tileModeY="repeat" mipmapMode="nearest" matrix="4,0,0,4,0,0" scaleMode="none"/>
               </Fill>
               <Stroke color="#CBD5E1" width="1"/>
             </Layer>
@@ -58,7 +58,7 @@
             <Layer width="100" height="70">
               <Rectangle position="50,35" size="100,70" roundness="6"/>
               <Fill>
-                <ImagePattern image="@tinyImg" tileModeX="repeat" tileModeY="repeat" mipmapMode="none" matrix="4,0,0,4,0,0"/>
+                <ImagePattern image="@tinyImg" tileModeX="repeat" tileModeY="repeat" mipmapMode="none" matrix="4,0,0,4,0,0" scaleMode="none"/>
               </Fill>
               <Stroke color="#CBD5E1" width="1"/>
             </Layer>

@@ -135,7 +135,7 @@
           <Layer width="60" height="60">
             <Rectangle position="30,30" size="56,56" roundness="8"/>
             <Fill>
-              <RadialGradient center="30,30" radius="40">
+              <RadialGradient center="0.5,0.5" radius="1.43">
                 <ColorStop offset="0" color="#FFFFFF"/>
                 <ColorStop offset="1" color="#8B5CF6"/>
               </RadialGradient>

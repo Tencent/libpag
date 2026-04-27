@@ -6,7 +6,7 @@
 <pagx version="1.0" width="400" height="520">
   <Resources>
     <Image id="patternImg" source="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAFUlEQVR4nGP8Oo/7PwMSYELmECcAAKy6AqWSorM1AAAAAElFTkSuQmCC"/>
-    <ImagePattern id="checkerPattern" image="@patternImg" tileModeX="repeat" tileModeY="repeat" matrix="3,0,0,3,0,0"/>
+    <ImagePattern id="checkerPattern" image="@patternImg" tileModeX="repeat" tileModeY="repeat" matrix="3,0,0,3,0,0" scaleMode="none"/>
     <PathData id="bannerCurve" data="M 50,60 Q 200,20 350,60"/>
     <Composition id="checkIcon" width="24" height="24">
       <Layer>
@@ -18,15 +18,15 @@
         <Stroke color="#FFFFFF" width="2" cap="round" join="round"/>
       </Layer>
     </Composition>
-    <LinearGradient id="fadeMask" startPoint="0,0" endPoint="0,30">
+    <LinearGradient id="fadeMask" startPoint="0,0" endPoint="0,1">
       <ColorStop offset="0" color="#FFFFFF"/>
       <ColorStop offset="1" color="#FFFFFF00"/>
     </LinearGradient>
-    <LinearGradient id="headerGrad" startPoint="0,0" endPoint="400,0">
+    <LinearGradient id="headerGrad" startPoint="0,0" endPoint="1,0">
       <ColorStop offset="0" color="#2C3E50"/>
       <ColorStop offset="1" color="#34495E"/>
     </LinearGradient>
-    <LinearGradient id="coralGrad" startPoint="0,0" endPoint="0,80">
+    <LinearGradient id="coralGrad" startPoint="0,0" endPoint="0,1">
       <ColorStop offset="0" color="#FF6B6B"/>
       <ColorStop offset="1" color="#EE5A24"/>
     </LinearGradient>

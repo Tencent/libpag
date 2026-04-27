@@ -37,7 +37,7 @@
               <Layer scrollRect="15,15,110,110">
                 <Rectangle position="70,70" size="140,140" roundness="20"/>
                 <Fill>
-                  <LinearGradient startPoint="0,0" endPoint="140,140">
+                  <LinearGradient startPoint="0,0" endPoint="1,1">
                     <ColorStop offset="0" color="#3B82F6"/>
                     <ColorStop offset="1" color="#EC4899"/>
                   </LinearGradient>
@@ -77,7 +77,7 @@
               <Layer id="lumMask" visible="false">
                 <Ellipse position="55,55" size="110,110"/>
                 <Fill>
-                  <RadialGradient center="55,55" radius="55">
+                  <RadialGradient center="0.5,0.5" radius="0.5">
                     <ColorStop offset="0" color="#FFFFFF"/>
                     <ColorStop offset="1" color="#000000"/>
                   </RadialGradient>

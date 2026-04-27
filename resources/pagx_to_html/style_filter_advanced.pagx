@@ -117,7 +117,7 @@
               <Layer name="blurMirror" width="88" height="52" centerX="0" centerY="0">
                 <Rectangle position="44,26" size="88,52"/>
                 <Fill>
-                  <LinearGradient startPoint="0,0" endPoint="88,0">
+                  <LinearGradient startPoint="0,0" endPoint="1,0">
                     <ColorStop offset="0" color="#06B6D4"/>
                     <ColorStop offset="0.33" color="#06B6D4"/>
                     <ColorStop offset="0.34" color="#EC4899"/>

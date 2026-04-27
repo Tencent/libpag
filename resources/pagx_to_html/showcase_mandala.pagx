@@ -4,7 +4,7 @@
      Stroke with round cap and various widths -->
 <pagx version="1.0" width="420" height="460">
   <Resources>
-    <ConicGradient id="rainbowConic" center="210,210" startAngle="0" endAngle="360">
+    <ConicGradient id="rainbowConic" center="210,210" startAngle="0" endAngle="360" fitsToGeometry="false">
       <ColorStop offset="0" color="#9333EA"/>
       <ColorStop offset="0.17" color="#DC2626"/>
       <ColorStop offset="0.33" color="#F59E0B"/>
@@ -13,16 +13,16 @@
       <ColorStop offset="0.83" color="#8B5CF6"/>
       <ColorStop offset="1" color="#9333EA"/>
     </ConicGradient>
-    <RadialGradient id="goldRadial" center="25,25" radius="25">
+    <RadialGradient id="goldRadial" center="25,25" radius="25" fitsToGeometry="false">
       <ColorStop offset="0" color="#F59E0B"/>
       <ColorStop offset="0.5" color="#D97706"/>
       <ColorStop offset="1" color="#92400E"/>
     </RadialGradient>
-    <RadialGradient id="tealGlow" center="50,50" radius="50">
+    <RadialGradient id="tealGlow" center="50,50" radius="50" fitsToGeometry="false">
       <ColorStop offset="0" color="#14B8A6"/>
       <ColorStop offset="1" color="#14B8A600"/>
     </RadialGradient>
-    <RadialGradient id="bgRadial" center="210,210" radius="280">
+    <RadialGradient id="bgRadial" center="210,210" radius="280" fitsToGeometry="false">
       <ColorStop offset="0" color="#1E1040"/>
       <ColorStop offset="1" color="#0A0612"/>
     </RadialGradient>
