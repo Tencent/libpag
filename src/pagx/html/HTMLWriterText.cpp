@@ -729,8 +729,33 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     }
   }
   if (text->fauxBold && !stroke) {
+    // Default to currentColor so solid-fill text inherits the same colour tgfx thickens the
+    // glyph path with. When the fill is a gradient/ImagePattern we render it via
+    // `background-clip:text` with `-webkit-text-fill-color:transparent`, which paints the
+    // clipped background *below* the text-stroke layer — so a currentColor stroke would sit
+    // on top of the gradient and repaint the glyph silhouette in the inherited text colour
+    // (typically near-black), visually erasing the gradient. Picking a representative stop
+    // colour keeps the thickened outline visually consistent with the gradient fill.
+    // For gradients: middle stop when available, otherwise first stop. ImagePattern has no
+    // stop list, so fall back to currentColor and accept a subtle edge artefact — samples
+    // don't combine ImagePattern fills with fauxBold today.
+    std::string strokeColor = "currentColor";
+    if (fill && fill->color) {
+      auto ct = fill->color->nodeType();
+      if (ct == NodeType::LinearGradient || ct == NodeType::RadialGradient ||
+          ct == NodeType::ConicGradient) {
+        auto* g = static_cast<const Gradient*>(fill->color);
+        if (!g->colorStops.empty()) {
+          size_t idx = g->colorStops.size() / 2;
+          auto* stop = g->colorStops[idx] ? g->colorStops[idx] : g->colorStops.front();
+          if (stop) {
+            strokeColor = ColorToRGBA(stop->color, fill->alpha);
+          }
+        }
+      }
+    }
     style += ";-webkit-text-stroke:" + FloatToString(FauxBoldStrokeWidth(text->renderFontSize())) +
-             "px currentColor";
+             "px " + strokeColor;
   }
   if (fill && fill->color) {
     auto ct = fill->color->nodeType();
