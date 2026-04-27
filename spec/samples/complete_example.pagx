@@ -91,7 +91,7 @@
   <Layer name="GetStartedButton" left="88" top="307">
     <Rectangle width="120" height="36" roundness="18"/>
     <Fill>
-      <LinearGradient endPoint="1,0">
+      <LinearGradient>
         <ColorStop color="#6366F1" offset="0"/>
         <ColorStop color="#8B5CF6" offset="1"/>
       </LinearGradient>

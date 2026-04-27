@@ -31,16 +31,17 @@ namespace pagx {
 class LinearGradient : public Gradient {
  public:
   /**
-   * The starting point of the gradient line. Defaults to (0, 0), the top-left corner of the
+   * The starting point of the gradient line. Defaults to (0, 0), the left edge of the
    * geometry's normalized bounding box when fitsToGeometry is true.
    */
   Point startPoint = {0.0f, 0.0f};
 
   /**
-   * The ending point of the gradient line. Defaults to (1, 1), the bottom-right corner of the
-   * geometry's normalized bounding box when fitsToGeometry is true.
+   * The ending point of the gradient line. Defaults to (1, 0), the right edge of the
+   * geometry's normalized bounding box when fitsToGeometry is true, producing a horizontal
+   * left-to-right gradient by default.
    */
-  Point endPoint = {1.0f, 1.0f};
+  Point endPoint = {1.0f, 0.0f};
 
   NodeType nodeType() const override {
     return NodeType::LinearGradient;

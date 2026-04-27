@@ -10,7 +10,7 @@
         <TextBox width="180" height="180" textAlign="justify" lineHeight="28">
           <Text text="Justify aligns words evenly 分布在 each full line." fontFamily="Arial" fontSize="18"/>
           <Fill>
-            <LinearGradient endPoint="1,0">
+            <LinearGradient>
               <ColorStop color="#6366F1" offset="0"/>
               <ColorStop color="#8B5CF6" offset="1"/>
             </LinearGradient>

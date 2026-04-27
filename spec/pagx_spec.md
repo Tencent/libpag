@@ -335,7 +335,7 @@ Linear gradients interpolate along the direction from start point to end point.
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `startPoint` | Point | `0,0` | Start point |
-| `endPoint` | Point | `1,1` | End point |
+| `endPoint` | Point | `1,0` | End point |
 | `matrix` | Matrix | identity matrix | Transform matrix |
 | `fitsToGeometry` | boolean | true | Whether `startPoint`/`endPoint` are interpreted in the geometry's normalized 0-1 bounding box space. See [Color Source Coordinate System](#color-source-coordinate-system) |
 
@@ -456,7 +456,7 @@ Except for solid colors, every color source (gradient or image pattern) interpre
 
 **Relative mode (default — per-geometry fit)**:
 
-Gradient parameters (`startPoint`, `endPoint`, `center`, `radius`, etc.) live in a `(0, 0)`-`(1, 1)` space mapped to **each geometry's own bounding box**; ImagePattern images are fitted into each geometry's bounding box according to `scaleMode`. The fill auto-resizes with the geometry, so multiple shapes of different sizes sharing the same color source each get their own properly-fitted fill.
+Gradient parameters (`startPoint`, `endPoint`, `center`, `radius`, etc.) live in a `(0, 0)`-`(1, 1)` space mapped to **each geometry's own bounding box**; ImagePattern images are fitted into each geometry's bounding box according to `scaleMode`. The fill auto-resizes with the geometry, so multiple geometries of different sizes sharing the same color source each get their own properly-fitted fill.
 
 **Absolute mode (opt-in — `fitsToGeometry="false"` / `scaleMode="none"`)**:
 
@@ -1169,7 +1169,7 @@ The VectorElement system employs an **accumulate-render** processing model: geom
 
 | Term | Elements | Description |
 |------|----------|-------------|
-| **Geometry Elements** | Rectangle, Ellipse, Polystar, Path, Text | Elements providing geometric shapes; accumulate as a geometry list in the context |
+| **Geometry Elements** | Rectangle, Ellipse, Polystar, Path, Text | Renderable geometry (shapes and text); accumulate as a geometry list in the context |
 | **Modifiers** | TrimPath, RoundCorner, MergePath, TextModifier, TextPath, TextBox, Repeater | Transform accumulated geometry |
 | **Painters** | Fill, Stroke | Perform fill or stroke rendering on accumulated geometry |
 | **Containers** | Group | Create isolated scopes and apply matrix transforms; merge upon completion |
@@ -1226,7 +1226,7 @@ Different modifiers have different scopes over elements in the geometry list:
 
 ### 6.2 Geometry Elements
 
-Geometry elements provide renderable shapes. All geometry elements, as well as TextPath, TextBox, and Group, support constraint attributes for positioning within their container — see §4.3 for the full attribute list, definitions, and behavior. Constraint attributes are not repeated in individual element tables below.
+Geometry elements provide renderable geometry (shapes and text). All geometry elements, as well as TextPath, TextBox, and Group, support constraint attributes for positioning within their container — see §4.3 for the full attribute list, definitions, and behavior. Constraint attributes are not repeated in individual element tables below.
 
 #### 6.2.1 Rectangle
 
@@ -1374,7 +1374,7 @@ Defines arbitrary shapes using SVG path syntax, supporting inline data or refere
 
 #### 6.2.5 Text
 
-Text elements provide geometric shapes for text content. Unlike shape elements that produce a single Path, Text produces a **glyph list** (multiple glyphs) after shaping, which accumulates in the rendering context's geometry list for subsequent modifier transformation or painter rendering.
+Text is a geometry element that contributes glyphs (rather than a path) to the geometry list. Unlike shape elements that produce a single Path, Text produces a **glyph list** (multiple glyphs) after shaping, which accumulates in the rendering context's geometry list for subsequent modifier transformation or painter rendering.
 
 ```xml
 <Text text="Hello World" left="100" top="200" fontFamily="Arial" fontStyle="Regular" fauxBold="true" fauxItalic="false" fontSize="24" letterSpacing="0" textAnchor="start"/>
@@ -2011,7 +2011,7 @@ alpha = lerp(startAlpha, endAlpha, t)
 
 When `copies` is a decimal (e.g., `3.5`), partial copies are achieved through **semi-transparent blending**:
 
-1. **Geometry copying**: Shapes and text are copied by `ceil(copies)` (i.e., 4), geometry itself is not scaled or clipped
+1. **Geometry copying**: Shapes and text geometry are copied by `ceil(copies)` (i.e., 4); the geometry itself is not scaled or clipped
 2. **Opacity adjustment**: The last copy's opacity is multiplied by the fractional part (e.g., 0.5), producing semi-transparent effect
 3. **Visual effect**: Simulates partial copies through opacity gradation
 
@@ -2197,7 +2197,7 @@ This appendix describes node categorization and nesting rules.
 | **Color Sources** | `SolidColor`, `LinearGradient`, `RadialGradient`, `ConicGradient`, `DiamondGradient`, `ImagePattern`, `ColorStop` | Color definitions used by painters. |
 | **Layer Styles** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle` | Visual effects applied to Layer content. |
 | **Layer Filters** | `BlurFilter`, `DropShadowFilter`, `InnerShadowFilter`, `BlendFilter`, `ColorMatrixFilter` | Post-processing effects applied to composited Layer. |
-| **Geometry Elements** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` | Drawable shapes and text. Must be inside Layer/Group. |
+| **Geometry Elements** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` | Drawable geometry (shapes and text). Must be inside Layer/Group. |
 | **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `TextBox`, `Repeater` | Transform or combine geometry and text. |
 | **Painters** | `Fill`, `Stroke` | Apply color/gradient to geometry. Must be inside Layer/Group. |
 | **Import Directives** | (inline `<svg>`, `import` attribute) | Import directives on Layer. Inline `<svg>` child elements and the `import`/`importFormat` attributes are resolved by `pagx resolve` into native PAGX nodes. |

@@ -11,7 +11,7 @@
       <Layer name="button" width="200" height="60">
         <Rectangle width="100%" height="100%" roundness="30"/>
         <Fill>
-          <LinearGradient endPoint="1,0">
+          <LinearGradient>
             <ColorStop color="#6366F1" offset="0"/>
             <ColorStop color="#8B5CF6" offset="1"/>
           </LinearGradient>

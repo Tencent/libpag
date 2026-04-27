@@ -67,7 +67,7 @@
       <Group>
         <Text text="Gradient Fill" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
         <Fill>
-          <LinearGradient endPoint="1,0">
+          <LinearGradient>
             <ColorStop color="#F43F5E" offset="0"/>
             <ColorStop color="#F59E0B" offset="0.5"/>
             <ColorStop color="#10B981" offset="1"/>

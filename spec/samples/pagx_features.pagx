@@ -101,7 +101,7 @@
     <Layer width="100%" height="100%" alpha="0.08">
       <Path left="20" data="@cardTopLine"/>
       <Stroke width="1">
-        <LinearGradient endPoint="1,0">
+        <LinearGradient>
           <ColorStop color="#F43F5E00" offset="0"/>
           <ColorStop color="#F43F5E" offset="0.5"/>
           <ColorStop color="#F43F5E00" offset="1"/>
@@ -148,7 +148,7 @@
     <Layer width="100%" height="100%" alpha="0.08">
       <Path left="20" data="@cardTopLine"/>
       <Stroke width="1">
-        <LinearGradient endPoint="1,0">
+        <LinearGradient>
           <ColorStop color="#38BDF800" offset="0"/>
           <ColorStop color="#38BDF8" offset="0.5"/>
           <ColorStop color="#38BDF800" offset="1"/>
@@ -193,7 +193,7 @@
     <Layer width="100%" height="100%" alpha="0.08">
       <Path left="20" data="@cardTopLine"/>
       <Stroke width="1">
-        <LinearGradient endPoint="1,0">
+        <LinearGradient>
           <ColorStop color="#A855F700" offset="0"/>
           <ColorStop color="#A855F7" offset="0.5"/>
           <ColorStop color="#A855F700" offset="1"/>
@@ -249,7 +249,7 @@
     <Layer width="100%" height="100%" alpha="0.08">
       <Path left="20" data="@cardTopLine"/>
       <Stroke width="1">
-        <LinearGradient endPoint="1,0">
+        <LinearGradient>
           <ColorStop color="#10B98100" offset="0"/>
           <ColorStop color="#10B981" offset="0.5"/>
           <ColorStop color="#10B98100" offset="1"/>
@@ -292,7 +292,7 @@
     <Layer width="100%" height="100%" alpha="0.08">
       <Path left="20" data="@cardTopLine"/>
       <Stroke width="1">
-        <LinearGradient endPoint="1,0">
+        <LinearGradient>
           <ColorStop color="#FBBF2400" offset="0"/>
           <ColorStop color="#FBBF24" offset="0.5"/>
           <ColorStop color="#FBBF2400" offset="1"/>
@@ -336,7 +336,7 @@
     <Group alpha="0.18">
       <Path data="M -400 -40 L 400 -40"/>
       <Stroke width="1">
-        <LinearGradient endPoint="1,0">
+        <LinearGradient>
           <ColorStop color="#6366F100" offset="0"/>
           <ColorStop color="#6366F1" offset="0.2"/>
           <ColorStop color="#8B5CF6" offset="0.5"/>

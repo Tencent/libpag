@@ -412,7 +412,7 @@
     </xs:sequence>
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="startPoint" type="PointType" default="0,0"/>
-    <xs:attribute name="endPoint" type="PointType" default="1,1"/>
+    <xs:attribute name="endPoint" type="PointType" default="1,0"/>
     <xs:attribute name="matrix" type="MatrixType"/>
     <xs:attribute name="fitsToGeometry" type="xs:boolean" default="true"/>
   </xs:complexType>

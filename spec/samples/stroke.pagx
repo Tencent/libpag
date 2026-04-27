@@ -16,7 +16,7 @@
     <Layer flex="1">
       <Path centerX="0" data="M 0,120 Q 150,0 300,120"/>
       <Stroke width="10" cap="round">
-        <LinearGradient endPoint="1,0">
+        <LinearGradient>
           <ColorStop color="#F43F5E" offset="0"/>
           <ColorStop color="#EC4899" offset="0.5"/>
           <ColorStop color="#8B5CF6" offset="1"/>
