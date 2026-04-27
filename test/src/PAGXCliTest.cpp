@@ -2895,6 +2895,15 @@ CLI_TEST(PAGXCliTest, Embed_FontFlags_AcceptedLikeOldSubcommand) {
   auto fontPath = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
   auto ret = CallRun(pagx::cli::RunEmbed, {"embed", "--file", fontPath, "-o", outPagx, tempPagx});
   EXPECT_EQ(ret, 0);
+  auto document = pagx::PAGXImporter::FromFile(outPagx);
+  ASSERT_NE(document, nullptr);
+  bool hasFontNode = false;
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == pagx::NodeType::Font) {
+      hasFontNode = true;
+    }
+  }
+  EXPECT_TRUE(hasFontNode);
 }
 
 CLI_TEST(PAGXCliTest, Embed_AlreadyEmbeddedImage_IsNoOp) {
