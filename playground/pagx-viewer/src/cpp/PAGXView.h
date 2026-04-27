@@ -79,6 +79,7 @@ class PAGXView {
 
  private:
   void applyCenteringTransform();
+  void syncSurfaceSize(tgfx::Context* context);
   void onZoomEnd();
   void updatePerformanceState(double frameDurationMs);
   void updateAdaptiveTileRefinement();

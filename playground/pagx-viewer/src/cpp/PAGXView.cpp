@@ -154,6 +154,7 @@ void PAGXView::buildLayers() {
   displayList.root()->removeChildren();
   displayList.root()->addChild(contentLayer);
   applyCenteringTransform();
+  presentImmediately = true;
 }
 
 void PAGXView::updateSize() {
@@ -163,24 +164,43 @@ void PAGXView::updateSize() {
   if (window == nullptr) {
     return;
   }
-  surface = nullptr;
   auto device = window->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
     return;
   }
-  surface = tgfx::Surface::MakeFrom(context, window);
-  if (surface == nullptr) {
-    device->unlock();
+  syncSurfaceSize(context);
+  device->unlock();
+}
+
+// Rebuilds the render surface when the canvas drawing-buffer size has changed.
+// Must be called while the GL context is locked. Used by both updateSize() and
+// draw() so that size changes driven purely by the JS side (e.g. a host-layer
+// ResizeObserver only adjusting canvas.width/height) are absorbed on the next
+// render tick without requiring an explicit updateSize() call.
+void PAGXView::syncSurfaceSize(tgfx::Context* context) {
+  if (window == nullptr || context == nullptr) {
     return;
   }
-  if (surface->width() != lastSurfaceWidth || surface->height() != lastSurfaceHeight) {
-    lastSurfaceWidth = surface->width();
-    lastSurfaceHeight = surface->height();
-    applyCenteringTransform();
-    presentImmediately = true;
+  int canvasWidth = 0;
+  int canvasHeight = 0;
+  emscripten_get_canvas_element_size(canvasID.c_str(), &canvasWidth, &canvasHeight);
+  if (canvasWidth <= 0 || canvasHeight <= 0) {
+    return;
   }
-  device->unlock();
+  if (surface != nullptr && surface->width() == canvasWidth &&
+      surface->height() == canvasHeight) {
+    return;
+  }
+  surface = nullptr;
+  surface = tgfx::Surface::MakeFrom(context, window);
+  if (surface == nullptr) {
+    return;
+  }
+  lastSurfaceWidth = surface->width();
+  lastSurfaceHeight = surface->height();
+  applyCenteringTransform();
+  presentImmediately = true;
 }
 
 void PAGXView::applyCenteringTransform() {
@@ -250,7 +270,17 @@ void PAGXView::draw() {
   bool hasContentChanged = displayList.hasContentChanged();
   bool hasLastRecording = (lastRecording != nullptr);
   bool needsInitialFrame = presentImmediately || (!useCustomBackgroundColor && backgroundLayer == nullptr);
-  if (!hasContentChanged && !hasLastRecording && !needsInitialFrame) {
+  // Detect size change before the early-return so a pure JS-driven resize
+  // (only canvas.width/height changed, no content dirty) still triggers a
+  // redraw. The actual surface rebuild happens inside syncSurfaceSize() while
+  // the GL context is locked.
+  int currentCanvasWidth = 0;
+  int currentCanvasHeight = 0;
+  emscripten_get_canvas_element_size(canvasID.c_str(), &currentCanvasWidth, &currentCanvasHeight);
+  bool sizeChanged = (surface == nullptr && currentCanvasWidth > 0 && currentCanvasHeight > 0) ||
+                     (surface != nullptr && (surface->width() != currentCanvasWidth ||
+                                             surface->height() != currentCanvasHeight));
+  if (!hasContentChanged && !hasLastRecording && !needsInitialFrame && !sizeChanged) {
     return;
   }
   auto device = window->getDevice();
@@ -258,9 +288,7 @@ void PAGXView::draw() {
   if (context == nullptr) {
     return;
   }
-  if (surface == nullptr) {
-    surface = tgfx::Surface::MakeFrom(context, window);
-  }
+  syncSurfaceSize(context);
   if (surface == nullptr) {
     device->unlock();
     return;
@@ -291,11 +319,16 @@ void PAGXView::draw() {
   auto recording = context->flush();
   if (presentImmediately) {
     presentImmediately = false;
+    lastRecording = nullptr;
     if (recording) {
       context->submit(std::move(recording));
     }
+  } else if (lastRecording) {
+    context->submit(std::move(lastRecording));
+    lastRecording = std::move(recording);
   } else {
-    std::swap(lastRecording, recording);
+    // Prime the pipeline on the first frame: no previous recording is cached yet, so submit the
+    // current one immediately to avoid a blank frame before the delayed-present pipeline kicks in.
     if (recording) {
       context->submit(std::move(recording));
     }

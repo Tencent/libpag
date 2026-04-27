@@ -147,7 +147,6 @@ const ESTIMATED_EMOJI_FONT_SIZE = 10300000;
 class PlaygroundState {
     module: PAGXModule | null = null;
     pagxView: PAGXViewClass | null = null;
-    resized: boolean = false;
     zoom: number = 1.0;
     offsetX: number = 0;
     offsetY: number = 0;
@@ -671,7 +670,6 @@ async function loadWasm(): Promise<void> {
     }
     playgroundState.pagxView = pagxView;
     updateSize();
-    playgroundState.pagxView?.setBackgroundColor('#FFFFFF');
     playgroundState.pagxView?.updateZoomScaleAndOffset(1.0, 0, 0);
     const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
     bindCanvasEvents(canvas);
@@ -692,7 +690,6 @@ function updateSize() {
     if (!playgroundState.pagxView) {
         return;
     }
-    playgroundState.resized = false;
     const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
     const container = document.getElementById('container') as HTMLDivElement;
     const screenRect = container.getBoundingClientRect();
@@ -1280,13 +1277,32 @@ if (typeof window !== 'undefined') {
         }
     };
 
-    window.onresize = () => {
-        if (!playgroundState.pagxView || playgroundState.resized) {
-            return;
-        }
-        playgroundState.resized = true;
-        window.setTimeout(() => {
-            updateSize();
-        }, 300);
-    };
+    // Observe container resize. The C++ PAGXView::draw() now auto-detects
+    // canvas drawing-buffer size changes and rebuilds its render surface in
+    // the same frame, so we can sync canvas.width/height and trigger a draw
+    // synchronously in the callback. This keeps resize + new frame within a
+    // single browser paint tick, eliminating the flicker that the old 300ms
+    // setTimeout debounce was trying to mask.
+    //
+    // rAF throttle: ResizeObserver may fire multiple times per frame during a
+    // fast drag. Coalesce into one updateSize() + draw() per frame to cap GL
+    // surface rebuild cost on low-end devices.
+    const container = document.getElementById('container');
+    if (container) {
+        let pendingResizeFrame: number | null = null;
+        const resizeObserver = new ResizeObserver(() => {
+            if (!playgroundState.pagxView || pendingResizeFrame !== null) {
+                return;
+            }
+            pendingResizeFrame = window.requestAnimationFrame(() => {
+                pendingResizeFrame = null;
+                if (!playgroundState.pagxView) {
+                    return;
+                }
+                updateSize();
+                playgroundState.pagxView.draw();
+            });
+        });
+        resizeObserver.observe(container);
+    }
 }
