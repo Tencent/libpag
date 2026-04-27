@@ -13,12 +13,12 @@
       <!-- Linear gradient fill -->
       <Layer flex="1">
         <Rectangle centerX="0" centerY="0" width="140" height="140" roundness="24"/>
-      <Fill>
-        <LinearGradient>
-          <ColorStop color="#6366F1" offset="0"/>
-          <ColorStop color="#8B5CF6" offset="1"/>
-        </LinearGradient>
-      </Fill>
+        <Fill>
+          <LinearGradient>
+            <ColorStop color="#6366F1" offset="0"/>
+            <ColorStop color="#8B5CF6" offset="1"/>
+          </LinearGradient>
+        </Fill>
         <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#8B5CF650"/>
       </Layer>
     </Layer>
