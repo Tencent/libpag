@@ -19,9 +19,6 @@ they **must not** be omitted.
 | **PathData** | `data` |
 | **Glyph** | `advance` |
 | **SolidColor** | `color` |
-| **LinearGradient** | `endPoint` |
-| **RadialGradient** | `radius` |
-| **DiamondGradient** | `radius` |
 | **ColorStop** | `offset`, `color` |
 | **ImagePattern** | `image` |
 | **BlendFilter** | `color` |
