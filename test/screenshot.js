@@ -34,6 +34,9 @@ async function captureOne(browser, task) {
     });
     const fileUrl = 'file://' + path.resolve(html);
     await page.goto(fileUrl, { waitUntil: 'networkidle0', timeout: SINGLE_TASK_TIMEOUT_MS });
+    // Wait until every @font-face is resolved so the first paint uses our repo-bundled
+    // Noto Sans SC file instead of whatever Chromium substitutes while the font is loading.
+    await page.evaluate(() => document.fonts.ready);
     await page.screenshot({
       path: path.resolve(png),
       type: 'png',
