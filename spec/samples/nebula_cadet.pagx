@@ -260,12 +260,7 @@
       <Layer name="Chips" right="14" top="14" width="150" layout="vertical" gap="6">
         <Layer name="CoinChip" height="28">
           <Rectangle width="100%" height="100%" roundness="14"/>
-          <Fill>
-            <LinearGradient endPoint="1,0">
-              <ColorStop color="#0F1A33CC" offset="0"/>
-              <ColorStop color="#14244ACC" offset="1"/>
-            </LinearGradient>
-          </Fill>
+          <Fill color="@chipGradient"/>
           <Stroke color="#334155" width="1"/>
           <Group>
             <Ellipse left="12" top="6" width="16" height="16"/>
@@ -287,12 +282,7 @@
         </Layer>
         <Layer name="DiamondChip" height="28">
           <Rectangle width="100%" height="100%" roundness="14"/>
-          <Fill>
-            <LinearGradient endPoint="1,0">
-              <ColorStop color="#14244ACC" offset="0"/>
-              <ColorStop color="#0F1A33CC" offset="1"/>
-            </LinearGradient>
-          </Fill>
+          <Fill color="@chipGradient"/>
           <Stroke color="#334155" width="1"/>
           <Group left="12" top="6">
             <Path data="@IconDiamond"/>
@@ -412,6 +402,10 @@
     </Layer>
   </Layer>
   <Resources>
+    <LinearGradient id="chipGradient" endPoint="1,0">
+      <ColorStop color="#0F1A33CC" offset="0"/>
+      <ColorStop color="#14244ACC" offset="1"/>
+    </LinearGradient>
     <PathData id="IconPlay" data="M 0 0 L 24 12 L 0 24 Z"/>
     <PathData id="IconCart" data="M 0 0 L 15 0 L 13 8 L 2 8 Z M 4 12 A 2 2 0 1 0 4 16 A 2 2 0 1 0 4 12 Z M 11 12 A 2 2 0 1 0 11 16 A 2 2 0 1 0 11 12 Z"/>
     <PathData id="IconCrown" data="M 0 10 L 4 0 L 10 6 L 16 0 L 20 10 Z M 2 10 L 2 14 L 18 14 L 18 10 Z"/>

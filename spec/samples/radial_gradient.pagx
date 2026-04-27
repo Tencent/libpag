@@ -4,7 +4,7 @@
   <Layer>
     <Ellipse left="40" top="40" width="320" height="320"/>
     <Fill>
-      <RadialGradient>
+      <RadialGradient center="0.3,0.3" radius="0.8">
         <ColorStop color="#FFF" offset="0"/>
         <ColorStop color="#06B6D4" offset="0.3"/>
         <ColorStop color="#3B82F6" offset="0.7"/>

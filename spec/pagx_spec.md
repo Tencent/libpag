@@ -2092,21 +2092,15 @@ Groups create isolated scopes for geometry accumulation and rendering:
 **Example 2 - Child Group Geometry Propagates Upward**:
 > [Sample](samples/group_propagation.pagx)
 
-**Example 3 - Multiple Painters Reuse Geometry**:
-> [Sample](samples/multiple_painters.pagx)
-
 #### Multiple Fills and Strokes
 
 Since painters do not clear the geometry list, the same geometry can have multiple Fills and Strokes applied consecutively.
 
-**Example 4 - Multiple Fills**:
+**Example 1 - Multiple Fills**:
 > [Sample](samples/multiple_fills.pagx)
 
-**Example 5 - Multiple Strokes**:
+**Example 2 - Multiple Strokes**:
 > [Sample](samples/multiple_strokes.pagx)
-
-**Example 6 - Mixed Overlay**:
-> [Sample](samples/mixed_overlay.pagx)
 
 **Rendering Order**: Multiple painters render in document order; those appearing earlier are below.
 

@@ -1,39 +1,47 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates ImagePattern fill with different scale modes and tile modes. -->
+<!-- Demonstrates the four ImagePattern scaleMode values. The target rectangles are
+     non-square (160x120) so the per-geometry fitting modes produce visibly different
+     results from the square logo image. -->
 <pagx width="400" height="400">
-  <!-- LetterBox: preserve aspect ratio, fit inside bounds, transparent empty areas (tileMode default = decal). -->
+  <!-- LetterBox (default): preserve aspect ratio, fit fully inside the bounds.
+       Empty bands appear on the long axis and are transparent (tileMode default = decal). -->
   <Layer name="LetterBox">
-    <Rectangle left="40" top="40" width="140" height="140" roundness="24"/>
+    <Rectangle left="25" top="45" width="160" height="120" roundness="16"/>
     <Fill>
-      <ImagePattern image="@logo" scaleMode="letterBox"/>
+      <ImagePattern image="@logo"/>
     </Fill>
     <Stroke color="#FFF" width="2"/>
   </Layer>
 
-  <!-- Zoom: preserve aspect ratio, cover bounds (may crop). -->
+  <!-- Zoom: preserve aspect ratio, cover the bounds. The image is centered and
+       cropped along the longer axis. -->
   <Layer name="Zoom">
-    <Rectangle left="220" top="40" width="140" height="140" roundness="24"/>
+    <Rectangle left="215" top="45" width="160" height="120" roundness="16"/>
     <Fill>
       <ImagePattern image="@logo" scaleMode="zoom"/>
     </Fill>
     <Stroke color="#FFF" width="2"/>
   </Layer>
 
-  <!-- Stretch: ignore aspect ratio, fill bounds. -->
+  <!-- Stretch: ignore aspect ratio and fill the bounds; the square logo is squashed
+       horizontally to match the 4:3 rectangle. -->
   <Layer name="Stretch">
-    <Rectangle left="40" top="220" width="140" height="140" roundness="24"/>
+    <Rectangle left="25" top="235" width="160" height="120" roundness="16"/>
     <Fill>
       <ImagePattern image="@logo" scaleMode="stretch"/>
     </Fill>
     <Stroke color="#FFF" width="2"/>
   </Layer>
 
-  <!-- None + repeat: disable per-geometry fitting; matrix + repeat tile in layer space. -->
-  <Layer name="RepeatScaled">
-    <Rectangle left="220" top="220" width="140" height="140" roundness="24"/>
+  <!-- None + repeat: disable per-geometry fitting. The image is placed in the parent
+       Layer's coordinate space (origin at the Layer's (0,0)) and tiled by tileMode.
+       The rectangle simply acts as a window onto that tiled fill, so the tiling grid
+       is aligned to the Layer instead of the rectangle. -->
+  <Layer name="RepeatTiled">
+    <Rectangle left="215" top="235" width="160" height="120" roundness="16"/>
     <Fill>
       <ImagePattern image="@logo" scaleMode="none" tileModeX="repeat" tileModeY="repeat"
-                    matrix="0.24,0,0,0.24,220,220"/>
+                    matrix="0.16,0,0,0.16,0,0"/>
     </Fill>
     <Stroke color="#FFF" width="2"/>
   </Layer>

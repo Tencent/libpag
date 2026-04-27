@@ -2087,21 +2087,15 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 **示例 2 - 子 Group 几何向上累积**：
 > [Sample](samples/group_propagation.pagx)
 
-**示例 3 - 多个绘制器复用几何**：
-> [Sample](samples/multiple_painters.pagx)
-
 #### 多重填充与描边
 
 由于绘制器不清空几何列表，同一几何可连续应用多个 Fill 和 Stroke。
 
-**示例 4 - 多重填充**：
+**示例 1 - 多重填充**：
 > [Sample](samples/multiple_fills.pagx)
 
-**示例 5 - 多重描边**：
+**示例 2 - 多重描边**：
 > [Sample](samples/multiple_strokes.pagx)
-
-**示例 6 - 混合叠加**：
-> [Sample](samples/mixed_overlay.pagx)
 
 **渲染顺序**：多个绘制器按文档顺序渲染，先出现的位于下方。
 
