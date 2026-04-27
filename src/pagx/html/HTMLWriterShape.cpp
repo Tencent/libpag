@@ -1187,6 +1187,27 @@ bool HTMLWriter::canCSS(const std::vector<GeoInfo>& geos, const Fill* fill, cons
     if (fill->fillRule == FillRule::EvenOdd) {
       return false;
     }
+    // Extract the geometry's paint-box size up front so gradient branches below can test
+    // whether the bounding box is square. tgfx's `fitsToGeometry=true` path (the default
+    // since PR#3404) renders gradients in normalized [0, 1]² shader space and then applies
+    // `scale(W, H)` to reach pixel space — equivalent to SVG `gradientUnits="objectBoundingBox"`.
+    // CSS `linear-gradient`/`radial-gradient`/`conic-gradient` have no equivalent of this
+    // non-uniform shader scale, so they diverge from tgfx whenever W != H. Fall back to the
+    // SVG emit path in those cases; when W == H the two formulations are geometrically
+    // identical and the CSS optimisation is still safe.
+    float boxW = 0, boxH = 0;
+    if (geos[0].type == NodeType::Rectangle) {
+      auto* r = static_cast<const Rectangle*>(geos[0].element);
+      auto size = r->renderSize();
+      boxW = size.width;
+      boxH = size.height;
+    } else if (geos[0].type == NodeType::Ellipse) {
+      auto* e = static_cast<const Ellipse*>(geos[0].element);
+      auto size = e->renderSize();
+      boxW = size.width;
+      boxH = size.height;
+    }
+    bool bboxNonSquare = boxW > 0 && boxH > 0 && !FloatNearlyZero(boxW - boxH);
     if (fill->color && fill->color->nodeType() == NodeType::LinearGradient) {
       auto g = static_cast<const LinearGradient*>(fill->color);
       if (!FloatNearlyZero(g->matrix.tx) || !FloatNearlyZero(g->matrix.ty)) {
@@ -1195,6 +1216,9 @@ bool HTMLWriter::canCSS(const std::vector<GeoInfo>& geos, const Fill* fill, cons
       float sx = std::sqrt(g->matrix.a * g->matrix.a + g->matrix.b * g->matrix.b);
       float sy = std::sqrt(g->matrix.c * g->matrix.c + g->matrix.d * g->matrix.d);
       if (!FloatNearlyZero(sx - 1.0f) || !FloatNearlyZero(sy - 1.0f)) {
+        return false;
+      }
+      if (g->fitsToGeometry && bboxNonSquare) {
         return false;
       }
     }
@@ -1207,6 +1231,9 @@ bool HTMLWriter::canCSS(const std::vector<GeoInfo>& geos, const Fill* fill, cons
       if (hasRotation && nonUniformScale) {
         return false;
       }
+      if (g->fitsToGeometry && bboxNonSquare) {
+        return false;
+      }
     }
     if (fill->color && fill->color->nodeType() == NodeType::DiamondGradient) {
       return false;
@@ -1216,6 +1243,9 @@ bool HTMLWriter::canCSS(const std::vector<GeoInfo>& geos, const Fill* fill, cons
       float sx = std::sqrt(g->matrix.a * g->matrix.a + g->matrix.b * g->matrix.b);
       float sy = std::sqrt(g->matrix.c * g->matrix.c + g->matrix.d * g->matrix.d);
       if (!FloatNearlyZero(sx - 1.0f) || !FloatNearlyZero(sy - 1.0f)) {
+        return false;
+      }
+      if (g->fitsToGeometry && bboxNonSquare) {
         return false;
       }
     }

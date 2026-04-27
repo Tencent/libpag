@@ -496,7 +496,11 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type) {
         svg.addAttr("y1", FloatToString(g->startPoint.y));
         svg.addAttr("x2", FloatToString(g->endPoint.x));
         svg.addAttr("y2", FloatToString(g->endPoint.y));
-        svg.addAttr("gradientUnits", "userSpaceOnUse");
+        // fitsToGeometry maps to SVG objectBoundingBox, where coords live in [0,1] of the
+        // filled shape's bbox — this matches PAGX's normalized default. When fitsToGeometry
+        // is false the gradient parameters are pixel values in the mask's own coordinate
+        // space and must be emitted as userSpaceOnUse so SVG consumes them verbatim.
+        svg.addAttr("gradientUnits", g->fitsToGeometry ? "objectBoundingBox" : "userSpaceOnUse");
         if (!g->matrix.isIdentity()) {
           svg.addAttr("gradientTransform", MatrixToCSS(g->matrix));
         }
@@ -518,7 +522,7 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type) {
         svg.addAttr("cx", FloatToString(g->center.x));
         svg.addAttr("cy", FloatToString(g->center.y));
         svg.addAttr("r", FloatToString(g->radius));
-        svg.addAttr("gradientUnits", "userSpaceOnUse");
+        svg.addAttr("gradientUnits", g->fitsToGeometry ? "objectBoundingBox" : "userSpaceOnUse");
         if (!g->matrix.isIdentity()) {
           svg.addAttr("gradientTransform", MatrixToCSS(g->matrix));
         }

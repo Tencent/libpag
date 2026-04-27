@@ -33,6 +33,20 @@ namespace pagx {
 
 using pag::FloatNearlyZero;
 
+// Maps a point from a Gradient's own coordinate space to the PAGX pixel coordinate space
+// expected by the rest of colorToCSS(). When `fitsToGeometry` is true (the default since tgfx
+// adopted relative-fill defaults), the gradient parameters live in the geometry's normalized
+// (0, 0)-(1, 1) bounding box; multiply by the box size and offset by its top-left to recover
+// pixel coordinates. When `fitsToGeometry` is false the parameters are already pixel values
+// (in the parent container's coordinate space), so return them unchanged.
+static Point MapGradientPoint(const Point& p, bool fitsToGeometry, float boxLeft, float boxTop,
+                              float boxWidth, float boxHeight) {
+  if (!fitsToGeometry || boxWidth <= 0 || boxHeight <= 0) {
+    return p;
+  }
+  return {p.x * boxWidth + boxLeft, p.y * boxHeight + boxTop};
+}
+
 std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, float boxLeft,
                                    float boxTop, float boxWidth, float boxHeight) {
   if (!src) {
@@ -65,8 +79,10 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
           return {};
         }
       }
-      Point s = g->matrix.mapPoint(g->startPoint);
-      Point e = g->matrix.mapPoint(g->endPoint);
+      Point s = MapGradientPoint(g->matrix.mapPoint(g->startPoint), g->fitsToGeometry, boxLeft,
+                                 boxTop, boxWidth, boxHeight);
+      Point e = MapGradientPoint(g->matrix.mapPoint(g->endPoint), g->fitsToGeometry, boxLeft,
+                                 boxTop, boxWidth, boxHeight);
       float ang = std::atan2(e.y - s.y, e.x - s.x) * 180.0f / static_cast<float>(M_PI) + 90.0f;
 
       // CSS linear-gradient's 0% and 100% anchors sit on the gradient line drawn through the
@@ -181,17 +197,27 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
       // tealGlow has center="50,50" but is painted inside an ellipse positioned around (180,180)
       // — tgfx renders it as fully-transparent outer stop, but naive CSS would draw it centred
       // on (50,50) within the div, introducing a visible teal glow the native render lacks).
-      Point c = g->matrix.mapPoint(g->center);
+      Point c = MapGradientPoint(g->matrix.mapPoint(g->center), g->fitsToGeometry, boxLeft, boxTop,
+                                 boxWidth, boxHeight);
       c.x -= boxLeft;
       c.y -= boxTop;
-      float r = g->radius * sx;
-      if (nonUniformScale) {
-        float ry = g->radius * sy;
-        return "radial-gradient(ellipse " + FloatToString(r) + "px " + FloatToString(ry) +
+      // When fitsToGeometry is true, radius lives in normalized bounding-box space; the fit
+      // matrix stretches it anisotropically into (radius * boxWidth, radius * boxHeight), so
+      // emit an ellipse keyed by the box extents. Callers that already sized the box square
+      // still reach the circle branch below via the nonUniformScale check.
+      float rx = g->radius * sx;
+      float ry = g->radius * (nonUniformScale ? sy : sx);
+      if (g->fitsToGeometry && boxWidth > 0 && boxHeight > 0) {
+        rx = g->radius * boxWidth * sx;
+        ry = g->radius * boxHeight * (nonUniformScale ? sy : sx);
+      }
+      if (nonUniformScale || (g->fitsToGeometry && boxWidth > 0 && boxHeight > 0 &&
+                              !FloatNearlyZero(boxWidth - boxHeight))) {
+        return "radial-gradient(ellipse " + FloatToString(rx) + "px " + FloatToString(ry) +
                "px at " + FloatToString(c.x) + "px " + FloatToString(c.y) + "px," +
                CSSStops(g->colorStops) + ")";
       }
-      return "radial-gradient(circle " + FloatToString(r) + "px at " + FloatToString(c.x) + "px " +
+      return "radial-gradient(circle " + FloatToString(rx) + "px at " + FloatToString(c.x) + "px " +
              FloatToString(c.y) + "px," + CSSStops(g->colorStops) + ")";
     }
     case NodeType::ConicGradient: {
@@ -211,7 +237,15 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
         }
         matRotation = std::atan2(g->matrix.b, g->matrix.a) * 180.0f / static_cast<float>(M_PI);
       }
-      Point c = g->matrix.mapPoint(g->center);
+      Point c = MapGradientPoint(g->matrix.mapPoint(g->center), g->fitsToGeometry, boxLeft, boxTop,
+                                 boxWidth, boxHeight);
+      // After normalizing to PAGX pixel space we need element-local coordinates for the CSS
+      // `conic-gradient(... at X Y)` anchor. In the legacy absolute-pixel path the pagx samples
+      // happen to place geometries at the outer layer origin so `boxLeft`/`boxTop` are zero and
+      // the subtraction is a no-op; once we added normalized support we must subtract
+      // unconditionally so nested layers also work.
+      c.x -= boxLeft;
+      c.y -= boxTop;
       float cssStartAng = g->startAngle + 90.0f + matRotation;
       float sweepRange = g->endAngle - g->startAngle;
       if (FloatNearlyZero(sweepRange - 360.0f)) {
@@ -280,12 +314,23 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
       if (outAlpha) {
         *outAlpha = 1.0f;
       }
-      Point c = g->matrix.mapPoint(g->center);
+      Point c = MapGradientPoint(g->matrix.mapPoint(g->center), g->fitsToGeometry, boxLeft, boxTop,
+                                 boxWidth, boxHeight);
       c.x -= boxLeft;
       c.y -= boxTop;
       float sx = std::sqrt(g->matrix.a * g->matrix.a + g->matrix.b * g->matrix.b);
-      float r = g->radius * sx;
-      return "radial-gradient(circle " + FloatToString(r) + "px at " + FloatToString(c.x) + "px " +
+      float rx = g->radius * sx;
+      float ry = rx;
+      if (g->fitsToGeometry && boxWidth > 0 && boxHeight > 0) {
+        rx = g->radius * boxWidth * sx;
+        ry = g->radius * boxHeight * sx;
+      }
+      if (!FloatNearlyZero(rx - ry)) {
+        return "radial-gradient(ellipse " + FloatToString(rx) + "px " + FloatToString(ry) +
+               "px at " + FloatToString(c.x) + "px " + FloatToString(c.y) + "px," +
+               CSSStops(g->colorStops) + ")";
+      }
+      return "radial-gradient(circle " + FloatToString(rx) + "px at " + FloatToString(c.x) + "px " +
              FloatToString(c.y) + "px," + CSSStops(g->colorStops) + ")";
     }
     default:
@@ -386,7 +431,7 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha) 
     _defs->addAttr("cx", FloatToString(g->center.x));
     _defs->addAttr("cy", FloatToString(g->center.y));
     _defs->addAttr("r", FloatToString(g->radius));
-    _defs->addAttr("gradientUnits", "userSpaceOnUse");
+    _defs->addAttr("gradientUnits", g->fitsToGeometry ? "objectBoundingBox" : "userSpaceOnUse");
     if (!g->matrix.isIdentity()) {
       _defs->addAttr("gradientTransform", MatrixToCSS(g->matrix));
     }
@@ -490,7 +535,10 @@ void HTMLWriter::writeSVGGradientDef(const ColorSource* src, const std::string& 
     _defs->addAttr("y1", FloatToString(g->startPoint.y));
     _defs->addAttr("x2", FloatToString(g->endPoint.x));
     _defs->addAttr("y2", FloatToString(g->endPoint.y));
-    _defs->addAttr("gradientUnits", "userSpaceOnUse");
+    // fitsToGeometry maps to SVG objectBoundingBox (coords in [0,1] of the filled shape's
+    // bbox); fitsToGeometry=false keeps the legacy userSpaceOnUse semantics for pixel-space
+    // gradient parameters shared across multiple geometries.
+    _defs->addAttr("gradientUnits", g->fitsToGeometry ? "objectBoundingBox" : "userSpaceOnUse");
     if (!g->matrix.isIdentity()) {
       _defs->addAttr("gradientTransform", MatrixToCSS(g->matrix));
     }
@@ -515,7 +563,7 @@ void HTMLWriter::writeSVGGradientDef(const ColorSource* src, const std::string& 
     _defs->addAttr("cx", FloatToString(g->center.x));
     _defs->addAttr("cy", FloatToString(g->center.y));
     _defs->addAttr("r", FloatToString(g->radius));
-    _defs->addAttr("gradientUnits", "userSpaceOnUse");
+    _defs->addAttr("gradientUnits", g->fitsToGeometry ? "objectBoundingBox" : "userSpaceOnUse");
     if (!g->matrix.isIdentity()) {
       _defs->addAttr("gradientTransform", MatrixToCSS(g->matrix));
     }
