@@ -567,6 +567,7 @@ class LayerBuilderContext {
     }
 
     // ImageScaleMode enum values: STRETCH=0, FIT=1, FILL=2, TILE=3
+    // Mirrors the string values emitted by PAGX exporters for custom attribute "image-scale-mode".
     enum class ImageScaleMode : int { STRETCH = 0, FIT = 1, FILL = 2, TILE = 3 };
     auto scaleMode = static_cast<ImageScaleMode>(scaleModeInt);
 
