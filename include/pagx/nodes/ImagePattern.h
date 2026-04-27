@@ -32,10 +32,7 @@ class Image;
 /**
  * An image pattern color source that uses an image as a fill. The image is first transformed by
  * the matrix attribute in its local coordinate space (the original image rect with the origin at
- * its top-left). When scaleMode is not ScaleMode::None, the transformed image is then fitted into
- * each geometry's bounding box according to the scale mode. When scaleMode is ScaleMode::None,
- * the transformed image is placed directly in the layer's coordinate space without per-geometry
- * fitting.
+ * its top-left). The transformed image is then placed into the geometry according to scaleMode.
  */
 class ImagePattern : public ColorSource {
  public:
@@ -71,9 +68,11 @@ class ImagePattern : public ColorSource {
   Matrix matrix = {};
 
   /**
-   * The rule used to fit the transformed image into each geometry's bounding box. The default
-   * value is LetterBox. When set to ScaleMode::None, the image is placed directly in the layer's
-   * coordinate space without per-geometry fitting.
+   * The rule used to place the transformed image into the geometry. The default is LetterBox,
+   * which fits the image into each geometry's bounding box (so the fill auto-fits per geometry).
+   * When set to ScaleMode::None, the image is placed in the parent container's coordinate space
+   * (the owning Group or Layer, with its origin at (0, 0)) without per-geometry fitting, and
+   * multiple geometries in that container share one continuous fill.
    */
   ScaleMode scaleMode = ScaleMode::LetterBox;
 

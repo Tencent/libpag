@@ -982,8 +982,9 @@ LinearGradient* SVGParserContext::convertLinearGradient(const std::shared_ptr<DO
   gradient->startPoint = transformMatrix.mapPoint(start);
   gradient->endPoint = transformMatrix.mapPoint(end);
 
-  // SVG gradients are already resolved into the geometry's local coordinate space above, so keep
-  // the PAGX gradient in that same space instead of the default normalized 0-1 space.
+  // SVG gradients are already resolved into absolute coordinates above (the parent container's
+  // coordinate space in PAGX), so disable per-geometry fitting instead of using the default
+  // normalized 0-1 space.
   gradient->fitsToGeometry = false;
 
   // Parse stops.
@@ -1027,8 +1028,9 @@ RadialGradient* SVGParserContext::convertRadialGradient(const std::shared_ptr<DO
     gradient->matrix = transformMatrix;
   }
 
-  // SVG gradients are already resolved into the geometry's local coordinate space above, so keep
-  // the PAGX gradient in that same space instead of the default normalized 0-1 space.
+  // SVG gradients are already resolved into absolute coordinates above (the parent container's
+  // coordinate space in PAGX), so disable per-geometry fitting instead of using the default
+  // normalized 0-1 space.
   gradient->fitsToGeometry = false;
 
   // Parse stops.
@@ -1042,8 +1044,9 @@ ImagePattern* SVGParserContext::convertPattern(const std::shared_ptr<DOMNode>& e
 
   pattern->id = getAttribute(element, "id");
 
-  // SVG patterns are already resolved into the layer's coordinate space via the matrix below,
-  // so skip per-geometry fitting instead of using the default LetterBox scale mode.
+  // SVG patterns are already resolved into absolute coordinates via the matrix below (the
+  // parent container's coordinate space in PAGX), so skip per-geometry fitting instead of using
+  // the default LetterBox scale mode.
   pattern->scaleMode = ScaleMode::None;
 
   // Parse pattern dimensions from SVG attributes.

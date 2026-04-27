@@ -116,7 +116,7 @@ sliders and loading indicators.
 ```
 
 **Pattern**: LinearGradient inside Fill applies to Text geometry — equivalent to CSS
-`background-clip: text`. Gradient coordinates default to the Text's normalized 0-1 bounding
+`background-clip: text`. Gradient coordinates default to the Text's own normalized 0-1 bounding
 box, so `endPoint="1,0"` spans the full text width regardless of font size.
 No Group needed when only one painter scope exists.
 

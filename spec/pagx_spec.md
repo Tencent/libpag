@@ -433,7 +433,7 @@ Image patterns use an image as a color source.
 | `filterMode` | FilterMode | linear | Texture filter mode |
 | `mipmapMode` | MipmapMode | linear | Mipmap mode |
 | `matrix` | Matrix | identity matrix | Transform matrix applied to the image in its local coordinate space (the original image rect with the origin at its top-left) |
-| `scaleMode` | ScaleMode | letterBox | Rule used to fit the transformed image into each geometry's bounding box. When `none`, the image is placed directly in the layer's coordinate space without per-geometry fitting. See [Color Source Coordinate System](#color-source-coordinate-system) |
+| `scaleMode` | ScaleMode | letterBox | Rule used to fit the transformed image into each geometry's bounding box. When `none`, the image is placed in the parent container's coordinate space without per-geometry fitting. See [Color Source Coordinate System](#color-source-coordinate-system) |
 
 **TileMode**: `clamp`, `repeat`, `mirror`, `decal`
 
@@ -449,32 +449,28 @@ Image patterns use an image as a color source.
 
 ##### Color Source Coordinate System
 
-Except for solid colors, all color sources (gradients, image patterns) support both a normalized coordinate space relative to each geometry's bounding box and the geometry's local coordinate space. The interpretation is controlled per color source:
+Except for solid colors, every color source (gradient or image pattern) interprets its geometric parameters in one of two coordinate spaces:
 
-- **Gradients**: governed by the `fitsToGeometry` attribute (default `true`).
-- **ImagePattern**: governed by the `scaleMode` attribute. Any scale mode other than `none` fits the image into each geometry's bounding box; `scaleMode="none"` places the image directly in the layer's coordinate space.
+- **Gradient**: `fitsToGeometry` (default `true`).
+- **ImagePattern**: `scaleMode` (default `letterBox`); any value other than `none` selects per-geometry fitting, `scaleMode="none"` selects the absolute mode.
 
-**Normalized bounding box space (default)**:
+**Relative mode (default — per-geometry fit)**:
 
-Gradient parameters (`startPoint`, `endPoint`, `center`, `radius`, etc.) are interpreted in a `(0, 0)`-`(1, 1)` coordinate space that maps to each geometry's bounding box. ImagePattern images are fitted into each geometry's bounding box according to `scaleMode`. Color sources in this space **automatically adapt to the size of every geometry that uses them**, so multiple shapes of different sizes sharing the same gradient or pattern each receive a properly-fitted fill.
+Gradient parameters (`startPoint`, `endPoint`, `center`, `radius`, etc.) live in a `(0, 0)`-`(1, 1)` space mapped to **each geometry's own bounding box**; ImagePattern images are fitted into each geometry's bounding box according to `scaleMode`. The fill auto-resizes with the geometry, so multiple shapes of different sizes sharing the same color source each get their own properly-fitted fill.
 
-**Local coordinate space** (opt-in):
+**Absolute mode (opt-in — `fitsToGeometry="false"` / `scaleMode="none"`)**:
 
-Set `fitsToGeometry="false"` on a gradient or `scaleMode="none"` on an ImagePattern to interpret parameters in the geometry's local coordinate space. In this mode the color source is positioned absolutely; multiple geometries sharing the same color source share a single continuous fill. The `matrix` attribute applies on top of the selected space.
+Parameters live in **the parent container's coordinate space** (the owning Group or Layer, with its origin at `(0, 0)`). Multiple geometries inside the same container share one continuous fill; resizing a geometry no longer rescales its fill, but a transform on the parent container moves both together.
 
-**Transform Behavior**:
+The `matrix` attribute is applied on top of the selected space.
 
-1. **External transforms affect both geometry and color source**: Group transforms, layer matrices, and other external transforms apply holistically to both the geometry element and its color source—they scale, rotate, and translate together.
-
-2. **Modifying geometry properties affects normalized fills but not absolute fills**: Because normalized fills re-fit to the geometry's new bounds, changing a Rectangle's `width`/`height` automatically rescales the gradient or pattern to cover the updated shape. In local-space mode (`fitsToGeometry="false"` / `scaleMode="none"`), the color source's coordinates do not move with the geometry.
-
-**Example**: Drawing a diagonal linear gradient in local coordinate space:
+**Example**: A linear gradient drawn in absolute mode across a 300×300 rectangle inside a Layer:
 
 > [Sample](samples/color_source_coordinates.pagx)
 
-- With `fitsToGeometry="false"` and a 300×300 region: applying `scale(2, 2)` to the layer scales both the rectangle and the gradient together (rectangle becomes 600×600, gradient stays aligned)
-- With `fitsToGeometry="false"` and changing Rectangle's `width`/`height` to 600,600 directly: the rectangle becomes 600×600 but the gradient coordinates remain unchanged, covering only the top-left quarter
-- With the default `fitsToGeometry="true"`: the gradient automatically re-fits to whatever size the rectangle has, so the visual fill always spans the shape's bounding box
+- `fitsToGeometry="false"` + `scale(2, 2)` on the parent Layer: the rectangle becomes 600×600 and the gradient scales with it.
+- `fitsToGeometry="false"` + Rectangle resized to 600×600 directly: the rectangle grows but the gradient stays anchored to the Layer, covering only the top-left quarter.
+- Default `fitsToGeometry="true"`: the gradient always re-fits to the rectangle's current bounding box.
 
 #### 3.3.4 Composition
 

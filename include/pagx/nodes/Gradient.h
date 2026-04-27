@@ -29,17 +29,12 @@ namespace pagx {
  * Base class for all gradient color sources. Gradient defines the attributes shared by linear,
  * radial, conic, and diamond gradients: a transformation matrix, a sequence of ColorStops, and
  * the coordinate-space selector fitsToGeometry.
- *
- * When fitsToGeometry is true (the default), the gradient's geometric parameters (start/end
- * points, center, radius, etc.) are interpreted in a normalized 0-1 coordinate space mapped to
- * each geometry's bounding box. When fitsToGeometry is false, the parameters are interpreted in
- * the geometry's local coordinate space.
  */
 class Gradient : public ColorSource {
  public:
   /**
-   * The transformation matrix applied to the gradient. The matrix operates on the gradient's
-   * local coordinate space (the space where startPoint/endPoint/center/radius are expressed).
+   * The transformation matrix applied to the gradient. The matrix is applied on top of the
+   * coordinate space selected by fitsToGeometry.
    */
   Matrix matrix = {};
 
@@ -49,10 +44,12 @@ class Gradient : public ColorSource {
   std::vector<ColorStop*> colorStops = {};
 
   /**
-   * Whether the gradient parameters are interpreted relative to each geometry's bounding box.
-   * When true (the default), the parameters live in a (0, 0)-(1, 1) coordinate space mapped to
-   * each geometry's bounding box. When false, the parameters are in the geometry's local
-   * coordinate space.
+   * Selects the coordinate space for the gradient's geometric parameters (start/end points,
+   * center, radius, etc.). When true (the default), the parameters live in a normalized
+   * (0, 0)-(1, 1) space mapped to each geometry's bounding box, and the fill auto-fits per
+   * geometry. When false, the parameters live in the parent container's coordinate space (the
+   * owning Group or Layer, with its origin at (0, 0)), and multiple geometries in that
+   * container share one continuous fill.
    */
   bool fitsToGeometry = true;
 

@@ -244,8 +244,8 @@ Color source that interpolates along a line from start point to end point.
 |-----------|------|---------|-------------|
 | `startPoint` | Point | `0,0` | Gradient start point |
 | `endPoint` | Point | `1,1` | Gradient end point |
-| `matrix` | Matrix | identity | Transform matrix for the gradient coordinate system |
-| `fitsToGeometry` | boolean | true | Whether the points are in the geometry's normalized 0-1 bounding box space (true) or local coordinate space (false) |
+| `matrix` | Matrix | identity | Transform matrix applied on top of the selected coordinate space |
+| `fitsToGeometry` | boolean | true | `true`: points are in each geometry's normalized 0-1 bounding box (auto-fit per shape). `false`: points are in the parent container's coordinate space (Group/Layer, origin at (0,0)) |
 
 ### ColorStop
 
@@ -269,8 +269,8 @@ Color source that radiates outward from a center point.
 |-----------|------|---------|-------------|
 | `center` | Point | `0.5,0.5` | Gradient center point |
 | `radius` | float | `0.5` | Gradient radius |
-| `matrix` | Matrix | identity | Transform matrix for the gradient coordinate system |
-| `fitsToGeometry` | boolean | true | Whether center/radius are in the geometry's normalized 0-1 bounding box space (true) or local coordinate space (false) |
+| `matrix` | Matrix | identity | Transform matrix applied on top of the selected coordinate space |
+| `fitsToGeometry` | boolean | true | `true`: center/radius are in each geometry's normalized 0-1 bounding box (auto-fit per shape). `false`: in the parent container's coordinate space (Group/Layer, origin at (0,0)) |
 
 ### ConicGradient
 
@@ -281,8 +281,8 @@ Color source (sweep gradient) that interpolates along the circumference between 
 | `center` | Point | `0.5,0.5` | Gradient center point |
 | `startAngle` | float | 0 | Start angle in degrees (0° = right, clockwise positive) |
 | `endAngle` | float | 360 | End angle in degrees |
-| `matrix` | Matrix | identity | Transform matrix for the gradient coordinate system |
-| `fitsToGeometry` | boolean | true | Whether center is in the geometry's normalized 0-1 bounding box space (true) or local coordinate space (false) |
+| `matrix` | Matrix | identity | Transform matrix applied on top of the selected coordinate space |
+| `fitsToGeometry` | boolean | true | `true`: center is in each geometry's normalized 0-1 bounding box (auto-fit per shape). `false`: in the parent container's coordinate space (Group/Layer, origin at (0,0)) |
 
 ### DiamondGradient
 
@@ -292,8 +292,8 @@ Color source that radiates from center toward four corners using Chebyshev dista
 |-----------|------|---------|-------------|
 | `center` | Point | `0.5,0.5` | Gradient center point |
 | `radius` | float | `0.5` | Gradient radius |
-| `matrix` | Matrix | identity | Transform matrix for the gradient coordinate system |
-| `fitsToGeometry` | boolean | true | Whether center/radius are in the geometry's normalized 0-1 bounding box space (true) or local coordinate space (false) |
+| `matrix` | Matrix | identity | Transform matrix applied on top of the selected coordinate space |
+| `fitsToGeometry` | boolean | true | `true`: center/radius are in each geometry's normalized 0-1 bounding box (auto-fit per shape). `false`: in the parent container's coordinate space (Group/Layer, origin at (0,0)) |
 
 ### ImagePattern
 
@@ -307,7 +307,7 @@ Color source that uses an image as a fill pattern with configurable tiling.
 | `filterMode` | FilterMode | linear | Texture filter mode |
 | `mipmapMode` | MipmapMode | linear | Mipmap mode |
 | `matrix` | Matrix | identity | Transform matrix applied to the image in its local coordinate space |
-| `scaleMode` | ScaleMode | letterBox | How the transformed image is fitted into each geometry's bounding box. Values: `none` (no per-geometry fitting; image placed directly in layer space), `stretch`, `letterBox`, `zoom` |
+| `scaleMode` | ScaleMode | letterBox | How the transformed image is fitted into each geometry's bounding box. Values: `stretch`, `letterBox`, `zoom` (auto-fit per shape); `none` (no per-geometry fitting; image placed in the parent container's coordinate space — Group/Layer, origin at (0,0)) |
 
 ### DropShadowStyle
 

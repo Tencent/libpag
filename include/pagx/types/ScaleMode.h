@@ -25,10 +25,10 @@ namespace pagx {
  */
 enum class ScaleMode {
   /**
-   * The image is not fitted into the geometry's bounding box. It is placed directly in the layer's
-   * coordinate space and tiled according to the pattern's tile modes. Use this mode when multiple
-   * geometries should share a continuous image layout instead of each receiving its own fitted
-   * copy.
+   * The image is not fitted into the geometry's bounding box. It is placed in the parent
+   * container's coordinate space (the owning Group or Layer, with its origin at (0, 0)) and
+   * tiled according to the pattern's tile modes. Use this mode to share one continuous image
+   * layout across multiple geometries instead of giving each its own fitted copy.
    */
   None,
 

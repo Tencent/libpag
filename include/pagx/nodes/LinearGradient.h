@@ -25,8 +25,8 @@ namespace pagx {
 
 /**
  * A linear gradient color source that produces a gradient along a line between two points. By
- * default the start and end points are interpreted in the geometry's normalized 0-1 bounding box
- * space (see Gradient::fitsToGeometry).
+ * default the start and end points are interpreted in each geometry's normalized (0, 0)-(1, 1)
+ * bounding box space (see Gradient::fitsToGeometry).
  */
 class LinearGradient : public Gradient {
  public:
