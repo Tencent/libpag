@@ -5,7 +5,7 @@
     <Ellipse left="160" top="160" width="180" height="180"/>
     <MergePath mode="union"/>
     <Fill>
-      <LinearGradient>
+      <LinearGradient endPoint="1,1">
         <ColorStop color="#6366F1" offset="0"/>
         <ColorStop color="#EC4899" offset="1"/>
       </LinearGradient>
