@@ -39,7 +39,7 @@ Layers in rows or columns, and constraint positioning for positioning elements w
     <Rectangle width="100%" height="100%" roundness="8"/>
     <Fill color="#3B82F6"/>
     <Group centerX="0" centerY="0" padding="10,15">
-      <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+      <Text text="Get Started" fontFamily="Noto Sans SC" fauxBold="true" fontSize="14"/>
       <Fill color="#FFF"/>
     </Group>
     <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#3B82F640"/>
@@ -65,7 +65,7 @@ linebox model), so use larger horizontal than vertical padding for visually equa
       <Fill color="#10B981"/>
     </Layer>
     <Layer>
-      <Text text="Online" fontFamily="Arial" fontSize="14"/>
+      <Text text="Online" fontFamily="Noto Sans SC" fontSize="14"/>
       <Fill color="#374151"/>
     </Layer>
   </Layer>
@@ -128,13 +128,13 @@ No Group needed when only one painter scope exists.
   <Layer centerX="0" centerY="0" layout="vertical" gap="16" alignment="center">
     <!-- Underline: same color — Text + Rectangle + single Fill -->
     <Layer>
-      <Text text="View All" fontFamily="Arial" fontSize="14"/>
+      <Text text="View All" fontFamily="Noto Sans SC" fontSize="14"/>
       <Rectangle bottom="0" width="100%" height="1"/>
       <Fill color="#3B82F6"/>
     </Layer>
     <!-- Strikethrough: different colors — Group isolates line's Fill -->
     <Layer>
-      <Text text="¥599" fontFamily="Arial" fontSize="16"/>
+      <Text text="¥599" fontFamily="Noto Sans SC" fontSize="16"/>
       <Fill color="#BDC3C7"/>
       <Group centerY="0" width="100%">
         <Rectangle width="100%" height="1"/>
@@ -209,7 +209,7 @@ DropShadowStyle for depth. For square avatars, use Rectangle with `roundness`.
       <Rectangle width="100%" height="100%" roundness="6"/>
       <Fill color="#6366F1"/>
       <Group centerX="0" centerY="0" padding="8,12">
-        <Text text="Messages" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
+        <Text text="Messages" fontFamily="Noto Sans SC" fauxBold="true" fontSize="13"/>
         <Fill color="#FFF"/>
       </Group>
     </Layer>
@@ -217,7 +217,7 @@ DropShadowStyle for depth. For square avatars, use Rectangle with `roundness`.
       <Rectangle width="100%" height="100%" roundness="6"/>
       <Fill color="#F1F5F9"/>
       <Group centerX="0" centerY="0" padding="8,12">
-        <Text text="Settings" fontFamily="Arial" fontSize="13"/>
+        <Text text="Settings" fontFamily="Noto Sans SC" fontSize="13"/>
         <Fill color="#334155"/>
       </Group>
     </Layer>
@@ -251,11 +251,11 @@ A card with vertical container layout, text header, and action buttons.
       <!-- Title + Value: flex="1" absorbs remaining space -->
       <Layer flex="1" layout="vertical">
         <Layer>
-          <Text text="Account Balance" fontFamily="Arial" fontSize="14"/>
+          <Text text="Account Balance" fontFamily="Noto Sans SC" fontSize="14"/>
           <Fill color="#64748B"/>
         </Layer>
         <Layer>
-          <Text text="$12,580" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+          <Text text="$12,580" fontFamily="Noto Sans SC" fauxBold="true" fontSize="28"/>
           <Fill color="#1E293B"/>
         </Layer>
       </Layer>
@@ -265,7 +265,7 @@ A card with vertical container layout, text header, and action buttons.
           <Rectangle width="100%" height="100%" roundness="10"/>
           <Fill color="#6366F1"/>
           <Group centerX="0" centerY="0" padding="16">
-            <Text text="Send" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+            <Text text="Send" fontFamily="Noto Sans SC" fauxBold="true" fontSize="14"/>
             <Fill color="#FFF"/>
           </Group>
         </Layer>
@@ -274,7 +274,7 @@ A card with vertical container layout, text header, and action buttons.
           <Fill color="#F1F5F9"/>
           <Stroke color="#CBD5E1" width="1" align="inside"/>
           <Group centerX="0" centerY="0" padding="16">
-            <Text text="Request" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+            <Text text="Request" fontFamily="Noto Sans SC" fauxBold="true" fontSize="14"/>
             <Fill color="#1E293B"/>
           </Group>
         </Layer>
@@ -300,7 +300,7 @@ Button cells use Group with `padding` for centered text (no layout needed). This
     <Fill color="#FFF"/>
     <Stroke color="#CBD5E1" width="1"/>
     <Group left="12" centerY="0">
-      <Text text="Enter your email..." fontFamily="Arial" fontSize="14"/>
+      <Text text="Enter your email..." fontFamily="Noto Sans SC" fontSize="14"/>
       <Fill color="#94A3B8"/>
     </Group>
     <InnerShadowStyle offsetY="2" blurX="4" blurY="4" color="#00000010"/>
@@ -369,7 +369,7 @@ any repeated element: cards, list items, grid cells.
             </svg>
           </Layer>
           <Layer>
-            <Text text="Home" fontFamily="Arial" fontStyle="Bold" fontSize="10"/>
+            <Text text="Home" fontFamily="Noto Sans SC" fauxBold="true" fontSize="10"/>
             <Fill color="#6366F1"/>
           </Layer>
         </Layer>
@@ -382,7 +382,7 @@ any repeated element: cards, list items, grid cells.
             </svg>
           </Layer>
           <Layer>
-            <Text text="Search" fontFamily="Arial" fontSize="10"/>
+            <Text text="Search" fontFamily="Noto Sans SC" fontSize="10"/>
             <Fill color="#94A3B8"/>
           </Layer>
         </Layer>
@@ -395,7 +395,7 @@ any repeated element: cards, list items, grid cells.
             </svg>
           </Layer>
           <Layer>
-            <Text text="Profile" fontFamily="Arial" fontSize="10"/>
+            <Text text="Profile" fontFamily="Noto Sans SC" fontSize="10"/>
             <Fill color="#94A3B8"/>
           </Layer>
         </Layer>
@@ -428,15 +428,15 @@ toolbar items.
       <Fill color="#F8FAFC"/>
       <Layer width="100%" height="100%" layout="horizontal" padding="0,16,0,16" alignment="center">
         <Layer width="130">
-          <Text text="Name" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
+          <Text text="Name" fontFamily="Noto Sans SC" fauxBold="true" fontSize="13"/>
           <Fill color="#64748B"/>
         </Layer>
         <Layer flex="1">
-          <Text text="Email" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
+          <Text text="Email" fontFamily="Noto Sans SC" fauxBold="true" fontSize="13"/>
           <Fill color="#64748B"/>
         </Layer>
         <Layer width="70">
-          <Text text="Status" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
+          <Text text="Status" fontFamily="Noto Sans SC" fauxBold="true" fontSize="13"/>
           <Fill color="#64748B"/>
         </Layer>
       </Layer>
@@ -449,18 +449,18 @@ toolbar items.
     <!-- Data row 1 -->
     <Layer height="44" layout="horizontal" padding="0,16,0,16" alignment="center">
       <Layer width="130">
-        <Text text="Alice Chen" fontFamily="Arial" fontSize="14"/>
+        <Text text="Alice Chen" fontFamily="Noto Sans SC" fontSize="14"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer flex="1">
-        <Text text="alice@example.com" fontFamily="Arial" fontSize="14"/>
+        <Text text="alice@example.com" fontFamily="Noto Sans SC" fontSize="14"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer width="70">
         <Rectangle width="100%" height="100%" roundness="12"/>
         <Fill color="#ECFDF5"/>
         <Group centerX="0" centerY="0" padding="4,8">
-          <Text text="Active" fontFamily="Arial" fontSize="12"/>
+          <Text text="Active" fontFamily="Noto Sans SC" fontSize="12"/>
           <Fill color="#10B981"/>
         </Group>
       </Layer>
@@ -473,18 +473,18 @@ toolbar items.
     <!-- Data row 2 -->
     <Layer height="44" layout="horizontal" padding="0,16,0,16" alignment="center">
       <Layer width="130">
-        <Text text="Bob Smith" fontFamily="Arial" fontSize="14"/>
+        <Text text="Bob Smith" fontFamily="Noto Sans SC" fontSize="14"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer flex="1">
-        <Text text="bob@example.com" fontFamily="Arial" fontSize="14"/>
+        <Text text="bob@example.com" fontFamily="Noto Sans SC" fontSize="14"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer width="70">
         <Rectangle width="100%" height="100%" roundness="12"/>
         <Fill color="#FEF3C7"/>
         <Group centerX="0" centerY="0" padding="4,8">
-          <Text text="Pending" fontFamily="Arial" fontSize="12"/>
+          <Text text="Pending" fontFamily="Noto Sans SC" fontSize="12"/>
           <Fill color="#D97706"/>
         </Group>
       </Layer>
@@ -647,7 +647,7 @@ of Stroke) and ring progress indicators. For legends, use the Icon + Label Row p
     </Group>
     <!-- Center percentage text -->
     <Group centerX="0" centerY="0">
-      <Text text="67%" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+      <Text text="67%" fontFamily="Noto Sans SC" fauxBold="true" fontSize="28"/>
       <Fill color="#1E293B"/>
     </Group>
   </Layer>

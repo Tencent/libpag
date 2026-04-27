@@ -6,7 +6,7 @@
     <Rectangle width="100%" height="100%" roundness="16"/>
     <Fill color="#6366F1"/>
     <TextBox left="24" right="24" top="24" bottom="24" textAlign="center" paragraphAlign="middle">
-      <Text text="TextBox stretches its typesetting area using constraint attributes" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+      <Text text="TextBox stretches its typesetting area using constraint attributes" fontFamily="Noto Sans SC" fauxBold="true" fontSize="18"/>
       <Fill color="#FFF"/>
     </TextBox>
     <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#6366F150"/>
@@ -17,7 +17,7 @@
     <Rectangle width="100%" height="100%" roundness="16"/>
     <Fill color="#10B981"/>
     <TextBox centerX="0" centerY="0">
-      <Text text="Group Layout" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+      <Text text="Group Layout" fontFamily="Noto Sans SC" fauxBold="true" fontSize="24"/>
       <Fill color="#FFF"/>
     </TextBox>
     <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#00000050"/>
