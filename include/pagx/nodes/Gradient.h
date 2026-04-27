@@ -49,9 +49,7 @@ class Gradient : public ColorSource {
    * (0, 0)-(1, 1) space mapped to each geometry's bounding box, and the fill auto-fits per
    * geometry. When false, the parameters live in the parent container's (Layer or Group)
    * coordinate space (origin at (0, 0)), and multiple geometries in that container share one
-   * continuous fill. When disabling this mode, the subclass geometric parameters should
-   * typically be reassigned to values suited to the parent container's coordinate space, as
-   * their defaults target the normalized 0-1 range.
+   * continuous fill.
    */
   bool fitsToGeometry = true;
 
