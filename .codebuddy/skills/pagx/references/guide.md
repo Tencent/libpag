@@ -463,7 +463,7 @@ See `patterns.md` §Gradient Text for LinearGradient on text, §Star Badge for R
 | CSS | PAGX |
 |-----|------|
 | `linear-gradient(angle, stops)` | `<LinearGradient startPoint endPoint>` in 0-1 space — convert angle to two points on the unit square |
-| `radial-gradient(circle closest-side at cx cy)` | `<RadialGradient center="cx,cy" radius="R">` in 0-1 space |
+| `radial-gradient(circle R at cx cy)` | `<RadialGradient center="cx,cy" radius="R">` — `cx`, `cy`, `R` must be normalized to 0-1 space |
 
 ## Modifiers
 
