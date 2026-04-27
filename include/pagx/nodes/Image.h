@@ -23,6 +23,10 @@
 #include "pagx/types/Data.h"
 #include "pagx/nodes/Node.h"
 
+namespace tgfx {
+class Image;
+}
+
 namespace pagx {
 
 /**
@@ -40,6 +44,15 @@ class Image : public Node {
    * External file path (mutually exclusive with data, data has priority).
    */
   std::string filePath = {};
+
+  /**
+   * A pre-decoded tgfx::Image produced by the host runtime, typically via an async native
+   * decoder on platforms where synchronous codec decoding is expensive (e.g. WeChat mini-program
+   * where wasm libwebp decoding blocks the main thread). When non-null, the renderer uses this
+   * directly and skips encoded-bytes decoding. Populated on the WeChat platform by
+   * PAGXView::loadFileDataAsNativeImage(); other platforms currently leave it null.
+   */
+  std::shared_ptr<tgfx::Image> decodedImage = nullptr;
 
   NodeType nodeType() const override {
     return NodeType::Image;

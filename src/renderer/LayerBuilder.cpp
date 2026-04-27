@@ -123,7 +123,7 @@ static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI)
   return tgfx::Image::MakeFromEncoded(ToTGFXData(data));
 }
 
-// Build context that maintains state during layer tree construction
+// Build context that maintains state during layer tree construction.
 class LayerBuilderContext {
  public:
   explicit LayerBuilderContext(int maxImageDimension = 0) : _maxImageDimension(maxImageDimension) {
@@ -378,6 +378,13 @@ class LayerBuilderContext {
       colorSource = convertColorSource(node->color);
     }
     if (colorSource == nullptr) {
+      // Image-backed fills drop out entirely until the underlying image arrives. Falling back to
+      // an opaque SolidColor here would paint a black placeholder over every shape that uses an
+      // ImagePattern before its decoded image is supplied via loadDecodedImage(); leaving the
+      // fill empty keeps those shapes transparent until the image is ready.
+      if (node->color && node->color->nodeType() == NodeType::ImagePattern) {
+        return nullptr;
+      }
       colorSource = tgfx::SolidColor::Make();
     }
 
@@ -535,6 +542,8 @@ class LayerBuilderContext {
 
     auto image = getOrCreateImage(node->image);
     if (!image) {
+      // Image data is missing for this node (never loaded or decode failed); paint nothing
+      // rather than falling back to an opaque color that would be visibly wrong.
       return nullptr;
     }
 
@@ -565,18 +574,18 @@ class LayerBuilderContext {
     if (it != _imageCache.end()) {
       return it->second;
     }
-    auto imgStart = std::chrono::high_resolution_clock::now();
     std::shared_ptr<tgfx::Image> image = nullptr;
-    const char* source = "none";
-    if (imageNode->data) {
+    if (imageNode->decodedImage) {
+      // Host-decoded image supplied via PAGXDocument::loadDecodedImage(). Skip all codec paths
+      // and reuse the tgfx::Image directly; mipmap state is assumed to already be applied by the
+      // caller so we do not re-wrap here to avoid invalidating any shared cache.
+      image = imageNode->decodedImage;
+    } else if (imageNode->data) {
       image = tgfx::Image::MakeFromEncoded(ToTGFXData(imageNode->data));
-      source = "data";
     } else if (imageNode->filePath.find("data:") == 0) {
       image = ImageFromDataURI(imageNode->filePath);
-      source = "dataURI";
     } else if (!imageNode->filePath.empty()) {
       image = tgfx::Image::MakeFromFile(imageNode->filePath);
-      source = "file";
     }
     // Enable mipmaps on every decoded image. ImagePattern already defaults to MipmapMode::Linear
     // on the sampling side, so the render pipeline is ready to consume mipmap levels; before this
@@ -586,18 +595,11 @@ class LayerBuilderContext {
     if (image) {
       image = image->makeMipmapped(true);
     }
-    auto imgEnd = std::chrono::high_resolution_clock::now();
-    auto imgMs = std::chrono::duration<double, std::milli>(imgEnd - imgStart).count();
-    if (imgMs > 1.0) {
-      if (image) {
-        tgfx::PrintLog("[PAGX Perf]     getOrCreateImage=%.1fms source=%s id=%s size=%dx%d\n",
-                       imgMs, source, imageNode->id.c_str(), image->width(), image->height());
-      } else {
-        tgfx::PrintLog("[PAGX Perf]     getOrCreateImage=%.1fms source=%s id=%s\n", imgMs, source,
-                       imageNode->id.c_str());
-      }
+    // Only memoize successful results. A null entry would cache the absence of a decoded image
+    // forever, so a later loadDecodedImage() on the same node would never take effect.
+    if (image) {
+      _imageCache[imageNode] = image;
     }
-    _imageCache[imageNode] = image;
     return image;
   }
 
@@ -939,13 +941,8 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document, int max
     return nullptr;
   }
 
-  auto start = std::chrono::high_resolution_clock::now();
   LayerBuilderContext context(maxImageDimension);
-  auto result = context.build(*document);
-  auto end = std::chrono::high_resolution_clock::now();
-  auto totalMs = std::chrono::duration<double, std::milli>(end - start).count();
-  tgfx::PrintLog("[PAGX Perf] LayerBuilder::Build total=%.1fms\n", totalMs);
-  return result;
+  return context.build(*document);
 }
 
 LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document, int maxImageDimension) {
@@ -960,13 +957,8 @@ LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document, int maxImage
     return {};
   }
 
-  auto start = std::chrono::high_resolution_clock::now();
   LayerBuilderContext context(maxImageDimension);
-  auto result = context.buildWithMap(*document);
-  auto end = std::chrono::high_resolution_clock::now();
-  auto totalMs = std::chrono::duration<double, std::milli>(end - start).count();
-  tgfx::PrintLog("[PAGX Perf] LayerBuilder::BuildWithMap total=%.1fms\n", totalMs);
-  return result;
+  return context.buildWithMap(*document);
 }
 
 }  // namespace pagx

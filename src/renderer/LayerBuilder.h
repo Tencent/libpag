@@ -26,8 +26,8 @@
 namespace pagx {
 
 /**
- * Result of building a layer tree, containing the root layer and an optional mapping from PAGX
- * Layer nodes to their corresponding tgfx::Layer objects.
+ * Result of building a layer tree, containing the root layer and a mapping from PAGX Layer
+ * nodes to their corresponding tgfx::Layer objects.
  */
 struct LayerBuildResult {
   std::shared_ptr<tgfx::Layer> root = nullptr;

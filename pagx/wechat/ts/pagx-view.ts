@@ -50,6 +50,25 @@ export interface PAGXViewOptions {
 /**
  * PAGXView for WeChat MiniProgram.
  * Manages canvas, WebGL context, and C++ PAGXViewWechat instance.
+ *
+ * @example Progressive image loading (async decode via host, bypasses wasm libwebp):
+ * ```ts
+ * const view = await View.init(module, canvas, { autoRender: true });
+ * view.parsePAGX(pagxBytes);
+ * view.buildLayers();               // Layout settles immediately using orig-image-*
+ *                                    // recorded in the PAGX file. Shapes whose fill is an
+ *                                    // ImagePattern stay transparent until their image
+ *                                    // arrives, everything else paints right away.
+ *
+ * for (const path of view.getExternalFilePaths()) {
+ *   (async () => {
+ *     const bytes = await myDownloader(path);               // Custom fetch / caching.
+ *     const canvas = await View.decodeImageFromBytes(bytes); // Host-native decode, runs
+ *                                                            // concurrently for each path.
+ *     view.loadFileDataAsNativeImage(path, canvas);          // Swap in on the next frame.
+ *   })();
+ * }
+ * ```
  */
 @destroyVerify
 export class View {
@@ -190,6 +209,29 @@ export class View {
       throw new Error('Native view not initialized');
     }
     return this.nativeView.loadFileData(filePath, fileData);
+  }
+
+  /**
+   * Attach a host-decoded image (e.g. an OffscreenCanvas produced via
+   * View.decodeImageToCanvas()) as the source for Image nodes matching the given file path.
+   * This is the preferred path on WeChat for external image resources because it moves webp/png
+   * decoding off the wasm main thread onto the mini-program's native decoder, and lets multiple
+   * images decode concurrently.
+   *
+   * Unlike loadFileData(), this method may be called AFTER buildLayers(). When called post-
+   * build, any VectorLayers whose shapes reference the updated image are rebuilt in place and
+   * will reflect the new asset on the next draw() call, so callers can trigger progressive
+   * image appearance without reconstructing the layer tree.
+   *
+   * @param filePath The external file path to match against Image nodes.
+   * @param nativeImage A host-decoded image object (typically an OffscreenCanvas).
+   * @returns True if a matching Image node was found and attached.
+   */
+  public loadFileDataAsNativeImage(filePath: string, nativeImage: unknown): boolean {
+    if (!this.nativeView) {
+      throw new Error('Native view not initialized');
+    }
+    return this.nativeView.loadFileDataAsNativeImage(filePath, nativeImage);
   }
 
   /**
@@ -439,6 +481,85 @@ export class View {
       this.animationFrameId = setTimeout(() => {
         this.renderLoop();
       }, 16) as any;
+    }
+  }
+
+  /**
+   * Decode an image from a file path (temp file or URL the mini-program can resolve) into an
+   * OffscreenCanvas. The decoded canvas is what loadFileDataAsNativeImage() expects. This
+   * utility is deliberately kept as a primitive -- it does not handle downloads or caching -- so
+   * callers can plug in their own network/caching logic (which is commonly required for CDN
+   * signing, retry policy, and so on).
+   *
+   * The decode itself runs on the mini-program's native decoder (webp/png/jpeg), which is
+   * multi-threaded off the JS thread, so concurrent decodeImageFromPath() calls can overlap.
+   *
+   * @param filePath The local temp path or remote URL.
+   * @returns A promise that resolves with an OffscreenCanvas containing the decoded pixels.
+   *          Rejects on decode failure.
+   */
+  public static decodeImageFromPath(filePath: string): Promise<OffscreenCanvas> {
+    return new Promise((resolve, reject) => {
+      const canvas = wx.createOffscreenCanvas({ type: '2d' }) as OffscreenCanvas & {
+        createImage: () => HTMLImageElement;
+      };
+      const img = canvas.createImage();
+      let settled = false;
+      img.onload = () => {
+        if (settled) return;
+        settled = true;
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d') as OffscreenCanvasRenderingContext2D | null;
+        if (!ctx) {
+          reject(new Error('decodeImageFromPath: 2d context unavailable'));
+          return;
+        }
+        ctx.drawImage(img as any, 0, 0);
+        resolve(canvas);
+      };
+      img.onerror = (err: any) => {
+        if (settled) return;
+        settled = true;
+        const msg = (err && (err.errMsg || err.message || err.type)) || 'onerror';
+        reject(new Error('decodeImageFromPath: ' + msg));
+      };
+      img.src = filePath;
+    });
+  }
+
+  /**
+   * Decode an image from its encoded bytes into an OffscreenCanvas. This writes the bytes to a
+   * short-lived temp file under wx.env.USER_DATA_PATH, runs decodeImageFromPath() on it, then
+   * deletes the file. Prefer decodeImageFromPath() directly when the caller already has the
+   * asset on disk or can pass a URL the mini-program can fetch.
+   *
+   * @param bytes The encoded image bytes (webp, png, jpeg, ...).
+   * @param hint An optional filename hint (with extension) used only to build the temp path;
+   *             does not affect decoding.
+   * @returns A promise that resolves with an OffscreenCanvas containing the decoded pixels.
+   */
+  public static async decodeImageFromBytes(
+    bytes: ArrayBuffer | Uint8Array,
+    hint: string = 'pagx_decode'
+  ): Promise<OffscreenCanvas> {
+    const fs = wx.getFileSystemManager();
+    const base = (wx as any).env?.USER_DATA_PATH ?? '';
+    const unique = `${hint.replace(/[^a-zA-Z0-9._-]/g, '_')}_${Date.now()}_${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
+    const tempPath = `${base}/${unique}`;
+    const buffer = bytes instanceof Uint8Array ? bytes.buffer : bytes;
+    (fs as any).writeFileSync(tempPath, buffer);
+    try {
+      return await View.decodeImageFromPath(tempPath);
+    } finally {
+      try {
+        fs.unlinkSync(tempPath);
+      } catch (_) {
+        // Best-effort cleanup. Leaving a stray temp file is not fatal; the OS/app cleanup will
+        // eventually reclaim it.
+      }
     }
   }
 }

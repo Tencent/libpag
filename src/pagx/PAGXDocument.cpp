@@ -20,7 +20,9 @@
 #include "LayoutContext.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/LayoutNode.h"
+#include "tgfx/core/Image.h"
 
 namespace pagx {
 
@@ -110,6 +112,9 @@ std::vector<std::string> PAGXDocument::getExternalFilePaths() const {
     if (image->data != nullptr || image->filePath.empty()) {
       continue;
     }
+    if (image->decodedImage != nullptr) {
+      continue;
+    }
     if (image->filePath.find("data:") == 0) {
       continue;
     }
@@ -136,6 +141,28 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
     found = true;
   }
   return found;
+}
+
+Image* PAGXDocument::loadDecodedImage(const std::string& filePath,
+                                      std::shared_ptr<tgfx::Image> decodedImage) {
+  if (filePath.empty() || decodedImage == nullptr) {
+    return nullptr;
+  }
+  Image* firstMatch = nullptr;
+  for (auto& node : nodes) {
+    if (node->nodeType() != NodeType::Image) {
+      continue;
+    }
+    auto* image = static_cast<Image*>(node.get());
+    if (image->filePath != filePath) {
+      continue;
+    }
+    image->decodedImage = decodedImage;
+    if (firstMatch == nullptr) {
+      firstMatch = image;
+    }
+  }
+  return firstMatch;
 }
 
 }  // namespace pagx

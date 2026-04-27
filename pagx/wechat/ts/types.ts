@@ -36,6 +36,13 @@ export interface PAGXViewNative {
     getExternalFilePaths: () => StringVector;
     /** Loads external file data for an Image node matching the given path. Returns true on success. */
     loadFileData: (filePath: string, fileData: Uint8Array) => boolean;
+    /**
+     * Attaches a host-decoded native image (e.g. an OffscreenCanvas produced by drawing a
+     * wx.createImage() result) to Image nodes matching the given path. Used for async image
+     * loading to avoid wasm-side webp decoding. Can be called after buildLayers() for
+     * progressive updates; returns true if at least one matching node was found.
+     */
+    loadFileDataAsNativeImage: (filePath: string, nativeImage: any) => boolean;
     /** Builds the layer tree from the previously parsed document. */
     buildLayers: () => void;
     /** Updates the canvas size and recreates the surface. */

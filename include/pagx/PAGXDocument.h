@@ -26,9 +26,15 @@
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Data.h"
 
+namespace tgfx {
+class Image;
+}
+
 namespace pagx {
 
 class LayoutContext;
+class Image;
+class ImagePattern;
 
 /**
  * PAGXDocument is the root container for a PAGX document.
@@ -118,7 +124,9 @@ class PAGXDocument : public Node {
 
   /**
    * Returns a list of external file paths referenced by Image nodes that have no embedded data.
-   * Data URIs (paths starting with "data:") are excluded.
+   * Data URIs (paths starting with "data:") are excluded. Image nodes whose decoded image has
+   * already been supplied (via loadDecodedImage) are also excluded so the same resource is not
+   * fetched twice.
    */
   std::vector<std::string> getExternalFilePaths() const;
 
@@ -131,6 +139,22 @@ class PAGXDocument : public Node {
    * @return true if a matching Image node was found and its data was loaded successfully
    */
   bool loadFileData(const std::string& filePath, std::shared_ptr<Data> data);
+
+  /**
+   * Attaches an already-decoded tgfx::Image to Image nodes matching the given file path. The
+   * decoded image is produced by the caller via a platform-specific path (for example, a WeChat
+   * mini-program decoding through OffscreenCanvas and then wrapping via tgfx::NativeCodec). When
+   * set, the renderer uses this image directly, bypassing the encoded-bytes codec path.
+   *
+   * Unlike loadFileData(), this method preserves the filePath on the node so the same path can be
+   * matched again (for example, when replacing a low-resolution placeholder with a higher-quality
+   * version). getExternalFilePaths() will still exclude the node while decodedImage is non-null.
+   *
+   * @param filePath the external file path to match against Image nodes
+   * @param decodedImage the pre-decoded tgfx::Image to attach
+   * @return the first matching Image node, or nullptr if no match was found.
+   */
+  Image* loadDecodedImage(const std::string& filePath, std::shared_ptr<tgfx::Image> decodedImage);
 
   /**
    * Executes auto layout on the document, positioning layers according to their layout

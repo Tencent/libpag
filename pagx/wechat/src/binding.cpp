@@ -34,6 +34,7 @@ EMSCRIPTEN_BINDINGS(PAGXView) {
       .function("parsePAGX", &PAGXView::parsePAGX)
       .function("getExternalFilePaths", &PAGXView::getExternalFilePaths)
       .function("loadFileData", &PAGXView::loadFileData)
+      .function("loadFileDataAsNativeImage", &PAGXView::loadFileDataAsNativeImage)
       .function("buildLayers", &PAGXView::buildLayers)
       .function("updateSize", &PAGXView::updateSize)
       .function("updateZoomScaleAndOffset", &PAGXView::updateZoomScaleAndOffset)

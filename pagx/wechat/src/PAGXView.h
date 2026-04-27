@@ -20,6 +20,7 @@
 
 #include <deque>
 #include <emscripten/bind.h>
+#include <memory>
 #include "tgfx/core/Color.h"
 #include "tgfx/gpu/Recording.h"
 #include "tgfx/layers/DisplayList.h"
@@ -85,6 +86,26 @@ class PAGXView {
    * @return True if a matching Image node was found and its data was loaded successfully.
    */
   bool loadFileData(const std::string& filePath, const emscripten::val& fileData);
+
+  /**
+   * Attaches an already-decoded native image to Image nodes matching the given file path. The
+   * native image must be a JavaScript object tgfx's web NativeCodec understands (typically an
+   * OffscreenCanvas produced by drawing a wx.createImage() result). This lets callers perform
+   * asynchronous decoding on the host side (e.g. via the mini-program's native webp decoder) and
+   * hand the renderer an already-decoded asset, bypassing the wasm libwebp path entirely.
+   *
+   * Unlike loadFileData(), this method can be called AFTER buildLayers(). When it is called
+   * post-build, any VectorLayers that reference the image are rebuilt in place so the new asset
+   * shows up on the next draw(); shapes whose fill was empty because the image had not yet
+   * arrived become visible at that point. This is the primary mechanism for progressive image
+   * loading on WeChat.
+   *
+   * @param filePath   The external file path to match against Image nodes.
+   * @param nativeImage  A JavaScript-side decoded image object.
+   * @return True if at least one matching Image node was found and attached.
+   */
+  bool loadFileDataAsNativeImage(const std::string& filePath,
+                                 const emscripten::val& nativeImage);
 
   /**
    * Builds the layer tree from the previously parsed document. Call this after parsePAGX() and

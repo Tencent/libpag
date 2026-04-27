@@ -23,9 +23,13 @@
 #include "GridBackground.h"
 #include "utils/StringParser.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/platform/Print.h"
+#include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/types/Data.h"
 #include "utils/ImagePatternMatrixCalculator.h"
@@ -195,6 +199,27 @@ bool PAGXView::loadFileData(const std::string& filePath, const val& fileData) {
   return document->loadFileData(filePath, std::move(data));
 }
 
+bool PAGXView::loadFileDataAsNativeImage(const std::string& filePath, const val& nativeImage) {
+  if (!document || filePath.empty() || !nativeImage.as<bool>()) {
+    return false;
+  }
+  // Wrap the host-decoded asset as a tgfx::Image backed by NativeCodec. This path bypasses
+  // wasm-side libwebp/libpng decoding entirely: sampling the image later will go through
+  // WebImageBuffer::onMakeTexture which uploads straight from the OffscreenCanvas.
+  auto codec = tgfx::ImageCodec::MakeFrom(nativeImage);
+  if (!codec) {
+    return false;
+  }
+  auto tgfxImage = tgfx::Image::MakeFrom(codec);
+  if (!tgfxImage) {
+    return false;
+  }
+  tgfxImage = tgfxImage->makeMipmapped(true);
+
+  auto* imageNode = document->loadDecodedImage(filePath, tgfxImage);
+  return imageNode != nullptr;
+}
+
 void PAGXView::buildLayers() {
   if (!document) {
     return;
@@ -210,7 +235,8 @@ void PAGXView::buildLayers() {
 
   document->applyLayout(&fontConfig);
 
-  contentLayer = LayerBuilder::Build(document.get(), MAX_IMAGE_DIMENSION);
+  auto buildResult = LayerBuilder::BuildWithMap(document.get(), MAX_IMAGE_DIMENSION);
+  contentLayer = buildResult.root;
 
   if (!contentLayer) {
     return;
