@@ -23,7 +23,7 @@ npm install -g @libpag/pagx
 | `pagx format` | Format a PAGX file with consistent indentation and attribute ordering |
 | `pagx bounds` | Query the precise rendered bounds of layers |
 | `pagx font` | Query a font file, a system font by name, or list system font families |
-| `pagx embed` | Embed fonts and images into a PAGX file as base64 |
+| `pagx embed` | Embed font glyphs and images into a PAGX file for self-contained output |
 
 ## Usage Examples
 
@@ -171,15 +171,15 @@ Query a font file, a system font by name, or list system font families. Exactly 
 
 ### `pagx embed [options] <file.pagx>`
 
-Embed fonts and images into a PAGX file as base64.
+Embed font glyphs and images into a PAGX file for self-contained output.
 
 | Option | Description |
 |--------|-------------|
 | `-o, --output <path>` | Output file path (default: overwrite input) |
 | `--file <path>` | Register a font file (repeatable) |
 | `--fallback <path\|name>` | Add a fallback font file or system font name (repeatable) |
-| `--skip-fonts` | Do not embed fonts |
-| `--skip-images` | Do not embed images |
+| `--skip-fonts` | Skip font embedding |
+| `--skip-images` | Skip image embedding |
 
 ## Supported Platforms
 
