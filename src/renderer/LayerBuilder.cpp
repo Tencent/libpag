@@ -691,6 +691,11 @@ class LayerBuilderContext {
             result.setScaleY(s00 * invDet);
             result.setTranslateX((s01 * s12 - s11 * s02) * invDet);
             result.setTranslateY((s10 * s02 - s00 * s12) * invDet);
+          } else {
+            // Paint transform is near-singular; fall back to natural stretch so the image
+            // still fills the node instead of collapsing to identity.
+            result.setScaleX(nodeWidth / imageWidth);
+            result.setScaleY(nodeHeight / imageHeight);
           }
         } else {
           result.setScaleX(nodeWidth / imageWidth);
