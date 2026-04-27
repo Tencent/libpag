@@ -685,12 +685,16 @@ std::string SVGWriter::writeInnerShadowFragment(float blurX, float blurY, float 
   std::string shadowResult = "innerShadow" + idx;
   writeShadowBlurAndOffset(blurX, blurY, offsetX, offsetY, "innerBlur" + idx, offsetResult);
 
+  // Inner shadow carves away the offset/blurred alpha from inside the source:
+  // result = k1*S*O + k2*S = S*(1 - O), where S = SourceAlpha, O = offsetResult.
+  // This keeps only the portion of the source that is NOT covered by the offset
+  // blur, producing the shadow along the inner edge opposite the offset direction.
   _defs->openElement("feComposite");
   _defs->addAttribute("in", "SourceAlpha");
   _defs->addAttribute("in2", offsetResult);
   _defs->addAttribute("operator", "arithmetic");
-  _defs->addAttribute("k2", "-1");
-  _defs->addAttribute("k3", "1");
+  _defs->addAttribute("k1", "-1");
+  _defs->addAttribute("k2", "1");
   _defs->addAttribute("result", compositeResult);
   _defs->closeElementSelfClosing();
 
