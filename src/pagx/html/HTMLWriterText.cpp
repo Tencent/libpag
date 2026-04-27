@@ -1144,6 +1144,14 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           transform +=
               "translate(" + FloatToString(-anchorX) + "px," + FloatToString(-anchorY) + "px) ";
         }
+        // Apply fauxItalic shear on every per-character span. Without this, text nodes with
+        // `fauxItalic="true"` that happen to also use a TextModifier/RangeSelector render
+        // upright (only the writeText primary path was handling fauxItalic). Appending skewX
+        // last mirrors the visual effect in the primary path; sharing the same
+        // transform-origin (50% 0.8em) keeps the shear pivot on the glyph baseline.
+        if (text->fauxItalic) {
+          transform += "skewX(-12deg) ";
+        }
         if (!transform.empty()) {
           charStyle += ";transform:" + transform;
           // Align transform pivot with the glyph baseline & advance center (tgfx uses
@@ -1168,6 +1176,7 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         } else if (!fill && stroke) {
           charStyle += ";color:transparent";
         }
+        bool emittedTextStroke = false;
         if (stroke) {
           Color strokeColor = {};
           float strokeWidth = stroke->width;
@@ -1187,7 +1196,17 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
             charStyle += ";-webkit-text-stroke:" + FloatToString(strokeWidth) + "px " +
                          ColorToRGBA(strokeColor, stroke->alpha);
             charStyle += ";paint-order:stroke fill";
+            emittedTextStroke = true;
           }
+        }
+        // fauxBold is emulated via -webkit-text-stroke; suppress it when a real stroke
+        // already occupies the same CSS slot so we don't overwrite it. Mirror the primary
+        // writeText branch's `fauxBold && !stroke` gate on a per-character basis since the
+        // stroke decision above is per-character when the TextModifier overrides apply.
+        if (text->fauxBold && !emittedTextStroke) {
+          charStyle +=
+              ";-webkit-text-stroke:" + FloatToString(FauxBoldStrokeWidth(text->renderFontSize())) +
+              "px currentColor";
         }
         out.openTag("span");
         out.addAttr("style", charStyle);
@@ -1464,8 +1483,24 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         // the full fontSize (1em) would place the span's bottom edge at pos.y, shifting glyphs
         // upward by ~0.1em.
         transform += "translate(-50%,-" + FloatToString(renderFont * 0.905f) + "px)";
+        // fauxItalic must shear the glyph in its own local space before TextPath's
+        // perpendicular-rotate and baseline-translate apply. CSS evaluates transforms
+        // right-to-left, so appending skewX(-12deg) last means it is the first operation to
+        // act on the glyph. Without this branch, any <Text fauxItalic="true"> placed on a
+        // <TextPath> renders upright in HTML even though tgfx shows it slanted.
+        if (text->fauxItalic) {
+          transform += " skewX(-12deg)";
+        }
         charStyle += ";transform:" + transform;
         charStyle += ";transform-origin:0 0";
+        // fauxBold is emulated via -webkit-text-stroke. The TextPath per-char branch does
+        // not emit a stroke itself (strokes are drawn in the earlier SVG glyph-run branch),
+        // so fauxBold can be applied unconditionally here. Without this, <Text fauxBold>
+        // along a path paints at normal weight in HTML.
+        if (text->fauxBold) {
+          charStyle += ";-webkit-text-stroke:" + FloatToString(FauxBoldStrokeWidth(renderFont)) +
+                       "px currentColor";
+        }
         if (fill && fill->color) {
           if (fill->color->nodeType() == NodeType::SolidColor) {
             auto sc = static_cast<const SolidColor*>(fill->color);
