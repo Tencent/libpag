@@ -7,7 +7,7 @@
   <Layer name="Background">
     <Rectangle width="800" height="600"/>
     <Fill>
-      <RadialGradient center="400,300" radius="500">
+      <RadialGradient center="400,300" radius="500" fitsToGeometry="false">
         <ColorStop color="#001122" offset="0"/>
         <ColorStop color="#000811" offset="0.7"/>
         <ColorStop color="#000" offset="1"/>
@@ -29,7 +29,7 @@
     <Group>
       <Rectangle width="800" height="600"/>
       <Fill>
-        <RadialGradient center="400,300" radius="600">
+        <RadialGradient center="400,300" radius="600" fitsToGeometry="false">
           <ColorStop color="#00000000" offset="0.6"/>
           <ColorStop color="#00000080" offset="1"/>
         </RadialGradient>
@@ -62,7 +62,7 @@
       <Polystar type="polygon" pointCount="3" outerRadius="80" rotation="90" position="0,0"/>
       <Stroke color="#FFAA00" width="4"/>
       <Fill>
-        <RadialGradient radius="80">
+        <RadialGradient radius="80" fitsToGeometry="false">
           <ColorStop color="#FFAA0040" offset="0"/>
           <ColorStop color="#FFAA0010" offset="1"/>
         </RadialGradient>
@@ -72,7 +72,7 @@
     <Layer mask="@triangleMask">
       <Rectangle left="-50" top="-50" width="100" height="100"/>
       <Fill>
-        <LinearGradient startPoint="-50,0" endPoint="50,0">
+        <LinearGradient startPoint="-50,0" endPoint="50,0" fitsToGeometry="false">
           <ColorStop color="#FFAA0000" offset="0"/>
           <ColorStop color="#FFAA0040" offset="0.5"/>
           <ColorStop color="#FFAA0000" offset="1"/>
@@ -96,7 +96,7 @@
     <Layer left="-180" top="200">
       <Path data="@healthArc"/>
       <Stroke width="20" cap="butt" dashes="4,2">
-        <LinearGradient startPoint="0,200" endPoint="0,0">
+        <LinearGradient startPoint="0,200" endPoint="0,0" fitsToGeometry="false">
           <ColorStop color="#F00" offset="0"/>
           <ColorStop color="#FF0" offset="0.5"/>
           <ColorStop color="#0F0" offset="1"/>
@@ -138,7 +138,7 @@
     <Layer left="144" top="200">
       <Path data="@energyArc"/>
       <Stroke width="20" cap="butt" dashes="10,2">
-        <LinearGradient startPoint="36,0" endPoint="36,200">
+        <LinearGradient startPoint="36,0" endPoint="36,200" fitsToGeometry="false">
           <ColorStop color="#0FF" offset="0"/>
           <ColorStop color="#0044FF" offset="1"/>
         </LinearGradient>
@@ -197,7 +197,7 @@
     <Layer>
       <Ellipse left="-65" top="-65" width="130" height="130"/>
       <Fill>
-        <ConicGradient endAngle="90">
+        <ConicGradient endAngle="90" fitsToGeometry="false">
           <ColorStop color="#00FF0000" offset="0"/>
           <ColorStop color="#00FF0080" offset="1"/>
         </ConicGradient>
