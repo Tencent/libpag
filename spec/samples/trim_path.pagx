@@ -14,7 +14,7 @@
         <Ellipse left="160" width="100" height="100"/>
         <TrimPath start="0.2" end="0.9"/>
         <Stroke width="10" cap="round">
-          <LinearGradient startPoint="0,0" endPoint="260,100">
+          <LinearGradient>
             <ColorStop color="#06B6D4" offset="0"/>
             <ColorStop color="#8B5CF6" offset="1"/>
           </LinearGradient>
@@ -40,7 +40,7 @@
         <Ellipse left="160" width="100" height="100"/>
         <TrimPath start="0.2" end="0.9" type="continuous"/>
         <Stroke width="10" cap="round">
-          <LinearGradient startPoint="0,0" endPoint="260,100">
+          <LinearGradient>
             <ColorStop color="#F59E0B" offset="0"/>
             <ColorStop color="#F43F5E" offset="1"/>
           </LinearGradient>

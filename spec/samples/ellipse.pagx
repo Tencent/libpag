@@ -8,7 +8,7 @@
       <Layer flex="1">
         <Ellipse centerX="0" centerY="0" width="140" height="140"/>
         <Fill>
-          <RadialGradient center="50,50" radius="100">
+          <RadialGradient>
             <ColorStop color="#FBBF24" offset="0"/>
             <ColorStop color="#F59E0B" offset="1"/>
           </RadialGradient>
@@ -19,7 +19,7 @@
       <Layer flex="1">
         <Ellipse centerX="0" centerY="0" width="160" height="100"/>
         <Fill>
-          <LinearGradient startPoint="0,0" endPoint="160,100">
+          <LinearGradient>
             <ColorStop color="#EC4899" offset="0"/>
             <ColorStop color="#DB2777" offset="1"/>
           </LinearGradient>
@@ -32,7 +32,7 @@
       <Layer flex="1">
         <Ellipse centerX="0" centerY="0" width="100" height="160"/>
         <Fill>
-          <LinearGradient startPoint="0,0" endPoint="100,160">
+          <LinearGradient>
             <ColorStop color="#06B6D4" offset="0"/>
             <ColorStop color="#0891B2" offset="1"/>
           </LinearGradient>
@@ -43,7 +43,7 @@
       <Layer flex="1">
         <Ellipse centerX="0" centerY="0" width="150" height="150"/>
         <Fill>
-          <RadialGradient center="55,55" radius="100">
+          <RadialGradient>
             <ColorStop color="#A78BFA" offset="0"/>
             <ColorStop color="#8B5CF6" offset="1"/>
           </RadialGradient>
