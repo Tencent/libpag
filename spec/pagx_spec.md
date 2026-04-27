@@ -2198,7 +2198,7 @@ This appendix describes node categorization and nesting rules.
 | **Layer Styles** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle` | Visual effects applied to Layer content. |
 | **Layer Filters** | `BlurFilter`, `DropShadowFilter`, `InnerShadowFilter`, `BlendFilter`, `ColorMatrixFilter` | Post-processing effects applied to composited Layer. |
 | **Geometry Elements** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` | Drawable geometry (shapes and text). Must be inside Layer/Group. |
-| **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `TextBox`, `Repeater` | Transform or combine geometry and text. |
+| **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `Repeater` | Transform or combine geometry and text. |
 | **Painters** | `Fill`, `Stroke` | Apply color/gradient to geometry. Must be inside Layer/Group. |
 | **Import Directives** | (inline `<svg>`, `import` attribute) | Import directives on Layer. Inline `<svg>` child elements and the `import`/`importFormat` attributes are resolved by `pagx resolve` into native PAGX nodes. |
 
