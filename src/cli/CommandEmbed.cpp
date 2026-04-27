@@ -49,8 +49,8 @@ static void PrintEmbedUsage() {
       << "                                   times)\n"
       << "  --fallback <path|name>           Add a fallback font file or system font name (can\n"
       << "                                   be specified multiple times)\n"
-      << "  --skip-fonts                     Do not embed fonts\n"
-      << "  --skip-images                    Do not embed images\n"
+      << "  --skip-fonts                     Skip font embedding\n"
+      << "  --skip-images                    Skip image embedding\n"
       << "  -h, --help                       Show this help message\n";
 }
 
