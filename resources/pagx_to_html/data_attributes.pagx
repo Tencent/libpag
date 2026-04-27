@@ -20,7 +20,7 @@
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="12,12,0,0"/>
         <Fill color="#3B82F6"/>
         <Layer left="0" right="0" top="0" bottom="0">
-          <Text text="Card Title" fontFamily="Arial" fontStyle="Bold" fontSize="14" centerX="0" centerY="0" textAnchor="center" data-editable="true" data-content-type="heading" data-priority="high"/>
+          <Text text="Card Title" fontFamily="Noto Sans SC" fauxBold="true" fontSize="14" centerX="0" centerY="0" textAnchor="center" data-editable="true" data-content-type="heading" data-priority="high"/>
           <Fill color="#FFFFFF"/>
         </Layer>
       </Layer>
@@ -30,7 +30,7 @@
         <!-- Description text -->
         <Layer height="36">
           <TextBox left="0" right="0" top="0" bottom="0" textAlign="start" lineHeight="15">
-            <Text text="Description text with custom data attributes on multiple elements." fontFamily="Arial" fontSize="11"/>
+            <Text text="Description text with custom data attributes on multiple elements." fontFamily="Noto Sans SC" fontSize="11"/>
             <Fill color="#64748B"/>
           </TextBox>
         </Layer>
@@ -47,7 +47,7 @@
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
             <Fill color="#10B981"/>
             <Layer left="0" right="0" top="0" bottom="0">
-              <Text text="Action" fontFamily="Arial" fontStyle="Bold" fontSize="12" centerX="0" centerY="0" textAnchor="center" data-action="submit-label"/>
+              <Text text="Action" fontFamily="Noto Sans SC" fauxBold="true" fontSize="12" centerX="0" centerY="0" textAnchor="center" data-action="submit-label"/>
               <Fill color="#FFFFFF"/>
             </Layer>
           </Layer>
@@ -63,7 +63,7 @@
       <!-- Footer -->
       <Layer name="footerText" height="28" data-section="footer" data-timestamp="2026-01-01">
         <Layer left="0" right="0" top="0" bottom="0">
-          <Text text="Footer info" fontFamily="Arial" fontSize="10" centerX="0" centerY="0" textAnchor="center"/>
+          <Text text="Footer info" fontFamily="Noto Sans SC" fontSize="10" centerX="0" centerY="0" textAnchor="center"/>
           <Fill color="#94A3B8"/>
         </Layer>
       </Layer>

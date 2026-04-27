@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="TextBox textAlign" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="TextBox textAlign" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="start, center, end, justify in text box" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="start, center, end, justify in text box" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -35,12 +35,12 @@
           <Fill color="#F8FAFC"/>
           <Stroke color="#E2E8F0" width="1"/>
           <TextBox left="4" right="4" top="4" bottom="4" textAlign="start" lineHeight="15">
-            <Text text="Hello World from the start side" fontFamily="Arial" fontSize="12"/>
+            <Text text="Hello World from the start side" fontFamily="Noto Sans SC" fontSize="12"/>
             <Fill color="#1E293B"/>
           </TextBox>
         </Layer>
         <Layer height="12">
-          <Text text="start" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
+          <Text text="start" fontFamily="Noto Sans SC" fauxBold="true" fontSize="9" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
       </Layer>
@@ -52,12 +52,12 @@
           <Fill color="#F8FAFC"/>
           <Stroke color="#E2E8F0" width="1"/>
           <TextBox left="4" right="4" top="4" bottom="4" textAlign="center" lineHeight="15">
-            <Text text="Hello World from the center" fontFamily="Arial" fontSize="12"/>
+            <Text text="Hello World from the center" fontFamily="Noto Sans SC" fontSize="12"/>
             <Fill color="#1E293B"/>
           </TextBox>
         </Layer>
         <Layer height="12">
-          <Text text="center" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
+          <Text text="center" fontFamily="Noto Sans SC" fauxBold="true" fontSize="9" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
       </Layer>
@@ -69,12 +69,12 @@
           <Fill color="#F8FAFC"/>
           <Stroke color="#E2E8F0" width="1"/>
           <TextBox left="4" right="4" top="4" bottom="4" textAlign="end" lineHeight="15">
-            <Text text="Hello World from the end side" fontFamily="Arial" fontSize="12"/>
+            <Text text="Hello World from the end side" fontFamily="Noto Sans SC" fontSize="12"/>
             <Fill color="#1E293B"/>
           </TextBox>
         </Layer>
         <Layer height="12">
-          <Text text="end" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
+          <Text text="end" fontFamily="Noto Sans SC" fauxBold="true" fontSize="9" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
       </Layer>
@@ -86,12 +86,12 @@
           <Fill color="#F8FAFC"/>
           <Stroke color="#E2E8F0" width="1"/>
           <TextBox left="4" right="4" top="4" bottom="4" textAlign="justify" lineHeight="15">
-            <Text text="Hello World from the justify mode" fontFamily="Arial" fontSize="12"/>
+            <Text text="Hello World from the justify mode" fontFamily="Noto Sans SC" fontSize="12"/>
             <Fill color="#1E293B"/>
           </TextBox>
         </Layer>
         <Layer height="12">
-          <Text text="justify" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
+          <Text text="justify" fontFamily="Noto Sans SC" fauxBold="true" fontSize="9" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
       </Layer>

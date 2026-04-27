@@ -17,7 +17,7 @@
         <Fill color="#FFF7ED"/>
         <Stroke color="#FDBA74" width="1"/>
         <TextBox left="8" right="8" top="10" bottom="10" writingMode="vertical" textAlign="start" lineHeight="30">
-          <Text text="竖排文字测试用例" fontFamily="Arial" fontSize="20"/>
+          <Text text="竖排文字测试用例" fontFamily="Noto Sans SC" fontSize="20"/>
           <Fill color="#9A3412"/>
         </TextBox>
       </Layer>
@@ -30,7 +30,7 @@
           <Fill color="#EFF6FF"/>
           <Stroke color="#93C5FD" width="1"/>
           <TextBox left="5" right="5" top="5" bottom="5" writingMode="vertical" paragraphAlign="middle">
-            <Text text="居中对齐" fontFamily="Arial" fontSize="18"/>
+            <Text text="居中对齐" fontFamily="Noto Sans SC" fontSize="18"/>
             <Fill color="#1E40AF"/>
           </TextBox>
         </Layer>
@@ -40,7 +40,7 @@
           <Fill color="#F0FDF4"/>
           <Stroke color="#86EFAC" width="1"/>
           <TextBox left="5" right="5" top="5" bottom="5" writingMode="vertical" paragraphAlign="far">
-            <Text text="远端" fontFamily="Arial" fontSize="16"/>
+            <Text text="远端" fontFamily="Noto Sans SC" fontSize="16"/>
             <Fill color="#166534"/>
           </TextBox>
         </Layer>
@@ -55,7 +55,7 @@
         <Fill color="#FEF2F2"/>
         <Stroke color="#FCA5A5" width="1"/>
         <TextBox left="5" right="5" top="5" bottom="5" paragraphAlign="far" textAlign="center">
-          <Text text="Bottom aligned" fontFamily="Arial" fontSize="12"/>
+          <Text text="Bottom aligned" fontFamily="Noto Sans SC" fontSize="12"/>
           <Fill color="#991B1B"/>
         </TextBox>
       </Layer>
@@ -65,7 +65,7 @@
         <Fill color="#FDF4FF"/>
         <Stroke color="#D8B4FE" width="1"/>
         <TextBox left="5" right="5" top="5" bottom="5" textAlign="center" paragraphAlign="middle" lineHeight="20">
-          <Text text="Custom line height with middle paragraph alignment." fontFamily="Arial" fontSize="12"/>
+          <Text text="Custom line height with middle paragraph alignment." fontFamily="Noto Sans SC" fontSize="12"/>
           <Fill color="#7E22CE"/>
         </TextBox>
       </Layer>

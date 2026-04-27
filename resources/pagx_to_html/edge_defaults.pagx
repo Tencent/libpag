@@ -13,11 +13,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Edge Cases and Defaults" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Edge Cases and Defaults" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Default values, zero sizes, minimal attributes" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="Default values, zero sizes, minimal attributes" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -39,7 +39,7 @@
             <Fill/>
           </Layer>
           <Layer height="10">
-            <Text text="Rect+Fill" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
+            <Text text="Rect+Fill" fontFamily="Noto Sans SC" fontSize="7" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
         </Layer>
@@ -50,7 +50,7 @@
             <Fill color="#3B82F6"/>
           </Layer>
           <Layer height="10">
-            <Text text="Ellipse" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
+            <Text text="Ellipse" fontFamily="Noto Sans SC" fontSize="7" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
         </Layer>
@@ -61,7 +61,7 @@
             <Stroke/>
           </Layer>
           <Layer height="10">
-            <Text text="Stroke" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
+            <Text text="Stroke" fontFamily="Noto Sans SC" fontSize="7" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
         </Layer>
@@ -73,7 +73,7 @@
             <Stroke color="#F59E0B" width="1"/>
           </Layer>
           <Layer height="10">
-            <Text text="Polystar" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
+            <Text text="Polystar" fontFamily="Noto Sans SC" fontSize="7" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
         </Layer>
@@ -93,7 +93,7 @@
             </Group>
           </Layer>
           <Layer height="10">
-            <Text text="Zero-size" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
+            <Text text="Zero-size" fontFamily="Noto Sans SC" fontSize="7" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
         </Layer>
@@ -110,7 +110,7 @@
             </Fill>
           </Layer>
           <Layer height="10">
-            <Text text="Conic" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
+            <Text text="Conic" fontFamily="Noto Sans SC" fontSize="7" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
         </Layer>
@@ -126,7 +126,7 @@
             </Group>
           </Layer>
           <Layer height="10">
-            <Text text="Minimal" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
+            <Text text="Minimal" fontFamily="Noto Sans SC" fontSize="7" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
         </Layer>
@@ -142,7 +142,7 @@
             </Fill>
           </Layer>
           <Layer height="10">
-            <Text text="Radial" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
+            <Text text="Radial" fontFamily="Noto Sans SC" fontSize="7" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
         </Layer>
@@ -159,7 +159,7 @@
             <Fill color="#8B5CF680" fillRule="evenOdd"/>
           </Layer>
           <Layer height="10">
-            <Text text="evenOdd" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
+            <Text text="evenOdd" fontFamily="Noto Sans SC" fontSize="7" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
         </Layer>
@@ -171,7 +171,7 @@
             <Stroke color="#06B6D4" width="2"/>
           </Layer>
           <Layer height="10">
-            <Text text="TrimPath" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
+            <Text text="TrimPath" fontFamily="Noto Sans SC" fontSize="7" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
         </Layer>
@@ -187,7 +187,7 @@
             </Group>
           </Layer>
           <Layer height="10">
-            <Text text="Empty" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
+            <Text text="Empty" fontFamily="Noto Sans SC" fontSize="7" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
         </Layer>

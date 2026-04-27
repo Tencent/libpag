@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Layer Filters" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Layer Filters" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Blur, DropShadow, InnerShadow, Blend, ColorMatrix" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="Blur, DropShadow, InnerShadow, Blend, ColorMatrix" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -39,7 +39,7 @@
             <BlurFilter blurX="4" blurY="4"/>
           </Layer>
           <Layer height="10">
-            <Text text="Blur" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="Blur" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -51,7 +51,7 @@
             <BlurFilter blurX="8" blurY="2"/>
           </Layer>
           <Layer height="10">
-            <Text text="Asymmetric" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="Asymmetric" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -63,7 +63,7 @@
             <DropShadowFilter offsetX="4" offsetY="4" blurX="8" blurY="8" color="#00000060"/>
           </Layer>
           <Layer height="10">
-            <Text text="DropShadow" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="DropShadow" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -75,7 +75,7 @@
             <DropShadowFilter offsetX="4" offsetY="8" blurX="12" blurY="12" color="#00000080" shadowOnly="true"/>
           </Layer>
           <Layer height="10">
-            <Text text="ShadowOnly" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="ShadowOnly" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -87,7 +87,7 @@
             <InnerShadowFilter offsetX="2" offsetY="2" blurX="6" blurY="6" color="#00000080"/>
           </Layer>
           <Layer height="10">
-            <Text text="InnerShadow" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="InnerShadow" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -103,7 +103,7 @@
             <BlendFilter color="#0000FF80" blendMode="overlay"/>
           </Layer>
           <Layer height="10">
-            <Text text="BlendFilter" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="BlendFilter" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -115,7 +115,7 @@
             <ColorMatrixFilter matrix="0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0,0,0,1,0"/>
           </Layer>
           <Layer height="10">
-            <Text text="Grayscale" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="Grayscale" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -128,7 +128,7 @@
             <DropShadowFilter offsetX="4" offsetY="4" blurX="8" blurY="8" color="#00000060"/>
           </Layer>
           <Layer height="10">
-            <Text text="Chained" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="Chained" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -140,7 +140,7 @@
             <InnerShadowFilter offsetX="2" offsetY="2" blurX="8" blurY="8" color="#00000080" shadowOnly="true"/>
           </Layer>
           <Layer height="10">
-            <Text text="Inner Only" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="Inner Only" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>

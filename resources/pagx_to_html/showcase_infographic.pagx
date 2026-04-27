@@ -46,11 +46,11 @@
       <Fill color="@headerGrad"/>
       <!-- TextPath: curved banner title + Subtitle -->
       <Layer>
-        <Text text="FEATURE SHOWCASE" fontFamily="Arial" fontStyle="Bold" fontSize="18" position="0,0" textAnchor="center"/>
+        <Text text="FEATURE SHOWCASE" fontFamily="Noto Sans SC" fauxBold="true" fontSize="18" position="0,0" textAnchor="center"/>
         <TextPath path="@bannerCurve" baselineOrigin="0,0" perpendicular="true" forceAlignment="true"/>
         <Fill color="#FFE66D"/>
         <Group>
-          <Text text="Everything you need to know" fontFamily="Arial" fontSize="11" position="200,62" textAnchor="center"/>
+          <Text text="Everything you need to know" fontFamily="Noto Sans SC" fontSize="11" position="200,62" textAnchor="center"/>
           <Fill color="#BDC3C7"/>
         </Group>
       </Layer>
@@ -65,15 +65,15 @@
     <!-- Rich text block -->
     <Layer height="30" layout="horizontal" alignment="center" arrangement="center">
       <Layer height="26">
-        <Text text="Modern " fontFamily="Arial" fontStyle="Bold" fontSize="22" position="0,0"/>
+        <Text text="Modern " fontFamily="Noto Sans SC" fauxBold="true" fontSize="22" position="0,0"/>
         <Fill color="#FF6B6B"/>
       </Layer>
       <Layer height="26">
-        <Text text="Infographic " fontFamily="Arial" fontStyle="Bold" fontSize="22" position="0,0"/>
+        <Text text="Infographic " fontFamily="Noto Sans SC" fauxBold="true" fontSize="22" position="0,0"/>
         <Fill color="#4ECDC4"/>
       </Layer>
       <Layer height="26">
-        <Text text="Design" fontFamily="Arial" fontStyle="Bold" fontSize="22" position="0,0"/>
+        <Text text="Design" fontFamily="Noto Sans SC" fauxBold="true" fontSize="22" position="0,0"/>
         <Fill color="#FFE66D"/>
       </Layer>
     </Layer>
@@ -82,7 +82,7 @@
     <Layer height="40" layout="vertical" alignment="center" arrangement="center">
       <Layer width="320" height="36">
         <TextBox left="0" right="0" top="0" bottom="0" textAlign="center" lineHeight="16" wordWrap="true">
-          <Text text="Combining multiple PAGX features into a cohesive visual layout with rich typography and icons." fontFamily="Arial" fontSize="11"/>
+          <Text text="Combining multiple PAGX features into a cohesive visual layout with rich typography and icons." fontFamily="Noto Sans SC" fontSize="11"/>
           <Fill color="#7F8C8D"/>
         </TextBox>
       </Layer>
@@ -101,11 +101,11 @@
           </Layer>
           <Layer flex="1" layout="vertical" gap="2">
             <Layer height="16">
-              <Text text="Vector Graphics" fontFamily="Arial" fontStyle="Bold" fontSize="13" position="0,0"/>
+              <Text text="Vector Graphics" fontFamily="Noto Sans SC" fauxBold="true" fontSize="13" position="0,0"/>
               <Fill color="#2C3E50"/>
             </Layer>
             <Layer height="12">
-              <Text text="Shapes, paths, gradients, and patterns" fontFamily="Arial" fontSize="10" position="0,0"/>
+              <Text text="Shapes, paths, gradients, and patterns" fontFamily="Noto Sans SC" fontSize="10" position="0,0"/>
               <Fill color="#95A5A6"/>
             </Layer>
           </Layer>
@@ -132,11 +132,11 @@
           </Layer>
           <Layer flex="1" layout="vertical" gap="2">
             <Layer height="16">
-              <Text text="Text Layout" fontFamily="Arial" fontStyle="Bold" fontSize="13" position="0,0"/>
+              <Text text="Text Layout" fontFamily="Noto Sans SC" fauxBold="true" fontSize="13" position="0,0"/>
               <Fill color="#2C3E50"/>
             </Layer>
             <Layer height="12">
-              <Text text="Rich text, text path, and text boxes" fontFamily="Arial" fontSize="10" position="0,0"/>
+              <Text text="Rich text, text path, and text boxes" fontFamily="Noto Sans SC" fontSize="10" position="0,0"/>
               <Fill color="#95A5A6"/>
             </Layer>
           </Layer>
@@ -163,11 +163,11 @@
           </Layer>
           <Layer flex="1" layout="vertical" gap="2">
             <Layer height="16">
-              <Text text="Visual Effects" fontFamily="Arial" fontStyle="Bold" fontSize="13" position="0,0"/>
+              <Text text="Visual Effects" fontFamily="Noto Sans SC" fauxBold="true" fontSize="13" position="0,0"/>
               <Fill color="#2C3E50"/>
             </Layer>
             <Layer height="12">
-              <Text text="Shadows, masks, blurs, and blend modes" fontFamily="Arial" fontSize="10" position="0,0"/>
+              <Text text="Shadows, masks, blurs, and blend modes" fontFamily="Noto Sans SC" fontSize="10" position="0,0"/>
               <Fill color="#95A5A6"/>
             </Layer>
           </Layer>
@@ -191,11 +191,11 @@
         <Fill color="@coralGrad"/>
         <Fill color="#FFFFFF08" placement="foreground"/>
         <Layer height="18">
-          <Text text="Get Started Today" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+          <Text text="Get Started Today" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
           <Fill color="#FFFFFF"/>
         </Layer>
         <Layer height="14">
-          <Text text="Build amazing visuals with PAGX" fontFamily="Arial" fontSize="11" centerX="0" textAnchor="center"/>
+          <Text text="Build amazing visuals with PAGX" fontFamily="Noto Sans SC" fontSize="11" centerX="0" textAnchor="center"/>
           <Fill color="#FFFFFFCC"/>
         </Layer>
       </Layer>
@@ -213,7 +213,7 @@
       </Layer>
       <Layer layout="vertical" alignment="center" arrangement="center" left="0" right="0" top="0" bottom="0">
         <Layer height="12">
-          <Text text="PAGX v1.0" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+          <Text text="PAGX v1.0" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
           <Fill color="#BDC3C7"/>
         </Layer>
       </Layer>

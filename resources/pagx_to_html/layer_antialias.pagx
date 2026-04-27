@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Anti-Aliasing" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Anti-Aliasing" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="antiAlias=false vs antiAlias=true" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="antiAlias=false vs antiAlias=true" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -35,7 +35,7 @@
           <Fill color="#3B82F6"/>
         </Layer>
         <Layer height="12">
-          <Text text="Crisp Edges" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+          <Text text="Crisp Edges" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
       </Layer>
@@ -47,7 +47,7 @@
           <Fill color="#10B981"/>
         </Layer>
         <Layer height="12">
-          <Text text="Smooth Edges" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+          <Text text="Smooth Edges" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
       </Layer>

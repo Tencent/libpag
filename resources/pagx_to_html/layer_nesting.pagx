@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Layer Nesting" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Layer Nesting" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Parent-child hierarchy and z-order" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="Parent-child hierarchy and z-order" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -48,15 +48,15 @@
         <!-- Labels -->
         <Layer layout="vertical" gap="6" alignment="start" arrangement="center">
           <Layer height="14">
-            <Text text="Parent (gray)" fontFamily="Arial" fontSize="9" position="0,0"/>
+            <Text text="Parent (gray)" fontFamily="Noto Sans SC" fontSize="9" position="0,0"/>
             <Fill color="#64748B"/>
           </Layer>
           <Layer height="14">
-            <Text text="Child1 (blue)" fontFamily="Arial" fontSize="9" position="0,0"/>
+            <Text text="Child1 (blue)" fontFamily="Noto Sans SC" fontSize="9" position="0,0"/>
             <Fill color="#3B82F6"/>
           </Layer>
           <Layer height="14">
-            <Text text="Child2 (red, on top)" fontFamily="Arial" fontSize="9" position="0,0"/>
+            <Text text="Child2 (red, on top)" fontFamily="Noto Sans SC" fontSize="9" position="0,0"/>
             <Fill color="#EF4444"/>
           </Layer>
         </Layer>

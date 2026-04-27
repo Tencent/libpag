@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Group Transform" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Group Transform" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Anchor, rotation, scale, skew, scope isolation" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="Anchor, rotation, scale, skew, scope isolation" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -39,7 +39,7 @@
             </Group>
           </Layer>
           <Layer height="12">
-            <Text text="Rotate+Scale" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="Rotate+Scale" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -52,7 +52,7 @@
             </Group>
           </Layer>
           <Layer height="12">
-            <Text text="Skew" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="Skew" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -71,7 +71,7 @@
             <Fill color="#10B981"/>
           </Layer>
           <Layer height="12">
-            <Text text="Scope Isolation" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="Scope Isolation" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -84,7 +84,7 @@
             <Fill color="#F59E0B"/>
           </Layer>
           <Layer height="12">
-            <Text text="Propagation" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="Propagation" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>

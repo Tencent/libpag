@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Stroke Attributes" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Stroke Attributes" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Cap, join, dashes, align, gradient — all 12 attributes" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="Cap, join, dashes, align, gradient — all 12 attributes" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -37,7 +37,7 @@
               <Stroke color="#3B82F6" width="6" cap="round" join="round"/>
             </Layer>
             <Layer height="10">
-              <Text text="round" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="round" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
@@ -49,7 +49,7 @@
               <Stroke color="#EF4444" width="4" dashes="12,6" dashOffset="4" cap="butt"/>
             </Layer>
             <Layer height="10">
-              <Text text="dashed" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="dashed" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
@@ -69,7 +69,7 @@
               </Group>
             </Layer>
             <Layer height="10">
-              <Text text="caps" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="caps" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
@@ -83,7 +83,7 @@
               <Stroke color="#F59E0B" width="6" join="miter" miterLimit="10"/>
             </Layer>
             <Layer height="10">
-              <Text text="miter" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="miter" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
@@ -94,7 +94,7 @@
               <Stroke color="#F59E0B" width="6" join="round"/>
             </Layer>
             <Layer height="10">
-              <Text text="round" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="round" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
@@ -105,7 +105,7 @@
               <Stroke color="#F59E0B" width="6" join="bevel"/>
             </Layer>
             <Layer height="10">
-              <Text text="bevel" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="bevel" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
@@ -120,7 +120,7 @@
               <Stroke color="#8B5CF6" width="8" align="center"/>
             </Layer>
             <Layer height="10">
-              <Text text="center" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="center" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
@@ -132,7 +132,7 @@
               <Stroke color="#8B5CF6" width="8" align="inside"/>
             </Layer>
             <Layer height="10">
-              <Text text="inside" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="inside" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
@@ -144,7 +144,7 @@
               <Stroke color="#8B5CF6" width="8" align="outside"/>
             </Layer>
             <Layer height="10">
-              <Text text="outside" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="outside" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
@@ -162,7 +162,7 @@
             </Stroke>
           </Layer>
           <Layer height="10">
-            <Text text="Gradient stroke" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="Gradient stroke" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>

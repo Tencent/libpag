@@ -25,11 +25,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Composition Resource" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Composition Resource" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Reusable component with matrix transform" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="Reusable component with matrix transform" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -48,7 +48,7 @@
             <Layer x="0" y="0" composition="@badge"/>
           </Layer>
           <Layer height="14">
-            <Text text="Normal" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="Normal" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -59,7 +59,7 @@
             <Layer x="0" y="0" composition="@badge" matrix="1.5,0,0,1.5,0,0"/>
           </Layer>
           <Layer height="14">
-            <Text text="Scaled 1.5x" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="Scaled 1.5x" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>

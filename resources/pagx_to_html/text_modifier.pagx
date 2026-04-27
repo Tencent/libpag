@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Text Modifier" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Text Modifier" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Per-glyph transforms with range selectors" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="Per-glyph transforms with range selectors" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -32,14 +32,14 @@
         <!-- Position shift with triangle shape selector -->
         <Layer layout="vertical" gap="4" alignment="center">
           <Layer height="52">
-            <Text text="WAVE" fontFamily="Arial" fontStyle="Bold" fontSize="48" centerX="0" textAnchor="center"/>
+            <Text text="WAVE" fontFamily="Noto Sans SC" fauxBold="true" fontSize="48" centerX="0" textAnchor="center"/>
             <TextModifier position="10,-10">
               <RangeSelector start="0" end="1" shape="triangle"/>
             </TextModifier>
             <Fill color="#3B82F6"/>
           </Layer>
           <Layer height="10">
-            <Text text="position + triangle" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="position + triangle" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
         </Layer>
@@ -47,14 +47,14 @@
         <!-- Rotation with rampUp selector -->
         <Layer layout="vertical" gap="4" alignment="center">
           <Layer height="44">
-            <Text text="ROTATE" fontFamily="Arial" fontStyle="Bold" fontSize="36" centerX="0" textAnchor="center"/>
+            <Text text="ROTATE" fontFamily="Noto Sans SC" fauxBold="true" fontSize="36" centerX="0" textAnchor="center"/>
             <TextModifier rotation="45">
               <RangeSelector start="0" end="1" shape="rampUp"/>
             </TextModifier>
             <Fill color="#10B981"/>
           </Layer>
           <Layer height="10">
-            <Text text="rotation + rampUp" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="rotation + rampUp" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
         </Layer>
@@ -62,14 +62,14 @@
         <!-- Scale + alpha with smooth selector -->
         <Layer layout="vertical" gap="4" alignment="center">
           <Layer height="44">
-            <Text text="SCALE" fontFamily="Arial" fontStyle="Bold" fontSize="36" centerX="0" textAnchor="center"/>
+            <Text text="SCALE" fontFamily="Noto Sans SC" fauxBold="true" fontSize="36" centerX="0" textAnchor="center"/>
             <TextModifier scale="1.5,1.5" alpha="0.3">
               <RangeSelector start="0.2" end="0.8" shape="smooth" easeIn="0.5" easeOut="0.5"/>
             </TextModifier>
             <Fill color="#EF4444"/>
           </Layer>
           <Layer height="10">
-            <Text text="scale + alpha + smooth" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="scale + alpha + smooth" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
         </Layer>
@@ -77,14 +77,14 @@
         <!-- fillColor override -->
         <Layer layout="vertical" gap="4" alignment="center">
           <Layer height="44">
-            <Text text="COLOR" fontFamily="Arial" fontStyle="Bold" fontSize="40" centerX="0" textAnchor="center"/>
+            <Text text="COLOR" fontFamily="Noto Sans SC" fauxBold="true" fontSize="40" centerX="0" textAnchor="center"/>
             <TextModifier fillColor="#EC4899">
               <RangeSelector start="0" end="1" shape="rampDown"/>
             </TextModifier>
             <Fill color="#8B5CF6"/>
           </Layer>
           <Layer height="10">
-            <Text text="fillColor + rampDown" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="fillColor + rampDown" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
         </Layer>

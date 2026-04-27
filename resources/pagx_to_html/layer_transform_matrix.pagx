@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Matrix Transform" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Matrix Transform" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="45-degree rotation via 2D matrix" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="45-degree rotation via 2D matrix" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -38,7 +38,7 @@
             </Layer>
           </Layer>
           <Layer height="12">
-            <Text text="Rotated 45°" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="Rotated 45°" fontFamily="Noto Sans SC" fauxBold="true" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#F59E0B"/>
           </Layer>
         </Layer>
@@ -50,7 +50,7 @@
             <Stroke color="#94A3B8" width="1" dashes="4,3"/>
           </Layer>
           <Layer height="12">
-            <Text text="Original" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="Original" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
         </Layer>

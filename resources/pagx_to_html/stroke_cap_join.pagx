@@ -17,11 +17,11 @@
     <!-- Title -->
     <Layer layout="vertical" gap="2" alignment="stretch">
       <Layer height="20">
-        <Text text="Stroke: Cap &amp; Join" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Stroke: Cap &amp; Join" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="lineCap butt/round/square, lineJoin miter/round/bevel" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="lineCap butt/round/square, lineJoin miter/round/bevel" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -37,7 +37,7 @@
         <!-- Section A: lineCap row -->
         <Layer layout="vertical" gap="6" alignment="stretch">
           <Layer height="12">
-            <Text text="cap" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
+            <Text text="cap" fontFamily="Noto Sans SC" fauxBold="true" fontSize="10" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
           <Layer layout="horizontal" gap="8" alignment="stretch" arrangement="center">
@@ -45,7 +45,7 @@
             <!-- cap = butt -->
             <Layer flex="1" layout="vertical" gap="4" alignment="center">
               <Layer height="10">
-                <Text text="butt" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+                <Text text="butt" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
                 <Fill color="#64748B"/>
               </Layer>
               <Layer width="100" height="48">
@@ -62,7 +62,7 @@
             <!-- cap = round -->
             <Layer flex="1" layout="vertical" gap="4" alignment="center">
               <Layer height="10">
-                <Text text="round" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+                <Text text="round" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
                 <Fill color="#64748B"/>
               </Layer>
               <Layer width="100" height="48">
@@ -78,7 +78,7 @@
             <!-- cap = square -->
             <Layer flex="1" layout="vertical" gap="4" alignment="center">
               <Layer height="10">
-                <Text text="square" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+                <Text text="square" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
                 <Fill color="#64748B"/>
               </Layer>
               <Layer width="100" height="48">
@@ -102,7 +102,7 @@
         <!-- Section B: lineJoin row -->
         <Layer layout="vertical" gap="6" alignment="stretch">
           <Layer height="12">
-            <Text text="join" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
+            <Text text="join" fontFamily="Noto Sans SC" fauxBold="true" fontSize="10" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
           <Layer layout="horizontal" gap="8" alignment="stretch" arrangement="center">
@@ -110,7 +110,7 @@
             <!-- join = miter -->
             <Layer flex="1" layout="vertical" gap="4" alignment="center">
               <Layer height="10">
-                <Text text="miter" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+                <Text text="miter" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
                 <Fill color="#64748B"/>
               </Layer>
               <Layer width="100" height="72">
@@ -126,7 +126,7 @@
             <!-- join = round -->
             <Layer flex="1" layout="vertical" gap="4" alignment="center">
               <Layer height="10">
-                <Text text="round" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+                <Text text="round" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
                 <Fill color="#64748B"/>
               </Layer>
               <Layer width="100" height="72">
@@ -142,7 +142,7 @@
             <!-- join = bevel -->
             <Layer flex="1" layout="vertical" gap="4" alignment="center">
               <Layer height="10">
-                <Text text="bevel" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+                <Text text="bevel" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
                 <Fill color="#64748B"/>
               </Layer>
               <Layer width="100" height="72">

@@ -34,11 +34,11 @@
     <!-- Title -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="GlyphRun Advanced" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="GlyphRun Advanced" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="12">
-        <Text text="positions, anchors, skews, combined, bitmap" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+        <Text text="positions, anchors, skews, combined, bitmap" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -54,7 +54,7 @@
         <!-- Row 1: positions -->
         <Layer layout="vertical" gap="3">
           <Layer height="12">
-            <Text text="positions" fontFamily="Arial" fontSize="10"/>
+            <Text text="positions" fontFamily="Noto Sans SC" fontSize="10"/>
             <Fill color="#94A3B8"/>
           </Layer>
           <Layer height="44">
@@ -70,7 +70,7 @@
         <Layer layout="horizontal" gap="16" alignment="stretch">
           <Layer flex="1" layout="vertical" gap="3">
             <Layer height="12">
-              <Text text="anchors + rotations" fontFamily="Arial" fontSize="10"/>
+              <Text text="anchors + rotations" fontFamily="Noto Sans SC" fontSize="10"/>
               <Fill color="#94A3B8"/>
             </Layer>
             <Layer height="44">
@@ -84,7 +84,7 @@
           <!-- Row 2 right: skews -->
           <Layer flex="1" layout="vertical" gap="3">
             <Layer height="12">
-              <Text text="skews" fontFamily="Arial" fontSize="10"/>
+              <Text text="skews" fontFamily="Noto Sans SC" fontSize="10"/>
               <Fill color="#94A3B8"/>
             </Layer>
             <Layer height="44">
@@ -99,7 +99,7 @@
         <!-- Row 3: all combined -->
         <Layer layout="vertical" gap="3">
           <Layer height="12">
-            <Text text="combined: positions + anchors + skews + scales + rotations" fontFamily="Arial" fontSize="10"/>
+            <Text text="combined: positions + anchors + skews + scales + rotations" fontFamily="Noto Sans SC" fontSize="10"/>
             <Fill color="#94A3B8"/>
           </Layer>
           <Layer height="48">
@@ -119,7 +119,7 @@
         <!-- Row 4: bitmap glyphs -->
         <Layer layout="vertical" gap="3">
           <Layer height="12">
-            <Text text="bitmap glyphs (star with offset, heart without)" fontFamily="Arial" fontSize="10"/>
+            <Text text="bitmap glyphs (star with offset, heart without)" fontFamily="Noto Sans SC" fontSize="10"/>
             <Fill color="#94A3B8"/>
           </Layer>
           <Layer height="70">

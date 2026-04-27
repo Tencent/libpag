@@ -16,11 +16,11 @@
     <!-- Title -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="3D matrix3D Axes" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="3D matrix3D Axes" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="RotateX 60, RotateY 60, RotateZ 60, then preserve3D translucent planes" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="RotateX 60, RotateY 60, RotateZ 60, then preserve3D translucent planes" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -41,7 +41,7 @@
           <!-- rotateX 60° -->
           <Layer width="90" height="120" layout="vertical" gap="6" alignment="center" arrangement="center">
             <Layer height="12">
-              <Text text="rotateX 60" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+              <Text text="rotateX 60" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
             <Layer width="80" height="60">
@@ -56,7 +56,7 @@
           <!-- rotateY 60° -->
           <Layer width="90" height="120" layout="vertical" gap="6" alignment="center" arrangement="center">
             <Layer height="12">
-              <Text text="rotateY 60" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+              <Text text="rotateY 60" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
             <Layer width="80" height="60">
@@ -71,7 +71,7 @@
           <!-- rotateZ 60° -->
           <Layer width="90" height="120" layout="vertical" gap="6" alignment="center" arrangement="center">
             <Layer height="12">
-              <Text text="rotateZ 60" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+              <Text text="rotateZ 60" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
             <Layer width="80" height="60">
@@ -90,7 +90,7 @@
              per-pixel depth intersection. -->
         <Layer layout="vertical" gap="6" alignment="center">
           <Layer height="12">
-            <Text text="preserve3D: two translucent planes sharing 3D space" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="preserve3D: two translucent planes sharing 3D space" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
           <Layer width="200" height="114" preserve3D="true">

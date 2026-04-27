@@ -25,11 +25,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Glyph Run" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Glyph Run" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Custom font glyphs with per-glyph transforms" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="Custom font glyphs with per-glyph transforms" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -45,7 +45,7 @@
         <!-- Row 1: xOffsets positioning -->
         <Layer layout="vertical" gap="4">
           <Layer height="12">
-            <Text text="xOffsets positioning" fontFamily="Arial" fontSize="10"/>
+            <Text text="xOffsets positioning" fontFamily="Noto Sans SC" fontSize="10"/>
             <Fill color="#94A3B8"/>
           </Layer>
           <Layer height="50">
@@ -59,7 +59,7 @@
         <!-- Row 2: per-glyph rotations and scales -->
         <Layer layout="vertical" gap="4">
           <Layer height="12">
-            <Text text="rotations + scales" fontFamily="Arial" fontSize="10"/>
+            <Text text="rotations + scales" fontFamily="Noto Sans SC" fontSize="10"/>
             <Fill color="#94A3B8"/>
           </Layer>
           <Layer height="50">
@@ -73,7 +73,7 @@
         <!-- Row 3: larger scale demo -->
         <Layer layout="vertical" gap="4">
           <Layer height="12">
-            <Text text="scaled up glyphs" fontFamily="Arial" fontSize="10"/>
+            <Text text="scaled up glyphs" fontFamily="Noto Sans SC" fontSize="10"/>
             <Fill color="#94A3B8"/>
           </Layer>
           <Layer height="50">

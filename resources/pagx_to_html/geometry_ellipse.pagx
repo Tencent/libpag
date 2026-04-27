@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Ellipse Geometry" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Ellipse Geometry" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Circle, horizontal, and reversed ellipse" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="Circle, horizontal, and reversed ellipse" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -35,7 +35,7 @@
             <Fill color="#3B82F6"/>
           </Layer>
           <Layer height="12">
-            <Text text="Circle" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="Circle" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -47,7 +47,7 @@
             <Fill color="#10B981"/>
           </Layer>
           <Layer height="12">
-            <Text text="Horizontal" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="Horizontal" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -59,7 +59,7 @@
             <Fill color="#EC4899"/>
           </Layer>
           <Layer height="12">
-            <Text text="Reversed" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="Reversed" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>

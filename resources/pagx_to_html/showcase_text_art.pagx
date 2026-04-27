@@ -27,11 +27,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="stretch">
       <Layer height="20">
-        <Text text="Showcase: Text Art" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Showcase: Text Art" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="TextModifier, TextPath, faux styles, writingMode" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="TextModifier, TextPath, faux styles, writingMode" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -50,14 +50,14 @@
           <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="4" alignment="center" arrangement="center">
             <!-- Large display text "TYPE" with gradient fill and stroke -->
             <Layer height="60">
-              <Text text="TYPE" fontFamily="Arial" fontStyle="Bold" fontSize="52" centerX="0" textAnchor="center" letterSpacing="6"/>
+              <Text text="TYPE" fontFamily="Noto Sans SC" fauxBold="true" fontSize="52" centerX="0" textAnchor="center" letterSpacing="6"/>
               <Fill color="@textRadial"/>
               <Stroke color="#FFFFFF30" width="2"/>
             </Layer>
 
             <!-- TextPath: text along circle -->
             <Layer width="160" height="160">
-              <Text text="CREATIVE  TYPOGRAPHY  POSTER  " fontFamily="Arial" fontStyle="Bold" fontSize="10" letterSpacing="3"/>
+              <Text text="CREATIVE  TYPOGRAPHY  POSTER  " fontFamily="Noto Sans SC" fauxBold="true" fontSize="10" letterSpacing="3"/>
               <TextPath path="@circlePath" baselineOrigin="0,0" perpendicular="true" forceAlignment="true"/>
               <Fill color="#C084FC"/>
             </Layer>
@@ -66,7 +66,7 @@
           <!-- Right side: vertical ART text using TextBox container with writingMode -->
           <Layer width="36" right="0" centerY="0">
             <TextBox width="36" height="120" writingMode="vertical" textAlign="center" paragraphAlign="middle" centerX="0" centerY="0">
-              <Text text="ART" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+              <Text text="ART" fontFamily="Noto Sans SC" fauxBold="true" fontSize="20"/>
               <Fill color="#4ECDC4"/>
             </TextBox>
           </Layer>
@@ -78,7 +78,7 @@
           <!-- TextModifier demo: wave text -->
           <Layer layout="vertical" gap="2" alignment="center">
             <Layer height="24">
-              <Text text="DESIGN" fontFamily="Arial" fontStyle="Bold" fontSize="20" centerX="0" textAnchor="center"/>
+              <Text text="DESIGN" fontFamily="Noto Sans SC" fauxBold="true" fontSize="20" centerX="0" textAnchor="center"/>
               <TextModifier position="8,4" skew="12" rotation="4" fillColor="#FFE66D">
                 <RangeSelector start="0" end="1" shape="triangle" weight="1"/>
                 <RangeSelector start="0.3" end="0.7" shape="smooth" mode="add" weight="0.5"/>
@@ -89,19 +89,19 @@
 
           <!-- FauxBold -->
           <Layer height="18">
-            <Text text="Bold" fontFamily="Arial" fontSize="14" centerX="0" textAnchor="center" fauxBold="true"/>
+            <Text text="Bold" fontFamily="Noto Sans SC" fontSize="14" centerX="0" textAnchor="center" fauxBold="true"/>
             <Fill color="#F59E0B"/>
           </Layer>
 
           <!-- FauxItalic -->
           <Layer height="18">
-            <Text text="Italic" fontFamily="Arial" fontSize="14" centerX="0" textAnchor="center" fauxItalic="true"/>
+            <Text text="Italic" fontFamily="Noto Sans SC" fontSize="14" centerX="0" textAnchor="center" fauxItalic="true"/>
             <Fill color="#10B981"/>
           </Layer>
 
           <!-- TextModifier with scale -->
           <Layer height="18">
-            <Text text="SCALE" fontFamily="Arial" fontStyle="Bold" fontSize="14" centerX="0" textAnchor="center" letterSpacing="2"/>
+            <Text text="SCALE" fontFamily="Noto Sans SC" fauxBold="true" fontSize="14" centerX="0" textAnchor="center" letterSpacing="2"/>
             <TextModifier anchor="0,6" scale="1.3,1.3">
               <RangeSelector start="0" end="1" shape="rampUp"/>
             </TextModifier>

@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Layer Styles" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Layer Styles" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="DropShadow, InnerShadow, BackgroundBlur" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="DropShadow, InnerShadow, BackgroundBlur" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -34,7 +34,7 @@
         <DropShadowStyle offsetX="4" offsetY="8" blurX="16" blurY="16" color="#00000060"/>
       </Layer>
       <Layer>
-        <Text text="DropShadow" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="110,133" textAnchor="center"/>
+        <Text text="DropShadow" fontFamily="Noto Sans SC" fauxBold="true" fontSize="9" position="110,133" textAnchor="center"/>
         <Fill color="#64748B"/>
       </Layer>
 
@@ -45,7 +45,7 @@
         <DropShadowStyle offsetX="0" offsetY="8" blurX="40" blurY="8" color="#00000060"/>
       </Layer>
       <Layer>
-        <Text text="Asymmetric" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="340,133" textAnchor="center"/>
+        <Text text="Asymmetric" fontFamily="Noto Sans SC" fauxBold="true" fontSize="9" position="340,133" textAnchor="center"/>
         <Fill color="#64748B"/>
       </Layer>
 
@@ -56,7 +56,7 @@
         <DropShadowStyle offsetX="4" offsetY="8" blurX="20" blurY="20" color="#00000080" showBehindLayer="false"/>
       </Layer>
       <Layer>
-        <Text text="No Behind" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="110,288" textAnchor="center"/>
+        <Text text="No Behind" fontFamily="Noto Sans SC" fauxBold="true" fontSize="9" position="110,288" textAnchor="center"/>
         <Fill color="#64748B"/>
       </Layer>
 
@@ -67,7 +67,7 @@
         <InnerShadowStyle offsetX="4" offsetY="4" blurX="12" blurY="12" color="#00000060"/>
       </Layer>
       <Layer>
-        <Text text="InnerShadow" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="340,288" textAnchor="center"/>
+        <Text text="InnerShadow" fontFamily="Noto Sans SC" fauxBold="true" fontSize="9" position="340,288" textAnchor="center"/>
         <Fill color="#64748B"/>
       </Layer>
 
@@ -78,7 +78,7 @@
         <BackgroundBlurStyle blurX="8" blurY="8"/>
       </Layer>
       <Layer>
-        <Text text="BackgroundBlur" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="225,200" textAnchor="center"/>
+        <Text text="BackgroundBlur" fontFamily="Noto Sans SC" fauxBold="true" fontSize="9" position="225,200" textAnchor="center"/>
         <Fill color="#64748B"/>
       </Layer>
     </Layer>

@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Merge Path Modes" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Merge Path Modes" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Boolean operations on overlapping shapes" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="Boolean operations on overlapping shapes" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -40,7 +40,7 @@
             </Layer>
           </Layer>
           <Layer height="12">
-            <Text text="Append" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="Append" fontFamily="Noto Sans SC" fauxBold="true" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -56,7 +56,7 @@
             </Layer>
           </Layer>
           <Layer height="12">
-            <Text text="Union" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="Union" fontFamily="Noto Sans SC" fauxBold="true" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -72,7 +72,7 @@
             </Layer>
           </Layer>
           <Layer height="12">
-            <Text text="Intersect" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="Intersect" fontFamily="Noto Sans SC" fauxBold="true" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -88,7 +88,7 @@
             </Layer>
           </Layer>
           <Layer height="12">
-            <Text text="Xor" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="Xor" fontFamily="Noto Sans SC" fauxBold="true" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -104,7 +104,7 @@
             </Layer>
           </Layer>
           <Layer height="12">
-            <Text text="Difference" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="Difference" fontFamily="Noto Sans SC" fauxBold="true" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>

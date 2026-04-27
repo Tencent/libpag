@@ -19,11 +19,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Fill Rule Comparison" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Fill Rule Comparison" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="winding vs evenOdd on overlapping paths" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="winding vs evenOdd on overlapping paths" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -39,11 +39,11 @@
       <!-- Column headers -->
       <Layer layout="horizontal" gap="0" alignment="center">
         <Layer flex="1" height="22">
-          <Text text="winding" fontFamily="Arial" fontStyle="Bold" fontSize="13" centerX="0" textAnchor="center"/>
+          <Text text="winding" fontFamily="Noto Sans SC" fauxBold="true" fontSize="13" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
         <Layer flex="1" height="22">
-          <Text text="evenOdd" fontFamily="Arial" fontStyle="Bold" fontSize="13" centerX="0" textAnchor="center"/>
+          <Text text="evenOdd" fontFamily="Noto Sans SC" fauxBold="true" fontSize="13" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
       </Layer>
@@ -52,7 +52,7 @@
       <Layer layout="horizontal" gap="0" alignment="center">
         <Layer flex="1" layout="vertical" gap="6" alignment="center">
           <Layer height="14">
-            <Text text="Star" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+            <Text text="Star" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
           <Layer height="80">
@@ -68,7 +68,7 @@
         </Layer>
         <Layer flex="1" layout="vertical" gap="6" alignment="center">
           <Layer height="14">
-            <Text text="Star" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+            <Text text="Star" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
           <Layer height="80">
@@ -88,7 +88,7 @@
       <Layer layout="horizontal" gap="0" alignment="center">
         <Layer flex="1" layout="vertical" gap="6" alignment="center">
           <Layer height="14">
-            <Text text="Circles" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+            <Text text="Circles" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
           <Layer height="55">
@@ -104,7 +104,7 @@
         </Layer>
         <Layer flex="1" layout="vertical" gap="6" alignment="center">
           <Layer height="14">
-            <Text text="Circles" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+            <Text text="Circles" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
           <Layer height="55">

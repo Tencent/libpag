@@ -16,11 +16,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Color Formats" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Color Formats" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="All supported color syntax variations" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="All supported color syntax variations" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -42,7 +42,7 @@
             <Fill color="#F00"/>
           </Layer>
           <Layer height="12">
-            <Text text="#RGB" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="#RGB" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -53,7 +53,7 @@
             <Fill color="#3B82F6"/>
           </Layer>
           <Layer height="12">
-            <Text text="#RRGGBB" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="#RRGGBB" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -64,7 +64,7 @@
             <Fill color="#EF444480"/>
           </Layer>
           <Layer height="12">
-            <Text text="#RRGGBBAA" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="#RRGGBBAA" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -77,7 +77,7 @@
             </Fill>
           </Layer>
           <Layer height="12">
-            <Text text="srgb()" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="srgb()" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -94,7 +94,7 @@
             </Fill>
           </Layer>
           <Layer height="12">
-            <Text text="p3()" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="p3()" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -105,7 +105,7 @@
             <Fill color="@resBrandColor"/>
           </Layer>
           <Layer height="12">
-            <Text text="@id ref" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="@id ref" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
