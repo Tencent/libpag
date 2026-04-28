@@ -1,16 +1,16 @@
 <pagx width="400" height="300">
   <Layer id="card" width="400" height="300">
-    <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+    <Rectangle width="100%" height="100%" roundness="12"/>
     <Fill color="#FFF"/>
     <Group left="20" top="20" width="360" height="260">
-      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Rectangle width="100%" height="100%"/>
       <Fill color="#F1F5F9"/>
       <Group>
-        <Rectangle left="10" top="10" size="150,80"/>
+        <Rectangle left="10" top="10" width="150" height="80"/>
         <Fill color="#3B82F6"/>
       </Group>
       <Group>
-        <Rectangle left="100" top="50" size="150,80"/>
+        <Rectangle left="100" top="50" width="150" height="80"/>
         <Fill color="#EF4444"/>
       </Group>
     </Group>

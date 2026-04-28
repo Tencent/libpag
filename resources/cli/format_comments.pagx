@@ -2,7 +2,7 @@
 <pagx width="200" height="200">
   <!-- Section A -->
   <Layer>
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Rectangle width="100%" height="100%"/>
     <Fill color="#FF0000"/>
   </Layer>
 

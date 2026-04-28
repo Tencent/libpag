@@ -2,59 +2,59 @@
 <!-- Container layout: compound scenarios -->
 <pagx width="840" height="520">
   <!-- Background -->
-  <Layer left="0" right="0" top="0" bottom="0">
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
+  <Layer width="100%" height="100%">
+    <Rectangle width="100%" height="100%"/>
     <Fill color="#F8FAFC"/>
   </Layer>
 
   <!-- Grid: 2 rows x 4 columns, uniform padding=30, gap=20 -->
-  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30">
+  <Layer width="100%" height="100%" layout="vertical" gap="20" padding="30">
 
     <!-- Row 1 -->
     <Layer flex="1" layout="horizontal" gap="20">
 
       <!-- 1. Vertical layout + spaceBetween: items pushed to top and bottom -->
       <Layer width="180" height="220" layout="vertical" gap="10" arrangement="spaceBetween">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Rectangle width="100%" height="100%" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer width="160" height="50">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Rectangle width="100%" height="100%" roundness="8"/>
           <Fill color="#6366F1"/>
         </Layer>
         <Layer width="160" height="50">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Rectangle width="100%" height="100%" roundness="8"/>
           <Fill color="#F43F5E"/>
         </Layer>
       </Layer>
 
       <!-- 2. Vertical layout + end arrangement -->
       <Layer width="180" height="220" layout="vertical" gap="10" arrangement="end">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Rectangle width="100%" height="100%" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer width="160" height="50">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Rectangle width="100%" height="100%" roundness="8"/>
           <Fill color="#10B981"/>
         </Layer>
         <Layer width="160" height="50">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Rectangle width="100%" height="100%" roundness="8"/>
           <Fill color="#F59E0B"/>
         </Layer>
       </Layer>
 
       <!-- 3. Horizontal padding (two values: v,h) -->
       <Layer width="180" height="220">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Rectangle width="100%" height="100%" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="8" padding="10,20">
+        <Layer width="100%" height="100%" layout="horizontal" gap="8" padding="10,20">
           <Layer width="45">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Rectangle width="100%" height="100%" roundness="8"/>
             <Fill color="#06B6D4"/>
           </Layer>
           <Layer width="45">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Rectangle width="100%" height="100%" roundness="8"/>
             <Fill color="#0891B2"/>
           </Layer>
         </Layer>
@@ -62,16 +62,16 @@
 
       <!-- 4. Vertical padding (four values: t,r,b,l) -->
       <Layer width="180" height="220">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Rectangle width="100%" height="100%" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="10" padding="10,15,20,25">
+        <Layer width="100%" height="100%" layout="vertical" gap="10" padding="10,15,20,25">
           <Layer width="120" height="60">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Rectangle width="100%" height="100%" roundness="8"/>
             <Fill color="#EC4899"/>
           </Layer>
           <Layer width="120" height="60">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Rectangle width="100%" height="100%" roundness="8"/>
             <Fill color="#F472B6"/>
           </Layer>
         </Layer>
@@ -84,69 +84,69 @@
 
       <!-- 5. Alignment=stretch in vertical layout -->
       <Layer width="180" height="220" layout="vertical" gap="10">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Rectangle width="100%" height="100%" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer height="50">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Rectangle width="100%" height="100%" roundness="8"/>
           <Fill color="#3B82F6"/>
         </Layer>
         <Layer height="50">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Rectangle width="100%" height="100%" roundness="8"/>
           <Fill color="#2563EB"/>
         </Layer>
       </Layer>
 
       <!-- 6. Horizontal layout + arrangement=end + gap -->
       <Layer width="180" height="220" layout="horizontal" gap="15" arrangement="end">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Rectangle width="100%" height="100%" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer width="50">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Rectangle width="100%" height="100%" roundness="8"/>
           <Fill color="#A16207"/>
         </Layer>
         <Layer width="50">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Rectangle width="100%" height="100%" roundness="8"/>
           <Fill color="#D97706"/>
         </Layer>
       </Layer>
 
       <!-- 7. Single child with spaceBetween (should revert to start behavior) -->
       <Layer width="180" height="220" layout="vertical" gap="10" arrangement="spaceBetween">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Rectangle width="100%" height="100%" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer width="160" height="60">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Rectangle width="100%" height="100%" roundness="8"/>
           <Fill color="#7C3AED"/>
         </Layer>
       </Layer>
 
       <!-- 8. Horizontal + vertical nested layout combo -->
       <Layer width="180" height="220" layout="horizontal" gap="10">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Rectangle width="100%" height="100%" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <!-- Nested vertical column 1 -->
         <Layer flex="1" layout="vertical" gap="8">
           <Layer width="70" height="50">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
+            <Rectangle width="100%" height="100%" roundness="6"/>
             <Fill color="#FCA5A5"/>
           </Layer>
           <Layer width="70" height="50">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
+            <Rectangle width="100%" height="100%" roundness="6"/>
             <Fill color="#FB7185"/>
           </Layer>
         </Layer>
         <!-- Nested vertical column 2 -->
         <Layer flex="1" layout="vertical" gap="8">
           <Layer width="70" height="50">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
+            <Rectangle width="100%" height="100%" roundness="6"/>
             <Fill color="#A5F3FC"/>
           </Layer>
           <Layer width="70" height="50">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
+            <Rectangle width="100%" height="100%" roundness="6"/>
             <Fill color="#67E8F9"/>
           </Layer>
         </Layer>

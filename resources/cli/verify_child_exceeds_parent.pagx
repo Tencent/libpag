@@ -4,14 +4,14 @@
   <!-- Case 1: child wider than parent -->
   <Layer width="200" height="200">
     <Layer width="250" height="100">
-      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Rectangle width="100%" height="100%"/>
       <Fill color="#FF0000"/>
     </Layer>
   </Layer>
   <!-- Case 2: child at negative coordinates -->
   <Layer width="200" height="200">
     <Layer x="-50" width="100" height="100">
-      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Rectangle width="100%" height="100%"/>
       <Fill color="#00FF00"/>
     </Layer>
   </Layer>

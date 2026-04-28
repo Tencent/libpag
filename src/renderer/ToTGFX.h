@@ -34,6 +34,7 @@
 #include "pagx/types/Point.h"
 #include "pagx/types/Rect.h"
 #include "pagx/types/RepeaterOrder.h"
+#include "pagx/types/ScaleMode.h"
 #include "pagx/types/SelectorTypes.h"
 #include "pagx/types/StrokeStyle.h"
 #include "pagx/types/TileMode.h"
@@ -59,6 +60,7 @@ enum class RepeaterOrder;
 enum class SelectorUnit;
 enum class SelectorShape;
 enum class SelectorMode;
+enum class ScaleMode;
 }  // namespace tgfx
 
 namespace pagx {
@@ -102,6 +104,8 @@ tgfx::TileMode ToTGFX(TileMode mode);
 tgfx::FilterMode ToTGFX(FilterMode mode);
 
 tgfx::MipmapMode ToTGFX(MipmapMode mode);
+
+tgfx::ScaleMode ToTGFX(ScaleMode mode);
 
 tgfx::Matrix3D ToTGFX3D(const Matrix3D& matrix3D);
 

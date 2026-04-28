@@ -3,7 +3,7 @@
     <Path data="M 50 50 L 150 50 L 150 100 L 50 100 Z"/>
     <Fill color="#F00"/>
     <Group left="0" top="0">
-      <Rectangle size="10,10"/>
+      <Rectangle width="10" height="10"/>
       <Fill color="#0F0"/>
     </Group>
   </Layer>

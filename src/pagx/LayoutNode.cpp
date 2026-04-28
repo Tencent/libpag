@@ -34,15 +34,17 @@ namespace pagx {
 
 bool LayoutNode::hasConstraints() const {
   return !std::isnan(left) || !std::isnan(right) || !std::isnan(top) || !std::isnan(bottom) ||
-         !std::isnan(centerX) || !std::isnan(centerY);
+         !std::isnan(centerX) || !std::isnan(centerY) || !std::isnan(percentWidth) ||
+         !std::isnan(percentHeight);
 }
 
 Rect LayoutNode::layoutBounds() const {
-  float x = std::isnan(layoutX) ? measuredX : layoutX;
-  float y = std::isnan(layoutY) ? measuredY : layoutY;
-  float w = std::isnan(layoutWidth) ? (std::isnan(measuredWidth) ? 0 : measuredWidth) : layoutWidth;
+  float x = std::isnan(layoutX) ? preferredX : layoutX;
+  float y = std::isnan(layoutY) ? preferredY : layoutY;
+  float w =
+      std::isnan(layoutWidth) ? (std::isnan(preferredWidth) ? 0 : preferredWidth) : layoutWidth;
   float h =
-      std::isnan(layoutHeight) ? (std::isnan(measuredHeight) ? 0 : measuredHeight) : layoutHeight;
+      std::isnan(layoutHeight) ? (std::isnan(preferredHeight) ? 0 : preferredHeight) : layoutHeight;
   return Rect::MakeXYWH(x, y, w, h);
 }
 
@@ -75,8 +77,8 @@ float LayoutNode::constraintExtentY() const {
 }
 
 void LayoutNode::updateSize(LayoutContext* context) {
-  // If both measured dimensions are already set, skip onMeasure.
-  if (!std::isnan(measuredWidth) && !std::isnan(measuredHeight)) {
+  // If both preferred dimensions are already set, skip onMeasure.
+  if (!std::isnan(preferredWidth) && !std::isnan(preferredHeight)) {
     return;
   }
   onMeasure(context);
@@ -96,48 +98,70 @@ void LayoutNode::setLayoutPosition(LayoutContext*, float x, float y) {
   }
 }
 
-Point LayoutNode::computeRenderPosition(const Rect& contentBounds) const {
+Point LayoutNode::computeRenderPosition(const Rect& contentBounds, float intrinsicWidth,
+                                        float intrinsicHeight) const {
   auto bounds = layoutBounds();
-  float scale = ComputeUniformScale(measuredWidth, measuredHeight, bounds.width, bounds.height);
+  float scale = ComputeUniformScale(intrinsicWidth, intrinsicHeight, bounds.width, bounds.height);
   float offsetX = (bounds.width - contentBounds.width * scale) * 0.5f;
   float offsetY = (bounds.height - contentBounds.height * scale) * 0.5f;
   return {bounds.x + offsetX - contentBounds.x * scale,
           bounds.y + offsetY - contentBounds.y * scale};
 }
 
-float LayoutNode::computeRenderScale() const {
+float LayoutNode::computeRenderScale(float intrinsicWidth, float intrinsicHeight) const {
   auto bounds = layoutBounds();
-  return ComputeUniformScale(measuredWidth, measuredHeight, bounds.width, bounds.height);
+  return ComputeUniformScale(intrinsicWidth, intrinsicHeight, bounds.width, bounds.height);
 }
 
 void LayoutNode::PerformConstraintLayout(const std::vector<LayoutNode*>& nodes, float containerW,
                                          float containerH, const Padding& padding,
                                          LayoutContext* context) {
   bool hasPadding = !padding.isZero();
-  float cw = hasPadding ? std::max(0.0f, containerW - padding.left - padding.right) : containerW;
-  float ch = hasPadding ? std::max(0.0f, containerH - padding.top - padding.bottom) : containerH;
+  // A NaN container axis means the parent is still resolving that axis (pass 1 of a
+  // content-measured parent). Propagate NaN downward so percent children fall back to their
+  // preferred size instead of locking onto a provisional value.
+  float cw =
+      std::isnan(containerW)
+          ? NAN
+          : (hasPadding ? std::max(0.0f, containerW - padding.left - padding.right) : containerW);
+  float ch =
+      std::isnan(containerH)
+          ? NAN
+          : (hasPadding ? std::max(0.0f, containerH - padding.top - padding.bottom) : containerH);
   for (auto* child : nodes) {
-    // Phase 1: compute target size from opposite-edge constraints.
+    // Phase 1: compute target size from parent-side inputs only.
+    //   opposite-edge constraints > percentWidth/Height > NAN (child uses its preferred size)
+    // An authored width/height is NOT considered here: the child already folds it into its
+    // preferred size during onMeasure(), so passing NAN lets setLayoutSize fall back to it.
+    // Rounding policy: `targetW` / `targetH` produced here are layout-allocated sizes (the
+    // engine derived them from constraints or percent), so we ceil them to whole pixels. Authored
+    // widths/heights and content-measured preferred sizes keep their exact values — they are
+    // carried through setLayoutSize's NaN fallback, not through this branch.
     float targetW = NAN;
-    float targetH = NAN;
     if (!std::isnan(child->left) && !std::isnan(child->right)) {
-      targetW = std::max(0.0f, std::ceil(cw - child->left - child->right));
+      targetW = std::isnan(cw) ? NAN : std::max(0.0f, std::ceil(cw - child->left - child->right));
+    } else if (!std::isnan(child->percentWidth)) {
+      targetW = std::ceil(cw * child->percentWidth / 100.0f);
     }
+    float targetH = NAN;
     if (!std::isnan(child->top) && !std::isnan(child->bottom)) {
-      targetH = std::max(0.0f, std::ceil(ch - child->top - child->bottom));
+      targetH = std::isnan(ch) ? NAN : std::max(0.0f, std::ceil(ch - child->top - child->bottom));
+    } else if (!std::isnan(child->percentHeight)) {
+      targetH = std::ceil(ch * child->percentHeight / 100.0f);
     }
     // Phase 2: write self rendering attributes and layoutWidth/layoutHeight.
     child->setLayoutSize(context, targetW, targetH);
-    // Phase 3: compute position from layoutWidth/layoutHeight.
-    if (child->hasConstraints()) {
+    // Phase 3: compute position from layoutWidth/layoutHeight. Any axis without a positional
+    // constraint defaults to 0 relative to the padding origin, so padding always applies.
+    if (child->hasConstraints() || hasPadding) {
       auto pos =
           CalculateConstrainedPosition(cw, ch, child->layoutWidth, child->layoutHeight, *child);
-      float finalX = hasPadding ? std::round(pos.x + padding.left) : std::round(pos.x);
-      float finalY = hasPadding ? std::round(pos.y + padding.top) : std::round(pos.y);
+      float relX = std::isnan(pos.x) ? 0.0f : pos.x;
+      float relY = std::isnan(pos.y) ? 0.0f : pos.y;
+      float finalX = hasPadding ? std::round(relX + padding.left) : std::round(relX);
+      float finalY = hasPadding ? std::round(relY + padding.top) : std::round(relY);
       // Phase 4: write self position and layoutX/layoutY.
       child->setLayoutPosition(context, finalX, finalY);
-    } else if (hasPadding) {
-      child->setLayoutPosition(context, std::round(padding.left), std::round(padding.top));
     }
   }
 }
@@ -250,13 +274,13 @@ void LayoutNode::MeasureChildNodes(const std::vector<Element*>& elements, float 
   float maxY = 0;
   for (auto* element : elements) {
     auto* node = AsLayoutNode(element);
-    if (node == nullptr || std::isnan(node->measuredWidth) || std::isnan(node->measuredHeight)) {
+    if (node == nullptr || std::isnan(node->preferredWidth) || std::isnan(node->preferredHeight)) {
       continue;
     }
-    float extX = node->hasConstraints() ? node->constraintExtentX() : node->measuredX;
-    float extY = node->hasConstraints() ? node->constraintExtentY() : node->measuredY;
-    extX += node->measuredWidth;
-    extY += node->measuredHeight;
+    float extX = node->hasConstraints() ? node->constraintExtentX() : node->preferredX;
+    float extY = node->hasConstraints() ? node->constraintExtentY() : node->preferredY;
+    extX += node->preferredWidth;
+    extY += node->preferredHeight;
     maxX = std::max(maxX, extX);
     maxY = std::max(maxY, extY);
   }

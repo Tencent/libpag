@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Content-measured TextBox + flex sibling. Flex fills remaining space after text wraps. -->
 <pagx width="300" height="300">
-  <Layer left="0" right="0" top="0" bottom="0">
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
+  <Layer width="100%" height="100%">
+    <Rectangle width="100%" height="100%"/>
     <Fill color="#F8FAFC"/>
   </Layer>
-  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="12" padding="20">
+  <Layer width="100%" height="100%" layout="vertical" gap="12" padding="20">
     <!-- Content-measured Layer with wrapping TextBox -->
     <Layer>
-      <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+      <Rectangle width="100%" height="100%" roundness="8"/>
       <Fill color="#FFFFFF"/>
-      <Layer left="0" right="0" top="0" bottom="0" padding="12">
-        <TextBox left="0" right="0">
+      <Layer width="100%" height="100%" padding="12">
+        <TextBox width="100%">
           <Text text="AAAA BBBB CCCC DDDD EEEE FFFF GGGG HHHH" fontFamily="Noto Sans SC" fontSize="16"/>
           <Fill color="#1E293B"/>
         </TextBox>
@@ -19,7 +19,7 @@
     </Layer>
     <!-- Flex child fills remaining space -->
     <Layer flex="1">
-      <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+      <Rectangle width="100%" height="100%" roundness="8"/>
       <Fill color="#6366F1"/>
     </Layer>
   </Layer>

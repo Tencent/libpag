@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="400" height="400">
   <Layer>
-    <Rectangle left="60" top="60" size="180,180" roundness="24"/>
-    <Ellipse left="160" top="160" size="180,180"/>
+    <Rectangle left="60" top="60" width="180" height="180" roundness="24"/>
+    <Ellipse left="160" top="160" width="180" height="180"/>
     <MergePath mode="union"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="280,280">
+      <LinearGradient endPoint="1,1">
         <ColorStop color="#6366F1" offset="0"/>
-        <ColorStop color="#8B5CF6" offset="0.5"/>
         <ColorStop color="#EC4899" offset="1"/>
       </LinearGradient>
     </Fill>

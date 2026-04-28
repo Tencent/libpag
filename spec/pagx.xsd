@@ -126,6 +126,13 @@
     </xs:restriction>
   </xs:simpleType>
 
+  <!-- DimensionType: supports absolute pixels (e.g., "100") or percentage (e.g., "50%"). -->
+  <xs:simpleType name="DimensionType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9]*\.?[0-9]+%?"/>
+    </xs:restriction>
+  </xs:simpleType>
+
   <!-- ========================= Enumeration Types ========================= -->
 
   <xs:simpleType name="BlendModeType">
@@ -180,6 +187,15 @@
       <xs:enumeration value="none"/>
       <xs:enumeration value="nearest"/>
       <xs:enumeration value="linear"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="ScaleModeType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="none"/>
+      <xs:enumeration value="stretch"/>
+      <xs:enumeration value="letterBox"/>
+      <xs:enumeration value="zoom"/>
     </xs:restriction>
   </xs:simpleType>
 
@@ -370,6 +386,8 @@
     <xs:attribute name="bottom" type="xs:decimal"/>
     <xs:attribute name="centerX" type="xs:decimal"/>
     <xs:attribute name="centerY" type="xs:decimal"/>
+    <xs:attribute name="width" type="DimensionType"/>
+    <xs:attribute name="height" type="DimensionType"/>
   </xs:attributeGroup>
 
   <!-- ========================= Color Source Elements ========================= -->
@@ -394,8 +412,9 @@
     </xs:sequence>
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="startPoint" type="PointType" default="0,0"/>
-    <xs:attribute name="endPoint" type="PointType" use="required"/>
+    <xs:attribute name="endPoint" type="PointType" default="1,0"/>
     <xs:attribute name="matrix" type="MatrixType"/>
+    <xs:attribute name="fitsToGeometry" type="xs:boolean" default="true"/>
   </xs:complexType>
 
   <!-- RadialGradient -->
@@ -404,9 +423,10 @@
       <xs:element name="ColorStop" type="ColorStopType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="center" type="PointType" default="0,0"/>
-    <xs:attribute name="radius" type="xs:decimal" use="required"/>
+    <xs:attribute name="center" type="PointType" default="0.5,0.5"/>
+    <xs:attribute name="radius" type="xs:decimal" default="0.5"/>
     <xs:attribute name="matrix" type="MatrixType"/>
+    <xs:attribute name="fitsToGeometry" type="xs:boolean" default="true"/>
   </xs:complexType>
 
   <!-- ConicGradient -->
@@ -415,10 +435,11 @@
       <xs:element name="ColorStop" type="ColorStopType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="center" type="PointType" default="0,0"/>
+    <xs:attribute name="center" type="PointType" default="0.5,0.5"/>
     <xs:attribute name="startAngle" type="xs:decimal" default="0"/>
     <xs:attribute name="endAngle" type="xs:decimal" default="360"/>
     <xs:attribute name="matrix" type="MatrixType"/>
+    <xs:attribute name="fitsToGeometry" type="xs:boolean" default="true"/>
   </xs:complexType>
 
   <!-- DiamondGradient -->
@@ -427,9 +448,10 @@
       <xs:element name="ColorStop" type="ColorStopType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="center" type="PointType" default="0,0"/>
-    <xs:attribute name="radius" type="xs:decimal" use="required"/>
+    <xs:attribute name="center" type="PointType" default="0.5,0.5"/>
+    <xs:attribute name="radius" type="xs:decimal" default="0.5"/>
     <xs:attribute name="matrix" type="MatrixType"/>
+    <xs:attribute name="fitsToGeometry" type="xs:boolean" default="true"/>
   </xs:complexType>
 
   <!-- ImagePattern -->
@@ -439,8 +461,9 @@
     <xs:attribute name="matrix" type="MatrixType"/>
     <xs:attribute name="filterMode" type="FilterModeType" default="linear"/>
     <xs:attribute name="mipmapMode" type="MipmapModeType" default="linear"/>
-    <xs:attribute name="tileModeX" type="TileModeType" default="clamp"/>
-    <xs:attribute name="tileModeY" type="TileModeType" default="clamp"/>
+    <xs:attribute name="tileModeX" type="TileModeType" default="decal"/>
+    <xs:attribute name="tileModeY" type="TileModeType" default="decal"/>
+    <xs:attribute name="scaleMode" type="ScaleModeType" default="letterBox"/>
   </xs:complexType>
 
   <!-- Color source group for inline use in Fill/Stroke -->
@@ -684,8 +707,6 @@
     </xs:sequence>
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attributeGroup ref="ConstraintAttributes"/>
-    <xs:attribute name="width" type="xs:decimal"/>
-    <xs:attribute name="height" type="xs:decimal"/>
     <xs:attribute name="padding" type="PaddingType"/>
     <xs:attribute name="textAlign" type="TextAlignType" default="start"/>
     <xs:attribute name="paragraphAlign" type="ParagraphAlignType" default="near"/>
@@ -835,8 +856,6 @@
     </xs:sequence>
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attributeGroup ref="ConstraintAttributes"/>
-    <xs:attribute name="width" type="xs:decimal"/>
-    <xs:attribute name="height" type="xs:decimal"/>
     <xs:attribute name="padding" type="PaddingType"/>
     <xs:attribute name="anchor" type="PointType" default="0,0"/>
     <xs:attribute name="position" type="PointType" default="0,0"/>
@@ -886,8 +905,6 @@
     <xs:attribute name="x" type="xs:decimal" default="0"/>
     <xs:attribute name="y" type="xs:decimal" default="0"/>
     <xs:attribute name="flex" type="xs:decimal" default="0"/>
-    <xs:attribute name="width" type="xs:decimal"/>
-    <xs:attribute name="height" type="xs:decimal"/>
     <xs:attribute name="layout" type="LayoutModeType" default="none"/>
     <xs:attribute name="gap" type="xs:decimal" default="0"/>
     <xs:attribute name="padding" type="PaddingType"/>
