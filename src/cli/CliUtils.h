@@ -27,6 +27,7 @@
 #include <vector>
 #include "pagx/FontConfig.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/SystemFonts.h"
 #include "pagx/nodes/Layer.h"
 #include "tgfx/core/Typeface.h"
 
@@ -46,9 +47,9 @@ static inline bool FontFamilyMatch(const std::string& requested, const std::stri
 }
 
 /**
- * Resolves a system font by family and style with fallback. First attempts an exact match with the
- * given style. If the result's fontFamily does not match the requested family (case-insensitive),
- * or the style is not found, falls back to the family's default style.
+ * Resolves a system font by family and style with fallback. First attempts MakeFromName for an
+ * exact match. If MakeFromName is unavailable (e.g. FreeType backend on macOS), falls back to
+ * SystemFonts::FindFont to locate the font file path and loads via MakeFromPath.
  */
 static inline std::shared_ptr<tgfx::Typeface> ResolveSystemTypeface(const std::string& family,
                                                                     const std::string& style) {
@@ -60,6 +61,17 @@ static inline std::shared_ptr<tgfx::Typeface> ResolveSystemTypeface(const std::s
     typeface = tgfx::Typeface::MakeFromName(family, "");
     if (typeface != nullptr && FontFamilyMatch(family, typeface->fontFamily())) {
       return typeface;
+    }
+  }
+  // Fallback: locate the font file via platform APIs and load by path.
+  auto location = pagx::SystemFonts::FindFont(family, style);
+  if (!location.path.empty()) {
+    return tgfx::Typeface::MakeFromPath(location.path, location.ttcIndex);
+  }
+  if (!style.empty()) {
+    location = pagx::SystemFonts::FindFont(family, "");
+    if (!location.path.empty()) {
+      return tgfx::Typeface::MakeFromPath(location.path, location.ttcIndex);
     }
   }
   return nullptr;

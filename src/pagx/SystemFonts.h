@@ -66,6 +66,13 @@ class SystemFonts {
    * guaranteed (callers should sort as needed).
    */
   static std::vector<FontFamilyEntry> AllFontFamilies();
+
+  /**
+   * Finds a single system font by family and style name. Returns a FontLocation with the file path
+   * and TTC index. If style is empty, returns the family's default style. Returns an empty
+   * FontLocation (empty path) if no match is found.
+   */
+  static FontLocation FindFont(const std::string& family, const std::string& style);
 };
 
 }  // namespace pagx
