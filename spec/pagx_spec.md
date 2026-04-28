@@ -335,8 +335,9 @@ Linear gradients interpolate along the direction from start point to end point.
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `startPoint` | Point | `0,0` | Start point |
-| `endPoint` | Point | (required) | End point |
-| `matrix` | Matrix | identity matrix | Transform matrix |
+| `endPoint` | Point | `1,0` | End point |
+| `matrix` | Matrix | identity matrix | Transform applied in the selected coordinate space. See [Color Source Coordinate System](#color-source-coordinate-system) |
+| `fitsToGeometry` | boolean | true | Coordinate space for the gradient. When `true`, the geometry's normalized 0-1 bounding box. When `false`, the parent container's (Layer or Group) coordinate space. See [Color Source Coordinate System](#color-source-coordinate-system) |
 
 **Calculation**: For a point P, its color is determined by the projection position of P onto the line connecting start and end points.
 
@@ -348,9 +349,10 @@ Radial gradients radiate outward from the center.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | Point | 0,0 | Center point |
-| `radius` | float | (required) | Gradient radius |
-| `matrix` | Matrix | identity matrix | Transform matrix |
+| `center` | Point | `0.5,0.5` | Center point |
+| `radius` | float | `0.5` | Gradient radius |
+| `matrix` | Matrix | identity matrix | Transform applied in the selected coordinate space. See [Color Source Coordinate System](#color-source-coordinate-system) |
+| `fitsToGeometry` | boolean | true | Coordinate space for the gradient. When `true`, the geometry's normalized 0-1 bounding box. When `false`, the parent container's (Layer or Group) coordinate space. See [Color Source Coordinate System](#color-source-coordinate-system) |
 
 **Calculation**: For a point P, its color is determined by `distance(P, center) / radius`.
 
@@ -362,10 +364,11 @@ Conic gradients (also known as sweep gradients) interpolate along the circumfere
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | Point | 0,0 | Center point |
+| `center` | Point | `0.5,0.5` | Center point |
 | `startAngle` | float | 0 | Start angle |
 | `endAngle` | float | 360 | End angle |
-| `matrix` | Matrix | identity matrix | Transform matrix |
+| `matrix` | Matrix | identity matrix | Transform applied in the selected coordinate space. See [Color Source Coordinate System](#color-source-coordinate-system) |
+| `fitsToGeometry` | boolean | true | Coordinate space for the gradient. When `true`, the geometry's normalized 0-1 bounding box. When `false`, the parent container's (Layer or Group) coordinate space. See [Color Source Coordinate System](#color-source-coordinate-system) |
 
 **Calculation**: For a point P, its color is determined by the ratio of `atan2(P.y - center.y, P.x - center.x)` within the `[startAngle, endAngle]` range.
 
@@ -386,9 +389,10 @@ Diamond gradients radiate from the center toward the four corners.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | Point | 0,0 | Center point |
-| `radius` | float | (required) | Gradient radius |
-| `matrix` | Matrix | identity matrix | Transform matrix |
+| `center` | Point | `0.5,0.5` | Center point |
+| `radius` | float | `0.5` | Gradient radius |
+| `matrix` | Matrix | identity matrix | Transform applied in the selected coordinate space. See [Color Source Coordinate System](#color-source-coordinate-system) |
+| `fitsToGeometry` | boolean | true | Coordinate space for the gradient. When `true`, the geometry's normalized 0-1 bounding box. When `false`, the parent container's (Layer or Group) coordinate space. See [Color Source Coordinate System](#color-source-coordinate-system) |
 
 **Calculation**: For a point P, its color is determined by the Chebyshev distance `max(|P.x - center.x|, |P.y - center.y|) / radius`.
 
@@ -424,11 +428,12 @@ Image patterns use an image as a color source.
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `image` | string | (required) | Image source: `@id` resource reference, file path, or data URI |
-| `tileModeX` | TileMode | clamp | X-direction tile mode |
-| `tileModeY` | TileMode | clamp | Y-direction tile mode |
+| `tileModeX` | TileMode | decal | X-direction tile mode |
+| `tileModeY` | TileMode | decal | Y-direction tile mode |
 | `filterMode` | FilterMode | linear | Texture filter mode |
 | `mipmapMode` | MipmapMode | linear | Mipmap mode |
-| `matrix` | Matrix | identity matrix | Transform matrix |
+| `matrix` | Matrix | identity matrix | Transform matrix applied in the image's local coordinate space. See [Color Source Coordinate System](#color-source-coordinate-system) |
+| `scaleMode` | ScaleMode | letterBox | Rule used to fit the transformed image into each geometry's bounding box. When `none`, the image is placed in the parent container's (Layer or Group) coordinate space without per-geometry fitting. See [Color Source Coordinate System](#color-source-coordinate-system) |
 
 **TileMode**: `clamp`, `repeat`, `mirror`, `decal`
 
@@ -436,26 +441,39 @@ Image patterns use an image as a color source.
 
 **MipmapMode**: `none`, `nearest`, `linear`
 
+**ScaleMode**: `none`, `stretch`, `letterBox`, `zoom`
+
 **Complete Example**: Demonstrates ImagePattern fill with different tile modes
 
 > [Sample](samples/image_pattern.pagx)
 
 ##### Color Source Coordinate System
 
-Except for solid colors, all color sources (gradients, image patterns) operate within a coordinate system **relative to the origin of the geometry element's local coordinate system**. The `matrix` attribute can be used to apply transforms to the color source coordinate system.
+Except for solid colors, every color source (gradient or image pattern) interprets its geometric parameters in one of two coordinate spaces:
 
-**Transform Behavior**:
+- **Gradient**: `fitsToGeometry` (default `true`).
+- **ImagePattern**: `scaleMode` (default `letterBox`); any value other than `none` selects per-geometry fitting, `scaleMode="none"` selects the absolute mode.
 
-1. **External transforms affect both geometry and color source**: Group transforms, layer matrices, and other external transforms apply holistically to both the geometry element and its color source—they scale, rotate, and translate together.
+**Relative mode (default — per-geometry fit)**:
 
-2. **Modifying geometry properties does not affect the color source**: Directly modifying geometry element properties (such as Rectangle's width/height or Path's path data) only changes the geometry content itself without affecting the color source coordinate system.
+Gradient parameters (`startPoint`, `endPoint`, `center`, `radius`, etc.) live in a `(0, 0)`-`(1, 1)` space mapped to **each geometry's own bounding box**; ImagePattern images are fitted into each geometry's bounding box according to `scaleMode`. The fill auto-resizes with the geometry, so multiple geometries of different sizes sharing the same color source each get their own properly-fitted fill.
 
-**Example**: Drawing a diagonal linear gradient within a 300×300 region:
+**Absolute mode (opt-in — `fitsToGeometry="false"` / `scaleMode="none"`)**:
+
+Parameters live in **the parent container's (Layer or Group) coordinate space**, with its origin at `(0, 0)`. Multiple geometries inside the same container share one continuous fill; resizing a geometry no longer rescales its fill, but a transform on the parent container moves both together.
+
+The `matrix` attribute composes on top of the above:
+
+- **Gradient**: applied in the selected coordinate space, affecting all gradient parameters uniformly.
+- **ImagePattern**: applied in the image's local coordinate space (the original image rect with the origin at its top-left), before the image is placed into the geometry according to `scaleMode`.
+
+**Example**: A linear gradient drawn in absolute mode across a 300×300 rectangle inside a Layer:
 
 > [Sample](samples/color_source_coordinates.pagx)
 
-- Applying `scale(2, 2)` transform to this layer: The rectangle becomes 600×600, and the gradient scales accordingly, maintaining consistent visual appearance
-- Directly changing Rectangle's size to 600,600: The rectangle becomes 600×600, but the gradient coordinates remain unchanged, covering only the top-left quarter of the rectangle
+- `fitsToGeometry="false"` + `scale(2, 2)` on the parent Layer: the rectangle becomes 600×600 and the gradient scales with it.
+- `fitsToGeometry="false"` + Rectangle resized to 600×600 directly: the rectangle grows but the gradient stays anchored to the Layer, covering only the top-left quarter.
+- Default `fitsToGeometry="true"`: the gradient always re-fits to the rectangle's current bounding box.
 
 #### 3.3.4 Composition
 
@@ -1154,7 +1172,7 @@ The VectorElement system employs an **accumulate-render** processing model: geom
 
 | Term | Elements | Description |
 |------|----------|-------------|
-| **Geometry Elements** | Rectangle, Ellipse, Polystar, Path, Text | Elements providing geometric shapes; accumulate as a geometry list in the context |
+| **Geometry Elements** | Rectangle, Ellipse, Polystar, Path, Text | Renderable geometry (shapes and text); accumulate as a geometry list in the context |
 | **Modifiers** | TrimPath, RoundCorner, MergePath, TextModifier, TextPath, TextBox, Repeater | Transform accumulated geometry |
 | **Painters** | Fill, Stroke | Perform fill or stroke rendering on accumulated geometry |
 | **Containers** | Group | Create isolated scopes and apply matrix transforms; merge upon completion |
@@ -1211,7 +1229,7 @@ Different modifiers have different scopes over elements in the geometry list:
 
 ### 6.2 Geometry Elements
 
-Geometry elements provide renderable shapes. All geometry elements, as well as TextPath, TextBox, and Group, support constraint attributes for positioning within their container — see §4.3 for the full attribute list, definitions, and behavior. Constraint attributes are not repeated in individual element tables below.
+Geometry elements provide renderable geometry (shapes and text). All geometry elements, as well as TextPath, TextBox, and Group, support constraint attributes for positioning within their container — see §4.3 for the full attribute list, definitions, and behavior. Constraint attributes are not repeated in individual element tables below.
 
 #### 6.2.1 Rectangle
 
@@ -1359,7 +1377,7 @@ Defines arbitrary shapes using SVG path syntax, supporting inline data or refere
 
 #### 6.2.5 Text
 
-Text elements provide geometric shapes for text content. Unlike shape elements that produce a single Path, Text produces a **glyph list** (multiple glyphs) after shaping, which accumulates in the rendering context's geometry list for subsequent modifier transformation or painter rendering.
+Text is a geometry element that contributes glyphs (rather than a path) to the geometry list. Unlike shape elements that produce a single Path, Text produces a **glyph list** (multiple glyphs) after shaping, which accumulates in the rendering context's geometry list for subsequent modifier transformation or painter rendering.
 
 ```xml
 <Text text="Hello World" left="100" top="200" fontFamily="Arial" fontStyle="Regular" fauxBold="true" fauxItalic="false" fontSize="24" letterSpacing="0" textAnchor="start"/>
@@ -1996,7 +2014,7 @@ alpha = lerp(startAlpha, endAlpha, t)
 
 When `copies` is a decimal (e.g., `3.5`), partial copies are achieved through **semi-transparent blending**:
 
-1. **Geometry copying**: Shapes and text are copied by `ceil(copies)` (i.e., 4), geometry itself is not scaled or clipped
+1. **Geometry copying**: Shapes and text geometry are copied by `ceil(copies)` (i.e., 4); the geometry itself is not scaled or clipped
 2. **Opacity adjustment**: The last copy's opacity is multiplied by the fractional part (e.g., 0.5), producing semi-transparent effect
 3. **Visual effect**: Simulates partial copies through opacity gradation
 
@@ -2077,21 +2095,15 @@ Groups create isolated scopes for geometry accumulation and rendering:
 **Example 2 - Child Group Geometry Propagates Upward**:
 > [Sample](samples/group_propagation.pagx)
 
-**Example 3 - Multiple Painters Reuse Geometry**:
-> [Sample](samples/multiple_painters.pagx)
-
 #### Multiple Fills and Strokes
 
 Since painters do not clear the geometry list, the same geometry can have multiple Fills and Strokes applied consecutively.
 
-**Example 4 - Multiple Fills**:
+**Example 1 - Multiple Fills**:
 > [Sample](samples/multiple_fills.pagx)
 
-**Example 5 - Multiple Strokes**:
+**Example 2 - Multiple Strokes**:
 > [Sample](samples/multiple_strokes.pagx)
-
-**Example 6 - Mixed Overlay**:
-> [Sample](samples/mixed_overlay.pagx)
 
 **Rendering Order**: Multiple painters render in document order; those appearing earlier are below.
 
@@ -2188,8 +2200,8 @@ This appendix describes node categorization and nesting rules.
 | **Color Sources** | `SolidColor`, `LinearGradient`, `RadialGradient`, `ConicGradient`, `DiamondGradient`, `ImagePattern`, `ColorStop` | Color definitions used by painters. |
 | **Layer Styles** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle` | Visual effects applied to Layer content. |
 | **Layer Filters** | `BlurFilter`, `DropShadowFilter`, `InnerShadowFilter`, `BlendFilter`, `ColorMatrixFilter` | Post-processing effects applied to composited Layer. |
-| **Geometry Elements** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` | Drawable shapes and text. Must be inside Layer/Group. |
-| **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `TextBox`, `Repeater` | Transform or combine geometry and text. |
+| **Geometry Elements** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` | Drawable geometry (shapes and text). Must be inside Layer/Group. |
+| **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `Repeater` | Transform or combine geometry and text. |
 | **Painters** | `Fill`, `Stroke` | Apply color/gradient to geometry. Must be inside Layer/Group. |
 | **Import Directives** | (inline `<svg>`, `import` attribute) | Import directives on Layer. Inline `<svg>` child elements and the `import`/`importFormat` attributes are resolved by `pagx resolve` into native PAGX nodes. |
 
@@ -2272,6 +2284,7 @@ Additionally, `Layer` (but not `Group`) may contain `<svg>` as an import directi
 | **TileMode** | `clamp`, `repeat`, `mirror`, `decal` |
 | **FilterMode** | `nearest`, `linear` |
 | **MipmapMode** | `none`, `nearest`, `linear` |
+| **ScaleMode** | `none`, `stretch`, `letterBox`, `zoom` |
 | **LayoutMode** | `none`, `horizontal`, `vertical` |
 | **Alignment** | `start`, `center`, `end`, `stretch` |
 | **Arrangement** | `start`, `center`, `end`, `spaceBetween`, `spaceEvenly`, `spaceAround` |

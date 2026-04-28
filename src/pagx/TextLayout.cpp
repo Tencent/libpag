@@ -516,8 +516,17 @@ class TextLayoutContext {
       float letterSpacing = glyph.letterSpacing;
       float glyphEndX = currentLineWidth + glyph.advance;
 
+      // CSS hanging whitespace rule: a trailing space/tab at end of line does NOT trigger wrap
+      // even when it exceeds boxWidth. The wrap only fires when the next non-whitespace glyph
+      // pushes the line past boxWidth. Matches Chromium / WebKit / Gecko behaviour so HTML
+      // exporter output aligns with PAGX native rendering without any browser-specific
+      // workarounds. U+3000 (CJK IDEOGRAPHIC SPACE) is excluded because CSS treats it as a
+      // regular glyph that *does* contribute to overflow.
+      bool currentIsHangableWhitespace = (glyph.unichar == ' ' || glyph.unichar == '\t');
+
       // Auto-wrap check
-      if (doWrap && !currentLine->glyphs.empty() && glyphEndX > params.boxWidth) {
+      if (doWrap && !currentLine->glyphs.empty() && glyphEndX > params.boxWidth &&
+          !currentIsHangableWhitespace) {
         if (lastBreakIndex >= 0) {
           // Split at break point: move glyphs after lastBreakIndex to new line
           std::vector<GlyphInfo> overflow(currentLine->glyphs.begin() + lastBreakIndex + 1,

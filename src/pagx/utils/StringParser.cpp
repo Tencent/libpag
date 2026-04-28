@@ -177,6 +177,10 @@ DEFINE_ENUM_CONVERSION(FilterMode, FilterMode::Nearest, {FilterMode::Nearest, "n
 DEFINE_ENUM_CONVERSION(MipmapMode, MipmapMode::None, {MipmapMode::None, "none"},
                        {MipmapMode::Nearest, "nearest"}, {MipmapMode::Linear, "linear"})
 
+DEFINE_ENUM_CONVERSION(ScaleMode, ScaleMode::LetterBox, {ScaleMode::None, "none"},
+                       {ScaleMode::Stretch, "stretch"}, {ScaleMode::LetterBox, "letterBox"},
+                       {ScaleMode::Zoom, "zoom"})
+
 DEFINE_ENUM_CONVERSION(MaskType, MaskType::Alpha, {MaskType::Alpha, "alpha"},
                        {MaskType::Luminance, "luminance"}, {MaskType::Contour, "contour"})
 

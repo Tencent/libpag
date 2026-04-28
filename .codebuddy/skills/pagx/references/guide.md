@@ -36,6 +36,9 @@ Spec rules, techniques, and common pitfalls for writing correct PAGX files.
 
 - **Origin**: top-left. **X**: right. **Y**: down. **Angles**: clockwise (0° = 3 o'clock).
 - **Units**: pixels (lengths), degrees (angles).
+- **Canvas clipping**: the `<pagx>` `width`/`height` define the rendering boundary — any
+  content extending beyond it is clipped. Allow margin for drop shadows, blurs, and
+  stroke half-widths that fall outside their geometry.
 
 ## Color Formats
 
@@ -433,16 +436,24 @@ over `position`.
   `dashes` (comma-separated lengths, e.g., `"5,3"` = 5px solid + 3px gap),
   `align` (center/inside/outside)
 
-All gradient/pattern coordinates are **relative to the geometry element's local origin**
-(not canvas). `ConicGradient` angles follow PAGX convention (0° = right), which differs
-from CSS `conic-gradient` (0° = top) — subtract 90° to convert. `DiamondGradient`
-radiates from center toward four corners (`center`, `radius`). `ImagePattern` fills
-geometry with an image (see `patterns.md` §Avatar).
+By default all gradient/pattern coordinates are **relative to each geometry's own bounding
+box**, in a normalized 0-1 space (`fitsToGeometry="true"` for gradients; any `scaleMode!="none"`
+for ImagePattern). The fill auto-fits per geometry. Set `fitsToGeometry="false"` on a gradient or
+`scaleMode="none"` on an ImagePattern to switch to **absolute coordinates** in the parent
+container's (Layer or Group) coordinate space (origin at (0, 0)); multiple geometries inside that
+container then share one continuous fill. This default contrasts with CSS/SVG, where gradient
+positions are pixel values; in PAGX, prefer the normalized form so a single gradient definition
+stays reusable across geometries of different sizes.
+`ConicGradient` angles follow PAGX convention (0° = right), which differs from CSS
+`conic-gradient` (0° = top) — subtract 90° to convert. `DiamondGradient` radiates from center
+toward four corners (`center`, `radius`). `ImagePattern` fills geometry with an image; see
+`patterns.md` §Avatar.
 
 ```xml
-<!-- Inline gradient in Fill -->
+<!-- Inline gradient in Fill (default: 0-1 space, auto-fit to geometry,
+     startPoint=0,0 → endPoint=1,0 horizontal left-to-right across the shape). -->
 <Fill>
-  <LinearGradient startPoint="0,0" endPoint="200,0">
+  <LinearGradient>
     <ColorStop offset="0" color="#6366F1"/>
     <ColorStop offset="1" color="#EC4899"/>
   </LinearGradient>
@@ -453,11 +464,6 @@ geometry with an image (see `patterns.md` §Avatar).
 ```
 
 See `patterns.md` §Gradient Text for LinearGradient on text, §Star Badge for RadialGradient.
-
-| CSS | PAGX |
-|-----|------|
-| `linear-gradient(angle, stops)` | `<LinearGradient startPoint endPoint>` — convert angle to coordinates |
-| `radial-gradient(circle R at cx cy)` | `<RadialGradient center="cx,cy" radius="R">` |
 
 ## Modifiers
 
@@ -491,7 +497,10 @@ if glyph lists are present (emoji silently discarded). Text modifiers silently s
 Fill/Stroke** in the scope. Isolate with Groups.
 
 **Repeater**: copies all accumulated geometry and styles. `copies=0` clears all.
-Nested Repeaters multiply: A × B total. See `patterns.md` §Circular Gauge.
+Nested Repeaters multiply: A × B total. Per-copy transforms are applied around `anchor`:
+`position` and `rotation` accumulate linearly (step N = N × value), `scale` accumulates
+exponentially (step N = value^N) — set `anchor` to the desired rotation/scale center
+(e.g., layer center for radial fan-out). See `patterns.md` §Circular Gauge.
 
 **TextModifier + RangeSelector**: applies per-glyph transforms (position, rotation, scale,
 alpha) to accumulated text. `RangeSelector` controls which glyphs are affected (`start`,

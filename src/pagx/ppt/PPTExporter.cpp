@@ -184,9 +184,12 @@ struct ImagePatternRect {
 };
 
 // Maps a gradient center point through its matrix and emits OOXML's
-// <a:fillToRect> in 1/1000-percent insets relative to shapeBounds. When the
-// shape bounds are unknown (e.g. a text fill where the bounds aren't computed
-// at the run level) the focus collapses to the geometric centre.
+// <a:fillToRect> in 1/1000-percent insets relative to shapeBounds. When
+// fitsToGeometry is true the center is already in normalized (0-1) space and
+// maps directly to relative insets; when false the center is in document space
+// and must be divided by shapeBounds. When the shape bounds are unknown (e.g. a
+// text fill where the bounds aren't computed at the run level) the focus
+// collapses to the geometric centre.
 template <typename Gradient>
 static void WriteFillToRectFromCenter(XMLBuilder& out, const Gradient* grad,
                                       const Rect& shapeBounds) {
@@ -195,9 +198,16 @@ static void WriteFillToRectFromCenter(XMLBuilder& out, const Gradient* grad,
   int r = 50000;
   int b = 50000;
   if (shapeBounds.width > 0 && shapeBounds.height > 0) {
-    Point centerDoc = grad->matrix.mapPoint(grad->center);
-    float relX = (centerDoc.x - shapeBounds.x) / shapeBounds.width;
-    float relY = (centerDoc.y - shapeBounds.y) / shapeBounds.height;
+    Point centerMapped = grad->matrix.mapPoint(grad->center);
+    float relX;
+    float relY;
+    if (grad->fitsToGeometry) {
+      relX = centerMapped.x;
+      relY = centerMapped.y;
+    } else {
+      relX = (centerMapped.x - shapeBounds.x) / shapeBounds.width;
+      relY = (centerMapped.y - shapeBounds.y) / shapeBounds.height;
+    }
     l = std::clamp(static_cast<int>(std::round(relX * 100000.0f)), 0, 100000);
     t = std::clamp(static_cast<int>(std::round(relY * 100000.0f)), 0, 100000);
     r = 100000 - l;
@@ -431,7 +441,8 @@ class PPTWriter {
   }
 
   void writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& parentMatrix = {},
-                  float parentAlpha = 1.0f);
+                  float parentAlpha = 1.0f, const std::vector<LayerFilter*>& inheritedFilters = {},
+                  const std::vector<LayerStyle*>& inheritedStyles = {});
 
  private:
   // Returns true iff the layer was successfully rasterized and emitted as p:pic.
@@ -594,19 +605,6 @@ class PPTWriter {
                     const std::vector<LayerStyle*>& styles = {});
   void writeShadowElement(XMLBuilder& out, const char* tag, float blurX, float blurY, float offsetX,
                           float offsetY, const Color& color, bool includeAlign);
-
-  // Fans out a container of shadow sources (Inner/Drop shadow filters or
-  // styles) to writeShadowElement. The source structs are unrelated types that
-  // happen to share the same public field names, so a template extracts the
-  // shared emission logic without introducing a shim interface.
-  template <typename Container>
-  void writeShadowSources(XMLBuilder& out, const Container& sources, const char* tag,
-                          bool includeAlign) {
-    for (const auto* s : sources) {
-      writeShadowElement(out, tag, s->blurX, s->blurY, s->offsetX, s->offsetY, s->color,
-                         includeAlign);
-    }
-  }
 
   static void WriteBlip(XMLBuilder& out, const std::string& relId, float alpha);
   static void WriteDefaultStretch(XMLBuilder& out);
@@ -916,6 +914,13 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
       Point ep = grad->matrix.mapPoint(grad->endPoint);
       float dx = ep.x - sp.x;
       float dy = ep.y - sp.y;
+      // When fitsToGeometry is true, start/end are in normalized (0-1) space.
+      // Scale by the shape aspect ratio so atan2 produces the correct visual
+      // angle in document space.
+      if (grad->fitsToGeometry && shapeBounds.width > 0 && shapeBounds.height > 0) {
+        dx *= shapeBounds.width;
+        dy *= shapeBounds.height;
+      }
       float angleDeg = RadiansToDegrees(std::atan2(dy, dx));
       int ang = AngleToPPT(angleDeg);
 
@@ -1240,14 +1245,14 @@ struct EffectSources {
   const BlurFilter* blur = nullptr;
   const BackgroundBlurStyle* backgroundBlur = nullptr;
   const BlendFilter* blend = nullptr;
-  std::vector<const InnerShadowFilter*> innerShadowFilters;
-  std::vector<const InnerShadowStyle*> innerShadowStyles;
-  std::vector<const DropShadowFilter*> dropShadowFilters;
-  std::vector<const DropShadowStyle*> dropShadowStyles;
+  const InnerShadowFilter* innerShadowFilter = nullptr;
+  const InnerShadowStyle* innerShadowStyle = nullptr;
+  const DropShadowFilter* dropShadowFilter = nullptr;
+  const DropShadowStyle* dropShadowStyle = nullptr;
 
   bool empty() const {
-    return !blur && !backgroundBlur && !blend && innerShadowFilters.empty() &&
-           innerShadowStyles.empty() && dropShadowFilters.empty() && dropShadowStyles.empty();
+    return !blur && !backgroundBlur && !blend && !innerShadowFilter && !innerShadowStyle &&
+           !dropShadowFilter && !dropShadowStyle;
   }
 };
 
@@ -1267,10 +1272,14 @@ static EffectSources CollectEffectSources(const std::vector<LayerFilter*>& filte
         }
         break;
       case NodeType::InnerShadowFilter:
-        sources.innerShadowFilters.push_back(static_cast<const InnerShadowFilter*>(f));
+        if (!sources.innerShadowFilter) {
+          sources.innerShadowFilter = static_cast<const InnerShadowFilter*>(f);
+        }
         break;
       case NodeType::DropShadowFilter:
-        sources.dropShadowFilters.push_back(static_cast<const DropShadowFilter*>(f));
+        if (!sources.dropShadowFilter) {
+          sources.dropShadowFilter = static_cast<const DropShadowFilter*>(f);
+        }
         break;
       default:
         break;
@@ -1284,10 +1293,14 @@ static EffectSources CollectEffectSources(const std::vector<LayerFilter*>& filte
         }
         break;
       case NodeType::InnerShadowStyle:
-        sources.innerShadowStyles.push_back(static_cast<const InnerShadowStyle*>(s));
+        if (!sources.innerShadowStyle) {
+          sources.innerShadowStyle = static_cast<const InnerShadowStyle*>(s);
+        }
         break;
       case NodeType::DropShadowStyle:
-        sources.dropShadowStyles.push_back(static_cast<const DropShadowStyle*>(s));
+        if (!sources.dropShadowStyle) {
+          sources.dropShadowStyle = static_cast<const DropShadowStyle*>(s);
+        }
         break;
       default:
         break;
@@ -1325,7 +1338,7 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
   if (avgBlur > 0) {
     out.openElement("a:blur")
         .addRequiredAttribute("rad", PxToEMU(avgBlur))
-        .addRequiredAttribute("grow", "1")
+        .addRequiredAttribute("grow", "true")
         .closeElementSelfClosing();
   }
 
@@ -1340,10 +1353,26 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
     }
   }
 
-  writeShadowSources(out, sources.innerShadowFilters, "a:innerShdw", false);
-  writeShadowSources(out, sources.innerShadowStyles, "a:innerShdw", false);
-  writeShadowSources(out, sources.dropShadowFilters, "a:outerShdw", true);
-  writeShadowSources(out, sources.dropShadowStyles, "a:outerShdw", true);
+  // OOXML §20.1.8.20 allows at most one <a:innerShdw> and one <a:outerShdw>
+  // per <a:effectLst>. Filters take precedence over styles.
+  if (sources.innerShadowFilter) {
+    auto* s = sources.innerShadowFilter;
+    writeShadowElement(out, "a:innerShdw", s->blurX, s->blurY, s->offsetX, s->offsetY, s->color,
+                       false);
+  } else if (sources.innerShadowStyle) {
+    auto* s = sources.innerShadowStyle;
+    writeShadowElement(out, "a:innerShdw", s->blurX, s->blurY, s->offsetX, s->offsetY, s->color,
+                       false);
+  }
+  if (sources.dropShadowFilter) {
+    auto* s = sources.dropShadowFilter;
+    writeShadowElement(out, "a:outerShdw", s->blurX, s->blurY, s->offsetX, s->offsetY, s->color,
+                       true);
+  } else if (sources.dropShadowStyle) {
+    auto* s = sources.dropShadowStyle;
+    writeShadowElement(out, "a:outerShdw", s->blurX, s->blurY, s->offsetX, s->offsetY, s->color,
+                       true);
+  }
 
   out.closeElement();  // a:effectLst
 }
@@ -1794,7 +1823,12 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
       style.algn = "just";
     }
   }
-  int64_t lnSpcPts = fs.textBox ? LineHeightToSpcPts(fs.textBox->lineHeight) : 0;
+  // In vertical writing mode, PAGX lineHeight controls column width (the
+  // block-axis dimension), not character-to-character spacing. PPT's lnSpc
+  // always controls the inline-axis spacing regardless of vert orientation, so
+  // emitting it for vertical text would incorrectly stretch the character pitch.
+  bool isVertical = fs.textBox && fs.textBox->writingMode == WritingMode::Vertical;
+  int64_t lnSpcPts = (!isVertical && fs.textBox) ? LineHeightToSpcPts(fs.textBox->lineHeight) : 0;
 
   emitNativeTextBody(out, text, lines, style, lnSpcPts, useLineLayout, filters, styles);
 
@@ -2161,7 +2195,11 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
   } else if (box->textAlign == TextAlign::Justify) {
     algn = "just";
   }
-  int64_t lnSpcPts = LineHeightToSpcPts(box->lineHeight);
+  // In vertical writing mode, PAGX lineHeight controls column width, not
+  // character-to-character spacing -- skip lnSpc emission (same logic as the
+  // writeNativeText path).
+  bool isVertical = box->writingMode == WritingMode::Vertical;
+  int64_t lnSpcPts = isVertical ? 0 : LineHeightToSpcPts(box->lineHeight);
 
   // Build per-run styles up-front (font/size/bold/italic/color/typeface).
   // Alignment lives on a:pPr (not a:rPr) so we leave style.algn at nullptr here.
@@ -2431,8 +2469,39 @@ bool PPTWriter::rasterizeLayerAsPicture(XMLBuilder& out, const Layer* layer, boo
   return true;
 }
 
+static std::vector<LayerFilter*> MergeFilters(const std::vector<LayerFilter*>& own,
+                                              const std::vector<LayerFilter*>& inherited) {
+  if (inherited.empty()) {
+    return own;
+  }
+  if (own.empty()) {
+    return inherited;
+  }
+  std::vector<LayerFilter*> merged;
+  merged.reserve(own.size() + inherited.size());
+  merged.insert(merged.end(), own.begin(), own.end());
+  merged.insert(merged.end(), inherited.begin(), inherited.end());
+  return merged;
+}
+
+static std::vector<LayerStyle*> MergeStyles(const std::vector<LayerStyle*>& own,
+                                            const std::vector<LayerStyle*>& inherited) {
+  if (inherited.empty()) {
+    return own;
+  }
+  if (own.empty()) {
+    return inherited;
+  }
+  std::vector<LayerStyle*> merged;
+  merged.reserve(own.size() + inherited.size());
+  merged.insert(merged.end(), own.begin(), own.end());
+  merged.insert(merged.end(), inherited.begin(), inherited.end());
+  return merged;
+}
+
 void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& parentMatrix,
-                           float parentAlpha) {
+                           float parentAlpha, const std::vector<LayerFilter*>& inheritedFilters,
+                           const std::vector<LayerStyle*>& inheritedStyles) {
   if (!layer->visible && layer->mask == nullptr) {
     return;
   }
@@ -2484,16 +2553,22 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& pa
     }
   }
 
-  writeElements(out, layer->contents, layerMatrix, layerAlpha, layer->filters, layer->styles);
+  // Merge the layer's own filters/styles with any inherited from a parent layer.
+  // Own entries come first so CollectEffectSources picks the layer's own effects
+  // when both layers carry the same effect type (e.g. both have a BlurFilter).
+  auto effectiveFilters = MergeFilters(layer->filters, inheritedFilters);
+  auto effectiveStyles = MergeStyles(layer->styles, inheritedStyles);
+
+  writeElements(out, layer->contents, layerMatrix, layerAlpha, effectiveFilters, effectiveStyles);
 
   if (layer->composition != nullptr) {
     for (const auto* compLayer : layer->composition->layers) {
-      writeLayer(out, compLayer, layerMatrix, layerAlpha);
+      writeLayer(out, compLayer, layerMatrix, layerAlpha, effectiveFilters, effectiveStyles);
     }
   }
 
   for (const auto* child : layer->children) {
-    writeLayer(out, child, layerMatrix, layerAlpha);
+    writeLayer(out, child, layerMatrix, layerAlpha, effectiveFilters, effectiveStyles);
   }
 }
 

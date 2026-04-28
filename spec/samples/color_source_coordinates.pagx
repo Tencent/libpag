@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates that color source coordinates are relative to geometry origin -->
+<!-- Demonstrates fitsToGeometry="false": gradient parameters are in the parent container's
+     (Layer or Group) coordinate space (origin at the parent Layer's (0,0)). -->
 <pagx width="400" height="400">
   <Layer>
     <Rectangle left="50" top="50" width="300" height="300" roundness="24"/>
@@ -7,7 +8,7 @@
     <DropShadowStyle offsetY="12" blurX="40" blurY="40" color="#EC489950"/>
   </Layer>
   <Resources>
-    <LinearGradient id="grad" startPoint="0,0" endPoint="300,300">
+    <LinearGradient id="grad" endPoint="300,300" fitsToGeometry="false">
       <ColorStop color="#EC4899" offset="0"/>
       <ColorStop color="#8B5CF6" offset="0.5"/>
       <ColorStop color="#6366F1" offset="1"/>

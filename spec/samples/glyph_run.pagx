@@ -5,9 +5,8 @@
       <GlyphRun font="@font1" fontSize="72" glyphs="14,15,16,17,18,19,20,21" x="34" y="145" bounds="0,0,335,85"/>
     </Text>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="280,0">
+      <LinearGradient>
         <ColorStop color="#6366F1" offset="0"/>
-        <ColorStop color="#8B5CF6" offset="0.5"/>
         <ColorStop color="#EC4899" offset="1"/>
       </LinearGradient>
     </Fill>

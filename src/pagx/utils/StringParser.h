@@ -41,6 +41,7 @@
 #include "pagx/types/Matrix.h"
 #include "pagx/types/MipmapMode.h"
 #include "pagx/types/Padding.h"
+#include "pagx/types/ScaleMode.h"
 #include "pagx/types/TextAnchor.h"
 #include "pagx/types/TextBaseline.h"
 #include "pagx/types/TileMode.h"
@@ -137,6 +138,13 @@ bool IsValidFilterModeString(const std::string& str);
 std::string MipmapModeToString(MipmapMode mode);
 MipmapMode MipmapModeFromString(const std::string& str);
 bool IsValidMipmapModeString(const std::string& str);
+
+//==============================================================================
+// ScaleMode
+//==============================================================================
+std::string ScaleModeToString(ScaleMode mode);
+ScaleMode ScaleModeFromString(const std::string& str);
+bool IsValidScaleModeString(const std::string& str);
 
 //==============================================================================
 // TextAlign, ParagraphAlign, TextAnchor, WritingMode, Overflow
