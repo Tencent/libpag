@@ -244,6 +244,57 @@ std::vector<FontFamilyEntry> SystemFonts::AllFontFamilies() {
   return entries;
 }
 
+FontLocation SystemFonts::FindFont(const std::string& family, const std::string& style) {
+  if (family.empty()) {
+    return {};
+  }
+  auto cfFamily =
+      CFStringCreateWithCString(kCFAllocatorDefault, family.c_str(), kCFStringEncodingUTF8);
+  if (cfFamily == nullptr) {
+    return {};
+  }
+  CFMutableDictionaryRef attributes = CFDictionaryCreateMutable(
+      kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+  CFDictionaryAddValue(attributes, kCTFontFamilyNameAttribute, cfFamily);
+  CFRelease(cfFamily);
+  if (!style.empty()) {
+    auto cfStyle =
+        CFStringCreateWithCString(kCFAllocatorDefault, style.c_str(), kCFStringEncodingUTF8);
+    if (cfStyle != nullptr) {
+      CFDictionaryAddValue(attributes, kCTFontStyleNameAttribute, cfStyle);
+      CFRelease(cfStyle);
+    }
+  }
+  const void* mandatoryKeys[] = {kCTFontFamilyNameAttribute, kCTFontStyleNameAttribute};
+  int mandatoryCount = style.empty() ? 1 : 2;
+  CFSetRef mandatoryAttributes =
+      CFSetCreate(kCFAllocatorDefault, mandatoryKeys, mandatoryCount, &kCFTypeSetCallBacks);
+  CTFontDescriptorRef descriptor = CTFontDescriptorCreateWithAttributes(attributes);
+  CFRelease(attributes);
+  if (descriptor == nullptr) {
+    if (mandatoryAttributes != nullptr) {
+      CFRelease(mandatoryAttributes);
+    }
+    return {};
+  }
+  CFArrayRef matches =
+      CTFontDescriptorCreateMatchingFontDescriptors(descriptor, mandatoryAttributes);
+  CFRelease(descriptor);
+  if (mandatoryAttributes != nullptr) {
+    CFRelease(mandatoryAttributes);
+  }
+  if (matches == nullptr || CFArrayGetCount(matches) == 0) {
+    if (matches != nullptr) {
+      CFRelease(matches);
+    }
+    return {};
+  }
+  auto matched = static_cast<CTFontDescriptorRef>(CFArrayGetValueAtIndex(matches, 0));
+  auto location = GetFontLocationFromDescriptor(matched);
+  CFRelease(matches);
+  return location;
+}
+
 }  // namespace pagx
 
 #elif defined(_WIN32)
@@ -446,6 +497,11 @@ std::vector<FontFamilyEntry> SystemFonts::AllFontFamilies() {
   return entries;
 }
 
+FontLocation SystemFonts::FindFont(const std::string&, const std::string&) {
+  // Windows FreeType backend already implements MakeFromName via DirectWrite.
+  return {};
+}
+
 }  // namespace pagx
 
 #elif defined(__linux__)
@@ -582,6 +638,55 @@ std::vector<FontFamilyEntry> SystemFonts::AllFontFamilies() {
   return entries;
 }
 
+FontLocation SystemFonts::FindFont(const std::string& family, const std::string& style) {
+  if (family.empty()) {
+    return {};
+  }
+  FcPattern* pattern = FcPatternCreate();
+  if (pattern == nullptr) {
+    return {};
+  }
+  FcPatternAddString(pattern, FC_FAMILY, reinterpret_cast<const FcChar8*>(family.c_str()));
+  if (!style.empty()) {
+    FcPatternAddString(pattern, FC_STYLE, reinterpret_cast<const FcChar8*>(style.c_str()));
+  }
+  FcPatternAddBool(pattern, FC_SCALABLE, FcTrue);
+  FcConfigSubstitute(nullptr, pattern, FcMatchPattern);
+  FcDefaultSubstitute(pattern);
+
+  FcResult result = FcResultMatch;
+  FcPattern* matched = FcFontMatch(nullptr, pattern, &result);
+  FcPatternDestroy(pattern);
+  if (matched == nullptr) {
+    return {};
+  }
+  FcChar8* filePath = nullptr;
+  if (FcPatternGetString(matched, FC_FILE, 0, &filePath) != FcResultMatch || filePath == nullptr) {
+    FcPatternDestroy(matched);
+    return {};
+  }
+  FcChar8* matchedFamily = nullptr;
+  FcPatternGetString(matched, FC_FAMILY, 0, &matchedFamily);
+  if (matchedFamily == nullptr ||
+      strcasecmp(reinterpret_cast<const char*>(matchedFamily), family.c_str()) != 0) {
+    FcPatternDestroy(matched);
+    return {};
+  }
+  FontLocation location = {};
+  location.path = std::string(reinterpret_cast<const char*>(filePath));
+  location.fontFamily = std::string(reinterpret_cast<const char*>(matchedFamily));
+  int ttcIndex = 0;
+  FcPatternGetInteger(matched, FC_INDEX, 0, &ttcIndex);
+  location.ttcIndex = ttcIndex;
+  FcChar8* matchedStyle = nullptr;
+  if (FcPatternGetString(matched, FC_STYLE, 0, &matchedStyle) == FcResultMatch &&
+      matchedStyle != nullptr) {
+    location.fontStyle = std::string(reinterpret_cast<const char*>(matchedStyle));
+  }
+  FcPatternDestroy(matched);
+  return location;
+}
+
 }  // namespace pagx
 
 #else
@@ -593,6 +698,10 @@ std::vector<FontLocation> SystemFonts::FallbackTypefaces() {
 }
 
 std::vector<FontFamilyEntry> SystemFonts::AllFontFamilies() {
+  return {};
+}
+
+FontLocation SystemFonts::FindFont(const std::string&, const std::string&) {
   return {};
 }
 
