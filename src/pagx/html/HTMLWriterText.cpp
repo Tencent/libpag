@@ -1486,6 +1486,13 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
           charStyle += ";font-family:'" + EscapeCssFontFamily(text->fontFamily) + "'";
         }
         charStyle += ";font-size:" + FloatToString(renderFont) + "px";
+        // Pin line-height to 1 so the span's line-box equals fontSize. Without this the
+        // per-char span inherits line-height:normal, which Chromium resolves to ~1.2em-1.5em
+        // depending on the font's OS/2 metrics. That inflates the line-box and shifts the
+        // alphabetic baseline down by roughly (line-height - 1em)/2, so the -0.905em vertical
+        // translate below no longer lands the baseline on the sampled curve point and the
+        // path visibly cuts through the glyph body instead of touching its feet.
+        charStyle += ";line-height:1";
         if (!text->fontStyle.empty()) {
           if (text->fontStyle.find("Bold") != std::string::npos) {
             charStyle += ";font-weight:bold";
@@ -1506,7 +1513,8 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         // where tgfx places the glyph baseline; we translate the span upward by the font ascent
         // so the baseline lands on pos.y. For Arial the typographic ascender is ~0.905em. Using
         // the full fontSize (1em) would place the span's bottom edge at pos.y, shifting glyphs
-        // upward by ~0.1em.
+        // upward by ~0.1em. With line-height:1 above, the span's content-box equals fontSize
+        // and the baseline sits ~0.905em from the top, so this translate lands it on pos.y.
         transform += "translate(-50%,-" + FloatToString(renderFont * 0.905f) + "px)";
         // fauxItalic must shear the glyph in its own local space before TextPath's
         // perpendicular-rotate and baseline-translate apply. CSS evaluates transforms
