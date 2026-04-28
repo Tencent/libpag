@@ -21,9 +21,11 @@
 #include <string>
 #include <vector>
 #include "base/PAGTest.h"
+#include "pagx/FontConfig.h"
 #include "pagx/HTMLExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/Typeface.h"
 #include "utils/Baseline.h"
 #include "utils/ProjectPath.h"
 
@@ -42,13 +44,32 @@ static std::string SaveFile(const std::string& content, const std::string& key) 
   return outPath;
 }
 
+// Returns a FontConfig that registers the repo-bundled Noto Sans SC as a fallback typeface.
+// This ensures that text shaping during HTML export (PAGXDocument::applyLayout) uses the
+// same font metrics as the tgfx native renderer, so overflow:hidden line-count decisions
+// and other metric-dependent layout calculations agree between the two code paths.
+static pagx::FontConfig MakeHtmlFontConfig() {
+  pagx::FontConfig c;
+  // Use registerTypeface (Stage 1 in LayoutContext::resolveTypeface) so the repo-bundled
+  // Noto Sans SC is chosen before Stage 5's Typeface::MakeFromName, which on macOS returns
+  // a non-nil CoreText substitution (Helvetica/Arial) even when the requested family is not
+  // installed, masking the user-registered font and using wrong font metrics for layout.
+  auto tf =
+      tgfx::Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  if (tf) {
+    c.registerTypeface(tf);
+  }
+  return c;
+}
+
 static std::string LoadAndConvert(const std::string& pagxPath,
                                   const pagx::HTMLExportOptions& options = {}) {
   auto doc = pagx::PAGXImporter::FromFile(pagxPath);
   if (doc == nullptr) {
     return "";
   }
-  doc->applyLayout();
+  auto fontConfig = MakeHtmlFontConfig();
+  doc->applyLayout(&fontConfig);
   return pagx::HTMLExporter::ToHTML(*doc, options);
 }
 
@@ -685,7 +706,8 @@ CLI_TEST(PAGXHtmlTest, HtmlScreenshotCompare) {
       ADD_FAILURE() << "Failed to load: " << baseName;
       continue;
     }
-    doc->applyLayout();
+    auto fontConfig = MakeHtmlFontConfig();
+    doc->applyLayout(&fontConfig);
 
     int width = static_cast<int>(doc->width);
     int height = static_cast<int>(doc->height);
