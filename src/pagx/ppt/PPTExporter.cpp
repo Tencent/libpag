@@ -650,19 +650,6 @@ class PPTWriter {
   void writeShadowElement(XMLBuilder& out, const char* tag, float blurX, float blurY, float offsetX,
                           float offsetY, const Color& color, bool includeAlign);
 
-  // Fans out a container of shadow sources (Inner/Drop shadow filters or
-  // styles) to writeShadowElement. The source structs are unrelated types that
-  // happen to share the same public field names, so a template extracts the
-  // shared emission logic without introducing a shim interface.
-  template <typename Container>
-  void writeShadowSources(XMLBuilder& out, const Container& sources, const char* tag,
-                          bool includeAlign) {
-    for (const auto* s : sources) {
-      writeShadowElement(out, tag, s->blurX, s->blurY, s->offsetX, s->offsetY, s->color,
-                         includeAlign);
-    }
-  }
-
   static void WriteBlip(XMLBuilder& out, const std::string& relId, float alpha);
   static void WriteDefaultStretch(XMLBuilder& out);
 
@@ -1302,14 +1289,14 @@ struct EffectSources {
   const BlurFilter* blur = nullptr;
   const BackgroundBlurStyle* backgroundBlur = nullptr;
   const BlendFilter* blend = nullptr;
-  std::vector<const InnerShadowFilter*> innerShadowFilters;
-  std::vector<const InnerShadowStyle*> innerShadowStyles;
-  std::vector<const DropShadowFilter*> dropShadowFilters;
-  std::vector<const DropShadowStyle*> dropShadowStyles;
+  const InnerShadowFilter* innerShadowFilter = nullptr;
+  const InnerShadowStyle* innerShadowStyle = nullptr;
+  const DropShadowFilter* dropShadowFilter = nullptr;
+  const DropShadowStyle* dropShadowStyle = nullptr;
 
   bool empty() const {
-    return !blur && !backgroundBlur && !blend && innerShadowFilters.empty() &&
-           innerShadowStyles.empty() && dropShadowFilters.empty() && dropShadowStyles.empty();
+    return !blur && !backgroundBlur && !blend && !innerShadowFilter && !innerShadowStyle &&
+           !dropShadowFilter && !dropShadowStyle;
   }
 };
 
@@ -1329,10 +1316,14 @@ static EffectSources CollectEffectSources(const std::vector<LayerFilter*>& filte
         }
         break;
       case NodeType::InnerShadowFilter:
-        sources.innerShadowFilters.push_back(static_cast<const InnerShadowFilter*>(f));
+        if (!sources.innerShadowFilter) {
+          sources.innerShadowFilter = static_cast<const InnerShadowFilter*>(f);
+        }
         break;
       case NodeType::DropShadowFilter:
-        sources.dropShadowFilters.push_back(static_cast<const DropShadowFilter*>(f));
+        if (!sources.dropShadowFilter) {
+          sources.dropShadowFilter = static_cast<const DropShadowFilter*>(f);
+        }
         break;
       default:
         break;
@@ -1346,10 +1337,14 @@ static EffectSources CollectEffectSources(const std::vector<LayerFilter*>& filte
         }
         break;
       case NodeType::InnerShadowStyle:
-        sources.innerShadowStyles.push_back(static_cast<const InnerShadowStyle*>(s));
+        if (!sources.innerShadowStyle) {
+          sources.innerShadowStyle = static_cast<const InnerShadowStyle*>(s);
+        }
         break;
       case NodeType::DropShadowStyle:
-        sources.dropShadowStyles.push_back(static_cast<const DropShadowStyle*>(s));
+        if (!sources.dropShadowStyle) {
+          sources.dropShadowStyle = static_cast<const DropShadowStyle*>(s);
+        }
         break;
       default:
         break;
@@ -1387,7 +1382,7 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
   if (avgBlur > 0) {
     out.openElement("a:blur")
         .addRequiredAttribute("rad", PxToEMU(avgBlur))
-        .addRequiredAttribute("grow", "1")
+        .addRequiredAttribute("grow", "true")
         .closeElementSelfClosing();
   }
 
@@ -1402,10 +1397,26 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
     }
   }
 
-  writeShadowSources(out, sources.innerShadowFilters, "a:innerShdw", false);
-  writeShadowSources(out, sources.innerShadowStyles, "a:innerShdw", false);
-  writeShadowSources(out, sources.dropShadowFilters, "a:outerShdw", true);
-  writeShadowSources(out, sources.dropShadowStyles, "a:outerShdw", true);
+  // OOXML §20.1.8.20 allows at most one <a:innerShdw> and one <a:outerShdw>
+  // per <a:effectLst>. Filters take precedence over styles.
+  if (sources.innerShadowFilter) {
+    auto* s = sources.innerShadowFilter;
+    writeShadowElement(out, "a:innerShdw", s->blurX, s->blurY, s->offsetX, s->offsetY, s->color,
+                       false);
+  } else if (sources.innerShadowStyle) {
+    auto* s = sources.innerShadowStyle;
+    writeShadowElement(out, "a:innerShdw", s->blurX, s->blurY, s->offsetX, s->offsetY, s->color,
+                       false);
+  }
+  if (sources.dropShadowFilter) {
+    auto* s = sources.dropShadowFilter;
+    writeShadowElement(out, "a:outerShdw", s->blurX, s->blurY, s->offsetX, s->offsetY, s->color,
+                       true);
+  } else if (sources.dropShadowStyle) {
+    auto* s = sources.dropShadowStyle;
+    writeShadowElement(out, "a:outerShdw", s->blurX, s->blurY, s->offsetX, s->offsetY, s->color,
+                       true);
+  }
 
   out.closeElement();  // a:effectLst
 }

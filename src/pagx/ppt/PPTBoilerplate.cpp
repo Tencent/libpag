@@ -132,8 +132,7 @@ std::string GeneratePresentation(float w, float h) {
   s += ">";
   s += "<p:sldMasterIdLst><p:sldMasterId id=\"2147483648\" r:id=\"rId1\"/></p:sldMasterIdLst>";
   s += "<p:sldIdLst><p:sldId id=\"256\" r:id=\"rId2\"/></p:sldIdLst>";
-  s += "<p:sldSz cx=\"" + std::to_string(cx) + "\" cy=\"" + std::to_string(cy) +
-       "\" type=\"custom\"/>";
+  s += "<p:sldSz cx=\"" + std::to_string(cx) + "\" cy=\"" + std::to_string(cy) + "\"/>";
   s += "<p:notesSz cx=\"" + std::to_string(cx) + "\" cy=\"" + std::to_string(cy) + "\"/>";
   s += "<p:defaultTextStyle>"
        "<a:defPPr><a:defRPr lang=\"en-US\"/></a:defPPr>";
