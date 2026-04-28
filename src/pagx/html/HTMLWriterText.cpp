@@ -749,44 +749,49 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     // fauxBold is emulated via `-webkit-text-stroke`. Pick the stroke colour carefully so the
     // emulated outline blends into the final glyph painted by the real passes:
     //
-    // 1. When the Text has a sibling <Stroke> that will arrive in the separate Stroke paint
-    //    pass (`companionStroke != nullptr`), the real Stroke span is drawn *on top of* this
-    //    Fill span. If we emit fauxBold in the inherited text colour, a thin ring of that
-    //    colour leaks out past the real Stroke edge (tgfx instead thickens the glyph path
-    //    first, then strokes the thickened outline — so only the real stroke colour ever
-    //    shows on the outside). Using the real Stroke's own colour for the fauxBold emulation
-    //    keeps the outer ring the same colour as the Stroke layer, so the two layers visually
-    //    merge into a single thicker outline and the glyph body still reads as bolder.
-    //    (Seen in showcase_text_art "TYPE".)
-    // 2. When the fill is a gradient/ImagePattern we render it via `background-clip:text`
-    //    with `-webkit-text-fill-color:transparent`, which paints the clipped background
-    //    *below* the text-stroke layer — a currentColor stroke would sit on top of the
-    //    gradient and repaint the glyph silhouette in the inherited text colour (typically
-    //    near-black), visually erasing the gradient. Pick the gradient's middle stop colour
-    //    so the thickened outline stays visually consistent with the gradient fill.
+    // 1. When the fill is a gradient/ImagePattern it is rendered via `background-clip:text`
+    //    with `-webkit-text-fill-color:transparent`. A solid-colour stroke would sit on top
+    //    of the clipped gradient and repaint the glyph silhouette in that single colour,
+    //    erasing the gradient. Since CSS `-webkit-text-stroke` does not accept a gradient,
+    //    we emit the stroke in `currentColor` with `color:transparent` — the stroke itself
+    //    renders nothing, but `background-clip:text` clips the gradient to the union of
+    //    fill geometry and stroke geometry, so the gradient fills the thickened silhouette.
+    //    This matches tgfx's path-union semantic (glyph outward-grown by stroke width/2)
+    //    while preserving the gradient. (Samples: selector_advanced "Selector Effects",
+    //    text_features "Text Features", showcase_text_art "TYPE".) This case takes priority
+    //    over the companionStroke case below: a gradient fill must not be overpainted by the
+    //    companionStroke's colour even when a sibling <Stroke> is present — the companion
+    //    stroke will still be emitted as a separate Stroke pass, giving the final glyph both
+    //    gradient fill and outer stroke ring, matching tgfx.
+    // 2. When the Text has a sibling <Stroke> that will arrive in the separate Stroke paint
+    //    pass (`companionStroke != nullptr`) and the fill is a *solid* colour, the real
+    //    Stroke span is drawn *on top of* this Fill span. If we emit fauxBold in the
+    //    inherited text colour, a thin ring of that colour leaks out past the real Stroke
+    //    edge (tgfx instead thickens the glyph path first, then strokes the thickened
+    //    outline — so only the real stroke colour ever shows on the outside). Using the
+    //    real Stroke's own colour for the fauxBold emulation keeps the outer ring the same
+    //    colour as the Stroke layer, so the two layers visually merge into a single thicker
+    //    outline and the glyph body still reads as bolder.
     // 3. Otherwise (solid fill, no companion stroke) use currentColor, which resolves to the
     //    same fill colour tgfx thickens the glyph path with.
+    bool fillIsGradient = false;
+    if (fill && fill->color) {
+      auto ct = fill->color->nodeType();
+      fillIsGradient = (ct == NodeType::LinearGradient || ct == NodeType::RadialGradient ||
+                        ct == NodeType::ConicGradient);
+    }
     std::string strokeColor = "currentColor";
-    if (companionStroke && companionStroke->color &&
-        companionStroke->color->nodeType() == NodeType::SolidColor) {
+    if (fillIsGradient) {
+      // Make the stroke invisible but let its geometry contribute to `background-clip:text`.
+      style += ";color:transparent";
+    } else if (companionStroke && companionStroke->color &&
+               companionStroke->color->nodeType() == NodeType::SolidColor) {
       auto sc = static_cast<const SolidColor*>(companionStroke->color);
       strokeColor = ColorToRGBA(sc->color, companionStroke->alpha);
-    } else if (!companionStroke && fill && fill->color) {
-      auto ct = fill->color->nodeType();
-      if (ct == NodeType::LinearGradient || ct == NodeType::RadialGradient ||
-          ct == NodeType::ConicGradient) {
-        auto* g = static_cast<const Gradient*>(fill->color);
-        if (!g->colorStops.empty()) {
-          size_t idx = g->colorStops.size() / 2;
-          auto* stop = g->colorStops[idx] ? g->colorStops[idx] : g->colorStops.front();
-          if (stop) {
-            strokeColor = ColorToRGBA(stop->color, fill->alpha);
-          }
-        }
-      }
     }
-    style += ";-webkit-text-stroke:" + FloatToString(FauxBoldStrokeWidth(text->renderFontSize())) +
-             "px " + strokeColor;
+    style +=
+        ";-webkit-text-stroke:" + FloatToString(FauxBoldStrokeWidth(text->renderFontSize())) +
+        "px " + strokeColor;
   }
   if (fill && fill->color) {
     auto ct = fill->color->nodeType();
@@ -799,6 +804,23 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       if (!css.empty()) {
         style += ";background:" + css;
         style += ";-webkit-background-clip:text;background-clip:text";
+        // Scope the gradient's 0%..100% range to the glyph's actual inked width rather than
+        // the span's own box width. For center/end-anchored text the span is usually much
+        // wider than the glyph run (so `text-align` can position the text), which otherwise
+        // stretches the gradient across the span and leaves the text landing only on the
+        // middle band of stops — visible as "gradient looks like a solid mid-tone" in samples
+        // like text_features's "Text Features" and selector_advanced's "Selector Effects".
+        // tgfx instead evaluates `fitsToGeometry=true` against the fill geometry's bounding
+        // box (i.e. the glyph run's bbox), so matching that here keeps the two renderers in
+        // visual agreement. Only applied when we have a non-zero layout width (post-layout)
+        // and the text is not anchored at Start (where span width == glyph width anyway).
+        if (text->textAnchor != TextAnchor::Start) {
+          float glyphW = text->layoutBoundsWidth();
+          if (glyphW > 0) {
+            style += ";background-size:" + FloatToString(glyphW) +
+                     "px 100%;background-position:center;background-repeat:no-repeat";
+          }
+        }
         style += ";-webkit-text-fill-color:transparent";
         if (fill->alpha < 1.0f) {
           alpha *= fill->alpha;
