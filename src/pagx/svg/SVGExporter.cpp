@@ -290,7 +290,8 @@ class SVGWriter {
 
   // Gradient / pattern defs (write to _defs)
   void writeGradientStops(const std::vector<ColorStop*>& stops);
-  void finishGradientDef(const Matrix& matrix, const std::vector<ColorStop*>& stops);
+  void finishGradientDef(const Matrix& matrix, const std::vector<ColorStop*>& stops,
+                         bool fitsToGeometry);
   void writeColorSourceDef(const ColorSource* source, const std::string& id);
   std::string writeImagePatternDef(const ImagePattern* pattern, const Rect& shapeBounds);
   std::string getColorSourceRef(const ColorSource* source, float* outAlpha,
@@ -396,8 +397,14 @@ void SVGWriter::writeGradientStops(const std::vector<ColorStop*>& stops) {
   }
 }
 
-void SVGWriter::finishGradientDef(const Matrix& matrix, const std::vector<ColorStop*>& stops) {
-  _defs->addAttribute("gradientUnits", "userSpaceOnUse");
+void SVGWriter::finishGradientDef(const Matrix& matrix, const std::vector<ColorStop*>& stops,
+                                  bool fitsToGeometry) {
+  // When fitsToGeometry is true the gradient coordinates live in normalized
+  // (0-1) space mapped to each geometry's bounding box — SVG's
+  // objectBoundingBox mode provides exactly this semantic. When false the
+  // coordinates are in the parent container's document space, so userSpaceOnUse
+  // is correct.
+  _defs->addAttribute("gradientUnits", fitsToGeometry ? "objectBoundingBox" : "userSpaceOnUse");
   if (!matrix.isIdentity()) {
     _defs->addAttribute("gradientTransform", MatrixToSVGTransform(matrix));
   }
@@ -420,7 +427,7 @@ void SVGWriter::writeColorSourceDef(const ColorSource* source, const std::string
       _defs->addRequiredAttribute("y1", grad->startPoint.y);
       _defs->addRequiredAttribute("x2", grad->endPoint.x);
       _defs->addRequiredAttribute("y2", grad->endPoint.y);
-      finishGradientDef(grad->matrix, grad->colorStops);
+      finishGradientDef(grad->matrix, grad->colorStops, grad->fitsToGeometry);
       break;
     }
     case NodeType::RadialGradient: {
@@ -430,17 +437,16 @@ void SVGWriter::writeColorSourceDef(const ColorSource* source, const std::string
       _defs->addRequiredAttribute("cx", grad->center.x);
       _defs->addRequiredAttribute("cy", grad->center.y);
       _defs->addRequiredAttribute("r", grad->radius);
-      finishGradientDef(grad->matrix, grad->colorStops);
+      finishGradientDef(grad->matrix, grad->colorStops, grad->fitsToGeometry);
       break;
     }
     case NodeType::ConicGradient: {
       // SVG has no conic/sweep gradient primitive (CSS `conic-gradient` is a
       // paint only available in HTML). Degrade to a radial gradient centred
       // at the conic's center so the stops still appear; the angular
-      // distribution is lost — matches PPT's path="circle" fallback. The
-      // conic has no radius; pick 50% of the viewport as a sensible default
-      // via gradientUnits="objectBoundingBox" would need a rework of the
-      // gradient machinery, so fall back to a fixed pixel radius here.
+      // distribution is lost — matches PPT's path="circle" fallback. When
+      // fitsToGeometry is true the center is already in normalized space and
+      // objectBoundingBox handles it; when false use a fixed pixel radius.
       auto grad = static_cast<const ConicGradient*>(source);
       _defs->addRawContent(std::string(_indentSpaces, ' ') +
                            "<!-- conic gradient degraded to radial -->\n");
@@ -448,8 +454,8 @@ void SVGWriter::writeColorSourceDef(const ColorSource* source, const std::string
       _defs->addAttribute("id", id);
       _defs->addRequiredAttribute("cx", grad->center.x);
       _defs->addRequiredAttribute("cy", grad->center.y);
-      _defs->addAttribute("r", 100.0f);
-      finishGradientDef(grad->matrix, grad->colorStops);
+      _defs->addAttribute("r", grad->fitsToGeometry ? 0.5f : 100.0f);
+      finishGradientDef(grad->matrix, grad->colorStops, grad->fitsToGeometry);
       break;
     }
     case NodeType::DiamondGradient: {
@@ -463,7 +469,7 @@ void SVGWriter::writeColorSourceDef(const ColorSource* source, const std::string
       _defs->addRequiredAttribute("cx", grad->center.x);
       _defs->addRequiredAttribute("cy", grad->center.y);
       _defs->addRequiredAttribute("r", grad->radius);
-      finishGradientDef(grad->matrix, grad->colorStops);
+      finishGradientDef(grad->matrix, grad->colorStops, grad->fitsToGeometry);
       break;
     }
     default:
