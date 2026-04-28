@@ -241,8 +241,8 @@ Color source that interpolates along a line from start point to end point.
 |-----------|------|---------|-------------|
 | `startPoint` | Point | `0,0` | Gradient start point |
 | `endPoint` | Point | `1,0` | Gradient end point (default: horizontal left-to-right) |
-| `matrix` | Matrix | identity | Transform matrix applied on top of the selected coordinate space |
-| `fitsToGeometry` | boolean | true | `true`: points are in each geometry's normalized 0-1 bounding box (auto-fit per geometry). `false`: points are in the parent container's (Layer or Group) coordinate space, origin at (0,0) |
+| `matrix` | Matrix | identity | Transform applied in the selected coordinate space |
+| `fitsToGeometry` | boolean | true | Coordinate space for the gradient. `true`: the geometry's normalized 0-1 bounding box. `false`: the parent container's (Layer or Group) coordinate space, origin at (0,0) |
 
 ### ColorStop
 
@@ -266,8 +266,8 @@ Color source that radiates outward from a center point.
 |-----------|------|---------|-------------|
 | `center` | Point | `0.5,0.5` | Gradient center point |
 | `radius` | float | `0.5` | Gradient radius |
-| `matrix` | Matrix | identity | Transform matrix applied on top of the selected coordinate space |
-| `fitsToGeometry` | boolean | true | `true`: center/radius are in each geometry's normalized 0-1 bounding box (auto-fit per geometry). `false`: in the parent container's (Layer or Group) coordinate space, origin at (0,0) |
+| `matrix` | Matrix | identity | Transform applied in the selected coordinate space |
+| `fitsToGeometry` | boolean | true | Coordinate space for the gradient. `true`: the geometry's normalized 0-1 bounding box. `false`: the parent container's (Layer or Group) coordinate space, origin at (0,0) |
 
 ### ConicGradient
 
@@ -278,8 +278,8 @@ Color source (sweep gradient) that interpolates along the circumference between 
 | `center` | Point | `0.5,0.5` | Gradient center point |
 | `startAngle` | float | 0 | Start angle in degrees (0° = right, clockwise positive) |
 | `endAngle` | float | 360 | End angle in degrees |
-| `matrix` | Matrix | identity | Transform matrix applied on top of the selected coordinate space |
-| `fitsToGeometry` | boolean | true | `true`: center is in each geometry's normalized 0-1 bounding box (auto-fit per geometry). `false`: in the parent container's (Layer or Group) coordinate space, origin at (0,0) |
+| `matrix` | Matrix | identity | Transform applied in the selected coordinate space |
+| `fitsToGeometry` | boolean | true | Coordinate space for the gradient. `true`: the geometry's normalized 0-1 bounding box. `false`: the parent container's (Layer or Group) coordinate space, origin at (0,0) |
 
 ### DiamondGradient
 
@@ -289,8 +289,8 @@ Color source that radiates from center toward four corners using Chebyshev dista
 |-----------|------|---------|-------------|
 | `center` | Point | `0.5,0.5` | Gradient center point |
 | `radius` | float | `0.5` | Gradient radius |
-| `matrix` | Matrix | identity | Transform matrix applied on top of the selected coordinate space |
-| `fitsToGeometry` | boolean | true | `true`: center/radius are in each geometry's normalized 0-1 bounding box (auto-fit per geometry). `false`: in the parent container's (Layer or Group) coordinate space, origin at (0,0) |
+| `matrix` | Matrix | identity | Transform applied in the selected coordinate space |
+| `fitsToGeometry` | boolean | true | Coordinate space for the gradient. `true`: the geometry's normalized 0-1 bounding box. `false`: the parent container's (Layer or Group) coordinate space, origin at (0,0) |
 
 ### ImagePattern
 
