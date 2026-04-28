@@ -228,9 +228,6 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           if (tb->writingMode == WritingMode::Vertical) {
             style += ";writing-mode:vertical-rl";
           }
-          if (tb->lineHeight > 0) {
-            style += ";line-height:" + FloatToString(tb->lineHeight) + "px";
-          }
           if (tb->wordWrap && !std::isnan(tbW) && tbW > 0) {
             style += ";word-wrap:break-word";
           } else {
@@ -304,6 +301,24 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             }
             if (strutSize > 0) {
               style += ";font-size:" + FloatToString(strutSize) + "px";
+            }
+            // Pin line-height too. When PAGX declares a TextBox lineHeight we honour it;
+            // otherwise fall back to the largest per-glyph fontLineHeight from tgfx's shaping
+            // result (|ascent| + descent + leading). Without an explicit line-height Chromium
+            // uses `line-height:normal`, which resolves to ~1.2em-1.5em depending on the font's
+            // OS/2 metrics and may exceed what tgfx's TextLayout uses per line, spilling the
+            // last line out of an `overflow:hidden` TextBox or shifting baseline positions.
+            float lineH = tb->lineHeight > 0 ? tb->lineHeight : 0.0f;
+            if (lineH <= 0) {
+              for (const auto& s : tbSpans) {
+                float flh = s.text->fontLineHeight();
+                if (flh > lineH) {
+                  lineH = flh;
+                }
+              }
+            }
+            if (lineH > 0) {
+              style += ";line-height:" + FloatToString(lineH) + "px";
             }
             out.openTag("div");
             out.addAttr("style", style);
@@ -414,6 +429,21 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           }
           if (tb->overflow == Overflow::Hidden) {
             style += ";overflow:hidden";
+          }
+          // Pin line-height for the same reason as the tbSpans branch above: without it
+          // Chromium falls back to `line-height:normal`, which depends on font OS/2 metrics
+          // and may differ from tgfx's per-line height, shifting line count and baselines.
+          float rtLineH = tb->lineHeight > 0 ? tb->lineHeight : 0.0f;
+          if (rtLineH <= 0) {
+            for (const auto& s : richTextSpans) {
+              float flh = s.text->fontLineHeight();
+              if (flh > rtLineH) {
+                rtLineH = flh;
+              }
+            }
+          }
+          if (rtLineH > 0) {
+            style += ";line-height:" + FloatToString(rtLineH) + "px";
           }
           out.openTag("div");
           out.addAttr("style", style);
