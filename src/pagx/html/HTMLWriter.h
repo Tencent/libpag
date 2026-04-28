@@ -278,7 +278,7 @@ class HTMLWriter {
                  const Stroke* stroke, float alpha, BlendMode painterBlend,
                  const TrimPath* trim = nullptr, MergePathMode mergeMode = MergePathMode::Append);
   void writeText(HTMLBuilder& out, const Text* text, const Fill* fill, const Stroke* stroke,
-                 const TextBox* tb, float alpha);
+                 const TextBox* tb, float alpha, bool hasCompanionStroke = false);
   void writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>& geos,
                          const TextModifier* modifier, const Fill* fill, const Stroke* stroke,
                          const TextBox* tb, float alpha);
@@ -294,7 +294,8 @@ class HTMLWriter {
                         bool distribute = false);
   void paintGeos(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
                  const Stroke* stroke, const TextBox* textBox, float alpha, bool hasTrim,
-                 const TrimPath* curTrim, bool hasMerge, MergePathMode mergeMode);
+                 const TrimPath* curTrim, bool hasMerge, MergePathMode mergeMode,
+                 bool hasCompanionStroke = false);
   void applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim);
   void applyTrimAttrsContinuous(HTMLBuilder& builder, const TrimPath* trim,
                                 const std::vector<float>& pathLengths, float totalLength,

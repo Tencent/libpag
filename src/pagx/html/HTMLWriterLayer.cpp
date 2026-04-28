@@ -65,7 +65,8 @@ static void EmitLeftTopCss(std::string& style, bool& positionSet, float x, float
 
 void HTMLWriter::paintGeos(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
                            const Stroke* stroke, const TextBox* textBox, float alpha, bool hasTrim,
-                           const TrimPath* curTrim, bool hasMerge, MergePathMode mergeMode) {
+                           const TrimPath* curTrim, bool hasMerge, MergePathMode mergeMode,
+                           bool hasCompanionStroke) {
   if (geos.empty()) {
     return;
   }
@@ -79,7 +80,8 @@ void HTMLWriter::paintGeos(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
   if (hasText) {
     for (auto& g : geos) {
       if (g.type == NodeType::Text) {
-        writeText(out, static_cast<const Text*>(g.element), fill, stroke, textBox, alpha);
+        writeText(out, static_cast<const Text*>(g.element), fill, stroke, textBox, alpha,
+                  hasCompanionStroke);
       } else {
         std::vector<GeoInfo> single = {g};
         renderGeo(out, single, fill, stroke, alpha, hasTrim, curTrim, hasMerge, mergeMode);
@@ -110,6 +112,20 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
 
   bool hasUpcomingRepeater = false;
   const TextBox* preScannedTextBox = nullptr;
+  // Pre-scan whether the element list contains any real Stroke node at the top level. The
+  // Fill and Stroke passes run as two separate invocations against the same element list, so
+  // when the Fill pass reaches writeText it has no visibility into a Stroke that will arrive
+  // in a later iteration. Without this flag, writeText's fauxBold branch emits an emulated
+  // `-webkit-text-stroke` on the fill span even when a real Stroke pass will later paint its
+  // own outline on top, producing a visible halo of the fauxBold colour underneath the real
+  // stroke (see memory/fauxbold_gradient_stroke_erase.md for the prior gradient-clip fix).
+  bool layerHasStroke = false;
+  for (auto* e : elements) {
+    if (e->nodeType() == NodeType::Stroke) {
+      layerHasStroke = true;
+      break;
+    }
+  }
   struct RichTextSpan {
     const Text* text = nullptr;
     const Fill* fill = nullptr;
@@ -170,7 +186,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             writeTextPath(out, geos, curTextPath, curFill, nullptr, curTextBox, a);
           } else {
             paintGeos(out, geos, curFill, nullptr, curTextBox, a, hasTrim, curTrim, hasMerge,
-                      mergeMode);
+                      mergeMode, layerHasStroke);
           }
         }
         break;
@@ -598,6 +614,16 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           geos.clear();
           std::vector<GeoInfo> groupGeos;
           Matrix gm = BuildGroupMatrix(group);
+          // Mirror the outer `layerHasStroke` pre-scan for Group elements so the Fill pass
+          // inside a Group can suppress fauxBold's emulated stroke when a real Stroke sibling
+          // will paint on top of the same glyphs.
+          bool groupHasStroke = false;
+          for (auto* ge : group->elements) {
+            if (ge->nodeType() == NodeType::Stroke) {
+              groupHasStroke = true;
+              break;
+            }
+          }
           for (auto* ge : group->elements) {
             auto gt = ge->nodeType();
             if (gt == NodeType::Rectangle || gt == NodeType::Ellipse || gt == NodeType::Path ||
@@ -621,7 +647,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               if (fill->placement == targetPlacement && !hasUpcomingRepeater) {
                 float a = distribute ? alpha : 1.0f;
                 paintGeos(out, geos, curFill, nullptr, curTextBox, a, hasTrim, curTrim, hasMerge,
-                          mergeMode);
+                          mergeMode, groupHasStroke);
               }
             } else if (gt == NodeType::Stroke) {
               auto stroke = static_cast<const Stroke*>(ge);

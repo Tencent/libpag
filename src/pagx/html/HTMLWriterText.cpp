@@ -625,7 +625,8 @@ void SampleArcLengthLUT(const ArcLengthLUT& lut, float arcLength, Point* outPos,
 //==============================================================================
 
 void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
-                           const Stroke* stroke, const TextBox* tb, float alpha) {
+                           const Stroke* stroke, const TextBox* tb, float alpha,
+                           bool hasCompanionStroke) {
   if (!text->glyphRuns.empty()) {
     writeGlyphRunSVG(out, text, fill, stroke, alpha);
     return;
@@ -728,7 +729,7 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       }
     }
   }
-  if (text->fauxBold && !stroke) {
+  if (text->fauxBold && !stroke && !hasCompanionStroke) {
     // Default to currentColor so solid-fill text inherits the same colour tgfx thickens the
     // glyph path with. When the fill is a gradient/ImagePattern we render it via
     // `background-clip:text` with `-webkit-text-fill-color:transparent`, which paints the
@@ -739,6 +740,13 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     // For gradients: middle stop when available, otherwise first stop. ImagePattern has no
     // stop list, so fall back to currentColor and accept a subtle edge artefact — samples
     // don't combine ImagePattern fills with fauxBold today.
+    //
+    // `hasCompanionStroke` guards against another failure mode: when the Text has both a
+    // fauxBold attribute and a sibling <Stroke> that will arrive in the separate Stroke paint
+    // pass, the Fill pass runs with `stroke==nullptr` and would otherwise emit this emulated
+    // text-stroke anyway — stacking under the real Stroke span and producing a visible halo
+    // of the fauxBold colour around every glyph (see showcase_text_art "TYPE"). In that case
+    // skip the fauxBold emulation entirely and let the real Stroke span provide the outline.
     std::string strokeColor = "currentColor";
     if (fill && fill->color) {
       auto ct = fill->color->nodeType();
