@@ -20,6 +20,7 @@
 #include "base/PAGTest.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXOptimizer.h"
+#include "pagx/PAGXOptimizerOptions.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/DropShadowStyle.h"
@@ -57,9 +58,11 @@ using pagx::MaskType;
 using pagx::Matrix;
 using pagx::Matrix3D;
 using pagx::NodeType;
+using pagx::OptimizeWithOptions;
 using pagx::Padding;
 using pagx::PAGXDocument;
 using pagx::PAGXOptimizer;
+using pagx::PAGXOptimizerOptions;
 using pagx::Path;
 using pagx::PathData;
 using pagx::Rectangle;
@@ -400,11 +403,11 @@ CLI_TEST(PAGXOptimizerTest, PruneEmptyDisabledKeepsEmptyLayer) {
   AddShellLayerWithFill(doc.get(), 20, 20, 1, 0, 0);
   AddTopLayer(doc.get());  // empty
 
-  PAGXOptimizer::Options options;
+  PAGXOptimizerOptions options;
   options.pruneEmpty = false;
   options.mergeAdjacentShellLayers = false;
   options.downgradeShellChildren = false;
-  PAGXOptimizer::Optimize(doc.get(), options);
+  OptimizeWithOptions(doc.get(), options);
   EXPECT_EQ(doc->layers.size(), 2u);
 }
 
@@ -433,12 +436,12 @@ CLI_TEST(PAGXOptimizerTest, DowngradeShellChildrenDisabled) {
   parent->children.push_back(childA);
   parent->children.push_back(childB);
 
-  PAGXOptimizer::Options options;
+  PAGXOptimizerOptions options;
   options.downgradeShellChildren = false;
   // mergeAdjacentShellLayers would otherwise collapse the two children into a single sibling —
   // disabling it here keeps the test focused on the downgrade toggle.
   options.mergeAdjacentShellLayers = false;
-  PAGXOptimizer::Optimize(doc.get(), options);
+  OptimizeWithOptions(doc.get(), options);
   EXPECT_EQ(parent->children.size(), 2u);
   EXPECT_TRUE(parent->contents.empty());
 }
@@ -449,9 +452,9 @@ CLI_TEST(PAGXOptimizerTest, MergeAdjacentShellLayersDisabled) {
   AddShellLayerWithFill(doc.get(), 12, 12, 0, 1, 0);
   AddShellLayerWithFill(doc.get(), 14, 14, 0, 0, 1);
 
-  PAGXOptimizer::Options options;
+  PAGXOptimizerOptions options;
   options.mergeAdjacentShellLayers = false;
-  PAGXOptimizer::Optimize(doc.get(), options);
+  OptimizeWithOptions(doc.get(), options);
   EXPECT_EQ(doc->layers.size(), 3u);
 }
 
@@ -461,9 +464,9 @@ CLI_TEST(PAGXOptimizerTest, UnwrapRedundantFirstGroupDisabled) {
   auto* outer = MakeFilledRectGroup(doc.get(), 50, 50, 1, 0, 0);
   layer->contents.push_back(outer);
 
-  PAGXOptimizer::Options options;
+  PAGXOptimizerOptions options;
   options.unwrapRedundantFirstGroup = false;
-  PAGXOptimizer::Optimize(doc.get(), options);
+  OptimizeWithOptions(doc.get(), options);
   ASSERT_EQ(layer->contents.size(), 1u);
   EXPECT_EQ(layer->contents[0]->nodeType(), NodeType::Group);
 }
@@ -474,10 +477,10 @@ CLI_TEST(PAGXOptimizerTest, MergeAdjacentGroupsDisabled) {
   layer->contents.push_back(MakeFilledRectGroup(doc.get(), 10, 10, 1, 0, 0));
   layer->contents.push_back(MakeFilledRectGroup(doc.get(), 12, 12, 1, 0, 0));
 
-  PAGXOptimizer::Options options;
+  PAGXOptimizerOptions options;
   options.mergeAdjacentGroups = false;
   options.unwrapRedundantFirstGroup = false;
-  PAGXOptimizer::Optimize(doc.get(), options);
+  OptimizeWithOptions(doc.get(), options);
   EXPECT_EQ(layer->contents.size(), 2u);
 }
 
@@ -497,11 +500,11 @@ CLI_TEST(PAGXOptimizerTest, CanonicalizePathsDisabled) {
   group->elements.push_back(MakeSolidFill(doc.get(), 1, 0, 0));
   layer->contents.push_back(group);
 
-  PAGXOptimizer::Options options;
+  PAGXOptimizerOptions options;
   options.canonicalizePaths = false;
   options.rectMaskToScrollRect = false;
   options.unwrapRedundantFirstGroup = false;
-  PAGXOptimizer::Optimize(doc.get(), options);
+  OptimizeWithOptions(doc.get(), options);
   ASSERT_EQ(layer->contents.size(), 1u);
   auto* outGroup = static_cast<Group*>(layer->contents[0]);
   bool hasRectangle = false;
@@ -525,9 +528,9 @@ CLI_TEST(PAGXOptimizerTest, RectMaskToScrollRectDisabled) {
   user->maskType = MaskType::Alpha;
   user->contents.push_back(MakeFilledRectGroup(doc.get(), 100, 100, 0, 1, 0));
 
-  PAGXOptimizer::Options options;
+  PAGXOptimizerOptions options;
   options.rectMaskToScrollRect = false;
-  PAGXOptimizer::Optimize(doc.get(), options);
+  OptimizeWithOptions(doc.get(), options);
   EXPECT_FALSE(user->hasScrollRect);
   EXPECT_EQ(user->mask, mask);
 }
@@ -568,13 +571,13 @@ CLI_TEST(PAGXOptimizerTest, DedupPathDataEnabledCollapsesDuplicates) {
     if (n->nodeType() == NodeType::PathData) beforePathData++;
   }
 
-  PAGXOptimizer::Options options;
+  PAGXOptimizerOptions options;
   options.dedupPathData = true;
   options.pruneUnreferencedResources = true;
   options.canonicalizePaths = false;
   options.unwrapRedundantFirstGroup = false;
   options.mergeAdjacentGroups = false;
-  PAGXOptimizer::Optimize(doc.get(), options);
+  OptimizeWithOptions(doc.get(), options);
 
   // After dedup, exactly one of the two PathData resources loses its id (the prune pass clears
   // the id of any resource that is no longer referenced).
@@ -622,11 +625,11 @@ CLI_TEST(PAGXOptimizerTest, DedupPathDataDisabledKeepsDuplicates) {
     if (n->nodeType() == NodeType::PathData) beforePathData++;
   }
 
-  PAGXOptimizer::Options options;
+  PAGXOptimizerOptions options;
   options.dedupPathData = false;
   options.pruneUnreferencedResources = false;
   options.canonicalizePaths = false;
-  PAGXOptimizer::Optimize(doc.get(), options);
+  OptimizeWithOptions(doc.get(), options);
 
   size_t afterPathData = 0;
   for (auto& n : doc->nodes) {
@@ -647,9 +650,9 @@ CLI_TEST(PAGXOptimizerTest, PruneUnreferencedResourcesEnabledClearsId) {
   orphan->lineTo(0, 5);
   orphan->close();
 
-  PAGXOptimizer::Options options;
+  PAGXOptimizerOptions options;
   options.pruneUnreferencedResources = true;
-  PAGXOptimizer::Optimize(doc.get(), options);
+  OptimizeWithOptions(doc.get(), options);
   EXPECT_TRUE(orphan->id.empty());
 }
 
@@ -665,9 +668,9 @@ CLI_TEST(PAGXOptimizerTest, PruneUnreferencedResourcesDisabledKeepsId) {
   orphan->lineTo(0, 5);
   orphan->close();
 
-  PAGXOptimizer::Options options;
+  PAGXOptimizerOptions options;
   options.pruneUnreferencedResources = false;
-  PAGXOptimizer::Optimize(doc.get(), options);
+  OptimizeWithOptions(doc.get(), options);
   EXPECT_EQ(orphan->id, "orphan-path");
 }
 
@@ -760,11 +763,11 @@ CLI_TEST(PAGXOptimizerTest, PruneUnreferencedResourcesPreservesChainedReferences
   group->elements.push_back(fill);
   layer->contents.push_back(group);
 
-  PAGXOptimizer::Options options;
+  PAGXOptimizerOptions options;
   options.pruneUnreferencedResources = true;
   options.canonicalizePaths = false;
   options.unwrapRedundantFirstGroup = false;
-  PAGXOptimizer::Optimize(doc.get(), options);
+  OptimizeWithOptions(doc.get(), options);
 
   EXPECT_EQ(data->id, "shared-path");
   EXPECT_EQ(color->id, "shared-color");
@@ -790,9 +793,9 @@ CLI_TEST(PAGXOptimizerTest, OptimizeResultSignalsNonConvergenceAtIterationCap) {
   layer->contents.push_back(MakeFilledRectGroup(doc.get(), 10, 10, 1, 0, 0));
   AddTopLayer(doc.get());  // a second shell layer so at least one rule still has something to do
 
-  PAGXOptimizer::Options options;
+  PAGXOptimizerOptions options;
   options.maxIterations = 1;
-  auto result = PAGXOptimizer::Optimize(doc.get(), options);
+  auto result = OptimizeWithOptions(doc.get(), options);
   EXPECT_FALSE(result.converged);
   EXPECT_EQ(result.iterationsUsed, 1);
   bool warnedAboutOptimizer = false;

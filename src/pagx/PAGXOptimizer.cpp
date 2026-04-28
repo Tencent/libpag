@@ -22,6 +22,7 @@
 #include <cstring>
 #include <unordered_map>
 #include <unordered_set>
+#include "PAGXOptimizerOptions.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
@@ -57,12 +58,16 @@ bool HasUnresolvedImport(const Layer* layer) {
 }
 
 bool LayerNeedsKeeping(const Layer* layer, const std::unordered_set<const Layer*>& maskRefs) {
-  if (maskRefs.find(layer) != maskRefs.end()) return true;
+  if (maskRefs.find(layer) != maskRefs.end()) {
+    return true;
+  }
   return false;
 }
 
 bool LayoutNodeHasConstraints(const LayoutNode* node) {
-  if (node == nullptr) return false;
+  if (node == nullptr) {
+    return false;
+  }
   return !std::isnan(node->left) || !std::isnan(node->right) || !std::isnan(node->top) ||
          !std::isnan(node->bottom) || !std::isnan(node->centerX) || !std::isnan(node->centerY);
 }
@@ -74,15 +79,33 @@ bool ElementHasConstraints(Element* element) {
 // Group is a no-op container: identity transform, default alpha, no layout,
 // no constraint frame, no padding.
 bool IsDefaultTransformGroup(const Group* group) {
-  if (group->alpha != 1.0f) return false;
-  if (group->position.x != 0 || group->position.y != 0) return false;
-  if (group->anchor.x != 0 || group->anchor.y != 0) return false;
-  if (group->rotation != 0) return false;
-  if (group->scale.x != 1 || group->scale.y != 1) return false;
-  if (group->skew != 0) return false;
-  if (group->skewAxis != 0) return false;
-  if (!std::isnan(group->width) || !std::isnan(group->height)) return false;
-  if (!group->padding.isZero()) return false;
+  if (group->alpha != 1.0f) {
+    return false;
+  }
+  if (group->position.x != 0 || group->position.y != 0) {
+    return false;
+  }
+  if (group->anchor.x != 0 || group->anchor.y != 0) {
+    return false;
+  }
+  if (group->rotation != 0) {
+    return false;
+  }
+  if (group->scale.x != 1 || group->scale.y != 1) {
+    return false;
+  }
+  if (group->skew != 0) {
+    return false;
+  }
+  if (group->skewAxis != 0) {
+    return false;
+  }
+  if (!std::isnan(group->width) || !std::isnan(group->height)) {
+    return false;
+  }
+  if (!group->padding.isZero()) {
+    return false;
+  }
   if (!std::isnan(group->left) || !std::isnan(group->right) || !std::isnan(group->top) ||
       !std::isnan(group->bottom) || !std::isnan(group->centerX) || !std::isnan(group->centerY)) {
     return false;
@@ -93,7 +116,9 @@ bool IsDefaultTransformGroup(const Group* group) {
 void CollectMaskRefs(const std::vector<Layer*>& layers, std::unordered_set<const Layer*>& refs);
 
 void CollectMaskRefsFromLayer(const Layer* layer, std::unordered_set<const Layer*>& refs) {
-  if (layer == nullptr) return;
+  if (layer == nullptr) {
+    return;
+  }
   if (layer->mask != nullptr) {
     refs.insert(layer->mask);
     CollectMaskRefsFromLayer(layer->mask, refs);
@@ -133,21 +158,33 @@ Group* WrapShellLayerAsGroup(PAGXDocument* doc, Layer* layer) {
 
 bool TryReadAxisAlignedRect(const PathData* data, float& cx, float& cy, float& w, float& h) {
   auto& verbs = data->verbs();
-  if (verbs.size() != 5 && verbs.size() != 6) return false;
-  if (verbs[0] != PathVerb::Move) return false;
-  for (size_t i = 1; i + 1 < verbs.size(); i++) {
-    if (verbs[i] != PathVerb::Line) return false;
+  if (verbs.size() != 5 && verbs.size() != 6) {
+    return false;
   }
-  if (verbs.back() != PathVerb::Close) return false;
+  if (verbs[0] != PathVerb::Move) {
+    return false;
+  }
+  for (size_t i = 1; i + 1 < verbs.size(); i++) {
+    if (verbs[i] != PathVerb::Line) {
+      return false;
+    }
+  }
+  if (verbs.back() != PathVerb::Close) {
+    return false;
+  }
   auto& pts = data->points();
   size_t pointCount = pts.size();
-  if (pointCount < 4) return false;
+  if (pointCount < 4) {
+    return false;
+  }
   for (size_t i = 0; i < pointCount; i++) {
     auto& p1 = pts[i];
     auto& p2 = pts[(i + 1) % pointCount];
     float dx = std::abs(p2.x - p1.x);
     float dy = std::abs(p2.y - p1.y);
-    if (dx > 0.01f && dy > 0.01f) return false;
+    if (dx > 0.01f && dy > 0.01f) {
+      return false;
+    }
   }
   float minX = pts[0].x, maxX = pts[0].x;
   float minY = pts[0].y, maxY = pts[0].y;
@@ -159,7 +196,9 @@ bool TryReadAxisAlignedRect(const PathData* data, float& cx, float& cy, float& w
   }
   w = maxX - minX;
   h = maxY - minY;
-  if (w < 0.01f || h < 0.01f) return false;
+  if (w < 0.01f || h < 0.01f) {
+    return false;
+  }
   cx = (minX + maxX) * 0.5f;
   cy = (minY + maxY) * 0.5f;
   return true;
@@ -167,14 +206,24 @@ bool TryReadAxisAlignedRect(const PathData* data, float& cx, float& cy, float& w
 
 bool TryReadEllipse(const PathData* data, float& cx, float& cy, float& w, float& h) {
   auto& verbs = data->verbs();
-  if (verbs.size() != 6) return false;
-  if (verbs[0] != PathVerb::Move) return false;
-  for (int i = 1; i <= 4; i++) {
-    if (verbs[i] != PathVerb::Cubic) return false;
+  if (verbs.size() != 6) {
+    return false;
   }
-  if (verbs[5] != PathVerb::Close) return false;
+  if (verbs[0] != PathVerb::Move) {
+    return false;
+  }
+  for (int i = 1; i <= 4; i++) {
+    if (verbs[i] != PathVerb::Cubic) {
+      return false;
+    }
+  }
+  if (verbs[5] != PathVerb::Close) {
+    return false;
+  }
   auto& pts = data->points();
-  if (pts.size() < 13) return false;
+  if (pts.size() < 13) {
+    return false;
+  }
 
   Point onCurve[4];
   onCurve[0] = pts[0];
@@ -194,7 +243,9 @@ bool TryReadEllipse(const PathData* data, float& cx, float& cy, float& w, float&
   cy = (minY + maxY) * 0.5f;
   float rx = (maxX - minX) * 0.5f;
   float ry = (maxY - minY) * 0.5f;
-  if (rx < 0.01f || ry < 0.01f) return false;
+  if (rx < 0.01f || ry < 0.01f) {
+    return false;
+  }
 
   bool foundTop = false, foundBottom = false, foundLeft = false, foundRight = false;
   static constexpr float TOLERANCE = 1.0f;
@@ -215,9 +266,14 @@ bool TryReadEllipse(const PathData* data, float& cx, float& cy, float& w, float&
       }
     }
   }
-  if (!(foundTop && foundBottom && foundLeft && foundRight)) return false;
+  if (!(foundTop && foundBottom && foundLeft && foundRight)) {
+    return false;
+  }
 
+  // Standard cubic Bezier approximation constant for quarter-circle arcs: 4*(sqrt(2)-1)/3.
   static constexpr float KAPPA = 0.5522847f;
+  // Maximum absolute pixel deviation allowed between an actual cubic control point and the ideal
+  // KAPPA-derived control point when recognizing an ellipse from a 4-cubic path.
   static constexpr float CP_TOLERANCE = 2.0f;
   float expectedCpOffsetX = rx * KAPPA;
   float expectedCpOffsetY = ry * KAPPA;
@@ -236,7 +292,9 @@ bool TryReadEllipse(const PathData* data, float& cx, float& cy, float& w, float&
     bool cp2Valid =
         (cp2DistX < CP_TOLERANCE && std::abs(cp2DistY - expectedCpOffsetY) < CP_TOLERANCE) ||
         (cp2DistY < CP_TOLERANCE && std::abs(cp2DistX - expectedCpOffsetX) < CP_TOLERANCE);
-    if (!cp1Valid || !cp2Valid) return false;
+    if (!cp1Valid || !cp2Valid) {
+      return false;
+    }
   }
   w = rx * 2.0f;
   h = ry * 2.0f;
@@ -246,10 +304,18 @@ bool TryReadEllipse(const PathData* data, float& cx, float& cy, float& w, float&
 // Replace `path` in-place with a Rectangle/Ellipse if eligible. Returns the new element to
 // substitute (which may be the same path if no rewrite happened).
 Element* TryCanonicalizePath(PAGXDocument* doc, Path* path) {
-  if (path->data == nullptr || path->data->isEmpty()) return path;
-  if (path->reversed) return path;
-  if (ElementHasConstraints(path)) return path;
-  if (!path->customData.empty()) return path;
+  if (path->data == nullptr || path->data->isEmpty()) {
+    return path;
+  }
+  if (path->reversed) {
+    return path;
+  }
+  if (ElementHasConstraints(path)) {
+    return path;
+  }
+  if (!path->customData.empty()) {
+    return path;
+  }
 
   float cx = 0, cy = 0, w = 0, h = 0;
   if (TryReadAxisAlignedRect(path->data, cx, cy, w, h)) {
@@ -280,47 +346,97 @@ Element* TryCanonicalizePath(PAGXDocument* doc, Path* path) {
 // ----------------------------------------------------------------------------
 
 bool TryConvertRectMaskToScrollRect(Layer* layer) {
-  if (layer->mask == nullptr) return false;
-  if (layer->maskType != MaskType::Alpha) return false;
-  if (layer->hasScrollRect) return false;
+  if (layer->mask == nullptr) {
+    return false;
+  }
+  if (layer->maskType != MaskType::Alpha) {
+    return false;
+  }
+  if (layer->hasScrollRect) {
+    return false;
+  }
   auto* m = layer->mask;
-  if (m->x != 0 || m->y != 0) return false;
-  if (!m->matrix.isIdentity()) return false;
-  if (!m->matrix3D.isIdentity()) return false;
-  if (m->alpha != 1.0f) return false;
-  if (m->blendMode != BlendMode::Normal) return false;
-  if (!m->styles.empty() || !m->filters.empty()) return false;
+  if (m->x != 0 || m->y != 0) {
+    return false;
+  }
+  if (!m->matrix.isIdentity()) {
+    return false;
+  }
+  if (!m->matrix3D.isIdentity()) {
+    return false;
+  }
+  if (m->alpha != 1.0f) {
+    return false;
+  }
+  if (m->blendMode != BlendMode::Normal) {
+    return false;
+  }
+  if (!m->styles.empty() || !m->filters.empty()) {
+    return false;
+  }
   // `id` / `name` on the mask layer come from SVG <clipPath>'s identifier and don't carry
   // user-meaningful state — the mask layer itself stays in doc->layers (hidden) after we
   // detach the mask reference, so any other consumer can still resolve it. Only customData
   // truly blocks the rewrite.
-  if (!m->customData.empty()) return false;
-  if (m->contents.size() != 2) return false;
-  if (m->contents[0]->nodeType() != NodeType::Rectangle) return false;
-  if (m->contents[1]->nodeType() != NodeType::Fill) return false;
+  if (!m->customData.empty()) {
+    return false;
+  }
+  if (m->contents.size() != 2) {
+    return false;
+  }
+  if (m->contents[0]->nodeType() != NodeType::Rectangle) {
+    return false;
+  }
+  if (m->contents[1]->nodeType() != NodeType::Fill) {
+    return false;
+  }
   auto* rect = static_cast<Rectangle*>(m->contents[0]);
-  if (rect->roundness != 0) return false;
-  if (rect->reversed) return false;
-  if (LayoutNodeHasConstraints(rect)) return false;
-  if (!rect->customData.empty()) return false;
+  if (rect->roundness != 0) {
+    return false;
+  }
+  if (rect->reversed) {
+    return false;
+  }
+  if (LayoutNodeHasConstraints(rect)) {
+    return false;
+  }
+  if (!rect->customData.empty()) {
+    return false;
+  }
   auto* fill = static_cast<Fill*>(m->contents[1]);
-  if (fill->alpha < 0.999f) return false;
-  if (fill->blendMode != BlendMode::Normal) return false;
+  if (fill->alpha < 0.999f) {
+    return false;
+  }
+  if (fill->blendMode != BlendMode::Normal) {
+    return false;
+  }
   if (fill->color != nullptr) {
-    if (fill->color->nodeType() != NodeType::SolidColor) return false;
+    if (fill->color->nodeType() != NodeType::SolidColor) {
+      return false;
+    }
     auto* sc = static_cast<const SolidColor*>(fill->color);
-    if (sc->color.alpha < 0.999f) return false;
+    if (sc->color.alpha < 0.999f) {
+      return false;
+    }
   }
   // tgfx's scrollRect uses (x,y) as a scroll offset (the rect's top-left maps to the layer's
   // local (0,0)). To preserve the original positioning we have to translate the layer by the
   // same (left, top) — which we can only do safely when the user layer has no rotation/scale,
   // no 3D matrix, and no constraint-based positioning.
-  if (!layer->matrix.isIdentity()) return false;
-  if (!layer->matrix3D.isIdentity()) return false;
-  if (LayoutNodeHasConstraints(layer)) return false;
+  if (!layer->matrix.isIdentity()) {
+    return false;
+  }
+  if (!layer->matrix3D.isIdentity()) {
+    return false;
+  }
+  if (LayoutNodeHasConstraints(layer)) {
+    return false;
+  }
   // If the layer already declares an explicit frame size, leave it alone — overwriting an
   // author-supplied width/height could change layout semantics for downstream consumers.
-  if (!std::isnan(layer->width) || !std::isnan(layer->height)) return false;
+  if (!std::isnan(layer->width) || !std::isnan(layer->height)) {
+    return false;
+  }
   float left = rect->position.x - rect->size.width * 0.5f;
   float top = rect->position.y - rect->size.height * 0.5f;
   layer->scrollRect = {left, top, rect->size.width, rect->size.height};
@@ -354,9 +470,15 @@ bool RectMaskToScrollRectInLayer(Layer* layer) {
 // only when both are SolidColor with identical Color values. Anything else (gradients, image
 // patterns) is treated as opaque: only equal when the SAME pointer is used.
 bool ColorSourcesEqual(const ColorSource* a, const ColorSource* b) {
-  if (a == b) return true;
-  if (a == nullptr || b == nullptr) return false;
-  if (a->nodeType() != b->nodeType()) return false;
+  if (a == b) {
+    return true;
+  }
+  if (a == nullptr || b == nullptr) {
+    return false;
+  }
+  if (a->nodeType() != b->nodeType()) {
+    return false;
+  }
   // For shared resource references (i.e. nodes registered in PAGXDocument::nodes by id) the
   // SVG importer reuses the same instance, so a == b will already be true above. For inline
   // SolidColor literals we compare values.
@@ -369,32 +491,68 @@ bool ColorSourcesEqual(const ColorSource* a, const ColorSource* b) {
 }
 
 bool FillsEqual(const Fill* a, const Fill* b) {
-  if (a->alpha != b->alpha) return false;
-  if (a->blendMode != b->blendMode) return false;
-  if (a->fillRule != b->fillRule) return false;
-  if (a->placement != b->placement) return false;
+  if (a->alpha != b->alpha) {
+    return false;
+  }
+  if (a->blendMode != b->blendMode) {
+    return false;
+  }
+  if (a->fillRule != b->fillRule) {
+    return false;
+  }
+  if (a->placement != b->placement) {
+    return false;
+  }
   return ColorSourcesEqual(a->color, b->color);
 }
 
 bool StrokesEqual(const Stroke* a, const Stroke* b) {
-  if (a->width != b->width) return false;
-  if (a->alpha != b->alpha) return false;
-  if (a->blendMode != b->blendMode) return false;
-  if (a->cap != b->cap) return false;
-  if (a->join != b->join) return false;
-  if (a->miterLimit != b->miterLimit) return false;
-  if (a->dashOffset != b->dashOffset) return false;
-  if (a->dashAdaptive != b->dashAdaptive) return false;
-  if (a->align != b->align) return false;
-  if (a->placement != b->placement) return false;
-  if (a->dashes != b->dashes) return false;
+  if (a->width != b->width) {
+    return false;
+  }
+  if (a->alpha != b->alpha) {
+    return false;
+  }
+  if (a->blendMode != b->blendMode) {
+    return false;
+  }
+  if (a->cap != b->cap) {
+    return false;
+  }
+  if (a->join != b->join) {
+    return false;
+  }
+  if (a->miterLimit != b->miterLimit) {
+    return false;
+  }
+  if (a->dashOffset != b->dashOffset) {
+    return false;
+  }
+  if (a->dashAdaptive != b->dashAdaptive) {
+    return false;
+  }
+  if (a->align != b->align) {
+    return false;
+  }
+  if (a->placement != b->placement) {
+    return false;
+  }
+  if (a->dashes != b->dashes) {
+    return false;
+  }
   return ColorSourcesEqual(a->color, b->color);
 }
 
 bool PaintersEqual(const Element* a, const Element* b) {
-  if (a == b) return true;
-  if (a == nullptr || b == nullptr) return false;
-  if (a->nodeType() != b->nodeType()) return false;
+  if (a == b) {
+    return true;
+  }
+  if (a == nullptr || b == nullptr) {
+    return false;
+  }
+  if (a->nodeType() != b->nodeType()) {
+    return false;
+  }
   if (a->nodeType() == NodeType::Fill) {
     return FillsEqual(static_cast<const Fill*>(a), static_cast<const Fill*>(b));
   }
@@ -433,10 +591,16 @@ PainterSignature ComputePainterSignature(const Group* group) {
 }
 
 bool PainterSignaturesEqual(const PainterSignature& a, const PainterSignature& b) {
-  if (!a.valid || !b.valid) return false;
-  if (a.painters.size() != b.painters.size()) return false;
+  if (!a.valid || !b.valid) {
+    return false;
+  }
+  if (a.painters.size() != b.painters.size()) {
+    return false;
+  }
   for (size_t i = 0; i < a.painters.size(); i++) {
-    if (!PaintersEqual(a.painters[i], b.painters[i])) return false;
+    if (!PaintersEqual(a.painters[i], b.painters[i])) {
+      return false;
+    }
   }
   return true;
 }
@@ -583,15 +747,29 @@ bool DowngradeShellChildrenInLayer(PAGXDocument* doc, Layer* layer,
   for (auto* child : layer->children) {
     changed |= DowngradeShellChildrenInLayer(doc, child, maskRefs);
   }
-  if (layer->layout != LayoutMode::None) return changed;
-  if (layer->children.empty()) return changed;
-  if (!layer->contents.empty()) return changed;  // mixed: paint order would change
+  if (layer->layout != LayoutMode::None) {
+    return changed;
+  }
+  if (layer->children.empty()) {
+    return changed;
+  }
+  if (!layer->contents.empty()) {
+    return changed;  // mixed: paint order would change
+  }
 
   for (auto* child : layer->children) {
-    if (!child->children.empty()) return changed;
-    if (!IsLayerShell(child)) return changed;
-    if (LayerNeedsKeeping(child, maskRefs)) return changed;
-    if (HasUnresolvedImport(child)) return changed;
+    if (!child->children.empty()) {
+      return changed;
+    }
+    if (!IsLayerShell(child)) {
+      return changed;
+    }
+    if (LayerNeedsKeeping(child, maskRefs)) {
+      return changed;
+    }
+    if (HasUnresolvedImport(child)) {
+      return changed;
+    }
   }
   // All children are downgradable.
   for (auto* child : layer->children) {
@@ -627,7 +805,9 @@ bool DowngradeShellChildren(PAGXDocument* doc, std::vector<Layer*>& layers,
 // ----------------------------------------------------------------------------
 
 bool IsMergeableShellLayer(const Layer* layer, const std::unordered_set<const Layer*>& maskRefs) {
-  if (!layer->children.empty()) return false;
+  if (!layer->children.empty()) {
+    return false;
+  }
   return IsLayerShell(layer) && !LayerNeedsKeeping(layer, maskRefs) && !HasUnresolvedImport(layer);
 }
 
@@ -636,7 +816,9 @@ bool IsMergeableShellLayer(const Layer* layer, const std::unordered_set<const La
 // want to avoid allocating a result vector until a mutation is actually detected.
 template <class T>
 void BeginMutation(std::vector<T>& source, std::vector<T>& result, size_t upTo, bool& changed) {
-  if (changed) return;
+  if (changed) {
+    return;
+  }
   changed = true;
   result.reserve(source.size());
   result.insert(result.end(), source.begin(), source.begin() + static_cast<ptrdiff_t>(upTo));
@@ -645,15 +827,21 @@ void BeginMutation(std::vector<T>& source, std::vector<T>& result, size_t upTo, 
 bool MergeAdjacentShellLayersInList(PAGXDocument* doc, std::vector<Layer*>& layers,
                                     bool parentHasLayout,
                                     const std::unordered_set<const Layer*>& maskRefs) {
-  if (parentHasLayout) return false;
-  if (layers.size() < 2) return false;
+  if (parentHasLayout) {
+    return false;
+  }
+  if (layers.size() < 2) {
+    return false;
+  }
 
   std::vector<Layer*> result;
   bool changed = false;
   size_t i = 0;
   while (i < layers.size()) {
     if (!IsMergeableShellLayer(layers[i], maskRefs)) {
-      if (changed) result.push_back(layers[i]);
+      if (changed) {
+        result.push_back(layers[i]);
+      }
       i++;
       continue;
     }
@@ -662,7 +850,9 @@ bool MergeAdjacentShellLayersInList(PAGXDocument* doc, std::vector<Layer*>& laye
       j++;
     }
     if (j - i < 2) {
-      if (changed) result.push_back(layers[i]);
+      if (changed) {
+        result.push_back(layers[i]);
+      }
       i++;
       continue;
     }
@@ -684,7 +874,9 @@ bool MergeAdjacentShellLayersInList(PAGXDocument* doc, std::vector<Layer*>& laye
     }
     i = j;
   }
-  if (!changed) return false;
+  if (!changed) {
+    return false;
+  }
   layers = std::move(result);
   return true;
 }
@@ -712,20 +904,32 @@ bool MergeAdjacentShellLayers(PAGXDocument* doc, std::vector<Layer*>& topLevel,
 // ----------------------------------------------------------------------------
 
 bool UnwrapRedundantFirstGroupInElements(std::vector<Element*>& elements) {
-  if (elements.empty()) return false;
+  if (elements.empty()) {
+    return false;
+  }
   auto* first = elements[0];
-  if (first->nodeType() != NodeType::Group) return false;
+  if (first->nodeType() != NodeType::Group) {
+    return false;
+  }
   auto* group = static_cast<Group*>(first);
-  if (!IsDefaultTransformGroup(group)) return false;
-  if (!group->customData.empty()) return false;
+  if (!IsDefaultTransformGroup(group)) {
+    return false;
+  }
+  if (!group->customData.empty()) {
+    return false;
+  }
   // Painter-leak guard: if the parent has more siblings AND the group contains painters,
   // unwrapping would let those painters bleed into following geometry.
-  if (elements.size() > 1 && ContainsPainter(group->elements)) return false;
+  if (elements.size() > 1 && ContainsPainter(group->elements)) {
+    return false;
+  }
   // Layout guard: any direct child element using right/bottom/centerX/centerY needs the group
   // as a constraint frame (this matches verify's CanUnwrapFirstChildGroup).
   for (auto* child : group->elements) {
     auto* layoutNode = LayoutNode::AsLayoutNode(child);
-    if (layoutNode == nullptr) continue;
+    if (layoutNode == nullptr) {
+      continue;
+    }
     if (!std::isnan(layoutNode->right) || !std::isnan(layoutNode->bottom) ||
         !std::isnan(layoutNode->centerX) || !std::isnan(layoutNode->centerY)) {
       return false;
@@ -733,8 +937,12 @@ bool UnwrapRedundantFirstGroupInElements(std::vector<Element*>& elements) {
   }
   std::vector<Element*> spliced;
   spliced.reserve(elements.size() - 1 + group->elements.size());
-  for (auto* gc : group->elements) spliced.push_back(gc);
-  for (size_t i = 1; i < elements.size(); i++) spliced.push_back(elements[i]);
+  for (auto* gc : group->elements) {
+    spliced.push_back(gc);
+  }
+  for (size_t i = 1; i < elements.size(); i++) {
+    spliced.push_back(elements[i]);
+  }
   elements = std::move(spliced);
   return true;
 }
@@ -766,7 +974,9 @@ bool UnwrapRedundantFirstGroupInLayer(Layer* layer) {
 // ----------------------------------------------------------------------------
 
 bool MergeAdjacentGroupsInElements(std::vector<Element*>& elements) {
-  if (elements.size() < 2) return false;
+  if (elements.size() < 2) {
+    return false;
+  }
   // Defer allocating `result` until the first merge actually occurs: most sibling lists don't
   // contain a mergeable pair, so in the common case we skip the vector entirely.
   std::vector<Element*> result;
@@ -775,30 +985,42 @@ bool MergeAdjacentGroupsInElements(std::vector<Element*>& elements) {
   while (i < elements.size()) {
     auto* el = elements[i];
     if (el->nodeType() != NodeType::Group) {
-      if (changed) result.push_back(el);
+      if (changed) {
+        result.push_back(el);
+      }
       i++;
       continue;
     }
     auto* baseGroup = static_cast<Group*>(el);
     if (!IsDefaultTransformGroup(baseGroup) || !baseGroup->customData.empty()) {
-      if (changed) result.push_back(el);
+      if (changed) {
+        result.push_back(el);
+      }
       i++;
       continue;
     }
     auto baseSig = ComputePainterSignature(baseGroup);
     if (!baseSig.valid) {
-      if (changed) result.push_back(el);
+      if (changed) {
+        result.push_back(el);
+      }
       i++;
       continue;
     }
     size_t j = i + 1;
     while (j < elements.size()) {
       auto* next = elements[j];
-      if (next->nodeType() != NodeType::Group) break;
+      if (next->nodeType() != NodeType::Group) {
+        break;
+      }
       auto* nextGroup = static_cast<Group*>(next);
-      if (!IsDefaultTransformGroup(nextGroup) || !nextGroup->customData.empty()) break;
+      if (!IsDefaultTransformGroup(nextGroup) || !nextGroup->customData.empty()) {
+        break;
+      }
       auto nextSig = ComputePainterSignature(nextGroup);
-      if (!PainterSignaturesEqual(baseSig, nextSig)) break;
+      if (!PainterSignaturesEqual(baseSig, nextSig)) {
+        break;
+      }
 
       // Insert nextGroup's geometry (everything before its trailing painters) into baseGroup
       // BEFORE baseGroup's painters. To preserve ordering, splice the new geometry just before
@@ -820,8 +1042,12 @@ bool MergeAdjacentGroupsInElements(std::vector<Element*>& elements) {
       }
       std::vector<Element*> updated;
       updated.reserve(baseGroup->elements.size() + nextFirstPainterIdx);
-      for (size_t k = 0; k < firstPainterIdx; k++) updated.push_back(baseGroup->elements[k]);
-      for (size_t k = 0; k < nextFirstPainterIdx; k++) updated.push_back(nextGroup->elements[k]);
+      for (size_t k = 0; k < firstPainterIdx; k++) {
+        updated.push_back(baseGroup->elements[k]);
+      }
+      for (size_t k = 0; k < nextFirstPainterIdx; k++) {
+        updated.push_back(nextGroup->elements[k]);
+      }
       for (size_t k = firstPainterIdx; k < baseGroup->elements.size(); k++) {
         updated.push_back(baseGroup->elements[k]);
       }
@@ -830,10 +1056,14 @@ bool MergeAdjacentGroupsInElements(std::vector<Element*>& elements) {
       BeginMutation(elements, result, i, changed);
       j++;
     }
-    if (changed) result.push_back(baseGroup);
+    if (changed) {
+      result.push_back(baseGroup);
+    }
     i = j;
   }
-  if (!changed) return false;
+  if (!changed) {
+    return false;
+  }
   elements = std::move(result);
   return true;
 }
@@ -910,7 +1140,9 @@ void RewritePathDataInElements(std::vector<Element*>& elements,
 
 void RewritePathDataInLayer(Layer* layer,
                             const std::unordered_map<PathData*, PathData*>& redirect) {
-  if (layer == nullptr) return;
+  if (layer == nullptr) {
+    return;
+  }
   RewritePathDataInElements(layer->contents, redirect);
   for (auto* child : layer->children) {
     RewritePathDataInLayer(child, redirect);
@@ -943,11 +1175,17 @@ bool DedupPathDataResources(PAGXDocument* doc) {
   std::unordered_map<std::string, PathData*> bySig;
   std::unordered_map<PathData*, PathData*> redirect;
   for (auto& nodePtr : doc->nodes) {
-    if (nodePtr->nodeType() != NodeType::PathData) continue;
+    if (nodePtr->nodeType() != NodeType::PathData) {
+      continue;
+    }
     auto* pd = static_cast<PathData*>(nodePtr.get());
-    if (pd->id.empty()) continue;
+    if (pd->id.empty()) {
+      continue;
+    }
     auto sig = PathDataSignature(pd);
-    if (sig.empty()) continue;
+    if (sig.empty()) {
+      continue;
+    }
     auto it = bySig.find(sig);
     if (it == bySig.end()) {
       bySig.emplace(std::move(sig), pd);
@@ -955,7 +1193,9 @@ bool DedupPathDataResources(PAGXDocument* doc) {
       redirect[pd] = it->second;
     }
   }
-  if (redirect.empty()) return false;
+  if (redirect.empty()) {
+    return false;
+  }
 
   for (auto* layer : doc->layers) {
     RewritePathDataInLayer(layer, redirect);
@@ -980,8 +1220,12 @@ bool DedupPathDataResources(PAGXDocument* doc) {
 void CollectReferencedIds(const PAGXDocument* doc, std::unordered_set<std::string>& refs);
 
 void CollectRefsFromElement(const Element* element, std::unordered_set<std::string>& refs) {
-  if (element == nullptr) return;
-  if (!element->id.empty()) refs.insert(element->id);
+  if (element == nullptr) {
+    return;
+  }
+  if (!element->id.empty()) {
+    refs.insert(element->id);
+  }
   auto type = element->nodeType();
   if (type == NodeType::Group || type == NodeType::TextBox) {
     auto* group = static_cast<const Group*>(element);
@@ -996,7 +1240,9 @@ void CollectRefsFromElement(const Element* element, std::unordered_set<std::stri
   } else if (type == NodeType::Fill) {
     auto* fill = static_cast<const Fill*>(element);
     if (fill->color != nullptr) {
-      if (!fill->color->id.empty()) refs.insert(fill->color->id);
+      if (!fill->color->id.empty()) {
+        refs.insert(fill->color->id);
+      }
       if (fill->color->nodeType() == NodeType::ImagePattern) {
         auto* pattern = static_cast<const ImagePattern*>(fill->color);
         if (pattern->image != nullptr && !pattern->image->id.empty()) {
@@ -1007,7 +1253,9 @@ void CollectRefsFromElement(const Element* element, std::unordered_set<std::stri
   } else if (type == NodeType::Stroke) {
     auto* stroke = static_cast<const Stroke*>(element);
     if (stroke->color != nullptr) {
-      if (!stroke->color->id.empty()) refs.insert(stroke->color->id);
+      if (!stroke->color->id.empty()) {
+        refs.insert(stroke->color->id);
+      }
       if (stroke->color->nodeType() == NodeType::ImagePattern) {
         auto* pattern = static_cast<const ImagePattern*>(stroke->color);
         if (pattern->image != nullptr && !pattern->image->id.empty()) {
@@ -1026,8 +1274,12 @@ void CollectRefsFromElement(const Element* element, std::unordered_set<std::stri
 }
 
 void CollectRefsFromLayer(const Layer* layer, std::unordered_set<std::string>& refs) {
-  if (layer == nullptr) return;
-  if (!layer->id.empty()) refs.insert(layer->id);
+  if (layer == nullptr) {
+    return;
+  }
+  if (!layer->id.empty()) {
+    refs.insert(layer->id);
+  }
   if (layer->mask != nullptr) {
     CollectRefsFromLayer(layer->mask, refs);
   }
@@ -1056,7 +1308,9 @@ void CollectReferencedIds(const PAGXDocument* doc, std::unordered_set<std::strin
     } else if (type == NodeType::Font) {
       auto* font = static_cast<const Font*>(nodePtr.get());
       for (auto* glyph : font->glyphs) {
-        if (glyph == nullptr) continue;
+        if (glyph == nullptr) {
+          continue;
+        }
         if (glyph->path != nullptr && !glyph->path->id.empty()) {
           refs.insert(glyph->path->id);
         }
@@ -1096,8 +1350,12 @@ bool PruneUnreferencedResources(PAGXDocument* doc) {
   bool changed = false;
   for (auto& nodePtr : doc->nodes) {
     auto* node = nodePtr.get();
-    if (node->id.empty()) continue;
-    if (!IsResourceNode(node->nodeType())) continue;
+    if (node->id.empty()) {
+      continue;
+    }
+    if (!IsResourceNode(node->nodeType())) {
+      continue;
+    }
     if (refs.find(node->id) == refs.end()) {
       node->id.clear();
       changed = true;
@@ -1112,7 +1370,7 @@ bool PruneUnreferencedResources(PAGXDocument* doc) {
 // matches the cap while the last pass still reported changes).
 int OptimizeLayerList(PAGXDocument* doc, std::vector<Layer*>& layers,
                       std::unordered_set<const Layer*>& maskRefs,
-                      const PAGXOptimizer::Options& options, bool* converged) {
+                      const PAGXOptimizerOptions& options, bool* converged) {
   int iter = 0;
   for (; iter < options.maxIterations; iter++) {
     bool changed = false;
@@ -1161,9 +1419,11 @@ int OptimizeLayerList(PAGXDocument* doc, std::vector<Layer*>& layers,
 
 }  // namespace
 
-PAGXOptimizer::Result PAGXOptimizer::Optimize(PAGXDocument* doc, const Options& options) {
-  Result result;
-  if (doc == nullptr) return result;
+PAGXOptimizer::Result OptimizeWithOptions(PAGXDocument* doc, const PAGXOptimizerOptions& options) {
+  PAGXOptimizer::Result result;
+  if (doc == nullptr) {
+    return result;
+  }
 
   std::unordered_set<const Layer*> maskRefs;
   RecomputeMaskRefs(doc, maskRefs);
@@ -1193,6 +1453,10 @@ PAGXOptimizer::Result PAGXOptimizer::Optimize(PAGXDocument* doc, const Options& 
                           " iterations — some simplifications may be missed");
   }
   return result;
+}
+
+PAGXOptimizer::Result PAGXOptimizer::Optimize(PAGXDocument* doc) {
+  return OptimizeWithOptions(doc, PAGXOptimizerOptions());
 }
 
 }  // namespace pagx

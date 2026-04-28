@@ -38,37 +38,11 @@ namespace pagx {
  */
 class PAGXOptimizer {
  public:
-  struct Options {
-    /** Remove empty Layers and empty Groups. */
-    bool pruneEmpty = true;
-    /** When a parent Layer has only shell children, convert children to inline Groups. */
-    bool downgradeShellChildren = true;
-    /** Merge runs of adjacent shell Layers into a single Layer with one Group per source. */
-    bool mergeAdjacentShellLayers = true;
-    /** Unwrap a leading Group child when it has default transform and no painter isolation needed. */
-    bool unwrapRedundantFirstGroup = true;
-    /** Collapse consecutive Groups with identical painters into a single Group. */
-    bool mergeAdjacentGroups = true;
-    /** Rewrite Path nodes that describe an axis-aligned rectangle or an ellipse. */
-    bool canonicalizePaths = true;
-    /** Replace alpha-rectangle masks with an equivalent scrollRect on the parent layer. */
-    bool rectMaskToScrollRect = true;
-    /** Collapse PathData resources with identical contents into a single instance. */
-    bool dedupPathData = true;
-    /** Drop resources from `<Resources>` that no longer have any reference in the layer tree. */
-    bool pruneUnreferencedResources = true;
-    /** Maximum number of iterations to run rules to a fixed point. */
-    int maxIterations = 8;
-
-    Options() {
-    }
-  };
-
   struct Result {
     /**
-     * True when the rule set reached a fixed point within `maxIterations`. A false value means the
-     * optimizer was cut off by the iteration cap, which either indicates a rule set that is still
-     * making progress or (rarely) two rules oscillating against each other.
+     * True when the rule set reached a fixed point within the iteration cap. A false value means
+     * the optimizer was cut off, which either indicates a rule set that is still making progress or
+     * (rarely) two rules oscillating against each other.
      */
     bool converged = true;
     /**
@@ -81,10 +55,10 @@ class PAGXOptimizer {
   /**
    * Simplifies the structure of `doc` in place. Has no effect on rendering output.
    * Safe to call multiple times; the second call is a no-op once the document is already
-   * at a fixed point. When the optimizer fails to converge within `options.maxIterations`, a
-   * warning is appended to `doc->errors` and `Result::converged` is set to false.
+   * at a fixed point. When the optimizer fails to converge, a warning is appended to
+   * `doc->errors` and `Result::converged` is set to false.
    */
-  static Result Optimize(PAGXDocument* doc, const Options& options = Options());
+  static Result Optimize(PAGXDocument* doc);
 };
 
 }  // namespace pagx
