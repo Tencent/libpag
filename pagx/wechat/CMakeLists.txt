@@ -21,11 +21,13 @@ get_filename_component(TGFX_DIR "${TGFX_DIR}" REALPATH)
 # This enables 128-bit SIMD instructions for faster image processing and matrix operations.
 # Highway library in tgfx will automatically use SIMD code paths when compiled with -msimd128.
 # Supported: iOS WeChat (iOS 14.5+), Android WeChat (most devices), Chrome 91+.
-if (DEFINED EMSCRIPTEN)
-    message(STATUS "WASM SIMD optimization enabled (-msimd128)")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msimd128")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msimd128")
-endif ()
+# NOTE: Currently disabled because enabling -msimd128 causes abnormal preview rendering
+# on iOS WeChat mini programs.
+# if (DEFINED EMSCRIPTEN)
+#     message(STATUS "WASM SIMD optimization enabled (-msimd128)")
+#     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msimd128")
+#     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msimd128")
+# endif ()
 
 # Add tgfx and pagx as dependencies
 if (NOT TARGET tgfx)
