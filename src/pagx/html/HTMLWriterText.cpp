@@ -51,13 +51,14 @@ using pag::FloatNearlyZero;
 
 // Mirrors tgfx/src/core/utils/FauxBoldScale.cpp so HTML export can emit a stroke width that
 // matches the native PAGX render. tgfx strokes the glyph path with `fontSize * FauxBoldScale`
-// and unions it with the original fill, which is a path-level operation that reliably
-// thickens glyphs even at sub-pixel widths. Chromium's `-webkit-text-stroke` raster pipeline
-// silently drops sub-pixel strokes (values below ~1px produce zero visible thickening), so
-// using the raw tgfx value as the CSS stroke width leaves small-font fauxBold invisible in
-// HTML. Add a 0.5px bias to clear Chromium's activation threshold; the resulting visible
-// thickening matches the tgfx render across the common fontSize range (empirically verified
-// for fontSize 9..36 against Chromium on macOS at 2x device pixel ratio).
+// as a center-stroke and unions it with the original fill, which effectively grows the glyph
+// outward by `(fontSize * scale) / 2` on every side. Chromium's `-webkit-text-stroke` is also
+// a center-stroke: half of the width lies inside the glyph (painted over the fill) and half
+// lies outside, so emitting `fontSize * scale` as the CSS stroke width produces the same
+// outward growth as tgfx. Empirically Chromium on macOS renders sub-pixel strokes down to
+// ~0.3px visibly, well below the smallest value this formula produces for fontSize>=9
+// (0.375px), so no artificial floor is needed — adding one reliably over-thickens small
+// fontSize glyphs because the floor is larger than the raw value.
 float FauxBoldStrokeWidth(float fontSize) {
   constexpr float keySmall = 9.0f;
   constexpr float keyLarge = 36.0f;
@@ -72,7 +73,7 @@ float FauxBoldStrokeWidth(float fontSize) {
     float t = (fontSize - keySmall) / (keyLarge - keySmall);
     scale = valSmall + (valLarge - valSmall) * t;
   }
-  return fontSize * scale + 0.5f;
+  return fontSize * scale;
 }
 
 //==============================================================================
@@ -626,7 +627,7 @@ void SampleArcLengthLUT(const ArcLengthLUT& lut, float arcLength, Point* outPos,
 
 void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
                            const Stroke* stroke, const TextBox* tb, float alpha,
-                           bool hasCompanionStroke) {
+                           const Stroke* companionStroke) {
   if (!text->glyphRuns.empty()) {
     writeGlyphRunSVG(out, text, fill, stroke, alpha);
     return;
@@ -729,26 +730,33 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       }
     }
   }
-  if (text->fauxBold && !stroke && !hasCompanionStroke) {
-    // Default to currentColor so solid-fill text inherits the same colour tgfx thickens the
-    // glyph path with. When the fill is a gradient/ImagePattern we render it via
-    // `background-clip:text` with `-webkit-text-fill-color:transparent`, which paints the
-    // clipped background *below* the text-stroke layer — so a currentColor stroke would sit
-    // on top of the gradient and repaint the glyph silhouette in the inherited text colour
-    // (typically near-black), visually erasing the gradient. Picking a representative stop
-    // colour keeps the thickened outline visually consistent with the gradient fill.
-    // For gradients: middle stop when available, otherwise first stop. ImagePattern has no
-    // stop list, so fall back to currentColor and accept a subtle edge artefact — samples
-    // don't combine ImagePattern fills with fauxBold today.
+  if (text->fauxBold && !stroke) {
+    // fauxBold is emulated via `-webkit-text-stroke`. Pick the stroke colour carefully so the
+    // emulated outline blends into the final glyph painted by the real passes:
     //
-    // `hasCompanionStroke` guards against another failure mode: when the Text has both a
-    // fauxBold attribute and a sibling <Stroke> that will arrive in the separate Stroke paint
-    // pass, the Fill pass runs with `stroke==nullptr` and would otherwise emit this emulated
-    // text-stroke anyway — stacking under the real Stroke span and producing a visible halo
-    // of the fauxBold colour around every glyph (see showcase_text_art "TYPE"). In that case
-    // skip the fauxBold emulation entirely and let the real Stroke span provide the outline.
+    // 1. When the Text has a sibling <Stroke> that will arrive in the separate Stroke paint
+    //    pass (`companionStroke != nullptr`), the real Stroke span is drawn *on top of* this
+    //    Fill span. If we emit fauxBold in the inherited text colour, a thin ring of that
+    //    colour leaks out past the real Stroke edge (tgfx instead thickens the glyph path
+    //    first, then strokes the thickened outline — so only the real stroke colour ever
+    //    shows on the outside). Using the real Stroke's own colour for the fauxBold emulation
+    //    keeps the outer ring the same colour as the Stroke layer, so the two layers visually
+    //    merge into a single thicker outline and the glyph body still reads as bolder.
+    //    (Seen in showcase_text_art "TYPE".)
+    // 2. When the fill is a gradient/ImagePattern we render it via `background-clip:text`
+    //    with `-webkit-text-fill-color:transparent`, which paints the clipped background
+    //    *below* the text-stroke layer — a currentColor stroke would sit on top of the
+    //    gradient and repaint the glyph silhouette in the inherited text colour (typically
+    //    near-black), visually erasing the gradient. Pick the gradient's middle stop colour
+    //    so the thickened outline stays visually consistent with the gradient fill.
+    // 3. Otherwise (solid fill, no companion stroke) use currentColor, which resolves to the
+    //    same fill colour tgfx thickens the glyph path with.
     std::string strokeColor = "currentColor";
-    if (fill && fill->color) {
+    if (companionStroke && companionStroke->color &&
+        companionStroke->color->nodeType() == NodeType::SolidColor) {
+      auto sc = static_cast<const SolidColor*>(companionStroke->color);
+      strokeColor = ColorToRGBA(sc->color, companionStroke->alpha);
+    } else if (!companionStroke && fill && fill->color) {
       auto ct = fill->color->nodeType();
       if (ct == NodeType::LinearGradient || ct == NodeType::RadialGradient ||
           ct == NodeType::ConicGradient) {

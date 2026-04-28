@@ -66,7 +66,7 @@ static void EmitLeftTopCss(std::string& style, bool& positionSet, float x, float
 void HTMLWriter::paintGeos(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
                            const Stroke* stroke, const TextBox* textBox, float alpha, bool hasTrim,
                            const TrimPath* curTrim, bool hasMerge, MergePathMode mergeMode,
-                           bool hasCompanionStroke) {
+                           const Stroke* companionStroke) {
   if (geos.empty()) {
     return;
   }
@@ -81,7 +81,7 @@ void HTMLWriter::paintGeos(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     for (auto& g : geos) {
       if (g.type == NodeType::Text) {
         writeText(out, static_cast<const Text*>(g.element), fill, stroke, textBox, alpha,
-                  hasCompanionStroke);
+                  companionStroke);
       } else {
         std::vector<GeoInfo> single = {g};
         renderGeo(out, single, fill, stroke, alpha, hasTrim, curTrim, hasMerge, mergeMode);
@@ -112,17 +112,16 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
 
   bool hasUpcomingRepeater = false;
   const TextBox* preScannedTextBox = nullptr;
-  // Pre-scan whether the element list contains any real Stroke node at the top level. The
-  // Fill and Stroke passes run as two separate invocations against the same element list, so
-  // when the Fill pass reaches writeText it has no visibility into a Stroke that will arrive
-  // in a later iteration. Without this flag, writeText's fauxBold branch emits an emulated
-  // `-webkit-text-stroke` on the fill span even when a real Stroke pass will later paint its
-  // own outline on top, producing a visible halo of the fauxBold colour underneath the real
-  // stroke (see memory/fauxbold_gradient_stroke_erase.md for the prior gradient-clip fix).
-  bool layerHasStroke = false;
+  // Pre-scan for a sibling Stroke node at the top level. The Fill and Stroke passes run as
+  // two separate invocations against the same element list, so when the Fill pass reaches
+  // writeText it has no visibility into the Stroke that will arrive in a later iteration.
+  // We capture the Stroke pointer (not just a bool) so the Fill pass can recolour its
+  // fauxBold emulation to match the real Stroke — this keeps the glyph thickening visible
+  // while preventing the fauxBold colour from leaking out past the real Stroke edge.
+  const Stroke* layerCompanionStroke = nullptr;
   for (auto* e : elements) {
     if (e->nodeType() == NodeType::Stroke) {
-      layerHasStroke = true;
+      layerCompanionStroke = static_cast<const Stroke*>(e);
       break;
     }
   }
@@ -186,7 +185,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             writeTextPath(out, geos, curTextPath, curFill, nullptr, curTextBox, a);
           } else {
             paintGeos(out, geos, curFill, nullptr, curTextBox, a, hasTrim, curTrim, hasMerge,
-                      mergeMode, layerHasStroke);
+                      mergeMode, layerCompanionStroke);
           }
         }
         break;
@@ -249,9 +248,11 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           } else {
             style += ";white-space:nowrap";
           }
-          if (tb->overflow == Overflow::Hidden) {
-            style += ";overflow:hidden";
-          }
+          // Defer the Overflow::Hidden emit until after tbSpans is collected: when the
+          // TextBox has a known height and line-height we can translate tgfx's whole-line
+          // drop semantics into CSS `-webkit-line-clamp`, which matches tgfx much more
+          // closely than a raw `overflow:hidden` pixel clip (which otherwise renders a
+          // partial line whose glyphs tgfx would have dropped entirely).
           // Collect text spans from TextBox children (Text+Fill at top level, and Group children)
           struct TBSpan {
             const Text* text = nullptr;
@@ -335,6 +336,42 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             }
             if (lineH > 0) {
               style += ";line-height:" + FloatToString(lineH) + "px";
+            }
+            // Translate PAGX Overflow::Hidden. tgfx's TextLayout drops any line whose
+            // bottom extends past the box (TextLayout.cpp ~L940), while CSS `overflow:hidden`
+            // is a pixel clip that otherwise leaves partial glyphs visible. Use tgfx's own
+            // layout result — the textBounds height already reflects the lines it kept — to
+            // constrain Chromium's visible height via `max-height`, so both renderers clip
+            // at the same line boundary. Skip the trim for non-Near paragraphAlign (flex
+            // vertical alignment is driven by the declared box height) and for vertical
+            // writing mode (height governs line count along x).
+            if (tb->overflow == Overflow::Hidden) {
+              bool shouldTrim = !std::isnan(tbH) && tbH > 0 && lineH > 0 &&
+                                tb->paragraphAlign == ParagraphAlign::Near &&
+                                tb->writingMode != WritingMode::Vertical;
+              if (shouldTrim) {
+                // tgfx's textBounds.height is the descent-inclusive height of the lines it
+                // actually retained; round up to a whole-line multiple of lineH so we do
+                // not accidentally clip a few px of descenders on the last kept line.
+                float tgfxH = 0;
+                for (const auto& s : tbSpans) {
+                  float spanH = s.text->layoutBoundsHeight();
+                  if (spanH > tgfxH) {
+                    tgfxH = spanH;
+                  }
+                }
+                if (tgfxH <= 0) {
+                  tgfxH = tbH;  // Fallback: no layout result, use declared box height
+                } else {
+                  // Round up to the nearest whole line so descenders are not clipped.
+                  int keptLines = static_cast<int>(std::ceil(tgfxH / lineH));
+                  tgfxH = static_cast<float>(keptLines) * lineH;
+                }
+                float trimmed = std::min(tbH, tgfxH);
+                style += ";max-height:" + FloatToString(trimmed) + "px;overflow:hidden";
+              } else {
+                style += ";overflow:hidden";
+              }
             }
             out.openTag("div");
             out.addAttr("style", style);
@@ -443,9 +480,8 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           if (tb->wordWrap) {
             style += ";word-wrap:break-word";
           }
-          if (tb->overflow == Overflow::Hidden) {
-            style += ";overflow:hidden";
-          }
+          // Defer Overflow::Hidden until after line-height is known so we can apply
+          // `-webkit-line-clamp` (matching tgfx's whole-line drop) whenever eligible.
           // Pin line-height for the same reason as the tbSpans branch above: without it
           // Chromium falls back to `line-height:normal`, which depends on font OS/2 metrics
           // and may differ from tgfx's per-line height, shifting line count and baselines.
@@ -460,6 +496,29 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           }
           if (rtLineH > 0) {
             style += ";line-height:" + FloatToString(rtLineH) + "px";
+          }
+          if (tb->overflow == Overflow::Hidden) {
+            bool shouldTrim = !std::isnan(tb->height) && tb->height > 0 && rtLineH > 0 &&
+                              tb->paragraphAlign == ParagraphAlign::Near;
+            if (shouldTrim) {
+              float tgfxH = 0;
+              for (const auto& s : richTextSpans) {
+                float spanH = s.text->layoutBoundsHeight();
+                if (spanH > tgfxH) {
+                  tgfxH = spanH;
+                }
+              }
+              if (tgfxH <= 0) {
+                tgfxH = tb->height;
+              } else {
+                int keptLines = static_cast<int>(std::ceil(tgfxH / rtLineH));
+                tgfxH = static_cast<float>(keptLines) * rtLineH;
+              }
+              float trimmed = std::min(tb->height, tgfxH);
+              style += ";max-height:" + FloatToString(trimmed) + "px;overflow:hidden";
+            } else {
+              style += ";overflow:hidden";
+            }
           }
           out.openTag("div");
           out.addAttr("style", style);
@@ -614,13 +673,13 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           geos.clear();
           std::vector<GeoInfo> groupGeos;
           Matrix gm = BuildGroupMatrix(group);
-          // Mirror the outer `layerHasStroke` pre-scan for Group elements so the Fill pass
-          // inside a Group can suppress fauxBold's emulated stroke when a real Stroke sibling
-          // will paint on top of the same glyphs.
-          bool groupHasStroke = false;
+          // Mirror the outer `layerCompanionStroke` pre-scan for Group elements so the Fill
+          // pass inside a Group can recolour fauxBold's emulated stroke to match a real
+          // Stroke sibling that will paint on top of the same glyphs.
+          const Stroke* groupCompanionStroke = nullptr;
           for (auto* ge : group->elements) {
             if (ge->nodeType() == NodeType::Stroke) {
-              groupHasStroke = true;
+              groupCompanionStroke = static_cast<const Stroke*>(ge);
               break;
             }
           }
@@ -647,7 +706,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               if (fill->placement == targetPlacement && !hasUpcomingRepeater) {
                 float a = distribute ? alpha : 1.0f;
                 paintGeos(out, geos, curFill, nullptr, curTextBox, a, hasTrim, curTrim, hasMerge,
-                          mergeMode, groupHasStroke);
+                          mergeMode, groupCompanionStroke);
               }
             } else if (gt == NodeType::Stroke) {
               auto stroke = static_cast<const Stroke*>(ge);

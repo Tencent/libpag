@@ -107,6 +107,14 @@ class Text : public Element, public LayoutNode {
    */
   float fontLineHeight() const;
 
+  /**
+   * Returns the height of the text bounds computed during layout. For TextBox text, this reflects
+   * the number of lines tgfx actually retained after applying overflow:hidden clipping — lines
+   * whose bottom would exceed the box height are dropped and do not contribute to this value.
+   * Returns 0 if layout has not been performed.
+   */
+  float layoutBoundsHeight() const;
+
   ~Text() override;
 
   /** Returns the text position adjusted to the layout bounds. */

@@ -34,6 +34,10 @@ float Text::fontLineHeight() const {
   return glyphData->fontLineHeight;
 }
 
+float Text::layoutBoundsHeight() const {
+  return textBounds.height;
+}
+
 static TextLayoutParams MakeStandaloneParams(const Text* text) {
   TextLayoutParams params = {};
   params.baseline = text->baseline;
