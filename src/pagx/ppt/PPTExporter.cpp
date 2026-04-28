@@ -1855,7 +1855,12 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
       style.algn = "just";
     }
   }
-  int64_t lnSpcPts = fs.textBox ? LineHeightToSpcPts(fs.textBox->lineHeight) : 0;
+  // In vertical writing mode, PAGX lineHeight controls column width (the
+  // block-axis dimension), not character-to-character spacing. PPT's lnSpc
+  // always controls the inline-axis spacing regardless of vert orientation, so
+  // emitting it for vertical text would incorrectly stretch the character pitch.
+  bool isVertical = fs.textBox && fs.textBox->writingMode == WritingMode::Vertical;
+  int64_t lnSpcPts = (!isVertical && fs.textBox) ? LineHeightToSpcPts(fs.textBox->lineHeight) : 0;
 
   emitNativeTextBody(out, text, lines, style, lnSpcPts, useLineLayout, filters, styles);
 
@@ -2222,7 +2227,11 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
   } else if (box->textAlign == TextAlign::Justify) {
     algn = "just";
   }
-  int64_t lnSpcPts = LineHeightToSpcPts(box->lineHeight);
+  // In vertical writing mode, PAGX lineHeight controls column width, not
+  // character-to-character spacing -- skip lnSpc emission (same logic as the
+  // writeNativeText path).
+  bool isVertical = box->writingMode == WritingMode::Vertical;
+  int64_t lnSpcPts = isVertical ? 0 : LineHeightToSpcPts(box->lineHeight);
 
   // Build per-run styles up-front (font/size/bold/italic/color/typeface).
   // Alignment lives on a:pPr (not a:rPr) so we leave style.algn at nullptr here.
