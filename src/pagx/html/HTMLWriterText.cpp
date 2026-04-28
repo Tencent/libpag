@@ -49,21 +49,36 @@ namespace pagx {
 using pag::DegreesToRadians;
 using pag::FloatNearlyZero;
 
-// Mirrors tgfx/src/core/utils/FauxBoldScale.cpp so HTML export can emit a stroke width that
-// matches the native PAGX render. tgfx strokes the glyph path with `fontSize * FauxBoldScale`
-// as a center-stroke and unions it with the original fill, which effectively grows the glyph
-// outward by `(fontSize * scale) / 2` on every side. Chromium's `-webkit-text-stroke` is also
-// a center-stroke: half of the width lies inside the glyph (painted over the fill) and half
-// lies outside, so emitting `fontSize * scale` as the CSS stroke width produces the same
-// outward growth as tgfx. Empirically Chromium on macOS renders sub-pixel strokes down to
-// ~0.3px visibly, well below the smallest value this formula produces for fontSize>=9
-// (0.375px), so no artificial floor is needed — adding one reliably over-thickens small
-// fontSize glyphs because the floor is larger than the raw value.
+// Chooses the CSS -webkit-text-stroke width needed to visually match tgfx's fauxBold render.
+//
+// tgfx's fauxBold (CGScalerContext.cpp): strokes the glyph path at width = `fontSize * scale`
+// with a standard center-stroke, then path-unions that stroke outline into the fill path and
+// rasterises the whole thing as one opaque shape. The union means every pixel touched by
+// either the original glyph or the stroke outline ends up at 100% coverage (modulo the
+// geometric AA at the new silhouette's edge).
+//
+// CSS `-webkit-text-stroke` on the other hand paints the stroke as a separate raster pass
+// *on top of* the glyph fill. The stroke's interior has full coverage where the center line
+// lies, but its outward-growing half is a pure AA half-feather — each row of pixels along
+// the stroke's outer edge has coverage that ramps from ~1.0 down to 0 across the half-width.
+// Averaged over the stroke width that's roughly half the coverage tgfx's union produces, so
+// the visual thickening from an identical numeric stroke width is materially smaller in
+// Chromium than in tgfx. Empirically (measured against the pagx_to_html samples on macOS
+// Chrome at 1x DPR) the visual weight ratio HTML/tgfx for a given stroke width sits around
+// 0.5 at fontSize 16 and climbs toward 0.8 at fontSize 48 as the AA-feather becomes a smaller
+// fraction of the total stroke body.
+//
+// `kAACompensation` is the multiplier that restores HTML weight to tgfx's. A constant ~1.6x
+// works well across the range we ship: at fontSize 9 it lifts 0.375px → 0.6px (enough for
+// Chromium to render a clearly thickened glyph without over-shooting into a halo), and at
+// fontSize 48 it lifts 1.5px → 2.4px (matches tgfx's ANCHOR weight without the `+0.5` fixed
+// bias that was previously over-thickening small glyphs).
 float FauxBoldStrokeWidth(float fontSize) {
   constexpr float keySmall = 9.0f;
   constexpr float keyLarge = 36.0f;
   constexpr float valSmall = 1.0f / 24.0f;
   constexpr float valLarge = 1.0f / 32.0f;
+  constexpr float kAACompensation = 1.6f;
   float scale;
   if (fontSize <= keySmall) {
     scale = valSmall;
@@ -73,7 +88,7 @@ float FauxBoldStrokeWidth(float fontSize) {
     float t = (fontSize - keySmall) / (keyLarge - keySmall);
     scale = valSmall + (valLarge - valSmall) * t;
   }
-  return fontSize * scale;
+  return fontSize * scale * kAACompensation;
 }
 
 //==============================================================================
