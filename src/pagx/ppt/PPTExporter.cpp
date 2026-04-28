@@ -228,9 +228,12 @@ struct ImagePatternRect {
 };
 
 // Maps a gradient center point through its matrix and emits OOXML's
-// <a:fillToRect> in 1/1000-percent insets relative to shapeBounds. When the
-// shape bounds are unknown (e.g. a text fill where the bounds aren't computed
-// at the run level) the focus collapses to the geometric centre.
+// <a:fillToRect> in 1/1000-percent insets relative to shapeBounds. When
+// fitsToGeometry is true the center is already in normalized (0-1) space and
+// maps directly to relative insets; when false the center is in document space
+// and must be divided by shapeBounds. When the shape bounds are unknown (e.g. a
+// text fill where the bounds aren't computed at the run level) the focus
+// collapses to the geometric centre.
 template <typename Gradient>
 static void WriteFillToRectFromCenter(XMLBuilder& out, const Gradient* grad,
                                       const Rect& shapeBounds) {
@@ -239,9 +242,16 @@ static void WriteFillToRectFromCenter(XMLBuilder& out, const Gradient* grad,
   int r = 50000;
   int b = 50000;
   if (shapeBounds.width > 0 && shapeBounds.height > 0) {
-    Point centerDoc = grad->matrix.mapPoint(grad->center);
-    float relX = (centerDoc.x - shapeBounds.x) / shapeBounds.width;
-    float relY = (centerDoc.y - shapeBounds.y) / shapeBounds.height;
+    Point centerMapped = grad->matrix.mapPoint(grad->center);
+    float relX;
+    float relY;
+    if (grad->fitsToGeometry) {
+      relX = centerMapped.x;
+      relY = centerMapped.y;
+    } else {
+      relX = (centerMapped.x - shapeBounds.x) / shapeBounds.width;
+      relY = (centerMapped.y - shapeBounds.y) / shapeBounds.height;
+    }
     l = std::clamp(static_cast<int>(std::round(relX * 100000.0f)), 0, 100000);
     t = std::clamp(static_cast<int>(std::round(relY * 100000.0f)), 0, 100000);
     r = 100000 - l;
@@ -960,6 +970,13 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
       Point ep = grad->matrix.mapPoint(grad->endPoint);
       float dx = ep.x - sp.x;
       float dy = ep.y - sp.y;
+      // When fitsToGeometry is true, start/end are in normalized (0-1) space.
+      // Scale by the shape aspect ratio so atan2 produces the correct visual
+      // angle in document space.
+      if (grad->fitsToGeometry && shapeBounds.width > 0 && shapeBounds.height > 0) {
+        dx *= shapeBounds.width;
+        dy *= shapeBounds.height;
+      }
       float angleDeg = RadiansToDegrees(std::atan2(dy, dx));
       int ang = AngleToPPT(angleDeg);
 
