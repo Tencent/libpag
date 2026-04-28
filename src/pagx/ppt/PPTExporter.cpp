@@ -485,7 +485,8 @@ class PPTWriter {
   }
 
   void writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& parentMatrix = {},
-                  float parentAlpha = 1.0f);
+                  float parentAlpha = 1.0f, const std::vector<LayerFilter*>& inheritedFilters = {},
+                  const std::vector<LayerStyle*>& inheritedStyles = {});
 
  private:
   // Returns true iff the layer was successfully rasterized and emitted as p:pic.
@@ -2500,8 +2501,39 @@ bool PPTWriter::rasterizeLayerAsPicture(XMLBuilder& out, const Layer* layer, boo
   return true;
 }
 
+static std::vector<LayerFilter*> MergeFilters(const std::vector<LayerFilter*>& own,
+                                              const std::vector<LayerFilter*>& inherited) {
+  if (inherited.empty()) {
+    return own;
+  }
+  if (own.empty()) {
+    return inherited;
+  }
+  std::vector<LayerFilter*> merged;
+  merged.reserve(own.size() + inherited.size());
+  merged.insert(merged.end(), own.begin(), own.end());
+  merged.insert(merged.end(), inherited.begin(), inherited.end());
+  return merged;
+}
+
+static std::vector<LayerStyle*> MergeStyles(const std::vector<LayerStyle*>& own,
+                                            const std::vector<LayerStyle*>& inherited) {
+  if (inherited.empty()) {
+    return own;
+  }
+  if (own.empty()) {
+    return inherited;
+  }
+  std::vector<LayerStyle*> merged;
+  merged.reserve(own.size() + inherited.size());
+  merged.insert(merged.end(), own.begin(), own.end());
+  merged.insert(merged.end(), inherited.begin(), inherited.end());
+  return merged;
+}
+
 void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& parentMatrix,
-                           float parentAlpha) {
+                           float parentAlpha, const std::vector<LayerFilter*>& inheritedFilters,
+                           const std::vector<LayerStyle*>& inheritedStyles) {
   if (!layer->visible && layer->mask == nullptr) {
     return;
   }
@@ -2553,16 +2585,22 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& pa
     }
   }
 
-  writeElements(out, layer->contents, layerMatrix, layerAlpha, layer->filters, layer->styles);
+  // Merge the layer's own filters/styles with any inherited from a parent layer.
+  // Own entries come first so CollectEffectSources picks the layer's own effects
+  // when both layers carry the same effect type (e.g. both have a BlurFilter).
+  auto effectiveFilters = MergeFilters(layer->filters, inheritedFilters);
+  auto effectiveStyles = MergeStyles(layer->styles, inheritedStyles);
+
+  writeElements(out, layer->contents, layerMatrix, layerAlpha, effectiveFilters, effectiveStyles);
 
   if (layer->composition != nullptr) {
     for (const auto* compLayer : layer->composition->layers) {
-      writeLayer(out, compLayer, layerMatrix, layerAlpha);
+      writeLayer(out, compLayer, layerMatrix, layerAlpha, effectiveFilters, effectiveStyles);
     }
   }
 
   for (const auto* child : layer->children) {
-    writeLayer(out, child, layerMatrix, layerAlpha);
+    writeLayer(out, child, layerMatrix, layerAlpha, effectiveFilters, effectiveStyles);
   }
 }
 
