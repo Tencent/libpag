@@ -91,9 +91,6 @@ const char* DetectImageMime(const uint8_t* bytes, size_t size);
  */
 std::pair<int, int> GetImageNativeSize(const Image* image);
 
-// Mirrors tgfx/src/core/utils/FauxBoldScale.cpp. Returns the stroke width (in px) that produces
-// the same visible thickening as tgfx's faux-bold path rendering at the given fontSize.
-float FauxBoldStrokeWidth(float fontSize);
 std::string EscapeCSSUrl(const std::string& url);
 
 std::string BuildPolystarPath(const Polystar* ps);
@@ -278,7 +275,7 @@ class HTMLWriter {
                  const Stroke* stroke, float alpha, BlendMode painterBlend,
                  const TrimPath* trim = nullptr, MergePathMode mergeMode = MergePathMode::Append);
   void writeText(HTMLBuilder& out, const Text* text, const Fill* fill, const Stroke* stroke,
-                 const TextBox* tb, float alpha, const Stroke* companionStroke = nullptr);
+                 const TextBox* tb, float alpha);
   void writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>& geos,
                          const TextModifier* modifier, const Fill* fill, const Stroke* stroke,
                          const TextBox* tb, float alpha);
@@ -294,8 +291,7 @@ class HTMLWriter {
                         bool distribute = false);
   void paintGeos(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
                  const Stroke* stroke, const TextBox* textBox, float alpha, bool hasTrim,
-                 const TrimPath* curTrim, bool hasMerge, MergePathMode mergeMode,
-                 const Stroke* companionStroke = nullptr);
+                 const TrimPath* curTrim, bool hasMerge, MergePathMode mergeMode);
   void applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim);
   void applyTrimAttrsContinuous(HTMLBuilder& builder, const TrimPath* trim,
                                 const std::vector<float>& pathLengths, float totalLength,

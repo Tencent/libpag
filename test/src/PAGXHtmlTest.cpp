@@ -92,9 +92,10 @@ std::string WrapHtmlDocument(const std::string& fragment, int width, int height)
   // Register the repo-bundled Noto Sans SC font so Chromium renders HTML text with the same
   // font that tgfx uses on the PAGX side. The absolute file:// URL works in Puppeteer because
   // screenshot.js loads the generated HTML via file://, which permits same-scheme sub-resources.
-  // font-synthesis:none disables Chromium's built-in faux bold/italic synthesis so that fauxBold
-  // and fauxItalic emitted by the exporter (-webkit-text-stroke and transform:skewX) remain the
-  // sole source of weight and slant.
+  // `font-synthesis:none` on body prevents Chromium from auto-synthesising bold/italic on
+  // elements that don't ask for it. The exporter's fauxBold and fauxItalic paths emit
+  // `font-weight:bold;font-synthesis-weight:auto` and `font-style:italic;font-synthesis-style:auto`
+  // respectively, re-enabling synthesis only on the elements that carry the faux flag.
   auto fontPath = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
   std::string fontFace = "@font-face{font-family:'Noto Sans SC';src:url('file://" + fontPath +
                          "') format('opentype');font-display:block}";

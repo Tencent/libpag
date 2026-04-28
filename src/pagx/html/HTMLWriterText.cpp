@@ -49,48 +49,6 @@ namespace pagx {
 using pag::DegreesToRadians;
 using pag::FloatNearlyZero;
 
-// Chooses the CSS -webkit-text-stroke width needed to visually match tgfx's fauxBold render.
-//
-// tgfx's fauxBold (CGScalerContext.cpp): strokes the glyph path at width = `fontSize * scale`
-// with a standard center-stroke, then path-unions that stroke outline into the fill path and
-// rasterises the whole thing as one opaque shape. The union means every pixel touched by
-// either the original glyph or the stroke outline ends up at 100% coverage (modulo the
-// geometric AA at the new silhouette's edge).
-//
-// CSS `-webkit-text-stroke` on the other hand paints the stroke as a separate raster pass
-// *on top of* the glyph fill. The stroke's interior has full coverage where the center line
-// lies, but its outward-growing half is a pure AA half-feather — each row of pixels along
-// the stroke's outer edge has coverage that ramps from ~1.0 down to 0 across the half-width.
-// Averaged over the stroke width that's roughly half the coverage tgfx's union produces, so
-// the visual thickening from an identical numeric stroke width is materially smaller in
-// Chromium than in tgfx. Empirically (measured against the pagx_to_html samples on macOS
-// Chrome at 1x DPR) the visual weight ratio HTML/tgfx for a given stroke width sits around
-// 0.5 at fontSize 16 and climbs toward 0.8 at fontSize 48 as the AA-feather becomes a smaller
-// fraction of the total stroke body.
-//
-// `kAACompensation` is the multiplier that restores HTML weight to tgfx's. A constant ~1.6x
-// works well across the range we ship: at fontSize 9 it lifts 0.375px → 0.6px (enough for
-// Chromium to render a clearly thickened glyph without over-shooting into a halo), and at
-// fontSize 48 it lifts 1.5px → 2.4px (matches tgfx's ANCHOR weight without the `+0.5` fixed
-// bias that was previously over-thickening small glyphs).
-float FauxBoldStrokeWidth(float fontSize) {
-  constexpr float keySmall = 9.0f;
-  constexpr float keyLarge = 36.0f;
-  constexpr float valSmall = 1.0f / 24.0f;
-  constexpr float valLarge = 1.0f / 32.0f;
-  constexpr float kAACompensation = 1.6f;
-  float scale;
-  if (fontSize <= keySmall) {
-    scale = valSmall;
-  } else if (fontSize >= keyLarge) {
-    scale = valLarge;
-  } else {
-    float t = (fontSize - keySmall) / (keyLarge - keySmall);
-    scale = valSmall + (valLarge - valSmall) * t;
-  }
-  return fontSize * scale * kAACompensation;
-}
-
 //==============================================================================
 // Text helper statics
 //==============================================================================
@@ -641,8 +599,7 @@ void SampleArcLengthLUT(const ArcLengthLUT& lut, float arcLength, Point* outPos,
 //==============================================================================
 
 void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
-                           const Stroke* stroke, const TextBox* tb, float alpha,
-                           const Stroke* companionStroke) {
+                           const Stroke* stroke, const TextBox* tb, float alpha) {
   if (!text->glyphRuns.empty()) {
     writeGlyphRunSVG(out, text, fill, stroke, alpha);
     return;
@@ -720,12 +677,14 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       style += ";line-height:" + FloatToString(lineHeight) + "px";
     }
   }
-  std::string textTransform;
   if (text->fauxItalic) {
-    textTransform = "skewX(-12deg)";
-  }
-  if (!textTransform.empty()) {
-    style += ";transform:" + textTransform;
+    // Use Chromium's native synthesized italic instead of a CSS transform. `font-style:italic`
+    // on a font that only ships a Regular variant makes the browser shear the glyphs itself,
+    // which affects the glyph raster but not the span's layout box (so letter-spacing, clipping,
+    // and text-align behave identically to the upright case). `font-synthesis-style:auto`
+    // re-enables synthesis on elements that inherit `font-synthesis:none` from an ancestor
+    // (the PAGXHtmlTest wrapper sets that globally so non-faux text stays unsynthesised).
+    style += ";font-style:italic;font-synthesis-style:auto";
   }
   // Font properties are hoisted to the parent Layer when fontHoisted; skip them on the span.
   if (!fontHoisted) {
@@ -746,52 +705,12 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     }
   }
   if (text->fauxBold && !stroke) {
-    // fauxBold is emulated via `-webkit-text-stroke`. Pick the stroke colour carefully so the
-    // emulated outline blends into the final glyph painted by the real passes:
-    //
-    // 1. When the fill is a gradient/ImagePattern it is rendered via `background-clip:text`
-    //    with `-webkit-text-fill-color:transparent`. A solid-colour stroke would sit on top
-    //    of the clipped gradient and repaint the glyph silhouette in that single colour,
-    //    erasing the gradient. Since CSS `-webkit-text-stroke` does not accept a gradient,
-    //    we emit the stroke in `currentColor` with `color:transparent` — the stroke itself
-    //    renders nothing, but `background-clip:text` clips the gradient to the union of
-    //    fill geometry and stroke geometry, so the gradient fills the thickened silhouette.
-    //    This matches tgfx's path-union semantic (glyph outward-grown by stroke width/2)
-    //    while preserving the gradient. (Samples: selector_advanced "Selector Effects",
-    //    text_features "Text Features", showcase_text_art "TYPE".) This case takes priority
-    //    over the companionStroke case below: a gradient fill must not be overpainted by the
-    //    companionStroke's colour even when a sibling <Stroke> is present — the companion
-    //    stroke will still be emitted as a separate Stroke pass, giving the final glyph both
-    //    gradient fill and outer stroke ring, matching tgfx.
-    // 2. When the Text has a sibling <Stroke> that will arrive in the separate Stroke paint
-    //    pass (`companionStroke != nullptr`) and the fill is a *solid* colour, the real
-    //    Stroke span is drawn *on top of* this Fill span. If we emit fauxBold in the
-    //    inherited text colour, a thin ring of that colour leaks out past the real Stroke
-    //    edge (tgfx instead thickens the glyph path first, then strokes the thickened
-    //    outline — so only the real stroke colour ever shows on the outside). Using the
-    //    real Stroke's own colour for the fauxBold emulation keeps the outer ring the same
-    //    colour as the Stroke layer, so the two layers visually merge into a single thicker
-    //    outline and the glyph body still reads as bolder.
-    // 3. Otherwise (solid fill, no companion stroke) use currentColor, which resolves to the
-    //    same fill colour tgfx thickens the glyph path with.
-    bool fillIsGradient = false;
-    if (fill && fill->color) {
-      auto ct = fill->color->nodeType();
-      fillIsGradient = (ct == NodeType::LinearGradient || ct == NodeType::RadialGradient ||
-                        ct == NodeType::ConicGradient);
-    }
-    std::string strokeColor = "currentColor";
-    if (fillIsGradient) {
-      // Make the stroke invisible but let its geometry contribute to `background-clip:text`.
-      style += ";color:transparent";
-    } else if (companionStroke && companionStroke->color &&
-               companionStroke->color->nodeType() == NodeType::SolidColor) {
-      auto sc = static_cast<const SolidColor*>(companionStroke->color);
-      strokeColor = ColorToRGBA(sc->color, companionStroke->alpha);
-    }
-    style +=
-        ";-webkit-text-stroke:" + FloatToString(FauxBoldStrokeWidth(text->renderFontSize())) +
-        "px " + strokeColor;
+    // Use Chromium's native synthesized bold. When the loaded @font-face exposes only a Regular
+    // variant, `font-weight:bold` triggers the browser's built-in synthesis, which thickens the
+    // rasterised glyph without adding a separate stroke layer above the fill.
+    // `font-synthesis-weight:auto` re-enables synthesis on elements that inherit
+    // `font-synthesis:none` from an ancestor.
+    style += ";font-weight:bold;font-synthesis-weight:auto";
   }
   if (fill && fill->color) {
     auto ct = fill->color->nodeType();
@@ -1222,13 +1141,10 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           transform +=
               "translate(" + FloatToString(-anchorX) + "px," + FloatToString(-anchorY) + "px) ";
         }
-        // Apply fauxItalic shear on every per-character span. Without this, text nodes with
-        // `fauxItalic="true"` that happen to also use a TextModifier/RangeSelector render
-        // upright (only the writeText primary path was handling fauxItalic). Appending skewX
-        // last mirrors the visual effect in the primary path; sharing the same
-        // transform-origin (50% 0.8em) keeps the shear pivot on the glyph baseline.
+        // fauxItalic is handled via CSS native synthesis (`font-style:italic` +
+        // `font-synthesis-style:auto`) instead of a CSS transform, so no skewX is appended.
         if (text->fauxItalic) {
-          transform += "skewX(-12deg) ";
+          charStyle += ";font-style:italic;font-synthesis-style:auto";
         }
         if (!transform.empty()) {
           charStyle += ";transform:" + transform;
@@ -1277,14 +1193,11 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
             emittedTextStroke = true;
           }
         }
-        // fauxBold is emulated via -webkit-text-stroke; suppress it when a real stroke
-        // already occupies the same CSS slot so we don't overwrite it. Mirror the primary
-        // writeText branch's `fauxBold && !stroke` gate on a per-character basis since the
-        // stroke decision above is per-character when the TextModifier overrides apply.
+        // fauxBold is handled via CSS native synthesis (`font-weight:bold` +
+        // `font-synthesis-weight:auto`). Suppress when a real stroke already occupies the
+        // text-stroke slot so a Stroke element still paints as expected.
         if (text->fauxBold && !emittedTextStroke) {
-          charStyle +=
-              ";-webkit-text-stroke:" + FloatToString(FauxBoldStrokeWidth(text->renderFontSize())) +
-              "px currentColor";
+          charStyle += ";font-weight:bold;font-synthesis-weight:auto";
         }
         out.openTag("span");
         out.addAttr("style", charStyle);
@@ -1570,22 +1483,17 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         // and the baseline sits ~0.905em from the top, so this translate lands it on pos.y.
         transform += "translate(-50%,-" + FloatToString(renderFont * 0.905f) + "px)";
         // fauxItalic must shear the glyph in its own local space before TextPath's
-        // perpendicular-rotate and baseline-translate apply. CSS evaluates transforms
-        // right-to-left, so appending skewX(-12deg) last means it is the first operation to
-        // act on the glyph. Without this branch, any <Text fauxItalic="true"> placed on a
-        // <TextPath> renders upright in HTML even though tgfx shows it slanted.
+        // fauxItalic is handled via CSS native synthesis on each per-character span.
         if (text->fauxItalic) {
-          transform += " skewX(-12deg)";
+          charStyle += ";font-style:italic;font-synthesis-style:auto";
         }
         charStyle += ";transform:" + transform;
         charStyle += ";transform-origin:0 0";
-        // fauxBold is emulated via -webkit-text-stroke. The TextPath per-char branch does
+        // fauxBold is handled via CSS native synthesis. The TextPath per-char branch does
         // not emit a stroke itself (strokes are drawn in the earlier SVG glyph-run branch),
-        // so fauxBold can be applied unconditionally here. Without this, <Text fauxBold>
-        // along a path paints at normal weight in HTML.
+        // so fauxBold can be applied unconditionally here.
         if (text->fauxBold) {
-          charStyle += ";-webkit-text-stroke:" + FloatToString(FauxBoldStrokeWidth(renderFont)) +
-                       "px currentColor";
+          charStyle += ";font-weight:bold;font-synthesis-weight:auto";
         }
         if (fill && fill->color) {
           if (fill->color->nodeType() == NodeType::SolidColor) {

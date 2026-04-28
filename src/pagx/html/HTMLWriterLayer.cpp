@@ -65,8 +65,7 @@ static void EmitLeftTopCss(std::string& style, bool& positionSet, float x, float
 
 void HTMLWriter::paintGeos(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
                            const Stroke* stroke, const TextBox* textBox, float alpha, bool hasTrim,
-                           const TrimPath* curTrim, bool hasMerge, MergePathMode mergeMode,
-                           const Stroke* companionStroke) {
+                           const TrimPath* curTrim, bool hasMerge, MergePathMode mergeMode) {
   if (geos.empty()) {
     return;
   }
@@ -80,8 +79,7 @@ void HTMLWriter::paintGeos(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
   if (hasText) {
     for (auto& g : geos) {
       if (g.type == NodeType::Text) {
-        writeText(out, static_cast<const Text*>(g.element), fill, stroke, textBox, alpha,
-                  companionStroke);
+        writeText(out, static_cast<const Text*>(g.element), fill, stroke, textBox, alpha);
       } else {
         std::vector<GeoInfo> single = {g};
         renderGeo(out, single, fill, stroke, alpha, hasTrim, curTrim, hasMerge, mergeMode);
@@ -112,19 +110,6 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
 
   bool hasUpcomingRepeater = false;
   const TextBox* preScannedTextBox = nullptr;
-  // Pre-scan for a sibling Stroke node at the top level. The Fill and Stroke passes run as
-  // two separate invocations against the same element list, so when the Fill pass reaches
-  // writeText it has no visibility into the Stroke that will arrive in a later iteration.
-  // We capture the Stroke pointer (not just a bool) so the Fill pass can recolour its
-  // fauxBold emulation to match the real Stroke — this keeps the glyph thickening visible
-  // while preventing the fauxBold colour from leaking out past the real Stroke edge.
-  const Stroke* layerCompanionStroke = nullptr;
-  for (auto* e : elements) {
-    if (e->nodeType() == NodeType::Stroke) {
-      layerCompanionStroke = static_cast<const Stroke*>(e);
-      break;
-    }
-  }
   struct RichTextSpan {
     const Text* text = nullptr;
     const Fill* fill = nullptr;
@@ -185,7 +170,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             writeTextPath(out, geos, curTextPath, curFill, nullptr, curTextBox, a);
           } else {
             paintGeos(out, geos, curFill, nullptr, curTextBox, a, hasTrim, curTrim, hasMerge,
-                      mergeMode, layerCompanionStroke);
+                      mergeMode);
           }
         }
         break;
@@ -423,9 +408,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               }
               if (span.text->fauxBold && !span.stroke) {
                 if (!spanStyle.empty()) spanStyle += ';';
-                spanStyle += "-webkit-text-stroke:" +
-                             FloatToString(FauxBoldStrokeWidth(span.text->renderFontSize())) +
-                             "px currentColor";
+                spanStyle += "font-weight:bold;font-synthesis-weight:auto";
               }
               if (span.stroke && span.stroke->color &&
                   span.stroke->color->nodeType() == NodeType::SolidColor) {
@@ -437,10 +420,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               }
               if (span.text->fauxItalic) {
                 if (!spanStyle.empty()) spanStyle += ';';
-                // `transform` is a no-op on pure inline boxes, so promote the span to
-                // inline-block. Each tbSpan is a short text run, so losing word-wrap inside
-                // the span is acceptable and matches the single-run expectation of fauxItalic.
-                spanStyle += "display:inline-block;transform:skewX(-12deg)";
+                spanStyle += "font-style:italic;font-synthesis-style:auto";
               }
               out.openTag("span");
               out.addAttr("style", spanStyle);
@@ -565,9 +545,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               }
             }
             if (span.text->fauxBold && !span.stroke) {
-              spanStyle += ";-webkit-text-stroke:" +
-                           FloatToString(FauxBoldStrokeWidth(span.text->renderFontSize())) +
-                           "px currentColor";
+              spanStyle += ";font-weight:bold;font-synthesis-weight:auto";
             }
             if (span.stroke && span.stroke->color &&
                 span.stroke->color->nodeType() == NodeType::SolidColor) {
@@ -577,11 +555,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               spanStyle += ";paint-order:stroke fill";
             }
             if (span.text->fauxItalic) {
-              // `transform` is a no-op on pure inline boxes, so promote the span to
-              // inline-block. Each rich-text span is a short text run, so losing word-wrap
-              // inside the span is acceptable and matches the single-run expectation of
-              // fauxItalic.
-              spanStyle += ";display:inline-block;transform:skewX(-12deg)";
+              spanStyle += ";font-style:italic;font-synthesis-style:auto";
             }
             out.openTag("span");
             out.addAttr("style", spanStyle);
@@ -673,16 +647,6 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           geos.clear();
           std::vector<GeoInfo> groupGeos;
           Matrix gm = BuildGroupMatrix(group);
-          // Mirror the outer `layerCompanionStroke` pre-scan for Group elements so the Fill
-          // pass inside a Group can recolour fauxBold's emulated stroke to match a real
-          // Stroke sibling that will paint on top of the same glyphs.
-          const Stroke* groupCompanionStroke = nullptr;
-          for (auto* ge : group->elements) {
-            if (ge->nodeType() == NodeType::Stroke) {
-              groupCompanionStroke = static_cast<const Stroke*>(ge);
-              break;
-            }
-          }
           for (auto* ge : group->elements) {
             auto gt = ge->nodeType();
             if (gt == NodeType::Rectangle || gt == NodeType::Ellipse || gt == NodeType::Path ||
@@ -706,7 +670,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               if (fill->placement == targetPlacement && !hasUpcomingRepeater) {
                 float a = distribute ? alpha : 1.0f;
                 paintGeos(out, geos, curFill, nullptr, curTextBox, a, hasTrim, curTrim, hasMerge,
-                          mergeMode, groupCompanionStroke);
+                          mergeMode);
               }
             } else if (gt == NodeType::Stroke) {
               auto stroke = static_cast<const Stroke*>(ge);
