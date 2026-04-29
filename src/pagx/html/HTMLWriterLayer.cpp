@@ -149,7 +149,42 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
   }
   bool useRichText = preScannedTextBox != nullptr && richTextGroupCount >= 2;
 
-  for (auto* element : elements) {
+  // Pre-scan Fill/Stroke pairing at targetPlacement so the Fill branch below can skip
+  // Text elements that a later Stroke will consume (otherwise two stacked <span>s with
+  // identical CSS end up sub-pixel offset from each other in Chromium, producing a
+  // doubled stroke edge around the glyphs - visible as e.g. TYPE's "E" sprouting an
+  // extra stroke stub to its right, or STROKE's "R" showing stroke bleed inside the
+  // letter body). Stroke then paints Text with (curFill, curStroke) as a single span.
+  //
+  // Matching rule: walk elements in order, pairing each Fill at targetPlacement with
+  // the next Stroke at targetPlacement before another Fill appears. Unpaired Fills
+  // still paint Text normally. TextModifier / TextPath paths have their own dispatch
+  // and are not covered here.
+  std::vector<bool> fillWillBePairedWithStroke(elements.size(), false);
+  {
+    const Fill* lastUnpairedFill = nullptr;
+    size_t lastUnpairedFillIndex = 0;
+    for (size_t i = 0; i < elements.size(); i++) {
+      auto* e = elements[i];
+      auto et = e->nodeType();
+      if (et == NodeType::Fill) {
+        auto* f = static_cast<const Fill*>(e);
+        if (f->placement == targetPlacement) {
+          lastUnpairedFill = f;
+          lastUnpairedFillIndex = i;
+        }
+      } else if (et == NodeType::Stroke) {
+        auto* s = static_cast<const Stroke*>(e);
+        if (s->placement == targetPlacement && lastUnpairedFill != nullptr) {
+          fillWillBePairedWithStroke[lastUnpairedFillIndex] = true;
+          lastUnpairedFill = nullptr;
+        }
+      }
+    }
+  }
+
+  for (size_t elemIndex = 0; elemIndex < elements.size(); elemIndex++) {
+    auto* element = elements[elemIndex];
     auto type = element->nodeType();
     switch (type) {
       case NodeType::Rectangle:
@@ -164,10 +199,29 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         curFill = fill;
         if (fill->placement == targetPlacement && !hasUpcomingRepeater) {
           float a = distribute ? alpha : 1.0f;
+          bool deferToStroke = fillWillBePairedWithStroke[elemIndex];
           if (curTextModifier && !geos.empty()) {
-            writeTextModifier(out, geos, curTextModifier, curFill, nullptr, curTextBox, a);
+            if (!deferToStroke) {
+              writeTextModifier(out, geos, curTextModifier, curFill, nullptr, curTextBox, a);
+            }
           } else if (curTextPath && !geos.empty()) {
-            writeTextPath(out, geos, curTextPath, curFill, nullptr, curTextBox, a);
+            if (!deferToStroke) {
+              writeTextPath(out, geos, curTextPath, curFill, nullptr, curTextBox, a);
+            }
+          } else if (deferToStroke) {
+            // A later Stroke at this placement will paint Text with (fill, stroke) as a
+            // single span. Paint shapes here with fill-only, but skip Text geos so the
+            // Stroke pass can merge them into one span instead of two stacked spans.
+            std::vector<GeoInfo> shapeGeos;
+            for (auto& g : geos) {
+              if (g.type != NodeType::Text) {
+                shapeGeos.push_back(g);
+              }
+            }
+            if (!shapeGeos.empty()) {
+              paintGeos(out, shapeGeos, curFill, nullptr, curTextBox, a, hasTrim, curTrim, hasMerge,
+                        mergeMode);
+            }
           } else {
             paintGeos(out, geos, curFill, nullptr, curTextBox, a, hasTrim, curTrim, hasMerge,
                       mergeMode);
@@ -181,9 +235,20 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         if (stroke->placement == targetPlacement && !hasUpcomingRepeater) {
           float a = distribute ? alpha : 1.0f;
           if (curTextModifier && !geos.empty()) {
-            writeTextModifier(out, geos, curTextModifier, nullptr, curStroke, curTextBox, a);
+            // Merge with the deferred Fill so per-character spans carry both fill and
+            // stroke in a single CSS declaration, avoiding Chromium's sub-pixel offset
+            // between two stacked <div>s.
+            writeTextModifier(out, geos, curTextModifier, curFill, curStroke, curTextBox, a);
           } else if (curTextPath && !geos.empty()) {
-            writeTextPath(out, geos, curTextPath, nullptr, curStroke, curTextBox, a);
+            writeTextPath(out, geos, curTextPath, curFill, curStroke, curTextBox, a);
+          } else if (curFill != nullptr) {
+            // Merge with the deferred Fill so Text renders as one span with both fill
+            // and stroke applied (avoids the Chromium sub-pixel offset between two
+            // stacked spans that caused glyph-level stroke doubling). Shapes get the
+            // fill repainted below the stroke, which is visually equivalent to the
+            // previous two-pass rendering but keeps the code path unified.
+            paintGeos(out, geos, curFill, curStroke, curTextBox, a, hasTrim, curTrim, hasMerge,
+                      mergeMode);
           } else {
             paintGeos(out, geos, nullptr, curStroke, curTextBox, a, hasTrim, curTrim, hasMerge,
                       mergeMode);
