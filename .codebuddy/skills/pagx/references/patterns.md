@@ -28,7 +28,7 @@ Layers in rows or columns, and constraint positioning for positioning elements w
 ```
 
 **Pattern**: Reference for the straight-line authoring pattern (see `guide.md`
-§Geometry Elements). For full-width dividers use `width="100%"` on the Layer; for
+§Straight Lines). For full-width dividers use `width="100%"` on the Layer; for
 vertical dividers swap the zero axis (`Rectangle width="0"` in a `Layer width="1"`).
 
 ### Button / Badge
