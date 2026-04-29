@@ -5,7 +5,7 @@
     <!-- Background -->
     <Rectangle width="100%" height="100%"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="0,600" fitsToGeometry="false">
+      <LinearGradient endPoint="0,1">
         <ColorStop color="#0B1026" offset="0"/>
         <ColorStop color="#0F1C3D" offset="0.6"/>
         <ColorStop color="#1B1140" offset="1"/>
