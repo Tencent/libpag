@@ -1,6 +1,6 @@
 # PAGX → PAG v2 转换技术方案设计文档
 
-**版本**：2.10
+**版本**：2.11
 **日期**：2026-04-29
 **状态**：待评审 / 待开工
 
@@ -576,6 +576,7 @@ struct EncodeContext {
   bool strictMode = false;                 // 由 Baker/PAGExporter 传入
 
   void warn(ErrorCode code, std::string msg = {}) {
+    if (warnings.size() >= limits::MAX_DIAGNOSTICS) return;   // §H.1 告警硬上限
     warnings.push_back({code, std::move(msg), 0});  // Encoder 不追踪 byteOffset
   }
 };
@@ -596,9 +597,14 @@ struct DecodeContext {
   }
 
   void error(ErrorCode code, std::string msg = {}) {
+    // 错误硬上限：errors 达到 MAX_DIAGNOSTICS 则静默丢弃（避免恶意文件撑爆内存）。
+    // 只保留最后一条"meta"告警说明已达顶；调用方按 hasError() 判定，不依赖条数。
+    if (errors.size() >= limits::MAX_DIAGNOSTICS) return;
     errors.push_back({code, std::move(msg), currentOffset()});
   }
   void warn(ErrorCode code, std::string msg = {}) {
+    // 告警硬上限（见上）。达顶时再次调用直接丢弃；不重复推"meta"，保持幂等。
+    if (warnings.size() >= limits::MAX_DIAGNOSTICS) return;
     warnings.push_back({code, std::move(msg), currentOffset()});
   }
   bool hasError() const { return !errors.empty(); }
@@ -616,6 +622,7 @@ struct DecodeContext {
     if (streamContext.hasException()) {
       uint32_t offset = currentOffset();
       for (const auto& msg : streamContext.errorMessages) {
+        if (errors.size() >= limits::MAX_DIAGNOSTICS) break;   // §H.1 硬上限
         errors.push_back({ErrorCode::TruncatedData, msg, offset});
       }
       streamContext.errorMessages.clear();
@@ -734,6 +741,7 @@ struct InflaterContext {
   std::vector<PendingMask> pendingMasks;
 
   void warn(ErrorCode code, std::string msg = {}) {
+    if (warnings.size() >= limits::MAX_DIAGNOSTICS) return;   // §H.1 告警硬上限
     warnings.push_back({code, std::move(msg), 0});
   }
 };
@@ -3485,8 +3493,6 @@ body:
 
 > **Decoder 校验**：读完 `compositionIndex` 后立即校验 `compositionIndex != UINT32_MAX && compositionIndex < doc.compositions.size()`；任一条件不满足推 `InvalidCompositionIndex=306` fatal 并 return（见 §G.2）。
 
-> **Decoder 校验**：读完 `compositionIndex` 后立即校验 `compositionIndex != UINT32_MAX && compositionIndex < doc.compositions.size()`；任一条件不满足推 `InvalidCompositionIndex=306` fatal 并 return（见 §G.2）。
-
 **VectorPayload**：
 ```
 TagCode::VectorPayload = 24
@@ -4103,10 +4109,12 @@ inline Diagnostic MakeDiag(ErrorCode code, std::string msg = {}) {
 ```cpp
 // src/pagx/pag/DecodeContext.cpp
 void DecodeContext::error(ErrorCode code, std::string msg) {
+  if (errors.size() >= limits::MAX_DIAGNOSTICS) return;   // §H.1 硬上限
   errors.push_back({code, std::move(msg),
                     static_cast<uint32_t>(currentStream ? currentStream->position() : 0)});
 }
 void DecodeContext::warn(ErrorCode code, std::string msg) {
+  if (warnings.size() >= limits::MAX_DIAGNOSTICS) return; // §H.1 硬上限
   warnings.push_back({code, std::move(msg),
                       static_cast<uint32_t>(currentStream ? currentStream->position() : 0)});
 }
@@ -4226,27 +4234,6 @@ template <> inline BlendMode ReadValue<BlendMode>(DecodeStream* s, DecodeContext
 
 `PropertyValueEquals<EnumT>` 走默认 `operator==`（enum 按 underlying type 比较，正确无歧义）。
 
-**`Property<EnumT>` 通路纪律**（强制）：
-
-当某枚举 `T` 被用于 `Property<T>` 字段（本期仅 `BlendMode`，见 §C.5 Layer），其 `ValueCodec` 特化**必须**以 `ReadEnum<T>` / `WriteEnum<T>` 为实现体，**不得**绕过 `EnumMeta<T>` 值域校验：
-
-```cpp
-// 正例（§D.8 Layer.blendMode 的实现形态）
-template <> inline void WriteValue<BlendMode>(EncodeStream* s, BlendMode v, EncodeContext*) {
-  s->writeUint8(static_cast<uint8_t>(v));
-}
-template <> inline BlendMode ReadValue<BlendMode>(DecodeStream* s, DecodeContext* ctx) {
-  return ReadEnum<BlendMode>(s, ctx);   // 走 EnumMeta，非法值 → InvalidEnumValue=407 + fallback
-}
-
-// 反例（严禁——会让非法 u8 逃过告警）
-template <> inline BlendMode ReadValue<BlendMode>(DecodeStream* s, DecodeContext*) {
-  return static_cast<BlendMode>(s->readUint8());   // ❌ 跳过值域校验 = UB
-}
-```
-
-`PropertyValueEquals<EnumT>` 走默认 `operator==`（enum 按 underlying type 比较，正确无歧义）。
-
 ### G.6 测试断言与覆盖矩阵
 
 单测用 ErrorCode 枚举断言（`EXPECT_EQ(result.errors[0].code, ErrorCode::LayoutNotApplied)`），避免字符串比对脆弱。每个 ErrorCode **必须**至少一条单测触发：
@@ -4259,7 +4246,6 @@ template <> inline BlendMode ReadValue<BlendMode>(DecodeStream* s, DecodeContext
 | EmptyCompositions (103) | BakerEdgeCasesTest.cpp | BakerEdgeCases.EmptyCompositions |
 | CompositionCycleDepth (104) | BakerEdgeCasesTest.cpp | BakerEdgeCases.CompositionCycle |
 | StructureLimitExceeded (105) | BakerEdgeCasesTest.cpp | BakerEdgeCases.StructureLimitExceeded |
-| StructureLimitExceeded (105) — Decoder 侧 count 攻击 | TruncatedDecodeTest.cpp | Truncate.ChildCountOverflow / ImageTableOverflow / FontTableOverflow |
 | StructureLimitExceeded (105) — Decoder 侧 count 攻击 | TruncatedDecodeTest.cpp | Truncate.ChildCountOverflow / ImageTableOverflow / FontTableOverflow |
 | ImageSourceMissing (200) | ResourceBakerTest.cpp | ResourceBaker.ImageFileMissing |
 | FontSourceMissing (201) | ResourceBakerTest.cpp | ResourceBaker.FontSourceMissing |
@@ -4337,6 +4323,9 @@ constexpr uint32_t MAX_STYLES_PER_LAYER  = 64;
 constexpr uint32_t MAX_VECTOR_ELEMENTS_PER_PAYLOAD = 100000;
 constexpr uint32_t MAX_VECTOR_ELEMENT_DEPTH = 64;                   // VectorGroup 嵌套深度上限
 constexpr uint32_t MAX_CHILDREN_PER_LAYER = 10000;
+
+// Diagnostic 累计上限（防止恶意文件让 warnings vector 增长到数百 MB）
+constexpr uint32_t MAX_DIAGNOSTICS = 1000;                          // Decoder/Baker/Inflater 共用
 }
 ```
 
@@ -4477,6 +4466,12 @@ target_link_libraries(PAGFullTest PRIVATE pagx-pag)
 - 本文档所有行号引用基于 `src/renderer/LayerBuilder.cpp` 当前实现；LayerBuilder 修改时需同步更新本文档附录 A。
 - PAGX 规范版本：`spec/pagx_spec.zh_CN.md`。
 - PAG v2 版本：0x02（本期）；动画扩展不升版本号。
+- v2.10 → v2.11 修订要点（冻结前清理：3 个粘贴回归 + 1 个 DoS 加固）：
+  - **F-1（P2）删除 §G.5 重复段**。v2.10 P2-2 新增 `Property<EnumT>` 通路纪律时粘贴两次（L4208-4227 与 L4229-4248 逐字相同），本版本删除后者。
+  - **F-2（P3）删除 §D.10 CompositionRefPayload 重复校验说明**。v2.10 P3-3 同样粘贴两次，本版本删除后者。
+  - **F-3（P3）删除 §G.6 `StructureLimitExceeded — Decoder 侧 count 攻击` 重复行**。v2.10 P2-1 加测试条目时粘贴两次。
+  - **F-4（P3 加固）Diagnostic 数量封顶**（§H.1 + §8.5 + §G.3）。v2.10 前无 `MAX_DIAGNOSTICS` 上限，恶意文件构造 100K 个损坏 element 可让 `DecodeContext::warnings` 增长到数百 MB（每 `Diagnostic` 含 `std::string`）。本版本：§H.1 新增 `constexpr uint32_t MAX_DIAGNOSTICS = 1000`；§8.5 `DecodeContext::error/warn`、`EncodeContext::warn`、`InflaterContext::warn`、`syncFromStreamContext` 循环全部加达顶静默丢弃逻辑；§G.3 DecodeContext.cpp 示例同步。达顶后新告警静默丢弃（保持幂等），不影响 `hasError()` 判定或正确路径。
+
 - v2.9 → v2.10 修订要点（冻结前最后一轮：1 P1 + 2 P2 + 3 P3）：
   - **P1-1：§C.5-pre 补 `struct FileHeader` + `struct PAGDocument` 顶层根结构**。v2.9 及以前，§22 附录 C 自称"PAGDocument 完整 C++ 定义"但实际只定义了 Property / enum / ImageAsset / Composition / Layer / VectorElement 等子结构，**顶层 `PAGDocument` 与 `FileHeader` 本身从未定义**——§8.2 / §8.3bis / §15.3 到处使用 `doc.header.width` / `doc.compositions` 却找不到权威字段表。本版本在 §C.4 末尾与 §C.5 之间新增 §C.5-pre 子节，钉死字段列表 + 默认值 + 成员访问风格（`doc->header.width`，四字段容器均为 `std::vector<std::unique_ptr<T>>`）。v2.0 → v2.9 十轮评审共同漏点。
   - **P2-1：补三个硬上限的 Decoder 强制校验**（§D.6 / §D.8 / §H.2 / §G.6）。`MAX_IMAGES` / `MAX_FONTS` / `MAX_CHILDREN_PER_LAYER` 三个常量在 §H.1 已定义但 Decoder Read 路径无 count 上界检查——攻击者构造 `childCount=0xFFFFFFFF` 的 .pag 可触发 `vector::reserve` OOM。本版本：§D.6 开头加"Decoder 强制上界"小节说明三个 count 校验时机；§D.8 LayerBlock.childCount 字段行追加内联校验注释；§H.2 Baker 侧列表加入三个常量并注明 "Decoder 侧同样校验"；§G.6 测试矩阵追加 `Truncate.ChildCountOverflow / ImageTableOverflow / FontTableOverflow` 覆盖。
