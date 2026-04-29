@@ -20,7 +20,7 @@
 /**
  * Prebuild script for pagx-playground.
  *
- * This script ensures pagx-viewer is built and copies the wasm files to public/wasm-mt/
+ * This script ensures pagx-viewer is built and copies the wasm files to wasm-mt/
  * before the main rollup build starts.
  *
  * Usage:
@@ -38,8 +38,7 @@ const __dirname = path.dirname(__filename);
 const PLAYGROUND_DIR = path.dirname(__dirname);
 const PAGX_VIEWER_DIR = path.resolve(PLAYGROUND_DIR, '../pagx-viewer');
 const PAGX_VIEWER_LIB_DIR = path.join(PAGX_VIEWER_DIR, 'lib');
-const PUBLIC_DIR = path.join(PLAYGROUND_DIR, 'public');
-const WASM_MT_DIR = path.join(PUBLIC_DIR, 'wasm-mt');
+const WASM_MT_DIR = path.join(PLAYGROUND_DIR, 'wasm-mt');
 
 const REQUIRED_FILES = ['pagx-viewer.wasm', 'pagx-viewer.esm.js'];
 
@@ -78,10 +77,10 @@ function buildPagxViewer() {
 }
 
 /**
- * Copy wasm files to public/wasm-mt/.
+ * Copy wasm files to wasm-mt/.
  */
 function copyWasmFiles() {
-  console.log('Copying wasm files to public/wasm-mt/...');
+  console.log('Copying wasm files to wasm-mt/...');
 
   if (!fs.existsSync(WASM_MT_DIR)) {
     fs.mkdirSync(WASM_MT_DIR, { recursive: true });

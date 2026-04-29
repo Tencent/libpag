@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-import { PAGXInit } from '../public/wasm-mt/pagx-viewer.esm';
+import { PAGXInit } from '../wasm-mt/pagx-viewer.esm';
 
 // pagx-viewer types
 

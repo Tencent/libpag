@@ -8,5 +8,6 @@ build-pagx-playground/
 lib/
 types/
 node_modules/
-public/wasm-mt
 package-lock.json
+fonts/
+wasm-mt/

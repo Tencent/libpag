@@ -28,7 +28,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Path: playground/pagx-playground/script -> libpag root
+// Path: playground/pagx-playground/scripts -> libpag root
 const libpagRoot = path.resolve(__dirname, '../../..');
 const playgroundRoot = path.resolve(__dirname, '..');
 const fileHeaderPath = path.resolve(libpagRoot, '.idea/fileTemplates/includes/PAG File Header.h');
@@ -37,7 +37,7 @@ const isRelease = process.env.BUILD_MODE === 'release';
 
 // Clean up old source map files in release mode
 if (isRelease) {
-    const outputDir = path.resolve(playgroundRoot, 'public');
+    const outputDir = path.resolve(playgroundRoot, 'wasm-mt');
     try {
         const files = readdirSync(outputDir);
         for (const file of files) {
@@ -55,10 +55,7 @@ function copyAssetsPlugin() {
     return {
         name: 'copy-assets',
         writeBundle() {
-            const publicDir = path.resolve(playgroundRoot, 'public');
-
-            // Copy fonts from resources/font
-            const fontsDir = path.join(publicDir, 'fonts');
+            const fontsDir = path.resolve(playgroundRoot, 'fonts');
             if (!existsSync(fontsDir)) {
                 mkdirSync(fontsDir, { recursive: true });
             }
@@ -95,7 +92,7 @@ const plugins = [
             return null;
         },
     },
-    copyAssetsPlugin(),
+    // copyAssetsPlugin(),
 ];
 
 export default [
@@ -103,7 +100,7 @@ export default [
         input: path.resolve(__dirname, '../src/index.ts'),
         output: {
             banner,
-            file: path.resolve(playgroundRoot, 'public/wasm-mt/index.js'),
+            file: path.resolve(playgroundRoot, 'wasm-mt/index.js'),
             format: 'esm',
             sourcemap: !isRelease
         },

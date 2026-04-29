@@ -883,48 +883,62 @@ function main() {
     runCommand('npm run build:release', PLAYGROUND_DIR, 600000);
   } else {
     console.log('Step 1: Skipping build (--skip-build flag set)');
-    if (!fs.existsSync(path.join(PLAYGROUND_DIR, 'public', 'wasm-mt', 'pagx-viewer.wasm'))) {
-      console.error('ERROR: public/wasm-mt/pagx-viewer.wasm not found. Run build first or remove --skip-build flag');
+    if (!fs.existsSync(path.join(PLAYGROUND_DIR, 'wasm-mt', 'pagx-viewer.wasm'))) {
+      console.error('ERROR: wasm-mt/pagx-viewer.wasm not found. Run build first or remove --skip-build flag');
       process.exit(1);
     }
   }
 
-  // Copy static files from public/
+  // Copy index.html
   console.log('\nStep 2: Copy files...');
-  const publicDir = path.join(PLAYGROUND_DIR, 'public');
+  const staticDir = path.join(PLAYGROUND_DIR, 'static');
   copyFile(
-    path.join(publicDir, 'index.html'),
+    path.join(staticDir, 'index.html'),
     path.join(outputDir, 'index.html')
   );
 
   // Copy index.css
   copyFile(
-    path.join(publicDir, 'index.css'),
+    path.join(staticDir, 'index.css'),
     path.join(outputDir, 'index.css')
   );
 
   // Copy favicon and logo
   copyFile(
-    path.join(publicDir, 'favicon.png'),
+    path.join(staticDir, 'favicon.png'),
     path.join(outputDir, 'favicon.png')
   );
   copyFile(
-    path.join(publicDir, 'logo.png'),
+    path.join(staticDir, 'logo.png'),
     path.join(outputDir, 'logo.png')
   );
 
-  // Copy fonts from public/fonts (already copied there by rollup build)
+  // Copy fonts from resources/font
   console.log('\n  Copying fonts...');
-  copyDir(
-    path.join(publicDir, 'fonts'),
-    path.join(outputDir, 'fonts')
+  copyFile(
+    path.join(RESOURCES_FONT_DIR, 'NotoSansSC-Regular.otf'),
+    path.join(outputDir, 'fonts', 'NotoSansSC-Regular.otf')
+  );
+  copyFile(
+    path.join(RESOURCES_FONT_DIR, 'NotoColorEmoji.ttf'),
+    path.join(outputDir, 'fonts', 'NotoColorEmoji.ttf')
   );
 
-  // Copy wasm-mt directory from public/wasm-mt (already copied there by rollup build)
+  // Copy wasm-mt directory
   console.log('\n  Copying wasm-mt...');
-  copyDir(
-    path.join(publicDir, 'wasm-mt'),
-    path.join(outputDir, 'wasm-mt')
+  const wasmDir = path.join(PLAYGROUND_DIR, 'wasm-mt');
+  const wasmOutputDir = path.join(outputDir, 'wasm-mt');
+  copyFile(
+    path.join(wasmDir, 'index.js'),
+    path.join(wasmOutputDir, 'index.js')
+  );
+  copyFile(
+    path.join(wasmDir, 'pagx-viewer.esm.js'),
+    path.join(wasmOutputDir, 'pagx-viewer.esm.js')
+  );
+  copyFile(
+    path.join(wasmDir, 'pagx-viewer.wasm'),
+    path.join(wasmOutputDir, 'pagx-viewer.wasm')
   );
 
   // Copy samples directory and generate index.json
