@@ -1,6 +1,6 @@
 # PAGX → PAG v2 转换技术方案设计文档
 
-**版本**：2.11
+**版本**：2.12
 **日期**：2026-04-29
 **状态**：待评审 / 待开工
 
@@ -216,10 +216,10 @@ data.alpha = ReadProperty(stream, ctx, /*defaultValue=*/ 1.0f, tagEnd);
 
 ### 5.1 顶层组成
 
-- **`PAGDocument`**：全文档的根。包含：
+- **`PAGDocument`**：全文档的根（完整字段定义见 §C.5-pre）。按字节流写入顺序（§8.2）包含：
   - `FileHeader`：画布尺寸、背景色、时间轴（frameRate/duration，本期静态均为默认值）；
-  - `compositions`：composition 列表，约定 `compositions[0]` 为 root composition；
-  - `images` / `fonts`：资源池，由索引在 payload 中引用。
+  - `images` / `fonts`：资源池，由索引在 payload 中引用；
+  - `compositions`：composition 列表，约定 `compositions[0]` 为 root composition。
 - **`Composition`**：一棵图层树的容器，带 id、width/height（root composition 的 w/h 承载 canvas 尺寸）、`layers[]`。
 - **`Layer`**：图层节点，按 `LayerType` 派发到 7 种类型之一（本期实际产出 3 种：`Layer` 容器 / `Vector` / `CompositionRef`）。
 
@@ -557,7 +557,7 @@ auto doc = std::make_shared<PAGDocument>();
 5. Compression == 0（当前唯一合法）；
 6. 所有资源/Tag 的大小上限（见附录 H）。
 
-### 8.5 EncodeContext / DecodeContext
+### 8.5 EncodeContext / DecodeContext / BakeContext / BakeContext
 
 Codec 内部使用 Context 结构承载跨 Tag 的状态（错误收集、深度追踪、DoS 记账）。v2 Context **包装** v1 `StreamContext`，负责把 v1 流级错误桥接到 v2 诊断体系。
 
@@ -597,13 +597,13 @@ struct DecodeContext {
   }
 
   void error(ErrorCode code, std::string msg = {}) {
-    // 错误硬上限：errors 达到 MAX_DIAGNOSTICS 则静默丢弃（避免恶意文件撑爆内存）。
-    // 只保留最后一条"meta"告警说明已达顶；调用方按 hasError() 判定，不依赖条数。
+    // 错误硬上限：errors 达到 MAX_DIAGNOSTICS 后后续调用完全静默（不推 meta，保持幂等）。
+    // 调用方按 hasError() 判定，不依赖条数。
     if (errors.size() >= limits::MAX_DIAGNOSTICS) return;
     errors.push_back({code, std::move(msg), currentOffset()});
   }
   void warn(ErrorCode code, std::string msg = {}) {
-    // 告警硬上限（见上）。达顶时再次调用直接丢弃；不重复推"meta"，保持幂等。
+    // 告警硬上限（见上）：达顶完全静默。
     if (warnings.size() >= limits::MAX_DIAGNOSTICS) return;
     warnings.push_back({code, std::move(msg), currentOffset()});
   }
@@ -643,6 +643,54 @@ struct DecodeContext {
 - 所有 Read/Write 函数必须接受 `Context*` 参数；
 - 深度追踪字段在 Read/Write LayerBlock / VectorGroup 的 进入/退出时 ++/--；
 - DoS 记账在分配 vector/string 前累加 `totalAllocatedBytes`，超 `MAX_TOTAL_BODY_BYTES` 触发 `BodyLengthOutOfRange`。
+
+**BakeContext**（Baker 内部使用，与 Encode/DecodeContext 对称但无字节流）：
+
+```cpp
+namespace pagx::pag {
+
+struct BakeContext {
+  std::vector<Diagnostic> errors;          // Baker fatal（100-199）
+  std::vector<Diagnostic> warnings;        // Baker warning（200-299）
+  uint32_t currentLayerDepth = 0;          // §H.2 MAX_LAYER_DEPTH
+  uint32_t currentVectorElementDepth = 0;  // §H.2 MAX_VECTOR_ELEMENT_DEPTH
+  bool strictMode = false;
+
+  // 资源索引化（§7.2 pre-pass 结果；VectorBaker / TextBaker 查表用）
+  std::unordered_map<const void*, uint32_t> imageIndexByNode;
+  std::unordered_map<const void*, uint32_t> fontIndexByNode;
+
+  // LayerPath 索引（§12.1 Mask 两趟 pre-pass 结果；Baker Pass 2 查表用）
+  std::unordered_map<const void*, std::vector<uint32_t>> layerPathByPagxLayer;
+
+  void error(ErrorCode code, std::string msg = {}) {
+    if (errors.size() >= limits::MAX_DIAGNOSTICS) return;   // §H.1 硬上限
+    errors.push_back({code, std::move(msg), 0});            // Baker 无字节流，byteOffset=0
+  }
+  void warn(ErrorCode code, std::string msg = {}) {
+    if (warnings.size() >= limits::MAX_DIAGNOSTICS) return; // §H.1 硬上限
+    warnings.push_back({code, std::move(msg), 0});
+  }
+  bool hasFatal() const { return !errors.empty(); }
+
+  // §H.2 检查点辅助
+  void enterLayer()           { ++currentLayerDepth; }
+  void exitLayer()            { --currentLayerDepth; }
+  void enterVectorGroup()     { ++currentVectorElementDepth; }
+  void exitVectorGroup()      { --currentVectorElementDepth; }
+};
+
+}
+```
+
+**Context 总览（四并列）**：
+
+| Context | 用途 | errors | warnings | byteOffset | MAX_DIAGNOSTICS cap |
+|---|---|---|---|---|---|
+| `EncodeContext` | 字节流编码 | —（Encoder 不产 error） | ✓ | 恒 0 | ✓ |
+| `DecodeContext` | 字节流解码 | ✓ | ✓ | stream->position() | ✓ |
+| `BakeContext`   | PAGX→PAGDocument | ✓ | ✓ | 恒 0 | ✓ |
+| `InflaterContext` | PAGDocument→tgfx::Layer | —（无 fatal） | ✓（见 §9.4）| 恒 0 | ✓ |
 
 ---
 
@@ -724,6 +772,19 @@ Inflater 内部使用的轻量上下文，承载 warning 收集 + pendingMasks +
 
 ```cpp
 namespace pagx::pag {
+
+// std::vector<uint32_t> 的哈希（层路径 key）——std::unordered_map 默认无此特化，必须显式提供。
+struct VectorU32Hash {
+  size_t operator()(const std::vector<uint32_t>& v) const noexcept {
+    // FNV-1a 变体；对短路径（典型 ≤ 8 层）速度足够。
+    size_t h = 0xcbf29ce484222325ULL;
+    for (uint32_t x : v) {
+      h ^= static_cast<size_t>(x);
+      h *= 0x100000001b3ULL;
+    }
+    return h;
+  }
+};
 
 struct InflaterContext {
   // 告警聚合（Inflater 无字节流，byteOffset 恒 0）
@@ -4459,6 +4520,8 @@ target_link_libraries(PAGFullTest PRIVATE pagx-pag)
 
 > **tgfx 暴露等级**：由于 `include/pagx/PAGLoader.h` 在头文件签名里暴露 `std::shared_ptr<tgfx::Layer>`，依赖 pagx-pag 的目标**传递**地获得 tgfx 的头可见性（CMake 中用 `PUBLIC tgfx`）。仅使用 `PAGExporter.h` / `Diagnostic.h` 的消费方虽然编译时会拿到 tgfx 头路径，但不会在自己的代码里出现 tgfx 符号——这是"在头文件层面隔离依赖"可以达到的最强保证；若要彻底隔离 tgfx 路径污染，需要把 PAGLoader 拆成独立静态库 `pagx-pag-loader`，**本期不做**（过度设计，用户量极小）。
 
+> **tgfx ABI 模型**：pagx 对 tgfx 采用 **SAME-BUILD ABI** 模型——pagx-pag 与 tgfx 必须在**同一次编译中一同构建并链接**，不承诺与其他 tgfx 预编译版本二进制兼容。原因：`PAGLoader::Result::layer` 的 `tgfx::Layer` 类型随 tgfx 版本可能变更 vtable / 虚函数签名 / 成员布局，跨版本混链会产生未定义行为。`DiagnosticCode` 的 append-only ABI 纪律（§15.1）仅覆盖 pagx 自身接口，**不** cascades 到 tgfx 符号。升级 tgfx 时必须重新构建 pagx-pag。
+
 ---
 
 ## 文档维护
@@ -4466,6 +4529,14 @@ target_link_libraries(PAGFullTest PRIVATE pagx-pag)
 - 本文档所有行号引用基于 `src/renderer/LayerBuilder.cpp` 当前实现；LayerBuilder 修改时需同步更新本文档附录 A。
 - PAGX 规范版本：`spec/pagx_spec.zh_CN.md`。
 - PAG v2 版本：0x02（本期）；动画扩展不升版本号。
+- v2.11 → v2.12 修订要点（freeze 前补完：5 个 polish，无架构变更）：
+  - **F-1（P2）§8.5 补 `BakeContext` 紧凑定义**。BakeContext 被全文档引用 11 次（§7.2 / §8.3bis / §H.2）但结构体字段 + warn/error 方法从未展开定义——v2.11 日志吹"MAX_DIAGNOSTICS 覆盖 5 places"时 BakeContext 漏了。本版本把 §8.5 标题扩展为 "EncodeContext / DecodeContext / BakeContext"，在 DecodeContext bridge 小节后补 BakeContext 定义（errors / warnings / currentLayerDepth / currentVectorElementDepth / strictMode / imageIndexByNode / fontIndexByNode / layerPathByPagxLayer + error/warn 加 MAX_DIAGNOSTICS cap + enterLayer/enterVectorGroup 辅助），末尾补"Context 四并列总览表"便于 AI 对比落代码。
+  - **F-2（P3）§9.4 补 `VectorU32Hash` 定义**。`InflaterContext::layerByPath` 使用 `std::unordered_map<std::vector<uint32_t>, ..., VectorU32Hash>`，但 `VectorU32Hash` 在文档任何地方都没定义。本版本在 §9.4 InflaterContext struct 之前补 FNV-1a 变体哈希实现（~10 行）。
+  - **F-3（P3）§I.4 补 tgfx SAME-BUILD ABI 声明**。`DiagnosticCode` append-only ABI 纪律（§15.1）只覆盖 pagx 自身，但 `PAGLoader::Result::layer` 暴露 `tgfx::Layer` 的 vtable——跨 tgfx 版本混链会 UB。本版本在 §I.4 "tgfx 暴露等级"引用块后追加 "tgfx ABI 模型" 引用块，明示"同一次编译中一同构建并链接，不承诺与其他 tgfx 预编译版本二进制兼容；升级 tgfx 时必须重新构建 pagx-pag"。
+  - **F-4（P3）§5.1 顶层组成顺序对齐字节流序**。v2.10 加 §C.5-pre 定义 `PAGDocument { header, images, fonts, compositions }` 后，§5.1 叙述顺序仍是 v2.9 前的"header → compositions → images/fonts"，与字节流写入顺序（§8.2 FileHeader → ImageAssetTable → FontAssetTable → CompositionList）不同步，读者容易对 Tag 顺序产生错觉。本版本 §5.1 调整为 "header → images/fonts → compositions" 并补 "按字节流写入顺序" + 引 "§C.5-pre 权威定义"。
+  - **F-5（P3）§8.5 `DecodeContext::error` 注释与代码一致化**。v2.11 代码是 `if (size >= cap) return;`（完全静默），注释却说 "只保留最后一条 meta 告警说明已达顶"——注释自相矛盾。本版本改注释为 "达顶后后续调用完全静默（不推 meta，保持幂等）"，与代码统一。
+  - **全文重复排查**：扫 2-gram / 长行重复，未发现新的段落级粘贴回归（v2.11 已清理的 3 处为 v2.11 独有引入）。
+
 - v2.10 → v2.11 修订要点（冻结前清理：3 个粘贴回归 + 1 个 DoS 加固）：
   - **F-1（P2）删除 §G.5 重复段**。v2.10 P2-2 新增 `Property<EnumT>` 通路纪律时粘贴两次（L4208-4227 与 L4229-4248 逐字相同），本版本删除后者。
   - **F-2（P3）删除 §D.10 CompositionRefPayload 重复校验说明**。v2.10 P3-3 同样粘贴两次，本版本删除后者。
