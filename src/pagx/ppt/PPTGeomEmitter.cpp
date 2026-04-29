@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <initializer_list>
+#include <optional>
 #include "pagx/xml/XMLBuilder.h"
 
 namespace pagx {
@@ -125,7 +126,7 @@ void EmitBridgedGroup(XMLBuilder& out, const std::vector<PathContour>& contours,
 }
 
 // Writes the geometry content for a group without opening its <a:path>.
-// Split out of EmitGroupPath so EmitGroupCustGeom's InlineSegments branch can
+// Split out of EmitGroupPath so EmitCustGeomCore's InlineSegments branch can
 // place corner marker segments in the same <a:path> as the main geometry.
 void EmitGroupPathBody(XMLBuilder& out, const std::vector<PathContour>& contours,
                        const std::vector<size_t>& group, const CoordScale& ts) {
@@ -190,6 +191,58 @@ void EmitCornerBoundsMarkerSegments(XMLBuilder& out, int64_t pathWidth, int64_t 
   EmitZeroLengthMarker(out, pathWidth, pathHeight);
 }
 
+// Emits a standalone strokeless sibling <a:path> carrying only the corner
+// bounds markers. Used by StandaloneStrokelessPath so round-capped strokes on
+// the enclosing sp cannot render visible dots at the corner points.
+void EmitStandaloneMarkerPath(XMLBuilder& out, int64_t pathWidth, int64_t pathHeight) {
+  out.openElement("a:path")
+      .addRequiredAttribute("w", pathWidth)
+      .addRequiredAttribute("h", pathHeight)
+      .addRequiredAttribute("fill", "none")
+      .addRequiredAttribute("stroke", "0")
+      .closeElementStart();
+  EmitCornerBoundsMarkerSegments(out, pathWidth, pathHeight);
+  out.closeElement();
+}
+
+// Shared <a:custGeom> writer: emits one <a:path> per group, with an optional
+// per-group corner bounds marker placed according to markerStyle. When
+// markerStyle is nullopt no marker is emitted (plain geometry). Groups are
+// treated independently — each group carries its own marker so the strategy
+// composes cleanly across any number of groups.
+void EmitCustGeomCore(XMLBuilder& out, const std::vector<PathContour>& contours,
+                      const std::vector<std::vector<size_t>>& groups, int64_t pathWidth,
+                      int64_t pathHeight, const CoordScale& ts,
+                      std::optional<BoundsMarkerStyle> markerStyle) {
+  EmitCustGeomHeader(out);
+  out.openElement("a:pathLst").closeElementStart();
+
+  for (const auto& group : groups) {
+    if (!markerStyle.has_value()) {
+      EmitGroupPath(out, contours, group, pathWidth, pathHeight, ts);
+      continue;
+    }
+    // Bounds marker strategy documented on BoundsMarkerStyle. Both strategies
+    // keep the bbox pinned to (pathWidth, pathHeight) for WeChat; the
+    // difference is whether the marker segments share the main <a:path> (safe
+    // when the sp has no stroke) or live in a strokeless sibling path (needed
+    // when the sp may carry a round-capped stroke that would otherwise render
+    // visible dots at the corners).
+    if (*markerStyle == BoundsMarkerStyle::StandaloneStrokelessPath) {
+      EmitStandaloneMarkerPath(out, pathWidth, pathHeight);
+      EmitGroupPath(out, contours, group, pathWidth, pathHeight, ts);
+    } else {
+      OpenPath(out, pathWidth, pathHeight);
+      EmitCornerBoundsMarkerSegments(out, pathWidth, pathHeight);
+      EmitGroupPathBody(out, contours, group, ts);
+      out.closeElement();
+    }
+  }
+
+  out.closeElement();  // a:pathLst
+  out.closeElement();  // a:custGeom
+}
+
 }  // namespace
 
 void EmitContourGeomFromGroups(XMLBuilder& out, const std::vector<PathContour>& contours,
@@ -197,13 +250,7 @@ void EmitContourGeomFromGroups(XMLBuilder& out, const std::vector<PathContour>& 
                                int64_t pathHeight, float scaleX, float scaleY, float scaledOfsX,
                                float scaledOfsY) {
   const CoordScale ts{scaleX, scaleY, scaledOfsX, scaledOfsY};
-  EmitCustGeomHeader(out);
-  out.openElement("a:pathLst").closeElementStart();
-  for (const auto& group : groups) {
-    EmitGroupPath(out, contours, group, pathWidth, pathHeight, ts);
-  }
-  out.closeElement();  // a:pathLst
-  out.closeElement();  // a:custGeom
+  EmitCustGeomCore(out, contours, groups, pathWidth, pathHeight, ts, std::nullopt);
 }
 
 void EmitFlatContourGeom(XMLBuilder& out, const std::vector<PathContour>& contours,
@@ -226,34 +273,7 @@ void EmitGroupCustGeom(XMLBuilder& out, const std::vector<PathContour>& contours
                        float scaleX, float scaleY, float scaledOfsX, float scaledOfsY,
                        BoundsMarkerStyle markerStyle) {
   const CoordScale ts{scaleX, scaleY, scaledOfsX, scaledOfsY};
-  EmitCustGeomHeader(out);
-  out.openElement("a:pathLst").closeElementStart();
-
-  // Bounds marker strategy documented on BoundsMarkerStyle. Both strategies
-  // keep the bbox pinned to (pathWidth, pathHeight) for WeChat; the difference
-  // is whether the marker segments share the main <a:path> (safe when the sp
-  // has no stroke) or live in a strokeless sibling path (needed when the sp
-  // may carry a round-capped stroke that would otherwise render visible dots
-  // at the corners).
-  if (markerStyle == BoundsMarkerStyle::StandaloneStrokelessPath) {
-    out.openElement("a:path")
-        .addRequiredAttribute("w", pathWidth)
-        .addRequiredAttribute("h", pathHeight)
-        .addRequiredAttribute("fill", "none")
-        .addRequiredAttribute("stroke", "0")
-        .closeElementStart();
-    EmitCornerBoundsMarkerSegments(out, pathWidth, pathHeight);
-    out.closeElement();  // a:path (bounds marker)
-    EmitGroupPath(out, contours, group, pathWidth, pathHeight, ts);
-  } else {
-    OpenPath(out, pathWidth, pathHeight);
-    EmitCornerBoundsMarkerSegments(out, pathWidth, pathHeight);
-    EmitGroupPathBody(out, contours, group, ts);
-    out.closeElement();  // a:path
-  }
-
-  out.closeElement();  // a:pathLst
-  out.closeElement();  // a:custGeom
+  EmitCustGeomCore(out, contours, {group}, pathWidth, pathHeight, ts, markerStyle);
 }
 
 }  // namespace pagx
