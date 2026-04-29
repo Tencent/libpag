@@ -557,7 +557,7 @@ auto doc = std::make_shared<PAGDocument>();
 5. Compression == 0（当前唯一合法）；
 6. 所有资源/Tag 的大小上限（见附录 H）。
 
-### 8.5 EncodeContext / DecodeContext / BakeContext / BakeContext
+### 8.5 EncodeContext / DecodeContext / BakeContext
 
 Codec 内部使用 Context 结构承载跨 Tag 的状态（错误收集、深度追踪、DoS 记账）。v2 Context **包装** v1 `StreamContext`，负责把 v1 流级错误桥接到 v2 诊断体系。
 
