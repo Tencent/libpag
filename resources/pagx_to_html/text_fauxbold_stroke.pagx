@@ -3,8 +3,9 @@
      -webkit-text-stroke paints along the synthesised-bold glyph outline instead of
      the thinner regular outline (which otherwise produces stroke bleed inside the
      glyph body). Covers writeText (Text+Fill+Stroke), writeTextModifier
-     (TextModifier.strokeColor override), and the TextBox span variant. -->
-<pagx version="1.0" width="420" height="280">
+     (TextModifier.strokeColor override), writeTextPath (Text wrapped in TextPath),
+     and the TextBox span variant. -->
+<pagx version="1.0" width="420" height="360">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -35,7 +36,15 @@
       <Stroke color="#00000000" width="2"/>
     </Layer>
 
-    <!-- Path 3: TextBox span — TextBox containing Text + Fill + Stroke + fauxBold -->
+    <!-- Path 3: writeTextPath — Text wrapped in TextPath + Fill + Stroke + fauxBold -->
+    <Layer height="72">
+      <Text text="ARC" fontFamily="Noto Sans SC" fauxBold="true" fontSize="32" textAnchor="start"/>
+      <TextPath path="M 50,60 Q 210,-20 370,60"/>
+      <Fill color="#8B5CF6"/>
+      <Stroke color="#F43F5E" width="2"/>
+    </Layer>
+
+    <!-- Path 4: TextBox span — TextBox containing Text + Fill + Stroke + fauxBold -->
     <Layer height="56">
       <TextBox left="0" right="0" top="0" bottom="0" textAlign="center" paragraphAlign="middle">
         <Text text="BOX" fontFamily="Noto Sans SC" fauxBold="true" fontSize="36"/>

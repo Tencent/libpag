@@ -1549,6 +1549,20 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
             }
           }
         }
+        // TextPath renders Fill and Stroke as two separate writeTextPath invocations (see
+        // dispatcher in HTMLWriterLayer.cpp). On the Stroke pass `fill` is null and `stroke`
+        // is set; emit -webkit-text-stroke so the per-character span actually paints the
+        // stroke outline (matching tgfx, which draws the Stroke around each glyph path just
+        // like the non-TextPath case). Without this, TextPath + Stroke produced empty spans.
+        if (stroke && stroke->color && stroke->color->nodeType() == NodeType::SolidColor) {
+          auto sc = static_cast<const SolidColor*>(stroke->color);
+          charStyle += ";-webkit-text-stroke:" + FloatToString(stroke->width) + "px " +
+                       ColorToRGBA(sc->color, stroke->alpha);
+          charStyle += ";paint-order:stroke fill";
+          if (!fill || !fill->color) {
+            charStyle += ";-webkit-text-fill-color:transparent";
+          }
+        }
         if (alpha < 1.0f) {
           charStyle += ";opacity:" + FloatToString(alpha);
         }
