@@ -45,6 +45,26 @@ static constexpr const char* NS_PRESENTATIONML =
 static constexpr const char* RELATIONSHIPS_OPEN =
     "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">";
 
+// Shared Relationship type prefix for every officeDocument-scoped relationship.
+static constexpr const char* REL_TYPE_OFFICE_DOC =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
+
+// Appends one `<Relationship Id="..." Type="..." Target="..."/>` element built
+// from the (typeSuffix, target) pair. typeSuffix is concatenated onto
+// REL_TYPE_OFFICE_DOC so the verbose Office-document namespace URL appears only
+// once in this file.
+static void AppendOfficeRel(std::string& s, const char* id, const char* typeSuffix,
+                            const std::string& target) {
+  s += "<Relationship Id=\"";
+  s += id;
+  s += "\" Type=\"";
+  s += REL_TYPE_OFFICE_DOC;
+  s += typeSuffix;
+  s += "\" Target=\"";
+  s += target;
+  s += "\"/>";
+}
+
 std::string GenerateContentTypes(const PPTWriterContext& ctx) {
   std::string s;
   s.reserve(2048);
@@ -91,18 +111,14 @@ std::string GenerateContentTypes(const PPTWriterContext& ctx) {
 
 std::string GenerateRootRels() {
   std::string s;
-  s.reserve(512);
+  s.reserve(768);
   s += XML_DECL;
   s += RELATIONSHIPS_OPEN;
-  s += "<Relationship Id=\"rId1\" "
-       "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\""
-       " Target=\"ppt/presentation.xml\"/>";
+  AppendOfficeRel(s, "rId1", "officeDocument", "ppt/presentation.xml");
   s += "<Relationship Id=\"rId2\" "
        "Type=\"http://schemas.openxmlformats.org/package/2006/relationships/metadata/"
        "core-properties\" Target=\"docProps/core.xml\"/>";
-  s += "<Relationship Id=\"rId3\" "
-       "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/"
-       "extended-properties\" Target=\"docProps/app.xml\"/>";
+  AppendOfficeRel(s, "rId3", "extended-properties", "docProps/app.xml");
   s += "</Relationships>";
   return s;
 }
@@ -159,24 +175,12 @@ std::string GeneratePresentationRels() {
   s.reserve(1024);
   s += XML_DECL;
   s += RELATIONSHIPS_OPEN;
-  s += "<Relationship Id=\"rId1\" "
-       "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster\" "
-       "Target=\"slideMasters/slideMaster1.xml\"/>";
-  s += "<Relationship Id=\"rId2\" "
-       "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide\" "
-       "Target=\"slides/slide1.xml\"/>";
-  s += "<Relationship Id=\"rId3\" "
-       "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/presProps\" "
-       "Target=\"presProps.xml\"/>";
-  s += "<Relationship Id=\"rId4\" "
-       "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/viewProps\" "
-       "Target=\"viewProps.xml\"/>";
-  s += "<Relationship Id=\"rId5\" "
-       "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme\" "
-       "Target=\"theme/theme1.xml\"/>";
-  s += "<Relationship Id=\"rId6\" "
-       "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableStyles\" "
-       "Target=\"tableStyles.xml\"/>";
+  AppendOfficeRel(s, "rId1", "slideMaster", "slideMasters/slideMaster1.xml");
+  AppendOfficeRel(s, "rId2", "slide", "slides/slide1.xml");
+  AppendOfficeRel(s, "rId3", "presProps", "presProps.xml");
+  AppendOfficeRel(s, "rId4", "viewProps", "viewProps.xml");
+  AppendOfficeRel(s, "rId5", "theme", "theme/theme1.xml");
+  AppendOfficeRel(s, "rId6", "tableStyles", "tableStyles.xml");
   s += "</Relationships>";
   return s;
 }
@@ -186,15 +190,9 @@ std::string GenerateSlideRels(const PPTWriterContext& ctx) {
   s.reserve(512);
   s += XML_DECL;
   s += RELATIONSHIPS_OPEN;
-  s += "<Relationship Id=\"rId1\" "
-       "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout\" "
-       "Target=\"../slideLayouts/slideLayout1.xml\"/>";
+  AppendOfficeRel(s, "rId1", "slideLayout", "../slideLayouts/slideLayout1.xml");
   for (const auto& img : ctx.images()) {
-    s += "<Relationship Id=\"" + img.relId +
-         "\" "
-         "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\" "
-         "Target=\"../" +
-         img.mediaPath.substr(4) + "\"/>";
+    AppendOfficeRel(s, img.relId.c_str(), "image", "../" + img.mediaPath.substr(4));
   }
   s += "</Relationships>";
   return s;
@@ -267,12 +265,8 @@ std::string GenerateSlideMasterRels() {
   s.reserve(512);
   s += XML_DECL;
   s += RELATIONSHIPS_OPEN;
-  s += "<Relationship Id=\"rId1\" "
-       "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout\" "
-       "Target=\"../slideLayouts/slideLayout1.xml\"/>";
-  s += "<Relationship Id=\"rId2\" "
-       "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme\" "
-       "Target=\"../theme/theme1.xml\"/>";
+  AppendOfficeRel(s, "rId1", "slideLayout", "../slideLayouts/slideLayout1.xml");
+  AppendOfficeRel(s, "rId2", "theme", "../theme/theme1.xml");
   s += "</Relationships>";
   return s;
 }
@@ -302,9 +296,7 @@ std::string GenerateSlideLayoutRels() {
   s.reserve(256);
   s += XML_DECL;
   s += RELATIONSHIPS_OPEN;
-  s += "<Relationship Id=\"rId1\" "
-       "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster\" "
-       "Target=\"../slideMasters/slideMaster1.xml\"/>";
+  AppendOfficeRel(s, "rId1", "slideMaster", "../slideMasters/slideMaster1.xml");
   s += "</Relationships>";
   return s;
 }

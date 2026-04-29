@@ -2512,30 +2512,21 @@ bool PPTWriter::rasterizeLayerAsPicture(XMLBuilder& out, const Layer* layer, boo
   return true;
 }
 
-static std::vector<LayerFilter*> MergeFilters(const std::vector<LayerFilter*>& own,
-                                              const std::vector<LayerFilter*>& inherited) {
+// Layer filters and styles follow identical merge semantics: own entries come
+// first (so CollectEffectSources picks the layer's own effect when both the
+// layer and a parent carry the same effect type), then inherited entries.
+// Shortcuts handle the common empty-on-either-side cases without allocating a
+// new vector.
+template <typename T>
+static std::vector<T*> MergeLayerLists(const std::vector<T*>& own,
+                                       const std::vector<T*>& inherited) {
   if (inherited.empty()) {
     return own;
   }
   if (own.empty()) {
     return inherited;
   }
-  std::vector<LayerFilter*> merged;
-  merged.reserve(own.size() + inherited.size());
-  merged.insert(merged.end(), own.begin(), own.end());
-  merged.insert(merged.end(), inherited.begin(), inherited.end());
-  return merged;
-}
-
-static std::vector<LayerStyle*> MergeStyles(const std::vector<LayerStyle*>& own,
-                                            const std::vector<LayerStyle*>& inherited) {
-  if (inherited.empty()) {
-    return own;
-  }
-  if (own.empty()) {
-    return inherited;
-  }
-  std::vector<LayerStyle*> merged;
+  std::vector<T*> merged;
   merged.reserve(own.size() + inherited.size());
   merged.insert(merged.end(), own.begin(), own.end());
   merged.insert(merged.end(), inherited.begin(), inherited.end());
@@ -2599,8 +2590,8 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& pa
   // Merge the layer's own filters/styles with any inherited from a parent layer.
   // Own entries come first so CollectEffectSources picks the layer's own effects
   // when both layers carry the same effect type (e.g. both have a BlurFilter).
-  auto effectiveFilters = MergeFilters(layer->filters, inheritedFilters);
-  auto effectiveStyles = MergeStyles(layer->styles, inheritedStyles);
+  auto effectiveFilters = MergeLayerLists(layer->filters, inheritedFilters);
+  auto effectiveStyles = MergeLayerLists(layer->styles, inheritedStyles);
 
   writeElements(out, layer->contents, layerMatrix, layerAlpha, effectiveFilters, effectiveStyles);
 

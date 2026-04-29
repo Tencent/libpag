@@ -19,6 +19,7 @@
 #include "pagx/ppt/PPTContourUtils.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 
 namespace pagx {
 
@@ -155,7 +156,7 @@ std::vector<PathContour> ParsePathContours(const PathData* data) {
 
 // A contour can only contain another when it is a closed loop with at least
 // one segment. Pre-computing this validity bit avoids re-evaluating it on
-// every i/j pair of the O(n²) containment scans below.
+// every i/j pair of the O(n²) containment scan below.
 static std::vector<bool> ComputeContainerValidity(const std::vector<PathContour>& contours) {
   std::vector<bool> valid(contours.size(), false);
   for (size_t i = 0; i < contours.size(); i++) {
@@ -164,18 +165,38 @@ static std::vector<bool> ComputeContainerValidity(const std::vector<PathContour>
   return valid;
 }
 
-static std::vector<int> ComputeContainmentDepths(const std::vector<PathContour>& contours,
-                                                 const std::vector<bool>& valid) {
-  std::vector<int> depths(contours.size(), 0);
-  for (size_t i = 0; i < contours.size(); i++) {
-    for (size_t j = 0; j < contours.size(); j++) {
+// Builds the (i, j) containment matrix in one O(n²) pass: entry (i, j) is
+// true when contour i lies inside contour j. Shared by the depth calculation
+// and the parent-assignment step so that ContourInsideContour — the expensive
+// ray-cast — runs at most once per ordered pair. `inside` is laid out row-major
+// as `uint8_t` rather than `std::vector<bool>` so reads/writes don't pay the
+// bit-packing cost on the hot inner loop.
+static std::vector<uint8_t> ComputeInsideMatrix(const std::vector<PathContour>& contours,
+                                                const std::vector<bool>& valid) {
+  size_t n = contours.size();
+  std::vector<uint8_t> inside(n * n, 0);
+  for (size_t i = 0; i < n; i++) {
+    for (size_t j = 0; j < n; j++) {
       if (i == j || !valid[j]) {
         continue;
       }
       if (ContourInsideContour(contours[i], contours[j])) {
-        depths[i]++;
+        inside[i * n + j] = 1;
       }
     }
+  }
+  return inside;
+}
+
+static std::vector<int> ComputeDepthsFromMatrix(size_t n, const std::vector<uint8_t>& inside) {
+  std::vector<int> depths(n, 0);
+  for (size_t i = 0; i < n; i++) {
+    int d = 0;
+    const uint8_t* row = inside.data() + i * n;
+    for (size_t j = 0; j < n; j++) {
+      d += row[j];
+    }
+    depths[i] = d;
   }
   return depths;
 }
@@ -207,32 +228,24 @@ static void AdjustWindingForEvenOdd(std::vector<PathContour>& contours,
 }
 
 // Assigns each inner contour to the first (by array order) depth-0 contour that
-// contains it.  If multiple disjoint outer contours exist and the endpoint-polygon
-// approximation in PointInsideContour produces a false positive, an inner contour
-// may be assigned to the wrong parent.  This is unlikely in practice because outer
-// contours are typically non-overlapping.
+// contains it, reusing the pre-computed inside matrix so no ContourInsideContour
+// call is repeated. If multiple disjoint outer contours exist and the endpoint-
+// polygon approximation in PointInsideContour produces a false positive, an inner
+// contour may be assigned to the wrong parent. This is unlikely in practice
+// because outer contours are typically non-overlapping.
 static std::vector<std::vector<size_t>> GroupContoursByOutermost(
     const std::vector<PathContour>& contours, const std::vector<int>& depths,
-    const std::vector<bool>& valid) {
-  // Pre-collect the outermost (depth-0 && valid) candidates so the inner
-  // search becomes O(n_outer) per inner contour instead of O(n) with an extra
-  // validity check on every iteration.
-  std::vector<size_t> outerIndices;
-  outerIndices.reserve(contours.size());
-  for (size_t i = 0; i < contours.size(); i++) {
-    if (depths[i] == 0 && valid[i]) {
-      outerIndices.push_back(i);
-    }
-  }
-
-  std::vector<int> parent(contours.size(), -1);
-  for (size_t i = 0; i < contours.size(); i++) {
+    const std::vector<bool>& valid, const std::vector<uint8_t>& inside) {
+  size_t n = contours.size();
+  std::vector<int> parent(n, -1);
+  for (size_t i = 0; i < n; i++) {
     if (depths[i] == 0) {
       parent[i] = static_cast<int>(i);
       continue;
     }
-    for (size_t j : outerIndices) {
-      if (j != i && ContourInsideContour(contours[i], contours[j])) {
+    const uint8_t* row = inside.data() + i * n;
+    for (size_t j = 0; j < n; j++) {
+      if (j != i && depths[j] == 0 && valid[j] && row[j]) {
         parent[i] = static_cast<int>(j);
         break;
       }
@@ -242,9 +255,9 @@ static std::vector<std::vector<size_t>> GroupContoursByOutermost(
     }
   }
 
-  std::vector<int> groupIndex(contours.size(), -1);
+  std::vector<int> groupIndex(n, -1);
   std::vector<std::vector<size_t>> groups;
-  for (size_t i = 0; i < contours.size(); i++) {
+  for (size_t i = 0; i < n; i++) {
     int p = parent[i];
     if (groupIndex[p] < 0) {
       groupIndex[p] = static_cast<int>(groups.size());
@@ -259,11 +272,12 @@ static std::vector<std::vector<size_t>> GroupContoursByOutermost(
 std::vector<std::vector<size_t>> PrepareContourGroups(std::vector<PathContour>& contours,
                                                       FillRule fillRule) {
   auto valid = ComputeContainerValidity(contours);
-  auto depths = ComputeContainmentDepths(contours, valid);
+  auto inside = ComputeInsideMatrix(contours, valid);
+  auto depths = ComputeDepthsFromMatrix(contours.size(), inside);
   if (fillRule == FillRule::EvenOdd) {
     AdjustWindingForEvenOdd(contours, depths, valid);
   }
-  return GroupContoursByOutermost(contours, depths, valid);
+  return GroupContoursByOutermost(contours, depths, valid, inside);
 }
 
 void TransformContours(std::vector<PathContour>& contours, const Matrix& transform) {
