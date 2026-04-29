@@ -29,6 +29,141 @@
 namespace pagx {
 
 //==============================================================================
+// Font-face rule generation
+//==============================================================================
+
+static const char* DetectFontFormat(const std::string& uri) {
+  auto dot = uri.rfind('.');
+  if (dot == std::string::npos) {
+    return nullptr;
+  }
+  auto ext = uri.substr(dot);
+  for (auto& c : ext) {
+    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  }
+  if (ext == ".otf") return "opentype";
+  if (ext == ".ttf" || ext == ".ttc") return "truetype";
+  if (ext == ".woff") return "woff";
+  if (ext == ".woff2") return "woff2";
+  return nullptr;
+}
+
+static const char* DetectFontMime(const std::string& uri) {
+  auto dot = uri.rfind('.');
+  if (dot == std::string::npos) {
+    return "font/ttf";
+  }
+  auto ext = uri.substr(dot);
+  for (auto& c : ext) {
+    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  }
+  if (ext == ".otf") return "font/otf";
+  if (ext == ".ttf" || ext == ".ttc") return "font/ttf";
+  if (ext == ".woff") return "font/woff";
+  if (ext == ".woff2") return "font/woff2";
+  return "font/ttf";
+}
+
+static std::string EncodeBase64(const std::vector<uint8_t>& data) {
+  static const char table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  std::string out;
+  out.reserve((data.size() + 2) / 3 * 4);
+  size_t i = 0;
+  while (i + 2 < data.size()) {
+    uint32_t v = (static_cast<uint32_t>(data[i]) << 16) |
+                 (static_cast<uint32_t>(data[i + 1]) << 8) | data[i + 2];
+    out += table[(v >> 18) & 0x3F];
+    out += table[(v >> 12) & 0x3F];
+    out += table[(v >> 6) & 0x3F];
+    out += table[v & 0x3F];
+    i += 3;
+  }
+  if (i + 1 == data.size()) {
+    uint32_t v = static_cast<uint32_t>(data[i]) << 16;
+    out += table[(v >> 18) & 0x3F];
+    out += table[(v >> 12) & 0x3F];
+    out += '=';
+    out += '=';
+  } else if (i + 2 == data.size()) {
+    uint32_t v = (static_cast<uint32_t>(data[i]) << 16) | (static_cast<uint32_t>(data[i + 1]) << 8);
+    out += table[(v >> 18) & 0x3F];
+    out += table[(v >> 12) & 0x3F];
+    out += table[(v >> 6) & 0x3F];
+    out += '=';
+  }
+  return out;
+}
+
+static std::string ReadFileAsDataURI(const std::string& path, const char* mime) {
+  std::ifstream file(path, std::ios::binary | std::ios::ate);
+  if (!file) {
+    return {};
+  }
+  auto size = file.tellg();
+  file.seekg(0);
+  std::vector<uint8_t> bytes(static_cast<size_t>(size));
+  file.read(reinterpret_cast<char*>(bytes.data()), size);
+  return std::string("data:") + mime + ";base64," + EncodeBase64(bytes);
+}
+
+static std::string BuildFontFaceCSS(const std::vector<FontFaceRule>& rules, bool minify) {
+  if (rules.empty()) {
+    return {};
+  }
+  std::string css;
+  for (const auto& rule : rules) {
+    if (rule.fontFamily.empty() || rule.uri.empty()) {
+      continue;
+    }
+    std::string srcUrl;
+    switch (rule.mode) {
+      case FontEmbedMode::URL:
+        srcUrl = rule.uri;
+        break;
+      case FontEmbedMode::Base64: {
+        auto dataUri = ReadFileAsDataURI(rule.uri, DetectFontMime(rule.uri));
+        if (dataUri.empty()) {
+          continue;
+        }
+        srcUrl = dataUri;
+        break;
+      }
+      case FontEmbedMode::FilePath:
+        srcUrl = "file://" + rule.uri;
+        break;
+    }
+    auto format = DetectFontFormat(rule.uri);
+    std::string srcValue = "url('" + srcUrl + "')";
+    if (format) {
+      srcValue += std::string(" format('") + format + "')";
+    }
+    if (minify) {
+      css += "@font-face{font-family:'" + rule.fontFamily + "';src:" + srcValue;
+      if (!rule.fontWeight.empty()) {
+        css += ";font-weight:" + rule.fontWeight;
+      }
+      if (!rule.fontStyle.empty()) {
+        css += ";font-style:" + rule.fontStyle;
+      }
+      css += ";font-display:block}";
+    } else {
+      css += "@font-face {\n";
+      css += "  font-family: '" + rule.fontFamily + "';\n";
+      css += "  src: " + srcValue + ";\n";
+      if (!rule.fontWeight.empty()) {
+        css += "  font-weight: " + rule.fontWeight + ";\n";
+      }
+      if (!rule.fontStyle.empty()) {
+        css += "  font-style: " + rule.fontStyle + ";\n";
+      }
+      css += "  font-display: block;\n";
+      css += "}\n";
+    }
+  }
+  return css;
+}
+
+//==============================================================================
 // Coordinate rounding
 //==============================================================================
 
@@ -198,6 +333,19 @@ std::string HTMLExporter::ToHTML(const PAGXDocument& doc, const Options& options
 
   if (options.extractStyleSheet) {
     nativeHTML = HTMLStyleExtractor::Extract(nativeHTML, ToExtractorFormat(options.format));
+  }
+
+  // Inject @font-face rules into the <style> block (or create a standalone <style> block).
+  std::string fontFaceCSS = BuildFontFaceCSS(options.fontFaceRules, minify);
+  if (!fontFaceCSS.empty()) {
+    auto stylePos = nativeHTML.find("<style>");
+    if (stylePos != std::string::npos) {
+      nativeHTML.insert(stylePos + 7, minify ? fontFaceCSS : "\n" + fontFaceCSS);
+    } else {
+      std::string block =
+          minify ? "<style>" + fontFaceCSS + "</style>" : "<style>\n" + fontFaceCSS + "</style>\n";
+      nativeHTML = block + nativeHTML;
+    }
   }
 
   const char* header = minify ? "" : kGeneratedComment;

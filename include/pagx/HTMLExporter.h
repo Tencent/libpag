@@ -19,9 +19,69 @@
 #pragma once
 
 #include <string>
+#include <vector>
 #include "pagx/PAGXDocument.h"
 
 namespace pagx {
+
+/**
+ * Specifies how a font file is referenced in the generated @font-face rule.
+ */
+enum class FontEmbedMode {
+  /**
+   * The uri field is emitted as-is inside a CSS `url()`. Use this for CDN links
+   * (e.g. "https://cdn.example.com/font.woff2") or relative paths that will be resolved
+   * against the HTML document's location (e.g. "fonts/NotoSansSC-Bold.ttf").
+   */
+  URL,
+
+  /**
+   * The uri field is a local file path. The exporter reads the file, base64-encodes its
+   * contents, and emits an inline `url(data:font/...;base64,...)` data URI. This produces
+   * a fully self-contained HTML document at the cost of a ~33% size increase for the font data.
+   */
+  Base64,
+
+  /**
+   * The uri field is a local file path that is emitted as a `file://` URL. Useful for local
+   * debugging and preview; browsers typically block file:// URLs from non-file:// pages, so
+   * this mode is not suitable for production delivery.
+   */
+  FilePath,
+};
+
+/**
+ * Describes a single @font-face rule to inject into the HTML output.
+ */
+struct FontFaceRule {
+  /**
+   * The CSS font-family name to declare (e.g. "Noto Sans SC"). Must match the font-family
+   * names used by the PAGX document's Text nodes.
+   */
+  std::string fontFamily;
+
+  /**
+   * The font source: a URL, relative path, or local file path depending on `mode`.
+   */
+  std::string uri;
+
+  /**
+   * How the uri should be embedded in the generated CSS.
+   */
+  FontEmbedMode mode = FontEmbedMode::URL;
+
+  /**
+   * Optional CSS font-weight value (e.g. "400", "700", "bold"). When empty, the property is
+   * omitted and the browser defaults to "normal" (400).
+   */
+  std::string fontWeight;
+
+  /**
+   * Optional CSS font-style value (e.g. "normal", "italic"). When empty, the property is
+   * omitted and the browser defaults to "normal".
+   */
+  std::string fontStyle;
+};
 
 /**
  * Output formatting style for the generated HTML document.
@@ -124,6 +184,15 @@ struct HTMLExportOptions {
    * The default is true.
    */
   bool extractStyleSheet = true;
+
+  /**
+   * @font-face rules to inject into the generated HTML. The exporter produces a complete
+   * @font-face CSS declaration for each entry, using the `mode` field to decide how the
+   * font file is referenced (inline URL, base64 data URI, or file:// path). When this
+   * vector is empty (the default), no @font-face rules are emitted and the browser falls
+   * back to system fonts or CSS font synthesis for any weight/style that is not installed.
+   */
+  std::vector<FontFaceRule> fontFaceRules = {};
 };
 
 /**
