@@ -5,7 +5,7 @@
   <Layer name="Parent" left="50" top="50">
     <Rectangle left="20" top="20" width="260" height="260" roundness="32"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="260,260">
+      <LinearGradient>
         <ColorStop color="#F43F5E" offset="0"/>
         <ColorStop color="#EC4899" offset="1"/>
       </LinearGradient>

@@ -18,38 +18,30 @@
 
 #pragma once
 
-#include <vector>
-#include "pagx/nodes/ColorSource.h"
-#include "pagx/nodes/ColorStop.h"
-#include "pagx/types/Matrix.h"
+#include "pagx/nodes/Gradient.h"
 #include "pagx/types/Point.h"
 
 namespace pagx {
 
 /**
- * A linear gradient color source that produces a gradient along a line between two points.
+ * A linear gradient color source that produces a gradient along a line between two points. By
+ * default the gradient lives in each geometry's normalized (0, 0)-(1, 1) bounding box space (see
+ * Gradient::fitsToGeometry).
  */
-class LinearGradient : public ColorSource {
+class LinearGradient : public Gradient {
  public:
   /**
-   * The starting point of the gradient line.
+   * The starting point of the gradient line. Defaults to (0, 0), the left edge of the
+   * geometry's normalized bounding box when fitsToGeometry is true.
    */
-  Point startPoint = {};
+  Point startPoint = {0.0f, 0.0f};
 
   /**
-   * The ending point of the gradient line.
+   * The ending point of the gradient line. Defaults to (1, 0), the right edge of the
+   * geometry's normalized bounding box when fitsToGeometry is true, producing a horizontal
+   * left-to-right gradient by default.
    */
-  Point endPoint = {};
-
-  /**
-   * The transformation matrix applied to the gradient.
-   */
-  Matrix matrix = {};
-
-  /**
-   * The color stops defining the gradient colors and positions.
-   */
-  std::vector<ColorStop*> colorStops = {};
+  Point endPoint = {1.0f, 0.0f};
 
   NodeType nodeType() const override {
     return NodeType::LinearGradient;
