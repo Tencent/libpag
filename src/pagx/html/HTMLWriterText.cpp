@@ -707,7 +707,7 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       }
     }
   }
-  if (text->fauxBold && !stroke) {
+  if (text->fauxBold) {
     // Use Chromium's native synthesized bold. When the loaded @font-face exposes only a Regular
     // variant, `font-weight:bold` triggers the browser's built-in synthesis, which thickens the
     // rasterised glyph without adding a separate stroke layer above the fill.
@@ -715,6 +715,12 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     // `font-synthesis:none` from an ancestor.
     // When fontStyle already contains "Bold", font-weight:bold is already emitted above;
     // the duplicate is harmless (CSS last-value wins) and keeps the logic straightforward.
+    // Must be emitted even when a real Stroke is present: tgfx renders fauxBold as a
+    // path-union thickening of the glyph and then draws the Stroke around the thickened
+    // outline, so CSS must synthesise-bold first and let -webkit-text-stroke paint along
+    // the thicker silhouette. Without this, the stroke traces the thinner regular outline
+    // and bleeds inside the bolder fill glyph, visible as coloured lines cutting through
+    // letter strokes.
     style += ";font-weight:bold;font-synthesis-weight:" +
              std::string(_ctx->fontSynthesisWeight ? "auto" : "none");
   }
@@ -1179,7 +1185,6 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         } else if (!fill && stroke) {
           charStyle += ";color:transparent";
         }
-        bool emittedTextStroke = false;
         if (stroke) {
           Color strokeColor = {};
           float strokeWidth = stroke->width;
@@ -1199,13 +1204,13 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
             charStyle += ";-webkit-text-stroke:" + FloatToString(strokeWidth) + "px " +
                          ColorToRGBA(strokeColor, stroke->alpha);
             charStyle += ";paint-order:stroke fill";
-            emittedTextStroke = true;
           }
         }
         // fauxBold is handled via CSS native synthesis (`font-weight:bold` +
-        // `font-synthesis-weight`). Suppress when a real stroke already occupies the
-        // text-stroke slot so a Stroke element still paints as expected.
-        if (text->fauxBold && !emittedTextStroke) {
+        // `font-synthesis-weight`). Must coexist with -webkit-text-stroke so the stroke
+        // paints along the synthesised-bold outline; otherwise the stroke traces the
+        // thinner regular outline and bleeds inside the bolder fill glyph.
+        if (text->fauxBold) {
           charStyle += ";font-weight:bold;font-synthesis-weight:" +
                        std::string(_ctx->fontSynthesisWeight ? "auto" : "none");
         }

@@ -408,7 +408,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                   }
                 }
               }
-              if (span.text->fauxBold && !span.stroke) {
+              if (span.text->fauxBold) {
                 if (!spanStyle.empty()) spanStyle += ';';
                 spanStyle += "font-weight:bold;font-synthesis-weight:" +
                              std::string(_ctx->fontSynthesisWeight ? "auto" : "none");
@@ -550,7 +550,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                 }
               }
             }
-            if (span.text->fauxBold && !span.stroke) {
+            if (span.text->fauxBold) {
               spanStyle += ";font-weight:bold;font-synthesis-weight:" +
                            std::string(_ctx->fontSynthesisWeight ? "auto" : "none");
             }

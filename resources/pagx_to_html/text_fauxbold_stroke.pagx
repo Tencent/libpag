@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: fauxBold must coexist with stroke across all text emit paths so that
+     -webkit-text-stroke paints along the synthesised-bold glyph outline instead of
+     the thinner regular outline (which otherwise produces stroke bleed inside the
+     glyph body). Covers writeText (Text+Fill+Stroke), writeTextModifier
+     (TextModifier.strokeColor override), and the TextBox span variant. -->
+<pagx version="1.0" width="420" height="280">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16,20,16,20" gap="10" alignment="stretch">
+    <!-- Title -->
+    <Layer height="20">
+      <Text text="fauxBold + Stroke" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
+      <Fill color="#1E293B"/>
+    </Layer>
+
+    <!-- Path 1: writeText — Text + Fill + Stroke + fauxBold -->
+    <Layer height="44">
+      <Text text="BOLD" fontFamily="Noto Sans SC" fauxBold="true" fontSize="40" centerX="0" textAnchor="center"/>
+      <Fill color="#F59E0B"/>
+      <Stroke color="#EF4444" width="2"/>
+    </Layer>
+
+    <!-- Path 2: writeTextModifier — Text + TextModifier(strokeColor/strokeWidth) + Fill + fauxBold -->
+    <Layer height="44">
+      <Text text="MOD" fontFamily="Noto Sans SC" fauxBold="true" fontSize="40" centerX="0" textAnchor="center"/>
+      <TextModifier strokeColor="#10B981" strokeWidth="2">
+        <RangeSelector start="0" end="1" shape="square"/>
+      </TextModifier>
+      <Fill color="#3B82F6"/>
+      <Stroke color="#00000000" width="2"/>
+    </Layer>
+
+    <!-- Path 3: TextBox span — TextBox containing Text + Fill + Stroke + fauxBold -->
+    <Layer height="56">
+      <TextBox left="0" right="0" top="0" bottom="0" textAlign="center" paragraphAlign="middle">
+        <Text text="BOX" fontFamily="Noto Sans SC" fauxBold="true" fontSize="36"/>
+        <Fill color="#EC4899"/>
+        <Stroke color="#0EA5E9" width="2"/>
+      </TextBox>
+    </Layer>
+  </Layer>
+</pagx>
