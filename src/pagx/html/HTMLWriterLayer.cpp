@@ -379,10 +379,10 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                 spanStyle += "font-size:" + FloatToString(span.text->renderFontSize()) + "px";
                 if (!span.text->fontStyle.empty()) {
                   if (span.text->fontStyle.find("Bold") != std::string::npos) {
-                    spanStyle += ";font-weight:bold";
+                    spanStyle += ";font-weight:bold;font-synthesis-weight:auto";
                   }
                   if (span.text->fontStyle.find("Italic") != std::string::npos) {
-                    spanStyle += ";font-style:italic";
+                    spanStyle += ";font-style:italic;font-synthesis-style:auto";
                   }
                 }
                 if (span.text->letterSpacing != 0.0f) {
@@ -519,10 +519,10 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               spanStyle += ";font-size:" + FloatToString(span.text->renderFontSize()) + "px";
               if (!span.text->fontStyle.empty()) {
                 if (span.text->fontStyle.find("Bold") != std::string::npos) {
-                  spanStyle += ";font-weight:bold";
+                  spanStyle += ";font-weight:bold;font-synthesis-weight:auto";
                 }
                 if (span.text->fontStyle.find("Italic") != std::string::npos) {
-                  spanStyle += ";font-style:italic";
+                  spanStyle += ";font-style:italic;font-synthesis-style:auto";
                 }
               }
               if (span.text->letterSpacing != 0.0f) {

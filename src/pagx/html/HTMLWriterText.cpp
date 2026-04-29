@@ -697,10 +697,10 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     }
     if (!text->fontStyle.empty()) {
       if (text->fontStyle.find("Bold") != std::string::npos) {
-        style += ";font-weight:bold";
+        style += ";font-weight:bold;font-synthesis-weight:auto";
       }
       if (text->fontStyle.find("Italic") != std::string::npos) {
-        style += ";font-style:italic";
+        style += ";font-style:italic;font-synthesis-style:auto";
       }
     }
   }
@@ -710,6 +710,8 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     // rasterised glyph without adding a separate stroke layer above the fill.
     // `font-synthesis-weight:auto` re-enables synthesis on elements that inherit
     // `font-synthesis:none` from an ancestor.
+    // When fontStyle already contains "Bold", font-weight:bold is already emitted above;
+    // the duplicate is harmless (CSS last-value wins) and keeps the logic straightforward.
     style += ";font-weight:bold;font-synthesis-weight:auto";
   }
   if (fill && fill->color) {
@@ -1071,10 +1073,10 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
       containerStyle += ";font-size:0";
       if (!text->fontStyle.empty()) {
         if (text->fontStyle.find("Bold") != std::string::npos) {
-          containerStyle += ";font-weight:bold";
+          containerStyle += ";font-weight:bold;font-synthesis-weight:auto";
         }
         if (text->fontStyle.find("Italic") != std::string::npos) {
-          containerStyle += ";font-style:italic";
+          containerStyle += ";font-style:italic;font-synthesis-style:auto";
         }
       }
       if (text->letterSpacing != 0.0f) {
@@ -1461,10 +1463,10 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         charStyle += ";line-height:1";
         if (!text->fontStyle.empty()) {
           if (text->fontStyle.find("Bold") != std::string::npos) {
-            charStyle += ";font-weight:bold";
+            charStyle += ";font-weight:bold;font-synthesis-weight:auto";
           }
           if (text->fontStyle.find("Italic") != std::string::npos) {
-            charStyle += ";font-style:italic";
+            charStyle += ";font-style:italic;font-synthesis-style:auto";
           }
         }
         if (text->letterSpacing != 0.0f) {
