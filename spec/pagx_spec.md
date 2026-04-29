@@ -1260,7 +1260,7 @@ rect.bottom = position.y + size.height / 2
 - `roundness` value is automatically limited to `min(roundness, size.width/2, size.height/2)`
 - When `roundness >= min(size.width, size.height) / 2`, the shorter dimension becomes semicircular
 
-**Degenerate Line**: When exactly one of `width` and `height` is `0` (the other is non-zero), the rectangle degenerates into a single line segment between its two opposite corners instead of a closed rectangle. This is the canonical way to author a straight line in PAGX — pair the zero-edge Rectangle with `Stroke` to draw the line. `roundness` is ignored in this case.
+**Degenerate Line**: When exactly one of `width` and `height` is `0` (the other is non-zero), the rectangle degenerates into a single line segment between its two opposite corners instead of a closed rectangle. `roundness` is ignored in this case.
 
 **Path Start Point**: Rectangle path starts from the **top-right corner**, drawn clockwise (`reversed="false"`). For a degenerate line, the path starts from the **top-left corner** and ends at the bottom-right corner (or vice versa when `reversed="true"`).
 

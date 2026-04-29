@@ -1260,7 +1260,7 @@ rect.bottom = position.y + size.height / 2
 - `roundness` 值自动限制为 `min(roundness, size.width/2, size.height/2)`
 - 当 `roundness >= min(size.width, size.height) / 2` 时，短边方向呈半圆形
 
-**线段退化**：当 `width` 和 `height` 中**恰好一个**为 `0`（另一个非零）时，矩形退化为连接两个对角的单条线段，而不是闭合矩形。这是 PAGX 中绘制直线的标准写法——将零边 Rectangle 与 `Stroke` 搭配即可绘出直线。此时 `roundness` 被忽略。
+**线段退化**：当 `width` 和 `height` 中**恰好一个**为 `0`（另一个非零）时，矩形退化为连接两个对角的单条线段，而不是闭合矩形。此时 `roundness` 被忽略。
 
 **示例**:
 

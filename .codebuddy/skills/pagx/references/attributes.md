@@ -113,9 +113,7 @@ Geometry element defined from center point with uniform corner rounding support.
 | `reversed` | bool | false | Reverse path direction |
 | `position` | Point | (center of bounding box) | Center point coordinate; animatable, prefer constraint attributes for static layout |
 
-Rectangle supports all constraint attributes. See §Constraint Attributes below.
-
-**Degenerate line**: When exactly one of `width` and `height` is `0`, the Rectangle becomes a single line segment between its two opposite corners. Use this with `Stroke` as the canonical way to draw a straight line in PAGX (e.g., dividers, underlines, axis ticks).
+Rectangle supports all constraint attributes. See §Constraint Attributes below. When exactly one of `width`/`height` is `0`, Rectangle degenerates to a line segment — see `guide.md` §Geometry Elements.
 
 ### Ellipse
 

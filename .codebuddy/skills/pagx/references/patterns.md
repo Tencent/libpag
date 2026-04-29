@@ -22,17 +22,14 @@ Layers in rows or columns, and constraint positioning for positioning elements w
 <pagx width="300" height="20">
   <Layer centerX="0" centerY="0" width="260" height="1">
     <Rectangle width="100%" height="0"/>
-    <Stroke color="#E2E8F0" width="1"/>
+    <Stroke color="#E2E8F0"/>
   </Layer>
 </pagx>
 ```
 
-**Pattern**: Zero-height Rectangle + Stroke is the canonical way to draw a straight line.
-The zero edge collapses the Rectangle to a single line segment, and Stroke renders it as
-a 1px line. The wrapping Layer carries an explicit `height="1"` so the divider occupies
-1px of layout space (otherwise it collapses to 0 in vertical layouts). For full-width
-dividers, use `width="100%"` on the Layer instead of an explicit width. For vertical
-dividers, swap the zero axis: `Rectangle width="0"` inside a Layer with `width="1"`.
+**Pattern**: Reference for the straight-line authoring pattern (see `guide.md`
+§Geometry Elements). For full-width dividers use `width="100%"` on the Layer; for
+vertical dividers swap the zero axis (`Rectangle width="0"` in a `Layer width="1"`).
 
 ### Button / Badge
 
@@ -136,7 +133,7 @@ No Group needed when only one painter scope exists.
       <Fill color="#3B82F6"/>
       <Group bottom="0" width="100%">
         <Rectangle width="100%" height="0"/>
-        <Stroke color="#3B82F6" width="1"/>
+        <Stroke color="#3B82F6"/>
       </Group>
     </Layer>
     <!-- Strikethrough: Text + isolated zero-height Rectangle through mid-line -->
@@ -145,17 +142,16 @@ No Group needed when only one painter scope exists.
       <Fill color="#BDC3C7"/>
       <Group centerY="0" width="100%">
         <Rectangle width="100%" height="0"/>
-        <Stroke color="#FF4757" width="1"/>
+        <Stroke color="#FF4757"/>
       </Group>
     </Layer>
   </Layer>
 </pagx>
 ```
 
-**Pattern**: PAGX has no `text-decoration`. Overlay a zero-height Rectangle + Stroke
-(the canonical straight-line pattern) wrapped in a Group so the Stroke does not leak
-onto the Text glyphs. Position the Group with `bottom="0"` for underline or
-`centerY="0"` for strikethrough, and use `width="100%"` to match the text width.
+**Pattern**: PAGX has no `text-decoration`. Overlay a line wrapped in a Group so the
+Stroke does not leak onto the Text glyphs. Position the Group with `bottom="0"` for
+underline or `centerY="0"` for strikethrough, with `width="100%"` to match text width.
 
 ### Image Placeholder
 
@@ -280,7 +276,7 @@ A card with vertical container layout, text header, and action buttons.
         <Layer flex="1">
           <Rectangle width="100%" height="100%" roundness="10"/>
           <Fill color="#F1F5F9"/>
-          <Stroke color="#CBD5E1" width="1" align="inside"/>
+          <Stroke color="#CBD5E1" align="inside"/>
           <Group centerX="0" centerY="0" padding="16">
             <Text text="Request" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
             <Fill color="#1E293B"/>
@@ -306,7 +302,7 @@ Button cells use Group with `padding` for centered text (no layout needed). This
   <Layer centerX="0" centerY="0" width="260" height="40">
     <Rectangle width="100%" height="100%" roundness="8"/>
     <Fill color="#FFF"/>
-    <Stroke color="#CBD5E1" width="1"/>
+    <Stroke color="#CBD5E1"/>
     <Group left="12" centerY="0">
       <Text text="Enter your email..." fontFamily="Arial" fontSize="14"/>
       <Fill color="#94A3B8"/>
@@ -452,7 +448,7 @@ toolbar items.
     <!-- Row divider -->
     <Layer height="1">
       <Rectangle width="100%" height="0"/>
-      <Stroke color="#F1F5F9" width="1"/>
+      <Stroke color="#F1F5F9"/>
     </Layer>
     <!-- Data row 1 -->
     <Layer height="44" layout="horizontal" padding="0,16,0,16" alignment="center">
@@ -476,7 +472,7 @@ toolbar items.
     <!-- Row divider -->
     <Layer height="1">
       <Rectangle width="100%" height="0"/>
-      <Stroke color="#F1F5F9" width="1"/>
+      <Stroke color="#F1F5F9"/>
     </Layer>
     <!-- Data row 2 -->
     <Layer height="44" layout="horizontal" padding="0,16,0,16" alignment="center">
@@ -505,8 +501,8 @@ toolbar items.
 **Pattern**: Table = vertical stack of horizontal rows. Each row is a `layout="horizontal"`
 Layer with child Layers as cells. Header row has distinct background. Use fixed `width` for
 columns that need consistent sizing (name, status, actions) and `flex="1"` for columns
-that absorb remaining space (email, description). Separate data rows with the
-`Rectangle height="0"` + `Stroke` divider pattern (see §Divider) wrapped in a 1px Layer.
+that absorb remaining space (email, description). Separate data rows with the divider
+pattern (see §Divider).
 
 ---
 
@@ -547,7 +543,7 @@ goes clockwise — use Group `rotation` to reposition the start point.
   <!-- Baseline -->
   <Layer left="30" right="30" bottom="30" height="1">
     <Rectangle width="100%" height="0"/>
-    <Stroke color="#CBD5E1" width="1"/>
+    <Stroke color="#CBD5E1"/>
   </Layer>
 </pagx>
 ```
@@ -565,7 +561,7 @@ Layer. Cannot use Repeater when heights differ — list each bar individually.
   <Layer centerX="0" centerY="0">
     <!-- Grid lines: 5 horizontal lines at 35px intervals -->
     <Rectangle width="240" height="0"/>
-    <Stroke color="#F1F5F9" width="1"/>
+    <Stroke color="#F1F5F9"/>
     <Repeater copies="5" position="0,35"/>
     <!-- Data line -->
     <Group>
