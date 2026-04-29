@@ -22,6 +22,7 @@
 #include "pagx/types/Data.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Typeface.h"
+#include "utils/ImagePatternMatrixCalculator.h"
 
 using namespace emscripten;
 
@@ -144,6 +145,10 @@ void PAGXView::buildLayers() {
   if (!document) {
     return;
   }
+  // TODO: Remove resolveAllImagePatternMatrices() after the pagx exporter adapts to relative
+  // coordinates for image and gradient fills. Currently it forces them to absolute coordinates
+  // to ensure correct rendering.
+  resolveAllImagePatternMatrices(document.get());
   document->applyLayout(&fontConfig);
   contentLayer = LayerBuilder::Build(document.get());
   if (!contentLayer) {
@@ -188,8 +193,7 @@ void PAGXView::syncSurfaceSize(tgfx::Context* context) {
   if (canvasWidth <= 0 || canvasHeight <= 0) {
     return;
   }
-  if (surface != nullptr && surface->width() == canvasWidth &&
-      surface->height() == canvasHeight) {
+  if (surface != nullptr && surface->width() == canvasWidth && surface->height() == canvasHeight) {
     return;
   }
   surface = nullptr;
@@ -269,7 +273,8 @@ void PAGXView::draw() {
   double frameStartMs = emscripten_get_now();
   bool hasContentChanged = displayList.hasContentChanged();
   bool hasLastRecording = (lastRecording != nullptr);
-  bool needsInitialFrame = presentImmediately || (!useCustomBackgroundColor && backgroundLayer == nullptr);
+  bool needsInitialFrame =
+      presentImmediately || (!useCustomBackgroundColor && backgroundLayer == nullptr);
   // Detect size change before the early-return so a pure JS-driven resize
   // (only canvas.width/height changed, no content dirty) still triggers a
   // redraw. The actual surface rebuild happens inside syncSurfaceSize() while
@@ -302,7 +307,8 @@ void PAGXView::draw() {
     int width = 0;
     int height = 0;
     emscripten_get_canvas_element_size(canvasID.c_str(), &width, &height);
-    auto density = width > 0 ? static_cast<float>(surface->width()) / static_cast<float>(width) : 1.0f;
+    auto density =
+        width > 0 ? static_cast<float>(surface->width()) / static_cast<float>(width) : 1.0f;
     int bgWidth = surface->width();
     int bgHeight = surface->height();
     if (!backgroundLayer || bgWidth != lastBackgroundWidth || bgHeight != lastBackgroundHeight ||
