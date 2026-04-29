@@ -18,8 +18,9 @@
 
 #pragma once
 
-#include <deque>
 #include <emscripten/bind.h>
+#include <deque>
+#include "GridBackground.h"
 #include "LayerBuilder.h"
 #include "pagx/FontConfig.h"
 #include "pagx/PAGXDocument.h"
@@ -27,7 +28,6 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Recording.h"
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
-#include "GridBackground.h"
 #include "tgfx/layers/DisplayList.h"
 
 namespace pagx {
