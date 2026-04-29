@@ -53,6 +53,29 @@ void EmitFlatContourGeom(XMLBuilder& out, const std::vector<PathContour>& contou
                          float scaledOfsX, float scaledOfsY);
 
 /**
+ * Selects how EmitGroupCustGeom places the corner bounds markers that pin the
+ * content bounding box to the declared (pathWidth, pathHeight). WeChat requires
+ * drawable segments at both corners to recognise the bbox, so the marker is
+ * always composed of zero-length lines.
+ *
+ * InlineSegments
+ *   Two `moveTo + lnTo` zero-length segments share the same `<a:path>` as the
+ *   main geometry. Use when the enclosing sp has no stroke (e.g. text-as-path
+ *   glyph shapes) so round caps cannot paint visible dots at the corner points.
+ *
+ * StandaloneStrokelessPath
+ *   The two corner segments are emitted in a separate `<a:path stroke="0"
+ *   fill="none">` placed before the main geometry path. Use when the enclosing
+ *   sp may carry a round-capped stroke: the per-path `stroke="0"` keeps the
+ *   markers from rendering as dots while the main geometry still honours the
+ *   sp-level `<a:ln>`.
+ */
+enum class BoundsMarkerStyle {
+  InlineSegments,
+  StandaloneStrokelessPath,
+};
+
+/**
  * Emits a single `<a:custGeom>` for one group that also includes the
  * zero-length bounds-marker path pinning the content bounding box to the
  * declared (pathWidth, pathHeight). Use this when emitting one shape per
@@ -60,6 +83,7 @@ void EmitFlatContourGeom(XMLBuilder& out, const std::vector<PathContour>& contou
  */
 void EmitGroupCustGeom(XMLBuilder& out, const std::vector<PathContour>& contours,
                        const std::vector<size_t>& group, int64_t pathWidth, int64_t pathHeight,
-                       float scaleX, float scaleY, float scaledOfsX, float scaledOfsY);
+                       float scaleX, float scaleY, float scaledOfsX, float scaledOfsY,
+                       BoundsMarkerStyle markerStyle);
 
 }  // namespace pagx

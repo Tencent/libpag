@@ -163,6 +163,33 @@ void EmitCustGeomHeader(XMLBuilder& out) {
       .closeElementSelfClosing();
 }
 
+void EmitCornerBoundsMarkerSegments(XMLBuilder& out, int64_t pathWidth, int64_t pathHeight) {
+  out.openElement("a:moveTo").closeElementStart();
+  out.openElement("a:pt")
+      .addRequiredAttribute("x", int64_t(0))
+      .addRequiredAttribute("y", int64_t(0))
+      .closeElementSelfClosing();
+  out.closeElement();
+  out.openElement("a:lnTo").closeElementStart();
+  out.openElement("a:pt")
+      .addRequiredAttribute("x", int64_t(0))
+      .addRequiredAttribute("y", int64_t(0))
+      .closeElementSelfClosing();
+  out.closeElement();
+  out.openElement("a:moveTo").closeElementStart();
+  out.openElement("a:pt")
+      .addRequiredAttribute("x", pathWidth)
+      .addRequiredAttribute("y", pathHeight)
+      .closeElementSelfClosing();
+  out.closeElement();
+  out.openElement("a:lnTo").closeElementStart();
+  out.openElement("a:pt")
+      .addRequiredAttribute("x", pathWidth)
+      .addRequiredAttribute("y", pathHeight)
+      .closeElementSelfClosing();
+  out.closeElement();
+}
+
 }  // namespace
 
 void EmitContourGeomFromGroups(XMLBuilder& out, const std::vector<PathContour>& contours,
@@ -198,49 +225,42 @@ void EmitFlatContourGeom(XMLBuilder& out, const std::vector<PathContour>& contou
 
 void EmitGroupCustGeom(XMLBuilder& out, const std::vector<PathContour>& contours,
                        const std::vector<size_t>& group, int64_t pathWidth, int64_t pathHeight,
-                       float scaleX, float scaleY, float scaledOfsX, float scaledOfsY) {
+                       float scaleX, float scaleY, float scaledOfsX, float scaledOfsY,
+                       BoundsMarkerStyle markerStyle) {
   EmitCustGeomHeader(out);
   out.openElement("a:pathLst").closeElementStart();
-  out.openElement("a:path")
-      .addRequiredAttribute("w", pathWidth)
-      .addRequiredAttribute("h", pathHeight)
-      .closeElementStart();
 
-  // Zero-length segments at opposite corners of the coordinate space.  They
-  // are invisible but force the content bounding box to match the declared
-  // (w, h), preventing renderers that auto-fit shapes to actual content bounds
-  // (e.g. WeChat) from rescaling each group independently.
-  out.openElement("a:moveTo").closeElementStart();
-  out.openElement("a:pt")
-      .addRequiredAttribute("x", int64_t(0))
-      .addRequiredAttribute("y", int64_t(0))
-      .closeElementSelfClosing();
-  out.closeElement();
-  out.openElement("a:lnTo").closeElementStart();
-  out.openElement("a:pt")
-      .addRequiredAttribute("x", int64_t(0))
-      .addRequiredAttribute("y", int64_t(0))
-      .closeElementSelfClosing();
-  out.closeElement();
-  out.openElement("a:moveTo").closeElementStart();
-  out.openElement("a:pt")
-      .addRequiredAttribute("x", pathWidth)
-      .addRequiredAttribute("y", pathHeight)
-      .closeElementSelfClosing();
-  out.closeElement();
-  out.openElement("a:lnTo").closeElementStart();
-  out.openElement("a:pt")
-      .addRequiredAttribute("x", pathWidth)
-      .addRequiredAttribute("y", pathHeight)
-      .closeElementSelfClosing();
-  out.closeElement();
-
-  if (group.size() > 1) {
-    EmitBridgedGroup(out, contours, group, scaleX, scaleY, scaledOfsX, scaledOfsY);
+  // Bounds marker strategy documented on BoundsMarkerStyle. Both strategies
+  // keep the bbox pinned to (pathWidth, pathHeight) for WeChat; the difference
+  // is whether the marker segments share the main `<a:path>` (safe when the
+  // sp has no stroke) or live in a strokeless sibling path (needed when the
+  // sp may carry a round-capped stroke that would otherwise render visible
+  // dots at the corners).
+  if (markerStyle == BoundsMarkerStyle::StandaloneStrokelessPath) {
+    out.openElement("a:path")
+        .addRequiredAttribute("w", pathWidth)
+        .addRequiredAttribute("h", pathHeight)
+        .addRequiredAttribute("fill", "none")
+        .addRequiredAttribute("stroke", "0")
+        .closeElementStart();
+    EmitCornerBoundsMarkerSegments(out, pathWidth, pathHeight);
+    out.closeElement();  // a:path (bounds marker)
+    EmitGroupPath(out, contours, group, pathWidth, pathHeight, scaleX, scaleY, scaledOfsX,
+                  scaledOfsY);
   } else {
-    EmitContour(out, contours[group[0]], scaleX, scaleY, scaledOfsX, scaledOfsY);
+    out.openElement("a:path")
+        .addRequiredAttribute("w", pathWidth)
+        .addRequiredAttribute("h", pathHeight)
+        .closeElementStart();
+    EmitCornerBoundsMarkerSegments(out, pathWidth, pathHeight);
+    if (group.size() > 1) {
+      EmitBridgedGroup(out, contours, group, scaleX, scaleY, scaledOfsX, scaledOfsY);
+    } else {
+      EmitContour(out, contours[group[0]], scaleX, scaleY, scaledOfsX, scaledOfsY);
+    }
+    out.closeElement();  // a:path
   }
-  out.closeElement();  // a:path
+
   out.closeElement();  // a:pathLst
   out.closeElement();  // a:custGeom
 }

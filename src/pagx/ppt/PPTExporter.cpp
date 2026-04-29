@@ -1556,7 +1556,8 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
     if (groups.size() > 1) {
       for (const auto& group : groups) {
         beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
-        EmitGroupCustGeom(out, contours, group, pw, ph, 1.0f, 1.0f, adjustedX, adjustedY);
+        EmitGroupCustGeom(out, contours, group, pw, ph, 1.0f, 1.0f, adjustedX, adjustedY,
+                          BoundsMarkerStyle::StandaloneStrokelessPath);
         writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters, styles);
       }
       return;
@@ -1675,7 +1676,8 @@ void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStr
     auto groups = PrepareContourGroups(allContours, FillRule::EvenOdd);
     for (const auto& group : groups) {
       beginShape(out, "Glyph", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
-      EmitGroupCustGeom(out, allContours, group, pw, ph, sx, sy, scaledOfsX, scaledOfsY);
+      EmitGroupCustGeom(out, allContours, group, pw, ph, sx, sy, scaledOfsX, scaledOfsY,
+                        BoundsMarkerStyle::InlineSegments);
       writeGlyphShape(out, fs.fill, alpha);
     }
   } else {
