@@ -7,7 +7,7 @@ alwaysApply: true
 
 格式：`feature/{username}_模块名` 或 `bugfix/{username}_模块名`
 
-- `{username}`：GitHub 用户 ID，全小写
+- `{username}`：用户名，全小写
 - 模块名用下划线连接，最多两个单词
 
 ## Commit 信息

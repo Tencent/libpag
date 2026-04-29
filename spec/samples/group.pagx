@@ -4,7 +4,7 @@
     <Group left="200" top="200" anchor="110,110" rotation="12">
       <Rectangle width="220" height="220" roundness="32"/>
       <Fill>
-        <LinearGradient startPoint="0,0" endPoint="220,220">
+        <LinearGradient>
           <ColorStop color="#F43F5E" offset="0"/>
           <ColorStop color="#EC4899" offset="0.5"/>
           <ColorStop color="#8B5CF6" offset="1"/>

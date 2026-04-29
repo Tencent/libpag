@@ -106,7 +106,7 @@ sliders and loading indicators.
   <Layer centerX="0" centerY="0">
     <Text text="Premium" fontFamily="Arial" fontStyle="Bold" fontSize="48"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="200,0">
+      <LinearGradient endPoint="1,0">
         <ColorStop color="#6366F1" offset="0"/>
         <ColorStop color="#EC4899" offset="1"/>
       </LinearGradient>
@@ -116,7 +116,8 @@ sliders and loading indicators.
 ```
 
 **Pattern**: LinearGradient inside Fill applies to Text geometry — equivalent to CSS
-`background-clip: text`. Gradient coordinates are relative to the Text's local origin.
+`background-clip: text`. Gradient coordinates default to the Text's own normalized 0-1 bounding
+box, so `endPoint="1,0"` spans the full text width regardless of font size.
 No Group needed when only one painter scope exists.
 
 ### Text Decoration (Strikethrough & Underline)
@@ -156,7 +157,7 @@ Same color: single Fill. Different colors: wrap the line in a Group to isolate i
   <Layer width="100%" height="100%" layout="vertical" gap="8" alignment="center" arrangement="center">
     <Rectangle width="100%" height="100%"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="343,200">
+      <LinearGradient endPoint="1,1">
         <ColorStop color="#F0F4FF" offset="0"/>
         <ColorStop color="#E8EEFF" offset="1"/>
       </LinearGradient>
@@ -703,7 +704,7 @@ frosted glass.
     <!-- Content behind the panel -->
     <Rectangle width="100%" height="100%"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="400,300">
+      <LinearGradient endPoint="1,1">
         <ColorStop color="#6366F1" offset="0"/>
         <ColorStop color="#EC4899" offset="1"/>
       </LinearGradient>
@@ -736,7 +737,7 @@ Badges often combine Polystar with gradients and layer styles for depth.
   <Layer width="200" height="200">
     <Polystar centerX="0" centerY="0" pointCount="5" outerRadius="80" innerRadius="35"/>
     <Fill>
-      <RadialGradient radius="80">
+      <RadialGradient>
         <ColorStop color="#FBBF24" offset="0"/>
         <ColorStop color="#F59E0B" offset="1"/>
       </RadialGradient>
@@ -747,6 +748,7 @@ Badges often combine Polystar with gradients and layer styles for depth.
 ```
 
 **Pattern**: Polystar generates regular stars/polygons from parameters — no manual Path
-needed. `type="polygon"` for regular polygons (hexagons, octagons). RadialGradient `radius`
-should match `outerRadius` for full coverage. DropShadowStyle with a matching hue creates a
-colored glow. Use for rating stars, achievement badges, decorative shapes.
+needed. `type="polygon"` for regular polygons (hexagons, octagons). RadialGradient defaults to
+the 0-1 bounding box with `center="0.5,0.5"` and `radius="0.5"`, so no attributes are needed to
+fill the star's bounding box. DropShadowStyle with a matching hue creates a colored glow. Use
+for rating stars, achievement badges, decorative shapes.

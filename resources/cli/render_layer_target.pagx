@@ -24,7 +24,7 @@
   <Layer id="banner" left="200" top="240">
     <Rectangle left="-180" top="-40" width="360" height="80" roundness="12"/>
     <Fill>
-      <LinearGradient startPoint="-180,0" endPoint="180,0">
+      <LinearGradient startPoint="-180,0" endPoint="180,0" fitsToGeometry="false">
         <ColorStop color="#7B1FA2" offset="0"/>
         <ColorStop color="#FF6F00" offset="1"/>
       </LinearGradient>
