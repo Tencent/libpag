@@ -761,7 +761,12 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
   }
   if (stroke && stroke->color && stroke->color->nodeType() == NodeType::SolidColor) {
     auto sc = static_cast<const SolidColor*>(stroke->color);
-    style += ";-webkit-text-stroke:" + FloatToString(stroke->width) + "px " +
+    // CSS -webkit-text-stroke draws a stroke band centred on the glyph edge; with
+    // paint-order:stroke fill the fill then covers the inside half, so visible outside = width/2.
+    // tgfx's Stroke at the default Center alignment combined with fauxBold path union renders
+    // roughly the full authored width outside the fill. Double the emitted width so Chromium's
+    // visible outside thickness matches tgfx.
+    style += ";-webkit-text-stroke:" + FloatToString(stroke->width * 2.0f) + "px " +
              ColorToRGBA(sc->color, stroke->alpha);
     style += ";paint-order:stroke fill";
     if (!fill || !fill->color) {
@@ -1201,7 +1206,10 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
             strokeWidth = stroke->width + (modifier->strokeWidth.value() - stroke->width) * absF;
           }
           if (hasStroke && strokeWidth > 0 && strokeColor.alpha > 0) {
-            charStyle += ";-webkit-text-stroke:" + FloatToString(strokeWidth) + "px " +
+            // See regular-span emit above: double the width so Chromium's visible outside
+            // stroke (half the authored -webkit-text-stroke under paint-order:stroke fill)
+            // matches tgfx's near-full-width visible stroke outside the fill.
+            charStyle += ";-webkit-text-stroke:" + FloatToString(strokeWidth * 2.0f) + "px " +
                          ColorToRGBA(strokeColor, stroke->alpha);
             charStyle += ";paint-order:stroke fill";
           }
@@ -1554,9 +1562,12 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         // is set; emit -webkit-text-stroke so the per-character span actually paints the
         // stroke outline (matching tgfx, which draws the Stroke around each glyph path just
         // like the non-TextPath case). Without this, TextPath + Stroke produced empty spans.
+        // Width is doubled so Chromium's visible outside stroke (half of the authored
+        // -webkit-text-stroke under paint-order:stroke fill) matches tgfx's near-full-width
+        // visible stroke outside the fill.
         if (stroke && stroke->color && stroke->color->nodeType() == NodeType::SolidColor) {
           auto sc = static_cast<const SolidColor*>(stroke->color);
-          charStyle += ";-webkit-text-stroke:" + FloatToString(stroke->width) + "px " +
+          charStyle += ";-webkit-text-stroke:" + FloatToString(stroke->width * 2.0f) + "px " +
                        ColorToRGBA(sc->color, stroke->alpha);
           charStyle += ";paint-order:stroke fill";
           if (!fill || !fill->color) {
