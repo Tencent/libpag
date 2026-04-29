@@ -201,22 +201,22 @@ void EmitGroupCustGeom(XMLBuilder& out, const std::vector<PathContour>& contours
                        float scaleX, float scaleY, float scaledOfsX, float scaledOfsY) {
   EmitCustGeomHeader(out);
   out.openElement("a:pathLst").closeElementStart();
-
-  // Zero-length segments at opposite corners of the coordinate space pin the
-  // content bounding box to the declared (w, h), preventing renderers that
-  // auto-fit shapes to actual content bounds (e.g. WeChat) from rescaling each
-  // group independently. They sit in their own <a:path> with stroke="0" and
-  // fill="none" so the markers don't paint anything: a stroked zero-length
-  // segment with cap="rnd" otherwise renders as a small filled circle at each
-  // corner, leaking visible dots into shapes that combine TrimPath/MergePath
-  // with a round-capped Stroke.
   out.openElement("a:path")
       .addRequiredAttribute("w", pathWidth)
       .addRequiredAttribute("h", pathHeight)
-      .addRequiredAttribute("fill", "none")
-      .addRequiredAttribute("stroke", "0")
       .closeElementStart();
+
+  // Zero-length segments at opposite corners of the coordinate space.  They
+  // are invisible but force the content bounding box to match the declared
+  // (w, h), preventing renderers that auto-fit shapes to actual content bounds
+  // (e.g. WeChat) from rescaling each group independently.
   out.openElement("a:moveTo").closeElementStart();
+  out.openElement("a:pt")
+      .addRequiredAttribute("x", int64_t(0))
+      .addRequiredAttribute("y", int64_t(0))
+      .closeElementSelfClosing();
+  out.closeElement();
+  out.openElement("a:lnTo").closeElementStart();
   out.openElement("a:pt")
       .addRequiredAttribute("x", int64_t(0))
       .addRequiredAttribute("y", int64_t(0))
@@ -228,10 +228,19 @@ void EmitGroupCustGeom(XMLBuilder& out, const std::vector<PathContour>& contours
       .addRequiredAttribute("y", pathHeight)
       .closeElementSelfClosing();
   out.closeElement();
-  out.closeElement();  // a:path (bounds marker)
+  out.openElement("a:lnTo").closeElementStart();
+  out.openElement("a:pt")
+      .addRequiredAttribute("x", pathWidth)
+      .addRequiredAttribute("y", pathHeight)
+      .closeElementSelfClosing();
+  out.closeElement();
 
-  EmitGroupPath(out, contours, group, pathWidth, pathHeight, scaleX, scaleY, scaledOfsX,
-                scaledOfsY);
+  if (group.size() > 1) {
+    EmitBridgedGroup(out, contours, group, scaleX, scaleY, scaledOfsX, scaledOfsY);
+  } else {
+    EmitContour(out, contours[group[0]], scaleX, scaleY, scaledOfsX, scaledOfsY);
+  }
+  out.closeElement();  // a:path
   out.closeElement();  // a:pathLst
   out.closeElement();  // a:custGeom
 }
