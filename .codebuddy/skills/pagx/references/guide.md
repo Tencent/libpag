@@ -431,9 +431,8 @@ over `position`.
 ### Straight Lines
 
 To draw a straight line, set exactly one of `width`/`height` on a `Rectangle` to `0` and
-add a `Stroke` — the Rectangle degenerates to a line segment. Isolate the Stroke in a
-Group when other geometry shares the scope. See `patterns.md` §Divider for the canonical
-example.
+add a `Stroke` — the Rectangle degenerates to a line segment. See `patterns.md` §Divider
+for the canonical example.
 
 ## Painters
 
