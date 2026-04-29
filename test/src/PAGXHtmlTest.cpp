@@ -89,16 +89,33 @@ static std::vector<std::string> GetHtmlTestFiles() {
 }
 
 std::string WrapHtmlDocument(const std::string& fragment, int width, int height) {
-  // Register the repo-bundled Noto Sans SC font so Chromium renders HTML text with the same
-  // font that tgfx uses on the PAGX side. The absolute file:// URL works in Puppeteer because
-  // screenshot.js loads the generated HTML via file://, which permits same-scheme sub-resources.
-  // `font-synthesis:none` on body prevents Chromium from auto-synthesising bold/italic on
-  // elements that don't ask for it. The exporter's fauxBold and fauxItalic paths emit
-  // `font-weight:bold;font-synthesis-weight:auto` and `font-style:italic;font-synthesis-style:auto`
-  // respectively, re-enabling synthesis only on the elements that carry the faux flag.
-  auto fontPath = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
-  std::string fontFace = "@font-face{font-family:'Noto Sans SC';src:url('file://" + fontPath +
-                         "') format('opentype');font-display:block}";
+  // All fonts are loaded from Google Fonts CDN so the generated HTML is portable — it renders
+  // correctly on any machine without requiring local font files. `font-synthesis:none` on body
+  // prevents Chromium from auto-synthesising bold/italic on elements that don't ask for it.
+  // The exporter's fauxBold and fauxItalic paths emit `font-weight:bold;font-synthesis-weight:
+  // auto` and `font-style:italic;font-synthesis-style:auto` respectively, re-enabling synthesis
+  // only on the elements that carry the faux flag.
+  std::string fontFace =
+      // Noto Sans SC Regular (400)
+      "@font-face{font-family:'Noto Sans SC';font-weight:400;"
+      "src:url('https://fonts.gstatic.com/s/notosanssc/v40/"
+      "k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaG9_FnYw.ttf') "
+      "format('truetype');font-display:block}"
+      // Noto Sans SC Bold (700)
+      "@font-face{font-family:'Noto Sans SC';font-weight:bold;"
+      "src:url('https://fonts.gstatic.com/s/notosanssc/v40/"
+      "k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaGzjCnYw.ttf') "
+      "format('truetype');font-display:block}"
+      // Noto Color Emoji
+      "@font-face{font-family:'Noto Color Emoji';"
+      "src:url('https://fonts.gstatic.com/s/notocoloremoji/v39/"
+      "Yq6P-KqIXTD0t4D9z1ESnKM3-HpFab4.ttf') "
+      "format('truetype');font-display:block}"
+      // Noto Sans Hebrew Regular (400)
+      "@font-face{font-family:'Noto Sans Hebrew';font-weight:400;"
+      "src:url('https://fonts.gstatic.com/s/notosanshebrew/v50/"
+      "or3HQ7v33eiDljA1IufXTtVf7V6RvEEdhQlk0LlGxCyaeNKYZC0sqk3xXGiXd4qtog.ttf') "
+      "format('truetype');font-display:block}";
   return "<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"><style>" + fontFace +
          "body{margin:0;padding:0;background:transparent;font-synthesis:none;width:" +
          std::to_string(width) + "px;height:" + std::to_string(height) +
