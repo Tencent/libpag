@@ -11,3 +11,4 @@ script/.build.lock
 package-lock.json
 ts/wasm
 types/
+lib/

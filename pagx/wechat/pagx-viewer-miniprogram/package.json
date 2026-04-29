@@ -1,6 +1,6 @@
 {
   "name": "@tencent/pagx-viewer-miniprogram",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "PAGX Viewer for WeChat Miniprogram",
   "main": "lib/pagx-viewer.js",
   "typings": "types/pagx/wechat/ts/pagx.d.ts",
