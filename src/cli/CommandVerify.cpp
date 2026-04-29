@@ -1788,10 +1788,15 @@ static void DetectZeroSize(const Layer* layer, const Layer* parentLayer,
   // constraints — treat them as size-dependent too.
   CollectChildrenSizeDependencies(layer->contents, &childrenDependOnWidth, &childrenDependOnHeight);
   // Geometry that actually wants extent on the collapsed axis (e.g. an 80px-wide Rectangle in a
-  // zero-width Layer) signals a real layout problem; geometry that is itself zero on that axis
-  // (e.g. a degenerate-line Rectangle, a horizontal Path) is intentional and not a problem.
-  bool contentsWantWidth = AnyLeafGeometryWantsExtentOnAxis(layer->contents, /*onWidth=*/true);
-  bool contentsWantHeight = AnyLeafGeometryWantsExtentOnAxis(layer->contents, /*onWidth=*/false);
+  // zero-width Layer) signals a real layout problem only when the layer's size feeds back into
+  // layout: either the layer participates in a parent layout flow, or it owns its own layout.
+  // For a free-standing absolutely-positioned, content-measured layer, a zero size does not
+  // affect rendering — the geometry still draws into its own layoutBounds — so we do not report.
+  bool sizeAffectsLayout = inParentLayout || hasLayoutChildren;
+  bool contentsWantWidth =
+      sizeAffectsLayout && AnyLeafGeometryWantsExtentOnAxis(layer->contents, /*onWidth=*/true);
+  bool contentsWantHeight =
+      sizeAffectsLayout && AnyLeafGeometryWantsExtentOnAxis(layer->contents, /*onWidth=*/false);
   bool zeroWidthMatters =
       bounds.width == 0 && (hasLayoutChildren || childrenDependOnWidth || contentsWantWidth);
   bool zeroHeightMatters =
