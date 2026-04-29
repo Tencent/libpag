@@ -19,6 +19,7 @@
 #include "pagx/ppt/PPTGeomEmitter.h"
 #include <algorithm>
 #include <cmath>
+#include <initializer_list>
 #include "pagx/xml/XMLBuilder.h"
 
 namespace pagx {
@@ -29,61 +30,50 @@ int64_t PxToEMU(float px) {
 
 namespace {
 
-void EmitPoint(XMLBuilder& out, const char* tag, float x, float y, float ofsX, float ofsY) {
+// Bundles the per-emit coordinate transform (scale + offset) used to map a
+// PathContour's original pixel coordinates into output space. Previously the
+// four components were threaded through every emit helper as independent
+// floats, which made call sites noisy and easy to reorder incorrectly.
+struct CoordScale {
+  float scaleX;
+  float scaleY;
+  float offX;
+  float offY;
+
+  Point map(const Point& p) const {
+    return {p.x * scaleX - offX, p.y * scaleY - offY};
+  }
+};
+
+// Writes a single <a:pt x=... y=.../> with EMU-converted coordinates.
+void EmitPt(XMLBuilder& out, const Point& p) {
+  out.openElement("a:pt")
+      .addRequiredAttribute("x", PxToEMU(p.x))
+      .addRequiredAttribute("y", PxToEMU(p.y))
+      .closeElementSelfClosing();
+}
+
+// Writes `<tag> <a:pt/>... </tag>`. Covers a:moveTo / a:lnTo (1 pt),
+// a:quadBezTo (2 pts) and a:cubicBezTo (3 pts) with a single primitive.
+void EmitPtList(XMLBuilder& out, const char* tag, std::initializer_list<Point> pts) {
   out.openElement(tag).closeElementStart();
-  out.openElement("a:pt")
-      .addRequiredAttribute("x", PxToEMU(x - ofsX))
-      .addRequiredAttribute("y", PxToEMU(y - ofsY))
-      .closeElementSelfClosing();
+  for (const auto& p : pts) {
+    EmitPt(out, p);
+  }
   out.closeElement();
 }
 
-void EmitQuadBezTo(XMLBuilder& out, const char* tag, float x0, float y0, float x1, float y1,
-                   float ofsX, float ofsY) {
-  out.openElement(tag).closeElementStart();
-  out.openElement("a:pt")
-      .addRequiredAttribute("x", PxToEMU(x0 - ofsX))
-      .addRequiredAttribute("y", PxToEMU(y0 - ofsY))
-      .closeElementSelfClosing();
-  out.openElement("a:pt")
-      .addRequiredAttribute("x", PxToEMU(x1 - ofsX))
-      .addRequiredAttribute("y", PxToEMU(y1 - ofsY))
-      .closeElementSelfClosing();
-  out.closeElement();
-}
-
-void EmitCubicBezTo(XMLBuilder& out, float x0, float y0, float x1, float y1, float x2, float y2,
-                    float ofsX, float ofsY) {
-  out.openElement("a:cubicBezTo").closeElementStart();
-  out.openElement("a:pt")
-      .addRequiredAttribute("x", PxToEMU(x0 - ofsX))
-      .addRequiredAttribute("y", PxToEMU(y0 - ofsY))
-      .closeElementSelfClosing();
-  out.openElement("a:pt")
-      .addRequiredAttribute("x", PxToEMU(x1 - ofsX))
-      .addRequiredAttribute("y", PxToEMU(y1 - ofsY))
-      .closeElementSelfClosing();
-  out.openElement("a:pt")
-      .addRequiredAttribute("x", PxToEMU(x2 - ofsX))
-      .addRequiredAttribute("y", PxToEMU(y2 - ofsY))
-      .closeElementSelfClosing();
-  out.closeElement();
-}
-
-void EmitContourSegments(XMLBuilder& out, const PathContour& c, float csX, float csY, float sOfsX,
-                         float sOfsY) {
+void EmitContourSegments(XMLBuilder& out, const PathContour& c, const CoordScale& ts) {
   for (const auto& s : c.segs) {
     switch (s.verb) {
       case PathVerb::Line:
-        EmitPoint(out, "a:lnTo", s.pts[0].x * csX, s.pts[0].y * csY, sOfsX, sOfsY);
+        EmitPtList(out, "a:lnTo", {ts.map(s.pts[0])});
         break;
       case PathVerb::Quad:
-        EmitQuadBezTo(out, "a:quadBezTo", s.pts[0].x * csX, s.pts[0].y * csY, s.pts[1].x * csX,
-                      s.pts[1].y * csY, sOfsX, sOfsY);
+        EmitPtList(out, "a:quadBezTo", {ts.map(s.pts[0]), ts.map(s.pts[1])});
         break;
       case PathVerb::Cubic:
-        EmitCubicBezTo(out, s.pts[0].x * csX, s.pts[0].y * csY, s.pts[1].x * csX, s.pts[1].y * csY,
-                       s.pts[2].x * csX, s.pts[2].y * csY, sOfsX, sOfsY);
+        EmitPtList(out, "a:cubicBezTo", {ts.map(s.pts[0]), ts.map(s.pts[1]), ts.map(s.pts[2])});
         break;
       default:
         break;
@@ -91,28 +81,30 @@ void EmitContourSegments(XMLBuilder& out, const PathContour& c, float csX, float
   }
 }
 
-void EmitContour(XMLBuilder& out, const PathContour& c, float csX, float csY, float sOfsX,
-                 float sOfsY) {
-  EmitPoint(out, "a:moveTo", c.start.x * csX, c.start.y * csY, sOfsX, sOfsY);
-  EmitContourSegments(out, c, csX, csY, sOfsX, sOfsY);
+void EmitContour(XMLBuilder& out, const PathContour& c, const CoordScale& ts) {
+  EmitPtList(out, "a:moveTo", {ts.map(c.start)});
+  EmitContourSegments(out, c, ts);
   if (c.closed) {
     out.openElement("a:close").closeElementSelfClosing();
   }
 }
 
-// Stitches an outer contour with its nested inner contours into a single contour
-// using zero-width bridge lines. The bridge goes from the outer's start to each
-// inner contour's start and returns along the same line, producing a self-overlapping
-// edge pair that cancels in any scan-line rasterizer.
+// Stitches an outer contour with its nested inner contours into a single
+// self-overlapping path using zero-width bridge lines. Each inner ring is
+// entered from the outer start and exited back to the outer start along the
+// same line, so the paired edges cancel under any scan-line rasteriser and
+// even-odd fill renders the expected holes.
 void EmitBridgedGroup(XMLBuilder& out, const std::vector<PathContour>& contours,
-                      const std::vector<size_t>& group, float csX, float csY, float sOfsX,
-                      float sOfsY) {
+                      const std::vector<size_t>& group, const CoordScale& ts) {
   const auto& outer = contours[group[0]];
+  const Point outerStart = ts.map(outer.start);
 
-  EmitPoint(out, "a:moveTo", outer.start.x * csX, outer.start.y * csY, sOfsX, sOfsY);
-  EmitContourSegments(out, outer, csX, csY, sOfsX, sOfsY);
+  EmitPtList(out, "a:moveTo", {outerStart});
+  EmitContourSegments(out, outer, ts);
   if (outer.closed) {
-    EmitPoint(out, "a:lnTo", outer.start.x * csX, outer.start.y * csY, sOfsX, sOfsY);
+    // Explicit lnTo back to the outer start provides a fixed anchor from
+    // which the following bridge lines can depart.
+    EmitPtList(out, "a:lnTo", {outerStart});
   }
 
   for (size_t i = 1; i < group.size(); i++) {
@@ -120,33 +112,45 @@ void EmitBridgedGroup(XMLBuilder& out, const std::vector<PathContour>& contours,
     if (inner.segs.empty()) {
       continue;
     }
-    EmitPoint(out, "a:lnTo", inner.start.x * csX, inner.start.y * csY, sOfsX, sOfsY);
-    EmitContourSegments(out, inner, csX, csY, sOfsX, sOfsY);
+    const Point innerStart = ts.map(inner.start);
+    EmitPtList(out, "a:lnTo", {innerStart});
+    EmitContourSegments(out, inner, ts);
     if (inner.closed) {
-      EmitPoint(out, "a:lnTo", inner.start.x * csX, inner.start.y * csY, sOfsX, sOfsY);
+      EmitPtList(out, "a:lnTo", {innerStart});
     }
-    EmitPoint(out, "a:lnTo", outer.start.x * csX, outer.start.y * csY, sOfsX, sOfsY);
+    EmitPtList(out, "a:lnTo", {outerStart});
   }
 
   out.openElement("a:close").closeElementSelfClosing();
 }
 
-// Emits one <a:path> for the given group: bridged when the group has nested
-// inner contours, plain otherwise. Caller is responsible for the surrounding
-// <a:pathLst> / <a:custGeom>.
-void EmitGroupPath(XMLBuilder& out, const std::vector<PathContour>& contours,
-                   const std::vector<size_t>& group, int64_t pathWidth, int64_t pathHeight,
-                   float scaleX, float scaleY, float scaledOfsX, float scaledOfsY) {
+// Writes the geometry content for a group without opening its <a:path>.
+// Split out of EmitGroupPath so EmitGroupCustGeom's InlineSegments branch can
+// place corner marker segments in the same <a:path> as the main geometry.
+void EmitGroupPathBody(XMLBuilder& out, const std::vector<PathContour>& contours,
+                       const std::vector<size_t>& group, const CoordScale& ts) {
+  if (group.size() > 1) {
+    EmitBridgedGroup(out, contours, group, ts);
+  } else {
+    EmitContour(out, contours[group[0]], ts);
+  }
+}
+
+void OpenPath(XMLBuilder& out, int64_t pathWidth, int64_t pathHeight) {
   out.openElement("a:path")
       .addRequiredAttribute("w", pathWidth)
       .addRequiredAttribute("h", pathHeight)
       .closeElementStart();
-  if (group.size() > 1) {
-    EmitBridgedGroup(out, contours, group, scaleX, scaleY, scaledOfsX, scaledOfsY);
-  } else {
-    EmitContour(out, contours[group[0]], scaleX, scaleY, scaledOfsX, scaledOfsY);
-  }
-  out.closeElement();  // a:path
+}
+
+// Emits a complete <a:path>...</a:path> element for one group. Use when no
+// bounds-marker needs to share the same path.
+void EmitGroupPath(XMLBuilder& out, const std::vector<PathContour>& contours,
+                   const std::vector<size_t>& group, int64_t pathWidth, int64_t pathHeight,
+                   const CoordScale& ts) {
+  OpenPath(out, pathWidth, pathHeight);
+  EmitGroupPathBody(out, contours, group, ts);
+  out.closeElement();
 }
 
 void EmitCustGeomHeader(XMLBuilder& out) {
@@ -163,31 +167,27 @@ void EmitCustGeomHeader(XMLBuilder& out) {
       .closeElementSelfClosing();
 }
 
+// Writes a zero-length (moveTo; lnTo) pair at (x, y). WeChat infers the path
+// bounding box from drawable segment extent, so emitting these at (0,0) and
+// (pathWidth, pathHeight) pins the bbox to the declared size.
+void EmitZeroLengthMarker(XMLBuilder& out, int64_t x, int64_t y) {
+  out.openElement("a:moveTo").closeElementStart();
+  out.openElement("a:pt")
+      .addRequiredAttribute("x", x)
+      .addRequiredAttribute("y", y)
+      .closeElementSelfClosing();
+  out.closeElement();
+  out.openElement("a:lnTo").closeElementStart();
+  out.openElement("a:pt")
+      .addRequiredAttribute("x", x)
+      .addRequiredAttribute("y", y)
+      .closeElementSelfClosing();
+  out.closeElement();
+}
+
 void EmitCornerBoundsMarkerSegments(XMLBuilder& out, int64_t pathWidth, int64_t pathHeight) {
-  out.openElement("a:moveTo").closeElementStart();
-  out.openElement("a:pt")
-      .addRequiredAttribute("x", int64_t(0))
-      .addRequiredAttribute("y", int64_t(0))
-      .closeElementSelfClosing();
-  out.closeElement();
-  out.openElement("a:lnTo").closeElementStart();
-  out.openElement("a:pt")
-      .addRequiredAttribute("x", int64_t(0))
-      .addRequiredAttribute("y", int64_t(0))
-      .closeElementSelfClosing();
-  out.closeElement();
-  out.openElement("a:moveTo").closeElementStart();
-  out.openElement("a:pt")
-      .addRequiredAttribute("x", pathWidth)
-      .addRequiredAttribute("y", pathHeight)
-      .closeElementSelfClosing();
-  out.closeElement();
-  out.openElement("a:lnTo").closeElementStart();
-  out.openElement("a:pt")
-      .addRequiredAttribute("x", pathWidth)
-      .addRequiredAttribute("y", pathHeight)
-      .closeElementSelfClosing();
-  out.closeElement();
+  EmitZeroLengthMarker(out, 0, 0);
+  EmitZeroLengthMarker(out, pathWidth, pathHeight);
 }
 
 }  // namespace
@@ -196,11 +196,11 @@ void EmitContourGeomFromGroups(XMLBuilder& out, const std::vector<PathContour>& 
                                const std::vector<std::vector<size_t>>& groups, int64_t pathWidth,
                                int64_t pathHeight, float scaleX, float scaleY, float scaledOfsX,
                                float scaledOfsY) {
+  const CoordScale ts{scaleX, scaleY, scaledOfsX, scaledOfsY};
   EmitCustGeomHeader(out);
   out.openElement("a:pathLst").closeElementStart();
   for (const auto& group : groups) {
-    EmitGroupPath(out, contours, group, pathWidth, pathHeight, scaleX, scaleY, scaledOfsX,
-                  scaledOfsY);
+    EmitGroupPath(out, contours, group, pathWidth, pathHeight, ts);
   }
   out.closeElement();  // a:pathLst
   out.closeElement();  // a:custGeom
@@ -209,14 +209,12 @@ void EmitContourGeomFromGroups(XMLBuilder& out, const std::vector<PathContour>& 
 void EmitFlatContourGeom(XMLBuilder& out, const std::vector<PathContour>& contours,
                          int64_t pathWidth, int64_t pathHeight, float scaleX, float scaleY,
                          float scaledOfsX, float scaledOfsY) {
+  const CoordScale ts{scaleX, scaleY, scaledOfsX, scaledOfsY};
   EmitCustGeomHeader(out);
   out.openElement("a:pathLst").closeElementStart();
-  out.openElement("a:path")
-      .addRequiredAttribute("w", pathWidth)
-      .addRequiredAttribute("h", pathHeight)
-      .closeElementStart();
+  OpenPath(out, pathWidth, pathHeight);
   for (const auto& c : contours) {
-    EmitContour(out, c, scaleX, scaleY, scaledOfsX, scaledOfsY);
+    EmitContour(out, c, ts);
   }
   out.closeElement();  // a:path
   out.closeElement();  // a:pathLst
@@ -227,15 +225,16 @@ void EmitGroupCustGeom(XMLBuilder& out, const std::vector<PathContour>& contours
                        const std::vector<size_t>& group, int64_t pathWidth, int64_t pathHeight,
                        float scaleX, float scaleY, float scaledOfsX, float scaledOfsY,
                        BoundsMarkerStyle markerStyle) {
+  const CoordScale ts{scaleX, scaleY, scaledOfsX, scaledOfsY};
   EmitCustGeomHeader(out);
   out.openElement("a:pathLst").closeElementStart();
 
   // Bounds marker strategy documented on BoundsMarkerStyle. Both strategies
   // keep the bbox pinned to (pathWidth, pathHeight) for WeChat; the difference
-  // is whether the marker segments share the main `<a:path>` (safe when the
-  // sp has no stroke) or live in a strokeless sibling path (needed when the
-  // sp may carry a round-capped stroke that would otherwise render visible
-  // dots at the corners).
+  // is whether the marker segments share the main <a:path> (safe when the sp
+  // has no stroke) or live in a strokeless sibling path (needed when the sp
+  // may carry a round-capped stroke that would otherwise render visible dots
+  // at the corners).
   if (markerStyle == BoundsMarkerStyle::StandaloneStrokelessPath) {
     out.openElement("a:path")
         .addRequiredAttribute("w", pathWidth)
@@ -245,19 +244,11 @@ void EmitGroupCustGeom(XMLBuilder& out, const std::vector<PathContour>& contours
         .closeElementStart();
     EmitCornerBoundsMarkerSegments(out, pathWidth, pathHeight);
     out.closeElement();  // a:path (bounds marker)
-    EmitGroupPath(out, contours, group, pathWidth, pathHeight, scaleX, scaleY, scaledOfsX,
-                  scaledOfsY);
+    EmitGroupPath(out, contours, group, pathWidth, pathHeight, ts);
   } else {
-    out.openElement("a:path")
-        .addRequiredAttribute("w", pathWidth)
-        .addRequiredAttribute("h", pathHeight)
-        .closeElementStart();
+    OpenPath(out, pathWidth, pathHeight);
     EmitCornerBoundsMarkerSegments(out, pathWidth, pathHeight);
-    if (group.size() > 1) {
-      EmitBridgedGroup(out, contours, group, scaleX, scaleY, scaledOfsX, scaledOfsY);
-    } else {
-      EmitContour(out, contours[group[0]], scaleX, scaleY, scaledOfsX, scaledOfsY);
-    }
+    EmitGroupPathBody(out, contours, group, ts);
     out.closeElement();  // a:path
   }
 

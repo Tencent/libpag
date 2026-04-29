@@ -1423,16 +1423,20 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
 
 // ── Custom geometry ────────────────────────────────────────────────────────
 
+// Bridging is only meaningful with multiple contours — with a single contour
+// there's nothing to stitch together, so emit it flat. When bridging is
+// disabled globally, always emit flat regardless of contour count.
 void PPTWriter::WriteContourGeom(XMLBuilder& out, std::vector<PathContour>& contours,
                                  int64_t pathWidth, int64_t pathHeight, float scaleX, float scaleY,
                                  float scaledOfsX, float scaledOfsY, FillRule fillRule) {
-  if (_bridgeContours && contours.size() > 1) {
-    auto groups = PrepareContourGroups(contours, fillRule);
-    EmitContourGeomFromGroups(out, contours, groups, pathWidth, pathHeight, scaleX, scaleY,
-                              scaledOfsX, scaledOfsY);
+  if (!_bridgeContours || contours.size() <= 1) {
+    EmitFlatContourGeom(out, contours, pathWidth, pathHeight, scaleX, scaleY, scaledOfsX,
+                        scaledOfsY);
     return;
   }
-  EmitFlatContourGeom(out, contours, pathWidth, pathHeight, scaleX, scaleY, scaledOfsX, scaledOfsY);
+  auto groups = PrepareContourGroups(contours, fillRule);
+  EmitContourGeomFromGroups(out, contours, groups, pathWidth, pathHeight, scaleX, scaleY,
+                            scaledOfsX, scaledOfsY);
 }
 
 // ── Shape writers ──────────────────────────────────────────────────────────
@@ -1551,27 +1555,33 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
   int64_t pw = std::max(int64_t(1), PxToEMU(adjustedW));
   int64_t ph = std::max(int64_t(1), PxToEMU(adjustedH));
 
-  if (_bridgeContours && contours.size() > 1) {
-    auto groups = PrepareContourGroups(contours, fillRule);
-    if (groups.size() > 1) {
-      for (const auto& group : groups) {
-        beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
-        EmitGroupCustGeom(out, contours, group, pw, ph, 1.0f, 1.0f, adjustedX, adjustedY,
-                          BoundsMarkerStyle::StandaloneStrokelessPath);
-        writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters, styles);
-      }
-      return;
-    }
-    // Single bridged group: skip the redundant grouping pass that
-    // WriteContourGeom would otherwise perform and emit directly.
+  // Fast path: bridging off or nothing to bridge → emit one flat custGeom.
+  if (!_bridgeContours || contours.size() <= 1) {
     beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
-    EmitContourGeomFromGroups(out, contours, groups, pw, ph, 1.0f, 1.0f, adjustedX, adjustedY);
+    WriteContourGeom(out, contours, pw, ph, 1.0f, 1.0f, adjustedX, adjustedY, fillRule);
     writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters, styles);
     return;
   }
 
+  auto groups = PrepareContourGroups(contours, fillRule);
+
+  // Multiple disjoint groups: emit one <p:sp> per group so each keeps its own
+  // bounds marker. StandaloneStrokelessPath keeps the corner markers from
+  // showing as dots under a round-capped sp-level stroke.
+  if (groups.size() > 1) {
+    for (const auto& group : groups) {
+      beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
+      EmitGroupCustGeom(out, contours, group, pw, ph, 1.0f, 1.0f, adjustedX, adjustedY,
+                        BoundsMarkerStyle::StandaloneStrokelessPath);
+      writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters, styles);
+    }
+    return;
+  }
+
+  // Single bridged group: emit directly (skip the redundant grouping pass
+  // that WriteContourGeom would otherwise repeat).
   beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
-  WriteContourGeom(out, contours, pw, ph, 1.0f, 1.0f, adjustedX, adjustedY, fillRule);
+  EmitContourGeomFromGroups(out, contours, groups, pw, ph, 1.0f, 1.0f, adjustedX, adjustedY);
   writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters, styles);
 }
 
@@ -1672,17 +1682,20 @@ void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStr
   float scaledOfsX = minX * sx;
   float scaledOfsY = minY * sy;
 
-  if (_bridgeContours && allContours.size() > 1) {
-    auto groups = PrepareContourGroups(allContours, FillRule::EvenOdd);
-    for (const auto& group : groups) {
-      beginShape(out, "Glyph", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
-      EmitGroupCustGeom(out, allContours, group, pw, ph, sx, sy, scaledOfsX, scaledOfsY,
-                        BoundsMarkerStyle::InlineSegments);
-      writeGlyphShape(out, fs.fill, alpha);
-    }
-  } else {
+  if (!_bridgeContours || allContours.size() <= 1) {
     beginShape(out, "Glyph", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
     WriteContourGeom(out, allContours, pw, ph, sx, sy, scaledOfsX, scaledOfsY, FillRule::EvenOdd);
+    writeGlyphShape(out, fs.fill, alpha);
+    return;
+  }
+
+  // One <p:sp> per bridged group so each carries its own inline bounds marker.
+  // InlineSegments is safe here because glyph shapes never stroke.
+  auto groups = PrepareContourGroups(allContours, FillRule::EvenOdd);
+  for (const auto& group : groups) {
+    beginShape(out, "Glyph", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
+    EmitGroupCustGeom(out, allContours, group, pw, ph, sx, sy, scaledOfsX, scaledOfsY,
+                      BoundsMarkerStyle::InlineSegments);
     writeGlyphShape(out, fs.fill, alpha);
   }
 }
