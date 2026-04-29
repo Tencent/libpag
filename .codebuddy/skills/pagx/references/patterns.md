@@ -20,7 +20,7 @@ Layers in rows or columns, and constraint positioning for positioning elements w
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="300" height="20">
-  <Layer centerX="0" centerY="0" width="260" height="1">
+  <Layer centerX="0" centerY="0" width="260">
     <Rectangle width="100%" height="0"/>
     <Stroke color="#E2E8F0"/>
   </Layer>
@@ -29,7 +29,7 @@ Layers in rows or columns, and constraint positioning for positioning elements w
 
 **Pattern**: Reference for the straight-line authoring pattern (see `guide.md`
 §Straight Lines). For full-width dividers use `width="100%"` on the Layer; for
-vertical dividers swap the zero axis (`Rectangle width="0"` in a `Layer width="1"`).
+vertical dividers swap the zero axis (`Rectangle width="0"` in a vertically sized Layer).
 
 ### Button / Badge
 
@@ -446,7 +446,7 @@ toolbar items.
       </Layer>
     </Layer>
     <!-- Row divider -->
-    <Layer height="1">
+    <Layer>
       <Rectangle width="100%" height="0"/>
       <Stroke color="#F1F5F9"/>
     </Layer>
@@ -470,7 +470,7 @@ toolbar items.
       </Layer>
     </Layer>
     <!-- Row divider -->
-    <Layer height="1">
+    <Layer>
       <Rectangle width="100%" height="0"/>
       <Stroke color="#F1F5F9"/>
     </Layer>
@@ -541,7 +541,7 @@ goes clockwise — use Group `rotation` to reposition the start point.
     </Layer>
   </Layer>
   <!-- Baseline -->
-  <Layer left="30" right="30" bottom="30" height="1">
+  <Layer left="30" right="30" bottom="30">
     <Rectangle width="100%" height="0"/>
     <Stroke color="#CBD5E1"/>
   </Layer>
