@@ -17,8 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <cmath>
+#include <string>
 #include "base/PAGTest.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/PAGXExporter.h"
+#include "pagx/PAGXImporter.h"
 #include "pagx/PAGXOptimizer.h"
 #include "pagx/PAGXOptimizerOptions.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -34,6 +37,7 @@
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/utils/VerifyUtils.h"
+#include "utils/ProjectPath.h"
 
 namespace pag {
 
@@ -61,6 +65,8 @@ using pagx::NodeType;
 using pagx::OptimizeWithOptions;
 using pagx::Padding;
 using pagx::PAGXDocument;
+using pagx::PAGXExporter;
+using pagx::PAGXImporter;
 using pagx::PAGXOptimizer;
 using pagx::PAGXOptimizerOptions;
 using pagx::Path;
@@ -380,6 +386,83 @@ CLI_TEST(PAGXOptimizerTest, OptimizeIsIdempotent) {
   PAGXOptimizer::Optimize(doc.get());
   EXPECT_EQ(doc->layers.size(), topCount);
   EXPECT_EQ(doc->layers[0]->contents.size(), firstContents);
+}
+
+// ---------------------------------------------------------------------------
+// Whole-rule-set stability against the resources/cli/optimizer_all_rules.pagx
+// fixture. The fixture is hand-crafted so that EVERY optimizer rule fires at
+// least once during the first pass; the two tests below pin down the two
+// invariants the optimizer must therefore satisfy:
+//
+//   1. In-memory idempotence: running Optimize repeatedly on the same document
+//      changes nothing after the first call (the rule set has reached a fixed
+//      point and subsequent calls produce byte-identical XML).
+//
+//   2. Round-trip stability: exporting the optimized document, re-importing
+//      it, and optimizing again still produces byte-identical XML. This is
+//      stronger than (1) because it also proves that the exporter writes
+//      enough state for the importer to reproduce a fixed-point document --
+//      no rule should "discover" something new on the re-imported tree.
+//
+// Both tests use the fully-public PAGXImporter / PAGXExporter pair so a CI
+// failure here points either at a non-determinism in the optimizer itself or
+// at an importer/exporter that drops or rewrites optimization-relevant state.
+// ---------------------------------------------------------------------------
+
+static std::string OptimizerFixturePath() {
+  return ProjectPath::Absolute("resources/cli/optimizer_all_rules.pagx");
+}
+
+CLI_TEST(PAGXOptimizerTest, AllRulesFixtureIsIdempotentAcrossRepeatedOptimize) {
+  auto doc = PAGXImporter::FromFile(OptimizerFixturePath());
+  ASSERT_TRUE(doc != nullptr);
+
+  auto firstResult = PAGXOptimizer::Optimize(doc.get());
+  EXPECT_TRUE(firstResult.converged);
+  auto firstXml = PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(firstXml.empty());
+
+  // A second optimize on the same in-memory document must be a no-op.
+  auto secondResult = PAGXOptimizer::Optimize(doc.get());
+  EXPECT_TRUE(secondResult.converged);
+  auto secondXml = PAGXExporter::ToXML(*doc);
+  EXPECT_EQ(firstXml, secondXml);
+
+  // Run a third time so a regression that needs >1 extra iteration to settle
+  // (e.g. two rules oscillating once before reaching a new fixed point) still
+  // surfaces here rather than silently passing the second-call check.
+  auto thirdResult = PAGXOptimizer::Optimize(doc.get());
+  EXPECT_TRUE(thirdResult.converged);
+  auto thirdXml = PAGXExporter::ToXML(*doc);
+  EXPECT_EQ(firstXml, thirdXml);
+}
+
+CLI_TEST(PAGXOptimizerTest, AllRulesFixtureIsStableAcrossExportImportRoundTrip) {
+  auto sourceDoc = PAGXImporter::FromFile(OptimizerFixturePath());
+  ASSERT_TRUE(sourceDoc != nullptr);
+  auto firstResult = PAGXOptimizer::Optimize(sourceDoc.get());
+  EXPECT_TRUE(firstResult.converged);
+  auto firstXml = PAGXExporter::ToXML(*sourceDoc);
+  ASSERT_FALSE(firstXml.empty());
+
+  // Round-trip 1: re-import the optimized XML and optimize again. The output
+  // must match the previous optimized XML byte-for-byte.
+  auto secondDoc = PAGXImporter::FromXML(firstXml);
+  ASSERT_TRUE(secondDoc != nullptr);
+  auto secondResult = PAGXOptimizer::Optimize(secondDoc.get());
+  EXPECT_TRUE(secondResult.converged);
+  auto secondXml = PAGXExporter::ToXML(*secondDoc);
+  EXPECT_EQ(firstXml, secondXml);
+
+  // Round-trip 2: feed the second round's output back through the loop one
+  // more time. Two complete iterations are enough to expose any drift that
+  // takes more than a single round to manifest.
+  auto thirdDoc = PAGXImporter::FromXML(secondXml);
+  ASSERT_TRUE(thirdDoc != nullptr);
+  auto thirdResult = PAGXOptimizer::Optimize(thirdDoc.get());
+  EXPECT_TRUE(thirdResult.converged);
+  auto thirdXml = PAGXExporter::ToXML(*thirdDoc);
+  EXPECT_EQ(secondXml, thirdXml);
 }
 
 // ---------------------------------------------------------------------------
