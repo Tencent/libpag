@@ -1,6 +1,6 @@
 # PAGX → PAG v2 转换技术方案设计文档
 
-**版本**：2.9
+**版本**：2.10
 **日期**：2026-04-29
 **状态**：待评审 / 待开工
 
@@ -2399,6 +2399,38 @@ struct GlyphRunBlob {
 
 > **注**：GlyphRunBlob 的字段集在开工阶段 8（TextBaker）**开始前**需要对照 `src/renderer/GlyphRunRenderer.cpp:159-314` 再精细核对一次；当前结构已涵盖 `BuildTextBlob`/`BuildTextBlobFromLayoutRuns` 所需的所有运行时字段（font、glyphs、positions、xforms、xOffsets、anchors、scales、rotations、skews）。
 
+### C.5-pre FileHeader / PAGDocument（顶层根结构）
+
+```cpp
+namespace pagx::pag {
+
+// 画布与时间轴头（对应 §D.5 FileHeader Tag 的字节布局）
+struct FileHeader {
+  float    width           = 0.0f;
+  float    height          = 0.0f;
+  Color    backgroundColor = Color{};         // sRGB；由 Baker 经 ToTGFX(pagx::Color) 得出
+  Ratio    frameRate       = {24, 1};         // 静态场景默认 24/1 fps
+  uint32_t duration        = 1;               // 单位：frame；本期静态写 1
+};
+
+// PAG v2 数据模型根对象。由 Baker 构造，由 Codec 编码/解码，由 LayerInflater 消费。
+// 生命周期一律 std::unique_ptr<PAGDocument>（见 §8.3bis RAII 纪律）。
+struct PAGDocument {
+  FileHeader                                 header       = {};
+  std::vector<std::unique_ptr<ImageAsset>>   images       = {};
+  std::vector<std::unique_ptr<FontAsset>>    fonts        = {};
+  std::vector<std::unique_ptr<Composition>>  compositions = {};
+};
+
+}
+```
+
+**字段约定**：
+- 四个字段与 §8.2 Encode 流程的 Tag 写入顺序严格对应（FileHeader → ImageAssetTable → FontAssetTable → CompositionList）；
+- `compositions[0]` 约定为 root composition（§5.1），Inflater 的遍历入口；
+- 全部 `std::unique_ptr` 子对象析构链式释放（§8.3bis "PAGDocument 析构链"）；
+- 成员访问风格：Baker 拿到 `doc` 后用 `doc->header.width`、`doc->images.push_back(...)`、`doc->compositions[i]->layers[j]` 等形态（`->` 因为 `unique_ptr<PAGDocument>`）。
+
 ### C.5 Composition / Layer
 
 ```cpp
@@ -3283,6 +3315,8 @@ body:
 
 ### D.6 ImageAssetTable / FontAssetTable
 
+> **Decoder 强制上界**：读完 `varU32 assetCount` 后立即校验：ImageAssetTable 要求 `assetCount ≤ limits::MAX_IMAGES`；FontAssetTable 要求 `assetCount ≤ limits::MAX_FONTS`。超限推 `StructureLimitExceeded=105` fatal 并 return（见 §H.1）。CompositionList 的 `compositionCount` 同理校验 `≤ MAX_COMPOSITIONS`。
+
 **ImageAssetTable**：
 
 ```
@@ -3381,7 +3415,7 @@ body:
     type=Layer          → 无 payload Tag
 
   # 子 Layer 列表
-  varU32 childCount
+  varU32 childCount              # Decoder 校验 childCount ≤ limits::MAX_CHILDREN_PER_LAYER；超限推 StructureLimitExceeded=105 fatal
   repeat childCount:
     [LayerBlock Tag]
 ```
@@ -3448,6 +3482,10 @@ TagCode::CompositionRefPayload = 26
 body:
   u32 compositionIndex
 ```
+
+> **Decoder 校验**：读完 `compositionIndex` 后立即校验 `compositionIndex != UINT32_MAX && compositionIndex < doc.compositions.size()`；任一条件不满足推 `InvalidCompositionIndex=306` fatal 并 return（见 §G.2）。
+
+> **Decoder 校验**：读完 `compositionIndex` 后立即校验 `compositionIndex != UINT32_MAX && compositionIndex < doc.compositions.size()`；任一条件不满足推 `InvalidCompositionIndex=306` fatal 并 return（见 §G.2）。
 
 **VectorPayload**：
 ```
@@ -4153,7 +4191,7 @@ inline T ReadEnum(DecodeStream* stream, DecodeContext* ctx) {
 - `LayerMaskType`（MaxValid=2, Default=Alpha）
 - `LineCap` / `LineJoin` / `StrokeAlign`（各自 MaxValid=2, Default=Butt/Miter/Center）
 - `FillRule`（MaxValid=1, Default=Winding）
-- `TileMode`（MaxValid=3, Default=Clamp）
+- `TileMode`（MaxValid=3, Default=Decal；与结构体字段默认值对齐，见 §C.6 / §C.9）
 - `FilterMode`（MaxValid=1, Default=Linear）
 - `MipmapMode`（MaxValid=2, Default=None）
 - `ScaleMode`（MaxValid=3, Default=LetterBox）
@@ -4167,6 +4205,48 @@ inline T ReadEnum(DecodeStream* stream, DecodeContext* ctx) {
 - `PropertyEncoding`（本期 MaxValid=0，值 > 0 走 §4.4 兜底而非 ReadEnum）
 - `GlyphRunKind`（MaxValid=1, Default=LayoutRun）
 
+**`Property<EnumT>` 通路纪律**（强制）：
+
+当某枚举 `T` 被用于 `Property<T>` 字段（本期仅 `BlendMode`，见 §C.5 Layer），其 `ValueCodec` 特化**必须**以 `ReadEnum<T>` / `WriteEnum<T>` 为实现体，**不得**绕过 `EnumMeta<T>` 值域校验：
+
+```cpp
+// 正例（§D.8 Layer.blendMode 的实现形态）
+template <> inline void WriteValue<BlendMode>(EncodeStream* s, BlendMode v, EncodeContext*) {
+  s->writeUint8(static_cast<uint8_t>(v));
+}
+template <> inline BlendMode ReadValue<BlendMode>(DecodeStream* s, DecodeContext* ctx) {
+  return ReadEnum<BlendMode>(s, ctx);   // 走 EnumMeta，非法值 → InvalidEnumValue=407 + fallback
+}
+
+// 反例（严禁——会让非法 u8 逃过告警）
+template <> inline BlendMode ReadValue<BlendMode>(DecodeStream* s, DecodeContext*) {
+  return static_cast<BlendMode>(s->readUint8());   // ❌ 跳过值域校验 = UB
+}
+```
+
+`PropertyValueEquals<EnumT>` 走默认 `operator==`（enum 按 underlying type 比较，正确无歧义）。
+
+**`Property<EnumT>` 通路纪律**（强制）：
+
+当某枚举 `T` 被用于 `Property<T>` 字段（本期仅 `BlendMode`，见 §C.5 Layer），其 `ValueCodec` 特化**必须**以 `ReadEnum<T>` / `WriteEnum<T>` 为实现体，**不得**绕过 `EnumMeta<T>` 值域校验：
+
+```cpp
+// 正例（§D.8 Layer.blendMode 的实现形态）
+template <> inline void WriteValue<BlendMode>(EncodeStream* s, BlendMode v, EncodeContext*) {
+  s->writeUint8(static_cast<uint8_t>(v));
+}
+template <> inline BlendMode ReadValue<BlendMode>(DecodeStream* s, DecodeContext* ctx) {
+  return ReadEnum<BlendMode>(s, ctx);   // 走 EnumMeta，非法值 → InvalidEnumValue=407 + fallback
+}
+
+// 反例（严禁——会让非法 u8 逃过告警）
+template <> inline BlendMode ReadValue<BlendMode>(DecodeStream* s, DecodeContext*) {
+  return static_cast<BlendMode>(s->readUint8());   // ❌ 跳过值域校验 = UB
+}
+```
+
+`PropertyValueEquals<EnumT>` 走默认 `operator==`（enum 按 underlying type 比较，正确无歧义）。
+
 ### G.6 测试断言与覆盖矩阵
 
 单测用 ErrorCode 枚举断言（`EXPECT_EQ(result.errors[0].code, ErrorCode::LayoutNotApplied)`），避免字符串比对脆弱。每个 ErrorCode **必须**至少一条单测触发：
@@ -4179,6 +4259,8 @@ inline T ReadEnum(DecodeStream* stream, DecodeContext* ctx) {
 | EmptyCompositions (103) | BakerEdgeCasesTest.cpp | BakerEdgeCases.EmptyCompositions |
 | CompositionCycleDepth (104) | BakerEdgeCasesTest.cpp | BakerEdgeCases.CompositionCycle |
 | StructureLimitExceeded (105) | BakerEdgeCasesTest.cpp | BakerEdgeCases.StructureLimitExceeded |
+| StructureLimitExceeded (105) — Decoder 侧 count 攻击 | TruncatedDecodeTest.cpp | Truncate.ChildCountOverflow / ImageTableOverflow / FontTableOverflow |
+| StructureLimitExceeded (105) — Decoder 侧 count 攻击 | TruncatedDecodeTest.cpp | Truncate.ChildCountOverflow / ImageTableOverflow / FontTableOverflow |
 | ImageSourceMissing (200) | ResourceBakerTest.cpp | ResourceBaker.ImageFileMissing |
 | FontSourceMissing (201) | ResourceBakerTest.cpp | ResourceBaker.FontSourceMissing |
 | MaskTargetMissing (202) | LayerBakerTest.cpp | LayerBaker.MaskTargetNotFound |
@@ -4186,7 +4268,6 @@ inline T ReadEnum(DecodeStream* stream, DecodeContext* ctx) {
 | InverseMatrixNonInvertible (205) | TextBakerTest.cpp | TextBaker.NonInvertibleInverseMatrix |
 | TextGlyphDataEmpty (206) | TextBakerTest.cpp | TextBaker.GlyphDataEmpty |
 | EmptyDocument (207) | BakerEdgeCasesTest.cpp | BakerEdgeCases.EmptyDocument |
-| GlyphRunKindInferred (208) | TextBakerTest.cpp | TextBaker.GlyphRunKindInferred |
 | GlyphRunKindInferred (208) | TextBakerTest.cpp | TextBaker.GlyphRunKindInferred |
 | InvalidMagic (300) | VersionRejectTest.cpp | VersionReject.BadMagic_PAX |
 | UnsupportedVersion (301) | VersionRejectTest.cpp | VersionReject.V1 / V3 / VFF |
@@ -4269,7 +4350,7 @@ constexpr uint32_t MAX_CHILDREN_PER_LAYER = 10000;
 
 - **MAX_LAYER_DEPTH (64)**：Baker 深度遍历 PAGX Layer 树时，`BakeContext::currentLayerDepth` 累加；超限时立即推 `ErrorCode::CompositionCycleDepth` fatal，放弃产出（`doc=nullptr`）。
 - **MAX_VECTOR_ELEMENT_DEPTH (64)**：VectorGroup 嵌套同理；共用 `BakeContext::currentVectorElementDepth`。
-- **MAX_COMPOSITIONS / MAX_LAYERS_PER_COMPOSITION / MAX_VECTOR_ELEMENTS_PER_PAYLOAD / MAX_FILTERS_PER_LAYER / MAX_STYLES_PER_LAYER / MAX_GRADIENT_STOPS / MAX_PATH_VERBS / MAX_GLYPHS_PER_RUN / MAX_NAME_STRING_BYTES / MAX_TEXT_STRING_BYTES**：Baker 在向 PAGDocument 推入每批次数据前检查，超限推 fatal 错误 `ErrorCode::StructureLimitExceeded`（见 §G.2 枚举定义；message 附具体字段名如 `"MAX_VECTOR_ELEMENTS_PER_PAYLOAD exceeded (got 120000)"` 或 `"MAX_NAME_STRING_BYTES exceeded for Layer::name (got 128KB)"`）。
+- **MAX_COMPOSITIONS / MAX_LAYERS_PER_COMPOSITION / MAX_CHILDREN_PER_LAYER / MAX_VECTOR_ELEMENTS_PER_PAYLOAD / MAX_FILTERS_PER_LAYER / MAX_STYLES_PER_LAYER / MAX_GRADIENT_STOPS / MAX_PATH_VERBS / MAX_GLYPHS_PER_RUN / MAX_IMAGES / MAX_FONTS / MAX_NAME_STRING_BYTES / MAX_TEXT_STRING_BYTES**：Baker 在向 PAGDocument 推入每批次数据前检查，超限推 fatal 错误 `ErrorCode::StructureLimitExceeded`（见 §G.2 枚举定义；message 附具体字段名如 `"MAX_VECTOR_ELEMENTS_PER_PAYLOAD exceeded (got 120000)"` 或 `"MAX_NAME_STRING_BYTES exceeded for Layer::name (got 128KB)"`）。Decoder 侧同样校验——见 §D.6 / §D.8 Read 伪码的 `count > MAX_*` 即时 return 分支。
 - **MAX_IMAGE_BYTES / MAX_FONT_BYTES**：ResourceBaker 读图片/字体字节前检查；超限推 warning `ErrorCode::ResourceSizeExceeded`，该资源 index 记为 UINT32_MAX，引用点降级。
 
 > **错误码语义划分**：
@@ -4396,6 +4477,14 @@ target_link_libraries(PAGFullTest PRIVATE pagx-pag)
 - 本文档所有行号引用基于 `src/renderer/LayerBuilder.cpp` 当前实现；LayerBuilder 修改时需同步更新本文档附录 A。
 - PAGX 规范版本：`spec/pagx_spec.zh_CN.md`。
 - PAG v2 版本：0x02（本期）；动画扩展不升版本号。
+- v2.9 → v2.10 修订要点（冻结前最后一轮：1 P1 + 2 P2 + 3 P3）：
+  - **P1-1：§C.5-pre 补 `struct FileHeader` + `struct PAGDocument` 顶层根结构**。v2.9 及以前，§22 附录 C 自称"PAGDocument 完整 C++ 定义"但实际只定义了 Property / enum / ImageAsset / Composition / Layer / VectorElement 等子结构，**顶层 `PAGDocument` 与 `FileHeader` 本身从未定义**——§8.2 / §8.3bis / §15.3 到处使用 `doc.header.width` / `doc.compositions` 却找不到权威字段表。本版本在 §C.4 末尾与 §C.5 之间新增 §C.5-pre 子节，钉死字段列表 + 默认值 + 成员访问风格（`doc->header.width`，四字段容器均为 `std::vector<std::unique_ptr<T>>`）。v2.0 → v2.9 十轮评审共同漏点。
+  - **P2-1：补三个硬上限的 Decoder 强制校验**（§D.6 / §D.8 / §H.2 / §G.6）。`MAX_IMAGES` / `MAX_FONTS` / `MAX_CHILDREN_PER_LAYER` 三个常量在 §H.1 已定义但 Decoder Read 路径无 count 上界检查——攻击者构造 `childCount=0xFFFFFFFF` 的 .pag 可触发 `vector::reserve` OOM。本版本：§D.6 开头加"Decoder 强制上界"小节说明三个 count 校验时机；§D.8 LayerBlock.childCount 字段行追加内联校验注释；§H.2 Baker 侧列表加入三个常量并注明 "Decoder 侧同样校验"；§G.6 测试矩阵追加 `Truncate.ChildCountOverflow / ImageTableOverflow / FontTableOverflow` 覆盖。
+  - **P2-2：§G.5 明文钉死 `Property<EnumT>` 通路纪律**。v2.9 里 §C.5 Layer 字段用 `Property<BlendMode>` + §D.8 "字节层 u8" + §G.5 BlendMode 有 EnumMeta，但**三者之间如何串联**未明文——AI 可能写出绕过 `ReadEnum<BlendMode>` 的实现（直接 `static_cast<BlendMode>(readUint8())`），让非法 u8 逃过 `InvalidEnumValue=407` 告警。本版本在 §G.5 EnumMeta 清单末尾新增纪律条款 + 正反例代码：`Property<EnumT>` 的 `ReadValue<T>` / `WriteValue<T>` 特化必须以 `ReadEnum<T>` / `WriteEnum<T>` 为实现体；`PropertyValueEquals<EnumT>` 走默认 `operator==`。
+  - **P3-1：§G.6 删 `GlyphRunKindInferred=208` 测试矩阵重复行**。v2.9 P1-A 修复时误粘贴两次。
+  - **P3-2：§G.5 `TileMode` 的 `EnumMeta::Default` Clamp → Decal**。与 §C.6 ImagePattern / §C.9 LayerFilter/LayerStyle 结构体字段默认值 `Decal` 对齐（2026-04-25 主干切换 Decal 时只改了结构体，EnumMeta 遗漏至今）。避免损坏字节流被回退为 Clamp 而合法字段保持 Decal 的混合状态。
+  - **P3-3：§D.10 CompositionRefPayload 加 Decoder 校验点说明**。`InvalidCompositionIndex=306` 的触发时机（读 `u32 compositionIndex` 后立即 `!= UINT32_MAX && < doc.compositions.size()`）原 §G.2 注释里有但 §D.10 Tag 布局处缺——AI 可能把校验推到 Inflater 阶段导致 Codec 路径放过病态输入。
+
 - v2.8 → v2.9 修订要点（独立审计补强：2 个 P1 + 7 个 P2 + 6 个 P3）：
   - **P1-A：§G.6 测试矩阵补 `GlyphRunKindInferred=208`**。v2.8 里 208 在 §G.2 声明（TextBaker 兜底分支使用），但 §G.6 测试矩阵找不到对应行——违反"每个 ErrorCode 必须至少一条单测触发"纪律。本版本补一行 `TextBakerTest.cpp / TextBaker.GlyphRunKindInferred`。
   - **P1-B：删除 `LayerFilter::blendMode` 死字段**（§C.9 + §5.6）。v2.8 里 `LayerFilter` 结构体声明 `BlendMode blendMode`，但 §D.12 所有 5 个 Filter Tag 的 body 都不写该字段——数据模型与字节流语义漂移，Baker 落该字段会被静默丢失。本版本删除 `LayerFilter::blendMode`（Blend filter 的混合入口由 `blendFilterMode` 承载，已在字节布局落地），§5.6 描述同步改为"`blendMode` 为 style 专用，Filter 若需混合用各自子类字段（如 `blendFilterMode`）"。注：`LayerStyle::blendMode` 保持不变——StyleDropShadow/InnerShadow/BackgroundBlur 的 Tag body 已显式序列化该字段。
