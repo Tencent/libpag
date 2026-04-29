@@ -322,7 +322,11 @@ int RunResolve(int argc, char* argv[]) {
   // contained imports or already-authored structure. The optimizer is conservative: any Layer
   // carrying id/name/customData/layout/constraints (typical hand-authored content) is untouched,
   // so this only cleans up the newly inlined import payload.
-  PAGXOptimizer::Optimize(doc.get());
+  auto optimizeResult = PAGXOptimizer::Optimize(doc.get());
+  if (!optimizeResult.converged) {
+    std::cerr << "pagx resolve: warning: PAGXOptimizer did not converge within "
+              << optimizeResult.iterationsUsed << " iteration(s); output may be sub-optimal\n";
+  }
 
   auto xml = PAGXExporter::ToXML(*doc);
   std::ofstream out(options.outputFile);

@@ -734,7 +734,7 @@ static void DetectRedundantFirstChildGroup(const std::vector<Element*>& elements
   // If there are following siblings AND the group contains painters, unwrapping would let those
   // painters bleed onto subsequent geometry. The Group is therefore providing real painter
   // isolation and should not be flagged.
-  if (elements.size() > 1 && ContainsPainter(group->elements)) {
+  if (elements.size() > 1 && HasPainter(group->elements)) {
     return;
   }
   AddDiagnostic(diagnostics, group->sourceLine,

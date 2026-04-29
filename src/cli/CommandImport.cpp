@@ -215,7 +215,11 @@ int RunImport(int argc, char* argv[]) {
     std::cerr << "pagx import: warning: " << warning << "\n";
   }
 
-  PAGXOptimizer::Optimize(result.document.get());
+  auto optimizeResult = PAGXOptimizer::Optimize(result.document.get());
+  if (!optimizeResult.converged) {
+    std::cerr << "pagx import: warning: PAGXOptimizer did not converge within "
+              << optimizeResult.iterationsUsed << " iteration(s); output may be sub-optimal\n";
+  }
 
   auto xml = PAGXExporter::ToXML(*result.document);
   if (!WriteStringToFile(xml, options.outputFile, "pagx import")) {

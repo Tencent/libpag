@@ -47,13 +47,13 @@ using pagx::BlendMode;
 using pagx::BlurFilter;
 using pagx::Color;
 using pagx::Composition;
-using pagx::ContainsPainter;
 using pagx::DropShadowStyle;
 using pagx::Element;
 using pagx::Ellipse;
 using pagx::Fill;
 using pagx::Group;
 using pagx::HasLayerOnlyFeatures;
+using pagx::HasPainter;
 using pagx::IsLayerShell;
 using pagx::IsPainter;
 using pagx::Layer;
@@ -1187,7 +1187,7 @@ CLI_TEST(VerifyUtilsTest, IsLayerShellCenterYConstraintSet) {
 }
 
 // ---------------------------------------------------------------------------
-// VerifyUtils: ContainsPainter / IsPainter
+// VerifyUtils: HasPainter / IsPainter
 // ---------------------------------------------------------------------------
 
 CLI_TEST(VerifyUtilsTest, IsPainterFillTrue) {
@@ -1206,42 +1206,42 @@ CLI_TEST(VerifyUtilsTest, IsPainterOtherTypesFalse) {
   EXPECT_FALSE(IsPainter(NodeType::Document));
 }
 
-CLI_TEST(VerifyUtilsTest, ContainsPainterEmptyVector) {
+CLI_TEST(VerifyUtilsTest, HasPainterEmptyVector) {
   std::vector<Element*> empty;
-  EXPECT_FALSE(ContainsPainter(empty));
+  EXPECT_FALSE(HasPainter(empty));
 }
 
-CLI_TEST(VerifyUtilsTest, ContainsPainterOnlyShapes) {
+CLI_TEST(VerifyUtilsTest, HasPainterOnlyShapes) {
   auto doc = PAGXDocument::Make(100, 100);
   std::vector<Element*> elements;
   elements.push_back(doc->makeNode<Rectangle>());
   elements.push_back(doc->makeNode<Ellipse>());
   elements.push_back(doc->makeNode<Group>());
-  EXPECT_FALSE(ContainsPainter(elements));
+  EXPECT_FALSE(HasPainter(elements));
 }
 
-CLI_TEST(VerifyUtilsTest, ContainsPainterWithFill) {
+CLI_TEST(VerifyUtilsTest, HasPainterWithFill) {
   auto doc = PAGXDocument::Make(100, 100);
   std::vector<Element*> elements;
   elements.push_back(doc->makeNode<Rectangle>());
   elements.push_back(doc->makeNode<Fill>());
-  EXPECT_TRUE(ContainsPainter(elements));
+  EXPECT_TRUE(HasPainter(elements));
 }
 
-CLI_TEST(VerifyUtilsTest, ContainsPainterWithStroke) {
+CLI_TEST(VerifyUtilsTest, HasPainterWithStroke) {
   auto doc = PAGXDocument::Make(100, 100);
   std::vector<Element*> elements;
   elements.push_back(doc->makeNode<Rectangle>());
   elements.push_back(doc->makeNode<Stroke>());
-  EXPECT_TRUE(ContainsPainter(elements));
+  EXPECT_TRUE(HasPainter(elements));
 }
 
-CLI_TEST(VerifyUtilsTest, ContainsPainterPainterAsFirstElement) {
+CLI_TEST(VerifyUtilsTest, HasPainterPainterAsFirstElement) {
   auto doc = PAGXDocument::Make(100, 100);
   std::vector<Element*> elements;
   elements.push_back(doc->makeNode<Fill>());
   elements.push_back(doc->makeNode<Rectangle>());
-  EXPECT_TRUE(ContainsPainter(elements));
+  EXPECT_TRUE(HasPainter(elements));
 }
 
 }  // namespace pag

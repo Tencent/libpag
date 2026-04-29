@@ -367,8 +367,11 @@ std::string FloatToString(float value) {
   // angle that almost lines up with a multiple of pi/2) still round-trip through XML losslessly
   // and changing them would alter rendered output for baseline-sensitive callers.
   if (s.find('e') != std::string::npos || s.find('E') != std::string::npos) {
-    // Pick a width that can fully represent the smallest float magnitude that still survives
-    // the round-trip; %.9f gives nine fractional digits, enough for any non-denormal float.
+    // Use 9 fractional digits: this matches FLT_DECIMAL_DIG, the minimum precision that
+    // guarantees every distinct float value serializes to a distinct decimal string and
+    // round-trips back to the same bit pattern. Fewer digits would collapse near-denormal
+    // values (e.g. 1e-30f) onto 0 after the scientific-notation branch is rewritten. Trailing
+    // zeros are stripped below so typical values stay short.
     snprintf(buf, sizeof(buf), "%.9f", value);
     s = buf;
     auto dot = s.find('.');

@@ -46,12 +46,101 @@ namespace pagx {
 
 // ============================================================================
 // Local helpers. `HasLayerOnlyFeatures`, `IsLayerShell`, `IsPainter`, and
-// `ContainsPainter` are the shared definitions from pagx/utils/VerifyUtils.h
+// `HasPainter` are the shared definitions from pagx/utils/VerifyUtils.h
 // (same semantics used by the cli verify / resolve commands) — keeping them in
 // one place avoids silent drift when new Layer attributes are introduced.
 // ============================================================================
 
 namespace {
+
+// ----------------------------------------------------------------------------
+// Forward declarations for every helper defined below. Keeping them together
+// here lets any function call any other regardless of definition order, so the
+// bodies below can be arranged by topic instead of by topological sort.
+// ----------------------------------------------------------------------------
+
+struct PainterSignature;
+
+bool HasUnresolvedImport(const Layer* layer);
+bool LayerNeedsKeeping(const Layer* layer, const std::unordered_set<const Layer*>& maskRefs);
+bool LayoutNodeHasConstraints(const LayoutNode* node);
+bool ElementHasConstraints(Element* element);
+bool IsDefaultTransformGroup(const Group* group);
+
+void CollectMaskRefsFromLayer(const Layer* layer, std::unordered_set<const Layer*>& refs);
+void CollectMaskRefs(const std::vector<Layer*>& layers, std::unordered_set<const Layer*>& refs);
+
+Group* WrapShellLayerAsGroup(PAGXDocument* doc, Layer* layer);
+
+bool TryReadAxisAlignedRect(const PathData* data, float& cx, float& cy, float& w, float& h);
+bool TryReadEllipse(const PathData* data, float& cx, float& cy, float& w, float& h);
+Element* TryCanonicalizePath(PAGXDocument* doc, Path* path);
+
+bool TryConvertRectMaskToScrollRect(Layer* layer);
+bool RectMaskToScrollRectInLayer(Layer* layer);
+
+bool ColorSourcesEqual(const ColorSource* a, const ColorSource* b);
+bool FillsEqual(const Fill* a, const Fill* b);
+bool StrokesEqual(const Stroke* a, const Stroke* b);
+bool PaintersEqual(const Element* a, const Element* b);
+PainterSignature ComputePainterSignature(const Group* group);
+bool PainterSignaturesEqual(const PainterSignature& a, const PainterSignature& b);
+
+bool PruneEmptyInElements(std::vector<Element*>& elements);
+bool PruneEmptyInGroup(Group* group);
+bool PruneEmptyInLayer(Layer* layer, const std::unordered_set<const Layer*>& maskRefs);
+bool PruneEmptyTopLevel(std::vector<Layer*>& layers, bool parentHasLayout,
+                        const std::unordered_set<const Layer*>& maskRefs);
+
+bool CanonicalizePathsInElements(PAGXDocument* doc, std::vector<Element*>& elements);
+bool CanonicalizePathsInLayer(PAGXDocument* doc, Layer* layer);
+
+bool DowngradeShellChildrenInLayer(PAGXDocument* doc, Layer* layer,
+                                   const std::unordered_set<const Layer*>& maskRefs);
+bool DowngradeShellChildren(PAGXDocument* doc, std::vector<Layer*>& layers,
+                            const std::unordered_set<const Layer*>& maskRefs);
+
+bool IsMergeableShellLayer(const Layer* layer, const std::unordered_set<const Layer*>& maskRefs);
+template <class T>
+void BeginMutation(std::vector<T>& source, std::vector<T>& result, size_t upTo, bool& changed);
+bool MergeAdjacentShellLayersInList(PAGXDocument* doc, std::vector<Layer*>& layers,
+                                    bool parentHasLayout,
+                                    const std::unordered_set<const Layer*>& maskRefs);
+bool MergeAdjacentShellLayersRecursive(PAGXDocument* doc, std::vector<Layer*>& layers,
+                                       bool parentHasLayout,
+                                       const std::unordered_set<const Layer*>& maskRefs);
+bool MergeAdjacentShellLayers(PAGXDocument* doc, std::vector<Layer*>& topLevel,
+                              const std::unordered_set<const Layer*>& maskRefs);
+
+bool UnwrapRedundantFirstGroupInElements(std::vector<Element*>& elements);
+bool UnwrapRedundantFirstGroupRecursive(std::vector<Element*>& elements);
+bool UnwrapRedundantFirstGroupInLayer(Layer* layer);
+
+bool MergeAdjacentGroupsInElements(std::vector<Element*>& elements);
+bool MergeAdjacentGroupsRecursive(std::vector<Element*>& elements);
+bool MergeAdjacentGroupsInLayer(Layer* layer);
+
+void RecomputeMaskRefs(PAGXDocument* doc, std::unordered_set<const Layer*>& refs);
+
+std::string PathDataSignature(const PathData* data);
+void RewritePathDataInElements(std::vector<Element*>& elements,
+                               const std::unordered_map<PathData*, PathData*>& redirect);
+void RewritePathDataInLayer(Layer* layer, const std::unordered_map<PathData*, PathData*>& redirect);
+bool DedupPathDataResources(PAGXDocument* doc);
+
+void CollectRefsFromElement(const Element* element, std::unordered_set<std::string>& refs);
+void CollectRefsFromLayer(const Layer* layer, std::unordered_set<std::string>& refs);
+void CollectReferencedIds(const PAGXDocument* doc, std::unordered_set<std::string>& refs);
+bool IsResourceNode(NodeType type);
+bool PruneUnreferencedResources(PAGXDocument* doc);
+
+int OptimizeLayerList(PAGXDocument* doc, std::vector<Layer*>& layers,
+                      std::unordered_set<const Layer*>& maskRefs,
+                      const PAGXOptimizerOptions& options, bool* converged);
+
+// ----------------------------------------------------------------------------
+// Helper definitions start here.
+// ----------------------------------------------------------------------------
 
 bool HasUnresolvedImport(const Layer* layer) {
   return !layer->importDirective.source.empty() || !layer->importDirective.content.empty();
@@ -113,8 +202,6 @@ bool IsDefaultTransformGroup(const Group* group) {
   return true;
 }
 
-void CollectMaskRefs(const std::vector<Layer*>& layers, std::unordered_set<const Layer*>& refs);
-
 void CollectMaskRefsFromLayer(const Layer* layer, std::unordered_set<const Layer*>& refs) {
   if (layer == nullptr) {
     return;
@@ -158,6 +245,13 @@ Group* WrapShellLayerAsGroup(PAGXDocument* doc, Layer* layer) {
 
 bool TryReadAxisAlignedRect(const PathData* data, float& cx, float& cy, float& w, float& h) {
   auto& verbs = data->verbs();
+  // Accept two well-formed axis-aligned rectangle encodings:
+  //   5 verbs: Move + 3 Line + Close       (SVG `<rect>` / importer canonical form — the Close
+  //                                         implicitly draws the fourth edge back to the start).
+  //   6 verbs: Move + 4 Line + Close       (SVG `<path d="M... L... L... L... L... Z">` where the
+  //                                         author emitted the final edge as an explicit Line
+  //                                         before closing — commonly produced by path editors).
+  // Any other verb count cannot describe a pure axis-aligned rectangle.
   if (verbs.size() != 5 && verbs.size() != 6) {
     return false;
   }
@@ -463,6 +557,14 @@ bool RectMaskToScrollRectInLayer(Layer* layer) {
 
 // ----------------------------------------------------------------------------
 // Painter signature (used to decide whether two Groups can merge geometry).
+//
+// The *Equal helpers below intentionally encode the *optimizer's* notion of "safe to treat as the
+// same painter when merging adjacent groups": shared resources compare by pointer identity (so two
+// references to the same `<gradient id="g1"/>` collapse), inline SolidColor literals compare by
+// value, and every other inline color source (gradient, ImagePattern) is treated as opaque unless
+// the same pointer is reused. This is more conservative than a generic structural equality, and it
+// is not reused anywhere else in the codebase — promoting these to a shared utility would push the
+// conservative semantics onto unrelated call sites, so they stay file-local on purpose.
 // ----------------------------------------------------------------------------
 
 // A painter's color source can be either a shared resource (compare by pointer identity, since
@@ -612,9 +714,6 @@ bool PainterSignaturesEqual(const PainterSignature& a, const PainterSignature& b
 
 // Recursively prune empty Layers (no contents/children/composition, no constraints, not
 // referenced as a mask, not a layout participant) and empty Groups.
-bool PruneEmptyInLayer(Layer* layer, const std::unordered_set<const Layer*>& maskRefs);
-bool PruneEmptyInGroup(Group* group);
-
 bool PruneEmptyInElements(std::vector<Element*>& elements) {
   bool changed = false;
   size_t writeIdx = 0;
@@ -920,7 +1019,7 @@ bool UnwrapRedundantFirstGroupInElements(std::vector<Element*>& elements) {
   }
   // Painter-leak guard: if the parent has more siblings AND the group contains painters,
   // unwrapping would let those painters bleed into following geometry.
-  if (elements.size() > 1 && ContainsPainter(group->elements)) {
+  if (elements.size() > 1 && HasPainter(group->elements)) {
     return false;
   }
   // Layout guard: any direct child element using right/bottom/centerX/centerY needs the group
@@ -1135,9 +1234,6 @@ std::string PathDataSignature(const PathData* data) {
   return sig;
 }
 
-void RewritePathDataInElements(std::vector<Element*>& elements,
-                               const std::unordered_map<PathData*, PathData*>& redirect);
-
 void RewritePathDataInLayer(Layer* layer,
                             const std::unordered_map<PathData*, PathData*>& redirect) {
   if (layer == nullptr) {
@@ -1217,8 +1313,6 @@ bool DedupPathDataResources(PAGXDocument* doc) {
 }
 
 // Collect every resource id that is referenced from a Layer, Element, Composition or Font glyph.
-void CollectReferencedIds(const PAGXDocument* doc, std::unordered_set<std::string>& refs);
-
 void CollectRefsFromElement(const Element* element, std::unordered_set<std::string>& refs) {
   if (element == nullptr) {
     return;

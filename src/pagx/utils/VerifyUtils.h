@@ -65,6 +65,6 @@ inline bool IsPainter(NodeType type) {
 /**
  * Returns true if `elements` contains at least one painter (Fill or Stroke).
  */
-bool ContainsPainter(const std::vector<Element*>& elements);
+bool HasPainter(const std::vector<Element*>& elements);
 
 }  // namespace pagx

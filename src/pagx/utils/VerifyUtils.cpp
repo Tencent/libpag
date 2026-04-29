@@ -117,7 +117,7 @@ bool IsLayerShell(const Layer* layer) {
   return true;
 }
 
-bool ContainsPainter(const std::vector<Element*>& elements) {
+bool HasPainter(const std::vector<Element*>& elements) {
   for (auto* el : elements) {
     if (IsPainter(el->nodeType())) {
       return true;
