@@ -415,8 +415,7 @@ All geometry elements support constraint attributes for positioning. Prefer cons
 over `position`.
 
 - **Rectangle**: `size`, `roundness` (single value, auto-limited to `min(r, w/2, h/2)`),
-  `reversed`. Setting exactly one of `width`/`height` to `0` degenerates it to a line
-  segment — see §Straight Lines below.
+  `reversed`
 - **Ellipse**: `size`, `reversed`
 - **Polystar**: `type` (polygon/star), `pointCount`, `outerRadius`, `innerRadius`,
   `outerRoundness`, `innerRoundness` (0–1 for vertex rounding).
