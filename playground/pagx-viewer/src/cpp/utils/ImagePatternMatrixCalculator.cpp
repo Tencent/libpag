@@ -121,7 +121,7 @@ bool resolveImagePatternMatrix(pagx::ImagePattern* pattern) {
   if (scaleModeIt == pattern->customData.end()) {
     return false;
   }
-
+  pattern->scaleMode = ScaleMode::None;
   char* end = nullptr;
   int scaleModeInt = static_cast<int>(std::strtol(scaleModeIt->second.c_str(), &end, 10));
   if (end == scaleModeIt->second.c_str()) {
@@ -197,7 +197,6 @@ void resolveAllImagePatternMatrices(pagx::PAGXDocument* document) {
       continue;
     }
     auto* pattern = static_cast<pagx::ImagePattern*>(nodePtr.get());
-    pattern->scaleMode = ScaleMode::None;
     resolveImagePatternMatrix(pattern);
   }
 }
