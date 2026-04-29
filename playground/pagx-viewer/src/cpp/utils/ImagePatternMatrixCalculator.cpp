@@ -121,7 +121,7 @@ bool resolveImagePatternMatrix(pagx::ImagePattern* pattern) {
   if (scaleModeIt == pattern->customData.end()) {
     return false;
   }
-  pattern->scaleMode = ScaleMode::None;
+
   char* end = nullptr;
   int scaleModeInt = static_cast<int>(std::strtol(scaleModeIt->second.c_str(), &end, 10));
   if (end == scaleModeIt->second.c_str()) {
@@ -168,11 +168,16 @@ bool resolveImagePatternMatrix(pagx::ImagePattern* pattern) {
     }
   }
 
+  if (actualImageWidth <= 0 || actualImageHeight <= 0 || nodeWidth <= 0 || nodeHeight <= 0) {
+    return false;
+  }
+
   // The matrix stored during export is paint->transform() (normalized transform).
   auto paintTransform = pattern->matrix;
 
   pattern->matrix = calculateImagePatternMatrix(scaleMode, actualImageWidth, actualImageHeight,
                                                 nodeWidth, nodeHeight, paintTransform, scaleFactor);
+  pattern->scaleMode = ScaleMode::None;
 
   return true;
 }
