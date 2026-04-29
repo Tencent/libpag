@@ -415,7 +415,10 @@ All geometry elements support constraint attributes for positioning. Prefer cons
 over `position`.
 
 - **Rectangle**: `size`, `roundness` (single value, auto-limited to `min(r, w/2, h/2)`),
-  `reversed`
+  `reversed`. **Straight line**: when exactly one of `width`/`height` is `0`, the
+  Rectangle degenerates to a single line segment — pair with `Stroke` to draw the line.
+  This is the **only** recommended way to author a straight line in PAGX (dividers,
+  underlines, axis ticks, etc.); do not use a 1px filled Rectangle.
 - **Ellipse**: `size`, `reversed`
 - **Polystar**: `type` (polygon/star), `pointCount`, `outerRadius`, `innerRadius`,
   `outerRoundness`, `innerRoundness` (0–1 for vertex rounding).
@@ -542,8 +545,9 @@ discards **entire lines**, not pixels). TextBox overrides child Text's `position
 </TextBox>
 ```
 
-**Strikethrough / underline**: Overlay a 1px Rectangle — `centerY="0"` for strikethrough,
-`bottom="0"` for underline. See `patterns.md` §Text Decoration.
+**Strikethrough / underline**: Overlay a zero-height Rectangle + Stroke (the canonical
+straight-line pattern) — `centerY="0"` for strikethrough, `bottom="0"` for underline. See
+`patterns.md` §Text Decoration.
 
 **TextPath**: maps glyphs onto a curved path. Supports constraint positioning (opposite-pair
 constraints and percentage dimensions use scale-to-fit). Text-to-shape conversion is
