@@ -431,12 +431,9 @@ over `position`.
 ### Straight Lines
 
 To draw a straight line, set exactly one of `width`/`height` on a `Rectangle` to `0` and
-add a `Stroke` — the Rectangle degenerates to a line segment. The wrapping `Layer` (or
-`Group`) **must** carry an explicit `1` on the perpendicular axis (e.g. `Layer height="1"`
-for a horizontal rule); otherwise the container collapses to 0 in flex layouts and
-surrounding `gap`/sibling positions go wrong (Stroke widens the visual bounds but does
-not feed back into layout measurement). Isolate the Stroke in a Group when other geometry
-shares the scope. See `patterns.md` §Divider for the canonical example.
+add a `Stroke` — the Rectangle degenerates to a line segment. Isolate the Stroke in a
+Group when other geometry shares the scope. See `patterns.md` §Divider for the canonical
+example.
 
 ## Painters
 
