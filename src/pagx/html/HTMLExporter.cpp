@@ -283,6 +283,8 @@ std::string HTMLExporter::ToHTML(const PAGXDocument& doc, const Options& options
   ctx.staticImgUrlPrefix = options.staticImgUrlPrefix;
   ctx.staticImgNamePrefix = options.staticImgNamePrefix;
   ctx.staticImgPixelRatio = options.staticImgPixelRatio;
+  ctx.fontSynthesisWeight = options.fontSynthesisWeight;
+  ctx.fontSynthesisStyle = options.fontSynthesisStyle;
 
   // Pre-pass: for every compatible PlusDarker Layer, render a cropped backdrop PNG with the layer
   // temporarily hidden. The resulting base64 data URLs are consumed by writeLayer below to emit an

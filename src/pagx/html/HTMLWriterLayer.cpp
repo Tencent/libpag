@@ -379,10 +379,12 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                 spanStyle += "font-size:" + FloatToString(span.text->renderFontSize()) + "px";
                 if (!span.text->fontStyle.empty()) {
                   if (span.text->fontStyle.find("Bold") != std::string::npos) {
-                    spanStyle += ";font-weight:bold;font-synthesis-weight:auto";
+                    spanStyle += ";font-weight:bold;font-synthesis-weight:" +
+                                 std::string(_ctx->fontSynthesisWeight ? "auto" : "none");
                   }
                   if (span.text->fontStyle.find("Italic") != std::string::npos) {
-                    spanStyle += ";font-style:italic;font-synthesis-style:auto";
+                    spanStyle += ";font-style:italic;font-synthesis-style:" +
+                                 std::string(_ctx->fontSynthesisStyle ? "auto" : "none");
                   }
                 }
                 if (span.text->letterSpacing != 0.0f) {
@@ -408,7 +410,8 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               }
               if (span.text->fauxBold && !span.stroke) {
                 if (!spanStyle.empty()) spanStyle += ';';
-                spanStyle += "font-weight:bold;font-synthesis-weight:auto";
+                spanStyle += "font-weight:bold;font-synthesis-weight:" +
+                             std::string(_ctx->fontSynthesisWeight ? "auto" : "none");
               }
               if (span.stroke && span.stroke->color &&
                   span.stroke->color->nodeType() == NodeType::SolidColor) {
@@ -420,7 +423,8 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               }
               if (span.text->fauxItalic) {
                 if (!spanStyle.empty()) spanStyle += ';';
-                spanStyle += "font-style:italic;font-synthesis-style:auto";
+                spanStyle += "font-style:italic;font-synthesis-style:" +
+                             std::string(_ctx->fontSynthesisStyle ? "auto" : "none");
               }
               out.openTag("span");
               out.addAttr("style", spanStyle);
@@ -519,10 +523,12 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               spanStyle += ";font-size:" + FloatToString(span.text->renderFontSize()) + "px";
               if (!span.text->fontStyle.empty()) {
                 if (span.text->fontStyle.find("Bold") != std::string::npos) {
-                  spanStyle += ";font-weight:bold;font-synthesis-weight:auto";
+                  spanStyle += ";font-weight:bold;font-synthesis-weight:" +
+                               std::string(_ctx->fontSynthesisWeight ? "auto" : "none");
                 }
                 if (span.text->fontStyle.find("Italic") != std::string::npos) {
-                  spanStyle += ";font-style:italic;font-synthesis-style:auto";
+                  spanStyle += ";font-style:italic;font-synthesis-style:" +
+                               std::string(_ctx->fontSynthesisStyle ? "auto" : "none");
                 }
               }
               if (span.text->letterSpacing != 0.0f) {
@@ -545,7 +551,8 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               }
             }
             if (span.text->fauxBold && !span.stroke) {
-              spanStyle += ";font-weight:bold;font-synthesis-weight:auto";
+              spanStyle += ";font-weight:bold;font-synthesis-weight:" +
+                           std::string(_ctx->fontSynthesisWeight ? "auto" : "none");
             }
             if (span.stroke && span.stroke->color &&
                 span.stroke->color->nodeType() == NodeType::SolidColor) {
@@ -555,7 +562,8 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               spanStyle += ";paint-order:stroke fill";
             }
             if (span.text->fauxItalic) {
-              spanStyle += ";font-style:italic;font-synthesis-style:auto";
+              spanStyle += ";font-style:italic;font-synthesis-style:" +
+                           std::string(_ctx->fontSynthesisStyle ? "auto" : "none");
             }
             out.openTag("span");
             out.addAttr("style", spanStyle);

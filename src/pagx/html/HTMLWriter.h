@@ -152,6 +152,10 @@ class HTMLWriterContext {
   std::string staticImgNamePrefix = {};
   float staticImgPixelRatio = 2.0f;
 
+  // Font synthesis control, forwarded from HTMLExportOptions.
+  bool fontSynthesisWeight = true;
+  bool fontSynthesisStyle = true;
+
   // Per-plusDarker-Layer backdrop data registered by HTMLPlusDarkerRenderer before the writer
   // walks the tree. When a Layer pointer is present here, the writer emits an SVG filter that
   // composites the backdrop via feImage + feComposite arithmetic instead of the mix-blend-mode
