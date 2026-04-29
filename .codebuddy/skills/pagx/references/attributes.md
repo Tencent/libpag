@@ -113,7 +113,7 @@ Geometry element defined from center point with uniform corner rounding support.
 | `reversed` | bool | false | Reverse path direction |
 | `position` | Point | (center of bounding box) | Center point coordinate; animatable, prefer constraint attributes for static layout |
 
-Rectangle supports all constraint attributes. See §Constraint Attributes below. When exactly one of `width`/`height` is `0`, Rectangle degenerates to a line segment — see `guide.md` §Geometry Elements.
+Rectangle supports all constraint attributes. See §Constraint Attributes below.
 
 ### Ellipse
 

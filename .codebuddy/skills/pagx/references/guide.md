@@ -432,10 +432,13 @@ over `position`.
 ### Straight Lines
 
 The only recommended way to draw a straight line (dividers, underlines, axis ticks, grid
-lines) is a zero-edge `Rectangle` + `Stroke` — never a 1px filled Rectangle. Wrap it in a
-`Layer` (or `Group`) with the perpendicular size set to `1` so the line occupies layout
-space, and isolate the Stroke in a Group when other geometry shares the scope. See
-`patterns.md` §Divider for the canonical example.
+lines) is a zero-edge `Rectangle` + `Stroke` — never a 1px filled Rectangle. The wrapping
+`Layer` (or `Group`) **must** carry an explicit `1` on the perpendicular axis (e.g.
+`Layer height="1"` for a horizontal rule); otherwise the container collapses to 0 in
+flex layouts and surrounding `gap`/sibling positions go wrong (Stroke widens the visual
+bounds but does not feed back into layout measurement). Isolate the Stroke in a Group
+when other geometry shares the scope. See `patterns.md` §Divider for the canonical
+example.
 
 ## Painters
 
