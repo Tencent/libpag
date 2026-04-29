@@ -18,7 +18,9 @@
 
 #include "ImagePatternMatrixCalculator.h"
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
+#include <string>
 
 #include "pagx/nodes/Image.h"
 #include "tgfx/core/Data.h"
@@ -26,6 +28,47 @@
 #include "tgfx/core/ImageCodec.h"
 
 namespace pagx {
+
+// customData key used to persist the original paint transform exported from the source file.
+// resolveImagePatternMatrix() overwrites pattern->matrix with the baked result, so we stash the
+// original 6-float affine here on first call to make the whole routine idempotent: later calls
+// (for example after progressive image upgrades replace decodedImage with a higher-resolution
+// tgfx::Image) can re-bake against the correct source matrix instead of re-baking the already
+// baked matrix.
+static constexpr const char* kPaintTransformKey = "paint-transform";
+
+static std::string SerializePaintTransform(const pagx::Matrix& matrix) {
+  char buf[128] = {};
+  std::snprintf(buf, sizeof(buf), "%.9g,%.9g,%.9g,%.9g,%.9g,%.9g", matrix.a, matrix.b, matrix.c,
+                matrix.d, matrix.tx, matrix.ty);
+  return buf;
+}
+
+static bool DeserializePaintTransform(const std::string& text, pagx::Matrix* out) {
+  float values[6] = {};
+  const char* cursor = text.c_str();
+  for (int i = 0; i < 6; ++i) {
+    char* end = nullptr;
+    values[i] = std::strtof(cursor, &end);
+    if (end == cursor) {
+      return false;
+    }
+    cursor = end;
+    // Skip the separator ',' between fields; the last field has no trailing comma.
+    if (i < 5) {
+      while (*cursor == ' ' || *cursor == ',') {
+        ++cursor;
+      }
+    }
+  }
+  out->a = values[0];
+  out->b = values[1];
+  out->c = values[2];
+  out->d = values[3];
+  out->tx = values[4];
+  out->ty = values[5];
+  return true;
+}
 
 pagx::Matrix calculateImagePatternMatrix(ImageScaleMode scaleMode, float imageWidth, float imageHeight,
                                          float nodeWidth, float nodeHeight, const pagx::Matrix& paintTransform,
@@ -177,8 +220,19 @@ bool resolveImagePatternMatrix(pagx::ImagePattern* pattern) {
     }
   }
 
-  // The matrix stored during export is paint->transform() (normalized transform).
-  auto paintTransform = pattern->matrix;
+  // The matrix stored during export is paint->transform() (normalized transform). After the
+  // first successful resolve, pattern->matrix is overwritten with the baked result, so we keep
+  // the original paint transform in customData to stay idempotent across re-resolves triggered
+  // by progressive image upgrades.
+  pagx::Matrix paintTransform = {};
+  auto ptIt = pattern->customData.find(kPaintTransformKey);
+  if (ptIt != pattern->customData.end() && DeserializePaintTransform(ptIt->second, &paintTransform)) {
+    // Already cached; use the original paint transform and ignore pattern->matrix, which holds
+    // a previously baked result.
+  } else {
+    paintTransform = pattern->matrix;
+    pattern->customData[kPaintTransformKey] = SerializePaintTransform(paintTransform);
+  }
 
   pattern->matrix = calculateImagePatternMatrix(
       scaleMode, actualImageWidth, actualImageHeight,
@@ -198,6 +252,27 @@ void resolveAllImagePatternMatrices(pagx::PAGXDocument* document) {
     auto* pattern = static_cast<pagx::ImagePattern*>(nodePtr.get());
     resolveImagePatternMatrix(pattern);
   }
+}
+
+size_t resolveImagePatternMatricesByFilePath(pagx::PAGXDocument* document,
+                                             const std::string& filePath) {
+  if (!document || filePath.empty()) {
+    return 0;
+  }
+  size_t updated = 0;
+  for (const auto& nodePtr : document->nodes) {
+    if (!nodePtr || nodePtr->nodeType() != pagx::NodeType::ImagePattern) {
+      continue;
+    }
+    auto* pattern = static_cast<pagx::ImagePattern*>(nodePtr.get());
+    if (!pattern->image || pattern->image->filePath != filePath) {
+      continue;
+    }
+    if (resolveImagePatternMatrix(pattern)) {
+      ++updated;
+    }
+  }
+  return updated;
 }
 
 }  // namespace pagx

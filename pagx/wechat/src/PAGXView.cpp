@@ -19,12 +19,14 @@
 #include "PAGXView.h"
 #include <emscripten/html5.h>
 #include <GLES3/gl31.h>
+#include <cstdlib>
 #include <tgfx/gpu/opengl/GLDevice.h>
 #include "GridBackground.h"
 #include "utils/StringParser.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/Rect.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/platform/Print.h"
@@ -172,6 +174,9 @@ void PAGXView::parsePAGX(const val& pagxData) {
   // Release old resources early to reduce peak memory usage when switching pages.
   displayList.root()->removeChildren();
   contentLayer = nullptr;
+  // Drop the per-document layer builder state before releasing the document itself; its
+  // internal maps hold pagx::Layer* pointers that would dangle once `document` resets.
+  builderSession = nullptr;
   document = nullptr;
 
   auto data = GetPagxDataFromEmscripten(pagxData);
@@ -220,6 +225,222 @@ bool PAGXView::loadFileDataAsNativeImage(const std::string& filePath, const val&
   return imageNode != nullptr;
 }
 
+bool PAGXView::upgradeImageFromNative(const std::string& filePath, const val& nativeImage) {
+  if (!document || !builderSession || filePath.empty() || !nativeImage.as<bool>()) {
+    return false;
+  }
+  auto codec = tgfx::ImageCodec::MakeFrom(nativeImage);
+  if (!codec) {
+    return false;
+  }
+  auto tgfxImage = tgfx::Image::MakeFrom(codec);
+  if (!tgfxImage) {
+    return false;
+  }
+  tgfxImage = tgfxImage->makeMipmapped(true);
+
+  // Attach the upgraded decoded image first so the session's rebuild sees the new pixels when
+  // it re-runs convertImagePattern on the affected layers. loadDecodedImage does not clear the
+  // filePath, so subsequent calls can replace it again (useful for multi-stage upgrades).
+  if (document->loadDecodedImage(filePath, tgfxImage) == nullptr) {
+    return false;
+  }
+  // ImagePattern matrices are baked in parsePAGX() against the initial image's pixel
+  // dimensions. Now that a higher-resolution image has replaced the initial one, those baked
+  // matrices would leave the upgraded image visibly misaligned (correct shape placement but
+  // wrong scale/offset inside the shape). resolveImagePatternMatricesByFilePath is idempotent
+  // thanks to the paint-transform cache in customData, so each upgrade call refreshes against
+  // the newly attached decodedImage without losing the original paint transform.
+  resolveImagePatternMatricesByFilePath(document.get(), filePath);
+  // Regenerate every layer whose fill/stroke currently points at this filePath. The return
+  // value is the number of tgfx layers whose contents were refreshed; zero means nothing in
+  // the document references the path (callers typically treat this as a no-op success, but
+  // we surface it as a boolean so JS can log it).
+  return builderSession->rebuildForFilePath(filePath) > 0;
+}
+
+namespace {
+
+val RectToJSObject(const tgfx::Rect& rect) {
+  val obj = val::object();
+  obj.set("x", rect.left);
+  obj.set("y", rect.top);
+  obj.set("w", rect.width());
+  obj.set("h", rect.height());
+  return obj;
+}
+
+}  // namespace
+
+val PAGXView::getImageBounds(const val& filePathList) const {
+  val result = val::object();
+  if (!document || !builderSession || !contentLayer) {
+    return result;
+  }
+  auto* rootLayer = contentLayer->root();
+  if (!rootLayer) {
+    return result;
+  }
+
+  auto count = filePathList["length"].as<unsigned>();
+  for (unsigned i = 0; i < count; ++i) {
+    std::string filePath = filePathList[i].as<std::string>();
+    auto affectedLayers = document->findLayersByFilePath(filePath);
+    if (affectedLayers.empty()) {
+      result.set(filePath, val::null());
+      continue;
+    }
+    tgfx::Rect unionBounds = tgfx::Rect::MakeEmpty();
+    tgfx::Rect largestBounds = tgfx::Rect::MakeEmpty();
+    float largestArea = 0.0f;
+    bool hasAny = false;
+    for (const auto* pagxLayer : affectedLayers) {
+      auto tgfxLayers = builderSession->getTgfxLayers(pagxLayer);
+      for (const auto& tgfxLayer : tgfxLayers) {
+        if (!tgfxLayer) {
+          continue;
+        }
+        // First getBounds(rootLayer) for a given tgfx Layer triggers tgfx's lazy localBounds
+        // evaluation (walks down to content, multiplies up ancestor matrices); later calls
+        // hit the cached value.
+        auto bounds = tgfxLayer->getBounds(rootLayer);
+        if (bounds.isEmpty()) {
+          continue;
+        }
+        if (!hasAny) {
+          unionBounds = bounds;
+          largestBounds = bounds;
+          largestArea = bounds.width() * bounds.height();
+          hasAny = true;
+        } else {
+          unionBounds.join(bounds);
+          float area = bounds.width() * bounds.height();
+          if (area > largestArea) {
+            largestArea = area;
+            largestBounds = bounds;
+          }
+        }
+      }
+    }
+    if (hasAny) {
+      val entry = val::object();
+      entry.set("unionBounds", RectToJSObject(unionBounds));
+      entry.set("largestBounds", RectToJSObject(largestBounds));
+      result.set(filePath, entry);
+    } else {
+      result.set(filePath, val::null());
+    }
+  }
+  return result;
+}
+
+val PAGXView::getImageMetadata() const {
+  val result = val::array();
+  if (!document) {
+    return result;
+  }
+
+  // Aggregate ImagePattern usages by the filePath of their referenced Image node so a single
+  // file shared across multiple fills only produces one entry. We keep the insertion order
+  // stable so later JS-side logs stay readable; switching to unordered_map would shuffle the
+  // entries across runs. Data URIs and inline data-backed images never surface to the JS
+  // downloader, so we skip them here as well.
+  std::vector<std::string> orderedPaths;
+  std::unordered_map<std::string, int> pathIndex;
+  std::unordered_map<std::string, std::pair<float, float>> originalDimensions;
+  std::unordered_map<std::string, std::vector<val>> usagesByPath;
+
+  auto parseFloatAttr = [](const std::unordered_map<std::string, std::string>& data,
+                           const char* key, float fallback) {
+    auto it = data.find(key);
+    if (it == data.end()) {
+      return fallback;
+    }
+    char* end = nullptr;
+    float value = std::strtof(it->second.c_str(), &end);
+    if (end == it->second.c_str()) {
+      return fallback;
+    }
+    return value;
+  };
+
+  auto parseIntAttr = [](const std::unordered_map<std::string, std::string>& data,
+                         const char* key, int fallback) {
+    auto it = data.find(key);
+    if (it == data.end()) {
+      return fallback;
+    }
+    char* end = nullptr;
+    long value = std::strtol(it->second.c_str(), &end, 10);
+    if (end == it->second.c_str()) {
+      return fallback;
+    }
+    return static_cast<int>(value);
+  };
+
+  for (const auto& node : document->nodes) {
+    if (!node || node->nodeType() != NodeType::ImagePattern) {
+      continue;
+    }
+    const auto* pattern = static_cast<const ImagePattern*>(node.get());
+    if (!pattern->image || pattern->image->filePath.empty()) {
+      continue;
+    }
+    const std::string& filePath = pattern->image->filePath;
+    // Skip data URIs: the JS downloader never touches them so surfacing them would just
+    // clutter the output.
+    if (filePath.compare(0, 5, "data:") == 0) {
+      continue;
+    }
+
+    const auto& data = pattern->customData;
+    float origWidth = parseFloatAttr(data, "orig-image-width", 0.0f);
+    float origHeight = parseFloatAttr(data, "orig-image-height", 0.0f);
+    float nodeWidth = parseFloatAttr(data, "node-width", 0.0f);
+    float nodeHeight = parseFloatAttr(data, "node-height", 0.0f);
+    int scaleMode = parseIntAttr(data, "image-scale-mode", 0);
+    // 0.5 matches the default used by ImagePatternMatrixCalculator so TILE patterns that omit
+    // the attribute behave identically in C++ and JS.
+    float scaleFactor = parseFloatAttr(data, "scale-factor", 0.5f);
+
+    if (pathIndex.find(filePath) == pathIndex.end()) {
+      pathIndex[filePath] = static_cast<int>(orderedPaths.size());
+      orderedPaths.push_back(filePath);
+      originalDimensions[filePath] = {origWidth, origHeight};
+      usagesByPath[filePath] = {};
+    } else {
+      // Keep the first positive dimension we saw: different ImagePatterns pointing at the
+      // same Image node may store zero for one or both dimensions depending on export path.
+      auto& existing = originalDimensions[filePath];
+      if (existing.first <= 0.0f && origWidth > 0.0f) existing.first = origWidth;
+      if (existing.second <= 0.0f && origHeight > 0.0f) existing.second = origHeight;
+    }
+
+    val usage = val::object();
+    usage.set("nodeWidth", nodeWidth);
+    usage.set("nodeHeight", nodeHeight);
+    usage.set("scaleMode", scaleMode);
+    usage.set("scaleFactor", scaleFactor);
+    usagesByPath[filePath].push_back(std::move(usage));
+  }
+
+  for (size_t i = 0; i < orderedPaths.size(); ++i) {
+    const auto& filePath = orderedPaths[i];
+    val entry = val::object();
+    entry.set("filePath", filePath);
+    entry.set("origWidth", originalDimensions[filePath].first);
+    entry.set("origHeight", originalDimensions[filePath].second);
+    val usageArr = val::array();
+    const auto& usages = usagesByPath[filePath];
+    for (size_t j = 0; j < usages.size(); ++j) {
+      usageArr.set(static_cast<unsigned>(j), usages[j]);
+    }
+    entry.set("usages", usageArr);
+    result.set(static_cast<unsigned>(i), entry);
+  }
+  return result;
+}
+
 void PAGXView::buildLayers() {
   if (!document) {
     return;
@@ -235,7 +456,10 @@ void PAGXView::buildLayers() {
 
   document->applyLayout(&fontConfig);
 
-  auto buildResult = LayerBuilder::BuildWithMap(document.get(), MAX_IMAGE_DIMENSION);
+  // Route through LayerBuilderSession so the build state survives into the progressive image
+  // upgrade path; see upgradeImageFromNative() below.
+  builderSession = std::make_unique<LayerBuilderSession>(MAX_IMAGE_DIMENSION);
+  auto buildResult = builderSession->build(document.get());
   contentLayer = buildResult.root;
 
   if (!contentLayer) {
@@ -305,20 +529,35 @@ void PAGXView::updateSize(int width, int height) {
   }
 }
 
-void PAGXView::applyCenteringTransform() {
-  if (_width <= 0 || _height <= 0 || !contentLayer) {
-    return;
+// Computes the contain-mode fit scale for the PAGX content against the canvas. Used by both
+// applyCenteringTransform() (content matrix) and getContentTransform() (comment-pin
+// coordinates) so the two stay in sync; any divergence here produces pins that drift relative
+// to the content.
+//
+// No lower bound is applied: when the design is larger than the canvas we scale it down to fit
+// so the user sees the whole document on first frame. This is mandatory for the progressive
+// image loading flow because a 1:1 clamp would skip rasterization of any tile outside the
+// canvas and therefore any image outside the top-left region, which in turn starves the
+// viewport-based upgrade scoring in ProgressiveImageUpgrader. The increased fill cost is
+// offset by downloading 20p thumbnails first, so the first-frame texture payload stays low.
+// Returns 0 when dimensions are invalid; callers must check before using the result.
+float PAGXView::computeFitScale() const {
+  if (_width <= 0 || _height <= 0 || pagxWidth <= 0 || pagxHeight <= 0) {
+    return 0.0f;
   }
-  if (pagxWidth <= 0 || pagxHeight <= 0) {
-    return;
-  }
-
   float scaleX = static_cast<float>(_width) / pagxWidth;
   float scaleY = static_cast<float>(_height) / pagxHeight;
-  float scale = std::min(scaleX, scaleY);
-  // Don't shrink the design below 1:1. When the design is larger than the canvas,
-  // show the top-left portion at full resolution to avoid triggering full texture upload.
-  scale = std::max(scale, 1.0f);
+  return std::min(scaleX, scaleY);
+}
+
+void PAGXView::applyCenteringTransform() {
+  if (!contentLayer) {
+    return;
+  }
+  float scale = computeFitScale();
+  if (scale <= 0.0f) {
+    return;
+  }
   float offsetX = (static_cast<float>(_width) - pagxWidth * scale) * 0.5f;
   float offsetY = (static_cast<float>(_height) - pagxHeight * scale) * 0.5f;
 
@@ -335,13 +574,10 @@ void PAGXView::setBoundsOrigin(float x, float y) {
 }
 
 val PAGXView::getContentTransform() const {
-  float fitScale = 0.0f;
+  float fitScale = computeFitScale();
   float centerOffsetX = 0.0f;
   float centerOffsetY = 0.0f;
-  if (_width > 0 && _height > 0 && pagxWidth > 0 && pagxHeight > 0) {
-    float scaleX = static_cast<float>(_width) / pagxWidth;
-    float scaleY = static_cast<float>(_height) / pagxHeight;
-    fitScale = std::max(std::min(scaleX, scaleY), 1.0f);
+  if (fitScale > 0.0f) {
     centerOffsetX = (static_cast<float>(_width) - pagxWidth * fitScale) * 0.5f;
     centerOffsetY = (static_cast<float>(_height) - pagxHeight * fitScale) * 0.5f;
   }
@@ -447,6 +683,11 @@ bool PAGXView::draw() {
 
   double frameStartMs = emscripten_get_now();
 
+  // Snapshot before any state update so the post-render logging block can tell whether this
+  // particular draw() call was the one that produced the first frame. Cleared along with the
+  // other temporary [PAGXView] first-frame telemetry once the 20p path is validated.
+  bool wasFirstFrame = !hasRenderedFirstFrame;
+
   // Per-stage timings in milliseconds. Remain 0 for stages that are skipped in this frame.
   double surfaceMs = 0.0;
   double bgMs = 0.0;
@@ -520,6 +761,16 @@ bool PAGXView::draw() {
         "flush=%.2fms submit=%.2fms unlock=%.2fms dirty=%d",
         frameDurationMs, surfaceMs, bgMs, renderMs, flushMs, submitMs, unlockMs,
         dirty ? 1 : 0);
+  }
+
+  // Temporary: log the first frame breakdown unconditionally so the 20p full-fit rollout can
+  // be validated against the previous 1:1-crop baseline. Remove together with the [PAGX Perf]
+  // debug logs once the numbers stabilize.
+  if (wasFirstFrame && hasRenderedFirstFrame) {
+    tgfx::PrintLog(
+        "[PAGXView] first frame: total=%.2fms surface=%.2fms bg=%.2fms render=%.2fms "
+        "flush=%.2fms submit=%.2fms unlock=%.2fms",
+        frameDurationMs, surfaceMs, bgMs, renderMs, flushMs, submitMs, unlockMs);
   }
 
   updatePerformanceState(frameDurationMs);

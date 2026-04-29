@@ -18,6 +18,9 @@
 
 #pragma once
 
+#include <cstddef>
+#include <string>
+
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/types/Matrix.h"
@@ -37,11 +40,21 @@ pagx::Matrix calculateImagePatternMatrix(ImageScaleMode scaleMode, float imageWi
                                          float nodeWidth, float nodeHeight, const pagx::Matrix& paintTransform,
                                          float scaleFactor = 0.5f);
 
-// Resolves a single ImagePattern's transform matrix from its customData and actual image dimensions.
+// Resolves a single ImagePattern's transform matrix from its customData and actual image
+// dimensions. Idempotent: the original paint transform is cached in customData on first call,
+// so repeated invocations after decodedImage changes recompute against the current image size
+// rather than re-baking the previously baked matrix.
 bool resolveImagePatternMatrix(pagx::ImagePattern* pattern);
 
 // Resolves all ImagePattern transform matrices in the document. Should be called after loading
 // external image data and before LayerBuilder::Build().
 void resolveAllImagePatternMatrices(pagx::PAGXDocument* document);
+
+// Resolves ImagePattern transform matrices for every pattern whose backing Image node has the
+// given filePath. Returns the number of patterns whose matrix was refreshed. Intended for the
+// progressive image upgrade path: when a higher-resolution image replaces the initial one, the
+// baked pattern matrix must be recomputed against the new image dimensions.
+size_t resolveImagePatternMatricesByFilePath(pagx::PAGXDocument* document,
+                                             const std::string& filePath);
 
 }  // namespace pagx
