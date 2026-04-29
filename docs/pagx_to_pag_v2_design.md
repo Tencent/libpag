@@ -1,6 +1,6 @@
 # PAGX → PAG v2 转换技术方案设计文档
 
-**版本**：2.7
+**版本**：2.9
 **日期**：2026-04-29
 **状态**：待评审 / 待开工
 
@@ -274,7 +274,7 @@ ColorSource 类型：SolidColor / LinearGradient / RadialGradient / ConicGradien
 - **Filter**：Blur、DropShadow、InnerShadow、ColorMatrix、Blend
 - **Style**：DropShadow、InnerShadow、BackgroundBlur
 
-所有 filter/style 公共字段：`blendMode`（style/某些 filter 使用）、`excludeChildEffects`（style 专用）。子类字段按 tgfx 对应类 1:1 映射，详情附录 C.9。
+所有 filter/style 公共字段：`blendMode`（style 专用——见 §C.9 LayerStyle）、`excludeChildEffects`（style 专用）。Filter 若有混合需求（如 FilterBlend），由各自子类字段（如 `blendFilterMode`）承载。子类字段按 tgfx 对应类 1:1 映射，详情附录 C.9。
 
 ---
 
@@ -289,9 +289,9 @@ ColorSource 类型：SolidColor / LinearGradient / RadialGradient / ConicGradien
 | 段 | 用途 | 编号范围 | 当前使用 | 预留 |
 |---|---|---|---|---|
 | 终结 | End tag | 0 | 1 | — |
-| 顶层 | FileHeader / Asset table / Composition list / Composition | 1-9 | 4 (1,2,3,4,5) | 4 个（6-9）|
+| 顶层 | FileHeader / Asset table / Composition list / Composition | 1-9 | 5 (1,2,3,4,5) | 4 个（6-9）|
 | Layer 及子 Tag | LayerBlock / LayerMaskRef / LayerFilters / LayerStyles / 保留 | 10-19 | 4 (10,12,13,14) | 6 个 |
-| Payload | Shape / Text / Image / Solid / Vector / Mesh / CompositionRef / 未来 payload | 20-39 | 6 (20-26 中 6 个) | 13 个 |
+| Payload | Shape / Text / Image / Solid / Vector / Mesh / CompositionRef | 20-39 | 7 (20-26) | 13 个 |
 | VectorElement | 14 种 element + 未来扩展（3D shape / Motion Path 等） | 40-79 | 14 (40-53) | 26 个 |
 | LayerFilter | 5 种 filter + 扩展（ChromaKey / Glow 等） | 80-99 | 5 (80-84)（**旧值 70-74 已迁移**） | 15 个 |
 | LayerStyle | 3 种 style + 扩展 | 100-119 | 3 (100-102)（**旧值 80-82 已迁移**） | 17 个 |
@@ -651,7 +651,8 @@ namespace pagx::pag {
 class LayerInflater {
  public:
   struct Result {
-    std::shared_ptr<tgfx::Layer> layer;        // 成功时通常非空；空文档合法场景为 nullptr（见下）
+    std::shared_ptr<tgfx::Layer> layer;        // 成功时通常非空；空文档合法场景为 nullptr（见下）。
+                                               // 所有权语义详见 §15.3 "Layer 所有权语义"——实为独占所有权。
     std::vector<Diagnostic> warnings;          // Inflater 侧告警（600-699 段，详见 §9.4 触发点表）
   };
 
@@ -910,7 +911,7 @@ Resource pre-pass 在 `LayerBaker::bake` 之前完成：
 
 ### 13.1 保留位
 
-1. **Property<T> 壳**：每个可动画字段已是 Property<T>，1 字节 encoding 位 + value。本期始终写 Constant。
+1. **Property<T> 壳**：每个可动画字段已是 Property<T>，字节流前缀 1 byte `propHeader` 位域（含 encoding / isDefault / hasExt，见 §4.3）+ 可选 value。本期始终写 Constant。
 2. **PropertyEncoding 枚举**：预留 Hold / Linear / Bezier / Spatial 等编码类型。
 3. **向前兼容解码策略**：本期 Decoder 对未知 PropertyEncoding 按 §4.4 兜底（放弃当前 Tag 剩余字段），保证旧 Decoder 读动画期生成的文件不崩溃。
 4. **Timeline 字段**：`FileHeader::frameRate/duration`、`Layer::startTime/duration/stretch` 已存在，本期写 "静态默认值"。
@@ -1338,7 +1339,7 @@ src/pagx/pag/
 ├── TagCode.h                     # TagCode 枚举
 ├── PropertyEncoding.h            # Read/WriteProperty<T> 模板
 ├── ValueCodec.h                  # Read/WriteValue<T> 每 T 特化
-├── ErrorCode.h                   # using ErrorCode = pagx::DiagnosticCode; 内部 alias
+├── ErrorCode.h                   # using ErrorCode/Diagnostic = pagx::DiagnosticCode/Diagnostic; 内部 alias（§G.3）
 ├── DiagBuild.h                   # MakeDecodeDiag / MakeDiag 内部辅助（避开与公共 Diagnostic.h 同名）
 ├── Baker.h / Baker.cpp           # 顶层 Bake 编排（内部头）
 ├── BakeContext.h / .cpp          # 资源索引、mask 上下文、错误/告警
@@ -1386,12 +1387,22 @@ test/src/pag/
 │   ├── TagHeaderTest.cpp
 │   ├── DiagnosticTest.cpp        # FormatDiagnostic / MakeDecodeDiag / MakeDiag
 │   ├── BakeContextTest.cpp
+│   ├── BakerEdgeCasesTest.cpp    # Baker fatal 段（100-105 + 207）集中测试
 │   ├── LayerBakerTest.cpp
 │   ├── VectorBakerTest.cpp
 │   ├── PaintBakerTest.cpp
 │   ├── TextBakerTest.cpp
 │   ├── StyleFilterBakerTest.cpp
 │   └── ResourceBakerTest.cpp
+├── codec/                           # §18.4bis 压缩机制专项（25 条，8 文件）
+│   ├── ColorCodecTest.cpp
+│   ├── PropertyCodecTest.cpp
+│   ├── MatrixCodecTest.cpp
+│   ├── PathCodecTest.cpp
+│   ├── ShapeStyleCodecTest.cpp
+│   ├── GlyphRunBlobCodecTest.cpp
+│   ├── LayerBitFlagsCodecTest.cpp
+│   └── VersionedTagTest.cpp
 ├── integration/
 │   ├── RoundTripTest.cpp
 │   ├── PAGDocumentParityTest.cpp
@@ -1625,7 +1636,7 @@ std::vector<PAGXSample> EnumerateSpecSamples();
 - 每个样本做一次轻量文本扫描（grep `<Text` / `<TextBox`）标记 `hasText`；
 - OutlineAll 测试仅对 `hasText == true` 的样本启用。
 
-### 18.4 Layer 1 单元测试（约 100 条，分 10 文件）
+### 18.4 Layer 1 单元测试（约 110 条，分 12 文件）
 
 详见上一轮"测试用例清单"的表格，此处不赘述。每个 Baker 子模块对应一个 test 文件，test 命名对齐 LayerBuilder 行号段。
 
@@ -1739,7 +1750,7 @@ TEST(RoundTrip, VectorLayerSimple) {
 |---|---|
 | RoundTripTest.cpp | 9 |
 | PAGDocumentParityTest.cpp | 2 |
-| InflaterParityTest.cpp | 3 |
+| InflaterParityTest.cpp | 5 |
 | VersionRejectTest.cpp | 6 |
 | TruncatedDecodeTest.cpp | 8 |
 
@@ -2012,7 +2023,7 @@ $BIN --gtest_filter="PAGPerformance.*" || true
 | 0 | `include/pagx/Diagnostic.h` / `src/pagx/Diagnostic.cpp` / `src/pagx/pag/ErrorCode.h` (alias) / `src/pagx/pag/DiagBuild.h` | `DiagnosticTest`（FormatDiagnostic 格式 + MakeDecodeDiag / MakeDiag 往返 + ABI-appended 码不丢） | 对外头齐备，作为后续阶段的 include 基础 |
 | 1 | `ValueCodec.h` / `PropertyEncoding.h` / `TagCode.h` / TagHeader util | `ValueCodecTest` / `PropertyEncodingTest` / `TagHeaderTest` | 三文件全绿 |
 | 2 | `PAGDocument.h` / `BakeContext.h+cpp` / `ResourceBaker.cpp` | `BakeContextTest` / `ResourceBakerTest` | 全绿 |
-| 3 | `LayerBaker.cpp`（通用字段）+ 测试工具 `PAGXBuilder` | `LayerBakerTest` | 全绿 |
+| 3 | `LayerBaker.cpp`（通用字段）+ 测试工具 `PAGXBuilder` | `LayerBakerTest` + `BakerEdgeCasesTest`（Baker fatal 段 100-105 + 207） | 全绿 |
 | 4 | `Codec.cpp` 基础 Tag（FileHeader/Composition/LayerBlock） | `RoundTripTest` 前半 + `VersionRejectTest` + `TruncatedDecodeTest` | 全绿 |
 | 5 | `VectorBaker.cpp` + `ElementTags.cpp` | `VectorBakerTest` + `RoundTripTest` 剩余 | 全绿 |
 | 6 | PaintBaker 代码（融入 VectorBaker 文件） | `PaintBakerTest` | 全绿 |
@@ -2765,7 +2776,6 @@ namespace pagx::pag {
 
 struct LayerFilter {
   LayerFilterType type;
-  BlendMode blendMode = BlendMode::SrcOver;  // 通用（某些 filter 不使用）
 
   // Blur / InnerShadow 共用 blurX/blurY
   Property<float> blurX = MakeProp(0.0f);
@@ -2780,7 +2790,7 @@ struct LayerFilter {
 
   // Blend
   Property<Color> blendColor = MakeProp(Color{});
-  BlendMode blendFilterMode = BlendMode::SrcOver;
+  BlendMode blendFilterMode = BlendMode::SrcOver;  // Filter 的混合模式入口
 
   // ColorMatrix
   Property<std::array<float, 20>> colorMatrix = MakeProp(std::array<float, 20>{});
@@ -3345,7 +3355,7 @@ body:
   # Property 字段（每个都带 1 byte propHeader 前缀，见 §4.3）
   Property<bool>      visible
   Property<float>     alpha
-  Property<u8>        blendMode     # BlendMode 存 u8
+  Property<BlendMode> blendMode    # 字节层 u8；ReadProperty<BlendMode> 走 EnumMeta 值域校验
   Property<Matrix>    matrix
   Property<Matrix3D>  matrix3D
 
@@ -3417,6 +3427,20 @@ body:
 ```
 
 ### D.10 Payload Tags
+
+**Payload 段 TagCode 分配（20-39，本期钉死，未来扩展只往后追加）**：
+
+| TagCode 值 | 枚举项 | 本期状态 |
+|---|---|---|
+| 20 | `TagCode::ShapePayload` | no-op（PAGX 无对应入口，Read/Write 路径占位） |
+| 21 | `TagCode::TextPayload` | no-op |
+| 22 | `TagCode::ImagePayload` | no-op |
+| 23 | `TagCode::SolidPayload` | no-op |
+| 24 | `TagCode::VectorPayload` | 产出 |
+| 25 | `TagCode::MeshPayload` | 产出（空 body） |
+| 26 | `TagCode::CompositionRefPayload` | 产出 |
+
+> **ABI 纪律**：20-23 即便 Write 路径 no-op，也**必须在 `TagCode` 枚举里显式声明以上常量值**——防止后续实现时被挪走破坏二进制稳定性。Decoder 遇到 20-23 的 Tag 按 length 跳过（触发 `UnknownTagCode=400` 或按 payload.type 不匹配的 debug-only warning，均不中断）。
 
 **CompositionRefPayload**：
 ```
@@ -3657,7 +3681,7 @@ if kind == ClassicGlyphRun:
   f32 baseX, f32 baseY
   floatList xOffsets        # v1 writeFloatList，precision = 2^(-glyphPrecisionLog2)
   int32List positionXY      # 长度 = 2 × glyphCount
-  int32List anchorXY        # 长度 = 2 × glyphCount；全 0 时 v1 writeInt32List 自动压缩到 ~glyphCount bit
+  int32List anchorXY        # 长度 = 2 × glyphCount；precision = 2^(-glyphPrecisionLog2)（同 positionXY）；全 0 时 v1 writeInt32List 自动压缩到 ~glyphCount bit
   floatList scaleXY         # 长度 = 2 × glyphCount；全 (1,1) 时同上
                             # precision = 0.005（v1 BEZIER_PRECISION 级别）
   floatList rotations       # 长度 = glyphCount；precision = 0.1 (度)
@@ -4125,7 +4149,7 @@ inline T ReadEnum(DecodeStream* stream, DecodeContext* ctx) {
 - `LayerFilterType`（MaxValid=4, Default=Blur）
 - `LayerStyleType`（MaxValid=2, Default=DropShadow）
 - `FontSourceKind`（MaxValid=1, Default=System）
-- `BlendMode`（直接 tgfx::BlendMode；MaxValid 参考 tgfx 枚举最大值）
+- `BlendMode`（MaxValid=17, Default=SrcOver；对应 §E.1 的 18 个值，以 tgfx::BlendMode 为底层类型）
 - `LayerMaskType`（MaxValid=2, Default=Alpha）
 - `LineCap` / `LineJoin` / `StrokeAlign`（各自 MaxValid=2, Default=Butt/Miter/Center）
 - `FillRule`（MaxValid=1, Default=Winding）
@@ -4134,11 +4158,11 @@ inline T ReadEnum(DecodeStream* stream, DecodeContext* ctx) {
 - `MipmapMode`（MaxValid=2, Default=None）
 - `ScaleMode`（MaxValid=3, Default=LetterBox）
 - `PolystarType`（MaxValid=1, Default=Polygon）
-- `MergePathOp`（参考 tgfx::MergePathOp 最大值）
+- `MergePathOp`（MaxValid=4, Default=Append；对应 §E.3 的 5 个值）
 - `TrimPathType`（MaxValid=1, Default=Simultaneously）
 - `RepeaterOrder`（MaxValid=1, Default=BelowOriginal）
 - `LayerPlacement`（MaxValid=1, Default=Background）
-- `SelectorUnit` / `SelectorShape` / `SelectorMode`（各自参考附录 E.6 枚举值）
+- `SelectorUnit`（MaxValid=1, Default=Percentage）/ `SelectorShape`（MaxValid=5, Default=Square）/ `SelectorMode`（MaxValid=5, Default=Add）
 - `TextAlign`（MaxValid=3, Default=Start）
 - `PropertyEncoding`（本期 MaxValid=0，值 > 0 走 §4.4 兜底而非 ReadEnum）
 - `GlyphRunKind`（MaxValid=1, Default=LayoutRun）
@@ -4162,6 +4186,8 @@ inline T ReadEnum(DecodeStream* stream, DecodeContext* ctx) {
 | InverseMatrixNonInvertible (205) | TextBakerTest.cpp | TextBaker.NonInvertibleInverseMatrix |
 | TextGlyphDataEmpty (206) | TextBakerTest.cpp | TextBaker.GlyphDataEmpty |
 | EmptyDocument (207) | BakerEdgeCasesTest.cpp | BakerEdgeCases.EmptyDocument |
+| GlyphRunKindInferred (208) | TextBakerTest.cpp | TextBaker.GlyphRunKindInferred |
+| GlyphRunKindInferred (208) | TextBakerTest.cpp | TextBaker.GlyphRunKindInferred |
 | InvalidMagic (300) | VersionRejectTest.cpp | VersionReject.BadMagic_PAX |
 | UnsupportedVersion (301) | VersionRejectTest.cpp | VersionReject.V1 / V3 / VFF |
 | UnsupportedCompression (302) | TruncatedDecodeTest.cpp | Truncate.UnsupportedCompression |
@@ -4370,6 +4396,23 @@ target_link_libraries(PAGFullTest PRIVATE pagx-pag)
 - 本文档所有行号引用基于 `src/renderer/LayerBuilder.cpp` 当前实现；LayerBuilder 修改时需同步更新本文档附录 A。
 - PAGX 规范版本：`spec/pagx_spec.zh_CN.md`。
 - PAG v2 版本：0x02（本期）；动画扩展不升版本号。
+- v2.8 → v2.9 修订要点（独立审计补强：2 个 P1 + 7 个 P2 + 6 个 P3）：
+  - **P1-A：§G.6 测试矩阵补 `GlyphRunKindInferred=208`**。v2.8 里 208 在 §G.2 声明（TextBaker 兜底分支使用），但 §G.6 测试矩阵找不到对应行——违反"每个 ErrorCode 必须至少一条单测触发"纪律。本版本补一行 `TextBakerTest.cpp / TextBaker.GlyphRunKindInferred`。
+  - **P1-B：删除 `LayerFilter::blendMode` 死字段**（§C.9 + §5.6）。v2.8 里 `LayerFilter` 结构体声明 `BlendMode blendMode`，但 §D.12 所有 5 个 Filter Tag 的 body 都不写该字段——数据模型与字节流语义漂移，Baker 落该字段会被静默丢失。本版本删除 `LayerFilter::blendMode`（Blend filter 的混合入口由 `blendFilterMode` 承载，已在字节布局落地），§5.6 描述同步改为"`blendMode` 为 style 专用，Filter 若需混合用各自子类字段（如 `blendFilterMode`）"。注：`LayerStyle::blendMode` 保持不变——StyleDropShadow/InnerShadow/BackgroundBlur 的 Tag body 已显式序列化该字段。
+  - **P2-A：§G.5 填 `BlendMode` / `MergePathOp` MaxValid 具体值**。v2.8 两条写作"参考 tgfx 枚举最大值"，AI 落代码无法直接写枚举特化。本版本依 §E.1 / §E.3 列出的值改为 `BlendMode(MaxValid=17, Default=SrcOver)` / `MergePathOp(MaxValid=4, Default=Append)`；顺便把 `SelectorUnit/Shape/Mode` 三条也补成具体数字。
+  - **P2-B：§16 unit/ 补 `BakerEdgeCasesTest.cpp`**。§G.6 引用该文件 8 次（100-105 + 207），但 §16 目录树没列它。本版本目录树追加该文件，§19 阶段 3 "同批测试" 也追加。
+  - **P2-C：§16 补 `codec/` 子目录**。§18.4bis 的 8 个压缩专项测试文件说"放在 `test/src/pag/codec/`"，但 §16 目录树无 `codec/` 节点。本版本追加 `codec/` 子目录 + 8 个文件。
+  - **P2-D：§18.5 `InflaterParityTest` 条数 3 → 5**。v2.6 新增 `InflaterEmptyDocument=604` 后，§18.5 表格下限仍写 3 条，与 §G.6 实际 5 条（600-604）不符。
+  - **P2-E：§16 `ErrorCode.h` 注释同步 Diagnostic alias**。§G.3 定义该文件同时 `using ErrorCode` 与 `using Diagnostic`，但 §16 注释只提 ErrorCode，AI 落代码会漏 Diagnostic alias。本版本注释改为 `using ErrorCode/Diagnostic = pagx::DiagnosticCode/Diagnostic;`。
+  - **P2-F：§D.10 显式钉死 Payload 段 TagCode（20-26）**。v2.8 里 Shape/Text/Image/Solid 四个 "本期不产出" 的 Payload 没写具体 TagCode 枚举值，未来实现时可能被挪走破坏 ABI。本版本在 §D.10 开头加分配表：`ShapePayload=20 / TextPayload=21 / ImagePayload=22 / SolidPayload=23 / VectorPayload=24 / MeshPayload=25 / CompositionRefPayload=26`，明示"即便 Write 路径 no-op，枚举值必须显式声明"。
+  - **P2-G：§6.1 顶层段 "4 个" → "5 个"，Payload 段 "6 (20-26 中 6 个)" → "7 (20-26)"**。顶层段实际 5 个 Tag（FileHeader/ImageAssetTable/FontAssetTable/CompositionList/Composition），Payload 段 20-26 共 7 个（因 P2-F 已钉 TagCode），"未来 payload" 条目删除。
+  - **P3-A：版本号 2.7 → 2.9**（v2.8 只改修订日志未升版本号，本轮一并修到最新）。
+  - **P3-B：§D.8 `Property<u8> blendMode` → `Property<BlendMode>`**。字节层仍是 u8，但类型记号与 §C.5 结构体字段一致（`Property<BlendMode>`），AI 落 `ReadProperty<BlendMode>` 可直接走 EnumMeta 值域校验，避免"Property<u8> vs Property<BlendMode>" 类型不对称。
+  - **P3-C：§13.1 #1 "1 字节 encoding 位 + value" 表述修正**。`propHeader` 是位域（含 encoding/isDefault/hasExt），"1 字节 encoding 位"语义不准确，改为 "字节流前缀 1 byte `propHeader` 位域（含 encoding / isDefault / hasExt，见 §4.3）+ 可选 value"。
+  - **P3-D：§D.11 ClassicGlyphRun `anchorXY` 精度补注**。其他量化字段（positionXY/scaleXY/rotations/skews）都有 precision 注释，只 anchorXY 空着。本版本追加 `precision = 2^(-glyphPrecisionLog2)（同 positionXY）`。
+  - **P3-E：§18.4 "约 100 条，分 10 文件" → "约 110 条，分 12 文件"**。v2.4 加 `DiagnosticTest.cpp`（+1 文件）、v2.9 加 `BakerEdgeCasesTest.cpp`（+1 文件），现在 unit/ 共 12 个文件；单测条数同步估算 +10。
+  - **P3-F：§9.1 Result `layer` 字段注释追加"所有权语义详见 §15.3"交叉引用**。避免 AI 只读 §9 Inflater 章节就按"普通 shared_ptr"理解，漏掉 §15.3 "独占所有权" 的强约束。
+
 - v2.7 → v2.8 修订要点（评估漏洞清理：5 个小修，无架构变更）：
   - **P2-1：§9.4 表头计数修正**。表头 "4 个 Inflater 告警码的触发点" 与下方 5 行表格（600-604）不一致——v2.6 新增 `InflaterEmptyDocument=604` 后未同步更新表头。本版本改为 "5 个"。
   - **P2-2：§9.2 "两趟 vs Pass 1/2/3" 措辞统一**。文字声称 "严格同构的两趟" 但伪码列 Pass 1/2/3（其中 Pass 3 是退栈前的 warnings move，非数据遍历）。本版本改为 "两趟遍历（外加一次退栈前的 warnings 转移）"，伪码里 `Pass 3（退栈前）` 改为 `Finalize（退栈前，非数据遍历）`；§9.4 `Pass 3 收尾规则` 同步改为 `Finalize 收尾规则`。
