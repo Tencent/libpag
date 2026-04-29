@@ -1680,6 +1680,36 @@ static void CollectChildrenSizeDependencies(const std::vector<Element*>& element
   }
 }
 
+// Returns true when at least one leaf geometry inside `elements` has a non-zero extent on the
+// specified axis (width when `onWidth` is true, otherwise height) — i.e. the geometry actually
+// wants size on that axis, so a zero-sized container would visually clip or collapse it.
+// Recurses into Group/TextBox so wrapped geometry (e.g. a text-decoration Group containing a
+// zero-height Rectangle) is also covered. A degenerate-line geometry (e.g. zero-height
+// Rectangle, horizontal Path) returns false on its zero axis, so the container's collapse on
+// that axis is treated as intentional and not reported.
+static bool AnyLeafGeometryWantsExtentOnAxis(const std::vector<Element*>& elements, bool onWidth) {
+  for (auto* element : elements) {
+    auto type = element->nodeType();
+    if (type == NodeType::Group || type == NodeType::TextBox) {
+      auto* group = static_cast<const Group*>(element);
+      if (AnyLeafGeometryWantsExtentOnAxis(group->elements, onWidth)) {
+        return true;
+      }
+      continue;
+    }
+    auto* node = LayoutNode::AsLayoutNode(element);
+    if (node == nullptr) {
+      continue;
+    }
+    auto leafBounds = node->layoutBounds();
+    float extent = onWidth ? leafBounds.width : leafBounds.height;
+    if (extent != 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
 static void DetectZeroSizeGroup(const Group* group, std::vector<VerifyDiagnostic>& diagnostics) {
   auto bounds = group->layoutBounds();
   if (bounds.width != 0 && bounds.height != 0) {
@@ -1709,9 +1739,13 @@ static void DetectZeroSizeGroup(const Group* group, std::vector<VerifyDiagnostic
     return;
   }
   std::ostringstream oss;
-  oss << "zero size (" << static_cast<int>(bounds.width) << "x" << static_cast<int>(bounds.height)
+  const char* axis = (bounds.width == 0 && bounds.height == 0) ? "size"
+                     : bounds.width == 0                       ? "width"
+                                                               : "height";
+  oss << "zero " << axis << " (" << static_cast<int>(bounds.width) << "x"
+      << static_cast<int>(bounds.height)
       << "), children depend on this container for layout. Fix: check why this container has no "
-         "size";
+      << axis;
   AddDiagnostic(diagnostics, group->sourceLine, oss.str());
 }
 
@@ -1753,26 +1787,36 @@ static void DetectZeroSize(const Layer* layer, const Layer* parentLayer,
   // VectorElements in layer->contents also consult the parent size for opposite-edge or percent
   // constraints — treat them as size-dependent too.
   CollectChildrenSizeDependencies(layer->contents, &childrenDependOnWidth, &childrenDependOnHeight);
-  bool zeroWidthMatters = bounds.width == 0 && (hasLayoutChildren || childrenDependOnWidth);
-  bool zeroHeightMatters = bounds.height == 0 && (hasLayoutChildren || childrenDependOnHeight);
-  if (!zeroWidthMatters && !zeroHeightMatters && !inParentLayout) {
+  // Geometry that actually wants extent on the collapsed axis (e.g. an 80px-wide Rectangle in a
+  // zero-width Layer) signals a real layout problem; geometry that is itself zero on that axis
+  // (e.g. a degenerate-line Rectangle, a horizontal Path) is intentional and not a problem.
+  bool contentsWantWidth = AnyLeafGeometryWantsExtentOnAxis(layer->contents, /*onWidth=*/true);
+  bool contentsWantHeight = AnyLeafGeometryWantsExtentOnAxis(layer->contents, /*onWidth=*/false);
+  bool zeroWidthMatters =
+      bounds.width == 0 && (hasLayoutChildren || childrenDependOnWidth || contentsWantWidth);
+  bool zeroHeightMatters =
+      bounds.height == 0 && (hasLayoutChildren || childrenDependOnHeight || contentsWantHeight);
+  if (!zeroWidthMatters && !zeroHeightMatters) {
     return;
   }
 
   std::ostringstream oss;
-  oss << "zero size (" << static_cast<int>(bounds.width) << "x" << static_cast<int>(bounds.height)
-      << "), children depend on this container for layout";
+  const char* axis = (zeroWidthMatters && zeroHeightMatters) ? "size"
+                     : zeroWidthMatters                      ? "width"
+                                                             : "height";
+  oss << "zero " << axis << " (" << static_cast<int>(bounds.width) << "x"
+      << static_cast<int>(bounds.height) << "), children depend on this container for layout";
 
   if (layer->flex > 0 && parentLayer != nullptr && parentLayer->layout != LayoutMode::None) {
     bool horizontal = parentLayer->layout == LayoutMode::Horizontal;
     auto parentBounds = parentLayer->layoutBounds();
     float parentMainSize = horizontal ? parentBounds.width : parentBounds.height;
     if (parentMainSize <= 0) {
-      const char* axis = horizontal ? "width" : "height";
-      oss << " (flex child, parent " << axis << " is 0)";
+      const char* parentAxis = horizontal ? "width" : "height";
+      oss << " (flex child, parent " << parentAxis << " is 0)";
     }
   }
-  oss << ". Fix: check why this container has no size";
+  oss << ". Fix: check why this container has no " << axis;
   AddDiagnostic(diagnostics, layer->sourceLine, oss.str());
 }
 

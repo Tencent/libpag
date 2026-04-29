@@ -1435,7 +1435,7 @@ CLI_TEST(PAGXCliTest, Layout_Placeholder) {
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
   // The third child Layer (id="bad") has zero width, should trigger a diagnostic.
-  EXPECT_TRUE(output.find("zero size") != std::string::npos);
+  EXPECT_TRUE(output.find("zero width") != std::string::npos);
 }
 
 // Background Rectangle on a layout Layer should not trigger overlap warnings with child Layers.
@@ -1474,7 +1474,7 @@ CLI_TEST(PAGXCliTest, Layout_TextFontFallback) {
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("zero size") == std::string::npos);
+  EXPECT_TRUE(output.find("zero ") == std::string::npos);
 }
 
 // Line Paths have preferred size clamped to 1px minimum, so they should not trigger zero-size
@@ -1488,7 +1488,7 @@ CLI_TEST(PAGXCliTest, Layout_PathZeroSize) {
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("zero size") == std::string::npos);
+  EXPECT_TRUE(output.find("zero ") == std::string::npos);
 }
 
 // Content origin offset: unconstrained Path starts at (50, 50), not (0, 0).
@@ -1721,7 +1721,7 @@ CLI_TEST(PAGXCliTest, Layout_FlexConstraintZeroParent) {
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
-  EXPECT_TRUE(output.find("zero size") != std::string::npos);
+  EXPECT_TRUE(output.find("zero height") != std::string::npos);
   EXPECT_TRUE(output.find("parent height is 0") != std::string::npos);
 }
 
@@ -2007,7 +2007,7 @@ CLI_TEST(PAGXCliTest, Layout_ZeroSizeExplicit) {
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("zero size") == std::string::npos);
+  EXPECT_TRUE(output.find("zero ") == std::string::npos);
 }
 
 // Empty layer (no contents, no children) in a layout should NOT trigger zero-size diagnostic,
@@ -2022,9 +2022,9 @@ CLI_TEST(PAGXCliTest, Layout_ZeroSizeEmpty) {
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
   // The non-empty Layer with width="0" should trigger zero-size.
-  EXPECT_TRUE(output.find("zero size (0x50)") != std::string::npos);
+  EXPECT_TRUE(output.find("zero width (0x50)") != std::string::npos);
   // The empty leaf Layer (line 5) should NOT trigger zero-size.
-  EXPECT_TRUE(output.find(":5: zero size") == std::string::npos);
+  EXPECT_TRUE(output.find(":5: zero ") == std::string::npos);
 }
 
 // Skeleton-phase containers: nested Layers with layout attributes and painters (Fill/Stroke) but
@@ -2039,7 +2039,7 @@ CLI_TEST(PAGXCliTest, Layout_ZeroSizeNoLeaf) {
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("zero size") == std::string::npos);
+  EXPECT_TRUE(output.find("zero ") == std::string::npos);
 }
 
 // Container with explicit zero width but leaf content (Rectangle) deep in the subtree.
@@ -2053,7 +2053,7 @@ CLI_TEST(PAGXCliTest, Layout_ZeroSizeDeepLeaf) {
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
-  EXPECT_TRUE(output.find("zero size (0x100)") != std::string::npos);
+  EXPECT_TRUE(output.find("zero width (0x100)") != std::string::npos);
 }
 
 // Polystar without explicit position should have auto-position applied at import time.
