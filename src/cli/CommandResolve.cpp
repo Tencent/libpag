@@ -25,6 +25,7 @@
 #include "cli/CliUtils.h"
 #include "cli/CommandImport.h"
 #include "pagx/PAGXExporter.h"
+#include "pagx/PAGXOptimizer.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/LayoutNode.h"
@@ -315,6 +316,16 @@ int RunResolve(int argc, char* argv[]) {
 
   if (resolvedCount == 0 && errorCount == 0) {
     return 0;
+  }
+
+  // Always run the optimizer so the resolve output is stable regardless of whether the input
+  // contained imports or already-authored structure. The optimizer is conservative: any Layer
+  // carrying id/name/customData/layout/constraints (typical hand-authored content) is untouched,
+  // so this only cleans up the newly inlined import payload.
+  auto optimizeResult = PAGXOptimizer::Optimize(doc.get());
+  if (!optimizeResult.converged) {
+    std::cerr << "pagx resolve: warning: PAGXOptimizer did not converge within "
+              << optimizeResult.iterationsUsed << " iteration(s); output may be sub-optimal\n";
   }
 
   auto xml = PAGXExporter::ToXML(*doc);

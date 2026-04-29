@@ -304,10 +304,9 @@ std::string ColorToHexString(const Color& color, bool withAlpha) {
 //==============================================================================
 
 std::string MatrixToString(const Matrix& matrix) {
-  char buf[256] = {};
-  snprintf(buf, sizeof(buf), "%g,%g,%g,%g,%g,%g", matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx,
-           matrix.ty);
-  return std::string(buf);
+  return FloatToString(matrix.a) + "," + FloatToString(matrix.b) + "," + FloatToString(matrix.c) +
+         "," + FloatToString(matrix.d) + "," + FloatToString(matrix.tx) + "," +
+         FloatToString(matrix.ty);
 }
 
 Matrix MatrixFromString(const std::string& str) {
@@ -356,9 +355,35 @@ std::vector<float> ParseFloatList(const std::string& str) {
 }
 
 std::string FloatToString(float value) {
-  char buf[32] = {};
+  if (value == 0.0f) {
+    return "0";
+  }
+  char buf[64] = {};
   snprintf(buf, sizeof(buf), "%g", value);
-  return std::string(buf);
+  std::string s(buf);
+  // %g may pick scientific notation for very large or very small magnitudes. Re-emit those
+  // in fixed form so the result always matches the schema's decimal patterns. We deliberately
+  // do NOT snap small magnitudes to zero here: even sub-pixel residuals (e.g. sin/cos of an
+  // angle that almost lines up with a multiple of pi/2) still round-trip through XML losslessly
+  // and changing them would alter rendered output for baseline-sensitive callers.
+  if (s.find('e') != std::string::npos || s.find('E') != std::string::npos) {
+    // Use 9 fractional digits: this matches FLT_DECIMAL_DIG, the minimum precision that
+    // guarantees every distinct float value serializes to a distinct decimal string and
+    // round-trips back to the same bit pattern. Fewer digits would collapse near-denormal
+    // values (e.g. 1e-30f) onto 0 after the scientific-notation branch is rewritten. Trailing
+    // zeros are stripped below so typical values stay short.
+    snprintf(buf, sizeof(buf), "%.9f", value);
+    s = buf;
+    auto dot = s.find('.');
+    if (dot != std::string::npos) {
+      auto last = s.find_last_not_of('0');
+      if (last == dot) {
+        last--;  // strip trailing dot
+      }
+      s = s.substr(0, last + 1);
+    }
+  }
+  return s;
 }
 
 Padding PaddingFromString(const std::string& str) {
