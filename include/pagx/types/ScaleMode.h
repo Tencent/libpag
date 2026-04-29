@@ -18,38 +18,37 @@
 
 #pragma once
 
-#include "pagx/nodes/Gradient.h"
-#include "pagx/types/Point.h"
-
 namespace pagx {
 
 /**
- * A radial gradient color source that produces a gradient radiating from a center point. By
- * default the gradient lives in each geometry's normalized (0, 0)-(1, 1) bounding box space (see
- * Gradient::fitsToGeometry).
+ * ScaleMode controls how an ImagePattern image is fitted into the geometry's bounding box.
  */
-class RadialGradient : public Gradient {
- public:
+enum class ScaleMode {
   /**
-   * The center point of the gradient. Defaults to (0.5, 0.5), the center of the geometry's
-   * normalized bounding box when fitsToGeometry is true.
+   * The image is not fitted into the geometry's bounding box. It is placed in the parent
+   * container's (Layer or Group) coordinate space (origin at (0, 0)) and extended outside the
+   * image bounds according to the pattern's tile modes. Use this mode to share one continuous
+   * image layout across multiple geometries instead of giving each its own fitted copy.
    */
-  Point center = {0.5f, 0.5f};
+  None,
 
   /**
-   * The radius of the gradient circle. Defaults to 0.5, reaching the bounding box edge along
-   * each axis when fitsToGeometry is true.
+   * The image is stretched to fill the bounding box, ignoring its original aspect ratio.
    */
-  float radius = 0.5f;
+  Stretch,
 
-  NodeType nodeType() const override {
-    return NodeType::RadialGradient;
-  }
+  /**
+   * The image is scaled uniformly to fit inside the bounding box while preserving its aspect
+   * ratio. The image is centered and empty areas may appear along one axis. This is the default
+   * value.
+   */
+  LetterBox,
 
- private:
-  RadialGradient() = default;
-
-  friend class PAGXDocument;
+  /**
+   * The image is scaled uniformly to cover the bounding box while preserving its aspect ratio.
+   * The image is centered and may be cropped along one axis.
+   */
+  Zoom
 };
 
 }  // namespace pagx

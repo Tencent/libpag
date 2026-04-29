@@ -141,7 +141,7 @@ class Layer : public Node, public LayoutNode {
   Composition* composition = nullptr;
 
   /**
-   * The vector elements contained in this layer (shapes, painters, modifiers, etc.).
+   * The vector elements contained in this layer (geometry, painters, modifiers, etc.).
    */
   std::vector<Element*> contents = {};
 

@@ -47,7 +47,7 @@
         <Layer width="100%" height="100%">
           <Path left="30" right="30" top="30" data="M 0,0 L 100,0 L 100,40 L 0,40 Z"/>
           <Fill>
-            <LinearGradient startPoint="0,0" endPoint="300,0">
+            <LinearGradient startPoint="0,0" endPoint="300,0" fitsToGeometry="false">
               <ColorStop color="#F59E0B" offset="0"/>
               <ColorStop color="#D97706" offset="1"/>
             </LinearGradient>
@@ -57,7 +57,7 @@
         <Layer width="100%" height="100%">
           <Path left="50" right="50" bottom="30" data="M 0,0 L 80,0 L 80,40 L 0,40 Z"/>
           <Fill>
-            <LinearGradient startPoint="0,0" endPoint="260,0">
+            <LinearGradient startPoint="0,0" endPoint="260,0" fitsToGeometry="false">
               <ColorStop color="#10B981" offset="0"/>
               <ColorStop color="#059669" offset="1"/>
             </LinearGradient>
@@ -80,7 +80,7 @@
         <Layer width="100%" height="100%">
           <Path top="20" bottom="20" centerX="0" data="M 0,0 L 40,0 L 40,60 L 0,60 Z"/>
           <Fill>
-            <LinearGradient startPoint="0,0" endPoint="0,210">
+            <LinearGradient startPoint="0,0" endPoint="0,210" fitsToGeometry="false">
               <ColorStop color="#06B6D4" offset="0"/>
               <ColorStop color="#0369A1" offset="1"/>
             </LinearGradient>
@@ -98,7 +98,7 @@
         <Layer width="100%" height="100%">
           <Path left="25" right="25" top="20" bottom="60" data="M 0,0 L 60,0 L 60,60 L 0,60 Z"/>
           <Fill>
-            <LinearGradient startPoint="0,0" endPoint="150,170">
+            <LinearGradient startPoint="0,0" endPoint="150,170" fitsToGeometry="false">
               <ColorStop color="#8B5CF6" offset="0"/>
               <ColorStop color="#6D28D9" offset="1"/>
             </LinearGradient>
@@ -116,7 +116,7 @@
         <Layer width="100%" height="100%">
           <Path left="30" right="30" top="60" bottom="20" data="M 0,0 L 100,0 L 100,50 L 0,50 Z"/>
           <Fill>
-            <LinearGradient startPoint="0,0" endPoint="300,170">
+            <LinearGradient startPoint="0,0" endPoint="300,170" fitsToGeometry="false">
               <ColorStop color="#EC4899" offset="0"/>
               <ColorStop color="#BE185D" offset="1"/>
             </LinearGradient>

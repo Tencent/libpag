@@ -27,7 +27,7 @@
 namespace pagx {
 
 /**
- * Fill represents a fill painter that fills shapes with a solid color, gradient, or pattern.
+ * Fill represents a fill painter that fills geometry with a solid color, gradient, or pattern.
  * The color is specified through a ColorSource node (SolidColor, LinearGradient, etc.) or
  * a reference to a defined color source (e.g., "@gradientId").
  */
