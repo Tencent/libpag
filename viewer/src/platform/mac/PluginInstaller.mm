@@ -279,6 +279,20 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
       return false;
     }
 
+    if (plugin == "H264EncoderTools") {
+      // H264EncoderTools installs to user directory ~/Library/Application Support/,
+      // so copy with normal user permissions to avoid creating root-owned directories.
+      QString targetDir = QFileInfo(target).absolutePath();
+      QDir().mkpath(targetDir);
+      QFile::remove(target);
+      QFile::copy(source, target);
+      QFile::setPermissions(target, QFileDevice::ReadOwner | QFileDevice::WriteOwner |
+                                        QFileDevice::ExeOwner | QFileDevice::ReadGroup |
+                                        QFileDevice::ExeGroup | QFileDevice::ReadOther |
+                                        QFileDevice::ExeOther);
+      continue;
+    }
+
     QString targetDir = QFileInfo(target).absolutePath();
     commands << QString("mkdir -p '%1'").arg(targetDir);
     commands << QString("rm -rf '%1'").arg(target);
@@ -305,6 +319,13 @@ bool PluginInstaller::removePluginFiles(const QStringList& plugins) const {
 
   for (const QString& plugin : plugins) {
     QString target = getPluginInstallPath(plugin);
+
+    if (plugin == "H264EncoderTools") {
+      // H264EncoderTools is in user directory, remove without admin privileges.
+      QFile::remove(target);
+      continue;
+    }
+
     commands << QString("rm -rf '%1'").arg(target);
   }
 
