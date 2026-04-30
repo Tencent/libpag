@@ -172,7 +172,7 @@ cp -R third_party/ ../libpag_pagx_pag_impl/third_party/
 | D-1.2 GlyphRun 字段集复核 | ⏳ | — | — | Phase 8 前 |
 | D-1.3 Mask 循环检测算法选择 | ⏳ | — | — | Phase 9 前 |
 | 0 Diagnostic | ✅ | (本提交) | 1 h | 7 文件交付；12/12 单测全绿；limits.h 一次性建全避免后续返工 |
-| 1 ValueCodec / CorruptBuilder | ⏳ | — | — | — |
+| 1 ValueCodec / CorruptBuilder | ✅ | (本提交) | 1.5 h | 9 文件交付；38/38 单测全绿；exit gate `grep std::vector<uint8_t> src/pagx/pag/` 零命中 |
 | 2 PAGDocument + 测试基建 | ⏳ | — | — | — |
 | 3 LayerBaker | ⏳ | — | — | — |
 | 4a Codec 容器头 | ⏳ | — | — | 可与 4b 合并 |
