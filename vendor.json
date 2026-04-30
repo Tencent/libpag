@@ -81,11 +81,12 @@
           "zlibstatic"
         ],
         "arguments": [
-          "-DZLIB_BUILD_EXAMPLES=OFF"
+          "-DZLIB_BUILD_EXAMPLES=OFF",
+          "-DCMAKE_C_FLAGS=\"-w\""
         ],
         "includes": [
-          "${SOURCE_DIR}",
-          "${BUILD_DIR}"
+          "${SOURCE_DIR}/zlib.h",
+          "${BUILD_DIR}/zconf.h"
         ]
       }
     },
