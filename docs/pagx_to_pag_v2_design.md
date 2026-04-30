@@ -1,8 +1,10 @@
 # PAGX → PAG v2 转换技术方案设计文档
 
-**版本**：2.19
+**版本**：2.20
 **日期**：2026-04-30
 **状态**：待评审 / 待开工
+
+> **性质声明**：本文档是 PAG v2 协议的**设计蓝本与 AI 编码唯一参考**，而非现有代码文档化。`src/pagx/pag/` 下的目录、头文件与类均为待建。主文档之外另有：历史修订记录见 [`docs/pagx_to_pag_v2_changelog.md`](pagx_to_pag_v2_changelog.md)；PAGX 规范见 `spec/pagx_spec.zh_CN.md`。
 
 ---
 
@@ -3473,39 +3475,40 @@ PR 验证与 nightly 的测试分拆策略——单次 CI 预算约束 15 分钟
 
 | 模块 | LayerBuilder 行号 | Baker 文件/函数 | Inflater 函数 |
 |---|---|---|---|
-| 顶层 build | 143-163 | `Baker::Bake` | `LayerInflater::Inflate` |
-| Layer 分发 | 167-202 | `LayerBaker::bake` | `inflateLayer` |
-| Composition | 205-216 | `LayerBaker`（同文件） | `inflateComposition` |
-| VectorLayer | 220-231 | `VectorBaker::bakeVectorLayer` | `inflateVectorLayer` |
-| Element 派发 | 263-307 | `VectorBaker::bakeVectorElement` | `inflateVectorElement` |
-| Rectangle | 310-317 | `bakeRectangle` | `inflateRectangle` |
-| Ellipse | 320-326 | `bakeEllipse` | `inflateEllipse` |
-| Polystar | 329-344 | `bakePolystar` | `inflatePolystar` |
-| Path | 361-368 | `bakePath` | `inflatePath` |
-| Text（独立） | 371-385, 237-243 | `TextBaker::bakeText` | `inflateText` |
-| Fill | 388-410 | `bakeFill` | `inflateFill` |
-| Stroke | 413-446 | `bakeStroke` | `inflateStroke` |
-| ColorSource 派发 | 449-477 | `PaintBaker::bakeColorSource` | `inflateColorSource` |
+| 顶层 build | 138-164 | `Baker::Bake` | `LayerInflater::Inflate` |
+| Layer 分发 | 167-203 | `LayerBaker::bake` | `inflateLayer` |
+| Composition | 205-218 | `LayerBaker`（同文件） | `inflateComposition` |
+| VectorLayer | 220-232 | `VectorBaker::bakeVectorLayer` | `inflateVectorLayer` |
+| Element 派发 | 263-308 | `VectorBaker::bakeVectorElement` | `inflateVectorElement` |
+| Rectangle | 310-318 | `bakeRectangle` | `inflateRectangle` |
+| Ellipse | 320-327 | `bakeEllipse` | `inflateEllipse` |
+| Polystar | 329-345 | `bakePolystar` | `inflatePolystar` |
+| Path | 361-369 | `bakePath` | `inflatePath` |
+| Text（独立） | 371-386, 237-244 | `TextBaker::bakeText` | `inflateText` |
+| Fill | 388-411 | `bakeFill` | `inflateFill` |
+| Stroke | 413-447 | `bakeStroke` | `inflateStroke` |
+| ColorSource 派发 | 449-482 | `PaintBaker::bakeColorSource` | `inflateColorSource` |
 | LinearGradient | 510-518 | `bakeLinearGradient` | `inflateLinearGradient` |
-| RadialGradient | 520-527 | `bakeRadialGradient` | `inflateRadialGradient` |
+| RadialGradient | 520-526 | `bakeRadialGradient` | `inflateRadialGradient` |
 | ConicGradient | 528-535 | `bakeConicGradient` | `inflateConicGradient` |
-| DiamondGradient | 537-544 | `bakeDiamondGradient` | `inflateDiamondGradient` |
+| DiamondGradient | 537-543 | `bakeDiamondGradient` | `inflateDiamondGradient` |
 | ImagePattern | 545-576 | `bakeImagePattern` | `inflateImagePattern` |
-| Gradient stops 兜底 | 487-500 | `ExtractGradientStops` 复刻 | 同 |
+| Gradient stops 兜底 | 484-497 | `ExtractGradientStops` 复刻 | 同 |
 | TrimPath | 578-587 | `bakeTrimPath` | `inflateTrimPath` |
 | TextPath | 589-607 | `TextBaker::bakeTextPath` | `inflateTextPath` |
 | RoundCorner | 609-613 | `bakeRoundCorner` | `inflateRoundCorner` |
 | MergePath | 615-621 | `bakeMergePath` | `inflateMergePath` |
 | Repeater | 623-635 | `bakeRepeater` | `inflateRepeater` |
 | TextModifier | 637-684 | `VectorBaker::bakeTextModifier` | `inflateTextModifier` |
-| RangeSelector | 666-678 | 嵌 `bakeTextModifier` | 嵌 `inflateTextModifier` |
+| RangeSelector | 664-678 | 嵌 `bakeTextModifier` | 嵌 `inflateTextModifier` |
 | Group | 686-734 | `bakeGroup` | `inflateGroup` |
-| TextBox | 250-260, 298-305 | `TextBaker::bakeTextBox` | `inflateTextBoxAsGroup` |
-| applyLayerAttributes | 736-800 | `LayerBaker::bakeCommon` | `applyLayerAttributes` |
+| TextBox | 249-261, 297-304 | `TextBaker::bakeTextBox` | `inflateTextBoxAsGroup` |
+| applyLayerAttributes | 736-801 | `LayerBaker::bakeCommon` | `applyLayerAttributes` |
 | LayerStyle 派发 | 803-840 | `StyleFilterBaker::bakeStyle` | `inflateStyle` |
 | LayerFilter 派发 | 842-875 | `StyleFilterBaker::bakeFilter` | `inflateFilter` |
-| Mask 两趟 | 149-160, 189-191 | Baker 第二趟 | Inflater 第二趟 |
+| Mask 两趟 | 150-161, 189-192 | Baker 第二趟 | Inflater 第二趟 |
 | 资源索引化 | —（LayerBuilder 现场解码） | `ResourceBaker`（pre-pass） | `InflaterContext::buildImages/Fonts` |
+
 
 ---
 
