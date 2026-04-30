@@ -23,8 +23,8 @@
     "build:wasm": "node script/cmake.js -a wasm-mt",
     "build:wasm:debug": "node script/cmake.js -a wasm-mt --debug",
     "build:types": "tsc -p tsconfig.type.json",
-    "build:js": "rollup -c script/rollup.config.js && npm run build:types  && node script/restore.replace.js -a wasm-mt",
-    "build:js:release": "BUILD_MODE=release rollup -c script/rollup.config.js && npm run build:types && node script/restore.replace.js -a wasm-mt",
+    "build:js": "rollup -c script/rollup.config.js && npm run build:types  && node script/fix-wasm-imports.js -a wasm-mt",
+    "build:js:release": "BUILD_MODE=release rollup -c script/rollup.config.js && npm run build:types && node script/fix-wasm-imports.js -a wasm-mt",
     "build:debug": "npm run build:wasm:debug && npm run build:js",
     "build:release": "npm run build:wasm && npm run build:js:release"
   },
