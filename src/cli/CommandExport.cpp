@@ -33,7 +33,7 @@ struct ExportOptions {
   int svgIndent = 2;
   bool svgNoXmlDeclaration = false;
   bool textToPath = false;
-  bool pptBridgeContours = true;
+  bool pptBridgeContours = false;
   bool pptRasterizeUnsupported = false;
 };
 
@@ -55,8 +55,9 @@ static void PrintUsage() {
       << "  --svg-no-xml-declaration    Omit the <?xml ...?> declaration\n"
       << "\n"
       << "PPT options:\n"
-      << "  --ppt-no-bridge-contours    Emit each contour as a separate sub-path instead\n"
-      << "                              of bridging nested contours (default: bridge on)\n"
+      << "  --ppt-bridge-contours       Bridge nested contours into a single self-intersecting\n"
+      << "                              sub-path instead of emitting each contour separately\n"
+      << "                              (default: off)\n"
       << "  --ppt-rasterize-unsupported Rasterize layers that use features OOXML cannot\n"
       << "                              represent natively (masks, scrollRect clipping,\n"
       << "                              blend modes outside of Normal/Multiply/Screen/Darken/\n"
@@ -99,8 +100,8 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
       options->svgNoXmlDeclaration = true;
     } else if (arg == "--text-to-path") {
       options->textToPath = true;
-    } else if (arg == "--ppt-no-bridge-contours") {
-      options->pptBridgeContours = false;
+    } else if (arg == "--ppt-bridge-contours") {
+      options->pptBridgeContours = true;
     } else if (arg == "--ppt-rasterize-unsupported") {
       options->pptRasterizeUnsupported = true;
     } else if (arg == "--help" || arg == "-h") {

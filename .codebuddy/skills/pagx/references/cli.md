@@ -348,7 +348,7 @@ pagx export --format svg --input icon.pagx       # force SVG output format
 pagx export --format pptx --input icon.pagx      # force PPTX output format
 pagx export --input icon.pagx --svg-indent 4     # 4-space indent
 pagx export --input icon.pagx --text-to-path     # convert text to paths
-pagx export --input icon.pagx --output out.pptx --ppt-no-bridge-contours  # separate sub-paths
+pagx export --input icon.pagx --output out.pptx --ppt-bridge-contours  # bridge nested contours
 pagx export --input icon.pagx --output out.pptx --ppt-rasterize-unsupported  # bake unsupported features
 ```
 
@@ -360,7 +360,7 @@ pagx export --input icon.pagx --output out.pptx --ppt-rasterize-unsupported  # b
 | `--text-to-path` | Convert text to path geometry using pre-shaped glyph outlines (default: native text rendering) |
 | `--svg-indent <n>` | Indentation spaces (default: 2, valid range: 0–16) |
 | `--svg-no-xml-declaration` | Omit the `<?xml ...?>` declaration |
-| `--ppt-no-bridge-contours` | Emit each contour as a separate sub-path instead of bridging nested contours (default: bridge on) |
+| `--ppt-bridge-contours` | Bridge nested contours into a single self-intersecting sub-path instead of emitting each contour separately (default: off) |
 | `--ppt-rasterize-unsupported` | Rasterize layers that use features OOXML cannot represent natively — masks, scrollRect clipping, blend modes outside of `Normal`/`Multiply`/`Screen`/`Darken`/`Lighten`, and wide-gamut color. For unsupported blend modes the backdrop beneath the layer is baked into the PNG so the blend composites against the real scene, at the cost of turning native content under the patch into pixels. Off by default, which silently drops these features and emits the layer as editable shapes (mask ignored, scrollRect dropped, blend falls back to `Normal`, wide-gamut clamped to sRGB). Tiled image patterns are always baked regardless of this flag, and features with no vector fallback (TextPath, ColorMatrix, conic/diamond gradient, shear transform) always bake regardless of this flag |
 
 
