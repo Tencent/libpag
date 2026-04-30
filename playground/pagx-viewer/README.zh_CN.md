@@ -41,16 +41,13 @@ view.parsePAGX(pagxData);
 
 // 步骤 2：获取文档中引用的外部文件路径（例如图片）。
 const paths = view.getExternalFilePaths();
-const count = paths.size();
 
 // 步骤 3：下载每个外部文件，并将其数据回填到视图中。
-for (let i = 0; i < count; i++) {
-  const filePath = paths.get(i);
+for (const filePath of paths) {
   const response = await fetch(baseUrl + filePath);
   const fileData = new Uint8Array(await response.arrayBuffer());
   view.loadFileData(filePath, fileData);
 }
-paths.delete(); // 记得释放返回的 vector，避免内存泄漏。
 
 // 步骤 4：在所有外部文件加载完成后构建图层树。
 view.buildLayers();

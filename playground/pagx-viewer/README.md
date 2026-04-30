@@ -42,16 +42,13 @@ view.parsePAGX(pagxData);
 
 // Step 2: Get external file paths (e.g., images) referenced by the document.
 const paths = view.getExternalFilePaths();
-const count = paths.size();
 
 // Step 3: Download each external file and inject it back into the view.
-for (let i = 0; i < count; i++) {
-  const filePath = paths.get(i);
+for (const filePath of paths) {
   const response = await fetch(baseUrl + filePath);
   const fileData = new Uint8Array(await response.arrayBuffer());
   view.loadFileData(filePath, fileData);
 }
-paths.delete(); // Always free the returned vector.
 
 // Step 4: Build the layer tree after all external files are loaded.
 view.buildLayers();
