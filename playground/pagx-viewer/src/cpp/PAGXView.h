@@ -55,12 +55,12 @@ class PAGXView {
   /**
    * Sets a solid background color. When set, the solid color will be used instead of the default
    * checkerboard pattern.
-   * @param alpha Alpha component (0.0 - 1.0).
    * @param red Red component (0.0 - 1.0).
    * @param green Green component (0.0 - 1.0).
    * @param blue Blue component (0.0 - 1.0).
+   * @param alpha Alpha component (0.0 - 1.0).
    */
-  void setBackgroundColor(float alpha, float red, float green, float blue);
+  void setBackgroundColor(float red, float green, float blue, float alpha);
 
   /**
    * Clears the custom background color and reverts to the default checkerboard pattern.

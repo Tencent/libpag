@@ -256,7 +256,7 @@ void PAGXView::updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY
   lastZoom = zoom;
 }
 
-void PAGXView::setBackgroundColor(float alpha, float red, float green, float blue) {
+void PAGXView::setBackgroundColor(float red, float green, float blue, float alpha) {
   useCustomBackgroundColor = true;
   customBackgroundColor = tgfx::Color{std::clamp(red, 0.0f, 1.0f), std::clamp(green, 0.0f, 1.0f),
                                       std::clamp(blue, 0.0f, 1.0f), std::clamp(alpha, 0.0f, 1.0f)};

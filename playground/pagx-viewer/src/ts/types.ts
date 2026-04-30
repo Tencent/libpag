@@ -103,12 +103,12 @@ export interface _PAGXView {
   /**
    * Sets a solid background color. When set, the solid color will be used instead of the default
    * checkerboard pattern.
-   * @param alpha Alpha component (0.0 - 1.0)
    * @param red Red component (0.0 - 1.0)
    * @param green Green component (0.0 - 1.0)
    * @param blue Blue component (0.0 - 1.0)
+   * @param alpha Alpha component (0.0 - 1.0)
    */
-  _setBackgroundColor(alpha: number, red: number, green: number, blue: number): void;
+  _setBackgroundColor(red: number, green: number, blue: number, alpha: number): void;
 
   /**
    * Clears the custom background color and reverts to the default checkerboard pattern.

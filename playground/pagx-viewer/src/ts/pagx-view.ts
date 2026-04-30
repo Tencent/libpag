@@ -231,7 +231,7 @@ export class PAGXView {
       parsed = { r: 1.0, g: 1.0, b: 1.0, a: 1.0 };
     }
     const finalAlpha = alpha !== undefined ? alpha : parsed.a;
-    this.nativeView._setBackgroundColor(finalAlpha, parsed.r, parsed.g, parsed.b);
+    this.nativeView._setBackgroundColor(parsed.r, parsed.g, parsed.b, finalAlpha);
   }
 
   /**
