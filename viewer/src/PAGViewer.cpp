@@ -19,6 +19,7 @@
 #include "PAGViewer.h"
 #include <QEvent>
 #include <QObject>
+#include <QTimer>
 #include "rendering/PAGWindow.h"
 #include "version.h"
 
@@ -32,10 +33,21 @@ PAGViewer::PAGViewer(int& argc, char** argv) : QApplication(argc, argv) {
 bool PAGViewer::event(QEvent* event) {
   if (event->type() == QEvent::FileOpen) {
     auto openEvent = static_cast<QFileOpenEvent*>(event);
-    auto path = openEvent->file();
-    openFile(path);
+    pendingOpenFilePath = openEvent->file();
+    // Defer file opening to avoid triggering view changes inside nested event loops
+    // (e.g., when PAGNetworkFetcher::fetch() is running QEventLoop::exec()).
+    QTimer::singleShot(0, this, &PAGViewer::processPendingOpenFile);
   }
   return QApplication::event(event);
+}
+
+void PAGViewer::processPendingOpenFile() {
+  if (pendingOpenFilePath.isEmpty()) {
+    return;
+  }
+  auto path = std::move(pendingOpenFilePath);
+  pendingOpenFilePath.clear();
+  openFile(path);
 }
 
 void PAGViewer::openFile(QString path) {
