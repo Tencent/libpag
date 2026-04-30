@@ -497,7 +497,7 @@ class PPTWriter {
   PPTWriterContext* _ctx = nullptr;
   PAGXDocument* _doc = nullptr;
   bool _convertTextToPath = true;
-  bool _bridgeContours = true;
+  bool _bridgeContours = false;
   bool _resolveModifiers = true;
   bool _rasterizeUnsupported = false;
   // Ratio of raster DPI to the 96 DPI logical coordinate space. Drives the
