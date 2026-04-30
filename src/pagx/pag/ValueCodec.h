@@ -238,13 +238,15 @@ inline tgfx::Matrix3D ReadMatrix3D(::pag::DecodeStream* s) {
   if ((header & 0x01u) != 0) {
     return tgfx::Matrix3D::I();
   }
-  float v[16] = {0.0f};
-  for (int i = 0; i < 16; ++i) {
-    v[i] = s->readFloat();
-  }
+  // Read column-major (matching the writer above) and rebuild via the public
+  // setRowColumn API — setAll / setColumn live in the private section of
+  // tgfx::Matrix3D, so element-by-element is the only stable path.
   tgfx::Matrix3D m{};
-  m.setAll(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11], v[12], v[13],
-           v[14], v[15]);
+  for (int c = 0; c < 4; ++c) {
+    for (int r = 0; r < 4; ++r) {
+      m.setRowColumn(r, c, s->readFloat());
+    }
+  }
   return m;
 }
 
