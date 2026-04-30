@@ -212,6 +212,8 @@ if (PAG_BUILD_PAGX)
 
     if (PAG_BUILD_PPT)
         list(APPEND PAG_FILES src/pagx/ppt/PPTExporter.cpp
+                src/pagx/ppt/PPTStyleEmitter.cpp
+                src/pagx/ppt/PPTTextWriter.cpp
                 src/pagx/ppt/PPTBoilerplate.cpp
                 src/pagx/ppt/PPTContourUtils.cpp
                 src/pagx/ppt/PPTGeomEmitter.cpp

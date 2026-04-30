@@ -140,6 +140,16 @@ std::shared_ptr<tgfx::Data> GetImageData(const Image* image);
 
 bool HasNonASCII(const std::string& str);
 
+/**
+ * Classifies a UTF-8 text run into an OOXML xml:lang tag. Returns "zh-CN" when
+ * the text contains any CJK code point (Han, Hiragana, Katakana, Hangul, or
+ * full-width punctuation) and "en-US" otherwise. PowerPoint paints a
+ * spellcheck squiggle under any run whose declared language doesn't match its
+ * glyphs, so this heuristic keeps the common CJK case free of red underlines
+ * without introducing a dependency on a real language detector.
+ */
+std::string DetectTextLang(const std::string& utf8);
+
 std::string UTF8ToUTF16BEHex(const std::string& utf8);
 
 /**

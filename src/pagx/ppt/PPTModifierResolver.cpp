@@ -39,6 +39,15 @@
 
 namespace pagx {
 
+// std::pow(negative, non-integer) returns NaN, which would propagate through
+// the downstream geometry when a Repeater uses a negative scale with a
+// fractional offset. Raise the magnitude and reapply the sign so a negative
+// base keeps producing a negative result.
+static float SignedPow(float base, float exp) {
+  float sign = base < 0.0f ? -1.0f : 1.0f;
+  return sign * std::pow(std::abs(base), exp);
+}
+
 //==============================================================================
 // Geometry helpers: build pagx::PathData from primitive shapes and from a
 // resolved tgfx::Path round-trip.
@@ -526,8 +535,8 @@ std::vector<Element*> PPTModifierResolver::resolve(const std::vector<Element*>& 
         generated.reserve(static_cast<size_t>(maxCount));
         for (int i = 0; i < maxCount; ++i) {
           float progress = static_cast<float>(i) + rep->offset;
-          float sx = std::pow(rep->scale.x, progress);
-          float sy = std::pow(rep->scale.y, progress);
+          float sx = SignedPow(rep->scale.x, progress);
+          float sy = SignedPow(rep->scale.y, progress);
           float rotation = rep->rotation * progress;
           float tx = rep->position.x * progress;
           float ty = rep->position.y * progress;

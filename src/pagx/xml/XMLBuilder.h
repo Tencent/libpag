@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cassert>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -188,6 +189,7 @@ class XMLBuilder {
     if (_prettyPrint) {
       _buf += '\n';
     }
+    assert(!_tags.empty());
     _tags.pop_back();
     return *this;
   }
@@ -199,6 +201,7 @@ class XMLBuilder {
       _indent--;
       writeIndent();
     }
+    assert(!_tags.empty());
     _buf += "</";
     _buf += _tags.back();
     _buf += '>';
@@ -214,6 +217,7 @@ class XMLBuilder {
   XMLBuilder& closeElementWithText(const std::string& text) {
     _buf += '>';
     escapeTextTo(_buf, text);
+    assert(!_tags.empty());
     _buf += "</";
     _buf += _tags.back();
     _buf += '>';
@@ -302,6 +306,7 @@ class XMLBuilder {
   }
 
   void writeIndent() {
+    assert(_indent >= 0);
     _buf.append(static_cast<size_t>(_indent * _indentSpaces), ' ');
   }
 

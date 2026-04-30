@@ -18,6 +18,7 @@
 
 #include "pagx/ppt/PPTContourUtils.h"
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -201,6 +202,7 @@ std::vector<PathContour> ParsePathContours(const PathData* data) {
   size_t ptIndex = 0;
   for (const auto& verb : verbs) {
     if (verb == PathVerb::Move) {
+      assert(ptIndex < points.size());
       contours.emplace_back();
       contours.back().start = points[ptIndex++];
     } else if (!contours.empty()) {
@@ -211,6 +213,7 @@ std::vector<PathContour> ParsePathContours(const PathData* data) {
         seg.verb = verb;
         int ptCount = PathData::PointsPerVerb(verb);
         for (int i = 0; i < ptCount; i++) {
+          assert(ptIndex < points.size());
           seg.pts[i] = points[ptIndex++];
         }
         contours.back().segs.push_back(seg);
@@ -246,6 +249,7 @@ struct ContainmentTable {
   size_t n = 0;
 
   bool isInside(size_t i, size_t j) const {
+    assert(i < n && j < n);
     return inside[i * n + j] != 0;
   }
 };

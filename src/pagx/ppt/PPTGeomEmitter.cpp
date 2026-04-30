@@ -19,14 +19,32 @@
 #include "pagx/ppt/PPTGeomEmitter.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <initializer_list>
+#include <limits>
 #include <optional>
 #include "pagx/xml/XMLBuilder.h"
 
 namespace pagx {
 
 int64_t PxToEMU(float px) {
-  return static_cast<int64_t>(std::round(static_cast<double>(px) * EMU_PER_PX));
+  double scaled = std::round(static_cast<double>(px) * EMU_PER_PX);
+  // A finite double that exceeds int64_t range (roughly ±9.22e18) becomes UB
+  // when cast. EMU multiplication reaches that point around px ≈ ±9.68e14, so
+  // clamp first to keep the conversion defined on pathological geometry. Note
+  // that static_cast<double>(INT64_MAX) rounds up to 2^63, which itself is out
+  // of range, hence the strict < comparison against 2^63.
+  constexpr double kUpperBound = 9223372036854775808.0;  // 2^63
+  if (!std::isfinite(scaled)) {
+    return 0;
+  }
+  if (scaled >= kUpperBound) {
+    return std::numeric_limits<int64_t>::max();
+  }
+  if (scaled < -kUpperBound) {
+    return std::numeric_limits<int64_t>::min();
+  }
+  return static_cast<int64_t>(scaled);
 }
 
 namespace {

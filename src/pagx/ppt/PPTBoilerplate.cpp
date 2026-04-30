@@ -277,7 +277,6 @@ std::string GenerateSlideLayout() {
   s += XML_DECL;
   s += "<p:sldLayout";
   s += NS_DRAWINGML;
-  s += NS_OFFICE_REL;
   s += NS_PRESENTATIONML;
   s += " type=\"blank\" preserve=\"1\">";
   s += "<p:cSld name=\"Blank\"><p:spTree>"
@@ -356,8 +355,6 @@ std::string GeneratePresProps() {
   s.reserve(256);
   s += XML_DECL;
   s += "<p:presentationPr";
-  s += NS_DRAWINGML;
-  s += NS_OFFICE_REL;
   s += NS_PRESENTATIONML;
   s += "/>";
   return s;
@@ -369,7 +366,6 @@ std::string GenerateViewProps() {
   s += XML_DECL;
   s += "<p:viewPr";
   s += NS_DRAWINGML;
-  s += NS_OFFICE_REL;
   s += NS_PRESENTATIONML;
   s += ">";
   s += "<p:normalViewPr><p:restoredLeft sz=\"15611\"/>"
