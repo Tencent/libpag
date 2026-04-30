@@ -47,6 +47,7 @@ class PAGXView : public ContentView {
   void onSizeChangedDelayHandled() override;
   Q_SLOT void onRequestSizeChanged();
   Q_SLOT void onPreferredSizeChanged();
+  Q_SLOT void onRenderThreadStarted();
 
   std::unique_ptr<PAGXViewModel> viewModel = nullptr;
 };
