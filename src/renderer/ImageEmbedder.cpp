@@ -19,9 +19,12 @@
 #include "renderer/ImageEmbedder.h"
 #include <fstream>
 #include <unordered_set>
+#include "base/utils/Log.h"
 #include "pagx/types/Data.h"
 
 namespace pagx {
+
+static constexpr size_t MaxFileSize = 256 * 1024 * 1024;
 
 static std::shared_ptr<pagx::Data> ReadFileToData(const std::string& path) {
   std::ifstream in(path, std::ios::binary | std::ios::ate);
@@ -29,6 +32,11 @@ static std::shared_ptr<pagx::Data> ReadFileToData(const std::string& path) {
   std::streampos end = in.tellg();
   if (end <= 0) return nullptr;  // covers tellg failure and empty file
   auto size = static_cast<size_t>(end);
+  if (size > MaxFileSize) {
+    LOGE("ReadFileToData: file '%s' exceeds the maximum size limit (%zu bytes).", path.c_str(),
+         MaxFileSize);
+    return nullptr;
+  }
   in.seekg(0, std::ios::beg);
   auto* buffer = new (std::nothrow) uint8_t[size];
   if (buffer == nullptr) return nullptr;
@@ -45,9 +53,6 @@ bool ImageEmbedder::embed(PAGXDocument* document) {
   auto paths = document->getExternalFilePaths();
   std::unordered_set<std::string> loaded;
   for (const auto& path : paths) {
-    if (path.find("://") != std::string::npos) {
-      continue;  // URL per D1.3 — silently skip
-    }
     if (!loaded.insert(path).second) {
       continue;
     }

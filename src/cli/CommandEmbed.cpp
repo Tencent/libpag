@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CommandEmbed.h"
+#include <cstdio>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -45,8 +46,8 @@ static void PrintEmbedUsage() {
       << "\n"
       << "Options:\n"
       << "  -o, --output <path>              Output file path (default: overwrite input)\n"
-      << "  --file <path>                    Register a font file (can be specified multiple\n"
-      << "                                   times)\n"
+      << "  --font-file, --file <path>       Register a font file for glyph embedding\n"
+      << "                                   (can be specified multiple times)\n"
       << "  --fallback <path|name>           Add a fallback font file or system font name (can\n"
       << "                                   be specified multiple times)\n"
       << "  --skip-fonts                     Skip font embedding\n"
@@ -60,7 +61,7 @@ static int ParseEmbedOptions(int argc, char* argv[], EmbedOptions* options) {
     std::string arg = argv[i];
     if ((arg == "-o" || arg == "--output") && i + 1 < argc) {
       options->outputFile = argv[++i];
-    } else if (arg == "--file" && i + 1 < argc) {
+    } else if ((arg == "--file" || arg == "--font-file") && i + 1 < argc) {
       options->fontFiles.push_back(argv[++i]);
     } else if (arg == "--fallback" && i + 1 < argc) {
       options->fallbacks.push_back(argv[++i]);
@@ -136,6 +137,20 @@ int RunEmbed(int argc, char* argv[]) {
   }
 
   auto xml = PAGXExporter::ToXML(*document);
+  if (options.outputFile == options.inputFile) {
+    auto tempPath = options.outputFile + ".tmp";
+    if (!WriteStringToFile(xml, tempPath, "pagx embed")) {
+      std::remove(tempPath.c_str());
+      return 1;
+    }
+    if (std::rename(tempPath.c_str(), options.outputFile.c_str()) != 0) {
+      std::cerr << "pagx embed: failed to replace '" << options.outputFile << "'\n";
+      std::remove(tempPath.c_str());
+      return 1;
+    }
+    std::cout << "pagx embed: wrote " << options.outputFile << "\n";
+    return 0;
+  }
   if (!WriteStringToFile(xml, options.outputFile, "pagx embed")) {
     return 1;
   }

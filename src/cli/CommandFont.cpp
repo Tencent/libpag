@@ -56,10 +56,6 @@ static void PrintFontUsage() {
             << "Exactly one of --file, --name, or --list must be specified.\n";
 }
 
-static bool FontFamilyLess(const pagx::FontFamilyEntry& lhs, const pagx::FontFamilyEntry& rhs) {
-  return lhs.family < rhs.family;
-}
-
 static void FormatFontListText(const std::vector<pagx::FontFamilyEntry>& entries) {
   for (const auto& entry : entries) {
     if (entry.styles.empty()) {
@@ -165,11 +161,8 @@ int RunFont(int argc, char* argv[]) {
   }
 
   if (options.listMode) {
-    if (options.sizeSpecified) {
-      std::cerr << "pagx font: warning: --size is ignored in --list mode\n";
-    }
     auto entries = pagx::SystemFonts::AllFontFamilies();
-    std::sort(entries.begin(), entries.end(), FontFamilyLess);
+    std::sort(entries.begin(), entries.end());
     if (options.jsonOutput) {
       FormatFontListJson(entries);
     } else {

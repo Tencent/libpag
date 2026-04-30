@@ -420,6 +420,14 @@ void FontEmbedder::ClearEmbeddedGlyphRuns(PAGXDocument* document) {
     }
   }
   nodes.resize(writeIdx);
+
+  for (auto it = document->nodeMap.begin(); it != document->nodeMap.end();) {
+    if (toRemove.count(it->second) > 0) {
+      it = document->nodeMap.erase(it);
+    } else {
+      ++it;
+    }
+  }
 }
 
 bool FontEmbedder::embed(PAGXDocument* document) {
