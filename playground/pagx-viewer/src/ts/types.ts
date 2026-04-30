@@ -19,24 +19,6 @@
 import { PAGXView } from './pagx-view';
 
 /**
- * Options for initializing the PAGX Viewer module.
- */
-export interface PAGXViewerOptions {
-  /**
-   * Custom function to locate the WASM file.
-   * @param file The WASM filename ('pagx-viewer.wasm')
-   * @returns The URL or path to the WASM file
-   */
-  locateFile?: (file: 'pagx-viewer.wasm') => string;
-
-  /**
-   * Pre-fetched WASM binary data. If provided, the module will use this
-   * instead of fetching the WASM file.
-   */
-  wasmBinary?: ArrayBuffer;
-}
-
-/**
  * Emscripten GL context interface.
  */
 export interface EmscriptenGLContext {

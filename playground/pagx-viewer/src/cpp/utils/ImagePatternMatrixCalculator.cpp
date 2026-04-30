@@ -26,7 +26,7 @@
 
 namespace pagx {
 
-pagx::Matrix calculateImagePatternMatrix(ImageScaleMode scaleMode, float imageWidth,
+pagx::Matrix CalculateImagePatternMatrix(ImageScaleMode scaleMode, float imageWidth,
                                          float imageHeight, float nodeWidth, float nodeHeight,
                                          const pagx::Matrix& paintTransform, float scaleFactor) {
   pagx::Matrix matrix = {};
@@ -112,7 +112,7 @@ pagx::Matrix calculateImagePatternMatrix(ImageScaleMode scaleMode, float imageWi
   return matrix;
 }
 
-bool resolveImagePatternMatrix(pagx::ImagePattern* pattern) {
+bool ResolveImagePatternMatrix(pagx::ImagePattern* pattern) {
   if (!pattern || !pattern->image) {
     return false;
   }
@@ -175,14 +175,27 @@ bool resolveImagePatternMatrix(pagx::ImagePattern* pattern) {
   // The matrix stored during export is paint->transform() (normalized transform).
   auto paintTransform = pattern->matrix;
 
-  pattern->matrix = calculateImagePatternMatrix(scaleMode, actualImageWidth, actualImageHeight,
+  pattern->matrix = CalculateImagePatternMatrix(scaleMode, actualImageWidth, actualImageHeight,
                                                 nodeWidth, nodeHeight, paintTransform, scaleFactor);
   pattern->scaleMode = ScaleMode::None;
 
   return true;
 }
 
-void resolveAllImagePatternMatrices(pagx::PAGXDocument* document) {
+void ResolveAllImagePatternMatrices(pagx::PAGXDocument* document) {
+  if (!document) {
+    return;
+  }
+  for (const auto& nodePtr : document->nodes) {
+    if (!nodePtr || nodePtr->nodeType() != pagx::NodeType::ImagePattern) {
+      continue;
+    }
+    auto* pattern = static_cast<pagx::ImagePattern*>(nodePtr.get());
+    ResolveImagePatternMatrix(pattern);
+  }
+}
+
+void ResolveAllGradientCoordinates(pagx::PAGXDocument* document) {
   if (!document) {
     return;
   }
@@ -190,19 +203,13 @@ void resolveAllImagePatternMatrices(pagx::PAGXDocument* document) {
     if (!nodePtr) {
       continue;
     }
-    if (nodePtr->nodeType() == pagx::NodeType::LinearGradient ||
-        nodePtr->nodeType() == pagx::NodeType::RadialGradient ||
-        nodePtr->nodeType() == pagx::NodeType::ConicGradient ||
-        nodePtr->nodeType() == pagx::NodeType::DiamondGradient) {
-      auto* gradient = static_cast<pagx::Gradient*>(nodePtr.get());
-      gradient->fitsToGeometry = false;
+    auto nodeType = nodePtr->nodeType();
+    if (nodeType != pagx::NodeType::LinearGradient && nodeType != pagx::NodeType::RadialGradient &&
+        nodeType != pagx::NodeType::ConicGradient && nodeType != pagx::NodeType::DiamondGradient) {
       continue;
     }
-    if (nodePtr->nodeType() != pagx::NodeType::ImagePattern) {
-      continue;
-    }
-    auto* pattern = static_cast<pagx::ImagePattern*>(nodePtr.get());
-    resolveImagePatternMatrix(pattern);
+    auto* gradient = static_cast<pagx::Gradient*>(nodePtr.get());
+    gradient->fitsToGeometry = false;
   }
 }
 

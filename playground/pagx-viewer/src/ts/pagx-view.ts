@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-import type { _PAGXView, StringVector } from './types';
+import type { _PAGXView } from './types';
 import { getPAGXModule } from './pagx-module';
 import { destroyVerify } from './decorators';
 
@@ -48,21 +48,21 @@ import { destroyVerify } from './decorators';
 export class PAGXView {
   /**
    * Creates a PAGXView from a canvas element.
-   * @param canvas CSS selector (e.g., '#my-canvas') or canvas element
+   * @param canvasID CSS selector for the canvas element (e.g., '#my-canvas'). Must be a non-empty
+   *                 selector that resolves to a single HTMLCanvasElement on the page.
    * @returns PAGXView instance or null if creation failed
    */
-  public static init(canvas: string | HTMLCanvasElement): PAGXView | null {
+  public static init(canvasID: string): PAGXView | null {
     const module = getPAGXModule();
     if (!module) {
       console.error('PAGXView: Module not initialized. Call PAGXInit() first.');
       return null;
     }
 
-    if (typeof canvas !== 'string' && !canvas.id) {
-      console.error('PAGXView: Canvas element must have a non-empty id attribute.');
+    if (!canvasID) {
+      console.error('PAGXView: canvasID must be a non-empty CSS selector.');
       return null;
     }
-    const canvasID = typeof canvas === 'string' ? canvas : `#${canvas.id}`;
     const nativeView = module._PAGXView._MakeFrom(canvasID);
     if (!nativeView) {
       console.error(`PAGXView: Failed to create PAGXView from canvas "${canvasID}".`);
@@ -82,7 +82,9 @@ export class PAGXView {
   /**
    * Whether the view has been destroyed.
    */
-  public isDestroyed = false;
+  public get isDestroyed(): boolean {
+    return this._isDestroyed;
+  }
 
   /**
    * Returns the original width of the PAGX content.
@@ -100,6 +102,7 @@ export class PAGXView {
 
   private nativeView: _PAGXView;
   private _isRunning = false;
+  private _isDestroyed = false;
   private animationFrameId: number | null = null;
 
   private constructor(nativeView: _PAGXView) {
@@ -124,6 +127,14 @@ export class PAGXView {
   }
 
   /**
+   * Clears the currently loaded PAGX content and releases associated resources. After this call
+   * the view will render as empty until a new document is loaded.
+   */
+  public clear(): void {
+    this.nativeView._loadPAGX(new Uint8Array(0));
+  }
+
+  /**
    * Parses PAGX data without building layers.
    * Call getExternalFilePaths() and loadFileData() after this to load external resources,
    * then call buildLayers() to complete the loading.
@@ -135,10 +146,19 @@ export class PAGXView {
 
   /**
    * Returns the list of external file paths referenced by the PAGX document.
-   * Must call delete() on the returned vector when done.
    */
-  public getExternalFilePaths(): StringVector {
-    return this.nativeView._getExternalFilePaths();
+  public getExternalFilePaths(): string[] {
+    const vector = this.nativeView._getExternalFilePaths();
+    const paths: string[] = [];
+    try {
+      const count = vector.size();
+      for (let i = 0; i < count; i++) {
+        paths.push(vector.get(i));
+      }
+    } finally {
+      vector.delete();
+    }
+    return paths;
   }
 
   /**
@@ -288,7 +308,7 @@ export class PAGXView {
   public destroy(): void {
     this.stop();
     this.nativeView.delete();
-    this.isDestroyed = true;
+    this._isDestroyed = true;
   }
 
   private renderLoop(): void {

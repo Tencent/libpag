@@ -42,19 +42,64 @@ const WASM_MT_DIR = path.join(PLAYGROUND_DIR, 'wasm-mt');
 
 const REQUIRED_FILES = ['pagx-viewer.wasm', 'pagx-viewer.esm.js'];
 
+// Source directories/files that should invalidate the build when newer than the artifacts.
+const SOURCE_PATHS = [
+  path.join(PAGX_VIEWER_DIR, 'src'),
+  path.join(PAGX_VIEWER_DIR, 'CMakeLists.txt'),
+  path.join(PAGX_VIEWER_DIR, 'package.json'),
+];
+
 const isRelease = process.argv.includes('--release');
 
 /**
- * Check if pagx-viewer has been built by verifying required files exist.
+ * Returns the most recent modification time (in ms) among the given files/directories.
+ * Directories are walked recursively. Missing paths are skipped.
+ */
+function latestMtimeMs(targetPath) {
+  let latest = 0;
+  const stack = [targetPath];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    let stat;
+    try {
+      stat = fs.statSync(current);
+    } catch {
+      continue;
+    }
+    if (stat.isDirectory()) {
+      for (const entry of fs.readdirSync(current)) {
+        stack.push(path.join(current, entry));
+      }
+    } else if (stat.mtimeMs > latest) {
+      latest = stat.mtimeMs;
+    }
+  }
+  return latest;
+}
+
+/**
+ * Check if pagx-viewer artifacts exist and are newer than the sources.
  */
 function isPagxViewerBuilt() {
+  let oldestArtifactMs = Number.POSITIVE_INFINITY;
   for (const file of REQUIRED_FILES) {
     const filePath = path.join(PAGX_VIEWER_LIB_DIR, file);
     if (!fs.existsSync(filePath)) {
       return false;
     }
+    const artifactMs = fs.statSync(filePath).mtimeMs;
+    if (artifactMs < oldestArtifactMs) {
+      oldestArtifactMs = artifactMs;
+    }
   }
-  return true;
+  let latestSourceMs = 0;
+  for (const sourcePath of SOURCE_PATHS) {
+    const ms = latestMtimeMs(sourcePath);
+    if (ms > latestSourceMs) {
+      latestSourceMs = ms;
+    }
+  }
+  return latestSourceMs <= oldestArtifactMs;
 }
 
 /**
@@ -105,10 +150,10 @@ function main() {
   console.log('Prebuild: Preparing pagx-viewer wasm files...\n');
 
   if (!isPagxViewerBuilt()) {
-    console.log('pagx-viewer not built, building now...\n');
+    console.log('pagx-viewer not built or out of date, building now...\n');
     buildPagxViewer();
   } else {
-    console.log('pagx-viewer already built.\n');
+    console.log('pagx-viewer already built and up to date.\n');
   }
 
   copyWasmFiles();

@@ -5,7 +5,7 @@
   "type": "module",
   "main": "lib/pagx-viewer.umd.js",
   "module": "lib/pagx-viewer.esm.js",
-  "types": "lib/types/playground/pagx-viewer/src/ts/pagx.d.ts",
+  "types": "types/pagx.d.ts",
   "exports": {
     ".": {
       "import": "./lib/pagx-viewer.esm.js",
@@ -14,7 +14,8 @@
     }
   },
   "files": [
-    "lib"
+    "lib",
+    "types"
   ],
   "scripts": {
     "clean": "rimraf dist wasm-mt build-pagx-viewer .*.md5",

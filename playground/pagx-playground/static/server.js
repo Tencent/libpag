@@ -24,6 +24,7 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const playgroundDir = path.resolve(__dirname, '..');
 const libpagDir = path.resolve(__dirname, '../../..');
 
 const app = express();
@@ -35,7 +36,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use('', express.static(path.join('./'), {
+app.use('', express.static(playgroundDir, {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.wasm')) {
       res.set('Content-Type', 'application/wasm');

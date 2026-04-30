@@ -21,6 +21,11 @@ import type { PAGXModule } from './types';
 let pagxModule: PAGXModule | null = null;
 
 export function setPAGXModule(module: PAGXModule): void {
+  if (pagxModule !== null && pagxModule !== module) {
+    console.warn(
+      'setPAGXModule: overwriting an existing PAGX module. Existing PAGXView instances bound to the previous module may behave unexpectedly.',
+    );
+  }
   pagxModule = module;
 }
 

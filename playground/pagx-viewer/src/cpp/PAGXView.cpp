@@ -145,10 +145,11 @@ void PAGXView::buildLayers() {
   if (!document) {
     return;
   }
-  // TODO: Remove resolveAllImagePatternMatrices() after the pagx exporter adapts to relative
-  // coordinates for image and gradient fills. Currently it forces them to absolute coordinates
-  // to ensure correct rendering.
-  resolveAllImagePatternMatrices(document.get());
+  // TODO: Remove ResolveAllImagePatternMatrices() and ResolveAllGradientCoordinates() after the
+  // pagx exporter adapts to relative coordinates for image and gradient fills. Currently we force
+  // them to absolute coordinates to ensure correct rendering.
+  ResolveAllImagePatternMatrices(document.get());
+  ResolveAllGradientCoordinates(document.get());
   document->applyLayout(&fontConfig);
   contentLayer = LayerBuilder::Build(document.get());
   if (!contentLayer) {
@@ -170,11 +171,17 @@ void PAGXView::updateSize() {
     return;
   }
   auto device = window->getDevice();
+  if (device == nullptr) {
+    return;
+  }
   auto context = device->lockContext();
   if (context == nullptr) {
     return;
   }
-  syncSurfaceSize(context);
+  int canvasWidth = 0;
+  int canvasHeight = 0;
+  emscripten_get_canvas_element_size(canvasID.c_str(), &canvasWidth, &canvasHeight);
+  syncSurfaceSize(context, canvasWidth, canvasHeight);
   device->unlock();
 }
 
@@ -183,13 +190,10 @@ void PAGXView::updateSize() {
 // draw() so that size changes driven purely by the JS side (e.g. a host-layer
 // ResizeObserver only adjusting canvas.width/height) are absorbed on the next
 // render tick without requiring an explicit updateSize() call.
-void PAGXView::syncSurfaceSize(tgfx::Context* context) {
+void PAGXView::syncSurfaceSize(tgfx::Context* context, int canvasWidth, int canvasHeight) {
   if (window == nullptr || context == nullptr) {
     return;
   }
-  int canvasWidth = 0;
-  int canvasHeight = 0;
-  emscripten_get_canvas_element_size(canvasID.c_str(), &canvasWidth, &canvasHeight);
   if (canvasWidth <= 0 || canvasHeight <= 0) {
     return;
   }
@@ -289,11 +293,14 @@ void PAGXView::draw() {
     return;
   }
   auto device = window->getDevice();
+  if (device == nullptr) {
+    return;
+  }
   auto context = device->lockContext();
   if (context == nullptr) {
     return;
   }
-  syncSurfaceSize(context);
+  syncSurfaceSize(context, currentCanvasWidth, currentCanvasHeight);
   if (surface == nullptr) {
     device->unlock();
     return;
@@ -304,11 +311,9 @@ void PAGXView::draw() {
   if (useCustomBackgroundColor) {
     canvas->clear(customBackgroundColor);
   } else {
-    int width = 0;
-    int height = 0;
-    emscripten_get_canvas_element_size(canvasID.c_str(), &width, &height);
-    auto density =
-        width > 0 ? static_cast<float>(surface->width()) / static_cast<float>(width) : 1.0f;
+    auto density = currentCanvasWidth > 0 ? static_cast<float>(surface->width()) /
+                                                static_cast<float>(currentCanvasWidth)
+                                          : 1.0f;
     int bgWidth = surface->width();
     int bgHeight = surface->height();
     if (!backgroundLayer || bgWidth != lastBackgroundWidth || bgHeight != lastBackgroundHeight ||

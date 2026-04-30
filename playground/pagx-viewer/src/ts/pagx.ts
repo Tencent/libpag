@@ -17,10 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 import { PAGXBind } from './binding';
-import * as types from './types';
+import type { PAGXModule } from './types';
 import createPAGX from '../../wasm-mt/pagx-viewer';
 
 export { PAGXView } from './pagx-view';
+export type { PAGXModule } from './types';
 
 export interface ModuleOption {
   /**
@@ -73,16 +74,15 @@ export interface ModuleOption {
  * view.destroy();
  * ```
  */
-export function PAGXInit(moduleOption: ModuleOption = {}): Promise<types.PAGXModule> {
+export function PAGXInit(moduleOption: ModuleOption = {}): Promise<PAGXModule> {
   return createPAGX(moduleOption)
-    .then((module: types.PAGXModule) => {
+    .then((module: PAGXModule) => {
       PAGXBind(module);
       return module;
     })
     .catch((error: unknown) => {
       console.error('PAGXInit failed:', error);
-      throw new Error('PAGXInit failed. Please check the .wasm file path.');
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`PAGXInit failed: ${message}`);
     });
 }
-
-export { types };

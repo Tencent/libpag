@@ -8,6 +8,5 @@ build-pagx-playground/
 lib/
 types/
 node_modules/
-package-lock.json
 fonts/
 wasm-mt/

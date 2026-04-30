@@ -2,6 +2,7 @@
   "compilerOptions": {
     "target": "ES2020",
     "declaration": true,
+    "rootDir": "./src/ts",
     "declarationDir": "./types",
     "emitDeclarationOnly": true,
     "removeComments": false,

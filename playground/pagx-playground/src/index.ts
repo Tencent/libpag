@@ -28,8 +28,9 @@ declare class PAGXViewClass {
     static init(canvasID: string): PAGXViewClass | null;
     registerFonts(fontData: Uint8Array, emojiFontData: Uint8Array): void;
     loadPAGX(data: Uint8Array): void;
+    clear(): void;
     parsePAGX(data: Uint8Array): void;
-    getExternalFilePaths(): { size(): number; get(i: number): string; delete(): void };
+    getExternalFilePaths(): string[];
     loadFileData(path: string, data: Uint8Array): boolean;
     buildLayers(): void;
     updateSize(): void;
@@ -824,7 +825,7 @@ const DEFAULT_TITLE = 'PAGX Playground';
 
 function goHome(pushHistory: boolean = true): void {
     if (playgroundState.pagxView) {
-        playgroundState.pagxView.loadPAGX(new Uint8Array(0));
+        playgroundState.pagxView.clear();
         gestureManager.resetTransform(playgroundState);
     }
     const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
@@ -853,14 +854,11 @@ async function loadExternalFiles(baseURL: string): Promise<void> {
         return;
     }
     const paths = playgroundState.pagxView.getExternalFilePaths();
-    const count = paths.size();
-    if (count === 0) {
-        paths.delete();
+    if (paths.length === 0) {
         return;
     }
     const fetches: Promise<void>[] = [];
-    for (let i = 0; i < count; i++) {
-        const filePath = paths.get(i);
+    for (const filePath of paths) {
         if (!isSafeRelativePath(filePath)) {
             console.warn(`Skipping unsafe external file path: ${filePath}`);
             continue;
@@ -882,7 +880,6 @@ async function loadExternalFiles(baseURL: string): Promise<void> {
                 })
         );
     }
-    paths.delete();
     await Promise.all(fetches);
 }
 
