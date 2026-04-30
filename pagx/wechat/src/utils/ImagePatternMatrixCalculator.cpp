@@ -72,12 +72,12 @@ static bool DeserializePaintTransform(const std::string& text, pagx::Matrix* out
 
 pagx::Matrix calculateImagePatternMatrix(ImageScaleMode scaleMode, float imageWidth, float imageHeight,
                                          float nodeWidth, float nodeHeight, const pagx::Matrix& paintTransform,
-                                         float scaleFactor) {
+                                         float scaleFactor, float origImageWidth, float origImageHeight) {
   pagx::Matrix matrix = {};
   matrix.a = 1.0f;
   matrix.d = 1.0f;
 
-  if (imageWidth <= 0 || imageHeight <= 0 || nodeWidth <= 0 || nodeHeight <= 0) {
+  if (imageWidth <= 0.0f || imageHeight <= 0.0f || nodeWidth <= 0.0f || nodeHeight <= 0.0f) {
     if (!paintTransform.isIdentity()) {
       return paintTransform;
     }
@@ -137,8 +137,16 @@ pagx::Matrix calculateImagePatternMatrix(ImageScaleMode scaleMode, float imageWi
       break;
     }
     case ImageScaleMode::TILE: {
-      matrix.a = scaleFactor;
-      matrix.d = scaleFactor;
+      float ratioX = scaleFactor;
+      float ratioY = scaleFactor;
+      if (origImageWidth > 0.0f) {
+        ratioX = scaleFactor * origImageWidth / imageWidth;
+      }
+      if (origImageHeight > 0.0f) {
+        ratioY = scaleFactor * origImageHeight / imageHeight;
+      }
+      matrix.a = ratioX;
+      matrix.d = ratioY;
       break;
     }
     default:
@@ -236,7 +244,8 @@ bool resolveImagePatternMatrix(pagx::ImagePattern* pattern) {
 
   pattern->matrix = calculateImagePatternMatrix(
       scaleMode, actualImageWidth, actualImageHeight,
-      nodeWidth, nodeHeight, paintTransform, scaleFactor);
+      nodeWidth, nodeHeight, paintTransform, scaleFactor,
+      origImageWidth, origImageHeight);
 
   return true;
 }

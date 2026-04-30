@@ -21,6 +21,7 @@
 #include <deque>
 #include <emscripten/bind.h>
 #include <memory>
+#include <string>
 #include "tgfx/core/Color.h"
 #include "tgfx/gpu/Recording.h"
 #include "tgfx/layers/DisplayList.h"
@@ -106,6 +107,66 @@ class PAGXView {
    */
   bool loadFileDataAsNativeImage(const std::string& filePath,
                                  const emscripten::val& nativeImage);
+
+  /**
+   * Replaces the decoded image attached to Image nodes that share the given filePath with a new
+   * version and immediately regenerates the vector contents of every affected VectorLayer. Use
+   * this to swap a low-resolution thumbnail for a full-resolution version (progressive image
+   * loading); the next draw() call uses the new asset without any explicit rebuildLayers().
+   *
+   * The call is a no-op when buildLayers() has not been invoked (there is no layer tree to
+   * update yet). For the first-time load of an image during initial buildLayers() use
+   * loadFileDataAsNativeImage() instead -- that entry point only attaches the decoded image
+   * without touching any layers, which is what the pre-build path needs.
+   *
+   * Must be called on the main thread and not from inside draw(); the layer mutation below
+   * relies on there being no concurrent render in progress.
+   *
+   * @param filePath The external file path to match against Image nodes.
+   * @param nativeImage A JavaScript-side decoded image object (same contract as
+   *                    loadFileDataAsNativeImage).
+   * @return True if at least one layer's contents were regenerated as a result of the swap.
+   */
+  bool upgradeImageFromNative(const std::string& filePath,
+                              const emscripten::val& nativeImage);
+
+  /**
+   * Returns root-space bounds (canvas pixel coordinates, already accounting for fitScale and
+   * the centering offset applied to contentLayer) for every filePath in the input list. Each
+   * returned entry has both a unionBounds (axis-aligned union of every referencing layer, used
+   * for viewport-intersection tests) and a largestBounds (the single referencing layer with the
+   * biggest area, used for focus-distance scoring). filePaths with no matching layer map to
+   * null so callers can tell apart "off-canvas" from "no such filePath".
+   *
+   * Must be called after buildLayers() so the contentLayer has been attached to the
+   * displayList; otherwise the result is an empty object. The first call triggers the tgfx
+   * layer tree to lazily compute and cache each layer's localBounds (estimated at 50-250ms
+   * total for a ~50-image document), so it is cheaper to defer the call to a moment when the
+   * user is already waiting (e.g. the first idle window after the initial frame has rendered)
+   * rather than running it synchronously alongside buildLayers().
+   *
+   * @param filePathList A JavaScript Array of file path strings.
+   * @return A JavaScript object keyed by filePath. Each value is either
+   *         { unionBounds: {x,y,w,h}, largestBounds: {x,y,w,h} } or null.
+   */
+  emscripten::val getImageBounds(const emscripten::val& filePathList) const;
+
+  /**
+   * Returns the ImagePattern usage metadata for every externally referenced image. The return
+   * value lets the JS layer size thumbnail downloads and compute display scale without having
+   * to re-parse the PAGX XML on its own; everything needed (original image dimensions, target
+   * node dimensions, scale mode, scaleFactor for tiled patterns) is forwarded from the
+   * ImagePattern::customData entries already populated by PAGXImporter.
+   *
+   * Must be called after parsePAGX() so customData has been filled in; calling earlier
+   * returns an empty array. Data URIs and inline data-backed Image nodes are excluded -- only
+   * Images with a non-empty filePath participate.
+   *
+   * @return A JavaScript Array of entries:
+   *         [ { filePath, origWidth, origHeight,
+   *             usages: [ { nodeWidth, nodeHeight, scaleMode, scaleFactor }, ... ] }, ... ]
+   */
+  emscripten::val getImageMetadata() const;
 
   /**
    * Builds the layer tree from the previously parsed document. Call this after parsePAGX() and
@@ -201,6 +262,11 @@ class PAGXView {
 
   void applyDocumentCustomData();
 
+  // Shared contain-mode fit scale used by both the content matrix and the JS-facing content
+  // transform. Keeping a single source of truth prevents comment pins from drifting relative to
+  // the rendered content.
+  float computeFitScale() const;
+
   void updatePerformanceState(double frameDurationMs);
 
   void updateAdaptiveTileRefinement();
@@ -212,6 +278,11 @@ class PAGXView {
   tgfx::DisplayList displayList = {};
   std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
   std::shared_ptr<PAGXDocument> document = nullptr;
+  // Session owns the LayerBuilder state so upgradeImageFromNative() can regenerate a subset of
+  // the layer tree when a higher-resolution asset replaces the thumbnail attached during the
+  // initial buildLayers() pass. Destroyed on every parsePAGX() so old build state never leaks
+  // across documents.
+  std::unique_ptr<LayerBuilderSession> builderSession = nullptr;
   float pagxWidth = 0.0f;
   float pagxHeight = 0.0f;
   int _width = 0;

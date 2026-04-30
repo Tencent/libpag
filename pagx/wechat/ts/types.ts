@@ -43,6 +43,28 @@ export interface PAGXViewNative {
      * progressive updates; returns true if at least one matching node was found.
      */
     loadFileDataAsNativeImage: (filePath: string, nativeImage: any) => boolean;
+    /**
+     * Replaces the decoded image attached to the given filePath with a new version AND
+     * immediately regenerates the contents of every layer that renders it, so the next draw()
+     * picks up the upgraded asset. Returns true when at least one layer was rebuilt. Call
+     * loadFileDataAsNativeImage() for the first-time attachment (before buildLayers()) and
+     * upgradeImageFromNative() for later swaps (after buildLayers()).
+     */
+    upgradeImageFromNative: (filePath: string, nativeImage: any) => boolean;
+    /**
+     * Returns root-space (canvas-pixel) bounds for each filePath in the provided list. Values
+     * are either { unionBounds, largestBounds } objects or null when the filePath is not
+     * referenced by any layer. Must be called after buildLayers(). The first call triggers
+     * lazy localBounds computation inside tgfx and is noticeably heavier than later calls.
+     */
+    getImageBounds: (filePathList: string[]) => Record<string, ImageBoundsEntry | null>;
+    /**
+     * Returns image metadata (original dimensions + per-usage node dimensions and scaleMode)
+     * for every externally referenced image in the document. JS callers use this to pick the
+     * right thumbnail size and compute display scale without having to re-parse the PAGX XML.
+     * Must be called after parsePAGX().
+     */
+    getImageMetadata: () => ImageMetadataEntry[];
     /** Builds the layer tree from the previously parsed document. */
     buildLayers: () => void;
     /** Updates the canvas size and recreates the surface. */
@@ -109,6 +131,55 @@ export interface NodePosition {
     x: number;
     /** The y coordinate of the node relative to the canvas (0 if not found). */
     y: number;
+}
+
+/**
+ * Root-space axis-aligned rectangle. Coordinates are in canvas pixels, already accounting for
+ * the content fit scale and centering offset applied to contentLayer.
+ */
+export interface ImageRect {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+}
+
+/**
+ * Bounds result for a single filePath returned by View.getImageBounds().
+ */
+export interface ImageBoundsEntry {
+    /** Union of the bounds of every layer referencing the filePath. Used for viewport tests. */
+    unionBounds: ImageRect;
+    /** Bounds of the single layer with the largest display area. Used for focus distance. */
+    largestBounds: ImageRect;
+}
+
+/**
+ * Per-usage ImagePattern parameters surfaced to JS by View.getImageMetadata().
+ */
+export interface ImageUsage {
+    /** Target node width in design-space pixels (may be 0 when the exporter omitted it). */
+    nodeWidth: number;
+    /** Target node height in design-space pixels (may be 0 when the exporter omitted it). */
+    nodeHeight: number;
+    /** ImageScaleMode encoded as the PAGX integer: 0=FILL, 1=FIT, 2=STRETCH, 3=TILE. */
+    scaleMode: number;
+    /** Scale factor used by TILE patterns (ignored for non-TILE modes). */
+    scaleFactor: number;
+}
+
+/**
+ * Metadata entry returned for each externally referenced image by View.getImageMetadata().
+ */
+export interface ImageMetadataEntry {
+    /** External file path, used as the key when calling loadFileDataAsNativeImage() etc. */
+    filePath: string;
+    /** Original image width in source pixels (0 when the exporter omitted it). */
+    origWidth: number;
+    /** Original image height in source pixels (0 when the exporter omitted it). */
+    origHeight: number;
+    /** Every ImagePattern that references this filePath, one entry per usage. */
+    usages: ImageUsage[];
 }
 
 /**

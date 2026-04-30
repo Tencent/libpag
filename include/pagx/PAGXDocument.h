@@ -157,6 +157,23 @@ class PAGXDocument : public Node {
   Image* loadDecodedImage(const std::string& filePath, std::shared_ptr<tgfx::Image> decodedImage);
 
   /**
+   * Returns every Layer whose fill/stroke references an ImagePattern backed by an Image node
+   * whose filePath matches the given value. The search follows nested Group elements and
+   * Composition references so repeated subtrees only surface their owning Layer once, but a
+   * Layer that references the same image filePath through multiple fills is returned exactly
+   * once.
+   *
+   * The lookup is served from a lazily built index over all Image-bearing ImagePattern nodes;
+   * the first call walks the entire document, later calls are O(1) hash lookups. Only Image
+   * nodes reachable through ImagePattern contribute to the index today, other node types that
+   * might gain a filePath in the future will need their own lookup helpers.
+   *
+   * @param imageFilePath the Image node filePath to match against
+   * @return the list of Layers referencing the given image filePath, empty when no match
+   */
+  std::vector<const Layer*> findLayersByImageFilePath(const std::string& imageFilePath);
+
+  /**
    * Executes auto layout on the document, positioning layers according to their layout
    * constraints. Must be called before rendering or font embedding. This method should only
    * be called once per document — repeated calls may produce incorrect results because
@@ -188,6 +205,11 @@ class PAGXDocument : public Node {
   FontConfig fontConfig;
   bool layoutApplied = false;
   std::unordered_map<std::string, Node*> nodeMap = {};
+
+  // Lazily built index of Image node filePath -> pagx Layer list, used by
+  // findLayersByImageFilePath().
+  std::unordered_map<std::string, std::vector<const Layer*>> layersByImageFilePath = {};
+  bool layersByImageFilePathBuilt = false;
 
   friend class PAGXImporter;
   friend class PAGXExporter;

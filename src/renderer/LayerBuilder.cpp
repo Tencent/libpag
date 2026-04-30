@@ -81,6 +81,7 @@
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/LayerMaskType.h"
 #include "tgfx/layers/LayerPaint.h"
+#include "tgfx/layers/LayerType.h"
 #include "tgfx/layers/StrokeAlign.h"
 #include "tgfx/layers/VectorLayer.h"
 #include "tgfx/layers/filters/BlendFilter.h"
@@ -123,17 +124,28 @@ static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI)
   return tgfx::Image::MakeFromEncoded(ToTGFXData(data));
 }
 
-// Build context that maintains state during layer tree construction.
+// Build context that maintains state during layer tree construction. Designed so the same
+// instance can be reused: the session-based flow keeps the context alive after build() so that
+// later rebuildForFilePath() calls can find the already-created tgfx layers and regenerate
+// their contents in place.
 class LayerBuilderContext {
  public:
-  explicit LayerBuilderContext(int maxImageDimension = 0) : _maxImageDimension(maxImageDimension) {
-  }
+  LayerBuilderContext() = default;
 
   LayerBuildResult buildWithMap(const PAGXDocument& document) {
     auto root = build(document);
     LayerBuildResult result = {};
     result.root = root;
-    result.layerMap = std::move(_tgfxLayerByPagxLayer);
+    // LayerBuildResult exposes a 1:1 pagx Layer -> tgfx Layer map for historical reasons. When
+    // a Composition is referenced by multiple Layers a single pagx Layer node actually produces
+    // several tgfx Layers; we only surface the first one here to keep the public contract
+    // stable. Session users that need every copy go through getTgfxLayers() instead.
+    result.layerMap.reserve(_tgfxLayersByPagxLayer.size());
+    for (const auto& [pagxLayer, tgfxLayers] : _tgfxLayersByPagxLayer) {
+      if (!tgfxLayers.empty()) {
+        result.layerMap.emplace(pagxLayer, tgfxLayers.front());
+      }
+    }
     return result;
   }
 
@@ -151,11 +163,14 @@ class LayerBuilderContext {
       }
     }
 
-    // Apply masks after all layers are built (second pass).
+    // Apply masks after all layers are built (second pass). A mask reference always points at a
+    // single pagx Layer node; when that node was instanced multiple times we use the first copy
+    // so masking keeps its previous single-target semantics. Masks inside a repeated
+    // Composition subtree that must track each instance need a future change.
     for (const auto& [layer, maskPagx, maskType] : _pendingMasks) {
-      auto it = _tgfxLayerByPagxLayer.find(maskPagx);
-      if (it != _tgfxLayerByPagxLayer.end()) {
-        auto maskLayer = it->second;
+      auto it = _tgfxLayersByPagxLayer.find(maskPagx);
+      if (it != _tgfxLayersByPagxLayer.end() && !it->second.empty()) {
+        auto maskLayer = it->second.front();
         // tgfx requires mask layer to be visible for hasValidMask() check.
         // The mask layer won't be drawn because maskOwner is set.
         maskLayer->setVisible(true);
@@ -165,6 +180,59 @@ class LayerBuilderContext {
     }
 
     return rootLayer;
+  }
+
+  // Returns every tgfx layer produced for the given pagx Layer. Order matches convertLayer()
+  // invocation order; an empty vector means the pagx Layer was never visited.
+  std::vector<std::shared_ptr<tgfx::Layer>> getTgfxLayers(const Layer* pagxLayer) const {
+    auto it = _tgfxLayersByPagxLayer.find(pagxLayer);
+    if (it == _tgfxLayersByPagxLayer.end()) {
+      return {};
+    }
+    return it->second;
+  }
+
+  // Evicts any cached tgfx::Image whose backing Image node has the given filePath so the next
+  // conversion goes through getOrCreateImage() again and picks up the updated decodedImage /
+  // data pointer. Returns true when at least one cache entry was cleared.
+  bool invalidateImagesByFilePath(const PAGXDocument& document, const std::string& filePath) {
+    if (filePath.empty()) {
+      return false;
+    }
+    bool cleared = false;
+    for (auto& node : document.nodes) {
+      if (!node || node->nodeType() != NodeType::Image) {
+        continue;
+      }
+      auto* imageNode = static_cast<const Image*>(node.get());
+      if (imageNode->filePath != filePath) {
+        continue;
+      }
+      if (_imageCache.erase(imageNode) > 0) {
+        cleared = true;
+      }
+    }
+    return cleared;
+  }
+
+  // Regenerates the contents of a VectorLayer by walking the original pagx Layer's contents
+  // list through convertVectorElement(). Non-VectorLayer targets are skipped because they do
+  // not own a setContents()-style slot (Composition container layers etc).
+  bool rebuildVectorContents(const Layer* pagxLayer, tgfx::Layer* tgfxLayer) {
+    if (!pagxLayer || !tgfxLayer || tgfxLayer->type() != tgfx::LayerType::Vector) {
+      return false;
+    }
+    auto* vectorLayer = static_cast<tgfx::VectorLayer*>(tgfxLayer);
+    std::vector<std::shared_ptr<tgfx::VectorElement>> contents;
+    contents.reserve(pagxLayer->contents.size());
+    for (const auto& element : pagxLayer->contents) {
+      auto tgfxElement = convertVectorElement(element);
+      if (tgfxElement) {
+        contents.push_back(tgfxElement);
+      }
+    }
+    vectorLayer->setContents(std::move(contents));
+    return true;
   }
 
  private:
@@ -185,8 +253,10 @@ class LayerBuilderContext {
     }
 
     if (layer) {
-      // Register layer for mask lookups.
-      _tgfxLayerByPagxLayer[node] = layer;
+      // Register layer for mask lookups and later rebuildForFilePath(). A single pagx Layer
+      // may appear here multiple times when its owning Composition is instanced more than
+      // once, so we append rather than overwrite.
+      _tgfxLayersByPagxLayer[node].push_back(layer);
 
       applyLayerAttributes(node, layer.get());
 
@@ -492,7 +562,16 @@ class LayerBuilderContext {
 
   static std::shared_ptr<tgfx::ColorSource> ApplyGradientMatrix(
       std::shared_ptr<tgfx::Gradient> gradient, const Matrix& matrix) {
-    if (gradient && !matrix.isIdentity()) {
+    if (!gradient) {
+      return gradient;
+    }
+    // tgfx's new Gradient API defaults _fitsToGeometry = true, which would reinterpret
+    // startPoint/endPoint/center as 0..1 bounding-box relative coordinates. PAGX stores those
+    // points in the parent container's local coordinate space (absolute design-space pixels), so
+    // opt out of per-geometry fitting to preserve the existing semantics. When LayerBuilder is
+    // rewritten to emit bounds-relative gradients this call can be removed.
+    gradient->setFitsToGeometry(false);
+    if (!matrix.isIdentity()) {
       gradient->setMatrix(ToTGFX(matrix));
     }
     return gradient;
@@ -548,21 +627,22 @@ class LayerBuilderContext {
     }
 
     auto patternMatrix = ToTGFX(node->matrix);
-    if (_maxImageDimension > 0) {
-      auto originalWidth = image->width();
-      auto originalHeight = image->height();
-      image = getOrCreateScaledImage(node->image, _maxImageDimension);
-      if (image->width() != originalWidth || image->height() != originalHeight) {
-        auto scaleX = static_cast<float>(originalWidth) / static_cast<float>(image->width());
-        auto scaleY = static_cast<float>(originalHeight) / static_cast<float>(image->height());
-        patternMatrix.preScale(scaleX, scaleY);
-      }
-    }
 
     auto sampling = tgfx::SamplingOptions(ToTGFX(node->filterMode), ToTGFX(node->mipmapMode));
     auto pattern =
         tgfx::ImagePattern::Make(image, ToTGFX(node->tileModeX), ToTGFX(node->tileModeY), sampling);
-    if (pattern && !patternMatrix.isIdentity()) {
+    if (!pattern) {
+      return pattern;
+    }
+    // tgfx's new ImagePattern API defaults _scaleMode = ScaleMode::LetterBox, which would fit the
+    // image into each geometry's bounding box and then layer that on top of the matrix we just
+    // computed -- two conflicting fits stacked on top of each other. ImagePatternMatrixCalculator
+    // already bakes the exporter's scale-mode choice into pattern->matrix, so we keep tgfx out of
+    // the fitting business by selecting ScaleMode::None. Once LayerBuilder is migrated to emit
+    // ImagePattern::setScaleMode() natively, this opt-out together with
+    // ImagePatternMatrixCalculator can be removed in one shot.
+    pattern->setScaleMode(tgfx::ScaleMode::None);
+    if (!patternMatrix.isIdentity()) {
       pattern->setMatrix(patternMatrix);
     }
 
@@ -601,32 +681,6 @@ class LayerBuilderContext {
       _imageCache[imageNode] = image;
     }
     return image;
-  }
-
-  std::shared_ptr<tgfx::Image> getOrCreateScaledImage(const Image* imageNode, int maxDimension) {
-    auto it = _scaledImageCache.find(imageNode);
-    if (it != _scaledImageCache.end()) {
-      return it->second;
-    }
-    auto image = getOrCreateImage(imageNode);
-    if (image) {
-      image = constrainImageSize(image, maxDimension);
-    }
-    _scaledImageCache[imageNode] = image;
-    return image;
-  }
-
-  static std::shared_ptr<tgfx::Image> constrainImageSize(std::shared_ptr<tgfx::Image> image,
-                                                         int maxDimension) {
-    if (image->width() <= maxDimension && image->height() <= maxDimension) {
-      return image;
-    }
-    float scale = static_cast<float>(maxDimension) /
-                  static_cast<float>(std::max(image->width(), image->height()));
-    int newWidth = std::max(1, static_cast<int>(static_cast<float>(image->width()) * scale));
-    int newHeight = std::max(1, static_cast<int>(static_cast<float>(image->height()) * scale));
-    auto scaled = image->makeScaled(newWidth, newHeight);
-    return scaled ? scaled : image;
   }
 
   std::shared_ptr<tgfx::TrimPath> convertTrimPath(const TrimPath* node) {
@@ -921,17 +975,16 @@ class LayerBuilderContext {
     }
   }
 
-  std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>> _tgfxLayerByPagxLayer = {};
+  std::unordered_map<const Layer*, std::vector<std::shared_ptr<tgfx::Layer>>>
+      _tgfxLayersByPagxLayer = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
       _pendingMasks = {};
-  int _maxImageDimension = 0;
   std::unordered_map<const Image*, std::shared_ptr<tgfx::Image>> _imageCache = {};
-  std::unordered_map<const Image*, std::shared_ptr<tgfx::Image>> _scaledImageCache = {};
 };
 
 // Public API implementation
 
-std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document, int maxImageDimension) {
+std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document) {
   if (document == nullptr) {
     return nullptr;
   }
@@ -941,11 +994,11 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document, int max
     return nullptr;
   }
 
-  LayerBuilderContext context(maxImageDimension);
+  LayerBuilderContext context;
   return context.build(*document);
 }
 
-LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document, int maxImageDimension) {
+LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document) {
   if (document == nullptr) {
     return {};
   }
@@ -957,8 +1010,64 @@ LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document, int maxImage
     return {};
   }
 
-  LayerBuilderContext context(maxImageDimension);
+  LayerBuilderContext context;
   return context.buildWithMap(*document);
+}
+
+// LayerBuilderSession PImpl: owns the LayerBuilderContext and a non-owning pointer back to the
+// PAGXDocument so rebuildForFilePath() can re-enumerate Image nodes and affected layers.
+struct LayerBuilderSession::Impl {
+  LayerBuilderContext context;
+  PAGXDocument* document = nullptr;
+};
+
+LayerBuilderSession::LayerBuilderSession() : impl(std::make_unique<Impl>()) {
+}
+
+LayerBuilderSession::~LayerBuilderSession() = default;
+
+LayerBuildResult LayerBuilderSession::build(PAGXDocument* document) {
+  if (document == nullptr) {
+    return {};
+  }
+  if (!document->isLayoutApplied()) {
+    LOGE(
+        "LayerBuilderSession::build() called before applyLayout(). Call "
+        "document->applyLayout() first.");
+    DEBUG_ASSERT(false);
+    return {};
+  }
+  impl->document = document;
+  return impl->context.buildWithMap(*document);
+}
+
+size_t LayerBuilderSession::rebuildForFilePath(const std::string& filePath) {
+  if (!impl->document || filePath.empty()) {
+    return 0;
+  }
+  // Evict the cached tgfx::Image for every Image node backing this filePath so the next call
+  // into convertImagePattern() picks up the freshly attached decodedImage / data pointer.
+  impl->context.invalidateImagesByFilePath(*impl->document, filePath);
+
+  auto affectedLayers = impl->document->findLayersByImageFilePath(filePath);
+  if (affectedLayers.empty()) {
+    return 0;
+  }
+  size_t rebuiltCount = 0;
+  for (const auto* pagxLayer : affectedLayers) {
+    auto tgfxLayers = impl->context.getTgfxLayers(pagxLayer);
+    for (const auto& tgfxLayer : tgfxLayers) {
+      if (impl->context.rebuildVectorContents(pagxLayer, tgfxLayer.get())) {
+        ++rebuiltCount;
+      }
+    }
+  }
+  return rebuiltCount;
+}
+
+std::vector<std::shared_ptr<tgfx::Layer>> LayerBuilderSession::getTgfxLayers(
+    const Layer* pagxLayer) const {
+  return impl->context.getTgfxLayers(pagxLayer);
 }
 
 }  // namespace pagx

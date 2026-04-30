@@ -36,9 +36,15 @@ enum class ImageScaleMode : int {
 };
 
 // Calculates the ImagePattern transform matrix based on the image scale mode.
+// origImageWidth/origImageHeight are used only by the TILE branch to compensate progressive
+// image loading: they represent the full-resolution pixel dimensions recorded by the exporter
+// so the tile period stays stable while imageWidth/imageHeight grow from placeholder toward
+// full resolution. Pass 0 for both to disable compensation and fall back to cocraft's
+// ratio = scaleFactor behavior.
 pagx::Matrix calculateImagePatternMatrix(ImageScaleMode scaleMode, float imageWidth, float imageHeight,
                                          float nodeWidth, float nodeHeight, const pagx::Matrix& paintTransform,
-                                         float scaleFactor = 0.5f);
+                                         float scaleFactor = 0.5f,
+                                         float origImageWidth = 0.0f, float origImageHeight = 0.0f);
 
 // Resolves a single ImagePattern's transform matrix from its customData and actual image
 // dimensions. Idempotent: the original paint transform is cached in customData on first call,

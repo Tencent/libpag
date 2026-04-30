@@ -47,15 +47,6 @@ namespace pagx {
 // resident so rebuild counts stay near zero during pan/zoom. Lower this again if memory-limited
 // devices start OOM-crashing.
 constexpr size_t MAX_CACHE_LIMIT = 512U * 1024 * 1024;
-// Maximum image dimension for LayerBuilder to constrain memory usage in WASM environment.
-// 0 disables the constrain entirely: decoded images reach the GPU at codec resolution. This is
-// the preferred setup now that mipmaps are enabled on every CodecImage -- a mipmapped texture
-// already serves every zoom ratio from a single decode, so forcing a CPU-side BoxFilter downscale
-// is pure overhead that multiplies first-frame decode time on PNG images (PNG cannot scale-decode
-// so the downscale requires a full-resolution decode followed by a BoxFilter pass). Set back to a
-// positive value (e.g. 4096) only if oversized source images threaten to blow the GPU memory
-// budget on constrained devices.
-constexpr int MAX_IMAGE_DIMENSION = 0;
 // GPU resource expiration in frames. The previous value (10 * 60 = 600 frames) caused textures
 // to be evicted purely by age even when the cache had plenty of free bytes -- for example, an
 // image that moves out of view during panning and returns 600 frames later (only a few seconds
@@ -141,6 +132,12 @@ static std::shared_ptr<Data> GetPagxDataFromEmscripten(const val& emscriptenData
 PAGXView::PAGXView(std::shared_ptr<tgfx::Device> device, int width, int height)
 : device(device), _width(width), _height(height) {
   displayList.setRenderMode(tgfx::RenderMode::Tiled);
+  // Keep zoomScalePrecision at tgfx's default (1000, i.e. 0.001 step) so pinch gestures feel
+  // smooth. A previous experiment bucketed zoom to 0.05 steps to improve TileCache reuse, but
+  // that produced visible stair-stepping during continuous zoom gestures while failing to fix
+  // the underlying shape-rasterize cost (which lives in ResourceCache, not tile bucketing).
+  // setAllowZoomBlur(true) already covers the transition period by upsampling the nearest
+  // ready TileCache, so removing the coarse quantization costs little in practice.
   displayList.setAllowZoomBlur(true);
   displayList.setMaxTileCount(256);
   displayList.setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
@@ -285,7 +282,7 @@ val PAGXView::getImageBounds(const val& filePathList) const {
   auto count = filePathList["length"].as<unsigned>();
   for (unsigned i = 0; i < count; ++i) {
     std::string filePath = filePathList[i].as<std::string>();
-    auto affectedLayers = document->findLayersByFilePath(filePath);
+    auto affectedLayers = document->findLayersByImageFilePath(filePath);
     if (affectedLayers.empty()) {
       result.set(filePath, val::null());
       continue;
@@ -458,7 +455,7 @@ void PAGXView::buildLayers() {
 
   // Route through LayerBuilderSession so the build state survives into the progressive image
   // upgrade path; see upgradeImageFromNative() below.
-  builderSession = std::make_unique<LayerBuilderSession>(MAX_IMAGE_DIMENSION);
+  builderSession = std::make_unique<LayerBuilderSession>();
   auto buildResult = builderSession->build(document.get());
   contentLayer = buildResult.root;
 
@@ -756,11 +753,13 @@ bool PAGXView::draw() {
   double frameDurationMs = frameEndMs - frameStartMs;
 
   if (frameDurationMs > SLOW_FRAME_LOG_THRESHOLD_MS) {
+    const auto& offset = displayList.contentOffset();
     tgfx::PrintLog(
         "[PAGXView] slow frame: total=%.2fms surface=%.2fms bg=%.2fms render=%.2fms "
-        "flush=%.2fms submit=%.2fms unlock=%.2fms dirty=%d",
+        "flush=%.2fms submit=%.2fms unlock=%.2fms dirty=%d zoom=%.4f quantized=%.4f "
+        "offset=(%.1f,%.1f)",
         frameDurationMs, surfaceMs, bgMs, renderMs, flushMs, submitMs, unlockMs,
-        dirty ? 1 : 0);
+        dirty ? 1 : 0, lastZoom, displayList.zoomScale(), offset.x, offset.y);
   }
 
   // Temporary: log the first frame breakdown unconditionally so the 20p full-fit rollout can

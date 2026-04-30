@@ -17,11 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXDocument.h"
+#include <unordered_set>
 #include "LayoutContext.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/LayoutNode.h"
+#include "pagx/nodes/Stroke.h"
 #include "tgfx/core/Image.h"
 
 namespace pagx {
@@ -163,6 +167,92 @@ Image* PAGXDocument::loadDecodedImage(const std::string& filePath,
     }
   }
   return firstMatch;
+}
+
+// Records into `index` every Image node filePath referenced by an ImagePattern inside
+// `element`, scoped to the owning `layer`. The inner unordered_set deduplicates layers that
+// have multiple fills or strokes pointing at the same filePath so the resulting index keeps
+// each Layer exactly once per path.
+static void CollectImageFilePathsFromElement(
+    const Element* element, const Layer* layer,
+    std::unordered_map<std::string, std::unordered_set<const Layer*>>* index) {
+  if (!element || !layer) {
+    return;
+  }
+  auto recordPattern = [&](const ColorSource* color) {
+    if (!color || color->nodeType() != NodeType::ImagePattern) {
+      return;
+    }
+    const auto* pattern = static_cast<const ImagePattern*>(color);
+    if (!pattern->image || pattern->image->filePath.empty()) {
+      return;
+    }
+    (*index)[pattern->image->filePath].insert(layer);
+  };
+
+  switch (element->nodeType()) {
+    case NodeType::Fill:
+      recordPattern(static_cast<const Fill*>(element)->color);
+      break;
+    case NodeType::Stroke:
+      recordPattern(static_cast<const Stroke*>(element)->color);
+      break;
+    case NodeType::Group:
+    case NodeType::TextBox: {
+      const auto* group = static_cast<const Group*>(element);
+      for (const auto* child : group->elements) {
+        CollectImageFilePathsFromElement(child, layer, index);
+      }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void CollectImageFilePathsFromLayers(
+    const std::vector<Layer*>& layers,
+    std::unordered_map<std::string, std::unordered_set<const Layer*>>* index,
+    std::unordered_set<const Composition*>* visitedCompositions) {
+  for (const auto* layer : layers) {
+    if (!layer) {
+      continue;
+    }
+    for (const auto* element : layer->contents) {
+      CollectImageFilePathsFromElement(element, layer, index);
+    }
+    CollectImageFilePathsFromLayers(layer->children, index, visitedCompositions);
+    // A Composition may be referenced by many Layers; skip re-entry once we have already
+    // walked its inner layers to avoid quadratic blowups in documents that instance the
+    // same Composition repeatedly.
+    if (layer->composition && visitedCompositions->insert(layer->composition).second) {
+      CollectImageFilePathsFromLayers(layer->composition->layers, index, visitedCompositions);
+    }
+  }
+}
+
+std::vector<const Layer*> PAGXDocument::findLayersByImageFilePath(
+    const std::string& imageFilePath) {
+  if (imageFilePath.empty()) {
+    return {};
+  }
+  if (!layersByImageFilePathBuilt) {
+    std::unordered_map<std::string, std::unordered_set<const Layer*>> tempIndex;
+    std::unordered_set<const Composition*> visitedCompositions;
+    CollectImageFilePathsFromLayers(layers, &tempIndex, &visitedCompositions);
+    layersByImageFilePath.clear();
+    layersByImageFilePath.reserve(tempIndex.size());
+    for (auto& [path, layerSet] : tempIndex) {
+      std::vector<const Layer*> layerList(layerSet.begin(), layerSet.end());
+      layersByImageFilePath.emplace(path, std::move(layerList));
+    }
+    layersByImageFilePathBuilt = true;
+  }
+  auto it = layersByImageFilePath.find(imageFilePath);
+  if (it == layersByImageFilePath.end()) {
+    return {};
+  }
+  return it->second;
 }
 
 }  // namespace pagx

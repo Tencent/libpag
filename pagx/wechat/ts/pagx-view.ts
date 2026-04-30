@@ -19,7 +19,13 @@
 import { RenderCanvas, WxCanvas } from './render-canvas';
 import { BackendContext } from './backend-context';
 import { destroyVerify } from './decorators';
-import type { PAGX, PAGXViewNative, ContentTransform } from './types';
+import type {
+  PAGX,
+  PAGXViewNative,
+  ContentTransform,
+  ImageBoundsEntry,
+  ImageMetadataEntry,
+} from './types';
 import type { wx } from './interfaces';
 
 declare const wx: wx;
@@ -232,6 +238,55 @@ export class View {
       throw new Error('Native view not initialized');
     }
     return this.nativeView.loadFileDataAsNativeImage(filePath, nativeImage);
+  }
+
+  /**
+   * Swap in a new host-decoded image for an already-rendered filePath and rebuild every layer
+   * that references it in place. Use this when replacing a low-resolution thumbnail with a
+   * higher-resolution version during progressive image loading; the next draw() picks up the
+   * upgraded asset without any additional calls. Returns false when the filePath is not
+   * currently referenced by any layer or buildLayers() has not been invoked yet.
+   *
+   * Call loadFileDataAsNativeImage() for the first-time attachment (before buildLayers()) and
+   * this method for subsequent swaps (after buildLayers()).
+   *
+   * @param filePath The external file path to match against Image nodes.
+   * @param nativeImage A host-decoded image object (typically an OffscreenCanvas).
+   */
+  public upgradeImageFromNative(filePath: string, nativeImage: unknown): boolean {
+    if (!this.nativeView) {
+      throw new Error('Native view not initialized');
+    }
+    return this.nativeView.upgradeImageFromNative(filePath, nativeImage);
+  }
+
+  /**
+   * Fetch root-space bounds for the given filePaths. Each entry describes the union of every
+   * layer that renders the image (for viewport intersection) and the single layer with the
+   * biggest display area (for focus-distance scoring used by progressive upgrade). Unknown
+   * filePaths map to null. Must be called after buildLayers(); the first call triggers lazy
+   * bounds evaluation inside tgfx and is noticeably heavier than later calls, so JS callers
+   * typically defer it to the first idle window after the initial frame renders.
+   *
+   * @param filePaths File paths to look up. Order is preserved in the returned map keys.
+   */
+  public getImageBounds(filePaths: string[]): Record<string, ImageBoundsEntry | null> {
+    if (!this.nativeView) {
+      throw new Error('Native view not initialized');
+    }
+    return this.nativeView.getImageBounds(filePaths);
+  }
+
+  /**
+   * Return ImagePattern usage metadata for every externally referenced image in the currently
+   * parsed document. Must be called after parsePAGX(). The JS-facing progressive loader uses
+   * this to choose thumbnail sizes and compute display scale without re-parsing the PAGX XML.
+   */
+  public getImageMetadata(): ImageMetadataEntry[] {
+    if (!this.nativeView) {
+      throw new Error('Native view not initialized');
+    }
+    return this.nativeView.getImageMetadata();
   }
 
   /**
