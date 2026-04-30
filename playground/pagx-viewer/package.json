@@ -1,0 +1,59 @@
+{
+  "name": "pagx-viewer",
+  "version": "1.0.0",
+  "description": "PAGX Viewer SDK - A lightweight WebAssembly-based PAGX file viewer",
+  "type": "module",
+  "main": "lib/pagx-viewer.umd.js",
+  "module": "lib/pagx-viewer.esm.js",
+  "types": "types/playground/pagx-viewer/src/ts/pagx.d.ts",
+  "exports": {
+    ".": {
+      "types": "./types/playground/pagx-viewer/src/ts/pagx.d.ts",
+      "import": "./lib/pagx-viewer.esm.js",
+      "require": "./lib/pagx-viewer.cjs.js",
+      "default": "./lib/pagx-viewer.umd.js"
+    }
+  },
+  "files": [
+    "lib",
+    "types"
+  ],
+  "scripts": {
+    "clean": "rimraf lib types wasm-mt build-pagx-viewer .*.md5",
+    "build:wasm": "node script/cmake.js -a wasm-mt",
+    "build:wasm:debug": "node script/cmake.js -a wasm-mt --debug",
+    "build:types": "tsc -p tsconfig.type.json",
+    "build:js": "rollup -c script/rollup.config.js && npm run build:types  && node script/fix-wasm-imports.js -a wasm-mt",
+    "build:js:release": "BUILD_MODE=release rollup -c script/rollup.config.js && npm run build:types && node script/fix-wasm-imports.js -a wasm-mt",
+    "build:debug": "npm run build:wasm:debug && npm run build:js",
+    "build:release": "npm run build:wasm && npm run build:js:release"
+  },
+  "devDependencies": {
+    "@rollup/plugin-alias": "~5.1.1",
+    "@rollup/plugin-commonjs": "~28.0.3",
+    "@rollup/plugin-node-resolve": "~16.0.1",
+    "@rollup/plugin-typescript": "~11.1.6",
+    "@types/emscripten": "~1.39.6",
+    "rimraf": "~5.0.10",
+    "rollup": "~4.18.0",
+    "rollup-plugin-dts": "~6.1.1",
+    "rollup-plugin-esbuild": "~6.1.1",
+    "@rollup/plugin-terser": "~0.4.4",
+    "tslib": "~2.4.1",
+    "typescript": "~5.0.3"
+  },
+  "license": "Apache-2.0",
+  "author": "Tencent",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Tencent/libpag.git",
+    "directory": "playground/pagx-viewer"
+  },
+  "keywords": [
+    "pagx",
+    "viewer",
+    "webassembly",
+    "wasm",
+    "graphics"
+  ]
+}

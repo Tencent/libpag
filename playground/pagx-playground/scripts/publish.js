@@ -49,7 +49,8 @@ const __dirname = path.dirname(__filename);
 // Default paths
 const SCRIPT_DIR = __dirname;
 const PLAYGROUND_DIR = path.dirname(SCRIPT_DIR);
-const LIBPAG_DIR = path.dirname(PLAYGROUND_DIR);
+// PLAYGROUND_DIR is libpag/playground/pagx-playground, so go up two levels to get libpag root
+const LIBPAG_DIR = path.dirname(path.dirname(PLAYGROUND_DIR));
 const RESOURCES_FONT_DIR = path.join(LIBPAG_DIR, 'resources', 'font');
 const SAMPLES_DIR = path.join(LIBPAG_DIR, 'spec', 'samples');
 const SKILLS_DIR = path.join(LIBPAG_DIR, '.codebuddy', 'skills');
@@ -882,32 +883,33 @@ function main() {
     runCommand('npm run build:release', PLAYGROUND_DIR, 600000);
   } else {
     console.log('Step 1: Skipping build (--skip-build flag set)');
-    if (!fs.existsSync(path.join(PLAYGROUND_DIR, 'wasm-mt', 'pagx-playground.wasm'))) {
-      console.error('ERROR: wasm-mt/pagx-playground.wasm not found. Run build first or remove --skip-build flag');
+    if (!fs.existsSync(path.join(PLAYGROUND_DIR, 'wasm-mt', 'pagx-viewer.wasm'))) {
+      console.error('ERROR: wasm-mt/pagx-viewer.wasm not found. Run build first or remove --skip-build flag');
       process.exit(1);
     }
   }
 
   // Copy index.html
   console.log('\nStep 2: Copy files...');
+  const staticDir = path.join(PLAYGROUND_DIR, 'static');
   copyFile(
-    path.join(PLAYGROUND_DIR, 'index.html'),
+    path.join(staticDir, 'index.html'),
     path.join(outputDir, 'index.html')
   );
 
   // Copy index.css
   copyFile(
-    path.join(PLAYGROUND_DIR, 'index.css'),
+    path.join(staticDir, 'index.css'),
     path.join(outputDir, 'index.css')
   );
 
   // Copy favicon and logo
   copyFile(
-    path.join(PLAYGROUND_DIR, 'favicon.png'),
+    path.join(staticDir, 'favicon.png'),
     path.join(outputDir, 'favicon.png')
   );
   copyFile(
-    path.join(PLAYGROUND_DIR, 'logo.png'),
+    path.join(staticDir, 'logo.png'),
     path.join(outputDir, 'logo.png')
   );
 
@@ -931,12 +933,12 @@ function main() {
     path.join(wasmOutputDir, 'index.js')
   );
   copyFile(
-    path.join(wasmDir, 'pagx-playground.js'),
-    path.join(wasmOutputDir, 'pagx-playground.js')
+    path.join(wasmDir, 'pagx-viewer.esm.js'),
+    path.join(wasmOutputDir, 'pagx-viewer.esm.js')
   );
   copyFile(
-    path.join(wasmDir, 'pagx-playground.wasm'),
-    path.join(wasmOutputDir, 'pagx-playground.wasm')
+    path.join(wasmDir, 'pagx-viewer.wasm'),
+    path.join(wasmOutputDir, 'pagx-viewer.wasm')
   );
 
   // Copy samples directory and generate index.json

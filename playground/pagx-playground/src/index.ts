@@ -16,9 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-import { PAGXModule, PAGXView } from './types';
-import PAGXWasm from './wasm-mt/pagx-playground';
-import { TGFXBind } from '@tgfx/binding';
+import { PAGXInit } from '../wasm-mt/pagx-viewer.esm';
+import type { PAGXView, PAGXModule } from '../../pagx-viewer/src/ts/pagx';
 
 interface I18nStrings {
     dropText: string;
@@ -116,7 +115,7 @@ const MAX_ZOOM = 1000.0;
 // Font URLs for preloading
 const FONT_URL = './fonts/NotoSansSC-Regular.otf';
 const EMOJI_FONT_URL = './fonts/NotoColorEmoji.ttf';
-const WASM_URL = './wasm-mt/pagx-playground.wasm';
+const WASM_URL = './wasm-mt/pagx-viewer.wasm';
 
 // Estimated sizes for progress calculation (in bytes)
 const ESTIMATED_WASM_SIZE = 2400000;
@@ -126,9 +125,6 @@ const ESTIMATED_EMOJI_FONT_SIZE = 10300000;
 class PlaygroundState {
     module: PAGXModule | null = null;
     pagxView: PAGXView | null = null;
-    animationFrameId: number | null = null;
-    isPageVisible: boolean = true;
-    resized: boolean = false;
     zoom: number = 1.0;
     offsetX: number = 0;
     offsetY: number = 0;
@@ -515,7 +511,6 @@ class GestureManager {
 const playgroundState = new PlaygroundState();
 const gestureManager = new GestureManager();
 const loadingProgress = new LoadingProgress();
-let animationLoopRunning = false;
 let wasmLoadPromise: Promise<void> | null = null;
 let fontLoadPromise: Promise<void> | null = null;
 
@@ -641,24 +636,22 @@ async function loadWasm(): Promise<void> {
     });
     loadingProgress.wasmDone = true;
     updateProgressUI();
-    // Then instantiate the module with the pre-fetched WASM
-    const module = await PAGXWasm({
+    // Initialize PAGX module
+    const module = await PAGXInit({
         locateFile: (file: string) => './wasm-mt/' + file,
-        mainScriptUrlOrBlob: './wasm-mt/pagx-playground.js',
         wasmBinary: wasmBuffer,
     });
-    playgroundState.module = module as PAGXModule;
-    TGFXBind(playgroundState.module as any);
-    const pagxView = playgroundState.module.PAGXView.MakeFrom('#pagx-canvas');
+    playgroundState.module = module;
+    const pagxView = module.PAGXView.init('#pagx-canvas');
     if (!pagxView) {
         throw new Error('Failed to create PAGXView');
     }
     playgroundState.pagxView = pagxView;
     updateSize();
-    playgroundState.pagxView.updateZoomScaleAndOffset(1.0, 0, 0);
+    pagxView.updateZoomScaleAndOffset(1.0, 0, 0);
     const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
     bindCanvasEvents(canvas);
-    animationLoop();
+    pagxView.start();
     setupVisibilityListeners();
 }
 
@@ -675,7 +668,6 @@ function updateSize() {
     if (!playgroundState.pagxView) {
         return;
     }
-    playgroundState.resized = false;
     const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
     const container = document.getElementById('container') as HTMLDivElement;
     const screenRect = container.getBoundingClientRect();
@@ -687,41 +679,18 @@ function updateSize() {
     playgroundState.pagxView.updateSize();
 }
 
-function draw() {
-    playgroundState.pagxView?.draw();
-}
-
-function animationLoop() {
-    if (animationLoopRunning) {
-        return;
-    }
-    animationLoopRunning = true;
-    const frame = () => {
-        if (!playgroundState.pagxView || !playgroundState.isPageVisible) {
-            animationLoopRunning = false;
-            playgroundState.animationFrameId = null;
-            return;
-        }
-        draw();
-        playgroundState.animationFrameId = requestAnimationFrame(frame);
-    };
-    playgroundState.animationFrameId = requestAnimationFrame(frame);
-}
-
 function handleVisibilityChange() {
-    playgroundState.isPageVisible = !document.hidden;
-    if (playgroundState.isPageVisible && playgroundState.animationFrameId === null) {
-        animationLoop();
+    if (document.hidden) {
+        playgroundState.pagxView?.stop();
+    } else {
+        playgroundState.pagxView?.start();
     }
 }
 
 function setupVisibilityListeners() {
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', () => {
-        if (playgroundState.animationFrameId !== null) {
-            cancelAnimationFrame(playgroundState.animationFrameId);
-            playgroundState.animationFrameId = null;
-        }
+        playgroundState.pagxView?.stop();
     });
 }
 
@@ -833,7 +802,7 @@ const DEFAULT_TITLE = 'PAGX Playground';
 
 function goHome(pushHistory: boolean = true): void {
     if (playgroundState.pagxView) {
-        playgroundState.pagxView.loadPAGX(new Uint8Array(0));
+        playgroundState.pagxView.clear();
         gestureManager.resetTransform(playgroundState);
     }
     const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
@@ -862,14 +831,11 @@ async function loadExternalFiles(baseURL: string): Promise<void> {
         return;
     }
     const paths = playgroundState.pagxView.getExternalFilePaths();
-    const count = paths.size();
-    if (count === 0) {
-        paths.delete();
+    if (paths.length === 0) {
         return;
     }
     const fetches: Promise<void>[] = [];
-    for (let i = 0; i < count; i++) {
-        const filePath = paths.get(i);
+    for (const filePath of paths) {
         if (!isSafeRelativePath(filePath)) {
             console.warn(`Skipping unsafe external file path: ${filePath}`);
             continue;
@@ -891,7 +857,6 @@ async function loadExternalFiles(baseURL: string): Promise<void> {
                 })
         );
     }
-    paths.delete();
     await Promise.all(fetches);
 }
 
@@ -911,7 +876,7 @@ async function loadPAGXData(data: Uint8Array, name: string, baseURL: string) {
     gestureManager.resetTransform(playgroundState);
     updateSize();
     // Draw the first frame before showing canvas to avoid flashing old content
-    draw();
+    playgroundState.pagxView.draw();
     hideDropZone();
     canvas.classList.remove('hidden');
     toolbar.classList.remove('hidden');
@@ -1142,7 +1107,7 @@ function applyI18n(): void {
         if (span) span.textContent = strings.back;
     }
 
-    document.querySelectorAll('.nav-dropdown-toggle').forEach((toggle) => {
+    document.querySelectorAll<HTMLElement>('.nav-dropdown-toggle').forEach((toggle) => {
         toggle.title = strings.docs;
         const span = toggle.querySelector('span');
         if (span) span.textContent = strings.docs;
@@ -1286,13 +1251,32 @@ if (typeof window !== 'undefined') {
         }
     };
 
-    window.onresize = () => {
-        if (!playgroundState.pagxView || playgroundState.resized) {
-            return;
-        }
-        playgroundState.resized = true;
-        window.setTimeout(() => {
-            updateSize();
-        }, 300);
-    };
+    // Observe container resize. The C++ PAGXView::draw() now auto-detects
+    // canvas drawing-buffer size changes and rebuilds its render surface in
+    // the same frame, so we can sync canvas.width/height and trigger a draw
+    // synchronously in the callback. This keeps resize + new frame within a
+    // single browser paint tick, eliminating the flicker that the old 300ms
+    // setTimeout debounce was trying to mask.
+    //
+    // rAF throttle: ResizeObserver may fire multiple times per frame during a
+    // fast drag. Coalesce into one updateSize() + draw() per frame to cap GL
+    // surface rebuild cost on low-end devices.
+    const container = document.getElementById('container');
+    if (container) {
+        let pendingResizeFrame: number | null = null;
+        const resizeObserver = new ResizeObserver(() => {
+            if (!playgroundState.pagxView || pendingResizeFrame !== null) {
+                return;
+            }
+            pendingResizeFrame = window.requestAnimationFrame(() => {
+                pendingResizeFrame = null;
+                if (!playgroundState.pagxView) {
+                    return;
+                }
+                updateSize();
+                playgroundState.pagxView.draw();
+            });
+        });
+        resizeObserver.observe(container);
+    }
 }

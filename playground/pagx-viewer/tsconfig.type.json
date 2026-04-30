@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "declaration": true,
+    "declarationDir": "./types",
+    "emitDeclarationOnly": true,
+    "removeComments": false,
+    "skipLibCheck": true,
+    "experimentalDecorators": true,
+    "moduleResolution": "bundler",
+    "baseUrl": ".",
+    "paths": {
+      "@tgfx/*": ["../../third_party/tgfx/web/src/*"]
+    }
+  },
+  "include": ["src/ts/pagx.ts"]
+}

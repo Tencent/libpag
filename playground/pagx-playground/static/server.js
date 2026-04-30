@@ -19,12 +19,13 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const libpagDir = path.resolve(__dirname, '..');
+const playgroundDir = path.resolve(__dirname, '..');
+const libpagDir = path.resolve(__dirname, '../../..');
 
 const app = express();
 
@@ -35,6 +36,14 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use('', express.static(playgroundDir, {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.wasm')) {
+      res.set('Content-Type', 'application/wasm');
+    }
+  }
+}));
+
 // Map /fonts to resources/font directory
 app.use('/fonts', express.static(path.join(libpagDir, 'resources', 'font')));
 
@@ -42,8 +51,8 @@ app.use('/fonts', express.static(path.join(libpagDir, 'resources', 'font')));
 app.get('/samples/index.json', (req, res) => {
   const samplesDir = path.join(libpagDir, 'spec', 'samples');
   const files = fs.readdirSync(samplesDir)
-    .filter(f => f.endsWith('.pagx'))
-    .sort();
+      .filter(f => f.endsWith('.pagx'))
+      .sort();
   res.json(files);
 });
 
@@ -65,7 +74,14 @@ app.get('/', (req, res) => {
 const port = 8080;
 app.listen(port, () => {
   const url = `http://localhost:${port}/`;
-  const start = (process.platform === 'darwin' ? 'open' : 'start');
-  exec(start + ' ' + url);
+  if (process.platform === 'darwin') {
+    execFile('open', [url]);
+  } else if (process.platform === 'win32') {
+    // `start` is a cmd.exe builtin, not a standalone executable; invoke via cmd /c.
+    // The empty string after `start` is the window title placeholder.
+    execFile('cmd', ['/c', 'start', '', url]);
+  } else {
+    execFile('xdg-open', [url]);
+  }
   console.log(`PAGX Playground running at ${url}`);
 });
