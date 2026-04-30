@@ -5179,7 +5179,7 @@ PAGX_TEST(PAGXTest, TextBoxPaddingRoundTrip) {
  * Test all HTML-related PAGX files in resources/pagx_to_html directory.
  */
 PAGX_TEST(PAGXTest, HtmlFiles) {
-  TestPAGXDirectory(context, ProjectPath::Absolute("resources/pagx_to_html"), "html");
+  TestPAGXDirectory(context, ProjectPath::Absolute("resources/pagx_to_html"), "html_native_");
 }
 
 /**
