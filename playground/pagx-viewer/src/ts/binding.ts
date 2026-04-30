@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //  Tencent is pleased to support the open source community by making libpag available.
@@ -17,24 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-import { fileURLToPath } from 'url';
-import { createRequire } from 'module';
-import path from 'path';
+import { TGFXBind } from '@tgfx/binding';
+import { PAGXModule } from './types';
+import { setPAGXModule } from './pagx-module';
+import { PAGXView } from './pagx-view';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const require = createRequire(import.meta.url);
-
-const playgroundDir = path.dirname(__dirname);
-process.chdir(playgroundDir);
-
-process.argv.push("-s");
-process.argv.push("./");
-process.argv.push("-o");
-process.argv.push("./");
-process.argv.push("-p");
-process.argv.push("web");
-process.argv.push("pagx-playground");
-
-// Use vendor_tools from libpag
-require("../../third_party/vendor_tools/lib-build");
+/**
+ * Binding PAGX JS module on PAGX WebAssembly module.
+ */
+export function PAGXBind(module: PAGXModule): void {
+  TGFXBind(module);
+  setPAGXModule(module);
+  module.PAGXView = PAGXView;
+}

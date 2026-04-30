@@ -24,9 +24,9 @@
 namespace pagx {
 
 /**
- * A diamond gradient color source that produces a gradient in a diamond shape from the center.
- * By default the center and radius are interpreted in each geometry's normalized (0, 0)-(1, 1)
- * bounding box space (see Gradient::fitsToGeometry).
+ * A diamond gradient color source that produces a gradient in a diamond shape from the center. By
+ * default the gradient lives in each geometry's normalized (0, 0)-(1, 1) bounding box space (see
+ * Gradient::fitsToGeometry).
  */
 class DiamondGradient : public Gradient {
  public:

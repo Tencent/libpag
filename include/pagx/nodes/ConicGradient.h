@@ -25,8 +25,8 @@ namespace pagx {
 
 /**
  * A conic (sweep) gradient color source that produces a gradient sweeping around a center point.
- * By default the center is interpreted in each geometry's normalized (0, 0)-(1, 1) bounding box
- * space (see Gradient::fitsToGeometry).
+ * By default the gradient lives in each geometry's normalized (0, 0)-(1, 1) bounding box space
+ * (see Gradient::fitsToGeometry).
  */
 class ConicGradient : public Gradient {
  public:

@@ -336,8 +336,8 @@ Linear gradients interpolate along the direction from start point to end point.
 |-----------|------|---------|-------------|
 | `startPoint` | Point | `0,0` | Start point |
 | `endPoint` | Point | `1,0` | End point |
-| `matrix` | Matrix | identity matrix | Transform matrix |
-| `fitsToGeometry` | boolean | true | Whether `startPoint`/`endPoint` are interpreted in the geometry's normalized 0-1 bounding box space. See [Color Source Coordinate System](#color-source-coordinate-system) |
+| `matrix` | Matrix | identity matrix | Transform applied in the selected coordinate space. See [Color Source Coordinate System](#color-source-coordinate-system) |
+| `fitsToGeometry` | boolean | true | Coordinate space for the gradient. When `true`, the geometry's normalized 0-1 bounding box. When `false`, the parent container's (Layer or Group) coordinate space. See [Color Source Coordinate System](#color-source-coordinate-system) |
 
 **Calculation**: For a point P, its color is determined by the projection position of P onto the line connecting start and end points.
 
@@ -351,8 +351,8 @@ Radial gradients radiate outward from the center.
 |-----------|------|---------|-------------|
 | `center` | Point | `0.5,0.5` | Center point |
 | `radius` | float | `0.5` | Gradient radius |
-| `matrix` | Matrix | identity matrix | Transform matrix |
-| `fitsToGeometry` | boolean | true | Whether `center`/`radius` are interpreted in the geometry's normalized 0-1 bounding box space. See [Color Source Coordinate System](#color-source-coordinate-system) |
+| `matrix` | Matrix | identity matrix | Transform applied in the selected coordinate space. See [Color Source Coordinate System](#color-source-coordinate-system) |
+| `fitsToGeometry` | boolean | true | Coordinate space for the gradient. When `true`, the geometry's normalized 0-1 bounding box. When `false`, the parent container's (Layer or Group) coordinate space. See [Color Source Coordinate System](#color-source-coordinate-system) |
 
 **Calculation**: For a point P, its color is determined by `distance(P, center) / radius`.
 
@@ -367,8 +367,8 @@ Conic gradients (also known as sweep gradients) interpolate along the circumfere
 | `center` | Point | `0.5,0.5` | Center point |
 | `startAngle` | float | 0 | Start angle |
 | `endAngle` | float | 360 | End angle |
-| `matrix` | Matrix | identity matrix | Transform matrix |
-| `fitsToGeometry` | boolean | true | Whether `center` is interpreted in the geometry's normalized 0-1 bounding box space. See [Color Source Coordinate System](#color-source-coordinate-system) |
+| `matrix` | Matrix | identity matrix | Transform applied in the selected coordinate space. See [Color Source Coordinate System](#color-source-coordinate-system) |
+| `fitsToGeometry` | boolean | true | Coordinate space for the gradient. When `true`, the geometry's normalized 0-1 bounding box. When `false`, the parent container's (Layer or Group) coordinate space. See [Color Source Coordinate System](#color-source-coordinate-system) |
 
 **Calculation**: For a point P, its color is determined by the ratio of `atan2(P.y - center.y, P.x - center.x)` within the `[startAngle, endAngle]` range.
 
@@ -391,8 +391,8 @@ Diamond gradients radiate from the center toward the four corners.
 |-----------|------|---------|-------------|
 | `center` | Point | `0.5,0.5` | Center point |
 | `radius` | float | `0.5` | Gradient radius |
-| `matrix` | Matrix | identity matrix | Transform matrix |
-| `fitsToGeometry` | boolean | true | Whether `center`/`radius` are interpreted in the geometry's normalized 0-1 bounding box space. See [Color Source Coordinate System](#color-source-coordinate-system) |
+| `matrix` | Matrix | identity matrix | Transform applied in the selected coordinate space. See [Color Source Coordinate System](#color-source-coordinate-system) |
+| `fitsToGeometry` | boolean | true | Coordinate space for the gradient. When `true`, the geometry's normalized 0-1 bounding box. When `false`, the parent container's (Layer or Group) coordinate space. See [Color Source Coordinate System](#color-source-coordinate-system) |
 
 **Calculation**: For a point P, its color is determined by the Chebyshev distance `max(|P.x - center.x|, |P.y - center.y|) / radius`.
 
@@ -432,7 +432,7 @@ Image patterns use an image as a color source.
 | `tileModeY` | TileMode | decal | Y-direction tile mode |
 | `filterMode` | FilterMode | linear | Texture filter mode |
 | `mipmapMode` | MipmapMode | linear | Mipmap mode |
-| `matrix` | Matrix | identity matrix | Transform matrix applied to the image in its local coordinate space (the original image rect with the origin at its top-left) |
+| `matrix` | Matrix | identity matrix | Transform matrix applied in the image's local coordinate space. See [Color Source Coordinate System](#color-source-coordinate-system) |
 | `scaleMode` | ScaleMode | letterBox | Rule used to fit the transformed image into each geometry's bounding box. When `none`, the image is placed in the parent container's (Layer or Group) coordinate space without per-geometry fitting. See [Color Source Coordinate System](#color-source-coordinate-system) |
 
 **TileMode**: `clamp`, `repeat`, `mirror`, `decal`
@@ -462,7 +462,10 @@ Gradient parameters (`startPoint`, `endPoint`, `center`, `radius`, etc.) live in
 
 Parameters live in **the parent container's (Layer or Group) coordinate space**, with its origin at `(0, 0)`. Multiple geometries inside the same container share one continuous fill; resizing a geometry no longer rescales its fill, but a transform on the parent container moves both together.
 
-The `matrix` attribute is applied on top of the selected space.
+The `matrix` attribute composes on top of the above:
+
+- **Gradient**: applied in the selected coordinate space, affecting all gradient parameters uniformly.
+- **ImagePattern**: applied in the image's local coordinate space (the original image rect with the origin at its top-left), before the image is placed into the geometry according to `scaleMode`.
 
 **Example**: A linear gradient drawn in absolute mode across a 300×300 rectangle inside a Layer:
 

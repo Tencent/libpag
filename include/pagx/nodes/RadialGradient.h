@@ -25,8 +25,8 @@ namespace pagx {
 
 /**
  * A radial gradient color source that produces a gradient radiating from a center point. By
- * default the center and radius are interpreted in each geometry's normalized (0, 0)-(1, 1)
- * bounding box space (see Gradient::fitsToGeometry).
+ * default the gradient lives in each geometry's normalized (0, 0)-(1, 1) bounding box space (see
+ * Gradient::fitsToGeometry).
  */
 class RadialGradient : public Gradient {
  public:
