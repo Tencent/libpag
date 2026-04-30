@@ -63,6 +63,11 @@ void PAGXView::initDrawable() {
   if (renderThread != nullptr) {
     drawable->moveToThread(renderThread.get());
   }
+  if (viewModel->hasContent()) {
+    sizeChanged = true;
+    viewModel->markNeedsRender();
+    triggerFlush();
+  }
 }
 
 void PAGXView::onRequestSizeChanged() {
