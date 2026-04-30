@@ -545,6 +545,40 @@ struct PathClosedCheckVisitor {
     }
   }
 };
+
+// Maps a PAGX Stroke's `align` attribute to the CSS `-webkit-text-stroke` width that, combined
+// with `paint-order:stroke fill`, produces the same visible outside thickness as tgfx.
+//
+// tgfx visible-outside-the-fill stroke (assuming a Fill is present and placement=Background):
+//   - Center (default): W/2  — stroke band is centred on the glyph edge, Fill covers the inside
+//   - Inside:           0    — the stroke band sits entirely inside the glyph, Fill covers it
+//   - Outside:          W    — the stroke band sits entirely outside the glyph
+//
+// CSS `-webkit-text-stroke: Cpx` is always centred on the glyph edge. With `paint-order:stroke
+// fill` the Fill covers the inside half, so CSS visible outside = C/2. Matching tgfx:
+//   - Center:  emit C = W
+//   - Inside:  suppress the stroke entirely (zero visible outside)
+//   - Outside: emit C = 2W  (CSS visible outside = 2W/2 = W)
+//
+// Returns 0 to indicate no `-webkit-text-stroke` should be emitted.
+static float ResolveTextStrokeCssWidth(float width, StrokeAlign align, bool hasFill) {
+  if (width <= 0.0f) {
+    return 0.0f;
+  }
+  switch (align) {
+    case StrokeAlign::Inside:
+      // When a Fill is present, the Inside stroke is entirely occluded by the Fill (tgfx
+      // visible = 0). Skip emission to stay faithful. When no Fill is present CSS cannot
+      // express a pure-inside stroke (the property is always centred); fall back to Center
+      // semantics so the stroke at least paints somewhere close to the authored geometry.
+      return hasFill ? 0.0f : width;
+    case StrokeAlign::Outside:
+      return width * 2.0f;
+    case StrokeAlign::Center:
+    default:
+      return width;
+  }
+}
 }  // namespace
 
 ArcLengthLUT BuildArcLengthLUT(const PathData& pathData, int samplesPerSegment) {
@@ -761,15 +795,17 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
   }
   if (stroke && stroke->color && stroke->color->nodeType() == NodeType::SolidColor) {
     auto sc = static_cast<const SolidColor*>(stroke->color);
-    // CSS -webkit-text-stroke draws a stroke band centred on the glyph edge; with
-    // paint-order:stroke fill the fill then covers the inside half, so visible outside = width/2.
-    // tgfx's Stroke at the default Center alignment combined with fauxBold path union renders
-    // roughly the full authored width outside the fill. Double the emitted width so Chromium's
-    // visible outside thickness matches tgfx.
-    style += ";-webkit-text-stroke:" + FloatToString(stroke->width * 2.0f) + "px " +
-             ColorToRGBA(sc->color, stroke->alpha);
-    style += ";paint-order:stroke fill";
-    if (!fill || !fill->color) {
+    bool hasFill = fill && fill->color;
+    float cssWidth = ResolveTextStrokeCssWidth(stroke->width, stroke->align, hasFill);
+    if (cssWidth > 0.0f) {
+      // paint-order:stroke fill draws the stroke first so the Fill on top clips the inside
+      // half of the centred band. Combined with the width chosen by ResolveTextStrokeCssWidth
+      // this reproduces tgfx's per-StrokeAlign visible-outside thickness.
+      style += ";-webkit-text-stroke:" + FloatToString(cssWidth) + "px " +
+               ColorToRGBA(sc->color, stroke->alpha);
+      style += ";paint-order:stroke fill";
+    }
+    if (!hasFill) {
       style += ";-webkit-text-fill-color:transparent";
     }
   }
@@ -1206,12 +1242,15 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
             strokeWidth = stroke->width + (modifier->strokeWidth.value() - stroke->width) * absF;
           }
           if (hasStroke && strokeWidth > 0 && strokeColor.alpha > 0) {
-            // See regular-span emit above: double the width so Chromium's visible outside
-            // stroke (half the authored -webkit-text-stroke under paint-order:stroke fill)
-            // matches tgfx's near-full-width visible stroke outside the fill.
-            charStyle += ";-webkit-text-stroke:" + FloatToString(strokeWidth * 2.0f) + "px " +
-                         ColorToRGBA(strokeColor, stroke->alpha);
-            charStyle += ";paint-order:stroke fill";
+            bool hasFill = fill && fill->color;
+            float cssWidth = ResolveTextStrokeCssWidth(strokeWidth, stroke->align, hasFill);
+            if (cssWidth > 0.0f) {
+              // See writeText above: width is chosen per StrokeAlign so that CSS
+              // paint-order:stroke fill reproduces tgfx's visible-outside thickness.
+              charStyle += ";-webkit-text-stroke:" + FloatToString(cssWidth) + "px " +
+                           ColorToRGBA(strokeColor, stroke->alpha);
+              charStyle += ";paint-order:stroke fill";
+            }
           }
         }
         // fauxBold is handled via CSS native synthesis (`font-weight:bold` +
@@ -1557,20 +1596,21 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
             }
           }
         }
-        // TextPath renders Fill and Stroke as two separate writeTextPath invocations (see
-        // dispatcher in HTMLWriterLayer.cpp). On the Stroke pass `fill` is null and `stroke`
-        // is set; emit -webkit-text-stroke so the per-character span actually paints the
-        // stroke outline (matching tgfx, which draws the Stroke around each glyph path just
-        // like the non-TextPath case). Without this, TextPath + Stroke produced empty spans.
-        // Width is doubled so Chromium's visible outside stroke (half of the authored
-        // -webkit-text-stroke under paint-order:stroke fill) matches tgfx's near-full-width
-        // visible stroke outside the fill.
+        // TextPath emits Fill and Stroke as separate per-character spans on the Stroke pass
+        // when no Fill was merged in; emit -webkit-text-stroke so the stroke actually paints,
+        // matching tgfx which draws the Stroke around each glyph path just like the non-TextPath
+        // case. Width is chosen per StrokeAlign so CSS paint-order:stroke fill reproduces
+        // tgfx's visible-outside thickness (see writeText for the full mapping).
         if (stroke && stroke->color && stroke->color->nodeType() == NodeType::SolidColor) {
           auto sc = static_cast<const SolidColor*>(stroke->color);
-          charStyle += ";-webkit-text-stroke:" + FloatToString(stroke->width * 2.0f) + "px " +
-                       ColorToRGBA(sc->color, stroke->alpha);
-          charStyle += ";paint-order:stroke fill";
-          if (!fill || !fill->color) {
+          bool hasFill = fill && fill->color;
+          float cssWidth = ResolveTextStrokeCssWidth(stroke->width, stroke->align, hasFill);
+          if (cssWidth > 0.0f) {
+            charStyle += ";-webkit-text-stroke:" + FloatToString(cssWidth) + "px " +
+                         ColorToRGBA(sc->color, stroke->alpha);
+            charStyle += ";paint-order:stroke fill";
+          }
+          if (!hasFill) {
             charStyle += ";-webkit-text-fill-color:transparent";
           }
         }
