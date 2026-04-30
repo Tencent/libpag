@@ -308,7 +308,12 @@ CLI_TEST(PAGXHtmlTest, ColorRadialGradient) {
   auto html =
       LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/color_radial_gradient.pagx"));
   ASSERT_FALSE(html.empty());
-  EXPECT_NE(html.find("radial-gradient"), std::string::npos);
+  // RadialGradient is emitted as CSS `radial-gradient()` on square geometries and as SVG
+  // `<radialGradient>` when fitsToGeometry=true with a non-square bounding box (CSS gradients
+  // cannot reproduce tgfx's objectBoundingBox non-uniform scale). Either path is valid — the
+  // test only asserts that the gradient is exported, not which form it takes.
+  EXPECT_TRUE(html.find("radial-gradient") != std::string::npos ||
+              html.find("<radialGradient") != std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, ColorConicGradient) {
