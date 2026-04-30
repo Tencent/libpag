@@ -17,30 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 import { PAGXInit } from '../wasm-mt/pagx-viewer.esm';
-
-// pagx-viewer types
-
-interface PAGXModule {
-    PAGXView: typeof PAGXViewClass;
-}
-
-declare class PAGXViewClass {
-    static init(canvas: string | HTMLCanvasElement): PAGXViewClass | null;
-    registerFonts(fontData: Uint8Array, emojiFontData: Uint8Array): void;
-    loadPAGX(data: Uint8Array): void;
-    clear(): void;
-    parsePAGX(data: Uint8Array): void;
-    getExternalFilePaths(): string[];
-    loadFileData(path: string, data: Uint8Array): boolean;
-    buildLayers(): void;
-    updateSize(): void;
-    updateZoomScaleAndOffset(zoom: number, offsetX: number, offsetY: number): void;
-    draw(): void;
-    start(): void;
-    stop(): void;
-    destroy(): void;
-    setBackgroundColor(color: string, alpha?: number):void;
-}
+import type { PAGXView, PAGXModule } from '../../pagx-viewer/src/ts/pagx';
 
 interface I18nStrings {
     dropText: string;
@@ -147,7 +124,7 @@ const ESTIMATED_EMOJI_FONT_SIZE = 10300000;
 
 class PlaygroundState {
     module: PAGXModule | null = null;
-    pagxView: PAGXViewClass | null = null;
+    pagxView: PAGXView | null = null;
     zoom: number = 1.0;
     offsetX: number = 0;
     offsetY: number = 0;
