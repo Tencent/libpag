@@ -25,7 +25,7 @@ interface PAGXModule {
 }
 
 declare class PAGXViewClass {
-    static init(canvasID: string): PAGXViewClass | null;
+    static init(canvas: string | HTMLCanvasElement): PAGXViewClass | null;
     registerFonts(fontData: Uint8Array, emojiFontData: Uint8Array): void;
     loadPAGX(data: Uint8Array): void;
     clear(): void;

@@ -47,22 +47,34 @@ import { destroyVerify } from './decorators';
 @destroyVerify
 export class PAGXView {
   /**
-   * Creates a PAGXView from a canvas element.
-   * @param canvasID CSS selector for the canvas element (e.g., '#my-canvas'). Must be a non-empty
-   *                 selector that resolves to a single HTMLCanvasElement on the page.
+   * Creates a PAGXView from a canvas element or a CSS selector.
+   * @param canvas Either a CSS selector string (e.g., `'#my-canvas'`) or an `HTMLCanvasElement`.
+   *               When an element is passed it must have a non-empty `id` attribute; the id is
+   *               used to build the CSS selector required by the underlying WebGL binding.
    * @returns PAGXView instance or null if creation failed
    */
-  public static init(canvasID: string): PAGXView | null {
+  public static init(canvas: string | HTMLCanvasElement): PAGXView | null {
     const module = getPAGXModule();
     if (!module) {
       console.error('PAGXView: Module not initialized. Call PAGXInit() first.');
       return null;
     }
 
-    if (!canvasID) {
-      console.error('PAGXView: canvasID must be a non-empty CSS selector.');
-      return null;
+    let canvasID: string;
+    if (typeof canvas === 'string') {
+      if (!canvas) {
+        console.error('PAGXView: canvas selector must be a non-empty string.');
+        return null;
+      }
+      canvasID = canvas;
+    } else {
+      if (!canvas.id) {
+        console.error('PAGXView: Canvas element must have a non-empty id attribute.');
+        return null;
+      }
+      canvasID = `#${canvas.id}`;
     }
+
     const nativeView = module._PAGXView._MakeFrom(canvasID);
     if (!nativeView) {
       console.error(`PAGXView: Failed to create PAGXView from canvas "${canvasID}".`);
