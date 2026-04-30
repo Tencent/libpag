@@ -23,9 +23,16 @@ interface DestroyableConstructor {
 
 export function destroyVerify<T extends DestroyableConstructor>(constructor: T): void {
   const prototype = constructor.prototype as Record<string, unknown>;
-  const functions = Object.getOwnPropertyNames(prototype).filter(
-    (name) => name !== 'constructor' && typeof prototype[name] === 'function',
-  );
+  // Walk property descriptors rather than reading `prototype[name]`. Accessing a getter via
+  // `prototype[name]` would invoke the getter with `this === prototype`, which throws for any
+  // getter that touches instance state (e.g. `this.nativeView._contentWidth()` here reads
+  // `undefined._contentWidth`). Descriptors let us filter for plain methods only and leave
+  // getters/setters untouched.
+  const methodNames = Object.getOwnPropertyNames(prototype).filter((name) => {
+    if (name === 'constructor') return false;
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, name);
+    return !!descriptor && typeof descriptor.value === 'function';
+  });
 
   const proxyFn = (target: Record<string, unknown>, methodName: string) => {
     const fn = target[methodName] as (...args: unknown[]) => unknown;
@@ -38,5 +45,5 @@ export function destroyVerify<T extends DestroyableConstructor>(constructor: T):
       return fn.call(this, ...args);
     };
   };
-  functions.forEach((name) => proxyFn(prototype, name));
+  methodNames.forEach((name) => proxyFn(prototype, name));
 }
