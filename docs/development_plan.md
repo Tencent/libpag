@@ -168,7 +168,7 @@ cp -R third_party/ ../libpag_pagx_pag_impl/third_party/
 
 | Phase | 状态 | commit hash | 实际耗时 | 阻塞/备注 |
 |---|---|---|---|---|
-| D-1.1 创建 src/pagx/pag/ 目录 + CMake target | ⏳ | — | — | tech lead 启动 |
+| D-1.1 创建 src/pagx/pag/ 目录 + CMake target | ✅ | (本提交) | 0.5 h | 跟随 glob 模式追加；设计文档 §16 同步修订 |
 | D-1.2 GlyphRun 字段集复核 | ⏳ | — | — | Phase 8 前 |
 | D-1.3 Mask 循环检测算法选择 | ⏳ | — | — | Phase 9 前 |
 | 0 Diagnostic | ⏳ | — | — | — |

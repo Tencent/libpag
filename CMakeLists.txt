@@ -191,9 +191,12 @@ if (PAG_BUILD_PAGX)
     list(APPEND PAGX_CORE_SOURCES ${PAGX_NODES_SOURCES})
     file(GLOB_RECURSE PAGX_UTILS_SOURCES src/pagx/utils/*.*)
     file(GLOB_RECURSE PAGX_XML_SOURCES src/pagx/xml/*.*)
+    # PAG v2 conversion module (PAGX -> PAG v2 codec, baker, inflater).
+    # See docs/pagx_to_pag_v2_design.md and docs/development_plan.md.
+    file(GLOB_RECURSE PAGX_PAG_SOURCES src/pagx/pag/*.*)
     # SVGPathParser is part of pagx core (used by PAGXImporter/PAGXExporter for path data)
     list(APPEND PAGX_CORE_SOURCES src/pagx/svg/SVGPathParser.cpp)
-    list(APPEND PAG_FILES ${PAGX_CORE_SOURCES} ${PAGX_UTILS_SOURCES} ${PAGX_XML_SOURCES})
+    list(APPEND PAG_FILES ${PAGX_CORE_SOURCES} ${PAGX_UTILS_SOURCES} ${PAGX_XML_SOURCES} ${PAGX_PAG_SOURCES})
     # renderer module (text layout, font embedding, etc.)
     file(GLOB_RECURSE RENDERER_FILES src/renderer/*.*)
     list(APPEND PAG_FILES ${RENDERER_FILES})

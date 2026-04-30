@@ -2299,13 +2299,16 @@ tools/
 
 ### CMake 集成
 
-- 新增静态库 `pagx-pag`，包含：
-  - 三个对外公共头：`include/pagx/Diagnostic.h` / `include/pagx/PAGExporter.h` / `include/pagx/PAGLoader.h`
-  - 对外 Diagnostic 格式化实现：`src/pagx/Diagnostic.cpp`
-  - 内部实现全部：`src/pagx/pag/` 下所有 `.h` / `.cpp`（含 `PAGExporter.cpp` / `PAGLoader.cpp` / Codec / Baker / Inflater / tags / layer_bakers 等）
-- `tgfx` 作为 `pagx-pag` 的 **PUBLIC** 依赖（因为 `PAGLoader.h` 在签名中暴露 `tgfx::Layer`），详细配置见 §I.4；
-- `pagx-cli` 链接 `pagx-pag`；
-- `PAGFullTest` 链接 `pagx-pag` + 新增 test 源文件（含阶段 0 `DiagnosticTest.cpp`、阶段 10.5 `PAGLoaderTest.cpp` 等）。
+本项目顶层 `CMakeLists.txt` 采用 `file(GLOB)` 汇总源文件进 `pag` 主静态库，不使用嵌套 `add_subdirectory`。PAG v2 转换模块跟随该约定：
+
+- `src/pagx/pag/` 下所有 `.h` / `.cpp` 通过 `file(GLOB_RECURSE PAGX_PAG_SOURCES src/pagx/pag/*.*)` 追加到 `PAG_FILES`，随 `pag` 主库一起编译（CMakeLists.txt:194-199 `PAG_BUILD_PAGX` 块内）；
+- 三个对外公共头：`include/pagx/Diagnostic.h` / `include/pagx/PAGExporter.h` / `include/pagx/PAGLoader.h`（纳入 `pag` 的公开 include path）；
+- 对外 Diagnostic 格式化实现 `src/pagx/Diagnostic.cpp` 通过既有 `file(GLOB src/pagx/*.cpp)` 自动纳入；
+- `tgfx` 作为 `pag` 主库的依赖（因为 `PAGLoader.h` 在签名中暴露 `tgfx::Layer`），详细配置见 §I.4；
+- `pagx-cli` 已链接 `pag`（既有 `target_link_libraries(pagx-cli pag ...)`）；
+- `PAGFullTest` 已链接 `pag` + 新增 test 源文件由 `file(GLOB_RECURSE test/src/**)` 自动纳入（含阶段 0 `DiagnosticTest.cpp`、阶段 10.5 `PAGLoaderTest.cpp` 等）。
+
+> **历史说明**：设计文档前期曾规划 `pagx-pag` 独立静态库（见 §I.4 CMake 样例），但顶层 CMake 已稳定采用 glob 模式，为保持一致性采纳 glob 约定。§I.4 的 SAME-BUILD ABI 纪律仍然有效——任一 `src/pagx/pag/` 文件与 tgfx 升级需同批 rebuild。
 
 ---
 
