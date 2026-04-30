@@ -268,7 +268,7 @@ bool PluginInstaller::executeWithPrivileges(const QString& command) const {
 }
 
 bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
-  QStringList commands;
+  QStringList adminCommands;
 
   for (const QString& plugin : plugins) {
     QString source = getPluginSourcePath(plugin);
@@ -279,10 +279,9 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
       return false;
     }
 
-    if (plugin == "H264EncoderTools") {
-      // H264EncoderTools installs to user directory ~/Library/Application Support/,
-      // so copy with normal user permissions to avoid creating root-owned directories.
-      QString targetDir = QFileInfo(target).absolutePath();
+    QString targetDir = QFileInfo(target).absolutePath();
+
+    if (getPluginPermission(plugin) == PluginPermission::User) {
       QDir().mkpath(targetDir);
       QFile::remove(target);
       QFile::copy(source, target);
@@ -290,56 +289,51 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
                                         QFileDevice::ExeOwner | QFileDevice::ReadGroup |
                                         QFileDevice::ExeGroup | QFileDevice::ReadOther |
                                         QFileDevice::ExeOther);
-      continue;
+    } else {
+      adminCommands << QString("mkdir -p '%1'").arg(targetDir);
+      adminCommands << QString("rm -rf '%1'").arg(target);
+      adminCommands << QString("ditto '%1' '%2'").arg(source).arg(target);
     }
-
-    QString targetDir = QFileInfo(target).absolutePath();
-    commands << QString("mkdir -p '%1'").arg(targetDir);
-    commands << QString("rm -rf '%1'").arg(target);
-    commands << QString("ditto '%1' '%2'").arg(source).arg(target);
   }
 
   char qtResourceCmd[cmdBufSize] = {0};
   CopyQtResource(qtResourceCmd, sizeof(qtResourceCmd));
   if (strlen(qtResourceCmd) > 0) {
-    commands << QString::fromUtf8(qtResourceCmd).trimmed();
+    adminCommands << QString::fromUtf8(qtResourceCmd).trimmed();
   }
 
-  if (commands.isEmpty()) {
+  if (adminCommands.isEmpty()) {
     return true;
   }
 
-  QString fullCommand = commands.join(" && ");
-  bool result = executeWithPrivileges(fullCommand);
-  return result;
+  QString fullCommand = adminCommands.join(" && ");
+  return executeWithPrivileges(fullCommand);
 }
 
 bool PluginInstaller::removePluginFiles(const QStringList& plugins) const {
-  QStringList commands;
+  QStringList adminCommands;
 
   for (const QString& plugin : plugins) {
     QString target = getPluginInstallPath(plugin);
 
-    if (plugin == "H264EncoderTools") {
-      // H264EncoderTools is in user directory, remove without admin privileges.
+    if (getPluginPermission(plugin) == PluginPermission::User) {
       QFile::remove(target);
-      continue;
+    } else {
+      adminCommands << QString("rm -rf '%1'").arg(target);
     }
-
-    commands << QString("rm -rf '%1'").arg(target);
   }
 
   char deleteQtResourceCmd[cmdBufSize] = {0};
   DeleteQtResource(deleteQtResourceCmd, sizeof(deleteQtResourceCmd));
   if (strlen(deleteQtResourceCmd) > 0) {
-    commands << QString::fromUtf8(deleteQtResourceCmd).trimmed();
+    adminCommands << QString::fromUtf8(deleteQtResourceCmd).trimmed();
   }
 
-  if (commands.isEmpty()) {
+  if (adminCommands.isEmpty()) {
     return true;
   }
 
-  QString fullCommand = commands.join(" && ");
+  QString fullCommand = adminCommands.join(" && ");
   return executeWithPrivileges(fullCommand);
 }
 

@@ -369,43 +369,41 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
 
   storeViewerPathForPlugin();
 
-  if (plugins.contains("H264EncoderTools")) {
-    copyH264EncoderToolsWithRetry(MaxCopyRetries);
-  }
-
-  if (plugins.contains("PAGExporter") && !aePaths.isEmpty()) {
-    QString sourcePath = getPluginSourcePath("PAGExporter");
-    if (QFile::exists(sourcePath)) {
-      for (const QString& aePath : aePaths) {
-        QString pluginsDir = aePath + "/Plug-ins";
-        operations << FileOperation::createDirectory(pluginsDir);
-        operations << FileOperation::copyFile(sourcePath, pluginsDir + "/PAGExporter.aex");
-      }
-    }
-
-    QString appDir = getQtResourceDir();
-    QDir dir(appDir);
-    QStringList dllFiles = dir.entryList(QStringList() << "*.dll", QDir::Files);
-    QStringList subDirs = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
-
-    for (const QString& aePath : aePaths) {
-      for (const QString& dllFile : dllFiles) {
-        if (shouldExcludeFile(dllFile)) {
-          continue;
-        }
-        operations << FileOperation::copyFile(appDir + "/" + dllFile, aePath + "/" + dllFile);
-      }
-      for (const QString& subDir : subDirs) {
-        if (shouldExcludeDir(subDir)) {
-          continue;
-        }
-        operations << FileOperation::copyDirectory(appDir + "/" + subDir, aePath + "/" + subDir);
-      }
-    }
-  }
-
   for (const QString& plugin : plugins) {
-    if (plugin == "H264EncoderTools" || plugin == "PAGExporter") {
+    if (getPluginPermission(plugin) == PluginPermission::User) {
+      copyH264EncoderToolsWithRetry(MaxCopyRetries);
+      continue;
+    }
+
+    if (plugin == "PAGExporter" && !aePaths.isEmpty()) {
+      QString sourcePath = getPluginSourcePath("PAGExporter");
+      if (QFile::exists(sourcePath)) {
+        for (const QString& aePath : aePaths) {
+          QString pluginsDir = aePath + "/Plug-ins";
+          operations << FileOperation::createDirectory(pluginsDir);
+          operations << FileOperation::copyFile(sourcePath, pluginsDir + "/PAGExporter.aex");
+        }
+      }
+
+      QString appDir = getQtResourceDir();
+      QDir dir(appDir);
+      QStringList dllFiles = dir.entryList(QStringList() << "*.dll", QDir::Files);
+      QStringList subDirs = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+
+      for (const QString& aePath : aePaths) {
+        for (const QString& dllFile : dllFiles) {
+          if (shouldExcludeFile(dllFile)) {
+            continue;
+          }
+          operations << FileOperation::copyFile(appDir + "/" + dllFile, aePath + "/" + dllFile);
+        }
+        for (const QString& subDir : subDirs) {
+          if (shouldExcludeDir(subDir)) {
+            continue;
+          }
+          operations << FileOperation::copyDirectory(appDir + "/" + subDir, aePath + "/" + subDir);
+        }
+      }
       continue;
     }
 
@@ -441,43 +439,42 @@ bool PluginInstaller::removePluginFiles(const QStringList& plugins) const {
   QList<FileOperation> operations;
   QStringList aePaths = const_cast<PluginInstaller*>(this)->getAeInstallPaths();
 
-  if (plugins.contains("PAGExporter") && !aePaths.isEmpty()) {
-    for (const QString& aePath : aePaths) {
-      operations << FileOperation::deleteFile(aePath + "/Plug-ins/PAGExporter.aex");
-    }
-
-    QString appDir = getQtResourceDir();
-    QDir dir(appDir);
-    QStringList dllFiles = dir.entryList(QStringList() << "*.dll", QDir::Files);
-    QStringList subDirs = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
-
-    for (const QString& aePath : aePaths) {
-      for (const QString& dllFile : dllFiles) {
-        if (shouldExcludeFile(dllFile)) {
-          continue;
-        }
-        operations << FileOperation::deleteFile(aePath + "/" + dllFile);
-      }
-      for (const QString& subDir : subDirs) {
-        if (shouldExcludeDir(subDir)) {
-          continue;
-        }
-        operations << FileOperation::deleteDirectory(aePath + "/" + subDir);
-      }
-    }
-  }
-
-  if (plugins.contains("H264EncoderTools")) {
-    QString h264Path = getPluginInstallPath("H264EncoderTools");
-    if (QFile::exists(h264Path)) {
-      QFile::remove(h264Path);
-    }
-  }
-
   for (const QString& plugin : plugins) {
-    if (plugin == "H264EncoderTools" || plugin == "PAGExporter") {
+    if (getPluginPermission(plugin) == PluginPermission::User) {
+      QString path = getPluginInstallPath(plugin);
+      if (QFile::exists(path)) {
+        QFile::remove(path);
+      }
       continue;
     }
+
+    if (plugin == "PAGExporter" && !aePaths.isEmpty()) {
+      for (const QString& aePath : aePaths) {
+        operations << FileOperation::deleteFile(aePath + "/Plug-ins/PAGExporter.aex");
+      }
+
+      QString appDir = getQtResourceDir();
+      QDir dir(appDir);
+      QStringList dllFiles = dir.entryList(QStringList() << "*.dll", QDir::Files);
+      QStringList subDirs = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+
+      for (const QString& aePath : aePaths) {
+        for (const QString& dllFile : dllFiles) {
+          if (shouldExcludeFile(dllFile)) {
+            continue;
+          }
+          operations << FileOperation::deleteFile(aePath + "/" + dllFile);
+        }
+        for (const QString& subDir : subDirs) {
+          if (shouldExcludeDir(subDir)) {
+            continue;
+          }
+          operations << FileOperation::deleteDirectory(aePath + "/" + subDir);
+        }
+      }
+      continue;
+    }
+
     operations << FileOperation::deleteFile(getPluginInstallPath(plugin));
   }
 

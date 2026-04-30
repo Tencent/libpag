@@ -164,6 +164,13 @@ QStringList PluginInstaller::getPluginList() const {
   return {"PAGExporter", "H264EncoderTools"};
 }
 
+PluginPermission PluginInstaller::getPluginPermission(const QString& pluginName) const {
+  if (pluginName == "H264EncoderTools") {
+    return PluginPermission::User;
+  }
+  return PluginPermission::Admin;
+}
+
 int64_t PluginInstaller::getPluginVersion(const QString& pluginPath) const {
   QString versionString;
   if (getPluginVersionString(pluginPath, versionString) != VersionResult::Success) {
