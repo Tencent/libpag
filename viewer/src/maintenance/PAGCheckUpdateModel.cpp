@@ -45,9 +45,10 @@ void PAGCheckUpdateModel::checkForUpdates(bool keepSlient, bool isUseBeta) {
 
   this->isUseBeta = isUseBeta;
   this->keepSilent = keepSlient;
-  PAGNetworkFetcher fetcher(ServerUrl);
-  connect(&fetcher, &PAGNetworkFetcher::fetched, this, &PAGCheckUpdateModel::getAppcast);
-  fetcher.fetch();
+  auto* fetcher = new PAGNetworkFetcher(ServerUrl, this);
+  connect(fetcher, &PAGNetworkFetcher::fetched, this, &PAGCheckUpdateModel::getAppcast);
+  connect(fetcher, &PAGNetworkFetcher::finished, fetcher, &QObject::deleteLater);
+  fetcher->fetchAsync();
 }
 
 void PAGCheckUpdateModel::getAppcast(const QByteArray& data) {

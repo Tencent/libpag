@@ -36,9 +36,6 @@ class PAGViewer : public QApplication {
   Q_SLOT void onWindowDestroyed(PAGWindow* window);
 
  private:
-  Q_SLOT void processPendingOpenFile();
-
-  QString pendingOpenFilePath;
   std::unique_ptr<PAGCheckUpdateModel> checkUpdateModel = nullptr;
 };
 
