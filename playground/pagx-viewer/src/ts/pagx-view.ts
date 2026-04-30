@@ -87,16 +87,16 @@ export class PAGXView {
   }
 
   /**
-   * Returns the original width of the PAGX content.
+   * The original width of the PAGX content.
    */
-  public contentWidth(): number {
+  public get contentWidth(): number {
     return this.nativeView._contentWidth();
   }
 
   /**
-   * Returns the original height of the PAGX content.
+   * The original height of the PAGX content.
    */
-  public contentHeight(): number {
+  public get contentHeight(): number {
     return this.nativeView._contentHeight();
   }
 

@@ -22,7 +22,7 @@ import commonJs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
 import alias from '@rollup/plugin-alias';
 import path from "path";
-import {readFileSync, readdirSync, unlinkSync} from "node:fs";
+import {readFileSync, readdirSync, unlinkSync, existsSync} from "node:fs";
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -32,7 +32,9 @@ const __dirname = path.dirname(__filename);
 const libpagRoot = path.resolve(__dirname, '../../..');
 const playgroundRoot = path.resolve(__dirname, '..');
 const fileHeaderPath = path.resolve(libpagRoot, '.idea/fileTemplates/includes/PAG File Header.h');
-const banner = readFileSync(fileHeaderPath, 'utf-8');
+// The IntelliJ file template is not guaranteed to exist (e.g. in fresh clones or CI minimal
+// checkouts). Fall back to an empty banner rather than failing the build.
+const banner = existsSync(fileHeaderPath) ? readFileSync(fileHeaderPath, 'utf-8') : '';
 const isRelease = process.env.BUILD_MODE === 'release';
 
 // Clean up old source map files in release mode

@@ -18,6 +18,7 @@
 
 #include "PAGXView.h"
 #include <emscripten/html5.h>
+#include <algorithm>
 #include "pagx/PAGXImporter.h"
 #include "pagx/types/Data.h"
 #include "tgfx/core/Data.h"
@@ -257,7 +258,8 @@ void PAGXView::updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY
 
 void PAGXView::setBackgroundColor(float alpha, float red, float green, float blue) {
   useCustomBackgroundColor = true;
-  customBackgroundColor = tgfx::Color{red, green, blue, alpha};
+  customBackgroundColor = tgfx::Color{std::clamp(red, 0.0f, 1.0f), std::clamp(green, 0.0f, 1.0f),
+                                      std::clamp(blue, 0.0f, 1.0f), std::clamp(alpha, 0.0f, 1.0f)};
   presentImmediately = true;
 }
 

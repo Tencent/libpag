@@ -56,8 +56,8 @@ else ()
     add_library(pagx-viewer SHARED ${VIEWER_FILES})
 endif ()
 
-target_compile_options(pagx-viewer PUBLIC ${VIEWER_COMPILE_OPTIONS})
-target_link_options(pagx-viewer PUBLIC ${VIEWER_LINK_OPTIONS})
+target_compile_options(pagx-viewer PRIVATE ${VIEWER_COMPILE_OPTIONS})
+target_link_options(pagx-viewer PRIVATE ${VIEWER_LINK_OPTIONS})
 # Link the complete pag static library (dead code is eliminated by wasm-ld + Binaryen Meta-DCE).
 # Also link tgfx to get its PUBLIC include directories (pag links tgfx via file path, not target).
 target_link_libraries(pagx-viewer pag tgfx)
