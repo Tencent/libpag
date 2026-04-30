@@ -242,13 +242,32 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           } else if (curTextPath && !geos.empty()) {
             writeTextPath(out, geos, curTextPath, curFill, curStroke, curTextBox, a);
           } else if (curFill != nullptr) {
-            // Merge with the deferred Fill so Text renders as one span with both fill
-            // and stroke applied (avoids the Chromium sub-pixel offset between two
-            // stacked spans that caused glyph-level stroke doubling). Shapes get the
-            // fill repainted below the stroke, which is visually equivalent to the
-            // previous two-pass rendering but keeps the code path unified.
-            paintGeos(out, geos, curFill, curStroke, curTextBox, a, hasTrim, curTrim, hasMerge,
-                      mergeMode);
+            // Split geos into Text vs Shape: the Fill+Stroke span merge only matters for Text
+            // (Chromium sub-pixel offset between two stacked spans produces doubled glyph
+            // edges). For Shapes, the preceding Fill branch already painted every Shape geo
+            // as a standalone div/SVG, so carrying curFill here would re-paint it a second
+            // time on top — which silently overwrites an earlier Fill in a multi-Fill stack
+            // (e.g. painter_multiple's Fill#1 blue + Fill#2 red-multiply: curFill becomes
+            // Fill#2, and emitting it again inside Stroke#1's SVG buries Fill#1's blue).
+            // Shape geos only need the stroke overlay; fill is intentionally nullptr so the
+            // SVG emits fill="none".
+            std::vector<GeoInfo> textGeos;
+            std::vector<GeoInfo> shapeGeos;
+            for (auto& g : geos) {
+              if (g.type == NodeType::Text) {
+                textGeos.push_back(g);
+              } else {
+                shapeGeos.push_back(g);
+              }
+            }
+            if (!textGeos.empty()) {
+              paintGeos(out, textGeos, curFill, curStroke, curTextBox, a, hasTrim, curTrim,
+                        hasMerge, mergeMode);
+            }
+            if (!shapeGeos.empty()) {
+              paintGeos(out, shapeGeos, nullptr, curStroke, curTextBox, a, hasTrim, curTrim,
+                        hasMerge, mergeMode);
+            }
           } else {
             paintGeos(out, geos, nullptr, curStroke, curTextBox, a, hasTrim, curTrim, hasMerge,
                       mergeMode);
@@ -481,10 +500,17 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               if (span.stroke && span.stroke->color &&
                   span.stroke->color->nodeType() == NodeType::SolidColor) {
                 auto sc = static_cast<const SolidColor*>(span.stroke->color);
-                if (!spanStyle.empty()) spanStyle += ';';
-                spanStyle += "-webkit-text-stroke:" + FloatToString(span.stroke->width) + "px " +
-                             ColorToRGBA(sc->color, span.stroke->alpha);
-                spanStyle += ";paint-order:stroke fill";
+                bool hasFill = span.fill && span.fill->color;
+                auto strokeCss = ResolveTextStrokeCss(span.stroke->width, span.stroke->align,
+                                                     hasFill);
+                if (strokeCss.width > 0.0f) {
+                  if (!spanStyle.empty()) spanStyle += ';';
+                  spanStyle += "-webkit-text-stroke:" + FloatToString(strokeCss.width) + "px " +
+                               ColorToRGBA(sc->color, span.stroke->alpha);
+                  if (strokeCss.paintOrderStrokeFill) {
+                    spanStyle += ";paint-order:stroke fill";
+                  }
+                }
               }
               if (span.text->fauxItalic) {
                 if (!spanStyle.empty()) spanStyle += ';';
@@ -622,9 +648,16 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             if (span.stroke && span.stroke->color &&
                 span.stroke->color->nodeType() == NodeType::SolidColor) {
               auto sc = static_cast<const SolidColor*>(span.stroke->color);
-              spanStyle += ";-webkit-text-stroke:" + FloatToString(span.stroke->width) + "px " +
-                           ColorToRGBA(sc->color, span.stroke->alpha);
-              spanStyle += ";paint-order:stroke fill";
+              bool hasFill = span.fill && span.fill->color;
+              auto strokeCss = ResolveTextStrokeCss(span.stroke->width, span.stroke->align,
+                                                   hasFill);
+              if (strokeCss.width > 0.0f) {
+                spanStyle += ";-webkit-text-stroke:" + FloatToString(strokeCss.width) + "px " +
+                             ColorToRGBA(sc->color, span.stroke->alpha);
+                if (strokeCss.paintOrderStrokeFill) {
+                  spanStyle += ";paint-order:stroke fill";
+                }
+              }
             }
             if (span.text->fauxItalic) {
               spanStyle += ";font-style:italic;font-synthesis-style:" +
@@ -1269,7 +1302,35 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     }
   }
 
-  if (!layer->passThroughBackground) {
+  // isolation: isolate is needed in two cases:
+  // 1) passThroughBackground=false: the Layer itself is a rendering boundary in PAGX semantics.
+  // 2) Any Fill/Stroke inside this Layer carries a non-default blendMode. In tgfx the painter
+  //    blend is confined to the Layer's own canvas (Fill#2 multiply only mixes with Fill#1
+  //    inside the same Layer, never with ancestor backgrounds). CSS mix-blend-mode defaults
+  //    to blending against the cumulative backdrop of the enclosing stacking context, so
+  //    without isolation here the multiply bleeds into whatever sits behind the Layer —
+  //    e.g. painter_multiple's red multiply mixing with the white card bg above, flooding
+  //    the blue Fill#1 with pink. Forcing isolation on the Layer box contains the blend to
+  //    the siblings that actually need it, matching tgfx's per-layer canvas semantics.
+  bool needsPainterBlendIsolation = false;
+  for (auto* element : layer->contents) {
+    if (element == nullptr) {
+      continue;
+    }
+    auto et = element->nodeType();
+    if (et == NodeType::Fill) {
+      if (static_cast<const Fill*>(element)->blendMode != BlendMode::Normal) {
+        needsPainterBlendIsolation = true;
+        break;
+      }
+    } else if (et == NodeType::Stroke) {
+      if (static_cast<const Stroke*>(element)->blendMode != BlendMode::Normal) {
+        needsPainterBlendIsolation = true;
+        break;
+      }
+    }
+  }
+  if (!layer->passThroughBackground || needsPainterBlendIsolation) {
     style += ";isolation:isolate";
   }
 

@@ -239,6 +239,18 @@ class HTMLWriter {
     std::string modifiedPathData = {};
   };
 
+  // Maps a PAGX Stroke's `align` attribute to a CSS `-webkit-text-stroke` width plus optional
+  // `paint-order: stroke fill`, reproducing tgfx's Fill-then-Stroke layering across all text
+  // emit paths (writeText, writeTextModifier, writeTextPath, TextBox rich-text / single-span).
+  // Shared so TextBox span paths produce the same StrokeAlign mapping as plain Text paths;
+  // otherwise a Stroke authored with align="Center" inside a TextBox would render with the
+  // wider Outside geometry simply because it went through a different dispatcher.
+  struct TextStrokeCss {
+    float width = 0.0f;
+    bool paintOrderStrokeFill = false;
+  };
+  static TextStrokeCss ResolveTextStrokeCss(float width, StrokeAlign align, bool hasFill);
+
   // Color source conversions. `boxLeft`/`boxTop`/`boxWidth`/`boxHeight` describe the element
   // box (in the gradient source's coordinate space) that the CSS background will paint into.
   // They are used by linear-gradient to emulate PAGX's startPoint/endPoint semantics since

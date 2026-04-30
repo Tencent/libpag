@@ -545,6 +545,7 @@ struct PathClosedCheckVisitor {
     }
   }
 };
+}  // namespace
 
 // Maps a PAGX Stroke's `align` attribute to a CSS `-webkit-text-stroke` width and paint-order
 // that reproduce tgfx's visible stroke. PAGX emits painters in document order and a `<Text>`
@@ -559,16 +560,12 @@ struct PathClosedCheckVisitor {
 //              exact layout tgfx produces for StrokeAlign::Center over a pre-drawn Fill.
 //   - Outside: emit C = 2W with `paint-order:stroke fill` so the Fill repaints on top of the
 //              inner half of the centred band, leaving a W-wide stroke entirely outside the
-//              glyph — matches tgfx's Inside/Outside boolean-op + stroke-on-fill layering.
+//              glyph — matches tgfx's Outside boolean-op + stroke-on-fill layering.
 //   - Inside:  CSS cannot express a stroke that lives only on the inner half of the glyph
 //              edge (the property is always centred). Suppress emission so nothing spills
 //              outside; the inside stroke color band is lost (documented limitation).
-struct TextStrokeCss {
-  float width = 0.0f;  // value to emit for `-webkit-text-stroke`; 0 means skip emission
-  bool paintOrderStrokeFill = false;  // true → emit `paint-order:stroke fill`
-};
-
-static TextStrokeCss ResolveTextStrokeCss(float width, StrokeAlign align, bool hasFill) {
+HTMLWriter::TextStrokeCss HTMLWriter::ResolveTextStrokeCss(float width, StrokeAlign align,
+                                                           bool hasFill) {
   TextStrokeCss out = {};
   if (width <= 0.0f) {
     return out;
@@ -601,7 +598,6 @@ static TextStrokeCss ResolveTextStrokeCss(float width, StrokeAlign align, bool h
   }
   return out;
 }
-}  // namespace
 
 ArcLengthLUT BuildArcLengthLUT(const PathData& pathData, int samplesPerSegment) {
   ArcLengthLUT lut = {};
