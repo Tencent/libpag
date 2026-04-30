@@ -100,6 +100,14 @@ bool PAGXDocument::hasUnresolvedImports() const {
   return false;
 }
 
+static bool IsUrlPath(const std::string& path) {
+  if (path.find("data:") == 0) {
+    return true;
+  }
+  auto schemePos = path.find("://");
+  return schemePos != std::string::npos && path.find('/') > schemePos;
+}
+
 std::vector<std::string> PAGXDocument::getExternalFilePaths() const {
   std::vector<std::string> paths = {};
   for (auto& node : nodes) {
@@ -110,7 +118,7 @@ std::vector<std::string> PAGXDocument::getExternalFilePaths() const {
     if (image->data != nullptr || image->filePath.empty()) {
       continue;
     }
-    if (image->filePath.find("data:") == 0) {
+    if (IsUrlPath(image->filePath)) {
       continue;
     }
     paths.push_back(image->filePath);

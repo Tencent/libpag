@@ -41,6 +41,10 @@ struct FontLocation {
 struct FontFamilyEntry {
   std::string family = {};
   std::vector<std::string> styles = {};
+
+  bool operator<(const FontFamilyEntry& other) const {
+    return family < other.family;
+  }
 };
 
 /**
