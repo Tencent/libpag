@@ -37,7 +37,7 @@ function getFilesInDir(dir, extension) {
 function replaceInFile(filePath, searchString, replacement) {
     const data = fs.readFileSync(filePath, 'utf-8');
     if (data.includes(searchString)) {
-        const updatedData = data.replace(new RegExp(searchString, 'g'), replacement);
+        const updatedData = data.replaceAll(searchString, replacement);
         fs.writeFileSync(filePath, updatedData, 'utf-8');
         console.log(`In file ${filePath}, "${searchString}" was replaced with "${replacement}"`);
     }

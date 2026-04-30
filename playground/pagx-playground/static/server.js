@@ -19,7 +19,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -73,7 +73,14 @@ app.get('/', (req, res) => {
 const port = 8080;
 app.listen(port, () => {
   const url = `http://localhost:${port}/`;
-  const start = (process.platform === 'darwin' ? 'open' : 'start');
-  exec(start + ' ' + url);
+  if (process.platform === 'darwin') {
+    execFile('open', [url]);
+  } else if (process.platform === 'win32') {
+    // `start` is a cmd.exe builtin, not a standalone executable; invoke via cmd /c.
+    // The empty string after `start` is the window title placeholder.
+    execFile('cmd', ['/c', 'start', '', url]);
+  } else {
+    execFile('xdg-open', [url]);
+  }
   console.log(`PAGX Playground running at ${url}`);
 });

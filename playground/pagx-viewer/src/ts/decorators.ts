@@ -25,8 +25,7 @@ export function destroyVerify(constructor: any) {
     const fn = target[methodName];
     target[methodName] = function (...args: any[]) {
       if (this['isDestroyed']) {
-        console.error(`Don't call ${methodName} of the ${constructor.name} that is destroyed.`);
-        return;
+        throw new Error(`Cannot call ${methodName} of the ${constructor.name} that has been destroyed.`);
       }
       return fn.call(this, ...args);
     };

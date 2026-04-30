@@ -58,6 +58,10 @@ export class PAGXView {
       return null;
     }
 
+    if (typeof canvas !== 'string' && !canvas.id) {
+      console.error('PAGXView: Canvas element must have a non-empty id attribute.');
+      return null;
+    }
     const canvasID = typeof canvas === 'string' ? canvas : `#${canvas.id}`;
     const nativeView = module._PAGXView._MakeFrom(canvasID);
     if (!nativeView) {
