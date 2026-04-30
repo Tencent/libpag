@@ -1,7 +1,7 @@
 # PAGX → PAG v2 转换技术方案设计文档
 
-**版本**：2.16
-**日期**：2026-04-29
+**版本**：2.17
+**日期**：2026-04-30
 **状态**：待评审 / 待开工
 
 ---
@@ -302,8 +302,8 @@ ColorSource 类型：SolidColor / LinearGradient / RadialGradient / ConicGradien
 
 | 段 | 用途 | 编号范围 | 当前使用 | 预留 |
 |---|---|---|---|---|
-| 终结 | End tag | 0 | 1 | — |
-| 顶层 | FileHeader / Asset table / Composition list / Composition | 1-9 | 5 (1,2,3,4,5) | 4 个（6-9）|
+| 终结 | End tag / ErrorMarker（P1-5 v2.17） | 0-1 reserved（End=0，ErrorMarker=1 预留） | 1 | — |
+| 顶层 | FileHeader / Asset table / Composition list / Composition（注：FileHeader 占用 TagCode=1 与 ErrorMarker 冲突；历史优先，ErrorMarker 改迁至 **TagCode=999**，"实验性段前末尾"保留） | 1-9 | 5 (1,2,3,4,5) | 4 个（6-9）|
 | Layer 及子 Tag | LayerBlock / LayerMaskRef / LayerFilters / LayerStyles / 保留 | 10-19 | 4 (10,12,13,14) | 6 个 |
 | Payload | Shape / Text / Image / Solid / Vector / Mesh / CompositionRef | 20-39 | 7 (20-26) | 13 个 |
 | VectorElement | 14 种 element + 未来扩展（3D shape / Motion Path 等） | 40-79 | 14 (40-53) | 26 个 |
@@ -312,7 +312,8 @@ ColorSource 类型：SolidColor / LinearGradient / RadialGradient / ConicGradien
 | 动画专用 | 关键帧 / 插值曲线 / RangeSelector v2 等 | 120-199 | 0 | 80 个 |
 | 资源扩展 | 新 asset 类型（SVG 片段 / Lottie / HDR Color 等） | 200-299 | 0 | 100 个 |
 | 版本化变体 | 同语义不兼容升级（如 `FileHeaderV2`、`ShapeStyleHDR`） | 300-599 | 0 | 300 个 |
-| 实验性 | 未入主干的实验功能、第三方扩展 | 900-1022 | 0 | 123 个 |
+| 实验性 | 未入主干的实验功能、第三方扩展 | 900-1021 | 0 | 122 个 |
+| **ErrorMarker**（P1-5 v2.17）| Baker fatal 中止标记（见 §8.3bis） | 1022 | 1 | — |
 | 保留 | 绝不分配（对齐 v1 `file.h:48` 10-bit 上限约束） | 1023 | — | — |
 
 > **v1.3 → v2.0 TagCode 迁移**：Filter 段从 70-74 迁至 80-99，Style 段从 80-82 迁至 100-119。原因：为"Payload 段"扩展到 20-39 腾出空间。v2 尚未发布，迁移无兼容性代价。附录 D.11/D.12 中所有 Filter/Style TagCode 值已同步更新。
@@ -553,6 +554,23 @@ auto doc = std::make_shared<PAGDocument>();
 
 **测试要求**（§18.4bis 追加 1 条）：
 - `BakerMemoryTest.FatalDuringLayerBakeNoLeak` —— 构造深度 65 的 PAGX 触发 `CompositionCycleDepth`，验证 `result.doc == nullptr` 且内存无泄漏（ASAN + valgrind 双跑）。
+
+### 8.3ter Baker fatal → Codec 字节流污染预警（P1-5 v2.17）
+
+**场景**：部分上层（CLI `pagx export` 流式管线、网络导出到 server）在 Baker → Codec → bytes 链路中，Baker fatal 发生时 Codec 已经开始 `Encode` 并产出了**部分字节**（例如成功的 FileHeader + ImageAssetTable，失败发生在第 N 个 Composition 内部）。若简单丢弃这批字节，下游 Decoder 读到"legit EOF 提前"与"正常文件"无法区分。
+
+**解决方案**：Codec 产出的字节流在 Baker fatal 时**必须**以 `TagCode::ErrorMarker` Tag 收尾——这是一个新预留 `TagCode = 1022`（见 §6.1 ErrorMarker 行）的零 body Tag：
+
+```
+TagCode::ErrorMarker = 1022
+body: 空
+```
+
+**纪律**：
+- Codec 对接 Baker 的桥接层：若 `BakeResult.errors` 非空（Baker fatal），Codec 在已产出的最后一个 Tag 之后写入 `WriteTag(body, ErrorMarker, {})`，然后 **不写 TagCode::End** 直接返回"污染字节流"状态。
+- Decoder 读到 `ErrorMarker` 立即：(a) `ctx->error(ErrorCode::ProducerFatal=106, "stream truncated by producer fatal")`；(b) 停止当前 Composition 的后续字段；(c) 继续尝试读下一个 Composition（部分恢复语义，便于日志上报而非直接丢）；(d) 不要求后续 `End` Tag。
+- 对 CLI 的价值：`pagx export` 管线在中间件产出 Baker fatal 时，下游 `pag render` 能看到 "stream truncated by producer fatal"，而非静默拿到半成品渲染出乱象。
+- 新增错误码 `ProducerFatal = 106`（Baker fatal 段追加；`contextIndex = UINT32_MAX`）。
 
 ### 8.4 防御性
 
@@ -872,7 +890,8 @@ Pass 1: 按 compositions[0] 构造 tgfx::Layer 树
               真实 `tgfx::Layer` 堆对象（≥64B + GPU 句柄），若不计入预算，攻击者构造
               10^7 次降级路径即可绕过 606 熔断重新爆内存（P0-3 v2.16 闭环）。
             * 然后 addChild(childTgfxLayer)（childTgfxLayer 为 nullptr 时跳过 addChild）
-            * 若 maskLayerPath 非空，记入 pendingMasks
+            * 若 maskLayerPath 非空，先 `ctx->reservePendingMaskSlot()` 校验（P0-2 v2.17），
+              通过则 `pendingMasks.push_back(...)`；失败则丢弃绑定，warn 603 一次即可
             * 把 (layerPath, tgfxLayer) 写入 layerByPath（包括空壳占位 Layer；nullptr 槽位
               也写入——layerPath 是 Baker 指派的结构坐标，占位槽位仍有合法坐标，Pass 2 Mask
               查表时若目标指向 nullptr，走 603 `InflateMaskResolveFailed` 降级路径）
@@ -881,6 +900,43 @@ Pass 2: 应用 mask
         - 对 pendingMasks 逐条：查表、setVisible(true)、setMask、setMaskType
         - 查不到 / 查到 nullptr → warn `InflateMaskResolveFailed` 并跳过
 Finalize（退栈前，非数据遍历）: 把 InflaterContext::warnings 一次性 move 到 Result::warnings
+```
+
+**Pass 1 C++ 骨架**（P0-4 v2.17，消除"空壳占位逻辑只在散文里"歧义）：
+
+```cpp
+std::shared_ptr<tgfx::Layer>
+Inflater::inflateLayer(const Layer& src, uint32_t layerIndex, InflaterContext* ctx) {
+  // 预算先行：无预算则整个子树不实例化，layerByPath 写 nullptr
+  if (!ctx->reserveLayerBudget(layerIndex)) {
+    ctx->layerByPath[PackLayerPath(src.layerPath)] = nullptr;
+    return nullptr;
+  }
+
+  auto tgfxLayer = MakeTgfxLayerByType(src.type);          // 类型派发
+  applyCommon(src, tgfxLayer.get(), ctx);                   // 通用字段
+  applyPayload(src, tgfxLayer.get(), ctx);                  // subtype payload
+
+  for (uint32_t i = 0; i < src.children.size(); ++i) {
+    auto& childSrc = *src.children[i];
+    auto childTgfx = inflateLayer(childSrc, i, ctx);        // 递归；失败得 nullptr
+    if (childTgfx == nullptr) {
+      // 降级路径仍消耗预算；预算耗尽则彻底不占位（父 addChild 也跳过）
+      if (!ctx->reserveLayerBudget(i)) {
+        ctx->layerByPath[PackLayerPath(childSrc.layerPath)] = nullptr;
+        continue;                                            // 父 addChild 不调
+      }
+      childTgfx = tgfx::Layer::Make();                       // 空壳占位保连续 layerPath
+    }
+    tgfxLayer->addChild(childTgfx);
+    ctx->layerByPath[PackLayerPath(childSrc.layerPath)] = childTgfx;
+  }
+
+  if (!src.maskLayerPath.empty() && ctx->reservePendingMaskSlot()) {
+    ctx->pendingMasks.push_back({tgfxLayer, PackLayerPath(src.maskLayerPath), src.maskType});
+  }
+  return tgfxLayer;
+}
 ```
 
 ### 9.3 字段应用模板
@@ -950,16 +1006,31 @@ struct InflaterContext {
   };
   std::vector<PendingMask> pendingMasks;
 
+  // P0-2 v2.17（安全）：pendingMasks 等 pending 集合的独立上限。`reserveLayerBudget` 只管 Layer 实例
+  // 总数（1e6），但单 Layer 可挂 N 个 mask；恶意构造 N×MAX_INFLATED_LAYER_COUNT 个 PendingMask
+  // 条目绕过 606 熔断、塞爆 vector 内存。每次 push 前按 `limits::MAX_PENDING_MASKS` 校验，
+  // 超限 warn 605/603 对应码 + 跳过 push（Pass 2 查表见 nullptr 自然降级）。
+  // trackMattes / references 若后续引入独立 pending 表同此约束。
+  bool reservePendingMaskSlot() {
+    if (pendingMasks.size() >= limits::MAX_PENDING_MASKS) {
+      warn(ErrorCode::InflateMaskResolveFailed,
+           "MAX_PENDING_MASKS exceeded; mask binding dropped");
+      return false;
+    }
+    return true;
+  }
+
   // Composition 引用图追踪（P0-A1，强制）：防止恶意 .pag 构造 compositions[0].layers[0]=
   // CompositionRef(0) 的自环或多 composition 互引成环，导致 inflateComposition → inflateLayer
   // → inflateCompositionRef → inflateComposition 无界递归 → 栈溢出。
   // Decoder 侧走 flat Tag，不检查引用图；防护责任落 Inflater。
   //
-  // Resize 契约（P2-3 v2.15 / P2-1 v2.16 修正）：`visitingComposition` 必须在 Inflate() 入口显式
-  // `visitingComposition.assign(doc->compositions.size(), false)`。
+  // Resize 契约（P2-3 v2.15 / P2-1 v2.16 修正 / P2-6 v2.17 清理）：`visitingComposition` 必须在
+  // Inflate() 入口显式 `visitingComposition.assign(doc->compositions.size(), false)`。
   // 单次入口 assign，无重入承诺——§9.1 Inflate 取 unique_ptr 所有权（v2.15 P0-1），doc 在 Inflate
-  // 返回后不可再用；InflaterContext 本身也不对外暴露，每次 Inflate 内部构造新 ctx。多次 Inflate
-  // 旧 doc 的路径已在 v2.15 签名层禁止，无需再考虑。
+  // 返回后不可再用；InflaterContext 本身也不对外暴露，每次 Inflate 内部构造新 ctx。Inflate 入口
+  // debug build 额外 `assert(visitingComposition.empty())`——本 ctx 刚构造，assign 前必空；否则
+  // 意味着 InflaterContext 被误重入（是 bug 而非合法场景）。
   std::vector<bool> visitingComposition;           // size == doc.compositions.size()，init false
   uint32_t currentCompositionDepth = 0;            // 见 §H.1 MAX_COMPOSITION_REF_DEPTH=32
 
@@ -975,9 +1046,11 @@ struct InflaterContext {
   }
 
   // 在每个 inflateLayer 入口调；超预算返回 false 让调用侧推 606 warn + 返回 nullptr。
-  bool reserveLayerBudget() {
+  // P1-1 v2.17：layerIndex 透传到 warn 的 contextIndex 字段，让消费方精确定位"第几个 Layer 爆预算"
+  // （§15.1 ABI 表 606 语义：first Layer triggering budget exhaustion）。
+  bool reserveLayerBudget(uint32_t layerIndex = UINT32_MAX) {
     if (totalInflatedLayers >= limits::MAX_INFLATED_LAYER_COUNT) {
-      warn(ErrorCode::InflaterLayerBudgetExceeded, "MAX_INFLATED_LAYER_COUNT exceeded");
+      warn(ErrorCode::InflaterLayerBudgetExceeded, "MAX_INFLATED_LAYER_COUNT exceeded", layerIndex);
       return false;
     }
     ++totalInflatedLayers;
@@ -1000,11 +1073,13 @@ struct CompositionVisitScope {
   CompositionVisitScope(InflaterContext* c, uint32_t compositionIndex) : ctx(c), idx(compositionIndex) {
     if (idx >= ctx->visitingComposition.size()) return;            // Decoder 已保证索引合法
     if (ctx->visitingComposition[idx]) {
-      ctx->warn(ErrorCode::InflateCompositionCycle, "composition self-reference or cycle");
+      // P1-1 v2.17：把导致环的 composition 索引（idx）透传到 Diagnostic.contextIndex，
+      // 消费方按 §G.4 示例 (c) 定位"哪个 composition 在环里"。
+      ctx->warn(ErrorCode::InflateCompositionCycle, "composition self-reference or cycle", idx);
       return;
     }
     if (ctx->currentCompositionDepth >= limits::MAX_COMPOSITION_REF_DEPTH) {
-      ctx->warn(ErrorCode::InflateCompositionCycle, "composition ref depth exceeds limit");
+      ctx->warn(ErrorCode::InflateCompositionCycle, "composition ref depth exceeds limit", idx);
       return;
     }
     ctx->visitingComposition[idx] = true;
@@ -1182,6 +1257,23 @@ BakeContext 对应字段见 §8.5 三层 map 定义。
 
 **失败处理**：文件读取/URI 解码失败 → warning + 该 paint 的 `imageIndex = UINT32_MAX`（哨兵）→ Inflater 见到哨兵返回 null colorSource（对齐 LayerBuilder 行 559-561）。
 
+**`ctx->warn` 3-arg 示例**（P0-3 v2.17，对应 §15.1 ABI 表 `ImageSourceMissing` 语义 = "imageIndex in PAGDocument::images[]"）：
+
+```cpp
+// ResourceBaker::bakeImages（§11.1 实现点；BakeContext 版本）
+for (uint32_t i = 0; i < pagxDoc.images().size(); ++i) {
+  auto bytes = ResolveImageBytes(*pagxDoc.images()[i]);
+  if (bytes == nullptr) {
+    bakeCtx->warn(ErrorCode::ImageSourceMissing,
+                  "image source resolve failed",
+                  i /* contextIndex = PAGX images[] 索引 */);
+    doc->images.emplace_back(/* 空 ImageAsset，保持 index 连续性 */);
+    continue;
+  }
+  // ... push_back(new ImageAsset{data=bytes, width, height});
+}
+```
+
 **Inflater 生命周期纪律**（P0-P2，强制）：`inflateImagePattern` 调 `tgfx::Image::MakeFromEncoded(imageAsset.data)` 成功后，**必须立刻** `imageAsset.data.reset()` 释放源 bytes 的强引用——tgfx::Image 内部已产生解码纹理/mipmap 缓存，保留源 bytes 会造成 (源 bytes + GPU/CPU 解码缓存) 双重驻留。测试点 `PAGLoaderTest.ImageBytesReleasedAfterInflate` 断言 `Inflate` 结束后 PAGDocument 所持 `ImageAsset::data` 的 `use_count() == 1`。
 
 ### 11.2 FontAsset
@@ -1246,7 +1338,26 @@ Resource pre-pass 在 `LayerBaker::bake` 之前完成：
 **Pass 2**：对 pendingMasks 每条：
 - 查 `layerByPath` 得 maskTgfxLayer；
 - 调 `maskTgfxLayer->setVisible(true)` + `tgfxLayer->setMask(maskTgfxLayer)` + `tgfxLayer->setMaskType(maskType)`；
-- 查不到 → 跳过（Baker 侧已 warn）。
+- 查不到 / 查到 nullptr → warn 603 + 跳过。
+
+**`ctx->warn` 3-arg 示例**（P0-3 v2.17，对应 §15.1 ABI 表 `InflateMaskResolveFailed=603` 语义 = "layerIndex"）：
+
+```cpp
+// LayerInflater::resolvePendingMasks（§9.2 Pass 2）
+for (uint32_t i = 0; i < ctx->pendingMasks.size(); ++i) {
+  auto& pm = ctx->pendingMasks[i];
+  auto it = ctx->layerByPath.find(pm.targetPath);
+  if (it == ctx->layerByPath.end() || it->second == nullptr) {
+    ctx->warn(ErrorCode::InflateMaskResolveFailed,
+              "mask target layer unresolved or placeholder",
+              i /* contextIndex = pendingMasks 索引 = host layer 的逻辑编号 */);
+    continue;
+  }
+  it->second->setVisible(true);
+  pm.host->setMask(it->second);
+  pm.host->setMaskType(pm.maskType);
+}
+```
 
 ---
 
@@ -1386,6 +1497,9 @@ enum class DiagnosticCode : uint16_t {
                                       //   后者 = UTF-8 字节非法（编码损坏）。
                                       // message 字段应附具体超限字段名，如
                                       // "MAX_VECTOR_ELEMENTS_PER_PAYLOAD exceeded (got 120000)".
+  ProducerFatal              = 106,   // P1-5 v2.17：Decoder 读到 TagCode::ErrorMarker——
+                                      // 上游 Baker fatal 已中断字节流（§8.3ter）。
+                                      // 不 reset doc（已成功部分可用），但主 body 后续不再解析
 
   // Baker warning
   ImageSourceMissing         = 200,
@@ -1448,6 +1562,13 @@ enum class DiagnosticCode : uint16_t {
  *                      the caller typically needs to identify WHICH asset
  *                      failed (see table below). UINT32_MAX means "not
  *                      applicable / unknown". Callers MAY dispatch on this.
+ *                      **MANDATORY GUARD (P1-2 v2.17)**: before using
+ *                      contextIndex as an array index, callers MUST check
+ *                      `d.contextIndex != UINT32_MAX` — some code paths
+ *                      (bridge push across Tag streams, fatal error without
+ *                      resource association) push UINT32_MAX sentinel even
+ *                      for codes in the semantic table. Raw indexing without
+ *                      the guard triggers UB (OOB read) on sentinel rows.
  *
  * `code → contextIndex` semantic table (stable ABI):
  *   200 ImageSourceMissing         → imageIndex in PAGDocument::images[]
@@ -1573,6 +1694,11 @@ class PAGExporter {
    *     partially written (ToFile — callers should remove it if unwanted).
    *
    * All fields are owned by this struct.
+   *
+   * **P2-3 v2.17（严格交叉引用）**：本 Result 的 ok / errors / warnings 契约与
+   * §15.3 `PAGLoader::Result` 对称：`ok == true ⟺ errors.empty()`，不论产出
+   * 是字节（Exporter）还是 Layer（Loader）。新增 Diagnostic 字段或修改
+   * errors/warnings 语义时必须两处同步更新，否则破坏 ABI 对称性。
    */
   struct Result {
     bool ok = false;                         // Derived: ok ⟺ errors.empty(). Filled by implementation;
@@ -1678,6 +1804,10 @@ class PAGLoader {
    *   - `errors` is non-empty (at least one fatal diagnostic).
    *   - `layer` is null; `canvasWidth/Height` may be 0 if decode failed
    *     before the FileHeader was parsed.
+   *
+   * **P2-3 v2.17（严格交叉引用）**：本 Result 的 ok / errors / warnings 契约与
+   * §15.2 `PAGExporter::Result` 对称。`ok == true ⟺ errors.empty()` 在两处
+   * 保持一致；修改语义必须两处同步。
    */
   struct Result {
     bool ok = false;                      // Derived: ok ⟺ errors.empty(). Filled by implementation;
@@ -2258,6 +2388,7 @@ auto doc = PAGXBuilder::Doc(200, 200)
 - 所有 fluent setter 返回 `PAGXBuilder&`，**不返回** nested builder——保持调用点线性可读；
 - `Build()` **必须** 调用 `applyLayout()`，避免 Baker 侧因 `LayoutNotApplied=100` fatal 路径掩盖真实测试意图；若测试本身要验 100 码，另设 `BuildWithoutLayout()`。
 - 所有填入字段按 PAGX 默认值语义对齐——测试代码不该显式写默认值，以便 defaultValue 变更时测试自动跟随。
+- **公有/私有可见性纪律**（P2-2 v2.17）：所有 fluent 方法 `public`；内部状态（`currentComposition_ / currentLayer_ / docRoot_ / vectorGroupStack_` 等）一律 `private`——测试代码**不直接访问字段**，只通过 fluent API；这样 `PAGXBuilder` 实现即可在未来无缝替换（如改为字节流缓存）而不破坏测试。
 
 **配套测试** `PAGXBuilderTest.cpp`（Phase 2 交付，P2-9 v2.16 扩至 ≥15 条）：
 
@@ -2276,6 +2407,8 @@ auto doc = PAGXBuilder::Doc(200, 200)
 - `Layer.WithAlpha` / `VectorGroup.Ellipse` / `VectorGroup.Path` / `VectorGroup.Stroke`
 - `CompositionRef.TimingMismatch`（进错 LayerType 调 asCompositionRef 触发 assert，仅 debug build 生效）
 - `Build.WithoutLayout`（验证 `BuildWithoutLayout()` 产出 `isLayoutApplied==false`，供 `LayoutNotApplied=100` 测试使用）
+
+**Phase 2 test deliverable 硬定数**（P1-8 v2.17）：**Phase 2 必须 ship 的 `PAGXBuilderTest` 用例数 = 13 条**（7 核心 + 6 扩展）。`BakeContextTest` / `ResourceBakerTest` 的 PAGXBuilder 消费算作 *integration 验证*，不计入本 13 条。Phase 2 exit 清单在交付判定时按此计数，少于 13 条视为 Phase 2 不通过。
 
 **"trivial passthrough 豁免"**：`withFrameRate / withDuration / withBackground / closeComposition / exitLayer / addEllipse / addPath / addStroke` 若实现为单行赋值，测试可合并进上述扩展用例内断言，不需独立 case。
 
@@ -2402,6 +2535,55 @@ PagxBytesLayout CapturePagxLayout(const std::vector<uint8_t>& bytes);
 
 }  // namespace pagx::test
 ```
+
+**CapturePagxLayout 实现方案**（P0-5 v2.17，闭环 "offset 从哪来"）：
+
+**方案选择**：优先 **(a) PAGExporter 测试钩子**——确定性、O(1)、不依赖字节回扫；回退 **(b) 字节流反向扫描**仅在 PAGExporter 无法编译 debug 钩子时使用。
+
+**(a) PAGExporter 测试钩子（推荐）**：
+
+```cpp
+// 1. 编译期开关，仅在 Debug + PAG_BUILD_TESTS 同时开时激活（见 P2 PAGX_DEBUG_OFFSETS 两条件守卫）
+#if defined(PAGX_DEBUG_OFFSETS) && defined(PAG_BUILD_TESTS)
+
+// 2. src/pagx/pag/Codec.h 内 Baker 写 Tag 时由 TagWriterScope 顺手记录：
+class TagWriterScope {
+ public:
+  TagWriterScope(EncodeStream* s, TagCode code, EncodeContext* ctx)
+      : stream_(s), ctx_(ctx), startOffset_(s->position()) {
+    if (code == TagCode::ShapeStyleData && ctx_->debugLayout) {
+      if (ctx_->debugLayout->firstShapeStyleStart == 0) {
+        ctx_->debugLayout->firstShapeStyleStart = startOffset_;
+      }
+    }
+    // ... 其他关键 Tag 同样模式：firstTagHeaderOffset / firstNumBitsOffset / ...
+  }
+  // dtor 写 length；内部方法 captureVarU32 / captureNumBits 在对应写入点被调用
+};
+
+// 3. CapturePagxLayout 实现（src/pagx/pag/DebugLayout.cpp）：
+PagxBytesLayout CapturePagxLayout(const std::vector<uint8_t>& bytes) {
+  // 重新跑一遍 Decode，但只为了提取 offset——独立于被测逻辑，确保无状态耦合。
+  // DecodeContext 挂一个 layout 收集器：每进入 ShapeStyleData 前记录 position()。
+  DecodeContext ctx;
+  ctx.layoutCapture = std::make_unique<PagxBytesLayout>();
+  pag::DecodeStream stream(bytes.data(), bytes.size());
+  Codec::Decode(&stream, &ctx);   // 副产物：layoutCapture 填满
+  return *ctx.layoutCapture;
+}
+
+#else
+// Release 或未启用 PAG_BUILD_TESTS：CapturePagxLayout 返回全零 layout
+// 测试用 `ASSERT_NE(layout.firstShapeStyleStart, 0)` 在 Release build 自动失败
+PagxBytesLayout CapturePagxLayout(const std::vector<uint8_t>&) { return {}; }
+#endif
+```
+
+**(b) 回退：字节流反向扫描**（若 Codec 侧无法改）：由 `CapturePagxLayout` 调 `pagx::pag::Codec::Decode` 到一个"仅记录 offset 不构造 PAGDocument"的轻量 DecodeContext 变体——本质仍是单次 O(n) 扫描，但无须触及 Codec 内部。后续若出现"两路维护"负担再切换 (a)。
+
+**测试纪律**：所有使用 `CapturePagxLayout` 的 CorruptBuilder 测试必须在 `TEST()` 首行加 `#if !defined(PAGX_DEBUG_OFFSETS) GTEST_SKIP() << "requires PAGX_DEBUG_OFFSETS debug build"; #endif`（或 `ASSERT_NE(layout.firstShapeStyleStart, 0)` 硬失败），避免 Release build 静默跑过。
+
+---
 
 **使用示例**：
 
@@ -2878,21 +3060,21 @@ $BIN --gtest_filter="PAGPerformance.*" || true
 
 | # | 产品代码 | 同批测试 | 交付判定 |
 |---|---|---|---|
-| 0 | `include/pagx/Diagnostic.h` / `src/pagx/Diagnostic.cpp` / `src/pagx/pag/ErrorCode.h` (alias) / `src/pagx/pag/DiagBuild.h`（含 `kAllDiagnosticCodes[]` 全枚举表，P0-6 v2.16） | `DiagnosticTest`（FormatDiagnostic 格式 + MakeDecodeDiag / MakeDiag 往返 + ABI-appended 码不丢 + `CodeToString.AllEnumValues` 遍历 `kAllDiagnosticCodes` 断言） | 对外头齐备，作为后续阶段的 include 基础 |
-| 1 | `ValueCodec.h` / `PropertyEncoding.h` / `TagCode.h` / TagHeader util + `test/src/pag/support/CorruptBuilder.h+cpp`（§18.3bis） | `ValueCodecTest` / `PropertyEncodingTest` / `TagHeaderTest` / `CorruptBuilderTest` | 四文件全绿；CorruptBuilder 本阶段交付以便后续 Phase 4 用 |
-| 2 | `PAGDocument.h` / `BakeContext.h+cpp` / `ResourceBaker.cpp` / **`test/src/pag/support/PAGXBuilder.h+cpp`**（Phase 2 前置交付，原计划 Phase 3） | `BakeContextTest` / `ResourceBakerTest` / `PAGXBuilderTest` | 全绿；PAGXBuilder fluent builder 可用 |
+| 0 | `include/pagx/Diagnostic.h` / `src/pagx/Diagnostic.cpp` / `src/pagx/pag/ErrorCode.h` (alias) / `src/pagx/pag/DiagBuild.h`（含 `kAllDiagnosticCodes[]` 全枚举表，P0-6 v2.16） | `DiagnosticTest`（FormatDiagnostic 格式 + MakeDecodeDiag / MakeDiag 往返 + ABI-appended 码不丢 + `CodeToString.AllEnumValues` 遍历 `kAllDiagnosticCodes` 断言） | 对外头齐备，作为后续阶段的 include 基础；**CR 维护清单**（P2-5 v2.17，任何 PR 新增 `DiagnosticCode` 必须依次打勾）：(a) 在枚举段内追加（`enum class DiagnosticCode` 声明）；(b) 在 `kAllDiagnosticCodes[]` 数组追加并把 `std::array<DiagnosticCode, N>` 中 N +1；(c) 在 `CodeToString` switch 追加 case；(d) 在 §G.6 测试矩阵增加对应行；(e) 若 contextIndex 有结构语义，在 §15.1 ABI 表补一行。五步缺一 Phase 0 `DiagnosticTest.CodeToString.AllEnumValues` 即挂，禁止合并 |
+| 1 | `ValueCodec.h` / `PropertyEncoding.h` / `TagCode.h` / TagHeader util + `test/src/pag/support/CorruptBuilder.h+cpp`（§18.3bis） | `ValueCodecTest` / `PropertyEncodingTest` / `TagHeaderTest` / `CorruptBuilderTest` | 四文件全绿；CorruptBuilder 本阶段交付以便后续 Phase 4 用；**Phase 1 exit gate**（P1-4 v2.17）：`grep -rn "std::vector<uint8_t>" src/pagx/pag/ValueCodec.h src/pagx/pag/Codec.cpp` 在 `ReadLengthPrefixedBytes` / `ReadUtf8String` / ImageAsset / FontAsset 上下文零命中（全部改用 `std::shared_ptr<const tgfx::Data>`）|
+| 2 | `PAGDocument.h` / `BakeContext.h+cpp` / `ResourceBaker.cpp` / **`test/src/pag/support/PAGXBuilder.h+cpp`**（Phase 2 前置交付，原计划 Phase 3）/ **`test/src/pag/support/StructBuilders.h+cpp`**（P0-6 v2.17 登记：`MakeDeepLayerStack` / `MakeMinimalComposition` 等结构性 helper，供 Phase 4+ 测试复用） + **`FontAsset::data` 类型迁移**（`std::vector<uint8_t>` → `std::shared_ptr<const tgfx::Data>`，P1-6 v2.16 落地；Baker/Codec/Inflater 三处消费点同批更新） | `BakeContextTest` / `ResourceBakerTest` / `PAGXBuilderTest`（≥13 条 fluent API smoke，P1-8 v2.17） | 全绿；PAGXBuilder fluent builder 可用；`grep -rn "std::vector<uint8_t>" src/pagx/` 零命中于 ImageAsset/FontAsset/ReadLengthPrefixedBytes 上下文（P1-4 v2.17 exit gate） |
 | 3 | `LayerBaker.cpp`（通用字段）| `LayerBakerTest` + `BakerEdgeCasesTest`（Baker fatal 段 100-105 + 207） | 全绿 |
 | 4 | `Codec.cpp` 基础 Tag（FileHeader/Composition/LayerBlock） | `RoundTripTest` 前半 + `VersionRejectTest` + `TruncatedDecodeTest`（**仅** 300/301/302/303/304/305/306 段。FileReadFailed=307 只能由 LoadFromFile 触发，推至 Phase 10.5；Path/Glyph/Resource 相关 402/403/404/405/408 推至 Phase 5/8；CompositionCycle=605 推至 Phase 9；LayerBudgetExceeded=606 推至 Phase 9） | 全绿 |
 | 5 | `VectorBaker.cpp` + `ElementTags.cpp` | `VectorBakerTest` + `RoundTripTest` 剩余 + `TruncatedDecodeTest.PathTooManyVerbs/GlyphCountOverflow`（新增：Path 相关 404/405） | 全绿 |
 | 6 | PaintBaker 代码（融入 VectorBaker 文件） | `PaintBakerTest` | 全绿 |
 | 7 | `StyleFilterBaker.cpp` + `FilterTags.cpp` + `StyleTags.cpp` | `StyleFilterBakerTest` | 全绿 |
-| 8 | `TextBaker.cpp` + GlyphRun 序列化 | `TextBakerTest` + `TruncatedDecodeTest.InvalidUtf8/ResourceOversize`（新增：403/402 覆盖 Text 文本 + Resource 侧） | 全绿 |
+| 8 | `TextBaker.cpp` + GlyphRun 序列化 | `TextBakerTest` + `TruncatedDecodeTest.InvalidUtf8/ImageOversize/FontOversize`（403 Utf8 + 402 image + 408 font 独立行，不再共用"Resource" 模糊说法，P2-1 v2.17） | 全绿 |
 | 9 | `LayerInflater.cpp` | `InflaterParityTest`（含 `CompositionSelfRef / CompositionRefTooDeep`=605 / `LayerBudgetExceeded`=606） + `PAGDocumentParityTest` | 全绿。不依赖 RenderUtil——Inflater 层测试只断言 layer 树结构，不渲染像素 |
 | 9.5 | `support/RenderUtil.cpp`（测试基建；拆出 Phase 9 是因为 Phase 9 InflaterParityTest 不需要 Surface 渲染） | — | RenderUtil 就绪，为 Phase 12 RenderEquivalenceTest + Day-1 smoke 内联 lambda 之外的场景铺垫 |
 | 10 | `PAGExporter.cpp`（导出对外 API） | — | API review 过 |
 | 10.5 | `include/pagx/PAGLoader.h` / `src/pagx/pag/PAGLoader.cpp`（加载对外 API） | `PAGLoaderTest`（LoadFromBytes 成功路径 / `PAGLoader.LoadFromFile_Missing` 触发 `FileReadFailed=307` / `Peek(filePath)` O(1) 路径 / `ImageBytesReleasedAfterInflate` data.use_count==1 断言 / Inflater warnings 被 Result.warnings 收集） | 对外加载 API review 过 + 全绿 |
 | 11 | `CommandExport.cpp` 扩展 | `EndToEndTest` + `EdgeCasesTest` | 全绿 |
-| 12 | — | `RenderEquivalenceTest` + `PAGDecodeFuzzTest`（§18.3ter Layer 6 Fuzz，≥ 1 CPU·小时 ASAN/UBSAN 全绿） | Render/OutlineAll 模式 Baseline::Compare 全绿；Fuzz 全绿 |
+| 12 | **`.github/workflows/pagx-fuzz.yml`**（P1-6 v2.17 登记：§18.3ter CI 规划正式落地产物，4-shard matrix × 6h + corpus cache + crash auto-commit） | `RenderEquivalenceTest` + `PAGDecodeFuzzTest`（§18.3ter Layer 6 Fuzz，≥ 1 CPU·小时 ASAN/UBSAN 全绿） | Render/OutlineAll 模式 Baseline::Compare 全绿；Fuzz 全绿；CI yaml 首次上绿 |
 | 13 | —（取消 v1 改动，v1 已能 graceful reject 0x02）| — | — |
 | 14 | — | `PerformanceTest` + 首次生成 `test/perf/baseline.json`（含 `pag_v1_load_ms` 参照） | 基线入 git |
 | 15 | `tools/coverage.sh` | — | 覆盖率 ≥85%，报告附 PR |
@@ -3787,11 +3969,18 @@ inline std::string ReadUtf8String(pag::DecodeStream* s, DecodeContext* ctx, size
 // 读 varU32 length 前缀 + length 字节二进制数据（图片/字体/GlyphBlob 等）。
 // 同样的 maxBytes + bytesAvailable 前置校验。
 // errorCode 参数指定超限时推什么 warn（ImageResourceSizeExceeded 或 FontResourceSizeExceeded）。
-// P1-9 v2.16：产出 `std::shared_ptr<const tgfx::Data>` 而非 `std::vector<uint8_t>`——直接对齐
-// ImageAsset/FontAsset 的 data 字段类型，且 tgfx::Data::MakeWithoutCopy 的内存由 tgfx 内部管理，
-// 跳过 `std::vector(n)` 的 n 字节零初始化（50 MB 字体省 ~20 ms）；DecodeContext 持有整个 body
-// 字节 buffer 的 owner，调用 `MakeWithoutCopy(ptr, n)` 零拷贝取切片；保险起见，Codec::Decode
-// 退栈前把所有未释放的 tgfx::Data 转成 `MakeAdopted` 拷贝——实际实现根据 backing buffer 生命周期选择。
+//
+// **P0-1 v2.17 生命周期纪律（取代 v2.16 的"默认零拷贝"）**：
+// 默认实现走 `MakeAdopted(unique_ptr<uint8_t[]>)` ——拥有分配但跳过 `vector(n)` 的零初始化，
+// 50 MB 字体仍省 ~20 ms（向 vector<uint8_t> 基线）。**零拷贝 `MakeWithoutCopy` 必须显式开启**：
+// 调用方构造 `ZeroCopyScope::DecodeLocal local_scope(ctx)` 显式声明"本作用域内产出的 Data 只在
+// Decoder 栈内使用、不会进入 PAGDocument 树、不会被 tgfx::Image 异步持有"——否则 tgfx::Image 的
+// 延迟解码会把 shared_ptr<Data> 存活到 PAGLoader 释放 backing buffer 之后，形成 UAF。
+//
+// **硬约束**：`ImageAsset::data` / `FontAsset::data` 必须始终持有 **owning** Data——禁止
+// PAGDocument 树内出现任何 `MakeWithoutCopy` 产物。Codec::Decode 出栈前若 `ZeroCopyScope` 活跃，
+// 遍历所有产出 Data，对每个 owning 测试 `data.unique() && !scope.owning` 失败即 `MakeAdopted`
+// 升级（一次 memcpy 兜底）。DecodeContext::streamBufferOwned() 已不再是判据——只有显式 scope 才开零拷贝。
 inline std::shared_ptr<const tgfx::Data>
     ReadLengthPrefixedBytes(pag::DecodeStream* s, DecodeContext* ctx,
                             size_t maxBytes, ErrorCode errorCode) {
@@ -3802,16 +3991,38 @@ inline std::shared_ptr<const tgfx::Data>
                                     s->size()));   // 尽力 skip 保持对齐
     return nullptr;
   }
-  // 优先尝试零拷贝引用 DecodeContext 持有的 backing buffer（若可用）；否则 MakeAdopted 分配 + copy
-  const uint8_t* slicePtr = s->currentReadablePtr();   // 假设 v1 DecodeStream 提供此接口；若无则回退
-  if (slicePtr != nullptr && ctx->streamBufferOwned()) {
-    s->advance(n);
-    return tgfx::Data::MakeWithoutCopy(slicePtr, n);
+  if (ctx->zeroCopyScopeActive()) {   // 仅在 ZeroCopyScope::DecodeLocal 内才允许零拷贝
+    const uint8_t* slicePtr = s->currentReadablePtr();
+    if (slicePtr != nullptr) {
+      s->advance(n);
+      return tgfx::Data::MakeWithoutCopy(slicePtr, n);   // lifetime 由 scope 负责
+    }
   }
-  auto buf = std::make_unique<uint8_t[]>(n);   // unique_ptr<uint8_t[]> 初始化未定义，跳过 vector 零填
+  // 默认路径：owning Data（alloc + read，跳过 vector 的零初始化）
+  auto buf = std::make_unique<uint8_t[]>(n);
   s->readBytes(buf.get(), n);
   return tgfx::Data::MakeAdopted(buf.release(), n, tgfx::Data::DeleteArrayProc);
 }
+```
+
+`ZeroCopyScope::DecodeLocal` 定义（`src/pagx/pag/DecodeContext.h`）：
+
+```cpp
+// 显式作用域，在内部允许 MakeWithoutCopy。仅适用于 Decoder 栈内使用、不入 PAGDocument 树的场景
+// （例如 DecodeProbe 快速扫描 FileHeader）。范围退出时 ctx->zeroCopyScopeActive 复位为 false。
+// ImageAsset.data / FontAsset.data **禁止**通过此 scope 构造——会导致 PAGLoader 释放后 UAF。
+class ZeroCopyScope {
+ public:
+  class DecodeLocal {
+   public:
+    explicit DecodeLocal(DecodeContext* ctx) : ctx_(ctx) { ctx_->setZeroCopyActive(true); }
+    ~DecodeLocal() { ctx_->setZeroCopyActive(false); }
+    DecodeLocal(const DecodeLocal&) = delete;
+    DecodeLocal& operator=(const DecodeLocal&) = delete;
+   private:
+    DecodeContext* ctx_;
+  };
+};
 ```
 
 **强制清单**（所有按 "varU32 length + N bytes" 模式的字段必须走上述入口）：
@@ -5043,6 +5254,7 @@ enum class DiagnosticCode : uint16_t {
   EmptyCompositions         = 103,  // 产出的 PAGDocument 无 compositions（不合法状态）
   CompositionCycleDepth     = 104,  // 嵌套 composition 超过 MAX_LAYER_DEPTH
   StructureLimitExceeded    = 105,  // 结构性计数/长度超出附录 H 硬上限（见 §G.2 枚举注释）
+  ProducerFatal             = 106,  // P1-5 v2.17：Decoder 读到 TagCode::ErrorMarker（见 §8.3ter）
 
   // ---------------- Baker 告警 (200-299) ----------------
   ImageSourceMissing        = 200,  // 图片文件缺失 / data URI 损坏
@@ -5147,7 +5359,7 @@ inline Diagnostic MakeDiag(ErrorCode code, std::string msg = {},
 // 全枚举值表（P0-6 v2.16，Phase 0 交付）：DiagnosticTest.CodeToString.AllEnumValues 依赖此表
 // 遍历断言 CodeToString(c) 非空。新增 enum 值时**必须**在本表补一项，否则 Phase 0 DiagnosticTest 挂，
 // 由此保证 §G.3bis Diagnostic.cpp switch case 与 enum 声明不发生 desync。
-inline constexpr std::array<DiagnosticCode, 40> kAllDiagnosticCodes = {
+inline constexpr std::array<DiagnosticCode, 41> kAllDiagnosticCodes = {
   DiagnosticCode::Ok,
   // Baker fatal 100-199
   DiagnosticCode::LayoutNotApplied,
@@ -5156,6 +5368,7 @@ inline constexpr std::array<DiagnosticCode, 40> kAllDiagnosticCodes = {
   DiagnosticCode::EmptyCompositions,
   DiagnosticCode::CompositionCycleDepth,
   DiagnosticCode::StructureLimitExceeded,
+  DiagnosticCode::ProducerFatal,   // P1-5 v2.17
   // Baker warning 200-299
   DiagnosticCode::ImageSourceMissing,
   DiagnosticCode::FontSourceMissing,
@@ -5248,6 +5461,7 @@ static const char* CodeToString(DiagnosticCode c) {
     case DiagnosticCode::EmptyCompositions:          return "EmptyCompositions";
     case DiagnosticCode::CompositionCycleDepth:      return "CompositionCycleDepth";
     case DiagnosticCode::StructureLimitExceeded:     return "StructureLimitExceeded";
+    case DiagnosticCode::ProducerFatal:              return "ProducerFatal";   // P1-5 v2.17
     case DiagnosticCode::ImageSourceMissing:         return "ImageSourceMissing";
     case DiagnosticCode::FontSourceMissing:          return "FontSourceMissing";
     case DiagnosticCode::MaskTargetMissing:          return "MaskTargetMissing";
@@ -5273,7 +5487,6 @@ static const char* CodeToString(DiagnosticCode c) {
     case DiagnosticCode::GlyphCountLimitExceeded:    return "GlyphCountLimitExceeded";
     case DiagnosticCode::LayerDepthLimitExceeded:    return "LayerDepthLimitExceeded";
     case DiagnosticCode::InvalidEnumValue:           return "InvalidEnumValue";
-    case DiagnosticCode::FontResourceSizeExceeded:   return "FontResourceSizeExceeded";
     case DiagnosticCode::FontResourceSizeExceeded:   return "FontResourceSizeExceeded";
     case DiagnosticCode::InflateImageDecodeFailed:   return "InflateImageDecodeFailed";
     case DiagnosticCode::InflateFontCreateFailed:    return "InflateFontCreateFailed";
@@ -5377,6 +5590,8 @@ for (const auto& d : r.warnings) {
 auto lr = pagx::PAGLoader::LoadFromFile(path);
 for (const auto& d : lr.warnings) {
   if (d.code == pagx::DiagnosticCode::ImageResourceSizeExceeded) {
+    // P1-2 v2.17：UINT32_MAX 守卫——跨 Tag bridge push 可能推 sentinel
+    if (d.contextIndex == UINT32_MAX) { LogWarn("Skipped oversized image"); continue; }
     LogWarn("Skipped oversized image #%u", d.contextIndex);
   }
 }
@@ -5384,6 +5599,7 @@ for (const auto& d : lr.warnings) {
 // 场景 3：检测 composition 循环引用，回溯构图阶段
 for (const auto& d : lr.warnings) {
   if (d.code == pagx::DiagnosticCode::InflateCompositionCycle) {
+    if (d.contextIndex == UINT32_MAX) { LogError("Composition cycle (index unknown)"); continue; }
     // contextIndex 是引用环起点 composition 下标
     LogError("Composition cycle at index %u — check your PAGX composition links",
              d.contextIndex);
@@ -5413,6 +5629,13 @@ namespace pagx::pag {
  *     static constexpr LayerMaskType Default = LayerMaskType::Alpha;
  *   };
  */
+/**
+ * ReadEnum: u8 + EnumMeta<T>::MaxValid 范围校验；越界 warn + 返回 Default。
+ *
+ * P0-3 v2.17（API）：`raw` 越界时作为 Diagnostic.contextIndex 透传给消费方，
+ * 让用户日志看到 "enum #%u out of range"。Diagnostic ABI 表（§15.1）：
+ * `InvalidEnumValue` 的 contextIndex 语义 = 越界的原始 u8 值（0..255）。
+ */
 template <typename T>
 struct EnumMeta;  // 需要为每个 T 特化
 
@@ -5421,7 +5644,8 @@ inline T ReadEnum(DecodeStream* stream, DecodeContext* ctx) {
   uint8_t raw = stream->readUint8();
   if (raw > EnumMeta<T>::MaxValid) {
     ctx->warn(ErrorCode::InvalidEnumValue,
-              "enum value out of range for " + std::string(typeid(T).name()));
+              "enum value out of range for " + std::string(typeid(T).name()),
+              raw /* contextIndex: 越界 u8 值 */);
     return EnumMeta<T>::Default;
   }
   return static_cast<T>(raw);
@@ -5588,6 +5812,11 @@ constexpr uint32_t MAX_COMPOSITION_REF_DEPTH        = 32;           // Inflater 
 
 // Inflater 全局 Layer 预算（P1-3 v2.15）：防 Decoder 单节点合法但 N^6 累积膨胀
 constexpr uint32_t MAX_INFLATED_LAYER_COUNT         = 1000000;      // Inflater 累计实例化 tgfx::Layer 的总数；超限该子树降级为空 Layer + warn 606
+
+// P0-2 v2.17（安全）：pending 集合独立熔断。`reserveLayerBudget` 只管 Layer 实例总数，单 Layer 可挂
+// N 个 mask；恶意构造 N×MAX_INFLATED_LAYER_COUNT 个 PendingMask 绕过 606。独立 cap 按 Layer 总数 ×
+// 常数因子保守估：1e6 Layer × 平均 0.26 mask ≈ 262144 足够真实素材，又远低于 vector 分配爆表。
+constexpr uint32_t MAX_PENDING_MASKS                = 262144;       // InflaterContext.pendingMasks 上限；超限 push 拒绝 + warn 603
 
 // Baker 侧全局结构性累加上限（P0-4 v2.15）：PAGX XML 可控，需 Baker 独立累计熔断
 // （Decoder 的 MAX_* 只管单节点/单 Tag；Baker 管 pre-pass 全树累积）
@@ -5818,22 +6047,48 @@ done
 
 ### 上次开工必读（开工前 AI / 人类 follow-up 的精简摘要）
 
-v2.0 → v2.16 累计 7 轮专家评审，~70 个 P0/P1/P2 修复。**开工前只需记下这些硬约束**，其他版本日志作"为什么这样设计"的补充阅读：
+v2.0 → v2.17 累计 8 轮专家评审，~85 个 P0/P1/P2 修复。**开工前只需记下这些硬约束**，其他版本日志作"为什么这样设计"的补充阅读：
 
 1. **ABI 红线**：`DiagnosticCode` 数值只能段内追加，不得复用 / 跨段迁移；`propHeader.hasExt=1` 的 extHeader 尺寸**永久锁 1 byte**（§4.3）——扩展走新 encoding 值（§4.4 规则 1）或升 FORMAT_VERSION。
 2. **签名纪律**：`LayerInflater::Inflate(std::unique_ptr<PAGDocument> doc)` 取所有权（§9.1）；所有 Read/Write 函数接 `Context*`（§8.4）；所有 `stream.setPosition(base + length)` 形式的 seek 用 `uint64_t` 中间结果（§D.3）；所有 DoS 累加写 `if (x > MAX - total)` 减法形式（§H.1）。
-3. **安全前置**：所有 varU32-prefixed utf8string / bytes 走 `ValueCodec.h` 的 `ReadUtf8String` / `ReadLengthPrefixedBytes` wrapper（§D.1）；所有 `readInt32List` / `readFloatList` / `readUBits` 走 `ReadInt32ListSafe` 确保 `numBits ≤ 32`；`readEncodedUint32` 第 5 字节带 continuation bit 即 warn + 返回 0。
-4. **循环防护**：`CurrentStreamScope` RAII guard 管 SubStream 嵌套（§8.5）；`CompositionVisitScope` RAII guard 管 Composition 引用图 + `MAX_COMPOSITION_REF_DEPTH=32`（§9.4）；Inflater `reserveLayerBudget()` 管 `MAX_INFLATED_LAYER_COUNT=1e6`。
-5. **资源零拷贝**：`ImageAsset::data` 是 `shared_ptr<const tgfx::Data>`（§11.1）；Inflater `MakeFromEncoded` 成功后立即 `data.reset()`；`PAGLoaderTest.ImageBytesReleasedAfterInflate` 断言 `use_count==1`。
+3. **安全前置**：所有 varU32-prefixed utf8string / bytes 走 `ValueCodec.h` 的 `ReadUtf8String` / `ReadLengthPrefixedBytes` wrapper（§D.1）；所有 `readInt32List` / `readFloatList` / `readUBits` 走 `ReadInt32ListSafe` 确保 `numBits ≤ 32`；`readEncodedUint32` 第 5 字节带 continuation bit 即 warn + 返回 0。`ReadLengthPrefixedBytes` 默认走 **owning** `MakeAdopted`——零拷贝 `MakeWithoutCopy` 必须在显式 `ZeroCopyScope::DecodeLocal` 内才允许，防 tgfx::Image 异步持有造成 UAF（P0-1 v2.17）。
+4. **循环防护**：`CurrentStreamScope` RAII guard 管 SubStream 嵌套（§8.5）；`CompositionVisitScope` RAII guard 管 Composition 引用图 + `MAX_COMPOSITION_REF_DEPTH=32`（§9.4）；Inflater `reserveLayerBudget(layerIndex)` 管 `MAX_INFLATED_LAYER_COUNT=1e6`；`reservePendingMaskSlot()` 管 `MAX_PENDING_MASKS=262144`（P0-2 v2.17，防止单 Layer 挂 N 个 mask 绕过 606）。
+5. **资源零拷贝**：`ImageAsset::data` / `FontAsset::data` 都是 `shared_ptr<const tgfx::Data>`（§11.1 / §11.2）；Inflater `MakeFromEncoded` / `MakeFromBytes` 成功后立即 `data.reset()`；`PAGLoaderTest.{Image,Font}BytesReleasedAfterInflate` 断言 `use_count==1`。
 6. **Baker 独立上限**：PAGX XML 可控，BakeContext 有独立 `totalLayerCount` / `totalVectorElementCount` / `totalCompositionCount` 累计熔断（§8.5 + §H.2），不依赖 Decoder 的 MAX_*。
-7. **Diagnostic 结构**：`{code, message, byteOffset, contextIndex}`——`message` 不稳定禁 switch；`contextIndex` 是 ABI 的（资源/layer/composition 索引，见 §15.1 code→contextIndex 表）。
-8. **测试前置工具**：Phase 1 交付 `CorruptBuilder`（字节级攻击注入）+ Phase 2 交付 `PAGXBuilder`（结构级 DOM 构造）——所有 regression test 建立在这两个工具上。
+7. **Diagnostic 结构**：`{code, message, byteOffset, contextIndex}`——`message` 不稳定禁 switch；`contextIndex` 是 ABI 的（资源/layer/composition 索引，见 §15.1 code→contextIndex 表）；消费 contextIndex 前**必须**检查 `!= UINT32_MAX` 守卫（P1-2 v2.17）。
+8. **测试前置工具**：Phase 1 交付 `CorruptBuilder`（字节级攻击注入）+ Phase 2 交付 `PAGXBuilder`（结构级 DOM 构造，13 条 smoke）+ Phase 2 交付 `StructBuilders.h`（`MakeDeepLayerStack` 等结构 helper）；`CapturePagxLayout(bytes)` 在 `PAGX_DEBUG_OFFSETS + PAG_BUILD_TESTS` 双条件 debug build 下提供 offset 定位；所有 regression test 建立在这四件套上。
 9. **双入口分层**：`PAGExporter.h` 不依赖 tgfx 渲染层（可传递 `tgfx::Data` 等核心数据类型）；`PAGLoader.h` 是唯一允许 `tgfx::Layer` 暴露的对外头；SAME-BUILD ABI 模型——升级 tgfx 必须重建 pagx-pag。
-10. **Phase 出口条件**：§19 阶段表严格按 Tag/功能拆错误码覆盖范围——Phase 4 只覆盖 300/301/302/303/304/305/306（Codec fatal 全段），其他推至对应 Phase（307→10.5，Path/Resource/Text 400 段→5/8，Inflater 600 段→9）；`PAGDecodeFuzz` 目标在 Phase 12 ≥1 CPU·小时 ASAN/UBSAN 全绿。
+10. **Phase 出口条件**：§19 阶段表严格按 Tag/功能拆错误码覆盖范围——Phase 4 只覆盖 300/301/302/303/304/305/306（Codec fatal 全段），其他推至对应 Phase（307→10.5，Path/Resource/Text 400 段→5/8，Inflater 600 段→9）；Phase 1 exit gate: `grep -rn "std::vector<uint8_t>" src/pagx/pag/` 在 ValueCodec/Codec 上下文零命中；Phase 2 exit: 13 条 PAGXBuilderTest；`PAGDecodeFuzz` 目标在 Phase 12 ≥1 CPU·小时 ASAN/UBSAN 全绿 + `.github/workflows/pagx-fuzz.yml` 交付。
+11. **enter/exit 纪律**（P1-2 v2.16 / P1-10 v2.17）：`BakeContext::enterLayer/enterVectorGroup` 返回 `bool`——false 即**整个子树 return，不配对 exit**；`exitLayer/exitVectorGroup` 内置饱和保护 `if (depth>0) --depth` 防误配对下溢把 MAX_DIAGNOSTICS=1000 塞满。
+12. **contextIndex 强制传参**（P0-1 v2.16 / P0-3 v2.17）：4 Context 的 `warn(code, msg, contextIndex=UINT32_MAX)` 三参签名——**16 个码**在 §15.1 ABI 表有结构语义（ImageSourceMissing/InflateCompositionCycle/InflaterLayerBudgetExceeded 等），调用点**必须**显式传入；`DiagnosticTest.FormatDiagnostic.WithContextIndex` 断言 `#ctx=N` 后缀输出。`ctx->warn` 3-arg 示例见 §11.1 Baker / §12.2 Pass 2 / §G.5 ReadEnum / §9.4 CompositionVisitScope。
 
-历史完整修订记录（v2.0 → v2.15）见下文。**实现阶段不需通读历史**，读完上述 10 条即可开工。
+历史完整修订记录（v2.0 → v2.16）见下文。**实现阶段不需通读历史**，读完上述 12 条即可开工。
 
 ### 历史修订记录
+
+- v2.16 → v2.17 修订要点（5 位专家评审团第 8 轮综合：6 P0 + 10 P1 + 6 P2，**用户要求再次清零**）：
+  - **P0-1（安全）§D.1 `ReadLengthPrefixedBytes` 默认 owning + ZeroCopyScope 显式开关**。v2.16 P1-9 把 wrapper 改返回 `shared_ptr<const tgfx::Data>` 优先 `MakeWithoutCopy`——但 tgfx::Image 惰性解码会把 `shared_ptr<Data>` 持有到 Codec::Decode 退栈之后，PAGLoader 释放 backing buffer 即 UAF。本版本默认走 `MakeAdopted(unique_ptr<uint8_t[]>)` owning 路径；零拷贝须在显式 `ZeroCopyScope::DecodeLocal` 作用域内才允许；`ImageAsset::data` / `FontAsset::data` 必须 owning，禁止 MakeWithoutCopy 产物进入 PAGDocument 树。
+  - **P0-2（安全）§H.1 + §9.4 `MAX_PENDING_MASKS=262144` 独立 cap**。v2.16 P0-3 加 606 `reserveLayerBudget` 管 Layer 总数，但单 Layer 可挂 N 个 mask——恶意构造 N×MAX_INFLATED_LAYER_COUNT 个 PendingMask 条目绕过 606 耗 vector 内存。本版本新增 `MAX_PENDING_MASKS=262144` + `InflaterContext::reservePendingMaskSlot()`；Pass 1 push pendingMasks 前校验，超限丢弃绑定 + warn 603。
+  - **P0-3（API）§9.2 / §11.1 / §12.2 / §G.5 补 `ctx->warn` 3-arg 调用示例**。v2.16 P0-1 把 Context warn 签名改 3-arg 但伪码无一处演示 contextIndex 传参。本版本补 4 个关键点：`§11.1` ResourceBaker.bakeImages `ImageSourceMissing` 传 PAGX images[] 索引；`§12.2` Pass 2 `InflateMaskResolveFailed` 传 pendingMasks 索引；`§G.5` ReadEnum `InvalidEnumValue` 传越界 raw u8 值；`§9.4` reserveLayerBudget 参数 `uint32_t layerIndex`。
+  - **P0-4（实现）§9.2 Pass 1 C++ 骨架**。v2.16 P0-3 "空壳占位/nullptr 槽位/addChild 跳过" 只有散文描述，Phase 9 实现者无参考。本版本补完整 inflateLayer 伪 C++（reserveLayerBudget 先行 + children 循环 + reservePendingMaskSlot + layerByPath 写入），闭环所有降级路径逻辑。
+  - **P0-5（实现）§18.3bis `CapturePagxLayout` 实现方案**。v2.16 P0-5 钉 `PagxBytesLayout` 结构 + helper 签名，但"offset 从哪来"只说 "debug build 从 PAGExporter 读取"——实现方式无参考，Phase 4 测试阻塞。本版本加 "(a) PAGExporter 测试钩子" 推荐方案（`TagWriterScope` 在写 ShapeStyleData 时记 offset + DecodeContext 挂 layoutCapture 副产物）+ "(b) 字节流反向扫描" 回退方案；双条件守卫 `#if defined(PAGX_DEBUG_OFFSETS) && defined(PAG_BUILD_TESTS)`。
+  - **P0-6（实现）§19 Phase 2 登记 `support/StructBuilders.h` + `FontAsset` 类型迁移**。v2.16 P0-4 在 §18.3bis 引入 `StructBuilders.h`（`MakeDeepLayerStack`）但 §19 Phase 2 表未登记；P1-6 钉 FontAsset 升级 shared_ptr 但同样无 Phase 表交付项。本版本 Phase 2 产品代码列补两项：StructBuilders.h + FontAsset.data 类型迁移；PAGXBuilderTest 同批扩至 ≥13 条。
+  - **P1-1（API）§9.4 `reserveLayerBudget(uint32_t layerIndex)` + `CompositionVisitScope` idx 透传**。v2.16 给 `Diagnostic.contextIndex` + 4 Context 3-arg 签名，但 606 `InflaterLayerBudgetExceeded` / 605 `InflateCompositionCycle` 的 contextIndex 来源没有闭环。本版本：reserveLayerBudget 加 layerIndex 参数透传到 warn；CompositionVisitScope dtor 前 idx 传入 warn；§15.1 ABI 表 606/605 → "first Layer triggering budget exhaustion" / "compositionIndex of cyclic reference"。
+  - **P1-2（API）§15.1 docstring + §G.4 消费示例 UINT32_MAX 守卫强制**。v2.16 P1-10 加了 3 个消费场景，但示例 (b) LoadFromBytes / (c) InflateCompositionCycle 不检查 `contextIndex != UINT32_MAX` 就直接打 `#%u`——某些 bridge path 会推 sentinel。本版本 `Diagnostic.contextIndex` docstring 加 "**MANDATORY GUARD**" 段；两个示例补 `if (d.contextIndex == UINT32_MAX)` 分支。
+  - **P1-3（架构）§6.1 + §8.3ter + 错误码 106 Baker 中断字节流预警**。Baker fatal 发生在 Codec 已产出部分字节后，下游 Decoder 无法区分 "legit EOF" 与 "producer fatal truncation"。本版本：§6.1 TagCode 段保留 1022 `ErrorMarker`；§8.3ter 规定 Codec 在 Baker fatal 时写入 `TagCode::ErrorMarker` 零 body Tag；Decoder 读到后推 `ProducerFatal=106` warning + 停止当前 Composition 解析；kAllDiagnosticCodes / CodeToString 同步。
+  - **P1-4（实现）§19 Phase 1/2 exit gate + `.github/workflows/pagx-fuzz.yml` 登记**。Phase 1 补 `grep -rn "std::vector<uint8_t>" src/pagx/pag/` 零命中于 ValueCodec/Codec 上下文；Phase 12 登记 fuzz yaml 交付物。
+  - **P1-5（实现）§6.1 Tag 段 ErrorMarker=1022 预留**。v2.16 及之前 TagCode 段"实验性"900-1022 无具体分配，ErrorMarker 新增时无归属。本版本 §6.1 表把 1022 独立分段为 "ErrorMarker" 专用，900-1021 保持实验性。
+  - **P1-6（实现）§19 Phase 12 CI yaml 登记**。§18.3ter Fuzz CI 有详细 spec 但 §19 阶段表未列 `.github/workflows/pagx-fuzz.yml` 为交付物。本版本 Phase 12 产品列补 CI yaml。
+  - **P1-7（实现）§19 Phase 2 `FontAsset.data` 类型迁移登记**。v2.16 P1-6 钉了 `vector<uint8_t>` → `shared_ptr<const tgfx::Data>` 升级，但 §19 无任务归属，AI 在 Phase 2 落 Baker 时会漏升级。本版本 Phase 2 表添加"FontAsset::data 类型迁移" 显式交付项。
+  - **P1-8（实现）§18.3pre Phase 2 exit 钉 13 条**。v2.16 P2-9 只说 "PAGXBuilderTest ≥ 15 条" 含糊——核心 7 + 扩展 8 = 15 但扩展后半 8 条用 ">= 8" 描述。本版本钉死 **13 条**（7 核心 + 6 扩展非 trivial；trivial passthrough 8 个 setter 豁免），Phase 2 交付判定按 13 计数。
+  - **P1-9（安全）§22 "上次开工必读" 加 #11 enter/exit 纪律 + #12 contextIndex 强制传参**。200 + 行日志仍未能让 AI 接手时看到 v2.16 P1-2 + P0-1 最关键两个闭环约束。本版本 10 条扩为 12 条，第 11/12 条对准"实现阶段最容易漏"的两个底线。
+  - **P1-10（同 P1-9）**：见 #11 enter/exit 纪律摘要合并。
+  - **P2-1（实现）§19 Phase 8 测试名称分裂 `ResourceOversize`→`ImageOversize/FontOversize`**。v2.16 P0-2 拆了 402/408 两码，但 Phase 8 测试命名仍为 `TruncatedDecodeTest.ResourceOversize` 合并形式，会让 AI 写一个测试同时触发两码模糊边界。本版本分裂为 `Truncate.ImageOversize` + `Truncate.FontOversize`。
+  - **P2-2（实现）§18.3pre PAGXBuilder 公有/私有可见性纪律**。v2.16 P0-6 引入 fluent API 但未说状态字段公私可见性。本版本补 "fluent 方法 public、状态 private，测试不访问字段" 约束。
+  - **P2-3（API）§15.2 + §15.3 Result 对称性交叉引用**。v2.16 两个 Result 独立定义，"ok ⟺ errors.empty() 契约"重复三遍。本版本两处 docstring 互相 `see §15.x Result` 强制语义同步。
+  - **P2-4（实现）§19 Phase 0 CR 维护清单**。v2.16 P0-6 钉了 `kAllDiagnosticCodes` 但新增 enum 依赖手动同步 5 个地方（enum 声明 / 数组 / 数组 size / CodeToString / G.6 矩阵 / 15.1 ABI 表），缺一 Phase 0 挂。本版本 Phase 0 交付判定列新增 5 条 checklist。
+  - **P2-5（同 P2-4）**：并入 CR checklist 条。
+  - **P2-6（实现）§9.4 visitingComposition 无重入契约**。v2.16 P2-1 清了"多次 Inflate 旧 doc 路径"散文但 debug assert 缺失。本版本加 `assert(visitingComposition.empty())` 入口断言，明示无重入意图。
 
 - v2.15 → v2.16 修订要点（5 位专家评审团第 7 轮综合：7 P0 + 11 P1 + 10 P2，**用户要求再次清零**）：
   - **P0-1（架构）§8.5 4 Context warn/error 加 `contextIndex` 参数**。v2.15 加 `Diagnostic.contextIndex` ABI 字段，但 4 Context 的 warn/error 只接 `(code, msg)`，推 push 时 contextIndex 恒 UINT32_MAX——ABI 承诺永远违约。本版本 EncodeContext/DecodeContext/BakeContext/InflaterContext 四处 warn/error 签名改 `(code, msg={}, uint32_t contextIndex = UINT32_MAX)`，Diagnostic 构造 4 字段齐备；`syncFromStreamContext` 的 bridge push 显式传 UINT32_MAX（跨 Tag sync 无 contextIndex 语义）。
