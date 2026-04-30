@@ -20,6 +20,8 @@
 #include <iostream>
 #include <string>
 #include "cli/CliUtils.h"
+#include "pagx/PAGXImporter.h"
+#include "pagx/PPTExporter.h"
 #include "pagx/SVGExporter.h"
 
 namespace pagx::cli {
@@ -30,7 +32,9 @@ struct ExportOptions {
   std::string format = {};
   int svgIndent = 2;
   bool svgNoXmlDeclaration = false;
-  bool svgNoConvertTextToPath = false;
+  bool textToPath = false;
+  bool pptBridgeContours = false;
+  bool pptRasterizeUnsupported = false;
 };
 
 static void PrintUsage() {
@@ -42,19 +46,36 @@ static void PrintUsage() {
       << "Options:\n"
       << "  --input <file>              Input PAGX file (required)\n"
       << "  --output <file>             Output file (default: <input>.<format>)\n"
-      << "  --format <format>           Output format (svg; inferred from --output extension)\n"
+      << "  --format <format>           Output format (svg, pptx; inferred from --output "
+         "extension)\n"
+      << "  --text-to-path              Convert text to path geometry (default: native text)\n"
       << "\n"
       << "SVG options:\n"
       << "  --svg-indent <n>            Indentation spaces (default: 2, valid range: 0-16)\n"
       << "  --svg-no-xml-declaration    Omit the <?xml ...?> declaration\n"
-      << "  --svg-no-convert-text-to-path\n"
-      << "                              Keep text as <text> elements instead of <path>\n"
+      << "\n"
+      << "PPT options:\n"
+      << "  --ppt-bridge-contours       Bridge nested contours into a single self-intersecting\n"
+      << "                              sub-path instead of emitting each contour separately\n"
+      << "                              (default: off)\n"
+      << "  --ppt-rasterize-unsupported Rasterize layers that use features OOXML cannot\n"
+      << "                              represent natively (masks, scrollRect clipping,\n"
+      << "                              blend modes outside of Normal/Multiply/Screen/Darken/\n"
+      << "                              Lighten, and wide-gamut color). For unsupported blend\n"
+      << "                              modes the backdrop beneath the layer is baked into the\n"
+      << "                              PNG too so the blend composites correctly, at the cost\n"
+      << "                              of turning native content under the patch into pixels.\n"
+      << "                              When off (the default), these features are silently\n"
+      << "                              dropped and the layer is emitted as editable shapes.\n"
       << "\n"
       << "Examples:\n"
       << "  pagx export --input icon.pagx                    # PAGX to icon.svg\n"
       << "  pagx export --input icon.pagx --output out.svg   # PAGX to out.svg\n"
+      << "  pagx export --input icon.pagx --output out.pptx  # PAGX to out.pptx\n"
       << "  pagx export --format svg --input icon.pagx       # force SVG output format\n"
-      << "  pagx export --input icon.pagx --svg-indent 4     # 4-space indent\n";
+      << "  pagx export --format pptx --input icon.pagx      # force PPTX output format\n"
+      << "  pagx export --input icon.pagx --svg-indent 4     # 4-space indent\n"
+      << "  pagx export --input icon.pagx --text-to-path     # convert text to paths\n";
 }
 
 static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
@@ -77,8 +98,12 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
       options->svgIndent = static_cast<int>(value);
     } else if (arg == "--svg-no-xml-declaration") {
       options->svgNoXmlDeclaration = true;
-    } else if (arg == "--svg-no-convert-text-to-path") {
-      options->svgNoConvertTextToPath = true;
+    } else if (arg == "--text-to-path") {
+      options->textToPath = true;
+    } else if (arg == "--ppt-bridge-contours") {
+      options->pptBridgeContours = true;
+    } else if (arg == "--ppt-rasterize-unsupported") {
+      options->pptRasterizeUnsupported = true;
     } else if (arg == "--help" || arg == "-h") {
       PrintUsage();
       return -1;
@@ -127,9 +152,39 @@ static int ExportToSVG(const ExportOptions& options) {
   SVGExporter::Options svgOptions = {};
   svgOptions.indent = options.svgIndent;
   svgOptions.xmlDeclaration = !options.svgNoXmlDeclaration;
-  svgOptions.convertTextToPath = !options.svgNoConvertTextToPath;
+  svgOptions.convertTextToPath = options.textToPath;
 
   if (!SVGExporter::ToFile(*document, options.outputFile, svgOptions)) {
+    std::cerr << "pagx export: error: failed to write '" << options.outputFile << "'\n";
+    return 1;
+  }
+
+  std::cout << "pagx export: wrote " << options.outputFile << "\n";
+  return 0;
+}
+
+static int ExportToPPT(const ExportOptions& options) {
+  auto document = PAGXImporter::FromFile(options.inputFile);
+  if (document == nullptr) {
+    std::cerr << "pagx export: error: failed to load '" << options.inputFile << "'\n";
+    return 1;
+  }
+  if (!document->errors.empty()) {
+    for (auto& error : document->errors) {
+      std::cerr << "pagx export: warning: " << error << "\n";
+    }
+  }
+  if (document->hasUnresolvedImports()) {
+    std::cerr << "pagx export: error: unresolved import directive, run 'pagx resolve' first\n";
+    return 1;
+  }
+
+  PPTExporter::Options pptOptions = {};
+  pptOptions.convertTextToPath = options.textToPath;
+  pptOptions.bridgeContours = options.pptBridgeContours;
+  pptOptions.rasterizeUnsupported = options.pptRasterizeUnsupported;
+
+  if (!PPTExporter::ToFile(*document, options.outputFile, pptOptions)) {
     std::cerr << "pagx export: error: failed to write '" << options.outputFile << "'\n";
     return 1;
   }
@@ -147,6 +202,9 @@ int RunExport(int argc, char* argv[]) {
 
   if (options.format == "svg") {
     return ExportToSVG(options);
+  }
+  if (options.format == "pptx") {
+    return ExportToPPT(options);
   }
 
   std::cerr << "pagx export: error: unsupported format '" << options.format << "'\n";

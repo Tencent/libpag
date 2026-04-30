@@ -811,6 +811,41 @@ class TextLayoutContext {
     }
   }
 
+  // Records per-Text line metadata (byte ranges and positions) for text export. For each Text
+  // element that contributes glyphs to this line, computes the min/max cluster (byte offset in
+  // the source UTF-8 string) and stores it together with the line's baseline Y and start X.
+  static void RecordPerTextLineMetadata(const LineInfo& line, float baselineY, float xOffset,
+                                        TextLayoutResult& result) {
+    std::unordered_map<Text*, std::pair<uint32_t, uint32_t>> perTextClusterRange;
+    for (auto& g : line.glyphs) {
+      if (g.unichar == '\n' || g.unichar == '\t' || g.sourceText == nullptr) {
+        continue;
+      }
+      auto rangeIt = perTextClusterRange.find(g.sourceText);
+      if (rangeIt == perTextClusterRange.end()) {
+        perTextClusterRange[g.sourceText] = {g.cluster, g.cluster};
+      } else {
+        rangeIt->second.first = std::min(rangeIt->second.first, g.cluster);
+        rangeIt->second.second = std::max(rangeIt->second.second, g.cluster);
+      }
+    }
+    for (auto& [text, range] : perTextClusterRange) {
+      uint32_t byteEnd = range.second;
+      if (byteEnd < text->text.size()) {
+        int32_t dummy = 0;
+        size_t charLen =
+            DecodeUTF8Char(text->text.data() + byteEnd, text->text.size() - byteEnd, &dummy);
+        byteEnd += static_cast<uint32_t>(charLen > 0 ? charLen : 1);
+      }
+      TextLayoutLineInfo lineInfo = {};
+      lineInfo.baselineY = baselineY;
+      lineInfo.startX = xOffset;
+      lineInfo.byteStart = range.first;
+      lineInfo.byteEnd = byteEnd;
+      result.textLines[text].push_back(lineInfo);
+    }
+  }
+
   void buildTextBlobWithLayout(const TextLayoutParams& params, const std::vector<LineInfo>& lines,
                                TextLayoutResult& result, bool paragraphRTL = false) {
     if (lines.empty()) {
@@ -1043,6 +1078,8 @@ class TextLayoutContext {
           tb = Rect::MakeXYWH(left, top, right - left, bottom - top);
         }
       }
+
+      RecordPerTextLineMetadata(line, baselineY, xOffset, result);
     }
   }
 
@@ -1478,6 +1515,14 @@ Rect TextLayoutResult::getTextBounds(Text* text) const {
     return it->second;
   }
   return {};
+}
+
+const std::vector<TextLayoutLineInfo>* TextLayoutResult::getTextLines(Text* text) const {
+  auto it = textLines.find(text);
+  if (it != textLines.end()) {
+    return &it->second;
+  }
+  return nullptr;
 }
 
 const std::vector<TextLayoutGlyphRun>* TextLayoutResult::getGlyphRuns(Text* text) const {

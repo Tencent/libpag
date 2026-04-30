@@ -34,6 +34,7 @@ option(PAG_USE_C "Enable c API" OFF)
 option(PAG_BUILD_PAGX "Enable PAGX format support" OFF)
 option(PAG_BUILD_CLI "Enable building the command-line tool" OFF)
 option(PAG_BUILD_SVG "Enable SVG import/export support" OFF)
+option(PAG_BUILD_PPT "Enable PPT export support" OFF)
 
 # EMSCRIPTEN_PTHREADS can be set by vendor tools for building the wasm-mt architecture.
 if (NOT WEB OR EMSCRIPTEN_PTHREADS)
@@ -92,12 +93,16 @@ elseif (PAG_USE_SWIFTSHADER)
     set(PAG_USE_ANGLE OFF)
 endif ()
 
-# PAG_BUILD_CLI requires PAG_BUILD_PAGX and PAG_BUILD_SVG
+# PAG_BUILD_CLI requires PAG_BUILD_PAGX, PAG_BUILD_SVG and PAG_BUILD_PPT
 if (PAG_BUILD_CLI)
     set(PAG_BUILD_PAGX ON)
     set(PAG_BUILD_SVG ON)
+    set(PAG_BUILD_PPT ON)
 endif ()
 if (PAG_BUILD_SVG)
+    set(PAG_BUILD_PAGX ON)
+endif ()
+if (PAG_BUILD_PPT)
     set(PAG_BUILD_PAGX ON)
 endif ()
 
@@ -119,6 +124,7 @@ if (PAG_BUILD_TESTS)
     set(PAG_BUILD_PAGX ON)
     set(PAG_BUILD_CLI ON)
     set(PAG_BUILD_SVG ON)
+    set(PAG_BUILD_PPT ON)
     set(PAG_USE_HARFBUZZ ON)
     set(PAG_USE_SYSTEM_LZ4 OFF)
     set(PAG_BUILD_SHARED OFF)
@@ -132,6 +138,7 @@ message("PAG_USE_HARFBUZZ: ${PAG_USE_HARFBUZZ}")
 message("PAG_BUILD_PAGX: ${PAG_BUILD_PAGX}")
 message("PAG_BUILD_CLI: ${PAG_BUILD_CLI}")
 message("PAG_BUILD_SVG: ${PAG_BUILD_SVG}")
+message("PAG_BUILD_PPT: ${PAG_BUILD_PPT}")
 message("PAG_USE_SYSTEM_LZ4: ${PAG_USE_SYSTEM_LZ4}")
 message("PAG_USE_C: ${PAG_USE_C}")
 message("PAG_BUILD_SHARED: ${PAG_BUILD_SHARED}")
@@ -200,7 +207,21 @@ if (PAG_BUILD_PAGX)
 
     if (PAG_BUILD_SVG)
         list(APPEND PAG_FILES src/pagx/svg/SVGImporter.cpp src/pagx/svg/SVGParserContext.h)
-        list(APPEND PAG_FILES src/pagx/svg/SVGExporter.cpp src/pagx/svg/SVGTextLayout.cpp)
+        list(APPEND PAG_FILES src/pagx/svg/SVGExporter.cpp)
+    endif ()
+
+    if (PAG_BUILD_PPT)
+        list(APPEND PAG_FILES src/pagx/ppt/PPTExporter.cpp
+                src/pagx/ppt/PPTStyleEmitter.cpp
+                src/pagx/ppt/PPTTextWriter.cpp
+                src/pagx/ppt/PPTBoilerplate.cpp
+                src/pagx/ppt/PPTContourUtils.cpp
+                src/pagx/ppt/PPTGeomEmitter.cpp
+                src/pagx/ppt/PPTFeatureProbe.cpp
+                src/pagx/ppt/PPTModifierResolver.cpp)
+        set(MINIZIP_DIR ${TGFX_DIR}/third_party/zlib/contrib/minizip)
+        list(APPEND PAG_FILES ${MINIZIP_DIR}/zip.c ${MINIZIP_DIR}/ioapi.c)
+        list(APPEND PAG_INCLUDES ${MINIZIP_DIR})
     endif ()
 endif ()
 file(GLOB COMMON_FILES src/platform/*.*)
@@ -294,6 +315,12 @@ endif ()
 
 if (PAG_BUILD_SVG)
     list(APPEND PAG_DEFINES PAG_BUILD_SVG)
+endif ()
+
+if (PAG_BUILD_PPT)
+    list(APPEND PAG_DEFINES PAG_BUILD_PPT)
+    list(APPEND PAG_STATIC_VENDORS zlib)
+    list(APPEND PAG_INCLUDES third_party/out/zlib/${INCLUDE_ENTRY})
 endif ()
 
 if (PAG_BUILD_CLI OR PAG_BUILD_TESTS)

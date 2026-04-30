@@ -1078,8 +1078,7 @@ CLI_TEST(PAGXCliTest, Import_SvgToPagx_Gradient) {
 }
 
 CLI_TEST(PAGXCliTest, Import_SvgToPagx_Text) {
-  auto svgPath =
-      ExportToSVG("render_text.pagx", "ImportSVG_Text.svg", {"--svg-no-convert-text-to-path"});
+  auto svgPath = ExportToSVG("render_text.pagx", "ImportSVG_Text.svg");
   auto outputPath = TempDir() + "/ImportSVG_Text.pagx";
   auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
@@ -1222,11 +1221,127 @@ CLI_TEST(PAGXCliTest, Export_UnexpectedArgument) {
   EXPECT_NE(ret, 0);
 }
 
+//==============================================================================
+// Export tests — PAGX to PPTX
+//==============================================================================
+
+#ifdef PAG_BUILD_PPT
+
+CLI_TEST(PAGXCliTest, Export_PagxToPptx_Basic) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto outputPath = TempDir() + "/ExportPPTX_Basic.pptx";
+  auto ret =
+      CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+  EXPECT_GT(std::filesystem::file_size(outputPath), 0u);
+}
+
+CLI_TEST(PAGXCliTest, Export_PagxToPptx_ForceFormat) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto outputPath = TempDir() + "/ExportPPTX_ForceFormat.out";
+  auto ret = CallRun(pagx::cli::RunExport,
+                     {"export", "--format", "pptx", "--input", inputPath, "--output", outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+  EXPECT_GT(std::filesystem::file_size(outputPath), 0u);
+}
+
+CLI_TEST(PAGXCliTest, Export_PagxToPptx_Gradient) {
+  auto inputPath = TestResourcePath("render_gradient.pagx");
+  auto outputPath = TempDir() + "/ExportPPTX_Gradient.pptx";
+  auto ret =
+      CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+  EXPECT_GT(std::filesystem::file_size(outputPath), 0u);
+}
+
+CLI_TEST(PAGXCliTest, Export_PagxToPptx_Text) {
+  auto inputPath = TestResourcePath("render_text.pagx");
+  auto outputPath = TempDir() + "/ExportPPTX_Text.pptx";
+  auto ret =
+      CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+}
+
+CLI_TEST(PAGXCliTest, Export_PagxToPptx_NoConvertTextToPath) {
+  auto inputPath = TestResourcePath("render_text.pagx");
+  auto outputPath = TempDir() + "/ExportPPTX_NoText2Path.pptx";
+  auto ret =
+      CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+  EXPECT_GT(std::filesystem::file_size(outputPath), 0u);
+}
+
+CLI_TEST(PAGXCliTest, Export_PagxToPptx_RasterizeUnsupported) {
+  auto inputPath = TestResourcePath("verify_simple.pagx");
+  auto outputPath = TempDir() + "/ExportPPTX_RasterizeUnsupported.pptx";
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--ppt-rasterize-unsupported", "--input",
+                                            inputPath, "--output", outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+}
+
+CLI_TEST(PAGXCliTest, Export_PagxToPptx_MissingFile) {
+  auto outputPath = TempDir() + "/ExportPPTX_Missing.pptx";
+  auto ret = CallRun(pagx::cli::RunExport,
+                     {"export", "--input", "nonexistent.pagx", "--output", outputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Export_PagxToPptx_InvalidFile) {
+  auto inputPath = TestResourcePath("verify_not_xml.pagx");
+  auto outputPath = TempDir() + "/ExportPPTX_Invalid.pptx";
+  auto ret =
+      CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Export_PagxToPptx_DefaultOutput) {
+  auto inputPath = CopyToTemp("render_basic.pagx", "ExportPPTXDefault.pagx");
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--format", "pptx", "--input", inputPath});
+  EXPECT_EQ(ret, 0);
+  auto defaultOutput = TempDir() + "/ExportPPTXDefault.pptx";
+  EXPECT_TRUE(std::filesystem::exists(defaultOutput));
+}
+
+CLI_TEST(PAGXCliTest, Export_PagxToPptx_WriteFailure) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto outputPath = "/nonexistent_dir_xyz/output.pptx";
+  auto ret =
+      CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Export_PagxToPptx_Scale) {
+  auto inputPath = TestResourcePath("render_scale.pagx");
+  auto outputPath = TempDir() + "/ExportPPTX_Scale.pptx";
+  auto ret =
+      CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+}
+
+CLI_TEST(PAGXCliTest, Export_PagxToPptx_ValidateSimple) {
+  auto inputPath = TestResourcePath("verify_simple.pagx");
+  auto outputPath = TempDir() + "/ExportPPTX_ValidateSimple.pptx";
+  auto ret =
+      CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+  EXPECT_GT(std::filesystem::file_size(outputPath), 0u);
+}
+
+#endif  // PAG_BUILD_PPT
+
 CLI_TEST(PAGXCliTest, Export_NoConvertTextToPath) {
   auto inputPath = TestResourcePath("render_text.pagx");
   auto outputPath = TempDir() + "/ExportSVG_NoConvertText.svg";
-  auto ret = CallRun(pagx::cli::RunExport, {"export", "--svg-no-convert-text-to-path", "--input",
-                                            inputPath, "--output", outputPath});
+  auto ret =
+      CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
   EXPECT_NE(output.find("<svg"), std::string::npos);

@@ -23,6 +23,8 @@
 
 namespace pagx {
 
+class FontConfig;
+
 /**
  * Export options for SVGExporter.
  */
@@ -41,9 +43,16 @@ struct SVGExportOptions {
    * Whether to convert text elements to path elements using pre-shaped glyph outlines. When
    * enabled, text with GlyphRun data is rendered as SVG <path> elements instead of <text> elements,
    * ensuring identical rendering across platforms without font dependency. Falls back to <text>
-   * elements when glyph outline data is unavailable. The default value is true.
+   * elements when glyph outline data is unavailable. The default value is false.
    */
-  bool convertTextToPath = true;
+  bool convertTextToPath = false;
+
+  /**
+   * Optional FontConfig for text layout. When provided, registered and fallback fonts from the
+   * FontConfig are used for text shaping and layout. When nullptr, the exporter falls back to
+   * system fonts via platform-native font lookup.
+   */
+  FontConfig* fontConfig = nullptr;
 };
 
 /**
@@ -56,14 +65,18 @@ class SVGExporter {
 
   /**
    * Exports a PAGXDocument to an SVG string.
+   * @param document the PAGXDocument to export. Passed as non-const because applyLayout() is run
+   *        on first use to resolve renderPosition() for layers and groups.
    */
-  static std::string ToSVG(const PAGXDocument& document, const Options& options = {});
+  static std::string ToSVG(PAGXDocument& document, const Options& options = {});
 
   /**
    * Exports a PAGXDocument to an SVG file.
-   * Returns true on success.
+   * @param document the PAGXDocument to export. Passed as non-const because applyLayout() is run
+   *        on first use to resolve renderPosition() for layers and groups.
+   * @return true on success.
    */
-  static bool ToFile(const PAGXDocument& document, const std::string& filePath,
+  static bool ToFile(PAGXDocument& document, const std::string& filePath,
                      const Options& options = {});
 };
 
