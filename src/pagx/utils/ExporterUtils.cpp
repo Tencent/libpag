@@ -245,7 +245,7 @@ static std::vector<PositionedGlyph> WalkGlyphs(const Text& text, float textPosX,
   }
   result.reserve(totalGlyphs);
   for (const auto* run : text.glyphRuns) {
-    if (!run->font || run->glyphs.empty()) {
+    if (!run->font || run->font->unitsPerEm <= 0 || run->glyphs.empty()) {
       continue;
     }
     float scale = run->fontSize / static_cast<float>(run->font->unitsPerEm);
@@ -512,7 +512,9 @@ bool GetPNGDPI(const uint8_t* data, size_t size, float* dpiX, float* dpiY) {
     if (memcmp(data + offset + 4, "IDAT", 4) == 0) {
       break;
     }
-    offset += 12 + chunkLen;
+    // Use size_t addition to avoid uint32_t wrap-around that could freeze the
+    // loop on a malformed PNG with chunkLen near 0xFFFFFFF4.
+    offset += 12 + static_cast<size_t>(chunkLen);
   }
   return false;
 }
@@ -609,6 +611,51 @@ bool HasNonASCII(const std::string& str) {
     }
   }
   return false;
+}
+
+// Heuristic classification of a text run into an OOXML xml:lang tag. PowerPoint
+// paints a spellcheck squiggle under any run whose declared language doesn't
+// match its glyphs, so emitting "en-US" for CJK text yields visible red
+// underlines on a correctly rendered document. We walk the UTF-8 bytes and
+// switch to "zh-CN" as soon as we see a code point in the common CJK blocks
+// (Han, Hiragana, Katakana, Hangul, or full-width punctuation). Runs that
+// don't contain CJK stay on "en-US", matching PowerPoint's own default.
+std::string DetectTextLang(const std::string& utf8) {
+  size_t i = 0;
+  while (i < utf8.size()) {
+    uint32_t cp = 0;
+    auto c = static_cast<unsigned char>(utf8[i]);
+    size_t bytes = 1;
+    if (c < 0x80) {
+      cp = c;
+    } else if (c < 0xE0) {
+      cp = c & 0x1Fu;
+      bytes = 2;
+    } else if (c < 0xF0) {
+      cp = c & 0x0Fu;
+      bytes = 3;
+    } else {
+      cp = c & 0x07u;
+      bytes = 4;
+    }
+    if (i + bytes > utf8.size()) {
+      break;
+    }
+    for (size_t k = 1; k < bytes; k++) {
+      cp = (cp << 6) | (static_cast<unsigned char>(utf8[i + k]) & 0x3Fu);
+    }
+    i += bytes;
+    if ((cp >= 0x3040 && cp <= 0x30FF) ||    // Hiragana + Katakana
+        (cp >= 0x3400 && cp <= 0x4DBF) ||    // CJK Extension A
+        (cp >= 0x4E00 && cp <= 0x9FFF) ||    // CJK Unified Ideographs
+        (cp >= 0xAC00 && cp <= 0xD7A3) ||    // Hangul Syllables
+        (cp >= 0xF900 && cp <= 0xFAFF) ||    // CJK Compatibility Ideographs
+        (cp >= 0xFF00 && cp <= 0xFFEF) ||    // Halfwidth / fullwidth forms
+        (cp >= 0x20000 && cp <= 0x2FFFF)) {  // CJK Extensions B..F + suppl.
+      return "zh-CN";
+    }
+  }
+  return "en-US";
 }
 
 std::string UTF8ToUTF16BEHex(const std::string& utf8) {
