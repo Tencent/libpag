@@ -163,6 +163,7 @@ class PAGXDocument : public Node {
   friend class PAGXImporter;
   friend class PAGXExporter;
   friend class TextLayoutContext;
+  friend class FontEmbedder;
 };
 
 }  // namespace pagx

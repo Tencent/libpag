@@ -21,8 +21,10 @@
 namespace pagx::cli {
 
 /**
- * Queries font metrics from a file or system font.
+ * Embeds font glyphs and images into a PAGX file, producing a self-contained output.
+ * Font embedding extracts glyph paths/images from laid-out text; image embedding inlines
+ * external files as base64. Run `pagx embed --help` for the full flag list.
  */
-int RunFont(int argc, char* argv[]);
+int RunEmbed(int argc, char* argv[]);
 
 }  // namespace pagx::cli

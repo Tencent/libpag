@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <unordered_map>
+#include <unordered_set>
 #include "base/utils/Log.h"
 #include "base/utils/MathUtil.h"
 #include "pagx/TextLayout.h"
@@ -390,6 +391,42 @@ void FontEmbedder::ClearEmbeddedGlyphRuns(PAGXDocument* document) {
   auto textOrder = CollectAllText(document);
   for (auto* text : textOrder) {
     text->glyphRuns.clear();
+  }
+
+  std::unordered_set<Node*> toRemove = {};
+  for (auto& node : document->nodes) {
+    auto type = node->nodeType();
+    if (type == NodeType::Font) {
+      toRemove.insert(node.get());
+      auto* font = static_cast<Font*>(node.get());
+      for (auto* glyph : font->glyphs) {
+        toRemove.insert(glyph);
+        if (glyph->path != nullptr) {
+          toRemove.insert(glyph->path);
+        }
+        if (glyph->image != nullptr) {
+          toRemove.insert(glyph->image);
+        }
+      }
+    } else if (type == NodeType::GlyphRun) {
+      toRemove.insert(node.get());
+    }
+  }
+  auto& nodes = document->nodes;
+  size_t writeIdx = 0;
+  for (size_t readIdx = 0; readIdx < nodes.size(); readIdx++) {
+    if (toRemove.count(nodes[readIdx].get()) == 0) {
+      nodes[writeIdx++] = std::move(nodes[readIdx]);
+    }
+  }
+  nodes.resize(writeIdx);
+
+  for (auto it = document->nodeMap.begin(); it != document->nodeMap.end();) {
+    if (toRemove.count(it->second) > 0) {
+      it = document->nodeMap.erase(it);
+    } else {
+      ++it;
+    }
   }
 }
 

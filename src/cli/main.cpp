@@ -20,6 +20,7 @@
 #include <iostream>
 #include <string>
 #include "cli/CommandBounds.h"
+#include "cli/CommandEmbed.h"
 #include "cli/CommandExport.h"
 #include "cli/CommandFont.h"
 #include "cli/CommandFormat.h"
@@ -44,7 +45,8 @@ static void PrintUsage() {
             << "  layout         Display layout tree with bounds\n"
             << "  render         Render PAGX to an image file (supports crop and scale)\n"
             << "  bounds         Query rendered pixel bounds of layers (for crop regions)\n"
-            << "  font           Query font metrics or embed fonts into a PAGX file\n"
+            << "  font           Query font metrics\n"
+            << "  embed          Embed fonts and images into a PAGX file\n"
             << "  format         Format a PAGX file (indentation and attribute ordering)\n"
             << "  import         Import from another format (e.g. SVG) to PAGX\n"
             << "  export         Export a PAGX file to another format (e.g. SVG)\n"
@@ -88,6 +90,9 @@ int main(int argc, char* argv[]) {
   }
   if (command == "font") {
     return pagx::cli::RunFont(argc - 1, argv + 1);
+  }
+  if (command == "embed") {
+    return pagx::cli::RunEmbed(argc - 1, argv + 1);
   }
   if (command == "format") {
     return pagx::cli::RunFormat(argc - 1, argv + 1);
