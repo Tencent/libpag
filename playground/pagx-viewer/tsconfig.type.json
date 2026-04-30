@@ -8,7 +8,7 @@
     "removeComments": false,
     "skipLibCheck": true,
     "experimentalDecorators": true,
-    "moduleResolution": "Node",
+    "moduleResolution": "bundler",
     "baseUrl": ".",
     "paths": {
       "@tgfx/*": ["../../third_party/tgfx/web/src/*"]

@@ -19,7 +19,7 @@ The SDK is composed of two files after build:
 ## Quick Start
 
 ```typescript
-import { PAGXInit } from 'pagx-viewer.esm'; // pagx-viewer.esm.js
+import { PAGXInit } from 'pagx-viewer';
 
 // Initialize the WASM module.
 const PAGX = await PAGXInit({

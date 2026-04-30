@@ -24,7 +24,7 @@
  * before the main rollup build starts.
  *
  * Usage:
- *   node script/prebuild.js [--release]
+ *   node scripts/prebuild.js [--release]
  */
 
 import fs from 'fs';

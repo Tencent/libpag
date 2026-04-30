@@ -22,7 +22,7 @@ import commonJs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
 import alias from '@rollup/plugin-alias';
 import path from "path";
-import {readFileSync, readdirSync, unlinkSync, copyFileSync, mkdirSync, existsSync} from "node:fs";
+import {readFileSync, readdirSync, unlinkSync} from "node:fs";
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -50,28 +50,6 @@ if (isRelease) {
     }
 }
 
-// Copy fonts and other assets after build
-function copyAssetsPlugin() {
-    return {
-        name: 'copy-assets',
-        writeBundle() {
-            const fontsDir = path.resolve(playgroundRoot, 'fonts');
-            if (!existsSync(fontsDir)) {
-                mkdirSync(fontsDir, { recursive: true });
-            }
-            const fontFiles = ['NotoSansSC-Regular.otf', 'NotoColorEmoji.ttf'];
-            for (const font of fontFiles) {
-                const fontSrc = path.resolve(libpagRoot, 'resources/font', font);
-                if (existsSync(fontSrc)) {
-                    copyFileSync(fontSrc, path.join(fontsDir, font));
-                }
-            }
-
-            console.log('Assets copied to public/');
-        }
-    };
-}
-
 const plugins = [
     esbuild({tsconfig: path.resolve(__dirname, "../src/tsconfig.json"), minify: isRelease}),
     json(),
@@ -80,7 +58,6 @@ const plugins = [
     alias({
         entries: [
             { find: '@tgfx', replacement: path.resolve(libpagRoot, 'third_party/tgfx/web/src') },
-            // { find: 'pagx-viewer', replacement: path.resolve(playgroundRoot, '../pagx-viewer/src/ts/pagx.ts') },
         ],
     }),
     {
@@ -92,7 +69,6 @@ const plugins = [
             return null;
         },
     },
-    // copyAssetsPlugin(),
 ];
 
 export default [

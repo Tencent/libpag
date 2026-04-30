@@ -18,7 +18,7 @@
     "types"
   ],
   "scripts": {
-    "clean": "rimraf dist wasm-mt build-pagx-viewer .*.md5",
+    "clean": "rimraf lib types wasm-mt build-pagx-viewer .*.md5",
     "build:wasm": "node script/cmake.js -a wasm-mt",
     "build:wasm:debug": "node script/cmake.js -a wasm-mt --debug",
     "build:types": "tsc -p tsconfig.type.json",

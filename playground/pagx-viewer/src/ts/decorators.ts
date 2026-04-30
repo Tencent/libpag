@@ -16,19 +16,27 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-export function destroyVerify(constructor: any) {
-  const functions = Object.getOwnPropertyNames(constructor.prototype).filter(
-    (name) => name !== 'constructor' && typeof constructor.prototype[name] === 'function',
+interface DestroyableConstructor {
+  name: string;
+  prototype: { isDestroyed: boolean };
+}
+
+export function destroyVerify<T extends DestroyableConstructor>(constructor: T): void {
+  const prototype = constructor.prototype as Record<string, unknown>;
+  const functions = Object.getOwnPropertyNames(prototype).filter(
+    (name) => name !== 'constructor' && typeof prototype[name] === 'function',
   );
 
-  const proxyFn = (target: { [prop: string]: any }, methodName: string) => {
-    const fn = target[methodName];
-    target[methodName] = function (...args: any[]) {
-      if (this['isDestroyed']) {
-        throw new Error(`Cannot call ${methodName} of the ${constructor.name} that has been destroyed.`);
+  const proxyFn = (target: Record<string, unknown>, methodName: string) => {
+    const fn = target[methodName] as (...args: unknown[]) => unknown;
+    target[methodName] = function (this: { isDestroyed: boolean }, ...args: unknown[]) {
+      if (this.isDestroyed) {
+        throw new Error(
+          `Cannot call ${methodName} of the ${constructor.name} that has been destroyed.`,
+        );
       }
       return fn.call(this, ...args);
     };
   };
-  functions.forEach((name) => proxyFn(constructor.prototype, name));
+  functions.forEach((name) => proxyFn(prototype, name));
 }

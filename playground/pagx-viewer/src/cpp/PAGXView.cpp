@@ -306,11 +306,11 @@ void PAGXView::draw() {
     return;
   }
   auto canvas = surface->getCanvas();
-  canvas->clear();
 
   if (useCustomBackgroundColor) {
     canvas->clear(customBackgroundColor);
   } else {
+    canvas->clear();
     auto density = currentCanvasWidth > 0 ? static_cast<float>(surface->width()) /
                                                 static_cast<float>(currentCanvasWidth)
                                           : 1.0f;

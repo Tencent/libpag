@@ -24,7 +24,11 @@ using namespace emscripten;
 EMSCRIPTEN_BINDINGS(PAGXPlayground) {
   class_<pagx::PAGXView>("_PAGXView")
       .smart_ptr<std::shared_ptr<pagx::PAGXView>>("_PAGXView")
-      .class_function("_MakeFrom", optional_override([](const std::string& canvasID) {
+      .class_function("_MakeFrom",
+                      // Lambda is required here: optional_override() only accepts a callable
+                      // with an emscripten-compatible signature. A named function would also work
+                      // but adds another symbol for a one-off adapter.
+                      optional_override([](const std::string& canvasID) {
                         if (canvasID.empty()) {
                           return std::shared_ptr<pagx::PAGXView>(nullptr);
                         }

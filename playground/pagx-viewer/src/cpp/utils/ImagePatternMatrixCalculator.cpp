@@ -127,6 +127,10 @@ bool ResolveImagePatternMatrix(pagx::ImagePattern* pattern) {
   if (end == scaleModeIt->second.c_str()) {
     return false;
   }
+  if (scaleModeInt < static_cast<int>(ImageScaleMode::STRETCH) ||
+      scaleModeInt > static_cast<int>(ImageScaleMode::TILE)) {
+    return false;
+  }
   auto scaleMode = static_cast<ImageScaleMode>(scaleModeInt);
 
   float nodeWidth = 0.0f, nodeHeight = 0.0f;

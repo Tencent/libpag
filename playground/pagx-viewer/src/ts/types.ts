@@ -16,40 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+import { TGFX } from '@tgfx/types';
 import { PAGXView } from './pagx-view';
-
-/**
- * Emscripten GL context interface.
- */
-export interface EmscriptenGLContext {
-  handle: number;
-  GLctx: WebGLRenderingContext;
-  attributes: EmscriptenGLContextAttributes;
-  initExtensionsDone: boolean;
-  version: number;
-}
-
-export type EmscriptenGLContextAttributes = { majorVersion: number; minorVersion: number } &
-  WebGLContextAttributes;
-
-export interface EmscriptenGL {
-  contexts: (EmscriptenGLContext | null)[];
-  createContext: (
-    canvas: HTMLCanvasElement | OffscreenCanvas,
-    webGLContextAttributes: EmscriptenGLContextAttributes
-  ) => number;
-  currentContext?: EmscriptenGLContext;
-  deleteContext: (contextHandle: number) => void;
-  framebuffers: (WebGLFramebuffer | null)[];
-  getContext: (contextHandle: number) => EmscriptenGLContext;
-  getNewId: (array: unknown[]) => number;
-  makeContextCurrent: (contextHandle: number) => boolean;
-  registerContext: (
-    ctx: WebGLRenderingContext,
-    webGLContextAttributes: EmscriptenGLContextAttributes
-  ) => number;
-  textures: (WebGLTexture | null)[];
-}
 
 /**
  * A vector of strings returned from the WASM module.
@@ -171,8 +139,7 @@ export interface _PAGXView {
 /**
  * The PAGX Viewer WebAssembly module.
  */
-export interface PAGXModule extends EmscriptenModule {
-  GL: EmscriptenGL;
+export interface PAGXModule extends TGFX {
   _PAGXView: {
     /**
      * Creates a native PAGXView instance from a canvas element.
@@ -182,5 +149,4 @@ export interface PAGXModule extends EmscriptenModule {
     _MakeFrom: (canvasID: string) => _PAGXView | null;
   };
   PAGXView: typeof PAGXView;
-  [key: string]: any;
 }

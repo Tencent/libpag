@@ -18,7 +18,7 @@ PAGX Viewer 将 libpag 的 PAGX 渲染引擎封装为一个体积小、无依赖
 ## 快速开始
 
 ```typescript
-import { PAGXInit } from 'pagx-viewer.esm'; // pagx-viewer.esm.js
+import { PAGXInit } from 'pagx-viewer';
 
 // 初始化 WASM 模块。
 const PAGX = await PAGXInit({

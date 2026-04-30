@@ -671,10 +671,10 @@ async function loadWasm(): Promise<void> {
     }
     playgroundState.pagxView = pagxView;
     updateSize();
-    playgroundState.pagxView?.updateZoomScaleAndOffset(1.0, 0, 0);
+    pagxView.updateZoomScaleAndOffset(1.0, 0, 0);
     const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
     bindCanvasEvents(canvas);
-    playgroundState.pagxView?.start();
+    pagxView.start();
     setupVisibilityListeners();
 }
 

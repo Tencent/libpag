@@ -25,7 +25,7 @@ import { PAGXView } from './pagx-view';
  * Binding PAGX JS module on PAGX WebAssembly module.
  */
 export function PAGXBind(module: PAGXModule): void {
-  TGFXBind(module as any);
+  TGFXBind(module);
   setPAGXModule(module);
   module.PAGXView = PAGXView;
 }
