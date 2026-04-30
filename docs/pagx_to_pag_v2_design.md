@@ -126,38 +126,24 @@ PAG v1 是现有的渲染二进制格式，服务于 PAGX 之前的 AE 动画工
 - 3 Context 共享 `DiagnosticCollector` 基类提供的 MAX_DIAGNOSTICS cap 与 message 截断；具体 API 定义见 §8.5。DecodeContext 另持 `currentStream` 在 wrapper 内自动填 byteOffset；BakeContext / InflaterContext 的 byteOffset 恒 0；InflaterContext 不持有 `errors`（无 fatal 语义）。
 - **阅读链**：先读本 §3.2 全览表 → 再读 §22 开工必读 14 条 → 编码期按需查 §3.3 术语索引。
 
-### 3.3 术语与权威定义索引（P2-5 v2.18 新增）
+### 3.3 术语索引
 
-新接手 AI 通过本表快速定位任意术语的唯一权威章节，无需跨节猜测。所有术语**只有一个**权威定义点；其他章节出现仅为引用。
+快速定位核心术语的权威章节。辅助类型（`RAII guard`、`*Result`、`pendingMasks`、`layerByPath` 等）的含义在所在章节内首次出现处注释给出，不在此列举。
 
 | 术语 | 含义 | 权威章节 |
 |---|---|---|
-| `PAGX` | 内部 XML 动画编辑格式（`.pagx`） | §1.1 背景 |
-| `PAGXDocument` | PAGX 运行时内存对象树（`pagx::PAGXDocument`），Baker 输入 | `include/pagx/PAGXDocument.h` |
-| `PAG v1` | 旧二进制 `.pag` 格式（version=0x01），v1 播放器消费 | `include/pag/file.h` |
-| `PAG v2` | 新二进制 `.pag` 格式（version=0x02），本文档主题 | §4.1 容器头 |
-| `PAGDocument` | PAG v2 的中间数据模型（C++ 结构），Baker 产出 / Codec 输入 / Inflater 输入 | §C.5-pre |
-| `bytes` | PAG v2 字节流（`.pag` 文件或内存 buffer） | §4 |
-| `tgfx::Layer` | tgfx 渲染层树，最终渲染对象 | `include/tgfx/layers/Layer.h` |
-| `Baker` | PAGX → PAGDocument 转换（状态 1→2），实现于 `src/pagx/pag/Baker.cpp` | §7 / §8.3bis |
-| `Codec` | PAGDocument ↔ bytes 编解码（状态 2↔3），实现于 `src/pagx/pag/Codec.cpp` | §8 |
-| `Inflater` / `LayerInflater` | PAGDocument → tgfx::Layer（状态 4→5），实现于 `src/pagx/pag/LayerInflater.cpp` | §9 |
-| `BakeContext` | Baker 的 Context 对象，持错误收集 + 深度 + 全局计数熔断 | §8.5 |
-| `DecodeContext` | Codec Decode 的 Context 对象，持 streamContext + byteOffset | §8.5 |
-| `InflaterContext` | Inflater 的 Context 对象，持 warnings + layerByPath + pendingMasks + visitingComposition + currentCompositionDepth + totalInflatedLayers（P1-10 v2.19 补）| §9.4 |
-| `DiagnosticCollector` | 所有 Context 的诊断收集基类（P0-3 v2.18） | §8.5 |
-| `BakeResult` / `DecodeResult` / `EncodeResult` | Baker / Codec::Decode / Codec::Encode 的内部返回类型 | §8.1 / §8.3bis |
-| `PAGExporter::Result` / `PAGLoader::Result` | 对外 API 的返回类型（含 ok + errors + warnings 契约） | §15.2 / §15.3 |
-| `Diagnostic` | 对外诊断结构 `{code, message, byteOffset, contextIndex}` | §15.1 |
-| `DiagnosticCode` / `ErrorCode` | 同一枚举的对外名 / 内部名（alias） | §G.2 + §15.1 |
-| `layerPath` | Layer 在 composition 树中的结构坐标（uint32 array） | §12.1 |
+| `PAGX` / `PAGXDocument` | PAGX 格式（`.pagx`，内部 XML 动画编辑格式）与其运行时内存对象树 | `include/pagx/PAGXDocument.h` |
+| `PAG v1` / `PAG v2` | 旧 `.pag`（version=0x01）与本文档定义的新 `.pag`（version=0x02） | §4.1 |
+| `PAGDocument` | PAG v2 中间数据模型，Baker 产出 / Codec 输入 / Inflater 输入 | §C.5-pre |
+| `Baker` | PAGX → PAGDocument 转换 | §7 / §8.3bis |
+| `Codec` | PAGDocument ↔ bytes 编解码 | §8 |
+| `Inflater` / `LayerInflater` | PAGDocument → tgfx::Layer | §9 |
+| `BakeContext` / `DecodeContext` / `InflaterContext` | 三个阶段的 Context 对象（状态 + 诊断收集） | §8.5 / §9.4 |
+| `EncodeSession` | Encode 阶段 `{DiagnosticCollector*, StreamContext*}` 2 指针聚合 | §8.5 |
+| `Diagnostic` / `DiagnosticCode` | 对外诊断结构 `{code, message, byteOffset, contextIndex}` 与错误码枚举 | §15.1 / §G.2 |
 | `PackedLayerPath` | layerPath 打包为 uint64 的 hashable key | §9.4 |
-| `visitingComposition` | Inflater 的 composition 引用图追踪数组（防环） | §9.4 |
-| `pendingMasks` | Inflater Pass 1 收集的 mask 延迟绑定列表 | §9.4 / §12.2 |
-| `layerByPath` | Inflater `PackedLayerPath → tgfx::Layer*` 查表 | §9.4 |
-| `CurrentStreamScope` / `CompositionVisitScope` / `ZeroCopyScope::DecodeLocal` | RAII guard（Codec SubStream / composition 环 / 零拷贝 scope） | §8.5 / §9.4 / §D.1 |
 
-**用法**：搜索某术语的权威定义直接定位本表；搜索"谁在使用术语 X"用 `grep -n "X"`。本表与文档正文同步——PR 新增术语必须在此表加一行。
+**用法**：术语权威定义搜索本表；PR 新增术语必须在此表加一行。
 
 ---
 
@@ -490,10 +476,16 @@ struct BakeResult {
 
 class Codec {
  public:
-  // Encode 内部构造 `EncodeSession session{&diag, &sc}` 栈对象（§8.5 P0-D v2.19）——
+  // Encode 内部构造 `EncodeSession session{&diag, &sc}` 栈对象（§8.5）——
   // Encode 失败只产生 warnings，不产生 errors；无需调用侧传策略位。
   // PAGExporter::Options::strict 由 PAGExporter.cpp 在 Result 装配阶段通过 SeverityOf 做 warning→error 晋升，
   // 不在 Codec 内承载——保持 Codec 只管字节流 I/O，不混策略。
+  //
+  // 契约：
+  //   - 输入：不为空的 PAGDocument 引用（调用方保证生命周期覆盖整个 Encode 调用）。
+  //   - 输出：EncodeResult.bytes 非空表示成功；.warnings 非空表示 encode 期累积的告警（如 BlendModeUnmapped）。
+  //   - 异常：不抛异常；不接受 nullptr；内部所有错误走 DiagnosticCollector。
+  //   - 线程：无共享状态；可在 ≥1 线程并行调用（不同 doc）。
   static EncodeResult Encode(const PAGDocument& doc);
   static DecodeResult Decode(const uint8_t* data, size_t length);
 };
@@ -1072,9 +1064,20 @@ Inflater 内部使用的轻量上下文，承载 warning 收集 + pendingMasks +
 ```cpp
 namespace pagx::pag {
 
-// layerPath 打包成 uint64：最深 64 层（≤ MAX_LAYER_DEPTH），每级 10 bit（≤ MAX_CHILDREN_PER_LAYER=1024
-// 已覆盖 PAG 实际最大 child 数），剩余位记 depth（6 bit）。此打包 hash 值不由攻击者可控
+// layerPath 打包成 uint64：最深 64 层（≤ MAX_LAYER_DEPTH），低 5 级承载（每级 10 bit，≤ MAX_CHILDREN_PER_LAYER=1024
+// 已覆盖 PAG 实际最大 child 数），低 6 bit 记真实 depth。此打包 hash 值不由攻击者可控
 // 序列生成（path 是 Baker 内部拼装的结构坐标，非字节流字段），故可安全用 unordered_map。
+//
+// 位布局（uint64，LSB 起）：
+//   bit[0..5]   (6 bit)  真实深度 n（≤ 63；n 超 63 时饱和为 63，仅影响 deep/超 deep 的哈希区分）
+//   bit[6..15]  (10 bit) level 0 child index
+//   bit[16..25] (10 bit) level 1 child index
+//   bit[26..35] (10 bit) level 2 child index
+//   bit[36..45] (10 bit) level 3 child index
+//   bit[46..55] (10 bit) level 4 child index
+//   bit[56..63] (8 bit)  reserved（写 0；未来可扩为第 6 级 8 bit 承载）
+//
+// 深度 > 5 的路径通过低 5 级 + 真实 depth 区分；实际 PAG 样本 99% 深度 ≤ 5，超深路径退化为哈希碰撞但不会冲突误判（`operator==` 严格比较 value）。
 struct PackedLayerPath {
   uint64_t value = 0;
   bool operator==(const PackedLayerPath& o) const { return value == o.value; }
@@ -1082,16 +1085,11 @@ struct PackedLayerPath {
 struct PackedLayerPathHash {
   size_t operator()(const PackedLayerPath& p) const { return std::hash<uint64_t>{}(p.value); }
 };
-// Pack 规则：bit[0..5]=depth, bit[6..15]=level0 child index, bit[16..25]=level1, ...
-// 最多 6 级足以覆盖 §H.1 的 MAX_LAYER_DEPTH=64 场景（单路径深度 ≤ 6 在实际 PAG 样本中占 99%；
-// 极深路径退化为哈希碰撞，但非攻击者可构造）——超 6 级仍可通过取低 6 级 + depth 唯一化。
 // P1-8 v2.16：header-only inline + span 签名消除 Baker pre-pass 10000 Layer × 1 次 vector heap 分配。
-// 原 `const std::vector<uint32_t>&` 即使传已有 vector 也会触发 allocation（tail padding / move 保护），
-// 换 pointer + size 签名更确定。调用点 `PackLayerPath(path.data(), path.size())` 无额外分配。
 inline PackedLayerPath PackLayerPath(const uint32_t* data, size_t n) {
   PackedLayerPath out{};
-  const size_t depth = std::min<size_t>(n, 6);  // 低 6 级承载
-  out.value = static_cast<uint64_t>(n & 0x3F);  // bit[0..5] 存真实深度（不截断，用于区分 {1,2} 与 {1,2,0}）
+  const size_t depth = std::min<size_t>(n, 5);  // 低 5 级承载，保证 bit 偏移 ≤ 55 不越 uint64 边界
+  out.value = static_cast<uint64_t>(std::min<size_t>(n, 63)) & 0x3F;  // bit[0..5] 存真实深度（饱和到 63）
   for (size_t i = 0; i < depth; ++i) {
     const uint64_t idx10 = static_cast<uint64_t>(data[i] & 0x3FF);   // 每级 10 bit，饱和截断到 1023
     out.value |= idx10 << (6 + i * 10);
@@ -2997,14 +2995,16 @@ cmake --build cmake-build-debuglocal --target PAGFullTest
 
 详见上一轮"测试用例清单"的表格，此处不赘述。每个 Baker 子模块对应一个 test 文件，test 命名对齐 LayerBuilder 行号段。
 
-### 18.4bis 压缩机制专项测试（v2.0 新增，共约 25 条）
+### 18.4bis 压缩机制专项测试（共约 20 条，边界通过参数化聚合）
 
-> **目的**：v2.0 引入 7 个压缩/扩展机制（A1/A3/B1/B2/C1/C2/D2），错误码路径已由附录 G.6 矩阵覆盖，但**成功路径的往返正确性 + 边界行为**需要独立测试。**这些测试放在 `test/src/pag/codec/` 目录下**，与 Baker 单测并列，不依赖 PAGX 样本，纯 PAGDocument 构造驱动。
+> **目的**：v2.0 引入 7 个压缩/扩展机制（A1/A3/B1/B2/C1/C2），错误码路径已由附录 G.6 矩阵覆盖，但**成功路径的往返正确性 + 边界行为**需要独立测试。**这些测试放在 `test/src/pag/codec/` 目录下**，与 Baker 单测并列，不依赖 PAGX 样本，纯 PAGDocument 构造驱动。
+>
+> **参数化优先原则**：多组边界值（浮点边界、矩阵类型、Path 精度等级等）优先使用 GoogleTest `TEST_P` 参数化聚合为 1 条测试 + N 组参数，而非平铺为 N 条独立测试。以此控制测试条目膨胀与维护成本。
 
 | 文件 | Test 组 | 断言要点 |
 |---|---|---|
 | `ColorCodecTest.cpp` | `ColorCodec.RoundTripAllU8Values` | 0-255 × 4 通道往返；`U8ToFloat(FloatToU8(v))` 量化误差 ≤ 1/255 |
-| | `ColorCodec.FloatToU8Boundary` | NaN → 0，-0.1f → 0，1.5f → 255，Inf → 255；边界值 0.5f → 128 |
+| | `ColorCodec.FloatEdgeCases`（**参数化**） | 覆盖以下浮点边界（FloatToU8 输出应全部 clamp 到 [0, 255]）：<br/>• NaN / -NaN → 0<br/>• +INF → 255<br/>• -INF → 0<br/>• -0.0 → 0<br/>• FLT_MAX → 255<br/>• FLT_MIN（subnormal）→ 0<br/>• -0.1f → 0（负值 clamp）<br/>• 1.5f → 255（超界 clamp）<br/>• 0.5f → 128（中间值四舍五入） |
 | | `ColorCodec.RoundTripViaStream` | `EncodeStream → DecodeStream` 往返，bytes == 4 |
 | `PropertyCodecTest.cpp` | `PropertyCodec.IsDefaultSkipValue` | `MakeProp(1.0f)` with defaultValue=1.0f → 字节流仅 1 B |
 | | `PropertyCodec.IsDefaultRoundTrip` | 非默认值往返后 `Property<T>::value` 一致 |
@@ -3015,6 +3015,7 @@ cmake --build cmake-build-debuglocal --target PAGFullTest
 | | `MatrixCodec.FullMatrix` | 任意 scale+skew → 25 bytes |
 | | `MatrixCodec.Matrix3DIdentity` | `Matrix3D::I()` 写出 1 byte；非 I → 65 bytes |
 | | `MatrixCodec.RoundTrip` | 随机生成 100 个 Matrix，encode→decode 后 `operator==` 成立 |
+| | `MatrixCodec.EdgeCases`（**参数化**） | 覆盖以下边界（P: TEST_P 参数化枚举，一条测试多组断言）：<br/>• 纯旋转矩阵（90°/180°/270°/任意角）<br/>• 纯缩放矩阵（scale=100 / 0.001 / -1 反射）<br/>• Singular 矩阵（det=0：退化为直线）<br/>• 极值缩放（FLT_MAX/FLT_MIN 附近）<br/>每组断言 encode→decode 后 matrix.fMat 精确相等 |
 | `PathCodecTest.cpp` | `PathCodec.QuantizedRoundTripSimple` | Move+Line+Close，format=1，量化后 decode 回来 verb 序列一致，坐标误差 ≤ precision |
 | | `PathCodec.QuantizedRoundTripConic` | 含 Conic verb 时 conicWeights 数组独立编码正确 |
 | | `PathCodec.FallbackToFloatFormat` | verbCount=2（极短 path）自动选 format=0 |
@@ -3387,6 +3388,12 @@ double pag_v1_load_ms = (now() - t0).ms();
 - gtest message 输出 sample 名 + 画布 width/height + surface 路径；
 - 人工 diff：对比 `test/baseline/{key}_base.webp` 与 `test/out/{key}.webp` 即可；
 - 确认视觉变更合理时，用户执行 `/accept-baseline` 斜杠命令接受（项目规则，见 `.codebuddy/rules/Test.md`）。
+
+**差异定位辅助**（非必需，推荐在基准变更频繁时启用）：
+- 当环境变量 `PAG_RENDER_DIFF=1` 时，测试 framework 额外计算 path A / path B 像素差异的**最大像素差**、**差异像素占比**、**空间热点**（差异 > 阈值的 tile 坐标），写入 `test/out/{key}_diff.txt`；
+- 最大像素差、差异占比用于快速判断是全图差异还是局部差异（局部差异通常指向具体 Layer 的编解码 bug）；
+- 热点 tile 坐标帮助定位到具体 PAGX 元素。
+- 该辅助诊断 CI 默认关闭（耗时 +2s/sample），仅在本地调试或 Nightly 打开。
 
 ### 18.11 基准更新纪律
 
@@ -4614,6 +4621,10 @@ WriteColor(stream, bakedColor);              // 内部实现 = WriteColorRGBA8
 ```
 
 **禁止事项**：Baker 任何 `ShapeStyleData::color` / `FilterBlock::color` / `TextModifier::fillColor` 等字段的写入路径都**不得**绕过 `ToTGFX`（否则 P3 色的 PAGX 样本在转出 PAG 中会渲染偏色）。项目现有 `ColorSpace` 枚举固定为 `SRGB/DisplayP3` 两值，将来若 pagx 扩展新 ColorSpace 值，需同步在 `ToTGFX(Color)` 和本节补充处理策略——不在本期范围。
+
+**P3 极值色域边界行为**：P3 色域超出 sRGB 时，`ToTGFX` 的 P3→sRGB 矩阵会产生 [r, g, b] 中某通道 < 0 或 > 1 的值。后续 `FloatToU8` 会 clamp 到 [0, 255]，等价于"超出 sRGB 可表达范围的色彩被截断到色域边界"——这是合理降级（不引入异常或 NaN），但语义上损失色彩精度。验证点：
+- 单元测试 `ColorCodec.P3ExtremeGamutClamp`：构造 `pagx::Color{r=1.2, g=-0.1, b=0.5, colorSpace=DisplayP3}`，断言 `ToTGFX` 输出在矩阵运算后各通道 `FloatToU8` clamp 行为符合预期（红 → 255，绿 → 0，蓝在中段）。
+- 测试数据若含 wide-gamut 素材，Baker 告警 `ColorGamutClamped=202`（warning）以便导出方感知。本期若无 P3 素材可推迟实施。
 
 ### D.2 tgfx::Path 的序列化格式
 
