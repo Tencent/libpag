@@ -34,14 +34,10 @@ PAGWindow::PAGWindow(QObject* parent) : QObject(parent) {
 }
 
 void PAGWindow::openFile(QString path) {
-  if (contentView == nullptr) {
+  if (window == nullptr) {
     return;
   }
-  bool result = contentView->getViewModel()->loadFile(path);
-  if (!result) {
-    return;
-  }
-  filePath = path;
+  Q_EMIT requestOpenFile(path);
   window->raise();
   window->requestActivate();
 }
@@ -70,6 +66,7 @@ void PAGWindow::disconnectContentViewSignals() {
     disconnect(viewModel, &ContentViewModel::filePathChanged, taskFactory,
                &PAGTaskFactory::setFilePath);
   }
+  disconnect(viewModel, &ContentViewModel::filePathChanged, this, &PAGWindow::updateFilePath);
   if (auto* pagVM = qobject_cast<PAGViewModel*>(viewModel)) {
     disconnect(pagVM, &PAGViewModel::fileChanged, treeViewModel.get(), &PAGTreeViewModel::setFile);
     disconnect(pagVM, &PAGViewModel::pagFileChanged, editAttributeModel.get(),
@@ -112,6 +109,7 @@ void PAGWindow::connectContentViewSignals() {
     connect(viewModel, &ContentViewModel::filePathChanged, taskFactory,
             &PAGTaskFactory::setFilePath);
   }
+  connect(viewModel, &ContentViewModel::filePathChanged, this, &PAGWindow::updateFilePath);
   if (auto* pagVM = qobject_cast<PAGViewModel*>(viewModel)) {
     connect(pagVM, &PAGViewModel::fileChanged, treeViewModel.get(), &PAGTreeViewModel::setFile,
             Qt::QueuedConnection);
@@ -205,6 +203,10 @@ bool PAGWindow::isUseEnglish() {
 
 QString PAGWindow::getFilePath() {
   return filePath;
+}
+
+void PAGWindow::updateFilePath(const QString& path) {
+  filePath = path;
 }
 
 QQmlApplicationEngine* PAGWindow::getEngine() {

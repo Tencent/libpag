@@ -40,6 +40,7 @@ class PAGWindow : public QObject {
   explicit PAGWindow(QObject* parent = nullptr);
 
   Q_SIGNAL void destroyWindow(PAGWindow* window);
+  Q_SIGNAL void requestOpenFile(const QString& filePath);
 
   Q_SLOT void openFile(QString path);
   Q_SLOT void onPAGViewerDestroyed();
@@ -55,6 +56,7 @@ class PAGWindow : public QObject {
  private:
   void connectContentViewSignals();
   void disconnectContentViewSignals();
+  void updateFilePath(const QString& path);
 
   QString filePath = "";
   QQuickWindow* window = nullptr;
