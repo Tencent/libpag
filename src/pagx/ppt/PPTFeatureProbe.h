@@ -53,17 +53,19 @@ struct PPTFeatureFlags {
                                      // producing a visibly wrong shape unless the layer is baked.
 
   /**
-   * Returns true when at least one unsupported feature is present.
+   * Returns true when at least one unsupported feature is present and the exporter should fall
+   * back to rasterization. Features with no meaningful vector fallback (TextPath, TextModifier,
+   * ColorMatrix, conic/diamond gradients, shear transforms) always trigger rasterization.
+   * Features that have a degraded-but-valid vector fallback (unsupported blend modes fall back
+   * to Normal, wide-gamut colors clamp to sRGB) trigger rasterization only when the caller opts
+   * in via `rasterizeUnsupported`.
    */
-  bool needsRasterization(bool rasterizeUnsupportedBlend, bool rasterizeWideGamut) const {
+  bool needsRasterization(bool rasterizeUnsupported) const {
     if (hasTextPath || hasTextModifier || hasColorMatrix || hasConicGradient ||
         hasDiamondGradient || hasShearTransform) {
       return true;
     }
-    if (rasterizeUnsupportedBlend && hasUnsupportedBlend) {
-      return true;
-    }
-    if (rasterizeWideGamut && hasWideGamutColor) {
+    if (rasterizeUnsupported && (hasUnsupportedBlend || hasWideGamutColor)) {
       return true;
     }
     return false;

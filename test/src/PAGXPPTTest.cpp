@@ -1960,7 +1960,9 @@ PAGX_TEST(PAGXPPTTest, MaskBakeDefault) {
 
   doc->layers.push_back(contentLayer);
 
-  ASSERT_TRUE(ExportAndVerify(*doc, "mask_bake_default"));
+  pagx::PPTExportOptions options;
+  options.rasterizeUnsupported = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "mask_bake_default", options));
 }
 
 PAGX_TEST(PAGXPPTTest, MaskNoBake) {
@@ -1992,7 +1994,6 @@ PAGX_TEST(PAGXPPTTest, MaskNoBake) {
   doc->layers.push_back(contentLayer);
 
   pagx::PPTExportOptions options;
-  options.bakeMask = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "mask_no_bake", options));
 }
 
@@ -2029,11 +2030,10 @@ PAGX_TEST(PAGXPPTTest, MaskNoBakeProducesSmaller) {
   auto vectorPath = outDir + "/mask_size_vector.pptx";
 
   pagx::PPTExportOptions bakedOpts;
-  bakedOpts.bakeMask = true;
+  bakedOpts.rasterizeUnsupported = true;
   ASSERT_TRUE(pagx::PPTExporter::ToFile(*doc, bakedPath, bakedOpts));
 
   pagx::PPTExportOptions vectorOpts;
-  vectorOpts.bakeMask = false;
   ASSERT_TRUE(pagx::PPTExporter::ToFile(*doc, vectorPath, vectorOpts));
 
   auto bakedSize = std::filesystem::file_size(bakedPath);
@@ -2090,7 +2090,6 @@ PAGX_TEST(PAGXPPTTest, MaskNoBakeWithChildLayers) {
   doc->layers.push_back(parentLayer);
 
   pagx::PPTExportOptions options;
-  options.bakeMask = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "mask_no_bake_children", options));
 }
 
@@ -2138,7 +2137,6 @@ PAGX_TEST(PAGXPPTTest, MaskNoBakeWithTransformAndAlpha) {
   doc->layers.push_back(contentLayer);
 
   pagx::PPTExportOptions options;
-  options.bakeMask = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "mask_no_bake_transform_alpha", options));
 }
 
@@ -2772,7 +2770,6 @@ PAGX_TEST(PAGXPPTTest, MaskNoBakeContourType) {
   doc->layers.push_back(contentLayer);
 
   pagx::PPTExportOptions options;
-  options.bakeMask = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "mask_no_bake_contour", options));
 }
 
@@ -3973,7 +3970,7 @@ PAGX_TEST(PAGXPPTTest, LayerNonNormalBlendModeEscalated) {
   doc->layers.push_back(fgLayer);
 
   pagx::PPTExportOptions options;
-  options.rasterizeUnsupportedBlend = true;
+  options.rasterizeUnsupported = true;
   ASSERT_TRUE(ExportAndVerify(*doc, "layer_blend_overlay", options));
 }
 
@@ -3997,7 +3994,7 @@ PAGX_TEST(PAGXPPTTest, LayerNonNormalBlendWithBackdrop) {
   doc->layers.push_back(fg);
 
   pagx::PPTExportOptions options;
-  options.rasterizeUnsupportedBlend = true;
+  options.rasterizeUnsupported = true;
   ASSERT_TRUE(ExportAndVerify(*doc, "layer_blend_with_backdrop", options));
 }
 
@@ -4018,7 +4015,7 @@ PAGX_TEST(PAGXPPTTest, FillBlendModeEscalated) {
   layer->contents.push_back(fill);
   doc->layers.push_back(layer);
   pagx::PPTExportOptions options;
-  options.rasterizeUnsupportedBlend = true;
+  options.rasterizeUnsupported = true;
   ASSERT_TRUE(ExportAndVerify(*doc, "fill_blend_hardlight", options));
 }
 
@@ -4034,7 +4031,6 @@ PAGX_TEST(PAGXPPTTest, RasterizeUnsupportedBlendDisabled) {
   doc->layers.push_back(layer);
 
   pagx::PPTExportOptions options;
-  options.rasterizeUnsupportedBlend = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "raster_blend_disabled", options));
 }
 
@@ -4072,7 +4068,7 @@ PAGX_TEST(PAGXPPTTest, BlendFilterUnsupportedMode) {
 
   doc->layers.push_back(layer);
   pagx::PPTExportOptions options;
-  options.rasterizeUnsupportedBlend = true;
+  options.rasterizeUnsupported = true;
   ASSERT_TRUE(ExportAndVerify(*doc, "blend_filter_unsupported", options));
 }
 
@@ -4092,7 +4088,9 @@ PAGX_TEST(PAGXPPTTest, WideGamutColorEscalated) {
   layer->contents.push_back(rect);
   layer->contents.push_back(fill);
   doc->layers.push_back(layer);
-  ASSERT_TRUE(ExportAndVerify(*doc, "wide_gamut_raster"));
+  pagx::PPTExportOptions options;
+  options.rasterizeUnsupported = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "wide_gamut_raster", options));
 }
 
 PAGX_TEST(PAGXPPTTest, WideGamutGradientEscalated) {
@@ -4121,7 +4119,9 @@ PAGX_TEST(PAGXPPTTest, WideGamutGradientEscalated) {
   layer->contents.push_back(rect);
   layer->contents.push_back(fill);
   doc->layers.push_back(layer);
-  ASSERT_TRUE(ExportAndVerify(*doc, "wide_gamut_grad_raster"));
+  pagx::PPTExportOptions options;
+  options.rasterizeUnsupported = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "wide_gamut_grad_raster", options));
 }
 
 PAGX_TEST(PAGXPPTTest, WideGamutDisabled) {
@@ -4142,7 +4142,6 @@ PAGX_TEST(PAGXPPTTest, WideGamutDisabled) {
   doc->layers.push_back(layer);
 
   pagx::PPTExportOptions options;
-  options.rasterizeWideGamut = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "wide_gamut_disabled", options));
 }
 
@@ -4543,7 +4542,9 @@ PAGX_TEST(PAGXPPTTest, NativeTextWithRadialGradientFill) {
 }
 
 //==============================================================================
-// Bake-path disable toggles (bakeMask covered already; add scrollRect, tiled).
+// scrollRect rasterization toggle. The bake-vs-drop path for masks is covered
+// by the Mask* tests above, and tiled patterns are always baked so no toggle
+// test is needed for them.
 //==============================================================================
 
 PAGX_TEST(PAGXPPTTest, ScrollRectBakeDefault) {
@@ -4557,7 +4558,9 @@ PAGX_TEST(PAGXPPTTest, ScrollRectBakeDefault) {
   layer->contents.push_back(rect);
   layer->contents.push_back(MakeSolidFill(doc.get(), {0.6f, 0.8f, 0.4f, 1.0f}));
   doc->layers.push_back(layer);
-  ASSERT_TRUE(ExportAndVerify(*doc, "scrollrect_bake_default"));
+  pagx::PPTExportOptions options;
+  options.rasterizeUnsupported = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "scrollrect_bake_default", options));
 }
 
 PAGX_TEST(PAGXPPTTest, ScrollRectBakeDisabled) {
@@ -4573,32 +4576,7 @@ PAGX_TEST(PAGXPPTTest, ScrollRectBakeDisabled) {
   doc->layers.push_back(layer);
 
   pagx::PPTExportOptions options;
-  options.bakeScrollRect = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "scrollrect_bake_disabled", options));
-}
-
-PAGX_TEST(PAGXPPTTest, TiledPatternBakeDisabled) {
-  auto doc = pagx::PAGXDocument::Make(400, 300);
-  auto* layer = doc->makeNode<pagx::Layer>();
-  auto* rect = doc->makeNode<pagx::Rectangle>();
-  rect->position = {200, 150};
-  rect->size = {200, 150};
-  auto* image = MakeTestPNGImage(doc.get());
-  auto* pattern = doc->makeNode<pagx::ImagePattern>();
-  pattern->image = image;
-  pattern->tileModeX = pagx::TileMode::Repeat;
-  pattern->tileModeY = pagx::TileMode::Repeat;
-  pattern->matrix = {2, 0, 0, 2, 0, 0};
-  auto* fill = doc->makeNode<pagx::Fill>();
-  fill->color = pattern;
-
-  layer->contents.push_back(rect);
-  layer->contents.push_back(fill);
-  doc->layers.push_back(layer);
-
-  pagx::PPTExportOptions options;
-  options.bakeTiledPattern = false;
-  ASSERT_TRUE(ExportAndVerify(*doc, "tiled_bake_disabled", options));
 }
 
 PAGX_TEST(PAGXPPTTest, BridgeContoursDisabled) {

@@ -348,10 +348,8 @@ pagx export --format svg --input icon.pagx       # force SVG output format
 pagx export --format pptx --input icon.pagx      # force PPTX output format
 pagx export --input icon.pagx --svg-indent 4     # 4-space indent
 pagx export --input icon.pagx --text-to-path     # convert text to paths
-pagx export --input icon.pagx --output out.pptx --ppt-no-bake-mask  # vector masks
-pagx export --input icon.pagx --output out.pptx --ppt-no-bake-tiled-pattern  # native a:tile
 pagx export --input icon.pagx --output out.pptx --ppt-no-bridge-contours  # separate sub-paths
-pagx export --input icon.pagx --output out.pptx --ppt-rasterize-blend  # bake unsupported blend against scene
+pagx export --input icon.pagx --output out.pptx --ppt-rasterize-unsupported  # bake unsupported features
 ```
 
 | Option | Description |
@@ -362,9 +360,7 @@ pagx export --input icon.pagx --output out.pptx --ppt-rasterize-blend  # bake un
 | `--text-to-path` | Convert text to path geometry using pre-shaped glyph outlines (default: native text rendering) |
 | `--svg-indent <n>` | Indentation spaces (default: 2, valid range: 0–16) |
 | `--svg-no-xml-declaration` | Omit the `<?xml ...?>` declaration |
-| `--ppt-no-bake-mask` | Export masked layers as editable vector shapes instead of rasterizing to bitmap |
-| `--ppt-no-bake-tiled-pattern` | Use native OOXML `a:tile` for tiled image patterns instead of rasterizing to bitmap (may produce inconsistent scaling across apps) |
 | `--ppt-no-bridge-contours` | Emit each contour as a separate sub-path instead of bridging nested contours (default: bridge on) |
-| `--ppt-rasterize-blend` | Rasterize layers whose blend mode is outside of `Normal`/`Multiply`/`Screen`/`Darken`/`Lighten` (the only ones OOXML can express) into a PNG patch that includes the backdrop beneath the layer, so the blend composites correctly against the real scene — at the cost of turning native content under the patch into baked pixels. Off by default, which silently drops the blend mode and renders the layer as `Normal`, preserving full editability |
+| `--ppt-rasterize-unsupported` | Rasterize layers that use features OOXML cannot represent natively — masks, scrollRect clipping, blend modes outside of `Normal`/`Multiply`/`Screen`/`Darken`/`Lighten`, and wide-gamut color. For unsupported blend modes the backdrop beneath the layer is baked into the PNG so the blend composites against the real scene, at the cost of turning native content under the patch into pixels. Off by default, which silently drops these features and emits the layer as editable shapes (mask ignored, scrollRect dropped, blend falls back to `Normal`, wide-gamut clamped to sRGB). Tiled image patterns are always baked regardless of this flag, and features with no vector fallback (TextPath, ColorMatrix, conic/diamond gradient, shear transform) always bake regardless of this flag |
 
 

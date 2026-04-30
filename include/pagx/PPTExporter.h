@@ -38,31 +38,6 @@ struct PPTExportOptions {
   bool convertTextToPath = false;
 
   /**
-   * Whether to rasterize masked layers into bitmap images. When enabled, layers with masks are
-   * rendered to PNG and embedded as picture elements. When disabled, the layer content is exported
-   * as editable vector shapes and the mask effect is ignored. The default value is true.
-   */
-  bool bakeMask = true;
-
-  /**
-   * Whether to rasterize layers that carry a scrollRect (either set explicitly or generated from
-   * clipToBounds during layout) into bitmap images. OOXML has no general-purpose clipping
-   * primitive for arbitrary shape children, so the only way to honour the clip is to bake the
-   * layer (with its scrollRect applied) to PNG. When disabled, the scrollRect is silently dropped
-   * and the layer content is exported as unclipped editable shapes. The default value is true.
-   */
-  bool bakeScrollRect = true;
-
-  /**
-   * Whether to rasterize tiled image patterns into bitmap images. When enabled, ImagePattern fills
-   * with repeat or mirror tile modes are pre-rendered at the shape size and embedded as stretched
-   * images, ensuring identical rendering across PowerPoint and Keynote regardless of DPI settings.
-   * When disabled, the native OOXML a:tile mechanism is used, which may produce inconsistent tile
-   * scaling across applications. The default value is true.
-   */
-  bool bakeTiledPattern = true;
-
-  /**
    * Whether to bridge nested contours within a single path element. When enabled, contours that
    * contain inner holes are connected by bridge edges so the hole is expressed as a single
    * self-intersecting sub-path, which some renderers require for correct even-odd fill. When
@@ -81,25 +56,21 @@ struct PPTExportOptions {
   bool resolveModifiers = true;
 
   /**
-   * Whether to rasterize layers that use blend modes outside of Normal/Multiply/Screen/Darken/
-   * Lighten (the only ones expressible in OOXML a:fillOverlay). When true, the layer and the
-   * backdrop beneath it (clipped to the layer's bounds) are rendered together into a PNG patch
-   * so the blend composites against the real scene and the resulting image visually matches the
-   * tgfx renderer — at the cost of turning any native content (gradients, sibling shapes) under
-   * the patch into baked pixels; surrounding content outside the layer's bounds stays fully
-   * editable. When false, the blend mode is silently dropped and the layer is rendered as Normal,
-   * preserving full editability but losing the blend effect. Rasterizing the layer without the
-   * backdrop is not offered because the result degenerates to a near-flat color patch that is
-   * visually wrong and still covers editable content beneath. The default value is false.
+   * Whether to rasterize layers that use features OOXML cannot represent natively — masks,
+   * scrollRect clipping, blend modes outside of Normal/Multiply/Screen/Darken/Lighten, and
+   * wide-gamut color sources (DisplayP3, etc.). When true, the layer is rendered to a PNG patch
+   * so the visual result matches the tgfx renderer; for unsupported blend modes the backdrop
+   * beneath the layer is baked into the patch as well, turning any native content under it into
+   * pixels so the blend composites correctly. When false, these features are silently dropped
+   * and the layer is emitted as editable vector shapes (the mask effect is ignored, the
+   * scrollRect is dropped, the blend mode falls back to Normal, and wide-gamut colors are
+   * clamped to sRGB), preserving full editability at the cost of visual fidelity. Tiled image
+   * patterns are always rasterized regardless of this flag because the native OOXML a:tile
+   * mechanism produces inconsistent scaling across PowerPoint and Keynote. Features with no
+   * meaningful vector fallback (TextPath, TextModifier, ColorMatrix, conic/diamond gradients,
+   * shear transforms) are always rasterized regardless of this flag. The default value is false.
    */
-  bool rasterizeUnsupportedBlend = false;
-
-  /**
-   * Whether to rasterize layers whose color sources reference wide-gamut color spaces (DisplayP3,
-   * etc.) so the visual appearance is preserved. OOXML colors are always sRGB. When false, the
-   * wide-gamut color is clamped to sRGB and rendered as a solid fill. The default value is true.
-   */
-  bool rasterizeWideGamut = true;
+  bool rasterizeUnsupported = false;
 
   /**
    * Pixel DPI used when a layer has to be rasterized to PNG. The Surface behind every bake (masked
