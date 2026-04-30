@@ -546,38 +546,60 @@ struct PathClosedCheckVisitor {
   }
 };
 
-// Maps a PAGX Stroke's `align` attribute to the CSS `-webkit-text-stroke` width that, combined
-// with `paint-order:stroke fill`, produces the same visible outside thickness as tgfx.
+// Maps a PAGX Stroke's `align` attribute to a CSS `-webkit-text-stroke` width and paint-order
+// that reproduce tgfx's visible stroke. PAGX emits painters in document order and a `<Text>`
+// with both a `<Fill>` and a `<Stroke>` writes Fill first then Stroke, so tgfx renders the
+// full W-wide stroke band on top of the Fill. CSS's default paint-order is `fill stroke`,
+// matching that layering out of the box — so the Center case needs no paint-order override.
 //
-// tgfx visible-outside-the-fill stroke (assuming a Fill is present and placement=Background):
-//   - Center (default): W/2  — stroke band is centred on the glyph edge, Fill covers the inside
-//   - Inside:           0    — the stroke band sits entirely inside the glyph, Fill covers it
-//   - Outside:          W    — the stroke band sits entirely outside the glyph
-//
-// CSS `-webkit-text-stroke: Cpx` is always centred on the glyph edge. With `paint-order:stroke
-// fill` the Fill covers the inside half, so CSS visible outside = C/2. Matching tgfx:
-//   - Center:  emit C = W
-//   - Inside:  suppress the stroke entirely (zero visible outside)
-//   - Outside: emit C = 2W  (CSS visible outside = 2W/2 = W)
-//
-// Returns 0 to indicate no `-webkit-text-stroke` should be emitted.
-static float ResolveTextStrokeCssWidth(float width, StrokeAlign align, bool hasFill) {
+// `-webkit-text-stroke: Cpx` is always centred on the glyph edge (total visible band = C).
+// Per-align mapping:
+//   - Center:  emit C = W, default paint-order. The whole W band paints over the Fill, inner
+//              half occluding the Fill's inner edge, outer half extending past the glyph — the
+//              exact layout tgfx produces for StrokeAlign::Center over a pre-drawn Fill.
+//   - Outside: emit C = 2W with `paint-order:stroke fill` so the Fill repaints on top of the
+//              inner half of the centred band, leaving a W-wide stroke entirely outside the
+//              glyph — matches tgfx's Inside/Outside boolean-op + stroke-on-fill layering.
+//   - Inside:  CSS cannot express a stroke that lives only on the inner half of the glyph
+//              edge (the property is always centred). Suppress emission so nothing spills
+//              outside; the inside stroke color band is lost (documented limitation).
+struct TextStrokeCss {
+  float width = 0.0f;  // value to emit for `-webkit-text-stroke`; 0 means skip emission
+  bool paintOrderStrokeFill = false;  // true → emit `paint-order:stroke fill`
+};
+
+static TextStrokeCss ResolveTextStrokeCss(float width, StrokeAlign align, bool hasFill) {
+  TextStrokeCss out = {};
   if (width <= 0.0f) {
-    return 0.0f;
+    return out;
   }
   switch (align) {
     case StrokeAlign::Inside:
-      // When a Fill is present, the Inside stroke is entirely occluded by the Fill (tgfx
-      // visible = 0). Skip emission to stay faithful. When no Fill is present CSS cannot
-      // express a pure-inside stroke (the property is always centred); fall back to Center
-      // semantics so the stroke at least paints somewhere close to the authored geometry.
-      return hasFill ? 0.0f : width;
+      // No lossless CSS representation. Suppress when a Fill exists so nothing paints
+      // outside the glyph; without a Fill there is no inside/outside distinction so fall
+      // back to Center semantics.
+      if (hasFill) {
+        return out;
+      }
+      out.width = width;
+      out.paintOrderStrokeFill = false;
+      break;
     case StrokeAlign::Outside:
-      return width * 2.0f;
+      if (hasFill) {
+        out.width = width * 2.0f;
+        out.paintOrderStrokeFill = true;
+      } else {
+        out.width = width;
+        out.paintOrderStrokeFill = false;
+      }
+      break;
     case StrokeAlign::Center:
     default:
-      return width;
+      out.width = width;
+      out.paintOrderStrokeFill = false;
+      break;
   }
+  return out;
 }
 }  // namespace
 
@@ -796,14 +818,13 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
   if (stroke && stroke->color && stroke->color->nodeType() == NodeType::SolidColor) {
     auto sc = static_cast<const SolidColor*>(stroke->color);
     bool hasFill = fill && fill->color;
-    float cssWidth = ResolveTextStrokeCssWidth(stroke->width, stroke->align, hasFill);
-    if (cssWidth > 0.0f) {
-      // paint-order:stroke fill draws the stroke first so the Fill on top clips the inside
-      // half of the centred band. Combined with the width chosen by ResolveTextStrokeCssWidth
-      // this reproduces tgfx's per-StrokeAlign visible-outside thickness.
-      style += ";-webkit-text-stroke:" + FloatToString(cssWidth) + "px " +
+    auto strokeCss = ResolveTextStrokeCss(stroke->width, stroke->align, hasFill);
+    if (strokeCss.width > 0.0f) {
+      style += ";-webkit-text-stroke:" + FloatToString(strokeCss.width) + "px " +
                ColorToRGBA(sc->color, stroke->alpha);
-      style += ";paint-order:stroke fill";
+      if (strokeCss.paintOrderStrokeFill) {
+        style += ";paint-order:stroke fill";
+      }
     }
     if (!hasFill) {
       style += ";-webkit-text-fill-color:transparent";
@@ -1243,13 +1264,13 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           }
           if (hasStroke && strokeWidth > 0 && strokeColor.alpha > 0) {
             bool hasFill = fill && fill->color;
-            float cssWidth = ResolveTextStrokeCssWidth(strokeWidth, stroke->align, hasFill);
-            if (cssWidth > 0.0f) {
-              // See writeText above: width is chosen per StrokeAlign so that CSS
-              // paint-order:stroke fill reproduces tgfx's visible-outside thickness.
-              charStyle += ";-webkit-text-stroke:" + FloatToString(cssWidth) + "px " +
+            auto strokeCss = ResolveTextStrokeCss(strokeWidth, stroke->align, hasFill);
+            if (strokeCss.width > 0.0f) {
+              charStyle += ";-webkit-text-stroke:" + FloatToString(strokeCss.width) + "px " +
                            ColorToRGBA(strokeColor, stroke->alpha);
-              charStyle += ";paint-order:stroke fill";
+              if (strokeCss.paintOrderStrokeFill) {
+                charStyle += ";paint-order:stroke fill";
+              }
             }
           }
         }
@@ -1599,16 +1620,18 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         // TextPath emits Fill and Stroke as separate per-character spans on the Stroke pass
         // when no Fill was merged in; emit -webkit-text-stroke so the stroke actually paints,
         // matching tgfx which draws the Stroke around each glyph path just like the non-TextPath
-        // case. Width is chosen per StrokeAlign so CSS paint-order:stroke fill reproduces
-        // tgfx's visible-outside thickness (see writeText for the full mapping).
+        // case. Width and paint-order come from ResolveTextStrokeCss so the StrokeAlign
+        // semantics match tgfx's Fill-then-Stroke layering (see writeText for the mapping).
         if (stroke && stroke->color && stroke->color->nodeType() == NodeType::SolidColor) {
           auto sc = static_cast<const SolidColor*>(stroke->color);
           bool hasFill = fill && fill->color;
-          float cssWidth = ResolveTextStrokeCssWidth(stroke->width, stroke->align, hasFill);
-          if (cssWidth > 0.0f) {
-            charStyle += ";-webkit-text-stroke:" + FloatToString(cssWidth) + "px " +
+          auto strokeCss = ResolveTextStrokeCss(stroke->width, stroke->align, hasFill);
+          if (strokeCss.width > 0.0f) {
+            charStyle += ";-webkit-text-stroke:" + FloatToString(strokeCss.width) + "px " +
                          ColorToRGBA(sc->color, stroke->alpha);
-            charStyle += ";paint-order:stroke fill";
+            if (strokeCss.paintOrderStrokeFill) {
+              charStyle += ";paint-order:stroke fill";
+            }
           }
           if (!hasFill) {
             charStyle += ";-webkit-text-fill-color:transparent";
