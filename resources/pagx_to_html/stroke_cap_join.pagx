@@ -17,7 +17,7 @@
     <!-- Title -->
     <Layer layout="vertical" gap="2" alignment="stretch">
       <Layer height="20">
-        <Text text="Stroke: Cap &amp; Join" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Stroke: Cap &amp; Join" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
@@ -37,7 +37,7 @@
         <!-- Section A: lineCap row -->
         <Layer layout="vertical" gap="6" alignment="stretch">
           <Layer height="12">
-            <Text text="cap" fontFamily="Noto Sans SC" fauxBold="true" fontSize="10" centerX="0" textAnchor="center"/>
+            <Text text="cap" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
           <Layer layout="horizontal" gap="8" alignment="stretch" arrangement="center">
@@ -102,7 +102,7 @@
         <!-- Section B: lineJoin row -->
         <Layer layout="vertical" gap="6" alignment="stretch">
           <Layer height="12">
-            <Text text="join" fontFamily="Noto Sans SC" fauxBold="true" fontSize="10" centerX="0" textAnchor="center"/>
+            <Text text="join" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
           <Layer layout="horizontal" gap="8" alignment="stretch" arrangement="center">

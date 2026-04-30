@@ -12,7 +12,7 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="stretch">
       <Layer height="20">
-        <Text text="Text Baseline &amp; Anchor" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Text Baseline &amp; Anchor" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
@@ -62,7 +62,7 @@
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
             <Fill color="#DBEAFE"/>
             <Layer left="0" right="0" top="0" bottom="0">
-              <Text text="Start" fontFamily="Noto Sans SC" fauxBold="true" fontSize="14" textAnchor="start" left="8" centerY="0"/>
+              <Text text="Start" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="14" textAnchor="start" left="8" centerY="0"/>
               <Fill color="#1D4ED8"/>
             </Layer>
           </Layer>
@@ -77,7 +77,7 @@
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
             <Fill color="#DCFCE7"/>
             <Layer left="0" right="0" top="0" bottom="0">
-              <Text text="Center" fontFamily="Noto Sans SC" fauxBold="true" fontSize="14" textAnchor="center" centerX="0" centerY="0"/>
+              <Text text="Center" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="14" textAnchor="center" centerX="0" centerY="0"/>
               <Fill color="#15803D"/>
             </Layer>
           </Layer>
@@ -92,7 +92,7 @@
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
             <Fill color="#FEF3C7"/>
             <Layer left="0" right="0" top="0" bottom="0">
-              <Text text="End" fontFamily="Noto Sans SC" fauxBold="true" fontSize="14" textAnchor="end" right="8" centerY="0"/>
+              <Text text="End" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="14" textAnchor="end" right="8" centerY="0"/>
               <Fill color="#B45309"/>
             </Layer>
           </Layer>

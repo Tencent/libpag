@@ -13,7 +13,7 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Text Modifier Advanced" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Text Modifier Advanced" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
@@ -32,7 +32,7 @@
 
         <!-- Anchor offset -->
         <Layer height="40">
-          <Text text="ANCHOR" fontFamily="Noto Sans SC" fauxBold="true" fontSize="36" centerX="0" textAnchor="center"/>
+          <Text text="ANCHOR" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="36" centerX="0" textAnchor="center"/>
           <TextModifier anchor="0,-18" rotation="15">
             <RangeSelector start="0" end="1" shape="rampUp"/>
           </TextModifier>
@@ -41,7 +41,7 @@
 
         <!-- Skew + skewAxis -->
         <Layer height="40">
-          <Text text="SKEWED" fontFamily="Noto Sans SC" fauxBold="true" fontSize="36" centerX="0" textAnchor="center"/>
+          <Text text="SKEWED" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="36" centerX="0" textAnchor="center"/>
           <TextModifier skew="25" skewAxis="90">
             <RangeSelector start="0" end="1" shape="triangle"/>
           </TextModifier>
@@ -50,7 +50,7 @@
 
         <!-- StrokeColor + strokeWidth override -->
         <Layer height="44">
-          <Text text="STROKE" fontFamily="Noto Sans SC" fauxBold="true" fontSize="40" centerX="0" textAnchor="center"/>
+          <Text text="STROKE" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="40" centerX="0" textAnchor="center"/>
           <TextModifier strokeColor="#EF4444" strokeWidth="2">
             <RangeSelector start="0" end="1" shape="square"/>
           </TextModifier>
@@ -60,7 +60,7 @@
 
         <!-- RangeSelector mode="subtract" -->
         <Layer height="34">
-          <Text text="SUBTRACT" fontFamily="Noto Sans SC" fauxBold="true" fontSize="30" centerX="0" textAnchor="center"/>
+          <Text text="SUBTRACT" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="30" centerX="0" textAnchor="center"/>
           <TextModifier fillColor="#EC4899" position="10,2">
             <RangeSelector start="0" end="1" shape="square" mode="add"/>
             <RangeSelector start="2" end="5" unit="index" shape="square" mode="subtract"/>
@@ -70,7 +70,7 @@
 
         <!-- RangeSelector mode="intersect" -->
         <Layer height="32">
-          <Text text="INTERSECT" fontFamily="Noto Sans SC" fauxBold="true" fontSize="28" centerX="0" textAnchor="center"/>
+          <Text text="INTERSECT" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="28" centerX="0" textAnchor="center"/>
           <TextModifier position="10,0" fillColor="#3B82F6">
             <RangeSelector start="0" end="0.7" shape="rampUp" mode="add"/>
             <RangeSelector start="0.3" end="1" shape="rampDown" mode="intersect"/>
@@ -81,7 +81,7 @@
         <!-- RangeSelector mode="min" and mode="max" side by side -->
         <Layer layout="horizontal" gap="20" alignment="center" arrangement="center">
           <Layer height="34">
-            <Text text="MIN MAX" fontFamily="Noto Sans SC" fauxBold="true" fontSize="30" centerX="0" textAnchor="center"/>
+            <Text text="MIN MAX" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="30" centerX="0" textAnchor="center"/>
             <TextModifier scale="1.4,1.4" fillColor="#F59E0B">
               <RangeSelector start="0" end="1" shape="rampUp" mode="add"/>
               <RangeSelector start="0" end="1" shape="rampDown" mode="min"/>
@@ -89,7 +89,7 @@
             <Fill color="#1F2937"/>
           </Layer>
           <Layer height="34">
-            <Text text="DIFF" fontFamily="Noto Sans SC" fauxBold="true" fontSize="30" centerX="0" textAnchor="center"/>
+            <Text text="DIFF" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="30" centerX="0" textAnchor="center"/>
             <TextModifier fillColor="#10B981">
               <RangeSelector start="0" end="1" shape="rampUp" mode="add"/>
               <RangeSelector start="0" end="1" shape="rampDown" mode="difference"/>
@@ -100,7 +100,7 @@
 
         <!-- RangeSelector randomOrder + randomSeed -->
         <Layer height="36">
-          <Text text="RANDOM" fontFamily="Noto Sans SC" fauxBold="true" fontSize="32" centerX="0" textAnchor="center"/>
+          <Text text="RANDOM" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="32" centerX="0" textAnchor="center"/>
           <TextModifier position="10,-2" rotation="10" fillColor="#EC4899">
             <RangeSelector start="0" end="0.6" shape="square" randomOrder="true" randomSeed="42"/>
           </TextModifier>

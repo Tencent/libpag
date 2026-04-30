@@ -19,7 +19,7 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Fill Rule Comparison" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Fill Rule Comparison" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
@@ -39,11 +39,11 @@
       <!-- Column headers -->
       <Layer layout="horizontal" gap="0" alignment="center">
         <Layer flex="1" height="22">
-          <Text text="winding" fontFamily="Noto Sans SC" fauxBold="true" fontSize="13" centerX="0" textAnchor="center"/>
+          <Text text="winding" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="13" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
         <Layer flex="1" height="22">
-          <Text text="evenOdd" fontFamily="Noto Sans SC" fauxBold="true" fontSize="13" centerX="0" textAnchor="center"/>
+          <Text text="evenOdd" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="13" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
       </Layer>

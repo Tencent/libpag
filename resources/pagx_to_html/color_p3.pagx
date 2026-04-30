@@ -13,7 +13,7 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Display P3 Colors" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Display P3 Colors" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
@@ -45,7 +45,7 @@
       <!-- P3 row -->
       <Layer layout="horizontal" gap="15" arrangement="center" alignment="center">
         <Layer width="30" height="14">
-          <Text text="P3" fontFamily="Noto Sans SC" fauxBold="true" fontSize="10"/>
+          <Text text="P3" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="10"/>
           <Fill color="#64748B"/>
         </Layer>
         <Layer width="50" height="50">
@@ -77,7 +77,7 @@
       <!-- sRGB row -->
       <Layer layout="horizontal" gap="15" arrangement="center" alignment="center">
         <Layer width="30" height="14">
-          <Text text="sRGB" fontFamily="Noto Sans SC" fauxBold="true" fontSize="10"/>
+          <Text text="sRGB" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="10"/>
           <Fill color="#64748B"/>
         </Layer>
         <Layer width="50" height="50">

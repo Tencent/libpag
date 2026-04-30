@@ -51,7 +51,7 @@
       <Layer layout="horizontal" gap="8" alignment="center" arrangement="spaceBetween">
         <Layer layout="vertical" gap="2">
           <Layer height="18">
-            <Text text="Revenue" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" position="0,0" data-content-type="title"/>
+            <Text text="Revenue" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" position="0,0" data-content-type="title"/>
             <Fill color="#E2E8F0"/>
           </Layer>
           <Layer height="14">
@@ -64,7 +64,7 @@
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
           <Fill color="#10B98130"/>
           <Layer left="0" right="0" top="0" bottom="0">
-            <Text text="+12%" fontFamily="Noto Sans SC" fauxBold="true" fontSize="10" centerX="0" centerY="0" textAnchor="center"/>
+            <Text text="+12%" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="10" centerX="0" centerY="0" textAnchor="center"/>
             <Fill color="#10B981"/>
           </Layer>
         </Layer>
@@ -78,7 +78,7 @@
 
       <!-- Large metric -->
       <Layer height="46" data-content-type="metric" data-value="24580">
-        <Text text="$24,580" fontFamily="Noto Sans SC" fauxBold="true" fontSize="40" position="0,0"/>
+        <Text text="$24,580" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="40" position="0,0"/>
         <Fill color="#F8FAFC"/>
       </Layer>
 

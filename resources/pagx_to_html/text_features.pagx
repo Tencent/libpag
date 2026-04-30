@@ -19,7 +19,7 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="stretch">
       <Layer height="20">
-        <Text text="Text Features" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Text Features" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="@headerGrad"/>
       </Layer>
       <Layer height="14">
@@ -43,7 +43,7 @@
             <Fill color="#94A3B8"/>
           </Layer>
           <Layer height="28">
-            <Text text="SPACED OUT" fontFamily="Noto Sans SC" fauxBold="true" fontSize="22" letterSpacing="8"/>
+            <Text text="SPACED OUT" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="22" letterSpacing="8"/>
             <Fill color="#3B82F6"/>
           </Layer>
         </Layer>
@@ -56,7 +56,7 @@
               <Fill color="#94A3B8"/>
             </Layer>
             <Layer height="24">
-              <Text text="Faux Bold Text" fontFamily="Noto Sans SC" fontSize="20" fauxBold="true"/>
+              <Text text="Faux Bold Text" fontFamily="Noto Sans SC" fontSize="20" fontStyle="Bold"/>
               <Fill color="#8B5CF6"/>
             </Layer>
           </Layer>

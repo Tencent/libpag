@@ -36,7 +36,7 @@
 
   <!-- Title, subtitle, canvas info, border, clipping test, footer -->
   <Layer>
-    <Text text="Hello, PAGX!" fontFamily="Noto Sans SC" fauxBold="true" fontSize="24" position="160,90" textAnchor="center"/>
+    <Text text="Hello, PAGX!" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="24" position="160,90" textAnchor="center"/>
     <Fill color="#1E293B"/>
     <Group>
       <Text text="Root Document Test" fontFamily="Noto Sans SC" fontSize="12" position="160,120" textAnchor="center"/>

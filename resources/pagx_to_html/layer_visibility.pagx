@@ -13,7 +13,7 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="18">
-        <Text text="Layer Visibility" fontFamily="Noto Sans SC" fauxBold="true" fontSize="14" centerX="0" textAnchor="center"/>
+        <Text text="Layer Visibility" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="14" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
@@ -37,7 +37,7 @@
             <Stroke color="#FFFFFF" width="2"/>
             <Group>
               <Ellipse position="55,42" size="8,8"/>
-              <Text text="Visible" fontFamily="Noto Sans SC" fauxBold="true" fontSize="12" position="55,68" textAnchor="center"/>
+              <Text text="Visible" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="12" position="55,68" textAnchor="center"/>
               <Fill color="#FFFFFF"/>
             </Group>
           </Layer>
@@ -64,7 +64,7 @@
               <Stroke color="#94A3B8" width="2" cap="round"/>
             </Group>
             <Group>
-              <Text text="Hidden" fontFamily="Noto Sans SC" fauxBold="true" fontSize="12" position="55,68" textAnchor="center"/>
+              <Text text="Hidden" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="12" position="55,68" textAnchor="center"/>
               <Fill color="#94A3B8"/>
             </Group>
           </Layer>

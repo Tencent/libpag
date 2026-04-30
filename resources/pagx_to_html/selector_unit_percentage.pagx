@@ -12,7 +12,7 @@
     <!-- Title -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="RangeSelector Units" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="RangeSelector Units" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
@@ -35,7 +35,7 @@
             <Fill color="#64748B"/>
           </Layer>
           <Layer height="36">
-            <Text text="HELLO" fontFamily="Noto Sans SC" fauxBold="true" fontSize="28" centerX="0" textAnchor="center"/>
+            <Text text="HELLO" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="28" centerX="0" textAnchor="center"/>
             <TextModifier alpha="0.25" fillColor="#EC4899">
               <RangeSelector start="0.2" end="0.8" unit="percentage" shape="square"/>
             </TextModifier>
@@ -50,7 +50,7 @@
             <Fill color="#64748B"/>
           </Layer>
           <Layer height="36">
-            <Text text="PERCENTAGE" fontFamily="Noto Sans SC" fauxBold="true" fontSize="22" centerX="0" textAnchor="center"/>
+            <Text text="PERCENTAGE" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="22" centerX="0" textAnchor="center"/>
             <TextModifier alpha="0.25" fillColor="#EC4899">
               <RangeSelector start="0.2" end="0.8" unit="percentage" shape="square"/>
             </TextModifier>
@@ -65,7 +65,7 @@
             <Fill color="#64748B"/>
           </Layer>
           <Layer height="36">
-            <Text text="INDEX" fontFamily="Noto Sans SC" fauxBold="true" fontSize="28" centerX="0" textAnchor="center"/>
+            <Text text="INDEX" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="28" centerX="0" textAnchor="center"/>
             <TextModifier alpha="0.25" fillColor="#10B981">
               <RangeSelector start="1" end="3" unit="index" shape="square"/>
             </TextModifier>
@@ -80,7 +80,7 @@
             <Fill color="#64748B"/>
           </Layer>
           <Layer height="36">
-            <Text text="ABSOLUTELY" fontFamily="Noto Sans SC" fauxBold="true" fontSize="22" centerX="0" textAnchor="center"/>
+            <Text text="ABSOLUTELY" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="22" centerX="0" textAnchor="center"/>
             <TextModifier alpha="0.25" fillColor="#10B981">
               <RangeSelector start="1" end="3" unit="index" shape="square"/>
             </TextModifier>

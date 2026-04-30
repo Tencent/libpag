@@ -12,7 +12,7 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Text Basics" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Text Basics" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
@@ -72,7 +72,7 @@
 
       <!-- fauxBold -->
       <Layer height="32">
-        <Text text="Faux Bold" fontFamily="Noto Sans SC" fontSize="28" fauxBold="true"/>
+        <Text text="Faux Bold" fontFamily="Noto Sans SC" fontSize="28" fontStyle="Bold"/>
         <Fill color="#EF4444"/>
       </Layer>
 
@@ -84,7 +84,7 @@
 
       <!-- fontStyle Bold Italic -->
       <Layer height="28">
-        <Text text="Bold Italic" fontFamily="Noto Sans SC" fauxBold="true" fauxItalic="true" fontSize="24"/>
+        <Text text="Bold Italic" fontFamily="Noto Sans SC" fontStyle="Bold" fauxItalic="true" fontSize="24"/>
         <Fill color="#EC4899"/>
       </Layer>
     </Layer>

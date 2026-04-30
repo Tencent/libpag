@@ -13,7 +13,7 @@
     <!-- Title using forward-referenced solid color -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="22">
-        <Text text="Forward Reference" fontFamily="Noto Sans SC" fauxBold="true" fontSize="18" centerX="0" textAnchor="center"/>
+        <Text text="Forward Reference" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="18" centerX="0" textAnchor="center"/>
         <Fill color="@titleColor"/>
       </Layer>
       <Layer height="14">
@@ -36,7 +36,7 @@
               <Ellipse position="60,30" size="30,30"/>
               <Fill color="#FFFFFF30"/>
               <Group>
-                <Text text="Color" fontFamily="Noto Sans SC" fauxBold="true" fontSize="12" position="60,57" textAnchor="center"/>
+                <Text text="Color" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="12" position="60,57" textAnchor="center"/>
                 <Fill color="#FFFFFF"/>
               </Group>
               <Group>
@@ -57,7 +57,7 @@
               <Polystar position="60,30" type="star" pointCount="5" outerRadius="15" innerRadius="7" rotation="-90"/>
               <Fill color="#FFFFFF30"/>
               <Group>
-                <Text text="Gradient" fontFamily="Noto Sans SC" fauxBold="true" fontSize="12" position="60,57" textAnchor="center"/>
+                <Text text="Gradient" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="12" position="60,57" textAnchor="center"/>
                 <Fill color="#FFFFFF"/>
               </Group>
               <Group>

@@ -46,7 +46,7 @@
       <Fill color="@headerGrad"/>
       <!-- TextPath: curved banner title + Subtitle -->
       <Layer>
-        <Text text="FEATURE SHOWCASE" fontFamily="Noto Sans SC" fauxBold="true" fontSize="18" position="0,0" textAnchor="center"/>
+        <Text text="FEATURE SHOWCASE" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="18" position="0,0" textAnchor="center"/>
         <TextPath path="@bannerCurve" baselineOrigin="0,0" perpendicular="true" forceAlignment="true"/>
         <Fill color="#FFE66D"/>
         <Group>
@@ -65,15 +65,15 @@
     <!-- Rich text block -->
     <Layer height="30" layout="horizontal" alignment="center" arrangement="center">
       <Layer height="26">
-        <Text text="Modern " fontFamily="Noto Sans SC" fauxBold="true" fontSize="22" position="0,0"/>
+        <Text text="Modern " fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="22" position="0,0"/>
         <Fill color="#FF6B6B"/>
       </Layer>
       <Layer height="26">
-        <Text text="Infographic " fontFamily="Noto Sans SC" fauxBold="true" fontSize="22" position="0,0"/>
+        <Text text="Infographic " fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="22" position="0,0"/>
         <Fill color="#4ECDC4"/>
       </Layer>
       <Layer height="26">
-        <Text text="Design" fontFamily="Noto Sans SC" fauxBold="true" fontSize="22" position="0,0"/>
+        <Text text="Design" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="22" position="0,0"/>
         <Fill color="#FFE66D"/>
       </Layer>
     </Layer>
@@ -101,7 +101,7 @@
           </Layer>
           <Layer flex="1" layout="vertical" gap="2">
             <Layer height="16">
-              <Text text="Vector Graphics" fontFamily="Noto Sans SC" fauxBold="true" fontSize="13" position="0,0"/>
+              <Text text="Vector Graphics" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="13" position="0,0"/>
               <Fill color="#2C3E50"/>
             </Layer>
             <Layer height="12">
@@ -132,7 +132,7 @@
           </Layer>
           <Layer flex="1" layout="vertical" gap="2">
             <Layer height="16">
-              <Text text="Text Layout" fontFamily="Noto Sans SC" fauxBold="true" fontSize="13" position="0,0"/>
+              <Text text="Text Layout" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="13" position="0,0"/>
               <Fill color="#2C3E50"/>
             </Layer>
             <Layer height="12">
@@ -163,7 +163,7 @@
           </Layer>
           <Layer flex="1" layout="vertical" gap="2">
             <Layer height="16">
-              <Text text="Visual Effects" fontFamily="Noto Sans SC" fauxBold="true" fontSize="13" position="0,0"/>
+              <Text text="Visual Effects" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="13" position="0,0"/>
               <Fill color="#2C3E50"/>
             </Layer>
             <Layer height="12">
@@ -191,7 +191,7 @@
         <Fill color="@coralGrad"/>
         <Fill color="#FFFFFF08" placement="foreground"/>
         <Layer height="18">
-          <Text text="Get Started Today" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
+          <Text text="Get Started Today" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
           <Fill color="#FFFFFF"/>
         </Layer>
         <Layer height="14">

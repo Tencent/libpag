@@ -34,7 +34,7 @@
     <!-- Title -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="GlyphRun Advanced" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="GlyphRun Advanced" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="12">

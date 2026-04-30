@@ -12,7 +12,7 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Transform Priority" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Transform Priority" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
@@ -38,7 +38,7 @@
             </Layer>
           </Layer>
           <Layer height="14">
-            <Text text="x/y only" fontFamily="Noto Sans SC" fauxBold="true" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="x/y only" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#3B82F6"/>
           </Layer>
         </Layer>
@@ -52,7 +52,7 @@
             </Layer>
           </Layer>
           <Layer height="14">
-            <Text text="matrix wins" fontFamily="Noto Sans SC" fauxBold="true" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="matrix wins" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#10B981"/>
           </Layer>
         </Layer>
@@ -66,7 +66,7 @@
             </Layer>
           </Layer>
           <Layer height="14">
-            <Text text="matrix3D wins" fontFamily="Noto Sans SC" fauxBold="true" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="matrix3D wins" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#EF4444"/>
           </Layer>
         </Layer>

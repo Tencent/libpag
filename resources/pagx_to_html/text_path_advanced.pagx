@@ -20,7 +20,7 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="4" alignment="center">
       <Layer height="20">
-        <Text text="Text Path Advanced" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Text Path Advanced" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
@@ -43,7 +43,7 @@
             <Path data="@bannerArc"/>
             <Stroke color="#3B82F6" width="1"/>
           </Layer>
-          <Text text="BANNER" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16"/>
+          <Text text="BANNER" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16"/>
           <TextPath path="@bannerArc" forceAlignment="true"/>
           <Fill color="#3B82F6"/>
         </Layer>
@@ -54,7 +54,7 @@
             <Path data="@uprightArc"/>
             <Stroke color="#8B5CF6" width="1" dashes="4,3"/>
           </Layer>
-          <Text text="UPRIGHT" fontFamily="Noto Sans SC" fauxBold="true" fontSize="10"/>
+          <Text text="UPRIGHT" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="10"/>
           <TextPath path="@uprightArc" perpendicular="false" forceAlignment="true"/>
           <Fill color="#8B5CF6"/>
         </Layer>
@@ -76,7 +76,7 @@
             <Path data="@sPath"/>
             <Stroke color="#F59E0B" width="1"/>
           </Layer>
-          <Text text="S-CURVE PATH" fontFamily="Noto Sans SC" fauxBold="true" fontSize="12"/>
+          <Text text="S-CURVE PATH" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="12"/>
           <TextPath path="@sPath" forceAlignment="true"/>
           <Fill color="#F59E0B"/>
         </Layer>
@@ -87,7 +87,7 @@
             <Path data="@wavyPath"/>
             <Stroke color="#10B981" width="1"/>
           </Layer>
-          <Text text="FORCE ALIGN" fontFamily="Noto Sans SC" fauxBold="true" fontSize="12"/>
+          <Text text="FORCE ALIGN" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="12"/>
           <TextPath path="@wavyPath" forceAlignment="true"/>
           <Fill color="#10B981"/>
         </Layer>

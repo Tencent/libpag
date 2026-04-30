@@ -12,7 +12,7 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Group Opacity" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Group Opacity" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
@@ -32,7 +32,7 @@
         <!-- Left column: groupOpacity=false -->
         <Layer flex="1" layout="vertical" gap="6" alignment="center" arrangement="center">
           <Layer height="14">
-            <Text text="groupOpacity=false" fontFamily="Noto Sans SC" fauxBold="true" fontSize="10" centerX="0" textAnchor="center"/>
+            <Text text="groupOpacity=false" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
           <!-- Overlapping shapes with per-child alpha -->
@@ -57,7 +57,7 @@
         <!-- Right column: groupOpacity=true -->
         <Layer flex="1" layout="vertical" gap="6" alignment="center" arrangement="center">
           <Layer height="14">
-            <Text text="groupOpacity=true" fontFamily="Noto Sans SC" fauxBold="true" fontSize="10" centerX="0" textAnchor="center"/>
+            <Text text="groupOpacity=true" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
           <!-- Overlapping shapes with composited alpha -->

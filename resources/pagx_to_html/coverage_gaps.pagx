@@ -18,7 +18,7 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="6" alignment="center">
       <Layer height="20">
-        <Text text="Coverage Gaps" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Coverage Gaps" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
@@ -106,7 +106,7 @@
           <!-- RangeSelector with offset (non-zero) -->
           <Layer width="150" layout="vertical" gap="10" alignment="center">
             <Layer width="150" height="48">
-              <Text text="OFFSET SEL" fontFamily="Noto Sans SC" fauxBold="true" fontSize="24" position="75,20" textAnchor="center"/>
+              <Text text="OFFSET SEL" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="24" position="75,20" textAnchor="center"/>
               <TextModifier position="8,0" fillColor="#EC4899">
                 <RangeSelector start="0" end="0.5" offset="0.3" shape="triangle"/>
               </TextModifier>
@@ -120,7 +120,7 @@
           <!-- TextPath with baselineAngle (non-zero) -->
           <Layer width="150" layout="vertical" gap="6" alignment="center">
             <Layer width="150" height="50">
-              <Text text="ANGLED BASE" fontFamily="Noto Sans SC" fauxBold="true" fontSize="14" position="75,25"/>
+              <Text text="ANGLED BASE" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="14" position="75,25"/>
               <TextPath path="@wavePath" baselineOrigin="75,25" baselineAngle="15" firstMargin="5"/>
               <Fill color="#10B981"/>
             </Layer>

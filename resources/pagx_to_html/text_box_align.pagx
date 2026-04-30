@@ -12,7 +12,7 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="TextBox textAlign" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="TextBox textAlign" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
@@ -40,7 +40,7 @@
           </TextBox>
         </Layer>
         <Layer height="12">
-          <Text text="start" fontFamily="Noto Sans SC" fauxBold="true" fontSize="9" centerX="0" textAnchor="center"/>
+          <Text text="start" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
       </Layer>
@@ -57,7 +57,7 @@
           </TextBox>
         </Layer>
         <Layer height="12">
-          <Text text="center" fontFamily="Noto Sans SC" fauxBold="true" fontSize="9" centerX="0" textAnchor="center"/>
+          <Text text="center" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
       </Layer>
@@ -74,7 +74,7 @@
           </TextBox>
         </Layer>
         <Layer height="12">
-          <Text text="end" fontFamily="Noto Sans SC" fauxBold="true" fontSize="9" centerX="0" textAnchor="center"/>
+          <Text text="end" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
       </Layer>
@@ -91,7 +91,7 @@
           </TextBox>
         </Layer>
         <Layer height="12">
-          <Text text="justify" fontFamily="Noto Sans SC" fauxBold="true" fontSize="9" centerX="0" textAnchor="center"/>
+          <Text text="justify" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
       </Layer>

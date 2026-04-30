@@ -12,7 +12,7 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="stretch">
       <Layer height="20">
-        <Text text="Stroke: Advanced" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Stroke: Advanced" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
@@ -35,7 +35,7 @@
           <!-- blendMode="multiply" demo -->
           <Layer layout="vertical" gap="6" alignment="center">
             <Layer height="12">
-              <Text text="blendMode=multiply" fontFamily="Noto Sans SC" fauxBold="true" fontSize="10" centerX="0" textAnchor="center"/>
+              <Text text="blendMode=multiply" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
               <Fill color="#94A3B8"/>
             </Layer>
             <Layer width="120" height="70">
@@ -53,7 +53,7 @@
           <!-- miterLimit demo -->
           <Layer layout="vertical" gap="6" alignment="center">
             <Layer height="12">
-              <Text text="miterLimit" fontFamily="Noto Sans SC" fauxBold="true" fontSize="10" centerX="0" textAnchor="center"/>
+              <Text text="miterLimit" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
               <Fill color="#94A3B8"/>
             </Layer>
             <Layer layout="horizontal" gap="12" alignment="stretch" arrangement="center">
@@ -94,7 +94,7 @@
           <!-- dashAdaptive=false -->
           <Layer flex="1" layout="vertical" gap="6" alignment="center">
             <Layer height="12">
-              <Text text="dashAdaptive=false" fontFamily="Noto Sans SC" fauxBold="true" fontSize="10" centerX="0" textAnchor="center"/>
+              <Text text="dashAdaptive=false" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
               <Fill color="#94A3B8"/>
             </Layer>
             <Layer width="160" height="58">
@@ -118,7 +118,7 @@
           <!-- dashAdaptive=true -->
           <Layer flex="1" layout="vertical" gap="6" alignment="center">
             <Layer height="12">
-              <Text text="dashAdaptive=true" fontFamily="Noto Sans SC" fauxBold="true" fontSize="10" centerX="0" textAnchor="center"/>
+              <Text text="dashAdaptive=true" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
               <Fill color="#94A3B8"/>
             </Layer>
             <Layer width="160" height="58">
