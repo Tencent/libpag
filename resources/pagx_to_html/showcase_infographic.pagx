@@ -203,11 +203,11 @@
 
     <!-- Footer with fade mask -->
     <Layer height="30">
-      <Layer id="fadeMaskLayer">
+      <Layer id="fadeMaskLayer" left="0" right="0" top="0" bottom="0">
         <Rectangle left="0" right="0" top="0" bottom="0"/>
         <Fill color="@fadeMask"/>
       </Layer>
-      <Layer mask="@fadeMaskLayer">
+      <Layer mask="@fadeMaskLayer" left="0" right="0" top="0" bottom="0">
         <Rectangle left="0" right="0" top="0" bottom="0"/>
         <Fill color="#F8F9FA"/>
       </Layer>
