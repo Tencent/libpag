@@ -1,6 +1,6 @@
 # PAGX → PAG v2 转换技术方案设计文档
 
-**版本**：2.12
+**版本**：2.13
 **日期**：2026-04-29
 **状态**：待评审 / 待开工
 
@@ -600,11 +600,17 @@ struct DecodeContext {
     // 错误硬上限：errors 达到 MAX_DIAGNOSTICS 后后续调用完全静默（不推 meta，保持幂等）。
     // 调用方按 hasError() 判定，不依赖条数。
     if (errors.size() >= limits::MAX_DIAGNOSTICS) return;
+    if (msg.size() > limits::MAX_DIAGNOSTIC_MESSAGE_BYTES) {
+      msg.resize(limits::MAX_DIAGNOSTIC_MESSAGE_BYTES);   // P1-C：单条 message 截断
+    }
     errors.push_back({code, std::move(msg), currentOffset()});
   }
   void warn(ErrorCode code, std::string msg = {}) {
     // 告警硬上限（见上）：达顶完全静默。
     if (warnings.size() >= limits::MAX_DIAGNOSTICS) return;
+    if (msg.size() > limits::MAX_DIAGNOSTIC_MESSAGE_BYTES) {
+      msg.resize(limits::MAX_DIAGNOSTIC_MESSAGE_BYTES);
+    }
     warnings.push_back({code, std::move(msg), currentOffset()});
   }
   bool hasError() const { return !errors.empty(); }
@@ -631,6 +637,42 @@ struct DecodeContext {
 };
 
 }
+```
+
+**`currentStream` 悬空指针防护**（P1-E，强制 RAII 约束）：`currentStream` 是弱引用，可能指向嵌套 Tag 分发中临时构造的 `SubStream sub` 局部对象。**严禁**手写 `ctx->currentStream = &sub;` 裸赋值（子 sub 析构后旧值仍留在 ctx 里形成悬空指针，后续 `warn()` / `currentOffset()` 读已死对象 → UAF）。所有赋值**必须**走 RAII guard：
+
+```cpp
+namespace pagx::pag {
+
+// 在 SubStream 作用域内临时切换 currentStream，退出自动还原。
+struct CurrentStreamScope {
+  DecodeContext* ctx;
+  pag::DecodeStream* prev;
+  CurrentStreamScope(DecodeContext* c, pag::DecodeStream* s) : ctx(c), prev(c->currentStream) {
+    c->currentStream = s;
+  }
+  ~CurrentStreamScope() { ctx->currentStream = prev; }
+  CurrentStreamScope(const CurrentStreamScope&) = delete;
+  CurrentStreamScope& operator=(const CurrentStreamScope&) = delete;
+};
+
+}
+```
+
+典型用法：
+```cpp
+// Codec::Decode 主循环
+while (true) {
+  TagHeader h = ReadTagHeader(stream);
+  if (h.code == End) break;
+  SubStream sub = stream.slice(h.length);
+  {
+    CurrentStreamScope scope(ctx, &sub);   // 入域切换
+    DispatchTagReader(h.code, sub, ctx);
+  }                                        // 出域自动还原到 stream
+  stream.seek(sub.end);
+}
+ctx->currentStream = nullptr;              // 主循环退出后显式置空
 ```
 
 **Bridge 使用纪律**：
@@ -773,27 +815,16 @@ Inflater 内部使用的轻量上下文，承载 warning 收集 + pendingMasks +
 ```cpp
 namespace pagx::pag {
 
-// std::vector<uint32_t> 的哈希（层路径 key）——std::unordered_map 默认无此特化，必须显式提供。
-struct VectorU32Hash {
-  size_t operator()(const std::vector<uint32_t>& v) const noexcept {
-    // FNV-1a 变体；对短路径（典型 ≤ 8 层）速度足够。
-    size_t h = 0xcbf29ce484222325ULL;
-    for (uint32_t x : v) {
-      h ^= static_cast<size_t>(x);
-      h *= 0x100000001b3ULL;
-    }
-    return h;
-  }
-};
-
 struct InflaterContext {
   // 告警聚合（Inflater 无字节流，byteOffset 恒 0）
   std::vector<Diagnostic> warnings;
 
-  // Mask 两趟状态（§12）
-  std::unordered_map<std::vector<uint32_t>,
-                     std::shared_ptr<tgfx::Layer>,
-                     VectorU32Hash>  layerByPath;   // Pass 1 填充，Pass 2 查
+  // Mask 两趟状态（§12）——用 std::map 而非 unordered_map，避免 hash-flood DoS。
+  // 理由：layerPath 深度 ≤ MAX_LAYER_DEPTH=64，层数 ≤ MAX_LAYERS_PER_COMPOSITION=10000；
+  // O(log N · depth) 有上界保证，hash collision 免疫。若未来确有性能需求再引入
+  // 带进程启动时随机种子的 SipHash-1-3，绝不用编译期常量种子的 FNV-1a（可离线算碰撞）。
+  std::map<std::vector<uint32_t>,
+           std::shared_ptr<tgfx::Layer>>  layerByPath;   // Pass 1 填充，Pass 2 查
   struct PendingMask {
     std::shared_ptr<tgfx::Layer> host;
     std::vector<uint32_t>        targetPath;
@@ -1145,7 +1176,16 @@ enum class DiagnosticCode : uint16_t {
 /**
  * Structured diagnostic emitted by export/load operations.
  *   - `code`       : machine-readable code; callers should dispatch on this.
+ *                    NUMERIC VALUE is part of the stable ABI — callers MAY
+ *                    persist the underlying uint16_t in logs/crash reports
+ *                    and expect it to retain semantic meaning across pagx
+ *                    versions. Deprecating a code means leaving its number
+ *                    reserved, never reusing it for new semantics.
  *   - `message`    : optional human-readable context; may be empty.
+ *                    WARNING: `message` text is unstable English debug text,
+ *                    NOT a translation key. Do NOT persist or switch on it;
+ *                    future pagx may introduce a separate `messageKey` field
+ *                    for i18n (see §G.4).
  *   - `byteOffset` : decoder path = stream->position() at error time; all
  *                    other paths (baker/encoder/inflater) = 0.
  */
@@ -1163,13 +1203,33 @@ struct Diagnostic {
  */
 std::string FormatDiagnostic(const Diagnostic& d);
 
+// ---- 辅助分类函数（cheap adds，零 ABI 风险——函数实现可随版本换）----
+
+/** Severity category derived from code segment. */
+enum class DiagnosticSeverity : uint8_t { Fatal, Warning };
+DiagnosticSeverity SeverityOf(DiagnosticCode code);
+
+/** Stage category derived from code segment. */
+enum class DiagnosticStage : uint8_t { Baker, Codec, Inflater };
+DiagnosticStage StageOf(DiagnosticCode code);
+
+// ---- Version query（cheap add）----
+struct VersionInfo {
+  uint16_t    formatVersion;   // PAG v2 = 0x02
+  const char* gitSha;          // build-time git SHA, short
+  const char* buildDate;       // __DATE__
+};
+VersionInfo Version();
+
 }  // namespace pagx
 ```
 
 **ABI 纪律**：
-- `DiagnosticCode` 是 ABI 承诺的一部分——枚举值**只能在段内追加**，不得复用已删除编号，不得跨段迁移；
+- `DiagnosticCode` 是 ABI 承诺的一部分——枚举值**只能在段内追加**，不得复用已删除编号，不得跨段迁移；**数值稳定**——调用方可持久化 `uint16_t(code)` 到日志/崩溃报告，跨版本保留语义；
 - 内部 `pagx::pag::ErrorCode` **是** `pagx::DiagnosticCode` 的 `using` 别名（见附录 G.2），保持单一真相；
-- 新增内部错误码等同于新增公共枚举值，走"段内追加"即可，不升 FORMAT_VERSION。
+- 新增内部错误码等同于新增公共枚举值，走"段内追加"即可，不升 FORMAT_VERSION；
+- `SeverityOf` / `StageOf` 是非 ABI 承诺（实现可换），但语义承诺稳定：Fatal 对应 100-199/300-399/500-599 段，Warning 对应 200-299/400-499/600-699 段；
+- `Diagnostic::message` 是**不稳定的英文调试文本**，不得持久化或做字符串 switch——未来可能新增 `messageKey` 字段走 i18n 路径。
 
 ### 15.2 `include/pagx/PAGExporter.h`
 
@@ -1238,7 +1298,11 @@ class PAGExporter {
    *
    * Thread-safety: Reentrant; no shared mutable state. Each call independently
    * produces its own Result. Same document MAY be exported concurrently from
-   * multiple threads, but the PAGXDocument itself must not be mutated during export.
+   * multiple threads, but the PAGXDocument itself (and any Data/strings it
+   * holds) must not be mutated during export. Reentrancy guarantees
+   * correctness, not parallel throughput — downstream OS font/image
+   * subsystems may serialize. After this function returns, the input document
+   * may be destroyed; the returned Result is fully self-contained.
    */
   static Result ToFile(const PAGXDocument& document, const std::string& filePath,
                        const Options& options = {});
@@ -1268,6 +1332,11 @@ class PAGExporter {
 // consumes rendered tgfx::Layer trees. For export-only use cases that do
 // not need rendering, include <pagx/PAGExporter.h> instead — that header
 // is tgfx-free.
+//
+// ABI model: SAME-BUILD. pagx-pag and tgfx MUST be built together in the
+// same compilation unit chain. Do NOT mix a prebuilt pagx-pag with a
+// different-version tgfx — tgfx::Layer's vtable/layout is not version-
+// stable. Rebuild pagx-pag whenever you upgrade tgfx. See §I.4 for details.
 
 #include <cstddef>
 #include <cstdint>
@@ -1320,8 +1389,11 @@ class PAGLoader {
    *                empty-but-valid documents — see Result docstring).
    *
    * Thread-safety: Reentrant. Each call produces an independent Layer tree;
-   * safe to invoke concurrently. The returned Layer tree is not itself
-   * thread-safe after this call returns (standard tgfx::Layer contract).
+   * safe to invoke concurrently. The returned Layer tree inherits tgfx::Layer's
+   * thread-affinity rules — treat it as a single-owner, single-render-thread
+   * resource. Reentrancy guarantees correctness, not parallel throughput:
+   * tgfx's font/image global caches may serialize concurrent Inflate calls;
+   * do not exceed CPU core count for best throughput.
    */
   static Result LoadFromBytes(const uint8_t* data, size_t length);
 
@@ -1330,6 +1402,24 @@ class PAGLoader {
    * On read failure, Result has ok=false and a single FileReadFailed error.
    */
   static Result LoadFromFile(const std::string& filePath);
+
+  /**
+   * Lightweight header-only peek. Decodes only the PAG v2 FileHeader (canvas
+   * size + version) without reading the body. Use for thumbnail lists or
+   * bulk-scanning scenarios where the full Layer tree is unnecessary.
+   *
+   * @param data    Pointer to PAG v2 bytes. Null or length<9 → ok=false + TruncatedData.
+   * @param length  Byte count.
+   * @return        PeekResult. Costs ~O(1) (reads <64 bytes).
+   */
+  struct PeekResult {
+    bool     ok = false;
+    int      canvasWidth  = 0;
+    int      canvasHeight = 0;
+    uint8_t  formatVersion = 0;       // 0x02 for PAG v2
+    std::vector<Diagnostic> errors;
+  };
+  static PeekResult Peek(const uint8_t* data, size_t length);
 };
 
 }  // namespace pagx
@@ -1662,19 +1752,31 @@ EXPECT_TRUE(Baseline::Compare(surfaceB, "PAGRenderTest_Render/" + sample));
 
 **Day-1 smoke test**（开工第 1 天 — 本地运行；**不产出基准图、不进入常态 CI、通过后从代码删除**）：
 
+> **实施前置**：Day-1 smoke **不依赖** §19 阶段 9 才交付的 `support/RenderUtil.cpp`——内联一个极简 `RenderLayerLocal(context, layer, w, h)` lambda 到测试内部即可（~20 行，直接 `tgfx::Surface::Make + DisplayList + root->addChild + render`）。阶段 9 统一的 RenderUtil 落地后，smoke 已经被删，不构成依赖悖论。`tgfx::Context*` 通过项目既有的 `pag::TestUtils::GetContext()`（见 `test/src/utils/TestUtils.h`）在 fixture SetUp 里获取。
+
 ```cpp
 TEST(PAGRenderSmoke, LayerBuilderIsDeterministic) {
+  auto context = pag::TestUtils::GetContext();
   auto doc = PAGXImporter::FromFile("spec/samples/<pick_one>.pagx");
   doc->applyLayout();
 
+  // Day-1 内联 helper：不抽到 RenderUtil（阶段 9 才有），见上方前置说明
+  auto renderLocal = [&](std::shared_ptr<tgfx::Layer> layer) {
+    auto surface = tgfx::Surface::Make(context, doc->width, doc->height);
+    tgfx::DisplayList list;
+    list.root()->addChild(layer);
+    list.render(surface.get(), /*clearAll=*/true);
+    return surface;
+  };
+
   auto r1 = LayerBuilder::Build(doc.get());
-  auto s1 = RenderLayerToSurface(context, r1, doc->width, doc->height);
+  auto s1 = renderLocal(r1);
   tgfx::Bitmap bitmap1(s1->width(), s1->height(), false, false);
   tgfx::Pixmap pixmap1(bitmap1);
   ASSERT_TRUE(s1->readPixels(pixmap1.info(), pixmap1.writablePixels()));
 
   auto r2 = LayerBuilder::Build(doc.get());
-  auto s2 = RenderLayerToSurface(context, r2, doc->width, doc->height);
+  auto s2 = renderLocal(r2);
   tgfx::Bitmap bitmap2(s2->width(), s2->height(), false, false);
   tgfx::Pixmap pixmap2(bitmap2);
   ASSERT_TRUE(s2->readPixels(pixmap2.info(), pixmap2.writablePixels()));
@@ -3211,10 +3313,23 @@ tgfx::Path ReadPathV1(pag::DecodeStream* stream, DecodeContext* ctx) {
   stream->alignWithBytes();
 
   uint32_t coordCount = stream->readEncodedUint32();
+  // P0 安全校验：coordCount 必须与 verb 序列精确匹配（Move/Line=2, Quad=4, Conic=4, Cubic=6, Close=0），
+  // 不匹配或超 MAX_PATH_COORDS 一律 fatal——防 16GB heap alloc 攻击。
+  uint32_t expectedCoords = ExpectedCoordCountFromVerbs(verbs);    // 按 verb 数组计算
+  if (coordCount != expectedCoords || coordCount > limits::MAX_PATH_COORDS) {
+    ctx->error(ErrorCode::MalformedTag, "path coordCount mismatch or overflow");
+    return tgfx::Path{};
+  }
   std::vector<int32_t> rawCoords(coordCount);
   stream->readInt32List(rawCoords.data(), coordCount);      // 动态位宽反解
 
   uint32_t conicCount = stream->readEncodedUint32();
+  // P0 安全校验：conicCount 必须 ≤ verb 序列中 Conic verb 数，且 ≤ MAX_PATH_CONIC_WEIGHTS。
+  uint32_t expectedConics = CountConicVerbs(verbs);
+  if (conicCount != expectedConics || conicCount > limits::MAX_PATH_CONIC_WEIGHTS) {
+    ctx->error(ErrorCode::MalformedTag, "path conicCount mismatch or overflow");
+    return tgfx::Path{};
+  }
   std::vector<float> conicWeights(conicCount);
   if (conicCount > 0) {
     stream->readFloatList(conicWeights.data(), conicCount, 0.005f);
@@ -3359,6 +3474,25 @@ void WriteEndTag(pag::EncodeStream* stream) {
 ```
 
 **Tag body 边界对齐规则**：读完 tag body 后须 `stream->setPosition(tagStart + headerSize + tagLength)` 强制对齐（`headerSize` 为 2 或 6 字节，由该 tag 的 codeAndLength 低 6 bit 是否为 63 决定）。
+
+**P0 安全校验：Tag length u32 加法回绕防护**（强制）：读到 `TagHeader` 后、seek 到 tag 末尾之前，必须用 `uint64_t` 做加法校验：
+
+```cpp
+// ❌ 错误：32-bit u32 加法会回绕（攻击者构造 tagLength=0xFFFFFFFE 让 Decoder 无限循环）
+stream->setPosition(tagStart + headerSize + tagLength);
+
+// ✅ 正确：uint64_t 中间结果 + 上界校验
+uint64_t tagEnd = static_cast<uint64_t>(tagStart)
+                + static_cast<uint64_t>(headerSize)
+                + static_cast<uint64_t>(tagLength);
+if (tagEnd > stream->size()) {
+  ctx->error(ErrorCode::MalformedTag, "tag length overflow or exceeds body");
+  return;
+}
+stream->setPosition(static_cast<size_t>(tagEnd));
+```
+
+此校验点同样适用于 §D.10 payload 内部的 SubStream slice 操作（`stream.slice(h.length)` 若 `length` 超剩余字节需 fatal）。
 
 ### D.4 文件容器
 
@@ -4192,6 +4326,108 @@ void DecodeContext::warn(ErrorCode code, std::string msg) {
 
 **测试影响**：附录 G.6 的错误码矩阵表里，**每条测试**在断言 `result.errors[0].code == ...` 后**可选**追加 `EXPECT_GT(result.errors[0].byteOffset, 0u)`（仅对 Decoder 路径的测试）。不强制。
 
+### G.3bis Diagnostic.cpp 实现规范（阶段 0 落地）
+
+**`FormatDiagnostic` 形态**（`src/pagx/Diagnostic.cpp`）：
+
+```cpp
+#include "pagx/Diagnostic.h"
+#include <cstdio>
+
+namespace pagx {
+
+// 手写 switch（非 X-macro）—— 显式枚举 ⇄ 字符串映射，便于 grep；
+// default 分支返回 "Code(<数字>)" 供未来新增枚举值的 forward-compat 路径。
+static const char* CodeToString(DiagnosticCode c) {
+  switch (c) {
+    case DiagnosticCode::Ok:                         return "Ok";
+    case DiagnosticCode::LayoutNotApplied:           return "LayoutNotApplied";
+    case DiagnosticCode::UnresolvedImports:          return "UnresolvedImports";
+    case DiagnosticCode::NullDocument:               return "NullDocument";
+    case DiagnosticCode::EmptyCompositions:          return "EmptyCompositions";
+    case DiagnosticCode::CompositionCycleDepth:      return "CompositionCycleDepth";
+    case DiagnosticCode::StructureLimitExceeded:     return "StructureLimitExceeded";
+    case DiagnosticCode::ImageSourceMissing:         return "ImageSourceMissing";
+    case DiagnosticCode::FontSourceMissing:          return "FontSourceMissing";
+    case DiagnosticCode::MaskTargetMissing:          return "MaskTargetMissing";
+    case DiagnosticCode::MaskSelfReference:          return "MaskSelfReference";
+    case DiagnosticCode::BlendModeUnmapped:          return "BlendModeUnmapped";
+    case DiagnosticCode::InverseMatrixNonInvertible: return "InverseMatrixNonInvertible";
+    case DiagnosticCode::TextGlyphDataEmpty:         return "TextGlyphDataEmpty";
+    case DiagnosticCode::EmptyDocument:              return "EmptyDocument";
+    case DiagnosticCode::GlyphRunKindInferred:       return "GlyphRunKindInferred";
+    case DiagnosticCode::InvalidMagic:               return "InvalidMagic";
+    case DiagnosticCode::UnsupportedVersion:         return "UnsupportedVersion";
+    case DiagnosticCode::UnsupportedCompression:     return "UnsupportedCompression";
+    case DiagnosticCode::TruncatedData:              return "TruncatedData";
+    case DiagnosticCode::MalformedTag:               return "MalformedTag";
+    case DiagnosticCode::BodyLengthOutOfRange:       return "BodyLengthOutOfRange";
+    case DiagnosticCode::InvalidCompositionIndex:    return "InvalidCompositionIndex";
+    case DiagnosticCode::FileReadFailed:             return "FileReadFailed";
+    case DiagnosticCode::UnknownTagCode:             return "UnknownTagCode";
+    case DiagnosticCode::UnknownPropertyEncoding:    return "UnknownPropertyEncoding";
+    case DiagnosticCode::ResourceSizeExceeded:       return "ResourceSizeExceeded";
+    case DiagnosticCode::StringInvalidUtf8:          return "StringInvalidUtf8";
+    case DiagnosticCode::PathVerbLimitExceeded:      return "PathVerbLimitExceeded";
+    case DiagnosticCode::GlyphCountLimitExceeded:    return "GlyphCountLimitExceeded";
+    case DiagnosticCode::LayerDepthLimitExceeded:    return "LayerDepthLimitExceeded";
+    case DiagnosticCode::InvalidEnumValue:           return "InvalidEnumValue";
+    case DiagnosticCode::InflateImageDecodeFailed:   return "InflateImageDecodeFailed";
+    case DiagnosticCode::InflateFontCreateFailed:    return "InflateFontCreateFailed";
+    case DiagnosticCode::InflateGlyphRunBuildFailed: return "InflateGlyphRunBuildFailed";
+    case DiagnosticCode::InflateMaskResolveFailed:   return "InflateMaskResolveFailed";
+    case DiagnosticCode::InflaterEmptyDocument:      return "InflaterEmptyDocument";
+  }
+  return nullptr;   // caller 走 "Code(%u)" fallback
+}
+
+std::string FormatDiagnostic(const Diagnostic& d) {
+  char buf[32];
+  const char* name = CodeToString(d.code);
+  std::string out = "[";
+  if (name) { out += name; }
+  else      { std::snprintf(buf, sizeof(buf), "Code(%u)", static_cast<unsigned>(d.code));
+              out += buf; }
+  out += "]";
+  if (!d.message.empty()) { out += ' '; out += d.message; }
+  if (d.byteOffset != 0) { std::snprintf(buf, sizeof(buf), " @0x%x", d.byteOffset); out += buf; }
+  return out;
+}
+
+DiagnosticSeverity SeverityOf(DiagnosticCode c) {
+  uint16_t v = static_cast<uint16_t>(c);
+  // Fatal 段：100-199 / 300-399 / 500-599；Warning 段：200-299 / 400-499 / 600-699。
+  if ((v >= 100 && v < 200) || (v >= 300 && v < 400) || (v >= 500 && v < 600)) {
+    return DiagnosticSeverity::Fatal;
+  }
+  return DiagnosticSeverity::Warning;
+}
+
+DiagnosticStage StageOf(DiagnosticCode c) {
+  uint16_t v = static_cast<uint16_t>(c);
+  if (v >= 100 && v < 300) return DiagnosticStage::Baker;
+  if (v >= 300 && v < 500) return DiagnosticStage::Codec;
+  return DiagnosticStage::Inflater;  // 500-699 及 Ok（0）兜底
+}
+
+}  // namespace pagx
+```
+
+**DiagnosticTest.cpp 断言清单**（阶段 0 必过，共 8 条）：
+
+| 测试名 | 断言 |
+|---|---|
+| `FormatDiagnostic.OkCode` | `FormatDiagnostic({Ok}) == "[Ok]"` |
+| `FormatDiagnostic.NoMessageNoOffset` | `FormatDiagnostic({LayoutNotApplied}) == "[LayoutNotApplied]"` |
+| `FormatDiagnostic.WithMessage` | `FormatDiagnostic({LayoutNotApplied, "must call applyLayout", 0}) == "[LayoutNotApplied] must call applyLayout"` |
+| `FormatDiagnostic.WithOffset` | `FormatDiagnostic({TruncatedData, "unexpected EOF", 0x4a2c}) == "[TruncatedData] unexpected EOF @0x4a2c"` |
+| `FormatDiagnostic.UnknownCodeFallback` | 构造 `static_cast<DiagnosticCode>(9999)` → 格式为 `"[Code(9999)]"` |
+| `SeverityOf.FatalSegments` | `SeverityOf(LayoutNotApplied) == Fatal`，`SeverityOf(TruncatedData) == Fatal` |
+| `SeverityOf.WarningSegments` | `SeverityOf(ImageSourceMissing) == Warning`，`SeverityOf(InflateImageDecodeFailed) == Warning` |
+| `StageOf.AllThreeStages` | `StageOf(LayoutNotApplied) == Baker`，`StageOf(InvalidMagic) == Codec`，`StageOf(InflaterEmptyDocument) == Inflater` |
+
+**ABI-appended 码兼容性**：测试断言 "FormatDiagnostic 对 `static_cast<DiagnosticCode>(9999)` 返回 `[Code(9999)]`" 即覆盖——保证未来段内追加新码时旧二进制不崩。
+
 ### G.4 公共 API 结构化暴露
 
 从 v2.4 起：
@@ -4361,8 +4597,10 @@ constexpr uint32_t MAX_LAYERS_PER_COMPOSITION = 10000;
 constexpr uint32_t MAX_COMPOSITIONS     = 1000;
 
 // Path/Glyph
-constexpr uint32_t MAX_PATH_VERBS       = 100000;
-constexpr uint32_t MAX_GLYPHS_PER_RUN   = 100000;
+constexpr uint32_t MAX_PATH_VERBS           = 100000;
+constexpr uint32_t MAX_PATH_COORDS          = 6 * MAX_PATH_VERBS;  // Cubic 最多 6 coord/verb
+constexpr uint32_t MAX_PATH_CONIC_WEIGHTS   = MAX_PATH_VERBS;      // Conic 最多 1 weight/verb
+constexpr uint32_t MAX_GLYPHS_PER_RUN       = 100000;
 
 // Path 编码格式选择阈值（B1 方案，见 §D.2.2）
 constexpr uint32_t PATH_QUANTIZATION_MIN_VERBS  = 3;           // verbCount < 此值 → 回退 format=0
@@ -4385,14 +4623,35 @@ constexpr uint32_t MAX_VECTOR_ELEMENTS_PER_PAYLOAD = 100000;
 constexpr uint32_t MAX_VECTOR_ELEMENT_DEPTH = 64;                   // VectorGroup 嵌套深度上限
 constexpr uint32_t MAX_CHILDREN_PER_LAYER = 10000;
 
+// 其他 count 上限（P1-A，见 §D.9 / §D.11）
+constexpr uint32_t MAX_MASK_PATH_DEPTH              = 64;           // LayerMaskRef.pathDepth（layerPath 深度 ≤ MAX_LAYER_DEPTH）
+constexpr uint32_t MAX_RANGE_SELECTORS_PER_MODIFIER = 16;           // ElementTextModifier.rangeSelectorCount
+constexpr uint32_t MAX_RUNS_PER_TEXT                = 256;          // ElementText.runCount
+constexpr uint32_t MAX_VECTOR_VALUE_ELEMENTS        = 1024;         // Property<vector<T>>.count（lineDashPattern / anchors / stopColors 等）
+
 // Diagnostic 累计上限（防止恶意文件让 warnings vector 增长到数百 MB）
-constexpr uint32_t MAX_DIAGNOSTICS = 1000;                          // Decoder/Baker/Inflater 共用
+constexpr uint32_t MAX_DIAGNOSTICS              = 1000;              // Decoder/Baker/Inflater 共用
+constexpr size_t   MAX_DIAGNOSTIC_MESSAGE_BYTES = 256;               // 单条 message 硬上限；warn/error 内部截断
 }
 ```
 
 **触发条件**：
 - Decoder 读取 `varU32 count` 后立即与对应 MAX 比较，超限 → push `Diagnostic{<对应 ErrorCode>}` + 返回 nullptr；
 - Read 单个资源 size 超 MAX_IMAGE_BYTES/MAX_FONT_BYTES → warn `ResourceSizeExceeded` + skip bytes + 跳过该资源（index 记为 UINT32_MAX）。
+
+**整数溢出安全写法**（P1-B，**强制约束**）：所有"累加后与上限比较"的 DoS 记账**必须**写成减法形式，禁止直接加法（32-bit 平台 `size_t` 加法会回绕绕过上限）：
+
+```cpp
+// ❌ 错误：32-bit size_t 加法可能回绕到 < MAX 而绕过检查
+if (totalAllocatedBytes + x > MAX_TOTAL_BODY_BYTES) return error;
+totalAllocatedBytes += x;
+
+// ✅ 正确：减法永不溢出（a - b ≥ 0 等价于 a ≥ b）
+if (x > MAX_TOTAL_BODY_BYTES - totalAllocatedBytes) return error;
+totalAllocatedBytes += x;
+```
+
+同理，所有 `stream.setPosition(base + length)` 形式的 seek 必须用 `uint64_t` 中间结果并前置校验 `base + length ≤ stream.size()`（P0-B，见 §D.3）。
 
 ### H.2 Baker 侧资源约束
 
@@ -4529,6 +4788,20 @@ target_link_libraries(PAGFullTest PRIVATE pagx-pag)
 - 本文档所有行号引用基于 `src/renderer/LayerBuilder.cpp` 当前实现；LayerBuilder 修改时需同步更新本文档附录 A。
 - PAGX 规范版本：`spec/pagx_spec.zh_CN.md`。
 - PAG v2 版本：0x02（本期）；动画扩展不升版本号。
+- v2.12 → v2.13 修订要点（5 位专家评审团综合输出：2 P0 + 7 P1 + 2 实现 P0，polish 留 v2.14）：
+  - **P0-A（安全）§D.2.2 Path coordCount/conicCount 上限校验**。PathV1 读 `coordCount`/`conicCount` 后无任何 MAX 校验，40 字节 `.pag` 可触发 `std::vector<int32_t>(0xFFFFFFFF)` 16GB heap alloc → OOM 崩溃；32-bit 平台 size_t 乘法溢出后 heap OOB write。本版本 §D.2.2 Read 伪码补"按 verb 序列计算 expectedCoords/expectedConics 精确匹配"的 P0 校验 + §H.1 新增 `MAX_PATH_COORDS = 6 * MAX_PATH_VERBS` / `MAX_PATH_CONIC_WEIGHTS = MAX_PATH_VERBS` 常量。不匹配或超上限推 `MalformedTag=304` fatal。
+  - **P0-B（安全）§D.3 Tag length u32 加法回绕防护**。`stream->setPosition(tagStart + headerSize + tagLength)` 裸 u32 加法，攻击者构造 `tagLength=0xFFFFFFFE` 回绕到小值让 Decoder 无限循环。本版本 §D.3 末尾补"**P0 安全校验：Tag length u32 加法回绕防护**"强制段——用 `uint64_t` 中间结果 + `tagEnd > stream->size()` 上界校验。
+  - **P1-A（安全）其他 count 上限**。`LayerMaskRef.pathDepth`、`ElementTextModifier.rangeSelectorCount`、`ElementText.runCount`、`Property<vector<T>>.count` 之前均无 MAX 校验，每个都是独立 heap OOM 面。本版本 §H.1 新增 `MAX_MASK_PATH_DEPTH=64` / `MAX_RANGE_SELECTORS_PER_MODIFIER=16` / `MAX_RUNS_PER_TEXT=256` / `MAX_VECTOR_VALUE_ELEMENTS=1024`。
+  - **P1-B（安全）整数溢出安全写法**（§H.1 触发条件段）。明示 "totalAllocatedBytes + x > MAX" 的错误写法在 32-bit `size_t` 上会回绕绕过限额，强制改为 "x > MAX - total" 减法形式；并指向 P0-B 的 seek 计算同理用 uint64_t。
+  - **P1-C（安全）Diagnostic message 字节上限**。`MAX_DIAGNOSTICS=1000` 限条数不限 size——恶意文件 1000 × 1MB message 仍可撑爆 64MB+ 内存。本版本 §H.1 新增 `MAX_DIAGNOSTIC_MESSAGE_BYTES=256`，§8.5 `DecodeContext::error/warn` 内部对传入 msg 做 resize 截断。
+  - **P1-D（安全）§9.4 layerByPath 换 std::map**。原 `std::unordered_map<vector<uint32_t>, ..., VectorU32Hash>` 用 FNV-1a 硬编码种子——攻击者离线算碰撞后构造 1 万条同 hash 的 layerPath 让查询退化 O(n²)，单文件 CPU 耗尽数秒。本版本直接换 `std::map`（红黑树，O(log N × depth) 上界保证，hash collision 免疫），删除 `VectorU32Hash` 定义。
+  - **P1-E（安全）§8.5 currentStream RAII guard**。原 `DecodeContext::currentStream` 弱引用赋值，嵌套 SubStream scope 退栈后形成悬空指针 → 后续 `warn()`/`currentOffset()` UAF。本版本在 Bridge 使用纪律前补强制 `CurrentStreamScope` RAII guard 定义 + 典型用法示例；主循环退出显式 `currentStream = nullptr`。
+  - **API P0（SDK）§15.3 PAGLoader.h 顶部 SAME-BUILD ABI 警告**。原 SAME-BUILD 声明埋在 §I.4 最后一段——用户拿到 PAGLoader.h 完全看不到，会误把预编译 pagx-pag 与不同版本 tgfx 混链 → 运行时 UB。本版本在 PAGLoader.h 文件顶部注释块（"This header depends on tgfx"并列）显式补 SAME-BUILD 声明 + 指向 §I.4。
+  - **API P1（SDK）新增 Peek / Version / SeverityOf / StageOf + 文档承诺强化**。§15.1 Diagnostic.h 新增 `SeverityOf(code)` / `StageOf(code)` 分类函数 + `Version()` + `VersionInfo` 结构，把 32 码降维到 2 轴；Diagnostic 结构 docstring 强化为"code 数值 ABI 稳定可持久化 / message 是不稳定英文调试文本不得持久化"；§15.3 PAGLoader 新增 `Peek(data, length)` 只读 FileHeader（缩略图/批量场景 10×-100× 提速）；PAGExporter/PAGLoader thread-safety docstring 补 3 行（并行吞吐不保证、Layer 单线程亲和、ToBytes 返回后 doc 可销毁）。
+  - **实现 P0 §18.2 Day-1 smoke 时间悖论修复**。原 smoke 用 `RenderLayerToSurface`——但 §19 阶段 9 才交付 `support/RenderUtil.cpp`，Day-1 无法运行（阶段时间悖论）。本版本 smoke 改用内联 lambda `renderLocal`（~20 行 Surface::Make + DisplayList + root->addChild + render），加前置说明"不依赖阶段 9 RenderUtil"；context 获取指向 `pag::TestUtils::GetContext()`。
+  - **实现 P0 §G.3bis Diagnostic.cpp 实现规范**。原 §19 阶段 0 说 `DiagnosticTest` 断言 "FormatDiagnostic 格式 + ABI-appended 码不丢"，但实现规范缺失——CodeToString 手写 switch vs X-macro、unknown code fallback、`FormatDiagnostic({Ok})` 语义都未明示。本版本新增 §G.3bis 给出完整 Diagnostic.cpp 样板（37 个枚举 → 字符串 switch + `Code(%u)` fallback + FormatDiagnostic 实现 + SeverityOf/StageOf 实现）+ DiagnosticTest 8 条断言清单。
+  - **Polish 批次延后**：架构 F1/F2/F3 文档澄清、§4.4 "最外层 Tag" 歧义修词、§D.1 补 "Write 顺序非 memcpy"、ValueCodec 特化归位纪律、tgfx 并发争用文档、ImageAsset 生命周期峰值文档、libwebp/libjpeg CVE 继承声明、附录 A 行号 CI 脚本提案、§18.4 每文件 case 清单、基准图首次 check-in 流程、CorruptBuilder 工具规范、"全绿"量化门槛——合计 12 项 polish/rationale 非阻塞项，归并到 v2.14 开工第一周清理，本轮不做。
+
 - v2.11 → v2.12 修订要点（freeze 前补完：5 个 polish，无架构变更）：
   - **F-1（P2）§8.5 补 `BakeContext` 紧凑定义**。BakeContext 被全文档引用 11 次（§7.2 / §8.3bis / §H.2）但结构体字段 + warn/error 方法从未展开定义——v2.11 日志吹"MAX_DIAGNOSTICS 覆盖 5 places"时 BakeContext 漏了。本版本把 §8.5 标题扩展为 "EncodeContext / DecodeContext / BakeContext"，在 DecodeContext bridge 小节后补 BakeContext 定义（errors / warnings / currentLayerDepth / currentVectorElementDepth / strictMode / imageIndexByNode / fontIndexByNode / layerPathByPagxLayer + error/warn 加 MAX_DIAGNOSTICS cap + enterLayer/enterVectorGroup 辅助），末尾补"Context 四并列总览表"便于 AI 对比落代码。
   - **F-2（P3）§9.4 补 `VectorU32Hash` 定义**。`InflaterContext::layerByPath` 使用 `std::unordered_map<std::vector<uint32_t>, ..., VectorU32Hash>`，但 `VectorU32Hash` 在文档任何地方都没定义。本版本在 §9.4 InflaterContext struct 之前补 FNV-1a 变体哈希实现（~10 行）。
