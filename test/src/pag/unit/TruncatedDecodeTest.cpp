@@ -8,6 +8,7 @@
 #include "pag/support/CorruptBuilder.h"
 #include "pagx/pag/Codec.h"
 #include "pagx/pag/PAGDocument.h"
+#include "pagx/pag/limits.h"
 
 using namespace pagx::pag;
 
@@ -126,16 +127,98 @@ TEST(Truncate, FileHeaderCanvasNaN) {
   EXPECT_TRUE(HasError(dec, pagx::DiagnosticCode::MalformedTag));
 }
 
-// ---------- 409 PrematureEndTag ----------
-//
-// The cleanest reproduction is to inflate bodyLength in the framing without
-// adding extra bytes — the End tag is hit while bytes remain unread by the
-// body loop's accounting. But our loop accounts via stream.position(), so a
-// mismatched bodyLength produces 305 first. Skip this case from Phase 4a;
-// 409 is naturally exercised once ImageAssetTable / FontAssetTable land in
-// Phase 4b and ErrorMarker can sit between two top-level Tags.
+// ---------- 409 PrematureEndTag (Phase 4b can naturally test) ----------
+// Skipped here — depends on ErrorMarker injection (Phase 4b but landed via
+// CorruptBuilder::AppendErrorMarkerTag which Phase 1 left as TODO).
 
-// ---------- 306 InvalidCompositionIndex ----------
-//
-// The CompositionRefPayload reader is Phase 4b; the index check lives there
-// too. Test moves to Phase 4b.
+// =============================================================================
+// Phase 4b: 306 InvalidCompositionIndex / 105 table overflows / 406 LayerDepth
+// / 403 InvalidUtf8
+// =============================================================================
+
+TEST(Truncate, InvalidCompositionIndex) {
+  // Build a doc with one composition that contains a CompositionRef pointing
+  // out of bounds (writer-side bug or attack). Encoding allows it; decode
+  // must fatally reject with 306.
+  pagx::pag::PAGDocument doc;
+  doc.header.width = 100.0f;
+  doc.header.height = 100.0f;
+  auto comp = std::make_unique<pagx::pag::Composition>();
+  comp->id = "x";
+  comp->width = 10;
+  comp->height = 10;
+  auto refLayer = std::make_unique<pagx::pag::Layer>();
+  refLayer->type = pagx::pag::LayerType::CompositionRef;
+  refLayer->compositionIndex = 99;  // way past the 1-element compositions vec
+  comp->layers.push_back(std::move(refLayer));
+  doc.compositions.push_back(std::move(comp));
+
+  auto enc = Codec::Encode(doc);
+  ASSERT_NE(enc.bytes, nullptr);
+  auto dec = Codec::Decode(enc.bytes->data(), enc.bytes->length());
+  EXPECT_EQ(dec.doc, nullptr);
+  EXPECT_TRUE(HasError(dec, pagx::DiagnosticCode::InvalidCompositionIndex));
+}
+
+TEST(Truncate, InvalidUtf8InCompositionId) {
+  // Build a doc with a composition whose id contains a malformed UTF-8
+  // sequence (lone continuation byte 0x80). Encode -> Decode must surface
+  // StringInvalidUtf8=403.
+  pagx::pag::PAGDocument doc;
+  doc.header.width = 100.0f;
+  doc.header.height = 100.0f;
+  auto comp = std::make_unique<pagx::pag::Composition>();
+  comp->id = std::string("\x80\x80\x80", 3);  // invalid UTF-8 (orphan continuations)
+  comp->width = 10;
+  comp->height = 10;
+  doc.compositions.push_back(std::move(comp));
+
+  auto enc = Codec::Encode(doc);
+  auto dec = Codec::Decode(enc.bytes->data(), enc.bytes->length());
+  // ReadUtf8String warns rather than fatally erroring (the empty string is
+  // the degraded result), so the doc decodes but with a warning.
+  ASSERT_NE(dec.doc, nullptr);
+  bool foundUtf8Warn = false;
+  for (const auto& w : dec.warnings) {
+    if (w.code == pagx::DiagnosticCode::StringInvalidUtf8) {
+      foundUtf8Warn = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(foundUtf8Warn);
+  // The id should have been replaced with empty per the safe-string contract.
+  EXPECT_EQ(dec.doc->compositions[0]->id, "");
+}
+
+TEST(Truncate, LayerDepthLimitExceeded) {
+  // Build a deeply-nested layer tree whose depth exceeds MAX_LAYER_DEPTH=64.
+  // Encoder doesn't enforce depth (Baker is normally responsible) — the
+  // Decoder must reject with 406 to defend against malicious / corrupt
+  // streams that bypass the Baker.
+  pagx::pag::PAGDocument doc;
+  doc.header.width = 100.0f;
+  doc.header.height = 100.0f;
+  auto comp = std::make_unique<pagx::pag::Composition>();
+  comp->id = "deep";
+  comp->width = 10;
+  comp->height = 10;
+
+  auto root = std::make_unique<pagx::pag::Layer>();
+  root->type = pagx::pag::LayerType::Layer;
+  pagx::pag::Layer* cursor = root.get();
+  for (uint32_t i = 0; i < pagx::pag::limits::MAX_LAYER_DEPTH + 5; ++i) {
+    auto child = std::make_unique<pagx::pag::Layer>();
+    child->type = pagx::pag::LayerType::Layer;
+    pagx::pag::Layer* next = child.get();
+    cursor->children.push_back(std::move(child));
+    cursor = next;
+  }
+  comp->layers.push_back(std::move(root));
+  doc.compositions.push_back(std::move(comp));
+
+  auto enc = Codec::Encode(doc);
+  ASSERT_NE(enc.bytes, nullptr);
+  auto dec = Codec::Decode(enc.bytes->data(), enc.bytes->length());
+  EXPECT_EQ(dec.doc, nullptr);
+  EXPECT_TRUE(HasError(dec, pagx::DiagnosticCode::LayerDepthLimitExceeded));
+}

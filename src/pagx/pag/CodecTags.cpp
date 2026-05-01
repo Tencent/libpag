@@ -98,15 +98,15 @@ void WriteComposition(::pag::EncodeStream* stream, const Composition& comp,
   WriteUtf8String(&body, comp.id);
   body.writeUint32(comp.width);
   body.writeUint32(comp.height);
-  // Phase 4a: layers stay opaque — Baker only ever produces empty layer
-  // vectors here. LayerBlock encode lands in Phase 4b.
   body.writeEncodedUint32(static_cast<uint32_t>(comp.layers.size()));
-  // Phase 4b: foreach layer -> WriteLayerBlock(&body, *layer, session);
+  for (const auto& layer : comp.layers) {
+    WriteLayerBlock(&body, *layer, session);
+  }
   WriteTag(stream, TagCode::Composition, &body);
 }
 
 std::unique_ptr<Composition> ReadComposition(::pag::DecodeStream* stream, DecodeContext* ctx,
-                                             uint64_t tagEnd) {
+                                             uint64_t tagEnd, size_t existingCompositionCount) {
   auto comp = std::make_unique<Composition>();
   auto guard = MakeGuard(ctx);
 
@@ -137,18 +137,36 @@ std::unique_ptr<Composition> ReadComposition(::pag::DecodeStream* stream, Decode
                "Composition layerCount exceeds MAX_LAYERS_PER_COMPOSITION");
     return nullptr;
   }
-  // Phase 4b: foreach -> ReadLayerBlock + push into comp->layers.
-  // Phase 4a: simply skip any payload bytes the writer left behind.
-  if (layerCount > 0) {
-    // Defensive: bytes after layerCount belong to LayerBlock tags we don't
-    // know how to read yet. Caller (the dispatcher) will setPosition(tagEnd)
-    // on return, so we just bail out — but warn so the test harness can see
-    // that Phase 4b work is needed.
-    ctx->warn(ErrorCode::UnknownTagCode,
-              "Composition contains layers but Phase 4a does not decode LayerBlock");
+
+  for (uint32_t i = 0; i < layerCount; ++i) {
+    if (stream->position() >= tagEnd) {
+      ctx->error(ErrorCode::TruncatedData, "Composition truncated before all LayerBlock tags read");
+      return nullptr;
+    }
+    TagHeader header = ReadTagHeader(stream);
+    if (header.code != TagCode::LayerBlock) {
+      ctx->error(ErrorCode::MalformedTag, "Composition expected nested LayerBlock tag");
+      return nullptr;
+    }
+    uint64_t bodyStart = stream->position();
+    uint64_t childEnd = 0;
+    if (!SafeTagEnd(stream, bodyStart, header.length, ctx, &childEnd)) {
+      return nullptr;
+    }
+    if (childEnd > tagEnd) {
+      ctx->error(ErrorCode::MalformedTag, "LayerBlock tag extends past Composition body");
+      return nullptr;
+    }
+    auto layer = ReadLayerBlock(stream, ctx, childEnd, existingCompositionCount);
+    if (ctx->hasError()) {
+      return nullptr;
+    }
+    if (layer != nullptr) {
+      comp->layers.push_back(std::move(layer));
+    }
+    SeekTo(stream, static_cast<uint32_t>(childEnd));
   }
 
-  (void)tagEnd;
   return comp;
 }
 
@@ -197,7 +215,7 @@ void ReadCompositionList(::pag::DecodeStream* stream, DecodeContext* ctx, uint64
       ctx->error(ErrorCode::MalformedTag, "Composition tag extends past CompositionList body");
       return;
     }
-    auto comp = ReadComposition(stream, ctx, childEnd);
+    auto comp = ReadComposition(stream, ctx, childEnd, out->size());
     if (ctx->hasError()) {
       return;
     }

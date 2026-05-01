@@ -25,6 +25,7 @@
 #include "codec/utils/DecodeStream.h"
 #include "codec/utils/EncodeStream.h"
 #include "pagx/pag/ValueCodec.h"
+#include "tgfx/core/BlendMode.h"
 
 namespace pagx::pag {
 
@@ -175,6 +176,19 @@ inline void WriteValue<tgfx::Matrix3D>(::pag::EncodeStream* s, const tgfx::Matri
 template <>
 inline tgfx::Matrix3D ReadValue<tgfx::Matrix3D>(::pag::DecodeStream* s) {
   return ReadMatrix3D(s);
+}
+
+// BlendMode — wire byte is the underlying enum value. Decoder side does not
+// validate the range here; ReadEnum<BlendMode> in §G.5 (Phase 5+) will do
+// that. Out-of-range values surface to the caller as an unmapped enum to be
+// downgraded by the next layer.
+template <>
+inline void WriteValue<tgfx::BlendMode>(::pag::EncodeStream* s, const tgfx::BlendMode& v) {
+  s->writeUint8(static_cast<uint8_t>(v));
+}
+template <>
+inline tgfx::BlendMode ReadValue<tgfx::BlendMode>(::pag::DecodeStream* s) {
+  return static_cast<tgfx::BlendMode>(s->readUint8());
 }
 
 // ------------------------------------------------------------------

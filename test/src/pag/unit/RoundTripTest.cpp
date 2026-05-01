@@ -3,9 +3,11 @@
 // Phase 4a RoundTrip — verifies Encode -> bytes -> Decode reproduces the
 // FileHeader / CompositionList / Composition framing fields. Layer-level
 // roundtrip lands in Phase 4b alongside LayerBlock decode.
+#include <cstring>
 #include "gtest/gtest.h"
 #include "pagx/pag/Codec.h"
 #include "pagx/pag/PAGDocument.h"
+#include "tgfx/core/Data.h"
 
 using namespace pagx::pag;
 
@@ -105,4 +107,189 @@ TEST(RoundTrip, ZeroDimensionCompositionWarnedAndClamped) {
   EXPECT_GE(dec.warnings.size(), 2u);  // one for width, one for height
   EXPECT_EQ(dec.doc->compositions[0]->width, 1u);
   EXPECT_EQ(dec.doc->compositions[0]->height, 1u);
+}
+
+// =============================================================================
+// Phase 4b: ImageAssetTable / FontAssetTable / LayerBlock / CompositionRef
+// =============================================================================
+
+TEST(RoundTrip, ImageAssetTablePreserved) {
+  PAGDocument doc = MakeMinimalDoc();
+  auto img = std::make_unique<ImageAsset>();
+  img->width = 256;
+  img->height = 128;
+  img->kind = ImageAssetKind::Raster;
+  // Synthetic PNG-ish bytes: enough to confirm the wire roundtrips.
+  static constexpr uint8_t kSampleData[] = {0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
+  img->data = ::tgfx::Data::MakeWithCopy(kSampleData, sizeof(kSampleData));
+  doc.images.push_back(std::move(img));
+
+  auto enc = Codec::Encode(doc);
+  auto dec = Codec::Decode(enc.bytes->data(), enc.bytes->length());
+  ASSERT_NE(dec.doc, nullptr);
+  EXPECT_TRUE(dec.errors.empty());
+  ASSERT_EQ(dec.doc->images.size(), 1u);
+  EXPECT_EQ(dec.doc->images[0]->width, 256);
+  EXPECT_EQ(dec.doc->images[0]->height, 128);
+  EXPECT_EQ(dec.doc->images[0]->kind, ImageAssetKind::Raster);
+  ASSERT_NE(dec.doc->images[0]->data, nullptr);
+  EXPECT_EQ(dec.doc->images[0]->data->size(), sizeof(kSampleData));
+  EXPECT_EQ(0, std::memcmp(dec.doc->images[0]->data->data(), kSampleData, sizeof(kSampleData)));
+}
+
+TEST(RoundTrip, FontAssetTablePreserved) {
+  PAGDocument doc = MakeMinimalDoc();
+  auto sysFont = std::make_unique<FontAsset>();
+  sysFont->kind = FontSourceKind::System;
+  sysFont->family = "Helvetica";
+  sysFont->style = "Bold";
+  doc.fonts.push_back(std::move(sysFont));
+
+  auto embeddedFont = std::make_unique<FontAsset>();
+  embeddedFont->kind = FontSourceKind::Embedded;
+  embeddedFont->family = "MyFont";
+  embeddedFont->style = "Regular";
+  static constexpr uint8_t kFontBytes[] = {'O', 'T', 'T', 'O', 0x00, 0x01};
+  embeddedFont->data = ::tgfx::Data::MakeWithCopy(kFontBytes, sizeof(kFontBytes));
+  embeddedFont->axes.push_back(FontAxis{0x77676874u, 400.0f, 100.0f, 900.0f});  // 'wght'
+  doc.fonts.push_back(std::move(embeddedFont));
+
+  auto enc = Codec::Encode(doc);
+  auto dec = Codec::Decode(enc.bytes->data(), enc.bytes->length());
+  ASSERT_NE(dec.doc, nullptr);
+  ASSERT_EQ(dec.doc->fonts.size(), 2u);
+  EXPECT_EQ(dec.doc->fonts[0]->family, "Helvetica");
+  EXPECT_EQ(dec.doc->fonts[0]->style, "Bold");
+  EXPECT_EQ(dec.doc->fonts[0]->kind, FontSourceKind::System);
+  EXPECT_EQ(dec.doc->fonts[1]->family, "MyFont");
+  EXPECT_EQ(dec.doc->fonts[1]->kind, FontSourceKind::Embedded);
+  ASSERT_NE(dec.doc->fonts[1]->data, nullptr);
+  EXPECT_EQ(dec.doc->fonts[1]->data->size(), sizeof(kFontBytes));
+  ASSERT_EQ(dec.doc->fonts[1]->axes.size(), 1u);
+  EXPECT_EQ(dec.doc->fonts[1]->axes[0].tag, 0x77676874u);
+  EXPECT_FLOAT_EQ(dec.doc->fonts[1]->axes[0].defaultValue, 400.0f);
+  EXPECT_FLOAT_EQ(dec.doc->fonts[1]->axes[0].minValue, 100.0f);
+  EXPECT_FLOAT_EQ(dec.doc->fonts[1]->axes[0].maxValue, 900.0f);
+}
+
+TEST(RoundTrip, LayerBlockBasicFields) {
+  PAGDocument doc = MakeMinimalDoc();
+  auto comp = std::make_unique<Composition>();
+  comp->id = "main";
+  comp->width = 100;
+  comp->height = 100;
+
+  auto layer = std::make_unique<Layer>();
+  layer->type = LayerType::Layer;
+  layer->name = "root_layer";
+  layer->startTime = 10;
+  layer->duration = 60;
+  layer->stretch = ::pag::Ratio{2, 1};
+  layer->preserve3D = true;
+  layer->allowsGroupOpacity = false;
+  layer->alpha = MakeProp(0.5f);
+  comp->layers.push_back(std::move(layer));
+
+  doc.compositions.push_back(std::move(comp));
+
+  auto enc = Codec::Encode(doc);
+  auto dec = Codec::Decode(enc.bytes->data(), enc.bytes->length());
+  ASSERT_NE(dec.doc, nullptr);
+  EXPECT_TRUE(dec.errors.empty());
+  ASSERT_EQ(dec.doc->compositions.size(), 1u);
+  ASSERT_EQ(dec.doc->compositions[0]->layers.size(), 1u);
+  const Layer& l = *dec.doc->compositions[0]->layers[0];
+  EXPECT_EQ(l.type, LayerType::Layer);
+  EXPECT_EQ(l.name, "root_layer");
+  EXPECT_EQ(l.startTime, 10u);
+  EXPECT_EQ(l.duration, 60u);
+  EXPECT_EQ(l.stretch.numerator, 2);
+  EXPECT_EQ(l.stretch.denominator, 1u);
+  EXPECT_TRUE(l.preserve3D);
+  EXPECT_FALSE(l.allowsGroupOpacity);
+  EXPECT_FLOAT_EQ(l.alpha.value, 0.5f);
+}
+
+TEST(RoundTrip, LayerBlockChildrenRecursion) {
+  PAGDocument doc = MakeMinimalDoc();
+  auto comp = std::make_unique<Composition>();
+  comp->id = "tree";
+  comp->width = 100;
+  comp->height = 100;
+
+  auto root = std::make_unique<Layer>();
+  root->type = LayerType::Layer;
+  root->name = "root";
+  for (int i = 0; i < 3; ++i) {
+    auto child = std::make_unique<Layer>();
+    child->type = LayerType::Layer;
+    child->name = std::string("child_") + std::to_string(i);
+    root->children.push_back(std::move(child));
+  }
+  comp->layers.push_back(std::move(root));
+  doc.compositions.push_back(std::move(comp));
+
+  auto enc = Codec::Encode(doc);
+  auto dec = Codec::Decode(enc.bytes->data(), enc.bytes->length());
+  ASSERT_NE(dec.doc, nullptr);
+  ASSERT_EQ(dec.doc->compositions[0]->layers.size(), 1u);
+  ASSERT_EQ(dec.doc->compositions[0]->layers[0]->children.size(), 3u);
+  for (int i = 0; i < 3; ++i) {
+    EXPECT_EQ(dec.doc->compositions[0]->layers[0]->children[i]->name,
+              std::string("child_") + std::to_string(i));
+  }
+}
+
+TEST(RoundTrip, CompositionRefPayload) {
+  PAGDocument doc = MakeMinimalDoc();
+  auto leafComp = std::make_unique<Composition>();
+  leafComp->id = "leaf";
+  leafComp->width = 50;
+  leafComp->height = 50;
+  doc.compositions.push_back(std::move(leafComp));
+
+  auto rootComp = std::make_unique<Composition>();
+  rootComp->id = "root";
+  rootComp->width = 100;
+  rootComp->height = 100;
+
+  auto refLayer = std::make_unique<Layer>();
+  refLayer->type = LayerType::CompositionRef;
+  refLayer->name = "ref_to_leaf";
+  refLayer->compositionIndex = 0;  // points to "leaf" — written before "root"
+  rootComp->layers.push_back(std::move(refLayer));
+
+  doc.compositions.push_back(std::move(rootComp));
+
+  auto enc = Codec::Encode(doc);
+  auto dec = Codec::Decode(enc.bytes->data(), enc.bytes->length());
+  ASSERT_NE(dec.doc, nullptr);
+  EXPECT_TRUE(dec.errors.empty());
+  ASSERT_EQ(dec.doc->compositions.size(), 2u);
+  ASSERT_EQ(dec.doc->compositions[1]->layers.size(), 1u);
+  EXPECT_EQ(dec.doc->compositions[1]->layers[0]->type, LayerType::CompositionRef);
+  EXPECT_EQ(dec.doc->compositions[1]->layers[0]->compositionIndex, 0u);
+}
+
+TEST(RoundTrip, LayerTransformDefaultsCollapsed) {
+  // A layer with all-default LayerTransform Properties should still encode +
+  // decode losslessly. The isDefault bit path is the most-trodden branch in
+  // production exports, so failing here would cascade through every doc.
+  PAGDocument doc = MakeMinimalDoc();
+  auto comp = std::make_unique<Composition>();
+  comp->width = 100;
+  comp->height = 100;
+  auto layer = std::make_unique<Layer>();
+  layer->type = LayerType::Layer;
+  comp->layers.push_back(std::move(layer));
+  doc.compositions.push_back(std::move(comp));
+
+  auto enc = Codec::Encode(doc);
+  auto dec = Codec::Decode(enc.bytes->data(), enc.bytes->length());
+  ASSERT_NE(dec.doc, nullptr);
+  ASSERT_EQ(dec.doc->compositions[0]->layers.size(), 1u);
+  const Layer& l = *dec.doc->compositions[0]->layers[0];
+  EXPECT_TRUE(l.visible.value);
+  EXPECT_FLOAT_EQ(l.alpha.value, 1.0f);
+  EXPECT_EQ(l.blendMode.value, ::tgfx::BlendMode::SrcOver);
 }

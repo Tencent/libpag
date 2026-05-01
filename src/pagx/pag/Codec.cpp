@@ -43,7 +43,8 @@ EncodeResult Codec::Encode(const PAGDocument& doc) {
 
   ::pag::EncodeStream body(&sc);
   WriteFileHeader(&body, doc.header, &session);
-  // Phase 4b: WriteImageAssetTable / WriteFontAssetTable land here.
+  WriteImageAssetTable(&body, doc.images, &session);
+  WriteFontAssetTable(&body, doc.fonts, &session);
   WriteCompositionList(&body, doc.compositions, &session);
   WriteEndTag(&body);
 
@@ -196,14 +197,21 @@ DecodeResult Codec::Decode(const uint8_t* data, size_t length) {
         sawFileHeader = true;
         break;
       }
+      case TagCode::ImageAssetTable: {
+        ReadImageAssetTable(&stream, &ctx, tagEnd, &doc->images);
+        break;
+      }
+      case TagCode::FontAssetTable: {
+        ReadFontAssetTable(&stream, &ctx, tagEnd, &doc->fonts);
+        break;
+      }
       case TagCode::CompositionList: {
         ReadCompositionList(&stream, &ctx, tagEnd, &doc->compositions);
         break;
       }
       default: {
-        // Unknown / Phase 4b deferred Tags (ImageAssetTable=2, FontAssetTable=3,
-        // LayerBlock=10, etc.) — warn + length-skip per §6.4.
-        ctx.warn(ErrorCode::UnknownTagCode, "unknown or not-yet-decoded TagCode; skipped");
+        // Unknown / forward-compat Tags — warn + length-skip per §6.4.
+        ctx.warn(ErrorCode::UnknownTagCode, "unknown TagCode at top level; skipped");
         break;
       }
     }

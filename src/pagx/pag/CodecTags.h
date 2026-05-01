@@ -62,7 +62,44 @@ void WriteComposition(::pag::EncodeStream* stream, const Composition& comp, Enco
 
 // Reads a single Composition body. Returns nullptr on fatal; warns on
 // width/height==0 (regenerates the field as 1 per design §D.7 P2-11).
+// `existingCompositionCount` is forwarded to LayerBlock readers so any
+// nested CompositionRefPayload can range-check its index against the parent
+// CompositionList state (Phase 4b only — see §D.10 P0 guidance).
 std::unique_ptr<Composition> ReadComposition(::pag::DecodeStream* stream, DecodeContext* ctx,
-                                             uint64_t tagEnd);
+                                             uint64_t tagEnd, size_t existingCompositionCount);
+
+// ---- ImageAssetTable (TagCode = 2) + ImageAsset sub-Tag (TagCode = 6) ----
+// body: varU32 assetCount, repeat[ImageAsset Tag]
+//
+// Each ImageAsset is its own sub-Tag with header so future fields can be
+// appended via TagHeader.length skip without breaking other entries — see
+// §D.6 v2.19 P0-R1 rationale.
+
+void WriteImageAssetTable(::pag::EncodeStream* stream,
+                          const std::vector<std::unique_ptr<ImageAsset>>& images,
+                          EncodeSession* session);
+
+void ReadImageAssetTable(::pag::DecodeStream* stream, DecodeContext* ctx, uint64_t tagEnd,
+                         std::vector<std::unique_ptr<ImageAsset>>* out);
+
+// ---- FontAssetTable (TagCode = 3) + FontAsset sub-Tag (TagCode = 7) ----
+
+void WriteFontAssetTable(::pag::EncodeStream* stream,
+                         const std::vector<std::unique_ptr<FontAsset>>& fonts,
+                         EncodeSession* session);
+
+void ReadFontAssetTable(::pag::DecodeStream* stream, DecodeContext* ctx, uint64_t tagEnd,
+                        std::vector<std::unique_ptr<FontAsset>>* out);
+
+// ---- LayerBlock (TagCode = 10) ------------------------------------------
+// Phase 4b covers LayerBlock body + LayerTransform sub-Tag (=15) + the
+// CompositionRefPayload (=26) — that combination is enough to roundtrip a
+// layer tree referencing other compositions. Other payloads / mask / filter
+// / style sub-Tags land in Phase 5-8.
+
+void WriteLayerBlock(::pag::EncodeStream* stream, const Layer& layer, EncodeSession* session);
+
+std::unique_ptr<Layer> ReadLayerBlock(::pag::DecodeStream* stream, DecodeContext* ctx,
+                                      uint64_t tagEnd, size_t existingCompositionCount);
 
 }  // namespace pagx::pag
