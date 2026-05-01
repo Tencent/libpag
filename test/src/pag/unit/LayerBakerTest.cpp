@@ -140,4 +140,55 @@ TEST(LayerBaker, MaskSelfReferenceProducesWarning) {
   EXPECT_TRUE(found);
 }
 
+TEST(LayerBaker, MaskTargetInDifferentCompositionMissing) {
+  // mask points at a layer inside a different composition — Pass 2 cannot
+  // resolve it (paths are per-composition) and emits MaskTargetMissing=202.
+  auto builder = pagx::test::PAGXBuilder::Make();
+  auto* otherComp = builder.AddComposition(100, 100);
+  auto* outsider = builder.MakeRawLayer();
+  outsider->name = "outsider";
+  otherComp->layers.push_back(outsider);
+
+  auto host = builder.AddLayer().Name("host");
+  host.Mask(outsider);
+  builder.RawDocument()->applyLayout();
+
+  auto result = Bake(*builder.RawDocument());
+  ASSERT_NE(result.doc, nullptr);
+  bool found = false;
+  for (const auto& w : result.warnings) {
+    if (w.code == DiagnosticCode::MaskTargetMissing) {
+      found = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+TEST(LayerBaker, MaskResolvedFillsMaskLayerPath) {
+  // host.mask = sibling at root index 0 → host (root index 1) should bake
+  // with maskLayerPath == [0].
+  auto builder = pagx::test::PAGXBuilder::Make();
+  auto target = builder.AddLayer().Name("target");
+  pagx::Layer* targetPtr = target.layer();
+
+  auto host = builder.AddLayer().Name("host");
+  host.Mask(targetPtr);
+
+  auto pagxDoc = builder.Done();
+  auto result = Bake(*pagxDoc);
+  ASSERT_NE(result.doc, nullptr);
+  EXPECT_TRUE(result.errors.empty());
+
+  // No mask warnings — successful resolution stays silent.
+  for (const auto& w : result.warnings) {
+    EXPECT_NE(w.code, DiagnosticCode::MaskTargetMissing);
+    EXPECT_NE(w.code, DiagnosticCode::MaskSelfReference);
+  }
+  ASSERT_EQ(result.doc->compositions[0]->layers.size(), 2u);
+  const auto& hostLayer = result.doc->compositions[0]->layers[1];
+  ASSERT_EQ(hostLayer->maskLayerPath.size(), 1u);
+  EXPECT_EQ(hostLayer->maskLayerPath[0], 0u);
+}
+
 }  // namespace pagx::pag

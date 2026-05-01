@@ -20,6 +20,7 @@
 #include "pagx/pag/ErrorCode.h"
 #include "pagx/pag/PAGDocument.h"
 #include "pagx/pag/PropertyEncoding.h"
+#include "pagx/pag/VectorBaker.h"
 #include "renderer/ToTGFX.h"
 
 namespace pagx::pag {
@@ -66,11 +67,32 @@ struct LayerWalker {
   // child indices from the enclosing root, used by Pass-2 mask resolution.
   // Lives on the local walker rather than BakeContext because Phase 3 only
   // needs it inside this single Bake() call.
+  //
+  // Phase 5c populates this table for the entire layer subtree before
+  // Pass 2 (bakeLayerList) starts so mask refs that point forward in the
+  // sibling order still resolve correctly.
   std::unordered_map<const pagx::Layer*, std::vector<uint32_t>> layerPath;
 
   // Tracks which compositions are currently on the bake stack so we can
   // detect Composition-level cycles before we recurse forever.
   std::unordered_set<const pagx::Composition*> activeCompositions;
+
+  // Mask Pass 1 — walk the layer tree once and record a child-index path
+  // for every Layer*. The path is "chain of child indices from the root of
+  // the enclosing composition", so a top-level layer at root index 2 has
+  // path = [2]; its first child has [2, 0]; etc.
+  void recordLayerPaths(const std::vector<pagx::Layer*>& src,
+                        const std::vector<uint32_t>& parentPath) {
+    for (size_t i = 0; i < src.size(); ++i) {
+      if (src[i] == nullptr) {
+        continue;
+      }
+      std::vector<uint32_t> here = parentPath;
+      here.push_back(static_cast<uint32_t>(i));
+      layerPath.emplace(src[i], here);
+      recordLayerPaths(src[i]->children, here);
+    }
+  }
 
   // Returns the PAGDocument index of the given composition, baking it on
   // first sight. Returns UINT32_MAX when a fatal occurred (caller must
@@ -97,6 +119,12 @@ struct LayerWalker {
     compositionIndex.emplace(compPtr, newIndex);
 
     activeCompositions.insert(compPtr);
+    // Mask Pass 1 — populate the path table for every layer in this
+    // composition's subtree before Pass 2 starts. We clear the per-composition
+    // entries on entry so paths from a sibling composition (different
+    // child-index basis) do not leak into the lookup.
+    layerPath.clear();
+    recordLayerPaths(compPtr->layers, {});
     bool fatal = false;
     bakeLayerList(compPtr->layers, doc.compositions[newIndex]->layers, fatal);
     activeCompositions.erase(compPtr);
@@ -139,10 +167,14 @@ struct LayerWalker {
       out->type = LayerType::CompositionRef;
       uint32_t childIndex = internComposition(src->composition);
       out->compositionIndex = childIndex;
+    } else if (!src->contents.empty()) {
+      // Phase 5c: a PAGX layer with vector contents becomes a Vector layer
+      // in PAGDocument. VectorBaker handles per-element dispatch.
+      out->type = LayerType::Vector;
+      out->vector = BakeVectorPayload(ctx, src->contents);
     } else {
-      // Phase 3 leaves all other layer types as the generic Layer container.
-      // Phase 5+ submodules will bump these to Vector / Text / Image / Solid
-      // when they wire their respective payload bakers.
+      // Generic Layer container (no payload). Phase 6-8 add Image / Solid /
+      // Text / Mesh dispatch when their bakers come online.
       out->type = LayerType::Layer;
     }
 
@@ -167,18 +199,24 @@ struct LayerWalker {
     out->allowsEdgeAntialiasing = src->antiAlias;
     out->allowsGroupOpacity = src->groupOpacity;
 
-    // Mask resolution is two-pass (§12). Phase 3 handles the easy
-    // cases now (self-reference + immediate sibling lookup) and leaves
-    // long-chain mask paths to be filled in by Phase 5+ once VectorBaker
-    // produces stable indices for shape layer children.
+    // Mask resolution (§12.1 Pass 2). Pass 1 (recordLayerPaths above) has
+    // already walked the entire layer subtree of the current composition, so
+    // forward sibling references resolve cleanly here.
     if (src->mask != nullptr) {
       if (src->mask == src) {
+        // Self-reference is a Baker-side fatal-warn: leave maskLayerPath
+        // empty, the Inflater layer (Phase 9) will not bind a mask.
         ctx.warn(ErrorCode::MaskSelfReference, "layer.mask points to itself");
       } else {
-        // Phase 3 leaves mask path empty when the target hasn't been baked
-        // yet — Inflater will warn InflateMaskResolveFailed on a missing
-        // path and continue. Once the Phase 5 mask pass lands the path is
-        // populated here.
+        auto it = layerPath.find(src->mask);
+        if (it == layerPath.end()) {
+          // Target lives in a different composition (or is dangling) —
+          // §12.1 says emit MaskTargetMissing and leave path empty.
+          ctx.warn(ErrorCode::MaskTargetMissing,
+                   "layer.mask points outside the current composition");
+        } else {
+          out->maskLayerPath = it->second;
+        }
       }
       out->maskType = static_cast<LayerMaskType>(pagx::ToTGFXMaskType(src->maskType));
     }
@@ -211,6 +249,9 @@ void BakeAllLayers(const pagx::PAGXDocument& pagxDoc, PAGDocument& doc, BakeCont
   uint32_t rootIndex = 0;
 
   bool fatal = false;
+  // Mask Pass 1 for the root composition's subtree.
+  walker.layerPath.clear();
+  walker.recordLayerPaths(pagxDoc.layers, {});
   walker.bakeLayerList(pagxDoc.layers, doc.compositions[rootIndex]->layers, fatal);
 }
 
