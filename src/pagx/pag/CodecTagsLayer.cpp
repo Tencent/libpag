@@ -13,6 +13,7 @@
 // the Baker side has matching producers. The byte layout already reserves
 // their TagCode values, so adding readers later is purely additive.
 #include "pagx/pag/CodecTags.h"
+#include "pagx/pag/ElementTags.h"
 #include "pagx/pag/PropertyEncoding.h"
 #include "pagx/pag/TagHeader.h"
 #include "pagx/pag/ValueCodec.h"
@@ -163,11 +164,13 @@ void WriteLayerBlock(::pag::EncodeStream* stream, const Layer& layer, EncodeSess
   // Reader can rely on its presence as an alignment anchor for §4.4 rule 1.
   WriteLayerTransform(&body, layer, session);
 
-  // Phase 4b only emits CompositionRef payload + Layer (no payload).
-  // Other types are encoded with no payload Tag too — the Decoder simply
-  // sees an empty payload region, matching the Phase 5-8 incremental ship.
+  // Phase 5a/4b emit one payload Tag for non-Layer types. Phase 5a adds
+  // VectorPayload; Phase 4b shipped CompositionRefPayload. Other types get
+  // empty bodies (no payload Tag) — Phase 5-8 will fill them in.
   if (layer.type == LayerType::CompositionRef) {
     WriteCompositionRefPayload(&body, layer.compositionIndex, session);
+  } else if (layer.type == LayerType::Vector && layer.vector != nullptr) {
+    WriteVectorPayload(&body, *layer.vector, session);
   }
 
   // Children (recursive).
@@ -286,17 +289,23 @@ std::unique_ptr<Layer> ReadLayerBlock(::pag::DecodeStream* stream, DecodeContext
         layer->compositionIndex = idx;
         break;
       }
-      // Phase 5-8 will plug Shape / Text / Image / Solid / Vector / Mesh
-      // payload readers in here. Until then, length-skip with a warn so
-      // forward-compat upgrades don't break the stream.
+      case TagCode::VectorPayload: {
+        layer->vector = ReadVectorPayload(stream, ctx, payloadEnd);
+        if (ctx->hasError()) {
+          --ctx->currentLayerDepth;
+          return nullptr;
+        }
+        break;
+      }
+      // Phase 6-8 will plug Shape / Text / Image / Solid / Mesh payload
+      // readers in here. Until then, length-skip with a warn so forward-
+      // compat upgrades don't break the stream.
       case TagCode::ShapePayload:
       case TagCode::TextPayload:
       case TagCode::ImagePayload:
       case TagCode::SolidPayload:
-      case TagCode::VectorPayload:
       case TagCode::MeshPayload: {
-        ctx->warn(ErrorCode::UnknownTagCode,
-                  "payload TagCode not yet decoded by Phase 4b; skipped");
+        ctx->warn(ErrorCode::UnknownTagCode, "payload TagCode not yet decoded; skipped");
         break;
       }
       default: {
