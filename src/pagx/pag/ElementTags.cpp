@@ -1,5 +1,6 @@
 // Copyright (C) 2026 Tencent. All rights reserved.
 #include "pagx/pag/ElementTags.h"
+#include "pagx/pag/GlyphRunCodec.h"
 #include "pagx/pag/PropertyEncoding.h"
 #include "pagx/pag/TagHeader.h"
 #include "pagx/pag/ValueCodec.h"
@@ -650,6 +651,273 @@ std::unique_ptr<ElementRepeaterData> ReadElementRepeaterBody(::pag::DecodeStream
   return d;
 }
 
+// ---------- Text (§D.11 ElementText = 50) ----------
+//
+// body = Property<Point> position,
+//        Property<vector<Point>> anchors,
+//        varU32 runCount,
+//        runCount × [GlyphRunBlob inline]
+//
+// We reuse the Property<vector<...>> specialisations (Phase 6 added vector<Color>
+// and vector<float>); Point is the third element kind in the family.
+
+void WriteElementTextBody(::pag::EncodeStream* body, const ElementTextData& d) {
+  WriteProperty<tgfx::Point>(body, d.position, /*default=*/tgfx::Point{});
+  WriteProperty<std::vector<tgfx::Point>>(body, d.anchors, /*default=*/std::vector<tgfx::Point>{});
+  body->writeEncodedUint32(static_cast<uint32_t>(d.glyphRuns.size()));
+  for (const auto& run : d.glyphRuns) {
+    WriteGlyphRunBlobInline(body, run);
+  }
+}
+
+std::unique_ptr<ElementTextData> ReadElementTextBody(::pag::DecodeStream* s, DecodeContext* ctx,
+                                                     uint32_t te) {
+  auto d = std::make_unique<ElementTextData>();
+  d->position = ReadProperty<tgfx::Point>(s, /*default=*/tgfx::Point{}, te);
+  d->anchors =
+      ReadProperty<std::vector<tgfx::Point>>(s, /*default=*/std::vector<tgfx::Point>{}, te);
+  auto guard = MakeGuard(ctx);
+  uint32_t runCount = ReadEncodedUint32Safe(s, &guard);
+  if (runCount > limits::MAX_RUNS_PER_TEXT) {
+    ctx->error(ErrorCode::StructureLimitExceeded, "ElementText runCount exceeds MAX_RUNS_PER_TEXT");
+    return nullptr;
+  }
+  d->glyphRuns.resize(runCount);
+  for (uint32_t i = 0; i < runCount; ++i) {
+    if (!ReadGlyphRunBlobInline(s, ctx, te, &d->glyphRuns[i])) {
+      return nullptr;
+    }
+  }
+  return d;
+}
+
+// ---------- TextPath (§D.11 ElementTextPath = 51) ----------
+//
+// body = Property<Path> path,
+//        Property<Point> baselineOrigin,
+//        Property<float> baselineAngle,
+//        Property<float> firstMargin,
+//        Property<float> lastMargin,
+//        u8 pathFlags  (bit 0 = Perpendicular, bit 1 = Reversed, bit 2 = ForceAlignment)
+//
+// Property<Path> goes through WritePathProperty / ReadPathProperty because
+// the Path decode needs ctx for NaN/verb-count fatals (§D.2 guard).
+
+namespace path_flags {
+constexpr uint8_t Perpendicular = 1u << 0;
+constexpr uint8_t Reversed = 1u << 1;
+constexpr uint8_t ForceAlignment = 1u << 2;
+}  // namespace path_flags
+
+void WriteElementTextPathBody(::pag::EncodeStream* body, const ElementTextPathData& d) {
+  WritePathProperty(body, d.path, /*default=*/tgfx::Path{});
+  WriteProperty<tgfx::Point>(body, d.baselineOrigin, /*default=*/tgfx::Point{});
+  WriteProperty<float>(body, d.baselineAngle, /*default=*/0.0f);
+  WriteProperty<float>(body, d.firstMargin, /*default=*/0.0f);
+  WriteProperty<float>(body, d.lastMargin, /*default=*/0.0f);
+  uint8_t flags = 0;
+  if (d.perpendicular) flags |= path_flags::Perpendicular;
+  if (d.reversed) flags |= path_flags::Reversed;
+  if (d.forceAlignment) flags |= path_flags::ForceAlignment;
+  body->writeUint8(flags);
+}
+
+std::unique_ptr<ElementTextPathData> ReadElementTextPathBody(::pag::DecodeStream* s,
+                                                             DecodeContext* ctx, uint32_t te) {
+  auto d = std::make_unique<ElementTextPathData>();
+  d->path = ReadPathProperty(s, ctx, /*default=*/tgfx::Path{}, te);
+  if (ctx->hasError()) {
+    return nullptr;
+  }
+  d->baselineOrigin = ReadProperty<tgfx::Point>(s, /*default=*/tgfx::Point{}, te);
+  d->baselineAngle = ReadProperty<float>(s, /*default=*/0.0f, te);
+  d->firstMargin = ReadProperty<float>(s, /*default=*/0.0f, te);
+  d->lastMargin = ReadProperty<float>(s, /*default=*/0.0f, te);
+  if (s->position() < te) {
+    uint8_t flags = s->readUint8();
+    d->perpendicular = (flags & path_flags::Perpendicular) != 0;
+    d->reversed = (flags & path_flags::Reversed) != 0;
+    d->forceAlignment = (flags & path_flags::ForceAlignment) != 0;
+  }
+  return d;
+}
+
+// ---------- RangeSelectorData inline (embedded in ElementTextModifier) ----------
+//
+// layout = Property<float> start,
+//          Property<float> end,
+//          Property<float> offset,
+//          u8 unit, u8 shape,
+//          Property<float> easeIn, Property<float> easeOut,
+//          u8 mode,
+//          Property<float> weight,
+//          bool randomOrder,
+//          u16 randomSeed
+
+void WriteRangeSelectorDataInline(::pag::EncodeStream* body, const RangeSelectorData& r) {
+  WriteProperty<float>(body, r.start, /*default=*/0.0f);
+  WriteProperty<float>(body, r.end, /*default=*/100.0f);
+  WriteProperty<float>(body, r.offset, /*default=*/0.0f);
+  body->writeUint8(static_cast<uint8_t>(r.unit));
+  body->writeUint8(static_cast<uint8_t>(r.shape));
+  WriteProperty<float>(body, r.easeIn, /*default=*/0.0f);
+  WriteProperty<float>(body, r.easeOut, /*default=*/0.0f);
+  body->writeUint8(static_cast<uint8_t>(r.mode));
+  WriteProperty<float>(body, r.weight, /*default=*/100.0f);
+  body->writeBoolean(r.randomOrder);
+  body->writeUint16(r.randomSeed);
+}
+
+std::unique_ptr<RangeSelectorData> ReadRangeSelectorDataInline(::pag::DecodeStream* s,
+                                                               DecodeContext* ctx, uint32_t te) {
+  auto r = std::make_unique<RangeSelectorData>();
+  r->start = ReadProperty<float>(s, /*default=*/0.0f, te);
+  r->end = ReadProperty<float>(s, /*default=*/100.0f, te);
+  r->offset = ReadProperty<float>(s, /*default=*/0.0f, te);
+  if (s->position() < te) {
+    uint8_t unitByte = s->readUint8();
+    if (unitByte > static_cast<uint8_t>(SelectorUnit::Index)) {
+      ctx->warn(ErrorCode::InvalidEnumValue,
+                "RangeSelectorData.unit out of range; using Percentage");
+      r->unit = SelectorUnit::Percentage;
+    } else {
+      r->unit = static_cast<SelectorUnit>(unitByte);
+    }
+  }
+  if (s->position() < te) {
+    uint8_t shapeByte = s->readUint8();
+    if (shapeByte > static_cast<uint8_t>(SelectorShape::Round)) {
+      ctx->warn(ErrorCode::InvalidEnumValue, "RangeSelectorData.shape out of range; using Square");
+      r->shape = SelectorShape::Square;
+    } else {
+      r->shape = static_cast<SelectorShape>(shapeByte);
+    }
+  }
+  r->easeIn = ReadProperty<float>(s, /*default=*/0.0f, te);
+  r->easeOut = ReadProperty<float>(s, /*default=*/0.0f, te);
+  if (s->position() < te) {
+    uint8_t modeByte = s->readUint8();
+    if (modeByte > static_cast<uint8_t>(SelectorMode::Difference)) {
+      ctx->warn(ErrorCode::InvalidEnumValue, "RangeSelectorData.mode out of range; using Add");
+      r->mode = SelectorMode::Add;
+    } else {
+      r->mode = static_cast<SelectorMode>(modeByte);
+    }
+  }
+  r->weight = ReadProperty<float>(s, /*default=*/100.0f, te);
+  if (s->position() < te) {
+    r->randomOrder = s->readBoolean();
+  }
+  if (s->position() + 2 <= te) {
+    r->randomSeed = s->readUint16();
+  }
+  return r;
+}
+
+// ---------- TextModifier (§D.11 ElementTextModifier = 52) ----------
+//
+// body = Property<Point> anchor,
+//        Property<Point> position,
+//        Property<float> rotation,
+//        Property<Point> scale,
+//        Property<float> skew,
+//        Property<float> skewAxis,
+//        Property<float> alpha,
+//        u8 modifierFlags  (bit 0 HasFillColor, bit 1 HasStrokeColor, bit 2 HasStrokeWidth)
+//        Property<Color>  fillColor    [only if HasFillColor]
+//        Property<Color>  strokeColor  [only if HasStrokeColor]
+//        Property<float>  strokeWidth  [only if HasStrokeWidth]
+//        varU32 rangeSelectorCount,
+//        rangeSelectorCount × [RangeSelectorData inline]
+
+namespace modifier_flags {
+constexpr uint8_t HasFillColor = 1u << 0;
+constexpr uint8_t HasStrokeColor = 1u << 1;
+constexpr uint8_t HasStrokeWidth = 1u << 2;
+}  // namespace modifier_flags
+
+void WriteElementTextModifierBody(::pag::EncodeStream* body, const ElementTextModifierData& d) {
+  WriteProperty<tgfx::Point>(body, d.anchor, /*default=*/tgfx::Point{});
+  WriteProperty<tgfx::Point>(body, d.position, /*default=*/tgfx::Point{});
+  WriteProperty<float>(body, d.rotation, /*default=*/0.0f);
+  WriteProperty<tgfx::Point>(body, d.scale, /*default=*/tgfx::Point{1.0f, 1.0f});
+  WriteProperty<float>(body, d.skew, /*default=*/0.0f);
+  WriteProperty<float>(body, d.skewAxis, /*default=*/0.0f);
+  WriteProperty<float>(body, d.alpha, /*default=*/1.0f);
+
+  uint8_t flags = 0;
+  if (d.hasFillColor) flags |= modifier_flags::HasFillColor;
+  if (d.hasStrokeColor) flags |= modifier_flags::HasStrokeColor;
+  if (d.hasStrokeWidth) flags |= modifier_flags::HasStrokeWidth;
+  body->writeUint8(flags);
+
+  if (d.hasFillColor) {
+    WriteProperty<tgfx::Color>(body, d.fillColor, /*default=*/tgfx::Color{});
+  }
+  if (d.hasStrokeColor) {
+    WriteProperty<tgfx::Color>(body, d.strokeColor, /*default=*/tgfx::Color{});
+  }
+  if (d.hasStrokeWidth) {
+    WriteProperty<float>(body, d.strokeWidth, /*default=*/0.0f);
+  }
+
+  body->writeEncodedUint32(static_cast<uint32_t>(d.rangeSelectors.size()));
+  for (const auto& sel : d.rangeSelectors) {
+    if (sel != nullptr) {
+      WriteRangeSelectorDataInline(body, *sel);
+    }
+  }
+}
+
+std::unique_ptr<ElementTextModifierData> ReadElementTextModifierBody(::pag::DecodeStream* s,
+                                                                     DecodeContext* ctx,
+                                                                     uint32_t te) {
+  auto d = std::make_unique<ElementTextModifierData>();
+  d->anchor = ReadProperty<tgfx::Point>(s, /*default=*/tgfx::Point{}, te);
+  d->position = ReadProperty<tgfx::Point>(s, /*default=*/tgfx::Point{}, te);
+  d->rotation = ReadProperty<float>(s, /*default=*/0.0f, te);
+  d->scale = ReadProperty<tgfx::Point>(s, /*default=*/tgfx::Point{1.0f, 1.0f}, te);
+  d->skew = ReadProperty<float>(s, /*default=*/0.0f, te);
+  d->skewAxis = ReadProperty<float>(s, /*default=*/0.0f, te);
+  d->alpha = ReadProperty<float>(s, /*default=*/1.0f, te);
+
+  uint8_t flags = 0;
+  if (s->position() < te) {
+    flags = s->readUint8();
+  }
+  d->hasFillColor = (flags & modifier_flags::HasFillColor) != 0;
+  d->hasStrokeColor = (flags & modifier_flags::HasStrokeColor) != 0;
+  d->hasStrokeWidth = (flags & modifier_flags::HasStrokeWidth) != 0;
+
+  if (d->hasFillColor) {
+    d->fillColor = ReadProperty<tgfx::Color>(s, /*default=*/tgfx::Color{}, te);
+  }
+  if (d->hasStrokeColor) {
+    d->strokeColor = ReadProperty<tgfx::Color>(s, /*default=*/tgfx::Color{}, te);
+  }
+  if (d->hasStrokeWidth) {
+    d->strokeWidth = ReadProperty<float>(s, /*default=*/0.0f, te);
+  }
+
+  auto guard = MakeGuard(ctx);
+  uint32_t selectorCount = 0;
+  if (s->position() < te) {
+    selectorCount = ReadEncodedUint32Safe(s, &guard);
+    if (selectorCount > limits::MAX_RANGE_SELECTORS_PER_MODIFIER) {
+      ctx->error(ErrorCode::StructureLimitExceeded,
+                 "TextModifier rangeSelectorCount exceeds limit");
+      return nullptr;
+    }
+  }
+  for (uint32_t i = 0; i < selectorCount; ++i) {
+    auto sel = ReadRangeSelectorDataInline(s, ctx, te);
+    if (sel != nullptr) {
+      d->rangeSelectors.push_back(std::move(sel));
+    }
+  }
+  return d;
+}
+
 // ---------- VectorGroup (recursive) ----------
 //
 // §D.11 VectorGroup body: varU32 elementCount + elementCount × Element Tag,
@@ -799,15 +1067,19 @@ void WriteVectorElement(::pag::EncodeStream* stream, const VectorElement& elemen
       WriteElementVectorGroupBody(&body, *payload, session);
       break;
     }
-    case VectorElementType::Text:
-    case VectorElementType::TextPath:
+    case VectorElementType::Text: {
+      const auto& payload = std::get<std::unique_ptr<ElementTextData>>(element.payload);
+      WriteElementTextBody(&body, *payload);
+      break;
+    }
+    case VectorElementType::TextPath: {
+      const auto& payload = std::get<std::unique_ptr<ElementTextPathData>>(element.payload);
+      WriteElementTextPathBody(&body, *payload);
+      break;
+    }
     case VectorElementType::TextModifier: {
-      // Phase 5a deferral: emit empty body so downstream Phase 8 can land
-      // the GlyphRunBlob format without changing the wrapping framing.
-      // Decoder will warn UnknownTagCode + length-skip during this Phase.
-      session->diag->warnings.push_back(
-          {ErrorCode::UnknownTagCode,
-           "Text-family element encoded as empty body (Phase 8 will land it)", 0, UINT32_MAX});
+      const auto& payload = std::get<std::unique_ptr<ElementTextModifierData>>(element.payload);
+      WriteElementTextModifierBody(&body, *payload);
       break;
     }
   }
@@ -823,14 +1095,9 @@ std::unique_ptr<VectorElement> ReadVectorElement(::pag::DecodeStream* s, DecodeC
     return nullptr;
   }
 
-  // Text-family deferrals — warn + skip without producing a VectorElement.
-  if (type == VectorElementType::Text || type == VectorElementType::TextPath ||
-      type == VectorElementType::TextModifier) {
-    ctx->warn(ErrorCode::UnknownTagCode,
-              "Text-family VectorElement not yet decoded by Phase 5a; skipped");
-    return nullptr;
-  }
-
+  // Text-family Tag codecs landed in Phase 8 (above). The switch below
+  // reads each into its typed payload; Text*.anchors and GlyphRunBlob go
+  // through the §D.11 quantised layout.
   uint32_t te = static_cast<uint32_t>(tagEnd);
   auto element = std::make_unique<VectorElement>();
   element->type = type;
@@ -870,10 +1137,14 @@ std::unique_ptr<VectorElement> ReadVectorElement(::pag::DecodeStream* s, DecodeC
       element->payload = ReadElementVectorGroupBody(s, ctx, te);
       break;
     case VectorElementType::Text:
+      element->payload = ReadElementTextBody(s, ctx, te);
+      break;
     case VectorElementType::TextPath:
+      element->payload = ReadElementTextPathBody(s, ctx, te);
+      break;
     case VectorElementType::TextModifier:
-      // Already early-returned above.
-      return nullptr;
+      element->payload = ReadElementTextModifierBody(s, ctx, te);
+      break;
   }
   if (ctx->hasError()) {
     return nullptr;

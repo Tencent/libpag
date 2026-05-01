@@ -238,6 +238,27 @@ inline std::vector<float> ReadValue<std::vector<float>>(::pag::DecodeStream* s) 
   return out;
 }
 
+// std::vector<Point> — Phase 8 (ElementText.anchors). Wire format: varU32
+// count + count × (f32 x, f32 y). Used for per-glyph anchor positions.
+template <>
+inline void WriteValue<std::vector<tgfx::Point>>(::pag::EncodeStream* s,
+                                                 const std::vector<tgfx::Point>& v) {
+  s->writeEncodedUint32(static_cast<uint32_t>(v.size()));
+  for (const auto& p : v) {
+    WritePoint(s, p);
+  }
+}
+template <>
+inline std::vector<tgfx::Point> ReadValue<std::vector<tgfx::Point>>(::pag::DecodeStream* s) {
+  uint32_t n = s->readEncodedUint32();
+  std::vector<tgfx::Point> out;
+  out.reserve(n);
+  for (uint32_t i = 0; i < n; ++i) {
+    out.push_back(ReadPoint(s));
+  }
+  return out;
+}
+
 // std::array<float, 20> — Phase 7 (ColorMatrixFilter.colorMatrix). Fixed
 // length, so no count prefix; just 20 back-to-back floats. Equality uses the
 // standard std::array operator== (element-wise, bit-exact for float via ==

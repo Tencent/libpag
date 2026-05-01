@@ -313,4 +313,14 @@ std::shared_ptr<tgfx::TextBlob> GlyphRunRenderer::BuildTextBlobFromLayoutRuns(
   return builder.build();
 }
 
+const std::vector<TextLayoutGlyphRun>& GlyphRunRenderer::GetLayoutRuns(const Text* text) {
+  // Empty sentinel returned when layoutRuns is unavailable. Statically
+  // scoped so the reference stays valid for the caller's lifetime.
+  static const std::vector<TextLayoutGlyphRun> kEmpty;
+  if (text == nullptr || text->glyphData == nullptr) {
+    return kEmpty;
+  }
+  return text->glyphData->layoutRuns;
+}
+
 }  // namespace pagx

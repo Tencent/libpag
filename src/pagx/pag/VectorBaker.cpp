@@ -41,10 +41,14 @@
 #include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextModifier.h"
+#include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/pag/BakeContext.h"
 #include "pagx/pag/PAGDocument.h"
 #include "pagx/pag/ResourceBaker.h"
+#include "pagx/pag/TextBaker.h"
 #include "renderer/ToTGFX.h"
 #include "tgfx/core/Data.h"
 
@@ -417,8 +421,8 @@ std::unique_ptr<VectorElement> BakeStroke(BakeContext& ctx, PAGDocument& doc,
   return el;
 }
 
-// Single-element dispatch by NodeType. Phase 6 adds Fill / Stroke; Text /
-// TextModifier / TextPath / TextBox still land in Phase 8.
+// Single-element dispatch by NodeType. Phase 6 adds Fill / Stroke; Phase 8
+// adds Text / TextPath / TextModifier / TextBox routing.
 std::unique_ptr<VectorElement> BakeElement(BakeContext& ctx, PAGDocument& doc,
                                            const pagx::Element* src) {
   if (src == nullptr) {
@@ -443,16 +447,21 @@ std::unique_ptr<VectorElement> BakeElement(BakeContext& ctx, PAGDocument& doc,
       return BakeRepeater(*static_cast<const pagx::Repeater*>(src));
     case pagx::NodeType::Group:
       return BakeGroup(ctx, doc, *static_cast<const pagx::Group*>(src));
+    case pagx::NodeType::TextBox:
+      // TextBox inherits from Group and, after layout, behaves as a Group
+      // containing positioned Text children. Phase 8 routes it through
+      // BakeGroup — the nested Text elements bake themselves.
+      return BakeGroup(ctx, doc, *static_cast<const pagx::Group*>(src));
     case pagx::NodeType::Fill:
       return BakeFill(ctx, doc, *static_cast<const pagx::Fill*>(src));
     case pagx::NodeType::Stroke:
       return BakeStroke(ctx, doc, *static_cast<const pagx::Stroke*>(src));
     case pagx::NodeType::Text:
-    case pagx::NodeType::TextModifier:
+      return TextBaker::BakeText(ctx, doc, *static_cast<const pagx::Text*>(src));
     case pagx::NodeType::TextPath:
-    case pagx::NodeType::TextBox:
-      // Phase 8 (TextBaker) lands these.
-      return nullptr;
+      return TextBaker::BakeTextPath(ctx, *static_cast<const pagx::TextPath*>(src));
+    case pagx::NodeType::TextModifier:
+      return TextBaker::BakeTextModifier(ctx, *static_cast<const pagx::TextModifier*>(src));
     default:
       // Layer / resource / filter / style nodes are not valid Element
       // subtypes for `Layer::contents`; the PAGX importer should have

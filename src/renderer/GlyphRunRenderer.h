@@ -57,6 +57,15 @@ class GlyphRunRenderer {
   static std::shared_ptr<tgfx::TextBlob> BuildTextBlobFromLayoutRuns(
       const std::vector<TextLayoutGlyphRun>& runs, const tgfx::Matrix& inverseMatrix);
 
+  /**
+   * Read-only accessor for the layout glyph runs already computed by
+   * Text::onMeasure (via TextLayout). Used by PAG v2 TextBaker (Phase 8) to
+   * serialise runtime-shaped text without re-running TextLayout. Returns an
+   * empty vector when the Text has not been laid out (e.g. the caller skipped
+   * PAGXDocument::applyLayout()) or when it is in pre-shaped mode.
+   */
+  static const std::vector<TextLayoutGlyphRun>& GetLayoutRuns(const Text* text);
+
  private:
   static std::shared_ptr<tgfx::Typeface> BuildTypefaceFromFont(const Font* fontNode);
 };
