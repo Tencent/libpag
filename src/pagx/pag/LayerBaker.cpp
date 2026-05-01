@@ -171,7 +171,7 @@ struct LayerWalker {
       // Phase 5c: a PAGX layer with vector contents becomes a Vector layer
       // in PAGDocument. VectorBaker handles per-element dispatch.
       out->type = LayerType::Vector;
-      out->vector = BakeVectorPayload(ctx, src->contents);
+      out->vector = BakeVectorPayload(ctx, doc, src->contents);
     } else {
       // Generic Layer container (no payload). Phase 6-8 add Image / Solid /
       // Text / Mesh dispatch when their bakers come online.

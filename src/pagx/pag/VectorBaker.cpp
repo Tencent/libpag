@@ -1,10 +1,12 @@
 // Copyright (C) 2026 Tencent. All rights reserved.
 //
-// Phase 5c VectorBaker — translates a PAGX layer's `contents` (vector of
-// pagx::Element*) into PAGDocument's VectorPayload. Phase 5c covers nine
-// geometry / modifier element types (Rectangle, Ellipse, Polystar, Path,
-// TrimPath, RoundCorner, MergePath, Repeater, Group). Fill / Stroke land in
-// Phase 6 (PaintBaker), and Text / TextPath / TextModifier in Phase 8.
+// Phase 5c VectorBaker + Phase 6 PaintBaker — translates a PAGX layer's
+// `contents` (vector of pagx::Element*) into PAGDocument's VectorPayload.
+// Phase 5c covered nine geometry / modifier element types. Phase 6 adds
+// Fill / Stroke element bakers plus the ColorSource dispatch (SolidColor /
+// LinearGradient / RadialGradient / ConicGradient / DiamondGradient /
+// ImagePattern) that fills the inline ShapeStyleData on each painter.
+// Text / TextPath / TextModifier remain in Phase 8.
 //
 // PAGX nodes expose plain fields (no Property<T> wrapper) plus a NaN-sentinel
 // convention for "unset" positions. The baker substitutes `Point{0, 0}` for
@@ -17,20 +19,34 @@
 #include <memory>
 #include <utility>
 #include <vector>
+#include "pagx/nodes/ColorSource.h"
+#include "pagx/nodes/ColorStop.h"
+#include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/DiamondGradient.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/Ellipse.h"
+#include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
+#include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/Polystar.h"
+#include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/RoundCorner.h"
+#include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/pag/BakeContext.h"
 #include "pagx/pag/PAGDocument.h"
+#include "pagx/pag/ResourceBaker.h"
 #include "renderer/ToTGFX.h"
+#include "tgfx/core/Data.h"
 
 namespace pagx::pag {
 
@@ -63,7 +79,8 @@ tgfx::TrimPathType MapTrimType(pagx::TrimType t) {
                                          : tgfx::TrimPathType::Separate;
 }
 
-std::unique_ptr<VectorElement> BakeElement(BakeContext& ctx, const pagx::Element* src);
+std::unique_ptr<VectorElement> BakeElement(BakeContext& ctx, PAGDocument& doc,
+                                           const pagx::Element* src);
 
 std::unique_ptr<VectorElement> BakeRectangle(const pagx::Rectangle& src) {
   auto data = std::make_unique<ElementRectangleData>();
@@ -173,7 +190,8 @@ std::unique_ptr<VectorElement> BakeRepeater(const pagx::Repeater& src) {
   return el;
 }
 
-std::unique_ptr<VectorElement> BakeGroup(BakeContext& ctx, const pagx::Group& src) {
+std::unique_ptr<VectorElement> BakeGroup(BakeContext& ctx, PAGDocument& doc,
+                                         const pagx::Group& src) {
   if (!ctx.enterVectorGroup()) {
     return nullptr;
   }
@@ -190,7 +208,7 @@ std::unique_ptr<VectorElement> BakeGroup(BakeContext& ctx, const pagx::Group& sr
     if (ctx.hasFatal()) {
       break;
     }
-    auto baked = BakeElement(ctx, child);
+    auto baked = BakeElement(ctx, doc, child);
     if (baked != nullptr) {
       data->elements.push_back(std::move(baked));
     }
@@ -204,10 +222,205 @@ std::unique_ptr<VectorElement> BakeGroup(BakeContext& ctx, const pagx::Group& sr
   return el;
 }
 
-// Single-element dispatch by NodeType. Phase 5c silently skips Fill / Stroke
-// / Text-family elements with a debug-only warn — Phase 6 (PaintBaker) and
-// Phase 8 (TextBaker) will plug them in by widening the switch.
-std::unique_ptr<VectorElement> BakeElement(BakeContext& ctx, const pagx::Element* src) {
+// ---------- PaintBaker (Phase 6) ----------
+//
+// PaintBaker produces the inline ShapeStyleData carried by Fill / Stroke
+// element payloads. The dispatcher routes pagx::ColorSource* subtypes to
+// one of six branch-specific bakers; each one touches only the fields that
+// sourceType declares active, leaving the rest at PAGDocument defaults so
+// the wire codec's isDefault short-circuit compresses the wrapper.
+//
+// Gradient-stops fallback (§F.3): the baker injects [Black@0, White@1]
+// when a gradient node has no color stops, matching LayerBuilder:487-500.
+//
+// ImagePattern image interning: RegisterImage is called only when the PAGX
+// Image node carries inline bytes. File-path-only images get
+// patternImageIndex = UINT32_MAX + ImageSourceMissing=200 so the Phase 9
+// Inflater can substitute a placeholder bitmap. Phase 10.5 PAGLoader will
+// widen this path to actually read files.
+
+void PopulateGradientStops(const pagx::Gradient& src, ShapeStyleData& style) {
+  std::vector<tgfx::Color> colors;
+  std::vector<float> positions;
+  if (src.colorStops.empty()) {
+    // Design doc §F.3 fallback — keeps Inflater well-formed.
+    colors.push_back(tgfx::Color{0.0f, 0.0f, 0.0f, 1.0f});
+    colors.push_back(tgfx::Color{1.0f, 1.0f, 1.0f, 1.0f});
+    positions.push_back(0.0f);
+    positions.push_back(1.0f);
+  } else {
+    colors.reserve(src.colorStops.size());
+    positions.reserve(src.colorStops.size());
+    for (const auto* stop : src.colorStops) {
+      if (stop == nullptr) {
+        continue;
+      }
+      colors.push_back(
+          tgfx::Color{stop->color.red, stop->color.green, stop->color.blue, stop->color.alpha});
+      positions.push_back(stop->offset);
+    }
+  }
+  style.stopColors = MakeProp(std::move(colors));
+  style.stopPositions = MakeProp(std::move(positions));
+}
+
+// Reuses the PAGX -> tgfx matrix converter from the renderer layer so
+// gradient / pattern matrices follow the same semantics as pagx rendering.
+tgfx::Matrix BakeMatrix(const pagx::Matrix& m) {
+  return pagx::ToTGFX(m);
+}
+
+// Interns the ImagePattern's source Image into PAGDocument::images and
+// returns the resulting index. Returns UINT32_MAX when the image has no
+// inline bytes (Baker side cannot load files in Phase 6 — Phase 10.5 will).
+uint32_t InternPatternImage(BakeContext& ctx, PAGDocument& doc, const pagx::Image* image) {
+  if (image == nullptr) {
+    return UINT32_MAX;
+  }
+  if (image->data == nullptr || image->data->empty()) {
+    // File-path-only or empty inline data: Baker cannot load bytes here.
+    // §G.2 warning 200 — Inflater renders a placeholder.
+    ctx.warn(ErrorCode::ImageSourceMissing,
+             "ImagePattern references an Image with no inline bytes");
+    return UINT32_MAX;
+  }
+  auto asset = std::make_unique<ImageAsset>();
+  asset->data = tgfx::Data::MakeWithCopy(image->data->bytes(), image->data->size());
+  asset->kind = ImageAssetKind::Raster;
+  // width / height stay 0 — real decode happens at Inflate time.
+  std::string semanticKey = image->filePath;  // empty OK for pure-inline images
+  return RegisterImage(ctx, doc, std::move(asset), image, std::move(semanticKey));
+}
+
+void BakeColorSource(BakeContext& ctx, PAGDocument& doc, const pagx::ColorSource* src,
+                     ShapeStyleData& out) {
+  if (src == nullptr) {
+    // Fill / Stroke with a null ColorSource stays at the SolidColor default
+    // (opaque black). Downstream wire is just the 4-byte common header.
+    out.sourceType = ColorSourceType::SolidColor;
+    return;
+  }
+  switch (src->nodeType()) {
+    case pagx::NodeType::SolidColor: {
+      const auto& s = *static_cast<const pagx::SolidColor*>(src);
+      out.sourceType = ColorSourceType::SolidColor;
+      out.color = MakeProp(tgfx::Color{s.color.red, s.color.green, s.color.blue, s.color.alpha});
+      break;
+    }
+    case pagx::NodeType::LinearGradient: {
+      const auto& g = *static_cast<const pagx::LinearGradient*>(src);
+      out.sourceType = ColorSourceType::LinearGradient;
+      PopulateGradientStops(g, out);
+      out.gradientMatrix = MakeProp(BakeMatrix(g.matrix));
+      out.fitsToGeometry = g.fitsToGeometry;
+      out.startPoint = MakeProp(tgfx::Point{g.startPoint.x, g.startPoint.y});
+      out.endPoint = MakeProp(tgfx::Point{g.endPoint.x, g.endPoint.y});
+      break;
+    }
+    case pagx::NodeType::RadialGradient: {
+      const auto& g = *static_cast<const pagx::RadialGradient*>(src);
+      out.sourceType = ColorSourceType::RadialGradient;
+      PopulateGradientStops(g, out);
+      out.gradientMatrix = MakeProp(BakeMatrix(g.matrix));
+      out.fitsToGeometry = g.fitsToGeometry;
+      out.center = MakeProp(tgfx::Point{g.center.x, g.center.y});
+      out.radius = MakeProp(g.radius);
+      break;
+    }
+    case pagx::NodeType::ConicGradient: {
+      const auto& g = *static_cast<const pagx::ConicGradient*>(src);
+      out.sourceType = ColorSourceType::ConicGradient;
+      PopulateGradientStops(g, out);
+      out.gradientMatrix = MakeProp(BakeMatrix(g.matrix));
+      out.fitsToGeometry = g.fitsToGeometry;
+      out.center = MakeProp(tgfx::Point{g.center.x, g.center.y});
+      // ConicGradient has no `radius` of its own — PAGDocument keeps the
+      // field at default 0 (Inflater reads startAngle/endAngle instead).
+      out.startAngle = MakeProp(g.startAngle);
+      out.endAngle = MakeProp(g.endAngle);
+      break;
+    }
+    case pagx::NodeType::DiamondGradient: {
+      const auto& g = *static_cast<const pagx::DiamondGradient*>(src);
+      out.sourceType = ColorSourceType::DiamondGradient;
+      PopulateGradientStops(g, out);
+      out.gradientMatrix = MakeProp(BakeMatrix(g.matrix));
+      out.fitsToGeometry = g.fitsToGeometry;
+      out.center = MakeProp(tgfx::Point{g.center.x, g.center.y});
+      out.radius = MakeProp(g.radius);
+      break;
+    }
+    case pagx::NodeType::ImagePattern: {
+      const auto& p = *static_cast<const pagx::ImagePattern*>(src);
+      out.sourceType = ColorSourceType::ImagePattern;
+      out.patternImageIndex = InternPatternImage(ctx, doc, p.image);
+      out.tileModeX = pagx::ToTGFX(p.tileModeX);
+      out.tileModeY = pagx::ToTGFX(p.tileModeY);
+      out.filterMode = pagx::ToTGFX(p.filterMode);
+      out.mipmapMode = pagx::ToTGFX(p.mipmapMode);
+      out.scaleMode = static_cast<ScaleMode>(pagx::ToTGFX(p.scaleMode));
+      out.patternMatrix = MakeProp(BakeMatrix(p.matrix));
+      break;
+    }
+    default:
+      // Unknown ColorSource subtype — leave the style at SolidColor default.
+      ctx.warn(ErrorCode::InvalidEnumValue,
+               "PaintBaker encountered an unknown ColorSource subtype");
+      out.sourceType = ColorSourceType::SolidColor;
+      break;
+  }
+}
+
+std::unique_ptr<VectorElement> BakeFill(BakeContext& ctx, PAGDocument& doc, const pagx::Fill& src) {
+  auto data = std::make_unique<ElementFillStyleData>();
+  data->style = std::make_unique<ShapeStyleData>();
+  data->style->alpha = MakeProp(src.alpha);
+  // §C.6 `overrideBlendMode` marks whether the source ColorSource forced a
+  // non-Normal blend. PAGX only defines `Normal` as the pass-through default
+  // (there is no separate SrcOver on pagx::BlendMode — see
+  // include/pagx/types/BlendMode.h), so the bit flips iff the PAGX node uses
+  // anything other than Normal.
+  data->style->blendMode = pagx::ToTGFX(src.blendMode);
+  data->style->overrideBlendMode = (src.blendMode != pagx::BlendMode::Normal);
+  BakeColorSource(ctx, doc, src.color, *data->style);
+  data->fillRule = pagx::ToTGFX(src.fillRule);
+  data->placement = pagx::ToTGFX(src.placement);
+
+  auto el = std::make_unique<VectorElement>();
+  el->type = VectorElementType::FillStyle;
+  el->payload = std::move(data);
+  return el;
+}
+
+std::unique_ptr<VectorElement> BakeStroke(BakeContext& ctx, PAGDocument& doc,
+                                          const pagx::Stroke& src) {
+  auto data = std::make_unique<ElementStrokeStyleData>();
+  data->style = std::make_unique<ShapeStyleData>();
+  data->style->alpha = MakeProp(src.alpha);
+  data->style->blendMode = pagx::ToTGFX(src.blendMode);
+  data->style->overrideBlendMode = (src.blendMode != pagx::BlendMode::Normal);
+  BakeColorSource(ctx, doc, src.color, *data->style);
+
+  data->strokeWidth = MakeProp(src.width);
+  data->lineCap = pagx::ToTGFX(src.cap);
+  data->lineJoin = pagx::ToTGFX(src.join);
+  data->miterLimit = MakeProp(src.miterLimit);
+  data->lineDashPattern = MakeProp(std::vector<float>{src.dashes.begin(), src.dashes.end()});
+  data->lineDashPhase = MakeProp(src.dashOffset);
+  data->lineDashAdaptive = src.dashAdaptive;
+  data->strokeAlign = pagx::ToTGFX(src.align);
+  data->placement = pagx::ToTGFX(src.placement);
+
+  auto el = std::make_unique<VectorElement>();
+  el->type = VectorElementType::StrokeStyle;
+  el->payload = std::move(data);
+  return el;
+}
+
+// Single-element dispatch by NodeType. Phase 6 adds Fill / Stroke; Text /
+// TextModifier / TextPath / TextBox still land in Phase 8.
+std::unique_ptr<VectorElement> BakeElement(BakeContext& ctx, PAGDocument& doc,
+                                           const pagx::Element* src) {
   if (src == nullptr) {
     return nullptr;
   }
@@ -229,16 +442,16 @@ std::unique_ptr<VectorElement> BakeElement(BakeContext& ctx, const pagx::Element
     case pagx::NodeType::Repeater:
       return BakeRepeater(*static_cast<const pagx::Repeater*>(src));
     case pagx::NodeType::Group:
-      return BakeGroup(ctx, *static_cast<const pagx::Group*>(src));
+      return BakeGroup(ctx, doc, *static_cast<const pagx::Group*>(src));
     case pagx::NodeType::Fill:
+      return BakeFill(ctx, doc, *static_cast<const pagx::Fill*>(src));
     case pagx::NodeType::Stroke:
+      return BakeStroke(ctx, doc, *static_cast<const pagx::Stroke*>(src));
     case pagx::NodeType::Text:
     case pagx::NodeType::TextModifier:
     case pagx::NodeType::TextPath:
     case pagx::NodeType::TextBox:
-      // Phase 6 / Phase 8 will land these. Silent skip keeps the layer
-      // shape intact — downstream readers see a smaller VectorPayload but
-      // do not error.
+      // Phase 8 (TextBaker) lands these.
       return nullptr;
     default:
       // Layer / resource / filter / style nodes are not valid Element
@@ -250,14 +463,14 @@ std::unique_ptr<VectorElement> BakeElement(BakeContext& ctx, const pagx::Element
 
 }  // namespace
 
-std::unique_ptr<VectorPayload> BakeVectorPayload(BakeContext& ctx,
+std::unique_ptr<VectorPayload> BakeVectorPayload(BakeContext& ctx, PAGDocument& doc,
                                                  const std::vector<pagx::Element*>& contents) {
   auto out = std::make_unique<VectorPayload>();
   for (auto* el : contents) {
     if (ctx.hasFatal()) {
       break;
     }
-    auto baked = BakeElement(ctx, el);
+    auto baked = BakeElement(ctx, doc, el);
     if (baked != nullptr) {
       out->contents.push_back(std::move(baked));
     }

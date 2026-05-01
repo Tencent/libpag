@@ -218,12 +218,15 @@ std::unique_ptr<ElementShapePathData> ReadElementShapePathBody(::pag::DecodeStre
   return d;
 }
 
-// ---------- ShapeStyleData inline (SolidColor branch only — Phase 5a) ----
+// ---------- ShapeStyleData inline (all 6 sourceType branches — Phase 6) ----
 //
-// §D.11 prescribes a wrapping `u16 innerLength` for forward-compat. Phase 5a
-// honours the wrapper but only emits the SolidColor branch fields. Phase 6
-// will widen the switch to gradient / image pattern branches without
-// changing the wrapper layout.
+// §D.11 prescribes a wrapping `u16 innerLength` (u16=0xFFFF escape → u32
+// extension) for forward-compat. The inner payload starts with the 4-byte
+// common header (sourceType / alpha / blendMode / overrideBlendMode) and
+// then branches by sourceType. A newer writer appending fields at the tail
+// of a branch stays compatible because the Reader always force-aligns to
+// innerEnd after the switch. An unknown sourceType collapses to the
+// common-header shape via warn + skip-to-innerEnd.
 
 void WriteShapeStyleDataInline(::pag::EncodeStream* body, const ShapeStyleData& s) {
   ::pag::EncodeStream inner(body->context);
@@ -231,12 +234,53 @@ void WriteShapeStyleDataInline(::pag::EncodeStream* body, const ShapeStyleData& 
   WriteProperty<float>(&inner, s.alpha, /*default=*/1.0f);
   inner.writeUint8(static_cast<uint8_t>(s.blendMode));
   inner.writeBoolean(s.overrideBlendMode);
-  // SolidColor branch: write `color` Property. Other branches will append
-  // their own fields here in Phase 6.
-  if (s.sourceType == ColorSourceType::SolidColor) {
-    WriteProperty<tgfx::Color>(&inner, s.color, /*default=*/tgfx::Color{});
+  switch (s.sourceType) {
+    case ColorSourceType::SolidColor:
+      WriteProperty<tgfx::Color>(&inner, s.color, /*default=*/tgfx::Color{});
+      break;
+    case ColorSourceType::LinearGradient:
+      WriteProperty<std::vector<tgfx::Color>>(&inner, s.stopColors,
+                                              /*default=*/std::vector<tgfx::Color>{});
+      WriteProperty<std::vector<float>>(&inner, s.stopPositions,
+                                        /*default=*/std::vector<float>{});
+      WriteProperty<tgfx::Matrix>(&inner, s.gradientMatrix, /*default=*/tgfx::Matrix::I());
+      inner.writeBoolean(s.fitsToGeometry);
+      WriteProperty<tgfx::Point>(&inner, s.startPoint, /*default=*/tgfx::Point{0.0f, 0.0f});
+      WriteProperty<tgfx::Point>(&inner, s.endPoint, /*default=*/tgfx::Point{1.0f, 0.0f});
+      break;
+    case ColorSourceType::RadialGradient:
+    case ColorSourceType::DiamondGradient:
+      WriteProperty<std::vector<tgfx::Color>>(&inner, s.stopColors,
+                                              /*default=*/std::vector<tgfx::Color>{});
+      WriteProperty<std::vector<float>>(&inner, s.stopPositions,
+                                        /*default=*/std::vector<float>{});
+      WriteProperty<tgfx::Matrix>(&inner, s.gradientMatrix, /*default=*/tgfx::Matrix::I());
+      inner.writeBoolean(s.fitsToGeometry);
+      WriteProperty<tgfx::Point>(&inner, s.center, /*default=*/tgfx::Point{});
+      WriteProperty<float>(&inner, s.radius, /*default=*/0.0f);
+      break;
+    case ColorSourceType::ConicGradient:
+      WriteProperty<std::vector<tgfx::Color>>(&inner, s.stopColors,
+                                              /*default=*/std::vector<tgfx::Color>{});
+      WriteProperty<std::vector<float>>(&inner, s.stopPositions,
+                                        /*default=*/std::vector<float>{});
+      WriteProperty<tgfx::Matrix>(&inner, s.gradientMatrix, /*default=*/tgfx::Matrix::I());
+      inner.writeBoolean(s.fitsToGeometry);
+      WriteProperty<tgfx::Point>(&inner, s.center, /*default=*/tgfx::Point{});
+      WriteProperty<float>(&inner, s.radius, /*default=*/0.0f);
+      WriteProperty<float>(&inner, s.startAngle, /*default=*/0.0f);
+      WriteProperty<float>(&inner, s.endAngle, /*default=*/360.0f);
+      break;
+    case ColorSourceType::ImagePattern:
+      inner.writeUint32(s.patternImageIndex);
+      inner.writeUint8(static_cast<uint8_t>(s.tileModeX));
+      inner.writeUint8(static_cast<uint8_t>(s.tileModeY));
+      inner.writeUint8(static_cast<uint8_t>(s.filterMode));
+      inner.writeUint8(static_cast<uint8_t>(s.mipmapMode));
+      inner.writeUint8(static_cast<uint8_t>(s.scaleMode));
+      WriteProperty<tgfx::Matrix>(&inner, s.patternMatrix, /*default=*/tgfx::Matrix::I());
+      break;
   }
-  // innerLength format: u16 if < 0xFFFF, else u16=0xFFFF + u32 extension.
   uint32_t innerLen = inner.length();
   if (innerLen < 0xFFFF) {
     body->writeUint16(static_cast<uint16_t>(innerLen));
@@ -267,8 +311,11 @@ std::unique_ptr<ShapeStyleData> ReadShapeStyleDataInline(::pag::DecodeStream* s,
 
   uint8_t srcByte = s->readUint8();
   // ColorSourceType currently holds 0..5 (SolidColor / LinearGradient /
-  // RadialGradient / ConicGradient / DiamondGradient / ImagePattern).
-  if (srcByte > 5) {
+  // RadialGradient / ConicGradient / DiamondGradient / ImagePattern). An
+  // unknown value collapses the whole branch payload to SolidColor defaults
+  // and jumps to innerEnd below.
+  bool knownSource = (srcByte <= 5);
+  if (!knownSource) {
     ctx->warn(ErrorCode::InvalidEnumValue, "ShapeStyle sourceType out of range; using SolidColor");
     style->sourceType = ColorSourceType::SolidColor;
   } else {
@@ -278,11 +325,73 @@ std::unique_ptr<ShapeStyleData> ReadShapeStyleDataInline(::pag::DecodeStream* s,
   style->blendMode = static_cast<tgfx::BlendMode>(s->readUint8());
   style->overrideBlendMode = (s->position() < innerEnd) ? s->readBoolean() : false;
 
-  // Phase 5a only decodes the SolidColor branch's `color` Property; other
-  // branches' fields stay at their PAGDocument defaults. Phase 6 will widen
-  // the switch.
-  if (style->sourceType == ColorSourceType::SolidColor && s->position() < innerEnd) {
-    style->color = ReadProperty<tgfx::Color>(s, /*default=*/tgfx::Color{}, innerEnd);
+  if (knownSource) {
+    switch (style->sourceType) {
+      case ColorSourceType::SolidColor:
+        if (s->position() < innerEnd) {
+          style->color = ReadProperty<tgfx::Color>(s, /*default=*/tgfx::Color{}, innerEnd);
+        }
+        break;
+      case ColorSourceType::LinearGradient:
+        style->stopColors = ReadProperty<std::vector<tgfx::Color>>(
+            s, /*default=*/std::vector<tgfx::Color>{}, innerEnd);
+        style->stopPositions =
+            ReadProperty<std::vector<float>>(s, /*default=*/std::vector<float>{}, innerEnd);
+        style->gradientMatrix =
+            ReadProperty<tgfx::Matrix>(s, /*default=*/tgfx::Matrix::I(), innerEnd);
+        style->fitsToGeometry = (s->position() < innerEnd) ? s->readBoolean() : true;
+        style->startPoint =
+            ReadProperty<tgfx::Point>(s, /*default=*/tgfx::Point{0.0f, 0.0f}, innerEnd);
+        style->endPoint =
+            ReadProperty<tgfx::Point>(s, /*default=*/tgfx::Point{1.0f, 0.0f}, innerEnd);
+        break;
+      case ColorSourceType::RadialGradient:
+      case ColorSourceType::DiamondGradient:
+        style->stopColors = ReadProperty<std::vector<tgfx::Color>>(
+            s, /*default=*/std::vector<tgfx::Color>{}, innerEnd);
+        style->stopPositions =
+            ReadProperty<std::vector<float>>(s, /*default=*/std::vector<float>{}, innerEnd);
+        style->gradientMatrix =
+            ReadProperty<tgfx::Matrix>(s, /*default=*/tgfx::Matrix::I(), innerEnd);
+        style->fitsToGeometry = (s->position() < innerEnd) ? s->readBoolean() : true;
+        style->center = ReadProperty<tgfx::Point>(s, /*default=*/tgfx::Point{}, innerEnd);
+        style->radius = ReadProperty<float>(s, /*default=*/0.0f, innerEnd);
+        break;
+      case ColorSourceType::ConicGradient:
+        style->stopColors = ReadProperty<std::vector<tgfx::Color>>(
+            s, /*default=*/std::vector<tgfx::Color>{}, innerEnd);
+        style->stopPositions =
+            ReadProperty<std::vector<float>>(s, /*default=*/std::vector<float>{}, innerEnd);
+        style->gradientMatrix =
+            ReadProperty<tgfx::Matrix>(s, /*default=*/tgfx::Matrix::I(), innerEnd);
+        style->fitsToGeometry = (s->position() < innerEnd) ? s->readBoolean() : true;
+        style->center = ReadProperty<tgfx::Point>(s, /*default=*/tgfx::Point{}, innerEnd);
+        style->radius = ReadProperty<float>(s, /*default=*/0.0f, innerEnd);
+        style->startAngle = ReadProperty<float>(s, /*default=*/0.0f, innerEnd);
+        style->endAngle = ReadProperty<float>(s, /*default=*/360.0f, innerEnd);
+        break;
+      case ColorSourceType::ImagePattern:
+        // Positional enums are raw bytes — reading past innerEnd is guarded
+        // by the outer skip below, but we still check before each read to
+        // honour a writer that emitted an undersized tail.
+        if (s->position() + 4 <= innerEnd) {
+          style->patternImageIndex = s->readUint32();
+        }
+        if (s->position() < innerEnd)
+          style->tileModeX = static_cast<tgfx::TileMode>(s->readUint8());
+        if (s->position() < innerEnd)
+          style->tileModeY = static_cast<tgfx::TileMode>(s->readUint8());
+        if (s->position() < innerEnd)
+          style->filterMode = static_cast<tgfx::FilterMode>(s->readUint8());
+        if (s->position() < innerEnd)
+          style->mipmapMode = static_cast<tgfx::MipmapMode>(s->readUint8());
+        if (s->position() < innerEnd) style->scaleMode = static_cast<ScaleMode>(s->readUint8());
+        if (s->position() < innerEnd) {
+          style->patternMatrix =
+              ReadProperty<tgfx::Matrix>(s, /*default=*/tgfx::Matrix::I(), innerEnd);
+        }
+        break;
+    }
   }
 
   // Forward-compat tail align: any unread bytes before innerEnd belong to

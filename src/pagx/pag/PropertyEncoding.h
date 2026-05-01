@@ -22,6 +22,7 @@
 #include <cstdint>
 #include <type_traits>
 #include <utility>
+#include <vector>
 #include "codec/utils/DecodeStream.h"
 #include "codec/utils/EncodeStream.h"
 #include "pagx/pag/PathCodec.h"
@@ -190,6 +191,50 @@ inline void WriteValue<tgfx::BlendMode>(::pag::EncodeStream* s, const tgfx::Blen
 template <>
 inline tgfx::BlendMode ReadValue<tgfx::BlendMode>(::pag::DecodeStream* s) {
   return static_cast<tgfx::BlendMode>(s->readUint8());
+}
+
+// std::vector<Color> / std::vector<float> — Phase 6 (gradient stopColors /
+// stopPositions). Wire format: varU32 count + count elements. Element codec
+// reuses the scalar WriteValue / ReadValue specializations for Color and
+// float. The caller never hits these specializations outside Property<T>, so
+// the count is never framed by a parent TagHeader — we rely on the Property's
+// own propHeader.isDefault shortcut to collapse empty stops entirely when
+// they equal the PAGDocument default.
+template <>
+inline void WriteValue<std::vector<tgfx::Color>>(::pag::EncodeStream* s,
+                                                 const std::vector<tgfx::Color>& v) {
+  s->writeEncodedUint32(static_cast<uint32_t>(v.size()));
+  for (const auto& c : v) {
+    WriteColor(s, c);
+  }
+}
+template <>
+inline std::vector<tgfx::Color> ReadValue<std::vector<tgfx::Color>>(::pag::DecodeStream* s) {
+  uint32_t n = s->readEncodedUint32();
+  std::vector<tgfx::Color> out;
+  out.reserve(n);
+  for (uint32_t i = 0; i < n; ++i) {
+    out.push_back(ReadColor(s));
+  }
+  return out;
+}
+
+template <>
+inline void WriteValue<std::vector<float>>(::pag::EncodeStream* s, const std::vector<float>& v) {
+  s->writeEncodedUint32(static_cast<uint32_t>(v.size()));
+  for (float f : v) {
+    s->writeFloat(f);
+  }
+}
+template <>
+inline std::vector<float> ReadValue<std::vector<float>>(::pag::DecodeStream* s) {
+  uint32_t n = s->readEncodedUint32();
+  std::vector<float> out;
+  out.reserve(n);
+  for (uint32_t i = 0; i < n; ++i) {
+    out.push_back(s->readFloat());
+  }
+  return out;
 }
 
 // tgfx::Path — Phase 5b. Path's decode path needs to push fatal diagnostics

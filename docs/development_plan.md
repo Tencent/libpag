@@ -181,7 +181,7 @@ cp -R third_party/ ../libpag_pagx_pag_impl/third_party/
 | &nbsp;&nbsp;5a element Tag codec | ✅ | (本提交) | 1.5 h | ElementTags.h/cpp + 11 element body Read/Write + VectorPayload(=24) + LayerBlock 接 VectorPayload；ShapeStyleData 内含 innerLength 包裹器（仅 SolidColor 分支）；MAX_VECTOR_ELEMENT_DEPTH 防御 + Element*Limit cap；12 测试全绿；Text 三种 element warn UnknownTagCode skip |
 | &nbsp;&nbsp;5b Path codec | ✅ | (本提交) | 1 h | PathCodec.h/cpp（仅 format=0 裸 float，format=1 量化推迟 Phase 12）+ ReadPathProperty/WritePathProperty + ElementShapePath 接 path Property；8 测试全绿覆盖 404 PathVerbLimitExceeded + NaN/Inf/无效格式 + Conic weight 校验；Iterator 暴露 close 自动展开为 lineTo+close（行为锁定，wire 用 iterator 计数） |
 | &nbsp;&nbsp;5c VectorBaker + Mask | ✅ | (本提交) | 1.5 h | VectorBaker.h/cpp（Rectangle/Ellipse/Polystar/Path/TrimPath/RoundCorner/MergePath/Repeater/Group 9 element baker）+ LayerBaker 接 Vector layer + Mask 两趟 pre-pass（recordLayerPaths Pass 1 + 路径解析 Pass 2）；11 测试全绿（VectorBaker 9 + LayerBaker mask 2）覆盖 202 MaskTargetMissing。**关键陷阱**：pagx::PolystarType {Polygon=0,Star=1} vs tgfx::PolystarType {Star=0,Polygon=1}，必须按名称映射 |
-| 6 PaintBaker | ⏳ | — | — | — |
+| 6 PaintBaker | ✅ | (本提交) | 1.5 h | ShapeStyleData codec 全 6 sourceType 分支（SolidColor/LinearGradient/RadialGradient/ConicGradient/DiamondGradient/ImagePattern）+ Property<vector<Color/float>> 特化 + PaintBaker ColorSource 派发（融入 VectorBaker.cpp）+ Fill/Stroke element baker + ImagePattern 复用 ResourceBaker::RegisterImage；10 测试全绿（PaintBaker 9 + ShapeStyleCodec 1）覆盖全 ColorSource roundtrip + 空 gradient stops 兜底注入 [Black@0,White@1] + filePath-only ImageSourceMissing=200 告警 + UnknownSourceType 降级 SolidColor + InvalidEnumValue=407 警告 |
 | 7 StyleFilterBaker | ⏳ | — | — | — |
 | 8 TextBaker + GlyphRun | ⏳ | — | — | — |
 | 9 LayerInflater | ⏳ | — | — | — |
