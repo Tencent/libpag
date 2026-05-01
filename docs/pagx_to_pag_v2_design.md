@@ -5244,8 +5244,13 @@ constexpr uint8_t Preserve3D             = 1u << 1;
 constexpr uint8_t PassThroughBackground  = 1u << 2;
 constexpr uint8_t AllowsEdgeAntialiasing = 1u << 3;
 constexpr uint8_t AllowsGroupOpacity     = 1u << 4;
+constexpr uint8_t HasFilters             = 1u << 5;  // Phase 7：LayerFilters sub-Tag 存在
+constexpr uint8_t HasStyles              = 1u << 6;  // Phase 7：LayerStyles sub-Tag 存在
+// bit 7 保留（Phase 9 HasMaskRef）
 }
 ```
+
+**Phase 7 约定（v2.21）**：位 5/6 用作 sub-Tag 存在性提示以消除"sub-Tag 头 vs childCount varU32"的 peek 歧义。Writer 对空 filters/styles 必须写 0；Reader 据位决定是否读对应 sub-Tag。位 7（HasMaskRef）留待 Phase 9 LayerMaskRef 落地时启用。
 
 ### D.9 LayerTransform / LayerMaskRef / LayerFilters / LayerStyles
 

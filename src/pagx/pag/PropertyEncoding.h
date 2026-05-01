@@ -19,6 +19,7 @@
 // without the caller having to replay the initializer.
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <type_traits>
 #include <utility>
@@ -233,6 +234,28 @@ inline std::vector<float> ReadValue<std::vector<float>>(::pag::DecodeStream* s) 
   out.reserve(n);
   for (uint32_t i = 0; i < n; ++i) {
     out.push_back(s->readFloat());
+  }
+  return out;
+}
+
+// std::array<float, 20> — Phase 7 (ColorMatrixFilter.colorMatrix). Fixed
+// length, so no count prefix; just 20 back-to-back floats. Equality uses the
+// standard std::array operator== (element-wise, bit-exact for float via ==
+// semantics; bit_cast precision is not required because the writer only
+// elides the payload when *all* 20 elements match the default, and the
+// identity matrix round-trips exactly under IEEE 754).
+template <>
+inline void WriteValue<std::array<float, 20>>(::pag::EncodeStream* s,
+                                              const std::array<float, 20>& v) {
+  for (float f : v) {
+    s->writeFloat(f);
+  }
+}
+template <>
+inline std::array<float, 20> ReadValue<std::array<float, 20>>(::pag::DecodeStream* s) {
+  std::array<float, 20> out{};
+  for (auto& f : out) {
+    f = s->readFloat();
   }
   return out;
 }

@@ -36,11 +36,11 @@ TagCode TagCodeForElementType(VectorElementType t) {
     case VectorElementType::Polystar:
       return TagCode::ElementPolystar;
     case VectorElementType::ShapePath:
-      return TagCode::ElementPath;
+      return TagCode::ElementShapePath;
     case VectorElementType::FillStyle:
-      return TagCode::ElementFill;
+      return TagCode::ElementFillStyle;
     case VectorElementType::StrokeStyle:
-      return TagCode::ElementStroke;
+      return TagCode::ElementStrokeStyle;
     case VectorElementType::TrimPath:
       return TagCode::ElementTrimPath;
     case VectorElementType::RoundCorner:
@@ -56,7 +56,7 @@ TagCode TagCodeForElementType(VectorElementType t) {
     case VectorElementType::TextModifier:
       return TagCode::ElementTextModifier;
     case VectorElementType::VectorGroup:
-      return TagCode::ElementGroup;
+      return TagCode::ElementVectorGroup;
   }
   // Unreachable — VectorElementType is a closed enum.
   return TagCode::ElementRectangle;
@@ -71,11 +71,11 @@ VectorElementType ElementTypeForTagCode(TagCode code, bool* outOk) {
       return VectorElementType::Ellipse;
     case TagCode::ElementPolystar:
       return VectorElementType::Polystar;
-    case TagCode::ElementPath:
+    case TagCode::ElementShapePath:
       return VectorElementType::ShapePath;
-    case TagCode::ElementFill:
+    case TagCode::ElementFillStyle:
       return VectorElementType::FillStyle;
-    case TagCode::ElementStroke:
+    case TagCode::ElementStrokeStyle:
       return VectorElementType::StrokeStyle;
     case TagCode::ElementTrimPath:
       return VectorElementType::TrimPath;
@@ -91,7 +91,7 @@ VectorElementType ElementTypeForTagCode(TagCode code, bool* outOk) {
       return VectorElementType::TextPath;
     case TagCode::ElementTextModifier:
       return VectorElementType::TextModifier;
-    case TagCode::ElementGroup:
+    case TagCode::ElementVectorGroup:
       return VectorElementType::VectorGroup;
     default:
       *outOk = false;

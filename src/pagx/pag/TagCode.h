@@ -49,33 +49,33 @@ enum class TagCode : uint16_t {
   MeshPayload = 25,
   CompositionRefPayload = 26,
 
-  // ---- VectorElement 40-119 (14 element types in use; 40-53) ----
+  // ---- VectorElement 40-119 (14 element types in use; 40-53, pinned by §D.11) ----
   ElementRectangle = 40,
   ElementEllipse = 41,
   ElementPolystar = 42,
-  ElementPath = 43,
-  ElementText = 44,
-  ElementFill = 45,
-  ElementStroke = 46,
-  ElementTrimPath = 47,
-  ElementTextPath = 48,
-  ElementRoundCorner = 49,
-  ElementMergePath = 50,
-  ElementRepeater = 51,
+  ElementShapePath = 43,
+  ElementFillStyle = 44,
+  ElementStrokeStyle = 45,
+  ElementTrimPath = 46,
+  ElementRoundCorner = 47,
+  ElementMergePath = 48,
+  ElementRepeater = 49,
+  ElementText = 50,
+  ElementTextPath = 51,
   ElementTextModifier = 52,
-  ElementGroup = 53,
+  ElementVectorGroup = 53,
 
-  // ---- LayerFilter 120-139 ----
+  // ---- LayerFilter 120-139 (pinned by §D.12) ----
   FilterBlur = 120,
-  FilterGlow = 121,
-  FilterDropShadow = 122,
-  FilterColorFill = 123,
-  FilterStroke = 124,
+  FilterDropShadow = 121,
+  FilterInnerShadow = 122,
+  FilterColorMatrix = 123,
+  FilterBlend = 124,
 
-  // ---- LayerStyle 140-159 ----
+  // ---- LayerStyle 140-159 (pinned by §D.12) ----
   StyleDropShadow = 140,
-  StyleStroke = 141,
-  StyleGradientOverlay = 142,
+  StyleInnerShadow = 141,
+  StyleBackgroundBlur = 142,
 
   // ---- Special 1022 ----
   ErrorMarker = 1022,

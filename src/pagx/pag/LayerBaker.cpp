@@ -20,6 +20,7 @@
 #include "pagx/pag/ErrorCode.h"
 #include "pagx/pag/PAGDocument.h"
 #include "pagx/pag/PropertyEncoding.h"
+#include "pagx/pag/StyleFilterBaker.h"
 #include "pagx/pag/VectorBaker.h"
 #include "renderer/ToTGFX.h"
 
@@ -220,6 +221,15 @@ struct LayerWalker {
       }
       out->maskType = static_cast<LayerMaskType>(pagx::ToTGFXMaskType(src->maskType));
     }
+
+    // ---- Layer filters / styles (Phase 7) ----
+    // PAGX stores these as vectors of typed node pointers; StyleFilterBaker
+    // translates each subtype into the flat pag::LayerFilter / LayerStyle
+    // struct. Empty inputs produce empty outputs, which keeps the wire
+    // format's layerFlags::HasFilters / HasStyles bits off and skips the
+    // sub-Tag emission entirely.
+    BakeLayerFilters(ctx, src->filters, &out->filters);
+    BakeLayerStyles(ctx, src->styles, &out->styles);
 
     // ---- Children recursion ----
     bool nestedFatal = false;

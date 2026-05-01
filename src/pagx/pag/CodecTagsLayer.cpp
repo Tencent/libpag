@@ -15,6 +15,7 @@
 #include "pagx/pag/CodecTags.h"
 #include "pagx/pag/ElementTags.h"
 #include "pagx/pag/PropertyEncoding.h"
+#include "pagx/pag/StyleFilterTags.h"
 #include "pagx/pag/TagHeader.h"
 #include "pagx/pag/ValueCodec.h"
 #include "pagx/pag/limits.h"
@@ -41,14 +42,23 @@ bool SafeTagEnd(::pag::DecodeStream* stream, uint64_t bodyStart, uint32_t bodyLe
 }
 
 // layerFlags bit positions — keep in sync with §D.8 and PAGDocument's
-// non-animatable bool flags. Locally scoped because Phase 4b is the only
-// site touching these bits today.
+// non-animatable bool flags. Bits 0-4 carry the persistent Layer booleans;
+// bits 5-6 carry Phase-7 sub-Tag presence hints so the Reader can skip the
+// LayerFilters / LayerStyles decode entirely when the writer omitted them,
+// avoiding the "peek a TagHeader vs start reading childCount varU32"
+// ambiguity that arises with three optional sub-Tags in a row.
+//
+// Bit 7 stays reserved for Phase 9 LayerMaskRef presence (same pattern) and
+// must continue to be written as 0 + ignored on Read until then.
 namespace flags {
 constexpr uint8_t HasScrollRect = 1u << 0;
 constexpr uint8_t Preserve3D = 1u << 1;
 constexpr uint8_t PassThroughBackground = 1u << 2;
 constexpr uint8_t AllowsEdgeAntialiasing = 1u << 3;
 constexpr uint8_t AllowsGroupOpacity = 1u << 4;
+constexpr uint8_t HasFilters = 1u << 5;
+constexpr uint8_t HasStyles = 1u << 6;
+// bit 7 reserved (LayerMaskRef presence, Phase 9+).
 }  // namespace flags
 
 uint8_t PackLayerFlags(const Layer& layer) {
@@ -58,6 +68,8 @@ uint8_t PackLayerFlags(const Layer& layer) {
   if (layer.passThroughBackground) f |= flags::PassThroughBackground;
   if (layer.allowsEdgeAntialiasing) f |= flags::AllowsEdgeAntialiasing;
   if (layer.allowsGroupOpacity) f |= flags::AllowsGroupOpacity;
+  if (!layer.filters.empty()) f |= flags::HasFilters;
+  if (!layer.styles.empty()) f |= flags::HasStyles;
   return f;
 }
 
@@ -67,8 +79,11 @@ void UnpackLayerFlags(uint8_t f, Layer* layer) {
   layer->passThroughBackground = (f & flags::PassThroughBackground) != 0;
   layer->allowsEdgeAntialiasing = (f & flags::AllowsEdgeAntialiasing) != 0;
   layer->allowsGroupOpacity = (f & flags::AllowsGroupOpacity) != 0;
-  // bits 5-7 reserved — explicitly ignored so future writers can light them
-  // up without breaking this Reader (§D.8 forward-compat).
+  // HasFilters / HasStyles are consumed by the Reader loop below; don't
+  // project them onto the Layer struct since the decoded filters / styles
+  // vectors are the truthy source of "has".
+  // bit 7 reserved — explicitly ignored so future writers can light it up
+  // without breaking this Reader (§D.8 forward-compat).
 }
 
 // =============================================================================
@@ -164,6 +179,16 @@ void WriteLayerBlock(::pag::EncodeStream* stream, const Layer& layer, EncodeSess
   // Reader can rely on its presence as an alignment anchor for §4.4 rule 1.
   WriteLayerTransform(&body, layer, session);
 
+  // LayerFilters / LayerStyles — only when non-empty (§D.8 "仅当
+  // !filters.empty()" / "仅当 !styles.empty()"). Order is fixed by
+  // §D.8 so the Reader can lookup-free dispatch on the inner TagCode.
+  if (!layer.filters.empty()) {
+    WriteLayerFilters(&body, layer.filters, session);
+  }
+  if (!layer.styles.empty()) {
+    WriteLayerStyles(&body, layer.styles, session);
+  }
+
   // Phase 5a/4b emit one payload Tag for non-Layer types. Phase 5a adds
   // VectorPayload; Phase 4b shipped CompositionRefPayload. Other types get
   // empty bodies (no payload Tag) — Phase 5-8 will fill them in.
@@ -223,18 +248,23 @@ std::unique_ptr<Layer> ReadLayerBlock(::pag::DecodeStream* stream, DecodeContext
 
   uint8_t layerFlags = stream->readUint8();
   UnpackLayerFlags(layerFlags, layer.get());
+  const bool hasFilters = (layerFlags & flags::HasFilters) != 0;
+  const bool hasStyles = (layerFlags & flags::HasStyles) != 0;
 
-  // Sub-Tag region: Phase 4b lays out LayerBlock body in a fixed order so we
+  // Sub-Tag region: LayerBlock body lays out sub-Tags in a fixed order so we
   // don't need to peek bytes to disambiguate "next sub-Tag" vs
   // "childCount varU32". Order is:
   //
-  //   1. LayerTransform (TagCode = 15) — required (§D.9 P0-R2)
-  //   2. payload Tag    (TagCode 20-26) — present iff type != Layer
-  //   3. childCount varU32 + children
+  //   1. LayerTransform   (TagCode = 15) — required (§D.9 P0-R2)
+  //   2. LayerFilters     (TagCode = 13) — present iff flags::HasFilters
+  //   3. LayerStyles      (TagCode = 14) — present iff flags::HasStyles
+  //   4. payload Tag      (TagCode 20-26) — present iff type != Layer
+  //   5. childCount varU32 + children
   //
-  // LayerMaskRef / LayerFilters / LayerStyles slots stay reserved between
-  // LayerTransform and the payload — Phase 5+ inserts them by widening this
-  // dispatch when the corresponding Bakers come online.
+  // LayerMaskRef (TagCode = 12) stays reserved between LayerTransform and
+  // LayerFilters — Phase 9 Inflater will populate maskLayerPath through its
+  // own sub-Tag once cross-layer mask chains are produced (will also claim
+  // flags::HasMaskRef bit 7).
 
   // ---- 1. LayerTransform (required) ----
   if (stream->position() >= tagEnd) {
@@ -261,7 +291,62 @@ std::unique_ptr<Layer> ReadLayerBlock(::pag::DecodeStream* stream, DecodeContext
   ReadLayerTransform(stream, ctx, xformEnd, layer.get());
   SeekTo(stream, static_cast<uint32_t>(xformEnd));
 
-  // ---- 2. Payload Tag (present iff type != Layer) ----
+  // Shared sub-Tag reader: consumes header + validates childEnd ≤ tagEnd,
+  // matches `expectedCode`, and returns the child body end. Used by the
+  // three fixed-order slots below (LayerFilters / LayerStyles / payload).
+  auto readExpectedSubTag = [&](TagCode expectedCode, uint64_t* outChildEnd) -> bool {
+    if (stream->position() >= tagEnd) {
+      ctx->error(ErrorCode::MalformedTag, "LayerBlock truncated before expected sub-Tag");
+      return false;
+    }
+    TagHeader header = ReadTagHeader(stream);
+    if (header.code != expectedCode) {
+      ctx->error(ErrorCode::MalformedTag,
+                 "LayerBlock sub-Tag order violates layerFlags presence bits");
+      return false;
+    }
+    uint64_t bodyStart = stream->position();
+    if (!SafeTagEnd(stream, bodyStart, header.length, ctx, outChildEnd)) {
+      return false;
+    }
+    if (*outChildEnd > tagEnd) {
+      ctx->error(ErrorCode::MalformedTag, "sub-Tag extends past LayerBlock body");
+      return false;
+    }
+    return true;
+  };
+
+  // ---- 2. Optional LayerFilters ----
+  if (hasFilters) {
+    uint64_t filtersEnd = 0;
+    if (!readExpectedSubTag(TagCode::LayerFilters, &filtersEnd)) {
+      --ctx->currentLayerDepth;
+      return nullptr;
+    }
+    ReadLayerFilters(stream, ctx, filtersEnd, &layer->filters);
+    if (ctx->hasError()) {
+      --ctx->currentLayerDepth;
+      return nullptr;
+    }
+    SeekTo(stream, static_cast<uint32_t>(filtersEnd));
+  }
+
+  // ---- 3. Optional LayerStyles ----
+  if (hasStyles) {
+    uint64_t stylesEnd = 0;
+    if (!readExpectedSubTag(TagCode::LayerStyles, &stylesEnd)) {
+      --ctx->currentLayerDepth;
+      return nullptr;
+    }
+    ReadLayerStyles(stream, ctx, stylesEnd, &layer->styles);
+    if (ctx->hasError()) {
+      --ctx->currentLayerDepth;
+      return nullptr;
+    }
+    SeekTo(stream, static_cast<uint32_t>(stylesEnd));
+  }
+
+  // ---- 4. Payload Tag (present iff type != Layer) ----
   if (layer->type != LayerType::Layer) {
     if (stream->position() >= tagEnd) {
       ctx->error(ErrorCode::MalformedTag, "LayerBlock missing payload Tag for non-Layer type");
