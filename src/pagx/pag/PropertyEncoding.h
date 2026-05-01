@@ -24,6 +24,7 @@
 #include <utility>
 #include "codec/utils/DecodeStream.h"
 #include "codec/utils/EncodeStream.h"
+#include "pagx/pag/PathCodec.h"
 #include "pagx/pag/ValueCodec.h"
 #include "tgfx/core/BlendMode.h"
 
@@ -191,6 +192,24 @@ inline tgfx::BlendMode ReadValue<tgfx::BlendMode>(::pag::DecodeStream* s) {
   return static_cast<tgfx::BlendMode>(s->readUint8());
 }
 
+// tgfx::Path — Phase 5b. Path's decode path needs to push fatal diagnostics
+// (NaN/Inf coords, verb count overrun) so it cannot ride the basic ValueCodec
+// pipeline. WritePath / ReadPath live in PathCodec.h. Wired through dedicated
+// WriteProperty<Path> / ReadProperty<Path> specializations below so the
+// caller-facing API stays uniform with the other Property<T> entries.
+//
+// We still provide a dummy ReadValue<Path> specialization that pushes a
+// fatal: it should NEVER be called from the regular Property pipeline (the
+// Property<Path> specializations bypass ReadValue<T>), but its presence
+// prevents accidental unspecialised template instantiation from returning
+// a nonsense Path.
+template <>
+inline void WriteValue<tgfx::Path>(::pag::EncodeStream* s, const tgfx::Path& v) {
+  WritePath(s, v);
+}
+// No ReadValue<Path> specialization — Property<Path> uses the dedicated
+// ReadProperty<Path> overload below, which threads DecodeContext through.
+
 // ------------------------------------------------------------------
 // WriteProperty<T> / ReadProperty<T> — the only API Baker/Codec touch.
 // ------------------------------------------------------------------
@@ -231,6 +250,54 @@ inline Property<T> ReadProperty(::pag::DecodeStream* stream, const T& defaultVal
     stream->skip(enclosingTagEnd - stream->position());
   }
   return MakeProp(defaultValue);
+}
+
+// ------------------------------------------------------------------
+// Property<Path> dedicated overload — Path's decode path needs to push
+// fatal diagnostics, so we route through DecodeContext directly instead of
+// piggy-backing on the basic ReadValue<T> pipeline. Callers go through this
+// overload by passing the ctx as the second arg (compile error makes the
+// distinction explicit).
+// ------------------------------------------------------------------
+
+inline Property<tgfx::Path> ReadPathProperty(::pag::DecodeStream* stream, DecodeContext* ctx,
+                                             const tgfx::Path& defaultValue,
+                                             uint32_t enclosingTagEnd) {
+  uint8_t header = stream->readUint8();
+  uint8_t encoding = static_cast<uint8_t>(header & prop_header::kEncodingMask);
+  bool isDefault = (header & prop_header::kIsDefaultBit) != 0;
+
+  if (encoding == prop_header::kEncodingConstant) {
+    if (isDefault) {
+      return MakeProp(defaultValue);
+    }
+    tgfx::Path p = ReadPath(stream, ctx);
+    if (ctx->hasError()) {
+      return MakeProp(defaultValue);
+    }
+    return MakeProp(std::move(p));
+  }
+  // Unknown encoding — same §4.4 rule 1 skip-to-tag-end semantics.
+  if (enclosingTagEnd > stream->position()) {
+    stream->skip(enclosingTagEnd - stream->position());
+  }
+  return MakeProp(defaultValue);
+}
+
+inline void WritePathProperty(::pag::EncodeStream* stream, const Property<tgfx::Path>& prop,
+                              const tgfx::Path& defaultValue) {
+  uint8_t header = static_cast<uint8_t>(PropertyEncoding::Constant);
+  // Path equality (operator==) is defined as "PathFillType + verb array +
+  // Point array equivalent" per Path.h:43 — safe to use for the isDefault
+  // collapse.
+  const bool isDefault = prop.encoding == PropertyEncoding::Constant && prop.value == defaultValue;
+  if (isDefault) {
+    header = static_cast<uint8_t>(header | prop_header::kIsDefaultBit);
+  }
+  stream->writeUint8(header);
+  if (!isDefault) {
+    WritePath(stream, prop.value);
+  }
 }
 
 }  // namespace pagx::pag

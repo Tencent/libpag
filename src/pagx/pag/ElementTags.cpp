@@ -191,23 +191,27 @@ std::unique_ptr<ElementPolystarData> ReadElementPolystarBody(::pag::DecodeStream
   return d;
 }
 
-// ---------- ShapePath (Phase 5a simplified — no Path bytes) ----------
+// ---------- ShapePath (Phase 5b: includes Path Property) ----------
 //
-// Body layout for Phase 5a: position Property + reversed bool. Phase 5b will
-// insert a Property<Path> between them; the addition is field-level so old
-// readers built against Phase 5a will length-skip the new Path bytes via
-// the wrapping TagHeader.length (§6.5 ①).
+// Body layout (Phase 5b):
+//   Property<Point> position
+//   Property<Path>  path
+//   bool            reversed
 
 void WriteElementShapePathBody(::pag::EncodeStream* body, const ElementShapePathData& d) {
   WriteProperty<tgfx::Point>(body, d.position, /*default=*/tgfx::Point{});
+  WritePathProperty(body, d.path, /*default=*/tgfx::Path{});
   body->writeBoolean(d.reversed);
 }
 
 std::unique_ptr<ElementShapePathData> ReadElementShapePathBody(::pag::DecodeStream* s,
-                                                               DecodeContext* /*ctx*/,
-                                                               uint32_t te) {
+                                                               DecodeContext* ctx, uint32_t te) {
   auto d = std::make_unique<ElementShapePathData>();
   d->position = ReadProperty<tgfx::Point>(s, /*default=*/tgfx::Point{}, te);
+  d->path = ReadPathProperty(s, ctx, /*default=*/tgfx::Path{}, te);
+  if (ctx->hasError()) {
+    return nullptr;
+  }
   if (s->position() < te) {
     d->reversed = s->readBoolean();
   }
