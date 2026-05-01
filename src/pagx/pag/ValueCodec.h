@@ -377,6 +377,17 @@ inline std::string ReadUtf8String(::pag::DecodeStream* s, DiagnosticCollectorGua
   return out;
 }
 
+// Symmetric writer for ReadUtf8String. Encodes `s.size()` as varU32 followed
+// by the raw bytes. v1 writeBytes() takes a non-const uint8_t* — the cast is
+// safe because EncodeStream only reads the input buffer.
+inline void WriteUtf8String(::pag::EncodeStream* stream, const std::string& s) {
+  stream->writeEncodedUint32(static_cast<uint32_t>(s.size()));
+  if (!s.empty()) {
+    stream->writeBytes(reinterpret_cast<uint8_t*>(const_cast<char*>(s.data())),
+                       static_cast<uint32_t>(s.size()));
+  }
+}
+
 // Reads varU32 length + length bytes of opaque data. Owning buffer is handed
 // back via shared_ptr<const tgfx::Data>. Zero-copy path is intentionally NOT
 // wired here — Phase 10.5 will add a ZeroCopyScope hook that flips the

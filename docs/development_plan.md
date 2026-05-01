@@ -175,7 +175,7 @@ cp -R third_party/ ../libpag_pagx_pag_impl/third_party/
 | 1 ValueCodec / CorruptBuilder | ✅ | (本提交) | 1.5 h | 9 文件交付；38/38 单测全绿；exit gate `grep std::vector<uint8_t> src/pagx/pag/` 零命中 |
 | 2 PAGDocument + 测试基建 | ✅ | (本提交) | 2 h | PAGDocument.h 全量字段；BakeContext + ResourceBaker；PAGDocumentEquals + 4 个 StructBuilders；26 条新测试全绿。**PAGXBuilder 推迟到 Phase 3**（与 LayerBaker 一起接 PAGX 节点更自然） |
 | 3 LayerBaker | ✅ | (本提交) | 1.5 h | Baker 入口 + LayerBaker 通用字段 + CompositionBaker；含前置 Phase 2 推迟的 PAGXBuilder（13 fluent + 7 LayerBaker + 5 fatal = 25 测试全绿）。深度/总量 cap 集成测因 PAGX applyLayout 在深嵌套上 O(N²) 退化，回退到 BakeContext 直接验证（已注释原因） |
-| 4a Codec 容器头 | ⏳ | — | — | 可与 4b 合并 |
+| 4a Codec 容器头 | ✅ | (本提交) | 1.5 h | DecodeContext + EncodeSession + Codec.h/cpp + FileHeader/CompositionList/Composition 三个框架 Tag；14 测试全绿（RoundTrip 4 + VersionReject 4 + Truncate 6）覆盖 300/301/302/303/304/305 段。`SeekTo()` helper 落地以绕开 v1 setPosition 怪癖；ImageAssetTable/FontAssetTable/LayerBlock/payload 推迟到 4b |
 | 4b Codec 主体 Tag | ⏳ | — | — | — |
 | 5 VectorBaker + ElementTags | ⏳ | — | — | — |
 | 6 PaintBaker | ⏳ | — | — | — |
