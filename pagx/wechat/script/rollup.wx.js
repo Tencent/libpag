@@ -59,7 +59,7 @@ export default [
     input: path.resolve(__dirname, '../ts/pagx.ts'),
     output: {
       banner,
-      file: path.resolve(__dirname, '../ts/wasm/pagx-viewer.js'),
+      file: path.resolve(__dirname, '../lib/pagx-viewer.js'),
       format: 'esm',
       sourcemap: !isRelease
     },

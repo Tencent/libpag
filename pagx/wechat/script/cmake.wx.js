@@ -38,8 +38,8 @@ await import('./setup.emsdk.wx.js');
 await import("../../../third_party/vendor_tools/lib-build");
 
 
-if (!fs.existsSync("../ts/wasm")) {
-    fs.mkdirSync("../ts/wasm", {recursive: true});
+if (!fs.existsSync("../lib")) {
+    fs.mkdirSync("../lib", {recursive: true});
 }
 
-fs.copyFileSync("../wasm/pagx-viewer.wasm", "../ts/wasm/pagx-viewer.wasm")
+fs.copyFileSync("../wasm/pagx-viewer.wasm", "../lib/pagx-viewer.wasm")

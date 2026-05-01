@@ -184,7 +184,7 @@ function main() {
 //     module.exports = { copyFiles };
 // }
 
-copyFiles('./ts/wasm', './wx_demo/utils',
+copyFiles('./lib/', './wx_demo/utils',
   ['*.js', '*.br'], {
   recursive: true,
   overwrite: true,
