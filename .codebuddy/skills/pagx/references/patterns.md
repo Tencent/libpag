@@ -30,6 +30,28 @@ Layers in rows or columns, and constraint positioning for positioning elements w
 **Pattern**: 1px Rectangle for horizontal rules. For full-width dividers, use
 `width="100%"` on the Layer instead of explicit width.
 
+### Dashed Divider
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="300" height="20">
+  <Layer centerX="0" centerY="0" width="260">
+    <Path data="M 0,0 L 260,0"/>
+    <Stroke color="#94A3B8" width="1" dashes="4,4"/>
+  </Layer>
+</pagx>
+```
+
+**Pattern**: Use a single-segment Path (one `M`+`L`) for any dashed or dotted line —
+horizontal, vertical, or diagonal. Stroke the Path with `dashes="on,off"` to get a
+single row of dashes.
+
+**Anti-pattern**: Do **not** express a dashed line with a Rectangle (even `height="0"`
+or `height="1"`) plus a dashed Stroke. A Rectangle is always a four-edge closed shape,
+so the dash pattern traces every edge — a thin Rectangle renders as **two** parallel
+rows of dashes (the top and bottom edges), not one. Rectangle + solid Fill is fine
+for solid dividers; once you need `dashes`, switch the geometry to Path.
+
 ### Button / Badge
 
 ```xml
