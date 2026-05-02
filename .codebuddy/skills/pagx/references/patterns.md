@@ -61,13 +61,11 @@ Stroke traces every edge and renders as two parallel rows of dashes, not one.
 </pagx>
 ```
 
-**Pattern**: Arrow = line Path + triangle head Path. The line ends at the triangle's
-**base midpoint**, not the tip — otherwise the line pokes through the head. Triangle:
-`M tipX-L,tipY-W L tipX,tipY L tipX-L,tipY+W Z` with `Fill` matching the Stroke color;
-`L` is the head length, `W` is the base half-width (≈0.5×L). Use `cap="butt"` so the
-line end sits flush with the base. For a dashed arrow add `dashes="6,4"` to the Stroke;
-for a curved arrow replace the line's `L` with `Q`/`C` — the curve still terminates at
-the base midpoint.
+**Pattern**: Arrow = line Path + triangle Path with matching Fill. End the line at
+the triangle's **base midpoint**, not the tip — otherwise the line pokes through
+the head. Triangle formula: `M tipX-L,tipY-W L tipX,tipY L tipX-L,tipY+W Z`
+(`L` = head length, `W` ≈ 0.5×L). Same rule holds for dashed (`dashes="6,4"`) or
+curved (`Q`/`C`) line variants.
 
 ### Button / Badge
 
