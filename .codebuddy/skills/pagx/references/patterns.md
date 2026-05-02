@@ -46,6 +46,29 @@ Layers in rows or columns, and constraint positioning for positioning elements w
 horizontal, vertical, or diagonal. A Rectangle is a four-edge closed shape, so a dashed
 Stroke traces every edge and renders as two parallel rows of dashes, not one.
 
+### Arrow Line
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="200" height="40">
+  <Layer centerX="0" centerY="0" width="180">
+    <!-- Line ends at the triangle's base midpoint (160,20), not the tip (172,20) -->
+    <Path data="M 0,20 L 160,20"/>
+    <Stroke color="#334155" width="2" cap="butt"/>
+    <Path data="M 160,14 L 172,20 L 160,26 Z"/>
+    <Fill color="#334155"/>
+  </Layer>
+</pagx>
+```
+
+**Pattern**: Arrow = line Path + triangle head Path. The line ends at the triangle's
+**base midpoint**, not the tip — otherwise the line pokes through the head. Triangle:
+`M tipX-L,tipY-W L tipX,tipY L tipX-L,tipY+W Z` with `Fill` matching the Stroke color;
+`L` is the head length, `W` is the base half-width (≈0.5×L). Use `cap="butt"` so the
+line end sits flush with the base. For a dashed arrow add `dashes="6,4"` to the Stroke;
+for a curved arrow replace the line's `L` with `Q`/`C` — the curve still terminates at
+the base midpoint.
+
 ### Button / Badge
 
 ```xml
