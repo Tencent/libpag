@@ -43,14 +43,8 @@ Layers in rows or columns, and constraint positioning for positioning elements w
 ```
 
 **Pattern**: Use a single-segment Path (one `M`+`L`) for any dashed or dotted line —
-horizontal, vertical, or diagonal. Stroke the Path with `dashes="on,off"` to get a
-single row of dashes.
-
-**Anti-pattern**: Do **not** express a dashed line with a Rectangle (even `height="0"`
-or `height="1"`) plus a dashed Stroke. A Rectangle is always a four-edge closed shape,
-so the dash pattern traces every edge — a thin Rectangle renders as **two** parallel
-rows of dashes (the top and bottom edges), not one. Rectangle + solid Fill is fine
-for solid dividers; once you need `dashes`, switch the geometry to Path.
+horizontal, vertical, or diagonal. A Rectangle is a four-edge closed shape, so a dashed
+Stroke traces every edge and renders as two parallel rows of dashes, not one.
 
 ### Button / Badge
 
