@@ -202,6 +202,18 @@ bool WriteStringToFile(const std::string& content, const std::string& filePath,
                        const std::string& command);
 
 /**
+ * Maps a human-readable font style name (as returned by tgfx::Typeface::fontStyle(), e.g.
+ * "Regular", "Bold", "Light Italic", "ExtraBold") to CSS font-weight (numeric 100..900) and
+ * font-style ("normal" or "italic") strings. The match is case-insensitive and tolerates
+ * internal whitespace between the weight token and the italic marker.
+ *
+ * Returns true with *weight and *style populated on success, or false if the style name is
+ * not recognised. Callers that need guaranteed values should fall back to user-supplied
+ * overrides on a false return.
+ */
+bool MapFontStyleToCSS(const std::string& styleName, std::string* weight, std::string* style);
+
+/**
  * Returns true if the Layer uses any feature that Group does not support at all (e.g. blendMode,
  * styles, filters, mask, 3D transforms, container layout, composition, alpha with offscreen
  * semantics). Does NOT check contents or children (callers handle those based on context), nor

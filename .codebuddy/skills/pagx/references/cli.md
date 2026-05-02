@@ -336,7 +336,7 @@ Format-specific options (e.g. `--svg-*`) are shared with `pagx import`; see abov
 
 ## pagx export
 
-Export a PAGX file to another format (e.g. SVG). The output format is inferred from the
+Export a PAGX file to another format (SVG or HTML). The output format is inferred from the
 output file extension. If neither `--format` nor a recognizable output extension is provided,
 the command reports an error.
 
@@ -345,15 +345,74 @@ pagx export --input icon.pagx                    # PAGX to icon.svg
 pagx export --input icon.pagx --output out.svg   # PAGX to out.svg
 pagx export --format svg --input icon.pagx       # force SVG output format
 pagx export --input icon.pagx --svg-indent 4     # 4-space indent
+pagx export --input icon.pagx --output out.html  # PAGX to HTML
 ```
 
 | Option | Description |
 |--------|-------------|
 | `--input <file>` | Input PAGX file (required) |
 | `--output <file>` | Output file (default: `<input>.<format>`) |
-| `--format <format>` | Output format (`svg`; inferred from output extension). Required if output has no extension |
+| `--format <format>` | Output format (`svg` or `html`; inferred from output extension). Required if output has no extension |
 | `--svg-indent <n>` | Indentation spaces (default: 2, valid range: 0–16) |
 | `--svg-no-xml-declaration` | Omit the `<?xml ...?>` declaration |
 | `--svg-no-convert-text-to-path` | Keep text as `<text>` elements instead of `<path>` |
+
+### HTML output
+
+When the output is HTML, `pagx export` writes a complete `<!DOCTYPE html>` document that can
+be opened directly in a browser. DiamondGradient and tiled/mirror ImagePattern fills that CSS
+cannot express natively are rasterized as PNG files into `<output-dir>/static-img/` and
+referenced by relative URL. When `--html-font` is used, local font files are copied into
+`<output-dir>/fonts/` and the generated CSS references them as `url("fonts/<name>")`.
+Deployment is therefore: ship the HTML file together with its sibling `fonts/` and
+`static-img/` directories.
+
+| Option | Description |
+|--------|-------------|
+| `--html-format <mode>` | Output format: `pretty` (default, human-readable), `compact` (diff-friendly one-rule-per-line CSS), or `minify` (single-line, smallest) |
+| `--html-font <spec>` | Inject a CSS `@font-face` rule. Can be repeated. See *Font spec syntax* below |
+| `--html-no-font-synthesis-weight` | Emit `font-synthesis-weight:none` (default: `auto`, letting the browser synthesise bold if no Bold face is provided) |
+| `--html-no-font-synthesis-style` | Emit `font-synthesis-style:none` (default: `auto`, letting the browser synthesise italic if no Italic face is provided) |
+
+#### Font spec syntax
+
+```
+<abs-path|https-url>[#family=X][#weight=N][#style=S]
+```
+
+- **Local file**: absolute filesystem path. The file is copied to `<output-dir>/fonts/<basename>`
+  and the generated `@font-face` references it as `url("fonts/<basename>")`. `family`,
+  `weight`, and `style` are auto-detected from the font's name table; each can be overridden
+  with the matching `#key=value`.
+- **URL** (`http://` or `https://`): the URL is emitted verbatim. `#family=`, `#weight=`, and
+  `#style=` are **all required** because the CLI cannot read the remote font file.
+- Duplicate basenames (two `--html-font` pointing to different files sharing one filename) are
+  allowed; the later one overwrites the earlier one and the CLI prints a warning. Rename the
+  source files if both copies need to coexist.
+- Weight values are CSS font-weight strings (`100`..`900`, `normal`, `bold`). Style values are
+  `normal` or `italic`.
+
+```bash
+# Local fonts, fully auto-detected
+pagx export --input dashboard.pagx --output out/index.html \
+            --html-font /abs/fonts/NotoSansSC-Regular.otf \
+            --html-font /abs/fonts/NotoSansSC-Bold.ttf
+
+# CDN fonts (all three fragments required)
+pagx export --input x.pagx --output out/index.html \
+            --html-font 'https://cdn.example.com/roboto.woff2#family=Roboto#weight=400#style=normal' \
+            --html-font 'https://cdn.example.com/roboto-bold.woff2#family=Roboto#weight=700#style=normal'
+
+# Override an auto-detected field (e.g. to rename the CSS family)
+pagx export --input x.pagx --output out/index.html \
+            --html-font '/abs/vendor/weirdname.otf#family=My Brand#weight=300'
+
+# Minified, no font synthesis fallback
+pagx export --input x.pagx --output out/index.html --html-format minify \
+            --html-font /abs/fonts/NotoSansSC-Regular.otf \
+            --html-font /abs/fonts/NotoSansSC-Bold.ttf \
+            --html-no-font-synthesis-weight \
+            --html-no-font-synthesis-style
+```
 
 

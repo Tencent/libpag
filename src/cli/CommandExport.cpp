@@ -17,12 +17,17 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CommandExport.h"
+#include <algorithm>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <string>
+#include <vector>
 #include "cli/CliUtils.h"
 #include "pagx/HTMLExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/SVGExporter.h"
+#include "tgfx/core/Typeface.h"
 
 namespace pagx::cli {
 
@@ -33,35 +38,60 @@ struct ExportOptions {
   int svgIndent = 2;
   bool svgNoXmlDeclaration = false;
   bool svgNoConvertTextToPath = false;
-  int htmlIndent = 2;
+  std::string htmlFormat = "pretty";
+  std::vector<std::string> htmlFonts = {};
+  bool htmlNoFontSynthesisWeight = false;
+  bool htmlNoFontSynthesisStyle = false;
 };
 
 static void PrintUsage() {
-  std::cout << "Usage: pagx export [options]\n"
-            << "\n"
-            << "Export a PAGX file to another format.\n"
-            << "\n"
-            << "Options:\n"
-            << "  --input <file>              Input PAGX file (required)\n"
-            << "  --output <file>             Output file (default: <input>.<format>)\n"
-            << "  --format <format>           Output format (svg, html; inferred from --output "
-               "extension)\n"
-            << "\n"
-            << "SVG options:\n"
-            << "  --svg-indent <n>            Indentation spaces (default: 2, valid range: 0-16)\n"
-            << "  --svg-no-xml-declaration    Omit the <?xml ...?> declaration\n"
-            << "  --svg-no-convert-text-to-path\n"
-            << "                              Keep text as <text> elements instead of <path>\n"
-            << "\n"
-            << "HTML options:\n"
-            << "  --html-indent <n>           Indentation spaces (default: 2, valid range: 0-16)\n"
-            << "\n"
-            << "Examples:\n"
-            << "  pagx export --input icon.pagx                    # PAGX to icon.svg\n"
-            << "  pagx export --input icon.pagx --output out.svg   # PAGX to out.svg\n"
-            << "  pagx export --format svg --input icon.pagx       # force SVG output format\n"
-            << "  pagx export --input icon.pagx --svg-indent 4     # 4-space indent\n"
-            << "  pagx export --input icon.pagx --output icon.html # PAGX to HTML\n";
+  std::cout
+      << "Usage: pagx export [options]\n"
+      << "\n"
+      << "Export a PAGX file to another format.\n"
+      << "\n"
+      << "Options:\n"
+      << "  --input <file>              Input PAGX file (required)\n"
+      << "  --output <file>             Output file (default: <input>.<format>)\n"
+      << "  --format <format>           Output format (svg, html; inferred from --output "
+         "extension)\n"
+      << "\n"
+      << "SVG options:\n"
+      << "  --svg-indent <n>            Indentation spaces (default: 2, valid range: 0-16)\n"
+      << "  --svg-no-xml-declaration    Omit the <?xml ...?> declaration\n"
+      << "  --svg-no-convert-text-to-path\n"
+      << "                              Keep text as <text> elements instead of <path>\n"
+      << "\n"
+      << "HTML options:\n"
+      << "  --html-format <mode>        Output format: pretty (default), compact, or minify\n"
+      << "  --html-font <spec>          Inject a CSS @font-face rule. Can be repeated.\n"
+      << "                              Spec syntax:\n"
+      << "                                "
+         "<abs-path|https-url>[#family=...][#weight=...][#style=...]\n"
+      << "                              Local files must be absolute paths; file is copied to\n"
+      << "                              <output-dir>/fonts/ and referenced as "
+         "url(\"fonts/<name>\").\n"
+      << "                              Family/weight/style are auto-detected from the file;\n"
+      << "                              override any with #family=/#weight=/#style=.\n"
+      << "                              URLs (http/https) require all three: #family, #weight, "
+         "#style.\n"
+      << "  --html-no-font-synthesis-weight\n"
+      << "                              Emit font-synthesis-weight:none (default: auto)\n"
+      << "  --html-no-font-synthesis-style\n"
+      << "                              Emit font-synthesis-style:none (default: auto)\n"
+      << "\n"
+      << "Examples:\n"
+      << "  pagx export --input icon.pagx                    # PAGX to icon.svg\n"
+      << "  pagx export --input icon.pagx --output out.svg   # PAGX to out.svg\n"
+      << "  pagx export --format svg --input icon.pagx       # force SVG output format\n"
+      << "  pagx export --input icon.pagx --svg-indent 4     # 4-space indent\n"
+      << "  pagx export --input icon.pagx --output icon.html # PAGX to HTML\n"
+      << "  pagx export --input dash.pagx --output out/index.html \\\n"
+      << "              --html-font /abs/NotoSansSC-Regular.otf \\\n"
+      << "              --html-font /abs/NotoSansSC-Bold.ttf  # auto-detect family/weight\n"
+      << "  pagx export --input dash.pagx --output out/index.html \\\n"
+      << "              --html-font "
+         "'https://cdn.example.com/roboto.woff2#family=Roboto#weight=400#style=normal'\n";
 }
 
 static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
@@ -86,14 +116,20 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
       options->svgNoXmlDeclaration = true;
     } else if (arg == "--svg-no-convert-text-to-path") {
       options->svgNoConvertTextToPath = true;
-    } else if (arg == "--html-indent" && i + 1 < argc) {
-      char* endPtr = nullptr;
-      long value = strtol(argv[++i], &endPtr, 10);
-      if (endPtr == argv[i] || *endPtr != '\0' || value < 0 || value > 16) {
-        std::cerr << "pagx export: error: invalid indent '" << argv[i] << "' (must be 0-16)\n";
+    } else if (arg == "--html-format" && i + 1 < argc) {
+      std::string value = argv[++i];
+      if (value != "pretty" && value != "compact" && value != "minify") {
+        std::cerr << "pagx export: error: invalid --html-format '" << value
+                  << "' (expected pretty, compact, or minify)\n";
         return 1;
       }
-      options->htmlIndent = static_cast<int>(value);
+      options->htmlFormat = value;
+    } else if (arg == "--html-font" && i + 1 < argc) {
+      options->htmlFonts.emplace_back(argv[++i]);
+    } else if (arg == "--html-no-font-synthesis-weight") {
+      options->htmlNoFontSynthesisWeight = true;
+    } else if (arg == "--html-no-font-synthesis-style") {
+      options->htmlNoFontSynthesisStyle = true;
     } else if (arg == "--help" || arg == "-h") {
       PrintUsage();
       return -1;
@@ -153,27 +189,264 @@ static int ExportToSVG(const ExportOptions& options) {
   return 0;
 }
 
+// Parsed representation of a single --html-font spec. For local-mode entries, `sourcePath` holds
+// the absolute filesystem path of the font file to be copied into <output-dir>/fonts/; the
+// `rule.uri` field stays empty until the copy step rewrites it to "fonts/<basename>".
+// For URL-mode entries, `sourcePath` is empty and `rule.uri` is the user-supplied URL.
+struct ParsedFontFace {
+  FontFaceRule rule = {};
+  std::string sourcePath = {};  // empty for URL mode
+};
+
+// Splits a single --html-font spec into uri + #key=value overrides. The separator is '#' to
+// avoid conflict with Windows drive letters (':') and font-family names (',' / '='). Fragments
+// are consumed greedily from the right so that the recogniser stops at the first token that
+// doesn't look like a valid "key=value" — anything to its left (including real URL fragments
+// like https://x/y#frag) stays part of the URI. The only recognised keys are family/weight/style.
+static bool ParseFontFaceOverrides(const std::string& spec, std::string* uri, std::string* family,
+                                   std::string* weight, std::string* style) {
+  std::string rest = spec;
+  while (true) {
+    auto hashPos = rest.rfind('#');
+    if (hashPos == std::string::npos) {
+      break;
+    }
+    auto eqPos = rest.find('=', hashPos + 1);
+    if (eqPos == std::string::npos) {
+      break;  // trailing "#foo" with no '=' — leave it attached to the URI
+    }
+    std::string key = rest.substr(hashPos + 1, eqPos - hashPos - 1);
+    std::string value = rest.substr(eqPos + 1);
+    std::string* target = nullptr;
+    if (key == "family") {
+      target = family;
+    } else if (key == "weight") {
+      target = weight;
+    } else if (key == "style") {
+      target = style;
+    }
+    if (target == nullptr) {
+      break;  // unknown key — stop right-to-left consumption, rest belongs to the URI
+    }
+    if (!target->empty()) {
+      std::cerr << "pagx export: error: duplicate #" << key << " in --html-font spec '" << spec
+                << "'\n";
+      return false;
+    }
+    *target = value;
+    rest.erase(hashPos);
+  }
+  *uri = rest;
+  return true;
+}
+
+// Parses one --html-font spec into a ParsedFontFace. Returns true on success. On failure, prints
+// a specific diagnostic to stderr and returns false. See the PrintUsage text for the spec syntax.
+static bool ParseFontFaceSpec(const std::string& spec, ParsedFontFace* out) {
+  std::string uri, familyOverride, weightOverride, styleOverride;
+  if (!ParseFontFaceOverrides(spec, &uri, &familyOverride, &weightOverride, &styleOverride)) {
+    return false;
+  }
+  if (uri.empty()) {
+    std::cerr << "pagx export: error: empty URI in --html-font spec '" << spec << "'\n";
+    return false;
+  }
+  const bool isUrl = uri.rfind("http://", 0) == 0 || uri.rfind("https://", 0) == 0;
+  if (isUrl) {
+    if (familyOverride.empty() || weightOverride.empty() || styleOverride.empty()) {
+      std::cerr << "pagx export: error: --html-font URL-mode spec '" << spec
+                << "' requires #family=..., #weight=..., and #style=...\n";
+      return false;
+    }
+    out->rule.fontFamily = familyOverride;
+    out->rule.fontWeight = weightOverride;
+    out->rule.fontStyle = styleOverride;
+    out->rule.uri = uri;
+    out->rule.mode = FontEmbedMode::URL;
+    out->sourcePath.clear();
+    return true;
+  }
+  // Local file mode
+  std::filesystem::path path(uri);
+  if (!path.is_absolute()) {
+    std::cerr << "pagx export: error: --html-font local path must be absolute; got '" << uri
+              << "'\n";
+    return false;
+  }
+  std::error_code ec;
+  if (!std::filesystem::exists(path, ec) || ec) {
+    std::cerr << "pagx export: error: --html-font file does not exist: '" << uri << "'\n";
+    return false;
+  }
+  std::string autoFamily, autoWeight, autoStyle;
+  if (familyOverride.empty() || weightOverride.empty() || styleOverride.empty()) {
+    auto typeface = tgfx::Typeface::MakeFromPath(uri);
+    if (typeface == nullptr) {
+      std::cerr << "pagx export: error: --html-font failed to parse font file '" << uri
+                << "'; override with #family=/#weight=/#style=\n";
+      return false;
+    }
+    autoFamily = typeface->fontFamily();
+    auto styleName = typeface->fontStyle();
+    if (!MapFontStyleToCSS(styleName, &autoWeight, &autoStyle)) {
+      if (weightOverride.empty() || styleOverride.empty()) {
+        std::cerr << "pagx export: error: --html-font cannot map font style '" << styleName
+                  << "' for '" << uri << "'; override with #weight=/#style=\n";
+        return false;
+      }
+    }
+    if (autoFamily.empty() && familyOverride.empty()) {
+      std::cerr << "pagx export: error: --html-font cannot read font family from '" << uri
+                << "'; override with #family=\n";
+      return false;
+    }
+  }
+  out->rule.fontFamily = familyOverride.empty() ? autoFamily : familyOverride;
+  out->rule.fontWeight = weightOverride.empty() ? autoWeight : weightOverride;
+  out->rule.fontStyle = styleOverride.empty() ? autoStyle : styleOverride;
+  out->rule.uri = {};                   // filled in by copy step
+  out->rule.mode = FontEmbedMode::URL;  // referenced by relative URL after copy
+  out->sourcePath = std::filesystem::absolute(path).string();
+  return true;
+}
+
+static HTMLFormat ParseHTMLFormat(const std::string& name) {
+  if (name == "minify") {
+    return HTMLFormat::Minify;
+  }
+  if (name == "compact") {
+    return HTMLFormat::Compact;
+  }
+  return HTMLFormat::Pretty;
+}
+
+// Wraps the HTML fragment returned by HTMLExporter::ToHTML in a complete <!DOCTYPE html>
+// document so that the output file can be opened directly in a browser. The body is sized to
+// the PAGX canvas; font-synthesis is disabled at the body level so that browsers don't spray
+// auto-synthesised bold/italic onto elements that did not ask for it — the per-element
+// font-synthesis:auto toggles emitted by HTMLExporter re-enable it where needed.
+static std::string WrapAsHTMLDocument(const std::string& fragment, float width, float height,
+                                      HTMLFormat format) {
+  const bool minify = format == HTMLFormat::Minify;
+  auto w = std::to_string(static_cast<int>(width));
+  auto h = std::to_string(static_cast<int>(height));
+  std::string bodyStyle = "margin:0;padding:0;width:" + w + "px;height:" + h +
+                          "px;overflow:hidden;font-family:sans-serif;font-synthesis:none";
+  if (minify) {
+    return "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>body{" + bodyStyle +
+           "}</style></head><body>" + fragment + "</body></html>";
+  }
+  return "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<style>\nbody { " + bodyStyle +
+         " }\n</style>\n</head>\n<body>\n" + fragment + "\n</body>\n</html>\n";
+}
+
 static int ExportToHTML(const ExportOptions& options) {
   auto document = PAGXImporter::FromFile(options.inputFile);
   if (document == nullptr) {
     std::cerr << "pagx export: error: failed to load '" << options.inputFile << "'\n";
     return 1;
   }
-  if (!document->errors.empty()) {
-    for (auto& error : document->errors) {
-      std::cerr << "pagx export: warning: " << error << "\n";
+  for (auto& error : document->errors) {
+    std::cerr << "pagx export: warning: " << error << "\n";
+  }
+
+  // Parse every --html-font spec before touching the filesystem, so that syntax errors abort
+  // cleanly without leaving half-populated output directories behind.
+  std::vector<ParsedFontFace> fonts;
+  fonts.reserve(options.htmlFonts.size());
+  for (const auto& spec : options.htmlFonts) {
+    ParsedFontFace parsed = {};
+    if (!ParseFontFaceSpec(spec, &parsed)) {
+      return 1;
     }
+    fonts.push_back(std::move(parsed));
+  }
+
+  std::filesystem::path outputPath(options.outputFile);
+  auto outputDir = outputPath.parent_path();
+  if (outputDir.empty()) {
+    outputDir = std::filesystem::current_path();
+  }
+
+  // Copy local-mode font files into <output-dir>/fonts/. Same-basename collisions are resolved
+  // by overwriting with a warning so the command stays predictable; users who care about the
+  // difference should give their font files unique names.
+  auto fontsDir = outputDir / "fonts";
+  bool fontsDirCreated = false;
+  for (auto& parsed : fonts) {
+    if (parsed.sourcePath.empty()) {
+      continue;
+    }
+    if (!fontsDirCreated) {
+      std::error_code ec;
+      std::filesystem::create_directories(fontsDir, ec);
+      if (ec) {
+        std::cerr << "pagx export: error: failed to create directory '" << fontsDir.string()
+                  << "': " << ec.message() << "\n";
+        return 1;
+      }
+      fontsDirCreated = true;
+    }
+    auto basename = std::filesystem::path(parsed.sourcePath).filename().string();
+    auto destPath = fontsDir / basename;
+    std::error_code existsEc;
+    if (std::filesystem::exists(destPath, existsEc) && !existsEc) {
+      std::error_code sameEc;
+      bool isSameFile = std::filesystem::equivalent(parsed.sourcePath, destPath, sameEc);
+      if (sameEc || !isSameFile) {
+        std::cerr << "pagx export: warning: overwriting '" << destPath.string() << "' with '"
+                  << parsed.sourcePath << "'\n";
+      }
+    }
+    std::error_code copyEc;
+    std::filesystem::copy_file(parsed.sourcePath, destPath,
+                               std::filesystem::copy_options::overwrite_existing, copyEc);
+    if (copyEc) {
+      std::cerr << "pagx export: error: failed to copy '" << parsed.sourcePath << "' to '"
+                << destPath.string() << "': " << copyEc.message() << "\n";
+      return 1;
+    }
+    parsed.rule.uri = "fonts/" + basename;
   }
 
   HTMLExporter::Options htmlOptions = {};
-  htmlOptions.indent = options.htmlIndent;
+  htmlOptions.format = ParseHTMLFormat(options.htmlFormat);
+  htmlOptions.staticImgDir = (outputDir / "static-img").string();
+  htmlOptions.staticImgUrlPrefix = "static-img/";
+  htmlOptions.fontSynthesisWeight = !options.htmlNoFontSynthesisWeight;
+  htmlOptions.fontSynthesisStyle = !options.htmlNoFontSynthesisStyle;
+  htmlOptions.fontFaceRules.reserve(fonts.size());
+  for (auto& parsed : fonts) {
+    htmlOptions.fontFaceRules.push_back(parsed.rule);
+  }
 
   document->applyLayout();
 
-  if (!HTMLExporter::ToFile(*document, options.outputFile, htmlOptions)) {
+  auto fragment = HTMLExporter::ToHTML(*document, htmlOptions);
+  if (fragment.empty()) {
+    std::cerr << "pagx export: error: HTMLExporter produced empty output for '" << options.inputFile
+              << "'\n";
+    return 1;
+  }
+
+  auto html = WrapAsHTMLDocument(fragment, document->width, document->height, htmlOptions.format);
+
+  if (!outputDir.empty() && !std::filesystem::exists(outputDir)) {
+    std::error_code ec;
+    std::filesystem::create_directories(outputDir, ec);
+    if (ec) {
+      std::cerr << "pagx export: error: failed to create directory '" << outputDir.string()
+                << "': " << ec.message() << "\n";
+      return 1;
+    }
+  }
+  std::ofstream file(options.outputFile, std::ios::binary);
+  if (!file) {
     std::cerr << "pagx export: error: failed to write '" << options.outputFile << "'\n";
     return 1;
   }
+  file.write(html.data(), static_cast<std::streamsize>(html.size()));
+  file.close();
 
   std::cout << "pagx export: wrote " << options.outputFile << "\n";
   return 0;
