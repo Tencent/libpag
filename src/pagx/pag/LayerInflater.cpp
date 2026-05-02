@@ -54,16 +54,16 @@ namespace {
 // CompositionRef; the subtype builders (applyPayload / inflateVectorElement)
 // call back into inflateLayer for VectorGroup children.
 // ---------------------------------------------------------------------------
-std::shared_ptr<tgfx::Layer> inflateLayer(const PAGDocument& doc, const Layer& src,
+std::shared_ptr<tgfx::Layer> inflateLayer(PAGDocument& doc, const Layer& src,
                                           std::vector<uint32_t>* pathStack, InflaterContext* ctx);
 
-std::shared_ptr<tgfx::Layer> inflateComposition(const PAGDocument& doc, uint32_t compositionIndex,
+std::shared_ptr<tgfx::Layer> inflateComposition(PAGDocument& doc, uint32_t compositionIndex,
                                                 std::vector<uint32_t>* pathStack,
                                                 InflaterContext* ctx);
 
 void applyCommon(const Layer& src, tgfx::Layer* layer, InflaterContext* ctx);
 
-std::shared_ptr<tgfx::VectorElement> inflateVectorElement(const PAGDocument& doc,
+std::shared_ptr<tgfx::VectorElement> inflateVectorElement(PAGDocument& doc,
                                                           const VectorElement& src,
                                                           InflaterContext* ctx);
 
@@ -71,8 +71,7 @@ std::shared_ptr<tgfx::VectorElement> inflateVectorElement(const PAGDocument& doc
 // LayerBuilder::convertColorSource). Image decode failures bubble up as
 // nullptr + warn 600; caller substitutes SolidColor::Make() so Fill/Stroke
 // still gets a valid, non-null colorSource.
-std::shared_ptr<tgfx::ColorSource> inflateColorSource(const PAGDocument& doc,
-                                                      const ShapeStyleData& style,
+std::shared_ptr<tgfx::ColorSource> inflateColorSource(PAGDocument& doc, const ShapeStyleData& style,
                                                       InflaterContext* ctx);
 
 // Filter / style shims — implemented in §9.3 (Task 3).
@@ -80,11 +79,11 @@ std::shared_ptr<tgfx::LayerFilter> inflateLayerFilter(const LayerFilter& src);
 std::shared_ptr<tgfx::LayerStyle> inflateLayerStyle(const LayerStyle& src);
 
 // Per-payload sub-inflaters — Task 4-6 flesh these out.
-std::shared_ptr<tgfx::Layer> inflateVectorPayload(const PAGDocument& doc, const VectorPayload& pay,
+std::shared_ptr<tgfx::Layer> inflateVectorPayload(PAGDocument& doc, const VectorPayload& pay,
                                                   InflaterContext* ctx);
-std::shared_ptr<tgfx::Layer> inflateShapePayload(const PAGDocument& doc, const ShapePayload& pay,
+std::shared_ptr<tgfx::Layer> inflateShapePayload(PAGDocument& doc, const ShapePayload& pay,
                                                  InflaterContext* ctx);
-std::shared_ptr<tgfx::Layer> inflateImagePayload(const PAGDocument& doc, const ImagePayload& pay,
+std::shared_ptr<tgfx::Layer> inflateImagePayload(PAGDocument& doc, const ImagePayload& pay,
                                                  InflaterContext* ctx);
 std::shared_ptr<tgfx::Layer> inflateSolidPayload(const SolidPayload& pay);
 std::shared_ptr<tgfx::Layer> inflateMeshPayload();
@@ -121,7 +120,7 @@ std::shared_ptr<tgfx::Layer> makeLayerByType(LayerType type) {
   return tgfx::Layer::Make();
 }
 
-std::shared_ptr<tgfx::Layer> inflateLayer(const PAGDocument& doc, const Layer& src,
+std::shared_ptr<tgfx::Layer> inflateLayer(PAGDocument& doc, const Layer& src,
                                           std::vector<uint32_t>* pathStack, InflaterContext* ctx) {
   // Budget first: if we're at the ceiling, the entire subtree is elided —
   // caller sees nullptr and writes a nullptr into layerByPath.
@@ -200,7 +199,7 @@ std::shared_ptr<tgfx::Layer> inflateLayer(const PAGDocument& doc, const Layer& s
   return layer;
 }
 
-std::shared_ptr<tgfx::Layer> inflateComposition(const PAGDocument& doc, uint32_t compositionIndex,
+std::shared_ptr<tgfx::Layer> inflateComposition(PAGDocument& doc, uint32_t compositionIndex,
                                                 std::vector<uint32_t>* pathStack,
                                                 InflaterContext* ctx) {
   if (compositionIndex >= doc.compositions.size() ||
@@ -365,8 +364,7 @@ std::shared_ptr<tgfx::LayerStyle> inflateLayerStyle(const LayerStyle& src) {
 
 // ---------- ShapeStyleData → tgfx::ColorSource (LayerBuilder::convertColorSource) ----------
 
-std::shared_ptr<tgfx::ColorSource> inflateColorSource(const PAGDocument& doc,
-                                                      const ShapeStyleData& style,
+std::shared_ptr<tgfx::ColorSource> inflateColorSource(PAGDocument& doc, const ShapeStyleData& style,
                                                       InflaterContext* ctx) {
   switch (style.sourceType) {
     case ColorSourceType::SolidColor:
@@ -435,6 +433,11 @@ std::shared_ptr<tgfx::ColorSource> inflateColorSource(const PAGDocument& doc,
                   "tgfx::Image::MakeFromEncoded returned null for patternImageIndex", idx);
         return nullptr;
       }
+      // tgfx::Image now owns the decoded payload (or a ref to the encoded
+      // bytes). Release the PAGDocument's reference so downstream peak
+      // memory stays bounded (see §11.1 "Inflater 生命周期纪律" + Phase
+      // 10.5 `ImageBytesReleasedAfterInflate` contract).
+      doc.images[idx]->data.reset();
       tgfx::SamplingOptions sampling(style.filterMode, style.mipmapMode);
       auto pattern = tgfx::ImagePattern::Make(image, style.tileModeX, style.tileModeY, sampling);
       if (pattern != nullptr) {
@@ -460,7 +463,7 @@ std::shared_ptr<tgfx::ColorSource> inflateColorSource(const PAGDocument& doc,
 // BuildTextBlobFromLayoutRuns which silently drops runs whose Typeface is
 // null, producing an empty TextBlob that bubbles up as 602 at the caller.
 
-tgfx::Font resolveFontAsset(const PAGDocument& doc, uint32_t fontIndex, float fontSize,
+tgfx::Font resolveFontAsset(PAGDocument& doc, uint32_t fontIndex, float fontSize,
                             InflaterContext* ctx) {
   if (fontIndex == UINT32_MAX || fontIndex >= doc.fonts.size() || doc.fonts[fontIndex] == nullptr) {
     ctx->warn(ErrorCode::InflateFontCreateFailed, "fontIndex out of range or FontAsset null",
@@ -488,7 +491,7 @@ tgfx::Font resolveFontAsset(const PAGDocument& doc, uint32_t fontIndex, float fo
 
 // ---------- ElementText inflation (§10.3 two-kind dispatch) ----------
 
-std::shared_ptr<tgfx::VectorElement> inflateElementText(const PAGDocument& doc,
+std::shared_ptr<tgfx::VectorElement> inflateElementText(PAGDocument& doc,
                                                         const ElementTextData& pay,
                                                         InflaterContext* ctx) {
   // Rebuild one TextLayoutGlyphRun per serialised GlyphRunBlob. Both kinds
@@ -554,7 +557,7 @@ std::shared_ptr<tgfx::VectorElement> inflateElementText(const PAGDocument& doc,
 
 // ---------- VectorElement dispatcher (LayerBuilder::convertVectorElement) ----------
 
-std::shared_ptr<tgfx::VectorElement> inflateVectorElement(const PAGDocument& doc,
+std::shared_ptr<tgfx::VectorElement> inflateVectorElement(PAGDocument& doc,
                                                           const VectorElement& src,
                                                           InflaterContext* ctx) {
   switch (src.type) {
@@ -784,7 +787,7 @@ std::shared_ptr<tgfx::VectorElement> inflateVectorElement(const PAGDocument& doc
   return nullptr;
 }
 
-std::shared_ptr<tgfx::Layer> inflateVectorPayload(const PAGDocument& doc, const VectorPayload& pay,
+std::shared_ptr<tgfx::Layer> inflateVectorPayload(PAGDocument& doc, const VectorPayload& pay,
                                                   InflaterContext* ctx) {
   auto layer = tgfx::VectorLayer::Make();
   std::vector<std::shared_ptr<tgfx::VectorElement>> elements;
@@ -811,8 +814,7 @@ std::shared_ptr<tgfx::Layer> inflateVectorPayload(const PAGDocument& doc, const 
 // conversions side-by-side so ShapePayload can land without waiting for a
 // future ShapeStyle ↔ ColorSource unification.
 
-std::shared_ptr<tgfx::ShapeStyle> inflateShapeStyle(const PAGDocument& doc,
-                                                    const ShapeStyleData& style,
+std::shared_ptr<tgfx::ShapeStyle> inflateShapeStyle(PAGDocument& doc, const ShapeStyleData& style,
                                                     InflaterContext* ctx) {
   const float styleAlpha = style.alpha.value;
   const tgfx::BlendMode blendMode = style.blendMode;
@@ -884,6 +886,7 @@ std::shared_ptr<tgfx::ShapeStyle> inflateShapeStyle(const PAGDocument& doc,
                   "tgfx::Image::MakeFromEncoded returned null (ShapePayload)", idx);
         return nullptr;
       }
+      doc.images[idx]->data.reset();
       tgfx::SamplingOptions sampling(style.filterMode, style.mipmapMode);
       auto shader =
           tgfx::Shader::MakeImageShader(image, style.tileModeX, style.tileModeY, sampling);
@@ -899,7 +902,7 @@ std::shared_ptr<tgfx::ShapeStyle> inflateShapeStyle(const PAGDocument& doc,
   return nullptr;
 }
 
-std::shared_ptr<tgfx::Layer> inflateShapePayload(const PAGDocument& doc, const ShapePayload& pay,
+std::shared_ptr<tgfx::Layer> inflateShapePayload(PAGDocument& doc, const ShapePayload& pay,
                                                  InflaterContext* ctx) {
   auto layer = tgfx::ShapeLayer::Make();
   layer->setPath(pay.path.value);
@@ -955,7 +958,7 @@ std::shared_ptr<tgfx::Layer> inflateShapePayload(const PAGDocument& doc, const S
   return layer;
 }
 
-std::shared_ptr<tgfx::Layer> inflateImagePayload(const PAGDocument& doc, const ImagePayload& pay,
+std::shared_ptr<tgfx::Layer> inflateImagePayload(PAGDocument& doc, const ImagePayload& pay,
                                                  InflaterContext* ctx) {
   auto layer = tgfx::ImageLayer::Make();
   const uint32_t idx = pay.imageIndex;
@@ -972,6 +975,7 @@ std::shared_ptr<tgfx::Layer> inflateImagePayload(const PAGDocument& doc, const I
               "tgfx::Image::MakeFromEncoded returned null (ImagePayload)", idx);
     return layer;
   }
+  doc.images[idx]->data.reset();
   layer->setImage(std::move(image));
   layer->setSampling(pay.sampling);
   return layer;
