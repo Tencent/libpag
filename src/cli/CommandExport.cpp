@@ -21,6 +21,7 @@
 #include <string>
 #include "cli/CliUtils.h"
 #include "pagx/HTMLExporter.h"
+#include "pagx/PAGExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/SVGExporter.h"
 
@@ -34,6 +35,10 @@ struct ExportOptions {
   bool svgNoXmlDeclaration = false;
   bool svgNoConvertTextToPath = false;
   int htmlIndent = 2;
+  // Phase 11: when true, PAG export promotes all Baker+Codec warnings to
+  // errors (§14.2). The CLI then returns a non-zero exit code. Maps 1:1
+  // onto PAGExporter::Options::strict.
+  bool pagStrict = false;
 };
 
 static void PrintUsage() {
@@ -44,8 +49,8 @@ static void PrintUsage() {
             << "Options:\n"
             << "  --input <file>              Input PAGX file (required)\n"
             << "  --output <file>             Output file (default: <input>.<format>)\n"
-            << "  --format <format>           Output format (svg, html; inferred from --output "
-               "extension)\n"
+            << "  --format <format>           Output format (svg, html, pag; inferred from "
+               "--output extension)\n"
             << "\n"
             << "SVG options:\n"
             << "  --svg-indent <n>            Indentation spaces (default: 2, valid range: 0-16)\n"
@@ -56,12 +61,20 @@ static void PrintUsage() {
             << "HTML options:\n"
             << "  --html-indent <n>           Indentation spaces (default: 2, valid range: 0-16)\n"
             << "\n"
+            << "PAG options:\n"
+            << "  --pag-strict                Treat Baker/Codec warnings as errors (non-zero exit "
+               "when any warning is produced)\n"
+            << "\n"
             << "Examples:\n"
             << "  pagx export --input icon.pagx                    # PAGX to icon.svg\n"
             << "  pagx export --input icon.pagx --output out.svg   # PAGX to out.svg\n"
             << "  pagx export --format svg --input icon.pagx       # force SVG output format\n"
             << "  pagx export --input icon.pagx --svg-indent 4     # 4-space indent\n"
-            << "  pagx export --input icon.pagx --output icon.html # PAGX to HTML\n";
+            << "  pagx export --input icon.pagx --output icon.html # PAGX to HTML\n"
+            << "  pagx export --input icon.pagx --format pag       # PAGX to icon.pag (binary)\n"
+            << "  pagx export --input icon.pagx --format pag --pag-strict\n"
+            << "                                                   # fail on any Baker/Codec "
+               "warning\n";
 }
 
 static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
@@ -94,6 +107,8 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
         return 1;
       }
       options->htmlIndent = static_cast<int>(value);
+    } else if (arg == "--pag-strict") {
+      options->pagStrict = true;
     } else if (arg == "--help" || arg == "-h") {
       PrintUsage();
       return -1;
@@ -179,6 +194,43 @@ static int ExportToHTML(const ExportOptions& options) {
   return 0;
 }
 
+// Exports a PAGX file to PAG v2 binary format via PAGExporter::ToFile.
+// Honours --pag-strict by mapping it onto PAGExporter::Options::strict —
+// when true, Baker/Codec Warning-severity diagnostics are promoted to
+// errors inside PAGExporter, flipping Result.ok=false and producing a
+// non-zero exit code here without us having to inspect the warnings
+// vector separately (§14.2 contract).
+static int ExportToPAG(const ExportOptions& options) {
+  auto document = LoadDocument(options.inputFile, "pagx export");
+  if (document == nullptr) {
+    return 1;
+  }
+  if (document->hasUnresolvedImports()) {
+    std::cerr << "pagx export: error: unresolved import directive, run 'pagx resolve' first\n";
+    return 1;
+  }
+  document->applyLayout();
+
+  PAGExporter::Options pagOptions;
+  pagOptions.strict = options.pagStrict;
+  auto result = PAGExporter::ToFile(*document, options.outputFile, pagOptions);
+
+  // Emit diagnostics regardless of success so users always see what
+  // happened. Format: "<severity>: [<CodeName>] <message> @0x<offset>".
+  for (const auto& d : result.errors) {
+    std::cerr << "pagx export: error: " << FormatDiagnostic(d) << "\n";
+  }
+  for (const auto& d : result.warnings) {
+    std::cerr << "pagx export: warning: " << FormatDiagnostic(d) << "\n";
+  }
+
+  if (!result.ok) {
+    return 1;
+  }
+  std::cout << "pagx export: wrote " << options.outputFile << "\n";
+  return 0;
+}
+
 int RunExport(int argc, char* argv[]) {
   ExportOptions options = {};
   auto parseResult = ParseOptions(argc, argv, &options);
@@ -192,6 +244,10 @@ int RunExport(int argc, char* argv[]) {
 
   if (options.format == "html") {
     return ExportToHTML(options);
+  }
+
+  if (options.format == "pag") {
+    return ExportToPAG(options);
   }
 
   std::cerr << "pagx export: error: unsupported format '" << options.format << "'\n";

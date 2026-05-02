@@ -861,4 +861,15 @@ if (PAG_BUILD_TESTS)
     target_link_options(PAGFullTest PRIVATE ${PAG_TEST_LINK_OPTIONS})
     target_link_libraries(PAGFullTest ${PAG_TEST_LIBS})
 
+    # Phase 11: inject the built pagx CLI binary's absolute path into
+    # PAGFullTest so CommandExportPAGTest can fork-exec it for an
+    # end-to-end smoke. `TARGET_FILE` is a generator expression that
+    # resolves to the final executable path at build time, which stays
+    # stable across clean / incremental rebuilds.
+    if (TARGET pagx-cli)
+        add_dependencies(PAGFullTest pagx-cli)
+        target_compile_definitions(PAGFullTest PRIVATE
+            PAGX_CLI_BINARY_PATH="$<TARGET_FILE:pagx-cli>")
+    endif ()
+
 endif ()
