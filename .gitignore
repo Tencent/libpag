@@ -121,3 +121,9 @@ cli/npm/package-lock.json
 # PAGX verify artifacts
 *.layout.xml
 
+
+# Phase 14: PerformanceTest baseline. First commit belongs to tech lead on a
+# reference machine (§18.8 P2-8). AI-generated baselines from arbitrary
+# developer machines would distort the committed reference; keep them local
+# so every developer sees their own numbers without polluting the repo.
+test/perf/baseline.json
