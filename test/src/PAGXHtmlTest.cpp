@@ -21,6 +21,7 @@
 #include <string>
 #include <vector>
 #include "base/PAGTest.h"
+#include "base/TestFontRegistration.h"
 #include "pagx/FontConfig.h"
 #include "pagx/HTMLExporter.h"
 #include "pagx/PAGXImporter.h"
@@ -31,34 +32,13 @@
 
 namespace pag {
 
-static std::string SaveFile(const std::string& content, const std::string& key) {
-  auto outPath = ProjectPath::Absolute("test/out/" + key);
-  auto dirPath = std::filesystem::path(outPath).parent_path();
-  if (!std::filesystem::exists(dirPath)) {
-    std::filesystem::create_directories(dirPath);
-  }
-  std::ofstream file(outPath, std::ios::binary);
-  if (file) {
-    file.write(content.data(), static_cast<std::streamsize>(content.size()));
-  }
-  return outPath;
-}
-
 // Returns a FontConfig that registers the repo-bundled Noto Sans SC as a fallback typeface.
 // This ensures that text shaping during HTML export (PAGXDocument::applyLayout) uses the
 // same font metrics as the tgfx native renderer, so overflow:hidden line-count decisions
 // and other metric-dependent layout calculations agree between the two code paths.
 static pagx::FontConfig MakeHtmlFontConfig() {
   pagx::FontConfig c;
-  // Use registerTypeface (Stage 1 in LayoutContext::resolveTypeface) so the repo-bundled
-  // Noto Sans SC is chosen before Stage 5's Typeface::MakeFromName, which on macOS returns
-  // a non-nil CoreText substitution (Helvetica/Arial) even when the requested family is not
-  // installed, masking the user-registered font and using wrong font metrics for layout.
-  auto tf =
-      tgfx::Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
-  if (tf) {
-    c.registerTypeface(tf);
-  }
+  RegisterTestTypefaces(c);
   return c;
 }
 
@@ -88,38 +68,148 @@ static std::vector<std::string> GetHtmlTestFiles() {
   return files;
 }
 
-std::string WrapHtmlDocument(const std::string& fragment, int width, int height) {
-  // All fonts are loaded from Google Fonts CDN so the generated HTML is portable — it renders
-  // correctly on any machine without requiring local font files. `font-synthesis:none` on body
-  // prevents Chromium from auto-synthesising bold/italic on elements that don't ask for it.
-  // The exporter's fauxBold and fauxItalic paths emit `font-weight:bold;font-synthesis-weight:
-  // auto` and `font-style:italic;font-synthesis-style:auto` respectively, re-enabling synthesis
-  // only on the elements that carry the faux flag.
+static std::string WrapHtmlDocument(const std::string& fragment, int width, int height) {
+  // Every @font-face lists the bundled local font file first and the Google Fonts CDN URL as a
+  // safety net. Browsers try sources left-to-right and silently fall back on load failure, so
+  // we get: (a) fast deterministic rendering when running offline — no network round-trip — and
+  // (b) graceful degradation to CDN when the local file is absent (e.g. the Bold face, which is
+  // not bundled in the repo, always resolves against the CDN). Local paths resolve relative to
+  // the HTML file itself, so BatchConvertAll must populate test/out/PAGXHtmlTest/fonts/ for the
+  // first url() to succeed; see the fonts-copy step below.
+  //
+  // `font-synthesis:none` on body prevents Chromium from auto-synthesising bold/italic on
+  // elements that don't ask for it. The exporter's fauxBold and fauxItalic paths emit
+  // `font-weight:bold;font-synthesis-weight:auto` and `font-style:italic;font-synthesis-style:
+  // auto` respectively, re-enabling synthesis only on the elements that carry the faux flag.
   std::string fontFace =
-      // Noto Sans SC Regular (400)
+      // Noto Sans SC Regular (400) — local OTF bundled in resources/font, CDN fallback.
       "@font-face{font-family:'Noto Sans SC';font-weight:400;"
-      "src:url('https://fonts.gstatic.com/s/notosanssc/v40/"
-      "k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaG9_FnYw.ttf') "
-      "format('truetype');font-display:block}"
-      // Noto Sans SC Bold (700)
+      "src:url('fonts/NotoSansSC-Regular.otf') format('opentype'),"
+      "url('https://fonts.gstatic.com/s/notosanssc/v40/"
+      "k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaG9_FnYw.ttf') format('truetype');"
+      "font-display:block}"
+      // Noto Sans SC Bold (700) — no local file bundled (too large for the repo), so the CDN
+      // is the only source. When running offline without a Bold face present, browsers will
+      // auto-synthesise bold from the Regular weight unless an element explicitly disables it.
       "@font-face{font-family:'Noto Sans SC';font-weight:bold;"
       "src:url('https://fonts.gstatic.com/s/notosanssc/v40/"
-      "k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaGzjCnYw.ttf') "
-      "format('truetype');font-display:block}"
-      // Noto Color Emoji
+      "k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaGzjCnYw.ttf') format('truetype');"
+      "font-display:block}"
+      // Noto Color Emoji — local TTF bundled, CDN fallback.
       "@font-face{font-family:'Noto Color Emoji';"
-      "src:url('https://fonts.gstatic.com/s/notocoloremoji/v39/"
-      "Yq6P-KqIXTD0t4D9z1ESnKM3-HpFab4.ttf') "
-      "format('truetype');font-display:block}"
-      // Noto Sans Hebrew Regular (400)
+      "src:url('fonts/NotoColorEmoji.ttf') format('truetype'),"
+      "url('https://fonts.gstatic.com/s/notocoloremoji/v39/"
+      "Yq6P-KqIXTD0t4D9z1ESnKM3-HpFab4.ttf') format('truetype');"
+      "font-display:block}"
+      // Noto Sans Hebrew Regular (400) — local TTF bundled, CDN fallback.
       "@font-face{font-family:'Noto Sans Hebrew';font-weight:400;"
-      "src:url('https://fonts.gstatic.com/s/notosanshebrew/v50/"
+      "src:url('fonts/NotoSansHebrew-Regular.ttf') format('truetype'),"
+      "url('https://fonts.gstatic.com/s/notosanshebrew/v50/"
       "or3HQ7v33eiDljA1IufXTtVf7V6RvEEdhQlk0LlGxCyaeNKYZC0sqk3xXGiXd4qtog.ttf') "
-      "format('truetype');font-display:block}";
+      "format('truetype');"
+      "font-display:block}";
   return "<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"><style>" + fontFace +
          "body{margin:0;padding:0;background:transparent;font-synthesis:none;width:" +
          std::to_string(width) + "px;height:" + std::to_string(height) +
          "px;overflow:hidden}</style></head>\n<body>\n" + fragment + "\n</body></html>";
+}
+
+// Copies the bundled fonts referenced by WrapHtmlDocument into the destination directory so
+// that the `url('fonts/<name>')` entries in each @font-face rule resolve locally when the HTML
+// is opened in a browser. Bold is deliberately absent — the wrapper points its one and only
+// `src:` for the bold weight at the CDN URL. Silently skips any font file not present in the
+// repo; the wrapper's multi-source `src:` will fall back to CDN for the missing ones.
+static void CopyBundledFontsTo(const std::string& destDir) {
+  struct FontFile {
+    const char* repoPath;
+    const char* destName;
+  };
+  static constexpr FontFile kBundled[] = {
+      {"resources/font/NotoSansSC-Regular.otf", "NotoSansSC-Regular.otf"},
+      {"resources/font/NotoColorEmoji.ttf", "NotoColorEmoji.ttf"},
+      {"resources/font/NotoSansHebrew-Regular.ttf", "NotoSansHebrew-Regular.ttf"},
+  };
+  std::error_code ec;
+  std::filesystem::create_directories(destDir, ec);
+  if (ec) {
+    return;
+  }
+  for (const auto& font : kBundled) {
+    auto src = ProjectPath::Absolute(font.repoPath);
+    if (!std::filesystem::exists(src)) {
+      continue;
+    }
+    auto dest = destDir + "/" + font.destName;
+    std::filesystem::copy_file(src, dest, std::filesystem::copy_options::overwrite_existing, ec);
+  }
+}
+
+// Result of exporting one PAGX sample into a wrapped HTML file on disk.
+struct ExportedSample {
+  bool success = false;           // false when load/export fails; inspect logs for the reason
+  int width = 0;                  // document width, needed by screenshot callers
+  int height = 0;                 // document height, same
+  std::string htmlPath;           // absolute path of the wrapped HTML file written to disk
+};
+
+// Generates the wrapped HTML for one PAGX sample and writes it next to `outDir`. Rasterizes
+// any Diamond / tiled-ImagePattern / PlusDarker fills into `outDir/static-img/` using a
+// per-sample name prefix so multiple samples can share that single directory without id
+// collisions. This helper is shared by BatchConvertAll (structural smoke test) and
+// HtmlScreenshotCompare (Puppeteer pixel comparison) so the two paths stay in lockstep —
+// any change to HTMLExportOptions, wrapper contents, or output paths needs to happen here
+// and affect both call sites at once.
+//
+// The caller owns the FontConfig (registering fonts is expensive) and is responsible for
+// invoking CopyBundledFontsTo(outDir + "/fonts") before calling this so the emitted
+// @font-face rules can resolve their local `url('fonts/...')` entries in the browser.
+// Failure does not abort the caller: the returned ExportedSample has success=false and a
+// std::cerr log line; callers decide whether that is a FAIL-the-test or a skip-this-sample
+// event based on their severity policy.
+static ExportedSample ExportSampleHtmlToFile(const std::string& pagxPath,
+                                             const std::string& outDir,
+                                             const pagx::FontConfig& fontConfig) {
+  ExportedSample result;
+  auto baseName = std::filesystem::path(pagxPath).stem().string();
+  result.htmlPath = outDir + "/" + baseName + ".html";
+
+  auto doc = pagx::PAGXImporter::FromFile(pagxPath);
+  if (!doc) {
+    std::cerr << "ExportSampleHtmlToFile: failed to load " << pagxPath << "\n";
+    return result;
+  }
+  // Re-using the caller's fontConfig here keeps text metrics consistent with whatever
+  // fallbacks + registered typefaces the test harness set up; without it, applyLayout
+  // would fall back to system fonts and its metrics would disagree with the browser.
+  doc->applyLayout(&fontConfig);
+
+  result.width = static_cast<int>(doc->width);
+  result.height = static_cast<int>(doc->height);
+
+  pagx::HTMLExportOptions opts;
+  opts.staticImgDir = outDir + "/static-img";
+  opts.staticImgUrlPrefix = "static-img/";
+  opts.staticImgNamePrefix = baseName + "-";
+  auto fragment = pagx::HTMLExporter::ToHTML(*doc, opts);
+  if (fragment.empty()) {
+    std::cerr << "ExportSampleHtmlToFile: ToHTML returned empty for " << baseName << "\n";
+    return result;
+  }
+  if (fragment.find("data-pagx-version") == std::string::npos) {
+    std::cerr << "ExportSampleHtmlToFile: missing data-pagx-version in " << baseName << "\n";
+    return result;
+  }
+
+  auto fullHtml = WrapHtmlDocument(fragment, result.width, result.height);
+  std::ofstream htmlFile(result.htmlPath, std::ios::binary);
+  if (!htmlFile) {
+    std::cerr << "ExportSampleHtmlToFile: cannot open " << result.htmlPath << " for writing\n";
+    return result;
+  }
+  htmlFile.write(fullHtml.data(), static_cast<std::streamsize>(fullHtml.size()));
+
+  result.success = true;
+  return result;
 }
 
 // =============================================================================
@@ -129,18 +219,19 @@ std::string WrapHtmlDocument(const std::string& fragment, int width, int height)
 CLI_TEST(PAGXHtmlTest, BatchConvertAll) {
   auto files = GetHtmlTestFiles();
   ASSERT_FALSE(files.empty()) << "No .pagx files found in resources/pagx_to_html/";
+  // Populate test/out/PAGXHtmlTest/fonts/ so the local `url('fonts/...')` entries in the
+  // WrapHtmlDocument @font-face rules can resolve when the emitted HTML is opened in a
+  // browser. The wrapper's second source (Google Fonts CDN) only kicks in when the local
+  // copy is missing — without this step, the primary source would 404 on every sample and
+  // the browser would fall back to CDN, defeating the "render offline, deterministic across
+  // machines" guarantee the multi-source wrapper is designed to provide.
+  auto outDir = ProjectPath::Absolute("test/out/PAGXHtmlTest");
+  std::filesystem::create_directories(outDir);
+  auto fontConfig = MakeHtmlFontConfig();
+  CopyBundledFontsTo(outDir + "/fonts");
   for (const auto& filePath : files) {
-    auto baseName = std::filesystem::path(filePath).stem().string();
-    auto doc = pagx::PAGXImporter::FromFile(filePath);
-    ASSERT_NE(doc, nullptr) << "Failed to load: " << baseName;
-    doc->applyLayout();
-    auto html = pagx::HTMLExporter::ToHTML(*doc);
-    EXPECT_FALSE(html.empty()) << "Failed to convert: " << baseName;
-    EXPECT_NE(html.find("data-pagx-version"), std::string::npos)
-        << "Missing data-pagx-version attribute in: " << baseName;
-    auto fullHtml =
-        WrapHtmlDocument(html, static_cast<int>(doc->width), static_cast<int>(doc->height));
-    SaveFile(fullHtml, "PAGXHtmlTest/" + baseName + ".html");
+    auto result = ExportSampleHtmlToFile(filePath, outDir, fontConfig);
+    EXPECT_TRUE(result.success) << "Failed to export: " << filePath;
   }
 }
 
@@ -668,8 +759,7 @@ static bool NodeAvailable() {
 // `screenshot.js --batch` so all screenshots share a single Chromium process. macOS
 // Chromium becomes unstable across repeated cold-starts (see
 // `feedback_puppeteer_screenshot_hang.md`), which fails this test after just a few
-// per-sample Puppeteer launches. Reusing one browser mirrors what
-// PAGXTest.GenerateComparisonPage already does for the comparison page.
+// per-sample Puppeteer launches. Reusing one browser sidesteps that entirely.
 static bool BatchCaptureHtmlScreenshots(
     const std::vector<std::tuple<std::string, std::string, int, int>>& tasks) {
   if (tasks.empty()) {
@@ -712,6 +802,13 @@ CLI_TEST(PAGXHtmlTest, HtmlScreenshotCompare) {
   auto outDir = ProjectPath::Absolute("test/out/PAGXHtmlTest");
   std::filesystem::create_directories(outDir);
 
+  // Populate the fonts/ directory so Puppeteer's Chromium can resolve the local `url('fonts/
+  // ...')` entries the wrapper emits. Without this step the local source 404s and every
+  // screenshot would silently fall back to the CDN — defeating determinism and adding network
+  // latency to a test that is expected to be offline-stable.
+  CopyBundledFontsTo(outDir + "/fonts");
+  auto fontConfig = MakeHtmlFontConfig();
+
   // Phase 1: export every sample's HTML and collect the screenshot task list.
   struct Entry {
     std::string baseName;
@@ -722,42 +819,17 @@ CLI_TEST(PAGXHtmlTest, HtmlScreenshotCompare) {
   entries.reserve(files.size());
   screenshotTasks.reserve(files.size());
   for (const auto& filePath : files) {
+    auto result = ExportSampleHtmlToFile(filePath, outDir, fontConfig);
+    if (!result.success) {
+      ADD_FAILURE() << "Failed to export HTML for " << filePath;
+      continue;
+    }
+    if (result.width <= 0 || result.height <= 0) {
+      continue;
+    }
     auto baseName = std::filesystem::path(filePath).stem().string();
-
-    auto doc = pagx::PAGXImporter::FromFile(filePath);
-    if (!doc) {
-      ADD_FAILURE() << "Failed to load: " << baseName;
-      continue;
-    }
-    auto fontConfig = MakeHtmlFontConfig();
-    doc->applyLayout(&fontConfig);
-
-    int width = static_cast<int>(doc->width);
-    int height = static_cast<int>(doc->height);
-    if (width <= 0 || height <= 0) {
-      continue;
-    }
-
-    auto htmlPath = outDir + "/" + baseName + ".html";
-    pagx::HTMLExportOptions opts;
-    // Rasterize Diamond/tiled-ImagePattern fills into PNG next to the HTML so that browser
-    // screenshots pick up the exact pixels tgfx produced, instead of a WebGL approximation.
-    opts.staticImgDir = outDir + "/static-img";
-    opts.staticImgUrlPrefix = "static-img/";
-    opts.staticImgNamePrefix = baseName + "-";
-    auto html = pagx::HTMLExporter::ToHTML(*doc, opts);
-    if (html.empty()) {
-      ADD_FAILURE() << "Failed to export HTML: " << baseName;
-      continue;
-    }
-
-    auto fullHtml = WrapHtmlDocument(html, width, height);
-    {
-      std::ofstream htmlFile(htmlPath, std::ios::binary);
-      htmlFile.write(fullHtml.data(), static_cast<std::streamsize>(fullHtml.size()));
-    }
     auto pngPath = outDir + "/" + baseName + ".png";
-    screenshotTasks.emplace_back(htmlPath, pngPath, width, height);
+    screenshotTasks.emplace_back(result.htmlPath, pngPath, result.width, result.height);
     entries.push_back({baseName, pngPath});
   }
 
