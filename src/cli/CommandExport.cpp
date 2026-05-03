@@ -24,6 +24,7 @@
 #include <string>
 #include <vector>
 #include "cli/CliUtils.h"
+#include "pagx/FontConfig.h"
 #include "pagx/HTMLExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/SVGExporter.h"
@@ -189,13 +190,24 @@ static int ExportToSVG(const ExportOptions& options) {
   return 0;
 }
 
-// Parsed representation of a single --html-font spec. For local-mode entries, `sourcePath` holds
-// the absolute filesystem path of the font file to be copied into <output-dir>/fonts/; the
-// `rule.uri` field stays empty until the copy step rewrites it to "fonts/<basename>".
-// For URL-mode entries, `sourcePath` is empty and `rule.uri` is the user-supplied URL.
+// Parsed representation of a single --html-font spec — one spec maps to one source entry.
+// Multiple ParsedFontFace instances sharing the same (fontFamily, fontWeight, fontStyle) triple
+// are later aggregated into a single FontFaceRule with multiple sources, so that users can
+// express "prefer local, fall back to CDN" by repeating --html-font with the same triple.
+// For local-mode entries, `sourcePath` holds the absolute filesystem path of the font file to
+// be copied into <output-dir>/fonts/; the final src URL is filled in by the copy step.
+// `typeface` holds a loaded tgfx::Typeface when the local file could be parsed, so that the
+// caller can register it with pagx::FontConfig and apply accurate text metrics during layout
+// — without this, applyLayout would fall back to system fonts and produce line-heights that
+// drift from what the browser actually renders with the injected @font-face.
+// For URL-mode entries, `sourcePath` and `typeface` are empty and `source.uri` is the user URL.
 struct ParsedFontFace {
-  FontFaceRule rule = {};
-  std::string sourcePath = {};  // empty for URL mode
+  std::string fontFamily = {};
+  std::string fontWeight = {};
+  std::string fontStyle = {};
+  FontFaceSource source = {};
+  std::string sourcePath = {};                    // empty for URL mode
+  std::shared_ptr<tgfx::Typeface> typeface = {};  // non-null for local mode when parse succeeded
 };
 
 // Splits a single --html-font spec into uri + #key=value overrides. The separator is '#' to
@@ -258,11 +270,11 @@ static bool ParseFontFaceSpec(const std::string& spec, ParsedFontFace* out) {
                 << "' requires #family=..., #weight=..., and #style=...\n";
       return false;
     }
-    out->rule.fontFamily = familyOverride;
-    out->rule.fontWeight = weightOverride;
-    out->rule.fontStyle = styleOverride;
-    out->rule.uri = uri;
-    out->rule.mode = FontEmbedMode::URL;
+    out->fontFamily = familyOverride;
+    out->fontWeight = weightOverride;
+    out->fontStyle = styleOverride;
+    out->source.uri = uri;
+    out->source.mode = FontEmbedMode::URL;
     out->sourcePath.clear();
     return true;
   }
@@ -278,9 +290,16 @@ static bool ParseFontFaceSpec(const std::string& spec, ParsedFontFace* out) {
     std::cerr << "pagx export: error: --html-font file does not exist: '" << uri << "'\n";
     return false;
   }
+  // Always attempt to load the typeface, even when the user provided overrides for every
+  // field. The loaded object is handed back so that applyLayout can register it and compute
+  // text metrics with the real font rather than a system fallback; otherwise the hard-coded
+  // widths/line-heights the exporter writes into CSS would disagree with what the browser
+  // renders with the same font file.
+  auto typeface = tgfx::Typeface::MakeFromPath(uri);
   std::string autoFamily, autoWeight, autoStyle;
-  if (familyOverride.empty() || weightOverride.empty() || styleOverride.empty()) {
-    auto typeface = tgfx::Typeface::MakeFromPath(uri);
+  const bool needAutoFields =
+      familyOverride.empty() || weightOverride.empty() || styleOverride.empty();
+  if (needAutoFields) {
     if (typeface == nullptr) {
       std::cerr << "pagx export: error: --html-font failed to parse font file '" << uri
                 << "'; override with #family=/#weight=/#style=\n";
@@ -301,12 +320,13 @@ static bool ParseFontFaceSpec(const std::string& spec, ParsedFontFace* out) {
       return false;
     }
   }
-  out->rule.fontFamily = familyOverride.empty() ? autoFamily : familyOverride;
-  out->rule.fontWeight = weightOverride.empty() ? autoWeight : weightOverride;
-  out->rule.fontStyle = styleOverride.empty() ? autoStyle : styleOverride;
-  out->rule.uri = {};                   // filled in by copy step
-  out->rule.mode = FontEmbedMode::URL;  // referenced by relative URL after copy
+  out->fontFamily = familyOverride.empty() ? autoFamily : familyOverride;
+  out->fontWeight = weightOverride.empty() ? autoWeight : weightOverride;
+  out->fontStyle = styleOverride.empty() ? autoStyle : styleOverride;
+  out->source.uri = {};                   // filled in by copy step
+  out->source.mode = FontEmbedMode::URL;  // referenced by relative URL after copy
   out->sourcePath = std::filesystem::absolute(path).string();
+  out->typeface = std::move(typeface);
   return true;
 }
 
@@ -406,21 +426,63 @@ static int ExportToHTML(const ExportOptions& options) {
                 << destPath.string() << "': " << copyEc.message() << "\n";
       return 1;
     }
-    parsed.rule.uri = "fonts/" + basename;
+    parsed.source.uri = "fonts/" + basename;
   }
 
   HTMLExporter::Options htmlOptions = {};
   htmlOptions.format = ParseHTMLFormat(options.htmlFormat);
-  htmlOptions.staticImgDir = (outputDir / "static-img").string();
-  htmlOptions.staticImgUrlPrefix = "static-img/";
+  // Isolate every HTML's rasterized assets in their own sub-directory so that multiple
+  // exports into the same output directory cannot collide on filenames like "dgc0.png"
+  // or "pd_0.png" (the exporter re-uses short ids per document). The sub-directory name
+  // is the output file's stem, matching how fonts/ is a single shared directory — but
+  // static-img actually does need per-document isolation because the ids are not unique
+  // across documents, whereas font basenames are expected to be unique by the user.
+  auto outputStem = outputPath.stem().string();
+  htmlOptions.staticImgDir = (outputDir / "static-img" / outputStem).string();
+  htmlOptions.staticImgUrlPrefix = "static-img/" + outputStem + "/";
   htmlOptions.fontSynthesisWeight = !options.htmlNoFontSynthesisWeight;
   htmlOptions.fontSynthesisStyle = !options.htmlNoFontSynthesisStyle;
+  // Aggregate ParsedFontFace entries sharing the same (family, weight, style) triple into a
+  // single FontFaceRule with multiple sources. Browsers try sources left-to-right and fall
+  // back to the next one on load failure, so users can list a local path followed by a CDN
+  // URL to get "prefer local, CDN safety net" in one declaration. Preserve the user's CLI
+  // order both across rules (first unseen triple → first rule) and within a rule (sources
+  // appended in the order the user listed them).
   htmlOptions.fontFaceRules.reserve(fonts.size());
-  for (auto& parsed : fonts) {
-    htmlOptions.fontFaceRules.push_back(parsed.rule);
+  for (const auto& parsed : fonts) {
+    FontFaceRule* target = nullptr;
+    for (auto& rule : htmlOptions.fontFaceRules) {
+      if (rule.fontFamily == parsed.fontFamily && rule.fontWeight == parsed.fontWeight &&
+          rule.fontStyle == parsed.fontStyle) {
+        target = &rule;
+        break;
+      }
+    }
+    if (target == nullptr) {
+      FontFaceRule rule = {};
+      rule.fontFamily = parsed.fontFamily;
+      rule.fontWeight = parsed.fontWeight;
+      rule.fontStyle = parsed.fontStyle;
+      htmlOptions.fontFaceRules.push_back(std::move(rule));
+      target = &htmlOptions.fontFaceRules.back();
+    }
+    target->sources.push_back(parsed.source);
   }
 
-  document->applyLayout();
+  // Register local-mode font files with pagx::FontConfig so applyLayout computes text
+  // metrics (glyph widths, line-heights) from the same font file the browser will load
+  // via the generated @font-face rule. Without this step tgfx falls back to whatever
+  // system font matches the requested family name, its metrics diverge from the browser's,
+  // and the hard-coded CSS widths/line-heights the exporter emits no longer line up with
+  // the actual rendered text. URL-mode fonts cannot be registered because the CLI has no
+  // local bytes to read — their text will still layout against system fallbacks.
+  pagx::FontConfig layoutFontConfig;
+  for (auto& parsed : fonts) {
+    if (parsed.typeface) {
+      layoutFontConfig.registerTypeface(parsed.typeface);
+    }
+  }
+  document->applyLayout(&layoutFontConfig);
 
   auto fragment = HTMLExporter::ToHTML(*document, htmlOptions);
   if (fragment.empty()) {

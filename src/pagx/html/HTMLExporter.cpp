@@ -112,30 +112,50 @@ static std::string BuildFontFaceCSS(const std::vector<FontFaceRule>& rules, bool
   }
   std::string css;
   for (const auto& rule : rules) {
-    if (rule.fontFamily.empty() || rule.uri.empty()) {
+    if (rule.fontFamily.empty() || rule.sources.empty()) {
       continue;
     }
-    std::string srcUrl;
-    switch (rule.mode) {
-      case FontEmbedMode::URL:
-        srcUrl = rule.uri;
-        break;
-      case FontEmbedMode::Base64: {
-        auto dataUri = ReadFileAsDataURI(rule.uri, DetectFontMime(rule.uri));
-        if (dataUri.empty()) {
-          continue;
-        }
-        srcUrl = dataUri;
-        break;
+    // Assemble the CSS `src:` value by iterating every source in order. Browsers try each
+    // url() entry left-to-right and fall back to the next one when the current source fails to
+    // load; this makes "bundled local font first, CDN as safety net" expressible in a single
+    // @font-face rule. A rule with all sources failing to resolve (e.g. every Base64 file
+    // missing) is skipped entirely so we never emit a rule with no valid src.
+    std::string srcValue;
+    for (const auto& source : rule.sources) {
+      if (source.uri.empty()) {
+        continue;
       }
-      case FontEmbedMode::FilePath:
-        srcUrl = "file://" + rule.uri;
-        break;
+      std::string srcUrl;
+      switch (source.mode) {
+        case FontEmbedMode::URL:
+          srcUrl = source.uri;
+          break;
+        case FontEmbedMode::Base64: {
+          auto dataUri = ReadFileAsDataURI(source.uri, DetectFontMime(source.uri));
+          if (dataUri.empty()) {
+            continue;
+          }
+          srcUrl = dataUri;
+          break;
+        }
+        case FontEmbedMode::FilePath:
+          srcUrl = "file://" + source.uri;
+          break;
+      }
+      if (srcUrl.empty()) {
+        continue;
+      }
+      if (!srcValue.empty()) {
+        srcValue += minify ? "," : ",\n       ";
+      }
+      srcValue += "url('" + srcUrl + "')";
+      auto format = DetectFontFormat(source.uri);
+      if (format) {
+        srcValue += std::string(" format('") + format + "')";
+      }
     }
-    auto format = DetectFontFormat(rule.uri);
-    std::string srcValue = "url('" + srcUrl + "')";
-    if (format) {
-      srcValue += std::string(" format('") + format + "')";
+    if (srcValue.empty()) {
+      continue;
     }
     if (minify) {
       css += "@font-face{font-family:'" + rule.fontFamily + "';src:" + srcValue;

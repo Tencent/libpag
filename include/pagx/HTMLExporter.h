@@ -51,6 +51,24 @@ enum class FontEmbedMode {
 };
 
 /**
+ * One entry in a @font-face rule's `src` list. A single FontFaceRule may carry multiple
+ * sources; the browser tries them in order and falls back to the next one if the current
+ * source fails to load (e.g. local file missing, network error). This enables patterns like
+ * "prefer bundled local font, fall back to CDN" in a single declaration.
+ */
+struct FontFaceSource {
+  /**
+   * The font source: a URL, relative path, or local file path depending on `mode`.
+   */
+  std::string uri;
+
+  /**
+   * How the uri should be embedded in the generated CSS.
+   */
+  FontEmbedMode mode = FontEmbedMode::URL;
+};
+
+/**
  * Describes a single @font-face rule to inject into the HTML output.
  */
 struct FontFaceRule {
@@ -61,14 +79,11 @@ struct FontFaceRule {
   std::string fontFamily;
 
   /**
-   * The font source: a URL, relative path, or local file path depending on `mode`.
+   * One or more font sources. Browsers try each entry in order — typical usage lists a local
+   * bundled file first and a CDN URL as fallback. Must contain at least one source; rules
+   * with an empty sources list are skipped during CSS emission.
    */
-  std::string uri;
-
-  /**
-   * How the uri should be embedded in the generated CSS.
-   */
-  FontEmbedMode mode = FontEmbedMode::URL;
+  std::vector<FontFaceSource> sources;
 
   /**
    * Optional CSS font-weight value (e.g. "400", "700", "bold"). When empty, the property is
