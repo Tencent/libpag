@@ -20,6 +20,7 @@
 #include <emscripten/html5.h>
 #include <GLES3/gl31.h>
 #include <cstdlib>
+#include <tgfx/gpu/Context.h>
 #include <tgfx/gpu/opengl/GLDevice.h>
 #include "GridBackground.h"
 #include "utils/StringParser.h"
@@ -141,6 +142,13 @@ PAGXView::PAGXView(std::shared_ptr<tgfx::Device> device, int width, int height)
   displayList.setAllowZoomBlur(true);
   displayList.setMaxTileCount(256);
   displayList.setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
+  // Per-frame throttle for tiles that need to be rasterized from scratch. Left at 0 (disabled)
+  // on entry and whenever the last user zoom action was zoom-in, because post-zoom-in the
+  // current-scale cache is nearly empty and any texture-invalidation wiping fallback caches
+  // will leave blank holes until deferred tiles catch up. Flipped to a positive value only
+  // after the user zooms out (updateZoomScaleAndOffset below), where plenty of fallback exists
+  // from the prior larger scale and throttling trades off a brief blur for smoother frames.
+  displayList.setTileThrottlePerFrame(0);
 }
 
 void PAGXView::registerFonts(const val& fontVal, const val& emojiFontVal) {
@@ -649,7 +657,17 @@ void PAGXView::updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY
 
     // Determine direction based on accumulated change (ignoring noise < 0.01)
     if (std::abs(accumulatedZoomChange) > 0.01f) {
-      isZoomingIn = (accumulatedZoomChange > 0.0f);
+      bool newZoomingIn = (accumulatedZoomChange > 0.0f);
+      if (newZoomingIn != isZoomingIn) {
+        isZoomingIn = newZoomingIn;
+        // Flip the per-frame tile throttle to match the latest confirmed direction. Zoom-in
+        // (and the static period that follows) disables throttling so any tile missing at the
+        // current scale can be rasterized this frame instead of leaving a blank hole when
+        // texture-invalidation already wiped the fallback source. Zoom-out re-enables
+        // throttling because the prior (larger) scale's tiles downsample cleanly into
+        // fallback and the occasional deferred tile only shows as a brief blur.
+        displayList.setTileThrottlePerFrame(isZoomingIn ? 0 : 3);
+      }
     }
 
     lastZoomUpdateTimestampMs = emscripten_get_now();
@@ -752,14 +770,27 @@ bool PAGXView::draw() {
   double frameEndMs = emscripten_get_now();
   double frameDurationMs = frameEndMs - frameStartMs;
 
-  if (frameDurationMs > SLOW_FRAME_LOG_THRESHOLD_MS) {
+  // Log only frames that exceed the slow-frame threshold. The post-slow follow-up mechanism
+  // below is kept as scaffolding for future debugging, but disabled here to keep the log clean.
+  bool isSlowFrame = frameDurationMs > SLOW_FRAME_LOG_THRESHOLD_MS;
+  bool shouldLogFrame = isSlowFrame;
+
+  if (shouldLogFrame) {
     const auto& offset = displayList.contentOffset();
+    float fitScale = computeFitScale();
+    float effectiveScale = fitScale * displayList.zoomScale();
+    // Expected drawn content size in canvas pixels (before viewport clipping). Anything much
+    // larger than the canvas itself means most fragment work is wasted off-screen.
+    float drawWidthPx = pagxWidth * effectiveScale;
+    float drawHeightPx = pagxHeight * effectiveScale;
     tgfx::PrintLog(
         "[PAGXView] slow frame: total=%.2fms surface=%.2fms bg=%.2fms render=%.2fms "
         "flush=%.2fms submit=%.2fms unlock=%.2fms dirty=%d zoom=%.4f quantized=%.4f "
-        "offset=(%.1f,%.1f)",
-        frameDurationMs, surfaceMs, bgMs, renderMs, flushMs, submitMs, unlockMs,
-        dirty ? 1 : 0, lastZoom, displayList.zoomScale(), offset.x, offset.y);
+        "offset=(%.1f,%.1f) fitScale=%.4f effScale=%.4f canvas=(%dx%d) pagx=(%.0fx%.0f) "
+        "drawPx=(%.0fx%.0f)",
+        frameDurationMs, surfaceMs, bgMs, renderMs, flushMs, submitMs, unlockMs, dirty ? 1 : 0,
+        lastZoom, displayList.zoomScale(), offset.x, offset.y, fitScale, effectiveScale, _width,
+        _height, pagxWidth, pagxHeight, drawWidthPx, drawHeightPx);
   }
 
   // Temporary: log the first frame breakdown unconditionally so the 20p full-fit rollout can
