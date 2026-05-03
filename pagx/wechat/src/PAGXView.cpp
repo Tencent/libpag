@@ -41,22 +41,11 @@ using namespace emscripten;
 
 namespace pagx {
 
-// Maximum GPU resource cache limit. Raised from the earlier 256MB after profiling showed the
-// previous value caused frequent LRU eviction of mipmapped textures: once a texture was evicted,
-// scrolling back to it triggered a full codec re-decode even though the data had not changed.
-// 512MB headroom keeps all typical PAGX documents (roughly 50 images, ~9MB mipmapped each)
-// resident so rebuild counts stay near zero during pan/zoom. Lower this again if memory-limited
-// devices start OOM-crashing.
-constexpr size_t MAX_CACHE_LIMIT = 512U * 1024 * 1024;
-// GPU resource expiration in frames. The previous value (10 * 60 = 600 frames) caused textures
-// to be evicted purely by age even when the cache had plenty of free bytes -- for example, an
-// image that moves out of view during panning and returns 600 frames later (only a few seconds
-// of continuous gesture input at 60fps+) would be decoded again despite never running into the
-// cache's byte ceiling. Setting this to tgfx's MAX_EXPIRATION_FRAMES effectively disables the
-// age-based eviction path, leaving the byte-capacity path as the only way a resource is
-// reclaimed; the intent is that 512MB of headroom now reliably translates into no re-decodes
-// during typical pan/zoom sessions. Revisit if real-world memory pressure requires an upper
-// bound on resource lifetime again.
+// GPU resource cache limit. 1GB keeps image textures and subtreeCache textures resident
+// through pan/zoom on image-heavy PAGX (peak ~1.2GB before eviction on 512MB limit).
+constexpr size_t MAX_CACHE_LIMIT = 1024U * 1024 * 1024;
+// GPU resource expiration in frames. Large value effectively disables age-based eviction
+// so cached textures only get reclaimed by the byte-capacity path above.
 constexpr size_t EXPIRATION_FRAMES = 1000000;
 // Slow frame threshold in milliseconds (more lenient than desktop 32ms due to WeChat environment).
 constexpr double SLOW_FRAME_THRESHOLD_MS = 50.0;
@@ -135,10 +124,7 @@ PAGXView::PAGXView(std::shared_ptr<tgfx::Device> device, int width, int height)
   displayList.setRenderMode(tgfx::RenderMode::Tiled);
   // Keep zoomScalePrecision at tgfx's default (1000, i.e. 0.001 step) so pinch gestures feel
   // smooth. A previous experiment bucketed zoom to 0.05 steps to improve TileCache reuse, but
-  // that produced visible stair-stepping during continuous zoom gestures while failing to fix
-  // the underlying shape-rasterize cost (which lives in ResourceCache, not tile bucketing).
-  // setAllowZoomBlur(true) already covers the transition period by upsampling the nearest
-  // ready TileCache, so removing the coarse quantization costs little in practice.
+  // that produced visible stair-stepping without fixing the underlying shape-rasterize cost.
   displayList.setAllowZoomBlur(true);
   displayList.setMaxTileCount(256);
   displayList.setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
@@ -149,6 +135,9 @@ PAGXView::PAGXView(std::shared_ptr<tgfx::Device> device, int width, int height)
   // after the user zooms out (updateZoomScaleAndOffset below), where plenty of fallback exists
   // from the prior larger scale and throttling trades off a brief blur for smoother frames.
   displayList.setTileThrottlePerFrame(0);
+  // Subtree cache: caches static layers as textures to avoid per-layer shape retriangulation,
+  // the dominant hotspot for PAGX content (Shape=200-400ms/frame on singleton shapes).
+  displayList.setSubtreeCacheMaxSize(2048);
 }
 
 void PAGXView::registerFonts(const val& fontVal, const val& emojiFontVal) {
@@ -183,6 +172,11 @@ void PAGXView::parsePAGX(const val& pagxData) {
   // internal maps hold pagx::Layer* pointers that would dangle once `document` resets.
   builderSession = nullptr;
   document = nullptr;
+  // Drop snapshots so the new document doesn't blit pixels from the old one.
+  cachedSnapshot = nullptr;
+  fitSnapshot = nullptr;
+  gestureActive = false;
+  zoomedOutFrameSettled = false;
 
   auto data = GetPagxDataFromEmscripten(pagxData);
   if (!data) {
@@ -528,6 +522,11 @@ void PAGXView::updateSize(int width, int height) {
   _width = width;
   _height = height;
   surface = nullptr;
+  // Snapshots are bound to the old surface size; drop them to avoid dimension mismatch.
+  cachedSnapshot = nullptr;
+  fitSnapshot = nullptr;
+  gestureActive = false;
+  zoomedOutFrameSettled = false;
 
   if (contentLayer) {
     applyCenteringTransform();
@@ -576,6 +575,17 @@ void PAGXView::setBoundsOrigin(float x, float y) {
   _boundsOriginX = x;
   _boundsOriginY = y;
   boundsOriginOverridden = true;
+}
+
+void PAGXView::setGestureActive(bool active) {
+  // Need at least one snapshot to composite; suppress freeze until the first full render.
+  if (active && cachedSnapshot == nullptr && fitSnapshot == nullptr) {
+    gestureActive = false;
+    return;
+  }
+  // Any gesture transition invalidates the zoom-out idle token.
+  zoomedOutFrameSettled = false;
+  gestureActive = active;
 }
 
 val PAGXView::getContentTransform() const {
@@ -637,6 +647,8 @@ val PAGXView::getNodePosition(const std::string& nodeId) const {
 
 void PAGXView::updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY) {
   bool zoomChanged = (std::abs(zoom - lastZoom) > 0.001f);
+  // View changed, invalidate the zoom-out idle token so the next draw() re-evaluates.
+  zoomedOutFrameSettled = false;
   if (zoom <= 1.0f) {
     displayList.setSubtreeCacheMaxSize(1024);
   } else {
@@ -698,12 +710,78 @@ bool PAGXView::draw() {
 
   double frameStartMs = emscripten_get_now();
 
-  // Snapshot before any state update so the post-render logging block can tell whether this
-  // particular draw() call was the one that produced the first frame. Cleared along with the
-  // other temporary [PAGXView] first-frame telemetry once the 20p path is validated.
+  float liveZoom = static_cast<float>(displayList.zoomScale());
+  const auto& liveOffset = displayList.contentOffset();
+
+  // Idle short-circuit: previous draw() used the zoom-out fast path and nothing moved.
+  // displayList's dirty flag is still set (we never ran render() to drain it), but the
+  // pixels on the surface already match liveZoom/liveOffset.
+  if (zoomedOutFrameSettled && !gestureActive && liveZoom <= 1.02f) {
+    return true;
+  }
+
+  // Composite-blit fast path. Skips the full displayList.render() pass in two cases:
+  //   1. Active gesture: user is panning/zooming, full render would cost 200-800ms/frame.
+  //   2. Steady state at zoom <= 1: fitSnapshot already contains all pixels any render
+  //      would produce at this zoom, so we can safely blit it instead of re-rendering.
+  // The 0.02 margin above 1.0 absorbs float drift on the user's release zoom.
+  bool fitOnly = !gestureActive && fitSnapshot != nullptr && liveZoom <= 1.02f;
+  if ((gestureActive || fitOnly) && surface != nullptr &&
+      (cachedSnapshot != nullptr || fitSnapshot != nullptr)) {
+    auto context = device->lockContext();
+    if (context == nullptr) {
+      return false;
+    }
+    auto canvas = surface->getCanvas();
+    canvas->clear();
+    if (backgroundVisible) {
+      DrawSolidBackground(canvas, _width, _height, backgroundTGFXColor);
+    } else {
+      DrawBackground(canvas, _width, _height, 1.0f);
+    }
+    // Layer 1: fit snapshot (full-document backdrop). Transform mirrors tgfx's display:
+    //   screenPixel = contentPixel * zoomScale + contentOffset
+    if (fitSnapshot != nullptr) {
+      float fitScale = fitSnapshotZoom != 0.0f ? liveZoom / fitSnapshotZoom : 1.0f;
+      float ftx = liveOffset.x - fitSnapshotOffset.x * fitScale;
+      float fty = liveOffset.y - fitSnapshotOffset.y * fitScale;
+      canvas->save();
+      canvas->translate(ftx, fty);
+      canvas->scale(fitScale, fitScale);
+      canvas->drawImage(fitSnapshot);
+      canvas->restore();
+    }
+    // Layer 2: cached snapshot (last viewport, sharp at its capture zoom), on top of fit.
+    if (cachedSnapshot != nullptr) {
+      float cachedScale = snapshotZoom != 0.0f ? liveZoom / snapshotZoom : 1.0f;
+      float cctx = liveOffset.x - snapshotOffset.x * cachedScale;
+      float ccty = liveOffset.y - snapshotOffset.y * cachedScale;
+      canvas->save();
+      canvas->translate(cctx, ccty);
+      canvas->scale(cachedScale, cachedScale);
+      canvas->drawImage(cachedSnapshot);
+      canvas->restore();
+    }
+    auto recording = context->flush();
+    if (recording) {
+      context->submit(std::move(recording));
+    }
+    device->unlock();
+    if (!hasRenderedFirstFrame) {
+      hasRenderedFirstFrame = true;
+    }
+    // Mark the zoom-out idle state so future draw() calls can short-circuit until the
+    // view moves. Only for the non-gesture path -- gestures expect to re-composite each frame.
+    if (fitOnly) {
+      zoomedOutFrameSettled = true;
+    }
+    return true;
+  }
+
+  // Capture before rendering so the post-render logging block can identify the first frame.
   bool wasFirstFrame = !hasRenderedFirstFrame;
 
-  // Per-stage timings in milliseconds. Remain 0 for stages that are skipped in this frame.
+  // Per-stage timings in milliseconds. Zero for stages skipped this frame.
   double surfaceMs = 0.0;
   double bgMs = 0.0;
   double renderMs = 0.0;
@@ -760,6 +838,22 @@ bool PAGXView::draw() {
       if (!hasRenderedFirstFrame) {
         hasRenderedFirstFrame = true;
       }
+      // Capture this fully-rendered frame as cachedSnapshot for the next gesture.
+      // Done inside the lock because makeImageSnapshot on a BackendRenderTarget triggers
+      // a GPU readback/copy.
+      cachedSnapshot = surface->makeImageSnapshot();
+      snapshotZoom = static_cast<float>(displayList.zoomScale());
+      snapshotOffset = displayList.contentOffset();
+      // Refresh fitSnapshot only at zoom ≈ 1 AND offset ≈ 0. Any off-center capture would
+      // leave blank bands when blitted at a different view state. Captured once on the
+      // first frame; never overwritten from a non-fit render.
+      if (std::abs(snapshotZoom - 1.0f) < 0.05f &&
+          std::abs(snapshotOffset.x) < 1.0f &&
+          std::abs(snapshotOffset.y) < 1.0f) {
+        fitSnapshot = cachedSnapshot;
+        fitSnapshotZoom = snapshotZoom;
+        fitSnapshotOffset = snapshotOffset;
+      }
     }
 
     double unlockStartMs = emscripten_get_now();
@@ -793,9 +887,7 @@ bool PAGXView::draw() {
         _height, pagxWidth, pagxHeight, drawWidthPx, drawHeightPx);
   }
 
-  // Temporary: log the first frame breakdown unconditionally so the 20p full-fit rollout can
-  // be validated against the previous 1:1-crop baseline. Remove together with the [PAGX Perf]
-  // debug logs once the numbers stabilize.
+  // First-frame breakdown for telemetry.
   if (wasFirstFrame && hasRenderedFirstFrame) {
     tgfx::PrintLog(
         "[PAGXView] first frame: total=%.2fms surface=%.2fms bg=%.2fms render=%.2fms "

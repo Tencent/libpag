@@ -356,6 +356,16 @@ export class View {
   }
 
   /**
+   * Toggles the gesture-freeze fast path. Call with true on pan/zoom start and false on end.
+   * While active, draw() blits the last rendered frame with a relative transform instead of
+   * running the full render pipeline, eliminating most per-frame cost at the expense of
+   * visual blur when zooming beyond the snapshot scale.
+   */
+  public setGestureActive(active: boolean): void {
+    this.nativeView!.setGestureActive(active);
+  }
+
+  /**
    * Returns the content transform parameters for mapping cocraft canvas coordinates to canvas
    * pixel positions. Call this once after loading a PAGX file to get the static transform needed
    * for comment overlay positioning.

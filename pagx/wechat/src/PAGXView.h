@@ -23,6 +23,7 @@
 #include <memory>
 #include <string>
 #include "tgfx/core/Color.h"
+#include "tgfx/core/Image.h"
 #include "tgfx/gpu/Recording.h"
 #include "tgfx/layers/DisplayList.h"
 #include "pagx/FontConfig.h"
@@ -228,6 +229,23 @@ class PAGXView {
   void setBoundsOrigin(float x, float y);
 
   /**
+   * Enables/disables gesture-freeze rendering. When enabled, draw() stops calling
+   * displayList.render() and instead blits the last fully-rendered frame to the surface,
+   * applying the delta between the snapshot's zoom/offset and the current ones. This
+   * eliminates per-frame shape retriangulation and slow-op execution for the duration of a
+   * user pan/zoom, at the cost of visual blur when zooming beyond the snapshot scale.
+   *
+   * The caller (JavaScript gesture layer) is responsible for calling setGestureActive(true)
+   * on zoomStart/panStart and setGestureActive(false) on zoomEnd/panEnd. The first draw()
+   * after disabling freezes performs a normal render, producing a "refocus" frame that is
+   * expected to be slow; subsequent idle frames are unaffected.
+   *
+   * No-op if a snapshot is unavailable (e.g. before the first frame has rendered). Freeze
+   * never latches across documents: parsePAGX/buildLayers clear the cached snapshot.
+   */
+  void setGestureActive(bool active);
+
+  /**
    * Returns the content transform parameters needed for mapping cocraft canvas coordinates to
    * canvas pixel positions. The returned JavaScript object contains:
    * - boundsOriginX/Y: PAGX content origin in cocraft canvas coordinates.
@@ -278,6 +296,21 @@ class PAGXView {
   tgfx::DisplayList displayList = {};
   std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
   std::shared_ptr<PAGXDocument> document = nullptr;
+
+  // Gesture-freeze pipeline. During active pan/zoom we bypass displayList.render() and
+  // composite two snapshots onto the surface: fitSnapshot (whole document at zoom=1,
+  // blurry when zoomed in but always fills the viewport) + cachedSnapshot (last rendered
+  // viewport, sharp at its capture zoom). Both cleared on parsePAGX/updateSize.
+  bool gestureActive = false;
+  std::shared_ptr<tgfx::Image> cachedSnapshot = nullptr;
+  float snapshotZoom = 1.0f;
+  tgfx::Point snapshotOffset = {};
+  std::shared_ptr<tgfx::Image> fitSnapshot = nullptr;
+  float fitSnapshotZoom = 1.0f;
+  tgfx::Point fitSnapshotOffset = {};
+  // Idle token for the zoom-out fast path: once draw() has painted the current view from
+  // fitSnapshot alone, further idle frames short-circuit. Cleared by any view change.
+  bool zoomedOutFrameSettled = false;
   // Session owns the LayerBuilder state so upgradeImageFromNative() can regenerate a subset of
   // the layer tree when a higher-resolution asset replaces the thumbnail attached during the
   // initial buildLayers() pass. Destroyed on every parsePAGX() so old build state never leaks

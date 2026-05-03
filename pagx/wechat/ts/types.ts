@@ -83,6 +83,8 @@ export interface PAGXViewNative {
     contentHeight: () => number;
     /** Overrides bounds origin read from the PAGX file. Values can be negative. */
     setBoundsOrigin: (x: number, y: number) => void;
+    /** Toggles gesture-freeze rendering; true during active pan/zoom, false otherwise. */
+    setGestureActive: (active: boolean) => void;
     /** Returns content transform parameters for mapping cocraft coordinates to canvas positions. */
     getContentTransform: () => ContentTransform;
     /** Looks up a node by ID and returns its position relative to the canvas. */
