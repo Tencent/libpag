@@ -799,6 +799,11 @@ if (PAG_BUILD_TESTS)
     endif ()
 
     file(GLOB_RECURSE SRC_FILES test/src/*.*)
+    # Phase 12.3: fuzz harness files define LLVMFuzzerTestOneInput and are
+    # only compiled when PAG_BUILD_FUZZ=ON under a dedicated clang+libFuzzer
+    # build. Strip them out of the regular test-suite glob so PAGFullTest /
+    # PAGUnitTest / UpdateBaseline link cleanly.
+    list(FILTER SRC_FILES EXCLUDE REGEX "test/src/pag/fuzz/")
     file(GLOB_RECURSE CLI_TEST_FILES src/cli/*.cpp src/cli/*.h)
     list(FILTER CLI_TEST_FILES EXCLUDE REGEX "main\\.cpp$")
     list(APPEND PAG_TEST_FILES ${SRC_FILES} ${CLI_TEST_FILES})
@@ -870,6 +875,69 @@ if (PAG_BUILD_TESTS)
         add_dependencies(PAGFullTest pagx-cli)
         target_compile_definitions(PAGFullTest PRIVATE
             PAGX_CLI_BINARY_PATH="$<TARGET_FILE:pagx-cli>")
+    endif ()
+
+    # Phase 12.3: libFuzzer harnesses. Only built when the user opts in
+    # with `-DPAG_BUILD_FUZZ=ON` and the active compiler supports
+    # `-fsanitize=fuzzer,address` (clang 6+ / Apple clang 11+). The
+    # fuzzer binaries live in a dedicated build directory (typically
+    # cmake-build-fuzz) so the default debug build stays untouched.
+    #
+    # macOS note: Apple clang 15+ ships without libclang_rt.fuzzer_osx.a,
+    # so on stock Xcode toolchains the linker step fails with
+    # "libclang_rt.fuzzer_osx.a not found". We detect that state at
+    # configure time and fall back to a standalone main() harness that
+    # still exercises Decode/Inflate over every byte stream in
+    # `test/fuzz_corpus/decode_seeds` — not a real fuzzer, but a
+    # coverage-preserving sanity run so the codepath stays compiling +
+    # testable without a Homebrew LLVM install.
+    if (PAG_BUILD_FUZZ)
+        include(CheckCXXSourceCompiles)
+        set(CMAKE_REQUIRED_FLAGS "-fsanitize=fuzzer,address")
+        set(CMAKE_REQUIRED_LINK_OPTIONS "-fsanitize=fuzzer,address")
+        check_cxx_source_compiles(
+            "extern \"C\" int LLVMFuzzerTestOneInput(const unsigned char*, unsigned long) { return 0; }"
+            PAG_HAS_LIBFUZZER)
+        unset(CMAKE_REQUIRED_FLAGS)
+        unset(CMAKE_REQUIRED_LINK_OPTIONS)
+
+        if (PAG_HAS_LIBFUZZER)
+            set(PAG_FUZZ_COMPILE_FLAGS -fsanitize=fuzzer,address,undefined
+                                       -fno-omit-frame-pointer)
+            set(PAG_FUZZ_LINK_FLAGS -fsanitize=fuzzer,address,undefined)
+            message(STATUS "libFuzzer runtime detected — building real libFuzzer harnesses")
+        else ()
+            # Fallback: compile harness files as regular binaries with a
+            # standalone main() that feeds test/fuzz_corpus seeds through
+            # LLVMFuzzerTestOneInput. See test/src/pag/fuzz/standalone_main.cpp.
+            set(PAG_FUZZ_COMPILE_FLAGS -fno-omit-frame-pointer)
+            set(PAG_FUZZ_LINK_FLAGS "")
+            message(STATUS
+                "libFuzzer runtime not available (stock Apple clang drops it); "
+                "falling back to standalone sanity runner")
+        endif ()
+
+        foreach (FUZZ_NAME PAGDecodeFuzz PAGInflaterFuzz)
+            if (FUZZ_NAME STREQUAL PAGDecodeFuzz)
+                set(FUZZ_SRC test/src/pag/fuzz/decode_fuzz.cpp)
+            else ()
+                set(FUZZ_SRC test/src/pag/fuzz/inflater_fuzz.cpp)
+            endif ()
+            if (PAG_HAS_LIBFUZZER)
+                add_executable(${FUZZ_NAME} ${FUZZ_SRC})
+            else ()
+                add_executable(${FUZZ_NAME} ${FUZZ_SRC}
+                               test/src/pag/fuzz/standalone_main.cpp)
+            endif ()
+            target_include_directories(${FUZZ_NAME} PRIVATE ${PAG_TEST_INCLUDES})
+            target_compile_options(${FUZZ_NAME} PRIVATE ${PAG_FUZZ_COMPILE_FLAGS}
+                                   ${PAG_TEST_COMPILE_OPTIONS})
+            if (PAG_FUZZ_LINK_FLAGS)
+                target_link_options(${FUZZ_NAME} PRIVATE ${PAG_FUZZ_LINK_FLAGS})
+            endif ()
+            target_compile_definitions(${FUZZ_NAME} PRIVATE ${PAG_TEST_DEFINES})
+            target_link_libraries(${FUZZ_NAME} ${PAG_TEST_LIBS})
+        endforeach ()
     endif ()
 
 endif ()

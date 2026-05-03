@@ -1,0 +1,164 @@
+# PAG v2 fuzz CI workflow — Phase 12.4 (design spec §18.3ter).
+#
+# Runs two libFuzzer harnesses (PAGDecodeFuzz, PAGInflaterFuzz) in a
+# 4-shard matrix × 6h max-total-time = 24 CPU·hours per scheduled run.
+# Gated on Linux so we always have libFuzzer available (stock Apple
+# clang drops libclang_rt.fuzzer_osx.a, forcing the local build onto a
+# standalone sanity runner; the CI box has full libFuzzer).
+#
+# Cadence:
+#   - PR gate path: `sanity` job, 1h max, single shard, must pass before
+#     merge (coverage acceptance decision lives with humans).
+#   - Scheduled: nightly 24 CPU·h fuzzing; crashes auto-committed to
+#     test/fuzz_corpus/crashes/ and an issue opened.
+
+name: pagx-fuzz
+
+on:
+  # Manual trigger for ad-hoc fuzzing runs (e.g. before a risky release).
+  workflow_dispatch:
+
+  # PR gate — tight, just enough to catch obvious regressions.
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/pagx/pag/**'
+      - 'test/src/pag/fuzz/**'
+      - 'test/src/pag/support/**'
+
+  # Nightly deep fuzzing. 6h per shard × 4 shards = 24 CPU·h.
+  schedule:
+    - cron: '0 2 * * *'  # 02:00 UTC daily
+
+jobs:
+  sanity:
+    # Fast PR-blocking 1-hour fuzz. Enough to catch most new-crash
+    # regressions without padding PR verification over 15 minutes.
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang + libFuzzer
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang ninja-build cmake
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+
+      - name: Configure fuzz build
+        run: |
+          cmake -G Ninja -DPAG_BUILD_TESTS=ON -DPAG_BUILD_FUZZ=ON \
+                -DCMAKE_BUILD_TYPE=Debug \
+                -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+                -B cmake-build-fuzz
+
+      - name: Build harnesses
+        run: |
+          cmake --build cmake-build-fuzz --target PAGDecodeFuzz PAGInflaterFuzz
+
+      - name: Seed corpus
+        run: |
+          cmake --build cmake-build-fuzz --target pagx-cli
+          mkdir -p test/fuzz_corpus/decode_seeds
+          for s in rectangle ellipse polystar fill stroke; do
+            ./cmake-build-fuzz/pagx export \
+              --input spec/samples/$s.pagx \
+              --output test/fuzz_corpus/decode_seeds/$s.pag \
+              --format pag || true
+          done
+
+      - name: Decode fuzz sanity (50 min)
+        run: |
+          ./cmake-build-fuzz/PAGDecodeFuzz \
+            -max_total_time=3000 -fork=1 -ignore_crashes=0 \
+            test/fuzz_corpus/decode_seeds
+
+      - name: Inflater fuzz sanity (20 min)
+        run: |
+          ./cmake-build-fuzz/PAGInflaterFuzz \
+            -max_total_time=1200 -fork=1 -ignore_crashes=0 \
+            test/fuzz_corpus/decode_seeds
+
+  deep:
+    # Nightly 4-shard matrix × 6 hours.
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 390  # 6h + 30m build/upload buffer
+    strategy:
+      fail-fast: false
+      matrix:
+        harness: [ PAGDecodeFuzz, PAGInflaterFuzz ]
+        shard: [ 0, 1 ]    # 2 shards per harness × 2 harnesses = 4 shards total
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang ninja-build cmake
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+
+      - name: Restore corpus cache
+        uses: actions/cache@v4
+        with:
+          path: test/fuzz_corpus
+          key: pagx-fuzz-corpus-${{ matrix.harness }}-${{ matrix.shard }}-${{ github.sha }}
+          restore-keys: |
+            pagx-fuzz-corpus-${{ matrix.harness }}-${{ matrix.shard }}-
+            pagx-fuzz-corpus-${{ matrix.harness }}-
+
+      - name: Configure + build
+        run: |
+          cmake -G Ninja -DPAG_BUILD_TESTS=ON -DPAG_BUILD_FUZZ=ON \
+                -DCMAKE_BUILD_TYPE=Debug \
+                -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+                -B cmake-build-fuzz
+          cmake --build cmake-build-fuzz --target ${{ matrix.harness }} pagx-cli
+
+      - name: Ensure seed corpus
+        run: |
+          mkdir -p test/fuzz_corpus/decode_seeds
+          for s in rectangle ellipse polystar fill stroke; do
+            if [ ! -f test/fuzz_corpus/decode_seeds/$s.pag ]; then
+              ./cmake-build-fuzz/pagx export \
+                --input spec/samples/$s.pagx \
+                --output test/fuzz_corpus/decode_seeds/$s.pag \
+                --format pag || true
+            fi
+          done
+
+      - name: Fuzz (6h)
+        run: |
+          ./cmake-build-fuzz/${{ matrix.harness }} \
+            -max_total_time=21000 -fork=1 -ignore_crashes=1 \
+            -print_final_stats=1 \
+            test/fuzz_corpus/decode_seeds
+
+      - name: Upload binary + corpus
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.harness }}-shard${{ matrix.shard }}
+          path: |
+            cmake-build-fuzz/${{ matrix.harness }}
+            test/fuzz_corpus
+          retention-days: 28
+
+      - name: Commit newly-minimized crashes
+        if: always()
+        run: |
+          if ls test/fuzz_corpus/crashes/crash-* 1> /dev/null 2>&1; then
+            git config user.name "pagx-fuzz-bot"
+            git config user.email "pagx-fuzz-bot@users.noreply.github.com"
+            git checkout -b fuzz-crash-$(date +%Y%m%d)-${{ matrix.harness }}-${{ matrix.shard }}
+            git add test/fuzz_corpus/crashes/
+            git commit -m "fuzz: auto-commit crash artefacts from ${{ matrix.harness }} shard ${{ matrix.shard }}"
+            git push origin HEAD
+          fi
