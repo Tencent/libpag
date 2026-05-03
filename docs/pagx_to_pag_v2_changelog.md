@@ -2,12 +2,29 @@
 
 本文档归档了 `docs/pagx_to_pag_v2_design.md` 的完整修订记录（v1.0 → v2.20）。
 
-**实现阶段不需通读历史**；主文档 `### 上次开工必读` 段已列出开工前必知的 16 条硬约束（12 基线 + 3 v2.19 新增 + 1 v2.20 新增）。
+**实现阶段不需通读历史**；主文档 `### 上次开工必读` 段已列出开工前必知的 17 条硬约束（12 基线 + 3 v2.19 新增 + 1 v2.20 文本回退 + 1 v2.20 Review 收敛）。
 历史版本条目仅作为"为什么这样设计"的背景参考。
 
 ---
 
 ### 历史修订记录
+
+- **v2.20 Review 收敛轮次**（P0+P1 文档修订，9 项，非编码阶段交付）：
+
+  背景：Phase 16 文本回退设计定稿后，用户要求对整份设计文档做一次完备性 Review。Agent 对架构合理性 / 可扩展性 / 可维护性 / 可读性 / 性能 / 边界情况 6 个维度分派 4 个子代理深度评审，去重汇总得到 15 项建议，按"不超前设计"原则收敛并落地 P0+P1 共 9 项：
+
+  - **P0-18**（§7.1）：Baker 输入 PAGX 生命周期约束写入共同约束——`BakeContext::layerPathByPagxLayer` / `imageIndexByNode` 以 `const void*`（PAGX 节点指针）为 key，依赖 PAGX 结构稳定。补强制条款"Bake 期间禁止并发修改 doc、禁止节点 GC"，杜绝悬空指针与 UAF。
+  - **P0-19**（§15.3 + §G.3）：`PAGLoader::Result` 新增 `uint32_t compositionCount` 字段 + §G.3 加 "消费侧 range-check 纪律"段。`InvalidCompositionIndex=306` 等码的 contextIndex 是 Decoder 从字节流读出的未校验原始值，消费方必须用 compositionCount 做范围检查才能安全分派。
+  - **P0-20**（§I.5）：Phase 1 开工前加 "varU32 安全预检"清单。3 种 v1 现状 → 3 种 Phase 1 动作（零改 / 补最短形式分支 / 落完整 wrapper），判定结论写入 Phase 1 PR 描述；预检未完成禁止进入 Phase 1 exit gate。
+  - **P0-21**（§18.3bis + §18.3ter）：Fuzz corpus 初始种子源规范——CorruptBuilder 为唯一来源；开 fuzz 前 `test/fuzz_corpus/seeds/` ≥ 30 条覆盖 §G.2 Codec 400 段 + Inflater 600 段；本地 corpus 上限 100 MB；禁止在 fuzz 侧复制独立生成器导致两份漂移。
+  - **P1-22**（§17 D3 + §19 Phase 15）：覆盖率目标改为分模块——Baker/Codec/Inflater 三大模块各 ≥80%、整体 ≥75%。取代原 "≥85%" 全局口径（与 Phase 15 实测 76.75% 的冲突消除）；工具链辅助头不单列指标。
+  - **P1-23**（§8.5 + §3.2 + §16 + 开工必读 #13）：`EncodeSession` 裸指针聚合体升级为独立 `EncodeContext`（继承 DiagnosticCollector，持 StreamContext + debugLayout）。4 Context 形态完全对称——都继承基类、都有 3 参 public `warn`、调用点永远 `ctx->warn(...)`；消除 "`session->diag->pushWarning(...)`" vs "`ctx->warn(...)`" 的双轨困扰。
+  - **P1-24**（§18.4quater / §18.4quinta）：微型专项测试合并——`PackLayerPath` 从 3 条合并为 1 条参数化（RoundTripMatrix）；`ZeroCopyScope` OwnershipMatrix 从 2 条合并为 1 条；`ZeroCopyScope.LeakDetection` 采用 ASAN/weak_ptr 双策略，非 ASAN 环境不再 GTEST_SKIP。
+  - **精简收敛（非编号）**：(a) §6.1 TagCode 分段表中 `240-299 资源扩展段` 预留删除（无 roadmap 的 SVG/Lottie/HDR 占位，遵循 §2 精简原则）。(b) `PAGExporter::Options::FontMode` 枚举 + `--pag-font-mode` CLI 选项 + `PAGRenderEquivalenceTest::OutlineAll_Baseline` 参数化 test **彻底移除**（避免长期 GTEST_SKIP 腐化；枚举值 206 `TextGlyphDataEmpty` 保留仅为 ABI append-only，新代码禁引用）。
+
+  **未采纳的 Review 建议**（列入"可选"留待实施期再议）：B3 样本特性矩阵表、B6 ElementText D.11 字段序对齐声明、B7 FontProvider const 正确性、B9 UTF-8/图像魔数入口清单、D.14 AnimationData 占位段——均为细粒度完备性补强，不阻塞开工。
+
+---
 
 - **v2.19 → v2.20 修订要点**（Phase 15 实测暴露的架构级回退，非评审团轮次）：
 
