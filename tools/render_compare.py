@@ -60,7 +60,7 @@ def render_html(pairs: list[tuple[str, Path, Path]]) -> str:
     # Relative paths from OUTPUT.parent so the HTML is portable.
     out_parent = OUTPUT.parent
     rows_html = []
-    for name, left, right in pairs:
+    for index, (name, left, right) in enumerate(pairs, start=1):
         left_rel = os.path.relpath(left, out_parent)
         right_rel = os.path.relpath(right, out_parent)
         source_rel = os.path.relpath(
@@ -68,6 +68,7 @@ def render_html(pairs: list[tuple[str, Path, Path]]) -> str:
         )
         rows_html.append(
             f"""      <tr>
+        <td class="index">{index}</td>
         <td class="name"><a href="{html.escape(source_rel)}" target="_blank">{html.escape(name)}</a></td>
         <td class="cell"><img src="{html.escape(left_rel)}" alt="{html.escape(name)} (PAGX native)"></td>
         <td class="cell"><img src="{html.escape(right_rel)}" alt="{html.escape(name)} (PAGX to PAG)"></td>
@@ -107,12 +108,20 @@ def render_html(pairs: list[tuple[str, Path, Path]]) -> str:
       font-size: 13px;
       z-index: 2;
     }}
+    th.col-index {{ width: 50px; text-align: right; }}
     th.col-name {{ width: 240px; }}
-    th.col-cell {{ width: calc((100% - 240px) / 2); }}
+    th.col-cell {{ width: calc((100% - 290px) / 2); }}
     tbody td {{
       padding: 12px;
       border-bottom: 1px solid #2d2d2d;
       vertical-align: top;
+    }}
+    td.index {{
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-size: 13px;
+      color: #808080;
+      text-align: right;
+      padding-right: 8px;
     }}
     td.name {{
       font-family: "SF Mono", Menlo, Consolas, monospace;
@@ -148,6 +157,7 @@ def render_html(pairs: list[tuple[str, Path, Path]]) -> str:
   <table>
     <thead>
       <tr>
+        <th class="col-index">#</th>
         <th class="col-name">sample</th>
         <th class="col-cell">PAGX native (reference)</th>
         <th class="col-cell">PAGX &rarr; PAG (under review)</th>

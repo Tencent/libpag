@@ -19,6 +19,7 @@
 #include "gtest/gtest.h"
 #include "pag/support/RenderUtil.h"
 #include "pagx/Diagnostic.h"
+#include "pagx/FontConfig.h"
 #include "pagx/PAGExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Rectangle.h"
@@ -27,6 +28,7 @@
 #include "pagx/pag/LayerInflater.h"
 #include "pagx/pag/PAGDocument.h"
 #include "renderer/LayerBuilder.h"
+#include "tgfx/core/Typeface.h"
 #include "utils/Baseline.h"
 #include "utils/ProjectPath.h"
 
@@ -204,6 +206,75 @@ TEST_F(Phase12ProbeFixture, DISABLED_PathAVsPathB) {
   auto surfaceB = pagx::test::RenderLayerToSurface(context, inf.layer, w, h);
   ASSERT_NE(surfaceB, nullptr);
   (void)Baseline::Compare(surfaceB, "Phase12Probe/masking_pathB");
+}
+
+// Text diagnostics probe: walk spec/samples/text.pagx through the full
+// Bake -> Encode -> Decode -> Inflate chain and dump every warning from
+// each stage. Helps localise where glyph runs are being dropped.
+TEST_F(Phase12ProbeFixture, DISABLED_TextInflateDiag) {
+  const auto path = ProjectPath::Absolute("spec/samples/text.pagx");
+  auto doc = pagx::PAGXImporter::FromFile(path);
+  ASSERT_NE(doc, nullptr);
+
+  // Mirror the system-font registration that PAGXTest does for its own
+  // SpecSamples pass — without it, applyLayout's runtime shaper may
+  // silently fall back to a typeface that TextBaker can't describe with
+  // the authored family/style pair.
+  pagx::FontConfig fontConfig;
+  const char* arialPaths[] = {
+      "/System/Library/Fonts/Supplemental/Arial.ttf",
+      "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+  };
+  for (const char* p : arialPaths) {
+    auto tf = tgfx::Typeface::MakeFromPath(p);
+    if (tf) fontConfig.registerTypeface(std::move(tf));
+  }
+  doc->applyLayout(&fontConfig);
+
+  std::cerr << "\n=== text.pagx inflate diag ===\n";
+
+  auto bakeResult = pagx::pag::Bake(*doc);
+  ASSERT_NE(bakeResult.doc, nullptr);
+  std::cerr << "BAKE warnings: " << bakeResult.warnings.size() << "\n";
+  for (const auto& w : bakeResult.warnings) {
+    std::cerr << "  bake.warn code=" << static_cast<int>(w.code) << " msg=" << w.message << "\n";
+  }
+  std::cerr << "BAKE doc: compositions=" << bakeResult.doc->compositions.size()
+            << " fonts=" << bakeResult.doc->fonts.size() << "\n";
+  for (size_t i = 0; i < bakeResult.doc->fonts.size(); ++i) {
+    const auto& f = bakeResult.doc->fonts[i];
+    std::cerr << "  font[" << i << "] kind=" << static_cast<int>(f->kind) << " family='"
+              << f->family << "' style='" << f->style
+              << "' data=" << (f->data ? std::to_string(f->data->size()) + " bytes" : "null")
+              << "\n";
+  }
+
+  auto encodeResult = pagx::pag::Codec::Encode(*bakeResult.doc);
+  ASSERT_NE(encodeResult.bytes, nullptr);
+  std::cerr << "ENCODE bytes=" << encodeResult.bytes->length()
+            << " warnings=" << encodeResult.warnings.size() << "\n";
+  for (const auto& w : encodeResult.warnings) {
+    std::cerr << "  encode.warn code=" << static_cast<int>(w.code) << " msg=" << w.message << "\n";
+  }
+
+  auto decodeResult =
+      pagx::pag::Codec::Decode(encodeResult.bytes->data(), encodeResult.bytes->length());
+  ASSERT_NE(decodeResult.doc, nullptr);
+  std::cerr << "DECODE doc: compositions=" << decodeResult.doc->compositions.size()
+            << " fonts=" << decodeResult.doc->fonts.size()
+            << " warnings=" << decodeResult.warnings.size() << "\n";
+  for (const auto& w : decodeResult.warnings) {
+    std::cerr << "  decode.warn code=" << static_cast<int>(w.code) << " msg=" << w.message << "\n";
+  }
+
+  auto inflateResult = pagx::pag::LayerInflater::Inflate(std::move(decodeResult.doc));
+  std::cerr << "INFLATE layer=" << (inflateResult.layer ? "ok" : "null")
+            << " warnings=" << inflateResult.warnings.size() << "\n";
+  for (const auto& w : inflateResult.warnings) {
+    std::cerr << "  inflate.warn code=" << static_cast<int>(w.code) << " msg=" << w.message << "\n";
+  }
+
+  SUCCEED();
 }
 
 }  // namespace pag
