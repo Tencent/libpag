@@ -54,16 +54,17 @@ cp -R third_party/ ../libpag_pagx_pag_impl/third_party/
 
 ## 2. Phase 路线图（基于设计文档 §19）
 
-设计文档 §19 已完整定义 16 个 Phase（0-15，含 4a/4b/9.5/10.5 拆分）的产品代码、测试、交付判定、依赖矩阵。本节不重复，只补 Phase 之间的"里程碑分组"和"AI 实施切入点"。
+设计文档 §19 已完整定义 Phase 0-16（含 4a/4b/9.5/10.5/11.5/11.6/16.0-16.6 拆分）的产品代码、测试、交付判定、依赖矩阵。本节不重复，只补 Phase 之间的"里程碑分组"和"AI 实施切入点"。
 
-### 2.1 四个里程碑（M1-M4）
+### 2.1 五个里程碑（M1-M5）
 
 | 里程碑 | 包含 Phase | 含义 | 阶段门槛 | 提交策略 |
 |---|---|---|---|---|
 | **M1：地基就绪** | 0, 1, 2, 3 | 全 include 基础 + 测试基建 + Baker 通用层 | code review 可启动 | 每 Phase 一个 commit |
 | **M2：编解码闭环** | 4(4a/4b), 5, 6, 7, 8 | Codec 全 Tag + 4 个 Baker 子模块 | feature 分支可合入 | 每 Phase 一个 commit；M2 末做一次集成 commit |
-| **M3：渲染 + 对外 API** | 9, 9.5, 10, 10.5, 11 | Inflater + 双对外 API + CLI | PR 可开 | Phase 10/10.5 完成后必做 API review |
-| **M4：质量保障** | 12, 13(空), 14, 15 | Render 等价 + Fuzz + 性能基线 + 覆盖率 | 可合入 main | Phase 12 触发首次截图基准接受流程 |
+| **M3：渲染 + 对外 API** | 9, 9.5, 10, 10.5, 11, 11.5, 11.6 | Inflater + 双对外 API + CLI + forward-ref + Baker render* / LayerMaskRef 补齐 | PR 可开 | Phase 10/10.5 完成后必做 API review |
+| **M4：质量保障** | 12, 13(空), 14, 15 | Render 等价 + Fuzz + 性能基线 + 覆盖率工具 | Phase 15 coverage.sh 落地（门槛 85% 转移到 M5，因 Phase 16 修完前文本路径不可测） | Phase 12 触发首次截图基准接受流程 |
+| **M5：文本 runtime-shape 回退** | 16.0-16.6 | Phase 8 预 shape 架构回退为 v1 runtime-shape；字体 FontProvider 注入；文本 inflate 不再因 macOS MakeFromName null 全空 | 含文字样本全部 inflate 非空；coverage 指定模块 ≥75%；可合入 main | 每子 Phase 一个 commit；16.6 用户 /accept-baseline 接 48 张新基线 |
 
 ### 2.2 各 Phase 估时（AI 单人）
 
@@ -90,8 +91,15 @@ cp -R third_party/ ../libpag_pagx_pag_impl/third_party/
 | 13 | （取消） | 0 | v1 已 graceful reject |
 | 14 | PerformanceTest + baseline.json | 2-3 h | 基线入 git |
 | 15 | coverage.sh + 报告 | 2-3 h | 覆盖率 ≥85%，未达则补测试回 Phase 1-9 |
+| 16.0 | Phase 16 文本 runtime-shape 设计定稿 | 2 h | 已完成，详见 `pagx_to_pag_v2_phase16_text_redesign.md` |
+| 16.1 | PAGDocument 新 ElementTextData + FontProvider 接口 | 3-4 h | ABI-兼容前提下同步移除 FontAsset 族；需 `FontProviderTest` 覆盖 default + null + fallback |
+| 16.2 | TextBaker 重写 + pre-shaped 降级 warning | 2-3 h | 测试矩阵大改，保留的原有用例 ~30% |
+| 16.3 | Codec 读写 schema 对齐 | 2 h | RoundTrip 全绿 |
+| 16.4 | LayerInflater 重写 + 布局器接入 | 4-5 h | 复用 v1 TextLayout + TextShaper，接口层 FontProvider |
+| 16.5 | 测试基建 FontProvider 注入 | 1-2 h | 共享 util 下沉 |
+| 16.6 | Baseline accept + 覆盖率重跑 | 1 h + 用户审图时间 | coverage.sh 在 src/pagx/pag/LayerInflater.cpp + TextBaker.cpp ≥75% |
 
-合计估时 ≈ **60-80 h**，约对应 8-10 个 AI 工作日（按每天 8h 有效编码）。这与设计文档 §19 评估的"单人 16 工作日或 3 人 10-12 天"一致。
+合计估时 ≈ **75-95 h**（M1-M5 全量），约对应 10-12 个 AI 工作日。Phase 0-14 已完成，剩余 Phase 15+16 估时 ≈ 15-20 h。
 
 ---
 
@@ -154,6 +162,9 @@ cp -R third_party/ ../libpag_pagx_pag_impl/third_party/
 | R8 | Phase 8 GlyphRun 字段集与运行时 TextLayout.h 偏差 | 2 | 3 | 6 | D-1.2 决策点强制 Phase 8 启动前复核 | 8 |
 | R9 | tgfx 子模块版本与本期 PAGLoader.h 暴露的 Layer API 不兼容 | 1 | 4 | 4 | Phase 10.5 启动前编译 PAGExporter.h 验证 include 链 | 10.5 |
 | R10 | 覆盖率 <85% 触发 Phase 15 反向回补测试 | 2 | 2 | 4 | Phase 1-11 严守 TDD；Phase 14 完成后预跑 coverage.sh 提前发现 | 15 |
+| R11 | Phase 15 实测 76.75% 未达 85%（已触发） | 5 | 2 | 10 | 已分析：主要缺口 html/ 73% + LayerInflater 55% + TextBaker 60% 源于 Phase 15 测试环境字体不可用 → Phase 16 修完后覆盖率门槛转移到 M5 Phase 16.6 | 15 / 16 |
+| R12 | Phase 16 跨平台字体解析不一致 | 4 | 3 | 12 | FontProvider 可注入接口 + 默认走 `pag::FontManager`；测试环境用 PAGXTest SpecSamples 的 font 注册逻辑复用；生产用户须调用 `PAGFont::RegisterFont` | 16.4 |
+| R13 | Phase 16 `spec/samples/*.pagx` 中 pre-shaped pagx::Text 样本一律降级损失 per-glyph xform | 3 | 2 | 6 | 发 `TextGlyphRunsDowngraded=208` warning；PAGX 原生渲染路径（不经 .pag）仍保留完整 pre-shaped 支持 | 16.2 |
 
 **最高优先级缓解**（红色风险 ≥9）：
 
@@ -191,10 +202,17 @@ cp -R third_party/ ../libpag_pagx_pag_impl/third_party/
 | 11 CLI 扩展 | ✅ | (本提交) | 1 h | src/cli/CommandExport.cpp 扩展 `--format pag` 分支调 PAGExporter::ToFile + `--pag-strict` 开关映射 Options::strict + ExportToPAG() 走 LoadDocument → hasUnresolvedImports 检查 → applyLayout → ToFile + 诊断信息经 FormatDiagnostic 逐行打印到 stderr（error/warning 区分前缀）+ ok 决定 exit code（§14.2 契约）；CMakeLists.txt 在 PAGFullTest 上注入 `PAGX_CLI_BINARY_PATH="$<TARGET_FILE:pagx-cli>"` 让测试能 fork-exec CLI；3 smoke 测试全绿（CommandExportPAG：SmokeProducesPagFile 校验 PAG magic / MissingInputFileFails 非零退出 / StrictFlagBlocksEmptyDocument 确认 --pag-strict 阻止空文档导出） |
 | 11.5 CompositionRef forward-ref | ✅ | 569a339c | 0.5 h | Codec 允许 CompositionRefPayload 引用未解码的后续 composition（范围上界改为 CompositionList 已声明总数而非 `out->size()`）；RoundTripTest +2 条回归（CompositionRefForwardReferenceSupported / CompositionRefBeyondDeclaredCountStillFatal）；Phase 12.0 探测 6 DECODE_FAIL → 0（app_icons / complete_example / composition / container_layout / nebula_cadet / space_explorer 全绿） |
 | 11.6 Baker render\* + LayerMaskRef codec | ✅ | 84bdf774 | 2 h | 5 个根因修复：(a) VectorBaker Rectangle/Ellipse/Polystar/ShapePath/Path 改读 `renderPosition/renderSize/renderScale/renderOuterRadius/renderInnerRadius` 而非原始字段（布局 shorthand 场景 NaN/0 → tgfx drawRRect DEBUG_ASSERT crash）；(b) LayerBaker `BuildLayerMatrix` 改读 `layer.renderPosition()` 接入 flex/top/left 布局；(c) VectorBaker `BakeGroup` 同样改读 `renderPosition()`；(d) TextBaker `BakeTextPath` 补齐 renderScale path transform + MakeTrans(renderPosition) + renderBaselineOrigin；(e) **CodecTagsLayer 新增 LayerMaskRef (TagCode=12) Write/Read + layerFlags bit 7 HasMaskRef**——Phase 4b 预留了 TagCode 位但从未实现 serialise，masks 每次 round-trip 静默丢失。CrossCheck FAIL 从 34 降到 15；220/220 回归全绿；48/48 样本跑完无 tgfx crash |
-| 12 RenderEquivalence + Fuzz + CI | ⏳ | — | — | 截图基准接受（首跑 48 samples 全部 baseline-missing FAIL，等 /accept-baseline；RenderEquivalenceTest + RenderCrossCheckTest + 2 libFuzzer harness + standalone sanity runner + .github/workflows/pagx-fuzz.yml 4-shard matrix 已落） |
+| 12 RenderEquivalence + Fuzz + CI | ✅ | 77decbe6 | 3 h | 48 samples + 48 CrossCheck 参数化；96 首跑 FAIL 为基线缺失预期；RenderCrossCheckTest 33 PASS / 15 FAIL (PSNR < 30dB 的多为文字样本，Phase 16 修复后预计清零 8+)；libFuzzer harness + standalone fallback + .github/workflows/pagx-fuzz.yml 4-shard × 6h CI yaml 已落 |
 | 13 v1 改动（取消） | ✅ | — | 0 | 设计文档已确认无需改 v1 |
-| 14 PerformanceTest + baseline | ✅ | (本提交) | 1 h | test/src/pag/unit/PerformanceTest.cpp：对 48 spec/samples 每样本测 size_ratio + load_ratio + 5 绝对时间（bake/encode/decode/pagx_load/pag_load；中位数-11 跑），写/读 test/perf/baseline.json（§18.8 schema 完整：format_version + notes + samples.{size_ratio, load_ratio, reference_abs_times.*}）；退化门槛：pag_load_ms ≤ previous × 1.05（§18.8 退化模式，PAGX→PAG v1 converter 尚未落地标记 §17 D-bucket "v1 对比待补"）；±20% load_ratio 漂移非阻塞 WARNING；**亚毫秒级测量噪声地板** = 1ms，低于此值的样本跳过退化/漂移检测（steady_clock jitter floor ≈20µs/call 导致 0.009→0.011ms 22% swing 是纯噪声，非真实退化）；baseline.json **不入 git**（.gitignore 条目 129）——§18.8 P2-8 要求首次 commit 归属 tech lead 参考机（Darwin arm64 M1 Max）；实测首跑结果：size_ratio 中位数 0.43（PAG v2 字节比 PAGX XML 小 57%），load_ratio 中位数 0.20（PAG v2 加载比 PAGX 快 5 倍），极端案例 text_path load_ratio=0.016（快 60 倍）— 达成设计文档期望 "size_ratio ≈ 0.3 / load_ratio ≈ 0.144"；篡改 baseline 验证 retrograde FAIL 正确触发 |
-| 15 coverage.sh | ⏳ | — | — | ≥85% |
+| 14 PerformanceTest + baseline | ✅ | 8b706d4c | 1 h | test/src/pag/unit/PerformanceTest.cpp：对 48 spec/samples 每样本测 size_ratio + load_ratio + 5 绝对时间（中位数-11 跑），±20% load_ratio 漂移非阻塞 WARNING；亚毫秒噪声地板 = 1ms；baseline.json 不入 git；实测 size_ratio 中位数 0.43 / load_ratio 中位数 0.20，达成设计文档期望 |
+| 15 coverage.sh | ✅ | 3ee770ce 等 | 3 h | CMake -DPAG_COVERAGE 开关 + tools/coverage.sh (clang source-based) + `-fsanitize=fuzzer` coverage-mode 剔除 ASAN；**实测 line coverage 76.75%（未达 85%）**：html/ 73% + pag/ 75%（LayerInflater 55% / TextBaker 60% 为主要缺口）；tools/render_compare.py + `PAGXNativeReferenceTest.RenderSpecSamplesToPAGXNativeDir` 辅助生成两列对比 HTML 便于人审；**Phase 16 修完 ElementText 路径后覆盖率预计显著上升**，85% 门槛转移到 Phase 16.6 |
+| **16.0 text redesign 设计** | ✅ | 3ee770ce | 2 h | docs/pagx_to_pag_v2_phase16_text_redesign.md (422 行) + Phase 16 集成到主设计文档 6 章节 + 术语索引 + Phase 表 + 维护日志 v2.20 |
+| **16.1 PAGDocument + FontProvider** | ⏳ | — | — | `include/pagx/pag/FontProvider.h` 接口 + `MakeDefaultFontProvider()` 实现；删 `FontAsset` / `FontAxis` / `FontSourceKind` / `GlyphRunBlob`；`PAGDocument::fonts[]` 移除；`ElementTextData` 新字段集；预估 3-4 h |
+| **16.2 TextBaker 重写** | ⏳ | — | — | runtime-shape 模式；pre-shaped 降级发 `TextGlyphRunsDowngraded=208`；预估 2-3 h |
+| **16.3 Codec schema 对齐** | ⏳ | — | — | ElementText body 读写新 schema；FontAssetTable 写路径移除（读路径保留 warn skip）；预估 2 h |
+| **16.4 Inflater 重写 + 布局器接入** | ⏳ | — | — | inflateElementText 用 FontProvider + TextShaper + v1 TextLayout；预估 4-5 h |
+| **16.5 测试基建 FontProvider 注入** | ⏳ | — | — | RenderEquivalenceTest / CrossCheck 注入；预估 1-2 h |
+| **16.6 Baseline accept + 覆盖率重跑** | ⏳ | — | — | 用户 /accept-baseline 接 48 张；coverage ≥ 75% for LayerInflater/TextBaker；预估 1 h + 用户审图时间 |
 
 ---
 

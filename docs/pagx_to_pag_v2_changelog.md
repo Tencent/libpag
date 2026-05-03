@@ -1,13 +1,77 @@
 # PAGX → PAG v2 技术方案修订记录（CHANGELOG）
 
-本文档归档了 `docs/pagx_to_pag_v2_design.md` 的完整修订记录（v1.0 → v2.19）。
+本文档归档了 `docs/pagx_to_pag_v2_design.md` 的完整修订记录（v1.0 → v2.20）。
 
-**实现阶段不需通读历史**；主文档 `### 上次开工必读` 段已列出开工前必知的 15 条硬约束。
+**实现阶段不需通读历史**；主文档 `### 上次开工必读` 段已列出开工前必知的 16 条硬约束（12 基线 + 3 v2.19 新增 + 1 v2.20 新增）。
 历史版本条目仅作为"为什么这样设计"的背景参考。
 
 ---
 
 ### 历史修订记录
+
+- **v2.19 → v2.20 修订要点**（Phase 15 实测暴露的架构级回退，非评审团轮次）：
+
+  背景：Phase 15 覆盖率工具落地后实测 76.75%（未达 85%），同时发现 PAGX→PAG 转换后所有含文字样本在 macOS 测试环境下完全不渲染。根因诊断（`Phase12ProbeFixture.DISABLED_TextInflateDiag` 定位）：`tgfx::SystemFont::MakeFromName` 在非 Windows 平台硬 `return nullptr`（见 `third_party/tgfx/src/core/vectors/freetype/SystemFont.cpp:267,276`），Phase 8 "glyph ID 预存序列化" 架构不可行——Inflater 拿不到原始 typeface，TextBlob 必然 null，ElementText 整体丢弃。
+
+  **方向决策**（用户确认）：回退到 v1 风格 runtime-shape。`ElementTextData` 存原始 text + fontFamily/fontStyle 字符串（对齐 v1 `pag::TextDocument`），Inflater 端调 v1 `TextShaper::Shape` + 复用 v1 TextLayout 做段落布局；字体通过新引入的 `FontProvider` 注入接口由调用方提供。
+
+  **主文档变更面**（31 处）：
+  - **§2 核心原则 #7** "字体双模式" → "文本 runtime-shape"
+  - **§3.3 术语索引** 新增 `FontProvider` / `TextShaper`；标 `GlyphRunBlob` / `FontAsset` 废弃
+  - **§6.1 TagCode 分段** `FontAssetTable=3` / `FontAsset=7` 保留编号但标 deprecated
+  - **§6.2 body 顶层写入顺序** 移除 `FontAssetTable`（legacy 对照保留）
+  - **§6.5 必选 top-level Tag 清单** 从 6 个缩减为 5 个
+  - **§7 Baker 职责表** TextBaker 描述更新
+  - **§8.2 Encode 流程伪码** `WriteTag(body, FontAssetTable, doc.fonts)` 注释掉
+  - **§8.3 档 (i) fatal 语义** 顶层序列描述更新
+  - **§8.5 BakeContext** `fontIndexByNode` 等 3 字段移除
+  - **§9.4 InflaterContext 错误码表** 601/602 触发路径更新
+  - **§10 整章重写**（字体双模式 → runtime-shape 模式）
+  - **§11.0 资源生命周期总表** FontAsset 行移除
+  - **§11.2 整节废弃**（FontAsset 结构）
+  - **§11.3 索引化时机** 去掉 Font pre-pass
+  - **§15.1 错误码 ABI 表** `FontSourceMissing=201 / InflateFontCreateFailed=601 / InflateGlyphRunBuildFailed=602 / FontResourceSizeExceeded=408` 的 contextIndex 语义从 fontIndex 改为 layerIndex 或 UINT32_MAX；`GlyphRunKindInferred=208` 重命名为 `TextGlyphRunsDowngraded=208`（新语义，不加码）
+  - **§15.2 PAGExporter::Options::FontMode** OutlineAll 注释更新为 "reserved, Phase 17+"
+  - **§15.3 PAGLoader::Options** 新增 `fontProvider` 字段
+  - **§16 目录结构** 增加 `include/pagx/pag/FontProvider.h`
+  - **§17 验收 B3** OutlineAll 模式 SKIP
+  - **§18.4bis** GlyphRunBlobCodecTest 3 用例标 DISABLED
+  - **§18.7** OutlineAll_Baseline GTEST_SKIP 包装
+  - **§19 Phase 表** 新增 Phase 16.0-16.6 共 7 行；阶段门槛 + 依赖矩阵对应扩充；M4 → M5 新增
+  - **§20 附录 A** 资源索引化行去掉 `buildFonts`
+  - **§21 附录 B** 待确认 #1 GlyphRun 字段集标废弃；#3 OutlineAll 策略标废弃
+  - **§C.4** 整节重写为 "ImageAsset（Phase 16 后唯一保留的资源）"；`FontAsset` / `FontAxis` / `FontSourceKind` / `GlyphRunBlob` / `LayoutGlyph` / `ClassicGlyph` / `GlyphRunKind` 结构全部移除
+  - **§C.5-pre PAGDocument** 删 `std::vector<std::unique_ptr<FontAsset>> fonts` 字段
+  - **§C.7 ElementTextData** 字段集重写为 v1 TextDocument 风格
+  - **§D.6** FontAssetTable 字节布局整节标 Phase 16 废弃
+  - **§D.11 VectorElement Tags 表** ElementText (50) body 字段重写；`text_flags` 位域新增（BoxText/FauxBold/FauxItalic/ApplyFill/ApplyStroke/StrokeOverFill）
+  - **§D.11 GlyphRunBlob inline** 整段标废弃
+  - **§D.13 函数签名模板** `WriteGlyphRunBlob` / `ReadGlyphRunBlob` 标 Phase 16 废弃
+  - **§G.2 错误码枚举** `FontSourceMissing=201` 新语义（layerIndex）；`TextGlyphDataEmpty=206` 备注"Phase 16 起不再触发"；`GlyphRunKindInferred=208` 重命名 `TextGlyphRunsDowngraded=208`（Phase 16 新语义，ABI 值不变）；`FontResourceSizeExceeded=408` 备注废弃；`InflateFontCreateFailed=601` / `InflateGlyphRunBuildFailed=602` 新语义
+  - **§H.5 字体魔数校验** 整节标 Phase 16 废弃（PAGX 自身 HTML/SVG 路径仍可复用参考）
+  - **§I.1 公共头** 增加 `pag/FontProvider.h`（tgfx-dependent）
+  - **§22 上次开工必读** 条目 5 `FontAsset::data` 移除；新增条目 16 描述 Phase 16 回退；引言 v2.17 → v2.20
+  - **§文档维护** PAG v2 版本备注加 Phase 16 ElementText schema 不兼容变更说明
+
+  **Phase 16 子 Phase 拆分**（§19 表格扩充）：
+  - 16.0 设计定稿（本次提交，详见 `pagx_to_pag_v2_phase16_text_redesign.md`）
+  - 16.1 PAGDocument 结构 + FontProvider 接口
+  - 16.2 TextBaker 重写（runtime-shape，pre-shaped 降级发 `TextGlyphRunsDowngraded=208`）
+  - 16.3 Codec 读写 schema 对齐；FontAssetTable 写路径移除（读路径保留 `UnknownTagCode=400` warn skip 以兼容老版本开发分支产物）
+  - 16.4 LayerInflater `inflateElementText` 重写，接入 `TextShaper::Shape` + v1 `TextLayout` 段落布局 + `FontProvider.getTypeface`
+  - 16.5 测试基础设施 `FontProvider` 注入（RenderEquivalenceTest / CrossCheck）
+  - 16.6 用户 `/accept-baseline` 接受新 48 张基线 + `coverage.sh` 重跑验证 `LayerInflater.cpp` / `TextBaker.cpp` ≥75%
+
+  **不升 FORMAT_VERSION**：PAG v2 尚未对外发布（仅在本仓内使用），ElementText schema 不兼容变更不构成任何用户 .pag 破坏，继续 0x02。
+
+  **配套交付物**（已提交）：
+  - `tools/coverage.sh` + CMake `-DPAG_COVERAGE` 开关 + fuzz 分支 ASAN 剔除（Phase 15）
+  - `tools/render_compare.py` + `test/src/pag/unit/GeneratePAGXNativeReferencesTest.cpp` 的 PAGX 原生 48 张参考图生成（Phase 15 辅助）
+  - `test/src/pag/unit/Phase12ProbeTest.cpp` 新增 `DISABLED_TextInflateDiag` 文字诊断 probe
+  - 本文档 v2.20 修订条目
+  - `docs/pagx_to_pag_v2_phase16_text_redesign.md` 独立设计文档（422 行）
+
+---
 
 - v2.18 → v2.19 修订要点（5 位专家评审团第 10 轮综合：11 P0 含 2 项字节布局重构 + 20 P1 + 10 P2 = 41 项，**用户要求全部 41 项清零含 P0-R1 + P0-R2 字节重构**）：
   - **字节布局重构**（v2 未发布，第二次也是最后一次不兼容重构，v2 后续仅字段追加）：
