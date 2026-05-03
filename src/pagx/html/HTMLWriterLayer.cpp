@@ -501,8 +501,8 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                   span.stroke->color->nodeType() == NodeType::SolidColor) {
                 auto sc = static_cast<const SolidColor*>(span.stroke->color);
                 bool hasFill = span.fill && span.fill->color;
-                auto strokeCss = ResolveTextStrokeCss(span.stroke->width, span.stroke->align,
-                                                     hasFill);
+                auto strokeCss =
+                    ResolveTextStrokeCss(span.stroke->width, span.stroke->align, hasFill);
                 if (strokeCss.width > 0.0f) {
                   if (!spanStyle.empty()) spanStyle += ';';
                   spanStyle += "-webkit-text-stroke:" + FloatToString(strokeCss.width) + "px " +
@@ -649,8 +649,8 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                 span.stroke->color->nodeType() == NodeType::SolidColor) {
               auto sc = static_cast<const SolidColor*>(span.stroke->color);
               bool hasFill = span.fill && span.fill->color;
-              auto strokeCss = ResolveTextStrokeCss(span.stroke->width, span.stroke->align,
-                                                   hasFill);
+              auto strokeCss =
+                  ResolveTextStrokeCss(span.stroke->width, span.stroke->align, hasFill);
               if (strokeCss.width > 0.0f) {
                 spanStyle += ";-webkit-text-stroke:" + FloatToString(strokeCss.width) + "px " +
                              ColorToRGBA(sc->color, span.stroke->alpha);
