@@ -230,9 +230,26 @@ std::unique_ptr<VectorElement> TextBaker::BakeTextPath(BakeContext& /*ctx*/,
                                                        const pagx::TextPath& src) {
   auto data = std::make_unique<ElementTextPathData>();
   if (src.path != nullptr) {
-    data->path = MakeProp(pagx::ToTGFX(*src.path));
+    // LayerBuilder (renderer/LayerBuilder.cpp `convertTextPath`) applies
+    // `getScaledPath(src.path, renderScale())` then
+    // `path.transform(MakeTrans(renderPosition))`. Mirror both here so
+    // path coordinates on the wire match LayerBuilder's direct-render
+    // output. Phase 11.6 fix.
+    auto path = pagx::ToTGFX(*src.path);
+    const float scale = src.renderScale();
+    if (scale != 1.0f) {
+      path.transform(tgfx::Matrix::MakeScale(scale));
+    }
+    auto pos = src.renderPosition();
+    if (pos.x != 0.0f || pos.y != 0.0f) {
+      path.transform(tgfx::Matrix::MakeTrans(pos.x, pos.y));
+    }
+    data->path = MakeProp(std::move(path));
   }
-  data->baselineOrigin = MakeProp(tgfx::Point{src.baselineOrigin.x, src.baselineOrigin.y});
+  // `baselineOrigin` is also subject to layout; LayerBuilder uses the
+  // renderBaselineOrigin() variant.
+  auto baseline = src.renderBaselineOrigin();
+  data->baselineOrigin = MakeProp(tgfx::Point{baseline.x, baseline.y});
   data->baselineAngle = MakeProp(src.baselineAngle);
   data->firstMargin = MakeProp(src.firstMargin);
   data->lastMargin = MakeProp(src.lastMargin);

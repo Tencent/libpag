@@ -56,10 +56,21 @@ namespace pagx::pag {
 
 namespace {
 
-// PAGX uses NAN as "position not explicitly set". The baker replaces it with
-// {0,0} so Property<Point> stays well-formed without calling renderPosition()
-// (which requires layout to have run).
-tgfx::Point ResolvePoint(const pagx::Point& p) {
+// PAGX uses NAN as "position not explicitly set"; the element's
+// renderPosition() / renderSize() / renderOuterRadius() / ... accessors
+// compute the final layout value from layoutBounds(). Bake is always
+// invoked after PAGXDocument::applyLayout() (Baker.cpp enforces it via
+// the LayoutNotApplied=100 preflight gate), so the render*() accessors
+// always return finite values. Using the raw fields instead — as earlier
+// Phase 5c/6 did — produces NaN positions and zero sizes when the PAGX
+// source uses the left/top/width/height layout shorthand, which in turn
+// makes the Inflater feed `tgfx::Rectangle::setSize({0,0})` and trip the
+// `DEBUG_ASSERT(!rRect.rect.isEmpty())` in tgfx::OpsCompositor::drawRRect.
+// Phase 11.6 fix.
+tgfx::Point PointFromRenderPosition(const pagx::Point& p) {
+  // `renderPosition()` always returns a finite Point post-layout; keep the
+  // NaN-guard purely as a belt-and-braces for future layout bugs — zero
+  // lines of behavioural cost when layout is correct.
   float x = std::isnan(p.x) ? 0.0f : p.x;
   float y = std::isnan(p.y) ? 0.0f : p.y;
   return tgfx::Point{x, y};
@@ -88,8 +99,8 @@ std::unique_ptr<VectorElement> BakeElement(BakeContext& ctx, PAGDocument& doc,
 
 std::unique_ptr<VectorElement> BakeRectangle(const pagx::Rectangle& src) {
   auto data = std::make_unique<ElementRectangleData>();
-  data->position = MakeProp(ResolvePoint(src.position));
-  data->size = MakeProp(SizeToPoint(src.size));
+  data->position = MakeProp(PointFromRenderPosition(src.renderPosition()));
+  data->size = MakeProp(SizeToPoint(src.renderSize()));
   data->roundness = MakeProp(src.roundness);
   data->reversed = src.reversed;
 
@@ -101,8 +112,8 @@ std::unique_ptr<VectorElement> BakeRectangle(const pagx::Rectangle& src) {
 
 std::unique_ptr<VectorElement> BakeEllipse(const pagx::Ellipse& src) {
   auto data = std::make_unique<ElementEllipseData>();
-  data->position = MakeProp(ResolvePoint(src.position));
-  data->size = MakeProp(SizeToPoint(src.size));
+  data->position = MakeProp(PointFromRenderPosition(src.renderPosition()));
+  data->size = MakeProp(SizeToPoint(src.renderSize()));
   data->reversed = src.reversed;
 
   auto el = std::make_unique<VectorElement>();
@@ -113,10 +124,12 @@ std::unique_ptr<VectorElement> BakeEllipse(const pagx::Ellipse& src) {
 
 std::unique_ptr<VectorElement> BakePolystar(const pagx::Polystar& src) {
   auto data = std::make_unique<ElementPolystarData>();
-  data->position = MakeProp(ResolvePoint(src.position));
+  data->position = MakeProp(PointFromRenderPosition(src.renderPosition()));
   data->pointCount = MakeProp(src.pointCount);
-  data->outerRadius = MakeProp(src.outerRadius);
-  data->innerRadius = MakeProp(src.innerRadius);
+  // `renderOuterRadius()` / `renderInnerRadius()` collapse the PAGX layout
+  // shorthand into explicit radii the same way LayerBuilder does.
+  data->outerRadius = MakeProp(src.renderOuterRadius());
+  data->innerRadius = MakeProp(src.renderInnerRadius());
   data->outerRoundness = MakeProp(src.outerRoundness);
   data->innerRoundness = MakeProp(src.innerRoundness);
   data->rotation = MakeProp(src.rotation);
@@ -131,9 +144,20 @@ std::unique_ptr<VectorElement> BakePolystar(const pagx::Polystar& src) {
 
 std::unique_ptr<VectorElement> BakePath(const pagx::Path& src) {
   auto data = std::make_unique<ElementShapePathData>();
-  data->position = MakeProp(ResolvePoint(src.position));
+  data->position = MakeProp(PointFromRenderPosition(src.renderPosition()));
   if (src.data != nullptr) {
-    data->path = MakeProp(pagx::ToTGFX(*src.data));
+    // LayerBuilder (renderer/LayerBuilder.cpp `convertPath` /
+    // `getScaledPath`) pre-applies `renderScale()` to the raw path. Baker
+    // bakes the already-scaled path so the two pipelines store the same
+    // geometry on the wire. Without this the PSNR against rich_text /
+    // path / text_path samples stays below 30 dB even after the Rectangle
+    // / Ellipse / Layer matrix fixes.
+    auto path = pagx::ToTGFX(*src.data);
+    const float scale = src.renderScale();
+    if (scale != 1.0f) {
+      path.transform(tgfx::Matrix::MakeScale(scale));
+    }
+    data->path = MakeProp(std::move(path));
   }
   data->reversed = src.reversed;
 
@@ -201,7 +225,12 @@ std::unique_ptr<VectorElement> BakeGroup(BakeContext& ctx, PAGDocument& doc,
   }
   auto data = std::make_unique<ElementVectorGroupData>();
   data->anchor = MakeProp(tgfx::Point{src.anchor.x, src.anchor.y});
-  data->position = MakeProp(tgfx::Point{src.position.x, src.position.y});
+  // Phase 11.6: Group inherits from LayoutNode — its authored `position`
+  // may be NaN when the group is positioned through flex / left / top.
+  // LayerBuilder (renderer/LayerBuilder.cpp `convertGroup`) calls
+  // `renderPosition()`; Baker follows suit.
+  auto renderPos = src.renderPosition();
+  data->position = MakeProp(tgfx::Point{renderPos.x, renderPos.y});
   data->scale = MakeProp(tgfx::Point{src.scale.x, src.scale.y});
   data->rotation = MakeProp(src.rotation);
   data->alpha = MakeProp(src.alpha);

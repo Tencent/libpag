@@ -41,16 +41,22 @@ tgfx::Matrix3D ToTgfxMatrix3D(const pagx::Matrix3D& m) {
   return out;
 }
 
-// Compose pagx::Layer.x / y onto its 2D matrix to produce the PAGDocument
-// Property<Matrix>. PAGX stores translate as separate (x, y) fields with the
-// rest of the affine in `matrix`; PAG v2 stores everything in a single Matrix.
+// Compose pagx::Layer's laid-out position onto its 2D matrix to produce
+// the PAGDocument Property<Matrix>. PAGX stores the user-authored
+// translate as `x` / `y` (intrinsic) or via the LayoutNode attributes
+// (flex / left / top / width / height) which applyLayout() resolves into
+// `renderPosition()`. LayerBuilder composes the final transform as
+// `translate(renderPosition) * matrix` (see renderer/LayerBuilder.cpp
+// applyLayerAttributes) — Baker must do the same, otherwise layout-aware
+// samples (every spec/samples/*.pagx with flex parents) round-trip with
+// every Layer stacked at the origin even though the Rectangle/Ellipse/
+// Polystar elements inside them are already positioned correctly by the
+// Phase 11.6 renderPosition fix.
 pag::Matrix BuildLayerMatrix(const pagx::Layer& src) {
-  // Start from the PAGX matrix (typically identity for documents without
-  // explicit transforms) then add (x, y) into the translate component.
   pag::Matrix m = pagx::ToTGFX(src.matrix);
-  if (src.x != 0.0f || src.y != 0.0f) {
-    m.setTranslateX(m.getTranslateX() + src.x);
-    m.setTranslateY(m.getTranslateY() + src.y);
+  auto layerPos = src.renderPosition();
+  if (layerPos.x != 0.0f || layerPos.y != 0.0f) {
+    m = pag::Matrix::MakeTrans(layerPos.x, layerPos.y) * m;
   }
   return m;
 }

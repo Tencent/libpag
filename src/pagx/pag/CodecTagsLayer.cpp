@@ -58,7 +58,10 @@ constexpr uint8_t AllowsEdgeAntialiasing = 1u << 3;
 constexpr uint8_t AllowsGroupOpacity = 1u << 4;
 constexpr uint8_t HasFilters = 1u << 5;
 constexpr uint8_t HasStyles = 1u << 6;
-// bit 7 reserved (LayerMaskRef presence, Phase 9+).
+// Phase 11.6: presence bit for LayerMaskRef (TagCode=12). Until this landed
+// the Baker populated `maskLayerPath` but Codec never serialised it, so
+// masks silently disappeared from every round-trip.
+constexpr uint8_t HasMaskRef = 1u << 7;
 }  // namespace flags
 
 uint8_t PackLayerFlags(const Layer& layer) {
@@ -70,6 +73,7 @@ uint8_t PackLayerFlags(const Layer& layer) {
   if (layer.allowsGroupOpacity) f |= flags::AllowsGroupOpacity;
   if (!layer.filters.empty()) f |= flags::HasFilters;
   if (!layer.styles.empty()) f |= flags::HasStyles;
+  if (!layer.maskLayerPath.empty()) f |= flags::HasMaskRef;
   return f;
 }
 
@@ -79,11 +83,9 @@ void UnpackLayerFlags(uint8_t f, Layer* layer) {
   layer->passThroughBackground = (f & flags::PassThroughBackground) != 0;
   layer->allowsEdgeAntialiasing = (f & flags::AllowsEdgeAntialiasing) != 0;
   layer->allowsGroupOpacity = (f & flags::AllowsGroupOpacity) != 0;
-  // HasFilters / HasStyles are consumed by the Reader loop below; don't
-  // project them onto the Layer struct since the decoded filters / styles
-  // vectors are the truthy source of "has".
-  // bit 7 reserved — explicitly ignored so future writers can light it up
-  // without breaking this Reader (§D.8 forward-compat).
+  // HasFilters / HasStyles / HasMaskRef are consumed by the Reader loop
+  // below; don't project them onto the Layer struct since the decoded
+  // filters / styles / maskLayerPath vectors are the truthy source of "has".
 }
 
 // =============================================================================
@@ -165,6 +167,72 @@ bool ReadCompositionRefPayload(::pag::DecodeStream* stream, DecodeContext* ctx, 
   return true;
 }
 
+// =============================================================================
+// LayerMaskRef sub-Tag (TagCode = 12) — Phase 11.6
+// =============================================================================
+//
+// body = varU32 pathLength + repeat[varU32 childIndex] + uint8 maskType
+//
+// Baker populates `layer.maskLayerPath` (a chain of child indices from the
+// enclosing Composition down to the mask target) plus `layer.maskType`.
+// The Inflater's Pass 2 re-walks the decoded layer tree using the same
+// index chain to bind `tgfx::Layer::setMask(...)`. Between Baker and
+// Inflater sits Codec — before this function existed, every mask silently
+// vanished across the round-trip because the struct fields were never
+// serialised.
+//
+// Length guard: PathLength is bounded by the Baker/Inflater shared
+// constant `MAX_MASK_PATH_DEPTH` so a malicious stream can't force a
+// decoder-side vector allocation larger than the producer itself would
+// accept.
+
+void WriteLayerMaskRef(::pag::EncodeStream* stream, const Layer& layer, EncodeSession* session) {
+  ::pag::EncodeStream body(session->sc);
+  body.writeEncodedUint32(static_cast<uint32_t>(layer.maskLayerPath.size()));
+  for (uint32_t idx : layer.maskLayerPath) {
+    body.writeEncodedUint32(idx);
+  }
+  body.writeUint8(static_cast<uint8_t>(layer.maskType));
+  WriteTag(stream, TagCode::LayerMaskRef, &body);
+}
+
+bool ReadLayerMaskRef(::pag::DecodeStream* stream, DecodeContext* ctx, uint64_t tagEnd,
+                      Layer* out) {
+  auto guard = MakeGuard(ctx);
+  uint32_t pathLen = ReadEncodedUint32Safe(stream, &guard);
+  if (ctx->hasError()) {
+    return false;
+  }
+  // Hard cap matches the Inflater's PackedLayerPath depth budget (5 levels
+  // × 10 bits). Anything beyond that cannot round-trip the Inflater's
+  // uint64-packed path representation; rejecting here prevents a later
+  // surprise truncation.
+  constexpr uint32_t kMaxLayerMaskPathLength = 5;
+  if (pathLen > kMaxLayerMaskPathLength) {
+    ctx->error(ErrorCode::MalformedTag, "LayerMaskRef pathLength exceeds MAX_MASK_PATH_DEPTH");
+    return false;
+  }
+  out->maskLayerPath.clear();
+  out->maskLayerPath.reserve(pathLen);
+  for (uint32_t i = 0; i < pathLen; ++i) {
+    if (stream->position() >= tagEnd) {
+      ctx->error(ErrorCode::TruncatedData, "LayerMaskRef truncated inside path vector");
+      return false;
+    }
+    out->maskLayerPath.push_back(ReadEncodedUint32Safe(stream, &guard));
+    if (ctx->hasError()) {
+      return false;
+    }
+  }
+  if (stream->position() >= tagEnd) {
+    ctx->error(ErrorCode::TruncatedData, "LayerMaskRef truncated before maskType byte");
+    return false;
+  }
+  out->maskType = static_cast<LayerMaskType>(stream->readUint8());
+  (void)tagEnd;
+  return true;
+}
+
 }  // namespace
 
 // =============================================================================
@@ -184,6 +252,13 @@ void WriteLayerBlock(::pag::EncodeStream* stream, const Layer& layer, EncodeSess
   // LayerTransform — strictly required (§D.9 P0-R2). Always emitted so the
   // Reader can rely on its presence as an alignment anchor for §4.4 rule 1.
   WriteLayerTransform(&body, layer, session);
+
+  // LayerMaskRef — optional, gated by layerFlags bit 7 (HasMaskRef). Must
+  // appear before LayerFilters / LayerStyles so the Reader can decide
+  // sub-Tag order purely from the flags byte.
+  if (!layer.maskLayerPath.empty()) {
+    WriteLayerMaskRef(&body, layer, session);
+  }
 
   // LayerFilters / LayerStyles — only when non-empty (§D.8 "仅当
   // !filters.empty()" / "仅当 !styles.empty()"). Order is fixed by
@@ -254,6 +329,7 @@ std::unique_ptr<Layer> ReadLayerBlock(::pag::DecodeStream* stream, DecodeContext
 
   uint8_t layerFlags = stream->readUint8();
   UnpackLayerFlags(layerFlags, layer.get());
+  const bool hasMaskRef = (layerFlags & flags::HasMaskRef) != 0;
   const bool hasFilters = (layerFlags & flags::HasFilters) != 0;
   const bool hasStyles = (layerFlags & flags::HasStyles) != 0;
 
@@ -262,15 +338,11 @@ std::unique_ptr<Layer> ReadLayerBlock(::pag::DecodeStream* stream, DecodeContext
   // "childCount varU32". Order is:
   //
   //   1. LayerTransform   (TagCode = 15) — required (§D.9 P0-R2)
-  //   2. LayerFilters     (TagCode = 13) — present iff flags::HasFilters
-  //   3. LayerStyles      (TagCode = 14) — present iff flags::HasStyles
-  //   4. payload Tag      (TagCode 20-26) — present iff type != Layer
-  //   5. childCount varU32 + children
-  //
-  // LayerMaskRef (TagCode = 12) stays reserved between LayerTransform and
-  // LayerFilters — Phase 9 Inflater will populate maskLayerPath through its
-  // own sub-Tag once cross-layer mask chains are produced (will also claim
-  // flags::HasMaskRef bit 7).
+  //   2. LayerMaskRef     (TagCode = 12) — present iff flags::HasMaskRef (Phase 11.6)
+  //   3. LayerFilters     (TagCode = 13) — present iff flags::HasFilters
+  //   4. LayerStyles      (TagCode = 14) — present iff flags::HasStyles
+  //   5. payload Tag      (TagCode 20-26) — present iff type != Layer
+  //   6. childCount varU32 + children
 
   // ---- 1. LayerTransform (required) ----
   if (stream->position() >= tagEnd) {
@@ -322,7 +394,21 @@ std::unique_ptr<Layer> ReadLayerBlock(::pag::DecodeStream* stream, DecodeContext
     return true;
   };
 
-  // ---- 2. Optional LayerFilters ----
+  // ---- 2. Optional LayerMaskRef ---- (Phase 11.6)
+  if (hasMaskRef) {
+    uint64_t maskEnd = 0;
+    if (!readExpectedSubTag(TagCode::LayerMaskRef, &maskEnd)) {
+      --ctx->currentLayerDepth;
+      return nullptr;
+    }
+    if (!ReadLayerMaskRef(stream, ctx, maskEnd, layer.get())) {
+      --ctx->currentLayerDepth;
+      return nullptr;
+    }
+    SeekTo(stream, static_cast<uint32_t>(maskEnd));
+  }
+
+  // ---- 3. Optional LayerFilters ----
   if (hasFilters) {
     uint64_t filtersEnd = 0;
     if (!readExpectedSubTag(TagCode::LayerFilters, &filtersEnd)) {
@@ -337,7 +423,7 @@ std::unique_ptr<Layer> ReadLayerBlock(::pag::DecodeStream* stream, DecodeContext
     SeekTo(stream, static_cast<uint32_t>(filtersEnd));
   }
 
-  // ---- 3. Optional LayerStyles ----
+  // ---- 4. Optional LayerStyles ----
   if (hasStyles) {
     uint64_t stylesEnd = 0;
     if (!readExpectedSubTag(TagCode::LayerStyles, &stylesEnd)) {
@@ -352,7 +438,7 @@ std::unique_ptr<Layer> ReadLayerBlock(::pag::DecodeStream* stream, DecodeContext
     SeekTo(stream, static_cast<uint32_t>(stylesEnd));
   }
 
-  // ---- 4. Payload Tag (present iff type != Layer) ----
+  // ---- 5. Payload Tag (present iff type != Layer) ----
   if (layer->type != LayerType::Layer) {
     if (stream->position() >= tagEnd) {
       ctx->error(ErrorCode::MalformedTag, "LayerBlock missing payload Tag for non-Layer type");
@@ -408,7 +494,7 @@ std::unique_ptr<Layer> ReadLayerBlock(::pag::DecodeStream* stream, DecodeContext
     SeekTo(stream, static_cast<uint32_t>(payloadEnd));
   }
 
-  // ---- 3. childCount + children ----
+  // ---- 6. childCount + children ----
   if (stream->position() >= tagEnd) {
     // No room left → zero children.
     --ctx->currentLayerDepth;
