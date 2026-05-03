@@ -111,7 +111,26 @@ function parseArgs(argv) {
   const browser = await puppeteer.launch({
     headless: true,
     protocolTimeout: PROTOCOL_TIMEOUT_MS,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--hide-scrollbars'],
+    // The flag set deliberately targets headless CI containers as well as local macOS:
+    //   --no-sandbox / --disable-setuid-sandbox — required when running as root in Docker,
+    //     and a no-op on a normal desktop user account.
+    //   --hide-scrollbars — avoids scrollbar gutters stealing viewport pixels.
+    //   --disable-dev-shm-usage — Docker defaults /dev/shm to 64 MB, which is not enough
+    //     for Chromium's shared memory; switching to /tmp prevents the "Target closed"
+    //     bursts that otherwise hit after a handful of pages. Harmless on macOS.
+    //   --disable-gpu — no GPU in headless CI; skipping the probe trims launch latency
+    //     and sidesteps driver-specific hangs.
+    //   --font-render-hinting=none — disables hinting-based glyph adjustments that vary
+    //     between CI machines. Pairs with the test harness's explicit @font-face rules
+    //     to make screenshots reproducible across laptops, CI runners, and reviewers.
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--hide-scrollbars',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--font-render-hinting=none',
+    ],
   });
 
   let failures = 0;
@@ -122,6 +141,15 @@ function parseArgs(argv) {
       const ok = await captureWithRetry(browser, task, label);
       if (!ok) {
         failures++;
+      }
+      // Give Chromium a brief window to tear down the just-closed target before the next
+      // newPage() starts. Without this cooldown the DevTools protocol occasionally races
+      // mid-batch (macOS tends to be the first to show "Target closed" bursts), which the
+      // retry loop then papers over at the cost of tens of seconds per flaky sample. 50 ms
+      // is imperceptible across 78 samples (~4 s total overhead) but measurably reduces
+      // mid-batch target churn. Skipped after the last task since the browser closes next.
+      if (i + 1 < parsed.tasks.length) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
       }
     }
   } finally {
