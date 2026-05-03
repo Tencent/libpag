@@ -144,13 +144,19 @@ void WriteCompositionRefPayload(::pag::EncodeStream* stream, uint32_t compositio
 }
 
 bool ReadCompositionRefPayload(::pag::DecodeStream* stream, DecodeContext* ctx, uint64_t tagEnd,
-                               size_t existingCompositionCount, uint32_t* outIndex) {
+                               size_t totalCompositionCount, uint32_t* outIndex) {
   uint32_t idx = stream->readUint32();
   // §D.10 P0: refuse UINT32_MAX sentinel and any out-of-range index, so the
-  // Inflater can never deref a stale slot. Phase 4b only resolves refs to
-  // already-decoded compositions (forward references would need a two-pass
-  // pass in Phase 9).
-  if (idx == UINT32_MAX || idx >= existingCompositionCount) {
+  // Inflater can never deref a stale slot. Phase 11.5 enlarged the in-range
+  // ceiling from "already-decoded compositions" to the declared total:
+  // Encode writes composition indices that may be larger than the position
+  // we're currently decoding (Baker depth-first interns the child
+  // composition before the parent finishes, so a root composition can
+  // legitimately hold a ref to compositions[N] while only compositions[0..k]
+  // (k<N) are on disk ahead of it). Using the total is safe because the
+  // CompositionList header writes the count up front, so Decode sees the
+  // ceiling immediately.
+  if (idx == UINT32_MAX || idx >= totalCompositionCount) {
     ctx->error(ErrorCode::InvalidCompositionIndex, "CompositionRef.compositionIndex out of range");
     return false;
   }
@@ -208,7 +214,7 @@ void WriteLayerBlock(::pag::EncodeStream* stream, const Layer& layer, EncodeSess
 }
 
 std::unique_ptr<Layer> ReadLayerBlock(::pag::DecodeStream* stream, DecodeContext* ctx,
-                                      uint64_t tagEnd, size_t existingCompositionCount) {
+                                      uint64_t tagEnd, size_t totalCompositionCount) {
   // §H.2 LayerDepthLimitExceeded check — DecodeContext mirrors the Baker's
   // depth gate so a malicious stream can't recurse past MAX_LAYER_DEPTH.
   if (ctx->currentLayerDepth >= limits::MAX_LAYER_DEPTH) {
@@ -367,7 +373,7 @@ std::unique_ptr<Layer> ReadLayerBlock(::pag::DecodeStream* stream, DecodeContext
     switch (payloadHeader.code) {
       case TagCode::CompositionRefPayload: {
         uint32_t idx = UINT32_MAX;
-        if (!ReadCompositionRefPayload(stream, ctx, payloadEnd, existingCompositionCount, &idx)) {
+        if (!ReadCompositionRefPayload(stream, ctx, payloadEnd, totalCompositionCount, &idx)) {
           --ctx->currentLayerDepth;
           return nullptr;
         }
@@ -439,7 +445,7 @@ std::unique_ptr<Layer> ReadLayerBlock(::pag::DecodeStream* stream, DecodeContext
       --ctx->currentLayerDepth;
       return nullptr;
     }
-    auto child = ReadLayerBlock(stream, ctx, childEnd, existingCompositionCount);
+    auto child = ReadLayerBlock(stream, ctx, childEnd, totalCompositionCount);
     if (ctx->hasError()) {
       --ctx->currentLayerDepth;
       return nullptr;

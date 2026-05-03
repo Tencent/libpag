@@ -62,11 +62,14 @@ void WriteComposition(::pag::EncodeStream* stream, const Composition& comp, Enco
 
 // Reads a single Composition body. Returns nullptr on fatal; warns on
 // width/height==0 (regenerates the field as 1 per design §D.7 P2-11).
-// `existingCompositionCount` is forwarded to LayerBlock readers so any
-// nested CompositionRefPayload can range-check its index against the parent
-// CompositionList state (Phase 4b only — see §D.10 P0 guidance).
+// `totalCompositionCount` is the total number of compositions declared at
+// the head of the containing CompositionList — **including ones not yet
+// decoded**. It is forwarded to LayerBlock readers so any nested
+// CompositionRefPayload can range-check against the full declared count,
+// which lets forward references (root→later-sibling) resolve cleanly per
+// §D.6 Phase 11.5.
 std::unique_ptr<Composition> ReadComposition(::pag::DecodeStream* stream, DecodeContext* ctx,
-                                             uint64_t tagEnd, size_t existingCompositionCount);
+                                             uint64_t tagEnd, size_t totalCompositionCount);
 
 // ---- ImageAssetTable (TagCode = 2) + ImageAsset sub-Tag (TagCode = 6) ----
 // body: varU32 assetCount, repeat[ImageAsset Tag]
@@ -100,6 +103,6 @@ void ReadFontAssetTable(::pag::DecodeStream* stream, DecodeContext* ctx, uint64_
 void WriteLayerBlock(::pag::EncodeStream* stream, const Layer& layer, EncodeSession* session);
 
 std::unique_ptr<Layer> ReadLayerBlock(::pag::DecodeStream* stream, DecodeContext* ctx,
-                                      uint64_t tagEnd, size_t existingCompositionCount);
+                                      uint64_t tagEnd, size_t totalCompositionCount);
 
 }  // namespace pagx::pag

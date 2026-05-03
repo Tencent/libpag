@@ -106,7 +106,7 @@ void WriteComposition(::pag::EncodeStream* stream, const Composition& comp,
 }
 
 std::unique_ptr<Composition> ReadComposition(::pag::DecodeStream* stream, DecodeContext* ctx,
-                                             uint64_t tagEnd, size_t existingCompositionCount) {
+                                             uint64_t tagEnd, size_t totalCompositionCount) {
   auto comp = std::make_unique<Composition>();
   auto guard = MakeGuard(ctx);
 
@@ -157,7 +157,7 @@ std::unique_ptr<Composition> ReadComposition(::pag::DecodeStream* stream, Decode
       ctx->error(ErrorCode::MalformedTag, "LayerBlock tag extends past Composition body");
       return nullptr;
     }
-    auto layer = ReadLayerBlock(stream, ctx, childEnd, existingCompositionCount);
+    auto layer = ReadLayerBlock(stream, ctx, childEnd, totalCompositionCount);
     if (ctx->hasError()) {
       return nullptr;
     }
@@ -215,7 +215,15 @@ void ReadCompositionList(::pag::DecodeStream* stream, DecodeContext* ctx, uint64
       ctx->error(ErrorCode::MalformedTag, "Composition tag extends past CompositionList body");
       return;
     }
-    auto comp = ReadComposition(stream, ctx, childEnd, out->size());
+    // §D.6 forward-reference support: CompositionRef payloads may target any
+    // composition in the already-known total count (Encode writes it up
+    // front in the CompositionList header), including compositions that
+    // haven't been decoded yet. Pass the total rather than the running
+    // `out->size()` so forward refs (e.g. root composition referring to a
+    // sibling that serialises later) resolve cleanly. Phase 11.5 fix — prior
+    // to this, every multi-composition document fatal-ed at decode time
+    // with `InvalidCompositionIndex=306`.
+    auto comp = ReadComposition(stream, ctx, childEnd, count);
     if (ctx->hasError()) {
       return;
     }

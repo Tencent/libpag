@@ -5,6 +5,7 @@
 // roundtrip lands in Phase 4b alongside LayerBlock decode.
 #include <cstring>
 #include "gtest/gtest.h"
+#include "pagx/Diagnostic.h"
 #include "pagx/pag/Codec.h"
 #include "pagx/pag/PAGDocument.h"
 #include "tgfx/core/Data.h"
@@ -269,6 +270,82 @@ TEST(RoundTrip, CompositionRefPayload) {
   ASSERT_EQ(dec.doc->compositions[1]->layers.size(), 1u);
   EXPECT_EQ(dec.doc->compositions[1]->layers[0]->type, LayerType::CompositionRef);
   EXPECT_EQ(dec.doc->compositions[1]->layers[0]->compositionIndex, 0u);
+}
+
+// Phase 11.5 regression: the Baker depth-first walks PAGX compositions and
+// interns children before the parent finishes, so the root composition
+// (compositions[0]) routinely holds a CompositionRef with compositionIndex
+// pointing at a *later* composition slot (1, 2, ...). Pre-fix this hit
+// `InvalidCompositionIndex=306` in Decode because the range check compared
+// against the count of already-decoded compositions (0 when processing the
+// root) instead of the total declared count. This test specifically
+// constructs a forward-reference so the regression stays caught.
+TEST(RoundTrip, CompositionRefForwardReferenceSupported) {
+  PAGDocument doc = MakeMinimalDoc();
+
+  // compositions[0] = root, carrying a CompositionRef(compositionIndex=1).
+  auto rootComp = std::make_unique<Composition>();
+  rootComp->id = "root";
+  rootComp->width = 100;
+  rootComp->height = 100;
+
+  auto refLayer = std::make_unique<Layer>();
+  refLayer->type = LayerType::CompositionRef;
+  refLayer->name = "ref_to_leaf_forward";
+  refLayer->compositionIndex = 1;  // forward-reference: leaf hasn't been
+                                   // pushed into the vector yet.
+  rootComp->layers.push_back(std::move(refLayer));
+  doc.compositions.push_back(std::move(rootComp));
+
+  // compositions[1] = leaf (serialised after root).
+  auto leafComp = std::make_unique<Composition>();
+  leafComp->id = "leaf";
+  leafComp->width = 50;
+  leafComp->height = 50;
+  doc.compositions.push_back(std::move(leafComp));
+
+  auto enc = Codec::Encode(doc);
+  ASSERT_NE(enc.bytes, nullptr);
+  EXPECT_TRUE(enc.warnings.empty());
+
+  auto dec = Codec::Decode(enc.bytes->data(), enc.bytes->length());
+  ASSERT_NE(dec.doc, nullptr) << "forward CompositionRef should not fatal";
+  EXPECT_TRUE(dec.errors.empty());
+  ASSERT_EQ(dec.doc->compositions.size(), 2u);
+  ASSERT_EQ(dec.doc->compositions[0]->layers.size(), 1u);
+  EXPECT_EQ(dec.doc->compositions[0]->layers[0]->type, LayerType::CompositionRef);
+  EXPECT_EQ(dec.doc->compositions[0]->layers[0]->compositionIndex, 1u);
+}
+
+// Phase 11.5 negative: forward refs within the declared total must pass,
+// but refs *beyond* the total (idx == declared count) still fatal with
+// `InvalidCompositionIndex=306` since the Inflater would deref a slot that
+// will never exist on the wire.
+TEST(RoundTrip, CompositionRefBeyondDeclaredCountStillFatal) {
+  PAGDocument doc = MakeMinimalDoc();
+  auto rootComp = std::make_unique<Composition>();
+  rootComp->width = 100;
+  rootComp->height = 100;
+  auto refLayer = std::make_unique<Layer>();
+  refLayer->type = LayerType::CompositionRef;
+  refLayer->compositionIndex = 5;  // only 1 composition declared; 5 is OOB.
+  rootComp->layers.push_back(std::move(refLayer));
+  doc.compositions.push_back(std::move(rootComp));
+
+  auto enc = Codec::Encode(doc);
+  ASSERT_NE(enc.bytes, nullptr);
+
+  auto dec = Codec::Decode(enc.bytes->data(), enc.bytes->length());
+  EXPECT_EQ(dec.doc, nullptr);
+  ASSERT_FALSE(dec.errors.empty());
+  bool sawInvalidCompositionIndex = false;
+  for (const auto& e : dec.errors) {
+    if (e.code == pagx::DiagnosticCode::InvalidCompositionIndex) {
+      sawInvalidCompositionIndex = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(sawInvalidCompositionIndex);
 }
 
 TEST(RoundTrip, LayerTransformDefaultsCollapsed) {
