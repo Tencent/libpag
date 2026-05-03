@@ -65,6 +65,11 @@ constexpr size_t MIN_RECOVERY_FRAMES_ZOOM_END = 10;
 // constant to tune log verbosity. submit() is asynchronous in the WebGL backend, so its reported
 // time only reflects CPU-side command submission, not actual GPU execution.
 constexpr double SLOW_FRAME_LOG_THRESHOLD_MS = 200.0;
+// Master switch for all draw()-path telemetry logs (slow-frame breakdown, first-frame breakdown).
+// Hardcoded off in shipped builds to keep the WeChat log channel quiet; flip to true and rebuild
+// when investigating a frame-pacing regression. `if constexpr` lets the compiler fully strip the
+// log branches when disabled, so there is zero runtime cost in the default configuration.
+constexpr bool DRAW_LOG_ENABLED = false;
 
 std::shared_ptr<PAGXView> PAGXView::MakeFrom(int width, int height) {
   if (width <= 0 || height <= 0) {
@@ -869,30 +874,34 @@ bool PAGXView::draw() {
   bool isSlowFrame = frameDurationMs > SLOW_FRAME_LOG_THRESHOLD_MS;
   bool shouldLogFrame = isSlowFrame;
 
-  if (shouldLogFrame) {
-    const auto& offset = displayList.contentOffset();
-    float fitScale = computeFitScale();
-    float effectiveScale = fitScale * displayList.zoomScale();
-    // Expected drawn content size in canvas pixels (before viewport clipping). Anything much
-    // larger than the canvas itself means most fragment work is wasted off-screen.
-    float drawWidthPx = pagxWidth * effectiveScale;
-    float drawHeightPx = pagxHeight * effectiveScale;
-    tgfx::PrintLog(
-        "[PAGXView] slow frame: total=%.2fms surface=%.2fms bg=%.2fms render=%.2fms "
-        "flush=%.2fms submit=%.2fms unlock=%.2fms dirty=%d zoom=%.4f quantized=%.4f "
-        "offset=(%.1f,%.1f) fitScale=%.4f effScale=%.4f canvas=(%dx%d) pagx=(%.0fx%.0f) "
-        "drawPx=(%.0fx%.0f)",
-        frameDurationMs, surfaceMs, bgMs, renderMs, flushMs, submitMs, unlockMs, dirty ? 1 : 0,
-        lastZoom, displayList.zoomScale(), offset.x, offset.y, fitScale, effectiveScale, _width,
-        _height, pagxWidth, pagxHeight, drawWidthPx, drawHeightPx);
+  if constexpr (DRAW_LOG_ENABLED) {
+    if (shouldLogFrame) {
+      const auto& offset = displayList.contentOffset();
+      float fitScale = computeFitScale();
+      float effectiveScale = fitScale * displayList.zoomScale();
+      // Expected drawn content size in canvas pixels (before viewport clipping). Anything much
+      // larger than the canvas itself means most fragment work is wasted off-screen.
+      float drawWidthPx = pagxWidth * effectiveScale;
+      float drawHeightPx = pagxHeight * effectiveScale;
+      tgfx::PrintLog(
+          "[PAGXView] slow frame: total=%.2fms surface=%.2fms bg=%.2fms render=%.2fms "
+          "flush=%.2fms submit=%.2fms unlock=%.2fms dirty=%d zoom=%.4f quantized=%.4f "
+          "offset=(%.1f,%.1f) fitScale=%.4f effScale=%.4f canvas=(%dx%d) pagx=(%.0fx%.0f) "
+          "drawPx=(%.0fx%.0f)",
+          frameDurationMs, surfaceMs, bgMs, renderMs, flushMs, submitMs, unlockMs, dirty ? 1 : 0,
+          lastZoom, displayList.zoomScale(), offset.x, offset.y, fitScale, effectiveScale, _width,
+          _height, pagxWidth, pagxHeight, drawWidthPx, drawHeightPx);
+    }
   }
 
   // First-frame breakdown for telemetry.
-  if (wasFirstFrame && hasRenderedFirstFrame) {
-    tgfx::PrintLog(
-        "[PAGXView] first frame: total=%.2fms surface=%.2fms bg=%.2fms render=%.2fms "
-        "flush=%.2fms submit=%.2fms unlock=%.2fms",
-        frameDurationMs, surfaceMs, bgMs, renderMs, flushMs, submitMs, unlockMs);
+  if constexpr (DRAW_LOG_ENABLED) {
+    if (wasFirstFrame && hasRenderedFirstFrame) {
+      tgfx::PrintLog(
+          "[PAGXView] first frame: total=%.2fms surface=%.2fms bg=%.2fms render=%.2fms "
+          "flush=%.2fms submit=%.2fms unlock=%.2fms",
+          frameDurationMs, surfaceMs, bgMs, renderMs, flushMs, submitMs, unlockMs);
+    }
   }
 
   updatePerformanceState(frameDurationMs);
