@@ -63,6 +63,7 @@ local.properties
 /result
 /vendor_tools
 cmake-build-*
+coverage/
 node_modules
 Build/
 test/out/

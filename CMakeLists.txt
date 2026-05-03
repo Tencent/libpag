@@ -34,6 +34,7 @@ option(PAG_USE_C "Enable c API" OFF)
 option(PAG_BUILD_PAGX "Enable PAGX format support" OFF)
 option(PAG_BUILD_CLI "Enable building the command-line tool" OFF)
 option(PAG_BUILD_SVG "Enable SVG import/export support" OFF)
+option(PAG_COVERAGE "Build with clang source-based coverage instrumentation" OFF)
 
 # EMSCRIPTEN_PTHREADS can be set by vendor tools for building the wasm-mt architecture.
 if (NOT WEB OR EMSCRIPTEN_PTHREADS)
@@ -137,6 +138,7 @@ message("PAG_USE_C: ${PAG_USE_C}")
 message("PAG_BUILD_SHARED: ${PAG_BUILD_SHARED}")
 message("PAG_BUILD_FRAMEWORK: ${PAG_BUILD_FRAMEWORK}")
 message("PAG_BUILD_TESTS: ${PAG_BUILD_TESTS}")
+message("PAG_COVERAGE: ${PAG_COVERAGE}")
 
 if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     if (DEPLOYMENT_TARGET)
@@ -226,6 +228,16 @@ endif ()
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     list(APPEND PAG_DEFINES DEBUG)
     #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -g -O1")
+endif ()
+
+# Phase 15: clang source-based coverage. Injected globally so every static
+# lib + test binary + fuzz harness emits .profraw under LLVM_PROFILE_FILE.
+# Incompatible with ASAN/UBSAN: when PAG_COVERAGE=ON the fuzz harness block
+# below drops -fsanitize=address,undefined to avoid shadow-memory vs profile
+# counter conflicts under stock Apple clang. Invoked via tools/coverage.sh.
+if (PAG_COVERAGE)
+    list(APPEND PAG_COMPILE_OPTIONS -fprofile-instr-generate -fcoverage-mapping)
+    list(APPEND PAG_LINK_OPTIONS -fprofile-instr-generate -fcoverage-mapping)
 endif ()
 
 if (PAG_BUILD_SHARED)
@@ -902,10 +914,19 @@ if (PAG_BUILD_TESTS)
         unset(CMAKE_REQUIRED_LINK_OPTIONS)
 
         if (PAG_HAS_LIBFUZZER)
-            set(PAG_FUZZ_COMPILE_FLAGS -fsanitize=fuzzer,address,undefined
-                                       -fno-omit-frame-pointer)
-            set(PAG_FUZZ_LINK_FLAGS -fsanitize=fuzzer,address,undefined)
-            message(STATUS "libFuzzer runtime detected — building real libFuzzer harnesses")
+            if (PAG_COVERAGE)
+                # Phase 15: coverage counters conflict with ASAN/UBSAN shadow
+                # memory under stock Apple clang — keep fuzzer runtime so the
+                # harness still runs, but drop address+undefined sanitizers.
+                set(PAG_FUZZ_COMPILE_FLAGS -fsanitize=fuzzer -fno-omit-frame-pointer)
+                set(PAG_FUZZ_LINK_FLAGS -fsanitize=fuzzer)
+                message(STATUS "libFuzzer runtime detected — coverage mode, ASAN/UBSAN disabled")
+            else ()
+                set(PAG_FUZZ_COMPILE_FLAGS -fsanitize=fuzzer,address,undefined
+                                           -fno-omit-frame-pointer)
+                set(PAG_FUZZ_LINK_FLAGS -fsanitize=fuzzer,address,undefined)
+                message(STATUS "libFuzzer runtime detected — building real libFuzzer harnesses")
+            endif ()
         else ()
             # Fallback: compile harness files as regular binaries with a
             # standalone main() that feeds test/fuzz_corpus seeds through
