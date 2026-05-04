@@ -1859,7 +1859,8 @@ void HTMLWriter::writeGroup(HTMLBuilder& out, const Group* group, float alpha, b
   out.addAttr("class", "pagx-group");
   out.addAttr("style", style);
   out.closeTagStart();
-  writeElements(out, group->elements, 1.0f, false, LayerPlacement::Background);
+  const Padding* groupPadding = group->padding.isZero() ? nullptr : &group->padding;
+  writeElements(out, group->elements, 1.0f, false, LayerPlacement::Background, groupPadding);
   bool hasForegroundPainter = false;
   for (auto* e : group->elements) {
     if (e->nodeType() == NodeType::Fill) {
@@ -1875,7 +1876,7 @@ void HTMLWriter::writeGroup(HTMLBuilder& out, const Group* group, float alpha, b
     }
   }
   if (hasForegroundPainter) {
-    writeElements(out, group->elements, 1.0f, false, LayerPlacement::Foreground);
+    writeElements(out, group->elements, 1.0f, false, LayerPlacement::Foreground, groupPadding);
   }
   out.closeTag();
 }
@@ -1897,29 +1898,11 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
   int n = static_cast<int>(std::ceil(rep->copies));
   float frac = rep->copies - std::floor(rep->copies);
   for (int i = 0; i < n; i++) {
+    // BuildRepeaterCopyMatrix encapsulates the idx → prog → transform pipeline; we still need
+    // idx locally to drive the alpha decay ramp below, which honours tgfx's startAlpha/endAlpha
+    // bookkeeping and the fractional last-copy coverage rule.
     int idx = (rep->order == RepeaterOrder::AboveOriginal) ? i : (n - 1 - i);
-    float prog = static_cast<float>(idx) + rep->offset;
-    Matrix m = {};
-    if (!FloatNearlyZero(rep->anchor.x) || !FloatNearlyZero(rep->anchor.y)) {
-      m = Matrix::Translate(-rep->anchor.x, -rep->anchor.y);
-    }
-    float sx = std::pow(rep->scale.x, prog);
-    float sy = std::pow(rep->scale.y, prog);
-    if (!FloatNearlyZero(sx - 1.0f) || !FloatNearlyZero(sy - 1.0f)) {
-      m = Matrix::Scale(sx, sy) * m;
-    }
-    float rot = rep->rotation * prog;
-    if (!FloatNearlyZero(rot)) {
-      m = Matrix::Rotate(rot) * m;
-    }
-    float px = rep->position.x * prog;
-    float py = rep->position.y * prog;
-    if (!FloatNearlyZero(px) || !FloatNearlyZero(py)) {
-      m = Matrix::Translate(px, py) * m;
-    }
-    if (!FloatNearlyZero(rep->anchor.x) || !FloatNearlyZero(rep->anchor.y)) {
-      m = Matrix::Translate(rep->anchor.x, rep->anchor.y) * m;
-    }
+    Matrix m = BuildRepeaterCopyMatrix(rep, i);
     // Prepend the parent layer div's shift so the copy still paints at the layer origin
     // inside the expanded div (see HTMLWriterContext::repeaterOriginOffsetX/Y).
     if (!FloatNearlyZero(originOffsetX) || !FloatNearlyZero(originOffsetY)) {

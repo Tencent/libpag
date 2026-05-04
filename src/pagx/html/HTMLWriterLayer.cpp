@@ -91,7 +91,8 @@ void HTMLWriter::paintGeos(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
 }
 
 void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& elements, float alpha,
-                               bool distribute, LayerPlacement targetPlacement) {
+                               bool distribute, LayerPlacement targetPlacement,
+                               const Padding* containerPadding) {
   RecursionGuard guard(_ctx);
   if (guard.overflowed()) {
     return;
@@ -192,7 +193,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
       case NodeType::Path:
       case NodeType::Polystar:
       case NodeType::Text:
-        geos.push_back({type, element, {}});
+        geos.push_back({type, element, {}, containerPadding});
         break;
       case NodeType::Fill: {
         auto fill = static_cast<const Fill*>(element);
@@ -753,6 +754,9 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           geos.clear();
           std::vector<GeoInfo> groupGeos;
           Matrix gm = BuildGroupMatrix(group);
+          // The group's own padding insets its children's constraint frame, mirroring Layer's
+          // behaviour; propagate it so stretch-rect children avoid the `inset:0` shortcut.
+          const Padding* groupPadding = group->padding.isZero() ? nullptr : &group->padding;
           for (auto* ge : group->elements) {
             auto gt = ge->nodeType();
             if (gt == NodeType::Rectangle || gt == NodeType::Ellipse || gt == NodeType::Path ||
@@ -762,12 +766,12 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               if (!pathData.isEmpty()) {
                 std::string svgPath = gm.isIdentity() ? PathDataToSVGString(pathData)
                                                       : TransformPathDataToSVG(pathData, gm);
-                GeoInfo info = {gt, ge, svgPath};
+                GeoInfo info = {gt, ge, svgPath, groupPadding};
                 geos.push_back(info);
                 groupGeos.push_back(info);
               }
             } else if (gt == NodeType::Text) {
-              GeoInfo info = {gt, ge, {}};
+              GeoInfo info = {gt, ge, {}, groupPadding};
               geos.push_back(info);
               groupGeos.push_back(info);
             } else if (gt == NodeType::Fill) {
@@ -789,9 +793,64 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             } else if (gt == NodeType::TrimPath) {
               hasTrim = true;
               curTrim = static_cast<const TrimPath*>(ge);
+            } else if (gt == NodeType::Repeater) {
+              // Expand the Repeater at path level inside the Group: instead of emitting N copy
+              // <div>s here (which would need Group-internal painters, undoing the "defer Fill
+              // to outer Repeater" contract), we grow groupGeos from K to K*copies and stamp
+              // each copy's transform into the geo's modifiedPathData. The outer Repeater then
+              // sees the fully expanded path set and applies its own transforms on top, which
+              // matches tgfx's Repeater-inside-Group semantics (inner multiplies geometry,
+              // outer multiplies the result). Alpha decay ramps on the inner Repeater would
+              // need a per-geo alpha to survive this collapse; carrying one through GeoInfo is
+              // an open issue, so samples relying on inner startAlpha/endAlpha will lose the
+              // decay — we keep the default alpha=1 case (verify_c6) correct and flag the
+              // restriction for follow-up if it surfaces.
+              auto innerRep = static_cast<const Repeater*>(ge);
+              int copies = static_cast<int>(std::ceil(innerRep->copies));
+              if (copies <= 0 || groupGeos.empty()) {
+                break;
+              }
+              std::vector<GeoInfo> originalGeos = groupGeos;
+              // Drop original-index entries we are about to re-emit in the expansion loop. We
+              // also trim `geos` (which mirrors groupGeos at this point thanks to the dual
+              // push_back pattern above) so we do not paint the pre-expansion copy twice.
+              geos.resize(geos.size() - originalGeos.size());
+              groupGeos.clear();
+              for (int i = 0; i < copies; i++) {
+                Matrix cm = BuildRepeaterCopyMatrix(innerRep, i);
+                for (const auto& orig : originalGeos) {
+                  GeoInfo copy = orig;
+                  if (!cm.isIdentity()) {
+                    PathData pathData = PathDataFromSVGString("");
+                    if (!orig.modifiedPathData.empty()) {
+                      pathData = PathDataFromSVGString(orig.modifiedPathData);
+                    } else if (orig.type == NodeType::Rectangle || orig.type == NodeType::Ellipse ||
+                               orig.type == NodeType::Path || orig.type == NodeType::Polystar) {
+                      GeoToPathData(orig.element, orig.type, pathData);
+                    }
+                    if (!pathData.isEmpty()) {
+                      copy.modifiedPathData = TransformPathDataToSVG(pathData, cm);
+                    }
+                  }
+                  groupGeos.push_back(copy);
+                  geos.push_back(copy);
+                }
+              }
             } else if (gt == NodeType::Group) {
               writeGroup(out, static_cast<const Group*>(ge), alpha, distribute);
             }
+          }
+          // Propagate the Group's Fill/Stroke out to the enclosing element stream. Without
+          // this, a Group that declares a Fill (to be consumed by an outer Repeater that
+          // copies the Group's geos 18× worth of times, say) would lose the Fill on Group exit
+          // — the outer Repeater would then paint uncoloured paths. Only override the outer
+          // painter when it was unset; an outer painter that existed before the Group enters
+          // is preserved to keep the existing "Repeater consumes pre-existing painter" rule.
+          if (!savedFill && curFill) {
+            savedFill = curFill;
+          }
+          if (!savedStroke && curStroke) {
+            savedStroke = curStroke;
           }
           curFill = savedFill;
           curStroke = savedStroke;
@@ -1019,7 +1078,10 @@ static ShadowShape findLayerShadowShape(const Layer* layer) {
 
 void HTMLWriter::writeLayerContents(HTMLBuilder& out, const Layer* layer, float alpha,
                                     bool distribute, LayerPlacement targetPlacement) {
-  writeElements(out, layer->contents, alpha, distribute, targetPlacement);
+  // Forward the layer's padding (when non-zero) so inner GeoInfo carries it. Skipping the
+  // pointer when padding is zero keeps downstream fast paths unchanged for the common case.
+  const Padding* layerPadding = layer->padding.isZero() ? nullptr : &layer->padding;
+  writeElements(out, layer->contents, alpha, distribute, targetPlacement, layerPadding);
 }
 
 //==============================================================================

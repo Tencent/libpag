@@ -443,25 +443,31 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type) {
   std::string fillAttr = "white";
   float fillOpacity = 1.0f;
 
-  // Compute bounding box of mask geometry for SVG viewBox.
+  // Compute bounding box of mask geometry for SVG viewBox. Each element
+  // reports its final geometry through renderPosition/renderSize so authored
+  // shorthand like <Rectangle width="W" height="H"/> (which leaves the
+  // intrinsic size at {0,0}) is handled correctly.
   float maxX = 0;
   float maxY = 0;
   for (auto* e : mask->contents) {
     if (e->nodeType() == NodeType::Rectangle) {
       auto rect = static_cast<const Rectangle*>(e);
-      float r = rect->position.x + rect->size.width / 2;
-      float b = rect->position.y + rect->size.height / 2;
-      maxX = std::max(maxX, r);
-      maxY = std::max(maxY, b);
+      auto pos = rect->renderPosition();
+      auto sz = rect->renderSize();
+      maxX = std::max(maxX, pos.x + sz.width / 2);
+      maxY = std::max(maxY, pos.y + sz.height / 2);
     } else if (e->nodeType() == NodeType::Ellipse) {
       auto el = static_cast<const Ellipse*>(e);
-      maxX = std::max(maxX, el->position.x + el->size.width / 2);
-      maxY = std::max(maxY, el->position.y + el->size.height / 2);
+      auto pos = el->renderPosition();
+      auto sz = el->renderSize();
+      maxX = std::max(maxX, pos.x + sz.width / 2);
+      maxY = std::max(maxY, pos.y + sz.height / 2);
     } else if (e->nodeType() == NodeType::Polystar) {
       auto ps = static_cast<const Polystar*>(e);
       float r = std::max(ps->outerRadius, ps->innerRadius);
-      maxX = std::max(maxX, ps->position.x + r);
-      maxY = std::max(maxY, ps->position.y + r);
+      auto pos = ps->renderPosition();
+      maxX = std::max(maxX, pos.x + r);
+      maxY = std::max(maxY, pos.y + r);
     }
   }
   if (FloatNearlyZero(maxX)) {
@@ -551,17 +557,25 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type) {
   for (auto* e : mask->contents) {
     if (e->nodeType() == NodeType::Rectangle) {
       auto rect = static_cast<const Rectangle*>(e);
+      // Use renderPosition/renderSize so that Rectangle instances authored as
+      // <Rectangle width="W" height="H"/> (which leave the intrinsic `size`
+      // member at its default {0,0}) are emitted with their layout-resolved
+      // geometry; otherwise the mask rect degenerates to width=0/height=0 and
+      // the masked layer becomes fully transparent. Matches HTMLWriterShape's
+      // handling of the same element.
+      auto pos = rect->renderPosition();
+      auto sz = rect->renderSize();
       svg.openTag("rect");
-      float x = rect->position.x - rect->size.width / 2;
-      float y = rect->position.y - rect->size.height / 2;
+      float x = pos.x - sz.width / 2;
+      float y = pos.y - sz.height / 2;
       if (!FloatNearlyZero(x)) {
         svg.addAttr("x", FloatToString(x));
       }
       if (!FloatNearlyZero(y)) {
         svg.addAttr("y", FloatToString(y));
       }
-      svg.addAttr("width", FloatToString(rect->size.width));
-      svg.addAttr("height", FloatToString(rect->size.height));
+      svg.addAttr("width", FloatToString(sz.width));
+      svg.addAttr("height", FloatToString(sz.height));
       if (rect->roundness > 0) {
         svg.addAttr("rx", FloatToString(rect->roundness));
       }
@@ -572,11 +586,13 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type) {
       svg.closeTagSelfClosing();
     } else if (e->nodeType() == NodeType::Ellipse) {
       auto el = static_cast<const Ellipse*>(e);
+      auto pos = el->renderPosition();
+      auto sz = el->renderSize();
       svg.openTag("ellipse");
-      svg.addAttr("cx", FloatToString(el->position.x));
-      svg.addAttr("cy", FloatToString(el->position.y));
-      svg.addAttr("rx", FloatToString(el->size.width / 2));
-      svg.addAttr("ry", FloatToString(el->size.height / 2));
+      svg.addAttr("cx", FloatToString(pos.x));
+      svg.addAttr("cy", FloatToString(pos.y));
+      svg.addAttr("rx", FloatToString(sz.width / 2));
+      svg.addAttr("ry", FloatToString(sz.height / 2));
       svg.addAttr("fill", fillAttr);
       if (fillOpacity < 1.0f) {
         svg.addAttr("fill-opacity", FloatToString(fillOpacity));

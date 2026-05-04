@@ -38,6 +38,7 @@
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/types/Alignment.h"
 #include "pagx/types/Arrangement.h"
@@ -102,6 +103,11 @@ void GeoToPathData(const Element* element, NodeType type, PathData& output);
 void ReversePathData(const PathData& pathData, PathData& output);
 void ApplyRoundCorner(const PathData& pathData, float radius, PathData& output);
 std::string TransformPathDataToSVG(const PathData& pathData, const Matrix& m);
+
+// Returns the transform matrix of the i-th copy produced by a Repeater, using the same formula
+// writeRepeater applies per copy: anchor recenter + scale^prog + rotate*prog + position*prog.
+// `i` is the raw loop index; the order (AboveOriginal vs BelowOriginal) and offset are folded in.
+Matrix BuildRepeaterCopyMatrix(const Repeater* rep, int i);
 
 float ComputePathLength(const PathData& pathData);
 float ComputePathSignedArea(const PathData& pathData);
@@ -237,6 +243,13 @@ class HTMLWriter {
     NodeType type = NodeType::Rectangle;
     const Element* element = nullptr;
     std::string modifiedPathData = {};
+    // Padding of the nearest layout container (Layer / Group) that owns this element. Needed by
+    // renderCSSDiv to decide whether the `inset:0` shortcut is safe: when the container has any
+    // padding, a Rectangle with left=right=top=bottom=0 must shrink inside that padded content
+    // box, which `inset:0` cannot express (CSS inset is relative to the parent's border box,
+    // not its padding box). In that case we fall back to the absolute-pixel branch whose
+    // left/top/width/height already reflect PAGX's padding-inset layout resolution.
+    const Padding* parentPadding = nullptr;
   };
 
   // Maps a PAGX Stroke's `align` attribute to a CSS `-webkit-text-stroke` width plus optional
@@ -269,8 +282,13 @@ class HTMLWriter {
   // mirror-tile emission path can replay the same inner DOM inside each of the 9 mirrored tiles.
   void writeLayerInner(HTMLBuilder& out, const Layer* layer, float contentAlpha,
                        bool childDistribute, bool isFlexContainer);
+  // `containerPadding` is the padding of the nearest layout container (Layer / Group) supplying
+  // these elements. It propagates into each emitted GeoInfo so that stretch-style Rectangles
+  // (left=right=top=bottom=0) can detect a padded parent and avoid the `inset:0` shortcut that
+  // would otherwise paint into the full border box instead of the padded content box.
   void writeElements(HTMLBuilder& out, const std::vector<Element*>& elements, float alpha,
-                     bool distribute, LayerPlacement targetPlacement);
+                     bool distribute, LayerPlacement targetPlacement,
+                     const Padding* containerPadding = nullptr);
   // Appends an SVG <filter> definition that composites the layer's pre-rendered backdrop with its
   // own pixels using feComposite arithmetic (k1=0, k2=1, k3=1, k4=-1), yielding PlusDarker
   // semantics: clamp(Sc + Dc - 1, 0, 1). Called once per plusDarker layer at the point the

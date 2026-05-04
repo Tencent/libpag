@@ -744,6 +744,39 @@ std::string TransformPathDataToSVG(const PathData& pathData, const Matrix& m) {
   return PathDataToSVGString(result);
 }
 
+Matrix BuildRepeaterCopyMatrix(const Repeater* rep, int i) {
+  // Mirror the per-copy transform formula writeRepeater applies in HTMLWriterText.cpp. The
+  // factoring is deliberate: anchor-out → scale → rotate → translate → anchor-in, composed
+  // right-to-left so the anchor (0,0) by default) stays fixed while each copy moves by a
+  // progressive delta. Using a shared helper keeps path-level geometry expansion (used when
+  // a Repeater lives inside a Group) in lockstep with DOM-level copy emission (outer path).
+  int n = static_cast<int>(std::ceil(rep->copies));
+  int idx = (rep->order == RepeaterOrder::AboveOriginal) ? i : (n - 1 - i);
+  float prog = static_cast<float>(idx) + rep->offset;
+  Matrix m = {};
+  if (!FloatNearlyZero(rep->anchor.x) || !FloatNearlyZero(rep->anchor.y)) {
+    m = Matrix::Translate(-rep->anchor.x, -rep->anchor.y);
+  }
+  float sx = std::pow(rep->scale.x, prog);
+  float sy = std::pow(rep->scale.y, prog);
+  if (!FloatNearlyZero(sx - 1.0f) || !FloatNearlyZero(sy - 1.0f)) {
+    m = Matrix::Scale(sx, sy) * m;
+  }
+  float rot = rep->rotation * prog;
+  if (!FloatNearlyZero(rot)) {
+    m = Matrix::Rotate(rot) * m;
+  }
+  float px = rep->position.x * prog;
+  float py = rep->position.y * prog;
+  if (!FloatNearlyZero(px) || !FloatNearlyZero(py)) {
+    m = Matrix::Translate(px, py) * m;
+  }
+  if (!FloatNearlyZero(rep->anchor.x) || !FloatNearlyZero(rep->anchor.y)) {
+    m = Matrix::Translate(rep->anchor.x, rep->anchor.y) * m;
+  }
+  return m;
+}
+
 void GeoToPathData(const Element* element, NodeType type, PathData& pathData) {
   pathData = PathDataFromSVGString("");
   switch (type) {
@@ -1281,7 +1314,13 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
   }
 
   // Use CSS inset:0 when the element fills its parent via constraints (left=0 right=0 top=0
-  // bottom=0), so it adapts to dynamic flex sizing instead of using fixed pixel values.
+  // bottom=0), so it adapts to dynamic flex sizing instead of using fixed pixel values. The
+  // shortcut is only safe when the parent container has no padding: CSS inset is measured from
+  // the parent's border box, not its padding box, so `inset:0` would paint into the full box
+  // whereas PAGX expects the stretched rectangle to shrink inside the padded content box. When
+  // the container is padded we fall through to the absolute-pixel branch where
+  // renderPosition/renderSize already reflect the layout-resolved inset geometry.
+  bool parentHasPadding = (geo.parentPadding != nullptr && !geo.parentPadding->isZero());
   bool fillsParent = false;
   if (isRect) {
     auto* r = static_cast<const Rectangle*>(geo.element);
@@ -1293,6 +1332,9 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
     fillsParent = !std::isnan(e->left) && FloatNearlyZero(e->left) && !std::isnan(e->right) &&
                   FloatNearlyZero(e->right) && !std::isnan(e->top) && FloatNearlyZero(e->top) &&
                   !std::isnan(e->bottom) && FloatNearlyZero(e->bottom);
+  }
+  if (fillsParent && parentHasPadding) {
+    fillsParent = false;
   }
 
   std::string style;
