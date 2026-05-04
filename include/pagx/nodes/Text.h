@@ -115,6 +115,15 @@ class Text : public Element, public LayoutNode {
   /** Returns the effective font size after layout scaling. */
   float renderFontSize() const;
 
+  /**
+   * Returns the y coordinate of the first glyph's baseline in the Text's local layout coordinate
+   * system, or 0 if applyLayout() has not been called (or the Text has no glyphs). The PAG v2
+   * Baker combines this with renderPosition() when writing ElementTextData.position, because a
+   * runtime-shape TextBlob's glyphs sit at y=baseline=0 while LayerBuilder's layoutRuns-driven
+   * TextBlob glyphs already carry the baseline y per glyph.
+   */
+  float firstBaselineY() const;
+
   NodeType nodeType() const override {
     return NodeType::Text;
   }

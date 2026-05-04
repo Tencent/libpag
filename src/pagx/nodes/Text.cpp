@@ -106,4 +106,13 @@ float Text::renderFontSize() const {
   return fontSize * textScale;
 }
 
+float Text::firstBaselineY() const {
+  for (const auto& run : glyphData->layoutRuns) {
+    if (!run.positions.empty()) {
+      return run.positions.front().y;
+    }
+  }
+  return 0.0f;
+}
+
 }  // namespace pagx

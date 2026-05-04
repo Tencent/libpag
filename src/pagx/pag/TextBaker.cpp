@@ -62,13 +62,32 @@ std::unique_ptr<VectorElement> TextBaker::BakeText(BakeContext& ctx, PAGDocument
                                                    const pagx::Text& src) {
   auto data = std::make_unique<ElementTextData>();
 
-  data->position = MakeProp(tgfx::Point{src.position.x, src.position.y});
+  // Render-space position + font size. LayerBuilder::convertText uses
+  // `renderPosition()` (= layoutBounds + center-of-textBounds offset) and
+  // `renderFontSize()` (= fontSize * textScale) at draw time; mirror that
+  // here so Path B (Baker -> Codec -> Inflater -> TextBlob::MakeFrom) matches
+  // Path A (LayerBuilder direct). Using `src.position` / `src.fontSize`
+  // loses the applyLayout() contribution and the text renders at the
+  // origin with the unscaled font.
+  auto renderPos = src.renderPosition();
+
+  // Baseline offset: runtime-shape produces a TextBlob whose glyphs sit at
+  // y=baseline=0 (i.e. the visual top is above the drawing origin). PAGX's
+  // layout engine already resolved the absolute baseline y for the first
+  // glyph; carry it through so the Inflater can place the baseline where
+  // LayerBuilder's convertText would have placed it. Without this the
+  // Inflater would fall back to a font-metrics approximation (ascent-only)
+  // that drifts ~16 px because the layout engine uses the full line-box
+  // height instead of ascent.
+  const float baselineY = src.firstBaselineY();
+
+  data->position = MakeProp(tgfx::Point{renderPos.x, renderPos.y + baselineY});
 
   // Content — the raw UTF-8 string runtime shapers re-shape at load time.
   data->text = src.text;
   data->fontFamily = src.fontFamily;
   data->fontStyle = src.fontStyle;
-  data->fontSize = src.fontSize;
+  data->fontSize = src.renderFontSize();
 
   // Paragraph layout. PAGX Text only exposes anchor + letterSpacing; the rest
   // default to v1 TextDocument neutrals. BoxText, leading, firstBaseLine and
