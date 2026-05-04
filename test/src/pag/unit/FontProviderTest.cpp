@@ -7,6 +7,7 @@
 #include <vector>
 #include "gtest/gtest.h"
 #include "pag/pag.h"  // pag::PAGFont::RegisterFont / UnregisterFont
+#include "pagx/FontConfig.h"
 #include "pagx/pag/FontProvider.h"
 #include "tgfx/core/Typeface.h"
 
@@ -146,6 +147,38 @@ TEST(FontProvider, PolymorphicUsageThroughBase) {
   std::shared_ptr<FontProvider> base = stub;
   EXPECT_EQ(base->getTypeface("Demo", "Regular"), typeface);
   EXPECT_EQ(base->getTypeface("Demo", "Bold"), nullptr);
+}
+
+// ---------- FontConfig adapter --------------------------------------------
+
+TEST(FontProvider, MakeFontProviderFromConfigNullReturnsNull) {
+  auto provider = MakeFontProviderFromConfig(nullptr);
+  EXPECT_EQ(provider, nullptr);
+}
+
+TEST(FontProvider, MakeFontProviderFromConfigEmptyConfig) {
+  auto config = std::make_shared<pagx::FontConfig>();
+  auto provider = MakeFontProviderFromConfig(config);
+  ASSERT_NE(provider, nullptr);
+  // Empty config: no registered typefaces, no fallbacks.
+  EXPECT_EQ(provider->getTypeface("AnyFont", "Regular"), nullptr);
+  EXPECT_TRUE(provider->getFallbackTypefaces().empty());
+}
+
+TEST(FontProvider, MakeFontProviderFromConfigFallbackQueryable) {
+  // Register one in-memory typeface as a fallback. The adapter should round-
+  // trip it through FontConfig::fallbackTypefaces().
+  auto config = std::make_shared<pagx::FontConfig>();
+  auto fallback = tgfx::Typeface::MakeEmpty();
+  ASSERT_NE(fallback, nullptr);
+  std::vector<std::shared_ptr<tgfx::Typeface>> list = {fallback};
+  config->addFallbackTypefaces(list);
+
+  auto provider = MakeFontProviderFromConfig(config);
+  ASSERT_NE(provider, nullptr);
+  auto chain = provider->getFallbackTypefaces();
+  ASSERT_EQ(chain.size(), 1u);
+  EXPECT_EQ(chain[0], fallback);
 }
 
 }  // namespace

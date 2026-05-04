@@ -73,3 +73,31 @@ class FontProvider {
 std::shared_ptr<FontProvider> MakeDefaultFontProvider();
 
 }  // namespace pagx::pag
+
+namespace pagx {
+class FontConfig;
+}  // namespace pagx
+
+namespace pagx::pag {
+
+/**
+ * Builds a FontProvider that delegates to a pagx::FontConfig — the same
+ * registry the PAGX layout engine uses. Purpose: test fixtures and tools
+ * that render both Path A (LayerBuilder / PAGXDocument::applyLayout) and
+ * Path B (PAGLoader / Inflater) can share a single FontConfig, guaranteeing
+ * the two paths resolve every fontFamily/fontStyle to the same typeface.
+ *
+ * getTypeface / getFallbackTypefaces delegate to FontConfig::findTypeface /
+ * FontConfig::fallbackTypefaces. Those are non-const on FontConfig because
+ * they may lazy-load deferred fallback fonts; the adapter keeps its
+ * shared_ptr<FontConfig> non-const and performs the lazy load inside the
+ * FontProvider's const virtual methods. That's safe — FontProvider's const
+ * contract is about not exposing mutable state to callers, and lazy-load is
+ * an invisible optimization.
+ *
+ * Returns nullptr if `fontConfig` is nullptr.
+ */
+std::shared_ptr<FontProvider> MakeFontProviderFromConfig(
+    std::shared_ptr<pagx::FontConfig> fontConfig);
+
+}  // namespace pagx::pag

@@ -66,6 +66,25 @@ class FontConfig {
   void addFallbackFont(const std::string& path, int ttcIndex, const std::string& fontFamily,
                        const std::string& fontStyle);
 
+  /**
+   * Looks up a typeface by family + style. Tries in order:
+   *   (1) exact family+style match among registered typefaces
+   *   (2) family-only match among registered typefaces (prefers Regular/Medium/Normal)
+   *   (3) family match among user fallback typefaces (may trigger lazy load)
+   * Returns nullptr if nothing matches. Does NOT consult system fonts — callers that need
+   * platform system lookup should fall through to tgfx::Typeface::MakeFromName themselves.
+   * Non-const because step (3) may lazy-load a deferred fallback font.
+   */
+  std::shared_ptr<tgfx::Typeface> findTypeface(const std::string& fontFamily,
+                                               const std::string& fontStyle);
+
+  /**
+   * Returns all user fallback typefaces in registration order. Lazy-loads deferred entries; any
+   * holder that fails to resolve is skipped. Useful for wiring a FontProvider (pagx/pag) that
+   * serves the same fallback chain used by the layout engine.
+   */
+  std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces();
+
  private:
   struct Data;
   std::unique_ptr<Data> data;

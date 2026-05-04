@@ -94,4 +94,85 @@ void FontConfig::addFallbackFont(const std::string& path, int ttcIndex,
   data->fallbackTypefaces.emplace_back(path, ttcIndex, fontFamily, fontStyle);
 }
 
+// Lower is preferred. Regular < Medium < Normal < everything else. Shared with LayoutContext's
+// legacy findTypeface path; keeping the definition here means any new caller (FontProvider
+// adapter, future Inflater fallback) gets the same tie-breaking automatically.
+static int StylePriority(const std::string& style) {
+  if (style == "Regular") {
+    return 0;
+  }
+  if (style == "Medium") {
+    return 1;
+  }
+  if (style == "Normal") {
+    return 2;
+  }
+  return 3;
+}
+
+std::shared_ptr<tgfx::Typeface> FontConfig::findTypeface(const std::string& fontFamily,
+                                                         const std::string& fontStyle) {
+  if (fontFamily.empty()) {
+    return nullptr;
+  }
+
+  // (1) Exact family+style match among registered typefaces. An empty incoming style is
+  // interpreted as "Regular" (matches the LayoutContext convention) so callers that only know the
+  // family still find the most common face.
+  Data::FontKey key = {};
+  key.family = fontFamily;
+  key.style = fontStyle.empty() ? "Regular" : fontStyle;
+  auto it = data->registeredTypefaces.find(key);
+  if (it != data->registeredTypefaces.end()) {
+    return it->second;
+  }
+
+  // (2) Family-name match across registered typefaces, prefer Regular/Medium/Normal. Ties break
+  // on style string ordering so the result is deterministic across runs.
+  std::shared_ptr<tgfx::Typeface> bestTypeface = nullptr;
+  int bestPriority = 4;
+  std::string bestStyle = {};
+  for (const auto& pair : data->registeredTypefaces) {
+    if (pair.first.family != fontFamily) {
+      continue;
+    }
+    int priority = StylePriority(pair.first.style);
+    bool preferred = (bestTypeface == nullptr) || (priority < bestPriority) ||
+                     (priority == bestPriority && pair.first.style < bestStyle);
+    if (preferred) {
+      bestTypeface = pair.second;
+      bestPriority = priority;
+      bestStyle = pair.first.style;
+    }
+  }
+  if (bestTypeface != nullptr) {
+    return bestTypeface;
+  }
+
+  // (3) Family-name match among user fallback typefaces. Lazy-loads deferred holders; a holder
+  // that fails to load is skipped silently and we keep searching.
+  for (auto& holder : data->fallbackTypefaces) {
+    if (holder.getFontFamily() != fontFamily) {
+      continue;
+    }
+    auto typeface = holder.getTypeface();
+    if (typeface != nullptr) {
+      return typeface;
+    }
+  }
+  return nullptr;
+}
+
+std::vector<std::shared_ptr<tgfx::Typeface>> FontConfig::fallbackTypefaces() {
+  std::vector<std::shared_ptr<tgfx::Typeface>> out;
+  out.reserve(data->fallbackTypefaces.size());
+  for (auto& holder : data->fallbackTypefaces) {
+    auto typeface = holder.getTypeface();
+    if (typeface != nullptr) {
+      out.push_back(std::move(typeface));
+    }
+  }
+  return out;
+}
+
 }  // namespace pagx

@@ -27,9 +27,11 @@
 #include "pag/support/PixelDiff.h"
 #include "pag/support/RenderUtil.h"
 #include "pag/support/SampleEnumerator.h"
+#include "pagx/FontConfig.h"
 #include "pagx/PAGExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/pag/Codec.h"
+#include "pagx/pag/FontProvider.h"
 #include "pagx/pag/LayerInflater.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/layers/Layer.h"
@@ -44,7 +46,14 @@ TEST_P(PAGRenderCrossCheck, PathA_vs_PathB) {
 
   auto doc = pagx::PAGXImporter::FromFile(sample.absolutePath);
   ASSERT_NE(doc, nullptr) << "PAGXImporter failed for " << sample.name;
-  doc->applyLayout();
+
+  // Both paths must see the same typeface registry. PathA feeds the
+  // fixture's FontConfig into applyLayout(); PathB feeds the matching
+  // FontProvider into LayerInflater::Inflate(). Without this wiring PathA
+  // falls through to tgfx::Typeface::MakeFromName (null on macOS) while
+  // PathB falls through to pag::FontManager — completely different fonts,
+  // same PAGX → ~14 dB PSNR even for geometrically-aligned renders.
+  doc->applyLayout(&fontConfig());
 
   const int canvasW = static_cast<int>(doc->width);
   const int canvasH = static_cast<int>(doc->height);
@@ -64,7 +73,9 @@ TEST_P(PAGRenderCrossCheck, PathA_vs_PathB) {
   auto decodeResult =
       pagx::pag::Codec::Decode(exportResult.bytes.data(), exportResult.bytes.size());
   ASSERT_NE(decodeResult.doc, nullptr);
-  auto inflateResult = pagx::pag::LayerInflater::Inflate(std::move(decodeResult.doc));
+  pagx::pag::LayerInflater::Options inflateOpts;
+  inflateOpts.fontProvider = fontProvider();
+  auto inflateResult = pagx::pag::LayerInflater::Inflate(std::move(decodeResult.doc), inflateOpts);
   ASSERT_NE(inflateResult.layer, nullptr);
   auto surfaceB = pagx::test::RenderLayerToSurface(context, inflateResult.layer, canvasW, canvasH);
   ASSERT_NE(surfaceB, nullptr);

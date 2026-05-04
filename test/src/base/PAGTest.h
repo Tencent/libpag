@@ -18,8 +18,17 @@
 
 #pragma once
 
+#include <memory>
 #include "gtest/gtest.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
+
+namespace pagx {
+class FontConfig;
+}
+
+namespace pagx::pag {
+class FontProvider;
+}
 
 namespace pag {
 class PAGTest : public testing::Test {
@@ -67,20 +76,28 @@ class PAGXTest : public PAGTest {
   std::shared_ptr<tgfx::GLDevice> device = nullptr;
   tgfx::Context* context = nullptr;
 
-  void SetUp() override {
-    PAGTest::SetUp();
-    device = tgfx::GLDevice::Make();
-    ASSERT_TRUE(device != nullptr);
-    context = device->lockContext();
-    ASSERT_TRUE(context != nullptr);
-  }
+  void SetUp() override;
+  void TearDown() override;
 
-  void TearDown() override {
-    if (device) {
-      device->unlock();
-    }
-    PAGTest::TearDown();
-  }
+  /**
+   * Shared FontConfig populated by SetUp() with Arial (macOS) + Noto Sans SC +
+   * Noto Color Emoji + Noto Sans Hebrew. Every PAGX rendering test can pass
+   * this to `PAGXDocument::applyLayout(&fontConfig())` so the layout engine
+   * sees the same typefaces that the matched PAG-v2 Inflater sees via
+   * `fontProvider()`. This eliminates the historical drift where PathA used
+   * pagx::FontConfig (empty in tests) while PathB used pag::FontManager.
+   */
+  pagx::FontConfig& fontConfig();
+
+  /**
+   * FontProvider backed by the same FontConfig above, for PAGLoader /
+   * LayerInflater::Inflate Options.
+   */
+  std::shared_ptr<pagx::pag::FontProvider> fontProvider();
+
+ private:
+  std::shared_ptr<pagx::FontConfig> sharedFontConfig = nullptr;
+  std::shared_ptr<pagx::pag::FontProvider> sharedFontProvider = nullptr;
 };
 
 #define PAGX_TEST(test_case_name, test_name)            \

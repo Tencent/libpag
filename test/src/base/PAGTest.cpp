@@ -17,6 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGTest.h"
+#include <vector>
+#include "pagx/FontConfig.h"
+#include "pagx/pag/FontProvider.h"
+#include "tgfx/core/Typeface.h"
+#include "utils/ProjectPath.h"
 
 namespace pag {
 static bool hasFailure = false;
@@ -31,4 +36,83 @@ void PAGTest::SetUp() {
 void PAGTest::TearDown() {
   hasFailure = hasFailure || ::testing::Test::HasFailure();
 }
+
+namespace {
+
+// Standard fallback typefaces used by PAGXTest fixtures: Noto Sans SC covers
+// CJK, Noto Color Emoji covers emoji, Noto Sans Hebrew covers Hebrew. Order
+// matters — the LayoutContext walks this vector in sequence when shaping
+// codepoints that the primary font can't render.
+std::vector<std::shared_ptr<tgfx::Typeface>> CreateFallbackTypefaces() {
+  std::vector<std::shared_ptr<tgfx::Typeface>> out;
+  const char* paths[] = {
+      "resources/font/NotoSansSC-Regular.otf",
+      "resources/font/NotoColorEmoji.ttf",
+      "resources/font/NotoSansHebrew-Regular.ttf",
+  };
+  for (const char* relPath : paths) {
+    auto typeface = tgfx::Typeface::MakeFromPath(ProjectPath::Absolute(relPath));
+    if (typeface != nullptr) {
+      out.push_back(std::move(typeface));
+    }
+  }
+  return out;
+}
+
+// macOS-only: register the four most common Arial faces so PAGX samples that
+// reference Arial by name (every spec/samples/text*.pagx) resolve to the
+// actual system font rather than falling through to Noto. Linux / CI Android
+// containers rarely ship Arial; we silently skip on those platforms. The Web
+// build has its own font registration path outside of PAGXTest.
+void RegisterSystemFonts(pagx::FontConfig& fontConfig) {
+#ifdef __APPLE__
+  const char* arialPaths[] = {
+      "/System/Library/Fonts/Supplemental/Arial.ttf",
+      "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+      "/System/Library/Fonts/Supplemental/Arial Italic.ttf",
+      "/System/Library/Fonts/Supplemental/Arial Bold Italic.ttf",
+  };
+  for (const char* path : arialPaths) {
+    auto typeface = tgfx::Typeface::MakeFromPath(path);
+    if (typeface != nullptr) {
+      fontConfig.registerTypeface(std::move(typeface));
+    }
+  }
+#else
+  (void)fontConfig;
+#endif
+}
+
+}  // namespace
+
+void PAGXTest::SetUp() {
+  PAGTest::SetUp();
+  device = tgfx::GLDevice::Make();
+  ASSERT_TRUE(device != nullptr);
+  context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+
+  sharedFontConfig = std::make_shared<pagx::FontConfig>();
+  sharedFontConfig->addFallbackTypefaces(CreateFallbackTypefaces());
+  RegisterSystemFonts(*sharedFontConfig);
+  sharedFontProvider = pagx::pag::MakeFontProviderFromConfig(sharedFontConfig);
+}
+
+void PAGXTest::TearDown() {
+  if (device) {
+    device->unlock();
+  }
+  sharedFontProvider.reset();
+  sharedFontConfig.reset();
+  PAGTest::TearDown();
+}
+
+pagx::FontConfig& PAGXTest::fontConfig() {
+  return *sharedFontConfig;
+}
+
+std::shared_ptr<pagx::pag::FontProvider> PAGXTest::fontProvider() {
+  return sharedFontProvider;
+}
+
 }  // namespace pag
