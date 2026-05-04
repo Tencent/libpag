@@ -181,5 +181,20 @@ TEST(FontProvider, MakeFontProviderFromConfigFallbackQueryable) {
   EXPECT_EQ(chain[0], fallback);
 }
 
+TEST(FontProvider, MakeFontProviderFromConfigExposesFontConfig) {
+  // The adapter must surface the underlying FontConfig so the Inflater can
+  // opt into the HarfBuzz-based text path. Default providers return nullptr.
+  auto config = std::make_shared<pagx::FontConfig>();
+  auto provider = MakeFontProviderFromConfig(config);
+  ASSERT_NE(provider, nullptr);
+  EXPECT_EQ(provider->getFontConfig(), config.get());
+}
+
+TEST(FontProvider, DefaultFontProviderHasNoFontConfig) {
+  auto provider = MakeDefaultFontProvider();
+  ASSERT_NE(provider, nullptr);
+  EXPECT_EQ(provider->getFontConfig(), nullptr);
+}
+
 }  // namespace
 }  // namespace pagx::pag

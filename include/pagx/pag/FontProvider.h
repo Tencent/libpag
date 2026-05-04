@@ -11,6 +11,10 @@
 #include <vector>
 #include "tgfx/core/Typeface.h"
 
+namespace pagx {
+class FontConfig;
+}  // namespace pagx
+
 namespace pagx::pag {
 
 /**
@@ -53,6 +57,27 @@ class FontProvider {
    */
   virtual std::vector<std::shared_ptr<tgfx::Typeface>> getFallbackTypefaces()
       const = 0;
+
+  /**
+   * Optional: returns the pagx::FontConfig this provider is backed by, or
+   * nullptr if the provider doesn't own one. When non-null the Inflater
+   * switches its text path from the tgfx primitive shaper
+   * (TextBlob::MakeFrom(string, font)) to the HarfBuzz-based pagx::TextShaper,
+   * matching the shaper PAGX layout uses and eliminating the per-glyph
+   * advance drift between Path A (LayerBuilder) and Path B (Inflater).
+   *
+   * Default returns nullptr so existing FontProvider implementations keep
+   * working on the primitive path without modification. Host adapters that
+   * already own a FontConfig (e.g. MakeFontProviderFromConfig) override this
+   * to expose it.
+   *
+   * Returns a raw pointer rather than shared_ptr to keep the FontProvider
+   * header independent of pagx/FontConfig.h; the adapter is responsible for
+   * keeping the FontConfig alive for the duration of the Inflate() call.
+   */
+  virtual pagx::FontConfig* getFontConfig() const {
+    return nullptr;
+  }
 };
 
 /**
@@ -71,14 +96,6 @@ class FontProvider {
  * rather than relying on this default.
  */
 std::shared_ptr<FontProvider> MakeDefaultFontProvider();
-
-}  // namespace pagx::pag
-
-namespace pagx {
-class FontConfig;
-}  // namespace pagx
-
-namespace pagx::pag {
 
 /**
  * Builds a FontProvider that delegates to a pagx::FontConfig — the same

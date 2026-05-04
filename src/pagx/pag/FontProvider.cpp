@@ -62,6 +62,10 @@ class FontConfigFontProvider : public FontProvider {
     return fontConfig->fallbackTypefaces();
   }
 
+  pagx::FontConfig* getFontConfig() const override {
+    return fontConfig.get();
+  }
+
  private:
   std::shared_ptr<pagx::FontConfig> fontConfig;
 };

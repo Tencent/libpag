@@ -2,8 +2,14 @@
 
 #include "pagx/pag/LayerInflater.h"
 #include <utility>
+#include <vector>
 #include "pagx/pag/FontProvider.h"
 #include "pagx/pag/InflaterContext.h"
+#ifdef PAG_USE_HARFBUZZ
+#include "pagx/FontConfig.h"
+#include "pagx/LayoutContext.h"
+#include "renderer/TextShaper.h"
+#endif
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Shader.h"
@@ -526,10 +532,52 @@ std::shared_ptr<tgfx::VectorElement> inflateElementText(PAGDocument& /*doc*/,
     return nullptr;
   }
 
-  auto textBlob = tgfx::TextBlob::MakeFrom(pay.text, font);
+  std::shared_ptr<tgfx::TextBlob> textBlob;
+
+#ifdef PAG_USE_HARFBUZZ
+  // Preferred path: if the FontProvider exposes its pagx::FontConfig we can
+  // shape through the same HarfBuzz-backed pagx::TextShaper the PAGX layout
+  // engine uses. That matches Path A (LayerBuilder) byte-for-byte on the
+  // per-glyph xAdvance, so CrossCheck PSNR is no longer limited by the
+  // HarfBuzz-vs-CoreText advance drift (Arial Bold 84pt: HB says 49.79,
+  // CoreText says 56 — 11% per glyph that the primitive shaper can't fix).
+  if (ctx->fontProvider != nullptr) {
+    if (auto* config = ctx->fontProvider->getFontConfig()) {
+      pagx::LayoutContext shapingContext(config);
+      auto shapedGlyphs = pagx::TextShaper::Shape(pay.text, font, shapingContext,
+                                                  /*vertical=*/false, /*rtl=*/false);
+      std::vector<tgfx::GlyphID> glyphIDs;
+      std::vector<tgfx::Point> positions;
+      glyphIDs.reserve(shapedGlyphs.size());
+      positions.reserve(shapedGlyphs.size());
+      float x = 0.0f;
+      for (const auto& sg : shapedGlyphs) {
+        if (sg.glyphID == 0) {
+          continue;
+        }
+        glyphIDs.push_back(sg.glyphID);
+        positions.push_back({x + sg.xOffset, sg.yOffset});
+        x += sg.xAdvance + pay.tracking;
+      }
+      if (!glyphIDs.empty()) {
+        textBlob =
+            tgfx::TextBlob::MakeFrom(glyphIDs.data(), positions.data(), glyphIDs.size(), font);
+      }
+    }
+  }
+#endif
+
+  if (textBlob == nullptr) {
+    // Fall back to the tgfx primitive shaper. No kerning / ligatures / bidi,
+    // and the xAdvance per glyph will come from font.getAdvance() instead of
+    // HarfBuzz — that's fine on hosts that didn't wire a FontConfig-backed
+    // provider (e.g. production PAGLoader callers using pag::FontManager).
+    textBlob = tgfx::TextBlob::MakeFrom(pay.text, font);
+  }
+
   if (textBlob == nullptr) {
     ctx->warn(ErrorCode::InflateGlyphRunBuildFailed,
-              "TextBlob::MakeFrom returned null; ElementText dropped");
+              "TextBlob construction failed for ElementText; dropping element");
     return nullptr;
   }
 
