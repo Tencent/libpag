@@ -34,6 +34,7 @@
 #include <string>
 #include <vector>
 #include "pagx/Diagnostic.h"
+#include "pagx/pag/FontProvider.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/layers/Layer.h"
 
@@ -61,6 +62,17 @@ class PAGLoader {
      */
     bool strict = false;
 
+    /**
+     * Font resolver for text inflation (Phase 16 runtime-shape mode). If
+     * null, Inflate() substitutes MakeDefaultFontProvider() which wraps the
+     * process-global pag::FontManager — so callers who have pre-registered
+     * typefaces through PAGFont::RegisterFont get that behaviour for free.
+     * Inject a custom FontProvider here to hook a host-specific registry
+     * (e.g. an iOS/Android app bundle, or a test fixture that returns
+     * deterministic stub typefaces).
+     */
+    std::shared_ptr<pag::FontProvider> fontProvider = nullptr;
+
     // Explicit default constructor — needed so default-arg
     // `LoadFromBytes(..., options = Options())` resolves during the class
     // definition (same clang quirk PAGExporter::Options hit).
@@ -77,6 +89,14 @@ class PAGLoader {
   struct Result {
     bool ok = false;
     std::shared_ptr<tgfx::Layer> layer = nullptr;
+    /**
+     * Number of compositions decoded from the document (0 if decode failed
+     * before the CompositionList was parsed). Consumers that branch on
+     * Diagnostic::contextIndex for codes that carry a "raw from bytes"
+     * composition index (InvalidCompositionIndex=306, etc.) must
+     * range-check against this value before dereferencing. See §G.3.
+     */
+    uint32_t compositionCount = 0;
     std::vector<Diagnostic> errors = {};
     std::vector<Diagnostic> warnings = {};
   };

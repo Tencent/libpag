@@ -44,7 +44,9 @@ EncodeResult Codec::Encode(const PAGDocument& doc) {
   ::pag::EncodeStream body(&sc);
   WriteFileHeader(&body, doc.header, &session);
   WriteImageAssetTable(&body, doc.images, &session);
-  WriteFontAssetTable(&body, doc.fonts, &session);
+  // Phase 16 (v2.20): FontAssetTable is no longer produced. Font information
+  // is carried verbatim on ElementTextData (fontFamily / fontStyle) and
+  // resolved at load time through the Inflater's FontProvider.
   WriteCompositionList(&body, doc.compositions, &session);
   WriteEndTag(&body);
 
@@ -202,7 +204,12 @@ DecodeResult Codec::Decode(const uint8_t* data, size_t length) {
         break;
       }
       case TagCode::FontAssetTable: {
-        ReadFontAssetTable(&stream, &ctx, tagEnd, &doc->fonts);
+        // Phase 16 (v2.20): forward-compat no-op. Byte streams produced by
+        // pre-v2.20 branches may still carry a FontAssetTable; we ignore
+        // the payload and let the generic length skip below align the
+        // cursor. The warn surfaces the downgrade so CI can flag stale
+        // Writers still emitting this tag.
+        ctx.warn(ErrorCode::UnknownTagCode, "FontAssetTable dropped (Phase 16 runtime-shape mode)");
         break;
       }
       case TagCode::CompositionList: {

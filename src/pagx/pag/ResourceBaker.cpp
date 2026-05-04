@@ -70,10 +70,4 @@ uint32_t RegisterImage(BakeContext& ctx, PAGDocument& doc, std::unique_ptr<Image
                      std::move(asset), nodePtr, std::move(semanticKey));
 }
 
-uint32_t RegisterFont(BakeContext& ctx, PAGDocument& doc, std::unique_ptr<FontAsset> asset,
-                      const void* nodePtr, std::string semanticKey) {
-  return InternAsset(doc.fonts, ctx.fontIndexByNode, ctx.fontIndexByDataPtr, ctx.fontIndexByKey,
-                     std::move(asset), nodePtr, std::move(semanticKey));
-}
-
 }  // namespace pagx::pag

@@ -122,7 +122,10 @@ bool PropertyEq(const Property<T>& a, const Property<T>& b, ValueEq value_eq,
   return true;
 }
 
-// ---- ImageAsset / FontAsset ----
+// ---- ImageAsset ----
+// Phase 16 (v2.20): the font asset table has been removed from
+// PAGDocument. Font family/style are now carried inline on
+// ElementTextData.
 
 bool ImageAssetEq(const ImageAsset& a, const ImageAsset& b, std::string& path, std::string* diff) {
   if (a.width != b.width) {
@@ -138,36 +141,6 @@ bool ImageAssetEq(const ImageAsset& a, const ImageAsset& b, std::string& path, s
   }
   if (!DataEq(a.data, b.data)) {
     return ReportMismatch(path + ".data", "byte payload differs", diff);
-  }
-  return true;
-}
-
-bool FontAssetEq(const FontAsset& a, const FontAsset& b, std::string& path, std::string* diff) {
-  if (a.kind != b.kind) {
-    return ReportMismatch(path + ".kind", "kind differs", diff);
-  }
-  if (a.family != b.family) {
-    return ReportMismatch(path + ".family", a.family + " vs " + b.family, diff);
-  }
-  if (a.style != b.style) {
-    return ReportMismatch(path + ".style", a.style + " vs " + b.style, diff);
-  }
-  if (!DataEq(a.data, b.data)) {
-    return ReportMismatch(path + ".data", "byte payload differs", diff);
-  }
-  if (a.axes.size() != b.axes.size()) {
-    return ReportMismatch(path + ".axes.size",
-                          std::to_string(a.axes.size()) + " vs " + std::to_string(b.axes.size()),
-                          diff);
-  }
-  for (size_t i = 0; i < a.axes.size(); ++i) {
-    const auto& ax = a.axes[i];
-    const auto& bx = b.axes[i];
-    if (ax.tag != bx.tag || !FloatEq(ax.defaultValue, bx.defaultValue) ||
-        !FloatEq(ax.minValue, bx.minValue) || !FloatEq(ax.maxValue, bx.maxValue)) {
-      IndexScope is(path, i);
-      return ReportMismatch(path, "axis differs", diff);
-    }
   }
   return true;
 }
@@ -329,23 +302,6 @@ bool DocumentsEqual(const PAGDocument& a, const PAGDocument& b, std::string* dif
       return ReportMismatch(subPath, "null vs non-null image", diff);
     }
     if (!ImageAssetEq(*a.images[i], *b.images[i], subPath, diff)) {
-      return false;
-    }
-  }
-  if (a.fonts.size() != b.fonts.size()) {
-    return ReportMismatch("doc.fonts.size",
-                          std::to_string(a.fonts.size()) + " vs " + std::to_string(b.fonts.size()),
-                          diff);
-  }
-  for (size_t i = 0; i < a.fonts.size(); ++i) {
-    std::string subPath = "doc.fonts[" + std::to_string(i) + "]";
-    if (a.fonts[i] == nullptr || b.fonts[i] == nullptr) {
-      if (a.fonts[i] == b.fonts[i]) {
-        continue;
-      }
-      return ReportMismatch(subPath, "null vs non-null font", diff);
-    }
-    if (!FontAssetEq(*a.fonts[i], *b.fonts[i], subPath, diff)) {
       return false;
     }
   }

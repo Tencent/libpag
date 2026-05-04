@@ -57,14 +57,14 @@ enum class DiagnosticCode : uint16_t {
 
   // Baker warning
   ImageSourceMissing         = 200,
-  FontSourceMissing          = 201,
+  FontSourceMissing          = 201,   // Phase 16: pagx::Text.fontFamily empty; Inflater falls back to FontProvider chain
   MaskTargetMissing          = 202,
   MaskSelfReference          = 203,
   BlendModeUnmapped          = 204,
   InverseMatrixNonInvertible = 205,
-  TextGlyphDataEmpty         = 206,
+  TextGlyphDataEmpty         = 206,   // deprecated in v2.20 (runtime-shape mode): numeric value reserved, do not re-use
   EmptyDocument              = 207,
-  GlyphRunKindInferred       = 208,
+  TextGlyphRunsDowngraded    = 208,   // Phase 16: pre-shaped pagx::Text.glyphRuns dropped; runtime-shape fallback emitted
 
   // Codec fatal
   InvalidMagic               = 300,

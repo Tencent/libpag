@@ -2,12 +2,10 @@
 
 #include "pagx/pag/LayerInflater.h"
 #include <utility>
-#include "pagx/TextLayout.h"
+#include "pagx/pag/FontProvider.h"
 #include "pagx/pag/InflaterContext.h"
-#include "renderer/GlyphRunRenderer.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
-#include "tgfx/core/RSXform.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/core/Typeface.h"
@@ -455,100 +453,87 @@ std::shared_ptr<tgfx::ColorSource> inflateColorSource(PAGDocument& doc, const Sh
   return nullptr;
 }
 
-// ---------- Font resolution (§9.4 601 / §10.3 fontIndex lookup) ----------
+// ---------- Font resolution (Phase 16 runtime-shape) --------------------
 //
-// Returns a non-null tgfx::Font on success. Failure paths (index OOR /
-// missing asset / MakeFromBytes / MakeFromName null) each push 601 warn and
-// return an empty Font — callers propagate the empty Font to
-// BuildTextBlobFromLayoutRuns which silently drops runs whose Typeface is
-// null, producing an empty TextBlob that bubbles up as 602 at the caller.
-
-tgfx::Font resolveFontAsset(PAGDocument& doc, uint32_t fontIndex, float fontSize,
-                            InflaterContext* ctx) {
-  if (fontIndex == UINT32_MAX || fontIndex >= doc.fonts.size() || doc.fonts[fontIndex] == nullptr) {
-    ctx->warn(ErrorCode::InflateFontCreateFailed, "fontIndex out of range or FontAsset null",
-              fontIndex);
+// Returns a non-null tgfx::Font on success. Lookup order:
+//   1. FontProvider.getTypeface(fontFamily, fontStyle) — exact-match path.
+//   2. FontProvider.getFallbackTypefaces() — first non-null entry wins.
+//   3. All failed → push InflateFontCreateFailed=601 and return an empty
+//      Font. The caller will propagate through TextBlob::MakeFrom which
+//      itself returns null when the font carries no typeface, and the
+//      outer inflateElementText path then surfaces 602.
+//
+// contextIndex currently defaults to UINT32_MAX because the Baker no longer
+// threads a fontIndex — PAGDocument::fonts[] is gone. If future consumers
+// need a per-layer cross-reference we will repurpose contextIndex to the
+// enclosing layer index.
+tgfx::Font resolveFont(const ElementTextData& pay, InflaterContext* ctx) {
+  if (ctx->fontProvider == nullptr) {
+    // Should never happen — LayerInflater::Inflate substitutes
+    // MakeDefaultFontProvider() when the caller passes nullptr. Defensive
+    // programming only.
+    ctx->warn(ErrorCode::InflateFontCreateFailed, "FontProvider is null");
     return tgfx::Font{};
   }
-  const FontAsset& asset = *doc.fonts[fontIndex];
-  std::shared_ptr<tgfx::Typeface> typeface;
-  if (asset.kind == FontSourceKind::Embedded && asset.data != nullptr) {
-    typeface = tgfx::Typeface::MakeFromBytes(asset.data->bytes(), asset.data->size());
-  } else {
-    // System path — PAGX Font nodes encode no TTF bytes (Phase 8 quirk:
-    // FontAsset::family = "#embedded" or an authored family string). The
-    // tgfx system font matcher is our best effort; a null return means the
-    // platform has no matching font and the text degrades to empty.
-    typeface = tgfx::Typeface::MakeFromName(asset.family, asset.style);
-  }
+
+  auto typeface = ctx->fontProvider->getTypeface(pay.fontFamily, pay.fontStyle);
   if (typeface == nullptr) {
-    ctx->warn(ErrorCode::InflateFontCreateFailed, "tgfx::Typeface construction returned null",
-              fontIndex);
-    return tgfx::Font{};
-  }
-  return tgfx::Font(std::move(typeface), fontSize);
-}
-
-// ---------- ElementText inflation (§10.3 two-kind dispatch) ----------
-
-std::shared_ptr<tgfx::VectorElement> inflateElementText(PAGDocument& doc,
-                                                        const ElementTextData& pay,
-                                                        InflaterContext* ctx) {
-  // Rebuild one TextLayoutGlyphRun per serialised GlyphRunBlob. Both kinds
-  // (LayoutRun / ClassicGlyphRun) feed into BuildTextBlobFromLayoutRuns —
-  // ClassicGlyph's extra fields (anchor/scale/rotation/skew) flatten into an
-  // RSXform vector to reuse the same builder.
-  std::vector<pagx::TextLayoutGlyphRun> runs;
-  runs.reserve(pay.glyphRuns.size());
-  tgfx::Matrix inverseMatrix = tgfx::Matrix::I();
-
-  for (const auto& blob : pay.glyphRuns) {
-    pagx::TextLayoutGlyphRun run;
-    run.font = resolveFontAsset(doc, blob.fontIndex, blob.fontSize, ctx);
-    // The last blob wins on inverseMatrix — TextBox laid-out siblings all
-    // carry the same inverseMatrix per prepareTextBoxTextBlobs() semantics.
-    inverseMatrix = blob.inverseMatrix;
-
-    if (blob.kind == GlyphRunKind::LayoutRun) {
-      run.glyphs.reserve(blob.layoutGlyphs.size());
-      run.positions.reserve(blob.layoutGlyphs.size());
-      bool anyXform = false;
-      for (const auto& g : blob.layoutGlyphs) {
-        run.glyphs.push_back(g.glyphId);
-        run.positions.push_back(g.position);
-        if (g.hasXform) {
-          anyXform = true;
-        }
-      }
-      if (anyXform) {
-        run.xforms.reserve(blob.layoutGlyphs.size());
-        for (const auto& g : blob.layoutGlyphs) {
-          run.xforms.push_back(tgfx::RSXform::Make(g.scos, g.ssin, g.tx, g.ty));
-        }
-      }
-    } else {
-      // ClassicGlyphRun → synthesise positions/xforms so the same
-      // BuildTextBlobFromLayoutRuns can consume it. Phase 10 can split this
-      // into a dedicated fast path if profiling calls for it.
-      run.glyphs.reserve(blob.classicGlyphs.size());
-      run.positions.reserve(blob.classicGlyphs.size());
-      for (const auto& g : blob.classicGlyphs) {
-        run.glyphs.push_back(g.glyphId);
-        run.positions.push_back(
-            tgfx::Point{blob.baseX + g.position.x + g.xOffset, blob.baseY + g.position.y});
+    for (auto& candidate : ctx->fontProvider->getFallbackTypefaces()) {
+      if (candidate != nullptr) {
+        typeface = std::move(candidate);
+        break;
       }
     }
-    runs.push_back(std::move(run));
+  }
+  if (typeface == nullptr) {
+    ctx->warn(ErrorCode::InflateFontCreateFailed, "FontProvider exhausted; no typeface matched " +
+                                                      pay.fontFamily + "/" + pay.fontStyle);
+    return tgfx::Font{};
   }
 
-  auto textBlob = pagx::GlyphRunRenderer::BuildTextBlobFromLayoutRuns(runs, inverseMatrix);
-  if (textBlob == nullptr) {
-    ctx->warn(ErrorCode::InflateGlyphRunBuildFailed,
-              "BuildTextBlobFromLayoutRuns returned null; ElementText dropped");
+  tgfx::Font font(std::move(typeface), pay.fontSize);
+  if (pay.fauxBold) {
+    font.setFauxBold(true);
+  }
+  if (pay.fauxItalic) {
+    font.setFauxItalic(true);
+  }
+  return font;
+}
+
+// ---------- ElementText inflation (Phase 16 runtime-shape MVP) ----------
+//
+// The Inflater feeds the raw UTF-8 string + the resolved tgfx::Font into
+// tgfx::TextBlob::MakeFrom which performs shaping under the hood. Paragraph
+// layout (justification / leading / firstBaseLine / BoxText) is deferred to
+// Phase 16.7 — the current MVP path uses a single line. PAGX-exclusive
+// anchors are forwarded to tgfx::Text::Make for TextModifier / RangeSelector
+// consumption.
+
+std::shared_ptr<tgfx::VectorElement> inflateElementText(PAGDocument& /*doc*/,
+                                                        const ElementTextData& pay,
+                                                        InflaterContext* ctx) {
+  if (pay.text.empty()) {
+    // Not necessarily an error — an empty Text is legal but produces no
+    // glyphs. Skip silently; returning nullptr drops the element so the
+    // enclosing VectorGroup still renders its other children.
     return nullptr;
   }
 
-  auto text = tgfx::Text::Make(textBlob, pay.anchors.value);
+  auto font = resolveFont(pay, ctx);
+  if (font.getTypeface() == nullptr) {
+    // resolveFont already warned. Drop the element.
+    return nullptr;
+  }
+
+  auto textBlob = tgfx::TextBlob::MakeFrom(pay.text, font);
+  if (textBlob == nullptr) {
+    ctx->warn(ErrorCode::InflateGlyphRunBuildFailed,
+              "TextBlob::MakeFrom returned null; ElementText dropped");
+    return nullptr;
+  }
+
+  auto text = tgfx::Text::Make(std::move(textBlob), pay.anchors.value);
   if (text != nullptr) {
     text->setPosition(pay.position.value);
   }
@@ -1001,7 +986,7 @@ std::shared_ptr<tgfx::Layer> inflateMeshPayload() {
 // Public Inflate entry
 // ---------------------------------------------------------------------------
 
-LayerInflater::Result LayerInflater::Inflate(std::unique_ptr<PAGDocument> doc) {
+LayerInflater::Result LayerInflater::Inflate(std::unique_ptr<PAGDocument> doc, Options opts) {
   Result result;
   if (doc == nullptr) {
     // Null document is treated as an empty-document case. Returning the 604
@@ -1013,6 +998,7 @@ LayerInflater::Result LayerInflater::Inflate(std::unique_ptr<PAGDocument> doc) {
   }
 
   InflaterContext ctx;
+  ctx.fontProvider = opts.fontProvider ? std::move(opts.fontProvider) : MakeDefaultFontProvider();
   ctx.visitingComposition.assign(doc->compositions.size(), false);
 
   // Empty-document gate (§9.1): compositions empty OR compositions[0] empty.

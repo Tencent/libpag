@@ -53,7 +53,7 @@ inline constexpr std::array<DiagnosticCode, 43> kAllDiagnosticCodes = {
     DiagnosticCode::InverseMatrixNonInvertible,
     DiagnosticCode::TextGlyphDataEmpty,
     DiagnosticCode::EmptyDocument,
-    DiagnosticCode::GlyphRunKindInferred,
+    DiagnosticCode::TextGlyphRunsDowngraded,
     // Codec fatal 300-399
     DiagnosticCode::InvalidMagic,
     DiagnosticCode::UnsupportedVersion,

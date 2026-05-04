@@ -1,11 +1,15 @@
 // Copyright (C) 2026 Tencent. All rights reserved.
 //
-// PAG v2 resource Tags — ImageAssetTable / ImageAsset / FontAssetTable /
-// FontAsset. Split out from CodecTags.cpp to keep that file focused on the
-// container framing.
+// PAG v2 resource Tags — ImageAssetTable / ImageAsset.
 //
-// Authoritative byte layouts: §D.6 (with v2.19 P0-R1 sub-Tag rationale)
-// and §H.1 / §H.4 / §H.5 (size + magic + axes limits).
+// Phase 16 (v2.20) removed the FontAssetTable / FontAsset writer path
+// entirely: runtime-shape mode carries font information as fontFamily /
+// fontStyle strings on ElementTextData, so there are no opaque font bytes
+// to serialise. The Decoder still tolerates the tag codes (3 / 7) through
+// the generic UnknownTagCode=400 path to remain forward-compatible with
+// byte streams produced by pre-v2.20 branches.
+//
+// Authoritative byte layouts: §D.6 (with v2.19 P0-R1 sub-Tag rationale).
 #include <cstring>
 #include "pagx/pag/CodecTags.h"
 #include "pagx/pag/TagHeader.h"
@@ -158,129 +162,6 @@ void ReadImageAssetTable(::pag::DecodeStream* stream, DecodeContext* ctx, uint64
       out->push_back(std::move(img));
     }
     // Each sub-Tag is forward-compat (length-bounded), so always align.
-    SeekTo(stream, static_cast<uint32_t>(childEnd));
-  }
-}
-
-// =============================================================================
-// FontAsset (TagCode = 7)
-// =============================================================================
-
-namespace {
-
-void WriteFontAsset(::pag::EncodeStream* stream, const FontAsset& asset, EncodeSession* session) {
-  ::pag::EncodeStream body(session->sc);
-  body.writeUint8(static_cast<uint8_t>(asset.kind));
-  WriteUtf8String(&body, asset.family);
-  WriteUtf8String(&body, asset.style);
-  WriteLengthPrefixedBytes(&body, asset.data);
-  body.writeEncodedUint32(static_cast<uint32_t>(asset.axes.size()));
-  for (const auto& axis : asset.axes) {
-    body.writeUint32(axis.tag);
-    body.writeFloat(axis.defaultValue);
-    body.writeFloat(axis.minValue);
-    body.writeFloat(axis.maxValue);
-  }
-  WriteTag(stream, TagCode::FontAssetItem, &body);
-}
-
-std::unique_ptr<FontAsset> ReadFontAsset(::pag::DecodeStream* stream, DecodeContext* ctx,
-                                         uint64_t tagEnd) {
-  auto asset = std::make_unique<FontAsset>();
-  auto guard = MakeGuard(ctx);
-
-  uint8_t kindByte = stream->readUint8();
-  if (kindByte == 0) {
-    asset->kind = FontSourceKind::System;
-  } else if (kindByte == 1) {
-    asset->kind = FontSourceKind::Embedded;
-  } else if (kindByte == 2) {
-    // VariableEmbedded reserved — downgrade to Embedded as per §D.6.
-    ctx->warn(ErrorCode::InvalidEnumValue,
-              "FontAsset kind=2 reserved (VariableEmbedded); downgraded to Embedded");
-    asset->kind = FontSourceKind::Embedded;
-  } else {
-    ctx->warn(ErrorCode::MalformedTag, "FontAsset kind out of range; entry skipped");
-    SeekTo(stream, static_cast<uint32_t>(tagEnd));
-    return nullptr;
-  }
-
-  asset->family = ReadUtf8String(stream, &guard, limits::MAX_NAME_STRING_BYTES);
-  if (ctx->hasError()) {
-    return nullptr;
-  }
-  asset->style = ReadUtf8String(stream, &guard, limits::MAX_NAME_STRING_BYTES);
-  if (ctx->hasError()) {
-    return nullptr;
-  }
-
-  asset->data = ReadLengthPrefixedBytes(stream, &guard, limits::MAX_FONT_BYTES,
-                                        ErrorCode::FontResourceSizeExceeded);
-
-  uint32_t axisCount = ReadEncodedUint32Safe(stream, &guard);
-  if (axisCount > limits::MAX_FONT_AXES) {
-    ctx->error(ErrorCode::StructureLimitExceeded, "FontAsset axisCount exceeds MAX_FONT_AXES");
-    return nullptr;
-  }
-  asset->axes.resize(axisCount);
-  for (uint32_t i = 0; i < axisCount; ++i) {
-    asset->axes[i].tag = stream->readUint32();
-    asset->axes[i].defaultValue = stream->readFloat();
-    asset->axes[i].minValue = stream->readFloat();
-    asset->axes[i].maxValue = stream->readFloat();
-  }
-  return asset;
-}
-
-}  // namespace
-
-void WriteFontAssetTable(::pag::EncodeStream* stream,
-                         const std::vector<std::unique_ptr<FontAsset>>& fonts,
-                         EncodeSession* session) {
-  ::pag::EncodeStream body(session->sc);
-  body.writeEncodedUint32(static_cast<uint32_t>(fonts.size()));
-  for (const auto& f : fonts) {
-    WriteFontAsset(&body, *f, session);
-  }
-  WriteTag(stream, TagCode::FontAssetTable, &body);
-}
-
-void ReadFontAssetTable(::pag::DecodeStream* stream, DecodeContext* ctx, uint64_t tagEnd,
-                        std::vector<std::unique_ptr<FontAsset>>* out) {
-  auto guard = MakeGuard(ctx);
-  uint32_t count = ReadEncodedUint32Safe(stream, &guard);
-  if (count > limits::MAX_FONTS) {
-    ctx->error(ErrorCode::StructureLimitExceeded, "FontAssetTable count exceeds MAX_FONTS");
-    return;
-  }
-
-  for (uint32_t i = 0; i < count; ++i) {
-    if (stream->position() >= tagEnd) {
-      ctx->error(ErrorCode::TruncatedData,
-                 "FontAssetTable truncated before all FontAsset tags read");
-      return;
-    }
-    TagHeader header = ReadTagHeader(stream);
-    if (header.code != TagCode::FontAssetItem) {
-      ctx->error(ErrorCode::MalformedTag, "FontAssetTable expected nested FontAsset tag");
-      return;
-    }
-    uint64_t bodyStart = stream->position();
-    uint64_t childEnd = 0;
-    if (!SafeTagEnd(stream, bodyStart, header.length, ctx, &childEnd)) {
-      return;
-    }
-    if (childEnd > tagEnd) {
-      ctx->error(ErrorCode::MalformedTag, "FontAsset extends past FontAssetTable");
-      return;
-    }
-    auto font = ReadFontAsset(stream, ctx, childEnd);
-    if (ctx->hasError()) {
-      return;
-    }
-    if (font != nullptr) {
-      out->push_back(std::move(font));
-    }
     SeekTo(stream, static_cast<uint32_t>(childEnd));
   }
 }

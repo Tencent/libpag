@@ -20,7 +20,8 @@
 #include <string>
 #include <variant>
 #include <vector>
-#include "pag/file.h"  // ::pag::Ratio
+#include "pag/file.h"   // ::pag::Ratio
+#include "pag/types.h"  // ::pag::ParagraphJustification / ::pag::TextDirection
 #include "pagx/pag/PropertyEncoding.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
@@ -81,6 +82,11 @@ using Matrix = tgfx::Matrix;
 using Matrix3D = tgfx::Matrix3D;
 using Path = tgfx::Path;
 using Ratio = ::pag::Ratio;
+
+// Text layout enums reused from libpag v1 TextDocument (Phase 16 runtime-shape
+// mode mirrors v1 TextDocument field set).
+using ParagraphJustification = ::pag::ParagraphJustification;
+using TextDirection = ::pag::TextDirection;
 
 // ImagePattern fill scaling (no direct tgfx equivalent; Inflater branches by value).
 enum class ScaleMode : uint8_t { None = 0, Stretch = 1, LetterBox = 2, Zoom = 3 };
@@ -143,11 +149,6 @@ enum class LayerStyleType : uint8_t {
   BackgroundBlur = 2,
 };
 
-enum class FontSourceKind : uint8_t {
-  System = 0,
-  Embedded = 1,
-};
-
 enum class ImageAssetKind : uint8_t {
   Raster = 0,  // only kind produced this cycle
   Svg = 1,     // reserved; Decoder warns + falls back to Raster
@@ -156,7 +157,7 @@ enum class ImageAssetKind : uint8_t {
 };
 
 // ============================================================================
-// C.4 — ImageAsset / FontAsset / GlyphRunBlob
+// C.4 — ImageAsset (Phase 16: font resources no longer embedded; see §10)
 // ============================================================================
 
 struct ImageAsset {
@@ -166,62 +167,6 @@ struct ImageAsset {
   int32_t width = 0;
   int32_t height = 0;
   ImageAssetKind kind = ImageAssetKind::Raster;
-};
-
-struct FontAxis {
-  uint32_t tag = 0;  // 4-char ASCII tag, e.g. 'wght' / 'wdth' / 'slnt'
-  float defaultValue = 0.0f;
-  float minValue = 0.0f;
-  float maxValue = 0.0f;
-};
-
-struct FontAsset {
-  FontSourceKind kind = FontSourceKind::System;
-  std::string family = {};
-  std::string style = {};
-  std::shared_ptr<const tgfx::Data> data;  // populated only when kind == Embedded
-  std::vector<FontAxis> axes = {};         // Variable Font axes; size ≤ MAX_FONT_AXES=64
-};
-
-enum class GlyphRunKind : uint8_t {
-  LayoutRun = 0,        // pairs with GlyphRunRenderer::BuildTextBlobFromLayoutRuns
-  ClassicGlyphRun = 1,  // pairs with GlyphRunRenderer::BuildTextBlob
-};
-
-struct GlyphRunBlob {
-  GlyphRunKind kind = GlyphRunKind::LayoutRun;
-  uint32_t fontIndex = 0;  // UINT32_MAX = font missing (degraded)
-  float fontSize = 12.0f;
-  Matrix inverseMatrix = Matrix::I();  // non-identity inside TextBox; identity for standalone Text
-
-  // ----- LayoutRun fields (kind == LayoutRun) -----
-  // Mirrors pagx::TextLayoutGlyphRun (src/pagx/TextLayout.h:41-46).
-  struct LayoutGlyph {
-    uint16_t glyphId = 0;
-    Point position = {};
-    bool hasXform = false;
-    float scos = 1.0f;
-    float ssin = 0.0f;
-    float tx = 0.0f;
-    float ty = 0.0f;
-  };
-  std::vector<LayoutGlyph> layoutGlyphs = {};
-
-  // ----- ClassicGlyphRun fields (kind == ClassicGlyphRun) -----
-  // Mirrors pagx::GlyphRun (include/pagx/nodes/GlyphRun.h:35-117); Baker has
-  // already applied position→x/y + xOffsets normalization.
-  struct ClassicGlyph {
-    uint16_t glyphId = 0;
-    float xOffset = 0.0f;
-    Point position = {};
-    Point anchor = {};
-    Point scale = {1.0f, 1.0f};
-    float rotation = 0.0f;  // degrees
-    float skew = 0.0f;      // degrees
-  };
-  float baseX = 0.0f;
-  float baseY = 0.0f;
-  std::vector<ClassicGlyph> classicGlyphs = {};
 };
 
 // ============================================================================
@@ -387,9 +332,49 @@ struct ElementRepeaterData {
 };
 
 struct ElementTextData {
+  // Phase 16 (v2.20): runtime-shape mode. Field set mirrors libpag v1
+  // pag::TextDocument (include/pag/types.h:class PAG_API TextDocument);
+  // GlyphRunBlob has been dropped. Inflater calls TextShaper::Shape + the
+  // v1 paragraph layout at load time.
   Property<Point> position = MakeProp(Point{});
+  // PAGX-exclusive per-glyph anchors; preserved so Inflater can pass them
+  // to tgfx::Text::Make(blob, anchors).
   Property<std::vector<Point>> anchors = MakeProp<std::vector<Point>>({});
-  std::vector<GlyphRunBlob> glyphRuns = {};
+
+  // ----- Content (shaper input) -----
+  std::string text = "";
+  std::string fontFamily = "";
+  std::string fontStyle = "";
+  float fontSize = 12.0f;
+
+  // ----- Direction / paragraph layout (aligns with v1 TextDocument) -----
+  TextDirection direction = TextDirection::Default;
+  ParagraphJustification justification = ParagraphJustification::LeftJustify;
+  float leading = 0.0f;   // Line leading; 0 = auto (fontSize * 1.2).
+  float tracking = 0.0f;  // Letter spacing.
+  float firstBaseLine = 0.0f;
+  float baselineShift = 0.0f;
+
+  // ----- BoxText -----
+  bool boxText = false;
+  Point boxTextPos = {};
+  Point boxTextSize = {};
+
+  // ----- Faux style (synthesized when no matching bold/italic typeface) ----
+  bool fauxBold = false;
+  bool fauxItalic = false;
+
+  // ----- Paint -----
+  bool applyFill = true;
+  bool applyStroke = false;
+  bool strokeOverFill = true;
+  Color fillColor = {};
+  Color strokeColor = {};
+  float strokeWidth = 1.0f;
+
+  // ----- Background (aligns with v1 TextSourceV2) -----
+  Color backgroundColor = {};
+  uint8_t backgroundAlpha = 0;
 };
 
 struct ElementTextPathData {
@@ -471,9 +456,14 @@ struct ShapePayload {
 };
 
 struct TextPayload {
+  // Reserved; PAGX does not currently route rich text through LayerType::Text
+  // (everything goes through VectorLayer + ElementText). Phase 16 (v2.20)
+  // drops fontIndex along with PAGDocument::fonts[] and instead carries
+  // family/style strings directly, matching runtime-shape mode.
   Property<std::string> text = MakeProp<std::string>({});
   Property<Color> textColor = MakeProp(Color{});
-  uint32_t fontIndex = UINT32_MAX;
+  std::string fontFamily = {};
+  std::string fontStyle = {};
   Property<float> fontSize = MakeProp(12.0f);
   Property<float> width = MakeProp(0.0f);
   Property<float> height = MakeProp(0.0f);
@@ -623,7 +613,6 @@ struct FileHeader {
 struct PAGDocument {
   FileHeader header = {};
   std::vector<std::unique_ptr<ImageAsset>> images = {};
-  std::vector<std::unique_ptr<FontAsset>> fonts = {};
   std::vector<std::unique_ptr<Composition>> compositions = {};
 };
 

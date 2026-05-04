@@ -1,7 +1,9 @@
 // Copyright (C) 2026 Tencent. All rights reserved.
 //
 // Phase 2 unit tests for ResourceBaker — the three-tier intern chain on
-// BakeContext.imageIndex* / fontIndex* maps.
+// BakeContext.imageIndex* maps. (Phase 16 v2.20 dropped the font intern
+// chain alongside PAGDocument::fonts[]; those tests are disabled here
+// and rewritten in Phase 16.2+.)
 #include <memory>
 #include <string>
 #include "gtest/gtest.h"
@@ -29,15 +31,6 @@ std::unique_ptr<ImageAsset> MakeImage(uint8_t fillByte, size_t bytes,
     *outData = data;
   }
   return asset;
-}
-
-std::unique_ptr<FontAsset> MakeFont(std::string family, std::string style,
-                                    FontSourceKind kind = FontSourceKind::System) {
-  auto f = std::make_unique<FontAsset>();
-  f->kind = kind;
-  f->family = std::move(family);
-  f->style = std::move(style);
-  return f;
 }
 
 }  // namespace
@@ -95,25 +88,16 @@ TEST(ResourceBaker, ImageDistinctAssetsTakeFreshSlots) {
   EXPECT_EQ(doc.images.size(), 3u);
 }
 
-TEST(ResourceBaker, FontSemanticKeyCollapse) {
-  BakeContext ctx;
-  PAGDocument doc;
-  std::string semantic = std::string("system") + '\0' + "PingFang" + '\0' + "Regular";
-  uint32_t firstIndex = RegisterFont(ctx, doc, MakeFont("PingFang", "Regular"), nullptr, semantic);
-  uint32_t secondIndex = RegisterFont(ctx, doc, MakeFont("PingFang", "Regular"), nullptr, semantic);
-  EXPECT_EQ(firstIndex, secondIndex);
-  EXPECT_EQ(doc.fonts.size(), 1u);
+TEST(ResourceBaker, DISABLED_FontSemanticKeyCollapse) {
+  // Phase 16 (v2.20): RegisterFont + PAGDocument::fonts removed. Rewrite
+  // against the runtime-shape text pipeline once it stabilises.
+  GTEST_SKIP() << "Disabled during Phase 16 rework of font intern chain.";
 }
 
-TEST(ResourceBaker, FontDistinctFamiliesTakeFreshSlots) {
-  BakeContext ctx;
-  PAGDocument doc;
-  std::string keyA = std::string("system") + '\0' + "PingFang" + '\0' + "Regular";
-  std::string keyB = std::string("system") + '\0' + "Helvetica" + '\0' + "Bold";
-  uint32_t a = RegisterFont(ctx, doc, MakeFont("PingFang", "Regular"), nullptr, keyA);
-  uint32_t b = RegisterFont(ctx, doc, MakeFont("Helvetica", "Bold"), nullptr, keyB);
-  EXPECT_NE(a, b);
-  EXPECT_EQ(doc.fonts.size(), 2u);
+TEST(ResourceBaker, DISABLED_FontDistinctFamiliesTakeFreshSlots) {
+  // Phase 16 (v2.20): family/style strings are now stored inline on
+  // ElementTextData; there is no longer a shared font table to intern into.
+  GTEST_SKIP() << "Disabled during Phase 16 rework of font intern chain.";
 }
 
 TEST(ResourceBaker, NullAssetDoesNotCrash) {

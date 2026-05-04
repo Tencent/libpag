@@ -116,7 +116,11 @@ PAGLoader::Result PAGLoader::LoadFromBytes(const uint8_t* data, size_t length,
     return result;
   }
 
-  auto inflate = pag::LayerInflater::Inflate(std::move(decode.doc));
+  result.compositionCount = static_cast<uint32_t>(decode.doc->compositions.size());
+
+  pag::LayerInflater::Options inflaterOpts;
+  inflaterOpts.fontProvider = options.fontProvider;
+  auto inflate = pag::LayerInflater::Inflate(std::move(decode.doc), std::move(inflaterOpts));
   result.layer = std::move(inflate.layer);
   for (auto& w : inflate.warnings) {
     result.warnings.push_back(std::move(w));

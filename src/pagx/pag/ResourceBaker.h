@@ -1,15 +1,14 @@
 // Copyright (C) 2026 Tencent. All rights reserved.
 //
-// Resource pre-pass — walks every layer once and interns ImageAsset / FontAsset
-// instances into PAGDocument::images / fonts. Subsequent baker submodules
-// (VectorBaker, TextBaker, ...) reach into BakeContext::imageIndex* /
-// fontIndex* maps to translate raw PAGX node references into compact uint32
-// indices.
+// Resource pre-pass — walks every layer once and interns ImageAsset instances
+// into PAGDocument::images. Subsequent baker submodules (VectorBaker,
+// TextBaker, ...) reach into BakeContext::imageIndex* maps to translate raw
+// PAGX node references into compact uint32 indices.
 //
-// Phase 2 deliverable scope: the deduplication primitives (RegisterImage /
-// RegisterFont) plus the BakeContext map plumbing. The PAGX-tree-walking
-// driver lands in Phase 3 alongside LayerBaker, since the walker depends on
-// PAGX node types that Phase 3 introduces.
+// Phase 16 (v2.20): font resources moved out of the .pag container entirely —
+// ElementTextData carries fontFamily/fontStyle strings verbatim and the
+// Inflater resolves typefaces through FontProvider at load time. The
+// RegisterFont helper is therefore gone; only RegisterImage remains.
 #pragma once
 
 #include <cstdint>
@@ -37,11 +36,5 @@ namespace pagx::pag {
 // insertion and stays with the existing slot on a hit.
 uint32_t RegisterImage(BakeContext& ctx, PAGDocument& doc, std::unique_ptr<ImageAsset> asset,
                        const void* nodePtr, std::string semanticKey);
-
-// Same three-tier intern path for fonts. semanticKey convention is
-// "<system|embedded>\0<family>\0<style>" so identical fonts coming from
-// different XML nodes still collapse to one slot.
-uint32_t RegisterFont(BakeContext& ctx, PAGDocument& doc, std::unique_ptr<FontAsset> asset,
-                      const void* nodePtr, std::string semanticKey);
 
 }  // namespace pagx::pag

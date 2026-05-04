@@ -1,6 +1,5 @@
 // Copyright (C) 2026 Tencent. All rights reserved.
 #include "pagx/pag/ElementTags.h"
-#include "pagx/pag/GlyphRunCodec.h"
 #include "pagx/pag/PropertyEncoding.h"
 #include "pagx/pag/TagHeader.h"
 #include "pagx/pag/ValueCodec.h"
@@ -653,41 +652,129 @@ std::unique_ptr<ElementRepeaterData> ReadElementRepeaterBody(::pag::DecodeStream
 
 // ---------- Text (§D.11 ElementText = 50) ----------
 //
-// body = Property<Point> position,
-//        Property<vector<Point>> anchors,
-//        varU32 runCount,
-//        runCount × [GlyphRunBlob inline]
+// Phase 16 (v2.20) runtime-shape body layout (mirrors v1 pag::TextDocument
+// field set — see include/pag/types.h TextDocument). No Property<T> wrapping
+// for the content fields themselves; animations come back through the
+// wrapping Property<Point> position/anchors.
 //
-// We reuse the Property<vector<...>> specialisations (Phase 6 added vector<Color>
-// and vector<float>); Point is the third element kind in the family.
+// body = Property<Point>                position
+//        Property<vector<Point>>        anchors
+//        utf8string                     text
+//        utf8string                     fontFamily
+//        utf8string                     fontStyle
+//        f32                            fontSize
+//        u8                             direction        (TextDirection enum)
+//        u8                             justification    (ParagraphJustification enum)
+//        f32                            leading
+//        f32                            tracking
+//        f32                            firstBaseLine
+//        f32                            baselineShift
+//        u8  boxFlags  (bit 0 = boxText, bit 1 = fauxBold, bit 2 = fauxItalic,
+//                       bit 3 = applyFill, bit 4 = applyStroke,
+//                       bit 5 = strokeOverFill)
+//        Point                          boxTextPos       (only when boxText)
+//        Point                          boxTextSize      (only when boxText)
+//        Color                          fillColor
+//        Color                          strokeColor
+//        f32                            strokeWidth
+//        Color                          backgroundColor
+//        u8                             backgroundAlpha
 
 void WriteElementTextBody(::pag::EncodeStream* body, const ElementTextData& d) {
   WriteProperty<tgfx::Point>(body, d.position, /*default=*/tgfx::Point{});
   WriteProperty<std::vector<tgfx::Point>>(body, d.anchors, /*default=*/std::vector<tgfx::Point>{});
-  body->writeEncodedUint32(static_cast<uint32_t>(d.glyphRuns.size()));
-  for (const auto& run : d.glyphRuns) {
-    WriteGlyphRunBlobInline(body, run);
+
+  WriteUtf8String(body, d.text);
+  WriteUtf8String(body, d.fontFamily);
+  WriteUtf8String(body, d.fontStyle);
+  body->writeFloat(d.fontSize);
+
+  body->writeUint8(static_cast<uint8_t>(d.direction));
+  body->writeUint8(static_cast<uint8_t>(d.justification));
+  body->writeFloat(d.leading);
+  body->writeFloat(d.tracking);
+  body->writeFloat(d.firstBaseLine);
+  body->writeFloat(d.baselineShift);
+
+  uint8_t boxFlags = 0;
+  if (d.boxText) boxFlags |= 0x01;
+  if (d.fauxBold) boxFlags |= 0x02;
+  if (d.fauxItalic) boxFlags |= 0x04;
+  if (d.applyFill) boxFlags |= 0x08;
+  if (d.applyStroke) boxFlags |= 0x10;
+  if (d.strokeOverFill) boxFlags |= 0x20;
+  body->writeUint8(boxFlags);
+
+  if (d.boxText) {
+    body->writeFloat(d.boxTextPos.x);
+    body->writeFloat(d.boxTextPos.y);
+    body->writeFloat(d.boxTextSize.x);
+    body->writeFloat(d.boxTextSize.y);
   }
+
+  WriteColor(body, d.fillColor);
+  WriteColor(body, d.strokeColor);
+  body->writeFloat(d.strokeWidth);
+  WriteColor(body, d.backgroundColor);
+  body->writeUint8(d.backgroundAlpha);
 }
 
 std::unique_ptr<ElementTextData> ReadElementTextBody(::pag::DecodeStream* s, DecodeContext* ctx,
                                                      uint32_t te) {
   auto d = std::make_unique<ElementTextData>();
+  auto guard = MakeGuard(ctx);
+
   d->position = ReadProperty<tgfx::Point>(s, /*default=*/tgfx::Point{}, te);
   d->anchors =
       ReadProperty<std::vector<tgfx::Point>>(s, /*default=*/std::vector<tgfx::Point>{}, te);
-  auto guard = MakeGuard(ctx);
-  uint32_t runCount = ReadEncodedUint32Safe(s, &guard);
-  if (runCount > limits::MAX_RUNS_PER_TEXT) {
-    ctx->error(ErrorCode::StructureLimitExceeded, "ElementText runCount exceeds MAX_RUNS_PER_TEXT");
-    return nullptr;
-  }
-  d->glyphRuns.resize(runCount);
-  for (uint32_t i = 0; i < runCount; ++i) {
-    if (!ReadGlyphRunBlobInline(s, ctx, te, &d->glyphRuns[i])) {
-      return nullptr;
+
+  d->text = ReadUtf8String(s, &guard, limits::MAX_TEXT_STRING_BYTES);
+  d->fontFamily = ReadUtf8String(s, &guard, limits::MAX_NAME_STRING_BYTES);
+  d->fontStyle = ReadUtf8String(s, &guard, limits::MAX_NAME_STRING_BYTES);
+  d->fontSize = s->readFloat();
+
+  {
+    uint8_t direction = s->readUint8();
+    if (direction > static_cast<uint8_t>(TextDirection::Vertical)) {
+      guard.warn(ErrorCode::InvalidEnumValue, "ElementText.direction");
+      direction = 0;
     }
+    d->direction = static_cast<TextDirection>(direction);
   }
+  {
+    uint8_t just = s->readUint8();
+    if (just > static_cast<uint8_t>(ParagraphJustification::FullJustifyLastLineFull)) {
+      guard.warn(ErrorCode::InvalidEnumValue, "ElementText.justification");
+      just = 0;
+    }
+    d->justification = static_cast<ParagraphJustification>(just);
+  }
+  d->leading = s->readFloat();
+  d->tracking = s->readFloat();
+  d->firstBaseLine = s->readFloat();
+  d->baselineShift = s->readFloat();
+
+  const uint8_t boxFlags = s->readUint8();
+  d->boxText = (boxFlags & 0x01) != 0;
+  d->fauxBold = (boxFlags & 0x02) != 0;
+  d->fauxItalic = (boxFlags & 0x04) != 0;
+  d->applyFill = (boxFlags & 0x08) != 0;
+  d->applyStroke = (boxFlags & 0x10) != 0;
+  d->strokeOverFill = (boxFlags & 0x20) != 0;
+
+  if (d->boxText) {
+    d->boxTextPos.x = s->readFloat();
+    d->boxTextPos.y = s->readFloat();
+    d->boxTextSize.x = s->readFloat();
+    d->boxTextSize.y = s->readFloat();
+  }
+
+  d->fillColor = ReadColor(s);
+  d->strokeColor = ReadColor(s);
+  d->strokeWidth = s->readFloat();
+  d->backgroundColor = ReadColor(s);
+  d->backgroundAlpha = s->readUint8();
+
   return d;
 }
 

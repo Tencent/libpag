@@ -12,6 +12,7 @@
 #include <memory>
 #include <vector>
 #include "pagx/Diagnostic.h"
+#include "pagx/pag/FontProvider.h"
 #include "pagx/pag/PAGDocument.h"
 #include "tgfx/layers/Layer.h"
 
@@ -19,6 +20,20 @@ namespace pagx::pag {
 
 class LayerInflater {
  public:
+  struct Options {
+    // Font resolver used by text inflation. If null, Inflate() falls back to
+    // MakeDefaultFontProvider() — see include/pagx/pag/FontProvider.h and
+    // docs/pagx_to_pag_v2_phase16_text_redesign.md §5.2.
+    std::shared_ptr<FontProvider> fontProvider = nullptr;
+
+    // Explicit default constructor — makes the default-arg
+    // `Inflate(..., Options opts = {})` resolve during the class body
+    // (same clang quirk PAGLoader::Options / PAGExporter::Options work
+    // around).
+    Options() {
+    }
+  };
+
   struct Result {
     // Non-null on success. nullptr iff the document has no renderable content
     // (empty compositions / compositions[0] empty); in that case the
@@ -35,7 +50,7 @@ class LayerInflater {
   //
   // Never produces fatal errors — per-layer / per-element failures degrade
   // into warnings (600-699, see §9.4) and the pipeline continues.
-  static Result Inflate(std::unique_ptr<PAGDocument> doc);
+  static Result Inflate(std::unique_ptr<PAGDocument> doc, Options opts = {});
 };
 
 }  // namespace pagx::pag

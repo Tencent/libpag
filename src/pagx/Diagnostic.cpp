@@ -46,8 +46,8 @@ static const char* CodeToString(DiagnosticCode c) {
       return "TextGlyphDataEmpty";
     case DiagnosticCode::EmptyDocument:
       return "EmptyDocument";
-    case DiagnosticCode::GlyphRunKindInferred:
-      return "GlyphRunKindInferred";
+    case DiagnosticCode::TextGlyphRunsDowngraded:
+      return "TextGlyphRunsDowngraded";
     case DiagnosticCode::InvalidMagic:
       return "InvalidMagic";
     case DiagnosticCode::UnsupportedVersion:

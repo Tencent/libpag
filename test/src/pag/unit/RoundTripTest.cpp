@@ -111,7 +111,8 @@ TEST(RoundTrip, ZeroDimensionCompositionWarnedAndClamped) {
 }
 
 // =============================================================================
-// Phase 4b: ImageAssetTable / FontAssetTable / LayerBlock / CompositionRef
+// Phase 4b: ImageAssetTable / LayerBlock / CompositionRef
+// (Font asset table dropped in Phase 16 v2.20 — runtime-shape text mode.)
 // =============================================================================
 
 TEST(RoundTrip, ImageAssetTablePreserved) {
@@ -138,39 +139,12 @@ TEST(RoundTrip, ImageAssetTablePreserved) {
   EXPECT_EQ(0, std::memcmp(dec.doc->images[0]->data->data(), kSampleData, sizeof(kSampleData)));
 }
 
-TEST(RoundTrip, FontAssetTablePreserved) {
-  PAGDocument doc = MakeMinimalDoc();
-  auto sysFont = std::make_unique<FontAsset>();
-  sysFont->kind = FontSourceKind::System;
-  sysFont->family = "Helvetica";
-  sysFont->style = "Bold";
-  doc.fonts.push_back(std::move(sysFont));
-
-  auto embeddedFont = std::make_unique<FontAsset>();
-  embeddedFont->kind = FontSourceKind::Embedded;
-  embeddedFont->family = "MyFont";
-  embeddedFont->style = "Regular";
-  static constexpr uint8_t kFontBytes[] = {'O', 'T', 'T', 'O', 0x00, 0x01};
-  embeddedFont->data = ::tgfx::Data::MakeWithCopy(kFontBytes, sizeof(kFontBytes));
-  embeddedFont->axes.push_back(FontAxis{0x77676874u, 400.0f, 100.0f, 900.0f});  // 'wght'
-  doc.fonts.push_back(std::move(embeddedFont));
-
-  auto enc = Codec::Encode(doc);
-  auto dec = Codec::Decode(enc.bytes->data(), enc.bytes->length());
-  ASSERT_NE(dec.doc, nullptr);
-  ASSERT_EQ(dec.doc->fonts.size(), 2u);
-  EXPECT_EQ(dec.doc->fonts[0]->family, "Helvetica");
-  EXPECT_EQ(dec.doc->fonts[0]->style, "Bold");
-  EXPECT_EQ(dec.doc->fonts[0]->kind, FontSourceKind::System);
-  EXPECT_EQ(dec.doc->fonts[1]->family, "MyFont");
-  EXPECT_EQ(dec.doc->fonts[1]->kind, FontSourceKind::Embedded);
-  ASSERT_NE(dec.doc->fonts[1]->data, nullptr);
-  EXPECT_EQ(dec.doc->fonts[1]->data->size(), sizeof(kFontBytes));
-  ASSERT_EQ(dec.doc->fonts[1]->axes.size(), 1u);
-  EXPECT_EQ(dec.doc->fonts[1]->axes[0].tag, 0x77676874u);
-  EXPECT_FLOAT_EQ(dec.doc->fonts[1]->axes[0].defaultValue, 400.0f);
-  EXPECT_FLOAT_EQ(dec.doc->fonts[1]->axes[0].minValue, 100.0f);
-  EXPECT_FLOAT_EQ(dec.doc->fonts[1]->axes[0].maxValue, 900.0f);
+TEST(RoundTrip, DISABLED_FontTablePreserved) {
+  // Phase 16 (v2.20): PAGDocument::fonts[] and the font asset table on the
+  // wire are gone; family/style strings live on ElementTextData instead.
+  // Reinstate this test in Phase 16.2+ once the new text wire format is
+  // frozen.
+  GTEST_SKIP() << "Disabled during Phase 16 rework of font asset table.";
 }
 
 TEST(RoundTrip, LayerBlockBasicFields) {

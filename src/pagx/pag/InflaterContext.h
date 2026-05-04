@@ -17,6 +17,7 @@
 #include <unordered_map>
 #include <vector>
 #include "pagx/pag/DiagnosticCollector.h"
+#include "pagx/pag/FontProvider.h"
 #include "pagx/pag/PAGDocument.h"
 #include "pagx/pag/limits.h"
 #include "tgfx/layers/Layer.h"
@@ -93,6 +94,11 @@ struct InflaterContext : DiagnosticCollector {
   // individual sub-structures but not cumulative totals — `10^6` layers
   // individually decodable can still OOM the GPU when all inflated.
   uint32_t totalInflatedLayers = 0;
+
+  // Font resolver injected by the caller (Phase 16 runtime-shape mode).
+  // Never null inside an active Inflate() call — LayerInflater::Inflate
+  // substitutes MakeDefaultFontProvider() when the caller passes nullptr.
+  std::shared_ptr<FontProvider> fontProvider;
 
   // Public warn wrapper (3-arg, same shape as DecodeContext / BakeContext).
   // Inflater has no byte stream, so byteOffset is always 0.

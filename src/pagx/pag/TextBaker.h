@@ -1,23 +1,27 @@
 // Copyright (C) 2026 Tencent. All rights reserved.
 //
-// Phase 8 TextBaker — translates PAGX Text / TextPath / TextModifier nodes
-// into their PAGDocument counterparts (ElementTextData /
-// ElementTextPathData / ElementTextModifierData). Lives behind its own
-// header because the Text baker path has to reach into Text's private
-// glyphData via a `friend class pag::TextBaker` declaration added in
-// include/pagx/nodes/Text.h — keeping the baker class (rather than a free
-// function) lets that friend grant survive.
+// TextBaker — translates PAGX Text / TextPath / TextModifier nodes into their
+// PAGDocument counterparts (ElementTextData / ElementTextPathData /
+// ElementTextModifierData).
+//
+// Phase 16 (v2.20): runtime-shape mode. TextBaker flattens pagx::Text fields
+// (text / fontFamily / fontStyle / fontSize / letterSpacing / fauxBold / ...)
+// directly into ElementTextData; the Inflater re-shapes at load time through
+// FontProvider + TextShaper. Pre-shaped glyphRuns are dropped (per-glyph
+// xform information is lost) and the Baker emits TextGlyphRunsDowngraded=208
+// so callers can see the downgrade explicitly.
+//
+// TextBaker stays a class rather than a free function because future Phases
+// reintroducing richer Text access may need the `friend class pag::TextBaker`
+// grant already declared inside include/pagx/nodes/Text.h.
 #pragma once
 
-#include <cstdint>
 #include <memory>
-#include <string>
 
 namespace pagx {
 class Text;
 class TextPath;
 class TextModifier;
-class Font;
 }  // namespace pagx
 
 namespace pagx::pag {
@@ -36,19 +40,6 @@ class TextBaker {
   static std::unique_ptr<VectorElement> BakeTextPath(BakeContext& ctx, const pagx::TextPath& src);
   static std::unique_ptr<VectorElement> BakeTextModifier(BakeContext& ctx,
                                                          const pagx::TextModifier& src);
-
-  // Interns a PAGX Font node into PAGDocument::fonts and returns its index.
-  // Phase 8 registers every unique pagx::Font* as a System-kind placeholder
-  // (family = synthetic "#embedded_<index>", no TTF bytes). Phase 10
-  // PAGExporter will upgrade these to Embedded FontAssets by re-running
-  // FontEmbedder. Returns UINT32_MAX when `font` is null.
-  static uint32_t InternFont(BakeContext& ctx, PAGDocument& doc, const pagx::Font* font);
-
-  // Interns a System-font (family + style) reference used by runtime
-  // shaping Text nodes. Phase 8 writes the family/style strings verbatim —
-  // Phase 9 Inflater resolves them at load time via platform font lookup.
-  static uint32_t InternSystemFont(BakeContext& ctx, PAGDocument& doc, const std::string& family,
-                                   const std::string& style);
 };
 
 }  // namespace pagx::pag

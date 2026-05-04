@@ -238,41 +238,16 @@ TEST(LayerInflater, ImagePatternDecodeFailureWarns600) {
 }
 
 // ---------------------------------------------------------------------------
-// 601 InflateFontCreateFailed — ElementText with out-of-range fontIndex.
-// Empty tgfx::Font propagates through BuildTextBlob, which returns null →
-// 602 also fires.
+// 601 InflateFontCreateFailed — Phase 16 rewires this path through the
+// runtime shaper; old GlyphRun-blob-based trigger no longer applies.
 // ---------------------------------------------------------------------------
 
-TEST(LayerInflater, OutOfRangeFontIndexWarns601) {
-  auto doc = MakeDoc();
-  auto comp = MakeComp();
-  auto layer = MakeLayer(LayerType::Vector);
-  auto vec = std::make_unique<VectorPayload>();
-
-  auto textEl = std::make_unique<VectorElement>();
-  textEl->type = VectorElementType::Text;
-  auto textData = std::make_unique<ElementTextData>();
-  GlyphRunBlob blob;
-  blob.kind = GlyphRunKind::LayoutRun;
-  blob.fontIndex = 999;  // Out of range — doc->fonts is empty.
-  blob.fontSize = 16.0f;
-  GlyphRunBlob::LayoutGlyph g;
-  g.glyphId = 1;
-  g.position = {0.0f, 0.0f};
-  blob.layoutGlyphs.push_back(g);
-  textData->glyphRuns.push_back(std::move(blob));
-  textEl->payload = std::move(textData);
-  vec->contents.push_back(std::move(textEl));
-
-  layer->vector = std::move(vec);
-  comp->layers.push_back(std::move(layer));
-  doc->compositions.push_back(std::move(comp));
-
-  auto r = LayerInflater::Inflate(std::move(doc));
-  ASSERT_NE(r.layer, nullptr);
-  EXPECT_TRUE(HasWarningCode(r.warnings, ErrorCode::InflateFontCreateFailed));
-  // Builder returns a null TextBlob when every run has no typeface → 602.
-  EXPECT_TRUE(HasWarningCode(r.warnings, ErrorCode::InflateGlyphRunBuildFailed));
+TEST(LayerInflater, DISABLED_OutOfRangeFontIndexWarns601) {
+  // Phase 16 (v2.20): ElementTextData::glyphRuns, the font asset table,
+  // and the per-run font index dispatch are all gone. Reinstate once the
+  // runtime shaper path produces its own 601 trigger (missing family
+  // resolution).
+  GTEST_SKIP() << "Disabled during Phase 16 rework of font resolution pipeline.";
 }
 
 // ---------------------------------------------------------------------------

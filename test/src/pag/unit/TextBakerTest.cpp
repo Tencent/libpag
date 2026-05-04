@@ -72,104 +72,23 @@ const Layer* FirstLayer(const PAGDocument& doc) {
 // Pre-shaped Text
 // -----------------------------------------------------------------------
 
-TEST(TextBaker, PreShapedTextSingleRunRoundTrip) {
-  auto r = BakeAndRoundTrip([](pagx::test::PAGXBuilder& b, pagx::Layer& host) {
-    auto* font = b.RawDocument()->makeNode<pagx::Font>();
-    font->unitsPerEm = 1000;
-
-    auto* run = b.RawDocument()->makeNode<pagx::GlyphRun>();
-    run->font = font;
-    run->glyphs = {65, 66, 67};  // 'A', 'B', 'C'
-    run->fontSize = 24.0f;
-    run->x = 10.0f;
-    run->y = 20.0f;
-    run->xOffsets = {0, 12, 24};
-    run->positions = {{0, 0}, {0, 0}, {0, 0}};
-
-    auto* text = b.RawDocument()->makeNode<pagx::Text>();
-    text->position = pagx::Point{5.0f, 15.0f};
-    text->glyphRuns = {run};
-    host.contents.push_back(text);
-  });
-  ASSERT_NE(r.decoded, nullptr);
-  const auto* layer = FirstLayer(*r.decoded);
-  ASSERT_NE(layer, nullptr);
-  ASSERT_NE(layer->vector, nullptr);
-  ASSERT_EQ(layer->vector->contents.size(), 1u);
-  ASSERT_EQ(layer->vector->contents[0]->type, VectorElementType::Text);
-  const auto& d = std::get<std::unique_ptr<ElementTextData>>(layer->vector->contents[0]->payload);
-  EXPECT_FLOAT_EQ(d->position.value.x, 5.0f);
-  EXPECT_FLOAT_EQ(d->position.value.y, 15.0f);
-  ASSERT_EQ(d->glyphRuns.size(), 1u);
-  const auto& blob = d->glyphRuns[0];
-  EXPECT_EQ(blob.kind, GlyphRunKind::ClassicGlyphRun);
-  EXPECT_FLOAT_EQ(blob.fontSize, 24.0f);
-  EXPECT_FLOAT_EQ(blob.baseX, 10.0f);
-  EXPECT_FLOAT_EQ(blob.baseY, 20.0f);
-  ASSERT_EQ(blob.classicGlyphs.size(), 3u);
-  EXPECT_EQ(blob.classicGlyphs[0].glyphId, 65u);
-  EXPECT_EQ(blob.classicGlyphs[2].glyphId, 67u);
-  EXPECT_NEAR(blob.classicGlyphs[1].xOffset, 12.0f, 1.0f / 16.0f);
-
-  // Font registration: one pagx::Font → exactly one FontAsset slot.
-  ASSERT_EQ(r.decoded->fonts.size(), 1u);
-  EXPECT_EQ(r.decoded->fonts[0]->kind, FontSourceKind::System);
-  EXPECT_EQ(r.decoded->fonts[0]->family, "#embedded");
+TEST(TextBaker, DISABLED_PreShapedTextSingleRunRoundTrip) {
+  // Phase 16 (v2.20): runtime-shape mode drops pre-shaped GlyphRun/Font
+  // assets. Rewrite in Phase 16.2+ against the new ElementTextData fields
+  // (text / fontFamily / fontStyle / fontSize / direction / ...).
+  GTEST_SKIP() << "Disabled during Phase 16 rework of pre-shaped text pipeline.";
 }
 
-TEST(TextBaker, PreShapedTextMultipleRunsShareFont) {
-  // Two GlyphRuns that reference the same pagx::Font node must collapse to
-  // a single FontAsset entry so the on-wire fontIndex table stays compact.
-  auto r = BakeAndRoundTrip([](pagx::test::PAGXBuilder& b, pagx::Layer& host) {
-    auto* font = b.RawDocument()->makeNode<pagx::Font>();
-
-    auto* run1 = b.RawDocument()->makeNode<pagx::GlyphRun>();
-    run1->font = font;
-    run1->glyphs = {65};
-    run1->fontSize = 12.0f;
-
-    auto* run2 = b.RawDocument()->makeNode<pagx::GlyphRun>();
-    run2->font = font;
-    run2->glyphs = {66};
-    run2->fontSize = 12.0f;
-
-    auto* text = b.RawDocument()->makeNode<pagx::Text>();
-    text->glyphRuns = {run1, run2};
-    host.contents.push_back(text);
-  });
-  ASSERT_NE(r.decoded, nullptr);
-  EXPECT_EQ(r.decoded->fonts.size(), 1u);
-  const auto* layer = FirstLayer(*r.decoded);
-  const auto& d = std::get<std::unique_ptr<ElementTextData>>(layer->vector->contents[0]->payload);
-  ASSERT_EQ(d->glyphRuns.size(), 2u);
-  EXPECT_EQ(d->glyphRuns[0].fontIndex, d->glyphRuns[1].fontIndex);
+TEST(TextBaker, DISABLED_PreShapedTextMultipleRunsShareFont) {
+  // Phase 16 (v2.20): font interning disappears along with the fonts[]
+  // asset table; runtime-shape mode stores family/style strings inline.
+  GTEST_SKIP() << "Disabled during Phase 16 rework of font asset interning.";
 }
 
-TEST(TextBaker, TextWithNullFontEmitsWarning) {
-  // GlyphRun.font = nullptr should warn FontSourceMissing, register no
-  // FontAsset, and fontIndex becomes UINT32_MAX.
-  auto r = BakeAndRoundTrip([](pagx::test::PAGXBuilder& b, pagx::Layer& host) {
-    auto* run = b.RawDocument()->makeNode<pagx::GlyphRun>();
-    // run->font stays null
-    run->glyphs = {42};
-
-    auto* text = b.RawDocument()->makeNode<pagx::Text>();
-    text->glyphRuns = {run};
-    host.contents.push_back(text);
-  });
-  ASSERT_NE(r.decoded, nullptr);
-  const auto* layer = FirstLayer(*r.decoded);
-  const auto& d = std::get<std::unique_ptr<ElementTextData>>(layer->vector->contents[0]->payload);
-  ASSERT_EQ(d->glyphRuns.size(), 1u);
-  EXPECT_EQ(d->glyphRuns[0].fontIndex, UINT32_MAX);
-  bool sawWarning = false;
-  for (const auto& w : r.bakeWarnings) {
-    if (w.code == pagx::DiagnosticCode::FontSourceMissing) {
-      sawWarning = true;
-      break;
-    }
-  }
-  EXPECT_TRUE(sawWarning);
+TEST(TextBaker, DISABLED_TextWithNullFontEmitsWarning) {
+  // Phase 16 (v2.20): FontSourceMissing semantics move with the runtime
+  // shaper; rewrite once the new warning contract is defined.
+  GTEST_SKIP() << "Disabled during Phase 16 rework of font-missing diagnostics.";
 }
 
 // -----------------------------------------------------------------------

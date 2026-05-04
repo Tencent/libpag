@@ -86,13 +86,11 @@ void ReadImageAssetTable(::pag::DecodeStream* stream, DecodeContext* ctx, uint64
                          std::vector<std::unique_ptr<ImageAsset>>* out);
 
 // ---- FontAssetTable (TagCode = 3) + FontAsset sub-Tag (TagCode = 7) ----
-
-void WriteFontAssetTable(::pag::EncodeStream* stream,
-                         const std::vector<std::unique_ptr<FontAsset>>& fonts,
-                         EncodeSession* session);
-
-void ReadFontAssetTable(::pag::DecodeStream* stream, DecodeContext* ctx, uint64_t tagEnd,
-                        std::vector<std::unique_ptr<FontAsset>>* out);
+//
+// Phase 16 (v2.20) stopped producing font resources — the tag-code values
+// are reserved but no Writer emits them, and the Decoder skips any legacy
+// bytes it encounters through the generic UnknownTagCode=400 path. Hence
+// no Read/Write*FontAssetTable prototypes exist any more.
 
 // ---- LayerBlock (TagCode = 10) ------------------------------------------
 // Phase 4b covers LayerBlock body + LayerTransform sub-Tag (=15) + the

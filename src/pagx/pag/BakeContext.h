@@ -52,9 +52,8 @@ struct BakeContext : DiagnosticCollector {
   std::unordered_map<const tgfx::Data*, uint32_t> imageIndexByDataPtr;  // embedded Data ptr
   std::unordered_map<std::string, uint32_t> imageIndexByKey;            // URI / abs path
 
-  std::unordered_map<const void*, uint32_t> fontIndexByNode;
-  std::unordered_map<const tgfx::Data*, uint32_t> fontIndexByDataPtr;  // Embedded font Data
-  std::unordered_map<std::string, uint32_t> fontIndexByKey;            // "system\0family\0style"
+  // Phase 16 (v2.20) removed the font interning maps — runtime-shape mode
+  // serializes fontFamily/fontStyle strings directly on ElementTextData.
 
   // ---- Mask two-pass index (§12.1) ----
   // Pass 1 records every PAGX layer's path (chain of child indices from the
