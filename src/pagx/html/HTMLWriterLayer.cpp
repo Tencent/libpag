@@ -1089,7 +1089,7 @@ void HTMLWriter::writeLayerContents(HTMLBuilder& out, const Layer* layer, float 
 //==============================================================================
 
 void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAlpha,
-                            bool distributeAlpha, bool isFlexItem) {
+                            bool distributeAlpha, bool isFlexItem, LayoutMode parentLayout) {
   RecursionGuard guard(_ctx);
   if (guard.overflowed()) {
     return;
@@ -1111,7 +1111,21 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
 
   if (isFlexItem) {
     // Flex item: positioned by parent's flexbox, no absolute positioning needed.
-    if (layer->flex > 0) {
+    //
+    // PAGX flex semantics (src/pagx/nodes/Layer.cpp:370, HasExplicitMainSize): a child with
+    // `flex > 0` only participates in flex distribution when the main-axis size is NOT declared.
+    // When the child has an explicit main-axis width/height (or percent) the declared value is
+    // used verbatim and the `flex` factor is ignored. CSS shorthand `flex: N` expands to
+    // `flex: N 1 0%`, which resets flex-basis to 0 and would grow the child past its declared
+    // width, so we must skip the `flex` declaration whenever the PAGX child already has an
+    // explicit main-axis size. `parentLayout` tells us which axis is the main axis.
+    bool mainAxisDeclared = false;
+    if (parentLayout == LayoutMode::Horizontal) {
+      mainAxisDeclared = !std::isnan(layer->width) || !std::isnan(layer->percentWidth);
+    } else if (parentLayout == LayoutMode::Vertical) {
+      mainAxisDeclared = !std::isnan(layer->height) || !std::isnan(layer->percentHeight);
+    }
+    if (layer->flex > 0 && !mainAxisDeclared) {
       style += "flex:" + FloatToString(layer->flex);
     }
     // When the layer has absolute-positioned contents (Text, shapes), it needs explicit size
@@ -2089,7 +2103,7 @@ void HTMLWriter::writeLayerInner(HTMLBuilder& out, const Layer* layer, float con
 
   for (auto* child : layer->children) {
     bool childIsFlexItem = isFlexContainer && child->includeInLayout;
-    writeLayer(out, child, contentAlpha, childDistribute, childIsFlexItem);
+    writeLayer(out, child, contentAlpha, childDistribute, childIsFlexItem, layer->layout);
   }
 
   if (hasForeground) {

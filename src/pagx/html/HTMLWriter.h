@@ -232,8 +232,15 @@ class HTMLWriter {
   HTMLWriter(HTMLBuilder* defs, HTMLWriterContext* ctx) : _defs(defs), _ctx(ctx) {
   }
 
+  // `parentLayout` is the flex layout mode of the layer's immediate PAGX parent. It is used to
+  // decide which axis is the main axis when deciding whether `flex="N"` should emit a CSS `flex`
+  // declaration: PAGX disables flex growth on a child that declares an explicit main-axis size,
+  // but CSS `flex: N` (shorthand for `flex: N 1 0%`) resets basis to 0 and would grow the child
+  // regardless. Pass LayoutMode::None for root children or composition-owned layers that have no
+  // PAGX parent flex container.
   void writeLayer(HTMLBuilder& out, const Layer* layer, float parentAlpha = 1.0f,
-                  bool distributeAlpha = false, bool isFlexItem = false);
+                  bool distributeAlpha = false, bool isFlexItem = false,
+                  LayoutMode parentLayout = LayoutMode::None);
 
  private:
   HTMLBuilder* _defs = nullptr;
