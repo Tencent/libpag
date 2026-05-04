@@ -324,7 +324,15 @@ class HTMLWriter {
                      const Fill* fill, const Stroke* stroke, const TextBox* tb, float alpha);
   void writeGlyphRunSVG(HTMLBuilder& out, const Text* text, const Fill* fill, const Stroke* stroke,
                         float alpha);
-  void writeGroup(HTMLBuilder& out, const Group* group, float alpha, bool distribute);
+  // `parentMatrix` is the accumulated transform of any enclosing Groups that were flattened
+  // into the current element stream (writeElements inlines flattened-Group geometry via
+  // TransformPathDataToSVG but emits nested Groups by recursing into writeGroup). For Groups
+  // reached from Layer contents or Composition roots the caller passes identity; when a flattened
+  // outer Group encounters an inner Group it must pass the outer Group's matrix so the inner
+  // Group's CSS transform stacks on top, since the inner Group's renderPosition is expressed in
+  // the outer Group's local space (not the enclosing Layer's).
+  void writeGroup(HTMLBuilder& out, const Group* group, float alpha, bool distribute,
+                  const Matrix& parentMatrix = {});
   void writeRepeater(HTMLBuilder& out, const Repeater* rep, const std::vector<GeoInfo>& geos,
                      const Fill* fill, const Stroke* stroke, float alpha,
                      const TrimPath* trim = nullptr, bool applyCopyAlphaDecay = true);

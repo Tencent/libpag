@@ -837,7 +837,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                 }
               }
             } else if (gt == NodeType::Group) {
-              writeGroup(out, static_cast<const Group*>(ge), alpha, distribute);
+              writeGroup(out, static_cast<const Group*>(ge), alpha, distribute, gm);
             }
           }
           // Propagate the Group's Fill/Stroke out to the enclosing element stream. Without

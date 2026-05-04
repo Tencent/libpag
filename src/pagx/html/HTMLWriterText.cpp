@@ -1840,12 +1840,21 @@ void HTMLWriter::applyTrimAttrsContinuous(HTMLBuilder& builder, const TrimPath* 
   }
 }
 
-void HTMLWriter::writeGroup(HTMLBuilder& out, const Group* group, float alpha, bool distribute) {
+void HTMLWriter::writeGroup(HTMLBuilder& out, const Group* group, float alpha, bool distribute,
+                            const Matrix& parentMatrix) {
   RecursionGuard guard(_ctx);
   if (guard.overflowed()) {
     return;
   }
+  // Stack the inner Group's own transform on top of any accumulated parent-Group transform.
+  // The parent is only non-identity when a flattened outer Group inlined its geometry (via
+  // TransformPathDataToSVG in writeElements) and then recursed into this Group without its own
+  // DOM wrapper; the inner Group's renderPosition is expressed in the outer Group's local
+  // space, so we must compose the outer transform here to land in the enclosing Layer's space.
   Matrix gm = BuildGroupMatrix(group);
+  if (!parentMatrix.isIdentity()) {
+    gm = parentMatrix * gm;
+  }
   std::string style = "position:relative";
   if (!gm.isIdentity()) {
     style += ";transform:" + MatrixTransformToCSS(gm);
