@@ -46,6 +46,23 @@ void PAGNetworkFetcher::fetch() {
   Q_EMIT finished();
 }
 
+void PAGNetworkFetcher::fetchAsync() {
+  auto* manager = new QNetworkAccessManager(this);
+  connect(manager, &QNetworkAccessManager::finished, this, &PAGNetworkFetcher::onReplyFinished);
+  manager->get(QNetworkRequest(QUrl(url)));
+}
+
+void PAGNetworkFetcher::onReplyFinished(QNetworkReply* reply) {
+  if (reply->error() == QNetworkReply::NoError) {
+    Q_EMIT fetched(reply->readAll());
+  } else {
+    Q_EMIT fetched({});
+  }
+  reply->deleteLater();
+  reply->manager()->deleteLater();
+  Q_EMIT finished();
+}
+
 PAGUpdateVersionFetcher::PAGUpdateVersionFetcher(const QString& url, QObject* parent)
     : PAGNetworkFetcher(url, parent) {
   connect(this, &PAGUpdateVersionFetcher::fetched, this, &PAGUpdateVersionFetcher::parseAppcast);

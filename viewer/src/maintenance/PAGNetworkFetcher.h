@@ -21,18 +21,29 @@
 #include <QObject>
 #include <QRunnable>
 
+class QNetworkReply;
+
 namespace pag {
 
 class PAGNetworkFetcher : public QObject {
   Q_OBJECT
  public:
   explicit PAGNetworkFetcher(const QString& url, QObject* parent = nullptr);
+
+  /// Performs a synchronous fetch using a nested event loop. Avoid calling on the main thread.
   void fetch();
+
+  /// Performs an asynchronous fetch without blocking the caller.
+  void fetchAsync();
+
   Q_SIGNAL void finished();
   Q_SIGNAL void fetched(const QByteArray& data);
 
  protected:
   QString url = "";
+
+ private:
+  Q_SLOT void onReplyFinished(QNetworkReply* reply);
 };
 
 class PAGUpdateVersionFetcher : public PAGNetworkFetcher {

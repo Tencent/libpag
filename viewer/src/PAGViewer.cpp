@@ -39,15 +39,16 @@ bool PAGViewer::event(QEvent* event) {
 }
 
 void PAGViewer::openFile(QString path) {
-  if (path.isEmpty()) {
-    return;
-  }
-
+  bool isPagx = path.toLower().endsWith(".pagx");
   PAGWindow* window = nullptr;
   for (int i = 0; i < PAGWindow::AllWindows.count(); i++) {
     auto win = PAGWindow::AllWindows[i];
     auto fileInWindow = win->getFilePath();
-    if (fileInWindow.isEmpty() || fileInWindow == path) {
+    if (!path.isEmpty() && fileInWindow == path) {
+      window = win;
+      break;
+    }
+    if (!isPagx && fileInWindow.isEmpty()) {
       window = win;
       break;
     }
@@ -55,14 +56,16 @@ void PAGViewer::openFile(QString path) {
 
   if (!window) {
     window = new PAGWindow();
-    QString viewType = path.toLower().endsWith(".pagx") ? "pagx" : "pag";
+    QString viewType = isPagx ? "pagx" : "pag";
     window->open(viewType);
     PAGWindow::AllWindows.append(window);
     QObject::connect(window, &PAGWindow::destroyWindow, this, &PAGViewer::onWindowDestroyed,
                      Qt::UniqueConnection);
   }
 
-  window->openFile(path);
+  if (!path.isEmpty()) {
+    window->openFile(path);
+  }
 }
 
 PAGCheckUpdateModel* PAGViewer::getCheckUpdateModel() {
