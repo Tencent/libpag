@@ -1,6 +1,6 @@
 # PAGX → PAG v2 技术方案修订记录（CHANGELOG）
 
-本文档归档了 `docs/pagx_to_pag_v2_design.md` 的完整修订记录（v1.0 → v2.20）。
+本文档归档了 `docs/pagx_to_pag_v2_design.md` 的完整修订记录（v1.0 → v2.21）。
 
 **实现阶段不需通读历史**；主文档 `### 上次开工必读` 段已列出开工前必知的 17 条硬约束（12 基线 + 3 v2.19 新增 + 1 v2.20 文本回退 + 1 v2.20 Review 收敛）。
 历史版本条目仅作为"为什么这样设计"的背景参考。
@@ -8,6 +8,28 @@
 ---
 
 ### 历史修订记录
+
+- **v2.21 Phase 16 实施期补丁**（实测期文档同步，5 个 commit，主文档 §10 修订）：
+
+  背景：Phase 16.1-16.4 主体（commit `f76384de`）落地后，跑 `RenderCrossCheck.PathA_vs_PathB` 发现 7 个文字相关样本仍 FAIL（PSNR 7-29 dB）。逐一排查暴露 4 个 Phase 16 设计稿未预见的实施细节，外加 1 个架构层面已知限制。本条目同步主文档 §10 章节结构、不改 PAG 文件格式（FORMAT_VERSION 仍 0x02）、不改 ABI。
+
+  - **§10.4 重写**："TextBox 的 inverseMatrix 处理" → "TextBox 的坐标处理（实施修订）"。设计稿要求 Baker 把 `inverseMatrix` 展平成 position 后乘修正、对齐 `LayerBuilder::prepareTextBoxTextBlobs`——实施期发现该路径在 runtime-shape 下不可行（Inflater 没有 LayoutContext）。改为 Baker 直接读 `pagx::Text::layoutOrigin()`（新 public API = `textBounds.x/y`）作为绝对 origin 序列化，Inflater 端不需要 TextBox 上下文。`rich_text.pagx` 多 span 拼接样本验证 PSNR ≥ 30 dB。
+  - **§10.5 新增**："实施期补丁要点（v2.21）"——四个补丁的根因 + 修复表格：
+    - `45cbe0b0` baseline-y：`tgfx::TextBlob::MakeFrom(text, font)` glyph 以 `y=baseline=0` 写入，首行被裁。新增 public `Text::firstBaselineY()` API；Baker 累加到 `position.y`。Inflater 不做 metrics 补偿（猜的 ascent 会差 ~16 px 且字体替换后 metrics 还会变）。
+    - `53a5609a` font align：PathA 用 `pagx::FontConfig`、PathB 用 `pag::FontManager` 两套割裂。`FontConfig` 加 public `findTypeface()` / `fallbackTypefaces()`；新增 `MakeFontProviderFromConfig()` adapter；`PAGXTest` fixture 内置 Arial+Noto 注册 + `fontConfig()` / `fontProvider()` getter；CrossCheck 两路径走同一 FontConfig。
+    - `36471b33` HarfBuzz shaper：`tgfx::TextBlob::MakeFrom(text, font)` 内部 primitive shaper 与 PAGX 的 HarfBuzz 对**同一 typeface 同一 glyph** 给出不同 advance（macOS Arial Bold 84pt 'P' HarfBuzz 49.79 vs CoreText 56，差 ~11%——**不是 kerning 是平台 shaper 本身的差异**）。`FontProvider` 加可选 `getFontConfig()` 虚方法；Inflater 检测 non-null 时改走 `pagx::TextShaper::Shape` + `TextBlob::MakeFrom(glyphIDs[], positions[], count, font)` 重载；nullptr 降级 primitive。
+    - `55590003` layoutOrigin：`Text::renderPosition()` 公式 `bounds + offset - textBounds` 对 TextBox child 自抵消为 `(0,0)`（PathA 的 inverseMatrix 路径需要这个减法，但 runtime-shape 没有 inverseMatrix）。新增 public `Text::layoutOrigin()` = `(textBounds.x, textBounds.y)`；Baker 按 `layoutOrigin().x/y == 0` 切换 standalone vs TextBox child 两条路径，y 计算公式也不同（standalone `position.y = renderPos.y + firstBaselineY`，TextBox child `position.y = firstBaselineY`——后者 baseline 已是 TextBox 绝对 y）。**两个 API 不能统一**。
+  - **§10.6 新增**："已知限制（Phase 16.7+ 待决策）"——三个无小代价修复的场景：
+    - **单 Text 多行换行 + 每行独立对齐**（`text_box.pagx` PSNR ~16 dB）：`ElementTextData::position` 单 Point 表达不出多行不同 x 起点。候选方案 A/B/C 待决策（详见主文档 §10.6）。
+    - **TextModifier + RangeSelector 字符级动画**（`text_modifier.pagx` PSNR ~15 dB）：MVP 完全未实现，Phase 16.7 规划项。
+    - **嵌入字体 `@font1`**（`glyph_run.pagx` PSNR ~16 dB）：Baker `TextGlyphRunsDowngraded=208` 警告 + 丢弃 pre-shaped glyphRuns；设计未定（资产化序列化 vs 接受 trade-off）。
+  - **§10.1 设计原则修正**：原"Inflater 重建：TextShaper::Shape 动态 shape + 复用 v1 TextLayout 做段落布局（justification / box wrap / tracking）"——实施期 Inflater 完全没用 v1 TextLayout、段落布局根本没做（这正是 §10.6 #1 限制的根本表现）。改为"Baker 把 PAGX `applyLayout()` 算出的派生几何（`firstBaselineY` / `layoutOrigin` / `renderFontSize`）显式序列化进 `ElementTextData`；Inflater 端只做 shape，不做段落布局"，并明确 shape 双路径（HarfBuzz / primitive）。
+
+  累积效果：CrossCheck FAIL 15 → 7（`text` / `text_path` / `trim_path` / `container_layout_include_in_layout` / `nebula_cadet` / `game_hud` / `rich_text` 全部 ≥ 30 dB）；总 PAGFullTest FAIL 66 → 56；剩余 7 个 CrossCheck 全部已识别根因（见 §10.6 + memory `project_pagx_to_pag_v2.md`）。
+
+  设计层教训沉淀为 memory `feedback_runtime_shape_baseline.md`（renderPosition / layoutOrigin 双 API 分流 + 派生几何必须 Baker 序列化）+ `feedback_shaper_advance.md`（HarfBuzz vs CoreText 平台 advance 差异，primitive shaper 不可替代）。
+
+---
 
 - **v2.20 Review 收敛轮次**（P0+P1 文档修订，9 项，非编码阶段交付）：
 
