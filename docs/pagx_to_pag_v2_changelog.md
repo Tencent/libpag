@@ -1,6 +1,6 @@
 # PAGX → PAG v2 技术方案修订记录（CHANGELOG）
 
-本文档归档了 `docs/pagx_to_pag_v2_design.md` 的完整修订记录（v1.0 → v2.21）。
+本文档归档了 `docs/pagx_to_pag_v2_design.md` 的完整修订记录（v1.0 → v2.22）。
 
 **实现阶段不需通读历史**；主文档 `### 上次开工必读` 段已列出开工前必知的 17 条硬约束（12 基线 + 3 v2.19 新增 + 1 v2.20 文本回退 + 1 v2.20 Review 收敛）。
 历史版本条目仅作为"为什么这样设计"的背景参考。
@@ -8,6 +8,35 @@
 ---
 
 ### 历史修订记录
+
+- **v2.22 Phase 16.6 shapedRuns hint**（TextBox multi-line bypass，1 个 commit，主文档 §10.5 / §10.6 修订）：
+
+  背景：v2.21 四补丁落地后 CrossCheck 还剩 7 个 FAIL，其中 `text_box` / `constraint_textbox_and_group` / `pagx_features` 三个样本卡在 15-30 dB 之间。根因 §10.6 #1 已经描述：PAGX `TextLayout` 把单个 `<Text>` 拆成多行 / 拉成 justify / 按列竖排后，`layoutRuns[]` 里每个 glyph 的 (x, y) + 可选 RSXform 全部独立，**单一 `ElementTextData::position` 架构上表达不出多行**。
+
+  **核心决策**：选 §10.6 候选方案 A（hint 字段）而非 B（拆多 ElementTextData，修不全 justify/vertical）或 C（port 段落布局器，~2-4 天工作量）。tgfx 早就暴露 `TextBlob::MakeFrom(glyphIDs[], positions[], count, font)` + `TextBlobBuilder::allocRunMatrix/RSXform` API，且 `pagx::GlyphRunRenderer::BuildTextBlobFromLayoutRuns` 已经把 layoutRuns 落成 TextBlob 的逻辑封装好——Inflater 直接复用，不需要重写 shape 路径。
+
+  **改动（7 文件 / +294）**：
+  - `ElementTextData` 加 inner struct `ShapedRun { glyphs, positions (relative to position), xforms, fontSize, typefaceFamily, typefaceStyle, typefaceKey }` + `vector<ShapedRun> shapedRuns`。字段追加式，不升 FORMAT_VERSION。
+  - `ElementTags.cpp` boxFlags 加 `0x40 = hasShapedHint` 位，条件写入 hint 块（位于 boxText 块之后、paint 之前；旧 decoder 仍能通过 boxFlags 跳过）。read 端 guard by `MAX_RUNS_PER_TEXT=256` + `MAX_GLYPHS_PER_RUN=100000`。
+  - `TypefaceKey.h` 新 helper `MakeTypefaceKey` 返回四元组签名 `family|style|unitsPerEm|glyphsCount`，Baker 写入、Inflater 比对。
+  - `TextBaker::BakeText` 加**语义判定**的 hint 生成：`layoutRuns` 出现多行 baseline y 或非空 xforms，且 glyph 总数 ≤ 500，则 snapshot。positions 相对 `position` 坐标（Baker 减 layoutOrigin.x / positionY），xforms.tx/ty 同理。
+  - `LayerInflater::inflateElementText` 前置 hint 优先路径：逐 run 用 FontProvider 重新 resolve typeface，比对 `MakeTypefaceKey` 字符串；全匹配则用 `BuildTextBlobFromLayoutRuns(runs, Matrix::I())` 重放，任一不匹配 emit `TextShapingHintMiss=608` info 并降级到现有 HarfBuzz / primitive 双路径。
+  - 新增 Diagnostic code `TextShapingHintMiss=608`（Inflater info 段）。
+  - Baker 不生成 hint 时（例如 standalone single-line Text），Inflater 完全走现有 runtime-shape 路径，零行为变化——hint 是**严格增补**，不影响已过的 10 个样本。
+
+  **语义判定 vs 结构判定（非显然设计决策）**：最初实现用 `layoutOrigin().x/y != 0`（结构判定，"Text 在不在 TextBox 里"）触发 hint，实测 `text_box.pagx` Box 1 的 Text 起点恰好在 TextBox (0,0)，被误判为 standalone、hint 不生成、justify 多行降级成 runtime shape 单行。改成"layoutRuns 有多行 baseline 或 xforms"的语义判定后，Box 1 命中。教训沉淀到 memory。
+
+  **累积效果**：
+  - CrossCheck FAIL 7 → **4**（`text_box` + `constraint_textbox_and_group` + `pagx_features` 三个过 30 dB）。
+  - 总 PAGFullTest FAIL 56 → **53**（48 Render_Baseline 等 `/accept-baseline` 不变）。
+  - 剩 4 个 CrossCheck 全部属 §10.6 已知限制（`text_modifier` 未实现 / `glyph_run` 嵌入字体 / `complete_example` 综合 / `image_pattern` 非文字）。
+
+  **非显然成本权衡**（写入设计文档）：
+  - `.pag` 体积：每 hint-eligible Text 增 ~10-20 B/glyph。text_box 四 Box 总计 ~110 glyph = +2 KB 增量；对比 ElementTextData 原始 ~200 B，增大约 10×，但仍是 KB 级；大段落（>500 glyph）强制跳过 hint 避免撑爆文件。
+  - 字体精确匹配依赖 `typefaceKey` 签名。字体版本/子集变化时 signature 会 miss → emit info → 降级 runtime shape（与 substitution 自然行为一致），不会错渲染。
+  - `shapedRuns` 作为**可选优化**而非 canonical storage：Inflater 拿不到字段、拿到空字段、拿到但 key 不匹配——三种情况全部 graceful fallback 到 runtime shape。
+
+---
 
 - **v2.21 Phase 16 实施期补丁**（实测期文档同步，5 个 commit，主文档 §10 修订）：
 

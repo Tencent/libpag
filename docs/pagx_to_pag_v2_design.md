@@ -1338,9 +1338,9 @@ PAGX 的 pre-shaped 节点用例极罕见（一般由作者手动逐字形调整
 
 适用范围：**TextBox 内每个 span 都是单行**的场景（多 span 不同字号/颜色拼接，如 `rich_text.pagx`）—— PSNR ≥ 30 dB 已验证。**单 span 内含 `\n` 多行换行 + 每行独立对齐**的场景见 §10.6 已知限制。
 
-### 10.5 实施期补丁要点（v2.21）
+### 10.5 实施期补丁要点（v2.21 + v2.22）
 
-Phase 16.1-16.4 主体落地后（commit `f76384de`），实测在 `RenderCrossCheck.PathA_vs_PathB` 上发现 4 个非显然差异源，逐一定位 + 修复：
+Phase 16.1-16.4 主体落地后（commit `f76384de`），实测在 `RenderCrossCheck.PathA_vs_PathB` 上发现 5 个非显然差异源，逐一定位 + 修复：
 
 | 补丁 | Commit | 根因 | 修复 |
 |---|---|---|---|
@@ -1348,16 +1348,18 @@ Phase 16.1-16.4 主体落地后（commit `f76384de`），实测在 `RenderCrossC
 | **font align** | `53a5609a` | PathA 用 `pagx::FontConfig`、PathB 用 `pag::FontManager`，两套字体注册系统割裂，CrossCheck 测试里同一 fontFamily 解析到不同 typeface。 | `pagx::FontConfig` 加 public `findTypeface()` / `fallbackTypefaces()`；新增 `pagx::pag::MakeFontProviderFromConfig()` adapter；`PAGXTest` fixture 内置 Arial+Noto 注册，提供 `fontConfig()` / `fontProvider()` getter；CrossCheck 两路径走同一 FontConfig。 |
 | **HarfBuzz shaper** | `36471b33` | `tgfx::TextBlob::MakeFrom(text, font)` 用 primitive shaper 逐字符 `font.getAdvance()`；与 PAGX 的 HarfBuzz shaper 对**同一 typeface 同一 glyph** 给出不同 advance（macOS Arial Bold 84pt 'P' HarfBuzz 49.79 vs CoreText 56，差 ~11%，**不是 kerning**），累积到字符串末端 PSNR 卡 18 dB。 | `FontProvider` 加可选 `getFontConfig()` 虚方法（默认 `nullptr`）；Inflater 检测到 non-null 时改走 `pagx::TextShaper::Shape` + `tgfx::TextBlob::MakeFrom(glyphIDs[], positions[], count, font)` 重载；nullptr 时降级 primitive。 |
 | **layoutOrigin** | `55590003` | `Text::renderPosition()` 公式 `bounds + offset - textBounds` 对 TextBox child 自抵消为 `(0,0)`——layout 引擎已把 textBounds.x/y 设成 TextBox 坐标系绝对位置，但 renderPosition 故意减掉它们（PathA 的 inverseMatrix 路径需要这个减法）。runtime-shape 没有 inverseMatrix，必须保留绝对位置。 | 新增 public `pagx::Text::layoutOrigin()` = `(textBounds.x, textBounds.y)`；Baker 按 `layoutOrigin().x/y == 0` 切换：standalone 走 `renderPosition()`（保留父 Layer 撑大居中）+ `position.y = renderPos.y + firstBaselineY`；TextBox child 走 `layoutOrigin()` + `position.y = firstBaselineY`（不加 layoutOrigin.y——TextBox child 的 baseline 已是 TextBox 绝对 y）。**两个 API 不能统一**——standalone 需要居中偏移、TextBox child 需要绝对坐标，两个分支的 y 公式也不同，详见 `feedback_runtime_shape_baseline.md`。 |
+| **shapedRuns hint** | `bfa0637f` | PAGX TextLayout 把单个 `<Text>` 拆成多行 / 拉成 justify / 按列竖排后，每个 glyph 的 (x, y) + 可选 RSXform 全部独立，**单一 `position` 表达不出多行/多列/justify 字间**。text_box 样本 4 个 Box 全部命中。 | `ElementTextData` 加 `vector<ShapedRun> shapedRuns` 可选字段（每 run = glyphs + positions 相对 + 可选 xforms + fontSize + typefaceKey 四元组 `family|style|unitsPerEm|glyphsCount`）；Baker 在**语义判定**（layoutRuns 出现多行 baseline 或非空 xforms）+ ≤500 glyph 时快照；Inflater 优先拿 FontProvider re-resolve 的 typeface，比对所有 run 的 typefaceKey 全命中则走 `GlyphRunRenderer::BuildTextBlobFromLayoutRuns` 重放，任一不命中发 `TextShapingHintMiss=608` info 降级 runtime shape。**触发判定是语义而非结构**——"layout 能否被 runtime shape 复现"，规避 `text_box.pagx` Box 1 (justify) 的 TextBox 起点 `layoutOrigin=(0,0)` 漏判陷阱。 |
 
-累积效果：CrossCheck FAIL 15 → 7（`text` / `text_path` / `trim_path` / `container_layout_include_in_layout` / `nebula_cadet` / `game_hud` / `rich_text` 全部 ≥ 30 dB）。
+累积效果：CrossCheck FAIL 15 → 4（`text` / `text_path` / `trim_path` / `container_layout_include_in_layout` / `nebula_cadet` / `game_hud` / `rich_text` / `text_box` / `constraint_textbox_and_group` / `pagx_features` 全部 ≥ 30 dB）。
 
 ### 10.6 已知限制（Phase 16.7+ 待决策）
 
-下列三个场景在当前 runtime-shape 架构下**无小代价修复**，需要架构层面决策（已记录在 memory `project_pagx_to_pag_v2.md` 下一步工作方向）：
+下列两个场景在当前 runtime-shape 架构下**无小代价修复**，需要架构层面决策（已记录在 memory `project_pagx_to_pag_v2.md` 下一步工作方向）：
 
-1. **单 Text 多行换行 + 每行独立对齐**（`text_box.pagx` 的 4 个 Box，PSNR ~16 dB）：PAGX `TextLayout` 把单个 `<Text>` 节点拆成多行后，每行的 baseline / x-offset / justify 字间扩展全部独立，`layoutRuns[]` 里每行 baseline y 不同、textAlign=center 时每行 x 起点不同。当前 `ElementTextData::position` 只能存一个 Point，**架构上表达不出多行**。候选修复：(A) Baker 序列化 `glyphIDs[] + positions[]` 作为 hint 字段，Inflater 优先使用、fallback runtime shape；(B) 把多行拆成多个 `ElementTextData`（仅适用水平非 justify）；(C) 扩 schema 存 `lineHeight/textAlign/boxWidth` 由 Inflater 复刻段落布局算法。
-2. **TextModifier + RangeSelector 字符级动画**（`text_modifier.pagx`，PSNR ~15 dB）：MVP 完全未实现。需要 `ShapedGlyph → 单字符 anchor → 变换`重新应用。Phase 16.7 规划项。
-3. **嵌入字体 `@font1`**（`glyph_run.pagx`，PSNR ~16 dB）：Baker 端 `TextGlyphRunsDowngraded=208` 警告 + 丢弃 pre-shaped glyphRuns；Inflater 用 fallback 字体重 shape，glyph 形状与作者意图差异显著。设计未定：要么把嵌入字体作为 PAG ImageAsset-like 资产序列化、要么接受 trade-off。
+1. **TextModifier + RangeSelector 字符级动画**（`text_modifier.pagx`，PSNR ~15 dB）：MVP 完全未实现。需要 `ShapedGlyph → 单字符 anchor → 变换`重新应用。Phase 16.7 规划项。
+2. **嵌入字体 `@font1`**（`glyph_run.pagx`，PSNR ~16 dB）：Baker 端 `TextGlyphRunsDowngraded=208` 警告 + 丢弃 pre-shaped glyphRuns；Inflater 用 fallback 字体重 shape，glyph 形状与作者意图差异显著。设计未定：要么把嵌入字体作为 PAG ImageAsset-like 资产序列化、要么接受 trade-off。
+
+**非文字但未关**：`image_pattern.pagx`（PSNR ~9 dB，独立非文字 bug）、`complete_example.pagx`（PSNR ~25 dB，综合样本，根因未定）—— 均 Phase 17+ 处理。
 
 ---
 
