@@ -755,10 +755,17 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           auto savedStroke = curStroke;
           auto savedHasTrim = hasTrim;
           auto savedTrim = curTrim;
+          auto savedTextPath = curTextPath;
+          auto savedTextModifier = curTextModifier;
           curFill = nullptr;
           curStroke = nullptr;
           hasTrim = false;
           curTrim = nullptr;
+          // A Group defines its own element scope: TextPath/TextModifier declared outside the
+          // Group must not bleed in and re-apply to Text children inside the Group. Clear them
+          // so the flatten loop starts clean; they are restored after the Group exits.
+          curTextPath = nullptr;
+          curTextModifier = nullptr;
           auto savedGeos = std::move(geos);
           geos.clear();
           std::vector<GeoInfo> groupGeos;
@@ -968,6 +975,8 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           curStroke = savedStroke;
           hasTrim = savedHasTrim;
           curTrim = savedTrim;
+          curTextPath = savedTextPath;
+          curTextModifier = savedTextModifier;
           savedGeos.insert(savedGeos.end(), groupGeos.begin(), groupGeos.end());
           geos = std::move(savedGeos);
         }
