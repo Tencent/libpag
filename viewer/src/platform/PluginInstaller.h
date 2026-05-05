@@ -34,6 +34,14 @@ enum class VersionResult {
   VersionInfoUnavailable
 };
 
+/// Indicates the privilege level required to install/uninstall a plugin.
+enum class PluginPermission {
+  /// The plugin installs to user-writable directories and needs no elevation.
+  User,
+  /// The plugin installs to system directories and requires admin privileges.
+  Admin
+};
+
 class PluginInstaller : public QObject {
   Q_OBJECT
 
@@ -68,6 +76,7 @@ class PluginInstaller : public QObject {
   QString getPluginSourcePath(const QString& pluginName) const;
   QString getPluginInstallPath(const QString& pluginName) const;
   QString getPluginFullName(const QString& pluginName) const;
+  PluginPermission getPluginPermission(const QString& pluginName) const;
   int getAeVersionForPath(const QString& aePath) const;
 
   VersionResult getPluginVersionString(const QString& pluginPath, QString& version) const;
