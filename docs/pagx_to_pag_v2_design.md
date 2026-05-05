@@ -1354,10 +1354,14 @@ Phase 16.1-16.4 主体落地后（commit `f76384de`），实测在 `RenderCrossC
 
 ### 10.6 已知限制（Phase 16.7+ 待决策）
 
-下列两个场景在当前 runtime-shape 架构下**无小代价修复**，需要架构层面决策（已记录在 memory `project_pagx_to_pag_v2.md` 下一步工作方向）：
+下列场景在当前 runtime-shape 架构下**无小代价修复**，需要架构层面决策（已记录在 memory `project_pagx_to_pag_v2.md` 下一步工作方向）：
 
 1. **TextModifier + RangeSelector 字符级动画**（`text_modifier.pagx`，PSNR ~15 dB）：MVP 完全未实现。需要 `ShapedGlyph → 单字符 anchor → 变换`重新应用。Phase 16.7 规划项。
-2. **嵌入字体 `@font1`**（`glyph_run.pagx`，PSNR ~16 dB）：Baker 端 `TextGlyphRunsDowngraded=208` 警告 + 丢弃 pre-shaped glyphRuns；Inflater 用 fallback 字体重 shape，glyph 形状与作者意图差异显著。设计未定：要么把嵌入字体作为 PAG ImageAsset-like 资产序列化、要么接受 trade-off。
+2. **嵌入字体 `@font1`（Pre-shaped GlyphRun，明确不支持）**（`glyph_run.pagx`，PSNR ~16 dB）：PAGX 允许作者在 `<Resources>` 嵌入自定义 SVG/Image glyph 字体（`<Font id="fontN"><Glyph .../></Font>`），由 `<GlyphRun font="@fontN" glyphs="...">` 引用。这类 pre-shaped glyphRuns 在 Baker 端触发 `TextGlyphRunsDowngraded=208` 警告并丢弃 per-glyph 数据，原因已在 Phase 16 设计文档确认：
+   - `TextLayout::Layout()` 遇到所有 Text 都是 pre-shaped 时走快速路径（仅计算 bounds），**不生成 `layoutRuns`**，Baker 端 snapshot hint 的语义判定（`hasMultipleLines || hasXforms`）必然为 false——hint 永远不生成。
+   - 嵌入字体 typeface 由 `GlyphRunRenderer::BuildTypefaceFromFont` 在运行时从 SVG path 动态构造，是**临时对象**，无稳定的 family/style/unitsPerEm 签名，typefaceKey 无法用于跨进程比对。
+   - Glyph ID 体系独立于系统字体，Inflater 端无法 re-resolve 到相同 typeface。
+   - **结论（方案 β 确认）**：预计不在后续 Phase 支持嵌入字体序列化（方案 α — FontAsset 资产化 — 工程量大且与 Phase 16 "不存 glyph 数据"原则冲突）。生产环境该场景极罕见（作者手动逐字形编辑才会产生），`TextGlyphRunsDowngraded=208` 警告已为调用方提供足够的降级通知。
 
 **非文字但未关**：`image_pattern.pagx`（PSNR ~9 dB，独立非文字 bug）、`complete_example.pagx`（PSNR ~25 dB，综合样本，根因未定）—— 均 Phase 17+ 处理。
 

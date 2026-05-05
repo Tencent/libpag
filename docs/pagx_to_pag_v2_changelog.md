@@ -36,6 +36,8 @@
   - 字体精确匹配依赖 `typefaceKey` 签名。字体版本/子集变化时 signature 会 miss → emit info → 降级 runtime shape（与 substitution 自然行为一致），不会错渲染。
   - `shapedRuns` 作为**可选优化**而非 canonical storage：Inflater 拿不到字段、拿到空字段、拿到但 key 不匹配——三种情况全部 graceful fallback 到 runtime shape。
 
+  **Pre-shaped GlyphRun / 嵌入字体决策（方案 β 确认，§10.6 #2）**：经可行性验证，方案 γ（扩展 shapedRuns hint 覆盖 pre-shaped Text）不可行：(1) `TextLayout::Layout()` 对 pre-shaped Text 走快速路径、**不生成 `layoutRuns`**，Baker 端 hint 语义判定永远为 false；(2) 嵌入字体 typeface 是 `PathTypefaceBuilder` 产生的运行时临时对象，无 family/style/unitsPerEm 可做跨进程 key 签名；(3) glyph ID 体系完全独立于系统字体。**决定：不支持嵌入字体序列化（方案 α 工程量大且违背 Phase 16 "不存 glyph 数据"原则）**，`glyph_run.pagx` PSNR ~16 dB 接受为已知限制。§10.6 同步由"设计未定"改为明确不支持。
+
 ---
 
 - **v2.21 Phase 16 实施期补丁**（实测期文档同步，5 个 commit，主文档 §10 修订）：
