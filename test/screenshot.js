@@ -8,9 +8,12 @@
  *
  * In batch mode the input file contains a JSON array of
  *   [{ html, png, width, height, scale }]
- * and a single Chromium process handles them sequentially. Chromium launch is the dominant
- * cost (~2-4s) so batching a large suite cuts runtime by an order of magnitude and removes
- * the cold-start races that caused sporadic `Page.captureScreenshot timed out` errors.
+ * and Chromium is reused across captures but rolled every RESTART_EVERY tasks (and on any
+ * fatal protocol error) to stay ahead of headless Chromium's shared-memory / GPU-context leak
+ * that otherwise kills the process around 50-70 pages in. Chromium launch is the dominant
+ * per-capture cost (~2-4s) so batching still cuts runtime by an order of magnitude versus
+ * launching per task, while the periodic roll absorbs the "Connection closed" bursts that
+ * used to sink the second half of the suite on macOS.
  *
  * Prerequisites: npx puppeteer browsers install chrome
  */
@@ -22,6 +25,22 @@ const fs = require('fs');
 const SINGLE_TASK_TIMEOUT_MS = 60000;
 const PROTOCOL_TIMEOUT_MS = 180000;
 const MAX_RETRIES = 2;
+// Roll the Chromium process every N captures. Long-running headless Chromium on macOS leaks
+// shared memory / GPU context state and starts returning "Connection closed" / "Target closed"
+// after roughly 50-70 pages, which the per-task retry loop then cannot recover from because
+// the entire browser is dead. Restarting on a fixed cadence well below the empirical failure
+// floor keeps the batch self-healing even on systems where Chromium would otherwise asphyxiate
+// midway through.
+const RESTART_EVERY = 30;
+// Substrings in error messages that indicate the browser as a whole is unusable, not just the
+// current page. Encountering any of these forces an immediate restart instead of burning the
+// remaining retry budget on a dead process.
+const FATAL_ERROR_PATTERNS = [
+  'Connection closed',
+  'Target closed',
+  'frame was detached',
+  'Browser closed',
+];
 
 async function captureOne(browser, task) {
   const { html, png, width, height, scale } = task;
@@ -51,11 +70,43 @@ async function captureOne(browser, task) {
   }
 }
 
-async function captureWithRetry(browser, task, label) {
+function isFatalBrowserError(err) {
+  const msg = err && err.message ? err.message : String(err);
+  return FATAL_ERROR_PATTERNS.some((pattern) => msg.includes(pattern));
+}
+
+async function launchBrowser() {
+  return puppeteer.launch({
+    headless: true,
+    protocolTimeout: PROTOCOL_TIMEOUT_MS,
+    // The flag set deliberately targets headless CI containers as well as local macOS:
+    //   --no-sandbox / --disable-setuid-sandbox — required when running as root in Docker,
+    //     and a no-op on a normal desktop user account.
+    //   --hide-scrollbars — avoids scrollbar gutters stealing viewport pixels.
+    //   --disable-dev-shm-usage — Docker defaults /dev/shm to 64 MB, which is not enough
+    //     for Chromium's shared memory; switching to /tmp prevents the "Target closed"
+    //     bursts that otherwise hit after a handful of pages. Harmless on macOS.
+    //   --disable-gpu — no GPU in headless CI; skipping the probe trims launch latency
+    //     and sidesteps driver-specific hangs.
+    //   --font-render-hinting=none — disables hinting-based glyph adjustments that vary
+    //     between CI machines. Pairs with the test harness's explicit @font-face rules
+    //     to make screenshots reproducible across laptops, CI runners, and reviewers.
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--hide-scrollbars',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--font-render-hinting=none',
+    ],
+  });
+}
+
+async function captureWithRetry(getBrowser, restartBrowser, task, label) {
   let lastError;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      await captureOne(browser, task);
+      await captureOne(getBrowser(), task);
       if (attempt > 0) {
         console.error(`[screenshot] ${label}: succeeded on retry ${attempt}`);
       }
@@ -63,6 +114,12 @@ async function captureWithRetry(browser, task, label) {
     } catch (err) {
       lastError = err;
       console.error(`[screenshot] ${label}: attempt ${attempt + 1} failed: ${err.message}`);
+      // If Chromium itself is gone, burning the remaining retries against the same dead
+      // process is pointless. Restart before the next attempt.
+      if (isFatalBrowserError(err) && attempt < MAX_RETRIES) {
+        console.error(`[screenshot] ${label}: browser appears dead, restarting Chromium`);
+        await restartBrowser();
+      }
     }
   }
   console.error(`[screenshot] ${label}: giving up after ${MAX_RETRIES + 1} attempts`);
@@ -108,48 +165,41 @@ function parseArgs(argv) {
     process.exit(1);
   }
 
-  const browser = await puppeteer.launch({
-    headless: true,
-    protocolTimeout: PROTOCOL_TIMEOUT_MS,
-    // The flag set deliberately targets headless CI containers as well as local macOS:
-    //   --no-sandbox / --disable-setuid-sandbox — required when running as root in Docker,
-    //     and a no-op on a normal desktop user account.
-    //   --hide-scrollbars — avoids scrollbar gutters stealing viewport pixels.
-    //   --disable-dev-shm-usage — Docker defaults /dev/shm to 64 MB, which is not enough
-    //     for Chromium's shared memory; switching to /tmp prevents the "Target closed"
-    //     bursts that otherwise hit after a handful of pages. Harmless on macOS.
-    //   --disable-gpu — no GPU in headless CI; skipping the probe trims launch latency
-    //     and sidesteps driver-specific hangs.
-    //   --font-render-hinting=none — disables hinting-based glyph adjustments that vary
-    //     between CI machines. Pairs with the test harness's explicit @font-face rules
-    //     to make screenshots reproducible across laptops, CI runners, and reviewers.
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--hide-scrollbars',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--font-render-hinting=none',
-    ],
-  });
+  let browser = await launchBrowser();
+  let capturesSinceLaunch = 0;
+  const getBrowser = () => browser;
+  const restartBrowser = async () => {
+    await browser.close().catch(() => {});
+    browser = await launchBrowser();
+    capturesSinceLaunch = 0;
+  };
 
   let failures = 0;
   try {
     for (let i = 0; i < parsed.tasks.length; i++) {
       const task = parsed.tasks[i];
       const label = path.basename(task.html || '') + ` (${i + 1}/${parsed.tasks.length})`;
-      const ok = await captureWithRetry(browser, task, label);
+      const ok = await captureWithRetry(getBrowser, restartBrowser, task, label);
       if (!ok) {
         failures++;
       }
-      // Give Chromium a brief window to tear down the just-closed target before the next
-      // newPage() starts. Without this cooldown the DevTools protocol occasionally races
-      // mid-batch (macOS tends to be the first to show "Target closed" bursts), which the
-      // retry loop then papers over at the cost of tens of seconds per flaky sample. 50 ms
-      // is imperceptible across 78 samples (~4 s total overhead) but measurably reduces
-      // mid-batch target churn. Skipped after the last task since the browser closes next.
+      capturesSinceLaunch++;
+      // Scheduled roll: restart the browser every RESTART_EVERY captures to stay ahead of the
+      // macOS Chromium leak curve. Skipped after the last task since the browser closes next.
       if (i + 1 < parsed.tasks.length) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        if (capturesSinceLaunch >= RESTART_EVERY) {
+          console.error(
+              `[screenshot] rolling Chromium after ${capturesSinceLaunch} captures (scheduled)`);
+          await restartBrowser();
+        } else {
+          // Give Chromium a brief window to tear down the just-closed target before the next
+          // newPage() starts. Without this cooldown the DevTools protocol occasionally races
+          // mid-batch (macOS tends to be the first to show "Target closed" bursts), which the
+          // retry loop then papers over at the cost of tens of seconds per flaky sample. 50 ms
+          // is imperceptible across 78 samples (~4 s total overhead) but measurably reduces
+          // mid-batch target churn.
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
       }
     }
   } finally {
