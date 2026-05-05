@@ -699,9 +699,15 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       style += ";line-height:" + FloatToString(tb->lineHeight) + "px";
     }
     if (tb->wordWrap && !std::isnan(tbW) && tbW > 0) {
-      style += ";word-wrap:break-word";
+      // `pre-wrap`: preserve both spaces and explicit \n newlines while still letting the
+      // browser wrap long lines at the tb width. Previously `word-wrap:break-word` alone was
+      // emitted, which falls back to the default `normal` white-space policy that collapses
+      // \n into a single space — so "Centered\nHorizontally\n&\nVertically" rendered as one
+      // long line instead of four (text_box Box 2 symptom).
+      style += ";white-space:pre-wrap;word-wrap:break-word";
     } else {
-      style += ";white-space:nowrap";
+      // No wrapping: keep \n as a hard line break, but do not let regular spaces wrap.
+      style += ";white-space:pre";
     }
     if (tb->overflow == Overflow::Hidden) {
       style += ";overflow:hidden";

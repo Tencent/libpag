@@ -314,9 +314,13 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             style += ";writing-mode:vertical-rl";
           }
           if (tb->wordWrap && !std::isnan(tbW) && tbW > 0) {
-            style += ";word-wrap:break-word";
+            // Preserve explicit \n newlines and soft-wrap long lines at the TextBox width.
+            // Without `pre-wrap`, Chromium collapses literal newlines into single spaces, so
+            // "Centered\nHorizontally\n&\nVertically" renders as one wrapped line instead of
+            // four (text_box Box 2 symptom).
+            style += ";white-space:pre-wrap;word-wrap:break-word";
           } else {
-            style += ";white-space:nowrap";
+            style += ";white-space:pre";
           }
           // Defer the Overflow::Hidden emit until after tbSpans is collected: when the
           // TextBox has a known height and line-height we can translate tgfx's whole-line
@@ -732,14 +736,23 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           }
         }
         bool hasPainter = false;
+        bool hasText = false;
         for (auto* ge : group->elements) {
           auto gt = ge->nodeType();
           if (gt == NodeType::Fill || gt == NodeType::Stroke) {
             hasPainter = true;
-            break;
+          } else if (gt == NodeType::Text) {
+            hasText = true;
           }
         }
-        if (hasPainter && group->alpha < 1.0f) {
+        // A Group with a non-identity transform (centerX/top/left constraints, scale, rotation…)
+        // must keep its own DOM wrapper when it contains a Text child. The flatten path inlines
+        // path/ellipse geos via TransformPathDataToSVG but Text is emitted by writeText, which
+        // reads Text::renderPosition relative to the Group — not the enclosing Layer — so a
+        // flattened Group would drop its constraint offset from the span's top/left and the
+        // text would collapse onto the Layer's origin (app_icons Calendar "17" symptom).
+        bool groupHasTransform = !BuildGroupMatrix(group).isIdentity();
+        if (hasPainter && (group->alpha < 1.0f || (hasText && groupHasTransform))) {
           writeGroup(out, group, alpha, distribute);
         } else {
           auto savedFill = curFill;
@@ -757,6 +770,17 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           // The group's own padding insets its children's constraint frame, mirroring Layer's
           // behaviour; propagate it so stretch-rect children avoid the `inset:0` shortcut.
           const Padding* groupPadding = group->padding.isZero() ? nullptr : &group->padding;
+          // Mirror the outer `hasUpcomingRepeater` scan: a Fill/Stroke that appears before a
+          // Repeater inside the group must NOT paint immediately, otherwise the pre-repeater
+          // single copy would render and the Repeater's path-level expansion would have no
+          // painter to attach to (complete_example Modifiers cyan ellipse only shows 1 of 5).
+          bool groupHasUpcomingRepeater = false;
+          for (auto* ge : group->elements) {
+            if (ge->nodeType() == NodeType::Repeater) {
+              groupHasUpcomingRepeater = true;
+              break;
+            }
+          }
           for (auto* ge : group->elements) {
             auto gt = ge->nodeType();
             if (gt == NodeType::Rectangle || gt == NodeType::Ellipse || gt == NodeType::Path ||
@@ -774,21 +798,50 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               GeoInfo info = {gt, ge, {}, groupPadding};
               geos.push_back(info);
               groupGeos.push_back(info);
+            } else if (gt == NodeType::TextPath) {
+              // Flatten path mirrors the top-level TextPath handler: capture the element so
+              // the subsequent Fill/Stroke triggers per-character path emission via
+              // writeTextPath instead of a plain <span> (text_path Group TextPath symptom).
+              curTextPath = static_cast<const TextPath*>(ge);
+            } else if (gt == NodeType::TextModifier) {
+              curTextModifier = static_cast<const TextModifier*>(ge);
             } else if (gt == NodeType::Fill) {
               auto fill = static_cast<const Fill*>(ge);
               curFill = fill;
-              if (fill->placement == targetPlacement && !hasUpcomingRepeater) {
+              if (fill->placement == targetPlacement && !hasUpcomingRepeater &&
+                  !groupHasUpcomingRepeater) {
                 float a = distribute ? alpha : 1.0f;
-                paintGeos(out, geos, curFill, nullptr, curTextBox, a, hasTrim, curTrim, hasMerge,
-                          mergeMode);
+                if (curTextPath && !geos.empty()) {
+                  writeTextPath(out, geos, curTextPath, curFill, nullptr, curTextBox, a);
+                  geos.clear();
+                  groupGeos.clear();
+                } else if (curTextModifier && !geos.empty()) {
+                  writeTextModifier(out, geos, curTextModifier, curFill, nullptr, curTextBox, a);
+                  geos.clear();
+                  groupGeos.clear();
+                } else {
+                  paintGeos(out, geos, curFill, nullptr, curTextBox, a, hasTrim, curTrim, hasMerge,
+                            mergeMode);
+                }
               }
             } else if (gt == NodeType::Stroke) {
               auto stroke = static_cast<const Stroke*>(ge);
               curStroke = stroke;
-              if (stroke->placement == targetPlacement && !hasUpcomingRepeater) {
+              if (stroke->placement == targetPlacement && !hasUpcomingRepeater &&
+                  !groupHasUpcomingRepeater) {
                 float a = distribute ? alpha : 1.0f;
-                paintGeos(out, geos, curFill, curStroke, curTextBox, a, hasTrim, curTrim, hasMerge,
-                          mergeMode);
+                if (curTextPath && !geos.empty()) {
+                  writeTextPath(out, geos, curTextPath, curFill, curStroke, curTextBox, a);
+                  geos.clear();
+                  groupGeos.clear();
+                } else if (curTextModifier && !geos.empty()) {
+                  writeTextModifier(out, geos, curTextModifier, curFill, curStroke, curTextBox, a);
+                  geos.clear();
+                  groupGeos.clear();
+                } else {
+                  paintGeos(out, geos, curFill, curStroke, curTextBox, a, hasTrim, curTrim,
+                            hasMerge, mergeMode);
+                }
               }
             } else if (gt == NodeType::TrimPath) {
               hasTrim = true;
@@ -818,26 +871,91 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               groupGeos.clear();
               for (int i = 0; i < copies; i++) {
                 Matrix cm = BuildRepeaterCopyMatrix(innerRep, i);
+                // Compose (gm ∘ cm): apply the repeater copy transform in Group-local space
+                // first, then translate/rotate/scale the whole Group into the enclosing Layer's
+                // space via gm. The previous code pulled the already-gm-baked path out of
+                // `modifiedPathData` and rotated it around the Layer origin, which multiplied
+                // any Group offset by sin/cos of the rotation angle and produced huge
+                // off-viewBox coordinates (complete_example Modifiers cyan Repeater symptom:
+                // ellipses scattered at ±500px instead of ±28px around the Group centre).
+                Matrix combined = gm.isIdentity() ? cm : (gm * cm);
                 for (const auto& orig : originalGeos) {
                   GeoInfo copy = orig;
-                  if (!cm.isIdentity()) {
-                    PathData pathData = PathDataFromSVGString("");
-                    if (!orig.modifiedPathData.empty()) {
-                      pathData = PathDataFromSVGString(orig.modifiedPathData);
-                    } else if (orig.type == NodeType::Rectangle || orig.type == NodeType::Ellipse ||
-                               orig.type == NodeType::Path || orig.type == NodeType::Polystar) {
-                      GeoToPathData(orig.element, orig.type, pathData);
-                    }
-                    if (!pathData.isEmpty()) {
-                      copy.modifiedPathData = TransformPathDataToSVG(pathData, cm);
-                    }
+                  PathData pathData = PathDataFromSVGString("");
+                  if (orig.type == NodeType::Rectangle || orig.type == NodeType::Ellipse ||
+                      orig.type == NodeType::Path || orig.type == NodeType::Polystar) {
+                    GeoToPathData(orig.element, orig.type, pathData);
+                  }
+                  if (!pathData.isEmpty()) {
+                    copy.modifiedPathData =
+                        combined.isIdentity() ? PathDataToSVGString(pathData)
+                                              : TransformPathDataToSVG(pathData, combined);
                   }
                   groupGeos.push_back(copy);
                   geos.push_back(copy);
                 }
               }
+              // If a Fill or Stroke was declared BEFORE this Repeater, its paint was deferred
+              // (see `groupHasUpcomingRepeater` above) so the expansion now needs to render the
+              // N copies explicitly. Without this a Group shaped like `<Ellipse/> <Fill/>
+              // <Repeater copies=5/>` would fall off the end of the loop with `groupGeos`
+              // holding all 5 copies but no paintGeos call to emit them (complete_example
+              // Modifiers cyan 5-ellipse symptom: only 1 copy visible when the later Fill path
+              // also forgot to paint).
+              if (curFill || curStroke) {
+                float a = distribute ? alpha : 1.0f;
+                paintGeos(out, geos, curFill, curStroke, curTextBox, a, hasTrim, curTrim, hasMerge,
+                          mergeMode);
+                geos.clear();
+                groupGeos.clear();
+                // `groupHasUpcomingRepeater` was only about deferring the pre-repeater paint;
+                // now that we have painted, any later Fill/Stroke for the same group should
+                // paint immediately again (not that PAGX samples normally need both).
+                groupHasUpcomingRepeater = false;
+              }
             } else if (gt == NodeType::Group) {
               writeGroup(out, static_cast<const Group*>(ge), alpha, distribute, gm);
+            } else if (gt == NodeType::RoundCorner) {
+              // Mirror the top-level RoundCorner handler (case above): apply the radius to
+              // every shape geo that came before it in the group's element list, replacing
+              // each geo's modifiedPathData with the rounded path. Without this a Group that
+              // wraps `<Rectangle/> <RoundCorner/> <Fill/>` would paint a sharp rectangle
+              // (complete_example Modifiers emerald rect symptom).
+              auto rc = static_cast<const RoundCorner*>(ge);
+              float rcRadius = rc->radius;
+              if (rcRadius > 0) {
+                for (auto& g : groupGeos) {
+                  if (g.type == NodeType::Rectangle || g.type == NodeType::Ellipse ||
+                      g.type == NodeType::Path || g.type == NodeType::Polystar) {
+                    PathData pathData = PathDataFromSVGString("");
+                    GeoToPathData(g.element, g.type, pathData);
+                    PathData rounded = PathDataFromSVGString("");
+                    ApplyRoundCorner(pathData, rcRadius, rounded);
+                    std::string svgPath =
+                        gm.isIdentity()
+                            ? PathDataToSVGString(rounded)
+                            : TransformPathDataToSVG(rounded, gm);
+                    g.modifiedPathData = svgPath;
+                  }
+                }
+                // `geos` mirrors groupGeos — keep them in sync so the later paintGeos sees
+                // the rounded data as well.
+                size_t headSize = geos.size() - groupGeos.size();
+                for (size_t i = 0; i < groupGeos.size(); i++) {
+                  geos[headSize + i].modifiedPathData = groupGeos[i].modifiedPathData;
+                }
+              }
+            } else if (gt == NodeType::MergePath) {
+              // Propagate MergePath into the shared flag used by renderSVG / canCSS, mirroring
+              // the top-level element handler. Without this, a Group containing
+              // `<Rectangle/> <Ellipse/> <MergePath mode="xor"/> <Fill/>` would emit the two
+              // shapes as independent SVG paths instead of combining them (complete_example
+              // Modifiers purple rect+ellipse xor symptom).
+              auto mp = static_cast<const MergePath*>(ge);
+              hasMerge = true;
+              mergeMode = mp->mode;
+              curFill = nullptr;
+              curStroke = nullptr;
             }
           }
           // Propagate the Group's Fill/Stroke out to the enclosing element stream. Without
