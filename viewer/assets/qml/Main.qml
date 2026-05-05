@@ -437,8 +437,10 @@ PAGWindow {
             mainForm.loadFile(filePath);
         });
 
-        startupTimer.start();
-        updateTimer.start();
+        if (isFirstWindow) {
+            startupTimer.start();
+            updateTimer.start();
+        }
 
         connectContentViewSignals();
     }

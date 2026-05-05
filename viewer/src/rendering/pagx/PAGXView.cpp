@@ -68,14 +68,7 @@ void PAGXView::initDrawable() {
 }
 
 void PAGXView::onRequestSizeChanged() {
-  // Stop any pending resize timer and set a time window to skip new ones.
-  // This prevents the 400ms delay handler from calling updateSize() again
-  // after we've already handled the size change here.
-  // We use a 500ms window to cover multiple geometryChange() calls that may occur
-  // due to Qt's layout system, and handle the race condition where
-  // geometryChange() is called after takeSizeChanged() clears sizeChanged.
   resizeTimer->stop();
-  skipResizeTimerUntil = QDateTime::currentMSecsSinceEpoch() + 500;
   sizeChanged = true;
   viewModel->markNeedsRender();
   triggerFlush();
@@ -97,7 +90,6 @@ void PAGXView::flush() const {
 
 void PAGXView::onRenderThreadStarted() {
   if (viewModel->hasContent()) {
-    sizeChanged = true;
     viewModel->markNeedsRender();
     triggerFlush();
   }

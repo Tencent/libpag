@@ -163,6 +163,7 @@ void PAGWindow::open(const QString& initialViewType) {
   context->setContextProperty("windowHelper", windowHelper.get());
   context->setContextProperty("pagWindow", this);
   context->setContextProperty("initialViewType", initialViewType);
+  context->setContextProperty("isFirstWindow", AllWindows.isEmpty());
   context->setContextProperty("treeViewModel", treeViewModel.get());
   context->setContextProperty("runTimeDataModel", runTimeDataModel.get());
   context->setContextProperty("editAttributeModel", editAttributeModel.get());
