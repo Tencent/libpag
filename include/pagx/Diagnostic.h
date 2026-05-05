@@ -97,6 +97,7 @@ enum class DiagnosticCode : uint16_t {
   InflateCompositionCycle    = 605,   // compositions reference graph self-loop / chain cycle / depth > MAX_COMPOSITION_REF_DEPTH
   InflaterLayerBudgetExceeded = 606,  // cumulative tgfx::Layer count above MAX_INFLATED_LAYER_COUNT=1e6; subtree degraded to empty Layer
   InflateMaskCycle           = 607,   // P0-16 v2.18: Layer mask cycle (A.mask=B + B.mask=A, or self-loop A.mask=A); masks on the cycle are skipped
+  TextShapingHintMiss        = 608,   // Phase 16.6: ElementText.shapedRuns typefaceKey did not match the Inflater-resolved typeface; hint dropped and runtime shape used instead (contextIndex = layerIndex)
 };
 
 /**

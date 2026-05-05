@@ -24,12 +24,15 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include "pagx/TextLayout.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/pag/BakeContext.h"
 #include "pagx/pag/PAGDocument.h"
+#include "pagx/pag/TypefaceKey.h"
+#include "renderer/GlyphRunRenderer.h"
 #include "renderer/ToTGFX.h"
 
 namespace pagx::pag {
@@ -121,6 +124,108 @@ std::unique_ptr<VectorElement> TextBaker::BakeText(BakeContext& ctx, PAGDocument
 
   data->fauxBold = src.fauxBold;
   data->fauxItalic = src.fauxItalic;
+
+  // Pre-shaped layout hint. The runtime-shape path cannot express PAGX's
+  // multi-line / justify / vertical-writing geometry from a single
+  // `position`, because a single Point anchors the whole TextBlob and the
+  // Inflater has no paragraph layout engine (§10.1). When PAGX TextLayout
+  // produced multi-line glyphs, per-glyph RSXforms (vertical writing mode
+  // with rotated Latin runs), or any other layout decision a single
+  // position cannot reproduce, we snapshot `glyphData->layoutRuns`
+  // directly so the Inflater can replay it.
+  //
+  // Trigger: `HasLayoutThatRuntimeShapeCannotReproduce(runs)` — the gate is
+  // semantic ("does runtime shape lose information here?") rather than
+  // structural ("is this Text inside a TextBox?"). Structural gates
+  // (`insideTextBox`) miss the edge case where a TextBox child Text starts
+  // at the TextBox origin (e.g. text_box.pagx Box 1: horizontal justify
+  // single-child Text, `layoutOrigin = (0, 0)` because the first glyph
+  // sits at the TextBox origin). Semantic gates capture exactly the cases
+  // we need:
+  //   - multi-line (more than one distinct baseline y among glyphs)
+  //   - vertical writing / RangeSelector (any non-empty xforms)
+  // Single-line Text in either coordinate convention is correctly handled
+  // by the runtime-shape fallback + firstBaselineY / layoutOrigin split,
+  // so those are skipped regardless of TextBox membership — saves ~10-20 B
+  // per glyph on .pag size without changing the render.
+  //
+  // Paragraphs wider than `kMaxHintGlyphs` are skipped as well and left to
+  // runtime shape (which still renders something even if geometry drifts).
+  // A blanket hint on a 10 000-glyph screenplay would hurt .pag size more
+  // than it helps PSNR; Phase 16.7+ is the right place to address that
+  // case with a proper paragraph layout port.
+  constexpr size_t kMaxHintGlyphs = 500;
+  const auto& runs = GlyphRunRenderer::GetLayoutRuns(&src);
+  size_t totalGlyphs = 0;
+  bool hasMultipleLines = false;
+  bool hasXforms = false;
+  float firstBaseline = 0.0f;
+  bool firstBaselineSeen = false;
+  for (const auto& run : runs) {
+    totalGlyphs += run.glyphs.size();
+    if (!run.xforms.empty()) {
+      hasXforms = true;
+    }
+    for (const auto& p : run.positions) {
+      if (!firstBaselineSeen) {
+        firstBaseline = p.y;
+        firstBaselineSeen = true;
+      } else if (p.y != firstBaseline) {
+        hasMultipleLines = true;
+      }
+    }
+  }
+  const bool needsShapedHint = (hasMultipleLines || hasXforms) && totalGlyphs > 0 &&
+                               totalGlyphs <= kMaxHintGlyphs;
+  if (needsShapedHint) {
+    std::vector<ElementTextData::ShapedRun> shapedRuns;
+    shapedRuns.reserve(runs.size());
+    bool allRunsUsable = true;
+    for (const auto& run : runs) {
+      if (run.glyphs.empty() || run.positions.size() < run.glyphs.size()) {
+        continue;
+      }
+      auto typeface = run.font.getTypeface();
+      if (typeface == nullptr) {
+        // One unresolvable run inside a TextBox would leave a gap in the
+        // replayed glyph stream; better to drop the whole hint and let the
+        // Inflater runtime-shape everything (matches the run-level
+        // fallback policy on the Inflater side).
+        allRunsUsable = false;
+        break;
+      }
+      ElementTextData::ShapedRun out;
+      out.glyphs = run.glyphs;
+      // Positions are stored relative to `data->position` so both the
+      // hint path and the runtime-shape fallback apply `setPosition` the
+      // same way on the Inflater side. This also keeps the hint
+      // independent of any downstream Layer matrices that move the
+      // anchor point.
+      out.positions.reserve(run.positions.size());
+      for (const auto& p : run.positions) {
+        out.positions.push_back(tgfx::Point{p.x - layoutOrigin.x, p.y - positionY});
+      }
+      if (!run.xforms.empty() && run.xforms.size() >= run.glyphs.size()) {
+        out.xforms.reserve(run.xforms.size());
+        for (const auto& xf : run.xforms) {
+          // RSXform's rotation/scale are orientation-only; only (tx, ty)
+          // need translating into position-relative space.
+          tgfx::RSXform adj = xf;
+          adj.tx = xf.tx - layoutOrigin.x;
+          adj.ty = xf.ty - positionY;
+          out.xforms.push_back(adj);
+        }
+      }
+      out.fontSize = run.font.getSize();
+      out.typefaceFamily = typeface->fontFamily();
+      out.typefaceStyle = typeface->fontStyle();
+      out.typefaceKey = MakeTypefaceKey(*typeface);
+      shapedRuns.push_back(std::move(out));
+    }
+    if (allRunsUsable && !shapedRuns.empty()) {
+      data->shapedRuns = std::move(shapedRuns);
+    }
+  }
 
   // Pre-shaped downgrade. PAGX-native per-glyph xform information is lost;
   // callers that genuinely need it should keep consuming the PAGX document

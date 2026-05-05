@@ -31,6 +31,7 @@
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/core/Point.h"
+#include "tgfx/core/RSXform.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/TileMode.h"
@@ -375,6 +376,39 @@ struct ElementTextData {
   // ----- Background (aligns with v1 TextSourceV2) -----
   Color backgroundColor = {};
   uint8_t backgroundAlpha = 0;
+
+  // ===== Pre-shaped layout hint (Phase 16.6 TextBox multi-line/justify/vertical bypass) =====
+  //
+  // When non-empty, the Inflater skips runtime shaping and replays PAGX
+  // TextLayout's already-resolved per-glyph geometry directly. Carries what
+  // a single `position` can't express: multi-line x-offsets, justify's
+  // widened spacing, vertical writing mode's per-glyph (x,y) + RSXform.
+  //
+  // Semantics (kept simple):
+  //   - positions are relative to `position` (Baker subtracts layoutOrigin
+  //     before writing), so the Inflater always calls
+  //     `text->setPosition(pay.position)` whether the hint is consumed or not.
+  //   - xforms, if non-empty, have (tx, ty) translated into the same
+  //     position-relative space alongside `positions`.
+  //   - `typefaceKey` is the four-tuple `family|style|unitsPerEm|glyphsCount`.
+  //     On the Inflater side we re-resolve the typeface via FontProvider and
+  //     only consume the hint when every run's key matches byte-for-byte;
+  //     any mismatch emits `TextShapingHintMiss` (info) and falls back to
+  //     runtime shape so font substitution still produces a correct render.
+  //   - Only emitted for TextBox-child Text and only when the run glyph-count
+  //     sum is <= kMaxHintGlyphs. Standalone Text runtime-shape is already
+  //     byte-for-byte correct via firstBaselineY + layoutOrigin; large
+  //     paragraphs would bloat .pag by ~10-20 B per glyph for no gain.
+  struct ShapedRun {
+    std::vector<tgfx::GlyphID> glyphs = {};
+    std::vector<tgfx::Point> positions = {};  // relative to ElementTextData::position
+    std::vector<tgfx::RSXform> xforms = {};   // empty when not vertical-rotated
+    float fontSize = 0.0f;
+    std::string typefaceFamily = "";
+    std::string typefaceStyle = "";
+    std::string typefaceKey = "";  // family|style|unitsPerEm|glyphsCount
+  };
+  std::vector<ShapedRun> shapedRuns = {};
 };
 
 struct ElementTextPathData {

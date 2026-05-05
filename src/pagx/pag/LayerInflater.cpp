@@ -3,8 +3,11 @@
 #include "pagx/pag/LayerInflater.h"
 #include <utility>
 #include <vector>
+#include "pagx/TextLayout.h"
 #include "pagx/pag/FontProvider.h"
 #include "pagx/pag/InflaterContext.h"
+#include "pagx/pag/TypefaceKey.h"
+#include "renderer/GlyphRunRenderer.h"
 #ifdef PAG_USE_HARFBUZZ
 #include "pagx/FontConfig.h"
 #include "pagx/LayoutContext.h"
@@ -534,6 +537,43 @@ std::shared_ptr<tgfx::VectorElement> inflateElementText(PAGDocument& /*doc*/,
 
   std::shared_ptr<tgfx::TextBlob> textBlob;
 
+  // Pre-shaped hint path (§10.5 Phase 16.6): when the Baker recognized a
+  // TextBox-child Text, it snapshots PAGX TextLayout's already-resolved
+  // glyphs + positions + optional RSXforms into pay.shapedRuns. Replaying
+  // them directly via GlyphRunRenderer::BuildTextBlobFromLayoutRuns
+  // reproduces every layout decision runtime shape can't express — multi-
+  // line x-offsets, justify spacing, vertical writing mode per-glyph
+  // (x,y)+rotation — with no paragraph-layout port required on this side.
+  //
+  // We only trust the hint when every run's typefaceKey matches the
+  // typeface re-resolved by our FontProvider. Any mismatch falls back to
+  // runtime shape (the host presumably substituted a different font; we
+  // want the render to match that substitution, not the export-time font).
+  if (!pay.shapedRuns.empty() && ctx->fontProvider != nullptr) {
+    std::vector<pagx::TextLayoutGlyphRun> runs;
+    runs.reserve(pay.shapedRuns.size());
+    bool allKeysMatch = true;
+    for (const auto& sr : pay.shapedRuns) {
+      auto tf = ctx->fontProvider->getTypeface(sr.typefaceFamily, sr.typefaceStyle);
+      if (tf == nullptr || MakeTypefaceKey(*tf) != sr.typefaceKey) {
+        allKeysMatch = false;
+        break;
+      }
+      pagx::TextLayoutGlyphRun r;
+      r.font = tgfx::Font(tf, sr.fontSize);
+      r.glyphs = sr.glyphs;
+      r.positions = sr.positions;
+      r.xforms = sr.xforms;
+      runs.push_back(std::move(r));
+    }
+    if (allKeysMatch) {
+      textBlob = pagx::GlyphRunRenderer::BuildTextBlobFromLayoutRuns(runs, tgfx::Matrix::I());
+    } else {
+      ctx->warn(ErrorCode::TextShapingHintMiss,
+                "ElementText.shapedRuns typefaceKey mismatch; falling back to runtime shape");
+    }
+  }
+
 #ifdef PAG_USE_HARFBUZZ
   // Preferred path: if the FontProvider exposes its pagx::FontConfig we can
   // shape through the same HarfBuzz-backed pagx::TextShaper the PAGX layout
@@ -541,7 +581,7 @@ std::shared_ptr<tgfx::VectorElement> inflateElementText(PAGDocument& /*doc*/,
   // per-glyph xAdvance, so CrossCheck PSNR is no longer limited by the
   // HarfBuzz-vs-CoreText advance drift (Arial Bold 84pt: HB says 49.79,
   // CoreText says 56 — 11% per glyph that the primitive shaper can't fix).
-  if (ctx->fontProvider != nullptr) {
+  if (textBlob == nullptr && ctx->fontProvider != nullptr) {
     if (auto* config = ctx->fontProvider->getFontConfig()) {
       pagx::LayoutContext shapingContext(config);
       auto shapedGlyphs = pagx::TextShaper::Shape(pay.text, font, shapingContext,

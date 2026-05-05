@@ -100,6 +100,8 @@ static const char* CodeToString(DiagnosticCode c) {
       return "InflaterLayerBudgetExceeded";
     case DiagnosticCode::InflateMaskCycle:
       return "InflateMaskCycle";
+    case DiagnosticCode::TextShapingHintMiss:
+      return "TextShapingHintMiss";
   }
   return nullptr;
 }

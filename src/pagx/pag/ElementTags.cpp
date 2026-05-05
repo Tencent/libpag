@@ -703,6 +703,8 @@ void WriteElementTextBody(::pag::EncodeStream* body, const ElementTextData& d) {
   if (d.applyFill) boxFlags |= 0x08;
   if (d.applyStroke) boxFlags |= 0x10;
   if (d.strokeOverFill) boxFlags |= 0x20;
+  const bool hasShapedHint = !d.shapedRuns.empty();
+  if (hasShapedHint) boxFlags |= 0x40;
   body->writeUint8(boxFlags);
 
   if (d.boxText) {
@@ -710,6 +712,38 @@ void WriteElementTextBody(::pag::EncodeStream* body, const ElementTextData& d) {
     body->writeFloat(d.boxTextPos.y);
     body->writeFloat(d.boxTextSize.x);
     body->writeFloat(d.boxTextSize.y);
+  }
+
+  // Pre-shaped hint block (§10.5 Phase 16.6 TextBox multi-line bypass). Kept
+  // immediately after the boxText block and before paint so a decoder that
+  // misses the 0x40 bit still lands correctly on paint fields.
+  if (hasShapedHint) {
+    body->writeUint32(static_cast<uint32_t>(d.shapedRuns.size()));
+    for (const auto& run : d.shapedRuns) {
+      const uint32_t glyphCount = static_cast<uint32_t>(run.glyphs.size());
+      body->writeUint32(glyphCount);
+      for (uint32_t i = 0; i < glyphCount; i++) {
+        body->writeUint16(run.glyphs[i]);
+      }
+      for (uint32_t i = 0; i < glyphCount; i++) {
+        body->writeFloat(run.positions[i].x);
+        body->writeFloat(run.positions[i].y);
+      }
+      const bool hasXforms = !run.xforms.empty();
+      body->writeUint8(hasXforms ? 1 : 0);
+      if (hasXforms) {
+        for (uint32_t i = 0; i < glyphCount; i++) {
+          body->writeFloat(run.xforms[i].scos);
+          body->writeFloat(run.xforms[i].ssin);
+          body->writeFloat(run.xforms[i].tx);
+          body->writeFloat(run.xforms[i].ty);
+        }
+      }
+      body->writeFloat(run.fontSize);
+      WriteUtf8String(body, run.typefaceFamily);
+      WriteUtf8String(body, run.typefaceStyle);
+      WriteUtf8String(body, run.typefaceKey);
+    }
   }
 
   WriteColor(body, d.fillColor);
@@ -761,12 +795,53 @@ std::unique_ptr<ElementTextData> ReadElementTextBody(::pag::DecodeStream* s, Dec
   d->applyFill = (boxFlags & 0x08) != 0;
   d->applyStroke = (boxFlags & 0x10) != 0;
   d->strokeOverFill = (boxFlags & 0x20) != 0;
+  const bool hasShapedHint = (boxFlags & 0x40) != 0;
 
   if (d->boxText) {
     d->boxTextPos.x = s->readFloat();
     d->boxTextPos.y = s->readFloat();
     d->boxTextSize.x = s->readFloat();
     d->boxTextSize.y = s->readFloat();
+  }
+
+  if (hasShapedHint) {
+    const uint32_t runCount = s->readUint32();
+    if (runCount > limits::MAX_RUNS_PER_TEXT) {
+      guard.warn(ErrorCode::StructureLimitExceeded, "ElementText.shapedRuns.runCount");
+      return nullptr;
+    }
+    d->shapedRuns.resize(runCount);
+    for (uint32_t r = 0; r < runCount; r++) {
+      auto& run = d->shapedRuns[r];
+      const uint32_t glyphCount = s->readUint32();
+      if (glyphCount > limits::MAX_GLYPHS_PER_RUN) {
+        guard.warn(ErrorCode::GlyphCountLimitExceeded, "ElementText.shapedRuns.glyphCount");
+        return nullptr;
+      }
+      run.glyphs.resize(glyphCount);
+      for (uint32_t i = 0; i < glyphCount; i++) {
+        run.glyphs[i] = s->readUint16();
+      }
+      run.positions.resize(glyphCount);
+      for (uint32_t i = 0; i < glyphCount; i++) {
+        run.positions[i].x = s->readFloat();
+        run.positions[i].y = s->readFloat();
+      }
+      const uint8_t hasXforms = s->readUint8();
+      if (hasXforms) {
+        run.xforms.resize(glyphCount);
+        for (uint32_t i = 0; i < glyphCount; i++) {
+          run.xforms[i].scos = s->readFloat();
+          run.xforms[i].ssin = s->readFloat();
+          run.xforms[i].tx = s->readFloat();
+          run.xforms[i].ty = s->readFloat();
+        }
+      }
+      run.fontSize = s->readFloat();
+      run.typefaceFamily = ReadUtf8String(s, &guard, limits::MAX_NAME_STRING_BYTES);
+      run.typefaceStyle = ReadUtf8String(s, &guard, limits::MAX_NAME_STRING_BYTES);
+      run.typefaceKey = ReadUtf8String(s, &guard, limits::MAX_NAME_STRING_BYTES);
+    }
   }
 
   d->fillColor = ReadColor(s);
