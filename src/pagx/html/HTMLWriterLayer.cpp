@@ -314,13 +314,9 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             style += ";writing-mode:vertical-rl";
           }
           if (tb->wordWrap && !std::isnan(tbW) && tbW > 0) {
-            // Preserve explicit \n newlines and soft-wrap long lines at the TextBox width.
-            // Without `pre-wrap`, Chromium collapses literal newlines into single spaces, so
-            // "Centered\nHorizontally\n&\nVertically" renders as one wrapped line instead of
-            // four (text_box Box 2 symptom).
-            style += ";white-space:pre-wrap;word-wrap:break-word";
+            style += ";word-wrap:break-word";
           } else {
-            style += ";white-space:pre";
+            style += ";white-space:nowrap";
           }
           // Defer the Overflow::Hidden emit until after tbSpans is collected: when the
           // TextBox has a known height and line-height we can translate tgfx's whole-line
@@ -609,7 +605,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             out.closeTagStart();
           }
           for (auto& span : richTextSpans) {
-            std::string spanStyle = tb->wordWrap ? "white-space:pre-wrap" : "white-space:pre";
+            std::string spanStyle = tb->wordWrap ? "" : "white-space:nowrap";
             bool spanFontHoisted = !_ctx->fontHoistSignature.fontFamily.empty() ||
                                    _ctx->fontHoistSignature.renderFontSize > 0;
             if (!spanFontHoisted) {
@@ -887,9 +883,9 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                     GeoToPathData(orig.element, orig.type, pathData);
                   }
                   if (!pathData.isEmpty()) {
-                    copy.modifiedPathData =
-                        combined.isIdentity() ? PathDataToSVGString(pathData)
-                                              : TransformPathDataToSVG(pathData, combined);
+                    copy.modifiedPathData = combined.isIdentity()
+                                                ? PathDataToSVGString(pathData)
+                                                : TransformPathDataToSVG(pathData, combined);
                   }
                   groupGeos.push_back(copy);
                   geos.push_back(copy);
@@ -931,10 +927,8 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                     GeoToPathData(g.element, g.type, pathData);
                     PathData rounded = PathDataFromSVGString("");
                     ApplyRoundCorner(pathData, rcRadius, rounded);
-                    std::string svgPath =
-                        gm.isIdentity()
-                            ? PathDataToSVGString(rounded)
-                            : TransformPathDataToSVG(rounded, gm);
+                    std::string svgPath = gm.isIdentity() ? PathDataToSVGString(rounded)
+                                                          : TransformPathDataToSVG(rounded, gm);
                     g.modifiedPathData = svgPath;
                   }
                 }
