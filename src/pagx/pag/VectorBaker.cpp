@@ -51,6 +51,7 @@
 #include "pagx/pag/TextBaker.h"
 #include "renderer/ToTGFX.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace pagx::pag {
 
@@ -305,22 +306,34 @@ tgfx::Matrix BakeMatrix(const pagx::Matrix& m) {
 
 // Interns the ImagePattern's source Image into PAGDocument::images and
 // returns the resulting index. Returns UINT32_MAX when the image has no
-// inline bytes (Baker side cannot load files in Phase 6 — Phase 10.5 will).
+// inline bytes (Baker side loads files from disk when only a filePath is
+// available; embedded Data bytes take priority when both are present).
 uint32_t InternPatternImage(BakeContext& ctx, PAGDocument& doc, const pagx::Image* image) {
   if (image == nullptr) {
     return UINT32_MAX;
   }
-  if (image->data == nullptr || image->data->empty()) {
-    // File-path-only or empty inline data: Baker cannot load bytes here.
-    // §G.2 warning 200 — Inflater renders a placeholder.
+  // Build a tgfx::Data: prefer embedded bytes, fall back to loading the file.
+  std::shared_ptr<tgfx::Data> imageData;
+  if (image->data != nullptr && !image->data->empty()) {
+    imageData = tgfx::Data::MakeWithCopy(image->data->bytes(), image->data->size());
+  } else if (!image->filePath.empty()) {
+    imageData = tgfx::Data::MakeFromFile(image->filePath);
+  }
+  if (imageData == nullptr || imageData->empty()) {
     ctx.warn(ErrorCode::ImageSourceMissing,
              "ImagePattern references an Image with no inline bytes");
     return UINT32_MAX;
   }
   auto asset = std::make_unique<ImageAsset>();
-  asset->data = tgfx::Data::MakeWithCopy(image->data->bytes(), image->data->size());
+  asset->data = imageData;
   asset->kind = ImageAssetKind::Raster;
-  // width / height stay 0 — real decode happens at Inflate time.
+  // Decode image header to get actual dimensions; Codec must write non-zero
+  // width/height or the Reader will degrade to 1x1 at load time.
+  auto codec = tgfx::ImageCodec::MakeFrom(imageData);
+  if (codec != nullptr) {
+    asset->width  = codec->width();
+    asset->height = codec->height();
+  }
   std::string semanticKey = image->filePath;  // empty OK for pure-inline images
   return RegisterImage(ctx, doc, std::move(asset), image, std::move(semanticKey));
 }

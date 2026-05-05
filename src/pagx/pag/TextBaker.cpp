@@ -175,8 +175,8 @@ std::unique_ptr<VectorElement> TextBaker::BakeText(BakeContext& ctx, PAGDocument
       }
     }
   }
-  const bool needsShapedHint = (hasMultipleLines || hasXforms) && totalGlyphs > 0 &&
-                               totalGlyphs <= kMaxHintGlyphs;
+  const bool needsShapedHint =
+      (hasMultipleLines || hasXforms) && totalGlyphs > 0 && totalGlyphs <= kMaxHintGlyphs;
   if (needsShapedHint) {
     std::vector<ElementTextData::ShapedRun> shapedRuns;
     shapedRuns.reserve(runs.size());

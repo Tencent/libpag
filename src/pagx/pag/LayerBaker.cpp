@@ -127,13 +127,27 @@ struct LayerWalker {
 
     activeCompositions.insert(compPtr);
     // Mask Pass 1 — populate the path table for every layer in this
-    // composition's subtree before Pass 2 starts. We clear the per-composition
-    // entries on entry so paths from a sibling composition (different
-    // child-index basis) do not leak into the lookup.
+    // composition's subtree before Pass 2 starts.
+    //
+    // We must NOT clear the global layerPath table here: a caller baking the
+    // root (or any parent) composition may have already recorded paths for
+    // layers that reference masks in that parent scope, and those entries must
+    // still be visible when Pass 2 resolves their `maskLayerPath`. Instead we
+    // save and restore the caller's entries around the sub-composition walk so
+    // each composition uses index chains relative to its own root (child-index
+    // basis) while leaving the parent's chains intact.
+    //
+    // Historical note: the original `layerPath.clear()` here was the root
+    // cause of MaskTargetMissing for any mask whose target layer lived in the
+    // parent composition but whose host layer was baked _after_ any
+    // `internComposition` call on a nested composition (e.g. a `<Layer
+    // composition="@cardBg"/>` ref processed before the mask host).
+    auto savedLayerPath = layerPath;
     layerPath.clear();
     recordLayerPaths(compPtr->layers, {});
     bool fatal = false;
     bakeLayerList(compPtr->layers, doc.compositions[newIndex]->layers, fatal);
+    layerPath = std::move(savedLayerPath);
     activeCompositions.erase(compPtr);
     if (fatal) {
       return UINT32_MAX;
