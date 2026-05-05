@@ -19,7 +19,9 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <fstream>
 #include <string>
+#include <vector>
 #include "base/utils/MathUtil.h"
 #include "pagx/html/HTMLWriter.h"
 #include "pagx/nodes/Group.h"
@@ -155,6 +157,32 @@ std::string GetImageSrc(const Image* image) {
   }
   if (!IsSafeImageUrl(image->filePath)) {
     return {};
+  }
+  // Relative file paths would otherwise resolve against the emitted HTML's directory, which
+  // rarely matches the PAGX source tree (complete_example's `spec/samples/pag_logo.png`
+  // symptom: the HTML sits in test/out/html-comparison/cli/spec/ so the browser hits a
+  // non-existent spec/samples/ next to it). When the path has no scheme and points to a
+  // readable file on disk, inline it as a data URI so the HTML stays self-contained.
+  size_t colon = image->filePath.find(':');
+  bool hasScheme = (colon != std::string::npos && colon > 0);
+  if (!hasScheme) {
+    auto codec = tgfx::ImageCodec::MakeFrom(image->filePath);
+    if (codec) {
+      // Re-read the file bytes directly — ImageCodec decodes lazily, so we cannot pull the raw
+      // encoded bytes out of it. Use a plain std::ifstream to slurp the file.
+      std::ifstream f(image->filePath, std::ios::binary | std::ios::ate);
+      if (f.good()) {
+        auto sz = f.tellg();
+        f.seekg(0, std::ios::beg);
+        std::vector<uint8_t> buf(static_cast<size_t>(sz));
+        if (f.read(reinterpret_cast<char*>(buf.data()), sz)) {
+          auto mime = DetectImageMime(buf.data(), buf.size());
+          if (mime) {
+            return "data:" + std::string(mime) + ";base64," + Base64Encode(buf.data(), buf.size());
+          }
+        }
+      }
+    }
   }
   return EscapeCSSUrl(image->filePath);
 }

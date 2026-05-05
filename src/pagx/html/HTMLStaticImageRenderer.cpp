@@ -40,14 +40,25 @@ namespace pagx {
 namespace {
 
 // Builds a fresh DiamondGradient inside `doc` whose coordinate space is the target tile's
-// local space. The original gradient is defined in the enclosing layer's coordinate space,
-// so we need to shift center by (-left, -top) to move the tile's top-left to the origin. The
-// gradient matrix stays the same (it operates on gradient-space vectors, not world positions).
+// local space. The source may author its centre/radius in either the geometry's normalized
+// 0..1 bounding box (when fitsToGeometry is true) or in the enclosing layer's absolute
+// coordinate space. For the normalized case the gradient lives in the geometry's own frame,
+// which after cloning becomes the new tile's frame 1:1 — no shift is needed. For the absolute
+// case we must translate by (-left, -top) so the tile's top-left corresponds to the gradient
+// origin. Previously the code always subtracted left/top, which in the common default
+// (fitsToGeometry=true, centre=(0.5,0.5)) pushed the centre by tens of pixels — turning the
+// entire tile into the gradient's last-stop colour (diamond_gradient symptom: flat #1E293B).
 DiamondGradient* CloneDiamondGradientShifted(PAGXDocument* doc, const DiamondGradient* src,
                                              float left, float top) {
   auto clone = doc->makeNode<DiamondGradient>();
-  clone->center = {src->center.x - left, src->center.y - top};
-  clone->radius = src->radius;
+  clone->fitsToGeometry = src->fitsToGeometry;
+  if (src->fitsToGeometry) {
+    clone->center = src->center;
+    clone->radius = src->radius;
+  } else {
+    clone->center = {src->center.x - left, src->center.y - top};
+    clone->radius = src->radius;
+  }
   clone->matrix = src->matrix;
   for (auto* srcStop : src->colorStops) {
     auto stop = doc->makeNode<ColorStop>();

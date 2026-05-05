@@ -365,34 +365,44 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha) 
   }
   if (src->nodeType() == NodeType::ConicGradient) {
     // Use SVG pattern with foreignObject to embed CSS conic-gradient.
-    // Must use userSpaceOnUse because CSS gradient coordinates are in absolute px.
+    // Pattern units: objectBoundingBox means pattern size == referencing geometry's bounding
+    // box (one pattern tile per geometry), so `background: conic-gradient(... at 50% 50% ...)`
+    // inside the foreignObject div lands on the geometry's centre regardless of its size or
+    // position. Previously we used userSpaceOnUse + a 10000×10000 tile, which put the CSS
+    // gradient centre 5000px away from small geometries (Card4 hexagon symptom) and hid the
+    // sweep entirely.
     auto g = static_cast<const ConicGradient*>(src);
     std::string id = _ctx->nextId("cpat");
     _defs->openTag("pattern");
     _defs->addAttr("id", id);
-    _defs->addAttr("patternUnits", "userSpaceOnUse");
+    _defs->addAttr("patternUnits", "objectBoundingBox");
+    _defs->addAttr("patternContentUnits", "objectBoundingBox");
     _defs->addAttr("x", "0");
     _defs->addAttr("y", "0");
-    std::string patternSize = FloatToString(std::max({_ctx->docWidth, _ctx->docHeight, 10000.0f}));
-    _defs->addAttr("width", patternSize);
-    _defs->addAttr("height", patternSize);
+    _defs->addAttr("width", "1");
+    _defs->addAttr("height", "1");
     _defs->closeTagStart();
     _defs->openTag("foreignObject");
-    _defs->addAttr("width", patternSize);
-    _defs->addAttr("height", patternSize);
+    _defs->addAttr("width", "1");
+    _defs->addAttr("height", "1");
     _defs->closeTagStart();
     // Extract rotation angle from the matrix and add it to the CSS start angle.
-    // Use the original center (not matrix-mapped) since the conic-gradient center
-    // is relative to the element's local coordinate space within the SVG pattern.
+    // When fitsToGeometry is true the PAGX centre is already in normalized 0..1 space; express
+    // it as a percentage so the gradient lands at the same relative point inside the foreignObject
+    // regardless of the referencing geometry's size.
     float matRotation = std::atan2(g->matrix.b, g->matrix.a) * 180.0f / static_cast<float>(M_PI);
     Point c = g->center;
+    bool centerInPercent = g->fitsToGeometry;
+    std::string cxStr =
+        centerInPercent ? (FloatToString(c.x * 100.0f) + "%") : (FloatToString(c.x) + "px");
+    std::string cyStr =
+        centerInPercent ? (FloatToString(c.y * 100.0f) + "%") : (FloatToString(c.y) + "px");
     float cssStartAng = g->startAngle + 90.0f + matRotation;
     float sweepRange = g->endAngle - g->startAngle;
     std::string cssGrad;
     if (FloatNearlyZero(sweepRange - 360.0f)) {
-      cssGrad = "conic-gradient(from " + FloatToString(cssStartAng) + "deg at " +
-                FloatToString(c.x) + "px " + FloatToString(c.y) + "px," + CSSStops(g->colorStops) +
-                ")";
+      cssGrad = "conic-gradient(from " + FloatToString(cssStartAng) + "deg at " + cxStr + " " +
+                cyStr + "," + CSSStops(g->colorStops) + ")";
     } else {
       std::string stops;
       bool first = true;
@@ -408,8 +418,7 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha) 
         float angle = cssStartAng + g->colorStops[i]->offset * sweepRange;
         stops += ' ' + FloatToString(angle) + "deg";
       }
-      cssGrad = "conic-gradient(at " + FloatToString(c.x) + "px " + FloatToString(c.y) + "px," +
-                stops + ")";
+      cssGrad = "conic-gradient(at " + cxStr + " " + cyStr + "," + stops + ")";
     }
     _defs->openTag("div");
     _defs->addAttr("xmlns", "http://www.w3.org/1999/xhtml");

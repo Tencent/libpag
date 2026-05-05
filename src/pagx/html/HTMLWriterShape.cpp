@@ -1366,37 +1366,50 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
       } else if (ct == NodeType::ImagePattern) {
         auto p = static_cast<const ImagePattern*>(fill->color);
         style += ";background-image:" + css;
-        // The dispatcher in paintGeos gates Mirror/Clamp to the PNG path, so we should only see
-        // Repeat and Decal here. Map defensively: anything that is not Repeat becomes no-repeat
-        // rather than silently aliasing Mirror onto repeat (which was a latent bug before the
-        // gate fix because the code path was unreachable in practice).
-        auto repeatX = std::string(TileModeToRepeatCss(p->tileModeX));
-        auto repeatY = std::string(TileModeToRepeatCss(p->tileModeY));
-        if (repeatX == repeatY) {
-          style += ";background-repeat:" + repeatX;
-        } else {
-          style += ";background-repeat:" + repeatX + " " + repeatY;
-        }
-        // When any axis tiles, the tile unit on screen must equal (sx*imgW, sy*imgH) CSS pixels
-        // to mirror tgfx's pattern->setMatrix() inverse texture-coordinate transform. That needs
-        // the image's native dimensions; emit background-size in absolute pixels when we can
-        // decode them, otherwise leave it off and let the browser use the natural image size
-        // (which is correct for identity matrices and a graceful degradation otherwise).
-        bool anyRepeat = (p->tileModeX == TileMode::Repeat) || (p->tileModeY == TileMode::Repeat);
-        if (anyRepeat) {
-          auto size = GetImageNativeSize(p->image);
-          if (size.first > 0 && size.second > 0) {
-            float sx = std::sqrt(p->matrix.a * p->matrix.a + p->matrix.b * p->matrix.b);
-            float sy = std::sqrt(p->matrix.c * p->matrix.c + p->matrix.d * p->matrix.d);
-            float tileW = sx * static_cast<float>(size.first);
-            float tileH = sy * static_cast<float>(size.second);
-            style +=
-                ";background-size:" + FloatToString(tileW) + "px " + FloatToString(tileH) + "px";
+        // Honour PAGX's scaleMode when emitting CSS. The legacy code below handled only the
+        // `none` (manual tiling via matrix) case and silently ignored letterbox/zoom/stretch,
+        // producing four identical-looking cards in image_pattern. Map each mode to the CSS
+        // shorthand that matches tgfx's per-geometry fitting: letterbox → contain (ASR fit),
+        // zoom → cover (ASR crop), stretch → 100% 100% (squash), none → absolute px from the
+        // pattern matrix. The fitted modes implicitly centre the image and disable tiling, so
+        // override background-repeat/position accordingly and skip the native-size path.
+        if (p->scaleMode == ScaleMode::LetterBox || p->scaleMode == ScaleMode::Zoom ||
+            p->scaleMode == ScaleMode::Stretch) {
+          const char* sizeValue = "contain";
+          if (p->scaleMode == ScaleMode::Zoom) {
+            sizeValue = "cover";
+          } else if (p->scaleMode == ScaleMode::Stretch) {
+            sizeValue = "100% 100%";
           }
-        }
-        if (!FloatNearlyZero(p->matrix.tx) || !FloatNearlyZero(p->matrix.ty)) {
-          style += ";background-position:" + FloatToString(p->matrix.tx) + "px " +
-                   FloatToString(p->matrix.ty) + "px";
+          style += ";background-size:";
+          style += sizeValue;
+          style += ";background-repeat:no-repeat;background-position:center";
+        } else {
+          auto repeatX = std::string(TileModeToRepeatCss(p->tileModeX));
+          auto repeatY = std::string(TileModeToRepeatCss(p->tileModeY));
+          if (repeatX == repeatY) {
+            style += ";background-repeat:" + repeatX;
+          } else {
+            style += ";background-repeat:" + repeatX + " " + repeatY;
+          }
+          // When any axis tiles, the tile unit on screen must equal (sx*imgW, sy*imgH) CSS
+          // pixels to mirror tgfx's pattern->setMatrix() inverse texture-coordinate transform.
+          bool anyRepeat = (p->tileModeX == TileMode::Repeat) || (p->tileModeY == TileMode::Repeat);
+          if (anyRepeat) {
+            auto size = GetImageNativeSize(p->image);
+            if (size.first > 0 && size.second > 0) {
+              float sx = std::sqrt(p->matrix.a * p->matrix.a + p->matrix.b * p->matrix.b);
+              float sy = std::sqrt(p->matrix.c * p->matrix.c + p->matrix.d * p->matrix.d);
+              float tileW = sx * static_cast<float>(size.first);
+              float tileH = sy * static_cast<float>(size.second);
+              style += ";background-size:" + FloatToString(tileW) + "px " + FloatToString(tileH) +
+                       "px";
+            }
+          }
+          if (!FloatNearlyZero(p->matrix.tx) || !FloatNearlyZero(p->matrix.ty)) {
+            style += ";background-position:" + FloatToString(p->matrix.tx) + "px " +
+                     FloatToString(p->matrix.ty) + "px";
+          }
         }
         // ImagePattern.mipmapMode has no CSS equivalent; browsers pick internal mipmap policy.
         if (p->filterMode == FilterMode::Nearest) {
@@ -2104,7 +2117,11 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
       pad = (stroke->align != StrokeAlign::Center) ? stroke->width * 2.0f : stroke->width;
     }
     float x0 = 0, y0 = 0, sw = 0, sh = 0;
-    if (!ComputeGeosBoundingBox(geos, pad, false, x0, y0, sw, sh)) {
+    // Include modified path data in the bounding box so Repeater-expanded geometry (which stores
+    // the transformed per-copy path in modifiedPathData) drives the SVG viewBox. Using the
+    // original element bounds would snap the viewBox to one copy (complete_example Modifiers
+    // cyan 5-ellipse symptom: viewBox `16 -6 12 12` only covers the first copy).
+    if (!ComputeGeosBoundingBox(geos, pad, true, x0, y0, sw, sh)) {
       return;
     }
     std::string svgStyle =
