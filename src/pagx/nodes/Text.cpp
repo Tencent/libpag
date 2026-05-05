@@ -115,4 +115,8 @@ float Text::firstBaselineY() const {
   return 0.0f;
 }
 
+Point Text::layoutOrigin() const {
+  return {textBounds.x, textBounds.y};
+}
+
 }  // namespace pagx

@@ -118,11 +118,24 @@ class Text : public Element, public LayoutNode {
   /**
    * Returns the y coordinate of the first glyph's baseline in the Text's local layout coordinate
    * system, or 0 if applyLayout() has not been called (or the Text has no glyphs). The PAG v2
-   * Baker combines this with renderPosition() when writing ElementTextData.position, because a
+   * Baker combines this with layoutOrigin() when writing ElementTextData.position, because a
    * runtime-shape TextBlob's glyphs sit at y=baseline=0 while LayerBuilder's layoutRuns-driven
    * TextBlob glyphs already carry the baseline y per glyph.
    */
   float firstBaselineY() const;
+
+  /**
+   * Returns the Text's origin in the layout coordinate system produced by applyLayout(). For a
+   * standalone Text this is (0, 0) — the text sits at the Layer origin. For a Text nested inside
+   * a TextBox it is the top-left corner of the line-box the TextBox layout engine placed this
+   * Text on, already accounting for textAlign / paragraphAlign / lineHeight / padding / writing
+   * mode. The PAG v2 Baker uses this instead of renderPosition() because renderPosition() cancels
+   * the TextBox contribution (it subtracts textBounds.x/y) and is only meaningful for standalone
+   * Texts that have been stretched by a parent Layer.
+   *
+   * Returns (0, 0) when applyLayout() has not been called.
+   */
+  Point layoutOrigin() const;
 
   NodeType nodeType() const override {
     return NodeType::Text;

@@ -62,26 +62,47 @@ std::unique_ptr<VectorElement> TextBaker::BakeText(BakeContext& ctx, PAGDocument
                                                    const pagx::Text& src) {
   auto data = std::make_unique<ElementTextData>();
 
-  // Render-space position + font size. LayerBuilder::convertText uses
-  // `renderPosition()` (= layoutBounds + center-of-textBounds offset) and
-  // `renderFontSize()` (= fontSize * textScale) at draw time; mirror that
-  // here so Path B (Baker -> Codec -> Inflater -> TextBlob::MakeFrom) matches
-  // Path A (LayerBuilder direct). Using `src.position` / `src.fontSize`
-  // loses the applyLayout() contribution and the text renders at the
-  // origin with the unscaled font.
-  auto renderPos = src.renderPosition();
+  // Layout-space origin + font size. The correct origin depends on whether
+  // this Text is a standalone element or nested in a TextBox:
+  //
+  //   - Standalone (textBounds.x/y == 0): use renderPosition(), which may
+  //     include a centering offset when the parent Layer has stretched the
+  //     Text's layoutBounds beyond its intrinsic textBounds. Without this
+  //     offset the text drifts off the visible area of samples where a
+  //     fixed-size parent Layer expects the text to sit in the middle.
+  //
+  //   - TextBox child (textBounds.x/y != 0): use layoutOrigin() ==
+  //     (textBounds.x, textBounds.y). The TextBox layout engine has already
+  //     placed the Text on its line-box accounting for textAlign /
+  //     paragraphAlign / lineHeight / padding / writing mode, and
+  //     renderPosition() would cancel that contribution by subtracting
+  //     textBounds.x/y.
+  //
+  // This is split-path rather than unconditional textBounds because the two
+  // branches answer different questions — "where does the visible glyph
+  // box sit in the layoutBounds rect?" (standalone) versus "where did the
+  // TextBox layout engine drop me?" (TextBox child). Merging would either
+  // lose standalone centering (causing complete_example / composition PSNR
+  // regressions) or lose TextBox placement (causing rich_text / text_box
+  // to render everything at the origin).
+  const bool insideTextBox = (src.layoutOrigin().x != 0.0f || src.layoutOrigin().y != 0.0f);
+  auto layoutOrigin = insideTextBox ? src.layoutOrigin() : src.renderPosition();
 
   // Baseline offset: runtime-shape produces a TextBlob whose glyphs sit at
   // y=baseline=0 (i.e. the visual top is above the drawing origin). PAGX's
   // layout engine already resolved the absolute baseline y for the first
-  // glyph; carry it through so the Inflater can place the baseline where
-  // LayerBuilder's convertText would have placed it. Without this the
-  // Inflater would fall back to a font-metrics approximation (ascent-only)
-  // that drifts ~16 px because the layout engine uses the full line-box
-  // height instead of ascent.
+  // glyph (in the same layout coordinate system as layoutOrigin), so carry
+  // it through. Without this the Inflater would fall back to a
+  // font-metrics approximation (ascent-only) that drifts ~16 px because
+  // the layout engine uses the full line-box height instead of ascent.
   const float baselineY = src.firstBaselineY();
 
-  data->position = MakeProp(tgfx::Point{renderPos.x, renderPos.y + baselineY});
+  // Standalone Text: the baseline is relative to renderPosition (which
+  // already includes the centering offset), so we add it directly.
+  // TextBox child: the baseline is in TextBox coordinates and already
+  // absolute — we use it as-is for y, with layoutOrigin.x for the x offset.
+  float positionY = insideTextBox ? baselineY : (layoutOrigin.y + baselineY);
+  data->position = MakeProp(tgfx::Point{layoutOrigin.x, positionY});
 
   // Content — the raw UTF-8 string runtime shapers re-shape at load time.
   data->text = src.text;
