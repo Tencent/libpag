@@ -40,7 +40,7 @@ SplitView {
 
     property alias controlForm: controlForm
 
-    property string currentViewType: "pag"
+    property string currentViewType: typeof initialViewType !== "undefined" ? initialViewType : "pag"
 
     property string pendingFilePath: ""
 
@@ -65,6 +65,9 @@ SplitView {
         let newViewType = lowerPath.endsWith(".pagx") ? "pagx" : "pag";
 
         if (currentViewType !== newViewType) {
+            if (contentView) {
+                contentView.prepareForRemoval();
+            }
             pendingFilePath = filePath;
             currentViewType = newViewType;
             return true;

@@ -433,6 +433,10 @@ PAGWindow {
         });
         menuBar.command.connect(onCommand);
 
+        pagWindow.requestOpenFile.connect(function (filePath) {
+            mainForm.loadFile(filePath);
+        });
+
         startupTimer.start();
         updateTimer.start();
 

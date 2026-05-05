@@ -45,6 +45,10 @@ class ContentView : public QQuickItem {
   virtual ContentViewModel* getViewModel() const = 0;
   RenderThread* getRenderThread() const;
 
+  /// Called from QML before the Loader switches components, ensuring the drawable
+  /// is released while the item is still attached to the window.
+  Q_INVOKABLE void prepareForRemoval();
+
   /**
    * Updates the QSG texture node with the current drawable's texture.
    * Handles both node creation and texture binding.
@@ -67,7 +71,9 @@ class ContentView : public QQuickItem {
   Q_SLOT void onWindowChanged(QQuickWindow* win);
 
   virtual void initDrawable();
+  virtual void releaseDrawable();
   virtual void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) override;
+  void itemChange(ItemChange change, const ItemChangeData& value) override;
   // Called at the end of sizeChangedDelayHandle(). Subclasses may override to perform
   // additional work after a resize debounce, such as marking render state dirty.
   virtual void onSizeChangedDelayHandled() {

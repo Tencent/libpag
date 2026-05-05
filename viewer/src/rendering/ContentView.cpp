@@ -28,29 +28,40 @@ ContentView::ContentView(QQuickItem* parent) : QQuickItem(parent) {
   setFlag(ItemHasContents, true);
   resizeTimer = std::make_unique<QTimer>();
   connect(resizeTimer.get(), &QTimer::timeout, this, &ContentView::sizeChangedDelayHandle);
-  if (window() != nullptr) {
-    initDrawable();
-  } else {
-    connect(this, &QQuickItem::windowChanged, this, &ContentView::onWindowChanged);
-  }
+  connect(this, &QQuickItem::windowChanged, this, &ContentView::onWindowChanged);
 }
 
 ContentView::~ContentView() {
-  if (renderThread != nullptr && renderThread->isRunning()) {
-    QMetaObject::invokeMethod(renderThread.get(), "shutDown", Qt::QueuedConnection);
-    renderThread->wait();
-  }
+  releaseDrawable();
 }
 
 void ContentView::onWindowChanged(QQuickWindow* win) {
   if (win != nullptr) {
-    disconnect(this, &QQuickItem::windowChanged, this, &ContentView::onWindowChanged);
     initDrawable();
+  }
+}
+
+void ContentView::itemChange(ItemChange change, const ItemChangeData& value) {
+  QQuickItem::itemChange(change, value);
+  if (change == ItemSceneChange && value.window == nullptr) {
+    releaseDrawable();
   }
 }
 
 void ContentView::initDrawable() {
   // Base implementation does nothing, subclasses will override
+}
+
+void ContentView::releaseDrawable() {
+  if (renderThread != nullptr && renderThread->isRunning()) {
+    QMetaObject::invokeMethod(renderThread.get(), "shutDown", Qt::QueuedConnection);
+    renderThread->wait();
+  }
+  drawable = nullptr;
+}
+
+void ContentView::prepareForRemoval() {
+  releaseDrawable();
 }
 
 void ContentView::sizeChangedDelayHandle() {

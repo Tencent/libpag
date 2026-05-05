@@ -39,6 +39,10 @@ bool PAGViewer::event(QEvent* event) {
 }
 
 void PAGViewer::openFile(QString path) {
+  if (path.isEmpty()) {
+    return;
+  }
+
   PAGWindow* window = nullptr;
   for (int i = 0; i < PAGWindow::AllWindows.count(); i++) {
     auto win = PAGWindow::AllWindows[i];
@@ -51,7 +55,8 @@ void PAGViewer::openFile(QString path) {
 
   if (!window) {
     window = new PAGWindow();
-    window->open();
+    QString viewType = path.toLower().endsWith(".pagx") ? "pagx" : "pag";
+    window->open(viewType);
     PAGWindow::AllWindows.append(window);
     QObject::connect(window, &PAGWindow::destroyWindow, this, &PAGViewer::onWindowDestroyed,
                      Qt::UniqueConnection);
