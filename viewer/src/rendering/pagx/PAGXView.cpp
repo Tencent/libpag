@@ -37,6 +37,8 @@ PAGXView::PAGXView(QQuickItem* parent) : ContentView(parent) {
   // Connect rendered signal to viewModel for deferred XmlLinesModel updates
   connect(renderThread.get(), &RenderThread::rendered, viewModel.get(),
           &PAGXViewModel::onRenderCompleted, Qt::QueuedConnection);
+  connect(renderThread.get(), &QThread::started, this, &PAGXView::onRenderThreadStarted,
+          Qt::QueuedConnection);
   renderThread->moveToThread(renderThread.get());
 }
 
@@ -89,6 +91,14 @@ void PAGXView::onSizeChangedDelayHandled() {
 
 void PAGXView::flush() const {
   if (viewModel->hasContent()) {
+    triggerFlush();
+  }
+}
+
+void PAGXView::onRenderThreadStarted() {
+  if (viewModel->hasContent()) {
+    sizeChanged = true;
+    viewModel->markNeedsRender();
     triggerFlush();
   }
 }
