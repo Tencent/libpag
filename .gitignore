@@ -48,6 +48,9 @@ local.properties
 # CodeBuddy
 .codebuddy/designs/
 
+# AI agent planning artifacts
+.planning/
+
 # Local config
 *.local.json
 *.local.md
