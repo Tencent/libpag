@@ -98,6 +98,40 @@ class HTMLBuilder {
     _tags.pop_back();
   }
 
+  // Like closeTagWithText but converts U+000A (newline, from &#10; in PAGX source) to <br>
+  // elements. Use this for TextBox spans where white-space is not `pre`; without the
+  // conversion the browser folds newlines into spaces under the default white-space:normal.
+  void closeTagWithTextBreaks(const std::string& text) {
+    if (_tags.empty()) {
+      return;
+    }
+    _buf += '>';
+    for (char c : text) {
+      switch (c) {
+        case '&':
+          _buf += "&amp;";
+          break;
+        case '<':
+          _buf += "&lt;";
+          break;
+        case '>':
+          _buf += "&gt;";
+          break;
+        case '\n':
+          _buf += "<br>";
+          break;
+        default:
+          _buf += c;
+          break;
+      }
+    }
+    _buf += "</";
+    _buf += _tags.back();
+    _buf += '>';
+    newline();
+    _tags.pop_back();
+  }
+
   void addRawContent(const std::string& c) {
     _buf += c;
   }

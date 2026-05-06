@@ -871,7 +871,14 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
   }
   out.openTag("span");
   out.addAttr("style", style);
-  out.closeTagWithText(text->text);
+  // Inside a TextBox the container uses word-wrap not white-space:pre, so U+000A
+  // newlines would be folded by the browser. Convert them to <br> explicitly.
+  // Outside a TextBox the span style already includes white-space:pre which handles \n.
+  if (tb) {
+    out.closeTagWithTextBreaks(text->text);
+  } else {
+    out.closeTagWithText(text->text);
+  }
 }
 
 // Renders a Text node whose glyphRuns reference an embedded Font resource (vector outlines or

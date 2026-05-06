@@ -536,7 +536,9 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               }
               out.openTag("span");
               out.addAttr("style", spanStyle);
-              out.closeTagWithText(span.text->text);
+              // Use closeTagWithTextBreaks so U+000A (from &#10;) renders as <br> rather
+              // than being folded into a space by the browser's default white-space handling.
+              out.closeTagWithTextBreaks(span.text->text);
             }
             if (needsInnerWrap) {
               out.closeTag();
@@ -682,7 +684,9 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             }
             out.openTag("span");
             out.addAttr("style", spanStyle);
-            out.closeTagWithText(span.text->text);
+            // Use closeTagWithTextBreaks so U+000A (from &#10;) renders as <br> rather
+            // than being folded into a space by the browser's default white-space handling.
+            out.closeTagWithTextBreaks(span.text->text);
           }
           if (needsInnerWrap) {
             out.closeTag();
