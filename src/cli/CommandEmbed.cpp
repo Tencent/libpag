@@ -40,7 +40,7 @@ struct EmbedOptions {
 
 static void PrintEmbedUsage() {
   std::cout
-      << "Usage: pagx embed [options] <file.pagx>\n"
+      << "Usage: pagx embed [options] input.pagx\n"
       << "\n"
       << "Embed font glyphs and images into a PAGX file for self-contained output.\n"
       << "\n"
