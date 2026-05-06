@@ -559,7 +559,13 @@ CLI_TEST(PAGXHtmlTest, Repeater) {
 CLI_TEST(PAGXHtmlTest, Group) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/group.pagx"));
   ASSERT_FALSE(html.empty());
-  EXPECT_NE(html.find("pagx-group"), std::string::npos);
+  // Shape-only Groups (no Text child) are flattened: their transform is baked into the SVG
+  // path data via TransformPathDataToSVG. Verify expected fill colors are present.
+  EXPECT_NE(html.find("#3B82F6"), std::string::npos) << "Rotate+Scale fill color missing";
+  // Scope Isolation: outer Fill(green) must only paint the outer Rectangle, not the Group ellipse.
+  EXPECT_NE(html.find("#10B981"), std::string::npos) << "Scope Isolation outer fill missing";
+  // Propagation: Group geometry propagates upward so the outer Fill can paint it.
+  EXPECT_NE(html.find("#F59E0B"), std::string::npos) << "Propagation fill missing";
 }
 
 // =============================================================================

@@ -764,7 +764,14 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         // flattened Group would drop its constraint offset from the span's top/left and the
         // text would collapse onto the Layer's origin (app_icons Calendar "17" symptom).
         bool groupHasTransform = !BuildGroupMatrix(group).isIdentity();
-        if (hasPainter && (group->alpha < 1.0f || (hasText && groupHasTransform))) {
+        // Only use the DOM wrapper (writeGroup) when the Group has a transform AND contains
+        // Text — the wrapper is needed so Text can resolve its renderPosition in Group space.
+        // Groups with alpha but no transform/text must use the flatten path so their geometry
+        // propagates upward to the enclosing scope (per PAGX spec §6.3 "Child Group geometry
+        // propagates upward"). A DOM-isolated div would block that propagation, causing outer
+        // Painters to miss the geometry (group_isolation: outer cyan Fill can't reach the
+        // inner red Rectangle, making it appear unaffected by the group's own fill).
+        if (hasPainter && hasText && groupHasTransform) {
           writeGroup(out, group, alpha, distribute);
         } else {
           auto savedFill = curFill;
@@ -786,6 +793,10 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           geos.clear();
           std::vector<GeoInfo> groupGeos;
           Matrix gm = BuildGroupMatrix(group);
+          // When a Group has alpha < 1, its Painters render with that alpha applied. In the
+          // flatten path, carry the group's alpha into every paintGeos/writeTextPath/
+          // writeTextModifier call so the fill-opacity matches the tgfx compositing result.
+          float groupAlpha = group->alpha;
           // The group's own padding insets its children's constraint frame, mirroring Layer's
           // behaviour; propagate it so stretch-rect children avoid the `inset:0` shortcut.
           const Padding* groupPadding = group->padding.isZero() ? nullptr : &group->padding;
@@ -829,7 +840,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               curFill = fill;
               if (fill->placement == targetPlacement && !hasUpcomingRepeater &&
                   !groupHasUpcomingRepeater) {
-                float a = distribute ? alpha : 1.0f;
+                float a = groupAlpha * (distribute ? alpha : 1.0f);
                 if (curTextPath && !geos.empty()) {
                   writeTextPath(out, geos, curTextPath, curFill, nullptr, curTextBox, a);
                   geos.clear();
@@ -848,7 +859,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               curStroke = stroke;
               if (stroke->placement == targetPlacement && !hasUpcomingRepeater &&
                   !groupHasUpcomingRepeater) {
-                float a = distribute ? alpha : 1.0f;
+                float a = groupAlpha * (distribute ? alpha : 1.0f);
                 if (curTextPath && !geos.empty()) {
                   writeTextPath(out, geos, curTextPath, curFill, curStroke, curTextBox, a);
                   geos.clear();
@@ -929,7 +940,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                   // outer copy-0 div (verify_c6_nested_repeater: 1 row instead of 18).
                   // Instead, keep geos in place so the outer Repeater sees all 30 copies.
                 } else {
-                  float a = distribute ? alpha : 1.0f;
+                  float a = groupAlpha * (distribute ? alpha : 1.0f);
                   paintGeos(out, geos, curFill, curStroke, curTextBox, a, hasTrim, curTrim,
                             hasMerge, mergeMode);
                   geos.clear();
