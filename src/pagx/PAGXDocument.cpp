@@ -106,8 +106,9 @@ static bool IsUrlPath(const std::string& path) {
   if (path.find("data:") == 0) {
     return true;
   }
-  auto schemePos = path.find("://");
-  return schemePos != std::string::npos && path.find('/') > schemePos;
+  // Match known URL schemes rather than generic :// to avoid false positives on Windows paths
+  // like C://Users/file.png.
+  return path.find("http://") == 0 || path.find("https://") == 0;
 }
 
 std::vector<std::string> PAGXDocument::getExternalFilePaths() const {
