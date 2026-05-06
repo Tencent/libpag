@@ -906,15 +906,23 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               // Modifiers cyan 5-ellipse symptom: only 1 copy visible when the later Fill path
               // also forgot to paint).
               if (curFill || curStroke) {
-                float a = distribute ? alpha : 1.0f;
-                paintGeos(out, geos, curFill, curStroke, curTextBox, a, hasTrim, curTrim, hasMerge,
-                          mergeMode);
-                geos.clear();
-                groupGeos.clear();
-                // `groupHasUpcomingRepeater` was only about deferring the pre-repeater paint;
-                // now that we have painted, any later Fill/Stroke for the same group should
-                // paint immediately again (not that PAGX samples normally need both).
-                groupHasUpcomingRepeater = false;
+                if (hasUpcomingRepeater) {
+                  // An outer Repeater will consume the expanded geos as its geometry source;
+                  // calling paintGeos here would render them once and then clear the vector,
+                  // leaving the outer Repeater with an empty geo list and producing only the
+                  // outer copy-0 div (verify_c6_nested_repeater: 1 row instead of 18).
+                  // Instead, keep geos in place so the outer Repeater sees all 30 copies.
+                } else {
+                  float a = distribute ? alpha : 1.0f;
+                  paintGeos(out, geos, curFill, curStroke, curTextBox, a, hasTrim, curTrim,
+                            hasMerge, mergeMode);
+                  geos.clear();
+                  groupGeos.clear();
+                  // `groupHasUpcomingRepeater` was only about deferring the pre-repeater paint;
+                  // now that we have painted, any later Fill/Stroke for the same group should
+                  // paint immediately again (not that PAGX samples normally need both).
+                  groupHasUpcomingRepeater = false;
+                }
               }
             } else if (gt == NodeType::Group) {
               writeGroup(out, static_cast<const Group*>(ge), alpha, distribute, gm);
