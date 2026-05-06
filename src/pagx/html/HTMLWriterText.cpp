@@ -1240,6 +1240,18 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           } else {
             charStyle += ";color:" + ColorToRGBA(sc->color, fill->alpha);
           }
+        } else if (fill && fill->color) {
+          // Non-solid fill (LinearGradient etc.): render via background-clip:text so the
+          // gradient is visible on per-character inline-block spans. Each span clips the
+          // gradient to its own advance width, which is a visible approximation — the
+          // gradient appears per-character rather than across the full word, but it is
+          // far better than the default black (no colour at all) that previously showed.
+          auto css = colorToCSS(fill->color, nullptr);
+          if (!css.empty()) {
+            charStyle += ";background:" + css;
+            charStyle += ";-webkit-background-clip:text;background-clip:text";
+            charStyle += ";-webkit-text-fill-color:transparent";
+          }
         } else if (!fill && stroke) {
           charStyle += ";color:transparent";
         }
