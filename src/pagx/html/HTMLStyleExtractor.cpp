@@ -724,6 +724,15 @@ std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) 
                        classification.varyingPropNames.size() >= 1 &&
                        classification.varyingPropNames.size() <= 2;
 
+    // Never split when `background` (shorthand) is a varying prop AND `background-clip`
+    // is a shared prop. CSS background shorthand implicitly resets background-clip to its
+    // initial value (border-box), which would silently undo the shared background-clip:text
+    // set in the base class and make gradient text render as a solid rectangle.
+    if (shouldSplit && VectorContains(classification.varyingPropNames, "background") &&
+        HasPropValue(classification.sharedProps, "background-clip", "text")) {
+      shouldSplit = false;
+    }
+
     if (shouldSplit) {
       // Use first tag for semantic prefix inference.
       const auto& firstTag = tags[members[0]->tagIndex];
