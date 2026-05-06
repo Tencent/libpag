@@ -711,9 +711,33 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       style += ";overflow:hidden";
     }
   } else {
-    auto renderPos = text->renderPosition();
     auto renderFont = text->renderFontSize();
-    float ty = renderPos.y;
+    // When the Text node carries GlyphRun data, the GlyphRun's x/y fields hold the pre-shaped
+    // pixel coordinates (baseline origin) produced by the tgfx layout engine. Use those directly
+    // instead of renderPosition(), which returns (0,0) for Text nodes without explicit left/top
+    // constraints — causing the span to pile up at the canvas origin.
+    float posX, posY;
+    if (!text->glyphRuns.empty() && text->glyphRuns[0]) {
+      auto* run0 = text->glyphRuns[0];
+      // GlyphRun.x is the overall run x offset. Per-glyph xOffsets (when present) encode the
+      // additional spacing, including any horizontal centering margin added by the tgfx layout
+      // engine. The actual left edge of the first glyph is run.x + xOffsets[0] (if xOffsets
+      // is non-empty) or simply run.x (when the glyphs are placed at the run origin).
+      if (!run0->xOffsets.empty()) {
+        posX = run0->x + run0->xOffsets[0];
+      } else {
+        posX = run0->x;
+      }
+      // GlyphRun.y is the alphabetic baseline. GlyphRun.bounds.height is the ascender height
+      // (distance from baseline to the top of the tallest glyph in this run). CSS `top` is the
+      // top of the line box, so subtract the ascender to convert baseline → line-box top.
+      posY = run0->y - run0->bounds.height;
+    } else {
+      auto renderPos = text->renderPosition();
+      posX = renderPos.x;
+      posY = renderPos.y;
+    }
+    float ty = posY;
     if (text->baseline == TextBaseline::Alphabetic) {
       ty -= renderFont * 0.8f;
     }
@@ -730,15 +754,14 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
         fill && fill->color && fill->color->nodeType() != NodeType::SolidColor;
     if (text->textAnchor == TextAnchor::Center) {
       if (usesBackgroundClipText) {
-        style += ";left:" + FloatToString(renderPos.x) +
-                 "px;transform:translateX(-50%);text-align:center";
+        style += ";left:" + FloatToString(posX) + "px;transform:translateX(-50%);text-align:center";
       } else {
-        style += ";left:0;width:" + FloatToString(renderPos.x * 2) + "px;text-align:center";
+        style += ";left:0;width:" + FloatToString(posX * 2) + "px;text-align:center";
       }
     } else if (text->textAnchor == TextAnchor::End) {
-      style += ";left:0;width:" + FloatToString(renderPos.x) + "px;text-align:right";
+      style += ";left:0;width:" + FloatToString(posX) + "px;text-align:right";
     } else {
-      style += ";left:" + FloatToString(renderPos.x) + "px";
+      style += ";left:" + FloatToString(posX) + "px";
     }
     // line-height is hoisted to the parent Layer when fontHoisted; otherwise emit it on the span.
     if (!fontHoisted) {
