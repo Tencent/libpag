@@ -714,10 +714,23 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       ty -= renderFont * 0.8f;
     }
     style += "position:absolute;top:" + FloatToString(ty) + "px;white-space:pre";
-    // Use text-align + width instead of transform:translateX to avoid creating a compositing
-    // layer, which disables subpixel antialiasing and makes text look thinner.
+    // Determine whether this text will use background-clip:text (non-solid fill or stroke-only).
+    // background-clip:text already disables subpixel antialiasing, so using
+    // transform:translateX(-50%) for centering has no additional cost in that case, and it lets
+    // the span width track the actual glyph advance rather than being fixed at the tgfx-measured
+    // container half-width — preventing Chromium's slightly wider font metrics from clipping the
+    // leading/trailing edges of gradient text (constraint_text "WIDE TEXT"/"Horizontal" symptom).
+    // For solid-colour text we keep the original text-align+width approach to preserve subpixel
+    // antialiasing.
+    bool usesBackgroundClipText =
+        fill && fill->color && fill->color->nodeType() != NodeType::SolidColor;
     if (text->textAnchor == TextAnchor::Center) {
-      style += ";left:0;width:" + FloatToString(renderPos.x * 2) + "px;text-align:center";
+      if (usesBackgroundClipText) {
+        style += ";left:" + FloatToString(renderPos.x) +
+                 "px;transform:translateX(-50%);text-align:center";
+      } else {
+        style += ";left:0;width:" + FloatToString(renderPos.x * 2) + "px;text-align:center";
+      }
     } else if (text->textAnchor == TextAnchor::End) {
       style += ";left:0;width:" + FloatToString(renderPos.x) + "px;text-align:right";
     } else {
@@ -1127,9 +1140,16 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
                                    "px;line-height:" + FloatToString(lineHeight) + "px";
       // Use text-align + width instead of transform:translateX to avoid creating a compositing
       // layer, which disables subpixel antialiasing and makes text look thinner.
+      bool tmUsesBackgroundClip =
+          fill && fill->color && fill->color->nodeType() != NodeType::SolidColor;
       if (text->textAnchor == TextAnchor::Center) {
-        containerStyle +=
-            ";left:0;width:" + FloatToString(renderPos.x * 2) + "px;text-align:center";
+        if (tmUsesBackgroundClip) {
+          containerStyle += ";left:" + FloatToString(renderPos.x) +
+                            "px;transform:translateX(-50%);text-align:center";
+        } else {
+          containerStyle +=
+              ";left:0;width:" + FloatToString(renderPos.x * 2) + "px;text-align:center";
+        }
       } else if (text->textAnchor == TextAnchor::End) {
         containerStyle += ";left:0;width:" + FloatToString(renderPos.x) + "px;text-align:right";
       } else {
