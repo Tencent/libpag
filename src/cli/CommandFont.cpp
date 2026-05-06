@@ -35,7 +35,6 @@ struct FontOptions {
   std::string fontFile = {};
   std::string fontName = {};
   float fontSize = 12.0f;
-  bool sizeSpecified = false;
   bool jsonOutput = false;
   bool listMode = false;
 };
@@ -129,7 +128,6 @@ int RunFont(int argc, char* argv[]) {
         std::cerr << "pagx font: invalid font size '" << argv[i] << "'\n";
         return 1;
       }
-      options.sizeSpecified = true;
     } else if (arg == "--json") {
       options.jsonOutput = true;
     } else if (arg == "--list") {
