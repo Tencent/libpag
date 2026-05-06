@@ -97,8 +97,11 @@ inline std::shared_ptr<tgfx::Typeface> ResolveFallbackTypeface(const std::string
     auto dot = specifier.rfind('.');
     if (dot != std::string::npos) {
       auto ext = specifier.substr(dot);
-      isFilePath = ext == ".ttf" || ext == ".otf" || ext == ".ttc" || ext == ".woff" ||
-                   ext == ".woff2" || ext == ".TTF" || ext == ".OTF" || ext == ".TTC";
+      for (auto& ch : ext) {
+        ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+      }
+      isFilePath =
+          ext == ".ttf" || ext == ".otf" || ext == ".ttc" || ext == ".woff" || ext == ".woff2";
     }
   }
   if (isFilePath) {
