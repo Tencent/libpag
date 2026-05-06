@@ -497,9 +497,139 @@ std::vector<FontFamilyEntry> SystemFonts::AllFontFamilies() {
   return entries;
 }
 
-FontLocation SystemFonts::FindFont(const std::string&, const std::string&) {
-  // Windows FreeType backend already implements MakeFromName via DirectWrite.
-  return {};
+FontLocation SystemFonts::FindFont(const std::string& family, const std::string& style) {
+  if (family.empty()) {
+    return {};
+  }
+
+  IDWriteFactory* factory = nullptr;
+  HRESULT hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
+                                   reinterpret_cast<IUnknown**>(&factory));
+  if (FAILED(hr) || factory == nullptr) {
+    return {};
+  }
+
+  IDWriteFontCollection* fontCollection = nullptr;
+  hr = factory->GetSystemFontCollection(&fontCollection);
+  if (FAILED(hr) || fontCollection == nullptr) {
+    SafeRelease(&factory);
+    return {};
+  }
+
+  int familyLen = MultiByteToWideChar(CP_UTF8, 0, family.c_str(), -1, nullptr, 0);
+  if (familyLen <= 0) {
+    SafeRelease(&fontCollection);
+    SafeRelease(&factory);
+    return {};
+  }
+  std::wstring wideFamily(static_cast<size_t>(familyLen), L'\0');
+  MultiByteToWideChar(CP_UTF8, 0, family.c_str(), -1, wideFamily.data(), familyLen);
+
+  UINT32 familyIndex = 0;
+  BOOL exists = FALSE;
+  hr = fontCollection->FindFamilyName(wideFamily.c_str(), &familyIndex, &exists);
+  if (FAILED(hr) || !exists) {
+    SafeRelease(&fontCollection);
+    SafeRelease(&factory);
+    return {};
+  }
+
+  IDWriteFontFamily* fontFamily = nullptr;
+  hr = fontCollection->GetFontFamily(familyIndex, &fontFamily);
+  if (FAILED(hr) || fontFamily == nullptr) {
+    SafeRelease(&fontCollection);
+    SafeRelease(&factory);
+    return {};
+  }
+
+  UINT32 fontCount = fontFamily->GetFontCount();
+  IDWriteFont* matchedFont = nullptr;
+
+  if (style.empty()) {
+    for (UINT32 j = 0; j < fontCount; j++) {
+      hr = fontFamily->GetFont(j, &matchedFont);
+      if (FAILED(hr) || matchedFont == nullptr) {
+        continue;
+      }
+      if (matchedFont->GetSimulations() == DWRITE_FONT_SIMULATIONS_NONE) {
+        break;
+      }
+      SafeRelease(&matchedFont);
+    }
+    if (matchedFont == nullptr) {
+      fontFamily->GetFont(0, &matchedFont);
+    }
+  } else {
+    for (UINT32 j = 0; j < fontCount; j++) {
+      IDWriteFont* font = nullptr;
+      hr = fontFamily->GetFont(j, &font);
+      if (FAILED(hr) || font == nullptr) {
+        continue;
+      }
+      if (font->GetSimulations() != DWRITE_FONT_SIMULATIONS_NONE) {
+        SafeRelease(&font);
+        continue;
+      }
+      auto faceName = GetFaceName(font);
+      if (_stricmp(faceName.c_str(), style.c_str()) == 0) {
+        matchedFont = font;
+        break;
+      }
+      SafeRelease(&font);
+    }
+  }
+
+  if (matchedFont == nullptr) {
+    SafeRelease(&fontFamily);
+    SafeRelease(&fontCollection);
+    SafeRelease(&factory);
+    return {};
+  }
+
+  IDWriteFontFace* fontFace = nullptr;
+  hr = matchedFont->CreateFontFace(&fontFace);
+  SafeRelease(&matchedFont);
+  if (FAILED(hr) || fontFace == nullptr) {
+    SafeRelease(&fontFamily);
+    SafeRelease(&fontCollection);
+    SafeRelease(&factory);
+    return {};
+  }
+
+  UINT32 fileCount = 1;
+  IDWriteFontFile* fontFile = nullptr;
+  hr = fontFace->GetFiles(&fileCount, &fontFile);
+  if (FAILED(hr) || fontFile == nullptr) {
+    SafeRelease(&fontFace);
+    SafeRelease(&fontFamily);
+    SafeRelease(&fontCollection);
+    SafeRelease(&factory);
+    return {};
+  }
+
+  const void* refKey = nullptr;
+  UINT32 refKeySize = 0;
+  hr = fontFile->GetReferenceKey(&refKey, &refKeySize);
+
+  FontLocation location = {};
+  // GetReferenceKey includes the null terminator in the byte count.
+  int keyLen = static_cast<int>(refKeySize / sizeof(wchar_t));
+  if (SUCCEEDED(hr) && refKey != nullptr && keyLen > 1) {
+    location.path = WideToUTF8(static_cast<const wchar_t*>(refKey), keyLen - 1);
+  }
+  SafeRelease(&fontFile);
+
+  location.ttcIndex = static_cast<int>(fontFace->GetIndex());
+  location.fontFamily = GetFamilyName(fontFamily);
+  if (!style.empty()) {
+    location.fontStyle = style;
+  }
+
+  SafeRelease(&fontFace);
+  SafeRelease(&fontFamily);
+  SafeRelease(&fontCollection);
+  SafeRelease(&factory);
+  return location;
 }
 
 }  // namespace pagx
