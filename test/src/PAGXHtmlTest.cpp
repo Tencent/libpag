@@ -88,12 +88,14 @@ static std::string WrapHtmlDocument(const std::string& fragment, int width, int 
       "url('https://fonts.gstatic.com/s/notosanssc/v40/"
       "k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaG9_FnYw.ttf') format('truetype');"
       "font-display:block}"
-      // Noto Sans SC Bold (700) — local TTF now bundled in resources/font; CDN as fallback.
-      // Without a real Bold face, browsers auto-synthesise bold from Regular, widening glyph
-      // advances ~6-8% and causing fauxBold text to wrap earlier than PAGX native does.
+      // Noto Sans SC Bold (700) — no local file should be injected here. tgfx fauxBold uses
+      // Regular glyph advance (unchanged), while a real Bold font has wider advances, causing
+      // more line breaks than PAGX native. CSS font-synthesis also widens advances (~6-8%) but
+      // less than a real Bold face. Neither perfectly matches tgfx fauxBold; this is a known
+      // limitation (see memory fauxbold_linebreak_divergence.md). CDN-only so no local Bold
+      // is loaded; we rely on synthesis as the closest available approximation.
       "@font-face{font-family:'Noto Sans SC';font-weight:bold;"
-      "src:url('fonts/NotoSansSC-Bold.ttf') format('truetype'),"
-      "url('https://fonts.gstatic.com/s/notosanssc/v40/"
+      "src:url('https://fonts.gstatic.com/s/notosanssc/v40/"
       "k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaGzjCnYw.ttf') format('truetype');"
       "font-display:block}"
       // Noto Color Emoji — local TTF bundled, CDN fallback.
@@ -117,8 +119,10 @@ static std::string WrapHtmlDocument(const std::string& fragment, int width, int 
 
 // Copies the bundled fonts referenced by WrapHtmlDocument into the destination directory so
 // that the `url('fonts/<name>')` entries in each @font-face rule resolve locally when the HTML
-// is opened in a browser. Silently skips any font file not present in the repo; the wrapper's
-// multi-source `src:` will fall back to CDN for the missing ones.
+// is opened in a browser. Bold is deliberately absent — the wrapper points its Bold weight
+// exclusively at the CDN URL so that no local Bold file is loaded (real Bold advances are wider
+// than tgfx fauxBold advances, causing more line breaks than PAGX native). Silently skips any
+// font file not present in the repo; the wrapper's multi-source `src:` will fall back to CDN.
 static void CopyBundledFontsTo(const std::string& destDir) {
   struct FontFile {
     const char* repoPath;
@@ -126,7 +130,6 @@ static void CopyBundledFontsTo(const std::string& destDir) {
   };
   static constexpr FontFile kBundled[] = {
       {"resources/font/NotoSansSC-Regular.otf", "NotoSansSC-Regular.otf"},
-      {"resources/font/NotoSansSC-Bold.ttf", "NotoSansSC-Bold.ttf"},
       {"resources/font/NotoColorEmoji.ttf", "NotoColorEmoji.ttf"},
       {"resources/font/NotoSansHebrew-Regular.ttf", "NotoSansHebrew-Regular.ttf"},
   };

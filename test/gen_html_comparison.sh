@@ -126,9 +126,12 @@ SECTION_TITLES=(
 
 # Local font files. Regular is bundled in the repo; Emoji and Hebrew are optional
 # fallback typefaces `pagx render` needs to avoid substituting system fonts when
-# a sample uses those scripts. Bold is also bundled so fauxBold text wraps
-# identically to PAGX native (CSS font-synthesis widens glyphs ~6-8%, causing
-# early line breaks that don't match tgfx's zero-advance fauxBold).
+# a sample uses those scripts.
+# NOTE: Bold is intentionally NOT auto-loaded even though NotoSansSC-Bold.ttf is now
+# bundled. Real Bold glyph advances are wider than tgfx fauxBold advances (which use
+# Regular advance unchanged), so injecting a real Bold font causes MORE line-break
+# divergence, not less. Use CSS font-synthesis (the default) as the closest available
+# approximation. Pass --bold-font manually only when explicitly comparing Bold rendering.
 FONT_REGULAR="$REPO/resources/font/NotoSansSC-Regular.otf"
 FONT_BOLD="$REPO/resources/font/NotoSansSC-Bold.ttf"
 FONT_EMOJI="$REPO/resources/font/NotoColorEmoji.ttf"
@@ -157,18 +160,13 @@ for font in "$FONT_REGULAR" "$FONT_EMOJI" "$FONT_HEBREW"; do
   fi
 done
 
-# The optional Bold face: prefer the repo-bundled file; fall back to the user's
-# Downloads directory; finally fall back to "no local Bold" (CDN Bold via the
-# multi-source CSS). When absent, CSS font-synthesis adds ~6-8% advance width,
-# causing line-break divergence from PAGX native.
+# The optional Bold face: NOT loaded by default (see comment above). Only probed
+# from the Downloads directory when the user explicitly omits --bold-font to signal
+# they want the old behaviour; production use should not pass a Bold font at all.
 if [ -z "$BOLD_FONT" ]; then
-  if [ -f "$FONT_BOLD" ]; then
-    BOLD_FONT="$FONT_BOLD"
-  else
-    DEFAULT_BOLD="$HOME/Downloads/Noto_Sans_SC/static/NotoSansSC-Bold.ttf"
-    if [ -f "$DEFAULT_BOLD" ]; then
-      BOLD_FONT="$DEFAULT_BOLD"
-    fi
+  DEFAULT_BOLD="$HOME/Downloads/Noto_Sans_SC/static/NotoSansSC-Bold.ttf"
+  if [ -f "$DEFAULT_BOLD" ]; then
+    : # intentionally do NOT auto-set BOLD_FONT; leave it empty
   fi
 fi
 if [ -n "$BOLD_FONT" ] && [ ! -f "$BOLD_FONT" ]; then
