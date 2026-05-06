@@ -1302,6 +1302,15 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   } else {
     style += "position:absolute";
     auto renderPos = layer->renderPosition();
+    // If the parent layer's div was shifted to cover Repeater union bounds, child layers need
+    // the inverse shift added to their own left/top so they still paint at the correct document
+    // position. Consume and clear the offset so it is not applied to grandchild layers.
+    if (!FloatNearlyZero(_ctx->childLayerOffsetX) || !FloatNearlyZero(_ctx->childLayerOffsetY)) {
+      renderPos.x += _ctx->childLayerOffsetX;
+      renderPos.y += _ctx->childLayerOffsetY;
+      _ctx->childLayerOffsetX = 0;
+      _ctx->childLayerOffsetY = 0;
+    }
     std::string transform = LayerTransformCSS(layer);
     // `positionSet` becomes true after we emit `left/top`. The Repeater branch below may need
     // to shift `renderPos` by the union-bounds offset (uL, uT) so the layer div extends into
@@ -1423,6 +1432,15 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     // to each copy's transform; the matrix stays in layer-local coordinates as before.
     _ctx->repeaterOriginOffsetX = repeaterOffsetX;
     _ctx->repeaterOriginOffsetY = repeaterOffsetY;
+    // Child layers (layer->children) are absolutely positioned inside this div and use their
+    // own renderPos for CSS left/top. When this div was shifted up/left by the union-bounds
+    // expansion, child layers need the inverse offset added to their renderPos so they remain
+    // at the correct document position (e.g. game_hud ReticleComplex: div shifts up by 228px
+    // but the circle/triangle children must still paint at the layer origin, not 228px higher).
+    _ctx->childLayerOffsetX = -repeaterOffsetX;
+    _ctx->childLayerOffsetY = -repeaterOffsetY;
+    _ctx->savedChildLayerOffsetX = _ctx->childLayerOffsetX;
+    _ctx->savedChildLayerOffsetY = _ctx->childLayerOffsetY;
     // The legacy branch below handled non-Repeater layers and still runs when `repeater` is
     // null. When a Repeater was present and sized the div above, skip this fallback.
     if (!repeater && (isFlexContainer || !layer->contents.empty())) {
@@ -2226,6 +2244,11 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
 
 void HTMLWriter::writeLayerInner(HTMLBuilder& out, const Layer* layer, float contentAlpha,
                                  bool childDistribute, bool isFlexContainer) {
+  // Snapshot the child-layer offset before any recursive processing; writeLayerContents and
+  // writeComposition may invoke nested writeLayer calls that overwrite savedChildLayerOffset.
+  float childOffX = _ctx->savedChildLayerOffsetX;
+  float childOffY = _ctx->savedChildLayerOffsetY;
+
   bool hasForeground = false;
   for (auto* e : layer->contents) {
     if (e->nodeType() == NodeType::Fill) {
@@ -2247,10 +2270,20 @@ void HTMLWriter::writeLayerInner(HTMLBuilder& out, const Layer* layer, float con
     writeComposition(out, layer->composition, contentAlpha, childDistribute);
   }
 
+  // Restore childLayerOffset before each child writeLayer call: the offset is consumed (cleared)
+  // by each child's own writeLayer entry, so it must be re-set for every sibling. We snapshot
+  // the value into local variables here — after writeLayerContents, the ctx values may have been
+  // overwritten by recursive writeLayer calls inside nested Group/Composition processing.
+  // savedChildLayerOffset* was set by the parent writeLayer immediately after computing the
+  // Repeater union-bounds shift; for layers without a Repeater it is (0,0).
   for (auto* child : layer->children) {
     bool childIsFlexItem = isFlexContainer && child->includeInLayout;
+    _ctx->childLayerOffsetX = childOffX;
+    _ctx->childLayerOffsetY = childOffY;
     writeLayer(out, child, contentAlpha, childDistribute, childIsFlexItem, layer->layout);
   }
+  _ctx->savedChildLayerOffsetX = 0;
+  _ctx->savedChildLayerOffsetY = 0;
 
   if (hasForeground) {
     writeLayerContents(out, layer, contentAlpha, childDistribute, LayerPlacement::Foreground);

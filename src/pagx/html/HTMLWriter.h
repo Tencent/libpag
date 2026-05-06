@@ -175,6 +175,21 @@ class HTMLWriterContext {
   float repeaterOriginOffsetX = 0;
   float repeaterOriginOffsetY = 0;
 
+  // Set by writeLayer at the same time as repeaterOriginOffset, but NOT cleared by writeRepeater.
+  // Child layers (layer->children) inside a Repeater-expanded parent div need to add this offset
+  // to their own renderPos so they stay at the correct document position despite the parent div
+  // having been shifted up/left by the Repeater union-bounds expansion.
+  // Consumed (read + cleared) by each child writeLayer call, then re-set for the next sibling
+  // by the parent writeLayerInner child loop before each writeLayer invocation.
+  float childLayerOffsetX = 0;
+  float childLayerOffsetY = 0;
+
+  // Saved copy of childLayerOffset for the current layer's children, set immediately after the
+  // Repeater offset is computed. The child loop uses this to restore childLayerOffset before each
+  // sibling writeLayer call (childLayerOffset is consumed/cleared on each invocation).
+  float savedChildLayerOffsetX = 0;
+  float savedChildLayerOffsetY = 0;
+
   // Set by writeLayer before emitting the layer's contents. When non-empty, the layer has hoisted
   // font CSS onto its own style attribute, so child Text spans should skip the font-* properties
   // that are already covered by this signature. Reset to empty when leaving the layer.
