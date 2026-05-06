@@ -278,7 +278,8 @@ class HTMLWriter {
   // absolute coordinates. Pass zero/NaN sizes when the box is irrelevant (e.g. SVG fills).
   std::string colorToCSS(const ColorSource* src, float* outAlpha, float boxLeft = 0,
                          float boxTop = 0, float boxWidth = 0, float boxHeight = 0);
-  std::string colorToSVGFill(const ColorSource* src, float* outAlpha);
+  std::string colorToSVGFill(const ColorSource* src, float* outAlpha, float bboxX = 0,
+                             float bboxY = 0, float bboxW = 0, float bboxH = 0);
   void writeSVGGradientDef(const ColorSource* src, const std::string& id);
 
   // Rendering
@@ -310,6 +311,8 @@ class HTMLWriter {
                     BlendMode painterBlend);
   void renderDiamondCanvas(HTMLBuilder& out, const GeoInfo& geo, const Fill* fill, float alpha,
                            BlendMode painterBlend);
+  void renderConicCanvas(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
+                         float alpha, BlendMode painterBlend);
   void renderImagePatternCanvas(HTMLBuilder& out, const GeoInfo& geo, const Fill* fill, float alpha,
                                 BlendMode painterBlend);
   void renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
@@ -364,7 +367,8 @@ class HTMLWriter {
   void writeClipContent(HTMLBuilder& out, const Layer* layer, const Matrix& parent);
 
   // SVG fill/stroke attributes
-  void applySVGFill(HTMLBuilder& out, const Fill* fill);
+  void applySVGFill(HTMLBuilder& out, const Fill* fill, float bboxX = 0, float bboxY = 0,
+                    float bboxW = 0, float bboxH = 0);
   void applySVGStroke(HTMLBuilder& out, const Stroke* stroke, float pathLength = 0.0f);
 
   // Returns the ID for a path definition in the global <defs>. If the d-string was already

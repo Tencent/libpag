@@ -19,6 +19,7 @@
 #pragma once
 
 #include <string>
+#include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DiamondGradient.h"
 #include "pagx/nodes/ImagePattern.h"
 
@@ -56,6 +57,13 @@ class HTMLStaticImageRenderer {
   static bool RenderImagePatternEllipseToPng(float left, float top, float width, float height,
                                              const ImagePattern* pattern, float pixelRatio,
                                              const std::string& outputPath);
+
+  // Rasterizes a rectangle region filled with the given ConicGradient. The caller is responsible
+  // for clipping the resulting <img> to the actual geometry shape. `left/top/width/height` are
+  // in the SVG user-coordinate space; the gradient is evaluated in that same space.
+  static bool RenderConicGradientToPng(float left, float top, float width, float height,
+                                       const ConicGradient* gradient, float pixelRatio,
+                                       const std::string& outputPath);
 };
 
 }  // namespace pagx

@@ -607,6 +607,59 @@ std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) 
   if (html.empty()) return html;
   auto tags = Tokenize(html);
 
+  // Pre-build a set of positions that lie inside <foreignObject>…</foreignObject> blocks.
+  // Elements nested inside foreignObject are HTML-in-SVG; they cannot access the document's
+  // <style> block, so their inline styles must NOT be extracted into CSS classes.
+  // We collect the [start,end) byte ranges of every foreignObject element and test each tag's
+  // tagStart against those ranges.
+  std::vector<std::pair<size_t, size_t>> foreignObjectRanges;
+  {
+    std::vector<size_t> foOpenStack;
+    size_t pos = 0;
+    while (pos < html.size()) {
+      size_t lt = html.find('<', pos);
+      if (lt == std::string::npos) break;
+      if (lt + 1 < html.size() && html[lt + 1] == '/') {
+        // Closing tag: check if it's </foreignObject>
+        size_t nameStart = lt + 2;
+        size_t nameEnd = nameStart;
+        while (nameEnd < html.size() && html[nameEnd] != '>' && html[nameEnd] != ' ') {
+          nameEnd++;
+        }
+        std::string closeName = html.substr(nameStart, nameEnd - nameStart);
+        // case-insensitive compare
+        for (auto& ch : closeName) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+        if (closeName == "foreignobject" && !foOpenStack.empty()) {
+          size_t openPos = foOpenStack.back();
+          foOpenStack.pop_back();
+          size_t closeEnd = html.find('>', nameEnd);
+          if (closeEnd != std::string::npos) {
+            foreignObjectRanges.push_back({openPos, closeEnd + 1});
+          }
+        }
+        pos = nameEnd + 1;
+      } else if (lt + 14 <= html.size()) {
+        // Opening tag: check for <foreignObject
+        std::string prefix = html.substr(lt + 1, 13);
+        for (auto& ch : prefix) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+        if (prefix == "foreignobject" && (lt + 14 >= html.size() ||
+            html[lt + 14] == ' ' || html[lt + 14] == '>' || html[lt + 14] == '\n')) {
+          foOpenStack.push_back(lt);
+        }
+        pos = lt + 1;
+      } else {
+        pos = lt + 1;
+      }
+    }
+  }
+
+  auto isInsideForeignObject = [&](size_t tagPos) {
+    for (const auto& r : foreignObjectRanges) {
+      if (tagPos >= r.first && tagPos < r.second) return true;
+    }
+    return false;
+  };
+
   // Pass 1: parse style values into StyleEntry structures.
   std::vector<StyleEntry> entries;
   // Map from tag index to entry index (-1 means no entry).
@@ -614,6 +667,10 @@ std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) 
   for (size_t ti = 0; ti < tags.size(); ti++) {
     const auto& tag = tags[ti];
     if (!tag.hasStyle || tag.tagName == "body") continue;
+    // Do not extract styles from elements inside <foreignObject>: those elements live in a
+    // separate HTML document context where the outer <style> block is not accessible, so
+    // replacing their inline style with a CSS class name would leave them unstyled.
+    if (isInsideForeignObject(tag.tagStart)) continue;
     auto rawValue = html.substr(tag.styleValueStart, tag.styleValueEnd - tag.styleValueStart);
     if (rawValue.empty()) continue;
     StyleEntry entry;

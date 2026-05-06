@@ -341,7 +341,8 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
   }
 }
 
-std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha) {
+std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha, float bboxX,
+                                       float bboxY, float bboxW, float bboxH) {
   if (!src) {
     if (outAlpha) {
       *outAlpha = 1.0f;
@@ -364,39 +365,49 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha) 
     return "url(#" + id + ")";
   }
   if (src->nodeType() == NodeType::ConicGradient) {
-    // Use SVG pattern with foreignObject to embed CSS conic-gradient.
-    // Pattern units: objectBoundingBox means pattern size == referencing geometry's bounding
-    // box (one pattern tile per geometry), so `background: conic-gradient(... at 50% 50% ...)`
-    // inside the foreignObject div lands on the geometry's centre regardless of its size or
-    // position. Previously we used userSpaceOnUse + a 10000×10000 tile, which put the CSS
-    // gradient centre 5000px away from small geometries (Card4 hexagon symptom) and hid the
-    // sweep entirely.
+    // Use SVG pattern + foreignObject to embed CSS conic-gradient.
+    // patternUnits/patternContentUnits=objectBoundingBox cannot be used here: Chromium
+    // interprets foreignObject width/height in CSS px (the HTML coordinate space), not in
+    // objectBoundingBox fractions, so `width="1" height="1"` produces a 1×1 px tile and the
+    // gradient is invisible. Instead use userSpaceOnUse with the caller-supplied bounding box
+    // so the foreignObject maps exactly onto the geometry's pixel extent.
     auto g = static_cast<const ConicGradient*>(src);
     std::string id = _ctx->nextId("cpat");
+    // Fall back to a generous tile when no bbox was supplied (caller didn't know the geometry).
+    float fw = (bboxW > 0) ? bboxW : 1000.0f;
+    float fh = (bboxH > 0) ? bboxH : 1000.0f;
+    float fx = (bboxW > 0) ? bboxX : -500.0f;
+    float fy = (bboxH > 0) ? bboxY : -500.0f;
     _defs->openTag("pattern");
     _defs->addAttr("id", id);
-    _defs->addAttr("patternUnits", "objectBoundingBox");
-    _defs->addAttr("patternContentUnits", "objectBoundingBox");
-    _defs->addAttr("x", "0");
-    _defs->addAttr("y", "0");
-    _defs->addAttr("width", "1");
-    _defs->addAttr("height", "1");
+    _defs->addAttr("patternUnits", "userSpaceOnUse");
+    _defs->addAttr("x", FloatToString(fx));
+    _defs->addAttr("y", FloatToString(fy));
+    _defs->addAttr("width", FloatToString(fw));
+    _defs->addAttr("height", FloatToString(fh));
     _defs->closeTagStart();
     _defs->openTag("foreignObject");
-    _defs->addAttr("width", "1");
-    _defs->addAttr("height", "1");
+    _defs->addAttr("x", FloatToString(fx));
+    _defs->addAttr("y", FloatToString(fy));
+    _defs->addAttr("width", FloatToString(fw));
+    _defs->addAttr("height", FloatToString(fh));
     _defs->closeTagStart();
     // Extract rotation angle from the matrix and add it to the CSS start angle.
-    // When fitsToGeometry is true the PAGX centre is already in normalized 0..1 space; express
-    // it as a percentage so the gradient lands at the same relative point inside the foreignObject
-    // regardless of the referencing geometry's size.
     float matRotation = std::atan2(g->matrix.b, g->matrix.a) * 180.0f / static_cast<float>(M_PI);
     Point c = g->center;
-    bool centerInPercent = g->fitsToGeometry;
-    std::string cxStr =
-        centerInPercent ? (FloatToString(c.x * 100.0f) + "%") : (FloatToString(c.x) + "px");
-    std::string cyStr =
-        centerInPercent ? (FloatToString(c.y * 100.0f) + "%") : (FloatToString(c.y) + "px");
+    // When fitsToGeometry, the PAGX centre is already in normalised 0..1 space relative to the
+    // geometry's bounding box — emit it as a percentage so it maps to the same relative point
+    // inside the foreignObject regardless of the geometry's pixel extent. When fitsToGeometry
+    // is false, c is in absolute document-space pixels; subtract the foreignObject's top-left
+    // corner (fx, fy) to convert to a foreignObject-local pixel offset.
+    std::string cxStr, cyStr;
+    if (g->fitsToGeometry) {
+      cxStr = FloatToString(c.x * 100.0f) + "%";
+      cyStr = FloatToString(c.y * 100.0f) + "%";
+    } else {
+      cxStr = FloatToString(c.x - fx) + "px";
+      cyStr = FloatToString(c.y - fy) + "px";
+    }
     float cssStartAng = g->startAngle + 90.0f + matRotation;
     float sweepRange = g->endAngle - g->startAngle;
     std::string cssGrad;

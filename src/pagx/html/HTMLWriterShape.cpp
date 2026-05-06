@@ -1118,13 +1118,15 @@ std::string HTMLWriter::getOrCreatePathDef(const std::string& d) {
   return id;
 }
 
-void HTMLWriter::applySVGFill(HTMLBuilder& out, const Fill* fill) {
+void HTMLWriter::applySVGFill(HTMLBuilder& out, const Fill* fill, float bboxX, float bboxY,
+                              float bboxW, float bboxH) {
   if (!fill) {
     out.addAttr("fill", "none");
     return;
   }
   float alpha = 1.0f;
-  std::string f = fill->color ? colorToSVGFill(fill->color, &alpha) : "#000000";
+  std::string f = fill->color ? colorToSVGFill(fill->color, &alpha, bboxX, bboxY, bboxW, bboxH)
+                               : "#000000";
   out.addAttr("fill", f);
   float ea = alpha * fill->alpha;
   if (ea < 1.0f) {
@@ -1402,8 +1404,8 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
               float sy = std::sqrt(p->matrix.c * p->matrix.c + p->matrix.d * p->matrix.d);
               float tileW = sx * static_cast<float>(size.first);
               float tileH = sy * static_cast<float>(size.second);
-              style += ";background-size:" + FloatToString(tileW) + "px " + FloatToString(tileH) +
-                       "px";
+              style +=
+                  ";background-size:" + FloatToString(tileW) + "px " + FloatToString(tileH) + "px";
             }
           }
           if (!FloatNearlyZero(p->matrix.tx) || !FloatNearlyZero(p->matrix.ty)) {
@@ -1791,7 +1793,7 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     if (!g.modifiedPathData.empty()) {
       out.openTag("path");
       out.addAttr("d", g.modifiedPathData);
-      applySVGFill(out, trim ? nullptr : fill);
+      applySVGFill(out, trim ? nullptr : fill, x0, y0, sw, sh);
       if (isContinuousTrim) {
         applySVGStroke(out, stroke, computeGeoPathLength(g));
         applyTrimAttrsContinuous(out, trim, pathLengths, totalPathLength, geoIdx);
@@ -1840,7 +1842,7 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
             out.addAttr("ry", FloatToString(r->roundness));
           }
         }
-        applySVGFill(out, trim ? nullptr : fill);
+        applySVGFill(out, trim ? nullptr : fill, x0, y0, sw, sh);
         if (isContinuousTrim) {
           applySVGStroke(out, stroke, computeGeoPathLength(g));
           applyTrimAttrsContinuous(out, trim, pathLengths, totalPathLength, geoIdx);
@@ -1868,7 +1870,7 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           out.addAttr("rx", FloatToString(size.width / 2));
           out.addAttr("ry", FloatToString(size.height / 2));
         }
-        applySVGFill(out, trim ? nullptr : fill);
+        applySVGFill(out, trim ? nullptr : fill, x0, y0, sw, sh);
         if (isContinuousTrim) {
           applySVGStroke(out, stroke, computeGeoPathLength(g));
           applyTrimAttrsContinuous(out, trim, pathLengths, totalPathLength, geoIdx);
@@ -1891,7 +1893,7 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
             out.openTag("path");
             out.addAttr("d", d);
           }
-          applySVGFill(out, trim ? nullptr : fill);
+          applySVGFill(out, trim ? nullptr : fill, x0, y0, sw, sh);
           if (isContinuousTrim) {
             applySVGStroke(out, stroke, computeGeoPathLength(g));
             applyTrimAttrsContinuous(out, trim, pathLengths, totalPathLength, geoIdx);
@@ -1915,7 +1917,7 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
             out.openTag("path");
             out.addAttr("d", d);
           }
-          applySVGFill(out, trim ? nullptr : fill);
+          applySVGFill(out, trim ? nullptr : fill, x0, y0, sw, sh);
           if (isContinuousTrim) {
             applySVGStroke(out, stroke, computeGeoPathLength(g));
             applyTrimAttrsContinuous(out, trim, pathLengths, totalPathLength, geoIdx);
@@ -2055,7 +2057,7 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         }
         out.openTag("path");
         out.addAttr("d", firstPathD);
-        applySVGFill(out, fill);
+        applySVGFill(out, fill, x0, y0, sw, sh);
         applySVGStroke(out, stroke);
         out.closeTagSelfClosing();
         for (size_t i = 1; i < geos.size(); i++) {
@@ -2148,7 +2150,7 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     if (fillRule != "nonzero") {
       out.addAttr("fill-rule", fillRule);
     }
-    applySVGFill(out, fill);
+    applySVGFill(out, fill, x0, y0, sw, sh);
     applySVGStroke(out, stroke);
     out.closeTagSelfClosing();
     out.closeTag();
@@ -2170,6 +2172,14 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
       renderImagePatternCanvas(out, geos[0], fill, alpha, painterBlend);
       return;
     }
+  }
+  if (fill && fill->color && fill->color->nodeType() == NodeType::ConicGradient &&
+      !_ctx->staticImgDir.empty() && !stroke && !hasTrim) {
+    // CSS conic-gradient via SVG pattern+foreignObject is unreliable in headless Chromium (the
+    // foreignObject content is not painted inside <defs>). Fall back to tgfx rasterization when
+    // a static image directory is available, so the gradient is always visible.
+    renderConicCanvas(out, geos, fill, alpha, painterBlend);
+    return;
   }
   if (canCSS(geos, fill, stroke, hasTrim, false)) {
     renderCSSDiv(out, geos[0], fill, alpha, painterBlend);
@@ -2249,6 +2259,89 @@ void HTMLWriter::renderDiamondCanvas(HTMLBuilder& out, const GeoInfo& geo, const
   out.addAttr("src", _ctx->staticImgUrlPrefix + fileName);
   out.addAttr("style", style);
   out.closeTagSelfClosing();
+}
+
+void HTMLWriter::renderConicCanvas(HTMLBuilder& out, const std::vector<GeoInfo>& geos,
+                                   const Fill* fill, float alpha, BlendMode painterBlend) {
+  if (_ctx->staticImgDir.empty()) {
+    return;
+  }
+  auto* cg = static_cast<const ConicGradient*>(fill->color);
+  // Compute the bounding box of all geos so the PNG tile covers the full shape.
+  float x0 = 0, y0 = 0, sw = 0, sh = 0;
+  if (!ComputeGeosBoundingBox(geos, 0.0f, true, x0, y0, sw, sh) || sw <= 0 || sh <= 0) {
+    return;
+  }
+
+  std::string imgId = _ctx->nextId("cgc");
+  std::string fileName = _ctx->staticImgNamePrefix + imgId + ".png";
+  std::filesystem::create_directories(_ctx->staticImgDir);
+  std::string absPath = _ctx->staticImgDir;
+  if (!absPath.empty() && absPath.back() != '/') {
+    absPath += "/";
+  }
+  absPath += fileName;
+
+  if (!HTMLStaticImageRenderer::RenderConicGradientToPng(x0, y0, sw, sh, cg,
+                                                         _ctx->staticImgPixelRatio, absPath)) {
+    return;
+  }
+
+  // Build a clip path from all geo shapes so the image is clipped to the actual geometry.
+  std::string clipId = _ctx->nextId("cgclip");
+  _defs->openTag("clipPath");
+  _defs->addAttr("id", clipId);
+  _defs->closeTagStart();
+  for (const auto& g : geos) {
+    std::string d;
+    if (!g.modifiedPathData.empty()) {
+      d = g.modifiedPathData;
+    } else {
+      PathData pd = PathDataFromSVGString("");
+      GeoToPathData(g.element, g.type, pd);
+      if (!pd.isEmpty()) {
+        d = PathDataToSVGString(pd);
+      }
+    }
+    if (!d.empty()) {
+      _defs->openTag("path");
+      _defs->addAttr("d", d);
+      _defs->closeTagSelfClosing();
+    }
+  }
+  _defs->closeTag();  // </clipPath>
+
+  // Emit the SVG wrapping the rasterized PNG: an <svg> at (x0,y0) containing an <image>
+  // with the clip-path applied.
+  std::string svgStyle =
+      "position:absolute;left:" + FloatToString(x0) + "px;top:" + FloatToString(y0) + "px";
+  if (painterBlend != BlendMode::Normal) {
+    auto blendStr = BlendModeToMixBlendMode(painterBlend);
+    if (blendStr) {
+      svgStyle += ";mix-blend-mode:";
+      svgStyle += blendStr;
+    }
+  }
+  if (alpha < 1.0f) {
+    svgStyle += ";opacity:" + FloatToString(alpha);
+  }
+  out.openTag("svg");
+  out.addAttr("width", FloatToString(sw));
+  out.addAttr("height", FloatToString(sh));
+  out.addAttr("viewBox",
+              FloatToString(x0) + " " + FloatToString(y0) + " " + FloatToString(sw) + " " +
+                  FloatToString(sh));
+  out.addAttr("style", svgStyle);
+  out.closeTagStart();
+  out.openTag("image");
+  out.addAttr("href", _ctx->staticImgUrlPrefix + fileName);
+  out.addAttr("x", FloatToString(x0));
+  out.addAttr("y", FloatToString(y0));
+  out.addAttr("width", FloatToString(sw));
+  out.addAttr("height", FloatToString(sh));
+  out.addAttr("clip-path", "url(#" + clipId + ")");
+  out.closeTagSelfClosing();
+  out.closeTag();  // </svg>
 }
 
 void HTMLWriter::renderImagePatternCanvas(HTMLBuilder& out, const GeoInfo& geo, const Fill* fill,

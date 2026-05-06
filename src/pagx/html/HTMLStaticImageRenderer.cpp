@@ -27,6 +27,7 @@
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/ConicGradient.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
@@ -271,6 +272,49 @@ bool HTMLStaticImageRenderer::RenderImagePatternEllipseToPng(float left, float t
   auto fill = doc->makeNode<Fill>();
   fill->color = CloneImagePatternShifted(doc.get(), pattern, left, top);
   layer->contents = {ellipse, fill};
+
+  return RenderTileToPng(doc.get(), w, h, pixelRatio, outputPath);
+}
+
+bool HTMLStaticImageRenderer::RenderConicGradientToPng(float left, float top, float width,
+                                                       float height, const ConicGradient* gradient,
+                                                       float pixelRatio,
+                                                       const std::string& outputPath) {
+  if (!gradient || width <= 0 || height <= 0) {
+    return false;
+  }
+  int w = static_cast<int>(std::ceil(width));
+  int h = static_cast<int>(std::ceil(height));
+  auto doc = PAGXDocument::Make(static_cast<float>(w), static_cast<float>(h));
+  auto layer = BuildSingleElementLayer(doc.get(), w, h);
+
+  auto rect = doc->makeNode<Rectangle>();
+  rect->position = {static_cast<float>(w) / 2.0f, static_cast<float>(h) / 2.0f};
+  rect->size = {static_cast<float>(w), static_cast<float>(h)};
+
+  auto fill = doc->makeNode<Fill>();
+  auto clone = doc->makeNode<ConicGradient>();
+  clone->fitsToGeometry = gradient->fitsToGeometry;
+  clone->startAngle = gradient->startAngle;
+  clone->endAngle = gradient->endAngle;
+  clone->matrix = gradient->matrix;
+  if (gradient->fitsToGeometry) {
+    // fitsToGeometry: centre is already normalized 0..1; pass through unchanged so the
+    // renderer evaluates it against the tile bounding box.
+    clone->center = gradient->center;
+  } else {
+    // Absolute pixel space: shift origin from the layer coordinate system to the tile's
+    // top-left corner so the gradient evaluates correctly within the PNG tile.
+    clone->center = {gradient->center.x - left, gradient->center.y - top};
+  }
+  for (auto* srcStop : gradient->colorStops) {
+    auto stop = doc->makeNode<ColorStop>();
+    stop->offset = srcStop->offset;
+    stop->color = srcStop->color;
+    clone->colorStops.push_back(stop);
+  }
+  fill->color = clone;
+  layer->contents = {rect, fill};
 
   return RenderTileToPng(doc.get(), w, h, pixelRatio, outputPath);
 }
