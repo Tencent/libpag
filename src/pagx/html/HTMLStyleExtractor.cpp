@@ -628,7 +628,8 @@ std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) 
         }
         std::string closeName = html.substr(nameStart, nameEnd - nameStart);
         // case-insensitive compare
-        for (auto& ch : closeName) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+        for (auto& ch : closeName)
+          ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
         if (closeName == "foreignobject" && !foOpenStack.empty()) {
           size_t openPos = foOpenStack.back();
           foOpenStack.pop_back();
@@ -641,9 +642,10 @@ std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) 
       } else if (lt + 14 <= html.size()) {
         // Opening tag: check for <foreignObject
         std::string prefix = html.substr(lt + 1, 13);
-        for (auto& ch : prefix) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
-        if (prefix == "foreignobject" && (lt + 14 >= html.size() ||
-            html[lt + 14] == ' ' || html[lt + 14] == '>' || html[lt + 14] == '\n')) {
+        for (auto& ch : prefix)
+          ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+        if (prefix == "foreignobject" && (lt + 14 >= html.size() || html[lt + 14] == ' ' ||
+                                          html[lt + 14] == '>' || html[lt + 14] == '\n')) {
           foOpenStack.push_back(lt);
         }
         pos = lt + 1;
