@@ -61,7 +61,10 @@ bool ImageEmbedder::embed(PAGXDocument* document) {
       lastErrorPath_ = path;
       return false;
     }
-    document->loadFileData(path, data);
+    if (!document->loadFileData(path, data)) {
+      lastErrorPath_ = path;
+      return false;
+    }
   }
   return true;
 }
