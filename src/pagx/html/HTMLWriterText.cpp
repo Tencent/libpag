@@ -1936,6 +1936,16 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
   float originOffsetY = _ctx->repeaterOriginOffsetY;
   _ctx->repeaterOriginOffsetX = 0;
   _ctx->repeaterOriginOffsetY = 0;
+  // Also clear savedChildLayerOffset while inside the Repeater copy loop: renderCSSDiv and
+  // renderSVG inside renderGeo must NOT apply the offset because each copy already has an
+  // explicit translate() that compensates for the div shift. The offset applies only to
+  // geometry that is rendered *outside* a Repeater copy div (e.g. post-Repeater dashed
+  // ellipses in game_hud). Restore the saved value after the loop so post-Repeater renderSVG
+  // calls (still inside the same writeElements) keep the correction.
+  float savedOffX = _ctx->savedChildLayerOffsetX;
+  float savedOffY = _ctx->savedChildLayerOffsetY;
+  _ctx->savedChildLayerOffsetX = 0;
+  _ctx->savedChildLayerOffsetY = 0;
   int n = static_cast<int>(std::ceil(rep->copies));
   float frac = rep->copies - std::floor(rep->copies);
   for (int i = 0; i < n; i++) {
@@ -1992,6 +2002,12 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
       renderGeo(out, geos, fill, stroke, 1.0f, false, trim, false);
     }
   }
+  // Restore savedChildLayerOffset so post-Repeater renderSVG calls (geometry that appears
+  // after the Repeater in writeElements, e.g. game_hud dashed ellipses) still get the
+  // correct div-shift compensation. Inside the copy loop above we cleared it to prevent
+  // renderGeo from double-shifting each copy's geometry.
+  _ctx->savedChildLayerOffsetX = savedOffX;
+  _ctx->savedChildLayerOffsetY = savedOffY;
 }
 
 void HTMLWriter::writeComposition(HTMLBuilder& out, const Composition* comp, float alpha,

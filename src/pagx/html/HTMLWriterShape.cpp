@@ -1125,8 +1125,8 @@ void HTMLWriter::applySVGFill(HTMLBuilder& out, const Fill* fill, float bboxX, f
     return;
   }
   float alpha = 1.0f;
-  std::string f = fill->color ? colorToSVGFill(fill->color, &alpha, bboxX, bboxY, bboxW, bboxH)
-                               : "#000000";
+  std::string f =
+      fill->color ? colorToSVGFill(fill->color, &alpha, bboxX, bboxY, bboxW, bboxH) : "#000000";
   out.addAttr("fill", f);
   float ea = alpha * fill->alpha;
   if (ea < 1.0f) {
@@ -1343,7 +1343,8 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
   if (fillsParent) {
     style = "position:absolute;inset:0";
   } else {
-    style = "position:absolute;left:" + FloatToString(left) + "px;top:" + FloatToString(top) +
+    style = "position:absolute;left:" + FloatToString(left + _ctx->savedChildLayerOffsetX) +
+            "px;top:" + FloatToString(top + _ctx->savedChildLayerOffsetY) +
             "px;width:" + FloatToString(w) + "px;height:" + FloatToString(h) + "px";
   }
 
@@ -1475,7 +1476,8 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     // Build a new SVG containing: <defs><mask>(stroke shapes)</mask></defs>
     //   + <foreignObject mask="url(#maskId)">(CSS conic-gradient div)</foreignObject>
     std::string svgStyle =
-        "position:absolute;left:" + FloatToString(x0) + "px;top:" + FloatToString(y0) + "px";
+        "position:absolute;left:" + FloatToString(x0 + _ctx->savedChildLayerOffsetX) +
+        "px;top:" + FloatToString(y0 + _ctx->savedChildLayerOffsetY) + "px";
     if (painterBlend != BlendMode::Normal) {
       auto blendStr = BlendModeToMixBlendMode(painterBlend);
       if (blendStr) {
@@ -1623,8 +1625,14 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     return;
   }
 
+  // When the enclosing layer div was shifted by Repeater union-bounds expansion, SVG elements
+  // inside writeElements (e.g. dashed-ellipse Groups in game_hud ReticleComplex) are positioned
+  // relative to the div origin, not the layer's logical origin. Add the saved child-layer offset
+  // so the SVG left/top compensates for the div shift, keeping the geometry at its correct
+  // layer-local position.
   std::string svgStyle =
-      "position:absolute;left:" + FloatToString(x0) + "px;top:" + FloatToString(y0) + "px";
+      "position:absolute;left:" + FloatToString(x0 + _ctx->savedChildLayerOffsetX) +
+      "px;top:" + FloatToString(y0 + _ctx->savedChildLayerOffsetY) + "px";
   if (painterBlend != BlendMode::Normal) {
     auto blendStr = BlendModeToMixBlendMode(painterBlend);
     if (blendStr) {
@@ -1966,7 +1974,8 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         return;
       }
       std::string svgStyle =
-          "position:absolute;left:" + FloatToString(x0) + "px;top:" + FloatToString(y0) + "px";
+          "position:absolute;left:" + FloatToString(x0 + _ctx->savedChildLayerOffsetX) +
+          "px;top:" + FloatToString(y0 + _ctx->savedChildLayerOffsetY) + "px";
       if (painterBlend != BlendMode::Normal) {
         auto blendStr = BlendModeToMixBlendMode(painterBlend);
         if (blendStr) {
@@ -2127,7 +2136,8 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
       return;
     }
     std::string svgStyle =
-        "position:absolute;left:" + FloatToString(x0) + "px;top:" + FloatToString(y0) + "px";
+        "position:absolute;left:" + FloatToString(x0 + _ctx->savedChildLayerOffsetX) +
+        "px;top:" + FloatToString(y0 + _ctx->savedChildLayerOffsetY) + "px";
     if (painterBlend != BlendMode::Normal) {
       auto blendStr = BlendModeToMixBlendMode(painterBlend);
       if (blendStr) {
@@ -2314,7 +2324,8 @@ void HTMLWriter::renderConicCanvas(HTMLBuilder& out, const std::vector<GeoInfo>&
   // Emit the SVG wrapping the rasterized PNG: an <svg> at (x0,y0) containing an <image>
   // with the clip-path applied.
   std::string svgStyle =
-      "position:absolute;left:" + FloatToString(x0) + "px;top:" + FloatToString(y0) + "px";
+      "position:absolute;left:" + FloatToString(x0 + _ctx->savedChildLayerOffsetX) +
+      "px;top:" + FloatToString(y0 + _ctx->savedChildLayerOffsetY) + "px";
   if (painterBlend != BlendMode::Normal) {
     auto blendStr = BlendModeToMixBlendMode(painterBlend);
     if (blendStr) {
@@ -2328,9 +2339,8 @@ void HTMLWriter::renderConicCanvas(HTMLBuilder& out, const std::vector<GeoInfo>&
   out.openTag("svg");
   out.addAttr("width", FloatToString(sw));
   out.addAttr("height", FloatToString(sh));
-  out.addAttr("viewBox",
-              FloatToString(x0) + " " + FloatToString(y0) + " " + FloatToString(sw) + " " +
-                  FloatToString(sh));
+  out.addAttr("viewBox", FloatToString(x0) + " " + FloatToString(y0) + " " + FloatToString(sw) +
+                             " " + FloatToString(sh));
   out.addAttr("style", svgStyle);
   out.closeTagStart();
   out.openTag("image");
