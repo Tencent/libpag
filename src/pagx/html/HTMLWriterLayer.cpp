@@ -1051,6 +1051,10 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         roundCornerRadius = 0.0f;
         curTextModifier = nullptr;
         curTextPath = nullptr;
+        // Clear the flag so that geometry appearing after this Repeater (e.g. rotated Group lines
+        // in game_hud Background) can be painted immediately by a subsequent Fill/Stroke rather
+        // than being deferred indefinitely and silently discarded.
+        hasUpcomingRepeater = false;
         break;
       }
       default:
