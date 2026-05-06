@@ -1409,9 +1409,16 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
                   ";background-size:" + FloatToString(tileW) + "px " + FloatToString(tileH) + "px";
             }
           }
-          if (!FloatNearlyZero(p->matrix.tx) || !FloatNearlyZero(p->matrix.ty)) {
-            style += ";background-position:" + FloatToString(p->matrix.tx) + "px " +
-                     FloatToString(p->matrix.ty) + "px";
+          // For scaleMode=none the pattern is anchored to the parent Layer's origin (0,0),
+          // not to the geometry's own top-left corner. CSS background-position is relative
+          // to the element, so compensate by subtracting the element's left/top offset so
+          // the tile grid aligns with the Layer coordinate system rather than the rectangle.
+          // matrix.tx/ty carry any additional translation authored on the ImagePattern.
+          float posX = p->matrix.tx - (left + _ctx->savedChildLayerOffsetX);
+          float posY = p->matrix.ty - (top + _ctx->savedChildLayerOffsetY);
+          if (!FloatNearlyZero(posX) || !FloatNearlyZero(posY)) {
+            style +=
+                ";background-position:" + FloatToString(posX) + "px " + FloatToString(posY) + "px";
           }
         }
         // ImagePattern.mipmapMode has no CSS equivalent; browsers pick internal mipmap policy.
