@@ -77,13 +77,21 @@ static inline std::shared_ptr<tgfx::Typeface> ResolveSystemTypeface(const std::s
   return nullptr;
 }
 
+inline size_t FindLastPathSeparator(const std::string& path) {
+  auto slash = path.rfind('/');
+  auto backslash = path.rfind('\\');
+  if (slash == std::string::npos) return backslash;
+  if (backslash == std::string::npos) return slash;
+  return std::max(slash, backslash);
+}
+
 /**
  * Resolves a fallback font specifier to a Typeface. Accepts either a font file path (containing
- * '/' or ending with a known font extension) or a font name in "family[,style]" format.
+ * a path separator or ending with a known font extension) or a font name in "family[,style]" format.
  */
 inline std::shared_ptr<tgfx::Typeface> ResolveFallbackTypeface(const std::string& specifier) {
-  // Treat as file path if it contains '/' or ends with a known font extension.
-  bool isFilePath = specifier.find('/') != std::string::npos;
+  bool isFilePath =
+      specifier.find('/') != std::string::npos || specifier.find('\\') != std::string::npos;
   if (!isFilePath) {
     auto dot = specifier.rfind('.');
     if (dot != std::string::npos) {
@@ -133,7 +141,7 @@ inline std::string ReplaceExtension(const std::string& path, const std::string& 
  * Extracts the directory part of a path (including trailing slash), or returns "./" if none.
  */
 inline std::string GetDirectory(const std::string& path) {
-  auto slash = path.rfind('/');
+  auto slash = FindLastPathSeparator(path);
   if (slash != std::string::npos) {
     return path.substr(0, slash + 1);
   }
@@ -144,7 +152,7 @@ inline std::string GetDirectory(const std::string& path) {
  * Extracts the base name from a path (filename without directory and extension).
  */
 inline std::string GetBaseName(const std::string& path) {
-  auto slash = path.rfind('/');
+  auto slash = FindLastPathSeparator(path);
   auto base = (slash != std::string::npos) ? path.substr(slash + 1) : path;
   auto dot = base.rfind('.');
   if (dot != std::string::npos) {
