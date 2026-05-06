@@ -546,19 +546,35 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha, 
   return "none";
 }
 
-void HTMLWriter::writeSVGGradientDef(const ColorSource* src, const std::string& id) {
+void HTMLWriter::writeSVGGradientDef(const ColorSource* src, const std::string& id, float bboxX,
+                                     float bboxY, float bboxW, float bboxH) {
+  // When fitsToGeometry=true and a valid bounding box is supplied, convert the normalised
+  // [0,1] gradient coordinates to userSpaceOnUse pixel coordinates. This is required when the
+  // gradient fill is shared across multiple SVG <path> elements (e.g. GlyphRun glyphs) because
+  // SVG applies objectBoundingBox independently to each element, making every glyph produce its
+  // own gradient instead of a single sweep across the whole text block.
+  bool resolveToUserSpace = bboxW > 0 && bboxH > 0;
   if (src->nodeType() == NodeType::LinearGradient) {
     auto g = static_cast<const LinearGradient*>(src);
     _defs->openTag("linearGradient");
     _defs->addAttr("id", id);
-    _defs->addAttr("x1", FloatToString(g->startPoint.x));
-    _defs->addAttr("y1", FloatToString(g->startPoint.y));
-    _defs->addAttr("x2", FloatToString(g->endPoint.x));
-    _defs->addAttr("y2", FloatToString(g->endPoint.y));
-    // fitsToGeometry maps to SVG objectBoundingBox (coords in [0,1] of the filled shape's
-    // bbox); fitsToGeometry=false keeps the legacy userSpaceOnUse semantics for pixel-space
-    // gradient parameters shared across multiple geometries.
-    _defs->addAttr("gradientUnits", g->fitsToGeometry ? "objectBoundingBox" : "userSpaceOnUse");
+    if (g->fitsToGeometry && resolveToUserSpace) {
+      // Map normalised [0,1] coords into the caller-supplied pixel bounding box.
+      _defs->addAttr("x1", FloatToString(bboxX + g->startPoint.x * bboxW));
+      _defs->addAttr("y1", FloatToString(bboxY + g->startPoint.y * bboxH));
+      _defs->addAttr("x2", FloatToString(bboxX + g->endPoint.x * bboxW));
+      _defs->addAttr("y2", FloatToString(bboxY + g->endPoint.y * bboxH));
+      _defs->addAttr("gradientUnits", "userSpaceOnUse");
+    } else {
+      _defs->addAttr("x1", FloatToString(g->startPoint.x));
+      _defs->addAttr("y1", FloatToString(g->startPoint.y));
+      _defs->addAttr("x2", FloatToString(g->endPoint.x));
+      _defs->addAttr("y2", FloatToString(g->endPoint.y));
+      // fitsToGeometry maps to SVG objectBoundingBox (coords in [0,1] of the filled shape's
+      // bbox); fitsToGeometry=false keeps the legacy userSpaceOnUse semantics for pixel-space
+      // gradient parameters shared across multiple geometries.
+      _defs->addAttr("gradientUnits", g->fitsToGeometry ? "objectBoundingBox" : "userSpaceOnUse");
+    }
     if (!g->matrix.isIdentity()) {
       _defs->addAttr("gradientTransform", MatrixToCSS(g->matrix));
     }
@@ -580,10 +596,18 @@ void HTMLWriter::writeSVGGradientDef(const ColorSource* src, const std::string& 
     auto g = static_cast<const RadialGradient*>(src);
     _defs->openTag("radialGradient");
     _defs->addAttr("id", id);
-    _defs->addAttr("cx", FloatToString(g->center.x));
-    _defs->addAttr("cy", FloatToString(g->center.y));
-    _defs->addAttr("r", FloatToString(g->radius));
-    _defs->addAttr("gradientUnits", g->fitsToGeometry ? "objectBoundingBox" : "userSpaceOnUse");
+    if (g->fitsToGeometry && resolveToUserSpace) {
+      // Map normalised centre and radius into pixel space.
+      _defs->addAttr("cx", FloatToString(bboxX + g->center.x * bboxW));
+      _defs->addAttr("cy", FloatToString(bboxY + g->center.y * bboxH));
+      _defs->addAttr("r", FloatToString(g->radius * std::min(bboxW, bboxH)));
+      _defs->addAttr("gradientUnits", "userSpaceOnUse");
+    } else {
+      _defs->addAttr("cx", FloatToString(g->center.x));
+      _defs->addAttr("cy", FloatToString(g->center.y));
+      _defs->addAttr("r", FloatToString(g->radius));
+      _defs->addAttr("gradientUnits", g->fitsToGeometry ? "objectBoundingBox" : "userSpaceOnUse");
+    }
     if (!g->matrix.isIdentity()) {
       _defs->addAttr("gradientTransform", MatrixToCSS(g->matrix));
     }

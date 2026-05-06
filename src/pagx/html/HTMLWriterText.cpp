@@ -887,7 +887,34 @@ void HTMLWriter::writeGlyphRunSVG(HTMLBuilder& out, const Text* text, const Fill
   out.closeTagStart();
   if (!paths.empty()) {
     out.openTag("g");
-    applySVGFill(out, fill);
+    // When the fill is a fitsToGeometry gradient, SVG would apply objectBoundingBox
+    // independently to each <path> element, causing every glyph to produce its own gradient
+    // sweep instead of one sweep across the whole text block. Fix this by converting the
+    // gradient to userSpaceOnUse using the first GlyphRun's bounds (which covers the entire
+    // text block) as the pixel-space bounding box.
+    bool usedGlyphBBox = false;
+    if (fill && fill->color) {
+      auto colorType = fill->color->nodeType();
+      bool isGrad = colorType == NodeType::LinearGradient || colorType == NodeType::RadialGradient;
+      if (isGrad && !text->glyphRuns.empty() && text->glyphRuns[0]) {
+        auto& b = text->glyphRuns[0]->bounds;
+        if (b.width > 0 && b.height > 0) {
+          float bx = renderPos.x + b.x;
+          float by = renderPos.y + b.y;
+          std::string gradId = _ctx->nextId("grad");
+          writeSVGGradientDef(fill->color, gradId, bx, by, b.width, b.height);
+          out.addAttr("fill", "url(#" + gradId + ")");
+          float ea = fill->alpha;
+          if (ea < 1.0f) {
+            out.addAttr("fill-opacity", FloatToString(ea));
+          }
+          usedGlyphBBox = true;
+        }
+      }
+    }
+    if (!usedGlyphBBox) {
+      applySVGFill(out, fill);
+    }
     applySVGStroke(out, stroke);
     out.closeTagStart();
     for (auto& gp : paths) {

@@ -295,7 +295,8 @@ class HTMLWriter {
                          float boxTop = 0, float boxWidth = 0, float boxHeight = 0);
   std::string colorToSVGFill(const ColorSource* src, float* outAlpha, float bboxX = 0,
                              float bboxY = 0, float bboxW = 0, float bboxH = 0);
-  void writeSVGGradientDef(const ColorSource* src, const std::string& id);
+  void writeSVGGradientDef(const ColorSource* src, const std::string& id, float bboxX = 0,
+                           float bboxY = 0, float bboxW = 0, float bboxH = 0);
 
   // Rendering
   void writeLayerContents(HTMLBuilder& out, const Layer* layer, float alpha, bool distribute,
