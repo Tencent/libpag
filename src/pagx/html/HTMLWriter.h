@@ -346,8 +346,11 @@ class HTMLWriter {
                          const TextBox* tb, float alpha);
   void writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const TextPath* textPath,
                      const Fill* fill, const Stroke* stroke, const TextBox* tb, float alpha);
-  void writeGlyphRunSVG(HTMLBuilder& out, const Text* text, const Fill* fill, const Stroke* stroke,
-                        float alpha);
+  // Renders a Text node whose glyphRuns hold embedded vector/bitmap shapes (not real text).
+  // Only call when text->text is empty or text->fontFamily is empty. Real text must go through
+  // the CSS span path in writeText to preserve gradient fills and layout semantics.
+  void writeEmbeddedShapeGlyphs(HTMLBuilder& out, const Text* text, const Fill* fill,
+                                const Stroke* stroke, float alpha);
   // `parentMatrix` is the accumulated transform of any enclosing Groups that were flattened
   // into the current element stream (writeElements inlines flattened-Group geometry via
   // TransformPathDataToSVG but emits nested Groups by recursing into writeGroup). For Groups

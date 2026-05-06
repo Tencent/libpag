@@ -652,8 +652,12 @@ void SampleArcLengthLUT(const ArcLengthLUT& lut, float arcLength, Point* outPos,
 
 void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
                            const Stroke* stroke, const TextBox* tb, float alpha) {
-  if (!text->glyphRuns.empty()) {
-    writeGlyphRunSVG(out, text, fill, stroke, alpha);
+  // GlyphRun-only nodes (no text string, no fontFamily) contain embedded vector/bitmap shapes,
+  // not real text. Route them to writeEmbeddedShapeGlyphs so they render as SVG paths/images.
+  // Nodes that have both a text string and a fontFamily are real text and fall through to the
+  // normal CSS span path below, regardless of any glyphRuns they may also carry.
+  if (!text->glyphRuns.empty() && (text->text.empty() || text->fontFamily.empty())) {
+    writeEmbeddedShapeGlyphs(out, text, fill, stroke, alpha);
     return;
   }
   if (text->text.empty()) {
@@ -847,8 +851,18 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
   out.closeTagWithText(text->text);
 }
 
-void HTMLWriter::writeGlyphRunSVG(HTMLBuilder& out, const Text* text, const Fill* fill,
-                                  const Stroke* stroke, float alpha) {
+// Renders a Text node whose glyphRuns reference an embedded Font resource (vector outlines or
+// bitmap images) that has no Unicode mapping. This is NOT a text-rendering path — the glyphs are
+// arbitrary vector/bitmap shapes that happen to be stored in a Font node for convenient
+// per-shape transform support (xOffsets, positions, anchors, rotations, scales, skews).
+//
+// Do NOT call this for Text nodes that have a non-empty `text` string and a `fontFamily`:
+// those are real text and must be rendered via the normal HTML/CSS span path in writeText so
+// that gradient fills, layout, and text semantics all work correctly.
+//
+// Correct call sites: writeText, only when text->text.empty() || text->fontFamily.empty().
+void HTMLWriter::writeEmbeddedShapeGlyphs(HTMLBuilder& out, const Text* text, const Fill* fill,
+                                          const Stroke* stroke, float alpha) {
   auto renderPos = text->renderPosition();
   auto paths = ComputeGlyphPaths(*text, renderPos.x, renderPos.y);
   bool hasBitmapGlyphs = false;
@@ -886,48 +900,8 @@ void HTMLWriter::writeGlyphRunSVG(HTMLBuilder& out, const Text* text, const Fill
   out.addAttr("style", svgStyle);
   out.closeTagStart();
   if (!paths.empty()) {
-    // When the fill is a fitsToGeometry gradient, SVG would apply objectBoundingBox
-    // independently to each <path> element, causing every glyph to produce its own gradient
-    // sweep instead of one sweep across the whole text block. Fix this by:
-    //   1. Emitting the gradient def inline in this SVG element (not in the shared svg0 defs),
-    //      so the userSpaceOnUse coordinates are interpreted in the same coordinate system as
-    //      the glyph paths — cross-SVG gradient references use the referencing SVG's viewport,
-    //      which can differ from the defining SVG's viewport.
-    //   2. Using the first GlyphRun's bounds (which covers the entire text block) as the
-    //      pixel-space bounding box so the gradient spans the full text width.
-    bool usedGlyphBBox = false;
-    if (fill && fill->color) {
-      auto colorType = fill->color->nodeType();
-      bool isGrad = colorType == NodeType::LinearGradient || colorType == NodeType::RadialGradient;
-      if (isGrad && !text->glyphRuns.empty() && text->glyphRuns[0]) {
-        auto* run0 = text->glyphRuns[0];
-        auto& b = run0->bounds;
-        if (b.width > 0 && b.height > 0) {
-          // bounds is in Text-local space relative to the GlyphRun origin (run->x, run->y),
-          // so the pixel bounding box in SVG coordinates is renderPos + run->x/y + bounds.
-          float bx = renderPos.x + run0->x + b.x;
-          float by = renderPos.y + run0->y + b.y;
-          std::string gradId = _ctx->nextId("grad");
-          // Write the gradient def inline inside this SVG, not into the shared svg0 defs.
-          // This ensures the userSpaceOnUse coordinates are resolved in the correct viewport.
-          out.openTag("defs");
-          out.closeTagStart();
-          writeSVGGradientDefInto(out, fill->color, gradId, bx, by, b.width, b.height);
-          out.closeTag();  // </defs>
-          out.openTag("g");
-          out.addAttr("fill", "url(#" + gradId + ")");
-          float ea = fill->alpha;
-          if (ea < 1.0f) {
-            out.addAttr("fill-opacity", FloatToString(ea));
-          }
-          usedGlyphBBox = true;
-        }
-      }
-    }
-    if (!usedGlyphBBox) {
-      out.openTag("g");
-      applySVGFill(out, fill);
-    }
+    out.openTag("g");
+    applySVGFill(out, fill);
     applySVGStroke(out, stroke);
     out.closeTagStart();
     for (auto& gp : paths) {

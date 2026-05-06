@@ -529,11 +529,13 @@ CLI_TEST(PAGXHtmlTest, TextPath) {
   EXPECT_NE(htmlAdv.find("#3B82F6"), std::string::npos);
 }
 
-CLI_TEST(PAGXHtmlTest, TextGlyphRun) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/text_glyph_run.pagx"));
+CLI_TEST(PAGXHtmlTest, ShapeGlyphRun) {
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/shape_glyph_run.pagx"));
   ASSERT_FALSE(html.empty());
-  // GlyphRun produces SVG paths per glyph
+  // Embedded geometric shapes and bitmap images rendered via GlyphRun produce SVG paths and
+  // image elements (not HTML text spans, since these nodes carry no text/fontFamily).
   EXPECT_NE(html.find("<path"), std::string::npos);
+  EXPECT_NE(html.find("<image"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, TextRich) {
