@@ -897,10 +897,13 @@ void HTMLWriter::writeGlyphRunSVG(HTMLBuilder& out, const Text* text, const Fill
       auto colorType = fill->color->nodeType();
       bool isGrad = colorType == NodeType::LinearGradient || colorType == NodeType::RadialGradient;
       if (isGrad && !text->glyphRuns.empty() && text->glyphRuns[0]) {
-        auto& b = text->glyphRuns[0]->bounds;
+        auto* run0 = text->glyphRuns[0];
+        auto& b = run0->bounds;
         if (b.width > 0 && b.height > 0) {
-          float bx = renderPos.x + b.x;
-          float by = renderPos.y + b.y;
+          // bounds is in Text-local space relative to the GlyphRun origin (run->x, run->y),
+          // so the pixel bounding box in SVG coordinates is renderPos + run->x/y + bounds.
+          float bx = renderPos.x + run0->x + b.x;
+          float by = renderPos.y + run0->y + b.y;
           std::string gradId = _ctx->nextId("grad");
           writeSVGGradientDef(fill->color, gradId, bx, by, b.width, b.height);
           out.addAttr("fill", "url(#" + gradId + ")");
