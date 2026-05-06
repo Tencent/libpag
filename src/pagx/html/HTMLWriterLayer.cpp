@@ -283,16 +283,28 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           auto tb = curTextBox;
           auto tbBounds = tb->layoutBounds();
           auto tbPos = tb->renderPosition();
-          float tbW = !std::isnan(tb->width) ? tb->width : tbBounds.width;
-          float tbH = !std::isnan(tb->height) ? tb->height : tbBounds.height;
+          // TextBox::layoutWidth is NaN when the width is derived purely from tgfx's own text
+          // measurement (no explicit width, no constraint-resolved width). Emitting that
+          // tgfx-measured pixel value as a CSS fixed width causes Chromium to wrap text when
+          // its font metrics are slightly wider than tgfx's — even for a single-line label like
+          // "Group Layout". Use `width:max-content` so Chromium sizes the box to its own
+          // measurement and never wraps at the container boundary.
+          // When layoutWidth is set (constraint/explicit/percentage-resolved), use its px value
+          // so that intentional multi-line word-wrap boxes respect their authored width.
+          bool layoutW = !tb->isWidthAutoSized();
+          bool layoutH = !tb->isHeightAutoSized();
+          float tbW = tbBounds.width;
+          float tbH = tbBounds.height;
           float tbLeft = tbPos.x;
           float tbTop = tbPos.y;
           std::string style = "position:absolute;left:" + FloatToString(tbLeft) +
                               "px;top:" + FloatToString(tbTop) + "px";
-          if (!std::isnan(tbW) && tbW > 0) {
+          if (layoutW && tbW > 0) {
             style += ";width:" + FloatToString(tbW) + "px";
+          } else if (!layoutW) {
+            style += ";width:max-content";
           }
-          if (!std::isnan(tbH) && tbH > 0) {
+          if (layoutH && tbH > 0) {
             style += ";height:" + FloatToString(tbH) + "px";
           }
           if (tb->textAlign == TextAlign::Center) {
@@ -313,7 +325,11 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           if (tb->writingMode == WritingMode::Vertical) {
             style += ";writing-mode:vertical-rl";
           }
-          if (tb->wordWrap && !std::isnan(tbW) && tbW > 0) {
+          // Only enable word-wrap when the box has an explicit width that was authored
+          // to contain multi-line text. When the width comes from tgfx's own content
+          // measurement (no explicit width), Chromium's slightly wider font metrics would
+          // immediately overflow that measured width and trigger an unwanted line break.
+          if (tb->wordWrap && layoutW && tbW > 0) {
             style += ";word-wrap:break-word";
           } else {
             style += ";white-space:nowrap";

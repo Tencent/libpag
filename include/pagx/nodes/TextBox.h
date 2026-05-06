@@ -90,6 +90,24 @@ class TextBox : public Group {
     return NodeType::TextBox;
   }
 
+  /**
+   * Returns true when neither the PAGX author nor the layout engine supplied an explicit width for
+   * this TextBox: the width was inferred entirely from tgfx's own text measurement. HTML exporters
+   * should use `width:max-content` in this case so Chromium's slightly-wider font metrics do not
+   * trigger an unwanted line break at the tgfx-measured boundary.
+   */
+  bool isWidthAutoSized() const {
+    return widthAutoSized;
+  }
+
+  /**
+   * Returns true when neither the PAGX author nor the layout engine supplied an explicit height for
+   * this TextBox: the height was inferred entirely from tgfx's own text measurement.
+   */
+  bool isHeightAutoSized() const {
+    return heightAutoSized;
+  }
+
  protected:
   void onMeasure(LayoutContext* context) override;
   void setLayoutSize(LayoutContext* context, float targetWidth, float targetHeight) override;
@@ -97,6 +115,8 @@ class TextBox : public Group {
 
  private:
   TextBox() = default;
+  bool widthAutoSized = false;
+  bool heightAutoSized = false;
 
   friend class PAGXDocument;
 };
