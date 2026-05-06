@@ -297,6 +297,11 @@ class HTMLWriter {
                              float bboxY = 0, float bboxW = 0, float bboxH = 0);
   void writeSVGGradientDef(const ColorSource* src, const std::string& id, float bboxX = 0,
                            float bboxY = 0, float bboxW = 0, float bboxH = 0);
+  // Like writeSVGGradientDef but writes into an arbitrary HTMLBuilder instead of _defs.
+  // Use this when the gradient must live in the same SVG as the geometry that references it
+  // (required for userSpaceOnUse coordinates to be resolved in the correct coordinate system).
+  void writeSVGGradientDefInto(HTMLBuilder& builder, const ColorSource* src, const std::string& id,
+                               float bboxX = 0, float bboxY = 0, float bboxW = 0, float bboxH = 0);
 
   // Rendering
   void writeLayerContents(HTMLBuilder& out, const Layer* layer, float alpha, bool distribute,

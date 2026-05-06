@@ -886,12 +886,15 @@ void HTMLWriter::writeGlyphRunSVG(HTMLBuilder& out, const Text* text, const Fill
   out.addAttr("style", svgStyle);
   out.closeTagStart();
   if (!paths.empty()) {
-    out.openTag("g");
     // When the fill is a fitsToGeometry gradient, SVG would apply objectBoundingBox
     // independently to each <path> element, causing every glyph to produce its own gradient
-    // sweep instead of one sweep across the whole text block. Fix this by converting the
-    // gradient to userSpaceOnUse using the first GlyphRun's bounds (which covers the entire
-    // text block) as the pixel-space bounding box.
+    // sweep instead of one sweep across the whole text block. Fix this by:
+    //   1. Emitting the gradient def inline in this SVG element (not in the shared svg0 defs),
+    //      so the userSpaceOnUse coordinates are interpreted in the same coordinate system as
+    //      the glyph paths — cross-SVG gradient references use the referencing SVG's viewport,
+    //      which can differ from the defining SVG's viewport.
+    //   2. Using the first GlyphRun's bounds (which covers the entire text block) as the
+    //      pixel-space bounding box so the gradient spans the full text width.
     bool usedGlyphBBox = false;
     if (fill && fill->color) {
       auto colorType = fill->color->nodeType();
@@ -905,7 +908,13 @@ void HTMLWriter::writeGlyphRunSVG(HTMLBuilder& out, const Text* text, const Fill
           float bx = renderPos.x + run0->x + b.x;
           float by = renderPos.y + run0->y + b.y;
           std::string gradId = _ctx->nextId("grad");
-          writeSVGGradientDef(fill->color, gradId, bx, by, b.width, b.height);
+          // Write the gradient def inline inside this SVG, not into the shared svg0 defs.
+          // This ensures the userSpaceOnUse coordinates are resolved in the correct viewport.
+          out.openTag("defs");
+          out.closeTagStart();
+          writeSVGGradientDefInto(out, fill->color, gradId, bx, by, b.width, b.height);
+          out.closeTag();  // </defs>
+          out.openTag("g");
           out.addAttr("fill", "url(#" + gradId + ")");
           float ea = fill->alpha;
           if (ea < 1.0f) {
@@ -916,6 +925,7 @@ void HTMLWriter::writeGlyphRunSVG(HTMLBuilder& out, const Text* text, const Fill
       }
     }
     if (!usedGlyphBBox) {
+      out.openTag("g");
       applySVGFill(out, fill);
     }
     applySVGStroke(out, stroke);

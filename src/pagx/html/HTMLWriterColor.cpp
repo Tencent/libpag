@@ -548,6 +548,12 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha, 
 
 void HTMLWriter::writeSVGGradientDef(const ColorSource* src, const std::string& id, float bboxX,
                                      float bboxY, float bboxW, float bboxH) {
+  writeSVGGradientDefInto(*_defs, src, id, bboxX, bboxY, bboxW, bboxH);
+}
+
+void HTMLWriter::writeSVGGradientDefInto(HTMLBuilder& builder, const ColorSource* src,
+                                         const std::string& id, float bboxX, float bboxY,
+                                         float bboxW, float bboxH) {
   // When fitsToGeometry=true and a valid bounding box is supplied, convert the normalised
   // [0,1] gradient coordinates to userSpaceOnUse pixel coordinates. This is required when the
   // gradient fill is shared across multiple SVG <path> elements (e.g. GlyphRun glyphs) because
@@ -556,75 +562,75 @@ void HTMLWriter::writeSVGGradientDef(const ColorSource* src, const std::string& 
   bool resolveToUserSpace = bboxW > 0 && bboxH > 0;
   if (src->nodeType() == NodeType::LinearGradient) {
     auto g = static_cast<const LinearGradient*>(src);
-    _defs->openTag("linearGradient");
-    _defs->addAttr("id", id);
+    builder.openTag("linearGradient");
+    builder.addAttr("id", id);
     if (g->fitsToGeometry && resolveToUserSpace) {
       // Map normalised [0,1] coords into the caller-supplied pixel bounding box.
-      _defs->addAttr("x1", FloatToString(bboxX + g->startPoint.x * bboxW));
-      _defs->addAttr("y1", FloatToString(bboxY + g->startPoint.y * bboxH));
-      _defs->addAttr("x2", FloatToString(bboxX + g->endPoint.x * bboxW));
-      _defs->addAttr("y2", FloatToString(bboxY + g->endPoint.y * bboxH));
-      _defs->addAttr("gradientUnits", "userSpaceOnUse");
+      builder.addAttr("x1", FloatToString(bboxX + g->startPoint.x * bboxW));
+      builder.addAttr("y1", FloatToString(bboxY + g->startPoint.y * bboxH));
+      builder.addAttr("x2", FloatToString(bboxX + g->endPoint.x * bboxW));
+      builder.addAttr("y2", FloatToString(bboxY + g->endPoint.y * bboxH));
+      builder.addAttr("gradientUnits", "userSpaceOnUse");
     } else {
-      _defs->addAttr("x1", FloatToString(g->startPoint.x));
-      _defs->addAttr("y1", FloatToString(g->startPoint.y));
-      _defs->addAttr("x2", FloatToString(g->endPoint.x));
-      _defs->addAttr("y2", FloatToString(g->endPoint.y));
+      builder.addAttr("x1", FloatToString(g->startPoint.x));
+      builder.addAttr("y1", FloatToString(g->startPoint.y));
+      builder.addAttr("x2", FloatToString(g->endPoint.x));
+      builder.addAttr("y2", FloatToString(g->endPoint.y));
       // fitsToGeometry maps to SVG objectBoundingBox (coords in [0,1] of the filled shape's
       // bbox); fitsToGeometry=false keeps the legacy userSpaceOnUse semantics for pixel-space
       // gradient parameters shared across multiple geometries.
-      _defs->addAttr("gradientUnits", g->fitsToGeometry ? "objectBoundingBox" : "userSpaceOnUse");
+      builder.addAttr("gradientUnits", g->fitsToGeometry ? "objectBoundingBox" : "userSpaceOnUse");
     }
     if (!g->matrix.isIdentity()) {
-      _defs->addAttr("gradientTransform", MatrixToCSS(g->matrix));
+      builder.addAttr("gradientTransform", MatrixToCSS(g->matrix));
     }
-    _defs->closeTagStart();
+    builder.closeTagStart();
     for (auto* stop : g->colorStops) {
       if (!stop) {
         continue;
       }
-      _defs->openTag("stop");
-      _defs->addAttr("offset", FloatToString(stop->offset));
-      _defs->addAttr("stop-color", ColorToSVGHex(stop->color));
+      builder.openTag("stop");
+      builder.addAttr("offset", FloatToString(stop->offset));
+      builder.addAttr("stop-color", ColorToSVGHex(stop->color));
       if (stop->color.alpha < 1.0f) {
-        _defs->addAttr("stop-opacity", FloatToString(stop->color.alpha));
+        builder.addAttr("stop-opacity", FloatToString(stop->color.alpha));
       }
-      _defs->closeTagSelfClosing();
+      builder.closeTagSelfClosing();
     }
-    _defs->closeTag();
+    builder.closeTag();
   } else if (src->nodeType() == NodeType::RadialGradient) {
     auto g = static_cast<const RadialGradient*>(src);
-    _defs->openTag("radialGradient");
-    _defs->addAttr("id", id);
+    builder.openTag("radialGradient");
+    builder.addAttr("id", id);
     if (g->fitsToGeometry && resolveToUserSpace) {
       // Map normalised centre and radius into pixel space.
-      _defs->addAttr("cx", FloatToString(bboxX + g->center.x * bboxW));
-      _defs->addAttr("cy", FloatToString(bboxY + g->center.y * bboxH));
-      _defs->addAttr("r", FloatToString(g->radius * std::min(bboxW, bboxH)));
-      _defs->addAttr("gradientUnits", "userSpaceOnUse");
+      builder.addAttr("cx", FloatToString(bboxX + g->center.x * bboxW));
+      builder.addAttr("cy", FloatToString(bboxY + g->center.y * bboxH));
+      builder.addAttr("r", FloatToString(g->radius * std::min(bboxW, bboxH)));
+      builder.addAttr("gradientUnits", "userSpaceOnUse");
     } else {
-      _defs->addAttr("cx", FloatToString(g->center.x));
-      _defs->addAttr("cy", FloatToString(g->center.y));
-      _defs->addAttr("r", FloatToString(g->radius));
-      _defs->addAttr("gradientUnits", g->fitsToGeometry ? "objectBoundingBox" : "userSpaceOnUse");
+      builder.addAttr("cx", FloatToString(g->center.x));
+      builder.addAttr("cy", FloatToString(g->center.y));
+      builder.addAttr("r", FloatToString(g->radius));
+      builder.addAttr("gradientUnits", g->fitsToGeometry ? "objectBoundingBox" : "userSpaceOnUse");
     }
     if (!g->matrix.isIdentity()) {
-      _defs->addAttr("gradientTransform", MatrixToCSS(g->matrix));
+      builder.addAttr("gradientTransform", MatrixToCSS(g->matrix));
     }
-    _defs->closeTagStart();
+    builder.closeTagStart();
     for (auto* stop : g->colorStops) {
       if (!stop) {
         continue;
       }
-      _defs->openTag("stop");
-      _defs->addAttr("offset", FloatToString(stop->offset));
-      _defs->addAttr("stop-color", ColorToSVGHex(stop->color));
+      builder.openTag("stop");
+      builder.addAttr("offset", FloatToString(stop->offset));
+      builder.addAttr("stop-color", ColorToSVGHex(stop->color));
       if (stop->color.alpha < 1.0f) {
-        _defs->addAttr("stop-opacity", FloatToString(stop->color.alpha));
+        builder.addAttr("stop-opacity", FloatToString(stop->color.alpha));
       }
-      _defs->closeTagSelfClosing();
+      builder.closeTagSelfClosing();
     }
-    _defs->closeTag();
+    builder.closeTag();
   }
 }
 
