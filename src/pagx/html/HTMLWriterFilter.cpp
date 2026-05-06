@@ -430,7 +430,7 @@ void HTMLWriter::registerFilterId(const std::string& signature, const std::strin
 // HTMLWriter – mask / clip defs
 //==============================================================================
 
-std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type) {
+std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type, Point maskedLayerPos) {
   const Fill* maskFill = nullptr;
   for (auto* e : mask->contents) {
     if (e->nodeType() == NodeType::Fill) {
@@ -662,6 +662,22 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type) {
     css += ";-webkit-mask-mode:luminance;mask-mode:luminance";
   } else {
     css += ";-webkit-mask-mode:alpha;mask-mode:alpha";
+  }
+  // The mask SVG uses document-absolute coordinates (the maskLayer sits at the document
+  // origin), but CSS mask-image starts at the masked element's own (0,0). Shift the mask
+  // back by the masked layer's render position so the two coordinate systems align.
+  if (!FloatNearlyZero(maskedLayerPos.x) || !FloatNearlyZero(maskedLayerPos.y)) {
+    std::string px = FloatToString(-maskedLayerPos.x) + "px";
+    std::string py = FloatToString(-maskedLayerPos.y) + "px";
+    css += ";-webkit-mask-position:" + px + " " + py;
+    css += ";mask-position:" + px + " " + py;
+    // mask-size must be set explicitly to the SVG's natural dimensions once mask-position is
+    // used, otherwise some browsers default to 'cover' and scale the mask.
+    css += ";-webkit-mask-size:" + FloatToString(maxX) + "px " + FloatToString(maxY) + "px";
+    css += ";mask-size:" + FloatToString(maxX) + "px " + FloatToString(maxY) + "px";
+    // Prevent the mask from tiling: without no-repeat, areas outside the mask rect would
+    // also become opaque due to the default repeat behaviour.
+    css += ";-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat";
   }
   return css;
 }

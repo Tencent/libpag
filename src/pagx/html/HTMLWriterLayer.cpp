@@ -1864,7 +1864,8 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       auto clipId = writeClipDef(layer->mask);
       style += ";clip-path:url(#" + clipId + ")";
     } else {
-      style += writeMaskCSS(layer->mask, layer->maskType);
+      auto pos = layer->renderPosition();
+      style += writeMaskCSS(layer->mask, layer->maskType, pos);
     }
   }
 
