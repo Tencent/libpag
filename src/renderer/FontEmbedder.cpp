@@ -412,6 +412,15 @@ void FontEmbedder::ClearEmbeddedGlyphRuns(PAGXDocument* document) {
       toRemove.insert(node.get());
     }
   }
+  // Clean up nodeMap before compacting nodes so the pointers in nodeMap remain valid.
+  for (auto it = document->nodeMap.begin(); it != document->nodeMap.end();) {
+    if (toRemove.count(it->second) > 0) {
+      it = document->nodeMap.erase(it);
+    } else {
+      ++it;
+    }
+  }
+
   auto& nodes = document->nodes;
   size_t writeIdx = 0;
   for (size_t readIdx = 0; readIdx < nodes.size(); readIdx++) {
@@ -420,14 +429,6 @@ void FontEmbedder::ClearEmbeddedGlyphRuns(PAGXDocument* document) {
     }
   }
   nodes.resize(writeIdx);
-
-  for (auto it = document->nodeMap.begin(); it != document->nodeMap.end();) {
-    if (toRemove.count(it->second) > 0) {
-      it = document->nodeMap.erase(it);
-    } else {
-      ++it;
-    }
-  }
 }
 
 bool FontEmbedder::embed(PAGXDocument* document) {
