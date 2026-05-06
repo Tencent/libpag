@@ -126,8 +126,11 @@ SECTION_TITLES=(
 
 # Local font files. Regular is bundled in the repo; Emoji and Hebrew are optional
 # fallback typefaces `pagx render` needs to avoid substituting system fonts when
-# a sample uses those scripts.
+# a sample uses those scripts. Bold is also bundled so fauxBold text wraps
+# identically to PAGX native (CSS font-synthesis widens glyphs ~6-8%, causing
+# early line breaks that don't match tgfx's zero-advance fauxBold).
 FONT_REGULAR="$REPO/resources/font/NotoSansSC-Regular.otf"
+FONT_BOLD="$REPO/resources/font/NotoSansSC-Bold.ttf"
 FONT_EMOJI="$REPO/resources/font/NotoColorEmoji.ttf"
 FONT_HEBREW="$REPO/resources/font/NotoSansHebrew-Regular.ttf"
 
@@ -154,14 +157,18 @@ for font in "$FONT_REGULAR" "$FONT_EMOJI" "$FONT_HEBREW"; do
   fi
 done
 
-# The optional Bold face: if the user did not pass --bold-font, probe the
-# default Downloads location, and fall back to "no Bold" (silent skip) if it
-# is not present either. When absent, every column that would otherwise load
-# a local Bold face falls back to the CDN Bold URL via the multi-source CSS.
+# The optional Bold face: prefer the repo-bundled file; fall back to the user's
+# Downloads directory; finally fall back to "no local Bold" (CDN Bold via the
+# multi-source CSS). When absent, CSS font-synthesis adds ~6-8% advance width,
+# causing line-break divergence from PAGX native.
 if [ -z "$BOLD_FONT" ]; then
-  DEFAULT_BOLD="$HOME/Downloads/Noto_Sans_SC/static/NotoSansSC-Bold.ttf"
-  if [ -f "$DEFAULT_BOLD" ]; then
-    BOLD_FONT="$DEFAULT_BOLD"
+  if [ -f "$FONT_BOLD" ]; then
+    BOLD_FONT="$FONT_BOLD"
+  else
+    DEFAULT_BOLD="$HOME/Downloads/Noto_Sans_SC/static/NotoSansSC-Bold.ttf"
+    if [ -f "$DEFAULT_BOLD" ]; then
+      BOLD_FONT="$DEFAULT_BOLD"
+    fi
   fi
 fi
 if [ -n "$BOLD_FONT" ] && [ ! -f "$BOLD_FONT" ]; then

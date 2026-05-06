@@ -88,11 +88,12 @@ static std::string WrapHtmlDocument(const std::string& fragment, int width, int 
       "url('https://fonts.gstatic.com/s/notosanssc/v40/"
       "k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaG9_FnYw.ttf') format('truetype');"
       "font-display:block}"
-      // Noto Sans SC Bold (700) — no local file bundled (too large for the repo), so the CDN
-      // is the only source. When running offline without a Bold face present, browsers will
-      // auto-synthesise bold from the Regular weight unless an element explicitly disables it.
+      // Noto Sans SC Bold (700) — local TTF now bundled in resources/font; CDN as fallback.
+      // Without a real Bold face, browsers auto-synthesise bold from Regular, widening glyph
+      // advances ~6-8% and causing fauxBold text to wrap earlier than PAGX native does.
       "@font-face{font-family:'Noto Sans SC';font-weight:bold;"
-      "src:url('https://fonts.gstatic.com/s/notosanssc/v40/"
+      "src:url('fonts/NotoSansSC-Bold.ttf') format('truetype'),"
+      "url('https://fonts.gstatic.com/s/notosanssc/v40/"
       "k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaGzjCnYw.ttf') format('truetype');"
       "font-display:block}"
       // Noto Color Emoji — local TTF bundled, CDN fallback.
@@ -116,9 +117,8 @@ static std::string WrapHtmlDocument(const std::string& fragment, int width, int 
 
 // Copies the bundled fonts referenced by WrapHtmlDocument into the destination directory so
 // that the `url('fonts/<name>')` entries in each @font-face rule resolve locally when the HTML
-// is opened in a browser. Bold is deliberately absent — the wrapper points its one and only
-// `src:` for the bold weight at the CDN URL. Silently skips any font file not present in the
-// repo; the wrapper's multi-source `src:` will fall back to CDN for the missing ones.
+// is opened in a browser. Silently skips any font file not present in the repo; the wrapper's
+// multi-source `src:` will fall back to CDN for the missing ones.
 static void CopyBundledFontsTo(const std::string& destDir) {
   struct FontFile {
     const char* repoPath;
@@ -126,6 +126,7 @@ static void CopyBundledFontsTo(const std::string& destDir) {
   };
   static constexpr FontFile kBundled[] = {
       {"resources/font/NotoSansSC-Regular.otf", "NotoSansSC-Regular.otf"},
+      {"resources/font/NotoSansSC-Bold.ttf", "NotoSansSC-Bold.ttf"},
       {"resources/font/NotoColorEmoji.ttf", "NotoColorEmoji.ttf"},
       {"resources/font/NotoSansHebrew-Regular.ttf", "NotoSansHebrew-Regular.ttf"},
   };
@@ -146,10 +147,10 @@ static void CopyBundledFontsTo(const std::string& destDir) {
 
 // Result of exporting one PAGX sample into a wrapped HTML file on disk.
 struct ExportedSample {
-  bool success = false;           // false when load/export fails; inspect logs for the reason
-  int width = 0;                  // document width, needed by screenshot callers
-  int height = 0;                 // document height, same
-  std::string htmlPath;           // absolute path of the wrapped HTML file written to disk
+  bool success = false;  // false when load/export fails; inspect logs for the reason
+  int width = 0;         // document width, needed by screenshot callers
+  int height = 0;        // document height, same
+  std::string htmlPath;  // absolute path of the wrapped HTML file written to disk
 };
 
 // Generates the wrapped HTML for one PAGX sample and writes it next to `outDir`. Rasterizes
@@ -166,8 +167,7 @@ struct ExportedSample {
 // Failure does not abort the caller: the returned ExportedSample has success=false and a
 // std::cerr log line; callers decide whether that is a FAIL-the-test or a skip-this-sample
 // event based on their severity policy.
-static ExportedSample ExportSampleHtmlToFile(const std::string& pagxPath,
-                                             const std::string& outDir,
+static ExportedSample ExportSampleHtmlToFile(const std::string& pagxPath, const std::string& outDir,
                                              const pagx::FontConfig& fontConfig) {
   ExportedSample result;
   auto baseName = std::filesystem::path(pagxPath).stem().string();
