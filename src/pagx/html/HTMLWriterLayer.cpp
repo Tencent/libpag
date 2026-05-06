@@ -1187,6 +1187,19 @@ struct ShadowShape {
 
 static ShadowShape findLayerShadowShape(const Layer* layer) {
   ShadowShape s = {};
+  // The shadow source div is a solid-filled CSS box. This only makes sense when the layer has a
+  // Fill — a stroke-only layer (e.g. game_hud circle outline) must not produce a filled shadow
+  // div because that would paint a solid disc over the interior of the stroke shape.
+  bool hasFill = false;
+  for (auto* e : layer->contents) {
+    if (e->nodeType() == NodeType::Fill) {
+      hasFill = true;
+      break;
+    }
+  }
+  if (!hasFill) {
+    return s;
+  }
   for (auto* e : layer->contents) {
     if (e->nodeType() == NodeType::Rectangle) {
       auto r = static_cast<const Rectangle*>(e);
