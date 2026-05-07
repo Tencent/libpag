@@ -581,6 +581,17 @@ export class View {
           return;
         }
         ctx.drawImage(img as any, 0, 0);
+        // Force the OffscreenCanvas's GPU contents to flush before handing it to the renderer.
+        // On iOS WeChat the drawImage above is GPU-accelerated and may be deferred until the
+        // canvas is read; calling getImageData synchronously waits for the pipeline to finish,
+        // so the subsequent texImage2D upload sees actual pixels instead of an undefined
+        // intermediate state that manifested as black tiles after first-time zoom-in.
+        try {
+          ctx.getImageData(0, 0, 1, 1);
+        } catch (_) {
+          // Best-effort flush. A failure here only loses the synchronization guarantee, the
+          // subsequent upload still attempts to consume the canvas as before.
+        }
         resolve(canvas);
       };
       img.onerror = (err: any) => {
