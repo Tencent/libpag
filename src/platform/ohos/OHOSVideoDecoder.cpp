@@ -22,8 +22,10 @@
 #include <multimedia/player_framework/native_avcodec_base.h>
 #include <multimedia/player_framework/native_avformat.h>
 #include <native_buffer/native_buffer.h>
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <mutex>
 #include "base/utils/Log.h"
 #include "rendering/video/SoftwareData.h"
@@ -278,8 +280,26 @@ std::shared_ptr<tgfx::ImageBuffer> OHOSVideoDecoder::onRenderFrame() {
       if (videoStride == 0 || videoSliceHeight == 0) {
         return nullptr;
       }
+      // NV12 layout: Y plane is `stride * sliceHeight` bytes, followed by UV plane that is
+      // half the height. The reported attr.size from the decoder is not always trustworthy
+      // on certain HarmonyOS devices, so fall back to the NV12 standard layout when it
+      // would produce a smaller UV plane than required by the GL upload step. GL reads
+      // `stride * (height / 2)` bytes for the UV plane, so under-allocating leads to an
+      // out-of-bounds read inside glTexSubImage2D and a SEGV_ACCERR crash on guard pages.
       yBufferSize = videoStride * videoSliceHeight;
-      uvBufferSize = codecBufferInfo.attr.size - yBufferSize;
+      size_t reportedUvSize = (codecBufferInfo.attr.size > static_cast<int32_t>(yBufferSize))
+                                  ? static_cast<size_t>(codecBufferInfo.attr.size) - yBufferSize
+                                  : 0;
+      size_t standardUvSize = yBufferSize / 2;
+      uvBufferSize = std::max(reportedUvSize, standardUvSize);
+      LOGI(
+          "OHOSVideoDecoder NV12 layout: format=%dx%d stride=%d sliceHeight=%d "
+          "attr.size=%d yBufferSize=%zu reportedUvSize=%zu standardUvSize=%zu "
+          "uvBufferSize=%zu glScanY=%zu glScanUV=%zu",
+          videoFormat.width, videoFormat.height, videoStride, videoSliceHeight,
+          codecBufferInfo.attr.size, yBufferSize, reportedUvSize, standardUvSize, uvBufferSize,
+          static_cast<size_t>(videoStride) * videoFormat.height,
+          static_cast<size_t>(videoStride) * (videoFormat.height / 2));
       yuvBuffer = std::make_shared<pag::YUVBuffer>();
       yuvBuffer->data[0] = new (std::nothrow) uint8_t[yBufferSize];
       if (yuvBuffer->data[0] == nullptr) {
@@ -299,9 +319,31 @@ std::shared_ptr<tgfx::ImageBuffer> OHOSVideoDecoder::onRenderFrame() {
     if (capacity <= 0) {
       return nullptr;
     }
+    // Avoid reading past the source buffer. The decoder may sometimes report a smaller
+    // capacity than `yBufferSize + uvBufferSize`, so cap each memcpy to the bytes that
+    // are actually available.
     uint8_t* yuvAddress = OH_AVBuffer_GetAddr(codecBufferInfo.buffer);
-    memcpy(yuvBuffer->data[0], yuvAddress, yBufferSize);
-    memcpy(yuvBuffer->data[1], yuvAddress + yBufferSize, uvBufferSize);
+    size_t totalCapacity = static_cast<size_t>(capacity);
+    size_t yCopySize = std::min(yBufferSize, totalCapacity);
+    memcpy(yuvBuffer->data[0], yuvAddress, yCopySize);
+    if (totalCapacity > yBufferSize) {
+      size_t uvCopySize = std::min(uvBufferSize, totalCapacity - yBufferSize);
+      memcpy(yuvBuffer->data[1], yuvAddress + yBufferSize, uvCopySize);
+      if (uvCopySize < uvBufferSize) {
+        // Zero-fill the remaining bytes so that subsequent GL upload reads valid memory
+        // instead of stale/garbage data, even if the GL driver reads past the actually
+        // populated region due to row stride padding.
+        memset(yuvBuffer->data[1] + uvCopySize, 0, uvBufferSize - uvCopySize);
+        LOGE("OHOSVideoDecoder: source UV plane truncated, expected %zu got %zu", uvBufferSize,
+             uvCopySize);
+      }
+    } else {
+      // Source buffer does not even contain a UV plane; zero the destination so GL upload
+      // is harmless.
+      memset(yuvBuffer->data[1], 0, uvBufferSize);
+      LOGE("OHOSVideoDecoder: source buffer has no UV plane (capacity=%zu, yBufferSize=%zu)",
+           totalCapacity, yBufferSize);
+    }
 
     auto yuvData = SoftwareData<OHOSVideoDecoder>::Make(videoFormat.width, videoFormat.height,
                                                         yuvBuffer->data, yuvBuffer->lineSize,
