@@ -75,6 +75,14 @@ std::string MatrixTransformToCSS(const Matrix& m);
 std::string Matrix3DToCSS(const Matrix3D& m);
 const char* BlendModeToMixBlendMode(BlendMode mode);
 Color LerpColor(const Color& a, const Color& b, float t);
+
+/**
+ * Samples a color from a gradient at normalized position t ([0, 1]) along the gradient line,
+ * clamped at the first and last stops. Used by TextModifier rendering to compute a per-character
+ * solid color based on each character's position within the overall text span's gradient.
+ */
+Color SampleLinearGradient(const std::vector<ColorStop*>& stops, float t);
+
 std::string LayerTransformCSS(const Layer* layer);
 Matrix BuildGroupMatrix(const Group* group);
 const char* AlignmentToCSS(Alignment alignment);

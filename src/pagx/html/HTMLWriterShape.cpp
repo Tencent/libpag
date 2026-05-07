@@ -478,6 +478,22 @@ void ApplyRoundCorner(const PathData& pathData, float radius, PathData& output) 
     }
     size_t n = contour.segments.size();
 
+    // Some generators (e.g. Polystar) close a path by appending an explicit "L startPoint"
+    // segment followed by a Close verb, so the last segment's endPoint is identical to
+    // startPoint.  When ApplyRoundCorner processes vi=0 it looks up prevVertex as
+    // segments[n-1].endPoint — which then equals vertex (startPoint) and produces a
+    // zero-length incoming edge, causing the rounding code to fall into the degenerate
+    // branch and skip the corner entirely.  Strip the redundant segment so the caller
+    // sees a clean n-sided polygon.
+    if (contour.closed && n >= 2) {
+      const auto& lastPt = contour.segments[n - 1].endPoint;
+      const auto& sp = contour.startPoint;
+      if (contour.segments[n - 1].verb == PathVerb::Line && std::abs(lastPt.x - sp.x) < 0.001f &&
+          std::abs(lastPt.y - sp.y) < 0.001f) {
+        n -= 1;  // drop the degenerate closing segment
+      }
+    }
+
     std::vector<Point> vertices = {};
     vertices.reserve(n + 1);
     vertices.push_back(contour.startPoint);

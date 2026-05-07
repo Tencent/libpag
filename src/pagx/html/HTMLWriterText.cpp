@@ -1305,16 +1305,58 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
             charStyle += ";color:" + ColorToRGBA(sc->color, fill->alpha);
           }
         } else if (fill && fill->color) {
-          // Non-solid fill (LinearGradient etc.): render via background-clip:text so the
-          // gradient is visible on per-character inline-block spans. Each span clips the
-          // gradient to its own advance width, which is a visible approximation — the
-          // gradient appears per-character rather than across the full word, but it is
-          // far better than the default black (no colour at all) that previously showed.
-          auto css = colorToCSS(fill->color, nullptr);
-          if (!css.empty()) {
-            charStyle += ";background:" + css;
-            charStyle += ";-webkit-background-clip:text;background-clip:text";
-            charStyle += ";-webkit-text-fill-color:transparent";
+          // Non-solid fill (LinearGradient etc.). When fitsToGeometry=false the gradient lives
+          // in the parent Layer's coordinate space and a single gradient spans the entire text
+          // block, so each character should display only its slice of the gradient rather than
+          // the full gradient compressed into its own advance width.
+          // Approach: compute this character's approximate Layer-space position along the gradient
+          // line (using renderPos + character index fraction * text block width), then sample
+          // the gradient at that position and render the character in that solid colour.
+          // This matches tgfx's behaviour where each small glyph path is filled with its portion
+          // of the parent-space gradient.
+          if (fill->color->nodeType() == NodeType::LinearGradient) {
+            auto* lg = static_cast<const LinearGradient*>(fill->color);
+            if (!lg->fitsToGeometry && !lg->colorStops.empty()) {
+              float textW = text->layoutBoundsWidth();
+              float textH = text->fontLineHeight() > 0 ? text->fontLineHeight() : renderFont;
+              // Character centre in Layer coordinate space (where startPoint/endPoint live).
+              // renderPos gives the text block's origin in Layer space; add the per-character
+              // fraction of the block width to approximate the character's Layer-space x.
+              float localFrac = (totalGlyphs > 1) ? (static_cast<float>(charIdx) + 0.5f) /
+                                                        static_cast<float>(totalGlyphs)
+                                                  : 0.5f;
+              float charLayerX = renderPos.x + localFrac * textW;
+              float charLayerY = renderPos.y + textH * 0.5f;
+              // Project the character's Layer-space position onto the gradient line to get
+              // a normalised parameter t, then map that into the [0..1] stop space.
+              Point s = lg->matrix.mapPoint(lg->startPoint);
+              Point e = lg->matrix.mapPoint(lg->endPoint);
+              float dx = e.x - s.x;
+              float dy = e.y - s.y;
+              float lenSq = dx * dx + dy * dy;
+              float stopT = 0.5f;
+              if (lenSq > 1e-10f) {
+                // Project charLayer onto the s→e vector.
+                stopT = ((charLayerX - s.x) * dx + (charLayerY - s.y) * dy) / lenSq;
+              }
+              Color sampled = SampleLinearGradient(lg->colorStops, stopT);
+              charStyle += ";color:" + ColorToRGBA(sampled, fill->alpha);
+            } else {
+              // fitsToGeometry=true: gradient fits each character individually, use background-clip
+              auto css = colorToCSS(fill->color, nullptr);
+              if (!css.empty()) {
+                charStyle += ";background:" + css;
+                charStyle += ";-webkit-background-clip:text;background-clip:text";
+                charStyle += ";-webkit-text-fill-color:transparent";
+              }
+            }
+          } else {
+            auto css = colorToCSS(fill->color, nullptr);
+            if (!css.empty()) {
+              charStyle += ";background:" + css;
+              charStyle += ";-webkit-background-clip:text;background-clip:text";
+              charStyle += ";-webkit-text-fill-color:transparent";
+            }
           }
         } else if (!fill && stroke) {
           charStyle += ";color:transparent";

@@ -361,6 +361,28 @@ Color LerpColor(const Color& a, const Color& b, float t) {
   return result;
 }
 
+Color SampleLinearGradient(const std::vector<ColorStop*>& stops, float t) {
+  if (stops.empty()) {
+    return {};
+  }
+  // Clamp t to [0, 1] then find the surrounding stops.
+  t = std::max(0.0f, std::min(1.0f, t));
+  if (t <= stops.front()->offset) {
+    return stops.front()->color;
+  }
+  if (t >= stops.back()->offset) {
+    return stops.back()->color;
+  }
+  for (size_t i = 1; i < stops.size(); i++) {
+    if (t <= stops[i]->offset) {
+      float range = stops[i]->offset - stops[i - 1]->offset;
+      float local = (range > 1e-6f) ? (t - stops[i - 1]->offset) / range : 0.0f;
+      return LerpColor(stops[i - 1]->color, stops[i]->color, local);
+    }
+  }
+  return stops.back()->color;
+}
+
 std::string LayerTransformCSS(const Layer* layer) {
   if (!layer->matrix3D.isIdentity()) {
     return Matrix3DToCSS(layer->matrix3D);
