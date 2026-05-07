@@ -753,12 +753,15 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         }
         bool hasPainter = false;
         bool hasText = false;
+        bool hasTextBox = false;
         for (auto* ge : group->elements) {
           auto gt = ge->nodeType();
           if (gt == NodeType::Fill || gt == NodeType::Stroke) {
             hasPainter = true;
           } else if (gt == NodeType::Text) {
             hasText = true;
+          } else if (gt == NodeType::TextBox) {
+            hasTextBox = true;
           }
         }
         // A Group with a non-identity transform (centerX/top/left constraints, scale, rotation…)
@@ -775,7 +778,12 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         // propagates upward"). A DOM-isolated div would block that propagation, causing outer
         // Painters to miss the geometry (group_isolation: outer cyan Fill can't reach the
         // inner red Rectangle, making it appear unaffected by the group's own fill).
-        if (hasPainter && hasText && groupHasTransform) {
+        // TextBox children always need the DOM wrapper: the flatten loop below has no case
+        // for NodeType::TextBox (TextBox carries a TextLayout subtree, not bare geometry, and
+        // is not something we can fold into the geos vector). Without writeGroup the TextBox
+        // would be silently dropped — pagx_features Pipeline buttons (".pagx", ".pag",
+        // "Production" labels) symptom: button background renders, label text disappears.
+        if ((hasPainter && hasText && groupHasTransform) || hasTextBox) {
           writeGroup(out, group, alpha, distribute);
         } else {
           auto savedFill = curFill;

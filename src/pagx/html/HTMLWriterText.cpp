@@ -1641,6 +1641,18 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         float normalAngle = tangent + static_cast<float>(M_PI) / 2.0f;
         pos.x += normalOffset * std::cos(normalAngle);
         pos.y += normalOffset * std::sin(normalAngle);
+        // SampleArcLengthLUT returns coordinates in the path's own local space (the raw
+        // M/L/A commands authored on the TextPath). The TextPath node itself is placed in
+        // its parent Layer via constraints (top/centerX/centerY/left etc.), so we must
+        // translate every per-character position by the TextPath's renderPosition() to
+        // land on the parent Layer's coordinate system. Without this, all characters end
+        // up rendered at the path's authoring origin (0, 0) in the parent — visually
+        // collapsed to the Layer's top-left corner instead of sitting on the arc the
+        // user authored (pagx_features Core ring symptom: ring text floats above/outside
+        // the visible orbit ring).
+        auto tpRenderPos = textPath->renderPosition();
+        pos.x += tpRenderPos.x;
+        pos.y += tpRenderPos.y;
         std::string charStr(p, len);
         std::string charStyle = "position:absolute;left:" + FloatToString(pos.x) +
                                 "px;top:" + FloatToString(pos.y) + "px";
