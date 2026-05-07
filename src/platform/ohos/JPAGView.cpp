@@ -274,6 +274,17 @@ static napi_value SetStateChangeCallback(napi_env env, napi_callback_info info) 
   }
   JPAGView* view = nullptr;
   napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  if (view == nullptr) {
+    return nullptr;
+  }
+
+  // Release any previously registered callback to avoid leaking the JS function
+  // reference and accumulating threadsafe-function instances when the JS side
+  // updates the callback on a reused PAGView.
+  if (view->playingStateCallback != nullptr) {
+    napi_release_threadsafe_function(view->playingStateCallback, napi_tsfn_release);
+    view->playingStateCallback = nullptr;
+  }
 
   napi_value resourceName = nullptr;
   napi_create_string_utf8(env, "PAGViewStateChangeCallback", NAPI_AUTO_LENGTH, &resourceName);
@@ -299,6 +310,18 @@ static napi_value SetProgressUpdateCallback(napi_env env, napi_callback_info inf
   }
   JPAGView* view = nullptr;
   napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  if (view == nullptr) {
+    return nullptr;
+  }
+
+  // Release any previously registered callback to avoid leaking the JS function
+  // reference and accumulating threadsafe-function instances when the JS side
+  // updates the callback on a reused PAGView.
+  if (view->progressCallback != nullptr) {
+    napi_release_threadsafe_function(view->progressCallback, napi_tsfn_release);
+    view->progressCallback = nullptr;
+  }
+
   napi_value resourceName = nullptr;
   napi_create_string_utf8(env, "PAGViewProgressCallback", NAPI_AUTO_LENGTH, &resourceName);
   napi_create_threadsafe_function(env, args[0], nullptr, resourceName, 0, 1, nullptr, nullptr,
