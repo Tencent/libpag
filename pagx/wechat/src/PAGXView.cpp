@@ -41,12 +41,11 @@ using namespace emscripten;
 
 namespace pagx {
 
-// GPU resource cache limit. Capped at 768MB on iOS WeChat: the previous 1GB setting led to
-// the mini-program being terminated under memory pressure (observed in production logs),
-// while 512MB causes noticeable eviction churn during pan/zoom on image-heavy PAGX. 768MB
-// is the middle ground that keeps most working sets resident and still leaves headroom
-// before the system kill threshold.
-constexpr size_t MAX_CACHE_LIMIT = 768U * 1024 * 1024;
+// GPU resource cache limit. Capped at 512MB on iOS WeChat: 1GB and 768MB both led to the
+// mini-program being terminated under memory pressure (observed in production logs).
+// 512MB causes more eviction churn during pan/zoom on image-heavy PAGX, but a brief
+// retexture is preferable to losing the entire session.
+constexpr size_t MAX_CACHE_LIMIT = 512U * 1024 * 1024;
 // GPU resource expiration in frames. Large value effectively disables age-based eviction
 // so cached textures only get reclaimed by the byte-capacity path above.
 constexpr size_t EXPIRATION_FRAMES = 1000000;
