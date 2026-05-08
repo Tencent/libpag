@@ -274,12 +274,16 @@ static napi_value SetStateChangeCallback(napi_env env, napi_callback_info info) 
   }
   JPAGView* view = nullptr;
   napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  if (view == nullptr) {
+    return nullptr;
+  }
 
   napi_value resourceName = nullptr;
   napi_create_string_utf8(env, "PAGViewStateChangeCallback", NAPI_AUTO_LENGTH, &resourceName);
-
+  napi_threadsafe_function callback = nullptr;
   napi_create_threadsafe_function(env, args[0], nullptr, resourceName, 0, 1, nullptr, nullptr, view,
-                                  StateChangeCallback, &view->playingStateCallback);
+                                  StateChangeCallback, &callback);
+  view->setPlayingStateCallback(callback);
   return nullptr;
 }
 
@@ -299,10 +303,16 @@ static napi_value SetProgressUpdateCallback(napi_env env, napi_callback_info inf
   }
   JPAGView* view = nullptr;
   napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  if (view == nullptr) {
+    return nullptr;
+  }
+
   napi_value resourceName = nullptr;
   napi_create_string_utf8(env, "PAGViewProgressCallback", NAPI_AUTO_LENGTH, &resourceName);
+  napi_threadsafe_function callback = nullptr;
   napi_create_threadsafe_function(env, args[0], nullptr, resourceName, 0, 1, nullptr, nullptr,
-                                  nullptr, ProgressCallback, &view->progressCallback);
+                                  nullptr, ProgressCallback, &callback);
+  view->setProgressCallback(callback);
   return nullptr;
 }
 
@@ -934,5 +944,29 @@ std::shared_ptr<PAGAnimator> JPAGView::getAnimator() {
 std::shared_ptr<PAGPlayer> JPAGView::getPlayer() {
   std::lock_guard lock_guard(locker);
   return player;
+}
+
+void JPAGView::setProgressCallback(napi_threadsafe_function callback) {
+  napi_threadsafe_function previous = nullptr;
+  {
+    std::lock_guard lock_guard(locker);
+    previous = progressCallback;
+    progressCallback = callback;
+  }
+  if (previous != nullptr) {
+    napi_release_threadsafe_function(previous, napi_tsfn_release);
+  }
+}
+
+void JPAGView::setPlayingStateCallback(napi_threadsafe_function callback) {
+  napi_threadsafe_function previous = nullptr;
+  {
+    std::lock_guard lock_guard(locker);
+    previous = playingStateCallback;
+    playingStateCallback = callback;
+  }
+  if (previous != nullptr) {
+    napi_release_threadsafe_function(previous, napi_tsfn_release);
+  }
 }
 }  // namespace pag

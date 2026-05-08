@@ -5,3 +5,7 @@ wasm-mt/
 build-pagx-playground/
 .*.md5
 .build.lock
+lib/
+types/
+node_modules/
+fonts/
