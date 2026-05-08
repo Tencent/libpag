@@ -190,14 +190,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
 .cmp label { display: block; font-size: 11px; color: #94a3b8; margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
 .cmp img { max-width: 100%; height: auto; border: 1px solid #e2e8f0; border-radius: 4px; background: repeating-conic-gradient(#f0f0f0 0% 25%, white 0% 50%) 50%/16px 16px; }
 .cmp iframe { max-width: 100%; border: 1px solid #e2e8f0; border-radius: 4px; background: repeating-conic-gradient(#f0f0f0 0% 25%, white 0% 50%) 50%/16px 16px; display: block; margin: 0 auto; }
-/* Oversize iframe wrapper: only used for canvases > 1000px wide (pagx_features,
-   space_explorer). The wrapper is a positioning context that owns the visible
-   size; the iframe inside keeps its authored width/height (so the inner page
+/* Every iframe sits inside an .iframe-scale wrapper so its visible size
+   tracks the PNG column width regardless of authored canvas dimensions.
+   The wrapper is a positioning context that owns the visible size; the
+   iframe inside keeps its authored width/height (so the inner page
    viewport renders at full size) and is shrunk via CSS transform applied by
    JS once the column's actual width is known. The wrapper's height is set in
-   JS to authored_height * scale so the card layout has no extra blank strip. */
-.cmp .iframe-scale { display: block; width: 100%; max-width: 100%; overflow: hidden; box-sizing: border-box; }
-.cmp .iframe-scale iframe { max-width: none; transform-origin: top left; margin: 0; }
+   JS to authored_height * scale so the card layout has no extra blank strip.
+   When the column is wider than the authored canvas the scale is clamped to
+   1 and no transform is applied; in either case the iframe is horizontally
+   centred inside the wrapper to mirror how the adjacent PNG (max-width:100%
+   on a centred parent) sits in its own column. */
+.cmp .iframe-scale { display: block; width: 100%; max-width: 100%; overflow: hidden; box-sizing: border-box; text-align: center; }
+.cmp .iframe-scale iframe { max-width: none; transform-origin: top center; margin: 0 auto; display: inline-block; }
 """
 
 
@@ -213,11 +218,12 @@ TAB_SCRIPT = """
   const tabs = Array.from(document.querySelectorAll('.tab[data-section]'));
   const sections = Array.from(document.querySelectorAll('.section[data-section]'));
 
-  // Only the oversize-iframe wrappers (canvas > 1000px wide) need JS-driven
-  // scaling. We measure the wrapper's offsetWidth (set by the parent flex
-  // column) and apply transform:scale on the inner iframe so its visible size
-  // matches the column. offsetWidth is 0 inside hidden tabs, so we re-run the
-  // sizing on every tab activation.
+  // Every iframe is wrapped in an .iframe-scale container. Measure the
+  // wrapper's offsetWidth (set by the parent flex column) and apply
+  // transform:scale on the inner iframe so its visible size matches the
+  // column. offsetWidth is 0 inside hidden tabs, so we re-run the sizing on
+  // every tab activation. When the column is wider than the authored canvas
+  // the scale is clamped to 1 and no transform is applied.
   function fitOversizeIframes(root) {
     const wraps = root.querySelectorAll('.iframe-scale');
     wraps.forEach(wrap => {
@@ -307,30 +313,22 @@ def build_cell(label: str, src: str, width: int, height: int, kind: str,
             f'<div><div class="lbl"><label>{label}</label></div>'
             f'<img src="{escaped_src}" width="{width}" alt="{escaped_title}"></div>'
         )
-    # Oversize iframes (authored canvas wider than what comfortably fits in one
-    # comparison column) get wrapped in a scaling container so the visible size
-    # matches the PNG column. Without this, CSS `max-width:100%` clips the
-    # iframe's outer box but the inner viewport keeps rendering at the full
-    # authored width, producing a much larger render than the adjacent PNG.
-    # Keep the threshold higher than the largest "normal" sample (800) so we
-    # only touch pagx_features (1600) and space_explorer (1200); every other
-    # iframe is emitted with its previous markup unchanged.
-    if width > 1000:
-        return (
-            f'<div><div class="lbl"><label>{label}</label>'
-            f'<a class="open" href="{escaped_src}" target="_blank" rel="noopener" '
-            f'title="{escaped_src}">{escaped_src}</a></div>'
-            f'<div class="iframe-scale" data-w="{width}" data-h="{height}">'
-            f'<iframe src="{escaped_src}" width="{width}" height="{height}" '
-            f'loading="lazy" scrolling="no" title="{escaped_title}"></iframe>'
-            f'</div></div>'
-        )
+    # Wrap every iframe in a scaling container so its visible size matches the
+    # PNG column regardless of authored canvas width. Without the wrapper, the
+    # CSS `max-width:100%` on the iframe shrinks only the outer box; the inner
+    # document keeps rendering at the authored width, clipping content and
+    # producing scrollbars when the column is narrower than the canvas (common
+    # for layout/ samples at 820px in three-column cards ~560px wide). The
+    # shared JS scaler applies transform:scale only when avail < authored
+    # width, so samples that already fit the column are unaffected.
     return (
         f'<div><div class="lbl"><label>{label}</label>'
         f'<a class="open" href="{escaped_src}" target="_blank" rel="noopener" '
         f'title="{escaped_src}">{escaped_src}</a></div>'
+        f'<div class="iframe-scale" data-w="{width}" data-h="{height}">'
         f'<iframe src="{escaped_src}" width="{width}" height="{height}" '
-        f'loading="lazy" scrolling="no" title="{escaped_title}"></iframe></div>'
+        f'loading="lazy" scrolling="no" title="{escaped_title}"></iframe>'
+        f'</div></div>'
     )
 
 
