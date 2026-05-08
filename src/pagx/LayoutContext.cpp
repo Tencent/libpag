@@ -23,6 +23,21 @@
 
 namespace pagx {
 
+// Normalise a font-family name for fuzzy matching: strip all ASCII spaces so that
+// "Noto Sans SC" and "NotoSansSC" resolve to the same key. This lets PAGX documents that
+// omit spaces (e.g. fontFamily="NotoSansSC") find a typeface registered under the name the
+// font file actually advertises ("Noto Sans SC"), and vice-versa.
+static std::string NormalizeFamilyName(const std::string& name) {
+  std::string out;
+  out.reserve(name.size());
+  for (char c : name) {
+    if (c != ' ') {
+      out += c;
+    }
+  }
+  return out;
+}
+
 static int StylePriority(const std::string& style) {
   if (style == "Regular") {
     return 0;
@@ -64,6 +79,30 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
     std::string bestStyle = {};
     for (const auto& pair : fontConfig->data->registeredTypefaces) {
       if (pair.first.family != fontFamily) {
+        continue;
+      }
+      int priority = StylePriority(pair.first.style);
+      bool preferred = (bestTypeface == nullptr) || (priority < bestPriority) ||
+                       (priority == bestPriority && pair.first.style < bestStyle);
+      if (preferred) {
+        bestTypeface = pair.second;
+        bestPriority = priority;
+        bestStyle = pair.first.style;
+      }
+    }
+    if (bestTypeface != nullptr) {
+      return bestTypeface;
+    }
+
+    // Stage 2b: Normalised family-name match (strip spaces). Handles the common case where
+    // the PAGX document uses a space-free alias (e.g. "NotoSansSC") for a font whose OS/2
+    // name contains spaces ("Noto Sans SC"), or vice-versa.
+    std::string normFamily = NormalizeFamilyName(fontFamily);
+    bestTypeface = nullptr;
+    bestPriority = 4;
+    bestStyle = {};
+    for (const auto& pair : fontConfig->data->registeredTypefaces) {
+      if (NormalizeFamilyName(pair.first.family) != normFamily) {
         continue;
       }
       int priority = StylePriority(pair.first.style);

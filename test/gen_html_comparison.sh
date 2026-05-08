@@ -203,20 +203,17 @@ if [ -n "$BOLD_FONT" ]; then
   RENDER_FONT_ARGS+=( --font "$BOLD_FONT" )
 fi
 
-# Base --html-font list: Regular local + Regular CDN aggregate into one
-# @font-face rule with two sources; Bold CDN is its own rule. If a local
-# Bold was found, we additionally list it as the Bold rule's first source.
+# For the comparison page we only use local font files so the iframes render
+# consistently without network access. CDN URLs are intentionally omitted here;
+# they are only kept in the exporter's default WrapHtmlDocument for end-user
+# deliverables where a local file may not be available.
 EXPORT_FONT_ARGS=(
   --html-font "$FONT_REGULAR"
-  --html-font "${CDN_REGULAR}#family=Noto Sans SC#weight=400#style=normal"
-  --html-font "${CDN_BOLD}#family=Noto Sans SC#weight=700#style=normal"
 )
 if [ -n "$BOLD_FONT" ]; then
   EXPORT_FONT_ARGS=(
     --html-font "$FONT_REGULAR"
-    --html-font "${CDN_REGULAR}#family=Noto Sans SC#weight=400#style=normal"
     --html-font "$BOLD_FONT"
-    --html-font "${CDN_BOLD}#family=Noto Sans SC#weight=700#style=normal"
   )
 fi
 
