@@ -37,6 +37,8 @@ void PAGWindow::openFile(QString path) {
   if (window == nullptr) {
     return;
   }
+  // Set filePath immediately so PAGViewer::openFile() can detect this window already
+  // owns the file, preventing duplicate windows when the same file is opened rapidly.
   filePath = path;
   Q_EMIT requestOpenFile(path);
   window->raise();
@@ -163,7 +165,7 @@ void PAGWindow::open(const QString& initialViewType) {
   context->setContextProperty("windowHelper", windowHelper.get());
   context->setContextProperty("pagWindow", this);
   context->setContextProperty("initialViewType", initialViewType);
-  context->setContextProperty("isFirstWindow", AllWindows.isEmpty());
+  context->setContextProperty("isFirstWindow", AllWindows.count() == 1);
   context->setContextProperty("treeViewModel", treeViewModel.get());
   context->setContextProperty("runTimeDataModel", runTimeDataModel.get());
   context->setContextProperty("editAttributeModel", editAttributeModel.get());

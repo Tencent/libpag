@@ -269,6 +269,7 @@ bool PluginInstaller::executeWithPrivileges(const QString& command) const {
 
 bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
   QStringList adminCommands;
+  bool userPluginSuccess = true;
 
   for (const QString& plugin : plugins) {
     QString source = getPluginSourcePath(plugin);
@@ -276,6 +277,10 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
 
     fs::path sourcePath(source.toStdString());
     if (!fs::exists(sourcePath)) {
+      if (getPluginPermission(plugin) == PluginPermission::User) {
+        userPluginSuccess = false;
+        continue;
+      }
       return false;
     }
 
@@ -283,11 +288,13 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
 
     if (getPluginPermission(plugin) == PluginPermission::User) {
       if (!QDir().mkpath(targetDir)) {
-        return false;
+        userPluginSuccess = false;
+        continue;
       }
       QFile::remove(target);
       if (!QFile::copy(source, target)) {
-        return false;
+        userPluginSuccess = false;
+        continue;
       }
       QFile::setPermissions(target, QFileDevice::ReadOwner | QFileDevice::WriteOwner |
                                         QFileDevice::ExeOwner | QFileDevice::ReadGroup |
@@ -307,11 +314,11 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
   }
 
   if (adminCommands.isEmpty()) {
-    return true;
+    return userPluginSuccess;
   }
 
   QString fullCommand = adminCommands.join(" && ");
-  return executeWithPrivileges(fullCommand);
+  return executeWithPrivileges(fullCommand) && userPluginSuccess;
 }
 
 bool PluginInstaller::removePluginFiles(const QStringList& plugins) const {

@@ -59,7 +59,6 @@ void PAGNetworkFetcher::onReplyFinished(QNetworkReply* reply) {
     Q_EMIT fetched({});
   }
   reply->deleteLater();
-  reply->manager()->deleteLater();
   Q_EMIT finished();
 }
 

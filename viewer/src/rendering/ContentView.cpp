@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ContentView.h"
-#include <QDateTime>
 #include <QQuickWindow>
 #include <QSGImageNode>
 #include "RenderThread.h"
@@ -32,6 +31,7 @@ ContentView::ContentView(QQuickItem* parent) : QQuickItem(parent) {
 }
 
 ContentView::~ContentView() {
+  resizeTimer->stop();
   releaseDrawable();
 }
 
@@ -53,6 +53,9 @@ void ContentView::initDrawable() {
 }
 
 void ContentView::releaseDrawable() {
+  if (drawable == nullptr) {
+    return;
+  }
   if (renderThread != nullptr && renderThread->isRunning()) {
     QMetaObject::invokeMethod(renderThread.get(), "shutDown", Qt::QueuedConnection);
     renderThread->wait();
@@ -61,6 +64,9 @@ void ContentView::releaseDrawable() {
 }
 
 void ContentView::prepareForRemoval() {
+  // Called explicitly before QML Loader switches components, because itemChange alone
+  // fires after the item is detached from the window. RenderThread::shutDown() needs
+  // the item still attached so it can move the drawable back to the main thread safely.
   releaseDrawable();
 }
 
@@ -78,10 +84,6 @@ void ContentView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeo
     return;
   }
   QQuickItem::geometryChange(newGeometry, oldGeometry);
-  auto now = QDateTime::currentMSecsSinceEpoch();
-  if (now < skipResizeTimerUntil) {
-    return;
-  }
   resizeTimer->start(400);
 }
 

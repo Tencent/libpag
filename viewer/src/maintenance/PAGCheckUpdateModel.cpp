@@ -76,8 +76,9 @@ void PAGCheckUpdateModel::getAppcast(const QByteArray& data) {
     auto* task = new PAGUpdateVersionFetcherTask(url);
     task->setAutoDelete(false);
     connect(task, &PAGUpdateVersionFetcherTask::versionFound, this,
-            &PAGCheckUpdateModel::getUpdateVersion);
-    connect(task, &PAGUpdateVersionFetcherTask::finished, task, &QObject::deleteLater);
+            &PAGCheckUpdateModel::getUpdateVersion, Qt::QueuedConnection);
+    connect(task, &PAGUpdateVersionFetcherTask::finished, task, &QObject::deleteLater,
+            Qt::QueuedConnection);
     threadPool->start(task);
   }
 }

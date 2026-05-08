@@ -56,11 +56,11 @@ void PAGViewer::openFile(QString path) {
 
   if (!window) {
     window = new PAGWindow();
-    QString viewType = isPagx ? "pagx" : "pag";
-    window->open(viewType);
     PAGWindow::AllWindows.append(window);
     QObject::connect(window, &PAGWindow::destroyWindow, this, &PAGViewer::onWindowDestroyed,
                      Qt::UniqueConnection);
+    QString viewType = isPagx ? "pagx" : "pag";
+    window->open(viewType);
   }
 
   if (!path.isEmpty()) {

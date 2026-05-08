@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "rendering/pagx/PAGXView.h"
-#include <QDateTime>
 #include "rendering/RenderThread.h"
 #include "rendering/pagx/PAGXRenderer.h"
 
