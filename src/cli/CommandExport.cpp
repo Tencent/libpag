@@ -33,7 +33,6 @@ struct ExportOptions {
   int svgIndent = 2;
   bool svgNoXmlDeclaration = false;
   bool textToPath = false;
-  bool pptBridgeContours = false;
   bool pptRasterizeUnsupported = false;
 };
 
@@ -55,9 +54,6 @@ static void PrintUsage() {
       << "  --svg-no-xml-declaration    Omit the <?xml ...?> declaration\n"
       << "\n"
       << "PPT options:\n"
-      << "  --ppt-bridge-contours       Bridge nested contours into a single self-intersecting\n"
-      << "                              sub-path instead of emitting each contour separately\n"
-      << "                              (default: off)\n"
       << "  --ppt-rasterize-unsupported Rasterize layers that use features OOXML cannot\n"
       << "                              represent natively (masks, scrollRect clipping,\n"
       << "                              blend modes outside of Normal/Multiply/Screen/Darken/\n"
@@ -100,8 +96,6 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
       options->svgNoXmlDeclaration = true;
     } else if (arg == "--text-to-path") {
       options->textToPath = true;
-    } else if (arg == "--ppt-bridge-contours") {
-      options->pptBridgeContours = true;
     } else if (arg == "--ppt-rasterize-unsupported") {
       options->pptRasterizeUnsupported = true;
     } else if (arg == "--help" || arg == "-h") {
@@ -181,7 +175,6 @@ static int ExportToPPT(const ExportOptions& options) {
 
   PPTExporter::Options pptOptions = {};
   pptOptions.convertTextToPath = options.textToPath;
-  pptOptions.bridgeContours = options.pptBridgeContours;
   pptOptions.rasterizeUnsupported = options.pptRasterizeUnsupported;
 
   if (!PPTExporter::ToFile(*document, options.outputFile, pptOptions)) {
