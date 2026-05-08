@@ -57,15 +57,18 @@ class JPAGView : public PAGAnimator::Listener, public XComponentListener {
 
   std::shared_ptr<PAGAnimator> getAnimator();
 
-  std::string id;
+  void setProgressCallback(napi_threadsafe_function callback);
 
-  napi_threadsafe_function progressCallback = nullptr;
-  napi_threadsafe_function playingStateCallback = nullptr;
+  void setPlayingStateCallback(napi_threadsafe_function callback);
+
+  std::string id;
 
  private:
   static napi_value Constructor(napi_env env, napi_callback_info info);
   std::shared_ptr<PAGPlayer> player;
   std::shared_ptr<PAGAnimator> animator = nullptr;
+  napi_threadsafe_function progressCallback = nullptr;
+  napi_threadsafe_function playingStateCallback = nullptr;
   std::mutex locker;
 };
 }  // namespace pag
