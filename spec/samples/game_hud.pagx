@@ -72,7 +72,7 @@
     <Layer mask="@triangleMask">
       <Rectangle left="-50" top="-50" width="100" height="100"/>
       <Fill>
-        <LinearGradient startPoint="-50,0" endPoint="50,0" fitsToGeometry="false">
+        <LinearGradient>
           <ColorStop color="#FFAA0000" offset="0"/>
           <ColorStop color="#FFAA0040" offset="0.5"/>
           <ColorStop color="#FFAA0000" offset="1"/>

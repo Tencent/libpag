@@ -73,7 +73,8 @@ class PAGXViewModel : public ContentViewModel {
 
   struct RenderState {
     std::shared_ptr<tgfx::DisplayList> displayList;
-    std::shared_ptr<tgfx::Layer> contentLayer;
+    // A transform container whose single child is the layer built by LayerBuilder.
+    std::shared_ptr<tgfx::Layer> rootLayer;
     int contentWidth = 0;
     int contentHeight = 0;
   };
@@ -101,7 +102,8 @@ class PAGXViewModel : public ContentViewModel {
   std::atomic_bool needsRender = false;
   std::mutex renderMutex = {};
   std::shared_ptr<pagx::PAGXDocument> pagxDocument = nullptr;
-  std::shared_ptr<tgfx::Layer> pagxContentLayer = nullptr;
+  // A transform container whose single child is the layer built by LayerBuilder.
+  std::shared_ptr<tgfx::Layer> pagxRootLayer = nullptr;
   std::shared_ptr<tgfx::DisplayList> displayList = nullptr;
   int pagxWidth = 0;
   int pagxHeight = 0;
