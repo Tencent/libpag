@@ -735,12 +735,17 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     } else {
       auto renderPos = text->renderPosition();
       posX = renderPos.x;
-      posY = renderPos.y;
+      if (text->baseline == TextBaseline::Alphabetic) {
+        // position.y is the alphabetic baseline (absolute y of the baseline in parent coords).
+        // CSS `top` is the top of the line box; the baseline sits at top + halfLeading + ascent.
+        // To land the baseline on position.y: top = position.y - ascent (using tgfx font ascent).
+        float ascent = text->fontAscent();
+        posY = text->position.y - (ascent > 0 ? ascent : text->renderFontSize() * 0.8f);
+      } else {
+        posY = renderPos.y;
+      }
     }
     float ty = posY;
-    if (text->baseline == TextBaseline::Alphabetic) {
-      ty -= renderFont * 0.8f;
-    }
     style += "position:absolute;top:" + FloatToString(ty) + "px;white-space:pre";
     // Determine whether this text will use background-clip:text (non-solid fill or stroke-only).
     // background-clip:text already disables subpixel antialiasing, so using
@@ -1177,7 +1182,8 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
       auto renderFont = text->renderFontSize();
       float ty = renderPos.y;
       if (text->baseline == TextBaseline::Alphabetic) {
-        ty -= renderFont * 0.8f;
+        float ascent = text->fontAscent();
+        ty = text->position.y - (ascent > 0 ? ascent : renderFont * 0.8f);
       }
       auto lineHeight = text->fontLineHeight() > 0 ? text->fontLineHeight() : renderFont;
       std::string containerStyle = "position:absolute;white-space:nowrap;top:" + FloatToString(ty) +

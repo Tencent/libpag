@@ -482,4 +482,49 @@ std::string PaddingToCSS(const Padding& padding) {
          FloatToString(padding.bottom) + "px " + FloatToString(padding.left) + "px";
 }
 
+bool TextStartsWithRTL(const std::string& utf8Text) {
+  // Walk the UTF-8 string and return true if the first Unicode codepoint with a strong BiDi
+  // directional type is RTL (Hebrew, Arabic, or other RTL scripts). This matches the UAX#9
+  // P2 paragraph-direction algorithm's "first strong character" rule so the HTML
+  // `direction:rtl` CSS property is added on exactly the same TextBox containers that tgfx
+  // marks as RTL paragraphs.
+  const unsigned char* p = reinterpret_cast<const unsigned char*>(utf8Text.c_str());
+  const unsigned char* end = p + utf8Text.size();
+  while (p < end) {
+    uint32_t cp = 0;
+    if (*p < 0x80) {
+      cp = *p++;
+    } else if ((*p & 0xE0) == 0xC0 && p + 1 < end) {
+      cp = ((*p & 0x1F) << 6) | (p[1] & 0x3F);
+      p += 2;
+    } else if ((*p & 0xF0) == 0xE0 && p + 2 < end) {
+      cp = ((*p & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F);
+      p += 3;
+    } else if ((*p & 0xF8) == 0xF0 && p + 3 < end) {
+      cp = ((*p & 0x07) << 18) | ((p[1] & 0x3F) << 12) | ((p[2] & 0x3F) << 6) | (p[3] & 0x3F);
+      p += 4;
+    } else {
+      p++;
+      continue;
+    }
+    // Skip neutral/weak characters (spaces, digits, punctuation) that don't determine direction.
+    // Hebrew block: U+0590–U+05FF
+    // Arabic block: U+0600–U+06FF, U+0750–U+077F, U+08A0–U+08FF
+    // Arabic Supplement/Extended: U+0600–U+08FF covers most cases
+    // Arabic Presentation Forms: U+FB1D–U+FDFF, U+FE70–U+FEFF
+    if ((cp >= 0x0590 && cp <= 0x05FF) || (cp >= 0x0600 && cp <= 0x08FF) ||
+        (cp >= 0xFB1D && cp <= 0xFDFF) || (cp >= 0xFE70 && cp <= 0xFEFF)) {
+      return true;
+    }
+    // Latin letters and CJK are strongly LTR — stop scanning on the first strong LTR character.
+    if ((cp >= 0x0041 && cp <= 0x007A) || (cp >= 0x00C0 && cp <= 0x02AF) ||
+        (cp >= 0x0400 && cp <= 0x052F) || (cp >= 0x4E00 && cp <= 0x9FFF) ||
+        (cp >= 0xAC00 && cp <= 0xD7AF)) {
+      return false;
+    }
+    // Digits, spaces, and other neutrals: keep scanning.
+  }
+  return false;
+}
+
 }  // namespace pagx

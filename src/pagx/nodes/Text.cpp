@@ -34,6 +34,10 @@ float Text::fontLineHeight() const {
   return glyphData->fontLineHeight;
 }
 
+float Text::fontAscent() const {
+  return glyphData->fontAscent;
+}
+
 float Text::layoutBoundsHeight() const {
   return textBounds.height;
 }
@@ -65,6 +69,7 @@ void Text::onMeasure(LayoutContext* context) {
   auto result = TextLayout::Layout({this}, params, context);
   glyphData->layoutRuns = result.extractLayoutRuns(this);
   glyphData->fontLineHeight = result.getFontLineHeight(this);
+  glyphData->fontAscent = result.getFontAscent(this);
   textBounds = result.bounds;
   // position is the text origin (x, baseline); textBounds is relative to position.
   preferredX = position.x + textBounds.x;
@@ -95,6 +100,7 @@ void Text::setLayoutSize(LayoutContext* context, float targetWidth, float target
     auto result = TextLayout::Layout({this}, params, context);
     glyphData->layoutRuns = result.extractLayoutRuns(this);
     glyphData->fontLineHeight = result.getFontLineHeight(this);
+    glyphData->fontAscent = result.getFontAscent(this);
     textBounds = result.bounds;
   }
   // Use mathematically scaled dimensions instead of textBounds from re-typesetting, because font

@@ -315,12 +315,17 @@ class TextLayoutContext {
     if (allGlyphs.empty()) {
       return result;
     }
-    // Collect per-Text max fontLineHeight from shaped glyphs.
+    // Collect per-Text max fontLineHeight and max ascent from shaped glyphs.
     for (auto& g : allGlyphs) {
       if (g.sourceText != nullptr && g.fontLineHeight > 0) {
         auto& stored = result.perTextFontLineHeight[g.sourceText];
         if (g.fontLineHeight > stored) {
           stored = g.fontLineHeight;
+        }
+        float absAscent = fabsf(g.ascent);
+        auto& storedAscent = result.perTextFontAscent[g.sourceText];
+        if (absAscent > storedAscent) {
+          storedAscent = absAscent;
         }
       }
     }
@@ -1492,6 +1497,14 @@ Rect TextLayoutResult::getTextBounds(Text* text) const {
 float TextLayoutResult::getFontLineHeight(Text* text) const {
   auto it = perTextFontLineHeight.find(text);
   if (it != perTextFontLineHeight.end()) {
+    return it->second;
+  }
+  return 0;
+}
+
+float TextLayoutResult::getFontAscent(Text* text) const {
+  auto it = perTextFontAscent.find(text);
+  if (it != perTextFontAscent.end()) {
     return it->second;
   }
   return 0;

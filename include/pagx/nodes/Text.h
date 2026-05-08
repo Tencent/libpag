@@ -108,6 +108,14 @@ class Text : public Element, public LayoutNode {
   float fontLineHeight() const;
 
   /**
+   * Returns the maximum font ascent (distance from baseline to the top of the tallest glyph)
+   * computed during layout. Used by HTML export for alphabetic-baseline text positioning where
+   * CSS `top = position.y - fontAscent()` places the baseline at the authored position.y.
+   * Returns 0 if layout has not been performed.
+   */
+  float fontAscent() const;
+
+  /**
    * Returns the height of the text bounds computed during layout. For TextBox text, this reflects
    * the number of lines tgfx actually retained after applying overflow:hidden clipping — lines
    * whose bottom would exceed the box height are dropped and do not contribute to this value.

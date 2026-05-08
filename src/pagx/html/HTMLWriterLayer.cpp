@@ -368,25 +368,35 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             } else if (childElem->nodeType() == NodeType::Text) {
               tbSpans.push_back({static_cast<const Text*>(childElem), topFill, topStroke});
             } else if (childElem->nodeType() == NodeType::Group) {
-              auto grp = static_cast<const Group*>(childElem);
-              const Text* grpText = nullptr;
-              const Fill* grpFill = nullptr;
-              const Stroke* grpStroke = nullptr;
-              for (auto* ge : grp->elements) {
-                if (ge->nodeType() == NodeType::Text) {
-                  if (!grpText) {
-                    grpText = static_cast<const Text*>(ge);
+              // Recursively collect Text spans from the Group's element tree, including
+              // nested sub-Groups. Each level may carry its own Fill/Stroke which applies
+              // to the Text nodes at that level (falls back to the parent level's painter).
+              struct GroupSpanCollector {
+                static void Collect(const Group* grp, const Fill* parentFill,
+                                    const Stroke* parentStroke, std::vector<TBSpan>& spans) {
+                  const Text* grpText = nullptr;
+                  const Fill* grpFill = parentFill;
+                  const Stroke* grpStroke = parentStroke;
+                  for (auto* ge : grp->elements) {
+                    if (ge->nodeType() == NodeType::Text) {
+                      if (!grpText) {
+                        grpText = static_cast<const Text*>(ge);
+                      }
+                    } else if (ge->nodeType() == NodeType::Fill) {
+                      grpFill = static_cast<const Fill*>(ge);
+                    } else if (ge->nodeType() == NodeType::Stroke) {
+                      grpStroke = static_cast<const Stroke*>(ge);
+                    } else if (ge->nodeType() == NodeType::Group) {
+                      Collect(static_cast<const Group*>(ge), grpFill, grpStroke, spans);
+                    }
                   }
-                } else if (ge->nodeType() == NodeType::Fill) {
-                  grpFill = static_cast<const Fill*>(ge);
-                } else if (ge->nodeType() == NodeType::Stroke) {
-                  grpStroke = static_cast<const Stroke*>(ge);
+                  if (grpText) {
+                    spans.push_back({grpText, grpFill, grpStroke});
+                  }
                 }
-              }
-              if (grpText) {
-                tbSpans.push_back(
-                    {grpText, grpFill ? grpFill : topFill, grpStroke ? grpStroke : topStroke});
-              }
+              };
+              GroupSpanCollector::Collect(static_cast<const Group*>(childElem), topFill, topStroke,
+                                          tbSpans);
             }
           }
           if (!tbSpans.empty()) {
@@ -457,6 +467,13 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                 style += ";max-height:" + FloatToString(trimmed) + "px;overflow:hidden";
               } else {
                 style += ";overflow:hidden";
+              }
+            }
+            // Detect RTL paragraph direction from the first span's text so text aligns right
+            // within the box, matching tgfx's bidi-resolved layout (paragraphRTL=true).
+            if (!tbSpans.empty() && !tbSpans[0].text->text.empty()) {
+              if (TextStartsWithRTL(tbSpans[0].text->text)) {
+                style += ";direction:rtl";
               }
             }
             out.openTag("div");

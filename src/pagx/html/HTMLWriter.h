@@ -89,6 +89,13 @@ const char* AlignmentToCSS(Alignment alignment);
 const char* ArrangementToCSS(Arrangement arrangement);
 std::string PaddingToCSS(const Padding& padding);
 
+/**
+ * Returns true if the text content's first strong directional character is RTL (Hebrew, Arabic,
+ * etc.). Used to emit `direction:rtl` on TextBox containers so the browser's Unicode BiDi
+ * algorithm aligns paragraphs to the right, matching PAGX's tgfx layout behaviour.
+ */
+bool TextStartsWithRTL(const std::string& utf8Text);
+
 std::string GetImageSrc(const Image* image);
 const char* DetectImageMime(const uint8_t* bytes, size_t size);
 
