@@ -884,6 +884,12 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
   // Outside a TextBox the span style already includes white-space:pre which handles \n.
   if (tb) {
     out.closeTagWithTextBreaks(text->text);
+    // closeTagWithTextBreaks no longer emits trailing breaks (HTMLWriterLayer's
+    // tbSpans/richTextSpans loops handle them with empty-line owner wrapping). For the
+    // single-span writeText path there is no "next span" to consult, so emit the trailing
+    // breaks here as bare <br>s — they share the line just closed by the span's content,
+    // so inheriting the span's font-size for the empty line is the correct default.
+    out.emitBreaks(HTMLBuilder::countTrailingBreaks(text->text));
   } else {
     out.closeTagWithText(text->text);
   }

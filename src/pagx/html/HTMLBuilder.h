@@ -120,6 +120,21 @@ class HTMLBuilder {
     for (size_t i = 0; i < count; ++i) _buf += "<br>";
   }
 
+  // Counts the trailing newline characters (U+000A) in the text. Mirrors
+  // countLeadingBreaks; used by HTMLWriterLayer to track the previous span's trailing
+  // breaks so it can wrap subsequent empty-line `<br>`s in the previous span's font-size.
+  static size_t countTrailingBreaks(const std::string& text) {
+    size_t n = 0;
+    while (n < text.size() && text[text.size() - 1 - n] == '\n') ++n;
+    return n;
+  }
+
+  // Appends a raw HTML fragment to the buffer. Used when the caller pre-formats a
+  // wrapped element (e.g. an empty-line `<br>` that needs a specific font-size).
+  void emitRaw(const std::string& raw) {
+    _buf += raw;
+  }
+
   // Closes the current open tag with caller-supplied pre-formatted HTML (raw — not escaped).
   // The caller is responsible for producing well-formed HTML inside content.
   void closeTagWithRawContent(const std::string& rawContent) {
@@ -143,7 +158,10 @@ class HTMLBuilder {
     // Skip leading newlines — caller must have already emitted them via emitBreaks().
     size_t innerStart = 0;
     while (innerStart < len && text[innerStart] == '\n') ++innerStart;
-    // Count trailing newlines to hoist after the closing </span> tag.
+    // Skip trailing newlines — caller is expected to emit them between spans, where it
+    // can wrap empty-line `<br>`s with the appropriate owner font-size (PAGX uses the
+    // fontLineHeight of the `\n` that produced each empty line; bare `<br>` inherits the
+    // container strut, which can be too small in mixed-size TextBoxes).
     size_t trailingBreaks = 0;
     while (trailingBreaks < len - innerStart && text[len - 1 - trailingBreaks] == '\n') {
       ++trailingBreaks;
@@ -173,10 +191,6 @@ class HTMLBuilder {
     _buf += "</";
     _buf += _tags.back();
     _buf += '>';
-    // Emit trailing newlines outside the span so they inherit the container's strut.
-    for (size_t i = 0; i < trailingBreaks; ++i) {
-      _buf += "<br>";
-    }
     newline();
     _tags.pop_back();
   }

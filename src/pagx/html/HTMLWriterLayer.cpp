@@ -494,6 +494,14 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               out.openTag("div");
               out.closeTagStart();
             }
+            // Track the previous span's trailing newline count and font-size so we can wrap
+            // empty-line `<br>`s in the previous span's font-size when the next span has its
+            // own font-size. PAGX uses the fontLineHeight of the `\n` glyph that started the
+            // empty line; CSS `<br>` inherits its parent's font-size, so a bare `<br>` between
+            // two spans of different sizes would inherit the container's strut and produce a
+            // line-box too short for what tgfx renders.
+            size_t prevTrailingBreaks = 0;
+            float prevFontSize = 0;
             for (auto& span : tbSpans) {
               std::string spanStyle;
               bool spanFontHoisted = !_ctx->fontHoistSignature.fontFamily.empty() ||
@@ -561,7 +569,48 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                 spanStyle += "font-style:italic;font-synthesis-style:" +
                              std::string(_ctx->fontSynthesisStyle ? "auto" : "none");
               }
-              out.emitBreaks(HTMLBuilder::countLeadingBreaks(span.text->text));
+              // For TextBoxes with an explicit lineHeight, force-pin the inline-axis size of
+              // any span whose font-size's natural line-height exceeds the container's
+              // declared lineHeight. Without this Chromium expands the line box to the span's
+              // natural metrics (line-height is treated as a minimum), pushing subsequent
+              // lines below where tgfx — which strictly honours the declared lineHeight per
+              // line — places them. Pin the inline-block's height to lineHeight so the line
+              // box doesn't expand; glyphs taller than the box overflow visibly (the default
+              // for inline-block) and we use vertical-align:top to keep the inline-block top
+              // aligned with the line box top, matching tgfx's per-line top-of-line baseline.
+              float spanFontSize = span.text->renderFontSize();
+              if (tb->lineHeight > 0 && spanFontSize > 0 &&
+                  spanFontSize * 1.17f > tb->lineHeight + 0.5f) {
+                spanStyle += ";display:inline-block;height:" + FloatToString(tb->lineHeight) +
+                             "px;line-height:" + FloatToString(tb->lineHeight) +
+                             "px;vertical-align:top";
+              }
+              // Emit between-span <br>s: prevTrailingBreaks (from prior span's trailing \n)
+              // plus countLeadingBreaks(current span's text). The first <br> ends the prior
+              // span's content line and inherits its strut naturally; each subsequent <br>
+              // is an empty line whose strut comes from the corresponding `\n` owner. PAGX
+              // assigns ownership: \n_1..\n_{prevTrailingBreaks} → previous span; \n_{...} on
+              // → current span. Wrap empty-line `<br>`s in the owner's font-size so the line
+              // box matches what tgfx computed, instead of inheriting the container strut.
+              size_t leadingBreaks = HTMLBuilder::countLeadingBreaks(span.text->text);
+              size_t totalBreaks = prevTrailingBreaks + leadingBreaks;
+              for (size_t bi = 0; bi < totalBreaks; ++bi) {
+                if (bi == 0) {
+                  // First <br> closes the previous span's last line — its line box is already
+                  // sized by the prior span's content, so a bare <br> is sufficient.
+                  out.emitBreaks(1);
+                } else {
+                  // Empty-line <br>. \n_bi (1-indexed) owner: bi <= prevTrailingBreaks → prev,
+                  // else current span.
+                  float ownerFontSize = (bi <= prevTrailingBreaks) ? prevFontSize : spanFontSize;
+                  if (ownerFontSize > 0) {
+                    out.emitRaw("<span style=\"font-size:" + FloatToString(ownerFontSize) +
+                                "px\"><br></span>");
+                  } else {
+                    out.emitBreaks(1);
+                  }
+                }
+              }
               out.openTag("span");
               out.addAttr("style", spanStyle);
               // For vertical-writing-mode TextBoxes with textAlign=justify (or an explicit
@@ -579,11 +628,27 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                 }
               }
               if (!usedPerCharDom) {
-                // Use closeTagWithTextBreaks so U+000A (from &#10;) renders as <br> rather
-                // than being folded into a space by the browser's default white-space handling.
-                // Leading/trailing <br>s are hoisted outside the span to avoid inheriting the
-                // span's font-size for the blank line height in mixed-size TextBoxes.
+                // Use closeTagWithTextBreaks so U+000A (from &#10;) inside the inner content
+                // renders as <br> rather than being folded into a space by the browser's
+                // default white-space handling. Leading/trailing <br>s are hoisted outside
+                // the span by HTMLWriterLayer (above) so they can be wrapped in the
+                // appropriate empty-line owner font-size.
                 out.closeTagWithTextBreaks(span.text->text);
+              }
+              prevTrailingBreaks = HTMLBuilder::countTrailingBreaks(span.text->text);
+              prevFontSize = spanFontSize;
+            }
+            // Flush any trailing breaks left over from the last span. These are dangling
+            // empty lines after the final visible content; emit them so the box's reported
+            // ink height matches PAGX (relevant for boxes that auto-measure cross-axis).
+            for (size_t bi = 0; bi < prevTrailingBreaks; ++bi) {
+              if (bi == 0) {
+                out.emitBreaks(1);
+              } else if (prevFontSize > 0) {
+                out.emitRaw("<span style=\"font-size:" + FloatToString(prevFontSize) +
+                            "px\"><br></span>");
+              } else {
+                out.emitBreaks(1);
               }
             }
             if (needsInnerWrap) {
@@ -653,6 +718,11 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             out.openTag("div");
             out.closeTagStart();
           }
+          // Same between-span <br> handling as the tbSpans branch above: empty-line <br>s
+          // (those that aren't terminating the prior span's content line) need to inherit
+          // the fontLineHeight of the `\n` that produced them, not the container strut.
+          size_t rtPrevTrailingBreaks = 0;
+          float rtPrevFontSize = 0;
           for (auto& span : richTextSpans) {
             std::string spanStyle = tb->wordWrap ? "" : "white-space:nowrap";
             bool spanFontHoisted = !_ctx->fontHoistSignature.fontFamily.empty() ||
@@ -713,12 +783,51 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               spanStyle += ";font-style:italic;font-synthesis-style:" +
                            std::string(_ctx->fontSynthesisStyle ? "auto" : "none");
             }
-            out.emitBreaks(HTMLBuilder::countLeadingBreaks(span.text->text));
+            // Force-pin inline-axis size when a span's natural line-height exceeds the
+            // container's declared lineHeight; otherwise Chromium expands the line box.
+            float rtSpanFontSize = span.text->renderFontSize();
+            if (tb->lineHeight > 0 && rtSpanFontSize > 0 &&
+                rtSpanFontSize * 1.17f > tb->lineHeight + 0.5f) {
+              spanStyle += ";display:inline-block;height:" + FloatToString(tb->lineHeight) +
+                           "px;line-height:" + FloatToString(tb->lineHeight) +
+                           "px;vertical-align:top";
+            }
+            // Emit between-span <br>s with empty-line owner wrapping (see tbSpans branch).
+            size_t rtLeadingBreaks = HTMLBuilder::countLeadingBreaks(span.text->text);
+            size_t rtTotalBreaks = rtPrevTrailingBreaks + rtLeadingBreaks;
+            for (size_t bi = 0; bi < rtTotalBreaks; ++bi) {
+              if (bi == 0) {
+                out.emitBreaks(1);
+              } else {
+                float ownerFontSize =
+                    (bi <= rtPrevTrailingBreaks) ? rtPrevFontSize : rtSpanFontSize;
+                if (ownerFontSize > 0) {
+                  out.emitRaw("<span style=\"font-size:" + FloatToString(ownerFontSize) +
+                              "px\"><br></span>");
+                } else {
+                  out.emitBreaks(1);
+                }
+              }
+            }
             out.openTag("span");
             out.addAttr("style", spanStyle);
-            // Use closeTagWithTextBreaks so U+000A (from &#10;) renders as <br> rather
-            // than being folded into a space by the browser's default white-space handling.
+            // Use closeTagWithTextBreaks so U+000A (from &#10;) inside the inner content
+            // renders as <br>; trailing breaks are handled by the next iteration via the
+            // between-span emission loop above.
             out.closeTagWithTextBreaks(span.text->text);
+            rtPrevTrailingBreaks = HTMLBuilder::countTrailingBreaks(span.text->text);
+            rtPrevFontSize = rtSpanFontSize;
+          }
+          // Flush remaining trailing breaks from the last rich-text span.
+          for (size_t bi = 0; bi < rtPrevTrailingBreaks; ++bi) {
+            if (bi == 0) {
+              out.emitBreaks(1);
+            } else if (rtPrevFontSize > 0) {
+              out.emitRaw("<span style=\"font-size:" + FloatToString(rtPrevFontSize) +
+                          "px\"><br></span>");
+            } else {
+              out.emitBreaks(1);
+            }
           }
           if (needsInnerWrap) {
             out.closeTag();
