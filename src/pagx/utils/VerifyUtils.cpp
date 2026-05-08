@@ -58,9 +58,6 @@ bool HasLayerOnlyFeatures(const Layer* layer) {
   if (layer->mask != nullptr) {
     return true;
   }
-  if (layer->maskType != MaskType::Alpha) {
-    return true;
-  }
   if (layer->composition != nullptr) {
     return true;
   }

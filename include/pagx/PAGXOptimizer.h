@@ -46,8 +46,10 @@ class PAGXOptimizer {
      */
     bool converged = true;
     /**
-     * Number of rule iterations actually executed (both on the root layer list and on each
-     * Composition's layer list). Useful as a monotonic signal for regression / telemetry.
+     * Cumulative rule iteration count across all layer lists (the root layer list plus each
+     * Composition's layer list). Each list is optimized independently with its own iteration cap,
+     * so this value is not directly comparable to any single-segment cap — use `converged` for
+     * the convergence signal instead. Useful as a monotonic signal for regression / telemetry.
      */
     int iterationsUsed = 0;
   };

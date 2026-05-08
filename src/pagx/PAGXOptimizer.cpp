@@ -45,10 +45,9 @@
 namespace pagx {
 
 // ============================================================================
-// Local helpers. `HasLayerOnlyFeatures`, `IsLayerShell`, `IsPainter`, and
-// `HasPainter` are the shared definitions from pagx/utils/VerifyUtils.h
-// (same semantics used by the cli verify / resolve commands) — keeping them in
-// one place avoids silent drift when new Layer attributes are introduced.
+// Shared layer/element classification predicates — single source-of-truth in
+// pagx/utils/VerifyUtils.h, used by verify, resolve, and optimizer. Keeping
+// them in one place avoids silent drift when new Layer attributes are introduced.
 // ============================================================================
 
 namespace {
@@ -157,8 +156,7 @@ bool LayoutNodeHasConstraints(const LayoutNode* node) {
   if (node == nullptr) {
     return false;
   }
-  return !std::isnan(node->left) || !std::isnan(node->right) || !std::isnan(node->top) ||
-         !std::isnan(node->bottom) || !std::isnan(node->centerX) || !std::isnan(node->centerY);
+  return node->hasConstraints();
 }
 
 bool ElementHasConstraints(Element* element) {
@@ -192,6 +190,9 @@ bool IsDefaultTransformGroup(const Group* group) {
   if (!std::isnan(group->width) || !std::isnan(group->height)) {
     return false;
   }
+  if (!std::isnan(group->percentWidth) || !std::isnan(group->percentHeight)) {
+    return false;
+  }
   if (!group->padding.isZero()) {
     return false;
   }
@@ -223,9 +224,10 @@ void CollectMaskRefs(const std::vector<Layer*>& layers, std::unordered_set<const
 // Layer -> Group conversion
 // ----------------------------------------------------------------------------
 
-// Wraps a downgradable shell Layer's contents in a new Group, transferring customData. The
-// caller is responsible for releasing the old Layer reference. Returns nullptr if the layer
-// is not safely downgradable (callers must check IsLayerShell + children.empty() first).
+// Wraps a downgradable shell Layer's contents in a new Group, transferring customData. Caller
+// must have verified the layer is downgradable and is responsible for removing it from the
+// owning list. Returns nullptr if the layer is not safely downgradable (callers must check
+// IsLayerShell + children.empty() first).
 Group* WrapShellLayerAsGroup(PAGXDocument* doc, Layer* layer) {
   auto* group = doc->makeNode<Group>();
   group->elements = std::move(layer->contents);
