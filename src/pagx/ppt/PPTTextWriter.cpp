@@ -165,7 +165,8 @@ PPTWriter::NativeTextGeometry PPTWriter::computeNativeTextGeometry(
     geom.posX = fs.textBox->renderPosition().x;
     geom.posY = fs.textBox->renderPosition().y;
     geom.estWidth = boxWidth;
-    geom.estHeight = (!std::isnan(boxHeight) && boxHeight > 0) ? boxHeight : text->fontSize * 1.4f;
+    geom.estHeight =
+        (!std::isnan(boxHeight) && boxHeight > 0) ? boxHeight : text->renderFontSize() * 1.4f;
     return geom;
   }
 
@@ -180,11 +181,13 @@ PPTWriter::NativeTextGeometry PPTWriter::computeNativeTextGeometry(
 
   // Fallback when layout produced no usable bounds (e.g. font metrics missing):
   // estimate from font size and adjust for the textAnchor that the missing
-  // layout would otherwise apply.
-  geom.estWidth = static_cast<float>(CountUTF8Characters(text->text)) * text->fontSize * 0.6f;
-  geom.estHeight = text->fontSize * 1.4f;
+  // layout would otherwise apply. Use renderFontSize() so that a text shrunk
+  // via textScale to fit dual-axis constraints still estimates correctly.
+  float effectiveFontSize = text->renderFontSize();
+  geom.estWidth = static_cast<float>(CountUTF8Characters(text->text)) * effectiveFontSize * 0.6f;
+  geom.estHeight = effectiveFontSize * 1.4f;
   geom.posX = text->renderPosition().x;
-  geom.posY = text->renderPosition().y - text->fontSize * 0.85f;
+  geom.posY = text->renderPosition().y - effectiveFontSize * 0.85f;
   if (text->textAnchor == TextAnchor::Center) {
     geom.posX -= geom.estWidth / 2.0f;
   } else if (text->textAnchor == TextAnchor::End) {
@@ -643,12 +646,12 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
   float estWidth = hasBoxWidth ? boxWidth : layoutResult.bounds.width;
   if (estWidth <= 0) {
     estWidth = static_cast<float>(CountUTF8Characters(runs.front().text->text)) *
-               runs.front().text->fontSize * 0.6f;
+               runs.front().text->renderFontSize() * 0.6f;
   }
   float estHeight =
       (!std::isnan(boxHeight) && boxHeight > 0) ? boxHeight : layoutResult.bounds.height;
   if (estHeight <= 0) {
-    estHeight = runs.front().text->fontSize * 1.4f;
+    estHeight = runs.front().text->renderFontSize() * 1.4f;
   }
 
   // Per-Text line metadata produced by PAGX's own layout. Use these line

@@ -426,9 +426,19 @@ inline PPTRunStyle BuildRunStyle(const Text* text, const Fill* fill, const Strok
   PPTRunStyle style = {};
   style.hasBold = text->fauxBold || text->fontStyle.find("Bold") != std::string::npos;
   style.hasItalic = text->fauxItalic || text->fontStyle.find("Italic") != std::string::npos;
-  style.fontSize = FontSizeToPPT(text->fontSize);
-  style.letterSpc = static_cast<int64_t>(std::round(text->letterSpacing * 75.0));
-  style.hasLetterSpacing = text->letterSpacing != 0.0f;
+  // Use the layout-resolved font size. PAGX layout may shrink a Text internally
+  // via a textScale factor to fit dual-axis constraints (e.g. `left`+`right`,
+  // `width="100%"`); `renderFontSize()` carries that factor while `fontSize`
+  // still holds the authored pre-scale value. Emitting the raw size here was
+  // the cause of constrained text overflowing its container in PowerPoint.
+  // Recover the same scale to apply it to letterSpacing, which the renderer
+  // also multiplies by textScale during shaping.
+  float effectiveFontSize = text->renderFontSize();
+  float textScale = (text->fontSize > 0.0f) ? effectiveFontSize / text->fontSize : 1.0f;
+  float effectiveLetterSpacing = text->letterSpacing * textScale;
+  style.fontSize = FontSizeToPPT(effectiveFontSize);
+  style.letterSpc = static_cast<int64_t>(std::round(effectiveLetterSpacing * 75.0));
+  style.hasLetterSpacing = effectiveLetterSpacing != 0.0f;
   style.hasFillColor = fill && IsRunCompatibleColorSource(fill->color);
   style.fillAlpha = style.hasFillColor ? fill->alpha * alpha : 0;
   style.fillColor = style.hasFillColor ? fill->color : nullptr;
