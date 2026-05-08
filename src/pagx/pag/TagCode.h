@@ -32,6 +32,11 @@ enum class TagCode : uint16_t {
   Composition = 5,
   ImageAssetItem = 6,
   FontAssetItem = 7,
+  // Phase 17 (v2.23): path-based embedded fonts owned by the PAG document
+  // itself. Mirrors PAGX <Font id="..."><Glyph advance="..." path="..."/></Font>.
+  // Not a ttf/otf subset; ttf font files are never embedded in PAG.
+  EmbeddedFontTable = 8,
+  EmbeddedFontItem = 9,
 
   // ---- Layer block + sub-tags 10-19 ----
   LayerBlock = 10,

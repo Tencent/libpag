@@ -27,9 +27,10 @@
 
   **Tag 表变更**：
   - 顶层段新增 `EmbeddedFontTable=8` / `EmbeddedFontItem=9`（占尽顶层预留空位）。
-  - VectorElement 段新增 `ElementTextGlyphRunList=54` / `ElementTextShapedGlyphList=55`（ElementTextData 内 child tag，两者互斥）。
+  - ElementText 内新字段 `glyphRuns` / `shapedGlyphs` **不新增 TagCode**——与 Phase 16.6 `shapedRuns` 同构，在 ElementText body 的 `boxFlags` 字段里用位开关条件写入（与 ElementText 现有扁平字段风格一致；sub-Tag 方案评估后放弃，避免在 leaf payload 里引入容器结构）。
+  - `boxFlags` 从 `uint8` 扩展为 `uint16`（§6.5 字段追加规则 ①）；Phase 16.6 `0x40 = hasShapedHint` 保留，新增 `0x80 = hasGlyphRuns` / `0x100 = hasShapedGlyphs`。
   - body 顶层写入顺序：`FileHeader → ImageAssetTable → EmbeddedFontTable → CompositionList → End`。
-  - Phase 16.6 `shapedRuns` 编解码逻辑删除。
+  - Phase 16.6 `shapedRuns` 编解码逻辑（最终）删除在 Commit 4。
   - PAG v2 尚未对外发布，不保留向后兼容；FORMAT_VERSION 保持 `0x02`。
 
   **Baker/Inflater 变更**：

@@ -92,6 +92,22 @@ void ReadImageAssetTable(::pag::DecodeStream* stream, DecodeContext* ctx, uint64
 // bytes it encounters through the generic UnknownTagCode=400 path. Hence
 // no Read/Write*FontAssetTable prototypes exist any more.
 
+// ---- EmbeddedFontTable (TagCode = 8) + EmbeddedFont sub-Tag (TagCode = 9) ----
+// body: varU32 fontCount, repeat[EmbeddedFont Tag]
+//
+// Phase 17 (v2.23) path-based embedded font resources — see EmbeddedFont
+// definition in PAGDocument.h. Mirrors PAGX <Font id="..."> elements.
+// Each EmbeddedFont is its own sub-Tag with header for forward-compat
+// field appending (same convention as ImageAsset). Only consumed by
+// ElementTextData::glyphRuns case A.
+
+void WriteEmbeddedFontTable(::pag::EncodeStream* stream,
+                            const std::vector<std::unique_ptr<EmbeddedFont>>& fonts,
+                            EncodeSession* session);
+
+void ReadEmbeddedFontTable(::pag::DecodeStream* stream, DecodeContext* ctx, uint64_t tagEnd,
+                           std::vector<std::unique_ptr<EmbeddedFont>>* out);
+
 // ---- LayerBlock (TagCode = 10) ------------------------------------------
 // Phase 4b covers LayerBlock body + LayerTransform sub-Tag (=15) + the
 // CompositionRefPayload (=26) — that combination is enough to roundtrip a

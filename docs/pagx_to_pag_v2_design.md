@@ -375,7 +375,7 @@ ColorSource 类型：SolidColor / LinearGradient / RadialGradient / ConicGradien
 | 顶层 | FileHeader / AssetTable / CompositionList / Composition / AssetItem（ImageAsset sub-Tag；**Phase 17 新增 EmbeddedFontTable=8 / EmbeddedFontItem=9**；FontAssetTable=3 / FontAsset=7 **Phase 16 废弃但数值保留**）| 1-9 | 7 active (1,2,5,6 + 8,9) + 2 reserved-废弃 (3,7) | 0 个（占满）|
 | Layer 及子 Tag | LayerBlock / LayerTransform / LayerMaskRef / LayerFilters / LayerStyles / 保留 | 10-19 | 5 (10,12,13,14,15) | 5 个 |
 | Payload | Shape / Text / Image / Solid / Vector / Mesh / CompositionRef | 20-39 | 7 (20-26) | 13 个 |
-| VectorElement | 14 种 element + **Phase 17 ElementTextGlyphRunList=54 / ElementTextShapedGlyphList=55** + 3D shape / Motion Path / AE modifier 扩展 | 40-119 | 16 (40-53 + 54,55) | 64 个 |
+| VectorElement | 14 种 element + 3D shape / Motion Path / AE modifier 扩展（Phase 17 新增字段 `glyphRuns` / `shapedGlyphs` 走 ElementText body 的 boxFlags 位扩展，不新增 TagCode）| 40-119 | 14 (40-53) | 66 个 |
 | LayerFilter | 5 种 filter + 扩展（ChromaKey / Glow 等） | 120-139 | 5 (120-124) | 15 个 |
 | LayerStyle | 3 种 style + 扩展 | 140-159 | 3 (140-142) | 17 个 |
 | 动画专用 | 关键帧 / 插值曲线 / RangeSelector v2 等 | 160-239 | 0 | 80 个 |
@@ -1398,9 +1398,9 @@ CrossCheck 定位：Phase 17 完成后 CrossCheck 从 "辅助诊断" 升级为 *
 #### Commit 1：数据模型 + Codec 骨架
 
 - `src/pagx/pag/PAGDocument.h` 新增 `EmbeddedGlyph` / `EmbeddedFont` / `GlyphRunData` / `ShapedGlyphRun` 四 struct；`PAGDocument.embeddedFonts` 顶层字段；`ElementTextData` 加 `glyphRuns` / `shapedGlyphs` 两向量。
-- `src/pagx/pag/TagCode.h` 新增 `EmbeddedFontTable=8 / EmbeddedFontItem=9 / ElementTextGlyphRunList=54 / ElementTextShapedGlyphList=55`。
-- `src/pagx/pag/ElementTags.cpp` + `Codec.cpp` 实现新 tag Read/Write。
-- `FileTag.cpp` 顶层写入顺序加入 `EmbeddedFontTable`（位置：`ImageAssetTable → EmbeddedFontTable → CompositionList`）。
+- `src/pagx/pag/TagCode.h` 顶层段新增 `EmbeddedFontTable=8 / EmbeddedFontItem=9`（承载 path-based 嵌入字体资源表）。**ElementText 内新增字段不新增 TagCode**——与现有 `shapedRuns` 同构，走 ElementText body 的 `boxFlags` 位扩展（见下）。
+- `ElementText` body 的 `boxFlags` 字段从 `uint8` 扩展为 `uint16`（按 §6.5 字段级追加规则 ①；旧 Reader 遇到扩展字段走 tag length skip 不崩溃）。Phase 16.6 占用 `0x40 = hasShapedHint` 保留；新增 `0x80 = hasGlyphRuns`（情况 A）+ `0x100 = hasShapedGlyphs`（情况 B）。两新字段的条件块紧接现有 `shapedRuns` 块之后、paint 字段之前。
+- `src/pagx/pag/ElementTags.cpp` + `Codec.cpp` 实现 `EmbeddedFont` tag 与 ElementText body 新字段的 Read/Write；`FileTag.cpp` 顶层写入顺序加入 `EmbeddedFontTable`（位置：`ImageAssetTable → EmbeddedFontTable → CompositionList`；与 ImageAssetTable 一致**始终写入**空表为 count=0 的 tag，不做"空则 skip"特判，保持顶层 tag 顺序恒定）。
 - `test/src/pag/unit/ElementTagsCodecTest.cpp` 新增 4 个 roundtrip 单测：EmbeddedFont / GlyphRunData / ShapedGlyphRun / ElementText 含两种分支。
 - **过渡策略**：Phase 16.6 `shapedRuns` 字段 + 相关 Baker/Inflater 代码**保留**不删，新增 `glyphRuns`/`shapedGlyphs`/`embeddedFonts` 加好但暂不写入。Commit 1 纯粹是结构扩展，视觉无回归；`shapedRuns` 作为 bridge，到 Commit 4 一起删。
 - **验收**：编译通过 + Codec roundtrip 测试绿 + 48 个 `PAGRenderEquivalenceTest` 无像素回归。

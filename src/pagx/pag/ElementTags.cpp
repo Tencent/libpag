@@ -696,7 +696,14 @@ void WriteElementTextBody(::pag::EncodeStream* body, const ElementTextData& d) {
   body->writeFloat(d.firstBaseLine);
   body->writeFloat(d.baselineShift);
 
-  uint8_t boxFlags = 0;
+  // boxFlags: bit 0-5 (6 bits) carry the v2.20 baseline flags; bit 6 is the
+  // Phase 16.6 shapedRuns hint gate; Phase 17 (v2.23) extends the field to
+  // uint16 and uses bit 7 / bit 8 for the case A / case B Phase 17 payload
+  // gates. The width promotion follows §6.5 rule ① "field-level append":
+  // older Readers (before bit 7 / 8 existed) saw a uint8 boxFlags whose top
+  // bit was unset for files Baker emitted, so widening doesn't break them
+  // either way — but we are pre-release and don't ship a v2.22 Reader.
+  uint16_t boxFlags = 0;
   if (d.boxText) boxFlags |= 0x01;
   if (d.fauxBold) boxFlags |= 0x02;
   if (d.fauxItalic) boxFlags |= 0x04;
@@ -705,7 +712,11 @@ void WriteElementTextBody(::pag::EncodeStream* body, const ElementTextData& d) {
   if (d.strokeOverFill) boxFlags |= 0x20;
   const bool hasShapedHint = !d.shapedRuns.empty();
   if (hasShapedHint) boxFlags |= 0x40;
-  body->writeUint8(boxFlags);
+  const bool hasGlyphRuns = !d.glyphRuns.empty();
+  if (hasGlyphRuns) boxFlags |= 0x80;
+  const bool hasShapedGlyphs = !d.shapedGlyphs.empty();
+  if (hasShapedGlyphs) boxFlags |= 0x100;
+  body->writeUint16(boxFlags);
 
   if (d.boxText) {
     body->writeFloat(d.boxTextPos.x);
@@ -743,6 +754,86 @@ void WriteElementTextBody(::pag::EncodeStream* body, const ElementTextData& d) {
       WriteUtf8String(body, run.typefaceFamily);
       WriteUtf8String(body, run.typefaceStyle);
       WriteUtf8String(body, run.typefaceKey);
+    }
+  }
+
+  // Phase 17 case A: author <GlyphRun> → embedded path-based font. Each run
+  // carries embeddedFontIndex (into PAGDocument.embeddedFonts) plus the
+  // PAGX-native fields (fontSize / glyphs / x,y / xOffsets / positions),
+  // and Phase 18-reserved per-glyph anchors / scales / rotations / skews
+  // vectors written verbatim (Phase 17 always empty).
+  if (hasGlyphRuns) {
+    body->writeUint32(static_cast<uint32_t>(d.glyphRuns.size()));
+    for (const auto& run : d.glyphRuns) {
+      body->writeEncodedUint32(run.embeddedFontIndex);
+      body->writeFloat(run.fontSize);
+      const uint32_t glyphCount = static_cast<uint32_t>(run.glyphs.size());
+      body->writeUint32(glyphCount);
+      for (uint32_t i = 0; i < glyphCount; i++) {
+        body->writeUint16(run.glyphs[i]);
+      }
+      body->writeFloat(run.x);
+      body->writeFloat(run.y);
+      body->writeUint32(static_cast<uint32_t>(run.xOffsets.size()));
+      for (float v : run.xOffsets) {
+        body->writeFloat(v);
+      }
+      body->writeUint32(static_cast<uint32_t>(run.positions.size()));
+      for (const auto& p : run.positions) {
+        body->writeFloat(p.x);
+        body->writeFloat(p.y);
+      }
+      // Phase 18 reserved fields — counts only, vectors are empty in Phase 17.
+      body->writeUint32(static_cast<uint32_t>(run.anchors.size()));
+      for (const auto& p : run.anchors) {
+        body->writeFloat(p.x);
+        body->writeFloat(p.y);
+      }
+      body->writeUint32(static_cast<uint32_t>(run.scales.size()));
+      for (const auto& p : run.scales) {
+        body->writeFloat(p.x);
+        body->writeFloat(p.y);
+      }
+      body->writeUint32(static_cast<uint32_t>(run.rotations.size()));
+      for (float v : run.rotations) {
+        body->writeFloat(v);
+      }
+      body->writeUint32(static_cast<uint32_t>(run.skews.size()));
+      for (float v : run.skews) {
+        body->writeFloat(v);
+      }
+    }
+  }
+
+  // Phase 17 case B: PAGX TextLayout's Bake-time-resolved glyph runs. Same
+  // shape as ShapedRun above (the bridge field) — when Commit 4 removes
+  // shapedRuns this branch becomes the sole shape-data carrier.
+  if (hasShapedGlyphs) {
+    body->writeUint32(static_cast<uint32_t>(d.shapedGlyphs.size()));
+    for (const auto& run : d.shapedGlyphs) {
+      WriteUtf8String(body, run.typefaceFamily);
+      WriteUtf8String(body, run.typefaceStyle);
+      WriteUtf8String(body, run.typefaceKey);
+      body->writeFloat(run.fontSize);
+      const uint32_t glyphCount = static_cast<uint32_t>(run.glyphs.size());
+      body->writeUint32(glyphCount);
+      for (uint32_t i = 0; i < glyphCount; i++) {
+        body->writeUint16(run.glyphs[i]);
+      }
+      for (uint32_t i = 0; i < glyphCount; i++) {
+        body->writeFloat(run.positions[i].x);
+        body->writeFloat(run.positions[i].y);
+      }
+      const bool hasXforms = !run.xforms.empty();
+      body->writeUint8(hasXforms ? 1 : 0);
+      if (hasXforms) {
+        for (uint32_t i = 0; i < glyphCount; i++) {
+          body->writeFloat(run.xforms[i].scos);
+          body->writeFloat(run.xforms[i].ssin);
+          body->writeFloat(run.xforms[i].tx);
+          body->writeFloat(run.xforms[i].ty);
+        }
+      }
     }
   }
 
@@ -788,7 +879,7 @@ std::unique_ptr<ElementTextData> ReadElementTextBody(::pag::DecodeStream* s, Dec
   d->firstBaseLine = s->readFloat();
   d->baselineShift = s->readFloat();
 
-  const uint8_t boxFlags = s->readUint8();
+  const uint16_t boxFlags = s->readUint16();
   d->boxText = (boxFlags & 0x01) != 0;
   d->fauxBold = (boxFlags & 0x02) != 0;
   d->fauxItalic = (boxFlags & 0x04) != 0;
@@ -796,6 +887,8 @@ std::unique_ptr<ElementTextData> ReadElementTextBody(::pag::DecodeStream* s, Dec
   d->applyStroke = (boxFlags & 0x10) != 0;
   d->strokeOverFill = (boxFlags & 0x20) != 0;
   const bool hasShapedHint = (boxFlags & 0x40) != 0;
+  const bool hasGlyphRuns = (boxFlags & 0x80) != 0;
+  const bool hasShapedGlyphs = (boxFlags & 0x100) != 0;
 
   if (d->boxText) {
     d->boxTextPos.x = s->readFloat();
@@ -841,6 +934,135 @@ std::unique_ptr<ElementTextData> ReadElementTextBody(::pag::DecodeStream* s, Dec
       run.typefaceFamily = ReadUtf8String(s, &guard, limits::MAX_NAME_STRING_BYTES);
       run.typefaceStyle = ReadUtf8String(s, &guard, limits::MAX_NAME_STRING_BYTES);
       run.typefaceKey = ReadUtf8String(s, &guard, limits::MAX_NAME_STRING_BYTES);
+    }
+  }
+
+  // Phase 17 case A: author-authored <GlyphRun>. Mirrors the Write side
+  // exactly — counted vectors for every optional / Phase 18-reserved field.
+  if (hasGlyphRuns) {
+    const uint32_t runCount = s->readUint32();
+    if (runCount > limits::MAX_RUNS_PER_TEXT) {
+      guard.warn(ErrorCode::StructureLimitExceeded, "ElementText.glyphRuns.runCount");
+      return nullptr;
+    }
+    d->glyphRuns.resize(runCount);
+    for (uint32_t r = 0; r < runCount; r++) {
+      auto& run = d->glyphRuns[r];
+      run.embeddedFontIndex = ReadEncodedUint32Safe(s, &guard);
+      run.fontSize = s->readFloat();
+      const uint32_t glyphCount = s->readUint32();
+      if (glyphCount > limits::MAX_GLYPHS_PER_RUN) {
+        guard.warn(ErrorCode::GlyphCountLimitExceeded, "ElementText.glyphRuns.glyphCount");
+        return nullptr;
+      }
+      run.glyphs.resize(glyphCount);
+      for (uint32_t i = 0; i < glyphCount; i++) {
+        run.glyphs[i] = s->readUint16();
+      }
+      run.x = s->readFloat();
+      run.y = s->readFloat();
+      const uint32_t xOffsetCount = s->readUint32();
+      if (xOffsetCount > limits::MAX_GLYPHS_PER_RUN) {
+        guard.warn(ErrorCode::GlyphCountLimitExceeded, "ElementText.glyphRuns.xOffsetCount");
+        return nullptr;
+      }
+      run.xOffsets.resize(xOffsetCount);
+      for (uint32_t i = 0; i < xOffsetCount; i++) {
+        run.xOffsets[i] = s->readFloat();
+      }
+      const uint32_t positionCount = s->readUint32();
+      if (positionCount > limits::MAX_GLYPHS_PER_RUN) {
+        guard.warn(ErrorCode::GlyphCountLimitExceeded, "ElementText.glyphRuns.positionCount");
+        return nullptr;
+      }
+      run.positions.resize(positionCount);
+      for (uint32_t i = 0; i < positionCount; i++) {
+        run.positions[i].x = s->readFloat();
+        run.positions[i].y = s->readFloat();
+      }
+      // Phase 18 reserved counts — Phase 17 always writes 0; reading is
+      // tolerant of non-zero in case a Phase 18 file passes through.
+      const uint32_t anchorCount = s->readUint32();
+      if (anchorCount > limits::MAX_GLYPHS_PER_RUN) {
+        guard.warn(ErrorCode::GlyphCountLimitExceeded, "ElementText.glyphRuns.anchorCount");
+        return nullptr;
+      }
+      run.anchors.resize(anchorCount);
+      for (uint32_t i = 0; i < anchorCount; i++) {
+        run.anchors[i].x = s->readFloat();
+        run.anchors[i].y = s->readFloat();
+      }
+      const uint32_t scaleCount = s->readUint32();
+      if (scaleCount > limits::MAX_GLYPHS_PER_RUN) {
+        guard.warn(ErrorCode::GlyphCountLimitExceeded, "ElementText.glyphRuns.scaleCount");
+        return nullptr;
+      }
+      run.scales.resize(scaleCount);
+      for (uint32_t i = 0; i < scaleCount; i++) {
+        run.scales[i].x = s->readFloat();
+        run.scales[i].y = s->readFloat();
+      }
+      const uint32_t rotationCount = s->readUint32();
+      if (rotationCount > limits::MAX_GLYPHS_PER_RUN) {
+        guard.warn(ErrorCode::GlyphCountLimitExceeded, "ElementText.glyphRuns.rotationCount");
+        return nullptr;
+      }
+      run.rotations.resize(rotationCount);
+      for (uint32_t i = 0; i < rotationCount; i++) {
+        run.rotations[i] = s->readFloat();
+      }
+      const uint32_t skewCount = s->readUint32();
+      if (skewCount > limits::MAX_GLYPHS_PER_RUN) {
+        guard.warn(ErrorCode::GlyphCountLimitExceeded, "ElementText.glyphRuns.skewCount");
+        return nullptr;
+      }
+      run.skews.resize(skewCount);
+      for (uint32_t i = 0; i < skewCount; i++) {
+        run.skews[i] = s->readFloat();
+      }
+    }
+  }
+
+  // Phase 17 case B: PAGX TextLayout-resolved glyph runs. Same shape as
+  // shapedRuns above (the Phase 16.6 bridge); fields appear in the same
+  // order so future deduplication just removes one branch.
+  if (hasShapedGlyphs) {
+    const uint32_t runCount = s->readUint32();
+    if (runCount > limits::MAX_RUNS_PER_TEXT) {
+      guard.warn(ErrorCode::StructureLimitExceeded, "ElementText.shapedGlyphs.runCount");
+      return nullptr;
+    }
+    d->shapedGlyphs.resize(runCount);
+    for (uint32_t r = 0; r < runCount; r++) {
+      auto& run = d->shapedGlyphs[r];
+      run.typefaceFamily = ReadUtf8String(s, &guard, limits::MAX_NAME_STRING_BYTES);
+      run.typefaceStyle = ReadUtf8String(s, &guard, limits::MAX_NAME_STRING_BYTES);
+      run.typefaceKey = ReadUtf8String(s, &guard, limits::MAX_NAME_STRING_BYTES);
+      run.fontSize = s->readFloat();
+      const uint32_t glyphCount = s->readUint32();
+      if (glyphCount > limits::MAX_GLYPHS_PER_RUN) {
+        guard.warn(ErrorCode::GlyphCountLimitExceeded, "ElementText.shapedGlyphs.glyphCount");
+        return nullptr;
+      }
+      run.glyphs.resize(glyphCount);
+      for (uint32_t i = 0; i < glyphCount; i++) {
+        run.glyphs[i] = s->readUint16();
+      }
+      run.positions.resize(glyphCount);
+      for (uint32_t i = 0; i < glyphCount; i++) {
+        run.positions[i].x = s->readFloat();
+        run.positions[i].y = s->readFloat();
+      }
+      const uint8_t hasXforms = s->readUint8();
+      if (hasXforms) {
+        run.xforms.resize(glyphCount);
+        for (uint32_t i = 0; i < glyphCount; i++) {
+          run.xforms[i].scos = s->readFloat();
+          run.xforms[i].ssin = s->readFloat();
+          run.xforms[i].tx = s->readFloat();
+          run.xforms[i].ty = s->readFloat();
+        }
+      }
     }
   }
 

@@ -171,6 +171,29 @@ struct ImageAsset {
 };
 
 // ============================================================================
+// C.4b — EmbeddedFont (Phase 17 v2.23: path-based font resource)
+// ============================================================================
+//
+// Mirrors PAGX <Font id="fontN"><Glyph advance="..." path="..."/></Font>.
+// Only consumed by case A (author-authored <GlyphRun>) via
+// ElementTextData::glyphRuns[i].embeddedFontIndex. NOT a ttf subset:
+// ttf / otf font files are never embedded in PAG.
+//
+// Coordinate convention: glyph paths retain the PAGX y-up source (e.g.
+// "M100 0 L193 -299" where negative y is above); the Inflater flips to
+// tgfx's y-down convention via Matrix::Scale(scale, -scale) at render time.
+
+struct EmbeddedGlyph {
+  float advance = 0.0f;  // PAGX <Glyph advance="..."> — em-units, pre-unitsPerEm
+  tgfx::Path path;       // PAGX <Glyph path="..."> — y-up source coordinates
+};
+
+struct EmbeddedFont {
+  uint32_t unitsPerEm = 1000;         // PAGX default
+  std::vector<EmbeddedGlyph> glyphs;  // index = value stored in GlyphRunData.glyphs
+};
+
+// ============================================================================
 // C.6 — ShapeStyleData (color source for Fill / Stroke)
 // ============================================================================
 
@@ -409,6 +432,55 @@ struct ElementTextData {
     std::string typefaceKey = "";  // family|style|unitsPerEm|glyphsCount
   };
   std::vector<ShapedRun> shapedRuns = {};
+
+  // ===== Phase 17 v2.23: case A / case B authoritative storage =====
+  //
+  // shapedRuns above is retained as a Phase 16.6 bridge during the Phase 17
+  // rollout (Commit 1-3). Commit 4 will remove shapedRuns; shapedGlyphs
+  // below replaces it as case B's sole data source.
+  //
+  // Branch discipline: across Commits 1-3 one of `glyphRuns` / `shapedGlyphs`
+  // is non-empty (case A / case B), never both. In Commit 1 Baker does not
+  // yet write either, so both stay empty and the Inflater falls back to the
+  // existing Phase 16.6 shapedRuns path — visual behaviour unchanged.
+
+  // Case A (Phase 17): PAGX Text has author <GlyphRun> referencing an
+  // embedded <Font>. Snapshot of those runs is stored verbatim here; the
+  // referenced path-based font resource is Bake-time interned into
+  // PAGDocument.embeddedFonts.
+  struct GlyphRunData {
+    uint32_t embeddedFontIndex = 0;  // → PAGDocument.embeddedFonts[i]
+    float fontSize = 12.0f;
+    std::vector<tgfx::GlyphID> glyphs;   // indexes into EmbeddedFont.glyphs
+    float x = 0.0f;                      // overall X offset (PAGX GlyphRun.x)
+    float y = 0.0f;                      // overall Y offset
+    std::vector<float> xOffsets;         // optional per-glyph X
+    std::vector<tgfx::Point> positions;  // optional per-glyph (x,y)
+    // Phase 18 reservations — Baker does not write these in Phase 17, but
+    // Codec still round-trips vector presence so a future Phase 18 payload
+    // decodes cleanly against a Phase 17 schema.
+    std::vector<tgfx::Point> anchors;
+    std::vector<tgfx::Point> scales;
+    std::vector<float> rotations;
+    std::vector<float> skews;
+  };
+  std::vector<GlyphRunData> glyphRuns = {};
+
+  // Case B (Phase 17): PAGX Text is pure <Text text="..."> without
+  // <GlyphRun>. PAGX TextLayout in applyLayout() has already resolved
+  // glyph IDs + positions per run; Baker snapshots them verbatim. Inflater
+  // uses FontProvider to resolve typeface and assembles tgfx::TextBlob
+  // directly — no re-shape, no re-layout.
+  struct ShapedGlyphRun {
+    std::string typefaceFamily;
+    std::string typefaceStyle;
+    std::string typefaceKey;  // family|style|unitsPerEm|glyphsCount
+    float fontSize = 12.0f;
+    std::vector<tgfx::GlyphID> glyphs;
+    std::vector<tgfx::Point> positions;  // relative to ElementTextData::position
+    std::vector<tgfx::RSXform> xforms;   // empty unless vertical writing mode
+  };
+  std::vector<ShapedGlyphRun> shapedGlyphs = {};
 };
 
 struct ElementTextPathData {
@@ -647,6 +719,10 @@ struct FileHeader {
 struct PAGDocument {
   FileHeader header = {};
   std::vector<std::unique_ptr<ImageAsset>> images = {};
+  // Phase 17 v2.23: path-based embedded fonts referenced by ElementTextData
+  // case A glyphRuns. NOT ttf/otf font files; see EmbeddedFont definition.
+  // Top-level Tag order: ImageAssetTable → EmbeddedFontTable → CompositionList.
+  std::vector<std::unique_ptr<EmbeddedFont>> embeddedFonts = {};
   std::vector<std::unique_ptr<Composition>> compositions = {};
 };
 

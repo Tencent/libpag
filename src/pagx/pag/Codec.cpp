@@ -47,6 +47,11 @@ EncodeResult Codec::Encode(const PAGDocument& doc) {
   // Phase 16 (v2.20): FontAssetTable is no longer produced. Font information
   // is carried verbatim on ElementTextData (fontFamily / fontStyle) and
   // resolved at load time through the Inflater's FontProvider.
+  // Phase 17 (v2.23): EmbeddedFontTable carries path-based <Font> resources
+  // referenced by ElementTextData::glyphRuns case A. Always written (even
+  // when empty) for stable top-level Tag ordering — same convention as
+  // ImageAssetTable.
+  WriteEmbeddedFontTable(&body, doc.embeddedFonts, &session);
   WriteCompositionList(&body, doc.compositions, &session);
   WriteEndTag(&body);
 
@@ -210,6 +215,10 @@ DecodeResult Codec::Decode(const uint8_t* data, size_t length) {
         // cursor. The warn surfaces the downgrade so CI can flag stale
         // Writers still emitting this tag.
         ctx.warn(ErrorCode::UnknownTagCode, "FontAssetTable dropped (Phase 16 runtime-shape mode)");
+        break;
+      }
+      case TagCode::EmbeddedFontTable: {
+        ReadEmbeddedFontTable(&stream, &ctx, tagEnd, &doc->embeddedFonts);
         break;
       }
       case TagCode::CompositionList: {

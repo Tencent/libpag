@@ -1,6 +1,7 @@
 // Copyright (C) 2026 Tencent. All rights reserved.
 //
-// PAG v2 resource Tags — ImageAssetTable / ImageAsset.
+// PAG v2 resource Tags — ImageAssetTable / ImageAsset / EmbeddedFontTable /
+// EmbeddedFont.
 //
 // Phase 16 (v2.20) removed the FontAssetTable / FontAsset writer path
 // entirely: runtime-shape mode carries font information as fontFamily /
@@ -9,9 +10,14 @@
 // the generic UnknownTagCode=400 path to remain forward-compatible with
 // byte streams produced by pre-v2.20 branches.
 //
+// Phase 17 (v2.23) introduces EmbeddedFontTable / EmbeddedFont — path-based
+// glyph resources owned by the PAG document itself (mirrors PAGX <Font>).
+// Not a ttf/otf subset; ttf font files are still never embedded in PAG.
+//
 // Authoritative byte layouts: §D.6 (with v2.19 P0-R1 sub-Tag rationale).
 #include <cstring>
 #include "pagx/pag/CodecTags.h"
+#include "pagx/pag/PathCodec.h"
 #include "pagx/pag/TagHeader.h"
 #include "pagx/pag/ValueCodec.h"
 #include "pagx/pag/limits.h"
@@ -162,6 +168,118 @@ void ReadImageAssetTable(::pag::DecodeStream* stream, DecodeContext* ctx, uint64
       out->push_back(std::move(img));
     }
     // Each sub-Tag is forward-compat (length-bounded), so always align.
+    SeekTo(stream, static_cast<uint32_t>(childEnd));
+  }
+}
+
+// =============================================================================
+// EmbeddedFont (TagCode = 9) — Phase 17 v2.23
+// =============================================================================
+
+namespace {
+
+// EmbeddedFont sub-Tag body: varU32 unitsPerEm, varU32 glyphCount,
+// repeat[ float advance, Path path ].
+//
+// Path encoding reuses the §D.2 quantised path codec (PathCodec.h::WritePath
+// / ReadPath) — same encoding ElementShapePath uses, so glyph outlines pay
+// the same per-verb cost (verbCount + xs[] + ys[]). The PAGX y-up source
+// orientation is preserved in the bytes; the Inflater applies the y-flip
+// matrix at render time (case A inflateTextAsPath).
+void WriteEmbeddedFont(::pag::EncodeStream* stream, const EmbeddedFont& font,
+                       EncodeSession* session) {
+  ::pag::EncodeStream body(session->sc);
+  body.writeEncodedUint32(font.unitsPerEm);
+  body.writeEncodedUint32(static_cast<uint32_t>(font.glyphs.size()));
+  for (const auto& glyph : font.glyphs) {
+    body.writeFloat(glyph.advance);
+    WritePath(&body, glyph.path);
+  }
+  WriteTag(stream, TagCode::EmbeddedFontItem, &body);
+}
+
+std::unique_ptr<EmbeddedFont> ReadEmbeddedFont(::pag::DecodeStream* stream, DecodeContext* ctx,
+                                               uint64_t tagEnd) {
+  auto font = std::make_unique<EmbeddedFont>();
+  auto guard = MakeGuard(ctx);
+
+  font->unitsPerEm = ReadEncodedUint32Safe(stream, &guard);
+  uint32_t glyphCount = ReadEncodedUint32Safe(stream, &guard);
+  // Each EmbeddedFont can hold the glyph table for an entire script (e.g.
+  // a Chinese subset of several thousand glyphs). MAX_GLYPHS_PER_RUN is the
+  // closest hard limit and is generous enough; reuse it rather than minting
+  // a new constant for the same magnitude.
+  if (glyphCount > limits::MAX_GLYPHS_PER_RUN) {
+    ctx->error(ErrorCode::GlyphCountLimitExceeded,
+               "EmbeddedFont glyphCount exceeds MAX_GLYPHS_PER_RUN");
+    return nullptr;
+  }
+
+  font->glyphs.resize(glyphCount);
+  for (uint32_t i = 0; i < glyphCount; ++i) {
+    font->glyphs[i].advance = stream->readFloat();
+    font->glyphs[i].path = ReadPath(stream, ctx);
+    if (ctx->hasError()) {
+      return nullptr;
+    }
+  }
+
+  (void)tagEnd;
+  return font;
+}
+
+}  // namespace
+
+void WriteEmbeddedFontTable(::pag::EncodeStream* stream,
+                            const std::vector<std::unique_ptr<EmbeddedFont>>& fonts,
+                            EncodeSession* session) {
+  ::pag::EncodeStream body(session->sc);
+  body.writeEncodedUint32(static_cast<uint32_t>(fonts.size()));
+  for (const auto& font : fonts) {
+    WriteEmbeddedFont(&body, *font, session);
+  }
+  WriteTag(stream, TagCode::EmbeddedFontTable, &body);
+}
+
+void ReadEmbeddedFontTable(::pag::DecodeStream* stream, DecodeContext* ctx, uint64_t tagEnd,
+                           std::vector<std::unique_ptr<EmbeddedFont>>* out) {
+  auto guard = MakeGuard(ctx);
+  uint32_t count = ReadEncodedUint32Safe(stream, &guard);
+  // Reuse MAX_FONTS — Phase 16 left this constant in place even after
+  // FontAssetTable was removed; semantically still represents "max font
+  // resources per document".
+  if (count > limits::MAX_FONTS) {
+    ctx->error(ErrorCode::StructureLimitExceeded, "EmbeddedFontTable count exceeds MAX_FONTS");
+    return;
+  }
+
+  for (uint32_t i = 0; i < count; ++i) {
+    if (stream->position() >= tagEnd) {
+      ctx->error(ErrorCode::TruncatedData,
+                 "EmbeddedFontTable truncated before all EmbeddedFont tags read");
+      return;
+    }
+    TagHeader header = ReadTagHeader(stream);
+    if (header.code != TagCode::EmbeddedFontItem) {
+      ctx->error(ErrorCode::MalformedTag, "EmbeddedFontTable expected nested EmbeddedFont tag");
+      return;
+    }
+    uint64_t bodyStart = stream->position();
+    uint64_t childEnd = 0;
+    if (!SafeTagEnd(stream, bodyStart, header.length, ctx, &childEnd)) {
+      return;
+    }
+    if (childEnd > tagEnd) {
+      ctx->error(ErrorCode::MalformedTag, "EmbeddedFont extends past EmbeddedFontTable");
+      return;
+    }
+    auto font = ReadEmbeddedFont(stream, ctx, childEnd);
+    if (ctx->hasError()) {
+      return;
+    }
+    if (font != nullptr) {
+      out->push_back(std::move(font));
+    }
     SeekTo(stream, static_cast<uint32_t>(childEnd));
   }
 }
