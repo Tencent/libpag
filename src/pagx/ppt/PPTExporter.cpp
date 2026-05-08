@@ -273,17 +273,28 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
   if (!path->data || path->data->isEmpty()) {
     return;
   }
-  Rect bounds = path->data->getBounds();
-  if (bounds.width <= 0 && bounds.height <= 0) {
+  Rect dataBounds = path->data->getBounds();
+  if (dataBounds.width <= 0 && dataBounds.height <= 0) {
     return;
   }
 
+  // Apply layout-resolved placement (matches LayerBuilder::convertPath):
+  // shapePath->setPosition(renderPosition()) + path is pre-scaled by renderScale().
+  // Without this the raw path data is emitted at its authored origin, losing any
+  // flex / centerX / layoutBounds-driven centring.
+  float scale = path->renderScale();
+  auto renderPos = path->renderPosition();
+  float scaledBoundsX = renderPos.x + dataBounds.x * scale;
+  float scaledBoundsY = renderPos.y + dataBounds.y * scale;
+  float scaledBoundsW = dataBounds.width * scale;
+  float scaledBoundsH = dataBounds.height * scale;
+
   float strokePad = (fs.stroke && fs.stroke->width > 0) ? fs.stroke->width : 0;
   float minDim = std::max(1.0f, strokePad);
-  float adjustedW = std::max(bounds.width, minDim);
-  float adjustedH = std::max(bounds.height, minDim);
-  float adjustedX = bounds.x - (adjustedW - bounds.width) / 2.0f;
-  float adjustedY = bounds.y - (adjustedH - bounds.height) / 2.0f;
+  float adjustedW = std::max(scaledBoundsW, minDim);
+  float adjustedH = std::max(scaledBoundsH, minDim);
+  float adjustedX = scaledBoundsX - (adjustedW - scaledBoundsW) / 2.0f;
+  float adjustedY = scaledBoundsY - (adjustedH - scaledBoundsH) / 2.0f;
   Rect shapeBounds = Rect::MakeXYWH(adjustedX, adjustedY, adjustedW, adjustedH);
 
   bool imageWritten = writeImagePatternAsPicture(out, fs.fill, shapeBounds, m, alpha);
@@ -298,10 +309,16 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
   int64_t pw = std::max(int64_t(1), PxToEMU(adjustedW));
   int64_t ph = std::max(int64_t(1), PxToEMU(adjustedH));
 
+  // CoordScale maps a raw path point `p` to shape-local coordinates via
+  // `p * scale - offset`. We want `p * scale + renderPos - adjustedXY`, so the
+  // offset passed in is `adjustedXY - renderPos`.
+  float ofsX = adjustedX - renderPos.x;
+  float ofsY = adjustedY - renderPos.y;
+
   // Fast path: bridging off or nothing to bridge → emit one flat custGeom.
   if (!_bridgeContours || contours.size() <= 1) {
     beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
-    writeContourGeom(out, contours, pw, ph, 1.0f, 1.0f, adjustedX, adjustedY, fillRule);
+    writeContourGeom(out, contours, pw, ph, scale, scale, ofsX, ofsY, fillRule);
     writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters, styles);
     return;
   }
@@ -314,7 +331,7 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
   if (groups.size() > 1) {
     for (const auto& group : groups) {
       beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
-      EmitGroupCustGeom(out, contours, group, pw, ph, 1.0f, 1.0f, adjustedX, adjustedY,
+      EmitGroupCustGeom(out, contours, group, pw, ph, scale, scale, ofsX, ofsY,
                         BoundsMarkerStyle::StandaloneStrokelessPath);
       writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters, styles);
     }
@@ -324,7 +341,7 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
   // Single bridged group: emit directly (skip the redundant grouping pass
   // that writeContourGeom would otherwise repeat).
   beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
-  EmitContourGeomFromGroups(out, contours, groups, pw, ph, 1.0f, 1.0f, adjustedX, adjustedY);
+  EmitContourGeomFromGroups(out, contours, groups, pw, ph, scale, scale, ofsX, ofsY);
   writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters, styles);
 }
 
