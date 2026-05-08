@@ -302,7 +302,15 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           if (layoutW && tbW > 0) {
             style += ";width:" + FloatToString(tbW) + "px";
           } else if (!layoutW) {
-            style += ";width:max-content";
+            // For vertical writing-mode TextBoxes, tgfx has already measured the exact column
+            // width needed; use that fixed value so Chromium produces the same column layout.
+            // For horizontal auto-sized boxes, keep max-content so Chromium's slightly wider
+            // font metrics don't trigger an unwanted line break at the tgfx boundary.
+            if (tb->writingMode == WritingMode::Vertical && tbW > 0) {
+              style += ";width:" + FloatToString(tbW) + "px";
+            } else {
+              style += ";width:max-content";
+            }
           }
           if (layoutH && tbH > 0) {
             style += ";height:" + FloatToString(tbH) + "px";
@@ -312,7 +320,9 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           } else if (tb->textAlign == TextAlign::End) {
             style += ";text-align:end";
           } else if (tb->textAlign == TextAlign::Justify) {
-            style += ";text-align:justify";
+            // text-align-last:left aligns the final paragraph line (after the last <br> or at end
+            // of content) to the start, matching tgfx where the last line is not justified.
+            style += ";text-align:justify;text-align-last:left";
           }
           if (tb->paragraphAlign != ParagraphAlign::Near) {
             style += ";display:flex;flex-direction:column";
@@ -374,14 +384,13 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               struct GroupSpanCollector {
                 static void Collect(const Group* grp, const Fill* parentFill,
                                     const Stroke* parentStroke, std::vector<TBSpan>& spans) {
-                  const Text* grpText = nullptr;
                   const Fill* grpFill = parentFill;
                   const Stroke* grpStroke = parentStroke;
                   for (auto* ge : grp->elements) {
                     if (ge->nodeType() == NodeType::Text) {
-                      if (!grpText) {
-                        grpText = static_cast<const Text*>(ge);
-                      }
+                      // Collect all Text nodes in the Group; the previous single-capture
+                      // pattern dropped any Text beyond the first (e.g. "\nAB" in Box I).
+                      spans.push_back({static_cast<const Text*>(ge), grpFill, grpStroke});
                     } else if (ge->nodeType() == NodeType::Fill) {
                       grpFill = static_cast<const Fill*>(ge);
                     } else if (ge->nodeType() == NodeType::Stroke) {
@@ -389,9 +398,6 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                     } else if (ge->nodeType() == NodeType::Group) {
                       Collect(static_cast<const Group*>(ge), grpFill, grpStroke, spans);
                     }
-                  }
-                  if (grpText) {
-                    spans.push_back({grpText, grpFill, grpStroke});
                   }
                 }
               };
@@ -433,41 +439,13 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             if (lineH > 0) {
               style += ";line-height:" + FloatToString(lineH) + "px";
             }
-            // Translate PAGX Overflow::Hidden. tgfx's TextLayout drops any line whose
-            // bottom extends past the box (TextLayout.cpp ~L940), while CSS `overflow:hidden`
-            // is a pixel clip that otherwise leaves partial glyphs visible. Use tgfx's own
-            // layout result — the textBounds height already reflects the lines it kept — to
-            // constrain Chromium's visible height via `max-height`, so both renderers clip
-            // at the same line boundary. Skip the trim for non-Near paragraphAlign (flex
-            // vertical alignment is driven by the declared box height) and for vertical
-            // writing mode (height governs line count along x).
+            // Translate PAGX Overflow::Hidden with a simple pixel clip. tgfx's TextLayout drops
+            // any line whose bottom extends past the box. A max-height based on tgfx's line count
+            // would differ from CSS when Chromium wraps lines differently; using only overflow:hidden
+            // clips at the declared box boundary and matches tgfx when line counts agree, and
+            // gracefully clips at the box edge when they diverge.
             if (tb->overflow == Overflow::Hidden) {
-              bool shouldTrim = !std::isnan(tbH) && tbH > 0 && lineH > 0 &&
-                                tb->paragraphAlign == ParagraphAlign::Near &&
-                                tb->writingMode != WritingMode::Vertical;
-              if (shouldTrim) {
-                // tgfx's textBounds.height is the descent-inclusive height of the lines it
-                // actually retained; round up to a whole-line multiple of lineH so we do
-                // not accidentally clip a few px of descenders on the last kept line.
-                float tgfxH = 0;
-                for (const auto& s : tbSpans) {
-                  float spanH = s.text->layoutBoundsHeight();
-                  if (spanH > tgfxH) {
-                    tgfxH = spanH;
-                  }
-                }
-                if (tgfxH <= 0) {
-                  tgfxH = tbH;  // Fallback: no layout result, use declared box height
-                } else {
-                  // Round up to the nearest whole line so descenders are not clipped.
-                  int keptLines = static_cast<int>(std::ceil(tgfxH / lineH));
-                  tgfxH = static_cast<float>(keptLines) * lineH;
-                }
-                float trimmed = std::min(tbH, tgfxH);
-                style += ";max-height:" + FloatToString(trimmed) + "px;overflow:hidden";
-              } else {
-                style += ";overflow:hidden";
-              }
+              style += ";overflow:hidden";
             }
             // Detect RTL paragraph direction from the first span's text so text aligns right
             // within the box, matching tgfx's bidi-resolved layout (paragraphRTL=true).
@@ -586,7 +564,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           } else if (tb->textAlign == TextAlign::End) {
             style += ";text-align:end";
           } else if (tb->textAlign == TextAlign::Justify) {
-            style += ";text-align:justify";
+            style += ";text-align:justify;text-align-last:left";
           }
           if (tb->wordWrap) {
             style += ";word-wrap:break-word";
@@ -609,27 +587,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             style += ";line-height:" + FloatToString(rtLineH) + "px";
           }
           if (tb->overflow == Overflow::Hidden) {
-            bool shouldTrim = !std::isnan(tb->height) && tb->height > 0 && rtLineH > 0 &&
-                              tb->paragraphAlign == ParagraphAlign::Near;
-            if (shouldTrim) {
-              float tgfxH = 0;
-              for (const auto& s : richTextSpans) {
-                float spanH = s.text->layoutBoundsHeight();
-                if (spanH > tgfxH) {
-                  tgfxH = spanH;
-                }
-              }
-              if (tgfxH <= 0) {
-                tgfxH = tb->height;
-              } else {
-                int keptLines = static_cast<int>(std::ceil(tgfxH / rtLineH));
-                tgfxH = static_cast<float>(keptLines) * rtLineH;
-              }
-              float trimmed = std::min(tb->height, tgfxH);
-              style += ";max-height:" + FloatToString(trimmed) + "px;overflow:hidden";
-            } else {
-              style += ";overflow:hidden";
-            }
+            style += ";overflow:hidden";
           }
           out.openTag("div");
           out.addAttr("style", style);
