@@ -521,6 +521,12 @@ std::vector<Element*> PPTModifierResolver::resolve(const std::vector<Element*>& 
         if (output.empty()) {
           break;
         }
+        // Clamp to a sane upper bound before any static_cast<int>: authored
+        // values near INT_MAX would invoke UB in the cast, and values around
+        // 1e6 would still allocate gigabytes via `generated.reserve(maxCount)`
+        // below. 10000 is comfortably above any visually meaningful copy count.
+        constexpr float kMaxRepeaterCopies = 10000.0f;
+        copiesF = std::min(copiesF, kMaxRepeaterCopies);
 
         // Snapshot the entire current scope (shapes + painters + nested groups
         // + anything else accumulated so far) as the body of every copy. This

@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include <cassert>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <string>
 #include <vector>
+#include "base/utils/Log.h"
 
 namespace pagx {
 
@@ -189,7 +189,10 @@ class XMLBuilder {
     if (_prettyPrint) {
       _buf += '\n';
     }
-    assert(!_tags.empty());
+    DEBUG_ASSERT(!_tags.empty());
+    if (_tags.empty()) {
+      return *this;
+    }
     _tags.pop_back();
     return *this;
   }
@@ -201,7 +204,10 @@ class XMLBuilder {
       _indent--;
       writeIndent();
     }
-    assert(!_tags.empty());
+    DEBUG_ASSERT(!_tags.empty());
+    if (_tags.empty()) {
+      return *this;
+    }
     _buf += "</";
     _buf += _tags.back();
     _buf += '>';
@@ -217,7 +223,10 @@ class XMLBuilder {
   XMLBuilder& closeElementWithText(const std::string& text) {
     _buf += '>';
     escapeTextTo(_buf, text);
-    assert(!_tags.empty());
+    DEBUG_ASSERT(!_tags.empty());
+    if (_tags.empty()) {
+      return *this;
+    }
     _buf += "</";
     _buf += _tags.back();
     _buf += '>';
@@ -306,8 +315,11 @@ class XMLBuilder {
   }
 
   void writeIndent() {
-    assert(_indent >= 0);
-    _buf.append(static_cast<size_t>(_indent * _indentSpaces), ' ');
+    DEBUG_ASSERT(_indent >= 0);
+    if (_indent <= 0) {
+      return;
+    }
+    _buf.append(static_cast<size_t>(_indent) * static_cast<size_t>(_indentSpaces), ' ');
   }
 
   static void escapeAttrTo(std::string& buf, const char* val) {

@@ -18,10 +18,10 @@
 
 #include "pagx/ppt/PPTContourUtils.h"
 #include <algorithm>
-#include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include "base/utils/Log.h"
 
 namespace pagx {
 
@@ -202,7 +202,12 @@ std::vector<PathContour> ParsePathContours(const PathData* data) {
   size_t ptIndex = 0;
   for (const auto& verb : verbs) {
     if (verb == PathVerb::Move) {
-      assert(ptIndex < points.size());
+      // Guard against malformed PathData where verbs and points counts are out
+      // of sync (e.g. truncated input). A simple Release-safe bail keeps parsing
+      // from reading past the end of `points` and corrupting adjacent memory.
+      if (ptIndex >= points.size()) {
+        break;
+      }
       contours.emplace_back();
       contours.back().start = points[ptIndex++];
     } else if (!contours.empty()) {
@@ -212,9 +217,16 @@ std::vector<PathContour> ParsePathContours(const PathData* data) {
         PathSeg seg;
         seg.verb = verb;
         int ptCount = PathData::PointsPerVerb(verb);
+        bool truncated = false;
         for (int i = 0; i < ptCount; i++) {
-          assert(ptIndex < points.size());
+          if (ptIndex >= points.size()) {
+            truncated = true;
+            break;
+          }
           seg.pts[i] = points[ptIndex++];
+        }
+        if (truncated) {
+          break;
         }
         contours.back().segs.push_back(seg);
       }
@@ -249,7 +261,7 @@ struct ContainmentTable {
   size_t n = 0;
 
   bool isInside(size_t i, size_t j) const {
-    assert(i < n && j < n);
+    DEBUG_ASSERT(i < n && j < n);
     return inside[i * n + j] != 0;
   }
 };

@@ -55,7 +55,7 @@ using pag::RadiansToDegrees;
 
 // ── Transform decomposition ────────────────────────────────────────────────
 
-PPTWriter::Xform PPTWriter::decomposeXform(float localX, float localY, float localW, float localH,
+PPTWriter::Xform PPTWriter::DecomposeXform(float localX, float localY, float localW, float localH,
                                            const Matrix& m) {
   float cx = localX + localW / 2.0f;
   float cy = localY + localH / 2.0f;
@@ -169,7 +169,7 @@ const LayerBuildResult& PPTWriter::ensureBuildResult() {
 // Bridging is only meaningful with multiple contours — with a single contour
 // there's nothing to stitch together, so emit it flat. When bridging is
 // disabled globally, always emit flat regardless of contour count.
-void PPTWriter::WriteContourGeom(XMLBuilder& out, std::vector<PathContour>& contours,
+void PPTWriter::writeContourGeom(XMLBuilder& out, std::vector<PathContour>& contours,
                                  int64_t pathWidth, int64_t pathHeight, float scaleX, float scaleY,
                                  float scaledOfsX, float scaledOfsY, FillRule fillRule) {
   if (!_bridgeContours || contours.size() <= 1) {
@@ -210,7 +210,7 @@ void PPTWriter::writeRectangle(XMLBuilder& out, const Rectangle* rect, const Fil
     return;
   }
 
-  auto xf = decomposeXform(x, y, w, h, m);
+  auto xf = DecomposeXform(x, y, w, h, m);
   beginShape(out, "Rectangle", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
 
   if (roundness > 0) {
@@ -257,7 +257,7 @@ void PPTWriter::writeEllipse(XMLBuilder& out, const Ellipse* ellipse, const Fill
     return;
   }
 
-  auto xf = decomposeXform(x, y, w, h, m);
+  auto xf = DecomposeXform(x, y, w, h, m);
   beginShape(out, "Ellipse", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
 
   out.openElement("a:prstGeom").addRequiredAttribute("prst", "ellipse").closeElementStart();
@@ -291,7 +291,7 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
     return;
   }
 
-  auto xf = decomposeXform(adjustedX, adjustedY, adjustedW, adjustedH, m);
+  auto xf = DecomposeXform(adjustedX, adjustedY, adjustedW, adjustedH, m);
   FillRule fillRule = (fs.fill) ? fs.fill->fillRule : FillRule::Winding;
 
   auto contours = ParsePathContours(path->data);
@@ -301,7 +301,7 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
   // Fast path: bridging off or nothing to bridge → emit one flat custGeom.
   if (!_bridgeContours || contours.size() <= 1) {
     beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
-    WriteContourGeom(out, contours, pw, ph, 1.0f, 1.0f, adjustedX, adjustedY, fillRule);
+    writeContourGeom(out, contours, pw, ph, 1.0f, 1.0f, adjustedX, adjustedY, fillRule);
     writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters, styles);
     return;
   }
@@ -322,7 +322,7 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
   }
 
   // Single bridged group: emit directly (skip the redundant grouping pass
-  // that WriteContourGeom would otherwise repeat).
+  // that writeContourGeom would otherwise repeat).
   beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
   EmitContourGeomFromGroups(out, contours, groups, pw, ph, 1.0f, 1.0f, adjustedX, adjustedY);
   writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters, styles);
@@ -671,6 +671,12 @@ static bool AddZipEntry(zipFile zf, const char* name, const void* data, unsigned
 }
 
 static bool AddZipString(zipFile zf, const char* name, const std::string& content) {
+  // minizip's zipWriteInFileInZip takes a 32-bit length, so a >4GB single part
+  // would be silently truncated. Matches the guard applied to image payloads
+  // further down.
+  if (content.size() > std::numeric_limits<unsigned>::max()) {
+    return false;
+  }
   return AddZipEntry(zf, name, content.data(), static_cast<unsigned>(content.size()));
 }
 
@@ -757,9 +763,17 @@ bool PPTExporter::ToFile(PAGXDocument& doc, const std::string& filePath, const O
 
   if (!ok) {
     zipClose(zf, nullptr);
+    // zipOpen(APPEND_STATUS_CREATE) created the file on disk before any entry
+    // was written, so a mid-write failure leaves a partially built (invalid)
+    // archive behind. Delete it so the caller doesn't see a corrupt PPTX.
+    std::remove(filePath.c_str());
     return false;
   }
-  return zipClose(zf, nullptr) == ZIP_OK;
+  if (zipClose(zf, nullptr) != ZIP_OK) {
+    std::remove(filePath.c_str());
+    return false;
+  }
+  return true;
 }
 
 }  // namespace pagx

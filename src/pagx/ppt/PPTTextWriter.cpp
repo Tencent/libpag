@@ -53,7 +53,7 @@ void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStr
   // ── Bitmap glyphs ─────────────────────────────────────────────────────────
   // Each bitmap glyph is emitted as its own p:pic; the glyph's image lives in
   // pixel coords, so we compose the per-glyph transform with the outer matrix
-  // and let decomposeXform turn the image rect into <a:xfrm>. Per-glyph skew
+  // and let DecomposeXform turn the image rect into <a:xfrm>. Per-glyph skew
   // can't be expressed in OOXML and is silently dropped (matches the behaviour
   // for other unsupported transform components elsewhere in this exporter).
   for (const auto& gi : glyphImages) {
@@ -71,7 +71,7 @@ void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStr
     }
     Matrix combined = m * gi.transform;
     auto xf =
-        decomposeXform(0.0f, 0.0f, static_cast<float>(imgW), static_cast<float>(imgH), combined);
+        DecomposeXform(0.0f, 0.0f, static_cast<float>(imgW), static_cast<float>(imgH), combined);
     beginPicture(out, "GlyphImage");
     out.openElement("p:blipFill").closeElementStart();
     WriteBlip(out, relId, alpha);
@@ -129,7 +129,7 @@ void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStr
   if (sx <= 0) sx = 1.0f;
   if (sy <= 0) sy = 1.0f;
 
-  auto xf = decomposeXform(minX, minY, boundsW, boundsH, m);
+  auto xf = DecomposeXform(minX, minY, boundsW, boundsH, m);
   int64_t pw = std::max(int64_t(1), PxToEMU(boundsW * sx));
   int64_t ph = std::max(int64_t(1), PxToEMU(boundsH * sy));
   float scaledOfsX = minX * sx;
@@ -137,7 +137,7 @@ void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStr
 
   if (!_bridgeContours || allContours.size() <= 1) {
     beginShape(out, "Glyph", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
-    WriteContourGeom(out, allContours, pw, ph, sx, sy, scaledOfsX, scaledOfsY, FillRule::EvenOdd);
+    writeContourGeom(out, allContours, pw, ph, sx, sy, scaledOfsX, scaledOfsY, FillRule::EvenOdd);
     writeGlyphShape(out, fs.fill, alpha);
     return;
   }
@@ -193,10 +193,8 @@ PPTWriter::NativeTextGeometry PPTWriter::computeNativeTextGeometry(
   return geom;
 }
 
-void PPTWriter::emitNativeTextShapeFrame(XMLBuilder& out, const Matrix& m,
-                                         const NativeTextGeometry& geom, const TextBox* textBox,
-                                         bool useLineLayout) {
-  auto xf = decomposeXform(geom.posX, geom.posY, geom.estWidth, geom.estHeight, m);
+void PPTWriter::emitTextShapeEnvelope(XMLBuilder& out, const Xform& xf, const TextBox* textBox,
+                                      const char* wrap) {
   int id = _ctx->nextShapeId();
   out.openElement("p:sp").closeElementStart();
   out.openElement("p:nvSpPr").closeElementStart();
@@ -218,20 +216,13 @@ void PPTWriter::emitNativeTextShapeFrame(XMLBuilder& out, const Matrix& m,
   out.openElement("a:noFill").closeElementSelfClosing();
   out.closeElement();
   // Shadow effects on the surrounding p:spPr would apply to the text-box rectangle
-  // rather than the text itself; emit them inside a:rPr below so the shadow follows
-  // the actual glyph outlines.
+  // rather than the text itself; callers emit them inside a:rPr below so the
+  // shadow follows the actual glyph outlines.
   out.closeElement();  // p:spPr
 
-  // Justify alignment requires PowerPoint to know a target line width; with
-  // wrap="none" the text is unbounded so PPT silently falls back to start
-  // alignment. Use wrap="square" in that case so PPT can justify within the
-  // shape's text area (our PAGX-determined visual lines should fit, so PPT
-  // shouldn't introduce additional wraps).
-  bool justifyAlign = textBox && textBox->textAlign == TextAlign::Justify;
   out.openElement("p:txBody").closeElementStart();
   out.openElement("a:bodyPr")
-      .addRequiredAttribute("wrap", useLineLayout ? (justifyAlign ? "square" : "none")
-                                                  : (geom.hasTextBox ? "square" : "none"))
+      .addRequiredAttribute("wrap", wrap)
       .addRequiredAttribute("lIns", "0")
       .addRequiredAttribute("tIns", "0")
       .addRequiredAttribute("rIns", "0")
@@ -239,6 +230,21 @@ void PPTWriter::emitNativeTextShapeFrame(XMLBuilder& out, const Matrix& m,
   AddBodyPrAttrsForTextBox(out, textBox);
   out.closeElementSelfClosing();
   out.openElement("a:lstStyle").closeElementSelfClosing();
+}
+
+void PPTWriter::emitNativeTextShapeFrame(XMLBuilder& out, const Matrix& m,
+                                         const NativeTextGeometry& geom, const TextBox* textBox,
+                                         bool useLineLayout) {
+  auto xf = DecomposeXform(geom.posX, geom.posY, geom.estWidth, geom.estHeight, m);
+  // Justify alignment requires PowerPoint to know a target line width; with
+  // wrap="none" the text is unbounded so PPT silently falls back to start
+  // alignment. Use wrap="square" in that case so PPT can justify within the
+  // shape's text area (our PAGX-determined visual lines should fit, so PPT
+  // shouldn't introduce additional wraps).
+  bool justifyAlign = textBox && textBox->textAlign == TextAlign::Justify;
+  const char* wrap =
+      useLineLayout ? (justifyAlign ? "square" : "none") : (geom.hasTextBox ? "square" : "none");
+  emitTextShapeEnvelope(out, xf, textBox, wrap);
 }
 
 void PPTWriter::emitNativeTextBody(XMLBuilder& out, const Text* text,
@@ -524,47 +530,16 @@ void PPTWriter::emitTextBoxShapeFrame(XMLBuilder& out, const TextBox* box, const
   // caller in writeElements), so the local origin here is (0, 0). Adding
   // box->position again would double-offset the shape, pushing the text-box
   // away from the centered position the layout assigned to it.
-  auto xf = decomposeXform(0.0f, 0.0f, estWidth, estHeight, transform);
-
-  int id = _ctx->nextShapeId();
-  out.openElement("p:sp").closeElementStart();
-  out.openElement("p:nvSpPr").closeElementStart();
-  out.openElement("p:cNvPr")
-      .addRequiredAttribute("id", id)
-      .addRequiredAttribute("name", "TextBox")
-      .closeElementSelfClosing();
-  out.openElement("p:cNvSpPr").addRequiredAttribute("txBox", "1").closeElementSelfClosing();
-  out.openElement("p:nvPr").closeElementSelfClosing();
-  out.closeElement();  // p:nvSpPr
-
-  out.openElement("p:spPr").closeElementStart();
-  WriteXfrm(out, xf);
-  out.openElement("a:prstGeom").addRequiredAttribute("prst", "rect").closeElementStart();
-  out.openElement("a:avLst").closeElementSelfClosing();
-  out.closeElement();
-  out.openElement("a:noFill").closeElementSelfClosing();
-  out.openElement("a:ln").closeElementStart();
-  out.openElement("a:noFill").closeElementSelfClosing();
-  out.closeElement();
-  out.closeElement();  // p:spPr
-
+  auto xf = DecomposeXform(0.0f, 0.0f, estWidth, estHeight, transform);
   // Justify alignment requires PowerPoint to know a target line width; with
   // wrap="none" the text is unbounded so PPT silently falls back to start
   // alignment. Use wrap="square" in that case so PPT can justify within the
   // shape's text area. Our PAGX-determined visual lines should already fit
   // within the shape, so PPT shouldn't introduce additional wraps.
   bool justifyAlign = box->textAlign == TextAlign::Justify;
-  out.openElement("p:txBody").closeElementStart();
-  out.openElement("a:bodyPr")
-      .addRequiredAttribute("wrap", useLineLayout ? (justifyAlign ? "square" : "none")
-                                                  : (hasBoxWidth ? "square" : "none"))
-      .addRequiredAttribute("lIns", "0")
-      .addRequiredAttribute("tIns", "0")
-      .addRequiredAttribute("rIns", "0")
-      .addRequiredAttribute("bIns", "0");
-  AddBodyPrAttrsForTextBox(out, box);
-  out.closeElementSelfClosing();
-  out.openElement("a:lstStyle").closeElementSelfClosing();
+  const char* wrap =
+      useLineLayout ? (justifyAlign ? "square" : "none") : (hasBoxWidth ? "square" : "none");
+  emitTextShapeEnvelope(out, xf, box, wrap);
 }
 
 void PPTWriter::emitTextBoxBody(const std::vector<RichTextRun>& runs,

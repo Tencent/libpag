@@ -44,6 +44,10 @@ struct SVGExportOptions {
    * enabled, text with GlyphRun data is rendered as SVG <path> elements instead of <text> elements,
    * ensuring identical rendering across platforms without font dependency. Falls back to <text>
    * elements when glyph outline data is unavailable. The default value is false.
+   *
+   * Note: the default changed from true to false. Downstream callers that want
+   * the previous outline-based output must now opt in explicitly by setting
+   * this field to true.
    */
   bool convertTextToPath = false;
 

@@ -395,14 +395,13 @@ std::string GenerateTableStyles() {
 
 std::string GenerateCoreProps() {
   std::string s;
-  s.reserve(512);
+  s.reserve(256);
   s += XML_DECL;
+  // Only cp:revision is emitted in the body, so only the cp: namespace is
+  // required. PowerPoint does not require the dc/dcterms/dcmitype/xsi
+  // declarations for a minimal core-properties part.
   s += "<cp:coreProperties "
-       "xmlns:cp=\"http://schemas.openxmlformats.org/package/2006/metadata/core-properties\" "
-       "xmlns:dc=\"http://purl.org/dc/elements/1.1/\" "
-       "xmlns:dcterms=\"http://purl.org/dc/terms/\" "
-       "xmlns:dcmitype=\"http://purl.org/dc/dcmitype/\" "
-       "xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">"
+       "xmlns:cp=\"http://schemas.openxmlformats.org/package/2006/metadata/core-properties\">"
        "<cp:revision>1</cp:revision>"
        "</cp:coreProperties>";
   return s;
@@ -412,9 +411,11 @@ std::string GenerateAppProps() {
   std::string s;
   s.reserve(512);
   s += XML_DECL;
+  // The body uses only elements in the default extended-properties namespace;
+  // the vt: prefix is never referenced, so it is omitted to avoid a dead
+  // xmlns declaration.
   s += "<Properties "
-       "xmlns=\"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties\" "
-       "xmlns:vt=\"http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes\">"
+       "xmlns=\"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties\">"
        "<TotalTime>0</TotalTime>"
        "<Words>0</Words>"
        "<Application>PAGX</Application>"

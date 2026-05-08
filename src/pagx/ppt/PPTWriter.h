@@ -596,7 +596,7 @@ class PPTWriter {
 
   PPTWriterContext* _ctx = nullptr;
   PAGXDocument* _doc = nullptr;
-  bool _convertTextToPath = true;
+  bool _convertTextToPath = false;
   bool _bridgeContours = false;
   bool _resolveModifiers = true;
   bool _rasterizeUnsupported = false;
@@ -756,7 +756,7 @@ class PPTWriter {
   // Shared contour-to-custGeom emitter used by writePath and writeTextAsPath
   // for the non-bridged or single-group case (when callers haven't already
   // prepared per-group emission themselves).
-  void WriteContourGeom(XMLBuilder& out, std::vector<PathContour>& contours, int64_t pathWidth,
+  void writeContourGeom(XMLBuilder& out, std::vector<PathContour>& contours, int64_t pathWidth,
                         int64_t pathHeight, float scaleX, float scaleY, float scaledOfsX,
                         float scaledOfsY, FillRule fillRule);
 
@@ -768,9 +768,17 @@ class PPTWriter {
     int64_t extCY = 0;
     int rotation = 0;
   };
-  static Xform decomposeXform(float localX, float localY, float localW, float localH,
+  static Xform DecomposeXform(float localX, float localY, float localW, float localH,
                               const Matrix& m);
   static void WriteXfrm(XMLBuilder& out, const Xform& xf);
+
+  // Emits the common <p:sp> / <p:spPr> / <p:txBody><a:bodyPr> / <a:lstStyle/>
+  // scaffold that both native-text and TextBox shape frames share. The caller
+  // supplies the decomposed Xform, the in-scope TextBox (for bodyPr paragraph
+  // attributes), and the pre-computed wrap value ("square" vs "none"). Leaves
+  // <p:txBody> open so the caller can stream <a:p> children into it.
+  void emitTextShapeEnvelope(XMLBuilder& out, const Xform& xf, const TextBox* textBox,
+                             const char* wrap);
 
   // p:pic helpers (declared after Xform)
   void beginPicture(XMLBuilder& out, const char* name);
