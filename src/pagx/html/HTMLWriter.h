@@ -96,6 +96,22 @@ std::string PaddingToCSS(const Padding& padding);
  */
 bool TextStartsWithRTL(const std::string& utf8Text);
 
+/**
+ * Builds inline HTML content for a vertical-writing-mode Text that needs per-character
+ * spacing control (typically `textAlign="justify"` with a declared `lineHeight`). The
+ * algorithm walks the source text in lockstep with the tgfx-produced layoutRuns positions,
+ * wraps each CJK character (or individual upright glyph) in an `<span style="display:inline-
+ * block;height:{advance}px">` so its inline-axis advance matches tgfx exactly, and keeps
+ * contiguous Latin/digit runs wrapped as a single `<span>` so they retain their natural
+ * horizontal shaping. Newlines (U+000A) become `<br>`. Returns an HTML fragment whose
+ * characters are already HTML-escaped and that must be emitted inside an outer `<span>`
+ * carrying font/color styling via `closeTagWithRawContent`.
+ *
+ * Falls back to an empty string (caller should fall back to the plain text path) when the
+ * text has no associated layoutRuns or when the glyph/char counts diverge.
+ */
+std::string BuildVerticalJustifyContent(const Text* text);
+
 std::string GetImageSrc(const Image* image);
 const char* DetectImageMime(const uint8_t* bytes, size_t size);
 

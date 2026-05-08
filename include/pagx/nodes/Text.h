@@ -157,10 +157,12 @@ class Text : public Element, public LayoutNode {
 
   friend class FontEmbedder;
   friend class GlyphRunRenderer;
+  friend class HTMLWriter;
   friend class LayerBuilderContext;
   friend class PAGXDocument;
   friend class TextBox;
   friend class TextLayout;
+  friend std::string BuildVerticalJustifyContent(const Text*);
 };
 
 }  // namespace pagx

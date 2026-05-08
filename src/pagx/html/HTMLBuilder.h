@@ -120,6 +120,21 @@ class HTMLBuilder {
     for (size_t i = 0; i < count; ++i) _buf += "<br>";
   }
 
+  // Closes the current open tag with caller-supplied pre-formatted HTML (raw — not escaped).
+  // The caller is responsible for producing well-formed HTML inside content.
+  void closeTagWithRawContent(const std::string& rawContent) {
+    if (_tags.empty()) {
+      return;
+    }
+    _buf += '>';
+    _buf += rawContent;
+    _buf += "</";
+    _buf += _tags.back();
+    _buf += '>';
+    newline();
+    _tags.pop_back();
+  }
+
   void closeTagWithTextBreaks(const std::string& text) {
     if (_tags.empty()) {
       return;

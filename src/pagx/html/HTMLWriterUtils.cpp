@@ -23,6 +23,7 @@
 #include <string>
 #include <vector>
 #include "base/utils/MathUtil.h"
+#include "pagx/TextLayout.h"
 #include "pagx/html/HTMLWriter.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
@@ -525,6 +526,224 @@ bool TextStartsWithRTL(const std::string& utf8Text) {
     // Digits, spaces, and other neutrals: keep scanning.
   }
   return false;
+}
+
+namespace {
+
+// Consumes one UTF-8 codepoint starting at utf8Text[pos]. Advances pos past the codepoint.
+// Returns {codepoint, byteLength}; on malformed input, returns {replacement, 1}.
+struct Codepoint {
+  uint32_t cp;
+  size_t byteLen;
+};
+Codepoint NextCodepoint(const std::string& utf8Text, size_t pos) {
+  const unsigned char* p = reinterpret_cast<const unsigned char*>(utf8Text.c_str()) + pos;
+  size_t rem = utf8Text.size() - pos;
+  if (rem == 0) return {0, 0};
+  if (*p < 0x80) return {*p, 1};
+  if ((*p & 0xE0) == 0xC0 && rem >= 2) {
+    return {static_cast<uint32_t>(((*p & 0x1F) << 6) | (p[1] & 0x3F)), 2};
+  }
+  if ((*p & 0xF0) == 0xE0 && rem >= 3) {
+    return {static_cast<uint32_t>(((*p & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F)), 3};
+  }
+  if ((*p & 0xF8) == 0xF0 && rem >= 4) {
+    return {static_cast<uint32_t>(((*p & 0x07) << 18) | ((p[1] & 0x3F) << 12) |
+                                  ((p[2] & 0x3F) << 6) | (p[3] & 0x3F)),
+            4};
+  }
+  return {static_cast<uint32_t>(*p), 1};
+}
+
+bool IsCJKCodepoint(uint32_t cp) {
+  // CJK Unified Ideographs, CJK Extension A, CJK Symbols and Punctuation, Hiragana, Katakana,
+  // Hangul, Fullwidth Forms. Matches characters that tgfx treats as `Upright` in vertical mode
+  // (per-char advance = font vertical advance, can break before).
+  return (cp >= 0x3000 && cp <= 0x303F) ||  // CJK punctuation
+         (cp >= 0x3040 && cp <= 0x309F) ||  // Hiragana
+         (cp >= 0x30A0 && cp <= 0x30FF) ||  // Katakana
+         (cp >= 0x3400 && cp <= 0x4DBF) ||  // CJK Ext A
+         (cp >= 0x4E00 && cp <= 0x9FFF) ||  // CJK Unified
+         (cp >= 0xAC00 && cp <= 0xD7AF) ||  // Hangul
+         (cp >= 0xF900 && cp <= 0xFAFF) ||  // CJK Compat
+         (cp >= 0xFF00 && cp <= 0xFFEF);    // Fullwidth forms
+}
+
+std::string EscapeHtmlChar(uint32_t cp, const std::string& srcBytes) {
+  if (cp == '&') return "&amp;";
+  if (cp == '<') return "&lt;";
+  if (cp == '>') return "&gt;";
+  if (cp == '"') return "&quot;";
+  return srcBytes;
+}
+
+}  // namespace
+
+std::string BuildVerticalJustifyContent(const Text* text) {
+  if (text == nullptr) return {};
+  const auto& runs = text->glyphData->layoutRuns;
+  // Collect all glyph positions in run order (within each run, glyphs are already in text order).
+  std::vector<tgfx::Point> glyphPositions;
+  for (const auto& run : runs) {
+    for (const auto& pos : run.positions) {
+      glyphPositions.push_back(pos);
+    }
+  }
+  // Count visible (non-newline) codepoints in the source text.
+  size_t visibleCount = 0;
+  for (size_t pos = 0; pos < text->text.size();) {
+    auto c = NextCodepoint(text->text, pos);
+    if (c.byteLen == 0) break;
+    if (c.cp != '\n') ++visibleCount;
+    pos += c.byteLen;
+  }
+  // If the layout produced a different number of glyphs than visible chars, fall back (the
+  // mapping would be ambiguous — for instance a cluster/ligature collapsed multiple source
+  // codepoints into one glyph). Upstream caller should emit plain text instead.
+  if (visibleCount != glyphPositions.size()) return {};
+
+  // Build a parallel list of "is this glyph a CJK codepoint" flags so the advance pass can
+  // skip over Latin/digit/space glyphs that PAGX treats as a single horizontal token.
+  std::vector<bool> glyphIsCjk(glyphPositions.size(), false);
+  {
+    size_t gi = 0;
+    for (size_t pos = 0; pos < text->text.size();) {
+      auto c = NextCodepoint(text->text, pos);
+      if (c.byteLen == 0) break;
+      if (c.cp != '\n') {
+        if (gi < glyphPositions.size()) {
+          glyphIsCjk[gi] = IsCJKCodepoint(c.cp);
+        }
+        ++gi;
+      }
+      pos += c.byteLen;
+    }
+  }
+
+  // Compute per-CJK-glyph inline-axis advance. For a CJK glyph i, we want the y-delta to
+  // either the next CJK glyph in the same column (so the wrapper height absorbs all the
+  // intermediate Latin/space glyphs) or — when this is the last glyph in the column or
+  // the next CJK is in a different column — the column's natural per-CJK advance.
+  std::vector<float> advances(glyphPositions.size(), 0.0f);
+  for (size_t i = 0; i + 1 < glyphPositions.size(); ++i) {
+    if (glyphPositions[i + 1].x != glyphPositions[i].x) continue;
+    if (!glyphIsCjk[i]) continue;
+    // Find the next CJK in the same column; absorb all glyphs between i and j into i's advance.
+    for (size_t j = i + 1; j < glyphPositions.size(); ++j) {
+      if (glyphPositions[j].x != glyphPositions[i].x) break;
+      if (glyphIsCjk[j]) {
+        advances[i] = glyphPositions[j].y - glyphPositions[i].y;
+        break;
+      }
+    }
+  }
+  // For each column, the dominant inter-CJK advance is the max of advances[] within that
+  // column's CJK glyphs. Apply it to the column's last CJK glyph (which has no successor
+  // CJK to derive an advance from) so its wrapper has the same pinned height as siblings.
+  std::vector<float> colMaxAdvance(glyphPositions.size(), 0.0f);
+  {
+    size_t colStart = 0;
+    for (size_t i = 1; i <= glyphPositions.size(); ++i) {
+      bool columnBreak =
+          (i == glyphPositions.size()) || (glyphPositions[i].x != glyphPositions[colStart].x);
+      if (columnBreak) {
+        float colMax = 0.0f;
+        for (size_t j = colStart; j < i; ++j) {
+          if (advances[j] > colMax) colMax = advances[j];
+        }
+        for (size_t j = colStart; j < i; ++j) {
+          colMaxAdvance[j] = colMax;
+        }
+        // Find the column's last CJK glyph and assign it colMax.
+        if (colMax > 0.0f) {
+          for (size_t j = i; j > colStart; --j) {
+            if (glyphIsCjk[j - 1]) {
+              advances[j - 1] = colMax;
+              break;
+            }
+          }
+        }
+        colStart = i;
+      }
+    }
+  }
+  // Use the font size as the natural CJK vertical advance (CJK vertAdvance ≈ font-size for
+  // Noto Sans SC and most CJK fonts). Columns whose colMaxAdvance is significantly larger
+  // than this are justified — the wrappers must pin the inflated advance. Columns whose
+  // colMaxAdvance is at or below this threshold are non-justified — emitting wrappers there
+  // would introduce inline-block baseline shifts that misalign against the PAGX render.
+  float naturalAdvance = text->renderFontSize();
+
+  // Walk source text and pair each visible codepoint with the corresponding glyph advance.
+  // Newlines become <br>; CJK glyphs are wrapped with the pinned inline-axis height so
+  // Chromium's line layout cannot shrink them back to the natural glyph advance.
+  std::string out;
+  out.reserve(text->text.size() * 16);
+  size_t gi = 0;
+  bool inLatinRun = false;
+  for (size_t pos = 0; pos < text->text.size();) {
+    auto c = NextCodepoint(text->text, pos);
+    if (c.byteLen == 0) break;
+    std::string srcBytes = text->text.substr(pos, c.byteLen);
+    pos += c.byteLen;
+
+    if (c.cp == '\n') {
+      if (inLatinRun) {
+        out += "</span>";
+        inLatinRun = false;
+      }
+      out += "<br>";
+      continue;
+    }
+
+    if (gi >= glyphPositions.size()) break;
+    float advance = advances[gi];
+    ++gi;
+
+    bool isCjk = IsCJKCodepoint(c.cp);
+    if (isCjk) {
+      if (inLatinRun) {
+        out += "</span>";
+        inLatinRun = false;
+      }
+      // Only wrap when this glyph's advance is meaningfully larger than the font's natural
+      // vertical advance (indicating a justified column). Otherwise let Chromium's default
+      // inline flow place the glyph — wrapping a non-justified glyph introduces a small
+      // inline-block baseline shift that visibly misaligns against the PAGX render.
+      bool needsWrap = advance > naturalAdvance + 0.5f;
+      if (needsWrap) {
+        out += "<span style=\"display:inline-block;height:";
+        out += FloatToString(advance);
+        out += "px;line-height:";
+        out += FloatToString(advance);
+        out += "px;text-align:center\">";
+        out += EscapeHtmlChar(c.cp, srcBytes);
+        out += "</span>";
+      } else {
+        out += EscapeHtmlChar(c.cp, srcBytes);
+      }
+    } else {
+      // Latin / digit / space: accumulate into an inline-block that runs in the parent's
+      // writing mode (vertical-rl) but with `white-space:nowrap` so Latin chars stay
+      // together and don't trigger column breaks individually. This matches PAGX's behaviour
+      // of treating contiguous Latin chars as natural-advance glyphs without justify spacing.
+      bool columnJustified = colMaxAdvance[gi - 1] > naturalAdvance + 0.5f;
+      if (columnJustified) {
+        if (!inLatinRun) {
+          out +=
+              "<span style=\"display:inline-block;white-space:nowrap;line-height:1;"
+              "vertical-align:baseline\">";
+          inLatinRun = true;
+        }
+      } else if (inLatinRun) {
+        out += "</span>";
+        inLatinRun = false;
+      }
+      out += EscapeHtmlChar(c.cp, srcBytes);
+    }
+  }
+  if (inLatinRun) out += "</span>";
+  return out;
 }
 
 }  // namespace pagx
