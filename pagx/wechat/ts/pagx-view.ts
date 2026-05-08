@@ -421,6 +421,15 @@ export class View {
   }
 
   /**
+   * Drop any cached/fit snapshots captured between parsePAGX and the gesture-state init,
+   * and reset the first-frame flag so isFirstFrameRendered() reflects post-init renders.
+   * Call right after applyGestureState() on a freshly loaded document.
+   */
+  public resetForFreshCapture(): void {
+    this.nativeView!.resetForFreshCapture();
+  }
+
+  /**
    * Start the rendering loop.
    * This will continuously call draw() using requestAnimationFrame.
    */

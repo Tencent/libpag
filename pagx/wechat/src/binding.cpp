@@ -44,6 +44,7 @@ EMSCRIPTEN_BINDINGS(PAGXView) {
       .function("onZoomEnd", &PAGXView::onZoomEnd)
       .function("draw", &PAGXView::draw)
       .function("firstFrameRendered", &PAGXView::firstFrameRendered)
+      .function("resetForFreshCapture", &PAGXView::resetForFreshCapture)
       .function("contentWidth", &PAGXView::contentWidth)
       .function("contentHeight", &PAGXView::contentHeight)
       .function("setBoundsOrigin", &PAGXView::setBoundsOrigin)

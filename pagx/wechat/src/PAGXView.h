@@ -207,6 +207,15 @@ class PAGXView {
   bool firstFrameRendered() const;
 
   /**
+   * Resets internal "first frame rendered" / fit snapshot state so callers can wait for a
+   * fresh first frame after applying gesture state on a newly loaded document. Use after
+   * parsePAGX + buildLayers + applyGestureState to ensure the upcoming first frame is
+   * captured against the final view state, not against the transient post-buildLayers
+   * default zoom/offset.
+   */
+  void resetForFreshCapture();
+
+  /**
    * Returns the width of the PAGX content in content pixels.
    */
   float contentWidth() const {
@@ -305,12 +314,23 @@ class PAGXView {
   std::shared_ptr<tgfx::Image> cachedSnapshot = nullptr;
   float snapshotZoom = 1.0f;
   tgfx::Point snapshotOffset = {};
+  // 单调递增计数器：每捕获一次 cached 自增 1，parsePAGX 时也自增。用于诊断
+  // composite 路径实际 blit 的是不是最新的快照（防止某处持有旧的 shared_ptr）。
+  uint32_t cachedVersion = 0;
   std::shared_ptr<tgfx::Image> fitSnapshot = nullptr;
   float fitSnapshotZoom = 1.0f;
   tgfx::Point fitSnapshotOffset = {};
+  uint32_t fitVersion = 0;
+  // fit 的超采样倍数：1 = 同分辨率；>1 = N 倍像素密度，用于超宽/超长文档清晰度。
+  float fitSnapshotPixelScale = 1.0f;
   // Idle token for the zoom-out fast path: once draw() has painted the current view from
   // fitSnapshot alone, further idle frames short-circuit. Cleared by any view change.
   bool zoomedOutFrameSettled = false;
+  // 距离最近一次手势结束的时间戳（emscripten_get_now ms）。用于让 cachedSnapshot 的
+  // 刷新延后到用户真正停下来再做：手势密集时复用上一次稳定 capture 的 cached，避免
+  // capture 抓到含 tile fallback 的过渡画面、避免连续 full render 的内存抖动。
+  // 0 表示从未发生过手势（首帧前），首帧 capture 不受门控限制。
+  double lastGestureEndMs = 0.0;
   // Session owns the LayerBuilder state so upgradeImageFromNative() can regenerate a subset of
   // the layer tree when a higher-resolution asset replaces the thumbnail attached during the
   // initial buildLayers() pass. Destroyed on every parsePAGX() so old build state never leaks
