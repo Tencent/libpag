@@ -352,6 +352,15 @@ Element* PPTModifierResolver::applyRoundCornerToElement(Element* shape,
   return makePathFromData(MakePathDataFromTGFX(_doc, tp));
 }
 
+// MergePathMode::Append preserves each sub-path verbatim and relies on the
+// fill rule to composite overlaps — that matches tgfx's Winding default the
+// PAG renderer uses, so two overlapping shapes render as one solid union.
+// OOXML a:custGeom has no fill-rule attribute and PowerPoint always evaluates
+// it as even-odd, which flips every overlapping region into a hole. To keep
+// Winding semantics intact on the PPTX side we translate Append into a
+// boolean Union here: disjoint shapes still produce one multi-contour path
+// (visually identical to Append), while overlapping shapes get their shared
+// region merged so even-odd can no longer punch it out.
 static tgfx::PathOp MergeModeToPathOp(MergePathMode mode) {
   switch (mode) {
     case MergePathMode::Union:
@@ -364,7 +373,7 @@ static tgfx::PathOp MergeModeToPathOp(MergePathMode mode) {
       return tgfx::PathOp::XOR;
     case MergePathMode::Append:
     default:
-      return tgfx::PathOp::Append;
+      return tgfx::PathOp::Union;
   }
 }
 
