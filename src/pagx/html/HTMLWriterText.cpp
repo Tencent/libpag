@@ -874,6 +874,9 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
   if (alpha < 1.0f) {
     style += ";opacity:" + FloatToString(alpha);
   }
+  if (tb) {
+    out.emitBreaks(HTMLBuilder::countLeadingBreaks(text->text));
+  }
   out.openTag("span");
   out.addAttr("style", style);
   // Inside a TextBox the container uses word-wrap not white-space:pre, so U+000A

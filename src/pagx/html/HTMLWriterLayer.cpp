@@ -541,10 +541,13 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                 spanStyle += "font-style:italic;font-synthesis-style:" +
                              std::string(_ctx->fontSynthesisStyle ? "auto" : "none");
               }
+              out.emitBreaks(HTMLBuilder::countLeadingBreaks(span.text->text));
               out.openTag("span");
               out.addAttr("style", spanStyle);
               // Use closeTagWithTextBreaks so U+000A (from &#10;) renders as <br> rather
               // than being folded into a space by the browser's default white-space handling.
+              // Leading/trailing <br>s are hoisted outside the span to avoid inheriting the
+              // span's font-size for the blank line height in mixed-size TextBoxes.
               out.closeTagWithTextBreaks(span.text->text);
             }
             if (needsInnerWrap) {
@@ -674,6 +677,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               spanStyle += ";font-style:italic;font-synthesis-style:" +
                            std::string(_ctx->fontSynthesisStyle ? "auto" : "none");
             }
+            out.emitBreaks(HTMLBuilder::countLeadingBreaks(span.text->text));
             out.openTag("span");
             out.addAttr("style", spanStyle);
             // Use closeTagWithTextBreaks so U+000A (from &#10;) renders as <br> rather

@@ -102,26 +102,41 @@ class HTMLBuilder {
   // elements. Use this for TextBox spans where white-space is not `pre`; without the
   // conversion the browser folds newlines into spaces under the default white-space:normal.
   //
-  // Trailing newlines are emitted AFTER the closing </span> tag rather than inside it.
-  // A <br> inside a span inherits the span's font-size, which inflates the resulting line-box
-  // in mixed-size TextBoxes (e.g. "Hg\n" at 40px leaves a 40px-tall blank line between Hg
-  // and the next smaller span). Moving the trailing <br> outside the span lets it inherit
-  // the container's strut (which is set to the document's intended line height), matching
-  // tgfx's per-line-max-ascent behaviour without an inflated blank line.
+  // Both leading and trailing newlines are hoisted OUTSIDE the <span>...</span> so that
+  // the <br> elements inherit the container's strut rather than the span's font-size.
+  // Returns the number of leading newlines so the caller can emit them before openTag.
+  // Usage:
+  //   size_t leading = HTMLBuilder::countLeadingBreaks(text);
+  //   out.emitBreaks(leading);
+  //   out.openTag("span"); out.addAttr(...);
+  //   out.closeTagWithTextBreaks(text);
+  static size_t countLeadingBreaks(const std::string& text) {
+    size_t n = 0;
+    while (n < text.size() && text[n] == '\n') ++n;
+    return n;
+  }
+
+  void emitBreaks(size_t count) {
+    for (size_t i = 0; i < count; ++i) _buf += "<br>";
+  }
+
   void closeTagWithTextBreaks(const std::string& text) {
     if (_tags.empty()) {
       return;
     }
-    // Count trailing newlines so we can hoist them outside the closing tag.
-    size_t trailingBreaks = 0;
     size_t len = text.size();
-    while (trailingBreaks < len && text[len - 1 - trailingBreaks] == '\n') {
+    // Skip leading newlines — caller must have already emitted them via emitBreaks().
+    size_t innerStart = 0;
+    while (innerStart < len && text[innerStart] == '\n') ++innerStart;
+    // Count trailing newlines to hoist after the closing </span> tag.
+    size_t trailingBreaks = 0;
+    while (trailingBreaks < len - innerStart && text[len - 1 - trailingBreaks] == '\n') {
       ++trailingBreaks;
     }
-    size_t innerLen = len - trailingBreaks;
+    size_t innerLen = len - innerStart - trailingBreaks;
     _buf += '>';
     for (size_t i = 0; i < innerLen; ++i) {
-      char c = text[i];
+      char c = text[innerStart + i];
       switch (c) {
         case '&':
           _buf += "&amp;";
@@ -143,7 +158,7 @@ class HTMLBuilder {
     _buf += "</";
     _buf += _tags.back();
     _buf += '>';
-    // Emit the trailing newlines outside the span so they inherit the container's strut.
+    // Emit trailing newlines outside the span so they inherit the container's strut.
     for (size_t i = 0; i < trailingBreaks; ++i) {
       _buf += "<br>";
     }
