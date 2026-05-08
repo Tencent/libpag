@@ -42,7 +42,13 @@ TEST_P(PAGRenderEquivalenceTest, Render_Baseline) {
 
   auto doc = pagx::PAGXImporter::FromFile(sample.absolutePath);
   ASSERT_NE(doc, nullptr) << "PAGXImporter failed for " << sample.name;
-  doc->applyLayout();
+  // Use the fixture's FontConfig on both sides of the round-trip so the
+  // Baker-side layout and the Inflater-side shape resolve typefaces against
+  // the same registry. Without this, shapedRuns hint typefaceKey never
+  // matches (PAGXTest's FontConfig vs Inflater's default pag::FontManager)
+  // and multi-line TextBox samples lose their wrap, rendering as a single
+  // line that overflows the box. See §10.5 shapedRuns hint policy.
+  doc->applyLayout(&fontConfig());
 
   pagx::PAGExporter::Options opts;
   auto exportResult = pagx::PAGExporter::ToBytes(*doc, opts);
@@ -53,7 +59,9 @@ TEST_P(PAGRenderEquivalenceTest, Render_Baseline) {
       pagx::pag::Codec::Decode(exportResult.bytes.data(), exportResult.bytes.size());
   ASSERT_NE(decodeResult.doc, nullptr) << "Codec::Decode failed for " << sample.name;
 
-  auto inflateResult = pagx::pag::LayerInflater::Inflate(std::move(decodeResult.doc));
+  pagx::pag::LayerInflater::Options inflateOpts;
+  inflateOpts.fontProvider = fontProvider();
+  auto inflateResult = pagx::pag::LayerInflater::Inflate(std::move(decodeResult.doc), inflateOpts);
   ASSERT_NE(inflateResult.layer, nullptr) << "LayerInflater returned null for " << sample.name;
 
   const int canvasW = static_cast<int>(doc->width);

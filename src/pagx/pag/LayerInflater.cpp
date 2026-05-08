@@ -545,19 +545,32 @@ std::shared_ptr<tgfx::VectorElement> inflateElementText(PAGDocument& /*doc*/,
   // line x-offsets, justify spacing, vertical writing mode per-glyph
   // (x,y)+rotation — with no paragraph-layout port required on this side.
   //
-  // We only trust the hint when every run's typefaceKey matches the
-  // typeface re-resolved by our FontProvider. Any mismatch falls back to
-  // runtime shape (the host presumably substituted a different font; we
-  // want the render to match that substitution, not the export-time font).
+  // Consumption policy: we always use the hint when it exists and we can
+  // resolve any typeface at all, because dropping the hint would lose the
+  // multi-line layout. Two tiers:
+  //   - typefaceKey match (Baker- and Inflater-side typefaces identical):
+  //     pixel-perfect replay, glyph ids match byte-for-byte.
+  //   - typefaceKey mismatch (host substituted a different font version or
+  //     uses a different provider): emit TextShapingHintMiss for
+  //     observability but still use the hint layout. Glyph ids are
+  //     typically stable for Latin-family fonts across platforms, so the
+  //     substitution manifests as subtle glyph-shape drift rather than
+  //     layout corruption. This is strictly better than the earlier policy
+  //     of falling back to runtime shape, which produced single-line
+  //     output for multi-line TextBox content (lost layout > glyph shape).
   if (!pay.shapedRuns.empty() && ctx->fontProvider != nullptr) {
     std::vector<pagx::TextLayoutGlyphRun> runs;
     runs.reserve(pay.shapedRuns.size());
-    bool allKeysMatch = true;
+    bool anyKeyMismatch = false;
+    bool anyRunUnresolved = false;
     for (const auto& sr : pay.shapedRuns) {
       auto tf = ctx->fontProvider->getTypeface(sr.typefaceFamily, sr.typefaceStyle);
-      if (tf == nullptr || MakeTypefaceKey(*tf) != sr.typefaceKey) {
-        allKeysMatch = false;
+      if (tf == nullptr) {
+        anyRunUnresolved = true;
         break;
+      }
+      if (MakeTypefaceKey(*tf) != sr.typefaceKey) {
+        anyKeyMismatch = true;
       }
       pagx::TextLayoutGlyphRun r;
       r.font = tgfx::Font(tf, sr.fontSize);
@@ -566,11 +579,13 @@ std::shared_ptr<tgfx::VectorElement> inflateElementText(PAGDocument& /*doc*/,
       r.xforms = sr.xforms;
       runs.push_back(std::move(r));
     }
-    if (allKeysMatch) {
+    if (!anyRunUnresolved) {
+      if (anyKeyMismatch) {
+        ctx->warn(ErrorCode::TextShapingHintMiss,
+                  "ElementText.shapedRuns typefaceKey mismatch; replaying layout with "
+                  "host-substituted typeface");
+      }
       textBlob = pagx::GlyphRunRenderer::BuildTextBlobFromLayoutRuns(runs, tgfx::Matrix::I());
-    } else {
-      ctx->warn(ErrorCode::TextShapingHintMiss,
-                "ElementText.shapedRuns typefaceKey mismatch; falling back to runtime shape");
     }
   }
 
