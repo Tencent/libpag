@@ -18,7 +18,7 @@
 
 #include "renderer/ImageEmbedder.h"
 #include <fstream>
-#include <unordered_set>
+#include <unordered_map>
 #include "base/utils/Log.h"
 #include "pagx/types/Data.h"
 
@@ -51,9 +51,9 @@ static std::shared_ptr<pagx::Data> ReadFileToData(const std::string& path) {
 bool ImageEmbedder::embed(PAGXDocument* document) {
   if (document == nullptr) return false;
   auto paths = document->getExternalFilePaths();
-  std::unordered_set<std::string> loaded;
+  std::unordered_map<std::string, std::shared_ptr<Data>> fileDataMap;
   for (const auto& path : paths) {
-    if (!loaded.insert(path).second) {
+    if (fileDataMap.count(path) > 0) {
       continue;
     }
     auto data = ReadFileToData(path);
@@ -61,11 +61,9 @@ bool ImageEmbedder::embed(PAGXDocument* document) {
       lastErrorPath_ = path;
       return false;
     }
-    if (!document->loadFileData(path, data)) {
-      lastErrorPath_ = path;
-      return false;
-    }
+    fileDataMap[path] = data;
   }
+  document->loadFileDataMap(fileDataMap);
   return true;
 }
 

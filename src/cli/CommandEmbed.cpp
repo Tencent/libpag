@@ -18,6 +18,8 @@
 
 #include "cli/CommandEmbed.h"
 #include <cstdio>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -139,11 +141,23 @@ int RunEmbed(int argc, char* argv[]) {
   auto xml = PAGXExporter::ToXML(*document);
   if (options.outputFile == options.inputFile) {
     auto tempPath = options.outputFile + ".tmp";
-    if (!WriteStringToFile(xml, tempPath, "pagx embed")) {
-      std::remove(tempPath.c_str());
-      return 1;
+    {
+      std::ofstream out(tempPath);
+      if (!out.is_open()) {
+        std::cerr << "pagx embed: failed to write '" << tempPath << "'\n";
+        return 1;
+      }
+      out << xml;
+      out.close();
+      if (out.fail()) {
+        std::cerr << "pagx embed: error writing to '" << tempPath << "'\n";
+        std::remove(tempPath.c_str());
+        return 1;
+      }
     }
-    if (std::rename(tempPath.c_str(), options.outputFile.c_str()) != 0) {
+    std::error_code ec;
+    std::filesystem::rename(tempPath, options.outputFile, ec);
+    if (ec) {
       std::cerr << "pagx embed: failed to replace '" << options.outputFile << "'\n";
       std::remove(tempPath.c_str());
       return 1;

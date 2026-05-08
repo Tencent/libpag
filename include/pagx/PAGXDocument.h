@@ -20,6 +20,8 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include "pagx/FontConfig.h"
 #include "pagx/nodes/Layer.h"
@@ -128,10 +130,19 @@ class PAGXDocument : public Node {
   bool loadFileData(const std::string& filePath, std::shared_ptr<Data> data);
 
   /**
+   * Batch version of loadFileData. Loads file data for all Image nodes whose filePath matches
+   * a key in the map in a single pass over the nodes. More efficient than calling loadFileData
+   * individually for each file when embedding multiple images.
+   * @param fileDataMap a map from file path to the file content to embed
+   */
+  void loadFileDataMap(
+      const std::unordered_map<std::string, std::shared_ptr<Data>>& fileDataMap);
+
+  /**
    * Executes auto layout on the document, positioning layers according to their layout
-   * constraints. Must be called before rendering or font embedding. This method should only
-   * be called once per document — repeated calls may produce incorrect results because
-   * measurement data is cached and some layout operations permanently modify source geometry.
+   * constraints. Must be called before rendering or font embedding. Repeated calls are safe
+   * only after calling ClearEmbeddedGlyphRuns + resetLayoutState(), which clears embedded
+   * glyph data and resets the layout flag so layout re-runs with fresh shaping data.
    * @param fontConfig Optional font config for text measurement and rendering. When provided,
    *                   updates the internal config before layout. Pass nullptr to use the
    *                   previously set config (or no config).
@@ -144,6 +155,28 @@ class PAGXDocument : public Node {
   bool isLayoutApplied() const {
     return layoutApplied;
   }
+
+  /**
+   * Removes the specified nodes from the document and cleans up their nodeMap entries.
+   * Node pointers in the set and any pointers derived from them (e.g. child glyphs) are
+   * invalidated after this call. Callers must first collect all affected nodes to remove
+   * before calling.
+   */
+  void removeNodes(const std::unordered_set<Node*>& nodesToRemove);
+
+  /**
+   * Assigns or changes the ID of an existing node. If the new ID already exists in the
+   * document, the old entry is replaced. If the ID is empty, the node is removed from the
+   * lookup index. The node must already be managed by this document.
+   */
+  void setNodeId(Node* node, const std::string& id);
+
+  /**
+   * Resets the layout-applied flag to allow applyLayout() to be called again. Must be paired
+   * with ClearEmbeddedGlyphRuns before re-embedding to ensure layout re-runs with fresh
+   * shaping data.
+   */
+  void resetLayoutState();
 
   NodeType nodeType() const override {
     return NodeType::Document;
@@ -163,7 +196,6 @@ class PAGXDocument : public Node {
   friend class PAGXImporter;
   friend class PAGXExporter;
   friend class TextLayoutContext;
-  friend class FontEmbedder;
 };
 
 }  // namespace pagx

@@ -46,6 +46,22 @@ static inline bool FontFamilyMatch(const std::string& requested, const std::stri
   return true;
 }
 
+static inline bool FontStyleMatch(const std::string& requested, const std::string& actual) {
+  if (requested.empty()) {
+    return true;
+  }
+  if (requested.size() != actual.size()) {
+    return false;
+  }
+  for (size_t i = 0; i < requested.size(); i++) {
+    if (std::tolower(static_cast<unsigned char>(requested[i])) !=
+        std::tolower(static_cast<unsigned char>(actual[i]))) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /**
  * Resolves a system font by family and style with fallback. First attempts MakeFromName for an
  * exact match. If MakeFromName is unavailable (e.g. FreeType backend on macOS), falls back to
@@ -54,12 +70,14 @@ static inline bool FontFamilyMatch(const std::string& requested, const std::stri
 static inline std::shared_ptr<tgfx::Typeface> ResolveSystemTypeface(const std::string& family,
                                                                     const std::string& style) {
   auto typeface = tgfx::Typeface::MakeFromName(family, style);
-  if (typeface != nullptr && FontFamilyMatch(family, typeface->fontFamily())) {
+  if (typeface != nullptr && FontFamilyMatch(family, typeface->fontFamily()) &&
+      FontStyleMatch(style, typeface->fontStyle())) {
     return typeface;
   }
   if (!style.empty()) {
     typeface = tgfx::Typeface::MakeFromName(family, "");
-    if (typeface != nullptr && FontFamilyMatch(family, typeface->fontFamily())) {
+    if (typeface != nullptr && FontFamilyMatch(family, typeface->fontFamily()) &&
+        FontStyleMatch(style, typeface->fontStyle())) {
       return typeface;
     }
   }

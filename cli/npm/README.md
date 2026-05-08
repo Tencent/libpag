@@ -76,8 +76,8 @@ pagx font --list
 # Embed fonts and images into a PAGX file
 pagx embed input.pagx
 
-# Embed with a custom font file and fallback
-pagx embed --file BrandFont.ttf --fallback "Arial" input.pagx
+# Embed with a custom font file and fallback (--font-file is an alias for --file)
+pagx embed --font-file BrandFont.ttf --fallback "Arial" input.pagx
 
 # Embed images only (skip font embedding)
 pagx embed --skip-fonts input.pagx
@@ -176,7 +176,7 @@ Embed font glyphs and images into a PAGX file for self-contained output.
 | Option | Description |
 |--------|-------------|
 | `-o, --output <path>` | Output file path (default: overwrite input) |
-| `--file <path>` | Register a font file (repeatable) |
+| `--file, --font-file <path>` | Register a font file (repeatable) |
 | `--fallback <path\|name>` | Add a fallback font file or system font name (repeatable) |
 | `--skip-fonts` | Skip font embedding |
 | `--skip-images` | Skip image embedding |
