@@ -282,9 +282,13 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
     QString targetDir = QFileInfo(target).absolutePath();
 
     if (getPluginPermission(plugin) == PluginPermission::User) {
-      QDir().mkpath(targetDir);
+      if (!QDir().mkpath(targetDir)) {
+        return false;
+      }
       QFile::remove(target);
-      QFile::copy(source, target);
+      if (!QFile::copy(source, target)) {
+        return false;
+      }
       QFile::setPermissions(target, QFileDevice::ReadOwner | QFileDevice::WriteOwner |
                                         QFileDevice::ExeOwner | QFileDevice::ReadGroup |
                                         QFileDevice::ExeGroup | QFileDevice::ReadOther |
