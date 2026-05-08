@@ -39,6 +39,7 @@
 namespace pagx {
 
 static constexpr int VectorFontUnitsPerEm = 1000;
+static constexpr float MinFontSize = 0.001f;
 
 static void PathToPathData(const tgfx::Path& path, PathData* pathData) {
   for (const auto& segment : path) {
@@ -118,7 +119,7 @@ static void CollectVectorGlyph(PAGXDocument* document, const tgfx::Font& font,
   if (!font.getPath(glyphID, &glyphPath) || glyphPath.isEmpty()) {
     return;
   }
-  if (fontSize < 0.001f) {
+  if (fontSize < MinFontSize) {
     return;
   }
   float scale = static_cast<float>(VectorFontUnitsPerEm) / fontSize;
@@ -168,7 +169,7 @@ static void CollectBitmapGlyph(
 
   if (builder.backingSize == 0) {
     float scaleX = std::abs(imageMatrix.getScaleX());
-    if (scaleX < 0.001f) {
+    if (scaleX < MinFontSize) {
       return;
     }
     builder.backingSize = static_cast<int>(std::round(font.getSize() / scaleX));
@@ -358,7 +359,7 @@ static void CollectSpacingGlyph(
   auto* typeface = font.getTypeface().get();
   GlyphKey key = {typeface, glyphID};
   float runFontSize = font.getSize();
-  if (runFontSize < 0.001f) {
+  if (runFontSize < MinFontSize) {
     return;
   }
   auto bitmapIt = bitmapBuilders.find(typeface);
@@ -412,23 +413,8 @@ void FontEmbedder::ClearEmbeddedGlyphRuns(PAGXDocument* document) {
       toRemove.insert(node.get());
     }
   }
-  // Clean up nodeMap before compacting nodes so the pointers in nodeMap remain valid.
-  for (auto it = document->nodeMap.begin(); it != document->nodeMap.end();) {
-    if (toRemove.count(it->second) > 0) {
-      it = document->nodeMap.erase(it);
-    } else {
-      ++it;
-    }
-  }
-
-  auto& nodes = document->nodes;
-  size_t writeIdx = 0;
-  for (size_t readIdx = 0; readIdx < nodes.size(); readIdx++) {
-    if (toRemove.count(nodes[readIdx].get()) == 0) {
-      nodes[writeIdx++] = std::move(nodes[readIdx]);
-    }
-  }
-  nodes.resize(writeIdx);
+  document->removeNodes(toRemove);
+  document->resetLayoutState();
 }
 
 bool FontEmbedder::embed(PAGXDocument* document) {
@@ -482,10 +468,11 @@ bool FontEmbedder::embed(PAGXDocument* document) {
     }
   }
 
-  // Assign sequential IDs to all fonts
+  // Assign sequential IDs to all embedded fonts using a reserved prefix to avoid
+  // collisions with user-created nodes.
   int fontIndex = 1;
   if (vectorBuilder.font != nullptr) {
-    vectorBuilder.font->id = "font" + std::to_string(fontIndex++);
+    document->setNodeId(vectorBuilder.font, "__embed_font_" + std::to_string(fontIndex++));
   }
   for (auto* typeface : bitmapTypefaces) {
     if (typeface == nullptr) {
@@ -493,7 +480,7 @@ bool FontEmbedder::embed(PAGXDocument* document) {
     }
     auto builderIt = bitmapBuilders.find(typeface);
     if (builderIt != bitmapBuilders.end() && builderIt->second.font != nullptr) {
-      builderIt->second.font->id = "font" + std::to_string(fontIndex++);
+      document->setNodeId(builderIt->second.font, "__embed_font_" + std::to_string(fontIndex++));
     }
   }
 
