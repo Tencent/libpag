@@ -339,9 +339,11 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           // to contain multi-line text. When the width comes from tgfx's own content
           // measurement (no explicit width), Chromium's slightly wider font metrics would
           // immediately overflow that measured width and trigger an unwanted line break.
+          // Vertical writing-mode boxes rely on the box height to trigger column breaks;
+          // white-space:nowrap would suppress column wrapping entirely, so skip it.
           if (tb->wordWrap && layoutW && tbW > 0) {
             style += ";word-wrap:break-word";
-          } else {
+          } else if (tb->writingMode != WritingMode::Vertical) {
             style += ";white-space:nowrap";
           }
           // Defer the Overflow::Hidden emit until after tbSpans is collected: when the
@@ -427,13 +429,23 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             // uses `line-height:normal`, which resolves to ~1.2em-1.5em depending on the font's
             // OS/2 metrics and may exceed what tgfx's TextLayout uses per line, spilling the
             // last line out of an `overflow:hidden` TextBox or shifting baseline positions.
+            // Exception: when spans have different font sizes (mixed-size rich text), a single
+            // container-level line-height would use the largest span's value and inflate spacing
+            // for smaller spans. In that case skip the container line-height and let each span's
+            // own font-size control its line-box height naturally.
             float lineH = tb->lineHeight > 0 ? tb->lineHeight : 0.0f;
             if (lineH <= 0) {
+              float minFlh = 1e9f;
+              float maxFlh = 0.0f;
               for (const auto& s : tbSpans) {
                 float flh = s.text->fontLineHeight();
-                if (flh > lineH) {
-                  lineH = flh;
-                }
+                if (flh > maxFlh) maxFlh = flh;
+                if (flh < minFlh) minFlh = flh;
+              }
+              // Only set a container line-height when all spans share the same size, so the
+              // value does not distort smaller spans in mixed-size TextBoxes.
+              if (maxFlh > 0 && maxFlh - minFlh < 0.5f) {
+                lineH = maxFlh;
               }
             }
             if (lineH > 0) {
@@ -574,13 +586,18 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           // Pin line-height for the same reason as the tbSpans branch above: without it
           // Chromium falls back to `line-height:normal`, which depends on font OS/2 metrics
           // and may differ from tgfx's per-line height, shifting line count and baselines.
+          // Skip the container line-height for mixed-size rich text (same logic as tbSpans).
           float rtLineH = tb->lineHeight > 0 ? tb->lineHeight : 0.0f;
           if (rtLineH <= 0) {
+            float rtMinFlh = 1e9f;
+            float rtMaxFlh = 0.0f;
             for (const auto& s : richTextSpans) {
               float flh = s.text->fontLineHeight();
-              if (flh > rtLineH) {
-                rtLineH = flh;
-              }
+              if (flh > rtMaxFlh) rtMaxFlh = flh;
+              if (flh < rtMinFlh) rtMinFlh = flh;
+            }
+            if (rtMaxFlh > 0 && rtMaxFlh - rtMinFlh < 0.5f) {
+              rtLineH = rtMaxFlh;
             }
           }
           if (rtLineH > 0) {
