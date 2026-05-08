@@ -224,12 +224,25 @@ void PPTWriter::emitTextShapeEnvelope(XMLBuilder& out, const Xform& xf, const Te
   out.closeElement();  // p:spPr
 
   out.openElement("p:txBody").closeElementStart();
+  // Map TextBox->padding onto <a:bodyPr> insets so PowerPoint lays out the
+  // text inside the same inner rectangle that PAGX used during layout
+  // (MakeTextBoxParams already shrinks the layout width/height by padding).
+  // OOXML's default insets are non-zero, so we always emit explicit values
+  // -- zeros for standalone text (no TextBox parent) and for TextBoxes with
+  // zero padding, to preserve the pre-padding-support behavior.
+  int64_t lIns = 0, tIns = 0, rIns = 0, bIns = 0;
+  if (textBox) {
+    lIns = PxToEMU(textBox->padding.left);
+    tIns = PxToEMU(textBox->padding.top);
+    rIns = PxToEMU(textBox->padding.right);
+    bIns = PxToEMU(textBox->padding.bottom);
+  }
   out.openElement("a:bodyPr")
       .addRequiredAttribute("wrap", wrap)
-      .addRequiredAttribute("lIns", "0")
-      .addRequiredAttribute("tIns", "0")
-      .addRequiredAttribute("rIns", "0")
-      .addRequiredAttribute("bIns", "0");
+      .addRequiredAttribute("lIns", lIns)
+      .addRequiredAttribute("tIns", tIns)
+      .addRequiredAttribute("rIns", rIns)
+      .addRequiredAttribute("bIns", bIns);
   AddBodyPrAttrsForTextBox(out, textBox);
   out.closeElementSelfClosing();
   out.openElement("a:lstStyle").closeElementSelfClosing();
