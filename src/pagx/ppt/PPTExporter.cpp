@@ -392,12 +392,18 @@ void PPTWriter::emitGeometryWithFs(XMLBuilder& out, const AccumulatedGeometry& e
       break;
     case NodeType::Text: {
       auto* text = static_cast<const Text*>(entry.element);
-      // GlyphRun-only Text (no readable text content) carries pre-shaped glyph
-      // outlines from a custom font; PowerPoint's native a:r runs can't express
-      // arbitrary glyph IDs + per-glyph transforms, so the only way to render
-      // these is via path geometry — regardless of the convertTextToPath flag.
-      bool glyphRunOnly = text->text.empty() && !text->glyphRuns.empty();
-      if ((_convertTextToPath || glyphRunOnly) && !text->glyphRuns.empty()) {
+      // Any Text that carries GlyphRun elements is treated as the authoritative
+      // geometry: PowerPoint's native a:r runs can't express arbitrary glyph
+      // IDs / per-glyph xOffsets / anchors / rotations / skews / scales, so
+      // going through writeNativeText would silently drop everything the
+      // GlyphRun specifies and fall back to PPT-driven layout, producing
+      // visibly wrong output. This also covers the common case of a Text that
+      // keeps its readable `text` for accessibility alongside pre-shaped
+      // GlyphRuns.
+      // The convertTextToPath flag has the same effect, but only when GlyphRun
+      // data is available to walk — without glyphRuns there is no geometry to
+      // emit and we must fall back to native text anyway.
+      if (!text->glyphRuns.empty()) {
         writeTextAsPath(out, text, localFs, entry.transform, entry.alpha, filters, styles);
       } else {
         writeNativeText(out, text, localFs, entry.transform, entry.alpha, filters, styles);
