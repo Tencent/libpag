@@ -1,10 +1,10 @@
 # PAGX → PAG v2 转换技术方案设计文档
 
-**版本**：2.20
-**日期**：2026-05-03
-**状态**：Phase 0-15 已落地 + Phase 16 设计确认，正在实施中
+**版本**：2.23
+**日期**：2026-05-08
+**状态**：Phase 0-16 已落地 + Phase 17 设计确认，实施待启动
 
-> **性质声明**：本文档是 PAG v2 协议的**设计蓝本与 AI 编码唯一参考**。Phase 0-15 已经落地（1085 测试中 971 PASSED），Phase 15 `tools/coverage.sh` 实测暴露 Phase 8 TextBaker 架构缺陷 → Phase 16 回退文本为 v1 runtime-shape 模式（§10）。`src/pagx/pag/` 目录已建，多数头文件与类已实现；Phase 16 改动面详见 [`pagx_to_pag_v2_phase16_text_redesign.md`](pagx_to_pag_v2_phase16_text_redesign.md)。历史修订记录见 [`docs/pagx_to_pag_v2_changelog.md`](pagx_to_pag_v2_changelog.md)；PAGX 规范见 `spec/pagx_spec.zh_CN.md`。
+> **性质声明**：本文档是 PAG v2 协议的**设计蓝本与 AI 编码唯一参考**。Phase 0-16 已经落地，当前进入 Phase 17 实施——PAGX/PAG 对等文本模式（§10），推翻 Phase 16 runtime-shape 路径，Bake 时完全固化 glyph 序列与约束布局结果；情况 A 新增 path-based EmbeddedFont 资源。历史修订记录见 [`docs/pagx_to_pag_v2_changelog.md`](pagx_to_pag_v2_changelog.md)；PAGX 规范见 `spec/pagx_spec.zh_CN.md`。
 
 ---
 
@@ -19,8 +19,8 @@
 7. Baker 子模块与映射规则
 8. Codec 设计（Encode / Decode）
 9. LayerInflater 设计（PAGDocument → tgfx::Layer）
-10. 文本处理（Phase 16 runtime-shape 模式）
-11. 资源管理（图片；字体 Phase 16 后无独立资源池）
+10. 文本处理（Phase 17 PAGX/PAG 对等模式）
+11. 资源管理（图片 + Phase 17 embeddedFonts；字体文件始终外部）
 12. Mask 两趟处理
 13. 动画可扩展性保留
 14. CLI 集成（pagx export --format pag）
@@ -72,7 +72,7 @@ PAG v1 是现有的渲染二进制格式，服务于 PAGX 之前的 AE 动画工
 4. **版本号 +1，v1 播放器拒绝加载**：二进制头部 version byte 从 `0x01` 升到 `0x02`；v1 播放器检测到 `0x02` 必须 graceful reject。
 5. **Tag 体系重新设计**：不复用 v1 的 TagCode；v2 在独立命名空间 `pagx::pag` 下定义全新 Tag 表。
 6. **保留几何语义**：Rectangle/Ellipse/Polystar 不归一化为 Path，对齐 tgfx VectorElement 原生能力。
-7. **文本 runtime-shape**（Phase 16 v2.20）：`.pag` 文件只存原始 text + fontFamily/fontStyle，Inflater 端用 `TextShaper` 运行时 shape；字体由调用方通过 `FontProvider`（或全局 `pag::FontManager`）在播放端注册。与 v1 行为对齐，规避跨平台 glyph ID 不稳定性。
+7. **文本 PAGX/PAG 对等**（Phase 17）：PAG 是 PAGX 的二进制版本——PAGX Text 节点怎么处理 PAG 就怎么存。**情况 A**（PAGX 有 `<GlyphRun>` 引用嵌入 `<Font>` path）：PAG 存 path 数据（EmbeddedFont + GlyphRunData），Inflater 按 path 渲染。**情况 B**（PAGX 纯文本）：PAG 存已固化的 glyph IDs + positions + typeface 引用（ShapedGlyphRun），Inflater 用 host font 直接组装 TextBlob。**Inflater 不再 shape，不再排版**——这些工作全部在 PAGX `applyLayout()` 阶段完成。ttf/otf 字体文件永不嵌入 PAG，继续靠外部 host font 提供。
 8. **动画扩展性保留**：所有可动画字段以 `Property<T>` 包装；本期只实现 Constant 编码分支，非 Constant 分支占位为 TODO。字节布局稳定：动画接入不升版本号、不新增字节布局、不新增 Tag。
 
 所有伪码和实现代码遵循项目编码规范（见 `.codebuddy/rules/Code.md`）。
@@ -145,8 +145,9 @@ PAG v1 是现有的渲染二进制格式，服务于 PAGX 之前的 AE 动画工
 | **数据载体** | | |
 | `VectorPayload` / `VectorElement` | Shape Layer 的 payload 由一串 VectorElement 组成，每个 Element 是 14 种形状/修饰器之一 | §C.7 / §D.5 |
 | `ShapeStyleData` | Fill / Stroke / Gradient / ImagePattern 五种上色源的共用载体 | §C.7 / §D.11 |
-| `FontProvider` | Phase 16 v2.20 新增：`LayerInflater::Options::fontProvider` 注入接口，由调用方提供 `(fontFamily, fontStyle) → tgfx::Typeface` 解析 | §10 |
-| `TextShaper` | libpag v1 既有的运行时 shape 组件（HarfBuzz / Primitive 二选一），Phase 16 v2.20 由 Inflater 直接调用以重建 TextBlob | §10 / `src/rendering/utils/shaper/TextShaper.h` |
+| `FontProvider` | Phase 16 v2.20 新增：`LayerInflater::Options::fontProvider` 注入接口，由调用方提供 `(fontFamily, fontStyle) → tgfx::Typeface` 解析。Phase 17 起仅用于情况 B shapedGlyphs 的 typeface 解析；情况 A 走 embeddedFonts path 不需要 FontProvider | §10 |
+| `EmbeddedFont` | Phase 17 新增：PAGX `<Font id="fontN">` 的 PAG 二进制对应物，path-based glyph 资源（**不是 ttf 子集**）。仅情况 A Text 使用，`PAGDocument.embeddedFonts` 顶层存储，`GlyphRunData.embeddedFontIndex` 引用 | §10 / §C.5-pre |
+| ~~`TextShaper`~~ | libpag v1 既有的运行时 shape 组件（HarfBuzz / Primitive 二选一），Phase 16 v2.20 由 Inflater 调用。**Phase 17 起 Inflater 不再调用** —— shape 工作已在 Bake 时完成 | §10 / `src/rendering/utils/shaper/TextShaper.h` |
 | ~~`GlyphRunBlob`~~ / ~~`FontAsset`~~ | v2.0-v2.19 的字体预 shape 数据结构，**Phase 16 v2.20 废弃** | §10 / §C.4 |
 | `layerPath` / `PackedLayerPath` | Layer 在 composition 树中的结构坐标（uint32 数组），打包为 uint64 的 hashable key | §12.1 / §9.4 |
 | `layerByPath` / `pendingMasks` | InflaterContext 的 Layer 路径查表与待绑定 mask 列表（Pass 1 收集，Pass 2 消费） | §9.4 / §12.2 |
@@ -371,10 +372,10 @@ ColorSource 类型：SolidColor / LinearGradient / RadialGradient / ConicGradien
 | 段 | 用途 | 编号范围 | 当前使用 | 预留 |
 |---|---|---|---|---|
 | 终结 | End tag | 0 | 1 | — |
-| 顶层 | FileHeader / AssetTable / CompositionList / Composition / AssetItem（ImageAsset sub-Tag；FontAssetTable=3 / FontAsset=7 **Phase 16 废弃但数值保留**）| 1-9 | 5 active + 2 reserved-废弃 (1,2,4,5,6) | 2 个（8-9）|
+| 顶层 | FileHeader / AssetTable / CompositionList / Composition / AssetItem（ImageAsset sub-Tag；**Phase 17 新增 EmbeddedFontTable=8 / EmbeddedFontItem=9**；FontAssetTable=3 / FontAsset=7 **Phase 16 废弃但数值保留**）| 1-9 | 7 active (1,2,5,6 + 8,9) + 2 reserved-废弃 (3,7) | 0 个（占满）|
 | Layer 及子 Tag | LayerBlock / LayerTransform / LayerMaskRef / LayerFilters / LayerStyles / 保留 | 10-19 | 5 (10,12,13,14,15) | 5 个 |
 | Payload | Shape / Text / Image / Solid / Vector / Mesh / CompositionRef | 20-39 | 7 (20-26) | 13 个 |
-| VectorElement | 14 种 element + 3D shape / Motion Path / AE modifier 扩展 | 40-119 | 14 (40-53) | 66 个 |
+| VectorElement | 14 种 element + **Phase 17 ElementTextGlyphRunList=54 / ElementTextShapedGlyphList=55** + 3D shape / Motion Path / AE modifier 扩展 | 40-119 | 16 (40-53 + 54,55) | 64 个 |
 | LayerFilter | 5 种 filter + 扩展（ChromaKey / Glow 等） | 120-139 | 5 (120-124) | 15 个 |
 | LayerStyle | 3 种 style + 扩展 | 140-159 | 3 (140-142) | 17 个 |
 | 动画专用 | 关键帧 / 插值曲线 / RangeSelector v2 等 | 160-239 | 0 | 80 个 |
@@ -393,10 +394,10 @@ ColorSource 类型：SolidColor / LinearGradient / RadialGradient / ConicGradien
 ### 6.2 body 顶层写入顺序
 
 ```
-FileHeader → ImageAssetTable → CompositionList → End
+FileHeader → ImageAssetTable → EmbeddedFontTable → CompositionList → End
 ```
 
-> Decoder 若读到老版本开发分支产出的 `FontAssetTable`（v2.20 起 Encoder 不再产出）按 `UnknownTagCode=400` warn + length skip，不崩溃。字体信息由 `ElementTextData::fontFamily/fontStyle` 直接携带（见 §10、§C.7、§D.11）。
+> **Phase 17 新增** `EmbeddedFontTable`（TagCode=8）位于 ImageAssetTable 与 CompositionList 之间，承载情况 A Text 引用的 path-based 嵌入字体资源（对应 PAGX `<Font id="fontN">`）。Decoder 按顺序读取，`ElementText` 内通过 `embeddedFontIndex` 查表。Decoder 若读到老版本开发分支产出的 `FontAssetTable`（v2.20 起 Encoder 不再产出）按 `UnknownTagCode=400` warn + length skip，不崩溃。
 
 ### 6.3 嵌套结构
 
@@ -1288,82 +1289,163 @@ std::shared_ptr<tgfx::Layer> inflateCompositionRef(uint32_t idx, InflaterContext
 
 ---
 
-## 10. 文本处理（Phase 16 runtime-shape 模式）
+## 10. 文本处理（Phase 17 PAGX/PAG 对等模式）
 
-本章权威定义文本路径。完整历史回退背景见 [`pagx_to_pag_v2_phase16_text_redesign.md`](pagx_to_pag_v2_phase16_text_redesign.md)。
+本章是文本路径的权威设计。Phase 16 runtime-shape 方案已推翻，历史叙述见 `docs/pagx_to_pag_v2_changelog.md` v2.20 / v2.21 / v2.22 条目。
 
 ### 10.1 设计原则
 
-- **序列化内容**：与 v1 `pag::TextDocument` 对齐——`text` 原始字符串 + `fontFamily` / `fontStyle` / `fontSize` + 排版字段（justification / leading / tracking / boxText / direction / ...）+ paint（fillColor / strokeColor / ...）。
-- **Inflater 重建**：Baker 把 PAGX `applyLayout()` 算出的派生几何（`firstBaselineY` / `layoutOrigin` / `renderFontSize`）显式序列化进 `ElementTextData::position` / `fontSize`；Inflater 端只做 shape，不做段落布局。Shape 路径有两条：(1) 当 `FontProvider::getFontConfig()` 返回 non-null 时走 `pagx::TextShaper::Shape` (HarfBuzz) + `tgfx::TextBlob::MakeFrom(glyphIDs[], positions[], count, font)` 重载——与 PAGX 原生渲染同源，per-glyph advance 完全一致；(2) 否则降级到 `tgfx::TextBlob::MakeFrom(text, font)` primitive shaper（不复现 kerning / ligatures / 平台 advance 差异）。详见 §10.5。
-- **字体解析**：`FontProvider` 可注入接口，调用方通过 `LayerInflater::Options::fontProvider` 传入（或走全局 `pag::FontManager` 默认 adapter）。未注册字体时走 fallback 列表；fallback 也无匹配时发 `InflateFontCreateFailed=601` 降级为空白占位。
-- **不再存 glyph ID**：彻底移除 Phase 8 的 GlyphRunBlob / LayoutGlyph / ClassicGlyph 结构。跨平台 / 跨字体版本 / 跨字体子集的 glyph ID 不稳定性从根上规避。
-- **段落布局未在 Inflater 实现**：单 Text 多行换行 / textAlign 每行独立对齐 / writingMode 竖排 / justify 字间扩展，全部由 PAGX `TextLayout` 在 Baker 端 `applyLayout()` 阶段一次性算完，结果通过 `layoutOrigin + firstBaselineY` 携带到 PAG。**当单 Text 在 PAGX 内被拆成多行时，单一 `position` 表达不出多行**——属当前架构已知限制（§10.6 #1）。
+- **P1 对等**：PAG 是 PAGX 的二进制版本。PAGX 怎么处理 Text 节点，PAG 就怎么存；PAGX 怎么渲染，PAG 就怎么渲染。两者**加载后的渲染行为完全对等**。
+- **P2 布局完全固化**：PAGX 的约束布局（`LayoutNode::PerformConstraintLayout`，含 FlexBox 规则 / percentWidth / centerX / left-right-top-bottom / TextBox 尺寸传播）在 Bake 时由 `PAGXDocument::applyLayout()` 跑完。PAG 文件里全是绝对坐标 / 绝对尺寸，Inflater **禁止**再跑任何约束解析。
+- **P3 Text 排版完全固化**：PAGX `TextLayout`（paragraph 排版 / line-box / justify / writing mode）在 `applyLayout()` 时跑完，每个 Text 节点上的 `glyphData->layoutRuns`（glyph IDs + positions）由 Bake 直接搬进 PAG。Inflater **不调用** `pagx::TextLayout`，不 re-shape。
+- **P4 path vs host font 两分支（按 PAGX 原始数据类型区分）**：
+  - **情况 A** — PAGX `<Text>` 含 author `<GlyphRun>`（作者手写 glyph IDs，引用嵌入的 `<Font id="fontN">` path 数据）：**PAG 存 path**（`EmbeddedFont` 顶层资源 + `ElementTextData::glyphRuns` 引用）；Inflater 按 path 绘制。
+  - **情况 B** — PAGX `<Text>` 无 `<GlyphRun>`（作者只写 `<Text text="...">`）：**PAG 存已 shape 结果**（`ElementTextData::shapedGlyphs`：glyph IDs + positions + typeface 引用）；Inflater 用 host font 按 glyph IDs 组装 `tgfx::TextBlob`。
+  - **字体文件（ttf/otf）永不嵌入 PAG**。情况 A 的 path 是 PAGX 文件内的 SVG-style 资源（来自 `<Font><Glyph path="..."/></Font>`），不是 ttf 子集；情况 B 继续靠外部 host font 提供 glyph 形状（`FontProvider` 接口）。
+- **P5 Phase 18 功能延后**：TextModifier + RangeSelector 的字符级动画不在 Phase 17 实现；数据模型预留 `anchors/scales/rotations/skews` 字段但 Baker 暂不写，`text_modifier.pagx` 样本继续 FAIL 属预期。
 
-### 10.2 单 span / 多 span 处理
-
-PAGX Text 节点的 runtime shaping 模式和 pre-shaped 模式在 Baker 端统一降级到 runtime-shape 输出：
+### 10.2 Text 节点的 Bake 分支
 
 ```
-独立 Text VectorElement（非 TextBox 子节点）                → 1 个 ElementText
-TextBox 含单 span                                            → VectorGroup 包 1 个 ElementText
-TextBox 含多 span（不同 family/size/color/stroke）            → VectorGroup 包 N 个 ElementText（每 span 一个）
-TextBox.elements.empty()                                     → 跳过
-pagx::Text.glyphRuns 非空（pre-shaped）                       → 降级为 runtime-shape + 发 warning
-                                                              (TextGlyphRunsDowngraded=208；per-glyph xform 丢失)
+PAGX <Text> 节点（已 applyLayout）                                  →  PAG ElementTextData
+────────────────────────────────────────────────────────────────
+含 author <GlyphRun>（作者手写 glyphs + 引用 <Font> path）          →  情况 A：写 glyphRuns + InternEmbeddedFont
+无 <GlyphRun>（纯文本 + fontFamily）                                →  情况 B：搬 glyphData->layoutRuns 到 shapedGlyphs
+                                                                       （包括 TextBox 子 Text 的多行 / justify / writing mode）
 ```
 
-PAGX 的 pre-shaped 节点用例极罕见（一般由作者手动逐字形调整时才产生 glyph IDs），Baker 回落到 `text + fontFamily` 的 runtime-shape 路径避免 .pag 端与 v1 渲染体系分叉。真正需要 per-glyph xform 的作者可以走 PAGX 原生渲染（不经 .pag 转换）。
+两分支在 PAG 里互斥：`glyphRuns` 和 `shapedGlyphs` **恰好一个非空**（极端退化 Text 两个都空，Inflater 返回 nullptr）。
 
-**重要**：本期**不产出** `LayerType::Text`（tgfx::TextLayer 只支持单 style，PAGX 富文本一律走 VectorLayer + ElementText）。
+`TextBox` 节点自身不产出 ElementText；它只是 PAGX 的布局容器，布局后其每个 child `<Text>` 的 `layoutOrigin` / `firstBaselineY` / `glyphData` 已固化，按上表逐一转成 VectorGroup 包 N 个 ElementText（N = TextBox 的 Text 子节点数）。
 
-### 10.3 ElementTextData 序列化
+**本期仍不产出** `LayerType::Text`（tgfx::TextLayer 单 style 限制）：PAGX 富文本一律走 VectorLayer + 多个 ElementText。
 
-`ElementTextData` 直接镜像 v1 `pag::TextDocument` 字段集（参见 `include/pag/types.h:class PAG_API TextDocument`）。权威 C++ 结构见 §C.7；字节布局见 §D.11。
+### 10.3 数据模型（详见 §C.5-pre / §C.7）
 
-**核心字段取舍**：
-- **不**序列化 `tgfx::Font` / `tgfx::Typeface` / glyph IDs / positions / xforms——全部在 Inflater 端 shape 时重建。
-- **不**序列化 `glyphData` / `bounds` / `textBlob`——Inflater 重算。
-- **保留** PAGX 独有的 `anchors`（Property<vector<Point>>）——Phase 8 已经把它挂在 `ElementTextData::anchors`，tgfx::Text 接收该字段作为 per-glyph 锚点（用于 Text Modifier / Range Selector 的字符动画路径）；Inflater 端 shape 后把 anchors 与 shapedGlyphs 对齐到字符级。
+**顶层**：`PAGDocument.embeddedFonts`（新增）—— 情况 A 的 path-based `<Font>` 资源全局表。多个 Text 引用同一 EmbeddedFont 时共用（去重键 = PAGX 侧 `pagx::Font*` 指针）。
 
-**兼容性**：ElementText payload 属**字段语义不兼容变更**，按 §4.1.1 / §6.5 规则应升 FORMAT_VERSION；但 PAG v2 尚未对外发布，事实层面不构成任何用户 .pag 文件破坏，故**不升 FORMAT_VERSION，继续 0x02**。老版本开发分支产出的 .pag 文件会在 ElementText sub-Tag 解析期发 `MalformedTag=304` 并 skip 整个 Text element，不崩溃。
+**`ElementTextData`** 重写：
+- 共有源属性元数据：`text / fontFamily / fontStyle / fauxBold / fauxItalic / fontSize / tracking / paint 属性 / paragraph 属性`。情况 A/B 都存（工具反向用；Inflater 不用于渲染）。
+- 已固化布局：`Property<Point> position`、`Property<vector<Point>> anchors`（P2 绝对坐标）。
+- 分支判别字段：`vector<GlyphRunData> glyphRuns`（情况 A）/ `vector<ShapedGlyphRun> shapedGlyphs`（情况 B）。
 
-### 10.4 TextBox 的坐标处理（实施修订）
+**`GlyphRunData`**（情况 A，与 PAGX `<GlyphRun>` 一一对应）：
+- `embeddedFontIndex` → `PAGDocument.embeddedFonts`
+- `fontSize / glyphs / x / y / xOffsets / positions` 直接拷贝 PAGX 同名字段
+- `anchors / scales / rotations / skews` 预留（Phase 18 启用）
 
-**设计稿曾要求**（已废弃）：Baker 把每个 span 的 `inverseMatrix` 展平为 `ElementTextData::position / anchors` 的后乘修正，对齐 `LayerBuilder::prepareTextBoxTextBlobs`。
+**`ShapedGlyphRun`**（情况 B，PAGX `TextLayout` 已 shape 结果快照）：
+- `typefaceFamily / typefaceStyle / typefaceKey`（= `family|style|unitsPerEm|glyphsCount`）
+- `fontSize`
+- `glyphs / positions / xforms` —— 相对 `ElementTextData.position` 的局部坐标
 
-**实施期发现**该路径在 runtime-shape 下不可行——Inflater 没有 `pagx::LayoutContext`，拿不到 TextBox 的容器属性（`textAlign / paragraphAlign / lineHeight / writingMode`），无法复刻 PathA 的 layout → inverse matrix → TextBlob 流程。
+**兼容性**：PAG v2 尚未对外发布，Phase 17 格式变更不保留向后兼容。FORMAT_VERSION 保持 `0x02`；Phase 16 开发分支产出的 .pag 文件作废，重 Bake 即可。
 
-**实际方案**（commit `55590003`，2026-05-04）：Baker 直接读取 PAGX 在 `applyLayout()` 阶段已写入每个 child Text 的 `textBounds.x/y`（= 该 Text 在 TextBox 坐标系里的绝对 origin），通过新增的 public `pagx::Text::layoutOrigin()` API 取出，作为 `ElementTextData::position` 序列化。Inflater 端不需要任何 TextBox 上下文——拿到的 position 已经是 TextBox 坐标系绝对值，直接给 `tgfx::Text::setPosition` 即可。
+### 10.4 Baker 流程（`src/pagx/pag/TextBaker.cpp`）
 
-适用范围：**TextBox 内每个 span 都是单行**的场景（多 span 不同字号/颜色拼接，如 `rich_text.pagx`）—— PSNR ≥ 30 dB 已验证。**单 span 内含 `\n` 多行换行 + 每行独立对齐**的场景见 §10.6 已知限制。
+1. 拷贝 PAGX Text 源属性元数据到 `ElementTextData`
+2. 按 Phase 16.6 split-path 公式固化 position（TextBox child 用 `layoutOrigin()` + `firstBaselineY`；standalone 用 `renderPosition()` + `layoutOrigin.y + firstBaselineY`）
+3. 分支判别：
+   - `src.glyphRuns` 非空（情况 A）→ 遍历写 `glyphRuns`；调 `InternEmbeddedFont(ctx, doc, gr.font)` 去重写 `doc.embeddedFonts`
+   - 否则（情况 B）→ 遍历 `src.glyphData->layoutRuns` 写 `shapedGlyphs`（positions 减去 layoutOrigin+positionY 转成相对存储；xforms.tx/ty 同样处理）
+4. 不设 `kMaxHintGlyphs` 上限 —— 任何大小都存，体积膨胀是设计取舍
 
-### 10.5 实施期补丁要点（v2.21 + v2.22）
+**`PAGExporter::ToBytes` 自动 `applyLayout`**：若 `doc.layoutApplied() == false`，Exporter 内部自动调 `applyLayout(opts.fontConfig)`，外部调用方不再需要手动调。
 
-Phase 16.1-16.4 主体落地后（commit `f76384de`），实测在 `RenderCrossCheck.PathA_vs_PathB` 上发现 5 个非显然差异源，逐一定位 + 修复：
+### 10.5 Inflater 流程（`src/pagx/pag/LayerInflater.cpp`）
 
-| 补丁 | Commit | 根因 | 修复 |
-|---|---|---|---|
-| **baseline-y** | `45cbe0b0` | `tgfx::TextBlob::MakeFrom(text, font)` 内部 glyph 以 `y=baseline=0` 写入（baseline 在画布顶），首行被裁。Inflater 用 `-font.getMetrics().ascent` 猜 baseline 与 PAGX layout 算的"行间空白"差 ~16 px。 | 新增 public `pagx::Text::firstBaselineY()`（内部读 `glyphData->layoutRuns[0].positions[0].y`）；Baker 把该值累加到 `ElementTextData::position.y`。Inflater 不做 metrics 补偿。 |
-| **font align** | `53a5609a` | PathA 用 `pagx::FontConfig`、PathB 用 `pag::FontManager`，两套字体注册系统割裂，CrossCheck 测试里同一 fontFamily 解析到不同 typeface。 | `pagx::FontConfig` 加 public `findTypeface()` / `fallbackTypefaces()`；新增 `pagx::pag::MakeFontProviderFromConfig()` adapter；`PAGXTest` fixture 内置 Arial+Noto 注册，提供 `fontConfig()` / `fontProvider()` getter；CrossCheck 两路径走同一 FontConfig。 |
-| **HarfBuzz shaper** | `36471b33` | `tgfx::TextBlob::MakeFrom(text, font)` 用 primitive shaper 逐字符 `font.getAdvance()`；与 PAGX 的 HarfBuzz shaper 对**同一 typeface 同一 glyph** 给出不同 advance（macOS Arial Bold 84pt 'P' HarfBuzz 49.79 vs CoreText 56，差 ~11%，**不是 kerning**），累积到字符串末端 PSNR 卡 18 dB。 | `FontProvider` 加可选 `getFontConfig()` 虚方法（默认 `nullptr`）；Inflater 检测到 non-null 时改走 `pagx::TextShaper::Shape` + `tgfx::TextBlob::MakeFrom(glyphIDs[], positions[], count, font)` 重载；nullptr 时降级 primitive。 |
-| **layoutOrigin** | `55590003` | `Text::renderPosition()` 公式 `bounds + offset - textBounds` 对 TextBox child 自抵消为 `(0,0)`——layout 引擎已把 textBounds.x/y 设成 TextBox 坐标系绝对位置，但 renderPosition 故意减掉它们（PathA 的 inverseMatrix 路径需要这个减法）。runtime-shape 没有 inverseMatrix，必须保留绝对位置。 | 新增 public `pagx::Text::layoutOrigin()` = `(textBounds.x, textBounds.y)`；Baker 按 `layoutOrigin().x/y == 0` 切换：standalone 走 `renderPosition()`（保留父 Layer 撑大居中）+ `position.y = renderPos.y + firstBaselineY`；TextBox child 走 `layoutOrigin()` + `position.y = firstBaselineY`（不加 layoutOrigin.y——TextBox child 的 baseline 已是 TextBox 绝对 y）。**两个 API 不能统一**——standalone 需要居中偏移、TextBox child 需要绝对坐标，两个分支的 y 公式也不同，详见 `feedback_runtime_shape_baseline.md`。 |
-| **shapedRuns hint** | `bfa0637f` | PAGX TextLayout 把单个 `<Text>` 拆成多行 / 拉成 justify / 按列竖排后，每个 glyph 的 (x, y) + 可选 RSXform 全部独立，**单一 `position` 表达不出多行/多列/justify 字间**。text_box 样本 4 个 Box 全部命中。 | `ElementTextData` 加 `vector<ShapedRun> shapedRuns` 可选字段（每 run = glyphs + positions 相对 + 可选 xforms + fontSize + typefaceKey 四元组 `family|style|unitsPerEm|glyphsCount`）；Baker 在**语义判定**（layoutRuns 出现多行 baseline 或非空 xforms）+ ≤500 glyph 时快照；Inflater 优先拿 FontProvider re-resolve 的 typeface，比对所有 run 的 typefaceKey 全命中则走 `GlyphRunRenderer::BuildTextBlobFromLayoutRuns` 重放，任一不命中发 `TextShapingHintMiss=608` info 降级 runtime shape。**触发判定是语义而非结构**——"layout 能否被 runtime shape 复现"，规避 `text_box.pagx` Box 1 (justify) 的 TextBox 起点 `layoutOrigin=(0,0)` 漏判陷阱。 |
+两个分支，互斥：
 
-累积效果：CrossCheck FAIL 15 → 4（`text` / `text_path` / `trim_path` / `container_layout_include_in_layout` / `nebula_cadet` / `game_hud` / `rich_text` / `text_box` / `constraint_textbox_and_group` / `pagx_features` 全部 ≥ 30 dB）。
+**情况 A — `inflateTextAsPath`**：
+- 对每个 `GlyphRunData`，从 `doc.embeddedFonts[embeddedFontIndex]` 取 `EmbeddedFont`
+- `scale = run.fontSize / emb.unitsPerEm`
+- 对每个 glyphId：`finalX = run.x + xOffsets[i] + positions[i].x`，`finalY = run.y + positions[i].y`
+- 矩阵 `Translate(finalX, finalY) * Scale(scale, -scale)`（y-up → y-down）变换 glyph path，合入 combinedPath
+- `tgfx::ShapePath::Make() + setPath(combinedPath) + setPosition(pay.position.value)`
+- Fill/Stroke 由父 VectorGroup 驱动（同现有链路）
 
-### 10.6 已知限制（Phase 16.7+ 待决策）
+**情况 B — `inflateTextAsShapedTextBlob`**：
+- 对每个 `ShapedGlyphRun`，`ctx.fontProvider->getTypeface(sr.typefaceFamily, sr.typefaceStyle)` 解析 typeface
+- typeface 为 null → warn + skip 该 run（保留其他 run）
+- `MakeTypefaceKey(tf) != sr.typefaceKey` → warn `TextShapingHintMiss`，但仍用 host-substituted typeface 画原 glyph IDs 保留布局（Phase 16.6 决策：布局正确 > 字形像素一致）
+- 组装 `pagx::TextLayoutGlyphRun{ font, glyphs, positions, xforms }` 列表
+- `pagx::GlyphRunRenderer::BuildTextBlobFromLayoutRuns(runs, Matrix::I())` 得到 TextBlob
+- `tgfx::Text::Make(blob, pay.anchors.value) + setPosition(pay.position.value)`
 
-下列场景在当前 runtime-shape 架构下**无小代价修复**，需要架构层面决策（已记录在 memory `project_pagx_to_pag_v2.md` 下一步工作方向）：
+**关键差异（相对 Phase 16）**：Inflater **不再调**  `pagx::TextShaper::Shape`、`pagx::TextLayout`、`TextBlob::MakeFrom(text, font)` primitive shaper —— shape/layout 工作全部在 Bake 时完成。
 
-1. **TextModifier + RangeSelector 字符级动画**（`text_modifier.pagx`，PSNR ~15 dB）：MVP 完全未实现。需要 `ShapedGlyph → 单字符 anchor → 变换`重新应用。Phase 16.7 规划项。
-2. **嵌入字体 `@font1`（Pre-shaped GlyphRun，明确不支持）**（`glyph_run.pagx`，PSNR ~16 dB）：PAGX 允许作者在 `<Resources>` 嵌入自定义 SVG/Image glyph 字体（`<Font id="fontN"><Glyph .../></Font>`），由 `<GlyphRun font="@fontN" glyphs="...">` 引用。这类 pre-shaped glyphRuns 在 Baker 端触发 `TextGlyphRunsDowngraded=208` 警告并丢弃 per-glyph 数据，原因已在 Phase 16 设计文档确认：
-   - `TextLayout::Layout()` 遇到所有 Text 都是 pre-shaped 时走快速路径（仅计算 bounds），**不生成 `layoutRuns`**，Baker 端 snapshot hint 的语义判定（`hasMultipleLines || hasXforms`）必然为 false——hint 永远不生成。
-   - 嵌入字体 typeface 由 `GlyphRunRenderer::BuildTypefaceFromFont` 在运行时从 SVG path 动态构造，是**临时对象**，无稳定的 family/style/unitsPerEm 签名，typefaceKey 无法用于跨进程比对。
-   - Glyph ID 体系独立于系统字体，Inflater 端无法 re-resolve 到相同 typeface。
-   - **结论（方案 β 确认）**：预计不在后续 Phase 支持嵌入字体序列化（方案 α — FontAsset 资产化 — 工程量大且与 Phase 16 "不存 glyph 数据"原则冲突）。生产环境该场景极罕见（作者手动逐字形编辑才会产生），`TextGlyphRunsDowngraded=208` 警告已为调用方提供足够的降级通知。
+### 10.6 Phase 16 关键补丁的去向
 
-**非文字但未关**：`image_pattern.pagx`（PSNR ~9 dB，独立非文字 bug）、`complete_example.pagx`（PSNR ~25 dB，综合样本，根因未定）—— 均 Phase 17+ 处理。
+Phase 16.1-16.6 的 5 个实施期补丁（baseline-y / font align / HarfBuzz shaper / layoutOrigin / shapedRuns hint）以及 Phase 16.7（author-GlyphRun origin salvage）在 Phase 17 方案下的处置：
+
+| Phase 16 补丁 | Phase 17 处置 |
+|---|---|
+| baseline-y（45cbe0b0）/ layoutOrigin（55590003） | **保留决策**：情况 A/B 的 position 固化公式复用该逻辑（split-path: TextBox child vs standalone） |
+| font align（53a5609a） | **保留**：`PAGXTest` 的 `fontConfig()` / `fontProvider()` 测试设施不变，供 Phase 17 两分支共用 |
+| HarfBuzz shaper（36471b33） | **删除**：Inflater 不再 shape，HarfBuzz 直连分支退场 |
+| shapedRuns hint（bfa0637f） | **语义升级**：字段改名 `shapedGlyphs`，从 opt-in hint 变为情况 B 唯一数据源；删除 `kMaxHintGlyphs` 上限和 `hasMultipleLines / hasXforms` gate（无条件写） |
+| author-GlyphRun origin salvage（Phase 16.7，d5ceb7eb） | **删除**：被情况 A path 渲染彻底取代，作者位置信息从 `<GlyphRun x/y/xOffsets>` 直接进入 `GlyphRunData`，无需在 `position` 上 salvage |
+
+CrossCheck 定位：Phase 17 完成后 CrossCheck 从 "辅助诊断" 升级为 **"强相等保证"** —— 两边走完全相同的 path 数据（情况 A）或相同的 host font + glyph IDs（情况 B），像素级一致应当是常态。FAIL 基本就是 bug。
+
+### 10.7 未解决项（Phase 18+）
+
+- **TextModifier + RangeSelector 字符级动画**（`text_modifier.pagx`）：Phase 17 预留 `GlyphRunData::anchors/scales/rotations/skews` 字段但 Baker 暂不写、Inflater 不消费。Phase 18 启用。
+- **非文字 bug**：`image_pattern.pagx`（独立非文字 bug）—— 待 Phase 17 之后的专项修复。
+
+### 10.8 实施拆分（4 次 commit）
+
+#### Commit 1：数据模型 + Codec 骨架
+
+- `src/pagx/pag/PAGDocument.h` 新增 `EmbeddedGlyph` / `EmbeddedFont` / `GlyphRunData` / `ShapedGlyphRun` 四 struct；`PAGDocument.embeddedFonts` 顶层字段；`ElementTextData` 加 `glyphRuns` / `shapedGlyphs` 两向量。
+- `src/pagx/pag/TagCode.h` 新增 `EmbeddedFontTable=8 / EmbeddedFontItem=9 / ElementTextGlyphRunList=54 / ElementTextShapedGlyphList=55`。
+- `src/pagx/pag/ElementTags.cpp` + `Codec.cpp` 实现新 tag Read/Write。
+- `FileTag.cpp` 顶层写入顺序加入 `EmbeddedFontTable`（位置：`ImageAssetTable → EmbeddedFontTable → CompositionList`）。
+- `test/src/pag/unit/ElementTagsCodecTest.cpp` 新增 4 个 roundtrip 单测：EmbeddedFont / GlyphRunData / ShapedGlyphRun / ElementText 含两种分支。
+- **过渡策略**：Phase 16.6 `shapedRuns` 字段 + 相关 Baker/Inflater 代码**保留**不删，新增 `glyphRuns`/`shapedGlyphs`/`embeddedFonts` 加好但暂不写入。Commit 1 纯粹是结构扩展，视觉无回归；`shapedRuns` 作为 bridge，到 Commit 4 一起删。
+- **验收**：编译通过 + Codec roundtrip 测试绿 + 48 个 `PAGRenderEquivalenceTest` 无像素回归。
+
+#### Commit 2：Baker + Inflater 情况 A（glyph_run 样本）
+
+- `TextBaker::BakeText` 加情况 A 分支：`src.glyphRuns` 非空时遍历写 `data.glyphRuns`；调 `InternEmbeddedFont(ctx, doc, gr.font)` 按 `pagx::Font*` 指针去重写资源表。
+- 删 Phase 16.7 author-GlyphRun origin salvage（被情况 A path 渲染彻底取代）。
+- `LayerInflater::inflateElementText` 加前置分支：`pay.glyphRuns` 非空走新 `inflateTextAsPath`——合成 tgfx::Path（y-up 源 → y-down 目标，`Matrix::Scale(scale, -scale)`）→ `ShapePath::setPath + setPosition`。
+- 情况 B 维持 Phase 16.6 shapedRuns hint + runtime-shape fallback 不变。
+- **验收**：`glyph_run.pagx` 渲染结果与 PAGX-native 视觉对齐（字形、重量、布局）；CrossCheck `glyph_run` 转 PASS 或 PSNR ≥ 30 dB；其他 47 样本无回归。
+
+#### Commit 3：Baker + Inflater 情况 B + 删 Phase 16 shape 路径
+
+- `TextBaker::BakeText` 情况 B 分支：遍历 `src.glyphData->layoutRuns` 无条件写 `data.shapedGlyphs`，positions / xforms.tx/ty 减去 `layoutOrigin + positionY` 转相对存储；删 Phase 16.6 `hasMultipleLines || hasXforms` gate 和 `kMaxHintGlyphs` 上限；删 `TextGlyphRunsDowngraded=208` warning 及相关降级逻辑。
+- `LayerInflater::inflateElementText` 情况 B 分支改走新 `inflateTextAsShapedTextBlob`：FontProvider 解析 typeface → `BuildTextBlobFromLayoutRuns` → `tgfx::Text`。
+- 删除 Phase 16 runtime-shape 的 4 条路径：`resolveFont` 主路径、`#ifdef PAG_USE_HARFBUZZ` 分支、`TextBlob::MakeFrom(text, font)` primitive shaper 退化分支、`pagx::TextShaper::Shape` 调用点。
+- `PAGExporter::ToBytes` / `ToFile` 自动调 `applyLayout(opts.fontConfig)`（若 `doc.layoutApplied() == false`）。
+- **验收**：48 个 `PAGRenderEquivalenceTest` 样本稳定（允许微小 glyph hinting 差异）；CrossCheck 文字相关 FAIL 清零（仅 `text_modifier` Phase 18、`image_pattern` 非文字 bug 不在 Phase 17 范围）。
+
+#### Commit 4：清理 + 文档同步
+
+- 删 `ElementTextData::shapedRuns` 字段 + `ShapedRun` struct + 相关 Codec 编解码函数 + Phase 16.6 所有过渡代码。
+- 更新 `src/pagx/pag/LayerInflater.h` / `src/pagx/pag/TextBaker.cpp` / `test/src/pag/unit/FontProviderTest.cpp` 中指向 `pagx_to_pag_v2_phase16_text_redesign.md` 的历史注释（改指向本文档 §10 对应小节，或指向 changelog v2.20 条目）。
+- `docs/pagx_to_pag_v2_changelog.md` 记 Phase 17 完成，更新遗留条目数。
+- 清理相关 memory：`feedback_runtime_shape_baseline.md`（runtime-shape 不再存在，决策失效）、`feedback_shaper_advance.md`（HarfBuzz advance 差异在情况 B 仍相关但路径变了）等。
+- **验收**：`PAGFullTest` 全绿（Phase 18 范围项除外）；代码无死代码；文档与代码一致。
+
+### 10.9 风险与开放问题
+
+- **`tgfx::Path` 序列化精度**（Commit 1 实测）：EmbeddedGlyph.path 计划复用 `ElementShapePath.path` 的现有 Path 编解码。若实测发现 glyph path 的控制点坐标规模（子像素级，单位 em = 1000）与 shape path（像素级，单位 pixel）精度诉求不同，Commit 1 需补针对性处理。
+- **PAGX path 坐标系约定**（Commit 2 核实）：glyph_run.pagx 源 `<Glyph path="M100 0 L193 -299">` 使用 y-up（负值 = 上方）。Inflater 统一用 `Matrix::Scale(scale, -scale)` 翻转到 tgfx y-down。若 PAGX 内部解析 `<Glyph path>` 时已翻转，Inflater 不再翻转；待 Commit 2 实施时确认 PAGX path 解析源码再拍板，避免双重翻转。
+- **`MakeTypefaceKey` 稳定性**：`family|style|unitsPerEm|glyphsCount` 作为 host font 版本指纹——不同机器同版本字体 glyphsCount 一致即视为同；大版本字体替换（例：Arial 6 → 7，glyph count 扩充）会 mismatch，此时按 Phase 16.6 决策"用宿主替代字体画原 glyph IDs"保留布局，emit `TextShapingHintMiss` info，不降级。
+- **CrossCheck 从辅助升级为强保证**：Phase 17 之后 PathA（LayerBuilder 直接消费 PAGX）与 PathB（PAGX→PAG→Inflater）在情况 A 走完全相同的 path 数据，情况 B 走相同 host font + glyph IDs —— 应当像素级一致。FAIL 基本就是 bug。
+- **EmbeddedFont 体积**：glyph_run.pagx 的 `@font1`（23 glyph）~3 KB；Latin 100 glyph ~15 KB；中文几千 glyph 可能 MB 级。用户决策"不设上限（正确性 > 体积）"，这是明确设计取舍。
+- **情况 B 的 anchors 字段**：`ElementTextData.anchors`（`Property<vector<Point>>`）Phase 17 仍保留——为 Phase 18 RangeSelector 字符级动画预留，当前情况 B 走 `shapedGlyphs` 不用 anchors。
+
+### 10.10 验收标准
+
+- Commit 1-4 全部合入。
+- 48 个 `PAGRenderEquivalenceTest` 样本里情况 A（glyph_run）+ 情况 B（文字类）渲染结果与 PAGX-native 视觉一致。
+- CrossCheck FAIL ≤ 2（仅 `text_modifier` Phase 18 / `image_pattern` 非文字）。
+- `.pag` 文件体积增长可接受（glyph_run 预计 Phase 16 ~5 KB → Phase 17 ~10 KB 量级）。
+- `PAGFullTest` 总通过数 ≥ Phase 16 基线（不回归）。
+- 代码注释中所有指向已删除的 `phase16_text_redesign.md` / `phase17_text_redesign.md` 的引用均已更新为指向本文档 §10 对应小节或 changelog 条目。
 
 ---
 
@@ -3451,7 +3533,7 @@ PR 验证与 nightly 的测试分拆策略——单次 CI 预算约束 15 分钟
 | 13 | —（取消 v1 改动，v1 已能 graceful reject 0x02）| — | — |
 | 14 | — | `PerformanceTest` + 首次生成 `test/perf/baseline.json`（含 `pag_v1_load_ms` 参照） | 基线入 git |
 | 15 | `tools/coverage.sh` | — | 覆盖率达 §17 D3 分模块门槛（Baker/Codec/Inflater 各 ≥80%，整体 ≥75%），报告附 PR |
-| **16.0** (v2.20) | `docs/pagx_to_pag_v2_phase16_text_redesign.md` 设计草案 | — | 用户 review 确认，6 个关键决策 (Q1-Q6) 定板 |
+| **16.0** (v2.20) | 文本 runtime-shape 回退设计（§10 Phase 16 段，后于 v2.23 Phase 17 推翻） | — | 用户 review 确认，6 个关键决策 (Q1-Q6) 定板 |
 | **16.1** | `PAGDocument.h` 新 `ElementTextData` 字段 + `include/pagx/pag/FontProvider.h` 接口 + `MakeDefaultFontProvider()` 实现；删 `FontAsset` / `FontAxis` / `FontSourceKind` / `GlyphRunBlob` 结构；`PAGDocument::fonts[]` 移除 | `FontProviderTest`（MakeFromName / fallback / null 路径） | 编译通过 + FontProviderTest 绿 |
 | **16.2** | `TextBaker.cpp` 重写（runtime-shape 模式）；`BakeTextPath` / `BakeTextModifier` 微调；pre-shaped 降级发 `TextGlyphRunsDowngraded=208` warning | `TextBakerTest` 新用例（断言 `ElementTextData.text/fontFamily/...` 序列化） | `TextBakerTest` 新版全绿 |
 | **16.3** | `Codec.cpp` ElementText body 读写对齐新 schema；`FontAssetTable=3` / `FontAsset=7` 读路径保留（warn skip）+ 写路径移除；`ResourceBaker::indexFonts` 移除 | `RoundTripTest` 文字用例 | 全绿 |
@@ -3484,7 +3566,7 @@ PR 验证与 nightly 的测试分拆策略——单次 CI 预算约束 15 分钟
 | 10.5 | Phase 10, 9.5 | `PAGLoader.cpp` |
 | 11 | Phase 10.5 | CLI 扩展 |
 | 12 | Phase 10.5, 9.5 (RenderUtil), 1 (CorruptBuilder for fuzz seed) | `RenderEquivalenceTest` + `PAGDecodeFuzzTest` + `PAGInflaterFuzzTest`（P1-9 v2.18 独立 harness）+ `.github/workflows/pagx-fuzz.yml` |
-| 16.0 | Phase 15 实测结论（macOS tgfx MakeFromName 硬 null 的根因暴露） | `pagx_to_pag_v2_phase16_text_redesign.md` 设计定稿 |
+| 16.0 | Phase 15 实测结论（macOS tgfx MakeFromName 硬 null 的根因暴露） | Phase 16 runtime-shape 设计定稿（已由 v2.23 Phase 17 推翻，见 §10 + changelog v2.20/v2.21/v2.22） |
 | 16.1 | Phase 16.0, Phase 2 (`PAGDocument.h`) | `FontProvider.h` 接口 + `ElementTextData` 新 schema |
 | 16.2 | Phase 16.1, Phase 8 (`TextBaker.cpp` 重写对象) | 新 TextBaker |
 | 16.3 | Phase 16.1, Phase 4 (`Codec.cpp` ElementText body 读写) | 新 ElementText body schema |
@@ -3809,10 +3891,24 @@ struct ImageAsset {
   ImageAssetKind kind = ImageAssetKind::Raster;  // v2.19 P0-I；本期 Baker 恒写 Raster
 };
 
+// Phase 17 新增：PAGX <Font id="fontN"> 的二进制对应物
+// 仅情况 A Text（作者 <GlyphRun> 引用的嵌入字体）使用；注意这不是 ttf 文件，
+// 而是 PAGX 文件内的 path-based glyph 资源（每个 <Glyph advance="..." path="..."/>）。
+// ttf/otf 字体文件**永不嵌入 PAG**。
+struct EmbeddedGlyph {
+  float      advance = 0.0f;  // 对应 PAGX <Glyph advance="...">
+  tgfx::Path path;            // 对应 PAGX <Glyph path="..."> —— y-up 源坐标系
+};
+
+struct EmbeddedFont {
+  uint32_t                   unitsPerEm = 1000;  // PAGX 默认 1000
+  std::vector<EmbeddedGlyph> glyphs;             // 下标即 GlyphRunData.glyphs 中的值
+};
+
 }
 ```
 
-> **已废弃的结构**（参考早期版本 git log 或 `pagx_to_pag_v2_phase16_text_redesign.md`）：`FontAsset`、`FontAxis`、`FontSourceKind`、`GlyphRunKind`、`GlyphRunBlob`（含 `LayoutGlyph` / `ClassicGlyph` 嵌套）。`PAGDocument::fonts[]` 向量同步移除——参见 §C.5-pre 更新后的 PAGDocument 定义。
+> **已废弃的结构**（参考早期版本 git log 或 changelog v2.20 条目）：`FontAsset`、`FontAxis`、`FontSourceKind`、`GlyphRunKind`、`GlyphRunBlob`（含 `LayoutGlyph` / `ClassicGlyph` 嵌套）。`PAGDocument::fonts[]` 向量同步移除——参见 §C.5-pre 更新后的 PAGDocument 定义。
 
 ### C.5-pre FileHeader / PAGDocument（顶层根结构）
 
@@ -3831,21 +3927,38 @@ struct FileHeader {
 // PAG v2 数据模型根对象。由 Baker 构造，由 Codec 编码/解码，由 LayerInflater 消费。
 // 生命周期一律 std::unique_ptr<PAGDocument>（见 §8.3bis RAII 纪律）。
 struct PAGDocument {
-  FileHeader                                 header       = {};
-  std::vector<std::unique_ptr<ImageAsset>>   images       = {};
-  // Phase 16 v2.20 移除：std::vector<std::unique_ptr<FontAsset>> fonts
-  // 字体信息改由 ElementTextData::fontFamily/fontStyle 直接携带（§10 / §C.7）
-  std::vector<std::unique_ptr<Composition>>  compositions = {};
+  FileHeader                                  header        = {};
+  std::vector<std::unique_ptr<ImageAsset>>    images        = {};
+  // Phase 17 新增：情况 A Text 的 path-based 嵌入字体资源（对应 PAGX <Font id="fontN">）
+  // 多个 ElementTextData::glyphRuns 按 embeddedFontIndex 引用（§10 / §C.7）
+  // 注意：ttf/otf 字体文件永不嵌入 PAG；此处存的是 PAGX <Font><Glyph path="..."/></Font>
+  //      path-based 资源，不是真字体文件
+  std::vector<std::unique_ptr<EmbeddedFont>>  embeddedFonts = {};
+  std::vector<std::unique_ptr<Composition>>   compositions  = {};
 };
 
 }
 ```
 
 **字段约定**：
-- 三个字段与 §8.2 Encode 流程的 Tag 写入顺序严格对应（FileHeader → ImageAssetTable → CompositionList；Phase 16 v2.20 删除 FontAssetTable）；
+- 四个字段与 §8.2 Encode 流程的 Tag 写入顺序严格对应（FileHeader → ImageAssetTable → EmbeddedFontTable → CompositionList；Phase 17 新增 EmbeddedFontTable）；
 - `compositions[0]` 约定为 root composition（§5.1），Inflater 的遍历入口；
 - 全部 `std::unique_ptr` 子对象析构链式释放（§8.3bis "PAGDocument 析构链"）；
-- 成员访问风格：Baker 拿到 `doc` 后用 `doc->header.width`、`doc->images.push_back(...)`、`doc->compositions[i]->layers[j]` 等形态（`->` 因为 `unique_ptr<PAGDocument>`）。
+- 成员访问风格：Baker 拿到 `doc` 后用 `doc->header.width`、`doc->images.push_back(...)`、`doc->embeddedFonts.push_back(...)`、`doc->compositions[i]->layers[j]` 等形态（`->` 因为 `unique_ptr<PAGDocument>`）。
+
+**EmbeddedFont 结构**（Phase 17 新增，详见 §10.3 / §C.7）：
+
+```cpp
+struct EmbeddedGlyph {
+  float      advance = 0.0f;  // 对应 PAGX <Glyph advance="...">
+  tgfx::Path path;            // 对应 PAGX <Glyph path="..."> —— y-up 源坐标系
+};
+
+struct EmbeddedFont {
+  uint32_t                    unitsPerEm = 1000;
+  std::vector<EmbeddedGlyph>  glyphs;  // 下标 = GlyphRunData.glyphs 内的值
+};
+```
 
 ### C.5 Composition / Layer
 
@@ -4093,21 +4206,50 @@ struct ElementRepeaterData {
   Property<float> endAlpha   = MakeProp(1.0f);
 };
 
+struct GlyphRunData {
+  // Phase 17 情况 A 专用：对应 PAGX <GlyphRun font="@fontN" glyphs="..." x/y/xOffsets/positions/...>
+  uint32_t            embeddedFontIndex = 0;  // → PAGDocument.embeddedFonts
+  float               fontSize = 12.0f;
+  std::vector<uint16_t> glyphs;               // EmbeddedFont.glyphs 的下标
+  float               x = 0.0f;               // overall offset
+  float               y = 0.0f;
+  std::vector<float>  xOffsets;               // 可选
+  std::vector<Point>  positions;              // 可选
+  // Phase 18 预留（Phase 17 始终为空）：
+  std::vector<Point>  anchors;
+  std::vector<Point>  scales;
+  std::vector<float>  rotations;
+  std::vector<float>  skews;
+};
+
+struct ShapedGlyphRun {
+  // Phase 17 情况 B 专用：PAGX TextLayout 在 applyLayout 时 shape 出的 glyph 序列快照
+  // typeface 引用——字体文件（ttf/otf）不嵌入 PAG，Inflater 通过 FontProvider 解析
+  std::string typefaceFamily;
+  std::string typefaceStyle;
+  std::string typefaceKey;   // = family|style|unitsPerEm|glyphsCount —— Inflater 校验用
+  float       fontSize = 12.0f;
+  std::vector<uint16_t>      glyphs;
+  std::vector<Point>         positions;  // 相对 ElementTextData.position
+  std::vector<tgfx::RSXform> xforms;     // vertical writing mode per-glyph 旋转；水平文字为空
+};
+
 struct ElementTextData {
-  // —— Phase 16 (v2.20): runtime-shape 模式。字段集镜像 v1 pag::TextDocument
-  //    （include/pag/types.h:class PAG_API TextDocument）。废弃 GlyphRunBlob 路径。
-  //    —— Inflater 端调 TextShaper::Shape + 复用 v1 TextLayout 段落布局。
+  // —— Phase 17: PAGX/PAG 对等模式。两分支：情况 A 存 path（glyphRuns+embeddedFonts）、
+  //    情况 B 存已 shape 的 glyph IDs（shapedGlyphs）。详见 §10。
+  //    glyphRuns / shapedGlyphs 恰好一个非空。
+
+  // —— 已固化布局（P2 绝对坐标）——
   Property<Point> position = MakeProp(Point{});
-  // PAGX 独有的 per-glyph 锚点列表；保留给 tgfx::Text::Make(blob, anchors) 调用。
   Property<std::vector<Point>> anchors = MakeProp<std::vector<Point>>({});
 
-  // —— 内容（runtime shape 的输入）——
+  // —— 共有源属性元数据（情况 A/B 都存；Inflater 不用于渲染，工具反向用）——
   std::string text = "";
   std::string fontFamily = "";
   std::string fontStyle = "";
   float fontSize = 12.0f;
 
-  // —— 排版方向与段落布局（对齐 v1 TextDocument）——
+  // —— 排版方向与段落布局（对齐 v1 TextDocument；工具反向用，Inflater 不重排版）——
   TextDirection direction = TextDirection::Default;
   ParagraphJustification justification = ParagraphJustification::LeftJustify;
   float leading = 0.0f;            // 行间距；0 = auto (fontSize * 1.2)
@@ -4115,16 +4257,16 @@ struct ElementTextData {
   float firstBaseLine = 0.0f;
   float baselineShift = 0.0f;
 
-  // —— BoxText ——
+  // —— BoxText（工具反向）——
   bool boxText = false;
   Point boxTextPos = {};
   Point boxTextSize = {};
 
-  // —— Faux style（无真 bold/italic typeface 时渲染器合成）——
+  // —— Faux style（两种情况都可能影响渲染合成）——
   bool fauxBold = false;
   bool fauxItalic = false;
 
-  // —— Paint ——
+  // —— Paint（两种情况共用）——
   bool applyFill = true;
   bool applyStroke = false;
   bool strokeOverFill = true;
@@ -4135,6 +4277,10 @@ struct ElementTextData {
   // —— 背景（对齐 v1 TextSourceV2）——
   Color backgroundColor = {};
   uint8_t backgroundAlpha = 0;
+
+  // —— 分支判别（二选一，至少一个非空）——
+  std::vector<GlyphRunData>   glyphRuns;     // 情况 A：PAGX 有 author <GlyphRun>
+  std::vector<ShapedGlyphRun> shapedGlyphs;  // 情况 B：PAGX 只有纯文本
 };
 
 struct ElementTextPathData {
@@ -5087,7 +5233,7 @@ body:
     f32       maxValue
 ```
 
-> Phase 16 运行时 shape 模式把 family/style 移入 `ElementTextData`（§C.7 + §D.11），字体 bytes 不再嵌入 .pag——由调用方通过 `FontProvider` / `pag::FontManager` 在播放端注册。详见 §10 及 `docs/pagx_to_pag_v2_phase16_text_redesign.md`。
+> Phase 16 运行时 shape 模式把 family/style 移入 `ElementTextData`（§C.7 + §D.11），字体 bytes 不再嵌入 .pag——由调用方通过 `FontProvider` / `pag::FontManager` 在播放端注册。详见 §10（Phase 17 后的当前权威设计）及 changelog v2.20 条目（历史 Phase 16 背景）。
 
 ### D.7 CompositionList / Composition
 
@@ -6531,7 +6677,7 @@ v2 对外共三个公共头，分依赖等级管理：
 - `pagx/PAGXDocument.h`（Loader 不碰 PAGX DOM）；
 - 任何 `src/` 或 `pagx/pag/` 内部 Codec/Baker/Inflater 头。
 
-**`pag/FontProvider.h` 设计**（Phase 16 v2.20 新增）：虚类 + `MakeDefaultFontProvider()` 工厂；默认实现走全局 `pag::FontManager`。详见 §10 及 [`pagx_to_pag_v2_phase16_text_redesign.md`](pagx_to_pag_v2_phase16_text_redesign.md)。
+**`pag/FontProvider.h` 设计**（Phase 16 v2.20 新增）：虚类 + `MakeDefaultFontProvider()` 工厂；默认实现走全局 `pag::FontManager`。详见 §10（Phase 17 后的当前权威设计）及 changelog v2.20 条目（历史 Phase 16 背景）。
 
 **头文件顶部必须有显式警告注释**（样板见 §15.3），提醒用户此头依赖 tgfx，纯导出场景应改用 `PAGExporter.h`。
 
@@ -6663,7 +6809,7 @@ v2.0 → v2.20 累计 9 轮专家评审（~85 个 P0/P1/P2 修复）+ 1 轮 Phas
 13. **架构基线 v2.19 + v2.20 P1-23**（钉死硬约束）：(a) **`DiagnosticCollector` 基类只暴露 protected `pushError/pushWarning` helper**，4 Context 各自 3 参 public `error/warn` wrapper（C++ 名称查找永远落子类，无 name hiding 歧义）；EncodeContext / InflaterContext **不 override `pushError`**（物理屏蔽 "无 fatal"）。(b) **`EncodeContext` 独立 Context**（v2.20 P1-23 替代 v2.19 `EncodeSession` 聚合体）——继承 DiagnosticCollector，持 `pag::StreamContext` + `debugLayout`；Encode 阶段所有 `Write<TagName>` 签名第三参为 `EncodeContext*`；§16 目录**产出 `src/pagx/pag/EncodeContext.h`**。(c) **ImageAssetTable / FontAssetTable 每 asset 独立 sub-Tag**（ImageAsset=6 / FontAsset=7）——字段级追加走 sub-Tag 内 length skip，v2.1+ 激活不炸 v2.0 Reader。(d) **`LayerTransform=15` 本期就落**——LayerBlock body 顶层仅留身份/时间轴/layerFlags，visible/alpha/blendMode/matrix/matrix3D/scrollRect 挪入 LayerTransform sub-Tag；动画期 §4.4 规则 1 "未知 encoding 收窄到 transform skip" 立即可用。
 14. **3 个安全校验新规 v2.19**：(a) `ImageAsset::kind` Decoder 强制 `kind == 0`（Raster）——kind != 0 但 <= 3 → warn `UnsupportedFeature=104` + 回退 Raster，kind > 3 → warn 304 整 Tag skip；**严禁** Inflater 基于字节流 kind 分派解码器（防未来加 Video/Hdr 解码器时字节级攻击面扩散）。(b) `FontAsset.axes[]` 读 `axisCount` 后立即校验 `≤ MAX_FONT_AXES = 64`（对齐 OpenType fvar 上限）——超限推 105 fatal 防 4GB OOM。(c) DiagnosticCode 总数 **43 码**（v2.18 的 40 + v2.19 补 `BlendModeUnmapped=204` / `PrematureEndTag=409` / `InflateMaskCycle=607`）；`std::array<DiagnosticCode, 43> kAllDiagnosticCodes` + `CodeToString` switch 必须同步。
 15. **阅读链** / **AnimationData 动画期准备**：开工阅读顺序 §3.2 → 本节开工必读 17 条 → §3.3 术语索引（按需）；动画期开工**前**必读 §D.14 AnimationData sub-Tag 草案（本期不产出，但字段布局 + 挂载点 + propertyId 枚举 + keyframe 模板已钉死，避免届时设计返工）。
-16. **Phase 16 v2.20 文本 runtime-shape 回退**（M5 里程碑）：Phase 15 实测发现 `tgfx::SystemFont::MakeFromName` 在 macOS/Linux/Android 硬 `return nullptr`（仅 Windows 实现 DirectWrite），Phase 8 "glyph ID 预存序列化" 架构不可行——所有文本 inflate 后 typeface null → TextBlob null → ElementText drop。**回退方向**：ElementTextData 存 text + fontFamily/fontStyle 字符串（对齐 v1 TextDocument），Inflater 调 v1 `TextShaper::Shape` 运行时 shape + 复用 v1 TextLayout 做段落布局。**接触面**：§10 / §C.4 / §C.7 / §D.6 / §D.11 / §G.2 (错误码 208 `TextGlyphRunsDowngraded` / 601/602 语义更新)；`FontAsset` / `GlyphRunBlob` / `FontAxis` / `FontSourceKind` / `PAGDocument::fonts[]` 全部废弃。**不升 FORMAT_VERSION**（v2 未对外发布）。**新增 `FontProvider` 接口**：调用方通过 `LayerInflater::Options::fontProvider` 注入自定义字体解析（默认 adapter 走全局 `pag::FontManager`）。详细设计见 [`pagx_to_pag_v2_phase16_text_redesign.md`](pagx_to_pag_v2_phase16_text_redesign.md)。
+16. **Phase 16 v2.20 文本 runtime-shape 回退**（M5 里程碑，**v2.23 Phase 17 已推翻**——见 §10 当前 PAGX/PAG 对等设计；保留本条作 Phase 16 历史说明）：Phase 15 实测发现 `tgfx::SystemFont::MakeFromName` 在 macOS/Linux/Android 硬 `return nullptr`（仅 Windows 实现 DirectWrite），Phase 8 "glyph ID 预存序列化" 架构不可行——所有文本 inflate 后 typeface null → TextBlob null → ElementText drop。**Phase 16 当时的回退方向**：ElementTextData 存 text + fontFamily/fontStyle 字符串（对齐 v1 TextDocument），Inflater 调 v1 `TextShaper::Shape` 运行时 shape + 复用 v1 TextLayout 做段落布局。`FontAsset` / `GlyphRunBlob` / `FontAxis` / `FontSourceKind` / `PAGDocument::fonts[]` 全部废弃。**不升 FORMAT_VERSION**（v2 未对外发布）。**新增 `FontProvider` 接口**：调用方通过 `LayerInflater::Options::fontProvider` 注入自定义字体解析（默认 adapter 走全局 `pag::FontManager`）。v2.23 Phase 17 后路径改为：情况 A（author GlyphRun）走 path 渲染存 EmbeddedFont，情况 B（纯文本）把 PAGX `applyLayout` 已 shape 的 glyph 序列完整固化入 PAG（`shapedGlyphs`），Inflater 不再 shape 也不再排版。
 17. **v2.20 Review 收敛**：9 项 P0+P1 文档修订落地（Baker PAGX 生命周期约束 / PAGLoader Result.compositionCount / varU32 安全预检 / Fuzz corpus 规范 / 覆盖率分模块目标 / 删 TagCode 240-299 预留 / 删 FontMode OutlineAll / EncodeContext 独立化 / 微型专项测试合并）。细节见 `docs/pagx_to_pag_v2_changelog.md` v2.20 Review 收敛条目。
 
 历史完整修订记录（v1.0 → v2.20）见 [`docs/pagx_to_pag_v2_changelog.md`](pagx_to_pag_v2_changelog.md)。**实现阶段不需通读历史**，读完上述 17 条（12 基线 + 3 v2.19 新增 + 1 v2.20 文本回退 + 1 v2.20 Review 收敛）即可开工。

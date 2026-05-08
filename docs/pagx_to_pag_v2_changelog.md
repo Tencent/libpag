@@ -1,13 +1,50 @@
 # PAGX → PAG v2 技术方案修订记录（CHANGELOG）
 
-本文档归档了 `docs/pagx_to_pag_v2_design.md` 的完整修订记录（v1.0 → v2.22）。
+本文档归档了 `docs/pagx_to_pag_v2_design.md` 的完整修订记录（v1.0 → v2.23）。
 
-**实现阶段不需通读历史**；主文档 `### 上次开工必读` 段已列出开工前必知的 17 条硬约束（12 基线 + 3 v2.19 新增 + 1 v2.20 文本回退 + 1 v2.20 Review 收敛）。
+**实现阶段不需通读历史**；主文档 `### 上次开工必读` 段已列出开工前必知的 17 条硬约束（12 基线 + 3 v2.19 新增 + 1 v2.20 文本回退 + 1 v2.23 Phase 17 文本对等）。
 历史版本条目仅作为"为什么这样设计"的背景参考。
 
 ---
 
 ### 历史修订记录
+
+- **v2.23 Phase 17 PAGX/PAG 对等文本设计**（推翻 Phase 16，主文档 §10 整章替换，实施按 4 次 commit 拆分待启动）：
+
+  **背景**：Phase 16 runtime-shape 方案在 `glyph_run.pagx` 上暴露根本冲突——作者 `<GlyphRun>` 引用的嵌入 `<Font>` path 数据在 Bake 时被完整丢弃，PAG 端用 host font 重新 shape，glyph 形状完全不同于 PAGX-native 渲染。Phase 16.6 shapedRuns hint / Phase 16.7 author-GlyphRun origin salvage 都是对"数据源丢失"打补丁。用户重新校准原则：**PAG 是 PAGX 的二进制版本，PAGX 怎么处理 PAG 就怎么存，两边加载后渲染行为完全对等**。
+
+  **核心决策**：按 PAGX Text 节点原始数据类型二分路径：
+  - **情况 A**：PAGX 有作者 `<GlyphRun>` → PAG 存 path 数据。新增顶层资源 `EmbeddedFont{ unitsPerEm, glyphs[{advance, path}] }`（对应 PAGX `<Font id="fontN"><Glyph path="..."/></Font>`，**不是 ttf 子集**）；`ElementTextData.glyphRuns` 存 `GlyphRunData{embeddedFontIndex, fontSize, glyphs, x, y, xOffsets, positions}`；Inflater 合成 `tgfx::Path` → `ShapePath` 渲染。
+  - **情况 B**：PAGX 只有纯 `<Text text="...">` → PAG 存已 shape 的 glyph 序列。`ElementTextData.shapedGlyphs` 存 `ShapedGlyphRun{typefaceFamily/Style/Key, fontSize, glyphs, positions, xforms}`，直接搬自 PAGX `Text.glyphData->layoutRuns`（Bake 时 PAGX `applyLayout()` 已 shape）；Inflater 用 FontProvider 解析 typeface 组装 `tgfx::TextBlob`。
+  - **ttf/otf 字体文件永不嵌入 PAG**。情况 A 的 path 数据是 PAGX 文件内 SVG-style 资源；情况 B 继续靠外部 host font。
+  - **约束布局（FlexBox / percentWidth / centerX / left-right-top-bottom / TextBox 尺寸传播）完全 Bake 时固化**。PAG 里 Layer / Group / Text 的 position/size 字段全是绝对坐标。Inflater 不再跑约束解析。
+  - **Text 排版（paragraph / line-box / justify / writing mode）完全 Bake 时固化**。Inflater 不再调 `pagx::TextLayout` 或 `TextShaper`。
+
+  **数据模型变更**：
+  - `PAGDocument` 新增 `vector<unique_ptr<EmbeddedFont>> embeddedFonts`。
+  - `ElementTextData` 重写：删除 Phase 16.6 `shapedRuns` 字段（语义升级为 `shapedGlyphs`，从 opt-in hint 变为情况 B 唯一数据源），新增 `glyphRuns` / `shapedGlyphs` 双分支字段。保留 `text / fontFamily / fontStyle / fauxBold/italic / paint / paragraph` 源属性元数据（渲染不用，工具反向用）。
+  - 新增 struct `EmbeddedGlyph` / `EmbeddedFont` / `GlyphRunData` / `ShapedGlyphRun`。
+
+  **Tag 表变更**：
+  - 顶层段新增 `EmbeddedFontTable=8` / `EmbeddedFontItem=9`（占尽顶层预留空位）。
+  - VectorElement 段新增 `ElementTextGlyphRunList=54` / `ElementTextShapedGlyphList=55`（ElementTextData 内 child tag，两者互斥）。
+  - body 顶层写入顺序：`FileHeader → ImageAssetTable → EmbeddedFontTable → CompositionList → End`。
+  - Phase 16.6 `shapedRuns` 编解码逻辑删除。
+  - PAG v2 尚未对外发布，不保留向后兼容；FORMAT_VERSION 保持 `0x02`。
+
+  **Baker/Inflater 变更**：
+  - `TextBaker::BakeText`：按 `src.glyphRuns` 是否非空分两分支。情况 A 走 `InternEmbeddedFont` 去重写资源表；情况 B 搬 `src.glyphData->layoutRuns` 到 `shapedGlyphs`（positions 减 layoutOrigin+positionY 转相对存储）。删 Phase 16.6 `kMaxHintGlyphs` 上限和 `hasMultipleLines || hasXforms` gate（无条件写 shapedGlyphs）；删 Phase 16.7 author-GlyphRun origin salvage；删 `TextGlyphRunsDowngraded=208` warning（不再降级）。
+  - `PAGExporter::ToBytes` 自动调 `applyLayout`——外部调用方无需手动调。
+  - `LayerInflater::inflateElementText`：按 `glyphRuns` / `shapedGlyphs` 分两分支。情况 A 合成 tgfx::Path 走 ShapePath；情况 B 组装 TextBlob 走 Text。删除 Phase 16 runtime-shape 所有分支（HarfBuzz 直连 / primitive shaper / resolveFont 主路径）。
+  - CrossCheck `PathA_vs_PathB` 从"辅助诊断"升级为"强相等保证"——两边走完全相同的 path 数据（情况 A）或同一 host font + glyph IDs（情况 B），像素级一致应为常态。
+
+  **实施拆分（4 commit）**：
+  1. 数据模型 + Codec 骨架（新 struct + 新 tag 编解码 + Codec roundtrip 单测；Baker/Inflater 暂保留 Phase 16 逻辑作为 bridge）
+  2. Baker + Inflater 情况 A 分支（glyph_run 样本视觉对齐 PAGX-native）
+  3. Baker + Inflater 情况 B 分支（删 Phase 16 runtime-shape 路径；48 个样本稳定）
+  4. 清理 + 文档同步（删 `shapedRuns` 字段 + Phase 16 过渡代码 + memory 更新）
+
+  **Phase 16 文档处置**：Phase 16 原独立设计文档 `pagx_to_pag_v2_phase16_text_redesign.md` 随 v2.23 删除；其历史叙述（v1 runtime-shape 决策、FontProvider 接口、TextShaper 依赖、FontAsset 废弃等）已由下方 v2.20 / v2.21 / v2.22 条目完整覆盖。主文档 §10 章首简要指向这几条 changelog 作为历史溯源。
 
 - **v2.22 Phase 16.6 shapedRuns hint**（TextBox multi-line bypass，1 个 commit，主文档 §10.5 / §10.6 修订）：
 
@@ -134,12 +171,12 @@
 
   **不升 FORMAT_VERSION**：PAG v2 尚未对外发布（仅在本仓内使用），ElementText schema 不兼容变更不构成任何用户 .pag 破坏，继续 0x02。
 
-  **配套交付物**（已提交）：
+  **配套交付物**（已提交；文档于 v2.23 整合）：
   - `tools/coverage.sh` + CMake `-DPAG_COVERAGE` 开关 + fuzz 分支 ASAN 剔除（Phase 15）
   - `tools/render_compare.py` + `test/src/pag/unit/GeneratePAGXNativeReferencesTest.cpp` 的 PAGX 原生 48 张参考图生成（Phase 15 辅助）
   - `test/src/pag/unit/Phase12ProbeTest.cpp` 新增 `DISABLED_TextInflateDiag` 文字诊断 probe
   - 本文档 v2.20 修订条目
-  - `docs/pagx_to_pag_v2_phase16_text_redesign.md` 独立设计文档（422 行）
+  - ~~`docs/pagx_to_pag_v2_phase16_text_redesign.md` 独立设计文档（422 行）~~ —— v2.23 起该文档删除，其内容已在本条及 v2.21 / v2.22 条目中完整覆盖
 
 ---
 
