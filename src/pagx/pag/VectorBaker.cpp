@@ -331,7 +331,7 @@ uint32_t InternPatternImage(BakeContext& ctx, PAGDocument& doc, const pagx::Imag
   // width/height or the Reader will degrade to 1x1 at load time.
   auto codec = tgfx::ImageCodec::MakeFrom(imageData);
   if (codec != nullptr) {
-    asset->width  = codec->width();
+    asset->width = codec->width();
     asset->height = codec->height();
   }
   std::string semanticKey = image->filePath;  // empty OK for pure-inline images

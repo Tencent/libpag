@@ -107,6 +107,32 @@ std::unique_ptr<VectorElement> TextBaker::BakeText(BakeContext& ctx, PAGDocument
   float positionY = insideTextBox ? baselineY : (layoutOrigin.y + baselineY);
   data->position = MakeProp(tgfx::Point{layoutOrigin.x, positionY});
 
+  // Author-GlyphRun origin salvage (Phase 16.7): when the PAGX source
+  // explicitly authored <GlyphRun x=.. y=.. xOffsets=..>, runtime-shape
+  // loses that placement because `Text.position` defaults to (0, 0) and
+  // `firstBaselineY()` returns 0 (TextLayout was never run — the Text has
+  // no UTF-8 runs to shape, only pre-shaped glyph IDs). Ship the first
+  // glyph's authored origin through `data->position` so the runtime-shape
+  // fallback at least lands near where the author intended. Glyph shapes
+  // still come from the host-resolved fontFamily (not the embedded font),
+  // so this is a best-effort placement, not pixel-perfect replay; that is
+  // the known-limitation contract for author-GlyphRun samples.
+  //
+  // Guard: only overlay when Baker's existing origin sources all came back
+  // zero. Non-zero layoutOrigin / baselineY indicates either a TextBox
+  // child (layoutOrigin.y is TextBox-relative) or a runtime-shaped Text
+  // with a real baseline — those already resolve correctly, and reading
+  // GlyphRun.x/y on top would double-count.
+  if (!src.glyphRuns.empty() && src.glyphRuns.front() != nullptr && layoutOrigin.x == 0.0f &&
+      layoutOrigin.y == 0.0f && baselineY == 0.0f) {
+    const auto* gr = src.glyphRuns.front();
+    const float firstXOffset = gr->xOffsets.empty() ? 0.0f : gr->xOffsets.front();
+    const float firstPosX = gr->positions.empty() ? 0.0f : gr->positions.front().x;
+    const float authoredX = gr->x + firstXOffset + firstPosX;
+    const float authoredY = gr->y;
+    data->position = MakeProp(tgfx::Point{authoredX, authoredY});
+  }
+
   // Content — the raw UTF-8 string runtime shapers re-shape at load time.
   data->text = src.text;
   data->fontFamily = src.fontFamily;
