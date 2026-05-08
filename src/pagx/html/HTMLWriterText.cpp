@@ -681,6 +681,14 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     if (!std::isnan(tbH) && tbH > 0) {
       style += ";height:" + FloatToString(tbH) + "px";
     }
+    // Honour TextBox padding by emitting CSS padding + border-box so Chromium wraps
+    // text at the same inner content rect tgfx used during layout. Without this an
+    // explicitly authored `<TextBox padding="16">` would render unrestricted text
+    // across the full layoutWidth and produce one fewer line break than PAGX.
+    if (!tb->padding.isZero()) {
+      style += ";padding:" + PaddingToCSS(tb->padding);
+      style += ";box-sizing:border-box";
+    }
     if (tb->textAlign == TextAlign::Center) {
       style += ";text-align:center";
     } else if (tb->textAlign == TextAlign::End) {

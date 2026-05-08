@@ -315,6 +315,17 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           if (layoutH && tbH > 0) {
             style += ";height:" + FloatToString(tbH) + "px";
           }
+          // PAGX `<TextBox padding="...">` insets the text content from the box edges:
+          // tgfx subtracts padding from layoutWidth/Height before line breaking, so the
+          // wrapped lines obey the inner content rectangle. Emit the same inset in CSS
+          // via `padding:...; box-sizing:border-box` so Chromium wraps at the same
+          // inner width — without this, layoutWidth=200 leaks the full 200 to the line
+          // breaker and we get one fewer line wrap than PAGX (visible in
+          // layout/padding_unified where the HTML squeezes "The text" onto line 1).
+          if (!tb->padding.isZero()) {
+            style += ";padding:" + PaddingToCSS(tb->padding);
+            style += ";box-sizing:border-box";
+          }
           if (tb->textAlign == TextAlign::Center) {
             style += ";text-align:center";
           } else if (tb->textAlign == TextAlign::End) {
@@ -688,6 +699,12 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           }
           if (!std::isnan(tb->height)) {
             style += ";height:" + FloatToString(tb->height) + "px";
+          }
+          // Match the tbSpans branch above: emit TextBox padding so Chromium wraps at
+          // the same inner content rect tgfx used during layout.
+          if (!tb->padding.isZero()) {
+            style += ";padding:" + PaddingToCSS(tb->padding);
+            style += ";box-sizing:border-box";
           }
           if (tb->paragraphAlign != ParagraphAlign::Near) {
             style += ";display:flex;flex-direction:column";
