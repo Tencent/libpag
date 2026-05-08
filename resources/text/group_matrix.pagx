@@ -9,7 +9,7 @@
     <Stroke/>
     <TextBox width="200" height="100" textAlign="center" paragraphAlign="middle">
       <Group position="50,30">
-        <Text text="Position" fontFamily="NotoSansSC" fontSize="24"/>
+        <Text text="Position" fontFamily="Noto Sans SC" fontSize="24"/>
         <Fill/>
       </Group>
     </TextBox>
@@ -21,7 +21,7 @@
     <Stroke/>
     <TextBox width="200" height="100" textAlign="center" paragraphAlign="middle">
       <Group scale="2,2">
-        <Text text="Scale" fontFamily="NotoSansSC" fontSize="24"/>
+        <Text text="Scale" fontFamily="Noto Sans SC" fontSize="24"/>
         <Fill/>
       </Group>
     </TextBox>
@@ -34,7 +34,7 @@
     <TextBox width="200" height="100" textAlign="center" paragraphAlign="middle">
       <Group position="20,10">
         <Group position="30,20">
-          <Text text="Nested" fontFamily="NotoSansSC" fontSize="24"/>
+          <Text text="Nested" fontFamily="Noto Sans SC" fontSize="24"/>
           <Fill/>
         </Group>
       </Group>
@@ -47,7 +47,7 @@
     <Stroke/>
     <TextBox width="200" height="100" textAlign="center" paragraphAlign="middle">
       <Group scale="2,1">
-        <Text text="NonUniform" fontFamily="NotoSansSC" fontSize="24"/>
+        <Text text="NonUniform" fontFamily="Noto Sans SC" fontSize="24"/>
         <Fill/>
       </Group>
     </TextBox>
@@ -60,7 +60,7 @@
     <TextBox width="200" height="100" textAlign="center" paragraphAlign="middle">
       <Group position="30,20" rotation="15">
         <Group scale="1,2">
-          <Text text="Complex" fontFamily="NotoSansSC" fontSize="24"/>
+          <Text text="Complex" fontFamily="Noto Sans SC" fontSize="24"/>
           <Fill/>
         </Group>
       </Group>

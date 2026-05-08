@@ -21,7 +21,6 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <set>
 #include <string>
 #include <vector>
 #include "cli/CliUtils.h"
@@ -32,18 +31,6 @@
 #include "tgfx/core/Typeface.h"
 
 namespace pagx::cli {
-
-// Strips all ASCII spaces from a font-family name for fuzzy matching.  Used to reconcile the
-// common case where PAGX documents spell a family without spaces ("NotoSansSC") while the font
-// file's OS/2 metadata uses spaces ("Noto Sans SC"), or vice-versa.
-static std::string NormFamilyName(const std::string& s) {
-  std::string out;
-  out.reserve(s.size());
-  for (char c : s) {
-    if (c != ' ') out += c;
-  }
-  return out;
-}
 
 struct ExportOptions {
   std::string inputFile = {};
@@ -496,48 +483,6 @@ static int ExportToHTML(const ExportOptions& options) {
     }
   }
   document->applyLayout(&layoutFontConfig);
-
-  // Reconcile @font-face font-family names with the names the PAGX document actually uses.
-  // The font file's OS/2 "family" field (e.g. "Noto Sans SC") often differs from the name
-  // the PAGX author wrote (e.g. "NotoSansSC"). When they disagree the generated CSS has
-  // `@font-face { font-family: 'Noto Sans SC' }` but `font-family: 'NotoSansSC'` on every
-  // text element, so the browser never matches the @font-face rule and falls back to the
-  // system sans-serif, producing a completely different layout.
-  //
-  // Fix: scan the raw PAGX XML for `fontFamily="..."` values; for each @font-face rule whose
-  // family name normalises (spaces stripped) to the same string as a PAGX family, replace the
-  // rule's family name with the one the document actually uses so CSS matches.
-  {
-    std::set<std::string> docFamilies;
-    std::ifstream xmlFile(options.inputFile, std::ios::binary);
-    if (xmlFile) {
-      std::string xmlText((std::istreambuf_iterator<char>(xmlFile)),
-                          std::istreambuf_iterator<char>());
-      const std::string attr = "fontFamily=\"";
-      size_t pos = 0;
-      while ((pos = xmlText.find(attr, pos)) != std::string::npos) {
-        pos += attr.size();
-        size_t end = xmlText.find('"', pos);
-        if (end == std::string::npos) break;
-        docFamilies.insert(xmlText.substr(pos, end - pos));
-        pos = end + 1;
-      }
-    }
-    if (!docFamilies.empty()) {
-      for (auto& rule : htmlOptions.fontFaceRules) {
-        if (docFamilies.count(rule.fontFamily)) {
-          continue;  // already matches a document family name exactly
-        }
-        std::string normRule = NormFamilyName(rule.fontFamily);
-        for (const auto& docFam : docFamilies) {
-          if (NormFamilyName(docFam) == normRule) {
-            rule.fontFamily = docFam;
-            break;
-          }
-        }
-      }
-    }
-  }
 
   auto fragment = HTMLExporter::ToHTML(*document, htmlOptions);
   if (fragment.empty()) {
