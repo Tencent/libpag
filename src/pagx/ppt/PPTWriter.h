@@ -286,29 +286,92 @@ inline void AddLTRBAttrs(XMLBuilder& out, const LTRBInsets& insets) {
   }
 }
 
-inline bool ComputeImagePatternRect(const ImagePattern* pattern, int imgW, int imgH,
-                                    const Rect& shapeBounds, ImagePatternRect* result) {
+// Computes the axis-aligned document rect occupied by the image after the
+// pattern's matrix transform and scaleMode fit are applied. Returns false when
+// the matrix has rotation/skew or negative scale — those cases have no faithful
+// <p:pic>/<a:srcRect> representation and must fall back to a raster bake.
+inline bool ComputePlacedImageRect(const ImagePattern* pattern, int imgW, int imgH,
+                                   const Rect& shapeBounds, Rect* result) {
   const auto& M = pattern->matrix;
-  float scaleX = std::sqrt(M.a * M.a + M.b * M.b);
-  float scaleY = std::sqrt(M.c * M.c + M.d * M.d);
-  if (scaleX <= 0 || scaleY <= 0) {
+  if (std::fabs(M.b) > pag::FLOAT_NEARLY_ZERO || std::fabs(M.c) > pag::FLOAT_NEARLY_ZERO) {
     return false;
   }
-  float imageDocW = static_cast<float>(imgW) * scaleX;
-  float imageDocH = static_cast<float>(imgH) * scaleY;
-  result->visL = std::max(shapeBounds.x, M.tx);
-  result->visT = std::max(shapeBounds.y, M.ty);
-  result->visR = std::min(shapeBounds.x + shapeBounds.width, M.tx + imageDocW);
-  result->visB = std::min(shapeBounds.y + shapeBounds.height, M.ty + imageDocH);
+  if (M.a <= 0 || M.d <= 0) {
+    return false;
+  }
+  float transformedW = static_cast<float>(imgW) * M.a;
+  float transformedH = static_cast<float>(imgH) * M.d;
+  if (transformedW <= 0 || transformedH <= 0) {
+    return false;
+  }
+
+  if (pattern->scaleMode == ScaleMode::None) {
+    result->x = M.tx;
+    result->y = M.ty;
+    result->width = transformedW;
+    result->height = transformedH;
+    return true;
+  }
+
+  if (shapeBounds.isEmpty()) {
+    return false;
+  }
+
+  float sx = shapeBounds.width / transformedW;
+  float sy = shapeBounds.height / transformedH;
+  switch (pattern->scaleMode) {
+    case ScaleMode::Stretch:
+      result->x = shapeBounds.x;
+      result->y = shapeBounds.y;
+      result->width = shapeBounds.width;
+      result->height = shapeBounds.height;
+      return true;
+    case ScaleMode::LetterBox: {
+      float scale = std::min(sx, sy);
+      result->width = transformedW * scale;
+      result->height = transformedH * scale;
+      result->x = shapeBounds.x + (shapeBounds.width - result->width) / 2.0f;
+      result->y = shapeBounds.y + (shapeBounds.height - result->height) / 2.0f;
+      return true;
+    }
+    case ScaleMode::Zoom: {
+      float scale = std::max(sx, sy);
+      result->width = transformedW * scale;
+      result->height = transformedH * scale;
+      result->x = shapeBounds.x + (shapeBounds.width - result->width) / 2.0f;
+      result->y = shapeBounds.y + (shapeBounds.height - result->height) / 2.0f;
+      return true;
+    }
+    case ScaleMode::None:
+      break;
+  }
+  return false;
+}
+
+inline bool ComputeImagePatternRect(const ImagePattern* pattern, int imgW, int imgH,
+                                    const Rect& shapeBounds, ImagePatternRect* result) {
+  Rect imageRect = {};
+  if (!ComputePlacedImageRect(pattern, imgW, imgH, shapeBounds, &imageRect)) {
+    return false;
+  }
+  if (imageRect.width <= 0 || imageRect.height <= 0) {
+    return false;
+  }
+  result->visL = std::max(shapeBounds.x, imageRect.x);
+  result->visT = std::max(shapeBounds.y, imageRect.y);
+  result->visR = std::min(shapeBounds.x + shapeBounds.width, imageRect.x + imageRect.width);
+  result->visB = std::min(shapeBounds.y + shapeBounds.height, imageRect.y + imageRect.height);
   if (result->visR <= result->visL || result->visB <= result->visT) {
     return false;
   }
-  result->srcL = static_cast<int>(std::round((result->visL - M.tx) / imageDocW * 100000.0f));
-  result->srcT = static_cast<int>(std::round((result->visT - M.ty) / imageDocH * 100000.0f));
-  result->srcR =
-      static_cast<int>(std::round((M.tx + imageDocW - result->visR) / imageDocW * 100000.0f));
-  result->srcB =
-      static_cast<int>(std::round((M.ty + imageDocH - result->visB) / imageDocH * 100000.0f));
+  result->srcL =
+      static_cast<int>(std::round((result->visL - imageRect.x) / imageRect.width * 100000.0f));
+  result->srcT =
+      static_cast<int>(std::round((result->visT - imageRect.y) / imageRect.height * 100000.0f));
+  result->srcR = static_cast<int>(
+      std::round((imageRect.x + imageRect.width - result->visR) / imageRect.width * 100000.0f));
+  result->srcB = static_cast<int>(
+      std::round((imageRect.y + imageRect.height - result->visB) / imageRect.height * 100000.0f));
   return true;
 }
 

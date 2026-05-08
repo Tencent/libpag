@@ -352,24 +352,33 @@ void PPTWriter::writeImagePatternFill(XMLBuilder& out, const ImagePattern* patte
         .addRequiredAttribute("algn", "tl")
         .closeElementSelfClosing();
   } else {
-    bool hasTransform = hasDimensions && !shapeBounds.isEmpty() && !pattern->matrix.isIdentity();
+    bool hasPlacement = hasDimensions && !shapeBounds.isEmpty();
     ImagePatternRect ipr = {};
-    if (hasTransform && ComputeImagePatternRect(pattern, imgW, imgH, shapeBounds, &ipr)) {
-      out.openElement("a:srcRect");
-      AddLTRBAttrs(out, {ipr.srcL, ipr.srcT, ipr.srcR, ipr.srcB});
-      out.closeElementSelfClosing();
-      LTRBInsets fill;
-      fill.l =
+    LTRBInsets srcInsets;
+    LTRBInsets fillInsets;
+    bool placed = false;
+    if (hasPlacement && ComputeImagePatternRect(pattern, imgW, imgH, shapeBounds, &ipr)) {
+      srcInsets.l = ipr.srcL;
+      srcInsets.t = ipr.srcT;
+      srcInsets.r = ipr.srcR;
+      srcInsets.b = ipr.srcB;
+      fillInsets.l =
           static_cast<int>(std::round((ipr.visL - shapeBounds.x) / shapeBounds.width * 100000.0f));
-      fill.t =
+      fillInsets.t =
           static_cast<int>(std::round((ipr.visT - shapeBounds.y) / shapeBounds.height * 100000.0f));
-      fill.r = static_cast<int>(std::round((shapeBounds.x + shapeBounds.width - ipr.visR) /
-                                           shapeBounds.width * 100000.0f));
-      fill.b = static_cast<int>(std::round((shapeBounds.y + shapeBounds.height - ipr.visB) /
-                                           shapeBounds.height * 100000.0f));
+      fillInsets.r = static_cast<int>(std::round((shapeBounds.x + shapeBounds.width - ipr.visR) /
+                                                 shapeBounds.width * 100000.0f));
+      fillInsets.b = static_cast<int>(std::round((shapeBounds.y + shapeBounds.height - ipr.visB) /
+                                                 shapeBounds.height * 100000.0f));
+      placed = srcInsets.any() || fillInsets.any();
+    }
+    if (placed) {
+      out.openElement("a:srcRect");
+      AddLTRBAttrs(out, srcInsets);
+      out.closeElementSelfClosing();
       out.openElement("a:stretch").closeElementStart();
       out.openElement("a:fillRect");
-      AddLTRBAttrs(out, fill);
+      AddLTRBAttrs(out, fillInsets);
       out.closeElementSelfClosing();
       out.closeElement();  // a:stretch
     } else {
