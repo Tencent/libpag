@@ -203,12 +203,16 @@ if [ -n "$BOLD_FONT" ]; then
   RENDER_FONT_ARGS+=( --font "$BOLD_FONT" )
 fi
 
-# For the comparison page we only use local font files so the iframes render
-# consistently without network access. CDN URLs are intentionally omitted here;
-# they are only kept in the exporter's default WrapHtmlDocument for end-user
-# deliverables where a local file may not be available.
+# Column 3 iframes load fonts from local files where available. Bold is not
+# bundled in resources/font/, so we register a CDN-only @font-face for it —
+# mirroring column 2's WrapHtmlDocument which uses the same CDN URL. Without
+# this, pagx_to_html/ samples with fontStyle="Bold" (e.g. section titles like
+# "Clip and Mask") render at Regular weight in column 3 because the CLI wrapper
+# sets `font-synthesis:none` on body, preventing Chromium from synthesising
+# bold from the Regular face.
 EXPORT_FONT_ARGS=(
   --html-font "$FONT_REGULAR"
+  --html-font "${CDN_BOLD}#family=Noto Sans SC#weight=bold#style=normal"
 )
 if [ -n "$BOLD_FONT" ]; then
   EXPORT_FONT_ARGS=(

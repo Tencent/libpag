@@ -383,20 +383,29 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               // Recursively collect Text spans from the Group's element tree, including
               // nested sub-Groups. Each level may carry its own Fill/Stroke which applies
               // to the Text nodes at that level (falls back to the parent level's painter).
+              // The Fill/Stroke within a Group applies to every Text at that same level
+              // regardless of their relative order (e.g. a Group with [Text, Fill] and a
+              // Group with [Fill, Text] both paint the Text with the Group's Fill). So we
+              // resolve the Group's own painter with a first pass over its direct children
+              // before emitting spans, otherwise a [Text, Fill] order would leak the
+              // caller's parentFill onto that Text.
               struct GroupSpanCollector {
                 static void Collect(const Group* grp, const Fill* parentFill,
                                     const Stroke* parentStroke, std::vector<TBSpan>& spans) {
                   const Fill* grpFill = parentFill;
                   const Stroke* grpStroke = parentStroke;
                   for (auto* ge : grp->elements) {
+                    if (ge->nodeType() == NodeType::Fill) {
+                      grpFill = static_cast<const Fill*>(ge);
+                    } else if (ge->nodeType() == NodeType::Stroke) {
+                      grpStroke = static_cast<const Stroke*>(ge);
+                    }
+                  }
+                  for (auto* ge : grp->elements) {
                     if (ge->nodeType() == NodeType::Text) {
                       // Collect all Text nodes in the Group; the previous single-capture
                       // pattern dropped any Text beyond the first (e.g. "\nAB" in Box I).
                       spans.push_back({static_cast<const Text*>(ge), grpFill, grpStroke});
-                    } else if (ge->nodeType() == NodeType::Fill) {
-                      grpFill = static_cast<const Fill*>(ge);
-                    } else if (ge->nodeType() == NodeType::Stroke) {
-                      grpStroke = static_cast<const Stroke*>(ge);
                     } else if (ge->nodeType() == NodeType::Group) {
                       Collect(static_cast<const Group*>(ge), grpFill, grpStroke, spans);
                     }
@@ -476,6 +485,19 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                   // same property is re-declared in the same inline style attribute.
                   style += ";width:" + FloatToString(renderedWidth) + "px";
                   style += ";left:" + FloatToString(tbLeft + (tbW - renderedWidth)) + "px";
+                }
+              } else if (lineH > 0 && tbH > 0) {
+                // Horizontal Overflow::Hidden: tgfx drops any line whose bottom extends past
+                // the box; Chromium's overflow:hidden only pixel-clips, leaving the top slice
+                // of the first over-box line visible. Shrink the content div's height to an
+                // integer multiple of line-height so the next line starts exactly at the
+                // bottom edge and is clipped in full, matching tgfx's whole-line drop.
+                int fit = static_cast<int>(tbH / lineH + 0.0001f);
+                if (fit >= 1) {
+                  float clipH = static_cast<float>(fit) * lineH;
+                  if (clipH < tbH - 0.5f) {
+                    style += ";height:" + FloatToString(clipH) + "px";
+                  }
                 }
               }
             }
@@ -709,6 +731,20 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           }
           if (tb->overflow == Overflow::Hidden) {
             style += ";overflow:hidden";
+            // Match tbSpans branch above: horizontal Overflow::Hidden needs the content div's
+            // height clipped to an integer multiple of line-height so the first over-box line
+            // is dropped entirely (tgfx drops whole lines; Chromium otherwise pixel-clips,
+            // leaving the top slice of the next line visible).
+            if (tb->writingMode != WritingMode::Vertical && rtLineH > 0 &&
+                !std::isnan(tb->height) && tb->height > 0) {
+              int fit = static_cast<int>(tb->height / rtLineH + 0.0001f);
+              if (fit >= 1) {
+                float clipH = static_cast<float>(fit) * rtLineH;
+                if (clipH < tb->height - 0.5f) {
+                  style += ";height:" + FloatToString(clipH) + "px";
+                }
+              }
+            }
           }
           out.openTag("div");
           out.addAttr("style", style);
