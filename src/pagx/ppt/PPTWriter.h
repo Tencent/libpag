@@ -455,16 +455,22 @@ inline int64_t LineHeightToSpcPts(float lineHeightPx) {
   return lineHeightPx > 0 ? static_cast<int64_t>(std::round(lineHeightPx * 75.0)) : 0;
 }
 
-// Emits an <a:pPr> with optional alignment and line-spacing. Skips emission
-// entirely when neither attribute is set, matching the previous inline blocks
-// in writeNativeText / writeParagraph / writeTextBoxGroup.
-inline void WriteParagraphProperties(XMLBuilder& out, const char* algn, int64_t lnSpcPts) {
-  if (!algn && lnSpcPts <= 0) {
+// Emits an <a:pPr> with optional alignment, line-spacing and base direction.
+// Skips emission entirely when no attribute is set, matching the previous
+// inline blocks in writeNativeText / writeParagraph / writeTextBoxGroup. When
+// `rtl` is true, emits rtl="1" so PowerPoint runs UBA with an RTL paragraph
+// base direction (pPr@rtl=0 is the OOXML default and is therefore elided).
+inline void WriteParagraphProperties(XMLBuilder& out, const char* algn, int64_t lnSpcPts,
+                                     bool rtl = false) {
+  if (!algn && lnSpcPts <= 0 && !rtl) {
     return;
   }
   auto& pPr = out.openElement("a:pPr");
   if (algn) {
     pPr.addRequiredAttribute("algn", algn);
+  }
+  if (rtl) {
+    pPr.addRequiredAttribute("rtl", "1");
   }
   if (lnSpcPts > 0) {
     pPr.closeElementStart();
@@ -751,12 +757,13 @@ class PPTWriter {
                                 const TextBox* textBox, bool useLineLayout);
   void emitNativeTextBody(XMLBuilder& out, const Text* text,
                           const std::vector<TextLayoutLineInfo>* lines, const PPTRunStyle& style,
-                          int64_t lnSpcPts, bool useLineLayout,
+                          int64_t lnSpcPts, bool rtl, bool useLineLayout,
                           const std::vector<LayerFilter*>& filters,
                           const std::vector<LayerStyle*>& styles);
   void writeParagraph(XMLBuilder& out, const std::string& lineText, const PPTRunStyle& style,
                       const std::vector<LayerFilter*>& filters,
-                      const std::vector<LayerStyle*>& styles, int64_t lnSpcPts = 0);
+                      const std::vector<LayerStyle*>& styles, int64_t lnSpcPts = 0,
+                      bool rtl = false);
   void writeParagraphRun(XMLBuilder& out, const std::string& runText, const PPTRunStyle& style,
                          const std::vector<LayerFilter*>& filters,
                          const std::vector<LayerStyle*>& styles);
@@ -779,6 +786,7 @@ class PPTWriter {
     XMLBuilder& out;
     const char* algn;
     int64_t lnSpcPts;
+    bool rtl;
     const std::vector<LayerFilter*>& filters;
     const std::vector<LayerStyle*>& styles;
     bool paragraphOpen = false;

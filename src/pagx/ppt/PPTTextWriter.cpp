@@ -265,8 +265,8 @@ void PPTWriter::emitNativeTextShapeFrame(XMLBuilder& out, const Matrix& m,
 
 void PPTWriter::emitNativeTextBody(XMLBuilder& out, const Text* text,
                                    const std::vector<TextLayoutLineInfo>* lines,
-                                   const PPTRunStyle& style, int64_t lnSpcPts, bool useLineLayout,
-                                   const std::vector<LayerFilter*>& filters,
+                                   const PPTRunStyle& style, int64_t lnSpcPts, bool rtl,
+                                   bool useLineLayout, const std::vector<LayerFilter*>& filters,
                                    const std::vector<LayerStyle*>& styles) {
   if (useLineLayout) {
     // Emit ALL visual lines inside a single <a:p> separated by soft <a:br/>
@@ -276,7 +276,7 @@ void PPTWriter::emitNativeTextBody(XMLBuilder& out, const Text* text,
     // except the semantically last participate in justify.
     bool wroteAny = false;
     out.openElement("a:p").closeElementStart();
-    WriteParagraphProperties(out, style.algn, lnSpcPts);
+    WriteParagraphProperties(out, style.algn, lnSpcPts, rtl);
     for (const auto& lineInfo : *lines) {
       if (lineInfo.byteStart >= lineInfo.byteEnd) {
         continue;
@@ -302,7 +302,7 @@ void PPTWriter::emitNativeTextBody(XMLBuilder& out, const Text* text,
     size_t nl = remaining.find('\n', pos);
     std::string line =
         (nl == std::string::npos) ? remaining.substr(pos) : remaining.substr(pos, nl - pos);
-    writeParagraph(out, line, style, filters, styles, lnSpcPts);
+    writeParagraph(out, line, style, filters, styles, lnSpcPts, rtl);
     if (nl == std::string::npos) {
       break;
     }
@@ -342,17 +342,32 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
 
   emitNativeTextShapeFrame(out, m, geom, fs.textBox, useLineLayout);
 
+  // Paragraph base direction by UBA P2/P3. Emitted via pPr@rtl so PowerPoint
+  // runs BiDi with the correct base direction and reproduces the same visual
+  // ordering as the PAGX renderer (which uses ICU with the same rule). Vertical
+  // writing mode ignores rtl per OOXML, so there's no harm in computing it in
+  // all cases.
+  bool rtl = HasRTLParagraphBase(text->text);
+
   PPTRunStyle style = BuildRunStyle(text, fs.fill, fs.stroke, alpha);
+  // TextAnchor / TextAlign use logical "Start"/"End" names; resolve them to
+  // physical left/right based on the paragraph base direction so that an RTL
+  // paragraph aligns to the right edge of its frame for Start (the default) and
+  // to the left for End. Center / Justify are direction-symmetric.
   if (text->textAnchor == TextAnchor::Center) {
     style.algn = "ctr";
+  } else if (text->textAnchor == TextAnchor::Start) {
+    style.algn = rtl ? "r" : nullptr;
   } else if (text->textAnchor == TextAnchor::End) {
-    style.algn = "r";
+    style.algn = rtl ? "l" : "r";
   }
   if (fs.textBox) {
     if (fs.textBox->textAlign == TextAlign::Center) {
       style.algn = "ctr";
+    } else if (fs.textBox->textAlign == TextAlign::Start) {
+      style.algn = rtl ? "r" : nullptr;
     } else if (fs.textBox->textAlign == TextAlign::End) {
-      style.algn = "r";
+      style.algn = rtl ? "l" : "r";
     } else if (fs.textBox->textAlign == TextAlign::Justify) {
       style.algn = "just";
     }
@@ -364,7 +379,11 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   bool isVertical = fs.textBox && fs.textBox->writingMode == WritingMode::Vertical;
   int64_t lnSpcPts = (!isVertical && fs.textBox) ? LineHeightToSpcPts(fs.textBox->lineHeight) : 0;
 
-  emitNativeTextBody(out, text, lines, style, lnSpcPts, useLineLayout, filters, styles);
+  // Vertical writing mode ignores BiDi base direction; suppress the rtl
+  // attribute so PowerPoint doesn't emit a spurious warning for eaVert text.
+  bool emitRtl = rtl && !isVertical;
+
+  emitNativeTextBody(out, text, lines, style, lnSpcPts, emitRtl, useLineLayout, filters, styles);
 
   out.closeElement();  // p:txBody
   out.closeElement();  // p:sp
@@ -465,9 +484,9 @@ void PPTWriter::writeLineBreak(XMLBuilder& out, const PPTRunStyle& style) {
 
 void PPTWriter::writeParagraph(XMLBuilder& out, const std::string& lineText,
                                const PPTRunStyle& style, const std::vector<LayerFilter*>& filters,
-                               const std::vector<LayerStyle*>& styles, int64_t lnSpcPts) {
+                               const std::vector<LayerStyle*>& styles, int64_t lnSpcPts, bool rtl) {
   out.openElement("a:p").closeElementStart();
-  WriteParagraphProperties(out, style.algn, lnSpcPts);
+  WriteParagraphProperties(out, style.algn, lnSpcPts, rtl);
   writeParagraphRun(out, lineText, style, filters, styles);
   out.closeElement();  // a:p
 }
@@ -509,7 +528,7 @@ void CollectRichTextRuns(const std::vector<Element*>& elements, const Fill* pare
 }  // namespace
 
 void PPTWriter::ParagraphEmitter::writePPr() {
-  WriteParagraphProperties(out, algn, lnSpcPts);
+  WriteParagraphProperties(out, algn, lnSpcPts, rtl);
 }
 
 void PPTWriter::ParagraphEmitter::openParagraph() {
@@ -699,18 +718,37 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
 
   emitTextBoxShapeFrame(out, box, transform, estWidth, estHeight, useLineLayout, hasBoxWidth);
 
+  // Paragraph base direction by UBA P2/P3. A TextBox carries a single pPr so
+  // all runs share one base direction; concatenating the run text in source
+  // order lets HasRTLParagraphBase walk until it hits the first strong
+  // directional character, matching the paragraph-level rule that PAGX's ICU
+  // BiDi uses. Vertical writing mode ignores rtl per OOXML, so we suppress it
+  // in that case to avoid emitting a no-op attribute.
+  bool isVertical = box->writingMode == WritingMode::Vertical;
+  bool rtl = false;
+  if (!isVertical) {
+    std::string combined;
+    for (const auto& run : runs) {
+      combined.append(run.text->text);
+    }
+    rtl = HasRTLParagraphBase(combined);
+  }
+
   const char* algn = nullptr;
   if (box->textAlign == TextAlign::Center) {
     algn = "ctr";
+  } else if (box->textAlign == TextAlign::Start) {
+    // "Start" is the logical default: left in LTR, right in RTL. OOXML defaults
+    // to "l" when algn is absent, so only emit an explicit "r" when rtl is on.
+    algn = rtl ? "r" : nullptr;
   } else if (box->textAlign == TextAlign::End) {
-    algn = "r";
+    algn = rtl ? "l" : "r";
   } else if (box->textAlign == TextAlign::Justify) {
     algn = "just";
   }
   // In vertical writing mode, PAGX lineHeight controls column width, not
   // character-to-character spacing -- skip lnSpc emission (same logic as the
   // writeNativeText path).
-  bool isVertical = box->writingMode == WritingMode::Vertical;
   int64_t lnSpcPts = isVertical ? 0 : LineHeightToSpcPts(box->lineHeight);
 
   // Build per-run styles up-front (font/size/bold/italic/color/typeface).
@@ -721,7 +759,7 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
     runStyles.push_back(BuildRunStyle(run.text, run.fill, run.stroke, alpha));
   }
 
-  ParagraphEmitter emitter{this, out, algn, lnSpcPts, filters, styles};
+  ParagraphEmitter emitter{this, out, algn, lnSpcPts, rtl, filters, styles};
   emitTextBoxBody(runs, runStyles, lineEntries, useLineLayout, emitter);
 
   out.closeElement();  // p:txBody
