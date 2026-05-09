@@ -77,6 +77,8 @@ export interface PAGXViewNative {
     draw: () => boolean;
     /** Returns true if the first frame has been rendered successfully. */
     firstFrameRendered: () => boolean;
+    /** Drop intermediate snapshots captured before gesture-state init, reset first-frame flag. */
+    resetForFreshCapture: () => void;
     /** Returns the width of the PAGX content in content pixels. */
     contentWidth: () => number;
     /** Returns the height of the PAGX content in content pixels. */

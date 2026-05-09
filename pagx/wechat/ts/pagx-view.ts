@@ -357,12 +357,17 @@ export class View {
 
   /**
    * Toggles the gesture-freeze fast path. Call with true on pan/zoom start and false on end.
-   * While active, draw() blits the last rendered frame with a relative transform instead of
-   * running the full render pipeline, eliminating most per-frame cost at the expense of
-   * visual blur when zooming beyond the snapshot scale.
+   * On active=true the native side captures the current surface as cachedSnapshot, so we
+   * wrap with makeCurrent to ensure the GL context is active for the readback.
    */
   public setGestureActive(active: boolean): void {
-    this.nativeView!.setGestureActive(active);
+    if (active && this.backendContext) {
+      this.backendContext.makeCurrent(this.module);
+      this.nativeView!.setGestureActive(active);
+      this.backendContext.clearCurrent(this.module);
+    } else {
+      this.nativeView!.setGestureActive(active);
+    }
   }
 
   /**
@@ -418,6 +423,15 @@ export class View {
    */
   public isFirstFrameRendered(): boolean {
     return this.nativeView!.firstFrameRendered();
+  }
+
+  /**
+   * Drop any cached/fit snapshots captured between parsePAGX and the gesture-state init,
+   * and reset the first-frame flag so isFirstFrameRendered() reflects post-init renders.
+   * Call right after applyGestureState() on a freshly loaded document.
+   */
+  public resetForFreshCapture(): void {
+    this.nativeView!.resetForFreshCapture();
   }
 
   /**
