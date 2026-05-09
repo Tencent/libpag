@@ -35,6 +35,7 @@
 #include "pagx/types/Padding.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/StringParser.h"
+#include "renderer/LineBreaker.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageCodec.h"
 
@@ -679,44 +680,54 @@ std::string HTMLWriter::rewriteVerticalColumnBreaks(const Text* text) {
 std::string HTMLWriter::buildVerticalJustifyContent(const Text* text, float boxHeight) {
   if (text == nullptr) return {};
   const auto& runs = text->glyphData->layoutRuns;
-  // Flatten glyph data from all runs. Positions and advances are already in layout order;
-  // advances[] carries the per-glyph `vg.height` that tgfx's vertical layout pass used to
-  // step `currentY`, and canBreakBefore[] carries the UAX-14 break flag tgfx consulted
-  // when deciding where to insert `justifyGap`.
+  if (runs.empty()) return {};
+  // Flatten glyph data across runs. Each glyph needs three derived attributes that tgfx's
+  // vertical justify pass consumes:
+  //   - position (for column-partitioning via x-coordinate gaps);
+  //   - `advance` = vg.height, i.e. the per-glyph inline-axis advance tgfx steps by. We
+  //     recompute it here from `font.getAdvance(glyphID, vertical=true/false)` rather than
+  //     plumb a new field through TextLayoutGlyphRun — the font is already stored per run,
+  //     the vertical/horizontal choice is encoded by whether the run used RSXform (rotated
+  //     Latin → horizontal advance) or not (upright CJK → vertical advance), and those are
+  //     the same two branches tgfx's layout pass uses (TextLayout.cpp:1127 / :1131). Note
+  //     this does not pick up author-specified letterSpacing; samples using letterSpacing
+  //     will be off by that amount but still produce a reasonable justify distribution.
+  //   - `canBreakBefore`, the UAX-14 flag tgfx consults before inserting justifyGap. We
+  //     recompute it by walking the source text's codepoints in lockstep with glyphs — the
+  //     mapping is 1:1 because a non-matching glyph/char count already triggers the early
+  //     fallback below.
   std::vector<tgfx::Point> glyphPositions;
   std::vector<float> glyphAdvances;
-  std::vector<bool> glyphBreakBefore;
   for (const auto& run : runs) {
+    bool rotated = !run.xforms.empty();
     for (size_t i = 0; i < run.positions.size(); ++i) {
       glyphPositions.push_back(run.positions[i]);
-      glyphAdvances.push_back(i < run.advances.size() ? run.advances[i] : 0.0f);
-      glyphBreakBefore.push_back(i < run.canBreakBefore.size() ? run.canBreakBefore[i] : false);
+      float adv = run.font.getAdvance(run.glyphs[i], /*verticalText=*/!rotated);
+      glyphAdvances.push_back(adv);
     }
   }
   if (glyphPositions.empty()) return {};
-  // If advances weren't populated (e.g. horizontal text reused this path) we can't reproduce
-  // tgfx's layout precisely — bail and let the caller emit plain text.
-  bool hasAdvances = false;
-  for (float a : glyphAdvances) {
-    if (a > 0) {
-      hasAdvances = true;
-      break;
-    }
-  }
-  if (!hasAdvances) return {};
 
-  // Count visible (non-newline) codepoints in the source text.
-  size_t visibleCount = 0;
+  // Count visible (non-newline) codepoints in the source text and gather the codepoints in
+  // text order so we can compute `canBreakBefore` per glyph.
+  std::vector<int32_t> visibleCodepoints;
+  visibleCodepoints.reserve(text->text.size());
   for (size_t pos = 0; pos < text->text.size();) {
     auto c = NextCodepoint(text->text, pos);
     if (c.byteLen == 0) break;
-    if (c.cp != '\n') ++visibleCount;
+    if (c.cp != '\n') visibleCodepoints.push_back(static_cast<int32_t>(c.cp));
     pos += c.byteLen;
   }
   // If the layout produced a different number of glyphs than visible chars, fall back (the
   // mapping would be ambiguous — for instance a cluster/ligature collapsed multiple source
   // codepoints into one glyph). Upstream caller should emit plain text instead.
-  if (visibleCount != glyphPositions.size()) return {};
+  if (visibleCodepoints.size() != glyphPositions.size()) return {};
+
+  std::vector<bool> glyphBreakBefore(glyphPositions.size(), false);
+  for (size_t i = 1; i < visibleCodepoints.size(); ++i) {
+    glyphBreakBefore[i] =
+        LineBreaker::CanBreakBetween(visibleCodepoints[i - 1], visibleCodepoints[i]);
+  }
 
   // Partition glyphs into columns using the same threshold as rewriteVerticalColumnBreaks:
   // Latin glyphs sit ~1.54px off the CJK baseline X inside a shared column (HarfBuzz vertical
@@ -734,7 +745,7 @@ std::string HTMLWriter::buildVerticalJustifyContent(const Text* text, float boxH
 
   // Replay tgfx's justify pass: for every non-last column with extra space and at least one
   // `canBreakBefore`, distribute `(boxHeight - sum(advances))` evenly across break points.
-  // Glyphs preceded by a break point emit a leading margin of `justifyGap`.
+  // Glyphs preceded by a break point emit a leading spacer of `justifyGap`.
   std::vector<float> leadingGap(glyphPositions.size(), 0.0f);
   size_t columnCount = columnStart.size() - 1;
   for (size_t c = 0; c < columnCount; ++c) {
@@ -759,10 +770,10 @@ std::string HTMLWriter::buildVerticalJustifyContent(const Text* text, float boxH
 
   // Emit one inline-block wrapper per glyph. Wrapper height pins the tgfx-computed advance
   // so Chromium's vertical inline flow reproduces tgfx's per-glyph spacing verbatim;
-  // `margin-block-start: justifyGap` (== vertical writing-mode's leading edge) inserts the
-  // extra space tgfx distributed at break points. CJK glyphs centre horizontally inside the
-  // wrapper to match tgfx's column-centred placement; Latin/digit/space glyphs rely on
-  // `white-space:nowrap` to stay cluster-tight.
+  // a leading empty inline-block spacer of `justifyGap` height inserts the extra space tgfx
+  // distributed at break points. CJK glyphs centre horizontally inside the wrapper to match
+  // tgfx's column-centred placement; Latin/digit/space glyphs rely on `white-space:nowrap`
+  // to stay cluster-tight.
   std::string out;
   out.reserve(text->text.size() * 24);
   size_t gi = 0;
@@ -779,12 +790,10 @@ std::string HTMLWriter::buildVerticalJustifyContent(const Text* text, float boxH
     float advance = glyphAdvances[gi];
     float gap = leadingGap[gi];
     bool isCjk = IsCJKCodepoint(c.cp);
-    // tgfx inserts `justifyGap` *before* every glyph whose `canBreakBefore` is true and
-    // which is not the column's first glyph. Emit the same gap as an empty inline-block
-    // spacer so Chromium's vertical inline flow advances the column by `gap` before laying
-    // out this glyph. Using a spacer (rather than margin-inline-start) sidesteps Chromium's
-    // margin-collapsing rules between consecutive inline-blocks in vertical writing modes,
-    // which can silently drop margins if the preceding sibling lacks a matching margin-end.
+    // Emit the justifyGap spacer *before* the glyph that triggered the break (matching
+    // tgfx's `currentY += justifyGap` which runs before writing glyph i+1). Using a spacer
+    // inline-block instead of margin-inline-start sidesteps Chromium's margin-collapsing
+    // rules between consecutive inline-blocks in vertical writing modes.
     if (gap > 0) {
       out += "<span style=\"display:inline-block;height:";
       out += FloatToString(gap);

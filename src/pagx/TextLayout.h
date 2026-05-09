@@ -43,13 +43,6 @@ struct TextLayoutGlyphRun {
   std::vector<tgfx::GlyphID> glyphs = {};
   std::vector<tgfx::Point> positions = {};
   std::vector<tgfx::RSXform> xforms = {};
-  // Per-glyph vertical advance (vg.height, i.e. upright vertical advance for CJK glyphs or
-  // horizontal advance for rotated Latin glyphs). Only populated for vertical-writing-mode
-  // layouts; horizontal layouts leave this empty.
-  std::vector<float> advances = {};
-  // Per-glyph UAX-14 "can break before this glyph" flag used by the layout justify pass.
-  // Only populated for vertical-writing-mode layouts.
-  std::vector<bool> canBreakBefore = {};
 };
 
 struct Text::GlyphData {
@@ -78,15 +71,6 @@ struct VerticalPositionedGlyph {
   bool useRSXform = false;
   tgfx::Point position = {};
   tgfx::RSXform xform = {};
-  // Per-glyph vertical-axis advance (the `vg.height` from the layout pass). Equals the natural
-  // upright vertical advance for CJK glyphs or the horizontal advance for rotated Latin glyphs,
-  // plus letterSpacing. Used by the HTML exporter's vertical justify path to pin inline-block
-  // heights so Chromium reproduces tgfx's per-glyph spacing (including justifyGap).
-  float advance = 0;
-  // UAX-14 "can a line break appear before this glyph" flag from the layout pass. justifyGap
-  // is added by tgfx before every glyph with this flag set; the HTML exporter applies the same
-  // gap as margin to keep token spacing aligned with tgfx.
-  bool canBreakBefore = false;
 };
 
 class TextLayoutResult {
