@@ -238,16 +238,187 @@ TEST(LayerInflater, ImagePatternDecodeFailureWarns600) {
 }
 
 // ---------------------------------------------------------------------------
-// 601 InflateFontCreateFailed — Phase 16 rewires this path through the
-// runtime shaper; old GlyphRun-blob-based trigger no longer applies.
+// 601 InflateFontCreateFailed — case B ElementText carries a shapedGlyphs
+// run that needs FontProvider to resolve the typeface. When the caller
+// passes Options{} (no fontProvider), Inflater emits 601 and drops the
+// text element. (Phase 17 rewired the old GlyphRun-blob-based trigger
+// through the shapedGlyphs path; Phase 18 kept the warn route intact.)
 // ---------------------------------------------------------------------------
 
-TEST(LayerInflater, DISABLED_OutOfRangeFontIndexWarns601) {
-  // Phase 16 (v2.20): ElementTextData::glyphRuns, the font asset table,
-  // and the per-run font index dispatch are all gone. Reinstate once the
-  // runtime shaper path produces its own 601 trigger (missing family
-  // resolution).
-  GTEST_SKIP() << "Disabled during Phase 16 rework of font resolution pipeline.";
+TEST(LayerInflater, CaseBTextNoFontProviderWarns601) {
+  auto doc = MakeDoc();
+  auto comp = MakeComp();
+  auto layer = MakeLayer(LayerType::Vector);
+
+  auto vec = std::make_unique<VectorPayload>();
+  auto textEl = std::make_unique<VectorElement>();
+  textEl->type = VectorElementType::Text;
+  auto textData = std::make_unique<ElementTextData>();
+  textData->fontFamily = "Arial";
+  textData->fontStyle = "Regular";
+  textData->fontSize = 24.0f;
+  // Case B run — Inflater must ask FontProvider for a typeface.
+  ElementTextData::ShapedGlyphRun run;
+  run.typefaceFamily = "Arial";
+  run.typefaceStyle = "Regular";
+  run.typefaceKey = "Arial|Regular|2048|3000";
+  run.fontSize = 24.0f;
+  run.glyphs = {72, 105};
+  run.positions = {{0, 0}, {12, 0}};
+  textData->shapedGlyphs.push_back(std::move(run));
+  textEl->payload = std::move(textData);
+  vec->contents.push_back(std::move(textEl));
+  layer->vector = std::move(vec);
+  comp->layers.push_back(std::move(layer));
+  doc->compositions.push_back(std::move(comp));
+
+  // Default Options = fontProvider nullptr → §500-502 triggers.
+  auto r = LayerInflater::Inflate(std::move(doc));
+  EXPECT_TRUE(HasWarningCode(r.warnings, ErrorCode::InflateFontCreateFailed));
+}
+
+// ---------------------------------------------------------------------------
+// 602 InflateGlyphRunBuildFailed — case A ElementText whose glyphRuns point
+// at an embeddedFontIndex out of range (or at a malformed EmbeddedFont with
+// unitsPerEm==0). Inflater skips the affected run and warns; the layer
+// itself stays non-null so the surrounding tree is intact.
+// ---------------------------------------------------------------------------
+
+TEST(LayerInflater, CaseATextMissingEmbeddedFontWarns602) {
+  auto doc = MakeDoc();
+  auto comp = MakeComp();
+  auto layer = MakeLayer(LayerType::Vector);
+
+  auto vec = std::make_unique<VectorPayload>();
+  auto textEl = std::make_unique<VectorElement>();
+  textEl->type = VectorElementType::Text;
+  auto textData = std::make_unique<ElementTextData>();
+  ElementTextData::GlyphRunData run;
+  run.embeddedFontIndex = 999;  // no such EmbeddedFont — will skip + warn.
+  run.fontSize = 24.0f;
+  run.glyphs = {1, 2};
+  run.positions = {{0, 0}, {12, 0}};
+  textData->glyphRuns.push_back(std::move(run));
+  textEl->payload = std::move(textData);
+  vec->contents.push_back(std::move(textEl));
+  layer->vector = std::move(vec);
+  comp->layers.push_back(std::move(layer));
+  doc->compositions.push_back(std::move(comp));
+
+  auto r = LayerInflater::Inflate(std::move(doc));
+  EXPECT_TRUE(HasWarningCode(r.warnings, ErrorCode::InflateGlyphRunBuildFailed));
+}
+
+TEST(LayerInflater, CaseATextZeroUnitsPerEmWarns602) {
+  auto doc = MakeDoc();
+  // One EmbeddedFont with unitsPerEm=0 — Inflater treats this as malformed
+  // and warns (§625-627).
+  auto embedded = std::make_unique<EmbeddedFont>();
+  embedded->unitsPerEm = 0;
+  EmbeddedGlyph g;
+  g.advance = 500.0f;
+  embedded->glyphs.push_back(std::move(g));
+  doc->embeddedFonts.push_back(std::move(embedded));
+
+  auto comp = MakeComp();
+  auto layer = MakeLayer(LayerType::Vector);
+  auto vec = std::make_unique<VectorPayload>();
+  auto textEl = std::make_unique<VectorElement>();
+  textEl->type = VectorElementType::Text;
+  auto textData = std::make_unique<ElementTextData>();
+  ElementTextData::GlyphRunData run;
+  run.embeddedFontIndex = 0;
+  run.fontSize = 24.0f;
+  run.glyphs = {0};
+  run.positions = {{0, 0}};
+  textData->glyphRuns.push_back(std::move(run));
+  textEl->payload = std::move(textData);
+  vec->contents.push_back(std::move(textEl));
+  layer->vector = std::move(vec);
+  comp->layers.push_back(std::move(layer));
+  doc->compositions.push_back(std::move(comp));
+
+  auto r = LayerInflater::Inflate(std::move(doc));
+  EXPECT_TRUE(HasWarningCode(r.warnings, ErrorCode::InflateGlyphRunBuildFailed));
+}
+
+// ---------------------------------------------------------------------------
+// ShapePayload + gradient fills — PAGX itself routes shapes through
+// VectorLayer (ShapePayload stays empty in Baker output), so these
+// codepaths are only reachable when a payload lands via a future producer
+// or a hand-built document. Covers all four Shader gradient flavors plus
+// ImagePattern-fallback (missing image index → nullptr stroke/fill is
+// dropped, ShapeLayer still instantiated).
+// ---------------------------------------------------------------------------
+
+TEST(LayerInflater, ShapePayloadGradientsInflate) {
+  auto doc = MakeDoc();
+  auto comp = MakeComp();
+
+  struct GradientSample {
+    ColorSourceType type;
+  };
+  const GradientSample samples[] = {
+      {ColorSourceType::LinearGradient},
+      {ColorSourceType::RadialGradient},
+      {ColorSourceType::ConicGradient},
+      {ColorSourceType::DiamondGradient},
+  };
+
+  for (const auto& sample : samples) {
+    auto layer = MakeLayer(LayerType::Shape);
+    auto payload = std::make_unique<ShapePayload>();
+
+    auto style = std::make_unique<ShapeStyleData>();
+    style->sourceType = sample.type;
+    // Two valid color stops so the Shader factory succeeds.
+    style->stopColors = MakeProp<std::vector<tgfx::Color>>(
+        {tgfx::Color{1.0f, 0.0f, 0.0f, 1.0f}, tgfx::Color{0.0f, 0.0f, 1.0f, 1.0f}});
+    style->stopPositions = MakeProp<std::vector<float>>({0.0f, 1.0f});
+    // Non-identity matrix → makeWithMatrix branch.
+    style->gradientMatrix = MakeProp(tgfx::Matrix::MakeTrans(5.0f, 5.0f));
+    // Linear endpoints / Radial-Conic-Diamond center-radius all need valid
+    // values to avoid the shader returning null.
+    style->startPoint = MakeProp(tgfx::Point{0.0f, 0.0f});
+    style->endPoint = MakeProp(tgfx::Point{100.0f, 0.0f});
+    style->center = MakeProp(tgfx::Point{50.0f, 50.0f});
+    style->radius = MakeProp(50.0f);
+    payload->fillStyles.push_back(std::move(style));
+
+    layer->shape = std::move(payload);
+    comp->layers.push_back(std::move(layer));
+  }
+
+  // Stroke path with ImagePattern pointing at a missing image (returns
+  // nullptr early — exercises §1053-1054 guard). Layer still instantiates.
+  {
+    auto layer = MakeLayer(LayerType::Shape);
+    auto payload = std::make_unique<ShapePayload>();
+    auto stroke = std::make_unique<ShapeStyleData>();
+    stroke->sourceType = ColorSourceType::ImagePattern;
+    stroke->patternImageIndex = 999;  // out of range.
+    payload->strokeStyles.push_back(std::move(stroke));
+    payload->strokeWidth = MakeProp(2.0f);
+    // Non-default line dash + strokeOnTop to walk §1130-1140.
+    payload->lineDashPattern = MakeProp<std::vector<float>>({4.0f, 2.0f});
+    payload->lineDashPhase = MakeProp(1.0f);
+    payload->lineDashAdaptive = true;
+    payload->strokeAlign = tgfx::StrokeAlign::Outside;
+    payload->strokeOnTop = true;
+    layer->shape = std::move(payload);
+    comp->layers.push_back(std::move(layer));
+  }
+
+  doc->compositions.push_back(std::move(comp));
+
+  auto r = LayerInflater::Inflate(std::move(doc));
+  ASSERT_NE(r.layer, nullptr);
+  // 4 gradient shape layers + 1 image-stroke shape layer = 5 children.
+  EXPECT_EQ(r.layer->children().size(), 5u);
+  for (const auto& child : r.layer->children()) {
+    auto sl = std::dynamic_pointer_cast<tgfx::ShapeLayer>(child);
+    EXPECT_NE(sl, nullptr);
+  }
 }
 
 // ---------------------------------------------------------------------------

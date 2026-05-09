@@ -75,16 +75,28 @@ echo "==> running PAGFullTest"
 #                                        the >5% retrograde gate always
 #                                        trips. Run Performance against
 #                                        the regular Debug build.
-#   - PAGRenderCrossCheck.*            — Phase 11.6 left 15 known-
-#                                        independent bugs (image_pattern
-#                                        / text / trim_path / etc.);
-#                                        each is tracked as its own
-#                                        bug-fix Phase, not Phase 15.
-#                                        Their codepaths are still
-#                                        exercised by PAGRender-
-#                                        EquivalenceTest and
-#                                        InflaterParity so coverage is
-#                                        not lost.
+#   - PAGRenderEquivalenceTest.Render_Baseline.*,
+#     PAGRenderEquivalenceTest.OutlineAll_Baseline.*
+#                                      — these compare a freshly rendered
+#                                        surface to webp baselines in
+#                                        test/baseline/; until the user
+#                                        runs /accept-baseline to promote
+#                                        current renders to baseline
+#                                        (design doc §19 P1-10), they FAIL
+#                                        on every fresh checkout and abort
+#                                        the script via `set -e`. The
+#                                        render codepaths themselves are
+#                                        still walked before the pixel
+#                                        compare, so profraw is recorded
+#                                        for the render half — but the
+#                                        pixel compare pass never contributes
+#                                        new lines anyway. Keeping
+#                                        PAGRenderCrossCheck in the run
+#                                        (it's the second render per
+#                                        sample) is worth the extra wall
+#                                        time because it adds ~11 pp of
+#                                        line coverage on LayerInflater
+#                                        alone (measured 2026-05-09).
 #   - PAGXHtmlTest.HtmlScreenshotCompare,
 #     PAGXTest.HtmlFiles               — PAGX→HTML export (puppeteer +
 #                                        HTML renderer) is a separate
@@ -95,16 +107,20 @@ echo "==> running PAGFullTest"
 #                                        its own Phase.
 LLVM_PROFILE_FILE="${PROFRAW_DIR}/full-%p.profraw" \
     "${FULL_TEST_BIN}" \
-    --gtest_filter='-PAGPerformance.*:AllSamples/PAGRenderCrossCheck.*:PAGXHtmlTest.HtmlScreenshotCompare:PAGXTest.HtmlFiles'
+    --gtest_filter='-PAGPerformance.*:AllSamples/PAGRenderEquivalenceTest.Render_Baseline*:AllSamples/PAGRenderEquivalenceTest.OutlineAll_Baseline*:PAGXHtmlTest.HtmlScreenshotCompare:PAGXTest.HtmlFiles'
 
 echo "==> running PAGDecodeFuzz over test/fuzz_corpus/decode_seeds"
 LLVM_PROFILE_FILE="${PROFRAW_DIR}/decode-%p.profraw" \
     "${DECODE_FUZZ_BIN}" test/fuzz_corpus/decode_seeds
 
 echo "==> running PAGInflaterFuzz over test/fuzz_corpus/inflater_seeds"
-# inflater_seeds is currently empty (Phase 12 left it as a placeholder);
-# the standalone runner just reports "0 seeds" and exits cleanly, which
-# still contributes entry-point coverage for the harness itself.
+# inflater_seeds is currently empty (Phase 12 left it as a placeholder); its
+# parent directory may even be missing on a fresh checkout. The standalone
+# runner exits with a non-zero status when the seed dir does not exist, which
+# `set -e` treats as fatal and the coverage pipeline never reaches the
+# profdata merge. Create the directory up-front so the runner always sees
+# "0 seeds" and exits cleanly — harness entry-point coverage still recorded.
+mkdir -p test/fuzz_corpus/inflater_seeds
 LLVM_PROFILE_FILE="${PROFRAW_DIR}/inflater-%p.profraw" \
     "${INFLATER_FUZZ_BIN}" test/fuzz_corpus/inflater_seeds
 
