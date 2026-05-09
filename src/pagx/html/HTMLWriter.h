@@ -117,22 +117,6 @@ std::string PaddingToCSS(const Padding& padding);
  */
 bool TextStartsWithRTL(const std::string& utf8Text);
 
-/**
- * Builds inline HTML content for a vertical-writing-mode Text that needs per-character
- * spacing control (typically `textAlign="justify"` with a declared `lineHeight`). The
- * algorithm walks the source text in lockstep with the tgfx-produced layoutRuns positions,
- * wraps each CJK character (or individual upright glyph) in an `<span style="display:inline-
- * block;height:{advance}px">` so its inline-axis advance matches tgfx exactly, and keeps
- * contiguous Latin/digit runs wrapped as a single `<span>` so they retain their natural
- * horizontal shaping. Newlines (U+000A) become `<br>`. Returns an HTML fragment whose
- * characters are already HTML-escaped and that must be emitted inside an outer `<span>`
- * carrying font/color styling via `closeTagWithRawContent`.
- *
- * Falls back to an empty string (caller should fall back to the plain text path) when the
- * text has no associated layoutRuns or when the glyph/char counts diverge.
- */
-std::string BuildVerticalJustifyContent(const Text* text);
-
 std::string GetImageSrc(const Image* image);
 const char* DetectImageMime(const uint8_t* bytes, size_t size);
 
@@ -362,6 +346,22 @@ class HTMLWriter {
   // chain unconditionally. Lives on HTMLWriter so it can access Text's private `glyphData`
   // through the existing `friend class HTMLWriter` declaration without adding a new friend.
   static std::string rewriteVerticalColumnBreaks(const Text* text);
+
+  // Builds inline HTML content for a vertical-writing-mode Text inside a TextBox that uses
+  // `textAlign="justify"`. Replays tgfx's vertical layout pass: each glyph becomes an
+  // `inline-block` whose height equals tgfx's `vg.height` advance, and every glyph marked
+  // `canBreakBefore` in a non-last column receives a leading `margin-block-start` of
+  // `justifyGap = (boxHeight - sum(advances)) / breakCount`. Chromium's vertical inline flow
+  // then reproduces tgfx's per-token spacing verbatim — `春眠 Not 觉晓` no longer collapses
+  // "眠" towards the Latin run (the pre-2026-05-09 implementation stretched the "眠" wrapper
+  // across the whole Latin run and centred the glyph inside the inflated span, visibly
+  // misaligning against tgfx). Requires TextLayoutGlyphRun.advances + canBreakBefore to be
+  // populated (only vertical layouts emit them). Returns an empty string (caller falls back
+  // to plain text) when those fields are missing or when the source/glyph counts diverge.
+  // `boxHeight` is the TextBox's declared height; 0/NaN disables justify-gap distribution.
+  // Lives on HTMLWriter so it can access Text's private `glyphData` through the existing
+  // `friend class HTMLWriter` declaration without adding a new friend.
+  static std::string buildVerticalJustifyContent(const Text* text, float boxHeight);
 
   // Color source conversions. `boxLeft`/`boxTop`/`boxWidth`/`boxHeight` describe the element
   // box (in the gradient source's coordinate space) that the CSS background will paint into.

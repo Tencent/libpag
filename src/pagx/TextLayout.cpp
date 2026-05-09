@@ -807,6 +807,8 @@ class TextLayoutContext {
         size_t count = runEnd - runStart;
         run.glyphs.reserve(count);
         run.positions.reserve(count);
+        run.advances.reserve(count);
+        run.canBreakBefore.reserve(count);
         if (runUseRSXform) {
           run.xforms.reserve(count);
         }
@@ -818,6 +820,8 @@ class TextLayoutContext {
           } else {
             run.positions.push_back(glyphs[i].position);
           }
+          run.advances.push_back(glyphs[i].advance);
+          run.canBreakBefore.push_back(glyphs[i].canBreakBefore);
         }
         runs.push_back(std::move(run));
         runStart = runEnd;
@@ -1436,6 +1440,8 @@ class TextLayoutContext {
           float tx = columnCenterX - (absAscent - g.descent) / 2;
           float ty = currentY - vg.leadingSquash;
           vpg.xform = tgfx::RSXform::Make(0, 1, tx, ty);
+          vpg.advance = vg.height;
+          vpg.canBreakBefore = vg.canBreakBefore;
           result.verticalGlyphs[g.sourceText].push_back(vpg);
         } else {
           // With HarfBuzz vert shaping, use getVerticalOffset() for all upright glyphs.
@@ -1449,6 +1455,8 @@ class TextLayoutContext {
           float glyphX = columnCenterX + offset.x;
           float glyphY = currentY - vg.leadingSquash + offset.y;
           vpg.position = tgfx::Point::Make(glyphX, glyphY);
+          vpg.advance = vg.height;
+          vpg.canBreakBefore = vg.canBreakBefore;
           result.verticalGlyphs[g.sourceText].push_back(vpg);
         }
 

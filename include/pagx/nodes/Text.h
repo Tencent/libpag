@@ -162,7 +162,6 @@ class Text : public Element, public LayoutNode {
   friend class PAGXDocument;
   friend class TextBox;
   friend class TextLayout;
-  friend std::string BuildVerticalJustifyContent(const Text*);
 };
 
 }  // namespace pagx

@@ -676,16 +676,35 @@ std::string HTMLWriter::rewriteVerticalColumnBreaks(const Text* text) {
   return out;
 }
 
-std::string BuildVerticalJustifyContent(const Text* text) {
+std::string HTMLWriter::buildVerticalJustifyContent(const Text* text, float boxHeight) {
   if (text == nullptr) return {};
   const auto& runs = text->glyphData->layoutRuns;
-  // Collect all glyph positions in run order (within each run, glyphs are already in text order).
+  // Flatten glyph data from all runs. Positions and advances are already in layout order;
+  // advances[] carries the per-glyph `vg.height` that tgfx's vertical layout pass used to
+  // step `currentY`, and canBreakBefore[] carries the UAX-14 break flag tgfx consulted
+  // when deciding where to insert `justifyGap`.
   std::vector<tgfx::Point> glyphPositions;
+  std::vector<float> glyphAdvances;
+  std::vector<bool> glyphBreakBefore;
   for (const auto& run : runs) {
-    for (const auto& pos : run.positions) {
-      glyphPositions.push_back(pos);
+    for (size_t i = 0; i < run.positions.size(); ++i) {
+      glyphPositions.push_back(run.positions[i]);
+      glyphAdvances.push_back(i < run.advances.size() ? run.advances[i] : 0.0f);
+      glyphBreakBefore.push_back(i < run.canBreakBefore.size() ? run.canBreakBefore[i] : false);
     }
   }
+  if (glyphPositions.empty()) return {};
+  // If advances weren't populated (e.g. horizontal text reused this path) we can't reproduce
+  // tgfx's layout precisely — bail and let the caller emit plain text.
+  bool hasAdvances = false;
+  for (float a : glyphAdvances) {
+    if (a > 0) {
+      hasAdvances = true;
+      break;
+    }
+  }
+  if (!hasAdvances) return {};
+
   // Count visible (non-newline) codepoints in the source text.
   size_t visibleCount = 0;
   for (size_t pos = 0; pos < text->text.size();) {
@@ -699,147 +718,89 @@ std::string BuildVerticalJustifyContent(const Text* text) {
   // codepoints into one glyph). Upstream caller should emit plain text instead.
   if (visibleCount != glyphPositions.size()) return {};
 
-  // Build a parallel list of "is this glyph a CJK codepoint" flags so the advance pass can
-  // skip over Latin/digit/space glyphs that PAGX treats as a single horizontal token.
-  std::vector<bool> glyphIsCjk(glyphPositions.size(), false);
-  {
-    size_t gi = 0;
-    for (size_t pos = 0; pos < text->text.size();) {
-      auto c = NextCodepoint(text->text, pos);
-      if (c.byteLen == 0) break;
-      if (c.cp != '\n') {
-        if (gi < glyphPositions.size()) {
-          glyphIsCjk[gi] = IsCJKCodepoint(c.cp);
-        }
-        ++gi;
-      }
-      pos += c.byteLen;
+  // Partition glyphs into columns using the same threshold as rewriteVerticalColumnBreaks:
+  // Latin glyphs sit ~1.54px off the CJK baseline X inside a shared column (HarfBuzz vertical
+  // metrics), so only `|dx| >= renderFontSize/2` counts as a real column transition.
+  float columnThreshold = text->renderFontSize() * 0.5f;
+  if (columnThreshold <= 0) columnThreshold = 12.0f;
+  std::vector<size_t> columnStart;  // index of first glyph in each column
+  columnStart.push_back(0);
+  for (size_t i = 1; i < glyphPositions.size(); ++i) {
+    if (std::fabs(glyphPositions[i].x - glyphPositions[i - 1].x) >= columnThreshold) {
+      columnStart.push_back(i);
+    }
+  }
+  columnStart.push_back(glyphPositions.size());  // sentinel
+
+  // Replay tgfx's justify pass: for every non-last column with extra space and at least one
+  // `canBreakBefore`, distribute `(boxHeight - sum(advances))` evenly across break points.
+  // Glyphs preceded by a break point emit a leading margin of `justifyGap`.
+  std::vector<float> leadingGap(glyphPositions.size(), 0.0f);
+  size_t columnCount = columnStart.size() - 1;
+  for (size_t c = 0; c < columnCount; ++c) {
+    size_t start = columnStart[c];
+    size_t end = columnStart[c + 1];
+    if (c + 1 == columnCount) continue;  // last column: no justify (TextAlign::Start semantics)
+    if (boxHeight <= 0) continue;
+    float naturalHeight = 0;
+    size_t breakCount = 0;
+    for (size_t i = start; i < end; ++i) {
+      naturalHeight += glyphAdvances[i];
+      if (i > start && glyphBreakBefore[i]) ++breakCount;
+    }
+    if (breakCount == 0) continue;
+    float extra = boxHeight - naturalHeight;
+    if (extra <= 0) continue;
+    float justifyGap = extra / static_cast<float>(breakCount);
+    for (size_t i = start + 1; i < end; ++i) {
+      if (glyphBreakBefore[i]) leadingGap[i] = justifyGap;
     }
   }
 
-  // Compute per-CJK-glyph inline-axis advance. For a CJK glyph i, we want the y-delta to
-  // either the next CJK glyph in the same column (so the wrapper height absorbs all the
-  // intermediate Latin/space glyphs) or — when this is the last glyph in the column or
-  // the next CJK is in a different column — the column's natural per-CJK advance.
-  std::vector<float> advances(glyphPositions.size(), 0.0f);
-  for (size_t i = 0; i + 1 < glyphPositions.size(); ++i) {
-    if (glyphPositions[i + 1].x != glyphPositions[i].x) continue;
-    if (!glyphIsCjk[i]) continue;
-    // Find the next CJK in the same column; absorb all glyphs between i and j into i's advance.
-    for (size_t j = i + 1; j < glyphPositions.size(); ++j) {
-      if (glyphPositions[j].x != glyphPositions[i].x) break;
-      if (glyphIsCjk[j]) {
-        advances[i] = glyphPositions[j].y - glyphPositions[i].y;
-        break;
-      }
-    }
-  }
-  // For each column, the dominant inter-CJK advance is the max of advances[] within that
-  // column's CJK glyphs. Apply it to the column's last CJK glyph (which has no successor
-  // CJK to derive an advance from) so its wrapper has the same pinned height as siblings.
-  std::vector<float> colMaxAdvance(glyphPositions.size(), 0.0f);
-  {
-    size_t colStart = 0;
-    for (size_t i = 1; i <= glyphPositions.size(); ++i) {
-      bool columnBreak =
-          (i == glyphPositions.size()) || (glyphPositions[i].x != glyphPositions[colStart].x);
-      if (columnBreak) {
-        float colMax = 0.0f;
-        for (size_t j = colStart; j < i; ++j) {
-          if (advances[j] > colMax) colMax = advances[j];
-        }
-        for (size_t j = colStart; j < i; ++j) {
-          colMaxAdvance[j] = colMax;
-        }
-        // Find the column's last CJK glyph and assign it colMax.
-        if (colMax > 0.0f) {
-          for (size_t j = i; j > colStart; --j) {
-            if (glyphIsCjk[j - 1]) {
-              advances[j - 1] = colMax;
-              break;
-            }
-          }
-        }
-        colStart = i;
-      }
-    }
-  }
-  // Use the font size as the natural CJK vertical advance (CJK vertAdvance ≈ font-size for
-  // Noto Sans SC and most CJK fonts). Columns whose colMaxAdvance is significantly larger
-  // than this are justified — the wrappers must pin the inflated advance. Columns whose
-  // colMaxAdvance is at or below this threshold are non-justified — emitting wrappers there
-  // would introduce inline-block baseline shifts that misalign against the PAGX render.
-  float naturalAdvance = text->renderFontSize();
-
-  // Walk source text and pair each visible codepoint with the corresponding glyph advance.
-  // Newlines become <br>; CJK glyphs are wrapped with the pinned inline-axis height so
-  // Chromium's line layout cannot shrink them back to the natural glyph advance.
+  // Emit one inline-block wrapper per glyph. Wrapper height pins the tgfx-computed advance
+  // so Chromium's vertical inline flow reproduces tgfx's per-glyph spacing verbatim;
+  // `margin-block-start: justifyGap` (== vertical writing-mode's leading edge) inserts the
+  // extra space tgfx distributed at break points. CJK glyphs centre horizontally inside the
+  // wrapper to match tgfx's column-centred placement; Latin/digit/space glyphs rely on
+  // `white-space:nowrap` to stay cluster-tight.
   std::string out;
-  out.reserve(text->text.size() * 16);
+  out.reserve(text->text.size() * 24);
   size_t gi = 0;
-  bool inLatinRun = false;
   for (size_t pos = 0; pos < text->text.size();) {
     auto c = NextCodepoint(text->text, pos);
     if (c.byteLen == 0) break;
     std::string srcBytes = text->text.substr(pos, c.byteLen);
     pos += c.byteLen;
-
     if (c.cp == '\n') {
-      if (inLatinRun) {
-        out += "</span>";
-        inLatinRun = false;
-      }
       out += "<br>";
       continue;
     }
-
     if (gi >= glyphPositions.size()) break;
-    float advance = advances[gi];
-    ++gi;
-
+    float advance = glyphAdvances[gi];
+    float gap = leadingGap[gi];
     bool isCjk = IsCJKCodepoint(c.cp);
-    if (isCjk) {
-      if (inLatinRun) {
-        out += "</span>";
-        inLatinRun = false;
-      }
-      // Only wrap when this glyph's advance is meaningfully larger than the font's natural
-      // vertical advance (indicating a justified column). Otherwise let Chromium's default
-      // inline flow place the glyph — wrapping a non-justified glyph introduces a small
-      // inline-block baseline shift that visibly misaligns against the PAGX render.
-      bool needsWrap = advance > naturalAdvance + 0.5f;
-      if (needsWrap) {
-        out += "<span style=\"display:inline-block;height:";
-        out += FloatToString(advance);
-        out += "px;line-height:";
-        out += FloatToString(advance);
-        out += "px;text-align:center\">";
-        out += EscapeHtmlChar(c.cp, srcBytes);
-        out += "</span>";
-      } else {
-        out += EscapeHtmlChar(c.cp, srcBytes);
-      }
-    } else {
-      // Latin / digit / space: accumulate into an inline-block that runs in the parent's
-      // writing mode (vertical-rl) but with `white-space:nowrap` so Latin chars stay
-      // together and don't trigger column breaks individually. This matches PAGX's behaviour
-      // of treating contiguous Latin chars as natural-advance glyphs without justify spacing.
-      bool columnJustified = colMaxAdvance[gi - 1] > naturalAdvance + 0.5f;
-      if (columnJustified) {
-        if (!inLatinRun) {
-          out +=
-              "<span style=\"display:inline-block;white-space:nowrap;line-height:1;"
-              "vertical-align:baseline\">";
-          inLatinRun = true;
-        }
-      } else if (inLatinRun) {
-        out += "</span>";
-        inLatinRun = false;
-      }
-      out += EscapeHtmlChar(c.cp, srcBytes);
+    // tgfx inserts `justifyGap` *before* every glyph whose `canBreakBefore` is true and
+    // which is not the column's first glyph. Emit the same gap as an empty inline-block
+    // spacer so Chromium's vertical inline flow advances the column by `gap` before laying
+    // out this glyph. Using a spacer (rather than margin-inline-start) sidesteps Chromium's
+    // margin-collapsing rules between consecutive inline-blocks in vertical writing modes,
+    // which can silently drop margins if the preceding sibling lacks a matching margin-end.
+    if (gap > 0) {
+      out += "<span style=\"display:inline-block;height:";
+      out += FloatToString(gap);
+      out += "px;width:0\"></span>";
     }
+    out += "<span style=\"display:inline-block;white-space:nowrap;line-height:";
+    out += FloatToString(advance > 0 ? advance : text->renderFontSize());
+    out += "px;height:";
+    out += FloatToString(advance > 0 ? advance : text->renderFontSize());
+    out += "px";
+    if (isCjk) out += ";text-align:center";
+    out += "\">";
+    out += EscapeHtmlChar(c.cp, srcBytes);
+    out += "</span>";
+    ++gi;
   }
-  if (inLatinRun) out += "</span>";
   return out;
 }
 

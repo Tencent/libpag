@@ -752,7 +752,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               // ourselves to reproduce tgfx's justify distribution on mixed CJK/Latin runs.
               bool usedPerCharDom = false;
               if (tb->writingMode == WritingMode::Vertical && tb->textAlign == TextAlign::Justify) {
-                std::string justifiedContent = BuildVerticalJustifyContent(span.text);
+                std::string justifiedContent = buildVerticalJustifyContent(span.text, tb->height);
                 if (!justifiedContent.empty()) {
                   out.closeTagWithRawContent(justifiedContent);
                   usedPerCharDom = true;
