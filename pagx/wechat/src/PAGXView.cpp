@@ -620,25 +620,31 @@ void PAGXView::setBoundsOrigin(float x, float y) {
 }
 
 void PAGXView::setGestureActive(bool active) {
-  // Need at least one snapshot to composite; suppress freeze until the first full render.
-  if (active && cachedSnapshot == nullptr && fitSnapshot == nullptr) {
-    tgfx::PrintLog("[Gesture] start SUPPRESSED: snapshots both null");
-    gestureActive = false;
-    return;
-  }
   if (active) {
-    tgfx::PrintLog("[Gesture] start cachedV%u(z=%.3f off=%.1f,%.1f) fitV%u(z=%.3f off=%.1f,%.1f)",
-                   cachedVersion, snapshotZoom, snapshotOffset.x, snapshotOffset.y,
-                   fitVersion, fitSnapshotZoom, fitSnapshotOffset.x, fitSnapshotOffset.y);
+    // 手势开始时立即抓主 surface 当前像素作为 cached（高清主视图层）。后续手势期间
+    // composite 把 cached 在 fit 之上 blit，提供"用户开始操作那一刻"的清晰内容。
+    if (surface != nullptr && device != nullptr) {
+      auto context = device->lockContext();
+      if (context != nullptr) {
+        cachedSnapshot = surface->makeImageSnapshot();
+        snapshotZoom = static_cast<float>(displayList.zoomScale());
+        snapshotOffset = displayList.contentOffset();
+        cachedVersion++;
+        device->unlock();
+      }
+    }
+    if (cachedSnapshot == nullptr && fitSnapshot == nullptr) {
+      tgfx::PrintLog("[Gesture] start SUPPRESSED: snapshots both null");
+      gestureActive = false;
+      return;
+    }
+    tgfx::PrintLog(
+        "[Gesture] start cachedV%u(z=%.3f off=%.1f,%.1f) fitV%u",
+        cachedVersion, snapshotZoom, snapshotOffset.x, snapshotOffset.y, fitVersion);
   } else {
-    // Record gesture-end timestamp so subsequent capture sites can decide whether the
-    // user has truly settled (>= cooldown ms since last gesture end) before refreshing
-    // cachedSnapshot. This prevents back-to-back gestures from constantly overwriting
-    // cached with mid-refinement frames.
     lastGestureEndMs = emscripten_get_now();
     tgfx::PrintLog("[Gesture] end @ %.0fms", lastGestureEndMs);
   }
-  // Any gesture transition invalidates the zoom-out idle token.
   zoomedOutFrameSettled = false;
   gestureActive = active;
 }
@@ -811,27 +817,50 @@ bool PAGXView::draw() {
       canvas->restore();
       fitDrawn = true;
     }
-    // Layer 2: cached snapshot (last viewport, sharp at its capture zoom), on top of fit.
-    // 当前阶段：仅绘制 fitSnapshot（首帧捕获的全文档底图）。cachedSnapshot 不再绘制
-    // 也不再捕获，避免清晰图与 fit 拼接产生的割裂感。
-    bool cachedDrawn = false;
+    // cached blit：cached 是手势开始瞬间的主 surface 截图（含 background）。clipRect
+    // 限制只画 cached 内文档实际占据的矩形，避免 cached 的 background 覆盖 fit 内容。
     float cachedScale = 0.0f;
     float cctx = 0.0f;
     float ccty = 0.0f;
-    // 拼接诊断：每 30 帧一次。当前只有 fit 在画。
+    bool cachedDrawn = false;
+    if (cachedSnapshot != nullptr) {
+      cachedScale = snapshotZoom != 0.0f ? liveZoom / snapshotZoom : 1.0f;
+      cctx = liveOffset.x - snapshotOffset.x * cachedScale;
+      ccty = liveOffset.y - snapshotOffset.y * cachedScale;
+      // 计算 cached 内文档矩形（cached 像素坐标系）：
+      //   surface 像素 = (内容点 * fitContentScale + center) * snapshotZoom + snapshotOffset
+      float fitContentScale = computeFitScale();
+      if (fitContentScale > 0.0f) {
+        float centerX = (static_cast<float>(_width) - pagxWidth * fitContentScale) * 0.5f;
+        float centerY = (static_cast<float>(_height) - pagxHeight * fitContentScale) * 0.5f;
+        float docLeft = centerX * snapshotZoom + snapshotOffset.x;
+        float docTop = centerY * snapshotZoom + snapshotOffset.y;
+        float docRight =
+            (centerX + pagxWidth * fitContentScale) * snapshotZoom + snapshotOffset.x;
+        float docBottom =
+            (centerY + pagxHeight * fitContentScale) * snapshotZoom + snapshotOffset.y;
+        canvas->save();
+        canvas->translate(cctx, ccty);
+        canvas->scale(cachedScale, cachedScale);
+        canvas->clipRect(tgfx::Rect::MakeLTRB(docLeft, docTop, docRight, docBottom));
+        canvas->drawImage(cachedSnapshot);
+        canvas->restore();
+        cachedDrawn = true;
+      }
+    }
+    // 拼接诊断：每 30 帧一次。
     static int compositeFrameCount = 0;
     if ((compositeFrameCount++ % 30) == 0) {
       tgfx::PrintLog(
           "[Composite] #%d gesture=%d live(z=%.3f off=%.1f,%.1f) | "
-          "fit drawn=%d scale=%.3f tx=%.1f ty=%.1f | cached disabled",
+          "fit drawn=%d scale=%.3f tx=%.1f ty=%.1f | "
+          "cached drawn=%d scale=%.3f tx=%.1f ty=%.1f cap(z=%.3f off=%.1f,%.1f)",
           compositeFrameCount, gestureActive ? 1 : 0,
           liveZoom, liveOffset.x, liveOffset.y,
-          fitDrawn ? 1 : 0, fitScale, ftx, fty);
+          fitDrawn ? 1 : 0, fitScale, ftx, fty,
+          cachedDrawn ? 1 : 0, cachedScale, cctx, ccty,
+          snapshotZoom, snapshotOffset.x, snapshotOffset.y);
     }
-    (void)cachedDrawn;
-    (void)cachedScale;
-    (void)cctx;
-    (void)ccty;
     auto recording = context->flush();
     if (recording) {
       context->submit(std::move(recording));
