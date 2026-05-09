@@ -67,19 +67,6 @@ constexpr size_t MIN_RECOVERY_FRAMES_ZOOM_END = 10;
 // constant to tune log verbosity. submit() is asynchronous in the WebGL backend, so its reported
 // time only reflects CPU-side command submission, not actual GPU execution.
 constexpr double SLOW_FRAME_LOG_THRESHOLD_MS = 200.0;
-// Master switch for the snapshot-based fast path (cachedSnapshot/fitSnapshot composite during
-// gestures, plus the zoom-out idle short-circuit). When enabled, draw() captures
-// surface->makeImageSnapshot() at the end of each normal render and reuses it on the next
-// frame to bypass displayList.render(); when disabled, every draw() goes through the normal
-// render path. The fast path delivers a large speedup during pan/zoom on heavy PAGX content
-// but currently has a page-switch artifact under investigation -- when the user switches
-// pages, the new page's first frame can be partially overwritten by stale snapshot pixels.
-// Until that root cause is fixed, ship with the fast path off and accept the gesture-time
-// performance regression. Flip back to 1 to re-enable both capture and the fast paths
-// together; the related members (cachedSnapshot/fitSnapshot/etc.) are kept in PAGXView.h
-// regardless so the surrounding bookkeeping remains compilable.
-#define PAGX_ENABLE_SNAPSHOT_FAST_PATH 0
-
 // Master switch for all draw()-path telemetry logs (slow-frame breakdown, first-frame breakdown).
 // Hardcoded off in shipped builds to keep the WeChat log channel quiet; flip to true and rebuild
 // when investigating a frame-pacing regression. `if constexpr` lets the compiler fully strip the
@@ -716,7 +703,6 @@ bool PAGXView::draw() {
 
   double frameStartMs = emscripten_get_now();
 
-#if PAGX_ENABLE_SNAPSHOT_FAST_PATH
   float liveZoom = static_cast<float>(displayList.zoomScale());
   const auto& liveOffset = displayList.contentOffset();
 
@@ -800,7 +786,6 @@ bool PAGXView::draw() {
     }
     return true;
   }
-#endif  // PAGX_ENABLE_SNAPSHOT_FAST_PATH
 
   // Capture before rendering so the post-render logging block can identify the first frame.
   bool wasFirstFrame = !hasRenderedFirstFrame;
@@ -862,7 +847,6 @@ bool PAGXView::draw() {
       if (!hasRenderedFirstFrame) {
         hasRenderedFirstFrame = true;
       }
-#if PAGX_ENABLE_SNAPSHOT_FAST_PATH
       // Capture this fully-rendered frame as cachedSnapshot for the next gesture.
       // Done inside the lock because makeImageSnapshot on a BackendRenderTarget triggers
       // a GPU readback/copy.
@@ -879,7 +863,6 @@ bool PAGXView::draw() {
         fitSnapshotZoom = snapshotZoom;
         fitSnapshotOffset = snapshotOffset;
       }
-#endif  // PAGX_ENABLE_SNAPSHOT_FAST_PATH
     }
 
     double unlockStartMs = emscripten_get_now();
