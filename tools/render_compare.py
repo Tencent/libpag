@@ -221,40 +221,42 @@ def render_html(cards_by_section: dict[str, list[Card]]) -> str:
   <title>PAGX vs PAGX-to-PAG render comparison ({total_samples} samples)</title>
   <style>
 :root {{
-  color-scheme: light dark;
+  color-scheme: light;
 {css_vars}
 }}
 body {{
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   margin: 0;
   padding: 0;
-  background: #1e1e1e;
-  color: #e0e0e0;
+  background: #f8fafc;
+  color: #0f172a;
 }}
 .topbar {{
   position: sticky;
   top: 0;
   z-index: 10;
-  background: #0f172a;
-  border-bottom: 1px solid #1f2937;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
   padding: 14px 20px 0;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }}
 .topbar h1 {{
   font-size: 16px;
   margin: 0 0 6px;
-  color: #e2e8f0;
+  color: #0f172a;
   font-weight: 600;
 }}
 .topbar .sub {{
   font-size: 12px;
-  color: #94a3b8;
+  color: #475569;
   margin-bottom: 12px;
 }}
 .topbar code {{
-  background: rgba(255,255,255,0.06);
+  background: #f1f5f9;
   padding: 1px 5px;
   border-radius: 3px;
   font-size: 11px;
+  color: #334155;
 }}
 .tabs {{
   display: flex;
@@ -267,18 +269,19 @@ body {{
   align-items: center;
   gap: 6px;
   padding: 7px 14px 9px;
-  border: 1px solid transparent;
+  border: 1px solid #e2e8f0;
   border-bottom: none;
   border-radius: 8px 8px 0 0;
-  background: rgba(255,255,255,0.04);
-  color: #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
   font-size: 13px;
   cursor: pointer;
-  transition: background 0.12s, color 0.12s;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
 }}
 .tab:hover {{
-  background: rgba(255,255,255,0.08);
-  color: #fff;
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #cbd5e1;
 }}
 .tab.active {{
   background: var(--tab-color, #2563eb);
@@ -290,22 +293,22 @@ body {{
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--tab-color, #94a3b8);
+  background: var(--tab-color, #cbd5e1);
 }}
 .tab.active .dot {{
-  background: rgba(255,255,255,0.85);
+  background: rgba(255,255,255,0.9);
 }}
 .tab .count {{
   display: inline-block;
   padding: 1px 7px;
   border-radius: 10px;
-  background: rgba(255,255,255,0.08);
-  color: #cbd5e1;
+  background: #e2e8f0;
+  color: #475569;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }}
 .tab.active .count {{
-  background: rgba(255,255,255,0.22);
+  background: rgba(255,255,255,0.25);
   color: white;
 }}
 main {{
@@ -319,7 +322,7 @@ main {{
 }}
 .section-meta {{
   font-size: 13px;
-  color: #94a3b8;
+  color: #475569;
   margin: 4px 0 12px;
   display: flex;
   align-items: center;
@@ -329,11 +332,11 @@ main {{
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: var(--section-color, #94a3b8);
+  background: var(--section-color, #cbd5e1);
 }}
 .section-meta code {{
-  color: #e0e0e0;
-  background: rgba(255,255,255,0.06);
+  color: #0f172a;
+  background: #e2e8f0;
   padding: 1px 6px;
   border-radius: 3px;
 }}
@@ -341,37 +344,45 @@ table {{
   border-collapse: collapse;
   width: 100%;
   table-layout: fixed;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  overflow: hidden;
 }}
 thead th {{
   position: sticky;
   top: 88px;
-  background: #1f2937;
+  background: #f1f5f9;
   padding: 10px 12px;
   text-align: left;
-  border-bottom: 2px solid #334155;
+  border-bottom: 1px solid #cbd5e1;
   font-size: 13px;
   z-index: 2;
-  color: #e2e8f0;
+  color: #0f172a;
+  font-weight: 600;
 }}
 th.col-index {{ width: 50px; text-align: right; }}
 th.col-name {{ width: 240px; }}
 th.col-cell {{ width: calc((100% - 290px) / 2); }}
 tbody td {{
   padding: 12px;
-  border-bottom: 1px solid #2d2d2d;
+  border-bottom: 1px solid #f1f5f9;
   vertical-align: top;
+}}
+tbody tr:last-child td {{
+  border-bottom: none;
 }}
 td.index {{
   font-family: "SF Mono", Menlo, Consolas, monospace;
   font-size: 13px;
-  color: #808080;
+  color: #94a3b8;
   text-align: right;
   padding-right: 8px;
 }}
 td.name {{
   font-family: "SF Mono", Menlo, Consolas, monospace;
   font-size: 13px;
-  color: #b5cea8;
+  color: #0369a1;
 }}
 td.name a {{
   color: inherit;
@@ -382,14 +393,14 @@ td.name a:hover {{
 }}
 td.name .size {{
   display: block;
-  color: #64748b;
+  color: #94a3b8;
   font-size: 11px;
   font-weight: normal;
   margin-top: 2px;
 }}
 td.cell {{
   background:
-    repeating-conic-gradient(#2a2a2a 0% 25%, #232323 0% 50%) 50% / 20px 20px;
+    repeating-conic-gradient(#f1f5f9 0% 25%, #e2e8f0 0% 50%) 50% / 20px 20px;
   text-align: center;
   min-height: 80px;
 }}
@@ -397,16 +408,16 @@ td.cell img {{
   max-width: 100%;
   max-height: 600px;
   display: inline-block;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
 }}
 .fail {{
   display: inline-block;
   min-width: 200px;
   padding: 18px 24px;
-  background: linear-gradient(135deg, #991b1b, #7f1d1d);
-  color: #fee2e2;
-  border: 1px solid #b91c1c;
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
   border-radius: 6px;
   font-family: "SF Mono", Menlo, Consolas, monospace;
   text-align: left;
@@ -415,7 +426,7 @@ td.cell img {{
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 1px;
-  color: #fecaca;
+  color: #b91c1c;
   margin-bottom: 4px;
 }}
 .fail-reason {{
@@ -423,11 +434,12 @@ td.cell img {{
   word-break: break-word;
 }}
 .empty {{
-  color: #94a3b8;
+  color: #475569;
   font-size: 14px;
   padding: 24px;
-  border: 1px dashed #334155;
+  border: 1px dashed #cbd5e1;
   border-radius: 6px;
+  background: #ffffff;
 }}
   </style>
 </head>
@@ -451,18 +463,26 @@ td.cell img {{
 (function() {{
   const tabs = document.querySelectorAll('.topbar .tab');
   const sections = document.querySelectorAll('main .section');
-  function activate(slug) {{
+  function activate(slug, opts) {{
+    const scroll = opts && opts.scroll;
     tabs.forEach(t => t.classList.toggle('active', t.dataset.section === slug));
     sections.forEach(s => s.classList.toggle('active', s.dataset.section === slug));
     if (location.hash !== '#' + slug) {{
       history.replaceState(null, '', '#' + slug);
     }}
+    if (scroll) {{
+      // Jump to top so every Tab click shows the first sample of the
+      // newly selected section rather than the previous section's scroll
+      // offset.
+      window.scrollTo({{ top: 0, left: 0, behavior: 'auto' }});
+    }}
   }}
-  tabs.forEach(t => t.addEventListener('click', () => activate(t.dataset.section)));
+  tabs.forEach(t => t.addEventListener('click', () => activate(t.dataset.section, {{ scroll: true }})));
   // Initial activation: from URL hash if valid, otherwise the first tab.
+  // Don't force-scroll on load — respect any deep-link fragment behaviour.
   const initial = (location.hash || '').replace(/^#/, '');
   const firstSlug = tabs[0] ? tabs[0].dataset.section : '';
-  activate([...tabs].some(t => t.dataset.section === initial) ? initial : firstSlug);
+  activate([...tabs].some(t => t.dataset.section === initial) ? initial : firstSlug, {{ scroll: false }});
 }})();
 </script>
 </body>
