@@ -632,8 +632,7 @@ void PPTWriter::emitTextBoxShapeFrame(XMLBuilder& out, const TextBox* box, const
   bool inlineAnchor = isVertical ? heightAnchor : widthAnchor;
   if (inlineAnchor) {
     if (box->textAlign == TextAlign::Center) {
-      (isVertical ? anchorOffsetY : anchorOffsetX) =
-          -(isVertical ? estHeight : estWidth) / 2.0f;
+      (isVertical ? anchorOffsetY : anchorOffsetX) = -(isVertical ? estHeight : estWidth) / 2.0f;
     } else if (box->textAlign == TextAlign::End) {
       (isVertical ? anchorOffsetY : anchorOffsetX) = -(isVertical ? estHeight : estWidth);
     }
@@ -645,8 +644,7 @@ void PPTWriter::emitTextBoxShapeFrame(XMLBuilder& out, const TextBox* box, const
   bool blockAnchor = isVertical ? widthAnchor : heightAnchor;
   if (blockAnchor) {
     if (box->paragraphAlign == ParagraphAlign::Middle) {
-      (isVertical ? anchorOffsetX : anchorOffsetY) =
-          -(isVertical ? estWidth : estHeight) / 2.0f;
+      (isVertical ? anchorOffsetX : anchorOffsetY) = -(isVertical ? estWidth : estHeight) / 2.0f;
     } else if (box->paragraphAlign == ParagraphAlign::Far) {
       (isVertical ? anchorOffsetX : anchorOffsetY) = -(isVertical ? estWidth : estHeight);
     }

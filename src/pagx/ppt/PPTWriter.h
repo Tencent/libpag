@@ -424,8 +424,15 @@ inline bool IsRunCompatibleColorSource(const ColorSource* color) {
 inline PPTRunStyle BuildRunStyle(const Text* text, const Fill* fill, const Stroke* stroke,
                                  float alpha) {
   PPTRunStyle style = {};
-  style.hasBold = text->fauxBold || text->fontStyle.find("Bold") != std::string::npos;
-  style.hasItalic = text->fauxItalic || text->fontStyle.find("Italic") != std::string::npos;
+  // Real Bold/Italic faces are expressed by appending the style to the typeface
+  // string (e.g. "Arial Bold") so PowerPoint resolves the same face that PAGX's
+  // tgfx::Typeface::MakeFromName(family, style) selects. Emitting b="1" / i="1"
+  // here as well would tell PowerPoint to apply faux bold/italic on top of the
+  // already-bold face, producing visibly thicker strokes than the PAGX render.
+  // Only fauxBold / fauxItalic — which the renderer applies as a synthesized
+  // outline thickening — should reach PowerPoint as b / i attributes.
+  style.hasBold = text->fauxBold;
+  style.hasItalic = text->fauxItalic;
   // Use the layout-resolved font size. PAGX layout may shrink a Text internally
   // via a textScale factor to fit dual-axis constraints (e.g. `left`+`right`,
   // `width="100%"`); `renderFontSize()` carries that factor while `fontSize`
@@ -442,7 +449,12 @@ inline PPTRunStyle BuildRunStyle(const Text* text, const Fill* fill, const Strok
   style.hasFillColor = fill && IsRunCompatibleColorSource(fill->color);
   style.fillAlpha = style.hasFillColor ? fill->alpha * alpha : 0;
   style.fillColor = style.hasFillColor ? fill->color : nullptr;
-  style.typeface = text->fontFamily.empty() ? std::string() : StripQuotes(text->fontFamily);
+  std::string family = text->fontFamily.empty() ? std::string() : StripQuotes(text->fontFamily);
+  if (!family.empty() && !text->fontStyle.empty() && text->fontStyle != "Regular") {
+    style.typeface = family + " " + text->fontStyle;
+  } else {
+    style.typeface = family;
+  }
   style.stroke = stroke;
   style.strokeAlpha = alpha;
   return style;
