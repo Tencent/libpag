@@ -184,4 +184,128 @@ TEST(TextBaker, TextModifierOptionalPaintOverrides) {
   EXPECT_FLOAT_EQ(d->strokeWidth.value, 2.5f);
 }
 
+// -----------------------------------------------------------------------
+// Phase 17 v2.23 — case A (author-authored GlyphRun + embedded <Font>)
+// -----------------------------------------------------------------------
+//
+// Case A writes data->glyphRuns verbatim from pagx::Text.glyphRuns and
+// interns each referenced pagx::Font into PAGDocument.embeddedFonts via
+// content hash. The tests below exercise:
+//   1. Basic fill — glyphRuns populated, text stays empty-position, the
+//      referenced font materialises in embeddedFonts with matching data.
+//   2. Intern dedup — two GlyphRuns referencing distinct-but-content-equal
+//      PAGX Font nodes collapse to a single embeddedFonts entry.
+
+TEST(TextBaker, CaseAAuthorGlyphRunInternsFont) {
+  auto r = BakeAndRoundTrip([](pagx::test::PAGXBuilder& b, pagx::Layer& host) {
+    auto* font = b.RawDocument()->makeNode<pagx::Font>();
+    font->id = "caseAFont";
+    font->unitsPerEm = 1024;
+    auto* glyph1 = b.RawDocument()->makeNode<pagx::Glyph>();
+    glyph1->path = b.RawDocument()->makeNode<pagx::PathData>();
+    // Triangle in PAGX y-up source coordinates; the y-flip is an
+    // Inflater concern, so the Baker preserves negative-y verbs verbatim.
+    glyph1->path->moveTo(0.0f, 0.0f);
+    glyph1->path->lineTo(40.0f, 0.0f);
+    glyph1->path->lineTo(40.0f, -50.0f);
+    glyph1->path->close();
+    glyph1->advance = 45.0f;
+    font->glyphs.push_back(glyph1);
+    auto* glyph2 = b.RawDocument()->makeNode<pagx::Glyph>();
+    glyph2->path = b.RawDocument()->makeNode<pagx::PathData>();
+    glyph2->path->moveTo(0.0f, 0.0f);
+    glyph2->path->lineTo(60.0f, -80.0f);
+    glyph2->path->close();
+    glyph2->advance = 65.0f;
+    font->glyphs.push_back(glyph2);
+
+    auto* text = b.RawDocument()->makeNode<pagx::Text>();
+    text->fontSize = 50.0f;
+    auto* run = b.RawDocument()->makeNode<pagx::GlyphRun>();
+    run->font = font;
+    run->fontSize = 50.0f;
+    run->glyphs = {1, 2, 1};
+    run->x = 12.0f;
+    run->y = 34.0f;
+    run->xOffsets = {0.0f, 50.0f, 120.0f};
+    text->glyphRuns.push_back(run);
+    host.contents.push_back(text);
+  });
+  ASSERT_NE(r.decoded, nullptr);
+  // One EmbeddedFont materialised with matching unitsPerEm + glyph table.
+  ASSERT_EQ(r.decoded->embeddedFonts.size(), 1u);
+  const auto& font = r.decoded->embeddedFonts[0];
+  EXPECT_EQ(font->unitsPerEm, 1024u);
+  ASSERT_EQ(font->glyphs.size(), 2u);
+  EXPECT_FLOAT_EQ(font->glyphs[0].advance, 45.0f);
+  EXPECT_FLOAT_EQ(font->glyphs[1].advance, 65.0f);
+
+  const auto* layer = FirstLayer(*r.decoded);
+  ASSERT_NE(layer, nullptr);
+  ASSERT_EQ(layer->vector->contents.size(), 1u);
+  ASSERT_EQ(layer->vector->contents[0]->type, VectorElementType::Text);
+  const auto& d = std::get<std::unique_ptr<ElementTextData>>(layer->vector->contents[0]->payload);
+  // Case A writes position = (0, 0); GlyphRun carries the real coordinates.
+  EXPECT_FLOAT_EQ(d->position.value.x, 0.0f);
+  EXPECT_FLOAT_EQ(d->position.value.y, 0.0f);
+  ASSERT_EQ(d->glyphRuns.size(), 1u);
+  const auto& gr = d->glyphRuns[0];
+  EXPECT_EQ(gr.embeddedFontIndex, 0u);
+  EXPECT_FLOAT_EQ(gr.fontSize, 50.0f);
+  EXPECT_EQ(gr.glyphs, (std::vector<tgfx::GlyphID>{1, 2, 1}));
+  EXPECT_FLOAT_EQ(gr.x, 12.0f);
+  EXPECT_FLOAT_EQ(gr.y, 34.0f);
+  EXPECT_EQ(gr.xOffsets, (std::vector<float>{0.0f, 50.0f, 120.0f}));
+  // Case B fields stay empty so Inflater never confuses branches.
+  EXPECT_TRUE(d->shapedGlyphs.empty());
+  EXPECT_TRUE(d->shapedRuns.empty());
+}
+
+TEST(TextBaker, CaseATwoRunsSameFontContentInternDedup) {
+  auto r = BakeAndRoundTrip([](pagx::test::PAGXBuilder& b, pagx::Layer& host) {
+    // Two PAGX Font nodes with identical unitsPerEm + glyph tables.
+    // Content-hash intern should recognise them as the same font and
+    // collapse to one embeddedFonts entry.
+    auto makeFont = [&](const char* id) {
+      auto* f = b.RawDocument()->makeNode<pagx::Font>();
+      f->id = id;
+      f->unitsPerEm = 1000;
+      auto* g = b.RawDocument()->makeNode<pagx::Glyph>();
+      g->path = b.RawDocument()->makeNode<pagx::PathData>();
+      g->path->moveTo(0.0f, 0.0f);
+      g->path->lineTo(30.0f, 0.0f);
+      g->path->lineTo(30.0f, -40.0f);
+      g->path->close();
+      g->advance = 32.0f;
+      f->glyphs.push_back(g);
+      return f;
+    };
+    auto* fontA = makeFont("fontA");
+    auto* fontB = makeFont("fontB");
+
+    auto makeRun = [&](pagx::Font* font, float xpos) {
+      auto* run = b.RawDocument()->makeNode<pagx::GlyphRun>();
+      run->font = font;
+      run->fontSize = 40.0f;
+      run->glyphs = {1};
+      run->x = xpos;
+      return run;
+    };
+    auto* text = b.RawDocument()->makeNode<pagx::Text>();
+    text->fontSize = 40.0f;
+    text->glyphRuns.push_back(makeRun(fontA, 0.0f));
+    text->glyphRuns.push_back(makeRun(fontB, 50.0f));
+    host.contents.push_back(text);
+  });
+  ASSERT_NE(r.decoded, nullptr);
+  // Content hash dedup → single EmbeddedFont entry despite two PAGX Fonts.
+  EXPECT_EQ(r.decoded->embeddedFonts.size(), 1u);
+  const auto* layer = FirstLayer(*r.decoded);
+  ASSERT_NE(layer, nullptr);
+  const auto& d = std::get<std::unique_ptr<ElementTextData>>(layer->vector->contents[0]->payload);
+  ASSERT_EQ(d->glyphRuns.size(), 2u);
+  EXPECT_EQ(d->glyphRuns[0].embeddedFontIndex, 0u);
+  EXPECT_EQ(d->glyphRuns[1].embeddedFontIndex, 0u);
+}
+
 }  // namespace pagx::pag

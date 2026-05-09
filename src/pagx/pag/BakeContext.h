@@ -55,6 +55,14 @@ struct BakeContext : DiagnosticCollector {
   // Phase 16 (v2.20) removed the font interning maps — runtime-shape mode
   // serializes fontFamily/fontStyle strings directly on ElementTextData.
 
+  // Phase 17 (v2.23) case A — EmbeddedFont intern map, keyed by a content
+  // hash of the PAGX Font (unitsPerEm + every glyph's advance + path verbs).
+  // Content-hash (not pagx::Font*) so two structurally identical <Font>
+  // nodes — e.g. the same subset emitted twice by different authoring
+  // pipelines — collapse to a single EmbeddedFont in the PAG document.
+  // Only the Baker writes through this map; it is cleared per Bake.
+  std::unordered_map<std::string, uint32_t> embeddedFontIndexByHash;
+
   // ---- Mask two-pass index (§12.1) ----
   // Pass 1 records every PAGX layer's path (chain of child indices from the
   // enclosing root); Pass 2 looks up mask targets by pointer.

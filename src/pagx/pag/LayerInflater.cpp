@@ -13,6 +13,7 @@
 #include "pagx/LayoutContext.h"
 #include "renderer/TextShaper.h"
 #endif
+#include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Shader.h"
@@ -510,6 +511,151 @@ tgfx::Font resolveFont(const ElementTextData& pay, InflaterContext* ctx) {
   return font;
 }
 
+// ---------- ElementText case A typeface synthesis (Phase 17 v2.23) ----------
+//
+// When the PAGX source authored <GlyphRun> referencing an embedded <Font>,
+// the Baker snapshots the glyph IDs + positions into ElementTextData.glyphRuns
+// and interns the font's path-based glyph table into PAGDocument.embeddedFonts.
+//
+// Implementation: for each embedded font we rebuild a
+// tgfx::PathTypefaceBuilder-backed typeface (the same mechanism PAGX-native
+// rendering uses — see GlyphRunRenderer::BuildTypefaceFromFont). This keeps
+// y-flip, ascent/descent and font-metric handling inside tgfx's font engine
+// so Path B renders byte-for-byte against Path A rather than re-deriving
+// those conventions manually. Glyph paths are stored y-up (PAGX source) and
+// tgfx's PathTypefaceBuilder performs the y-flip as part of TextBlob
+// rasterization; applying our own Matrix::Scale(s, -s) on top would double-
+// flip and shift by twice the ascent (the initial Phase 17 ShapePath
+// attempt hit exactly that — PSNR ~14 dB on glyph_run).
+//
+// Per-glyph position formula mirrors PAGX renderer
+// (GlyphRunRenderer::BuildTextBlob §197-213). `positions` take priority
+// over `xOffsets`; when neither is set, posX accumulates through
+// font.getAdvance(). All three branches are preserved here so PAGX and
+// PAG agree on per-glyph x/y even when the run vectors are sparse /
+// asymmetric.
+//
+// Phase 18 per-glyph xforms (anchors/scales/rotations/skews) are stored on
+// GlyphRunData but not yet applied — case A does not support TextModifier
+// animations in Phase 17 (design doc §10.8).
+std::shared_ptr<tgfx::VectorElement> inflateTextAsPath(PAGDocument& doc, const ElementTextData& pay,
+                                                       InflaterContext* ctx) {
+  // Rebuild one typeface per EmbeddedFont; cache by index so two runs
+  // sharing a font reuse the same typeface handle.
+  std::vector<std::shared_ptr<tgfx::Typeface>> typefaces(doc.embeddedFonts.size());
+  auto getTypeface = [&](uint32_t index) -> std::shared_ptr<tgfx::Typeface> {
+    if (index >= doc.embeddedFonts.size()) {
+      return nullptr;
+    }
+    if (typefaces[index] != nullptr) {
+      return typefaces[index];
+    }
+    const auto& font = doc.embeddedFonts[index];
+    if (font == nullptr) {
+      return nullptr;
+    }
+    tgfx::PathTypefaceBuilder builder;
+    for (const auto& glyph : font->glyphs) {
+      // Reserve the GlyphID slot even for empty paths — incoming IDs from
+      // GlyphRunData.glyphs still need to index correctly.
+      builder.addGlyph(glyph.path, glyph.advance);
+    }
+    typefaces[index] = builder.detach();
+    return typefaces[index];
+  };
+
+  // Concatenate all runs into a single TextBlob when they share a
+  // typeface (the common case: one <Font> → many <GlyphRun>). Mixed-
+  // typeface runs within one Text are a Phase 18 concern and fall back
+  // to the first run only with a warning.
+  std::shared_ptr<tgfx::TextBlob> textBlob;
+  bool multiTypefaceSeen = false;
+  std::shared_ptr<tgfx::Typeface> firstTypeface;
+  std::vector<tgfx::GlyphID> glyphIDs;
+  std::vector<tgfx::Point> positions;
+  tgfx::Font lastFont;  // carries fauxBold/fauxItalic + size from first run
+
+  for (const auto& run : pay.glyphRuns) {
+    auto typeface = getTypeface(run.embeddedFontIndex);
+    if (typeface == nullptr) {
+      ctx->warn(ErrorCode::InflateGlyphRunBuildFailed,
+                "case A GlyphRun references missing EmbeddedFont; skipping run");
+      continue;
+    }
+    const auto& fontEntry = doc.embeddedFonts[run.embeddedFontIndex];
+    if (fontEntry->unitsPerEm == 0) {
+      ctx->warn(ErrorCode::InflateGlyphRunBuildFailed,
+                "case A EmbeddedFont has zero unitsPerEm; skipping run");
+      continue;
+    }
+    // fontSize / unitsPerEm mirrors GlyphRunRenderer §177: the path data
+    // is stored in design-space em units so the tgfx font applies this
+    // scale at rasterize time.
+    const float tgfxFontSize = run.fontSize / static_cast<float>(fontEntry->unitsPerEm);
+    tgfx::Font font(typeface, tgfxFontSize);
+    if (pay.fauxBold) {
+      font.setFauxBold(true);
+    }
+    if (pay.fauxItalic) {
+      font.setFauxItalic(true);
+    }
+    if (firstTypeface == nullptr) {
+      firstTypeface = typeface;
+      lastFont = font;
+    } else if (typeface != firstTypeface) {
+      multiTypefaceSeen = true;
+      continue;
+    }
+
+    const size_t count = run.glyphs.size();
+    float currentX = run.x;
+    for (size_t i = 0; i < count; ++i) {
+      float posX = 0.0f;
+      float posY = 0.0f;
+      // Per-glyph positioning priority (GlyphRunRenderer §197-213):
+      //   1. positions[i] present → posX = run.x + positions[i].x (+ xOffsets[i])
+      //   2. xOffsets[i] present  → posX = run.x + xOffsets[i]
+      //   3. neither               → posX accumulates advance
+      if (i < run.positions.size()) {
+        posX = run.x + run.positions[i].x;
+        posY = run.y + run.positions[i].y;
+        if (i < run.xOffsets.size()) {
+          posX += run.xOffsets[i];
+        }
+      } else if (i < run.xOffsets.size()) {
+        posX = run.x + run.xOffsets[i];
+        posY = run.y;
+      } else {
+        posX = currentX;
+        posY = run.y;
+        currentX += font.getAdvance(run.glyphs[i]);
+      }
+      glyphIDs.push_back(run.glyphs[i]);
+      positions.push_back(tgfx::Point{posX, posY});
+    }
+  }
+
+  if (multiTypefaceSeen) {
+    ctx->warn(ErrorCode::InflateGlyphRunBuildFailed,
+              "case A Text with mixed EmbeddedFonts: later runs dropped (Phase 17 limit)");
+  }
+
+  if (glyphIDs.empty() || firstTypeface == nullptr) {
+    return nullptr;
+  }
+
+  textBlob = tgfx::TextBlob::MakeFrom(glyphIDs.data(), positions.data(), glyphIDs.size(), lastFont);
+  if (textBlob == nullptr) {
+    return nullptr;
+  }
+
+  auto text = tgfx::Text::Make(std::move(textBlob), pay.anchors.value);
+  if (text != nullptr) {
+    text->setPosition(pay.position.value);
+  }
+  return text;
+}
+
 // ---------- ElementText inflation (Phase 16 runtime-shape MVP) ----------
 //
 // The Inflater feeds the raw UTF-8 string + the resolved tgfx::Font into
@@ -519,9 +665,16 @@ tgfx::Font resolveFont(const ElementTextData& pay, InflaterContext* ctx) {
 // anchors are forwarded to tgfx::Text::Make for TextModifier / RangeSelector
 // consumption.
 
-std::shared_ptr<tgfx::VectorElement> inflateElementText(PAGDocument& /*doc*/,
+std::shared_ptr<tgfx::VectorElement> inflateElementText(PAGDocument& doc,
                                                         const ElementTextData& pay,
                                                         InflaterContext* ctx) {
+  // Phase 17 case A: author-authored GlyphRun referencing embedded font.
+  // Prefer this path when present — it bypasses the host FontProvider
+  // entirely and renders the exact author geometry.
+  if (!pay.glyphRuns.empty()) {
+    return inflateTextAsPath(doc, pay, ctx);
+  }
+
   if (pay.text.empty()) {
     // Not necessarily an error — an empty Text is legal but produces no
     // glyphs. Skip silently; returning nullptr drops the element so the
