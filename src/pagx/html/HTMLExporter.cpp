@@ -165,6 +165,9 @@ static std::string BuildFontFaceCSS(const std::vector<FontFaceRule>& rules, bool
       if (!rule.fontStyle.empty()) {
         css += ";font-style:" + rule.fontStyle;
       }
+      if (!rule.unicodeRange.empty()) {
+        css += ";unicode-range:" + rule.unicodeRange;
+      }
       css += ";font-display:block}";
     } else {
       css += "@font-face {\n";
@@ -175,6 +178,9 @@ static std::string BuildFontFaceCSS(const std::vector<FontFaceRule>& rules, bool
       }
       if (!rule.fontStyle.empty()) {
         css += "  font-style: " + rule.fontStyle + ";\n";
+      }
+      if (!rule.unicodeRange.empty()) {
+        css += "  unicode-range: " + rule.unicodeRange + ";\n";
       }
       css += "  font-display: block;\n";
       css += "}\n";

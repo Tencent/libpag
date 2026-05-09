@@ -84,6 +84,26 @@ Color LerpColor(const Color& a, const Color& b, float t);
 Color SampleLinearGradient(const std::vector<ColorStop*>& stops, float t);
 
 std::string LayerTransformCSS(const Layer* layer);
+
+/**
+ * Rewrites line-break-hint characters inside a Text node's literal text so the browser's CSS
+ * line-breaker matches PAGX's UAX-14 behaviour without changing the visible text:
+ *
+ *  - Replaces SHY (U+00AD) with ZWSP (U+200B). PAGX treats SHY as an invisible break-allowed
+ *    point, but Chromium follows the CSS spec and renders SHY as a visible hyphen at the line
+ *    end — replacing it with ZWSP keeps the same break-allowed semantics with no visible glyph.
+ *  - Inserts ZWSP after every '/' (slash). PAGX's UAX-14 maps '/' to class BA (break-allowed),
+ *    but Chromium's `word-wrap:break-word` does not break at '/' inside a single token like
+ *    "path/to/some/file" and falls back to mid-character splitting. The injected ZWSP is the
+ *    standard web-typography hint that lets Chromium break right after the '/' the same way
+ *    tgfx does.
+ *
+ * Both characters are zero-width to the user and only affect line-break decisions. Other
+ * line-break-affecting Unicode characters (ZWSP itself, WJ U+2060, IN/OP/CL/NS/QU classes
+ * such as 「」、——、…、 ー、'") render the same way in Chromium and tgfx without rewriting,
+ * so they are passed through unchanged. Returns the rewritten string.
+ */
+std::string RewriteLineBreakHints(const std::string& text);
 Matrix BuildGroupMatrix(const Group* group);
 const char* AlignmentToCSS(Alignment alignment);
 const char* ArrangementToCSS(Arrangement arrangement);

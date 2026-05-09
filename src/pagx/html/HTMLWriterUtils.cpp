@@ -397,6 +397,36 @@ std::string LayerTransformCSS(const Layer* layer) {
   return MatrixTransformToCSS(m);
 }
 
+std::string RewriteLineBreakHints(const std::string& text) {
+  // ZWSP (ZERO WIDTH SPACE) and SHY (SOFT HYPHEN) UTF-8 byte sequences. ZWSP is U+200B
+  // (E2 80 8B); SHY is U+00AD (C2 AD).
+  static constexpr const char ZWSP[] = "\xE2\x80\x8B";
+  std::string out;
+  out.reserve(text.size() + text.size() / 8);
+  for (size_t i = 0; i < text.size();) {
+    unsigned char c = static_cast<unsigned char>(text[i]);
+    if (c == 0xC2 && i + 1 < text.size() && static_cast<unsigned char>(text[i + 1]) == 0xAD) {
+      // Replace SHY with ZWSP — same break-allowed semantic, no visible hyphen at line end.
+      out.append(ZWSP, 3);
+      i += 2;
+      continue;
+    }
+    if (c == '/') {
+      // Inject ZWSP after every '/' so Chromium can break at the same point tgfx's UAX-14
+      // BA classification allows. Without this, "path/to/some/file" stays as one atomic
+      // token under `word-wrap:break-word` and is split mid-character ("some/fil" + "e")
+      // when the box is too narrow.
+      out += '/';
+      out.append(ZWSP, 3);
+      i += 1;
+      continue;
+    }
+    out += text[i];
+    i += 1;
+  }
+  return out;
+}
+
 Matrix BuildGroupMatrix(const Group* group) {
   bool hasAnchor = !FloatNearlyZero(group->anchor.x) || !FloatNearlyZero(group->anchor.y);
   // renderPosition() returns the layout-resolved top-left (incorporates constraint layout such as

@@ -68,7 +68,7 @@ static void PrintUsage() {
       << "  --html-font <spec>          Inject a CSS @font-face rule. Can be repeated.\n"
       << "                              Spec syntax:\n"
       << "                                "
-         "<abs-path|https-url>[#family=...][#weight=...][#style=...]\n"
+         "<abs-path|https-url>[#family=...][#weight=...][#style=...][#unicode-range=...]\n"
       << "                              Local files must be absolute paths; file is copied to\n"
       << "                              <output-dir>/fonts/ and referenced as "
          "url(\"fonts/<name>\").\n"
@@ -76,6 +76,10 @@ static void PrintUsage() {
       << "                              override any with #family=/#weight=/#style=.\n"
       << "                              URLs (http/https) require all three: #family, #weight, "
          "#style.\n"
+      << "                              #unicode-range is optional; use it to scope a rule\n"
+      << "                              to a codepoint subset (e.g. emoji as\n"
+      << "                              U+1F300-1F9FF) so multiple @font-face rules under\n"
+      << "                              the same family cover different scripts.\n"
       << "  --html-no-font-synthesis-weight\n"
       << "                              Emit font-synthesis-weight:none (default: auto)\n"
       << "  --html-no-font-synthesis-style\n"
@@ -205,6 +209,7 @@ struct ParsedFontFace {
   std::string fontFamily = {};
   std::string fontWeight = {};
   std::string fontStyle = {};
+  std::string unicodeRange = {};  // empty → applies to every codepoint in the source font
   FontFaceSource source = {};
   std::string sourcePath = {};                    // empty for URL mode
   std::shared_ptr<tgfx::Typeface> typeface = {};  // non-null for local mode when parse succeeded
@@ -214,9 +219,13 @@ struct ParsedFontFace {
 // avoid conflict with Windows drive letters (':') and font-family names (',' / '='). Fragments
 // are consumed greedily from the right so that the recogniser stops at the first token that
 // doesn't look like a valid "key=value" — anything to its left (including real URL fragments
-// like https://x/y#frag) stays part of the URI. The only recognised keys are family/weight/style.
+// like https://x/y#frag) stays part of the URI. Recognised keys are family/weight/style and
+// unicode-range (the last scopes a rule to a subset of codepoints so multiple @font-face
+// rules under the same family can cover different scripts, e.g. Noto Sans SC for Latin/CJK
+// alongside Noto Color Emoji limited to emoji codepoints).
 static bool ParseFontFaceOverrides(const std::string& spec, std::string* uri, std::string* family,
-                                   std::string* weight, std::string* style) {
+                                   std::string* weight, std::string* style,
+                                   std::string* unicodeRange) {
   std::string rest = spec;
   while (true) {
     auto hashPos = rest.rfind('#');
@@ -236,6 +245,8 @@ static bool ParseFontFaceOverrides(const std::string& spec, std::string* uri, st
       target = weight;
     } else if (key == "style") {
       target = style;
+    } else if (key == "unicode-range") {
+      target = unicodeRange;
     }
     if (target == nullptr) {
       break;  // unknown key — stop right-to-left consumption, rest belongs to the URI
@@ -255,8 +266,9 @@ static bool ParseFontFaceOverrides(const std::string& spec, std::string* uri, st
 // Parses one --html-font spec into a ParsedFontFace. Returns true on success. On failure, prints
 // a specific diagnostic to stderr and returns false. See the PrintUsage text for the spec syntax.
 static bool ParseFontFaceSpec(const std::string& spec, ParsedFontFace* out) {
-  std::string uri, familyOverride, weightOverride, styleOverride;
-  if (!ParseFontFaceOverrides(spec, &uri, &familyOverride, &weightOverride, &styleOverride)) {
+  std::string uri, familyOverride, weightOverride, styleOverride, unicodeRangeOverride;
+  if (!ParseFontFaceOverrides(spec, &uri, &familyOverride, &weightOverride, &styleOverride,
+                              &unicodeRangeOverride)) {
     return false;
   }
   if (uri.empty()) {
@@ -273,6 +285,7 @@ static bool ParseFontFaceSpec(const std::string& spec, ParsedFontFace* out) {
     out->fontFamily = familyOverride;
     out->fontWeight = weightOverride;
     out->fontStyle = styleOverride;
+    out->unicodeRange = unicodeRangeOverride;
     out->source.uri = uri;
     out->source.mode = FontEmbedMode::URL;
     out->sourcePath.clear();
@@ -323,6 +336,7 @@ static bool ParseFontFaceSpec(const std::string& spec, ParsedFontFace* out) {
   out->fontFamily = familyOverride.empty() ? autoFamily : familyOverride;
   out->fontWeight = weightOverride.empty() ? autoWeight : weightOverride;
   out->fontStyle = styleOverride.empty() ? autoStyle : styleOverride;
+  out->unicodeRange = unicodeRangeOverride;
   out->source.uri = {};                   // filled in by copy step
   out->source.mode = FontEmbedMode::URL;  // referenced by relative URL after copy
   out->sourcePath = std::filesystem::absolute(path).string();
@@ -442,18 +456,20 @@ static int ExportToHTML(const ExportOptions& options) {
   htmlOptions.staticImgUrlPrefix = "static-img/" + outputStem + "/";
   htmlOptions.fontSynthesisWeight = !options.htmlNoFontSynthesisWeight;
   htmlOptions.fontSynthesisStyle = !options.htmlNoFontSynthesisStyle;
-  // Aggregate ParsedFontFace entries sharing the same (family, weight, style) triple into a
-  // single FontFaceRule with multiple sources. Browsers try sources left-to-right and fall
-  // back to the next one on load failure, so users can list a local path followed by a CDN
-  // URL to get "prefer local, CDN safety net" in one declaration. Preserve the user's CLI
-  // order both across rules (first unseen triple → first rule) and within a rule (sources
-  // appended in the order the user listed them).
+  // Aggregate ParsedFontFace entries sharing the same (family, weight, style, unicode-range)
+  // tuple into a single FontFaceRule with multiple sources. Browsers try sources left-to-right
+  // and fall back to the next one on load failure, so users can list a local path followed by
+  // a CDN URL to get "prefer local, CDN safety net" in one declaration. unicode-range is part
+  // of the aggregation key because a rule scoping Noto Color Emoji to emoji codepoints is a
+  // different @font-face from the unrestricted Noto Sans SC rule, even though both share the
+  // same CSS font-family name. Preserve the user's CLI order both across rules (first unseen
+  // tuple → first rule) and within a rule (sources appended in the order the user listed them).
   htmlOptions.fontFaceRules.reserve(fonts.size());
   for (const auto& parsed : fonts) {
     FontFaceRule* target = nullptr;
     for (auto& rule : htmlOptions.fontFaceRules) {
       if (rule.fontFamily == parsed.fontFamily && rule.fontWeight == parsed.fontWeight &&
-          rule.fontStyle == parsed.fontStyle) {
+          rule.fontStyle == parsed.fontStyle && rule.unicodeRange == parsed.unicodeRange) {
         target = &rule;
         break;
       }
@@ -463,6 +479,7 @@ static int ExportToHTML(const ExportOptions& options) {
       rule.fontFamily = parsed.fontFamily;
       rule.fontWeight = parsed.fontWeight;
       rule.fontStyle = parsed.fontStyle;
+      rule.unicodeRange = parsed.unicodeRange;
       htmlOptions.fontFaceRules.push_back(std::move(rule));
       target = &htmlOptions.fontFaceRules.back();
     }

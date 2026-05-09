@@ -96,6 +96,18 @@ struct FontFaceRule {
    * omitted and the browser defaults to "normal".
    */
   std::string fontStyle;
+
+  /**
+   * Optional CSS `unicode-range` value (e.g. "U+0590-05FF" for Hebrew, or
+   * "U+1F300-1F9FF,U+1F1E6-1F1FF" for emoji). When set, the browser only consults this
+   * @font-face for codepoints inside the range — letting multiple @font-face rules under
+   * the same font-family name cover different scripts (e.g. a Noto Sans SC rule for
+   * Latin/CJK paired with a Noto Color Emoji rule scoped to emoji codepoints, so Chromium
+   * picks the right face per glyph instead of using the OS fallback emoji font). When
+   * empty, the property is omitted and the rule applies to every codepoint the source
+   * font file actually contains.
+   */
+  std::string unicodeRange;
 };
 
 /**

@@ -735,7 +735,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                   if (!segStyle.empty()) {
                     out.addAttr("style", segStyle);
                   }
-                  out.closeTagWithText(segments[si]);
+                  out.closeTagWithText(RewriteLineBreakHints(segments[si]));
                 }
                 prevTrailingBreaks = HTMLBuilder::countTrailingBreaks(span.text->text);
                 prevFontSize = spanFontSize;
@@ -764,7 +764,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                 // default white-space handling. Leading/trailing <br>s are hoisted outside
                 // the span by HTMLWriterLayer (above) so they can be wrapped in the
                 // appropriate empty-line owner font-size.
-                out.closeTagWithTextBreaks(span.text->text);
+                out.closeTagWithTextBreaks(RewriteLineBreakHints(span.text->text));
               }
               prevTrailingBreaks = HTMLBuilder::countTrailingBreaks(span.text->text);
               prevFontSize = spanFontSize;
@@ -975,7 +975,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             // Use closeTagWithTextBreaks so U+000A (from &#10;) inside the inner content
             // renders as <br>; trailing breaks are handled by the next iteration via the
             // between-span emission loop above.
-            out.closeTagWithTextBreaks(span.text->text);
+            out.closeTagWithTextBreaks(RewriteLineBreakHints(span.text->text));
             rtPrevTrailingBreaks = HTMLBuilder::countTrailingBreaks(span.text->text);
             rtPrevFontSize = rtSpanFontSize;
           }

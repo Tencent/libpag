@@ -203,21 +203,38 @@ if [ -n "$BOLD_FONT" ]; then
   RENDER_FONT_ARGS+=( --font "$BOLD_FONT" )
 fi
 
-# Column 3 iframes load fonts from local files where available. Bold is not
-# bundled in resources/font/, so we register a CDN-only @font-face for it —
-# mirroring column 2's WrapHtmlDocument which uses the same CDN URL. Without
-# this, pagx_to_html/ samples with fontStyle="Bold" (e.g. section titles like
-# "Clip and Mask") render at Regular weight in column 3 because the CLI wrapper
-# sets `font-synthesis:none` on body, preventing Chromium from synthesising
-# bold from the Regular face.
+# Column 3 iframes load fonts from local files where available.
+#
+# - Bold is not bundled in resources/font/, so we register a CDN-only @font-face
+#   for it — mirroring column 2's WrapHtmlDocument which uses the same CDN URL.
+#   Without this, pagx_to_html/ samples with fontStyle="Bold" (e.g. section
+#   titles like "Clip and Mask") render at Regular weight in column 3 because
+#   the CLI wrapper sets `font-synthesis:none` on body, preventing Chromium
+#   from synthesising bold from the Regular face.
+# - NotoColorEmoji is bundled and registered under the same family name "Noto
+#   Sans SC" scoped to the standard emoji codepoint ranges. Text nodes in PAGX
+#   samples like text/emoji spell fontFamily as "Noto Sans SC", so we need the
+#   emoji rule to advertise the same family for Chromium to find it via
+#   @font-face. The unicode-range makes Chromium pick this rule only for emoji
+#   codepoints, falling back to Noto Sans SC for everything else. Without this
+#   the emoji glyphs render via the OS fallback font (macOS Apple Color Emoji
+#   with weaker ZWJ-sequence support — visible as the family glyph 👨‍👩‍👧‍👦
+#   collapsing to a single line-art figure on macOS) and visibly diverge from
+#   PAGX native where tgfx fell back to our bundled NotoColorEmoji.ttf.
+#   The codepoint list mirrors the ranges Google Fonts ships for the public
+#   "Noto Color Emoji" font: BMP misc symbols / dingbats / variation selector,
+#   regional indicators, ZWJ, and the SMP emoji blocks.
+EMOJI_RANGES="U+200D,U+2300-23FF,U+2600-27BF,U+2B00-2BFF,U+FE0F,U+1F000-1F02F,U+1F0A0-1F0FF,U+1F100-1F64F,U+1F680-1F6FF,U+1F700-1F77F,U+1F780-1F7FF,U+1F800-1F8FF,U+1F900-1F9FF,U+1FA00-1FA6F,U+1FA70-1FAFF,U+1F1E6-1F1FF"
 EXPORT_FONT_ARGS=(
   --html-font "$FONT_REGULAR"
   --html-font "${CDN_BOLD}#family=Noto Sans SC#weight=bold#style=normal"
+  --html-font "${FONT_EMOJI}#family=Noto Sans SC#weight=400#style=normal#unicode-range=${EMOJI_RANGES}"
 )
 if [ -n "$BOLD_FONT" ]; then
   EXPORT_FONT_ARGS=(
     --html-font "$FONT_REGULAR"
     --html-font "$BOLD_FONT"
+    --html-font "${FONT_EMOJI}#family=Noto Sans SC#weight=400#style=normal#unicode-range=${EMOJI_RANGES}"
   )
 fi
 
