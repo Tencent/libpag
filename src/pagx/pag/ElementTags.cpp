@@ -726,8 +726,11 @@ void WriteElementTextBody(::pag::EncodeStream* body, const ElementTextData& d) {
   // Phase 17 case A: author <GlyphRun> → embedded path-based font. Each run
   // carries embeddedFontIndex (into PAGDocument.embeddedFonts) plus the
   // PAGX-native fields (fontSize / glyphs / x,y / xOffsets / positions),
-  // and Phase 18-reserved per-glyph anchors / scales / rotations / skews
-  // vectors written verbatim (Phase 17 always empty).
+  // followed by author-layer per-glyph xforms (anchors / scales / rotations
+  // / skews) written verbatim — see PAGDocument.h::GlyphRunData. Current
+  // spec/samples leave those vectors empty, so Baker writes 0 counts; the
+  // wire format reserves them so Baker activation later doesn't change the
+  // schema.
   if (hasGlyphRuns) {
     body->writeUint32(static_cast<uint32_t>(d.glyphRuns.size()));
     for (const auto& run : d.glyphRuns) {
@@ -749,7 +752,9 @@ void WriteElementTextBody(::pag::EncodeStream* body, const ElementTextData& d) {
         body->writeFloat(p.x);
         body->writeFloat(p.y);
       }
-      // Phase 18 reserved fields — counts only, vectors are empty in Phase 17.
+      // Author-layer per-glyph xforms — counts only today, vectors empty
+      // in current spec samples. Field is reserved on-wire so activation
+      // later doesn't bump the schema.
       body->writeUint32(static_cast<uint32_t>(run.anchors.size()));
       for (const auto& p : run.anchors) {
         body->writeFloat(p.x);
@@ -864,7 +869,9 @@ std::unique_ptr<ElementTextData> ReadElementTextBody(::pag::DecodeStream* s, Dec
   }
 
   // Phase 17 case A: author-authored <GlyphRun>. Mirrors the Write side
-  // exactly — counted vectors for every optional / Phase 18-reserved field.
+  // exactly — counted vectors for every optional field, including the
+  // author-layer per-glyph xforms reserved on-wire (anchors / scales /
+  // rotations / skews; see PAGDocument.h::GlyphRunData).
   if (hasGlyphRuns) {
     const uint32_t runCount = s->readUint32();
     if (runCount > limits::MAX_RUNS_PER_TEXT) {
@@ -906,8 +913,9 @@ std::unique_ptr<ElementTextData> ReadElementTextBody(::pag::DecodeStream* s, Dec
         run.positions[i].x = s->readFloat();
         run.positions[i].y = s->readFloat();
       }
-      // Phase 18 reserved counts — Phase 17 always writes 0; reading is
-      // tolerant of non-zero in case a Phase 18 file passes through.
+      // Author-layer per-glyph xforms — Baker writes 0 counts in current
+      // code paths; reader is tolerant of non-zero so a future producer
+      // populating these fields decodes cleanly.
       const uint32_t anchorCount = s->readUint32();
       if (anchorCount > limits::MAX_GLYPHS_PER_RUN) {
         guard.warn(ErrorCode::GlyphCountLimitExceeded, "ElementText.glyphRuns.anchorCount");

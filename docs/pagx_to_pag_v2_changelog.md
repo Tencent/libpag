@@ -9,6 +9,16 @@
 
 ### 历史修订记录
 
+- **v2.24 Phase 17 收尾 + Phase 18 实施完成补记**（CrossCheck 全绿后追记）：
+
+  **CrossCheck 终态**：48/48 全部 PASS（2026-05-09 实测），含 `text_modifier`（PSNR=+∞ bit-perfect）、`image_pattern`、`glyph_run`。Phase 16.7 末遗留的 4 个 FAIL 全部清零。
+
+  - **TextModifier + RangeSelector 实施**（commit `0cf5dd04`）：v2.23 Phase 17 末 BakeTextModifier 用 `(void)src.selectors;` 跳过了 selector 序列化，导致 `text_modifier.pagx` CrossCheck FAIL。本 commit 补齐 selector 透传链路：`TextBaker::BakeTextModifier` 遍历 `src.selectors`，按 `nodeType()==RangeSelector` 派发 + `static_cast` 后逐字段拷贝 11 个 RangeSelector 字段；非 RangeSelector 子类 emit `TextSelectorTypeUnsupported=209` warning 并 skip。Codec 与 Inflater 早在 Phase 17 就已支持，TextSelector 透传打通后 PathA / PathB bit-perfect 一致。新增 `TextBaker.TextModifierRangeSelectorRoundTrip` 单测覆盖 round-trip。
+  - **image_pattern 修复**：`ImageAsset` 增加 `decodedImage` cache，避免 `data.reset()` 后多次 inflate 静默 fallback——`image_pattern.pagx` 4 个 Layer 共享单 ImageAsset 时不再各自重新解码或落入 sentinel 分支。修复路径见 `feedback_image_asset_cache.md`。
+
+  **架构定位**：v2.23 主文档"CrossCheck 是强相等保证"承诺至此完全兑现。`GlyphRunData::anchors/scales/rotations/skews` 仍以 reserved 形态保留在 schema 上（对应 PAGX `<GlyphRun anchors="..." ...>` 作者层 per-glyph 静态 xforms，PAGX→SVG 已使用，PAGX→PAG 当前 spec 样本未触发）。详见主文档 §10.7。
+
+
 - **v2.23 Phase 17 实施完成补记**（4 commit 全部合入 main 后追记）：
 
   **实施结果**：4 次 commit 按计划落地，CrossCheck 从 Phase 16.7 的 4 个 FAIL 收敛到 2 个（`image_pattern` 非文字 + `text_modifier` Phase 18 范围）。

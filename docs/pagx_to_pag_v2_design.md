@@ -1302,7 +1302,7 @@ std::shared_ptr<tgfx::Layer> inflateCompositionRef(uint32_t idx, InflaterContext
   - **情况 A** — PAGX `<Text>` 含 author `<GlyphRun>`（作者手写 glyph IDs，引用嵌入的 `<Font id="fontN">` path 数据）：**PAG 存 path**（`EmbeddedFont` 顶层资源 + `ElementTextData::glyphRuns` 引用）；Inflater 按 path 绘制。
   - **情况 B** — PAGX `<Text>` 无 `<GlyphRun>`（作者只写 `<Text text="...">`）：**PAG 存已 shape 结果**（`ElementTextData::shapedGlyphs`：glyph IDs + positions + typeface 引用）；Inflater 用 host font 按 glyph IDs 组装 `tgfx::TextBlob`。
   - **字体文件（ttf/otf）永不嵌入 PAG**。情况 A 的 path 是 PAGX 文件内的 SVG-style 资源（来自 `<Font><Glyph path="..."/></Font>`），不是 ttf 子集；情况 B 继续靠外部 host font 提供 glyph 形状（`FontProvider` 接口）。
-- **P5 Phase 18 功能延后**：TextModifier + RangeSelector 的字符级动画不在 Phase 17 实现；数据模型预留 `anchors/scales/rotations/skews` 字段但 Baker 暂不写，`text_modifier.pagx` 样本继续 FAIL 属预期。
+- **P5 TextModifier 字符级动画**：TextModifier + RangeSelector 在 Phase 17 已随 `ElementTextModifier` vector element + `BakeTextModifier` + Inflater 完整实装并通过 CrossCheck（`text_modifier.pagx` PSNR=+∞）。`GlyphRunData::anchors/scales/rotations/skews` 是另一个不同维度——case A `<GlyphRun>` 的 per-glyph 静态 xforms，目前 spec 样本未触发，Baker 暂不写、Codec 仅 round-trip 空 vector，详见 §10.7。
 
 ### 10.2 Text 节点的 Bake 分支
 
@@ -1332,7 +1332,7 @@ PAGX <Text> 节点（已 applyLayout）                                  →  PA
 **`GlyphRunData`**（情况 A，与 PAGX `<GlyphRun>` 一一对应）：
 - `embeddedFontIndex` → `PAGDocument.embeddedFonts`
 - `fontSize / glyphs / x / y / xOffsets / positions` 直接拷贝 PAGX 同名字段
-- `anchors / scales / rotations / skews` 预留（Phase 18 启用）
+- `anchors / scales / rotations / skews` 预留（case A per-glyph 静态 xforms，对应 PAGX `<GlyphRun anchors="..." scales="...">`；当前 spec 样本未触发，Baker 暂不写、Codec 仅 round-trip 空 vector；参考 PAGX→SVG 的处理 `src/pagx/svg/SVGTextLayout.cpp:313-342`）
 
 **`ShapedGlyphRun`**（情况 B，PAGX `TextLayout` 已 shape 结果快照）：
 - `typefaceFamily / typefaceStyle / typefaceKey`（= `family|style|unitsPerEm|glyphsCount`）
@@ -1388,10 +1388,13 @@ Phase 16.1-16.6 的 5 个实施期补丁（baseline-y / font align / HarfBuzz sh
 
 CrossCheck 定位：Phase 17 完成后 CrossCheck 从 "辅助诊断" 升级为 **"强相等保证"** —— 两边走完全相同的 path 数据（情况 A）或相同的 host font + glyph IDs（情况 B），像素级一致应当是常态。FAIL 基本就是 bug。
 
-### 10.7 未解决项（Phase 18+）
+### 10.7 未解决项
 
-- **TextModifier + RangeSelector 字符级动画**（`text_modifier.pagx`）：Phase 17 预留 `GlyphRunData::anchors/scales/rotations/skews` 字段但 Baker 暂不写、Inflater 不消费。Phase 18 启用。
-- **非文字 bug**：`image_pattern.pagx`（独立非文字 bug）—— 待 Phase 17 之后的专项修复。
+Phase 17 收尾时（2026-05-09 实测）48 个 CrossCheck 样本全部 PASS，含 `text_modifier.pagx`（PSNR=+∞，bit-perfect）、`image_pattern.pagx`、`glyph_run.pagx`。原本规划为 Phase 18 的 TextModifier + RangeSelector 字符级动画在 Phase 17 commit 序列中已随 `ElementTextModifier` vector element + `BakeTextModifier` + Inflater `case VectorElementType::TextModifier` 一并实装并跑通 CrossCheck，无需独立 Phase。
+
+仅有一项延后跟进：
+
+- **case A `<GlyphRun>` 的 per-glyph 静态 xforms（`anchors/scales/rotations/skews`）**：`PAGDocument.h::GlyphRunData` 已预留 4 个 vector 字段、Codec 读写空 vector 也已能 round-trip，但 Baker 不写、Inflater 不消费。当前 `spec/samples/*.pagx` 没有任何样本同时满足"author `<GlyphRun>` + 非空 per-glyph xforms"——`glyph_run.pagx` 用 `<GlyphRun>` 但所有 xforms 字段为空，CrossCheck PSNR=34.7 dB 已通过 30 dB 门槛。等出现真实样本触发 FAIL 时再补 Baker / Inflater 的字段搬运（参考 `src/pagx/svg/SVGTextLayout.cpp:313-342` PAGX→SVG 的处理方式）。
 
 ### 10.8 实施拆分（4 次 commit）
 
@@ -1419,7 +1422,7 @@ CrossCheck 定位：Phase 17 完成后 CrossCheck 从 "辅助诊断" 升级为 *
 - `LayerInflater::inflateElementText` 情况 B 分支改走新 `inflateTextAsShapedTextBlob`：FontProvider 解析 typeface → `BuildTextBlobFromLayoutRuns` → `tgfx::Text`。
 - 删除 Phase 16 runtime-shape 的 4 条路径：`resolveFont` 主路径、`#ifdef PAG_USE_HARFBUZZ` 分支、`TextBlob::MakeFrom(text, font)` primitive shaper 退化分支、`pagx::TextShaper::Shape` 调用点。
 - `PAGExporter::ToBytes` / `ToFile` 自动调 `applyLayout(opts.fontConfig)`（若 `doc.layoutApplied() == false`）。
-- **验收**：48 个 `PAGRenderEquivalenceTest` 样本稳定（允许微小 glyph hinting 差异）；CrossCheck 文字相关 FAIL 清零（仅 `text_modifier` Phase 18、`image_pattern` 非文字 bug 不在 Phase 17 范围）。
+- **验收**：48 个 `PAGRenderEquivalenceTest` 样本稳定（允许微小 glyph hinting 差异）；CrossCheck 文字相关 FAIL 清零（Commit 3 当时 `text_modifier` 仍 FAIL，后续 Phase 17 收尾连同 TextModifier vector element 实装一并转绿，最终 48/48 全 PASS——见 §10.7 / §10.10）。
 
 #### Commit 4：清理 + 文档同步（已完成）
 
@@ -1428,7 +1431,7 @@ CrossCheck 定位：Phase 17 完成后 CrossCheck 从 "辅助诊断" 升级为 *
 - `LayerInflater::inflateElementText` / `TextBaker::BakeText` 中的过渡注释清理；`TypefaceKey.h` 注释更新指向 `ShapedGlyphRun::typefaceKey`。
 - 测试文件中 `EXPECT_TRUE(d->shapedRuns.empty())` 断言移除（字段已不存在）；`RenderEquivalenceTest.cpp` 注释更新到 case B 语境。
 - 本文档（§10.6 表格 + §10.8 本节 + §10.10）同步更新；changelog 追加 v2.23 Commit 4 完成补记。
-- **验收**（实测）：`PAGFullTest` 78/80 PASS（filter `TextBaker.* / ElementTags.* / RoundTrip.* / CrossCheck.*`），FAIL 仅 `image_pattern` + `text_modifier`（与 Commit 3 完全一致，零回归）；全套测试除 `Render_Baseline` 外 993/997 PASS。
+- **验收**（实测）：`PAGFullTest` 78/80 PASS（filter `TextBaker.* / ElementTags.* / RoundTrip.* / CrossCheck.*`），FAIL 仅 `image_pattern` + `text_modifier`（与 Commit 3 完全一致，零回归）；全套测试除 `Render_Baseline` 外 993/997 PASS。Phase 17 收尾时（2026-05-09）这两个 FAIL 也已转绿（image_pattern 走 ImageAsset 解码缓存修复；text_modifier 走 TextModifier vector element 完整实装），CrossCheck 最终 48/48 全 PASS——见 §10.7 / §10.10。
 
 ### 10.9 风险与开放问题
 
@@ -1437,13 +1440,13 @@ CrossCheck 定位：Phase 17 完成后 CrossCheck 从 "辅助诊断" 升级为 *
 - **`MakeTypefaceKey` 稳定性**：`family|style|unitsPerEm|glyphsCount` 作为 host font 版本指纹——不同机器同版本字体 glyphsCount 一致即视为同；大版本字体替换（例：Arial 6 → 7，glyph count 扩充）会 mismatch，此时按 Phase 16.6 决策"用宿主替代字体画原 glyph IDs"保留布局，emit `TextShapingHintMiss` info，不降级。
 - **CrossCheck 从辅助升级为强保证**：Phase 17 之后 PathA（LayerBuilder 直接消费 PAGX）与 PathB（PAGX→PAG→Inflater）在情况 A 走完全相同的 path 数据，情况 B 走相同 host font + glyph IDs —— 应当像素级一致。FAIL 基本就是 bug。
 - **EmbeddedFont 体积**：glyph_run.pagx 的 `@font1`（23 glyph）~3 KB；Latin 100 glyph ~15 KB；中文几千 glyph 可能 MB 级。用户决策"不设上限（正确性 > 体积）"，这是明确设计取舍。
-- **情况 B 的 anchors 字段**：`ElementTextData.anchors`（`Property<vector<Point>>`）Phase 17 仍保留——为 Phase 18 RangeSelector 字符级动画预留，当前情况 B 走 `shapedGlyphs` 不用 anchors。
+- **情况 B 的 anchors 字段**：`ElementTextData.anchors`（`Property<vector<Point>>`）当前情况 B 走 `shapedGlyphs` 不消费 anchors，但保留作为字段以便 future per-glyph anchor 需求落地时不必改 schema。TextModifier 字符级动画走的是 `ElementTextModifier` 独立 vector element + RangeSelector，不依赖此字段。
 
 ### 10.10 验收标准
 
 - ✅ Commit 1-4 全部合入。
 - ✅ 48 个 `PAGRenderEquivalenceTest` 样本里情况 A（glyph_run）+ 情况 B（文字类）渲染结果与 PAGX-native 视觉一致（glyph_run CrossCheck 在 Commit 2 后转 PASS）。
-- ✅ CrossCheck FAIL = 2（仅 `text_modifier` Phase 18 / `image_pattern` 非文字 bug；与 Commit 3 一致，Commit 4 零新增回归）。
+- ✅ CrossCheck FAIL = 0（48/48 全部 PASS，含 `text_modifier` `image_pattern` `glyph_run`；`text_modifier` PSNR=+∞ bit-perfect）。
 - ✅ `.pag` 文件体积增长可接受（glyph_run 预计 Phase 16 ~5 KB → Phase 17 ~10 KB 量级）。
 - ✅ `PAGFullTest` 总通过数 ≥ Phase 16 基线（不回归）。
 - ✅ 代码注释中所有指向已删除的 `phase16_text_redesign.md` / `phase17_text_redesign.md` 的引用均已更新为指向本文档 §10 对应小节或 changelog 条目。
@@ -4216,7 +4219,8 @@ struct GlyphRunData {
   float               y = 0.0f;
   std::vector<float>  xOffsets;               // 可选
   std::vector<Point>  positions;              // 可选
-  // Phase 18 预留（Phase 17 始终为空）：
+  // 作者层 per-glyph 静态 xforms（PAGX `<GlyphRun anchors="..." scales="...">`）；
+  // 当前 spec 样本未触发，Baker 暂不写、Codec 仅 round-trip 空 vector：
   std::vector<Point>  anchors;
   std::vector<Point>  scales;
   std::vector<float>  rotations;

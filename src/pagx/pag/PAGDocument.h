@@ -172,7 +172,7 @@ struct ImageAsset {
   // reused on subsequent calls. Lets a single ImageAsset back many
   // ImagePattern color sources without re-decoding or hitting the
   // post-reset sentinel branch (image_pattern.pagx exercises 4 layers
-  // sharing one logo, regression originally fixed in Phase 18.1).
+  // sharing one logo, regression originally fixed during Phase 17 wrap-up).
   // tgfx::Image is itself shared_ptr-managed, so reuse keeps GPU/CPU
   // decode caches single-instanced.
   std::shared_ptr<tgfx::Image> decodedImage;
@@ -432,9 +432,13 @@ struct ElementTextData {
     float y = 0.0f;                      // overall Y offset
     std::vector<float> xOffsets;         // optional per-glyph X
     std::vector<tgfx::Point> positions;  // optional per-glyph (x,y)
-    // Phase 18 reservations — Baker does not write these in Phase 17, but
-    // Codec still round-trips vector presence so a future Phase 18 payload
-    // decodes cleanly against a Phase 17 schema.
+    // Author-layer per-glyph static xforms (PAGX `<GlyphRun anchors="..."
+    // scales="..." rotations="..." skews="...">`). PAGX→SVG already applies
+    // these (src/pagx/svg/SVGTextLayout.cpp:313-342); PAG side is dormant —
+    // current spec/samples don't populate them, so Baker writes nothing and
+    // Codec only round-trips empty vectors. Activate Baker/Inflater when a
+    // real sample appears in CrossCheck FAIL list. Distinct from TextModifier
+    // animation, which is a separate vector element wired via ElementTextModifier.
     std::vector<tgfx::Point> anchors;
     std::vector<tgfx::Point> scales;
     std::vector<float> rotations;

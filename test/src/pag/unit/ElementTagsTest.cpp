@@ -425,7 +425,7 @@ TEST(ElementTags, ElementTextCaseAGlyphRunsRoundTrip) {
   // xOffsets and positions are both optional — exercise both being non-empty.
   run.xOffsets = {0.0f, 50.0f, 100.0f, 150.0f, 200.0f, 250.0f, 300.0f, 350.0f};
   run.positions = {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}};
-  // Phase 18 reserved vectors stay empty in Phase 17.
+  // Author-layer per-glyph xforms vectors stay empty in this fixture.
   textData->glyphRuns.push_back(std::move(run));
 
   auto doc = MakeMinimalDocWithText(std::move(textData));

@@ -147,10 +147,11 @@ uint32_t InternEmbeddedFont(BakeContext& ctx, PAGDocument& doc, const pagx::Font
 
 // Fills `out` from a PAGX GlyphRun, verbatim (case A stores author
 // coordinates as Text-local absolute positions; see design doc §10.8).
-// Phase 18-reserved per-glyph fields (anchors / scales / rotations /
-// skews) are carried through so a future Phase 18 payload reader can
-// consume them without a schema bump — Baker writes them now, Inflater
-// ignores them in Phase 17.
+// Author-layer per-glyph xforms (anchors / scales / rotations / skews)
+// are forwarded as-is so the wire format stays stable; Inflater ignores
+// them today because current spec/samples don't populate them. See
+// PAGDocument.h::GlyphRunData and design doc §10.7 for activation
+// guidance.
 void FillGlyphRunData(const pagx::GlyphRun& src, uint32_t embeddedFontIndex,
                       ElementTextData::GlyphRunData* out) {
   out->embeddedFontIndex = embeddedFontIndex;
@@ -412,8 +413,8 @@ std::unique_ptr<VectorElement> TextBaker::BakeTextModifier(BakeContext& ctx,
     data->strokeWidth = MakeProp(*src.strokeWidth);
   }
 
-  // Selector serialization (Phase 18). PAGX TextSelector is a polymorphic
-  // base; only RangeSelector is concretely implemented today. Mirror PathA
+  // Selector serialization. PAGX TextSelector is a polymorphic base;
+  // only RangeSelector is concretely implemented today. Mirror PathA
   // (LayerBuilder::convertTextModifier §638-682): dispatch by nodeType,
   // static_cast to the concrete subclass, copy the 11 RangeSelector fields
   // verbatim. Values cross the wire as-is (PAGX small-decimal 0..1 for

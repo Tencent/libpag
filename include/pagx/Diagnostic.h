@@ -65,7 +65,7 @@ enum class DiagnosticCode : uint16_t {
   TextGlyphDataEmpty         = 206,   // deprecated in v2.20 (runtime-shape mode): numeric value reserved, do not re-use
   EmptyDocument              = 207,
   TextGlyphRunsDowngraded    = 208,   // Phase 16: pre-shaped pagx::Text.glyphRuns dropped; runtime-shape fallback emitted
-  TextSelectorTypeUnsupported = 209,  // Phase 18: TextModifier carried a TextSelector subclass other than RangeSelector; that selector dropped (only RangeSelector concretely implemented today)
+  TextSelectorTypeUnsupported = 209,  // TextModifier carried a TextSelector subclass other than RangeSelector; that selector dropped (only RangeSelector concretely implemented today)
 
   // Codec fatal
   InvalidMagic               = 300,

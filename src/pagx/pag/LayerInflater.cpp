@@ -569,9 +569,13 @@ std::shared_ptr<tgfx::VectorElement> inflateTextAsShapedTextBlob(PAGDocument& /*
 // PAG agree on per-glyph x/y even when the run vectors are sparse /
 // asymmetric.
 //
-// Phase 18 per-glyph xforms (anchors/scales/rotations/skews) are stored on
-// GlyphRunData but not yet applied — case A does not support TextModifier
-// animations in Phase 17 (design doc §10.8).
+// Author-layer per-glyph static xforms (anchors/scales/rotations/skews)
+// are stored on GlyphRunData but not yet consumed here — current
+// spec/samples leave those vectors empty (glyph_run.pagx itself does
+// not set them). Activate when a real sample appears in CrossCheck FAIL
+// list; PAGX→SVG already does the math at src/pagx/svg/SVGTextLayout.cpp
+// :313-342. This is unrelated to TextModifier animation, which is wired
+// through a separate ElementTextModifier vector element (design doc §10.7).
 std::shared_ptr<tgfx::VectorElement> inflateTextAsPath(PAGDocument& doc, const ElementTextData& pay,
                                                        InflaterContext* ctx) {
   // Rebuild one typeface per EmbeddedFont; cache by index so two runs
@@ -600,8 +604,8 @@ std::shared_ptr<tgfx::VectorElement> inflateTextAsPath(PAGDocument& doc, const E
 
   // Concatenate all runs into a single TextBlob when they share a
   // typeface (the common case: one <Font> → many <GlyphRun>). Mixed-
-  // typeface runs within one Text are a Phase 18 concern and fall back
-  // to the first run only with a warning.
+  // typeface runs within one Text are a future concern (no spec sample
+  // triggers it) and fall back to the first run only with a warning.
   std::shared_ptr<tgfx::TextBlob> textBlob;
   bool multiTypefaceSeen = false;
   std::shared_ptr<tgfx::Typeface> firstTypeface;
