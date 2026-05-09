@@ -128,11 +128,18 @@ def collect_cards() -> dict[str, list[Card]]:
 
 
 def status_cell(status: str, webp: Optional[Path], alt: str,
-                out_parent: Path) -> str:
+                out_parent: Path, width: int = 0, height: int = 0) -> str:
     """Render the inner content of one column. 'ok' → <img>; failure → red card."""
     if status == "ok" and webp is not None and webp.exists():
         webp_rel = os.path.relpath(webp, out_parent)
-        return (f'<img src="{html.escape(webp_rel)}" '
+        # ComparisonDumpTest renders webp at 2× the document's CSS size (for
+        # crisper text/hairline AA). Emit HTML intrinsic width/height at the
+        # CSS size so the browser downsamples the 2× bitmap back to 1× —
+        # visual dimensions stay identical to the designer-facing layout
+        # while pixels on HiDPI displays are sharper.
+        size_attr = (f' width="{width}" height="{height}"'
+                     if width > 0 and height > 0 else '')
+        return (f'<img src="{html.escape(webp_rel)}"{size_attr} '
                 f'alt="{html.escape(alt)}" loading="lazy">')
     # Failure path — surface the stage so visual review pinpoints the bug.
     reason = status.removeprefix("fail:") if status.startswith("fail:") else status
@@ -158,9 +165,11 @@ def render_section(slug: str, rel_dir: str, cards: list[Card],
     card_blocks = []
     for index, card in enumerate(cards, start=1):
         pagx_cell = status_cell(card.pagx_status, card.pagx_webp,
-                                f"{card.name} (PAGX native)", out_parent)
+                                f"{card.name} (PAGX native)", out_parent,
+                                card.width, card.height)
         pag_cell = status_cell(card.pag_status, card.pag_webp,
-                               f"{card.name} (PAGX to PAG)", out_parent)
+                               f"{card.name} (PAGX to PAG)", out_parent,
+                               card.width, card.height)
         source_rel = os.path.relpath(
             REPO_ROOT / rel_dir / f"{card.name}.pagx", out_parent)
         size_label = (f"{card.width}&times;{card.height}"

@@ -45,6 +45,15 @@ namespace pag {
 
 namespace {
 
+// Supersample factor: render each sample at 2× the document's CSS
+// dimensions and rely on render_compare.html's img[width][height] attributes
+// to scale the webp back to 1× for display. Giving the vector pipeline
+// twice the pixel budget makes text antialiasing and 1px-hairline strokes
+// survive the browser-side downsample crisply, at ~3-4× file-size cost.
+// Status sidecar still records the document's CSS size so the HTML layout
+// matches the designer-facing dimensions.
+constexpr float kRenderScale = 2.0f;
+
 // Write a one-line-per-stage status file next to the two webp outputs.
 // Format is intentionally trivial `key=value\n` so the Python report
 // reader can parse with a single split().
@@ -82,12 +91,14 @@ RenderOutcome RenderPathA(tgfx::Context* context, pagx::PAGXDocument* doc, pagx:
     r.error = "invalid canvas size";
     return r;
   }
-  auto surface = pagx::test::RenderLayerToSurface(context, layer, canvasW, canvasH);
+  const int renderW = static_cast<int>(canvasW * kRenderScale);
+  const int renderH = static_cast<int>(canvasH * kRenderScale);
+  auto surface = pagx::test::RenderLayerToSurface(context, layer, renderW, renderH, kRenderScale);
   if (!surface) {
     r.error = "RenderLayerToSurface failed";
     return r;
   }
-  tgfx::Bitmap bitmap(canvasW, canvasH, false, false);
+  tgfx::Bitmap bitmap(renderW, renderH, false, false);
   tgfx::Pixmap pixmap(bitmap);
   if (!surface->readPixels(pixmap.info(), pixmap.writablePixels())) {
     r.error = "readPixels failed";
@@ -129,12 +140,15 @@ RenderOutcome RenderPathB(tgfx::Context* context, pagx::PAGXDocument* doc,
     r.error = "invalid canvas size";
     return r;
   }
-  auto surface = pagx::test::RenderLayerToSurface(context, inflateResult.layer, canvasW, canvasH);
+  const int renderW = static_cast<int>(canvasW * kRenderScale);
+  const int renderH = static_cast<int>(canvasH * kRenderScale);
+  auto surface = pagx::test::RenderLayerToSurface(context, inflateResult.layer, renderW, renderH,
+                                                  kRenderScale);
   if (!surface) {
     r.error = "RenderLayerToSurface failed";
     return r;
   }
-  tgfx::Bitmap bitmap(canvasW, canvasH, false, false);
+  tgfx::Bitmap bitmap(renderW, renderH, false, false);
   tgfx::Pixmap pixmap(bitmap);
   if (!surface->readPixels(pixmap.info(), pixmap.writablePixels())) {
     r.error = "readPixels failed";
