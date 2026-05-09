@@ -37,12 +37,12 @@ SECTIONS = [
     ("text", "resources/text"),
 ]
 
-# Per-section accent colour. Picks lifted from the reference report at
+# Per-section accent colour. Picks aligned with the sibling report at
 # test/out/html-comparison/index.html so the two tools feel of-a-piece.
 SECTION_COLORS = {
-    "spec": "#2563eb",
+    "spec": "#8b5cf6",
     "pagx_to_html": "#6366f1",
-    "cli": "#10b981",
+    "cli": "#14b8a6",
     "layout": "#f59e0b",
     "text": "#ec4899",
 }
@@ -129,7 +129,7 @@ def collect_cards() -> dict[str, list[Card]]:
 
 def status_cell(status: str, webp: Optional[Path], alt: str,
                 out_parent: Path) -> str:
-    """Render one column. 'ok' → image; anything else → red failure card."""
+    """Render the inner content of one column. 'ok' → <img>; failure → red card."""
     if status == "ok" and webp is not None and webp.exists():
         webp_rel = os.path.relpath(webp, out_parent)
         return (f'<img src="{html.escape(webp_rel)}" '
@@ -144,14 +144,18 @@ def status_cell(status: str, webp: Optional[Path], alt: str,
 
 def render_section(slug: str, rel_dir: str, cards: list[Card],
                    out_parent: Path) -> str:
-    """Emit one <section> block for a single tab."""
+    """Emit one <section> block for a single tab — stacked card layout
+    mirroring test/out/html-comparison/index.html."""
     if not cards:
-        return (f'<section class="section" data-section="{slug}">'
-                f'  <p class="empty">No samples found under '
-                f'<code>{html.escape(rel_dir)}</code>. Did '
-                f'ComparisonDumpTest run for this section?</p></section>')
+        return (
+            f'<section class="section" data-section="{slug}" '
+            f'style="--section-color: var(--color-{slug})">\n'
+            f'  <div class="section-meta"><span class="dot"></span>'
+            f'No samples found under <code>{html.escape(rel_dir)}</code>. '
+            f'Did ComparisonDumpTest run for this section?</div>\n'
+            f'</section>')
 
-    rows = []
+    card_blocks = []
     for index, card in enumerate(cards, start=1):
         pagx_cell = status_cell(card.pagx_status, card.pagx_webp,
                                 f"{card.name} (PAGX native)", out_parent)
@@ -161,30 +165,42 @@ def render_section(slug: str, rel_dir: str, cards: list[Card],
             REPO_ROOT / rel_dir / f"{card.name}.pagx", out_parent)
         size_label = (f"{card.width}&times;{card.height}"
                       if card.width and card.height else "–")
-        rows.append(
-            f'      <tr>'
-            f'<td class="index">{index}</td>'
-            f'<td class="name"><a href="{html.escape(source_rel)}" '
-            f'target="_blank">{html.escape(card.name)}</a>'
-            f'<span class="size">{size_label}</span></td>'
-            f'<td class="cell">{pagx_cell}</td>'
-            f'<td class="cell">{pag_cell}</td>'
-            f'</tr>')
-    return (f'<section class="section" data-section="{slug}">\n'
-            f'  <div class="section-meta">'
-            f'<span class="dot"></span>{html.escape(slug)} '
-            f'&middot; <code>{html.escape(rel_dir)}</code> '
-            f'&middot; {len(cards)} samples</div>\n'
-            f'  <table>\n'
-            f'    <thead><tr>'
-            f'<th class="col-index">#</th>'
-            f'<th class="col-name">sample</th>'
-            f'<th class="col-cell">PAGX native</th>'
-            f'<th class="col-cell">PAGX &rarr; PAG</th>'
-            f'</tr></thead>\n'
-            f'    <tbody>\n'
-            + "\n".join(rows)
-            + '\n    </tbody>\n  </table>\n</section>')
+        card_id = f"{slug}--{card.name}"
+        card_blocks.append(
+            f'<div class="card" id="{html.escape(card_id)}">\n'
+            f'  <div class="hd">\n'
+            f'    <h3>{index}. {html.escape(card.name)}</h3>\n'
+            f'    <span class="sz">{size_label}</span>\n'
+            f'  </div>\n'
+            f'  <div class="cmp">\n'
+            f'    <div>\n'
+            f'      <div class="lbl">\n'
+            f'        <label>PAGX Native</label>\n'
+            f'        <a class="open" href="{html.escape(source_rel)}" '
+            f'target="_blank" rel="noopener">'
+            f'{html.escape(rel_dir)}/{html.escape(card.name)}.pagx</a>\n'
+            f'      </div>\n'
+            f'      {pagx_cell}\n'
+            f'    </div>\n'
+            f'    <div>\n'
+            f'      <div class="lbl">\n'
+            f'        <label>PAGX &rarr; PAG</label>\n'
+            f'      </div>\n'
+            f'      {pag_cell}\n'
+            f'    </div>\n'
+            f'  </div>\n'
+            f'</div>')
+
+    meta = (
+        f'<div class="section-meta"><span class="dot"></span>'
+        f'{html.escape(slug)} &middot; <code>{html.escape(rel_dir)}</code> '
+        f'&middot; {len(cards)} samples</div>')
+    return (
+        f'<section class="section" data-section="{slug}" '
+        f'style="--section-color: var(--color-{slug})">\n'
+        f'  {meta}\n'
+        + "\n".join(card_blocks)
+        + '\n</section>')
 
 
 def render_html(cards_by_section: dict[str, list[Card]]) -> str:
@@ -224,206 +240,257 @@ def render_html(cards_by_section: dict[str, list[Card]]) -> str:
   color-scheme: light;
 {css_vars}
 }}
+* {{ box-sizing: border-box; }}
 body {{
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+  background: #f1f5f9;
   margin: 0;
   padding: 0;
-  background: #f8fafc;
   color: #0f172a;
+  -webkit-font-smoothing: antialiased;
 }}
+
+/* ── Top bar ─────────────────────────────────────────────────────── */
 .topbar {{
   position: sticky;
   top: 0;
-  z-index: 10;
-  background: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
-  padding: 14px 20px 0;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  z-index: 20;
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
 }}
-.topbar h1 {{
-  font-size: 16px;
-  margin: 0 0 6px;
-  color: #0f172a;
+.topbar-inner {{
+  max-width: 1680px;
+  margin: 0 auto;
+  padding: 14px 28px 10px;
+}}
+.topbar .title h1 {{
+  margin: 0;
+  font-size: 17px;
   font-weight: 600;
+  color: #0f172a;
+  letter-spacing: -.01em;
 }}
-.topbar .sub {{
+.topbar .title .sub {{
   font-size: 12px;
-  color: #475569;
-  margin-bottom: 12px;
+  color: #64748b;
+  margin-top: 3px;
+  letter-spacing: 0;
 }}
-.topbar code {{
-  background: #f1f5f9;
+.topbar .title code {{
+  background: rgba(15, 23, 42, 0.06);
   padding: 1px 5px;
   border-radius: 3px;
   font-size: 11px;
   color: #334155;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }}
-.tabs {{
+.topbar .tabs {{
   display: flex;
   gap: 6px;
-  flex-wrap: wrap;
-  padding-bottom: 0;
+  margin-top: 12px;
+  overflow-x: auto;
+  scrollbar-width: thin;
 }}
-.tab {{
+.topbar .tabs::-webkit-scrollbar {{ height: 6px; }}
+.topbar .tabs::-webkit-scrollbar-thumb {{
+  background: rgba(15, 23, 42, 0.12);
+  border-radius: 3px;
+}}
+.topbar .tab {{
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 14px 9px;
-  border: 1px solid #e2e8f0;
-  border-bottom: none;
-  border-radius: 8px 8px 0 0;
-  background: #f8fafc;
-  color: #334155;
+  gap: 8px;
+  padding: 7px 14px;
   font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  color: #334155;
+  background: white;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 999px;
   cursor: pointer;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: background .18s ease, color .18s ease, border-color .18s ease, box-shadow .18s ease, transform .05s ease;
 }}
-.tab:hover {{
-  background: #f1f5f9;
+.topbar .tab:hover {{
   color: #0f172a;
-  border-color: #cbd5e1;
+  background: #f8fafc;
+  border-color: var(--tab-color, #94a3b8);
+  box-shadow: 0 2px 6px -1px color-mix(in srgb, var(--tab-color, #94a3b8) 25%, rgba(15, 23, 42, 0.08));
 }}
-.tab.active {{
-  background: var(--tab-color, #2563eb);
-  color: white;
-  border-color: var(--tab-color, #2563eb);
-  font-weight: 600;
+.topbar .tab:active {{ transform: translateY(1px); }}
+.topbar .tab:focus-visible {{
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
 }}
-.tab .dot {{
+.topbar .tab .dot {{
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--tab-color, #cbd5e1);
+  background: var(--tab-color, #94a3b8);
+  flex-shrink: 0;
 }}
-.tab.active .dot {{
-  background: rgba(255,255,255,0.9);
-}}
-.tab .count {{
+.topbar .tab .count {{
   display: inline-block;
-  padding: 1px 7px;
-  border-radius: 10px;
-  background: #e2e8f0;
-  color: #475569;
   font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+  background: rgba(15, 23, 42, 0.06);
+  padding: 1px 7px;
+  border-radius: 999px;
   font-variant-numeric: tabular-nums;
 }}
-.tab.active .count {{
-  background: rgba(255,255,255,0.25);
+.topbar .tab.active {{
+  color: white;
+  background: var(--tab-color, #2563eb);
+  border-color: var(--tab-color, #2563eb);
+  box-shadow: 0 4px 10px -2px color-mix(in srgb, var(--tab-color, #2563eb) 45%, transparent);
+}}
+.topbar .tab.active:hover {{
+  background: var(--tab-color, #2563eb);
+  border-color: var(--tab-color, #2563eb);
   color: white;
 }}
-main {{
-  padding: 16px 24px 32px;
+.topbar .tab.active .dot {{ background: rgba(255, 255, 255, 0.85); }}
+.topbar .tab.active .count {{
+  color: white;
+  background: rgba(255, 255, 255, 0.22);
 }}
-.section {{
-  display: none;
-}}
-.section.active {{
-  display: block;
-}}
+
+/* ── Sections + meta pill ───────────────────────────────────────── */
+.main {{ padding: 24px 24px 48px; }}
+.section {{ display: none; }}
+.section.active {{ display: block; }}
 .section-meta {{
-  font-size: 13px;
-  color: #475569;
-  margin: 4px 0 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  text-align: center;
+  color: #64748b;
+  font-size: 12px;
+  margin: 0 auto 24px;
+  padding: 6px 14px;
+  max-width: fit-content;
+  background: white;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  border-radius: 999px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }}
 .section-meta .dot {{
-  width: 10px;
-  height: 10px;
+  display: inline-block;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: var(--section-color, #cbd5e1);
+  background: var(--section-color, #94a3b8);
+  margin-right: 8px;
+  vertical-align: middle;
 }}
 .section-meta code {{
-  color: #0f172a;
-  background: #e2e8f0;
+  background: rgba(15, 23, 42, 0.06);
   padding: 1px 6px;
   border-radius: 3px;
+  color: #334155;
 }}
-table {{
-  border-collapse: collapse;
-  width: 100%;
-  table-layout: fixed;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
+
+/* ── Card (one row per sample) ──────────────────────────────────── */
+.card {{
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .08);
+  margin: 0 auto 20px;
+  max-width: 1680px;
   overflow: hidden;
 }}
-thead th {{
-  position: sticky;
-  top: 88px;
-  background: #f1f5f9;
-  padding: 10px 12px;
-  text-align: left;
-  border-bottom: 1px solid #cbd5e1;
-  font-size: 13px;
-  z-index: 2;
-  color: #0f172a;
-  font-weight: 600;
+.hd {{
+  padding: 12px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }}
-th.col-index {{ width: 50px; text-align: right; }}
-th.col-name {{ width: 240px; }}
-th.col-cell {{ width: calc((100% - 290px) / 2); }}
-tbody td {{
-  padding: 12px;
-  border-bottom: 1px solid #f1f5f9;
-  vertical-align: top;
+.hd h3 {{
+  margin: 0;
+  font-size: 14px;
+  color: #334155;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }}
-tbody tr:last-child td {{
-  border-bottom: none;
-}}
-td.index {{
-  font-family: "SF Mono", Menlo, Consolas, monospace;
-  font-size: 13px;
-  color: #94a3b8;
-  text-align: right;
-  padding-right: 8px;
-}}
-td.name {{
-  font-family: "SF Mono", Menlo, Consolas, monospace;
-  font-size: 13px;
-  color: #0369a1;
-}}
-td.name a {{
-  color: inherit;
-  text-decoration: none;
-}}
-td.name a:hover {{
-  text-decoration: underline;
-}}
-td.name .size {{
-  display: block;
-  color: #94a3b8;
+.sz {{
   font-size: 11px;
-  font-weight: normal;
-  margin-top: 2px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #dcfce7;
+  color: #166534;
+  flex: 0 0 auto;
 }}
-td.cell {{
-  background:
-    repeating-conic-gradient(#f1f5f9 0% 25%, #e2e8f0 0% 50%) 50% / 20px 20px;
+.cmp {{ display: flex; }}
+.cmp > div {{
+  flex: 1;
+  padding: 12px;
   text-align: center;
-  min-height: 80px;
+  min-width: 0;
 }}
-td.cell img {{
+.cmp > div + div {{ border-left: 1px solid #e2e8f0; }}
+.cmp .lbl {{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+  min-height: 19px;
+}}
+.cmp .lbl label {{
+  margin: 0;
+  display: block;
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}}
+.cmp .lbl .open {{
   max-width: 100%;
-  max-height: 600px;
-  display: inline-block;
-  background: #ffffff;
-  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+  font-size: 11px;
+  color: #2563eb;
+  text-decoration: none;
+  padding: 2px 8px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #eff6ff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }}
+.cmp .lbl .open:hover {{
+  background: #dbeafe;
+  border-color: #60a5fa;
+}}
+.cmp img {{
+  max-width: 100%;
+  height: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  background: repeating-conic-gradient(#f0f0f0 0% 25%, white 0% 50%) 50%/16px 16px;
+}}
+
+/* ── Failure card (replaces the <img> when a render stage failed) ─ */
 .fail {{
   display: inline-block;
-  min-width: 200px;
+  min-width: 240px;
   padding: 18px 24px;
   background: #fef2f2;
   color: #991b1b;
   border: 1px solid #fca5a5;
   border-radius: 6px;
-  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   text-align: left;
 }}
 .fail-title {{
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 1px;
   color: #b91c1c;
@@ -433,30 +500,21 @@ td.cell img {{
   font-size: 13px;
   word-break: break-word;
 }}
-.empty {{
-  color: #475569;
-  font-size: 14px;
-  padding: 24px;
-  border: 1px dashed #cbd5e1;
-  border-radius: 6px;
-  background: #ffffff;
-}}
   </style>
 </head>
 <body>
 <header class="topbar">
-  <h1>PAGX &harr; PAGX-to-PAG render comparison &mdash; {total_samples} samples total</h1>
-  <div class="sub">
-    Left column: PAGX-native render (LayerBuilder direct). &nbsp;|&nbsp;
-    Right column: PAGX &rarr; PAG &rarr; Inflater render.
-    Both paths share the PAGXTest FontConfig/FontProvider — any visual diff is a bug.
-    Click a sample name to open the source <code>.pagx</code>.
-  </div>
-  <div class="tabs">
+  <div class="topbar-inner">
+    <div class="title">
+      <h1>PAGX rendering comparison <span style="color:#64748b;font-weight:500">· {total_samples} samples</span></h1>
+      <div class="sub">Left: PAGX-native render (LayerBuilder direct) &nbsp;|&nbsp; Right: PAGX &rarr; PAG &rarr; Inflater render. Both paths share the PAGXTest FontConfig/FontProvider — any visual diff is a bug. Click the source link to open the <code>.pagx</code>.</div>
+    </div>
+    <div class="tabs">
 {chr(10).join(tab_buttons)}
+    </div>
   </div>
 </header>
-<main>
+<main class="main">
 {chr(10).join(section_blocks)}
 </main>
 <script>
@@ -465,9 +523,14 @@ td.cell img {{
   const sections = document.querySelectorAll('main .section');
   function activate(slug, opts) {{
     const scroll = opts && opts.scroll;
-    tabs.forEach(t => t.classList.toggle('active', t.dataset.section === slug));
+    let found = false;
+    tabs.forEach(t => {{
+      const on = t.dataset.section === slug;
+      t.classList.toggle('active', on);
+      if (on) found = true;
+    }});
     sections.forEach(s => s.classList.toggle('active', s.dataset.section === slug));
-    if (location.hash !== '#' + slug) {{
+    if (found && location.hash !== '#' + slug) {{
       history.replaceState(null, '', '#' + slug);
     }}
     if (scroll) {{
@@ -478,6 +541,10 @@ td.cell img {{
     }}
   }}
   tabs.forEach(t => t.addEventListener('click', () => activate(t.dataset.section, {{ scroll: true }})));
+  window.addEventListener('hashchange', () => {{
+    const slug = (location.hash || '').replace(/^#/, '');
+    if (slug) activate(slug, {{ scroll: true }});
+  }});
   // Initial activation: from URL hash if valid, otherwise the first tab.
   // Don't force-scroll on load — respect any deep-link fragment behaviour.
   const initial = (location.hash || '').replace(/^#/, '');
