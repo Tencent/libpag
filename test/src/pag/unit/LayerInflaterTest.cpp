@@ -635,4 +635,80 @@ TEST(LayerInflater, NestedVectorGroupInflates) {
   EXPECT_EQ(outerGroup->elements().size(), 1u);
 }
 
+// ---------------------------------------------------------------------------
+// makeLayerByType fallback — the inflater only calls it when a typed
+// Layer (Shape / Image / Solid / Vector) arrives with its payload pointer
+// null. Normal Baker output always fills the payload, so reach the
+// fallback by hand-building Layers with type != Layer but payload left
+// empty. Drives the §100-108 switch.
+// ---------------------------------------------------------------------------
+
+TEST(LayerInflater, NullPayloadTypedLayersFallbackToMakeLayerByType) {
+  auto doc = MakeDoc();
+  auto comp = MakeComp();
+  comp->layers.push_back(MakeLayer(LayerType::Shape));
+  comp->layers.push_back(MakeLayer(LayerType::Image));
+  comp->layers.push_back(MakeLayer(LayerType::Solid));
+  comp->layers.push_back(MakeLayer(LayerType::Vector));
+  comp->layers.push_back(MakeLayer(LayerType::Mesh));
+  doc->compositions.push_back(std::move(comp));
+
+  auto r = LayerInflater::Inflate(std::move(doc));
+  ASSERT_NE(r.layer, nullptr);
+  ASSERT_EQ(r.layer->children().size(), 5u);
+  EXPECT_NE(std::dynamic_pointer_cast<tgfx::ShapeLayer>(r.layer->children()[0]), nullptr);
+  EXPECT_NE(std::dynamic_pointer_cast<tgfx::Layer>(r.layer->children()[1]), nullptr);
+  EXPECT_NE(std::dynamic_pointer_cast<tgfx::SolidLayer>(r.layer->children()[2]), nullptr);
+  EXPECT_NE(std::dynamic_pointer_cast<tgfx::VectorLayer>(r.layer->children()[3]), nullptr);
+  // Mesh falls back to bare tgfx::Layer (MeshPayload empty this cycle).
+  EXPECT_NE(r.layer->children()[4], nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// applyCommon — optional fields wired through conditional branches. One
+// Layer carrying non-default matrix3D / preserve3D / !allowsEdgeAntialiasing
+// / !passThroughBackground / InnerShadow filter walks §264 / §267 / §273 /
+// §277 / §334-336 in a single pass.
+// ---------------------------------------------------------------------------
+
+TEST(LayerInflater, LayerOptionalAttributesAndInnerShadowFilter) {
+  auto doc = MakeDoc();
+  auto comp = MakeComp();
+  auto layer = MakeLayer();
+
+  // Matrix3D non-identity → §263-264. Start from identity then bump the
+  // translate-X slot (column 3, row 0). Actual value doesn't matter — only
+  // isIdentity() gating does.
+  auto m3d = Matrix3D::I();
+  m3d.values[12] = 10.0f;
+  layer->matrix3D = MakeProp(m3d);
+  // preserve3D / !passThroughBackground / !allowsEdgeAntialiasing.
+  layer->preserve3D = true;
+  layer->passThroughBackground = false;
+  layer->allowsEdgeAntialiasing = false;
+
+  // InnerShadow filter — §334-336.
+  auto inner = std::make_unique<LayerFilter>();
+  inner->type = LayerFilterType::InnerShadow;
+  inner->offsetX = MakeProp(3.0f);
+  inner->offsetY = MakeProp(4.0f);
+  inner->blurX = MakeProp(2.0f);
+  inner->blurY = MakeProp(2.0f);
+  inner->color = MakeProp(tgfx::Color{0.0f, 0.0f, 0.0f, 1.0f});
+  inner->shadowOnly = false;
+  layer->filters.push_back(std::move(inner));
+
+  comp->layers.push_back(std::move(layer));
+  doc->compositions.push_back(std::move(comp));
+
+  auto r = LayerInflater::Inflate(std::move(doc));
+  ASSERT_NE(r.layer, nullptr);
+  ASSERT_EQ(r.layer->children().size(), 1u);
+  auto child = r.layer->children()[0];
+  EXPECT_TRUE(child->preserve3D());
+  EXPECT_FALSE(child->allowsEdgeAntialiasing());
+  EXPECT_FALSE(child->passThroughBackground());
+  EXPECT_EQ(child->filters().size(), 1u);
+}
+
 }  // namespace pagx::pag

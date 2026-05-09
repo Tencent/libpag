@@ -34,7 +34,7 @@ bool HasError(const DecodeResult& r, pagx::DiagnosticCode code) {
   return false;
 }
 
-[[maybe_unused]] bool HasWarning(const DecodeResult& r, pagx::DiagnosticCode code) {
+bool HasWarning(const DecodeResult& r, pagx::DiagnosticCode code) {
   for (const auto& w : r.warnings) {
     if (w.code == code) {
       return true;
@@ -221,4 +221,145 @@ TEST(Truncate, LayerDepthLimitExceeded) {
   auto dec = Codec::Decode(enc.bytes->data(), enc.bytes->length());
   EXPECT_EQ(dec.doc, nullptr);
   EXPECT_TRUE(HasError(dec, pagx::DiagnosticCode::LayerDepthLimitExceeded));
+}
+
+// =============================================================================
+// Top-level Tag loop edge cases — exercise the §197 TagCode switch's default
+// / duplicate-FileHeader / malformed-length branches in Codec.cpp. These are
+// defensive paths that the Encoder never produces naturally, so we inject
+// synthetic Tag bytes before the End marker of a known-good stream.
+// =============================================================================
+
+namespace {
+
+// TagHeader wire format (TagHeader.cpp:19-28): little-endian u16 where the
+// high 10 bits are the TagCode and the low 6 bits are the length (or 63 +
+// a trailing u32 length for long bodies). Small helpers for readable byte
+// vectors in tests:
+std::vector<uint8_t> InlineTagHeader(uint16_t code, uint32_t length) {
+  EXPECT_LT(length, 63u);  // we only ever use the inline form here.
+  uint16_t typeAndLength = static_cast<uint16_t>((code << 6) | (length & 0x3Fu));
+  return {static_cast<uint8_t>(typeAndLength & 0xFF),
+          static_cast<uint8_t>((typeAndLength >> 8) & 0xFF)};
+}
+
+std::vector<uint8_t> LongTagHeader(uint16_t code, uint32_t length) {
+  uint16_t typeAndLength = static_cast<uint16_t>((code << 6) | 63u);
+  return {
+      static_cast<uint8_t>(typeAndLength & 0xFF),
+      static_cast<uint8_t>((typeAndLength >> 8) & 0xFF),
+      static_cast<uint8_t>(length & 0xFF),
+      static_cast<uint8_t>((length >> 8) & 0xFF),
+      static_cast<uint8_t>((length >> 16) & 0xFF),
+      static_cast<uint8_t>((length >> 24) & 0xFF),
+  };
+}
+
+// Rewrite the little-endian bodyLength field at offset 4 of a PAG stream.
+void PatchBodyLength(std::vector<uint8_t>* bytes, uint32_t newLength) {
+  (*bytes)[4] = static_cast<uint8_t>(newLength & 0xFF);
+  (*bytes)[5] = static_cast<uint8_t>((newLength >> 8) & 0xFF);
+  (*bytes)[6] = static_cast<uint8_t>((newLength >> 16) & 0xFF);
+  (*bytes)[7] = static_cast<uint8_t>((newLength >> 24) & 0xFF);
+}
+
+}  // namespace
+
+// Phase 15 §228-231 — a top-level Tag with an unknown TagCode is skipped
+// with an UnknownTagCode warning (forward-compat). The rest of the body
+// decodes cleanly, so dec.doc must be non-null.
+TEST(Truncate, UnknownTopLevelTagCodeWarns) {
+  auto bytes = EncodeMinimalDoc();
+  // End tag sits at the final 2 bytes (WriteEndTag = 0x0000). Splice in an
+  // unknown Tag with code=500 and length=0 right before it.
+  ASSERT_GE(bytes.size(), 11u);
+  const uint32_t originalBodyLength =
+      static_cast<uint32_t>(bytes[4]) | (static_cast<uint32_t>(bytes[5]) << 8) |
+      (static_cast<uint32_t>(bytes[6]) << 16) | (static_cast<uint32_t>(bytes[7]) << 24);
+
+  std::vector<uint8_t> out(bytes.begin(), bytes.end() - 2);  // drop End tag
+  auto unknown = InlineTagHeader(/*code=*/500u, /*length=*/0u);
+  out.insert(out.end(), unknown.begin(), unknown.end());
+  out.push_back(0x00);  // End tag low byte
+  out.push_back(0x00);  // End tag high byte
+  PatchBodyLength(&out, originalBodyLength + static_cast<uint32_t>(unknown.size()));
+
+  auto dec = Codec::Decode(out.data(), out.size());
+  EXPECT_NE(dec.doc, nullptr);
+  EXPECT_TRUE(HasWarning(dec, pagx::DiagnosticCode::UnknownTagCode));
+}
+
+// Phase 15 §199-202 — a second FileHeader Tag is ignored with an
+// UnknownTagCode warning (forward-compat).
+TEST(Truncate, DuplicateFileHeaderWarns) {
+  auto bytes = EncodeMinimalDoc();
+  // Splice in another FileHeader (TagCode=1) with a tiny length. We don't
+  // actually need valid FileHeader body bytes — the tag is skipped by the
+  // sawFileHeader guard before ReadFileHeader runs, but the body bytes
+  // must still fit within the declared tag length so the tagEnd seek
+  // lands on the next Tag. Use length=0 to avoid any body.
+  ASSERT_GE(bytes.size(), 11u);
+  const uint32_t originalBodyLength =
+      static_cast<uint32_t>(bytes[4]) | (static_cast<uint32_t>(bytes[5]) << 8) |
+      (static_cast<uint32_t>(bytes[6]) << 16) | (static_cast<uint32_t>(bytes[7]) << 24);
+
+  std::vector<uint8_t> out(bytes.begin(), bytes.end() - 2);  // drop End
+  auto dup = InlineTagHeader(/*code=*/1u, /*length=*/0u);    // duplicate FileHeader
+  out.insert(out.end(), dup.begin(), dup.end());
+  out.push_back(0x00);
+  out.push_back(0x00);
+  PatchBodyLength(&out, originalBodyLength + static_cast<uint32_t>(dup.size()));
+
+  auto dec = Codec::Decode(out.data(), out.size());
+  EXPECT_NE(dec.doc, nullptr);
+  EXPECT_TRUE(HasWarning(dec, pagx::DiagnosticCode::UnknownTagCode));
+}
+
+// Phase 15 §190-194 — a Tag whose length field claims more bytes than
+// bodyLength declares. Triggers MalformedTag and aborts the decode (doc
+// goes back to nullptr).
+TEST(Truncate, TagLengthExceedsBodyEndIsMalformed) {
+  auto bytes = EncodeMinimalDoc();
+  const uint32_t originalBodyLength =
+      static_cast<uint32_t>(bytes[4]) | (static_cast<uint32_t>(bytes[5]) << 8) |
+      (static_cast<uint32_t>(bytes[6]) << 16) | (static_cast<uint32_t>(bytes[7]) << 24);
+
+  // Splice in a long-form Tag whose length claims 1 MB of body. The
+  // tagEnd = tagBodyStart + 1 MB will trivially exceed bodyEnd; Codec
+  // emits MalformedTag and bails.
+  std::vector<uint8_t> out(bytes.begin(), bytes.end() - 2);
+  auto poison = LongTagHeader(/*code=*/500u, /*length=*/1u << 20);
+  out.insert(out.end(), poison.begin(), poison.end());
+  out.push_back(0x00);
+  out.push_back(0x00);
+  PatchBodyLength(&out, originalBodyLength + static_cast<uint32_t>(poison.size()));
+
+  auto dec = Codec::Decode(out.data(), out.size());
+  EXPECT_EQ(dec.doc, nullptr);
+  EXPECT_TRUE(HasError(dec, pagx::DiagnosticCode::MalformedTag));
+}
+
+// Phase 15 §163-167 — bodyLength claims more bytes than the stream holds
+// at the TagHeader boundary. Specifically: body ends with a single byte
+// followed by EOF, so bytesAvailable<2 fires before ReadTagHeader runs.
+// We reach this path by making bodyLength exactly 1 greater than the
+// actual trailing byte count (trimmed End tag to a single byte).
+TEST(Truncate, TruncatedBeforeTagHeader) {
+  auto bytes = EncodeMinimalDoc();
+  const uint32_t originalBodyLength =
+      static_cast<uint32_t>(bytes[4]) | (static_cast<uint32_t>(bytes[5]) << 8) |
+      (static_cast<uint32_t>(bytes[6]) << 16) | (static_cast<uint32_t>(bytes[7]) << 24);
+
+  // Drop the End tag's high byte so only 1 byte remains at the end; leave
+  // bodyLength advertising the original (2-byte End) count. Codec reaches
+  // the loop iteration for the final Tag, sees bytesAvailable == 1 < 2,
+  // and trips TruncatedData §164.
+  ASSERT_GE(bytes.size(), 1u);
+  std::vector<uint8_t> out(bytes.begin(), bytes.end() - 1);  // chop 1 byte
+  // Shrink bodyLength by exactly 1 so Layer-5 guard still accepts it.
+  PatchBodyLength(&out, originalBodyLength - 1);
+
+  auto dec = Codec::Decode(out.data(), out.size());
+  EXPECT_EQ(dec.doc, nullptr);
+  EXPECT_TRUE(HasError(dec, pagx::DiagnosticCode::TruncatedData));
 }
