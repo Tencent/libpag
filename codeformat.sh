@@ -35,6 +35,7 @@ find src -name "*.cpp" -print  -o -name "*.h" -print  -o -name "*.mm" -print  -o
 find test \( -path test/framework/lzma \) -prune -o -name "*.cpp" -print  -o -name "*.h" -print | xargs $CLANG_FORMAT -i
 find viewer/src  -name "*.cpp" -print  -o -name "*.h" -print  -o -name "*.mm" -print -o -name "*.m" -print -o -name "*.hpp" -print | xargs $CLANG_FORMAT -i
 find exporter/src  -name "*.cpp" -print  -o -name "*.h" -print  -o -name "*.mm" -print -o -name "*.m" -print -o -name "*.hpp" -print | xargs $CLANG_FORMAT -i
+find playground/pagx-viewer/src/cpp  -name "*.cpp" -print  -o -name "*.h" -print  -o -name "*.mm" -print -o -name "*.m" -print -o -name "*.hpp" -print | xargs $CLANG_FORMAT -i
 
 git diff
 result=`git diff`

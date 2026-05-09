@@ -18,10 +18,12 @@
 
 #include "PAGXView.h"
 #include <emscripten/html5.h>
+#include <algorithm>
 #include "pagx/PAGXImporter.h"
 #include "pagx/types/Data.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Typeface.h"
+#include "utils/ImagePatternMatrixCalculator.h"
 
 using namespace emscripten;
 
@@ -144,6 +146,11 @@ void PAGXView::buildLayers() {
   if (!document) {
     return;
   }
+  // TODO: Remove ResolveAllImagePatternMatrices() and ResolveAllGradientCoordinates() after the
+  // pagx exporter adapts to relative coordinates for image and gradient fills. Currently we force
+  // them to absolute coordinates to ensure correct rendering.
+  ResolveAllImagePatternMatrices(document.get());
+  ResolveAllGradientCoordinates(document.get());
   document->applyLayout(&fontConfig);
   contentLayer = LayerBuilder::Build(document.get());
   if (!contentLayer) {
@@ -154,6 +161,7 @@ void PAGXView::buildLayers() {
   displayList.root()->removeChildren();
   displayList.root()->addChild(contentLayer);
   applyCenteringTransform();
+  presentImmediately = true;
 }
 
 void PAGXView::updateSize() {
@@ -163,24 +171,45 @@ void PAGXView::updateSize() {
   if (window == nullptr) {
     return;
   }
-  surface = nullptr;
   auto device = window->getDevice();
+  if (device == nullptr) {
+    return;
+  }
   auto context = device->lockContext();
   if (context == nullptr) {
     return;
   }
-  surface = tgfx::Surface::MakeFrom(context, window);
-  if (surface == nullptr) {
-    device->unlock();
+  int canvasWidth = 0;
+  int canvasHeight = 0;
+  emscripten_get_canvas_element_size(canvasID.c_str(), &canvasWidth, &canvasHeight);
+  syncSurfaceSize(context, canvasWidth, canvasHeight);
+  device->unlock();
+}
+
+// Rebuilds the render surface when the canvas drawing-buffer size has changed.
+// Must be called while the GL context is locked. Used by both updateSize() and
+// draw() so that size changes driven purely by the JS side (e.g. a host-layer
+// ResizeObserver only adjusting canvas.width/height) are absorbed on the next
+// render tick without requiring an explicit updateSize() call.
+void PAGXView::syncSurfaceSize(tgfx::Context* context, int canvasWidth, int canvasHeight) {
+  if (window == nullptr || context == nullptr) {
     return;
   }
-  if (surface->width() != lastSurfaceWidth || surface->height() != lastSurfaceHeight) {
-    lastSurfaceWidth = surface->width();
-    lastSurfaceHeight = surface->height();
-    applyCenteringTransform();
-    presentImmediately = true;
+  if (canvasWidth <= 0 || canvasHeight <= 0) {
+    return;
   }
-  device->unlock();
+  if (surface != nullptr && surface->width() == canvasWidth && surface->height() == canvasHeight) {
+    return;
+  }
+  surface = nullptr;
+  surface = tgfx::Surface::MakeFrom(context, window);
+  if (surface == nullptr) {
+    return;
+  }
+  lastSurfaceWidth = surface->width();
+  lastSurfaceHeight = surface->height();
+  applyCenteringTransform();
+  presentImmediately = true;
 }
 
 void PAGXView::applyCenteringTransform() {
@@ -227,6 +256,19 @@ void PAGXView::updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY
   lastZoom = zoom;
 }
 
+void PAGXView::setBackgroundColor(float red, float green, float blue, float alpha) {
+  useCustomBackgroundColor = true;
+  customBackgroundColor = tgfx::Color{std::clamp(red, 0.0f, 1.0f), std::clamp(green, 0.0f, 1.0f),
+                                      std::clamp(blue, 0.0f, 1.0f), std::clamp(alpha, 0.0f, 1.0f)};
+  presentImmediately = true;
+}
+
+void PAGXView::clearBackgroundColor() {
+  useCustomBackgroundColor = false;
+  customBackgroundColor = tgfx::Color::Transparent();
+  presentImmediately = true;
+}
+
 void PAGXView::draw() {
   if (window == nullptr) {
     window = tgfx::WebGLWindow::MakeFrom(canvasID);
@@ -237,47 +279,69 @@ void PAGXView::draw() {
   double frameStartMs = emscripten_get_now();
   bool hasContentChanged = displayList.hasContentChanged();
   bool hasLastRecording = (lastRecording != nullptr);
-  bool needsInitialFrame = presentImmediately || backgroundLayer == nullptr;
-  if (!hasContentChanged && !hasLastRecording && !needsInitialFrame) {
+  bool needsInitialFrame =
+      presentImmediately || (!useCustomBackgroundColor && backgroundLayer == nullptr);
+  // Detect size change before the early-return so a pure JS-driven resize
+  // (only canvas.width/height changed, no content dirty) still triggers a
+  // redraw. The actual surface rebuild happens inside syncSurfaceSize() while
+  // the GL context is locked.
+  int currentCanvasWidth = 0;
+  int currentCanvasHeight = 0;
+  emscripten_get_canvas_element_size(canvasID.c_str(), &currentCanvasWidth, &currentCanvasHeight);
+  bool sizeChanged = (surface == nullptr && currentCanvasWidth > 0 && currentCanvasHeight > 0) ||
+                     (surface != nullptr && (surface->width() != currentCanvasWidth ||
+                                             surface->height() != currentCanvasHeight));
+  if (!hasContentChanged && !hasLastRecording && !needsInitialFrame && !sizeChanged) {
     return;
   }
   auto device = window->getDevice();
+  if (device == nullptr) {
+    return;
+  }
   auto context = device->lockContext();
   if (context == nullptr) {
     return;
   }
-  if (surface == nullptr) {
-    surface = tgfx::Surface::MakeFrom(context, window);
-  }
+  syncSurfaceSize(context, currentCanvasWidth, currentCanvasHeight);
   if (surface == nullptr) {
     device->unlock();
     return;
   }
   auto canvas = surface->getCanvas();
-  canvas->clear();
-  int width = 0;
-  int height = 0;
-  emscripten_get_canvas_element_size(canvasID.c_str(), &width, &height);
-  auto density = width > 0 ? static_cast<float>(surface->width()) / static_cast<float>(width) : 1.0f;
-  int bgWidth = surface->width();
-  int bgHeight = surface->height();
-  if (!backgroundLayer || bgWidth != lastBackgroundWidth || bgHeight != lastBackgroundHeight ||
-      std::abs(density - lastBackgroundDensity) > 0.001f) {
-    backgroundLayer = GridBackgroundLayer::Make(bgWidth, bgHeight, density);
-    lastBackgroundWidth = bgWidth;
-    lastBackgroundHeight = bgHeight;
-    lastBackgroundDensity = density;
+
+  if (useCustomBackgroundColor) {
+    canvas->clear(customBackgroundColor);
+  } else {
+    canvas->clear();
+    auto density = currentCanvasWidth > 0 ? static_cast<float>(surface->width()) /
+                                                static_cast<float>(currentCanvasWidth)
+                                          : 1.0f;
+    int bgWidth = surface->width();
+    int bgHeight = surface->height();
+    if (!backgroundLayer || bgWidth != lastBackgroundWidth || bgHeight != lastBackgroundHeight ||
+        std::abs(density - lastBackgroundDensity) > 0.001f) {
+      backgroundLayer = GridBackgroundLayer::Make(bgWidth, bgHeight, density);
+      lastBackgroundWidth = bgWidth;
+      lastBackgroundHeight = bgHeight;
+      lastBackgroundDensity = density;
+    }
+    backgroundLayer->draw(canvas);
   }
-  backgroundLayer->draw(canvas);
+
   displayList.render(surface.get(), false);
   auto recording = context->flush();
   if (presentImmediately) {
     presentImmediately = false;
+    lastRecording = nullptr;
     if (recording) {
       context->submit(std::move(recording));
     }
+  } else if (lastRecording) {
+    context->submit(std::move(lastRecording));
+    lastRecording = std::move(recording);
   } else {
-    std::swap(lastRecording, recording);
+    // Prime the pipeline on the first frame: no previous recording is cached yet, so submit the
+    // current one immediately to avoid a blank frame before the delayed-present pipeline kicks in.
     if (recording) {
       context->submit(std::move(recording));
     }

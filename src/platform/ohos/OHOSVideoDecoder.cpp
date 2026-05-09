@@ -24,6 +24,7 @@
 #include <native_buffer/native_buffer.h>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <mutex>
 #include "base/utils/Log.h"
 #include "rendering/video/SoftwareData.h"
@@ -31,6 +32,26 @@
 
 namespace pag {
 #define NV12_PLANE_COUNT 2
+
+namespace {
+// RAII wrapper for per-frame NV12 CPU buffers. The lifetime is owned by the SoftwareData
+// attached to the ImageBuffer, so the memory stays alive until the asynchronous GPU upload
+// task finishes, even if the decoder has been destroyed in the meantime.
+struct NV12FrameBuffer {
+  uint8_t* data[2] = {nullptr, nullptr};
+  int lineSize[2] = {0, 0};
+
+  NV12FrameBuffer() = default;
+
+  ~NV12FrameBuffer() {
+    delete[] data[0];
+    delete[] data[1];
+  }
+
+  NV12FrameBuffer(const NV12FrameBuffer&) = delete;
+  NV12FrameBuffer& operator=(const NV12FrameBuffer&) = delete;
+};
+}  // namespace
 
 void OH_AVCodecOnError(OH_AVCodec*, int32_t index, void* userData) {
   if (userData == nullptr) {
@@ -80,7 +101,6 @@ std::shared_ptr<OHOSVideoDecoder> OHOSVideoDecoder::MakeSoftwareDecoder(const Vi
   if (!decoder->isValid) {
     return nullptr;
   }
-  decoder->weakThis = decoder;
   return decoder;
 }
 
@@ -91,14 +111,6 @@ OHOSVideoDecoder::OHOSVideoDecoder(const VideoFormat& format, bool hardware) {
 }
 
 OHOSVideoDecoder::~OHOSVideoDecoder() {
-  if (yuvBuffer) {
-    if (yuvBuffer->data[0]) {
-      delete[] yuvBuffer->data[0];
-    }
-    if (yuvBuffer->data[1]) {
-      delete[] yuvBuffer->data[1];
-    }
-  }
   if (videoCodec != nullptr) {
     releaseOutputBuffer();
     OH_VideoDecoder_Flush(videoCodec);
@@ -278,34 +290,46 @@ std::shared_ptr<tgfx::ImageBuffer> OHOSVideoDecoder::onRenderFrame() {
       if (videoStride == 0 || videoSliceHeight == 0) {
         return nullptr;
       }
-      yBufferSize = videoStride * videoSliceHeight;
-      uvBufferSize = codecBufferInfo.attr.size - yBufferSize;
-      yuvBuffer = std::make_shared<pag::YUVBuffer>();
-      yuvBuffer->data[0] = new (std::nothrow) uint8_t[yBufferSize];
-      if (yuvBuffer->data[0] == nullptr) {
-        videoStride = 0;
-        return nullptr;
-      }
-      yuvBuffer->data[1] = new (std::nothrow) uint8_t[uvBufferSize];
-      if (yuvBuffer->data[1] == nullptr) {
-        delete[] yuvBuffer->data[0];
-        videoStride = 0;
-        return nullptr;
-      }
-      yuvBuffer->lineSize[0] = videoStride;
-      yuvBuffer->lineSize[1] = videoStride;
     }
     auto capacity = OH_AVBuffer_GetCapacity(codecBufferInfo.buffer);
     if (capacity <= 0) {
       return nullptr;
     }
     uint8_t* yuvAddress = OH_AVBuffer_GetAddr(codecBufferInfo.buffer);
-    memcpy(yuvBuffer->data[0], yuvAddress, yBufferSize);
-    memcpy(yuvBuffer->data[1], yuvAddress + yBufferSize, uvBufferSize);
+    if (yuvAddress == nullptr) {
+      return nullptr;
+    }
+    size_t yBufferSize = static_cast<size_t>(videoStride) * static_cast<size_t>(videoSliceHeight);
+    size_t uvBufferSize = codecBufferInfo.attr.size > static_cast<int32_t>(yBufferSize)
+                              ? static_cast<size_t>(codecBufferInfo.attr.size) - yBufferSize
+                              : 0;
+    if (uvBufferSize == 0) {
+      return nullptr;
+    }
 
-    auto yuvData = SoftwareData<OHOSVideoDecoder>::Make(videoFormat.width, videoFormat.height,
-                                                        yuvBuffer->data, yuvBuffer->lineSize,
-                                                        NV12_PLANE_COUNT, weakThis.lock());
+    // Allocate a fresh frame buffer for every decoded frame. SoftwareData keeps a
+    // shared_ptr to the NV12FrameBuffer, so the memory stays alive until the asynchronous
+    // GPU upload task consumes it, even if the decoder is destroyed in the meantime.
+    auto frameBuffer = std::make_shared<NV12FrameBuffer>();
+    frameBuffer->data[0] = new (std::nothrow) uint8_t[yBufferSize];
+    if (frameBuffer->data[0] == nullptr) {
+      return nullptr;
+    }
+    frameBuffer->lineSize[0] = videoStride;
+    frameBuffer->data[1] = new (std::nothrow) uint8_t[uvBufferSize];
+    if (frameBuffer->data[1] == nullptr) {
+      return nullptr;
+    }
+    frameBuffer->lineSize[1] = videoStride;
+
+    memcpy(frameBuffer->data[0], yuvAddress, yBufferSize);
+    memcpy(frameBuffer->data[1], yuvAddress + yBufferSize, uvBufferSize);
+
+    uint8_t* planes[3] = {frameBuffer->data[0], frameBuffer->data[1], nullptr};
+    int lineSizes[3] = {frameBuffer->lineSize[0], frameBuffer->lineSize[1], 0};
+    auto yuvData =
+        SoftwareData<NV12FrameBuffer>::Make(videoFormat.width, videoFormat.height, planes,
+                                            lineSizes, NV12_PLANE_COUNT, std::move(frameBuffer));
     imageBuffer = tgfx::ImageBuffer::MakeNV12(yuvData, videoFormat.colorSpace);
   }
   return imageBuffer;

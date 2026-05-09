@@ -33,8 +33,8 @@ namespace pagx {
 class Gradient : public ColorSource {
  public:
   /**
-   * The transformation matrix applied to the gradient. The matrix is applied on top of the
-   * coordinate space selected by fitsToGeometry.
+   * The transformation matrix applied to the gradient, composed in the selected coordinate
+   * space (see fitsToGeometry).
    */
   Matrix matrix = {};
 
@@ -44,12 +44,11 @@ class Gradient : public ColorSource {
   std::vector<ColorStop*> colorStops = {};
 
   /**
-   * Selects the coordinate space for the gradient's geometric parameters (start/end points,
-   * center, radius, etc.). When true (the default), the parameters live in a normalized
-   * (0, 0)-(1, 1) space mapped to each geometry's bounding box, and the fill auto-fits per
-   * geometry. When false, the parameters live in the parent container's (Layer or Group)
-   * coordinate space (origin at (0, 0)), and multiple geometries in that container share one
-   * continuous fill.
+   * Selects the coordinate space for the gradient. When true (the default), the gradient lives
+   * in a normalized (0, 0)-(1, 1) space mapped to each geometry's bounding box, and the fill
+   * auto-fits per geometry. When false, the gradient lives in the parent container's (Layer or
+   * Group) coordinate space (origin at (0, 0)), and multiple geometries in that container share
+   * one continuous fill.
    */
   bool fitsToGeometry = true;
 

@@ -22,19 +22,24 @@ import commonJs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
 import alias from '@rollup/plugin-alias';
 import path from "path";
-import {readFileSync, readdirSync, unlinkSync} from "node:fs";
+import {readFileSync, readdirSync, unlinkSync, existsSync} from "node:fs";
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const fileHeaderPath = path.resolve(__dirname, '../../.idea/fileTemplates/includes/PAG File Header.h');
-const banner = readFileSync(fileHeaderPath, 'utf-8');
+// Path: playground/pagx-playground/scripts -> libpag root
+const libpagRoot = path.resolve(__dirname, '../../..');
+const playgroundRoot = path.resolve(__dirname, '..');
+const fileHeaderPath = path.resolve(libpagRoot, '.idea/fileTemplates/includes/PAG File Header.h');
+// The IntelliJ file template is not guaranteed to exist (e.g. in fresh clones or CI minimal
+// checkouts). Fall back to an empty banner rather than failing the build.
+const banner = existsSync(fileHeaderPath) ? readFileSync(fileHeaderPath, 'utf-8') : '';
 const isRelease = process.env.BUILD_MODE === 'release';
 
 // Clean up old source map files in release mode
 if (isRelease) {
-    const outputDir = path.resolve(__dirname, '../wasm-mt');
+    const outputDir = path.resolve(playgroundRoot, 'wasm-mt');
     try {
         const files = readdirSync(outputDir);
         for (const file of files) {
@@ -48,17 +53,18 @@ if (isRelease) {
 }
 
 const plugins = [
-    esbuild({tsconfig: path.resolve(__dirname, "../tsconfig.json"), minify: isRelease}),
+    esbuild({tsconfig: path.resolve(__dirname, "../src/tsconfig.json"), minify: isRelease}),
     json(),
     resolve({ extensions: ['.ts', '.js'] }),
     commonJs(),
     alias({
-        entries: [{ find: '@tgfx', replacement: path.resolve(__dirname, '../../third_party/tgfx/web/src') }],
+        entries: [
+            { find: '@tgfx', replacement: path.resolve(libpagRoot, 'third_party/tgfx/web/src') },
+        ],
     }),
     {
         name: 'preserve-import-meta-url',
-        resolveImportMeta(property, options) {
-            // Preserve the original behavior of `import.meta.url`.
+        resolveImportMeta(property) {
             if (property === 'url') {
                 return 'import.meta.url';
             }
@@ -69,10 +75,10 @@ const plugins = [
 
 export default [
     {
-        input: path.resolve(__dirname, '../index.ts'),
+        input: path.resolve(__dirname, '../src/index.ts'),
         output: {
             banner,
-            file: path.resolve(__dirname, '../wasm-mt/index.js'),
+            file: path.resolve(playgroundRoot, 'wasm-mt/index.js'),
             format: 'esm',
             sourcemap: !isRelease
         },
