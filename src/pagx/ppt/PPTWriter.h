@@ -793,6 +793,15 @@ class PPTWriter {
   // the same font/size as the following run (otherwise PowerPoint uses its
   // default size and the line-height of that break is wrong).
   void writeLineBreak(XMLBuilder& out, const PPTRunStyle& style);
+
+  // Walks the byte range [start, end) of `source` and emits one <a:br/> for
+  // each '\n' encountered. Returns the number of breaks emitted so the caller
+  // can distinguish "explicit \n in source" from "PAGX-driven auto-wrap".
+  // Used to reconstruct empty paragraphs that TextLayout's line metadata
+  // collapses (consecutive '\n's). Replaces the equivalent lambda inline
+  // because project convention forbids lambda expressions.
+  size_t writeNewlineBreaksInRange(XMLBuilder& out, const std::string& source, size_t start,
+                                   size_t end, const PPTRunStyle& style);
   void writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
                          const std::vector<Element*>& elements, const Matrix& transform,
                          float alpha, const std::vector<LayerFilter*>& filters,
@@ -826,6 +835,19 @@ class PPTWriter {
                        const std::vector<PPTRunStyle>& runStyles,
                        std::vector<LineEntry>& lineEntries, bool useLineLayout,
                        ParagraphEmitter& emitter);
+
+  // Walks the source-text range [startRun:startByte, endRun:endByte) across
+  // adjacent RichTextRun entries and emits one <a:br/> per '\n' encountered.
+  // Each break carries the rPr of the run that contains the '\n', so a 40pt
+  // run followed by a 16pt run preserves the 40pt height for the empty line
+  // sitting inside the 40pt run. Returns the number of breaks emitted so the
+  // caller can distinguish "explicit \n in source" from "PAGX-driven auto
+  // wrap with no \n in source". Replaces the equivalent lambda inline because
+  // project convention forbids lambda expressions.
+  size_t writeNewlineBreaksAcrossRuns(ParagraphEmitter& emitter,
+                                      const std::vector<RichTextRun>& runs,
+                                      const std::vector<PPTRunStyle>& runStyles, size_t startRun,
+                                      size_t startByte, size_t endRun, size_t endByte);
 
   // Shape envelope helpers
   void beginShape(XMLBuilder& out, const char* name, int64_t offX, int64_t offY, int64_t extCX,

@@ -53,6 +53,21 @@ namespace pagx {
 using pag::FloatNearlyZero;
 using pag::RadiansToDegrees;
 
+namespace {
+
+// True when an ImagePattern fill was already emitted as a standalone <p:pic>
+// and the surrounding shape adds nothing — no stroke painter, no layer
+// filters, no layer styles. In that case the caller can skip emitting a
+// redundant <p:sp> envelope and return early. Centralizes the guard shared by
+// writeRectangle / writeEllipse / writePath.
+bool CanSkipShapeAfterPicture(bool imageWritten, const FillStrokeInfo& fs,
+                              const std::vector<LayerFilter*>& filters,
+                              const std::vector<LayerStyle*>& styles) {
+  return imageWritten && !fs.stroke && filters.empty() && styles.empty();
+}
+
+}  // namespace
+
 // ── Transform decomposition ────────────────────────────────────────────────
 
 PPTWriter::Xform PPTWriter::DecomposeXform(float localX, float localY, float localW, float localH,
@@ -206,7 +221,7 @@ void PPTWriter::writeRectangle(XMLBuilder& out, const Rectangle* rect, const Fil
   Rect shapeBounds = Rect::MakeXYWH(x, y, w, h);
 
   bool imageWritten = writeImagePatternAsPicture(out, fs.fill, shapeBounds, m, alpha);
-  if (imageWritten && !fs.stroke && filters.empty() && styles.empty()) {
+  if (CanSkipShapeAfterPicture(imageWritten, fs, filters, styles)) {
     return;
   }
 
@@ -253,7 +268,7 @@ void PPTWriter::writeEllipse(XMLBuilder& out, const Ellipse* ellipse, const Fill
   Rect shapeBounds = Rect::MakeXYWH(x, y, w, h);
 
   bool imageWritten = writeImagePatternAsPicture(out, fs.fill, shapeBounds, m, alpha);
-  if (imageWritten && !fs.stroke && filters.empty() && styles.empty()) {
+  if (CanSkipShapeAfterPicture(imageWritten, fs, filters, styles)) {
     return;
   }
 
@@ -298,7 +313,7 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
   Rect shapeBounds = Rect::MakeXYWH(adjustedX, adjustedY, adjustedW, adjustedH);
 
   bool imageWritten = writeImagePatternAsPicture(out, fs.fill, shapeBounds, m, alpha);
-  if (imageWritten && !fs.stroke && filters.empty() && styles.empty()) {
+  if (CanSkipShapeAfterPicture(imageWritten, fs, filters, styles)) {
     return;
   }
 
@@ -583,9 +598,10 @@ bool PPTWriter::rasterizeLayerAsPicture(XMLBuilder& out, const Layer* layer, boo
 // layer and a parent carry the same effect type), then inherited entries.
 // Shortcuts handle the common empty-on-either-side cases without allocating a
 // new vector.
+namespace {
+
 template <typename T>
-static std::vector<T*> MergeLayerLists(const std::vector<T*>& own,
-                                       const std::vector<T*>& inherited) {
+std::vector<T*> MergeLayerLists(const std::vector<T*>& own, const std::vector<T*>& inherited) {
   if (inherited.empty()) {
     return own;
   }
@@ -598,6 +614,8 @@ static std::vector<T*> MergeLayerLists(const std::vector<T*>& own,
   merged.insert(merged.end(), inherited.begin(), inherited.end());
   return merged;
 }
+
+}  // namespace
 
 void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& parentMatrix,
                            float parentAlpha, const std::vector<LayerFilter*>& inheritedFilters,

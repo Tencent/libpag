@@ -38,6 +38,22 @@ using pag::FloatNearlyEqual;
 using pag::FloatNearlyZero;
 using pag::RadiansToDegrees;
 
+namespace {
+
+// Emits the run-level typeface triplet shared by writeParagraphRun and
+// writeLineBreak. a:latin covers Latin scripts, a:ea handles East Asian
+// (Chinese/Japanese/Korean) ranges, and a:cs covers complex scripts (Arabic,
+// Hebrew, Thai, etc.) — without any of them PowerPoint silently falls back to
+// the theme font for that script range even when the run carries the right
+// typeface on a sibling element.
+void WriteRunTypeface(XMLBuilder& out, const std::string& typeface) {
+  out.openElement("a:latin").addRequiredAttribute("typeface", typeface).closeElementSelfClosing();
+  out.openElement("a:ea").addRequiredAttribute("typeface", typeface).closeElementSelfClosing();
+  out.openElement("a:cs").addRequiredAttribute("typeface", typeface).closeElementSelfClosing();
+}
+
+}  // namespace
+
 void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStrokeInfo& fs,
                                 const Matrix& m, float alpha,
                                 const std::vector<LayerFilter*>& /*filters*/,
@@ -289,20 +305,6 @@ void PPTWriter::emitNativeTextBody(XMLBuilder& out, const Text* text,
     // separate <a:br/>, so `Hg\n\nAB` produces two breaks (one empty middle
     // line) instead of collapsing into "Hg<br/>AB" (single break, no empty
     // line) which is what the previous filter-and-skip path emitted.
-    auto emitBreaksFor = [&](size_t start, size_t end) -> size_t {
-      size_t emitted = 0;
-      if (end > text->text.size()) {
-        end = text->text.size();
-      }
-      for (size_t pos = start; pos < end; ++pos) {
-        if (text->text[pos] == '\n') {
-          writeLineBreak(out, style);
-          ++emitted;
-        }
-      }
-      return emitted;
-    };
-
     bool wroteAny = false;
     size_t prevByteEnd = 0;
     for (const auto& lineInfo : *lines) {
@@ -310,7 +312,8 @@ void PPTWriter::emitNativeTextBody(XMLBuilder& out, const Text* text,
         continue;
       }
       if (wroteAny) {
-        size_t emitted = emitBreaksFor(prevByteEnd, lineInfo.byteStart);
+        size_t emitted =
+            writeNewlineBreaksInRange(out, text->text, prevByteEnd, lineInfo.byteStart, style);
         if (emitted == 0) {
           // Auto-wrap (no source '\n' between entries): still need one break
           // to move PowerPoint onto the next visual line.
@@ -318,7 +321,7 @@ void PPTWriter::emitNativeTextBody(XMLBuilder& out, const Text* text,
         }
       } else {
         // Leading '\n's before the first non-empty line.
-        emitBreaksFor(0, lineInfo.byteStart);
+        writeNewlineBreaksInRange(out, text->text, 0, lineInfo.byteStart, style);
       }
       std::string line =
           text->text.substr(lineInfo.byteStart, lineInfo.byteEnd - lineInfo.byteStart);
@@ -331,12 +334,12 @@ void PPTWriter::emitNativeTextBody(XMLBuilder& out, const Text* text,
     if (wroteAny) {
       // Trailing '\n's after the last non-empty line: each becomes an empty
       // bottom line, matching the source text shape.
-      emitBreaksFor(prevByteEnd, text->text.size());
+      writeNewlineBreaksInRange(out, text->text, prevByteEnd, text->text.size(), style);
     } else {
       // Text consists solely of '\n's (no non-empty lines were emitted): walk
       // the entire string so every '\n' still produces an empty line in the
       // output paragraph.
-      emitBreaksFor(0, text->text.size());
+      writeNewlineBreaksInRange(out, text->text, 0, text->text.size(), style);
     }
     out.closeElement();  // a:p
     return;
@@ -478,18 +481,7 @@ void PPTWriter::writeParagraphRun(XMLBuilder& out, const std::string& runText,
   }
   writeEffects(out, filters, styles);
   if (!style.typeface.empty()) {
-    out.openElement("a:latin")
-        .addRequiredAttribute("typeface", style.typeface)
-        .closeElementSelfClosing();
-    out.openElement("a:ea")
-        .addRequiredAttribute("typeface", style.typeface)
-        .closeElementSelfClosing();
-    // a:cs covers complex scripts (Arabic, Hebrew, Thai, etc.). Without it
-    // those glyphs fall back to the theme font even when the run ships with
-    // the correct typeface on a:latin/a:ea.
-    out.openElement("a:cs")
-        .addRequiredAttribute("typeface", style.typeface)
-        .closeElementSelfClosing();
+    WriteRunTypeface(out, style.typeface);
   }
   out.closeElement();  // a:rPr
   out.openElement("a:t").closeElementStart();
@@ -514,20 +506,50 @@ void PPTWriter::writeLineBreak(XMLBuilder& out, const PPTRunStyle& style) {
   }
   if (!style.typeface.empty()) {
     out.closeElementStart();
-    out.openElement("a:latin")
-        .addRequiredAttribute("typeface", style.typeface)
-        .closeElementSelfClosing();
-    out.openElement("a:ea")
-        .addRequiredAttribute("typeface", style.typeface)
-        .closeElementSelfClosing();
-    out.openElement("a:cs")
-        .addRequiredAttribute("typeface", style.typeface)
-        .closeElementSelfClosing();
+    WriteRunTypeface(out, style.typeface);
     out.closeElement();  // a:rPr
   } else {
     out.closeElementSelfClosing();
   }
   out.closeElement();  // a:br
+}
+
+size_t PPTWriter::writeNewlineBreaksInRange(XMLBuilder& out, const std::string& source,
+                                            size_t start, size_t end, const PPTRunStyle& style) {
+  size_t emitted = 0;
+  if (end > source.size()) {
+    end = source.size();
+  }
+  for (size_t pos = start; pos < end; ++pos) {
+    if (source[pos] == '\n') {
+      writeLineBreak(out, style);
+      ++emitted;
+    }
+  }
+  return emitted;
+}
+
+size_t PPTWriter::writeNewlineBreaksAcrossRuns(ParagraphEmitter& emitter,
+                                               const std::vector<RichTextRun>& runs,
+                                               const std::vector<PPTRunStyle>& runStyles,
+                                               size_t startRun, size_t startByte, size_t endRun,
+                                               size_t endByte) {
+  size_t emitted = 0;
+  for (size_t r = startRun; r <= endRun && r < runs.size(); ++r) {
+    const std::string& text = runs[r].text->text;
+    size_t s = (r == startRun) ? startByte : 0;
+    size_t e = (r == endRun) ? endByte : text.size();
+    if (e > text.size()) {
+      e = text.size();
+    }
+    for (size_t pos = s; pos < e; ++pos) {
+      if (text[pos] == '\n') {
+        emitter.emitLineBreak(runStyles[r]);
+        ++emitted;
+      }
+    }
+  }
+  return emitted;
 }
 
 void PPTWriter::writeParagraph(XMLBuilder& out, const std::string& lineText,
@@ -708,40 +730,14 @@ void PPTWriter::emitTextBoxBody(const std::vector<RichTextRun>& runs,
       return;
     }
 
-    // Walk a closed source-text range [startRun:startByte, endRun:endByte)
-    // and emit one <a:br/> per '\n' encountered. Each break carries the
-    // font/size of the run that *contains* the '\n', so an empty line created
-    // by `Hg\n` (40pt) renders 40pt tall even when followed by `\nAB` (16pt).
-    // Returns the number of breaks emitted, so the caller can distinguish
-    // "explicit \n in source" from "PAGX-driven auto-wrap with no \n in
-    // source" and inject a single auto-wrap break in the latter case.
-    auto emitBreaksForRange = [&](size_t startRun, size_t startByte, size_t endRun,
-                                  size_t endByte) -> size_t {
-      size_t emitted = 0;
-      for (size_t r = startRun; r <= endRun && r < runs.size(); ++r) {
-        const std::string& text = runs[r].text->text;
-        size_t s = (r == startRun) ? startByte : 0;
-        size_t e = (r == endRun) ? endByte : text.size();
-        if (e > text.size()) {
-          e = text.size();
-        }
-        for (size_t pos = s; pos < e; ++pos) {
-          if (text[pos] == '\n') {
-            emitter.emitLineBreak(runStyles[r]);
-            ++emitted;
-          }
-        }
-      }
-      return emitted;
-    };
-
     // Leading '\n' before the first non-empty visual line: each one becomes
     // an empty line at the top of the paragraph. The very first <a:br/>
     // moves the cursor off the implicit "line 0" of the paragraph; subsequent
     // ones add additional empty lines.
     const auto& firstLineEntries = visualLines.front();
     const auto& firstEntry = lineEntries[firstLineEntries.front()];
-    emitBreaksForRange(0, 0, firstEntry.runIndex, firstEntry.byteStart);
+    writeNewlineBreaksAcrossRuns(emitter, runs, runStyles, 0, 0, firstEntry.runIndex,
+                                 firstEntry.byteStart);
 
     for (size_t li = 0; li < visualLines.size(); ++li) {
       for (size_t entryIdx : visualLines[li]) {
@@ -753,8 +749,9 @@ void PPTWriter::emitTextBoxBody(const std::vector<RichTextRun>& runs,
       if (li + 1 < visualLines.size()) {
         const auto& lastEntry = lineEntries[visualLines[li].back()];
         const auto& nextFirstEntry = lineEntries[visualLines[li + 1].front()];
-        size_t emitted = emitBreaksForRange(lastEntry.runIndex, lastEntry.byteEnd,
-                                            nextFirstEntry.runIndex, nextFirstEntry.byteStart);
+        size_t emitted = writeNewlineBreaksAcrossRuns(emitter, runs, runStyles, lastEntry.runIndex,
+                                                      lastEntry.byteEnd, nextFirstEntry.runIndex,
+                                                      nextFirstEntry.byteStart);
         if (emitted == 0) {
           // PAGX wrapped mid-text without a source '\n' (auto word-wrap): the
           // following line still needs a <a:br/> to start on a new line. Use
@@ -769,8 +766,8 @@ void PPTWriter::emitTextBoxBody(const std::vector<RichTextRun>& runs,
     // line, mirroring the leading-'\n' behaviour above.
     if (!runs.empty()) {
       const auto& lastEntry = lineEntries[visualLines.back().back()];
-      emitBreaksForRange(lastEntry.runIndex, lastEntry.byteEnd, runs.size() - 1,
-                         runs.back().text->text.size());
+      writeNewlineBreaksAcrossRuns(emitter, runs, runStyles, lastEntry.runIndex, lastEntry.byteEnd,
+                                   runs.size() - 1, runs.back().text->text.size());
     }
 
     emitter.closeParagraph();

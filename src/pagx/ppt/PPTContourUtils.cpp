@@ -93,7 +93,7 @@ void ReverseContour(PathContour& c) {
 
   std::vector<PathSeg> rev;
   rev.reserve(n);
-  for (int i = static_cast<int>(n) - 1; i >= 0; i--) {
+  for (size_t i = n; i-- > 0;) {
     Point dest = (i > 0) ? SegEndpoint(c.segs[i - 1]) : originalStart;
     const auto& seg = c.segs[i];
     PathSeg reversed;
