@@ -197,12 +197,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
    viewport renders at full size) and is shrunk via CSS transform applied by
    JS once the column's actual width is known. The wrapper's height is set in
    JS to authored_height * scale so the card layout has no extra blank strip.
-   When the column is wider than the authored canvas the scale is clamped to
-   1 and no transform is applied; in either case the iframe is horizontally
-   centred inside the wrapper to mirror how the adjacent PNG (max-width:100%
-   on a centred parent) sits in its own column. */
-.cmp .iframe-scale { display: block; width: 100%; max-width: 100%; overflow: hidden; box-sizing: border-box; text-align: center; }
-.cmp .iframe-scale iframe { max-width: none; transform-origin: top center; margin: 0 auto; display: inline-block; }
+
+   Positioning rules depend on whether the iframe is being scaled:
+   - scale<1 (canvas wider than column): JS sets `transform-origin:top left`
+     and zero left margin so the scaled box stays anchored to the wrapper's
+     left edge. Otherwise the iframe's layout width (its full authored size)
+     overflows the wrapper on both sides even when the visual transform fits,
+     which was observed with pagx_features (1600px) and space_explorer
+     (1200px) pushing off the right side of the screen.
+   - scale==1 (canvas fits in the column): JS centres the iframe horizontally
+     within the wrapper so small samples like layout/* (~300px) sit in the
+     middle of a ~560px column rather than hugging the left edge. */
+.cmp .iframe-scale { display: block; width: 100%; max-width: 100%; overflow: hidden; box-sizing: border-box; }
+.cmp .iframe-scale iframe { max-width: none; display: block; margin: 0; }
 """
 
 
@@ -222,8 +229,14 @@ TAB_SCRIPT = """
   // wrapper's offsetWidth (set by the parent flex column) and apply
   // transform:scale on the inner iframe so its visible size matches the
   // column. offsetWidth is 0 inside hidden tabs, so we re-run the sizing on
-  // every tab activation. When the column is wider than the authored canvas
-  // the scale is clamped to 1 and no transform is applied.
+  // every tab activation. Two layout modes:
+  //   - scale<1: anchor the iframe to the wrapper's top-left. Centering it
+  //     would keep the iframe's *layout* box (authored width) at its full
+  //     size and push the unscaled bounding rect past the column and off
+  //     the screen, even though the visually-transformed pixels fit.
+  //   - scale==1: centre the iframe with auto horizontal margin so small
+  //     canvases (e.g. layout/* ~300px) don't hug the left edge of the
+  //     wider flex column.
   function fitOversizeIframes(root) {
     const wraps = root.querySelectorAll('.iframe-scale');
     wraps.forEach(wrap => {
@@ -235,7 +248,15 @@ TAB_SCRIPT = """
       const iframe = wrap.querySelector('iframe');
       if (!iframe) return;
       const scale = Math.min(1, avail / w);
-      iframe.style.transform = scale < 1 ? ('scale(' + scale + ')') : '';
+      if (scale < 1) {
+        iframe.style.transformOrigin = 'top left';
+        iframe.style.transform = 'scale(' + scale + ')';
+        iframe.style.margin = '0';
+      } else {
+        iframe.style.transform = '';
+        iframe.style.transformOrigin = '';
+        iframe.style.margin = '0 auto';
+      }
       wrap.style.height = (h * scale) + 'px';
     });
   }
