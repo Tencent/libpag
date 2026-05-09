@@ -274,23 +274,64 @@ void PPTWriter::emitNativeTextBody(XMLBuilder& out, const Text* text,
     // paragraph, so isolating each line in its own paragraph would disable
     // justify entirely; soft breaks within one paragraph make all lines
     // except the semantically last participate in justify.
-    bool wroteAny = false;
     out.openElement("a:p").closeElementStart();
     WriteParagraphProperties(out, style.algn, lnSpcPts, rtl);
+
+    // TextLayout's per-Text line metadata only records lines that contributed
+    // glyphs, so empty lines (created by consecutive '\n') don't appear in
+    // `*lines`. Reconstruct them here by counting '\n' characters in the
+    // source text between consecutive non-empty line entries: each '\n' is a
+    // separate <a:br/>, so `Hg\n\nAB` produces two breaks (one empty middle
+    // line) instead of collapsing into "Hg<br/>AB" (single break, no empty
+    // line) which is what the previous filter-and-skip path emitted.
+    auto emitBreaksFor = [&](size_t start, size_t end) -> size_t {
+      size_t emitted = 0;
+      if (end > text->text.size()) {
+        end = text->text.size();
+      }
+      for (size_t pos = start; pos < end; ++pos) {
+        if (text->text[pos] == '\n') {
+          writeLineBreak(out, style);
+          ++emitted;
+        }
+      }
+      return emitted;
+    };
+
+    bool wroteAny = false;
+    size_t prevByteEnd = 0;
     for (const auto& lineInfo : *lines) {
       if (lineInfo.byteStart >= lineInfo.byteEnd) {
         continue;
       }
+      if (wroteAny) {
+        size_t emitted = emitBreaksFor(prevByteEnd, lineInfo.byteStart);
+        if (emitted == 0) {
+          // Auto-wrap (no source '\n' between entries): still need one break
+          // to move PowerPoint onto the next visual line.
+          writeLineBreak(out, style);
+        }
+      } else {
+        // Leading '\n's before the first non-empty line.
+        emitBreaksFor(0, lineInfo.byteStart);
+      }
       std::string line =
           text->text.substr(lineInfo.byteStart, lineInfo.byteEnd - lineInfo.byteStart);
-      if (line.empty()) {
-        continue;
+      if (!line.empty()) {
+        writeParagraphRun(out, line, style, filters, styles);
       }
-      if (wroteAny) {
-        writeLineBreak(out, style);
-      }
-      writeParagraphRun(out, line, style, filters, styles);
+      prevByteEnd = lineInfo.byteEnd;
       wroteAny = true;
+    }
+    if (wroteAny) {
+      // Trailing '\n's after the last non-empty line: each becomes an empty
+      // bottom line, matching the source text shape.
+      emitBreaksFor(prevByteEnd, text->text.size());
+    } else {
+      // Text consists solely of '\n's (no non-empty lines were emitted): walk
+      // the entire string so every '\n' still produces an empty line in the
+      // output paragraph.
+      emitBreaksFor(0, text->text.size());
     }
     out.closeElement();  // a:p
     return;
@@ -565,7 +606,50 @@ void PPTWriter::emitTextBoxShapeFrame(XMLBuilder& out, const TextBox* box, const
   // caller in writeElements), so the local origin here is (0, 0). Adding
   // box->position again would double-offset the shape, pushing the text-box
   // away from the centered position the layout assigned to it.
-  auto xf = DecomposeXform(0.0f, 0.0f, estWidth, estHeight, transform);
+  //
+  // Anchor mode: when the box is authored with width="0" (or height="0"), the
+  // box position marks an *anchor point* and textAlign / paragraphAlign select
+  // which side of the rendered text sits on it. The shape envelope is sized
+  // to the actual text bounds (estWidth/estHeight), so to honour the anchor
+  // we shift the shape's local origin instead of relying on PPT's in-shape
+  // alignment (which would be a no-op when the shape is exactly text-sized).
+  // EffectiveTextBoxWidth returns 0 only for the explicit "0" case (NaN means
+  // "auto-resolve from layout bounds"), so testing the raw box->width keeps
+  // the auto-measured-one-axis path (Box Q / Box R) on the default branch.
+  bool widthAnchor = !std::isnan(box->width) && box->width == 0.0f;
+  bool heightAnchor = !std::isnan(box->height) && box->height == 0.0f;
+  bool isVertical = box->writingMode == WritingMode::Vertical;
+  // OOXML's bodyPr@anchor (paragraphAlign) describes block-axis placement,
+  // bodyPr child algn (textAlign) inline-axis. In horizontal writing the
+  // inline axis is X and block axis is Y; in eaVert they swap.
+  float anchorOffsetX = 0.0f;
+  float anchorOffsetY = 0.0f;
+  // Inline-axis anchor: textAlign decides which side of the text sits on the
+  // anchor. In horizontal writing this drives X; in vertical writing it
+  // drives the column's vertical flow (Y) instead.
+  bool inlineAnchor = isVertical ? heightAnchor : widthAnchor;
+  if (inlineAnchor) {
+    if (box->textAlign == TextAlign::Center) {
+      (isVertical ? anchorOffsetY : anchorOffsetX) =
+          -(isVertical ? estHeight : estWidth) / 2.0f;
+    } else if (box->textAlign == TextAlign::End) {
+      (isVertical ? anchorOffsetY : anchorOffsetX) = -(isVertical ? estHeight : estWidth);
+    }
+    // Justify on a zero-extent box has no target width to distribute against
+    // and falls back to Start, matching the PAGX renderer.
+  }
+  // Block-axis anchor: paragraphAlign decides top/centre/bottom (horizontal)
+  // or right/centre/left of the column block (eaVert).
+  bool blockAnchor = isVertical ? widthAnchor : heightAnchor;
+  if (blockAnchor) {
+    if (box->paragraphAlign == ParagraphAlign::Middle) {
+      (isVertical ? anchorOffsetX : anchorOffsetY) =
+          -(isVertical ? estWidth : estHeight) / 2.0f;
+    } else if (box->paragraphAlign == ParagraphAlign::Far) {
+      (isVertical ? anchorOffsetX : anchorOffsetY) = -(isVertical ? estWidth : estHeight);
+    }
+  }
+  auto xf = DecomposeXform(anchorOffsetX, anchorOffsetY, estWidth, estHeight, transform);
   // Justify alignment requires PowerPoint to know a target line width; with
   // wrap="none" the text is unbounded so PPT silently falls back to start
   // alignment. Use wrap="square" in that case so PPT can justify within the
@@ -588,6 +672,24 @@ void PPTWriter::emitTextBoxBody(const std::vector<RichTextRun>& runs,
     // with matching baselineY into one visual line.
     std::stable_sort(lineEntries.begin(), lineEntries.end(), CompareLineEntryByBaselineY);
     constexpr float baselineEpsilon = 0.5f;
+
+    // Group entries by baseline into visual lines. Each visual line carries
+    // all runs that contribute glyphs to that baseline (for rich text on the
+    // same line).
+    std::vector<std::vector<size_t>> visualLines;
+    {
+      size_t i = 0;
+      while (i < lineEntries.size()) {
+        float baseline = lineEntries[i].baselineY;
+        visualLines.emplace_back();
+        while (i < lineEntries.size() &&
+               std::fabs(lineEntries[i].baselineY - baseline) < baselineEpsilon) {
+          visualLines.back().push_back(i);
+          ++i;
+        }
+      }
+    }
+
     // Emit ALL visual lines inside a single <a:p> separated by soft <a:br/>
     // breaks (rather than one <a:p> per line). This is required for justify
     // alignment to behave: OOXML's algn="just" never justifies the last line
@@ -596,23 +698,76 @@ void PPTWriter::emitTextBoxBody(const std::vector<RichTextRun>& runs,
     // Soft breaks within a single paragraph make all lines except the
     // semantically last one participate in justify.
     emitter.openParagraph();
-    bool firstLine = true;
-    size_t i = 0;
-    while (i < lineEntries.size()) {
-      float baseline = lineEntries[i].baselineY;
-      if (!firstLine) {
-        emitter.emitLineBreak(runStyles[lineEntries[i].runIndex]);
+    if (visualLines.empty()) {
+      emitter.closeParagraph();
+      return;
+    }
+
+    // Walk a closed source-text range [startRun:startByte, endRun:endByte)
+    // and emit one <a:br/> per '\n' encountered. Each break carries the
+    // font/size of the run that *contains* the '\n', so an empty line created
+    // by `Hg\n` (40pt) renders 40pt tall even when followed by `\nAB` (16pt).
+    // Returns the number of breaks emitted, so the caller can distinguish
+    // "explicit \n in source" from "PAGX-driven auto-wrap with no \n in
+    // source" and inject a single auto-wrap break in the latter case.
+    auto emitBreaksForRange = [&](size_t startRun, size_t startByte, size_t endRun,
+                                  size_t endByte) -> size_t {
+      size_t emitted = 0;
+      for (size_t r = startRun; r <= endRun && r < runs.size(); ++r) {
+        const std::string& text = runs[r].text->text;
+        size_t s = (r == startRun) ? startByte : 0;
+        size_t e = (r == endRun) ? endByte : text.size();
+        if (e > text.size()) {
+          e = text.size();
+        }
+        for (size_t pos = s; pos < e; ++pos) {
+          if (text[pos] == '\n') {
+            emitter.emitLineBreak(runStyles[r]);
+            ++emitted;
+          }
+        }
       }
-      firstLine = false;
-      while (i < lineEntries.size() &&
-             std::fabs(lineEntries[i].baselineY - baseline) < baselineEpsilon) {
-        const auto& entry = lineEntries[i];
+      return emitted;
+    };
+
+    // Leading '\n' before the first non-empty visual line: each one becomes
+    // an empty line at the top of the paragraph. The very first <a:br/>
+    // moves the cursor off the implicit "line 0" of the paragraph; subsequent
+    // ones add additional empty lines.
+    const auto& firstLineEntries = visualLines.front();
+    const auto& firstEntry = lineEntries[firstLineEntries.front()];
+    emitBreaksForRange(0, 0, firstEntry.runIndex, firstEntry.byteStart);
+
+    for (size_t li = 0; li < visualLines.size(); ++li) {
+      for (size_t entryIdx : visualLines[li]) {
+        const auto& entry = lineEntries[entryIdx];
         const std::string& src = runs[entry.runIndex].text->text;
         emitter.emitRun(src.substr(entry.byteStart, entry.byteEnd - entry.byteStart),
                         runStyles[entry.runIndex]);
-        ++i;
+      }
+      if (li + 1 < visualLines.size()) {
+        const auto& lastEntry = lineEntries[visualLines[li].back()];
+        const auto& nextFirstEntry = lineEntries[visualLines[li + 1].front()];
+        size_t emitted = emitBreaksForRange(lastEntry.runIndex, lastEntry.byteEnd,
+                                            nextFirstEntry.runIndex, nextFirstEntry.byteStart);
+        if (emitted == 0) {
+          // PAGX wrapped mid-text without a source '\n' (auto word-wrap): the
+          // following line still needs a <a:br/> to start on a new line. Use
+          // the next line's run style so the break height matches the line
+          // it terminates into.
+          emitter.emitLineBreak(runStyles[nextFirstEntry.runIndex]);
+        }
       }
     }
+
+    // Trailing '\n' after the last entry: each one produces an empty trailing
+    // line, mirroring the leading-'\n' behaviour above.
+    if (!runs.empty()) {
+      const auto& lastEntry = lineEntries[visualLines.back().back()];
+      emitBreaksForRange(lastEntry.runIndex, lastEntry.byteEnd, runs.size() - 1,
+                         runs.back().text->text.size());
+    }
+
     emitter.closeParagraph();
     return;
   }
