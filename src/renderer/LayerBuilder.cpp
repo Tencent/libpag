@@ -115,6 +115,16 @@
 
 namespace pagx {
 
+// Master switch to skip all PAGX layer effects (DropShadow/InnerShadow/BackgroundBlur styles
+// plus Blur/DropShadow/InnerShadow/Blend/ColorMatrix filters) during conversion to the tgfx
+// layer tree. Each effect normally forces tgfx to allocate an offscreen surface at render
+// time and run a sampling pass over the affected layer; large designs can carry hundreds of
+// shadow styles whose combined offscreen cost dominates the wasm heap. Flip this to 1 in
+// debug builds to measure how much of the rendering load is attributable to effects vs
+// actual layer geometry. The visual result with effects disabled is wrong (no shadows / no
+// blur), but everything downstream still parses, lays out, and renders without crashing.
+#define PAG_DISABLE_LAYER_EFFECTS 1
+
 // Decode a data URI (e.g., "data:image/png;base64,...") to an Image.
 static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI) {
   auto data = DecodeBase64DataURI(dataURI);
@@ -872,6 +882,7 @@ class LayerBuilderContext {
     }
 
     // Layer styles
+#if !PAG_DISABLE_LAYER_EFFECTS
     std::vector<std::shared_ptr<tgfx::LayerStyle>> styles;
     styles.reserve(node->styles.size());
     for (const auto& style : node->styles) {
@@ -899,6 +910,7 @@ class LayerBuilderContext {
     if (!filters.empty()) {
       layer->setFilters(filters);
     }
+#endif  // !PAG_DISABLE_LAYER_EFFECTS
   }
 
   std::shared_ptr<tgfx::LayerStyle> convertLayerStyle(const LayerStyle* node) {

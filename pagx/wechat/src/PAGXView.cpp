@@ -67,6 +67,19 @@ constexpr size_t MIN_RECOVERY_FRAMES_ZOOM_END = 10;
 // constant to tune log verbosity. submit() is asynchronous in the WebGL backend, so its reported
 // time only reflects CPU-side command submission, not actual GPU execution.
 constexpr double SLOW_FRAME_LOG_THRESHOLD_MS = 200.0;
+// Master switch for the snapshot-based fast path (cachedSnapshot/fitSnapshot composite during
+// gestures, plus the zoom-out idle short-circuit). When enabled, draw() captures
+// surface->makeImageSnapshot() at the end of each normal render and reuses it on the next
+// frame to bypass displayList.render(); when disabled, every draw() goes through the normal
+// render path. The fast path delivers a large speedup during pan/zoom on heavy PAGX content
+// but currently has a page-switch artifact under investigation -- when the user switches
+// pages, the new page's first frame can be partially overwritten by stale snapshot pixels.
+// Until that root cause is fixed, ship with the fast path off and accept the gesture-time
+// performance regression. Flip back to 1 to re-enable both capture and the fast paths
+// together; the related members (cachedSnapshot/fitSnapshot/etc.) are kept in PAGXView.h
+// regardless so the surrounding bookkeeping remains compilable.
+#define PAGX_ENABLE_SNAPSHOT_FAST_PATH 0
+
 // Master switch for all draw()-path telemetry logs (slow-frame breakdown, first-frame breakdown).
 // Hardcoded off in shipped builds to keep the WeChat log channel quiet; flip to true and rebuild
 // when investigating a frame-pacing regression. `if constexpr` lets the compiler fully strip the
@@ -135,13 +148,12 @@ PAGXView::PAGXView(std::shared_ptr<tgfx::Device> device, int width, int height)
   displayList.setAllowZoomBlur(true);
   displayList.setMaxTileCount(256);
   displayList.setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
-  // Per-frame throttle for tiles that need to be rasterized from scratch. Left at 0 (disabled)
-  // on entry and whenever the last user zoom action was zoom-in, because post-zoom-in the
-  // current-scale cache is nearly empty and any texture-invalidation wiping fallback caches
-  // will leave blank holes until deferred tiles catch up. Flipped to a positive value only
-  // after the user zooms out (updateZoomScaleAndOffset below), where plenty of fallback exists
-  // from the prior larger scale and throttling trades off a brief blur for smoother frames.
-  displayList.setTileThrottlePerFrame(0);
+  // Per-frame tile rasterization throttle that applies on non-zoom-in frames (zoom-out and
+  // idle). Zoom-in frames bypass the throttle automatically inside tgfx so any cache-missing
+  // tile is rasterized in the current frame -- short-term zoom-blur fallback is acceptable,
+  // blank holes from texture-invalidation are not. The direction is inferred by tgfx itself
+  // from accumulated zoom-scale deltas (with a built-in deadband to filter gesture jitter).
+  displayList.setZoomOutTileThrottlePerFrame(3);
   // Subtree cache: caches static layers as textures to avoid per-layer shape retriangulation,
   // the dominant hotspot for PAGX content (Shape=200-400ms/frame on singleton shapes).
   displayList.setSubtreeCacheMaxSize(2048);
@@ -665,29 +677,16 @@ void PAGXView::updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY
   if (zoomChanged) {
     if (!isZooming) {
       isZooming = true;
-      zoomStartValue = lastZoom;
-      accumulatedZoomChange = 0.0f;
       updateAdaptiveTileRefinement();
     }
 
-    // Accumulate zoom change to determine overall direction
-    float currentChange = zoom - lastZoom;
-    accumulatedZoomChange += currentChange;
-
-    // Determine direction based on accumulated change (ignoring noise < 0.01)
-    if (std::abs(accumulatedZoomChange) > 0.01f) {
-      bool newZoomingIn = (accumulatedZoomChange > 0.0f);
-      if (newZoomingIn != isZoomingIn) {
-        isZoomingIn = newZoomingIn;
-        // Flip the per-frame tile throttle to match the latest confirmed direction. Zoom-in
-        // (and the static period that follows) disables throttling so any tile missing at the
-        // current scale can be rasterized this frame instead of leaving a blank hole when
-        // texture-invalidation already wiped the fallback source. Zoom-out re-enables
-        // throttling because the prior (larger) scale's tiles downsample cleanly into
-        // fallback and the occasional deferred tile only shows as a brief blur.
-        displayList.setTileThrottlePerFrame(isZoomingIn ? 0 : 3);
-      }
-    }
+    // Direction tracking is owned by tgfx (DisplayList::setZoomScale + the deadband
+    // accumulator gated on setZoomOutTileThrottlePerFrame). pagx still needs a coarse
+    // direction signal for the in/out timeout split below (ZOOM_IN_END_TIMEOUT_MS vs
+    // ZOOM_OUT_END_TIMEOUT_MS), so we derive it from the current single-frame delta. Timeouts
+    // only fire after several hundred milliseconds of no updates, by which point any single
+    // jittery frame's direction has long stopped mattering.
+    isZoomingIn = (zoom > lastZoom);
 
     lastZoomUpdateTimestampMs = emscripten_get_now();
   }
@@ -717,13 +716,22 @@ bool PAGXView::draw() {
 
   double frameStartMs = emscripten_get_now();
 
+#if PAGX_ENABLE_SNAPSHOT_FAST_PATH
   float liveZoom = static_cast<float>(displayList.zoomScale());
   const auto& liveOffset = displayList.contentOffset();
 
-  // Idle short-circuit: previous draw() used the zoom-out fast path and nothing moved.
-  // displayList's dirty flag is still set (we never ran render() to drain it), but the
-  // pixels on the surface already match liveZoom/liveOffset.
-  if (zoomedOutFrameSettled && !gestureActive && liveZoom <= 1.02f) {
+  // Idle short-circuit: a previous draw() finished the zoom-out fast path and nothing has
+  // moved since. The displayList still reports dirty (we never ran render() to drain it),
+  // but the pixels already on the surface match the current zoom/offset, so we can return
+  // immediately. Bail out as soon as tgfx reports actual content has changed -- once the
+  // fast path settled into idle, the only way hasContentChanged() flips back to true is a
+  // layer-tree mutation (progressive image upgrade swapping a higher-resolution texture, or
+  // the initial loadFileDataAsNativeImage() attaching pixels to nodes whose first render
+  // already happened). setZoomScale/setContentOffset cannot trigger this branch because both
+  // clear zoomedOutFrameSettled via updateZoomScaleAndOffset(); without the dirty guard
+  // those post-first-render content changes would be silently dropped.
+  if (zoomedOutFrameSettled && !gestureActive && liveZoom <= 1.02f &&
+      !displayList.hasContentChanged()) {
     return true;
   }
 
@@ -732,7 +740,15 @@ bool PAGXView::draw() {
   //   2. Steady state at zoom <= 1: fitSnapshot already contains all pixels any render
   //      would produce at this zoom, so we can safely blit it instead of re-rendering.
   // The 0.02 margin above 1.0 absorbs float drift on the user's release zoom.
-  bool fitOnly = !gestureActive && fitSnapshot != nullptr && liveZoom <= 1.02f;
+  //
+  // The non-gesture branch additionally requires displayList not to be dirty: a dirty flag
+  // here means the layer tree changed since the snapshot was captured (typically a
+  // progressive image upgrade or a deferred image attach), so blitting fitSnapshot would
+  // hide the new content. Active gestures override this because the user expects steady
+  // pan/zoom feedback even when async upgrades land mid-gesture; the snapshot will be
+  // refreshed on the next non-gesture frame.
+  bool fitOnly = !gestureActive && fitSnapshot != nullptr && liveZoom <= 1.02f &&
+                 !displayList.hasContentChanged();
   if ((gestureActive || fitOnly) && surface != nullptr &&
       (cachedSnapshot != nullptr || fitSnapshot != nullptr)) {
     auto context = device->lockContext();
@@ -784,6 +800,7 @@ bool PAGXView::draw() {
     }
     return true;
   }
+#endif  // PAGX_ENABLE_SNAPSHOT_FAST_PATH
 
   // Capture before rendering so the post-render logging block can identify the first frame.
   bool wasFirstFrame = !hasRenderedFirstFrame;
@@ -845,6 +862,7 @@ bool PAGXView::draw() {
       if (!hasRenderedFirstFrame) {
         hasRenderedFirstFrame = true;
       }
+#if PAGX_ENABLE_SNAPSHOT_FAST_PATH
       // Capture this fully-rendered frame as cachedSnapshot for the next gesture.
       // Done inside the lock because makeImageSnapshot on a BackendRenderTarget triggers
       // a GPU readback/copy.
@@ -861,6 +879,7 @@ bool PAGXView::draw() {
         fitSnapshotZoom = snapshotZoom;
         fitSnapshotOffset = snapshotOffset;
       }
+#endif  // PAGX_ENABLE_SNAPSHOT_FAST_PATH
     }
 
     double unlockStartMs = emscripten_get_now();

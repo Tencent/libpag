@@ -344,9 +344,10 @@ class PAGXView {
   bool hasRenderedFirstFrame = false;
 
   float lastZoom = 1.0f;
-  float zoomStartValue = 1.0f;          // Zoom value at gesture start
-  float accumulatedZoomChange = 0.0f;   // Accumulated zoom change during gesture
   bool isZooming = false;
+  // isZoomingIn is derived per-frame from a single (zoom > lastZoom) comparison and is only
+  // consumed by the in/out timeout split in draw() (ZOOM_IN/OUT_END_TIMEOUT_MS). The throttle
+  // itself is no longer driven from here -- tgfx infers direction internally.
   bool isZoomingIn = false;
   int currentMaxTilesRefinedPerFrame = 1;
   double tryUpgradeTimestampMs = 0.0;
