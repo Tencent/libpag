@@ -24,6 +24,11 @@
 #include "pagx/pag/ErrorCode.h"
 #include "pagx/pag/limits.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/Matrix.h"
+
+namespace pagx {
+class Text;
+}
 
 namespace pagx::pag {
 
@@ -67,6 +72,17 @@ struct BakeContext : DiagnosticCollector {
   // Pass 1 records every PAGX layer's path (chain of child indices from the
   // enclosing root); Pass 2 looks up mask targets by pointer.
   std::unordered_map<const void*, std::vector<uint32_t>> layerPathByPagxLayer;
+
+  // ---- TextBox cumulative-transform index ----
+  // Populated when BakeElement traverses a <TextBox>. For each descendant
+  // Text, stores the inverse of the cumulative Group transform between the
+  // TextBox root and the Text, mirroring LayerBuilder's prepareTextBoxTextBlobs
+  // path. TextBaker reads this map in the case-B branch and writes the
+  // inverse into ElementTextData::textBoxInverseMatrix so the Inflater can
+  // cancel the Group transform replayed on the reconstructed VectorGroup.
+  // Texts outside a TextBox never populate the map; BakeText defaults to
+  // Matrix::I() on miss.
+  std::unordered_map<const pagx::Text*, tgfx::Matrix> textBoxInverseMatrixByText;
 
   // ---- Public 3-arg API ----
 

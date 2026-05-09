@@ -19,6 +19,7 @@
 #include <memory>
 #include <utility>
 #include <vector>
+#include "pagx/TextLayout.h"
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/ConicGradient.h"
@@ -42,6 +43,7 @@
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
@@ -496,11 +498,30 @@ std::unique_ptr<VectorElement> BakeElement(BakeContext& ctx, PAGDocument& doc,
       return BakeRepeater(*static_cast<const pagx::Repeater*>(src));
     case pagx::NodeType::Group:
       return BakeGroup(ctx, doc, *static_cast<const pagx::Group*>(src));
-    case pagx::NodeType::TextBox:
+    case pagx::NodeType::TextBox: {
       // TextBox inherits from Group and, after layout, behaves as a Group
-      // containing positioned Text children. Phase 8 routes it through
-      // BakeGroup — the nested Text elements bake themselves.
+      // containing positioned Text children. Before recursing through
+      // BakeGroup, pre-compute the cumulative Group transform between the
+      // TextBox root and each descendant Text — TextBaker (case B) writes
+      // the inverse onto ElementTextData::textBoxInverseMatrix so the
+      // Inflater can cancel the Group transform replayed on the
+      // reconstructed VectorGroup. Mirrors LayerBuilder's
+      // prepareTextBoxTextBlobs path (renderer/LayerBuilder.cpp §249-261).
+      const auto* textBox = static_cast<const pagx::TextBox*>(src);
+      std::vector<pagx::Text*> childText;
+      std::vector<tgfx::Matrix> childMatrices;
+      pagx::TextLayout::CollectTextElements(textBox->elements, childText, childMatrices);
+      for (size_t i = 0; i < childText.size(); i++) {
+        tgfx::Matrix inverse = {};
+        // Non-invertible matrix (e.g. scale=(0,0)) has no visual rendering
+        // anyway — leave the map entry absent so BakeText defaults to I().
+        if (!childMatrices[i].invert(&inverse)) {
+          continue;
+        }
+        ctx.textBoxInverseMatrixByText[childText[i]] = inverse;
+      }
       return BakeGroup(ctx, doc, *static_cast<const pagx::Group*>(src));
+    }
     case pagx::NodeType::Fill:
       return BakeFill(ctx, doc, *static_cast<const pagx::Fill*>(src));
     case pagx::NodeType::Stroke:

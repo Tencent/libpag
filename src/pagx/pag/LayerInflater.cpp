@@ -532,7 +532,8 @@ std::shared_ptr<tgfx::VectorElement> inflateTextAsShapedTextBlob(PAGDocument& /*
               "ElementText.shapedGlyphs typefaceKey mismatch; replaying layout with "
               "host-substituted typeface");
   }
-  auto textBlob = pagx::GlyphRunRenderer::BuildTextBlobFromLayoutRuns(runs, tgfx::Matrix::I());
+  auto textBlob =
+      pagx::GlyphRunRenderer::BuildTextBlobFromLayoutRuns(runs, pay.textBoxInverseMatrix);
   if (textBlob == nullptr) {
     ctx->warn(ErrorCode::InflateGlyphRunBuildFailed,
               "TextBlob construction failed for case B ElementText; dropping element");

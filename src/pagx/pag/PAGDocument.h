@@ -376,6 +376,16 @@ struct ElementTextData {
   // to tgfx::Text::Make(blob, anchors).
   Property<std::vector<Point>> anchors = MakeProp<std::vector<Point>>({});
 
+  // Cumulative Group transform applied by PAGX between the wrapping TextBox
+  // and this Text. Baker stores the inverse; Inflater forwards it to
+  // GlyphRunRenderer::BuildTextBlobFromLayoutRuns so that the Group's native
+  // transform (replayed on the reconstructed VectorGroup) cancels the
+  // baked-in inverse at draw time — matching LayerBuilder's
+  // prepareTextBoxTextBlobs path (renderer/LayerBuilder.cpp §249-261). Texts
+  // that live outside a TextBox keep Identity, and Codec skips the field
+  // when it has not been touched.
+  Matrix textBoxInverseMatrix = Matrix::I();
+
   // ----- Content (shaper input) -----
   std::string text = "";
   std::string fontFamily = "";

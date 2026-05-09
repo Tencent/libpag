@@ -813,6 +813,15 @@ void WriteElementTextBody(::pag::EncodeStream* body, const ElementTextData& d) {
   body->writeFloat(d.strokeWidth);
   WriteColor(body, d.backgroundColor);
   body->writeUint8(d.backgroundAlpha);
+
+  // Phase 18: TextBox cumulative-transform inverse (§6.5 field-level append).
+  // Baker writes the inverse of the Group stack between the enclosing
+  // <TextBox> and this Text; Inflater forwards it to
+  // GlyphRunRenderer::BuildTextBlobFromLayoutRuns to cancel the Group
+  // transform replayed on the reconstructed VectorGroup. Texts outside a
+  // TextBox stay at Identity — WriteMatrix compresses that to a single
+  // header byte.
+  WriteMatrix(body, d.textBoxInverseMatrix);
 }
 
 std::unique_ptr<ElementTextData> ReadElementTextBody(::pag::DecodeStream* s, DecodeContext* ctx,
@@ -1005,6 +1014,13 @@ std::unique_ptr<ElementTextData> ReadElementTextBody(::pag::DecodeStream* s, Dec
   d->strokeWidth = s->readFloat();
   d->backgroundColor = ReadColor(s);
   d->backgroundAlpha = s->readUint8();
+
+  // Phase 18 field-level append: TextBox cumulative-transform inverse.
+  // Older payloads (no TextBox inverse) stop at backgroundAlpha; the
+  // `position() < te` guard keeps the Identity default in that case.
+  if (s->position() < te) {
+    d->textBoxInverseMatrix = ReadMatrix(s);
+  }
 
   return d;
 }

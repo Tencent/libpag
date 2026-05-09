@@ -349,6 +349,15 @@ std::unique_ptr<VectorElement> TextBaker::BakeText(BakeContext& ctx, PAGDocument
     data->shapedGlyphs = std::move(shapedGlyphs);
   }
 
+  // Pick up the TextBox cumulative-transform inverse populated by
+  // VectorBaker when this Text lives under a <TextBox>. Outside a TextBox
+  // the map stays empty and textBoxInverseMatrix remains Identity. See
+  // PAGDocument.h ElementTextData::textBoxInverseMatrix for the contract.
+  auto it = ctx.textBoxInverseMatrixByText.find(&src);
+  if (it != ctx.textBoxInverseMatrixByText.end()) {
+    data->textBoxInverseMatrix = it->second;
+  }
+
   auto el = std::make_unique<VectorElement>();
   el->type = VectorElementType::Text;
   el->payload = std::move(data);
