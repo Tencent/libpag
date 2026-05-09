@@ -341,9 +341,16 @@ uint32_t InternPatternImage(BakeContext& ctx, PAGDocument& doc, const pagx::Imag
 void BakeColorSource(BakeContext& ctx, PAGDocument& doc, const pagx::ColorSource* src,
                      ShapeStyleData& out) {
   if (src == nullptr) {
-    // Fill / Stroke with a null ColorSource stays at the SolidColor default
-    // (opaque black). Downstream wire is just the 4-byte common header.
+    // PAGX `Fill.color == nullptr` / `Stroke.color == nullptr` means
+    // "use the default SolidColor". LayerBuilder realizes this via
+    // tgfx::SolidColor::Make(), whose default is Color::Black(). Mirror
+    // that intent on the wire by writing Black explicitly — without this
+    // the inline ShapeStyleData.color stays at tgfx::Color{} (opaque
+    // white), the Codec's isDefault short-circuit drops the field, and
+    // the Inflater reconstructs SolidColor::Make(white), making PAGX→PAG
+    // render diverge from the PAGX-native render.
     out.sourceType = ColorSourceType::SolidColor;
+    out.color = MakeProp(tgfx::Color::Black());
     return;
   }
   switch (src->nodeType()) {
