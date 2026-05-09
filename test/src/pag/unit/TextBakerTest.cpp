@@ -13,6 +13,7 @@
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
@@ -305,6 +306,61 @@ TEST(TextBaker, CaseATwoRunsSameFontContentInternDedup) {
   ASSERT_EQ(d->glyphRuns.size(), 2u);
   EXPECT_EQ(d->glyphRuns[0].embeddedFontIndex, 0u);
   EXPECT_EQ(d->glyphRuns[1].embeddedFontIndex, 0u);
+}
+
+// -----------------------------------------------------------------------
+// Phase 18 v2.24 — TextModifier RangeSelector serialization
+// -----------------------------------------------------------------------
+//
+// The Phase 17 BakeTextModifier dropped TextModifier.selectors entirely
+// (`(void)src.selectors;`); Phase 18 wires the selector vector through to
+// PAG so the Inflater (and tgfx::TextModifier::apply at render time) can
+// drive the per-glyph factor curve. This test exercises the round-trip:
+// build a PAGX TextModifier with one RangeSelector, Bake → encode →
+// decode, and assert all 11 RangeSelector fields survived.
+
+TEST(TextBaker, TextModifierRangeSelectorRoundTrip) {
+  auto r = BakeAndRoundTrip([](pagx::test::PAGXBuilder& b, pagx::Layer& host) {
+    auto* mod = b.RawDocument()->makeNode<pagx::TextModifier>();
+    mod->position = pagx::Point{0.0f, -30.0f};
+    auto* sel = b.RawDocument()->makeNode<pagx::RangeSelector>();
+    sel->start = 0.25f;
+    sel->end = 0.75f;
+    sel->offset = 0.1f;
+    sel->unit = pagx::SelectorUnit::Index;
+    sel->shape = pagx::SelectorShape::Triangle;
+    sel->easeIn = 0.4f;
+    sel->easeOut = 0.6f;
+    sel->mode = pagx::SelectorMode::Intersect;
+    sel->weight = 0.8f;
+    sel->randomOrder = true;
+    sel->randomSeed = 4242;
+    mod->selectors.push_back(sel);
+    host.contents.push_back(mod);
+  });
+  ASSERT_NE(r.decoded, nullptr);
+  const auto* layer = FirstLayer(*r.decoded);
+  ASSERT_NE(layer, nullptr);
+  ASSERT_EQ(layer->vector->contents.size(), 1u);
+  ASSERT_EQ(layer->vector->contents[0]->type, VectorElementType::TextModifier);
+  const auto& d =
+      std::get<std::unique_ptr<ElementTextModifierData>>(layer->vector->contents[0]->payload);
+  // Transform survives (sanity).
+  EXPECT_FLOAT_EQ(d->position.value.y, -30.0f);
+  // Selector materialised.
+  ASSERT_EQ(d->rangeSelectors.size(), 1u);
+  const auto& s = *d->rangeSelectors[0];
+  EXPECT_FLOAT_EQ(s.start.value, 0.25f);
+  EXPECT_FLOAT_EQ(s.end.value, 0.75f);
+  EXPECT_FLOAT_EQ(s.offset.value, 0.1f);
+  EXPECT_EQ(s.unit, tgfx::SelectorUnit::Index);
+  EXPECT_EQ(s.shape, tgfx::SelectorShape::Triangle);
+  EXPECT_FLOAT_EQ(s.easeIn.value, 0.4f);
+  EXPECT_FLOAT_EQ(s.easeOut.value, 0.6f);
+  EXPECT_EQ(s.mode, tgfx::SelectorMode::Intersect);
+  EXPECT_FLOAT_EQ(s.weight.value, 0.8f);
+  EXPECT_TRUE(s.randomOrder);
+  EXPECT_EQ(s.randomSeed, 4242);
 }
 
 }  // namespace pagx::pag

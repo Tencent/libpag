@@ -48,6 +48,8 @@ static const char* CodeToString(DiagnosticCode c) {
       return "EmptyDocument";
     case DiagnosticCode::TextGlyphRunsDowngraded:
       return "TextGlyphRunsDowngraded";
+    case DiagnosticCode::TextSelectorTypeUnsupported:
+      return "TextSelectorTypeUnsupported";
     case DiagnosticCode::InvalidMagic:
       return "InvalidMagic";
     case DiagnosticCode::UnsupportedVersion:

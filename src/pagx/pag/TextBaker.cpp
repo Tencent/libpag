@@ -34,9 +34,11 @@
 #include "pagx/TextLayout.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
+#include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
+#include "pagx/nodes/TextSelector.h"
 #include "pagx/pag/BakeContext.h"
 #include "pagx/pag/PAGDocument.h"
 #include "pagx/pag/TypefaceKey.h"
@@ -386,7 +388,7 @@ std::unique_ptr<VectorElement> TextBaker::BakeTextPath(BakeContext& /*ctx*/,
   return el;
 }
 
-std::unique_ptr<VectorElement> TextBaker::BakeTextModifier(BakeContext& /*ctx*/,
+std::unique_ptr<VectorElement> TextBaker::BakeTextModifier(BakeContext& ctx,
                                                            const pagx::TextModifier& src) {
   auto data = std::make_unique<ElementTextModifierData>();
   data->anchor = MakeProp(tgfx::Point{src.anchor.x, src.anchor.y});
@@ -410,11 +412,45 @@ std::unique_ptr<VectorElement> TextBaker::BakeTextModifier(BakeContext& /*ctx*/,
     data->strokeWidth = MakeProp(*src.strokeWidth);
   }
 
-  // RangeSelector baking (structure-only — TextSelector has no concrete
-  // subtypes exposed in the PAGX public header today). Emit empty vector;
-  // later Phases plug in the real selector dispatch when pagx::TextRangeSelector /
-  // pagx::TextExpressionSelector land.
-  (void)src.selectors;
+  // Selector serialization (Phase 18). PAGX TextSelector is a polymorphic
+  // base; only RangeSelector is concretely implemented today. Mirror PathA
+  // (LayerBuilder::convertTextModifier §638-682): dispatch by nodeType,
+  // static_cast to the concrete subclass, copy the 11 RangeSelector fields
+  // verbatim. Values cross the wire as-is (PAGX small-decimal 0..1 for
+  // start/end/weight matches what tgfx::RangeSelector consumes; no unit
+  // conversion); the 100.0f defaults in WriteRangeSelectorDataInline are
+  // codec-level varint defaults inherited from v1, not a semantic
+  // reinterpretation.
+  for (const auto* selector : src.selectors) {
+    if (selector == nullptr) {
+      continue;
+    }
+    if (selector->nodeType() != pagx::NodeType::RangeSelector) {
+      // Defensive — TextSelector has no other concrete subclass today, but
+      // emit a warning so a future ExpressionSelector / WiggleSelector
+      // landing in PAGX surfaces here at Bake time rather than rendering
+      // a silently-stripped selector.
+      ctx.warn(ErrorCode::TextSelectorTypeUnsupported,
+               "TextModifier selector subtype not supported; skipping");
+      continue;
+    }
+    const auto* range = static_cast<const pagx::RangeSelector*>(selector);
+    auto out = std::make_unique<RangeSelectorData>();
+    out->start = MakeProp(range->start);
+    out->end = MakeProp(range->end);
+    out->offset = MakeProp(range->offset);
+    out->unit = pagx::ToTGFX(range->unit);
+    out->shape = pagx::ToTGFX(range->shape);
+    out->easeIn = MakeProp(range->easeIn);
+    out->easeOut = MakeProp(range->easeOut);
+    out->mode = pagx::ToTGFX(range->mode);
+    out->weight = MakeProp(range->weight);
+    out->randomOrder = range->randomOrder;
+    // PAGX `int randomSeed` → PAG `uint16_t`. Range covers any reasonable
+    // seed (LayerBuilder PathA does the same narrowing cast §679).
+    out->randomSeed = static_cast<uint16_t>(range->randomSeed);
+    data->rangeSelectors.push_back(std::move(out));
+  }
 
   auto el = std::make_unique<VectorElement>();
   el->type = VectorElementType::TextModifier;
