@@ -99,7 +99,7 @@ cp -R third_party/ ../libpag_pagx_pag_impl/third_party/
 | 16.5 | 测试基建 FontProvider 注入 | 1-2 h | 共享 util 下沉 |
 | 16.6 | Baseline accept + 覆盖率重跑 | 1 h + 用户审图时间 | coverage.sh 在 src/pagx/pag/LayerInflater.cpp + TextBaker.cpp ≥75% |
 
-合计估时 ≈ **75-95 h**（M1-M5 全量），约对应 10-12 个 AI 工作日。Phase 0-14 已完成，剩余 Phase 15+16 估时 ≈ 15-20 h。
+合计估时 ≈ **75-95 h**（M1-M5 全量），约对应 10-12 个 AI 工作日。**Phase 0-18 全部完成**（含 Phase 16 五轮补丁 + Phase 17 PAGX/PAG 对等文本模式 + Phase 18 TextModifier），CrossCheck 48/48 全绿。剩余仅：用户 `/accept-baseline` 接受新基线 + coverage 重跑（软指标）。
 
 ---
 
@@ -180,8 +180,8 @@ cp -R third_party/ ../libpag_pagx_pag_impl/third_party/
 | Phase | 状态 | commit hash | 实际耗时 | 阻塞/备注 |
 |---|---|---|---|---|
 | D-1.1 创建 src/pagx/pag/ 目录 + CMake target | ✅ | (本提交) | 0.5 h | 跟随 glob 模式追加；设计文档 §16 同步修订 |
-| D-1.2 GlyphRun 字段集复核 | ⏳ | — | — | Phase 8 前 |
-| D-1.3 Mask 循环检测算法选择 | ⏳ | — | — | Phase 9 前 |
+| D-1.2 GlyphRun 字段集复核 | ✅ | (Phase 8 实施期内确认) | — | Phase 8 启动时已逐字段对齐 PAGX TextLayout.h；后 Phase 16 v2.20 + Phase 17 v2.23 推翻 GlyphRunBlob 改用 case A/B 双分支，决策含义本身已被替换 |
+| D-1.3 Mask 循环检测算法选择 | ✅ | (Phase 9 实施期内确认) | — | Phase 9 LayerInflater 落地时采用简化 DFS 着色法（white/gray/black），见 InflaterContext + Pass 2 mask 解析 |
 | 0 Diagnostic | ✅ | (本提交) | 1 h | 7 文件交付；12/12 单测全绿；limits.h 一次性建全避免后续返工 |
 | 1 ValueCodec / CorruptBuilder | ✅ | (本提交) | 1.5 h | 9 文件交付；38/38 单测全绿；exit gate `grep std::vector<uint8_t> src/pagx/pag/` 零命中 |
 | 2 PAGDocument + 测试基建 | ✅ | (本提交) | 2 h | PAGDocument.h 全量字段；BakeContext + ResourceBaker；PAGDocumentEquals + 4 个 StructBuilders；26 条新测试全绿。**PAGXBuilder 推迟到 Phase 3**（与 LayerBaker 一起接 PAGX 节点更自然） |
@@ -207,12 +207,16 @@ cp -R third_party/ ../libpag_pagx_pag_impl/third_party/
 | 14 PerformanceTest + baseline | ✅ | 8b706d4c | 1 h | test/src/pag/unit/PerformanceTest.cpp：对 48 spec/samples 每样本测 size_ratio + load_ratio + 5 绝对时间（中位数-11 跑），±20% load_ratio 漂移非阻塞 WARNING；亚毫秒噪声地板 = 1ms；baseline.json 不入 git；实测 size_ratio 中位数 0.43 / load_ratio 中位数 0.20，达成设计文档期望 |
 | 15 coverage.sh | ✅ | 3ee770ce 等 | 3 h | CMake -DPAG_COVERAGE 开关 + tools/coverage.sh (clang source-based) + `-fsanitize=fuzzer` coverage-mode 剔除 ASAN；**实测 line coverage 76.75%（未达 85%）**：html/ 73% + pag/ 75%（LayerInflater 55% / TextBaker 60% 为主要缺口）；tools/render_compare.py + `PAGXNativeReferenceTest.RenderSpecSamplesToPAGXNativeDir` 辅助生成两列对比 HTML 便于人审；**Phase 16 修完 ElementText 路径后覆盖率预计显著上升**，85% 门槛转移到 Phase 16.6 |
 | **16.0 text redesign 设计** | ✅ | 3ee770ce | 2 h | docs/pagx_to_pag_v2_phase16_text_redesign.md (422 行) + Phase 16 集成到主设计文档 6 章节 + 术语索引 + Phase 表 + 维护日志 v2.20 |
-| **16.1 PAGDocument + FontProvider** | ⏳ | — | — | `include/pagx/pag/FontProvider.h` 接口 + `MakeDefaultFontProvider()` 实现；删 `FontAsset` / `FontAxis` / `FontSourceKind` / `GlyphRunBlob`；`PAGDocument::fonts[]` 移除；`ElementTextData` 新字段集；预估 3-4 h |
-| **16.2 TextBaker 重写** | ⏳ | — | — | runtime-shape 模式；pre-shaped 降级发 `TextGlyphRunsDowngraded=208`；预估 2-3 h |
-| **16.3 Codec schema 对齐** | ⏳ | — | — | ElementText body 读写新 schema；FontAssetTable 写路径移除（读路径保留 warn skip）；预估 2 h |
-| **16.4 Inflater 重写 + 布局器接入** | ⏳ | — | — | inflateElementText 用 FontProvider + TextShaper + v1 TextLayout；预估 4-5 h |
-| **16.5 测试基建 FontProvider 注入** | ⏳ | — | — | RenderEquivalenceTest / CrossCheck 注入；预估 1-2 h |
-| **16.6 Baseline accept + 覆盖率重跑** | ⏳ | — | — | 用户 /accept-baseline 接 48 张；coverage ≥ 75% for LayerInflater/TextBaker；预估 1 h + 用户审图时间 |
+| **16.1 PAGDocument + FontProvider** | ✅ | f76384de | 3-4 h | FontProvider 接口 + 默认 pag::FontManager 实现；ElementTextData 新字段集；FontAsset 族删除 |
+| **16.2 TextBaker 重写** | ✅ | f76384de | 2-3 h | runtime-shape Baker；pre-shaped 路径降级发 `TextGlyphRunsDowngraded=208` |
+| **16.3 Codec schema 对齐** | ✅ | f76384de | 2 h | ElementText body 新 schema；FontAssetTable 仅保留 read-warn-skip 兼容 |
+| **16.4 Inflater 重写 + 布局器接入** | ✅ | f76384de | 4-5 h | inflateElementText 走 FontProvider + TextShaper + v1 TextLayout |
+| **16.5 测试基建 FontProvider 注入** | ✅ | 53a5609a | 1-2 h | PAGXTest fixture 内置 Arial + Noto + fontConfig() / fontProvider() getter |
+| **16.6 Baseline accept + 覆盖率重跑** | ⏳ | — | — | 仅余用户操作：`/accept-baseline` 接受 48 张新基线；coverage 重跑（仍属软指标，Phase 16 后预计达 75%） |
+| 16.x 五轮稳定补丁 | ✅ | 45cbe0b0 / 53a5609a / 36471b33 / 55590003 / bfa0637f | 累计 ~6 h | baseline-y / font align / HarfBuzz shaper / layoutOrigin / shapedRuns hint；CrossCheck 15 → 4 |
+| **17 PAGX/PAG 对等文本模式（4 commit）** | ✅ | 2832e8f3 / a62b3652 / 1c1bae28 / (Commit 4) | 累计 ~12 h | case A path-based + case B host-font-shapedGlyphs 双分支；EmbeddedFont 顶层资源；删除 Phase 16 runtime-shape 4 条死路径；CrossCheck 4 → 2（剩 image_pattern + text_modifier） |
+| **17.x ImageAsset decodedImage cache** | ✅ | (Phase 17 收尾) | — | image_pattern.pagx 4 Layer 共享单 ImageAsset 不再静默 fallback；CrossCheck 转 PASS |
+| **18 TextModifier RangeSelector 实施** | ✅ | 0cf5dd04 | — | TextBaker::BakeTextModifier selector 透传打通；text_modifier.pagx CrossCheck PSNR=+∞ bit-perfect；CrossCheck 终态 48/48 全 PASS |
 
 ---
 
