@@ -135,20 +135,25 @@ void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStr
   float scaledOfsX = minX * sx;
   float scaledOfsY = minY * sy;
 
-  if (!_bridgeContours || allContours.size() <= 1) {
-    beginShape(out, "Glyph", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
-    writeContourGeom(out, allContours, pw, ph, sx, sy, scaledOfsX, scaledOfsY, FillRule::EvenOdd);
-    writeGlyphShape(out, fs.fill, alpha);
-    return;
-  }
-
-  // One <p:sp> per bridged group so each carries its own inline bounds marker.
+  // Always group glyph contours through PrepareContourGroups so that
+  // AdjustWindingForEvenOdd normalises every glyph's outer/inner ring
+  // orientation (depth-0 outers share the same sign, holes are reversed).
+  // Skipping this step — as a previous fast-path did when _bridgeContours was
+  // false — let two same-direction outers from neighbouring glyphs cancel
+  // under even-odd whenever skew/rotation made them overlap, producing the
+  // hollowed-out 'G' seen in the skews row of glyph_run_advanced.
+  //
+  // Each group (typically one per glyph) becomes its own <p:sp>: that gives
+  // every glyph an isolated even-odd fill domain, so overlap between adjacent
+  // glyphs cannot collapse one into a hole of another. _bridgeContours still
+  // controls whether outer+inner rings inside a single group are stitched via
+  // zero-width bridges or emitted as separate sub-paths in the same <a:path>.
   // InlineSegments is safe here because glyph shapes never stroke.
   auto groups = PrepareContourGroups(allContours, FillRule::EvenOdd);
   for (const auto& group : groups) {
     beginShape(out, "Glyph", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
     EmitGroupCustGeom(out, allContours, group, pw, ph, sx, sy, scaledOfsX, scaledOfsY,
-                      BoundsMarkerStyle::InlineSegments);
+                      BoundsMarkerStyle::InlineSegments, _bridgeContours);
     writeGlyphShape(out, fs.fill, alpha);
   }
 }

@@ -146,12 +146,23 @@ void EmitBridgedGroup(XMLBuilder& out, const std::vector<PathContour>& contours,
 // Writes the geometry content for a group without opening its <a:path>.
 // Split out of EmitGroupPath so EmitCustGeomCore's InlineSegments branch can
 // place corner marker segments in the same <a:path> as the main geometry.
+//
+// `bridgeContours` selects between:
+//   * true  — stitch outer + inner rings into one self-overlapping sub-path
+//             via zero-width bridge lines (renderer-portable even-odd holes).
+//   * false — emit each ring as its own moveTo/.../close sub-path within the
+//             same <a:path>, letting the default even-odd fill rule express
+//             holes. Required when the caller wants to keep the contours
+//             unbridged (e.g. global --ppt-bridge-contours off).
 void EmitGroupPathBody(XMLBuilder& out, const std::vector<PathContour>& contours,
-                       const std::vector<size_t>& group, const CoordScale& ts) {
-  if (group.size() > 1) {
+                       const std::vector<size_t>& group, const CoordScale& ts,
+                       bool bridgeContours) {
+  if (group.size() > 1 && bridgeContours) {
     EmitBridgedGroup(out, contours, group, ts);
-  } else {
-    EmitContour(out, contours[group[0]], ts);
+    return;
+  }
+  for (size_t idx : group) {
+    EmitContour(out, contours[idx], ts);
   }
 }
 
@@ -166,9 +177,9 @@ void OpenPath(XMLBuilder& out, int64_t pathWidth, int64_t pathHeight) {
 // bounds-marker needs to share the same path.
 void EmitGroupPath(XMLBuilder& out, const std::vector<PathContour>& contours,
                    const std::vector<size_t>& group, int64_t pathWidth, int64_t pathHeight,
-                   const CoordScale& ts) {
+                   const CoordScale& ts, bool bridgeContours) {
   OpenPath(out, pathWidth, pathHeight);
-  EmitGroupPathBody(out, contours, group, ts);
+  EmitGroupPathBody(out, contours, group, ts, bridgeContours);
   out.closeElement();
 }
 
@@ -231,13 +242,13 @@ void EmitStandaloneMarkerPath(XMLBuilder& out, int64_t pathWidth, int64_t pathHe
 void EmitCustGeomCore(XMLBuilder& out, const std::vector<PathContour>& contours,
                       const std::vector<std::vector<size_t>>& groups, int64_t pathWidth,
                       int64_t pathHeight, const CoordScale& ts,
-                      std::optional<BoundsMarkerStyle> markerStyle) {
+                      std::optional<BoundsMarkerStyle> markerStyle, bool bridgeContours) {
   EmitCustGeomHeader(out);
   out.openElement("a:pathLst").closeElementStart();
 
   for (const auto& group : groups) {
     if (!markerStyle.has_value()) {
-      EmitGroupPath(out, contours, group, pathWidth, pathHeight, ts);
+      EmitGroupPath(out, contours, group, pathWidth, pathHeight, ts, bridgeContours);
       continue;
     }
     // Bounds marker strategy documented on BoundsMarkerStyle. Both strategies
@@ -248,11 +259,11 @@ void EmitCustGeomCore(XMLBuilder& out, const std::vector<PathContour>& contours,
     // visible dots at the corners).
     if (*markerStyle == BoundsMarkerStyle::StandaloneStrokelessPath) {
       EmitStandaloneMarkerPath(out, pathWidth, pathHeight);
-      EmitGroupPath(out, contours, group, pathWidth, pathHeight, ts);
+      EmitGroupPath(out, contours, group, pathWidth, pathHeight, ts, bridgeContours);
     } else {
       OpenPath(out, pathWidth, pathHeight);
       EmitCornerBoundsMarkerSegments(out, pathWidth, pathHeight);
-      EmitGroupPathBody(out, contours, group, ts);
+      EmitGroupPathBody(out, contours, group, ts, bridgeContours);
       out.closeElement();
     }
   }
@@ -268,7 +279,8 @@ void EmitContourGeomFromGroups(XMLBuilder& out, const std::vector<PathContour>& 
                                int64_t pathHeight, float scaleX, float scaleY, float scaledOfsX,
                                float scaledOfsY) {
   const CoordScale ts{scaleX, scaleY, scaledOfsX, scaledOfsY};
-  EmitCustGeomCore(out, contours, groups, pathWidth, pathHeight, ts, std::nullopt);
+  EmitCustGeomCore(out, contours, groups, pathWidth, pathHeight, ts, std::nullopt,
+                   /*bridgeContours=*/true);
 }
 
 void EmitFlatContourGeom(XMLBuilder& out, const std::vector<PathContour>& contours,
@@ -289,9 +301,9 @@ void EmitFlatContourGeom(XMLBuilder& out, const std::vector<PathContour>& contou
 void EmitGroupCustGeom(XMLBuilder& out, const std::vector<PathContour>& contours,
                        const std::vector<size_t>& group, int64_t pathWidth, int64_t pathHeight,
                        float scaleX, float scaleY, float scaledOfsX, float scaledOfsY,
-                       BoundsMarkerStyle markerStyle) {
+                       BoundsMarkerStyle markerStyle, bool bridgeContours) {
   const CoordScale ts{scaleX, scaleY, scaledOfsX, scaledOfsY};
-  EmitCustGeomCore(out, contours, {group}, pathWidth, pathHeight, ts, markerStyle);
+  EmitCustGeomCore(out, contours, {group}, pathWidth, pathHeight, ts, markerStyle, bridgeContours);
 }
 
 }  // namespace pagx

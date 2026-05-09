@@ -332,7 +332,7 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
     for (const auto& group : groups) {
       beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
       EmitGroupCustGeom(out, contours, group, pw, ph, scale, scale, ofsX, ofsY,
-                        BoundsMarkerStyle::StandaloneStrokelessPath);
+                        BoundsMarkerStyle::StandaloneStrokelessPath, _bridgeContours);
       writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters, styles);
     }
     return;

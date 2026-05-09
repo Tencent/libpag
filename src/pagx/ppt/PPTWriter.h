@@ -464,8 +464,7 @@ inline PPTRunStyle BuildRunStyle(const Text* text, const Fill* fill, const Strok
   // to the regular face here; the same face would have been selected if we
   // had emitted "Arial Light" as the typeface name and the renderer failed
   // to resolve it.
-  style.typeface =
-      text->fontFamily.empty() ? std::string() : StripQuotes(text->fontFamily);
+  style.typeface = text->fontFamily.empty() ? std::string() : StripQuotes(text->fontFamily);
   style.stroke = stroke;
   style.strokeAlpha = alpha;
   return style;

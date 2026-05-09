@@ -80,10 +80,19 @@ enum class BoundsMarkerStyle {
  * zero-length bounds-marker path pinning the content bounding box to the
  * declared (pathWidth, pathHeight). Use this when emitting one shape per
  * group so each shape carries its own bounds marker.
+ *
+ * `bridgeContours` controls how a multi-contour group (outer + inner rings)
+ * renders inside the group's `<a:path>`. When true, the outer and inner rings
+ * are stitched into a single self-overlapping path with zero-width bridge
+ * lines so even-odd fill expresses the holes (required by some renderers
+ * that don't handle multi-sub-path even-odd). When false, each ring is
+ * emitted as a separate sub-path within the same `<a:path>`, relying on the
+ * default even-odd fill rule to render holes. Single-contour groups are
+ * unaffected.
  */
 void EmitGroupCustGeom(XMLBuilder& out, const std::vector<PathContour>& contours,
                        const std::vector<size_t>& group, int64_t pathWidth, int64_t pathHeight,
                        float scaleX, float scaleY, float scaledOfsX, float scaledOfsY,
-                       BoundsMarkerStyle markerStyle);
+                       BoundsMarkerStyle markerStyle, bool bridgeContours);
 
 }  // namespace pagx
