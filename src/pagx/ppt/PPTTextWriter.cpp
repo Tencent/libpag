@@ -413,12 +413,14 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
       style.algn = "just";
     }
   }
-  // In vertical writing mode, PAGX lineHeight controls column width (the
-  // block-axis dimension), not character-to-character spacing. PPT's lnSpc
-  // always controls the inline-axis spacing regardless of vert orientation, so
-  // emitting it for vertical text would incorrectly stretch the character pitch.
+  // PAGX lineHeight maps onto OOXML <a:lnSpc> in both writing modes: in horizontal mode each
+  // "line" is a row so lnSpc is the row pitch (vertical advance), in eaVert each "line" is a
+  // column so lnSpc is the column pitch (horizontal advance). The earlier code skipped this in
+  // vertical mode under the assumption that lnSpc only ever drives the inline axis, which left
+  // PowerPoint to fall back to its default ~1.2x font-size column width regardless of the
+  // PAGX-authored lineHeight.
   bool isVertical = fs.textBox && fs.textBox->writingMode == WritingMode::Vertical;
-  int64_t lnSpcPts = (!isVertical && fs.textBox) ? LineHeightToSpcPts(fs.textBox->lineHeight) : 0;
+  int64_t lnSpcPts = fs.textBox ? LineHeightToSpcPts(fs.textBox->lineHeight) : 0;
 
   // Vertical writing mode ignores BiDi base direction; suppress the rtl
   // attribute so PowerPoint doesn't emit a spurious warning for eaVert text.
@@ -841,34 +843,33 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
     estHeight = runs.front().text->renderFontSize() * 1.4f;
   }
 
-  // Per-Text line metadata produced by PAGX's own layout. Use these line
-  // breaks as authoritative paragraph boundaries (rather than letting
-  // PowerPoint re-wrap with its own font metrics, which doesn't match the
-  // PAGX renderer) so the PPT output matches the PAGX rendering exactly.
-  // `getTextLines` returns nullptr for layouts where line info isn't tracked
-  // (notably vertical writing mode); those fall back to legacy '\n'-splitting
-  // and PowerPoint-driven wrapping.
+  // Per-Text line metadata produced by PAGX's own layout. Use these line breaks as authoritative
+  // paragraph boundaries (rather than letting PowerPoint re-wrap with its own font metrics, which
+  // doesn't match the PAGX renderer) so the PPT output matches the PAGX rendering exactly. In
+  // vertical mode each entry is a column instead of a row (baselineY stores -columnX so the
+  // ascending sort below maps to right-to-left source order); columns dropped by
+  // overflow="hidden" are absent from the layout result and therefore omitted from the PPT output
+  // automatically. `getTextLines` only returns nullptr for layouts where line info isn't tracked
+  // (e.g. embedded glyph runs); those fall back to legacy '\n'-splitting.
   std::vector<LineEntry> lineEntries;
-  bool useLineLayout = box->writingMode != WritingMode::Vertical;
-  if (useLineLayout) {
-    for (size_t i = 0; i < runs.size(); ++i) {
-      auto* mt = const_cast<Text*>(runs[i].text);
-      auto* lines = layoutResult.getTextLines(mt);
-      if (lines == nullptr) {
-        useLineLayout = false;
-        lineEntries.clear();
-        break;
-      }
-      for (const auto& li : *lines) {
-        if (li.byteStart >= li.byteEnd) {
-          continue;
-        }
-        lineEntries.push_back({i, li.baselineY, li.byteStart, li.byteEnd});
-      }
-    }
-    if (useLineLayout && lineEntries.empty()) {
+  bool useLineLayout = true;
+  for (size_t i = 0; i < runs.size(); ++i) {
+    auto* mt = const_cast<Text*>(runs[i].text);
+    auto* lines = layoutResult.getTextLines(mt);
+    if (lines == nullptr) {
       useLineLayout = false;
+      lineEntries.clear();
+      break;
     }
+    for (const auto& li : *lines) {
+      if (li.byteStart >= li.byteEnd) {
+        continue;
+      }
+      lineEntries.push_back({i, li.baselineY, li.byteStart, li.byteEnd});
+    }
+  }
+  if (useLineLayout && lineEntries.empty()) {
+    useLineLayout = false;
   }
 
   emitTextBoxShapeFrame(out, box, transform, estWidth, estHeight, useLineLayout, hasBoxWidth);
@@ -901,10 +902,9 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
   } else if (box->textAlign == TextAlign::Justify) {
     algn = "just";
   }
-  // In vertical writing mode, PAGX lineHeight controls column width, not
-  // character-to-character spacing -- skip lnSpc emission (same logic as the
-  // writeNativeText path).
-  int64_t lnSpcPts = isVertical ? 0 : LineHeightToSpcPts(box->lineHeight);
+  // PAGX lineHeight maps onto OOXML <a:lnSpc> in both writing modes (see writeNativeText for the
+  // full rationale): horizontal lnSpc drives row pitch, eaVert lnSpc drives column pitch.
+  int64_t lnSpcPts = LineHeightToSpcPts(box->lineHeight);
 
   // Build per-run styles up-front (font/size/bold/italic/color/typeface).
   // Alignment lives on a:pPr (not a:rPr) so we leave style.algn at nullptr here.
