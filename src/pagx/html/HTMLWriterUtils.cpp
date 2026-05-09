@@ -609,6 +609,73 @@ std::string EscapeHtmlChar(uint32_t cp, const std::string& srcBytes) {
 
 }  // namespace
 
+std::string HTMLWriter::rewriteVerticalColumnBreaks(const Text* text) {
+  if (text == nullptr || text->glyphData == nullptr) return text ? text->text : std::string{};
+  const auto& runs = text->glyphData->layoutRuns;
+  std::vector<tgfx::Point> glyphPositions;
+  for (const auto& run : runs) {
+    for (const auto& pos : run.positions) {
+      glyphPositions.push_back(pos);
+    }
+  }
+  if (glyphPositions.size() < 2) return text->text;
+  size_t visibleCount = 0;
+  for (size_t pos = 0; pos < text->text.size();) {
+    auto c = NextCodepoint(text->text, pos);
+    if (c.byteLen == 0) break;
+    if (c.cp != '\n') ++visibleCount;
+    pos += c.byteLen;
+  }
+  if (visibleCount != glyphPositions.size()) return text->text;
+  // A real column break shows up as `|x_i - x_{i-1}| >= fontSize/2`. Latin/digit glyphs in a
+  // CJK vertical column sit ~1.54 px off the CJK baseline X (per HarfBuzz vertical metrics for
+  // Noto Sans SC), which would otherwise be misread as a column transition and inject one <br>
+  // per CJK<->Latin handoff (broke vertical.pagx Box A `2024年12月31日` and friends in the
+  // 2026-05-09 attempt). The real per-column inline width is the natural CJK advance, i.e.
+  // the rendered fontSize, so half of that is a comfortable threshold separating the two.
+  float threshold = text->renderFontSize() * 0.5f;
+  if (threshold <= 0) threshold = 12.0f;
+  std::vector<bool> startsNewColumn(glyphPositions.size(), false);
+  for (size_t i = 1; i < glyphPositions.size(); ++i) {
+    if (std::fabs(glyphPositions[i].x - glyphPositions[i - 1].x) >= threshold) {
+      startsNewColumn[i] = true;
+    }
+  }
+  bool hasBreak = false;
+  for (bool b : startsNewColumn) {
+    if (b) {
+      hasBreak = true;
+      break;
+    }
+  }
+  if (!hasBreak) return text->text;
+  // Walk source text and glyphs in lock-step, inserting '\n' before any glyph that started a
+  // new column. Skip the insertion when the source already has a '\n' immediately before this
+  // codepoint (avoid emitting two consecutive <br>s).
+  std::string out;
+  out.reserve(text->text.size() + 8);
+  size_t gi = 0;
+  bool prevWasNewline = false;
+  for (size_t pos = 0; pos < text->text.size();) {
+    auto c = NextCodepoint(text->text, pos);
+    if (c.byteLen == 0) break;
+    std::string srcBytes = text->text.substr(pos, c.byteLen);
+    pos += c.byteLen;
+    if (c.cp == '\n') {
+      out += srcBytes;
+      prevWasNewline = true;
+      continue;
+    }
+    if (gi < startsNewColumn.size() && startsNewColumn[gi] && !prevWasNewline) {
+      out += '\n';
+    }
+    out += srcBytes;
+    prevWasNewline = false;
+    ++gi;
+  }
+  return out;
+}
+
 std::string BuildVerticalJustifyContent(const Text* text) {
   if (text == nullptr) return {};
   const auto& runs = text->glyphData->layoutRuns;

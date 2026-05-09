@@ -926,7 +926,11 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
   // newlines would be folded by the browser. Convert them to <br> explicitly.
   // Outside a TextBox the span style already includes white-space:pre which handles \n.
   if (tb) {
-    out.closeTagWithTextBreaks(RewriteLineBreakHints(text->text));
+    // For vertical TextBoxes inject <br> at every column break tgfx computed (see
+    // rewriteVerticalColumnBreaks docs for rationale).
+    std::string innerText =
+        (tb->writingMode == WritingMode::Vertical) ? rewriteVerticalColumnBreaks(text) : text->text;
+    out.closeTagWithTextBreaks(RewriteLineBreakHints(innerText));
     // closeTagWithTextBreaks no longer emits trailing breaks (HTMLWriterLayer's
     // tbSpans/richTextSpans loops handle them with empty-line owner wrapping). For the
     // single-span writeText path there is no "next span" to consult, so emit the trailing

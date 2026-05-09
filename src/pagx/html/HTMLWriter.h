@@ -104,6 +104,7 @@ std::string LayerTransformCSS(const Layer* layer);
  * so they are passed through unchanged. Returns the rewritten string.
  */
 std::string RewriteLineBreakHints(const std::string& text);
+
 Matrix BuildGroupMatrix(const Group* group);
 const char* AlignmentToCSS(Alignment alignment);
 const char* ArrangementToCSS(Arrangement arrangement);
@@ -336,6 +337,31 @@ class HTMLWriter {
     bool paintOrderStrokeFill = false;
   };
   static TextStrokeCss ResolveTextStrokeCss(float width, StrokeAlign align, bool hasFill);
+
+  // For vertical-writing-mode TextBoxes, inserts a literal '\n' (which the HTML emit path
+  // turns into `<br>`) before every glyph that tgfx placed into a new column. Without this,
+  // Chromium re-runs its own line-break algorithm on the raw text and — lacking PAGX's UAX-14
+  // punctuation-squash rules — picks different column boundaries (e.g. for `「你好」。「世界」`
+  // in a 100x160 vertical box, tgfx packs the leading paren and closing punctuation onto
+  // column 1 and the second `「世界」` onto column 2, while Chromium splits `「世界」` across
+  // two columns).
+  //
+  // Column transitions are detected by `|x_i - x_{i-1}| >= renderFontSize/2`. The threshold is
+  // intentionally large because Latin/digit glyphs in a CJK vertical column sit ~1.54px off
+  // the CJK baseline X (HarfBuzz vertical metrics for Noto Sans SC), and that small offset
+  // must NOT trigger a column break or every CJK<->Latin handoff inside a single column would
+  // be split (broke vertical.pagx's `2024年12月31日` and Latin/CJK mixed samples in an earlier
+  // attempt).
+  //
+  // Source `\n` characters are passed through untouched and suppress the very next auto-break
+  // so we don't emit two consecutive `<br>`s when the author already requested a column break
+  // that coincides with a tgfx column transition. If the source visible-codepoint count
+  // differs from the laid-out glyph count (ligature/cluster collapse) we return the input
+  // unchanged so the caller falls back to plain text. Returns the source text unchanged when
+  // no rewriting is needed (single column, non-vertical text, or null input) so callers can
+  // chain unconditionally. Lives on HTMLWriter so it can access Text's private `glyphData`
+  // through the existing `friend class HTMLWriter` declaration without adding a new friend.
+  static std::string rewriteVerticalColumnBreaks(const Text* text);
 
   // Color source conversions. `boxLeft`/`boxTop`/`boxWidth`/`boxHeight` describe the element
   // box (in the gradient source's coordinate space) that the CSS background will paint into.
