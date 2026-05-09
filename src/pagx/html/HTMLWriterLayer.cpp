@@ -335,6 +335,30 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             // of content) to the start, matching tgfx where the last line is not justified.
             style += ";text-align:justify;text-align-last:left";
           }
+          // Anchor mode: TextBox authored with width="0" / height="0" (explicit zero, not NaN)
+          // uses the TextBox's origin as a single anchor point and relies on textAlign /
+          // paragraphAlign to place the text relative to that point. tgfx collapses the box to
+          // zero size and lets each line flow past the anchor. CSS `text-align` alone can't
+          // reproduce the horizontal case because our emitted container has `width:max-content`
+          // (hugging the glyph run); `display:flex; justify-content:center/flex-end` alone can't
+          // reproduce the vertical case because the box height is also `max-content`. Shift the
+          // entire box with `transform:translate(-X%, -Y%)` so the anchor lands on the correct
+          // glyph edge — -50% for Center/Middle, -100% for End/Far.
+          bool widthAnchor =
+              !tb->isWidthAutoSized() && tb->width == 0.0f && tb->textAlign != TextAlign::Start;
+          bool heightAnchor = !tb->isHeightAutoSized() && tb->height == 0.0f &&
+                              tb->paragraphAlign != ParagraphAlign::Near;
+          if (widthAnchor || heightAnchor) {
+            std::string tx = "0";
+            std::string ty = "0";
+            if (widthAnchor) {
+              tx = (tb->textAlign == TextAlign::Center) ? "-50%" : "-100%";
+            }
+            if (heightAnchor) {
+              ty = (tb->paragraphAlign == ParagraphAlign::Middle) ? "-50%" : "-100%";
+            }
+            style += ";transform:translate(" + tx + "," + ty + ")";
+          }
           if (tb->paragraphAlign != ParagraphAlign::Near) {
             style += ";display:flex;flex-direction:column";
             if (tb->paragraphAlign == ParagraphAlign::Middle) {
@@ -540,6 +564,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             // line-box too short for what tgfx renders.
             size_t prevTrailingBreaks = 0;
             float prevFontSize = 0;
+            bool isFirstSpan = true;
             for (auto& span : tbSpans) {
               std::string spanStyle;
               // When the span's text contains U+0009 (TAB) honour it by setting
@@ -643,10 +668,25 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               // assigns ownership: \n_1..\n_{prevTrailingBreaks} → previous span; \n_{...} on
               // → current span. Wrap empty-line `<br>`s in the owner's font-size so the line
               // box matches what tgfx computed, instead of inheriting the container strut.
+              //
+              // Special case: the leading \n at the very start of the TextBox (first span's
+              // first leading break) has no preceding glyph in tgfx, so its
+              // pendingNewlineFontLineHeight is 0 and FinishLine assigns maxLineHeight=0 to
+              // that empty line. Wrap it in a zero-height span so Chromium doesn't allocate a
+              // full container line-height for what tgfx draws as a zero-height empty line
+              // (e.g. text "\nLine2\n\nLine4" should hug the box top in HTML the way it does
+              // in PAGX native).
               size_t leadingBreaks = HTMLBuilder::countLeadingBreaks(span.text->text);
               size_t totalBreaks = prevTrailingBreaks + leadingBreaks;
               for (size_t bi = 0; bi < totalBreaks; ++bi) {
-                if (bi == 0) {
+                if (bi == 0 && isFirstSpan && prevTrailingBreaks == 0) {
+                  // Leading \n at TextBox start: tgfx gives this empty line height 0 (its
+                  // pendingNewlineFontLineHeight is 0 because no glyph precedes it). Emit
+                  // nothing so Chromium starts the first content line at the box top, just
+                  // like PAGX native — wrapping the <br> in any element still leaves the
+                  // forced break consuming a full line-height in Chromium's inline formatting
+                  // context.
+                } else if (bi == 0) {
                   // First <br> closes the previous span's last line — its line box is already
                   // sized by the prior span's content, so a bare <br> is sufficient.
                   out.emitBreaks(1);
@@ -661,6 +701,46 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                     out.emitBreaks(1);
                   }
                 }
+              }
+              // Detect single-span horizontal justify-with-\n upfront — when true, we emit
+              // a <div> per \n-segment instead of a single <span>...<br>... so each segment
+              // becomes its own justify paragraph. CSS treats every <br> as a paragraph
+              // terminator for `text-align:justify` purposes, so this rewrite is the only
+              // way to get the line-before-<br> justified the way tgfx does.
+              bool useJustifyParagraphSplit = tb->textAlign == TextAlign::Justify &&
+                                              tb->writingMode != WritingMode::Vertical &&
+                                              tbSpans.size() == 1 && span.text &&
+                                              span.text->text.find('\n') != std::string::npos;
+              if (useJustifyParagraphSplit) {
+                const std::string& src = span.text->text;
+                size_t pos = 0;
+                std::vector<std::string> segments;
+                while (pos <= src.size()) {
+                  size_t nl = src.find('\n', pos);
+                  if (nl == std::string::npos) {
+                    segments.push_back(src.substr(pos));
+                    break;
+                  }
+                  segments.push_back(src.substr(pos, nl - pos));
+                  pos = nl + 1;
+                }
+                for (size_t si = 0; si < segments.size(); ++si) {
+                  bool isLast = (si + 1 == segments.size());
+                  std::string segStyle = spanStyle;
+                  if (!isLast) {
+                    if (!segStyle.empty()) segStyle += ';';
+                    segStyle += "text-align-last:justify";
+                  }
+                  out.openTag("div");
+                  if (!segStyle.empty()) {
+                    out.addAttr("style", segStyle);
+                  }
+                  out.closeTagWithText(segments[si]);
+                }
+                prevTrailingBreaks = HTMLBuilder::countTrailingBreaks(span.text->text);
+                prevFontSize = spanFontSize;
+                isFirstSpan = false;
+                continue;
               }
               out.openTag("span");
               out.addAttr("style", spanStyle);
@@ -688,6 +768,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               }
               prevTrailingBreaks = HTMLBuilder::countTrailingBreaks(span.text->text);
               prevFontSize = spanFontSize;
+              isFirstSpan = false;
             }
             // Flush any trailing breaks left over from the last span. These are dangling
             // empty lines after the final visible content; emit them so the box's reported

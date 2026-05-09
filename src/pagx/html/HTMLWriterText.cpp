@@ -765,7 +765,26 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     // antialiasing.
     bool usesBackgroundClipText =
         fill && fill->color && fill->color->nodeType() != NodeType::SolidColor;
-    if (text->textAnchor == TextAnchor::Center) {
+    // Multi-line text with a non-Start anchor needs per-line alignment relative to the anchor
+    // point. The single-line path below uses `width:posX*2` (center) or `width:posX` (end)
+    // which only positions one line correctly — posX here is glyphRuns[0]'s x, i.e. the
+    // *first* line's left edge. For "Center A\nCenter BB\nCenter CCC" each line has a
+    // different left edge, so the per-line shift has to be handled by CSS `text-align` inside
+    // a span whose anchor is the origin, shifted with `transform:translateX`. tgfx centres
+    // each line around anchor x=0 in the layer's coordinate space; mirror that by placing
+    // the span at `text->position.x` and using translateX(-50%) for Center / -100% for End.
+    bool multiLineAnchor =
+        text->text.find('\n') != std::string::npos && text->textAnchor != TextAnchor::Start;
+    if (multiLineAnchor) {
+      float anchorX = text->position.x;
+      if (text->textAnchor == TextAnchor::Center) {
+        style +=
+            ";left:" + FloatToString(anchorX) + "px;transform:translateX(-50%);text-align:center";
+      } else {
+        style +=
+            ";left:" + FloatToString(anchorX) + "px;transform:translateX(-100%);text-align:right";
+      }
+    } else if (text->textAnchor == TextAnchor::Center) {
       if (usesBackgroundClipText) {
         style += ";left:" + FloatToString(posX) + "px;transform:translateX(-50%);text-align:center";
       } else {
