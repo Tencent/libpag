@@ -239,13 +239,13 @@ TEST(LayerInflater, ImagePatternDecodeFailureWarns600) {
 
 // ---------------------------------------------------------------------------
 // 601 InflateFontCreateFailed — case B ElementText carries a shapedGlyphs
-// run that needs FontProvider to resolve the typeface. When the caller
-// passes Options{} (no fontProvider), Inflater emits 601 and drops the
-// text element. (Phase 17 rewired the old GlyphRun-blob-based trigger
-// through the shapedGlyphs path; Phase 18 kept the warn route intact.)
+// run whose typeface MakeDefaultFontProvider cannot resolve on macOS
+// (SystemFont::MakeFromName is a no-op there — see feedback_build_quirks.md
+// entry #49). Inflater emits 601 and drops the text element. Phase 17/18
+// kept this warn route intact.
 // ---------------------------------------------------------------------------
 
-TEST(LayerInflater, CaseBTextNoFontProviderWarns601) {
+TEST(LayerInflater, CaseBTextUnresolvableTypefaceWarns601) {
   auto doc = MakeDoc();
   auto comp = MakeComp();
   auto layer = MakeLayer(LayerType::Vector);
@@ -272,7 +272,9 @@ TEST(LayerInflater, CaseBTextNoFontProviderWarns601) {
   comp->layers.push_back(std::move(layer));
   doc->compositions.push_back(std::move(comp));
 
-  // Default Options = fontProvider nullptr → §500-502 triggers.
+  // Default Options → Inflate substitutes MakeDefaultFontProvider(), which
+  // walks pag::FontManager with no registered fonts. getTypeface() returns
+  // null for "Arial/Regular" and §508-512 warns + drops the text.
   auto r = LayerInflater::Inflate(std::move(doc));
   EXPECT_TRUE(HasWarningCode(r.warnings, ErrorCode::InflateFontCreateFailed));
 }

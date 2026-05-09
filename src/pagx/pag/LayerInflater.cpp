@@ -493,13 +493,13 @@ std::shared_ptr<tgfx::ColorSource> inflateColorSource(PAGDocument& doc, const Sh
 // destroy line layout; the user-visible effect of a dropped Text is
 // preferable to a garbled one. This matches case A's "missing
 // EmbeddedFont → drop run" policy.
+// Pre-condition: ctx->fontProvider is non-null. `LayerInflater::Inflate`
+// guarantees this by substituting MakeDefaultFontProvider() when the
+// caller passes Options{} without an override. Case-B text is only
+// reachable through that entry point, so no null-guard is needed here.
 std::shared_ptr<tgfx::VectorElement> inflateTextAsShapedTextBlob(PAGDocument& /*doc*/,
                                                                  const ElementTextData& pay,
                                                                  InflaterContext* ctx) {
-  if (ctx->fontProvider == nullptr) {
-    ctx->warn(ErrorCode::InflateFontCreateFailed, "FontProvider is null for case B Text");
-    return nullptr;
-  }
   std::vector<pagx::TextLayoutGlyphRun> runs;
   runs.reserve(pay.shapedGlyphs.size());
   bool anyKeyMismatch = false;
