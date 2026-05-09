@@ -424,15 +424,24 @@ inline bool IsRunCompatibleColorSource(const ColorSource* color) {
 inline PPTRunStyle BuildRunStyle(const Text* text, const Fill* fill, const Stroke* stroke,
                                  float alpha) {
   PPTRunStyle style = {};
-  // Real Bold/Italic faces are expressed by appending the style to the typeface
-  // string (e.g. "Arial Bold") so PowerPoint resolves the same face that PAGX's
-  // tgfx::Typeface::MakeFromName(family, style) selects. Emitting b="1" / i="1"
-  // here as well would tell PowerPoint to apply faux bold/italic on top of the
-  // already-bold face, producing visibly thicker strokes than the PAGX render.
-  // Only fauxBold / fauxItalic — which the renderer applies as a synthesized
-  // outline thickening — should reach PowerPoint as b / i attributes.
-  style.hasBold = text->fauxBold;
-  style.hasItalic = text->fauxItalic;
+  // Bold/Italic are expressed via OOXML's standard b="1" / i="1" attributes on
+  // a:rPr together with the bare family name on a:latin (e.g. "Arial"). This
+  // matches the spec: a PPTX consumer (PowerPoint, Keynote, LibreOffice / soffice,
+  // most online viewers) is expected to resolve the family + b/i to the real
+  // Bold / Italic face when the system has it, and only synthesize faux-bold /
+  // faux-italic on the regular face when the real face is missing. An earlier
+  // implementation pushed the style into the typeface string itself (e.g.
+  // "Arial Bold") to avoid PowerPoint stacking faux-bold on the already-bold
+  // face; in practice that broke fontconfig-based renderers (LibreOffice on
+  // macOS / Linux) which match "Arial Bold" against the *family* "Arial Bold"
+  // — no such family exists, so the renderer falls back to a default font and
+  // the bold weight is silently lost. fauxBold / fauxItalic still need to
+  // surface as b / i so the renderer applies the synthesized thickening that
+  // matches PAGX's own faux-style behaviour.
+  bool hasRealBold = text->fontStyle.find("Bold") != std::string::npos;
+  bool hasRealItalic = text->fontStyle.find("Italic") != std::string::npos;
+  style.hasBold = text->fauxBold || hasRealBold;
+  style.hasItalic = text->fauxItalic || hasRealItalic;
   // Use the layout-resolved font size. PAGX layout may shrink a Text internally
   // via a textScale factor to fit dual-axis constraints (e.g. `left`+`right`,
   // `width="100%"`); `renderFontSize()` carries that factor while `fontSize`
@@ -449,12 +458,14 @@ inline PPTRunStyle BuildRunStyle(const Text* text, const Fill* fill, const Strok
   style.hasFillColor = fill && IsRunCompatibleColorSource(fill->color);
   style.fillAlpha = style.hasFillColor ? fill->alpha * alpha : 0;
   style.fillColor = style.hasFillColor ? fill->color : nullptr;
-  std::string family = text->fontFamily.empty() ? std::string() : StripQuotes(text->fontFamily);
-  if (!family.empty() && !text->fontStyle.empty() && text->fontStyle != "Regular") {
-    style.typeface = family + " " + text->fontStyle;
-  } else {
-    style.typeface = family;
-  }
+  // Always emit just the family name — Bold / Italic ride on b="1" / i="1"
+  // above. Non-bold/italic style hints (e.g. "Light", "Medium") cannot be
+  // expressed in basic OOXML rPr (which only carries b/i), so they collapse
+  // to the regular face here; the same face would have been selected if we
+  // had emitted "Arial Light" as the typeface name and the renderer failed
+  // to resolve it.
+  style.typeface =
+      text->fontFamily.empty() ? std::string() : StripQuotes(text->fontFamily);
   style.stroke = stroke;
   style.strokeAlpha = alpha;
   return style;
