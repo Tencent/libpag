@@ -336,3 +336,37 @@ TEST(RoundTrip, LayerTransformDefaultsCollapsed) {
   EXPECT_FLOAT_EQ(l.alpha.value, 1.0f);
   EXPECT_EQ(l.blendMode.value, ::tgfx::BlendMode::SrcOver);
 }
+
+// v2.25 regression: Decoder's LayerMaskRef pathLength cap was hard-coded
+// to 5, rejecting legitimate deep-nested masks (resources/pagx_to_html/
+// clip_and_mask.pagx has depth 7). Cap is now limits::MAX_MASK_PATH_DEPTH
+// and PackedLayerPath stores the full index vector so no truncation
+// happens on the Inflater side either. This round-trip pins the fix.
+TEST(RoundTrip, LayerMaskRefDepthSevenRoundTrip) {
+  PAGDocument doc = MakeMinimalDoc();
+  auto comp = std::make_unique<Composition>();
+  comp->id = "main";
+  comp->width = 100;
+  comp->height = 100;
+
+  auto layer = std::make_unique<Layer>();
+  layer->type = LayerType::Layer;
+  layer->maskLayerPath = {0, 1, 2, 3, 4, 5, 6};  // depth 7, above the old 5 cap.
+  layer->maskType = ::tgfx::LayerMaskType::Luminance;
+  comp->layers.push_back(std::move(layer));
+  doc.compositions.push_back(std::move(comp));
+
+  auto enc = Codec::Encode(doc);
+  ASSERT_NE(enc.bytes, nullptr);
+  auto dec = Codec::Decode(enc.bytes->data(), enc.bytes->length());
+  ASSERT_NE(dec.doc, nullptr) << "Decoder rejected a valid MAX_MASK_PATH_DEPTH payload";
+  EXPECT_TRUE(dec.errors.empty());
+
+  ASSERT_EQ(dec.doc->compositions[0]->layers.size(), 1u);
+  const auto& out = dec.doc->compositions[0]->layers[0]->maskLayerPath;
+  ASSERT_EQ(out.size(), 7u);
+  for (uint32_t i = 0; i < 7u; ++i) {
+    EXPECT_EQ(out[i], i);
+  }
+  EXPECT_EQ(dec.doc->compositions[0]->layers[0]->maskType, ::tgfx::LayerMaskType::Luminance);
+}

@@ -203,12 +203,14 @@ bool ReadLayerMaskRef(::pag::DecodeStream* stream, DecodeContext* ctx, uint64_t 
   if (ctx->hasError()) {
     return false;
   }
-  // Hard cap matches the Inflater's PackedLayerPath depth budget (5 levels
-  // × 10 bits). Anything beyond that cannot round-trip the Inflater's
-  // uint64-packed path representation; rejecting here prevents a later
-  // surprise truncation.
-  constexpr uint32_t kMaxLayerMaskPathLength = 5;
-  if (pathLen > kMaxLayerMaskPathLength) {
+  // v2.25: upper bound aligns with the design-doc constant. Pre-v2.25 the
+  // Decoder hard-coded `5` here to match a bit-packed PackedLayerPath
+  // layout (5 × 10 bits); that data structure was rewritten to store the
+  // full index vector (see InflaterContext.h), so the Decoder can safely
+  // accept up to the `limits::MAX_MASK_PATH_DEPTH` shared by Baker /
+  // Inflater. `resources/pagx_to_html/clip_and_mask.pagx` (depth 7) was
+  // the regression sample that surfaced the mismatch.
+  if (pathLen > limits::MAX_MASK_PATH_DEPTH) {
     ctx->error(ErrorCode::MalformedTag, "LayerMaskRef pathLength exceeds MAX_MASK_PATH_DEPTH");
     return false;
   }

@@ -24,50 +24,49 @@
 
 namespace pagx::pag {
 
-// Packed Layer path key for the Pass-1 `layerByPath` lookup. PAGX build of
-// `maskLayerPath` is a chain of child indices from the enclosing Composition
-// root down to the mask target — ≤ MAX_LAYER_DEPTH levels with ≤
-// MAX_CHILDREN_PER_LAYER=1024 children per level. We fold the first 5 levels
-// into the low 56 bits of a uint64 and stash the real depth in the low 6
-// bits; depths > 5 share the 5-level prefix hash but still compare equal
-// only on a full `value` match.
+// Packed Layer path key for the Pass-1 `layerByPath` lookup. Holds the full
+// chain of child indices from the enclosing Composition root down to the
+// target Layer (≤ limits::MAX_MASK_PATH_DEPTH levels deep in practice; no
+// hard cap here — callers enforce depth at encode/decode boundaries).
 //
-// §9.4 Reader-facing details (bit layout):
-//   [ 0..5 ]   real depth n (≤ 63; clamped)
-//   [ 6..15 ]  level 0 child index (≤ 1023; clamped)
-//   [16..25 ]  level 1 child index
-//   [26..35 ]  level 2 child index
-//   [36..45 ]  level 3 child index
-//   [46..55 ]  level 4 child index
-//   [56..63 ]  reserved (must be 0)
+// Pre-v2.25 this was a uint64 bit-packed (5 × 10-bit index slots + 6-bit
+// depth). That representation truncated beyond 5 levels, so legitimate
+// `resources/pagx_to_html/clip_and_mask.pagx` (mask path depth 7) could
+// not round-trip and also risked silent hash collisions with unrelated
+// paths sharing a 5-level prefix. Current representation stores the path
+// verbatim so equality is exact and the only cost is one heap allocation
+// per entry.
 struct PackedLayerPath {
-  uint64_t value = 0;
+  std::vector<uint32_t> path;
   bool operator==(const PackedLayerPath& o) const {
-    return value == o.value;
+    return path == o.path;
   }
 };
 
 struct PackedLayerPathHash {
   size_t operator()(const PackedLayerPath& p) const {
-    return std::hash<uint64_t>{}(p.value);
+    // FNV-1a-style fold over the index chain. Ample entropy for the
+    // bounded (≤ MAX_MASK_PATH_DEPTH × uint32) inputs; rehashing hot
+    // loops is not on the critical path.
+    size_t h = 1469598103934665603ull;
+    for (uint32_t idx : p.path) {
+      h ^= static_cast<size_t>(idx);
+      h *= 1099511628211ull;
+    }
+    return h;
   }
 };
 
 inline PackedLayerPath PackLayerPath(const uint32_t* data, size_t n) {
   PackedLayerPath out{};
-  // Low 5 levels carry the real indices. Depth stored as saturation-clamped
-  // 6-bit so deep paths still hash deterministically.
-  const size_t depth = n < 5 ? n : 5;
-  out.value = static_cast<uint64_t>(n < 63 ? n : 63) & 0x3F;
-  for (size_t i = 0; i < depth; ++i) {
-    const uint64_t idx10 = static_cast<uint64_t>(data[i] & 0x3FF);
-    out.value |= idx10 << (6 + i * 10);
-  }
+  out.path.assign(data, data + n);
   return out;
 }
 
 inline PackedLayerPath PackLayerPath(const std::vector<uint32_t>& path) {
-  return PackLayerPath(path.data(), path.size());
+  PackedLayerPath out{};
+  out.path = path;
+  return out;
 }
 
 struct InflaterContext : DiagnosticCollector {

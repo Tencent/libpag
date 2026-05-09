@@ -568,6 +568,51 @@ TEST(LayerInflater, MaskResolutionSucceeds) {
 }
 
 // ---------------------------------------------------------------------------
+// Deep mask path (6 levels) — regression guard for the pre-v2.25
+// PackedLayerPath truncation where paths beyond 5 levels either collided
+// in hash or were rejected outright by the Decoder's hard-coded cap of 5.
+// resources/pagx_to_html/clip_and_mask.pagx exercises depth 7 in the
+// wild; this synthetic fixture pins the minimum depth above the old cap.
+// ---------------------------------------------------------------------------
+
+TEST(LayerInflater, DeepMaskPathResolutionSucceeds) {
+  auto doc = MakeDoc();
+  auto comp = MakeComp();
+
+  // Build a single spine of nested layers 6 deep:
+  //   comp.layers[0]
+  //     .children[0]
+  //       .children[0]
+  //         .children[0]
+  //           .children[0]
+  //             .children[0]  ← target (path = {0,0,0,0,0,0})
+  //             .children[1]  ← host (path = {0,0,0,0,0,1}), maskLayerPath = target
+  auto target = MakeLayer();
+  auto host = MakeLayer();
+  host->maskLayerPath = {0, 0, 0, 0, 0, 0};  // 6 levels, targets the sibling.
+  host->maskType = tgfx::LayerMaskType::Alpha;
+
+  auto innermost = std::make_unique<Layer>();
+  innermost->type = LayerType::Layer;
+  innermost->children.push_back(std::move(target));
+  innermost->children.push_back(std::move(host));
+
+  std::unique_ptr<Layer> current = std::move(innermost);
+  for (int i = 0; i < 5; ++i) {
+    auto parent = std::make_unique<Layer>();
+    parent->type = LayerType::Layer;
+    parent->children.push_back(std::move(current));
+    current = std::move(parent);
+  }
+  comp->layers.push_back(std::move(current));
+  doc->compositions.push_back(std::move(comp));
+
+  auto r = LayerInflater::Inflate(std::move(doc));
+  ASSERT_NE(r.layer, nullptr);
+  EXPECT_FALSE(HasWarningCode(r.warnings, ErrorCode::InflateMaskResolveFailed));
+}
+
+// ---------------------------------------------------------------------------
 // ShapePayload with SolidColor fill — ShapeLayer emerges and carries 1 fill.
 // ---------------------------------------------------------------------------
 
