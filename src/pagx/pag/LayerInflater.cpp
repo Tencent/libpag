@@ -422,25 +422,38 @@ std::shared_ptr<tgfx::ColorSource> inflateColorSource(PAGDocument& doc, const Sh
 
     case ColorSourceType::ImagePattern: {
       const uint32_t idx = style.patternImageIndex;
-      if (idx == UINT32_MAX || idx >= doc.images.size() || doc.images[idx] == nullptr ||
-          doc.images[idx]->data == nullptr) {
-        // Sentinel / missing image — Baker already warned at 200 (§G.2). We
+      if (idx == UINT32_MAX || idx >= doc.images.size() || doc.images[idx] == nullptr) {
+        // Sentinel / out-of-range — Baker already warned at 200 (§G.2). We
         // don't double-warn here, just fall back to a null ColorSource so
         // the caller drops to SolidColor::Make() default.
         return nullptr;
       }
-      auto image =
-          tgfx::Image::MakeFromEncoded(std::const_pointer_cast<tgfx::Data>(doc.images[idx]->data));
+      auto& asset = *doc.images[idx];
+      // Cache hit: a previous ImagePattern referencing this asset already
+      // decoded the bytes and stashed the tgfx::Image. Reuse keeps GPU/CPU
+      // decode caches single-instanced and prevents the "second consumer
+      // sees null data" regression that image_pattern.pagx exercises (4
+      // layers share one logo).
+      std::shared_ptr<tgfx::Image> image = asset.decodedImage;
       if (image == nullptr) {
-        ctx->warn(ErrorCode::InflateImageDecodeFailed,
-                  "tgfx::Image::MakeFromEncoded returned null for patternImageIndex", idx);
-        return nullptr;
+        if (asset.data == nullptr) {
+          // Source bytes already released and no cached image — only
+          // possible if the asset was tampered with mid-flight or a prior
+          // decode attempt failed silently. Drop the element.
+          return nullptr;
+        }
+        image = tgfx::Image::MakeFromEncoded(std::const_pointer_cast<tgfx::Data>(asset.data));
+        if (image == nullptr) {
+          ctx->warn(ErrorCode::InflateImageDecodeFailed,
+                    "tgfx::Image::MakeFromEncoded returned null for patternImageIndex", idx);
+          return nullptr;
+        }
+        // First decode: stash the image and release the source bytes per
+        // the §11.1 ImageBytesReleasedAfterInflate contract — tgfx::Image
+        // already holds its own reference to the encoded payload.
+        asset.decodedImage = image;
+        asset.data.reset();
       }
-      // tgfx::Image now owns the decoded payload (or a ref to the encoded
-      // bytes). Release the PAGDocument's reference so downstream peak
-      // memory stays bounded (see §11.1 "Inflater 生命周期纪律" + Phase
-      // 10.5 `ImageBytesReleasedAfterInflate` contract).
-      doc.images[idx]->data.reset();
       tgfx::SamplingOptions sampling(style.filterMode, style.mipmapMode);
       auto pattern = tgfx::ImagePattern::Make(image, style.tileModeX, style.tileModeY, sampling);
       if (pattern != nullptr) {
@@ -1033,18 +1046,26 @@ std::shared_ptr<tgfx::ShapeStyle> inflateShapeStyle(PAGDocument& doc, const Shap
     }
     case ColorSourceType::ImagePattern: {
       const uint32_t idx = style.patternImageIndex;
-      if (idx == UINT32_MAX || idx >= doc.images.size() || doc.images[idx] == nullptr ||
-          doc.images[idx]->data == nullptr) {
+      if (idx == UINT32_MAX || idx >= doc.images.size() || doc.images[idx] == nullptr) {
         return nullptr;
       }
-      auto image =
-          tgfx::Image::MakeFromEncoded(std::const_pointer_cast<tgfx::Data>(doc.images[idx]->data));
+      auto& asset = *doc.images[idx];
+      // See InflateColorSource above for the cache rationale — same shape,
+      // applies here for ShapePayload's parallel path.
+      std::shared_ptr<tgfx::Image> image = asset.decodedImage;
       if (image == nullptr) {
-        ctx->warn(ErrorCode::InflateImageDecodeFailed,
-                  "tgfx::Image::MakeFromEncoded returned null (ShapePayload)", idx);
-        return nullptr;
+        if (asset.data == nullptr) {
+          return nullptr;
+        }
+        image = tgfx::Image::MakeFromEncoded(std::const_pointer_cast<tgfx::Data>(asset.data));
+        if (image == nullptr) {
+          ctx->warn(ErrorCode::InflateImageDecodeFailed,
+                    "tgfx::Image::MakeFromEncoded returned null (ShapePayload)", idx);
+          return nullptr;
+        }
+        asset.decodedImage = image;
+        asset.data.reset();
       }
-      doc.images[idx]->data.reset();
       tgfx::SamplingOptions sampling(style.filterMode, style.mipmapMode);
       auto shader =
           tgfx::Shader::MakeImageShader(image, style.tileModeX, style.tileModeY, sampling);

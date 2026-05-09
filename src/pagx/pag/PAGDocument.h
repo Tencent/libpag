@@ -26,6 +26,7 @@
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/Image.h"  // ImageAsset::decodedImage cache
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Matrix3D.h"
 #include "tgfx/core/Path.h"
@@ -163,8 +164,18 @@ enum class ImageAssetKind : uint8_t {
 
 struct ImageAsset {
   // Raw encoded bytes (PNG / JPEG / WebP). shared_ptr enables zero-copy
-  // through the loader (Phase 10.5 will wire ZeroCopyScope).
+  // through the loader (Phase 10.5 will wire ZeroCopyScope). Reset to null
+  // by the Inflater after the first successful decode (§11.1
+  // `ImageBytesReleasedAfterInflate` contract).
   std::shared_ptr<const tgfx::Data> data;
+  // Cached decoded image, populated by the Inflater on first decode and
+  // reused on subsequent calls. Lets a single ImageAsset back many
+  // ImagePattern color sources without re-decoding or hitting the
+  // post-reset sentinel branch (image_pattern.pagx exercises 4 layers
+  // sharing one logo, regression originally fixed in Phase 18.1).
+  // tgfx::Image is itself shared_ptr-managed, so reuse keeps GPU/CPU
+  // decode caches single-instanced.
+  std::shared_ptr<tgfx::Image> decodedImage;
   int32_t width = 0;
   int32_t height = 0;
   ImageAssetKind kind = ImageAssetKind::Raster;
