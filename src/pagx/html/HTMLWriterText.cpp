@@ -860,16 +860,24 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
         style += ";background:" + css;
         style += ";-webkit-background-clip:text;background-clip:text";
         // Scope the gradient's 0%..100% range to the glyph's actual inked width rather than
-        // the span's own box width. For center/end-anchored text the span is usually much
-        // wider than the glyph run (so `text-align` can position the text), which otherwise
-        // stretches the gradient across the span and leaves the text landing only on the
-        // middle band of stops — visible as "gradient looks like a solid mid-tone" in samples
-        // like text_features's "Text Features" and selector_advanced's "Selector Effects".
-        // tgfx instead evaluates `fitsToGeometry=true` against the fill geometry's bounding
-        // box (i.e. the glyph run's bbox), so matching that here keeps the two renderers in
-        // visual agreement. Only applied when we have a non-zero layout width (post-layout)
-        // and the text is not anchored at Start (where span width == glyph width anyway).
-        if (text->textAnchor != TextAnchor::Start) {
+        // the span's own box width. For end-anchored text the span is `width:posX` (the
+        // distance from the layer's left edge to the anchor), much wider than the glyph run,
+        // which otherwise stretches the gradient across the span and leaves the text landing
+        // only on the middle band of stops — visible as "gradient looks like a solid mid-tone"
+        // in samples like text_features's "Text Features". tgfx instead evaluates
+        // `fitsToGeometry=true` against the fill geometry's bounding box (i.e. the glyph run's
+        // bbox), so matching that here keeps the two renderers in visual agreement.
+        //
+        // Skip this when center-anchored (the transform:translateX(-50%) path above) and for
+        // multi-line anchored text (also transform path): both let the span size to its own
+        // max-content, which is Chromium's actual rendered glyph width. Limiting background to
+        // tgfx's narrower glyph measurement leaves the leading/trailing characters with no
+        // gradient fill and they show up clipped (selector_advanced "Selector Effects" — the
+        // capital S vanished because Chromium's bold metrics ran ~10px wider than tgfx).
+        bool isMultiLineAnchored =
+            text->text.find('\n') != std::string::npos && text->textAnchor != TextAnchor::Start;
+        bool transformCentered = text->textAnchor == TextAnchor::Center || isMultiLineAnchored;
+        if (text->textAnchor != TextAnchor::Start && !transformCentered) {
           float glyphW = text->layoutBoundsWidth();
           if (glyphW > 0) {
             style += ";background-size:" + FloatToString(glyphW) +
