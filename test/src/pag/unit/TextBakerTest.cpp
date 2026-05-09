@@ -258,7 +258,6 @@ TEST(TextBaker, CaseAAuthorGlyphRunInternsFont) {
   EXPECT_EQ(gr.xOffsets, (std::vector<float>{0.0f, 50.0f, 120.0f}));
   // Case B fields stay empty so Inflater never confuses branches.
   EXPECT_TRUE(d->shapedGlyphs.empty());
-  EXPECT_TRUE(d->shapedRuns.empty());
 }
 
 TEST(TextBaker, CaseATwoRunsSameFontContentInternDedup) {

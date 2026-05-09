@@ -695,11 +695,10 @@ std::shared_ptr<tgfx::VectorElement> inflateTextAsPath(PAGDocument& doc, const E
 // case B is "host-resolved best-effort").
 //
 // Phase 16 runtime-shape paths (resolveFont + HarfBuzz second-pass shaper +
-// primitive shaper fallback) are retired in Phase 17 — every render-path
-// the host needs is now covered by the two branches above. The
-// shapedRuns field still roundtrips through Codec for binary compat with
-// in-flight Phase 16.6 .pag files (Commit 4 removes the field), but the
-// Inflater no longer reads it.
+// primitive shaper fallback) and the Phase 16.6 shapedRuns hint bridge are
+// both retired in Phase 17 — every render path the host needs is covered
+// by the two branches above. boxFlags bit 0x40 (formerly hasShapedHint)
+// stays reserved.
 
 std::shared_ptr<tgfx::VectorElement> inflateElementText(PAGDocument& doc,
                                                         const ElementTextData& pay,

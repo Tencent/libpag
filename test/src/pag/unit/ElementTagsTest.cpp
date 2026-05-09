@@ -441,7 +441,6 @@ TEST(ElementTags, ElementTextCaseAGlyphRunsRoundTrip) {
   const auto& d = std::get<std::unique_ptr<ElementTextData>>(vec->contents[0]->payload);
   ASSERT_EQ(d->glyphRuns.size(), 1u);
   EXPECT_TRUE(d->shapedGlyphs.empty());
-  EXPECT_TRUE(d->shapedRuns.empty());
 
   const auto& r = d->glyphRuns[0];
   EXPECT_EQ(r.embeddedFontIndex, 0u);
@@ -504,7 +503,6 @@ TEST(ElementTags, ElementTextCaseBShapedGlyphsRoundTrip) {
   const auto& d = std::get<std::unique_ptr<ElementTextData>>(vec->contents[0]->payload);
   ASSERT_EQ(d->shapedGlyphs.size(), 2u);
   EXPECT_TRUE(d->glyphRuns.empty());
-  EXPECT_TRUE(d->shapedRuns.empty());
 
   const auto& r0 = d->shapedGlyphs[0];
   EXPECT_EQ(r0.typefaceFamily, "Arial");
@@ -527,10 +525,11 @@ TEST(ElementTags, ElementTextCaseBShapedGlyphsRoundTrip) {
 }
 
 TEST(ElementTags, ElementTextEmptyBranchesRoundTrip) {
-  // Sanity case: ElementText with neither glyphRuns nor shapedGlyphs nor
-  // shapedRuns — Commit 1 visual-no-regression baseline. The boxFlags
-  // bits 0x40 / 0x80 / 0x100 should all be off; round-trip must preserve
-  // the base source-attribute fields without crashing on the empty branches.
+  // Sanity case: ElementText with neither glyphRuns nor shapedGlyphs —
+  // empty Text baseline. Both case A / case B boxFlags bits (0x80 / 0x100)
+  // stay off; the 0x40 reserved bit is also expected off. Round-trip must
+  // preserve the base source-attribute fields without crashing on the
+  // empty branches.
   auto textData = std::make_unique<ElementTextData>();
   textData->position = MakeProp(::tgfx::Point{1.0f, 2.0f});
   textData->text = "empty";
@@ -547,7 +546,6 @@ TEST(ElementTags, ElementTextEmptyBranchesRoundTrip) {
   const auto& d = std::get<std::unique_ptr<ElementTextData>>(vec->contents[0]->payload);
   EXPECT_TRUE(d->glyphRuns.empty());
   EXPECT_TRUE(d->shapedGlyphs.empty());
-  EXPECT_TRUE(d->shapedRuns.empty());
   EXPECT_EQ(d->text, "empty");
   EXPECT_EQ(d->fontFamily, "Sans");
   EXPECT_FLOAT_EQ(d->fontSize, 14.0f);

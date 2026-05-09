@@ -21,11 +21,6 @@
 //      inflateTextAsShapedTextBlob). Glyph paths are NOT embedded; the
 //      host is expected to have the family installed.
 //
-// shapedRuns (Phase 16.6 bridge field) is a dead-but-roundtripped field in
-// Phase 17 — the Codec still reads/writes it for backward compat, but the
-// Baker stops producing it and the Inflater stops consuming it. Commit 4
-// removes the field entirely.
-//
 // Authoritative spec: docs/pagx_to_pag_v2_design.md §10.
 #include "pagx/pag/TextBaker.h"
 #include <cstdint>
@@ -299,11 +294,9 @@ std::unique_ptr<VectorElement> TextBaker::BakeText(BakeContext& ctx, PAGDocument
 
   // Snapshot PAGX TextLayout output verbatim into ElementTextData::shapedGlyphs.
   // Each run carries its resolved typeface (family + style + 4-tuple key),
-  // glyphs, positions, and optional RSXforms. Positions and xforms are
-  // converted to coordinates relative to ElementTextData::position so the
-  // Inflater can apply a single Layer-level setPosition() to anchor the
-  // entire blob — same convention used by case A (glyph_run) and the
-  // earlier Phase 16.6 shapedRuns hint, ensuring a uniform Inflater path.
+  // glyphs, layout-absolute positions, and optional RSXforms. The Inflater
+  // applies setPosition(pay.position.value) to anchor the blob, mirroring
+  // PathA's LayerBuilder::convertText math (renderPosition → setPosition).
   //
   // Edge case: PAGX TextLayout did not produce runs (Text never had
   // applyLayout() called, or empty/all-whitespace text). We still produce
@@ -312,10 +305,9 @@ std::unique_ptr<VectorElement> TextBaker::BakeText(BakeContext& ctx, PAGDocument
   //
   // Run-level typeface resolution: every layoutRun has a non-null typeface
   // by construction (PAGX TextLayout would have skipped the run otherwise).
-  // The defensive check below mirrors Phase 16.6 hint policy: drop the
-  // entire shapedGlyphs payload if any run is unresolvable, so the
-  // Inflater sees an empty case-B payload and drops the Text rather than
-  // rendering a partial glyph stream with gaps.
+  // Defensive check: drop the entire shapedGlyphs payload if any run is
+  // unresolvable, so the Inflater sees an empty case-B payload and drops
+  // the Text rather than rendering a partial glyph stream with gaps.
   const auto& runs = GlyphRunRenderer::GetLayoutRuns(&src);
   std::vector<ElementTextData::ShapedGlyphRun> shapedGlyphs;
   shapedGlyphs.reserve(runs.size());
@@ -353,9 +345,6 @@ std::unique_ptr<VectorElement> TextBaker::BakeText(BakeContext& ctx, PAGDocument
   if (allRunsUsable && !shapedGlyphs.empty()) {
     data->shapedGlyphs = std::move(shapedGlyphs);
   }
-  // shapedRuns (Phase 16.6 bridge field) is NOT populated in Phase 17.
-  // The field still exists on ElementTextData and roundtrips through Codec
-  // for byte compatibility with stale .pag files; Commit 4 removes it.
 
   auto el = std::make_unique<VectorElement>();
   el->type = VectorElementType::Text;

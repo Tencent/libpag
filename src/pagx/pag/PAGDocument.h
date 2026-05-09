@@ -400,54 +400,19 @@ struct ElementTextData {
   Color backgroundColor = {};
   uint8_t backgroundAlpha = 0;
 
-  // ===== Pre-shaped layout hint (Phase 16.6 TextBox multi-line/justify/vertical bypass) =====
-  //
-  // When non-empty, the Inflater skips runtime shaping and replays PAGX
-  // TextLayout's already-resolved per-glyph geometry directly. Carries what
-  // a single `position` can't express: multi-line x-offsets, justify's
-  // widened spacing, vertical writing mode's per-glyph (x,y) + RSXform.
-  //
-  // Semantics (kept simple):
-  //   - positions are relative to `position` (Baker subtracts layoutOrigin
-  //     before writing), so the Inflater always calls
-  //     `text->setPosition(pay.position)` whether the hint is consumed or not.
-  //   - xforms, if non-empty, have (tx, ty) translated into the same
-  //     position-relative space alongside `positions`.
-  //   - `typefaceKey` is the four-tuple `family|style|unitsPerEm|glyphsCount`.
-  //     On the Inflater side we re-resolve the typeface via FontProvider and
-  //     only consume the hint when every run's key matches byte-for-byte;
-  //     any mismatch emits `TextShapingHintMiss` (info) and falls back to
-  //     runtime shape so font substitution still produces a correct render.
-  //   - Only emitted for TextBox-child Text and only when the run glyph-count
-  //     sum is <= kMaxHintGlyphs. Standalone Text runtime-shape is already
-  //     byte-for-byte correct via firstBaselineY + layoutOrigin; large
-  //     paragraphs would bloat .pag by ~10-20 B per glyph for no gain.
-  struct ShapedRun {
-    std::vector<tgfx::GlyphID> glyphs = {};
-    std::vector<tgfx::Point> positions = {};  // relative to ElementTextData::position
-    std::vector<tgfx::RSXform> xforms = {};   // empty when not vertical-rotated
-    float fontSize = 0.0f;
-    std::string typefaceFamily = "";
-    std::string typefaceStyle = "";
-    std::string typefaceKey = "";  // family|style|unitsPerEm|glyphsCount
-  };
-  std::vector<ShapedRun> shapedRuns = {};
-
   // ===== Phase 17 v2.23: case A / case B authoritative storage =====
   //
-  // shapedRuns above is retained as a Phase 16.6 bridge during the Phase 17
-  // rollout (Commit 1-3). Commit 4 will remove shapedRuns; shapedGlyphs
-  // below replaces it as case B's sole data source.
-  //
-  // Branch discipline: across Commits 1-3 one of `glyphRuns` / `shapedGlyphs`
-  // is non-empty (case A / case B), never both. In Commit 1 Baker does not
-  // yet write either, so both stay empty and the Inflater falls back to the
-  // existing Phase 16.6 shapedRuns path — visual behaviour unchanged.
+  // Exactly one of `glyphRuns` (case A) and `shapedGlyphs` (case B) is
+  // non-empty per ElementText, mirroring the PAGX-side branch the Baker
+  // observed. Both empty means an empty Text (no UTF-8 content and no
+  // author runs) — the Inflater drops it silently.
 
-  // Case A (Phase 17): PAGX Text has author <GlyphRun> referencing an
-  // embedded <Font>. Snapshot of those runs is stored verbatim here; the
-  // referenced path-based font resource is Bake-time interned into
-  // PAGDocument.embeddedFonts.
+  // Case A: PAGX Text has author <GlyphRun> referencing an embedded <Font>.
+  // Snapshot of those runs is stored verbatim here; the referenced path-
+  // based font resource is Bake-time interned into PAGDocument.embeddedFonts.
+  // The Inflater rebuilds a tgfx::PathTypefaceBuilder-backed typeface and
+  // replays the glyph stream — no FontProvider involvement, exact author
+  // geometry preserved.
   struct GlyphRunData {
     uint32_t embeddedFontIndex = 0;  // → PAGDocument.embeddedFonts[i]
     float fontSize = 12.0f;
@@ -466,19 +431,21 @@ struct ElementTextData {
   };
   std::vector<GlyphRunData> glyphRuns = {};
 
-  // Case B (Phase 17): PAGX Text is pure <Text text="..."> without
-  // <GlyphRun>. PAGX TextLayout in applyLayout() has already resolved
-  // glyph IDs + positions per run; Baker snapshots them verbatim. Inflater
-  // uses FontProvider to resolve typeface and assembles tgfx::TextBlob
-  // directly — no re-shape, no re-layout.
+  // Case B: PAGX Text is pure <Text text="..."> without <GlyphRun>. PAGX
+  // TextLayout in applyLayout() has already resolved glyph IDs + positions
+  // per run; Baker snapshots them verbatim. Inflater uses FontProvider to
+  // resolve typeface and assembles tgfx::TextBlob directly — no re-shape,
+  // no re-layout. positions are layout-absolute (PathA-equivalent); the
+  // Inflater applies pay.position via setPosition exactly the way PAGX-
+  // native LayerBuilder::convertText does with renderPosition().
   struct ShapedGlyphRun {
     std::string typefaceFamily;
     std::string typefaceStyle;
     std::string typefaceKey;  // family|style|unitsPerEm|glyphsCount
     float fontSize = 12.0f;
     std::vector<tgfx::GlyphID> glyphs;
-    std::vector<tgfx::Point> positions;  // relative to ElementTextData::position
-    std::vector<tgfx::RSXform> xforms;   // empty unless vertical writing mode
+    std::vector<tgfx::Point> positions;
+    std::vector<tgfx::RSXform> xforms;  // empty unless vertical writing mode
   };
   std::vector<ShapedGlyphRun> shapedGlyphs = {};
 };

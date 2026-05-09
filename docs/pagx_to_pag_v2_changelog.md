@@ -9,6 +9,24 @@
 
 ### 历史修订记录
 
+- **v2.23 Phase 17 实施完成补记**（4 commit 全部合入 main 后追记）：
+
+  **实施结果**：4 次 commit 按计划落地，CrossCheck 从 Phase 16.7 的 4 个 FAIL 收敛到 2 个（`image_pattern` 非文字 + `text_modifier` Phase 18 范围）。
+
+  - Commit 1（`2832e8f3`）：数据模型 + Codec roundtrip + 4 个单测，零渲染回归。
+  - Commit 2（`a62b3652`）：Baker + Inflater 情况 A，**glyph_run CrossCheck 转 PASS**。中途发现初版 ShapePath + 手工 `Matrix::Scale(s, -s)` 翻 Y 与 tgfx 字体引擎内在 Y 翻转叠加（双翻转 bug），改为 `tgfx::PathTypefaceBuilder` + `TextBlob::MakeFrom` 后对齐。教训沉淀到 `feedback_embedded_font_typeface.md`。
+  - Commit 3（`1c1bae28`）：Baker + Inflater 情况 B，删除 Phase 16 runtime-shape 主路径（resolveFont / HarfBuzz 直连 / primitive shaper / shapedRuns hint 共 4 条死路径）。中途发现 Phase 16.6 hint 路径在 standalone single-line Text 上**多了 baselineY**的隐藏 bug——Phase 16.6 时这种场景走 HarfBuzz fallback 不进 hint 路径，bug 被掩盖；Commit 3 把所有 case B 路由到 hint-style 后第一次暴露（composition / complete_example PSNR 跌到 23-26 dB）。修复方案：`data->position` 直接写 `src.renderPosition()`（不加 baselineY），shapedGlyphs.positions 保留 layout-absolute（不减 layoutOrigin），与 PathA `LayerBuilder::convertText` 完全镜像。教训沉淀到 `feedback_text_position_setposition.md`。
+  - Commit 4（本次）：删除 `ElementTextData::shapedRuns` 字段 + `ShapedRun` struct + ElementTags.cpp 的 Read/Write 块（约 -100 行）；boxFlags 位 `0x40`（原 `hasShapedHint`）释放为 reserved 不重用；测试断言与注释清理；本 changelog + 主设计文档 §10.6 / §10.8 / §10.10 同步更新。
+
+  **CrossCheck 收敛轨迹**：
+  - Phase 16 末：FAIL = 4（glyph_run / image_pattern / text_modifier + 1 不稳定）
+  - Commit 1 末：FAIL = 3（仅文档/数据结构改动）
+  - Commit 2 末：FAIL = 2（glyph_run 转 PASS）
+  - Commit 3 末：FAIL = 2（零新增回归，复杂样本 composition / complete_example 因 baselineY bug 修复后保持 PASS）
+  - Commit 4 末：FAIL = 2（与 Commit 3 完全一致，零回归）
+
+  **架构终态**：PAG 文本只有两条数据通路（情况 A path-based / 情况 B layout-snapshot），Inflater 不再调 `pagx::TextShaper::Shape` / `pagx::TextLayout` / `TextBlob::MakeFrom(text, font)`。CrossCheck 从"辅助诊断"升级为"强相等保证"——情况 A 走完全相同 path 数据、情况 B 走完全相同 host font + glyph IDs，像素级一致是设计承诺。
+
 - **v2.23 Phase 17 PAGX/PAG 对等文本设计**（推翻 Phase 16，主文档 §10 整章替换，实施按 4 次 commit 拆分待启动）：
 
   **背景**：Phase 16 runtime-shape 方案在 `glyph_run.pagx` 上暴露根本冲突——作者 `<GlyphRun>` 引用的嵌入 `<Font>` path 数据在 Bake 时被完整丢弃，PAG 端用 host font 重新 shape，glyph 形状完全不同于 PAGX-native 渲染。Phase 16.6 shapedRuns hint / Phase 16.7 author-GlyphRun origin salvage 都是对"数据源丢失"打补丁。用户重新校准原则：**PAG 是 PAGX 的二进制版本，PAGX 怎么处理 PAG 就怎么存，两边加载后渲染行为完全对等**。

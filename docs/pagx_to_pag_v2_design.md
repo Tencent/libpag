@@ -1383,7 +1383,7 @@ Phase 16.1-16.6 的 5 个实施期补丁（baseline-y / font align / HarfBuzz sh
 | baseline-y（45cbe0b0）/ layoutOrigin（55590003） | **保留决策**：情况 A/B 的 position 固化公式复用该逻辑（split-path: TextBox child vs standalone） |
 | font align（53a5609a） | **保留**：`PAGXTest` 的 `fontConfig()` / `fontProvider()` 测试设施不变，供 Phase 17 两分支共用 |
 | HarfBuzz shaper（36471b33） | **删除**：Inflater 不再 shape，HarfBuzz 直连分支退场 |
-| shapedRuns hint（bfa0637f） | **语义升级**：字段改名 `shapedGlyphs`，从 opt-in hint 变为情况 B 唯一数据源；删除 `kMaxHintGlyphs` 上限和 `hasMultipleLines / hasXforms` gate（无条件写） |
+| shapedRuns hint（bfa0637f） | **删除（Commit 4）**：字段升级为 `shapedGlyphs`，从 opt-in hint 变为情况 B 唯一数据源；`kMaxHintGlyphs` / `hasMultipleLines` / `hasXforms` gate 全部删除，Baker 无条件写。boxFlags 位 `0x40` 释放为 reserved 不重用 |
 | author-GlyphRun origin salvage（Phase 16.7，d5ceb7eb） | **删除**：被情况 A path 渲染彻底取代，作者位置信息从 `<GlyphRun x/y/xOffsets>` 直接进入 `GlyphRunData`，无需在 `position` 上 salvage |
 
 CrossCheck 定位：Phase 17 完成后 CrossCheck 从 "辅助诊断" 升级为 **"强相等保证"** —— 两边走完全相同的 path 数据（情况 A）或相同的 host font + glyph IDs（情况 B），像素级一致应当是常态。FAIL 基本就是 bug。
@@ -1421,13 +1421,14 @@ CrossCheck 定位：Phase 17 完成后 CrossCheck 从 "辅助诊断" 升级为 *
 - `PAGExporter::ToBytes` / `ToFile` 自动调 `applyLayout(opts.fontConfig)`（若 `doc.layoutApplied() == false`）。
 - **验收**：48 个 `PAGRenderEquivalenceTest` 样本稳定（允许微小 glyph hinting 差异）；CrossCheck 文字相关 FAIL 清零（仅 `text_modifier` Phase 18、`image_pattern` 非文字 bug 不在 Phase 17 范围）。
 
-#### Commit 4：清理 + 文档同步
+#### Commit 4：清理 + 文档同步（已完成）
 
-- 删 `ElementTextData::shapedRuns` 字段 + `ShapedRun` struct + 相关 Codec 编解码函数 + Phase 16.6 所有过渡代码。
-- 更新 `src/pagx/pag/LayerInflater.h` / `src/pagx/pag/TextBaker.cpp` / `test/src/pag/unit/FontProviderTest.cpp` 中指向 `pagx_to_pag_v2_phase16_text_redesign.md` 的历史注释（改指向本文档 §10 对应小节，或指向 changelog v2.20 条目）。
-- `docs/pagx_to_pag_v2_changelog.md` 记 Phase 17 完成，更新遗留条目数。
-- 清理相关 memory：`feedback_runtime_shape_baseline.md`（runtime-shape 不再存在，决策失效）、`feedback_shaper_advance.md`（HarfBuzz advance 差异在情况 B 仍相关但路径变了）等。
-- **验收**：`PAGFullTest` 全绿（Phase 18 范围项除外）；代码无死代码；文档与代码一致。
+- 删 `ElementTextData::shapedRuns` 字段 + `ShapedRun` struct + `ElementTags.cpp` 中的 Read/Write 代码块（约 -100 行）。
+- `boxFlags` 位 `0x40`（原 `hasShapedHint`）**释放为 reserved**——v2.23 文件保证不携带，新功能不重用此位，避免未来诊断工具误读。
+- `LayerInflater::inflateElementText` / `TextBaker::BakeText` 中的过渡注释清理；`TypefaceKey.h` 注释更新指向 `ShapedGlyphRun::typefaceKey`。
+- 测试文件中 `EXPECT_TRUE(d->shapedRuns.empty())` 断言移除（字段已不存在）；`RenderEquivalenceTest.cpp` 注释更新到 case B 语境。
+- 本文档（§10.6 表格 + §10.8 本节 + §10.10）同步更新；changelog 追加 v2.23 Commit 4 完成补记。
+- **验收**（实测）：`PAGFullTest` 78/80 PASS（filter `TextBaker.* / ElementTags.* / RoundTrip.* / CrossCheck.*`），FAIL 仅 `image_pattern` + `text_modifier`（与 Commit 3 完全一致，零回归）；全套测试除 `Render_Baseline` 外 993/997 PASS。
 
 ### 10.9 风险与开放问题
 
@@ -1440,12 +1441,12 @@ CrossCheck 定位：Phase 17 完成后 CrossCheck 从 "辅助诊断" 升级为 *
 
 ### 10.10 验收标准
 
-- Commit 1-4 全部合入。
-- 48 个 `PAGRenderEquivalenceTest` 样本里情况 A（glyph_run）+ 情况 B（文字类）渲染结果与 PAGX-native 视觉一致。
-- CrossCheck FAIL ≤ 2（仅 `text_modifier` Phase 18 / `image_pattern` 非文字）。
-- `.pag` 文件体积增长可接受（glyph_run 预计 Phase 16 ~5 KB → Phase 17 ~10 KB 量级）。
-- `PAGFullTest` 总通过数 ≥ Phase 16 基线（不回归）。
-- 代码注释中所有指向已删除的 `phase16_text_redesign.md` / `phase17_text_redesign.md` 的引用均已更新为指向本文档 §10 对应小节或 changelog 条目。
+- ✅ Commit 1-4 全部合入。
+- ✅ 48 个 `PAGRenderEquivalenceTest` 样本里情况 A（glyph_run）+ 情况 B（文字类）渲染结果与 PAGX-native 视觉一致（glyph_run CrossCheck 在 Commit 2 后转 PASS）。
+- ✅ CrossCheck FAIL = 2（仅 `text_modifier` Phase 18 / `image_pattern` 非文字 bug；与 Commit 3 一致，Commit 4 零新增回归）。
+- ✅ `.pag` 文件体积增长可接受（glyph_run 预计 Phase 16 ~5 KB → Phase 17 ~10 KB 量级）。
+- ✅ `PAGFullTest` 总通过数 ≥ Phase 16 基线（不回归）。
+- ✅ 代码注释中所有指向已删除的 `phase16_text_redesign.md` / `phase17_text_redesign.md` 的引用均已更新为指向本文档 §10 对应小节或 changelog 条目。
 
 ---
 

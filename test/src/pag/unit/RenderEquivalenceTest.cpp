@@ -44,10 +44,11 @@ TEST_P(PAGRenderEquivalenceTest, Render_Baseline) {
   ASSERT_NE(doc, nullptr) << "PAGXImporter failed for " << sample.name;
   // Use the fixture's FontConfig on both sides of the round-trip so the
   // Baker-side layout and the Inflater-side shape resolve typefaces against
-  // the same registry. Without this, shapedRuns hint typefaceKey never
-  // matches (PAGXTest's FontConfig vs Inflater's default pag::FontManager)
-  // and multi-line TextBox samples lose their wrap, rendering as a single
-  // line that overflows the box. See §10.5 shapedRuns hint policy.
+  // the same registry. Without this, case B's shapedGlyphs typefaceKey
+  // never matches (PAGXTest's FontConfig vs Inflater's default
+  // pag::FontManager) and TextShapingHintMiss fires on every Text. The
+  // layout still replays correctly, but observability noise muddies real
+  // regressions.
   doc->applyLayout(&fontConfig());
 
   pagx::PAGExporter::Options opts;
