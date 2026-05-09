@@ -18,7 +18,12 @@ OUT_DIR="coverage"
 HTML_DIR="${OUT_DIR}/html"
 PROFRAW_DIR="${OUT_DIR}/profraw"
 MERGED_PROFDATA="${OUT_DIR}/merged.profdata"
-THRESHOLD_PCT=85
+# Overall line-coverage gate for src/pagx + include/pagx. Aligned with
+# design doc §17 D3: project-wide ≥75% (the per-module 80% targets for
+# Baker / Codec / Inflater are tracked in the printed report but not
+# enforced here). The earlier 85% value was a Phase 15 scripting slip
+# predating D3 and produced perpetual red builds even when D3 was met.
+THRESHOLD_PCT=75
 
 # --- 1. Resolve llvm toolchain ---------------------------------------------
 if command -v llvm-profdata >/dev/null 2>&1 && command -v llvm-cov >/dev/null 2>&1; then

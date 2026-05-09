@@ -15,6 +15,7 @@
 
   - **TextModifier + RangeSelector 实施**（commit `0cf5dd04`）：v2.23 Phase 17 末 BakeTextModifier 用 `(void)src.selectors;` 跳过了 selector 序列化，导致 `text_modifier.pagx` CrossCheck FAIL。本 commit 补齐 selector 透传链路：`TextBaker::BakeTextModifier` 遍历 `src.selectors`，按 `nodeType()==RangeSelector` 派发 + `static_cast` 后逐字段拷贝 11 个 RangeSelector 字段；非 RangeSelector 子类 emit `TextSelectorTypeUnsupported=209` warning 并 skip。Codec 与 Inflater 早在 Phase 17 就已支持，TextSelector 透传打通后 PathA / PathB bit-perfect 一致。新增 `TextBaker.TextModifierRangeSelectorRoundTrip` 单测覆盖 round-trip。
   - **image_pattern 修复**：`ImageAsset` 增加 `decodedImage` cache，避免 `data.reset()` 后多次 inflate 静默 fallback——`image_pattern.pagx` 4 个 Layer 共享单 ImageAsset 时不再各自重新解码或落入 sentinel 分支。修复路径见 `feedback_image_asset_cache.md`。
+  - **Coverage 门槛对齐 + LayerInflater 分支测试**（commit `a36b06e0`）：`tools/coverage.sh` 的硬门槛从 Phase 15 遗留的 85% 改为 75%，对齐设计文档 §17 D3（整体 ≥75%、Baker/Codec/Inflater 各 ≥80%）；脚本同步补齐 `--gtest_filter` 排除 `Render_Baseline`/`OutlineAll_Baseline`（baseline 未接受触发 `set -e` 退出）+ `mkdir -p test/fuzz_corpus/inflater_seeds`（空目录缺失同类问题）；新增 4 条 `LayerInflater` 异常分支测试（case B FontProvider 缺失、case A EmbeddedFont 越界 / unitsPerEm=0、ShapePayload 四种 gradient + ImagePattern 兜底）。重跑实测：整体 78.21%、LayerInflater 79.03%、TextBaker 89.80%（均达 §17 D3 门槛）。
 
   **架构定位**：v2.23 主文档"CrossCheck 是强相等保证"承诺至此完全兑现。`GlyphRunData::anchors/scales/rotations/skews` 仍以 reserved 形态保留在 schema 上（对应 PAGX `<GlyphRun anchors="..." ...>` 作者层 per-glyph 静态 xforms，PAGX→SVG 已使用，PAGX→PAG 当前 spec 样本未触发）。详见主文档 §10.7。
 

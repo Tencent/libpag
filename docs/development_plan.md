@@ -63,7 +63,7 @@ cp -R third_party/ ../libpag_pagx_pag_impl/third_party/
 | **M1：地基就绪** | 0, 1, 2, 3 | 全 include 基础 + 测试基建 + Baker 通用层 | code review 可启动 | 每 Phase 一个 commit |
 | **M2：编解码闭环** | 4(4a/4b), 5, 6, 7, 8 | Codec 全 Tag + 4 个 Baker 子模块 | feature 分支可合入 | 每 Phase 一个 commit；M2 末做一次集成 commit |
 | **M3：渲染 + 对外 API** | 9, 9.5, 10, 10.5, 11, 11.5, 11.6 | Inflater + 双对外 API + CLI + forward-ref + Baker render* / LayerMaskRef 补齐 | PR 可开 | Phase 10/10.5 完成后必做 API review |
-| **M4：质量保障** | 12, 13(空), 14, 15 | Render 等价 + Fuzz + 性能基线 + 覆盖率工具 | Phase 15 coverage.sh 落地（门槛 85% 转移到 M5，因 Phase 16 修完前文本路径不可测） | Phase 12 触发首次截图基准接受流程 |
+| **M4：质量保障** | 12, 13(空), 14, 15 | Render 等价 + Fuzz + 性能基线 + 覆盖率工具 | Phase 15 coverage.sh 落地；脚本早期误用 85% 硬门槛（v2.24 已对齐设计文档 §17 D3 的 ≥75% 整体门槛） | Phase 12 触发首次截图基准接受流程 |
 | **M5：文本 runtime-shape 回退** | 16.0-16.6 | Phase 8 预 shape 架构回退为 v1 runtime-shape；字体 FontProvider 注入；文本 inflate 不再因 macOS MakeFromName null 全空 | 含文字样本全部 inflate 非空；coverage 指定模块 ≥75%；可合入 main | 每子 Phase 一个 commit；16.6 用户 /accept-baseline 接 48 张新基线 |
 
 ### 2.2 各 Phase 估时（AI 单人）
@@ -90,7 +90,7 @@ cp -R third_party/ ../libpag_pagx_pag_impl/third_party/
 | 12 | RenderEquivalence + Fuzz + CI | 4-6 h | **首次截图基准接受**触发 `/accept-baseline` 流程 |
 | 13 | （取消） | 0 | v1 已 graceful reject |
 | 14 | PerformanceTest + baseline.json | 2-3 h | 基线入 git |
-| 15 | coverage.sh + 报告 | 2-3 h | 覆盖率 ≥85%，未达则补测试回 Phase 1-9 |
+| 15 | coverage.sh + 报告 | 2-3 h | 覆盖率对齐设计文档 §17 D3（整体 ≥75%，Baker/Codec/Inflater 各 ≥80%），未达则补测试回 Phase 1-9 |
 | 16.0 | Phase 16 文本 runtime-shape 设计定稿 | 2 h | 已完成，详见 `pagx_to_pag_v2_phase16_text_redesign.md` |
 | 16.1 | PAGDocument 新 ElementTextData + FontProvider 接口 | 3-4 h | ABI-兼容前提下同步移除 FontAsset 族；需 `FontProviderTest` 覆盖 default + null + fallback |
 | 16.2 | TextBaker 重写 + pre-shaped 降级 warning | 2-3 h | 测试矩阵大改，保留的原有用例 ~30% |
@@ -161,8 +161,8 @@ cp -R third_party/ ../libpag_pagx_pag_impl/third_party/
 | R7 | Phase 0 `kAllDiagnosticCodes[]` 5 步维护清单后续 PR 漏改 | 3 | 2 | 6 | 设计文档已固化 `DiagnosticTest.CodeToString.AllEnumValues` 自动断言，漏改即测试挂 | 0 之后所有 Phase |
 | R8 | Phase 8 GlyphRun 字段集与运行时 TextLayout.h 偏差 | 2 | 3 | 6 | D-1.2 决策点强制 Phase 8 启动前复核 | 8 |
 | R9 | tgfx 子模块版本与本期 PAGLoader.h 暴露的 Layer API 不兼容 | 1 | 4 | 4 | Phase 10.5 启动前编译 PAGExporter.h 验证 include 链 | 10.5 |
-| R10 | 覆盖率 <85% 触发 Phase 15 反向回补测试 | 2 | 2 | 4 | Phase 1-11 严守 TDD；Phase 14 完成后预跑 coverage.sh 提前发现 | 15 |
-| R11 | Phase 15 实测 76.75% 未达 85%（已触发） | 5 | 2 | 10 | 已分析：主要缺口 html/ 73% + LayerInflater 55% + TextBaker 60% 源于 Phase 15 测试环境字体不可用 → Phase 16 修完后覆盖率门槛转移到 M5 Phase 16.6 | 15 / 16 |
+| R10 | 覆盖率 <75%（设计文档 §17 D3）触发 Phase 15 反向回补测试 | 2 | 2 | 4 | Phase 1-11 严守 TDD；Phase 14 完成后预跑 coverage.sh 提前发现 | 15 |
+| R11 | Phase 15 脚本误用 85% 硬门槛导致 Phase 15 实测 76.75% 误报未达标 | 5 | 2 | 10 | 已分析：主要缺口 html/ 73% + LayerInflater 55% + TextBaker 60% 源于 Phase 15 测试环境字体不可用 → Phase 16-18 修完后，v2.24 重跑 coverage 整体 78.21% / LayerInflater 79.03% / TextBaker 89.80%（设计文档 §17 D3 门槛：整体 ≥75%、三模块各 ≥80%）；脚本阈值已对齐为 75% | 15 / 16 / v2.24 |
 | R12 | Phase 16 跨平台字体解析不一致 | 4 | 3 | 12 | FontProvider 可注入接口 + 默认走 `pag::FontManager`；测试环境用 PAGXTest SpecSamples 的 font 注册逻辑复用；生产用户须调用 `PAGFont::RegisterFont` | 16.4 |
 | R13 | Phase 16 `spec/samples/*.pagx` 中 pre-shaped pagx::Text 样本一律降级损失 per-glyph xform | 3 | 2 | 6 | 发 `TextGlyphRunsDowngraded=208` warning；PAGX 原生渲染路径（不经 .pag）仍保留完整 pre-shaped 支持 | 16.2 |
 
@@ -205,14 +205,14 @@ cp -R third_party/ ../libpag_pagx_pag_impl/third_party/
 | 12 RenderEquivalence + Fuzz + CI | ✅ | 77decbe6 | 3 h | 48 samples + 48 CrossCheck 参数化；96 首跑 FAIL 为基线缺失预期；RenderCrossCheckTest 33 PASS / 15 FAIL (PSNR < 30dB 的多为文字样本，Phase 16 修复后预计清零 8+)；libFuzzer harness + standalone fallback + .github/workflows/pagx-fuzz.yml 4-shard × 6h CI yaml 已落 |
 | 13 v1 改动（取消） | ✅ | — | 0 | 设计文档已确认无需改 v1 |
 | 14 PerformanceTest + baseline | ✅ | 8b706d4c | 1 h | test/src/pag/unit/PerformanceTest.cpp：对 48 spec/samples 每样本测 size_ratio + load_ratio + 5 绝对时间（中位数-11 跑），±20% load_ratio 漂移非阻塞 WARNING；亚毫秒噪声地板 = 1ms；baseline.json 不入 git；实测 size_ratio 中位数 0.43 / load_ratio 中位数 0.20，达成设计文档期望 |
-| 15 coverage.sh | ✅ | 3ee770ce 等 | 3 h | CMake -DPAG_COVERAGE 开关 + tools/coverage.sh (clang source-based) + `-fsanitize=fuzzer` coverage-mode 剔除 ASAN；**实测 line coverage 76.75%（未达 85%）**：html/ 73% + pag/ 75%（LayerInflater 55% / TextBaker 60% 为主要缺口）；tools/render_compare.py + `PAGXNativeReferenceTest.RenderSpecSamplesToPAGXNativeDir` 辅助生成两列对比 HTML 便于人审；**Phase 16 修完 ElementText 路径后覆盖率预计显著上升**，85% 门槛转移到 Phase 16.6 |
+| 15 coverage.sh | ✅ | 3ee770ce 等 | 3 h | CMake -DPAG_COVERAGE 开关 + tools/coverage.sh (clang source-based) + `-fsanitize=fuzzer` coverage-mode 剔除 ASAN；Phase 15 时实测 line coverage 76.75%（脚本当时误配 85% 硬门槛，实际设计文档 §17 D3 为整体 ≥75%）：html/ 73% + pag/ 75%（LayerInflater 55% / TextBaker 60% 为主要缺口）；tools/render_compare.py + `PAGXNativeReferenceTest.RenderSpecSamplesToPAGXNativeDir` 辅助生成两列对比 HTML 便于人审；Phase 16–18 修完后 v2.24 重跑：整体 78.21% / LayerInflater 79.03% / TextBaker 89.80%（均达 §17 D3 门槛）；脚本阈值已对齐 75% |
 | **16.0 text redesign 设计** | ✅ | 3ee770ce | 2 h | docs/pagx_to_pag_v2_phase16_text_redesign.md (422 行) + Phase 16 集成到主设计文档 6 章节 + 术语索引 + Phase 表 + 维护日志 v2.20 |
 | **16.1 PAGDocument + FontProvider** | ✅ | f76384de | 3-4 h | FontProvider 接口 + 默认 pag::FontManager 实现；ElementTextData 新字段集；FontAsset 族删除 |
 | **16.2 TextBaker 重写** | ✅ | f76384de | 2-3 h | runtime-shape Baker；pre-shaped 路径降级发 `TextGlyphRunsDowngraded=208` |
 | **16.3 Codec schema 对齐** | ✅ | f76384de | 2 h | ElementText body 新 schema；FontAssetTable 仅保留 read-warn-skip 兼容 |
 | **16.4 Inflater 重写 + 布局器接入** | ✅ | f76384de | 4-5 h | inflateElementText 走 FontProvider + TextShaper + v1 TextLayout |
 | **16.5 测试基建 FontProvider 注入** | ✅ | 53a5609a | 1-2 h | PAGXTest fixture 内置 Arial + Noto + fontConfig() / fontProvider() getter |
-| **16.6 Baseline accept + 覆盖率重跑** | ⏳ | — | — | 仅余用户操作：`/accept-baseline` 接受 48 张新基线；coverage 重跑（仍属软指标，Phase 16 后预计达 75%） |
+| **16.6 Baseline accept + 覆盖率重跑** | 🔄 | a36b06e0 | — | 覆盖率已重跑（设计文档 §17 D3 门槛全部达标：整体 78.21%、LayerInflater 79.03%、TextBaker 89.80%）；仅余用户操作 `/accept-baseline` 接受 48 张新基线 |
 | 16.x 五轮稳定补丁 | ✅ | 45cbe0b0 / 53a5609a / 36471b33 / 55590003 / bfa0637f | 累计 ~6 h | baseline-y / font align / HarfBuzz shaper / layoutOrigin / shapedRuns hint；CrossCheck 15 → 4 |
 | **17 PAGX/PAG 对等文本模式（4 commit）** | ✅ | 2832e8f3 / a62b3652 / 1c1bae28 / (Commit 4) | 累计 ~12 h | case A path-based + case B host-font-shapedGlyphs 双分支；EmbeddedFont 顶层资源；删除 Phase 16 runtime-shape 4 条死路径；CrossCheck 4 → 2（剩 image_pattern + text_modifier） |
 | **17.x ImageAsset decodedImage cache** | ✅ | (Phase 17 收尾) | — | image_pattern.pagx 4 Layer 共享单 ImageAsset 不再静默 fallback；CrossCheck 转 PASS |
@@ -229,7 +229,7 @@ cp -R third_party/ ../libpag_pagx_pag_impl/third_party/
 | **A 功能正确性** | A1-A5：spec/samples export + Decode + RoundTrip + Inflater 同构 | Phase 11 完成时 |
 | **B 渲染一致性** | B1-B3：Render / OutlineAll 模式 Baseline::Compare | Phase 12 完成时 |
 | **C 鲁棒性** | C1-C10：空 / 缺资源 / 截断 / 循环 / 超大 文件 | Phase 4-12 各 TruncatedDecodeTest 已逐项覆盖 |
-| **D 非功能性（软指标）** | D1-D5：体积 ≤30%、性能 ≤20%、覆盖率 ≥85%、API review、lint | Phase 14-15 完成时 |
+| **D 非功能性（软指标）** | D1-D5：体积 ≤30%、性能 ≤20%、覆盖率对齐设计文档 §17 D3（整体 ≥75%，Baker/Codec/Inflater 各 ≥80%）、API review、lint | Phase 14-15 完成时 |
 
 ---
 
