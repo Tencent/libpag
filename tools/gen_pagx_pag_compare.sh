@@ -11,11 +11,11 @@
 #   3. python3 tools/render_compare.py
 #
 # Common usage:
-#   tools/render_compare.sh                     # full pipeline
-#   tools/render_compare.sh --no-build          # skip rebuild, use existing PAGFullTest
-#   tools/render_compare.sh --no-render         # skip rendering, just regenerate HTML
-#                                                # from existing webp outputs
-#   BUILD_DIR=cmake-build-debuglocal tools/render_compare.sh   # use a different build dir
+#   tools/gen_pagx_pag_compare.sh                     # full pipeline
+#   tools/gen_pagx_pag_compare.sh --no-build          # skip rebuild, use existing PAGFullTest
+#   tools/gen_pagx_pag_compare.sh --no-render         # skip rendering, just regenerate HTML
+#                                                     # from existing webp outputs
+#   BUILD_DIR=cmake-build-debuglocal tools/gen_pagx_pag_compare.sh   # use a different build dir
 
 set -euo pipefail
 
