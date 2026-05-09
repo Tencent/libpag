@@ -58,6 +58,7 @@ std::vector<PAGXSample> EnumerateSpecSamples() {
     sample.name = entry.path().stem().string();
     sample.absolutePath = entry.path().string();
     sample.hasText = FileContainsText(entry.path());
+    sample.section = "spec";
     out.push_back(std::move(sample));
   }
   std::sort(out.begin(), out.end(), SampleByName);
@@ -70,6 +71,53 @@ std::vector<PAGXSample> EnumerateFirstBatchSamples() {
   // future fixtures introduce non-deterministic Bake fatals, add a
   // knownBroken std::set here and filter before returning.
   return EnumerateSpecSamples();
+}
+
+namespace {
+
+// Scan one directory, tag every found .pagx with `section`. Used only by
+// EnumerateComparisonSamples so each Tab in the visual report carries its
+// origin directory. Missing dir → silent skip (some resources/* may be
+// absent on minimal checkouts; the comparison report just shows fewer
+// cards).
+void AppendPagxFromDir(const std::string& relativeDir, const std::string& section,
+                       std::vector<PAGXSample>* out) {
+  const auto dir = pag::ProjectPath::Absolute(relativeDir);
+  std::error_code ec;
+  std::filesystem::directory_iterator it(dir, ec);
+  if (ec) {
+    return;
+  }
+  std::vector<PAGXSample> sectionSamples;
+  for (const auto& entry : it) {
+    if (!entry.is_regular_file()) {
+      continue;
+    }
+    if (entry.path().extension() != ".pagx") {
+      continue;
+    }
+    PAGXSample sample;
+    sample.name = entry.path().stem().string();
+    sample.absolutePath = entry.path().string();
+    sample.hasText = FileContainsText(entry.path());
+    sample.section = section;
+    sectionSamples.push_back(std::move(sample));
+  }
+  std::sort(sectionSamples.begin(), sectionSamples.end(), SampleByName);
+  out->insert(out->end(), std::make_move_iterator(sectionSamples.begin()),
+              std::make_move_iterator(sectionSamples.end()));
+}
+
+}  // namespace
+
+std::vector<PAGXSample> EnumerateComparisonSamples() {
+  std::vector<PAGXSample> out;
+  AppendPagxFromDir("spec/samples", "spec", &out);
+  AppendPagxFromDir("resources/pagx_to_html", "pagx_to_html", &out);
+  AppendPagxFromDir("resources/cli", "cli", &out);
+  AppendPagxFromDir("resources/layout", "layout", &out);
+  AppendPagxFromDir("resources/text", "text", &out);
+  return out;
 }
 
 }  // namespace pagx::test

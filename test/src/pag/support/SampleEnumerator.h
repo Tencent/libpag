@@ -28,6 +28,13 @@ struct PAGXSample {
   // (Phase 12's OutlineAll is SKIP-gated anyway while the Baker
   // OutlineAll path is pending).
   bool hasText = false;
+
+  // Source directory slug: "spec" for spec/samples/, or one of
+  // "pagx_to_html" / "cli" / "layout" / "text" for the matching
+  // resources/* subdirectories. Only populated by EnumerateComparisonSamples;
+  // EnumerateSpecSamples / EnumerateFirstBatchSamples leave it as "spec"
+  // for backward compatibility with existing gate tests.
+  std::string section = "spec";
 };
 
 // Scans spec/samples/*.pagx (non-recursive) and returns one PAGXSample per
@@ -45,5 +52,12 @@ std::vector<PAGXSample> EnumerateSpecSamples();
 // can be exempted from the hard gate without losing them from the
 // exploratory list.
 std::vector<PAGXSample> EnumerateFirstBatchSamples();
+
+// Union of spec/samples/ + resources/{pagx_to_html,cli,layout,text}/ for
+// the visual comparison report (tools/render_compare.py). Every returned
+// PAGXSample has `section` populated. Samples are grouped by section in
+// the output order spec → pagx_to_html → cli → layout → text; within a
+// section order is alphabetical. Never gated — purely for visual review.
+std::vector<PAGXSample> EnumerateComparisonSamples();
 
 }  // namespace pagx::test
