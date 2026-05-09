@@ -656,6 +656,17 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& pa
     }
   }
 
+  // scrollRect's translation half (-rectX, -rectY) shifts children so the
+  // rect's top-left maps to the layer origin (matches tgfx setScrollRect).
+  // OOXML can't express the clip half natively, but the translation is a
+  // plain affine and we can apply it here so children land at the correct
+  // position even when rasterization is disabled or fails. Without this the
+  // children would render at their pre-scroll authored positions, visibly
+  // offset from the rect's intended viewport.
+  if (layer->hasScrollRect) {
+    layerMatrix = layerMatrix * Matrix::Translate(-layer->scrollRect.x, -layer->scrollRect.y);
+  }
+
   // Merge the layer's own filters/styles with any inherited from a parent layer.
   // Own entries come first so CollectEffectSources picks the layer's own effects
   // when both layers carry the same effect type (e.g. both have a BlurFilter).
