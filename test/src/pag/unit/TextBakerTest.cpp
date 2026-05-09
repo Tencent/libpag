@@ -70,29 +70,6 @@ const Layer* FirstLayer(const PAGDocument& doc) {
 }  // namespace
 
 // -----------------------------------------------------------------------
-// Pre-shaped Text
-// -----------------------------------------------------------------------
-
-TEST(TextBaker, DISABLED_PreShapedTextSingleRunRoundTrip) {
-  // Phase 16 (v2.20): runtime-shape mode drops pre-shaped GlyphRun/Font
-  // assets. Rewrite in Phase 16.2+ against the new ElementTextData fields
-  // (text / fontFamily / fontStyle / fontSize / direction / ...).
-  GTEST_SKIP() << "Disabled during Phase 16 rework of pre-shaped text pipeline.";
-}
-
-TEST(TextBaker, DISABLED_PreShapedTextMultipleRunsShareFont) {
-  // Phase 16 (v2.20): font interning disappears along with the fonts[]
-  // asset table; runtime-shape mode stores family/style strings inline.
-  GTEST_SKIP() << "Disabled during Phase 16 rework of font asset interning.";
-}
-
-TEST(TextBaker, DISABLED_TextWithNullFontEmitsWarning) {
-  // Phase 16 (v2.20): FontSourceMissing semantics move with the runtime
-  // shaper; rewrite once the new warning contract is defined.
-  GTEST_SKIP() << "Disabled during Phase 16 rework of font-missing diagnostics.";
-}
-
-// -----------------------------------------------------------------------
 // TextPath
 // -----------------------------------------------------------------------
 

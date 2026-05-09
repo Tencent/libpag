@@ -45,23 +45,7 @@ namespace pagx {
  */
 class PAGExporter {
  public:
-  /**
-   * Controls how text is emitted.
-   *   Render:      Emit text as reference to system or embedded fonts.
-   *                Renderer performs glyph rasterisation at playback time.
-   *                Default.
-   *   OutlineAll:  Bake every glyph to vector paths at conversion time,
-   *                producing a self-contained file at the cost of size.
-   *
-   * Phase 10 honours only Render; OutlineAll plumbing lands in Phase 11
-   * together with the CLI wiring. Selecting OutlineAll today silently
-   * behaves like Render.
-   */
-  enum class FontMode { Render, OutlineAll };
-
   struct Options {
-    FontMode fontMode = FontMode::Render;
-
     /**
      * If true, all Diagnostic whose SeverityOf(code) == Warning are promoted
      * to errors (which flips ok=false per the Result invariant). Inflater

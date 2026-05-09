@@ -80,8 +80,7 @@ echo "==> running PAGFullTest"
 #                                        the >5% retrograde gate always
 #                                        trips. Run Performance against
 #                                        the regular Debug build.
-#   - PAGRenderEquivalenceTest.Render_Baseline.*,
-#     PAGRenderEquivalenceTest.OutlineAll_Baseline.*
+#   - PAGRenderEquivalenceTest.Render_Baseline.*
 #                                      — these compare a freshly rendered
 #                                        surface to webp baselines in
 #                                        test/baseline/; until the user
@@ -112,7 +111,7 @@ echo "==> running PAGFullTest"
 #                                        its own Phase.
 LLVM_PROFILE_FILE="${PROFRAW_DIR}/full-%p.profraw" \
     "${FULL_TEST_BIN}" \
-    --gtest_filter='-PAGPerformance.*:AllSamples/PAGRenderEquivalenceTest.Render_Baseline*:AllSamples/PAGRenderEquivalenceTest.OutlineAll_Baseline*:PAGXHtmlTest.HtmlScreenshotCompare:PAGXTest.HtmlFiles'
+    --gtest_filter='-PAGPerformance.*:AllSamples/PAGRenderEquivalenceTest.Render_Baseline*:PAGXHtmlTest.HtmlScreenshotCompare:PAGXTest.HtmlFiles'
 
 echo "==> running PAGDecodeFuzz over test/fuzz_corpus/decode_seeds"
 LLVM_PROFILE_FILE="${PROFRAW_DIR}/decode-%p.profraw" \

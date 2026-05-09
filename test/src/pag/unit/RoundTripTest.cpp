@@ -139,14 +139,6 @@ TEST(RoundTrip, ImageAssetTablePreserved) {
   EXPECT_EQ(0, std::memcmp(dec.doc->images[0]->data->data(), kSampleData, sizeof(kSampleData)));
 }
 
-TEST(RoundTrip, DISABLED_FontTablePreserved) {
-  // Phase 16 (v2.20): PAGDocument::fonts[] and the font asset table on the
-  // wire are gone; family/style strings live on ElementTextData instead.
-  // Reinstate this test in Phase 16.2+ once the new text wire format is
-  // frozen.
-  GTEST_SKIP() << "Disabled during Phase 16 rework of font asset table.";
-}
-
 TEST(RoundTrip, LayerBlockBasicFields) {
   PAGDocument doc = MakeMinimalDoc();
   auto comp = std::make_unique<Composition>();

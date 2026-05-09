@@ -208,15 +208,4 @@ TEST_F(Phase12ProbeFixture, DISABLED_PathAVsPathB) {
   (void)Baseline::Compare(surfaceB, "Phase12Probe/masking_pathB");
 }
 
-// Text diagnostics probe: walk spec/samples/text.pagx through the full
-// Bake -> Encode -> Decode -> Inflate chain and dump every warning from
-// each stage. Helps localise where glyph runs are being dropped.
-// Phase 16 (v2.20) tore out PAGDocument::fonts[] along with the font
-// asset table, so the per-font dump is temporarily removed. Reinstate
-// once the runtime-shape inflate pipeline carries family/style fields we
-// can dump.
-TEST_F(Phase12ProbeFixture, DISABLED_TextInflateDiag) {
-  GTEST_SKIP() << "Disabled during Phase 16 rework of text inflate diagnostics.";
-}
-
 }  // namespace pag

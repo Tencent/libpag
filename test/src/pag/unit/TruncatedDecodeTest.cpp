@@ -363,3 +363,25 @@ TEST(Truncate, TruncatedBeforeTagHeader) {
   EXPECT_EQ(dec.doc, nullptr);
   EXPECT_TRUE(HasError(dec, pagx::DiagnosticCode::TruncatedData));
 }
+
+// Codec.cpp §180-182 — the End tag arrives before bodyLength is fully
+// consumed. §8.3 P0-15 treats this as a non-fatal warning (PrematureEndTag)
+// because some pipelines append metadata past End. Construct by inflating
+// bodyLength to cover 2 extra trailing padding bytes we append ourselves.
+TEST(Truncate, PrematureEndTagWarns) {
+  auto bytes = EncodeMinimalDoc();
+  const uint32_t originalBodyLength =
+      static_cast<uint32_t>(bytes[4]) | (static_cast<uint32_t>(bytes[5]) << 8) |
+      (static_cast<uint32_t>(bytes[6]) << 16) | (static_cast<uint32_t>(bytes[7]) << 24);
+
+  std::vector<uint8_t> out = bytes;
+  // Append 2 bytes of metadata past the real End tag and inflate bodyLength
+  // so the Codec is told "the body is longer than where End actually lives".
+  out.push_back(0xAB);
+  out.push_back(0xCD);
+  PatchBodyLength(&out, originalBodyLength + 2u);
+
+  auto dec = Codec::Decode(out.data(), out.size());
+  EXPECT_NE(dec.doc, nullptr);
+  EXPECT_TRUE(HasWarning(dec, pagx::DiagnosticCode::PrematureEndTag));
+}

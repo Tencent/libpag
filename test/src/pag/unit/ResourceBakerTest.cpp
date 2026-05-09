@@ -88,18 +88,6 @@ TEST(ResourceBaker, ImageDistinctAssetsTakeFreshSlots) {
   EXPECT_EQ(doc.images.size(), 3u);
 }
 
-TEST(ResourceBaker, DISABLED_FontSemanticKeyCollapse) {
-  // Phase 16 (v2.20): RegisterFont + PAGDocument::fonts removed. Rewrite
-  // against the runtime-shape text pipeline once it stabilises.
-  GTEST_SKIP() << "Disabled during Phase 16 rework of font intern chain.";
-}
-
-TEST(ResourceBaker, DISABLED_FontDistinctFamiliesTakeFreshSlots) {
-  // Phase 16 (v2.20): family/style strings are now stored inline on
-  // ElementTextData; there is no longer a shared font table to intern into.
-  GTEST_SKIP() << "Disabled during Phase 16 rework of font intern chain.";
-}
-
 TEST(ResourceBaker, NullAssetDoesNotCrash) {
   BakeContext ctx;
   PAGDocument doc;

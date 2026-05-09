@@ -14,11 +14,6 @@
 //   3. user runs `/accept-baseline` to promote current outputs to baseline
 //   4. re-run → all samples PASS
 // AI does NOT execute step 3 (hard project rule: .codebuddy/rules/Test.md).
-//
-// OutlineAll mode: skipped wholesale because PAGExporter::Options::FontMode::
-// OutlineAll is presently a silent alias for Render (memory quirk: Baker
-// OutlineAll path un-landed). Once Baker OutlineAll ships, flip the SKIP to
-// the actual Baseline::Compare against PAGRenderTest_OutlineAll/{sample}.
 
 #include <string>
 #include <utility>
@@ -78,18 +73,6 @@ TEST_P(PAGRenderEquivalenceTest, Render_Baseline) {
   // expected first-run fails into a tractable review.
   EXPECT_TRUE(Baseline::Compare(surface, "PAGRenderTest_Render/" + sample.name))
       << "render baseline mismatch (first-run expected until /accept-baseline runs)";
-}
-
-TEST_P(PAGRenderEquivalenceTest, OutlineAll_Baseline) {
-  const auto& sample = GetParam();
-  if (!sample.hasText) {
-    GTEST_SKIP() << "OutlineAll only applies to text-bearing samples";
-  }
-  // TODO(Phase-future): flip this GTEST_SKIP to the actual
-  // `PAGExporter::Options::fontMode = FontMode::OutlineAll` flow once the
-  // Baker OutlineAll path lands. Keeping the parametrisation in place now
-  // so future baseline directories line up with the existing naming.
-  GTEST_SKIP() << "OutlineAll mode currently aliased to Render — pending Baker OutlineAll";
 }
 
 // gtest TestParamInfo name-generator — uses a plain static function

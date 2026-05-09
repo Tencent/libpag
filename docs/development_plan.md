@@ -212,7 +212,7 @@ cp -R third_party/ ../libpag_pagx_pag_impl/third_party/
 | **16.3 Codec schema 对齐** | ✅ | f76384de | 2 h | ElementText body 新 schema；FontAssetTable 仅保留 read-warn-skip 兼容 |
 | **16.4 Inflater 重写 + 布局器接入** | ✅ | f76384de | 4-5 h | inflateElementText 走 FontProvider + TextShaper + v1 TextLayout |
 | **16.5 测试基建 FontProvider 注入** | ✅ | 53a5609a | 1-2 h | PAGXTest fixture 内置 Arial + Noto + fontConfig() / fontProvider() getter |
-| **16.6 Baseline accept + 覆盖率重跑** | 🔄 | a36b06e0 | — | 覆盖率已重跑（设计文档 §17 D3 门槛全部达标：整体 78.21%、LayerInflater 79.03%、TextBaker 89.80%）；仅余用户操作 `/accept-baseline` 接受 48 张新基线 |
+| **16.6 Baseline accept + 覆盖率重跑** | 🔄 | 92e922c2 | — | 覆盖率已重跑（设计文档 §17 D3 门槛全部达标：整体 78.35%、Baker TextBaker 89.80% / ResourceBaker 91.67% / PathCodec 87.13%、Codec Codec.cpp 88.61% / ElementTags 84.24%、Inflater LayerInflater 81.82%）；仅余用户操作 `/accept-baseline` 接受 48 张新基线 |
 | 16.x 五轮稳定补丁 | ✅ | 45cbe0b0 / 53a5609a / 36471b33 / 55590003 / bfa0637f | 累计 ~6 h | baseline-y / font align / HarfBuzz shaper / layoutOrigin / shapedRuns hint；CrossCheck 15 → 4 |
 | **17 PAGX/PAG 对等文本模式（4 commit）** | ✅ | 2832e8f3 / a62b3652 / 1c1bae28 / (Commit 4) | 累计 ~12 h | case A path-based + case B host-font-shapedGlyphs 双分支；EmbeddedFont 顶层资源；删除 Phase 16 runtime-shape 4 条死路径；CrossCheck 4 → 2（剩 image_pattern + text_modifier） |
 | **17.x ImageAsset decodedImage cache** | ✅ | (Phase 17 收尾) | — | image_pattern.pagx 4 Layer 共享单 ImageAsset 不再静默 fallback；CrossCheck 转 PASS |
