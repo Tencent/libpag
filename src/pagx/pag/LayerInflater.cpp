@@ -8,11 +8,6 @@
 #include "pagx/pag/InflaterContext.h"
 #include "pagx/pag/TypefaceKey.h"
 #include "renderer/GlyphRunRenderer.h"
-#ifdef PAG_USE_HARFBUZZ
-#include "pagx/FontConfig.h"
-#include "pagx/LayoutContext.h"
-#include "renderer/TextShaper.h"
-#endif
 #include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
@@ -463,52 +458,78 @@ std::shared_ptr<tgfx::ColorSource> inflateColorSource(PAGDocument& doc, const Sh
   return nullptr;
 }
 
-// ---------- Font resolution (Phase 16 runtime-shape) --------------------
+// ---------- ElementText case B typeface replay (Phase 17 v2.23) -------------
 //
-// Returns a non-null tgfx::Font on success. Lookup order:
-//   1. FontProvider.getTypeface(fontFamily, fontStyle) — exact-match path.
-//   2. FontProvider.getFallbackTypefaces() — first non-null entry wins.
-//   3. All failed → push InflateFontCreateFailed=601 and return an empty
-//      Font. The caller will propagate through TextBlob::MakeFrom which
-//      itself returns null when the font carries no typeface, and the
-//      outer inflateElementText path then surfaces 602.
+// Replays ElementTextData::shapedGlyphs through the host FontProvider. The
+// Baker has already snapshotted PAGX TextLayout's glyph IDs + positions +
+// optional RSXforms verbatim, so the Inflater never re-shapes — every
+// layout decision (multi-line wrap, justify spacing, vertical writing
+// mode, RangeSelector xforms) is preserved by-construction.
 //
-// contextIndex currently defaults to UINT32_MAX because the Baker no longer
-// threads a fontIndex — PAGDocument::fonts[] is gone. If future consumers
-// need a per-layer cross-reference we will repurpose contextIndex to the
-// enclosing layer index.
-tgfx::Font resolveFont(const ElementTextData& pay, InflaterContext* ctx) {
+// typefaceKey policy (carried from Phase 16.6 hint path): if the host's
+// FontProvider returns a typeface whose 4-tuple key
+// (family|style|unitsPerEm|glyphsCount) doesn't match what the Baker
+// captured, we still replay using the host typeface and emit
+// TextShapingHintMiss for observability. Latin glyph IDs are stable
+// across font versions, so the substitution typically manifests as subtle
+// shape drift rather than layout corruption — strictly better than
+// dropping the layout altogether.
+//
+// Failure mode: if any run's typeface is unresolvable, the entire Text is
+// dropped (return null). Partial-glyph replay would leave gaps that
+// destroy line layout; the user-visible effect of a dropped Text is
+// preferable to a garbled one. This matches case A's "missing
+// EmbeddedFont → drop run" policy.
+std::shared_ptr<tgfx::VectorElement> inflateTextAsShapedTextBlob(PAGDocument& /*doc*/,
+                                                                 const ElementTextData& pay,
+                                                                 InflaterContext* ctx) {
   if (ctx->fontProvider == nullptr) {
-    // Should never happen — LayerInflater::Inflate substitutes
-    // MakeDefaultFontProvider() when the caller passes nullptr. Defensive
-    // programming only.
-    ctx->warn(ErrorCode::InflateFontCreateFailed, "FontProvider is null");
-    return tgfx::Font{};
+    ctx->warn(ErrorCode::InflateFontCreateFailed, "FontProvider is null for case B Text");
+    return nullptr;
   }
-
-  auto typeface = ctx->fontProvider->getTypeface(pay.fontFamily, pay.fontStyle);
-  if (typeface == nullptr) {
-    for (auto& candidate : ctx->fontProvider->getFallbackTypefaces()) {
-      if (candidate != nullptr) {
-        typeface = std::move(candidate);
-        break;
-      }
+  std::vector<pagx::TextLayoutGlyphRun> runs;
+  runs.reserve(pay.shapedGlyphs.size());
+  bool anyKeyMismatch = false;
+  for (const auto& sr : pay.shapedGlyphs) {
+    auto tf = ctx->fontProvider->getTypeface(sr.typefaceFamily, sr.typefaceStyle);
+    if (tf == nullptr) {
+      ctx->warn(ErrorCode::InflateFontCreateFailed,
+                "case B ElementText typeface unresolvable: " + sr.typefaceFamily + "/" +
+                    sr.typefaceStyle + "; dropping Text");
+      return nullptr;
     }
+    if (MakeTypefaceKey(*tf) != sr.typefaceKey) {
+      anyKeyMismatch = true;
+    }
+    pagx::TextLayoutGlyphRun r;
+    r.font = tgfx::Font(tf, sr.fontSize);
+    if (pay.fauxBold) {
+      r.font.setFauxBold(true);
+    }
+    if (pay.fauxItalic) {
+      r.font.setFauxItalic(true);
+    }
+    r.glyphs = sr.glyphs;
+    r.positions = sr.positions;
+    r.xforms = sr.xforms;
+    runs.push_back(std::move(r));
   }
-  if (typeface == nullptr) {
-    ctx->warn(ErrorCode::InflateFontCreateFailed, "FontProvider exhausted; no typeface matched " +
-                                                      pay.fontFamily + "/" + pay.fontStyle);
-    return tgfx::Font{};
+  if (anyKeyMismatch) {
+    ctx->warn(ErrorCode::TextShapingHintMiss,
+              "ElementText.shapedGlyphs typefaceKey mismatch; replaying layout with "
+              "host-substituted typeface");
   }
-
-  tgfx::Font font(std::move(typeface), pay.fontSize);
-  if (pay.fauxBold) {
-    font.setFauxBold(true);
+  auto textBlob = pagx::GlyphRunRenderer::BuildTextBlobFromLayoutRuns(runs, tgfx::Matrix::I());
+  if (textBlob == nullptr) {
+    ctx->warn(ErrorCode::InflateGlyphRunBuildFailed,
+              "TextBlob construction failed for case B ElementText; dropping element");
+    return nullptr;
   }
-  if (pay.fauxItalic) {
-    font.setFauxItalic(true);
+  auto text = tgfx::Text::Make(std::move(textBlob), pay.anchors.value);
+  if (text != nullptr) {
+    text->setPosition(pay.position.value);
   }
-  return font;
+  return text;
 }
 
 // ---------- ElementText case A typeface synthesis (Phase 17 v2.23) ----------
@@ -656,144 +677,41 @@ std::shared_ptr<tgfx::VectorElement> inflateTextAsPath(PAGDocument& doc, const E
   return text;
 }
 
-// ---------- ElementText inflation (Phase 16 runtime-shape MVP) ----------
+// ---------- ElementText inflation (Phase 17 v2.23) ----------
 //
-// The Inflater feeds the raw UTF-8 string + the resolved tgfx::Font into
-// tgfx::TextBlob::MakeFrom which performs shaping under the hood. Paragraph
-// layout (justification / leading / firstBaseLine / BoxText) is deferred to
-// Phase 16.7 — the current MVP path uses a single line. PAGX-exclusive
-// anchors are forwarded to tgfx::Text::Make for TextModifier / RangeSelector
-// consumption.
+// Two-branch dispatch — the same data shape PAGX uses, replayed verbatim:
+//
+//   case A (pay.glyphRuns non-empty)   → inflateTextAsPath
+//                                          (rebuild PathTypeface from
+//                                           PAGDocument.embeddedFonts)
+//   case B (pay.shapedGlyphs non-empty)→ inflateTextAsShapedTextBlob
+//                                          (resolve typefaces via
+//                                           FontProvider, replay layout)
+//   neither (empty Text)               → return nullptr (silently drop)
+//
+// The two branches are mutually exclusive by Bake convention: one PAGX
+// Text emits glyphRuns OR shapedGlyphs, never both. If a future malformed
+// payload contains both, glyphRuns wins (case A is "exact author intent",
+// case B is "host-resolved best-effort").
+//
+// Phase 16 runtime-shape paths (resolveFont + HarfBuzz second-pass shaper +
+// primitive shaper fallback) are retired in Phase 17 — every render-path
+// the host needs is now covered by the two branches above. The
+// shapedRuns field still roundtrips through Codec for binary compat with
+// in-flight Phase 16.6 .pag files (Commit 4 removes the field), but the
+// Inflater no longer reads it.
 
 std::shared_ptr<tgfx::VectorElement> inflateElementText(PAGDocument& doc,
                                                         const ElementTextData& pay,
                                                         InflaterContext* ctx) {
-  // Phase 17 case A: author-authored GlyphRun referencing embedded font.
-  // Prefer this path when present — it bypasses the host FontProvider
-  // entirely and renders the exact author geometry.
   if (!pay.glyphRuns.empty()) {
     return inflateTextAsPath(doc, pay, ctx);
   }
-
-  if (pay.text.empty()) {
-    // Not necessarily an error — an empty Text is legal but produces no
-    // glyphs. Skip silently; returning nullptr drops the element so the
-    // enclosing VectorGroup still renders its other children.
-    return nullptr;
+  if (!pay.shapedGlyphs.empty()) {
+    return inflateTextAsShapedTextBlob(doc, pay, ctx);
   }
-
-  auto font = resolveFont(pay, ctx);
-  if (font.getTypeface() == nullptr) {
-    // resolveFont already warned. Drop the element.
-    return nullptr;
-  }
-
-  std::shared_ptr<tgfx::TextBlob> textBlob;
-
-  // Pre-shaped hint path (§10.5 Phase 16.6): when the Baker recognized a
-  // TextBox-child Text, it snapshots PAGX TextLayout's already-resolved
-  // glyphs + positions + optional RSXforms into pay.shapedRuns. Replaying
-  // them directly via GlyphRunRenderer::BuildTextBlobFromLayoutRuns
-  // reproduces every layout decision runtime shape can't express — multi-
-  // line x-offsets, justify spacing, vertical writing mode per-glyph
-  // (x,y)+rotation — with no paragraph-layout port required on this side.
-  //
-  // Consumption policy: we always use the hint when it exists and we can
-  // resolve any typeface at all, because dropping the hint would lose the
-  // multi-line layout. Two tiers:
-  //   - typefaceKey match (Baker- and Inflater-side typefaces identical):
-  //     pixel-perfect replay, glyph ids match byte-for-byte.
-  //   - typefaceKey mismatch (host substituted a different font version or
-  //     uses a different provider): emit TextShapingHintMiss for
-  //     observability but still use the hint layout. Glyph ids are
-  //     typically stable for Latin-family fonts across platforms, so the
-  //     substitution manifests as subtle glyph-shape drift rather than
-  //     layout corruption. This is strictly better than the earlier policy
-  //     of falling back to runtime shape, which produced single-line
-  //     output for multi-line TextBox content (lost layout > glyph shape).
-  if (!pay.shapedRuns.empty() && ctx->fontProvider != nullptr) {
-    std::vector<pagx::TextLayoutGlyphRun> runs;
-    runs.reserve(pay.shapedRuns.size());
-    bool anyKeyMismatch = false;
-    bool anyRunUnresolved = false;
-    for (const auto& sr : pay.shapedRuns) {
-      auto tf = ctx->fontProvider->getTypeface(sr.typefaceFamily, sr.typefaceStyle);
-      if (tf == nullptr) {
-        anyRunUnresolved = true;
-        break;
-      }
-      if (MakeTypefaceKey(*tf) != sr.typefaceKey) {
-        anyKeyMismatch = true;
-      }
-      pagx::TextLayoutGlyphRun r;
-      r.font = tgfx::Font(tf, sr.fontSize);
-      r.glyphs = sr.glyphs;
-      r.positions = sr.positions;
-      r.xforms = sr.xforms;
-      runs.push_back(std::move(r));
-    }
-    if (!anyRunUnresolved) {
-      if (anyKeyMismatch) {
-        ctx->warn(ErrorCode::TextShapingHintMiss,
-                  "ElementText.shapedRuns typefaceKey mismatch; replaying layout with "
-                  "host-substituted typeface");
-      }
-      textBlob = pagx::GlyphRunRenderer::BuildTextBlobFromLayoutRuns(runs, tgfx::Matrix::I());
-    }
-  }
-
-#ifdef PAG_USE_HARFBUZZ
-  // Preferred path: if the FontProvider exposes its pagx::FontConfig we can
-  // shape through the same HarfBuzz-backed pagx::TextShaper the PAGX layout
-  // engine uses. That matches Path A (LayerBuilder) byte-for-byte on the
-  // per-glyph xAdvance, so CrossCheck PSNR is no longer limited by the
-  // HarfBuzz-vs-CoreText advance drift (Arial Bold 84pt: HB says 49.79,
-  // CoreText says 56 — 11% per glyph that the primitive shaper can't fix).
-  if (textBlob == nullptr && ctx->fontProvider != nullptr) {
-    if (auto* config = ctx->fontProvider->getFontConfig()) {
-      pagx::LayoutContext shapingContext(config);
-      auto shapedGlyphs = pagx::TextShaper::Shape(pay.text, font, shapingContext,
-                                                  /*vertical=*/false, /*rtl=*/false);
-      std::vector<tgfx::GlyphID> glyphIDs;
-      std::vector<tgfx::Point> positions;
-      glyphIDs.reserve(shapedGlyphs.size());
-      positions.reserve(shapedGlyphs.size());
-      float x = 0.0f;
-      for (const auto& sg : shapedGlyphs) {
-        if (sg.glyphID == 0) {
-          continue;
-        }
-        glyphIDs.push_back(sg.glyphID);
-        positions.push_back({x + sg.xOffset, sg.yOffset});
-        x += sg.xAdvance + pay.tracking;
-      }
-      if (!glyphIDs.empty()) {
-        textBlob =
-            tgfx::TextBlob::MakeFrom(glyphIDs.data(), positions.data(), glyphIDs.size(), font);
-      }
-    }
-  }
-#endif
-
-  if (textBlob == nullptr) {
-    // Fall back to the tgfx primitive shaper. No kerning / ligatures / bidi,
-    // and the xAdvance per glyph will come from font.getAdvance() instead of
-    // HarfBuzz — that's fine on hosts that didn't wire a FontConfig-backed
-    // provider (e.g. production PAGLoader callers using pag::FontManager).
-    textBlob = tgfx::TextBlob::MakeFrom(pay.text, font);
-  }
-
-  if (textBlob == nullptr) {
-    ctx->warn(ErrorCode::InflateGlyphRunBuildFailed,
-              "TextBlob construction failed for ElementText; dropping element");
-    return nullptr;
-  }
-
-  auto text = tgfx::Text::Make(std::move(textBlob), pay.anchors.value);
-  if (text != nullptr) {
-    text->setPosition(pay.position.value);
-  }
-  return text;
+  // Empty Text (no shape data and no author runs): nothing to render.
+  return nullptr;
 }
 
 // ---------- VectorElement dispatcher (LayerBuilder::convertVectorElement) ----------

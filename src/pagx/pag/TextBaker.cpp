@@ -1,24 +1,32 @@
 // Copyright (C) 2026 Tencent. All rights reserved.
 //
-// Phase 16 TextBaker — runtime-shape mode.
+// Phase 17 TextBaker — case A / case B branching.
 //
-// PAGX exposes two Text rendering modes:
-//   1. Pre-shaped: `text.glyphRuns` holds pagx::GlyphRun* entries with glyph
-//      IDs, positions and per-glyph xforms. Useful for author-authored
-//      per-glyph animation, but tied to a specific font + typeface identity
-//      that isn't portable across platforms.
-//   2. Runtime shaping: `text.glyphRuns` is empty. The Text carries a UTF-8
-//      string + fontFamily/fontStyle/fontSize; the renderer shapes at draw
-//      time.
+// PAGX exposes two Text rendering modes; Phase 17 (v2.23) gives each one a
+// dedicated branch in PAG v2 so the Inflater can always replay the exact
+// PAGX-native geometry without re-shaping at load time.
 //
-// Phase 16 (v2.20) standardises on runtime shaping for the PAG v2 pipeline.
-// Pre-shaped inputs are DOWNGRADED: glyph IDs + per-glyph xforms are
-// discarded, the text + fontFamily/fontStyle are preserved, and a
-// TextGlyphRunsDowngraded=208 warning is emitted so the call site can decide
-// whether to regenerate the PAGX asset without pre-shaping.
+//   1. Case A — author <GlyphRun> referencing embedded <Font>: glyph IDs
+//      and positions are author-resolved; the referenced path-based font
+//      is interned into PAGDocument.embeddedFonts and the run snapshot
+//      lands in ElementTextData::glyphRuns. The Inflater rebuilds the
+//      glyph paths via tgfx::PathTypefaceBuilder (see inflateTextAsPath).
 //
-// Authoritative spec: docs/pagx_to_pag_v2_design.md §10 +
-// docs/pagx_to_pag_v2_phase16_text_redesign.md §4.
+//   2. Case B — runtime-shape Text (no <GlyphRun> children): the raw
+//      UTF-8 string + fontFamily/fontStyle/fontSize is shaped by PAGX
+//      TextLayout at applyLayout() time; we snapshot the resulting
+//      glyphData->layoutRuns into ElementTextData::shapedGlyphs. The
+//      Inflater resolves each run's typeface via FontProvider and replays
+//      the glyph stream — no second-pass shaping (see
+//      inflateTextAsShapedTextBlob). Glyph paths are NOT embedded; the
+//      host is expected to have the family installed.
+//
+// shapedRuns (Phase 16.6 bridge field) is a dead-but-roundtripped field in
+// Phase 17 — the Codec still reads/writes it for backward compat, but the
+// Baker stops producing it and the Inflater stops consuming it. Commit 4
+// removes the field entirely.
+//
+// Authoritative spec: docs/pagx_to_pag_v2_design.md §10.
 #include "pagx/pag/TextBaker.h"
 #include <cstdint>
 #include <cstring>
@@ -238,49 +246,38 @@ std::unique_ptr<VectorElement> TextBaker::BakeText(BakeContext& ctx, PAGDocument
     }
   }
 
-  // ---- Case B (Phase 16 runtime-shape fallback, unchanged below) ----
-
-  // Layout-space origin + font size. The correct origin depends on whether
-  // this Text is a standalone element or nested in a TextBox:
+  // ---- Case B (Phase 17 v2.23): runtime-shape Text. ----
   //
-  //   - Standalone (textBounds.x/y == 0): use renderPosition(), which may
-  //     include a centering offset when the parent Layer has stretched the
-  //     Text's layoutBounds beyond its intrinsic textBounds. Without this
-  //     offset the text drifts off the visible area of samples where a
-  //     fixed-size parent Layer expects the text to sit in the middle.
-  //
-  //   - TextBox child (textBounds.x/y != 0): use layoutOrigin() ==
-  //     (textBounds.x, textBounds.y). The TextBox layout engine has already
-  //     placed the Text on its line-box accounting for textAlign /
-  //     paragraphAlign / lineHeight / padding / writing mode, and
-  //     renderPosition() would cancel that contribution by subtracting
-  //     textBounds.x/y.
-  //
-  // This is split-path rather than unconditional textBounds because the two
-  // branches answer different questions — "where does the visible glyph
-  // box sit in the layoutBounds rect?" (standalone) versus "where did the
-  // TextBox layout engine drop me?" (TextBox child). Merging would either
-  // lose standalone centering (causing complete_example / composition PSNR
-  // regressions) or lose TextBox placement (causing rich_text / text_box
-  // to render everything at the origin).
-  const bool insideTextBox = (src.layoutOrigin().x != 0.0f || src.layoutOrigin().y != 0.0f);
-  auto layoutOrigin = insideTextBox ? src.layoutOrigin() : src.renderPosition();
+  // Text without author <GlyphRun> children: PAGX TextLayout has shaped the
+  // raw UTF-8 text into glyph IDs + positions + (optional) RSXforms. Snap-
+  // shot every layoutRun verbatim into ElementTextData::shapedGlyphs and
+  // bypass runtime-shape entirely on the Inflater side (Phase 17 Commit 3
+  // moves shaped data from "opt-in hint" to "sole data source"). Glyph
+  // shapes are NOT embedded — the Inflater resolves typefaces by family +
+  // style strings via FontProvider; this is the by-design contract for the
+  // host having a font installed (see design doc §10.8).
 
-  // Baseline offset: runtime-shape produces a TextBlob whose glyphs sit at
-  // y=baseline=0 (i.e. the visual top is above the drawing origin). PAGX's
-  // layout engine already resolved the absolute baseline y for the first
-  // glyph (in the same layout coordinate system as layoutOrigin), so carry
-  // it through. Without this the Inflater would fall back to a
-  // font-metrics approximation (ascent-only) that drifts ~16 px because
-  // the layout engine uses the full line-box height instead of ascent.
-  const float baselineY = src.firstBaselineY();
-
-  // Standalone Text: the baseline is relative to renderPosition (which
-  // already includes the centering offset), so we add it directly.
-  // TextBox child: the baseline is in TextBox coordinates and already
-  // absolute — we use it as-is for y, with layoutOrigin.x for the x offset.
-  float positionY = insideTextBox ? baselineY : (layoutOrigin.y + baselineY);
-  data->position = MakeProp(tgfx::Point{layoutOrigin.x, positionY});
+  // Render anchor (PathA: convertText() in LayerBuilder uses
+  // src.renderPosition() directly as setPosition for the tgfx::Text
+  // VectorElement). Mirror that exactly here so case B replays PathA's
+  // blob-positioning math; the ElementTextData.position field becomes
+  // the verbatim renderPosition.
+  //
+  // Why not (layoutOrigin.x, layoutOrigin.y + baselineY) like Phase 16.6?
+  // Phase 16.6 added baselineY to compensate for runtime-shape's blob
+  // origin sitting at glyph baseline=0 (the runtime shaper produces
+  // glyphs at y=0 + advance, then setPosition shifts them down to the
+  // visual baseline). Phase 17 case B does NOT runtime-shape: it replays
+  // PAGX's already-baselined layoutRuns positions (positions[0].y =
+  // baselineY by construction), so adding baselineY again would render
+  // the glyphs one baseline below where PathA places them.
+  //
+  // shapedGlyphs.positions remain layout-absolute (no Baker-side
+  // subtraction) because PathA's GlyphRunRenderer::BuildTextBlobFromLayoutRuns
+  // consumes the same layout-absolute layoutRuns; matching the Baker
+  // storage to PathA's input keeps PathA-vs-PathB PSNR aligned.
+  auto renderPos = src.renderPosition();
+  data->position = MakeProp(tgfx::Point{renderPos.x, renderPos.y});
 
   // Content — the raw UTF-8 string runtime shapers re-shape at load time.
   data->text = src.text;
@@ -300,131 +297,65 @@ std::unique_ptr<VectorElement> TextBaker::BakeText(BakeContext& ctx, PAGDocument
   data->fauxBold = src.fauxBold;
   data->fauxItalic = src.fauxItalic;
 
-  // Pre-shaped layout hint. The runtime-shape path cannot express PAGX's
-  // multi-line / justify / vertical-writing geometry from a single
-  // `position`, because a single Point anchors the whole TextBlob and the
-  // Inflater has no paragraph layout engine (§10.1). When PAGX TextLayout
-  // produced multi-line glyphs, per-glyph RSXforms (vertical writing mode
-  // with rotated Latin runs), or any other layout decision a single
-  // position cannot reproduce, we snapshot `glyphData->layoutRuns`
-  // directly so the Inflater can replay it.
+  // Snapshot PAGX TextLayout output verbatim into ElementTextData::shapedGlyphs.
+  // Each run carries its resolved typeface (family + style + 4-tuple key),
+  // glyphs, positions, and optional RSXforms. Positions and xforms are
+  // converted to coordinates relative to ElementTextData::position so the
+  // Inflater can apply a single Layer-level setPosition() to anchor the
+  // entire blob — same convention used by case A (glyph_run) and the
+  // earlier Phase 16.6 shapedRuns hint, ensuring a uniform Inflater path.
   //
-  // Trigger: `HasLayoutThatRuntimeShapeCannotReproduce(runs)` — the gate is
-  // semantic ("does runtime shape lose information here?") rather than
-  // structural ("is this Text inside a TextBox?"). Structural gates
-  // (`insideTextBox`) miss the edge case where a TextBox child Text starts
-  // at the TextBox origin (e.g. text_box.pagx Box 1: horizontal justify
-  // single-child Text, `layoutOrigin = (0, 0)` because the first glyph
-  // sits at the TextBox origin). Semantic gates capture exactly the cases
-  // we need:
-  //   - multi-line (more than one distinct baseline y among glyphs)
-  //   - vertical writing / RangeSelector (any non-empty xforms)
-  // Single-line Text in either coordinate convention is correctly handled
-  // by the runtime-shape fallback + firstBaselineY / layoutOrigin split,
-  // so those are skipped regardless of TextBox membership — saves ~10-20 B
-  // per glyph on .pag size without changing the render.
+  // Edge case: PAGX TextLayout did not produce runs (Text never had
+  // applyLayout() called, or empty/all-whitespace text). We still produce
+  // an ElementTextData with empty shapedGlyphs; the Inflater drops empty
+  // Texts silently — equivalent to Phase 16's empty-text branch.
   //
-  // Paragraphs wider than `kMaxHintGlyphs` are skipped as well and left to
-  // runtime shape (which still renders something even if geometry drifts).
-  // A blanket hint on a 10 000-glyph screenplay would hurt .pag size more
-  // than it helps PSNR; Phase 16.7+ is the right place to address that
-  // case with a proper paragraph layout port.
-  constexpr size_t kMaxHintGlyphs = 500;
+  // Run-level typeface resolution: every layoutRun has a non-null typeface
+  // by construction (PAGX TextLayout would have skipped the run otherwise).
+  // The defensive check below mirrors Phase 16.6 hint policy: drop the
+  // entire shapedGlyphs payload if any run is unresolvable, so the
+  // Inflater sees an empty case-B payload and drops the Text rather than
+  // rendering a partial glyph stream with gaps.
   const auto& runs = GlyphRunRenderer::GetLayoutRuns(&src);
-  size_t totalGlyphs = 0;
-  bool hasMultipleLines = false;
-  bool hasXforms = false;
-  float firstBaseline = 0.0f;
-  bool firstBaselineSeen = false;
+  std::vector<ElementTextData::ShapedGlyphRun> shapedGlyphs;
+  shapedGlyphs.reserve(runs.size());
+  bool allRunsUsable = true;
   for (const auto& run : runs) {
-    totalGlyphs += run.glyphs.size();
-    if (!run.xforms.empty()) {
-      hasXforms = true;
+    if (run.glyphs.empty()) {
+      continue;
     }
+    auto typeface = run.font.getTypeface();
+    if (typeface == nullptr) {
+      allRunsUsable = false;
+      break;
+    }
+    ElementTextData::ShapedGlyphRun out;
+    out.typefaceFamily = typeface->fontFamily();
+    out.typefaceStyle = typeface->fontStyle();
+    out.typefaceKey = MakeTypefaceKey(*typeface);
+    out.fontSize = run.font.getSize();
+    out.glyphs = run.glyphs;
+    out.positions.reserve(run.positions.size());
     for (const auto& p : run.positions) {
-      if (!firstBaselineSeen) {
-        firstBaseline = p.y;
-        firstBaselineSeen = true;
-      } else if (p.y != firstBaseline) {
-        hasMultipleLines = true;
+      // Layout-absolute coordinates — Inflater applies setPosition(renderPos)
+      // to anchor the entire blob, mirroring PathA's convertText math.
+      out.positions.push_back(tgfx::Point{p.x, p.y});
+    }
+    if (!run.xforms.empty() && run.xforms.size() >= run.glyphs.size()) {
+      out.xforms.reserve(run.xforms.size());
+      for (const auto& xf : run.xforms) {
+        // RSXform tx/ty are also layout-absolute; preserved verbatim.
+        out.xforms.push_back(xf);
       }
     }
+    shapedGlyphs.push_back(std::move(out));
   }
-  const bool needsShapedHint =
-      (hasMultipleLines || hasXforms) && totalGlyphs > 0 && totalGlyphs <= kMaxHintGlyphs;
-  if (needsShapedHint) {
-    std::vector<ElementTextData::ShapedRun> shapedRuns;
-    shapedRuns.reserve(runs.size());
-    bool allRunsUsable = true;
-    for (const auto& run : runs) {
-      if (run.glyphs.empty() || run.positions.size() < run.glyphs.size()) {
-        continue;
-      }
-      auto typeface = run.font.getTypeface();
-      if (typeface == nullptr) {
-        // One unresolvable run inside a TextBox would leave a gap in the
-        // replayed glyph stream; better to drop the whole hint and let the
-        // Inflater runtime-shape everything (matches the run-level
-        // fallback policy on the Inflater side).
-        allRunsUsable = false;
-        break;
-      }
-      ElementTextData::ShapedRun out;
-      out.glyphs = run.glyphs;
-      // Positions are stored relative to `data->position` so both the
-      // hint path and the runtime-shape fallback apply `setPosition` the
-      // same way on the Inflater side. This also keeps the hint
-      // independent of any downstream Layer matrices that move the
-      // anchor point.
-      out.positions.reserve(run.positions.size());
-      for (const auto& p : run.positions) {
-        out.positions.push_back(tgfx::Point{p.x - layoutOrigin.x, p.y - positionY});
-      }
-      if (!run.xforms.empty() && run.xforms.size() >= run.glyphs.size()) {
-        out.xforms.reserve(run.xforms.size());
-        for (const auto& xf : run.xforms) {
-          // RSXform's rotation/scale are orientation-only; only (tx, ty)
-          // need translating into position-relative space.
-          tgfx::RSXform adj = xf;
-          adj.tx = xf.tx - layoutOrigin.x;
-          adj.ty = xf.ty - positionY;
-          out.xforms.push_back(adj);
-        }
-      }
-      out.fontSize = run.font.getSize();
-      out.typefaceFamily = typeface->fontFamily();
-      out.typefaceStyle = typeface->fontStyle();
-      out.typefaceKey = MakeTypefaceKey(*typeface);
-      shapedRuns.push_back(std::move(out));
-    }
-    if (allRunsUsable && !shapedRuns.empty()) {
-      data->shapedRuns = std::move(shapedRuns);
-    }
+  if (allRunsUsable && !shapedGlyphs.empty()) {
+    data->shapedGlyphs = std::move(shapedGlyphs);
   }
-
-  // Pre-shaped downgrade. PAGX-native per-glyph xform information is lost;
-  // callers that genuinely need it should keep consuming the PAGX document
-  // directly rather than round-tripping through PAG v2.
-  if (!src.glyphRuns.empty()) {
-    ctx.warn(ErrorCode::TextGlyphRunsDowngraded,
-             "Pre-shaped pagx::Text.glyphRuns dropped; runtime-shape fallback used");
-
-    // PAGX-exclusive per-glyph anchors are salvaged: the Inflater can align
-    // the TextShaper output glyph-for-glyph against this vector for
-    // TextModifier / RangeSelector paths (design doc §10.3).
-    std::vector<tgfx::Point> allAnchors;
-    for (const auto* run : src.glyphRuns) {
-      if (run == nullptr) {
-        continue;
-      }
-      for (const auto& a : run->anchors) {
-        allAnchors.push_back(tgfx::Point{a.x, a.y});
-      }
-    }
-    if (!allAnchors.empty()) {
-      data->anchors = MakeProp(std::move(allAnchors));
-    }
-  }
+  // shapedRuns (Phase 16.6 bridge field) is NOT populated in Phase 17.
+  // The field still exists on ElementTextData and roundtrips through Codec
+  // for byte compatibility with stale .pag files; Commit 4 removes it.
 
   auto el = std::make_unique<VectorElement>();
   el->type = VectorElementType::Text;
