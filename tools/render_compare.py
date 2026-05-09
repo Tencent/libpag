@@ -234,7 +234,7 @@ def render_html(cards_by_section: dict[str, list[Card]]) -> str:
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>PAGX vs PAGX-to-PAG render comparison ({total_samples} samples)</title>
+  <title>PAGX &amp; PAG rendering comparison ({total_samples} samples)</title>
   <style>
 :root {{
   color-scheme: light;
@@ -506,7 +506,7 @@ body {{
 <header class="topbar">
   <div class="topbar-inner">
     <div class="title">
-      <h1>PAGX rendering comparison <span style="color:#64748b;font-weight:500">· {total_samples} samples</span></h1>
+      <h1>PAGX &amp; PAG rendering comparison <span style="color:#64748b;font-weight:500">· {total_samples} samples</span></h1>
       <div class="sub">Left: PAGX-native render (LayerBuilder direct) &nbsp;|&nbsp; Right: PAGX &rarr; PAG &rarr; Inflater render. Both paths share the PAGXTest FontConfig/FontProvider — any visual diff is a bug. Click the source link to open the <code>.pagx</code>.</div>
     </div>
     <div class="tabs">
