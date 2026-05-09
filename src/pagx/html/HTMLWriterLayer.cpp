@@ -352,6 +352,11 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           // immediately overflow that measured width and trigger an unwanted line break.
           // Vertical writing-mode boxes rely on the box height to trigger column breaks;
           // white-space:nowrap would suppress column wrapping entirely, so skip it.
+          //
+          // Note: container-level `white-space:pre-wrap` is avoided because pretty-printed
+          // HTML puts indentation and newlines between the container <div> and its inner
+          // <span> tags; `pre-wrap` on the container would render those as leading blank
+          // lines. TAB handling is applied per-span instead (see spanStyle below).
           if (tb->wordWrap && layoutW && tbW > 0) {
             style += ";word-wrap:break-word";
           } else if (tb->writingMode != WritingMode::Vertical) {
@@ -537,6 +542,19 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             float prevFontSize = 0;
             for (auto& span : tbSpans) {
               std::string spanStyle;
+              // When the span's text contains U+0009 (TAB) honour it by setting
+              // `white-space:pre-wrap` and an explicit `tab-size`. Applied at the span
+              // level (not the container) so pretty-printed indentation/newlines between
+              // container div and span tags are still collapsed normally; only the
+              // characters inside the span see pre-wrap. tgfx's tab stop is
+              // `effectiveFontSize * 4` (see TextLayout.cpp CreateTabGlyph).
+              if (span.text && span.text->text.find('\t') != std::string::npos) {
+                float spanSize = span.text->renderFontSize();
+                spanStyle += "white-space:pre-wrap";
+                if (spanSize > 0) {
+                  spanStyle += ";tab-size:" + FloatToString(spanSize * 4) + "px";
+                }
+              }
               bool spanFontHoisted = !_ctx->fontHoistSignature.fontFamily.empty() ||
                                      _ctx->fontHoistSignature.renderFontSize > 0;
               if (!spanFontHoisted) {
@@ -778,6 +796,15 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           float rtPrevFontSize = 0;
           for (auto& span : richTextSpans) {
             std::string spanStyle = tb->wordWrap ? "" : "white-space:nowrap";
+            // Honour U+0009 TAB when present (see tbSpans branch for rationale).
+            if (span.text && span.text->text.find('\t') != std::string::npos) {
+              float spanSize = span.text->renderFontSize();
+              if (!spanStyle.empty()) spanStyle += ';';
+              spanStyle += "white-space:pre-wrap";
+              if (spanSize > 0) {
+                spanStyle += ";tab-size:" + FloatToString(spanSize * 4) + "px";
+              }
+            }
             bool spanFontHoisted = !_ctx->fontHoistSignature.fontFamily.empty() ||
                                    _ctx->fontHoistSignature.renderFontSize > 0;
             if (!spanFontHoisted) {

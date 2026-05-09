@@ -882,6 +882,14 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
   if (alpha < 1.0f) {
     style += ";opacity:" + FloatToString(alpha);
   }
+  // Honour U+0009 TAB inside the span (see HTMLWriterLayer tbSpans branch for rationale).
+  if (text && text->text.find('\t') != std::string::npos) {
+    float spanSize = text->renderFontSize();
+    style += ";white-space:pre-wrap";
+    if (spanSize > 0) {
+      style += ";tab-size:" + FloatToString(spanSize * 4) + "px";
+    }
+  }
   if (tb) {
     out.emitBreaks(HTMLBuilder::countLeadingBreaks(text->text));
   }
