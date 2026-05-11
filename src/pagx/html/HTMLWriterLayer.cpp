@@ -54,6 +54,13 @@ using pag::FloatNearlyZero;
 // always overwrites the seed. Mirrors the same sentinel used in HTMLWriter::ComputeGeosBoundingBox.
 static constexpr float BBOX_SENTINEL_LARGE = 1e9f;
 
+// Chromium's default `line-height: normal` resolves to ≈1.17 × font-size for typical Latin
+// fonts. When a span's natural line-height would exceed the TextBox's declared lineHeight we
+// need to pin the span's inline-axis size so the line box cannot expand past what tgfx laid
+// out; the 1.17 ratio is the threshold at which Chromium starts to grow the line. Reused by
+// both the tbSpans and richTextSpans emission branches.
+static constexpr float CHROMIUM_NORMAL_LINE_HEIGHT_RATIO = 1.17f;
+
 static void EmitLeftTopCss(std::string& style, bool& positionSet, float x, float y) {
   style += ";left:" + CssFloatToString(x) + "px;top:" + CssFloatToString(y) + "px";
   positionSet = true;
@@ -657,7 +664,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               // aligned with the line box top, matching tgfx's per-line top-of-line baseline.
               float spanFontSize = span.text->renderFontSize();
               if (tb->lineHeight > 0 && spanFontSize > 0 &&
-                  spanFontSize * 1.17f > tb->lineHeight + 0.5f) {
+                  spanFontSize * CHROMIUM_NORMAL_LINE_HEIGHT_RATIO > tb->lineHeight + 0.5f) {
                 spanStyle += ";display:inline-block;height:" + CssFloatToString(tb->lineHeight) +
                              "px;line-height:" + CssFloatToString(tb->lineHeight) +
                              "px;vertical-align:top";
@@ -957,7 +964,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             // container's declared lineHeight; otherwise Chromium expands the line box.
             float rtSpanFontSize = span.text->renderFontSize();
             if (tb->lineHeight > 0 && rtSpanFontSize > 0 &&
-                rtSpanFontSize * 1.17f > tb->lineHeight + 0.5f) {
+                rtSpanFontSize * CHROMIUM_NORMAL_LINE_HEIGHT_RATIO > tb->lineHeight + 0.5f) {
               spanStyle += ";display:inline-block;height:" + CssFloatToString(tb->lineHeight) +
                            "px;line-height:" + CssFloatToString(tb->lineHeight) +
                            "px;vertical-align:top";
