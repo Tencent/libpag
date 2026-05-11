@@ -152,6 +152,11 @@ enum class HTMLFormat {
 
 /**
  * Export options for HTMLExporter.
+ *
+ * ABI stability: this struct is part of the public API. New optional fields must be appended at
+ * the end with sensible defaults so that callers compiled against an older header continue to
+ * link and behave correctly. Reordering, removing, or changing the type of an existing field is
+ * a breaking change.
  */
 struct HTMLExportOptions {
   /**
@@ -166,8 +171,9 @@ struct HTMLExportOptions {
    * produced by the HTML builder; it does not influence the formatting of CSS declarations
    * inside the <style> block — Compact mode always writes declarations on a single line per
    * rule, and Pretty mode always uses a fixed 2-space declaration indent regardless of this
-   * value. Ignored entirely when `format` is HTMLFormat::Minify. Negative values are not
-   * defined; callers should pass a non-negative integer.
+   * value. Ignored entirely when `format` is HTMLFormat::Minify. Negative values produce
+   * undefined output (the library does not clamp them); callers must pass a non-negative
+   * integer.
    */
   int indent = 2;
 
@@ -189,6 +195,12 @@ struct HTMLExportOptions {
   /**
    * Filename prefix applied to every generated static image, useful when multiple HTML documents
    * share a single static-img directory and need to avoid name collisions (e.g., "doc_name-").
+   *
+   * When multiple documents share a `staticImgDir`, the caller is responsible for choosing a
+   * prefix that is unique per document; the library does not detect or recover from collisions
+   * (later writes silently overwrite earlier files of the same generated name). The CLI tool
+   * derives a prefix automatically from the output HTML filename stem; programmatic callers
+   * must supply their own.
    */
   std::string staticImgNamePrefix = {};
 
@@ -280,6 +292,10 @@ class HTMLExporter {
 
   /**
    * Exports a PAGXDocument to an HTML file. Creates parent directories if they do not exist.
+   *
+   * Implementation note: this method is a thin wrapper around ToHTML — it builds the document
+   * string in memory via ToHTML and then writes that string to disk. Callers that need to
+   * stream the output or post-process it before writing should call ToHTML directly.
    *
    * File handling: the output file is opened with std::ios::binary and truncated; if a file
    * already exists at `filePath` it is overwritten without prompting. `filePath` is used
