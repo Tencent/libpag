@@ -123,7 +123,7 @@ namespace pagx {
 // debug builds to measure how much of the rendering load is attributable to effects vs
 // actual layer geometry. The visual result with effects disabled is wrong (no shadows / no
 // blur), but everything downstream still parses, lays out, and renders without crashing.
-#define PAG_DISABLE_LAYER_EFFECTS 1
+#define PAG_DISABLE_LAYER_EFFECTS 0
 
 // Decode a data URI (e.g., "data:image/png;base64,...") to an Image.
 static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI) {
@@ -327,6 +327,102 @@ class LayerBuilderContext {
     }
   }
 
+  // Fingerprint over every input GlyphRunRenderer::BuildTextBlob consumes. When BuildTextBlob is
+  // changed to read a new field, that field MUST be mixed in here — otherwise the cache may serve
+  // stale glyphs.
+  static uint64_t ComputeTextBlobFingerprint(const Text* text, const tgfx::Matrix& inverseMatrix) {
+    // FNV-1a 64-bit. Collision probability for ~5K entries is ~10^-12, and the glyphSum secondary
+    // check guards the rare miss.
+    constexpr uint64_t FNV_OFFSET = 0xcbf29ce484222325ULL;
+    constexpr uint64_t FNV_PRIME = 0x100000001b3ULL;
+    uint64_t h = FNV_OFFSET;
+    auto mix = [&](const void* data, size_t bytes) {
+      const uint8_t* p = static_cast<const uint8_t*>(data);
+      for (size_t i = 0; i < bytes; ++i) {
+        h ^= p[i];
+        h *= FNV_PRIME;
+      }
+    };
+    // 1. Inverse matrix (6 floats).
+    float matrixValues[6] = {0};
+    inverseMatrix.get6(matrixValues);
+    mix(matrixValues, sizeof(matrixValues));
+    // 2. Faux bold / italic flags
+    bool fauxFlags[2] = {text->fauxBold, text->fauxItalic};
+    mix(fauxFlags, sizeof(fauxFlags));
+    // 3. GlyphRun count
+    size_t runCount = text->glyphRuns.size();
+    mix(&runCount, sizeof(runCount));
+    // 4. Per-run geometry.
+    for (const auto* run : text->glyphRuns) {
+      if (!run) {
+        uint8_t nullMarker = 0;
+        mix(&nullMarker, sizeof(nullMarker));
+        continue;
+      }
+      const Font* fontPtr = run->font;
+      mix(&fontPtr, sizeof(fontPtr));
+      mix(&run->fontSize, sizeof(run->fontSize));
+      mix(&run->x, sizeof(run->x));
+      mix(&run->y, sizeof(run->y));
+      auto mixVec = [&](const auto& vec) {
+        size_t n = vec.size();
+        mix(&n, sizeof(n));
+        if (n > 0) {
+          mix(vec.data(), n * sizeof(vec[0]));
+        }
+      };
+      mixVec(run->glyphs);
+      mixVec(run->positions);
+      mixVec(run->xOffsets);
+      mixVec(run->scales);
+      mixVec(run->rotations);
+      mixVec(run->skews);
+      mixVec(run->anchors);
+    }
+    return h;
+  }
+
+  // Total glyph count across all GlyphRuns. Used as a cheap secondary key check so a 64-bit
+  // hash collision (already < 1 in 10^12) cannot promote to a wrong-render bug — a mismatched
+  // glyphSum forces a rebuild rather than reuse.
+  static size_t SumGlyphCount(const Text* text) {
+    size_t sum = 0;
+    for (const auto* run : text->glyphRuns) {
+      if (run) sum += run->glyphs.size();
+    }
+    return sum;
+  }
+
+  // Cached wrapper around PrepareTextBlob. Looks up the fingerprint first; on hit reuses the
+  // TextBlob and per-glyph anchors from the cache. On miss builds via PrepareTextBlob and
+  // stashes the result.
+  void prepareTextBlobCached(Text* text, const tgfx::Matrix& inverseMatrix) {
+    if (!text || !text->glyphData) return;
+    // Already prepared in this build session (or a previous instance hit the same cache slot).
+    if (text->glyphData->textBlob) return;
+    // The runtime-shaping path uses layoutRuns rather than glyphRuns; the fingerprint scheme
+    // here covers only the embedded glyphRuns path, which is what cocraft exports. Fall back
+    // to the uncached path for layoutRuns to stay correct.
+    if (!text->glyphData->layoutRuns.empty() || text->glyphRuns.empty()) {
+      PrepareTextBlob(text, inverseMatrix);
+      return;
+    }
+    auto fingerprint = ComputeTextBlobFingerprint(text, inverseMatrix);
+    size_t glyphSum = SumGlyphCount(text);
+    auto it = _textBlobCache.find(fingerprint);
+    if (it != _textBlobCache.end() && it->second.glyphSum == glyphSum) {
+      text->glyphData->textBlob = it->second.textBlob;
+      text->glyphData->anchors = it->second.anchors;
+      return;
+    }
+    PrepareTextBlob(text, inverseMatrix);
+    if (text->glyphData->textBlob) {
+      _textBlobCache[fingerprint] =
+          TextBlobCacheEntry{glyphSum, text->glyphData->textBlob, text->glyphData->anchors};
+    }
+  }
+
   // Prepare TextBlobs for all Text children of a TextBox by applying inverse matrices.
   // This must happen at render time (not layout time) so that tgfx's StrokePainter can
   // detect the Group transform via geometry->matrix changes between apply() and draw().
@@ -340,7 +436,7 @@ class LayerBuilderContext {
       if (!matrices[i].invert(&inverse)) {
         continue;
       }
-      PrepareTextBlob(childText[i], inverse);
+      prepareTextBlobCached(childText[i], inverse);
     }
   }
 
@@ -437,11 +533,8 @@ class LayerBuilderContext {
   }
 
   std::shared_ptr<tgfx::Text> convertText(Text* node) {
+    prepareTextBlobCached(node, tgfx::Matrix::I());
     auto textBlob = node->glyphData->textBlob;
-    if (textBlob == nullptr) {
-      PrepareTextBlob(node, tgfx::Matrix::I());
-      textBlob = node->glyphData->textBlob;
-    }
     if (textBlob == nullptr) {
       return nullptr;
     }
@@ -992,6 +1085,16 @@ class LayerBuilderContext {
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
       _pendingMasks = {};
   std::unordered_map<const Image*, std::shared_ptr<tgfx::Image>> _imageCache = {};
+  // TextBlob fingerprint cache. Keyed by FNV-1a 64-bit hash over every BuildTextBlob input.
+  // glyphSum acts as a secondary check guarding against the (vanishingly rare) hash collision.
+  // Sharing the same TextBlob shared_ptr across many Text nodes is what reclaims the bulk of
+  // the per-Text glyph-path memory cost we observed at 0% reuse before the cache was added.
+  struct TextBlobCacheEntry {
+    size_t glyphSum;
+    std::shared_ptr<tgfx::TextBlob> textBlob;
+    std::vector<tgfx::Point> anchors;
+  };
+  std::unordered_map<uint64_t, TextBlobCacheEntry> _textBlobCache = {};
 };
 
 // Public API implementation
