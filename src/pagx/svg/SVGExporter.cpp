@@ -1443,8 +1443,43 @@ void SVGWriter::writeTextAsPath(SVGBuilder& out, const Text* text, const FillStr
 // ── writeText ───────────────────────────────────────────────────────────────
 
 static void WriteSharedTextAttrs(SVGBuilder& out, const Text* text, TextAnchor anchor) {
+  // Browser-first bold/italic mapping. A real Bold / Italic face (the PAGX
+  // Text carries fontStyle="Bold" / "Italic" / "Bold Italic") is encoded by
+  // appending the style to the family name (e.g. "Arial Bold"), and the
+  // font-weight / font-style attributes are suppressed. Browsers and CoreText
+  // (Safari, Chromium, macOS Preview / QuickLook) resolve the styled family
+  // name directly to the real bold/italic glyph face — emitting just the
+  // bare family name plus font-weight="bold" instead made them apply
+  // faux-bold synthesis on top of the regular face, producing a visibly
+  // thicker stroke than the PAGX renderer (which loads the real Arial Bold
+  // face via MakeFromName(fontFamily, fontStyle)).
+  //
+  // fauxBold / fauxItalic still surface as font-weight / font-style — those
+  // flags exist precisely so the renderer synthesizes the style instead of
+  // locking onto a particular face. When both apply at once (a real Bold face
+  // plus an additional fauxBold), the styled family picks the real Bold face
+  // and font-weight="bold" layers the extra synthesis on top, mirroring
+  // tgfx's setFauxBold-on-top-of-Bold-primary behaviour in PAGX's own
+  // renderer.
+  //
+  // Trade-off: fontconfig-based viewers (librsvg, Inkscape on Linux, some
+  // online viewers) match "Arial Bold" against the *family* "Arial Bold"
+  // rather than family "Arial" + Bold face. No such family exists, so they
+  // fall back to a substitute font and lose the bold weight. The call here
+  // is that native browser / Preview fidelity matters more than fontconfig
+  // fallback behaviour. Mirrors BuildRunStyle in src/pagx/ppt/PPTWriter.h.
+  bool hasRealBold = text->fontStyle.find("Bold") != std::string::npos;
+  bool hasRealItalic = text->fontStyle.find("Italic") != std::string::npos;
   if (!text->fontFamily.empty()) {
-    out.addAttribute("font-family", text->fontFamily);
+    std::string typeface = StripQuotes(text->fontFamily);
+    if (hasRealBold && hasRealItalic) {
+      typeface += " Bold Italic";
+    } else if (hasRealBold) {
+      typeface += " Bold";
+    } else if (hasRealItalic) {
+      typeface += " Italic";
+    }
+    out.addAttribute("font-family", typeface);
   }
   // Use the layout-resolved font size. PAGX layout may shrink a Text internally via
   // a textScale factor to fit dual-axis constraints (e.g. `left`+`right`,
@@ -1463,15 +1498,10 @@ static void WriteSharedTextAttrs(SVGBuilder& out, const Text* text, TextAnchor a
   } else if (anchor == TextAnchor::End) {
     out.addAttribute("text-anchor", "end");
   }
-  // fauxBold / fauxItalic take precedence over the fontStyle name: a font may
-  // lack a real bold/italic face but the authoring tool still asks the
-  // renderer to synthesize one. Mirrors BuildRunStyle in PPTExporter.cpp.
-  bool hasBold = text->fauxBold || text->fontStyle.find("Bold") != std::string::npos;
-  bool hasItalic = text->fauxItalic || text->fontStyle.find("Italic") != std::string::npos;
-  if (hasBold) {
+  if (text->fauxBold) {
     out.addAttribute("font-weight", "bold");
   }
-  if (hasItalic) {
+  if (text->fauxItalic) {
     out.addAttribute("font-style", "italic");
   }
 }
