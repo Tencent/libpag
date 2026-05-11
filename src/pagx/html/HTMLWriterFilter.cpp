@@ -694,6 +694,14 @@ std::string HTMLWriter::writeClipDef(const Layer* mask) {
 }
 
 void HTMLWriter::writeClipContent(HTMLBuilder& out, const Layer* layer, const Matrix& parent) {
+  // Depth-limit the clip-content descent. The sibling recursive paths writeLayer,
+  // writeGroup, writeComposition and writeElements each acquire a RecursionGuard; this
+  // one used to be the only recursive entry point without one, so a crafted mask graph
+  // deeper than MAX_RECURSION_DEPTH would overflow the stack here.
+  RecursionGuard guard(_ctx);
+  if (guard.overflowed()) {
+    return;
+  }
   Matrix lm = layer->matrix;
   if (layer->x != 0 || layer->y != 0) {
     lm = Matrix::Translate(layer->x, layer->y) * lm;

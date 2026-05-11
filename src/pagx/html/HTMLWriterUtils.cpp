@@ -679,7 +679,7 @@ std::string HTMLWriter::rewriteVerticalColumnBreaks(const Text* text) {
 }
 
 std::string HTMLWriter::buildVerticalJustifyContent(const Text* text, float boxHeight) {
-  if (text == nullptr) return {};
+  if (text == nullptr || text->glyphData == nullptr) return {};
   const auto& runs = text->glyphData->layoutRuns;
   if (runs.empty()) return {};
   // Flatten glyph data across runs. Each glyph needs three derived attributes that tgfx's
