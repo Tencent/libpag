@@ -176,11 +176,44 @@ static std::string MatrixToSVGTransform(const Matrix& matrix) {
   return result;
 }
 
+// Detects an image MIME type from the leading bytes of the encoded stream so that
+// data URIs declare the actual format (PNG/JPEG/WebP). Defaults to image/png when
+// the magic bytes are not recognized, matching the long-standing assumption that
+// embedded images are PNG and keeping the legacy export behaviour for that case.
+static const char* DetectImageMimeType(const uint8_t* data, size_t size) {
+  if (size >= 8 && data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47) {
+    return "image/png";
+  }
+  if (size >= 3 && data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF) {
+    return "image/jpeg";
+  }
+  if (size >= 12 && data[0] == 'R' && data[1] == 'I' && data[2] == 'F' && data[3] == 'F' &&
+      data[8] == 'W' && data[9] == 'E' && data[10] == 'B' && data[11] == 'P') {
+    return "image/webp";
+  }
+  return "image/png";
+}
+
+static std::string EncodeImageDataURI(const uint8_t* bytes, size_t size) {
+  std::string href = "data:";
+  href += DetectImageMimeType(bytes, size);
+  href += ";base64,";
+  href += Base64Encode(bytes, size);
+  return href;
+}
+
+// SVG cross-environment usage (e.g. embedded in HTML, opened in a browser) cannot
+// rely on absolute filesystem paths resolving, so prefer to inline the encoded image
+// bytes as a data URI. Reads from disk on demand when only filePath is populated.
 static std::string GetImageHref(const Image* image) {
   if (image->data) {
-    return "data:image/png;base64," + Base64Encode(image->data->bytes(), image->data->size());
+    return EncodeImageDataURI(image->data->bytes(), image->data->size());
   }
   if (!image->filePath.empty()) {
+    auto data = GetImageData(image);
+    if (data && data->size() > 0) {
+      return EncodeImageDataURI(data->bytes(), data->size());
+    }
     return image->filePath;
   }
   return {};
@@ -542,15 +575,19 @@ std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern, const R
 
   std::string defId = generateId("pattern");
 
-  // Detect which tile modes we need to handle
+  // Detect which tile modes we need to handle. Decal is intentionally excluded from
+  // needsBaking: a Decal-only pattern paints the image once with the matrix/scaleMode
+  // placement and leaves the outside transparent, which is already what the native
+  // non-baking branch below emits (and crucially RenderTiledPattern ignores scaleMode,
+  // so baking would crop the image to the shape origin and lose LetterBox/Zoom/Stretch
+  // fit). Mirror and Clamp have no portable SVG primitive and still require baking.
   bool needsNativeTiling =
       (pattern->tileModeX == TileMode::Repeat || pattern->tileModeY == TileMode::Repeat);
   bool needsBaking =
       (pattern->tileModeX == TileMode::Mirror || pattern->tileModeY == TileMode::Mirror ||
-       pattern->tileModeX == TileMode::Clamp || pattern->tileModeY == TileMode::Clamp ||
-       pattern->tileModeX == TileMode::Decal || pattern->tileModeY == TileMode::Decal);
+       pattern->tileModeX == TileMode::Clamp || pattern->tileModeY == TileMode::Clamp);
 
-  // Try baking for unsupported tile modes (Mirror, Clamp, Decal)
+  // Try baking for unsupported tile modes (Mirror, Clamp)
   if (needsBaking && !shapeBounds.isEmpty()) {
     int w = static_cast<int>(ceilf(shapeBounds.width));
     int h = static_cast<int>(ceilf(shapeBounds.height));
