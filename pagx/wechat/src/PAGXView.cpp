@@ -172,8 +172,6 @@ void PAGXView::loadPAGX(const val& pagxData) {
 
 void PAGXView::parsePAGX(const val& pagxData) {
   // Release old resources early to reduce peak memory usage when switching pages.
-  bool hadCached = cachedSnapshot != nullptr;
-  bool hadFit = fitSnapshot != nullptr;
   displayList.root()->removeChildren();
   contentLayer = nullptr;
   // Drop the per-document layer builder state before releasing the document itself; its
@@ -200,9 +198,6 @@ void PAGXView::parsePAGX(const val& pagxData) {
   // Reset first-frame flag so JS-side loading flow can wait for the new document's first
   // render via isFirstFrameRendered() instead of seeing a stale true from the previous one.
   hasRenderedFirstFrame = false;
-  tgfx::PrintLog("[parsePAGX] @ %.0fms cleared cached(%s) fit(%s) reset zoom/offset, version-> %u",
-                 emscripten_get_now(),
-                 hadCached ? "had" : "none", hadFit ? "had" : "none", cachedVersion);
 
   auto data = GetPagxDataFromEmscripten(pagxData);
   if (!data) {
@@ -496,10 +491,6 @@ void PAGXView::buildLayers() {
   applyDocumentCustomData();
   displayList.root()->addChild(contentLayer);
   applyCenteringTransform();
-  tgfx::PrintLog("[buildLayers] @ %.0fms new contentLayer pagx=%.0fx%.0f canvas=%dx%d "
-                 "contentLayer=%p children=%zu",
-                 emscripten_get_now(), pagxWidth, pagxHeight, _width, _height,
-                 contentLayer.get(), contentLayer->children().size());
 }
 
 void PAGXView::applyDocumentCustomData() {
@@ -549,10 +540,6 @@ void PAGXView::updateSize(int width, int height) {
     return;
   }
 
-  bool hadCached = cachedSnapshot != nullptr;
-  bool hadFit = fitSnapshot != nullptr;
-  int oldW = _width;
-  int oldH = _height;
   _width = width;
   _height = height;
   surface = nullptr;
@@ -563,9 +550,6 @@ void PAGXView::updateSize(int width, int height) {
   fitVersion = 0;
   fitSnapshotPixelScale = 1.0f;
   gestureActive = false;
-  tgfx::PrintLog("[updateSize] %dx%d -> %dx%d cleared snapshots cached(%s) fit(%s)",
-                 oldW, oldH, width, height,
-                 hadCached ? "had" : "none", hadFit ? "had" : "none");
   zoomedOutFrameSettled = false;
   lastGestureEndMs = 0.0;
 
@@ -620,29 +604,13 @@ void PAGXView::setBoundsOrigin(float x, float y) {
 
 void PAGXView::setGestureActive(bool active) {
   if (active) {
-    // 手势开始时立即抓主 surface 当前像素作为 cached（高清主视图层）。后续手势期间
-    // composite 把 cached 在 fit 之上 blit，提供"用户开始操作那一刻"的清晰内容。
-    if (surface != nullptr && device != nullptr) {
-      auto context = device->lockContext();
-      if (context != nullptr) {
-        cachedSnapshot = surface->makeImageSnapshot();
-        snapshotZoom = static_cast<float>(displayList.zoomScale());
-        snapshotOffset = displayList.contentOffset();
-        cachedVersion++;
-        device->unlock();
-      }
-    }
-    if (cachedSnapshot == nullptr && fitSnapshot == nullptr) {
-      tgfx::PrintLog("[Gesture] start SUPPRESSED: snapshots both null");
+    // 当前阶段只用 fitSnapshot 做 composite，不再抓 cached。
+    if (fitSnapshot == nullptr) {
       gestureActive = false;
       return;
     }
-    tgfx::PrintLog(
-        "[Gesture] start cachedV%u(z=%.3f off=%.1f,%.1f) fitV%u",
-        cachedVersion, snapshotZoom, snapshotOffset.x, snapshotOffset.y, fitVersion);
   } else {
     lastGestureEndMs = emscripten_get_now();
-    tgfx::PrintLog("[Gesture] end @ %.0fms", lastGestureEndMs);
   }
   zoomedOutFrameSettled = false;
   gestureActive = active;
@@ -789,8 +757,7 @@ bool PAGXView::draw() {
   // refreshed on the next non-gesture frame.
   bool fitOnly = !gestureActive && fitSnapshot != nullptr && liveZoom <= 1.02f &&
                  !displayList.hasContentChanged();
-  if ((gestureActive || fitOnly) && surface != nullptr &&
-      (cachedSnapshot != nullptr || fitSnapshot != nullptr)) {
+  if ((gestureActive || fitOnly) && surface != nullptr && fitSnapshot != nullptr) {
     auto context = device->lockContext();
     if (context == nullptr) {
       return false;
@@ -819,50 +786,7 @@ bool PAGXView::draw() {
       canvas->restore();
       fitDrawn = true;
     }
-    // cached blit：cached 是手势开始瞬间的主 surface 截图（含 background）。clipRect
-    // 限制只画 cached 内文档实际占据的矩形，避免 cached 的 background 覆盖 fit 内容。
-    float cachedScale = 0.0f;
-    float cctx = 0.0f;
-    float ccty = 0.0f;
-    bool cachedDrawn = false;
-    if (cachedSnapshot != nullptr) {
-      cachedScale = snapshotZoom != 0.0f ? liveZoom / snapshotZoom : 1.0f;
-      cctx = liveOffset.x - snapshotOffset.x * cachedScale;
-      ccty = liveOffset.y - snapshotOffset.y * cachedScale;
-      // 计算 cached 内文档矩形（cached 像素坐标系）：
-      //   surface 像素 = (内容点 * fitContentScale + center) * snapshotZoom + snapshotOffset
-      float fitContentScale = computeFitScale();
-      if (fitContentScale > 0.0f) {
-        float centerX = (static_cast<float>(_width) - pagxWidth * fitContentScale) * 0.5f;
-        float centerY = (static_cast<float>(_height) - pagxHeight * fitContentScale) * 0.5f;
-        float docLeft = centerX * snapshotZoom + snapshotOffset.x;
-        float docTop = centerY * snapshotZoom + snapshotOffset.y;
-        float docRight =
-            (centerX + pagxWidth * fitContentScale) * snapshotZoom + snapshotOffset.x;
-        float docBottom =
-            (centerY + pagxHeight * fitContentScale) * snapshotZoom + snapshotOffset.y;
-        canvas->save();
-        canvas->translate(cctx, ccty);
-        canvas->scale(cachedScale, cachedScale);
-        canvas->clipRect(tgfx::Rect::MakeLTRB(docLeft, docTop, docRight, docBottom));
-        canvas->drawImage(cachedSnapshot);
-        canvas->restore();
-        cachedDrawn = true;
-      }
-    }
-    // 拼接诊断：每 30 帧一次。
-    static int compositeFrameCount = 0;
-    if ((compositeFrameCount++ % 30) == 0) {
-      tgfx::PrintLog(
-          "[Composite] #%d gesture=%d live(z=%.3f off=%.1f,%.1f) | "
-          "fit drawn=%d scale=%.3f tx=%.1f ty=%.1f | "
-          "cached drawn=%d scale=%.3f tx=%.1f ty=%.1f cap(z=%.3f off=%.1f,%.1f)",
-          compositeFrameCount, gestureActive ? 1 : 0,
-          liveZoom, liveOffset.x, liveOffset.y,
-          fitDrawn ? 1 : 0, fitScale, ftx, fty,
-          cachedDrawn ? 1 : 0, cachedScale, cctx, ccty,
-          snapshotZoom, snapshotOffset.x, snapshotOffset.y);
-    }
+    (void)fitDrawn;
     auto recording = context->flush();
     if (recording) {
       context->submit(std::move(recording));
@@ -985,22 +909,6 @@ bool PAGXView::draw() {
         fitSnapshotZoom = 1.0f;
         fitSnapshotOffset = {0.0f, 0.0f};
         fitVersion++;
-        tgfx::PrintLog(
-            "[Capture] @ %.0fms fitV%u CAPTURED pixelScale=%.1fx surface=%dx%d "
-            "snapshot=%p contentLayer=%p children=%zu pagx=%.0fx%.0f fitContentScale=%.4f",
-            emscripten_get_now(), fitVersion, fitSnapshotPixelScale,
-            static_cast<int>(_width * fitSnapshotPixelScale),
-            static_cast<int>(_height * fitSnapshotPixelScale),
-            fitSnapshot.get(), contentLayer.get(),
-            contentLayer->children().size(), pagxWidth, pagxHeight, fitContentScale);
-      } else if (!hasContent) {
-        tgfx::PrintLog(
-            "[Capture] @ %.0fms SKIPPED no contentLayer (parsePAGX cleared it)",
-            emscripten_get_now());
-      } else {
-        tgfx::PrintLog(
-            "[Capture] @ %.0fms SKIPPED fit already exists (fitV%u)",
-            emscripten_get_now(), fitVersion);
       }
     }
 
@@ -1094,8 +1002,6 @@ void PAGXView::resetForFreshCapture() {
   fitSnapshotPixelScale = 1.0f;
   hasRenderedFirstFrame = false;
   zoomedOutFrameSettled = false;
-  tgfx::PrintLog("[resetForFreshCapture] dropped intermediate snapshots, version-> %u",
-                 cachedVersion);
 }
 
 int PAGXView::width() const {
