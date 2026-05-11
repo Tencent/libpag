@@ -720,9 +720,15 @@ std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) 
     }
 
     auto classification = ClassifyGroupProperties(members);
+    // Split into base+modifier whenever at least two shared declarations can be hoisted out.
+    // The previous upper bound of 2 varying properties was too tight for text outputs where
+    // per-character spans typically vary by 3 properties (top/left/transform along a path).
+    // For a group of N members with S shared and V varying decls, splitting saves (N-1)*S
+    // declarations; once V <= 3 the per-modifier overhead never outweighs that gain on real
+    // documents.
     bool shouldSplit = groupSize >= 2 && classification.sharedProps.size() >= 2 &&
                        classification.varyingPropNames.size() >= 1 &&
-                       classification.varyingPropNames.size() <= 2;
+                       classification.varyingPropNames.size() <= 3;
 
     // Never split when `background` (shorthand) is a varying prop AND `background-clip`
     // is a shared prop. CSS background shorthand implicitly resets background-clip to its

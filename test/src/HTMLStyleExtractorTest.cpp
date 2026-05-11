@@ -260,6 +260,65 @@ CLI_TEST(HTMLStyleExtractorTest, SharedModifierClass) {
   EXPECT_EQ(count, 2);
 }
 
+CLI_TEST(HTMLStyleExtractorTest, BaseModifierThreeVarying) {
+  // Three glyph-like spans share color/display/font-size; top, left, and transform vary.
+  // Three varying properties are still profitable to split because (N-1) * sharedDecls
+  // dominates the modifier-class overhead.
+  std::string input =
+      R"X(<html><head></head><body>)X"
+      R"X(<span style="color:#3B82F6;display:inline-block;font-size:14px;top:10px;left:20px;transform:rotate(5deg)">a</span>)X"
+      R"X(<span style="color:#3B82F6;display:inline-block;font-size:14px;top:12px;left:30px;transform:rotate(10deg)">b</span>)X"
+      R"X(<span style="color:#3B82F6;display:inline-block;font-size:14px;top:14px;left:40px;transform:rotate(15deg)">c</span>)X"
+      R"X(</body></html>)X";
+  auto result = pagx::HTMLStyleExtractor::Extract(input);
+  // Base class with the 3 shared declarations (canonical order: display 20, color 90, font-size 92).
+  EXPECT_NE(result.find(".text0{display:inline-block;color:#3B82F6;font-size:14px}"),
+            std::string::npos);
+  // Three modifier classes carrying only the varying triple (top 12, left 15, transform 40).
+  EXPECT_NE(result.find(".text1{top:10px;left:20px;transform:rotate(5deg)}"), std::string::npos);
+  EXPECT_NE(result.find(".text2{top:12px;left:30px;transform:rotate(10deg)}"), std::string::npos);
+  EXPECT_NE(result.find(".text3{top:14px;left:40px;transform:rotate(15deg)}"), std::string::npos);
+  // Each span should carry base+modifier pair.
+  EXPECT_NE(result.find("class=\"text0 text1\""), std::string::npos);
+  EXPECT_NE(result.find("class=\"text0 text2\""), std::string::npos);
+  EXPECT_NE(result.find("class=\"text0 text3\""), std::string::npos);
+  // No remaining inline styles.
+  EXPECT_EQ(result.find("style=\"color"), std::string::npos);
+}
+
+CLI_TEST(HTMLStyleExtractorTest, BaseModifierFourVaryingFallback) {
+  // Four varying properties exceeds the upper bound (3); the group must fall back to
+  // standalone classes rather than split.
+  std::string input =
+      R"(<html><head></head><body>)"
+      R"(<div style="position:absolute;color:red;width:10px;top:0;left:0">a</div>)"
+      R"(<div style="position:absolute;color:blue;width:20px;top:5px;left:5px">b</div>)"
+      R"(</body></html>)";
+  auto result = pagx::HTMLStyleExtractor::Extract(input);
+  // No base/modifier pair anywhere — each element should carry exactly one class.
+  EXPECT_EQ(result.find("class=\"layer0 "), std::string::npos);
+  EXPECT_EQ(result.find("class=\"div0 "), std::string::npos);
+  // Each element gets a single standalone class containing all five declarations.
+  EXPECT_NE(result.find("color:red"), std::string::npos);
+  EXPECT_NE(result.find("color:blue"), std::string::npos);
+  EXPECT_NE(result.find("width:10px"), std::string::npos);
+  EXPECT_NE(result.find("width:20px"), std::string::npos);
+}
+
+CLI_TEST(HTMLStyleExtractorTest, BaseModifierThreeVaryingZeroShared) {
+  // Three properties all differ → shared = 0. The shared >= 2 guard must keep this in
+  // fallback even though varying = 3 is now permitted.
+  std::string input = R"(<html><head></head><body>)"
+                      R"(<div style="color:red;width:10px;height:5px">a</div>)"
+                      R"(<div style="color:blue;width:20px;height:8px">b</div>)"
+                      R"(</body></html>)";
+  auto result = pagx::HTMLStyleExtractor::Extract(input);
+  // Standalone classes; no base/modifier composition.
+  EXPECT_EQ(result.find("class=\"div0 div"), std::string::npos);
+  EXPECT_NE(result.find("color:red"), std::string::npos);
+  EXPECT_NE(result.find("color:blue"), std::string::npos);
+}
+
 CLI_TEST(HTMLStyleExtractorTest, GradientParenthesesParse) {
   // Semicolons and colons inside parentheses must not cause splits.
   std::string input =
