@@ -252,6 +252,12 @@ class HTMLExporter {
    * Exports a PAGXDocument to an HTML string. The output is a standalone HTML fragment containing
    * CSS styles and SVG elements that visually reproduce the PAGX content in modern browsers.
    *
+   * Precondition: `document.isLayoutApplied()` must return true — the exporter reads
+   * layout-resolved geometry (positions, sizes, text runs) produced by PAGXDocument::applyLayout
+   * and cannot derive them on the fly. Passing a document whose layout has not been applied
+   * silently produces an empty or degenerate HTML string rather than throwing; callers are
+   * responsible for invoking applyLayout() themselves.
+   *
    * Thread safety: this is a stateless static method and may be called concurrently from
    * multiple threads, provided that each thread passes a distinct document (or a document that
    * is guaranteed not to be mutated for the duration of the call).
@@ -265,7 +271,7 @@ class HTMLExporter {
    * pointer or reference to the document or its internal nodes beyond the duration of this
    * call, so the caller is free to destroy or mutate `document` as soon as ToHTML returns.
    *
-   * @param document The PAGX document to export.
+   * @param document The PAGX document to export. Must have had applyLayout() called.
    * @param options Export options controlling output formatting.
    * @return The generated HTML string, or an empty string if the document has no content or
    *         if the exporter encountered an internal failure.
@@ -280,10 +286,10 @@ class HTMLExporter {
    * verbatim — the library does not validate, sanitise, or restrict it, so protecting against
    * path traversal and ensuring the location is writable are the caller's responsibility.
    *
-   * Thread safety, failure semantics, and document ownership follow the same rules as
-   * ToHTML; see that method for details.
+   * Precondition, thread safety, failure semantics, and document ownership follow the same
+   * rules as ToHTML; see that method for details.
    *
-   * @param document The PAGX document to export.
+   * @param document The PAGX document to export. Must have had applyLayout() called.
    * @param filePath The output file path, used verbatim (no validation performed by the
    *                 library).
    * @param options Export options controlling output formatting.
