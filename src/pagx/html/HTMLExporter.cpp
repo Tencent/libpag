@@ -158,7 +158,8 @@ static std::string BuildFontFaceCSS(const std::vector<FontFaceRule>& rules, bool
       continue;
     }
     if (minify) {
-      css += "@font-face{font-family:'" + rule.fontFamily + "';src:" + srcValue;
+      css +=
+          "@font-face{font-family:'" + EscapeCssFontFamily(rule.fontFamily) + "';src:" + srcValue;
       if (!rule.fontWeight.empty()) {
         css += ";font-weight:" + rule.fontWeight;
       }
@@ -171,7 +172,7 @@ static std::string BuildFontFaceCSS(const std::vector<FontFaceRule>& rules, bool
       css += ";font-display:block}";
     } else {
       css += "@font-face {\n";
-      css += "  font-family: '" + rule.fontFamily + "';\n";
+      css += "  font-family: '" + EscapeCssFontFamily(rule.fontFamily) + "';\n";
       css += "  src: " + srcValue + ";\n";
       if (!rule.fontWeight.empty()) {
         css += "  font-weight: " + rule.fontWeight + ";\n";

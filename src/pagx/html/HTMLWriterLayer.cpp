@@ -2296,6 +2296,12 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     out.addAttr("data-name", layer->name);
   }
   for (auto& [key, value] : layer->customData) {
+    // IsValidCustomDataKey() is enforced at import time, but programmatic PAGXDocument
+    // construction can bypass that check. Re-validate here so a crafted key cannot inject
+    // attribute boundary characters (", >, space) into the emitted HTML tag.
+    if (!IsValidCustomDataKey(key)) {
+      continue;
+    }
     out.addAttr(("data-" + key).c_str(), value);
   }
   out.addAttr("style", style);
