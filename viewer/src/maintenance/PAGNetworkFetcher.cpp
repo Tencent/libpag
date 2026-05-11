@@ -47,7 +47,10 @@ void PAGNetworkFetcher::fetch() {
 }
 
 void PAGNetworkFetcher::fetchAsync() {
-  auto* manager = new QNetworkAccessManager(this);
+  if (manager != nullptr) {
+    return;
+  }
+  manager = new QNetworkAccessManager(this);
   connect(manager, &QNetworkAccessManager::finished, this, &PAGNetworkFetcher::onReplyFinished);
   manager->get(QNetworkRequest(QUrl(url)));
 }
@@ -59,6 +62,8 @@ void PAGNetworkFetcher::onReplyFinished(QNetworkReply* reply) {
     Q_EMIT fetched({});
   }
   reply->deleteLater();
+  manager->deleteLater();
+  manager = nullptr;
   Q_EMIT finished();
 }
 

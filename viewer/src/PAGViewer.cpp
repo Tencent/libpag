@@ -48,6 +48,9 @@ void PAGViewer::openFile(QString path) {
       window = win;
       break;
     }
+    // PAGX files always open in a new window because they require a different QML view
+    // component (PAGXView vs PAGView), and reusing an empty PAG window would need a Loader
+    // switch that is simpler handled by creating a fresh window.
     if (!isPagx && fileInWindow.isEmpty()) {
       window = win;
       break;

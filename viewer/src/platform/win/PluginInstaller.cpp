@@ -378,11 +378,10 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
   bool userPluginSuccess = true;
 
   for (const QString& plugin : plugins) {
-    if (getPluginPermission(plugin) == PluginPermission::User) {
-      if (plugin == "H264EncoderTools") {
-        if (!copyH264EncoderToolsWithRetry(MaxCopyRetries)) {
-          userPluginSuccess = false;
-        }
+    auto permission = getPluginPermission(plugin);
+    if (permission == PluginPermission::User) {
+      if (!copyH264EncoderToolsWithRetry(MaxCopyRetries)) {
+        userPluginSuccess = false;
       }
       continue;
     }
@@ -544,6 +543,9 @@ bool PluginInstaller::copyH264EncoderToolsWithRetry(int maxRetries) const {
   }
 
   QString installDir = getH264EncoderToolsInstallDir();
+  if (installDir.isEmpty()) {
+    return false;
+  }
   QString targetPath = installDir + "/H264EncoderTools.exe";
 
   QDir dir;
@@ -571,6 +573,11 @@ bool PluginInstaller::copyH264EncoderToolsWithRetry(int maxRetries) const {
 }
 
 void PluginInstaller::storeViewerPathForPlugin() const {
+  // Uses QStandardPaths::AppDataLocation (not qgetenv("APPDATA")) intentionally.
+  // This resolves to an app-specific subdirectory (e.g. %APPDATA%/pag/PAGViewer/) which is
+  // the correct location for PAGExporter's PAGViewerPath.txt. The qgetenv("APPDATA") pattern
+  // used elsewhere targets the bare roaming directory for H264EncoderTools compatibility.
+  // This call runs before elevation, so it always resolves to the invoking user's profile.
   QString roaming = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
   QString pagExporterDir = roaming + "/PAGExporter";
 

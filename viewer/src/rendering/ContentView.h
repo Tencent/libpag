@@ -45,8 +45,12 @@ class ContentView : public QQuickItem {
   virtual ContentViewModel* getViewModel() const = 0;
   RenderThread* getRenderThread() const;
 
+  /// Releases the GPU drawable and shuts down the render thread.
   /// Called from QML before the Loader switches components, ensuring the drawable
   /// is released while the item is still attached to the window.
+  /// Note: the same releaseDrawable() effect is also triggered by ~ContentView() and
+  /// itemChange(ItemSceneChange) when the item loses its window, but those fire too
+  /// late for a Loader component switch where RenderThread needs the window context.
   Q_INVOKABLE void prepareForRemoval();
 
   /**

@@ -274,10 +274,14 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
   for (const QString& plugin : plugins) {
     QString source = getPluginSourcePath(plugin);
     QString target = getPluginInstallPath(plugin);
+    auto permission = getPluginPermission(plugin);
 
     fs::path sourcePath(source.toStdString());
     if (!fs::exists(sourcePath)) {
-      if (getPluginPermission(plugin) == PluginPermission::User) {
+      // User-permission plugins (e.g. H264EncoderTools) are auxiliary — a missing source
+      // is tolerable and should not abort the entire batch install. Admin-permission plugins
+      // (e.g. PAGExporter) are the core deliverable, so a missing source is fatal.
+      if (permission == PluginPermission::User) {
         userPluginSuccess = false;
         continue;
       }
@@ -286,7 +290,7 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
 
     QString targetDir = QFileInfo(target).absolutePath();
 
-    if (getPluginPermission(plugin) == PluginPermission::User) {
+    if (permission == PluginPermission::User) {
       if (!QDir().mkpath(targetDir)) {
         userPluginSuccess = false;
         continue;
@@ -326,8 +330,9 @@ bool PluginInstaller::removePluginFiles(const QStringList& plugins) const {
 
   for (const QString& plugin : plugins) {
     QString target = getPluginInstallPath(plugin);
+    auto permission = getPluginPermission(plugin);
 
-    if (getPluginPermission(plugin) == PluginPermission::User) {
+    if (permission == PluginPermission::User) {
       QFile::remove(target);
     } else {
       adminCommands << QString("rm -rf '%1'").arg(target);

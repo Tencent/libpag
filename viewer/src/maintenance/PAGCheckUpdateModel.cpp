@@ -37,14 +37,14 @@ PAGCheckUpdateModel::~PAGCheckUpdateModel() {
   }
 }
 
-void PAGCheckUpdateModel::checkForUpdates(bool keepSlient, bool isUseBeta) {
+void PAGCheckUpdateModel::checkForUpdates(bool keepSilent, bool isUseBeta) {
   if (!availableUpdateUrls.empty()) {
     qDebug() << "Checking for updates is already in progress, please try again later";
     return;
   }
 
   this->isUseBeta = isUseBeta;
-  this->keepSilent = keepSlient;
+  this->keepSilent = keepSilent;
   auto* fetcher = new PAGNetworkFetcher(ServerUrl, this);
   connect(fetcher, &PAGNetworkFetcher::fetched, this, &PAGCheckUpdateModel::getAppcast);
   connect(fetcher, &PAGNetworkFetcher::finished, fetcher, &QObject::deleteLater);

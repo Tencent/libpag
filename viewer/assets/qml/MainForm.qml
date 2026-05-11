@@ -40,7 +40,7 @@ SplitView {
 
     property alias controlForm: controlForm
 
-    property string currentViewType: typeof initialViewType !== "undefined" ? initialViewType : "pag"
+    property string currentViewType: initialViewType
 
     property string pendingFilePath: ""
 
