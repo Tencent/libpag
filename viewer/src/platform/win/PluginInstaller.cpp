@@ -380,8 +380,10 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
   for (const QString& plugin : plugins) {
     auto permission = getPluginPermission(plugin);
     if (permission == PluginPermission::User) {
-      if (!copyH264EncoderToolsWithRetry(MaxCopyRetries)) {
-        userPluginSuccess = false;
+      if (plugin == "H264EncoderTools") {
+        if (!copyH264EncoderToolsWithRetry(MaxCopyRetries)) {
+          userPluginSuccess = false;
+        }
       }
       continue;
     }
