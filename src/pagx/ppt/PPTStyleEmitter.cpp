@@ -512,23 +512,26 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
   // OOXML effectLst requires this element order (§20.1.8.20):
   // blur, fillOverlay, glow, innerShdw, outerShdw, prstShdw, reflection, softEdge
 
-  // BlurFilter (filter) takes precedence over BackgroundBlurStyle. PPT has no native
-  // background-blur primitive; we emit a:blur as a best-effort approximation that
-  // blurs the shape itself rather than the background behind it.
-  // grow="1" allows the blur to extend beyond the original shape bounds — required
-  // for solid-filled shapes, otherwise PowerPoint clips the blurred edges back to
-  // the original bounds and the effect becomes invisible.
-  float avgBlur = 0;
+  // BlurFilter blurs the shape itself, which is exactly what OOXML's a:blur does, so
+  // the mapping is direct. grow="1" allows the blur to extend beyond the original
+  // shape bounds — required for solid-filled shapes, otherwise PowerPoint clips the
+  // blurred edges back to the original bounds and the effect becomes invisible.
+  //
+  // BackgroundBlurStyle is intentionally NOT mapped to a:blur. It is a frosted-glass
+  // / backdrop-filter effect that blurs the pixels behind the shape while leaving the
+  // shape's own fill and stroke crisp. OOXML has no native backdrop-blur primitive
+  // and using a:blur as a stand-in produces visibly wrong output: the card's stroke,
+  // rounded corners, and fill all become fuzzy. Authors who need a faithful render of
+  // BackgroundBlurStyle should enable `rasterizeUnsupported` so the layer is baked
+  // with its real backdrop via rasterizeLayerAsPicture (probed in PPTFeatureProbe).
   if (sources.blur) {
-    avgBlur = (sources.blur->blurX + sources.blur->blurY) / 2.0f;
-  } else if (sources.backgroundBlur) {
-    avgBlur = (sources.backgroundBlur->blurX + sources.backgroundBlur->blurY) / 2.0f;
-  }
-  if (avgBlur > 0) {
-    out.openElement("a:blur")
-        .addRequiredAttribute("rad", PxToEMU(avgBlur))
-        .addRequiredAttribute("grow", "true")
-        .closeElementSelfClosing();
+    float avgBlur = (sources.blur->blurX + sources.blur->blurY) / 2.0f;
+    if (avgBlur > 0) {
+      out.openElement("a:blur")
+          .addRequiredAttribute("rad", PxToEMU(avgBlur))
+          .addRequiredAttribute("grow", "true")
+          .closeElementSelfClosing();
+    }
   }
 
   if (sources.blend) {

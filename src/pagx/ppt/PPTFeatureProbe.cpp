@@ -19,6 +19,7 @@
 #include "pagx/ppt/PPTFeatureProbe.h"
 #include <cmath>
 #include "base/utils/MathUtil.h"
+#include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/ColorSource.h"
@@ -92,6 +93,7 @@ static void Merge(PPTFeatureFlags* dst, const PPTFeatureFlags& src) {
   dst->hasDiamondGradient |= src.hasDiamondGradient;
   dst->hasConicGradient |= src.hasConicGradient;
   dst->hasShearTransform |= src.hasShearTransform;
+  dst->hasBackgroundBlur |= src.hasBackgroundBlur;
 }
 
 static bool GradientHasWideGamutStop(const std::vector<ColorStop*>& stops) {
@@ -212,6 +214,17 @@ PPTFeatureFlags ProbeLayerFeatures(const Layer* layer) {
       auto* blend = static_cast<const BlendFilter*>(filter);
       if (!IsSupportedBlendFilterMode(blend->blendMode)) {
         out.hasUnsupportedBlend = true;
+      }
+    }
+  }
+  for (const auto* style : layer->styles) {
+    if (style == nullptr) {
+      continue;
+    }
+    if (style->nodeType() == NodeType::BackgroundBlurStyle) {
+      auto* bg = static_cast<const BackgroundBlurStyle*>(style);
+      if (bg->blurX > 0 || bg->blurY > 0) {
+        out.hasBackgroundBlur = true;
       }
     }
   }

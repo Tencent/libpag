@@ -29,7 +29,6 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/PPTExporter.h"
 #include "pagx/TextLayout.h"
-#include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorStop.h"
@@ -572,16 +571,19 @@ inline const char* BlendModeToPPT(BlendMode mode) {
 // → innerShdw → outerShdw) and applied by the consumer, not by collection.
 struct EffectSources {
   const BlurFilter* blur = nullptr;
-  const BackgroundBlurStyle* backgroundBlur = nullptr;
   const BlendFilter* blend = nullptr;
   const InnerShadowFilter* innerShadowFilter = nullptr;
   const InnerShadowStyle* innerShadowStyle = nullptr;
   const DropShadowFilter* dropShadowFilter = nullptr;
   const DropShadowStyle* dropShadowStyle = nullptr;
 
+  // BackgroundBlurStyle is intentionally not tracked: it has no faithful OOXML
+  // primitive (a:blur blurs the shape itself, not the backdrop) and the writer
+  // drops it on the vector path. When `rasterizeUnsupported` is enabled, the
+  // feature probe rasterizes the layer with backdrop instead.
   bool empty() const {
-    return !blur && !backgroundBlur && !blend && !innerShadowFilter && !innerShadowStyle &&
-           !dropShadowFilter && !dropShadowStyle;
+    return !blur && !blend && !innerShadowFilter && !innerShadowStyle && !dropShadowFilter &&
+           !dropShadowStyle;
   }
 };
 
@@ -616,11 +618,6 @@ inline EffectSources CollectEffectSources(const std::vector<LayerFilter*>& filte
   }
   for (const auto* s : styles) {
     switch (s->nodeType()) {
-      case NodeType::BackgroundBlurStyle:
-        if (!sources.backgroundBlur) {
-          sources.backgroundBlur = static_cast<const BackgroundBlurStyle*>(s);
-        }
-        break;
       case NodeType::InnerShadowStyle:
         if (!sources.innerShadowStyle) {
           sources.innerShadowStyle = static_cast<const InnerShadowStyle*>(s);

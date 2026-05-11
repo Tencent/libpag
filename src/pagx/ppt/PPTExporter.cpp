@@ -661,14 +661,14 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& pa
   // blends, ColorMatrix filters, or wide-gamut colors.
   auto features = ProbeLayerFeatures(layer);
   if (features.needsRasterization(_rasterizeUnsupported)) {
-    // For a non-Normal blend mode, compositing against the real backdrop
-    // requires rendering the whole scene clipped to the layer's bounds —
+    // Backdrop-aware features (non-Normal blend mode, BackgroundBlurStyle)
+    // require rendering the whole scene clipped to the layer's bounds —
     // this turns any editable native content beneath the patch into baked
     // pixels, which is why `rasterizeUnsupported` defaults to false.
     // Every other unsupported feature (TextPath, ColorMatrix, wide-gamut
     // color, diamond/conic gradient, shear transform) is self-contained and
     // renders fine against an empty canvas.
-    bool withBackdrop = features.hasUnsupportedBlend && _rasterizeUnsupported;
+    bool withBackdrop = features.requiresBackdrop(_rasterizeUnsupported);
     if (rasterizeLayerAsPicture(out, layer, withBackdrop)) {
       return;
     }

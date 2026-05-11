@@ -51,24 +51,39 @@ struct PPTFeatureFlags {
                                      // translation, rotation, and axis-aligned scale/flip). The
                                      // exporter's matrix decomposition silently drops the shear,
                                      // producing a visibly wrong shape unless the layer is baked.
+  bool hasBackgroundBlur = false;    // BackgroundBlurStyle is a frosted-glass / backdrop-filter
+                                     // effect; OOXML has no native backdrop-blur primitive
+                                     // (a:blur blurs the shape itself, including its strokes and
+                                     // rounded corners, so it is not a valid stand-in). On the
+                                     // vector path the style is silently dropped; only the
+                                     // backdrop-aware raster fallback can reproduce it.
 
   /**
    * Returns true when at least one unsupported feature is present and the exporter should fall
    * back to rasterization. Features with no meaningful vector fallback (TextPath, TextModifier,
    * ColorMatrix, conic/diamond gradients, shear transforms) always trigger rasterization.
    * Features that have a degraded-but-valid vector fallback (unsupported blend modes fall back
-   * to Normal, wide-gamut colors clamp to sRGB) trigger rasterization only when the caller opts
-   * in via `rasterizeUnsupported`.
+   * to Normal, wide-gamut colors clamp to sRGB, background blur is dropped) trigger rasterization
+   * only when the caller opts in via `rasterizeUnsupported`.
    */
   bool needsRasterization(bool rasterizeUnsupported) const {
     if (hasTextPath || hasTextModifier || hasColorMatrix || hasConicGradient ||
         hasDiamondGradient || hasShearTransform) {
       return true;
     }
-    if (rasterizeUnsupported && (hasUnsupportedBlend || hasWideGamutColor)) {
+    if (rasterizeUnsupported && (hasUnsupportedBlend || hasWideGamutColor || hasBackgroundBlur)) {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Returns true when reproducing the unsupported feature requires compositing the layer against
+   * the real backdrop pixels (non-Normal blend mode, BackgroundBlurStyle). Self-contained features
+   * (TextPath, ColorMatrix, wide-gamut color, etc.) render fine against an empty canvas.
+   */
+  bool requiresBackdrop(bool rasterizeUnsupported) const {
+    return rasterizeUnsupported && (hasUnsupportedBlend || hasBackgroundBlur);
   }
 };
 
