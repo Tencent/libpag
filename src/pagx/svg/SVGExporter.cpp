@@ -1642,12 +1642,16 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
   TextAnchoring anchoring = ResolveTextAnchorAndOffset(text, fs.textBox, layoutResult, rtl);
 
   std::string transform = MatrixToSVGTransform(m);
-  if (!lines || lines->empty()) {
-    // Vertical writing mode skips horizontal line layout (see TextLayout.cpp:318),
-    // so textLines is nullptr and we must fall back to a single <text> element
-    // that carries the writing-mode attribute. The vertical-mode text flows
-    // top-to-bottom via CSS writing-mode="tb"; SVG renderers lay out the
-    // characters along the block-flow axis of the <text> element.
+  // Vertical writing mode populates textLines with one entry per column where
+  // baselineY actually stores -columnX (used by the PPT writer as a sort key
+  // to recover right-to-left column order). Iterating those entries here would
+  // add the negative column-X as a Y coordinate, pushing the text far above
+  // the box. Fall through to the single <text writing-mode="tb"> path so the
+  // SVG renderer lays out columns itself along the block-flow axis.
+  if (isVertical || !lines || lines->empty()) {
+    // The vertical-mode text flows top-to-bottom via CSS writing-mode="tb";
+    // SVG renderers lay out the characters along the block-flow axis of the
+    // <text> element.
     out.openElement("text");
     if (!transform.empty()) {
       out.addAttribute("transform", transform);
