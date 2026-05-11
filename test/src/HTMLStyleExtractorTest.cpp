@@ -30,12 +30,14 @@ CLI_TEST(HTMLStyleExtractorTest, NoStyleAttributes) {
 }
 
 CLI_TEST(HTMLStyleExtractorTest, SingleStyle) {
+  // A single-use standalone style is inlined rather than hoisted into a class
+  // (see InlineSingleUse* tests). For the class hoisting path, see DuplicateStyles.
   std::string input =
       R"(<html><head></head><body><div style="color:red">hello</div></body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
-  EXPECT_NE(result.find(".div0{color:red}"), std::string::npos);
-  EXPECT_NE(result.find("class=\"div0\""), std::string::npos);
-  EXPECT_EQ(result.find("style=\"color:red\""), std::string::npos);
+  EXPECT_NE(result.find("style=\"color:red\""), std::string::npos);
+  EXPECT_EQ(result.find(".div0{"), std::string::npos);
+  EXPECT_EQ(result.find("<style>"), std::string::npos);
 }
 
 CLI_TEST(HTMLStyleExtractorTest, DuplicateStyles) {
@@ -48,42 +50,57 @@ CLI_TEST(HTMLStyleExtractorTest, DuplicateStyles) {
 }
 
 CLI_TEST(HTMLStyleExtractorTest, ExistingClassMerged) {
-  std::string input =
-      R"(<html><head></head><body><div class="foo" style="color:red">hello</div></body></html>)";
+  // Pre-existing class must be preserved next to the extractor-assigned class.
+  // Two tags share the style so it hoists to a class rather than inlining.
+  std::string input = R"(<html><head></head><body><div class="foo" style="color:red">a</div>)"
+                      R"(<div class="bar" style="color:red">b</div></body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
   EXPECT_NE(result.find("class=\"foo div0\""), std::string::npos);
+  EXPECT_NE(result.find("class=\"bar div0\""), std::string::npos);
   EXPECT_EQ(result.find("style=\"color:red\""), std::string::npos);
 }
 
 CLI_TEST(HTMLStyleExtractorTest, EmptyExistingClass) {
-  std::string input =
-      R"(<html><head></head><body><div class="" style="color:red">hello</div></body></html>)";
+  // Empty class attribute must not leave a stray leading space in the merged value.
+  // Two uses keep the class form active.
+  std::string input = R"(<html><head></head><body>)"
+                      R"(<div class="" style="color:red">a</div>)"
+                      R"(<div class="" style="color:red">b</div></body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
   EXPECT_NE(result.find("class=\"div0\""), std::string::npos);
 }
 
 CLI_TEST(HTMLStyleExtractorTest, EntityApostrophe) {
-  std::string input =
-      R"(<html><head></head><body><div style="font-family:&#39;Arial&#39;">hello</div></body></html>)";
+  // Two uses so the decoded style becomes a class (otherwise single-use inlining fires).
+  std::string input = R"(<html><head></head><body><div style="font-family:&#39;Arial&#39;">a</div>)"
+                      R"(<div style="font-family:&#39;Arial&#39;">b</div></body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
   EXPECT_NE(result.find(".div0{font-family:'Arial'}"), std::string::npos);
 }
 
 CLI_TEST(HTMLStyleExtractorTest, EntityAll5Named) {
-  std::string input =
-      R"(<html><head></head><body><div style="a:&amp;b:&lt;c:&gt;d:&quot;e:&apos;">hello</div></body></html>)";
+  std::string input = R"(<html><head></head><body>)"
+                      R"(<div style="a:&amp;b:&lt;c:&gt;d:&quot;e:&apos;">a</div>)"
+                      R"(<div style="a:&amp;b:&lt;c:&gt;d:&quot;e:&apos;">b</div>)"
+                      R"(</body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
   EXPECT_NE(result.find("a:&b:<c:>d:\"e:'"), std::string::npos);
 }
 
 CLI_TEST(HTMLStyleExtractorTest, EntityNumericDec) {
-  std::string input = R"(<html><head></head><body><div style="x:&#65;">hello</div></body></html>)";
+  std::string input = R"(<html><head></head><body>)"
+                      R"(<div style="x:&#65;">a</div>)"
+                      R"(<div style="x:&#65;">b</div>)"
+                      R"(</body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
   EXPECT_NE(result.find("x:A"), std::string::npos);
 }
 
 CLI_TEST(HTMLStyleExtractorTest, EntityNumericHex) {
-  std::string input = R"(<html><head></head><body><div style="x:&#x41;">hello</div></body></html>)";
+  std::string input = R"(<html><head></head><body>)"
+                      R"(<div style="x:&#x41;">a</div>)"
+                      R"(<div style="x:&#x41;">b</div>)"
+                      R"(</body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
   EXPECT_NE(result.find("x:A"), std::string::npos);
 }
@@ -104,11 +121,13 @@ CLI_TEST(HTMLStyleExtractorTest, EmptyStyleAttr) {
 }
 
 CLI_TEST(HTMLStyleExtractorTest, CommentSkipped) {
+  // Commented-out style="..." attributes must not be extracted. Two real divs share
+  // the same style so it hoists to a class (class-form is what this test asserts).
   std::string input =
-      R"(<html><head></head><body><!-- <div style="color:red"> --><div style="color:blue">hello</div></body></html>)";
+      R"(<html><head></head><body><!-- <div style="color:red"> -->)"
+      R"(<div style="color:blue">a</div><div style="color:blue">b</div></body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
   EXPECT_NE(result.find(".div0{color:blue}"), std::string::npos);
-  // The comment text is preserved verbatim; only the real div's style is extracted.
   EXPECT_NE(result.find("<!-- <div style=\"color:red\"> -->"), std::string::npos);
 }
 
@@ -120,7 +139,9 @@ CLI_TEST(HTMLStyleExtractorTest, StyleValueWithDataUri) {
 }
 
 CLI_TEST(HTMLStyleExtractorTest, NoHeadInsertBeforeBody) {
-  std::string input = R"(<html><body><div style="color:red">hello</div></body></html>)";
+  // Two uses so the extracted class persists; tests the placement of <style>.
+  std::string input = R"(<html><body><div style="color:red">a</div>)"
+                      R"(<div style="color:red">b</div></body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
   EXPECT_NE(result.find("<style>"), std::string::npos);
   // Style block should be before <body.
@@ -130,24 +151,30 @@ CLI_TEST(HTMLStyleExtractorTest, NoHeadInsertBeforeBody) {
 }
 
 CLI_TEST(HTMLStyleExtractorTest, SelfClosingTag) {
-  std::string input =
-      R"(<html><head></head><body><img src="x.png" style="width:100px" /></body></html>)";
+  // Two self-closing imgs share the style so it hoists to a class.
+  std::string input = R"(<html><head></head><body>)"
+                      R"(<img src="a.png" style="width:100px" />)"
+                      R"(<img src="b.png" style="width:100px" /></body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
   EXPECT_NE(result.find("class=\"div0\""), std::string::npos);
   EXPECT_NE(result.find("/>"), std::string::npos);
 }
 
 CLI_TEST(HTMLStyleExtractorTest, ClassInsertedAfterTagName) {
-  std::string input =
-      R"(<html><head></head><body><div id="x" style="color:red">hello</div></body></html>)";
+  // Two uses so the style hoists to a class that sits next to an unrelated attribute.
+  std::string input = R"(<html><head></head><body>)"
+                      R"(<div id="x" style="color:red">a</div>)"
+                      R"(<div id="y" style="color:red">b</div></body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
   EXPECT_NE(result.find("class=\"div0\""), std::string::npos);
   EXPECT_NE(result.find("id=\"x\""), std::string::npos);
 }
 
 CLI_TEST(HTMLStyleExtractorTest, StyleInsertedBeforeHeadClose) {
-  std::string input =
-      R"(<html><head><meta charset="utf-8"></head><body><div style="color:red">hello</div></body></html>)";
+  // Two uses so the <style> block gets emitted; tests placement relative to </head>.
+  std::string input = R"(<html><head><meta charset="utf-8"></head><body>)"
+                      R"(<div style="color:red">a</div>)"
+                      R"(<div style="color:red">b</div></body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
   auto stylePos = result.find("<style>");
   auto headClosePos = result.find("</head>");
@@ -155,8 +182,11 @@ CLI_TEST(HTMLStyleExtractorTest, StyleInsertedBeforeHeadClose) {
 }
 
 CLI_TEST(HTMLStyleExtractorTest, MultipleUniqueStyles) {
-  std::string input =
-      R"(<html><head></head><body><div style="color:red">a</div><div style="color:blue">b</div></body></html>)";
+  // Each of the two styles is used twice so both hoist to classes.
+  std::string input = R"(<html><head></head><body><div style="color:red">a1</div>)"
+                      R"(<div style="color:red">a2</div>)"
+                      R"(<div style="color:blue">b1</div>)"
+                      R"(<div style="color:blue">b2</div></body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
   EXPECT_NE(result.find(".div0{color:red}"), std::string::npos);
   EXPECT_NE(result.find(".div1{color:blue}"), std::string::npos);
@@ -223,9 +253,12 @@ CLI_TEST(HTMLStyleExtractorTest, BaseModifierText) {
 
 CLI_TEST(HTMLStyleExtractorTest, FallbackNoSplit) {
   // 3+ varying properties → should not split, fallback to standalone classes.
+  // Each style is used twice to keep Pass 1.5 from inlining single-use classes back.
   std::string input = R"(<html><head></head><body>)"
-                      R"(<div style="color:red;font-size:12px;margin:10px">a</div>)"
-                      R"(<div style="color:blue;font-size:14px;margin:20px">b</div>)"
+                      R"(<div style="color:red;font-size:12px;margin:10px">a1</div>)"
+                      R"(<div style="color:red;font-size:12px;margin:10px">a2</div>)"
+                      R"(<div style="color:blue;font-size:14px;margin:20px">b1</div>)"
+                      R"(<div style="color:blue;font-size:14px;margin:20px">b2</div>)"
                       R"(</body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
   // All 3 properties differ → 3 varying > 2, so no split. Declarations are emitted in
@@ -319,6 +352,110 @@ CLI_TEST(HTMLStyleExtractorTest, BaseModifierThreeVaryingZeroShared) {
   EXPECT_NE(result.find("color:blue"), std::string::npos);
 }
 
+// =============================================================================
+// Single-use inlining: classes referenced by exactly one tag (and not part of a
+// base+modifier pair) are reverted to inline style="..." to save the class-header
+// and class="name" overhead. See Pass 1.5 of Extract().
+// =============================================================================
+
+CLI_TEST(HTMLStyleExtractorTest, InlineSingleUseStandalone) {
+  // A solo standalone class is cheaper as inline style.
+  std::string input = R"(<html><head></head><body><span style="color:red">x</span></body></html>)";
+  auto result = pagx::HTMLStyleExtractor::Extract(input);
+  EXPECT_NE(result.find("style=\"color:red\""), std::string::npos);
+  EXPECT_EQ(result.find(".text0"), std::string::npos);
+  EXPECT_EQ(result.find("class=\"text0\""), std::string::npos);
+  EXPECT_EQ(result.find("<style>"), std::string::npos);
+}
+
+CLI_TEST(HTMLStyleExtractorTest, InlineSingleUseKeepsRootClass) {
+  // The document-root div is always kept as a class even when single-use so
+  // downstream consumers can select it (`.root0`).
+  std::string input =
+      R"(<html><head></head><body>)"
+      R"(<div style="position:relative;width:100px;height:100px;overflow:hidden">r</div>)"
+      R"(</body></html>)";
+  auto result = pagx::HTMLStyleExtractor::Extract(input);
+  EXPECT_NE(result.find(".root0"), std::string::npos);
+  EXPECT_NE(result.find("class=\"root0\""), std::string::npos);
+  EXPECT_EQ(result.find("style=\"position:relative"), std::string::npos);
+}
+
+CLI_TEST(HTMLStyleExtractorTest, InlineSingleUseKeepsPairedModifier) {
+  // Modifier classes in a base+modifier pair are often refCount=1 but must stay as
+  // classes to preserve the shared base.
+  std::string input =
+      R"(<html><head></head><body>)"
+      R"(<div style="position:absolute;width:50px;height:40px;background-color:#FF0000">a</div>)"
+      R"(<div style="position:absolute;width:50px;height:40px;background-color:#00FF00">b</div>)"
+      R"(</body></html>)";
+  auto result = pagx::HTMLStyleExtractor::Extract(input);
+  EXPECT_NE(result.find(".bg0{position:absolute;width:50px;height:40px}"), std::string::npos);
+  EXPECT_NE(result.find(".bg1{background-color:#FF0000}"), std::string::npos);
+  EXPECT_NE(result.find(".bg2{background-color:#00FF00}"), std::string::npos);
+  EXPECT_NE(result.find("class=\"bg0 bg1\""), std::string::npos);
+  EXPECT_NE(result.find("class=\"bg0 bg2\""), std::string::npos);
+  EXPECT_EQ(result.find("style=\"position:absolute"), std::string::npos);
+}
+
+CLI_TEST(HTMLStyleExtractorTest, InlineSingleUsePreservesExistingClass) {
+  // A pre-existing class attribute on the tag is preserved verbatim; the inlined style
+  // is emitted alongside it as a separate style="..." attribute.
+  std::string input = R"(<html><head></head><body>)"
+                      R"(<div class="pagx-group" style="opacity:0.5">g</div></body></html>)";
+  auto result = pagx::HTMLStyleExtractor::Extract(input);
+  EXPECT_NE(result.find("class=\"pagx-group\""), std::string::npos);
+  EXPECT_NE(result.find("style=\"opacity:0.5\""), std::string::npos);
+  EXPECT_EQ(result.find(".layer0"), std::string::npos);
+  EXPECT_EQ(result.find(".div0"), std::string::npos);
+}
+
+CLI_TEST(HTMLStyleExtractorTest, InlineSingleUseMultiUseStillClass) {
+  // Two tags share the same style → refCount=2 → class form beats inline.
+  std::string input =
+      R"(<html><head></head><body>)"
+      R"(<span style="color:red">a</span><span style="color:red">b</span></body></html>)";
+  auto result = pagx::HTMLStyleExtractor::Extract(input);
+  EXPECT_NE(result.find(".text0{color:red}"), std::string::npos);
+  // Both spans reference the class; no inline style emission.
+  EXPECT_EQ(result.find("style=\"color:red\""), std::string::npos);
+}
+
+CLI_TEST(HTMLStyleExtractorTest, InlineSingleUseOmitsStyleBlockWhenAllInlined) {
+  // When every generated class gets inlined, Pass 3 must not leave an empty
+  // <style></style> behind.
+  std::string input = R"(<html><head></head><body>)"
+                      R"(<span style="color:red">a</span>)"
+                      R"(<span style="color:blue">b</span>)"
+                      R"(<span style="color:green">c</span></body></html>)";
+  auto result = pagx::HTMLStyleExtractor::Extract(input);
+  EXPECT_NE(result.find("style=\"color:red\""), std::string::npos);
+  EXPECT_NE(result.find("style=\"color:blue\""), std::string::npos);
+  EXPECT_NE(result.find("style=\"color:green\""), std::string::npos);
+  EXPECT_EQ(result.find("<style>"), std::string::npos);
+}
+
+CLI_TEST(HTMLStyleExtractorTest, InlineSingleUseCanonicalOrder) {
+  // Inline emission uses the same CSSPropertyOrder-sorted declarations as the class
+  // form would have. Source order: color, width, position. Expected canonical order:
+  // position (10) → width (31) → color (90).
+  std::string input = R"(<html><head></head><body>)"
+                      R"(<div style="color:red;width:10px;position:absolute">x</div>)"
+                      R"(</body></html>)";
+  auto result = pagx::HTMLStyleExtractor::Extract(input);
+  EXPECT_NE(result.find("style=\"position:absolute;width:10px;color:red\""), std::string::npos);
+}
+
+CLI_TEST(HTMLStyleExtractorTest, InlineSingleUseEntityReencoding) {
+  // A value containing & or " must be re-escaped when embedded into a double-quoted
+  // style attribute. Source uses &quot;; decoded is "; re-encoded back to &quot;.
+  std::string input = R"(<html><head></head><body>)"
+                      R"(<div style="font-family:&quot;Arial&quot;,sans-serif">x</div>)"
+                      R"(</body></html>)";
+  auto result = pagx::HTMLStyleExtractor::Extract(input);
+  EXPECT_NE(result.find("style=\"font-family:&quot;Arial&quot;,sans-serif\""), std::string::npos);
+}
+
 CLI_TEST(HTMLStyleExtractorTest, GradientParenthesesParse) {
   // Semicolons and colons inside parentheses must not cause splits.
   std::string input =
@@ -340,8 +477,10 @@ CLI_TEST(HTMLStyleExtractorTest, GradientParenthesesParse) {
 }
 
 CLI_TEST(HTMLStyleExtractorTest, FormatPretty) {
+  // Two uses keep the class form so we can inspect the Pretty <style> block shape.
   std::string input = R"(<html><head></head><body>)"
                       R"(<div style="color:red;font-size:12px">a</div>)"
+                      R"(<div style="color:red;font-size:12px">b</div>)"
                       R"(</body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input, pagx::HTMLStyleExtractor::Format::Pretty);
   // Selector on its own line with opening brace separated by a space.
@@ -354,9 +493,10 @@ CLI_TEST(HTMLStyleExtractorTest, FormatPretty) {
 }
 
 CLI_TEST(HTMLStyleExtractorTest, FormatMinify) {
+  // Use each style twice to keep the class form (single-use inlines, see InlineSingleUse*).
   std::string input = R"(<html><head></head><body>)"
-                      R"(<div style="color:red">a</div>)"
-                      R"(<div style="color:blue">b</div>)"
+                      R"(<div style="color:red">a1</div><div style="color:red">a2</div>)"
+                      R"(<div style="color:blue">b1</div><div style="color:blue">b2</div>)"
                       R"(</body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input, pagx::HTMLStyleExtractor::Format::Minify);
   // Style block must be on a single line with no newlines anywhere inside it.
@@ -372,8 +512,10 @@ CLI_TEST(HTMLStyleExtractorTest, FormatMinify) {
 
 CLI_TEST(HTMLStyleExtractorTest, FormatCompactIsDefault) {
   // Calling without an explicit format argument must match explicit Compact.
+  // Two uses keep the class hoisted so we can inspect the <style> block shape.
   std::string input = R"(<html><head></head><body>)"
                       R"(<div style="color:red">a</div>)"
+                      R"(<div style="color:red">b</div>)"
                       R"(</body></html>)";
   auto defaulted = pagx::HTMLStyleExtractor::Extract(input);
   auto explicitCompact =

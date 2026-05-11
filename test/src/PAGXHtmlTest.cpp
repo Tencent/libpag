@@ -262,7 +262,10 @@ CLI_TEST(PAGXHtmlTest, RootDocument) {
 CLI_TEST(PAGXHtmlTest, LayerVisibility) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_visibility.pagx"));
   ASSERT_FALSE(html.empty());
-  EXPECT_NE(html.find("display: none"), std::string::npos);
+  // Accept either the class form ("display: none" in a CSS rule) or the inlined form
+  // ("display:none" in a style="..." attribute) — both are valid Pretty output.
+  EXPECT_TRUE(html.find("display: none") != std::string::npos ||
+              html.find("display:none") != std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, LayerAlpha) {
@@ -295,7 +298,10 @@ CLI_TEST(PAGXHtmlTest, LayerTransformMatrix3D) {
       LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_transform_matrix3d.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("matrix3d("), std::string::npos);
-  EXPECT_NE(html.find("transform-style: preserve-3d"), std::string::npos);
+  // Accept both Pretty class-rule ("transform-style: preserve-3d") and inlined
+  // ("transform-style:preserve-3d") forms.
+  EXPECT_TRUE(html.find("transform-style: preserve-3d") != std::string::npos ||
+              html.find("transform-style:preserve-3d") != std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, LayerTransformPriority) {
@@ -365,7 +371,9 @@ CLI_TEST(PAGXHtmlTest, GeometryRectangle) {
 CLI_TEST(PAGXHtmlTest, GeometryEllipse) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/geometry_ellipse.pagx"));
   ASSERT_FALSE(html.empty());
-  EXPECT_NE(html.find("border-radius: 50%"), std::string::npos);
+  // Accept both class-rule and inlined forms.
+  EXPECT_TRUE(html.find("border-radius: 50%") != std::string::npos ||
+              html.find("border-radius:50%") != std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, GeometryPolystar) {

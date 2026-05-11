@@ -18,6 +18,7 @@
 #include "pagx/html/HTMLStyleExtractor.h"
 #include <algorithm>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace pagx {
@@ -117,6 +118,26 @@ static std::string DecodeHTMLEntities(const std::string& str) {
     }
   }
   return result;
+}
+
+// Re-encode only the entity subset that can break a double-quoted HTML attribute value.
+// The inline style values produced by Pass 1.5 come from entity-decoded declarations
+// (via DecodeHTMLEntities during parse), so any raw " or & must be escaped before being
+// embedded back into a style="..." attribute. Other characters are safe inside a
+// double-quoted attribute per the HTML5 parser.
+static std::string EncodeAttrValue(const std::string& s) {
+  std::string out;
+  out.reserve(s.size());
+  for (char c : s) {
+    if (c == '&') {
+      out += "&amp;";
+    } else if (c == '"') {
+      out += "&quot;";
+    } else {
+      out += c;
+    }
+  }
+  return out;
 }
 
 //==============================================================================
@@ -296,6 +317,8 @@ struct StyleEntry {
 struct ClassRule {
   std::string className;
   std::string declarations;
+  bool isPaired = false;  // emitted by the base+modifier split branch (either role)
+  bool isRoot = false;    // document root class; never eligible for inline collapse
 };
 
 struct PropertyClassification {
@@ -746,7 +769,9 @@ std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) 
                                         members[0]->properties, classification.varyingPropNames);
       // Emit base class.
       auto baseName = prefix + std::to_string(prefixCounters[prefix]++);
-      classRules.push_back({baseName, BuildDeclarationsString(classification.sharedProps)});
+      classRules.push_back({baseName, BuildDeclarationsString(classification.sharedProps),
+                            /*isPaired=*/true,
+                            /*isRoot=*/false});
 
       // Emit modifier classes (dedup by varying-value key within this group).
       std::unordered_map<std::string, std::string> varyingKeyToModifierName;
@@ -779,7 +804,8 @@ std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) 
             }
           }
           modName = prefix + std::to_string(prefixCounters[prefix]++);
-          classRules.push_back({modName, BuildDeclarationsString(varyingProps)});
+          classRules.push_back({modName, BuildDeclarationsString(varyingProps),
+                                /*isPaired=*/true, /*isRoot=*/false});
           varyingKeyToModifierName[varyingKey] = modName;
         }
         tagClassNames[entry.tagIndex] = {baseName, modName};
@@ -805,11 +831,54 @@ std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) 
           // Normalize declaration order for professional front-end readability.
           // dedup key (styleToClassName) continues to use decodedStyle: two tags with the
           // same source style trivially map to the same sorted output, so the cache works.
-          classRules.push_back({className, BuildDeclarationsString(entry.properties)});
+          classRules.push_back({className, BuildDeclarationsString(entry.properties),
+                                /*isPaired=*/false, /*isRoot=*/(prefix == "root")});
           styleToClassName[entry.decodedStyle] = className;
           tagClassNames[entry.tagIndex] = {className};
         }
       }
+    }
+  }
+
+  // Pass 1.5: inline single-use standalone classes back into style="..." attributes.
+  // When a generated class is referenced by exactly one tag and is not part of a
+  // base+modifier pair and is not the document root, the class form costs more bytes
+  // (rule header + class="name") than the equivalent inline style="..."; restore the
+  // latter. Keeping root and paired members preserves base-class sharing and the
+  // externally-visible root selector.
+  std::vector<std::string> inlineStyle(tags.size());
+  std::vector<bool> hasInlineStyle(tags.size(), false);
+  if (!classRules.empty()) {
+    std::unordered_map<std::string, int> classRefCount;
+    for (const auto& names : tagClassNames) {
+      for (const auto& n : names) classRefCount[n]++;
+    }
+    std::unordered_map<std::string, size_t> classIndex;
+    for (size_t ri = 0; ri < classRules.size(); ri++) {
+      classIndex[classRules[ri].className] = ri;
+    }
+    std::unordered_set<std::string> droppedClasses;
+    for (size_t ti = 0; ti < tags.size(); ti++) {
+      if (tagClassNames[ti].size() != 1) continue;
+      const auto& name = tagClassNames[ti][0];
+      auto it = classIndex.find(name);
+      if (it == classIndex.end()) continue;
+      const auto& rule = classRules[it->second];
+      if (rule.isRoot) continue;
+      if (rule.isPaired) continue;
+      if (classRefCount[name] != 1) continue;
+      inlineStyle[ti] = rule.declarations;  // already in canonical property order
+      hasInlineStyle[ti] = true;
+      tagClassNames[ti].clear();
+      droppedClasses.insert(name);
+    }
+    if (!droppedClasses.empty()) {
+      std::vector<ClassRule> kept;
+      kept.reserve(classRules.size() - droppedClasses.size());
+      for (auto& r : classRules) {
+        if (!droppedClasses.count(r.className)) kept.push_back(std::move(r));
+      }
+      classRules = std::move(kept);
     }
   }
 
@@ -821,7 +890,8 @@ std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) 
     const auto& tag = tags[ti];
     if (tagToEntry[ti] < 0) continue;
     const auto& classNames = tagClassNames[ti];
-    if (classNames.empty()) continue;
+    bool hasInline = hasInlineStyle[ti];
+    if (classNames.empty() && !hasInline) continue;
 
     // Copy everything from prev to the start of this tag.
     output.append(html, prev, tag.tagStart - prev);
@@ -835,22 +905,28 @@ std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) 
     // Copy '<tagName'.
     output.append(html, tag.tagStart, nameEnd - tag.tagStart);
 
-    // Build the class value string.
+    // Build the class value string. Pre-existing source class (e.g. class="pagx-group"
+    // emitted by HTMLWriterText) is preserved verbatim; extractor-assigned class names
+    // are appended after it. When Pass 1.5 inlined the tag's only extractor class,
+    // classNames is empty — then we only keep whatever the source already had.
     std::string classValue;
     if (tag.hasClass) {
-      auto existingClass =
-          html.substr(tag.classValueStart, tag.classValueEnd - tag.classValueStart);
-      if (!existingClass.empty()) {
-        classValue = existingClass + " ";
-      }
+      classValue = html.substr(tag.classValueStart, tag.classValueEnd - tag.classValueStart);
     }
-    for (size_t ci = 0; ci < classNames.size(); ci++) {
-      if (ci > 0) classValue += " ";
-      classValue += classNames[ci];
+    for (const auto& cn : classNames) {
+      if (!classValue.empty()) classValue += " ";
+      classValue += cn;
     }
-    output += " class=\"";
-    output += classValue;
-    output += "\"";
+    if (!classValue.empty()) {
+      output += " class=\"";
+      output += classValue;
+      output += "\"";
+    }
+    if (hasInline) {
+      output += " style=\"";
+      output += EncodeAttrValue(inlineStyle[ti]);
+      output += "\"";
+    }
 
     // Re-emit all other attributes (skip class and style).
     size_t attrPos = nameEnd;
@@ -922,7 +998,11 @@ std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) 
   }
   output.append(html, prev, html.size() - prev);
 
-  // Pass 3: insert <style> block before </head>.
+  // Pass 3: insert <style> block before </head>. Skipped entirely when every class
+  // was inlined in Pass 1.5, so we never emit an empty <style></style>.
+  if (classRules.empty()) {
+    return output;
+  }
   std::string styleBlock;
   if (format == Format::Minify) {
     styleBlock = "<style>";
