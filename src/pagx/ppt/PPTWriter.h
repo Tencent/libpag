@@ -48,10 +48,10 @@
 #include "pagx/nodes/TextBox.h"
 #include "pagx/ppt/PPTContourUtils.h"
 #include "pagx/ppt/PPTGeomEmitter.h"
-#include "pagx/ppt/PPTModifierResolver.h"
 #include "pagx/ppt/PPTWriterContext.h"
 #include "pagx/types/Rect.h"
 #include "pagx/utils/ExporterUtils.h"
+#include "pagx/utils/ModifierResolver.h"
 #include "pagx/xml/XMLBuilder.h"
 #include "renderer/LayerBuilder.h"
 
@@ -135,29 +135,6 @@ inline float StrokeAlignInset(const Stroke* stroke) {
     case StrokeAlign::Center:
     default:
       return 0.0f;
-  }
-}
-
-// Applies the stroke-inset to an axis-aligned shape rect. Clamps the inset so
-// the geometry never collapses past the centre (the OOXML stroke would draw
-// against zero-extent geometry otherwise). `roundness` is also reduced so
-// rounded-rectangle corners stay visually consistent after the inset.
-inline void ApplyStrokeBoxInset(const Stroke* stroke, float& x, float& y, float& w, float& h,
-                                float* roundness = nullptr) {
-  float inset = StrokeAlignInset(stroke);
-  if (inset == 0.0f) {
-    return;
-  }
-  float maxInset = std::min(w, h) / 2.0f;
-  if (inset > maxInset) {
-    inset = maxInset;
-  }
-  x += inset;
-  y += inset;
-  w -= inset * 2.0f;
-  h -= inset * 2.0f;
-  if (roundness) {
-    *roundness = std::max(0.0f, *roundness - inset);
   }
 }
 
@@ -708,7 +685,7 @@ class PPTWriter {
   GPUContext _gpu;
   LayerBuildResult _buildResult = {};
   bool _buildResultReady = false;
-  PPTModifierResolver _resolver;
+  ModifierResolver _resolver;
 
   const LayerBuildResult& ensureBuildResult();
 
