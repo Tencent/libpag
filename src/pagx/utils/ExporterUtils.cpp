@@ -245,7 +245,7 @@ static std::vector<PositionedGlyph> WalkGlyphs(const Text& text, float textPosX,
   }
   result.reserve(totalGlyphs);
   for (const auto* run : text.glyphRuns) {
-    if (!run->font || run->glyphs.empty()) {
+    if (!run->font || run->font->unitsPerEm <= 0 || run->glyphs.empty()) {
       continue;
     }
     float scale = run->fontSize / static_cast<float>(run->font->unitsPerEm);
@@ -515,7 +515,9 @@ bool GetPNGDPI(const uint8_t* data, size_t size, float* dpiX, float* dpiY) {
     if (memcmp(data + offset + 4, "IDAT", 4) == 0) {
       break;
     }
-    offset += 12 + chunkLen;
+    // Use size_t addition to avoid uint32_t wrap-around that could freeze the
+    // loop on a malformed PNG with chunkLen near 0xFFFFFFF4.
+    offset += 12 + static_cast<size_t>(chunkLen);
   }
   return false;
 }
@@ -609,6 +611,130 @@ bool HasNonASCII(const std::string& str) {
   for (unsigned char c : str) {
     if (c > 127) {
       return true;
+    }
+  }
+  return false;
+}
+
+// Heuristic classification of a text run into an OOXML xml:lang tag. PowerPoint
+// paints a spellcheck squiggle under any run whose declared language doesn't
+// match its glyphs, so emitting "en-US" for CJK/Hebrew/Arabic text yields
+// visible red underlines on a correctly rendered document. We walk the UTF-8
+// bytes and pick the first non-ASCII script encountered: CJK -> "zh-CN",
+// Hebrew -> "he-IL", Arabic -> "ar-SA"; runs with no recognised non-ASCII
+// script stay on "en-US", matching PowerPoint's own default.
+std::string DetectTextLang(const std::string& utf8) {
+  size_t i = 0;
+  while (i < utf8.size()) {
+    uint32_t cp = 0;
+    auto c = static_cast<unsigned char>(utf8[i]);
+    size_t bytes = 1;
+    if (c < 0x80) {
+      cp = c;
+    } else if (c < 0xE0) {
+      cp = c & 0x1Fu;
+      bytes = 2;
+    } else if (c < 0xF0) {
+      cp = c & 0x0Fu;
+      bytes = 3;
+    } else {
+      cp = c & 0x07u;
+      bytes = 4;
+    }
+    if (i + bytes > utf8.size()) {
+      break;
+    }
+    for (size_t k = 1; k < bytes; k++) {
+      cp = (cp << 6) | (static_cast<unsigned char>(utf8[i + k]) & 0x3Fu);
+    }
+    i += bytes;
+    if ((cp >= 0x3040 && cp <= 0x30FF) ||    // Hiragana + Katakana
+        (cp >= 0x3400 && cp <= 0x4DBF) ||    // CJK Extension A
+        (cp >= 0x4E00 && cp <= 0x9FFF) ||    // CJK Unified Ideographs
+        (cp >= 0xAC00 && cp <= 0xD7A3) ||    // Hangul Syllables
+        (cp >= 0xF900 && cp <= 0xFAFF) ||    // CJK Compatibility Ideographs
+        (cp >= 0xFF00 && cp <= 0xFFEF) ||    // Halfwidth / fullwidth forms
+        (cp >= 0x20000 && cp <= 0x2FFFF)) {  // CJK Extensions B..F + suppl.
+      return "zh-CN";
+    }
+    if (cp >= 0x0590 && cp <= 0x05FF) {  // Hebrew
+      return "he-IL";
+    }
+    if ((cp >= 0x0600 && cp <= 0x06FF) ||  // Arabic
+        (cp >= 0x0750 && cp <= 0x077F) ||  // Arabic Supplement
+        (cp >= 0x08A0 && cp <= 0x08FF) ||  // Arabic Extended-A
+        (cp >= 0xFB50 && cp <= 0xFDFF) ||  // Arabic Presentation Forms-A
+        (cp >= 0xFE70 && cp <= 0xFEFF)) {  // Arabic Presentation Forms-B
+      return "ar-SA";
+    }
+  }
+  return "en-US";
+}
+
+// Paragraph base direction per UBA rules P2/P3: scan code points in order,
+// take the direction of the first strong-directional character. Hebrew and
+// Arabic code points in the RTL blocks are strong-R (or strong-AL for Arabic).
+// ASCII letters and CJK are strong-L. Everything else (digits, punctuation,
+// whitespace) is weak/neutral and does not determine the base direction. If
+// no strong character is found the paragraph defaults to LTR.
+bool HasRTLParagraphBase(const std::string& utf8) {
+  size_t i = 0;
+  while (i < utf8.size()) {
+    uint32_t cp = 0;
+    auto c = static_cast<unsigned char>(utf8[i]);
+    size_t bytes = 1;
+    if (c < 0x80) {
+      cp = c;
+    } else if (c < 0xE0) {
+      cp = c & 0x1Fu;
+      bytes = 2;
+    } else if (c < 0xF0) {
+      cp = c & 0x0Fu;
+      bytes = 3;
+    } else {
+      cp = c & 0x07u;
+      bytes = 4;
+    }
+    if (i + bytes > utf8.size()) {
+      break;
+    }
+    for (size_t k = 1; k < bytes; k++) {
+      cp = (cp << 6) | (static_cast<unsigned char>(utf8[i + k]) & 0x3Fu);
+    }
+    i += bytes;
+    // Strong RTL: Hebrew, Arabic, Syriac, Thaana, NKo, and the Arabic
+    // presentation forms. Covers the common cases the PAGX exporter sees.
+    if ((cp >= 0x0590 && cp <= 0x05FF) ||  // Hebrew
+        (cp >= 0x0600 && cp <= 0x06FF) ||  // Arabic
+        (cp >= 0x0700 && cp <= 0x074F) ||  // Syriac
+        (cp >= 0x0750 && cp <= 0x077F) ||  // Arabic Supplement
+        (cp >= 0x0780 && cp <= 0x07BF) ||  // Thaana
+        (cp >= 0x07C0 && cp <= 0x07FF) ||  // NKo
+        (cp >= 0x08A0 && cp <= 0x08FF) ||  // Arabic Extended-A
+        (cp >= 0xFB1D && cp <= 0xFDFF) ||  // Hebrew / Arabic Presentation Forms-A
+        (cp >= 0xFE70 && cp <= 0xFEFF)) {  // Arabic Presentation Forms-B
+      return true;
+    }
+    // Strong LTR: ASCII letters, Latin-1 letters, Greek / Cyrillic / Armenian,
+    // and the common CJK blocks reused above. Anything identified here halts
+    // the scan with an LTR result.
+    bool strongLtr = false;
+    if ((cp >= 0x0041 && cp <= 0x005A) ||    // A-Z
+        (cp >= 0x0061 && cp <= 0x007A) ||    // a-z
+        (cp >= 0x00C0 && cp <= 0x024F) ||    // Latin-1 Suppl + Extended-A/B
+        (cp >= 0x0370 && cp <= 0x03FF) ||    // Greek
+        (cp >= 0x0400 && cp <= 0x04FF) ||    // Cyrillic
+        (cp >= 0x0530 && cp <= 0x058F) ||    // Armenian
+        (cp >= 0x3040 && cp <= 0x30FF) ||    // Hiragana + Katakana
+        (cp >= 0x3400 && cp <= 0x4DBF) ||    // CJK Extension A
+        (cp >= 0x4E00 && cp <= 0x9FFF) ||    // CJK Unified Ideographs
+        (cp >= 0xAC00 && cp <= 0xD7A3) ||    // Hangul Syllables
+        (cp >= 0xF900 && cp <= 0xFAFF) ||    // CJK Compatibility Ideographs
+        (cp >= 0x20000 && cp <= 0x2FFFF)) {  // CJK Extensions B..F + suppl.
+      strongLtr = true;
+    }
+    if (strongLtr) {
+      return false;
     }
   }
   return false;

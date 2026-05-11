@@ -4,14 +4,13 @@
 <pagx width="400" height="400">
   <Layer>
     <Rectangle left="50" top="50" width="300" height="300" roundness="24"/>
-    <Fill color="@grad"/>
+    <Fill>
+      <LinearGradient endPoint="300,300" fitsToGeometry="false">
+        <ColorStop color="#EC4899" offset="0"/>
+        <ColorStop color="#8B5CF6" offset="0.5"/>
+        <ColorStop color="#6366F1" offset="1"/>
+      </LinearGradient>
+    </Fill>
     <DropShadowStyle offsetY="12" blurX="40" blurY="40" color="#EC489950"/>
   </Layer>
-  <Resources>
-    <LinearGradient id="grad" endPoint="300,300" fitsToGeometry="false">
-      <ColorStop color="#EC4899" offset="0"/>
-      <ColorStop color="#8B5CF6" offset="0.5"/>
-      <ColorStop color="#6366F1" offset="1"/>
-    </LinearGradient>
-  </Resources>
 </pagx>

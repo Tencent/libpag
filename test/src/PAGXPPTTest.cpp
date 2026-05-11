@@ -1960,7 +1960,9 @@ PAGX_TEST(PAGXPPTTest, MaskBakeDefault) {
 
   doc->layers.push_back(contentLayer);
 
-  ASSERT_TRUE(ExportAndVerify(*doc, "mask_bake_default"));
+  pagx::PPTExportOptions options;
+  options.rasterizeUnsupported = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "mask_bake_default", options));
 }
 
 PAGX_TEST(PAGXPPTTest, MaskNoBake) {
@@ -1992,7 +1994,6 @@ PAGX_TEST(PAGXPPTTest, MaskNoBake) {
   doc->layers.push_back(contentLayer);
 
   pagx::PPTExportOptions options;
-  options.bakeMask = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "mask_no_bake", options));
 }
 
@@ -2029,11 +2030,10 @@ PAGX_TEST(PAGXPPTTest, MaskNoBakeProducesSmaller) {
   auto vectorPath = outDir + "/mask_size_vector.pptx";
 
   pagx::PPTExportOptions bakedOpts;
-  bakedOpts.bakeMask = true;
+  bakedOpts.rasterizeUnsupported = true;
   ASSERT_TRUE(pagx::PPTExporter::ToFile(*doc, bakedPath, bakedOpts));
 
   pagx::PPTExportOptions vectorOpts;
-  vectorOpts.bakeMask = false;
   ASSERT_TRUE(pagx::PPTExporter::ToFile(*doc, vectorPath, vectorOpts));
 
   auto bakedSize = std::filesystem::file_size(bakedPath);
@@ -2090,7 +2090,6 @@ PAGX_TEST(PAGXPPTTest, MaskNoBakeWithChildLayers) {
   doc->layers.push_back(parentLayer);
 
   pagx::PPTExportOptions options;
-  options.bakeMask = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "mask_no_bake_children", options));
 }
 
@@ -2138,7 +2137,6 @@ PAGX_TEST(PAGXPPTTest, MaskNoBakeWithTransformAndAlpha) {
   doc->layers.push_back(contentLayer);
 
   pagx::PPTExportOptions options;
-  options.bakeMask = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "mask_no_bake_transform_alpha", options));
 }
 
@@ -2772,7 +2770,6 @@ PAGX_TEST(PAGXPPTTest, MaskNoBakeContourType) {
   doc->layers.push_back(contentLayer);
 
   pagx::PPTExportOptions options;
-  options.bakeMask = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "mask_no_bake_contour", options));
 }
 
@@ -3973,7 +3970,7 @@ PAGX_TEST(PAGXPPTTest, LayerNonNormalBlendModeEscalated) {
   doc->layers.push_back(fgLayer);
 
   pagx::PPTExportOptions options;
-  options.rasterizeUnsupportedBlend = true;
+  options.rasterizeUnsupported = true;
   ASSERT_TRUE(ExportAndVerify(*doc, "layer_blend_overlay", options));
 }
 
@@ -3997,7 +3994,7 @@ PAGX_TEST(PAGXPPTTest, LayerNonNormalBlendWithBackdrop) {
   doc->layers.push_back(fg);
 
   pagx::PPTExportOptions options;
-  options.rasterizeUnsupportedBlend = true;
+  options.rasterizeUnsupported = true;
   ASSERT_TRUE(ExportAndVerify(*doc, "layer_blend_with_backdrop", options));
 }
 
@@ -4018,7 +4015,7 @@ PAGX_TEST(PAGXPPTTest, FillBlendModeEscalated) {
   layer->contents.push_back(fill);
   doc->layers.push_back(layer);
   pagx::PPTExportOptions options;
-  options.rasterizeUnsupportedBlend = true;
+  options.rasterizeUnsupported = true;
   ASSERT_TRUE(ExportAndVerify(*doc, "fill_blend_hardlight", options));
 }
 
@@ -4034,7 +4031,6 @@ PAGX_TEST(PAGXPPTTest, RasterizeUnsupportedBlendDisabled) {
   doc->layers.push_back(layer);
 
   pagx::PPTExportOptions options;
-  options.rasterizeUnsupportedBlend = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "raster_blend_disabled", options));
 }
 
@@ -4072,7 +4068,7 @@ PAGX_TEST(PAGXPPTTest, BlendFilterUnsupportedMode) {
 
   doc->layers.push_back(layer);
   pagx::PPTExportOptions options;
-  options.rasterizeUnsupportedBlend = true;
+  options.rasterizeUnsupported = true;
   ASSERT_TRUE(ExportAndVerify(*doc, "blend_filter_unsupported", options));
 }
 
@@ -4092,7 +4088,9 @@ PAGX_TEST(PAGXPPTTest, WideGamutColorEscalated) {
   layer->contents.push_back(rect);
   layer->contents.push_back(fill);
   doc->layers.push_back(layer);
-  ASSERT_TRUE(ExportAndVerify(*doc, "wide_gamut_raster"));
+  pagx::PPTExportOptions options;
+  options.rasterizeUnsupported = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "wide_gamut_raster", options));
 }
 
 PAGX_TEST(PAGXPPTTest, WideGamutGradientEscalated) {
@@ -4121,7 +4119,9 @@ PAGX_TEST(PAGXPPTTest, WideGamutGradientEscalated) {
   layer->contents.push_back(rect);
   layer->contents.push_back(fill);
   doc->layers.push_back(layer);
-  ASSERT_TRUE(ExportAndVerify(*doc, "wide_gamut_grad_raster"));
+  pagx::PPTExportOptions options;
+  options.rasterizeUnsupported = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "wide_gamut_grad_raster", options));
 }
 
 PAGX_TEST(PAGXPPTTest, WideGamutDisabled) {
@@ -4142,7 +4142,6 @@ PAGX_TEST(PAGXPPTTest, WideGamutDisabled) {
   doc->layers.push_back(layer);
 
   pagx::PPTExportOptions options;
-  options.rasterizeWideGamut = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "wide_gamut_disabled", options));
 }
 
@@ -4543,7 +4542,9 @@ PAGX_TEST(PAGXPPTTest, NativeTextWithRadialGradientFill) {
 }
 
 //==============================================================================
-// Bake-path disable toggles (bakeMask covered already; add scrollRect, tiled).
+// scrollRect rasterization toggle. The bake-vs-drop path for masks is covered
+// by the Mask* tests above, and tiled patterns are always baked so no toggle
+// test is needed for them.
 //==============================================================================
 
 PAGX_TEST(PAGXPPTTest, ScrollRectBakeDefault) {
@@ -4557,7 +4558,9 @@ PAGX_TEST(PAGXPPTTest, ScrollRectBakeDefault) {
   layer->contents.push_back(rect);
   layer->contents.push_back(MakeSolidFill(doc.get(), {0.6f, 0.8f, 0.4f, 1.0f}));
   doc->layers.push_back(layer);
-  ASSERT_TRUE(ExportAndVerify(*doc, "scrollrect_bake_default"));
+  pagx::PPTExportOptions options;
+  options.rasterizeUnsupported = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "scrollrect_bake_default", options));
 }
 
 PAGX_TEST(PAGXPPTTest, ScrollRectBakeDisabled) {
@@ -4573,32 +4576,7 @@ PAGX_TEST(PAGXPPTTest, ScrollRectBakeDisabled) {
   doc->layers.push_back(layer);
 
   pagx::PPTExportOptions options;
-  options.bakeScrollRect = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "scrollrect_bake_disabled", options));
-}
-
-PAGX_TEST(PAGXPPTTest, TiledPatternBakeDisabled) {
-  auto doc = pagx::PAGXDocument::Make(400, 300);
-  auto* layer = doc->makeNode<pagx::Layer>();
-  auto* rect = doc->makeNode<pagx::Rectangle>();
-  rect->position = {200, 150};
-  rect->size = {200, 150};
-  auto* image = MakeTestPNGImage(doc.get());
-  auto* pattern = doc->makeNode<pagx::ImagePattern>();
-  pattern->image = image;
-  pattern->tileModeX = pagx::TileMode::Repeat;
-  pattern->tileModeY = pagx::TileMode::Repeat;
-  pattern->matrix = {2, 0, 0, 2, 0, 0};
-  auto* fill = doc->makeNode<pagx::Fill>();
-  fill->color = pattern;
-
-  layer->contents.push_back(rect);
-  layer->contents.push_back(fill);
-  doc->layers.push_back(layer);
-
-  pagx::PPTExportOptions options;
-  options.bakeTiledPattern = false;
-  ASSERT_TRUE(ExportAndVerify(*doc, "tiled_bake_disabled", options));
 }
 
 PAGX_TEST(PAGXPPTTest, BridgeContoursDisabled) {
@@ -4814,6 +4792,1046 @@ PAGX_TEST(PAGXPPTTest, PathEvenOddCubicContour) {
   layer->contents.push_back(fill);
   doc->layers.push_back(layer);
   ASSERT_TRUE(ExportAndVerify(*doc, "path_cubic_evenodd"));
+}
+
+//==============================================================================
+// Coverage boost: bridgeContours=true exercises PPTContourUtils ParsePathContours
+// branches plus PPTGeomEmitter EmitBridgedGroup and EmitGroupCustGeom paths that
+// the default options never reach.
+//==============================================================================
+
+PAGX_TEST(PAGXPPTTest, BridgeContoursLineEvenOdd) {
+  auto doc = pagx::PAGXDocument::Make(400, 400);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  auto* pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(50, 50);
+  pathData->lineTo(350, 50);
+  pathData->lineTo(350, 350);
+  pathData->lineTo(50, 350);
+  pathData->close();
+  pathData->moveTo(150, 150);
+  pathData->lineTo(250, 150);
+  pathData->lineTo(250, 250);
+  pathData->lineTo(150, 250);
+  pathData->close();
+  path->data = pathData;
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->fillRule = pagx::FillRule::EvenOdd;
+  fill->color = MakeSolidFill(doc.get(), {0.2f, 0.6f, 0.4f, 1.0f})->color;
+
+  layer->contents.push_back(path);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  pagx::PPTExportOptions options;
+  options.bridgeContours = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "bridge_line_evenodd", options));
+}
+
+PAGX_TEST(PAGXPPTTest, BridgeContoursOpenInnerContour) {
+  // Inner ring is unclosed: exercises PathContour::closed=false branches in
+  // EmitContour / EmitBridgedGroup and the inner.segs.empty() guard.
+  auto doc = pagx::PAGXDocument::Make(400, 400);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  auto* pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(50, 50);
+  pathData->lineTo(350, 50);
+  pathData->lineTo(350, 350);
+  pathData->lineTo(50, 350);
+  pathData->close();
+  pathData->moveTo(150, 150);
+  pathData->lineTo(250, 150);
+  pathData->lineTo(250, 250);
+  pathData->lineTo(150, 250);
+  path->data = pathData;
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->fillRule = pagx::FillRule::EvenOdd;
+  fill->color = MakeSolidFill(doc.get(), {0.4f, 0.5f, 0.7f, 1.0f})->color;
+
+  layer->contents.push_back(path);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  pagx::PPTExportOptions options;
+  options.bridgeContours = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "bridge_open_inner", options));
+}
+
+PAGX_TEST(PAGXPPTTest, BridgeContoursCubicNested) {
+  // Cubic outer + cubic inner: drives SegmentTwiceSignedArea cubic branch, the
+  // SegmentMidpoint cubic branch, and ReverseContour's Cubic verb branch when
+  // AdjustWindingForEvenOdd flips the inner.
+  auto doc = pagx::PAGXDocument::Make(400, 400);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  auto* pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(50, 200);
+  pathData->cubicTo(50, 50, 350, 50, 350, 200);
+  pathData->cubicTo(350, 350, 50, 350, 50, 200);
+  pathData->close();
+  pathData->moveTo(150, 200);
+  pathData->cubicTo(150, 130, 250, 130, 250, 200);
+  pathData->cubicTo(250, 270, 150, 270, 150, 200);
+  pathData->close();
+  path->data = pathData;
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->fillRule = pagx::FillRule::EvenOdd;
+  fill->color = MakeSolidFill(doc.get(), {0.6f, 0.4f, 0.3f, 1.0f})->color;
+
+  layer->contents.push_back(path);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  pagx::PPTExportOptions options;
+  options.bridgeContours = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "bridge_cubic_nested", options));
+}
+
+PAGX_TEST(PAGXPPTTest, BridgeContoursQuadNested) {
+  // Quad outer + quad inner: drives SegmentTwiceSignedArea quad branch and the
+  // SegmentMidpoint / ReverseContour quad branches.
+  auto doc = pagx::PAGXDocument::Make(400, 400);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  auto* pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(50, 200);
+  pathData->quadTo(50, 50, 200, 50);
+  pathData->quadTo(350, 50, 350, 200);
+  pathData->quadTo(350, 350, 200, 350);
+  pathData->quadTo(50, 350, 50, 200);
+  pathData->close();
+  pathData->moveTo(150, 200);
+  pathData->quadTo(150, 130, 200, 130);
+  pathData->quadTo(250, 130, 250, 200);
+  pathData->quadTo(250, 270, 200, 270);
+  pathData->quadTo(150, 270, 150, 200);
+  pathData->close();
+  path->data = pathData;
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->fillRule = pagx::FillRule::EvenOdd;
+  fill->color = MakeSolidFill(doc.get(), {0.2f, 0.5f, 0.8f, 1.0f})->color;
+
+  layer->contents.push_back(path);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  pagx::PPTExportOptions options;
+  options.bridgeContours = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "bridge_quad_nested", options));
+}
+
+PAGX_TEST(PAGXPPTTest, BridgeContoursMultipleDisjointGroups) {
+  // Two disjoint outer rings each with a hole: PrepareContourGroups produces
+  // multiple groups so writePath emits one <p:sp> per group via
+  // EmitGroupCustGeom + StandaloneStrokelessPath marker.
+  auto doc = pagx::PAGXDocument::Make(600, 400);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  auto* pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(50, 50);
+  pathData->lineTo(250, 50);
+  pathData->lineTo(250, 350);
+  pathData->lineTo(50, 350);
+  pathData->close();
+  pathData->moveTo(100, 100);
+  pathData->lineTo(200, 100);
+  pathData->lineTo(200, 300);
+  pathData->lineTo(100, 300);
+  pathData->close();
+  pathData->moveTo(350, 50);
+  pathData->lineTo(550, 50);
+  pathData->lineTo(550, 350);
+  pathData->lineTo(350, 350);
+  pathData->close();
+  pathData->moveTo(400, 100);
+  pathData->lineTo(500, 100);
+  pathData->lineTo(500, 300);
+  pathData->lineTo(400, 300);
+  pathData->close();
+  path->data = pathData;
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->fillRule = pagx::FillRule::EvenOdd;
+  fill->color = MakeSolidFill(doc.get(), {0.3f, 0.6f, 0.4f, 1.0f})->color;
+
+  layer->contents.push_back(path);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  pagx::PPTExportOptions options;
+  options.bridgeContours = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "bridge_multi_disjoint", options));
+}
+
+PAGX_TEST(PAGXPPTTest, BridgeContoursMultipleDisjointWithStroke) {
+  // Same multi-group geometry as above but with a Stroke painter so the
+  // per-group <p:sp> goes through writeShapeTail with a stroke.
+  auto doc = pagx::PAGXDocument::Make(600, 400);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  auto* pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(50, 50);
+  pathData->lineTo(250, 50);
+  pathData->lineTo(250, 350);
+  pathData->lineTo(50, 350);
+  pathData->close();
+  pathData->moveTo(350, 50);
+  pathData->lineTo(550, 50);
+  pathData->lineTo(550, 350);
+  pathData->lineTo(350, 350);
+  pathData->close();
+  path->data = pathData;
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->fillRule = pagx::FillRule::EvenOdd;
+  fill->color = MakeSolidFill(doc.get(), {0.5f, 0.7f, 0.4f, 1.0f})->color;
+
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  stroke->width = 4;
+  stroke->cap = pagx::LineCap::Round;
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  stroke->color = solid;
+
+  layer->contents.push_back(path);
+  layer->contents.push_back(fill);
+  layer->contents.push_back(stroke);
+  doc->layers.push_back(layer);
+
+  pagx::PPTExportOptions options;
+  options.bridgeContours = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "bridge_multi_disjoint_stroke", options));
+}
+
+PAGX_TEST(PAGXPPTTest, BridgeContoursWindingFillRule) {
+  // Bridging with FillRule::Winding: AdjustWindingForEvenOdd is skipped so the
+  // fillRule != EvenOdd branch in PrepareContourGroups runs.
+  auto doc = pagx::PAGXDocument::Make(400, 400);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  auto* pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(50, 50);
+  pathData->lineTo(350, 50);
+  pathData->lineTo(350, 350);
+  pathData->lineTo(50, 350);
+  pathData->close();
+  pathData->moveTo(150, 150);
+  pathData->lineTo(250, 150);
+  pathData->lineTo(250, 250);
+  pathData->lineTo(150, 250);
+  pathData->close();
+  path->data = pathData;
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->fillRule = pagx::FillRule::Winding;
+  fill->color = MakeSolidFill(doc.get(), {0.7f, 0.5f, 0.3f, 1.0f})->color;
+
+  layer->contents.push_back(path);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  pagx::PPTExportOptions options;
+  options.bridgeContours = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "bridge_winding", options));
+}
+
+PAGX_TEST(PAGXPPTTest, BridgeContoursTextToPath) {
+  // GlyphRun text under bridgeContours: writeTextAsPath drives
+  // PrepareContourGroups + EmitGroupCustGeom for each glyph group.
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  // Glyph 1: rectangular outer + smaller inner rect → bridged group
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->advance = 600;
+  glyph->path = doc->makeNode<pagx::PathData>();
+  glyph->path->moveTo(50, 50);
+  glyph->path->lineTo(550, 50);
+  glyph->path->lineTo(550, 700);
+  glyph->path->lineTo(50, 700);
+  glyph->path->close();
+  glyph->path->moveTo(150, 150);
+  glyph->path->lineTo(450, 150);
+  glyph->path->lineTo(450, 600);
+  glyph->path->lineTo(150, 600);
+  glyph->path->close();
+  font->glyphs.push_back(glyph);
+
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "O";
+  text->position = {100, 130};
+  text->fontSize = 96.0f;
+
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 96.0f;
+  run->glyphs = {1};
+  text->glyphRuns.push_back(run);
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.1f, 0.1f, 0.1f, 1.0f};
+  fill->color = solid;
+
+  layer->contents.push_back(text);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  pagx::PPTExportOptions options;
+  options.convertTextToPath = true;
+  options.bridgeContours = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "bridge_text_to_path", options));
+}
+
+//==============================================================================
+// Coverage boost: PPTStyleEmitter and PPTFeatureProbe edge cases.
+//==============================================================================
+
+PAGX_TEST(PAGXPPTTest, ConicGradientFillVectorFallback) {
+  // rasterizeUnsupported=false: ProbeLayerFeatures still flags conic but the
+  // raster path is skipped so writeColorSource emits the last-resort circular
+  // gradient (covers PPTStyleEmitter ConicGradient branch lines 231-238).
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 200};
+
+  auto* grad = doc->makeNode<pagx::ConicGradient>();
+  grad->center = {200, 150};
+  grad->startAngle = 0;
+  grad->endAngle = 360;
+  auto* s0 = doc->makeNode<pagx::ColorStop>();
+  s0->offset = 0;
+  s0->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  auto* s1 = doc->makeNode<pagx::ColorStop>();
+  s1->offset = 1;
+  s1->color = {0.0f, 0.0f, 1.0f, 1.0f};
+  grad->colorStops.push_back(s0);
+  grad->colorStops.push_back(s1);
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = grad;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  pagx::PPTExportOptions options;
+  options.rasterizeUnsupported = false;
+  ASSERT_TRUE(ExportAndVerify(*doc, "conic_vector_fallback", options));
+}
+
+PAGX_TEST(PAGXPPTTest, DiamondGradientFillVectorFallback) {
+  // Same idea as conic fallback: emits the diamond-as-rect gradient via
+  // PPTStyleEmitter DiamondGradient branch lines 244-251.
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 200};
+
+  auto* grad = doc->makeNode<pagx::DiamondGradient>();
+  grad->center = {200, 150};
+  grad->radius = 100;
+  auto* s0 = doc->makeNode<pagx::ColorStop>();
+  s0->offset = 0;
+  s0->color = {1.0f, 0.6f, 0.0f, 1.0f};
+  auto* s1 = doc->makeNode<pagx::ColorStop>();
+  s1->offset = 1;
+  s1->color = {0.0f, 0.3f, 0.6f, 1.0f};
+  grad->colorStops.push_back(s0);
+  grad->colorStops.push_back(s1);
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = grad;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  pagx::PPTExportOptions options;
+  options.rasterizeUnsupported = false;
+  ASSERT_TRUE(ExportAndVerify(*doc, "diamond_vector_fallback", options));
+}
+
+PAGX_TEST(PAGXPPTTest, FillRuleEvenOddSinglePathDataFlat) {
+  // Single-contour path with EvenOdd: PrepareContourGroups path is bypassed
+  // (contours.size() <= 1), exercising writeContourGeom's flat-emit fast path.
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  auto* pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(50, 50);
+  pathData->lineTo(350, 50);
+  pathData->lineTo(350, 250);
+  pathData->lineTo(50, 250);
+  pathData->close();
+  path->data = pathData;
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->fillRule = pagx::FillRule::EvenOdd;
+  fill->color = MakeSolidFill(doc.get(), {0.4f, 0.6f, 0.9f, 1.0f})->color;
+
+  layer->contents.push_back(path);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  pagx::PPTExportOptions options;
+  options.bridgeContours = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "single_contour_evenodd_bridge", options));
+}
+
+PAGX_TEST(PAGXPPTTest, FillBlendNonRasterizedDropped) {
+  // Fill has non-Normal blendMode but rasterizeUnsupported=false: the
+  // PPTFeatureProbe Fill branch (lines 159-160) flags it but writePath emits
+  // the geometry without rasterizing, so the blend mode is silently dropped.
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 150};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->blendMode = pagx::BlendMode::HardLight;
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.7f, 0.4f, 0.2f, 1.0f};
+  fill->color = solid;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  pagx::PPTExportOptions options;
+  options.rasterizeUnsupported = false;
+  ASSERT_TRUE(ExportAndVerify(*doc, "fill_blend_dropped", options));
+}
+
+PAGX_TEST(PAGXPPTTest, StrokeBlendNonNormalProbed) {
+  // Stroke->blendMode != Normal: covers PPTFeatureProbe Stroke branch
+  // (lines 167-169 hasUnsupportedBlend on the stroke probe).
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  auto* pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(50, 100);
+  pathData->lineTo(350, 100);
+  path->data = pathData;
+
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  stroke->width = 5;
+  stroke->blendMode = pagx::BlendMode::HardLight;
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.0f, 0.4f, 0.8f, 1.0f};
+  stroke->color = solid;
+
+  layer->contents.push_back(path);
+  layer->contents.push_back(stroke);
+  doc->layers.push_back(layer);
+
+  pagx::PPTExportOptions options;
+  options.rasterizeUnsupported = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "stroke_blend_probed", options));
+}
+
+PAGX_TEST(PAGXPPTTest, RadialGradientWideGamutEscalated) {
+  // Radial gradient with a wide-gamut stop: covers
+  // PPTFeatureProbe::ProbeColorSource RadialGradient branch (lines 122-124).
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 200};
+
+  auto* grad = doc->makeNode<pagx::RadialGradient>();
+  grad->center = {200, 150};
+  grad->radius = 100;
+  auto* s0 = doc->makeNode<pagx::ColorStop>();
+  s0->offset = 0;
+  s0->color = {1.0f, 0.2f, 0.1f, 1.0f};
+  s0->color.colorSpace = pagx::ColorSpace::DisplayP3;
+  auto* s1 = doc->makeNode<pagx::ColorStop>();
+  s1->offset = 1;
+  s1->color = {0.1f, 0.4f, 0.9f, 1.0f};
+  grad->colorStops.push_back(s0);
+  grad->colorStops.push_back(s1);
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = grad;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  pagx::PPTExportOptions options;
+  options.rasterizeUnsupported = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "radial_widegamut_raster", options));
+}
+
+PAGX_TEST(PAGXPPTTest, ConicGradientWideGamutEscalated) {
+  // Conic gradient with a wide-gamut stop: covers
+  // PPTFeatureProbe::ProbeColorSource ConicGradient wide-gamut branch (line 129).
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 200};
+
+  auto* grad = doc->makeNode<pagx::ConicGradient>();
+  grad->center = {200, 150};
+  auto* s0 = doc->makeNode<pagx::ColorStop>();
+  s0->offset = 0;
+  s0->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  s0->color.colorSpace = pagx::ColorSpace::DisplayP3;
+  auto* s1 = doc->makeNode<pagx::ColorStop>();
+  s1->offset = 1;
+  s1->color = {0.0f, 0.0f, 1.0f, 1.0f};
+  grad->colorStops.push_back(s0);
+  grad->colorStops.push_back(s1);
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = grad;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  pagx::PPTExportOptions options;
+  options.rasterizeUnsupported = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "conic_widegamut_raster", options));
+}
+
+PAGX_TEST(PAGXPPTTest, DiamondGradientWideGamutEscalated) {
+  // Diamond gradient with a wide-gamut stop: covers
+  // PPTFeatureProbe::ProbeColorSource DiamondGradient wide-gamut branch (line 135).
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 200};
+
+  auto* grad = doc->makeNode<pagx::DiamondGradient>();
+  grad->center = {200, 150};
+  grad->radius = 100;
+  auto* s0 = doc->makeNode<pagx::ColorStop>();
+  s0->offset = 0;
+  s0->color = {1.0f, 0.5f, 0.0f, 1.0f};
+  s0->color.colorSpace = pagx::ColorSpace::DisplayP3;
+  auto* s1 = doc->makeNode<pagx::ColorStop>();
+  s1->offset = 1;
+  s1->color = {0.0f, 0.3f, 0.6f, 1.0f};
+  grad->colorStops.push_back(s0);
+  grad->colorStops.push_back(s1);
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = grad;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  pagx::PPTExportOptions options;
+  options.rasterizeUnsupported = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "diamond_widegamut_raster", options));
+}
+
+PAGX_TEST(PAGXPPTTest, NestedTextBoxFeatureProbe) {
+  // TextBox containing nested TextPath: ProbeElementsFeatures TextBox branch
+  // recurses into the box's elements (covers lines 181-185).
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* tb = doc->makeNode<pagx::TextBox>();
+  tb->position = {200, 150};
+  tb->width = 200;
+  tb->height = 100;
+  auto* txt = doc->makeNode<pagx::Text>();
+  txt->text = "Hello";
+  txt->fontSize = 18;
+  auto* tp = doc->makeNode<pagx::TextPath>();
+  auto* pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(0, 0);
+  pathData->lineTo(200, 0);
+  tp->path = pathData;
+  tb->elements.push_back(txt);
+  tb->elements.push_back(tp);
+  layer->contents.push_back(tb);
+  layer->contents.push_back(MakeSolidFill(doc.get(), {0.0f, 0.0f, 0.0f, 1.0f}));
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "textbox_nested_textpath_probe"));
+}
+
+//==============================================================================
+// Coverage boost: PPTModifierResolver edge branches.
+//==============================================================================
+
+PAGX_TEST(PAGXPPTTest, PolystarZeroPointsResolved) {
+  // Polystar with pointCount=0 returns empty path inside StarToTGFXPath /
+  // PolygonToTGFXPath (covers the early-return guard).
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* star = doc->makeNode<pagx::Polystar>();
+  star->type = pagx::PolystarType::Polygon;
+  star->position = {200, 150};
+  star->pointCount = 0;
+  star->outerRadius = 80;
+  layer->contents.push_back(star);
+  layer->contents.push_back(MakeSolidFill(doc.get(), {0.4f, 0.4f, 0.4f, 1.0f}));
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "polystar_zero_points"));
+}
+
+PAGX_TEST(PAGXPPTTest, PolygonTooFewPoints) {
+  // Polygon with <3 points: PolygonToTGFXPath returns empty (numPoints<3 guard
+  // at line 208-210).
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* poly = doc->makeNode<pagx::Polystar>();
+  poly->type = pagx::PolystarType::Polygon;
+  poly->position = {200, 150};
+  poly->pointCount = 2;
+  poly->outerRadius = 80;
+  layer->contents.push_back(poly);
+  layer->contents.push_back(MakeSolidFill(doc.get(), {0.5f, 0.5f, 0.5f, 1.0f}));
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "polygon_two_points"));
+}
+
+PAGX_TEST(PAGXPPTTest, TrimPathOnPolystarPath) {
+  // TrimPath applied to a Polystar (after resolveModifiers expands it): drives
+  // PrimitiveToTGFXPath through the Path branch with renderScale path applied
+  // because the wrapper Path keeps position=(0,0).
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* star = doc->makeNode<pagx::Polystar>();
+  star->type = pagx::PolystarType::Star;
+  star->position = {200, 150};
+  star->pointCount = 5;
+  star->outerRadius = 80;
+  star->innerRadius = 40;
+  star->outerRoundness = 0.2f;
+  star->innerRoundness = 0.2f;
+  auto* trim = doc->makeNode<pagx::TrimPath>();
+  trim->start = 0.1f;
+  trim->end = 0.7f;
+  trim->offset = 30;
+  layer->contents.push_back(star);
+  layer->contents.push_back(trim);
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  stroke->width = 3;
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.2f, 0.2f, 0.6f, 1.0f};
+  stroke->color = solid;
+  layer->contents.push_back(stroke);
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "trim_on_polystar"));
+}
+
+PAGX_TEST(PAGXPPTTest, RoundCornerZeroRadiusNoOp) {
+  // RoundCorner with radius<=0 returns shape unchanged via the early-return
+  // branch at PPTModifierResolver line 341-343.
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 100};
+  auto* rc = doc->makeNode<pagx::RoundCorner>();
+  rc->radius = 0;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(rc);
+  layer->contents.push_back(MakeSolidFill(doc.get(), {0.6f, 0.4f, 0.2f, 1.0f}));
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "roundcorner_zero_noop"));
+}
+
+PAGX_TEST(PAGXPPTTest, MergePathInsideGroupResolved) {
+  // MergePath inside a Group: resolveModifiers recurses into the group via
+  // processVectorScope's Group branch and resolver re-runs scoped to the group.
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* group = doc->makeNode<pagx::Group>();
+  group->position = {200, 150};
+  auto* r1 = doc->makeNode<pagx::Rectangle>();
+  r1->position = {-30, 0};
+  r1->size = {120, 80};
+  auto* r2 = doc->makeNode<pagx::Rectangle>();
+  r2->position = {30, 0};
+  r2->size = {120, 80};
+  auto* mp = doc->makeNode<pagx::MergePath>();
+  mp->mode = pagx::MergePathMode::Union;
+  group->elements.push_back(r1);
+  group->elements.push_back(r2);
+  group->elements.push_back(mp);
+  group->elements.push_back(MakeSolidFill(doc.get(), {0.7f, 0.4f, 0.4f, 1.0f}));
+  layer->contents.push_back(group);
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "mergepath_in_group"));
+}
+
+PAGX_TEST(PAGXPPTTest, RepeaterInsideGroupExpansion) {
+  // Group containing a Repeater: covers Group->Group recursion + Repeater body
+  // snapshot path inside resolve().
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* group = doc->makeNode<pagx::Group>();
+  group->position = {100, 150};
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {0, 0};
+  rect->size = {40, 40};
+  auto* rep = doc->makeNode<pagx::Repeater>();
+  rep->copies = 3;
+  rep->position = {60, 0};
+  group->elements.push_back(rect);
+  group->elements.push_back(rep);
+  group->elements.push_back(MakeSolidFill(doc.get(), {0.3f, 0.6f, 0.5f, 1.0f}));
+  layer->contents.push_back(group);
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "repeater_in_group"));
+}
+
+PAGX_TEST(PAGXPPTTest, RepeaterReversedScale) {
+  // Repeater scale.x negative + fractional: SignedPow's negative branch (line
+  // 47) and the fractional alpha multiplier branch (line 562-563) fire.
+  auto doc = pagx::PAGXDocument::Make(500, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {120, 150};
+  rect->size = {40, 40};
+  auto* rep = doc->makeNode<pagx::Repeater>();
+  rep->copies = 2.5f;
+  rep->position = {60, 0};
+  rep->scale = {-0.9f, 1.0f};
+  rep->offset = 0.0f;
+  rep->startAlpha = 1.0f;
+  rep->endAlpha = 0.5f;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(rep);
+  layer->contents.push_back(MakeSolidFill(doc.get(), {0.5f, 0.3f, 0.7f, 1.0f}));
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "repeater_negscale_frac"));
+}
+
+//==============================================================================
+// Coverage boost: PPTTextWriter writeNativeText + writeTextBoxGroup paths the
+// existing tests don't reach (multiline run with newlines, fauxBold/fauxItalic
+// run-level effects, multiline TextBox via paragraph emitter).
+//==============================================================================
+
+PAGX_TEST(PAGXPPTTest, NativeTextFauxBoldItalic) {
+  // fauxBold/fauxItalic without "Bold"/"Italic" font style: BuildRunStyle takes
+  // the fauxBold-only branch (style.hasBold=true), and writeParagraphRun emits
+  // the b="1" / i="1" attributes (PPTTextWriter lines 502, 505).
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "Faux";
+  text->position = {120, 100};
+  text->fontFamily = "Arial";
+  text->fontSize = 28;
+  text->fauxBold = true;
+  text->fauxItalic = true;
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(text);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "text_faux_bold_italic"));
+}
+
+PAGX_TEST(PAGXPPTTest, TextBoxJustifyTextAlign) {
+  // TextBox with TextAlign::Justify: drives the algn="just" branch
+  // (PPTTextWriter line 421).
+  auto doc = pagx::PAGXDocument::Make(400, 250);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* tb = doc->makeNode<pagx::TextBox>();
+  tb->position = {200, 100};
+  tb->width = 220;
+  tb->height = 100;
+  tb->textAlign = pagx::TextAlign::Justify;
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "Justified text content here.";
+  text->fontFamily = "Arial";
+  text->fontSize = 16;
+  tb->elements.push_back(text);
+  tb->elements.push_back(MakeSolidFill(doc.get(), {0.0f, 0.0f, 0.0f, 1.0f}));
+  layer->contents.push_back(tb);
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "textbox_justify"));
+}
+
+PAGX_TEST(PAGXPPTTest, TextBoxParagraphAlignMiddle) {
+  // ParagraphAlign::Middle → bodyPr@anchor="ctr" via AddBodyPrAttrsForTextBox
+  // line 528-531.
+  auto doc = pagx::PAGXDocument::Make(400, 250);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* tb = doc->makeNode<pagx::TextBox>();
+  tb->position = {200, 100};
+  tb->width = 220;
+  tb->height = 120;
+  tb->paragraphAlign = pagx::ParagraphAlign::Middle;
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "Center";
+  text->fontFamily = "Arial";
+  text->fontSize = 18;
+  tb->elements.push_back(text);
+  tb->elements.push_back(MakeSolidFill(doc.get(), {0.0f, 0.0f, 0.0f, 1.0f}));
+  layer->contents.push_back(tb);
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "textbox_paragraph_middle"));
+}
+
+PAGX_TEST(PAGXPPTTest, TextBoxParagraphAlignFar) {
+  // ParagraphAlign::Far → bodyPr@anchor="b" via AddBodyPrAttrsForTextBox
+  // line 528, 530-532.
+  auto doc = pagx::PAGXDocument::Make(400, 250);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* tb = doc->makeNode<pagx::TextBox>();
+  tb->position = {200, 100};
+  tb->width = 220;
+  tb->height = 120;
+  tb->paragraphAlign = pagx::ParagraphAlign::Far;
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "Far";
+  text->fontFamily = "Arial";
+  text->fontSize = 18;
+  tb->elements.push_back(text);
+  tb->elements.push_back(MakeSolidFill(doc.get(), {0.0f, 0.0f, 0.0f, 1.0f}));
+  layer->contents.push_back(tb);
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "textbox_paragraph_far"));
+}
+
+PAGX_TEST(PAGXPPTTest, TextBoxAnchorWidthZero) {
+  // width=0 anchor mode with TextAlign::Center / End: drives the
+  // emitTextBoxShapeFrame inline-anchor branch (lines 661-664).
+  auto doc = pagx::PAGXDocument::Make(400, 250);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* tb = doc->makeNode<pagx::TextBox>();
+  tb->position = {200, 100};
+  tb->width = 0;
+  tb->textAlign = pagx::TextAlign::Center;
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "Anchor";
+  text->fontFamily = "Arial";
+  text->fontSize = 18;
+  tb->elements.push_back(text);
+  tb->elements.push_back(MakeSolidFill(doc.get(), {0.0f, 0.0f, 0.0f, 1.0f}));
+  layer->contents.push_back(tb);
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "textbox_anchor_width0_center"));
+}
+
+PAGX_TEST(PAGXPPTTest, TextBoxAnchorWidthZeroEnd) {
+  auto doc = pagx::PAGXDocument::Make(400, 250);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* tb = doc->makeNode<pagx::TextBox>();
+  tb->position = {300, 100};
+  tb->width = 0;
+  tb->textAlign = pagx::TextAlign::End;
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "AnchorEnd";
+  text->fontFamily = "Arial";
+  text->fontSize = 18;
+  tb->elements.push_back(text);
+  tb->elements.push_back(MakeSolidFill(doc.get(), {0.0f, 0.0f, 0.0f, 1.0f}));
+  layer->contents.push_back(tb);
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "textbox_anchor_width0_end"));
+}
+
+PAGX_TEST(PAGXPPTTest, TextBoxAnchorHeightZeroMiddle) {
+  // height=0 anchor + ParagraphAlign::Middle / Far in horizontal mode: drives
+  // the block-axis anchor branch (lines 673-676).
+  auto doc = pagx::PAGXDocument::Make(400, 250);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* tb = doc->makeNode<pagx::TextBox>();
+  tb->position = {200, 100};
+  tb->width = 200;
+  tb->height = 0;
+  tb->paragraphAlign = pagx::ParagraphAlign::Middle;
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "Mid";
+  text->fontFamily = "Arial";
+  text->fontSize = 18;
+  tb->elements.push_back(text);
+  tb->elements.push_back(MakeSolidFill(doc.get(), {0.0f, 0.0f, 0.0f, 1.0f}));
+  layer->contents.push_back(tb);
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "textbox_anchor_height0_middle"));
+}
+
+PAGX_TEST(PAGXPPTTest, TextBoxAnchorHeightZeroFar) {
+  auto doc = pagx::PAGXDocument::Make(400, 250);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* tb = doc->makeNode<pagx::TextBox>();
+  tb->position = {200, 200};
+  tb->width = 200;
+  tb->height = 0;
+  tb->paragraphAlign = pagx::ParagraphAlign::Far;
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "Far";
+  text->fontFamily = "Arial";
+  text->fontSize = 18;
+  tb->elements.push_back(text);
+  tb->elements.push_back(MakeSolidFill(doc.get(), {0.0f, 0.0f, 0.0f, 1.0f}));
+  layer->contents.push_back(tb);
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "textbox_anchor_height0_far"));
+}
+
+PAGX_TEST(PAGXPPTTest, TextBoxRichTextWithMultipleRuns) {
+  // TextBox with two Text children sharing one Fill: CollectRichTextRuns
+  // produces multiple runs that share style; the writeTextBoxGroup line-layout
+  // path emits them inside a single <a:p>.
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* tb = doc->makeNode<pagx::TextBox>();
+  tb->position = {200, 100};
+  tb->width = 240;
+  tb->height = 80;
+  auto* t1 = doc->makeNode<pagx::Text>();
+  t1->text = "Hello ";
+  t1->fontFamily = "Arial";
+  t1->fontSize = 18;
+  auto* t2 = doc->makeNode<pagx::Text>();
+  t2->text = "World";
+  t2->fontFamily = "Arial";
+  t2->fontSize = 18;
+  tb->elements.push_back(t1);
+  tb->elements.push_back(t2);
+  tb->elements.push_back(MakeSolidFill(doc.get(), {0.0f, 0.0f, 0.0f, 1.0f}));
+  layer->contents.push_back(tb);
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "textbox_multi_runs"));
+}
+
+PAGX_TEST(PAGXPPTTest, TextBoxEmptyTextRunsSkipped) {
+  // TextBox with all-empty Text children: CollectRichTextRuns rejects them
+  // (line 585) and writeTextBoxGroup early-returns at runs.empty() (line 815).
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* tb = doc->makeNode<pagx::TextBox>();
+  tb->position = {200, 100};
+  tb->width = 200;
+  tb->height = 60;
+  auto* t = doc->makeNode<pagx::Text>();
+  t->text = "";
+  t->fontFamily = "Arial";
+  t->fontSize = 14;
+  tb->elements.push_back(t);
+  tb->elements.push_back(MakeSolidFill(doc.get(), {0.0f, 0.0f, 0.0f, 1.0f}));
+  layer->contents.push_back(tb);
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "textbox_all_empty_runs"));
+}
+
+PAGX_TEST(PAGXPPTTest, NativeTextRtlBaseDirection) {
+  // RTL paragraph base direction: HasRTLParagraphBase returns true so
+  // emitNativeTextBody emits pPr@rtl=1 via WriteParagraphProperties.
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "אבג";  // Hebrew aleph-bet-gimel
+  text->position = {200, 100};
+  text->fontSize = 24;
+  layer->contents.push_back(text);
+  layer->contents.push_back(MakeSolidFill(doc.get(), {0.0f, 0.0f, 0.0f, 1.0f}));
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "text_rtl"));
+}
+
+PAGX_TEST(PAGXPPTTest, NativeTextRtlAnchorEnd) {
+  // RTL + TextAnchor::End: covers the rtl ? "l" : "r" branch in writeNativeText
+  // (line 410-411).
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "אבג";
+  text->position = {200, 100};
+  text->fontSize = 24;
+  text->textAnchor = pagx::TextAnchor::End;
+  layer->contents.push_back(text);
+  layer->contents.push_back(MakeSolidFill(doc.get(), {0.0f, 0.0f, 0.0f, 1.0f}));
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "text_rtl_anchor_end"));
+}
+
+PAGX_TEST(PAGXPPTTest, NativeTextEmptyEarlyReturn) {
+  // Text with empty string but non-empty fill: writeNativeText hits line 367-369
+  // early return, but the surrounding scope still emits other shapes.
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 100};
+  rect->size = {100, 60};
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "";
+  text->position = {200, 100};
+  text->fontSize = 24;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(text);
+  layer->contents.push_back(MakeSolidFill(doc.get(), {0.0f, 0.5f, 0.5f, 1.0f}));
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "text_empty_early_return"));
+}
+
+PAGX_TEST(PAGXPPTTest, ImagePatternFill_NativeTilePathWithDimensions) {
+  // ImagePattern + Repeat tiling on a real PNG: the bake fallback fails (no GPU
+  // returns nullptr from RenderTiledPattern in tests), so the code falls
+  // through to the native <a:tile> emit path (PPTStyleEmitter lines 328-353).
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 150};
+
+  auto* image = MakeTestPNGImage(doc.get());
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->tileModeX = pagx::TileMode::Repeat;
+  pattern->tileModeY = pagx::TileMode::Mirror;
+  pattern->matrix = {2.0f, 0.0f, 0.0f, 1.5f, 5.0f, 7.0f};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "imagepattern_native_tile"));
+}
+
+PAGX_TEST(PAGXPPTTest, ImagePatternFill_TileFlipNone) {
+  // Tile with both axes Repeat (flip == "none" branch line 338).
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 150};
+
+  auto* image = MakeTestPNGImage(doc.get());
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->tileModeX = pagx::TileMode::Repeat;
+  pattern->tileModeY = pagx::TileMode::Repeat;
+  pattern->matrix = {1.5f, 0.0f, 0.0f, 1.5f, 0.0f, 0.0f};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+  ASSERT_TRUE(ExportAndVerify(*doc, "imagepattern_tile_flip_none"));
 }
 
 }  // namespace pag

@@ -19,6 +19,9 @@
 #include "pagx/ppt/PPTContourUtils.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <limits>
+#include "base/utils/Log.h"
 
 namespace pagx {
 
@@ -32,19 +35,52 @@ Point SegEndpoint(const PathSeg& seg) {
   return seg.pts[0];
 }
 
-// Approximates the signed area using segment endpoints only (polygon approximation).
-// For paths with few high-curvature bezier segments (e.g., a circle from 4 cubics),
-// the winding direction may be inaccurate.
+static double Cross(const Point& a, const Point& b) {
+  return static_cast<double>(a.x) * b.y - static_cast<double>(b.x) * a.y;
+}
+
+// 2x signed area contribution of one segment from `prev` to its endpoint using
+// Green's theorem ∮ x dy. Exact for Line/Quad/Cubic so the winding sign is
+// correct even for paths built from few high-curvature beziers (e.g. a circle
+// from 4 cubics). `double` accumulation keeps precision under large coordinates.
+static double SegmentTwiceSignedArea(const PathSeg& seg, const Point& prev) {
+  if (seg.verb == PathVerb::Quad) {
+    const Point& p0 = prev;
+    const Point& p1 = seg.pts[0];
+    const Point& p2 = seg.pts[1];
+    // chord contribution + (2/3) * 2A(triangle P0,P1,P2)
+    double triangle = Cross(p0, p1) + Cross(p1, p2) + Cross(p2, p0);
+    return Cross(p0, p2) + (2.0 / 3.0) * triangle;
+  }
+  if (seg.verb == PathVerb::Cubic) {
+    const Point& p0 = prev;
+    const Point& p1 = seg.pts[0];
+    const Point& p2 = seg.pts[1];
+    const Point& p3 = seg.pts[2];
+    double c01 = Cross(p0, p1);
+    double c02 = Cross(p0, p2);
+    double c03 = Cross(p0, p3);
+    double c12 = Cross(p1, p2);
+    double c13 = Cross(p1, p3);
+    double c23 = Cross(p2, p3);
+    return (6.0 * c01 + 3.0 * c02 + c03 + 3.0 * c12 + 3.0 * c13 + 6.0 * c23) / 10.0;
+  }
+  // Line (and Move/Close defensively fall through as a straight edge to endpoint).
+  return Cross(prev, seg.pts[0]);
+}
+
+// Computes the exact signed area (actually 2x, sign preserved) by integrating
+// along each bezier segment analytically. Unlike an endpoint-polygon
+// approximation, this is robust to paths with few high-curvature curves.
 float ComputeSignedArea(const PathContour& contour) {
-  float area = 0;
+  double area = 0;
   Point prev = contour.start;
   for (const auto& seg : contour.segs) {
-    Point next = SegEndpoint(seg);
-    area += (prev.x * next.y - next.x * prev.y);
-    prev = next;
+    area += SegmentTwiceSignedArea(seg, prev);
+    prev = SegEndpoint(seg);
   }
-  area += (prev.x * contour.start.y - contour.start.x * prev.y);
-  return area;
+  area += Cross(prev, contour.start);
+  return static_cast<float>(area);
 }
 
 void ReverseContour(PathContour& c) {
@@ -57,7 +93,7 @@ void ReverseContour(PathContour& c) {
 
   std::vector<PathSeg> rev;
   rev.reserve(n);
-  for (int i = static_cast<int>(n) - 1; i >= 0; i--) {
+  for (size_t i = n; i-- > 0;) {
     Point dest = (i > 0) ? SegEndpoint(c.segs[i - 1]) : originalStart;
     const auto& seg = c.segs[i];
     PathSeg reversed;
@@ -81,39 +117,73 @@ void ReverseContour(PathContour& c) {
 
 // Half-edge ray-cast test: returns true when the horizontal ray from `pt` to +x
 // crosses the (pi, pj) edge. Caller XORs this into a running `inside` flag so
-// that an odd number of crossings means the point is inside the polygon.
+// that an odd number of crossings means the point is inside the polygon. The
+// intersection x-coordinate is computed in `double` to avoid float cancellation
+// on near-horizontal edges and under large coordinates.
 static bool RayCrossesEdge(const Point& pt, const Point& pi, const Point& pj) {
-  return ((pi.y > pt.y) != (pj.y > pt.y)) &&
-         (pt.x < (pj.x - pi.x) * (pt.y - pi.y) / (pj.y - pi.y) + pi.x);
+  if ((pi.y > pt.y) == (pj.y > pt.y)) {
+    return false;
+  }
+  double dy = static_cast<double>(pj.y) - pi.y;
+  double xIntersect =
+      (static_cast<double>(pj.x) - pi.x) * (static_cast<double>(pt.y) - pi.y) / dy + pi.x;
+  return static_cast<double>(pt.x) < xIntersect;
 }
 
 // Tests point containment using endpoint polygon approximation (ray casting).
 // For paths with few high-curvature bezier segments, the result may be inaccurate
 // near curved edges.
 bool PointInsideContour(const Point& pt, const PathContour& contour) {
-  bool inside = false;
-  Point lastVertex = contour.segs.empty() ? contour.start : SegEndpoint(contour.segs.back());
-  if (RayCrossesEdge(pt, contour.start, lastVertex)) {
-    inside = !inside;
+  if (contour.segs.empty()) {
+    return false;
   }
+  bool inside = false;
   Point prev = contour.start;
   for (const auto& seg : contour.segs) {
     Point cur = SegEndpoint(seg);
-    if (RayCrossesEdge(pt, cur, prev)) {
+    if (RayCrossesEdge(pt, prev, cur)) {
       inside = !inside;
     }
     prev = cur;
   }
+  // Closing edge from the last vertex back to the start.
+  if (RayCrossesEdge(pt, prev, contour.start)) {
+    inside = !inside;
+  }
   return inside;
 }
 
+// Returns the true curve midpoint (t=0.5) of a segment starting at `start`, via
+// closed-form de Casteljau. Using the curve midpoint instead of the chord
+// midpoint makes the ContourInsideContour fallback robust for high-curvature
+// segments where the chord midpoint may lie outside the actual curve.
+static Point SegmentMidpoint(const PathSeg& seg, const Point& start) {
+  if (seg.verb == PathVerb::Quad) {
+    const Point& p0 = start;
+    const Point& p1 = seg.pts[0];
+    const Point& p2 = seg.pts[1];
+    return {0.25f * p0.x + 0.5f * p1.x + 0.25f * p2.x, 0.25f * p0.y + 0.5f * p1.y + 0.25f * p2.y};
+  }
+  if (seg.verb == PathVerb::Cubic) {
+    const Point& p0 = start;
+    const Point& p1 = seg.pts[0];
+    const Point& p2 = seg.pts[1];
+    const Point& p3 = seg.pts[2];
+    return {0.125f * (p0.x + 3.0f * p1.x + 3.0f * p2.x + p3.x),
+            0.125f * (p0.y + 3.0f * p1.y + 3.0f * p2.y + p3.y)};
+  }
+  const Point& p1 = seg.pts[0];
+  return {(start.x + p1.x) * 0.5f, (start.y + p1.y) * 0.5f};
+}
+
 // Tests whether `inner` is spatially nested inside `outer`. Samples inner.start
-// plus the midpoint of inner's first segment chord and returns true if any
-// sample lies strictly inside `outer`. The midpoint fallback exists because
-// inner.start can coincide with a polygon-approximation vertex of `outer` when
-// both contours come from a path boolean (e.g. tgfx::PathOp::XOR emits an inner
-// hole whose start point is tangent to the outer boundary), and ray casting on
-// a boundary vertex is numerically unstable and often misses the containment.
+// plus the true curve midpoint (t=0.5) of inner's first segment and returns
+// true if any sample lies strictly inside `outer`. The midpoint fallback exists
+// because inner.start can coincide with a polygon-approximation vertex of
+// `outer` when both contours come from a path boolean (e.g. tgfx::PathOp::XOR
+// emits an inner hole whose start point is tangent to the outer boundary), and
+// ray casting on a boundary vertex is numerically unstable and often misses the
+// containment.
 bool ContourInsideContour(const PathContour& inner, const PathContour& outer) {
   if (PointInsideContour(inner.start, outer)) {
     return true;
@@ -121,8 +191,7 @@ bool ContourInsideContour(const PathContour& inner, const PathContour& outer) {
   if (inner.segs.empty()) {
     return false;
   }
-  Point next = SegEndpoint(inner.segs.front());
-  Point midpoint = {(inner.start.x + next.x) * 0.5f, (inner.start.y + next.y) * 0.5f};
+  Point midpoint = SegmentMidpoint(inner.segs.front(), inner.start);
   return PointInsideContour(midpoint, outer);
 }
 
@@ -133,9 +202,14 @@ std::vector<PathContour> ParsePathContours(const PathData* data) {
   size_t ptIndex = 0;
   for (const auto& verb : verbs) {
     if (verb == PathVerb::Move) {
-      PathContour c;
-      c.start = points[ptIndex++];
-      contours.push_back(std::move(c));
+      // Guard against malformed PathData where verbs and points counts are out
+      // of sync (e.g. truncated input). A simple Release-safe bail keeps parsing
+      // from reading past the end of `points` and corrupting adjacent memory.
+      if (ptIndex >= points.size()) {
+        break;
+      }
+      contours.emplace_back();
+      contours.back().start = points[ptIndex++];
     } else if (!contours.empty()) {
       if (verb == PathVerb::Close) {
         contours.back().closed = true;
@@ -143,8 +217,16 @@ std::vector<PathContour> ParsePathContours(const PathData* data) {
         PathSeg seg;
         seg.verb = verb;
         int ptCount = PathData::PointsPerVerb(verb);
+        bool truncated = false;
         for (int i = 0; i < ptCount; i++) {
+          if (ptIndex >= points.size()) {
+            truncated = true;
+            break;
+          }
           seg.pts[i] = points[ptIndex++];
+        }
+        if (truncated) {
+          break;
         }
         contours.back().segs.push_back(seg);
       }
@@ -153,86 +235,174 @@ std::vector<PathContour> ParsePathContours(const PathData* data) {
   return contours;
 }
 
-// A contour can only contain another when it is a closed loop with at least
-// one segment. Pre-computing this validity bit avoids re-evaluating it on
-// every i/j pair of the O(n²) containment scans below.
-static std::vector<bool> ComputeContainerValidity(const std::vector<PathContour>& contours) {
-  std::vector<bool> valid(contours.size(), false);
-  for (size_t i = 0; i < contours.size(); i++) {
-    valid[i] = contours[i].closed && !contours[i].segs.empty();
+// Per-contour metadata shared by the bridging pipeline: axis-aligned bounds
+// (for pair pruning), a "can contain" flag (only closed rings with at least
+// one segment can hold another contour), and the row-major inside-matrix —
+// entry (i, j) is true when contour i lies inside contour j. Building all
+// three once lets depth calculation and parent assignment reuse the same
+// data without repeating the expensive ContourInsideContour ray cast.
+struct ContourBounds {
+  float minX;
+  float minY;
+  float maxX;
+  float maxY;
+
+  bool disjoint(const ContourBounds& o) const {
+    return maxX < o.minX || o.maxX < minX || maxY < o.minY || o.maxY < minY;
   }
-  return valid;
+};
+
+struct ContainmentTable {
+  std::vector<ContourBounds> bounds;
+  std::vector<bool> canContain;
+  // inside[i * n + j] == 1  <=>  contour i is inside contour j.
+  // uint8_t (not vector<bool>) to avoid bit-packing on the hot inner loop.
+  std::vector<uint8_t> inside;
+  size_t n = 0;
+
+  bool isInside(size_t i, size_t j) const {
+    DEBUG_ASSERT(i < n && j < n);
+    return inside[i * n + j] != 0;
+  }
+};
+
+static void ExpandBoundsBy(ContourBounds& b, const Point& p) {
+  b.minX = std::min(b.minX, p.x);
+  b.minY = std::min(b.minY, p.y);
+  b.maxX = std::max(b.maxX, p.x);
+  b.maxY = std::max(b.maxY, p.y);
 }
 
-static std::vector<int> ComputeContainmentDepths(const std::vector<PathContour>& contours,
-                                                 const std::vector<bool>& valid) {
-  std::vector<int> depths(contours.size(), 0);
-  for (size_t i = 0; i < contours.size(); i++) {
-    for (size_t j = 0; j < contours.size(); j++) {
-      if (i == j || !valid[j]) {
+static ContourBounds ComputeOneBounds(const PathContour& c) {
+  constexpr float inf = std::numeric_limits<float>::infinity();
+  ContourBounds b{inf, inf, -inf, -inf};
+  ExpandBoundsBy(b, c.start);
+  for (const auto& seg : c.segs) {
+    int ptCount = PathData::PointsPerVerb(seg.verb);
+    for (int k = 0; k < ptCount; k++) {
+      ExpandBoundsBy(b, seg.pts[k]);
+    }
+  }
+  return b;
+}
+
+// Builds the containment table in one O(n²) pass. Bbox pruning works because
+// ContourInsideContour samples points from inner's control-point bbox (a
+// superset of the curves' convex hull). When inner's bbox is disjoint from
+// outer's bbox, both samples must fall outside outer, so we can safely skip
+// the ray cast.
+static ContainmentTable BuildContainmentTable(const std::vector<PathContour>& contours) {
+  ContainmentTable table;
+  const size_t n = contours.size();
+  table.n = n;
+  table.bounds.reserve(n);
+  table.canContain.assign(n, false);
+  table.inside.assign(n * n, 0);
+
+  for (size_t i = 0; i < n; i++) {
+    table.bounds.push_back(ComputeOneBounds(contours[i]));
+    table.canContain[i] = contours[i].closed && !contours[i].segs.empty();
+  }
+  for (size_t i = 0; i < n; i++) {
+    for (size_t j = 0; j < n; j++) {
+      if (i == j || !table.canContain[j]) {
+        continue;
+      }
+      if (table.bounds[i].disjoint(table.bounds[j])) {
         continue;
       }
       if (ContourInsideContour(contours[i], contours[j])) {
-        depths[i]++;
+        table.inside[i * n + j] = 1;
       }
     }
+  }
+  return table;
+}
+
+// Depth of contour i is the number of other contours that strictly contain it.
+static std::vector<int> ComputeDepths(const ContainmentTable& table) {
+  std::vector<int> depths(table.n, 0);
+  for (size_t i = 0; i < table.n; i++) {
+    const uint8_t* row = table.inside.data() + i * table.n;
+    int d = 0;
+    for (size_t j = 0; j < table.n; j++) {
+      d += row[j];
+    }
+    depths[i] = d;
   }
   return depths;
 }
 
+// Picks the orientation sign that depth-0 (outermost) contours should use,
+// falling back to any valid contour if none have depth 0. Returns 0 only when
+// no contour is valid, in which case the caller must skip winding adjustment.
+static int ChooseReferenceSign(const std::vector<int>& signs, const std::vector<int>& depths,
+                               const std::vector<bool>& canContain) {
+  const size_t n = signs.size();
+  for (size_t i = 0; i < n; i++) {
+    if (canContain[i] && depths[i] == 0) {
+      return signs[i];
+    }
+  }
+  for (size_t i = 0; i < n; i++) {
+    if (canContain[i]) {
+      return signs[i];
+    }
+  }
+  return 0;
+}
+
+// For even-odd fill, ensure alternating winding by depth: depth-0 contours
+// share the outermost sign, depth-1 contours use the opposite, and so on.
+// Mis-oriented contours are reversed in place. PowerPoint's stitching relies
+// on this invariant to render holes correctly.
 static void AdjustWindingForEvenOdd(std::vector<PathContour>& contours,
                                     const std::vector<int>& depths,
-                                    const std::vector<bool>& valid) {
-  int refSign = 0;
-  for (size_t i = 0; i < contours.size(); i++) {
-    if (depths[i] == 0 && valid[i]) {
-      refSign = (ComputeSignedArea(contours[i]) >= 0) ? 1 : -1;
-      break;
+                                    const std::vector<bool>& canContain) {
+  const size_t n = contours.size();
+  std::vector<int> signs(n, 0);
+  for (size_t i = 0; i < n; i++) {
+    if (canContain[i]) {
+      signs[i] = (ComputeSignedArea(contours[i]) >= 0) ? 1 : -1;
     }
   }
-  if (refSign == 0 && !contours.empty()) {
-    refSign = (ComputeSignedArea(contours[0]) >= 0) ? 1 : -1;
+  int refSign = ChooseReferenceSign(signs, depths, canContain);
+  if (refSign == 0) {
+    return;
   }
-  for (size_t i = 0; i < contours.size(); i++) {
-    if (!valid[i]) {
+  for (size_t i = 0; i < n; i++) {
+    if (!canContain[i]) {
       continue;
     }
-    float area = ComputeSignedArea(contours[i]);
-    int currentSign = (area >= 0) ? 1 : -1;
     int targetSign = (depths[i] % 2 == 0) ? refSign : -refSign;
-    if (currentSign != targetSign) {
+    if (signs[i] != targetSign) {
       ReverseContour(contours[i]);
     }
   }
 }
 
-// Assigns each inner contour to the first (by array order) depth-0 contour that
-// contains it.  If multiple disjoint outer contours exist and the endpoint-polygon
-// approximation in PointInsideContour produces a false positive, an inner contour
-// may be assigned to the wrong parent.  This is unlikely in practice because outer
-// contours are typically non-overlapping.
-static std::vector<std::vector<size_t>> GroupContoursByOutermost(
-    const std::vector<PathContour>& contours, const std::vector<int>& depths,
-    const std::vector<bool>& valid) {
-  // Pre-collect the outermost (depth-0 && valid) candidates so the inner
-  // search becomes O(n_outer) per inner contour instead of O(n) with an extra
-  // validity check on every iteration.
-  std::vector<size_t> outerIndices;
-  outerIndices.reserve(contours.size());
-  for (size_t i = 0; i < contours.size(); i++) {
-    if (depths[i] == 0 && valid[i]) {
-      outerIndices.push_back(i);
-    }
-  }
-
-  std::vector<int> parent(contours.size(), -1);
-  for (size_t i = 0; i < contours.size(); i++) {
+// For each contour, returns the index of the depth-0 contour that will own it
+// in the bridged output. Depth-0 contours own themselves; any other contour is
+// assigned to the first depth-0 contour (by array order) that contains it.
+// Orphans (no containing depth-0 contour, which should not happen for
+// well-formed input but is handled defensively) are made their own root so
+// they still appear as a standalone group.
+//
+// If the endpoint-polygon approximation in PointInsideContour produces a false
+// positive when multiple disjoint depth-0 contours exist, an inner contour may
+// end up assigned to the wrong parent. This is unlikely in practice because
+// depth-0 contours are typically non-overlapping.
+static std::vector<int> AssignParents(const ContainmentTable& table,
+                                      const std::vector<int>& depths) {
+  const size_t n = table.n;
+  std::vector<int> parent(n, -1);
+  for (size_t i = 0; i < n; i++) {
     if (depths[i] == 0) {
       parent[i] = static_cast<int>(i);
       continue;
     }
-    for (size_t j : outerIndices) {
-      if (j != i && ContourInsideContour(contours[i], contours[j])) {
+    for (size_t j = 0; j < n; j++) {
+      if (j != i && depths[j] == 0 && table.canContain[j] && table.isInside(i, j)) {
         parent[i] = static_cast<int>(j);
         break;
       }
@@ -241,10 +411,17 @@ static std::vector<std::vector<size_t>> GroupContoursByOutermost(
       parent[i] = static_cast<int>(i);
     }
   }
+  return parent;
+}
 
-  std::vector<int> groupIndex(contours.size(), -1);
+// Collects contours sharing the same parent (outermost ancestor) into one
+// group. Group order follows first-appearance of each root so the output is
+// deterministic, and each root sits at index 0 of its group.
+static std::vector<std::vector<size_t>> BuildGroupsFromParents(const std::vector<int>& parent) {
+  const size_t n = parent.size();
+  std::vector<int> groupIndex(n, -1);
   std::vector<std::vector<size_t>> groups;
-  for (size_t i = 0; i < contours.size(); i++) {
+  for (size_t i = 0; i < n; i++) {
     int p = parent[i];
     if (groupIndex[p] < 0) {
       groupIndex[p] = static_cast<int>(groups.size());
@@ -258,12 +435,13 @@ static std::vector<std::vector<size_t>> GroupContoursByOutermost(
 
 std::vector<std::vector<size_t>> PrepareContourGroups(std::vector<PathContour>& contours,
                                                       FillRule fillRule) {
-  auto valid = ComputeContainerValidity(contours);
-  auto depths = ComputeContainmentDepths(contours, valid);
+  auto table = BuildContainmentTable(contours);
+  auto depths = ComputeDepths(table);
   if (fillRule == FillRule::EvenOdd) {
-    AdjustWindingForEvenOdd(contours, depths, valid);
+    AdjustWindingForEvenOdd(contours, depths, table.canContain);
   }
-  return GroupContoursByOutermost(contours, depths, valid);
+  auto parent = AssignParents(table, depths);
+  return BuildGroupsFromParents(parent);
 }
 
 void TransformContours(std::vector<PathContour>& contours, const Matrix& transform) {

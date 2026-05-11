@@ -33,13 +33,7 @@ struct ExportOptions {
   int svgIndent = 2;
   bool svgNoXmlDeclaration = false;
   bool textToPath = false;
-  // Defaults mirror PPTExporter::Options so the CLI flags can disable each
-  // feature without inverting the value at assignment time.
-  bool pptBakeMask = true;
-  bool pptBakeScrollRect = true;
-  bool pptBakeTiledPattern = true;
-  bool pptBridgeContours = true;
-  bool pptRasterizeUnsupportedBlend = false;
+  bool pptRasterizeUnsupported = false;
 };
 
 static void PrintUsage() {
@@ -60,21 +54,17 @@ static void PrintUsage() {
       << "  --svg-no-xml-declaration    Omit the <?xml ...?> declaration\n"
       << "\n"
       << "PPT options:\n"
-      << "  --ppt-no-bake-mask          Export masked layers as vector shapes instead of\n"
-      << "                              rasterizing to bitmap\n"
-      << "  --ppt-no-bake-scroll-rect   Drop scrollRect clipping instead of rasterizing\n"
-      << "                              clipped layers to bitmap\n"
-      << "  --ppt-no-bake-tiled-pattern Use native OOXML a:tile instead of rasterizing\n"
-      << "                              tiled image patterns to bitmap\n"
-      << "  --ppt-no-bridge-contours    Emit each contour as a separate sub-path instead\n"
-      << "                              of bridging nested contours (default: bridge on)\n"
-      << "  --ppt-rasterize-blend       Rasterize layers whose blend mode is outside of\n"
-      << "                              Normal/Multiply/Screen/Darken/Lighten (the only ones\n"
-      << "                              OOXML can express) into a PNG patch that includes the\n"
-      << "                              backdrop beneath the layer, so the blend composites\n"
-      << "                              correctly at the cost of turning native content under\n"
-      << "                              the patch into baked pixels (default: off, the blend\n"
-      << "                              mode is silently dropped and the layer renders Normal)\n"
+      << "  --ppt-rasterize-unsupported Rasterize layers that use features OOXML cannot\n"
+      << "                              represent natively (masks, scrollRect clipping,\n"
+      << "                              blend modes outside of Normal/Multiply/Screen/Darken/\n"
+      << "                              Lighten, wide-gamut color, and BackgroundBlurStyle).\n"
+      << "                              For unsupported blend modes and BackgroundBlurStyle\n"
+      << "                              the backdrop beneath the layer is baked into the PNG\n"
+      << "                              too so the composite (or frosted-glass blur) renders\n"
+      << "                              correctly, at the cost of turning native content under\n"
+      << "                              the patch into pixels. When off (the default), these\n"
+      << "                              features are silently dropped and the layer is emitted\n"
+      << "                              as editable shapes.\n"
       << "\n"
       << "Examples:\n"
       << "  pagx export --input icon.pagx                    # PAGX to icon.svg\n"
@@ -108,16 +98,8 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
       options->svgNoXmlDeclaration = true;
     } else if (arg == "--text-to-path") {
       options->textToPath = true;
-    } else if (arg == "--ppt-no-bake-mask") {
-      options->pptBakeMask = false;
-    } else if (arg == "--ppt-no-bake-scroll-rect") {
-      options->pptBakeScrollRect = false;
-    } else if (arg == "--ppt-no-bake-tiled-pattern") {
-      options->pptBakeTiledPattern = false;
-    } else if (arg == "--ppt-no-bridge-contours") {
-      options->pptBridgeContours = false;
-    } else if (arg == "--ppt-rasterize-blend") {
-      options->pptRasterizeUnsupportedBlend = true;
+    } else if (arg == "--ppt-rasterize-unsupported") {
+      options->pptRasterizeUnsupported = true;
     } else if (arg == "--help" || arg == "-h") {
       PrintUsage();
       return -1;
@@ -195,11 +177,7 @@ static int ExportToPPT(const ExportOptions& options) {
 
   PPTExporter::Options pptOptions = {};
   pptOptions.convertTextToPath = options.textToPath;
-  pptOptions.bakeMask = options.pptBakeMask;
-  pptOptions.bakeScrollRect = options.pptBakeScrollRect;
-  pptOptions.bakeTiledPattern = options.pptBakeTiledPattern;
-  pptOptions.bridgeContours = options.pptBridgeContours;
-  pptOptions.rasterizeUnsupportedBlend = options.pptRasterizeUnsupportedBlend;
+  pptOptions.rasterizeUnsupported = options.pptRasterizeUnsupported;
 
   if (!PPTExporter::ToFile(*document, options.outputFile, pptOptions)) {
     std::cerr << "pagx export: error: failed to write '" << options.outputFile << "'\n";

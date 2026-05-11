@@ -1276,11 +1276,11 @@ CLI_TEST(PAGXCliTest, Export_PagxToPptx_NoConvertTextToPath) {
   EXPECT_GT(std::filesystem::file_size(outputPath), 0u);
 }
 
-CLI_TEST(PAGXCliTest, Export_PagxToPptx_NoBakeMask) {
+CLI_TEST(PAGXCliTest, Export_PagxToPptx_RasterizeUnsupported) {
   auto inputPath = TestResourcePath("verify_simple.pagx");
-  auto outputPath = TempDir() + "/ExportPPTX_NoBakeMask.pptx";
-  auto ret = CallRun(pagx::cli::RunExport, {"export", "--ppt-no-bake-mask", "--input", inputPath,
-                                            "--output", outputPath});
+  auto outputPath = TempDir() + "/ExportPPTX_RasterizeUnsupported.pptx";
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--ppt-rasterize-unsupported", "--input",
+                                            inputPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(outputPath));
 }

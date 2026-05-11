@@ -177,9 +177,9 @@
         <translation>应用</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="679"/>
+        <location filename="../qml/MainForm.qml" line="681"/>
         <source>Save</source>
-        <translation type="unfinished">保存</translation>
+        <translation>保存</translation>
     </message>
     <message>
         <location filename="../qml/MainForm.qml" line="635"/>
@@ -187,7 +187,7 @@
         <translation>修改已放弃</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="670"/>
+        <location filename="../qml/MainForm.qml" line="672"/>
         <source>Changes applied</source>
         <translation>修改已应用</translation>
     </message>
@@ -196,7 +196,7 @@
         <translation type="vanished">应用修改失败</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="712"/>
+        <location filename="../qml/MainForm.qml" line="714"/>
         <source>File saved</source>
         <translation>文件已保存</translation>
     </message>
@@ -451,17 +451,17 @@
     <message>
         <location filename="../qml/Profiler.qml" line="692"/>
         <source>Node Distribution</source>
-        <translation type="unfinished"></translation>
+        <translation>节点分布</translation>
     </message>
     <message>
         <location filename="../qml/Profiler.qml" line="702"/>
         <source>nodes</source>
-        <translation type="unfinished"></translation>
+        <translation>个节点</translation>
     </message>
     <message>
         <location filename="../qml/Profiler.qml" line="809"/>
         <source>Theoretical FPS</source>
-        <translation type="unfinished"></translation>
+        <translation>理论帧率</translation>
     </message>
     <message>
         <location filename="../qml/Profiler.qml" line="26"/>
@@ -602,29 +602,29 @@
 <context>
     <name>pag::PAGXViewModel</name>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="308"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="312"/>
         <source>Failed to parse XML: invalid syntax or structure</source>
-        <translation type="unfinished"></translation>
+        <translation>解析 XML 失败：语法或结构无效</translation>
     </message>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="313"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="318"/>
         <source>Failed to build layer from XML document</source>
-        <translation type="unfinished"></translation>
+        <translation>从 XML 文档构建图层失败</translation>
     </message>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="341"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="349"/>
         <source>No file path specified</source>
-        <translation type="unfinished"></translation>
+        <translation>未指定文件路径</translation>
     </message>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="345"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="353"/>
         <source>Failed to open file for writing: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>无法打开文件进行写入：%1</translation>
     </message>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="350"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="358"/>
         <source>Failed to write all data to file</source>
-        <translation type="unfinished"></translation>
+        <translation>写入文件数据不完整</translation>
     </message>
 </context>
 <context>

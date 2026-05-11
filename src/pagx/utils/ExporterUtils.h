@@ -140,6 +140,28 @@ std::shared_ptr<tgfx::Data> GetImageData(const Image* image);
 
 bool HasNonASCII(const std::string& str);
 
+/**
+ * Classifies a UTF-8 text run into an OOXML xml:lang tag. Returns "zh-CN" for
+ * runs containing CJK code points, "he-IL" / "ar-SA" for runs containing
+ * Hebrew / Arabic code points, and "en-US" otherwise. Scans in source order and
+ * returns the first non-ASCII script encountered so mixed-script runs still pick
+ * up a reasonable dominant language. PowerPoint paints a spellcheck squiggle
+ * under any run whose declared language doesn't match its glyphs, so this
+ * heuristic keeps the common cases free of red underlines without introducing a
+ * dependency on a real language detector.
+ */
+std::string DetectTextLang(const std::string& utf8);
+
+/**
+ * Returns true when the UTF-8 text's paragraph base direction is right-to-left
+ * per the Unicode Bidirectional Algorithm rules P2/P3: the direction is taken
+ * from the first strong directional character (R, AL, or L). Text that contains
+ * no strong directional character returns false (default LTR). Used by the PPT
+ * exporter to emit pPr@rtl so PowerPoint runs UBA with the correct base
+ * direction and reproduces the same visual ordering as the PAGX renderer.
+ */
+bool HasRTLParagraphBase(const std::string& utf8);
+
 std::string UTF8ToUTF16BEHex(const std::string& utf8);
 
 /**

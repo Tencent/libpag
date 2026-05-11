@@ -53,13 +53,46 @@ void EmitFlatContourGeom(XMLBuilder& out, const std::vector<PathContour>& contou
                          float scaledOfsX, float scaledOfsY);
 
 /**
+ * Selects how EmitGroupCustGeom places the corner bounds markers that pin the
+ * content bounding box to the declared (pathWidth, pathHeight). WeChat requires
+ * drawable segments at both corners to recognise the bbox, so the marker is
+ * always composed of zero-length lines.
+ *
+ * InlineSegments
+ *   Two `moveTo + lnTo` zero-length segments share the same `<a:path>` as the
+ *   main geometry. Use when the enclosing sp has no stroke (e.g. text-as-path
+ *   glyph shapes) so round caps cannot paint visible dots at the corner points.
+ *
+ * StandaloneStrokelessPath
+ *   The two corner segments are emitted in a separate `<a:path stroke="0"
+ *   fill="none">` placed before the main geometry path. Use when the enclosing
+ *   sp may carry a round-capped stroke: the per-path `stroke="0"` keeps the
+ *   markers from rendering as dots while the main geometry still honours the
+ *   sp-level `<a:ln>`.
+ */
+enum class BoundsMarkerStyle {
+  InlineSegments,
+  StandaloneStrokelessPath,
+};
+
+/**
  * Emits a single `<a:custGeom>` for one group that also includes the
  * zero-length bounds-marker path pinning the content bounding box to the
  * declared (pathWidth, pathHeight). Use this when emitting one shape per
  * group so each shape carries its own bounds marker.
+ *
+ * `bridgeContours` controls how a multi-contour group (outer + inner rings)
+ * renders inside the group's `<a:path>`. When true, the outer and inner rings
+ * are stitched into a single self-overlapping path with zero-width bridge
+ * lines so even-odd fill expresses the holes (required by some renderers
+ * that don't handle multi-sub-path even-odd). When false, each ring is
+ * emitted as a separate sub-path within the same `<a:path>`, relying on the
+ * default even-odd fill rule to render holes. Single-contour groups are
+ * unaffected.
  */
 void EmitGroupCustGeom(XMLBuilder& out, const std::vector<PathContour>& contours,
                        const std::vector<size_t>& group, int64_t pathWidth, int64_t pathHeight,
-                       float scaleX, float scaleY, float scaledOfsX, float scaledOfsY);
+                       float scaleX, float scaleY, float scaledOfsX, float scaledOfsY,
+                       BoundsMarkerStyle markerStyle, bool bridgeContours);
 
 }  // namespace pagx

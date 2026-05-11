@@ -18,15 +18,16 @@
 
 #pragma once
 
-#include <deque>
 #include <emscripten/bind.h>
+#include <deque>
+#include "GridBackground.h"
 #include "LayerBuilder.h"
 #include "pagx/FontConfig.h"
 #include "pagx/PAGXDocument.h"
+#include "tgfx/core/Color.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Recording.h"
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
-#include "GridBackground.h"
 #include "tgfx/layers/DisplayList.h"
 
 namespace pagx {
@@ -51,6 +52,21 @@ class PAGXView {
 
   void updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY);
 
+  /**
+   * Sets a solid background color. When set, the solid color will be used instead of the default
+   * checkerboard pattern.
+   * @param red Red component (0.0 - 1.0).
+   * @param green Green component (0.0 - 1.0).
+   * @param blue Blue component (0.0 - 1.0).
+   * @param alpha Alpha component (0.0 - 1.0).
+   */
+  void setBackgroundColor(float red, float green, float blue, float alpha);
+
+  /**
+   * Clears the custom background color and reverts to the default checkerboard pattern.
+   */
+  void clearBackgroundColor();
+
   void draw();
 
   float contentWidth() const {
@@ -63,6 +79,7 @@ class PAGXView {
 
  private:
   void applyCenteringTransform();
+  void syncSurfaceSize(tgfx::Context* context, int canvasWidth, int canvasHeight);
   void onZoomEnd();
   void updatePerformanceState(double frameDurationMs);
   void updateAdaptiveTileRefinement();
@@ -87,6 +104,10 @@ class PAGXView {
   int lastBackgroundWidth = 0;
   int lastBackgroundHeight = 0;
   float lastBackgroundDensity = 0.0f;
+
+  // Custom background color (when useCustomBackgroundColor is true)
+  bool useCustomBackgroundColor = false;
+  tgfx::Color customBackgroundColor = tgfx::Color::Transparent();
 
   // Performance monitoring
   struct FrameRecord {

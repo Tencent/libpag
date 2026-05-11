@@ -109,8 +109,14 @@ class TextLayoutResult {
   /**
   * Returns the line-level metadata for a specific Text element. Each entry corresponds to one
   * line of text with baseline position, alignment offset, and byte range in the source string.
-  * Returns nullptr if no line info is available for this text (e.g. vertical layout or embedded
-  * glyph runs).
+  *
+  * For horizontal writing mode each entry is a visual line, with baselineY in ascending order
+  * matching top-to-bottom source order. For vertical writing mode each entry is a column;
+  * baselineY stores -columnX so that ascending order maps to right-to-left source order and
+  * the PPT exporter can keep its single sort path. Columns dropped by overflow="hidden" are
+  * excluded (the layout filter runs before recording).
+  *
+  * Returns nullptr if no line info is available for this text (e.g. embedded glyph runs).
   */
   const std::vector<TextLayoutLineInfo>* getTextLines(Text* text) const;
 

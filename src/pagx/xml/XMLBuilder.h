@@ -24,6 +24,7 @@
 #include <cstdio>
 #include <string>
 #include <vector>
+#include "base/utils/Log.h"
 
 namespace pagx {
 
@@ -188,6 +189,10 @@ class XMLBuilder {
     if (_prettyPrint) {
       _buf += '\n';
     }
+    DEBUG_ASSERT(!_tags.empty());
+    if (_tags.empty()) {
+      return *this;
+    }
     _tags.pop_back();
     return *this;
   }
@@ -198,6 +203,10 @@ class XMLBuilder {
     if (_prettyPrint) {
       _indent--;
       writeIndent();
+    }
+    DEBUG_ASSERT(!_tags.empty());
+    if (_tags.empty()) {
+      return *this;
     }
     _buf += "</";
     _buf += _tags.back();
@@ -214,6 +223,10 @@ class XMLBuilder {
   XMLBuilder& closeElementWithText(const std::string& text) {
     _buf += '>';
     escapeTextTo(_buf, text);
+    DEBUG_ASSERT(!_tags.empty());
+    if (_tags.empty()) {
+      return *this;
+    }
     _buf += "</";
     _buf += _tags.back();
     _buf += '>';
@@ -302,7 +315,11 @@ class XMLBuilder {
   }
 
   void writeIndent() {
-    _buf.append(static_cast<size_t>(_indent * _indentSpaces), ' ');
+    DEBUG_ASSERT(_indent >= 0);
+    if (_indent <= 0) {
+      return;
+    }
+    _buf.append(static_cast<size_t>(_indent) * static_cast<size_t>(_indentSpaces), ' ');
   }
 
   static void escapeAttrTo(std::string& buf, const char* val) {

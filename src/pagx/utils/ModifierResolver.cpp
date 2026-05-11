@@ -39,6 +39,15 @@
 
 namespace pagx {
 
+// std::pow(negative, non-integer) returns NaN, which would propagate through
+// the downstream geometry when a Repeater uses a negative scale with a
+// fractional offset. Raise the magnitude and reapply the sign so a negative
+// base keeps producing a negative result.
+static float SignedPow(float base, float exp) {
+  float sign = base < 0.0f ? -1.0f : 1.0f;
+  return sign * std::pow(std::abs(base), exp);
+}
+
 //==============================================================================
 // Geometry helpers: build pagx::PathData from primitive shapes and from a
 // resolved tgfx::Path round-trip.
@@ -343,6 +352,15 @@ Element* ModifierResolver::applyRoundCornerToElement(Element* shape,
   return makePathFromData(MakePathDataFromTGFX(_doc, tp));
 }
 
+// MergePathMode::Append preserves each sub-path verbatim and relies on the
+// fill rule to composite overlaps — that matches tgfx's Winding default the
+// PAG renderer uses, so two overlapping shapes render as one solid union.
+// OOXML a:custGeom has no fill-rule attribute and PowerPoint always evaluates
+// it as even-odd, which flips every overlapping region into a hole. To keep
+// Winding semantics intact on the PPTX side we translate Append into a
+// boolean Union here: disjoint shapes still produce one multi-contour path
+// (visually identical to Append), while overlapping shapes get their shared
+// region merged so even-odd can no longer punch it out.
 static tgfx::PathOp MergeModeToPathOp(MergePathMode mode) {
   switch (mode) {
     case MergePathMode::Union:
@@ -355,7 +373,7 @@ static tgfx::PathOp MergeModeToPathOp(MergePathMode mode) {
       return tgfx::PathOp::XOR;
     case MergePathMode::Append:
     default:
-      return tgfx::PathOp::Append;
+      return tgfx::PathOp::Union;
   }
 }
 
@@ -512,6 +530,12 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
         if (output.empty()) {
           break;
         }
+        // Clamp to a sane upper bound before any static_cast<int>: authored
+        // values near INT_MAX would invoke UB in the cast, and values around
+        // 1e6 would still allocate gigabytes via `generated.reserve(maxCount)`
+        // below. 10000 is comfortably above any visually meaningful copy count.
+        constexpr float kMaxRepeaterCopies = 10000.0f;
+        copiesF = std::min(copiesF, kMaxRepeaterCopies);
 
         // Snapshot the entire current scope (shapes + painters + nested groups
         // + anything else accumulated so far) as the body of every copy. This
@@ -526,8 +550,8 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
         generated.reserve(static_cast<size_t>(maxCount));
         for (int i = 0; i < maxCount; ++i) {
           float progress = static_cast<float>(i) + rep->offset;
-          float sx = std::pow(rep->scale.x, progress);
-          float sy = std::pow(rep->scale.y, progress);
+          float sx = SignedPow(rep->scale.x, progress);
+          float sy = SignedPow(rep->scale.y, progress);
           float rotation = rep->rotation * progress;
           float tx = rep->position.x * progress;
           float ty = rep->position.y * progress;
