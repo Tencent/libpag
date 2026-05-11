@@ -144,7 +144,7 @@ bool HTMLWriter::ComputeGeosBoundingBox(const std::vector<GeoInfo>& geos, float 
 // CSS equivalent and Clamp's edge-pixel extension is not expressible either, so both must continue
 // through the PNG path. Rotated or skewed matrices also fall back to PNG. Pure scale, pure
 // translation, and identity all map cleanly onto CSS.
-static bool imagePatternCSSable(const ImagePattern* p) {
+static bool ImagePatternCSSable(const ImagePattern* p) {
   bool xOk = (p->tileModeX == TileMode::Repeat || p->tileModeX == TileMode::Decal);
   bool yOk = (p->tileModeY == TileMode::Repeat || p->tileModeY == TileMode::Decal);
   if (!xOk || !yOk) {
@@ -822,29 +822,29 @@ void GeoToPathData(const Element* element, NodeType type, PathData& pathData) {
         // Match native (tgfx) RRect startIndex=2: start at right edge top-rn, CW direction.
         pathData.moveTo(x + w, y + rn);
         if (r->reversed) {
-          pathData.cubicTo(x + w, y + rn * (1 - kBezierKappa), x + w - rn * (1 - kBezierKappa), y,
+          pathData.cubicTo(x + w, y + rn * (1 - BEZIER_KAPPA), x + w - rn * (1 - BEZIER_KAPPA), y,
                            x + w - rn, y);
           pathData.lineTo(x + rn, y);
-          pathData.cubicTo(x + rn * (1 - kBezierKappa), y, x, y + rn * (1 - kBezierKappa), x,
+          pathData.cubicTo(x + rn * (1 - BEZIER_KAPPA), y, x, y + rn * (1 - BEZIER_KAPPA), x,
                            y + rn);
           pathData.lineTo(x, y + h - rn);
-          pathData.cubicTo(x, y + h - rn * (1 - kBezierKappa), x + rn * (1 - kBezierKappa), y + h,
+          pathData.cubicTo(x, y + h - rn * (1 - BEZIER_KAPPA), x + rn * (1 - BEZIER_KAPPA), y + h,
                            x + rn, y + h);
           pathData.lineTo(x + w - rn, y + h);
-          pathData.cubicTo(x + w - rn * (1 - kBezierKappa), y + h, x + w,
-                           y + h - rn * (1 - kBezierKappa), x + w, y + h - rn);
+          pathData.cubicTo(x + w - rn * (1 - BEZIER_KAPPA), y + h, x + w,
+                           y + h - rn * (1 - BEZIER_KAPPA), x + w, y + h - rn);
         } else {
           pathData.lineTo(x + w, y + h - rn);
-          pathData.cubicTo(x + w, y + h - rn * (1 - kBezierKappa), x + w - rn * (1 - kBezierKappa),
+          pathData.cubicTo(x + w, y + h - rn * (1 - BEZIER_KAPPA), x + w - rn * (1 - BEZIER_KAPPA),
                            y + h, x + w - rn, y + h);
           pathData.lineTo(x + rn, y + h);
-          pathData.cubicTo(x + rn * (1 - kBezierKappa), y + h, x, y + h - rn * (1 - kBezierKappa),
+          pathData.cubicTo(x + rn * (1 - BEZIER_KAPPA), y + h, x, y + h - rn * (1 - BEZIER_KAPPA),
                            x, y + h - rn);
           pathData.lineTo(x, y + rn);
-          pathData.cubicTo(x, y + rn * (1 - kBezierKappa), x + rn * (1 - kBezierKappa), y, x + rn,
+          pathData.cubicTo(x, y + rn * (1 - BEZIER_KAPPA), x + rn * (1 - BEZIER_KAPPA), y, x + rn,
                            y);
           pathData.lineTo(x + w - rn, y);
-          pathData.cubicTo(x + w - rn * (1 - kBezierKappa), y, x + w, y + rn * (1 - kBezierKappa),
+          pathData.cubicTo(x + w - rn * (1 - BEZIER_KAPPA), y, x + w, y + rn * (1 - BEZIER_KAPPA),
                            x + w, y + rn);
         }
         pathData.close();
@@ -859,8 +859,8 @@ void GeoToPathData(const Element* element, NodeType type, PathData& pathData) {
       float cy = pos.y;
       float rx = size.width / 2;
       float ry = size.height / 2;
-      float kx = rx * kBezierKappa;
-      float ky = ry * kBezierKappa;
+      float kx = rx * BEZIER_KAPPA;
+      float ky = ry * BEZIER_KAPPA;
       // Match native (tgfx/Skia) start point: top center (12 o'clock), CW direction.
       pathData.moveTo(cx, cy - ry);
       if (e->reversed) {
@@ -2203,7 +2203,7 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     // carries rotation/skew need the PNG rasterization path. Pure-scale repeat and all decal
     // variants fall through to the CSS branch below, which keeps the HTML DOM-inspectable and
     // avoids writing PNGs for simple tiled fills.
-    if (p->image && !imagePatternCSSable(p)) {
+    if (p->image && !ImagePatternCSSable(p)) {
       renderImagePatternCanvas(out, geos[0], fill, alpha, painterBlend);
       return;
     }

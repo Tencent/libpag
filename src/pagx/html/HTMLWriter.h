@@ -59,7 +59,7 @@ class TextPath;
 class TrimPath;
 
 // Kappa value for 90-degree bezier arc approximation: 4 * (sqrt(2) - 1) / 3
-static constexpr float kBezierKappa = 0.5522847498307936f;
+static constexpr float BEZIER_KAPPA = 0.5522847498307936f;
 
 //==============================================================================
 // Shared static utility functions

@@ -1410,7 +1410,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
   }
 }
 
-static std::string clipPathFromContents(const Layer* layer) {
+static std::string ClipPathFromContents(const Layer* layer) {
   auto layerBounds = layer->layoutBounds();
   float containerW = layerBounds.width;
   float containerH = layerBounds.height;
@@ -1468,7 +1468,7 @@ static std::string clipPathFromContents(const Layer* layer) {
 // `backdrop-filter` sampling path. `box-shadow` does not establish that context, but it paints
 // along the element's own border-box — only correct when we can also put the matching
 // border-radius on that border-box.
-static std::string layerBoxShadowBorderRadius(const Layer* layer) {
+static std::string LayerBoxShadowBorderRadius(const Layer* layer) {
   auto layerBounds = layer->layoutBounds();
   float containerW = layerBounds.width;
   float containerH = layerBounds.height;
@@ -1482,7 +1482,7 @@ static std::string layerBoxShadowBorderRadius(const Layer* layer) {
       if (bounds.isEmpty()) {
         continue;
       }
-      // Rectangle must fully cover the layer (same logic as clipPathFromContents: top/left/
+      // Rectangle must fully cover the layer (same logic as ClipPathFromContents: top/left/
       // bottom/right insets are all zero). Otherwise box-shadow would trace the wrong outline.
       if (bounds.x > 0.5f || bounds.y > 0.5f || bounds.x + bounds.width < containerW - 0.5f ||
           bounds.y + bounds.height < containerH - 0.5f) {
@@ -1533,7 +1533,7 @@ struct ShadowShape {
   bool valid = false;
 };
 
-static ShadowShape findLayerShadowShape(const Layer* layer) {
+static ShadowShape FindLayerShadowShape(const Layer* layer) {
   ShadowShape s = {};
   // The shadow source div is a solid-filled CSS box. This only makes sense when the layer has a
   // Fill — a stroke-only layer (e.g. game_hud circle outline) must not produce a filled shadow
@@ -1984,7 +1984,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   // the same stacking context as the element's siblings, so the child backdrop-filter still
   // sees the pre-layer backdrop. `box-shadow` only reproduces the right outline when the
   // layer's visible contour IS the element's rounded border-box, which we detect via
-  // layerBoxShadowBorderRadius.
+  // LayerBoxShadowBorderRadius.
   bool hasBackdropBlurFill = false;
   for (auto* ls : layer->styles) {
     if (ls->nodeType() == NodeType::BackgroundBlurStyle && ls->blendMode == BlendMode::Normal) {
@@ -2015,7 +2015,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         belowStyles.push_back({NodeType::DropShadowStyle, ls});
       } else if (ds->blurX == ds->blurY && ds->showBehindLayer && hasBackdropBlurFill &&
                  boxShadowValue.empty()) {
-        std::string radius = layerBoxShadowBorderRadius(layer);
+        std::string radius = LayerBoxShadowBorderRadius(layer);
         if (!radius.empty()) {
           // box-shadow fallback: preserves the sibling backdrop-filter sampling path. Also
           // propagate group opacity down to children, because `opacity < 1` on the layer div
@@ -2037,7 +2037,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       // false requires an erase-mask that CSS has no direct equivalent for, so it continues
       // down the SVG filter path.
       if (!hasBlendMode && ds->showBehindLayer) {
-        ShadowShape shape = findLayerShadowShape(layer);
+        ShadowShape shape = FindLayerShadowShape(layer);
         if (shape.valid) {
           std::string style =
               "position:absolute;left:" + CssFloatToString(shape.left + ds->offsetX) +
@@ -2404,7 +2404,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         std::string blurStyle = "position:absolute;inset:0;backdrop-filter:blur(" +
                                 CssFloatToString(avg) + "px);-webkit-backdrop-filter:blur(" +
                                 CssFloatToString(avg) + "px)";
-        blurStyle += clipPathFromContents(layer);
+        blurStyle += ClipPathFromContents(layer);
         if (blendStr) {
           blurStyle += ";mix-blend-mode:";
           blurStyle += blendStr;
@@ -2423,7 +2423,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       if (avg > 0) {
         std::string blurStyle = "position:absolute;inset:0;backdrop-filter:blur(" +
                                 CssFloatToString(avg) + "px);-webkit-backdrop-filter:blur(" +
-                                CssFloatToString(avg) + "px)" + clipPathFromContents(layer);
+                                CssFloatToString(avg) + "px)" + ClipPathFromContents(layer);
         // The box-shadow fallback pushes group opacity down to siblings. The backdrop-filter
         // div is its own sibling, so it also needs the distributed alpha; otherwise the blurred
         // backdrop renders at full strength while the glass/inner content appear dimmed.
