@@ -128,6 +128,26 @@ static std::string SanitizeFontFaceValue(const std::string& value) {
   return out;
 }
 
+// Restricts a caller-supplied staticImgNamePrefix to the character set [A-Za-z0-9_.-]. The
+// prefix is concatenated into a filesystem path (staticImgDir + staticImgNamePrefix + imgId +
+// ".png") and written to disk, so unchecked input could traverse out of staticImgDir with
+// sequences like "../". Allowing only filename-safe ASCII characters blocks path separators
+// ('/' and '\\'), whitespace, and non-ASCII bytes while preserving every character a
+// legitimate "docname-" style prefix needs.
+static std::string SanitizeStaticImgNamePrefix(const std::string& prefix) {
+  std::string out;
+  out.reserve(prefix.size());
+  for (char c : prefix) {
+    auto uc = static_cast<unsigned char>(c);
+    bool allowed = (uc >= 'A' && uc <= 'Z') || (uc >= 'a' && uc <= 'z') ||
+                   (uc >= '0' && uc <= '9') || c == '_' || c == '.' || c == '-';
+    if (allowed) {
+      out += c;
+    }
+  }
+  return out;
+}
+
 static std::string BuildFontFaceCSS(const std::vector<FontFaceRule>& rules, bool minify) {
   if (rules.empty()) {
     return {};
@@ -170,7 +190,11 @@ static std::string BuildFontFaceCSS(const std::vector<FontFaceRule>& rules, bool
       if (!srcValue.empty()) {
         srcValue += minify ? "," : ",\n       ";
       }
-      srcValue += "url('" + srcUrl + "')";
+      // Escape the URL value for the single-quoted CSS string context of url('...'). Base64
+      // data URIs only contain characters the CSS parser accepts unescaped, so this is a
+      // no-op for Base64 mode; for URL and FilePath mode it blocks a caller-supplied uri
+      // containing a raw ' or control byte from breaking out of the declaration.
+      srcValue += "url('" + EscapeCssFontFamily(srcUrl) + "')";
       auto format = DetectFontFormat(source.uri);
       if (format) {
         srcValue += std::string(" format('") + format + "')";
@@ -330,7 +354,11 @@ std::string HTMLExporter::ToHTML(const PAGXDocument& doc, const Options& options
   ctx.docHeight = doc.height;
   ctx.staticImgDir = options.staticImgDir;
   ctx.staticImgUrlPrefix = options.staticImgUrlPrefix;
-  ctx.staticImgNamePrefix = options.staticImgNamePrefix;
+  // Restrict the caller-supplied prefix to filename-safe characters before it flows into
+  // either the context (for HTMLWriterShape rasterization paths) or HTMLPlusDarkerRenderer,
+  // so a crafted prefix cannot escape staticImgDir through path-traversal sequences.
+  auto sanitizedImgPrefix = SanitizeStaticImgNamePrefix(options.staticImgNamePrefix);
+  ctx.staticImgNamePrefix = sanitizedImgPrefix;
   ctx.staticImgPixelRatio = options.staticImgPixelRatio;
   ctx.fontSynthesisWeight = options.fontSynthesisWeight;
   ctx.fontSynthesisStyle = options.fontSynthesisStyle;
@@ -343,7 +371,7 @@ std::string HTMLExporter::ToHTML(const PAGXDocument& doc, const Options& options
   // approximation.
   if (!options.staticImgDir.empty()) {
     HTMLPlusDarkerRenderer::RenderAll(doc, options.staticImgDir, options.staticImgUrlPrefix,
-                                      options.staticImgNamePrefix, options.staticImgPixelRatio,
+                                      sanitizedImgPrefix, options.staticImgPixelRatio,
                                       ctx.plusDarkerBackdrops);
   }
 

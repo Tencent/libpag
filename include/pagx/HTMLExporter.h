@@ -201,6 +201,11 @@ struct HTMLExportOptions {
    * (later writes silently overwrite earlier files of the same generated name). The CLI tool
    * derives a prefix automatically from the output HTML filename stem; programmatic callers
    * must supply their own.
+   *
+   * For security, the value is restricted to the character set [A-Za-z0-9_.-] at emission time;
+   * any other character (including '/', '\\', whitespace, and non-ASCII bytes) is dropped, so
+   * a maliciously crafted prefix cannot escape the `staticImgDir` via path traversal sequences
+   * such as "../".
    */
   std::string staticImgNamePrefix = {};
 
