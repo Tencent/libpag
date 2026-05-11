@@ -953,8 +953,10 @@ PAGX_TEST(PAGXSVGTest, SVGExport_DropShadowStyle) {
 }
 
 /**
- * WritingMode::Vertical emits writing-mode="tb" on the <text> element so CJK
- * vertical layout appears correctly.
+ * WritingMode::Vertical emits writing-mode="vertical-rl" on the <text> element
+ * so CJK vertical layout appears correctly. The modern CSS Writing Modes value
+ * (rather than the legacy SVG 1.1 "tb") is used because text-anchor handling
+ * in the legacy keyword path is inconsistent across renderers.
  */
 PAGX_TEST(PAGXSVGTest, SVGExport_WritingModeVertical) {
   auto doc = pagx::PAGXDocument::Make(200, 300);
@@ -983,7 +985,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_WritingModeVertical) {
   pagx::SVGExportOptions options;
   options.convertTextToPath = false;
   auto svg = pagx::SVGExporter::ToSVG(*doc, options);
-  EXPECT_NE(svg.find("writing-mode=\"tb\""), std::string::npos);
+  EXPECT_NE(svg.find("writing-mode=\"vertical-rl\""), std::string::npos);
   SaveFile(svg, "PAGXSVGTest/svg_export_writing_mode_vertical.svg");
 }
 

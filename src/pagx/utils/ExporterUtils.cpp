@@ -1037,6 +1037,15 @@ TextLayoutParams MakeStandaloneParams(const Text* text) {
       params.textAlign = TextAlign::End;
       break;
   }
+  // Forward the textScale applied by LayoutNode::setLayoutSize when fitting the Text into a
+  // dual-axis constraint (e.g. left+right, width="100%"). Without this, re-running TextLayout
+  // here uses the authored fontSize while WriteSharedTextAttrs emits the scaled renderFontSize(),
+  // so baselineY/lineWidth are computed at the wrong scale and the exported text overflows its
+  // container. renderFontSize() is the public mirror of fontSize*textScale; derive the scale from
+  // it so we don't need to expose Text::textScale.
+  if (text->fontSize > 0.0f) {
+    params.textScale = text->renderFontSize() / text->fontSize;
+  }
   return params;
 }
 

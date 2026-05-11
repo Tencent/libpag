@@ -845,7 +845,19 @@ class TextLayoutContext {
       }
       TextLayoutLineInfo info = {};
       info.baselineY = -columnX;
-      info.startX = 0;
+      // Vertical mode repurposes line metrics for column geometry so writers
+      // that emulate the layout (SVG <text>, which can't auto-wrap into
+      // columns) have the data they need without re-running the shaper:
+      //   * lineWidth  — column.maxColumnWidth (the column's allocated
+      //     horizontal slot, derived from font line height — used to centre
+      //     the column on its true horizontal midpoint, since maxColumnWidth
+      //     ≠ font size when leading is non-zero or fonts mix).
+      //   * startX     — column.height (the column's inline-axis extent —
+      //     used to anchor inline alignment per-column without relying on
+      //     text-anchor, which several SVG renderers ignore in vertical
+      //     writing-mode).
+      info.startX = column.height;
+      info.lineWidth = column.maxColumnWidth;
       info.byteStart = range.first;
       info.byteEnd = byteEnd;
       result.textLines[text].push_back(info);

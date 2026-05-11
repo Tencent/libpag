@@ -1482,12 +1482,16 @@ static void ApplyTextBoxBodyAttrs(SVGBuilder& out, const TextBox* box) {
   if (box == nullptr) {
     return;
   }
-  // CSS writing-mode "tb" (top-to-bottom) approximates PAGX's vertical CJK
-  // layout. The modern value "vertical-rl" produces the same column order but
-  // some older SVG renderers only understand the legacy "tb" keyword, so we
-  // emit it for broadest compatibility.
+  // CSS writing-mode "vertical-rl" matches PAGX's vertical CJK layout:
+  // characters flow top-to-bottom within a column and columns advance
+  // right-to-left. The legacy SVG 1.1 keyword "tb" is treated as an alias
+  // by modern renderers, but "vertical-rl" is the value defined by CSS
+  // Writing Modes Level 3 — browsers (including the WebKit/Blink based
+  // renderers used by macOS QuickLook / Preview) follow the modern spec for
+  // text-anchor interpretation in inline-axis (vertical) alignment, where
+  // "tb" sometimes hits a legacy code path that ignores text-anchor.
   if (box->writingMode == WritingMode::Vertical) {
-    out.addAttribute("writing-mode", "tb");
+    out.addAttribute("writing-mode", "vertical-rl");
   }
 }
 
@@ -1679,16 +1683,95 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
   TextAnchoring anchoring = ResolveTextAnchorAndOffset(text, fs.textBox, layoutResult, rtl);
 
   std::string transform = MatrixToSVGTransform(m);
-  // Vertical writing mode populates textLines with one entry per column where
-  // baselineY actually stores -columnX (used by the PPT writer as a sort key
-  // to recover right-to-left column order). Iterating those entries here would
-  // add the negative column-X as a Y coordinate, pushing the text far above
-  // the box. Fall through to the single <text writing-mode="tb"> path so the
-  // SVG renderer lays out columns itself along the block-flow axis.
+
+  // Vertical writing mode: SVG <text> does not auto-wrap into columns —
+  // writing-mode only orients glyphs along the block axis, it never breaks
+  // a long string into multiple columns. The layout already computed
+  // per-column geometry — one TextLayoutLineInfo per visible column, with
+  // baselineY = -columnX (column left-edge X in content coordinates),
+  // lineWidth = maxColumnWidth, and startX = column.height. Columns dropped
+  // by overflow="hidden" are absent from the layout result and therefore
+  // omitted here automatically. For each column we:
+  //   * recover columnX and shift by paddingLeft + columnWidth/2 to land on
+  //     the column's true horizontal centre (CSS vertical writing-mode
+  //     treats this midpoint as the inline baseline);
+  //   * compute the inline-axis (vertical) start y from box->textAlign and
+  //     column.height instead of relying on SVG's text-anchor, because
+  //     several renderers (incl. Chrome / WebKit) ignore text-anchor in
+  //     vertical writing-mode and always treat the position as the inline
+  //     start, leaving Center / End-aligned columns overflowing past the
+  //     box's bottom edge.
+  if (isVertical && lines && !lines->empty()) {
+    float effectiveFontSize = text->renderFontSize();
+    float paddingLeft = fs.textBox ? fs.textBox->padding.left : 0.0f;
+    float paddingTop = fs.textBox ? fs.textBox->padding.top : 0.0f;
+    float effectiveHeight = fs.textBox ? EffectiveTextBoxHeight(fs.textBox)
+                                       : std::numeric_limits<float>::quiet_NaN();
+    float innerHeight = (!std::isnan(effectiveHeight))
+                            ? std::max(0.0f, effectiveHeight - paddingTop -
+                                                 (fs.textBox ? fs.textBox->padding.bottom : 0.0f))
+                            : 0.0f;
+    TextAlign textAlign = fs.textBox ? fs.textBox->textAlign : TextAlign::Start;
+    for (const auto& info : *lines) {
+      if (info.byteStart >= info.byteEnd ||
+          info.byteEnd - info.byteStart > text->text.size() - info.byteStart) {
+        continue;
+      }
+      std::string columnText =
+          text->text.substr(info.byteStart, info.byteEnd - info.byteStart);
+      if (columnText.empty()) {
+        continue;
+      }
+      float columnX = -info.baselineY;
+      // Layout fills lineWidth/startX with column geometry; fall back to
+      // sensible defaults if either is missing (e.g. degenerate font metric).
+      float columnWidth = info.lineWidth > 0 ? info.lineWidth : effectiveFontSize;
+      float columnHeight = info.startX > 0 ? info.startX : 0.0f;
+      float columnCenterX = paddingLeft + columnX + columnWidth / 2.0f;
+      float columnY = paddingTop;
+      if (innerHeight > 0 && columnHeight > 0) {
+        switch (textAlign) {
+          case TextAlign::Center:
+            columnY = paddingTop + (innerHeight - columnHeight) / 2.0f;
+            break;
+          case TextAlign::End:
+            columnY = paddingTop + innerHeight - columnHeight;
+            break;
+          case TextAlign::Justify:
+            // SVG offers no portable way to distribute extra inline-axis
+            // space across vertical glyphs; degrade to Start, matching the
+            // PAGX renderer's behaviour when justify can't apply.
+          case TextAlign::Start:
+          default:
+            columnY = paddingTop;
+            break;
+        }
+      }
+      out.openElement("text");
+      if (!transform.empty()) {
+        out.addAttribute("transform", transform);
+      }
+      // Suppress the resolved text-anchor here: inline alignment is baked
+      // into columnY above, and emitting text-anchor on a vertical <text>
+      // either has no effect (Chrome) or shifts glyphs the wrong way
+      // (older WebKit), depending on the renderer.
+      WriteSharedTextAttrs(out, text, TextAnchor::Start);
+      ApplyTextBoxBodyAttrs(out, fs.textBox);
+      applyPainters(out, fs, {}, alpha);
+      out.addRequiredAttribute("x", columnCenterX);
+      out.addRequiredAttribute("y", columnY);
+      out.closeElementWithText(columnText);
+    }
+    return;
+  }
+
   if (isVertical || !lines || lines->empty()) {
-    // The vertical-mode text flows top-to-bottom via CSS writing-mode="tb";
-    // SVG renderers lay out the characters along the block-flow axis of the
-    // <text> element.
+    // Fallback for: vertical mode with no usable column info (e.g. layout
+    // produced nothing), or horizontal mode with no line info. Emit the whole
+    // string as one <text>; horizontal mode needs a baseline shift by font
+    // size since (x, y) in SVG marks the baseline of the first glyph, not the
+    // top of the line box. Vertical fallback keeps offsetY as-is because
+    // writing-mode handles the block-flow baseline implicitly.
     out.openElement("text");
     if (!transform.empty()) {
       out.addAttribute("transform", transform);
@@ -1697,9 +1780,6 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
     ApplyTextBoxBodyAttrs(out, fs.textBox);
     applyPainters(out, fs, {}, alpha);
     out.addRequiredAttribute("x", anchoring.anchorX);
-    // In vertical mode offsetY already points to the correct inline-axis start;
-    // in horizontal fallback the y coordinate needs a baseline shift by fontSize.
-    // Use renderFontSize() so the baseline shift tracks textScale shrinking.
     out.addRequiredAttribute(
         "y", isVertical ? anchoring.offsetY : anchoring.offsetY + text->renderFontSize());
     out.closeElementWithText(text->text);
