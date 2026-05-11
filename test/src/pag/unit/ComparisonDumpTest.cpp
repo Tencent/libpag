@@ -25,6 +25,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include "base/PAGTest.h"
 #include "pag/support/RenderUtil.h"
@@ -159,6 +160,39 @@ RenderOutcome RenderPathB(tgfx::Context* context, pagx::PAGXDocument* doc,
   return r;
 }
 
+// `pagx resolve` CLI fixtures under resources/cli/ that carry unresolved
+// <svg> / import="*.svg" directives — Baker rejects them with
+// UnresolvedImports=101 by design (`pagx resolve` is the only entry that
+// strips those directives before Bake). Plus `verify_not_xml` carries
+// deliberately invalid XML so PAGXImporter rejects it. The visual dump skips
+// this fixed allowlist so the report stays focused on real round-trip
+// regressions. Adding new fixtures with the same shape must extend this list
+// explicitly — name-prefix heuristics would mis-flag round-trip-clean siblings
+// (e.g. `import_node_none.pagx` carries no actual import directive).
+bool ShouldSkipForComparison(const pagx::test::PAGXSample& sample) {
+  if (sample.section != "cli") {
+    return false;
+  }
+  static const std::unordered_set<std::string> kSkippedCliFixtures = {
+      "import_node_basic",         "import_resolve_multi_layer", "resolve_conflict_children",
+      "resolve_conflict_contents", "resolve_scaled_layer",       "verify_not_xml",
+  };
+  return kSkippedCliFixtures.count(sample.name) != 0;
+}
+
+// Remove any stale {name}.status.txt / {name}_pagx.webp / {name}_pag.webp
+// produced by an earlier dump run. Without this the HTML report would still
+// show the skipped sample (render_compare.py reconstructs the sample set from
+// disk artefacts).
+void PurgeSkippedArtefacts(const pagx::test::PAGXSample& sample) {
+  const auto outDir =
+      std::filesystem::path(pag::ProjectPath::Absolute("test/out/comparison")) / sample.section;
+  for (const std::string& suffix : {".status.txt", "_pagx.webp", "_pag.webp"}) {
+    std::error_code ec;
+    std::filesystem::remove(outDir / (sample.name + suffix), ec);
+  }
+}
+
 }  // namespace
 
 class ComparisonDumpTest : public PAGXTest {};
@@ -175,8 +209,14 @@ TEST_F(ComparisonDumpTest, DISABLED_DumpAllSections) {
   size_t totalB = 0;
   size_t failA = 0;
   size_t failB = 0;
+  size_t skipped = 0;
 
   for (const auto& sample : samples) {
+    if (ShouldSkipForComparison(sample)) {
+      PurgeSkippedArtefacts(sample);
+      ++skipped;
+      continue;
+    }
     const std::string keyA = "comparison/" + sample.section + "/" + sample.name + "_pagx";
     const std::string keyB = "comparison/" + sample.section + "/" + sample.name + "_pag";
 
@@ -218,8 +258,10 @@ TEST_F(ComparisonDumpTest, DISABLED_DumpAllSections) {
                 outcomeB.ok ? "ok" : "fail:" + outcomeB.error, width, height);
   }
 
-  std::printf("\n[ComparisonDumpTest] %zu samples; PathA ok=%zu fail=%zu; PathB ok=%zu fail=%zu\n",
-              samples.size(), totalA, failA, totalB, failB);
+  std::printf(
+      "\n[ComparisonDumpTest] %zu samples; PathA ok=%zu fail=%zu; PathB ok=%zu fail=%zu; "
+      "skipped=%zu\n",
+      samples.size(), totalA, failA, totalB, failB, skipped);
 }
 
 }  // namespace pag
