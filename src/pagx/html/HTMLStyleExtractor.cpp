@@ -622,6 +622,15 @@ static std::string BuildDeclarationsString(const std::vector<CSSProperty>& props
   return result;
 }
 
+// Returns true when `pos` falls inside any of the half-open [start,end) byte ranges. Used to
+// filter out tags nested inside <foreignObject> elements during style extraction.
+static bool IsPosInsideRange(size_t pos, const std::vector<std::pair<size_t, size_t>>& ranges) {
+  for (const auto& r : ranges) {
+    if (pos >= r.first && pos < r.second) return true;
+  }
+  return false;
+}
+
 //==============================================================================
 // Extract
 //==============================================================================
@@ -678,13 +687,6 @@ std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) 
     }
   }
 
-  auto isInsideForeignObject = [&](size_t tagPos) {
-    for (const auto& r : foreignObjectRanges) {
-      if (tagPos >= r.first && tagPos < r.second) return true;
-    }
-    return false;
-  };
-
   // Pass 1: parse style values into StyleEntry structures.
   std::vector<StyleEntry> entries;
   // Map from tag index to entry index (-1 means no entry).
@@ -695,7 +697,7 @@ std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) 
     // Do not extract styles from elements inside <foreignObject>: those elements live in a
     // separate HTML document context where the outer <style> block is not accessible, so
     // replacing their inline style with a CSS class name would leave them unstyled.
-    if (isInsideForeignObject(tag.tagStart)) continue;
+    if (IsPosInsideRange(tag.tagStart, foreignObjectRanges)) continue;
     auto rawValue = html.substr(tag.styleValueStart, tag.styleValueEnd - tag.styleValueStart);
     if (rawValue.empty()) continue;
     StyleEntry entry;

@@ -38,6 +38,30 @@ namespace pagx {
 
 using pag::FloatNearlyZero;
 
+// Emits a feColorMatrix that extracts the alpha channel of `currentInput` into a fresh result
+// node, but only if the cached `alphaResult` is stale. Mutates the four pipeline state
+// variables in place (allocating a fresh result name through `si`) and returns the name of the
+// alpha-only result that downstream filter primitives should reference. The four references
+// match the local pipeline state of writeFilterDefs verbatim so the helper reads as if it were
+// still inline; pulling them out as parameters lets writeFilterDefs avoid a local lambda per
+// the project's no-lambda rule.
+static std::string EnsurePipelineAlpha(HTMLBuilder* defs, int& si, const std::string& currentInput,
+                                       std::string& alphaResult, bool& alphaDirty) {
+  if (!alphaDirty) {
+    return alphaResult;
+  }
+  std::string aId = "a" + std::to_string(si++);
+  defs->openTag("feColorMatrix");
+  defs->addAttr("in", currentInput);
+  defs->addAttr("type", "matrix");
+  defs->addAttr("values", "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0");
+  defs->addAttr("result", aId);
+  defs->closeTagSelfClosing();
+  alphaResult = aId;
+  alphaDirty = false;
+  return alphaResult;
+}
+
 //==============================================================================
 // HTMLWriter – mirror-tile eligibility
 //==============================================================================
@@ -175,27 +199,6 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
   std::string alphaResult = "SourceAlpha";
   bool alphaDirty = false;
 
-  // Kept as a local lambda rather than extracted per the project's no-lambda rule because it
-  // forms a five-state machine (si / currentInput / alphaResult / alphaDirty / _defs) whose
-  // reads and writes are interleaved with the caller's own mutations of those same variables.
-  // Extracting it would require threading all five variables through every call site as
-  // in/out parameters, which is strictly uglier than a scoped closure.
-  auto ensureAlpha = [&]() -> std::string {
-    if (!alphaDirty) {
-      return alphaResult;
-    }
-    std::string aId = "a" + std::to_string(si++);
-    _defs->openTag("feColorMatrix");
-    _defs->addAttr("in", currentInput);
-    _defs->addAttr("type", "matrix");
-    _defs->addAttr("values", "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0");
-    _defs->addAttr("result", aId);
-    _defs->closeTagSelfClosing();
-    alphaResult = aId;
-    alphaDirty = false;
-    return alphaResult;
-  };
-
   for (auto* f : filters) {
     switch (f->nodeType()) {
       case NodeType::BlurFilter: {
@@ -219,7 +222,7 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
       case NodeType::DropShadowFilter: {
         auto s = static_cast<const DropShadowFilter*>(f);
         std::string i = std::to_string(si++);
-        std::string alphaIn = ensureAlpha();
+        std::string alphaIn = EnsurePipelineAlpha(_defs, si, currentInput, alphaResult, alphaDirty);
         _defs->openTag("feGaussianBlur");
         _defs->addAttr("in", alphaIn);
         std::string sd = CssFloatToString(s->blurX);
@@ -275,7 +278,7 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
       case NodeType::InnerShadowFilter: {
         auto s = static_cast<const InnerShadowFilter*>(f);
         std::string i = std::to_string(si++);
-        std::string alphaIn = ensureAlpha();
+        std::string alphaIn = EnsurePipelineAlpha(_defs, si, currentInput, alphaResult, alphaDirty);
         // Invert current alpha so that exterior becomes opaque and interior becomes transparent.
         // Blurring the inverted alpha produces a falloff that bleeds into the shape from every
         // edge, then offsetting and clipping back to the source mask yields the inner shadow.
@@ -380,7 +383,7 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
       case NodeType::BlendFilter: {
         auto bf = static_cast<const BlendFilter*>(f);
         std::string i = std::to_string(si++);
-        std::string alphaIn = ensureAlpha();
+        std::string alphaIn = EnsurePipelineAlpha(_defs, si, currentInput, alphaResult, alphaDirty);
         _defs->openTag("feFlood");
         _defs->addAttr("flood-color", ColorToSVGHex(bf->color));
         if (bf->color.alpha < 1.0f) {
