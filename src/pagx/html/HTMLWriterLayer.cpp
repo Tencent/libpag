@@ -66,6 +66,99 @@ static void EmitLeftTopCss(std::string& style, bool& positionSet, float x, float
   positionSet = true;
 }
 
+// A Group whose children are exactly one Text plus at least one Fill/Stroke (and nothing else)
+// behaves as a single rich-text span for the enclosing TextBox: we hoist the Text into the
+// TextBox container as one of its <span> children rather than rendering the Group as a
+// stand-alone DOM wrapper. CollectRichTextSpans pre-scans an element list to pull out every
+// such qualifying Group.
+struct RichTextSpan {
+  const Text* text = nullptr;
+  const Fill* fill = nullptr;
+  const Stroke* stroke = nullptr;
+};
+
+// Outputs of the first pre-scan pass: hasUpcomingRepeater, the first TextBox seen, the rich
+// text spans pulled from sibling Groups, and the derived useRichText flag (true when there is
+// a TextBox with no inline elements but at least two qualifying sibling Groups).
+struct RichTextScanResult {
+  bool hasUpcomingRepeater = false;
+  const TextBox* preScannedTextBox = nullptr;
+  std::vector<RichTextSpan> richTextSpans;
+  bool useRichText = false;
+};
+
+static RichTextScanResult CollectRichTextSpans(const std::vector<Element*>& elements) {
+  RichTextScanResult r;
+  int richTextGroupCount = 0;
+  for (auto* e : elements) {
+    if (e->nodeType() == NodeType::Repeater) {
+      r.hasUpcomingRepeater = true;
+    } else if (e->nodeType() == NodeType::TextBox) {
+      r.preScannedTextBox = static_cast<const TextBox*>(e);
+    } else if (e->nodeType() == NodeType::Group && r.preScannedTextBox == nullptr) {
+      auto grp = static_cast<const Group*>(e);
+      const Text* spanText = nullptr;
+      const Fill* spanFill = nullptr;
+      const Stroke* spanStroke = nullptr;
+      bool isTextSpan = true;
+      for (auto* ge : grp->elements) {
+        auto gt = ge->nodeType();
+        if (gt == NodeType::Text) {
+          spanText = static_cast<const Text*>(ge);
+        } else if (gt == NodeType::Fill) {
+          spanFill = static_cast<const Fill*>(ge);
+        } else if (gt == NodeType::Stroke) {
+          spanStroke = static_cast<const Stroke*>(ge);
+        } else {
+          isTextSpan = false;
+          break;
+        }
+      }
+      if (isTextSpan && spanText && (spanFill || spanStroke)) {
+        richTextGroupCount++;
+        r.richTextSpans.push_back({spanText, spanFill, spanStroke});
+      }
+    }
+  }
+  r.useRichText = r.preScannedTextBox != nullptr && richTextGroupCount >= 2;
+  return r;
+}
+
+// Pre-scan Fill/Stroke pairing at targetPlacement so the Fill branch in the main dispatch can
+// skip Text elements that a later Stroke will consume (otherwise two stacked <span>s with
+// identical CSS end up sub-pixel offset from each other in Chromium, producing a doubled stroke
+// edge around the glyphs - visible as e.g. TYPE's "E" sprouting an extra stroke stub to its
+// right, or STROKE's "R" showing stroke bleed inside the letter body). Stroke then paints Text
+// with (curFill, curStroke) as a single span.
+//
+// Matching rule: walk elements in order, pairing each Fill at targetPlacement with the next
+// Stroke at targetPlacement before another Fill appears. Unpaired Fills still paint Text
+// normally. TextModifier / TextPath paths have their own dispatch and are not covered here.
+static std::vector<bool> ComputeFillStrokePairing(const std::vector<Element*>& elements,
+                                                  LayerPlacement targetPlacement) {
+  std::vector<bool> fillWillBePairedWithStroke(elements.size(), false);
+  const Fill* lastUnpairedFill = nullptr;
+  size_t lastUnpairedFillIndex = 0;
+  for (size_t i = 0; i < elements.size(); i++) {
+    auto* e = elements[i];
+    auto et = e->nodeType();
+    if (et == NodeType::Fill) {
+      auto* f = static_cast<const Fill*>(e);
+      if (f->placement == targetPlacement) {
+        lastUnpairedFill = f;
+        lastUnpairedFillIndex = i;
+      }
+    } else if (et == NodeType::Stroke) {
+      auto* s = static_cast<const Stroke*>(e);
+      if (s->placement == targetPlacement && lastUnpairedFill != nullptr) {
+        fillWillBePairedWithStroke[lastUnpairedFillIndex] = true;
+        lastUnpairedFill = nullptr;
+      }
+    }
+  }
+  return fillWillBePairedWithStroke;
+}
+
 //==============================================================================
 // HTMLWriter – element processing
 //==============================================================================
@@ -117,79 +210,16 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
   const TextPath* curTextPath = nullptr;
 
   bool hasUpcomingRepeater = false;
-  const TextBox* preScannedTextBox = nullptr;
-  struct RichTextSpan {
-    const Text* text = nullptr;
-    const Fill* fill = nullptr;
-    const Stroke* stroke = nullptr;
-  };
   std::vector<RichTextSpan> richTextSpans = {};
-  int richTextGroupCount = 0;
-  for (auto* e : elements) {
-    if (e->nodeType() == NodeType::Repeater) {
-      hasUpcomingRepeater = true;
-    } else if (e->nodeType() == NodeType::TextBox) {
-      preScannedTextBox = static_cast<const TextBox*>(e);
-    } else if (e->nodeType() == NodeType::Group && preScannedTextBox == nullptr) {
-      auto grp = static_cast<const Group*>(e);
-      const Text* spanText = nullptr;
-      const Fill* spanFill = nullptr;
-      const Stroke* spanStroke = nullptr;
-      bool isTextSpan = true;
-      for (auto* ge : grp->elements) {
-        auto gt = ge->nodeType();
-        if (gt == NodeType::Text) {
-          spanText = static_cast<const Text*>(ge);
-        } else if (gt == NodeType::Fill) {
-          spanFill = static_cast<const Fill*>(ge);
-        } else if (gt == NodeType::Stroke) {
-          spanStroke = static_cast<const Stroke*>(ge);
-        } else {
-          isTextSpan = false;
-          break;
-        }
-      }
-      if (isTextSpan && spanText && (spanFill || spanStroke)) {
-        richTextGroupCount++;
-        richTextSpans.push_back({spanText, spanFill, spanStroke});
-      }
-    }
-  }
-  bool useRichText = preScannedTextBox != nullptr && richTextGroupCount >= 2;
-
-  // Pre-scan Fill/Stroke pairing at targetPlacement so the Fill branch below can skip
-  // Text elements that a later Stroke will consume (otherwise two stacked <span>s with
-  // identical CSS end up sub-pixel offset from each other in Chromium, producing a
-  // doubled stroke edge around the glyphs - visible as e.g. TYPE's "E" sprouting an
-  // extra stroke stub to its right, or STROKE's "R" showing stroke bleed inside the
-  // letter body). Stroke then paints Text with (curFill, curStroke) as a single span.
-  //
-  // Matching rule: walk elements in order, pairing each Fill at targetPlacement with
-  // the next Stroke at targetPlacement before another Fill appears. Unpaired Fills
-  // still paint Text normally. TextModifier / TextPath paths have their own dispatch
-  // and are not covered here.
-  std::vector<bool> fillWillBePairedWithStroke(elements.size(), false);
+  bool useRichText = false;
   {
-    const Fill* lastUnpairedFill = nullptr;
-    size_t lastUnpairedFillIndex = 0;
-    for (size_t i = 0; i < elements.size(); i++) {
-      auto* e = elements[i];
-      auto et = e->nodeType();
-      if (et == NodeType::Fill) {
-        auto* f = static_cast<const Fill*>(e);
-        if (f->placement == targetPlacement) {
-          lastUnpairedFill = f;
-          lastUnpairedFillIndex = i;
-        }
-      } else if (et == NodeType::Stroke) {
-        auto* s = static_cast<const Stroke*>(e);
-        if (s->placement == targetPlacement && lastUnpairedFill != nullptr) {
-          fillWillBePairedWithStroke[lastUnpairedFillIndex] = true;
-          lastUnpairedFill = nullptr;
-        }
-      }
-    }
+    auto scan = CollectRichTextSpans(elements);
+    hasUpcomingRepeater = scan.hasUpcomingRepeater;
+    richTextSpans = std::move(scan.richTextSpans);
+    useRichText = scan.useRichText;
   }
+
+  auto fillWillBePairedWithStroke = ComputeFillStrokePairing(elements, targetPlacement);
 
   for (size_t elemIndex = 0; elemIndex < elements.size(); elemIndex++) {
     auto* element = elements[elemIndex];
