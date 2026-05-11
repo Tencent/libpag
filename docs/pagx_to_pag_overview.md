@@ -412,6 +412,226 @@ tgfx::Layer 树（可直接交 tgfx::Surface 渲染）
 | `test/src/pag/unit/ComparisonDumpTest.cpp` | PathA/PathB 并列渲染对比（273/273 ok） | ~280 |
 | `test/src/pag/unit/RenderCrossCheckTest.cpp` | PSNR bit-perfect 强相等（48/48） | — |
 
+### 3.3 模块调用时序图
+
+下图展示一次 `PAGExporter::ToBytes` 与一次 `PAGLoader::LoadFromBytes` 的完整调用时序，重点是字节边界的产生与消费时刻。GitHub 渲染下方 mermaid 图。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant App  as 调用方
+    participant Imp  as PAGXImporter
+    participant Doc  as PAGXDocument
+    participant Bk   as Baker (5 子模块)
+    participant Bc   as BakeContext
+    participant Cd   as Codec
+    participant Bytes as 字节流
+    participant Inf  as LayerInflater
+
+    rect rgba(220,235,255,0.6)
+    note over App,Bytes: ━━━ 写出阶段 PAGX → PAG bytes ━━━
+    App->>Imp: FromFile(path)
+    Imp->>Doc: 构造 PAGXDocument
+    App->>Doc: applyLayout(fontConfig)
+    note right of Doc: 约束解析 + TextLayout shape
+    App->>Bk: Bake(pagxDoc)
+    Bk->>Bk: PreflightChecks<br/>(LayoutNotApplied / UnresolvedImports)
+    alt fatal 100-199
+        Bk-->>App: doc=nullptr + errors
+    else ok
+        Bk->>Bc: ResourceBaker pre-pass<br/>(Image 三层 / EmbeddedFont 哈希)
+        Bk->>Bk: LayerBaker 递归<br/>+ Mask Pass-1
+        Bk->>Bk: VectorBaker / TextBaker /<br/>StyleFilterBaker 类型分派
+        Bk->>Bk: Mask Pass-2 解析
+        Bk-->>App: PAGDocument
+    end
+    App->>Cd: Encode(pagDoc)
+    Cd->>Bytes: 9-byte 容器头
+    Cd->>Bytes: FileHeader Tag
+    Cd->>Bytes: ImageAssetTable Tag
+    Cd->>Bytes: EmbeddedFontTable Tag
+    Cd->>Bytes: CompositionList Tag<br/>(嵌套 Composition / Layer / Element)
+    Cd->>Bytes: End Tag
+    Cd-->>App: bytes
+    end
+
+    rect rgba(220,255,225,0.6)
+    note over App,Bytes: ━━━ 读入阶段 PAG bytes → tgfx::Layer ━━━
+    App->>Cd: Decode(bytes)
+    Cd->>Bytes: read magic / version / bodyLength
+    alt 容器头错
+        Cd-->>App: doc=nullptr + 300-399 errors
+    else ok
+        loop body Tag dispatch
+            Cd->>Bytes: ReadTagHeader (2 / 6 byte)
+            alt 已知 TagCode
+                Cd->>Cd: ReadXxx() 业务函数
+            else 未知 TagCode
+                Cd->>Cd: warn UnknownTagCode=400
+                Cd->>Bytes: SeekTo(tagEnd)
+            end
+        end
+        Cd-->>App: PAGDocument
+    end
+    App->>Inf: Inflate(doc, {fontProvider})
+    Inf->>Inf: inflateComposition → inflateLayer (递归)<br/>→ inflateVectorElement
+    Inf->>Inf: case A: PathTypefaceBuilder<br/>case B: FontProvider.getTypeface
+    Inf->>Inf: Mask Pass: maskLayerPath 索引回溯
+    Inf-->>App: tgfx::Layer 树 + 600-699 warnings
+    end
+```
+
+**关键时序观察**：
+
+- **Baker fatal 早期短路**（步骤 6）：document=nullptr 直接返回，`Codec::Encode` 永远不被调用
+- **资源去重在 LayerBaker 之前**（步骤 9 → 10）：ResourceBaker pre-pass 让后续 LayerBaker/TextBaker 写 `imageIndex` / `embeddedFontIndex` 时直接拿到已 intern 的索引
+- **Mask 两趟**（步骤 10 + 12）：PAGX 树形非时间序，mask 目标可能在 path 后才出现，必须 Pass-1 先记录所有 Layer 索引链
+- **Decoder fail-soft**：未知 TagCode 不 abort，按 length skip，文件其余部分正常读
+- **Inflater 无 fatal**：单元素失败降级为空 `tgfx::Layer::Make()`，主干 Layer 树永远产出
+
+### 3.4 字节级追踪（真实样本端到端）
+
+下面用 `spec/samples/group_isolation.pagx`（197 byte，全 48 sample 中最小且不含 image/font）做端到端字节追踪。该 sample 含 1 Composition / 1 Vector Layer / 1 VectorGroup（`alpha=0.7`）/ 1 Rectangle / 1 Ellipse / 2 Fill，能干净展示主干字节布局与 propHeader 默认值短路效果。
+
+#### 源 PAGX
+
+```xml
+<pagx width="400" height="400">
+  <Layer>
+    <Group alpha="0.7">
+      <Rectangle left="40" top="100" width="200" height="200" roundness="24"/>
+      <Fill color="#F43F5E"/>
+    </Group>
+    <Ellipse left="160" top="100" width="200" height="200"/>
+    <Fill color="#06B6D4"/>
+  </Layer>
+</pagx>
+```
+
+#### 完整 197 byte hex dump
+
+```
+offset    bytes (hex)                                          ascii
+  0000:   50 41 47 02 bc 00 00 00 00 58 00 00 00 c8 43 00      PAG......X....C.
+  0010:   00 c8 43 ff ff ff ff 18 00 00 00 01 00 00 00 01      ..C.............
+  0020:   00 00 00 81 00 00 01 02 00 3f 01 94 00 00 00 01      .........?......
+  0030:   7f 01 8d 00 00 00 00 90 01 00 00 90 01 00 00 01      ................
+  0040:   bf 02 7d 00 00 00 05 00 00 00 00 00 01 00 00 00      ..}.............
+  0050:   01 00 00 00 01 00 00 00 1c c5 03 10 10 10 10 10      ................
+  0060:   3f 06 5c 00 00 00 03 75 0d 02 18 0a 00 00 00 0c      ?.\....u........
+  0070:   43 00 00 48 43 00 00 00 48 43 00 00 48 43 00 00      C..HC...HC..HC..
+  0080:   00 c0 41 00 0d 0b 09 00 00 10 03 00 00 f4 3f 5e      ..A...........?^
+  0090:   ff 00 00 10 10 10 10 00 33 33 33 3f 10 10 53 0a      ........333?..S.
+  00a0:   00 00 00 82 43 00 00 48 43 00 00 00 48 43 00 00      ....C..HC...HC..
+  00b0:   48 43 00 0d 0b 09 00 00 10 03 00 00 06 b6 d4 ff      HC..............
+  00c0:   00 00 00 00 00                                       .....
+```
+
+#### 主干字段逐段标注
+
+> 每段格式：`[offset 范围] raw bytes — 字段名 → 含义`。下划线缩进表示嵌套层级。仅展开容器头到 LayerTransform 的主干（约前 96 byte）；其后 VectorPayload 内的 Group/Rectangle/Ellipse/Fill 字节在 `pagx_to_pag_v2_design.md` 附录 D.11 有详尽字段表。
+
+```
+=== 容器头 (9 byte) ===
+[0x0000-0x0002]  50 41 47           magic         → "PAG"
+[0x0003-0x0003]  02                 version       → 0x02 (FORMAT_VERSION)
+[0x0004-0x0007]  bc 00 00 00        bodyLength    → 188 byte (LE u32)
+[0x0008-0x0008]  00                 compression   → UNCOMPRESSED
+
+=== FileHeader Tag (TagCode=1) — 共 26 byte (2 头 + 24 体) ===
+[0x0009-0x000a]  58 00              TagHeader     → u16 0x0058 = (code=1)<<6 | length=24
+[0x000b-0x000e]  00 00 c8 43        width         → 400.0f
+[0x000f-0x0012]  00 00 c8 43        height        → 400.0f
+[0x0013-0x0016]  ff ff ff ff        backgroundColor → 0xFFFFFFFF white opaque (RGBA u8×4)
+[0x0017-0x001a]  18 00 00 00        frameRate.num → 24
+[0x001b-0x001e]  01 00 00 00        frameRate.den → 1   (24/1 fps)
+[0x001f-0x0022]  01 00 00 00        duration      → 1 帧
+
+=== ImageAssetTable Tag (TagCode=2) — 共 3 byte ===
+[0x0023-0x0024]  81 00              TagHeader     → u16 0x0081 = (code=2)<<6 | length=1
+[0x0025-0x0025]  00                 count         → 0 (varU32)
+
+=== EmbeddedFontTable Tag (TagCode=8) — 共 3 byte ===
+[0x0026-0x0027]  01 02              TagHeader     → u16 0x0201 = (code=8)<<6 | length=1
+[0x0028-0x0028]  00                 count         → 0 (varU32)
+
+=== CompositionList Tag (TagCode=4) — 共 154 byte (6 头 + 148 体) ===
+[0x0029-0x002a]  3f 01              codeAndLength → u16 0x013F = (code=4)<<6 | length=63 (溢出)
+[0x002b-0x002e]  94 00 00 00        extendedLength→ 148
+[0x002f-0x002f]  01                 count         → 1 (varU32)
+
+  --- 嵌套 Composition Tag (TagCode=5) — 共 147 byte (6 头 + 141 体) ---
+  [0x0030-0x0031]  7f 01            codeAndLength → u16 0x017F = (code=5)<<6 | length=63
+  [0x0032-0x0035]  8d 00 00 00      extendedLength→ 141
+  [0x0036-0x0036]  00               id length     → 0 (隐式根 composition,匿名)
+  [0x0037-0x003a]  90 01 00 00      width         → 400 (u32 — composition canvas)
+  [0x003b-0x003e]  90 01 00 00      height        → 400
+  [0x003f-0x003f]  01               layerCount    → 1 (varU32)
+
+    --- 嵌套 LayerBlock Tag (TagCode=10) — 共 131 byte (6 头 + 125 体) ---
+    [0x0040-0x0041]  bf 02          codeAndLength → u16 0x02BF = (code=10)<<6 | length=63
+    [0x0042-0x0045]  7d 00 00 00    extendedLength→ 125
+    [0x0046-0x0046]  05             type          → 5 = LayerType::Vector
+    [0x0047-0x0047]  00             name length   → 0 (匿名 Layer)
+    [0x0048-0x004b]  00 00 00 00    startTime     → 0   ← Phase 20 候选优化:静态层省 16 byte
+    [0x004c-0x004f]  01 00 00 00    duration      → 1
+    [0x0050-0x0053]  01 00 00 00    stretch.num   → 1
+    [0x0054-0x0057]  01 00 00 00    stretch.den   → 1   (1:1 静态层)
+    [0x0058-0x0058]  1c             layerFlags    → 0x1C = bit2 PassThroughBackground +
+                                                          bit3 AllowsEdgeAA +
+                                                          bit4 AllowsGroupOpacity
+
+      --- 嵌套 LayerTransform Tag (TagCode=15) — 共 7 byte (2 头 + 5 体) ---
+      [0x0059-0x005a]  c5 03        TagHeader     → u16 0x03C5 = (code=15)<<6 | length=5
+      [0x005b-0x005b]  10           propHeader#1  → visible.isDefault=1 (true)  ★
+      [0x005c-0x005c]  10           propHeader#2  → alpha.isDefault=1 (1.0)     ★
+      [0x005d-0x005d]  10           propHeader#3  → blendMode.isDefault=1 (Normal) ★
+      [0x005e-0x005e]  10           propHeader#4  → matrix.isDefault=1 (Identity)  ★
+      [0x005f-0x005f]  10           propHeader#5  → matrix3D.isDefault=1 (Identity)★
+
+    --- 嵌套 VectorPayload Tag (TagCode=24) — 共 98 byte (6 头 + 92 体) ---
+    [0x0060-0x0061]  3f 06          codeAndLength → u16 0x063F = (code=24)<<6 | length=63
+    [0x0062-0x0065]  5c 00 00 00    extendedLength→ 92
+    [0x0066-0x0066]  03             element count → 3 (Group / Ellipse / Fill)
+
+    --- 之后 92 byte 是 3 个 VectorElement,详见 spec §D.11 ---
+    --- 0x0067 起: ElementVectorGroup α=0.7 / Ellipse / Fill ---
+
+=== End Tag (TagCode=0) ===
+[0x00C1-0x00C2]  00 00              TagHeader     → u16 0x0000 = (code=0)<<6 | length=0
+[0x00C3-0x00C4]  00 00              padding (4 byte 对齐残留,不在 bodyLength 内)
+```
+
+#### 关键观察
+
+1. **★ 标记的 5 个 `0x10` 字节** 在 `LayerTransform` 内是**最直观的压缩展示**：5 个 Property（visible / alpha / blendMode / matrix / matrix3D）全部命中默认值，**5 byte 替代了 (1+1) + (1+4) + (1+1) + (1+25) + (1+65) = 101 byte 的"完整写法"**——压缩比 ~20×。这是「决策三 propHeader 默认值短路」的实际兑现。
+
+2. **TagHeader 紧凑格式**的"小 Tag 走 2 byte / 大 Tag 走 6 byte"在样本里都出现：FileHeader/ImageAssetTable/EmbeddedFontTable/LayerTransform 都是 2 byte 头；CompositionList/Composition/LayerBlock/VectorPayload 都因 length ≥ 63 走 6 byte 扩展头（length 字段 = 63 触发后跟 u32）。
+
+3. **Layer 静态时间字段** `startTime/duration/stretch.num/stretch.den` 共 16 byte（offset 0x48-0x57）全是 hard-coded `0/1/1/1`——是 Phase 20 方向 1 待启动优化的目标，可改 1 byte isStatic 标志省 15 byte/Layer。
+
+4. **顶层 Tag 顺序固定**：FileHeader → ImageAssetTable → EmbeddedFontTable → CompositionList → End，由 `Codec.cpp:44-56` 强制（spec §6.2）。Reader 不依赖此顺序（按 TagCode dispatch），但 Writer 必须保持，便于 Reader 早期校验。
+
+5. **嵌套结构靠 Tag length 自隔离**：CompositionList(154) 内 Composition(147) 内 LayerBlock(131) 内 LayerTransform(7) + VectorPayload(98)——每层都用自己的 length 边界，未知子 Tag 可被任意层 skip 不影响外层。
+
+#### 体积构成
+
+将 197 byte 按功能归类：
+
+| 组成 | 字节数 | 占比 |
+|---|---|---|
+| 容器头 (`PAG` magic + version + bodyLength + compression) | 9 | 4.6% |
+| FileHeader Tag（含 TagHeader + body） | 26 | 13.2% |
+| 资源表（ImageAssetTable + EmbeddedFontTable，全空） | 6 | 3.0% |
+| Tag 头开销（CompositionList/Composition/LayerBlock 三层 6-byte ext-header + VectorPayload） | 24 | 12.2% |
+| Composition body 元字段（id/w/h/layerCount） | 10 | 5.1% |
+| Layer body 元字段（type/name/timing/flags） | 19 | 9.6% |
+| LayerTransform 体（5 byte，全默认） | 5 | 2.5% |
+| VectorPayload + 3 VectorElement bodies | 95 | 48.2% |
+| End Tag + 对齐残留 | ~3 | 1.5% |
+
+可见**实际有内容的图形数据仅占 48%**，元字段+Tag 头共 ~52%。这反映了 v2 是为大文档优化（资源池 / Composition 复用 / 深嵌套 Layer 树），小样本的 Tag 头开销占比偏高——但对 ≥ 1 KB 的真实文档，相对开销迅速下降到 < 10%。
+
 ---
 
 ## 4. Tag 注册表（已定义 42 个）
