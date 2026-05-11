@@ -66,16 +66,10 @@ static void EmitLeftTopCss(std::string& style, bool& positionSet, float x, float
   positionSet = true;
 }
 
-// A Group whose children are exactly one Text plus at least one Fill/Stroke (and nothing else)
-// behaves as a single rich-text span for the enclosing TextBox: we hoist the Text into the
-// TextBox container as one of its <span> children rather than rendering the Group as a
-// stand-alone DOM wrapper. CollectRichTextSpans pre-scans an element list to pull out every
-// such qualifying Group.
-struct RichTextSpan {
-  const Text* text = nullptr;
-  const Fill* fill = nullptr;
-  const Stroke* stroke = nullptr;
-};
+// CollectRichTextSpans pre-scans an element list to pull out every Group that should be hoisted
+// into the enclosing TextBox as a single <span> child instead of being rendered as a stand-alone
+// DOM wrapper. A Group qualifies when its children are exactly one Text plus at least one
+// Fill/Stroke (and nothing else); see HTMLWriter.h for the RichTextSpan struct itself.
 
 // Outputs of the first pre-scan pass: hasUpcomingRepeater, the first TextBox seen, the rich
 // text spans pulled from sibling Groups, and the derived useRichText flag (true when there is
@@ -85,6 +79,46 @@ struct RichTextScanResult {
   const TextBox* preScannedTextBox = nullptr;
   std::vector<RichTextSpan> richTextSpans;
   bool useRichText = false;
+};
+
+// A single text span emitted inside a TextBox container. Collected from TextBox children at the
+// top level (Text + Fill / Stroke painters that apply to the spans below them) and recursively
+// from nested Group children. Used by renderTextBoxWithSpans.
+struct TBSpan {
+  const Text* text = nullptr;
+  const Fill* fill = nullptr;
+  const Stroke* stroke = nullptr;
+};
+
+// Recursive helper that flattens Group children into TBSpans. Each Group level may carry its
+// own Fill/Stroke which applies to every Text at that same level regardless of their relative
+// order (e.g. a Group with [Text, Fill] and a Group with [Fill, Text] both paint the Text with
+// the Group's Fill). The painter is resolved with a first pass over direct children before
+// emitting spans, otherwise a [Text, Fill] order would leak the caller's parentFill onto the
+// Text. Defined as a struct with a static method rather than a free function so the recursive
+// call can refer to its own type without an explicit forward declaration.
+struct GroupSpanCollector {
+  static void Collect(const Group* grp, const Fill* parentFill, const Stroke* parentStroke,
+                      std::vector<TBSpan>& spans) {
+    const Fill* grpFill = parentFill;
+    const Stroke* grpStroke = parentStroke;
+    for (auto* ge : grp->elements) {
+      if (ge->nodeType() == NodeType::Fill) {
+        grpFill = static_cast<const Fill*>(ge);
+      } else if (ge->nodeType() == NodeType::Stroke) {
+        grpStroke = static_cast<const Stroke*>(ge);
+      }
+    }
+    for (auto* ge : grp->elements) {
+      if (ge->nodeType() == NodeType::Text) {
+        // Collect all Text nodes in the Group; the previous single-capture pattern dropped any
+        // Text beyond the first (e.g. "\nAB" in Box I).
+        spans.push_back({static_cast<const Text*>(ge), grpFill, grpStroke});
+      } else if (ge->nodeType() == NodeType::Group) {
+        Collect(static_cast<const Group*>(ge), grpFill, grpStroke, spans);
+      }
+    }
+  }
 };
 
 static RichTextScanResult CollectRichTextSpans(const std::vector<Element*>& elements) {
@@ -316,736 +350,9 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
       case NodeType::TextBox: {
         curTextBox = static_cast<const TextBox*>(element);
         if (!curTextBox->elements.empty()) {
-          // TextBox with child elements: render as a positioned container with text styling.
-          auto tb = curTextBox;
-          auto tbBounds = tb->layoutBounds();
-          auto tbPos = tb->renderPosition();
-          // TextBox::layoutWidth is NaN when the width is derived purely from tgfx's own text
-          // measurement (no explicit width, no constraint-resolved width). Emitting that
-          // tgfx-measured pixel value as a CSS fixed width causes Chromium to wrap text when
-          // its font metrics are slightly wider than tgfx's — even for a single-line label like
-          // "Group Layout". Use `width:max-content` so Chromium sizes the box to its own
-          // measurement and never wraps at the container boundary.
-          // When layoutWidth is set (constraint/explicit/percentage-resolved), use its px value
-          // so that intentional multi-line word-wrap boxes respect their authored width.
-          bool layoutW = !tb->isWidthAutoSized();
-          bool layoutH = !tb->isHeightAutoSized();
-          float tbW = tbBounds.width;
-          float tbH = tbBounds.height;
-          float tbLeft = tbPos.x;
-          float tbTop = tbPos.y;
-          std::string style = "position:absolute;left:" + CssFloatToString(tbLeft) +
-                              "px;top:" + CssFloatToString(tbTop) + "px";
-          if (layoutW && tbW > 0) {
-            style += ";width:" + CssFloatToString(tbW) + "px";
-          } else if (!layoutW) {
-            // For vertical writing-mode TextBoxes, tgfx has already measured the exact column
-            // width needed; use that fixed value so Chromium produces the same column layout.
-            // For horizontal auto-sized boxes, keep max-content so Chromium's slightly wider
-            // font metrics don't trigger an unwanted line break at the tgfx boundary.
-            if (tb->writingMode == WritingMode::Vertical && tbW > 0) {
-              style += ";width:" + CssFloatToString(tbW) + "px";
-            } else {
-              style += ";width:max-content";
-            }
-          }
-          if (layoutH && tbH > 0) {
-            style += ";height:" + CssFloatToString(tbH) + "px";
-          }
-          // PAGX `<TextBox padding="...">` insets the text content from the box edges:
-          // tgfx subtracts padding from layoutWidth/Height before line breaking, so the
-          // wrapped lines obey the inner content rectangle. Emit the same inset in CSS
-          // via `padding:...; box-sizing:border-box` so Chromium wraps at the same
-          // inner width — without this, layoutWidth=200 leaks the full 200 to the line
-          // breaker and we get one fewer line wrap than PAGX (visible in
-          // layout/padding_unified where the HTML squeezes "The text" onto line 1).
-          if (!tb->padding.isZero()) {
-            style += ";padding:" + PaddingToCSS(tb->padding);
-            style += ";box-sizing:border-box";
-          }
-          if (tb->textAlign == TextAlign::Center) {
-            style += ";text-align:center";
-          } else if (tb->textAlign == TextAlign::End) {
-            style += ";text-align:end";
-          } else if (tb->textAlign == TextAlign::Justify) {
-            // text-align-last:left aligns the final paragraph line (after the last <br> or at end
-            // of content) to the start, matching tgfx where the last line is not justified.
-            style += ";text-align:justify;text-align-last:left";
-          }
-          // Anchor mode: TextBox authored with width="0" / height="0" (explicit zero, not NaN)
-          // uses the TextBox's origin as a single anchor point and relies on textAlign /
-          // paragraphAlign to place the text relative to that point. tgfx collapses the box to
-          // zero size and lets each line flow past the anchor. CSS `text-align` alone can't
-          // reproduce the horizontal case because our emitted container has `width:max-content`
-          // (hugging the glyph run); `display:flex; justify-content:center/flex-end` alone can't
-          // reproduce the vertical case because the box height is also `max-content`. Shift the
-          // entire box with `transform:translate(-X%, -Y%)` so the anchor lands on the correct
-          // glyph edge — -50% for Center/Middle, -100% for End/Far.
-          bool widthAnchor =
-              !tb->isWidthAutoSized() && tb->width == 0.0f && tb->textAlign != TextAlign::Start;
-          bool heightAnchor = !tb->isHeightAutoSized() && tb->height == 0.0f &&
-                              tb->paragraphAlign != ParagraphAlign::Near;
-          if (widthAnchor || heightAnchor) {
-            std::string tx = "0";
-            std::string ty = "0";
-            if (widthAnchor) {
-              tx = (tb->textAlign == TextAlign::Center) ? "-50%" : "-100%";
-            }
-            if (heightAnchor) {
-              ty = (tb->paragraphAlign == ParagraphAlign::Middle) ? "-50%" : "-100%";
-            }
-            style += ";transform:translate(" + tx + "," + ty + ")";
-          }
-          if (tb->paragraphAlign != ParagraphAlign::Near) {
-            style += ";display:flex;flex-direction:column";
-            if (tb->paragraphAlign == ParagraphAlign::Middle) {
-              style += ";justify-content:center";
-            } else if (tb->paragraphAlign == ParagraphAlign::Far) {
-              style += ";justify-content:flex-end";
-            }
-          }
-          if (tb->writingMode == WritingMode::Vertical) {
-            style += ";writing-mode:vertical-rl";
-          }
-          // Only enable word-wrap when the box has an explicit width that was authored
-          // to contain multi-line text. When the width comes from tgfx's own content
-          // measurement (no explicit width), Chromium's slightly wider font metrics would
-          // immediately overflow that measured width and trigger an unwanted line break.
-          // Vertical writing-mode boxes rely on the box height to trigger column breaks;
-          // white-space:nowrap would suppress column wrapping entirely, so skip it.
-          //
-          // Note: container-level `white-space:pre-wrap` is avoided because pretty-printed
-          // HTML puts indentation and newlines between the container <div> and its inner
-          // <span> tags; `pre-wrap` on the container would render those as leading blank
-          // lines. TAB handling is applied per-span instead (see spanStyle below).
-          if (tb->wordWrap && layoutW && tbW > 0) {
-            style += ";word-wrap:break-word";
-          } else if (tb->writingMode != WritingMode::Vertical) {
-            style += ";white-space:nowrap";
-          }
-          // Defer the Overflow::Hidden emit until after tbSpans is collected: when the
-          // TextBox has a known height and line-height we can translate tgfx's whole-line
-          // drop semantics into CSS `-webkit-line-clamp`, which matches tgfx much more
-          // closely than a raw `overflow:hidden` pixel clip (which otherwise renders a
-          // partial line whose glyphs tgfx would have dropped entirely).
-          // Collect text spans from TextBox children (Text+Fill at top level, and Group children)
-          struct TBSpan {
-            const Text* text = nullptr;
-            const Fill* fill = nullptr;
-            const Stroke* stroke = nullptr;
-          };
-          std::vector<TBSpan> tbSpans;
-          const Fill* topFill = nullptr;
-          const Stroke* topStroke = nullptr;
-          for (auto* childElem : tb->elements) {
-            if (childElem->nodeType() == NodeType::Fill) {
-              auto fill = static_cast<const Fill*>(childElem);
-              topFill = fill;
-              for (auto& s : tbSpans) {
-                if (!s.fill) {
-                  s.fill = fill;
-                }
-              }
-            } else if (childElem->nodeType() == NodeType::Stroke) {
-              auto stroke = static_cast<const Stroke*>(childElem);
-              topStroke = stroke;
-              for (auto& s : tbSpans) {
-                if (!s.stroke) {
-                  s.stroke = stroke;
-                }
-              }
-            } else if (childElem->nodeType() == NodeType::Text) {
-              tbSpans.push_back({static_cast<const Text*>(childElem), topFill, topStroke});
-            } else if (childElem->nodeType() == NodeType::Group) {
-              // Recursively collect Text spans from the Group's element tree, including
-              // nested sub-Groups. Each level may carry its own Fill/Stroke which applies
-              // to the Text nodes at that level (falls back to the parent level's painter).
-              // The Fill/Stroke within a Group applies to every Text at that same level
-              // regardless of their relative order (e.g. a Group with [Text, Fill] and a
-              // Group with [Fill, Text] both paint the Text with the Group's Fill). So we
-              // resolve the Group's own painter with a first pass over its direct children
-              // before emitting spans, otherwise a [Text, Fill] order would leak the
-              // caller's parentFill onto that Text.
-              struct GroupSpanCollector {
-                static void Collect(const Group* grp, const Fill* parentFill,
-                                    const Stroke* parentStroke, std::vector<TBSpan>& spans) {
-                  const Fill* grpFill = parentFill;
-                  const Stroke* grpStroke = parentStroke;
-                  for (auto* ge : grp->elements) {
-                    if (ge->nodeType() == NodeType::Fill) {
-                      grpFill = static_cast<const Fill*>(ge);
-                    } else if (ge->nodeType() == NodeType::Stroke) {
-                      grpStroke = static_cast<const Stroke*>(ge);
-                    }
-                  }
-                  for (auto* ge : grp->elements) {
-                    if (ge->nodeType() == NodeType::Text) {
-                      // Collect all Text nodes in the Group; the previous single-capture
-                      // pattern dropped any Text beyond the first (e.g. "\nAB" in Box I).
-                      spans.push_back({static_cast<const Text*>(ge), grpFill, grpStroke});
-                    } else if (ge->nodeType() == NodeType::Group) {
-                      Collect(static_cast<const Group*>(ge), grpFill, grpStroke, spans);
-                    }
-                  }
-                }
-              };
-              GroupSpanCollector::Collect(static_cast<const Group*>(childElem), topFill, topStroke,
-                                          tbSpans);
-            }
-          }
-          if (!tbSpans.empty()) {
-            // Pin font-size on the container so Chromium's line-box strut uses this value
-            // instead of the inherited ancestor default (typically 16px body), which would
-            // otherwise inflate each line-box above the declared `line-height` and push every
-            // text line further down than tgfx renders it. Use the smallest span font-size so
-            // the strut contribution never exceeds what any child span would produce on its own.
-            float strutSize = tbSpans[0].text->renderFontSize();
-            for (const auto& s : tbSpans) {
-              float fs = s.text->renderFontSize();
-              if (fs > 0 && fs < strutSize) {
-                strutSize = fs;
-              }
-            }
-            if (strutSize > 0) {
-              style += ";font-size:" + CssFloatToString(strutSize) + "px";
-            }
-            // Pin line-height too. When PAGX declares a TextBox lineHeight we honour it;
-            // otherwise fall back to the largest per-glyph fontLineHeight from tgfx's shaping
-            // result (|ascent| + descent + leading). Without an explicit line-height Chromium
-            // uses `line-height:normal`, which resolves to ~1.2em-1.5em depending on the font's
-            // OS/2 metrics and may exceed what tgfx's TextLayout uses per line, spilling the
-            // last line out of an `overflow:hidden` TextBox or shifting baseline positions.
-            // Exception: when spans have different font sizes (mixed-size rich text), a single
-            // container-level line-height would use the largest span's value and inflate spacing
-            // for smaller spans. In that case skip the container line-height and let each span's
-            // own font-size control its line-box height naturally.
-            float lineH = tb->lineHeight > 0 ? tb->lineHeight : 0.0f;
-            if (lineH <= 0) {
-              float minFlh = 1e9f;
-              float maxFlh = 0.0f;
-              for (const auto& s : tbSpans) {
-                float flh = s.text->fontLineHeight();
-                if (flh > maxFlh) maxFlh = flh;
-                if (flh < minFlh) minFlh = flh;
-              }
-              // Only set a container line-height when all spans share the same size, so the
-              // value does not distort smaller spans in mixed-size TextBoxes.
-              if (maxFlh > 0 && maxFlh - minFlh < 0.5f) {
-                lineH = maxFlh;
-              }
-            }
-            if (lineH > 0) {
-              style += ";line-height:" + CssFloatToString(lineH) + "px";
-            }
-            // Translate PAGX Overflow::Hidden with a simple pixel clip. tgfx's TextLayout drops
-            // any line whose bottom extends past the box. A max-height based on tgfx's line count
-            // would differ from CSS when Chromium wraps lines differently; using only overflow:hidden
-            // clips at the declared box boundary and matches tgfx when line counts agree, and
-            // gracefully clips at the box edge when they diverge.
-            if (tb->overflow == Overflow::Hidden) {
-              style += ";overflow:hidden";
-              // Vertical-mode Overflow::Hidden: tgfx drops whole columns whose left edge
-              // underflows the box. Chromium's overflow:hidden is a pixel clip and would
-              // still paint the first partial column at x=[0, partialWidth]. Shrink the
-              // inner content div to the union of rendered spans' textBounds widths and
-              // shift it right so vertical-rl text still starts at the original right edge.
-              if (tb->writingMode == WritingMode::Vertical) {
-                float renderedWidth = 0;
-                for (const auto& s : tbSpans) {
-                  float w = s.text ? s.text->layoutBoundsWidth() : 0;
-                  if (w > renderedWidth) {
-                    renderedWidth = w;
-                  }
-                }
-                if (renderedWidth > 0 && renderedWidth < tbW - 0.5f) {
-                  // Override the earlier width/left declarations; CSS later-wins when the
-                  // same property is re-declared in the same inline style attribute.
-                  style += ";width:" + CssFloatToString(renderedWidth) + "px";
-                  style += ";left:" + CssFloatToString(tbLeft + (tbW - renderedWidth)) + "px";
-                }
-              } else if (lineH > 0 && tbH > 0) {
-                // Horizontal Overflow::Hidden: tgfx drops any line whose bottom extends past
-                // the box; Chromium's overflow:hidden only pixel-clips, leaving the top slice
-                // of the first over-box line visible. Shrink the content div's height to an
-                // integer multiple of line-height so the next line starts exactly at the
-                // bottom edge and is clipped in full, matching tgfx's whole-line drop.
-                int fit = static_cast<int>(tbH / lineH + 0.0001f);
-                if (fit >= 1) {
-                  float clipH = static_cast<float>(fit) * lineH;
-                  if (clipH < tbH - 0.5f) {
-                    style += ";height:" + CssFloatToString(clipH) + "px";
-                  }
-                }
-              }
-            }
-            // Detect RTL paragraph direction from the first span's text so text aligns right
-            // within the box, matching tgfx's bidi-resolved layout (paragraphRTL=true).
-            if (!tbSpans.empty() && !tbSpans[0].text->text.empty()) {
-              if (TextStartsWithRTL(tbSpans[0].text->text)) {
-                style += ";direction:rtl";
-              }
-            }
-            out.openTag("div");
-            out.addAttr("style", style);
-            out.closeTagStart();
-            bool needsInnerWrap = tb->paragraphAlign != ParagraphAlign::Near;
-            if (needsInnerWrap) {
-              out.openTag("div");
-              out.closeTagStart();
-            }
-            // Track the previous span's trailing newline count and font-size so we can wrap
-            // empty-line `<br>`s in the previous span's font-size when the next span has its
-            // own font-size. PAGX uses the fontLineHeight of the `\n` glyph that started the
-            // empty line; CSS `<br>` inherits its parent's font-size, so a bare `<br>` between
-            // two spans of different sizes would inherit the container's strut and produce a
-            // line-box too short for what tgfx renders.
-            size_t prevTrailingBreaks = 0;
-            float prevFontSize = 0;
-            bool isFirstSpan = true;
-            for (auto& span : tbSpans) {
-              std::string spanStyle;
-              // When the span's text contains U+0009 (TAB) honour it by setting
-              // `white-space:pre-wrap` and an explicit `tab-size`. Applied at the span
-              // level (not the container) so pretty-printed indentation/newlines between
-              // container div and span tags are still collapsed normally; only the
-              // characters inside the span see pre-wrap. tgfx's tab stop is
-              // `effectiveFontSize * 4` (see TextLayout.cpp CreateTabGlyph).
-              if (span.text && span.text->text.find('\t') != std::string::npos) {
-                float spanSize = span.text->renderFontSize();
-                spanStyle += "white-space:pre-wrap";
-                if (spanSize > 0) {
-                  spanStyle += ";tab-size:" + CssFloatToString(spanSize * 4) + "px";
-                }
-              }
-              bool spanFontHoisted = !_ctx->fontHoistSignature.fontFamily.empty() ||
-                                     _ctx->fontHoistSignature.renderFontSize > 0;
-              if (!spanFontHoisted) {
-                if (!span.text->fontFamily.empty()) {
-                  if (!spanStyle.empty()) spanStyle += ';';
-                  spanStyle += "font-family:'" + EscapeCssFontFamily(span.text->fontFamily) + "'";
-                }
-                if (!spanStyle.empty()) spanStyle += ';';
-                spanStyle += "font-size:" + CssFloatToString(span.text->renderFontSize()) + "px";
-                if (!span.text->fontStyle.empty()) {
-                  if (span.text->fontStyle.find("Bold") != std::string::npos) {
-                    spanStyle += ";font-weight:bold;font-synthesis-weight:" +
-                                 std::string(_ctx->fontSynthesisWeight ? "auto" : "none");
-                  }
-                  if (span.text->fontStyle.find("Italic") != std::string::npos) {
-                    spanStyle += ";font-style:italic;font-synthesis-style:" +
-                                 std::string(_ctx->fontSynthesisStyle ? "auto" : "none");
-                  }
-                }
-                if (span.text->letterSpacing != 0.0f) {
-                  spanStyle +=
-                      ";letter-spacing:" + CssFloatToString(span.text->letterSpacing) + "px";
-                }
-              }
-              if (span.fill && span.fill->color) {
-                auto ct = span.fill->color->nodeType();
-                if (ct == NodeType::SolidColor) {
-                  auto sc = static_cast<const SolidColor*>(span.fill->color);
-                  if (!spanStyle.empty()) spanStyle += ';';
-                  spanStyle += "color:" + ColorToRGBA(sc->color, span.fill->alpha);
-                } else {
-                  float ca = 1.0f;
-                  std::string css = colorToCSS(span.fill->color, &ca);
-                  if (!css.empty()) {
-                    if (!spanStyle.empty()) spanStyle += ';';
-                    spanStyle += "background:" + css;
-                    spanStyle += ";-webkit-background-clip:text;background-clip:text";
-                    spanStyle += ";-webkit-text-fill-color:transparent";
-                  }
-                }
-              }
-              if (span.text->fauxBold) {
-                if (!spanStyle.empty()) spanStyle += ';';
-                spanStyle += "font-weight:bold;font-synthesis-weight:" +
-                             std::string(_ctx->fontSynthesisWeight ? "auto" : "none");
-              }
-              if (span.stroke && span.stroke->color &&
-                  span.stroke->color->nodeType() == NodeType::SolidColor) {
-                auto sc = static_cast<const SolidColor*>(span.stroke->color);
-                bool hasFill = span.fill && span.fill->color;
-                auto strokeCss =
-                    ResolveTextStrokeCss(span.stroke->width, span.stroke->align, hasFill);
-                if (strokeCss.width > 0.0f) {
-                  if (!spanStyle.empty()) spanStyle += ';';
-                  spanStyle += "-webkit-text-stroke:" + CssFloatToString(strokeCss.width) + "px " +
-                               ColorToRGBA(sc->color, span.stroke->alpha);
-                  if (strokeCss.paintOrderStrokeFill) {
-                    spanStyle += ";paint-order:stroke fill";
-                  }
-                }
-              }
-              if (span.text->fauxItalic) {
-                if (!spanStyle.empty()) spanStyle += ';';
-                spanStyle += "font-style:italic;font-synthesis-style:" +
-                             std::string(_ctx->fontSynthesisStyle ? "auto" : "none");
-              }
-              // For TextBoxes with an explicit lineHeight, force-pin the inline-axis size of
-              // any span whose font-size's natural line-height exceeds the container's
-              // declared lineHeight. Without this Chromium expands the line box to the span's
-              // natural metrics (line-height is treated as a minimum), pushing subsequent
-              // lines below where tgfx — which strictly honours the declared lineHeight per
-              // line — places them. Pin the inline-block's height to lineHeight so the line
-              // box doesn't expand; glyphs taller than the box overflow visibly (the default
-              // for inline-block) and we use vertical-align:top to keep the inline-block top
-              // aligned with the line box top, matching tgfx's per-line top-of-line baseline.
-              float spanFontSize = span.text->renderFontSize();
-              if (tb->lineHeight > 0 && spanFontSize > 0 &&
-                  spanFontSize * CHROMIUM_NORMAL_LINE_HEIGHT_RATIO > tb->lineHeight + 0.5f) {
-                spanStyle += ";display:inline-block;height:" + CssFloatToString(tb->lineHeight) +
-                             "px;line-height:" + CssFloatToString(tb->lineHeight) +
-                             "px;vertical-align:top";
-              }
-              // Emit between-span <br>s: prevTrailingBreaks (from prior span's trailing \n)
-              // plus countLeadingBreaks(current span's text). The first <br> ends the prior
-              // span's content line and inherits its strut naturally; each subsequent <br>
-              // is an empty line whose strut comes from the corresponding `\n` owner. PAGX
-              // assigns ownership: \n_1..\n_{prevTrailingBreaks} → previous span; \n_{...} on
-              // → current span. Wrap empty-line `<br>`s in the owner's font-size so the line
-              // box matches what tgfx computed, instead of inheriting the container strut.
-              //
-              // Special case: the leading \n at the very start of the TextBox (first span's
-              // first leading break) has no preceding glyph in tgfx, so its
-              // pendingNewlineFontLineHeight is 0 and FinishLine assigns maxLineHeight=0 to
-              // that empty line. Wrap it in a zero-height span so Chromium doesn't allocate a
-              // full container line-height for what tgfx draws as a zero-height empty line
-              // (e.g. text "\nLine2\n\nLine4" should hug the box top in HTML the way it does
-              // in PAGX native).
-              size_t leadingBreaks = HTMLBuilder::countLeadingBreaks(span.text->text);
-              size_t totalBreaks = prevTrailingBreaks + leadingBreaks;
-              for (size_t bi = 0; bi < totalBreaks; ++bi) {
-                if (bi == 0 && isFirstSpan && prevTrailingBreaks == 0) {
-                  // Leading \n at TextBox start: tgfx gives this empty line height 0 (its
-                  // pendingNewlineFontLineHeight is 0 because no glyph precedes it). Emit
-                  // nothing so Chromium starts the first content line at the box top, just
-                  // like PAGX native — wrapping the <br> in any element still leaves the
-                  // forced break consuming a full line-height in Chromium's inline formatting
-                  // context.
-                } else if (bi == 0) {
-                  // First <br> closes the previous span's last line — its line box is already
-                  // sized by the prior span's content, so a bare <br> is sufficient.
-                  out.emitBreaks(1);
-                } else {
-                  // Empty-line <br>. \n_bi (1-indexed) owner: bi <= prevTrailingBreaks → prev,
-                  // else current span.
-                  float ownerFontSize = (bi <= prevTrailingBreaks) ? prevFontSize : spanFontSize;
-                  if (ownerFontSize > 0) {
-                    out.emitRaw("<span style=\"font-size:" + CssFloatToString(ownerFontSize) +
-                                "px\"><br></span>");
-                  } else {
-                    out.emitBreaks(1);
-                  }
-                }
-              }
-              // Detect single-span horizontal justify-with-\n upfront — when true, we emit
-              // a <div> per \n-segment instead of a single <span>...<br>... so each segment
-              // becomes its own justify paragraph. CSS treats every <br> as a paragraph
-              // terminator for `text-align:justify` purposes, so this rewrite is the only
-              // way to get the line-before-<br> justified the way tgfx does.
-              bool useJustifyParagraphSplit = tb->textAlign == TextAlign::Justify &&
-                                              tb->writingMode != WritingMode::Vertical &&
-                                              tbSpans.size() == 1 && span.text &&
-                                              span.text->text.find('\n') != std::string::npos;
-              if (useJustifyParagraphSplit) {
-                const std::string& src = span.text->text;
-                size_t pos = 0;
-                std::vector<std::string> segments;
-                while (pos <= src.size()) {
-                  size_t nl = src.find('\n', pos);
-                  if (nl == std::string::npos) {
-                    segments.push_back(src.substr(pos));
-                    break;
-                  }
-                  segments.push_back(src.substr(pos, nl - pos));
-                  pos = nl + 1;
-                }
-                for (size_t si = 0; si < segments.size(); ++si) {
-                  bool isLast = (si + 1 == segments.size());
-                  std::string segStyle = spanStyle;
-                  if (!isLast) {
-                    if (!segStyle.empty()) segStyle += ';';
-                    segStyle += "text-align-last:justify";
-                  }
-                  out.openTag("div");
-                  if (!segStyle.empty()) {
-                    out.addAttr("style", segStyle);
-                  }
-                  out.closeTagWithText(RewriteLineBreakHints(segments[si]));
-                }
-                prevTrailingBreaks = HTMLBuilder::countTrailingBreaks(span.text->text);
-                prevFontSize = spanFontSize;
-                isFirstSpan = false;
-                continue;
-              }
-              out.openTag("span");
-              out.addAttr("style", spanStyle);
-              // For vertical-writing-mode TextBoxes with textAlign=justify (or an explicit
-              // lineHeight that exceeds the glyph's natural advance), emit per-CJK-character
-              // wrappers so each CJK glyph's inline-axis advance is pinned to the value tgfx
-              // computed (including justifyGap). CSS `text-align:justify` in vertical-rl does
-              // not insert inter-CJK gaps (only inter-word), so we have to wrap the glyphs
-              // ourselves to reproduce tgfx's justify distribution on mixed CJK/Latin runs.
-              bool usedPerCharDom = false;
-              if (tb->writingMode == WritingMode::Vertical && tb->textAlign == TextAlign::Justify) {
-                std::string justifiedContent = buildVerticalJustifyContent(span.text, tb->height);
-                if (!justifiedContent.empty()) {
-                  out.closeTagWithRawContent(justifiedContent);
-                  usedPerCharDom = true;
-                }
-              }
-              if (!usedPerCharDom) {
-                // Use closeTagWithTextBreaks so U+000A (from &#10;) inside the inner content
-                // renders as <br> rather than being folded into a space by the browser's
-                // default white-space handling. Leading/trailing <br>s are hoisted outside
-                // the span by HTMLWriterLayer (above) so they can be wrapped in the
-                // appropriate empty-line owner font-size.
-                //
-                // For vertical TextBoxes (non-justify path) inject <br> at every column
-                // break tgfx computed — Chromium otherwise uses its own line-breaker which
-                // doesn't know about PAGX's UAX-14 punctuation-squash rules and would split
-                // tokens like 「世界」 across columns where tgfx kept them together.
-                std::string spanText = (tb->writingMode == WritingMode::Vertical)
-                                           ? rewriteVerticalColumnBreaks(span.text)
-                                           : span.text->text;
-                out.closeTagWithTextBreaks(RewriteLineBreakHints(spanText));
-              }
-              prevTrailingBreaks = HTMLBuilder::countTrailingBreaks(span.text->text);
-              prevFontSize = spanFontSize;
-              isFirstSpan = false;
-            }
-            // Flush any trailing breaks left over from the last span. These are dangling
-            // empty lines after the final visible content; emit them so the box's reported
-            // ink height matches PAGX (relevant for boxes that auto-measure cross-axis).
-            for (size_t bi = 0; bi < prevTrailingBreaks; ++bi) {
-              if (bi == 0) {
-                out.emitBreaks(1);
-              } else if (prevFontSize > 0) {
-                out.emitRaw("<span style=\"font-size:" + CssFloatToString(prevFontSize) +
-                            "px\"><br></span>");
-              } else {
-                out.emitBreaks(1);
-              }
-            }
-            if (needsInnerWrap) {
-              out.closeTag();
-            }
-            out.closeTag();
-          }
+          renderTextBoxWithSpans(out, curTextBox);
         } else if (useRichText && !richTextSpans.empty()) {
-          auto tb = curTextBox;
-          auto tbPos = tb->renderPosition();
-          std::string style = "position:absolute;left:" + CssFloatToString(tbPos.x) +
-                              "px;top:" + CssFloatToString(tbPos.y) + "px";
-          if (!std::isnan(tb->width)) {
-            style += ";width:" + CssFloatToString(tb->width) + "px";
-          }
-          if (!std::isnan(tb->height)) {
-            style += ";height:" + CssFloatToString(tb->height) + "px";
-          }
-          // Match the tbSpans branch above: emit TextBox padding so Chromium wraps at
-          // the same inner content rect tgfx used during layout.
-          if (!tb->padding.isZero()) {
-            style += ";padding:" + PaddingToCSS(tb->padding);
-            style += ";box-sizing:border-box";
-          }
-          if (tb->paragraphAlign != ParagraphAlign::Near) {
-            style += ";display:flex;flex-direction:column";
-            if (tb->paragraphAlign == ParagraphAlign::Middle) {
-              style += ";justify-content:center";
-            } else if (tb->paragraphAlign == ParagraphAlign::Far) {
-              style += ";justify-content:flex-end";
-            }
-          }
-          if (tb->textAlign == TextAlign::Center) {
-            style += ";text-align:center";
-          } else if (tb->textAlign == TextAlign::End) {
-            style += ";text-align:end";
-          } else if (tb->textAlign == TextAlign::Justify) {
-            style += ";text-align:justify;text-align-last:left";
-          }
-          if (tb->wordWrap) {
-            style += ";word-wrap:break-word";
-          }
-          // Defer Overflow::Hidden until after line-height is known so we can apply
-          // `-webkit-line-clamp` (matching tgfx's whole-line drop) whenever eligible.
-          // Pin line-height for the same reason as the tbSpans branch above: without it
-          // Chromium falls back to `line-height:normal`, which depends on font OS/2 metrics
-          // and may differ from tgfx's per-line height, shifting line count and baselines.
-          // Skip the container line-height for mixed-size rich text (same logic as tbSpans).
-          float rtLineH = tb->lineHeight > 0 ? tb->lineHeight : 0.0f;
-          if (rtLineH <= 0) {
-            float rtMinFlh = 1e9f;
-            float rtMaxFlh = 0.0f;
-            for (const auto& s : richTextSpans) {
-              float flh = s.text->fontLineHeight();
-              if (flh > rtMaxFlh) rtMaxFlh = flh;
-              if (flh < rtMinFlh) rtMinFlh = flh;
-            }
-            if (rtMaxFlh > 0 && rtMaxFlh - rtMinFlh < 0.5f) {
-              rtLineH = rtMaxFlh;
-            }
-          }
-          if (rtLineH > 0) {
-            style += ";line-height:" + CssFloatToString(rtLineH) + "px";
-          }
-          if (tb->overflow == Overflow::Hidden) {
-            style += ";overflow:hidden";
-            // Match tbSpans branch above: horizontal Overflow::Hidden needs the content div's
-            // height clipped to an integer multiple of line-height so the first over-box line
-            // is dropped entirely (tgfx drops whole lines; Chromium otherwise pixel-clips,
-            // leaving the top slice of the next line visible).
-            if (tb->writingMode != WritingMode::Vertical && rtLineH > 0 &&
-                !std::isnan(tb->height) && tb->height > 0) {
-              int fit = static_cast<int>(tb->height / rtLineH + 0.0001f);
-              if (fit >= 1) {
-                float clipH = static_cast<float>(fit) * rtLineH;
-                if (clipH < tb->height - 0.5f) {
-                  style += ";height:" + CssFloatToString(clipH) + "px";
-                }
-              }
-            }
-          }
-          out.openTag("div");
-          out.addAttr("style", style);
-          out.closeTagStart();
-          bool needsInnerWrap = tb->paragraphAlign != ParagraphAlign::Near;
-          if (needsInnerWrap) {
-            out.openTag("div");
-            out.closeTagStart();
-          }
-          // Same between-span <br> handling as the tbSpans branch above: empty-line <br>s
-          // (those that aren't terminating the prior span's content line) need to inherit
-          // the fontLineHeight of the `\n` that produced them, not the container strut.
-          size_t rtPrevTrailingBreaks = 0;
-          float rtPrevFontSize = 0;
-          for (auto& span : richTextSpans) {
-            std::string spanStyle = tb->wordWrap ? "" : "white-space:nowrap";
-            // Honour U+0009 TAB when present (see tbSpans branch for rationale).
-            if (span.text && span.text->text.find('\t') != std::string::npos) {
-              float spanSize = span.text->renderFontSize();
-              if (!spanStyle.empty()) spanStyle += ';';
-              spanStyle += "white-space:pre-wrap";
-              if (spanSize > 0) {
-                spanStyle += ";tab-size:" + CssFloatToString(spanSize * 4) + "px";
-              }
-            }
-            bool spanFontHoisted = !_ctx->fontHoistSignature.fontFamily.empty() ||
-                                   _ctx->fontHoistSignature.renderFontSize > 0;
-            if (!spanFontHoisted) {
-              if (!span.text->fontFamily.empty()) {
-                spanStyle += ";font-family:'" + EscapeCssFontFamily(span.text->fontFamily) + "'";
-              }
-              spanStyle += ";font-size:" + CssFloatToString(span.text->renderFontSize()) + "px";
-              if (!span.text->fontStyle.empty()) {
-                if (span.text->fontStyle.find("Bold") != std::string::npos) {
-                  spanStyle += ";font-weight:bold;font-synthesis-weight:" +
-                               std::string(_ctx->fontSynthesisWeight ? "auto" : "none");
-                }
-                if (span.text->fontStyle.find("Italic") != std::string::npos) {
-                  spanStyle += ";font-style:italic;font-synthesis-style:" +
-                               std::string(_ctx->fontSynthesisStyle ? "auto" : "none");
-                }
-              }
-              if (span.text->letterSpacing != 0.0f) {
-                spanStyle += ";letter-spacing:" + CssFloatToString(span.text->letterSpacing) + "px";
-              }
-            }
-            if (span.fill && span.fill->color) {
-              auto ct = span.fill->color->nodeType();
-              if (ct == NodeType::SolidColor) {
-                auto sc = static_cast<const SolidColor*>(span.fill->color);
-                spanStyle += ";color:" + ColorToRGBA(sc->color, span.fill->alpha);
-              } else {
-                float ca = 1.0f;
-                std::string css = colorToCSS(span.fill->color, &ca);
-                if (!css.empty()) {
-                  spanStyle += ";background:" + css;
-                  spanStyle += ";-webkit-background-clip:text;background-clip:text";
-                  spanStyle += ";-webkit-text-fill-color:transparent";
-                }
-              }
-            }
-            if (span.text->fauxBold) {
-              spanStyle += ";font-weight:bold;font-synthesis-weight:" +
-                           std::string(_ctx->fontSynthesisWeight ? "auto" : "none");
-            }
-            if (span.stroke && span.stroke->color &&
-                span.stroke->color->nodeType() == NodeType::SolidColor) {
-              auto sc = static_cast<const SolidColor*>(span.stroke->color);
-              bool hasFill = span.fill && span.fill->color;
-              auto strokeCss =
-                  ResolveTextStrokeCss(span.stroke->width, span.stroke->align, hasFill);
-              if (strokeCss.width > 0.0f) {
-                spanStyle += ";-webkit-text-stroke:" + CssFloatToString(strokeCss.width) + "px " +
-                             ColorToRGBA(sc->color, span.stroke->alpha);
-                if (strokeCss.paintOrderStrokeFill) {
-                  spanStyle += ";paint-order:stroke fill";
-                }
-              }
-            }
-            if (span.text->fauxItalic) {
-              spanStyle += ";font-style:italic;font-synthesis-style:" +
-                           std::string(_ctx->fontSynthesisStyle ? "auto" : "none");
-            }
-            // Force-pin inline-axis size when a span's natural line-height exceeds the
-            // container's declared lineHeight; otherwise Chromium expands the line box.
-            float rtSpanFontSize = span.text->renderFontSize();
-            if (tb->lineHeight > 0 && rtSpanFontSize > 0 &&
-                rtSpanFontSize * CHROMIUM_NORMAL_LINE_HEIGHT_RATIO > tb->lineHeight + 0.5f) {
-              spanStyle += ";display:inline-block;height:" + CssFloatToString(tb->lineHeight) +
-                           "px;line-height:" + CssFloatToString(tb->lineHeight) +
-                           "px;vertical-align:top";
-            }
-            // Emit between-span <br>s with empty-line owner wrapping (see tbSpans branch).
-            size_t rtLeadingBreaks = HTMLBuilder::countLeadingBreaks(span.text->text);
-            size_t rtTotalBreaks = rtPrevTrailingBreaks + rtLeadingBreaks;
-            for (size_t bi = 0; bi < rtTotalBreaks; ++bi) {
-              if (bi == 0) {
-                out.emitBreaks(1);
-              } else {
-                float ownerFontSize =
-                    (bi <= rtPrevTrailingBreaks) ? rtPrevFontSize : rtSpanFontSize;
-                if (ownerFontSize > 0) {
-                  out.emitRaw("<span style=\"font-size:" + CssFloatToString(ownerFontSize) +
-                              "px\"><br></span>");
-                } else {
-                  out.emitBreaks(1);
-                }
-              }
-            }
-            out.openTag("span");
-            out.addAttr("style", spanStyle);
-            // Use closeTagWithTextBreaks so U+000A (from &#10;) inside the inner content
-            // renders as <br>; trailing breaks are handled by the next iteration via the
-            // between-span emission loop above.
-            //
-            // For vertical TextBoxes inject <br> at every column break tgfx computed (same
-            // rationale as the tbSpans path above).
-            std::string rtSpanText = (tb->writingMode == WritingMode::Vertical)
-                                         ? rewriteVerticalColumnBreaks(span.text)
-                                         : span.text->text;
-            out.closeTagWithTextBreaks(RewriteLineBreakHints(rtSpanText));
-            rtPrevTrailingBreaks = HTMLBuilder::countTrailingBreaks(span.text->text);
-            rtPrevFontSize = rtSpanFontSize;
-          }
-          // Flush remaining trailing breaks from the last rich-text span.
-          for (size_t bi = 0; bi < rtPrevTrailingBreaks; ++bi) {
-            if (bi == 0) {
-              out.emitBreaks(1);
-            } else if (rtPrevFontSize > 0) {
-              out.emitRaw("<span style=\"font-size:" + CssFloatToString(rtPrevFontSize) +
-                          "px\"><br></span>");
-            } else {
-              out.emitBreaks(1);
-            }
-          }
-          if (needsInnerWrap) {
-            out.closeTag();
-          }
-          out.closeTag();
+          renderTextBoxAsRichText(out, curTextBox, richTextSpans);
         }
         break;
       }
@@ -1438,6 +745,695 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         break;
     }
   }
+}
+
+void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
+  // TextBox with child elements: render as a positioned container with text styling.
+  auto tbBounds = tb->layoutBounds();
+  auto tbPos = tb->renderPosition();
+  // TextBox::layoutWidth is NaN when the width is derived purely from tgfx's own text
+  // measurement (no explicit width, no constraint-resolved width). Emitting that
+  // tgfx-measured pixel value as a CSS fixed width causes Chromium to wrap text when
+  // its font metrics are slightly wider than tgfx's — even for a single-line label like
+  // "Group Layout". Use `width:max-content` so Chromium sizes the box to its own
+  // measurement and never wraps at the container boundary.
+  // When layoutWidth is set (constraint/explicit/percentage-resolved), use its px value
+  // so that intentional multi-line word-wrap boxes respect their authored width.
+  bool layoutW = !tb->isWidthAutoSized();
+  bool layoutH = !tb->isHeightAutoSized();
+  float tbW = tbBounds.width;
+  float tbH = tbBounds.height;
+  float tbLeft = tbPos.x;
+  float tbTop = tbPos.y;
+  std::string style = "position:absolute;left:" + CssFloatToString(tbLeft) +
+                      "px;top:" + CssFloatToString(tbTop) + "px";
+  if (layoutW && tbW > 0) {
+    style += ";width:" + CssFloatToString(tbW) + "px";
+  } else if (!layoutW) {
+    // For vertical writing-mode TextBoxes, tgfx has already measured the exact column
+    // width needed; use that fixed value so Chromium produces the same column layout.
+    // For horizontal auto-sized boxes, keep max-content so Chromium's slightly wider
+    // font metrics don't trigger an unwanted line break at the tgfx boundary.
+    if (tb->writingMode == WritingMode::Vertical && tbW > 0) {
+      style += ";width:" + CssFloatToString(tbW) + "px";
+    } else {
+      style += ";width:max-content";
+    }
+  }
+  if (layoutH && tbH > 0) {
+    style += ";height:" + CssFloatToString(tbH) + "px";
+  }
+  // PAGX `<TextBox padding="...">` insets the text content from the box edges:
+  // tgfx subtracts padding from layoutWidth/Height before line breaking, so the
+  // wrapped lines obey the inner content rectangle. Emit the same inset in CSS
+  // via `padding:...; box-sizing:border-box` so Chromium wraps at the same
+  // inner width — without this, layoutWidth=200 leaks the full 200 to the line
+  // breaker and we get one fewer line wrap than PAGX (visible in
+  // layout/padding_unified where the HTML squeezes "The text" onto line 1).
+  if (!tb->padding.isZero()) {
+    style += ";padding:" + PaddingToCSS(tb->padding);
+    style += ";box-sizing:border-box";
+  }
+  if (tb->textAlign == TextAlign::Center) {
+    style += ";text-align:center";
+  } else if (tb->textAlign == TextAlign::End) {
+    style += ";text-align:end";
+  } else if (tb->textAlign == TextAlign::Justify) {
+    // text-align-last:left aligns the final paragraph line (after the last <br> or at end
+    // of content) to the start, matching tgfx where the last line is not justified.
+    style += ";text-align:justify;text-align-last:left";
+  }
+  // Anchor mode: TextBox authored with width="0" / height="0" (explicit zero, not NaN)
+  // uses the TextBox's origin as a single anchor point and relies on textAlign /
+  // paragraphAlign to place the text relative to that point. tgfx collapses the box to
+  // zero size and lets each line flow past the anchor. CSS `text-align` alone can't
+  // reproduce the horizontal case because our emitted container has `width:max-content`
+  // (hugging the glyph run); `display:flex; justify-content:center/flex-end` alone can't
+  // reproduce the vertical case because the box height is also `max-content`. Shift the
+  // entire box with `transform:translate(-X%, -Y%)` so the anchor lands on the correct
+  // glyph edge — -50% for Center/Middle, -100% for End/Far.
+  bool widthAnchor =
+      !tb->isWidthAutoSized() && tb->width == 0.0f && tb->textAlign != TextAlign::Start;
+  bool heightAnchor =
+      !tb->isHeightAutoSized() && tb->height == 0.0f && tb->paragraphAlign != ParagraphAlign::Near;
+  if (widthAnchor || heightAnchor) {
+    std::string tx = "0";
+    std::string ty = "0";
+    if (widthAnchor) {
+      tx = (tb->textAlign == TextAlign::Center) ? "-50%" : "-100%";
+    }
+    if (heightAnchor) {
+      ty = (tb->paragraphAlign == ParagraphAlign::Middle) ? "-50%" : "-100%";
+    }
+    style += ";transform:translate(" + tx + "," + ty + ")";
+  }
+  if (tb->paragraphAlign != ParagraphAlign::Near) {
+    style += ";display:flex;flex-direction:column";
+    if (tb->paragraphAlign == ParagraphAlign::Middle) {
+      style += ";justify-content:center";
+    } else if (tb->paragraphAlign == ParagraphAlign::Far) {
+      style += ";justify-content:flex-end";
+    }
+  }
+  if (tb->writingMode == WritingMode::Vertical) {
+    style += ";writing-mode:vertical-rl";
+  }
+  // Only enable word-wrap when the box has an explicit width that was authored
+  // to contain multi-line text. When the width comes from tgfx's own content
+  // measurement (no explicit width), Chromium's slightly wider font metrics would
+  // immediately overflow that measured width and trigger an unwanted line break.
+  // Vertical writing-mode boxes rely on the box height to trigger column breaks;
+  // white-space:nowrap would suppress column wrapping entirely, so skip it.
+  //
+  // Note: container-level `white-space:pre-wrap` is avoided because pretty-printed
+  // HTML puts indentation and newlines between the container <div> and its inner
+  // <span> tags; `pre-wrap` on the container would render those as leading blank
+  // lines. TAB handling is applied per-span instead (see spanStyle below).
+  if (tb->wordWrap && layoutW && tbW > 0) {
+    style += ";word-wrap:break-word";
+  } else if (tb->writingMode != WritingMode::Vertical) {
+    style += ";white-space:nowrap";
+  }
+  // Defer the Overflow::Hidden emit until after tbSpans is collected: when the
+  // TextBox has a known height and line-height we can translate tgfx's whole-line
+  // drop semantics into CSS `-webkit-line-clamp`, which matches tgfx much more
+  // closely than a raw `overflow:hidden` pixel clip (which otherwise renders a
+  // partial line whose glyphs tgfx would have dropped entirely).
+  std::vector<TBSpan> tbSpans;
+  const Fill* topFill = nullptr;
+  const Stroke* topStroke = nullptr;
+  for (auto* childElem : tb->elements) {
+    if (childElem->nodeType() == NodeType::Fill) {
+      auto fill = static_cast<const Fill*>(childElem);
+      topFill = fill;
+      for (auto& s : tbSpans) {
+        if (!s.fill) {
+          s.fill = fill;
+        }
+      }
+    } else if (childElem->nodeType() == NodeType::Stroke) {
+      auto stroke = static_cast<const Stroke*>(childElem);
+      topStroke = stroke;
+      for (auto& s : tbSpans) {
+        if (!s.stroke) {
+          s.stroke = stroke;
+        }
+      }
+    } else if (childElem->nodeType() == NodeType::Text) {
+      tbSpans.push_back({static_cast<const Text*>(childElem), topFill, topStroke});
+    } else if (childElem->nodeType() == NodeType::Group) {
+      GroupSpanCollector::Collect(static_cast<const Group*>(childElem), topFill, topStroke,
+                                  tbSpans);
+    }
+  }
+  if (!tbSpans.empty()) {
+    // Pin font-size on the container so Chromium's line-box strut uses this value
+    // instead of the inherited ancestor default (typically 16px body), which would
+    // otherwise inflate each line-box above the declared `line-height` and push every
+    // text line further down than tgfx renders it. Use the smallest span font-size so
+    // the strut contribution never exceeds what any child span would produce on its own.
+    float strutSize = tbSpans[0].text->renderFontSize();
+    for (const auto& s : tbSpans) {
+      float fs = s.text->renderFontSize();
+      if (fs > 0 && fs < strutSize) {
+        strutSize = fs;
+      }
+    }
+    if (strutSize > 0) {
+      style += ";font-size:" + CssFloatToString(strutSize) + "px";
+    }
+    // Pin line-height too. When PAGX declares a TextBox lineHeight we honour it;
+    // otherwise fall back to the largest per-glyph fontLineHeight from tgfx's shaping
+    // result (|ascent| + descent + leading). Without an explicit line-height Chromium
+    // uses `line-height:normal`, which resolves to ~1.2em-1.5em depending on the font's
+    // OS/2 metrics and may exceed what tgfx's TextLayout uses per line, spilling the
+    // last line out of an `overflow:hidden` TextBox or shifting baseline positions.
+    // Exception: when spans have different font sizes (mixed-size rich text), a single
+    // container-level line-height would use the largest span's value and inflate spacing
+    // for smaller spans. In that case skip the container line-height and let each span's
+    // own font-size control its line-box height naturally.
+    float lineH = tb->lineHeight > 0 ? tb->lineHeight : 0.0f;
+    if (lineH <= 0) {
+      float minFlh = 1e9f;
+      float maxFlh = 0.0f;
+      for (const auto& s : tbSpans) {
+        float flh = s.text->fontLineHeight();
+        if (flh > maxFlh) maxFlh = flh;
+        if (flh < minFlh) minFlh = flh;
+      }
+      // Only set a container line-height when all spans share the same size, so the
+      // value does not distort smaller spans in mixed-size TextBoxes.
+      if (maxFlh > 0 && maxFlh - minFlh < 0.5f) {
+        lineH = maxFlh;
+      }
+    }
+    if (lineH > 0) {
+      style += ";line-height:" + CssFloatToString(lineH) + "px";
+    }
+    // Translate PAGX Overflow::Hidden with a simple pixel clip. tgfx's TextLayout drops
+    // any line whose bottom extends past the box. A max-height based on tgfx's line count
+    // would differ from CSS when Chromium wraps lines differently; using only overflow:hidden
+    // clips at the declared box boundary and matches tgfx when line counts agree, and
+    // gracefully clips at the box edge when they diverge.
+    if (tb->overflow == Overflow::Hidden) {
+      style += ";overflow:hidden";
+      // Vertical-mode Overflow::Hidden: tgfx drops whole columns whose left edge
+      // underflows the box. Chromium's overflow:hidden is a pixel clip and would
+      // still paint the first partial column at x=[0, partialWidth]. Shrink the
+      // inner content div to the union of rendered spans' textBounds widths and
+      // shift it right so vertical-rl text still starts at the original right edge.
+      if (tb->writingMode == WritingMode::Vertical) {
+        float renderedWidth = 0;
+        for (const auto& s : tbSpans) {
+          float w = s.text ? s.text->layoutBoundsWidth() : 0;
+          if (w > renderedWidth) {
+            renderedWidth = w;
+          }
+        }
+        if (renderedWidth > 0 && renderedWidth < tbW - 0.5f) {
+          // Override the earlier width/left declarations; CSS later-wins when the
+          // same property is re-declared in the same inline style attribute.
+          style += ";width:" + CssFloatToString(renderedWidth) + "px";
+          style += ";left:" + CssFloatToString(tbLeft + (tbW - renderedWidth)) + "px";
+        }
+      } else if (lineH > 0 && tbH > 0) {
+        // Horizontal Overflow::Hidden: tgfx drops any line whose bottom extends past
+        // the box; Chromium's overflow:hidden only pixel-clips, leaving the top slice
+        // of the first over-box line visible. Shrink the content div's height to an
+        // integer multiple of line-height so the next line starts exactly at the
+        // bottom edge and is clipped in full, matching tgfx's whole-line drop.
+        int fit = static_cast<int>(tbH / lineH + 0.0001f);
+        if (fit >= 1) {
+          float clipH = static_cast<float>(fit) * lineH;
+          if (clipH < tbH - 0.5f) {
+            style += ";height:" + CssFloatToString(clipH) + "px";
+          }
+        }
+      }
+    }
+    // Detect RTL paragraph direction from the first span's text so text aligns right
+    // within the box, matching tgfx's bidi-resolved layout (paragraphRTL=true).
+    if (!tbSpans.empty() && !tbSpans[0].text->text.empty()) {
+      if (TextStartsWithRTL(tbSpans[0].text->text)) {
+        style += ";direction:rtl";
+      }
+    }
+    out.openTag("div");
+    out.addAttr("style", style);
+    out.closeTagStart();
+    bool needsInnerWrap = tb->paragraphAlign != ParagraphAlign::Near;
+    if (needsInnerWrap) {
+      out.openTag("div");
+      out.closeTagStart();
+    }
+    // Track the previous span's trailing newline count and font-size so we can wrap
+    // empty-line `<br>`s in the previous span's font-size when the next span has its
+    // own font-size. PAGX uses the fontLineHeight of the `\n` glyph that started the
+    // empty line; CSS `<br>` inherits its parent's font-size, so a bare `<br>` between
+    // two spans of different sizes would inherit the container's strut and produce a
+    // line-box too short for what tgfx renders.
+    size_t prevTrailingBreaks = 0;
+    float prevFontSize = 0;
+    bool isFirstSpan = true;
+    for (auto& span : tbSpans) {
+      std::string spanStyle;
+      // When the span's text contains U+0009 (TAB) honour it by setting
+      // `white-space:pre-wrap` and an explicit `tab-size`. Applied at the span
+      // level (not the container) so pretty-printed indentation/newlines between
+      // container div and span tags are still collapsed normally; only the
+      // characters inside the span see pre-wrap. tgfx's tab stop is
+      // `effectiveFontSize * 4` (see TextLayout.cpp CreateTabGlyph).
+      if (span.text && span.text->text.find('\t') != std::string::npos) {
+        float spanSize = span.text->renderFontSize();
+        spanStyle += "white-space:pre-wrap";
+        if (spanSize > 0) {
+          spanStyle += ";tab-size:" + CssFloatToString(spanSize * 4) + "px";
+        }
+      }
+      bool spanFontHoisted = !_ctx->fontHoistSignature.fontFamily.empty() ||
+                             _ctx->fontHoistSignature.renderFontSize > 0;
+      if (!spanFontHoisted) {
+        if (!span.text->fontFamily.empty()) {
+          if (!spanStyle.empty()) spanStyle += ';';
+          spanStyle += "font-family:'" + EscapeCssFontFamily(span.text->fontFamily) + "'";
+        }
+        if (!spanStyle.empty()) spanStyle += ';';
+        spanStyle += "font-size:" + CssFloatToString(span.text->renderFontSize()) + "px";
+        if (!span.text->fontStyle.empty()) {
+          if (span.text->fontStyle.find("Bold") != std::string::npos) {
+            spanStyle += ";font-weight:bold;font-synthesis-weight:" +
+                         std::string(_ctx->fontSynthesisWeight ? "auto" : "none");
+          }
+          if (span.text->fontStyle.find("Italic") != std::string::npos) {
+            spanStyle += ";font-style:italic;font-synthesis-style:" +
+                         std::string(_ctx->fontSynthesisStyle ? "auto" : "none");
+          }
+        }
+        if (span.text->letterSpacing != 0.0f) {
+          spanStyle += ";letter-spacing:" + CssFloatToString(span.text->letterSpacing) + "px";
+        }
+      }
+      if (span.fill && span.fill->color) {
+        auto ct = span.fill->color->nodeType();
+        if (ct == NodeType::SolidColor) {
+          auto sc = static_cast<const SolidColor*>(span.fill->color);
+          if (!spanStyle.empty()) spanStyle += ';';
+          spanStyle += "color:" + ColorToRGBA(sc->color, span.fill->alpha);
+        } else {
+          float ca = 1.0f;
+          std::string css = colorToCSS(span.fill->color, &ca);
+          if (!css.empty()) {
+            if (!spanStyle.empty()) spanStyle += ';';
+            spanStyle += "background:" + css;
+            spanStyle += ";-webkit-background-clip:text;background-clip:text";
+            spanStyle += ";-webkit-text-fill-color:transparent";
+          }
+        }
+      }
+      if (span.text->fauxBold) {
+        if (!spanStyle.empty()) spanStyle += ';';
+        spanStyle += "font-weight:bold;font-synthesis-weight:" +
+                     std::string(_ctx->fontSynthesisWeight ? "auto" : "none");
+      }
+      if (span.stroke && span.stroke->color &&
+          span.stroke->color->nodeType() == NodeType::SolidColor) {
+        auto sc = static_cast<const SolidColor*>(span.stroke->color);
+        bool hasFill = span.fill && span.fill->color;
+        auto strokeCss = ResolveTextStrokeCss(span.stroke->width, span.stroke->align, hasFill);
+        if (strokeCss.width > 0.0f) {
+          if (!spanStyle.empty()) spanStyle += ';';
+          spanStyle += "-webkit-text-stroke:" + CssFloatToString(strokeCss.width) + "px " +
+                       ColorToRGBA(sc->color, span.stroke->alpha);
+          if (strokeCss.paintOrderStrokeFill) {
+            spanStyle += ";paint-order:stroke fill";
+          }
+        }
+      }
+      if (span.text->fauxItalic) {
+        if (!spanStyle.empty()) spanStyle += ';';
+        spanStyle += "font-style:italic;font-synthesis-style:" +
+                     std::string(_ctx->fontSynthesisStyle ? "auto" : "none");
+      }
+      // For TextBoxes with an explicit lineHeight, force-pin the inline-axis size of
+      // any span whose font-size's natural line-height exceeds the container's
+      // declared lineHeight. Without this Chromium expands the line box to the span's
+      // natural metrics (line-height is treated as a minimum), pushing subsequent
+      // lines below where tgfx — which strictly honours the declared lineHeight per
+      // line — places them. Pin the inline-block's height to lineHeight so the line
+      // box doesn't expand; glyphs taller than the box overflow visibly (the default
+      // for inline-block) and we use vertical-align:top to keep the inline-block top
+      // aligned with the line box top, matching tgfx's per-line top-of-line baseline.
+      float spanFontSize = span.text->renderFontSize();
+      if (tb->lineHeight > 0 && spanFontSize > 0 &&
+          spanFontSize * CHROMIUM_NORMAL_LINE_HEIGHT_RATIO > tb->lineHeight + 0.5f) {
+        spanStyle += ";display:inline-block;height:" + CssFloatToString(tb->lineHeight) +
+                     "px;line-height:" + CssFloatToString(tb->lineHeight) + "px;vertical-align:top";
+      }
+      // Emit between-span <br>s: prevTrailingBreaks (from prior span's trailing \n)
+      // plus countLeadingBreaks(current span's text). The first <br> ends the prior
+      // span's content line and inherits its strut naturally; each subsequent <br>
+      // is an empty line whose strut comes from the corresponding `\n` owner. PAGX
+      // assigns ownership: \n_1..\n_{prevTrailingBreaks} → previous span; \n_{...} on
+      // → current span. Wrap empty-line `<br>`s in the owner's font-size so the line
+      // box matches what tgfx computed, instead of inheriting the container strut.
+      //
+      // Special case: the leading \n at the very start of the TextBox (first span's
+      // first leading break) has no preceding glyph in tgfx, so its
+      // pendingNewlineFontLineHeight is 0 and FinishLine assigns maxLineHeight=0 to
+      // that empty line. Wrap it in a zero-height span so Chromium doesn't allocate a
+      // full container line-height for what tgfx draws as a zero-height empty line
+      // (e.g. text "\nLine2\n\nLine4" should hug the box top in HTML the way it does
+      // in PAGX native).
+      size_t leadingBreaks = HTMLBuilder::countLeadingBreaks(span.text->text);
+      size_t totalBreaks = prevTrailingBreaks + leadingBreaks;
+      for (size_t bi = 0; bi < totalBreaks; ++bi) {
+        if (bi == 0 && isFirstSpan && prevTrailingBreaks == 0) {
+          // Leading \n at TextBox start: tgfx gives this empty line height 0 (its
+          // pendingNewlineFontLineHeight is 0 because no glyph precedes it). Emit
+          // nothing so Chromium starts the first content line at the box top, just
+          // like PAGX native — wrapping the <br> in any element still leaves the
+          // forced break consuming a full line-height in Chromium's inline formatting
+          // context.
+        } else if (bi == 0) {
+          // First <br> closes the previous span's last line — its line box is already
+          // sized by the prior span's content, so a bare <br> is sufficient.
+          out.emitBreaks(1);
+        } else {
+          // Empty-line <br>. \n_bi (1-indexed) owner: bi <= prevTrailingBreaks → prev,
+          // else current span.
+          float ownerFontSize = (bi <= prevTrailingBreaks) ? prevFontSize : spanFontSize;
+          if (ownerFontSize > 0) {
+            out.emitRaw("<span style=\"font-size:" + CssFloatToString(ownerFontSize) +
+                        "px\"><br></span>");
+          } else {
+            out.emitBreaks(1);
+          }
+        }
+      }
+      // Detect single-span horizontal justify-with-\n upfront — when true, we emit
+      // a <div> per \n-segment instead of a single <span>...<br>... so each segment
+      // becomes its own justify paragraph. CSS treats every <br> as a paragraph
+      // terminator for `text-align:justify` purposes, so this rewrite is the only
+      // way to get the line-before-<br> justified the way tgfx does.
+      bool useJustifyParagraphSplit =
+          tb->textAlign == TextAlign::Justify && tb->writingMode != WritingMode::Vertical &&
+          tbSpans.size() == 1 && span.text && span.text->text.find('\n') != std::string::npos;
+      if (useJustifyParagraphSplit) {
+        const std::string& src = span.text->text;
+        size_t pos = 0;
+        std::vector<std::string> segments;
+        while (pos <= src.size()) {
+          size_t nl = src.find('\n', pos);
+          if (nl == std::string::npos) {
+            segments.push_back(src.substr(pos));
+            break;
+          }
+          segments.push_back(src.substr(pos, nl - pos));
+          pos = nl + 1;
+        }
+        for (size_t si = 0; si < segments.size(); ++si) {
+          bool isLast = (si + 1 == segments.size());
+          std::string segStyle = spanStyle;
+          if (!isLast) {
+            if (!segStyle.empty()) segStyle += ';';
+            segStyle += "text-align-last:justify";
+          }
+          out.openTag("div");
+          if (!segStyle.empty()) {
+            out.addAttr("style", segStyle);
+          }
+          out.closeTagWithText(RewriteLineBreakHints(segments[si]));
+        }
+        prevTrailingBreaks = HTMLBuilder::countTrailingBreaks(span.text->text);
+        prevFontSize = spanFontSize;
+        isFirstSpan = false;
+        continue;
+      }
+      out.openTag("span");
+      out.addAttr("style", spanStyle);
+      // For vertical-writing-mode TextBoxes with textAlign=justify (or an explicit
+      // lineHeight that exceeds the glyph's natural advance), emit per-CJK-character
+      // wrappers so each CJK glyph's inline-axis advance is pinned to the value tgfx
+      // computed (including justifyGap). CSS `text-align:justify` in vertical-rl does
+      // not insert inter-CJK gaps (only inter-word), so we have to wrap the glyphs
+      // ourselves to reproduce tgfx's justify distribution on mixed CJK/Latin runs.
+      bool usedPerCharDom = false;
+      if (tb->writingMode == WritingMode::Vertical && tb->textAlign == TextAlign::Justify) {
+        std::string justifiedContent = buildVerticalJustifyContent(span.text, tb->height);
+        if (!justifiedContent.empty()) {
+          out.closeTagWithRawContent(justifiedContent);
+          usedPerCharDom = true;
+        }
+      }
+      if (!usedPerCharDom) {
+        // Use closeTagWithTextBreaks so U+000A (from &#10;) inside the inner content
+        // renders as <br> rather than being folded into a space by the browser's
+        // default white-space handling. Leading/trailing <br>s are hoisted outside
+        // the span by HTMLWriterLayer (above) so they can be wrapped in the
+        // appropriate empty-line owner font-size.
+        //
+        // For vertical TextBoxes (non-justify path) inject <br> at every column
+        // break tgfx computed — Chromium otherwise uses its own line-breaker which
+        // doesn't know about PAGX's UAX-14 punctuation-squash rules and would split
+        // tokens like 「世界」 across columns where tgfx kept them together.
+        std::string spanText = (tb->writingMode == WritingMode::Vertical)
+                                   ? rewriteVerticalColumnBreaks(span.text)
+                                   : span.text->text;
+        out.closeTagWithTextBreaks(RewriteLineBreakHints(spanText));
+      }
+      prevTrailingBreaks = HTMLBuilder::countTrailingBreaks(span.text->text);
+      prevFontSize = spanFontSize;
+      isFirstSpan = false;
+    }
+    // Flush any trailing breaks left over from the last span. These are dangling
+    // empty lines after the final visible content; emit them so the box's reported
+    // ink height matches PAGX (relevant for boxes that auto-measure cross-axis).
+    for (size_t bi = 0; bi < prevTrailingBreaks; ++bi) {
+      if (bi == 0) {
+        out.emitBreaks(1);
+      } else if (prevFontSize > 0) {
+        out.emitRaw("<span style=\"font-size:" + CssFloatToString(prevFontSize) +
+                    "px\"><br></span>");
+      } else {
+        out.emitBreaks(1);
+      }
+    }
+    if (needsInnerWrap) {
+      out.closeTag();
+    }
+    out.closeTag();
+  }
+}
+
+void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
+                                         const std::vector<RichTextSpan>& richTextSpans) {
+  auto tbPos = tb->renderPosition();
+  std::string style = "position:absolute;left:" + CssFloatToString(tbPos.x) +
+                      "px;top:" + CssFloatToString(tbPos.y) + "px";
+  if (!std::isnan(tb->width)) {
+    style += ";width:" + CssFloatToString(tb->width) + "px";
+  }
+  if (!std::isnan(tb->height)) {
+    style += ";height:" + CssFloatToString(tb->height) + "px";
+  }
+  // Match the tbSpans branch above: emit TextBox padding so Chromium wraps at
+  // the same inner content rect tgfx used during layout.
+  if (!tb->padding.isZero()) {
+    style += ";padding:" + PaddingToCSS(tb->padding);
+    style += ";box-sizing:border-box";
+  }
+  if (tb->paragraphAlign != ParagraphAlign::Near) {
+    style += ";display:flex;flex-direction:column";
+    if (tb->paragraphAlign == ParagraphAlign::Middle) {
+      style += ";justify-content:center";
+    } else if (tb->paragraphAlign == ParagraphAlign::Far) {
+      style += ";justify-content:flex-end";
+    }
+  }
+  if (tb->textAlign == TextAlign::Center) {
+    style += ";text-align:center";
+  } else if (tb->textAlign == TextAlign::End) {
+    style += ";text-align:end";
+  } else if (tb->textAlign == TextAlign::Justify) {
+    style += ";text-align:justify;text-align-last:left";
+  }
+  if (tb->wordWrap) {
+    style += ";word-wrap:break-word";
+  }
+  // Defer Overflow::Hidden until after line-height is known so we can apply
+  // `-webkit-line-clamp` (matching tgfx's whole-line drop) whenever eligible.
+  // Pin line-height for the same reason as the tbSpans branch above: without it
+  // Chromium falls back to `line-height:normal`, which depends on font OS/2 metrics
+  // and may differ from tgfx's per-line height, shifting line count and baselines.
+  // Skip the container line-height for mixed-size rich text (same logic as tbSpans).
+  float rtLineH = tb->lineHeight > 0 ? tb->lineHeight : 0.0f;
+  if (rtLineH <= 0) {
+    float rtMinFlh = 1e9f;
+    float rtMaxFlh = 0.0f;
+    for (const auto& s : richTextSpans) {
+      float flh = s.text->fontLineHeight();
+      if (flh > rtMaxFlh) rtMaxFlh = flh;
+      if (flh < rtMinFlh) rtMinFlh = flh;
+    }
+    if (rtMaxFlh > 0 && rtMaxFlh - rtMinFlh < 0.5f) {
+      rtLineH = rtMaxFlh;
+    }
+  }
+  if (rtLineH > 0) {
+    style += ";line-height:" + CssFloatToString(rtLineH) + "px";
+  }
+  if (tb->overflow == Overflow::Hidden) {
+    style += ";overflow:hidden";
+    // Match tbSpans branch above: horizontal Overflow::Hidden needs the content div's
+    // height clipped to an integer multiple of line-height so the first over-box line
+    // is dropped entirely (tgfx drops whole lines; Chromium otherwise pixel-clips,
+    // leaving the top slice of the next line visible).
+    if (tb->writingMode != WritingMode::Vertical && rtLineH > 0 && !std::isnan(tb->height) &&
+        tb->height > 0) {
+      int fit = static_cast<int>(tb->height / rtLineH + 0.0001f);
+      if (fit >= 1) {
+        float clipH = static_cast<float>(fit) * rtLineH;
+        if (clipH < tb->height - 0.5f) {
+          style += ";height:" + CssFloatToString(clipH) + "px";
+        }
+      }
+    }
+  }
+  out.openTag("div");
+  out.addAttr("style", style);
+  out.closeTagStart();
+  bool needsInnerWrap = tb->paragraphAlign != ParagraphAlign::Near;
+  if (needsInnerWrap) {
+    out.openTag("div");
+    out.closeTagStart();
+  }
+  // Same between-span <br> handling as the tbSpans branch above: empty-line <br>s
+  // (those that aren't terminating the prior span's content line) need to inherit
+  // the fontLineHeight of the `\n` that produced them, not the container strut.
+  size_t rtPrevTrailingBreaks = 0;
+  float rtPrevFontSize = 0;
+  for (auto& span : richTextSpans) {
+    std::string spanStyle = tb->wordWrap ? "" : "white-space:nowrap";
+    // Honour U+0009 TAB when present (see tbSpans branch for rationale).
+    if (span.text && span.text->text.find('\t') != std::string::npos) {
+      float spanSize = span.text->renderFontSize();
+      if (!spanStyle.empty()) spanStyle += ';';
+      spanStyle += "white-space:pre-wrap";
+      if (spanSize > 0) {
+        spanStyle += ";tab-size:" + CssFloatToString(spanSize * 4) + "px";
+      }
+    }
+    bool spanFontHoisted =
+        !_ctx->fontHoistSignature.fontFamily.empty() || _ctx->fontHoistSignature.renderFontSize > 0;
+    if (!spanFontHoisted) {
+      if (!span.text->fontFamily.empty()) {
+        spanStyle += ";font-family:'" + EscapeCssFontFamily(span.text->fontFamily) + "'";
+      }
+      spanStyle += ";font-size:" + CssFloatToString(span.text->renderFontSize()) + "px";
+      if (!span.text->fontStyle.empty()) {
+        if (span.text->fontStyle.find("Bold") != std::string::npos) {
+          spanStyle += ";font-weight:bold;font-synthesis-weight:" +
+                       std::string(_ctx->fontSynthesisWeight ? "auto" : "none");
+        }
+        if (span.text->fontStyle.find("Italic") != std::string::npos) {
+          spanStyle += ";font-style:italic;font-synthesis-style:" +
+                       std::string(_ctx->fontSynthesisStyle ? "auto" : "none");
+        }
+      }
+      if (span.text->letterSpacing != 0.0f) {
+        spanStyle += ";letter-spacing:" + CssFloatToString(span.text->letterSpacing) + "px";
+      }
+    }
+    if (span.fill && span.fill->color) {
+      auto ct = span.fill->color->nodeType();
+      if (ct == NodeType::SolidColor) {
+        auto sc = static_cast<const SolidColor*>(span.fill->color);
+        spanStyle += ";color:" + ColorToRGBA(sc->color, span.fill->alpha);
+      } else {
+        float ca = 1.0f;
+        std::string css = colorToCSS(span.fill->color, &ca);
+        if (!css.empty()) {
+          spanStyle += ";background:" + css;
+          spanStyle += ";-webkit-background-clip:text;background-clip:text";
+          spanStyle += ";-webkit-text-fill-color:transparent";
+        }
+      }
+    }
+    if (span.text->fauxBold) {
+      spanStyle += ";font-weight:bold;font-synthesis-weight:" +
+                   std::string(_ctx->fontSynthesisWeight ? "auto" : "none");
+    }
+    if (span.stroke && span.stroke->color &&
+        span.stroke->color->nodeType() == NodeType::SolidColor) {
+      auto sc = static_cast<const SolidColor*>(span.stroke->color);
+      bool hasFill = span.fill && span.fill->color;
+      auto strokeCss = ResolveTextStrokeCss(span.stroke->width, span.stroke->align, hasFill);
+      if (strokeCss.width > 0.0f) {
+        spanStyle += ";-webkit-text-stroke:" + CssFloatToString(strokeCss.width) + "px " +
+                     ColorToRGBA(sc->color, span.stroke->alpha);
+        if (strokeCss.paintOrderStrokeFill) {
+          spanStyle += ";paint-order:stroke fill";
+        }
+      }
+    }
+    if (span.text->fauxItalic) {
+      spanStyle += ";font-style:italic;font-synthesis-style:" +
+                   std::string(_ctx->fontSynthesisStyle ? "auto" : "none");
+    }
+    // Force-pin inline-axis size when a span's natural line-height exceeds the
+    // container's declared lineHeight; otherwise Chromium expands the line box.
+    float rtSpanFontSize = span.text->renderFontSize();
+    if (tb->lineHeight > 0 && rtSpanFontSize > 0 &&
+        rtSpanFontSize * CHROMIUM_NORMAL_LINE_HEIGHT_RATIO > tb->lineHeight + 0.5f) {
+      spanStyle += ";display:inline-block;height:" + CssFloatToString(tb->lineHeight) +
+                   "px;line-height:" + CssFloatToString(tb->lineHeight) + "px;vertical-align:top";
+    }
+    // Emit between-span <br>s with empty-line owner wrapping (see tbSpans branch).
+    size_t rtLeadingBreaks = HTMLBuilder::countLeadingBreaks(span.text->text);
+    size_t rtTotalBreaks = rtPrevTrailingBreaks + rtLeadingBreaks;
+    for (size_t bi = 0; bi < rtTotalBreaks; ++bi) {
+      if (bi == 0) {
+        out.emitBreaks(1);
+      } else {
+        float ownerFontSize = (bi <= rtPrevTrailingBreaks) ? rtPrevFontSize : rtSpanFontSize;
+        if (ownerFontSize > 0) {
+          out.emitRaw("<span style=\"font-size:" + CssFloatToString(ownerFontSize) +
+                      "px\"><br></span>");
+        } else {
+          out.emitBreaks(1);
+        }
+      }
+    }
+    out.openTag("span");
+    out.addAttr("style", spanStyle);
+    // Use closeTagWithTextBreaks so U+000A (from &#10;) inside the inner content
+    // renders as <br>; trailing breaks are handled by the next iteration via the
+    // between-span emission loop above.
+    //
+    // For vertical TextBoxes inject <br> at every column break tgfx computed (same
+    // rationale as the tbSpans path above).
+    std::string rtSpanText = (tb->writingMode == WritingMode::Vertical)
+                                 ? rewriteVerticalColumnBreaks(span.text)
+                                 : span.text->text;
+    out.closeTagWithTextBreaks(RewriteLineBreakHints(rtSpanText));
+    rtPrevTrailingBreaks = HTMLBuilder::countTrailingBreaks(span.text->text);
+    rtPrevFontSize = rtSpanFontSize;
+  }
+  // Flush remaining trailing breaks from the last rich-text span.
+  for (size_t bi = 0; bi < rtPrevTrailingBreaks; ++bi) {
+    if (bi == 0) {
+      out.emitBreaks(1);
+    } else if (rtPrevFontSize > 0) {
+      out.emitRaw("<span style=\"font-size:" + CssFloatToString(rtPrevFontSize) +
+                  "px\"><br></span>");
+    } else {
+      out.emitBreaks(1);
+    }
+  }
+  if (needsInnerWrap) {
+    out.closeTag();
+  }
+  out.closeTag();
 }
 
 static std::string ClipPathFromContents(const Layer* layer) {

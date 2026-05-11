@@ -278,6 +278,15 @@ class RecursionGuard {
 // HTMLWriter
 //==============================================================================
 
+// A TextBox child whose enclosing Group qualified for rich-text-span treatment: one Text plus
+// at least one Fill or Stroke painter, and nothing else. Defined here (rather than only in the
+// .cpp) so renderTextBoxAsRichText can take it by reference in the header.
+struct RichTextSpan {
+  const Text* text = nullptr;
+  const Fill* fill = nullptr;
+  const Stroke* stroke = nullptr;
+};
+
 class HTMLWriter {
  public:
   HTMLWriter(HTMLBuilder* defs, HTMLWriterContext* ctx) : _defs(defs), _ctx(ctx) {
@@ -395,6 +404,15 @@ class HTMLWriter {
   void writeElements(HTMLBuilder& out, const std::vector<Element*>& elements, float alpha,
                      bool distribute, LayerPlacement targetPlacement,
                      const Padding* containerPadding = nullptr);
+  // Renders a TextBox that has inline child elements (Text, Fill, Stroke, Group) as a positioned
+  // container with per-span CSS spans. The two TextBox emission paths are split out from
+  // writeElements so the main dispatch loop stays focused on its state machine.
+  void renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb);
+  // Renders a TextBox whose inline element list is empty but whose sibling Groups already
+  // qualified as rich-text spans (collected during writeElements' pre-scan). The Group siblings
+  // are emitted inside the TextBox container instead of as stand-alone DOM wrappers.
+  void renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
+                               const std::vector<RichTextSpan>& richTextSpans);
   // Appends an SVG <filter> definition that composites the layer's pre-rendered backdrop with its
   // own pixels using feComposite arithmetic (k1=0, k2=1, k3=1, k4=-1), yielding PlusDarker
   // semantics: clamp(Sc + Dc - 1, 0, 1). Called once per plusDarker layer at the point the
