@@ -125,7 +125,7 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
             auto* firstStop = g->colorStops.front();
             auto* lastStop = g->colorStops.back();
             if (!firstStop || !lastStop) {
-              return "linear-gradient(" + FloatToString(ang) + "deg," + CSSStops(g->colorStops) +
+              return "linear-gradient(" + CssFloatToString(ang) + "deg," + CSSStops(g->colorStops) +
                      ")";
             }
             std::string stops;
@@ -135,7 +135,7 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
             size_t firstIndex = 0;
             if (startT > 0.0f) {
               stops += ColorToRGBA(firstStop->color) + " 0%," + ColorToRGBA(firstStop->color) +
-                       " " + FloatToString(startT * 100.0f) + "%";
+                       " " + CssFloatToString(startT * 100.0f) + "%";
               // When the first stop's offset is 0, it maps to startT and duplicates the clamp
               // endpoint — start the loop from index 1 to skip it.
               float mapped0 = startT + g->colorStops[0]->offset * (endT - startT);
@@ -152,8 +152,8 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
               if (!stops.empty()) {
                 stops += ",";
               }
-              stops +=
-                  ColorToRGBA(g->colorStops[i]->color) + " " + FloatToString(mapped * 100.0f) + "%";
+              stops += ColorToRGBA(g->colorStops[i]->color) + " " +
+                       CssFloatToString(mapped * 100.0f) + "%";
             }
             // Trailing clamp region: endT..100% filled with the last stop colour.
             // When the last stop's offset is 1, it maps to endT and duplicates the clamp
@@ -161,17 +161,17 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
             if (endT < 1.0f) {
               float mappedLast = startT + g->colorStops.back()->offset * (endT - startT);
               if (std::abs(mappedLast - endT) > GRADIENT_MAPPING_EPSILON) {
-                stops +=
-                    "," + ColorToRGBA(lastStop->color) + " " + FloatToString(endT * 100.0f) + "%";
+                stops += "," + ColorToRGBA(lastStop->color) + " " +
+                         CssFloatToString(endT * 100.0f) + "%";
               }
               stops += "," + ColorToRGBA(lastStop->color) + " 100%";
             }
-            return "linear-gradient(" + FloatToString(ang) + "deg," + stops + ")";
+            return "linear-gradient(" + CssFloatToString(ang) + "deg," + stops + ")";
           }
         }
       }
 
-      return "linear-gradient(" + FloatToString(ang) + "deg," + CSSStops(g->colorStops) + ")";
+      return "linear-gradient(" + CssFloatToString(ang) + "deg," + CSSStops(g->colorStops) + ")";
     }
     case NodeType::RadialGradient: {
       auto g = static_cast<const RadialGradient*>(src);
@@ -213,12 +213,12 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
       }
       if (nonUniformScale || (g->fitsToGeometry && boxWidth > 0 && boxHeight > 0 &&
                               !FloatNearlyZero(boxWidth - boxHeight))) {
-        return "radial-gradient(ellipse " + FloatToString(rx) + "px " + FloatToString(ry) +
-               "px at " + FloatToString(c.x) + "px " + FloatToString(c.y) + "px," +
+        return "radial-gradient(ellipse " + CssFloatToString(rx) + "px " + CssFloatToString(ry) +
+               "px at " + CssFloatToString(c.x) + "px " + CssFloatToString(c.y) + "px," +
                CSSStops(g->colorStops) + ")";
       }
-      return "radial-gradient(circle " + FloatToString(rx) + "px at " + FloatToString(c.x) + "px " +
-             FloatToString(c.y) + "px," + CSSStops(g->colorStops) + ")";
+      return "radial-gradient(circle " + CssFloatToString(rx) + "px at " + CssFloatToString(c.x) +
+             "px " + CssFloatToString(c.y) + "px," + CSSStops(g->colorStops) + ")";
     }
     case NodeType::ConicGradient: {
       auto g = static_cast<const ConicGradient*>(src);
@@ -249,9 +249,9 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
       float cssStartAng = g->startAngle + 90.0f + matRotation;
       float sweepRange = g->endAngle - g->startAngle;
       if (FloatNearlyZero(sweepRange - 360.0f)) {
-        return "conic-gradient(from " + FloatToString(cssStartAng) + "deg at " +
-               FloatToString(c.x) + "px " + FloatToString(c.y) + "px," + CSSStops(g->colorStops) +
-               ")";
+        return "conic-gradient(from " + CssFloatToString(cssStartAng) + "deg at " +
+               CssFloatToString(c.x) + "px " + CssFloatToString(c.y) + "px," +
+               CSSStops(g->colorStops) + ")";
       }
       // Partial sweep: use absolute CSS angles (PAGX angle + 90°) without 'from' keyword.
       // Native clamp behavior (PAGX coordinate, 0°=right):
@@ -271,9 +271,9 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
         lastColor = ColorToRGBA(g->colorStops.back()->color);
       }
       std::string stops;
-      stops += lastColor + " " + FloatToString(cssOrigin) + "deg";
-      stops += "," + firstColor + " " + FloatToString(cssOrigin) + "deg";
-      stops += "," + firstColor + " " + FloatToString(cssStartAng) + "deg";
+      stops += lastColor + " " + CssFloatToString(cssOrigin) + "deg";
+      stops += "," + firstColor + " " + CssFloatToString(cssOrigin) + "deg";
+      stops += "," + firstColor + " " + CssFloatToString(cssStartAng) + "deg";
       // Skip the first stop if offset==0 (it maps to cssStartAng, already emitted above)
       // and the last stop if offset==1 (it maps to cssEndAng, emitted below).
       for (size_t i = 0; i < g->colorStops.size(); i++) {
@@ -289,10 +289,10 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
         stops += ',';
         stops += ColorToRGBA(g->colorStops[i]->color);
         float angle = cssStartAng + g->colorStops[i]->offset * sweepRange;
-        stops += ' ' + FloatToString(angle) + "deg";
+        stops += ' ' + CssFloatToString(angle) + "deg";
       }
-      stops += "," + lastColor + " " + FloatToString(cssEndAng) + "deg";
-      return "conic-gradient(at " + FloatToString(c.x) + "px " + FloatToString(c.y) + "px," +
+      stops += "," + lastColor + " " + CssFloatToString(cssEndAng) + "deg";
+      return "conic-gradient(at " + CssFloatToString(c.x) + "px " + CssFloatToString(c.y) + "px," +
              stops + ")";
     }
     case NodeType::ImagePattern: {
@@ -326,12 +326,12 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
         ry = g->radius * boxHeight * sx;
       }
       if (!FloatNearlyZero(rx - ry)) {
-        return "radial-gradient(ellipse " + FloatToString(rx) + "px " + FloatToString(ry) +
-               "px at " + FloatToString(c.x) + "px " + FloatToString(c.y) + "px," +
+        return "radial-gradient(ellipse " + CssFloatToString(rx) + "px " + CssFloatToString(ry) +
+               "px at " + CssFloatToString(c.x) + "px " + CssFloatToString(c.y) + "px," +
                CSSStops(g->colorStops) + ")";
       }
-      return "radial-gradient(circle " + FloatToString(rx) + "px at " + FloatToString(c.x) + "px " +
-             FloatToString(c.y) + "px," + CSSStops(g->colorStops) + ")";
+      return "radial-gradient(circle " + CssFloatToString(rx) + "px at " + CssFloatToString(c.x) +
+             "px " + CssFloatToString(c.y) + "px," + CSSStops(g->colorStops) + ")";
     }
     default:
       if (outAlpha) {
@@ -381,16 +381,16 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha, 
     _defs->openTag("pattern");
     _defs->addAttr("id", id);
     _defs->addAttr("patternUnits", "userSpaceOnUse");
-    _defs->addAttr("x", FloatToString(fx));
-    _defs->addAttr("y", FloatToString(fy));
-    _defs->addAttr("width", FloatToString(fw));
-    _defs->addAttr("height", FloatToString(fh));
+    _defs->addAttr("x", CssFloatToString(fx));
+    _defs->addAttr("y", CssFloatToString(fy));
+    _defs->addAttr("width", CssFloatToString(fw));
+    _defs->addAttr("height", CssFloatToString(fh));
     _defs->closeTagStart();
     _defs->openTag("foreignObject");
-    _defs->addAttr("x", FloatToString(fx));
-    _defs->addAttr("y", FloatToString(fy));
-    _defs->addAttr("width", FloatToString(fw));
-    _defs->addAttr("height", FloatToString(fh));
+    _defs->addAttr("x", CssFloatToString(fx));
+    _defs->addAttr("y", CssFloatToString(fy));
+    _defs->addAttr("width", CssFloatToString(fw));
+    _defs->addAttr("height", CssFloatToString(fh));
     _defs->closeTagStart();
     // Extract rotation angle from the matrix and add it to the CSS start angle.
     float matRotation = std::atan2(g->matrix.b, g->matrix.a) * 180.0f / static_cast<float>(M_PI);
@@ -402,17 +402,17 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha, 
     // corner (fx, fy) to convert to a foreignObject-local pixel offset.
     std::string cxStr, cyStr;
     if (g->fitsToGeometry) {
-      cxStr = FloatToString(c.x * 100.0f) + "%";
-      cyStr = FloatToString(c.y * 100.0f) + "%";
+      cxStr = CssFloatToString(c.x * 100.0f) + "%";
+      cyStr = CssFloatToString(c.y * 100.0f) + "%";
     } else {
-      cxStr = FloatToString(c.x - fx) + "px";
-      cyStr = FloatToString(c.y - fy) + "px";
+      cxStr = CssFloatToString(c.x - fx) + "px";
+      cyStr = CssFloatToString(c.y - fy) + "px";
     }
     float cssStartAng = g->startAngle + 90.0f + matRotation;
     float sweepRange = g->endAngle - g->startAngle;
     std::string cssGrad;
     if (FloatNearlyZero(sweepRange - 360.0f)) {
-      cssGrad = "conic-gradient(from " + FloatToString(cssStartAng) + "deg at " + cxStr + " " +
+      cssGrad = "conic-gradient(from " + CssFloatToString(cssStartAng) + "deg at " + cxStr + " " +
                 cyStr + "," + CSSStops(g->colorStops) + ")";
     } else {
       std::string stops;
@@ -427,7 +427,7 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha, 
         first = false;
         stops += ColorToRGBA(g->colorStops[i]->color);
         float angle = cssStartAng + g->colorStops[i]->offset * sweepRange;
-        stops += ' ' + FloatToString(angle) + "deg";
+        stops += ' ' + CssFloatToString(angle) + "deg";
       }
       cssGrad = "conic-gradient(at " + cxStr + " " + cyStr + "," + stops + ")";
     }
@@ -448,9 +448,9 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha, 
     std::string id = _ctx->nextId("grad");
     _defs->openTag("radialGradient");
     _defs->addAttr("id", id);
-    _defs->addAttr("cx", FloatToString(g->center.x));
-    _defs->addAttr("cy", FloatToString(g->center.y));
-    _defs->addAttr("r", FloatToString(g->radius));
+    _defs->addAttr("cx", CssFloatToString(g->center.x));
+    _defs->addAttr("cy", CssFloatToString(g->center.y));
+    _defs->addAttr("r", CssFloatToString(g->radius));
     _defs->addAttr("gradientUnits", g->fitsToGeometry ? "objectBoundingBox" : "userSpaceOnUse");
     if (!g->matrix.isIdentity()) {
       _defs->addAttr("gradientTransform", MatrixToCSS(g->matrix));
@@ -461,10 +461,10 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha, 
         continue;
       }
       _defs->openTag("stop");
-      _defs->addAttr("offset", FloatToString(stop->offset));
+      _defs->addAttr("offset", CssFloatToString(stop->offset));
       _defs->addAttr("stop-color", ColorToSVGHex(stop->color));
       if (stop->color.alpha < 1.0f) {
-        _defs->addAttr("stop-opacity", FloatToString(stop->color.alpha));
+        _defs->addAttr("stop-opacity", CssFloatToString(stop->color.alpha));
       }
       _defs->closeTagSelfClosing();
     }
@@ -498,10 +498,10 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha, 
       float sx = std::sqrt(p->matrix.a * p->matrix.a + p->matrix.b * p->matrix.b);
       float sy = std::sqrt(p->matrix.c * p->matrix.c + p->matrix.d * p->matrix.d);
       if (!FloatNearlyZero(sx - 1.0f) || !FloatNearlyZero(sy - 1.0f)) {
-        bgSize = FloatToString(sx * 100.0f) + "% " + FloatToString(sy * 100.0f) + "%";
+        bgSize = CssFloatToString(sx * 100.0f) + "% " + CssFloatToString(sy * 100.0f) + "%";
       }
       if (!FloatNearlyZero(p->matrix.tx) || !FloatNearlyZero(p->matrix.ty)) {
-        bgPos = FloatToString(p->matrix.tx) + "px " + FloatToString(p->matrix.ty) + "px";
+        bgPos = CssFloatToString(p->matrix.tx) + "px " + CssFloatToString(p->matrix.ty) + "px";
       }
     }
     std::string cssStyle =
@@ -521,7 +521,8 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha, 
     _defs->addAttr("patternUnits", "userSpaceOnUse");
     _defs->addAttr("x", "0");
     _defs->addAttr("y", "0");
-    std::string patternSize = FloatToString(std::max({_ctx->docWidth, _ctx->docHeight, 10000.0f}));
+    std::string patternSize =
+        CssFloatToString(std::max({_ctx->docWidth, _ctx->docHeight, 10000.0f}));
     _defs->addAttr("width", patternSize);
     _defs->addAttr("height", patternSize);
     _defs->closeTagStart();
@@ -566,16 +567,16 @@ void HTMLWriter::writeSVGGradientDefInto(HTMLBuilder& builder, const ColorSource
     builder.addAttr("id", id);
     if (g->fitsToGeometry && resolveToUserSpace) {
       // Map normalised [0,1] coords into the caller-supplied pixel bounding box.
-      builder.addAttr("x1", FloatToString(bboxX + g->startPoint.x * bboxW));
-      builder.addAttr("y1", FloatToString(bboxY + g->startPoint.y * bboxH));
-      builder.addAttr("x2", FloatToString(bboxX + g->endPoint.x * bboxW));
-      builder.addAttr("y2", FloatToString(bboxY + g->endPoint.y * bboxH));
+      builder.addAttr("x1", CssFloatToString(bboxX + g->startPoint.x * bboxW));
+      builder.addAttr("y1", CssFloatToString(bboxY + g->startPoint.y * bboxH));
+      builder.addAttr("x2", CssFloatToString(bboxX + g->endPoint.x * bboxW));
+      builder.addAttr("y2", CssFloatToString(bboxY + g->endPoint.y * bboxH));
       builder.addAttr("gradientUnits", "userSpaceOnUse");
     } else {
-      builder.addAttr("x1", FloatToString(g->startPoint.x));
-      builder.addAttr("y1", FloatToString(g->startPoint.y));
-      builder.addAttr("x2", FloatToString(g->endPoint.x));
-      builder.addAttr("y2", FloatToString(g->endPoint.y));
+      builder.addAttr("x1", CssFloatToString(g->startPoint.x));
+      builder.addAttr("y1", CssFloatToString(g->startPoint.y));
+      builder.addAttr("x2", CssFloatToString(g->endPoint.x));
+      builder.addAttr("y2", CssFloatToString(g->endPoint.y));
       // fitsToGeometry maps to SVG objectBoundingBox (coords in [0,1] of the filled shape's
       // bbox); fitsToGeometry=false keeps the legacy userSpaceOnUse semantics for pixel-space
       // gradient parameters shared across multiple geometries.
@@ -590,10 +591,10 @@ void HTMLWriter::writeSVGGradientDefInto(HTMLBuilder& builder, const ColorSource
         continue;
       }
       builder.openTag("stop");
-      builder.addAttr("offset", FloatToString(stop->offset));
+      builder.addAttr("offset", CssFloatToString(stop->offset));
       builder.addAttr("stop-color", ColorToSVGHex(stop->color));
       if (stop->color.alpha < 1.0f) {
-        builder.addAttr("stop-opacity", FloatToString(stop->color.alpha));
+        builder.addAttr("stop-opacity", CssFloatToString(stop->color.alpha));
       }
       builder.closeTagSelfClosing();
     }
@@ -604,14 +605,14 @@ void HTMLWriter::writeSVGGradientDefInto(HTMLBuilder& builder, const ColorSource
     builder.addAttr("id", id);
     if (g->fitsToGeometry && resolveToUserSpace) {
       // Map normalised centre and radius into pixel space.
-      builder.addAttr("cx", FloatToString(bboxX + g->center.x * bboxW));
-      builder.addAttr("cy", FloatToString(bboxY + g->center.y * bboxH));
-      builder.addAttr("r", FloatToString(g->radius * std::min(bboxW, bboxH)));
+      builder.addAttr("cx", CssFloatToString(bboxX + g->center.x * bboxW));
+      builder.addAttr("cy", CssFloatToString(bboxY + g->center.y * bboxH));
+      builder.addAttr("r", CssFloatToString(g->radius * std::min(bboxW, bboxH)));
       builder.addAttr("gradientUnits", "userSpaceOnUse");
     } else {
-      builder.addAttr("cx", FloatToString(g->center.x));
-      builder.addAttr("cy", FloatToString(g->center.y));
-      builder.addAttr("r", FloatToString(g->radius));
+      builder.addAttr("cx", CssFloatToString(g->center.x));
+      builder.addAttr("cy", CssFloatToString(g->center.y));
+      builder.addAttr("r", CssFloatToString(g->radius));
       builder.addAttr("gradientUnits", g->fitsToGeometry ? "objectBoundingBox" : "userSpaceOnUse");
     }
     if (!g->matrix.isIdentity()) {
@@ -623,10 +624,10 @@ void HTMLWriter::writeSVGGradientDefInto(HTMLBuilder& builder, const ColorSource
         continue;
       }
       builder.openTag("stop");
-      builder.addAttr("offset", FloatToString(stop->offset));
+      builder.addAttr("offset", CssFloatToString(stop->offset));
       builder.addAttr("stop-color", ColorToSVGHex(stop->color));
       if (stop->color.alpha < 1.0f) {
-        builder.addAttr("stop-opacity", FloatToString(stop->color.alpha));
+        builder.addAttr("stop-opacity", CssFloatToString(stop->color.alpha));
       }
       builder.closeTagSelfClosing();
     }

@@ -52,8 +52,8 @@ void ColorToRGB(const Color& color, int& r, int& g, int& b) {
 
 std::string ColorToHex(const Color& color) {
   if (color.colorSpace == ColorSpace::DisplayP3) {
-    return "color(display-p3 " + FloatToString(color.red) + " " + FloatToString(color.green) + " " +
-           FloatToString(color.blue) + ")";
+    return "color(display-p3 " + CssFloatToString(color.red) + " " + CssFloatToString(color.green) +
+           " " + CssFloatToString(color.blue) + ")";
   }
   int r = 0, g = 0, b = 0;
   ColorToRGB(color, r, g, b);
@@ -75,8 +75,8 @@ std::string ColorToSVGHex(const Color& color) {
 std::string ColorToRGBA(const Color& color, float extra) {
   float a = color.alpha * extra;
   if (color.colorSpace == ColorSpace::DisplayP3) {
-    return "color(display-p3 " + FloatToString(color.red) + " " + FloatToString(color.green) + " " +
-           FloatToString(color.blue) + " / " + FloatToString(a) + ")";
+    return "color(display-p3 " + CssFloatToString(color.red) + " " + CssFloatToString(color.green) +
+           " " + CssFloatToString(color.blue) + " / " + CssFloatToString(a) + ")";
   }
   if (a >= 1.0f) {
     return ColorToHex(color);
@@ -84,7 +84,7 @@ std::string ColorToRGBA(const Color& color, float extra) {
   int r = 0, g = 0, b = 0;
   ColorToRGB(color, r, g, b);
   return "rgba(" + std::to_string(r) + "," + std::to_string(g) + "," + std::to_string(b) + "," +
-         FloatToString(a) + ")";
+         CssFloatToString(a) + ")";
 }
 
 const char* DetectImageMime(const uint8_t* bytes, size_t size) {
@@ -238,7 +238,7 @@ std::string CSSStops(const std::vector<ColorStop*>& stops) {
     first = false;
     r += ColorToRGBA(stops[i]->color);
     r += ' ';
-    r += FloatToString(stops[i]->offset * 100.0f);
+    r += CssFloatToString(stops[i]->offset * 100.0f);
     r += '%';
   }
   return r;
@@ -246,8 +246,8 @@ std::string CSSStops(const std::vector<ColorStop*>& stops) {
 
 std::string MatrixToCSS(const Matrix& m) {
   std::string r = "matrix(";
-  r += FloatToString(m.a) + ',' + FloatToString(m.b) + ',' + FloatToString(m.c) + ',' +
-       FloatToString(m.d) + ',' + FloatToString(m.tx) + ',' + FloatToString(m.ty) + ')';
+  r += CssFloatToString(m.a) + ',' + CssFloatToString(m.b) + ',' + CssFloatToString(m.c) + ',' +
+       CssFloatToString(m.d) + ',' + CssFloatToString(m.tx) + ',' + CssFloatToString(m.ty) + ')';
   return r;
 }
 
@@ -262,7 +262,7 @@ std::string MatrixTransformToCSS(const Matrix& m) {
     if (!hasTranslate) {
       return {};
     }
-    return "translate(" + FloatToString(m.tx) + "px," + FloatToString(m.ty) + "px)";
+    return "translate(" + CssFloatToString(m.tx) + "px," + CssFloatToString(m.ty) + "px)";
   }
 
   // Uniform scale + rotation: matrix has the form [a, b, -b, a] (i.e. a==d, b==-c).
@@ -274,19 +274,19 @@ std::string MatrixTransformToCSS(const Matrix& m) {
 
     std::string r;
     if (hasTranslate) {
-      r += "translate(" + FloatToString(m.tx) + "px," + FloatToString(m.ty) + "px)";
+      r += "translate(" + CssFloatToString(m.tx) + "px," + CssFloatToString(m.ty) + "px)";
     }
     if (!FloatNearlyZero(angle)) {
       if (!r.empty()) {
         r += ' ';
       }
-      r += "rotate(" + FloatToString(angle) + "deg)";
+      r += "rotate(" + CssFloatToString(angle) + "deg)";
     }
     if (!FloatNearlyZero(s - 1.0f)) {
       if (!r.empty()) {
         r += ' ';
       }
-      r += "scale(" + FloatToString(s) + ")";
+      r += "scale(" + CssFloatToString(s) + ")";
     }
     if (!r.empty()) {
       return r;
@@ -298,7 +298,7 @@ std::string MatrixTransformToCSS(const Matrix& m) {
   if (isNonUniformScale) {
     std::string r;
     if (hasTranslate) {
-      r += "translate(" + FloatToString(m.tx) + "px," + FloatToString(m.ty) + "px)";
+      r += "translate(" + CssFloatToString(m.tx) + "px," + CssFloatToString(m.ty) + "px)";
     }
     bool sxOne = FloatNearlyZero(m.a - 1.0f);
     bool syOne = FloatNearlyZero(m.d - 1.0f);
@@ -307,13 +307,13 @@ std::string MatrixTransformToCSS(const Matrix& m) {
         r += ' ';
       }
       if (sxOne && !syOne) {
-        r += "scaleY(" + FloatToString(m.d) + ")";
+        r += "scaleY(" + CssFloatToString(m.d) + ")";
       } else if (!sxOne && syOne) {
-        r += "scaleX(" + FloatToString(m.a) + ")";
+        r += "scaleX(" + CssFloatToString(m.a) + ")";
       } else if (FloatNearlyZero(m.a - m.d)) {
-        r += "scale(" + FloatToString(m.a) + ")";
+        r += "scale(" + CssFloatToString(m.a) + ")";
       } else {
-        r += "scale(" + FloatToString(m.a) + "," + FloatToString(m.d) + ")";
+        r += "scale(" + CssFloatToString(m.a) + "," + CssFloatToString(m.d) + ")";
       }
     }
     if (!r.empty()) {
@@ -322,8 +322,9 @@ std::string MatrixTransformToCSS(const Matrix& m) {
   }
 
   // Fallback: full matrix().
-  return "matrix(" + FloatToString(m.a) + ',' + FloatToString(m.b) + ',' + FloatToString(m.c) +
-         ',' + FloatToString(m.d) + ',' + FloatToString(m.tx) + ',' + FloatToString(m.ty) + ')';
+  return "matrix(" + CssFloatToString(m.a) + ',' + CssFloatToString(m.b) + ',' +
+         CssFloatToString(m.c) + ',' + CssFloatToString(m.d) + ',' + CssFloatToString(m.tx) + ',' +
+         CssFloatToString(m.ty) + ')';
 }
 
 std::string Matrix3DToCSS(const Matrix3D& m) {
@@ -332,7 +333,7 @@ std::string Matrix3DToCSS(const Matrix3D& m) {
     if (i > 0) {
       r += ',';
     }
-    r += FloatToString(m.values[i]);
+    r += CssFloatToString(m.values[i]);
   }
   r += ')';
   return r;
@@ -504,14 +505,14 @@ std::string PaddingToCSS(const Padding& padding) {
   if (FloatNearlyZero(padding.right - padding.left) &&
       FloatNearlyZero(padding.bottom - padding.top) &&
       FloatNearlyZero(padding.top - padding.left)) {
-    return FloatToString(padding.top) + "px";
+    return CssFloatToString(padding.top) + "px";
   }
   if (FloatNearlyZero(padding.top - padding.bottom) &&
       FloatNearlyZero(padding.left - padding.right)) {
-    return FloatToString(padding.top) + "px " + FloatToString(padding.right) + "px";
+    return CssFloatToString(padding.top) + "px " + CssFloatToString(padding.right) + "px";
   }
-  return FloatToString(padding.top) + "px " + FloatToString(padding.right) + "px " +
-         FloatToString(padding.bottom) + "px " + FloatToString(padding.left) + "px";
+  return CssFloatToString(padding.top) + "px " + CssFloatToString(padding.right) + "px " +
+         CssFloatToString(padding.bottom) + "px " + CssFloatToString(padding.left) + "px";
 }
 
 bool TextStartsWithRTL(const std::string& utf8Text) {
@@ -796,13 +797,13 @@ std::string HTMLWriter::buildVerticalJustifyContent(const Text* text, float boxH
     // rules between consecutive inline-blocks in vertical writing modes.
     if (gap > 0) {
       out += "<span style=\"display:inline-block;height:";
-      out += FloatToString(gap);
+      out += CssFloatToString(gap);
       out += "px;width:0\"></span>";
     }
     out += "<span style=\"display:inline-block;white-space:nowrap;line-height:";
-    out += FloatToString(advance > 0 ? advance : text->renderFontSize());
+    out += CssFloatToString(advance > 0 ? advance : text->renderFontSize());
     out += "px;height:";
-    out += FloatToString(advance > 0 ? advance : text->renderFontSize());
+    out += CssFloatToString(advance > 0 ? advance : text->renderFontSize());
     out += "px";
     if (isCjk) out += ";text-align:center";
     out += "\">";

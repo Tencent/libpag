@@ -165,9 +165,9 @@ static void AppendPolystarCurve(std::string& d, float centerX, float centerY, fl
   float cp1y = dy1 + dx1 * roundness1 * angleDelta + centerY;
   float cp2x = dx2 + dy2 * roundness2 * angleDelta + centerX;
   float cp2y = dy2 - dx2 * roundness2 * angleDelta + centerY;
-  d += "C" + FloatToString(cp1x) + "," + FloatToString(cp1y) + " " + FloatToString(cp2x) + "," +
-       FloatToString(cp2y) + " " + FloatToString(dx2 + centerX) + "," +
-       FloatToString(dy2 + centerY);
+  d += "C" + CssFloatToString(cp1x) + "," + CssFloatToString(cp1y) + " " + CssFloatToString(cp2x) +
+       "," + CssFloatToString(cp2y) + " " + CssFloatToString(dx2 + centerX) + "," +
+       CssFloatToString(dy2 + centerY);
 }
 
 std::string BuildPolystarPath(const Polystar* ps) {
@@ -200,7 +200,7 @@ std::string BuildPolystarPath(const Polystar* ps) {
 
     std::string d;
     d.reserve(static_cast<size_t>(numPoints) * 50);
-    d += "M" + FloatToString(lastDx + centerX) + "," + FloatToString(lastDy + centerY);
+    d += "M" + CssFloatToString(lastDx + centerX) + "," + CssFloatToString(lastDy + centerY);
 
     bool outerFlag = false;
     for (int i = 0; i < numPoints; i++) {
@@ -228,7 +228,7 @@ std::string BuildPolystarPath(const Polystar* ps) {
         lastDx = dx;
         lastDy = dy;
       } else {
-        d += "L" + FloatToString(dx + centerX) + "," + FloatToString(dy + centerY);
+        d += "L" + CssFloatToString(dx + centerX) + "," + CssFloatToString(dy + centerY);
       }
       outerFlag = !outerFlag;
     }
@@ -252,7 +252,7 @@ std::string BuildPolystarPath(const Polystar* ps) {
 
   std::string d;
   d.reserve(static_cast<size_t>(numPoints) * 50);
-  d += "M" + FloatToString(lastDx + centerX) + "," + FloatToString(lastDy + centerY);
+  d += "M" + CssFloatToString(lastDx + centerX) + "," + CssFloatToString(lastDy + centerY);
 
   float angleDelta = angleStep * direction;
   for (int i = 1; i < numPoints; i++) {
@@ -263,7 +263,7 @@ std::string BuildPolystarPath(const Polystar* ps) {
       AppendPolystarCurve(d, centerX, centerY, angleDelta * 0.25f, lastDx, lastDy,
                           ps->outerRoundness, dx, dy, ps->outerRoundness);
     } else {
-      d += "L" + FloatToString(dx + centerX) + "," + FloatToString(dy + centerY);
+      d += "L" + CssFloatToString(dx + centerX) + "," + CssFloatToString(dy + centerY);
     }
     lastDx = dx;
     lastDy = dy;
@@ -926,49 +926,49 @@ std::string RectToPathData(const Rectangle* r) {
     if (r->reversed) {
       // Counter-clockwise in screen space from top-right:
       // (x+w,y) -> (x,y) -> (x,y+h) -> (x+w,y+h) -> close.
-      return "M" + FloatToString(x + w) + "," + FloatToString(y) + "H" + FloatToString(x) + "V" +
-             FloatToString(y + h) + "H" + FloatToString(x + w) + "Z";
+      return "M" + CssFloatToString(x + w) + "," + CssFloatToString(y) + "H" + CssFloatToString(x) +
+             "V" + CssFloatToString(y + h) + "H" + CssFloatToString(x + w) + "Z";
     }
     // Clockwise in screen space from top-right:
     // (x+w,y) -> (x+w,y+h) -> (x,y+h) -> (x,y) -> close.
-    return "M" + FloatToString(x + w) + "," + FloatToString(y) + "V" + FloatToString(y + h) + "H" +
-           FloatToString(x) + "V" + FloatToString(y) + "Z";
+    return "M" + CssFloatToString(x + w) + "," + CssFloatToString(y) + "V" +
+           CssFloatToString(y + h) + "H" + CssFloatToString(x) + "V" + CssFloatToString(y) + "Z";
   }
   float rn = std::min(r->roundness, std::min(w / 2, h / 2));
   std::string d;
   if (r->reversed) {
     // Counter-clockwise from top-right, starting just past the top-right round corner.
-    d += "M" + FloatToString(x + w) + "," + FloatToString(y + rn);
-    d += "V" + FloatToString(y + h - rn);
-    d += "A" + FloatToString(rn) + "," + FloatToString(rn) + " 0 0 0 " + FloatToString(x + w - rn) +
-         "," + FloatToString(y + h);
-    d += "H" + FloatToString(x + rn);
-    d += "A" + FloatToString(rn) + "," + FloatToString(rn) + " 0 0 0 " + FloatToString(x) + "," +
-         FloatToString(y + h - rn);
-    d += "V" + FloatToString(y + rn);
-    d += "A" + FloatToString(rn) + "," + FloatToString(rn) + " 0 0 0 " + FloatToString(x + rn) +
-         "," + FloatToString(y);
-    d += "H" + FloatToString(x + w - rn);
-    d += "A" + FloatToString(rn) + "," + FloatToString(rn) + " 0 0 0 " + FloatToString(x + w) +
-         "," + FloatToString(y + rn);
+    d += "M" + CssFloatToString(x + w) + "," + CssFloatToString(y + rn);
+    d += "V" + CssFloatToString(y + h - rn);
+    d += "A" + CssFloatToString(rn) + "," + CssFloatToString(rn) + " 0 0 0 " +
+         CssFloatToString(x + w - rn) + "," + CssFloatToString(y + h);
+    d += "H" + CssFloatToString(x + rn);
+    d += "A" + CssFloatToString(rn) + "," + CssFloatToString(rn) + " 0 0 0 " + CssFloatToString(x) +
+         "," + CssFloatToString(y + h - rn);
+    d += "V" + CssFloatToString(y + rn);
+    d += "A" + CssFloatToString(rn) + "," + CssFloatToString(rn) + " 0 0 0 " +
+         CssFloatToString(x + rn) + "," + CssFloatToString(y);
+    d += "H" + CssFloatToString(x + w - rn);
+    d += "A" + CssFloatToString(rn) + "," + CssFloatToString(rn) + " 0 0 0 " +
+         CssFloatToString(x + w) + "," + CssFloatToString(y + rn);
     d += "Z";
   } else {
     // Clockwise from top-right, starting just past the top-right round corner (SkRRect
     // startIndex=2 puts the move-to at the corner's bottom tangent and walks along the right
     // edge downward first).
-    d += "M" + FloatToString(x + w) + "," + FloatToString(y + rn);
-    d += "V" + FloatToString(y + h - rn);
-    d += "A" + FloatToString(rn) + "," + FloatToString(rn) + " 0 0 1 " + FloatToString(x + w - rn) +
-         "," + FloatToString(y + h);
-    d += "H" + FloatToString(x + rn);
-    d += "A" + FloatToString(rn) + "," + FloatToString(rn) + " 0 0 1 " + FloatToString(x) + "," +
-         FloatToString(y + h - rn);
-    d += "V" + FloatToString(y + rn);
-    d += "A" + FloatToString(rn) + "," + FloatToString(rn) + " 0 0 1 " + FloatToString(x + rn) +
-         "," + FloatToString(y);
-    d += "H" + FloatToString(x + w - rn);
-    d += "A" + FloatToString(rn) + "," + FloatToString(rn) + " 0 0 1 " + FloatToString(x + w) +
-         "," + FloatToString(y + rn);
+    d += "M" + CssFloatToString(x + w) + "," + CssFloatToString(y + rn);
+    d += "V" + CssFloatToString(y + h - rn);
+    d += "A" + CssFloatToString(rn) + "," + CssFloatToString(rn) + " 0 0 1 " +
+         CssFloatToString(x + w - rn) + "," + CssFloatToString(y + h);
+    d += "H" + CssFloatToString(x + rn);
+    d += "A" + CssFloatToString(rn) + "," + CssFloatToString(rn) + " 0 0 1 " + CssFloatToString(x) +
+         "," + CssFloatToString(y + h - rn);
+    d += "V" + CssFloatToString(y + rn);
+    d += "A" + CssFloatToString(rn) + "," + CssFloatToString(rn) + " 0 0 1 " +
+         CssFloatToString(x + rn) + "," + CssFloatToString(y);
+    d += "H" + CssFloatToString(x + w - rn);
+    d += "A" + CssFloatToString(rn) + "," + CssFloatToString(rn) + " 0 0 1 " +
+         CssFloatToString(x + w) + "," + CssFloatToString(y + rn);
     d += "Z";
   }
   return d;
@@ -982,10 +982,10 @@ std::string EllipseToPathData(const Ellipse* e) {
   float rx = size.width / 2;
   float ry = size.height / 2;
   const char* sweep = e->reversed ? "0" : "1";
-  return "M" + FloatToString(cx - rx) + "," + FloatToString(cy) + "A" + FloatToString(rx) + "," +
-         FloatToString(ry) + " 0 1 " + sweep + " " + FloatToString(cx + rx) + "," +
-         FloatToString(cy) + "A" + FloatToString(rx) + "," + FloatToString(ry) + " 0 1 " + sweep +
-         " " + FloatToString(cx - rx) + "," + FloatToString(cy) + "Z";
+  return "M" + CssFloatToString(cx - rx) + "," + CssFloatToString(cy) + "A" + CssFloatToString(rx) +
+         "," + CssFloatToString(ry) + " 0 1 " + sweep + " " + CssFloatToString(cx + rx) + "," +
+         CssFloatToString(cy) + "A" + CssFloatToString(rx) + "," + CssFloatToString(ry) + " 0 1 " +
+         sweep + " " + CssFloatToString(cx - rx) + "," + CssFloatToString(cy) + "Z";
 }
 
 std::string ReversePathDataToSVGString(const PathData& pathData) {
@@ -1052,8 +1052,8 @@ std::string ReversePathDataToSVGString(const PathData& pathData) {
   result.reserve(pathData.verbs().size() * 24);
   for (auto& contour : contours) {
     if (contour.segments.empty()) {
-      result +=
-          "M" + FloatToString(contour.startPoint.x) + " " + FloatToString(contour.startPoint.y);
+      result += "M" + CssFloatToString(contour.startPoint.x) + " " +
+                CssFloatToString(contour.startPoint.y);
       if (contour.closed) {
         result += "Z";
       }
@@ -1061,7 +1061,7 @@ std::string ReversePathDataToSVGString(const PathData& pathData) {
     }
     auto& lastSeg = contour.segments.back();
     Point newStart = lastSeg.points.back();
-    result += "M" + FloatToString(newStart.x) + " " + FloatToString(newStart.y);
+    result += "M" + CssFloatToString(newStart.x) + " " + CssFloatToString(newStart.y);
 
     for (int i = static_cast<int>(contour.segments.size()) - 1; i >= 0; i--) {
       auto& seg = contour.segments[static_cast<size_t>(i)];
@@ -1069,16 +1069,18 @@ std::string ReversePathDataToSVGString(const PathData& pathData) {
                                 : contour.segments[static_cast<size_t>(i - 1)].points.back();
       switch (seg.verb) {
         case PathVerb::Line:
-          result += "L" + FloatToString(segStart.x) + " " + FloatToString(segStart.y);
+          result += "L" + CssFloatToString(segStart.x) + " " + CssFloatToString(segStart.y);
           break;
         case PathVerb::Quad:
-          result += "Q" + FloatToString(seg.points[0].x) + " " + FloatToString(seg.points[0].y) +
-                    " " + FloatToString(segStart.x) + " " + FloatToString(segStart.y);
+          result += "Q" + CssFloatToString(seg.points[0].x) + " " +
+                    CssFloatToString(seg.points[0].y) + " " + CssFloatToString(segStart.x) + " " +
+                    CssFloatToString(segStart.y);
           break;
         case PathVerb::Cubic:
-          result += "C" + FloatToString(seg.points[1].x) + " " + FloatToString(seg.points[1].y) +
-                    " " + FloatToString(seg.points[0].x) + " " + FloatToString(seg.points[0].y) +
-                    " " + FloatToString(segStart.x) + " " + FloatToString(segStart.y);
+          result += "C" + CssFloatToString(seg.points[1].x) + " " +
+                    CssFloatToString(seg.points[1].y) + " " + CssFloatToString(seg.points[0].x) +
+                    " " + CssFloatToString(seg.points[0].y) + " " + CssFloatToString(segStart.x) +
+                    " " + CssFloatToString(segStart.y);
           break;
         default:
           break;
@@ -1146,7 +1148,7 @@ void HTMLWriter::applySVGFill(HTMLBuilder& out, const Fill* fill, float bboxX, f
   out.addAttr("fill", f);
   float ea = alpha * fill->alpha;
   if (ea < 1.0f) {
-    out.addAttr("fill-opacity", FloatToString(ea));
+    out.addAttr("fill-opacity", CssFloatToString(ea));
   }
   if (fill->fillRule == FillRule::EvenOdd) {
     out.addAttr("fill-rule", "evenodd");
@@ -1162,14 +1164,14 @@ void HTMLWriter::applySVGStroke(HTMLBuilder& out, const Stroke* stroke, float pa
   out.addAttr("stroke", s);
   float ea = alpha * stroke->alpha;
   if (ea < 1.0f) {
-    out.addAttr("stroke-opacity", FloatToString(ea));
+    out.addAttr("stroke-opacity", CssFloatToString(ea));
   }
   float effectiveWidth = stroke->width;
   if (stroke->align != StrokeAlign::Center) {
     effectiveWidth *= 2.0f;
   }
   if (effectiveWidth != 1.0f) {
-    out.addAttr("stroke-width", FloatToString(effectiveWidth));
+    out.addAttr("stroke-width", CssFloatToString(effectiveWidth));
   }
   if (stroke->cap == LineCap::Round) {
     out.addAttr("stroke-linecap", "round");
@@ -1182,7 +1184,7 @@ void HTMLWriter::applySVGStroke(HTMLBuilder& out, const Stroke* stroke, float pa
     out.addAttr("stroke-linejoin", "bevel");
   }
   if (stroke->join == LineJoin::Miter && stroke->miterLimit != 4.0f) {
-    out.addAttr("stroke-miterlimit", FloatToString(stroke->miterLimit));
+    out.addAttr("stroke-miterlimit", CssFloatToString(stroke->miterLimit));
   }
   if (!stroke->dashes.empty()) {
     std::vector<float> dashValues = stroke->dashes;
@@ -1206,7 +1208,7 @@ void HTMLWriter::applySVGStroke(HTMLBuilder& out, const Stroke* stroke, float pa
       if (i > 0) {
         d += ',';
       }
-      d += FloatToString(dashValues[i]);
+      d += CssFloatToString(dashValues[i]);
     }
     out.addAttr("stroke-dasharray", d);
   }
@@ -1214,7 +1216,7 @@ void HTMLWriter::applySVGStroke(HTMLBuilder& out, const Stroke* stroke, float pa
     // Both SVG `stroke-dashoffset` (SVG 1.1 §11.4) and tgfx's Skia `SkDashPathEffect` phase
     // use the same sign convention: a positive value advances the dash pattern forward so
     // the path start lies `offset` units into the pattern. Pass the value through verbatim.
-    out.addAttr("stroke-dashoffset", FloatToString(stroke->dashOffset));
+    out.addAttr("stroke-dashoffset", CssFloatToString(stroke->dashOffset));
   }
 }
 
@@ -1359,15 +1361,15 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
   if (fillsParent) {
     style = "position:absolute;inset:0";
   } else {
-    style = "position:absolute;left:" + FloatToString(left + _ctx->savedChildLayerOffsetX) +
-            "px;top:" + FloatToString(top + _ctx->savedChildLayerOffsetY) +
-            "px;width:" + FloatToString(w) + "px;height:" + FloatToString(h) + "px";
+    style = "position:absolute;left:" + CssFloatToString(left + _ctx->savedChildLayerOffsetX) +
+            "px;top:" + CssFloatToString(top + _ctx->savedChildLayerOffsetY) +
+            "px;width:" + CssFloatToString(w) + "px;height:" + CssFloatToString(h) + "px";
   }
 
   if (isEllipse) {
     style += ";border-radius:50%";
   } else if (roundness > 0) {
-    style += ";border-radius:" + FloatToString(roundness) + "px";
+    style += ";border-radius:" + CssFloatToString(roundness) + "px";
   }
 
   if (fill) {
@@ -1421,8 +1423,8 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
               float sy = std::sqrt(p->matrix.c * p->matrix.c + p->matrix.d * p->matrix.d);
               float tileW = sx * static_cast<float>(size.first);
               float tileH = sy * static_cast<float>(size.second);
-              style +=
-                  ";background-size:" + FloatToString(tileW) + "px " + FloatToString(tileH) + "px";
+              style += ";background-size:" + CssFloatToString(tileW) + "px " +
+                       CssFloatToString(tileH) + "px";
             }
           }
           // For scaleMode=none the pattern is anchored to the parent Layer's origin (0,0),
@@ -1433,8 +1435,8 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
           float posX = p->matrix.tx - (left + _ctx->savedChildLayerOffsetX);
           float posY = p->matrix.ty - (top + _ctx->savedChildLayerOffsetY);
           if (!FloatNearlyZero(posX) || !FloatNearlyZero(posY)) {
-            style +=
-                ";background-position:" + FloatToString(posX) + "px " + FloatToString(posY) + "px";
+            style += ";background-position:" + CssFloatToString(posX) + "px " +
+                     CssFloatToString(posY) + "px";
           }
         }
         // ImagePattern.mipmapMode has no CSS equivalent; browsers pick internal mipmap policy.
@@ -1467,7 +1469,7 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
     }
   }
   if (alpha < 1.0f) {
-    style += ";opacity:" + FloatToString(alpha);
+    style += ";opacity:" + CssFloatToString(alpha);
   }
 
   out.openTag("div");
@@ -1499,8 +1501,8 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     // Build a new SVG containing: <defs><mask>(stroke shapes)</mask></defs>
     //   + <foreignObject mask="url(#maskId)">(CSS conic-gradient div)</foreignObject>
     std::string svgStyle =
-        "position:absolute;left:" + FloatToString(x0 + _ctx->savedChildLayerOffsetX) +
-        "px;top:" + FloatToString(y0 + _ctx->savedChildLayerOffsetY) + "px";
+        "position:absolute;left:" + CssFloatToString(x0 + _ctx->savedChildLayerOffsetX) +
+        "px;top:" + CssFloatToString(y0 + _ctx->savedChildLayerOffsetY) + "px";
     if (painterBlend != BlendMode::Normal) {
       auto blendStr = BlendModeToMixBlendMode(painterBlend);
       if (blendStr) {
@@ -1509,13 +1511,13 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
       }
     }
     if (alpha < 1.0f) {
-      svgStyle += ";opacity:" + FloatToString(alpha);
+      svgStyle += ";opacity:" + CssFloatToString(alpha);
     }
     out.openTag("svg");
-    out.addAttr("width", FloatToString(bw));
-    out.addAttr("height", FloatToString(bh));
-    out.addAttr("viewBox", FloatToString(x0) + " " + FloatToString(y0) + " " + FloatToString(bw) +
-                               " " + FloatToString(bh));
+    out.addAttr("width", CssFloatToString(bw));
+    out.addAttr("height", CssFloatToString(bh));
+    out.addAttr("viewBox", CssFloatToString(x0) + " " + CssFloatToString(y0) + " " +
+                               CssFloatToString(bw) + " " + CssFloatToString(bh));
     out.addAttr("style", svgStyle);
     out.closeTagStart();
     // Inline <mask> with stroke shapes rendered in white.
@@ -1525,10 +1527,10 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     out.openTag("mask");
     out.addAttr("id", maskId);
     out.addAttr("maskUnits", "userSpaceOnUse");
-    out.addAttr("x", FloatToString(x0));
-    out.addAttr("y", FloatToString(y0));
-    out.addAttr("width", FloatToString(bw));
-    out.addAttr("height", FloatToString(bh));
+    out.addAttr("x", CssFloatToString(x0));
+    out.addAttr("y", CssFloatToString(y0));
+    out.addAttr("width", CssFloatToString(bw));
+    out.addAttr("height", CssFloatToString(bh));
     out.closeTagStart();
     for (auto& g : geos) {
       if (!g.modifiedPathData.empty()) {
@@ -1536,7 +1538,7 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         out.addAttr("d", g.modifiedPathData);
         out.addAttr("fill", "none");
         out.addAttr("stroke", "white");
-        out.addAttr("stroke-width", FloatToString(stroke->width));
+        out.addAttr("stroke-width", CssFloatToString(stroke->width));
         if (stroke->cap == LineCap::Round) {
           out.addAttr("stroke-linecap", "round");
         }
@@ -1549,13 +1551,13 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           auto pos = e->renderPosition();
           auto size = e->renderSize();
           out.openTag("ellipse");
-          out.addAttr("cx", FloatToString(pos.x));
-          out.addAttr("cy", FloatToString(pos.y));
-          out.addAttr("rx", FloatToString(size.width / 2));
-          out.addAttr("ry", FloatToString(size.height / 2));
+          out.addAttr("cx", CssFloatToString(pos.x));
+          out.addAttr("cy", CssFloatToString(pos.y));
+          out.addAttr("rx", CssFloatToString(size.width / 2));
+          out.addAttr("ry", CssFloatToString(size.height / 2));
           out.addAttr("fill", "none");
           out.addAttr("stroke", "white");
-          out.addAttr("stroke-width", FloatToString(stroke->width));
+          out.addAttr("stroke-width", CssFloatToString(stroke->width));
           if (stroke->cap == LineCap::Round) {
             out.addAttr("stroke-linecap", "round");
           }
@@ -1569,16 +1571,16 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           float rx = pos.x - size.width / 2;
           float ry = pos.y - size.height / 2;
           out.openTag("rect");
-          out.addAttr("x", FloatToString(rx));
-          out.addAttr("y", FloatToString(ry));
-          out.addAttr("width", FloatToString(size.width));
-          out.addAttr("height", FloatToString(size.height));
+          out.addAttr("x", CssFloatToString(rx));
+          out.addAttr("y", CssFloatToString(ry));
+          out.addAttr("width", CssFloatToString(size.width));
+          out.addAttr("height", CssFloatToString(size.height));
           if (r->roundness > 0) {
-            out.addAttr("rx", FloatToString(r->roundness));
+            out.addAttr("rx", CssFloatToString(r->roundness));
           }
           out.addAttr("fill", "none");
           out.addAttr("stroke", "white");
-          out.addAttr("stroke-width", FloatToString(stroke->width));
+          out.addAttr("stroke-width", CssFloatToString(stroke->width));
           out.closeTagSelfClosing();
           break;
         }
@@ -1590,7 +1592,7 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
             out.addAttr("d", d);
             out.addAttr("fill", "none");
             out.addAttr("stroke", "white");
-            out.addAttr("stroke-width", FloatToString(stroke->width));
+            out.addAttr("stroke-width", CssFloatToString(stroke->width));
             if (stroke->cap == LineCap::Round) {
               out.addAttr("stroke-linecap", "round");
             }
@@ -1606,7 +1608,7 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
             out.addAttr("d", d);
             out.addAttr("fill", "none");
             out.addAttr("stroke", "white");
-            out.addAttr("stroke-width", FloatToString(stroke->width));
+            out.addAttr("stroke-width", CssFloatToString(stroke->width));
             if (stroke->cap == LineCap::Round) {
               out.addAttr("stroke-linecap", "round");
             }
@@ -1624,10 +1626,10 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     auto css = colorToCSS(stroke->color, nullptr);
     if (!css.empty()) {
       out.openTag("foreignObject");
-      out.addAttr("x", FloatToString(x0));
-      out.addAttr("y", FloatToString(y0));
-      out.addAttr("width", FloatToString(bw));
-      out.addAttr("height", FloatToString(bh));
+      out.addAttr("x", CssFloatToString(x0));
+      out.addAttr("y", CssFloatToString(y0));
+      out.addAttr("width", CssFloatToString(bw));
+      out.addAttr("height", CssFloatToString(bh));
       out.addAttr("mask", "url(#" + maskId + ")");
       out.closeTagStart();
       out.openTag("div");
@@ -1654,8 +1656,8 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
   // so the SVG left/top compensates for the div shift, keeping the geometry at its correct
   // layer-local position.
   std::string svgStyle =
-      "position:absolute;left:" + FloatToString(x0 + _ctx->savedChildLayerOffsetX) +
-      "px;top:" + FloatToString(y0 + _ctx->savedChildLayerOffsetY) + "px";
+      "position:absolute;left:" + CssFloatToString(x0 + _ctx->savedChildLayerOffsetX) +
+      "px;top:" + CssFloatToString(y0 + _ctx->savedChildLayerOffsetY) + "px";
   if (painterBlend != BlendMode::Normal) {
     auto blendStr = BlendModeToMixBlendMode(painterBlend);
     if (blendStr) {
@@ -1664,14 +1666,14 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     }
   }
   if (alpha < 1.0f) {
-    svgStyle += ";opacity:" + FloatToString(alpha);
+    svgStyle += ";opacity:" + CssFloatToString(alpha);
   }
 
   out.openTag("svg");
-  out.addAttr("width", FloatToString(sw));
-  out.addAttr("height", FloatToString(sh));
-  out.addAttr("viewBox", FloatToString(x0) + " " + FloatToString(y0) + " " + FloatToString(sw) +
-                             " " + FloatToString(sh));
+  out.addAttr("width", CssFloatToString(sw));
+  out.addAttr("height", CssFloatToString(sh));
+  out.addAttr("viewBox", CssFloatToString(x0) + " " + CssFloatToString(y0) + " " +
+                             CssFloatToString(sw) + " " + CssFloatToString(sh));
   out.addAttr("style", svgStyle);
   out.closeTagStart();
 
@@ -1690,10 +1692,10 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
       // elements with clip-rule does not work because clip-rule only applies to <path> elements.
       std::string combinedD;
       // Outer rectangle path
-      combinedD += "M" + FloatToString(x0) + "," + FloatToString(y0);
-      combinedD += "H" + FloatToString(x0 + sw);
-      combinedD += "V" + FloatToString(y0 + sh);
-      combinedD += "H" + FloatToString(x0);
+      combinedD += "M" + CssFloatToString(x0) + "," + CssFloatToString(y0);
+      combinedD += "H" + CssFloatToString(x0 + sw);
+      combinedD += "V" + CssFloatToString(y0 + sh);
+      combinedD += "H" + CssFloatToString(x0);
       combinedD += "Z";
       // Inner shape path(s)
       for (auto& g : geos) {
@@ -1745,15 +1747,15 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
             float cy = pos.y - size.height / 2;
             out.openTag("rect");
             if (!FloatNearlyZero(cx)) {
-              out.addAttr("x", FloatToString(cx));
+              out.addAttr("x", CssFloatToString(cx));
             }
             if (!FloatNearlyZero(cy)) {
-              out.addAttr("y", FloatToString(cy));
+              out.addAttr("y", CssFloatToString(cy));
             }
-            out.addAttr("width", FloatToString(size.width));
-            out.addAttr("height", FloatToString(size.height));
+            out.addAttr("width", CssFloatToString(size.width));
+            out.addAttr("height", CssFloatToString(size.height));
             if (r->roundness > 0) {
-              out.addAttr("rx", FloatToString(r->roundness));
+              out.addAttr("rx", CssFloatToString(r->roundness));
             }
             out.closeTagSelfClosing();
             break;
@@ -1763,10 +1765,10 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
             auto pos = e->renderPosition();
             auto size = e->renderSize();
             out.openTag("ellipse");
-            out.addAttr("cx", FloatToString(pos.x));
-            out.addAttr("cy", FloatToString(pos.y));
-            out.addAttr("rx", FloatToString(size.width / 2));
-            out.addAttr("ry", FloatToString(size.height / 2));
+            out.addAttr("cx", CssFloatToString(pos.x));
+            out.addAttr("cy", CssFloatToString(pos.y));
+            out.addAttr("rx", CssFloatToString(size.width / 2));
+            out.addAttr("ry", CssFloatToString(size.height / 2));
             out.closeTagSelfClosing();
             break;
           }
@@ -1861,16 +1863,16 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           float y = pos.y - size.height / 2;
           out.openTag("rect");
           if (!FloatNearlyZero(x)) {
-            out.addAttr("x", FloatToString(x));
+            out.addAttr("x", CssFloatToString(x));
           }
           if (!FloatNearlyZero(y)) {
-            out.addAttr("y", FloatToString(y));
+            out.addAttr("y", CssFloatToString(y));
           }
-          out.addAttr("width", FloatToString(size.width));
-          out.addAttr("height", FloatToString(size.height));
+          out.addAttr("width", CssFloatToString(size.width));
+          out.addAttr("height", CssFloatToString(size.height));
           if (r->roundness > 0) {
-            out.addAttr("rx", FloatToString(r->roundness));
-            out.addAttr("ry", FloatToString(r->roundness));
+            out.addAttr("rx", CssFloatToString(r->roundness));
+            out.addAttr("ry", CssFloatToString(r->roundness));
           }
         }
         applySVGFill(out, trim ? nullptr : fill, x0, y0, sw, sh);
@@ -1896,10 +1898,10 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           auto pos = e->renderPosition();
           auto size = e->renderSize();
           out.openTag("ellipse");
-          out.addAttr("cx", FloatToString(pos.x));
-          out.addAttr("cy", FloatToString(pos.y));
-          out.addAttr("rx", FloatToString(size.width / 2));
-          out.addAttr("ry", FloatToString(size.height / 2));
+          out.addAttr("cx", CssFloatToString(pos.x));
+          out.addAttr("cy", CssFloatToString(pos.y));
+          out.addAttr("rx", CssFloatToString(size.width / 2));
+          out.addAttr("ry", CssFloatToString(size.height / 2));
         }
         applySVGFill(out, trim ? nullptr : fill, x0, y0, sw, sh);
         if (isContinuousTrim) {
@@ -1997,8 +1999,8 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         return;
       }
       std::string svgStyle =
-          "position:absolute;left:" + FloatToString(x0 + _ctx->savedChildLayerOffsetX) +
-          "px;top:" + FloatToString(y0 + _ctx->savedChildLayerOffsetY) + "px";
+          "position:absolute;left:" + CssFloatToString(x0 + _ctx->savedChildLayerOffsetX) +
+          "px;top:" + CssFloatToString(y0 + _ctx->savedChildLayerOffsetY) + "px";
       if (painterBlend != BlendMode::Normal) {
         auto blendStr = BlendModeToMixBlendMode(painterBlend);
         if (blendStr) {
@@ -2007,13 +2009,13 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         }
       }
       if (alpha < 1.0f) {
-        svgStyle += ";opacity:" + FloatToString(alpha);
+        svgStyle += ";opacity:" + CssFloatToString(alpha);
       }
       out.openTag("svg");
-      out.addAttr("width", FloatToString(sw));
-      out.addAttr("height", FloatToString(sh));
-      out.addAttr("viewBox", FloatToString(x0) + " " + FloatToString(y0) + " " + FloatToString(sw) +
-                                 " " + FloatToString(sh));
+      out.addAttr("width", CssFloatToString(sw));
+      out.addAttr("height", CssFloatToString(sh));
+      out.addAttr("viewBox", CssFloatToString(x0) + " " + CssFloatToString(y0) + " " +
+                                 CssFloatToString(sw) + " " + CssFloatToString(sh));
       out.addAttr("style", svgStyle);
       out.closeTagStart();
 
@@ -2159,8 +2161,8 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
       return;
     }
     std::string svgStyle =
-        "position:absolute;left:" + FloatToString(x0 + _ctx->savedChildLayerOffsetX) +
-        "px;top:" + FloatToString(y0 + _ctx->savedChildLayerOffsetY) + "px";
+        "position:absolute;left:" + CssFloatToString(x0 + _ctx->savedChildLayerOffsetX) +
+        "px;top:" + CssFloatToString(y0 + _ctx->savedChildLayerOffsetY) + "px";
     if (painterBlend != BlendMode::Normal) {
       auto blendStr = BlendModeToMixBlendMode(painterBlend);
       if (blendStr) {
@@ -2169,13 +2171,13 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
       }
     }
     if (alpha < 1.0f) {
-      svgStyle += ";opacity:" + FloatToString(alpha);
+      svgStyle += ";opacity:" + CssFloatToString(alpha);
     }
     out.openTag("svg");
-    out.addAttr("width", FloatToString(sw));
-    out.addAttr("height", FloatToString(sh));
-    out.addAttr("viewBox", FloatToString(x0) + " " + FloatToString(y0) + " " + FloatToString(sw) +
-                               " " + FloatToString(sh));
+    out.addAttr("width", CssFloatToString(sw));
+    out.addAttr("height", CssFloatToString(sh));
+    out.addAttr("viewBox", CssFloatToString(x0) + " " + CssFloatToString(y0) + " " +
+                               CssFloatToString(sw) + " " + CssFloatToString(sh));
     out.addAttr("style", svgStyle);
     out.closeTagStart();
     out.openTag("path");
@@ -2274,11 +2276,11 @@ void HTMLWriter::renderDiamondCanvas(HTMLBuilder& out, const GeoInfo& geo, const
     return;
   }
 
-  std::string style = "position:absolute;left:" + FloatToString(left) +
-                      "px;top:" + FloatToString(top) + "px;width:" + FloatToString(w) +
-                      "px;height:" + FloatToString(h) + "px";
+  std::string style = "position:absolute;left:" + CssFloatToString(left) +
+                      "px;top:" + CssFloatToString(top) + "px;width:" + CssFloatToString(w) +
+                      "px;height:" + CssFloatToString(h) + "px";
   if (alpha < 1.0f) {
-    style += ";opacity:" + FloatToString(alpha);
+    style += ";opacity:" + CssFloatToString(alpha);
   }
   if (painterBlend != BlendMode::Normal) {
     auto blendStr = BlendModeToMixBlendMode(painterBlend);
@@ -2347,8 +2349,8 @@ void HTMLWriter::renderConicCanvas(HTMLBuilder& out, const std::vector<GeoInfo>&
   // Emit the SVG wrapping the rasterized PNG: an <svg> at (x0,y0) containing an <image>
   // with the clip-path applied.
   std::string svgStyle =
-      "position:absolute;left:" + FloatToString(x0 + _ctx->savedChildLayerOffsetX) +
-      "px;top:" + FloatToString(y0 + _ctx->savedChildLayerOffsetY) + "px";
+      "position:absolute;left:" + CssFloatToString(x0 + _ctx->savedChildLayerOffsetX) +
+      "px;top:" + CssFloatToString(y0 + _ctx->savedChildLayerOffsetY) + "px";
   if (painterBlend != BlendMode::Normal) {
     auto blendStr = BlendModeToMixBlendMode(painterBlend);
     if (blendStr) {
@@ -2357,21 +2359,21 @@ void HTMLWriter::renderConicCanvas(HTMLBuilder& out, const std::vector<GeoInfo>&
     }
   }
   if (alpha < 1.0f) {
-    svgStyle += ";opacity:" + FloatToString(alpha);
+    svgStyle += ";opacity:" + CssFloatToString(alpha);
   }
   out.openTag("svg");
-  out.addAttr("width", FloatToString(sw));
-  out.addAttr("height", FloatToString(sh));
-  out.addAttr("viewBox", FloatToString(x0) + " " + FloatToString(y0) + " " + FloatToString(sw) +
-                             " " + FloatToString(sh));
+  out.addAttr("width", CssFloatToString(sw));
+  out.addAttr("height", CssFloatToString(sh));
+  out.addAttr("viewBox", CssFloatToString(x0) + " " + CssFloatToString(y0) + " " +
+                             CssFloatToString(sw) + " " + CssFloatToString(sh));
   out.addAttr("style", svgStyle);
   out.closeTagStart();
   out.openTag("image");
   out.addAttr("href", _ctx->staticImgUrlPrefix + fileName);
-  out.addAttr("x", FloatToString(x0));
-  out.addAttr("y", FloatToString(y0));
-  out.addAttr("width", FloatToString(sw));
-  out.addAttr("height", FloatToString(sh));
+  out.addAttr("x", CssFloatToString(x0));
+  out.addAttr("y", CssFloatToString(y0));
+  out.addAttr("width", CssFloatToString(sw));
+  out.addAttr("height", CssFloatToString(sh));
   out.addAttr("clip-path", "url(#" + clipId + ")");
   out.closeTagSelfClosing();
   out.closeTag();  // </svg>
@@ -2431,11 +2433,11 @@ void HTMLWriter::renderImagePatternCanvas(HTMLBuilder& out, const GeoInfo& geo, 
     return;
   }
 
-  std::string style = "position:absolute;left:" + FloatToString(left) +
-                      "px;top:" + FloatToString(top) + "px;width:" + FloatToString(w) +
-                      "px;height:" + FloatToString(h) + "px";
+  std::string style = "position:absolute;left:" + CssFloatToString(left) +
+                      "px;top:" + CssFloatToString(top) + "px;width:" + CssFloatToString(w) +
+                      "px;height:" + CssFloatToString(h) + "px";
   if (alpha < 1.0f) {
-    style += ";opacity:" + FloatToString(alpha);
+    style += ";opacity:" + CssFloatToString(alpha);
   }
   if (painterBlend != BlendMode::Normal) {
     auto blendStr = BlendModeToMixBlendMode(painterBlend);

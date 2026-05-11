@@ -127,7 +127,7 @@ std::string FontSignatureToCss(const FontSignature& sig) {
   }
   if (sig.renderFontSize > 0) {
     if (!css.empty()) css += ';';
-    css += "font-size:" + FloatToString(sig.renderFontSize) + "px";
+    css += "font-size:" + CssFloatToString(sig.renderFontSize) + "px";
   }
   if (sig.bold) {
     if (!css.empty()) css += ';';
@@ -139,11 +139,11 @@ std::string FontSignatureToCss(const FontSignature& sig) {
   }
   if (!std::isnan(sig.letterSpacing) && sig.letterSpacing != 0.0f) {
     if (!css.empty()) css += ';';
-    css += "letter-spacing:" + FloatToString(sig.letterSpacing) + "px";
+    css += "letter-spacing:" + CssFloatToString(sig.letterSpacing) + "px";
   }
   if (!std::isnan(sig.lineHeight) && sig.lineHeight > 0) {
     if (!css.empty()) css += ';';
-    css += "line-height:" + FloatToString(sig.lineHeight) + "px";
+    css += "line-height:" + CssFloatToString(sig.lineHeight) + "px";
   }
   return css;
 }

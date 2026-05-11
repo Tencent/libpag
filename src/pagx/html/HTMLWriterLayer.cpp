@@ -55,7 +55,7 @@ using pag::FloatNearlyZero;
 static constexpr float BBOX_SENTINEL_LARGE = 1e9f;
 
 static void EmitLeftTopCss(std::string& style, bool& positionSet, float x, float y) {
-  style += ";left:" + FloatToString(x) + "px;top:" + FloatToString(y) + "px";
+  style += ";left:" + CssFloatToString(x) + "px;top:" + CssFloatToString(y) + "px";
   positionSet = true;
 }
 
@@ -297,23 +297,23 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           float tbH = tbBounds.height;
           float tbLeft = tbPos.x;
           float tbTop = tbPos.y;
-          std::string style = "position:absolute;left:" + FloatToString(tbLeft) +
-                              "px;top:" + FloatToString(tbTop) + "px";
+          std::string style = "position:absolute;left:" + CssFloatToString(tbLeft) +
+                              "px;top:" + CssFloatToString(tbTop) + "px";
           if (layoutW && tbW > 0) {
-            style += ";width:" + FloatToString(tbW) + "px";
+            style += ";width:" + CssFloatToString(tbW) + "px";
           } else if (!layoutW) {
             // For vertical writing-mode TextBoxes, tgfx has already measured the exact column
             // width needed; use that fixed value so Chromium produces the same column layout.
             // For horizontal auto-sized boxes, keep max-content so Chromium's slightly wider
             // font metrics don't trigger an unwanted line break at the tgfx boundary.
             if (tb->writingMode == WritingMode::Vertical && tbW > 0) {
-              style += ";width:" + FloatToString(tbW) + "px";
+              style += ";width:" + CssFloatToString(tbW) + "px";
             } else {
               style += ";width:max-content";
             }
           }
           if (layoutH && tbH > 0) {
-            style += ";height:" + FloatToString(tbH) + "px";
+            style += ";height:" + CssFloatToString(tbH) + "px";
           }
           // PAGX `<TextBox padding="...">` insets the text content from the box edges:
           // tgfx subtracts padding from layoutWidth/Height before line breaking, so the
@@ -470,7 +470,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               }
             }
             if (strutSize > 0) {
-              style += ";font-size:" + FloatToString(strutSize) + "px";
+              style += ";font-size:" + CssFloatToString(strutSize) + "px";
             }
             // Pin line-height too. When PAGX declares a TextBox lineHeight we honour it;
             // otherwise fall back to the largest per-glyph fontLineHeight from tgfx's shaping
@@ -498,7 +498,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               }
             }
             if (lineH > 0) {
-              style += ";line-height:" + FloatToString(lineH) + "px";
+              style += ";line-height:" + CssFloatToString(lineH) + "px";
             }
             // Translate PAGX Overflow::Hidden with a simple pixel clip. tgfx's TextLayout drops
             // any line whose bottom extends past the box. A max-height based on tgfx's line count
@@ -523,8 +523,8 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                 if (renderedWidth > 0 && renderedWidth < tbW - 0.5f) {
                   // Override the earlier width/left declarations; CSS later-wins when the
                   // same property is re-declared in the same inline style attribute.
-                  style += ";width:" + FloatToString(renderedWidth) + "px";
-                  style += ";left:" + FloatToString(tbLeft + (tbW - renderedWidth)) + "px";
+                  style += ";width:" + CssFloatToString(renderedWidth) + "px";
+                  style += ";left:" + CssFloatToString(tbLeft + (tbW - renderedWidth)) + "px";
                 }
               } else if (lineH > 0 && tbH > 0) {
                 // Horizontal Overflow::Hidden: tgfx drops any line whose bottom extends past
@@ -536,7 +536,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                 if (fit >= 1) {
                   float clipH = static_cast<float>(fit) * lineH;
                   if (clipH < tbH - 0.5f) {
-                    style += ";height:" + FloatToString(clipH) + "px";
+                    style += ";height:" + CssFloatToString(clipH) + "px";
                   }
                 }
               }
@@ -577,7 +577,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                 float spanSize = span.text->renderFontSize();
                 spanStyle += "white-space:pre-wrap";
                 if (spanSize > 0) {
-                  spanStyle += ";tab-size:" + FloatToString(spanSize * 4) + "px";
+                  spanStyle += ";tab-size:" + CssFloatToString(spanSize * 4) + "px";
                 }
               }
               bool spanFontHoisted = !_ctx->fontHoistSignature.fontFamily.empty() ||
@@ -588,7 +588,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                   spanStyle += "font-family:'" + EscapeCssFontFamily(span.text->fontFamily) + "'";
                 }
                 if (!spanStyle.empty()) spanStyle += ';';
-                spanStyle += "font-size:" + FloatToString(span.text->renderFontSize()) + "px";
+                spanStyle += "font-size:" + CssFloatToString(span.text->renderFontSize()) + "px";
                 if (!span.text->fontStyle.empty()) {
                   if (span.text->fontStyle.find("Bold") != std::string::npos) {
                     spanStyle += ";font-weight:bold;font-synthesis-weight:" +
@@ -600,7 +600,8 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                   }
                 }
                 if (span.text->letterSpacing != 0.0f) {
-                  spanStyle += ";letter-spacing:" + FloatToString(span.text->letterSpacing) + "px";
+                  spanStyle +=
+                      ";letter-spacing:" + CssFloatToString(span.text->letterSpacing) + "px";
                 }
               }
               if (span.fill && span.fill->color) {
@@ -633,7 +634,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                     ResolveTextStrokeCss(span.stroke->width, span.stroke->align, hasFill);
                 if (strokeCss.width > 0.0f) {
                   if (!spanStyle.empty()) spanStyle += ';';
-                  spanStyle += "-webkit-text-stroke:" + FloatToString(strokeCss.width) + "px " +
+                  spanStyle += "-webkit-text-stroke:" + CssFloatToString(strokeCss.width) + "px " +
                                ColorToRGBA(sc->color, span.stroke->alpha);
                   if (strokeCss.paintOrderStrokeFill) {
                     spanStyle += ";paint-order:stroke fill";
@@ -657,8 +658,8 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               float spanFontSize = span.text->renderFontSize();
               if (tb->lineHeight > 0 && spanFontSize > 0 &&
                   spanFontSize * 1.17f > tb->lineHeight + 0.5f) {
-                spanStyle += ";display:inline-block;height:" + FloatToString(tb->lineHeight) +
-                             "px;line-height:" + FloatToString(tb->lineHeight) +
+                spanStyle += ";display:inline-block;height:" + CssFloatToString(tb->lineHeight) +
+                             "px;line-height:" + CssFloatToString(tb->lineHeight) +
                              "px;vertical-align:top";
               }
               // Emit between-span <br>s: prevTrailingBreaks (from prior span's trailing \n)
@@ -695,7 +696,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                   // else current span.
                   float ownerFontSize = (bi <= prevTrailingBreaks) ? prevFontSize : spanFontSize;
                   if (ownerFontSize > 0) {
-                    out.emitRaw("<span style=\"font-size:" + FloatToString(ownerFontSize) +
+                    out.emitRaw("<span style=\"font-size:" + CssFloatToString(ownerFontSize) +
                                 "px\"><br></span>");
                   } else {
                     out.emitBreaks(1);
@@ -785,7 +786,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               if (bi == 0) {
                 out.emitBreaks(1);
               } else if (prevFontSize > 0) {
-                out.emitRaw("<span style=\"font-size:" + FloatToString(prevFontSize) +
+                out.emitRaw("<span style=\"font-size:" + CssFloatToString(prevFontSize) +
                             "px\"><br></span>");
               } else {
                 out.emitBreaks(1);
@@ -799,13 +800,13 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         } else if (useRichText && !richTextSpans.empty()) {
           auto tb = curTextBox;
           auto tbPos = tb->renderPosition();
-          std::string style = "position:absolute;left:" + FloatToString(tbPos.x) +
-                              "px;top:" + FloatToString(tbPos.y) + "px";
+          std::string style = "position:absolute;left:" + CssFloatToString(tbPos.x) +
+                              "px;top:" + CssFloatToString(tbPos.y) + "px";
           if (!std::isnan(tb->width)) {
-            style += ";width:" + FloatToString(tb->width) + "px";
+            style += ";width:" + CssFloatToString(tb->width) + "px";
           }
           if (!std::isnan(tb->height)) {
-            style += ";height:" + FloatToString(tb->height) + "px";
+            style += ";height:" + CssFloatToString(tb->height) + "px";
           }
           // Match the tbSpans branch above: emit TextBox padding so Chromium wraps at
           // the same inner content rect tgfx used during layout.
@@ -851,7 +852,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             }
           }
           if (rtLineH > 0) {
-            style += ";line-height:" + FloatToString(rtLineH) + "px";
+            style += ";line-height:" + CssFloatToString(rtLineH) + "px";
           }
           if (tb->overflow == Overflow::Hidden) {
             style += ";overflow:hidden";
@@ -865,7 +866,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               if (fit >= 1) {
                 float clipH = static_cast<float>(fit) * rtLineH;
                 if (clipH < tb->height - 0.5f) {
-                  style += ";height:" + FloatToString(clipH) + "px";
+                  style += ";height:" + CssFloatToString(clipH) + "px";
                 }
               }
             }
@@ -891,7 +892,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               if (!spanStyle.empty()) spanStyle += ';';
               spanStyle += "white-space:pre-wrap";
               if (spanSize > 0) {
-                spanStyle += ";tab-size:" + FloatToString(spanSize * 4) + "px";
+                spanStyle += ";tab-size:" + CssFloatToString(spanSize * 4) + "px";
               }
             }
             bool spanFontHoisted = !_ctx->fontHoistSignature.fontFamily.empty() ||
@@ -900,7 +901,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               if (!span.text->fontFamily.empty()) {
                 spanStyle += ";font-family:'" + EscapeCssFontFamily(span.text->fontFamily) + "'";
               }
-              spanStyle += ";font-size:" + FloatToString(span.text->renderFontSize()) + "px";
+              spanStyle += ";font-size:" + CssFloatToString(span.text->renderFontSize()) + "px";
               if (!span.text->fontStyle.empty()) {
                 if (span.text->fontStyle.find("Bold") != std::string::npos) {
                   spanStyle += ";font-weight:bold;font-synthesis-weight:" +
@@ -912,7 +913,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                 }
               }
               if (span.text->letterSpacing != 0.0f) {
-                spanStyle += ";letter-spacing:" + FloatToString(span.text->letterSpacing) + "px";
+                spanStyle += ";letter-spacing:" + CssFloatToString(span.text->letterSpacing) + "px";
               }
             }
             if (span.fill && span.fill->color) {
@@ -941,7 +942,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               auto strokeCss =
                   ResolveTextStrokeCss(span.stroke->width, span.stroke->align, hasFill);
               if (strokeCss.width > 0.0f) {
-                spanStyle += ";-webkit-text-stroke:" + FloatToString(strokeCss.width) + "px " +
+                spanStyle += ";-webkit-text-stroke:" + CssFloatToString(strokeCss.width) + "px " +
                              ColorToRGBA(sc->color, span.stroke->alpha);
                 if (strokeCss.paintOrderStrokeFill) {
                   spanStyle += ";paint-order:stroke fill";
@@ -957,8 +958,8 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             float rtSpanFontSize = span.text->renderFontSize();
             if (tb->lineHeight > 0 && rtSpanFontSize > 0 &&
                 rtSpanFontSize * 1.17f > tb->lineHeight + 0.5f) {
-              spanStyle += ";display:inline-block;height:" + FloatToString(tb->lineHeight) +
-                           "px;line-height:" + FloatToString(tb->lineHeight) +
+              spanStyle += ";display:inline-block;height:" + CssFloatToString(tb->lineHeight) +
+                           "px;line-height:" + CssFloatToString(tb->lineHeight) +
                            "px;vertical-align:top";
             }
             // Emit between-span <br>s with empty-line owner wrapping (see tbSpans branch).
@@ -971,7 +972,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
                 float ownerFontSize =
                     (bi <= rtPrevTrailingBreaks) ? rtPrevFontSize : rtSpanFontSize;
                 if (ownerFontSize > 0) {
-                  out.emitRaw("<span style=\"font-size:" + FloatToString(ownerFontSize) +
+                  out.emitRaw("<span style=\"font-size:" + CssFloatToString(ownerFontSize) +
                               "px\"><br></span>");
                 } else {
                   out.emitBreaks(1);
@@ -998,7 +999,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             if (bi == 0) {
               out.emitBreaks(1);
             } else if (rtPrevFontSize > 0) {
-              out.emitRaw("<span style=\"font-size:" + FloatToString(rtPrevFontSize) +
+              out.emitRaw("<span style=\"font-size:" + CssFloatToString(rtPrevFontSize) +
                           "px\"><br></span>");
             } else {
               out.emitBreaks(1);
@@ -1424,10 +1425,11 @@ static std::string clipPathFromContents(const Layer* layer) {
       if (left < 0) left = 0;
       if (bottom < 0) bottom = 0;
       if (right < 0) right = 0;
-      std::string clip = ";clip-path:inset(" + FloatToString(top) + "px " + FloatToString(right) +
-                         "px " + FloatToString(bottom) + "px " + FloatToString(left) + "px";
+      std::string clip = ";clip-path:inset(" + CssFloatToString(top) + "px " +
+                         CssFloatToString(right) + "px " + CssFloatToString(bottom) + "px " +
+                         CssFloatToString(left) + "px";
       if (r->roundness > 0) {
-        clip += " round " + FloatToString(r->roundness) + "px";
+        clip += " round " + CssFloatToString(r->roundness) + "px";
       }
       clip += ")";
       return clip;
@@ -1440,9 +1442,9 @@ static std::string clipPathFromContents(const Layer* layer) {
       }
       float cx = bounds.x + bounds.width / 2;
       float cy = bounds.y + bounds.height / 2;
-      return ";clip-path:ellipse(" + FloatToString(bounds.width / 2) + "px " +
-             FloatToString(bounds.height / 2) + "px at " + FloatToString(cx) + "px " +
-             FloatToString(cy) + "px)";
+      return ";clip-path:ellipse(" + CssFloatToString(bounds.width / 2) + "px " +
+             CssFloatToString(bounds.height / 2) + "px at " + CssFloatToString(cx) + "px " +
+             CssFloatToString(cy) + "px)";
     }
   }
   return {};
@@ -1480,7 +1482,7 @@ static std::string layerBoxShadowBorderRadius(const Layer* layer) {
         return {};
       }
       if (r->roundness > 0) {
-        return FloatToString(r->roundness) + "px";
+        return CssFloatToString(r->roundness) + "px";
       }
       return "0";
     }
@@ -1551,7 +1553,7 @@ static ShadowShape findLayerShadowShape(const Layer* layer) {
       s.width = bounds.width;
       s.height = bounds.height;
       if (r->roundness > 0) {
-        s.radius = FloatToString(r->roundness) + "px";
+        s.radius = CssFloatToString(r->roundness) + "px";
       }
       s.valid = true;
       return s;
@@ -1627,7 +1629,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       mainAxisDeclared = !std::isnan(layer->height) || !std::isnan(layer->percentHeight);
     }
     if (layer->flex > 0 && !mainAxisDeclared) {
-      style += "flex:" + FloatToString(layer->flex);
+      style += "flex:" + CssFloatToString(layer->flex);
     }
     // When the layer has absolute-positioned contents (Text, shapes), it needs explicit size
     // so that contents' coordinates are correct. Use pagx explicit size first, then fall back
@@ -1640,13 +1642,13 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       if (!style.empty()) {
         style += ';';
       }
-      style += "width:" + FloatToString(outputW) + "px";
+      style += "width:" + CssFloatToString(outputW) + "px";
     }
     if (!std::isnan(outputH) && outputH > 0) {
       if (!style.empty()) {
         style += ';';
       }
-      style += "height:" + FloatToString(outputH) + "px";
+      style += "height:" + CssFloatToString(outputH) + "px";
     }
     // Flex item needs position:relative for absolute-positioned contents or child layers.
     if (isFlexContainer || needsSize || !layer->children.empty()) {
@@ -1765,10 +1767,10 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         EmitLeftTopCss(style, positionSet, renderPos.x + repeaterOffsetX,
                        renderPos.y + repeaterOffsetY);
         if (uw > 0) {
-          style += ";width:" + FloatToString(uw) + "px";
+          style += ";width:" + CssFloatToString(uw) + "px";
         }
         if (uh > 0) {
-          style += ";height:" + FloatToString(uh) + "px";
+          style += ";height:" + CssFloatToString(uh) + "px";
         }
         style += ";overflow:visible";
       }
@@ -1802,10 +1804,10 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     if (!repeater && (isFlexContainer || !layer->contents.empty())) {
       auto bounds = layer->layoutBounds();
       if (bounds.width > 0) {
-        style += ";width:" + FloatToString(bounds.width) + "px";
+        style += ";width:" + CssFloatToString(bounds.width) + "px";
       }
       if (bounds.height > 0) {
-        style += ";height:" + FloatToString(bounds.height) + "px";
+        style += ";height:" + CssFloatToString(bounds.height) + "px";
       }
     }
   }
@@ -1831,7 +1833,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
                    layer->arrangement == Arrangement::SpaceEvenly ||
                    layer->arrangement == Arrangement::SpaceAround;
     if (!isSpace && layer->gap > 0) {
-      style += ";gap:" + FloatToString(layer->gap) + "px";
+      style += ";gap:" + CssFloatToString(layer->gap) + "px";
     }
     if (!layer->padding.isZero()) {
       style += ";padding:" + PaddingToCSS(layer->padding);
@@ -1851,11 +1853,11 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       auto bounds = layer->layoutBounds();
       if (horizontal && std::isnan(layer->width) && bounds.width > 0) {
         if (style.find("width:") == std::string::npos) {
-          style += ";width:" + FloatToString(bounds.width) + "px";
+          style += ";width:" + CssFloatToString(bounds.width) + "px";
         }
       } else if (!horizontal && std::isnan(layer->height) && bounds.height > 0) {
         if (style.find("height:") == std::string::npos) {
-          style += ";height:" + FloatToString(bounds.height) + "px";
+          style += ";height:" + CssFloatToString(bounds.height) + "px";
         }
       }
     }
@@ -2011,8 +2013,8 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
           // box-shadow fallback: preserves the sibling backdrop-filter sampling path. Also
           // propagate group opacity down to children, because `opacity < 1` on the layer div
           // would re-introduce the stacking context we just eliminated.
-          boxShadowValue = FloatToString(ds->offsetX) + "px " + FloatToString(ds->offsetY) + "px " +
-                           FloatToString(ds->blurX) + "px " + ColorToRGBA(ds->color);
+          boxShadowValue = CssFloatToString(ds->offsetX) + "px " + CssFloatToString(ds->offsetY) +
+                           "px " + CssFloatToString(ds->blurX) + "px " + ColorToRGBA(ds->color);
           boxShadowBorderRadius = radius;
           suppressGroupOpacity = true;
           continue;
@@ -2030,11 +2032,12 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       if (!hasBlendMode && ds->showBehindLayer) {
         ShadowShape shape = findLayerShadowShape(layer);
         if (shape.valid) {
-          std::string style = "position:absolute;left:" + FloatToString(shape.left + ds->offsetX) +
-                              "px;top:" + FloatToString(shape.top + ds->offsetY) +
-                              "px;width:" + FloatToString(shape.width) +
-                              "px;height:" + FloatToString(shape.height) +
-                              "px;background-color:" + ColorToRGBA(ds->color);
+          std::string style =
+              "position:absolute;left:" + CssFloatToString(shape.left + ds->offsetX) +
+              "px;top:" + CssFloatToString(shape.top + ds->offsetY) +
+              "px;width:" + CssFloatToString(shape.width) +
+              "px;height:" + CssFloatToString(shape.height) +
+              "px;background-color:" + ColorToRGBA(ds->color);
           if (!shape.radius.empty()) {
             style += ";border-radius:" + shape.radius;
           }
@@ -2042,17 +2045,17 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
           // stdDeviation numerically when the values are equal.
           float blurAvg = (ds->blurX + ds->blurY) * 0.5f;
           if (blurAvg > 0) {
-            style += ";filter:blur(" + FloatToString(blurAvg) + "px)";
+            style += ";filter:blur(" + CssFloatToString(blurAvg) + "px)";
           }
           pendingSiblingShadows.push_back(style);
           continue;
         }
       }
       {
-        std::string signature = "dss:" + FloatToString(ds->offsetX) + "," +
-                                FloatToString(ds->offsetY) + "," + FloatToString(ds->blurX) + "," +
-                                FloatToString(ds->blurY) + "," + ColorToRGBA(ds->color) + "," +
-                                (ds->showBehindLayer ? "1" : "0");
+        std::string signature = "dss:" + CssFloatToString(ds->offsetX) + "," +
+                                CssFloatToString(ds->offsetY) + "," + CssFloatToString(ds->blurX) +
+                                "," + CssFloatToString(ds->blurY) + "," + ColorToRGBA(ds->color) +
+                                "," + (ds->showBehindLayer ? "1" : "0");
         std::string fid = lookupFilterId(signature);
         if (fid.empty()) {
           fid = _ctx->nextId("filter");
@@ -2077,26 +2080,27 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
           _defs->closeTagSelfClosing();
           _defs->openTag("feGaussianBlur");
           _defs->addAttr("in", "opaqueAlpha");
-          _defs->addAttr("stdDeviation", FloatToString(ds->blurX) + " " + FloatToString(ds->blurY));
+          _defs->addAttr("stdDeviation",
+                         CssFloatToString(ds->blurX) + " " + CssFloatToString(ds->blurY));
           _defs->addAttr("result", "blur");
           _defs->closeTagSelfClosing();
           _defs->openTag("feOffset");
           _defs->addAttr("in", "blur");
           if (!FloatNearlyZero(ds->offsetX)) {
-            _defs->addAttr("dx", FloatToString(ds->offsetX));
+            _defs->addAttr("dx", CssFloatToString(ds->offsetX));
           }
           if (!FloatNearlyZero(ds->offsetY)) {
-            _defs->addAttr("dy", FloatToString(ds->offsetY));
+            _defs->addAttr("dy", CssFloatToString(ds->offsetY));
           }
           _defs->addAttr("result", "off");
           _defs->closeTagSelfClosing();
           _defs->openTag("feColorMatrix");
           _defs->addAttr("in", "off");
           _defs->addAttr("type", "matrix");
-          _defs->addAttr("values", "0 0 0 0 " + FloatToString(ds->color.red) + " 0 0 0 0 " +
-                                       FloatToString(ds->color.green) + " 0 0 0 0 " +
-                                       FloatToString(ds->color.blue) + " 0 0 0 " +
-                                       FloatToString(ds->color.alpha) + " 0");
+          _defs->addAttr("values", "0 0 0 0 " + CssFloatToString(ds->color.red) + " 0 0 0 0 " +
+                                       CssFloatToString(ds->color.green) + " 0 0 0 0 " +
+                                       CssFloatToString(ds->color.blue) + " 0 0 0 " +
+                                       CssFloatToString(ds->color.alpha) + " 0");
           _defs->addAttr("result", "shadow");
           _defs->closeTagSelfClosing();
           if (!ds->showBehindLayer) {
@@ -2139,9 +2143,9 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       if (hasBlendMode) {
         aboveStyles.push_back({NodeType::InnerShadowStyle, ls});
       } else {
-        std::string signature = "iss:" + FloatToString(is->offsetX) + "," +
-                                FloatToString(is->offsetY) + "," + FloatToString(is->blurX) + "," +
-                                FloatToString(is->blurY) + "," + ColorToRGBA(is->color);
+        std::string signature = "iss:" + CssFloatToString(is->offsetX) + "," +
+                                CssFloatToString(is->offsetY) + "," + CssFloatToString(is->blurX) +
+                                "," + CssFloatToString(is->blurY) + "," + ColorToRGBA(is->color);
         std::string fid = lookupFilterId(signature);
         if (fid.empty()) {
           fid = _ctx->nextId("filter");
@@ -2166,9 +2170,9 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
           _defs->addAttr("tableValues", "1 0");
           _defs->closeTagSelfClosing();
           _defs->closeTag();
-          std::string sd = FloatToString(is->blurX);
+          std::string sd = CssFloatToString(is->blurX);
           if (is->blurX != is->blurY) {
-            sd += " " + FloatToString(is->blurY);
+            sd += " " + CssFloatToString(is->blurY);
           }
           _defs->openTag("feGaussianBlur");
           _defs->addAttr("in", "iInv");
@@ -2180,10 +2184,10 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
             _defs->openTag("feOffset");
             _defs->addAttr("in", blurredResult);
             if (!FloatNearlyZero(is->offsetX)) {
-              _defs->addAttr("dx", FloatToString(is->offsetX));
+              _defs->addAttr("dx", CssFloatToString(is->offsetX));
             }
             if (!FloatNearlyZero(is->offsetY)) {
-              _defs->addAttr("dy", FloatToString(is->offsetY));
+              _defs->addAttr("dy", CssFloatToString(is->offsetY));
             }
             _defs->addAttr("result", "iOff");
             _defs->closeTagSelfClosing();
@@ -2192,7 +2196,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
           _defs->openTag("feFlood");
           _defs->addAttr("flood-color", ColorToSVGHex(is->color));
           if (is->color.alpha < 1.0f) {
-            _defs->addAttr("flood-opacity", FloatToString(is->color.alpha));
+            _defs->addAttr("flood-opacity", CssFloatToString(is->color.alpha));
           }
           _defs->addAttr("result", "iFlood");
           _defs->closeTagSelfClosing();
@@ -2251,7 +2255,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     if (suppressGroupOpacity) {
       childDistribute = true;
     } else {
-      style += ";opacity:" + FloatToString(layerAlpha);
+      style += ";opacity:" + CssFloatToString(layerAlpha);
     }
   }
 
@@ -2326,8 +2330,8 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       }
       bool isUniformBlur = FloatNearlyZero(ds->blurX - ds->blurY);
       if (isUniformBlur && ds->showBehindLayer) {
-        shadowStyle += ";filter:drop-shadow(" + FloatToString(ds->offsetX) + "px " +
-                       FloatToString(ds->offsetY) + "px " + FloatToString(ds->blurX) + "px " +
+        shadowStyle += ";filter:drop-shadow(" + CssFloatToString(ds->offsetX) + "px " +
+                       CssFloatToString(ds->offsetY) + "px " + CssFloatToString(ds->blurX) + "px " +
                        ColorToRGBA(ds->color) + ")";
         out.openTag("div");
         out.addAttr("style", shadowStyle);
@@ -2344,19 +2348,19 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         _defs->openTag("feGaussianBlur");
         _defs->addAttr("in", "SourceGraphic");
         _defs->addAttr("stdDeviation",
-                       FloatToString(ds->blurX / 2) + " " + FloatToString(ds->blurY / 2));
+                       CssFloatToString(ds->blurX / 2) + " " + CssFloatToString(ds->blurY / 2));
         _defs->addAttr("result", "blur");
         _defs->closeTagSelfClosing();
         _defs->openTag("feOffset");
         _defs->addAttr("in", "blur");
-        _defs->addAttr("dx", FloatToString(ds->offsetX));
-        _defs->addAttr("dy", FloatToString(ds->offsetY));
+        _defs->addAttr("dx", CssFloatToString(ds->offsetX));
+        _defs->addAttr("dy", CssFloatToString(ds->offsetY));
         _defs->addAttr("result", "offsetBlur");
         _defs->closeTagSelfClosing();
         _defs->openTag("feFlood");
         _defs->addAttr("flood-color", ColorToSVGHex(ds->color));
         if (ds->color.alpha < 1.0f) {
-          _defs->addAttr("flood-opacity", FloatToString(ds->color.alpha));
+          _defs->addAttr("flood-opacity", CssFloatToString(ds->color.alpha));
         }
         _defs->addAttr("result", "color");
         _defs->closeTagSelfClosing();
@@ -2385,8 +2389,8 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       float avg = (blur->blurX + blur->blurY) / 2.0f;
       if (avg > 0) {
         std::string blurStyle = "position:absolute;inset:0;backdrop-filter:blur(" +
-                                FloatToString(avg) + "px);-webkit-backdrop-filter:blur(" +
-                                FloatToString(avg) + "px)";
+                                CssFloatToString(avg) + "px);-webkit-backdrop-filter:blur(" +
+                                CssFloatToString(avg) + "px)";
         blurStyle += clipPathFromContents(layer);
         if (blendStr) {
           blurStyle += ";mix-blend-mode:";
@@ -2405,13 +2409,13 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       float avg = (blur->blurX + blur->blurY) / 2.0f;
       if (avg > 0) {
         std::string blurStyle = "position:absolute;inset:0;backdrop-filter:blur(" +
-                                FloatToString(avg) + "px);-webkit-backdrop-filter:blur(" +
-                                FloatToString(avg) + "px)" + clipPathFromContents(layer);
+                                CssFloatToString(avg) + "px);-webkit-backdrop-filter:blur(" +
+                                CssFloatToString(avg) + "px)" + clipPathFromContents(layer);
         // The box-shadow fallback pushes group opacity down to siblings. The backdrop-filter
         // div is its own sibling, so it also needs the distributed alpha; otherwise the blurred
         // backdrop renders at full strength while the glass/inner content appear dimmed.
         if (suppressGroupOpacity && layerAlpha < 1.0f) {
-          blurStyle += ";opacity:" + FloatToString(layerAlpha);
+          blurStyle += ";opacity:" + CssFloatToString(layerAlpha);
         }
         out.openTag("div");
         out.addAttr("style", blurStyle);
@@ -2423,12 +2427,12 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   if (needScrollRectWrapper) {
     auto& sr = layer->scrollRect;
     out.openTag("div");
-    out.addAttr("style", "position:absolute;left:0px;top:0px;width:" + FloatToString(sr.width) +
-                             "px;height:" + FloatToString(sr.height) + "px;overflow:hidden");
+    out.addAttr("style", "position:absolute;left:0px;top:0px;width:" + CssFloatToString(sr.width) +
+                             "px;height:" + CssFloatToString(sr.height) + "px;overflow:hidden");
     out.closeTagStart();
     out.openTag("div");
-    out.addAttr("style", "position:relative;left:" + FloatToString(-sr.x) +
-                             "px;top:" + FloatToString(-sr.y) + "px");
+    out.addAttr("style", "position:relative;left:" + CssFloatToString(-sr.x) +
+                             "px;top:" + CssFloatToString(-sr.y) + "px");
     out.closeTagStart();
   }
 
@@ -2463,17 +2467,17 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     float clipH = mirrorTileHeight + 2.0f * margin;
 
     out.openTag("div");
-    std::string clipStyle = "position:absolute;left:" + FloatToString(-margin) +
-                            "px;top:" + FloatToString(-margin) +
-                            "px;width:" + FloatToString(clipW) +
-                            "px;height:" + FloatToString(clipH) + "px;overflow:hidden";
+    std::string clipStyle = "position:absolute;left:" + CssFloatToString(-margin) +
+                            "px;top:" + CssFloatToString(-margin) +
+                            "px;width:" + CssFloatToString(clipW) +
+                            "px;height:" + CssFloatToString(clipH) + "px;overflow:hidden";
     out.addAttr("style", clipStyle);
     out.closeTagStart();
 
     out.openTag("div");
-    std::string gridStyle = "position:absolute;left:0;top:0;width:" + FloatToString(clipW) +
-                            "px;height:" + FloatToString(clipH) + "px;filter:blur(" +
-                            FloatToString(blurRadius) + "px)";
+    std::string gridStyle = "position:absolute;left:0;top:0;width:" + CssFloatToString(clipW) +
+                            "px;height:" + CssFloatToString(clipH) + "px;filter:blur(" +
+                            CssFloatToString(blurRadius) + "px)";
     out.addAttr("style", gridStyle);
     out.closeTagStart();
 
@@ -2502,12 +2506,13 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     };
     for (const auto& t : tiles) {
       out.openTag("div");
-      std::string ts = "position:absolute;left:0;top:0;width:" + FloatToString(W) +
-                       "px;height:" + FloatToString(H) + "px";
+      std::string ts = "position:absolute;left:0;top:0;width:" + CssFloatToString(W) +
+                       "px;height:" + CssFloatToString(H) + "px";
       if (t.tx != 0 || t.ty != 0 || t.sx != 1.0f || t.sy != 1.0f) {
-        ts += ";transform:translate(" + FloatToString(t.tx) + "px," + FloatToString(t.ty) + "px)";
+        ts += ";transform:translate(" + CssFloatToString(t.tx) + "px," + CssFloatToString(t.ty) +
+              "px)";
         if (t.sx != 1.0f || t.sy != 1.0f) {
-          ts += " scale(" + FloatToString(t.sx) + "," + FloatToString(t.sy) + ")";
+          ts += " scale(" + CssFloatToString(t.sx) + "," + CssFloatToString(t.sy) + ")";
         }
       }
       out.addAttr("style", ts);
@@ -2525,9 +2530,9 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     auto blendStr = BlendModeToMixBlendMode(ls->blendMode);
     if (styleType == NodeType::InnerShadowStyle) {
       auto is = static_cast<const InnerShadowStyle*>(ls);
-      std::string signature = "issb:" + FloatToString(is->offsetX) + "," +
-                              FloatToString(is->offsetY) + "," + FloatToString(is->blurX) + "," +
-                              FloatToString(is->blurY) + "," + ColorToRGBA(is->color);
+      std::string signature = "issb:" + CssFloatToString(is->offsetX) + "," +
+                              CssFloatToString(is->offsetY) + "," + CssFloatToString(is->blurX) +
+                              "," + CssFloatToString(is->blurY) + "," + ColorToRGBA(is->color);
       std::string fid = lookupFilterId(signature);
       if (fid.empty()) {
         fid = _ctx->nextId("isf");
@@ -2542,10 +2547,10 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         _defs->openTag("feOffset");
         _defs->addAttr("in", "SourceAlpha");
         if (!FloatNearlyZero(is->offsetX)) {
-          _defs->addAttr("dx", FloatToString(is->offsetX));
+          _defs->addAttr("dx", CssFloatToString(is->offsetX));
         }
         if (!FloatNearlyZero(is->offsetY)) {
-          _defs->addAttr("dy", FloatToString(is->offsetY));
+          _defs->addAttr("dy", CssFloatToString(is->offsetY));
         }
         _defs->addAttr("result", "iOff");
         _defs->closeTagSelfClosing();
@@ -2557,9 +2562,9 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         _defs->addAttr("k3", "1");
         _defs->addAttr("result", "iComp");
         _defs->closeTagSelfClosing();
-        std::string sd = FloatToString(is->blurX);
+        std::string sd = CssFloatToString(is->blurX);
         if (is->blurX != is->blurY) {
-          sd += " " + FloatToString(is->blurY);
+          sd += " " + CssFloatToString(is->blurY);
         }
         _defs->openTag("feGaussianBlur");
         _defs->addAttr("in", "iComp");
@@ -2569,10 +2574,10 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         _defs->openTag("feColorMatrix");
         _defs->addAttr("in", "iBlur");
         _defs->addAttr("type", "matrix");
-        _defs->addAttr("values", "0 0 0 0 " + FloatToString(is->color.red) + " 0 0 0 0 " +
-                                     FloatToString(is->color.green) + " 0 0 0 0 " +
-                                     FloatToString(is->color.blue) + " 0 0 0 " +
-                                     FloatToString(is->color.alpha) + " 0");
+        _defs->addAttr("values", "0 0 0 0 " + CssFloatToString(is->color.red) + " 0 0 0 0 " +
+                                     CssFloatToString(is->color.green) + " 0 0 0 0 " +
+                                     CssFloatToString(is->color.blue) + " 0 0 0 " +
+                                     CssFloatToString(is->color.alpha) + " 0");
         _defs->closeTagSelfClosing();
         _defs->closeTag();
         registerFilterId(signature, fid);
@@ -2656,8 +2661,8 @@ void HTMLWriter::emitPlusDarkerFilterDef(const PlusDarkerBackdrop& backdrop) {
   _defs->addAttr("id", backdrop.filterId);
   _defs->addAttr("x", "0");
   _defs->addAttr("y", "0");
-  _defs->addAttr("width", FloatToString(backdrop.cropWidth));
-  _defs->addAttr("height", FloatToString(backdrop.cropHeight));
+  _defs->addAttr("width", CssFloatToString(backdrop.cropWidth));
+  _defs->addAttr("height", CssFloatToString(backdrop.cropHeight));
   _defs->addAttr("filterUnits", "userSpaceOnUse");
   _defs->addAttr("primitiveUnits", "userSpaceOnUse");
   _defs->addAttr("color-interpolation-filters", "sRGB");
@@ -2666,8 +2671,8 @@ void HTMLWriter::emitPlusDarkerFilterDef(const PlusDarkerBackdrop& backdrop) {
   _defs->addAttr("href", backdrop.backdropDataURL);
   _defs->addAttr("x", "0");
   _defs->addAttr("y", "0");
-  _defs->addAttr("width", FloatToString(backdrop.cropWidth));
-  _defs->addAttr("height", FloatToString(backdrop.cropHeight));
+  _defs->addAttr("width", CssFloatToString(backdrop.cropWidth));
+  _defs->addAttr("height", CssFloatToString(backdrop.cropHeight));
   _defs->addAttr("preserveAspectRatio", "none");
   _defs->addAttr("result", "bg");
   _defs->closeTagSelfClosing();

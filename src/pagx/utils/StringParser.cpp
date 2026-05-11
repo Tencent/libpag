@@ -377,6 +377,26 @@ std::string CoordToString(float value) {
   return std::string(buf);
 }
 
+std::string CssFloatToString(float value) {
+  if (std::isnan(value) || std::isinf(value)) {
+    return "0";
+  }
+  char buf[32] = {};
+  snprintf(buf, sizeof(buf), "%.3f", value);
+  std::string s(buf);
+  if (s.find('.') != std::string::npos) {
+    size_t lastNonZero = s.find_last_not_of('0');
+    s.erase(lastNonZero + 1);
+    if (!s.empty() && s.back() == '.') {
+      s.pop_back();
+    }
+  }
+  if (s == "-0") {
+    s = "0";
+  }
+  return s;
+}
+
 Padding PaddingFromString(const std::string& str) {
   auto values = ParseFloatList(str);
   Padding p = {};

@@ -673,13 +673,13 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     auto tbRenderPos = tb->renderPosition();
     float tbLeft = tbRenderPos.x;
     float tbTop = tbRenderPos.y;
-    style +=
-        "position:absolute;left:" + FloatToString(tbLeft) + "px;top:" + FloatToString(tbTop) + "px";
+    style += "position:absolute;left:" + CssFloatToString(tbLeft) +
+             "px;top:" + CssFloatToString(tbTop) + "px";
     if (!std::isnan(tbW) && tbW > 0) {
-      style += ";width:" + FloatToString(tbW) + "px";
+      style += ";width:" + CssFloatToString(tbW) + "px";
     }
     if (!std::isnan(tbH) && tbH > 0) {
-      style += ";height:" + FloatToString(tbH) + "px";
+      style += ";height:" + CssFloatToString(tbH) + "px";
     }
     // Honour TextBox padding by emitting CSS padding + border-box so Chromium wraps
     // text at the same inner content rect tgfx used during layout. Without this an
@@ -708,7 +708,7 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       style += ";writing-mode:vertical-rl";
     }
     if (tb->lineHeight > 0) {
-      style += ";line-height:" + FloatToString(tb->lineHeight) + "px";
+      style += ";line-height:" + CssFloatToString(tb->lineHeight) + "px";
     }
     if (tb->wordWrap && !std::isnan(tbW) && tbW > 0) {
       style += ";word-wrap:break-word";
@@ -754,7 +754,7 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       }
     }
     float ty = posY;
-    style += "position:absolute;top:" + FloatToString(ty) + "px;white-space:pre";
+    style += "position:absolute;top:" + CssFloatToString(ty) + "px;white-space:pre";
     // Determine whether this text will use background-clip:text (non-solid fill or stroke-only).
     // background-clip:text already disables subpixel antialiasing, so using
     // transform:translateX(-50%) for centering has no additional cost in that case, and it lets
@@ -778,27 +778,28 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     if (multiLineAnchor) {
       float anchorX = text->position.x;
       if (text->textAnchor == TextAnchor::Center) {
-        style +=
-            ";left:" + FloatToString(anchorX) + "px;transform:translateX(-50%);text-align:center";
+        style += ";left:" + CssFloatToString(anchorX) +
+                 "px;transform:translateX(-50%);text-align:center";
       } else {
-        style +=
-            ";left:" + FloatToString(anchorX) + "px;transform:translateX(-100%);text-align:right";
+        style += ";left:" + CssFloatToString(anchorX) +
+                 "px;transform:translateX(-100%);text-align:right";
       }
     } else if (text->textAnchor == TextAnchor::Center) {
       if (usesBackgroundClipText) {
-        style += ";left:" + FloatToString(posX) + "px;transform:translateX(-50%);text-align:center";
+        style +=
+            ";left:" + CssFloatToString(posX) + "px;transform:translateX(-50%);text-align:center";
       } else {
-        style += ";left:0;width:" + FloatToString(posX * 2) + "px;text-align:center";
+        style += ";left:0;width:" + CssFloatToString(posX * 2) + "px;text-align:center";
       }
     } else if (text->textAnchor == TextAnchor::End) {
-      style += ";left:0;width:" + FloatToString(posX) + "px;text-align:right";
+      style += ";left:0;width:" + CssFloatToString(posX) + "px;text-align:right";
     } else {
-      style += ";left:" + FloatToString(posX) + "px";
+      style += ";left:" + CssFloatToString(posX) + "px";
     }
     // line-height is hoisted to the parent Layer when fontHoisted; otherwise emit it on the span.
     if (!fontHoisted) {
       auto lineHeight = text->fontLineHeight() > 0 ? text->fontLineHeight() : renderFont;
-      style += ";line-height:" + FloatToString(lineHeight) + "px";
+      style += ";line-height:" + CssFloatToString(lineHeight) + "px";
     }
   }
   if (text->fauxItalic) {
@@ -816,9 +817,9 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     if (!text->fontFamily.empty()) {
       style += ";font-family:'" + EscapeCssFontFamily(text->fontFamily) + "'";
     }
-    style += ";font-size:" + FloatToString(text->renderFontSize()) + "px";
+    style += ";font-size:" + CssFloatToString(text->renderFontSize()) + "px";
     if (text->letterSpacing != 0.0f) {
-      style += ";letter-spacing:" + FloatToString(text->letterSpacing) + "px";
+      style += ";letter-spacing:" + CssFloatToString(text->letterSpacing) + "px";
     }
     if (!text->fontStyle.empty()) {
       if (text->fontStyle.find("Bold") != std::string::npos) {
@@ -880,7 +881,7 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
         if (text->textAnchor != TextAnchor::Start && !transformCentered) {
           float glyphW = text->layoutBoundsWidth();
           if (glyphW > 0) {
-            style += ";background-size:" + FloatToString(glyphW) +
+            style += ";background-size:" + CssFloatToString(glyphW) +
                      "px 100%;background-position:center;background-repeat:no-repeat";
           }
         }
@@ -896,7 +897,7 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     bool hasFill = fill && fill->color;
     auto strokeCss = ResolveTextStrokeCss(stroke->width, stroke->align, hasFill);
     if (strokeCss.width > 0.0f) {
-      style += ";-webkit-text-stroke:" + FloatToString(strokeCss.width) + "px " +
+      style += ";-webkit-text-stroke:" + CssFloatToString(strokeCss.width) + "px " +
                ColorToRGBA(sc->color, stroke->alpha);
       if (strokeCss.paintOrderStrokeFill) {
         style += ";paint-order:stroke fill";
@@ -907,14 +908,14 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     }
   }
   if (alpha < 1.0f) {
-    style += ";opacity:" + FloatToString(alpha);
+    style += ";opacity:" + CssFloatToString(alpha);
   }
   // Honour U+0009 TAB inside the span (see HTMLWriterLayer tbSpans branch for rationale).
   if (text && text->text.find('\t') != std::string::npos) {
     float spanSize = text->renderFontSize();
     style += ";white-space:pre-wrap";
     if (spanSize > 0) {
-      style += ";tab-size:" + FloatToString(spanSize * 4) + "px";
+      style += ";tab-size:" + CssFloatToString(spanSize * 4) + "px";
     }
   }
   if (tb) {
@@ -985,7 +986,7 @@ void HTMLWriter::writeEmbeddedShapeGlyphs(HTMLBuilder& out, const Text* text, co
   }
   std::string svgStyle = "position:absolute;left:0;top:0;overflow:visible";
   if (alpha < 1.0f) {
-    svgStyle += ";opacity:" + FloatToString(alpha);
+    svgStyle += ";opacity:" + CssFloatToString(alpha);
   }
   out.openTag("svg");
   out.addAttr("style", svgStyle);
@@ -1121,7 +1122,7 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
     if (!text->glyphRuns.empty()) {
       std::string svgStyle = "position:absolute;left:0;top:0;overflow:visible";
       if (alpha < 1.0f) {
-        svgStyle += ";opacity:" + FloatToString(alpha);
+        svgStyle += ";opacity:" + CssFloatToString(alpha);
       }
       out.openTag("svg");
       out.addAttr("style", svgStyle);
@@ -1189,7 +1190,7 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           out.openTag("g");
           out.addAttr("transform", MatrixToCSS(m));
           if (glyphAlpha < 1.0f) {
-            out.addAttr("opacity", FloatToString(glyphAlpha));
+            out.addAttr("opacity", CssFloatToString(glyphAlpha));
           }
           out.closeTagStart();
           out.openTag("path");
@@ -1202,7 +1203,7 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
               out.addAttr("fill", ColorToSVGHex(blended));
               float fa = blended.alpha * fill->alpha;
               if (fa < 1.0f) {
-                out.addAttr("fill-opacity", FloatToString(fa));
+                out.addAttr("fill-opacity", CssFloatToString(fa));
               }
             } else {
               applySVGFill(out, fill);
@@ -1217,14 +1218,14 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
               float blendFactor = sc.alpha * absF;
               if (blendFactor > 0) {
                 out.addAttr("stroke", ColorToSVGHex(sc));
-                out.addAttr("stroke-opacity", FloatToString(blendFactor));
+                out.addAttr("stroke-opacity", CssFloatToString(blendFactor));
               }
             }
             if (modifier->strokeWidth.has_value() && absF > 0) {
               float origWidth = stroke->width;
               float modWidth = modifier->strokeWidth.value();
               float finalWidth = origWidth + (modWidth - origWidth) * absF;
-              out.addAttr("stroke-width", FloatToString(finalWidth));
+              out.addAttr("stroke-width", CssFloatToString(finalWidth));
             }
           }
           out.closeTagSelfClosing();
@@ -1242,24 +1243,25 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         ty = text->position.y - (ascent > 0 ? ascent : renderFont * 0.8f);
       }
       auto lineHeight = text->fontLineHeight() > 0 ? text->fontLineHeight() : renderFont;
-      std::string containerStyle = "position:absolute;white-space:nowrap;top:" + FloatToString(ty) +
-                                   "px;line-height:" + FloatToString(lineHeight) + "px";
+      std::string containerStyle =
+          "position:absolute;white-space:nowrap;top:" + CssFloatToString(ty) +
+          "px;line-height:" + CssFloatToString(lineHeight) + "px";
       // Use text-align + width instead of transform:translateX to avoid creating a compositing
       // layer, which disables subpixel antialiasing and makes text look thinner.
       bool tmUsesBackgroundClip =
           fill && fill->color && fill->color->nodeType() != NodeType::SolidColor;
       if (text->textAnchor == TextAnchor::Center) {
         if (tmUsesBackgroundClip) {
-          containerStyle += ";left:" + FloatToString(renderPos.x) +
+          containerStyle += ";left:" + CssFloatToString(renderPos.x) +
                             "px;transform:translateX(-50%);text-align:center";
         } else {
           containerStyle +=
-              ";left:0;width:" + FloatToString(renderPos.x * 2) + "px;text-align:center";
+              ";left:0;width:" + CssFloatToString(renderPos.x * 2) + "px;text-align:center";
         }
       } else if (text->textAnchor == TextAnchor::End) {
-        containerStyle += ";left:0;width:" + FloatToString(renderPos.x) + "px;text-align:right";
+        containerStyle += ";left:0;width:" + CssFloatToString(renderPos.x) + "px;text-align:right";
       } else {
-        containerStyle += ";left:" + FloatToString(renderPos.x) + "px";
+        containerStyle += ";left:" + CssFloatToString(renderPos.x) + "px";
       }
       if (!text->fontFamily.empty()) {
         containerStyle += ";font-family:'" + EscapeCssFontFamily(text->fontFamily) + "'";
@@ -1276,15 +1278,15 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         }
       }
       if (text->letterSpacing != 0.0f) {
-        containerStyle += ";letter-spacing:" + FloatToString(text->letterSpacing) + "px";
+        containerStyle += ";letter-spacing:" + CssFloatToString(text->letterSpacing) + "px";
       }
       if (alpha < 1.0f) {
-        containerStyle += ";opacity:" + FloatToString(alpha);
+        containerStyle += ";opacity:" + CssFloatToString(alpha);
       }
       out.openTag("div");
       out.addAttr("style", containerStyle);
       out.closeTagStart();
-      std::string fontSizeStr = FloatToString(renderFont) + "px";
+      std::string fontSizeStr = CssFloatToString(renderFont) + "px";
       const char* p = text->text.c_str();
       size_t charIdx = 0;
       while (*p) {
@@ -1304,22 +1306,22 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         std::string transform;
         if (!FloatNearlyZero(modifier->position.x * f) ||
             !FloatNearlyZero(modifier->position.y * f)) {
-          transform += "translate(" + FloatToString(modifier->position.x * f) + "px," +
-                       FloatToString(modifier->position.y * f) + "px) ";
+          transform += "translate(" + CssFloatToString(modifier->position.x * f) + "px," +
+                       CssFloatToString(modifier->position.y * f) + "px) ";
         }
         float anchorX = modifier->anchor.x * f;
         float anchorY = modifier->anchor.y * f;
         if (!FloatNearlyZero(anchorX) || !FloatNearlyZero(anchorY)) {
           transform +=
-              "translate(" + FloatToString(anchorX) + "px," + FloatToString(anchorY) + "px) ";
+              "translate(" + CssFloatToString(anchorX) + "px," + CssFloatToString(anchorY) + "px) ";
         }
         if (!FloatNearlyZero(modifier->rotation * f)) {
-          transform += "rotate(" + FloatToString(modifier->rotation * f) + "deg) ";
+          transform += "rotate(" + CssFloatToString(modifier->rotation * f) + "deg) ";
         }
         float sx = 1.0f + (modifier->scale.x - 1.0f) * absF;
         float sy = 1.0f + (modifier->scale.y - 1.0f) * absF;
         if (!FloatNearlyZero(sx - 1.0f) || !FloatNearlyZero(sy - 1.0f)) {
-          transform += "scale(" + FloatToString(sx) + "," + FloatToString(sy) + ") ";
+          transform += "scale(" + CssFloatToString(sx) + "," + CssFloatToString(sy) + ") ";
         }
         if (!FloatNearlyZero(modifier->skew * absF)) {
           // tgfx TextModifier::ApplySkew rotates by -skewAxis, applies skewX, then rotates back by
@@ -1328,16 +1330,16 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           // rotate(+axis) skewX(-skew) rotate(-axis). Skip the rotations when skewAxis is 0 to
           // keep the simpler output for the common pure-horizontal-skew case.
           if (!FloatNearlyZero(modifier->skewAxis)) {
-            transform += "rotate(" + FloatToString(modifier->skewAxis) + "deg) ";
+            transform += "rotate(" + CssFloatToString(modifier->skewAxis) + "deg) ";
           }
-          transform += "skewX(" + FloatToString(-modifier->skew * absF) + "deg) ";
+          transform += "skewX(" + CssFloatToString(-modifier->skew * absF) + "deg) ";
           if (!FloatNearlyZero(modifier->skewAxis)) {
-            transform += "rotate(" + FloatToString(-modifier->skewAxis) + "deg) ";
+            transform += "rotate(" + CssFloatToString(-modifier->skewAxis) + "deg) ";
           }
         }
         if (!FloatNearlyZero(anchorX) || !FloatNearlyZero(anchorY)) {
-          transform +=
-              "translate(" + FloatToString(-anchorX) + "px," + FloatToString(-anchorY) + "px) ";
+          transform += "translate(" + CssFloatToString(-anchorX) + "px," +
+                       CssFloatToString(-anchorY) + "px) ";
         }
         // fauxItalic is handled via CSS native synthesis (`font-style:italic` +
         // `font-synthesis-style`) instead of a CSS transform, so no skewX is appended.
@@ -1356,7 +1358,7 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         }
         if (modifier->alpha < 1.0f) {
           float charAlpha = std::max(0.0f, 1.0f + (modifier->alpha - 1.0f) * absF);
-          charStyle += ";opacity:" + FloatToString(charAlpha);
+          charStyle += ";opacity:" + CssFloatToString(charAlpha);
         }
         if (fill && fill->color && fill->color->nodeType() == NodeType::SolidColor) {
           auto sc = static_cast<const SolidColor*>(fill->color);
@@ -1442,7 +1444,7 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
             bool hasFill = fill && fill->color;
             auto strokeCss = ResolveTextStrokeCss(strokeWidth, stroke->align, hasFill);
             if (strokeCss.width > 0.0f) {
-              charStyle += ";-webkit-text-stroke:" + FloatToString(strokeCss.width) + "px " +
+              charStyle += ";-webkit-text-stroke:" + CssFloatToString(strokeCss.width) + "px " +
                            ColorToRGBA(strokeColor, stroke->alpha);
               if (strokeCss.paintOrderStrokeFill) {
                 charStyle += ";paint-order:stroke fill";
@@ -1502,7 +1504,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
     if (!text->glyphRuns.empty()) {
       std::string svgStyle = "position:absolute;left:0;top:0;overflow:visible";
       if (alpha < 1.0f) {
-        svgStyle += ";opacity:" + FloatToString(alpha);
+        svgStyle += ";opacity:" + CssFloatToString(alpha);
       }
       out.openTag("svg");
       out.addAttr("style", svgStyle);
@@ -1716,13 +1718,13 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         pos.x += tpRenderPos.x;
         pos.y += tpRenderPos.y;
         std::string charStr(p, len);
-        std::string charStyle = "position:absolute;left:" + FloatToString(pos.x) +
-                                "px;top:" + FloatToString(pos.y) + "px";
+        std::string charStyle = "position:absolute;left:" + CssFloatToString(pos.x) +
+                                "px;top:" + CssFloatToString(pos.y) + "px";
         charStyle += ";display:inline-block";
         if (!text->fontFamily.empty()) {
           charStyle += ";font-family:'" + EscapeCssFontFamily(text->fontFamily) + "'";
         }
-        charStyle += ";font-size:" + FloatToString(renderFont) + "px";
+        charStyle += ";font-size:" + CssFloatToString(renderFont) + "px";
         // Pin line-height to 1 so the span's line-box equals fontSize. Without this the
         // per-char span inherits line-height:normal, which Chromium resolves to ~1.2em-1.5em
         // depending on the font's OS/2 metrics. That inflates the line-box and shifts the
@@ -1741,12 +1743,12 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
           }
         }
         if (text->letterSpacing != 0.0f) {
-          charStyle += ";letter-spacing:" + FloatToString(text->letterSpacing) + "px";
+          charStyle += ";letter-spacing:" + CssFloatToString(text->letterSpacing) + "px";
         }
         std::string transform;
         if (textPath->perpendicular) {
           float angleDeg = tangent * 180.0f / static_cast<float>(M_PI) - textPath->baselineAngle;
-          transform += "rotate(" + FloatToString(angleDeg) + "deg) ";
+          transform += "rotate(" + CssFloatToString(angleDeg) + "deg) ";
         }
         // Align the character baseline to the path sample point. The sampled (pos.x, pos.y) is
         // where tgfx places the glyph baseline; we translate the span upward by the font ascent
@@ -1754,7 +1756,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         // the full fontSize (1em) would place the span's bottom edge at pos.y, shifting glyphs
         // upward by ~0.1em. With line-height:1 above, the span's content-box equals fontSize
         // and the baseline sits ~0.905em from the top, so this translate lands it on pos.y.
-        transform += "translate(-50%,-" + FloatToString(renderFont * 0.905f) + "px)";
+        transform += "translate(-50%,-" + CssFloatToString(renderFont * 0.905f) + "px)";
         // fauxItalic must shear the glyph in its own local space before TextPath's
         // fauxItalic is handled via CSS native synthesis on each per-character span.
         if (text->fauxItalic) {
@@ -1815,7 +1817,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
           bool hasFill = fill && fill->color;
           auto strokeCss = ResolveTextStrokeCss(stroke->width, stroke->align, hasFill);
           if (strokeCss.width > 0.0f) {
-            charStyle += ";-webkit-text-stroke:" + FloatToString(strokeCss.width) + "px " +
+            charStyle += ";-webkit-text-stroke:" + CssFloatToString(strokeCss.width) + "px " +
                          ColorToRGBA(sc->color, stroke->alpha);
             if (strokeCss.paintOrderStrokeFill) {
               charStyle += ";paint-order:stroke fill";
@@ -1826,7 +1828,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
           }
         }
         if (alpha < 1.0f) {
-          charStyle += ";opacity:" + FloatToString(alpha);
+          charStyle += ";opacity:" + CssFloatToString(alpha);
         }
         out.openTag("span");
         out.addAttr("style", charStyle);
@@ -1864,16 +1866,16 @@ void HTMLWriter::applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim) {
   if (!wrapping) {
     float visible = e - s;
     float gap = 1.0f - visible;
-    builder.addAttr("stroke-dasharray", FloatToString(visible) + " " + FloatToString(gap));
-    builder.addAttr("stroke-dashoffset", FloatToString(-s));
+    builder.addAttr("stroke-dasharray", CssFloatToString(visible) + " " + CssFloatToString(gap));
+    builder.addAttr("stroke-dashoffset", CssFloatToString(-s));
   } else {
     float seg1 = 1.0f - s;
     float seg2 = (e > 1.0f) ? (e - 1.0f) : e;
     float gap = std::max(0.0f, 1.0f - seg1 - seg2);
     // Use 4-value dasharray to avoid SVG odd-count auto-duplication.
-    builder.addAttr("stroke-dasharray", FloatToString(seg1) + " " + FloatToString(gap) + " " +
-                                            FloatToString(seg2) + " 0");
-    builder.addAttr("stroke-dashoffset", FloatToString(-s));
+    builder.addAttr("stroke-dasharray", CssFloatToString(seg1) + " " + CssFloatToString(gap) + " " +
+                                            CssFloatToString(seg2) + " 0");
+    builder.addAttr("stroke-dashoffset", CssFloatToString(-s));
   }
 }
 
@@ -2021,14 +2023,14 @@ void HTMLWriter::applyTrimAttrsContinuous(HTMLBuilder& builder, const TrimPath* 
   if (localEnd <= 1.0f) {
     float visible = localEnd - localStart;
     float gap = 1.0f - visible;
-    builder.addAttr("stroke-dasharray", FloatToString(visible) + " " + FloatToString(gap));
-    builder.addAttr("stroke-dashoffset", FloatToString(-localStart));
+    builder.addAttr("stroke-dasharray", CssFloatToString(visible) + " " + CssFloatToString(gap));
+    builder.addAttr("stroke-dashoffset", CssFloatToString(-localStart));
   } else {
     float seg1 = 1.0f - localStart;
     float seg2 = localEnd - 1.0f;
     float gap = 1.0f - seg1 - seg2;
-    builder.addAttr("stroke-dasharray",
-                    FloatToString(seg2) + " " + FloatToString(gap) + " " + FloatToString(seg1));
+    builder.addAttr("stroke-dasharray", CssFloatToString(seg2) + " " + CssFloatToString(gap) + " " +
+                                            CssFloatToString(seg1));
   }
 }
 
@@ -2054,7 +2056,7 @@ void HTMLWriter::writeGroup(HTMLBuilder& out, const Group* group, float alpha, b
   }
   if (group->alpha < 1.0f) {
     float ea = distribute ? (group->alpha * alpha) : group->alpha;
-    style += ";opacity:" + FloatToString(ea);
+    style += ";opacity:" + CssFloatToString(ea);
   }
   out.openTag("div");
   out.addAttr("class", "pagx-group");
@@ -2152,7 +2154,7 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
         s += ";transform-origin:0 0";
       }
       if (ea < 1.0f) {
-        s += ";opacity:" + FloatToString(ea);
+        s += ";opacity:" + CssFloatToString(ea);
       }
       out.addAttr("style", s);
       out.closeTagStart();
@@ -2183,8 +2185,8 @@ void HTMLWriter::writeComposition(HTMLBuilder& out, const Composition* comp, flo
   bool needContainer = comp->width > 0 && comp->height > 0;
   if (needContainer) {
     out.openTag("div");
-    out.addAttr("style", "position:relative;width:" + FloatToString(comp->width) +
-                             "px;height:" + FloatToString(comp->height) + "px");
+    out.addAttr("style", "position:relative;width:" + CssFloatToString(comp->width) +
+                             "px;height:" + CssFloatToString(comp->height) + "px");
     out.closeTagStart();
   }
   for (auto* layer : comp->layers) {
