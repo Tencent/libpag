@@ -477,6 +477,60 @@ void SVGWriter::writeColorSourceDef(const ColorSource* source, const std::string
   }
 }
 
+// Computes the axis-aligned document-space rect occupied by an ImagePattern's image after
+// the pattern matrix and scaleMode fit are applied. Returns false when the matrix carries
+// rotation, skew, or negative scale — those cases have no faithful <image>/preserveAspectRatio
+// representation and the caller must fall back to the matrix-driven path. Mirrors PPT's
+// ComputePlacedImageRect so SVG and PPTX agree on the placement contract.
+static bool ComputePlacedImageRectSVG(const ImagePattern* pattern, int imgW, int imgH,
+                                      const Rect& shapeBounds, Rect* result) {
+  const auto& M = pattern->matrix;
+  if (std::fabs(M.b) > 1e-6f || std::fabs(M.c) > 1e-6f) {
+    return false;
+  }
+  if (M.a <= 0 || M.d <= 0) {
+    return false;
+  }
+  float transformedW = static_cast<float>(imgW) * M.a;
+  float transformedH = static_cast<float>(imgH) * M.d;
+  if (transformedW <= 0 || transformedH <= 0) {
+    return false;
+  }
+  if (pattern->scaleMode == ScaleMode::None) {
+    *result = Rect::MakeXYWH(M.tx, M.ty, transformedW, transformedH);
+    return true;
+  }
+  if (shapeBounds.isEmpty()) {
+    return false;
+  }
+  float sx = shapeBounds.width / transformedW;
+  float sy = shapeBounds.height / transformedH;
+  switch (pattern->scaleMode) {
+    case ScaleMode::Stretch:
+      *result = Rect::MakeXYWH(shapeBounds.x, shapeBounds.y, shapeBounds.width, shapeBounds.height);
+      return true;
+    case ScaleMode::LetterBox: {
+      float s = std::min(sx, sy);
+      float w = transformedW * s;
+      float h = transformedH * s;
+      *result = Rect::MakeXYWH(shapeBounds.x + (shapeBounds.width - w) / 2.0f,
+                               shapeBounds.y + (shapeBounds.height - h) / 2.0f, w, h);
+      return true;
+    }
+    case ScaleMode::Zoom: {
+      float s = std::max(sx, sy);
+      float w = transformedW * s;
+      float h = transformedH * s;
+      *result = Rect::MakeXYWH(shapeBounds.x + (shapeBounds.width - w) / 2.0f,
+                               shapeBounds.y + (shapeBounds.height - h) / 2.0f, w, h);
+      return true;
+    }
+    case ScaleMode::None:
+      break;
+  }
+  return false;
+}
+
 std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern, const Rect& shapeBounds) {
   if (!pattern->image) {
     return {};
@@ -560,7 +614,10 @@ std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern, const R
     _defs->addRequiredAttribute("height", static_cast<float>(imgH));
   } else if (hasImageSize && !shapeBounds.isEmpty()) {
     // Non-tiling fallback: single tile covers the entire shape bounds so the
-    // image appears exactly once. The pattern matrix positions the image inside.
+    // image appears exactly once. Compute the placed image rect (matrix +
+    // scaleMode) so LetterBox / Zoom / Stretch produce the correct fit instead
+    // of stretching the raw image across each shape (ScaleMode::None preserves
+    // the prior matrix-driven behaviour).
     _defs->addAttributeIfNonZero("x", shapeBounds.x);
     _defs->addAttributeIfNonZero("y", shapeBounds.y);
     _defs->addRequiredAttribute("width", shapeBounds.width);
@@ -568,13 +625,27 @@ std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern, const R
     _defs->closeElementStart();
     _defs->openElement("image");
     _defs->addAttribute("href", href);
-    _defs->addRequiredAttribute("width", static_cast<float>(imgW));
-    _defs->addRequiredAttribute("height", static_cast<float>(imgH));
-    if (!pattern->matrix.isIdentity()) {
-      Matrix localMatrix = pattern->matrix;
-      localMatrix.tx -= shapeBounds.x;
-      localMatrix.ty -= shapeBounds.y;
-      _defs->addAttribute("transform", MatrixToSVGTransform(localMatrix));
+    Rect placed = {};
+    if (ComputePlacedImageRectSVG(pattern, imgW, imgH, shapeBounds, &placed)) {
+      _defs->addAttributeIfNonZero("x", placed.x - shapeBounds.x);
+      _defs->addAttributeIfNonZero("y", placed.y - shapeBounds.y);
+      _defs->addRequiredAttribute("width", placed.width);
+      _defs->addRequiredAttribute("height", placed.height);
+      // The placed rect already factors in matrix scale and scaleMode fit, so
+      // tell SVG to stretch the image bitmap exactly to that rect.
+      _defs->addAttribute("preserveAspectRatio", "none");
+    } else {
+      // Rotation, skew, or negative scale: fall back to raw matrix-driven
+      // positioning at natural pixel size (matches ScaleMode::None behaviour
+      // without the scaleMode fit, since no axis-aligned rect can express it).
+      _defs->addRequiredAttribute("width", static_cast<float>(imgW));
+      _defs->addRequiredAttribute("height", static_cast<float>(imgH));
+      if (!pattern->matrix.isIdentity()) {
+        Matrix localMatrix = pattern->matrix;
+        localMatrix.tx -= shapeBounds.x;
+        localMatrix.ty -= shapeBounds.y;
+        _defs->addAttribute("transform", MatrixToSVGTransform(localMatrix));
+      }
     }
   } else {
     _defs->addAttribute("width", "100%");
@@ -1227,23 +1298,41 @@ void SVGWriter::writePath(SVGBuilder& out, const Path* path, const FillStrokeInf
   if (!path->data || path->data->isEmpty()) {
     return;
   }
+  // Apply layout-resolved placement (matches LayerBuilder::convertPath):
+  // shapePath->setPosition(renderPosition()) + path data is scaled by renderScale().
+  // Without applying both, raw path data emits at its authored origin and authored
+  // size, losing any flex / centerX / layoutBounds-driven centring and sizing.
   auto renderPos = path->renderPosition();
+  float scale = path->renderScale();
   out.openElement("path");
   std::string transform = MatrixToSVGTransform(m);
-  bool hasPosition = renderPos.x != 0.0f || renderPos.y != 0.0f;
-  if (hasPosition) {
-    std::string posTransform =
+  std::string localTransform;
+  if (renderPos.x != 0.0f || renderPos.y != 0.0f) {
+    localTransform =
         "translate(" + FloatToString(renderPos.x) + "," + FloatToString(renderPos.y) + ")";
-    if (!transform.empty()) {
-      out.addAttribute("transform", transform + " " + posTransform);
-    } else {
-      out.addAttribute("transform", posTransform);
+  }
+  if (scale != 1.0f) {
+    if (!localTransform.empty()) {
+      localTransform += " ";
     }
+    localTransform += "scale(" + FloatToString(scale) + ")";
+  }
+  if (!transform.empty() && !localTransform.empty()) {
+    out.addAttribute("transform", transform + " " + localTransform);
   } else if (!transform.empty()) {
     out.addAttribute("transform", transform);
+  } else if (!localTransform.empty()) {
+    out.addAttribute("transform", localTransform);
   }
   out.addAttribute("d", PathDataToSVGString(*path->data));
-  Rect bounds = path->data->getBounds();
+  // shapeBounds must reflect the painted region in the parent coordinate space so
+  // gradient `fitsToGeometry` and image patterns sample the right rectangle. The path
+  // data sits in pre-scale space, so multiply the raw bounds by the scale factor and
+  // translate them by renderPosition to match the on-canvas extent.
+  Rect dataBounds = path->data->getBounds();
+  Rect bounds = Rect::MakeXYWH(renderPos.x + dataBounds.x * scale,
+                               renderPos.y + dataBounds.y * scale, dataBounds.width * scale,
+                               dataBounds.height * scale);
   applyPainters(out, fs, bounds, alpha);
   out.closeElementSelfClosing();
 }
@@ -1320,9 +1409,17 @@ static void WriteSharedTextAttrs(SVGBuilder& out, const Text* text, TextAnchor a
   if (!text->fontFamily.empty()) {
     out.addAttribute("font-family", text->fontFamily);
   }
-  out.addAttribute("font-size", FloatToString(text->fontSize));
+  // Use the layout-resolved font size. PAGX layout may shrink a Text internally via
+  // a textScale factor to fit dual-axis constraints (e.g. `left`+`right`,
+  // `width="100%"`); renderFontSize() carries that factor while fontSize still holds
+  // the authored pre-scale value. Emitting the raw size here causes constrained text
+  // to overflow its container in viewers. Recover the same scale to apply it to
+  // letterSpacing, which the renderer also multiplies by textScale during shaping.
+  float effectiveFontSize = text->renderFontSize();
+  float textScale = (text->fontSize > 0.0f) ? effectiveFontSize / text->fontSize : 1.0f;
+  out.addAttribute("font-size", FloatToString(effectiveFontSize));
   if (text->letterSpacing != 0.0f) {
-    out.addAttribute("letter-spacing", FloatToString(text->letterSpacing));
+    out.addAttribute("letter-spacing", FloatToString(text->letterSpacing * textScale));
   }
   if (anchor == TextAnchor::Center) {
     out.addAttribute("text-anchor", "middle");
@@ -1378,6 +1475,38 @@ struct TextAnchoring {
   float justifyWidth = 0;  // > 0 only when horizontal-justify is in effect.
 };
 
+// Logical Start / End describe the *paragraph-relative* edges; the physical
+// visual edge a renderer should hit depends on the paragraph base direction
+// (UBA P2/P3). For RTL paragraphs Start sits on the visual right edge and End
+// on the visual left, so swap the two before mapping to SVG's
+// direction-agnostic text-anchor / anchorX calculations. Center and Justify
+// are direction-symmetric.
+static TextAnchor ResolveLogicalAnchor(TextAnchor logical, bool rtl) {
+  if (!rtl) {
+    return logical;
+  }
+  if (logical == TextAnchor::Start) {
+    return TextAnchor::End;
+  }
+  if (logical == TextAnchor::End) {
+    return TextAnchor::Start;
+  }
+  return logical;
+}
+
+static TextAlign ResolveLogicalAlign(TextAlign logical, bool rtl) {
+  if (!rtl) {
+    return logical;
+  }
+  if (logical == TextAlign::Start) {
+    return TextAlign::End;
+  }
+  if (logical == TextAlign::End) {
+    return TextAlign::Start;
+  }
+  return logical;
+}
+
 // Vertical writing mode: textAlign controls the inline axis (vertical),
 // paragraphAlign controls the block axis (horizontal, columns right-to-left).
 static void ResolveVerticalAnchoring(const Text* text, const TextBox* box,
@@ -1389,7 +1518,8 @@ static void ResolveVerticalAnchoring(const Text* text, const TextBox* box,
   float effectiveWidth = EffectiveTextBoxWidth(box);
   float effectiveHeight = EffectiveTextBoxHeight(box);
   auto textBounds = layoutResult.getTextBounds(const_cast<Text*>(text));
-  float contentWidth = textBounds.isEmpty() ? text->fontSize : textBounds.width;
+  float effectiveFontSize = text->renderFontSize();
+  float contentWidth = textBounds.isEmpty() ? effectiveFontSize : textBounds.width;
   float innerWidth = effectiveWidth - paddingLeft - paddingRight;
   float innerHeight =
       (!std::isnan(effectiveHeight)) ? effectiveHeight - paddingTop - paddingBottom : 0;
@@ -1397,13 +1527,13 @@ static void ResolveVerticalAnchoring(const Text* text, const TextBox* box,
   // Near = right edge, Far = left edge.
   switch (box->paragraphAlign) {
     case ParagraphAlign::Middle:
-      out->anchorX = paddingLeft + (innerWidth + contentWidth) / 2 - text->fontSize / 2;
+      out->anchorX = paddingLeft + (innerWidth + contentWidth) / 2 - effectiveFontSize / 2;
       break;
     case ParagraphAlign::Far:
-      out->anchorX = paddingLeft + contentWidth - text->fontSize / 2;
+      out->anchorX = paddingLeft + contentWidth - effectiveFontSize / 2;
       break;
     default:
-      out->anchorX = effectiveWidth - paddingRight - text->fontSize / 2;
+      out->anchorX = effectiveWidth - paddingRight - effectiveFontSize / 2;
       break;
   }
   // Inline axis (vertical): textAlign positions text top-to-bottom.
@@ -1428,12 +1558,15 @@ static void ResolveVerticalAnchoring(const Text* text, const TextBox* box,
   }
 }
 
-static void ResolveHorizontalAnchoring(const TextBox* box, TextAnchoring* out) {
+static void ResolveHorizontalAnchoring(const TextBox* box, bool rtl, TextAnchoring* out) {
   float paddingLeft = box->padding.left;
   float paddingTop = box->padding.top;
   float paddingRight = box->padding.right;
   float effectiveWidth = EffectiveTextBoxWidth(box);
-  switch (box->textAlign) {
+  // Resolve logical Start/End to a physical edge based on paragraph base
+  // direction so an RTL paragraph aligns to the right edge for Start (the
+  // default) and to the left for End.
+  switch (ResolveLogicalAlign(box->textAlign, rtl)) {
     case TextAlign::Center:
       out->anchor = TextAnchor::Center;
       out->anchorX = paddingLeft + (effectiveWidth - paddingLeft - paddingRight) / 2;
@@ -1458,12 +1591,14 @@ static void ResolveHorizontalAnchoring(const TextBox* box, TextAnchoring* out) {
 // The transform matrix passed into writeTextWithLayout already includes
 // renderPosition via BuildGroupMatrix, so anchor x/y are in TextBox-local
 // coordinates starting from (0,0). Standalone Text (no TextBox) uses the
-// element's own anchor / renderPosition directly.
+// element's own anchor / renderPosition directly. `rtl` reflects the
+// paragraph base direction (UBA P2/P3) and is only meaningful for horizontal
+// writing mode — vertical writing flows top-to-bottom and ignores bidi.
 static TextAnchoring ResolveTextAnchorAndOffset(const Text* text, const TextBox* box,
-                                                const TextLayoutResult& layoutResult) {
+                                                const TextLayoutResult& layoutResult, bool rtl) {
   TextAnchoring out;
   if (box == nullptr) {
-    out.anchor = text->textAnchor;
+    out.anchor = ResolveLogicalAnchor(text->textAnchor, rtl);
     auto renderPos = text->renderPosition();
     out.anchorX = renderPos.x;
     out.offsetY = renderPos.y;
@@ -1472,7 +1607,7 @@ static TextAnchoring ResolveTextAnchorAndOffset(const Text* text, const TextBox*
   if (box->writingMode == WritingMode::Vertical) {
     ResolveVerticalAnchoring(text, box, layoutResult, &out);
   } else {
-    ResolveHorizontalAnchoring(box, &out);
+    ResolveHorizontalAnchoring(box, rtl, &out);
   }
   return out;
 }
@@ -1500,7 +1635,11 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
   auto* lines = layoutResult.getTextLines(mutableText);
 
   bool isVertical = fs.textBox && fs.textBox->writingMode == WritingMode::Vertical;
-  TextAnchoring anchoring = ResolveTextAnchorAndOffset(text, fs.textBox, layoutResult);
+  // Paragraph base direction (UBA P2/P3). Vertical writing flows top-to-bottom
+  // and ignores BiDi, so suppress the rtl axis in that case to avoid swapping
+  // the column anchor for Hebrew/Arabic vertical layouts.
+  bool rtl = !isVertical && HasRTLParagraphBase(text->text);
+  TextAnchoring anchoring = ResolveTextAnchorAndOffset(text, fs.textBox, layoutResult, rtl);
 
   std::string transform = MatrixToSVGTransform(m);
   if (!lines || lines->empty()) {
@@ -1519,8 +1658,9 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
     out.addRequiredAttribute("x", anchoring.anchorX);
     // In vertical mode offsetY already points to the correct inline-axis start;
     // in horizontal fallback the y coordinate needs a baseline shift by fontSize.
-    out.addRequiredAttribute("y",
-                             isVertical ? anchoring.offsetY : anchoring.offsetY + text->fontSize);
+    // Use renderFontSize() so the baseline shift tracks textScale shrinking.
+    out.addRequiredAttribute(
+        "y", isVertical ? anchoring.offsetY : anchoring.offsetY + text->renderFontSize());
     out.closeElementWithText(text->text);
     return;
   }
@@ -1670,9 +1810,17 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
 
   // Compute TextBox-level positioning (shared by all lines). TextBox rich-text
   // is always horizontal here (vertical falls back above), so ResolveHorizontalAnchoring
-  // gives us anchor/anchorX/offsetY/justifyWidth directly.
+  // gives us anchor/anchorX/offsetY/justifyWidth directly. The TextBox carries a
+  // single paragraph, so concatenating run text in source order matches the
+  // paragraph-level base direction rule that PAGX's ICU BiDi uses; the helper
+  // walks until it hits the first strong directional character.
+  std::string combinedText;
+  for (const auto& run : runs) {
+    combinedText.append(run.text->text);
+  }
+  bool rtl = HasRTLParagraphBase(combinedText);
   TextAnchoring anchoring;
-  ResolveHorizontalAnchoring(textBox, &anchoring);
+  ResolveHorizontalAnchoring(textBox, rtl, &anchoring);
   std::string svgTransform = MatrixToSVGTransform(transform);
 
   // Stable-sort entries by baselineY so that runs from different Text
@@ -1768,12 +1916,14 @@ void SVGWriter::writeText(SVGBuilder& out, const Text* text, const FillStrokeInf
   }
 
   // Fallback for when TextLayout produces no line info (e.g. empty text after shaping).
+  bool isVertical = fs.textBox && fs.textBox->writingMode == WritingMode::Vertical;
+  bool rtl = !isVertical && HasRTLParagraphBase(text->text);
   std::string transform = MatrixToSVGTransform(m);
   out.openElement("text");
   if (!transform.empty()) {
     out.addAttribute("transform", transform);
   }
-  WriteSharedTextAttrs(out, text, text->textAnchor);
+  WriteSharedTextAttrs(out, text, ResolveLogicalAnchor(text->textAnchor, rtl));
   ApplyTextBoxBodyAttrs(out, fs.textBox);
   applyPainters(out, fs, {}, alpha);
   auto renderPos = text->renderPosition();
@@ -1882,11 +2032,17 @@ void SVGWriter::emitGeometryWithFs(SVGBuilder& out, const AccumulatedGeometry& e
       break;
     case NodeType::Text: {
       auto* text = static_cast<const Text*>(entry.element);
-      // GlyphRun-only Text (no readable content) carries pre-shaped glyph
-      // outlines; the only way to render these is via path geometry regardless
-      // of convertTextToPath — matches PPT's behaviour.
-      bool glyphRunOnly = text->text.empty() && !text->glyphRuns.empty();
-      if ((_convertTextToPath || glyphRunOnly) && !text->glyphRuns.empty()) {
+      // Any Text that carries GlyphRun elements is treated as the authoritative
+      // geometry: SVG's native <text> can't express arbitrary glyph IDs /
+      // per-glyph xOffsets / anchors / rotations / skews / scales, so going
+      // through writeText would silently drop everything the GlyphRun specifies
+      // and fall back to renderer-driven layout, producing visibly wrong
+      // output. This also covers the common case of a Text that keeps its
+      // readable `text` for accessibility alongside pre-shaped GlyphRuns.
+      // The convertTextToPath flag has the same effect, but only when GlyphRun
+      // data is available to walk — without glyphRuns there is no geometry to
+      // emit and we must fall back to native text anyway.
+      if (!text->glyphRuns.empty()) {
         writeTextAsPath(out, text, localFs, entry.transform, entry.alpha);
       } else {
         writeText(out, text, localFs, entry.transform, entry.alpha);
