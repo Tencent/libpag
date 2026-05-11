@@ -274,6 +274,41 @@ class RecursionGuard {
   bool _overflowed = false;
 };
 
+// RAII guard for the three Repeater-related offset fields on HTMLWriterContext. writeLayer
+// records them at construction and restores them at destruction, so any early return inside
+// writeLayer after the fields have been mutated leaves the context with its original values
+// rather than leaking the current layer's offsets to the next sibling layer's snapshot.
+// The normal-flow consumers (writeRepeater, writeLayerInner's child loop) snapshot the values
+// into locals on entry, so restoring the context after writeLayer returns is observationally
+// neutral for them.
+class RepeaterOffsetGuard {
+ public:
+  explicit RepeaterOffsetGuard(HTMLWriterContext* c)
+      : _ctx(c), _originX(c->repeaterOriginOffsetX), _originY(c->repeaterOriginOffsetY),
+        _childX(c->childLayerOffsetX), _childY(c->childLayerOffsetY),
+        _savedChildX(c->savedChildLayerOffsetX), _savedChildY(c->savedChildLayerOffsetY) {
+  }
+  ~RepeaterOffsetGuard() {
+    _ctx->repeaterOriginOffsetX = _originX;
+    _ctx->repeaterOriginOffsetY = _originY;
+    _ctx->childLayerOffsetX = _childX;
+    _ctx->childLayerOffsetY = _childY;
+    _ctx->savedChildLayerOffsetX = _savedChildX;
+    _ctx->savedChildLayerOffsetY = _savedChildY;
+  }
+  RepeaterOffsetGuard(const RepeaterOffsetGuard&) = delete;
+  RepeaterOffsetGuard& operator=(const RepeaterOffsetGuard&) = delete;
+
+ private:
+  HTMLWriterContext* _ctx = nullptr;
+  float _originX = 0;
+  float _originY = 0;
+  float _childX = 0;
+  float _childY = 0;
+  float _savedChildX = 0;
+  float _savedChildY = 0;
+};
+
 //==============================================================================
 // HTMLWriter
 //==============================================================================

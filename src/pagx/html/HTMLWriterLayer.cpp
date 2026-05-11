@@ -1640,6 +1640,12 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   if (guard.overflowed()) {
     return;
   }
+  // Save-and-restore the six Repeater-related offset fields across this entire writeLayer
+  // scope: the setters below mutate them in place, and at least one early-return path
+  // (hasContent == false, after the ctx writes) exits without clearing them, which would leak
+  // a stale offset to the next sibling layer's writeLayer invocation. The guard restores the
+  // caller's offsets at destruction regardless of how writeLayer returns.
+  RepeaterOffsetGuard offsetGuard(_ctx);
   if (!layer->visible) {
     out.openTag("div");
     out.addAttr("style", "display:none");
