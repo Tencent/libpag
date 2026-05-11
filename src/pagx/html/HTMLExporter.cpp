@@ -106,6 +106,28 @@ static std::string ReadFileAsDataURI(const std::string& path, const char* mime) 
   return std::string("data:") + mime + ";base64," + EncodeBase64(bytes);
 }
 
+// Strips characters that would let a caller-supplied FontFaceRule value escape the `@font-face`
+// declaration it is being concatenated into. Unlike EscapeCssFontFamily (which operates on a
+// quoted string context), this filter is meant for unquoted CSS keyword/list values such as
+// font-weight, font-style and unicode-range. Control characters, quote marks, backslashes and
+// the declaration/block terminators ';', '{', '}' are all dropped; '<' and '>' are dropped too
+// so the emitted CSS cannot break out of the surrounding <style> element. Every other visible
+// ASCII byte — including the ',' '+' '-' 'U' needed by unicode-range — flows through unchanged,
+// so legitimate values are preserved exactly.
+static std::string SanitizeFontFaceValue(const std::string& value) {
+  std::string out;
+  out.reserve(value.size());
+  for (char c : value) {
+    auto uc = static_cast<unsigned char>(c);
+    if (uc < 0x20 || c == ';' || c == '{' || c == '}' || c == '<' || c == '>' || c == '\\' ||
+        c == '"' || c == '\'') {
+      continue;
+    }
+    out += c;
+  }
+  return out;
+}
+
 static std::string BuildFontFaceCSS(const std::vector<FontFaceRule>& rules, bool minify) {
   if (rules.empty()) {
     return {};
@@ -161,13 +183,13 @@ static std::string BuildFontFaceCSS(const std::vector<FontFaceRule>& rules, bool
       css +=
           "@font-face{font-family:'" + EscapeCssFontFamily(rule.fontFamily) + "';src:" + srcValue;
       if (!rule.fontWeight.empty()) {
-        css += ";font-weight:" + rule.fontWeight;
+        css += ";font-weight:" + SanitizeFontFaceValue(rule.fontWeight);
       }
       if (!rule.fontStyle.empty()) {
-        css += ";font-style:" + rule.fontStyle;
+        css += ";font-style:" + SanitizeFontFaceValue(rule.fontStyle);
       }
       if (!rule.unicodeRange.empty()) {
-        css += ";unicode-range:" + rule.unicodeRange;
+        css += ";unicode-range:" + SanitizeFontFaceValue(rule.unicodeRange);
       }
       css += ";font-display:block}";
     } else {
@@ -175,13 +197,13 @@ static std::string BuildFontFaceCSS(const std::vector<FontFaceRule>& rules, bool
       css += "  font-family: '" + EscapeCssFontFamily(rule.fontFamily) + "';\n";
       css += "  src: " + srcValue + ";\n";
       if (!rule.fontWeight.empty()) {
-        css += "  font-weight: " + rule.fontWeight + ";\n";
+        css += "  font-weight: " + SanitizeFontFaceValue(rule.fontWeight) + ";\n";
       }
       if (!rule.fontStyle.empty()) {
-        css += "  font-style: " + rule.fontStyle + ";\n";
+        css += "  font-style: " + SanitizeFontFaceValue(rule.fontStyle) + ";\n";
       }
       if (!rule.unicodeRange.empty()) {
-        css += "  unicode-range: " + rule.unicodeRange + ";\n";
+        css += "  unicode-range: " + SanitizeFontFaceValue(rule.unicodeRange) + ";\n";
       }
       css += "  font-display: block;\n";
       css += "}\n";
