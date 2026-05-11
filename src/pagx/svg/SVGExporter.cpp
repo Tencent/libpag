@@ -1712,7 +1712,15 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
                                                  (fs.textBox ? fs.textBox->padding.bottom : 0.0f))
                             : 0.0f;
     TextAlign textAlign = fs.textBox ? fs.textBox->textAlign : TextAlign::Start;
-    for (const auto& info : *lines) {
+    // For Justify, mirror the renderer's per-column behaviour: every column
+    // except the last visible (non-empty) one is stretched to fill the box
+    // along the inline axis; the last column degrades to Start. Pre-compute
+    // that index so the per-column emission can branch on it without an extra
+    // pass.
+    size_t lastJustifyColumnIdx =
+        (textAlign == TextAlign::Justify) ? FindLastNonEmptyLineIndex(text->text, *lines) : 0;
+    for (size_t lineIdx = 0; lineIdx < lines->size(); ++lineIdx) {
+      const auto& info = (*lines)[lineIdx];
       if (info.byteStart >= info.byteEnd ||
           info.byteEnd - info.byteStart > text->text.size() - info.byteStart) {
         continue;
@@ -1729,6 +1737,7 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
       float columnHeight = info.startX > 0 ? info.startX : 0.0f;
       float columnCenterX = paddingLeft + columnX + columnWidth / 2.0f;
       float columnY = paddingTop;
+      bool justifyStretch = false;
       if (innerHeight > 0 && columnHeight > 0) {
         switch (textAlign) {
           case TextAlign::Center:
@@ -1738,9 +1747,19 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
             columnY = paddingTop + innerHeight - columnHeight;
             break;
           case TextAlign::Justify:
-            // SVG offers no portable way to distribute extra inline-axis
-            // space across vertical glyphs; degrade to Start, matching the
-            // PAGX renderer's behaviour when justify can't apply.
+            // Stretch all non-last columns to fill innerHeight by widening
+            // inter-glyph spacing (see textLength emission below). The last
+            // visible column degrades to Start, matching the renderer.
+            // SVG's lengthAdjust="spacing" distributes the surplus uniformly
+            // across every glyph pair, while the renderer concentrates it at
+            // UAX#14 break opportunities — visually near-identical for the
+            // CJK + Latin mixes vertical justify is used for, and the only
+            // portable approximation available without per-glyph <tspan>s.
+            columnY = paddingTop;
+            if (lineIdx != lastJustifyColumnIdx && innerHeight > columnHeight) {
+              justifyStretch = true;
+            }
+            break;
           case TextAlign::Start:
           default:
             columnY = paddingTop;
@@ -1760,6 +1779,10 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
       applyPainters(out, fs, {}, alpha);
       out.addRequiredAttribute("x", columnCenterX);
       out.addRequiredAttribute("y", columnY);
+      if (justifyStretch) {
+        out.addAttribute("textLength", FloatToString(innerHeight));
+        out.addAttribute("lengthAdjust", "spacing");
+      }
       out.closeElementWithText(columnText);
     }
     return;
