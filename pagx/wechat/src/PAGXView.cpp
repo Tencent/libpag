@@ -895,6 +895,12 @@ bool PAGXView::draw() {
             }
             fitSnapshot = offscreen->makeImageSnapshot();
             fitSnapshotPixelScale = pixelScale;
+            // 同 main surface 路径：snapshot 可能挂了一个延迟 copy task，立刻 flush
+            // 让它在源 offscreen 还干净时完成，避免后续误覆盖。
+            auto copyRecording = context->flush();
+            if (copyRecording) {
+              context->submit(std::move(copyRecording));
+            }
             displayList.setZoomScale(savedZoom);
             displayList.setContentOffset(savedOffset.x, savedOffset.y);
           } else {
@@ -904,6 +910,13 @@ bool PAGXView::draw() {
         } else {
           fitSnapshot = surface->makeImageSnapshot();
           fitSnapshotPixelScale = 1.0f;
+          // makeImageSnapshot 在 externallyOwned surface（小程序 main canvas）上会创建
+          // 一个异步 copy 任务。如果不立刻 flush，这个 copy 会延迟到下次 draw 时执行，
+          // 那时 surface 上的像素可能已被新一次 render 覆盖，导致快照拿到错误内容。
+          auto snapRecording = context->flush();
+          if (snapRecording) {
+            context->submit(std::move(snapRecording));
+          }
         }
 
         fitSnapshotZoom = 1.0f;
