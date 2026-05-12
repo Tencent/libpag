@@ -498,19 +498,40 @@ inline int64_t LineHeightToSpcPts(float lineHeightPx) {
   return lineHeightPx > 0 ? static_cast<int64_t>(std::round(lineHeightPx * 75.0)) : 0;
 }
 
-// Emits an <a:pPr> with optional alignment, line-spacing and base direction.
-// Skips emission entirely when no attribute is set, matching the previous
-// inline blocks in writeNativeText / writeParagraph / writeTextBoxGroup. When
-// `rtl` is true, emits rtl="1" so PowerPoint runs UBA with an RTL paragraph
-// base direction (pPr@rtl=0 is the OOXML default and is therefore elided).
+// PAGX's text layout advances each `\t` to the next multiple of `4 * fontSize`
+// pixels (TextLayout.cpp: `tabWidth = effectiveFontSize * 4`). OOXML expresses
+// the same idea via <a:pPr defTabSz="...">, in EMU. Without this override
+// PowerPoint falls back to the master's defTabSz="914400" (1 inch ≈ 96px), so
+// any text whose font size differs from 24px renders tabs at the wrong stops
+// — text following the tab lands at a different X position than PAGX laid
+// out, visibly drifting (or overflowing) the text box. Returns 0 for
+// non-positive font sizes so the caller can skip emission.
+inline int64_t PagxTabSizeEMU(float fontSizePx) {
+  if (!(fontSizePx > 0.0f)) {
+    return 0;
+  }
+  return static_cast<int64_t>(std::round(static_cast<double>(fontSizePx) * 4.0 * EMU_PER_PX));
+}
+
+// Emits an <a:pPr> with optional alignment, line-spacing, base direction, and
+// default tab-stop interval. Skips emission entirely when no attribute is set,
+// matching the previous inline blocks in writeNativeText / writeParagraph /
+// writeTextBoxGroup. When `rtl` is true, emits rtl="1" so PowerPoint runs UBA
+// with an RTL paragraph base direction (pPr@rtl=0 is the OOXML default and is
+// therefore elided). When `defTabSzEMU` is positive, overrides the master's
+// default tab-stop interval so paragraphs with `\t` characters land glyphs at
+// the same stops PAGX used during layout.
 inline void WriteParagraphProperties(XMLBuilder& out, const char* algn, int64_t lnSpcPts,
-                                     bool rtl = false) {
-  if (!algn && lnSpcPts <= 0 && !rtl) {
+                                     bool rtl = false, int64_t defTabSzEMU = 0) {
+  if (!algn && lnSpcPts <= 0 && !rtl && defTabSzEMU <= 0) {
     return;
   }
   auto& pPr = out.openElement("a:pPr");
   if (algn) {
     pPr.addRequiredAttribute("algn", algn);
+  }
+  if (defTabSzEMU > 0) {
+    pPr.addRequiredAttribute("defTabSz", defTabSzEMU);
   }
   if (rtl) {
     pPr.addRequiredAttribute("rtl", "1");
@@ -798,13 +819,13 @@ class PPTWriter {
                                 const TextBox* textBox, bool useLineLayout);
   void emitNativeTextBody(XMLBuilder& out, const Text* text,
                           const std::vector<TextLayoutLineInfo>* lines, const PPTRunStyle& style,
-                          int64_t lnSpcPts, bool rtl, bool useLineLayout,
+                          int64_t lnSpcPts, bool rtl, bool useLineLayout, int64_t defTabSzEMU,
                           const std::vector<LayerFilter*>& filters,
                           const std::vector<LayerStyle*>& styles);
   void writeParagraph(XMLBuilder& out, const std::string& lineText, const PPTRunStyle& style,
                       const std::vector<LayerFilter*>& filters,
                       const std::vector<LayerStyle*>& styles, int64_t lnSpcPts = 0,
-                      bool rtl = false);
+                      bool rtl = false, int64_t defTabSzEMU = 0);
   void writeParagraphRun(XMLBuilder& out, const std::string& runText, const PPTRunStyle& style,
                          const std::vector<LayerFilter*>& filters,
                          const std::vector<LayerStyle*>& styles);
@@ -837,6 +858,7 @@ class PPTWriter {
     const char* algn;
     int64_t lnSpcPts;
     bool rtl;
+    int64_t defTabSzEMU;
     const std::vector<LayerFilter*>& filters;
     const std::vector<LayerStyle*>& styles;
     bool paragraphOpen = false;
