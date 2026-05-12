@@ -565,7 +565,13 @@ void PPTWriter::writeElements(XMLBuilder& out, const std::vector<Element*>& elem
 }
 
 // Rasterize the entire layer (including its sub-tree) to a single embedded PNG
-// and emit it as a positioned p:pic. Returns true if a picture was emitted.
+// and emit it as a positioned p:pic. Returns true on success, including the
+// no-op case where the layer's visible bounds are empty (everything clipped
+// out by scrollRect / clipToBounds / mask) — callers MUST treat that as
+// "successfully rasterized to nothing" and not fall through to emit children
+// unclipped. Returns false only for environmental failures (no GPU, encoder
+// error, missing layer-map entry, etc.) so the caller can attempt a degraded
+// fallback.
 bool PPTWriter::rasterizeLayerAsPicture(XMLBuilder& out, const Layer* layer, bool withBackdrop) {
   auto& buildResult = ensureBuildResult();
   auto it = buildResult.layerMap.find(layer);
@@ -576,6 +582,25 @@ bool PPTWriter::rasterizeLayerAsPicture(XMLBuilder& out, const Layer* layer, boo
   if (!tgfxLayer) {
     return false;
   }
+
+  // Keep the picture's on-slide xfrm in sync with the surface that produced
+  // the PNG: when the target layer has its own scrollRect, the PNG is sized to
+  // and clipped against the scrollRect window (RenderMaskedLayer applies the
+  // clip because tgfx's Layer::draw skips the layer's own scrollRect). Using
+  // the raw getBounds() here would place the bitmap with the unclipped extent
+  // and visually break scrollRect clipping for non-backdrop bakes.
+  auto bounds = withBackdrop ? tgfxLayer->getBounds(buildResult.root.get(), true)
+                             : ComputeRasterizedLayerBounds(buildResult.root, tgfxLayer);
+
+  // Empty visible bounds means the layer's content is completely clipped out.
+  // Report success without emitting anything: the caller's `return` short-
+  // circuits the fall-through path that would otherwise emit children
+  // unclipped, which would leak shapes that should be invisible (PAGX render
+  // shows nothing; pre-fix PPTX showed them at their pre-clip world position).
+  if (bounds.isEmpty() || bounds.width() <= 0 || bounds.height() <= 0) {
+    return true;
+  }
+
   auto pixelScale = static_cast<float>(_rasterDPI) / 96.0f;
   auto pngData = withBackdrop ? RenderLayerCompositeWithBackdrop(&_gpu, buildResult.root, tgfxLayer,
                                                                  pixelScale)
@@ -583,14 +608,6 @@ bool PPTWriter::rasterizeLayerAsPicture(XMLBuilder& out, const Layer* layer, boo
   if (!pngData) {
     return false;
   }
-  // Keep the picture's on-slide xfrm in sync with the surface that produced the
-  // PNG: when the target layer has its own scrollRect, the PNG is sized to and
-  // clipped against the scrollRect window (RenderMaskedLayer applies the clip
-  // because tgfx's Layer::draw skips the layer's own scrollRect). Using the
-  // raw getBounds() here would place the bitmap with the unclipped extent and
-  // visually break scrollRect clipping for non-backdrop bakes.
-  auto bounds = withBackdrop ? tgfxLayer->getBounds(buildResult.root.get(), true)
-                             : ComputeRasterizedLayerBounds(buildResult.root, tgfxLayer);
   auto offX = PxToEMU(bounds.left);
   auto offY = PxToEMU(bounds.top);
   auto extCX = std::max(int64_t(1), PxToEMU(bounds.width()));
@@ -638,9 +655,11 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& pa
     if (rasterizeLayerAsPicture(out, layer)) {
       return;
     }
-    // Bake fell through (zero bounds, no GPU, etc.) - fall through to writing
-    // the layer as a regular layer so its content is at least visible without
-    // the mask effect.
+    // Bake failed environmentally (no GPU, encoder error, etc.) - fall through
+    // to writing the layer as a regular layer so its content is at least
+    // visible without the mask effect. Empty-bounds (fully-masked-out) layers
+    // are handled inside rasterizeLayerAsPicture as a successful no-op and
+    // never reach this fallback.
   }
 
   // OOXML has no native clipping primitive for arbitrary shape children, so a
@@ -654,8 +673,11 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& pa
     if (rasterizeLayerAsPicture(out, layer)) {
       return;
     }
-    // Bake fell through (zero bounds, no GPU, etc.) - fall through and emit the
-    // layer's content unclipped so it remains at least partially visible.
+    // Bake failed environmentally (no GPU, encoder error, etc.) - fall through
+    // and emit the layer's content unclipped so it remains at least partially
+    // visible. Empty-bounds layers (everything clipped out by scrollRect) are
+    // handled inside rasterizeLayerAsPicture as a successful no-op so they
+    // don't leak through this fallback.
   }
 
   // Probe the layer for features that OOXML cannot represent natively. Features
