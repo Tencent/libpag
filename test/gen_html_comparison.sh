@@ -25,15 +25,15 @@
 #
 #   html-comparison/
 #   ├── index.html
+#   ├── fonts/                  # shared by every HTML below; each HTML's
+#   │                           # @font-face rules reference url('../fonts/...')
 #   ├── pagx-render/<section>/<name>.png
 #   ├── test/                   # only for the pagx_to_html section
 #   │   ├── <name>.html
-#   │   ├── fonts/...
 #   │   └── static-img/...
 #   └── cli/                    # one subdir per section to avoid name collisions
 #       ├── <section>/
 #       │   ├── <name>.html
-#       │   ├── fonts/...
 #       │   └── static-img/...
 #
 # Subdirectories keep the five sections namespace-isolated because a handful
@@ -380,6 +380,61 @@ else
   echo "      run: ./cmake-build-debug/PAGFullTest --gtest_filter=PAGXHtmlTest.BatchConvertAll"
   echo "      to populate it, then re-run this script."
 fi
+
+#-------------------------------------------------------------------------
+# Consolidate per-section fonts/ directories into a single top-level fonts/
+#-------------------------------------------------------------------------
+#
+# pagx export writes a fonts/ directory next to every output HTML it produces,
+# and the test-embedded copy step above lifts the BatchConvertAll fonts/ into
+# test/fonts/. With five CLI sections plus the test column, the same ~18-28 MB
+# font payload gets written six times. The HTML files reference fonts as
+# `url('fonts/Name.ttf')`, so consolidating their physical location requires
+# rewriting every reference to `url('../fonts/Name.ttf')` simultaneously.
+#
+# This shrinks the deploy bundle from ~131 MB to ~44 MB without changing the
+# generated HTML structure or the relative-path contract between html and its
+# @font-face URLs; static-img/ directories stay untouched.
+
+echo ""
+echo "== consolidating per-section fonts/ into top-level fonts/ =="
+GLOBAL_FONTS_DIR="$OUT_DIR/fonts"
+mkdir -p "$GLOBAL_FONTS_DIR"
+
+# Collect the superset of fonts from every per-section directory. `cp -n` keeps
+# the first copy of each filename; since every section ships the same font
+# bytes this is equivalent to a deduplicated union. We deliberately do NOT
+# hash-verify here: if two sections ever diverge on font content the downstream
+# visual comparison will surface the difference, and the cost of a redundant
+# sha256 walk per run is not worth the paranoia.
+for dir in "$OUT_DIR"/cli/*/fonts "$OUT_DIR"/test/fonts; do
+  if [ -d "$dir" ]; then
+    cp -R -n "$dir"/* "$GLOBAL_FONTS_DIR"/ 2>/dev/null || true
+  fi
+done
+
+# Rewrite every surviving per-section HTML reference from the old per-section
+# `url('fonts/...)` form to the new top-level `url('../fonts/...)` form. The
+# script uses a single sed pass per file (find -exec ... +) to avoid
+# re-invoking sed once per sample on sections with dozens of files. BSD sed on
+# macOS requires `-i ''`; GNU sed treats the same invocation as "-i" with an
+# empty suffix, which is compatible.
+if [ "$(uname)" = "Darwin" ]; then
+  SED_INPLACE=(-i '')
+else
+  SED_INPLACE=(-i)
+fi
+find "$OUT_DIR"/cli "$OUT_DIR"/test -maxdepth 2 -name "*.html" -type f -exec \
+  sed "${SED_INPLACE[@]}" "s|url('fonts/|url('../fonts/|g" {} +
+
+# Drop the now-redundant per-section font directories. pagx-render/ and
+# static-img/ are untouched; the generated HTML still resolves static-img
+# via its own relative path.
+rm -rf "$OUT_DIR"/cli/*/fonts "$OUT_DIR"/test/fonts
+
+font_count=$(ls "$GLOBAL_FONTS_DIR" 2>/dev/null | wc -l | tr -d ' ')
+font_size=$(du -sh "$GLOBAL_FONTS_DIR" 2>/dev/null | cut -f1)
+echo "  shared fonts/ contains $font_count file(s), $font_size"
 
 #-------------------------------------------------------------------------
 # Build index.html
