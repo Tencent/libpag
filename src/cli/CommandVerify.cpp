@@ -20,6 +20,7 @@
 #include <libxml/parser.h>
 #include <libxml/tree.h>
 #include <libxml/xmlschemas.h>
+#include <algorithm>
 #include <cfloat>
 #include <cmath>
 #include <cstdlib>
@@ -629,10 +630,6 @@ static bool IsGeometryElement(NodeType type) {
          type == NodeType::Path || type == NodeType::Text;
 }
 
-static bool IsPainterElement(NodeType type) {
-  return type == NodeType::Fill || type == NodeType::Stroke;
-}
-
 static bool ContainsRepeater(const std::vector<Element*>& elements) {
   for (auto* element : elements) {
     if (element->nodeType() == NodeType::Repeater) {
@@ -650,7 +647,7 @@ static void DetectPainterLeak(const std::vector<Element*>& elements,
   int lastPainterIndex = -1;
   for (size_t i = 0; i < elements.size(); i++) {
     auto type = elements[i]->nodeType();
-    if (!IsPainterElement(type)) {
+    if (!IsPainter(type)) {
       continue;
     }
     if (lastPainterIndex >= 0) {
@@ -727,11 +724,22 @@ static void DetectRedundantFirstChildGroup(const std::vector<Element*>& elements
     return;
   }
   auto* group = static_cast<const Group*>(first);
-  if (CanUnwrapFirstChildGroup(group)) {
-    AddDiagnostic(diagnostics, group->sourceLine,
-                  "redundant first-child Group, no painter isolation needed. "
-                  "Fix: unwrap — move children into parent scope");
+  if (!CanUnwrapFirstChildGroup(group)) {
+    return;
   }
+  // Groups with customData carry intentional metadata that would be lost if unwrapped.
+  if (!group->customData.empty()) {
+    return;
+  }
+  // If there are following siblings AND the group contains painters, unwrapping would let those
+  // painters bleed onto subsequent geometry. The Group is therefore providing real painter
+  // isolation and should not be flagged.
+  if (elements.size() > 1 && HasPainter(group->elements)) {
+    return;
+  }
+  AddDiagnostic(diagnostics, group->sourceLine,
+                "redundant first-child Group, no painter isolation needed. "
+                "Fix: unwrap — move children into parent scope");
 }
 
 // ============================================================================
@@ -1146,7 +1154,7 @@ static void DetectIneffectiveLayoutAttrs(const Layer* layer, bool parentHasLayou
 // ============================================================================
 
 static bool CanDowngradeLayerToGroup(const Layer* layer) {
-  return layer->children.empty() && pagx::cli::IsLayerShell(layer);
+  return layer->children.empty() && pagx::IsLayerShell(layer);
 }
 
 static void DetectDowngradableLayers(const Layer* parentLayer,
@@ -1310,10 +1318,10 @@ static void DetectHighPathComplexity(const Path* path, std::vector<VerifyDiagnos
     return;
   }
   auto verbCount = path->data->verbs().size();
-  if (verbCount > 500) {
+  if (verbCount > 1024) {
     AddDiagnostic(diagnostics, path->sourceLine,
                   "Path with " + std::to_string(verbCount) +
-                      " verbs (> 500), may cause slow rendering. "
+                      " verbs (> 1024), may cause slow rendering. "
                       "Fix: check if path can be simplified or split");
   }
 }
@@ -1440,6 +1448,12 @@ static void DetectRectangularMask(const Layer* layer, std::vector<VerifyDiagnost
   }
   if (maskLayer->contents[0]->nodeType() != NodeType::Rectangle ||
       maskLayer->contents[1]->nodeType() != NodeType::Fill) {
+    return;
+  }
+  auto* rect = static_cast<Rectangle*>(maskLayer->contents[0]);
+  // A rounded or reversed rectangle is NOT clip-equivalent to a plain rectangular bounds clip,
+  // so suggesting scrollRect/clipToBounds would change the rendered output.
+  if (rect->roundness != 0 || rect->reversed) {
     return;
   }
   auto* fill = static_cast<Fill*>(maskLayer->contents[1]);
