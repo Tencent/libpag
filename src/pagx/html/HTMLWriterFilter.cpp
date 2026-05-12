@@ -675,14 +675,16 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type, Point mas
     std::string py = CssFloatToString(-maskedLayerPos.y) + "px";
     css += ";-webkit-mask-position:" + px + " " + py;
     css += ";mask-position:" + px + " " + py;
-    // mask-size must be set explicitly to the SVG's natural dimensions once mask-position is
-    // used, otherwise some browsers default to 'cover' and scale the mask.
-    css += ";-webkit-mask-size:" + CssFloatToString(maxX) + "px " + CssFloatToString(maxY) + "px";
-    css += ";mask-size:" + CssFloatToString(maxX) + "px " + CssFloatToString(maxY) + "px";
-    // Prevent the mask from tiling: without no-repeat, areas outside the mask rect would
-    // also become opaque due to the default repeat behaviour.
-    css += ";-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat";
   }
+  // mask-size and mask-repeat must always be pinned, not just when mask-position is used.
+  // CSS defaults to `mask-size:auto` which resolves to `cover` in some browsers and to the
+  // SVG's intrinsic size in others, and `mask-repeat:repeat` which would tile the mask SVG
+  // across the masked element. Without explicit values a 100×100 mask on a 200×200 element
+  // either stretches to fill (mask loses its clipping geometry, D1 section of
+  // optimizer_all_rules) or tiles into a checkerboard.
+  css += ";-webkit-mask-size:" + CssFloatToString(maxX) + "px " + CssFloatToString(maxY) + "px";
+  css += ";mask-size:" + CssFloatToString(maxX) + "px " + CssFloatToString(maxY) + "px";
+  css += ";-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat";
   return css;
 }
 
