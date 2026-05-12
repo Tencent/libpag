@@ -21,7 +21,6 @@
 #include <string>
 #include <vector>
 #include "base/PAGTest.h"
-#include "base/TestFontRegistration.h"
 #include "pagx/FontConfig.h"
 #include "pagx/HTMLExporter.h"
 #include "pagx/PAGXImporter.h"
@@ -32,13 +31,21 @@
 
 namespace pag {
 
-// Returns a FontConfig that registers the repo-bundled Noto Sans SC as a fallback typeface.
-// This ensures that text shaping during HTML export (PAGXDocument::applyLayout) uses the
-// same font metrics as the tgfx native renderer, so overflow:hidden line-count decisions
-// and other metric-dependent layout calculations agree between the two code paths.
+// Returns a FontConfig that registers the repo-bundled Noto Sans SC Regular as a fallback
+// typeface. This ensures that text shaping during HTML export (PAGXDocument::applyLayout) uses
+// the same Regular font metrics as the tgfx native renderer, so overflow:hidden line-count
+// decisions and other metric-dependent layout calculations agree between the two code paths
+// for non-bold text. Bold text is intentionally not registered here: tgfx falls back to
+// faux-bold synthesis (Regular advance with thickened outline) and the screenshot baseline
+// captures whatever the browser produces with that HTML structure, accepting the visual
+// divergence between faux-bold and a real Bold typeface.
 static pagx::FontConfig MakeHtmlFontConfig() {
   pagx::FontConfig c;
-  RegisterTestTypefaces(c);
+  auto regularTypeface =
+      tgfx::Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  if (regularTypeface) {
+    c.registerTypeface(regularTypeface);
+  }
   return c;
 }
 
