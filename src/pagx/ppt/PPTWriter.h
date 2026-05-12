@@ -719,7 +719,7 @@ class PPTWriter {
   bool _convertTextToPath = false;
   bool _bridgeContours = false;
   bool _resolveModifiers = true;
-  bool _rasterizeUnsupported = false;
+  bool _rasterizeUnsupported = true;
   // Ratio of raster DPI to the 96 DPI logical coordinate space. Drives the
   // off-screen Surface size of every PNG bake (masked layer, scrollRect bake,
   // blend/wide-gamut fallback, tiled pattern). The placed <p:pic>/<a:blipFill>

@@ -68,9 +68,11 @@ struct PPTExportOptions {
    * patterns are always rasterized regardless of this flag because the native OOXML a:tile
    * mechanism produces inconsistent scaling across PowerPoint and Keynote. Features with no
    * meaningful vector fallback (TextPath, TextModifier, ColorMatrix, conic/diamond gradients,
-   * shear transforms) are always rasterized regardless of this flag. The default value is false.
+   * shear transforms) are always rasterized regardless of this flag. The default value is true,
+   * favouring visual fidelity over editability — callers that need editable vector output for
+   * unsupported features should set this to false explicitly.
    */
-  bool rasterizeUnsupported = false;
+  bool rasterizeUnsupported = true;
 
   /**
    * Pixel DPI used when a layer has to be rasterized to PNG. The Surface behind every bake (masked

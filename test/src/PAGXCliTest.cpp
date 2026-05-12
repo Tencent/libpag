@@ -1276,10 +1276,10 @@ CLI_TEST(PAGXCliTest, Export_PagxToPptx_NoConvertTextToPath) {
   EXPECT_GT(std::filesystem::file_size(outputPath), 0u);
 }
 
-CLI_TEST(PAGXCliTest, Export_PagxToPptx_RasterizeUnsupported) {
+CLI_TEST(PAGXCliTest, Export_PagxToPptx_NoRasterizeUnsupported) {
   auto inputPath = TestResourcePath("verify_simple.pagx");
-  auto outputPath = TempDir() + "/ExportPPTX_RasterizeUnsupported.pptx";
-  auto ret = CallRun(pagx::cli::RunExport, {"export", "--ppt-rasterize-unsupported", "--input",
+  auto outputPath = TempDir() + "/ExportPPTX_NoRasterizeUnsupported.pptx";
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--ppt-no-rasterize-unsupported", "--input",
                                             inputPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(outputPath));

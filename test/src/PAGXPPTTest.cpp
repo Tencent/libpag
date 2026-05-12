@@ -1994,6 +1994,7 @@ PAGX_TEST(PAGXPPTTest, MaskNoBake) {
   doc->layers.push_back(contentLayer);
 
   pagx::PPTExportOptions options;
+  options.rasterizeUnsupported = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "mask_no_bake", options));
 }
 
@@ -2034,6 +2035,7 @@ PAGX_TEST(PAGXPPTTest, MaskNoBakeProducesSmaller) {
   ASSERT_TRUE(pagx::PPTExporter::ToFile(*doc, bakedPath, bakedOpts));
 
   pagx::PPTExportOptions vectorOpts;
+  vectorOpts.rasterizeUnsupported = false;
   ASSERT_TRUE(pagx::PPTExporter::ToFile(*doc, vectorPath, vectorOpts));
 
   auto bakedSize = std::filesystem::file_size(bakedPath);
@@ -2090,6 +2092,7 @@ PAGX_TEST(PAGXPPTTest, MaskNoBakeWithChildLayers) {
   doc->layers.push_back(parentLayer);
 
   pagx::PPTExportOptions options;
+  options.rasterizeUnsupported = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "mask_no_bake_children", options));
 }
 
@@ -2137,6 +2140,7 @@ PAGX_TEST(PAGXPPTTest, MaskNoBakeWithTransformAndAlpha) {
   doc->layers.push_back(contentLayer);
 
   pagx::PPTExportOptions options;
+  options.rasterizeUnsupported = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "mask_no_bake_transform_alpha", options));
 }
 
@@ -2770,6 +2774,7 @@ PAGX_TEST(PAGXPPTTest, MaskNoBakeContourType) {
   doc->layers.push_back(contentLayer);
 
   pagx::PPTExportOptions options;
+  options.rasterizeUnsupported = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "mask_no_bake_contour", options));
 }
 
@@ -4031,6 +4036,7 @@ PAGX_TEST(PAGXPPTTest, RasterizeUnsupportedBlendDisabled) {
   doc->layers.push_back(layer);
 
   pagx::PPTExportOptions options;
+  options.rasterizeUnsupported = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "raster_blend_disabled", options));
 }
 
@@ -4142,6 +4148,7 @@ PAGX_TEST(PAGXPPTTest, WideGamutDisabled) {
   doc->layers.push_back(layer);
 
   pagx::PPTExportOptions options;
+  options.rasterizeUnsupported = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "wide_gamut_disabled", options));
 }
 
@@ -4576,6 +4583,7 @@ PAGX_TEST(PAGXPPTTest, ScrollRectBakeDisabled) {
   doc->layers.push_back(layer);
 
   pagx::PPTExportOptions options;
+  options.rasterizeUnsupported = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "scrollrect_bake_disabled", options));
 }
 

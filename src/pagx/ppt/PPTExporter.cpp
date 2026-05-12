@@ -664,10 +664,12 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& pa
     // Backdrop-aware features (non-Normal blend mode, BackgroundBlurStyle)
     // require rendering the whole scene clipped to the layer's bounds —
     // this turns any editable native content beneath the patch into baked
-    // pixels, which is why `rasterizeUnsupported` defaults to false.
-    // Every other unsupported feature (TextPath, ColorMatrix, wide-gamut
-    // color, diamond/conic gradient, shear transform) is self-contained and
-    // renders fine against an empty canvas.
+    // pixels, which is the main reason a caller might disable
+    // `rasterizeUnsupported` (it defaults to true so the slide matches the
+    // tgfx renderer out of the box). Every other unsupported feature
+    // (TextPath, ColorMatrix, wide-gamut color, diamond/conic gradient,
+    // shear transform) is self-contained and renders fine against an empty
+    // canvas.
     bool withBackdrop = features.requiresBackdrop(_rasterizeUnsupported);
     if (rasterizeLayerAsPicture(out, layer, withBackdrop)) {
       return;
