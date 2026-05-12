@@ -106,7 +106,17 @@ std::string LayerTransformCSS(const Layer* layer);
  */
 std::string RewriteLineBreakHints(const std::string& text);
 
-Matrix BuildGroupMatrix(const Group* group);
+/**
+ * HTML-local wrapper around pagx::BuildGroupMatrix that negates the `group->skew` angle so the
+ * resulting shear matches tgfx native rendering (VectorGroup::ApplySkew uses
+ * `DegreesToRadians(-skew)`). The shared pagx::BuildGroupMatrix follows the SVG matrix sign
+ * convention asserted by main's PAGXSVGTest.SVGExport_GroupSkew, so we cannot fix the sign at
+ * that layer without breaking the SVG / PPT exporters and their pinned test expectations. Use
+ * this wrapper everywhere the HTML exporter would have called BuildGroupMatrix on a Group node
+ * (path bake in flattenGroup, transform emission in writeGroup, etc.).
+ */
+Matrix BuildGroupMatrixForHTML(const Group* group);
+
 const char* AlignmentToCSS(Alignment alignment);
 const char* ArrangementToCSS(Arrangement arrangement);
 std::string PaddingToCSS(const Padding& padding);

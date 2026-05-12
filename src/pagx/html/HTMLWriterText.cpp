@@ -39,10 +39,11 @@
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/svg/SVGPathParser.h"
-#include "pagx/svg/SVGTextLayout.h"
 #include "pagx/types/SelectorTypes.h"
 #include "pagx/types/TrimType.h"
+#include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/StringParser.h"
+#include "tgfx/core/UTF.h"
 
 namespace pagx {
 
@@ -52,6 +53,22 @@ using pag::FloatNearlyZero;
 //==============================================================================
 // Text helper statics
 //==============================================================================
+
+// Decodes a single UTF-8 character from the byte stream.
+// Returns the number of bytes consumed, or 0 on error.
+static size_t SVGDecodeUTF8Char(const char* data, size_t remaining, int32_t* unichar) {
+  if (remaining == 0) {
+    return 0;
+  }
+  const char* ptr = data;
+  const char* end = data + remaining;
+  int32_t ch = tgfx::UTF::NextUTF8(&ptr, end);
+  if (ch < 0) {
+    return 0;
+  }
+  *unichar = ch;
+  return static_cast<size_t>(ptr - data);
+}
 
 // Approximate character advance widths as fractions of fontSize for common proportional fonts
 // (Arial / Helvetica). These values are derived from the actual glyph advance widths in
@@ -2045,7 +2062,7 @@ void HTMLWriter::writeGroup(HTMLBuilder& out, const Group* group, float alpha, b
   // TransformPathDataToSVG in writeElements) and then recursed into this Group without its own
   // DOM wrapper; the inner Group's renderPosition is expressed in the outer Group's local
   // space, so we must compose the outer transform here to land in the enclosing Layer's space.
-  Matrix gm = BuildGroupMatrix(group);
+  Matrix gm = BuildGroupMatrixForHTML(group);
   if (!parentMatrix.isIdentity()) {
     gm = parentMatrix * gm;
   }

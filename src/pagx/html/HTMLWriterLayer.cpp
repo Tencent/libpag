@@ -43,6 +43,7 @@
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/MergePathMode.h"
+#include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/StringParser.h"
 
 namespace pagx {
@@ -431,7 +432,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         // reads Text::renderPosition relative to the Group — not the enclosing Layer — so a
         // flattened Group would drop its constraint offset from the span's top/left and the
         // text would collapse onto the Layer's origin (app_icons Calendar "17" symptom).
-        bool groupHasTransform = !BuildGroupMatrix(group).isIdentity();
+        bool groupHasTransform = !BuildGroupMatrixForHTML(group).isIdentity();
         // Only use the DOM wrapper (writeGroup) when the Group has a transform AND contains
         // Text — the wrapper is needed so Text can resolve its renderPosition in Group space.
         // Groups with alpha but no transform/text must use the flatten path so their geometry
@@ -534,7 +535,7 @@ void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha,
   auto savedGeos = std::move(geos);
   geos.clear();
   std::vector<GeoInfo> groupGeos;
-  Matrix gm = BuildGroupMatrix(group);
+  Matrix gm = BuildGroupMatrixForHTML(group);
   // When a Group has alpha < 1, its Painters render with that alpha applied. In the
   // flatten path, carry the group's alpha into every paintGeos/writeTextPath/
   // writeTextModifier call so the fill-opacity matches the tgfx compositing result.

@@ -343,8 +343,12 @@ the command reports an error.
 ```bash
 pagx export --input icon.pagx                    # PAGX to icon.svg
 pagx export --input icon.pagx --output out.svg   # PAGX to out.svg
+pagx export --input icon.pagx --output out.pptx  # PAGX to out.pptx
 pagx export --format svg --input icon.pagx       # force SVG output format
+pagx export --format pptx --input icon.pagx      # force PPTX output format
 pagx export --input icon.pagx --svg-indent 4     # 4-space indent
+pagx export --input icon.pagx --text-to-path     # convert text to paths
+pagx export --input icon.pagx --output out.pptx --ppt-no-bake-unsupported  # keep unsupported features editable
 pagx export --input icon.pagx --output out.html  # PAGX to HTML
 ```
 
@@ -352,10 +356,11 @@ pagx export --input icon.pagx --output out.html  # PAGX to HTML
 |--------|-------------|
 | `--input <file>` | Input PAGX file (required) |
 | `--output <file>` | Output file (default: `<input>.<format>`) |
-| `--format <format>` | Output format (`svg` or `html`; inferred from output extension). Required if output has no extension |
+| `--format <format>` | Output format (`svg`, `pptx`, or `html`; inferred from output extension). Required if output has no extension |
+| `--text-to-path` | Convert text to path geometry using pre-shaped glyph outlines (default: native text rendering) |
 | `--svg-indent <n>` | Indentation spaces (default: 2, valid range: 0–16) |
 | `--svg-no-xml-declaration` | Omit the `<?xml ...?>` declaration |
-| `--svg-no-convert-text-to-path` | Keep text as `<text>` elements instead of `<path>` |
+| `--ppt-no-bake-unsupported` | Disable the default baking of layers that use features OOXML cannot represent natively — masks, scrollRect clipping, blend modes outside of `Normal`/`Multiply`/`Screen`/`Darken`/`Lighten`, and wide-gamut color. By default the exporter bakes these layers into PNG patches so the slide matches the tgfx renderer (for unsupported blend modes the backdrop beneath the layer is baked into the PNG so the blend composites against the real scene, at the cost of turning native content under the patch into pixels). Pass this flag to silently drop those features and emit the layer as editable shapes instead (mask ignored, scrollRect dropped, blend falls back to `Normal`, wide-gamut clamped to sRGB). Tiled image patterns are always baked regardless of this flag, and features with no vector fallback (TextPath, ColorMatrix, conic/diamond gradient, shear transform) always bake regardless of this flag |
 
 ### HTML output
 

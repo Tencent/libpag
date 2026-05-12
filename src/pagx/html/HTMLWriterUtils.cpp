@@ -509,12 +509,17 @@ std::string RewriteLineBreakHints(const std::string& text) {
   return out;
 }
 
-Matrix BuildGroupMatrix(const Group* group) {
-  bool hasAnchor = !FloatNearlyZero(group->anchor.x) || !FloatNearlyZero(group->anchor.y);
-  // renderPosition() returns the layout-resolved top-left (incorporates constraint layout such as
-  // centerX/centerY/left/right). When the group has no layout constraints, renderPosition equals
-  // (position.x, position.y), so this subsumes the explicit position property.
+// HTML-local skew sign fix. Mirrors pagx::BuildGroupMatrix line-for-line except for one shear:
+// the shear coefficient uses `tan(-group->skew)` so the result agrees with tgfx native rendering
+// (VectorGroup::ApplySkew passes `DegreesToRadians(-skew)` into the shear). The shared
+// pagx::BuildGroupMatrix uses the +skew sign because main's PAGXSVGTest.SVGExport_GroupSkew
+// pinned that convention for SVG output, and the SVG/PPT exporters depend on it. Rather than
+// flipping the shared helper (which would break those exporters and the pinned test) we keep
+// the HTML exporter's path bake aligned with native by routing every BuildGroupMatrix call
+// through this wrapper. Any change to the rest of BuildGroupMatrix must be mirrored here.
+Matrix BuildGroupMatrixForHTML(const Group* group) {
   auto renderPos = group->renderPosition();
+  bool hasAnchor = !FloatNearlyZero(group->anchor.x) || !FloatNearlyZero(group->anchor.y);
   bool hasPosition = !FloatNearlyZero(renderPos.x) || !FloatNearlyZero(renderPos.y);
   bool hasRotation = !FloatNearlyZero(group->rotation);
   bool hasScale =
@@ -535,6 +540,7 @@ Matrix BuildGroupMatrix(const Group* group) {
   if (hasSkew) {
     m = Matrix::Rotate(group->skewAxis) * m;
     Matrix shear = {};
+    // Sign deliberately negated relative to pagx::BuildGroupMatrix; see function comment.
     shear.c = std::tan(DegreesToRadians(-group->skew));
     m = shear * m;
     m = Matrix::Rotate(-group->skewAxis) * m;
