@@ -30,6 +30,7 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/types/Matrix.h"
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
 class Context;
@@ -184,10 +185,23 @@ class GPUContext {
 };
 
 /**
+ * Returns the rectangle (in `root`'s coordinate space) that the rasterization helpers below use
+ * as both the surface size and the on-slide placement of a baked layer. This is the layer's
+ * tight global bounds intersected with the layer's own scrollRect (mapped to `root`) when one is
+ * present, so callers and renderers agree on a single, scrollRect-clipped extent. Returns an
+ * empty rect when the intersection is empty.
+ */
+tgfx::Rect ComputeRasterizedLayerBounds(const std::shared_ptr<tgfx::Layer>& root,
+                                        const std::shared_ptr<tgfx::Layer>& targetLayer);
+
+/**
  * Rasterizes a tgfx layer (including any masks) to a PNG-encoded Data object. `pixelScale` is the
  * ratio of the desired output pixel density to the layer's logical coordinate space (e.g. 2.0 for
  * 2x density). The encoded PNG has dimensions ceil(logicalSize * pixelScale); callers keep using
  * the logical bounds when placing the PNG so that consumers scale it back up on display.
+ * If the layer has its own scrollRect, the output is clipped to and sized by the scrollRect's
+ * visible window in `root`'s coordinates (since tgfx's Layer::draw deliberately skips applying
+ * the layer's own scrollRect).
  * Returns nullptr if the layer has zero bounds or rasterization fails.
  */
 std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,

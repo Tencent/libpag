@@ -583,7 +583,14 @@ bool PPTWriter::rasterizeLayerAsPicture(XMLBuilder& out, const Layer* layer, boo
   if (!pngData) {
     return false;
   }
-  auto bounds = tgfxLayer->getBounds(buildResult.root.get(), true);
+  // Keep the picture's on-slide xfrm in sync with the surface that produced the
+  // PNG: when the target layer has its own scrollRect, the PNG is sized to and
+  // clipped against the scrollRect window (RenderMaskedLayer applies the clip
+  // because tgfx's Layer::draw skips the layer's own scrollRect). Using the
+  // raw getBounds() here would place the bitmap with the unclipped extent and
+  // visually break scrollRect clipping for non-backdrop bakes.
+  auto bounds = withBackdrop ? tgfxLayer->getBounds(buildResult.root.get(), true)
+                             : ComputeRasterizedLayerBounds(buildResult.root, tgfxLayer);
   auto offX = PxToEMU(bounds.left);
   auto offY = PxToEMU(bounds.top);
   auto extCX = std::max(int64_t(1), PxToEMU(bounds.width()));

@@ -823,6 +823,13 @@ static std::shared_ptr<tgfx::Data> RenderToPNG(tgfx::Context* context, int width
 // the global bounds origin mapped to (0,0) so the emitted PNG is tightly
 // cropped. Used for mask / scrollRect bakes where the layer's visual result
 // does not depend on the backdrop.
+//
+// Note: tgfx's Layer::draw deliberately does NOT apply the target layer's own
+// scrollRect (see Layer.h doc on draw()) — only children's scrollRects are
+// honoured during the recursive walk. Without this drawer applying the clip
+// itself the baked PNG would contain the target's full unclipped content. The
+// scrollRect lives in layer-local coordinates, so we clip after concatenating
+// the layer's relative matrix while the canvas is still in layer-local space.
 struct MaskedLayerDrawer {
   const std::shared_ptr<tgfx::Layer>& root;
   const std::shared_ptr<tgfx::Layer>& targetLayer;
@@ -830,6 +837,10 @@ struct MaskedLayerDrawer {
   void operator()(tgfx::Canvas* canvas) const {
     canvas->translate(-globalBounds.left, -globalBounds.top);
     canvas->concat(targetLayer->getRelativeMatrix(root.get()));
+    auto scrollRect = targetLayer->scrollRect();
+    if (!scrollRect.isEmpty()) {
+      canvas->clipRect(scrollRect, targetLayer->allowsEdgeAntialiasing());
+    }
     targetLayer->draw(canvas);
   }
 };
@@ -884,11 +895,34 @@ void GPUContext::unlock() {
   }
 }
 
+tgfx::Rect ComputeRasterizedLayerBounds(const std::shared_ptr<tgfx::Layer>& root,
+                                        const std::shared_ptr<tgfx::Layer>& targetLayer) {
+  auto bounds = targetLayer->getBounds(root.get(), true);
+  auto scrollRect = targetLayer->scrollRect();
+  if (!scrollRect.isEmpty()) {
+    // getRelativeMatrix(root) already folds in scrollRect's preTranslate (see
+    // tgfx Layer::getMatrixWithScrollRect), so mapping the scrollRect rect
+    // through it yields the visible window in `root` coordinates regardless of
+    // the layer's matrix or scroll offsets. getBounds however does not
+    // intersect the layer's own scrollRect with its own bounds (only child
+    // scrollRects are intersected during traversal), so we apply the clip here
+    // to keep the rasterized extent in sync with what will actually be drawn.
+    auto windowInRoot = targetLayer->getRelativeMatrix(root.get()).mapRect(scrollRect);
+    if (!bounds.intersect(windowInRoot)) {
+      return tgfx::Rect::MakeEmpty();
+    }
+  }
+  return bounds;
+}
+
 std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,
                                               const std::shared_ptr<tgfx::Layer>& root,
                                               const std::shared_ptr<tgfx::Layer>& targetLayer,
                                               float pixelScale) {
-  auto globalBounds = targetLayer->getBounds(root.get(), true);
+  auto globalBounds = ComputeRasterizedLayerBounds(root, targetLayer);
+  if (globalBounds.isEmpty()) {
+    return nullptr;
+  }
   auto context = gpu->lockContext();
   if (context == nullptr) {
     return nullptr;
