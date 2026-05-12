@@ -426,8 +426,6 @@ void FilterRenderer::DrawWithFilter(Canvas* parentCanvas, const FilterModifier* 
     auto filter = LayerStylesFilter::Make(cache, filterList->layerStyles, filterList->layerFrame,
                                           contentScale, filterList->layerStyleScale);
     filter->applyFilter(parentCanvas, std::move(output));
-  } else if (input == output) {
-    parentCanvas->drawPicture(sourcePicture);
   } else {
     auto canvasMatrix = parentCanvas->getMatrix();
     parentCanvas->translate(totalOffset.x, totalOffset.y);
