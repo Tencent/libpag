@@ -78,7 +78,8 @@ static void PrintUsage() {
       << "  pagx export --input icon.pagx --svg-indent 4     # 4-space indent\n"
       << "  pagx export --input icon.pagx --text-to-path     # convert text to paths\n"
       << "  pagx export --input icon.pagx --output out.pptx --ppt-no-rasterize-unsupported\n"
-      << "                                                   # keep unsupported features editable\n";
+      << "                                                   # keep unsupported features "
+         "editable\n";
 }
 
 static int ParseOptions(int argc, char* argv[], ExportOptions* options) {

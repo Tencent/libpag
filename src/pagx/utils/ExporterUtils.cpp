@@ -845,6 +845,69 @@ struct MaskedLayerDrawer {
   }
 };
 
+// Hides every layer that the BackdropCompositeDrawer must NOT bake into the PNG, restoring the
+// original visibility flags on destruction. The drawer needs the target layer's backdrop (i.e.
+// the pixels of layers drawn before it under the same root) but must exclude the target's later-
+// drawn siblings as well as anything painted on top of the target itself — otherwise the bake
+// captures content that the surrounding writeLayer recursion will also emit natively, producing
+// duplicated / overlapping output.
+//
+// The mask is built by walking the chain root -> ... -> targetLayer's parent. At each ancestor,
+// every child whose draw order is at-or-after the next link in the chain is hidden. The target
+// itself is excluded from the hide set because the drawer still needs to paint it on top of the
+// backdrop (that is, after all, the whole point of the backdrop composite).
+class BackdropSiblingMask {
+ public:
+  BackdropSiblingMask(const std::shared_ptr<tgfx::Layer>& root,
+                      const std::shared_ptr<tgfx::Layer>& targetLayer) {
+    if (!root || !targetLayer || root.get() == targetLayer.get()) {
+      return;
+    }
+    std::vector<tgfx::Layer*> chain;
+    for (auto* current = targetLayer.get(); current != nullptr; current = current->parent()) {
+      chain.push_back(current);
+      if (current == root.get()) {
+        break;
+      }
+    }
+    if (chain.empty() || chain.back() != root.get()) {
+      // targetLayer is not a descendant of root; defensive bail-out.
+      return;
+    }
+    for (size_t i = chain.size() - 1; i > 0; --i) {
+      auto* ancestor = chain[i];
+      auto* nextInChain = chain[i - 1];
+      bool seenChainLink = false;
+      for (const auto& child : ancestor->children()) {
+        if (child.get() == nextInChain) {
+          seenChainLink = true;
+          continue;
+        }
+        if (!seenChainLink) {
+          continue;
+        }
+        if (!child->visible()) {
+          continue;
+        }
+        _hidden.push_back(child);
+        child->setVisible(false);
+      }
+    }
+  }
+
+  ~BackdropSiblingMask() {
+    for (const auto& layer : _hidden) {
+      layer->setVisible(true);
+    }
+  }
+
+  BackdropSiblingMask(const BackdropSiblingMask&) = delete;
+  BackdropSiblingMask& operator=(const BackdropSiblingMask&) = delete;
+
+ private:
+  std::vector<std::shared_ptr<tgfx::Layer>> _hidden;
+};
+
 // Draws the entire scene from `root` downward into the off-screen canvas,
 // clipped to the target layer's global bounds. Used when the target layer's
 // visual result depends on the backdrop pixels below it — e.g. a non-Normal
@@ -852,6 +915,11 @@ struct MaskedLayerDrawer {
 // already been drawn underneath. Drawing only the target against an empty
 // canvas (as MaskedLayerDrawer does) would blend it with transparent-black
 // and lose the intended composite; drawing `root` with a clip preserves it.
+//
+// `targetLayer` is the layer whose composite is being baked. The caller must arrange (via
+// BackdropSiblingMask) for any ancestor sibling drawn AFTER the target chain to be invisible
+// before this drawer runs, so the PNG only contains the backdrop + target instead of the
+// surrounding native content the writer will emit separately.
 struct BackdropCompositeDrawer {
   const std::shared_ptr<tgfx::Layer>& root;
   const tgfx::Rect& globalBounds;
@@ -938,13 +1006,20 @@ std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,
 std::shared_ptr<tgfx::Data> RenderLayerCompositeWithBackdrop(
     GPUContext* gpu, const std::shared_ptr<tgfx::Layer>& root,
     const std::shared_ptr<tgfx::Layer>& targetLayer, float pixelScale) {
-  auto globalBounds = targetLayer->getBounds(root.get(), true);
+  auto globalBounds = ComputeRasterizedLayerBounds(root, targetLayer);
+  if (globalBounds.isEmpty()) {
+    return nullptr;
+  }
   auto context = gpu->lockContext();
   if (context == nullptr) {
     return nullptr;
   }
   int width = static_cast<int>(ceilf(globalBounds.width()));
   int height = static_cast<int>(ceilf(globalBounds.height()));
+  // Hide every layer that is drawn after the target along its ancestor chain so the bake captures
+  // only the target plus its true backdrop (pixels drawn before it). Without this guard the
+  // surrounding writer would re-emit those siblings on top of the PNG, double-painting them.
+  BackdropSiblingMask hideMask(root, targetLayer);
   auto result =
       RenderToPNG(context, width, height, pixelScale, BackdropCompositeDrawer{root, globalBounds});
   gpu->unlock();

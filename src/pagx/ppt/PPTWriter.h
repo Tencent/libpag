@@ -722,7 +722,13 @@ class PPTWriter {
         _layoutContext(layoutContext), _resolver(doc) {
   }
 
-  void writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& parentMatrix = {},
+  // Top-level entry: walks every layer in `_doc->layers`, pairing each with its corresponding
+  // top-level tgfx::Layer from the build-time root, so writeLayer's positional descent into
+  // tgfxLayer->children() resolves the correct per-instance subtree for any Composition reference.
+  void writeDocument(XMLBuilder& out);
+
+  void writeLayer(XMLBuilder& out, const Layer* layer,
+                  const std::shared_ptr<tgfx::Layer>& tgfxLayer, const Matrix& parentMatrix = {},
                   float parentAlpha = 1.0f, const std::vector<LayerFilter*>& inheritedFilters = {},
                   const std::vector<LayerStyle*>& inheritedStyles = {});
 
@@ -733,7 +739,11 @@ class PPTWriter {
   // the layer composites against the backdrop correctly; otherwise only the layer
   // itself is rendered (used for mask / scrollRect fallbacks that don't depend on
   // the backdrop pixels).
-  bool rasterizeLayerAsPicture(XMLBuilder& out, const Layer* layer, bool withBackdrop = false);
+  // `tgfxLayer` is the live tgfx instance built from `layer`; the caller (writeLayer) supplies it
+  // because layerMap collapses multiple Composition references to the same key.
+  bool rasterizeLayerAsPicture(XMLBuilder& out, const Layer* layer,
+                               const std::shared_ptr<tgfx::Layer>& tgfxLayer,
+                               bool withBackdrop = false);
 
   PPTWriterContext* _ctx = nullptr;
   PAGXDocument* _doc = nullptr;
