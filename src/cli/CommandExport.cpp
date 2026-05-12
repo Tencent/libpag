@@ -33,7 +33,7 @@ struct ExportOptions {
   int svgIndent = 2;
   bool svgNoXmlDeclaration = false;
   bool textToPath = false;
-  bool pptRasterizeUnsupported = true;
+  bool pptBakeUnsupported = true;
 };
 
 static void PrintUsage() {
@@ -54,12 +54,12 @@ static void PrintUsage() {
       << "  --svg-no-xml-declaration    Omit the <?xml ...?> declaration\n"
       << "\n"
       << "PPT options:\n"
-      << "  --ppt-no-rasterize-unsupported\n"
-      << "                              Do not rasterize layers that use features OOXML cannot\n"
+      << "  --ppt-no-bake-unsupported\n"
+      << "                              Do not bake layers that use features OOXML cannot\n"
       << "                              represent natively (masks, scrollRect clipping, blend\n"
       << "                              modes outside of Normal/Multiply/Screen/Darken/Lighten,\n"
-      << "                              wide-gamut color, and BackgroundBlurStyle). By default\n"
-      << "                              these layers are baked into PNG patches so the slide\n"
+      << "                              wide-gamut color, and BackgroundBlurStyle) into PNG\n"
+      << "                              patches. By default these layers are baked so the slide\n"
       << "                              matches the tgfx renderer; for unsupported blend modes\n"
       << "                              and BackgroundBlurStyle the backdrop beneath the layer\n"
       << "                              is baked too so the composite (or frosted-glass blur)\n"
@@ -77,7 +77,7 @@ static void PrintUsage() {
       << "  pagx export --format pptx --input icon.pagx      # force PPTX output format\n"
       << "  pagx export --input icon.pagx --svg-indent 4     # 4-space indent\n"
       << "  pagx export --input icon.pagx --text-to-path     # convert text to paths\n"
-      << "  pagx export --input icon.pagx --output out.pptx --ppt-no-rasterize-unsupported\n"
+      << "  pagx export --input icon.pagx --output out.pptx --ppt-no-bake-unsupported\n"
       << "                                                   # keep unsupported features "
          "editable\n";
 }
@@ -104,8 +104,8 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
       options->svgNoXmlDeclaration = true;
     } else if (arg == "--text-to-path") {
       options->textToPath = true;
-    } else if (arg == "--ppt-no-rasterize-unsupported") {
-      options->pptRasterizeUnsupported = false;
+    } else if (arg == "--ppt-no-bake-unsupported") {
+      options->pptBakeUnsupported = false;
     } else if (arg == "--help" || arg == "-h") {
       PrintUsage();
       return -1;
@@ -183,7 +183,7 @@ static int ExportToPPT(const ExportOptions& options) {
 
   PPTExporter::Options pptOptions = {};
   pptOptions.convertTextToPath = options.textToPath;
-  pptOptions.rasterizeUnsupported = options.pptRasterizeUnsupported;
+  pptOptions.bakeUnsupported = options.pptBakeUnsupported;
 
   if (!PPTExporter::ToFile(*document, options.outputFile, pptOptions)) {
     std::cerr << "pagx export: error: failed to write '" << options.outputFile << "'\n";

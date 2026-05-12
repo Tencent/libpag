@@ -622,8 +622,8 @@ struct EffectSources {
 
   // BackgroundBlurStyle is intentionally not tracked: it has no faithful OOXML
   // primitive (a:blur blurs the shape itself, not the backdrop) and the writer
-  // drops it on the vector path. When `rasterizeUnsupported` is enabled, the
-  // feature probe rasterizes the layer with backdrop instead.
+  // drops it on the vector path. When `bakeUnsupported` is enabled, the feature
+  // probe bakes the layer (with backdrop) to a PNG patch instead.
   bool empty() const {
     return !blur && !blend && !innerShadowFilter && !innerShadowStyle && !dropShadowFilter &&
            !dropShadowStyle;
@@ -718,7 +718,7 @@ class PPTWriter {
             LayoutContext* layoutContext)
       : _ctx(ctx), _doc(doc), _convertTextToPath(options.convertTextToPath),
         _bridgeContours(options.bridgeContours), _resolveModifiers(options.resolveModifiers),
-        _rasterizeUnsupported(options.rasterizeUnsupported), _rasterDPI(options.rasterDPI),
+        _bakeUnsupported(options.bakeUnsupported), _rasterDPI(options.rasterDPI),
         _layoutContext(layoutContext), _resolver(doc) {
   }
 
@@ -750,7 +750,7 @@ class PPTWriter {
   bool _convertTextToPath = false;
   bool _bridgeContours = false;
   bool _resolveModifiers = true;
-  bool _rasterizeUnsupported = true;
+  bool _bakeUnsupported = true;
   // Ratio of raster DPI to the 96 DPI logical coordinate space. Drives the
   // off-screen Surface size of every PNG bake (masked layer, scrollRect bake,
   // blend/wide-gamut fallback, tiled pattern). The placed <p:pic>/<a:blipFill>

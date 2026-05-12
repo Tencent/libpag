@@ -522,8 +522,8 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
   // shape's own fill and stroke crisp. OOXML has no native backdrop-blur primitive
   // and using a:blur as a stand-in produces visibly wrong output: the card's stroke,
   // rounded corners, and fill all become fuzzy. Authors who need a faithful render of
-  // BackgroundBlurStyle should enable `rasterizeUnsupported` so the layer is baked
-  // with its real backdrop via rasterizeLayerAsPicture (probed in PPTFeatureProbe).
+  // BackgroundBlurStyle should enable `bakeUnsupported` so the layer is baked with
+  // its real backdrop via rasterizeLayerAsPicture (probed in PPTFeatureProbe).
   if (sources.blur) {
     float avgBlur = (sources.blur->blurX + sources.blur->blurY) / 2.0f;
     if (avgBlur > 0) {
