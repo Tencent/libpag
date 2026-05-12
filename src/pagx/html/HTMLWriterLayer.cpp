@@ -1100,7 +1100,7 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
                      "px;line-height:" + CssFloatToString(tb->lineHeight) + "px;vertical-align:top";
       }
       // Emit between-span <br>s: prevTrailingBreaks (from prior span's trailing \n)
-      // plus countLeadingBreaks(current span's text). The first <br> ends the prior
+      // plus CountLeadingBreaks(current span's text). The first <br> ends the prior
       // span's content line and inherits its strut naturally; each subsequent <br>
       // is an empty line whose strut comes from the corresponding `\n` owner. PAGX
       // assigns ownership: \n_1..\n_{prevTrailingBreaks} → previous span; \n_{...} on
@@ -1114,7 +1114,7 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
       // full container line-height for what tgfx draws as a zero-height empty line
       // (e.g. text "\nLine2\n\nLine4" should hug the box top in HTML the way it does
       // in PAGX native).
-      size_t leadingBreaks = HTMLBuilder::countLeadingBreaks(span.text->text);
+      size_t leadingBreaks = HTMLBuilder::CountLeadingBreaks(span.text->text);
       size_t totalBreaks = prevTrailingBreaks + leadingBreaks;
       for (size_t bi = 0; bi < totalBreaks; ++bi) {
         if (bi == 0 && isFirstSpan && prevTrailingBreaks == 0) {
@@ -1174,7 +1174,7 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
           }
           out.closeTagWithText(RewriteLineBreakHints(segments[si]));
         }
-        prevTrailingBreaks = HTMLBuilder::countTrailingBreaks(span.text->text);
+        prevTrailingBreaks = HTMLBuilder::CountTrailingBreaks(span.text->text);
         prevFontSize = spanFontSize;
         isFirstSpan = false;
         continue;
@@ -1189,7 +1189,7 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
       // ourselves to reproduce tgfx's justify distribution on mixed CJK/Latin runs.
       bool usedPerCharDom = false;
       if (tb->writingMode == WritingMode::Vertical && tb->textAlign == TextAlign::Justify) {
-        std::string justifiedContent = buildVerticalJustifyContent(span.text, tb->height);
+        std::string justifiedContent = BuildVerticalJustifyContent(span.text, tb->height);
         if (!justifiedContent.empty()) {
           out.closeTagWithRawContent(justifiedContent);
           usedPerCharDom = true;
@@ -1207,11 +1207,11 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
         // doesn't know about PAGX's UAX-14 punctuation-squash rules and would split
         // tokens like 「世界」 across columns where tgfx kept them together.
         std::string spanText = (tb->writingMode == WritingMode::Vertical)
-                                   ? rewriteVerticalColumnBreaks(span.text)
+                                   ? RewriteVerticalColumnBreaks(span.text)
                                    : span.text->text;
         out.closeTagWithTextBreaks(RewriteLineBreakHints(spanText));
       }
-      prevTrailingBreaks = HTMLBuilder::countTrailingBreaks(span.text->text);
+      prevTrailingBreaks = HTMLBuilder::CountTrailingBreaks(span.text->text);
       prevFontSize = spanFontSize;
       isFirstSpan = false;
     }
@@ -1399,7 +1399,7 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
                    "px;line-height:" + CssFloatToString(tb->lineHeight) + "px;vertical-align:top";
     }
     // Emit between-span <br>s with empty-line owner wrapping (see tbSpans branch).
-    size_t rtLeadingBreaks = HTMLBuilder::countLeadingBreaks(span.text->text);
+    size_t rtLeadingBreaks = HTMLBuilder::CountLeadingBreaks(span.text->text);
     size_t rtTotalBreaks = rtPrevTrailingBreaks + rtLeadingBreaks;
     for (size_t bi = 0; bi < rtTotalBreaks; ++bi) {
       if (bi == 0) {
@@ -1423,10 +1423,10 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
     // For vertical TextBoxes inject <br> at every column break tgfx computed (same
     // rationale as the tbSpans path above).
     std::string rtSpanText = (tb->writingMode == WritingMode::Vertical)
-                                 ? rewriteVerticalColumnBreaks(span.text)
+                                 ? RewriteVerticalColumnBreaks(span.text)
                                  : span.text->text;
     out.closeTagWithTextBreaks(RewriteLineBreakHints(rtSpanText));
-    rtPrevTrailingBreaks = HTMLBuilder::countTrailingBreaks(span.text->text);
+    rtPrevTrailingBreaks = HTMLBuilder::CountTrailingBreaks(span.text->text);
     rtPrevFontSize = rtSpanFontSize;
   }
   // Flush remaining trailing breaks from the last rich-text span.
@@ -1991,7 +1991,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   // grid wrapper instead), and the outer div gains `overflow:hidden` to clip the mirrored tiles
   // back to the source layer's size. The tile geometry uses the layer's own size, falling back
   // to its laid-out bounds when width/height are NaN.
-  bool useMirrorTile = needsMirrorTiling(layer);
+  bool useMirrorTile = NeedsMirrorTiling(layer);
   float mirrorTileWidth = 0;
   float mirrorTileHeight = 0;
   if (useMirrorTile) {
@@ -2514,7 +2514,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     //                  layer's original W x H plus a `margin`-wide halo on every side.
     auto* bf = static_cast<const BlurFilter*>(layer->filters[0]);
     float blurRadius =
-        bf->blurX;  // needsMirrorTiling only matches uniform blur (filters.size()==1)
+        bf->blurX;  // NeedsMirrorTiling only matches uniform blur (filters.size()==1)
     // Match tgfx's GaussianBlurImageFilter::onFilterBounds which outsets by 2*sigma. Using the
     // same margin keeps HTML's visible halo bbox consistent with PAGX native rendering.
     float margin = 2.0f * blurRadius;

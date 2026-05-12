@@ -691,7 +691,7 @@ std::string EscapeHtmlChar(uint32_t cp, const std::string& srcBytes) {
 
 }  // namespace
 
-std::string HTMLWriter::rewriteVerticalColumnBreaks(const Text* text) {
+std::string HTMLWriter::RewriteVerticalColumnBreaks(const Text* text) {
   if (text == nullptr || text->glyphData == nullptr) return text ? text->text : std::string{};
   const auto& runs = text->glyphData->layoutRuns;
   std::vector<tgfx::Point> glyphPositions;
@@ -758,7 +758,7 @@ std::string HTMLWriter::rewriteVerticalColumnBreaks(const Text* text) {
   return out;
 }
 
-std::string HTMLWriter::buildVerticalJustifyContent(const Text* text, float boxHeight) {
+std::string HTMLWriter::BuildVerticalJustifyContent(const Text* text, float boxHeight) {
   if (text == nullptr || text->glyphData == nullptr) return {};
   const auto& runs = text->glyphData->layoutRuns;
   if (runs.empty()) return {};
@@ -810,7 +810,7 @@ std::string HTMLWriter::buildVerticalJustifyContent(const Text* text, float boxH
         LineBreaker::CanBreakBetween(visibleCodepoints[i - 1], visibleCodepoints[i]);
   }
 
-  // Partition glyphs into columns using the same threshold as rewriteVerticalColumnBreaks:
+  // Partition glyphs into columns using the same threshold as RewriteVerticalColumnBreaks:
   // Latin glyphs sit ~1.54px off the CJK baseline X inside a shared column (HarfBuzz vertical
   // metrics), so only `|dx| >= renderFontSize/2` counts as a real column transition.
   float columnThreshold = text->renderFontSize() * 0.5f;

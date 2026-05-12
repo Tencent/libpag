@@ -400,7 +400,7 @@ class HTMLWriter {
   // no rewriting is needed (single column, non-vertical text, or null input) so callers can
   // chain unconditionally. Lives on HTMLWriter so it can access Text's private `glyphData`
   // through the existing `friend class HTMLWriter` declaration without adding a new friend.
-  static std::string rewriteVerticalColumnBreaks(const Text* text);
+  static std::string RewriteVerticalColumnBreaks(const Text* text);
 
   // Builds inline HTML content for a vertical-writing-mode Text inside a TextBox that uses
   // `textAlign="justify"`. Replays tgfx's vertical layout pass: each glyph becomes an
@@ -416,7 +416,7 @@ class HTMLWriter {
   // `boxHeight` is the TextBox's declared height; 0/NaN disables justify-gap distribution.
   // Lives on HTMLWriter so it can access Text's private `glyphData` through the existing
   // `friend class HTMLWriter` declaration without adding a new friend.
-  static std::string buildVerticalJustifyContent(const Text* text, float boxHeight);
+  static std::string BuildVerticalJustifyContent(const Text* text, float boxHeight);
 
   // Color source conversions. `boxLeft`/`boxTop`/`boxWidth`/`boxHeight` describe the element
   // box (in the gradient source's coordinate space) that the CSS background will paint into.
@@ -537,7 +537,7 @@ class HTMLWriter {
   // to approximate BlurFilter.tileMode=Mirror in HTML. The path requires a single BlurFilter
   // with tileMode=Mirror and no LayerStyles (drop shadows / inner shadows / backdrop blurs) on
   // the same layer, because those would interact non-trivially with the duplicated subtree.
-  static bool needsMirrorTiling(const Layer* layer);
+  static bool NeedsMirrorTiling(const Layer* layer);
 
   // Mask/clip defs
   std::string writeMaskCSS(const Layer* mask, MaskType type, Point maskedLayerPos = {});

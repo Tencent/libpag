@@ -46,7 +46,7 @@ class HTMLBuilder {
     _buf += ' ';
     _buf += name;
     _buf += "=\"";
-    _buf += escapeAttr(value);
+    _buf += EscapeAttr(value);
     _buf += '"';
   }
 
@@ -90,7 +90,7 @@ class HTMLBuilder {
       return;
     }
     _buf += '>';
-    _buf += escapeHTML(text);
+    _buf += EscapeHTML(text);
     _buf += "</";
     _buf += _tags.back();
     _buf += '>';
@@ -106,11 +106,11 @@ class HTMLBuilder {
   // the <br> elements inherit the container's strut rather than the span's font-size.
   // Returns the number of leading newlines so the caller can emit them before openTag.
   // Usage:
-  //   size_t leading = HTMLBuilder::countLeadingBreaks(text);
+  //   size_t leading = HTMLBuilder::CountLeadingBreaks(text);
   //   out.emitBreaks(leading);
   //   out.openTag("span"); out.addAttr(...);
   //   out.closeTagWithTextBreaks(text);
-  static size_t countLeadingBreaks(const std::string& text) {
+  static size_t CountLeadingBreaks(const std::string& text) {
     size_t n = 0;
     while (n < text.size() && text[n] == '\n') ++n;
     return n;
@@ -121,9 +121,9 @@ class HTMLBuilder {
   }
 
   // Counts the trailing newline characters (U+000A) in the text. Mirrors
-  // countLeadingBreaks; used by HTMLWriterLayer to track the previous span's trailing
+  // CountLeadingBreaks; used by HTMLWriterLayer to track the previous span's trailing
   // breaks so it can wrap subsequent empty-line `<br>`s in the previous span's font-size.
-  static size_t countTrailingBreaks(const std::string& text) {
+  static size_t CountTrailingBreaks(const std::string& text) {
     size_t n = 0;
     while (n < text.size() && text[text.size() - 1 - n] == '\n') ++n;
     return n;
@@ -200,7 +200,7 @@ class HTMLBuilder {
   }
 
   void addTextContent(const std::string& t) {
-    _buf += escapeHTML(t);
+    _buf += EscapeHTML(t);
   }
 
   int level() const {
@@ -233,7 +233,7 @@ class HTMLBuilder {
     }
   }
 
-  static std::string escapeAttr(const std::string& s) {
+  static std::string EscapeAttr(const std::string& s) {
     std::string r;
     r.reserve(s.size());
     for (char c : s) {
@@ -260,7 +260,7 @@ class HTMLBuilder {
     return r;
   }
 
-  static std::string escapeHTML(const std::string& s) {
+  static std::string EscapeHTML(const std::string& s) {
     std::string r;
     r.reserve(s.size());
     for (char c : s) {

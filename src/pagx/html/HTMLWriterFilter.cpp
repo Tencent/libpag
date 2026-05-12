@@ -66,7 +66,7 @@ static std::string EnsurePipelineAlpha(HTMLBuilder* defs, int& si, const std::st
 // HTMLWriter – mirror-tile eligibility
 //==============================================================================
 
-bool HTMLWriter::needsMirrorTiling(const Layer* layer) {
+bool HTMLWriter::NeedsMirrorTiling(const Layer* layer) {
   // Guard: need exactly one filter that is a BlurFilter with tileMode=Mirror, and no layer
   // styles (which would need to be applied outside the tile container and require separate
   // stacking-context handling). Mixed filter chains also fall through because the tile wrapper

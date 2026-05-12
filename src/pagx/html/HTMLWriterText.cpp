@@ -919,7 +919,7 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     }
   }
   if (tb) {
-    out.emitBreaks(HTMLBuilder::countLeadingBreaks(text->text));
+    out.emitBreaks(HTMLBuilder::CountLeadingBreaks(text->text));
   }
   out.openTag("span");
   out.addAttr("style", style);
@@ -928,16 +928,16 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
   // Outside a TextBox the span style already includes white-space:pre which handles \n.
   if (tb) {
     // For vertical TextBoxes inject <br> at every column break tgfx computed (see
-    // rewriteVerticalColumnBreaks docs for rationale).
+    // RewriteVerticalColumnBreaks docs for rationale).
     std::string innerText =
-        (tb->writingMode == WritingMode::Vertical) ? rewriteVerticalColumnBreaks(text) : text->text;
+        (tb->writingMode == WritingMode::Vertical) ? RewriteVerticalColumnBreaks(text) : text->text;
     out.closeTagWithTextBreaks(RewriteLineBreakHints(innerText));
     // closeTagWithTextBreaks no longer emits trailing breaks (HTMLWriterLayer's
     // tbSpans/richTextSpans loops handle them with empty-line owner wrapping). For the
     // single-span writeText path there is no "next span" to consult, so emit the trailing
     // breaks here as bare <br>s — they share the line just closed by the span's content,
     // so inheriting the span's font-size for the empty line is the correct default.
-    out.emitBreaks(HTMLBuilder::countTrailingBreaks(text->text));
+    out.emitBreaks(HTMLBuilder::CountTrailingBreaks(text->text));
   } else {
     out.closeTagWithText(RewriteLineBreakHints(text->text));
   }
