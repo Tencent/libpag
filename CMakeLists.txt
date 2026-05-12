@@ -313,8 +313,7 @@ endif ()
 
 if (PAG_BUILD_PPT)
     list(APPEND PAG_DEFINES PAG_BUILD_PPT)
-    list(APPEND PAG_STATIC_VENDORS zlib)
-    list(APPEND PAG_INCLUDES third_party/out/zlib/${INCLUDE_ENTRY})
+    list(APPEND PAG_INCLUDES ${TGFX_DIR}/third_party/out/zlib/${INCLUDE_ENTRY})
 endif ()
 
 if (PAG_BUILD_CLI OR PAG_BUILD_TESTS)
