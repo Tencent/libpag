@@ -41,14 +41,41 @@ using namespace emscripten;
 
 namespace pagx {
 
+// Wasm linear memory size in bytes (HEAP8.byteLength equivalent). Each wasm page is 64 KiB.
+// Returns -1 on non-wasm platforms so the same probe can stay in cross-platform code.
+static int64_t SampleWasmHeap() {
+#if defined(__EMSCRIPTEN__) || defined(__wasm__)
+  return static_cast<int64_t>(__builtin_wasm_memory_size(0)) * 65536;
+#else
+  return -1;
+#endif
+}
+
+// One-shot wasm heap log. Format kept simple so it can be grepped from the miniprogram console.
+static void LogMemProbe(const char* tag) {
+  tgfx::PrintLog("[MemProbe] tag=%s wasmHeap=%lld", tag,
+                 static_cast<long long>(SampleWasmHeap()));
+}
+
+// Bucket index for an image's pixel area. Boundaries align with the [Img] log analysis: tiny
+// icons cluster in bucket 0, thumbnail-grade photos in 1-2, full-resolution stuff in 3-5.
+static int ImageSizeBucket(uint64_t pixels) {
+  if (pixels < 10000ULL) return 0;
+  if (pixels < 100000ULL) return 1;
+  if (pixels < 500000ULL) return 2;
+  if (pixels < 1000000ULL) return 3;
+  if (pixels < 2000000ULL) return 4;
+  return 5;
+}
+
 // GPU resource cache limit. Capped at 512MB on iOS WeChat: 1GB and 768MB both led to the
 // mini-program being terminated under memory pressure (observed in production logs).
 // 512MB causes more eviction churn during pan/zoom on image-heavy PAGX, but a brief
 // retexture is preferable to losing the entire session.
 constexpr size_t MAX_CACHE_LIMIT = 512U * 1024 * 1024;
-// GPU resource expiration in frames. Large value effectively disables age-based eviction
-// so cached textures only get reclaimed by the byte-capacity path above.
-constexpr size_t EXPIRATION_FRAMES = 1000000;
+// GPU resource expiration in frames. Matches the tgfx default; the byte-capacity path above
+// remains the primary cap.
+constexpr size_t EXPIRATION_FRAMES = 120;
 // Slow frame threshold in milliseconds (more lenient than desktop 32ms due to WeChat environment).
 constexpr double SLOW_FRAME_THRESHOLD_MS = 50.0;
 // Recovery time window in milliseconds (longer than desktop 2s to reduce jitter).
@@ -171,6 +198,7 @@ void PAGXView::loadPAGX(const val& pagxData) {
 }
 
 void PAGXView::parsePAGX(const val& pagxData) {
+  LogMemProbe("parsePAGX.enter");
   // Release old resources early to reduce peak memory usage when switching pages.
   displayList.root()->removeChildren();
   contentLayer = nullptr;
@@ -198,12 +226,27 @@ void PAGXView::parsePAGX(const val& pagxData) {
   // Reset first-frame flag so JS-side loading flow can wait for the new document's first
   // render via isFirstFrameRendered() instead of seeing a stale true from the previous one.
   hasRenderedFirstFrame = false;
+  // Reset image-decode accounting for the new document.
+  imageDecodedPixelTotal = 0;
+  imageDecodedCount = 0;
+  for (auto& b : imageSizeBuckets) {
+    b = 0;
+  }
 
   auto data = GetPagxDataFromEmscripten(pagxData);
   if (!data) {
     return;
   }
+  size_t xmlSize = data->size();
   document = PAGXImporter::FromXML(data->bytes(), data->size());
+  if (document) {
+    auto paths = document->getExternalFilePaths();
+    tgfx::PrintLog(
+        "[MemProbe] tag=parsePAGX.exit wasmHeap=%lld xmlBytes=%zu externalImageRefs=%zu",
+        static_cast<long long>(SampleWasmHeap()), xmlSize, paths.size());
+  } else {
+    LogMemProbe("parsePAGX.exit.failed");
+  }
 }
 
 std::vector<std::string> PAGXView::getExternalFilePaths() const {
@@ -241,6 +284,33 @@ bool PAGXView::loadFileDataAsNativeImage(const std::string& filePath, const val&
   }
   tgfxImage = tgfxImage->makeMipmapped(true);
 
+  imageDecodedCount += 1;
+  uint64_t pixels = static_cast<uint64_t>(tgfxImage->width()) *
+                    static_cast<uint64_t>(tgfxImage->height());
+  imageDecodedPixelTotal += pixels;
+  imageSizeBuckets[ImageSizeBucket(pixels)] += 1;
+  // Always log size for each loaded image, plus a [BigImg] marker when a single image is
+  // unusually large (≥ 1 MPx). 1280×1280 = 1.64 MPx is the imageMogr2 default cap; anything
+  // bigger means CDN side did not honor the thumbnail params for this asset.
+  tgfx::PrintLog("[Img] load path=%s size=%dx%d (%.2fMPx)", filePath.c_str(),
+                 tgfxImage->width(), tgfxImage->height(),
+                 static_cast<double>(pixels) / 1e6);
+  if (pixels >= 1000000ULL) {
+    tgfx::PrintLog("[BigImg] LOAD path=%s size=%dx%d (%.2fMPx ~%lluKB RGBA)",
+                   filePath.c_str(), tgfxImage->width(), tgfxImage->height(),
+                   static_cast<double>(pixels) / 1e6,
+                   static_cast<unsigned long long>(pixels * 4 / 1024));
+  }
+  // Throttled probe: every 32 images log a roll-up to keep the console readable on
+  // image-heavy documents.
+  if ((imageDecodedCount % 32) == 0) {
+    tgfx::PrintLog(
+        "[MemProbe] tag=loadImage.tick wasmHeap=%lld imageCount=%u pixels=%llu (~%lluMB RGBA)",
+        static_cast<long long>(SampleWasmHeap()), imageDecodedCount,
+        static_cast<unsigned long long>(imageDecodedPixelTotal),
+        static_cast<unsigned long long>(imageDecodedPixelTotal * 4 / 1024 / 1024));
+  }
+
   auto* imageNode = document->loadDecodedImage(filePath, tgfxImage);
   return imageNode != nullptr;
 }
@@ -259,6 +329,31 @@ bool PAGXView::upgradeImageFromNative(const std::string& filePath, const val& na
   }
   tgfxImage = tgfxImage->makeMipmapped(true);
 
+  imageDecodedCount += 1;
+  uint64_t pixels = static_cast<uint64_t>(tgfxImage->width()) *
+                    static_cast<uint64_t>(tgfxImage->height());
+  imageDecodedPixelTotal += pixels;
+  imageSizeBuckets[ImageSizeBucket(pixels)] += 1;
+  tgfx::PrintLog("[Img] upgrade path=%s size=%dx%d (%.2fMPx)", filePath.c_str(),
+                 tgfxImage->width(), tgfxImage->height(),
+                 static_cast<double>(pixels) / 1e6);
+  if (pixels >= 1000000ULL) {
+    tgfx::PrintLog("[BigImg] UPGRADE path=%s size=%dx%d (%.2fMPx ~%lluKB RGBA)",
+                   filePath.c_str(), tgfxImage->width(), tgfxImage->height(),
+                   static_cast<double>(pixels) / 1e6,
+                   static_cast<unsigned long long>(pixels * 4 / 1024));
+  }
+  if ((imageDecodedCount % 32) == 0) {
+    tgfx::PrintLog(
+        "[MemProbe] tag=upgradeImage.tick wasmHeap=%lld imageCount=%u pixels=%llu (~%lluMB RGBA) "
+        "buckets=[%u,%u,%u,%u,%u,%u]",
+        static_cast<long long>(SampleWasmHeap()), imageDecodedCount,
+        static_cast<unsigned long long>(imageDecodedPixelTotal),
+        static_cast<unsigned long long>(imageDecodedPixelTotal * 4 / 1024 / 1024),
+        imageSizeBuckets[0], imageSizeBuckets[1], imageSizeBuckets[2],
+        imageSizeBuckets[3], imageSizeBuckets[4], imageSizeBuckets[5]);
+  }
+
   // Attach the upgraded decoded image first so the session's rebuild sees the new pixels when
   // it re-runs convertImagePattern on the affected layers. loadDecodedImage does not clear the
   // filePath, so subsequent calls can replace it again (useful for multi-stage upgrades).
@@ -276,7 +371,8 @@ bool PAGXView::upgradeImageFromNative(const std::string& filePath, const val& na
   // value is the number of tgfx layers whose contents were refreshed; zero means nothing in
   // the document references the path (callers typically treat this as a no-op success, but
   // we surface it as a boolean so JS can log it).
-  return builderSession->rebuildForFilePath(filePath) > 0;
+  bool ok = builderSession->rebuildForFilePath(filePath) > 0;
+  return ok;
 }
 
 namespace {
@@ -465,6 +561,15 @@ void PAGXView::buildLayers() {
   if (!document) {
     return;
   }
+  tgfx::PrintLog(
+      "[MemProbe] tag=buildLayers.enter wasmHeap=%lld imageCount=%u pixels=%llu (~%lluMB RGBA)",
+      static_cast<long long>(SampleWasmHeap()), imageDecodedCount,
+      static_cast<unsigned long long>(imageDecodedPixelTotal),
+      static_cast<unsigned long long>(imageDecodedPixelTotal * 4 / 1024 / 1024));
+  tgfx::PrintLog(
+      "[ImgHist] tiny<10K=%u small<100K=%u mid<500K=%u large<1M=%u xl<2M=%u huge>=2M=%u",
+      imageSizeBuckets[0], imageSizeBuckets[1], imageSizeBuckets[2],
+      imageSizeBuckets[3], imageSizeBuckets[4], imageSizeBuckets[5]);
 
   // PAGX files exported by CoCraft reference images by hash, so actual pixel dimensions are
   // unavailable at export time. The exporter stores a normalized transform and scale parameters in
@@ -475,6 +580,7 @@ void PAGXView::buildLayers() {
   resolveAllImagePatternMatrices(document.get());
 
   document->applyLayout(&fontConfig);
+  LogMemProbe("buildLayers.afterApplyLayout");
 
   // Route through LayerBuilderSession so the build state survives into the progressive image
   // upgrade path; see upgradeImageFromNative() below.
@@ -483,6 +589,7 @@ void PAGXView::buildLayers() {
   contentLayer = buildResult.root;
 
   if (!contentLayer) {
+    LogMemProbe("buildLayers.exit.noContent");
     return;
   }
   hasRenderedFirstFrame = false;
@@ -491,6 +598,7 @@ void PAGXView::buildLayers() {
   applyDocumentCustomData();
   displayList.root()->addChild(contentLayer);
   applyCenteringTransform();
+  LogMemProbe("buildLayers.exit");
 }
 
 void PAGXView::applyDocumentCustomData() {
@@ -855,6 +963,21 @@ bool PAGXView::draw() {
     double flushStartMs = emscripten_get_now();
     auto recording = context->flush();
     flushMs = emscripten_get_now() - flushStartMs;
+
+    // Throttled GPU cache footprint probe. context->memoryUsage() reports total bytes held by
+    // the tgfx ResourceCache (textures + buffers); purgeableBytes is the LRU-evictable subset.
+    // Diff between consecutive logs shows whether upgrade-released textures are actually being
+    // freed by the LRU or piling up.
+    static int gpuProbeCounter = 0;
+    if ((gpuProbeCounter++ % 60) == 0) {
+      tgfx::PrintLog(
+          "[MemProbe] tag=gpu.cache memoryUsage=%lluMB purgeable=%lluMB cacheLimit=%lluMB "
+          "imageCount=%u",
+          static_cast<unsigned long long>(context->memoryUsage() / 1024 / 1024),
+          static_cast<unsigned long long>(context->purgeableBytes() / 1024 / 1024),
+          static_cast<unsigned long long>(context->cacheLimit() / 1024 / 1024),
+          imageDecodedCount);
+    }
 
     if (recording) {
       double submitStartMs = emscripten_get_now();

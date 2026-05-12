@@ -363,6 +363,16 @@ class PAGXView {
   // State tracking
   bool hasRenderedFirstFrame = false;
 
+  // Accumulated decoded image accounting (debug only). Reset in parsePAGX(). Counts each call
+  // to loadFileDataAsNativeImage / upgradeImageFromNative; pixel total approximates the GPU
+  // texture footprint at RGBA8 (×4 bytes), useful for correlating wasm heap with image load.
+  uint64_t imageDecodedPixelTotal = 0;
+  uint32_t imageDecodedCount = 0;
+  // Histogram of decoded image sizes by pixel area, indexed by bucket: 0:<10K, 1:<100K,
+  // 2:<500K, 3:<1M, 4:<2M, 5:>=2M. Lets us tell at a glance whether the document is dominated
+  // by tiny icons or by large photos without scrolling through per-image log lines.
+  uint32_t imageSizeBuckets[6] = {0, 0, 0, 0, 0, 0};
+
   float lastZoom = 1.0f;
   bool isZooming = false;
   // isZoomingIn is derived per-frame from a single (zoom > lastZoom) comparison and is only

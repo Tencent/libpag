@@ -125,6 +125,17 @@ namespace pagx {
 // blur), but everything downstream still parses, lays out, and renders without crashing.
 #define PAG_DISABLE_LAYER_EFFECTS 0
 
+// Wasm linear memory size in bytes (HEAP8.byteLength equivalent). Returns -1 on non-wasm
+// platforms so the same probe can stay in cross-platform code without #ifdef noise at call
+// sites. Each wasm page is 64 KiB.
+static int64_t SampleWasmHeap() {
+#if defined(__EMSCRIPTEN__) || defined(__wasm__)
+  return static_cast<int64_t>(__builtin_wasm_memory_size(0)) * 65536;
+#else
+  return -1;
+#endif
+}
+
 // Decode a data URI (e.g., "data:image/png;base64,...") to an Image.
 static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI) {
   auto data = DecodeBase64DataURI(dataURI);
@@ -160,6 +171,8 @@ class LayerBuilderContext {
   }
 
   std::shared_ptr<tgfx::Layer> build(const PAGXDocument& document) {
+    tgfx::PrintLog("[MemProbe] tag=LayerBuilder.build.enter wasmHeap=%lld",
+                   static_cast<long long>(SampleWasmHeap()));
     // Build layer tree.
     auto rootLayer = tgfx::Layer::Make();
     // [TEMP] Completely disable scrollRect to verify if the tgfx clip processing causes binding
@@ -189,6 +202,8 @@ class LayerBuilderContext {
       }
     }
 
+    tgfx::PrintLog("[MemProbe] tag=LayerBuilder.build.exit wasmHeap=%lld",
+                   static_cast<long long>(SampleWasmHeap()));
     return rootLayer;
   }
 
