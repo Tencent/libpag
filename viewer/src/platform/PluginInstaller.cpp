@@ -85,9 +85,6 @@ InstallResult PluginInstaller::installPlugin() {
 
   QStringList plugins = getPluginList();
   for (const QString& plugin : plugins) {
-    if (getPluginPermission(plugin) == PluginPermission::User) {
-      continue;
-    }
     QString sourcePath = getPluginSourcePath(plugin);
     if (!QFile::exists(sourcePath)) {
       showMessage(tr("Installation Failed"), tr("Plugin source not found: %1").arg(sourcePath),
