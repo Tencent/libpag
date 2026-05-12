@@ -414,18 +414,24 @@ for dir in "$OUT_DIR"/cli/*/fonts "$OUT_DIR"/test/fonts; do
 done
 
 # Rewrite every surviving per-section HTML reference from the old per-section
-# `url('fonts/...)` form to the new top-level `url('../fonts/...)` form. The
-# script uses a single sed pass per file (find -exec ... +) to avoid
-# re-invoking sed once per sample on sections with dozens of files. BSD sed on
-# macOS requires `-i ''`; GNU sed treats the same invocation as "-i" with an
-# empty suffix, which is compatible.
+# `url('fonts/...)` form to the new top-level `url('../fonts/...)` form. Files
+# under cli/<section>/ sit two levels below OUT_DIR, so they need `../../fonts/`
+# to reach the consolidated directory; files under test/ sit one level below
+# and need `../fonts/`. The script issues one sed pass per group (find -exec
+# ... +) to avoid re-invoking sed once per sample on sections with dozens of
+# files. BSD sed on macOS requires `-i ''`; GNU sed treats the same invocation
+# as "-i" with an empty suffix, which is compatible.
 if [ "$(uname)" = "Darwin" ]; then
   SED_INPLACE=(-i '')
 else
   SED_INPLACE=(-i)
 fi
-find "$OUT_DIR"/cli "$OUT_DIR"/test -maxdepth 2 -name "*.html" -type f -exec \
-  sed "${SED_INPLACE[@]}" "s|url('fonts/|url('../fonts/|g" {} +
+find "$OUT_DIR"/cli -maxdepth 2 -name "*.html" -type f -exec \
+  sed "${SED_INPLACE[@]}" "s|url('fonts/|url('../../fonts/|g" {} +
+if [ -d "$OUT_DIR"/test ]; then
+  find "$OUT_DIR"/test -maxdepth 1 -name "*.html" -type f -exec \
+    sed "${SED_INPLACE[@]}" "s|url('fonts/|url('../fonts/|g" {} +
+fi
 
 # Drop the now-redundant per-section font directories. pagx-render/ and
 # static-img/ are untouched; the generated HTML still resolves static-img
