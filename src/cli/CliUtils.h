@@ -28,6 +28,7 @@
 #include "pagx/FontConfig.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/utils/VerifyUtils.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx::cli {
@@ -200,22 +201,5 @@ bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& font
  */
 bool WriteStringToFile(const std::string& content, const std::string& filePath,
                        const std::string& command);
-
-/**
- * Returns true if the Layer uses any feature that Group does not support at all (e.g. blendMode,
- * styles, filters, mask, 3D transforms, container layout, composition, alpha with offscreen
- * semantics). Does NOT check contents or children (callers handle those based on context), nor
- * attributes whose values can be mechanically transferred to a Group (2D matrix, x/y position,
- * width/height, padding, constraint positioning). When adding a new Layer-only attribute, add a corresponding
- * check here; otherwise the attribute will be silently ignored.
- */
-bool HasLayerOnlyFeatures(const Layer* layer);
-
-/**
- * Returns true if the Layer is a plain shell — all attributes are at their default values. Does
- * NOT check contents (the payload to retain). Stricter than HasLayerOnlyFeatures: also requires
- * attributes transferable to Group (x/y position, 2D matrix, size, padding, constraints) to be default.
- */
-bool IsLayerShell(const Layer* layer);
 
 }  // namespace pagx::cli
