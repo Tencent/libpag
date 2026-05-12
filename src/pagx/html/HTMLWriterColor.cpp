@@ -303,7 +303,7 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
       if (!p->image) {
         return "transparent";
       }
-      std::string imgUrl = "url(" + GetImageSrc(p->image) + ")";
+      std::string imgUrl = "url(" + GetImageSrc(p->image, _ctx) + ")";
       // Store tileMode/filterMode/matrix info in the CSS background shorthand
       // The caller will handle background-repeat/background-size/image-rendering separately
       return imgUrl;
@@ -482,7 +482,7 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha, 
       }
       return "none";
     }
-    std::string imgUrl = "url(" + GetImageSrc(p->image) + ")";
+    std::string imgUrl = "url(" + GetImageSrc(p->image, _ctx) + ")";
     std::string repeatX = "no-repeat";
     std::string repeatY = "no-repeat";
     if (p->tileModeX == TileMode::Repeat || p->tileModeX == TileMode::Mirror) {

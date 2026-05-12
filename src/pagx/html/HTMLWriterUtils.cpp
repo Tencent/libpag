@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -148,7 +149,83 @@ static bool IsSafeImageUrl(const std::string& url) {
   return scheme == "http" || scheme == "https" || scheme == "data";
 }
 
-std::string GetImageSrc(const Image* image) {
+// Returns the basename of `path` restricted to filesystem-safe ASCII (matches
+// SanitizeStaticImgNamePrefix's character set: [A-Za-z0-9_.-]). Any other byte (path
+// separators, whitespace, non-ASCII) is replaced with '_'. Used when copying external image
+// files into staticImgDir; combined with the staticImgNamePrefix (also sanitized at export
+// entry) and the same-source dedup cache, this prevents a crafted filePath from escaping the
+// destination directory through path-traversal sequences.
+static std::string SanitizeBasename(const std::string& path) {
+  size_t slash = path.find_last_of("/\\");
+  std::string base = (slash == std::string::npos) ? path : path.substr(slash + 1);
+  std::string out;
+  out.reserve(base.size());
+  for (char c : base) {
+    auto uc = static_cast<unsigned char>(c);
+    bool allowed = (uc >= 'A' && uc <= 'Z') || (uc >= 'a' && uc <= 'z') ||
+                   (uc >= '0' && uc <= '9') || c == '_' || c == '.' || c == '-';
+    out += allowed ? c : '_';
+  }
+  if (out.empty() || out == "." || out == "..") {
+    out = "img";
+  }
+  return out;
+}
+
+// Splits a filename into (stem, extension-including-dot). For "logo.png" returns ("logo",
+// ".png"); for "no_dot" returns ("no_dot", ""); for ".hidden" returns (".hidden", "").
+static std::pair<std::string, std::string> SplitStemExt(const std::string& filename) {
+  size_t dot = filename.find_last_of('.');
+  if (dot == std::string::npos || dot == 0) {
+    return {filename, std::string()};
+  }
+  return {filename.substr(0, dot), filename.substr(dot)};
+}
+
+// Copies the external image file referenced by `srcPath` into the writer's staticImgDir, and
+// returns the relative URL the HTML should reference. Same-source paths are copied at most
+// once per document via ctx->externalImageCopies; distinct sources sharing a basename receive
+// disambiguated names (e.g. "logo.png", "logo_1.png", ...) tracked in
+// ctx->externalImageClaimedNames. Returns an empty string when the destination cannot be
+// prepared or the file cannot be copied — the caller falls back to inlining.
+static std::string CopyExternalImageToStaticDir(const std::string& srcPath,
+                                                HTMLWriterContext* ctx) {
+  if (!ctx || ctx->staticImgDir.empty()) {
+    return {};
+  }
+  std::error_code ec;
+  auto absSrc = std::filesystem::weakly_canonical(srcPath, ec);
+  std::string keyPath = ec ? srcPath : absSrc.string();
+
+  auto cached = ctx->externalImageCopies.find(keyPath);
+  if (cached != ctx->externalImageCopies.end()) {
+    return ctx->staticImgUrlPrefix + cached->second;
+  }
+
+  std::filesystem::create_directories(ctx->staticImgDir, ec);
+  if (ec) {
+    return {};
+  }
+
+  std::string baseName = SanitizeBasename(srcPath);
+  std::string prefixed = ctx->staticImgNamePrefix + baseName;
+  auto [stem, ext] = SplitStemExt(prefixed);
+  std::string candidate = prefixed;
+  for (int suffix = 1; ctx->externalImageClaimedNames.count(candidate) > 0; suffix++) {
+    candidate = stem + "_" + std::to_string(suffix) + ext;
+  }
+
+  std::filesystem::path dst = std::filesystem::path(ctx->staticImgDir) / candidate;
+  std::filesystem::copy_file(srcPath, dst, std::filesystem::copy_options::overwrite_existing, ec);
+  if (ec) {
+    return {};
+  }
+  ctx->externalImageCopies[keyPath] = candidate;
+  ctx->externalImageClaimedNames.insert(candidate);
+  return ctx->staticImgUrlPrefix + candidate;
+}
+
+std::string GetImageSrc(const Image* image, HTMLWriterContext* ctx) {
   if (image->data) {
     auto mime = DetectImageMime(image->data->bytes(), image->data->size());
     if (!mime) {
@@ -160,16 +237,19 @@ std::string GetImageSrc(const Image* image) {
   if (!IsSafeImageUrl(image->filePath)) {
     return {};
   }
-  // Relative file paths would otherwise resolve against the emitted HTML's directory, which
-  // rarely matches the PAGX source tree (complete_example's `spec/samples/pag_logo.png`
-  // symptom: the HTML sits in test/out/html-comparison/cli/spec/ so the browser hits a
-  // non-existent spec/samples/ next to it). When the path has no scheme and points to a
-  // readable file on disk, inline it as a data URI so the HTML stays self-contained.
   size_t colon = image->filePath.find(':');
   bool hasScheme = (colon != std::string::npos && colon > 0);
   if (!hasScheme) {
     auto codec = tgfx::ImageCodec::MakeFrom(image->filePath);
     if (codec) {
+      // Preferred path: copy the file alongside the HTML output (under staticImgDir) and
+      // emit a relative URL. Keeps the HTML small and lets browsers cache the image
+      // separately. Falls through to base64 inlining when staticImgDir is unset or the
+      // copy fails, so callers that omit staticImgDir still get a self-contained HTML.
+      auto copiedUrl = CopyExternalImageToStaticDir(image->filePath, ctx);
+      if (!copiedUrl.empty()) {
+        return copiedUrl;
+      }
       // Re-read the file bytes directly — ImageCodec decodes lazily, so we cannot pull the raw
       // encoded bytes out of it. Use a plain std::ifstream to slurp the file.
       std::ifstream f(image->filePath, std::ios::binary | std::ios::ate);

@@ -1049,7 +1049,7 @@ void HTMLWriter::writeEmbeddedShapeGlyphs(HTMLBuilder& out, const Text* text, co
         float oy = glyph->offset.y;
         Matrix glyphMatrix =
             Matrix::Translate(posX + ox * scale, posY + oy * scale) * Matrix::Scale(scale, scale);
-        std::string src = GetImageSrc(glyph->image);
+        std::string src = GetImageSrc(glyph->image, _ctx);
         out.openTag("image");
         out.addAttr("href", src);
         out.addAttr("transform", MatrixToCSS(glyphMatrix));

@@ -50,6 +50,7 @@
 namespace pagx {
 
 class Group;
+class HTMLWriterContext;
 class Polystar;
 class Repeater;
 class Text;
@@ -117,7 +118,7 @@ std::string PaddingToCSS(const Padding& padding);
  */
 bool TextStartsWithRTL(const std::string& utf8Text);
 
-std::string GetImageSrc(const Image* image);
+std::string GetImageSrc(const Image* image, HTMLWriterContext* ctx);
 const char* DetectImageMime(const uint8_t* bytes, size_t size);
 
 /**
@@ -188,11 +189,21 @@ class HTMLWriterContext {
 
   // Static-image rasterization config, forwarded from HTMLExportOptions. Empty `staticImgDir`
   // disables rasterization entirely; the writer then emits nothing for Diamond/tiled-pattern
-  // fills (they are CSS-inexpressible without the PNG).
+  // fills (they are CSS-inexpressible without the PNG). It also doubles as the destination for
+  // copying external image files referenced by Image resources via `filePath`; when empty,
+  // GetImageSrc falls back to inlining external file bytes as base64 data URIs so the HTML
+  // remains self-contained.
   std::string staticImgDir = {};
   std::string staticImgUrlPrefix = "static-img/";
   std::string staticImgNamePrefix = {};
   float staticImgPixelRatio = 2.0f;
+
+  // Cache: source absolute file path → assigned filename inside staticImgDir. Used by
+  // GetImageSrc to deduplicate identical source paths (one source copied at most once per
+  // document) and to track already-claimed filenames so distinct sources sharing the same
+  // basename receive disambiguated copies (e.g. "logo.png", "logo_1.png").
+  std::unordered_map<std::string, std::string> externalImageCopies = {};
+  std::unordered_set<std::string> externalImageClaimedNames = {};
 
   // Font synthesis control, forwarded from HTMLExportOptions.
   bool fontSynthesisWeight = true;

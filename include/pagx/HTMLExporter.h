@@ -178,10 +178,18 @@ struct HTMLExportOptions {
   int indent = 2;
 
   /**
-   * Absolute directory path where the exporter writes PNG files for shapes filled with color
-   * sources that CSS cannot express natively (DiamondGradient and tiled ImagePattern). The
-   * exporter creates the directory if it does not exist. When left empty, such shapes are
-   * silently skipped in the HTML output.
+   * Absolute directory path where the exporter writes auxiliary image files. Two kinds of files
+   * land here:
+   *   1. PNGs rasterized from shapes whose color sources CSS cannot express natively
+   *      (DiamondGradient and tiled ImagePattern).
+   *   2. Copies of external image files referenced by Image resources via `filePath`. The HTML
+   *      then references them by relative URL (`staticImgUrlPrefix + filename`), so the
+   *      generated bundle ships images as separate files instead of inlining them as base64.
+   *      Same-source paths are deduplicated (copied at most once); distinct sources sharing a
+   *      basename receive disambiguated copies (e.g. `logo.png`, `logo_1.png`).
+   * The exporter creates the directory if it does not exist. When left empty, rasterized
+   * shapes are silently skipped and external image filePaths fall back to base64 inlining so
+   * the HTML remains self-contained.
    */
   std::string staticImgDir = {};
 
