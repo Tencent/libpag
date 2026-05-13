@@ -19,24 +19,35 @@
 #include "JsHelper.h"
 #include <multimedia/image_framework/image/pixelmap_native.h>
 #include <multimedia/image_framework/image_pixel_map_mdk.h>
+#include <mutex>
+#include <unordered_map>
 #include "base/utils/Log.h"
 #include "tgfx/core/ImageInfo.h"
 
 namespace pag {
 
-static std::unordered_map<std::string, napi_ref> ConstructorRefMap;
+// Constructor references are partitioned by napi_env, because each OHOS Worker has its own
+// EcmaVM. A napi_ref created with one env's EcmaVM cannot be safely released or accessed
+// from another env's thread. Using a process-wide map keyed only by name caused a fatal
+// "ecma_vm cannot run in multi-thread" abort when a Worker thread imported libpag and tried
+// to delete a reference that was created on the main thread's EcmaVM.
+static std::mutex ConstructorRefMapMutex;
+static std::unordered_map<napi_env, std::unordered_map<std::string, napi_ref>> ConstructorRefMap;
 
-bool SetConstructor(napi_env env, napi_value constructor, const std::string& name) {
+static bool SetConstructor(napi_env env, napi_value constructor, const std::string& name) {
   if (env == nullptr || constructor == nullptr || name.empty()) {
     return false;
   }
-  if (ConstructorRefMap.find(name) != ConstructorRefMap.end()) {
-    napi_delete_reference(env, ConstructorRefMap.at(name));
-    ConstructorRefMap.erase(name);
+  std::lock_guard<std::mutex> autoLock(ConstructorRefMapMutex);
+  auto& envMap = ConstructorRefMap[env];
+  auto it = envMap.find(name);
+  if (it != envMap.end()) {
+    napi_delete_reference(env, it->second);
+    envMap.erase(it);
   }
-  napi_ref ref;
+  napi_ref ref = nullptr;
   napi_create_reference(env, constructor, 1, &ref);
-  ConstructorRefMap[name] = ref;
+  envMap[name] = ref;
   return true;
 }
 
@@ -44,10 +55,21 @@ napi_value GetConstructor(napi_env env, const std::string& name) {
   if (env == nullptr || name.empty()) {
     return nullptr;
   }
-  napi_value result = nullptr;
-  if (ConstructorRefMap.find(name) != ConstructorRefMap.end()) {
-    napi_get_reference_value(env, ConstructorRefMap.at(name), &result);
+  napi_ref ref = nullptr;
+  {
+    std::lock_guard<std::mutex> autoLock(ConstructorRefMapMutex);
+    auto envIt = ConstructorRefMap.find(env);
+    if (envIt == ConstructorRefMap.end()) {
+      return nullptr;
+    }
+    auto refIt = envIt->second.find(name);
+    if (refIt == envIt->second.end()) {
+      return nullptr;
+    }
+    ref = refIt->second;
   }
+  napi_value result = nullptr;
+  napi_get_reference_value(env, ref, &result);
   return result;
 }
 
