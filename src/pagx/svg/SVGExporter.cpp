@@ -859,7 +859,9 @@ void SVGWriter::writeBlendFilter(const BlendFilter* blend, int& shadowIndex,
   _defs->openElement("feBlend");
   _defs->addAttribute("in", floodResult);
   _defs->addAttribute("in2", currentSource);
-  auto modeStr = BlendModeToSVGString(blend->blendMode);
+  // Use the feBlend-specific lookup — modes without an feBlend equivalent
+  // (plus-lighter / plus-darker) intentionally fall back to the default mode.
+  auto modeStr = BlendModeToFEBlendString(blend->blendMode);
   if (modeStr) {
     _defs->addAttribute("mode", modeStr);
   }
