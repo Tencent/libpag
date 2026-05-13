@@ -39,6 +39,9 @@ struct ImportFormatOptions {
   bool svgExpandUse = true;
   bool svgFlattenTransforms = false;
   bool svgPreserveUnknown = false;
+  bool htmlStrict = false;
+  bool htmlPreserveUnknown = false;
+  bool htmlPreferBodySize = true;
 };
 
 /**

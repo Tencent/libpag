@@ -17,9 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CommandImport.h"
+#include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include "cli/CliUtils.h"
+#include "pagx/HTMLImporter.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXOptimizer.h"
 #include "pagx/SVGImporter.h"
@@ -39,6 +42,12 @@ void ParseFormatOptions(int argc, char* argv[], ImportFormatOptions* options) {
       options->svgFlattenTransforms = true;
     } else if (arg == "--svg-preserve-unknown") {
       options->svgPreserveUnknown = true;
+    } else if (arg == "--html-strict") {
+      options->htmlStrict = true;
+    } else if (arg == "--html-preserve-unknown") {
+      options->htmlPreserveUnknown = true;
+    } else if (arg == "--html-no-prefer-body-size") {
+      options->htmlPreferBodySize = false;
     }
   }
 }
@@ -58,12 +67,24 @@ static std::string InferFormatFromContent(const std::string& content) {
         for (auto& ch : tagName) {
           ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
         }
+        if (tagName == "html" || tagName == "body") {
+          return "html";
+        }
         return tagName;
       }
     }
     pos = content.find('<', pos + 1);
   }
   return {};
+}
+
+static std::string NormalizeFormat(const std::string& format, const std::string& fallback) {
+  std::string f = format.empty() ? fallback : format;
+  for (auto& ch : f) {
+    ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+  }
+  if (f == "htm" || f == "xhtml") f = "html";
+  return f;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -81,6 +102,17 @@ static SVGImporter::Options ToSVGOptions(const ImportFormatOptions& formatOption
   return svgOptions;
 }
 
+static HTMLImporter::Options ToHTMLOptions(const ImportFormatOptions& formatOptions,
+                                           float targetWidth = NAN, float targetHeight = NAN) {
+  HTMLImporter::Options options = {};
+  options.strict = formatOptions.htmlStrict;
+  options.preserveUnknownElements = formatOptions.htmlPreserveUnknown;
+  options.preferBodySize = formatOptions.htmlPreferBodySize;
+  options.targetWidth = targetWidth;
+  options.targetHeight = targetHeight;
+  return options;
+}
+
 static void InlinePathData(PAGXDocument* doc) {
   for (auto& node : doc->nodes) {
     if (node->nodeType() == NodeType::PathData) {
@@ -93,13 +125,18 @@ ImportResult ImportFile(const std::string& filePath, const std::string& format,
                         const ImportFormatOptions& formatOptions, float targetWidth,
                         float targetHeight) {
   ImportResult result = {};
-  auto effectiveFormat = format.empty() ? GetFileExtension(filePath) : format;
-  if (effectiveFormat != "svg") {
+  auto extension = GetFileExtension(filePath);
+  std::string effectiveFormat = NormalizeFormat(format, extension);
+  if (effectiveFormat == "svg") {
+    result.document =
+        SVGImporter::Parse(filePath, ToSVGOptions(formatOptions, targetWidth, targetHeight));
+  } else if (effectiveFormat == "html") {
+    result.document =
+        HTMLImporter::Parse(filePath, ToHTMLOptions(formatOptions, targetWidth, targetHeight));
+  } else {
     result.error = "unsupported format '" + effectiveFormat + "'";
     return result;
   }
-  result.document =
-      SVGImporter::Parse(filePath, ToSVGOptions(formatOptions, targetWidth, targetHeight));
   if (result.document == nullptr) {
     result.error = "failed to parse '" + filePath + "'";
     return result;
@@ -113,13 +150,17 @@ ImportResult ImportString(const std::string& content, const std::string& format,
                           const ImportFormatOptions& formatOptions, float targetWidth,
                           float targetHeight) {
   ImportResult result = {};
-  auto effectiveFormat = format.empty() ? InferFormatFromContent(content) : format;
-  if (effectiveFormat != "svg") {
+  std::string effectiveFormat = NormalizeFormat(format, InferFormatFromContent(content));
+  if (effectiveFormat == "svg") {
+    result.document =
+        SVGImporter::ParseString(content, ToSVGOptions(formatOptions, targetWidth, targetHeight));
+  } else if (effectiveFormat == "html") {
+    result.document =
+        HTMLImporter::ParseString(content, ToHTMLOptions(formatOptions, targetWidth, targetHeight));
+  } else {
     result.error = "unsupported inline import format '" + effectiveFormat + "'";
     return result;
   }
-  result.document =
-      SVGImporter::ParseString(content, ToSVGOptions(formatOptions, targetWidth, targetHeight));
   if (result.document == nullptr) {
     result.error = "failed to parse inline content";
     return result;
@@ -146,18 +187,24 @@ static void PrintUsage() {
             << "Import a file from another format and convert it to PAGX.\n"
             << "\n"
             << "Options:\n"
-            << "  --input <file>              Input file to import (required)\n"
-            << "  --output <file>             Output PAGX file (default: <input>.pagx)\n"
-            << "  --format <format>           Force input format (svg)\n"
+            << "  --input <file>                 Input file to import (required)\n"
+            << "  --output <file>                Output PAGX file (default: <input>.pagx)\n"
+            << "  --format <format>              Force input format (svg, html)\n"
             << "\n"
             << "SVG options:\n"
-            << "  --svg-no-expand-use         Do not expand <use> references\n"
-            << "  --svg-flatten-transforms    Flatten nested transforms into single matrices\n"
-            << "  --svg-preserve-unknown      Preserve unsupported SVG elements as Unknown nodes\n"
+            << "  --svg-no-expand-use            Do not expand <use> references\n"
+            << "  --svg-flatten-transforms       Flatten nested transforms into single matrices\n"
+            << "  --svg-preserve-unknown         Preserve unsupported SVG elements as Unknown nodes\n"
+            << "\n"
+            << "HTML options:\n"
+            << "  --html-strict                  Treat HTML import warnings as errors\n"
+            << "  --html-preserve-unknown        Keep unknown HTML tags as empty Layers\n"
+            << "  --html-no-prefer-body-size     Prefer --target* over <body> intrinsic size\n"
             << "\n"
             << "Examples:\n"
-            << "  pagx import --input icon.svg                     # SVG to icon.pagx\n"
-            << "  pagx import --input icon.svg --output out.pagx   # SVG to out.pagx\n";
+            << "  pagx import --input icon.svg                      # SVG to icon.pagx\n"
+            << "  pagx import --input layout.html                   # HTML to layout.pagx\n"
+            << "  pagx import --input page.html --output card.pagx  # HTML to card.pagx\n";
 }
 
 static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
@@ -171,7 +218,8 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
     } else if (arg == "--format" && i + 1 < argc) {
       options->format = argv[++i];
     } else if (arg == "--svg-no-expand-use" || arg == "--svg-flatten-transforms" ||
-               arg == "--svg-preserve-unknown") {
+               arg == "--svg-preserve-unknown" || arg == "--html-strict" ||
+               arg == "--html-preserve-unknown" || arg == "--html-no-prefer-body-size") {
       // Handled by ParseFormatOptions below.
     } else if (arg == "--help" || arg == "-h") {
       PrintUsage();
