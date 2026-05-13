@@ -218,7 +218,12 @@ if (PAG_BUILD_PAGX)
     endif ()
 
     if (PAG_BUILD_HTML)
-        list(APPEND PAG_FILES src/pagx/html/HTMLImporter.cpp src/pagx/html/HTMLParserContext.h)
+        list(APPEND PAG_FILES
+            src/pagx/html/HTMLImporter.cpp
+            src/pagx/html/HTMLStyleResolver.cpp
+            src/pagx/html/HTMLLayerBuilder.cpp
+            src/pagx/html/HTMLValueParser.cpp
+            src/pagx/html/HTMLParserContext.h)
     endif ()
 
     if (PAG_BUILD_PPT)

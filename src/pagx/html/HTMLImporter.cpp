@@ -23,9 +23,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <sstream>
-#include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include "pagx/html/HTMLParserContext.h"
 #include "pagx/utils/StringParser.h"
@@ -34,30 +31,12 @@
 namespace pagx {
 
 //==================================================================================================
-// Static helpers (HTML/CSS lexical primitives)
+// detail namespace: shared CSS lexical helpers (non-inline definitions live here so that
+// the four split translation units can all link against a single copy).
 //==================================================================================================
 
-namespace {
+namespace detail {
 
-// Lower-case ASCII in place.
-std::string ToLower(std::string s) {
-  for (auto& c : s) {
-    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-  }
-  return s;
-}
-
-// Trim ASCII whitespace from both ends.
-std::string Trim(const std::string& s) {
-  size_t start = s.find_first_not_of(" \t\r\n");
-  if (start == std::string::npos) {
-    return {};
-  }
-  size_t end = s.find_last_not_of(" \t\r\n");
-  return s.substr(start, end - start + 1);
-}
-
-// Split a CSS value list on top-level commas (commas inside parentheses are not split).
 std::vector<std::string> SplitTopLevelCommas(const std::string& s) {
   std::vector<std::string> out;
   int depth = 0;
@@ -77,8 +56,6 @@ std::vector<std::string> SplitTopLevelCommas(const std::string& s) {
   return out;
 }
 
-// Split a CSS value on whitespace runs while respecting parenthesised groups (so
-// "0 2px 6px rgba(0,0,0,0.2)" yields four tokens).
 std::vector<std::string> SplitTopLevelWhitespace(const std::string& s) {
   std::vector<std::string> out;
   int depth = 0;
@@ -105,9 +82,6 @@ std::vector<std::string> SplitTopLevelWhitespace(const std::string& s) {
   return out;
 }
 
-// Parse a CSS style string into a property map. Later properties override earlier ones.
-// Mirrors the SVG importer's ParseStyleString but kept private so the two modules stay
-// independent. Comments and parenthesised values are respected.
 void ParseStyleString(const std::string& styleStr,
                       std::unordered_map<std::string, std::string>& out) {
   size_t pos = 0;
@@ -149,8 +123,6 @@ void ParseStyleString(const std::string& styleStr,
   }
 }
 
-// CSS named color table (CSS Color 3 + rebeccapurple). Duplicated to keep HTML importer
-// independent of the SVG module.
 const std::unordered_map<std::string, uint32_t>& NamedColors() {
   // clang-format off
   static const std::unordered_map<std::string, uint32_t> table = {
@@ -209,8 +181,6 @@ const std::unordered_map<std::string, uint32_t>& NamedColors() {
   return table;
 }
 
-// Default style sheet by element tag. Returns the declarations to apply; concatenated
-// before any class rules so user styles always win.
 const std::unordered_map<std::string, std::string>& ElementDefaults() {
   // clang-format off
   static const std::unordered_map<std::string, std::string> table = {
@@ -227,22 +197,6 @@ const std::unordered_map<std::string, std::string>& ElementDefaults() {
   return table;
 }
 
-bool IsContainerTag(const std::string& tag) {
-  return tag == "div" || tag == "section" || tag == "header" || tag == "footer" || tag == "main" ||
-         tag == "aside" || tag == "nav" || tag == "article" || tag == "body";
-}
-
-bool IsTextLeafTag(const std::string& tag) {
-  return tag == "p" || tag == "h1" || tag == "h2" || tag == "h3" || tag == "h4" || tag == "h5" ||
-         tag == "h6" || tag == "span" || tag == "a";
-}
-
-bool IsInlineRunTag(const std::string& tag) {
-  return tag == "span" || tag == "a" || tag == "br";
-}
-
-// Lower-case the tag name of every element node in place. Avoids needing to test every
-// tag with both cases later on. Text nodes keep their content unchanged.
 void LowercaseTagsInPlace(const std::shared_ptr<DOMNode>& node) {
   if (!node) return;
   if (node->type == DOMNodeType::Element) {
@@ -259,7 +213,6 @@ void LowercaseTagsInPlace(const std::shared_ptr<DOMNode>& node) {
   }
 }
 
-// Escape XML text/attribute values for round-tripping inline SVG content.
 std::string EscapeXml(const std::string& text, bool isAttribute) {
   std::string out;
   out.reserve(text.size());
@@ -285,8 +238,6 @@ std::string EscapeXml(const std::string& text, bool isAttribute) {
   return out;
 }
 
-// Try to parse a CSS angle in `deg`, `rad`, `turn`, or unitless (deg). Returns 0 on
-// failure.
 float ParseAngle(const std::string& raw) {
   std::string s = Trim(raw);
   if (s.empty()) return 0.0f;
@@ -300,13 +251,28 @@ float ParseAngle(const std::string& raw) {
   return v;
 }
 
-// Returns the converted PAGX gradient angle (degrees, 0° = +X axis) for a CSS angle
-// (degrees, 0° = top, clockwise).
-float CssToPagxAngle(float cssDeg) {
-  return cssDeg - 90.0f;
+float CssDirectionToAngle(const std::string& kw) {
+  std::string s = ToLower(Trim(kw));
+  if (s.compare(0, 3, "to ") != 0) return 180.0f;
+  s = Trim(s.substr(3));
+  if (s == "top") return 0.0f;
+  if (s == "right") return 90.0f;
+  if (s == "bottom") return 180.0f;
+  if (s == "left") return 270.0f;
+  if (s == "top right" || s == "right top") return 45.0f;
+  if (s == "bottom right" || s == "right bottom") return 135.0f;
+  if (s == "bottom left" || s == "left bottom") return 225.0f;
+  if (s == "top left" || s == "left top") return 315.0f;
+  return 180.0f;
 }
 
-// Strip trailing slashes so file path resolution doesn't pick up wrong directories.
+std::string ExtractParenArgs(const std::string& value) {
+  auto open = value.find('(');
+  auto close = value.rfind(')');
+  if (open == std::string::npos || close == std::string::npos || close <= open) return {};
+  return value.substr(open + 1, close - open - 1);
+}
+
 std::string DirectoryOf(const std::string& filePath) {
   auto lastSlash = filePath.find_last_of("/\\");
   if (lastSlash == std::string::npos) {
@@ -328,15 +294,101 @@ bool LooksAbsolutePath(const std::string& src) {
   return false;
 }
 
-// Returns the value of property `key` from `props`, or an empty string when absent.
-const std::string& LookupProperty(const std::unordered_map<std::string, std::string>& props,
-                                  const std::string& key) {
-  static const std::string emptyValue;
-  auto it = props.find(key);
-  return it == props.end() ? emptyValue : it->second;
+Color HexToColor(uint32_t hex, bool hasAlpha) {
+  Color color = {};
+  color.colorSpace = ColorSpace::SRGB;
+  if (hasAlpha) {
+    color.red = static_cast<float>((hex >> 24) & 0xFF) / 255.0f;
+    color.green = static_cast<float>((hex >> 16) & 0xFF) / 255.0f;
+    color.blue = static_cast<float>((hex >> 8) & 0xFF) / 255.0f;
+    color.alpha = static_cast<float>(hex & 0xFF) / 255.0f;
+  } else {
+    color.red = static_cast<float>((hex >> 16) & 0xFF) / 255.0f;
+    color.green = static_cast<float>((hex >> 8) & 0xFF) / 255.0f;
+    color.blue = static_cast<float>(hex & 0xFF) / 255.0f;
+    color.alpha = 1.0f;
+  }
+  return color;
 }
 
-}  // namespace
+Padding BuildPaddingShorthand(const std::vector<float>& nums) {
+  Padding p = {};
+  if (nums.size() == 1) {
+    p.top = p.right = p.bottom = p.left = nums[0];
+  } else if (nums.size() == 2) {
+    p.top = p.bottom = nums[0];
+    p.left = p.right = nums[1];
+  } else if (nums.size() == 3) {
+    p.top = nums[0];
+    p.left = p.right = nums[1];
+    p.bottom = nums[2];
+  } else if (nums.size() >= 4) {
+    p.top = nums[0];
+    p.right = nums[1];
+    p.bottom = nums[2];
+    p.left = nums[3];
+  }
+  return p;
+}
+
+bool ParseSizingDimension(const std::string& raw, float& outPx, float& outPct) {
+  std::string value = Trim(raw);
+  if (value.empty()) return false;
+  char* end = nullptr;
+  float num = std::strtof(value.c_str(), &end);
+  if (end == value.c_str()) return false;
+  std::string suffix = Trim(end);
+  if (suffix == "%") {
+    outPct = num;
+    return true;
+  }
+  if (suffix.empty() || suffix == "px") {
+    outPx = num;
+    return true;
+  }
+  if (suffix == "em" || suffix == "rem") {
+    outPx = num * 16.0f;
+    return true;
+  }
+  outPx = num;
+  return true;
+}
+
+std::string CollapseHTMLWhitespace(const std::string& raw) {
+  std::string normalized;
+  normalized.reserve(raw.size());
+  bool prevSpace = false;
+  for (char c : raw) {
+    if (c == '\n') {
+      if (!normalized.empty() && normalized.back() == ' ') {
+        normalized.pop_back();
+      }
+      normalized.push_back('\n');
+      prevSpace = false;
+      continue;
+    }
+    if (c == ' ' || c == '\t' || c == '\r') {
+      if (!prevSpace && !normalized.empty()) {
+        normalized.push_back(' ');
+        prevSpace = true;
+      }
+    } else {
+      normalized.push_back(c);
+      prevSpace = false;
+    }
+  }
+  while (!normalized.empty() && (normalized.back() == ' ' || normalized.back() == '\n')) {
+    normalized.pop_back();
+  }
+  size_t start = 0;
+  while (start < normalized.size() && normalized[start] == ' ') start++;
+  if (start > 0) normalized.erase(0, start);
+  return normalized;
+}
+
+}  // namespace detail
+
+using namespace pagx::detail;
 
 //==================================================================================================
 // HTMLImporter public entry points
@@ -476,82 +528,6 @@ void HTMLParserContext::hardError(const std::string& message) {
 }
 
 //==================================================================================================
-// Style sheet collection
-//==================================================================================================
-
-void HTMLParserContext::collectStyles(const std::shared_ptr<DOMNode>& head) {
-  auto child = head->getFirstChild();
-  while (child) {
-    if (child->type == DOMNodeType::Element && child->name == "style") {
-      parseStyleBlock(child);
-    }
-    child = child->getNextSibling();
-  }
-}
-
-void HTMLParserContext::parseStyleBlock(const std::shared_ptr<DOMNode>& styleNode) {
-  // The text content is stored as a child Text node whose `name` field carries the text.
-  auto textChild = styleNode->getFirstChild();
-  if (!textChild || textChild->type != DOMNodeType::Text) {
-    return;
-  }
-  const std::string& css = textChild->name;
-
-  size_t pos = 0;
-  while (pos < css.size()) {
-    while (pos < css.size() && std::isspace(static_cast<unsigned char>(css[pos]))) {
-      pos++;
-    }
-    if (pos >= css.size()) break;
-    if (pos + 1 < css.size() && css[pos] == '/' && css[pos + 1] == '*') {
-      auto commentEnd = css.find("*/", pos + 2);
-      pos = (commentEnd == std::string::npos) ? css.size() : commentEnd + 2;
-      continue;
-    }
-    size_t bracePos = css.find('{', pos);
-    if (bracePos == std::string::npos) break;
-    std::string selectorStr = Trim(css.substr(pos, bracePos - pos));
-    size_t closePos = css.find('}', bracePos);
-    if (closePos == std::string::npos) break;
-    std::string body = Trim(css.substr(bracePos + 1, closePos - bracePos - 1));
-    if (selectorStr.empty() || body.empty()) {
-      pos = closePos + 1;
-      continue;
-    }
-
-    auto selectors = SplitTopLevelCommas(selectorStr);
-    for (auto& sel : selectors) {
-      sel = Trim(sel);
-      if (sel.empty()) continue;
-      if (sel[0] == '.') {
-        std::string cls = sel.substr(1);
-        if (cls.find_first_of(" \t.>+~:[#") == std::string::npos) {
-          auto& slot = _cssClassRules[cls];
-          slot = slot.empty() ? body : (slot + ";" + body);
-          continue;
-        }
-      }
-      // Element selector (lower-case ascii letters / digits only, e.g. body, h1, p).
-      bool allowed = !sel.empty();
-      for (char c : sel) {
-        if (!std::isalnum(static_cast<unsigned char>(c))) {
-          allowed = false;
-          break;
-        }
-      }
-      if (allowed) {
-        std::string lowered = ToLower(sel);
-        auto& slot = _cssElementRules[lowered];
-        slot = slot.empty() ? body : (slot + ";" + body);
-        continue;
-      }
-      warn("html: unsupported selector '" + sel + "' in <style>; declarations dropped");
-    }
-    pos = closePos + 1;
-  }
-}
-
-//==================================================================================================
 // Canvas size resolution
 //==================================================================================================
 
@@ -640,7 +616,7 @@ bool HTMLParserContext::requiresInnerHost(const HTMLBoxAttributes& box) {
 }
 
 //==================================================================================================
-// Body / element conversion (foundation – minimal stub; expanded in subsequent milestones)
+// Body / element conversion
 //==================================================================================================
 
 Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, float canvasW,
@@ -735,10 +711,6 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
   return nullptr;
 }
 
-//==================================================================================================
-// Container / text / image / svg conversion (m3+ milestones extend these)
-//==================================================================================================
-
 Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& element,
                                            const HTMLBoxAttributes& box,
                                            const HTMLInheritedStyle& inherited, int depth) {
@@ -796,39 +768,9 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
   return layer;
 }
 
-// Collapse HTML whitespace in a single fragment: convert tabs/CR to spaces, collapse
-// adjacent ASCII whitespace, and trim leading/trailing whitespace at the fragment level.
-static std::string CollapseHTMLWhitespace(const std::string& raw) {
-  std::string normalized;
-  normalized.reserve(raw.size());
-  bool prevSpace = false;
-  for (char c : raw) {
-    if (c == '\n') {
-      if (!normalized.empty() && normalized.back() == ' ') {
-        normalized.pop_back();
-      }
-      normalized.push_back('\n');
-      prevSpace = false;
-      continue;
-    }
-    if (c == ' ' || c == '\t' || c == '\r') {
-      if (!prevSpace && !normalized.empty()) {
-        normalized.push_back(' ');
-        prevSpace = true;
-      }
-    } else {
-      normalized.push_back(c);
-      prevSpace = false;
-    }
-  }
-  while (!normalized.empty() && (normalized.back() == ' ' || normalized.back() == '\n')) {
-    normalized.pop_back();
-  }
-  size_t start = 0;
-  while (start < normalized.size() && normalized[start] == ' ') start++;
-  if (start > 0) normalized.erase(0, start);
-  return normalized;
-}
+//==================================================================================================
+// Text fragment collection / text leaf conversion
+//==================================================================================================
 
 HTMLParserContext::TextFragment HTMLParserContext::makeTextFragment(
     const HTMLInheritedStyle& inherited) {
@@ -886,24 +828,6 @@ void HTMLParserContext::collectTextFragments(const std::shared_ptr<DOMNode>& ele
     }
     child = child->getNextSibling();
   }
-}
-
-Text* HTMLParserContext::buildTextElement(const TextFragment& fragment) {
-  auto t = _document->makeNode<Text>();
-  t->text = fragment.text;
-  t->fontFamily = fragment.fontFamily;
-  t->fontStyle = fragment.fontStyleName;
-  t->fontSize = fragment.fontSize;
-  t->letterSpacing = fragment.letterSpacing;
-  return t;
-}
-
-Fill* HTMLParserContext::buildSolidFill(const Color& color) {
-  auto fill = _document->makeNode<Fill>();
-  auto solid = _document->makeNode<SolidColor>();
-  solid->color = color;
-  fill->color = solid;
-  return fill;
 }
 
 Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& element,
@@ -1013,1034 +937,6 @@ Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& elemen
 
   assignElementId(outer, element);
   return outer;
-}
-
-Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
-                                       const HTMLBoxAttributes& box) {
-  auto* srcAttr = element->findAttribute("src");
-  if (!srcAttr || srcAttr->empty()) {
-    warn("html: <img> missing src; skipped");
-    return nullptr;
-  }
-  std::string src = *srcAttr;
-  if (src.size() > 4 && ToLower(src.substr(src.size() - 4)) == ".svg" &&
-      src.compare(0, 5, "data:") != 0) {
-    auto layer = _document->makeNode<Layer>();
-    applySizeAndPosition(layer, box);
-    applyLayerAttributes(layer, element, box);
-    layer->importDirective.source = LooksAbsolutePath(src) ? src : (_basePath + src);
-    layer->importDirective.format = "svg";
-    assignElementId(layer, element);
-    return layer;
-  }
-
-  std::string resolved = LooksAbsolutePath(src) ? src : (_basePath + src);
-  auto* imageNode = registerImageResource(resolved);
-  if (!imageNode) return nullptr;
-
-  auto layer = _document->makeNode<Layer>();
-  applySizeAndPosition(layer, box);
-  applyLayerAttributes(layer, element, box);
-
-  auto rect = _document->makeNode<Rectangle>();
-  rect->percentWidth = 100.0f;
-  rect->percentHeight = 100.0f;
-  layer->contents.push_back(rect);
-
-  auto fill = _document->makeNode<Fill>();
-  auto pattern = _document->makeNode<ImagePattern>();
-  pattern->image = imageNode;
-  fill->color = pattern;
-  layer->contents.push_back(fill);
-  assignElementId(layer, element);
-  return layer;
-}
-
-Layer* HTMLParserContext::convertInlineSvg(const std::shared_ptr<DOMNode>& element,
-                                           const HTMLBoxAttributes& box) {
-  auto layer = _document->makeNode<Layer>();
-  applySizeAndPosition(layer, box);
-  applyLayerAttributes(layer, element, box);
-  layer->importDirective.content = serializeSvg(element);
-  layer->importDirective.format = "svg";
-  assignElementId(layer, element);
-  return layer;
-}
-
-//==================================================================================================
-// Style resolution
-//==================================================================================================
-
-void HTMLParserContext::mergeClassRules(const std::string& classAttribute,
-                                        std::unordered_map<std::string, std::string>& out) {
-  size_t p = 0;
-  const auto& s = classAttribute;
-  while (p < s.size()) {
-    while (p < s.size() && std::isspace(static_cast<unsigned char>(s[p]))) p++;
-    if (p >= s.size()) break;
-    size_t e = p;
-    while (e < s.size() && !std::isspace(static_cast<unsigned char>(s[e]))) e++;
-    auto it = _cssClassRules.find(s.substr(p, e - p));
-    if (it != _cssClassRules.end()) {
-      ParseStyleString(it->second, out);
-    }
-    p = e;
-  }
-}
-
-const std::unordered_map<std::string, std::string>& HTMLParserContext::getResolvedStyle(
-    const std::shared_ptr<DOMNode>& node) {
-  auto it = _stylePropertiesCache.find(node.get());
-  if (it != _stylePropertiesCache.end()) {
-    return it->second;
-  }
-  auto& slot = _stylePropertiesCache[node.get()];
-
-  // Priority: element defaults -> element rules from <style> -> class rules -> inline.
-  const auto& tagDefaults = ElementDefaults();
-  auto tagIt = tagDefaults.find(node->name);
-  if (tagIt != tagDefaults.end()) {
-    ParseStyleString(tagIt->second, slot);
-  }
-  auto elemRuleIt = _cssElementRules.find(node->name);
-  if (elemRuleIt != _cssElementRules.end()) {
-    ParseStyleString(elemRuleIt->second, slot);
-  }
-  auto* classAttr = node->findAttribute("class");
-  if (classAttr) {
-    mergeClassRules(*classAttr, slot);
-  }
-  auto* styleAttr = node->findAttribute("style");
-  if (styleAttr) {
-    ParseStyleString(*styleAttr, slot);
-  }
-  return slot;
-}
-
-std::string HTMLParserContext::getStyleProperty(const std::shared_ptr<DOMNode>& node,
-                                                const std::string& property,
-                                                const std::string& fallback) {
-  const auto& props = getResolvedStyle(node);
-  auto it = props.find(property);
-  if (it != props.end()) return it->second;
-  return fallback;
-}
-
-HTMLInheritedStyle HTMLParserContext::computeInherited(const std::shared_ptr<DOMNode>& element,
-                                                       const HTMLInheritedStyle& parent) {
-  HTMLInheritedStyle out = parent;
-  const auto& props = getResolvedStyle(element);
-  auto take = [&](const std::string& key, std::string& slot) {
-    auto it = props.find(key);
-    if (it != props.end()) slot = it->second;
-  };
-  take("color", out.color);
-  take("font-family", out.fontFamily);
-  take("font-size", out.fontSize);
-  take("font-weight", out.fontWeight);
-  take("font-style", out.fontStyle);
-  take("letter-spacing", out.letterSpacing);
-  take("line-height", out.lineHeight);
-  take("text-align", out.textAlign);
-  take("text-decoration", out.textDecoration);
-  take("white-space", out.whiteSpace);
-  // Compute combined font-style label used by PAGX Text.
-  bool isBold = false;
-  if (!out.fontWeight.empty()) {
-    std::string w = ToLower(Trim(out.fontWeight));
-    if (w == "bold" || w == "bolder") isBold = true;
-    if (!isBold) {
-      char* end = nullptr;
-      long n = std::strtol(w.c_str(), &end, 10);
-      if (end != w.c_str() && n >= 600) isBold = true;
-    }
-  }
-  bool isItalic = false;
-  if (!out.fontStyle.empty()) {
-    std::string fs = ToLower(Trim(out.fontStyle));
-    if (fs == "italic" || fs == "oblique") isItalic = true;
-  }
-  out.fontStyleName.clear();
-  if (isBold && isItalic) {
-    out.fontStyleName = "Bold Italic";
-  } else if (isBold) {
-    out.fontStyleName = "Bold";
-  } else if (isItalic) {
-    out.fontStyleName = "Italic";
-  }
-  return out;
-}
-
-HTMLBoxAttributes HTMLParserContext::resolveBox(const std::shared_ptr<DOMNode>& element) {
-  HTMLBoxAttributes box = {};
-  const auto& props = getResolvedStyle(element);
-  parseBoxSizing(box, props);
-  parseBoxPositioning(box, props);
-  parseBoxLayout(box, props);
-  parseBoxVisuals(box, props);
-  return box;
-}
-
-namespace {
-
-// Parses a CSS dimension string into either an explicit pixel value or a percent value.
-// Returns true on success and writes one of `outPx` / `outPct` (the other stays NaN).
-bool ParseSizingDimension(const std::string& raw, float& outPx, float& outPct) {
-  std::string value = Trim(raw);
-  if (value.empty()) return false;
-  char* end = nullptr;
-  float num = std::strtof(value.c_str(), &end);
-  if (end == value.c_str()) return false;
-  std::string suffix = Trim(end);
-  if (suffix == "%") {
-    outPct = num;
-    return true;
-  }
-  if (suffix.empty() || suffix == "px") {
-    outPx = num;
-    return true;
-  }
-  if (suffix == "em" || suffix == "rem") {
-    outPx = num * 16.0f;
-    return true;
-  }
-  outPx = num;
-  return true;
-}
-
-}  // namespace
-
-void HTMLParserContext::parseBoxSizing(HTMLBoxAttributes& box,
-                                       const std::unordered_map<std::string, std::string>& props) {
-  ParseSizingDimension(LookupProperty(props, "width"), box.widthPx, box.widthPct);
-  ParseSizingDimension(LookupProperty(props, "height"), box.heightPx, box.heightPct);
-}
-
-void HTMLParserContext::parseBoxPositioning(
-    HTMLBoxAttributes& box, const std::unordered_map<std::string, std::string>& props) {
-  std::string pos = ToLower(Trim(LookupProperty(props, "position")));
-  if (pos == "absolute") {
-    box.absolute = true;
-  } else if (!pos.empty() && pos != "static") {
-    warn("html: position: " + pos + " not supported; downgraded to absolute");
-    box.absolute = true;
-  }
-  if (!box.absolute) return;
-  const std::string& left = LookupProperty(props, "left");
-  if (!left.empty()) box.leftPx = parsePxLength(left);
-  const std::string& right = LookupProperty(props, "right");
-  if (!right.empty()) box.rightPx = parsePxLength(right);
-  const std::string& top = LookupProperty(props, "top");
-  if (!top.empty()) box.topPx = parsePxLength(top);
-  const std::string& bottom = LookupProperty(props, "bottom");
-  if (!bottom.empty()) box.bottomPx = parsePxLength(bottom);
-}
-
-namespace {
-
-Padding BuildPaddingShorthand(const std::vector<float>& nums) {
-  Padding p = {};
-  if (nums.size() == 1) {
-    p.top = p.right = p.bottom = p.left = nums[0];
-  } else if (nums.size() == 2) {
-    p.top = p.bottom = nums[0];
-    p.left = p.right = nums[1];
-  } else if (nums.size() == 3) {
-    p.top = nums[0];
-    p.left = p.right = nums[1];
-    p.bottom = nums[2];
-  } else if (nums.size() >= 4) {
-    p.top = nums[0];
-    p.right = nums[1];
-    p.bottom = nums[2];
-    p.left = nums[3];
-  }
-  return p;
-}
-
-}  // namespace
-
-void HTMLParserContext::parseBoxLayout(HTMLBoxAttributes& box,
-                                       const std::unordered_map<std::string, std::string>& props) {
-  std::string disp = ToLower(Trim(LookupProperty(props, "display")));
-  if (disp == "flex") {
-    box.displayFlex = true;
-  } else if (!disp.empty() && disp != "block" && disp != "inline" && disp != "inline-block") {
-    warn("html: display: " + disp + " not supported; ignored");
-  } else if (disp == "inline-block") {
-    warn("html: display: inline-block not supported; treated as block");
-  }
-  std::string fd = ToLower(Trim(LookupProperty(props, "flex-direction")));
-  if (fd == "column" || fd == "column-reverse") {
-    box.flexRow = false;
-    if (fd == "column-reverse") warn("html: flex-direction: column-reverse not supported");
-  } else if (fd == "row-reverse") {
-    warn("html: flex-direction: row-reverse not supported");
-  }
-  const std::string& gap = LookupProperty(props, "gap");
-  if (!gap.empty()) {
-    box.gapPx = parsePxLength(gap);
-    box.gapSet = !std::isnan(box.gapPx);
-    if (!box.gapSet) box.gapPx = 0;
-  }
-  const std::string& padding = LookupProperty(props, "padding");
-  if (!padding.empty()) {
-    auto tokens = SplitTopLevelWhitespace(padding);
-    std::vector<float> nums;
-    for (auto& t : tokens) {
-      float v = parsePxLength(t);
-      if (std::isnan(v)) {
-        warn("html: invalid padding token '" + t + "'");
-        continue;
-      }
-      nums.push_back(v);
-    }
-    box.padding = BuildPaddingShorthand(nums);
-    box.paddingSet = !nums.empty();
-  }
-  std::string ai = ToLower(Trim(LookupProperty(props, "align-items")));
-  if (!ai.empty()) box.alignItems = ai;
-  std::string jc = ToLower(Trim(LookupProperty(props, "justify-content")));
-  if (!jc.empty()) box.justifyContent = jc;
-  const std::string& flex = LookupProperty(props, "flex");
-  if (!flex.empty()) {
-    char* end = nullptr;
-    float v = std::strtof(flex.c_str(), &end);
-    if (end != flex.c_str()) {
-      box.flexGrow = v;
-      box.flexGrowSet = true;
-    } else {
-      warn("html: flex shorthand '" + flex + "' not supported beyond 'flex: N'");
-    }
-  }
-  if (!LookupProperty(props, "flex-wrap").empty()) {
-    warn("html: flex-wrap not supported; ignored");
-  }
-  if (!LookupProperty(props, "margin").empty()) {
-    warn("html: margin not supported; use padding/gap/flex");
-  }
-  if (!LookupProperty(props, "margin-top").empty()) warn("html: margin-top not supported");
-  if (!LookupProperty(props, "margin-right").empty()) warn("html: margin-right not supported");
-  if (!LookupProperty(props, "margin-bottom").empty()) warn("html: margin-bottom not supported");
-  if (!LookupProperty(props, "margin-left").empty()) warn("html: margin-left not supported");
-  if (!LookupProperty(props, "grid-template-columns").empty()) {
-    warn("html: grid layout not supported");
-  }
-  if (!LookupProperty(props, "transform").empty()) warn("html: transform not supported");
-}
-
-void HTMLParserContext::parseBoxVisuals(HTMLBoxAttributes& box,
-                                        const std::unordered_map<std::string, std::string>& props) {
-  std::string bgColor = LookupProperty(props, "background-color");
-  if (bgColor.empty()) {
-    bgColor = LookupProperty(props, "background");  // accept shorthand if it's color-only
-  }
-  if (!bgColor.empty() && bgColor.find('(') == std::string::npos &&
-      bgColor.find("gradient") == std::string::npos && bgColor.find("url") == std::string::npos) {
-    box.backgroundColor = parseColor(bgColor);
-    box.backgroundColorSet = true;
-  }
-  std::string bgImage = LookupProperty(props, "background-image");
-  if (bgImage.empty()) {
-    const std::string& sh = LookupProperty(props, "background");
-    if (!sh.empty() && sh.find("gradient") != std::string::npos) {
-      bgImage = sh;
-    }
-  }
-  if (!bgImage.empty()) {
-    box.backgroundImage = bgImage;
-  }
-
-  const std::string& br = LookupProperty(props, "border-radius");
-  if (!br.empty()) {
-    float v = parsePxLength(br);
-    if (!std::isnan(v)) {
-      box.borderRadiusPx = v;
-      box.borderRadiusSet = true;
-    }
-  }
-
-  const std::string& border = LookupProperty(props, "border");
-  if (!border.empty()) {
-    auto tokens = SplitTopLevelWhitespace(border);
-    for (auto& t : tokens) {
-      float w = parsePxLength(t);
-      if (!std::isnan(w)) {
-        box.borderWidthPx = w;
-        continue;
-      }
-      std::string lt = ToLower(t);
-      if (lt == "solid" || lt == "none") continue;
-      if (lt == "dashed" || lt == "dotted" || lt == "double" || lt == "groove" || lt == "ridge" ||
-          lt == "inset" || lt == "outset") {
-        warn("html: border style '" + lt + "' not supported; treated as solid");
-        continue;
-      }
-      box.borderColor = parseColor(t);
-    }
-    box.borderSet = box.borderWidthPx > 0;
-  }
-
-  box.boxShadow = LookupProperty(props, "box-shadow");
-  box.filter = LookupProperty(props, "filter");
-  box.backdropFilter = LookupProperty(props, "backdrop-filter");
-
-  const std::string& op = LookupProperty(props, "opacity");
-  if (!op.empty()) {
-    char* end = nullptr;
-    float v = std::strtof(op.c_str(), &end);
-    if (end != op.c_str()) {
-      box.opacity = std::max(0.0f, std::min(1.0f, v));
-      box.opacitySet = true;
-    }
-  }
-  box.mixBlendMode = ToLower(Trim(LookupProperty(props, "mix-blend-mode")));
-
-  std::string overflow = ToLower(Trim(LookupProperty(props, "overflow")));
-  if (overflow == "hidden") {
-    box.clipOverflow = true;
-  } else if (!overflow.empty() && overflow != "visible") {
-    warn("html: overflow: " + overflow + " not fully supported");
-  }
-}
-
-//==================================================================================================
-// Layer attribute application (m3 / m5 milestones extend these)
-//==================================================================================================
-
-void HTMLParserContext::applySizeAndPosition(Layer* layer, const HTMLBoxAttributes& box) {
-  if (!std::isnan(box.widthPx)) layer->width = box.widthPx;
-  if (!std::isnan(box.heightPx)) layer->height = box.heightPx;
-  if (!std::isnan(box.widthPct)) layer->percentWidth = box.widthPct;
-  if (!std::isnan(box.heightPct)) layer->percentHeight = box.heightPct;
-  if (box.absolute) {
-    layer->includeInLayout = false;
-    if (!std::isnan(box.leftPx)) layer->left = box.leftPx;
-    if (!std::isnan(box.rightPx)) layer->right = box.rightPx;
-    if (!std::isnan(box.topPx)) layer->top = box.topPx;
-    if (!std::isnan(box.bottomPx)) layer->bottom = box.bottomPx;
-  }
-  // `flex` is an "as-a-child" property; apply it on the outermost Layer regardless of
-  // whether this Layer is a container, leaf, or image.
-  if (box.flexGrowSet) {
-    layer->flex = box.flexGrow;
-  }
-}
-
-void HTMLParserContext::applyLayoutAttributes(Layer* layer, const HTMLBoxAttributes& box) {
-  if (box.displayFlex) {
-    layer->layout = box.flexRow ? LayoutMode::Horizontal : LayoutMode::Vertical;
-  }
-  if (box.gapSet) layer->gap = box.gapPx;
-  if (box.paddingSet) layer->padding = box.padding;
-  if (!box.alignItems.empty()) {
-    const std::string& a = box.alignItems;
-    if (a == "stretch") layer->alignment = Alignment::Stretch;
-    else if (a == "center")
-      layer->alignment = Alignment::Center;
-    else if (a == "flex-start" || a == "start")
-      layer->alignment = Alignment::Start;
-    else if (a == "flex-end" || a == "end")
-      layer->alignment = Alignment::End;
-    else
-      warn("html: unsupported align-items '" + a + "'");
-  }
-  if (!box.justifyContent.empty()) {
-    const std::string& j = box.justifyContent;
-    if (j == "flex-start" || j == "start") layer->arrangement = Arrangement::Start;
-    else if (j == "center")
-      layer->arrangement = Arrangement::Center;
-    else if (j == "flex-end" || j == "end")
-      layer->arrangement = Arrangement::End;
-    else if (j == "space-between")
-      layer->arrangement = Arrangement::SpaceBetween;
-    else if (j == "space-evenly")
-      layer->arrangement = Arrangement::SpaceEvenly;
-    else if (j == "space-around")
-      layer->arrangement = Arrangement::SpaceAround;
-    else
-      warn("html: unsupported justify-content '" + j + "'");
-  }
-}
-
-bool HTMLParserContext::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttributes& box,
-                                               bool addRectangle) {
-  bool emitted = false;
-  Rectangle* rect = nullptr;
-  if (addRectangle && (box.backgroundColorSet || !box.backgroundImage.empty() ||
-                       box.borderRadiusSet || box.borderSet)) {
-    rect = _document->makeNode<Rectangle>();
-    rect->percentWidth = 100.0f;
-    rect->percentHeight = 100.0f;
-    rect->roundness = box.borderRadiusSet ? box.borderRadiusPx : 0.0f;
-    layer->contents.push_back(rect);
-    emitted = true;
-  }
-
-  // Background colour / gradient.
-  if (rect && box.backgroundColorSet && box.backgroundImage.empty()) {
-    layer->contents.push_back(buildSolidFill(box.backgroundColor));
-    emitted = true;
-  } else if (rect && !box.backgroundImage.empty()) {
-    auto fill = _document->makeNode<Fill>();
-    std::string bg = Trim(box.backgroundImage);
-    std::string lower = ToLower(bg);
-    if (lower.compare(0, 16, "linear-gradient(") == 0) {
-      fill->color = parseLinearGradient(bg);
-    } else if (lower.compare(0, 16, "radial-gradient(") == 0) {
-      fill->color = parseRadialGradient(bg);
-    } else if (lower.compare(0, 15, "conic-gradient(") == 0) {
-      fill->color = parseConicGradient(bg);
-    } else if (lower.compare(0, 4, "url(") == 0) {
-      warn("html: background-image: url(...) not supported; use <img>");
-    } else {
-      warn("html: background-image '" + bg + "' not supported");
-    }
-    if (!fill->color && box.backgroundColorSet) {
-      auto solid = _document->makeNode<SolidColor>();
-      solid->color = box.backgroundColor;
-      fill->color = solid;
-    }
-    if (fill->color) {
-      layer->contents.push_back(fill);
-      emitted = true;
-    }
-  }
-
-  // Border.
-  if (rect && box.borderSet) {
-    auto stroke = _document->makeNode<Stroke>();
-    auto solid = _document->makeNode<SolidColor>();
-    solid->color = box.borderColor;
-    stroke->color = solid;
-    stroke->width = box.borderWidthPx;
-    stroke->align = StrokeAlign::Inside;
-    layer->contents.push_back(stroke);
-    emitted = true;
-  }
-
-  // box-shadow → DropShadowStyle / InnerShadowStyle list.
-  if (!box.boxShadow.empty()) {
-    auto shadows = parseShadowList(box.boxShadow);
-    for (auto& s : shadows) {
-      if (s.inset) {
-        auto inner = _document->makeNode<InnerShadowStyle>();
-        inner->offsetX = s.offsetX;
-        inner->offsetY = s.offsetY;
-        inner->blurX = s.blur;
-        inner->blurY = s.blur;
-        inner->color = s.color;
-        layer->styles.push_back(inner);
-      } else {
-        auto drop = _document->makeNode<DropShadowStyle>();
-        drop->offsetX = s.offsetX;
-        drop->offsetY = s.offsetY;
-        drop->blurX = s.blur;
-        drop->blurY = s.blur;
-        drop->color = s.color;
-        layer->styles.push_back(drop);
-      }
-    }
-    if (!shadows.empty()) emitted = true;
-  }
-
-  // backdrop-filter: blur(...) → BackgroundBlurStyle.
-  if (!box.backdropFilter.empty()) {
-    auto steps = parseFilterChain(box.backdropFilter);
-    for (auto& step : steps) {
-      if (step.kind == FilterStep::Kind::Blur) {
-        auto bg = _document->makeNode<BackgroundBlurStyle>();
-        bg->blurX = step.blurX;
-        bg->blurY = step.blurY;
-        layer->styles.push_back(bg);
-        emitted = true;
-      } else {
-        warn("html: backdrop-filter '" + step.raw + "' not supported");
-      }
-    }
-  }
-
-  return emitted;
-}
-
-void HTMLParserContext::applyLayerAttributes(Layer* layer, const std::shared_ptr<DOMNode>& element,
-                                             const HTMLBoxAttributes& box) {
-  if (box.opacitySet) layer->alpha = box.opacity;
-  if (!box.mixBlendMode.empty()) {
-    BlendMode mode = BlendModeFromString(box.mixBlendMode);
-    layer->blendMode = mode;
-  }
-  if (box.clipOverflow) layer->clipToBounds = true;
-
-  // filter chain (excluding backdrop-filter, which is handled as a Layer style).
-  if (!box.filter.empty()) {
-    auto steps = parseFilterChain(box.filter);
-    for (auto& step : steps) {
-      if (step.kind == FilterStep::Kind::Blur) {
-        auto blur = _document->makeNode<BlurFilter>();
-        blur->blurX = step.blurX;
-        blur->blurY = step.blurY;
-        layer->filters.push_back(blur);
-      } else if (step.kind == FilterStep::Kind::DropShadow) {
-        auto drop = _document->makeNode<DropShadowFilter>();
-        drop->offsetX = step.shadow.offsetX;
-        drop->offsetY = step.shadow.offsetY;
-        drop->blurX = step.shadow.blur;
-        drop->blurY = step.shadow.blur;
-        drop->color = step.shadow.color;
-        layer->filters.push_back(drop);
-      } else {
-        warn("html: filter '" + step.raw + "' not supported");
-      }
-    }
-  }
-
-  // data-* attributes -> customData
-  for (const auto& attr : element->attributes) {
-    if (attr.name.compare(0, 5, "data-") == 0) {
-      std::string key = attr.name.substr(5);
-      if (IsValidCustomDataKey(key)) {
-        layer->customData[key] = attr.value;
-      } else {
-        warn("html: invalid data-* attribute name '" + attr.name + "'");
-      }
-    }
-  }
-  // href on <a>
-  if (element->name == "a") {
-    auto* href = element->findAttribute("href");
-    if (href && !href->empty() && IsValidCustomDataKey("href")) {
-      layer->customData["href"] = *href;
-    }
-  }
-}
-
-//==================================================================================================
-// Value parsing
-//==================================================================================================
-
-Color HTMLParserContext::parseColor(const std::string& valueRaw) {
-  std::string value = Trim(valueRaw);
-  if (value.empty() || ToLower(value) == "none" || ToLower(value) == "transparent") {
-    return {0, 0, 0, 0, ColorSpace::SRGB};
-  }
-  if (value[0] == '#') {
-    Color color = {};
-    color.colorSpace = ColorSpace::SRGB;
-    uint32_t hex = 0;
-    if (value.length() == 4) {
-      char r = value[1], g = value[2], b = value[3];
-      char expanded[7] = {r, r, g, g, b, b, '\0'};
-      hex = std::strtoul(expanded, nullptr, 16);
-      color.red = static_cast<float>((hex >> 16) & 0xFF) / 255.0f;
-      color.green = static_cast<float>((hex >> 8) & 0xFF) / 255.0f;
-      color.blue = static_cast<float>(hex & 0xFF) / 255.0f;
-      color.alpha = 1.0f;
-      return color;
-    }
-    if (value.length() == 5) {
-      char r = value[1], g = value[2], b = value[3], a = value[4];
-      char expanded[9] = {r, r, g, g, b, b, a, a, '\0'};
-      hex = std::strtoul(expanded, nullptr, 16);
-      color.red = static_cast<float>((hex >> 24) & 0xFF) / 255.0f;
-      color.green = static_cast<float>((hex >> 16) & 0xFF) / 255.0f;
-      color.blue = static_cast<float>((hex >> 8) & 0xFF) / 255.0f;
-      color.alpha = static_cast<float>(hex & 0xFF) / 255.0f;
-      return color;
-    }
-    if (value.length() == 7) {
-      hex = std::strtoul(value.c_str() + 1, nullptr, 16);
-      color.red = static_cast<float>((hex >> 16) & 0xFF) / 255.0f;
-      color.green = static_cast<float>((hex >> 8) & 0xFF) / 255.0f;
-      color.blue = static_cast<float>(hex & 0xFF) / 255.0f;
-      color.alpha = 1.0f;
-      return color;
-    }
-    if (value.length() == 9) {
-      hex = std::strtoul(value.c_str() + 1, nullptr, 16);
-      color.red = static_cast<float>((hex >> 24) & 0xFF) / 255.0f;
-      color.green = static_cast<float>((hex >> 16) & 0xFF) / 255.0f;
-      color.blue = static_cast<float>((hex >> 8) & 0xFF) / 255.0f;
-      color.alpha = static_cast<float>(hex & 0xFF) / 255.0f;
-      return color;
-    }
-  }
-  if (value.compare(0, 3, "rgb") == 0) {
-    auto open = value.find('(');
-    auto close = value.find(')');
-    if (open != std::string::npos && close != std::string::npos) {
-      std::string inner = value.substr(open + 1, close - open - 1);
-      auto comps = ParseFloatList(inner);
-      Color color = {};
-      color.colorSpace = ColorSpace::SRGB;
-      float r = 0, g = 0, b = 0, a = 1.0f;
-      if (comps.size() >= 3) {
-        r = comps[0];
-        g = comps[1];
-        b = comps[2];
-        if (comps.size() >= 4) a = comps[3];
-      }
-      color.red = r / 255.0f;
-      color.green = g / 255.0f;
-      color.blue = b / 255.0f;
-      color.alpha = a;
-      return color;
-    }
-  }
-  // Named color
-  std::string lowered = ToLower(value);
-  const auto& named = NamedColors();
-  auto it = named.find(lowered);
-  if (it != named.end()) {
-    uint32_t hex = it->second;
-    Color color = {};
-    color.red = static_cast<float>((hex >> 16) & 0xFF) / 255.0f;
-    color.green = static_cast<float>((hex >> 8) & 0xFF) / 255.0f;
-    color.blue = static_cast<float>(hex & 0xFF) / 255.0f;
-    color.alpha = 1.0f;
-    color.colorSpace = ColorSpace::SRGB;
-    return color;
-  }
-  return {0, 0, 0, 1, ColorSpace::SRGB};
-}
-
-float HTMLParserContext::parsePxLength(const std::string& valueRaw) {
-  std::string value = Trim(valueRaw);
-  if (value.empty()) return NAN;
-  char* end = nullptr;
-  float num = std::strtof(value.c_str(), &end);
-  if (end == value.c_str()) return NAN;
-  std::string suffix = Trim(end);
-  if (suffix.empty() || suffix == "px") return num;
-  if (suffix == "%") {
-    return NAN;  // percent not allowed for properties parsed via parsePxLength
-  }
-  if (suffix == "em" || suffix == "rem") {
-    warn("html: em/rem unit not supported; treated as 16px");
-    return num * 16.0f;
-  }
-  warn("html: length unit '" + suffix + "' not supported; treated as px");
-  return num;
-}
-
-std::vector<HTMLParserContext::ShadowSpec> HTMLParserContext::parseShadowList(
-    const std::string& value) {
-  std::vector<ShadowSpec> out;
-  if (value.empty()) return out;
-  auto items = SplitTopLevelCommas(value);
-  for (auto& item : items) {
-    auto tokens = SplitTopLevelWhitespace(item);
-    if (tokens.empty()) continue;
-    ShadowSpec s;
-    std::vector<float> lengths;
-    std::vector<std::string> nonLengths;
-    for (auto& t : tokens) {
-      std::string lt = ToLower(t);
-      if (lt == "inset") {
-        s.inset = true;
-        continue;
-      }
-      // try as length
-      char* end = nullptr;
-      float num = std::strtof(t.c_str(), &end);
-      if (end != t.c_str()) {
-        std::string suffix = Trim(end);
-        if (suffix.empty() || suffix == "px") {
-          lengths.push_back(num);
-          continue;
-        }
-      }
-      nonLengths.push_back(t);
-    }
-    if (lengths.size() >= 2) {
-      s.offsetX = lengths[0];
-      s.offsetY = lengths[1];
-      if (lengths.size() >= 3) s.blur = lengths[2];
-      if (lengths.size() >= 4) {
-        s.spread = lengths[3];
-        if (s.spread != 0) warn("html: box-shadow spread is not supported and was ignored");
-      }
-    } else {
-      warn("html: malformed box-shadow '" + item + "'");
-      continue;
-    }
-    if (!nonLengths.empty()) {
-      // Join color tokens back (handles rgb(...) etc.).
-      std::string colorStr;
-      for (size_t i = 0; i < nonLengths.size(); i++) {
-        if (i) colorStr.push_back(' ');
-        colorStr += nonLengths[i];
-      }
-      s.color = parseColor(colorStr);
-    } else {
-      s.color = {0, 0, 0, 1.0f, ColorSpace::SRGB};
-    }
-    out.push_back(s);
-  }
-  return out;
-}
-
-std::vector<HTMLParserContext::FilterStep> HTMLParserContext::parseFilterChain(
-    const std::string& value) {
-  std::vector<FilterStep> out;
-  if (value.empty()) return out;
-  size_t pos = 0;
-  while (pos < value.size()) {
-    while (pos < value.size() && std::isspace(static_cast<unsigned char>(value[pos]))) pos++;
-    if (pos >= value.size()) break;
-    size_t start = pos;
-    size_t paren = value.find('(', pos);
-    if (paren == std::string::npos) break;
-    std::string name = ToLower(Trim(value.substr(start, paren - start)));
-    int depth = 1;
-    size_t end = paren + 1;
-    while (end < value.size() && depth > 0) {
-      if (value[end] == '(') depth++;
-      else if (value[end] == ')')
-        depth--;
-      if (depth > 0) end++;
-    }
-    if (end >= value.size()) break;
-    std::string args = value.substr(paren + 1, end - paren - 1);
-    FilterStep step;
-    step.raw = value.substr(start, end - start + 1);
-    if (name == "blur") {
-      float b = parsePxLength(args);
-      step.kind = FilterStep::Kind::Blur;
-      step.blurX = std::isnan(b) ? 0 : b;
-      step.blurY = step.blurX;
-    } else if (name == "drop-shadow") {
-      step.kind = FilterStep::Kind::DropShadow;
-      auto shadows = parseShadowList(args);
-      if (!shadows.empty()) {
-        step.shadow = shadows.front();
-      }
-    } else {
-      step.kind = FilterStep::Kind::Unsupported;
-    }
-    out.push_back(step);
-    pos = end + 1;
-  }
-  return out;
-}
-
-namespace {
-
-// Convert CSS keyword direction ("to bottom right", etc.) to a CSS angle in degrees.
-float CssDirectionToAngle(const std::string& kw) {
-  std::string s = ToLower(Trim(kw));
-  if (s.compare(0, 3, "to ") != 0) return 180.0f;
-  s = Trim(s.substr(3));
-  if (s == "top") return 0.0f;
-  if (s == "right") return 90.0f;
-  if (s == "bottom") return 180.0f;
-  if (s == "left") return 270.0f;
-  if (s == "top right" || s == "right top") return 45.0f;
-  if (s == "bottom right" || s == "right bottom") return 135.0f;
-  if (s == "bottom left" || s == "left bottom") return 225.0f;
-  if (s == "top left" || s == "left top") return 315.0f;
-  return 180.0f;
-}
-
-// Pull the bracketed args of a function-like CSS value: "linear-gradient(a, b, c)" -> "a, b, c".
-std::string ExtractParenArgs(const std::string& value) {
-  auto open = value.find('(');
-  auto close = value.rfind(')');
-  if (open == std::string::npos || close == std::string::npos || close <= open) return {};
-  return value.substr(open + 1, close - open - 1);
-}
-
-}  // namespace
-
-LinearGradient* HTMLParserContext::parseLinearGradient(const std::string& value) {
-  std::string args = ExtractParenArgs(value);
-  if (args.empty()) return nullptr;
-  auto parts = SplitTopLevelCommas(args);
-  if (parts.size() < 2) return nullptr;
-  float cssAngle = 180.0f;  // CSS default: to bottom
-  size_t stopStart = 0;
-  std::string first = Trim(parts[0]);
-  std::string firstLower = ToLower(first);
-  if (firstLower.compare(0, 3, "to ") == 0) {
-    cssAngle = CssDirectionToAngle(firstLower);
-    stopStart = 1;
-  } else if (firstLower.find("deg") != std::string::npos ||
-             firstLower.find("rad") != std::string::npos ||
-             firstLower.find("turn") != std::string::npos) {
-    cssAngle = ParseAngle(first);
-    stopStart = 1;
-  }
-  GradientStops stops = parseGradientStops(parts, stopStart, /*interpretAngularOffset=*/false);
-  if (!finaliseGradientStops(stops)) return nullptr;
-
-  auto grad = _document->makeNode<LinearGradient>();
-  float angle = CssToPagxAngle(cssAngle) * 3.14159265358979323846f / 180.0f;
-  float cx = 0.5f, cy = 0.5f;
-  float half = 0.5f;
-  grad->startPoint = {cx - std::cos(angle) * half, cy - std::sin(angle) * half};
-  grad->endPoint = {cx + std::cos(angle) * half, cy + std::sin(angle) * half};
-  emitColorStops(grad->colorStops, stops);
-  return grad;
-}
-
-RadialGradient* HTMLParserContext::parseRadialGradient(const std::string& value) {
-  std::string args = ExtractParenArgs(value);
-  if (args.empty()) return nullptr;
-  auto parts = SplitTopLevelCommas(args);
-  if (parts.size() < 2) return nullptr;
-  size_t stopStart = 0;
-  // Allow leading shape descriptor like "circle at center", "ellipse 50% 50%", etc.
-  std::string first = ToLower(Trim(parts[0]));
-  if (first.find("circle") != std::string::npos || first.find("ellipse") != std::string::npos ||
-      first.find("at") != std::string::npos) {
-    stopStart = 1;
-  }
-  GradientStops stops = parseGradientStops(parts, stopStart, /*interpretAngularOffset=*/false);
-  if (!finaliseGradientStops(stops)) return nullptr;
-
-  auto grad = _document->makeNode<RadialGradient>();
-  grad->center = {0.5f, 0.5f};
-  grad->radius = 0.5f;
-  emitColorStops(grad->colorStops, stops);
-  return grad;
-}
-
-ConicGradient* HTMLParserContext::parseConicGradient(const std::string& value) {
-  std::string args = ExtractParenArgs(value);
-  if (args.empty()) return nullptr;
-  auto parts = SplitTopLevelCommas(args);
-  if (parts.size() < 2) return nullptr;
-  size_t stopStart = 0;
-  float cssAngle = 0.0f;
-  std::string first = ToLower(Trim(parts[0]));
-  if (first.compare(0, 5, "from ") == 0) {
-    cssAngle = ParseAngle(first.substr(5));
-    stopStart = 1;
-  }
-  GradientStops stops = parseGradientStops(parts, stopStart, /*interpretAngularOffset=*/true);
-  if (!finaliseGradientStops(stops)) return nullptr;
-
-  auto grad = _document->makeNode<ConicGradient>();
-  grad->center = {0.5f, 0.5f};
-  grad->startAngle = CssToPagxAngle(cssAngle);
-  grad->endAngle = grad->startAngle + 360.0f;
-  emitColorStops(grad->colorStops, stops);
-  return grad;
-}
-
-HTMLParserContext::GradientStops HTMLParserContext::parseGradientStops(
-    const std::vector<std::string>& parts, size_t startIndex, bool interpretAngularOffset) {
-  GradientStops stops;
-  for (size_t i = startIndex; i < parts.size(); i++) {
-    auto tokens = SplitTopLevelWhitespace(parts[i]);
-    if (tokens.empty()) continue;
-    Color color = parseColor(tokens[0]);
-    float offset = NAN;
-    if (tokens.size() >= 2) {
-      const std::string& off = tokens[1];
-      if (!off.empty() && off.back() == '%') {
-        offset = std::strtof(off.c_str(), nullptr) / 100.0f;
-      } else if (interpretAngularOffset && !off.empty() && off.find("deg") != std::string::npos) {
-        offset = ParseAngle(off) / 360.0f;
-      } else if (!interpretAngularOffset) {
-        float v = parsePxLength(off);
-        if (!std::isnan(v)) offset = v;
-      }
-    }
-    stops.emplace_back(offset, color);
-  }
-  return stops;
-}
-
-bool HTMLParserContext::finaliseGradientStops(GradientStops& stops) {
-  if (stops.empty()) return false;
-  if (std::isnan(stops.front().first)) stops.front().first = 0.0f;
-  if (std::isnan(stops.back().first)) stops.back().first = 1.0f;
-  for (size_t i = 1; i + 1 < stops.size(); i++) {
-    if (std::isnan(stops[i].first)) {
-      // Linear interpolation between bracketing known stops.
-      size_t prev = i - 1;
-      size_t next = i + 1;
-      while (next < stops.size() && std::isnan(stops[next].first)) next++;
-      if (next < stops.size()) {
-        float span = stops[next].first - stops[prev].first;
-        float steps = static_cast<float>(next - prev);
-        stops[i].first = stops[prev].first + span * 1.0f / steps;
-      } else {
-        stops[i].first = 1.0f;
-      }
-    }
-  }
-  return true;
-}
-
-template <typename T>
-void HTMLParserContext::emitColorStops(T& targetStops, const GradientStops& stops) {
-  for (const auto& [offset, color] : stops) {
-    auto stop = _document->makeNode<ColorStop>();
-    stop->offset = offset;
-    stop->color = color;
-    targetStops.push_back(stop);
-  }
-}
-
-//==================================================================================================
-// Image resource registration
-//==================================================================================================
-
-Image* HTMLParserContext::registerImageResource(const std::string& imageSource) {
-  if (imageSource.empty()) return nullptr;
-  auto it = _imageSourceToId.find(imageSource);
-  if (it != _imageSourceToId.end()) return it->second;
-  auto imageNode = _document->makeNode<Image>();
-  imageNode->id = generateUniqueId("image");
-  imageNode->filePath = imageSource;
-  _imageSourceToId[imageSource] = imageNode;
-  return imageNode;
-}
-
-//==================================================================================================
-// Inline SVG serialisation
-//==================================================================================================
-
-namespace {
-
-void SerializeNode(std::string& out, const std::shared_ptr<DOMNode>& node) {
-  if (!node) return;
-  if (node->type == DOMNodeType::Text) {
-    out += EscapeXml(node->name, /*isAttribute=*/false);
-    return;
-  }
-  out.push_back('<');
-  out += node->name;
-  for (const auto& attr : node->attributes) {
-    out.push_back(' ');
-    out += attr.name;
-    out += "=\"";
-    out += EscapeXml(attr.value, /*isAttribute=*/true);
-    out.push_back('"');
-  }
-  if (!node->firstChild) {
-    out += "/>";
-    return;
-  }
-  out.push_back('>');
-  auto child = node->firstChild;
-  while (child) {
-    SerializeNode(out, child);
-    child = child->nextSibling;
-  }
-  out += "</";
-  out += node->name;
-  out.push_back('>');
-}
-
-}  // namespace
-
-std::string HTMLParserContext::serializeSvg(const std::shared_ptr<DOMNode>& svgNode) {
-  std::string out;
-  SerializeNode(out, svgNode);
-  return out;
 }
 
 }  // namespace pagx

@@ -1,0 +1,389 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include <algorithm>
+#include <cctype>
+#include <cmath>
+#include <cstdlib>
+#include "pagx/html/HTMLParserContext.h"
+
+namespace pagx {
+
+using namespace pagx::detail;
+
+namespace {
+
+// Reads `props[key]` (when present) into `slot`. Hoisted out of computeInherited to
+// keep with the project rule banning lambdas.
+void TakeProp(const std::unordered_map<std::string, std::string>& props, const std::string& key,
+              std::string& slot) {
+  auto it = props.find(key);
+  if (it != props.end()) slot = it->second;
+}
+
+}  // namespace
+
+void HTMLParserContext::collectStyles(const std::shared_ptr<DOMNode>& head) {
+  auto child = head->getFirstChild();
+  while (child) {
+    if (child->type == DOMNodeType::Element && child->name == "style") {
+      parseStyleBlock(child);
+    }
+    child = child->getNextSibling();
+  }
+}
+
+void HTMLParserContext::parseStyleBlock(const std::shared_ptr<DOMNode>& styleNode) {
+  // The text content is stored as a child Text node whose `name` field carries the text.
+  auto textChild = styleNode->getFirstChild();
+  if (!textChild || textChild->type != DOMNodeType::Text) {
+    return;
+  }
+  const std::string& css = textChild->name;
+
+  size_t pos = 0;
+  while (pos < css.size()) {
+    while (pos < css.size() && std::isspace(static_cast<unsigned char>(css[pos]))) {
+      pos++;
+    }
+    if (pos >= css.size()) break;
+    if (pos + 1 < css.size() && css[pos] == '/' && css[pos + 1] == '*') {
+      auto commentEnd = css.find("*/", pos + 2);
+      pos = (commentEnd == std::string::npos) ? css.size() : commentEnd + 2;
+      continue;
+    }
+    size_t bracePos = css.find('{', pos);
+    if (bracePos == std::string::npos) break;
+    std::string selectorStr = Trim(css.substr(pos, bracePos - pos));
+    size_t closePos = css.find('}', bracePos);
+    if (closePos == std::string::npos) break;
+    std::string body = Trim(css.substr(bracePos + 1, closePos - bracePos - 1));
+    if (selectorStr.empty() || body.empty()) {
+      pos = closePos + 1;
+      continue;
+    }
+
+    auto selectors = SplitTopLevelCommas(selectorStr);
+    for (auto& sel : selectors) {
+      sel = Trim(sel);
+      if (sel.empty()) continue;
+      if (sel[0] == '.') {
+        std::string cls = sel.substr(1);
+        if (cls.find_first_of(" \t.>+~:[#") == std::string::npos) {
+          auto& slot = _cssClassRules[cls];
+          slot = slot.empty() ? body : (slot + ";" + body);
+          continue;
+        }
+      }
+      // Element selector (lower-case ascii letters / digits only, e.g. body, h1, p).
+      bool allowed = !sel.empty();
+      for (char c : sel) {
+        if (!std::isalnum(static_cast<unsigned char>(c))) {
+          allowed = false;
+          break;
+        }
+      }
+      if (allowed) {
+        std::string lowered = ToLower(sel);
+        auto& slot = _cssElementRules[lowered];
+        slot = slot.empty() ? body : (slot + ";" + body);
+        continue;
+      }
+      warn("html: unsupported selector '" + sel + "' in <style>; declarations dropped");
+    }
+    pos = closePos + 1;
+  }
+}
+
+void HTMLParserContext::mergeClassRules(const std::string& classAttribute,
+                                        std::unordered_map<std::string, std::string>& out) {
+  size_t p = 0;
+  const auto& s = classAttribute;
+  while (p < s.size()) {
+    while (p < s.size() && std::isspace(static_cast<unsigned char>(s[p]))) p++;
+    if (p >= s.size()) break;
+    size_t e = p;
+    while (e < s.size() && !std::isspace(static_cast<unsigned char>(s[e]))) e++;
+    auto it = _cssClassRules.find(s.substr(p, e - p));
+    if (it != _cssClassRules.end()) {
+      ParseStyleString(it->second, out);
+    }
+    p = e;
+  }
+}
+
+const std::unordered_map<std::string, std::string>& HTMLParserContext::getResolvedStyle(
+    const std::shared_ptr<DOMNode>& node) {
+  auto it = _stylePropertiesCache.find(node.get());
+  if (it != _stylePropertiesCache.end()) {
+    return it->second;
+  }
+  auto& slot = _stylePropertiesCache[node.get()];
+
+  // Priority: element defaults -> element rules from <style> -> class rules -> inline.
+  const auto& tagDefaults = ElementDefaults();
+  auto tagIt = tagDefaults.find(node->name);
+  if (tagIt != tagDefaults.end()) {
+    ParseStyleString(tagIt->second, slot);
+  }
+  auto elemRuleIt = _cssElementRules.find(node->name);
+  if (elemRuleIt != _cssElementRules.end()) {
+    ParseStyleString(elemRuleIt->second, slot);
+  }
+  auto* classAttr = node->findAttribute("class");
+  if (classAttr) {
+    mergeClassRules(*classAttr, slot);
+  }
+  auto* styleAttr = node->findAttribute("style");
+  if (styleAttr) {
+    ParseStyleString(*styleAttr, slot);
+  }
+  return slot;
+}
+
+std::string HTMLParserContext::getStyleProperty(const std::shared_ptr<DOMNode>& node,
+                                                const std::string& property,
+                                                const std::string& fallback) {
+  const auto& props = getResolvedStyle(node);
+  auto it = props.find(property);
+  if (it != props.end()) return it->second;
+  return fallback;
+}
+
+HTMLInheritedStyle HTMLParserContext::computeInherited(const std::shared_ptr<DOMNode>& element,
+                                                       const HTMLInheritedStyle& parent) {
+  HTMLInheritedStyle out = parent;
+  const auto& props = getResolvedStyle(element);
+  TakeProp(props, "color", out.color);
+  TakeProp(props, "font-family", out.fontFamily);
+  TakeProp(props, "font-size", out.fontSize);
+  TakeProp(props, "font-weight", out.fontWeight);
+  TakeProp(props, "font-style", out.fontStyle);
+  TakeProp(props, "letter-spacing", out.letterSpacing);
+  TakeProp(props, "line-height", out.lineHeight);
+  TakeProp(props, "text-align", out.textAlign);
+  TakeProp(props, "text-decoration", out.textDecoration);
+  TakeProp(props, "white-space", out.whiteSpace);
+  // Compute combined font-style label used by PAGX Text.
+  bool isBold = false;
+  if (!out.fontWeight.empty()) {
+    std::string w = ToLower(Trim(out.fontWeight));
+    if (w == "bold" || w == "bolder") isBold = true;
+    if (!isBold) {
+      char* end = nullptr;
+      long n = std::strtol(w.c_str(), &end, 10);
+      if (end != w.c_str() && n >= 600) isBold = true;
+    }
+  }
+  bool isItalic = false;
+  if (!out.fontStyle.empty()) {
+    std::string fs = ToLower(Trim(out.fontStyle));
+    if (fs == "italic" || fs == "oblique") isItalic = true;
+  }
+  out.fontStyleName.clear();
+  if (isBold && isItalic) {
+    out.fontStyleName = "Bold Italic";
+  } else if (isBold) {
+    out.fontStyleName = "Bold";
+  } else if (isItalic) {
+    out.fontStyleName = "Italic";
+  }
+  return out;
+}
+
+HTMLBoxAttributes HTMLParserContext::resolveBox(const std::shared_ptr<DOMNode>& element) {
+  HTMLBoxAttributes box = {};
+  const auto& props = getResolvedStyle(element);
+  parseBoxSizing(box, props);
+  parseBoxPositioning(box, props);
+  parseBoxLayout(box, props);
+  parseBoxVisuals(box, props);
+  return box;
+}
+
+void HTMLParserContext::parseBoxSizing(HTMLBoxAttributes& box,
+                                       const std::unordered_map<std::string, std::string>& props) {
+  ParseSizingDimension(LookupProperty(props, "width"), box.widthPx, box.widthPct);
+  ParseSizingDimension(LookupProperty(props, "height"), box.heightPx, box.heightPct);
+}
+
+void HTMLParserContext::parseBoxPositioning(
+    HTMLBoxAttributes& box, const std::unordered_map<std::string, std::string>& props) {
+  std::string pos = LookupLowerTrimmed(props, "position");
+  if (pos == "absolute") {
+    box.absolute = true;
+  } else if (!pos.empty() && pos != "static") {
+    warn("html: position: " + pos + " not supported; downgraded to absolute");
+    box.absolute = true;
+  }
+  if (!box.absolute) return;
+  const std::string& left = LookupProperty(props, "left");
+  if (!left.empty()) box.leftPx = parsePxLength(left);
+  const std::string& right = LookupProperty(props, "right");
+  if (!right.empty()) box.rightPx = parsePxLength(right);
+  const std::string& top = LookupProperty(props, "top");
+  if (!top.empty()) box.topPx = parsePxLength(top);
+  const std::string& bottom = LookupProperty(props, "bottom");
+  if (!bottom.empty()) box.bottomPx = parsePxLength(bottom);
+}
+
+void HTMLParserContext::parseBoxLayout(HTMLBoxAttributes& box,
+                                       const std::unordered_map<std::string, std::string>& props) {
+  std::string disp = LookupLowerTrimmed(props, "display");
+  if (disp == "flex") {
+    box.displayFlex = true;
+  } else if (!disp.empty() && disp != "block" && disp != "inline" && disp != "inline-block") {
+    warn("html: display: " + disp + " not supported; ignored");
+  } else if (disp == "inline-block") {
+    warn("html: display: inline-block not supported; treated as block");
+  }
+  std::string fd = LookupLowerTrimmed(props, "flex-direction");
+  if (fd == "column" || fd == "column-reverse") {
+    box.flexRow = false;
+    if (fd == "column-reverse") warn("html: flex-direction: column-reverse not supported");
+  } else if (fd == "row-reverse") {
+    warn("html: flex-direction: row-reverse not supported");
+  }
+  const std::string& gap = LookupProperty(props, "gap");
+  if (!gap.empty()) {
+    box.gapPx = parsePxLength(gap);
+    box.gapSet = !std::isnan(box.gapPx);
+    if (!box.gapSet) box.gapPx = 0;
+  }
+  const std::string& padding = LookupProperty(props, "padding");
+  if (!padding.empty()) {
+    auto tokens = SplitTopLevelWhitespace(padding);
+    std::vector<float> nums;
+    for (auto& t : tokens) {
+      float v = parsePxLength(t);
+      if (std::isnan(v)) {
+        warn("html: invalid padding token '" + t + "'");
+        continue;
+      }
+      nums.push_back(v);
+    }
+    box.padding = BuildPaddingShorthand(nums);
+    box.paddingSet = !nums.empty();
+  }
+  std::string ai = LookupLowerTrimmed(props, "align-items");
+  if (!ai.empty()) box.alignItems = ai;
+  std::string jc = LookupLowerTrimmed(props, "justify-content");
+  if (!jc.empty()) box.justifyContent = jc;
+  const std::string& flex = LookupProperty(props, "flex");
+  if (!flex.empty()) {
+    char* end = nullptr;
+    float v = std::strtof(flex.c_str(), &end);
+    if (end != flex.c_str()) {
+      box.flexGrow = v;
+      box.flexGrowSet = true;
+    } else {
+      warn("html: flex shorthand '" + flex + "' not supported beyond 'flex: N'");
+    }
+  }
+  if (!LookupProperty(props, "flex-wrap").empty()) {
+    warn("html: flex-wrap not supported; ignored");
+  }
+  if (!LookupProperty(props, "margin").empty()) {
+    warn("html: margin not supported; use padding/gap/flex");
+  }
+  if (!LookupProperty(props, "margin-top").empty()) warn("html: margin-top not supported");
+  if (!LookupProperty(props, "margin-right").empty()) warn("html: margin-right not supported");
+  if (!LookupProperty(props, "margin-bottom").empty()) warn("html: margin-bottom not supported");
+  if (!LookupProperty(props, "margin-left").empty()) warn("html: margin-left not supported");
+  if (!LookupProperty(props, "grid-template-columns").empty()) {
+    warn("html: grid layout not supported");
+  }
+  if (!LookupProperty(props, "transform").empty()) warn("html: transform not supported");
+}
+
+void HTMLParserContext::parseBoxVisuals(HTMLBoxAttributes& box,
+                                        const std::unordered_map<std::string, std::string>& props) {
+  std::string bgColor = LookupProperty(props, "background-color");
+  if (bgColor.empty()) {
+    bgColor = LookupProperty(props, "background");  // accept shorthand if it's color-only
+  }
+  if (!bgColor.empty() && bgColor.find('(') == std::string::npos &&
+      bgColor.find("gradient") == std::string::npos && bgColor.find("url") == std::string::npos) {
+    box.backgroundColor = parseColor(bgColor);
+    box.backgroundColorSet = true;
+  }
+  std::string bgImage = LookupProperty(props, "background-image");
+  if (bgImage.empty()) {
+    const std::string& sh = LookupProperty(props, "background");
+    if (!sh.empty() && sh.find("gradient") != std::string::npos) {
+      bgImage = sh;
+    }
+  }
+  if (!bgImage.empty()) {
+    box.backgroundImage = bgImage;
+  }
+
+  const std::string& br = LookupProperty(props, "border-radius");
+  if (!br.empty()) {
+    float v = parsePxLength(br);
+    if (!std::isnan(v)) {
+      box.borderRadiusPx = v;
+      box.borderRadiusSet = true;
+    }
+  }
+
+  const std::string& border = LookupProperty(props, "border");
+  if (!border.empty()) {
+    auto tokens = SplitTopLevelWhitespace(border);
+    for (auto& t : tokens) {
+      float w = parsePxLength(t);
+      if (!std::isnan(w)) {
+        box.borderWidthPx = w;
+        continue;
+      }
+      std::string lt = ToLower(t);
+      if (lt == "solid" || lt == "none") continue;
+      if (lt == "dashed" || lt == "dotted" || lt == "double" || lt == "groove" || lt == "ridge" ||
+          lt == "inset" || lt == "outset") {
+        warn("html: border style '" + lt + "' not supported; treated as solid");
+        continue;
+      }
+      box.borderColor = parseColor(t);
+    }
+    box.borderSet = box.borderWidthPx > 0;
+  }
+
+  box.boxShadow = LookupProperty(props, "box-shadow");
+  box.filter = LookupProperty(props, "filter");
+  box.backdropFilter = LookupProperty(props, "backdrop-filter");
+
+  const std::string& op = LookupProperty(props, "opacity");
+  if (!op.empty()) {
+    char* end = nullptr;
+    float v = std::strtof(op.c_str(), &end);
+    if (end != op.c_str()) {
+      box.opacity = std::max(0.0f, std::min(1.0f, v));
+      box.opacitySet = true;
+    }
+  }
+  box.mixBlendMode = LookupLowerTrimmed(props, "mix-blend-mode");
+
+  std::string overflow = LookupLowerTrimmed(props, "overflow");
+  if (overflow == "hidden") {
+    box.clipOverflow = true;
+  } else if (!overflow.empty() && overflow != "visible") {
+    warn("html: overflow: " + overflow + " not fully supported");
+  }
+}
+
+}  // namespace pagx
