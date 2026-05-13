@@ -136,14 +136,6 @@ class Text : public Element, public LayoutNode {
    */
   float fontAscent() const;
 
-  /**
-   * Returns the width of the text bounds computed during layout — the actual inked width of the
-   * shaped glyph run(s), not the containing Layer's width. Useful for HTML export to scope a
-   * `background-clip:text` gradient to the same width tgfx uses when `fitsToGeometry=true`
-   * evaluates against the glyph bounding box. Returns 0 if layout has not been performed.
-   */
-  float layoutBoundsWidth() const;
-
   struct GlyphData;
   GlyphData* glyphData;
   Rect textBounds = {};

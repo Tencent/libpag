@@ -892,7 +892,7 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
             text->text.find('\n') != std::string::npos && text->textAnchor != TextAnchor::Start;
         bool transformCentered = text->textAnchor == TextAnchor::Center || isMultiLineAnchored;
         if (text->textAnchor != TextAnchor::Start && !transformCentered) {
-          float glyphW = text->layoutBoundsWidth();
+          float glyphW = text->textBounds.width;
           if (glyphW > 0) {
             style += ";background-size:" + CssFloatToString(glyphW) +
                      "px 100%;background-position:center;background-repeat:no-repeat";
@@ -1391,7 +1391,7 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           if (fill->color->nodeType() == NodeType::LinearGradient) {
             auto* lg = static_cast<const LinearGradient*>(fill->color);
             if (!lg->fitsToGeometry && !lg->colorStops.empty()) {
-              float textW = text->layoutBoundsWidth();
+              float textW = text->textBounds.width;
               float textH = text->fontLineHeight() > 0 ? text->fontLineHeight() : renderFont;
               // Character centre in Layer coordinate space (where startPoint/endPoint live).
               // renderPos gives the text block's origin in Layer space; add the per-character

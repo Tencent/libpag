@@ -956,7 +956,7 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
       if (tb->writingMode == WritingMode::Vertical) {
         float renderedWidth = 0;
         for (const auto& s : tbSpans) {
-          float w = s.text ? s.text->layoutBoundsWidth() : 0;
+          float w = s.text ? s.text->textBounds.width : 0;
           if (w > renderedWidth) {
             renderedWidth = w;
           }

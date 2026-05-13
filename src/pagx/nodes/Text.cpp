@@ -38,10 +38,6 @@ float Text::fontAscent() const {
   return glyphData->fontAscent;
 }
 
-float Text::layoutBoundsWidth() const {
-  return textBounds.width;
-}
-
 static TextLayoutParams MakeStandaloneParams(const Text* text) {
   TextLayoutParams params = {};
   params.baseline = text->baseline;
