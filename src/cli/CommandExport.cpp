@@ -42,8 +42,6 @@ struct ExportOptions {
   bool textToPath = false;
   bool pptBakeUnsupported = true;
   std::vector<std::string> htmlFonts = {};
-  bool htmlNoFontSynthesisWeight = false;
-  bool htmlNoFontSynthesisStyle = false;
 };
 
 static void PrintUsage() {
@@ -95,10 +93,6 @@ static void PrintUsage() {
       << "                              to a codepoint subset (e.g. emoji as\n"
       << "                              U+1F300-1F9FF) so multiple @font-face rules under\n"
       << "                              the same family cover different scripts.\n"
-      << "  --html-no-font-synthesis-weight\n"
-      << "                              Emit font-synthesis-weight:none (default: auto)\n"
-      << "  --html-no-font-synthesis-style\n"
-      << "                              Emit font-synthesis-style:none (default: auto)\n"
       << "\n"
       << "Examples:\n"
       << "  pagx export --input icon.pagx                    # PAGX to icon.svg\n"
@@ -146,10 +140,6 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
       options->pptBakeUnsupported = false;
     } else if (arg == "--html-font" && i + 1 < argc) {
       options->htmlFonts.emplace_back(argv[++i]);
-    } else if (arg == "--html-no-font-synthesis-weight") {
-      options->htmlNoFontSynthesisWeight = true;
-    } else if (arg == "--html-no-font-synthesis-style") {
-      options->htmlNoFontSynthesisStyle = true;
     } else if (arg == "--help" || arg == "-h") {
       PrintUsage();
       return -1;
@@ -443,8 +433,6 @@ static int ExportToHTML(const ExportOptions& options) {
   }
 
   HTMLExporter::Options htmlOptions = {};
-  htmlOptions.fontSynthesisWeight = !options.htmlNoFontSynthesisWeight;
-  htmlOptions.fontSynthesisStyle = !options.htmlNoFontSynthesisStyle;
   // Aggregate ParsedFontFace entries sharing the same (family, weight, style, unicode-range)
   // tuple into a single FontFaceRule with multiple sources. Browsers try sources left-to-right
   // and fall back to the next one on load failure, so users can list a local path followed by

@@ -826,8 +826,7 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     // and text-align behave identically to the upright case). `font-synthesis-style`
     // re-enables synthesis on elements that inherit `font-synthesis:none` from an ancestor
     // (the PAGXHtmlTest wrapper sets that globally so non-faux text stays unsynthesised).
-    style += ";font-style:italic;font-synthesis-style:" +
-             std::string(_ctx->fontSynthesisStyle ? "auto" : "none");
+    style += ";font-style:italic;font-synthesis-style:auto";
   }
   // Font properties are hoisted to the parent Layer when fontHoisted; skip them on the span.
   if (!fontHoisted) {
@@ -840,12 +839,10 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     }
     if (!text->fontStyle.empty()) {
       if (text->fontStyle.find("Bold") != std::string::npos) {
-        style += ";font-weight:bold;font-synthesis-weight:" +
-                 std::string(_ctx->fontSynthesisWeight ? "auto" : "none");
+        style += ";font-weight:bold;font-synthesis-weight:auto";
       }
       if (text->fontStyle.find("Italic") != std::string::npos) {
-        style += ";font-style:italic;font-synthesis-style:" +
-                 std::string(_ctx->fontSynthesisStyle ? "auto" : "none");
+        style += ";font-style:italic;font-synthesis-style:auto";
       }
     }
   }
@@ -863,8 +860,7 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     // the thicker silhouette. Without this, the stroke traces the thinner regular outline
     // and bleeds inside the bolder fill glyph, visible as coloured lines cutting through
     // letter strokes.
-    style += ";font-weight:bold;font-synthesis-weight:" +
-             std::string(_ctx->fontSynthesisWeight ? "auto" : "none");
+    style += ";font-weight:bold;font-synthesis-weight:auto";
   }
   if (fill && fill->color) {
     auto ct = fill->color->nodeType();
@@ -1286,12 +1282,10 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
       containerStyle += ";font-size:0";
       if (!text->fontStyle.empty()) {
         if (text->fontStyle.find("Bold") != std::string::npos) {
-          containerStyle += ";font-weight:bold;font-synthesis-weight:" +
-                            std::string(_ctx->fontSynthesisWeight ? "auto" : "none");
+          containerStyle += ";font-weight:bold;font-synthesis-weight:auto";
         }
         if (text->fontStyle.find("Italic") != std::string::npos) {
-          containerStyle += ";font-style:italic;font-synthesis-style:" +
-                            std::string(_ctx->fontSynthesisStyle ? "auto" : "none");
+          containerStyle += ";font-style:italic;font-synthesis-style:auto";
         }
       }
       if (text->letterSpacing != 0.0f) {
@@ -1361,8 +1355,7 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         // fauxItalic is handled via CSS native synthesis (`font-style:italic` +
         // `font-synthesis-style`) instead of a CSS transform, so no skewX is appended.
         if (text->fauxItalic) {
-          charStyle += ";font-style:italic;font-synthesis-style:" +
-                       std::string(_ctx->fontSynthesisStyle ? "auto" : "none");
+          charStyle += ";font-style:italic;font-synthesis-style:auto";
         }
         if (!transform.empty()) {
           charStyle += ";transform:" + transform;
@@ -1474,8 +1467,7 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         // paints along the synthesised-bold outline; otherwise the stroke traces the
         // thinner regular outline and bleeds inside the bolder fill glyph.
         if (text->fauxBold) {
-          charStyle += ";font-weight:bold;font-synthesis-weight:" +
-                       std::string(_ctx->fontSynthesisWeight ? "auto" : "none");
+          charStyle += ";font-weight:bold;font-synthesis-weight:auto";
         }
         out.openTag("span");
         out.addAttr("style", charStyle);
@@ -1751,12 +1743,10 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         charStyle += ";line-height:1";
         if (!text->fontStyle.empty()) {
           if (text->fontStyle.find("Bold") != std::string::npos) {
-            charStyle += ";font-weight:bold;font-synthesis-weight:" +
-                         std::string(_ctx->fontSynthesisWeight ? "auto" : "none");
+            charStyle += ";font-weight:bold;font-synthesis-weight:auto";
           }
           if (text->fontStyle.find("Italic") != std::string::npos) {
-            charStyle += ";font-style:italic;font-synthesis-style:" +
-                         std::string(_ctx->fontSynthesisStyle ? "auto" : "none");
+            charStyle += ";font-style:italic;font-synthesis-style:auto";
           }
         }
         if (text->letterSpacing != 0.0f) {
@@ -1777,8 +1767,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         // fauxItalic must shear the glyph in its own local space before TextPath's
         // fauxItalic is handled via CSS native synthesis on each per-character span.
         if (text->fauxItalic) {
-          charStyle += ";font-style:italic;font-synthesis-style:" +
-                       std::string(_ctx->fontSynthesisStyle ? "auto" : "none");
+          charStyle += ";font-style:italic;font-synthesis-style:auto";
         }
         charStyle += ";transform:" + transform;
         charStyle += ";transform-origin:0 0";
@@ -1786,8 +1775,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         // not emit a stroke itself (strokes are drawn in the earlier SVG glyph-run branch),
         // so fauxBold can be applied unconditionally here.
         if (text->fauxBold) {
-          charStyle += ";font-weight:bold;font-synthesis-weight:" +
-                       std::string(_ctx->fontSynthesisWeight ? "auto" : "none");
+          charStyle += ";font-weight:bold;font-synthesis-weight:auto";
         }
         if (fill && fill->color) {
           if (fill->color->nodeType() == NodeType::SolidColor) {

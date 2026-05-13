@@ -147,23 +147,6 @@ struct HTMLExportOptions {
    * back to system fonts or CSS font synthesis for any weight/style that is not installed.
    */
   std::vector<FontFaceRule> fontFaceRules = {};
-
-  /**
-   * Controls the CSS `font-synthesis-weight` value emitted on elements that use fauxBold or
-   * fontStyle="Bold". When true (the default), the exporter emits `font-synthesis-weight:auto`
-   * so the browser synthesises bold when no Bold @font-face is available. When false, emits
-   * `font-synthesis-weight:none`, disabling synthesis — use this when all required Bold font
-   * files are provided via `fontFaceRules` and no synthesis is desired.
-   */
-  bool fontSynthesisWeight = true;
-
-  /**
-   * Controls the CSS `font-synthesis-style` value emitted on elements that use fauxItalic or
-   * fontStyle="Italic". When true (the default), the exporter emits `font-synthesis-style:auto`
-   * so the browser synthesises italic when no Italic @font-face is available. When false, emits
-   * `font-synthesis-style:none`, disabling synthesis.
-   */
-  bool fontSynthesisStyle = true;
 };
 
 /**

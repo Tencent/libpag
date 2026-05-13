@@ -1032,12 +1032,10 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
         spanStyle += "font-size:" + CssFloatToString(span.text->renderFontSize()) + "px";
         if (!span.text->fontStyle.empty()) {
           if (span.text->fontStyle.find("Bold") != std::string::npos) {
-            spanStyle += ";font-weight:bold;font-synthesis-weight:" +
-                         std::string(_ctx->fontSynthesisWeight ? "auto" : "none");
+            spanStyle += ";font-weight:bold;font-synthesis-weight:auto";
           }
           if (span.text->fontStyle.find("Italic") != std::string::npos) {
-            spanStyle += ";font-style:italic;font-synthesis-style:" +
-                         std::string(_ctx->fontSynthesisStyle ? "auto" : "none");
+            spanStyle += ";font-style:italic;font-synthesis-style:auto";
           }
         }
         if (span.text->letterSpacing != 0.0f) {
@@ -1063,8 +1061,7 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
       }
       if (span.text->fauxBold) {
         if (!spanStyle.empty()) spanStyle += ';';
-        spanStyle += "font-weight:bold;font-synthesis-weight:" +
-                     std::string(_ctx->fontSynthesisWeight ? "auto" : "none");
+        spanStyle += "font-weight:bold;font-synthesis-weight:auto";
       }
       if (span.stroke && span.stroke->color &&
           span.stroke->color->nodeType() == NodeType::SolidColor) {
@@ -1082,8 +1079,7 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
       }
       if (span.text->fauxItalic) {
         if (!spanStyle.empty()) spanStyle += ';';
-        spanStyle += "font-style:italic;font-synthesis-style:" +
-                     std::string(_ctx->fontSynthesisStyle ? "auto" : "none");
+        spanStyle += "font-style:italic;font-synthesis-style:auto";
       }
       // For TextBoxes with an explicit lineHeight, force-pin the inline-axis size of
       // any span whose font-size's natural line-height exceeds the container's
@@ -1343,12 +1339,10 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
       spanStyle += ";font-size:" + CssFloatToString(span.text->renderFontSize()) + "px";
       if (!span.text->fontStyle.empty()) {
         if (span.text->fontStyle.find("Bold") != std::string::npos) {
-          spanStyle += ";font-weight:bold;font-synthesis-weight:" +
-                       std::string(_ctx->fontSynthesisWeight ? "auto" : "none");
+          spanStyle += ";font-weight:bold;font-synthesis-weight:auto";
         }
         if (span.text->fontStyle.find("Italic") != std::string::npos) {
-          spanStyle += ";font-style:italic;font-synthesis-style:" +
-                       std::string(_ctx->fontSynthesisStyle ? "auto" : "none");
+          spanStyle += ";font-style:italic;font-synthesis-style:auto";
         }
       }
       if (span.text->letterSpacing != 0.0f) {
@@ -1371,8 +1365,7 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
       }
     }
     if (span.text->fauxBold) {
-      spanStyle += ";font-weight:bold;font-synthesis-weight:" +
-                   std::string(_ctx->fontSynthesisWeight ? "auto" : "none");
+      spanStyle += ";font-weight:bold;font-synthesis-weight:auto";
     }
     if (span.stroke && span.stroke->color &&
         span.stroke->color->nodeType() == NodeType::SolidColor) {
@@ -1388,8 +1381,7 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
       }
     }
     if (span.text->fauxItalic) {
-      spanStyle += ";font-style:italic;font-synthesis-style:" +
-                   std::string(_ctx->fontSynthesisStyle ? "auto" : "none");
+      spanStyle += ";font-style:italic;font-synthesis-style:auto";
     }
     // Force-pin inline-axis size when a span's natural line-height exceeds the
     // container's declared lineHeight; otherwise Chromium expands the line box.
