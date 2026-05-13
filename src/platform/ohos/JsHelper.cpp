@@ -60,7 +60,12 @@ static bool SetConstructor(napi_env env, napi_value constructor, const std::stri
   bool firstInsert = ConstructorRefMap.find(env) == ConstructorRefMap.end();
   auto& envMap = ConstructorRefMap[env];
   if (firstInsert) {
-    napi_add_env_cleanup_hook(env, CleanupConstructorRefs, env);
+    auto status = napi_add_env_cleanup_hook(env, CleanupConstructorRefs, env);
+    if (status != napi_ok) {
+      ConstructorRefMap.erase(env);
+      LOGE("SetConstructor napi_add_env_cleanup_hook failed :%d", status);
+      return false;
+    }
   }
   auto refIt = envMap.find(name);
   if (refIt != envMap.end()) {
