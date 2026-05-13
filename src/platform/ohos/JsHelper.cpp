@@ -31,19 +31,41 @@ namespace pag {
 // from another env's thread. Using a process-wide map keyed only by name caused a fatal
 // "ecma_vm cannot run in multi-thread" abort when a Worker thread imported libpag and tried
 // to delete a reference that was created on the main thread's EcmaVM.
+//
+// We do NOT call napi_delete_reference for entries belonging to other envs from this map
+// (that was the original crash). Per-env cleanup is handled by CleanupConstructorRefs,
+// registered via napi_add_env_cleanup_hook on first insertion for each env. The hook runs
+// on the owning env's thread during teardown, where napi_delete_reference is safe.
 static std::mutex ConstructorRefMapMutex;
 static std::unordered_map<napi_env, std::unordered_map<std::string, napi_ref>> ConstructorRefMap;
+
+static void CleanupConstructorRefs(void* arg) {
+  auto env = static_cast<napi_env>(arg);
+  std::lock_guard<std::mutex> autoLock(ConstructorRefMapMutex);
+  auto envIt = ConstructorRefMap.find(env);
+  if (envIt == ConstructorRefMap.end()) {
+    return;
+  }
+  for (auto& entry : envIt->second) {
+    napi_delete_reference(env, entry.second);
+  }
+  ConstructorRefMap.erase(envIt);
+}
 
 static bool SetConstructor(napi_env env, napi_value constructor, const std::string& name) {
   if (env == nullptr || constructor == nullptr || name.empty()) {
     return false;
   }
   std::lock_guard<std::mutex> autoLock(ConstructorRefMapMutex);
+  bool firstInsert = ConstructorRefMap.find(env) == ConstructorRefMap.end();
   auto& envMap = ConstructorRefMap[env];
-  auto it = envMap.find(name);
-  if (it != envMap.end()) {
-    napi_delete_reference(env, it->second);
-    envMap.erase(it);
+  if (firstInsert) {
+    napi_add_env_cleanup_hook(env, CleanupConstructorRefs, env);
+  }
+  auto refIt = envMap.find(name);
+  if (refIt != envMap.end()) {
+    napi_delete_reference(env, refIt->second);
+    envMap.erase(refIt);
   }
   napi_ref ref = nullptr;
   napi_create_reference(env, constructor, 1, &ref);
