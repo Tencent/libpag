@@ -30,11 +30,11 @@
 #   ├── pagx-render/<section>/<name>.png
 #   ├── test/                   # only for the pagx_to_html section
 #   │   ├── <name>.html
-#   │   └── static-img/...
+#   │   └── <name>/             # sibling assets dir (rasterized PNGs) per HTML
 #   └── cli/                    # one subdir per section to avoid name collisions
 #       ├── <section>/
 #       │   ├── <name>.html
-#       │   └── static-img/...
+#       │   └── <name>/         # sibling assets dir per HTML
 #
 # Subdirectories keep the five sections namespace-isolated because a handful
 # of sample names (text_path, text_box, group, repeater, text_modifier) exist
@@ -42,8 +42,9 @@
 #
 # Preconditions the script enforces:
 #   - cmake-build-debug/pagx executable must exist (any section)
-#   - for the pagx_to_html section's col 2: test/out/PAGXHtmlTest/<name>.html
-#     and its sibling fonts/ and static-img/ must exist. Run
+#   - for the pagx_to_html section's col 2: test/out/PAGXHtmlTest/<name>.html,
+#     its sibling fonts/ directory, and each HTML's sibling <name>/ asset dir
+#     must exist. Run
 #     `PAGFullTest --gtest_filter=PAGXHtmlTest.BatchConvertAll` first.
 #     When these are missing the pagx_to_html section simply drops col 2 and
 #     renders the remaining columns — other sections are unaffected.
@@ -360,18 +361,20 @@ if ls "$TEST_OUT"/*.html >/dev/null 2>&1; then
     src="$TEST_OUT/$name.html"
     if [ -f "$src" ]; then
       cp "$src" "$OUT_DIR/test/$name.html"
+      # HTMLExporter writes rasterized assets (DiamondGradient / ConicGradient /
+      # ImagePattern / PlusDarker) to a sibling directory named after the HTML
+      # stem, and the HTML references them via `<stem>/<file>.png`. Copy the
+      # per-sample asset directory alongside the HTML so those URLs resolve.
+      if [ -d "$TEST_OUT/$name" ]; then
+        cp -R "$TEST_OUT/$name" "$OUT_DIR/test/$name"
+      fi
       total_test_copied=$((total_test_copied + 1))
     fi
   done
   # The wrapper's @font-face rules reference `fonts/...` relative to the HTML,
-  # and any sample using DiamondGradient/tiled ImagePattern references
-  # `static-img/...`. Both directories live alongside the test-embedded HTMLs,
-  # so copying them over keeps the iframe self-contained.
+  # so copying the fonts directory over keeps the iframe self-contained.
   if [ -d "$TEST_OUT/fonts" ]; then
     cp -R "$TEST_OUT/fonts" "$OUT_DIR/test/fonts"
-  fi
-  if [ -d "$TEST_OUT/static-img" ]; then
-    cp -R "$TEST_OUT/static-img" "$OUT_DIR/test/static-img"
   fi
   echo "  copied $total_test_copied test-embedded HTMLs"
 else
@@ -394,7 +397,7 @@ fi
 #
 # This shrinks the deploy bundle from ~131 MB to ~44 MB without changing the
 # generated HTML structure or the relative-path contract between html and its
-# @font-face URLs; static-img/ directories stay untouched.
+# @font-face URLs; per-sample asset directories (<stem>/) stay untouched.
 
 echo ""
 echo "== consolidating per-section fonts/ into top-level fonts/ =="
@@ -433,9 +436,9 @@ if [ -d "$OUT_DIR"/test ]; then
     sed "${SED_INPLACE[@]}" "s|url('fonts/|url('../fonts/|g" {} +
 fi
 
-# Drop the now-redundant per-section font directories. pagx-render/ and
-# static-img/ are untouched; the generated HTML still resolves static-img
-# via its own relative path.
+# Drop the now-redundant per-section font directories. pagx-render/ and each
+# HTML's per-sample asset directory are untouched; the generated HTML still
+# resolves its rasterized asset URLs via its own relative path.
 rm -rf "$OUT_DIR"/cli/*/fonts "$OUT_DIR"/test/fonts
 
 font_count=$(ls "$GLOBAL_FONTS_DIR" 2>/dev/null | wc -l | tr -d ' ')
