@@ -87,10 +87,10 @@ struct HTMLInheritedStyle {
  */
 struct HTMLBoxAttributes {
   // Sizing
-  float widthPx = NAN;     // explicit px width
-  float widthPct = NAN;    // explicit % width (0-100)
-  float heightPx = NAN;    // explicit px height
-  float heightPct = NAN;   // explicit % height (0-100)
+  float widthPx = NAN;    // explicit px width
+  float widthPct = NAN;   // explicit % width (0-100)
+  float heightPx = NAN;   // explicit px height
+  float heightPct = NAN;  // explicit % height (0-100)
 
   // Positioning (only when position: absolute)
   bool absolute = false;
@@ -101,7 +101,7 @@ struct HTMLBoxAttributes {
 
   // Layout
   bool displayFlex = false;
-  bool flexRow = true;   // default of CSS flex
+  bool flexRow = true;  // default of CSS flex
   float gapPx = 0.0f;
   bool gapSet = false;
   Padding padding = {};
@@ -196,8 +196,26 @@ class HTMLParserContext {
     std::string textDecoration = {};
   };
   void collectTextFragments(const std::shared_ptr<DOMNode>& element,
-                            const HTMLInheritedStyle& inherited,
-                            std::vector<TextFragment>& out);
+                            const HTMLInheritedStyle& inherited, std::vector<TextFragment>& out);
+
+  // Builds a TextFragment whose style fields mirror `inherited`. The `text` field is
+  // left empty for the caller to fill in.
+  TextFragment makeTextFragment(const HTMLInheritedStyle& inherited);
+
+  // Returns true when two fragments share every style fingerprint (everything except
+  // `text`), and therefore can be merged into a single run.
+  static bool fragmentsShareStyle(const TextFragment& a, const TextFragment& b);
+
+  // Appends `text` to the fragment list, merging into the previous fragment when their
+  // style fingerprints match.
+  void appendTextFragment(std::vector<TextFragment>& out, const HTMLInheritedStyle& inherited,
+                          std::string text);
+
+  // Builds a Text Element from a fragment.
+  Text* buildTextElement(const TextFragment& fragment);
+
+  // Builds a Fill Element with a SolidColor of `color`.
+  Fill* buildSolidFill(const Color& color);
 
   // <img> conversion.
   Layer* convertImage(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box);
@@ -209,11 +227,37 @@ class HTMLParserContext {
   const std::unordered_map<std::string, std::string>& getResolvedStyle(
       const std::shared_ptr<DOMNode>& node);
 
-  HTMLBoxAttributes resolveBox(const std::shared_ptr<DOMNode>& element,
-                               const HTMLInheritedStyle& inherited);
+  HTMLBoxAttributes resolveBox(const std::shared_ptr<DOMNode>& element);
+
+  // resolveBox sub-steps. Each consumes the shared resolved style map.
+  void parseBoxSizing(HTMLBoxAttributes& box,
+                      const std::unordered_map<std::string, std::string>& props);
+  void parseBoxPositioning(HTMLBoxAttributes& box,
+                           const std::unordered_map<std::string, std::string>& props);
+  void parseBoxLayout(HTMLBoxAttributes& box,
+                      const std::unordered_map<std::string, std::string>& props);
+  void parseBoxVisuals(HTMLBoxAttributes& box,
+                       const std::unordered_map<std::string, std::string>& props);
 
   HTMLInheritedStyle computeInherited(const std::shared_ptr<DOMNode>& element,
                                       const HTMLInheritedStyle& parent);
+
+  // Returns true when the box carries any visual that requires a Rectangle/Fill/Stroke
+  // chain on the outer Layer. Used to decide whether a double-host split is needed.
+  static bool hasBackgroundVisuals(const HTMLBoxAttributes& box);
+
+  // Returns true when an inner host Layer is needed (the outer carries the background and
+  // the inner carries padding / layout). Mirrors the rule that padding cannot live on the
+  // same Layer as the background rectangle without changing geometry.
+  static bool requiresInnerHost(const HTMLBoxAttributes& box);
+
+  // Splits class attribute on whitespace and merges the matching class rule declarations
+  // into `out`. Used by both canvas-size detection and full style resolution.
+  void mergeClassRules(const std::string& classAttribute,
+                       std::unordered_map<std::string, std::string>& out);
+
+  // Reads element id (or generates a unique one on collision) and assigns it to `layer`.
+  void assignElementId(Layer* layer, const std::shared_ptr<DOMNode>& element);
 
   // Returns the property's resolved value, or `fallback`. Looks up inline style, class
   // rules, element defaults (in that priority), respecting CSS rules.
@@ -238,12 +282,8 @@ class HTMLParserContext {
   void applyLayerAttributes(Layer* layer, const std::shared_ptr<DOMNode>& element,
                             const HTMLBoxAttributes& box);
 
-  // Parses CSS color-like value into a PAGX Color. Returns transparent on empty/"none".
+  // Parses a CSS color-like value into a PAGX Color. Returns transparent on empty/"none".
   Color parseColor(const std::string& value);
-
-  // Parses a CSS length. Returns 0 on empty/invalid. Supports px, %, and unitless.
-  // outIsPercent is set to true when the value uses %.
-  float parseLength(const std::string& value, float containerSize, bool* outIsPercent = nullptr);
 
   // Parses a non-negative pixel length (no % allowed). Returns NaN on empty.
   float parsePxLength(const std::string& value);
@@ -276,6 +316,24 @@ class HTMLParserContext {
   LinearGradient* parseLinearGradient(const std::string& value);
   RadialGradient* parseRadialGradient(const std::string& value);
   ConicGradient* parseConicGradient(const std::string& value);
+
+  // Shared parsed-but-unfinalised stops representation produced by gradient parsers.
+  using GradientStops = std::vector<std::pair<float, Color>>;
+
+  // Parses the comma-separated trailing portion of a gradient call (`stop, stop, ...`)
+  // into colour/offset pairs. `interpretAngularOffset` enables `<deg>` offsets used by
+  // conic-gradient. Offsets that fail to parse are left as NaN for finalisation.
+  GradientStops parseGradientStops(const std::vector<std::string>& parts, size_t startIndex,
+                                   bool interpretAngularOffset);
+
+  // Fills NaN offsets in `stops` with sensible defaults: first/last default to 0/1, and
+  // intermediate gaps are spread evenly between known anchors. Returns false when no
+  // stops are present.
+  static bool finaliseGradientStops(GradientStops& stops);
+
+  // Appends ColorStop nodes for every entry of `stops` to `targetStops`.
+  template <typename T>
+  void emitColorStops(T& targetStops, const GradientStops& stops);
 
   // Image resource registration.
   Image* registerImageResource(const std::string& imageSource);
