@@ -122,7 +122,8 @@ inline std::shared_ptr<pagx::PAGXDocument> ParseFromString(const std::string& ht
 //==================================================================================================
 
 PAG_TEST(PAGXHTMLTest, ParsesCanvasSizeFromBody) {
-  auto doc = ParseFromString(R"HTML(<html><body style="width:200px;height:100px"></body></html>)HTML");
+  auto doc =
+      ParseFromString(R"HTML(<html><body style="width:200px;height:100px"></body></html>)HTML");
   ASSERT_NE(doc, nullptr);
   EXPECT_FLOAT_EQ(doc->width, 200.0f);
   EXPECT_FLOAT_EQ(doc->height, 100.0f);
@@ -585,8 +586,7 @@ PAG_TEST(PAGXHTMLTest, MarginEmitsWarning) {
 
 static void RunFixture(const std::string& name) {
   auto fixturePath = ProjectPath::Absolute("resources/html/" + name + ".html");
-  ASSERT_TRUE(std::filesystem::exists(fixturePath))
-      << "fixture missing: " << fixturePath;
+  ASSERT_TRUE(std::filesystem::exists(fixturePath)) << "fixture missing: " << fixturePath;
   auto doc = pagx::HTMLImporter::Parse(fixturePath);
   ASSERT_NE(doc, nullptr) << "failed to parse fixture " << name;
   EXPECT_GT(doc->width, 0.0f);

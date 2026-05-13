@@ -182,29 +182,30 @@ struct ImportOptions {
 };
 
 static void PrintUsage() {
-  std::cout << "Usage: pagx import [options]\n"
-            << "\n"
-            << "Import a file from another format and convert it to PAGX.\n"
-            << "\n"
-            << "Options:\n"
-            << "  --input <file>                 Input file to import (required)\n"
-            << "  --output <file>                Output PAGX file (default: <input>.pagx)\n"
-            << "  --format <format>              Force input format (svg, html)\n"
-            << "\n"
-            << "SVG options:\n"
-            << "  --svg-no-expand-use            Do not expand <use> references\n"
-            << "  --svg-flatten-transforms       Flatten nested transforms into single matrices\n"
-            << "  --svg-preserve-unknown         Preserve unsupported SVG elements as Unknown nodes\n"
-            << "\n"
-            << "HTML options:\n"
-            << "  --html-strict                  Treat HTML import warnings as errors\n"
-            << "  --html-preserve-unknown        Keep unknown HTML tags as empty Layers\n"
-            << "  --html-no-prefer-body-size     Prefer --target* over <body> intrinsic size\n"
-            << "\n"
-            << "Examples:\n"
-            << "  pagx import --input icon.svg                      # SVG to icon.pagx\n"
-            << "  pagx import --input layout.html                   # HTML to layout.pagx\n"
-            << "  pagx import --input page.html --output card.pagx  # HTML to card.pagx\n";
+  std::cout
+      << "Usage: pagx import [options]\n"
+      << "\n"
+      << "Import a file from another format and convert it to PAGX.\n"
+      << "\n"
+      << "Options:\n"
+      << "  --input <file>                 Input file to import (required)\n"
+      << "  --output <file>                Output PAGX file (default: <input>.pagx)\n"
+      << "  --format <format>              Force input format (svg, html)\n"
+      << "\n"
+      << "SVG options:\n"
+      << "  --svg-no-expand-use            Do not expand <use> references\n"
+      << "  --svg-flatten-transforms       Flatten nested transforms into single matrices\n"
+      << "  --svg-preserve-unknown         Preserve unsupported SVG elements as Unknown nodes\n"
+      << "\n"
+      << "HTML options:\n"
+      << "  --html-strict                  Treat HTML import warnings as errors\n"
+      << "  --html-preserve-unknown        Keep unknown HTML tags as empty Layers\n"
+      << "  --html-no-prefer-body-size     Prefer --target* over <body> intrinsic size\n"
+      << "\n"
+      << "Examples:\n"
+      << "  pagx import --input icon.svg                      # SVG to icon.pagx\n"
+      << "  pagx import --input layout.html                   # HTML to layout.pagx\n"
+      << "  pagx import --input page.html --output card.pagx  # HTML to card.pagx\n";
 }
 
 static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
