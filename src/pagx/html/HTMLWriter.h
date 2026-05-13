@@ -197,15 +197,13 @@ class HTMLWriterContext {
   int recursionDepth = 0;
   static constexpr int MAX_RECURSION_DEPTH = 512;
 
-  // Static-image rasterization config, forwarded from HTMLExportOptions. Empty `staticImgDir`
-  // disables rasterization entirely; the writer then emits nothing for Diamond/tiled-pattern
-  // fills (they are CSS-inexpressible without the PNG). It also doubles as the destination for
-  // copying external image files referenced by Image resources via `filePath`; when empty,
-  // GetImageSrc falls back to inlining external file bytes as base64 data URIs so the HTML
-  // remains self-contained.
+  // Static-image rasterization config derived by HTMLExporter from the caller-supplied
+  // resourceDir. `staticImgDir` is the absolute filesystem path where PNG assets are written;
+  // `staticImgUrlPrefix` is the relative URL prefix that the generated HTML uses to reference
+  // them (derived as the directory's basename + '/'). The resourceDir is mandatory at the
+  // public API boundary, so both fields are non-empty when HTMLWriter runs.
   std::string staticImgDir = {};
-  std::string staticImgUrlPrefix = "static-img/";
-  std::string staticImgNamePrefix = {};
+  std::string staticImgUrlPrefix = {};
   float staticImgPixelRatio = 2.0f;
 
   // Cache: source absolute file path → assigned filename inside staticImgDir. Used by

@@ -2256,7 +2256,7 @@ void HTMLWriter::renderDiamondCanvas(HTMLBuilder& out, const GeoInfo& geo, const
   }
 
   std::string imgId = _ctx->nextId("dgc");
-  std::string fileName = _ctx->staticImgNamePrefix + imgId + ".png";
+  std::string fileName = imgId + ".png";
   std::filesystem::create_directories(_ctx->staticImgDir);
   std::string absPath = _ctx->staticImgDir;
   if (!absPath.empty() && absPath.back() != '/') {
@@ -2309,7 +2309,7 @@ void HTMLWriter::renderConicCanvas(HTMLBuilder& out, const std::vector<GeoInfo>&
   }
 
   std::string imgId = _ctx->nextId("cgc");
-  std::string fileName = _ctx->staticImgNamePrefix + imgId + ".png";
+  std::string fileName = imgId + ".png";
   std::filesystem::create_directories(_ctx->staticImgDir);
   std::string absPath = _ctx->staticImgDir;
   if (!absPath.empty() && absPath.back() != '/') {
@@ -2413,7 +2413,7 @@ void HTMLWriter::renderImagePatternCanvas(HTMLBuilder& out, const GeoInfo& geo, 
   }
 
   std::string imgId = _ctx->nextId("ipc");
-  std::string fileName = _ctx->staticImgNamePrefix + imgId + ".png";
+  std::string fileName = imgId + ".png";
   std::filesystem::create_directories(_ctx->staticImgDir);
   std::string absPath = _ctx->staticImgDir;
   if (!absPath.empty() && absPath.back() != '/') {

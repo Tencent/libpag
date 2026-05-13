@@ -57,7 +57,11 @@ static std::string LoadAndConvert(const std::string& pagxPath,
   }
   auto fontConfig = MakeHtmlFontConfig();
   doc->applyLayout(&fontConfig);
-  return pagx::HTMLExporter::ToHTML(*doc, options);
+  // Shared tmp asset dir for all string-assertion tests. Individual tests assert HTML text
+  // content only; the PNG files written here are not validated, so cross-test filename
+  // collisions (e.g. dgc0.png from two different samples) are harmless.
+  auto tmpAssets = ProjectPath::Absolute("test/out/PAGXHtmlTest/tmp-assets");
+  return pagx::HTMLExporter::ToHTML(*doc, tmpAssets, options);
 }
 
 static std::vector<std::string> GetHtmlTestFiles() {
@@ -199,10 +203,11 @@ static ExportedSample ExportSampleHtmlToFile(const std::string& pagxPath, const 
   result.height = static_cast<int>(doc->height);
 
   pagx::HTMLExportOptions opts;
-  opts.staticImgDir = outDir + "/static-img";
-  opts.staticImgUrlPrefix = "static-img/";
-  opts.staticImgNamePrefix = baseName + "-";
-  auto fragment = pagx::HTMLExporter::ToHTML(*doc, opts);
+  // Resource directory follows the new HTMLExporter convention: sibling directory named after
+  // the HTML file stem. Multiple samples in the same outDir therefore get independent asset
+  // sub-directories (outDir/<baseName>/), no filename-prefix gymnastics required.
+  auto resourceDir = outDir + "/" + baseName;
+  auto fragment = pagx::HTMLExporter::ToHTML(*doc, resourceDir, opts);
   if (fragment.empty()) {
     std::cerr << "ExportSampleHtmlToFile: ToHTML returned empty for " << baseName << "\n";
     return result;
@@ -431,23 +436,25 @@ CLI_TEST(PAGXHtmlTest, ColorConicGradient) {
   auto html =
       LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/color_conic_gradient.pagx"));
   ASSERT_FALSE(html.empty());
-  EXPECT_NE(html.find("conic-gradient"), std::string::npos);
+  // ConicGradient now always rasterizes to a PNG: the new HTMLExporter contract requires a
+  // resource directory, so the writer takes the rasterization path that produces stable pixels
+  // across browsers (in particular headless Chromium, where SVG pattern + foreignObject
+  // delivery of CSS conic-gradient is unreliable). The PNG is referenced via SVG <image>
+  // (not HTML <img>) because the gradient lives inside an SVG <foreignObject>-free path that
+  // pairs the rasterized image with a clipPath built from the geometry.
+  EXPECT_NE(html.find("<image"), std::string::npos);
+  EXPECT_NE(html.find("tmp-assets/cgc"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, ColorDiamondGradient) {
-  auto outDir = ProjectPath::Absolute("test/out/PAGXHtmlTest");
-  std::filesystem::create_directories(outDir);
-  pagx::HTMLExportOptions opts;
-  opts.staticImgDir = outDir + "/static-img";
-  opts.staticImgUrlPrefix = "static-img/";
-  opts.staticImgNamePrefix = "color_diamond_gradient-";
-  auto html = LoadAndConvert(
-      ProjectPath::Absolute("resources/pagx_to_html/color_diamond_gradient.pagx"), opts);
+  auto html =
+      LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/color_diamond_gradient.pagx"));
   ASSERT_FALSE(html.empty());
   // DiamondGradient rasterizes to a PNG because CSS has no native diamond shape; the HTML
-  // references that PNG through an <img> tag.
+  // references that PNG through an <img> tag. URL prefix is derived from the resource
+  // directory's basename ("tmp-assets/"), and the id follows the "dgc" naming scheme.
   EXPECT_NE(html.find("<img"), std::string::npos);
-  EXPECT_NE(html.find("static-img/color_diamond_gradient-"), std::string::npos);
+  EXPECT_NE(html.find("tmp-assets/dgc"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, ColorImagePattern) {

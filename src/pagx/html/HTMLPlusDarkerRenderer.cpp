@@ -191,8 +191,7 @@ bool RenderCroppedBackdrop(const PAGXDocument& doc, tgfx::Context* ctx, float bx
 }  // namespace
 
 void HTMLPlusDarkerRenderer::RenderAll(const PAGXDocument& doc, const std::string& staticImgDir,
-                                       const std::string& /*urlPrefix*/,
-                                       const std::string& staticImgNamePrefix, float pixelRatio,
+                                       const std::string& /*urlPrefix*/, float pixelRatio,
                                        std::unordered_map<const Layer*, PlusDarkerBackdrop>& out) {
   std::unordered_map<const Layer*, const Layer*> parentMap;
   std::vector<Layer*> candidates;
@@ -240,7 +239,7 @@ void HTMLPlusDarkerRenderer::RenderAll(const PAGXDocument& doc, const std::strin
     } guard{target, target->visible};
     target->visible = false;
 
-    std::string fileName = staticImgNamePrefix + "pd_" + std::to_string(idx) + ".png";
+    std::string fileName = "pd_" + std::to_string(idx) + ".png";
     std::string absPath = staticImgDir + "/" + fileName;
     std::shared_ptr<tgfx::Data> encoded;
     if (!RenderCroppedBackdrop(doc, ctx, bx, by, bw, bh, pixelRatio, absPath, &encoded)) {

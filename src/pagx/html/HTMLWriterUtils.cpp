@@ -149,12 +149,11 @@ static bool IsSafeImageUrl(const std::string& url) {
   return scheme == "http" || scheme == "https" || scheme == "data";
 }
 
-// Returns the basename of `path` restricted to filesystem-safe ASCII (matches
-// SanitizeStaticImgNamePrefix's character set: [A-Za-z0-9_.-]). Any other byte (path
-// separators, whitespace, non-ASCII) is replaced with '_'. Used when copying external image
-// files into staticImgDir; combined with the staticImgNamePrefix (also sanitized at export
-// entry) and the same-source dedup cache, this prevents a crafted filePath from escaping the
-// destination directory through path-traversal sequences.
+// Returns the basename of `path` restricted to filesystem-safe ASCII ([A-Za-z0-9_.-]). Any
+// other byte (path separators, whitespace, non-ASCII) is replaced with '_'. Used when copying
+// external image files into staticImgDir; combined with the same-source dedup cache, this
+// prevents a crafted filePath from escaping the destination directory through path-traversal
+// sequences.
 static std::string SanitizeBasename(const std::string& path) {
   size_t slash = path.find_last_of("/\\");
   std::string base = (slash == std::string::npos) ? path : path.substr(slash + 1);
@@ -208,9 +207,8 @@ static std::string CopyExternalImageToStaticDir(const std::string& srcPath,
   }
 
   std::string baseName = SanitizeBasename(srcPath);
-  std::string prefixed = ctx->staticImgNamePrefix + baseName;
-  auto [stem, ext] = SplitStemExt(prefixed);
-  std::string candidate = prefixed;
+  auto [stem, ext] = SplitStemExt(baseName);
+  std::string candidate = baseName;
   for (int suffix = 1; ctx->externalImageClaimedNames.count(candidate) > 0; suffix++) {
     candidate = stem + "_" + std::to_string(suffix) + ext;
   }

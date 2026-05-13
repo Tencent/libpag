@@ -120,46 +120,6 @@ struct FontFaceRule {
  */
 struct HTMLExportOptions {
   /**
-   * Absolute directory path where the exporter writes auxiliary image files. Two kinds of files
-   * land here:
-   *   1. PNGs rasterized from shapes whose color sources CSS cannot express natively
-   *      (DiamondGradient and tiled ImagePattern).
-   *   2. Copies of external image files referenced by Image resources via `filePath`. The HTML
-   *      then references them by relative URL (`staticImgUrlPrefix + filename`), so the
-   *      generated bundle ships images as separate files instead of inlining them as base64.
-   *      Same-source paths are deduplicated (copied at most once); distinct sources sharing a
-   *      basename receive disambiguated copies (e.g. `logo.png`, `logo_1.png`).
-   * The exporter creates the directory if it does not exist. When left empty, rasterized
-   * shapes are silently skipped and external image filePaths fall back to base64 inlining so
-   * the HTML remains self-contained.
-   */
-  std::string staticImgDir = {};
-
-  /**
-   * URL prefix used for <img src="..."> references to the generated static images, relative to
-   * the HTML document's location. The default is "static-img/", matching the convention that
-   * static-img/ sits next to the HTML file.
-   */
-  std::string staticImgUrlPrefix = "static-img/";
-
-  /**
-   * Filename prefix applied to every generated static image, useful when multiple HTML documents
-   * share a single static-img directory and need to avoid name collisions (e.g., "doc_name-").
-   *
-   * When multiple documents share a `staticImgDir`, the caller is responsible for choosing a
-   * prefix that is unique per document; the library does not detect or recover from collisions
-   * (later writes silently overwrite earlier files of the same generated name). The CLI tool
-   * derives a prefix automatically from the output HTML filename stem; programmatic callers
-   * must supply their own.
-   *
-   * For security, the value is restricted to the character set [A-Za-z0-9_.-] at emission time;
-   * any other character (including '/', '\\', whitespace, and non-ASCII bytes) is dropped, so
-   * a maliciously crafted prefix cannot escape the `staticImgDir` via path traversal sequences
-   * such as "../".
-   */
-  std::string staticImgNamePrefix = {};
-
-  /**
    * Device pixel ratio used when rasterizing static images. A value of 2 produces @2x assets,
    * which keeps visual parity with the browser's 2x comparison output. The default is 2.
    */
@@ -219,6 +179,21 @@ class HTMLExporter {
    * Exports a PAGXDocument to an HTML string. The output is a standalone HTML fragment containing
    * CSS styles and SVG elements that visually reproduce the PAGX content in modern browsers.
    *
+   * Resource directory contract: `resourceDir` is a mandatory absolute directory path where the
+   * exporter writes auxiliary image files. Two kinds of files land there:
+   *   1. PNGs rasterized from shapes whose color sources CSS cannot express natively
+   *      (DiamondGradient, tiled ImagePattern, PlusDarker backdrops).
+   *   2. Copies of external image files referenced by Image resources via `filePath`.
+   * The exporter creates the directory if it does not exist. The generated HTML references these
+   * assets via a relative URL whose prefix is the basename of `resourceDir` followed by `/`
+   * (e.g. `resourceDir = "/tmp/abc"` produces `<img src="abc/dgc0.png">`). Callers must write
+   * the returned HTML string to a file located in `resourceDir`'s parent directory for those
+   * relative URLs to resolve; ToFile enforces this layout automatically.
+   *
+   * Passing an empty `resourceDir` is treated as a usage error: the exporter logs an error to
+   * stderr and returns an empty string. Use ToFile if you want resource-directory derivation
+   * handled for you.
+   *
    * Precondition: `document.isLayoutApplied()` must return true — the exporter reads
    * layout-resolved geometry (positions, sizes, text runs) produced by PAGXDocument::applyLayout
    * and cannot derive them on the fly. Passing a document whose layout has not been applied
@@ -227,30 +202,37 @@ class HTMLExporter {
    *
    * Thread safety: this is a stateless static method and may be called concurrently from
    * multiple threads, provided that each thread passes a distinct document (or a document that
-   * is guaranteed not to be mutated for the duration of the call).
+   * is guaranteed not to be mutated for the duration of the call) and a distinct resourceDir
+   * (so that concurrent writers do not race on the same filesystem location).
    *
-   * Failure semantics: returns an empty string both on internal failure and when the document
-   * genuinely has no visible content. The two cases are not distinguished by the return value;
-   * callers that need to tell them apart should inspect the document themselves (for example,
-   * check that `document` has a non-null root layer) before invoking ToHTML.
+   * Failure semantics: returns an empty string on internal failure, when the document has no
+   * visible content, or when `resourceDir` is empty. The distinct causes are not encoded in
+   * the return value; callers that need to tell them apart should validate inputs themselves
+   * before invoking ToHTML.
    *
    * Ownership: `document` is consumed by const reference. The exporter does not retain any
    * pointer or reference to the document or its internal nodes beyond the duration of this
    * call, so the caller is free to destroy or mutate `document` as soon as ToHTML returns.
    *
    * @param document The PAGX document to export. Must have had applyLayout() called.
+   * @param resourceDir Absolute directory path for auxiliary PNGs and copied images. Must not
+   *                    be empty.
    * @param options Export options controlling output formatting.
-   * @return The generated HTML string, or an empty string if the document has no content or
-   *         if the exporter encountered an internal failure.
+   * @return The generated HTML string, or an empty string if resourceDir is empty, the document
+   *         has no content, or the exporter encountered an internal failure.
    */
-  static std::string ToHTML(const PAGXDocument& document, const Options& options = {});
+  static std::string ToHTML(const PAGXDocument& document, const std::string& resourceDir,
+                            const Options& options = {});
 
   /**
    * Exports a PAGXDocument to an HTML file. Creates parent directories if they do not exist.
    *
-   * Implementation note: this method is a thin wrapper around ToHTML — it builds the document
-   * string in memory via ToHTML and then writes that string to disk. Callers that need to
-   * stream the output or post-process it before writing should call ToHTML directly.
+   * Implementation note: this method derives the resource directory automatically as
+   * `parent_path(filePath) / stem(filePath)` — i.e. a sibling directory of the HTML file whose
+   * name matches the HTML file's stem. For example, `filePath = "/tmp/abc.html"` writes
+   * auxiliary assets to `/tmp/abc/` and the HTML references them via `<img src="abc/...">`.
+   * Internally this method calls ToHTML with the derived resource directory and writes the
+   * resulting string to disk.
    *
    * File handling: the output file is opened with std::ios::binary and truncated; if a file
    * already exists at `filePath` it is overwritten without prompting. `filePath` is used

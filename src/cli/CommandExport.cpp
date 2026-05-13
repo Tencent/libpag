@@ -443,15 +443,6 @@ static int ExportToHTML(const ExportOptions& options) {
   }
 
   HTMLExporter::Options htmlOptions = {};
-  // Isolate every HTML's rasterized assets in their own sub-directory so that multiple
-  // exports into the same output directory cannot collide on filenames like "dgc0.png"
-  // or "pd_0.png" (the exporter re-uses short ids per document). The sub-directory name
-  // is the output file's stem, matching how fonts/ is a single shared directory — but
-  // static-img actually does need per-document isolation because the ids are not unique
-  // across documents, whereas font basenames are expected to be unique by the user.
-  auto outputStem = outputPath.stem().string();
-  htmlOptions.staticImgDir = (outputDir / "static-img" / outputStem).string();
-  htmlOptions.staticImgUrlPrefix = "static-img/" + outputStem + "/";
   htmlOptions.fontSynthesisWeight = !options.htmlNoFontSynthesisWeight;
   htmlOptions.fontSynthesisStyle = !options.htmlNoFontSynthesisStyle;
   // Aggregate ParsedFontFace entries sharing the same (family, weight, style, unicode-range)
@@ -499,7 +490,13 @@ static int ExportToHTML(const ExportOptions& options) {
   }
   document->applyLayout(&layoutFontConfig);
 
-  auto fragment = HTMLExporter::ToHTML(*document, htmlOptions);
+  // Resource directory convention: sibling directory named after the HTML file's stem, so the
+  // generated HTML references assets via "<stem>/…" relative URLs. This matches the new
+  // HTMLExporter contract enforced by ToFile, but we call ToHTML explicitly because CLI needs
+  // to wrap the fragment in a complete <!DOCTYPE html> document before writing it.
+  auto outputStem = outputPath.stem().string();
+  auto resourceDir = (outputDir / outputStem).string();
+  auto fragment = HTMLExporter::ToHTML(*document, resourceDir, htmlOptions);
   if (fragment.empty()) {
     std::cerr << "pagx export: error: HTMLExporter produced empty output for '" << options.inputFile
               << "'\n";
