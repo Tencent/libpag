@@ -50,7 +50,7 @@ class PAGNetworkFetcher : public QObject {
 
  private:
   Q_SLOT void onReplyFinished(QNetworkReply* reply);
-  QNetworkAccessManager* manager = nullptr;
+  QNetworkAccessManager* asyncManager = nullptr;
 };
 
 class PAGUpdateVersionFetcher : public PAGNetworkFetcher {

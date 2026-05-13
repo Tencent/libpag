@@ -194,11 +194,13 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
   }
   auto byteData = pag::ByteData::FromPath(strPath);
   if (byteData == nullptr) {
+    Q_EMIT filePathChanged("");
     return false;
   }
 
   auto document = pagx::PAGXImporter::FromXML(byteData->data(), byteData->length());
   if (document == nullptr) {
+    Q_EMIT filePathChanged("");
     return false;
   }
   document->applyLayout();
@@ -209,6 +211,7 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
       std::lock_guard<std::mutex> lock(renderMutex);
       clearContent();
     }
+    Q_EMIT filePathChanged("");
     Q_EMIT pagxDocumentChanged(nullptr);
     return false;
   }
