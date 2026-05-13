@@ -26,8 +26,7 @@ namespace pagx {
 
 class HTMLBuilder {
  public:
-  explicit HTMLBuilder(int indentSpaces, int initialLevel = 0, size_t reserve = 4096)
-      : _level(initialLevel), _spaces(indentSpaces) {
+  explicit HTMLBuilder(int initialLevel = 0, size_t reserve = 4096) : _level(initialLevel) {
     _buf.reserve(reserve);
   }
 
@@ -214,7 +213,7 @@ class HTMLBuilder {
   std::string _buf = {};
   std::vector<const char*> _tags = {};
   int _level = 0;
-  int _spaces = 2;
+  static constexpr int _spaces = 2;
 
   void indent() {
     if (_level > 0) {

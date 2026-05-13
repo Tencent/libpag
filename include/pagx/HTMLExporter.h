@@ -120,16 +120,6 @@ struct FontFaceRule {
  */
 struct HTMLExportOptions {
   /**
-   * Indentation width (in space characters) applied to HTML tag nesting in the output. The
-   * default is 2. This value only affects the indentation of <tag>...</tag> nesting levels
-   * produced by the HTML builder; it does not influence the formatting of CSS declarations
-   * inside the <style> block, which always uses a fixed 2-space declaration indent. Negative
-   * values produce undefined output (the library does not clamp them); callers must pass a
-   * non-negative integer.
-   */
-  int indent = 2;
-
-  /**
    * Absolute directory path where the exporter writes auxiliary image files. Two kinds of files
    * land here:
    *   1. PNGs rasterized from shapes whose color sources CSS cannot express natively

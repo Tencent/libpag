@@ -669,20 +669,6 @@ CLI_TEST(PAGXHtmlTest, LayerPassThrough) {
 // Export options
 // =============================================================================
 
-CLI_TEST(PAGXHtmlTest, ExportOptions_Indent) {
-  auto doc = pagx::PAGXImporter::FromFile(
-      ProjectPath::Absolute("resources/pagx_to_html/root_document.pagx"));
-  ASSERT_TRUE(doc != nullptr);
-  doc->applyLayout();
-
-  pagx::HTMLExportOptions opts = {};
-  opts.indent = 4;
-  auto html = pagx::HTMLExporter::ToHTML(*doc, opts);
-  ASSERT_FALSE(html.empty());
-  // With 4-space indent, first child should be indented by 4 spaces
-  EXPECT_NE(html.find("    "), std::string::npos);
-}
-
 CLI_TEST(PAGXHtmlTest, FilterDedup_ShowcaseInfographic) {
   // showcase_infographic.pagx has 3 layers with identical DropShadowStyle parameters.
   // The signature-keyed filter cache should emit one <filter> and reuse it.
