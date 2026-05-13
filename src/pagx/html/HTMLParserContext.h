@@ -291,6 +291,12 @@ class HTMLParserContext {
   // Parses a non-negative pixel length (no % allowed). Returns NaN on empty.
   float parsePxLength(const std::string& value);
 
+  // Resolves a CSS line-height value into pixels. Supports unitless multipliers (CSS spec:
+  // "the used value is this unitless <number> multiplied by the element's font size"), `px`,
+  // `em`/`rem` (treated as 16px and current font size respectively), and percentages relative to
+  // font size. Returns NaN when the value is empty or unparseable.
+  float resolveLineHeightPx(const std::string& value, float fontSizePx);
+
   // Parses a `box-shadow` value into a list of resolved shadows. Inset shadows have
   // `inset == true`.
   struct ShadowSpec {

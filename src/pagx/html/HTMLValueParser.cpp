@@ -105,6 +105,35 @@ float HTMLParserContext::parsePxLength(const std::string& valueRaw) {
   return num;
 }
 
+float HTMLParserContext::resolveLineHeightPx(const std::string& valueRaw, float fontSizePx) {
+  std::string value = Trim(valueRaw);
+  if (value.empty()) return NAN;
+  std::string lowered = ToLower(value);
+  if (lowered == "normal") return NAN;
+  char* end = nullptr;
+  float num = std::strtof(value.c_str(), &end);
+  if (end == value.c_str()) return NAN;
+  std::string suffix = Trim(end);
+  // Unitless: CSS spec says "the used value is this unitless <number> multiplied by the
+  // element's font size". This is the most common authoring form (e.g. "line-height: 1.5") and
+  // is what HTML pages such as the maimai sample rely on.
+  if (suffix.empty()) {
+    if (std::isnan(fontSizePx) || fontSizePx <= 0) return NAN;
+    return num * fontSizePx;
+  }
+  if (suffix == "px") return num;
+  if (suffix == "%") {
+    if (std::isnan(fontSizePx) || fontSizePx <= 0) return NAN;
+    return num * fontSizePx / 100.0f;
+  }
+  if (suffix == "em" || suffix == "rem") {
+    if (std::isnan(fontSizePx) || fontSizePx <= 0) return NAN;
+    return num * fontSizePx;
+  }
+  warn("html: line-height unit '" + suffix + "' not supported");
+  return NAN;
+}
+
 std::vector<HTMLParserContext::ShadowSpec> HTMLParserContext::parseShadowList(
     const std::string& value) {
   std::vector<ShadowSpec> out;

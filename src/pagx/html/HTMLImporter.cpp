@@ -874,6 +874,9 @@ Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& elemen
     textHost->contents.push_back(buildSolidFill(f.color));
   } else {
     auto textBox = _document->makeNode<TextBox>();
+    // Anchor the TextBox to the host layer's content width so that wordWrap can engage. Without
+    // this the TextBox would adopt its single-line natural width and overflow the parent box.
+    textBox->percentWidth = 100.0f;
     std::string ta = ToLower(Trim(inherited.textAlign));
     if (!ta.empty()) {
       if (ta == "left" || ta == "start") textBox->textAlign = TextAlign::Start;
@@ -887,7 +890,7 @@ Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& elemen
         warn("html: unsupported text-align '" + ta + "'");
     }
     if (!inherited.lineHeight.empty()) {
-      float lh = parsePxLength(inherited.lineHeight);
+      float lh = resolveLineHeightPx(inherited.lineHeight, fragments.front().fontSize);
       if (!std::isnan(lh) && lh > 0) textBox->lineHeight = lh;
     }
     if (hasNoWrap) {
