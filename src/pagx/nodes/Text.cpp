@@ -38,10 +38,6 @@ float Text::fontAscent() const {
   return glyphData->fontAscent;
 }
 
-float Text::layoutBoundsHeight() const {
-  return textBounds.height;
-}
-
 float Text::layoutBoundsWidth() const {
   return textBounds.width;
 }
