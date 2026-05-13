@@ -36,7 +36,7 @@ CLI_TEST(HTMLStyleExtractorTest, SingleStyle) {
       R"(<html><head></head><body><div style="color:red">hello</div></body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
   EXPECT_NE(result.find("style=\"color:red\""), std::string::npos);
-  EXPECT_EQ(result.find(".div0{"), std::string::npos);
+  EXPECT_EQ(result.find(".div0 {"), std::string::npos);
   EXPECT_EQ(result.find("<style>"), std::string::npos);
 }
 
@@ -44,9 +44,9 @@ CLI_TEST(HTMLStyleExtractorTest, DuplicateStyles) {
   std::string input =
       R"(<html><head></head><body><div style="color:red">a</div><span style="color:red">b</span></body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
-  EXPECT_NE(result.find(".div0{color:red}"), std::string::npos);
+  EXPECT_NE(result.find(".div0 {\n  color: red;\n}"), std::string::npos);
   // Only one rule — the span reuses the div's class via exact-string dedup.
-  EXPECT_EQ(result.find(".div1{"), std::string::npos);
+  EXPECT_EQ(result.find(".div1 {"), std::string::npos);
 }
 
 CLI_TEST(HTMLStyleExtractorTest, ExistingClassMerged) {
@@ -75,7 +75,7 @@ CLI_TEST(HTMLStyleExtractorTest, EntityApostrophe) {
   std::string input = R"(<html><head></head><body><div style="font-family:&#39;Arial&#39;">a</div>)"
                       R"(<div style="font-family:&#39;Arial&#39;">b</div></body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
-  EXPECT_NE(result.find(".div0{font-family:'Arial'}"), std::string::npos);
+  EXPECT_NE(result.find("font-family: 'Arial';"), std::string::npos);
 }
 
 CLI_TEST(HTMLStyleExtractorTest, EntityAll5Named) {
@@ -84,7 +84,7 @@ CLI_TEST(HTMLStyleExtractorTest, EntityAll5Named) {
                       R"(<div style="a:&amp;b:&lt;c:&gt;d:&quot;e:&apos;">b</div>)"
                       R"(</body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
-  EXPECT_NE(result.find("a:&b:<c:>d:\"e:'"), std::string::npos);
+  EXPECT_NE(result.find("a: &b:<c:>d:\"e:'"), std::string::npos);
 }
 
 CLI_TEST(HTMLStyleExtractorTest, EntityNumericDec) {
@@ -93,7 +93,7 @@ CLI_TEST(HTMLStyleExtractorTest, EntityNumericDec) {
                       R"(<div style="x:&#65;">b</div>)"
                       R"(</body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
-  EXPECT_NE(result.find("x:A"), std::string::npos);
+  EXPECT_NE(result.find("x: A"), std::string::npos);
 }
 
 CLI_TEST(HTMLStyleExtractorTest, EntityNumericHex) {
@@ -102,7 +102,7 @@ CLI_TEST(HTMLStyleExtractorTest, EntityNumericHex) {
                       R"(<div style="x:&#x41;">b</div>)"
                       R"(</body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
-  EXPECT_NE(result.find("x:A"), std::string::npos);
+  EXPECT_NE(result.find("x: A"), std::string::npos);
 }
 
 CLI_TEST(HTMLStyleExtractorTest, BodyStylePreserved) {
@@ -127,7 +127,7 @@ CLI_TEST(HTMLStyleExtractorTest, CommentSkipped) {
       R"(<html><head></head><body><!-- <div style="color:red"> -->)"
       R"(<div style="color:blue">a</div><div style="color:blue">b</div></body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
-  EXPECT_NE(result.find(".div0{color:blue}"), std::string::npos);
+  EXPECT_NE(result.find(".div0 {\n  color: blue;\n}"), std::string::npos);
   EXPECT_NE(result.find("<!-- <div style=\"color:red\"> -->"), std::string::npos);
 }
 
@@ -188,8 +188,8 @@ CLI_TEST(HTMLStyleExtractorTest, MultipleUniqueStyles) {
                       R"(<div style="color:blue">b1</div>)"
                       R"(<div style="color:blue">b2</div></body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
-  EXPECT_NE(result.find(".div0{color:red}"), std::string::npos);
-  EXPECT_NE(result.find(".div1{color:blue}"), std::string::npos);
+  EXPECT_NE(result.find(".div0 {\n  color: red;\n}"), std::string::npos);
+  EXPECT_NE(result.find(".div1 {\n  color: blue;\n}"), std::string::npos);
 }
 
 // =============================================================================
@@ -205,11 +205,12 @@ CLI_TEST(HTMLStyleExtractorTest, BaseModifierBlend) {
       R"(</body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
   // Base class with shared properties.
-  EXPECT_NE(result.find(".blend0{position:absolute;width:48px;height:30px}"), std::string::npos);
+  EXPECT_NE(result.find(".blend0 {\n  position: absolute;\n  width: 48px;\n  height: 30px;\n}"),
+            std::string::npos);
   // Modifier classes with individual blend modes.
-  EXPECT_NE(result.find(".blend1{mix-blend-mode:multiply}"), std::string::npos);
-  EXPECT_NE(result.find(".blend2{mix-blend-mode:screen}"), std::string::npos);
-  EXPECT_NE(result.find(".blend3{mix-blend-mode:overlay}"), std::string::npos);
+  EXPECT_NE(result.find(".blend1 {\n  mix-blend-mode: multiply;\n}"), std::string::npos);
+  EXPECT_NE(result.find(".blend2 {\n  mix-blend-mode: screen;\n}"), std::string::npos);
+  EXPECT_NE(result.find(".blend3 {\n  mix-blend-mode: overlay;\n}"), std::string::npos);
   // Elements should have base+modifier class pair (layer detected via mix-blend-mode).
   EXPECT_NE(result.find("class=\"blend0 blend1\""), std::string::npos);
   EXPECT_NE(result.find("class=\"blend0 blend2\""), std::string::npos);
@@ -226,10 +227,11 @@ CLI_TEST(HTMLStyleExtractorTest, BaseModifierBgColor) {
       R"(</body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
   // Base class with shared properties (layer detected via position:absolute + size, no inset).
-  EXPECT_NE(result.find(".bg0{position:absolute;width:50px;height:40px}"), std::string::npos);
+  EXPECT_NE(result.find(".bg0 {\n  position: absolute;\n  width: 50px;\n  height: 40px;\n}"),
+            std::string::npos);
   // Modifier classes with individual background colors.
-  EXPECT_NE(result.find(".bg1{background-color:#FF0000}"), std::string::npos);
-  EXPECT_NE(result.find(".bg2{background-color:#00FF00}"), std::string::npos);
+  EXPECT_NE(result.find(".bg1 {\n  background-color: #FF0000;\n}"), std::string::npos);
+  EXPECT_NE(result.find(".bg2 {\n  background-color: #00FF00;\n}"), std::string::npos);
   // Elements should have base+modifier class pair.
   EXPECT_NE(result.find("class=\"bg0 bg1\""), std::string::npos);
   EXPECT_NE(result.find("class=\"bg0 bg2\""), std::string::npos);
@@ -242,10 +244,11 @@ CLI_TEST(HTMLStyleExtractorTest, BaseModifierText) {
                       R"(</body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
   // Base class with shared properties.
-  EXPECT_NE(result.find(".text0{position:absolute;top:0;color:#FFF}"), std::string::npos);
+  EXPECT_NE(result.find(".text0 {\n  position: absolute;\n  top: 0;\n  color: #FFF;\n}"),
+            std::string::npos);
   // Modifier classes with individual widths.
-  EXPECT_NE(result.find(".text1{width:27px}"), std::string::npos);
-  EXPECT_NE(result.find(".text2{width:35px}"), std::string::npos);
+  EXPECT_NE(result.find(".text1 {\n  width: 27px;\n}"), std::string::npos);
+  EXPECT_NE(result.find(".text2 {\n  width: 35px;\n}"), std::string::npos);
   // Elements should have base+modifier class pair.
   EXPECT_NE(result.find("class=\"text0 text1\""), std::string::npos);
   EXPECT_NE(result.find("class=\"text0 text2\""), std::string::npos);
@@ -263,8 +266,10 @@ CLI_TEST(HTMLStyleExtractorTest, FallbackNoSplit) {
   auto result = pagx::HTMLStyleExtractor::Extract(input);
   // All 3 properties differ → 3 varying > 2, so no split. Declarations are emitted in
   // canonical order: margin (box, 38) → color (typography, 90) → font-size (92).
-  EXPECT_NE(result.find(".div0{margin:10px;color:red;font-size:12px}"), std::string::npos);
-  EXPECT_NE(result.find(".div1{margin:20px;color:blue;font-size:14px}"), std::string::npos);
+  EXPECT_NE(result.find(".div0 {\n  margin: 10px;\n  color: red;\n  font-size: 12px;\n}"),
+            std::string::npos);
+  EXPECT_NE(result.find(".div1 {\n  margin: 20px;\n  color: blue;\n  font-size: 14px;\n}"),
+            std::string::npos);
 }
 
 CLI_TEST(HTMLStyleExtractorTest, SharedModifierClass) {
@@ -277,12 +282,13 @@ CLI_TEST(HTMLStyleExtractorTest, SharedModifierClass) {
       R"(</body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
   // Base class with shared properties.
-  EXPECT_NE(result.find(".blend0{position:absolute;width:48px;height:30px}"), std::string::npos);
+  EXPECT_NE(result.find(".blend0 {\n  position: absolute;\n  width: 48px;\n  height: 30px;\n}"),
+            std::string::npos);
   // Multiply modifier should appear only once (shared by elements a and c).
-  EXPECT_NE(result.find(".blend1{mix-blend-mode:multiply}"), std::string::npos);
-  EXPECT_NE(result.find(".blend2{mix-blend-mode:screen}"), std::string::npos);
+  EXPECT_NE(result.find(".blend1 {\n  mix-blend-mode: multiply;\n}"), std::string::npos);
+  EXPECT_NE(result.find(".blend2 {\n  mix-blend-mode: screen;\n}"), std::string::npos);
   // No third modifier should exist.
-  EXPECT_EQ(result.find(".blend3{"), std::string::npos);
+  EXPECT_EQ(result.find(".blend3 {"), std::string::npos);
   // Two elements share blend1 modifier.
   int count = 0;
   size_t pos = 0;
@@ -305,12 +311,16 @@ CLI_TEST(HTMLStyleExtractorTest, BaseModifierThreeVarying) {
       R"X(</body></html>)X";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
   // Base class with the 3 shared declarations (canonical order: display 20, color 90, font-size 92).
-  EXPECT_NE(result.find(".text0{display:inline-block;color:#3B82F6;font-size:14px}"),
-            std::string::npos);
+  EXPECT_NE(
+      result.find(".text0 {\n  display: inline-block;\n  color: #3B82F6;\n  font-size: 14px;\n}"),
+      std::string::npos);
   // Three modifier classes carrying only the varying triple (top 12, left 15, transform 40).
-  EXPECT_NE(result.find(".text1{top:10px;left:20px;transform:rotate(5deg)}"), std::string::npos);
-  EXPECT_NE(result.find(".text2{top:12px;left:30px;transform:rotate(10deg)}"), std::string::npos);
-  EXPECT_NE(result.find(".text3{top:14px;left:40px;transform:rotate(15deg)}"), std::string::npos);
+  EXPECT_NE(result.find(".text1 {\n  top: 10px;\n  left: 20px;\n  transform: rotate(5deg);\n}"),
+            std::string::npos);
+  EXPECT_NE(result.find(".text2 {\n  top: 12px;\n  left: 30px;\n  transform: rotate(10deg);\n}"),
+            std::string::npos);
+  EXPECT_NE(result.find(".text3 {\n  top: 14px;\n  left: 40px;\n  transform: rotate(15deg);\n}"),
+            std::string::npos);
   // Each span should carry base+modifier pair.
   EXPECT_NE(result.find("class=\"text0 text1\""), std::string::npos);
   EXPECT_NE(result.find("class=\"text0 text2\""), std::string::npos);
@@ -390,9 +400,10 @@ CLI_TEST(HTMLStyleExtractorTest, InlineSingleUseKeepsPairedModifier) {
       R"(<div style="position:absolute;width:50px;height:40px;background-color:#00FF00">b</div>)"
       R"(</body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
-  EXPECT_NE(result.find(".bg0{position:absolute;width:50px;height:40px}"), std::string::npos);
-  EXPECT_NE(result.find(".bg1{background-color:#FF0000}"), std::string::npos);
-  EXPECT_NE(result.find(".bg2{background-color:#00FF00}"), std::string::npos);
+  EXPECT_NE(result.find(".bg0 {\n  position: absolute;\n  width: 50px;\n  height: 40px;\n}"),
+            std::string::npos);
+  EXPECT_NE(result.find(".bg1 {\n  background-color: #FF0000;\n}"), std::string::npos);
+  EXPECT_NE(result.find(".bg2 {\n  background-color: #00FF00;\n}"), std::string::npos);
   EXPECT_NE(result.find("class=\"bg0 bg1\""), std::string::npos);
   EXPECT_NE(result.find("class=\"bg0 bg2\""), std::string::npos);
   EXPECT_EQ(result.find("style=\"position:absolute"), std::string::npos);
@@ -416,7 +427,7 @@ CLI_TEST(HTMLStyleExtractorTest, InlineSingleUseMultiUseStillClass) {
       R"(<html><head></head><body>)"
       R"(<span style="color:red">a</span><span style="color:red">b</span></body></html>)";
   auto result = pagx::HTMLStyleExtractor::Extract(input);
-  EXPECT_NE(result.find(".text0{color:red}"), std::string::npos);
+  EXPECT_NE(result.find(".text0 {\n  color: red;\n}"), std::string::npos);
   // Both spans reference the class; no inline style emission.
   EXPECT_EQ(result.find("style=\"color:red\""), std::string::npos);
 }
@@ -469,60 +480,11 @@ CLI_TEST(HTMLStyleExtractorTest, GradientParenthesesParse) {
   EXPECT_NE(result.find("linear-gradient(135deg,rgba(255,0,0,0.5) 50%,#00FF00 100%)"),
             std::string::npos);
   // The gradient value must be intact (not split at internal ; or :).
-  EXPECT_NE(result.find(".div0{position:absolute;background:linear-gradient(135deg,rgba(255,0,0,0."
-                        "5) 50%,#00FF00 100%)}"),
+  EXPECT_NE(result.find(".div0 {\n  position: absolute;\n  background: "
+                        "linear-gradient(135deg,rgba(255,0,0,0.5) 50%,#00FF00 100%);\n}"),
             std::string::npos);
-  EXPECT_NE(result.find(".div1{color:#FFF}"), std::string::npos);
-  EXPECT_NE(result.find(".div2{color:#000}"), std::string::npos);
-}
-
-CLI_TEST(HTMLStyleExtractorTest, FormatPretty) {
-  // Two uses keep the class form so we can inspect the Pretty <style> block shape.
-  std::string input = R"(<html><head></head><body>)"
-                      R"(<div style="color:red;font-size:12px">a</div>)"
-                      R"(<div style="color:red;font-size:12px">b</div>)"
-                      R"(</body></html>)";
-  auto result = pagx::HTMLStyleExtractor::Extract(input, pagx::HTMLStyleExtractor::Format::Pretty);
-  // Selector on its own line with opening brace separated by a space.
-  EXPECT_NE(result.find(".div0 {\n"), std::string::npos);
-  // Each declaration on its own line, indented by two spaces, terminated by a semicolon.
-  EXPECT_NE(result.find("\n  color: red;\n"), std::string::npos);
-  EXPECT_NE(result.find("\n  font-size: 12px;\n"), std::string::npos);
-  // Closing brace on its own line.
-  EXPECT_NE(result.find("\n}\n"), std::string::npos);
-}
-
-CLI_TEST(HTMLStyleExtractorTest, FormatMinify) {
-  // Use each style twice to keep the class form (single-use inlines, see InlineSingleUse*).
-  std::string input = R"(<html><head></head><body>)"
-                      R"(<div style="color:red">a1</div><div style="color:red">a2</div>)"
-                      R"(<div style="color:blue">b1</div><div style="color:blue">b2</div>)"
-                      R"(</body></html>)";
-  auto result = pagx::HTMLStyleExtractor::Extract(input, pagx::HTMLStyleExtractor::Format::Minify);
-  // Style block must be on a single line with no newlines anywhere inside it.
-  auto styleStart = result.find("<style>");
-  auto styleEnd = result.find("</style>");
-  ASSERT_NE(styleStart, std::string::npos);
-  ASSERT_NE(styleEnd, std::string::npos);
-  auto styleBlock = result.substr(styleStart, styleEnd - styleStart + 8);
-  EXPECT_EQ(styleBlock.find('\n'), std::string::npos);
-  EXPECT_NE(styleBlock.find(".div0{color:red}"), std::string::npos);
-  EXPECT_NE(styleBlock.find(".div1{color:blue}"), std::string::npos);
-}
-
-CLI_TEST(HTMLStyleExtractorTest, FormatCompactIsDefault) {
-  // Calling without an explicit format argument must match explicit Compact.
-  // Two uses keep the class hoisted so we can inspect the <style> block shape.
-  std::string input = R"(<html><head></head><body>)"
-                      R"(<div style="color:red">a</div>)"
-                      R"(<div style="color:red">b</div>)"
-                      R"(</body></html>)";
-  auto defaulted = pagx::HTMLStyleExtractor::Extract(input);
-  auto explicitCompact =
-      pagx::HTMLStyleExtractor::Extract(input, pagx::HTMLStyleExtractor::Format::Compact);
-  EXPECT_EQ(defaulted, explicitCompact);
-  // Compact shape: "<style>\n.div0{color:red}\n</style>\n".
-  EXPECT_NE(defaulted.find("<style>\n.div0{color:red}\n</style>\n"), std::string::npos);
+  EXPECT_NE(result.find(".div1 {\n  color: #FFF;\n}"), std::string::npos);
+  EXPECT_NE(result.find(".div2 {\n  color: #000;\n}"), std::string::npos);
 }
 
 }  // namespace pag

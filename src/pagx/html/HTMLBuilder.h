@@ -26,9 +26,8 @@ namespace pagx {
 
 class HTMLBuilder {
  public:
-  explicit HTMLBuilder(int indentSpaces, int initialLevel = 0, size_t reserve = 4096,
-                       bool minify = false)
-      : _level(initialLevel), _spaces(indentSpaces), _minify(minify) {
+  explicit HTMLBuilder(int indentSpaces, int initialLevel = 0, size_t reserve = 4096)
+      : _level(initialLevel), _spaces(indentSpaces) {
     _buf.reserve(reserve);
   }
 
@@ -216,21 +215,15 @@ class HTMLBuilder {
   std::vector<const char*> _tags = {};
   int _level = 0;
   int _spaces = 2;
-  bool _minify = false;
 
   void indent() {
-    if (_minify) {
-      return;
-    }
     if (_level > 0) {
       _buf.append(static_cast<size_t>(_level * _spaces), ' ');
     }
   }
 
   void newline() {
-    if (!_minify) {
-      _buf += '\n';
-    }
+    _buf += '\n';
   }
 
   static std::string EscapeAttr(const std::string& s) {

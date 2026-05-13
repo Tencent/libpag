@@ -635,7 +635,7 @@ static bool IsPosInsideRange(size_t pos, const std::vector<std::pair<size_t, siz
 // Extract
 //==============================================================================
 
-std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) {
+std::string HTMLStyleExtractor::Extract(const std::string& html) {
   if (html.empty()) return html;
   auto tags = Tokenize(html);
 
@@ -1005,31 +1005,16 @@ std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) 
   if (classRules.empty()) {
     return output;
   }
-  std::string styleBlock;
-  if (format == Format::Minify) {
-    styleBlock = "<style>";
-    for (const auto& rule : classRules) {
-      styleBlock += "." + rule.className + "{" + rule.declarations + "}";
+  std::string styleBlock = "<style>\n";
+  for (const auto& rule : classRules) {
+    styleBlock += "." + rule.className + " {\n";
+    auto props = ParseStyleProperties(rule.declarations);
+    for (const auto& p : props) {
+      styleBlock += "  " + p.name + ": " + p.value + ";\n";
     }
-    styleBlock += "</style>";
-  } else if (format == Format::Pretty) {
-    styleBlock = "<style>\n";
-    for (const auto& rule : classRules) {
-      styleBlock += "." + rule.className + " {\n";
-      auto props = ParseStyleProperties(rule.declarations);
-      for (const auto& p : props) {
-        styleBlock += "  " + p.name + ": " + p.value + ";\n";
-      }
-      styleBlock += "}\n";
-    }
-    styleBlock += "</style>\n";
-  } else {
-    styleBlock = "<style>\n";
-    for (const auto& rule : classRules) {
-      styleBlock += "." + rule.className + "{" + rule.declarations + "}\n";
-    }
-    styleBlock += "</style>\n";
+    styleBlock += "}\n";
   }
+  styleBlock += "</style>\n";
   size_t headEndPos = output.find("</head>");
   if (headEndPos != std::string::npos) {
     output.insert(headEndPos, styleBlock);

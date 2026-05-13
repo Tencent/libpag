@@ -41,7 +41,6 @@ struct ExportOptions {
   bool svgNoXmlDeclaration = false;
   bool textToPath = false;
   bool pptBakeUnsupported = true;
-  std::string htmlFormat = "pretty";
   std::vector<std::string> htmlFonts = {};
   bool htmlNoFontSynthesisWeight = false;
   bool htmlNoFontSynthesisStyle = false;
@@ -81,7 +80,6 @@ static void PrintUsage() {
       << "                              falls back to Normal, wide-gamut clamped to sRGB).\n"
       << "\n"
       << "HTML options:\n"
-      << "  --html-format <mode>        Output format: pretty (default), compact, or minify\n"
       << "  --html-font <spec>          Inject a CSS @font-face rule. Can be repeated.\n"
       << "                              Spec syntax:\n"
       << "                                "
@@ -146,14 +144,6 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
       options->textToPath = true;
     } else if (arg == "--ppt-no-bake-unsupported") {
       options->pptBakeUnsupported = false;
-    } else if (arg == "--html-format" && i + 1 < argc) {
-      std::string value = argv[++i];
-      if (value != "pretty" && value != "compact" && value != "minify") {
-        std::cerr << "pagx export: error: invalid --html-format '" << value
-                  << "' (expected pretty, compact, or minify)\n";
-        return 1;
-      }
-      options->htmlFormat = value;
     } else if (arg == "--html-font" && i + 1 < argc) {
       options->htmlFonts.emplace_back(argv[++i]);
     } else if (arg == "--html-no-font-synthesis-weight") {
@@ -369,32 +359,16 @@ static bool ParseFontFaceSpec(const std::string& spec, ParsedFontFace* out) {
   return true;
 }
 
-static HTMLFormat ParseHTMLFormat(const std::string& name) {
-  if (name == "minify") {
-    return HTMLFormat::Minify;
-  }
-  if (name == "compact") {
-    return HTMLFormat::Compact;
-  }
-  return HTMLFormat::Pretty;
-}
-
 // Wraps the HTML fragment returned by HTMLExporter::ToHTML in a complete <!DOCTYPE html>
 // document so that the output file can be opened directly in a browser. The body is sized to
 // the PAGX canvas; font-synthesis is disabled at the body level so that browsers don't spray
 // auto-synthesised bold/italic onto elements that did not ask for it — the per-element
 // font-synthesis:auto toggles emitted by HTMLExporter re-enable it where needed.
-static std::string WrapAsHTMLDocument(const std::string& fragment, float width, float height,
-                                      HTMLFormat format) {
-  const bool minify = format == HTMLFormat::Minify;
+static std::string WrapAsHTMLDocument(const std::string& fragment, float width, float height) {
   auto w = std::to_string(static_cast<int>(width));
   auto h = std::to_string(static_cast<int>(height));
   std::string bodyStyle = "margin:0;padding:0;width:" + w + "px;height:" + h +
                           "px;overflow:hidden;font-family:sans-serif;font-synthesis:none";
-  if (minify) {
-    return "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>body{" + bodyStyle +
-           "}</style></head><body>" + fragment + "</body></html>";
-  }
   return "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<style>\nbody { " + bodyStyle +
          " }\n</style>\n</head>\n<body>\n" + fragment + "\n</body>\n</html>\n";
 }
@@ -469,7 +443,6 @@ static int ExportToHTML(const ExportOptions& options) {
   }
 
   HTMLExporter::Options htmlOptions = {};
-  htmlOptions.format = ParseHTMLFormat(options.htmlFormat);
   // Isolate every HTML's rasterized assets in their own sub-directory so that multiple
   // exports into the same output directory cannot collide on filenames like "dgc0.png"
   // or "pd_0.png" (the exporter re-uses short ids per document). The sub-directory name
@@ -533,7 +506,7 @@ static int ExportToHTML(const ExportOptions& options) {
     return 1;
   }
 
-  auto html = WrapAsHTMLDocument(fragment, document->width, document->height, htmlOptions.format);
+  auto html = WrapAsHTMLDocument(fragment, document->width, document->height);
 
   if (!outputDir.empty() && !std::filesystem::exists(outputDir)) {
     std::error_code ec;
