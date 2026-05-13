@@ -823,42 +823,112 @@ static std::shared_ptr<tgfx::Data> RenderToPNG(tgfx::Context* context, int width
 }
 
 // Draws `targetLayer` (and only that layer) into the off-screen canvas, with
-// the bounds origin mapped to (0,0) so the emitted PNG is tightly cropped.
-// `bounds` and `coordinateSpace` describe the coordinate space chosen by the
-// caller: pixels are rendered so that `coordinateSpace`'s axes align with the
-// canvas axes, and the PNG can be placed at `bounds.left/top` inside any
-// container drawn in the same space. Used for mask / scrollRect bakes where
-// the layer's visual result does not depend on the backdrop.
+// the global bounds origin mapped to (0,0) so the emitted PNG is tightly
+// cropped. Used for mask / scrollRect bakes where the layer's visual result
+// does not depend on the backdrop.
+//
+// Note: tgfx's Layer::draw deliberately does NOT apply the target layer's own
+// scrollRect (see Layer.h doc on draw()) — only children's scrollRects are
+// honoured during the recursive walk. Without this drawer applying the clip
+// itself the baked PNG would contain the target's full unclipped content. The
+// scrollRect lives in layer-local coordinates, so we clip after concatenating
+// the layer's relative matrix while the canvas is still in layer-local space.
 struct MaskedLayerDrawer {
+  const std::shared_ptr<tgfx::Layer>& root;
   const std::shared_ptr<tgfx::Layer>& targetLayer;
-  const tgfx::Layer* coordinateSpace;
-  const tgfx::Rect& bounds;
+  const tgfx::Rect& globalBounds;
   void operator()(tgfx::Canvas* canvas) const {
-    canvas->translate(-bounds.left, -bounds.top);
-    canvas->concat(targetLayer->getRelativeMatrix(coordinateSpace));
+    canvas->translate(-globalBounds.left, -globalBounds.top);
+    canvas->concat(targetLayer->getRelativeMatrix(root.get()));
+    auto scrollRect = targetLayer->scrollRect();
+    if (!scrollRect.isEmpty()) {
+      canvas->clipRect(scrollRect, targetLayer->allowsEdgeAntialiasing());
+    }
     targetLayer->draw(canvas);
   }
 };
 
+// Hides every layer that the BackdropCompositeDrawer must NOT bake into the PNG, restoring the
+// original visibility flags on destruction. The drawer needs the target layer's backdrop (i.e.
+// the pixels of layers drawn before it under the same root) but must exclude the target's later-
+// drawn siblings as well as anything painted on top of the target itself — otherwise the bake
+// captures content that the surrounding writeLayer recursion will also emit natively, producing
+// duplicated / overlapping output.
+//
+// The mask is built by walking the chain root -> ... -> targetLayer's parent. At each ancestor,
+// every child whose draw order is at-or-after the next link in the chain is hidden. The target
+// itself is excluded from the hide set because the drawer still needs to paint it on top of the
+// backdrop (that is, after all, the whole point of the backdrop composite).
+class BackdropSiblingMask {
+ public:
+  BackdropSiblingMask(const std::shared_ptr<tgfx::Layer>& root,
+                      const std::shared_ptr<tgfx::Layer>& targetLayer) {
+    if (!root || !targetLayer || root.get() == targetLayer.get()) {
+      return;
+    }
+    std::vector<tgfx::Layer*> chain;
+    for (auto* current = targetLayer.get(); current != nullptr; current = current->parent()) {
+      chain.push_back(current);
+      if (current == root.get()) {
+        break;
+      }
+    }
+    if (chain.empty() || chain.back() != root.get()) {
+      // targetLayer is not a descendant of root; defensive bail-out.
+      return;
+    }
+    for (size_t i = chain.size() - 1; i > 0; --i) {
+      auto* ancestor = chain[i];
+      auto* nextInChain = chain[i - 1];
+      bool seenChainLink = false;
+      for (const auto& child : ancestor->children()) {
+        if (child.get() == nextInChain) {
+          seenChainLink = true;
+          continue;
+        }
+        if (!seenChainLink) {
+          continue;
+        }
+        if (!child->visible()) {
+          continue;
+        }
+        _hidden.push_back(child);
+        child->setVisible(false);
+      }
+    }
+  }
+
+  ~BackdropSiblingMask() {
+    for (const auto& layer : _hidden) {
+      layer->setVisible(true);
+    }
+  }
+
+  BackdropSiblingMask(const BackdropSiblingMask&) = delete;
+  BackdropSiblingMask& operator=(const BackdropSiblingMask&) = delete;
+
+ private:
+  std::vector<std::shared_ptr<tgfx::Layer>> _hidden;
+};
+
 // Draws the entire scene from `root` downward into the off-screen canvas,
-// clipped to the target layer's bounds expressed in `coordinateSpace`. Used
-// when the target layer's visual result depends on the backdrop pixels below
-// it — e.g. a non-Normal `Layer.blendMode`, which the tgfx renderer composites
-// against whatever has already been drawn underneath. Drawing only the target
-// against an empty canvas (as MaskedLayerDrawer does) would blend it with
-// transparent-black and lose the intended composite; drawing `root` with a
-// clip preserves it. The canvas is pre-translated so `bounds.left/top` maps
-// to (0,0); clipRect is applied in that shifted coordinateSpace before
-// concat'ing root's relative matrix so the clip region aligns with the
-// canvas extent. concat then maps root-space drawing into coordinateSpace.
+// clipped to the target layer's global bounds. Used when the target layer's
+// visual result depends on the backdrop pixels below it — e.g. a non-Normal
+// `Layer.blendMode`, which the tgfx renderer composites against whatever has
+// already been drawn underneath. Drawing only the target against an empty
+// canvas (as MaskedLayerDrawer does) would blend it with transparent-black
+// and lose the intended composite; drawing `root` with a clip preserves it.
+//
+// `targetLayer` is the layer whose composite is being baked. The caller must arrange (via
+// BackdropSiblingMask) for any ancestor sibling drawn AFTER the target chain to be invisible
+// before this drawer runs, so the PNG only contains the backdrop + target instead of the
+// surrounding native content the writer will emit separately.
 struct BackdropCompositeDrawer {
   const std::shared_ptr<tgfx::Layer>& root;
-  const tgfx::Layer* coordinateSpace;
-  const tgfx::Rect& bounds;
+  const tgfx::Rect& globalBounds;
   void operator()(tgfx::Canvas* canvas) const {
-    canvas->translate(-bounds.left, -bounds.top);
-    canvas->clipRect(bounds);
-    canvas->concat(root->getRelativeMatrix(coordinateSpace));
+    canvas->translate(-globalBounds.left, -globalBounds.top);
+    canvas->clipRect(globalBounds);
     root->draw(canvas);
   }
 };
@@ -896,6 +966,66 @@ void GPUContext::unlock() {
   }
 }
 
+tgfx::Rect ComputeRasterizedLayerBounds(const std::shared_ptr<tgfx::Layer>& root,
+                                        const std::shared_ptr<tgfx::Layer>& targetLayer) {
+  auto bounds = targetLayer->getBounds(root.get(), true);
+  auto scrollRect = targetLayer->scrollRect();
+  if (!scrollRect.isEmpty()) {
+    // getRelativeMatrix(root) already folds in scrollRect's preTranslate (see
+    // tgfx Layer::getMatrixWithScrollRect), so mapping the scrollRect rect
+    // through it yields the visible window in `root` coordinates regardless of
+    // the layer's matrix or scroll offsets. getBounds however does not
+    // intersect the layer's own scrollRect with its own bounds (only child
+    // scrollRects are intersected during traversal), so we apply the clip here
+    // to keep the rasterized extent in sync with what will actually be drawn.
+    auto windowInRoot = targetLayer->getRelativeMatrix(root.get()).mapRect(scrollRect);
+    if (!bounds.intersect(windowInRoot)) {
+      return tgfx::Rect::MakeEmpty();
+    }
+  }
+  return bounds;
+}
+
+std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,
+                                              const std::shared_ptr<tgfx::Layer>& root,
+                                              const std::shared_ptr<tgfx::Layer>& targetLayer,
+                                              float pixelScale) {
+  auto globalBounds = ComputeRasterizedLayerBounds(root, targetLayer);
+  if (globalBounds.isEmpty()) {
+    return nullptr;
+  }
+  auto context = gpu->lockContext();
+  if (context == nullptr) {
+    return nullptr;
+  }
+  int width = static_cast<int>(ceilf(globalBounds.width()));
+  int height = static_cast<int>(ceilf(globalBounds.height()));
+  auto result = RenderToPNG(context, width, height, pixelScale,
+                            MaskedLayerDrawer{root, targetLayer, globalBounds});
+  gpu->unlock();
+  return result;
+}
+
+namespace {
+
+// Draws `targetLayer` (and only that layer) into the off-screen canvas using the supplied
+// coordinate space rather than the document root. The bounds origin is mapped to (0,0) so the
+// PNG is tightly cropped and can be placed at `bounds.left/top` inside any container whose
+// transform chain matches `coordinateSpace`. Used by the SVG path where the enclosing `<g>`
+// already carries the parent transform.
+struct MaskedLayerDrawerInSpace {
+  const std::shared_ptr<tgfx::Layer>& targetLayer;
+  const tgfx::Layer* coordinateSpace;
+  const tgfx::Rect& bounds;
+  void operator()(tgfx::Canvas* canvas) const {
+    canvas->translate(-bounds.left, -bounds.top);
+    canvas->concat(targetLayer->getRelativeMatrix(coordinateSpace));
+    targetLayer->draw(canvas);
+  }
+};
+
+}  // namespace
+
 std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,
                                               const std::shared_ptr<tgfx::Layer>& root,
                                               const std::shared_ptr<tgfx::Layer>& targetLayer,
@@ -903,6 +1033,9 @@ std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,
                                               float pixelScale) {
   auto coordinateSpace = targetCoordinateSpace != nullptr ? targetCoordinateSpace : root.get();
   auto bounds = targetLayer->getBounds(coordinateSpace, true);
+  if (bounds.isEmpty() || bounds.width() <= 0 || bounds.height() <= 0) {
+    return nullptr;
+  }
   auto context = gpu->lockContext();
   if (context == nullptr) {
     return nullptr;
@@ -910,25 +1043,30 @@ std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,
   int width = static_cast<int>(ceilf(bounds.width()));
   int height = static_cast<int>(ceilf(bounds.height()));
   auto result = RenderToPNG(context, width, height, pixelScale,
-                            MaskedLayerDrawer{targetLayer, coordinateSpace, bounds});
+                            MaskedLayerDrawerInSpace{targetLayer, coordinateSpace, bounds});
   gpu->unlock();
   return result;
 }
 
 std::shared_ptr<tgfx::Data> RenderLayerCompositeWithBackdrop(
     GPUContext* gpu, const std::shared_ptr<tgfx::Layer>& root,
-    const std::shared_ptr<tgfx::Layer>& targetLayer, const tgfx::Layer* targetCoordinateSpace,
-    float pixelScale) {
-  auto coordinateSpace = targetCoordinateSpace != nullptr ? targetCoordinateSpace : root.get();
-  auto bounds = targetLayer->getBounds(coordinateSpace, true);
+    const std::shared_ptr<tgfx::Layer>& targetLayer, float pixelScale) {
+  auto globalBounds = ComputeRasterizedLayerBounds(root, targetLayer);
+  if (globalBounds.isEmpty()) {
+    return nullptr;
+  }
   auto context = gpu->lockContext();
   if (context == nullptr) {
     return nullptr;
   }
-  int width = static_cast<int>(ceilf(bounds.width()));
-  int height = static_cast<int>(ceilf(bounds.height()));
-  auto result = RenderToPNG(context, width, height, pixelScale,
-                            BackdropCompositeDrawer{root, coordinateSpace, bounds});
+  int width = static_cast<int>(ceilf(globalBounds.width()));
+  int height = static_cast<int>(ceilf(globalBounds.height()));
+  // Hide every layer that is drawn after the target along its ancestor chain so the bake captures
+  // only the target plus its true backdrop (pixels drawn before it). Without this guard the
+  // surrounding writer would re-emit those siblings on top of the PNG, double-painting them.
+  BackdropSiblingMask hideMask(root, targetLayer);
+  auto result =
+      RenderToPNG(context, width, height, pixelScale, BackdropCompositeDrawer{root, globalBounds});
   gpu->unlock();
   return result;
 }

@@ -1961,7 +1961,7 @@ PAGX_TEST(PAGXPPTTest, MaskBakeDefault) {
   doc->layers.push_back(contentLayer);
 
   pagx::PPTExportOptions options;
-  options.rasterizeUnsupported = true;
+  options.bakeUnsupported = true;
   ASSERT_TRUE(ExportAndVerify(*doc, "mask_bake_default", options));
 }
 
@@ -1994,6 +1994,7 @@ PAGX_TEST(PAGXPPTTest, MaskNoBake) {
   doc->layers.push_back(contentLayer);
 
   pagx::PPTExportOptions options;
+  options.bakeUnsupported = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "mask_no_bake", options));
 }
 
@@ -2030,10 +2031,11 @@ PAGX_TEST(PAGXPPTTest, MaskNoBakeProducesSmaller) {
   auto vectorPath = outDir + "/mask_size_vector.pptx";
 
   pagx::PPTExportOptions bakedOpts;
-  bakedOpts.rasterizeUnsupported = true;
+  bakedOpts.bakeUnsupported = true;
   ASSERT_TRUE(pagx::PPTExporter::ToFile(*doc, bakedPath, bakedOpts));
 
   pagx::PPTExportOptions vectorOpts;
+  vectorOpts.bakeUnsupported = false;
   ASSERT_TRUE(pagx::PPTExporter::ToFile(*doc, vectorPath, vectorOpts));
 
   auto bakedSize = std::filesystem::file_size(bakedPath);
@@ -2090,6 +2092,7 @@ PAGX_TEST(PAGXPPTTest, MaskNoBakeWithChildLayers) {
   doc->layers.push_back(parentLayer);
 
   pagx::PPTExportOptions options;
+  options.bakeUnsupported = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "mask_no_bake_children", options));
 }
 
@@ -2137,6 +2140,7 @@ PAGX_TEST(PAGXPPTTest, MaskNoBakeWithTransformAndAlpha) {
   doc->layers.push_back(contentLayer);
 
   pagx::PPTExportOptions options;
+  options.bakeUnsupported = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "mask_no_bake_transform_alpha", options));
 }
 
@@ -2770,6 +2774,7 @@ PAGX_TEST(PAGXPPTTest, MaskNoBakeContourType) {
   doc->layers.push_back(contentLayer);
 
   pagx::PPTExportOptions options;
+  options.bakeUnsupported = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "mask_no_bake_contour", options));
 }
 
@@ -3970,7 +3975,7 @@ PAGX_TEST(PAGXPPTTest, LayerNonNormalBlendModeEscalated) {
   doc->layers.push_back(fgLayer);
 
   pagx::PPTExportOptions options;
-  options.rasterizeUnsupported = true;
+  options.bakeUnsupported = true;
   ASSERT_TRUE(ExportAndVerify(*doc, "layer_blend_overlay", options));
 }
 
@@ -3994,7 +3999,7 @@ PAGX_TEST(PAGXPPTTest, LayerNonNormalBlendWithBackdrop) {
   doc->layers.push_back(fg);
 
   pagx::PPTExportOptions options;
-  options.rasterizeUnsupported = true;
+  options.bakeUnsupported = true;
   ASSERT_TRUE(ExportAndVerify(*doc, "layer_blend_with_backdrop", options));
 }
 
@@ -4015,11 +4020,11 @@ PAGX_TEST(PAGXPPTTest, FillBlendModeEscalated) {
   layer->contents.push_back(fill);
   doc->layers.push_back(layer);
   pagx::PPTExportOptions options;
-  options.rasterizeUnsupported = true;
+  options.bakeUnsupported = true;
   ASSERT_TRUE(ExportAndVerify(*doc, "fill_blend_hardlight", options));
 }
 
-PAGX_TEST(PAGXPPTTest, RasterizeUnsupportedBlendDisabled) {
+PAGX_TEST(PAGXPPTTest, BakeUnsupportedBlendDisabled) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto* layer = doc->makeNode<pagx::Layer>();
   layer->blendMode = pagx::BlendMode::Overlay;
@@ -4031,6 +4036,7 @@ PAGX_TEST(PAGXPPTTest, RasterizeUnsupportedBlendDisabled) {
   doc->layers.push_back(layer);
 
   pagx::PPTExportOptions options;
+  options.bakeUnsupported = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "raster_blend_disabled", options));
 }
 
@@ -4068,7 +4074,7 @@ PAGX_TEST(PAGXPPTTest, BlendFilterUnsupportedMode) {
 
   doc->layers.push_back(layer);
   pagx::PPTExportOptions options;
-  options.rasterizeUnsupported = true;
+  options.bakeUnsupported = true;
   ASSERT_TRUE(ExportAndVerify(*doc, "blend_filter_unsupported", options));
 }
 
@@ -4089,7 +4095,7 @@ PAGX_TEST(PAGXPPTTest, WideGamutColorEscalated) {
   layer->contents.push_back(fill);
   doc->layers.push_back(layer);
   pagx::PPTExportOptions options;
-  options.rasterizeUnsupported = true;
+  options.bakeUnsupported = true;
   ASSERT_TRUE(ExportAndVerify(*doc, "wide_gamut_raster", options));
 }
 
@@ -4120,7 +4126,7 @@ PAGX_TEST(PAGXPPTTest, WideGamutGradientEscalated) {
   layer->contents.push_back(fill);
   doc->layers.push_back(layer);
   pagx::PPTExportOptions options;
-  options.rasterizeUnsupported = true;
+  options.bakeUnsupported = true;
   ASSERT_TRUE(ExportAndVerify(*doc, "wide_gamut_grad_raster", options));
 }
 
@@ -4142,6 +4148,7 @@ PAGX_TEST(PAGXPPTTest, WideGamutDisabled) {
   doc->layers.push_back(layer);
 
   pagx::PPTExportOptions options;
+  options.bakeUnsupported = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "wide_gamut_disabled", options));
 }
 
@@ -4559,7 +4566,7 @@ PAGX_TEST(PAGXPPTTest, ScrollRectBakeDefault) {
   layer->contents.push_back(MakeSolidFill(doc.get(), {0.6f, 0.8f, 0.4f, 1.0f}));
   doc->layers.push_back(layer);
   pagx::PPTExportOptions options;
-  options.rasterizeUnsupported = true;
+  options.bakeUnsupported = true;
   ASSERT_TRUE(ExportAndVerify(*doc, "scrollrect_bake_default", options));
 }
 
@@ -4576,6 +4583,7 @@ PAGX_TEST(PAGXPPTTest, ScrollRectBakeDisabled) {
   doc->layers.push_back(layer);
 
   pagx::PPTExportOptions options;
+  options.bakeUnsupported = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "scrollrect_bake_disabled", options));
 }
 
@@ -5096,7 +5104,7 @@ PAGX_TEST(PAGXPPTTest, BridgeContoursTextToPath) {
 //==============================================================================
 
 PAGX_TEST(PAGXPPTTest, ConicGradientFillVectorFallback) {
-  // rasterizeUnsupported=false: ProbeLayerFeatures still flags conic but the
+  // bakeUnsupported=false: ProbeLayerFeatures still flags conic but the
   // raster path is skipped so writeColorSource emits the last-resort circular
   // gradient (covers PPTStyleEmitter ConicGradient branch lines 231-238).
   auto doc = pagx::PAGXDocument::Make(400, 300);
@@ -5126,7 +5134,7 @@ PAGX_TEST(PAGXPPTTest, ConicGradientFillVectorFallback) {
   doc->layers.push_back(layer);
 
   pagx::PPTExportOptions options;
-  options.rasterizeUnsupported = false;
+  options.bakeUnsupported = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "conic_vector_fallback", options));
 }
 
@@ -5159,7 +5167,7 @@ PAGX_TEST(PAGXPPTTest, DiamondGradientFillVectorFallback) {
   doc->layers.push_back(layer);
 
   pagx::PPTExportOptions options;
-  options.rasterizeUnsupported = false;
+  options.bakeUnsupported = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "diamond_vector_fallback", options));
 }
 
@@ -5191,7 +5199,7 @@ PAGX_TEST(PAGXPPTTest, FillRuleEvenOddSinglePathDataFlat) {
 }
 
 PAGX_TEST(PAGXPPTTest, FillBlendNonRasterizedDropped) {
-  // Fill has non-Normal blendMode but rasterizeUnsupported=false: the
+  // Fill has non-Normal blendMode but bakeUnsupported=false: the
   // PPTFeatureProbe Fill branch (lines 159-160) flags it but writePath emits
   // the geometry without rasterizing, so the blend mode is silently dropped.
   auto doc = pagx::PAGXDocument::Make(400, 300);
@@ -5211,7 +5219,7 @@ PAGX_TEST(PAGXPPTTest, FillBlendNonRasterizedDropped) {
   doc->layers.push_back(layer);
 
   pagx::PPTExportOptions options;
-  options.rasterizeUnsupported = false;
+  options.bakeUnsupported = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "fill_blend_dropped", options));
 }
 
@@ -5238,7 +5246,7 @@ PAGX_TEST(PAGXPPTTest, StrokeBlendNonNormalProbed) {
   doc->layers.push_back(layer);
 
   pagx::PPTExportOptions options;
-  options.rasterizeUnsupported = true;
+  options.bakeUnsupported = true;
   ASSERT_TRUE(ExportAndVerify(*doc, "stroke_blend_probed", options));
 }
 
@@ -5272,7 +5280,7 @@ PAGX_TEST(PAGXPPTTest, RadialGradientWideGamutEscalated) {
   doc->layers.push_back(layer);
 
   pagx::PPTExportOptions options;
-  options.rasterizeUnsupported = true;
+  options.bakeUnsupported = true;
   ASSERT_TRUE(ExportAndVerify(*doc, "radial_widegamut_raster", options));
 }
 
@@ -5305,7 +5313,7 @@ PAGX_TEST(PAGXPPTTest, ConicGradientWideGamutEscalated) {
   doc->layers.push_back(layer);
 
   pagx::PPTExportOptions options;
-  options.rasterizeUnsupported = true;
+  options.bakeUnsupported = true;
   ASSERT_TRUE(ExportAndVerify(*doc, "conic_widegamut_raster", options));
 }
 
@@ -5339,7 +5347,7 @@ PAGX_TEST(PAGXPPTTest, DiamondGradientWideGamutEscalated) {
   doc->layers.push_back(layer);
 
   pagx::PPTExportOptions options;
-  options.rasterizeUnsupported = true;
+  options.bakeUnsupported = true;
   ASSERT_TRUE(ExportAndVerify(*doc, "diamond_widegamut_raster", options));
 }
 

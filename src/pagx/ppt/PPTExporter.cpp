@@ -565,26 +565,47 @@ void PPTWriter::writeElements(XMLBuilder& out, const std::vector<Element*>& elem
 }
 
 // Rasterize the entire layer (including its sub-tree) to a single embedded PNG
-// and emit it as a positioned p:pic. Returns true if a picture was emitted.
-bool PPTWriter::rasterizeLayerAsPicture(XMLBuilder& out, const Layer* layer, bool withBackdrop) {
+// and emit it as a positioned p:pic. Returns true on success, including the
+// no-op case where the layer's visible bounds are empty (everything clipped
+// out by scrollRect / clipToBounds / mask) — callers MUST treat that as
+// "successfully rasterized to nothing" and not fall through to emit children
+// unclipped. Returns false only for environmental failures (no GPU, encoder
+// error, missing layer-map entry, etc.) so the caller can attempt a degraded
+// fallback.
+bool PPTWriter::rasterizeLayerAsPicture(XMLBuilder& out, const Layer* layer,
+                                        const std::shared_ptr<tgfx::Layer>& tgfxLayer,
+                                        bool withBackdrop) {
   auto& buildResult = ensureBuildResult();
-  auto it = buildResult.layerMap.find(layer);
-  if (it == buildResult.layerMap.end() || !buildResult.root) {
+  if (!buildResult.root || !tgfxLayer) {
     return false;
   }
-  auto tgfxLayer = it->second;
-  if (!tgfxLayer) {
-    return false;
+  (void)layer;
+
+  // Keep the picture's on-slide xfrm in sync with the surface that produced
+  // the PNG: when the target layer has its own scrollRect, the PNG is sized to
+  // and clipped against the scrollRect window (RenderMaskedLayer and
+  // RenderLayerCompositeWithBackdrop both apply the clip because tgfx's
+  // Layer::draw skips the layer's own scrollRect). Using the raw getBounds()
+  // here would place the bitmap with the unclipped extent and visually break
+  // scrollRect clipping.
+  auto bounds = ComputeRasterizedLayerBounds(buildResult.root, tgfxLayer);
+
+  // Empty visible bounds means the layer's content is completely clipped out.
+  // Report success without emitting anything: the caller's `return` short-
+  // circuits the fall-through path that would otherwise emit children
+  // unclipped, which would leak shapes that should be invisible (PAGX render
+  // shows nothing; pre-fix PPTX showed them at their pre-clip world position).
+  if (bounds.isEmpty() || bounds.width() <= 0 || bounds.height() <= 0) {
+    return true;
   }
+
   auto pixelScale = static_cast<float>(_rasterDPI) / 96.0f;
-  auto pngData = withBackdrop
-                     ? RenderLayerCompositeWithBackdrop(&_gpu, buildResult.root, tgfxLayer, nullptr,
-                                                        pixelScale)
-                     : RenderMaskedLayer(&_gpu, buildResult.root, tgfxLayer, nullptr, pixelScale);
+  auto pngData = withBackdrop ? RenderLayerCompositeWithBackdrop(&_gpu, buildResult.root, tgfxLayer,
+                                                                 pixelScale)
+                              : RenderMaskedLayer(&_gpu, buildResult.root, tgfxLayer, pixelScale);
   if (!pngData) {
     return false;
   }
-  auto bounds = tgfxLayer->getBounds(buildResult.root.get(), true);
   auto offX = PxToEMU(bounds.left);
   auto offY = PxToEMU(bounds.top);
   auto extCX = std::max(int64_t(1), PxToEMU(bounds.width()));
@@ -618,8 +639,10 @@ std::vector<T*> MergeLayerLists(const std::vector<T*>& own, const std::vector<T*
 
 }  // namespace
 
-void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& parentMatrix,
-                           float parentAlpha, const std::vector<LayerFilter*>& inheritedFilters,
+void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer,
+                           const std::shared_ptr<tgfx::Layer>& tgfxLayer,
+                           const Matrix& parentMatrix, float parentAlpha,
+                           const std::vector<LayerFilter*>& inheritedFilters,
                            const std::vector<LayerStyle*>& inheritedStyles) {
   if (!layer->visible && layer->mask == nullptr) {
     return;
@@ -628,49 +651,55 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& pa
   Matrix layerMatrix = parentMatrix * BuildLayerMatrix(layer);
   float layerAlpha = parentAlpha * layer->alpha;
 
-  if (layer->mask != nullptr && _rasterizeUnsupported) {
-    if (rasterizeLayerAsPicture(out, layer)) {
+  if (layer->mask != nullptr && _bakeUnsupported) {
+    if (rasterizeLayerAsPicture(out, layer, tgfxLayer)) {
       return;
     }
-    // Bake fell through (zero bounds, no GPU, etc.) - fall through to writing
-    // the layer as a regular layer so its content is at least visible without
-    // the mask effect.
+    // Bake failed environmentally (no GPU, encoder error, etc.) - fall through
+    // to writing the layer as a regular layer so its content is at least
+    // visible without the mask effect. Empty-bounds (fully-masked-out) layers
+    // are handled inside rasterizeLayerAsPicture as a successful no-op and
+    // never reach this fallback.
   }
 
   // OOXML has no native clipping primitive for arbitrary shape children, so a
   // layer that carries a scrollRect (set explicitly or generated by clipToBounds
   // during layout) can only be honoured by rasterizing the whole layer subtree
   // through the renderer, which already applies setScrollRect via tgfx. When
-  // rasterizeUnsupported is off the clip is silently dropped and child shapes
-  // are emitted unclipped (matches the behaviour of unsupported features
+  // bakeUnsupported is off the clip is silently dropped and child shapes are
+  // emitted unclipped (matches the behaviour of unsupported features
   // elsewhere).
-  if (layer->hasScrollRect && _rasterizeUnsupported) {
-    if (rasterizeLayerAsPicture(out, layer)) {
+  if (layer->hasScrollRect && _bakeUnsupported) {
+    if (rasterizeLayerAsPicture(out, layer, tgfxLayer)) {
       return;
     }
-    // Bake fell through (zero bounds, no GPU, etc.) - fall through and emit the
-    // layer's content unclipped so it remains at least partially visible.
+    // Bake failed environmentally (no GPU, encoder error, etc.) - fall through
+    // and emit the layer's content unclipped so it remains at least partially
+    // visible. Empty-bounds layers (everything clipped out by scrollRect) are
+    // handled inside rasterizeLayerAsPicture as a successful no-op so they
+    // don't leak through this fallback.
   }
 
   // Probe the layer for features that OOXML cannot represent natively. Features
   // with no meaningful vector fallback (TextPath, TextModifier, ColorMatrix,
   // conic/diamond gradients, shear transforms) always bake to a PNG; features
   // with a degraded-but-valid fallback (unsupported blend modes, wide-gamut
-  // color) only bake when the caller opts in via `rasterizeUnsupported`. The
+  // color) only bake when the caller opts in via `bakeUnsupported`. The
   // alternative (silently dropping unsupported elements) was the V1 behaviour
   // and produced obviously wrong slides for documents with TextPath, complex
   // blends, ColorMatrix filters, or wide-gamut colors.
   auto features = ProbeLayerFeatures(layer);
-  if (features.needsRasterization(_rasterizeUnsupported)) {
+  if (features.needsRasterization(_bakeUnsupported)) {
     // Backdrop-aware features (non-Normal blend mode, BackgroundBlurStyle)
     // require rendering the whole scene clipped to the layer's bounds —
     // this turns any editable native content beneath the patch into baked
-    // pixels, which is why `rasterizeUnsupported` defaults to false.
-    // Every other unsupported feature (TextPath, ColorMatrix, wide-gamut
-    // color, diamond/conic gradient, shear transform) is self-contained and
-    // renders fine against an empty canvas.
-    bool withBackdrop = features.requiresBackdrop(_rasterizeUnsupported);
-    if (rasterizeLayerAsPicture(out, layer, withBackdrop)) {
+    // pixels, which is the main reason a caller might disable
+    // `bakeUnsupported` (it defaults to true so the slide matches the tgfx
+    // renderer out of the box). Every other unsupported feature (TextPath,
+    // ColorMatrix, wide-gamut color, diamond/conic gradient, shear transform)
+    // is self-contained and renders fine against an empty canvas.
+    bool withBackdrop = features.requiresBackdrop(_bakeUnsupported);
+    if (rasterizeLayerAsPicture(out, layer, tgfxLayer, withBackdrop)) {
       return;
     }
   }
@@ -694,14 +723,49 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& pa
 
   writeElements(out, layer->contents, layerMatrix, layerAlpha, effectiveFilters, effectiveStyles);
 
+  // Descend into the matching tgfx subtree: LayerBuilder pushes one tgfx::Layer per child in the
+  // order [composition->layers ..., layer->children ...] under tgfxLayer, so a positional walk
+  // through tgfxLayer->children() recovers the per-instance tgfx::Layer for each PAGX child even
+  // when the PAGX subtree is shared by multiple Composition references.
+  size_t tgfxChildIndex = 0;
+  const auto* tgfxChildren = tgfxLayer ? &tgfxLayer->children() : nullptr;
+
   if (layer->composition != nullptr) {
     for (const auto* compLayer : layer->composition->layers) {
-      writeLayer(out, compLayer, layerMatrix, layerAlpha, effectiveFilters, effectiveStyles);
+      std::shared_ptr<tgfx::Layer> childTgfx;
+      if (tgfxChildren && tgfxChildIndex < tgfxChildren->size()) {
+        childTgfx = (*tgfxChildren)[tgfxChildIndex];
+      }
+      ++tgfxChildIndex;
+      writeLayer(out, compLayer, childTgfx, layerMatrix, layerAlpha, effectiveFilters,
+                 effectiveStyles);
     }
   }
 
   for (const auto* child : layer->children) {
-    writeLayer(out, child, layerMatrix, layerAlpha, effectiveFilters, effectiveStyles);
+    std::shared_ptr<tgfx::Layer> childTgfx;
+    if (tgfxChildren && tgfxChildIndex < tgfxChildren->size()) {
+      childTgfx = (*tgfxChildren)[tgfxChildIndex];
+    }
+    ++tgfxChildIndex;
+    writeLayer(out, child, childTgfx, layerMatrix, layerAlpha, effectiveFilters, effectiveStyles);
+  }
+}
+
+void PPTWriter::writeDocument(XMLBuilder& out) {
+  auto& buildResult = ensureBuildResult();
+  // The build-time root has one child per top-level document layer (LayerBuilder pushes them in
+  // order). Pairing them up lets writeLayer descend into the matching tgfx subtree even when a
+  // Composition is referenced multiple times.
+  const auto* topChildren = buildResult.root ? &buildResult.root->children() : nullptr;
+  size_t topIndex = 0;
+  for (const auto* layer : _doc->layers) {
+    std::shared_ptr<tgfx::Layer> tgfxLayer;
+    if (topChildren && topIndex < topChildren->size()) {
+      tgfxLayer = (*topChildren)[topIndex];
+    }
+    ++topIndex;
+    writeLayer(out, layer, tgfxLayer);
   }
 }
 
@@ -749,9 +813,7 @@ bool PPTExporter::ToFile(PAGXDocument& doc, const std::string& filePath, const O
 
   // Build slide body content
   XMLBuilder body(false, 2, 0, 16384);
-  for (const auto* layer : doc.layers) {
-    writer.writeLayer(body, layer);
-  }
+  writer.writeDocument(body);
   std::string bodyContent = body.release();
 
   // Assemble slide XML

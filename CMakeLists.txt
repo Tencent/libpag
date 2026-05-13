@@ -211,13 +211,8 @@ if (PAG_BUILD_PAGX)
     endif ()
 
     if (PAG_BUILD_PPT)
-        list(APPEND PAG_FILES src/pagx/ppt/PPTExporter.cpp
-                src/pagx/ppt/PPTStyleEmitter.cpp
-                src/pagx/ppt/PPTTextWriter.cpp
-                src/pagx/ppt/PPTBoilerplate.cpp
-                src/pagx/ppt/PPTContourUtils.cpp
-                src/pagx/ppt/PPTGeomEmitter.cpp
-                src/pagx/ppt/PPTFeatureProbe.cpp)
+        file(GLOB_RECURSE PAGX_PPT_SOURCES src/pagx/ppt/*.*)
+        list(APPEND PAG_FILES ${PAGX_PPT_SOURCES})
         set(MINIZIP_DIR ${TGFX_DIR}/third_party/zlib/contrib/minizip)
         list(APPEND PAG_FILES ${MINIZIP_DIR}/zip.c ${MINIZIP_DIR}/ioapi.c)
         list(APPEND PAG_INCLUDES ${MINIZIP_DIR})
@@ -318,8 +313,7 @@ endif ()
 
 if (PAG_BUILD_PPT)
     list(APPEND PAG_DEFINES PAG_BUILD_PPT)
-    list(APPEND PAG_STATIC_VENDORS zlib)
-    list(APPEND PAG_INCLUDES third_party/out/zlib/${INCLUDE_ENTRY})
+    list(APPEND PAG_INCLUDES ${TGFX_DIR}/third_party/out/zlib/${INCLUDE_ENTRY})
 endif ()
 
 if (PAG_BUILD_CLI OR PAG_BUILD_TESTS)

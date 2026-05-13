@@ -48,10 +48,10 @@
 #include "pagx/nodes/TextBox.h"
 #include "pagx/ppt/PPTContourUtils.h"
 #include "pagx/ppt/PPTGeomEmitter.h"
+#include "pagx/ppt/PPTModifierResolver.h"
 #include "pagx/ppt/PPTWriterContext.h"
 #include "pagx/types/Rect.h"
 #include "pagx/utils/ExporterUtils.h"
-#include "pagx/utils/ModifierResolver.h"
 #include "pagx/xml/XMLBuilder.h"
 #include "renderer/LayerBuilder.h"
 
@@ -111,31 +111,6 @@ inline size_t CountUTF8Characters(const std::string& str) {
     }
   }
   return count;
-}
-
-//==============================================================================
-// Stroke-alignment geometry compensation
-//==============================================================================
-
-// PowerPoint's <a:ln> always centres the stroke on the path geometry, so the
-// only way to emulate StrokeAlign::Inside / StrokeAlign::Outside is to inset
-// (or outset) the geometry that backs the stroke painter by half the stroke
-// width before emitting it.  Returns the per-side offset to apply: positive
-// shrinks the geometry (Inside), negative grows it (Outside), and zero leaves
-// the geometry unchanged (Center, no stroke, or zero width).
-inline float StrokeAlignInset(const Stroke* stroke) {
-  if (stroke == nullptr || stroke->width <= 0) {
-    return 0.0f;
-  }
-  switch (stroke->align) {
-    case StrokeAlign::Inside:
-      return stroke->width / 2.0f;
-    case StrokeAlign::Outside:
-      return -stroke->width / 2.0f;
-    case StrokeAlign::Center:
-    default:
-      return 0.0f;
-  }
 }
 
 //==============================================================================
@@ -475,19 +450,40 @@ inline int64_t LineHeightToSpcPts(float lineHeightPx) {
   return lineHeightPx > 0 ? static_cast<int64_t>(std::round(lineHeightPx * 75.0)) : 0;
 }
 
-// Emits an <a:pPr> with optional alignment, line-spacing and base direction.
-// Skips emission entirely when no attribute is set, matching the previous
-// inline blocks in writeNativeText / writeParagraph / writeTextBoxGroup. When
-// `rtl` is true, emits rtl="1" so PowerPoint runs UBA with an RTL paragraph
-// base direction (pPr@rtl=0 is the OOXML default and is therefore elided).
+// PAGX's text layout advances each `\t` to the next multiple of `4 * fontSize`
+// pixels (TextLayout.cpp: `tabWidth = effectiveFontSize * 4`). OOXML expresses
+// the same idea via <a:pPr defTabSz="...">, in EMU. Without this override
+// PowerPoint falls back to the master's defTabSz="914400" (1 inch ≈ 96px), so
+// any text whose font size differs from 24px renders tabs at the wrong stops
+// — text following the tab lands at a different X position than PAGX laid
+// out, visibly drifting (or overflowing) the text box. Returns 0 for
+// non-positive font sizes so the caller can skip emission.
+inline int64_t PagxTabSizeEMU(float fontSizePx) {
+  if (!(fontSizePx > 0.0f)) {
+    return 0;
+  }
+  return static_cast<int64_t>(std::round(static_cast<double>(fontSizePx) * 4.0 * EMU_PER_PX));
+}
+
+// Emits an <a:pPr> with optional alignment, line-spacing, base direction, and
+// default tab-stop interval. Skips emission entirely when no attribute is set,
+// matching the previous inline blocks in writeNativeText / writeParagraph /
+// writeTextBoxGroup. When `rtl` is true, emits rtl="1" so PowerPoint runs UBA
+// with an RTL paragraph base direction (pPr@rtl=0 is the OOXML default and is
+// therefore elided). When `defTabSzEMU` is positive, overrides the master's
+// default tab-stop interval so paragraphs with `\t` characters land glyphs at
+// the same stops PAGX used during layout.
 inline void WriteParagraphProperties(XMLBuilder& out, const char* algn, int64_t lnSpcPts,
-                                     bool rtl = false) {
-  if (!algn && lnSpcPts <= 0 && !rtl) {
+                                     bool rtl = false, int64_t defTabSzEMU = 0) {
+  if (!algn && lnSpcPts <= 0 && !rtl && defTabSzEMU <= 0) {
     return;
   }
   auto& pPr = out.openElement("a:pPr");
   if (algn) {
     pPr.addRequiredAttribute("algn", algn);
+  }
+  if (defTabSzEMU > 0) {
+    pPr.addRequiredAttribute("defTabSz", defTabSzEMU);
   }
   if (rtl) {
     pPr.addRequiredAttribute("rtl", "1");
@@ -578,8 +574,8 @@ struct EffectSources {
 
   // BackgroundBlurStyle is intentionally not tracked: it has no faithful OOXML
   // primitive (a:blur blurs the shape itself, not the backdrop) and the writer
-  // drops it on the vector path. When `rasterizeUnsupported` is enabled, the
-  // feature probe rasterizes the layer with backdrop instead.
+  // drops it on the vector path. When `bakeUnsupported` is enabled, the feature
+  // probe bakes the layer (with backdrop) to a PNG patch instead.
   bool empty() const {
     return !blur && !blend && !innerShadowFilter && !innerShadowStyle && !dropShadowFilter &&
            !dropShadowStyle;
@@ -674,11 +670,17 @@ class PPTWriter {
             LayoutContext* layoutContext)
       : _ctx(ctx), _doc(doc), _convertTextToPath(options.convertTextToPath),
         _bridgeContours(options.bridgeContours), _resolveModifiers(options.resolveModifiers),
-        _rasterizeUnsupported(options.rasterizeUnsupported), _rasterDPI(options.rasterDPI),
+        _bakeUnsupported(options.bakeUnsupported), _rasterDPI(options.rasterDPI),
         _layoutContext(layoutContext), _resolver(doc) {
   }
 
-  void writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& parentMatrix = {},
+  // Top-level entry: walks every layer in `_doc->layers`, pairing each with its corresponding
+  // top-level tgfx::Layer from the build-time root, so writeLayer's positional descent into
+  // tgfxLayer->children() resolves the correct per-instance subtree for any Composition reference.
+  void writeDocument(XMLBuilder& out);
+
+  void writeLayer(XMLBuilder& out, const Layer* layer,
+                  const std::shared_ptr<tgfx::Layer>& tgfxLayer, const Matrix& parentMatrix = {},
                   float parentAlpha = 1.0f, const std::vector<LayerFilter*>& inheritedFilters = {},
                   const std::vector<LayerStyle*>& inheritedStyles = {});
 
@@ -689,14 +691,18 @@ class PPTWriter {
   // the layer composites against the backdrop correctly; otherwise only the layer
   // itself is rendered (used for mask / scrollRect fallbacks that don't depend on
   // the backdrop pixels).
-  bool rasterizeLayerAsPicture(XMLBuilder& out, const Layer* layer, bool withBackdrop = false);
+  // `tgfxLayer` is the live tgfx instance built from `layer`; the caller (writeLayer) supplies it
+  // because layerMap collapses multiple Composition references to the same key.
+  bool rasterizeLayerAsPicture(XMLBuilder& out, const Layer* layer,
+                               const std::shared_ptr<tgfx::Layer>& tgfxLayer,
+                               bool withBackdrop = false);
 
   PPTWriterContext* _ctx = nullptr;
   PAGXDocument* _doc = nullptr;
   bool _convertTextToPath = false;
   bool _bridgeContours = false;
   bool _resolveModifiers = true;
-  bool _rasterizeUnsupported = false;
+  bool _bakeUnsupported = true;
   // Ratio of raster DPI to the 96 DPI logical coordinate space. Drives the
   // off-screen Surface size of every PNG bake (masked layer, scrollRect bake,
   // blend/wide-gamut fallback, tiled pattern). The placed <p:pic>/<a:blipFill>
@@ -707,7 +713,7 @@ class PPTWriter {
   GPUContext _gpu;
   LayerBuildResult _buildResult = {};
   bool _buildResultReady = false;
-  ModifierResolver _resolver;
+  PPTModifierResolver _resolver;
 
   const LayerBuildResult& ensureBuildResult();
 
@@ -775,13 +781,13 @@ class PPTWriter {
                                 const TextBox* textBox, bool useLineLayout);
   void emitNativeTextBody(XMLBuilder& out, const Text* text,
                           const std::vector<TextLayoutLineInfo>* lines, const PPTRunStyle& style,
-                          int64_t lnSpcPts, bool rtl, bool useLineLayout,
+                          int64_t lnSpcPts, bool rtl, bool useLineLayout, int64_t defTabSzEMU,
                           const std::vector<LayerFilter*>& filters,
                           const std::vector<LayerStyle*>& styles);
   void writeParagraph(XMLBuilder& out, const std::string& lineText, const PPTRunStyle& style,
                       const std::vector<LayerFilter*>& filters,
                       const std::vector<LayerStyle*>& styles, int64_t lnSpcPts = 0,
-                      bool rtl = false);
+                      bool rtl = false, int64_t defTabSzEMU = 0);
   void writeParagraphRun(XMLBuilder& out, const std::string& runText, const PPTRunStyle& style,
                          const std::vector<LayerFilter*>& filters,
                          const std::vector<LayerStyle*>& styles);
@@ -814,6 +820,7 @@ class PPTWriter {
     const char* algn;
     int64_t lnSpcPts;
     bool rtl;
+    int64_t defTabSzEMU;
     const std::vector<LayerFilter*>& filters;
     const std::vector<LayerStyle*>& styles;
     bool paragraphOpen = false;

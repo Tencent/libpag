@@ -39,6 +39,7 @@
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 #include "utils/Baseline.h"
+#include "utils/PAGXTestUtils.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestDir.h"
 
@@ -99,15 +100,6 @@ static bool RenderAndCompare(std::vector<std::string> args, const std::string& k
 static std::string ReadFile(const std::string& path) {
   std::ifstream in(path);
   return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
-
-static int CallRun(int (*fn)(int, char*[]), std::vector<std::string> args) {
-  std::vector<char*> argv = {};
-  argv.reserve(args.size());
-  for (auto& arg : args) {
-    argv.push_back(arg.data());
-  }
-  return fn(static_cast<int>(argv.size()), argv.data());
 }
 
 static std::string ExportToSVG(const std::string& pagxResourceName, const std::string& svgTempName,
@@ -629,7 +621,7 @@ CLI_TEST(PAGXCliTest, Verify_C10_ComplexPath) {
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
-  EXPECT_TRUE(output.find("verbs (> 500)") != std::string::npos);
+  EXPECT_TRUE(output.find("verbs (> 1024)") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Verify_C11_LowOpacityHighCost) {
@@ -1276,10 +1268,10 @@ CLI_TEST(PAGXCliTest, Export_PagxToPptx_NoConvertTextToPath) {
   EXPECT_GT(std::filesystem::file_size(outputPath), 0u);
 }
 
-CLI_TEST(PAGXCliTest, Export_PagxToPptx_RasterizeUnsupported) {
+CLI_TEST(PAGXCliTest, Export_PagxToPptx_NoBakeUnsupported) {
   auto inputPath = TestResourcePath("verify_simple.pagx");
-  auto outputPath = TempDir() + "/ExportPPTX_RasterizeUnsupported.pptx";
-  auto ret = CallRun(pagx::cli::RunExport, {"export", "--ppt-rasterize-unsupported", "--input",
+  auto outputPath = TempDir() + "/ExportPPTX_NoBakeUnsupported.pptx";
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--ppt-no-bake-unsupported", "--input",
                                             inputPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(outputPath));
@@ -2756,7 +2748,7 @@ CLI_TEST(PAGXCliTest, Verify_PainterLeakClean) {
   auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
   auto output = oss.str();
-  EXPECT_NE(ret, 0);
+  EXPECT_EQ(ret, 0);
   EXPECT_EQ(output.find("painter leaks geometry"), std::string::npos);
 }
 

@@ -287,7 +287,8 @@ void PPTWriter::emitNativeTextShapeFrame(XMLBuilder& out, const Matrix& m,
 void PPTWriter::emitNativeTextBody(XMLBuilder& out, const Text* text,
                                    const std::vector<TextLayoutLineInfo>* lines,
                                    const PPTRunStyle& style, int64_t lnSpcPts, bool rtl,
-                                   bool useLineLayout, const std::vector<LayerFilter*>& filters,
+                                   bool useLineLayout, int64_t defTabSzEMU,
+                                   const std::vector<LayerFilter*>& filters,
                                    const std::vector<LayerStyle*>& styles) {
   if (useLineLayout) {
     // Emit ALL visual lines inside a single <a:p> separated by soft <a:br/>
@@ -296,7 +297,7 @@ void PPTWriter::emitNativeTextBody(XMLBuilder& out, const Text* text,
     // justify entirely; soft breaks within one paragraph make all lines
     // except the semantically last participate in justify.
     out.openElement("a:p").closeElementStart();
-    WriteParagraphProperties(out, style.algn, lnSpcPts, rtl);
+    WriteParagraphProperties(out, style.algn, lnSpcPts, rtl, defTabSzEMU);
 
     // TextLayout's per-Text line metadata only records lines that contributed
     // glyphs, so empty lines (created by consecutive '\n') don't appear in
@@ -351,7 +352,7 @@ void PPTWriter::emitNativeTextBody(XMLBuilder& out, const Text* text,
     size_t nl = remaining.find('\n', pos);
     std::string line =
         (nl == std::string::npos) ? remaining.substr(pos) : remaining.substr(pos, nl - pos);
-    writeParagraph(out, line, style, filters, styles, lnSpcPts, rtl);
+    writeParagraph(out, line, style, filters, styles, lnSpcPts, rtl, defTabSzEMU);
     if (nl == std::string::npos) {
       break;
     }
@@ -434,7 +435,16 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   // attribute so PowerPoint doesn't emit a spurious warning for eaVert text.
   bool emitRtl = rtl && !isVertical;
 
-  emitNativeTextBody(out, text, lines, style, lnSpcPts, emitRtl, useLineLayout, filters, styles);
+  // PAGX advances `\t` to the next multiple of `4 * fontSize` pixels; emit
+  // the matching <a:pPr defTabSz="..."> so PowerPoint reproduces the same tab
+  // stops instead of the master's 1-inch fallback. Skip the override entirely
+  // when the source has no tab characters: the default is already correct
+  // and the extra attribute would just add XML noise.
+  int64_t defTabSzEMU =
+      (text->text.find('\t') != std::string::npos) ? PagxTabSizeEMU(text->renderFontSize()) : 0;
+
+  emitNativeTextBody(out, text, lines, style, lnSpcPts, emitRtl, useLineLayout, defTabSzEMU,
+                     filters, styles);
 
   out.closeElement();  // p:txBody
   out.closeElement();  // p:sp
@@ -554,9 +564,10 @@ size_t PPTWriter::writeNewlineBreaksAcrossRuns(ParagraphEmitter& emitter,
 
 void PPTWriter::writeParagraph(XMLBuilder& out, const std::string& lineText,
                                const PPTRunStyle& style, const std::vector<LayerFilter*>& filters,
-                               const std::vector<LayerStyle*>& styles, int64_t lnSpcPts, bool rtl) {
+                               const std::vector<LayerStyle*>& styles, int64_t lnSpcPts, bool rtl,
+                               int64_t defTabSzEMU) {
   out.openElement("a:p").closeElementStart();
-  WriteParagraphProperties(out, style.algn, lnSpcPts, rtl);
+  WriteParagraphProperties(out, style.algn, lnSpcPts, rtl, defTabSzEMU);
   writeParagraphRun(out, lineText, style, filters, styles);
   out.closeElement();  // a:p
 }
@@ -598,7 +609,7 @@ void CollectRichTextRuns(const std::vector<Element*>& elements, const Fill* pare
 }  // namespace
 
 void PPTWriter::ParagraphEmitter::writePPr() {
-  WriteParagraphProperties(out, algn, lnSpcPts, rtl);
+  WriteParagraphProperties(out, algn, lnSpcPts, rtl, defTabSzEMU);
 }
 
 void PPTWriter::ParagraphEmitter::openParagraph() {
@@ -914,7 +925,22 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
     runStyles.push_back(BuildRunStyle(run.text, run.fill, run.stroke, alpha));
   }
 
-  ParagraphEmitter emitter{this, out, algn, lnSpcPts, rtl, filters, styles};
+  // Locate the first run whose text contains a `\t` and use its renderFontSize
+  // to set the paragraph's defTabSz. PAGX shapes each Text with its own
+  // `4 * fontSize` tab stop; OOXML can carry only a single defTabSz per
+  // paragraph, so mixed-size rich text with tabs in multiple runs may still
+  // drift slightly — but matching the first tab-bearing run keeps the common
+  // single-style case exact. Skip the override entirely when no run has a
+  // tab so the master's default value still applies (no XML noise).
+  int64_t defTabSzEMU = 0;
+  for (const auto& run : runs) {
+    if (run.text->text.find('\t') != std::string::npos) {
+      defTabSzEMU = PagxTabSizeEMU(run.text->renderFontSize());
+      break;
+    }
+  }
+
+  ParagraphEmitter emitter{this, out, algn, lnSpcPts, rtl, defTabSzEMU, filters, styles};
   emitTextBoxBody(runs, runStyles, lineEntries, useLineLayout, emitter);
 
   out.closeElement();  // p:txBody

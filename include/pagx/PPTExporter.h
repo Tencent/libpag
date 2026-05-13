@@ -56,24 +56,26 @@ struct PPTExportOptions {
   bool resolveModifiers = true;
 
   /**
-   * Whether to rasterize layers that use features OOXML cannot represent natively — masks,
-   * scrollRect clipping, blend modes outside of Normal/Multiply/Screen/Darken/Lighten, and
-   * wide-gamut color sources (DisplayP3, etc.). When true, the layer is rendered to a PNG patch
+   * Whether to bake layers that use features OOXML cannot represent natively — masks, scrollRect
+   * clipping, blend modes outside of Normal/Multiply/Screen/Darken/Lighten, and wide-gamut color
+   * sources (DisplayP3, etc.) — into PNG patches. When true, the layer is rendered to a PNG patch
    * so the visual result matches the tgfx renderer; for unsupported blend modes the backdrop
    * beneath the layer is baked into the patch as well, turning any native content under it into
    * pixels so the blend composites correctly. When false, these features are silently dropped
    * and the layer is emitted as editable vector shapes (the mask effect is ignored, the
    * scrollRect is dropped, the blend mode falls back to Normal, and wide-gamut colors are
    * clamped to sRGB), preserving full editability at the cost of visual fidelity. Tiled image
-   * patterns are always rasterized regardless of this flag because the native OOXML a:tile
-   * mechanism produces inconsistent scaling across PowerPoint and Keynote. Features with no
-   * meaningful vector fallback (TextPath, TextModifier, ColorMatrix, conic/diamond gradients,
-   * shear transforms) are always rasterized regardless of this flag. The default value is false.
+   * patterns are always baked regardless of this flag because the native OOXML a:tile mechanism
+   * produces inconsistent scaling across PowerPoint and Keynote. Features with no meaningful
+   * vector fallback (TextPath, TextModifier, ColorMatrix, conic/diamond gradients, shear
+   * transforms) are always baked regardless of this flag. The default value is true, favouring
+   * visual fidelity over editability — callers that need editable vector output for unsupported
+   * features should set this to false explicitly.
    */
-  bool rasterizeUnsupported = false;
+  bool bakeUnsupported = true;
 
   /**
-   * Pixel DPI used when a layer has to be rasterized to PNG. The Surface behind every bake (masked
+   * Pixel DPI used when a layer has to be baked to PNG. The Surface behind every bake (masked
    * layer, scrollRect fallback, blend/wide-gamut fallback, tiled pattern) is sized by
    * `rasterDPI / 96` relative to the layer's logical extent, while the placed picture keeps the
    * logical EMU dimensions — the consumer stretches the denser bitmap over the same visible area,
