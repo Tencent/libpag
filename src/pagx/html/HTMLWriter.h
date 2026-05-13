@@ -204,7 +204,7 @@ class HTMLWriterContext {
   // public API boundary, so both fields are non-empty when HTMLWriter runs.
   std::string staticImgDir = {};
   std::string staticImgUrlPrefix = {};
-  float staticImgPixelRatio = 2.0f;
+  float rasterScale = 2.0f;
 
   // Cache: source absolute file path → assigned filename inside staticImgDir. Used by
   // GetImageSrc to deduplicate identical source paths (one source copied at most once per

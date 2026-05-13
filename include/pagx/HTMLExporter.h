@@ -120,10 +120,14 @@ struct FontFaceRule {
  */
 struct HTMLExportOptions {
   /**
-   * Device pixel ratio used when rasterizing static images. A value of 2 produces @2x assets,
-   * which keeps visual parity with the browser's 2x comparison output. The default is 2.
+   * Oversampling factor applied when rasterizing static images. The exporter sizes the
+   * resulting PNG at `ceil(cssSize * rasterScale)` physical pixels while the HTML still
+   * references it at the original CSS size, so high-DPI screens can use the extra pixels
+   * for crisper rendering. The default is 2 (i.e. @2x assets), matching the typical
+   * browser comparison output. This is unrelated to the runtime device pixel ratio — it
+   * is a build-time decision baked into the PNG and cannot adapt to the viewer's display.
    */
-  float staticImgPixelRatio = 2.0f;
+  float rasterScale = 2.0f;
 
   /**
    * When true, all inline `style="..."` attributes are consolidated into a

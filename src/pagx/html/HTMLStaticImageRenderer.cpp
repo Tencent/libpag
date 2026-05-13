@@ -128,7 +128,7 @@ bool WriteSurfaceAsPng(tgfx::Surface* surface, int pxWidth, int pxHeight,
 // Core render helper: builds a minimal PAGXDocument consisting of one geo element filled with
 // `colorSourceInDoc` (already translated into the tile's local coordinate space), rasterizes it
 // via tgfx, and writes the result to `outputPath`.
-bool RenderTileToPng(PAGXDocument* doc, int cssWidth, int cssHeight, float pixelRatio,
+bool RenderTileToPng(PAGXDocument* doc, int cssWidth, int cssHeight, float rasterScale,
                      const std::string& outputPath) {
   if (cssWidth <= 0 || cssHeight <= 0) {
     return false;
@@ -144,15 +144,15 @@ bool RenderTileToPng(PAGXDocument* doc, int cssWidth, int cssHeight, float pixel
     return false;
   }
 
-  int pxWidth = static_cast<int>(std::ceil(static_cast<float>(cssWidth) * pixelRatio));
-  int pxHeight = static_cast<int>(std::ceil(static_cast<float>(cssHeight) * pixelRatio));
+  int pxWidth = static_cast<int>(std::ceil(static_cast<float>(cssWidth) * rasterScale));
+  int pxHeight = static_cast<int>(std::ceil(static_cast<float>(cssHeight) * rasterScale));
 
   auto layer = LayerBuilder::Build(doc);
   if (!layer) {
     device->unlock();
     return false;
   }
-  layer->setMatrix(tgfx::Matrix::MakeScale(pixelRatio));
+  layer->setMatrix(tgfx::Matrix::MakeScale(rasterScale));
 
   auto surface = tgfx::Surface::Make(context, pxWidth, pxHeight);
   if (!surface) {
@@ -183,7 +183,7 @@ Layer* BuildSingleElementLayer(PAGXDocument* doc, int width, int height) {
 
 bool HTMLStaticImageRenderer::RenderDiamondToPng(float left, float top, float width, float height,
                                                  float roundness, const DiamondGradient* gradient,
-                                                 float pixelRatio, const std::string& outputPath) {
+                                                 float rasterScale, const std::string& outputPath) {
   if (!gradient || width <= 0 || height <= 0) {
     return false;
   }
@@ -201,13 +201,13 @@ bool HTMLStaticImageRenderer::RenderDiamondToPng(float left, float top, float wi
   fill->color = CloneDiamondGradientShifted(doc.get(), gradient, left, top);
   layer->contents = {rect, fill};
 
-  return RenderTileToPng(doc.get(), w, h, pixelRatio, outputPath);
+  return RenderTileToPng(doc.get(), w, h, rasterScale, outputPath);
 }
 
 bool HTMLStaticImageRenderer::RenderDiamondEllipseToPng(float left, float top, float width,
                                                         float height,
                                                         const DiamondGradient* gradient,
-                                                        float pixelRatio,
+                                                        float rasterScale,
                                                         const std::string& outputPath) {
   if (!gradient || width <= 0 || height <= 0) {
     return false;
@@ -225,12 +225,13 @@ bool HTMLStaticImageRenderer::RenderDiamondEllipseToPng(float left, float top, f
   fill->color = CloneDiamondGradientShifted(doc.get(), gradient, left, top);
   layer->contents = {ellipse, fill};
 
-  return RenderTileToPng(doc.get(), w, h, pixelRatio, outputPath);
+  return RenderTileToPng(doc.get(), w, h, rasterScale, outputPath);
 }
 
 bool HTMLStaticImageRenderer::RenderImagePatternToPng(float left, float top, float width,
                                                       float height, float roundness,
-                                                      const ImagePattern* pattern, float pixelRatio,
+                                                      const ImagePattern* pattern,
+                                                      float rasterScale,
                                                       const std::string& outputPath) {
   if (!pattern || !pattern->image || width <= 0 || height <= 0) {
     return false;
@@ -249,13 +250,13 @@ bool HTMLStaticImageRenderer::RenderImagePatternToPng(float left, float top, flo
   fill->color = CloneImagePatternShifted(doc.get(), pattern, left, top);
   layer->contents = {rect, fill};
 
-  return RenderTileToPng(doc.get(), w, h, pixelRatio, outputPath);
+  return RenderTileToPng(doc.get(), w, h, rasterScale, outputPath);
 }
 
 bool HTMLStaticImageRenderer::RenderImagePatternEllipseToPng(float left, float top, float width,
                                                              float height,
                                                              const ImagePattern* pattern,
-                                                             float pixelRatio,
+                                                             float rasterScale,
                                                              const std::string& outputPath) {
   if (!pattern || !pattern->image || width <= 0 || height <= 0) {
     return false;
@@ -273,12 +274,12 @@ bool HTMLStaticImageRenderer::RenderImagePatternEllipseToPng(float left, float t
   fill->color = CloneImagePatternShifted(doc.get(), pattern, left, top);
   layer->contents = {ellipse, fill};
 
-  return RenderTileToPng(doc.get(), w, h, pixelRatio, outputPath);
+  return RenderTileToPng(doc.get(), w, h, rasterScale, outputPath);
 }
 
 bool HTMLStaticImageRenderer::RenderConicGradientToPng(float left, float top, float width,
                                                        float height, const ConicGradient* gradient,
-                                                       float pixelRatio,
+                                                       float rasterScale,
                                                        const std::string& outputPath) {
   if (!gradient || width <= 0 || height <= 0) {
     return false;
@@ -316,7 +317,7 @@ bool HTMLStaticImageRenderer::RenderConicGradientToPng(float left, float top, fl
   fill->color = clone;
   layer->contents = {rect, fill};
 
-  return RenderTileToPng(doc.get(), w, h, pixelRatio, outputPath);
+  return RenderTileToPng(doc.get(), w, h, rasterScale, outputPath);
 }
 
 }  // namespace pagx

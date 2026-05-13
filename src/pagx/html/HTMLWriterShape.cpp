@@ -2266,11 +2266,11 @@ void HTMLWriter::renderDiamondCanvas(HTMLBuilder& out, const GeoInfo& geo, const
 
   bool ok = false;
   if (geo.type == NodeType::Ellipse) {
-    ok = HTMLStaticImageRenderer::RenderDiamondEllipseToPng(left, top, w, h, dg,
-                                                            _ctx->staticImgPixelRatio, absPath);
+    ok = HTMLStaticImageRenderer::RenderDiamondEllipseToPng(left, top, w, h, dg, _ctx->rasterScale,
+                                                            absPath);
   } else {
     ok = HTMLStaticImageRenderer::RenderDiamondToPng(left, top, w, h, roundness, dg,
-                                                     _ctx->staticImgPixelRatio, absPath);
+                                                     _ctx->rasterScale, absPath);
   }
   if (!ok) {
     return;
@@ -2317,8 +2317,8 @@ void HTMLWriter::renderConicCanvas(HTMLBuilder& out, const std::vector<GeoInfo>&
   }
   absPath += fileName;
 
-  if (!HTMLStaticImageRenderer::RenderConicGradientToPng(x0, y0, sw, sh, cg,
-                                                         _ctx->staticImgPixelRatio, absPath)) {
+  if (!HTMLStaticImageRenderer::RenderConicGradientToPng(x0, y0, sw, sh, cg, _ctx->rasterScale,
+                                                         absPath)) {
     return;
   }
 
@@ -2423,11 +2423,11 @@ void HTMLWriter::renderImagePatternCanvas(HTMLBuilder& out, const GeoInfo& geo, 
 
   bool ok = false;
   if (geo.type == NodeType::Ellipse) {
-    ok = HTMLStaticImageRenderer::RenderImagePatternEllipseToPng(
-        left, top, w, h, p, _ctx->staticImgPixelRatio, absPath);
+    ok = HTMLStaticImageRenderer::RenderImagePatternEllipseToPng(left, top, w, h, p,
+                                                                 _ctx->rasterScale, absPath);
   } else {
     ok = HTMLStaticImageRenderer::RenderImagePatternToPng(left, top, w, h, roundness, p,
-                                                          _ctx->staticImgPixelRatio, absPath);
+                                                          _ctx->rasterScale, absPath);
   }
   if (!ok) {
     return;

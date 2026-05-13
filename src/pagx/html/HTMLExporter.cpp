@@ -322,12 +322,12 @@ std::string HTMLExporter::ToHTML(const PAGXDocument& doc, const std::string& res
   ctx.docHeight = doc.height;
   ctx.staticImgDir = resourceDir;
   ctx.staticImgUrlPrefix = urlPrefix;
-  ctx.staticImgPixelRatio = options.staticImgPixelRatio;
+  ctx.rasterScale = options.rasterScale;
 
   // Pre-pass: for every compatible PlusDarker Layer, render a cropped backdrop PNG with the layer
   // temporarily hidden. The resulting base64 data URLs are consumed by writeLayer below to emit an
   // SVG filter (feImage + feComposite arithmetic) that matches tgfx PlusDarker pixel-for-pixel.
-  HTMLPlusDarkerRenderer::RenderAll(doc, resourceDir, urlPrefix, options.staticImgPixelRatio,
+  HTMLPlusDarkerRenderer::RenderAll(doc, resourceDir, urlPrefix, options.rasterScale,
                                     ctx.plusDarkerBackdrops);
 
   HTMLWriter writer(&defs, &ctx);
