@@ -360,26 +360,6 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
   writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters, styles);
 }
 
-namespace {
-
-// Look for the first non-container <TextBox> in `elements` so it can be
-// associated with sibling Text geometry (matches the legacy
-// CollectFillStroke().textBox behaviour). Container TextBoxes (those with
-// children) are handled separately as scopes by processVectorScope.
-const TextBox* FindModifierTextBox(const std::vector<Element*>& elements) {
-  for (auto* e : elements) {
-    if (e->nodeType() == NodeType::TextBox) {
-      auto* tb = static_cast<const TextBox*>(e);
-      if (tb->elements.empty()) {
-        return tb;
-      }
-    }
-  }
-  return nullptr;
-}
-
-}  // namespace
-
 // Dispatch a single accumulated geometry through the appropriate per-shape
 // writer with the given Painter applied. Each painter that renders a geometry
 // goes through this function so that multi-fill / multi-stroke produces one

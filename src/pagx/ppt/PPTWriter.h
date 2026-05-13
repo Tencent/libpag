@@ -398,8 +398,6 @@ inline PPTRunStyle BuildRunStyle(const Text* text, const Fill* fill, const Strok
   // to a substitute font and lose the bold weight. This was the reason for
   // the previous bare-family approach; the call here is that PowerPoint
   // visual fidelity matters more than LibreOffice fallback behaviour.
-  bool hasRealBold = text->fontStyle.find("Bold") != std::string::npos;
-  bool hasRealItalic = text->fontStyle.find("Italic") != std::string::npos;
   style.hasBold = text->fauxBold;
   style.hasItalic = text->fauxItalic;
   // Use the layout-resolved font size. PAGX layout may shrink a Text internally
@@ -426,18 +424,7 @@ inline PPTRunStyle BuildRunStyle(const Text* text, const Fill* fill, const Strok
   // regular face here — the same face would have been picked if we had
   // emitted "Arial Light" as the typeface name and the renderer failed to
   // resolve it.
-  if (text->fontFamily.empty()) {
-    style.typeface = std::string();
-  } else {
-    style.typeface = StripQuotes(text->fontFamily);
-    if (hasRealBold && hasRealItalic) {
-      style.typeface += " Bold Italic";
-    } else if (hasRealBold) {
-      style.typeface += " Bold";
-    } else if (hasRealItalic) {
-      style.typeface += " Italic";
-    }
-  }
+  style.typeface = BuildStyledTypeface(text->fontFamily, text->fontStyle);
   style.stroke = stroke;
   style.strokeAlpha = alpha;
   return style;

@@ -1369,9 +1369,9 @@ void SVGWriter::writePath(SVGBuilder& out, const Path* path, const FillStrokeInf
   // data sits in pre-scale space, so multiply the raw bounds by the scale factor and
   // translate them by renderPosition to match the on-canvas extent.
   Rect dataBounds = path->data->getBounds();
-  Rect bounds = Rect::MakeXYWH(renderPos.x + dataBounds.x * scale,
-                               renderPos.y + dataBounds.y * scale, dataBounds.width * scale,
-                               dataBounds.height * scale);
+  Rect bounds =
+      Rect::MakeXYWH(renderPos.x + dataBounds.x * scale, renderPos.y + dataBounds.y * scale,
+                     dataBounds.width * scale, dataBounds.height * scale);
   applyPainters(out, fs, bounds, alpha);
   out.closeElementSelfClosing();
 }
@@ -1470,17 +1470,8 @@ static void WriteSharedTextAttrs(SVGBuilder& out, const Text* text, TextAnchor a
   // fall back to a substitute font and lose the bold weight. The call here
   // is that native browser / Preview fidelity matters more than fontconfig
   // fallback behaviour. Mirrors BuildRunStyle in src/pagx/ppt/PPTWriter.h.
-  bool hasRealBold = text->fontStyle.find("Bold") != std::string::npos;
-  bool hasRealItalic = text->fontStyle.find("Italic") != std::string::npos;
-  if (!text->fontFamily.empty()) {
-    std::string typeface = StripQuotes(text->fontFamily);
-    if (hasRealBold && hasRealItalic) {
-      typeface += " Bold Italic";
-    } else if (hasRealBold) {
-      typeface += " Bold";
-    } else if (hasRealItalic) {
-      typeface += " Italic";
-    }
+  std::string typeface = BuildStyledTypeface(text->fontFamily, text->fontStyle);
+  if (!typeface.empty()) {
     out.addAttribute("font-family", typeface);
   }
   // Use the layout-resolved font size. PAGX layout may shrink a Text internally via
@@ -1548,37 +1539,8 @@ struct TextAnchoring {
   float justifyWidth = 0;  // > 0 only when horizontal-justify is in effect.
 };
 
-// Logical Start / End describe the *paragraph-relative* edges; the physical
-// visual edge a renderer should hit depends on the paragraph base direction
-// (UBA P2/P3). For RTL paragraphs Start sits on the visual right edge and End
-// on the visual left, so swap the two before mapping to SVG's
-// direction-agnostic text-anchor / anchorX calculations. Center and Justify
-// are direction-symmetric.
-static TextAnchor ResolveLogicalAnchor(TextAnchor logical, bool rtl) {
-  if (!rtl) {
-    return logical;
-  }
-  if (logical == TextAnchor::Start) {
-    return TextAnchor::End;
-  }
-  if (logical == TextAnchor::End) {
-    return TextAnchor::Start;
-  }
-  return logical;
-}
-
-static TextAlign ResolveLogicalAlign(TextAlign logical, bool rtl) {
-  if (!rtl) {
-    return logical;
-  }
-  if (logical == TextAlign::Start) {
-    return TextAlign::End;
-  }
-  if (logical == TextAlign::End) {
-    return TextAlign::Start;
-  }
-  return logical;
-}
+// Logical-to-physical anchor / align resolution lives in ExporterUtils.h
+// (ResolveLogicalAnchor / ResolveLogicalAlign), shared with the PPT exporter.
 
 // Vertical writing mode: textAlign controls the inline axis (vertical),
 // paragraphAlign controls the block axis (horizontal, columns right-to-left).
@@ -1737,8 +1699,8 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
     float effectiveFontSize = text->renderFontSize();
     float paddingLeft = fs.textBox ? fs.textBox->padding.left : 0.0f;
     float paddingTop = fs.textBox ? fs.textBox->padding.top : 0.0f;
-    float effectiveHeight = fs.textBox ? EffectiveTextBoxHeight(fs.textBox)
-                                       : std::numeric_limits<float>::quiet_NaN();
+    float effectiveHeight =
+        fs.textBox ? EffectiveTextBoxHeight(fs.textBox) : std::numeric_limits<float>::quiet_NaN();
     float innerHeight = (!std::isnan(effectiveHeight))
                             ? std::max(0.0f, effectiveHeight - paddingTop -
                                                  (fs.textBox ? fs.textBox->padding.bottom : 0.0f))
@@ -1757,8 +1719,7 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
           info.byteEnd - info.byteStart > text->text.size() - info.byteStart) {
         continue;
       }
-      std::string columnText =
-          text->text.substr(info.byteStart, info.byteEnd - info.byteStart);
+      std::string columnText = text->text.substr(info.byteStart, info.byteEnd - info.byteStart);
       if (columnText.empty()) {
         continue;
       }
@@ -1877,7 +1838,8 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
 
 // One "run" inside a rich TextBox: a Text together with the Fill and Stroke
 // painters that apply to it. Mirrors PPTWriter::RichTextRun so container-mode
-// TextBox reproduces per-run fill/stroke pairing.
+// TextBox reproduces per-run fill/stroke pairing. Walked by the shared
+// CollectRichTextRuns template in ExporterUtils.h.
 namespace {
 
 struct SVGRichTextRun {
@@ -1885,29 +1847,6 @@ struct SVGRichTextRun {
   const Fill* fill = nullptr;
   const Stroke* stroke = nullptr;
 };
-
-// Walk TextBox children in source order, pairing every Text with its nearest
-// enclosing Fill/Stroke. Direct Text children inherit `parentFill`/`parentStroke`;
-// Texts nested in a Group use that Group's locally-collected Fill/Stroke,
-// falling back to the parent's. Same contract as PPTExporter::CollectRichTextRuns.
-void CollectSVGRichTextRuns(const std::vector<Element*>& elements, const Fill* parentFill,
-                            const Stroke* parentStroke, std::vector<SVGRichTextRun>& outRuns) {
-  for (auto* element : elements) {
-    auto type = element->nodeType();
-    if (type == NodeType::Text) {
-      auto* t = static_cast<const Text*>(element);
-      if (!t->text.empty()) {
-        outRuns.push_back({t, parentFill, parentStroke});
-      }
-    } else if (type == NodeType::Group) {
-      auto* g = static_cast<const Group*>(element);
-      auto groupFs = CollectFillStroke(g->elements);
-      const Fill* effectiveFill = groupFs.fill ? groupFs.fill : parentFill;
-      const Stroke* effectiveStroke = groupFs.stroke ? groupFs.stroke : parentStroke;
-      CollectSVGRichTextRuns(g->elements, effectiveFill, effectiveStroke, outRuns);
-    }
-  }
-}
 
 struct SVGLineEntry {
   size_t runIndex = 0;
@@ -1917,10 +1856,6 @@ struct SVGLineEntry {
   uint32_t byteEnd = 0;
 };
 
-bool CompareSVGLineEntryByBaselineY(const SVGLineEntry& a, const SVGLineEntry& b) {
-  return a.baselineY < b.baselineY;
-}
-
 }  // namespace
 
 void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
@@ -1928,7 +1863,7 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
                                   float alpha) {
   auto topLevelFs = CollectFillStroke(elements);
   std::vector<SVGRichTextRun> runs;
-  CollectSVGRichTextRuns(elements, topLevelFs.fill, topLevelFs.stroke, runs);
+  CollectRichTextRuns(elements, topLevelFs.fill, topLevelFs.stroke, runs);
   if (runs.empty()) {
     return;
   }
@@ -2001,7 +1936,7 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
 
   // Stable-sort entries by baselineY so that runs from different Text
   // elements sharing the same visual line stay in source order.
-  std::stable_sort(lineEntries.begin(), lineEntries.end(), CompareSVGLineEntryByBaselineY);
+  std::stable_sort(lineEntries.begin(), lineEntries.end(), LineEntryBaselineYLess<SVGLineEntry>);
   constexpr float baselineEpsilon = 0.5f;
 
   // Find the last visual line's baseline for justify last-line detection.
@@ -2161,26 +2096,6 @@ bool SVGWriter::rasterizeLayerAsImage(SVGBuilder& out, const Layer* layer) {
 //==============================================================================
 // SVGWriter – element list and layer writing
 //==============================================================================
-
-namespace {
-
-// Look for the first modifier-only <TextBox> in `elements` so it can be
-// associated with sibling Text geometry (matches the legacy
-// CollectFillStroke().textBox behaviour). Container TextBoxes (those with
-// children) are handled separately as scopes by processVectorScope.
-const TextBox* FindModifierTextBox(const std::vector<Element*>& elements) {
-  for (auto* e : elements) {
-    if (e->nodeType() == NodeType::TextBox) {
-      auto* tb = static_cast<const TextBox*>(e);
-      if (tb->elements.empty()) {
-        return tb;
-      }
-    }
-  }
-  return nullptr;
-}
-
-}  // namespace
 
 // Dispatch a single accumulated geometry through the appropriate per-shape
 // writer with the given painter applied. Each painter that renders a geometry
