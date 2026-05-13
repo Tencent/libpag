@@ -776,8 +776,8 @@ bool IsLayerStructurallyEmpty(const Layer* layer) {
   // Size-dependent constraints (right/bottom/centerX/centerY) still resolve to a finite
   // box at layout time, so the layer can render via filters / background blur. left/top
   // alone only translate, so an otherwise-empty layer with just left/top is still empty.
-  if (!std::isnan(layer->right) || !std::isnan(layer->bottom) ||
-      !std::isnan(layer->centerX) || !std::isnan(layer->centerY)) {
+  if (!std::isnan(layer->right) || !std::isnan(layer->bottom) || !std::isnan(layer->centerX) ||
+      !std::isnan(layer->centerY)) {
     return false;
   }
   if (!layer->customData.empty()) {
@@ -799,8 +799,7 @@ bool PruneEmptyInLayer(Layer* layer, const std::unordered_set<const Layer*>& mas
     auto* child = layer->children[i];
     changed |= PruneEmptyInLayer(child, maskRefs);
     bool inParentLayout = layerHasLayout && child->includeInLayout;
-    if (IsLayerStructurallyEmpty(child) && !inParentLayout &&
-        !LayerNeedsKeeping(child, maskRefs)) {
+    if (IsLayerStructurallyEmpty(child) && !inParentLayout && !LayerNeedsKeeping(child, maskRefs)) {
       changed = true;
       continue;
     }
@@ -821,8 +820,7 @@ bool PruneEmptyTopLevel(std::vector<Layer*>& layers, bool parentHasLayout,
     auto* layer = layers[i];
     changed |= PruneEmptyInLayer(layer, maskRefs);
     bool inParentLayout = parentHasLayout && layer->includeInLayout;
-    if (IsLayerStructurallyEmpty(layer) && !inParentLayout &&
-        !LayerNeedsKeeping(layer, maskRefs)) {
+    if (IsLayerStructurallyEmpty(layer) && !inParentLayout && !LayerNeedsKeeping(layer, maskRefs)) {
       changed = true;
       continue;
     }
