@@ -29,6 +29,8 @@
 
 namespace pagx {
 
+struct FontSignature;
+
 /**
  * Text is a geometry element that produces a glyph list after text shaping, which accumulates into
  * the rendering context for subsequent modifiers or painters. It supports two rendering modes:
@@ -101,6 +103,25 @@ class Text : public Element, public LayoutNode {
    */
   TextBaseline baseline = TextBaseline::LineBox;
 
+  ~Text() override;
+
+  /** Returns the text position adjusted to the layout bounds. */
+  Point renderPosition() const;
+
+  /** Returns the effective font size after layout scaling. */
+  float renderFontSize() const;
+
+  NodeType nodeType() const override {
+    return NodeType::Text;
+  }
+
+ protected:
+  void onMeasure(LayoutContext* context) override;
+  void setLayoutSize(LayoutContext* context, float targetWidth, float targetHeight) override;
+
+ private:
+  Text();
+
   /**
    * Returns the font metrics line height (|ascent| + descent + leading) computed during layout.
    * Returns 0 if layout has not been performed.
@@ -131,30 +152,12 @@ class Text : public Element, public LayoutNode {
    */
   float layoutBoundsWidth() const;
 
-  ~Text() override;
-
-  /** Returns the text position adjusted to the layout bounds. */
-  Point renderPosition() const;
-
-  /** Returns the effective font size after layout scaling. */
-  float renderFontSize() const;
-
-  NodeType nodeType() const override {
-    return NodeType::Text;
-  }
-
- protected:
-  void onMeasure(LayoutContext* context) override;
-  void setLayoutSize(LayoutContext* context, float targetWidth, float targetHeight) override;
-
- private:
-  Text();
-
   struct GlyphData;
   GlyphData* glyphData;
   Rect textBounds = {};
   float textScale = 1.0f;
 
+  friend FontSignature SignatureOf(const Text* text);
   friend class FontEmbedder;
   friend class GlyphRunRenderer;
   friend class HTMLWriter;

@@ -90,6 +90,14 @@ class TextBox : public Group {
     return NodeType::TextBox;
   }
 
+ protected:
+  void onMeasure(LayoutContext* context) override;
+  void setLayoutSize(LayoutContext* context, float targetWidth, float targetHeight) override;
+  void updateLayout(LayoutContext* context) override;
+
+ private:
+  TextBox() = default;
+
   /**
    * Returns true when neither the PAGX author nor the layout engine supplied an explicit width for
    * this TextBox: the width was inferred entirely from tgfx's own text measurement. HTML exporters
@@ -108,16 +116,10 @@ class TextBox : public Group {
     return heightAutoSized;
   }
 
- protected:
-  void onMeasure(LayoutContext* context) override;
-  void setLayoutSize(LayoutContext* context, float targetWidth, float targetHeight) override;
-  void updateLayout(LayoutContext* context) override;
-
- private:
-  TextBox() = default;
   bool widthAutoSized = false;
   bool heightAutoSized = false;
 
+  friend class HTMLWriter;
   friend class PAGXDocument;
 };
 
