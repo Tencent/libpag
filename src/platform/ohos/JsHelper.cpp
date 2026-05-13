@@ -73,7 +73,11 @@ static bool SetConstructor(napi_env env, napi_value constructor, const std::stri
     envMap.erase(refIt);
   }
   napi_ref ref = nullptr;
-  napi_create_reference(env, constructor, 1, &ref);
+  auto refStatus = napi_create_reference(env, constructor, 1, &ref);
+  if (refStatus != napi_ok) {
+    LOGE("SetConstructor napi_create_reference failed :%d", refStatus);
+    return false;
+  }
   envMap[name] = ref;
   return true;
 }
