@@ -140,7 +140,10 @@ napi_status DefineClass(napi_env env, napi_value exports, const std::string& utf
     LOGE("DefineClass napi_set_named_property failed:%d", status);
     return status;
   }
-  SetConstructor(env, classConstructor, utf8name);
+  if (!SetConstructor(env, classConstructor, utf8name)) {
+    LOGE("DefineClass SetConstructor failed");
+    return napi_status::napi_generic_failure;
+  }
   if (parentName.empty()) {
     return status;
   }
