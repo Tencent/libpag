@@ -760,10 +760,93 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       auto renderPos = text->renderPosition();
       posX = renderPos.x;
       if (text->baseline == TextBaseline::Alphabetic) {
-        // position.y is the alphabetic baseline; CSS top is the line-box top.
-        // Use position.y directly — the vertical offset between baseline and line-box
-        // top depends on the font's actual ascent, which tgfx should provide in the future.
-        posY = text->position.y;
+        // SVG <text> natively positions its y attribute at the alphabetic baseline,
+        // matching the PAGX semantic without needing font ascent metrics.
+        float x = renderPos.x;
+        float y = text->position.y;
+
+        HTMLBuilder localDefs;
+        std::string svgFillAttr;
+        float fillAlpha = 1.0f;
+        bool needDefs = false;
+        if (fill && fill->color) {
+          if (fill->color->nodeType() == NodeType::SolidColor) {
+            auto sc = static_cast<const SolidColor*>(fill->color);
+            svgFillAttr = ColorToSVGHex(sc->color);
+            fillAlpha = sc->color.alpha * fill->alpha;
+          } else {
+            needDefs = true;
+            std::string gradId = _ctx->nextId("grad");
+            localDefs.openTag("defs");
+            localDefs.closeTagStart();
+            float bboxW = text->renderFontSize() * static_cast<float>(text->text.size()) * 0.6f;
+            float bboxH = text->renderFontSize();
+            writeSVGGradientDefInto(localDefs, fill->color, gradId, x, y - bboxH, bboxW, bboxH);
+            localDefs.closeTag();
+            svgFillAttr = "url(#" + gradId + ")";
+            fillAlpha = fill->alpha;
+          }
+        }
+
+        out.openTag("svg");
+        out.addAttr("style", "position:absolute;left:0;top:0;overflow:visible");
+        out.closeTagStart();
+        if (needDefs) {
+          out.emitRaw(localDefs.release());
+        }
+
+        out.openTag("text");
+        out.addAttr("x", CssFloatToString(x));
+        out.addAttr("y", CssFloatToString(y));
+        if (!text->fontFamily.empty()) {
+          out.addAttr("font-family", EscapeCssFontFamily(text->fontFamily));
+        }
+        out.addAttr("font-size", CssFloatToString(text->renderFontSize()));
+        if (!text->fontStyle.empty()) {
+          if (text->fontStyle.find("Bold") != std::string::npos) {
+            out.addAttr("font-weight", "bold");
+          }
+          if (text->fontStyle.find("Italic") != std::string::npos) {
+            out.addAttr("font-style", "italic");
+          }
+        }
+        if (text->fauxBold) {
+          out.addAttr("font-weight", "bold");
+        }
+        if (text->fauxItalic) {
+          out.addAttr("font-style", "italic");
+        }
+        if (text->letterSpacing != 0.0f) {
+          out.addAttr("letter-spacing", CssFloatToString(text->letterSpacing));
+        }
+        if (text->textAnchor == TextAnchor::Center) {
+          out.addAttr("text-anchor", "middle");
+        } else if (text->textAnchor == TextAnchor::End) {
+          out.addAttr("text-anchor", "end");
+        }
+        if (!svgFillAttr.empty()) {
+          out.addAttr("fill", svgFillAttr);
+          if (fillAlpha < 1.0f) {
+            out.addAttr("fill-opacity", CssFloatToString(fillAlpha));
+          }
+        } else if (!fill) {
+          // Stroke-only (no Fill node at all): suppress SVG's default black fill.
+          out.addAttr("fill", "none");
+        }
+        // When fill exists but fill->color is null (e.g. <Fill/> with no explicit color),
+        // SVG's default fill (black) is the correct behaviour — emit nothing.
+        if (stroke && stroke->color) {
+          applySVGStroke(out, stroke);
+          if (fill && fill->color) {
+            out.addAttr("paint-order", "stroke fill");
+          }
+        }
+        if (alpha < 1.0f) {
+          out.addAttr("opacity", CssFloatToString(alpha));
+        }
+        out.closeTagWithText(text->text);
+        out.closeTag();  // </svg>
+        return;
       } else {
         posY = renderPos.y;
       }
