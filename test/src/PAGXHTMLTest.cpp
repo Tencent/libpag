@@ -542,6 +542,37 @@ PAG_TEST(PAGXHTMLTest, InlineSvgPassedAsImportDirective) {
   EXPECT_NE(leaf->importDirective.content.find("circle"), std::string::npos);
 }
 
+// Regression: inline <svg> with only viewBox (no width/height) must keep the
+// case-sensitive `viewBox` attribute through the HTML import pipeline. The
+// browser-emitted snapshot (e.g. from tools/html-snapshot) lowercases HTML
+// attribute names but preserves SVG's camelCase ones, and the SVG importer used
+// during `pagx resolve` looks up the attribute case-sensitively. If the
+// importer lowercases `viewBox`, the inline content fails to parse because the
+// SVG has no fallback width/height.
+PAG_TEST(PAGXHTMLTest, InlineSvgPreservesCamelCaseAttributes) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px">
+      <svg viewBox="0 0 16 16" preserveAspectRatio="xMidYMid meet">
+        <linearGradient id="g" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="16" y2="16">
+          <stop offset="0" stop-color="#F00"/>
+          <stop offset="1" stop-color="#00F"/>
+        </linearGradient>
+        <circle cx="8" cy="8" r="6" fill="url(#g)"/>
+      </svg>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  ASSERT_FALSE(leaf->importDirective.content.empty());
+  const auto& content = leaf->importDirective.content;
+  EXPECT_NE(content.find("viewBox=\"0 0 16 16\""), std::string::npos);
+  EXPECT_NE(content.find("preserveAspectRatio=\"xMidYMid meet\""), std::string::npos);
+  EXPECT_NE(content.find("<linearGradient"), std::string::npos);
+  EXPECT_NE(content.find("gradientUnits=\"userSpaceOnUse\""), std::string::npos);
+  EXPECT_EQ(content.find("viewbox="), std::string::npos);
+  EXPECT_EQ(content.find("<lineargradient"), std::string::npos);
+}
+
 PAG_TEST(PAGXHTMLTest, StyleClassRulesApply) {
   auto doc = ParseFromString(R"HTML(
     <html><head><style>.box{background-color:#123456;border-radius:8px}</style></head>

@@ -202,6 +202,14 @@ void LowercaseTagsInPlace(const std::shared_ptr<DOMNode>& node) {
   if (!node) return;
   if (node->type == DOMNodeType::Element) {
     node->name = ToLower(std::move(node->name));
+    // Inline SVG: SVG attribute and tag names are case-sensitive (viewBox,
+    // preserveAspectRatio, linearGradient, clipPath, ...). The whole subtree is
+    // serialized verbatim into importDirective.content and re-parsed by the SVG
+    // importer in `pagx resolve`, so we must preserve case here. Lower-casing the
+    // <svg> element's own tag is still fine (the importer dispatches on "svg").
+    if (node->name == "svg") {
+      return;
+    }
     // Lower-case attribute names while we're here (CSS keys must be lower-case anyway).
     for (auto& attr : node->attributes) {
       attr.name = ToLower(std::move(attr.name));
