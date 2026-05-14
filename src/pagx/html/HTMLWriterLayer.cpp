@@ -57,10 +57,6 @@ static constexpr float BBOX_SENTINEL_LARGE = 1e9f;
 
 // Chromium's default `line-height: normal` resolves to ≈1.17 × font-size for typical Latin
 // fonts. When a span's natural line-height would exceed the TextBox's declared lineHeight we
-// need to pin the span's inline-axis size so the line box cannot expand past what tgfx laid
-// out; the 1.17 ratio is the threshold at which Chromium starts to grow the line. Reused by
-// both the tbSpans and richTextSpans emission branches.
-static constexpr float CHROMIUM_NORMAL_LINE_HEIGHT_RATIO = 1.17f;
 
 static void EmitLeftTopCss(std::string& style, bool& positionSet, float x, float y) {
   style += ";left:" + CssFloatToString(x) + "px;top:" + CssFloatToString(y) + "px";
@@ -898,21 +894,6 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
     }
   }
   if (!tbSpans.empty()) {
-    // Pin font-size on the container so Chromium's line-box strut uses this value
-    // instead of the inherited ancestor default (typically 16px body), which would
-    // otherwise inflate each line-box above the declared `line-height` and push every
-    // text line further down than tgfx renders it. Use the smallest span font-size so
-    // the strut contribution never exceeds what any child span would produce on its own.
-    float strutSize = tbSpans[0].text->renderFontSize();
-    for (const auto& s : tbSpans) {
-      float fs = s.text->renderFontSize();
-      if (fs > 0 && fs < strutSize) {
-        strutSize = fs;
-      }
-    }
-    if (strutSize > 0) {
-      style += ";font-size:" + CssFloatToString(strutSize) + "px";
-    }
     // Honour the authored TextBox.lineHeight only. The previous fallback derived a
     // container line-height from per-glyph fontLineHeight metrics; that path was removed
     // along with Text::fontLineHeight(), so when no lineHeight is authored Chromium falls
@@ -928,38 +909,12 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
     // gracefully clips at the box edge when they diverge.
     if (tb->overflow == Overflow::Hidden) {
       style += ";overflow:hidden";
-      // Vertical-mode Overflow::Hidden: tgfx drops whole columns whose left edge
-      // underflows the box. Chromium's overflow:hidden is a pixel clip and would
-      // still paint the first partial column at x=[0, partialWidth]. Shrink the
-      // inner content div to the union of rendered spans' textBounds widths and
-      // shift it right so vertical-rl text still starts at the original right edge.
       if (tb->writingMode == WritingMode::Vertical) {
-        float renderedWidth = 0;
-        for (const auto& s : tbSpans) {
-          float w = s.text ? s.text->textBounds.width : 0;
-          if (w > renderedWidth) {
-            renderedWidth = w;
-          }
-        }
-        if (renderedWidth > 0 && renderedWidth < tbW - 0.5f) {
-          // Override the earlier width/left declarations; CSS later-wins when the
-          // same property is re-declared in the same inline style attribute.
-          style += ";width:" + CssFloatToString(renderedWidth) + "px";
-          style += ";left:" + CssFloatToString(tbLeft + (tbW - renderedWidth)) + "px";
-        }
-      } else if (lineH > 0 && tbH > 0) {
-        // Horizontal Overflow::Hidden: tgfx drops any line whose bottom extends past
-        // the box; Chromium's overflow:hidden only pixel-clips, leaving the top slice
-        // of the first over-box line visible. Shrink the content div's height to an
-        // integer multiple of line-height so the next line starts exactly at the
-        // bottom edge and is clipped in full, matching tgfx's whole-line drop.
-        int fit = static_cast<int>(tbH / lineH + 0.0001f);
-        if (fit >= 1) {
-          float clipH = static_cast<float>(fit) * lineH;
-          if (clipH < tbH - 0.5f) {
-            style += ";height:" + CssFloatToString(clipH) + "px";
-          }
-        }
+        // CSS overflow:hidden pixel-clips; tgfx drops entire columns. The visual difference
+        // (partial column visible in HTML vs fully hidden in PAGX) is accepted as a known
+        // divergence until tgfx aligns with CSS pixel-clip semantics.
+      } else {
+        // Horizontal overflow:hidden — CSS pixel-clips naturally; no height manipulation.
       }
     }
     // Detect RTL paragraph direction from the first span's text so text aligns right
@@ -1061,21 +1016,7 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
         if (!spanStyle.empty()) spanStyle += ';';
         spanStyle += "font-style:italic;font-synthesis-style:auto";
       }
-      // For TextBoxes with an explicit lineHeight, force-pin the inline-axis size of
-      // any span whose font-size's natural line-height exceeds the container's
-      // declared lineHeight. Without this Chromium expands the line box to the span's
-      // natural metrics (line-height is treated as a minimum), pushing subsequent
-      // lines below where tgfx — which strictly honours the declared lineHeight per
-      // line — places them. Pin the inline-block's height to lineHeight so the line
-      // box doesn't expand; glyphs taller than the box overflow visibly (the default
-      // for inline-block) and we use vertical-align:top to keep the inline-block top
-      // aligned with the line box top, matching tgfx's per-line top-of-line baseline.
       float spanFontSize = span.text->renderFontSize();
-      if (tb->lineHeight > 0 && spanFontSize > 0 &&
-          spanFontSize * CHROMIUM_NORMAL_LINE_HEIGHT_RATIO > tb->lineHeight + 0.5f) {
-        spanStyle += ";display:inline-block;height:" + CssFloatToString(tb->lineHeight) +
-                     "px;line-height:" + CssFloatToString(tb->lineHeight) + "px;vertical-align:top";
-      }
       // Emit between-span <br>s: prevTrailingBreaks (from prior span's trailing \n)
       // plus CountLeadingBreaks(current span's text). The first <br> ends the prior
       // span's content line and inherits its strut naturally; each subsequent <br>
@@ -1258,20 +1199,6 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
   }
   if (tb->overflow == Overflow::Hidden) {
     style += ";overflow:hidden";
-    // Match tbSpans branch above: horizontal Overflow::Hidden needs the content div's
-    // height clipped to an integer multiple of line-height so the first over-box line
-    // is dropped entirely (tgfx drops whole lines; Chromium otherwise pixel-clips,
-    // leaving the top slice of the next line visible).
-    if (tb->writingMode != WritingMode::Vertical && rtLineH > 0 && !std::isnan(tb->height) &&
-        tb->height > 0) {
-      int fit = static_cast<int>(tb->height / rtLineH + 0.0001f);
-      if (fit >= 1) {
-        float clipH = static_cast<float>(fit) * rtLineH;
-        if (clipH < tb->height - 0.5f) {
-          style += ";height:" + CssFloatToString(clipH) + "px";
-        }
-      }
-    }
   }
   out.openTag("div");
   out.addAttr("style", style);
@@ -1350,14 +1277,7 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
     if (span.text->fauxItalic) {
       spanStyle += ";font-style:italic;font-synthesis-style:auto";
     }
-    // Force-pin inline-axis size when a span's natural line-height exceeds the
-    // container's declared lineHeight; otherwise Chromium expands the line box.
     float rtSpanFontSize = span.text->renderFontSize();
-    if (tb->lineHeight > 0 && rtSpanFontSize > 0 &&
-        rtSpanFontSize * CHROMIUM_NORMAL_LINE_HEIGHT_RATIO > tb->lineHeight + 0.5f) {
-      spanStyle += ";display:inline-block;height:" + CssFloatToString(tb->lineHeight) +
-                   "px;line-height:" + CssFloatToString(tb->lineHeight) + "px;vertical-align:top";
-    }
     // Emit between-span <br>s with empty-line owner wrapping (see tbSpans branch).
     size_t rtLeadingBreaks = HTMLBuilder::CountLeadingBreaks(span.text->text);
     size_t rtTotalBreaks = rtPrevTrailingBreaks + rtLeadingBreaks;

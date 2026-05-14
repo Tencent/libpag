@@ -599,14 +599,8 @@ HTMLWriter::TextStrokeCss HTMLWriter::ResolveTextStrokeCss(float width, StrokeAl
       out.paintOrderStrokeFill = false;
       break;
     case StrokeAlign::Outside:
-      if (hasFill) {
-        out.width = width * 2.0f;
-        out.paintOrderStrokeFill = true;
-      } else {
-        out.width = width;
-        out.paintOrderStrokeFill = false;
-      }
-      break;
+      // CSS `-webkit-text-stroke` is always centred on the glyph edge; there is no native
+      // outside-only stroke. Fall through to Center semantics and accept the visual difference.
     case StrokeAlign::Center:
     default:
       out.width = width;
@@ -760,11 +754,10 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       auto renderPos = text->renderPosition();
       posX = renderPos.x;
       if (text->baseline == TextBaseline::Alphabetic) {
-        // position.y is the alphabetic baseline. CSS `top` is the top of the line box, so we
-        // subtract a font-size-relative ascent estimate to land the baseline near position.y.
-        // Without exact font metrics this is an approximation that may drift by a few pixels
-        // depending on the actual font's ascent/em ratio.
-        posY = text->position.y - text->renderFontSize() * 0.8f;
+        // position.y is the alphabetic baseline; CSS top is the line-box top.
+        // Use position.y directly — the vertical offset between baseline and line-box
+        // top depends on the font's actual ascent, which tgfx should provide in the future.
+        posY = text->position.y;
       } else {
         posY = renderPos.y;
       }
@@ -812,7 +805,6 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     } else {
       style += ";left:" + CssFloatToString(posX) + "px";
     }
-    (void)fontHoisted;
   }
   if (text->fauxItalic) {
     // Use Chromium's native synthesized italic instead of a CSS transform. `font-style:italic`
@@ -842,19 +834,9 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     }
   }
   if (text->fauxBold) {
-    // Use Chromium's native synthesized bold. When the loaded @font-face exposes only a Regular
-    // variant, `font-weight:bold` triggers the browser's built-in synthesis, which thickens the
-    // rasterised glyph without adding a separate stroke layer above the fill.
-    // `font-synthesis-weight` re-enables synthesis on elements that inherit
-    // `font-synthesis:none` from an ancestor.
-    // When fontStyle already contains "Bold", font-weight:bold is already emitted above;
-    // the duplicate is harmless (CSS last-value wins) and keeps the logic straightforward.
-    // Must be emitted even when a real Stroke is present: tgfx renders fauxBold as a
-    // path-union thickening of the glyph and then draws the Stroke around the thickened
-    // outline, so CSS must synthesise-bold first and let -webkit-text-stroke paint along
-    // the thicker silhouette. Without this, the stroke traces the thinner regular outline
-    // and bleeds inside the bolder fill glyph, visible as coloured lines cutting through
-    // letter strokes.
+    // Emit font-weight:bold so the browser synthesises bold when no Bold variant is registered
+    // in @font-face. font-synthesis-weight:auto re-enables synthesis on elements that inherit
+    // font-synthesis:none from an ancestor.
     style += ";font-weight:bold;font-synthesis-weight:auto";
   }
   if (fill && fill->color) {
@@ -868,31 +850,6 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       if (!css.empty()) {
         style += ";background:" + css;
         style += ";-webkit-background-clip:text;background-clip:text";
-        // Scope the gradient's 0%..100% range to the glyph's actual inked width rather than
-        // the span's own box width. For end-anchored text the span is `width:posX` (the
-        // distance from the layer's left edge to the anchor), much wider than the glyph run,
-        // which otherwise stretches the gradient across the span and leaves the text landing
-        // only on the middle band of stops — visible as "gradient looks like a solid mid-tone"
-        // in samples like text_features's "Text Features". tgfx instead evaluates
-        // `fitsToGeometry=true` against the fill geometry's bounding box (i.e. the glyph run's
-        // bbox), so matching that here keeps the two renderers in visual agreement.
-        //
-        // Skip this when center-anchored (the transform:translateX(-50%) path above) and for
-        // multi-line anchored text (also transform path): both let the span size to its own
-        // max-content, which is Chromium's actual rendered glyph width. Limiting background to
-        // tgfx's narrower glyph measurement leaves the leading/trailing characters with no
-        // gradient fill and they show up clipped (selector_advanced "Selector Effects" — the
-        // capital S vanished because Chromium's bold metrics ran ~10px wider than tgfx).
-        bool isMultiLineAnchored =
-            text->text.find('\n') != std::string::npos && text->textAnchor != TextAnchor::Start;
-        bool transformCentered = text->textAnchor == TextAnchor::Center || isMultiLineAnchored;
-        if (text->textAnchor != TextAnchor::Start && !transformCentered) {
-          float glyphW = text->textBounds.width;
-          if (glyphW > 0) {
-            style += ";background-size:" + CssFloatToString(glyphW) +
-                     "px 100%;background-position:center;background-repeat:no-repeat";
-          }
-        }
         style += ";-webkit-text-fill-color:transparent";
         if (fill->alpha < 1.0f) {
           alpha *= fill->alpha;
@@ -1247,7 +1204,7 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
       auto renderFont = text->renderFontSize();
       float ty = renderPos.y;
       if (text->baseline == TextBaseline::Alphabetic) {
-        ty = text->position.y - renderFont * 0.8f;
+        ty = text->position.y;
       }
       std::string containerStyle =
           "position:absolute;white-space:nowrap;top:" + CssFloatToString(ty) + "px";
@@ -1371,58 +1328,12 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
             charStyle += ";color:" + ColorToRGBA(sc->color, fill->alpha);
           }
         } else if (fill && fill->color) {
-          // Non-solid fill (LinearGradient etc.). When fitsToGeometry=false the gradient lives
-          // in the parent Layer's coordinate space and a single gradient spans the entire text
-          // block, so each character should display only its slice of the gradient rather than
-          // the full gradient compressed into its own advance width.
-          // Approach: compute this character's approximate Layer-space position along the gradient
-          // line (using renderPos + character index fraction * text block width), then sample
-          // the gradient at that position and render the character in that solid colour.
-          // This matches tgfx's behaviour where each small glyph path is filled with its portion
-          // of the parent-space gradient.
-          if (fill->color->nodeType() == NodeType::LinearGradient) {
-            auto* lg = static_cast<const LinearGradient*>(fill->color);
-            if (!lg->fitsToGeometry && !lg->colorStops.empty()) {
-              float textW = text->textBounds.width;
-              float textH = renderFont;
-              // Character centre in Layer coordinate space (where startPoint/endPoint live).
-              // renderPos gives the text block's origin in Layer space; add the per-character
-              // fraction of the block width to approximate the character's Layer-space x.
-              float localFrac = (totalGlyphs > 1) ? (static_cast<float>(charIdx) + 0.5f) /
-                                                        static_cast<float>(totalGlyphs)
-                                                  : 0.5f;
-              float charLayerX = renderPos.x + localFrac * textW;
-              float charLayerY = renderPos.y + textH * 0.5f;
-              // Project the character's Layer-space position onto the gradient line to get
-              // a normalised parameter t, then map that into the [0..1] stop space.
-              Point s = lg->matrix.mapPoint(lg->startPoint);
-              Point e = lg->matrix.mapPoint(lg->endPoint);
-              float dx = e.x - s.x;
-              float dy = e.y - s.y;
-              float lenSq = dx * dx + dy * dy;
-              float stopT = 0.5f;
-              if (lenSq > 1e-10f) {
-                // Project charLayer onto the s→e vector.
-                stopT = ((charLayerX - s.x) * dx + (charLayerY - s.y) * dy) / lenSq;
-              }
-              Color sampled = SampleLinearGradient(lg->colorStops, stopT);
-              charStyle += ";color:" + ColorToRGBA(sampled, fill->alpha);
-            } else {
-              // fitsToGeometry=true: gradient fits each character individually, use background-clip
-              auto css = colorToCSS(fill->color, nullptr);
-              if (!css.empty()) {
-                charStyle += ";background:" + css;
-                charStyle += ";-webkit-background-clip:text;background-clip:text";
-                charStyle += ";-webkit-text-fill-color:transparent";
-              }
-            }
-          } else {
-            auto css = colorToCSS(fill->color, nullptr);
-            if (!css.empty()) {
-              charStyle += ";background:" + css;
-              charStyle += ";-webkit-background-clip:text;background-clip:text";
-              charStyle += ";-webkit-text-fill-color:transparent";
-            }
+          // Non-solid fill (LinearGradient, RadialGradient, etc.): use background-clip:text.
+          auto css = colorToCSS(fill->color, nullptr);
+          if (!css.empty()) {
+            charStyle += ";background:" + css;
+            charStyle += ";-webkit-background-clip:text;background-clip:text";
+            charStyle += ";-webkit-text-fill-color:transparent";
           }
         } else if (!fill && stroke) {
           charStyle += ";color:transparent";
@@ -1454,10 +1365,6 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
             }
           }
         }
-        // fauxBold is handled via CSS native synthesis (`font-weight:bold` +
-        // `font-synthesis-weight`). Must coexist with -webkit-text-stroke so the stroke
-        // paints along the synthesised-bold outline; otherwise the stroke traces the
-        // thinner regular outline and bleeds inside the bolder fill glyph.
         if (text->fauxBold) {
           charStyle += ";font-weight:bold;font-synthesis-weight:auto";
         }
@@ -1673,9 +1580,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
       auto textRenderPos = text->renderPosition();
       auto baselineOrigin = textPath->renderBaselineOrigin();
       float characterAnchorY = textRenderPos.y;
-      if (text->baseline == TextBaseline::LineBox) {
-        characterAnchorY += renderFont * 0.8f;
-      }
+      // LineBox baseline: position.y is line-box top; no ascent offset needed.
       float characterCursorX = textRenderPos.x;
       float currentArcPos = textPath->firstMargin;
       p = text->text.c_str();
@@ -1726,13 +1631,6 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
           charStyle += ";font-family:'" + EscapeCssFontFamily(text->fontFamily) + "'";
         }
         charStyle += ";font-size:" + CssFloatToString(renderFont) + "px";
-        // Pin line-height to 1 so the span's line-box equals fontSize. Without this the
-        // per-char span inherits line-height:normal, which Chromium resolves to ~1.2em-1.5em
-        // depending on the font's OS/2 metrics. That inflates the line-box and shifts the
-        // alphabetic baseline down by roughly (line-height - 1em)/2, so the -0.905em vertical
-        // translate below no longer lands the baseline on the sampled curve point and the
-        // path visibly cuts through the glyph body instead of touching its feet.
-        charStyle += ";line-height:1";
         if (!text->fontStyle.empty()) {
           if (text->fontStyle.find("Bold") != std::string::npos) {
             charStyle += ";font-weight:bold;font-synthesis-weight:auto";
@@ -1749,13 +1647,9 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
           float angleDeg = tangent * 180.0f / static_cast<float>(M_PI) - textPath->baselineAngle;
           transform += "rotate(" + CssFloatToString(angleDeg) + "deg) ";
         }
-        // Align the character baseline to the path sample point. The sampled (pos.x, pos.y) is
-        // where tgfx places the glyph baseline; we translate the span upward by the font ascent
-        // so the baseline lands on pos.y. For Arial the typographic ascender is ~0.905em. Using
-        // the full fontSize (1em) would place the span's bottom edge at pos.y, shifting glyphs
-        // upward by ~0.1em. With line-height:1 above, the span's content-box equals fontSize
-        // and the baseline sits ~0.905em from the top, so this translate lands it on pos.y.
-        transform += "translate(-50%,-" + CssFloatToString(renderFont * 0.905f) + "px)";
+        // Center the character span on the path sample point horizontally; vertical offset
+        // between line-box top and baseline depends on the font's actual ascent metrics.
+        transform += "translate(-50%,-" + CssFloatToString(renderFont) + "px)";
         // fauxItalic must shear the glyph in its own local space before TextPath's
         // fauxItalic is handled via CSS native synthesis on each per-character span.
         if (text->fauxItalic) {
