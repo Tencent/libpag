@@ -115,6 +115,14 @@ inline std::shared_ptr<pagx::PAGXDocument> ParseFromString(const std::string& ht
   return pagx::HTMLImporter::ParseString(html);
 }
 
+inline pagx::Color SolidFillColorOf(pagx::Layer* layer) {
+  auto* fill = FindElementOfType<pagx::Fill>(layer);
+  if (!fill) return {};
+  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  if (!solid) return {};
+  return solid->color;
+}
+
 }  // namespace
 
 //==================================================================================================
@@ -578,6 +586,659 @@ PAG_TEST(PAGXHTMLTest, MarginEmitsWarning) {
     if (msg.find("margin") != std::string::npos) hasWarning = true;
   }
   EXPECT_TRUE(hasWarning);
+}
+
+//==================================================================================================
+// Document-level + style-block tests
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLTest, TitleStoredAsDataTitle) {
+  auto doc = ParseFromString(R"HTML(
+    <html>
+      <head><title>Canvas Title</title></head>
+      <body style="width:50px;height:50px"></body>
+    </html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto it = doc->customData.find("title");
+  ASSERT_NE(it, doc->customData.end());
+  EXPECT_EQ(it->second, "Canvas Title");
+}
+
+PAG_TEST(PAGXHTMLTest, MetaTagIgnoredSilently) {
+  auto doc = ParseFromString(R"HTML(
+    <html>
+      <head><meta charset="utf-8"/></head>
+      <body style="width:50px;height:50px"></body>
+    </html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  for (const auto& msg : doc->errors) {
+    EXPECT_EQ(msg.find("meta"), std::string::npos) << msg;
+  }
+}
+
+PAG_TEST(PAGXHTMLTest, RejectsMissingBody) {
+  auto doc = ParseFromString(R"HTML(<html><head></head></html>)HTML");
+  EXPECT_EQ(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLTest, CommaSeparatedClassRulesApply) {
+  auto doc = ParseFromString(R"HTML(
+    <html><head><style>.a, .b { background-color:#112233; border-radius:6px }</style></head>
+      <body style="width:80px;height:40px">
+        <div class="a" style="width:20px;height:20px"></div>
+        <div class="b" style="width:20px;height:20px"></div>
+      </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->layers.front()->children.size(), 2u);
+  for (auto* div : doc->layers.front()->children) {
+    auto* fill = FindElementOfType<pagx::Fill>(div);
+    auto* rect = FindElementOfType<pagx::Rectangle>(div);
+    ASSERT_NE(fill, nullptr);
+    ASSERT_NE(rect, nullptr);
+    auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+    ASSERT_NE(solid, nullptr);
+    EXPECT_TRUE(ColorNear(solid->color, HexColor(0x112233)));
+    EXPECT_FLOAT_EQ(rect->roundness, 6.0f);
+  }
+}
+
+PAG_TEST(PAGXHTMLTest, MultipleClassesMergeWithLastWinning) {
+  auto doc = ParseFromString(R"HTML(
+    <html><head><style>
+      .base { background-color:#000000; border-radius:4px }
+      .override { background-color:#FF8800 }
+    </style></head>
+      <body style="width:50px;height:50px">
+        <div class="base override" style="width:50px;height:50px"></div>
+      </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(div);
+  auto* rect = FindElementOfType<pagx::Rectangle>(div);
+  ASSERT_NE(fill, nullptr);
+  ASSERT_NE(rect, nullptr);
+  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  ASSERT_NE(solid, nullptr);
+  EXPECT_TRUE(ColorNear(solid->color, HexColor(0xFF8800)));
+  EXPECT_FLOAT_EQ(rect->roundness, 4.0f);
+}
+
+PAG_TEST(PAGXHTMLTest, InlineStyleBeatsClassRule) {
+  auto doc = ParseFromString(R"HTML(
+    <html><head><style>.box { background-color:#111111 }</style></head>
+      <body style="width:50px;height:50px">
+        <div class="box" style="width:50px;height:50px;background-color:#22AAEE"></div>
+      </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(div);
+  ASSERT_NE(fill, nullptr);
+  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  ASSERT_NE(solid, nullptr);
+  EXPECT_TRUE(ColorNear(solid->color, HexColor(0x22AAEE)));
+}
+
+PAG_TEST(PAGXHTMLTest, ElementSelectorAppliesToTag) {
+  auto doc = ParseFromString(R"HTML(
+    <html><head><style>p { color:#33CC44 }</style></head>
+      <body style="width:200px;height:40px">
+        <p>Hello</p>
+      </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(leaf);
+  ASSERT_NE(fill, nullptr);
+  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  ASSERT_NE(solid, nullptr);
+  EXPECT_TRUE(ColorNear(solid->color, HexColor(0x33CC44)));
+}
+
+PAG_TEST(PAGXHTMLTest, UnsupportedSelectorIgnoredAndDoesNotApply) {
+  auto doc = ParseFromString(R"HTML(
+    <html><head><style>
+      div > .child { background-color:#FF0000 }
+      .ok { background-color:#00FF00 }
+    </style></head>
+      <body style="width:50px;height:50px">
+        <div class="child ok" style="width:50px;height:50px"></div>
+      </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  // The descendant selector "div > .child" must be dropped; only the simple ".ok" rule applies.
+  auto* div = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(div);
+  ASSERT_NE(fill, nullptr);
+  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  ASSERT_NE(solid, nullptr);
+  EXPECT_TRUE(ColorNear(solid->color, HexColor(0x00FF00)));
+}
+
+//==================================================================================================
+// Sizing / positioning / element type tests
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLTest, PercentSizingMapsToPercentFields) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:100px">
+      <div style="width:50%;height:25%;background-color:#000"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FLOAT_EQ(div->percentWidth, 50.0f);
+  EXPECT_FLOAT_EQ(div->percentHeight, 25.0f);
+  EXPECT_TRUE(std::isnan(div->width));
+  EXPECT_TRUE(std::isnan(div->height));
+}
+
+PAG_TEST(PAGXHTMLTest, SemanticContainersMapToLayer) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <header style="width:100px;height:20px"></header>
+      <main style="width:100px;height:60px"></main>
+      <footer style="width:100px;height:20px"></footer>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_EQ(doc->layers.front()->children.size(), 3u);
+}
+
+PAG_TEST(PAGXHTMLTest, NonStaticPositionDowngradesAbsolute) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="position:fixed;top:5px;left:5px;width:10px;height:10px;background-color:#000"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FALSE(div->includeInLayout);
+  bool hasWarning = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("position") != std::string::npos) hasWarning = true;
+  }
+  EXPECT_TRUE(hasWarning);
+}
+
+//==================================================================================================
+// Layout / arrangement / alignment tests
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLTest, FlexDirectionColumn) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:200px">
+      <div style="display:flex;flex-direction:column;width:50px;height:200px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_EQ(div->layout, pagx::LayoutMode::Vertical);
+}
+
+PAG_TEST(PAGXHTMLTest, AlignItemsAndJustifyContentVariants) {
+  struct Pair {
+    const char* css;
+    pagx::Alignment expected;
+  };
+  Pair alignments[] = {{"stretch", pagx::Alignment::Stretch},
+                       {"flex-start", pagx::Alignment::Start},
+                       {"flex-end", pagx::Alignment::End}};
+  for (const auto& p : alignments) {
+    std::string html = std::string(
+                           "<html><body style=\"width:50px;height:50px\">"
+                           "<div style=\"display:flex;align-items:") +
+                       p.css + ";width:50px;height:50px\"></div></body></html>";
+    auto doc = ParseFromString(html);
+    ASSERT_NE(doc, nullptr);
+    EXPECT_EQ(doc->layers.front()->children.front()->alignment, p.expected) << p.css;
+  }
+  struct JPair {
+    const char* css;
+    pagx::Arrangement expected;
+  };
+  JPair justifies[] = {{"flex-start", pagx::Arrangement::Start},
+                       {"center", pagx::Arrangement::Center},
+                       {"flex-end", pagx::Arrangement::End},
+                       {"space-evenly", pagx::Arrangement::SpaceEvenly},
+                       {"space-around", pagx::Arrangement::SpaceAround}};
+  for (const auto& p : justifies) {
+    std::string html = std::string(
+                           "<html><body style=\"width:50px;height:50px\">"
+                           "<div style=\"display:flex;justify-content:") +
+                       p.css + ";width:50px;height:50px\"></div></body></html>";
+    auto doc = ParseFromString(html);
+    ASSERT_NE(doc, nullptr);
+    EXPECT_EQ(doc->layers.front()->children.front()->arrangement, p.expected) << p.css;
+  }
+}
+
+PAG_TEST(PAGXHTMLTest, PaddingShorthandTwoAndThreeValues) {
+  auto two = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="display:flex;padding:4px 6px;width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(two, nullptr);
+  auto* a = two->layers.front()->children.front();
+  EXPECT_FLOAT_EQ(a->padding.top, 4.0f);
+  EXPECT_FLOAT_EQ(a->padding.bottom, 4.0f);
+  EXPECT_FLOAT_EQ(a->padding.left, 6.0f);
+  EXPECT_FLOAT_EQ(a->padding.right, 6.0f);
+
+  auto three = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="display:flex;padding:1px 2px 3px;width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(three, nullptr);
+  auto* b = three->layers.front()->children.front();
+  EXPECT_FLOAT_EQ(b->padding.top, 1.0f);
+  EXPECT_FLOAT_EQ(b->padding.left, 2.0f);
+  EXPECT_FLOAT_EQ(b->padding.right, 2.0f);
+  EXPECT_FLOAT_EQ(b->padding.bottom, 3.0f);
+}
+
+//==================================================================================================
+// Color parsing tests
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLTest, NamedColorAccepted) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-color:red"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
+  ASSERT_NE(fill, nullptr);
+  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  ASSERT_NE(solid, nullptr);
+  EXPECT_TRUE(ColorNear(solid->color, HexColor(0xFF0000)));
+}
+
+PAG_TEST(PAGXHTMLTest, ShortHexBackgroundColorAccepted) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-color:#0F0"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(
+      ColorNear(SolidFillColorOf(doc->layers.front()->children.front()), HexColor(0x00FF00)));
+}
+
+PAG_TEST(PAGXHTMLTest, RgbaTextColorParsed) {
+  // background-color skips functional values, but parseColor handles rgba(...) for text color.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style="color:rgba(0,0,255,0.5)">Hi</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(
+      ColorNear(SolidFillColorOf(doc->layers.front()->children.front()), HexColor(0x0000FF, 0.5f)));
+}
+
+//==================================================================================================
+// Text tests
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLTest, BodyDefaultsArial14Color) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span>Hello</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  auto* text = FindElementOfType<pagx::Text>(leaf);
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->fontFamily, "Arial");
+  EXPECT_FLOAT_EQ(text->fontSize, 14.0f);
+  auto* fill = FindElementOfType<pagx::Fill>(leaf);
+  ASSERT_NE(fill, nullptr);
+  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  ASSERT_NE(solid, nullptr);
+  EXPECT_TRUE(ColorNear(solid->color, HexColor(0x1E293B)));
+}
+
+PAG_TEST(PAGXHTMLTest, HeadingDefaultFontSizes) {
+  struct Row {
+    const char* tag;
+    float size;
+  };
+  Row rows[] = {{"h1", 32.0f}, {"h2", 24.0f}, {"h3", 20.0f},
+                {"h4", 18.0f}, {"h5", 16.0f}, {"h6", 14.0f}};
+  for (const auto& r : rows) {
+    std::string html = std::string("<html><body style=\"width:200px;height:60px\"><") + r.tag +
+                       ">T</" + r.tag + "></body></html>";
+    auto doc = ParseFromString(html);
+    ASSERT_NE(doc, nullptr) << r.tag;
+    auto* leaf = doc->layers.front()->children.front();
+    auto* text = FindElementOfType<pagx::Text>(leaf);
+    ASSERT_NE(text, nullptr) << r.tag;
+    EXPECT_FLOAT_EQ(text->fontSize, r.size) << r.tag;
+    EXPECT_EQ(text->fontStyle, "Bold") << r.tag;
+  }
+}
+
+PAG_TEST(PAGXHTMLTest, FontWeightNumericMapsToBold) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style="font-weight:700">Heavy</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->fontStyle, "Bold");
+}
+
+PAG_TEST(PAGXHTMLTest, FontWeightUnder600IsNotBold) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style="font-weight:500">Medium</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
+  ASSERT_NE(text, nullptr);
+  EXPECT_TRUE(text->fontStyle.empty());
+}
+
+PAG_TEST(PAGXHTMLTest, BoldItalicCombined) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style="font-weight:bold;font-style:italic">Hi</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->fontStyle, "Bold Italic");
+}
+
+PAG_TEST(PAGXHTMLTest, FontFamilyAndLetterSpacing) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style="font-family:Helvetica;letter-spacing:2px">Hi</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->fontFamily, "Helvetica");
+  EXPECT_FLOAT_EQ(text->letterSpacing, 2.0f);
+}
+
+PAG_TEST(PAGXHTMLTest, TextAlignAndLineHeightOnParagraph) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:60px">
+      <p style="text-align:center;line-height:20px">Hi <span>World</span></p>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  auto* tb = FindElementOfType<pagx::TextBox>(leaf);
+  ASSERT_NE(tb, nullptr);
+  EXPECT_EQ(tb->textAlign, pagx::TextAlign::Center);
+  EXPECT_FLOAT_EQ(tb->lineHeight, 20.0f);
+}
+
+PAG_TEST(PAGXHTMLTest, TextAlignJustifyMapped) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:60px">
+      <p style="text-align:justify">Hi <span>World</span></p>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* tb = FindElementOfType<pagx::TextBox>(doc->layers.front()->children.front());
+  ASSERT_NE(tb, nullptr);
+  EXPECT_EQ(tb->textAlign, pagx::TextAlign::Justify);
+}
+
+PAG_TEST(PAGXHTMLTest, WhiteSpaceNowrapDisablesWrap) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <p style="white-space:nowrap">Hi <span>World</span></p>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* tb = FindElementOfType<pagx::TextBox>(doc->layers.front()->children.front());
+  ASSERT_NE(tb, nullptr);
+  EXPECT_FALSE(tb->wordWrap);
+}
+
+PAG_TEST(PAGXHTMLTest, OverflowHiddenOnTextContainerHidesText) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <p style="overflow:hidden">Hi <span>World</span></p>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* tb = FindElementOfType<pagx::TextBox>(doc->layers.front()->children.front());
+  ASSERT_NE(tb, nullptr);
+  EXPECT_EQ(tb->overflow, pagx::Overflow::Hidden);
+}
+
+PAG_TEST(PAGXHTMLTest, TextDecorationLineThroughOverlay) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style="font-size:14px;color:#000;text-decoration:line-through">Hello</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  auto* rect = FindElementOfType<pagx::Rectangle>(leaf);
+  ASSERT_NE(rect, nullptr);
+  EXPECT_FLOAT_EQ(rect->centerY, 0.0f);
+  EXPECT_FLOAT_EQ(rect->height, 1.0f);
+  EXPECT_FLOAT_EQ(rect->percentWidth, 100.0f);
+}
+
+//==================================================================================================
+// Gradients / Anchor / data-* / id tests
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLTest, LinearGradientToBottomRight) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-image:linear-gradient(to bottom right, #F00, #00F)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
+  ASSERT_NE(fill, nullptr);
+  auto* lg = dynamic_cast<pagx::LinearGradient*>(fill->color);
+  ASSERT_NE(lg, nullptr);
+  // CSS 135deg → PAGX 45deg (top-left to bottom-right diagonal).
+  EXPECT_GT(lg->endPoint.x, lg->startPoint.x);
+  EXPECT_GT(lg->endPoint.y, lg->startPoint.y);
+}
+
+PAG_TEST(PAGXHTMLTest, LinearGradientThreeStopsInterpolatesMiddleOffset) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-image:linear-gradient(90deg,#F00,#0F0,#00F)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
+  auto* lg = dynamic_cast<pagx::LinearGradient*>(fill->color);
+  ASSERT_NE(lg, nullptr);
+  ASSERT_EQ(lg->colorStops.size(), 3u);
+  EXPECT_TRUE(NearlyEqual(lg->colorStops[0]->offset, 0.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(lg->colorStops[1]->offset, 0.5f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(lg->colorStops[2]->offset, 1.0f, 0.01f));
+}
+
+PAG_TEST(PAGXHTMLTest, ConicGradientFrom90DegMapsToZero) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-image:conic-gradient(from 90deg, #F00, #00F)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
+  auto* cg = dynamic_cast<pagx::ConicGradient*>(fill->color);
+  ASSERT_NE(cg, nullptr);
+  // CSS 90° (right) ⇒ PAGX 0° (along +X axis).
+  EXPECT_TRUE(NearlyEqual(cg->startAngle, 0.0f, 0.01f));
+}
+
+PAG_TEST(PAGXHTMLTest, AnchorHrefStoredAsCustomData) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <a href="https://example.com" style="font-size:14px">Link</a>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  auto it = leaf->customData.find("href");
+  ASSERT_NE(it, leaf->customData.end());
+  EXPECT_EQ(it->second, "https://example.com");
+}
+
+PAG_TEST(PAGXHTMLTest, AnchorDefaultsBlueAndUnderline) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <a href="https://e.test">Link</a>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(leaf);
+  ASSERT_NE(fill, nullptr);
+  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  ASSERT_NE(solid, nullptr);
+  EXPECT_TRUE(ColorNear(solid->color, HexColor(0x2563EB)));
+  // Underline overlay rectangle should exist.
+  EXPECT_GE(CountElements<pagx::Rectangle>(leaf->contents), 1u);
+}
+
+PAG_TEST(PAGXHTMLTest, DataStarAttributesPropagate) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div data-role="primary" data-label="hi" style="width:50px;height:50px;background-color:#000"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_EQ(div->customData["role"], "primary");
+  EXPECT_EQ(div->customData["label"], "hi");
+}
+
+PAG_TEST(PAGXHTMLTest, IdAttributePropagatesToLayer) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div id="hero" style="width:50px;height:50px;background-color:#000"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_EQ(div->id, "hero");
+}
+
+//==================================================================================================
+// Image / SVG / Options tests
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLTest, ImgWithSvgSrcBecomesImportDirective) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px">
+      <img src="logo.svg" style="width:80px;height:80px"/>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  EXPECT_EQ(leaf->importDirective.format, "svg");
+  EXPECT_FALSE(leaf->importDirective.source.empty());
+  EXPECT_NE(leaf->importDirective.source.find("logo.svg"), std::string::npos);
+  // No Rectangle/Fill is emitted for external SVG imports.
+  EXPECT_EQ(CountElements<pagx::Rectangle>(leaf->contents), 0u);
+}
+
+PAG_TEST(PAGXHTMLTest, RepeatedImageSourceDeduplicated) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:160px;height:80px">
+      <img src="logo.png" style="width:80px;height:80px"/>
+      <img src="logo.png" style="width:80px;height:80px"/>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto& kids = doc->layers.front()->children;
+  ASSERT_EQ(kids.size(), 2u);
+  auto* fillA = FindElementOfType<pagx::Fill>(kids[0]);
+  auto* fillB = FindElementOfType<pagx::Fill>(kids[1]);
+  ASSERT_NE(fillA, nullptr);
+  ASSERT_NE(fillB, nullptr);
+  auto* patA = dynamic_cast<pagx::ImagePattern*>(fillA->color);
+  auto* patB = dynamic_cast<pagx::ImagePattern*>(fillB->color);
+  ASSERT_NE(patA, nullptr);
+  ASSERT_NE(patB, nullptr);
+  EXPECT_EQ(patA->image, patB->image);
+}
+
+PAG_TEST(PAGXHTMLTest, StrictModeRejectsUnsupportedElement) {
+  pagx::HTMLImporter::Options opts;
+  opts.strict = true;
+  std::string html =
+      R"HTML(<html><body style="width:50px;height:50px"><canvas></canvas></body></html>)HTML";
+  auto doc = pagx::HTMLImporter::ParseString(html, opts);
+  EXPECT_EQ(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLTest, PreserveUnknownElementsKeepsPlaceholder) {
+  pagx::HTMLImporter::Options opts;
+  opts.preserveUnknownElements = true;
+  std::string html =
+      R"HTML(<html><body style="width:50px;height:50px"><foo></foo></body></html>)HTML";
+  auto doc = pagx::HTMLImporter::ParseString(html, opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.front()->children.empty());
+  auto* placeholder = doc->layers.front()->children.front();
+  auto it = placeholder->customData.find("html-unknown");
+  ASSERT_NE(it, placeholder->customData.end());
+  EXPECT_EQ(it->second, "foo");
+}
+
+PAG_TEST(PAGXHTMLTest, TargetSizeOverridesBody) {
+  pagx::HTMLImporter::Options opts;
+  opts.targetWidth = 400.0f;
+  opts.targetHeight = 200.0f;
+  std::string html = R"HTML(<html><body style="width:50px;height:50px"></body></html>)HTML";
+  auto doc = pagx::HTMLImporter::ParseString(html, opts);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FLOAT_EQ(doc->width, 400.0f);
+  EXPECT_FLOAT_EQ(doc->height, 200.0f);
+}
+
+PAG_TEST(PAGXHTMLTest, PreferBodySizeWinsOverTarget) {
+  pagx::HTMLImporter::Options opts;
+  opts.targetWidth = 400.0f;
+  opts.targetHeight = 200.0f;
+  opts.preferBodySize = true;
+  std::string html = R"HTML(<html><body style="width:50px;height:50px"></body></html>)HTML";
+  auto doc = pagx::HTMLImporter::ParseString(html, opts);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FLOAT_EQ(doc->width, 50.0f);
+  EXPECT_FLOAT_EQ(doc->height, 50.0f);
+}
+
+PAG_TEST(PAGXHTMLTest, TargetUsedWhenBodyMissingSize) {
+  pagx::HTMLImporter::Options opts;
+  opts.targetWidth = 320.0f;
+  opts.targetHeight = 96.0f;
+  std::string html = R"HTML(<html><body></body></html>)HTML";
+  auto doc = pagx::HTMLImporter::ParseString(html, opts);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FLOAT_EQ(doc->width, 320.0f);
+  EXPECT_FLOAT_EQ(doc->height, 96.0f);
 }
 
 //==================================================================================================
