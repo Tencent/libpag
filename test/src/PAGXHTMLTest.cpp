@@ -732,6 +732,38 @@ PAG_TEST(PAGXHTMLTest, AbsoluteOnTextLeafEmitsWarning) {
   EXPECT_TRUE(downgradeWarn);
 }
 
+PAG_TEST(PAGXHTMLTest, TextLeafWithBlockChildFallsBackToContainer) {
+  // Regression: <span> / <p> with block-level children used to drop the children with the
+  // warning "<div> not supported inside text leaf; skipped". HTML allows mixed inline/block
+  // content, and the snapshot emitter for tools/html-snapshot frequently produces it (e.g.
+  // when a Lucide <svg> sits inside an inline wrapper). We now fall back to container
+  // handling so the children survive as sibling layers.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:50px">
+      <span style="position:absolute;left:0;top:0;width:60px;height:20px;color:#000">
+        Hi
+        <div style="position:absolute;left:30px;top:0;width:20px;height:20px;
+                    background-color:#FF2442;border-radius:4px"></div>
+      </span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  for (const auto& msg : doc->errors) {
+    EXPECT_TRUE(msg.find("not supported inside text leaf") == std::string::npos)
+        << "unexpected warning: " << msg;
+  }
+  auto* span = doc->layers.front()->children.front();
+  ASSERT_NE(span, nullptr);
+  bool foundBlockChild = false;
+  for (auto* child : span->children) {
+    auto* fill = FindElementOfType<pagx::Fill>(child);
+    if (fill != nullptr && ColorNear(SolidFillColorOf(child), HexColor(0xFF2442))) {
+      foundBlockChild = true;
+    }
+  }
+  EXPECT_TRUE(foundBlockChild);
+}
+
 PAG_TEST(PAGXHTMLTest, MissingCanvasReportsHardError) {
   auto doc = ParseFromString(R"HTML(<html><body></body></html>)HTML");
   EXPECT_EQ(doc, nullptr);
@@ -1095,7 +1127,6 @@ PAG_TEST(PAGXHTMLTest, ShortHexBackgroundColorAccepted) {
 }
 
 PAG_TEST(PAGXHTMLTest, RgbaTextColorParsed) {
-  // background-color skips functional values, but parseColor handles rgba(...) for text color.
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <span style="color:rgba(0,0,255,0.5)">Hi</span>
@@ -1104,6 +1135,32 @@ PAG_TEST(PAGXHTMLTest, RgbaTextColorParsed) {
   ASSERT_NE(doc, nullptr);
   EXPECT_TRUE(
       ColorNear(SolidFillColorOf(doc->layers.front()->children.front()), HexColor(0x0000FF, 0.5f)));
+}
+
+PAG_TEST(PAGXHTMLTest, RgbBackgroundColorParsed) {
+  // Regression: `background-color` used to skip any value containing '(', which silently
+  // dropped functional color literals like rgb()/rgba() emitted by browsers and authoring
+  // tools. parseColor handles them fine, so the only thing the importer should reject for
+  // background-color is non-color shorthands (gradients / url()).
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-color:rgb(255, 36, 66)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(
+      ColorNear(SolidFillColorOf(doc->layers.front()->children.front()), HexColor(0xFF2442)));
+}
+
+PAG_TEST(PAGXHTMLTest, RgbaBackgroundColorParsed) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-color:rgba(0, 0, 0, 0.4)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(
+      ColorNear(SolidFillColorOf(doc->layers.front()->children.front()), HexColor(0x000000, 0.4f)));
 }
 
 //==================================================================================================

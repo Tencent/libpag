@@ -369,8 +369,10 @@ void HTMLParserContext::parseBoxVisuals(HTMLBoxAttributes& box,
   if (bgColor.empty()) {
     bgColor = LookupProperty(props, "background");  // accept shorthand if it's color-only
   }
-  if (!bgColor.empty() && bgColor.find('(') == std::string::npos &&
-      bgColor.find("gradient") == std::string::npos && bgColor.find("url") == std::string::npos) {
+  // `parseColor` accepts hex, named colors, and `rgb()/rgba()` literals. We only need to bail
+  // out when the value is actually a non-color shorthand (gradient / url-image).
+  if (!bgColor.empty() && bgColor.find("gradient") == std::string::npos &&
+      bgColor.find("url(") == std::string::npos) {
     box.backgroundColor = parseColor(bgColor);
     box.backgroundColorSet = true;
   }

@@ -740,6 +740,23 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
     return convertContainer(element, box, childInherited, depth);
   }
   if (IsTextLeafTag(tag)) {
+    // HTML allows mixed content: a <span> / <p> may contain inline-block children
+    // (<div>, <svg>, <img>, ...). Strict text-leaf handling would drop them. When we
+    // detect any non-inline-run element child, fall back to container handling so
+    // both the text fragments and the block children survive as sibling layers.
+    auto isInlineLeafChild = [](const std::string& name) {
+      return IsInlineRunTag(name) || name == "br";
+    };
+    bool hasBlockChild = false;
+    for (auto c = element->getFirstChild(); c; c = c->getNextSibling()) {
+      if (c->type != DOMNodeType::Element) continue;
+      if (isInlineLeafChild(c->name)) continue;
+      hasBlockChild = true;
+      break;
+    }
+    if (hasBlockChild) {
+      return convertContainer(element, box, childInherited, depth);
+    }
     return convertTextLeaf(element, box, childInherited);
   }
   if (_options.preserveUnknownElements) {
