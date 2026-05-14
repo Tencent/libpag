@@ -18,10 +18,14 @@
 
 #pragma once
 
+#include <cstdint>
 #include <deque>
 #include <emscripten/bind.h>
 #include <memory>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/gpu/Recording.h"
@@ -30,7 +34,34 @@
 #include "pagx/PAGXDocument.h"
 #include "LayerBuilder.h"
 
+namespace tgfx {
+class Context;
+}
+
 namespace pagx {
+
+/**
+ * Quality tier for an externally supplied native image attached via
+ * PAGXView::attachNativeImage(). The two tiers map to distinct slots on each Image node and obey
+ * different lifecycle rules:
+ *
+ *   - Thumbnail: low-resolution preview (typically <= 256x256). Written to Image::thumbnailImage.
+ *     Acts as a fallback when the full-resolution texture is missing or has been evicted, so the
+ *     affected fill area never goes blank during progressive loading or memory pressure.
+ *     Thumbnails are not subject to per-frame LRU eviction; they are only dropped when an
+ *     incoming attachNativeImage() would push the thumbnail bucket over its byte budget, in
+ *     which case the oldest thumbnails are silently dropped to make room.
+ *
+ *   - Full: full-resolution texture. Written to Image::decodedImage. Subject to per-frame LRU
+ *     eviction once the full bucket exceeds its byte budget; evicted paths fire the
+ *     onTextureEvict callback so the host can drop its own cached copy. Layers whose full
+ *     texture has been evicted automatically fall back to the corresponding thumbnailImage on
+ *     the next draw, keeping the fill visible until a new full texture arrives.
+ */
+enum class ImageQuality : uint8_t {
+  Thumbnail = 0,
+  Full = 1,
+};
 
 class PAGXView {
  public:
@@ -51,6 +82,14 @@ class PAGXView {
    * Constructs a PAGXView with the given device and canvas dimensions.
    */
   PAGXView(std::shared_ptr<tgfx::Device> device, int width, int height);
+
+  /**
+   * Releases every backend texture this view still owns. Run while the GL context the view
+   * was bound to is still current — the JS-side destroy() handles makeCurrent/clearCurrent
+   * around nativeView.delete(), so this destructor sees a valid GL state and can call
+   * gl.deleteTexture directly.
+   */
+  ~PAGXView();
 
   /**
    * Registers fallback fonts for text rendering.
@@ -108,6 +147,74 @@ class PAGXView {
    */
   bool loadFileDataAsNativeImage(const std::string& filePath,
                                  const emscripten::val& nativeImage);
+
+  /**
+   * Attaches a host-decoded native image (typically an OffscreenCanvas) to Image nodes matching
+   * the given file path under a specific quality tier. Unlike loadFileDataAsNativeImage(), which
+   * hands off the JS object to tgfx's NativeCodec wrapper, this entry point uploads the pixels
+   * to a GPU texture immediately at the next draw() call (inside lockContext) and stores the
+   * resulting tgfx::Image as a backend-texture image whose lifetime is tied to PAGXView's own
+   * LRU caches. The OffscreenCanvas can be released by the caller as soon as this method
+   * returns; the C++ side keeps a reference to the JS object only until the upload runs.
+   *
+   * The quality argument selects which slot on the Image node receives the result:
+   *   - ImageQuality::Thumbnail writes to Image::thumbnailImage (fallback rendering).
+   *   - ImageQuality::Full writes to Image::decodedImage (primary rendering).
+   *
+   * Both quality tiers may be attached for the same filePath at different times; they live in
+   * distinct caches and do not overwrite each other.
+   *
+   * @param filePath The external file path to match against Image nodes.
+   * @param nativeImage A JavaScript-side decoded image source (OffscreenCanvas, ImageBitmap, or
+   *                    similar). Must be truthy.
+   * @param qualityRaw The image quality as the integer value of ImageQuality, passed through as
+   *                   a plain int because the JS binding cannot pass enum values directly.
+   * @return True if the request was queued for upload. The actual GPU upload happens at the
+   *         next draw().
+   */
+  bool attachNativeImage(const std::string& filePath, const emscripten::val& nativeImage,
+                         int qualityRaw);
+
+  /**
+   * Registers a JavaScript handler that receives backend-texture lifecycle events from this
+   * view. The handler object is expected to expose two methods (both optional; missing methods
+   * are silently skipped):
+   *
+   *   - onTextureRequest(filePath: string): called for paths whose full-quality decodedImage
+   *     was previously attached and then evicted by the LRU sweep, until a new
+   *     attachNativeImage(Full) lands. Initial-attachment paths (decodedImage never present)
+   *     are NOT surfaced here — those are owned by the host's own progressive image flow,
+   *     bootstrapped from getExternalFilePaths(). The host should respond by downloading +
+   *     decoding the asset and calling attachNativeImage(filePath, source, ImageQuality.Full);
+   *     doing so atomically clears the in-flight marker for that path so further draws will
+   *     re-request only if the asset is evicted again later. To prevent per-frame spam, each
+   *     evicted path is only emitted once until the host responds via attachNativeImage(Full);
+   *     hosts that drop a request without responding will not see it re-fired (and the renderer
+   *     will keep falling back to thumbnailImage indefinitely).
+   *
+   *   - onTextureEvict(filePaths: string[]): called once per draw with every full-quality path
+   *     that was just dropped by the LRU sweep. The host can use this hint to release the
+   *     corresponding bytes from its own cache. Thumbnail evictions never fire this callback.
+   *
+   * Passing a falsy value (undefined / null) clears any previously registered handler. The
+   * registration survives parsePAGX(), so callers only need to set it once after MakeFrom().
+   */
+  void setTextureEventHandler(const emscripten::val& handler);
+
+  /**
+   * Reports whether the full-quality cache has crossed its hard cap. Hosts driving a
+   * progressive thumbnail-to-full upgrade flow should consult this at the top of every
+   * upgrade pass and skip new uploads while it returns true. Reactive responses to
+   * onTextureRequest are still safe because each one replaces an entry that has just been
+   * evicted, leaving total bytes net-flat.
+   *
+   * The flag is purely a function of externalTexturesTotalBytes vs fullBudgetHardCap; it
+   * clears automatically as soon as a viewport change lets the LRU drain enough off-viewport
+   * entries to fall back below the cap. Hosts do not need to subscribe to a separate
+   * "memory recovered" callback: the next gesture-triggered evaluate() naturally re-checks
+   * this method and resumes upgrades.
+   */
+  bool isFullBudgetSaturated() const;
 
   /**
    * Replaces the decoded image attached to Image nodes that share the given filePath with a new
@@ -336,6 +443,200 @@ class PAGXView {
   // initial buildLayers() pass. Destroyed on every parsePAGX() so old build state never leaks
   // across documents.
   std::unique_ptr<LayerBuilderSession> builderSession = nullptr;
+
+  // Pending GPU upload requested by attachNativeImage(). Each entry parks the JS-side decoded
+  // image (typically an OffscreenCanvas) until the next draw() so the actual texImage2D call
+  // happens inside lockContext, where the WebGL context is bound to the renderer's GL state.
+  // The JS reference held in nativeImage keeps the source alive across the gap between the
+  // attach call and the draw that consumes it. width/height/sizeBytes are sampled once at
+  // queue time (single wasm↔JS round-trip per attach) so the budget check and the eventual
+  // flush can both reuse them without bouncing back through emscripten::val.
+  struct PendingUpload {
+    std::string filePath;
+    emscripten::val nativeImage;
+    ImageQuality quality = ImageQuality::Full;
+    int width = 0;
+    int height = 0;
+    uint64_t sizeBytes = 0;
+  };
+  std::vector<PendingUpload> pendingUploads = {};
+  // Running sum of sizeBytes for thumbnail-quality entries currently in pendingUploads. Lets
+  // attachNativeImage(Thumbnail) compare against thumbnailBudget in O(1) without re-walking
+  // the queue (and without bouncing into JS for width/height). Maintained alongside every
+  // push_back / clear / swap that touches pendingUploads.
+  uint64_t pendingThumbnailBytes = 0;
+  // Mirror of pendingThumbnailBytes for full-quality entries. Used by attachNativeImage(Full)
+  // to project the post-flush total before queuing so we can run a proactive
+  // enforceFullBudget() pass and avoid the "attach 8 fulls → enforceFullBudget evicts in
+  // bulk after flush" two-phase oscillation that wasted both upload bandwidth and triggered
+  // visible thumbnail-fallback flicker on the freshly evicted paths.
+  uint64_t pendingFullBytes = 0;
+
+  // Backing storage for backend-texture images uploaded by the host. Each entry pins one
+  // tgfx::Image wrapping a GL texture that this view owns directly — tgfx is told the texture
+  // is non-adopted (Image::MakeFrom, not MakeAdopted) so the underlying TextureView is
+  // dropped from the ResourceCache the moment our shared_ptr releases, instead of being held
+  // back in the scratch pool to wait for an LRU sweep. textureId stores the GL.textures index
+  // returned by createBackendTexture so the eviction path can hand it to destroyBackendTexture
+  // and free the GPU memory in the same draw that drops the entry. sizeBytes is the
+  // approximate GPU footprint at RGBA8 plus a 1/3 mipmap multiplier; it is used for budget
+  // accounting. LRU rank is no longer carried per-entry: enforceFullBudget() ranks candidates
+  // on demand by their distance to the viewport center, and approximating "actively used" by
+  // "still attached" turned out to mark every entry as equally fresh, which silently disabled
+  // LRU pressure entirely.
+  struct ExternalTextureEntry {
+    std::shared_ptr<tgfx::Image> image = nullptr;
+    uint64_t sizeBytes = 0;
+    unsigned textureId = 0;
+  };
+  // Full-quality cache: subject to per-frame LRU eviction once externalTexturesTotalBytes
+  // exceeds fullBudget. Eviction fires the onTextureEvict callback (TODO: wired in step 6).
+  std::unordered_map<std::string, ExternalTextureEntry> externalTextures = {};
+  uint64_t externalTexturesTotalBytes = 0;
+  // Thumbnail cache: not evicted on a per-frame basis. Only contracts when an incoming
+  // attachNativeImage() would push thumbnailTexturesTotalBytes past thumbnailBudget, at which
+  // point the oldest thumbnails are silently dropped. Thumbnails always survive when the full
+  // bucket evicts, so the fill area can keep showing the blurry preview.
+  std::unordered_map<std::string, ExternalTextureEntry> thumbnailTextures = {};
+  uint64_t thumbnailTexturesTotalBytes = 0;
+  // Tunable byte budgets. Sized against the 512MB tgfx cacheLimit on iOS WeChat (raising
+  // tgfx beyond 512MB triggered OOM kills in production, so the limit is fixed). The full
+  // bucket runs a two-tier policy:
+  //   - fullBudget (256MB): soft cap. The LRU starts evicting off-viewport entries as soon as
+  //     totalBytes crosses this line, but uploads are still allowed: the buffer between
+  //     soft and hard caps lets visible-but-not-yet-evicted entries cohabit with newly
+  //     attached fulls without immediately stalling the upgrade pipeline. Sized so the
+  //     remaining cacheLimit headroom (512 - 256 - 56 = 200MB) absorbs tgfx's tile/surface
+  //     cache growth during zoom-in: production logs showed the prior 320MB cap leaving only
+  //     ~136MB for tile cache, which got exhausted (memoryUsage hit 509MB on a 512MB cap)
+  //     when zooming into image-heavy PAGX documents.
+  //   - fullBudgetHardCap (384MB): hard cap. Once totalBytes reaches this line the host's
+  //     evaluate() loop is expected to stop issuing new full-quality upgrades (queried via
+  //     isFullBudgetSaturated()). Reactive responses to onTextureRequest still proceed —
+  //     those are 1:1 replacements for evicted entries that the renderer is already
+  //     referencing, so they can't push totalBytes any higher than it was before the evict.
+  //     Recovery is automatic: a viewport change causes the LRU to evict newly off-viewport
+  //     entries, totalBytes drops back below the hard cap, and the saturation flag clears.
+  //
+  // 56MB for thumbnails covers ~168 256x256 previews — more than any realistic document
+  // references. When thumbnailBudget is exhausted the oldest thumbnails are silently
+  // dropped without a host callback; affected layers may render blank until a fresh
+  // full-quality attach lands.
+  size_t fullBudget = 256ULL * 1024 * 1024;
+  size_t fullBudgetHardCap = 384ULL * 1024 * 1024;
+  size_t thumbnailBudget = 56ULL * 1024 * 1024;
+  // Monotonic counter incremented at the end of every draw(). Used by the eviction-overflow
+  // warning to throttle log output to once per 60 frames.
+  uint64_t currentFrameIndex = 0;
+  // Frame index of the last "fullBudget exceeded with all paths viewport-protected" warning.
+  // Used by enforceFullBudget to throttle the log to once per 60 frames so a sustained
+  // overflow does not flood the console.
+  uint64_t lastFullBudgetOverflowWarnFrame = 0;
+
+  // JS-side event handler registered via setTextureEventHandler(). Default-constructed val is
+  // undefined; we treat both undefined and null as "no handler". The handler object is held
+  // by value here; emscripten::val keeps a reference into the JS heap that prevents garbage
+  // collection until this PAGXView is destroyed (or the handler is replaced).
+  emscripten::val textureEventHandler = emscripten::val::undefined();
+  // Paths for which onTextureRequest has been emitted but no matching attachNativeImage(Full)
+  // call has resolved yet. Prevents the per-draw scan from re-requesting the same asset on
+  // every frame while a download is in flight. Cleared on parsePAGX() so a new document
+  // starts with a fresh request budget.
+  std::unordered_set<std::string> inFlightFullRequests = {};
+
+  // Paths whose full-quality decodedImage was previously attached and then evicted by the LRU
+  // sweep. The renderer uses this set to distinguish "never attached" from "attached and
+  // evicted" — only the latter should drive new onTextureRequest events, because the former is
+  // already covered by the host's initial getExternalFilePaths() / attachNativeImage flow and
+  // surfacing it again would re-request the asset every frame during the perfectly normal
+  // pre-attach window. Cleared on parsePAGX() and on each successful attachNativeImage(Full).
+  std::unordered_set<std::string> evictedFullPaths = {};
+
+  // GL.textures indices retired during the current draw (eviction, replacement upload, or
+  // document reset) but not yet handed to gl.deleteTexture. drainPendingTextureDeletes()
+  // empties this list at the very end of draw(), after flush + submit have run, so the
+  // GL command buffer that used these textures has already been built and submitted to the
+  // driver. WebGL guarantees in-flight commands keep working with a deleted texture id; only
+  // future bind calls fail (which is exactly what we want — the entry is already gone from
+  // externalTextures / thumbnailTextures and no further sampling can reference it).
+  std::vector<unsigned> pendingTextureDeletes = {};
+
+  // Records textureId for retirement at the next drainPendingTextureDeletes(). 0 is treated
+  // as "no id" and silently dropped so callers do not need to special-case empty entries.
+  void retireTextureId(unsigned textureId);
+
+  // Hands every queued texture id to JS gl.deleteTexture and clears pendingTextureDeletes.
+  // Must run on the GL thread inside an active lockContext window so the call sequence races
+  // with no other GL work; called twice in draw() (once per lockContext branch) so the GPU
+  // memory backing an evicted texture is freed in the same frame it was retired.
+  void drainPendingTextureDeletes();
+
+  // Drains pendingUploads inside lockContext. For each request: registers a new GL texture id
+  // via the JS helper, wraps it in a non-adopted tgfx::Image (Image::MakeFrom) so tgfx never
+  // claims ownership of the GL texture, writes it to the matching Image node, and bookkeeps
+  // the entry into externalTextures or thumbnailTextures by quality. The wasm side keeps the
+  // textureId on the entry so retireTextureId() can reclaim the GPU memory directly when the
+  // entry is later evicted or replaced. Called from draw() after lockContext() succeeds and
+  // before any rendering happens.
+  void flushPendingUploads(tgfx::Context* context);
+
+  // Evicts full-quality entries until externalTexturesTotalBytes drops at or below fullBudget.
+  // Candidates are restricted to paths whose union bounds fall outside the (1.2x-expanded)
+  // viewport — visible paths are hard-protected so the user never sees a texture they're
+  // looking at disappear. Off-viewport candidates are sorted by distance from the viewport
+  // center descending (farther first), modeled on tgfx's tiled rasterization which uses the
+  // same focal-distance ordering. For each evicted path: removes the cache entry (releasing
+  // the adopted backend texture), clears the matching Image node's decodedImage, and rebuilds
+  // the affected layers so the next frame falls back to thumbnailImage.
+  //
+  // When every cache entry is inside the protected viewport the budget is allowed to overflow
+  // temporarily — evicting a visible texture would only cause it to be re-fetched and re-
+  // attached the same frame, oscillating against itself. A 60-frame-throttled warning is
+  // logged in this case so sustained overflow stays visible without flooding the console.
+  void enforceFullBudget();
+
+  // Computes the current viewport rectangle in displayList.root() coordinates. The result is
+  // suitable for direct intersection with the bounds returned by Layer::getBounds(rootLayer).
+  // Returns an empty rect when the canvas is unavailable or the live zoom is non-positive
+  // (degenerate transform); callers must treat empty as "no viewport protection possible".
+  tgfx::Rect computeViewportInRootCoords() const;
+
+  // Collects the union of layer bounds (in displayList.root() coordinates) for every filePath
+  // currently sitting in externalTextures. Used by enforceFullBudget for two consecutive
+  // decisions: (1) whether each path intersects the viewport (visibility protection) and (2)
+  // how far the off-viewport paths sit from the viewport center (eviction priority). Sharing
+  // a single pass keeps the cost of one full bounds-collection low — every getBounds() call
+  // is cached by tgfx after the first hit, so repeated invocations across frames are O(1).
+  // Paths whose layers all return empty bounds are absent from the result.
+  std::unordered_map<std::string, tgfx::Rect> computeFullPathBounds() const;
+
+  // Attempts to free at least neededBytes from the thumbnail cache by evicting entries in
+  // hash-map iteration order until the requested amount is freed (or the cache is empty).
+  // Returns the number of bytes actually freed; the caller is responsible for re-checking
+  // that the upload can now fit. Eviction is silent (no host callback).
+  //
+  // Thumbnails do not get the per-entry recency / viewport-distance ranking that the full
+  // bucket gets: the cache is sized to comfortably hold every thumbnail in any realistic
+  // document (56MB / ~340KB per entry ≈ 168 thumbnails), so the eviction path is a true
+  // last-resort fallback. Spending complexity on a smarter ordering here would have no
+  // observable benefit.
+  uint64_t evictOldestThumbnailsUntilFits(uint64_t neededBytes);
+
+  // Walks every Image node and emits onTextureRequest(filePath) for paths that are referenced
+  // by the document but currently lack a full-quality decodedImage and have not already been
+  // requested in a previous draw. Triggered once per draw after the LRU sweep so freshly
+  // evicted paths immediately re-enter the in-flight set on the same frame.
+  void scanAndRequestMissingTextures();
+
+  // Invokes the JS handler's onTextureRequest hook with the given filePath. No-op when the
+  // handler has not been registered or does not expose this method. Called from
+  // scanAndRequestMissingTextures(); never from inside lockContext.
+  void emitTextureRequest(const std::string& filePath);
+
+  // Invokes the JS handler's onTextureEvict hook with the given filePaths. No-op when the
+  // list is empty, when the handler has not been registered, or when the handler does not
+  // expose this method. Called from enforceFullBudget(); never from inside lockContext.
+  void emitTextureEvict(const std::vector<std::string>& filePaths);
   float pagxWidth = 0.0f;
   float pagxHeight = 0.0f;
   int _width = 0;

@@ -202,14 +202,19 @@ bool resolveImagePatternMatrix(pagx::ImagePattern* pattern) {
   // Parse actual image dimensions from the best available source. The priority mirrors the
   // fallback chain in LayerBuilder::getOrCreateImage() so the pattern matrix stays consistent
   // with what will actually be rendered:
-  //   1. decodedImage: host-decoded tgfx::Image supplied via loadDecodedImage(). Chosen first so
-  //      progressive loading (e.g. low-res placeholder swapped for full-res) recomputes matrices
-  //      off the newest asset.
-  //   2. data: encoded bytes. We peek the header via ImageCodec::MakeFrom without forcing a
+  //   1. decodedImage: host-decoded full-quality tgfx::Image supplied via loadDecodedImage().
+  //      Chosen first so progressive loading (e.g. thumbnail swapped for full-resolution)
+  //      recomputes matrices off the highest-quality asset that will actually sample.
+  //   2. thumbnailImage: lower-resolution backend texture written via
+  //      loadDecodedImageAsThumbnail(). LayerBuilder falls back to this slot when
+  //      decodedImage is absent, so the pattern matrix must be sized against thumbnail pixel
+  //      dimensions in that window or the fill will sample outside the texture (visible as a
+  //      blank rectangle clamped to the edge sample).
+  //   3. data: encoded bytes. We peek the header via ImageCodec::MakeFrom without forcing a
   //      full decode.
-  //   3. orig-image-* from customData: the dimensions recorded by the exporter. Used both when
+  //   4. orig-image-* from customData: the dimensions recorded by the exporter. Used both when
   //      no pixels have arrived yet (placeholder layout during progressive loading) and as a
-  //      fallback when both data and decodedImage are absent.
+  //      fallback when decodedImage / thumbnailImage / data are all absent.
   float actualImageWidth = origImageWidth;
   float actualImageHeight = origImageHeight;
   auto* imageNode = pattern->image;
@@ -218,6 +223,10 @@ bool resolveImagePatternMatrix(pagx::ImagePattern* pattern) {
         imageNode->decodedImage->height() > 0) {
       actualImageWidth = static_cast<float>(imageNode->decodedImage->width());
       actualImageHeight = static_cast<float>(imageNode->decodedImage->height());
+    } else if (imageNode->thumbnailImage && imageNode->thumbnailImage->width() > 0 &&
+               imageNode->thumbnailImage->height() > 0) {
+      actualImageWidth = static_cast<float>(imageNode->thumbnailImage->width());
+      actualImageHeight = static_cast<float>(imageNode->thumbnailImage->height());
     } else if (imageNode->data && imageNode->data->size() > 0) {
       auto tgfxData = tgfx::Data::MakeWithoutCopy(imageNode->data->data(), imageNode->data->size());
       auto codec = tgfx::ImageCodec::MakeFrom(tgfxData);

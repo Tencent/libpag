@@ -30,6 +30,52 @@ import type { wx } from './interfaces';
 
 declare const wx: wx;
 
+/**
+ * Quality tier for an image attached via View.attachNativeImage(). The two tiers map to
+ * distinct slots on each Image node and obey different lifecycle rules:
+ *
+ *   - Thumbnail: low-resolution preview (typically <= 256x256). Acts as a fallback when the
+ *     full-resolution texture is missing or has been evicted, so the affected fill area never
+ *     goes blank during progressive loading or memory pressure. Thumbnails are not subject to
+ *     per-frame LRU eviction; they are dropped only when the thumbnail bucket exceeds its
+ *     budget, in which case the oldest entries are silently evicted.
+ *
+ *   - Full: full-resolution texture. Subject to per-frame LRU eviction when the full bucket
+ *     exceeds its budget; evicted paths fire the onTextureEvict callback so the host can drop
+ *     its own cached copy. Layers whose full texture has been evicted automatically fall back
+ *     to the thumbnail on the next draw.
+ *
+ * Numeric values must match pagx::ImageQuality on the C++ side (Thumbnail = 0, Full = 1).
+ */
+export enum ImageQuality {
+  Thumbnail = 0,
+  Full = 1,
+}
+
+/**
+ * JavaScript handler shape registered via View.setTextureEventHandler(). Every method is
+ * optional; missing methods are silently skipped on the C++ side.
+ */
+export interface TextureEventHandler {
+  /**
+   * Called by the renderer once per draw whenever an Image node references a filePath whose
+   * full-quality texture is not currently attached and no in-flight attachNativeImage(Full)
+   * request has already been queued for the same path. The host is expected to fetch and
+   * decode the asset asynchronously and resolve via attachNativeImage(filePath, source, Full);
+   * doing so atomically clears the in-flight marker so the same path is not re-requested
+   * unless it is evicted again later.
+   */
+  onTextureRequest?: (filePath: string) => void;
+
+  /**
+   * Called once per draw with every full-quality path that was just dropped by the LRU sweep.
+   * The host can release the corresponding bytes from its own cache. Thumbnail evictions are
+   * silent and never fire this callback.
+   */
+  onTextureEvict?: (filePaths: string[]) => void;
+}
+
+
 export interface PAGXViewOptions {
   /**
    * Auto start rendering loop. default false.
@@ -258,6 +304,74 @@ export class View {
       throw new Error('Native view not initialized');
     }
     return this.nativeView.upgradeImageFromNative(filePath, nativeImage);
+  }
+
+  /**
+   * Attaches a host-decoded native image (typically an OffscreenCanvas) to Image nodes
+   * matching the given filePath under a specific quality tier. Unlike loadFileDataAsNativeImage
+   * + upgradeImageFromNative, the pixels are uploaded as a GPU-resident backend texture on the
+   * next draw() and the host-side OffscreenCanvas can be released as soon as this call
+   * returns; the renderer no longer holds a reference into the JS heap once the upload runs.
+   *
+   * Two quality tiers may be attached for the same filePath at different times. Typical
+   * progressive flow:
+   *   1. Initial: download a small thumbnail variant (e.g. via the imageMogr2 thumbnail
+   *      transform), decode to OffscreenCanvas, attachNativeImage(path, canvas, Thumbnail).
+   *   2. Later: download the full asset, decode, attachNativeImage(path, canvas, Full).
+   * The thumbnail keeps the fill non-blank if the full texture is later evicted under memory
+   * pressure (the renderer transparently falls back to the thumbnail until a new full
+   * attachment arrives, which the host typically triggers from onTextureRequest).
+   *
+   * @param filePath The external file path to match against Image nodes.
+   * @param nativeImage Host-decoded image source. Standard web TexImageSource or WeChat
+   *                    OffscreenCanvas; the latter is detected by the `isOffscreenCanvas`
+   *                    discriminator.
+   * @param quality Quality tier; selects the Image-node slot the upload writes to.
+   * @returns True when the request was queued. The actual GPU upload happens on the next
+   *          draw(); a return value of false typically means the thumbnail budget cannot fit
+   *          the upload (Thumbnail) or the document/native view is not ready.
+   */
+  public attachNativeImage(
+    filePath: string,
+    nativeImage: unknown,
+    quality: ImageQuality
+  ): boolean {
+    if (!this.nativeView) {
+      throw new Error('Native view not initialized');
+    }
+    return this.nativeView.attachNativeImage(filePath, nativeImage, quality);
+  }
+
+  /**
+   * Registers a JavaScript handler that receives backend-texture lifecycle events from this
+   * view. See TextureEventHandler for the expected method shape; both onTextureRequest and
+   * onTextureEvict are optional and missing methods are silently skipped.
+   *
+   * Pass null/undefined to clear a previously registered handler. The handler survives
+   * parsePAGX(), so callers typically register it once after init().
+   */
+  public setTextureEventHandler(handler: TextureEventHandler | null): void {
+    if (!this.nativeView) {
+      throw new Error('Native view not initialized');
+    }
+    this.nativeView.setTextureEventHandler(handler);
+  }
+
+  /**
+   * Returns true when the SDK's full-quality cache has crossed its hard cap. Progressive
+   * upgrade loops in the host should call this at the top of every upgrade pass and skip
+   * new uploads while it returns true. Reactive responses to onTextureRequest remain safe
+   * (1:1 replacement of just-evicted entries leaves total bytes net-flat). The flag clears
+   * automatically once a viewport change lets the LRU drain enough off-viewport entries.
+   *
+   * Returns false when the native view is not initialized; callers in that state have no
+   * cache to worry about anyway.
+   */
+  public isFullBudgetSaturated(): boolean {
+    if (!this.nativeView) {
+      return false;
+    }
+    return this.nativeView.isFullBudgetSaturated();
   }
 
   /**

@@ -157,6 +157,49 @@ class PAGXDocument : public Node {
   Image* loadDecodedImage(const std::string& filePath, std::shared_ptr<tgfx::Image> decodedImage);
 
   /**
+   * Attaches a low-resolution preview tgfx::Image to Image nodes matching the given file path.
+   * The renderer uses this image only as a fallback when the full-resolution decodedImage is
+   * absent (initial load not yet complete, or evicted under memory pressure). The full-quality
+   * counterpart is loadDecodedImage(); the two writes target distinct fields on the Image node
+   * and do not overwrite each other.
+   *
+   * Like loadDecodedImage(), this method preserves the filePath on the node so the same path
+   * can be matched again later (for example, to replace the thumbnail with a higher-quality
+   * version on subsequent attaches). Once a thumbnail has been attached, getExternalFilePaths()
+   * stops returning the matching path — the host is expected to drive the eventual full-quality
+   * upload through its own progressive flow rather than via another getExternalFilePaths()
+   * round-trip.
+   *
+   * @param filePath the external file path to match against Image nodes
+   * @param thumbnailImage the pre-decoded low-resolution preview tgfx::Image to attach
+   * @return the first matching Image node, or nullptr if no match was found.
+   */
+  Image* loadDecodedImageAsThumbnail(const std::string& filePath,
+                                     std::shared_ptr<tgfx::Image> thumbnailImage);
+
+  /**
+   * Clears the decodedImage field on every Image node matching the given file path. Used by the
+   * full-quality LRU eviction path: dropping the host's tgfx::Image cache entry must be paired
+   * with detaching the same image from its document nodes so subsequent renders fall back to
+   * the thumbnail (or render empty if no thumbnail is attached). The filePath itself is
+   * preserved so the node can be re-attached later when a new full-quality version arrives.
+   *
+   * @param filePath the external file path to match against Image nodes
+   * @return the first matching Image node, or nullptr if no match was found.
+   */
+  Image* clearDecodedImage(const std::string& filePath);
+
+  /**
+   * Clears the thumbnailImage field on every Image node matching the given file path. Used by
+   * the thumbnail budget eviction path. As with clearDecodedImage(), the filePath is preserved
+   * so a new thumbnail can be attached on a later attachNativeImage() call.
+   *
+   * @param filePath the external file path to match against Image nodes
+   * @return the first matching Image node, or nullptr if no match was found.
+   */
+  Image* clearThumbnailImage(const std::string& filePath);
+
+  /**
    * Returns every Layer whose fill/stroke references an ImagePattern backed by an Image node
    * whose filePath matches the given value. The search follows nested Group elements and
    * Composition references so repeated subtrees only surface their owning Layer once, but a

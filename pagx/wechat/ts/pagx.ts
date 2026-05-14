@@ -44,3 +44,5 @@ const PAGXInit = (moduleOption: moduleOption = {}): Promise<types.PAGX> =>
     });
 
 export { PAGXInit, types };
+export { ImageQuality } from './pagx-view';
+export type { TextureEventHandler } from './pagx-view';

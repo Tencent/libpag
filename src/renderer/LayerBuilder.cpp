@@ -772,12 +772,29 @@ class LayerBuilderContext {
     if (it != _imageCache.end()) {
       return it->second;
     }
+    // Fallback chain. Earlier sources have priority; the host runtime is responsible for
+    // refreshing the chain via PAGXDocument::loadDecodedImage / loadDecodedImageAsThumbnail
+    // (and the corresponding clear*) plus rebuildForFilePath when the renderer should pick up
+    // a new asset. Sources fall into two camps:
+    //   1. Backend-texture images (decodedImage / thumbnailImage): already mipmapped at upload
+    //      time by the host's createBackendTexture helper. Re-wrapping with makeMipmapped(true)
+    //      here would force tgfx to allocate a parallel mipmapped texture and copy the pixels,
+    //      wasting GPU memory. Use as-is.
+    //   2. CPU-decoded images (encoded data, file path, data URI): produced lazily by tgfx
+    //      codecs. Wrap with makeMipmapped(true) so subsequent sampling at non-1:1 scales does
+    //      not re-decode at every zoom level.
     std::shared_ptr<tgfx::Image> image = nullptr;
+    bool isAdoptedBackendTexture = false;
     if (imageNode->decodedImage) {
-      // Host-decoded image supplied via PAGXDocument::loadDecodedImage(). Skip all codec paths
-      // and reuse the tgfx::Image directly; mipmap state is assumed to already be applied by the
-      // caller so we do not re-wrap here to avoid invalidating any shared cache.
+      // Full-quality host-decoded image. Skip all codec paths and reuse directly.
       image = imageNode->decodedImage;
+      isAdoptedBackendTexture = true;
+    } else if (imageNode->thumbnailImage) {
+      // Full-quality counterpart is missing (initial load not complete, or evicted under
+      // memory pressure). Fall back to the low-resolution preview so the affected fill area
+      // shows a blurry but non-empty image until the full texture arrives.
+      image = imageNode->thumbnailImage;
+      isAdoptedBackendTexture = true;
     } else if (imageNode->data) {
       image = tgfx::Image::MakeFromEncoded(ToTGFXData(imageNode->data));
     } else if (imageNode->filePath.find("data:") == 0) {
@@ -785,12 +802,7 @@ class LayerBuilderContext {
     } else if (!imageNode->filePath.empty()) {
       image = tgfx::Image::MakeFromFile(imageNode->filePath);
     }
-    // Enable mipmaps on every decoded image. ImagePattern already defaults to MipmapMode::Linear
-    // on the sampling side, so the render pipeline is ready to consume mipmap levels; before this
-    // call the image itself was not flagged as mipmapped, which silently disabled the benefit.
-    // With mipmaps the codec decodes at a single resolution once and hardware-generated levels
-    // cover every zoom ratio, eliminating the per-scale-level re-decode observed during zoom.
-    if (image) {
+    if (image && !isAdoptedBackendTexture) {
       image = image->makeMipmapped(true);
     }
     // Only memoize successful results. A null entry would cache the absence of a decoded image

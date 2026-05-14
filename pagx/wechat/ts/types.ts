@@ -44,6 +44,29 @@ export interface PAGXViewNative {
      */
     loadFileDataAsNativeImage: (filePath: string, nativeImage: any) => boolean;
     /**
+     * Attaches a host-decoded native image to Image nodes matching the given path under a
+     * specific quality tier. Unlike loadFileDataAsNativeImage(), the image is uploaded as a
+     * GPU-resident backend texture on the next draw() and the host-side OffscreenCanvas can be
+     * released as soon as this call returns. The qualityRaw argument is the integer value of
+     * ImageQuality (Thumbnail = 0, Full = 1); the C++ side rejects any other value.
+     */
+    attachNativeImage: (filePath: string, nativeImage: any, qualityRaw: number) => boolean;
+    /**
+     * Registers a JavaScript object whose onTextureRequest / onTextureEvict methods receive
+     * backend-texture lifecycle events. Pass null/undefined to clear a previously registered
+     * handler. The handler survives across parsePAGX() calls.
+     */
+    setTextureEventHandler: (handler: any) => void;
+    /**
+     * Returns true when externalTexturesTotalBytes has crossed fullBudgetHardCap. Hosts running
+     * a progressive thumbnail-to-full upgrade flow should consult this at the top of every
+     * upgrade pass and skip new full-quality uploads while it returns true. Reactive responses
+     * to onTextureRequest are still safe (each one is a 1:1 replacement for an evicted entry,
+     * so totalBytes stays net-flat). The flag clears automatically on the next draw whose
+     * eviction sweep reduces totalBytes back below the hard cap.
+     */
+    isFullBudgetSaturated: () => boolean;
+    /**
      * Replaces the decoded image attached to the given filePath with a new version AND
      * immediately regenerates the contents of every layer that renders it, so the next draw()
      * picks up the upgraded asset. Returns true when at least one layer was rebuilt. Call

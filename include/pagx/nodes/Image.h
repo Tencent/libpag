@@ -50,9 +50,21 @@ class Image : public Node {
    * decoder on platforms where synchronous codec decoding is expensive (e.g. WeChat mini-program
    * where wasm libwebp decoding blocks the main thread). When non-null, the renderer uses this
    * directly and skips encoded-bytes decoding. Populated on the WeChat platform by
-   * PAGXView::loadFileDataAsNativeImage(); other platforms currently leave it null.
+   * PAGXView::attachNativeImage() with quality=Full (and the legacy
+   * loadFileDataAsNativeImage() / upgradeImageFromNative entry points which forward to it);
+   * other platforms currently leave it null.
    */
   std::shared_ptr<tgfx::Image> decodedImage = nullptr;
+
+  /**
+   * Low-resolution preview tgfx::Image attached alongside the full-resolution decodedImage.
+   * Populated by PAGXView::attachNativeImage() with quality=Thumbnail. When the renderer cannot
+   * use decodedImage (initial load not yet complete, or the full-resolution texture has been
+   * evicted under memory pressure), it falls back to thumbnailImage so the affected fill area
+   * shows a blurry preview rather than a blank rectangle. Always nullptr on platforms that do
+   * not opt into the backend-texture image flow.
+   */
+  std::shared_ptr<tgfx::Image> thumbnailImage = nullptr;
 
   NodeType nodeType() const override {
     return NodeType::Image;

@@ -119,6 +119,16 @@ std::vector<std::string> PAGXDocument::getExternalFilePaths() const {
     if (image->decodedImage != nullptr) {
       continue;
     }
+    // Skip nodes that already carry a thumbnail (or any backend-texture preview). The host
+    // typically responds to getExternalFilePaths() by downloading + attaching a thumbnail; once
+    // that attachment lands, the path is considered "primed" and the host is expected to
+    // schedule the full-quality upload through its own progressive logic, not through another
+    // pass over getExternalFilePaths(). The eventual full-quality miss is signalled separately
+    // via onTextureRequest, which only fires after eviction or for paths that never received a
+    // thumbnail in the first place.
+    if (image->thumbnailImage != nullptr) {
+      continue;
+    }
     if (image->filePath.find("data:") == 0) {
       continue;
     }
@@ -162,6 +172,70 @@ Image* PAGXDocument::loadDecodedImage(const std::string& filePath,
       continue;
     }
     image->decodedImage = decodedImage;
+    if (firstMatch == nullptr) {
+      firstMatch = image;
+    }
+  }
+  return firstMatch;
+}
+
+Image* PAGXDocument::loadDecodedImageAsThumbnail(const std::string& filePath,
+                                                 std::shared_ptr<tgfx::Image> thumbnailImage) {
+  if (filePath.empty() || thumbnailImage == nullptr) {
+    return nullptr;
+  }
+  Image* firstMatch = nullptr;
+  for (auto& node : nodes) {
+    if (node->nodeType() != NodeType::Image) {
+      continue;
+    }
+    auto* image = static_cast<Image*>(node.get());
+    if (image->filePath != filePath) {
+      continue;
+    }
+    image->thumbnailImage = thumbnailImage;
+    if (firstMatch == nullptr) {
+      firstMatch = image;
+    }
+  }
+  return firstMatch;
+}
+
+Image* PAGXDocument::clearDecodedImage(const std::string& filePath) {
+  if (filePath.empty()) {
+    return nullptr;
+  }
+  Image* firstMatch = nullptr;
+  for (auto& node : nodes) {
+    if (node->nodeType() != NodeType::Image) {
+      continue;
+    }
+    auto* image = static_cast<Image*>(node.get());
+    if (image->filePath != filePath) {
+      continue;
+    }
+    image->decodedImage = nullptr;
+    if (firstMatch == nullptr) {
+      firstMatch = image;
+    }
+  }
+  return firstMatch;
+}
+
+Image* PAGXDocument::clearThumbnailImage(const std::string& filePath) {
+  if (filePath.empty()) {
+    return nullptr;
+  }
+  Image* firstMatch = nullptr;
+  for (auto& node : nodes) {
+    if (node->nodeType() != NodeType::Image) {
+      continue;
+    }
+    auto* image = static_cast<Image*>(node.get());
+    if (image->filePath != filePath) {
+      continue;
+    }
+    image->thumbnailImage = nullptr;
     if (firstMatch == nullptr) {
       firstMatch = image;
     }
