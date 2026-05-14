@@ -760,10 +760,6 @@ void PAGXView::enforceFullBudget() {
     // host receives onTextureRequest the same draw and can start re-fetching immediately.
     // attachNativeImage(Full) will erase the entry once a replacement upload is queued.
     evictedFullPaths.insert(c.path);
-    tgfx::PrintLog("[PAGX] full LRU evict path=%s freed=%lluKB total=%lluMB",
-                   c.path.c_str(),
-                   static_cast<unsigned long long>(c.sizeBytes / 1024),
-                   static_cast<unsigned long long>(externalTexturesTotalBytes / 1024 / 1024));
   }
   // Still over budget after the sweep means every remaining entry sits inside the protected
   // viewport. Letting the budget overflow temporarily is strictly better than evicting a
