@@ -179,7 +179,7 @@ with mixed styles, multi-style `border`, `outline`, `transform`, `transform-orig
 | `font-style: italic | oblique` | `Text.fontStyle = "Italic"` (or `"Bold Italic"`) |
 | `letter-spacing: N px` | `Text.letterSpacing` |
 | `text-align: start | left | center | right | justify` | `TextBox.textAlign = "start|center|end|justify"` (`left` → `start`, `right` → `end`) |
-| `line-height: N px` (number form not supported) | `TextBox.lineHeight` |
+| `line-height: N px` / `line-height: N` (unitless multiplier) / `N%` | `TextBox.lineHeight` (unitless and % are resolved against the element's `font-size`) |
 | `text-decoration: underline | line-through` | 1px `<Rectangle>` overlay (`bottom="0"` / `centerY="0"`), see §6 |
 | `white-space: nowrap` | `TextBox.wordWrap = false` |
 | `overflow: hidden` on a text container | `TextBox.overflow = "hidden"` |

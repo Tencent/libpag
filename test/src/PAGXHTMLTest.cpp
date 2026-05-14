@@ -34,6 +34,7 @@
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/InnerShadowStyle.h"
@@ -586,6 +587,227 @@ PAG_TEST(PAGXHTMLTest, MarginEmitsWarning) {
     if (msg.find("margin") != std::string::npos) hasWarning = true;
   }
   EXPECT_TRUE(hasWarning);
+}
+
+PAG_TEST(PAGXHTMLTest, DisallowedSizingPropertiesEmitWarnings) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="min-width:10px;max-width:40px;aspect-ratio:1/1;width:50px;height:50px;
+                  background-color:#000"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  bool minWarn = false, maxWarn = false, aspectWarn = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("min-width") != std::string::npos) minWarn = true;
+    if (msg.find("max-width") != std::string::npos) maxWarn = true;
+    if (msg.find("aspect-ratio") != std::string::npos) aspectWarn = true;
+  }
+  EXPECT_TRUE(minWarn);
+  EXPECT_TRUE(maxWarn);
+  EXPECT_TRUE(aspectWarn);
+}
+
+PAG_TEST(PAGXHTMLTest, DisallowedLayoutPropertiesEmitWarnings) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="display:flex;align-self:center;align-content:center;flex-grow:1;flex-basis:auto;
+                  width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  bool selfWarn = false, contentWarn = false, growWarn = false, basisWarn = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("align-self") != std::string::npos) selfWarn = true;
+    if (msg.find("align-content") != std::string::npos) contentWarn = true;
+    if (msg.find("flex-grow") != std::string::npos) growWarn = true;
+    if (msg.find("flex-basis") != std::string::npos) basisWarn = true;
+  }
+  EXPECT_TRUE(selfWarn);
+  EXPECT_TRUE(contentWarn);
+  EXPECT_TRUE(growWarn);
+  EXPECT_TRUE(basisWarn);
+}
+
+PAG_TEST(PAGXHTMLTest, DisallowedVisualPropertiesEmitWarnings) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="outline:1px solid red;clip-path:circle(20px);transform-origin:center;
+                  background-size:cover;width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  bool outlineWarn = false, clipWarn = false, originWarn = false, bgSizeWarn = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("outline") != std::string::npos) outlineWarn = true;
+    if (msg.find("clip-path") != std::string::npos) clipWarn = true;
+    if (msg.find("transform-origin") != std::string::npos) originWarn = true;
+    if (msg.find("background-size") != std::string::npos) bgSizeWarn = true;
+  }
+  EXPECT_TRUE(outlineWarn);
+  EXPECT_TRUE(clipWarn);
+  EXPECT_TRUE(originWarn);
+  EXPECT_TRUE(bgSizeWarn);
+}
+
+PAG_TEST(PAGXHTMLTest, DisallowedTextPropertiesEmitWarnings) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <p style="text-transform:uppercase;text-indent:10px;text-overflow:ellipsis;
+                font-variant:small-caps">Hi</p>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  bool transformWarn = false, indentWarn = false, ellipsisWarn = false, variantWarn = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("text-transform") != std::string::npos) transformWarn = true;
+    if (msg.find("text-indent") != std::string::npos) indentWarn = true;
+    if (msg.find("text-overflow") != std::string::npos) ellipsisWarn = true;
+    if (msg.find("font-variant") != std::string::npos) variantWarn = true;
+  }
+  EXPECT_TRUE(transformWarn);
+  EXPECT_TRUE(indentWarn);
+  EXPECT_TRUE(ellipsisWarn);
+  EXPECT_TRUE(variantWarn);
+}
+
+PAG_TEST(PAGXHTMLTest, BoxSizingNonBorderBoxWarns) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="box-sizing:content-box;width:30px;height:30px;background-color:#000"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  bool boxSizingWarn = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("box-sizing") != std::string::npos) boxSizingWarn = true;
+  }
+  EXPECT_TRUE(boxSizingWarn);
+}
+
+PAG_TEST(PAGXHTMLTest, UniversalSelectorWarnsAndDoesNotApply) {
+  auto doc = ParseFromString(R"HTML(
+    <html><head><style>* { background-color:#FF0000 }</style></head>
+      <body style="width:50px;height:50px">
+        <div style="width:50px;height:50px;background-color:#00FF00"></div>
+      </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  bool universalWarn = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("universal selector") != std::string::npos) universalWarn = true;
+  }
+  EXPECT_TRUE(universalWarn);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_TRUE(ColorNear(SolidFillColorOf(div), HexColor(0x00FF00)));
+}
+
+PAG_TEST(PAGXHTMLTest, FlexShorthandWithDisallowedFormWarns) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="display:flex;width:50px;height:50px">
+        <div style="flex:1 1 auto;background-color:#000"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  bool flexWarn = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("flex shorthand") != std::string::npos) flexWarn = true;
+  }
+  EXPECT_TRUE(flexWarn);
+}
+
+PAG_TEST(PAGXHTMLTest, AbsoluteOnTextLeafEmitsWarning) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style="position:absolute;top:0;left:0;font-size:14px">Hi</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  bool downgradeWarn = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("absolute on text leaf") != std::string::npos) downgradeWarn = true;
+  }
+  EXPECT_TRUE(downgradeWarn);
+}
+
+PAG_TEST(PAGXHTMLTest, MissingCanvasReportsHardError) {
+  auto doc = ParseFromString(R"HTML(<html><body></body></html>)HTML");
+  EXPECT_EQ(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLTest, RootLevelExtraElementWarns) {
+  auto doc = ParseFromString(R"HTML(
+    <html>
+      <body style="width:50px;height:50px"></body>
+      <foo></foo>
+    </html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("at root is not allowed") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+}
+
+PAG_TEST(PAGXHTMLTest, HeadDisallowedChildrenWarn) {
+  auto doc = ParseFromString(R"HTML(
+    <html>
+      <head><script>var x=1;</script></head>
+      <body style="width:50px;height:50px"></body>
+    </html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("script") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+}
+
+PAG_TEST(PAGXHTMLTest, ExternalStylesheetLinkWarns) {
+  auto doc = ParseFromString(R"HTML(
+    <html>
+      <head><link rel="stylesheet" href="theme.css"/></head>
+      <body style="width:50px;height:50px"></body>
+    </html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("link") != std::string::npos && msg.find("stylesheet") != std::string::npos) {
+      warned = true;
+    }
+  }
+  EXPECT_TRUE(warned);
+}
+
+PAG_TEST(PAGXHTMLTest, TextDecorationColorDifferingWrapsInGroup) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style="font-size:14px;color:#000;
+                   text-decoration:underline;text-decoration-color:#FF0000">Hi</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  // The decoration overlay is wrapped in a Group when its colour differs from the text.
+  bool foundGroup = false;
+  for (auto* e : leaf->contents) {
+    if (auto* g = dynamic_cast<pagx::Group*>(e)) {
+      auto* rect = FindElement<pagx::Rectangle>(g->elements);
+      auto* fill = FindElement<pagx::Fill>(g->elements);
+      ASSERT_NE(rect, nullptr);
+      ASSERT_NE(fill, nullptr);
+      auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+      ASSERT_NE(solid, nullptr);
+      EXPECT_TRUE(ColorNear(solid->color, HexColor(0xFF0000)));
+      foundGroup = true;
+    }
+  }
+  EXPECT_TRUE(foundGroup);
 }
 
 //==================================================================================================

@@ -458,11 +458,35 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
         head = child;
       } else if (child->name == "body" && !body) {
         body = child;
+      } else {
+        warn("html: element '" + child->name + "' at root is not allowed; skipped");
       }
     }
     child = child->getNextSibling();
   }
   if (!body) {
+    hardError("html: missing <body>");
+    return nullptr;
+  }
+
+  // Determine canvas size before constructing the document so that we can publish a
+  // diagnostic entry into PAGXDocument::errors when sizing fails. The document is
+  // constructed in either case so that callers can read diagnostics.
+  float canvasW = 0;
+  float canvasH = 0;
+  bool canvasResolved = resolveCanvasSize(body, canvasW, canvasH);
+  _canvasWidth = canvasW;
+  _canvasHeight = canvasH;
+  _document = PAGXDocument::Make(canvasResolved ? canvasW : 0.0f, canvasResolved ? canvasH : 0.0f);
+
+  // Now that the document exists, flush any pending diagnostics gathered before its creation.
+  for (auto& msg : _pendingDiagnostics) {
+    _document->errors.push_back(std::move(msg));
+  }
+  _pendingDiagnostics.clear();
+
+  if (!canvasResolved) {
+    hardError("html: failed to determine canvas size");
     return nullptr;
   }
 
@@ -470,17 +494,6 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   if (head) {
     collectStyles(head);
   }
-
-  // Determine canvas size.
-  float canvasW = 0;
-  float canvasH = 0;
-  if (!resolveCanvasSize(body, canvasW, canvasH)) {
-    return nullptr;
-  }
-
-  _canvasWidth = canvasW;
-  _canvasHeight = canvasH;
-  _document = PAGXDocument::Make(canvasW, canvasH);
 
   // Title -> data-title on the document (PAGX has no top-level title node; the
   // exporter writes data-* on the root <pagx>).
@@ -517,6 +530,8 @@ void HTMLParserContext::warn(const std::string& message) {
   }
   if (_document) {
     _document->errors.push_back(message);
+  } else {
+    _pendingDiagnostics.push_back(message);
   }
 }
 
@@ -524,6 +539,8 @@ void HTMLParserContext::hardError(const std::string& message) {
   _hadHardError = true;
   if (_document) {
     _document->errors.push_back(message);
+  } else {
+    _pendingDiagnostics.push_back(message);
   }
 }
 
@@ -844,6 +861,10 @@ Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& elemen
   if (fragments.empty()) {
     return nullptr;
   }
+  if (box.absolute) {
+    warn("html: position: absolute on text leaf '<" + element->name +
+         ">' is downgraded to absolute on the surrounding Layer");
+  }
 
   bool hasBgVisuals = hasBackgroundVisuals(box);
   bool hasMultipleFragments = fragments.size() > 1;
@@ -916,22 +937,45 @@ Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& elemen
 
   std::string deco = ToLower(Trim(inherited.textDecoration));
   if (!deco.empty() && deco != "none") {
-    Color decorationColor = fragments.front().color;
+    Color textColor = fragments.front().color;
+    Color decorationColor = textColor;
+    bool decorationColorDiffers = false;
+    if (!inherited.textDecorationColor.empty()) {
+      Color parsed = parseColor(inherited.textDecorationColor);
+      if (!(parsed == textColor)) {
+        decorationColor = parsed;
+        decorationColorDiffers = true;
+      }
+    }
     if (deco.find("underline") != std::string::npos) {
       auto rect = _document->makeNode<Rectangle>();
       rect->percentWidth = 100.0f;
       rect->height = 1.0f;
       rect->bottom = 0.0f;
-      textHost->contents.push_back(rect);
-      textHost->contents.push_back(buildSolidFill(decorationColor));
+      if (decorationColorDiffers) {
+        auto group = _document->makeNode<Group>();
+        group->elements.push_back(rect);
+        group->elements.push_back(buildSolidFill(decorationColor));
+        textHost->contents.push_back(group);
+      } else {
+        textHost->contents.push_back(rect);
+        textHost->contents.push_back(buildSolidFill(decorationColor));
+      }
     }
     if (deco.find("line-through") != std::string::npos) {
       auto rect = _document->makeNode<Rectangle>();
       rect->percentWidth = 100.0f;
       rect->height = 1.0f;
       rect->centerY = 0.0f;
-      textHost->contents.push_back(rect);
-      textHost->contents.push_back(buildSolidFill(decorationColor));
+      if (decorationColorDiffers) {
+        auto group = _document->makeNode<Group>();
+        group->elements.push_back(rect);
+        group->elements.push_back(buildSolidFill(decorationColor));
+        textHost->contents.push_back(group);
+      } else {
+        textHost->contents.push_back(rect);
+        textHost->contents.push_back(buildSolidFill(decorationColor));
+      }
     }
     if (deco.find("overline") != std::string::npos) {
       warn("html: text-decoration overline not supported");

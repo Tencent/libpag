@@ -41,8 +41,18 @@ void TakeProp(const std::unordered_map<std::string, std::string>& props, const s
 void HTMLParserContext::collectStyles(const std::shared_ptr<DOMNode>& head) {
   auto child = head->getFirstChild();
   while (child) {
-    if (child->type == DOMNodeType::Element && child->name == "style") {
-      parseStyleBlock(child);
+    if (child->type == DOMNodeType::Element) {
+      if (child->name == "style") {
+        parseStyleBlock(child);
+      } else if (child->name != "title" && child->name != "meta" && child->name != "link") {
+        warn("html: element '<" + child->name + ">' inside <head> is not allowed; skipped");
+      } else if (child->name == "link") {
+        auto* rel = child->findAttribute("rel");
+        if (rel && ToLower(Trim(*rel)) == "stylesheet") {
+          warn("html: external <link rel=\"stylesheet\"> is not supported; ignored");
+        }
+        // Other <link> uses (preconnect/icon/etc.) are silently ignored.
+      }
     }
     child = child->getNextSibling();
   }
@@ -82,6 +92,10 @@ void HTMLParserContext::parseStyleBlock(const std::shared_ptr<DOMNode>& styleNod
     for (auto& sel : selectors) {
       sel = Trim(sel);
       if (sel.empty()) continue;
+      if (sel == "*") {
+        warn("html: universal selector '*' not allowed in <style>; declarations dropped");
+        continue;
+      }
       if (sel[0] == '.') {
         std::string cls = sel.substr(1);
         if (cls.find_first_of(" \t.>+~:[#") == std::string::npos) {
@@ -178,6 +192,7 @@ HTMLInheritedStyle HTMLParserContext::computeInherited(const std::shared_ptr<DOM
   TakeProp(props, "line-height", out.lineHeight);
   TakeProp(props, "text-align", out.textAlign);
   TakeProp(props, "text-decoration", out.textDecoration);
+  TakeProp(props, "text-decoration-color", out.textDecorationColor);
   TakeProp(props, "white-space", out.whiteSpace);
   // Compute combined font-style label used by PAGX Text.
   bool isBold = false;
@@ -203,6 +218,19 @@ HTMLInheritedStyle HTMLParserContext::computeInherited(const std::shared_ptr<DOM
   } else if (isItalic) {
     out.fontStyleName = "Italic";
   }
+
+  static const char* kTextDisallowed[] = {
+      "text-transform", "text-indent",  "word-spacing", "unicode-bidi",
+      "font-variant",   "font-stretch", "font"};
+  for (const auto* prop : kTextDisallowed) {
+    if (!LookupProperty(props, prop).empty()) {
+      warn(std::string("html: ") + prop + " not supported; ignored");
+    }
+  }
+  std::string textOverflow = LookupLowerTrimmed(props, "text-overflow");
+  if (textOverflow == "ellipsis") {
+    warn("html: text-overflow: ellipsis is not implemented in PAGX");
+  }
   return out;
 }
 
@@ -220,6 +248,17 @@ void HTMLParserContext::parseBoxSizing(HTMLBoxAttributes& box,
                                        const std::unordered_map<std::string, std::string>& props) {
   ParseSizingDimension(LookupProperty(props, "width"), box.widthPx, box.widthPct);
   ParseSizingDimension(LookupProperty(props, "height"), box.heightPx, box.heightPct);
+  std::string boxSizing = LookupLowerTrimmed(props, "box-sizing");
+  if (!boxSizing.empty() && boxSizing != "border-box") {
+    warn("html: box-sizing: " + boxSizing + " not supported; treated as border-box");
+  }
+  static const char* kSizingDisallowed[] = {"min-width", "min-height", "max-width", "max-height",
+                                            "aspect-ratio"};
+  for (const auto* prop : kSizingDisallowed) {
+    if (!LookupProperty(props, prop).empty()) {
+      warn(std::string("html: ") + prop + " not supported; ignored");
+    }
+  }
 }
 
 void HTMLParserContext::parseBoxPositioning(
@@ -286,9 +325,11 @@ void HTMLParserContext::parseBoxLayout(HTMLBoxAttributes& box,
   if (!jc.empty()) box.justifyContent = jc;
   const std::string& flex = LookupProperty(props, "flex");
   if (!flex.empty()) {
+    std::string trimmed = Trim(flex);
     char* end = nullptr;
-    float v = std::strtof(flex.c_str(), &end);
-    if (end != flex.c_str()) {
+    float v = std::strtof(trimmed.c_str(), &end);
+    bool consumedAll = end != trimmed.c_str() && Trim(end).empty();
+    if (consumedAll && v >= 0) {
       box.flexGrow = v;
       box.flexGrowSet = true;
     } else {
@@ -298,6 +339,14 @@ void HTMLParserContext::parseBoxLayout(HTMLBoxAttributes& box,
   if (!LookupProperty(props, "flex-wrap").empty()) {
     warn("html: flex-wrap not supported; ignored");
   }
+  static const char* kLayoutDisallowed[] = {"flex-grow",  "flex-shrink", "flex-basis",
+                                            "float",      "order",       "align-content",
+                                            "align-self", "direction"};
+  for (const auto* prop : kLayoutDisallowed) {
+    if (!LookupProperty(props, prop).empty()) {
+      warn(std::string("html: ") + prop + " not supported; ignored");
+    }
+  }
   if (!LookupProperty(props, "margin").empty()) {
     warn("html: margin not supported; use padding/gap/flex");
   }
@@ -306,6 +355,9 @@ void HTMLParserContext::parseBoxLayout(HTMLBoxAttributes& box,
   if (!LookupProperty(props, "margin-bottom").empty()) warn("html: margin-bottom not supported");
   if (!LookupProperty(props, "margin-left").empty()) warn("html: margin-left not supported");
   if (!LookupProperty(props, "grid-template-columns").empty()) {
+    warn("html: grid layout not supported");
+  }
+  if (!LookupProperty(props, "grid-template-rows").empty()) {
     warn("html: grid layout not supported");
   }
   if (!LookupProperty(props, "transform").empty()) warn("html: transform not supported");
@@ -383,6 +435,15 @@ void HTMLParserContext::parseBoxVisuals(HTMLBoxAttributes& box,
     box.clipOverflow = true;
   } else if (!overflow.empty() && overflow != "visible") {
     warn("html: overflow: " + overflow + " not fully supported");
+  }
+
+  static const char* kVisualsDisallowed[] = {
+      "background-size", "background-repeat", "background-position", "outline", "transform-origin",
+      "perspective",     "clip-path"};
+  for (const auto* prop : kVisualsDisallowed) {
+    if (!LookupProperty(props, prop).empty()) {
+      warn(std::string("html: ") + prop + " not supported; ignored");
+    }
   }
 }
 

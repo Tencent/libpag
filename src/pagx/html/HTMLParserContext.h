@@ -80,6 +80,7 @@ struct HTMLInheritedStyle {
   std::string lineHeight = {};
   std::string textAlign = {};
   std::string textDecoration = {};
+  std::string textDecorationColor = {};
   std::string whiteSpace = {};
 };
 
@@ -380,6 +381,10 @@ class HTMLParserContext {
 
   // Image deduplication.
   std::unordered_map<std::string, Image*> _imageSourceToId = {};
+
+  // Diagnostics queued before _document was constructed (so that errors raised during
+  // canvas-size resolution can still be surfaced once the document exists).
+  std::vector<std::string> _pendingDiagnostics = {};
 
   int _nextGeneratedId = 0;
   float _canvasWidth = 0;
