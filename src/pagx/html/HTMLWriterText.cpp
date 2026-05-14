@@ -1542,192 +1542,148 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
       out.closeTag();  // </g>
       out.closeTag();  // </svg>
     } else {
+      // SVG <text><textPath> approach: the browser handles baseline alignment, character
+      // advance measurement, and perpendicular rotation natively, producing pixel-perfect
+      // results without the estimation errors of the per-character <span> approach.
       auto renderFont = text->renderFontSize();
-      float totalWidth = 0.0f;
-      const char* p = text->text.c_str();
-      while (*p) {
-        int32_t ch = 0;
-        size_t len = SVGDecodeUTF8Char(p, text->text.size() - (p - text->text.c_str()), &ch);
-        if (len == 0) {
-          break;
-        }
-        totalWidth += EstimateCharAdvanceHTML(ch, renderFont) + text->letterSpacing;
-        p += len;
+      std::string pathSvgData = PathDataToSVGString(pathData);
+      auto tpRenderPos = textPath->renderPosition();
+      std::string svgStyle = "position:absolute;overflow:visible";
+      svgStyle += ";left:" + CssFloatToString(tpRenderPos.x) + "px";
+      svgStyle += ";top:" + CssFloatToString(tpRenderPos.y) + "px";
+      out.openTag("svg");
+      out.addAttr("style", svgStyle);
+      out.closeTagStart();
+
+      // Local <defs>: path definition + optional gradient.
+      std::string pathId = _ctx->nextId("tp");
+      HTMLBuilder localDefs;
+      localDefs.openTag("defs");
+      localDefs.closeTagStart();
+      localDefs.openTag("path");
+      localDefs.addAttr("id", pathId);
+      localDefs.addAttr("d", pathSvgData);
+      localDefs.closeTagSelfClosing();
+
+      // Resolve fill for SVG: solid color goes directly on <text>; gradients need a
+      // <linearGradient>/<radialGradient> def. Compute path bounding box from the LUT
+      // so that fitsToGeometry gradients map correctly across the whole text run.
+      float bboxMinX = 1e9f, bboxMinY = 1e9f, bboxMaxX = -1e9f, bboxMaxY = -1e9f;
+      for (auto& p : lut.positions) {
+        if (p.x < bboxMinX) bboxMinX = p.x;
+        if (p.y < bboxMinY) bboxMinY = p.y;
+        if (p.x > bboxMaxX) bboxMaxX = p.x;
+        if (p.y > bboxMaxY) bboxMaxY = p.y;
       }
-      size_t charCount = 0;
-      const char* q = text->text.c_str();
-      while (*q) {
-        int32_t ch = 0;
-        size_t len = SVGDecodeUTF8Char(q, text->text.size() - (q - text->text.c_str()), &ch);
-        if (len == 0) {
-          break;
-        }
-        charCount++;
-        q += len;
-      }
-      float extraSpacing = 0.0f;
-      if (textPath->forceAlignment && charCount > 1 && totalWidth > 0) {
-        extraSpacing = (effectiveLength - totalWidth) / static_cast<float>(charCount - 1);
-      }
-      // Normal mode uses per-character anchor decomposition relative to baselineOrigin (see
-      // tgfx/src/layers/vectors/TextPath.cpp). The baseline here is approximated: character
-      // anchor y sits at the alphabetic baseline (renderPos.y + renderFont * 0.8 when
-      // baseline=LineBox), while anchor x is the character's advance center relative to the
-      // Text origin.
-      float baselineAngleRad = textPath->baselineAngle * static_cast<float>(M_PI) / 180.0f;
-      float baselineCos = std::cos(baselineAngleRad);
-      float baselineSin = std::sin(baselineAngleRad);
-      auto textRenderPos = text->renderPosition();
-      auto baselineOrigin = textPath->renderBaselineOrigin();
-      float characterAnchorY = textRenderPos.y;
-      // LineBox baseline: position.y is line-box top; no ascent offset needed.
-      float characterCursorX = textRenderPos.x;
-      float currentArcPos = textPath->firstMargin;
-      p = text->text.c_str();
-      while (*p) {
-        int32_t ch = 0;
-        size_t len = SVGDecodeUTF8Char(p, text->text.size() - (p - text->text.c_str()), &ch);
-        if (len == 0) {
-          break;
-        }
-        float charWidth = EstimateCharAdvanceHTML(ch, renderFont) + text->letterSpacing;
-        float pathOffset = 0.0f;
-        float normalOffset = 0.0f;
-        float tangent = 0;
-        Point pos = {};
-        float charCenterArc = currentArcPos + charWidth / 2.0f;
-        if (textPath->forceAlignment) {
-          SampleArcLengthLUT(lut, charCenterArc, &pos, &tangent, isClosed);
-          pathOffset = charCenterArc;
+      float bboxW = bboxMaxX - bboxMinX;
+      float bboxH = bboxMaxY - bboxMinY;
+
+      std::string svgFillAttr;
+      float fillAlpha = 1.0f;
+      if (fill && fill->color) {
+        if (fill->color->nodeType() == NodeType::SolidColor) {
+          auto sc = static_cast<const SolidColor*>(fill->color);
+          svgFillAttr = ColorToSVGHex(sc->color);
+          fillAlpha = sc->color.alpha * fill->alpha;
         } else {
-          float anchorX = characterCursorX + charWidth * 0.5f;
-          float dx = anchorX - baselineOrigin.x;
-          float dy = characterAnchorY - baselineOrigin.y;
-          float tangentDistance = dx * baselineCos + dy * baselineSin;
-          normalOffset = dy * baselineCos - dx * baselineSin;
-          pathOffset = textPath->firstMargin + tangentDistance;
-          SampleArcLengthLUT(lut, pathOffset, &pos, &tangent, isClosed);
+          std::string gradId = _ctx->nextId("grad");
+          writeSVGGradientDefInto(localDefs, fill->color, gradId, bboxMinX, bboxMinY, bboxW, bboxH);
+          svgFillAttr = "url(#" + gradId + ")";
+          fillAlpha = fill->alpha;
         }
-        float normalAngle = tangent + static_cast<float>(M_PI) / 2.0f;
-        pos.x += normalOffset * std::cos(normalAngle);
-        pos.y += normalOffset * std::sin(normalAngle);
-        // SampleArcLengthLUT returns coordinates in the path's own local space (the raw
-        // M/L/A commands authored on the TextPath). The TextPath node itself is placed in
-        // its parent Layer via constraints (top/centerX/centerY/left etc.), so we must
-        // translate every per-character position by the TextPath's renderPosition() to
-        // land on the parent Layer's coordinate system. Without this, all characters end
-        // up rendered at the path's authoring origin (0, 0) in the parent — visually
-        // collapsed to the Layer's top-left corner instead of sitting on the arc the
-        // user authored (pagx_features Core ring symptom: ring text floats above/outside
-        // the visible orbit ring).
-        auto tpRenderPos = textPath->renderPosition();
-        pos.x += tpRenderPos.x;
-        pos.y += tpRenderPos.y;
-        std::string charStr(p, len);
-        std::string charStyle = "position:absolute;left:" + CssFloatToString(pos.x) +
-                                "px;top:" + CssFloatToString(pos.y) + "px";
-        charStyle += ";display:inline-block";
-        if (!text->fontFamily.empty()) {
-          charStyle += ";font-family:'" + EscapeCssFontFamily(text->fontFamily) + "'";
-        }
-        charStyle += ";font-size:" + CssFloatToString(renderFont) + "px";
-        if (!text->fontStyle.empty()) {
-          if (text->fontStyle.find("Bold") != std::string::npos) {
-            charStyle += ";font-weight:bold";
-          }
-          if (text->fontStyle.find("Italic") != std::string::npos) {
-            charStyle += ";font-style:italic";
-          }
-        }
-        if (text->letterSpacing != 0.0f) {
-          charStyle += ";letter-spacing:" + CssFloatToString(text->letterSpacing) + "px";
-        }
-        std::string transform;
-        if (textPath->perpendicular) {
-          float angleDeg = tangent * 180.0f / static_cast<float>(M_PI) - textPath->baselineAngle;
-          transform += "rotate(" + CssFloatToString(angleDeg) + "deg) ";
-        }
-        // Center the character span on the path sample point horizontally; vertical offset
-        // between line-box top and baseline depends on the font's actual ascent metrics.
-        transform += "translate(-50%,-" + CssFloatToString(renderFont) + "px)";
-        // fauxItalic must shear the glyph in its own local space before TextPath's
-        // fauxItalic is handled via CSS native synthesis on each per-character span.
-        if (text->fauxItalic) {
-          charStyle += ";font-style:italic";
-        }
-        charStyle += ";transform:" + transform;
-        charStyle += ";transform-origin:0 0";
-        // fauxBold is handled via CSS native synthesis. The TextPath per-char branch does
-        // not emit a stroke itself (strokes are drawn in the earlier SVG glyph-run branch),
-        // so fauxBold can be applied unconditionally here.
-        if (text->fauxBold) {
-          charStyle += ";font-weight:bold";
-        }
-        if (fill && fill->color) {
-          if (fill->color->nodeType() == NodeType::SolidColor) {
-            auto sc = static_cast<const SolidColor*>(fill->color);
-            charStyle += ";color:" + ColorToRGBA(sc->color, fill->alpha);
-          } else if (fill->color->nodeType() == NodeType::LinearGradient) {
-            auto lg = static_cast<const LinearGradient*>(fill->color);
-            if (!lg->colorStops.empty()) {
-              float t = effectiveLength > 0 ? charCenterArc / effectiveLength : 0;
-              if (t < 0) t = 0;
-              if (t > 1) t = 1;
-              Color sampled = lg->colorStops[0]->color;
-              for (size_t si = 0; si + 1 < lg->colorStops.size(); si++) {
-                float o0 = lg->colorStops[si]->offset;
-                float o1 = lg->colorStops[si + 1]->offset;
-                if (t >= o0 && t <= o1 && o1 > o0) {
-                  float f = (t - o0) / (o1 - o0);
-                  auto& c0 = lg->colorStops[si]->color;
-                  auto& c1 = lg->colorStops[si + 1]->color;
-                  sampled.red = c0.red + (c1.red - c0.red) * f;
-                  sampled.green = c0.green + (c1.green - c0.green) * f;
-                  sampled.blue = c0.blue + (c1.blue - c0.blue) * f;
-                  break;
-                }
-              }
-              charStyle += ";color:" + ColorToRGBA(sampled, fill->alpha);
-            }
-          } else {
-            auto css = colorToCSS(fill->color, nullptr);
-            if (!css.empty()) {
-              charStyle += ";background:" + css;
-              charStyle += ";-webkit-background-clip:text;background-clip:text";
-              charStyle += ";-webkit-text-fill-color:transparent";
-            }
-          }
-        }
-        // TextPath emits Fill and Stroke as separate per-character spans on the Stroke pass
-        // when no Fill was merged in; emit -webkit-text-stroke so the stroke actually paints,
-        // matching tgfx which draws the Stroke around each glyph path just like the non-TextPath
-        // case. Width and paint-order come from ResolveTextStrokeCss so the StrokeAlign
-        // semantics match tgfx's Fill-then-Stroke layering (see writeText for the mapping).
-        if (stroke && stroke->color && stroke->color->nodeType() == NodeType::SolidColor) {
-          auto sc = static_cast<const SolidColor*>(stroke->color);
-          bool hasFill = fill && fill->color;
-          auto strokeCss = ResolveTextStrokeCss(stroke->width, stroke->align, hasFill);
-          if (strokeCss.width > 0.0f) {
-            charStyle += ";-webkit-text-stroke:" + CssFloatToString(strokeCss.width) + "px " +
-                         ColorToRGBA(sc->color, stroke->alpha);
-            if (strokeCss.paintOrderStrokeFill) {
-              charStyle += ";paint-order:stroke fill";
-            }
-          }
-          if (!hasFill) {
-            charStyle += ";-webkit-text-fill-color:transparent";
-          }
-        }
-        if (alpha < 1.0f) {
-          charStyle += ";opacity:" + CssFloatToString(alpha);
-        }
-        out.openTag("span");
-        out.addAttr("style", charStyle);
-        out.closeTagWithText(charStr);
-        currentArcPos += charWidth + extraSpacing;
-        characterCursorX += charWidth;
-        p += len;
       }
+      localDefs.closeTag();  // </defs>
+      out.emitRaw(localDefs.release());
+
+      // <text> element with font attributes.
+      out.openTag("text");
+      if (!text->fontFamily.empty()) {
+        out.addAttr("font-family", EscapeCssFontFamily(text->fontFamily));
+      }
+      out.addAttr("font-size", CssFloatToString(renderFont));
+      if (!text->fontStyle.empty()) {
+        if (text->fontStyle.find("Bold") != std::string::npos) {
+          out.addAttr("font-weight", "bold");
+        }
+        if (text->fontStyle.find("Italic") != std::string::npos) {
+          out.addAttr("font-style", "italic");
+        }
+      }
+      if (text->fauxBold) {
+        out.addAttr("font-weight", "bold");
+      }
+      if (text->fauxItalic) {
+        out.addAttr("font-style", "italic");
+      }
+      if (text->letterSpacing != 0.0f) {
+        out.addAttr("letter-spacing", CssFloatToString(text->letterSpacing));
+      }
+
+      // Fill.
+      if (!svgFillAttr.empty()) {
+        out.addAttr("fill", svgFillAttr);
+        if (fillAlpha < 1.0f) {
+          out.addAttr("fill-opacity", CssFloatToString(fillAlpha));
+        }
+      } else {
+        out.addAttr("fill", "none");
+      }
+
+      // Stroke.
+      if (stroke && stroke->color) {
+        applySVGStroke(out, stroke);
+        bool hasFill = fill && fill->color;
+        if (hasFill) {
+          out.addAttr("paint-order", "stroke fill");
+        }
+      }
+
+      // forceAlignment: use textLength + lengthAdjust="spacing" to spread characters
+      // evenly across the effective path length.
+      if (textPath->forceAlignment) {
+        out.addAttr("textLength", CssFloatToString(effectiveLength));
+        out.addAttr("lengthAdjust", "spacing");
+      }
+
+      // perpendicular=false: SVG textPath always rotates characters along the tangent;
+      // emit rotate="0" on each character to keep them upright.
+      if (!textPath->perpendicular) {
+        size_t charCount = 0;
+        const char* q = text->text.c_str();
+        while (*q) {
+          int32_t ch = 0;
+          size_t len = SVGDecodeUTF8Char(q, text->text.size() - (q - text->text.c_str()), &ch);
+          if (len == 0) {
+            break;
+          }
+          charCount++;
+          q += len;
+        }
+        std::string rotates;
+        for (size_t i = 0; i < charCount; i++) {
+          if (i > 0) {
+            rotates += " ";
+          }
+          rotates += "0";
+        }
+        out.addAttr("rotate", rotates);
+      }
+
+      if (alpha < 1.0f) {
+        out.addAttr("opacity", CssFloatToString(alpha));
+      }
+      out.closeTagStart();
+
+      // <textPath> referencing the path definition.
+      out.openTag("textPath");
+      out.addAttr("href", "#" + pathId);
+      if (textPath->firstMargin > 0) {
+        out.addAttr("startOffset", CssFloatToString(textPath->firstMargin));
+      }
+      out.closeTagWithText(text->text);
+
+      out.closeTag();  // </text>
+      out.closeTag();  // </svg>
     }
   }
 }
