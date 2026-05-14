@@ -19,96 +19,9 @@
 #pragma once
 
 #include <string>
-#include <vector>
 #include "pagx/PAGXDocument.h"
 
 namespace pagx {
-
-/**
- * Specifies how a font file is referenced in the generated @font-face rule.
- */
-enum class FontEmbedMode {
-  /**
-   * The uri field is emitted as-is inside a CSS `url()`. Use this for CDN links
-   * (e.g. "https://cdn.example.com/font.woff2") or relative paths that will be resolved
-   * against the HTML document's location (e.g. "fonts/NotoSansSC-Bold.ttf").
-   */
-  URL,
-
-  /**
-   * The uri field is a local file path. The exporter reads the file, base64-encodes its
-   * contents, and emits an inline `url(data:font/...;base64,...)` data URI. This produces
-   * a fully self-contained HTML document at the cost of a ~33% size increase for the font data.
-   */
-  Base64,
-
-  /**
-   * The uri field is a local file path that is emitted as a `file://` URL. Useful for local
-   * debugging and preview; browsers typically block file:// URLs from non-file:// pages, so
-   * this mode is not suitable for production delivery.
-   */
-  FilePath,
-};
-
-/**
- * One entry in a @font-face rule's `src` list. A single FontFaceRule may carry multiple
- * sources; the browser tries them in order and falls back to the next one if the current
- * source fails to load (e.g. local file missing, network error). This enables patterns like
- * "prefer bundled local font, fall back to CDN" in a single declaration.
- */
-struct FontFaceSource {
-  /**
-   * The font source: a URL, relative path, or local file path depending on `mode`.
-   */
-  std::string uri;
-
-  /**
-   * How the uri should be embedded in the generated CSS.
-   */
-  FontEmbedMode mode = FontEmbedMode::URL;
-};
-
-/**
- * Describes a single @font-face rule to inject into the HTML output.
- */
-struct FontFaceRule {
-  /**
-   * The CSS font-family name to declare (e.g. "Noto Sans SC"). Must match the font-family
-   * names used by the PAGX document's Text nodes.
-   */
-  std::string fontFamily;
-
-  /**
-   * One or more font sources. Browsers try each entry in order — typical usage lists a local
-   * bundled file first and a CDN URL as fallback. Must contain at least one source; rules
-   * with an empty sources list are skipped during CSS emission.
-   */
-  std::vector<FontFaceSource> sources;
-
-  /**
-   * Optional CSS font-weight value (e.g. "400", "700", "bold"). When empty, the property is
-   * omitted and the browser defaults to "normal" (400).
-   */
-  std::string fontWeight;
-
-  /**
-   * Optional CSS font-style value (e.g. "normal", "italic"). When empty, the property is
-   * omitted and the browser defaults to "normal".
-   */
-  std::string fontStyle;
-
-  /**
-   * Optional CSS `unicode-range` value (e.g. "U+0590-05FF" for Hebrew, or
-   * "U+1F300-1F9FF,U+1F1E6-1F1FF" for emoji). When set, the browser only consults this
-   * @font-face for codepoints inside the range — letting multiple @font-face rules under
-   * the same font-family name cover different scripts (e.g. a Noto Sans SC rule for
-   * Latin/CJK paired with a Noto Color Emoji rule scoped to emoji codepoints, so Chromium
-   * picks the right face per glyph instead of using the OS fallback emoji font). When
-   * empty, the property is omitted and the rule applies to every codepoint the source
-   * font file actually contains.
-   */
-  std::string unicodeRange;
-};
 
 /**
  * Export options for HTMLExporter.
@@ -142,15 +55,6 @@ struct HTMLExportOptions {
    * The default is true.
    */
   bool extractStyleSheet = true;
-
-  /**
-   * @font-face rules to inject into the generated HTML. The exporter produces a complete
-   * @font-face CSS declaration for each entry, using the `mode` field to decide how the
-   * font file is referenced (inline URL, base64 data URI, or file:// path). When this
-   * vector is empty (the default), no @font-face rules are emitted and the browser falls
-   * back to system fonts or CSS font synthesis for any weight/style that is not installed.
-   */
-  std::vector<FontFaceRule> fontFaceRules = {};
 };
 
 /**

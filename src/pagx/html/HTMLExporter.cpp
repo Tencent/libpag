@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/HTMLExporter.h"
-#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -28,179 +27,6 @@
 #include "pagx/utils/StringParser.h"
 
 namespace pagx {
-
-//==============================================================================
-// Font-face rule generation
-//==============================================================================
-
-static const char* DetectFontFormat(const std::string& uri) {
-  auto dot = uri.rfind('.');
-  if (dot == std::string::npos) {
-    return nullptr;
-  }
-  auto ext = uri.substr(dot);
-  for (auto& c : ext) {
-    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-  }
-  if (ext == ".otf") return "opentype";
-  if (ext == ".ttf" || ext == ".ttc") return "truetype";
-  if (ext == ".woff") return "woff";
-  if (ext == ".woff2") return "woff2";
-  return nullptr;
-}
-
-static const char* DetectFontMime(const std::string& uri) {
-  auto dot = uri.rfind('.');
-  if (dot == std::string::npos) {
-    return "font/ttf";
-  }
-  auto ext = uri.substr(dot);
-  for (auto& c : ext) {
-    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-  }
-  if (ext == ".otf") return "font/otf";
-  if (ext == ".ttf" || ext == ".ttc") return "font/ttf";
-  if (ext == ".woff") return "font/woff";
-  if (ext == ".woff2") return "font/woff2";
-  return "font/ttf";
-}
-
-static std::string EncodeBase64(const std::vector<uint8_t>& data) {
-  static const char table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-  std::string out;
-  out.reserve((data.size() + 2) / 3 * 4);
-  size_t i = 0;
-  while (i + 2 < data.size()) {
-    uint32_t v = (static_cast<uint32_t>(data[i]) << 16) |
-                 (static_cast<uint32_t>(data[i + 1]) << 8) | data[i + 2];
-    out += table[(v >> 18) & 0x3F];
-    out += table[(v >> 12) & 0x3F];
-    out += table[(v >> 6) & 0x3F];
-    out += table[v & 0x3F];
-    i += 3;
-  }
-  if (i + 1 == data.size()) {
-    uint32_t v = static_cast<uint32_t>(data[i]) << 16;
-    out += table[(v >> 18) & 0x3F];
-    out += table[(v >> 12) & 0x3F];
-    out += '=';
-    out += '=';
-  } else if (i + 2 == data.size()) {
-    uint32_t v = (static_cast<uint32_t>(data[i]) << 16) | (static_cast<uint32_t>(data[i + 1]) << 8);
-    out += table[(v >> 18) & 0x3F];
-    out += table[(v >> 12) & 0x3F];
-    out += table[(v >> 6) & 0x3F];
-    out += '=';
-  }
-  return out;
-}
-
-static std::string ReadFileAsDataURI(const std::string& path, const char* mime) {
-  std::ifstream file(path, std::ios::binary | std::ios::ate);
-  if (!file) {
-    return {};
-  }
-  auto size = file.tellg();
-  file.seekg(0);
-  std::vector<uint8_t> bytes(static_cast<size_t>(size));
-  file.read(reinterpret_cast<char*>(bytes.data()), size);
-  return std::string("data:") + mime + ";base64," + EncodeBase64(bytes);
-}
-
-// Strips characters that would let a caller-supplied FontFaceRule value escape the `@font-face`
-// declaration it is being concatenated into. Unlike EscapeCssFontFamily (which operates on a
-// quoted string context), this filter is meant for unquoted CSS keyword/list values such as
-// font-weight, font-style and unicode-range. Control characters, quote marks, backslashes and
-// the declaration/block terminators ';', '{', '}' are all dropped; '<' and '>' are dropped too
-// so the emitted CSS cannot break out of the surrounding <style> element. Every other visible
-// ASCII byte — including the ',' '+' '-' 'U' needed by unicode-range — flows through unchanged,
-// so legitimate values are preserved exactly.
-static std::string SanitizeFontFaceValue(const std::string& value) {
-  std::string out;
-  out.reserve(value.size());
-  for (char c : value) {
-    auto uc = static_cast<unsigned char>(c);
-    if (uc < 0x20 || c == ';' || c == '{' || c == '}' || c == '<' || c == '>' || c == '\\' ||
-        c == '"' || c == '\'') {
-      continue;
-    }
-    out += c;
-  }
-  return out;
-}
-
-static std::string BuildFontFaceCSS(const std::vector<FontFaceRule>& rules) {
-  if (rules.empty()) {
-    return {};
-  }
-  std::string css;
-  for (const auto& rule : rules) {
-    if (rule.fontFamily.empty() || rule.sources.empty()) {
-      continue;
-    }
-    // Assemble the CSS `src:` value by iterating every source in order. Browsers try each
-    // url() entry left-to-right and fall back to the next one when the current source fails to
-    // load; this makes "bundled local font first, CDN as safety net" expressible in a single
-    // @font-face rule. A rule with all sources failing to resolve (e.g. every Base64 file
-    // missing) is skipped entirely so we never emit a rule with no valid src.
-    std::string srcValue;
-    for (const auto& source : rule.sources) {
-      if (source.uri.empty()) {
-        continue;
-      }
-      std::string srcUrl;
-      switch (source.mode) {
-        case FontEmbedMode::URL:
-          srcUrl = source.uri;
-          break;
-        case FontEmbedMode::Base64: {
-          auto dataUri = ReadFileAsDataURI(source.uri, DetectFontMime(source.uri));
-          if (dataUri.empty()) {
-            continue;
-          }
-          srcUrl = dataUri;
-          break;
-        }
-        case FontEmbedMode::FilePath:
-          srcUrl = "file://" + source.uri;
-          break;
-      }
-      if (srcUrl.empty()) {
-        continue;
-      }
-      if (!srcValue.empty()) {
-        srcValue += ",\n       ";
-      }
-      // Escape the URL value for the single-quoted CSS string context of url('...'). Base64
-      // data URIs only contain characters the CSS parser accepts unescaped, so this is a
-      // no-op for Base64 mode; for URL and FilePath mode it blocks a caller-supplied uri
-      // containing a raw ' or control byte from breaking out of the declaration.
-      srcValue += "url('" + EscapeCssFontFamily(srcUrl) + "')";
-      auto format = DetectFontFormat(source.uri);
-      if (format) {
-        srcValue += std::string(" format('") + format + "')";
-      }
-    }
-    if (srcValue.empty()) {
-      continue;
-    }
-    css += "@font-face {\n";
-    css += "  font-family: '" + EscapeCssFontFamily(rule.fontFamily) + "';\n";
-    css += "  src: " + srcValue + ";\n";
-    if (!rule.fontWeight.empty()) {
-      css += "  font-weight: " + SanitizeFontFaceValue(rule.fontWeight) + ";\n";
-    }
-    if (!rule.fontStyle.empty()) {
-      css += "  font-style: " + SanitizeFontFaceValue(rule.fontStyle) + ";\n";
-    }
-    if (!rule.unicodeRange.empty()) {
-      css += "  unicode-range: " + SanitizeFontFaceValue(rule.unicodeRange) + ";\n";
-    }
-    css += "  font-display: block;\n";
-    css += "}\n";
-  }
-  return css;
-}
 
 //==============================================================================
 // Coordinate rounding
@@ -367,17 +193,6 @@ std::string HTMLExporter::ToHTML(const PAGXDocument& doc, const std::string& res
 
   if (options.extractStyleSheet) {
     nativeHTML = HTMLStyleExtractor::Extract(nativeHTML);
-  }
-
-  // Inject @font-face rules into the <style> block (or create a standalone <style> block).
-  std::string fontFaceCSS = BuildFontFaceCSS(options.fontFaceRules);
-  if (!fontFaceCSS.empty()) {
-    auto stylePos = nativeHTML.find("<style>");
-    if (stylePos != std::string::npos) {
-      nativeHTML.insert(stylePos + 7, "\n" + fontFaceCSS);
-    } else {
-      nativeHTML = "<style>\n" + fontFaceCSS + "</style>\n" + nativeHTML;
-    }
   }
 
   return std::string(GENERATED_COMMENT) + nativeHTML;

@@ -621,9 +621,7 @@ bool TextStartsWithRTL(const std::string& utf8Text) {
   return false;
 }
 
-namespace {
-
-}  // namespace
+namespace {}  // namespace
 
 std::string HTMLWriter::RewriteVerticalColumnBreaks(const Text* text) {
   // Return the original text unchanged. The previous implementation used tgfx glyph positions
