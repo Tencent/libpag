@@ -7,7 +7,7 @@
     <Rectangle size="150,120"/>
     <Stroke/>
     <TextBox width="150" height="120">
-      <Text text="你好世界，这是测试文本。" fontFamily="Noto Sans SC" fontSize="20"/>
+      <Text text="你好世界，这是测试文本。" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill/>
     </TextBox>
   </Layer>
@@ -17,7 +17,7 @@
     <Rectangle size="150,80"/>
     <Stroke/>
     <TextBox width="150" height="80" overflow="hidden">
-      <Text text="Overflow text that is very long and should be clipped by the box boundary." fontFamily="Noto Sans SC" fontSize="18"/>
+      <Text text="Overflow text that is very long and should be clipped by the box boundary." fontFamily="NotoSansSC" fontSize="18"/>
       <Fill/>
     </TextBox>
   </Layer>
@@ -27,7 +27,7 @@
     <Rectangle size="150,80"/>
     <Stroke/>
     <TextBox width="150" height="80" textAlign="justify">
-      <Text text="Justify this line&#10;Last line start" fontFamily="Noto Sans SC" fontSize="18"/>
+      <Text text="Justify this line&#10;Last line start" fontFamily="NotoSansSC" fontSize="18"/>
       <Fill/>
     </TextBox>
   </Layer>
@@ -39,7 +39,7 @@
     <Rectangle size="120,130"/>
     <Stroke/>
     <TextBox width="120" height="130">
-      <Text text="&#10;Line2&#10;&#10;Line4" fontFamily="Noto Sans SC" fontSize="20"/>
+      <Text text="&#10;Line2&#10;&#10;Line4" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill/>
     </TextBox>
   </Layer>
@@ -49,10 +49,10 @@
     <Rectangle size="230,120"/>
     <Stroke/>
     <TextBox width="230" height="120" textAlign="end">
-      <Text text="Right" fontFamily="Noto Sans SC" fontSize="24"/>
+      <Text text="Right" fontFamily="NotoSansSC" fontSize="24"/>
       <Fill/>
       <Group>
-        <Text text="Align" fontFamily="Noto Sans SC" fontSize="36"/>
+        <Text text="Align" fontFamily="NotoSansSC" fontSize="36"/>
         <Fill/>
       </Group>
     </TextBox>
@@ -65,7 +65,7 @@
     <Rectangle size="150,80"/>
     <Stroke/>
     <TextBox width="150" height="80">
-      <Text text="aaAÂẤ" fontFamily="Noto Sans SC" fontSize="32"/>
+      <Text text="aaAÂẤ" fontFamily="NotoSansSC" fontSize="32"/>
       <Fill/>
     </TextBox>
   </Layer>
@@ -75,7 +75,7 @@
     <Rectangle size="150,80"/>
     <Stroke/>
     <TextBox width="150" height="80" paragraphAlign="middle">
-      <Text text="aaAÂẤ" fontFamily="Noto Sans SC" fontSize="32"/>
+      <Text text="aaAÂẤ" fontFamily="NotoSansSC" fontSize="32"/>
       <Fill/>
     </TextBox>
   </Layer>
@@ -85,7 +85,7 @@
     <Rectangle size="150,80"/>
     <Stroke/>
     <TextBox width="150" height="80" paragraphAlign="far">
-      <Text text="aaAÂẤ" fontFamily="Noto Sans SC" fontSize="32"/>
+      <Text text="aaAÂẤ" fontFamily="NotoSansSC" fontSize="32"/>
       <Fill/>
     </TextBox>
   </Layer>
@@ -97,11 +97,11 @@
     <Rectangle size="200,180"/>
     <Stroke/>
     <TextBox width="200" height="180">
-      <Text text="Hg&#10;" fontFamily="Noto Sans SC" fontSize="40"/>
+      <Text text="Hg&#10;" fontFamily="NotoSansSC" fontSize="40"/>
       <Fill/>
       <Group>
-        <Text text="Xy" fontFamily="Noto Sans SC" fontSize="20"/>
-        <Text text="&#10;AB" fontFamily="Noto Sans SC" fontSize="60"/>
+        <Text text="Xy" fontFamily="NotoSansSC" fontSize="20"/>
+        <Text text="&#10;AB" fontFamily="NotoSansSC" fontSize="60"/>
         <Fill/>
       </Group>
     </TextBox>
@@ -112,11 +112,11 @@
     <Rectangle size="200,180"/>
     <Stroke/>
     <TextBox width="200" height="180" lineHeight="40">
-      <Text text="Hg&#10;" fontFamily="Noto Sans SC" fontSize="40"/>
+      <Text text="Hg&#10;" fontFamily="NotoSansSC" fontSize="40"/>
       <Fill/>
       <Group>
-        <Text text="Xy" fontFamily="Noto Sans SC" fontSize="20"/>
-        <Text text="&#10;AB" fontFamily="Noto Sans SC" fontSize="60"/>
+        <Text text="Xy" fontFamily="NotoSansSC" fontSize="20"/>
+        <Text text="&#10;AB" fontFamily="NotoSansSC" fontSize="60"/>
         <Fill/>
       </Group>
     </TextBox>
@@ -127,7 +127,7 @@
     <Rectangle size="150,160"/>
     <Stroke/>
     <TextBox width="150" height="160" paragraphAlign="far" lineHeight="50">
-      <Text text="Line1&#10;Line2" fontFamily="Noto Sans SC" fontSize="24"/>
+      <Text text="Line1&#10;Line2" fontFamily="NotoSansSC" fontSize="24"/>
       <Fill/>
     </TextBox>
   </Layer>
@@ -139,11 +139,11 @@
     <Rectangle size="150,180"/>
     <Stroke/>
     <TextBox width="150" height="180" paragraphAlign="far">
-      <Text text="Large&#10;" fontFamily="Noto Sans SC" fontSize="36"/>
+      <Text text="Large&#10;" fontFamily="NotoSansSC" fontSize="36"/>
       <Fill/>
       <Group>
-        <Text text="Medium&#10;" fontFamily="Noto Sans SC" fontSize="24"/>
-        <Text text="Tiny" fontFamily="Noto Sans SC" fontSize="16"/>
+        <Text text="Medium&#10;" fontFamily="NotoSansSC" fontSize="24"/>
+        <Text text="Tiny" fontFamily="NotoSansSC" fontSize="16"/>
         <Fill/>
       </Group>
     </TextBox>
@@ -156,10 +156,10 @@
     <Rectangle size="200,180"/>
     <Stroke/>
     <TextBox width="200" height="180">
-      <Text text="Hg&#10;" fontFamily="Noto Sans SC" fontSize="40"/>
+      <Text text="Hg&#10;" fontFamily="NotoSansSC" fontSize="40"/>
       <Fill/>
       <Group>
-        <Text text="&#10;AB" fontFamily="Noto Sans SC" fontSize="16"/>
+        <Text text="&#10;AB" fontFamily="NotoSansSC" fontSize="16"/>
         <Fill/>
       </Group>
     </TextBox>
@@ -173,7 +173,7 @@
     <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Stroke/>
     <TextBox width="180" textAlign="center">
-      <Text text="Width set, height auto." fontFamily="Noto Sans SC" fontSize="24"/>
+      <Text text="Width set, height auto." fontFamily="NotoSansSC" fontSize="24"/>
       <Fill/>
     </TextBox>
   </Layer>
@@ -183,7 +183,7 @@
     <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Stroke/>
     <TextBox height="90" paragraphAlign="middle">
-      <Text text="Height only" fontFamily="Noto Sans SC" fontSize="24"/>
+      <Text text="Height only" fontFamily="NotoSansSC" fontSize="24"/>
       <Fill/>
     </TextBox>
   </Layer>
@@ -193,7 +193,7 @@
     <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Stroke/>
     <TextBox height="90" writingMode="vertical">
-      <Text text="竖排设高度宽度靠测量自动分列" fontFamily="Noto Sans SC" fontSize="24"/>
+      <Text text="竖排设高度宽度靠测量自动分列" fontFamily="NotoSansSC" fontSize="24"/>
       <Fill/>
     </TextBox>
   </Layer>
@@ -202,7 +202,7 @@
 
   <!-- Box M: Point text, textAnchor=start (default) -->
   <Layer left="50" top="1000">
-    <Text text="Line One&#10;Line Two&#10;Line Three" fontFamily="Noto Sans SC" fontSize="24"/>
+    <Text text="Line One&#10;Line Two&#10;Line Three" fontFamily="NotoSansSC" fontSize="24"/>
     <Fill/>
     <Group>
       <Ellipse left="-3" top="-3" size="6,6"/>
@@ -212,7 +212,7 @@
 
   <!-- Box N: Point text, textAnchor=center -->
   <Layer left="320" top="1000">
-    <Text text="Center A&#10;Center BB&#10;Center CCC" fontFamily="Noto Sans SC" fontSize="24" textAnchor="center"/>
+    <Text text="Center A&#10;Center BB&#10;Center CCC" fontFamily="NotoSansSC" fontSize="24" textAnchor="center"/>
     <Fill/>
     <Group>
       <Ellipse left="-3" top="-3" size="6,6"/>
@@ -222,7 +222,7 @@
 
   <!-- Box O: Point text, textAnchor=end -->
   <Layer left="590" top="1000">
-    <Text text="End X&#10;End YY&#10;End ZZZ" fontFamily="Noto Sans SC" fontSize="24" textAnchor="end"/>
+    <Text text="End X&#10;End YY&#10;End ZZZ" fontFamily="NotoSansSC" fontSize="24" textAnchor="end"/>
     <Fill/>
     <Group>
       <Ellipse left="-3" top="-3" size="6,6"/>
@@ -237,7 +237,7 @@
   <Layer left="50" top="1130">
     <!-- TextAlign Start -->
     <TextBox width="0" height="0">
-      <Text text="Start" fontFamily="Noto Sans SC" fontSize="20"/>
+      <Text text="Start" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill/>
     </TextBox>
     <Group>
@@ -247,7 +247,7 @@
 
     <!-- TextAlign Center -->
     <TextBox left="110" width="0" height="0" textAlign="center">
-      <Text text="Center" fontFamily="Noto Sans SC" fontSize="20"/>
+      <Text text="Center" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill/>
     </TextBox>
     <Group>
@@ -257,7 +257,7 @@
 
     <!-- TextAlign End -->
     <TextBox left="220" width="0" height="0" textAlign="end">
-      <Text text="End" fontFamily="Noto Sans SC" fontSize="20"/>
+      <Text text="End" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill/>
     </TextBox>
     <Group>
@@ -267,7 +267,7 @@
 
     <!-- ParagraphAlign Near -->
     <TextBox left="330" width="0" height="0">
-      <Text text="Near" fontFamily="Noto Sans SC" fontSize="20"/>
+      <Text text="Near" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill/>
     </TextBox>
     <Group>
@@ -277,7 +277,7 @@
 
     <!-- ParagraphAlign Middle -->
     <TextBox left="440" width="0" height="0" paragraphAlign="middle">
-      <Text text="Middle" fontFamily="Noto Sans SC" fontSize="20"/>
+      <Text text="Middle" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill/>
     </TextBox>
     <Group>
@@ -287,7 +287,7 @@
 
     <!-- ParagraphAlign Far -->
     <TextBox left="550" width="0" height="0" paragraphAlign="far">
-      <Text text="Far" fontFamily="Noto Sans SC" fontSize="20"/>
+      <Text text="Far" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill/>
     </TextBox>
     <Group>

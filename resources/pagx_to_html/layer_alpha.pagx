@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Layer Alpha" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Layer Alpha" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Opacity blending on overlapping layers" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="Opacity blending on overlapping layers" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -41,11 +41,11 @@
 
       <!-- Labels -->
       <Layer centerX="-35" bottom="15" width="80" height="12">
-        <Text text="alpha=0.3" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
+        <Text text="alpha=0.3" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
         <Fill color="#64748B"/>
       </Layer>
       <Layer centerX="35" bottom="15" width="80" height="12">
-        <Text text="alpha=0.7" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
+        <Text text="alpha=0.7" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
         <Fill color="#64748B"/>
       </Layer>
     </Layer>

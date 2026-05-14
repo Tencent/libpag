@@ -19,11 +19,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="4" alignment="center">
       <Layer height="20">
-        <Text text="Text Path" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Text Path" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Text along curves and straight paths" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="Text along curves and straight paths" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -44,7 +44,7 @@
             <Stroke color="#8B5CF6" width="1" dashes="6,4"/>
           </Layer>
           <Layer name="arcDemo">
-            <Text text="ALONG A PATH" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="24"/>
+            <Text text="ALONG A PATH" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
             <TextPath path="@arcPath" forceAlignment="true"/>
             <Fill>
               <LinearGradient startPoint="0,0" endPoint="1,0">
@@ -63,7 +63,7 @@
             <Stroke color="#10B981" width="1" dashes="6,4"/>
           </Layer>
           <Layer name="lineDemo">
-            <Text text="Straight Path with Margins" fontFamily="Noto Sans SC" fontSize="12"/>
+            <Text text="Straight Path with Margins" fontFamily="Arial" fontSize="12"/>
             <TextPath path="@linePath" firstMargin="20" lastMargin="20" forceAlignment="true"/>
             <Fill color="#10B981"/>
           </Layer>
@@ -76,7 +76,7 @@
             <Stroke color="#F59E0B" width="1" dashes="6,4"/>
           </Layer>
           <Layer name="sCurveDemo">
-            <Text text="S-CURVE PATH" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="14"/>
+            <Text text="S-CURVE PATH" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
             <TextPath path="@sCurve" forceAlignment="true"/>
             <Fill color="#F59E0B"/>
           </Layer>

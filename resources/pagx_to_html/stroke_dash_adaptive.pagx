@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Dash Adaptive Stroke" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Dash Adaptive Stroke" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Normal dashes vs evenly distributed dashes" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="Normal dashes vs evenly distributed dashes" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -33,7 +33,7 @@
         <!-- Left column: normal dashes -->
         <Layer flex="1" layout="vertical" gap="10" alignment="center" arrangement="center">
           <Layer height="14">
-            <Text text="dashAdaptive=false" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
+            <Text text="dashAdaptive=false" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
           <Layer width="120" height="120">
@@ -51,7 +51,7 @@
         <!-- Right column: adaptive dashes -->
         <Layer flex="1" layout="vertical" gap="10" alignment="center" arrangement="center">
           <Layer height="14">
-            <Text text="dashAdaptive=true" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
+            <Text text="dashAdaptive=true" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
           <Layer width="120" height="120">

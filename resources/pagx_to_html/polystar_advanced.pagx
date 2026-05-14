@@ -13,11 +13,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Polystar Advanced" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Polystar Advanced" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Fractional points, roundness, reversed, and edge cases" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="Fractional points, roundness, reversed, and edge cases" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -38,7 +38,7 @@
             <Fill color="#3B82F6"/>
           </Layer>
           <Layer height="12">
-            <Text text="5.5 pts" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="5.5 pts" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -49,7 +49,7 @@
             <Fill color="#EC4899"/>
           </Layer>
           <Layer height="12">
-            <Text text="Flower" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="Flower" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -60,7 +60,7 @@
             <Fill color="#10B981"/>
           </Layer>
           <Layer height="12">
-            <Text text="Reversed" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="Reversed" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -71,7 +71,7 @@
             <Fill color="#F59E0B"/>
           </Layer>
           <Layer height="12">
-            <Text text="Soft Hex" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="Soft Hex" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -86,7 +86,7 @@
             <Fill color="#8B5CF6"/>
           </Layer>
           <Layer height="12">
-            <Text text="3.7 polygon" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="3.7 polygon" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -97,7 +97,7 @@
             <Fill color="#EF4444"/>
           </Layer>
           <Layer height="12">
-            <Text text="Max round" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="Max round" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -108,7 +108,7 @@
             <Fill color="#06B6D4"/>
           </Layer>
           <Layer height="12">
-            <Text text="Rev polygon" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="Rev polygon" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -119,7 +119,7 @@
             <Fill color="#D946EF"/>
           </Layer>
           <Layer height="12">
-            <Text text="2.3 pts" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="2.3 pts" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>

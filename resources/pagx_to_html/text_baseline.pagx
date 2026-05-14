@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="stretch">
       <Layer height="20">
-        <Text text="Text Baseline &amp; Anchor" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Text Baseline &amp; Anchor" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="baseline modes and textAnchor alignment" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="baseline modes and textAnchor alignment" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -33,22 +33,22 @@
         <!-- LineBox baseline (default) -->
         <Layer width="150" layout="vertical" gap="4" alignment="stretch">
           <Layer height="40">
-            <Text text="LineBox (default)" fontFamily="Noto Sans SC" fontSize="16" baseline="lineBox" centerX="0" centerY="0" textAnchor="center"/>
+            <Text text="LineBox (default)" fontFamily="Arial" fontSize="16" baseline="lineBox" centerX="0" centerY="0" textAnchor="center"/>
             <Fill color="#3B82F6"/>
           </Layer>
           <Layer height="12">
-            <Text text="baseline=lineBox" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="baseline=lineBox" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
         <!-- Alphabetic baseline -->
         <Layer width="150" layout="vertical" gap="4" alignment="stretch">
           <Layer height="40">
-            <Text text="Alphabetic" fontFamily="Noto Sans SC" fontSize="16" baseline="alphabetic" centerX="0" centerY="0" textAnchor="center"/>
+            <Text text="Alphabetic" fontFamily="Arial" fontSize="16" baseline="alphabetic" centerX="0" centerY="0" textAnchor="center"/>
             <Fill color="#EF4444"/>
           </Layer>
           <Layer height="12">
-            <Text text="baseline=alphabetic" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="baseline=alphabetic" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -62,12 +62,12 @@
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
             <Fill color="#DBEAFE"/>
             <Layer left="0" right="0" top="0" bottom="0">
-              <Text text="Start" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="14" textAnchor="start" left="8" centerY="0"/>
+              <Text text="Start" fontFamily="Arial" fontStyle="Bold" fontSize="14" textAnchor="start" left="8" centerY="0"/>
               <Fill color="#1D4ED8"/>
             </Layer>
           </Layer>
           <Layer height="12">
-            <Text text="textAnchor=start" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="textAnchor=start" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -77,12 +77,12 @@
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
             <Fill color="#DCFCE7"/>
             <Layer left="0" right="0" top="0" bottom="0">
-              <Text text="Center" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="14" textAnchor="center" centerX="0" centerY="0"/>
+              <Text text="Center" fontFamily="Arial" fontStyle="Bold" fontSize="14" textAnchor="center" centerX="0" centerY="0"/>
               <Fill color="#15803D"/>
             </Layer>
           </Layer>
           <Layer height="12">
-            <Text text="textAnchor=center" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="textAnchor=center" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>
@@ -92,12 +92,12 @@
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
             <Fill color="#FEF3C7"/>
             <Layer left="0" right="0" top="0" bottom="0">
-              <Text text="End" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="14" textAnchor="end" right="8" centerY="0"/>
+              <Text text="End" fontFamily="Arial" fontStyle="Bold" fontSize="14" textAnchor="end" right="8" centerY="0"/>
               <Fill color="#B45309"/>
             </Layer>
           </Layer>
           <Layer height="12">
-            <Text text="textAnchor=end" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="textAnchor=end" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>

@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Text Box Layout" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Text Box Layout" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Alignment, writing mode, overflow, and wrapping" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="Alignment, writing mode, overflow, and wrapping" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -38,12 +38,12 @@
               <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
               <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
               <TextBox left="0" right="0" top="0" bottom="0" textAlign="center" paragraphAlign="middle">
-                <Text text="Centered in Box" fontFamily="Noto Sans SC" fontSize="18"/>
+                <Text text="Centered in Box" fontFamily="Arial" fontSize="18"/>
                 <Fill color="#1F2937"/>
               </TextBox>
             </Layer>
             <Layer height="10">
-              <Text text="center + middle" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="center + middle" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#94A3B8"/>
             </Layer>
           </Layer>
@@ -54,12 +54,12 @@
               <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
               <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
               <TextBox left="0" right="0" top="0" bottom="0" textAlign="justify" lineHeight="22">
-                <Text text="This is a longer text that should wrap and be justified in the box." fontFamily="Noto Sans SC" fontSize="14"/>
+                <Text text="This is a longer text that should wrap and be justified in the box." fontFamily="Arial" fontSize="14"/>
                 <Fill color="#3B82F6"/>
               </TextBox>
             </Layer>
             <Layer height="10">
-              <Text text="justify + lineHeight" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="justify + lineHeight" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#94A3B8"/>
             </Layer>
           </Layer>
@@ -74,12 +74,12 @@
               <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
               <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
               <TextBox left="0" right="0" top="0" bottom="0" writingMode="vertical">
-                <Text text="竖排文字" fontFamily="Noto Sans SC" fontSize="18"/>
+                <Text text="竖排文字" fontFamily="Arial" fontSize="18"/>
                 <Fill color="#8B5CF6"/>
               </TextBox>
             </Layer>
             <Layer height="10">
-              <Text text="vertical" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="vertical" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#94A3B8"/>
             </Layer>
           </Layer>
@@ -90,12 +90,12 @@
               <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
               <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
               <TextBox left="0" right="0" top="0" bottom="0" overflow="hidden">
-                <Text text="Text line 1. Text line 2. Text line 3. Text line 4. Text line 5." fontFamily="Noto Sans SC" fontSize="12"/>
+                <Text text="Text line 1. Text line 2. Text line 3. Text line 4. Text line 5." fontFamily="Arial" fontSize="12"/>
                 <Fill color="#EF4444"/>
               </TextBox>
             </Layer>
             <Layer height="10">
-              <Text text="overflow=hidden" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="overflow=hidden" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#94A3B8"/>
             </Layer>
           </Layer>
@@ -106,12 +106,12 @@
               <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
               <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
               <TextBox left="0" right="0" top="0" bottom="0" wordWrap="false">
-                <Text text="No wrap text" fontFamily="Noto Sans SC" fontSize="14"/>
+                <Text text="No wrap text" fontFamily="Arial" fontSize="14"/>
                 <Fill color="#F59E0B"/>
               </TextBox>
             </Layer>
             <Layer height="10">
-              <Text text="no wrap" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="no wrap" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#94A3B8"/>
             </Layer>
           </Layer>
@@ -121,11 +121,11 @@
         <Layer layout="horizontal" gap="16" alignment="center" arrangement="center">
           <Layer layout="vertical" gap="4" alignment="center">
             <Layer>
-              <Text text="Auto sized box" fontFamily="Noto Sans SC" fontSize="16"/>
+              <Text text="Auto sized box" fontFamily="Arial" fontSize="16"/>
               <Fill color="#10B981"/>
             </Layer>
             <Layer height="10">
-              <Text text="auto size (no TextBox)" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="auto size (no TextBox)" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#94A3B8"/>
             </Layer>
           </Layer>

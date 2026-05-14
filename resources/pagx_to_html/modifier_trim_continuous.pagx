@@ -18,8 +18,8 @@
 
   <!-- Labels + Continuous mode: trim spans across all 3 shapes as one path -->
   <Layer>
-    <Text text="continuous" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="12" position="120,28" textAnchor="center"/>
-    <Text text="separate" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="12" position="320,28" textAnchor="center"/>
+    <Text text="continuous" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="120,28" textAnchor="center"/>
+    <Text text="separate" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="320,28" textAnchor="center"/>
     <Fill color="#64748B"/>
     <Group>
       <!-- Rectangle outline -->
@@ -64,8 +64,8 @@
     <Path data="M 200,25 L 200,100"/>
     <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
     <Group>
-      <Text text="continuous + offset" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="12" position="120,130" textAnchor="center"/>
-      <Text text="separate + offset" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="12" position="320,130" textAnchor="center"/>
+      <Text text="continuous + offset" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="120,130" textAnchor="center"/>
+      <Text text="separate + offset" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="320,130" textAnchor="center"/>
       <Fill color="#64748B"/>
     </Group>
     <Group>

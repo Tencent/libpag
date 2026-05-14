@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="6" alignment="center">
       <Layer height="20">
-        <Text text="Trim Path" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Trim Path" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Separate, continuous, wrap-around, and offset" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="Separate, continuous, wrap-around, and offset" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -40,7 +40,7 @@
               <Stroke color="#3B82F6" width="6" cap="round"/>
             </Layer>
             <Layer height="12">
-              <Text text="Separate 75%" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="Separate 75%" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
@@ -53,7 +53,7 @@
               <Stroke color="#EF4444" width="6" cap="round"/>
             </Layer>
             <Layer height="12">
-              <Text text="Wrap-around" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="Wrap-around" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
@@ -70,7 +70,7 @@
               <Stroke color="#10B981" width="4" cap="round"/>
             </Layer>
             <Layer height="12">
-              <Text text="Continuous" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="Continuous" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
@@ -83,7 +83,7 @@
               <Stroke color="#F59E0B" width="6" cap="round"/>
             </Layer>
             <Layer height="12">
-              <Text text="Offset 90deg" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="Offset 90deg" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>

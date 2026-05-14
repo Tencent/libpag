@@ -46,13 +46,13 @@
 
     <!-- Title -->
     <Layer height="20">
-      <Text text="Shape Glyph Run" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="15" centerX="0" textAnchor="center"/>
+      <Text text="Shape Glyph Run" fontFamily="Arial" fontStyle="Bold" fontSize="15" centerX="0" textAnchor="center"/>
       <Fill color="#1E293B"/>
     </Layer>
 
     <!-- Subtitle -->
     <Layer height="12">
-      <Text text="GlyphRun as shape-batch renderer (not text)" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
+      <Text text="GlyphRun as shape-batch renderer (not text)" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
       <Fill color="#64748B"/>
     </Layer>
 
@@ -66,7 +66,7 @@
 
         <!-- ① xOffsets: four shapes, equally spaced, no transform (baseline row) -->
         <Layer height="11">
-          <Text text="① xOffsets — four shapes, uniform spacing (no transform)" fontFamily="Noto Sans SC" fontSize="9"/>
+          <Text text="① xOffsets — four shapes, uniform spacing (no transform)" fontFamily="Arial" fontSize="9"/>
           <Fill color="#94A3B8"/>
         </Layer>
         <Layer height="38">
@@ -79,7 +79,7 @@
 
         <!-- ② positions: same spacing, each shape nudged in xy -->
         <Layer height="11">
-          <Text text="② positions — per-shape xy nudge (±8px)" fontFamily="Noto Sans SC" fontSize="9"/>
+          <Text text="② positions — per-shape xy nudge (±8px)" fontFamily="Arial" fontSize="9"/>
           <Fill color="#94A3B8"/>
         </Layer>
         <Layer height="50">
@@ -94,7 +94,7 @@
 
         <!-- ③ scales: anchor at shape centre (anchorY = -fontSize*0.4 ≈ -11) -->
         <Layer height="11">
-          <Text text="③ scales — 0.6× / 0.8× / 1.0× / 1.2× (anchor at centre)" fontFamily="Noto Sans SC" fontSize="9"/>
+          <Text text="③ scales — 0.6× / 0.8× / 1.0× / 1.2× (anchor at centre)" fontFamily="Arial" fontSize="9"/>
           <Fill color="#94A3B8"/>
         </Layer>
         <Layer height="46">
@@ -109,7 +109,7 @@
 
         <!-- ④ skews: alternating -20°/+20° -->
         <Layer height="11">
-          <Text text="④ skews — -20° / +20° / -20° / +20°" fontFamily="Noto Sans SC" fontSize="9"/>
+          <Text text="④ skews — -20° / +20° / -20° / +20°" fontFamily="Arial" fontSize="9"/>
           <Fill color="#94A3B8"/>
         </Layer>
         <Layer height="46">
@@ -123,7 +123,7 @@
 
         <!-- ⑤ anchors: different pivot points produce different scale origins -->
         <Layer height="11">
-          <Text text="⑤ anchors — different pivot points, all scaled 1.4×" fontFamily="Noto Sans SC" fontSize="9"/>
+          <Text text="⑤ anchors — different pivot points, all scaled 1.4×" fontFamily="Arial" fontSize="9"/>
           <Fill color="#94A3B8"/>
         </Layer>
         <Layer height="44">
@@ -138,7 +138,7 @@
 
         <!-- ⑥ combined: all transforms with moderate values -->
         <Layer height="11">
-          <Text text="⑥ combined — pos + anchor + skew + scale" fontFamily="Noto Sans SC" fontSize="9"/>
+          <Text text="⑥ combined — pos + anchor + skew + scale" fontFamily="Arial" fontSize="9"/>
           <Fill color="#94A3B8"/>
         </Layer>
         <Layer height="52">
@@ -160,7 +160,7 @@
 
         <!-- ⑦ bitmap: star (with glyph offset) + heart (without), alternating -->
         <Layer height="11">
-          <Text text="⑦ bitmap — star (glyph offset) + heart (no offset), alternating" fontFamily="Noto Sans SC" fontSize="9"/>
+          <Text text="⑦ bitmap — star (glyph offset) + heart (no offset), alternating" fontFamily="Arial" fontSize="9"/>
           <Fill color="#94A3B8"/>
         </Layer>
         <Layer height="50">

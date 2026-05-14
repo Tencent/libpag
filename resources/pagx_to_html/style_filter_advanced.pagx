@@ -24,7 +24,7 @@
           </Layer>
         </Layer>
         <Layer height="12">
-          <Text text="DropShadow blendMode" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
+          <Text text="DropShadow blendMode" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
       </Layer>
@@ -39,7 +39,7 @@
           </Layer>
         </Layer>
         <Layer height="12">
-          <Text text="InnerShadow blendMode" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
+          <Text text="InnerShadow blendMode" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
       </Layer>
@@ -62,7 +62,7 @@
           </Layer>
         </Layer>
         <Layer height="12">
-          <Text text="excludeChildEffects" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
+          <Text text="excludeChildEffects" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
       </Layer>
@@ -81,7 +81,7 @@
           </Layer>
         </Layer>
         <Layer height="12">
-          <Text text="BgBlur tileMode=clamp" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
+          <Text text="BgBlur tileMode=clamp" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
       </Layer>
@@ -103,7 +103,7 @@
           </Layer>
         </Layer>
         <Layer height="12">
-          <Text text="Stroke alpha+foreground" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
+          <Text text="Stroke alpha+foreground" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
       </Layer>
@@ -130,7 +130,7 @@
               </Layer>
             </Layer>
             <Layer height="10">
-              <Text text="Blur mirror" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="Blur mirror" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
@@ -144,7 +144,7 @@
               </Layer>
             </Layer>
             <Layer height="10">
-              <Text text="Reversed" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="Reversed" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>

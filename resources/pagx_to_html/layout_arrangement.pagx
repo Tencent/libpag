@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Layout Arrangement" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Layout Arrangement" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="start, center, end, spaceBetween, spaceEvenly, spaceAround" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="start, center, end, spaceBetween, spaceEvenly, spaceAround" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -33,7 +33,7 @@
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="9"/>
         <Fill color="#EF4444"/>
         <Layer left="0" right="0" top="0" bottom="0">
-          <Text text="overlay" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="9" centerX="0" centerY="0" textAnchor="center"/>
+          <Text text="overlay" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" centerY="0" textAnchor="center"/>
           <Fill color="#FFFFFF"/>
         </Layer>
       </Layer>
@@ -44,7 +44,7 @@
         <!-- Row 1: arrangement=start -->
         <Layer layout="vertical" gap="3" alignment="stretch">
           <Layer height="12">
-            <Text text="arrangement=start" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="arrangement=start" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
           <Layer height="32" layout="horizontal" gap="8" arrangement="start" alignment="stretch">
@@ -66,7 +66,7 @@
         <!-- Row 2: arrangement=center -->
         <Layer layout="vertical" gap="3" alignment="stretch">
           <Layer height="12">
-            <Text text="arrangement=center" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="arrangement=center" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
           <Layer height="32" layout="horizontal" gap="8" arrangement="center" alignment="stretch">
@@ -88,7 +88,7 @@
         <!-- Row 3: arrangement=end -->
         <Layer layout="vertical" gap="3" alignment="stretch">
           <Layer height="12">
-            <Text text="arrangement=end" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="arrangement=end" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
           <Layer height="32" layout="horizontal" gap="8" arrangement="end" alignment="stretch">
@@ -110,7 +110,7 @@
         <!-- Row 4: arrangement=spaceBetween -->
         <Layer layout="vertical" gap="3" alignment="stretch">
           <Layer height="12">
-            <Text text="arrangement=spaceBetween" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="arrangement=spaceBetween" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
           <Layer height="32" layout="horizontal" arrangement="spaceBetween" alignment="stretch">
@@ -132,7 +132,7 @@
         <!-- Row 5: arrangement=spaceEvenly -->
         <Layer layout="vertical" gap="3" alignment="stretch">
           <Layer height="12">
-            <Text text="arrangement=spaceEvenly" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="arrangement=spaceEvenly" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
           <Layer height="32" layout="horizontal" arrangement="spaceEvenly" alignment="stretch">
@@ -154,7 +154,7 @@
         <!-- Row 6: arrangement=spaceAround -->
         <Layer layout="vertical" gap="3" alignment="stretch">
           <Layer height="12">
-            <Text text="arrangement=spaceAround" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="arrangement=spaceAround" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
           <Layer height="32" layout="horizontal" arrangement="spaceAround" alignment="stretch">
@@ -176,7 +176,7 @@
         <!-- Row 7: alignment=start demonstration (cross-axis) -->
         <Layer layout="vertical" gap="3" alignment="stretch">
           <Layer height="12">
-            <Text text="alignment=start (cross-axis top)" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="alignment=start (cross-axis top)" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
           <Layer height="48" layout="horizontal" gap="8" arrangement="center" alignment="start">

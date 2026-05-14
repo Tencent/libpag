@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Fill Attributes" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Fill Attributes" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Alpha, blendMode, fillRule, placement, color source" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="Alpha, blendMode, fillRule, placement, color source" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -37,7 +37,7 @@
               <Fill color="#3B82F6" alpha="0.5"/>
             </Layer>
             <Layer height="12">
-              <Text text="alpha=0.5" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
+              <Text text="alpha=0.5" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
@@ -49,7 +49,7 @@
               <Fill color="#10B981" fillRule="evenOdd"/>
             </Layer>
             <Layer height="12">
-              <Text text="evenOdd" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
+              <Text text="evenOdd" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
@@ -65,7 +65,7 @@
               </Group>
             </Layer>
             <Layer height="12">
-              <Text text="multiply" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
+              <Text text="multiply" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
@@ -84,7 +84,7 @@
               </Layer>
             </Layer>
             <Layer height="12">
-              <Text text="foreground" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
+              <Text text="foreground" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
@@ -98,7 +98,7 @@
               </Fill>
             </Layer>
             <Layer height="12">
-              <Text text="child override" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
+              <Text text="child override" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>

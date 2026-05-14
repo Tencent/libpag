@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Round Corner Modifier" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Round Corner Modifier" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Sharp corners converted to bezier arcs" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="Sharp corners converted to bezier arcs" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -38,7 +38,7 @@
         </Layer>
         <!-- Label -->
         <Layer height="14">
-          <Text text="radius=15" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
+          <Text text="radius=15" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
           <Fill color="#64748B"/>
         </Layer>
       </Layer>

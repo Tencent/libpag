@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Text Basics" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Text Basics" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Anchors, spacing, faux styles, and font styles" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="Anchors, spacing, faux styles, and font styles" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -31,11 +31,11 @@
         <!-- Basic text: textAnchor=start (default) -->
       <Layer layout="vertical" gap="2">
         <Layer height="28">
-          <Text text="Hello World" fontFamily="Noto Sans SC" fontSize="24"/>
+          <Text text="Hello World" fontFamily="Arial" fontSize="24"/>
           <Fill color="#1F2937"/>
         </Layer>
         <Layer height="10">
-          <Text text="start" fontFamily="Noto Sans SC" fontSize="8"/>
+          <Text text="start" fontFamily="Arial" fontSize="8"/>
           <Fill color="#94A3B8"/>
         </Layer>
       </Layer>
@@ -43,11 +43,11 @@
       <!-- textAnchor=center -->
       <Layer layout="vertical" gap="2" alignment="center">
         <Layer height="28">
-          <Text text="Centered" fontFamily="Noto Sans SC" fontSize="24" centerX="0" textAnchor="center"/>
+          <Text text="Centered" fontFamily="Arial" fontSize="24" centerX="0" textAnchor="center"/>
           <Fill color="#3B82F6"/>
         </Layer>
         <Layer height="10">
-          <Text text="center" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+          <Text text="center" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
           <Fill color="#94A3B8"/>
         </Layer>
       </Layer>
@@ -55,36 +55,36 @@
       <!-- textAnchor=end -->
       <Layer layout="vertical" gap="2">
         <Layer height="28">
-          <Text text="Right Aligned" fontFamily="Noto Sans SC" fontSize="24" right="0" textAnchor="end"/>
+          <Text text="Right Aligned" fontFamily="Arial" fontSize="24" right="0" textAnchor="end"/>
           <Fill color="#10B981"/>
         </Layer>
         <Layer height="10">
-          <Text text="end" fontFamily="Noto Sans SC" fontSize="8" right="0" textAnchor="end"/>
+          <Text text="end" fontFamily="Arial" fontSize="8" right="0" textAnchor="end"/>
           <Fill color="#94A3B8"/>
         </Layer>
       </Layer>
 
       <!-- letterSpacing -->
       <Layer height="32">
-        <Text text="SPACED" fontFamily="Noto Sans SC" fontSize="28" letterSpacing="8"/>
+        <Text text="SPACED" fontFamily="Arial" fontSize="28" letterSpacing="8"/>
         <Fill color="#8B5CF6"/>
       </Layer>
 
       <!-- fauxBold -->
       <Layer height="32">
-        <Text text="Faux Bold" fontFamily="Noto Sans SC" fontSize="28" fontStyle="Bold"/>
+        <Text text="Faux Bold" fontFamily="Arial" fontSize="28" fauxBold="true"/>
         <Fill color="#EF4444"/>
       </Layer>
 
       <!-- fauxItalic -->
       <Layer height="32">
-        <Text text="Faux Italic" fontFamily="Noto Sans SC" fontSize="28" fauxItalic="true"/>
+        <Text text="Faux Italic" fontFamily="Arial" fontSize="28" fauxItalic="true"/>
         <Fill color="#F59E0B"/>
       </Layer>
 
       <!-- fontStyle Bold Italic -->
       <Layer height="28">
-        <Text text="Bold Italic" fontFamily="Noto Sans SC" fontStyle="Bold" fauxItalic="true" fontSize="24"/>
+        <Text text="Bold Italic" fontFamily="Arial" fontStyle="Bold Italic" fontSize="24"/>
         <Fill color="#EC4899"/>
       </Layer>
     </Layer>

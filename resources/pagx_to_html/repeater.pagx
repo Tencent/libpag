@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Repeater" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Repeater" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Transform interpolation, fractional copies, and order" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="Transform interpolation, fractional copies, and order" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -38,7 +38,7 @@
               <Repeater copies="5" position="40,5" endAlpha="0.2" order="belowOriginal"/>
             </Layer>
             <Layer height="10">
-              <Text text="5 copies, alpha fade" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="5 copies, alpha fade" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
@@ -53,7 +53,7 @@
               </Layer>
             </Layer>
             <Layer height="10">
-              <Text text="Rotation + scale" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="Rotation + scale" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
@@ -69,7 +69,7 @@
               <Repeater copies="3.5" position="40,5"/>
             </Layer>
             <Layer height="10">
-              <Text text="Fractional 3.5" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="Fractional 3.5" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
@@ -82,7 +82,7 @@
               <Repeater copies="4" position="25,12" order="aboveOriginal" startAlpha="0.3" endAlpha="1"/>
             </Layer>
             <Layer height="10">
-              <Text text="aboveOriginal" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="aboveOriginal" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
@@ -95,7 +95,7 @@
               <Repeater copies="0"/>
             </Layer>
             <Layer height="10">
-              <Text text="copies=0" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="copies=0" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>

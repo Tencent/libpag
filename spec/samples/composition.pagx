@@ -19,7 +19,7 @@
         <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#6366F180"/>
       </Layer>
       <Layer name="label" width="200" height="60">
-        <Text centerX="0" centerY="0" text="Button" fontFamily="Noto Sans SC" fauxBold="true" fontSize="22"/>
+        <Text centerX="0" centerY="0" text="Button" fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
         <Fill color="#FFF"/>
       </Layer>
     </Composition>

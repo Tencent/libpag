@@ -12,11 +12,11 @@
     <!-- Title -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="RangeSelector Units" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="RangeSelector Units" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="unit=percentage vs unit=index, start=0.2 end=0.8" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="unit=percentage vs unit=index, start=0.2 end=0.8" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -31,11 +31,11 @@
         <!-- Row 1: percentage, 5 glyphs -->
         <Layer layout="vertical" gap="3" alignment="center">
           <Layer height="12">
-            <Text text="percentage, N=5 → covers glyphs 1..3" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="percentage, N=5 → covers glyphs 1..3" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
           <Layer height="36">
-            <Text text="HELLO" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="28" centerX="0" textAnchor="center"/>
+            <Text text="HELLO" fontFamily="Arial" fontStyle="Bold" fontSize="28" centerX="0" textAnchor="center"/>
             <TextModifier alpha="0.25" fillColor="#EC4899">
               <RangeSelector start="0.2" end="0.8" unit="percentage" shape="square"/>
             </TextModifier>
@@ -46,11 +46,11 @@
         <!-- Row 2: percentage, 10 glyphs — scales proportionally -->
         <Layer layout="vertical" gap="3" alignment="center">
           <Layer height="12">
-            <Text text="percentage, N=10 → covers glyphs 2..7" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="percentage, N=10 → covers glyphs 2..7" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
           <Layer height="36">
-            <Text text="PERCENTAGE" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="22" centerX="0" textAnchor="center"/>
+            <Text text="PERCENTAGE" fontFamily="Arial" fontStyle="Bold" fontSize="22" centerX="0" textAnchor="center"/>
             <TextModifier alpha="0.25" fillColor="#EC4899">
               <RangeSelector start="0.2" end="0.8" unit="percentage" shape="square"/>
             </TextModifier>
@@ -61,11 +61,11 @@
         <!-- Row 3: index, 5 glyphs — absolute positions 0.2..0.8 -->
         <Layer layout="vertical" gap="3" alignment="center">
           <Layer height="12">
-            <Text text="index, N=5, start=1 end=3" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="index, N=5, start=1 end=3" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
           <Layer height="36">
-            <Text text="INDEX" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="28" centerX="0" textAnchor="center"/>
+            <Text text="INDEX" fontFamily="Arial" fontStyle="Bold" fontSize="28" centerX="0" textAnchor="center"/>
             <TextModifier alpha="0.25" fillColor="#10B981">
               <RangeSelector start="1" end="3" unit="index" shape="square"/>
             </TextModifier>
@@ -76,11 +76,11 @@
         <!-- Row 4: index, 10 glyphs — same absolute window 1..3, leaves most untouched -->
         <Layer layout="vertical" gap="3" alignment="center">
           <Layer height="12">
-            <Text text="index, N=10, start=1 end=3 (same range → fewer covered)" fontFamily="Noto Sans SC" fontSize="9" centerX="0" textAnchor="center"/>
+            <Text text="index, N=10, start=1 end=3 (same range → fewer covered)" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
           <Layer height="36">
-            <Text text="ABSOLUTELY" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="22" centerX="0" textAnchor="center"/>
+            <Text text="ABSOLUTELY" fontFamily="Arial" fontStyle="Bold" fontSize="22" centerX="0" textAnchor="center"/>
             <TextModifier alpha="0.25" fillColor="#10B981">
               <RangeSelector start="1" end="3" unit="index" shape="square"/>
             </TextModifier>

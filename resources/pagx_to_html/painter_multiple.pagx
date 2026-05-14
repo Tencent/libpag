@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Multiple Painters" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Multiple Painters" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Stacked fills and strokes on one shape" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="Stacked fills and strokes on one shape" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -46,11 +46,11 @@
         <!-- Legend -->
         <Layer layout="vertical" gap="2" alignment="center">
           <Layer height="12">
-            <Text text="Fill #1 (blue) + Fill #2 (red multiply)" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="Fill #1 (blue) + Fill #2 (red multiply)" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
           <Layer height="12">
-            <Text text="Stroke #1 (green) + Stroke #2 (orange dashed)" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="Stroke #1 (green) + Stroke #2 (orange dashed)" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#64748B"/>
           </Layer>
         </Layer>

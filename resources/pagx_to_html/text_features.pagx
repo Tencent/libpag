@@ -19,11 +19,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="stretch">
       <Layer height="20">
-        <Text text="Text Features" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Text Features" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="@headerGrad"/>
       </Layer>
       <Layer height="14">
-        <Text text="letterSpacing, faux styles, CDATA, overflow" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="letterSpacing, faux styles, CDATA, overflow" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -39,11 +39,11 @@
         <!-- 1. letterSpacing -->
         <Layer layout="vertical" gap="2">
           <Layer height="12">
-            <Text text="letterSpacing" fontFamily="Noto Sans SC" fontSize="10"/>
+            <Text text="letterSpacing" fontFamily="Arial" fontSize="10"/>
             <Fill color="#94A3B8"/>
           </Layer>
           <Layer height="28">
-            <Text text="SPACED OUT" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="22" letterSpacing="8"/>
+            <Text text="SPACED OUT" fontFamily="Arial" fontStyle="Bold" fontSize="22" letterSpacing="8"/>
             <Fill color="#3B82F6"/>
           </Layer>
         </Layer>
@@ -52,21 +52,21 @@
         <Layer layout="horizontal" gap="16" alignment="stretch">
           <Layer flex="1" layout="vertical" gap="2">
             <Layer height="12">
-              <Text text="fauxBold" fontFamily="Noto Sans SC" fontSize="10"/>
+              <Text text="fauxBold" fontFamily="Arial" fontSize="10"/>
               <Fill color="#94A3B8"/>
             </Layer>
             <Layer height="24">
-              <Text text="Faux Bold Text" fontFamily="Noto Sans SC" fontSize="20" fontStyle="Bold"/>
+              <Text text="Faux Bold Text" fontFamily="Arial" fontSize="20" fauxBold="true"/>
               <Fill color="#8B5CF6"/>
             </Layer>
           </Layer>
           <Layer flex="1" layout="vertical" gap="2">
             <Layer height="12">
-              <Text text="fauxItalic" fontFamily="Noto Sans SC" fontSize="10"/>
+              <Text text="fauxItalic" fontFamily="Arial" fontSize="10"/>
               <Fill color="#94A3B8"/>
             </Layer>
             <Layer height="24">
-              <Text text="Faux Italic Text" fontFamily="Noto Sans SC" fontSize="20" fauxItalic="true"/>
+              <Text text="Faux Italic Text" fontFamily="Arial" fontSize="20" fauxItalic="true"/>
               <Fill color="#EC4899"/>
             </Layer>
           </Layer>
@@ -77,11 +77,11 @@
           <!-- CDATA multiline -->
           <Layer flex="1" layout="vertical" gap="2">
             <Layer height="12">
-              <Text text="CDATA multiline" fontFamily="Noto Sans SC" fontSize="10"/>
+              <Text text="CDATA multiline" fontFamily="Arial" fontSize="10"/>
               <Fill color="#94A3B8"/>
             </Layer>
             <Layer height="60">
-              <Text fontFamily="Noto Sans SC" fontSize="16">
+              <Text fontFamily="Arial" fontSize="16">
 <![CDATA[Line 1
 Line 2
 Line 3]]>
@@ -93,14 +93,14 @@ Line 3]]>
           <!-- TextBox overflow=visible -->
           <Layer flex="1" layout="vertical" gap="2">
             <Layer height="12">
-              <Text text="overflow=visible" fontFamily="Noto Sans SC" fontSize="10"/>
+              <Text text="overflow=visible" fontFamily="Arial" fontSize="10"/>
               <Fill color="#94A3B8"/>
             </Layer>
             <Layer width="140" height="50">
               <Rectangle left="0" right="0" top="0" bottom="0"/>
               <Stroke color="#F59E0B" width="1" dashes="4,3"/>
               <TextBox left="0" right="0" top="0" bottom="0" overflow="visible" lineHeight="17">
-                <Text text="This text overflows the small box and remains visible beyond its boundaries." fontFamily="Noto Sans SC" fontSize="14"/>
+                <Text text="This text overflows the small box and remains visible beyond its boundaries." fontFamily="Arial" fontSize="14"/>
                 <Fill color="#F59E0B"/>
               </TextBox>
             </Layer>

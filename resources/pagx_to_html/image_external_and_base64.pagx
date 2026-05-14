@@ -15,7 +15,7 @@
     <!-- Left: external file path -->
     <Layer layout="vertical" gap="4" alignment="center">
       <Layer height="14">
-        <Text text="external file" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="external file" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#64748B"/>
       </Layer>
       <Layer width="160" height="160">
@@ -30,7 +30,7 @@
     <!-- Right: inline base64 -->
     <Layer layout="vertical" gap="4" alignment="center">
       <Layer height="14">
-        <Text text="base64 inline" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="base64 inline" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#64748B"/>
       </Layer>
       <Layer width="160" height="160">

@@ -38,11 +38,11 @@
         <Fill color="#6366F1"/>
         <Layer width="100%" height="100%" layout="vertical" gap="8" padding="20" alignment="center" arrangement="center">
           <Layer>
-            <Text text="Card Title" fontFamily="Noto Sans SC" fauxBold="true" fontSize="16"/>
+            <Text text="Card Title" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
             <Fill color="#FFF"/>
           </Layer>
           <Layer>
-            <Text text="Subtitle" fontFamily="Noto Sans SC" fontSize="12"/>
+            <Text text="Subtitle" fontFamily="Arial" fontSize="12"/>
             <Fill color="#C4B5FD"/>
           </Layer>
         </Layer>
@@ -71,7 +71,7 @@
           <Rectangle width="100%" height="100%" roundness="24"/>
           <Fill color="#EC4899"/>
           <Group centerX="0" centerY="0" padding="12,24">
-            <Text text="Button" fontFamily="Noto Sans SC" fauxBold="true" fontSize="14"/>
+            <Text text="Button" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
             <Fill color="#FFF"/>
           </Group>
         </Layer>
@@ -85,7 +85,7 @@
           <Rectangle width="100%" height="100%" roundness="8"/>
           <Fill color="#FFF7ED"/>
           <TextBox width="100%" height="100%" padding="16" textAlign="start">
-            <Text text="TextBox with padding. The text area is inset by 16px on all sides." fontFamily="Noto Sans SC" fontSize="13"/>
+            <Text text="TextBox with padding. The text area is inset by 16px on all sides." fontFamily="Arial" fontSize="13"/>
             <Fill color="#9A3412"/>
           </TextBox>
         </Layer>

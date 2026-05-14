@@ -18,11 +18,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="6" alignment="center">
       <Layer height="20">
-        <Text text="Coverage Gaps" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Coverage Gaps" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="mipmapMode, Repeater offset, textAlign, RangeSelector, baselineAngle" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="mipmapMode, Repeater offset, textAlign, RangeSelector, baselineAngle" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -49,7 +49,7 @@
               <Stroke color="#CBD5E1" width="1"/>
             </Layer>
             <Layer height="12">
-              <Text text="mipmapMode=nearest" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="mipmapMode=nearest" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
@@ -63,7 +63,7 @@
               <Stroke color="#CBD5E1" width="1"/>
             </Layer>
             <Layer height="12">
-              <Text text="mipmapMode=none" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="mipmapMode=none" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
@@ -79,7 +79,7 @@
               <Repeater copies="4" offset="0.5" position="28,0" rotation="8" anchor="12,12"/>
             </Layer>
             <Layer height="12">
-              <Text text="Repeater offset=0.5" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="Repeater offset=0.5" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
@@ -90,12 +90,12 @@
               <Fill color="#F1F5F9"/>
               <Stroke color="#CBD5E1" width="1"/>
               <Layer left="5" right="5" top="5" bottom="5">
-                <Text text="End aligned text" fontFamily="Noto Sans SC" fontSize="11" position="140,5" textAnchor="end"/>
+                <Text text="End aligned text" fontFamily="Arial" fontSize="11" position="140,5" textAnchor="end"/>
                 <Fill color="#1E293B"/>
               </Layer>
             </Layer>
             <Layer height="12">
-              <Text text="textAnchor=end" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="textAnchor=end" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
@@ -106,26 +106,26 @@
           <!-- RangeSelector with offset (non-zero) -->
           <Layer width="150" layout="vertical" gap="10" alignment="center">
             <Layer width="150" height="48">
-              <Text text="OFFSET SEL" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="24" position="75,20" textAnchor="center"/>
+              <Text text="OFFSET SEL" fontFamily="Arial" fontStyle="Bold" fontSize="24" position="75,20" textAnchor="center"/>
               <TextModifier position="8,0" fillColor="#EC4899">
                 <RangeSelector start="0" end="0.5" offset="0.3" shape="triangle"/>
               </TextModifier>
               <Fill color="#3B82F6"/>
             </Layer>
             <Layer height="12">
-              <Text text="RangeSelector offset=0.3" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="RangeSelector offset=0.3" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>
           <!-- TextPath with baselineAngle (non-zero) -->
           <Layer width="150" layout="vertical" gap="6" alignment="center">
             <Layer width="150" height="50">
-              <Text text="ANGLED BASE" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="14" position="75,25"/>
+              <Text text="ANGLED BASE" fontFamily="Arial" fontStyle="Bold" fontSize="14" position="75,25"/>
               <TextPath path="@wavePath" baselineOrigin="75,25" baselineAngle="15" firstMargin="5"/>
               <Fill color="#10B981"/>
             </Layer>
             <Layer height="12">
-              <Text text="baselineAngle=15" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="baselineAngle=15" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#64748B"/>
             </Layer>
           </Layer>

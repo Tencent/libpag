@@ -29,7 +29,7 @@
             </Layer>
           </Layer>
           <Layer height="10">
-            <Text text="normal" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="normal" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#FFFFFF"/>
           </Layer>
         </Layer>
@@ -41,7 +41,7 @@
             </Layer>
           </Layer>
           <Layer height="10">
-            <Text text="multiply" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="multiply" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#FFFFFF"/>
           </Layer>
         </Layer>
@@ -53,7 +53,7 @@
             </Layer>
           </Layer>
           <Layer height="10">
-            <Text text="screen" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="screen" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#FFFFFF"/>
           </Layer>
         </Layer>
@@ -65,7 +65,7 @@
             </Layer>
           </Layer>
           <Layer height="10">
-            <Text text="overlay" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="overlay" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#FFFFFF"/>
           </Layer>
         </Layer>
@@ -77,7 +77,7 @@
             </Layer>
           </Layer>
           <Layer height="10">
-            <Text text="darken" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="darken" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#FFFFFF"/>
           </Layer>
         </Layer>
@@ -89,7 +89,7 @@
             </Layer>
           </Layer>
           <Layer height="10">
-            <Text text="lighten" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="lighten" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#FFFFFF"/>
           </Layer>
         </Layer>
@@ -105,7 +105,7 @@
             </Layer>
           </Layer>
           <Layer height="10">
-            <Text text="dodge" fontFamily="Noto Sans SC" fontSize="7" centerX="0" textAnchor="center"/>
+            <Text text="dodge" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
             <Fill color="#FFFFFF"/>
           </Layer>
         </Layer>
@@ -117,7 +117,7 @@
             </Layer>
           </Layer>
           <Layer height="10">
-            <Text text="burn" fontFamily="Noto Sans SC" fontSize="7" centerX="0" textAnchor="center"/>
+            <Text text="burn" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
             <Fill color="#FFFFFF"/>
           </Layer>
         </Layer>
@@ -129,7 +129,7 @@
             </Layer>
           </Layer>
           <Layer height="10">
-            <Text text="hardLight" fontFamily="Noto Sans SC" fontSize="7" centerX="0" textAnchor="center"/>
+            <Text text="hardLight" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
             <Fill color="#FFFFFF"/>
           </Layer>
         </Layer>
@@ -141,7 +141,7 @@
             </Layer>
           </Layer>
           <Layer height="10">
-            <Text text="softLight" fontFamily="Noto Sans SC" fontSize="7" centerX="0" textAnchor="center"/>
+            <Text text="softLight" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
             <Fill color="#FFFFFF"/>
           </Layer>
         </Layer>
@@ -153,7 +153,7 @@
             </Layer>
           </Layer>
           <Layer height="10">
-            <Text text="difference" fontFamily="Noto Sans SC" fontSize="7" centerX="0" textAnchor="center"/>
+            <Text text="difference" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
             <Fill color="#FFFFFF"/>
           </Layer>
         </Layer>
@@ -165,7 +165,7 @@
             </Layer>
           </Layer>
           <Layer height="10">
-            <Text text="exclusion" fontFamily="Noto Sans SC" fontSize="7" centerX="0" textAnchor="center"/>
+            <Text text="exclusion" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
             <Fill color="#FFFFFF"/>
           </Layer>
         </Layer>
@@ -181,7 +181,7 @@
             </Layer>
           </Layer>
           <Layer height="10">
-            <Text text="hue" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="hue" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#FFFFFF"/>
           </Layer>
         </Layer>
@@ -193,7 +193,7 @@
             </Layer>
           </Layer>
           <Layer height="10">
-            <Text text="saturation" fontFamily="Noto Sans SC" fontSize="7" centerX="0" textAnchor="center"/>
+            <Text text="saturation" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
             <Fill color="#FFFFFF"/>
           </Layer>
         </Layer>
@@ -205,7 +205,7 @@
             </Layer>
           </Layer>
           <Layer height="10">
-            <Text text="color" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="color" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#FFFFFF"/>
           </Layer>
         </Layer>
@@ -217,7 +217,7 @@
             </Layer>
           </Layer>
           <Layer height="10">
-            <Text text="luminosity" fontFamily="Noto Sans SC" fontSize="7" centerX="0" textAnchor="center"/>
+            <Text text="luminosity" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
             <Fill color="#FFFFFF"/>
           </Layer>
         </Layer>
@@ -229,7 +229,7 @@
             </Layer>
           </Layer>
           <Layer height="10">
-            <Text text="plusLighter" fontFamily="Noto Sans SC" fontSize="7" centerX="0" textAnchor="center"/>
+            <Text text="plusLighter" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
             <Fill color="#FFFFFF"/>
           </Layer>
         </Layer>
@@ -241,7 +241,7 @@
             </Layer>
           </Layer>
           <Layer height="10">
-            <Text text="plusDarker" fontFamily="Noto Sans SC" fontSize="7" centerX="0" textAnchor="center"/>
+            <Text text="plusDarker" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
             <Fill color="#FFFFFF"/>
           </Layer>
         </Layer>

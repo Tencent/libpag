@@ -5,7 +5,7 @@
     <Rectangle size="250,50"/>
     <Stroke/>
     <TextBox width="250" height="50">
-      <Text fontFamily="Noto Sans SC" fontSize="24"><![CDATA[café résumé naïve]]></Text>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[café résumé naïve]]></Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -15,7 +15,7 @@
     <Rectangle size="220,50"/>
     <Stroke/>
     <TextBox width="220" height="50">
-      <Text text="你好&#9;World&#9;测试" fontFamily="Noto Sans SC" fontSize="20"/>
+      <Text text="你好&#9;World&#9;测试" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill/>
     </TextBox>
   </Layer>
@@ -25,7 +25,7 @@
     <Rectangle size="250,100"/>
     <Stroke/>
     <TextBox width="250" height="100">
-      <Text fontFamily="Noto Sans SC" fontSize="24"><![CDATA[平仮名カタカナ漢字混合テスト]]></Text>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[平仮名カタカナ漢字混合テスト]]></Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -35,7 +35,7 @@
     <Rectangle size="220,50"/>
     <Stroke/>
     <TextBox width="220" height="50">
-      <Text fontFamily="Noto Sans SC" fontSize="24"><![CDATA[Ａ，Ｂ。Ｃ：Ｄ]]></Text>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[Ａ，Ｂ。Ｃ：Ｄ]]></Text>
       <Fill/>
     </TextBox>
   </Layer>
@@ -45,7 +45,7 @@
     <Rectangle size="220,130"/>
     <Stroke/>
     <TextBox width="220" height="130">
-      <Text fontFamily="Noto Sans SC" fontSize="18"><![CDATA[Line1
+      <Text fontFamily="NotoSansSC" fontSize="18"><![CDATA[Line1
 Line2
 
 Line4

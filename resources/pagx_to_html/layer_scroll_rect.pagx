@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Scroll Rect" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Scroll Rect" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Viewport clipping with content extending beyond" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="Viewport clipping with content extending beyond" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -49,7 +49,7 @@
               </Layer>
             </Layer>
             <Layer height="12">
-              <Text text="Viewport 1" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="Viewport 1" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#94A3B8"/>
             </Layer>
           </Layer>
@@ -71,7 +71,7 @@
               </Layer>
             </Layer>
             <Layer height="12">
-              <Text text="Viewport 2" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+              <Text text="Viewport 2" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
               <Fill color="#94A3B8"/>
             </Layer>
           </Layer>
@@ -84,13 +84,13 @@
             <Stroke color="#94A3B8" width="1" dashes="4,3"/>
             <Layer scrollRect="0,0,280,50" x="0" y="0">
               <TextBox width="500" height="50" wordWrap="false" paragraphAlign="middle">
-                <Text text="This is a long text that extends well beyond the scroll rect boundary and should be clipped." fontFamily="Noto Sans SC" fontSize="14"/>
+                <Text text="This is a long text that extends well beyond the scroll rect boundary and should be clipped." fontFamily="Arial" fontSize="14"/>
                 <Fill color="#1F2937"/>
               </TextBox>
             </Layer>
           </Layer>
           <Layer height="12">
-            <Text text="Text Clipping" fontFamily="Noto Sans SC" fontSize="8" centerX="0" textAnchor="center"/>
+            <Text text="Text Clipping" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
             <Fill color="#94A3B8"/>
           </Layer>
         </Layer>

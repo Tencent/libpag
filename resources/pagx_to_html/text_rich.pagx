@@ -12,11 +12,11 @@
     <!-- Title area -->
     <Layer layout="vertical" gap="2" alignment="center">
       <Layer height="20">
-        <Text text="Rich Text" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Text text="Rich Text" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
         <Fill color="#1E293B"/>
       </Layer>
       <Layer height="14">
-        <Text text="Multi-color spans with shared TextBox" fontFamily="Noto Sans SC" fontSize="10" centerX="0" textAnchor="center"/>
+        <Text text="Multi-color spans with shared TextBox" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Layer>
@@ -29,34 +29,34 @@
 
       <!-- Rich text: TextBox with Group children for independent styles -->
       <TextBox left="20" right="20" top="15" bottom="15" lineHeight="32" textAlign="center" paragraphAlign="middle">
-        <Text text="Hello " fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="24"/>
+        <Text text="Hello " fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
         <Fill color="#EF4444"/>
         <Group>
-          <Text text="Beautiful " fontFamily="Noto Sans SC" fauxItalic="true" fontSize="24"/>
+          <Text text="Beautiful " fontFamily="Arial" fontStyle="Italic" fontSize="24"/>
           <Fill color="#3B82F6"/>
         </Group>
         <Group>
-          <Text text="World!&#10;" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="24"/>
+          <Text text="World!&#10;" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
           <Fill color="#10B981"/>
         </Group>
         <Group>
-          <Text text="Mixed " fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="20"/>
+          <Text text="Mixed " fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
           <Fill color="#8B5CF6"/>
         </Group>
         <Group>
-          <Text text="Styles " fontFamily="Noto Sans SC" fontStyle="Bold" fauxItalic="true" fontSize="20"/>
+          <Text text="Styles " fontFamily="Arial" fontStyle="Bold Italic" fontSize="20"/>
           <Fill color="#F59E0B"/>
         </Group>
         <Group>
-          <Text text="in " fontFamily="Noto Sans SC" fontSize="16"/>
+          <Text text="in " fontFamily="Arial" fontSize="16"/>
           <Fill color="#64748B"/>
         </Group>
         <Group>
-          <Text text="one " fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="18"/>
+          <Text text="one " fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
           <Fill color="#EC4899"/>
         </Group>
         <Group>
-          <Text text="TextBox" fontFamily="Noto Sans SC" fontStyle="Bold" fontSize="18"/>
+          <Text text="TextBox" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
           <Fill color="#06B6D4"/>
         </Group>
       </TextBox>
