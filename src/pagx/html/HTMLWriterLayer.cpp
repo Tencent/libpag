@@ -758,16 +758,18 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
   // TextBox with child elements: render as a positioned container with text styling.
   auto tbBounds = tb->layoutBounds();
   auto tbPos = tb->renderPosition();
-  // TextBox::layoutWidth is NaN when the width is derived purely from tgfx's own text
-  // measurement (no explicit width, no constraint-resolved width). Emitting that
-  // tgfx-measured pixel value as a CSS fixed width causes Chromium to wrap text when
-  // its font metrics are slightly wider than tgfx's — even for a single-line label like
-  // "Group Layout". Use `width:max-content` so Chromium sizes the box to its own
-  // Approximation after fontLineHeight/isWidthAutoSized helper removal: use the authored
-  // TextBox.width/height directly. This loses the "parent-constraint-supplied" axis info,
-  // so percent-resolved or flex-traversed widths fall back to the auto-sized branch.
-  bool layoutW = !std::isnan(tb->width);
-  bool layoutH = !std::isnan(tb->height);
+  // Determine whether the TextBox has an externally-determined width/height (as opposed to
+  // auto-sizing from text content). The width can come from three sources:
+  //   1. Explicit authored attribute: width="160"
+  //   2. Opposite-edge constraints: left="0" right="0" (resolved by PerformConstraintLayout)
+  //   3. Percent of parent: percentWidth="50"
+  // When none of these apply, the box is auto-sized and we emit `width:max-content` so
+  // Chromium sizes it to its own text measurement (avoiding unwanted line breaks from the
+  // slight metric difference between tgfx and Chromium).
+  bool layoutW = !std::isnan(tb->width) || (!std::isnan(tb->left) && !std::isnan(tb->right)) ||
+                 !std::isnan(tb->percentWidth);
+  bool layoutH = !std::isnan(tb->height) || (!std::isnan(tb->top) && !std::isnan(tb->bottom)) ||
+                 !std::isnan(tb->percentHeight);
   float tbW = tbBounds.width;
   float tbH = tbBounds.height;
   float tbLeft = tbPos.x;

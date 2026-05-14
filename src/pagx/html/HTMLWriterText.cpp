@@ -679,17 +679,23 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
   std::string style;
   style.reserve(300);
   if (tb) {
-    float tbW = tb->width;
-    float tbH = tb->height;
+    auto tbBounds = tb->layoutBounds();
+    float tbW = tbBounds.width;
+    float tbH = tbBounds.height;
+    // Determine whether the TextBox has an externally-determined width/height.
+    bool layoutW = !std::isnan(tb->width) || (!std::isnan(tb->left) && !std::isnan(tb->right)) ||
+                   !std::isnan(tb->percentWidth);
+    bool layoutH = !std::isnan(tb->height) || (!std::isnan(tb->top) && !std::isnan(tb->bottom)) ||
+                   !std::isnan(tb->percentHeight);
     auto tbRenderPos = tb->renderPosition();
     float tbLeft = tbRenderPos.x;
     float tbTop = tbRenderPos.y;
     style += "position:absolute;left:" + CssFloatToString(tbLeft) +
              "px;top:" + CssFloatToString(tbTop) + "px";
-    if (!std::isnan(tbW) && tbW > 0) {
+    if (layoutW && tbW > 0) {
       style += ";width:" + CssFloatToString(tbW) + "px";
     }
-    if (!std::isnan(tbH) && tbH > 0) {
+    if (layoutH && tbH > 0) {
       style += ";height:" + CssFloatToString(tbH) + "px";
     }
     // Honour TextBox padding by emitting CSS padding + border-box so Chromium wraps
@@ -721,7 +727,7 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     if (tb->lineHeight > 0) {
       style += ";line-height:" + CssFloatToString(tb->lineHeight) + "px";
     }
-    if (tb->wordWrap && !std::isnan(tbW) && tbW > 0) {
+    if (tb->wordWrap && layoutW && tbW > 0) {
       style += ";word-wrap:break-word";
     } else {
       style += ";white-space:nowrap";
