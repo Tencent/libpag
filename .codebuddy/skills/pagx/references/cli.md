@@ -362,13 +362,3 @@ pagx export --input icon.pagx --output out.html  # PAGX to HTML
 | `--svg-no-xml-declaration` | Omit the `<?xml ...?>` declaration |
 | `--ppt-no-bake-unsupported` | Disable the default baking of layers that use features OOXML cannot represent natively — masks, scrollRect clipping, blend modes outside of `Normal`/`Multiply`/`Screen`/`Darken`/`Lighten`, and wide-gamut color. By default the exporter bakes these layers into PNG patches so the slide matches the tgfx renderer (for unsupported blend modes the backdrop beneath the layer is baked into the PNG so the blend composites against the real scene, at the cost of turning native content under the patch into pixels). Pass this flag to silently drop those features and emit the layer as editable shapes instead (mask ignored, scrollRect dropped, blend falls back to `Normal`, wide-gamut clamped to sRGB). Tiled image patterns are always baked regardless of this flag, and features with no vector fallback (TextPath, ColorMatrix, conic/diamond gradient, shear transform) always bake regardless of this flag |
 
-### HTML output
-
-When the output is HTML, `pagx export` writes a complete `<!DOCTYPE html>` document that can
-be opened directly in a browser. DiamondGradient and tiled/mirror ImagePattern fills that CSS
-cannot express natively are rasterized as PNG files into a sibling directory named after the
-HTML file's stem and referenced by relative URL. The CLI reads system fonts and system fallback
-font lists automatically; no `--html-font` option is needed.
-
-
-
