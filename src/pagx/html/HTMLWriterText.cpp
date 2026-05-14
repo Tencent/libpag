@@ -1638,27 +1638,55 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         }
       }
 
+      // Count UTF-8 characters (needed for closed-path textLength and perpendicular=false).
+      size_t charCount = 0;
+      const char* q = text->text.c_str();
+      while (*q) {
+        int32_t ch = 0;
+        size_t len = SVGDecodeUTF8Char(q, text->text.size() - (q - text->text.c_str()), &ch);
+        if (len == 0) {
+          break;
+        }
+        charCount++;
+        q += len;
+      }
+
       // forceAlignment: use textLength + lengthAdjust="spacing" to spread characters
-      // evenly across the effective path length.
+      // evenly across the effective path length. On a closed path, tgfx distributes N
+      // equal gaps (including the junction between last and first character), but SVG
+      // textLength only creates N-1 gaps. Adjust textLength so the N-1 SVG gaps plus
+      // the implicit junction gap all equal (effectiveLength - totalAdvance) / N.
       if (textPath->forceAlignment) {
-        out.addAttr("textLength", CssFloatToString(effectiveLength));
+        float svgTextLength = effectiveLength;
+        if (isClosed && charCount > 1) {
+          // SVG gap = (svgTextLength - W) / (N-1), junction = effectiveLength - svgTextLength.
+          // Set both equal: svgTextLength = W + (N-1) * (effectiveLength - W) / N.
+          // We don't know the browser's W, but the ratio is the same if we just scale:
+          // svgTextLength = effectiveLength * (N-1) / N makes all gaps equal when
+          // totalAdvance << effectiveLength, but diverges when text fills more of the path.
+          // The exact formula requires W, which we approximate with EstimateCharAdvanceHTML.
+          float estAdvance = 0.0f;
+          const char* ep = text->text.c_str();
+          while (*ep) {
+            int32_t ech = 0;
+            size_t elen =
+                SVGDecodeUTF8Char(ep, text->text.size() - (ep - text->text.c_str()), &ech);
+            if (elen == 0) {
+              break;
+            }
+            estAdvance += EstimateCharAdvanceHTML(ech, renderFont) + text->letterSpacing;
+            ep += elen;
+          }
+          float n = static_cast<float>(charCount);
+          svgTextLength = estAdvance + (n - 1.0f) * (effectiveLength - estAdvance) / n;
+        }
+        out.addAttr("textLength", CssFloatToString(svgTextLength));
         out.addAttr("lengthAdjust", "spacing");
       }
 
       // perpendicular=false: SVG textPath always rotates characters along the tangent;
       // emit rotate="0" on each character to keep them upright.
       if (!textPath->perpendicular) {
-        size_t charCount = 0;
-        const char* q = text->text.c_str();
-        while (*q) {
-          int32_t ch = 0;
-          size_t len = SVGDecodeUTF8Char(q, text->text.size() - (q - text->text.c_str()), &ch);
-          if (len == 0) {
-            break;
-          }
-          charCount++;
-          q += len;
-        }
         std::string rotates;
         for (size_t i = 0; i < charCount; i++) {
           if (i > 0) {
