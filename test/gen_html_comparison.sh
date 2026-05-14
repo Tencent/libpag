@@ -6,58 +6,44 @@
 #
 # Section layout and column count:
 #
-#   pagx_to_html  — three columns:
+#   pagx_to_html  — three columns (all PNG screenshots):
 #     col 1 — tgfx native render (2x PNG from `pagx render`)
-#     col 2 — test-embedded HTML (copied from PAGXHtmlTest.BatchConvertAll output)
-#     col 3 — CLI-exported HTML (`pagx export` with multi-source @font-face)
+#     col 2 — test-embedded HTML screenshot (Puppeteer capture of BatchConvertAll output)
+#     col 3 — CLI-exported HTML screenshot (Puppeteer capture of `pagx export` output)
 #
-#   cli / layout / text / spec — two columns (these samples have no
-#   test-embedded equivalent, and comparing PAGX native against the CLI export
-#   is the useful thing to see):
+#   cli / layout / text / spec — two columns:
 #     col 1 — tgfx native render (2x PNG)
-#     col 2 — CLI-exported HTML
+#     col 2 — CLI-exported HTML screenshot
 #
 # Pass --without-cli to drop the CLI column on every section (leaves pagx_to_html
-# with two columns — native PNG + test-embedded HTML — and the other four
-# sections with only the native PNG column).
+# with two columns — native PNG + test-embedded HTML screenshot — and the other
+# four sections with only the native PNG column).
 #
 # Output layout (rooted at test/out/html-comparison/):
 #
 #   html-comparison/
 #   ├── index.html
-#   ├── fonts/                  # shared by every HTML below; each HTML's
-#   │                           # @font-face rules reference url('../fonts/...')
+#   ├── fonts/                  # shared by every HTML below
 #   ├── pagx-render/<section>/<name>.png
 #   ├── test/                   # only for the pagx_to_html section
 #   │   ├── <name>.html
 #   │   └── <name>/             # sibling assets dir (rasterized PNGs) per HTML
-#   └── cli/                    # one subdir per section to avoid name collisions
-#       ├── <section>/
-#       │   ├── <name>.html
-#       │   └── <name>/         # sibling assets dir per HTML
-#
-# Subdirectories keep the five sections namespace-isolated because a handful
-# of sample names (text_path, text_box, group, repeater, text_modifier) exist
-# in both pagx_to_html and spec/samples.
+#   ├── test-screenshots/<name>.png         # Puppeteer capture of test/ HTMLs
+#   ├── cli/                    # one subdir per section to avoid name collisions
+#   │   ├── <section>/
+#   │   │   ├── <name>.html
+#   │   │   └── <name>/         # sibling assets dir per HTML
+#   └── cli-screenshots/<section>/<name>.png  # Puppeteer capture of cli/ HTMLs
 #
 # Preconditions the script enforces:
 #   - cmake-build-debug/pagx executable must exist (any section)
-#   - for the pagx_to_html section's col 2: test/out/PAGXHtmlTest/<name>.html,
-#     its sibling fonts/ directory, and each HTML's sibling <name>/ asset dir
+#   - for the pagx_to_html section's col 2: test/out/PAGXHtmlTest/<name>.html
 #     must exist. Run
 #     `PAGFullTest --gtest_filter=PAGXHtmlTest.BatchConvertAll` first.
-#     When these are missing the pagx_to_html section simply drops col 2 and
-#     renders the remaining columns — other sections are unaffected.
+#     When these are missing the pagx_to_html section simply drops col 2.
 #
 # Usage:
-#   bash test/gen_html_comparison.sh [--with-cli|--without-cli] [--bold-font <path>]
-#
-# --with-cli is the default (the script runs `pagx export` on every sample).
-# --without-cli skips all CLI work.
-# --bold-font lets you point at a local NotoSansSC-Bold file if you have one;
-# the default is to skip the bold typeface because the repo doesn't bundle it,
-# in which case the CDN fallback in the generated CSS handles Bold rendering
-# at runtime.
+#   bash test/gen_html_comparison.sh [--with-cli|--without-cli]
 
 set -euo pipefail
 
@@ -66,7 +52,6 @@ set -euo pipefail
 #-------------------------------------------------------------------------
 
 WITH_CLI=1
-BOLD_FONT=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -77,10 +62,6 @@ while [ $# -gt 0 ]; do
     --without-cli)
       WITH_CLI=0
       shift
-      ;;
-    --bold-font)
-      BOLD_FONT="$2"
-      shift 2
       ;;
     -h|--help)
       sed -n '2,/^$/p' "$0" | sed 's/^# //; s/^#$//'
@@ -101,14 +82,9 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PAGX_BIN="$REPO/cmake-build-debug/pagx"
 TEST_OUT="$REPO/test/out/PAGXHtmlTest"
 OUT_DIR="$REPO/test/out/html-comparison"
+SCREENSHOT_JS="$REPO/test/screenshot.js"
 
-# Section definitions. The "section id" is the short stable name used in
-# filesystem paths and DOM ids; the "source dir" is repo-relative; the "title"
-# is the display label shown in the tab bar and the section heading.
-#
-# These entries drive both the bash-side iteration here and the python-side
-# index builder (which re-discovers section dirs under pagx-render/ — so the
-# two sides don't need to share literal order as long as the set matches).
+# Section definitions.
 SECTION_IDS=(pagx_to_html cli layout text spec)
 SECTION_SRCDIRS=(
   "resources/pagx_to_html"
@@ -125,22 +101,35 @@ SECTION_TITLES=(
   "spec (PAGX spec samples)"
 )
 
-# Local font files. Regular is bundled in the repo; Emoji and Hebrew are optional
-# fallback typefaces `pagx render` needs to avoid substituting system fonts when
-# a sample uses those scripts.
-# NOTE: Bold is intentionally NOT auto-loaded even though NotoSansSC-Bold.ttf is now
-# bundled. Real Bold glyph advances are wider than tgfx fauxBold advances (which use
-# Regular advance unchanged), so injecting a real Bold font causes MORE line-break
-# divergence, not less. Use CSS font-synthesis (the default) as the closest available
-# approximation. Pass --bold-font manually only when explicitly comparing Bold rendering.
+#-------------------------------------------------------------------------
+# Font files for pagx render
+#-------------------------------------------------------------------------
+
+# System Arial fonts — register Regular, Bold, Italic, Bold Italic so that
+# pagx render uses the real typeface files (matched by fontFamily + fontStyle)
+# instead of relying on tgfx's MakeFromName system font lookup.
+ARIAL_REGULAR="/System/Library/Fonts/Supplemental/Arial.ttf"
+ARIAL_BOLD="/System/Library/Fonts/Supplemental/Arial Bold.ttf"
+ARIAL_ITALIC="/System/Library/Fonts/Supplemental/Arial Italic.ttf"
+ARIAL_BOLD_ITALIC="/System/Library/Fonts/Supplemental/Arial Bold Italic.ttf"
+
+# Repo-bundled fallback fonts for non-Latin scripts.
 FONT_REGULAR="$REPO/resources/font/NotoSansSC-Regular.otf"
-FONT_BOLD="$REPO/resources/font/NotoSansSC-Bold.ttf"
 FONT_EMOJI="$REPO/resources/font/NotoColorEmoji.ttf"
 FONT_HEBREW="$REPO/resources/font/NotoSansHebrew-Regular.ttf"
 
-# Upstream Google Fonts CDN URLs — kept only as a reference comment.
-# CDN_REGULAR="https://fonts.gstatic.com/s/notosanssc/v40/k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaG9_FnYw.ttf"
-# CDN_BOLD="https://fonts.gstatic.com/s/notosanssc/v40/k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaGzjCnYw.ttf"
+# Build the --font / --fallback arg list.
+RENDER_FONT_ARGS=()
+for f in "$ARIAL_REGULAR" "$ARIAL_BOLD" "$ARIAL_ITALIC" "$ARIAL_BOLD_ITALIC"; do
+  if [ -f "$f" ]; then
+    RENDER_FONT_ARGS+=( --font "$f" )
+  fi
+done
+for f in "$FONT_REGULAR" "$FONT_EMOJI" "$FONT_HEBREW"; do
+  if [ -f "$f" ]; then
+    RENDER_FONT_ARGS+=( --fallback "$f" )
+  fi
+done
 
 #-------------------------------------------------------------------------
 # Preconditions
@@ -152,55 +141,26 @@ if [ ! -x "$PAGX_BIN" ]; then
   exit 1
 fi
 
-for font in "$FONT_REGULAR" "$FONT_EMOJI" "$FONT_HEBREW"; do
-  if [ ! -f "$font" ]; then
-    echo "error: bundled font file not found: $font" >&2
-    exit 1
-  fi
-done
-
-# The optional Bold face: NOT loaded by default (see comment above). Only probed
-# from the Downloads directory when the user explicitly omits --bold-font to signal
-# they want the old behaviour; production use should not pass a Bold font at all.
-if [ -z "$BOLD_FONT" ]; then
-  DEFAULT_BOLD="$HOME/Downloads/Noto_Sans_SC/static/NotoSansSC-Bold.ttf"
-  if [ -f "$DEFAULT_BOLD" ]; then
-    : # intentionally do NOT auto-set BOLD_FONT; leave it empty
-  fi
-fi
-if [ -n "$BOLD_FONT" ] && [ ! -f "$BOLD_FONT" ]; then
-  echo "error: --bold-font file not found: $BOLD_FONT" >&2
-  exit 1
-fi
-
 #-------------------------------------------------------------------------
 # Clean output
 #-------------------------------------------------------------------------
 
-# Remove any stale run. We reconstruct the whole directory every time because
-# the set of samples and assets changes between pagx revisions, and dangling
-# files from an older run would show up in the comparison as ghosts.
 rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 
 #-------------------------------------------------------------------------
-# Shared args
+# Helper: extract width and height from a .pagx file
 #-------------------------------------------------------------------------
 
-# Build the --font arg list once. The positional --fallback args mirror the
-# CreateFallbackTypefaces() list that the tgfx-native baseline uses, so the
-# PNGs this script produces are byte-for-byte close to the ones PAGXTest
-# writes into test/out/PAGXHtmlTest/*_pagx.png (see memory
-# pagx_render_vs_displaylist_scale for why they are not bit-exact).
-RENDER_FONT_ARGS=(
-  --font    "$FONT_REGULAR"
-  --fallback "$FONT_REGULAR"
-  --fallback "$FONT_EMOJI"
-  --fallback "$FONT_HEBREW"
-)
-if [ -n "$BOLD_FONT" ]; then
-  RENDER_FONT_ARGS+=( --font "$BOLD_FONT" )
-fi
+pagx_dims() {
+  python3 -c "
+import re, sys
+t = open(sys.argv[1]).read()
+m = re.search(r'<pagx[^>]*\bwidth=\"(\d+)\"[^>]*\bheight=\"(\d+)\"', t)
+if not m: sys.exit(1)
+print(m.group(1), m.group(2))
+" "$1"
+}
 
 #-------------------------------------------------------------------------
 # Per-section processing
@@ -235,13 +195,7 @@ for i in "${!SECTION_IDS[@]}"; do
     mkdir -p "$OUT_DIR/cli/$section"
   fi
 
-  # Column 1: pagx render (2x PNG)
-  #
-  # Some samples are structurally invalid for rendering on purpose: the cli
-  # section includes import_* samples with unresolved <import> directives (they
-  # need `pagx resolve` to run first) and verify_not_xml.pagx tests parser error
-  # paths. We silently skip failed renders — the Python index builder keys on
-  # the rendered PNG directory, so skipped samples simply drop out of the page.
+  # Column 1: pagx render (2x PNG) with registered Arial + fallback fonts.
   echo "  rendering col 1 (pagx render --scale 2) ..."
   rendered=0
   skipped=0
@@ -254,9 +208,6 @@ for i in "${!SECTION_IDS[@]}"; do
       rendered=$((rendered + 1))
     else
       skipped=$((skipped + 1))
-      # Drop any partial PNG so the Python builder doesn't pick up a truncated
-      # file. `render` is atomic-write in practice but this is a cheap safety
-      # net and makes the "skipped" count authoritative.
       rm -f "$OUT_DIR/pagx-render/$section/$name.png"
     fi
   done
@@ -267,11 +218,7 @@ for i in "${!SECTION_IDS[@]}"; do
     echo "    rendered $rendered PNGs"
   fi
 
-  # Column 3 (or 2 for non-pagx_to_html sections): pagx export
-  #
-  # We only try to export samples whose PNG rendered successfully above; the
-  # unresolved-import and verify_not_xml samples would fail here too for the
-  # same structural reasons.
+  # CLI column: pagx export
   if [ "$WITH_CLI" = "1" ]; then
     echo "  exporting CLI column (pagx export) ..."
     exported=0
@@ -282,11 +229,6 @@ for i in "${!SECTION_IDS[@]}"; do
         export_skipped=$((export_skipped + 1))
         continue
       fi
-      # Capture pagx export output, filter the per-font "overwriting" warnings
-      # (which fire once per font file after the first sample since everyone
-      # shares fonts/), then decide success by the presence of the HTML file
-      # rather than the exit status — the pipe-to-grep pipeline can swallow
-      # the `export` exit code in some shells.
       "$PAGX_BIN" export \
           --input "$pagx" \
           --output "$OUT_DIR/cli/$section/$name.html" \
@@ -324,21 +266,12 @@ if ls "$TEST_OUT"/*.html >/dev/null 2>&1; then
     src="$TEST_OUT/$name.html"
     if [ -f "$src" ]; then
       cp "$src" "$OUT_DIR/test/$name.html"
-      # HTMLExporter writes rasterized assets (DiamondGradient / ConicGradient /
-      # ImagePattern / PlusDarker) to a sibling directory named after the HTML
-      # stem, and the HTML references them via `<stem>/<file>.png`. Copy the
-      # per-sample asset directory alongside the HTML so those URLs resolve.
       if [ -d "$TEST_OUT/$name" ]; then
         cp -R "$TEST_OUT/$name" "$OUT_DIR/test/$name"
       fi
       total_test_copied=$((total_test_copied + 1))
     fi
   done
-  # The wrapper's @font-face rules reference `fonts/...` relative to the HTML,
-  # so copying the fonts directory over keeps the iframe self-contained.
-  if [ -d "$TEST_OUT/fonts" ]; then
-    cp -R "$TEST_OUT/fonts" "$OUT_DIR/test/fonts"
-  fi
   echo "  copied $total_test_copied test-embedded HTMLs"
 else
   echo ""
@@ -350,43 +283,18 @@ fi
 #-------------------------------------------------------------------------
 # Consolidate per-section fonts/ directories into a single top-level fonts/
 #-------------------------------------------------------------------------
-#
-# pagx export writes a fonts/ directory next to every output HTML it produces,
-# and the test-embedded copy step above lifts the BatchConvertAll fonts/ into
-# test/fonts/. With five CLI sections plus the test column, the same ~18-28 MB
-# font payload gets written six times. The HTML files reference fonts as
-# `url('fonts/Name.ttf')`, so consolidating their physical location requires
-# rewriting every reference to `url('../fonts/Name.ttf')` simultaneously.
-#
-# This shrinks the deploy bundle from ~131 MB to ~44 MB without changing the
-# generated HTML structure or the relative-path contract between html and its
-# @font-face URLs; per-sample asset directories (<stem>/) stay untouched.
 
 echo ""
 echo "== consolidating per-section fonts/ into top-level fonts/ =="
 GLOBAL_FONTS_DIR="$OUT_DIR/fonts"
 mkdir -p "$GLOBAL_FONTS_DIR"
 
-# Collect the superset of fonts from every per-section directory. `cp -n` keeps
-# the first copy of each filename; since every section ships the same font
-# bytes this is equivalent to a deduplicated union. We deliberately do NOT
-# hash-verify here: if two sections ever diverge on font content the downstream
-# visual comparison will surface the difference, and the cost of a redundant
-# sha256 walk per run is not worth the paranoia.
 for dir in "$OUT_DIR"/cli/*/fonts "$OUT_DIR"/test/fonts; do
   if [ -d "$dir" ]; then
     cp -R -n "$dir"/* "$GLOBAL_FONTS_DIR"/ 2>/dev/null || true
   fi
 done
 
-# Rewrite every surviving per-section HTML reference from the old per-section
-# `url('fonts/...)` form to the new top-level `url('../fonts/...)` form. Files
-# under cli/<section>/ sit two levels below OUT_DIR, so they need `../../fonts/`
-# to reach the consolidated directory; files under test/ sit one level below
-# and need `../fonts/`. The script issues one sed pass per group (find -exec
-# ... +) to avoid re-invoking sed once per sample on sections with dozens of
-# files. BSD sed on macOS requires `-i ''`; GNU sed treats the same invocation
-# as "-i" with an empty suffix, which is compatible.
 if [ "$(uname)" = "Darwin" ]; then
   SED_INPLACE=(-i '')
 else
@@ -399,14 +307,83 @@ if [ -d "$OUT_DIR"/test ]; then
     sed "${SED_INPLACE[@]}" "s|url('fonts/|url('../fonts/|g" {} +
 fi
 
-# Drop the now-redundant per-section font directories. pagx-render/ and each
-# HTML's per-sample asset directory are untouched; the generated HTML still
-# resolves its rasterized asset URLs via its own relative path.
 rm -rf "$OUT_DIR"/cli/*/fonts "$OUT_DIR"/test/fonts
 
 font_count=$(ls "$GLOBAL_FONTS_DIR" 2>/dev/null | wc -l | tr -d ' ')
 font_size=$(du -sh "$GLOBAL_FONTS_DIR" 2>/dev/null | cut -f1)
 echo "  shared fonts/ contains $font_count file(s), $font_size"
+
+#-------------------------------------------------------------------------
+# Screenshot HTML columns via Puppeteer
+#-------------------------------------------------------------------------
+
+echo ""
+echo "== screenshotting HTML columns via Puppeteer =="
+
+TASKS_JSON="$OUT_DIR/.screenshot_tasks.json"
+task_count=0
+
+# Start JSON array
+printf '[\n' > "$TASKS_JSON"
+
+# Test-embedded screenshots (pagx_to_html section only)
+if [ -d "$OUT_DIR/test" ]; then
+  mkdir -p "$OUT_DIR/test-screenshots"
+  shopt -s nullglob
+  test_htmls=( "$OUT_DIR"/test/*.html )
+  shopt -u nullglob
+  for html_file in "${test_htmls[@]}"; do
+    name="$(basename "$html_file" .html)"
+    pagx="$REPO/resources/pagx_to_html/$name.pagx"
+    if [ ! -f "$pagx" ]; then continue; fi
+    dims=$(pagx_dims "$pagx" 2>/dev/null) || continue
+    read -r w h <<< "$dims"
+    [ "$task_count" -gt 0 ] && printf ',\n' >> "$TASKS_JSON"
+    printf '{"html":"%s","png":"%s","width":%s,"height":%s,"scale":2}' \
+      "$html_file" "$OUT_DIR/test-screenshots/$name.png" "$w" "$h" >> "$TASKS_JSON"
+    task_count=$((task_count + 1))
+  done
+fi
+
+# CLI screenshots (all sections)
+if [ "$WITH_CLI" = "1" ]; then
+  for i in "${!SECTION_IDS[@]}"; do
+    section="${SECTION_IDS[$i]}"
+    cli_section_dir="$OUT_DIR/cli/$section"
+    if [ ! -d "$cli_section_dir" ]; then continue; fi
+    srcdir="$REPO/${SECTION_SRCDIRS[$i]}"
+    mkdir -p "$OUT_DIR/cli-screenshots/$section"
+    shopt -s nullglob
+    cli_htmls=( "$cli_section_dir"/*.html )
+    shopt -u nullglob
+    for html_file in "${cli_htmls[@]}"; do
+      name="$(basename "$html_file" .html)"
+      pagx="$srcdir/$name.pagx"
+      if [ ! -f "$pagx" ]; then continue; fi
+      dims=$(pagx_dims "$pagx" 2>/dev/null) || continue
+      read -r w h <<< "$dims"
+      [ "$task_count" -gt 0 ] && printf ',\n' >> "$TASKS_JSON"
+      printf '{"html":"%s","png":"%s","width":%s,"height":%s,"scale":2}' \
+        "$html_file" "$OUT_DIR/cli-screenshots/$section/$name.png" "$w" "$h" >> "$TASKS_JSON"
+      task_count=$((task_count + 1))
+    done
+  done
+fi
+
+printf '\n]\n' >> "$TASKS_JSON"
+
+if [ "$task_count" -gt 0 ]; then
+  echo "  $task_count HTML screenshots queued"
+  node "$SCREENSHOT_JS" --batch "$TASKS_JSON"
+  # Count successful screenshots
+  test_ss=$(find "$OUT_DIR/test-screenshots" -name "*.png" 2>/dev/null | wc -l | tr -d ' ')
+  cli_ss=$(find "$OUT_DIR/cli-screenshots" -name "*.png" 2>/dev/null | wc -l | tr -d ' ')
+  echo "  captured $test_ss test-embedded + $cli_ss CLI screenshots"
+else
+  echo "  no HTML files to screenshot"
+fi
+
+rm -f "$TASKS_JSON"
 
 #-------------------------------------------------------------------------
 # Build index.html
