@@ -73,6 +73,15 @@ class HTMLImporter {
      */
     bool preserveUnknownElements = false;
 
+    /**
+     * When true (default), the parsed DOM is run through `HTMLSubsetTransformer` before
+     * traversal. The transformer normalises the document skeleton, resolves `<style>` cascade
+     * into inline styles, drops disallowed properties, and prunes unsupported elements so the
+     * importer only ever sees subset-compliant HTML. Disable for debugging or when you have
+     * already pre-normalised the input.
+     */
+    bool autoNormalize = true;
+
     Options() {
     }
   };

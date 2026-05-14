@@ -223,7 +223,15 @@ if (PAG_BUILD_PAGX)
             src/pagx/html/HTMLStyleResolver.cpp
             src/pagx/html/HTMLLayerBuilder.cpp
             src/pagx/html/HTMLValueParser.cpp
-            src/pagx/html/HTMLParserContext.h)
+            src/pagx/html/HTMLParserContext.h
+            src/pagx/html/HTMLSubsetTransformer.cpp
+            src/pagx/html/HTMLTransformPasses.cpp
+            src/pagx/html/HTMLTransformPasses.h
+            src/pagx/html/HTMLTransformContext.h
+            src/pagx/html/HTMLCssCascade.cpp
+            src/pagx/html/HTMLCssCascade.h
+            src/pagx/html/HTMLSubsetPropertyTable.cpp
+            src/pagx/html/HTMLSubsetPropertyTable.h)
     endif ()
 
     if (PAG_BUILD_PPT)

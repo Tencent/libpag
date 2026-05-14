@@ -266,8 +266,32 @@ CLI flags:
 - `--html-strict`: treat warnings as errors (CI use).
 - `--html-preserve-unknown`: keep unknown tags as empty Layers tagged
   `data-html-unknown="<tag>"` for forensic debugging.
+- `--html-no-normalize`: skip the subset normalizer pre-pass (see §11). Use for debugging
+  the raw importer against already-subset HTML.
 
-## 11. Worked Example
+## 11. Auto-normalization
+
+Before the importer traverses the DOM it runs `HTMLSubsetTransformer` (see
+`include/pagx/HTMLSubsetTransformer.h`). The transformer rewrites the input into strict subset
+form so that the rest of the pipeline only ever sees compliant HTML. It is on by default;
+`HTMLImporter::Options::autoNormalize = false` (or `--html-no-normalize`) disables it.
+
+The transformer runs as a fixed pipeline of six passes. Behaviour:
+
+| Pass | Silently rewrites | Warns and drops |
+|------|-------------------|-----------------|
+| DocumentSkeleton | merges duplicate `<head>` / `<body>`, lowercases tags, strips comments / processing instructions, drops `<head>` children other than `<title>` / `<meta>` / `<style>` | `<script>` and other disallowed `<head>` content (`subset:unsupported-tag`); external `<link rel="stylesheet">` (`subset:external-stylesheet`); stray top-level elements between `<html>` and `<body>` (`subset:unsupported-tag`) |
+| StyleSheetCollector | inlines class- and element-selector rules from a single `<style>` block into the per-element cascade and removes the `<style>` element | universal `*`, descendant / pseudo / attribute selectors (`subset:unsupported-selector`); `@media`, `@font-face`, `@keyframes` and any other at-rule (`subset:unsupported-at-rule`) |
+| ComputedStyle | resolves the cascade (inherited → element defaults → element rules → class rules → inline `style`) and writes the merged map back as inline style | — |
+| PropertyFilter | converts `em` → px (resolved against the parent's computed `font-size`), `rem` → px (16-px base), `vw`/`vh` → px (resolved against canvas size), `pt` → px; collapses `flex: <grow> <shrink> <basis>` to `flex: <grow>` (`subset:flex-shorthand-collapsed`); downgrades `position: relative \| fixed \| sticky` to `position: absolute` | `margin*`, `transform*`, `clip-path`, `outline`, `float`, `order`, `align-content`, `align-self`, `direction`, `unicode-bidi`, `flex-wrap`, `flex-grow`, `flex-shrink`, `flex-basis`, `min-*`, `max-*`, `aspect-ratio`, `background-size`, `background-repeat`, `background-position`, `text-transform`, `text-indent`, `word-*`, `overflow-wrap`, `font-variant`, `font-stretch`, `font` shorthand, `grid-*`, per-side `border-*`, per-corner `border-*-radius`, `z-index`, `cursor`, `pointer-events`, `user-select`, `visibility` (`subset:unsupported-property`); `var()`, `calc()`, `min/max/clamp()` (`subset:unsupported-property`); other unknown units (`subset:unsupported-property`) |
+| StructureNormalization | wraps stray text inside a container in `<p>` (`subset:text-wrapped`); drops whitespace-only text nodes between elements; leaves `<svg>` subtrees opaque so the SVG resolver can see them verbatim | unknown tags (`<table>`, `<form>`, `<input>`, `<button>`, custom elements, etc.) are removed (`subset:unsupported-tag`); with `--html-preserve-unknown` they're kept as `<div data-html-unknown="<tag>">` instead |
+| InlineStyleEmitter | rewrites every element's resolved style map back into `style="…"` with alphabetically sorted properties for deterministic output; drops the now-redundant `class` attribute (kept when `Options::preserveClassAttribute` is true) | — |
+
+All diagnostics share the `subset:<category>` code namespace and are surfaced through
+`PAGXDocument::errors` (and `ImportResult::warnings` for the CLI). In strict mode the first
+warning is upgraded to a hard error and the import aborts.
+
+## 12. Worked Example
 
 Input:
 

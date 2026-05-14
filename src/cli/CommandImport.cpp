@@ -48,6 +48,8 @@ void ParseFormatOptions(int argc, char* argv[], ImportFormatOptions* options) {
       options->htmlPreserveUnknown = true;
     } else if (arg == "--html-no-prefer-body-size") {
       options->htmlPreferBodySize = false;
+    } else if (arg == "--html-no-normalize") {
+      options->htmlAutoNormalize = false;
     }
   }
 }
@@ -108,6 +110,7 @@ static HTMLImporter::Options ToHTMLOptions(const ImportFormatOptions& formatOpti
   options.strict = formatOptions.htmlStrict;
   options.preserveUnknownElements = formatOptions.htmlPreserveUnknown;
   options.preferBodySize = formatOptions.htmlPreferBodySize;
+  options.autoNormalize = formatOptions.htmlAutoNormalize;
   options.targetWidth = targetWidth;
   options.targetHeight = targetHeight;
   return options;
@@ -201,6 +204,7 @@ static void PrintUsage() {
       << "  --html-strict                  Treat HTML import warnings as errors\n"
       << "  --html-preserve-unknown        Keep unknown HTML tags as empty Layers\n"
       << "  --html-no-prefer-body-size     Prefer --target* over <body> intrinsic size\n"
+      << "  --html-no-normalize            Skip the HTML subset normalizer (debug)\n"
       << "\n"
       << "Examples:\n"
       << "  pagx import --input icon.svg                      # SVG to icon.pagx\n"
@@ -220,7 +224,8 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
       options->format = argv[++i];
     } else if (arg == "--svg-no-expand-use" || arg == "--svg-flatten-transforms" ||
                arg == "--svg-preserve-unknown" || arg == "--html-strict" ||
-               arg == "--html-preserve-unknown" || arg == "--html-no-prefer-body-size") {
+               arg == "--html-preserve-unknown" || arg == "--html-no-prefer-body-size" ||
+               arg == "--html-no-normalize") {
       // Handled by ParseFormatOptions below.
     } else if (arg == "--help" || arg == "-h") {
       PrintUsage();

@@ -24,6 +24,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <utility>
+#include "pagx/HTMLSubsetTransformer.h"
 #include "pagx/html/HTMLParserContext.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
@@ -446,6 +447,29 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   LowercaseTagsInPlace(root);
   if (root->name != "html") {
     return nullptr;
+  }
+
+  // Run the subset transformer as a pre-pass so the remainder of this routine only ever sees
+  // subset-compliant HTML. The transformer mutates `root` in place; diagnostics are forwarded
+  // into _pendingDiagnostics so they end up on PAGXDocument::errors once the document exists.
+  if (_options.autoNormalize) {
+    HTMLSubsetTransformer::Options topts = {};
+    topts.strict = _options.strict;
+    topts.preserveUnknownElements = _options.preserveUnknownElements;
+    topts.canvasWidth = _options.targetWidth;
+    topts.canvasHeight = _options.targetHeight;
+    auto report = HTMLSubsetTransformer::Transform(root, topts);
+    for (auto& diag : report.diagnostics) {
+      std::string formatted = diag.message;
+      if (!diag.code.empty()) {
+        formatted += " [" + diag.code + "]";
+      }
+      _pendingDiagnostics.push_back(std::move(formatted));
+    }
+    if (!report.ok) {
+      _hadHardError = true;
+      return nullptr;
+    }
   }
 
   // Find <head> and <body>.

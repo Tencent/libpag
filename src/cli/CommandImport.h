@@ -42,6 +42,12 @@ struct ImportFormatOptions {
   bool htmlStrict = false;
   bool htmlPreserveUnknown = false;
   bool htmlPreferBodySize = true;
+  /**
+   * Run the HTML subset normalizer as a pre-pass inside the importer. Default true. Set to
+   * false (via `--html-no-normalize`) when debugging the raw importer behaviour against
+   * already-subset HTML.
+   */
+  bool htmlAutoNormalize = true;
 };
 
 /**
