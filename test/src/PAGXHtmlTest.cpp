@@ -59,12 +59,8 @@ static std::vector<std::string> GetHtmlTestFiles() {
 }
 
 static std::string WrapHtmlDocument(const std::string& fragment, int width, int height) {
-  // `font-synthesis:none` on body prevents Chromium from auto-synthesising bold/italic on
-  // elements that don't ask for it. The exporter's fauxBold and fauxItalic paths emit
-  // `font-weight:bold;font-synthesis-weight:auto` and `font-style:italic;font-synthesis-style:
-  // auto` respectively, re-enabling synthesis only on the elements that carry the faux flag.
   return "<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"><style>"
-         "body{margin:0;padding:0;background:transparent;font-synthesis:none;width:" +
+         "body{margin:0;padding:0;background:transparent;width:" +
          std::to_string(width) + "px;height:" + std::to_string(height) +
          "px;overflow:hidden}</style></head>\n<body>\n" + fragment + "\n</body></html>";
 }

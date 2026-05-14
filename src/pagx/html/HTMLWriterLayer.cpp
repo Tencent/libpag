@@ -967,10 +967,10 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
         spanStyle += "font-size:" + CssFloatToString(span.text->renderFontSize()) + "px";
         if (!span.text->fontStyle.empty()) {
           if (span.text->fontStyle.find("Bold") != std::string::npos) {
-            spanStyle += ";font-weight:bold;font-synthesis-weight:auto";
+            spanStyle += ";font-weight:bold";
           }
           if (span.text->fontStyle.find("Italic") != std::string::npos) {
-            spanStyle += ";font-style:italic;font-synthesis-style:auto";
+            spanStyle += ";font-style:italic";
           }
         }
         if (span.text->letterSpacing != 0.0f) {
@@ -996,7 +996,7 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
       }
       if (span.text->fauxBold) {
         if (!spanStyle.empty()) spanStyle += ';';
-        spanStyle += "font-weight:bold;font-synthesis-weight:auto";
+        spanStyle += "font-weight:bold";
       }
       if (span.stroke && span.stroke->color &&
           span.stroke->color->nodeType() == NodeType::SolidColor) {
@@ -1014,7 +1014,7 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
       }
       if (span.text->fauxItalic) {
         if (!spanStyle.empty()) spanStyle += ';';
-        spanStyle += "font-style:italic;font-synthesis-style:auto";
+        spanStyle += "font-style:italic";
       }
       float spanFontSize = span.text->renderFontSize();
       // Emit between-span <br>s: prevTrailingBreaks (from prior span's trailing \n)
@@ -1233,10 +1233,10 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
       spanStyle += ";font-size:" + CssFloatToString(span.text->renderFontSize()) + "px";
       if (!span.text->fontStyle.empty()) {
         if (span.text->fontStyle.find("Bold") != std::string::npos) {
-          spanStyle += ";font-weight:bold;font-synthesis-weight:auto";
+          spanStyle += ";font-weight:bold";
         }
         if (span.text->fontStyle.find("Italic") != std::string::npos) {
-          spanStyle += ";font-style:italic;font-synthesis-style:auto";
+          spanStyle += ";font-style:italic";
         }
       }
       if (span.text->letterSpacing != 0.0f) {
@@ -1259,7 +1259,7 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
       }
     }
     if (span.text->fauxBold) {
-      spanStyle += ";font-weight:bold;font-synthesis-weight:auto";
+      spanStyle += ";font-weight:bold";
     }
     if (span.stroke && span.stroke->color &&
         span.stroke->color->nodeType() == NodeType::SolidColor) {
@@ -1275,7 +1275,7 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
       }
     }
     if (span.text->fauxItalic) {
-      spanStyle += ";font-style:italic;font-synthesis-style:auto";
+      spanStyle += ";font-style:italic";
     }
     float rtSpanFontSize = span.text->renderFontSize();
     // Emit between-span <br>s with empty-line owner wrapping (see tbSpans branch).

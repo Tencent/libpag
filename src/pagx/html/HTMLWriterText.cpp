@@ -810,10 +810,8 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     // Use Chromium's native synthesized italic instead of a CSS transform. `font-style:italic`
     // on a font that only ships a Regular variant makes the browser shear the glyphs itself,
     // which affects the glyph raster but not the span's layout box (so letter-spacing, clipping,
-    // and text-align behave identically to the upright case). `font-synthesis-style`
-    // re-enables synthesis on elements that inherit `font-synthesis:none` from an ancestor
-    // (the PAGXHtmlTest wrapper sets that globally so non-faux text stays unsynthesised).
-    style += ";font-style:italic;font-synthesis-style:auto";
+    // and text-align behave identically to the upright case).
+    style += ";font-style:italic";
   }
   // Font properties are hoisted to the parent Layer when fontHoisted; skip them on the span.
   if (!fontHoisted) {
@@ -826,18 +824,15 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     }
     if (!text->fontStyle.empty()) {
       if (text->fontStyle.find("Bold") != std::string::npos) {
-        style += ";font-weight:bold;font-synthesis-weight:auto";
+        style += ";font-weight:bold";
       }
       if (text->fontStyle.find("Italic") != std::string::npos) {
-        style += ";font-style:italic;font-synthesis-style:auto";
+        style += ";font-style:italic";
       }
     }
   }
   if (text->fauxBold) {
-    // Emit font-weight:bold so the browser synthesises bold when no Bold variant is registered
-    // in @font-face. font-synthesis-weight:auto re-enables synthesis on elements that inherit
-    // font-synthesis:none from an ancestor.
-    style += ";font-weight:bold;font-synthesis-weight:auto";
+    style += ";font-weight:bold";
   }
   if (fill && fill->color) {
     auto ct = fill->color->nodeType();
@@ -1231,10 +1226,10 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
       containerStyle += ";font-size:0";
       if (!text->fontStyle.empty()) {
         if (text->fontStyle.find("Bold") != std::string::npos) {
-          containerStyle += ";font-weight:bold;font-synthesis-weight:auto";
+          containerStyle += ";font-weight:bold";
         }
         if (text->fontStyle.find("Italic") != std::string::npos) {
-          containerStyle += ";font-style:italic;font-synthesis-style:auto";
+          containerStyle += ";font-style:italic";
         }
       }
       if (text->letterSpacing != 0.0f) {
@@ -1301,10 +1296,9 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           transform += "translate(" + CssFloatToString(-anchorX) + "px," +
                        CssFloatToString(-anchorY) + "px) ";
         }
-        // fauxItalic is handled via CSS native synthesis (`font-style:italic` +
-        // `font-synthesis-style`) instead of a CSS transform, so no skewX is appended.
+        // fauxItalic is handled via CSS native synthesis instead of a CSS transform.
         if (text->fauxItalic) {
-          charStyle += ";font-style:italic;font-synthesis-style:auto";
+          charStyle += ";font-style:italic";
         }
         if (!transform.empty()) {
           charStyle += ";transform:" + transform;
@@ -1366,7 +1360,7 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           }
         }
         if (text->fauxBold) {
-          charStyle += ";font-weight:bold;font-synthesis-weight:auto";
+          charStyle += ";font-weight:bold";
         }
         out.openTag("span");
         out.addAttr("style", charStyle);
@@ -1633,10 +1627,10 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         charStyle += ";font-size:" + CssFloatToString(renderFont) + "px";
         if (!text->fontStyle.empty()) {
           if (text->fontStyle.find("Bold") != std::string::npos) {
-            charStyle += ";font-weight:bold;font-synthesis-weight:auto";
+            charStyle += ";font-weight:bold";
           }
           if (text->fontStyle.find("Italic") != std::string::npos) {
-            charStyle += ";font-style:italic;font-synthesis-style:auto";
+            charStyle += ";font-style:italic";
           }
         }
         if (text->letterSpacing != 0.0f) {
@@ -1653,7 +1647,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         // fauxItalic must shear the glyph in its own local space before TextPath's
         // fauxItalic is handled via CSS native synthesis on each per-character span.
         if (text->fauxItalic) {
-          charStyle += ";font-style:italic;font-synthesis-style:auto";
+          charStyle += ";font-style:italic";
         }
         charStyle += ";transform:" + transform;
         charStyle += ";transform-origin:0 0";
@@ -1661,7 +1655,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         // not emit a stroke itself (strokes are drawn in the earlier SVG glyph-run branch),
         // so fauxBold can be applied unconditionally here.
         if (text->fauxBold) {
-          charStyle += ";font-weight:bold;font-synthesis-weight:auto";
+          charStyle += ";font-weight:bold";
         }
         if (fill && fill->color) {
           if (fill->color->nodeType() == NodeType::SolidColor) {
