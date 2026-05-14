@@ -767,11 +767,11 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
   // tgfx-measured pixel value as a CSS fixed width causes Chromium to wrap text when
   // its font metrics are slightly wider than tgfx's — even for a single-line label like
   // "Group Layout". Use `width:max-content` so Chromium sizes the box to its own
-  // measurement and never wraps at the container boundary.
-  // When layoutWidth is set (constraint/explicit/percentage-resolved), use its px value
-  // so that intentional multi-line word-wrap boxes respect their authored width.
-  bool layoutW = !tb->isWidthAutoSized();
-  bool layoutH = !tb->isHeightAutoSized();
+  // Approximation after fontLineHeight/isWidthAutoSized helper removal: use the authored
+  // TextBox.width/height directly. This loses the "parent-constraint-supplied" axis info,
+  // so percent-resolved or flex-traversed widths fall back to the auto-sized branch.
+  bool layoutW = !std::isnan(tb->width);
+  bool layoutH = !std::isnan(tb->height);
   float tbW = tbBounds.width;
   float tbH = tbBounds.height;
   float tbLeft = tbPos.x;
@@ -824,9 +824,9 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
   // entire box with `transform:translate(-X%, -Y%)` so the anchor lands on the correct
   // glyph edge — -50% for Center/Middle, -100% for End/Far.
   bool widthAnchor =
-      !tb->isWidthAutoSized() && tb->width == 0.0f && tb->textAlign != TextAlign::Start;
+      !std::isnan(tb->width) && tb->width == 0.0f && tb->textAlign != TextAlign::Start;
   bool heightAnchor =
-      !tb->isHeightAutoSized() && tb->height == 0.0f && tb->paragraphAlign != ParagraphAlign::Near;
+      !std::isnan(tb->height) && tb->height == 0.0f && tb->paragraphAlign != ParagraphAlign::Near;
   if (widthAnchor || heightAnchor) {
     std::string tx = "0";
     std::string ty = "0";
@@ -913,31 +913,11 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
     if (strutSize > 0) {
       style += ";font-size:" + CssFloatToString(strutSize) + "px";
     }
-    // Pin line-height too. When PAGX declares a TextBox lineHeight we honour it;
-    // otherwise fall back to the largest per-glyph fontLineHeight from tgfx's shaping
-    // result (|ascent| + descent + leading). Without an explicit line-height Chromium
-    // uses `line-height:normal`, which resolves to ~1.2em-1.5em depending on the font's
-    // OS/2 metrics and may exceed what tgfx's TextLayout uses per line, spilling the
-    // last line out of an `overflow:hidden` TextBox or shifting baseline positions.
-    // Exception: when spans have different font sizes (mixed-size rich text), a single
-    // container-level line-height would use the largest span's value and inflate spacing
-    // for smaller spans. In that case skip the container line-height and let each span's
-    // own font-size control its line-box height naturally.
+    // Honour the authored TextBox.lineHeight only. The previous fallback derived a
+    // container line-height from per-glyph fontLineHeight metrics; that path was removed
+    // along with Text::fontLineHeight(), so when no lineHeight is authored Chromium falls
+    // back to its own line-height:normal (read from the font's OS/2 metrics).
     float lineH = tb->lineHeight > 0 ? tb->lineHeight : 0.0f;
-    if (lineH <= 0) {
-      float minFlh = 1e9f;
-      float maxFlh = 0.0f;
-      for (const auto& s : tbSpans) {
-        float flh = s.text->fontLineHeight();
-        if (flh > maxFlh) maxFlh = flh;
-        if (flh < minFlh) minFlh = flh;
-      }
-      // Only set a container line-height when all spans share the same size, so the
-      // value does not distort smaller spans in mixed-size TextBoxes.
-      if (maxFlh > 0 && maxFlh - minFlh < 0.5f) {
-        lineH = maxFlh;
-      }
-    }
     if (lineH > 0) {
       style += ";line-height:" + CssFloatToString(lineH) + "px";
     }
@@ -1269,23 +1249,10 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
   }
   // Defer Overflow::Hidden until after line-height is known so we can apply
   // `-webkit-line-clamp` (matching tgfx's whole-line drop) whenever eligible.
-  // Pin line-height for the same reason as the tbSpans branch above: without it
-  // Chromium falls back to `line-height:normal`, which depends on font OS/2 metrics
-  // and may differ from tgfx's per-line height, shifting line count and baselines.
-  // Skip the container line-height for mixed-size rich text (same logic as tbSpans).
+  // Honour the authored TextBox.lineHeight only. The previous fallback derived a
+  // container line-height from per-glyph fontLineHeight metrics; that path was removed
+  // along with Text::fontLineHeight().
   float rtLineH = tb->lineHeight > 0 ? tb->lineHeight : 0.0f;
-  if (rtLineH <= 0) {
-    float rtMinFlh = 1e9f;
-    float rtMaxFlh = 0.0f;
-    for (const auto& s : richTextSpans) {
-      float flh = s.text->fontLineHeight();
-      if (flh > rtMaxFlh) rtMaxFlh = flh;
-      if (flh < rtMinFlh) rtMinFlh = flh;
-    }
-    if (rtMaxFlh > 0 && rtMaxFlh - rtMinFlh < 0.5f) {
-      rtLineH = rtMaxFlh;
-    }
-  }
   if (rtLineH > 0) {
     style += ";line-height:" + CssFloatToString(rtLineH) + "px";
   }

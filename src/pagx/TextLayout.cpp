@@ -315,20 +315,6 @@ class TextLayoutContext {
     if (allGlyphs.empty()) {
       return result;
     }
-    // Collect per-Text max fontLineHeight and max ascent from shaped glyphs.
-    for (auto& g : allGlyphs) {
-      if (g.sourceText != nullptr && g.fontLineHeight > 0) {
-        auto& stored = result.perTextFontLineHeight[g.sourceText];
-        if (g.fontLineHeight > stored) {
-          stored = g.fontLineHeight;
-        }
-        float absAscent = fabsf(g.ascent);
-        auto& storedAscent = result.perTextFontAscent[g.sourceText];
-        if (absAscent > storedAscent) {
-          storedAscent = absAscent;
-        }
-      }
-    }
     if (params.writingMode == WritingMode::Vertical) {
       auto columns = layoutColumns(allGlyphs, params);
       buildTextBlobVertical(params, columns, result);
@@ -1575,22 +1561,6 @@ Rect TextLayoutResult::getTextBounds(Text* text) const {
     return it->second;
   }
   return {};
-}
-
-float TextLayoutResult::getFontLineHeight(Text* text) const {
-  auto it = perTextFontLineHeight.find(text);
-  if (it != perTextFontLineHeight.end()) {
-    return it->second;
-  }
-  return 0;
-}
-
-float TextLayoutResult::getFontAscent(Text* text) const {
-  auto it = perTextFontAscent.find(text);
-  if (it != perTextFontAscent.end()) {
-    return it->second;
-  }
-  return 0;
 }
 
 const std::vector<TextLayoutLineInfo>* TextLayoutResult::getTextLines(Text* text) const {

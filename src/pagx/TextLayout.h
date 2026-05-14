@@ -49,8 +49,6 @@ struct Text::GlyphData {
   std::shared_ptr<tgfx::TextBlob> textBlob = nullptr;
   std::vector<tgfx::Point> anchors = {};
   std::vector<TextLayoutGlyphRun> layoutRuns = {};
-  float fontLineHeight = 0;
-  float fontAscent = 0;
 };
 
 class Element;
@@ -96,19 +94,6 @@ class TextLayoutResult {
   Rect getTextBounds(Text* text) const;
 
   /**
-   * Returns the max font metrics line height for a specific Text element.
-   * This is the maximum fontLineHeight (|ascent| + descent + leading) across all glyphs
-   * shaped for the given Text element. Returns 0 if not found.
-   */
-  float getFontLineHeight(Text* text) const;
-
-  /**
-   * Returns the max font ascent (|ascent|) for a specific Text element across all shaped glyphs.
-   * Returns 0 if not found.
-   */
-  float getFontAscent(Text* text) const;
-
-  /**
    * Returns the layout glyph runs for a specific Text element. Runs are in layout coordinate
    * system and grouped by font. GlyphIDs reference the original (source) font.
    */
@@ -139,8 +124,6 @@ class TextLayoutResult {
   std::unordered_map<Text*, std::vector<VerticalPositionedGlyph>> verticalGlyphs = {};
   std::unordered_map<Text*, Rect> perTextBounds = {};
   std::unordered_map<Text*, std::vector<TextLayoutGlyphRun>> layoutGlyphRuns = {};
-  std::unordered_map<Text*, float> perTextFontLineHeight = {};
-  std::unordered_map<Text*, float> perTextFontAscent = {};
   std::unordered_map<Text*, std::vector<TextLayoutLineInfo>> textLines = {};
   friend class TextLayoutContext;
 };

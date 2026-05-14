@@ -75,8 +75,6 @@ void TextBox::setLayoutSize(LayoutContext* context, float targetWidth, float tar
   // descendants fall back to their preferred size instead of locking onto a provisional value.
   bool widthFromContent = std::isnan(targetWidth) && std::isnan(this->width);
   bool heightFromContent = std::isnan(targetHeight) && std::isnan(this->height);
-  widthAutoSized = widthFromContent;
-  heightAutoSized = heightFromContent;
   layoutWidth = widthFromContent ? NAN : (!std::isnan(targetWidth) ? targetWidth : preferredWidth);
   layoutHeight =
       heightFromContent ? NAN : (!std::isnan(targetHeight) ? targetHeight : preferredHeight);
@@ -145,7 +143,6 @@ void TextBox::updateLayout(LayoutContext* context) {
     auto* text = childText[i];
     text->textBounds = result.getTextBounds(text);
     text->glyphData->layoutRuns = result.extractLayoutRuns(text);
-    text->glyphData->fontLineHeight = result.getFontLineHeight(text);
     if (hasPadding) {
       text->textBounds.x += padding.left;
       text->textBounds.y += padding.top;

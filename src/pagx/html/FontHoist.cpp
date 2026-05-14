@@ -31,7 +31,7 @@ FontSignature SignatureOf(const Text* text) {
   sig.bold = !text->fontStyle.empty() && text->fontStyle.find("Bold") != std::string::npos;
   sig.italic = !text->fontStyle.empty() && text->fontStyle.find("Italic") != std::string::npos;
   sig.letterSpacing = text->letterSpacing;
-  sig.lineHeight = text->fontLineHeight();
+  // sig.lineHeight stays at default NaN — the per-glyph fontLineHeight source was removed.
   return sig;
 }
 

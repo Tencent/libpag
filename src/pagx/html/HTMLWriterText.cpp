@@ -736,7 +736,6 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       style += ";overflow:hidden";
     }
   } else {
-    auto renderFont = text->renderFontSize();
     // When the Text node carries GlyphRun data, the GlyphRun's x/y fields hold the pre-shaped
     // pixel coordinates (baseline origin) produced by the tgfx layout engine. Use those directly
     // instead of renderPosition(), which returns (0,0) for Text nodes without explicit left/top
@@ -761,11 +760,11 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       auto renderPos = text->renderPosition();
       posX = renderPos.x;
       if (text->baseline == TextBaseline::Alphabetic) {
-        // position.y is the alphabetic baseline (absolute y of the baseline in parent coords).
-        // CSS `top` is the top of the line box; the baseline sits at top + halfLeading + ascent.
-        // To land the baseline on position.y: top = position.y - ascent (using tgfx font ascent).
-        float ascent = text->fontAscent();
-        posY = text->position.y - (ascent > 0 ? ascent : text->renderFontSize() * 0.8f);
+        // position.y is the alphabetic baseline. CSS `top` is the top of the line box, so we
+        // subtract a font-size-relative ascent estimate to land the baseline near position.y.
+        // Without exact font metrics this is an approximation that may drift by a few pixels
+        // depending on the actual font's ascent/em ratio.
+        posY = text->position.y - text->renderFontSize() * 0.8f;
       } else {
         posY = renderPos.y;
       }
@@ -813,11 +812,7 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     } else {
       style += ";left:" + CssFloatToString(posX) + "px";
     }
-    // line-height is hoisted to the parent Layer when fontHoisted; otherwise emit it on the span.
-    if (!fontHoisted) {
-      auto lineHeight = text->fontLineHeight() > 0 ? text->fontLineHeight() : renderFont;
-      style += ";line-height:" + CssFloatToString(lineHeight) + "px";
-    }
+    (void)fontHoisted;
   }
   if (text->fauxItalic) {
     // Use Chromium's native synthesized italic instead of a CSS transform. `font-style:italic`
@@ -1252,13 +1247,10 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
       auto renderFont = text->renderFontSize();
       float ty = renderPos.y;
       if (text->baseline == TextBaseline::Alphabetic) {
-        float ascent = text->fontAscent();
-        ty = text->position.y - (ascent > 0 ? ascent : renderFont * 0.8f);
+        ty = text->position.y - renderFont * 0.8f;
       }
-      auto lineHeight = text->fontLineHeight() > 0 ? text->fontLineHeight() : renderFont;
       std::string containerStyle =
-          "position:absolute;white-space:nowrap;top:" + CssFloatToString(ty) +
-          "px;line-height:" + CssFloatToString(lineHeight) + "px";
+          "position:absolute;white-space:nowrap;top:" + CssFloatToString(ty) + "px";
       // Use text-align + width instead of transform:translateX to avoid creating a compositing
       // layer, which disables subpixel antialiasing and makes text look thinner.
       bool tmUsesBackgroundClip =
@@ -1392,7 +1384,7 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
             auto* lg = static_cast<const LinearGradient*>(fill->color);
             if (!lg->fitsToGeometry && !lg->colorStops.empty()) {
               float textW = text->textBounds.width;
-              float textH = text->fontLineHeight() > 0 ? text->fontLineHeight() : renderFont;
+              float textH = renderFont;
               // Character centre in Layer coordinate space (where startPoint/endPoint live).
               // renderPos gives the text block's origin in Layer space; add the per-character
               // fraction of the block width to approximate the character's Layer-space x.

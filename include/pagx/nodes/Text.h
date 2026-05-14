@@ -29,8 +29,6 @@
 
 namespace pagx {
 
-struct FontSignature;
-
 /**
  * Text is a geometry element that produces a glyph list after text shaping, which accumulates into
  * the rendering context for subsequent modifiers or painters. It supports two rendering modes:
@@ -122,26 +120,11 @@ class Text : public Element, public LayoutNode {
  private:
   Text();
 
-  /**
-   * Returns the font metrics line height (|ascent| + descent + leading) computed during layout.
-   * Returns 0 if layout has not been performed.
-   */
-  float fontLineHeight() const;
-
-  /**
-   * Returns the maximum font ascent (distance from baseline to the top of the tallest glyph)
-   * computed during layout. Used by HTML export for alphabetic-baseline text positioning where
-   * CSS `top = position.y - fontAscent()` places the baseline at the authored position.y.
-   * Returns 0 if layout has not been performed.
-   */
-  float fontAscent() const;
-
   struct GlyphData;
   GlyphData* glyphData;
   Rect textBounds = {};
   float textScale = 1.0f;
 
-  friend FontSignature SignatureOf(const Text* text);
   friend class FontEmbedder;
   friend class GlyphRunRenderer;
   friend class HTMLWriter;
