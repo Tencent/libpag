@@ -101,6 +101,43 @@ Options:
 //--------------------------------------------------------------------------------------------------
 
 /* eslint-disable no-undef, no-inner-declarations */
+
+// Walk every <img> in the document and, for any whose `src` is an absolute
+// `http(s)://` URL, fetch the bytes and stash a `data:` URI on
+// `data-snapshot-src`. The downstream snapshot reader (`imgSrc`) prefers that
+// attribute, so the emitted HTML becomes self-contained — required because
+// `pagx render` cannot fetch URLs at render time. Failures (CORS, network,
+// 404) are logged and left in place: the snapshot will then fall back to the
+// original URL and render as an empty box rather than aborting the pipeline.
+async function inlineExternalImages() {
+  const imgs = Array.from(document.querySelectorAll('img'));
+  await Promise.all(imgs.map(async (img) => {
+    const src = img.currentSrc || img.src || img.getAttribute('src') || '';
+    if (!src) return;
+    if (src.startsWith('data:')) return;
+    if (!/^https?:/i.test(src)) return;
+    try {
+      const res = await fetch(src, { mode: 'cors', credentials: 'omit' });
+      if (!res.ok) {
+        console.warn(`html-snapshot: image fetch ${res.status} for ${src}`);
+        return;
+      }
+      const blob = await res.blob();
+      const dataUri = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(blob);
+      });
+      if (typeof dataUri === 'string' && dataUri.startsWith('data:')) {
+        img.setAttribute('data-snapshot-src', dataUri);
+      }
+    } catch (err) {
+      console.warn(`html-snapshot: failed to inline ${src}: ${err && err.message}`);
+    }
+  }));
+}
+
 function takeSnapshot(config) {
   // Tags we never emit. Their subtree is also dropped. The list mirrors the subset spec
   // (anything outside `spec/html_subset.md` §2 has no PAGX mapping) plus the obvious
@@ -526,11 +563,15 @@ function takeSnapshot(config) {
     return parts.join('; ');
   }
 
-  // Re-resolve a relative <img> src to a path relative to the *output* file. Since the
-  // output sits next to the input, we just keep the original relative path verbatim.
+  // Resolve the <img>'s source for the snapshot output. We prefer the inlined data
+  // URI produced by the pre-snapshot `inlineExternalImages` pass: PAGX's renderer
+  // only knows how to load local files and `data:` URIs, so leaving an `http(s)://`
+  // src would render as an empty box. Local/relative paths and `data:` URIs already
+  // work out of the box and are kept verbatim.
   function imgSrc(el) {
-    const raw = el.getAttribute('src') || '';
-    return raw;
+    const inlined = el.getAttribute('data-snapshot-src');
+    if (inlined) return inlined;
+    return el.getAttribute('src') || '';
   }
 
   // Synthesize text content for form elements (placeholder / value / button label).
@@ -846,6 +887,13 @@ async function main() {
     if (opts.waitMs > 0) {
       await new Promise((r) => setTimeout(r, opts.waitMs));
     }
+
+    // PAGX's renderer can read `data:` URIs and local files but not `http(s)://`
+    // URLs. Inline every external image into a base64 data URI here so the
+    // downstream `pagx render` step can decode them directly. We stash the result
+    // on `data-snapshot-src` rather than mutating `src` so that the live layout
+    // (which has already settled around the original image) is left untouched.
+    await page.evaluate(inlineExternalImages);
 
     const result = await page.evaluate(takeSnapshot, { /* config placeholder */ });
     fs.writeFileSync(opts.output, result.html, 'utf8');
