@@ -107,27 +107,17 @@ SECTION_TITLES=(
 
 # System Arial fonts — register Regular, Bold, Italic, Bold Italic so that
 # pagx render uses the real typeface files (matched by fontFamily + fontStyle)
-# instead of relying on tgfx's MakeFromName system font lookup.
+# instead of relying on tgfx's MakeFromName system font lookup, which may
+# return a fallback font instead of the exact Arial typeface on macOS.
 ARIAL_REGULAR="/System/Library/Fonts/Supplemental/Arial.ttf"
 ARIAL_BOLD="/System/Library/Fonts/Supplemental/Arial Bold.ttf"
 ARIAL_ITALIC="/System/Library/Fonts/Supplemental/Arial Italic.ttf"
 ARIAL_BOLD_ITALIC="/System/Library/Fonts/Supplemental/Arial Bold Italic.ttf"
 
-# Repo-bundled fallback fonts for non-Latin scripts.
-FONT_REGULAR="$REPO/resources/font/NotoSansSC-Regular.otf"
-FONT_EMOJI="$REPO/resources/font/NotoColorEmoji.ttf"
-FONT_HEBREW="$REPO/resources/font/NotoSansHebrew-Regular.ttf"
-
-# Build the --font / --fallback arg list.
 RENDER_FONT_ARGS=()
 for f in "$ARIAL_REGULAR" "$ARIAL_BOLD" "$ARIAL_ITALIC" "$ARIAL_BOLD_ITALIC"; do
   if [ -f "$f" ]; then
     RENDER_FONT_ARGS+=( --font "$f" )
-  fi
-done
-for f in "$FONT_REGULAR" "$FONT_EMOJI" "$FONT_HEBREW"; do
-  if [ -f "$f" ]; then
-    RENDER_FONT_ARGS+=( --fallback "$f" )
   fi
 done
 
@@ -195,7 +185,7 @@ for i in "${!SECTION_IDS[@]}"; do
     mkdir -p "$OUT_DIR/cli/$section"
   fi
 
-  # Column 1: pagx render (2x PNG) with registered Arial + fallback fonts.
+  # Column 1: pagx render (2x PNG) with registered Arial fonts.
   echo "  rendering col 1 (pagx render --scale 2) ..."
   rendered=0
   skipped=0

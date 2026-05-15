@@ -23,6 +23,7 @@
 #include <random>
 #include <string>
 #include "base/utils/MathUtil.h"
+#include "pagx/TextLayout.h"
 #include "pagx/html/FontHoist.h"
 #include "pagx/html/HTMLWriter.h"
 #include "pagx/nodes/Font.h"
@@ -1290,174 +1291,334 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
       if (text->baseline == TextBaseline::Alphabetic) {
         ty = text->position.y;
       }
-      std::string containerStyle =
-          "position:absolute;white-space:nowrap;top:" + CssFloatToString(ty) + "px";
-      // Use text-align + width instead of transform:translateX to avoid creating a compositing
-      // layer, which disables subpixel antialiasing and makes text look thinner.
-      bool tmUsesBackgroundClip =
-          fill && fill->color && fill->color->nodeType() != NodeType::SolidColor;
-      if (text->textAnchor == TextAnchor::Center) {
-        if (tmUsesBackgroundClip) {
-          containerStyle += ";left:" + CssFloatToString(renderPos.x) +
-                            "px;transform:translateX(-50%);text-align:center";
-        } else {
-          containerStyle +=
-              ";left:0;width:" + CssFloatToString(renderPos.x * 2) + "px;text-align:center";
+
+      // When the fill is a gradient (non-solid) and there's no per-char fillColor override,
+      // render via SVG <text> elements so all characters share a single <linearGradient
+      // gradientUnits="userSpaceOnUse"> definition. CSS background-clip:text cannot span
+      // multiple independently-transformed inline-block spans, but SVG fill="url(#...)" can.
+      bool usesSVGTextGradient = fill && fill->color &&
+                                 fill->color->nodeType() != NodeType::SolidColor &&
+                                 !(modifier->fillColor.has_value());
+
+      if (usesSVGTextGradient) {
+        // --- SVG <text> path for gradient fills ---
+        // Use layoutRuns for precise per-glyph positions. Each glyph's (x, y) is in the
+        // text's layout coordinate system; the SVG viewport is positioned at renderPos so
+        // glyph coordinates are relative to that origin.
+        std::string svgStyle = "position:absolute;left:" + CssFloatToString(renderPos.x) +
+                               "px;top:" + CssFloatToString(ty) + "px;overflow:visible";
+        if (alpha < 1.0f) {
+          svgStyle += ";opacity:" + CssFloatToString(alpha);
         }
-      } else if (text->textAnchor == TextAnchor::End) {
-        containerStyle += ";left:0;width:" + CssFloatToString(renderPos.x) + "px;text-align:right";
-      } else {
-        containerStyle += ";left:" + CssFloatToString(renderPos.x) + "px";
-      }
-      if (!text->fontFamily.empty()) {
-        containerStyle += ";font-family:'" + EscapeCssFontFamily(text->fontFamily) + "'";
-      }
-      containerStyle += ";font-size:0";
-      if (!text->fontStyle.empty()) {
-        if (text->fontStyle.find("Bold") != std::string::npos) {
-          containerStyle += ";font-weight:bold";
+        out.openTag("svg");
+        out.addAttr("style", svgStyle);
+        out.closeTagStart();
+
+        // Write gradient definition into an inline <defs> block.
+        std::string gradId = _ctx->nextId("tmgrad");
+        out.openTag("defs");
+        out.closeTagStart();
+        writeSVGGradientDefInto(out, fill->color, gradId);
+        out.closeTag();  // </defs>
+
+        std::string fillRef = "url(#" + gradId + ")";
+        float fillAlpha = fill->alpha;
+
+        // Build shared font attributes.
+        std::string fontFamily;
+        if (!text->fontFamily.empty()) {
+          fontFamily = "'" + EscapeCssFontFamily(text->fontFamily) + "'";
         }
-        if (text->fontStyle.find("Italic") != std::string::npos) {
-          containerStyle += ";font-style:italic";
-        }
-      }
-      if (text->letterSpacing != 0.0f) {
-        containerStyle += ";letter-spacing:" + CssFloatToString(text->letterSpacing) + "px";
-      }
-      if (alpha < 1.0f) {
-        containerStyle += ";opacity:" + CssFloatToString(alpha);
-      }
-      out.openTag("div");
-      out.addAttr("style", containerStyle);
-      out.closeTagStart();
-      std::string fontSizeStr = CssFloatToString(renderFont) + "px";
-      const char* p = text->text.c_str();
-      size_t charIdx = 0;
-      while (*p) {
-        int32_t ch = 0;
-        size_t len = SVGDecodeUTF8Char(p, text->text.size() - (p - text->text.c_str()), &ch);
-        if (len == 0) {
-          break;
-        }
-        float f = (charIdx < factors.size()) ? factors[charIdx] : 0.0f;
-        float absF = std::abs(f);
-        std::string charStr(p, len);
-        bool isSpace = (ch == ' ');
-        if (isSpace) {
-          charStr = "\u00A0";
-        }
-        std::string charStyle = "display:inline-block;font-size:" + fontSizeStr;
-        std::string transform;
-        if (!FloatNearlyZero(modifier->position.x * f) ||
-            !FloatNearlyZero(modifier->position.y * f)) {
-          transform += "translate(" + CssFloatToString(modifier->position.x * f) + "px," +
-                       CssFloatToString(modifier->position.y * f) + "px) ";
-        }
-        float anchorX = modifier->anchor.x * f;
-        float anchorY = modifier->anchor.y * f;
-        if (!FloatNearlyZero(anchorX) || !FloatNearlyZero(anchorY)) {
-          transform +=
-              "translate(" + CssFloatToString(anchorX) + "px," + CssFloatToString(anchorY) + "px) ";
-        }
-        if (!FloatNearlyZero(modifier->rotation * f)) {
-          transform += "rotate(" + CssFloatToString(modifier->rotation * f) + "deg) ";
-        }
-        float sx = 1.0f + (modifier->scale.x - 1.0f) * absF;
-        float sy = 1.0f + (modifier->scale.y - 1.0f) * absF;
-        if (!FloatNearlyZero(sx - 1.0f) || !FloatNearlyZero(sy - 1.0f)) {
-          transform += "scale(" + CssFloatToString(sx) + "," + CssFloatToString(sy) + ") ";
-        }
-        if (!FloatNearlyZero(modifier->skew * absF)) {
-          // tgfx TextModifier::ApplySkew rotates by -skewAxis, applies skewX, then rotates back by
-          // +skewAxis. This skews along an arbitrary axis (skewAxis=90 becomes a vertical skew).
-          // CSS transform applies right-to-left on the point, so the equivalent sequence is
-          // rotate(+axis) skewX(-skew) rotate(-axis). Skip the rotations when skewAxis is 0 to
-          // keep the simpler output for the common pure-horizontal-skew case.
-          if (!FloatNearlyZero(modifier->skewAxis)) {
-            transform += "rotate(" + CssFloatToString(modifier->skewAxis) + "deg) ";
-          }
-          transform += "skewX(" + CssFloatToString(-modifier->skew * absF) + "deg) ";
-          if (!FloatNearlyZero(modifier->skewAxis)) {
-            transform += "rotate(" + CssFloatToString(-modifier->skewAxis) + "deg) ";
+        bool isBold = text->fauxBold || text->fontStyle.find("Bold") != std::string::npos;
+        bool isItalic = text->fauxItalic || text->fontStyle.find("Italic") != std::string::npos;
+
+        // Collect per-glyph positions from layoutRuns. Flatten all runs into a single
+        // position list indexed by glyph order within this Text element.
+        std::vector<tgfx::Point> glyphPositions;
+        std::vector<float> glyphAdvances;
+        for (auto& run : text->glyphData->layoutRuns) {
+          for (size_t gi = 0; gi < run.positions.size(); gi++) {
+            glyphPositions.push_back(run.positions[gi]);
+            float adv = 0;
+            if (gi < run.glyphs.size()) {
+              adv = run.font.getAdvance(run.glyphs[gi]);
+            }
+            glyphAdvances.push_back(adv);
           }
         }
-        if (!FloatNearlyZero(anchorX) || !FloatNearlyZero(anchorY)) {
-          transform += "translate(" + CssFloatToString(-anchorX) + "px," +
-                       CssFloatToString(-anchorY) + "px) ";
-        }
-        // fauxItalic is handled via CSS native synthesis instead of a CSS transform.
-        if (text->fauxItalic) {
-          charStyle += ";font-style:italic";
-        }
-        if (!transform.empty()) {
-          charStyle += ";transform:" + transform;
-          // Align transform pivot with the glyph baseline & advance center (tgfx uses
-          // glyph.anchor = (advance/2, 0) on the alphabetic baseline). Without this,
-          // rotation/scale would pivot around the inline-block center (50% 50%), shifting
-          // glyphs incorrectly. 50% aligns with advance center; 0.8em approximates Arial
-          // ascent, placing the origin on the baseline.
-          charStyle += ";transform-origin:50% 0.8em";
-        }
-        if (modifier->alpha < 1.0f) {
-          float charAlpha = std::max(0.0f, 1.0f + (modifier->alpha - 1.0f) * absF);
-          charStyle += ";opacity:" + CssFloatToString(charAlpha);
-        }
-        if (fill && fill->color && fill->color->nodeType() == NodeType::SolidColor) {
-          auto sc = static_cast<const SolidColor*>(fill->color);
-          if (modifier->fillColor.has_value() && absF > 0.0f) {
-            Color blended = LerpColor(sc->color, modifier->fillColor.value(), absF);
-            charStyle += ";color:" + ColorToRGBA(blended, fill->alpha);
-          } else {
-            charStyle += ";color:" + ColorToRGBA(sc->color, fill->alpha);
+
+        const char* p = text->text.c_str();
+        size_t charIdx = 0;
+        while (*p) {
+          int32_t ch = 0;
+          size_t len = SVGDecodeUTF8Char(p, text->text.size() - (p - text->text.c_str()), &ch);
+          if (len == 0) {
+            break;
           }
-        } else if (fill && fill->color) {
-          // Non-solid fill (LinearGradient, RadialGradient, etc.): use background-clip:text.
-          auto css = colorToCSS(fill->color, nullptr);
-          if (!css.empty()) {
-            charStyle += ";background:" + css;
-            charStyle += ";-webkit-background-clip:text;background-clip:text";
-            charStyle += ";-webkit-text-fill-color:transparent";
+          float f = (charIdx < factors.size()) ? factors[charIdx] : 0.0f;
+          float absF = std::abs(f);
+          std::string charStr(p, len);
+
+          // Build SVG transform. The glyph position (glyphX, glyphY) is baked into the
+          // transform as a final translate so that rotation/scale pivot around the glyph's
+          // center (advance/2, 0) in the glyph's local space — matching the HTML span path's
+          // transform-origin:50% 0.8em behavior (approximated as advance/2 on the baseline).
+          float glyphX = (charIdx < glyphPositions.size()) ? glyphPositions[charIdx].x : 0;
+          float glyphY = (charIdx < glyphPositions.size()) ? glyphPositions[charIdx].y : 0;
+          float glyphAdv = (charIdx < glyphAdvances.size()) ? glyphAdvances[charIdx] : 0;
+          float pivotX = glyphAdv * 0.5f;
+          float pivotY = 0;
+
+          std::string svgTransform;
+          // Start with glyph position translation.
+          svgTransform +=
+              "translate(" + CssFloatToString(glyphX) + "," + CssFloatToString(glyphY) + ") ";
+          // TextModifier position offset.
+          if (!FloatNearlyZero(modifier->position.x * f) ||
+              !FloatNearlyZero(modifier->position.y * f)) {
+            svgTransform += "translate(" + CssFloatToString(modifier->position.x * f) + "," +
+                            CssFloatToString(modifier->position.y * f) + ") ";
           }
-        } else if (!fill && stroke) {
-          charStyle += ";color:transparent";
-        }
-        if (stroke) {
-          Color strokeColor = {};
-          float strokeWidth = stroke->width;
-          bool hasStroke = false;
-          if (modifier->strokeColor.has_value() && absF > 0.0f) {
-            strokeColor = modifier->strokeColor.value();
-            strokeColor.alpha *= absF;
-            hasStroke = true;
-          } else if (stroke->color && stroke->color->nodeType() == NodeType::SolidColor) {
-            strokeColor = static_cast<const SolidColor*>(stroke->color)->color;
-            hasStroke = true;
+          // Move to pivot for rotation/scale/skew.
+          float modAnchorX = pivotX + modifier->anchor.x * absF;
+          float modAnchorY = pivotY + modifier->anchor.y * absF;
+          svgTransform += "translate(" + CssFloatToString(modAnchorX) + "," +
+                          CssFloatToString(modAnchorY) + ") ";
+          if (!FloatNearlyZero(modifier->rotation * f)) {
+            svgTransform += "rotate(" + CssFloatToString(modifier->rotation * f) + ") ";
           }
-          if (modifier->strokeWidth.has_value() && absF > 0.0f) {
-            strokeWidth = stroke->width + (modifier->strokeWidth.value() - stroke->width) * absF;
+          float sx = 1.0f + (modifier->scale.x - 1.0f) * absF;
+          float sy = 1.0f + (modifier->scale.y - 1.0f) * absF;
+          if (!FloatNearlyZero(sx - 1.0f) || !FloatNearlyZero(sy - 1.0f)) {
+            svgTransform += "scale(" + CssFloatToString(sx) + "," + CssFloatToString(sy) + ") ";
           }
-          if (hasStroke && strokeWidth > 0 && strokeColor.alpha > 0) {
-            bool hasFill = fill && fill->color;
-            auto strokeCss = ResolveTextStrokeCss(strokeWidth, stroke->align, hasFill);
-            if (strokeCss.width > 0.0f) {
-              charStyle += ";-webkit-text-stroke:" + CssFloatToString(strokeCss.width) + "px " +
-                           ColorToRGBA(strokeColor, stroke->alpha);
-              if (strokeCss.paintOrderStrokeFill) {
-                charStyle += ";paint-order:stroke fill";
+          if (!FloatNearlyZero(modifier->skew * absF)) {
+            if (!FloatNearlyZero(modifier->skewAxis)) {
+              svgTransform += "rotate(" + CssFloatToString(modifier->skewAxis) + ") ";
+            }
+            svgTransform += "skewX(" + CssFloatToString(-modifier->skew * absF) + ") ";
+            if (!FloatNearlyZero(modifier->skewAxis)) {
+              svgTransform += "rotate(" + CssFloatToString(-modifier->skewAxis) + ") ";
+            }
+          }
+          // Move back from pivot.
+          svgTransform += "translate(" + CssFloatToString(-modAnchorX) + "," +
+                          CssFloatToString(-modAnchorY) + ") ";
+
+          out.openTag("text");
+          if (!fontFamily.empty()) {
+            out.addAttr("font-family", fontFamily);
+          }
+          out.addAttr("font-size", CssFloatToString(renderFont));
+          if (isBold) {
+            out.addAttr("font-weight", "bold");
+          }
+          if (isItalic) {
+            out.addAttr("font-style", "italic");
+          }
+          out.addAttr("fill", fillRef);
+          if (fillAlpha < 1.0f) {
+            out.addAttr("fill-opacity", CssFloatToString(fillAlpha));
+          }
+          if (stroke && stroke->color && stroke->color->nodeType() == NodeType::SolidColor) {
+            auto sc = static_cast<const SolidColor*>(stroke->color);
+            float strokeWidth = stroke->width;
+            if (modifier->strokeWidth.has_value() && absF > 0.0f) {
+              strokeWidth += (modifier->strokeWidth.value() - strokeWidth) * absF;
+            }
+            if (strokeWidth > 0) {
+              out.addAttr("stroke", ColorToSVGHex(sc->color));
+              out.addAttr("stroke-width", CssFloatToString(strokeWidth));
+              if (sc->color.alpha * stroke->alpha < 1.0f) {
+                out.addAttr("stroke-opacity", CssFloatToString(sc->color.alpha * stroke->alpha));
               }
             }
           }
+          if (!svgTransform.empty()) {
+            out.addAttr("transform", svgTransform);
+          }
+          if (modifier->alpha < 1.0f) {
+            float charAlpha = std::max(0.0f, 1.0f + (modifier->alpha - 1.0f) * absF);
+            out.addAttr("opacity", CssFloatToString(charAlpha));
+          }
+          out.closeTagWithText(charStr);
+
+          p += len;
+          charIdx++;
         }
-        if (text->fauxBold) {
-          charStyle += ";font-weight:bold";
+        out.closeTag();  // </svg>
+      } else {
+        // --- Original HTML <span> path for solid fills ---
+        std::string containerStyle =
+            "position:absolute;white-space:nowrap;top:" + CssFloatToString(ty) + "px";
+        // Use text-align + width instead of transform:translateX to avoid creating a compositing
+        // layer, which disables subpixel antialiasing and makes text look thinner.
+        bool tmUsesBackgroundClip =
+            fill && fill->color && fill->color->nodeType() != NodeType::SolidColor;
+        if (text->textAnchor == TextAnchor::Center) {
+          if (tmUsesBackgroundClip) {
+            containerStyle += ";left:" + CssFloatToString(renderPos.x) +
+                              "px;transform:translateX(-50%);text-align:center";
+          } else {
+            containerStyle +=
+                ";left:0;width:" + CssFloatToString(renderPos.x * 2) + "px;text-align:center";
+          }
+        } else if (text->textAnchor == TextAnchor::End) {
+          containerStyle +=
+              ";left:0;width:" + CssFloatToString(renderPos.x) + "px;text-align:right";
+        } else {
+          containerStyle += ";left:" + CssFloatToString(renderPos.x) + "px";
         }
-        out.openTag("span");
-        out.addAttr("style", charStyle);
-        out.closeTagWithText(charStr);
-        p += len;
-        charIdx++;
-      }
-      out.closeTag();  // </div>
+        if (!text->fontFamily.empty()) {
+          containerStyle += ";font-family:'" + EscapeCssFontFamily(text->fontFamily) + "'";
+        }
+        containerStyle += ";font-size:0";
+        if (!text->fontStyle.empty()) {
+          if (text->fontStyle.find("Bold") != std::string::npos) {
+            containerStyle += ";font-weight:bold";
+          }
+          if (text->fontStyle.find("Italic") != std::string::npos) {
+            containerStyle += ";font-style:italic";
+          }
+        }
+        if (text->letterSpacing != 0.0f) {
+          containerStyle += ";letter-spacing:" + CssFloatToString(text->letterSpacing) + "px";
+        }
+        if (alpha < 1.0f) {
+          containerStyle += ";opacity:" + CssFloatToString(alpha);
+        }
+        out.openTag("div");
+        out.addAttr("style", containerStyle);
+        out.closeTagStart();
+        std::string fontSizeStr = CssFloatToString(renderFont) + "px";
+        const char* p = text->text.c_str();
+        size_t charIdx = 0;
+        while (*p) {
+          int32_t ch = 0;
+          size_t len = SVGDecodeUTF8Char(p, text->text.size() - (p - text->text.c_str()), &ch);
+          if (len == 0) {
+            break;
+          }
+          float f = (charIdx < factors.size()) ? factors[charIdx] : 0.0f;
+          float absF = std::abs(f);
+          std::string charStr(p, len);
+          bool isSpace = (ch == ' ');
+          if (isSpace) {
+            charStr = "\u00A0";
+          }
+          std::string charStyle = "display:inline-block;font-size:" + fontSizeStr;
+          std::string transform;
+          if (!FloatNearlyZero(modifier->position.x * f) ||
+              !FloatNearlyZero(modifier->position.y * f)) {
+            transform += "translate(" + CssFloatToString(modifier->position.x * f) + "px," +
+                         CssFloatToString(modifier->position.y * f) + "px) ";
+          }
+          float anchorX = modifier->anchor.x * f;
+          float anchorY = modifier->anchor.y * f;
+          if (!FloatNearlyZero(anchorX) || !FloatNearlyZero(anchorY)) {
+            transform += "translate(" + CssFloatToString(anchorX) + "px," +
+                         CssFloatToString(anchorY) + "px) ";
+          }
+          if (!FloatNearlyZero(modifier->rotation * f)) {
+            transform += "rotate(" + CssFloatToString(modifier->rotation * f) + "deg) ";
+          }
+          float sx = 1.0f + (modifier->scale.x - 1.0f) * absF;
+          float sy = 1.0f + (modifier->scale.y - 1.0f) * absF;
+          if (!FloatNearlyZero(sx - 1.0f) || !FloatNearlyZero(sy - 1.0f)) {
+            transform += "scale(" + CssFloatToString(sx) + "," + CssFloatToString(sy) + ") ";
+          }
+          if (!FloatNearlyZero(modifier->skew * absF)) {
+            // tgfx TextModifier::ApplySkew rotates by -skewAxis, applies skewX, then rotates back by
+            // +skewAxis. This skews along an arbitrary axis (skewAxis=90 becomes a vertical skew).
+            // CSS transform applies right-to-left on the point, so the equivalent sequence is
+            // rotate(+axis) skewX(-skew) rotate(-axis). Skip the rotations when skewAxis is 0 to
+            // keep the simpler output for the common pure-horizontal-skew case.
+            if (!FloatNearlyZero(modifier->skewAxis)) {
+              transform += "rotate(" + CssFloatToString(modifier->skewAxis) + "deg) ";
+            }
+            transform += "skewX(" + CssFloatToString(-modifier->skew * absF) + "deg) ";
+            if (!FloatNearlyZero(modifier->skewAxis)) {
+              transform += "rotate(" + CssFloatToString(-modifier->skewAxis) + "deg) ";
+            }
+          }
+          if (!FloatNearlyZero(anchorX) || !FloatNearlyZero(anchorY)) {
+            transform += "translate(" + CssFloatToString(-anchorX) + "px," +
+                         CssFloatToString(-anchorY) + "px) ";
+          }
+          // fauxItalic is handled via CSS native synthesis instead of a CSS transform.
+          if (text->fauxItalic) {
+            charStyle += ";font-style:italic";
+          }
+          if (!transform.empty()) {
+            charStyle += ";transform:" + transform;
+            // Align transform pivot with the glyph baseline & advance center (tgfx uses
+            // glyph.anchor = (advance/2, 0) on the alphabetic baseline). Without this,
+            // rotation/scale would pivot around the inline-block center (50% 50%), shifting
+            // glyphs incorrectly. 50% aligns with advance center; 0.8em approximates Arial
+            // ascent, placing the origin on the baseline.
+            charStyle += ";transform-origin:50% 0.8em";
+          }
+          if (modifier->alpha < 1.0f) {
+            float charAlpha = std::max(0.0f, 1.0f + (modifier->alpha - 1.0f) * absF);
+            charStyle += ";opacity:" + CssFloatToString(charAlpha);
+          }
+          if (fill && fill->color && fill->color->nodeType() == NodeType::SolidColor) {
+            auto sc = static_cast<const SolidColor*>(fill->color);
+            if (modifier->fillColor.has_value() && absF > 0.0f) {
+              Color blended = LerpColor(sc->color, modifier->fillColor.value(), absF);
+              charStyle += ";color:" + ColorToRGBA(blended, fill->alpha);
+            } else {
+              charStyle += ";color:" + ColorToRGBA(sc->color, fill->alpha);
+            }
+          } else if (fill && fill->color) {
+            // Non-solid fill (LinearGradient, RadialGradient, etc.): use background-clip:text.
+            auto css = colorToCSS(fill->color, nullptr);
+            if (!css.empty()) {
+              charStyle += ";background:" + css;
+              charStyle += ";-webkit-background-clip:text;background-clip:text";
+              charStyle += ";-webkit-text-fill-color:transparent";
+            }
+          } else if (!fill && stroke) {
+            charStyle += ";color:transparent";
+          }
+          if (stroke) {
+            Color strokeColor = {};
+            float strokeWidth = stroke->width;
+            bool hasStroke = false;
+            if (modifier->strokeColor.has_value() && absF > 0.0f) {
+              strokeColor = modifier->strokeColor.value();
+              strokeColor.alpha *= absF;
+              hasStroke = true;
+            } else if (stroke->color && stroke->color->nodeType() == NodeType::SolidColor) {
+              strokeColor = static_cast<const SolidColor*>(stroke->color)->color;
+              hasStroke = true;
+            }
+            if (modifier->strokeWidth.has_value() && absF > 0.0f) {
+              strokeWidth = stroke->width + (modifier->strokeWidth.value() - stroke->width) * absF;
+            }
+            if (hasStroke && strokeWidth > 0 && strokeColor.alpha > 0) {
+              bool hasFill = fill && fill->color;
+              auto strokeCss = ResolveTextStrokeCss(strokeWidth, stroke->align, hasFill);
+              if (strokeCss.width > 0.0f) {
+                charStyle += ";-webkit-text-stroke:" + CssFloatToString(strokeCss.width) + "px " +
+                             ColorToRGBA(strokeColor, stroke->alpha);
+                if (strokeCss.paintOrderStrokeFill) {
+                  charStyle += ";paint-order:stroke fill";
+                }
+              }
+            }
+          }
+          if (text->fauxBold) {
+            charStyle += ";font-weight:bold";
+          }
+          out.openTag("span");
+          out.addAttr("style", charStyle);
+          out.closeTagWithText(charStr);
+          p += len;
+          charIdx++;
+        }
+        out.closeTag();  // </div>
+      }                  // end of HTML span path (usesSVGTextGradient == false)
     }
   }
 }
