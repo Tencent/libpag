@@ -894,6 +894,50 @@ void StripChildAbsolute(PropertyMap& childProps, FlexAxis axis, CrossAlign align
   }
 }
 
+// Reorders `parent`'s element children so that they appear in `sortedElements` order while
+// keeping any non-element (text) children in their original ordinal slots. This is needed
+// because `position: absolute` children render at their declared `left`/`top` regardless of
+// document order, but a flex container honours document order — so converting an absolute
+// layout whose DOM order doesn't match its visual order would re-shuffle the children.
+// Returns true when the order was changed.
+bool ReorderElementChildrenToMainAxis(const std::shared_ptr<DOMNode>& parent,
+                                      const std::vector<ChildBox>& sortedElements) {
+  if (!parent) return false;
+  std::vector<std::shared_ptr<DOMNode>> all;
+  std::vector<std::shared_ptr<DOMNode>> elementsInDom;
+  for (auto c = parent->firstChild; c; c = c->nextSibling) {
+    all.push_back(c);
+    if (c->type == DOMNodeType::Element) elementsInDom.push_back(c);
+  }
+  if (elementsInDom.size() != sortedElements.size()) return false;
+  bool needsReorder = false;
+  for (size_t i = 0; i < elementsInDom.size(); i++) {
+    if (elementsInDom[i] != sortedElements[i].node) {
+      needsReorder = true;
+      break;
+    }
+  }
+  if (!needsReorder) return false;
+  size_t idx = 0;
+  for (auto& c : all) {
+    if (c->type == DOMNodeType::Element) {
+      c = sortedElements[idx++].node;
+    }
+  }
+  parent->firstChild = nullptr;
+  std::shared_ptr<DOMNode> prev;
+  for (auto& c : all) {
+    c->nextSibling = nullptr;
+    if (!prev) {
+      parent->firstChild = c;
+    } else {
+      prev->nextSibling = c;
+    }
+    prev = c;
+  }
+  return true;
+}
+
 void TryInferFlexOnContainer(const std::shared_ptr<DOMNode>& parent, HTMLTransformContext& ctx) {
   if (!parent || parent->type != DOMNodeType::Element) return;
   const std::string& tag = parent->name;
@@ -1024,9 +1068,17 @@ void TryInferFlexOnContainer(const std::shared_ptr<DOMNode>& parent, HTMLTransfo
     StripChildAbsolute(*cp, axis, align);
   }
 
+  // Flex layout follows document order, but the original `position: absolute` children were
+  // placed at their declared coordinates regardless of source order. If the two diverge, we
+  // must rewrite the DOM child list to match the inferred axis order — otherwise the rewrite
+  // visually shuffles the children. The boxes are already non-overlapping along the main axis
+  // (InferAxis guaranteed it), so reordering them here is safe.
+  bool reordered = ReorderElementChildrenToMainAxis(parent, sorted);
+
   ctx.warn("subset:flex-inferred",
-           "html: <" + tag + "> rewritten as display:flex (" + AxisName(axis) +
-               ", " + std::to_string(boxes.size()) + " children)",
+           std::string("html: <") + tag + "> rewritten as display:flex (" + AxisName(axis) +
+               ", " + std::to_string(boxes.size()) + " children" +
+               (reordered ? ", reordered to match position" : "") + ")",
            parent);
 }
 

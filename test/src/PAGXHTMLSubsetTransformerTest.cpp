@@ -535,6 +535,65 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceLeavesExistingFlexAlone) {
   EXPECT_TRUE(StyleContains(body, "gap: 5px"));
 }
 
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceReordersChildrenWhenDomOrderDiffersFromAxis) {
+  // The three children are declared out of visual order: source order is left, right, middle
+  // (by `left:`). Without DOM reordering, applying `display:flex` would render them in source
+  // order, swapping the visible right and middle columns. Verify the fix puts them back in
+  // position order so the visual layout is preserved.
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:300px;height:50px">
+               <div data-id="left"   style="position:absolute;left:0px;top:0px;width:100px;height:50px"></div>
+               <div data-id="right"  style="position:absolute;left:200px;top:0px;width:100px;height:50px"></div>
+               <div data-id="middle" style="position:absolute;left:100px;top:0px;width:100px;height:50px"></div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:flex-inferred"));
+  auto body = root->getFirstChild("body");
+  ASSERT_NE(body, nullptr);
+  EXPECT_TRUE(StyleContains(body, "display: flex"));
+  EXPECT_TRUE(StyleContains(body, "flex-direction: row"));
+  std::vector<std::string> orderedIds;
+  for (auto c = body->firstChild; c; c = c->nextSibling) {
+    if (c->type != pagx::DOMNodeType::Element) continue;
+    orderedIds.push_back(AttrValue(c, "data-id"));
+  }
+  ASSERT_EQ(orderedIds.size(), 3u);
+  EXPECT_EQ(orderedIds[0], "left");
+  EXPECT_EQ(orderedIds[1], "middle");
+  EXPECT_EQ(orderedIds[2], "right");
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceKeepsChildrenWhenDomOrderMatchesAxis) {
+  // Sanity-check: when the source order already matches position order, no reordering is
+  // needed and the children appear in their original sequence.
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:300px;height:50px">
+               <div data-id="a" style="position:absolute;left:0px;top:0px;width:100px;height:50px"></div>
+               <div data-id="b" style="position:absolute;left:100px;top:0px;width:100px;height:50px"></div>
+               <div data-id="c" style="position:absolute;left:200px;top:0px;width:100px;height:50px"></div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:flex-inferred"));
+  auto body = root->getFirstChild("body");
+  std::vector<std::string> orderedIds;
+  for (auto c = body->firstChild; c; c = c->nextSibling) {
+    if (c->type != pagx::DOMNodeType::Element) continue;
+    orderedIds.push_back(AttrValue(c, "data-id"));
+  }
+  ASSERT_EQ(orderedIds.size(), 3u);
+  EXPECT_EQ(orderedIds[0], "a");
+  EXPECT_EQ(orderedIds[1], "b");
+  EXPECT_EQ(orderedIds[2], "c");
+}
+
 PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceTolerancePicksUpSubpixelDrift) {
   pagx::HTMLSubsetTransformer::Options opts = {};
   opts.inferFlexFromAbsolute = true;
