@@ -308,9 +308,10 @@ class RepeaterOffsetGuard {
 // HTMLWriter
 //==============================================================================
 
-// A TextBox child whose enclosing Group qualified for rich-text-span treatment: one Text plus
-// at least one Fill or Stroke painter, and nothing else. Defined here (rather than only in the
-// .cpp) so renderTextBoxAsRichText can take it by reference in the header.
+//==============================================================================
+// HTMLWriter
+//==============================================================================
+
 struct RichTextSpan {
   const Text* text = nullptr;
   const Fill* fill = nullptr;
@@ -347,6 +348,18 @@ class HTMLWriter {
     // not its padding box). In that case we fall back to the absolute-pixel branch whose
     // left/top/width/height already reflect PAGX's padding-inset layout resolution.
     const Padding* parentPadding = nullptr;
+  };
+
+  struct ElementDispatchState {
+    std::vector<GeoInfo> geos = {};
+    const Fill* curFill = nullptr;
+    const Stroke* curStroke = nullptr;
+    bool hasTrim = false;
+    const TrimPath* curTrim = nullptr;
+    bool hasMerge = false;
+    MergePathMode mergeMode = MergePathMode::Append;
+    const TextPath* curTextPath = nullptr;
+    const TextModifier* curTextModifier = nullptr;
   };
 
   // Maps a PAGX Stroke's `align` attribute to a CSS `-webkit-text-stroke` width plus optional
@@ -410,19 +423,9 @@ class HTMLWriter {
   // are emitted inside the TextBox container instead of as stand-alone DOM wrappers.
   void renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
                                const std::vector<RichTextSpan>& richTextSpans);
-  // Handles the Group case's flatten path inside writeElements: runs the Group's children
-  // through an inner element dispatch that mirrors the outer switch, with the Group's matrix
-  // composed in. The 8 mutable parameters carry the writeElements state machine through the
-  // call: the helper saves them on entry and restores them on exit (with one-way fill/stroke
-  // promotion when the Group introduces a painter that the outer scope was missing). Splitting
-  // this 240-line block out lets the main dispatch loop stay readable; collapsing the parameter
-  // list into a state-guard struct is a separate cleanup tracked by the ARCH-01 review item.
   void flattenGroup(HTMLBuilder& out, const Group* group, float alpha, bool distribute,
                     LayerPlacement targetPlacement, bool hasUpcomingRepeater,
-                    const TextBox* curTextBox, std::vector<GeoInfo>& geos, const Fill*& curFill,
-                    const Stroke*& curStroke, bool& hasTrim, const TrimPath*& curTrim,
-                    bool& hasMerge, MergePathMode& mergeMode, const TextPath*& curTextPath,
-                    const TextModifier*& curTextModifier);
+                    const TextBox* curTextBox, ElementDispatchState& state);
   // Appends an SVG <filter> definition that composites the layer's pre-rendered backdrop with its
   // own pixels using feComposite arithmetic (k1=0, k2=1, k3=1, k4=-1), yielding PlusDarker
   // semantics: clamp(Sc + Dc - 1, 0, 1). Called once per plusDarker layer at the point the

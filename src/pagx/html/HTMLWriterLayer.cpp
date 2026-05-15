@@ -228,17 +228,9 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
   if (guard.overflowed()) {
     return;
   }
-  std::vector<GeoInfo> geos = {};
-  const Fill* curFill = nullptr;
-  const Stroke* curStroke = nullptr;
+  ElementDispatchState state;
   const TextBox* curTextBox = nullptr;
-  bool hasTrim = false;
-  const TrimPath* curTrim = nullptr;
-  bool hasMerge = false;
-  MergePathMode mergeMode = MergePathMode::Append;
   float roundCornerRadius = 0.0f;
-  const TextModifier* curTextModifier = nullptr;
-  const TextPath* curTextPath = nullptr;
 
   bool hasUpcomingRepeater = false;
   std::vector<RichTextSpan> richTextSpans = {};
@@ -261,56 +253,60 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
       case NodeType::Path:
       case NodeType::Polystar:
       case NodeType::Text:
-        geos.push_back({type, element, {}, containerPadding});
+        state.geos.push_back({type, element, {}, containerPadding});
         break;
       case NodeType::Fill: {
         auto fill = static_cast<const Fill*>(element);
-        curFill = fill;
+        state.curFill = fill;
         if (fill->placement == targetPlacement && !hasUpcomingRepeater) {
           float a = distribute ? alpha : 1.0f;
           bool deferToStroke = fillWillBePairedWithStroke[elemIndex];
-          if (curTextModifier && !geos.empty()) {
+          if (state.curTextModifier && !state.geos.empty()) {
             if (!deferToStroke) {
-              writeTextModifier(out, geos, curTextModifier, curFill, nullptr, curTextBox, a);
+              writeTextModifier(out, state.geos, state.curTextModifier, state.curFill, nullptr,
+                                curTextBox, a);
             }
-          } else if (curTextPath && !geos.empty()) {
+          } else if (state.curTextPath && !state.geos.empty()) {
             if (!deferToStroke) {
-              writeTextPath(out, geos, curTextPath, curFill, nullptr, curTextBox, a);
+              writeTextPath(out, state.geos, state.curTextPath, state.curFill, nullptr, curTextBox,
+                            a);
             }
           } else if (deferToStroke) {
             // A later Stroke at this placement will paint Text with (fill, stroke) as a
             // single span. Paint shapes here with fill-only, but skip Text geos so the
             // Stroke pass can merge them into one span instead of two stacked spans.
             std::vector<GeoInfo> shapeGeos;
-            for (auto& g : geos) {
+            for (auto& g : state.geos) {
               if (g.type != NodeType::Text) {
                 shapeGeos.push_back(g);
               }
             }
             if (!shapeGeos.empty()) {
-              paintGeos(out, shapeGeos, curFill, nullptr, curTextBox, a, hasTrim, curTrim, hasMerge,
-                        mergeMode);
+              paintGeos(out, shapeGeos, state.curFill, nullptr, curTextBox, a, state.hasTrim,
+                        state.curTrim, state.hasMerge, state.mergeMode);
             }
           } else {
-            paintGeos(out, geos, curFill, nullptr, curTextBox, a, hasTrim, curTrim, hasMerge,
-                      mergeMode);
+            paintGeos(out, state.geos, state.curFill, nullptr, curTextBox, a, state.hasTrim,
+                      state.curTrim, state.hasMerge, state.mergeMode);
           }
         }
         break;
       }
       case NodeType::Stroke: {
         auto stroke = static_cast<const Stroke*>(element);
-        curStroke = stroke;
+        state.curStroke = stroke;
         if (stroke->placement == targetPlacement && !hasUpcomingRepeater) {
           float a = distribute ? alpha : 1.0f;
-          if (curTextModifier && !geos.empty()) {
+          if (state.curTextModifier && !state.geos.empty()) {
             // Merge with the deferred Fill so per-character spans carry both fill and
             // stroke in a single CSS declaration, avoiding Chromium's sub-pixel offset
             // between two stacked <div>s.
-            writeTextModifier(out, geos, curTextModifier, curFill, curStroke, curTextBox, a);
-          } else if (curTextPath && !geos.empty()) {
-            writeTextPath(out, geos, curTextPath, curFill, curStroke, curTextBox, a);
-          } else if (curFill != nullptr) {
+            writeTextModifier(out, state.geos, state.curTextModifier, state.curFill,
+                              state.curStroke, curTextBox, a);
+          } else if (state.curTextPath && !state.geos.empty()) {
+            writeTextPath(out, state.geos, state.curTextPath, state.curFill, state.curStroke,
+                          curTextBox, a);
+          } else if (state.curFill != nullptr) {
             // Split geos into Text vs Shape: the Fill+Stroke span merge only matters for Text
             // (Chromium sub-pixel offset between two stacked spans produces doubled glyph
             // edges). For Shapes, the preceding Fill branch already painted every Shape geo
@@ -322,7 +318,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             // SVG emits fill="none".
             std::vector<GeoInfo> textGeos;
             std::vector<GeoInfo> shapeGeos;
-            for (auto& g : geos) {
+            for (auto& g : state.geos) {
               if (g.type == NodeType::Text) {
                 textGeos.push_back(g);
               } else {
@@ -330,16 +326,16 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
               }
             }
             if (!textGeos.empty()) {
-              paintGeos(out, textGeos, curFill, curStroke, curTextBox, a, hasTrim, curTrim,
-                        hasMerge, mergeMode);
+              paintGeos(out, textGeos, state.curFill, state.curStroke, curTextBox, a, state.hasTrim,
+                        state.curTrim, state.hasMerge, state.mergeMode);
             }
             if (!shapeGeos.empty()) {
-              paintGeos(out, shapeGeos, nullptr, curStroke, curTextBox, a, hasTrim, curTrim,
-                        hasMerge, mergeMode);
+              paintGeos(out, shapeGeos, nullptr, state.curStroke, curTextBox, a, state.hasTrim,
+                        state.curTrim, state.hasMerge, state.mergeMode);
             }
           } else {
-            paintGeos(out, geos, nullptr, curStroke, curTextBox, a, hasTrim, curTrim, hasMerge,
-                      mergeMode);
+            paintGeos(out, state.geos, nullptr, state.curStroke, curTextBox, a, state.hasTrim,
+                      state.curTrim, state.hasMerge, state.mergeMode);
           }
         }
         break;
@@ -354,14 +350,14 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         break;
       }
       case NodeType::TrimPath:
-        hasTrim = true;
-        curTrim = static_cast<const TrimPath*>(element);
+        state.hasTrim = true;
+        state.curTrim = static_cast<const TrimPath*>(element);
         break;
       case NodeType::RoundCorner: {
         auto rc = static_cast<const RoundCorner*>(element);
         roundCornerRadius = rc->radius;
         if (roundCornerRadius > 0) {
-          for (auto& g : geos) {
+          for (auto& g : state.geos) {
             if (g.type == NodeType::Rectangle || g.type == NodeType::Ellipse ||
                 g.type == NodeType::Path || g.type == NodeType::Polystar) {
               PathData pathData = PathDataFromSVGString("");
@@ -376,17 +372,17 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
       }
       case NodeType::MergePath: {
         auto mp = static_cast<const MergePath*>(element);
-        hasMerge = true;
-        mergeMode = mp->mode;
-        curFill = nullptr;
-        curStroke = nullptr;
+        state.hasMerge = true;
+        state.mergeMode = mp->mode;
+        state.curFill = nullptr;
+        state.curStroke = nullptr;
         break;
       }
       case NodeType::TextModifier:
-        curTextModifier = static_cast<const TextModifier*>(element);
+        state.curTextModifier = static_cast<const TextModifier*>(element);
         break;
       case NodeType::TextPath:
-        curTextPath = static_cast<const TextPath*>(element);
+        state.curTextPath = static_cast<const TextPath*>(element);
         break;
       case NodeType::Group: {
         auto group = static_cast<const Group*>(element);
@@ -445,8 +441,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           writeGroup(out, group, alpha, distribute);
         } else {
           flattenGroup(out, group, alpha, distribute, targetPlacement, hasUpcomingRepeater,
-                       curTextBox, geos, curFill, curStroke, hasTrim, curTrim, hasMerge, mergeMode,
-                       curTextPath, curTextModifier);
+                       curTextBox, state);
         }
         break;
       }
@@ -458,8 +453,8 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         // Mirror this ordering so the HTML decay (div opacity per copy) only kicks in when
         // the fill/stroke was declared before the Repeater (showcase_mandala Middle Ring has
         // the Stroke after, so every petal must render at full alpha).
-        const Fill* repFillBefore = curFill;
-        const Stroke* repStrokeBefore = curStroke;
+        const Fill* repFillBefore = state.curFill;
+        const Stroke* repStrokeBefore = state.curStroke;
         const Fill* repFillAfter = nullptr;
         const Stroke* repStrokeAfter = nullptr;
         if (!repFillBefore || !repStrokeBefore) {
@@ -483,18 +478,18 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         const Fill* repFill = repFillBefore ? repFillBefore : repFillAfter;
         const Stroke* repStroke = repStrokeBefore ? repStrokeBefore : repStrokeAfter;
         bool applyDecay = (repFillBefore != nullptr) || (repStrokeBefore != nullptr);
-        writeRepeater(out, rep, geos, repFill, repStroke, distribute ? alpha : 1.0f, curTrim,
-                      applyDecay);
-        geos.clear();
-        curFill = nullptr;
-        curStroke = nullptr;
-        hasTrim = false;
-        curTrim = nullptr;
-        hasMerge = false;
-        mergeMode = MergePathMode::Append;
+        writeRepeater(out, rep, state.geos, repFill, repStroke, distribute ? alpha : 1.0f,
+                      state.curTrim, applyDecay);
+        state.geos.clear();
+        state.curFill = nullptr;
+        state.curStroke = nullptr;
+        state.hasTrim = false;
+        state.curTrim = nullptr;
+        state.hasMerge = false;
+        state.mergeMode = MergePathMode::Append;
         roundCornerRadius = 0.0f;
-        curTextModifier = nullptr;
-        curTextPath = nullptr;
+        state.curTextModifier = nullptr;
+        state.curTextPath = nullptr;
         // Clear the flag so that geometry appearing after this Repeater (e.g. rotated Group lines
         // in game_hud Background) can be painted immediately by a subsequent Fill/Stroke rather
         // than being deferred indefinitely and silently discarded.
@@ -509,27 +504,24 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
 
 void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha, bool distribute,
                               LayerPlacement targetPlacement, bool hasUpcomingRepeater,
-                              const TextBox* curTextBox, std::vector<GeoInfo>& geos,
-                              const Fill*& curFill, const Stroke*& curStroke, bool& hasTrim,
-                              const TrimPath*& curTrim, bool& hasMerge, MergePathMode& mergeMode,
-                              const TextPath*& curTextPath, const TextModifier*& curTextModifier) {
-  auto savedFill = curFill;
-  auto savedStroke = curStroke;
-  auto savedHasTrim = hasTrim;
-  auto savedTrim = curTrim;
-  auto savedTextPath = curTextPath;
-  auto savedTextModifier = curTextModifier;
-  curFill = nullptr;
-  curStroke = nullptr;
-  hasTrim = false;
-  curTrim = nullptr;
+                              const TextBox* curTextBox, ElementDispatchState& state) {
+  auto savedFill = state.curFill;
+  auto savedStroke = state.curStroke;
+  auto savedHasTrim = state.hasTrim;
+  auto savedTrim = state.curTrim;
+  auto savedTextPath = state.curTextPath;
+  auto savedTextModifier = state.curTextModifier;
+  state.curFill = nullptr;
+  state.curStroke = nullptr;
+  state.hasTrim = false;
+  state.curTrim = nullptr;
   // A Group defines its own element scope: TextPath/TextModifier declared outside the
   // Group must not bleed in and re-apply to Text children inside the Group. Clear them
   // so the flatten loop starts clean; they are restored after the Group exits.
-  curTextPath = nullptr;
-  curTextModifier = nullptr;
-  auto savedGeos = std::move(geos);
-  geos.clear();
+  state.curTextPath = nullptr;
+  state.curTextModifier = nullptr;
+  auto savedGeos = std::move(state.geos);
+  state.geos.clear();
   std::vector<GeoInfo> groupGeos;
   Matrix gm = BuildGroupMatrixForHTML(group);
   // When a Group has alpha < 1, its Painters render with that alpha applied. In the
@@ -560,60 +552,63 @@ void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha,
         std::string svgPath =
             gm.isIdentity() ? PathDataToSVGString(pathData) : TransformPathDataToSVG(pathData, gm);
         GeoInfo info = {gt, ge, svgPath, groupPadding};
-        geos.push_back(info);
+        state.geos.push_back(info);
         groupGeos.push_back(info);
       }
     } else if (gt == NodeType::Text) {
       GeoInfo info = {gt, ge, {}, groupPadding};
-      geos.push_back(info);
+      state.geos.push_back(info);
       groupGeos.push_back(info);
     } else if (gt == NodeType::TextPath) {
       // Flatten path mirrors the top-level TextPath handler: capture the element so
       // the subsequent Fill/Stroke triggers per-character path emission via
       // writeTextPath instead of a plain <span> (text_path Group TextPath symptom).
-      curTextPath = static_cast<const TextPath*>(ge);
+      state.curTextPath = static_cast<const TextPath*>(ge);
     } else if (gt == NodeType::TextModifier) {
-      curTextModifier = static_cast<const TextModifier*>(ge);
+      state.curTextModifier = static_cast<const TextModifier*>(ge);
     } else if (gt == NodeType::Fill) {
       auto fill = static_cast<const Fill*>(ge);
-      curFill = fill;
+      state.curFill = fill;
       if (fill->placement == targetPlacement && !hasUpcomingRepeater && !groupHasUpcomingRepeater) {
         float a = groupAlpha * (distribute ? alpha : 1.0f);
-        if (curTextPath && !geos.empty()) {
-          writeTextPath(out, geos, curTextPath, curFill, nullptr, curTextBox, a);
-          geos.clear();
+        if (state.curTextPath && !state.geos.empty()) {
+          writeTextPath(out, state.geos, state.curTextPath, state.curFill, nullptr, curTextBox, a);
+          state.geos.clear();
           groupGeos.clear();
-        } else if (curTextModifier && !geos.empty()) {
-          writeTextModifier(out, geos, curTextModifier, curFill, nullptr, curTextBox, a);
-          geos.clear();
+        } else if (state.curTextModifier && !state.geos.empty()) {
+          writeTextModifier(out, state.geos, state.curTextModifier, state.curFill, nullptr,
+                            curTextBox, a);
+          state.geos.clear();
           groupGeos.clear();
         } else {
-          paintGeos(out, geos, curFill, nullptr, curTextBox, a, hasTrim, curTrim, hasMerge,
-                    mergeMode);
+          paintGeos(out, state.geos, state.curFill, nullptr, curTextBox, a, state.hasTrim,
+                    state.curTrim, state.hasMerge, state.mergeMode);
         }
       }
     } else if (gt == NodeType::Stroke) {
       auto stroke = static_cast<const Stroke*>(ge);
-      curStroke = stroke;
+      state.curStroke = stroke;
       if (stroke->placement == targetPlacement && !hasUpcomingRepeater &&
           !groupHasUpcomingRepeater) {
         float a = groupAlpha * (distribute ? alpha : 1.0f);
-        if (curTextPath && !geos.empty()) {
-          writeTextPath(out, geos, curTextPath, curFill, curStroke, curTextBox, a);
-          geos.clear();
+        if (state.curTextPath && !state.geos.empty()) {
+          writeTextPath(out, state.geos, state.curTextPath, state.curFill, state.curStroke,
+                        curTextBox, a);
+          state.geos.clear();
           groupGeos.clear();
-        } else if (curTextModifier && !geos.empty()) {
-          writeTextModifier(out, geos, curTextModifier, curFill, curStroke, curTextBox, a);
-          geos.clear();
+        } else if (state.curTextModifier && !state.geos.empty()) {
+          writeTextModifier(out, state.geos, state.curTextModifier, state.curFill, state.curStroke,
+                            curTextBox, a);
+          state.geos.clear();
           groupGeos.clear();
         } else {
-          paintGeos(out, geos, curFill, curStroke, curTextBox, a, hasTrim, curTrim, hasMerge,
-                    mergeMode);
+          paintGeos(out, state.geos, state.curFill, state.curStroke, curTextBox, a, state.hasTrim,
+                    state.curTrim, state.hasMerge, state.mergeMode);
         }
       }
     } else if (gt == NodeType::TrimPath) {
-      hasTrim = true;
-      curTrim = static_cast<const TrimPath*>(ge);
+      state.hasTrim = true;
+      state.curTrim = static_cast<const TrimPath*>(ge);
     } else if (gt == NodeType::Repeater) {
       // Expand the Repeater at path level inside the Group: instead of emitting N copy
       // <div>s here (which would need Group-internal painters, undoing the "defer Fill
@@ -635,7 +630,7 @@ void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha,
       // Drop original-index entries we are about to re-emit in the expansion loop. We
       // also trim `geos` (which mirrors groupGeos at this point thanks to the dual
       // push_back pattern above) so we do not paint the pre-expansion copy twice.
-      geos.resize(geos.size() - originalGeos.size());
+      state.geos.resize(state.geos.size() - originalGeos.size());
       groupGeos.clear();
       for (int i = 0; i < copies; i++) {
         Matrix cm = BuildRepeaterCopyMatrix(innerRep, i);
@@ -660,7 +655,7 @@ void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha,
                                         : TransformPathDataToSVG(pathData, combined);
           }
           groupGeos.push_back(copy);
-          geos.push_back(copy);
+          state.geos.push_back(copy);
         }
       }
       // If a Fill or Stroke was declared BEFORE this Repeater, its paint was deferred
@@ -670,7 +665,7 @@ void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha,
       // holding all 5 copies but no paintGeos call to emit them (complete_example
       // Modifiers cyan 5-ellipse symptom: only 1 copy visible when the later Fill path
       // also forgot to paint).
-      if (curFill || curStroke) {
+      if (state.curFill || state.curStroke) {
         if (hasUpcomingRepeater) {
           // An outer Repeater will consume the expanded geos as its geometry source;
           // calling paintGeos here would render them once and then clear the vector,
@@ -679,9 +674,9 @@ void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha,
           // Instead, keep geos in place so the outer Repeater sees all 30 copies.
         } else {
           float a = groupAlpha * (distribute ? alpha : 1.0f);
-          paintGeos(out, geos, curFill, curStroke, curTextBox, a, hasTrim, curTrim, hasMerge,
-                    mergeMode);
-          geos.clear();
+          paintGeos(out, state.geos, state.curFill, state.curStroke, curTextBox, a, state.hasTrim,
+                    state.curTrim, state.hasMerge, state.mergeMode);
+          state.geos.clear();
           groupGeos.clear();
           // `groupHasUpcomingRepeater` was only about deferring the pre-repeater paint;
           // now that we have painted, any later Fill/Stroke for the same group should
@@ -714,9 +709,9 @@ void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha,
         }
         // `geos` mirrors groupGeos — keep them in sync so the later paintGeos sees
         // the rounded data as well.
-        size_t headSize = geos.size() - groupGeos.size();
+        size_t headSize = state.geos.size() - groupGeos.size();
         for (size_t i = 0; i < groupGeos.size(); i++) {
-          geos[headSize + i].modifiedPathData = groupGeos[i].modifiedPathData;
+          state.geos[headSize + i].modifiedPathData = groupGeos[i].modifiedPathData;
         }
       }
     } else if (gt == NodeType::MergePath) {
@@ -726,10 +721,10 @@ void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha,
       // shapes as independent SVG paths instead of combining them (complete_example
       // Modifiers purple rect+ellipse xor symptom).
       auto mp = static_cast<const MergePath*>(ge);
-      hasMerge = true;
-      mergeMode = mp->mode;
-      curFill = nullptr;
-      curStroke = nullptr;
+      state.hasMerge = true;
+      state.mergeMode = mp->mode;
+      state.curFill = nullptr;
+      state.curStroke = nullptr;
     }
   }
   // Propagate the Group's Fill/Stroke out to the enclosing element stream. Without
@@ -738,20 +733,20 @@ void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha,
   // — the outer Repeater would then paint uncoloured paths. Only override the outer
   // painter when it was unset; an outer painter that existed before the Group enters
   // is preserved to keep the existing "Repeater consumes pre-existing painter" rule.
-  if (!savedFill && curFill) {
-    savedFill = curFill;
+  if (!savedFill && state.curFill) {
+    savedFill = state.curFill;
   }
-  if (!savedStroke && curStroke) {
-    savedStroke = curStroke;
+  if (!savedStroke && state.curStroke) {
+    savedStroke = state.curStroke;
   }
-  curFill = savedFill;
-  curStroke = savedStroke;
-  hasTrim = savedHasTrim;
-  curTrim = savedTrim;
-  curTextPath = savedTextPath;
-  curTextModifier = savedTextModifier;
+  state.curFill = savedFill;
+  state.curStroke = savedStroke;
+  state.hasTrim = savedHasTrim;
+  state.curTrim = savedTrim;
+  state.curTextPath = savedTextPath;
+  state.curTextModifier = savedTextModifier;
   savedGeos.insert(savedGeos.end(), groupGeos.begin(), groupGeos.end());
-  geos = std::move(savedGeos);
+  state.geos = std::move(savedGeos);
 }
 
 void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
