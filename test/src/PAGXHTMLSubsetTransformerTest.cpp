@@ -594,6 +594,64 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceKeepsChildrenWhenDomOrderMa
   EXPECT_EQ(orderedIds[2], "c");
 }
 
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceRecoversNestedPaddingUnderStretchParent) {
+  // Regression for the snapshot.js → pagx import pipeline (`html2pagx`). The body has a
+  // column-stretch flex layout (children span the full body width), so the outer pass
+  // erases each child's `width: 320px`. The inner child is itself a row container whose
+  // own children stop short of both edges (`left:14..286`), and its row padding must be
+  // recovered from the original 320px width rather than from the children's bbox. With
+  // pre-order traversal the inner inference happened *after* the outer strip and silently
+  // collapsed the padding to 0; the fix walks children first so the inner pass still sees
+  // the explicit width.
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:320px;height:120px">
+               <div style="position:absolute;left:0px;top:0px;width:320px;height:60px;background-color:#fff">
+                 <div style="position:absolute;left:14px;top:18px;width:24px;height:24px"></div>
+                 <div style="position:absolute;left:48px;top:18px;width:200px;height:24px"></div>
+                 <div style="position:absolute;left:258px;top:18px;width:24px;height:24px"></div>
+                 <div style="position:absolute;left:292px;top:18px;width:14px;height:24px"></div>
+               </div>
+               <div style="position:absolute;left:0px;top:60px;width:320px;height:60px;background-color:#fff">
+                 <div style="position:absolute;left:0px;top:0px;width:160px;height:60px"></div>
+                 <div style="position:absolute;left:160px;top:0px;width:160px;height:60px"></div>
+               </div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:flex-inferred"));
+  auto body = root->getFirstChild("body");
+  ASSERT_NE(body, nullptr);
+  EXPECT_TRUE(StyleContains(body, "display: flex"));
+  EXPECT_TRUE(StyleContains(body, "flex-direction: column"));
+  EXPECT_TRUE(StyleContains(body, "align-items: stretch"));
+
+  // First child: header row whose direct children stop 14px from both edges. After the fix
+  // its inner inference uses the original 320px width and recovers padding-left/right = 14.
+  auto topBar = body->firstChild;
+  ASSERT_NE(topBar, nullptr);
+  ASSERT_EQ(topBar->type, pagx::DOMNodeType::Element);
+  EXPECT_TRUE(StyleContains(topBar, "display: flex"));
+  EXPECT_TRUE(StyleContains(topBar, "flex-direction: row"));
+  // Asymmetric main-axis padding (14 left, 14 right) emitted as the 2-token shorthand.
+  EXPECT_TRUE(StyleContains(topBar, "padding: 0px 14px"));
+  // Because the parent stretches its cross axis, the top bar's width is erased.
+  EXPECT_FALSE(StyleContains(topBar, "width:"));
+
+  // Second child: a row of two siblings that exactly tile the parent. Its inner inference
+  // should produce zero horizontal padding (and is allowed to use stretch on its own
+  // children's height).
+  auto grid = topBar->nextSibling;
+  while (grid && grid->type != pagx::DOMNodeType::Element) grid = grid->nextSibling;
+  ASSERT_NE(grid, nullptr);
+  EXPECT_TRUE(StyleContains(grid, "display: flex"));
+  EXPECT_TRUE(StyleContains(grid, "flex-direction: row"));
+  // No padding emitted (all four sides are zero — the shorthand is suppressed entirely).
+  EXPECT_FALSE(StyleContains(grid, "padding:"));
+}
+
 PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceTolerancePicksUpSubpixelDrift) {
   pagx::HTMLSubsetTransformer::Options opts = {};
   opts.inferFlexFromAbsolute = true;

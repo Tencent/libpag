@@ -1086,12 +1086,18 @@ void WalkInferFlex(const std::shared_ptr<DOMNode>& node, HTMLTransformContext& c
   if (!node || node->type != DOMNodeType::Element) return;
   // SVG subtrees are opaque (their absolute geometry is meaningful at a different layer).
   if (node->name == "svg") return;
-  TryInferFlexOnContainer(node, ctx);
+  // Recurse children first so that each container resolves its own flex spacing while its
+  // explicit width/height is still intact. If we processed the parent first and it folded
+  // its children into a `stretch` alignment, the child's cross-axis dimension would be
+  // erased before the child got a chance to use it — forcing the child's own inference to
+  // fall back to a children-bbox content range and silently dropping the parent-edge
+  // paddings (top bar / tab bar / category row, video grid horizontal padding, ...).
   auto child = node->firstChild;
   while (child) {
     WalkInferFlex(child, ctx);
     child = child->nextSibling;
   }
+  TryInferFlexOnContainer(node, ctx);
 }
 
 }  // namespace
