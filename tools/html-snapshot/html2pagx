@@ -17,6 +17,7 @@
 #   --scale <N>                Render scale factor (default: 1)
 #   --no-render                Stop after pagx resolve; do not produce PNG
 #   --no-resolve               Stop after pagx import; do not run resolve/render
+#   --no-infer-flex            Disable AbsoluteToFlexInference (default: on)
 #   -h, --help                 Show this help
 
 set -u
@@ -43,6 +44,7 @@ PAGX_BIN="$DEFAULT_PAGX_BIN"
 SCALE="1"
 DO_RESOLVE=1
 DO_RENDER=1
+INFER_FLEX=1
 SNAPSHOT_EXTRA_ARGS=()
 
 while [[ $# -gt 0 ]]; do
@@ -70,6 +72,10 @@ while [[ $# -gt 0 ]]; do
     --no-resolve)
       DO_RESOLVE=0
       DO_RENDER=0
+      shift
+      ;;
+    --no-infer-flex)
+      INFER_FLEX=0
       shift
       ;;
     --viewport-width|--viewport-height|--wait-ms|--selector)
@@ -172,7 +178,11 @@ node "$SCRIPT_DIR/snapshot.js" "$INPUT_ABS" -o "$SUBSET_HTML" "${SNAPSHOT_EXTRA_
 # Step 2: pagx import
 #--------------------------------------------------------------------------------------------------
 echo "[2] import    $SUBSET_HTML"
-"$PAGX_BIN" import --input "$SUBSET_HTML" --output "$SUBSET_PAGX" 2>&1 \
+IMPORT_ARGS=(--input "$SUBSET_HTML" --output "$SUBSET_PAGX")
+if [[ "$INFER_FLEX" -eq 1 ]]; then
+  IMPORT_ARGS+=(--html-infer-flex)
+fi
+"$PAGX_BIN" import "${IMPORT_ARGS[@]}" 2>&1 \
   | grep -v "warning: html: position: absolute on text leaf" \
   || true
 
