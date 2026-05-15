@@ -97,7 +97,15 @@ npm run build:debug
 # Release build: minified JS, stripped WASM, optimized for production.
 # Use this when integrating the SDK into a shipping product.
 npm run build:release
+
+# Single-threaded variants (no pthread / SharedArrayBuffer requirement).
+# Useful when the hosting page cannot enable cross-origin isolation.
+npm run build:debug:st
+npm run build:release:st
 ```
+
+> Note: the multi-threaded (`wasm-mt`) and single-threaded (`wasm`) builds share the same output
+> files in `lib/`. Running a build of one flavor will overwrite the other's artifacts.
 
 Both commands generate the following artifacts under `lib/`:
 
@@ -122,10 +130,14 @@ bundles), you can invoke the individual steps:
 
 | Command | Description |
 |---------|-------------|
-| `npm run build:wasm` | Build only the WebAssembly binary (release) |
-| `npm run build:wasm:debug` | Build only the WebAssembly binary (debug) |
-| `npm run build:js` | Build only the JavaScript bundles (debug) |
-| `npm run build:js:release` | Build only the JavaScript bundles (release) |
+| `npm run build:wasm` | Build only the WebAssembly binary (multi-threaded, release) |
+| `npm run build:wasm:debug` | Build only the WebAssembly binary (multi-threaded, debug) |
+| `npm run build:wasm:st` | Build only the WebAssembly binary (single-threaded, release) |
+| `npm run build:wasm:st:debug` | Build only the WebAssembly binary (single-threaded, debug) |
+| `npm run build:js` | Build only the JavaScript bundles (multi-threaded, debug) |
+| `npm run build:js:release` | Build only the JavaScript bundles (multi-threaded, release) |
+| `npm run build:js:st` | Build only the JavaScript bundles (single-threaded, debug) |
+| `npm run build:js:st:release` | Build only the JavaScript bundles (single-threaded, release) |
 | `npm run build:types` | Emit TypeScript declaration files |
 | `npm run clean` | Remove build artifacts and caches |
 
