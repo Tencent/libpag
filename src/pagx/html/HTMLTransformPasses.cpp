@@ -20,11 +20,14 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <set>
 #include <string>
 #include <utility>
+#include <vector>
 #include "pagx/html/HTMLCssCascade.h"
 #include "pagx/html/HTMLParserContext.h"
 #include "pagx/html/HTMLSubsetPropertyTable.h"
@@ -524,6 +527,530 @@ void PropertyFilterPass::apply(const std::shared_ptr<DOMNode>& root, HTMLTransfo
   // Root document font-size defaults to 14px (matches HTML_DEFAULT_FONT_SIZE / the body
   // element default in `ElementDefaults`).
   FilterTree(body, 14.0f, ctx);
+}
+
+//==================================================================================================
+// AbsoluteToFlexInferencePass
+//==================================================================================================
+
+namespace {
+
+// Parses an already-normalised length value (`Npx`) into a finite float. Returns false when
+// the value is empty, percent-based, or otherwise not a plain pixel length. PropertyFilter has
+// already converted every supported unit to `px`, so anything else means "skip".
+bool ParseNormalisedPx(const std::string& valueRaw, float& outPx) {
+  std::string value = Trim(valueRaw);
+  if (value.empty()) return false;
+  const char* c = value.c_str();
+  char* end = nullptr;
+  float v = std::strtof(c, &end);
+  if (end == c) return false;
+  if (!std::isfinite(v)) return false;
+  std::string suffix = Trim(end);
+  if (suffix.empty() || suffix == "px") {
+    outPx = v;
+    return true;
+  }
+  return false;
+}
+
+// Reads a property from a resolved style map, returning empty when missing.
+const std::string& LookupResolved(const PropertyMap& props, const std::string& key) {
+  static const std::string kEmpty;
+  auto it = props.find(key);
+  return it == props.end() ? kEmpty : it->second;
+}
+
+// Lower-cased view of a resolved property.
+std::string LookupResolvedLower(const PropertyMap& props, const std::string& key) {
+  return ToLower(Trim(LookupResolved(props, key)));
+}
+
+// Parses the resolved `padding` shorthand (1-4 px tokens) into top/right/bottom/left. Returns
+// false if the value is missing or any token is not a plain px length. Per-side `padding-*`
+// overrides (when present) win over the shorthand.
+bool ParsePaddingFromResolved(const PropertyMap& props, float& top, float& right, float& bottom,
+                              float& left) {
+  top = right = bottom = left = 0.0f;
+  bool any = false;
+  auto applyShorthand = [&](const std::string& v) {
+    auto tokens = pagx::detail::SplitTopLevelWhitespace(v);
+    std::vector<float> nums;
+    nums.reserve(tokens.size());
+    for (auto& t : tokens) {
+      float px = 0.0f;
+      if (!ParseNormalisedPx(t, px)) return false;
+      nums.push_back(px);
+    }
+    if (nums.empty()) return false;
+    auto p = pagx::detail::BuildPaddingShorthand(nums);
+    top = p.top;
+    right = p.right;
+    bottom = p.bottom;
+    left = p.left;
+    any = true;
+    return true;
+  };
+  auto sh = LookupResolved(props, "padding");
+  if (!sh.empty() && !applyShorthand(sh)) return false;
+  // Per-side overrides.
+  float px = 0.0f;
+  if (auto v = LookupResolved(props, "padding-top"); !v.empty() && ParseNormalisedPx(v, px)) {
+    top = px;
+    any = true;
+  }
+  if (auto v = LookupResolved(props, "padding-right"); !v.empty() && ParseNormalisedPx(v, px)) {
+    right = px;
+    any = true;
+  }
+  if (auto v = LookupResolved(props, "padding-bottom"); !v.empty() && ParseNormalisedPx(v, px)) {
+    bottom = px;
+    any = true;
+  }
+  if (auto v = LookupResolved(props, "padding-left"); !v.empty() && ParseNormalisedPx(v, px)) {
+    left = px;
+    any = true;
+  }
+  return any || sh.empty();  // empty padding is fine (zeros)
+}
+
+// Builds a CSS px shorthand string from top/right/bottom/left, collapsing to the shortest
+// equivalent form ("N", "T R", "T R B" vs "T R B L").
+std::string EmitPaddingShorthand(float t, float r, float b, float l) {
+  auto fmt = [](float v) {
+    float rounded = std::round(v * 1000.0f) / 1000.0f;
+    if (rounded == std::floor(rounded) && std::fabs(rounded) < 1e9f) {
+      return std::to_string(static_cast<long long>(rounded)) + "px";
+    }
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%g", static_cast<double>(rounded));
+    return std::string(buf) + "px";
+  };
+  if (t == r && r == b && b == l) return fmt(t);
+  if (t == b && l == r) return fmt(t) + " " + fmt(r);
+  if (l == r) return fmt(t) + " " + fmt(r) + " " + fmt(b);
+  return fmt(t) + " " + fmt(r) + " " + fmt(b) + " " + fmt(l);
+}
+
+std::string EmitPxValue(float v) {
+  float rounded = std::round(v * 1000.0f) / 1000.0f;
+  if (rounded == std::floor(rounded) && std::fabs(rounded) < 1e9f) {
+    return std::to_string(static_cast<long long>(rounded)) + "px";
+  }
+  char buf[32];
+  std::snprintf(buf, sizeof(buf), "%g", static_cast<double>(rounded));
+  return std::string(buf) + "px";
+}
+
+struct ChildBox {
+  std::shared_ptr<DOMNode> node;
+  float left = 0.0f;
+  float top = 0.0f;
+  float width = 0.0f;
+  float height = 0.0f;
+};
+
+// Returns true when `props` describes an `position: absolute` element with all four of
+// `left`/`top`/`width`/`height` resolved into plain px lengths and no `right`/`bottom` /
+// `flex` overrides that would conflict with a flex rewrite.
+bool ExtractAbsoluteBox(const PropertyMap& props, ChildBox& out) {
+  if (LookupResolvedLower(props, "position") != "absolute") return false;
+  // Conflict guards: we don't try to rewrite children that pin against the parent's right /
+  // bottom edges, or that already declare a flex grow factor.
+  auto rightVal = LookupResolved(props, "right");
+  auto bottomVal = LookupResolved(props, "bottom");
+  if (!rightVal.empty()) return false;
+  if (!bottomVal.empty()) return false;
+  if (!LookupResolved(props, "flex").empty()) return false;
+  float left = 0.0f;
+  float top = 0.0f;
+  float width = 0.0f;
+  float height = 0.0f;
+  if (!ParseNormalisedPx(LookupResolved(props, "left"), left)) return false;
+  if (!ParseNormalisedPx(LookupResolved(props, "top"), top)) return false;
+  if (!ParseNormalisedPx(LookupResolved(props, "width"), width)) return false;
+  if (!ParseNormalisedPx(LookupResolved(props, "height"), height)) return false;
+  if (!std::isfinite(left) || !std::isfinite(top)) return false;
+  if (!(width > 0.0f) || !(height > 0.0f)) return false;
+  out.left = left;
+  out.top = top;
+  out.width = width;
+  out.height = height;
+  return true;
+}
+
+enum class FlexAxis { Row, Column };
+
+// Returns the inferred main axis when every child's bounding box is ordered along it without
+// overlap. When both axes are valid (single child / collinear), prefers the axis with the
+// larger spread. Returns std::nullopt-equivalent (false) when neither axis works.
+bool InferAxis(const std::vector<ChildBox>& children, float tol, FlexAxis& out) {
+  if (children.size() < 2) return false;
+  auto axisOk = [&](bool row) {
+    auto sorted = children;
+    std::sort(sorted.begin(), sorted.end(), [&](const ChildBox& a, const ChildBox& b) {
+      return row ? a.left < b.left : a.top < b.top;
+    });
+    for (size_t i = 0; i + 1 < sorted.size(); i++) {
+      float curEnd = row ? sorted[i].left + sorted[i].width : sorted[i].top + sorted[i].height;
+      float nextStart = row ? sorted[i + 1].left : sorted[i + 1].top;
+      if (nextStart < curEnd - tol) return false;  // overlap on main axis
+    }
+    return true;
+  };
+  bool rowOk = axisOk(true);
+  bool colOk = axisOk(false);
+  if (rowOk && colOk) {
+    // Both axes are non-overlapping — pick the one with the largest spread of starts so that a
+    // genuine row-of-3 doesn't get classified as a column with three identical y values.
+    auto spread = [&](bool row) {
+      float lo = std::numeric_limits<float>::infinity();
+      float hi = -std::numeric_limits<float>::infinity();
+      for (const auto& c : children) {
+        float v = row ? c.left : c.top;
+        lo = std::min(lo, v);
+        hi = std::max(hi, v);
+      }
+      return hi - lo;
+    };
+    out = spread(true) >= spread(false) ? FlexAxis::Row : FlexAxis::Column;
+    return true;
+  }
+  if (rowOk) {
+    out = FlexAxis::Row;
+    return true;
+  }
+  if (colOk) {
+    out = FlexAxis::Column;
+    return true;
+  }
+  return false;
+}
+
+enum class CrossAlign { Start, Center, End, Stretch, Mixed };
+
+// Determines a single `align-items` value compatible with all children's cross-axis position
+// inside the parent's content box. Returns CrossAlign::Mixed when no single keyword fits.
+CrossAlign InferCrossAlign(const std::vector<ChildBox>& children, FlexAxis axis,
+                           float contentLow, float contentHigh, float tol) {
+  if (children.empty()) return CrossAlign::Mixed;
+  bool stretchOk = true;
+  bool startOk = true;
+  bool endOk = true;
+  bool centerOk = true;
+  float contentMid = 0.5f * (contentLow + contentHigh);
+  float contentSize = contentHigh - contentLow;
+  for (const auto& c : children) {
+    float lo = axis == FlexAxis::Row ? c.top : c.left;
+    float size = axis == FlexAxis::Row ? c.height : c.width;
+    float hi = lo + size;
+    float mid = lo + size * 0.5f;
+    if (std::fabs(lo - contentLow) > tol) startOk = false;
+    if (std::fabs(hi - contentHigh) > tol) endOk = false;
+    if (std::fabs(mid - contentMid) > tol) centerOk = false;
+    if (!(std::fabs(lo - contentLow) <= tol && std::fabs(size - contentSize) <= tol)) {
+      stretchOk = false;
+    }
+  }
+  if (stretchOk) return CrossAlign::Stretch;
+  if (startOk) return CrossAlign::Start;
+  if (centerOk) return CrossAlign::Center;
+  if (endOk) return CrossAlign::End;
+  return CrossAlign::Mixed;
+}
+
+// Result of main-axis spacing inference. Either we can produce a clean
+// (paddingLeading, paddingTrailing, gap) triple (`ok = true`), or we can't and the parent is
+// left as-is.
+struct MainAxisFit {
+  bool ok = false;
+  float paddingLeading = 0.0f;
+  float paddingTrailing = 0.0f;
+  float gap = 0.0f;
+};
+
+MainAxisFit InferMainAxisSpacing(const std::vector<ChildBox>& sorted, FlexAxis axis,
+                                 float contentLow, float contentHigh, float tol) {
+  MainAxisFit fit = {};
+  auto get = [&](const ChildBox& c, bool low) {
+    if (axis == FlexAxis::Row) {
+      return low ? c.left : c.left + c.width;
+    }
+    return low ? c.top : c.top + c.height;
+  };
+  fit.paddingLeading = get(sorted.front(), true) - contentLow;
+  fit.paddingTrailing = contentHigh - get(sorted.back(), false);
+  if (fit.paddingLeading < -tol) return fit;     // first child overflows the content box
+  if (fit.paddingTrailing < -tol) return fit;    // last child overflows the content box
+  if (fit.paddingLeading < 0) fit.paddingLeading = 0;
+  if (fit.paddingTrailing < 0) fit.paddingTrailing = 0;
+  if (sorted.size() == 1) {
+    fit.ok = true;
+    return fit;
+  }
+  // Compute every middle gap; require they all match within tolerance.
+  float first = get(sorted[1], true) - get(sorted[0], false);
+  if (first < -tol) return fit;  // overlap (shouldn't happen — InferAxis guarded this)
+  float gap = std::max(0.0f, first);
+  for (size_t i = 1; i + 1 < sorted.size(); i++) {
+    float g = get(sorted[i + 1], true) - get(sorted[i], false);
+    if (std::fabs(g - first) > tol) return fit;
+    gap = std::max(gap, std::max(0.0f, g));
+  }
+  fit.gap = gap;
+  fit.ok = true;
+  return fit;
+}
+
+// Looks up the parent's content box (inside-padding rectangle) along a single axis. When the
+// parent has no explicit dimension, falls back to the children's bounding extents so that the
+// inference still works on layout-only wrapper containers. Returns true on success.
+bool ResolveContentRange(const PropertyMap* parentProps, const std::vector<ChildBox>& children,
+                         float padLow, float padHigh, FlexAxis axis, float& contentLow,
+                         float& contentHigh) {
+  contentLow = padLow;
+  contentHigh = std::numeric_limits<float>::quiet_NaN();
+  float dim = std::numeric_limits<float>::quiet_NaN();
+  if (parentProps) {
+    const std::string& key = axis == FlexAxis::Row ? "width" : "height";
+    auto val = LookupResolved(*parentProps, key);
+    float px = 0.0f;
+    if (!val.empty() && ParseNormalisedPx(val, px) && px > 0.0f) {
+      dim = px;
+    }
+  }
+  if (std::isfinite(dim)) {
+    contentHigh = dim - padHigh;
+    return contentHigh > contentLow;
+  }
+  // Fallback: bounding extent of children (allows inference on parents without explicit size).
+  float lo = std::numeric_limits<float>::infinity();
+  float hi = -std::numeric_limits<float>::infinity();
+  for (const auto& c : children) {
+    float a = axis == FlexAxis::Row ? c.left : c.top;
+    float b = axis == FlexAxis::Row ? c.left + c.width : c.top + c.height;
+    lo = std::min(lo, a);
+    hi = std::max(hi, b);
+  }
+  if (!std::isfinite(lo) || !std::isfinite(hi)) return false;
+  contentLow = lo;
+  contentHigh = hi;
+  return true;
+}
+
+const char* AxisName(FlexAxis a) {
+  return a == FlexAxis::Row ? "row" : "column";
+}
+
+// Mutates the parent's resolved style to declare the inferred flex layout. Strips any
+// per-side padding overrides we just folded into the shorthand.
+void ApplyFlexToParent(PropertyMap& parentProps, FlexAxis axis, float padTop, float padRight,
+                       float padBottom, float padLeft, float gap, CrossAlign align) {
+  parentProps["display"] = "flex";
+  parentProps["flex-direction"] = AxisName(axis);
+  if (gap > 0.0f) {
+    parentProps["gap"] = EmitPxValue(gap);
+  } else {
+    parentProps.erase("gap");
+  }
+  if (padTop > 0.0f || padRight > 0.0f || padBottom > 0.0f || padLeft > 0.0f) {
+    parentProps["padding"] = EmitPaddingShorthand(padTop, padRight, padBottom, padLeft);
+  } else {
+    parentProps.erase("padding");
+  }
+  parentProps.erase("padding-top");
+  parentProps.erase("padding-right");
+  parentProps.erase("padding-bottom");
+  parentProps.erase("padding-left");
+  switch (align) {
+    case CrossAlign::Stretch:
+      parentProps["align-items"] = "stretch";
+      break;
+    case CrossAlign::Center:
+      parentProps["align-items"] = "center";
+      break;
+    case CrossAlign::Start:
+      parentProps["align-items"] = "flex-start";
+      break;
+    case CrossAlign::End:
+      parentProps["align-items"] = "flex-end";
+      break;
+    case CrossAlign::Mixed:
+      break;  // unreachable: caller already filtered Mixed
+  }
+}
+
+// Strips position-related declarations from a child that the parent's flex layout now
+// places. When the chosen alignment is Stretch the cross-axis size is also dropped so that
+// the flex engine fills the cross axis (matching CSS `align-items: stretch`).
+void StripChildAbsolute(PropertyMap& childProps, FlexAxis axis, CrossAlign align) {
+  childProps.erase("position");
+  childProps.erase("left");
+  childProps.erase("right");
+  childProps.erase("top");
+  childProps.erase("bottom");
+  if (align == CrossAlign::Stretch) {
+    childProps.erase(axis == FlexAxis::Row ? "height" : "width");
+  }
+}
+
+void TryInferFlexOnContainer(const std::shared_ptr<DOMNode>& parent, HTMLTransformContext& ctx) {
+  if (!parent || parent->type != DOMNodeType::Element) return;
+  const std::string& tag = parent->name;
+  // Only rewrite "container" tags — descending into <p>/<span>/<a> would change text layout.
+  // <body> is handled the same way (it's a container for layout purposes).
+  if (!IsContainerTag(tag)) return;
+
+  // If the parent already declares display: flex, leave it alone — we don't second-guess
+  // explicit author intent.
+  auto* parentResolved = ctx.findResolved(parent.get());
+  if (parentResolved) {
+    if (LookupResolvedLower(*parentResolved, "display") == "flex") return;
+  }
+
+  // Gather direct element children with absolute geometry. We require *every* element child
+  // to participate; mixing absolute and flow children can't be expressed as a single flex
+  // container, so we skip rather than do something surprising.
+  std::vector<ChildBox> boxes;
+  bool sawNonAbsoluteChild = false;
+  size_t totalElementChildren = 0;
+  for (auto c = parent->firstChild; c; c = c->nextSibling) {
+    if (c->type != DOMNodeType::Element) continue;
+    totalElementChildren++;
+    auto* cp = ctx.findResolved(c.get());
+    if (!cp) {
+      sawNonAbsoluteChild = true;
+      continue;
+    }
+    ChildBox box = {};
+    box.node = c;
+    if (!ExtractAbsoluteBox(*cp, box)) {
+      sawNonAbsoluteChild = true;
+      continue;
+    }
+    boxes.push_back(box);
+  }
+  if (sawNonAbsoluteChild) return;
+  if (boxes.size() < 2) return;
+  if (totalElementChildren != boxes.size()) return;
+
+  float tol = std::max(0.0f, ctx.options().flexInferenceTolerancePx);
+
+  FlexAxis axis = FlexAxis::Row;
+  if (!InferAxis(boxes, tol, axis)) {
+    ctx.warn("subset:flex-inference-skipped",
+             "html: <" + tag +
+                 "> children overlap on both axes; cannot recover flex layout, kept absolute",
+             parent);
+    return;
+  }
+
+  // Resolve the parent's content box along both axes. When the parent has no explicit size,
+  // fall back to the children's bounding extents (so wrapper containers without a width still
+  // get inferred); this keeps the cross-axis check honest because alignment is computed
+  // against the same range the children already span.
+  float padTopExisting = 0.0f;
+  float padRightExisting = 0.0f;
+  float padBottomExisting = 0.0f;
+  float padLeftExisting = 0.0f;
+  if (parentResolved) {
+    if (!ParsePaddingFromResolved(*parentResolved, padTopExisting, padRightExisting,
+                                  padBottomExisting, padLeftExisting)) {
+      // Padding declared but not in plain px (e.g. percent) — bail out rather than guess.
+      return;
+    }
+  }
+  float mainContentLow = 0.0f;
+  float mainContentHigh = 0.0f;
+  float crossContentLow = 0.0f;
+  float crossContentHigh = 0.0f;
+  float mainPadLow = axis == FlexAxis::Row ? padLeftExisting : padTopExisting;
+  float mainPadHigh = axis == FlexAxis::Row ? padRightExisting : padBottomExisting;
+  float crossPadLow = axis == FlexAxis::Row ? padTopExisting : padLeftExisting;
+  float crossPadHigh = axis == FlexAxis::Row ? padBottomExisting : padRightExisting;
+  if (!ResolveContentRange(parentResolved, boxes, mainPadLow, mainPadHigh, axis, mainContentLow,
+                           mainContentHigh)) {
+    return;
+  }
+  FlexAxis crossAxis = axis == FlexAxis::Row ? FlexAxis::Column : FlexAxis::Row;
+  if (!ResolveContentRange(parentResolved, boxes, crossPadLow, crossPadHigh, crossAxis,
+                           crossContentLow, crossContentHigh)) {
+    return;
+  }
+
+  CrossAlign align = InferCrossAlign(boxes, axis, crossContentLow, crossContentHigh, tol);
+  if (align == CrossAlign::Mixed) {
+    ctx.warn("subset:flex-inference-skipped",
+             "html: <" + tag +
+                 "> children have mixed cross-axis alignment; kept absolute",
+             parent);
+    return;
+  }
+
+  // Sort once along the main axis for spacing inference.
+  std::vector<ChildBox> sorted = boxes;
+  std::sort(sorted.begin(), sorted.end(), [&](const ChildBox& a, const ChildBox& b) {
+    return axis == FlexAxis::Row ? a.left < b.left : a.top < b.top;
+  });
+
+  MainAxisFit fit = InferMainAxisSpacing(sorted, axis, mainContentLow, mainContentHigh, tol);
+  if (!fit.ok) {
+    ctx.warn("subset:flex-inference-skipped",
+             "html: <" + tag +
+                 "> children have inconsistent main-axis spacing; kept absolute",
+             parent);
+    return;
+  }
+
+  // Combine inherited cross-axis padding (kept verbatim) with the inferred main-axis padding.
+  float padTop = axis == FlexAxis::Row ? padTopExisting : fit.paddingLeading;
+  float padBottom = axis == FlexAxis::Row ? padBottomExisting : fit.paddingTrailing;
+  float padLeft = axis == FlexAxis::Row ? fit.paddingLeading : padLeftExisting;
+  float padRight = axis == FlexAxis::Row ? fit.paddingTrailing : padRightExisting;
+
+  // Commit the rewrite to the parent's resolved property map. PropertyFilter has already
+  // populated this; the InlineStyleEmitter will serialise it back to `style="…"`.
+  if (!parentResolved) {
+    PropertyMap fresh;
+    ctx.setResolved(parent.get(), std::move(fresh));
+    parentResolved = ctx.findResolved(parent.get());
+  }
+  ApplyFlexToParent(*parentResolved, axis, padTop, padRight, padBottom, padLeft, fit.gap, align);
+
+  // Strip absolute placement from each child.
+  for (auto& b : boxes) {
+    auto* cp = ctx.findResolved(b.node.get());
+    if (!cp) continue;
+    StripChildAbsolute(*cp, axis, align);
+  }
+
+  ctx.warn("subset:flex-inferred",
+           "html: <" + tag + "> rewritten as display:flex (" + AxisName(axis) +
+               ", " + std::to_string(boxes.size()) + " children)",
+           parent);
+}
+
+void WalkInferFlex(const std::shared_ptr<DOMNode>& node, HTMLTransformContext& ctx) {
+  if (!node || node->type != DOMNodeType::Element) return;
+  // SVG subtrees are opaque (their absolute geometry is meaningful at a different layer).
+  if (node->name == "svg") return;
+  TryInferFlexOnContainer(node, ctx);
+  auto child = node->firstChild;
+  while (child) {
+    WalkInferFlex(child, ctx);
+    child = child->nextSibling;
+  }
+}
+
+}  // namespace
+
+void AbsoluteToFlexInferencePass::apply(const std::shared_ptr<DOMNode>& root,
+                                        HTMLTransformContext& ctx) {
+  if (!root || ctx.hasFatal()) return;
+  if (!ctx.options().inferFlexFromAbsolute) return;
+  auto body = root->getFirstChild("body");
+  if (!body) return;
+  WalkInferFlex(body, ctx);
 }
 
 //==================================================================================================

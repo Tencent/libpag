@@ -82,6 +82,17 @@ class HTMLImporter {
      */
     bool autoNormalize = true;
 
+    /**
+     * When true, the auto-normalizer also runs the `AbsoluteToFlexInference` pass, which
+     * recovers `display: flex` semantics from a tree where every visual element is
+     * `position: absolute` with explicit `left/top/width/height` (the canonical output of
+     * `tools/html-snapshot/snapshot.js`). Containers whose children form a clean 1D row or
+     * column with consistent gaps and uniform alignment are rewritten into flex; containers
+     * that don't admit a clean inference are left untouched. Default false (lossy
+     * heuristic — opt in explicitly). No effect when `autoNormalize` is false.
+     */
+    bool inferFlexFromAbsolute = false;
+
     Options() {
     }
   };

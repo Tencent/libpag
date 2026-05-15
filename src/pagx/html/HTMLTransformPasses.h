@@ -90,6 +90,33 @@ class PropertyFilterPass : public HTMLTransformPass {
 };
 
 /**
+ * Optional Pass — AbsoluteToFlexInference.
+ *
+ * Recovers flexbox semantics from a tree where every visual element is `position: absolute`
+ * with explicit `left/top/width/height` (the canonical output of `tools/html-snapshot`). For
+ * each container whose children form a single 1D row or column with consistent gaps,
+ * symmetric padding, and uniform cross-axis alignment, the pass rewrites the parent into a
+ * `display: flex` container and strips the children's `position`/`left`/`right`/`top`/
+ * `bottom` declarations.
+ *
+ * Off by default (`Options::inferFlexFromAbsolute`). Enable via `--html-infer-flex` in the
+ * CLI when the upstream HTML is known to be flat absolute output and you want the resulting
+ * PAGX to be edit-friendly.
+ *
+ * Containers that don't admit a clean 1D inference (overlapping siblings, mixed cross-axis
+ * alignment, inconsistent spacing, mixed `position` values) are left untouched and an
+ * informational `subset:flex-inference-skipped` diagnostic records the reason. Successful
+ * conversions emit `subset:flex-inferred`.
+ */
+class AbsoluteToFlexInferencePass : public HTMLTransformPass {
+ public:
+  const char* name() const override {
+    return "AbsoluteToFlexInference";
+  }
+  void apply(const std::shared_ptr<DOMNode>& root, HTMLTransformContext& ctx) override;
+};
+
+/**
  * Pass 5 — StructureNormalization.
  *
  * Removes tags outside the subset (`<table>`, `<form>`, `<input>`, `<script>`, ...), wraps

@@ -48,6 +48,12 @@ struct ImportFormatOptions {
    * already-subset HTML.
    */
   bool htmlAutoNormalize = true;
+  /**
+   * Recover `display: flex` semantics from a flat absolute-positioned input (typically
+   * `tools/html-snapshot/snapshot.js` output). Lossy heuristic; default false. Enable via
+   * `--html-infer-flex`.
+   */
+  bool htmlInferFlex = false;
 };
 
 /**

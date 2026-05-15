@@ -379,6 +379,181 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, StrictModeFailsOnUnsupportedProperty) {
 }
 
 //==================================================================================================
+// AbsoluteToFlexInference (opt-in)
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceIsOffByDefault) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:50px">
+               <div style="position:absolute;left:0px;top:0px;width:50px;height:50px"></div>
+               <div style="position:absolute;left:60px;top:0px;width:50px;height:50px"></div>
+             </body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  auto body = root->getFirstChild("body");
+  ASSERT_NE(body, nullptr);
+  EXPECT_FALSE(StyleContains(body, "display: flex"));
+  // Both divs keep their absolute positioning by default.
+  size_t absCount = 0;
+  for (auto c = body->firstChild; c; c = c->nextSibling) {
+    if (c->type == pagx::DOMNodeType::Element && StyleContains(c, "position: absolute")) {
+      absCount++;
+    }
+  }
+  EXPECT_EQ(absCount, 2u);
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceRecoversRowLayoutWhenEnabled) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:50px">
+               <div style="position:absolute;left:10px;top:0px;width:50px;height:50px"></div>
+               <div style="position:absolute;left:70px;top:0px;width:50px;height:50px"></div>
+               <div style="position:absolute;left:130px;top:0px;width:50px;height:50px"></div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:flex-inferred"));
+  auto body = root->getFirstChild("body");
+  EXPECT_TRUE(StyleContains(body, "display: flex"));
+  EXPECT_TRUE(StyleContains(body, "flex-direction: row"));
+  EXPECT_TRUE(StyleContains(body, "gap: 10px"));
+  // padTop=0, padRight=20, padBottom=0, padLeft=10 → 4-token shorthand.
+  EXPECT_TRUE(StyleContains(body, "padding: 0px 20px 0px 10px"));
+  // All children span the body's full height (50px) → align-items: stretch.
+  EXPECT_TRUE(StyleContains(body, "align-items: stretch"));
+  // Every child loses its position/left/top, and (because of stretch) its cross-axis size.
+  for (auto c = body->firstChild; c; c = c->nextSibling) {
+    if (c->type != pagx::DOMNodeType::Element) continue;
+    EXPECT_FALSE(StyleContains(c, "position"));
+    EXPECT_FALSE(StyleContains(c, "left:"));
+    EXPECT_FALSE(StyleContains(c, "top:"));
+    EXPECT_FALSE(StyleContains(c, "height:"));
+    // Main-axis (width) is preserved.
+    EXPECT_TRUE(StyleContains(c, "width: 50px"));
+  }
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceRecoversColumnLayoutWithCenter) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:120px;height:200px">
+               <div style="position:absolute;left:10px;top:10px;width:100px;height:50px"></div>
+               <div style="position:absolute;left:35px;top:70px;width:50px;height:50px"></div>
+               <div style="position:absolute;left:10px;top:130px;width:100px;height:50px"></div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:flex-inferred"));
+  auto body = root->getFirstChild("body");
+  EXPECT_TRUE(StyleContains(body, "display: flex"));
+  EXPECT_TRUE(StyleContains(body, "flex-direction: column"));
+  EXPECT_TRUE(StyleContains(body, "gap: 10px"));
+  // padTop=10, padRight=0, padBottom=20, padLeft=0 → "T R B" 3-token form.
+  EXPECT_TRUE(StyleContains(body, "padding: 10px 0px 20px"));
+  // First/last children span the inner content width (10..110); middle one is centred at
+  // x=35..85. Their common cross-axis property is `center`, not `stretch`.
+  EXPECT_TRUE(StyleContains(body, "align-items: center"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceSkipsOverlappingChildren) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:200px">
+               <div style="position:absolute;left:0px;top:0px;width:100px;height:100px"></div>
+               <div style="position:absolute;left:50px;top:50px;width:100px;height:100px"></div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:flex-inference-skipped"));
+  auto body = root->getFirstChild("body");
+  EXPECT_FALSE(StyleContains(body, "display: flex"));
+  // Both children keep their absolute positioning.
+  for (auto c = body->firstChild; c; c = c->nextSibling) {
+    if (c->type == pagx::DOMNodeType::Element) {
+      EXPECT_TRUE(StyleContains(c, "position: absolute"));
+    }
+  }
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceSkipsMixedCrossAlignment) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:300px;height:100px">
+               <div style="position:absolute;left:0px;top:0px;width:50px;height:50px"></div>
+               <div style="position:absolute;left:60px;top:25px;width:50px;height:50px"></div>
+               <div style="position:absolute;left:120px;top:50px;width:50px;height:50px"></div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:flex-inference-skipped"));
+  auto body = root->getFirstChild("body");
+  EXPECT_FALSE(StyleContains(body, "display: flex"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceSkipsInconsistentGap) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:300px;height:50px">
+               <div style="position:absolute;left:0px;top:0px;width:50px;height:50px"></div>
+               <div style="position:absolute;left:60px;top:0px;width:50px;height:50px"></div>
+               <div style="position:absolute;left:200px;top:0px;width:50px;height:50px"></div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:flex-inference-skipped"));
+  auto body = root->getFirstChild("body");
+  EXPECT_FALSE(StyleContains(body, "display: flex"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceLeavesExistingFlexAlone) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:50px;display:flex;gap:5px">
+               <div style="width:50px;height:50px"></div>
+               <div style="width:50px;height:50px"></div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  // No flex-inferred diagnostic — body already declared display:flex, we don't second-guess.
+  EXPECT_FALSE(HasDiagnostic(result, "subset:flex-inferred"));
+  auto body = root->getFirstChild("body");
+  // The original gap survives untouched.
+  EXPECT_TRUE(StyleContains(body, "gap: 5px"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceTolerancePicksUpSubpixelDrift) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  // Gaps are 10.4 / 9.6 (drift < default 1.5px tolerance) and tops drift by 0.7px (< tol).
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:50px">
+               <div style="position:absolute;left:10px;top:0px;width:50px;height:50px"></div>
+               <div style="position:absolute;left:70.4px;top:0.7px;width:50px;height:50px"></div>
+               <div style="position:absolute;left:130px;top:0px;width:50px;height:50px"></div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:flex-inferred"));
+  auto body = root->getFirstChild("body");
+  EXPECT_TRUE(StyleContains(body, "display: flex"));
+}
+
+//==================================================================================================
 // Idempotency
 //==================================================================================================
 

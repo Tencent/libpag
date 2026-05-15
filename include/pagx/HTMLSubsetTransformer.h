@@ -100,6 +100,27 @@ class HTMLSubsetTransformer {
     float canvasWidth = NAN;
     float canvasHeight = NAN;
 
+    /**
+     * Enables the `AbsoluteToFlexInference` pass. When true, containers whose children form a
+     * clean 1D row or column of `position: absolute` boxes are rewritten into `display: flex`
+     * with inferred `gap`, `padding`, `align-items` (and `flex-direction`); children lose
+     * their `position`/`left`/`right`/`top`/`bottom` declarations. Containers that do not
+     * admit a clean inference (overlap, mixed alignment, inconsistent spacing) are left
+     * untouched.
+     *
+     * Default false. Intended for input produced by `tools/html-snapshot/snapshot.js` and
+     * other pixel-baked sources where the original flex semantics need to be recovered to
+     * make the resulting PAGX edit-friendly. Lossy by design — opt in explicitly.
+     */
+    bool inferFlexFromAbsolute = false;
+
+    /**
+     * Snap tolerance (in pixels) used by `AbsoluteToFlexInference` when deciding whether two
+     * positions are "the same". Values within this distance are treated as equal. Default
+     * 1.5 px, which absorbs typical sub-pixel rounding noise from `getBoundingClientRect()`.
+     */
+    float flexInferenceTolerancePx = 1.5f;
+
     Options() {
     }
   };

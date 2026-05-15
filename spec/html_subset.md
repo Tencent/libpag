@@ -268,6 +268,9 @@ CLI flags:
   `data-html-unknown="<tag>"` for forensic debugging.
 - `--html-no-normalize`: skip the subset normalizer pre-pass (see §11). Use for debugging
   the raw importer against already-subset HTML.
+- `--html-infer-flex`: enable the `AbsoluteToFlexInference` pass (see §11). Recovers
+  `display: flex` semantics from a flat `position: absolute` input (typically the output
+  of `tools/html-snapshot/snapshot.js`). Lossy heuristic — opt in explicitly.
 
 ## 11. Auto-normalization
 
@@ -276,7 +279,8 @@ Before the importer traverses the DOM it runs `HTMLSubsetTransformer` (see
 form so that the rest of the pipeline only ever sees compliant HTML. It is on by default;
 `HTMLImporter::Options::autoNormalize = false` (or `--html-no-normalize`) disables it.
 
-The transformer runs as a fixed pipeline of six passes. Behaviour:
+The transformer runs as a fixed pipeline of six core passes plus one optional pass.
+Behaviour:
 
 | Pass | Silently rewrites | Warns and drops |
 |------|-------------------|-----------------|
@@ -284,6 +288,7 @@ The transformer runs as a fixed pipeline of six passes. Behaviour:
 | StyleSheetCollector | inlines class- and element-selector rules from a single `<style>` block into the per-element cascade and removes the `<style>` element | universal `*`, descendant / pseudo / attribute selectors (`subset:unsupported-selector`); `@media`, `@font-face`, `@keyframes` and any other at-rule (`subset:unsupported-at-rule`) |
 | ComputedStyle | resolves the cascade (inherited → element defaults → element rules → class rules → inline `style`) and writes the merged map back as inline style | — |
 | PropertyFilter | converts `em` → px (resolved against the parent's computed `font-size`), `rem` → px (16-px base), `vw`/`vh` → px (resolved against canvas size), `pt` → px; collapses `flex: <grow> <shrink> <basis>` to `flex: <grow>` (`subset:flex-shorthand-collapsed`); downgrades `position: relative \| fixed \| sticky` to `position: absolute` | `margin*`, `transform*`, `clip-path`, `outline`, `float`, `order`, `align-content`, `align-self`, `direction`, `unicode-bidi`, `flex-wrap`, `flex-grow`, `flex-shrink`, `flex-basis`, `min-*`, `max-*`, `aspect-ratio`, `background-size`, `background-repeat`, `background-position`, `text-transform`, `text-indent`, `word-*`, `overflow-wrap`, `font-variant`, `font-stretch`, `font` shorthand, `grid-*`, per-side `border-*`, per-corner `border-*-radius`, `z-index`, `cursor`, `pointer-events`, `user-select`, `visibility` (`subset:unsupported-property`); `var()`, `calc()`, `min/max/clamp()` (`subset:unsupported-property`); other unknown units (`subset:unsupported-property`) |
+| AbsoluteToFlexInference *(opt-in: `Options::inferFlexFromAbsolute` / `--html-infer-flex`)* | rewrites a container whose children form a clean 1D row or column of `position: absolute` boxes into `display: flex` with inferred `gap`, `padding`, `align-items`, `flex-direction`; strips the children's `position` / `left` / `right` / `top` / `bottom` (`subset:flex-inferred`) | containers whose children overlap on both axes, mix cross-axis alignment, or have inconsistent main-axis spacing are left untouched (`subset:flex-inference-skipped`) |
 | StructureNormalization | wraps stray text inside a container in `<p>` (`subset:text-wrapped`); drops whitespace-only text nodes between elements; leaves `<svg>` subtrees opaque so the SVG resolver can see them verbatim | unknown tags (`<table>`, `<form>`, `<input>`, `<button>`, custom elements, etc.) are removed (`subset:unsupported-tag`); with `--html-preserve-unknown` they're kept as `<div data-html-unknown="<tag>">` instead |
 | InlineStyleEmitter | rewrites every element's resolved style map back into `style="…"` with alphabetically sorted properties for deterministic output; drops the now-redundant `class` attribute (kept when `Options::preserveClassAttribute` is true) | — |
 

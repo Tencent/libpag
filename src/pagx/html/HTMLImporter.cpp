@@ -466,6 +466,7 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
     topts.preserveUnknownElements = _options.preserveUnknownElements;
     topts.canvasWidth = _options.targetWidth;
     topts.canvasHeight = _options.targetHeight;
+    topts.inferFlexFromAbsolute = _options.inferFlexFromAbsolute;
     auto report = HTMLSubsetTransformer::Transform(root, topts);
     for (auto& diag : report.diagnostics) {
       std::string formatted = diag.message;

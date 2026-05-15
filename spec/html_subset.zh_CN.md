@@ -251,6 +251,9 @@ CLI 选项：
   Layer，便于排查。
 - `--html-no-normalize`：跳过子集归一化前置流程（见 §11），用于在已经满足子集的 HTML
   上直接调试导入器。
+- `--html-infer-flex`：启用 `AbsoluteToFlexInference` Pass（见 §11），从 flat
+  `position: absolute` 输入（典型场景：`tools/html-snapshot/snapshot.js` 输出）反推
+  `display: flex`。属于有损启发式重写，需要显式启用。
 
 ## 11. 自动归一化（Auto-normalization）
 
@@ -259,7 +262,7 @@ CLI 选项：
 代码只接触合规的 HTML。该过程默认开启；通过
 `HTMLImporter::Options::autoNormalize = false`（或 `--html-no-normalize`）可以关闭。
 
-转换器按固定顺序执行六个 Pass，行为如下：
+转换器按固定顺序执行六个核心 Pass，外加一个可选 Pass，行为如下：
 
 | Pass | 静默改写 | 警告并丢弃 |
 |------|----------|------------|
@@ -267,6 +270,7 @@ CLI 选项：
 | StyleSheetCollector | 把 `<style>` 中的类选择器与元素选择器规则展开到每个元素的内联级联里，并移除 `<style>` 元素本身 | `*`、后代/伪类/属性选择器（`subset:unsupported-selector`）；`@media`、`@font-face`、`@keyframes` 等 at-rule（`subset:unsupported-at-rule`） |
 | ComputedStyle | 完成 CSS 级联（继承 → 元素默认 → 元素规则 → 类规则 → 内联 `style`），并把合并后的属性写回内联 style | — |
 | PropertyFilter | 把 `em` 转 px（基准为父元素计算后的 `font-size`），`rem` 转 px（基准 16px），`vw`/`vh` 转 px（基准为画布尺寸），`pt` 转 px；把 `flex: <grow> <shrink> <basis>` 收敛为 `flex: <grow>`（`subset:flex-shorthand-collapsed`）；把 `position: relative \| fixed \| sticky` 降级为 `position: absolute` | `margin*`、`transform*`、`clip-path`、`outline`、`float`、`order`、`align-content`、`align-self`、`direction`、`unicode-bidi`、`flex-wrap`、`flex-grow`、`flex-shrink`、`flex-basis`、`min-*`、`max-*`、`aspect-ratio`、`background-size`、`background-repeat`、`background-position`、`text-transform`、`text-indent`、`word-*`、`overflow-wrap`、`font-variant`、`font-stretch`、`font` 简写、`grid-*`、单边 `border-*`、单角 `border-*-radius`、`z-index`、`cursor`、`pointer-events`、`user-select`、`visibility`（`subset:unsupported-property`）；`var()`、`calc()`、`min/max/clamp()`（`subset:unsupported-property`）；其它不支持的单位（`subset:unsupported-property`） |
+| AbsoluteToFlexInference *（可选：`Options::inferFlexFromAbsolute` / `--html-infer-flex`）* | 当某容器的所有子元素都是 `position: absolute` 且能整齐拼成一行/一列时，把容器改写为 `display: flex` 并填入推断出的 `gap`、`padding`、`align-items`、`flex-direction`，同时移除子元素的 `position` / `left` / `right` / `top` / `bottom`（`subset:flex-inferred`） | 子元素在两个轴向都重叠、跨轴对齐方式不一致、或主轴间距不均匀的容器一律保留绝对定位（`subset:flex-inference-skipped`） |
 | StructureNormalization | 把容器中的散落文本包进 `<p>`（`subset:text-wrapped`）；丢掉元素之间纯空白的文本节点；保持 `<svg>` 子树原样以供 SVG 解析器使用 | 未知标签（`<table>`、`<form>`、`<input>`、`<button>`、自定义元素等）被移除（`subset:unsupported-tag`）；启用 `--html-preserve-unknown` 时会被保留为 `<div data-html-unknown="<tag>">` |
 | InlineStyleEmitter | 把每个元素解析后的属性集合按字母顺序重新写回 `style="…"`（保证可重复输出）；同时丢掉已经被级联吸收的 `class` 属性（`Options::preserveClassAttribute` 为真时保留） | — |
 
