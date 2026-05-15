@@ -1,0 +1,16 @@
+{
+  "name": "html-snapshot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Render a JS/React-driven HTML page in a headless browser and emit a flat, absolute-positioned snapshot that conforms to spec/html_subset.md.",
+  "main": "snapshot.js",
+  "bin": {
+    "html-snapshot": "./snapshot.js"
+  },
+  "scripts": {
+    "snapshot": "node snapshot.js"
+  },
+  "dependencies": {
+    "puppeteer": "^23.0.0"
+  }
+}

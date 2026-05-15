@@ -1,0 +1,208 @@
+#!/usr/bin/env bash
+# html2pagx — one-shot pipeline for converting a JS/React-driven HTML page into a
+# rendered PAGX. Wraps four steps:
+#
+#   1. snapshot.js     <input>.html        → <input>.subset.html
+#   2. pagx import     <input>.subset.html → <input>.subset.pagx
+#   3. pagx resolve    <input>.subset.pagx
+#   4. pagx render     <input>.subset.pagx → <input>.subset.png
+#
+# Usage:
+#   html2pagx <input.html> [options]
+#
+# Options (any unknown flag is forwarded to snapshot.js):
+#   -o, --output-dir <dir>     Write outputs to <dir> (default: same dir as input)
+#   --pagx-bin <path>          Path to the pagx CLI (default: $PAGX_BIN or
+#                              ../../cmake-build-debug/pagx relative to this script)
+#   --scale <N>                Render scale factor (default: 1)
+#   --no-render                Stop after pagx resolve; do not produce PNG
+#   --no-resolve               Stop after pagx import; do not run resolve/render
+#   -h, --help                 Show this help
+
+set -u
+set -o pipefail
+
+#--------------------------------------------------------------------------------------------------
+# Locate this script's directory so we can call snapshot.js and the bundled pagx default.
+#--------------------------------------------------------------------------------------------------
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+DEFAULT_PAGX_BIN="${PAGX_BIN:-$REPO_ROOT/cmake-build-debug/pagx}"
+
+print_usage() {
+  sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+#--------------------------------------------------------------------------------------------------
+# Arg parsing
+#--------------------------------------------------------------------------------------------------
+INPUT=""
+OUTPUT_DIR=""
+PAGX_BIN="$DEFAULT_PAGX_BIN"
+SCALE="1"
+DO_RESOLVE=1
+DO_RENDER=1
+SNAPSHOT_EXTRA_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help)
+      print_usage
+      exit 0
+      ;;
+    -o|--output-dir)
+      OUTPUT_DIR="$2"
+      shift 2
+      ;;
+    --pagx-bin)
+      PAGX_BIN="$2"
+      shift 2
+      ;;
+    --scale)
+      SCALE="$2"
+      shift 2
+      ;;
+    --no-render)
+      DO_RENDER=0
+      shift
+      ;;
+    --no-resolve)
+      DO_RESOLVE=0
+      DO_RENDER=0
+      shift
+      ;;
+    --viewport-width|--viewport-height|--wait-ms|--selector)
+      SNAPSHOT_EXTRA_ARGS+=("$1" "$2")
+      shift 2
+      ;;
+    --)
+      shift
+      while [[ $# -gt 0 ]]; do
+        SNAPSHOT_EXTRA_ARGS+=("$1")
+        shift
+      done
+      ;;
+    -*)
+      echo "html2pagx: unknown option '$1'" >&2
+      echo "Run with --help for usage." >&2
+      exit 2
+      ;;
+    *)
+      if [[ -z "$INPUT" ]]; then
+        INPUT="$1"
+      else
+        echo "html2pagx: unexpected positional argument '$1'" >&2
+        exit 2
+      fi
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "$INPUT" ]]; then
+  echo "html2pagx: missing input HTML file" >&2
+  echo "Run with --help for usage." >&2
+  exit 2
+fi
+
+#--------------------------------------------------------------------------------------------------
+# Resolve absolute paths
+#--------------------------------------------------------------------------------------------------
+if [[ ! -f "$INPUT" ]]; then
+  echo "html2pagx: input not found: $INPUT" >&2
+  exit 1
+fi
+
+INPUT_ABS="$(cd "$(dirname "$INPUT")" && pwd)/$(basename "$INPUT")"
+INPUT_DIR="$(dirname "$INPUT_ABS")"
+INPUT_BASE="$(basename "$INPUT_ABS" .html)"
+INPUT_BASE="${INPUT_BASE%.htm}"
+
+OUT_DIR="${OUTPUT_DIR:-$INPUT_DIR}"
+if [[ -n "$OUTPUT_DIR" ]]; then
+  mkdir -p "$OUT_DIR"
+  OUT_DIR="$(cd "$OUT_DIR" && pwd)"
+fi
+
+SUBSET_HTML="$OUT_DIR/${INPUT_BASE}.subset.html"
+SUBSET_PAGX="$OUT_DIR/${INPUT_BASE}.subset.pagx"
+SUBSET_PNG="$OUT_DIR/${INPUT_BASE}.subset.png"
+
+#--------------------------------------------------------------------------------------------------
+# Pre-flight
+#--------------------------------------------------------------------------------------------------
+if [[ ! -d "$SCRIPT_DIR/node_modules/puppeteer" ]]; then
+  echo "html2pagx: puppeteer is not installed. Run:" >&2
+  echo "  cd $SCRIPT_DIR && npm install" >&2
+  exit 1
+fi
+
+# Puppeteer ships with a pinned Chromium build cached in $PUPPETEER_CACHE_DIR
+# (defaults to ~/.cache/puppeteer). If it's missing — for example because npm
+# install ran inside a sandbox with a redirected cache — surface a clear
+# remediation rather than letting puppeteer-core throw a stack trace.
+PUPPETEER_CACHE_DIR_EFFECTIVE="${PUPPETEER_CACHE_DIR:-$HOME/.cache/puppeteer}"
+if [[ ! -d "$PUPPETEER_CACHE_DIR_EFFECTIVE/chrome" ]] \
+    || [[ -z "$(ls "$PUPPETEER_CACHE_DIR_EFFECTIVE/chrome" 2>/dev/null)" ]]; then
+  echo "html2pagx: puppeteer's bundled Chrome is missing from" >&2
+  echo "          $PUPPETEER_CACHE_DIR_EFFECTIVE/chrome" >&2
+  echo "Install it with:" >&2
+  echo "  PUPPETEER_CACHE_DIR=\"$PUPPETEER_CACHE_DIR_EFFECTIVE\" \\" >&2
+  echo "    npx --prefix $SCRIPT_DIR puppeteer browsers install chrome" >&2
+  exit 1
+fi
+
+if [[ "$DO_RESOLVE" -eq 1 || "$DO_RENDER" -eq 1 ]]; then
+  if [[ ! -x "$PAGX_BIN" ]]; then
+    echo "html2pagx: pagx binary not found or not executable: $PAGX_BIN" >&2
+    echo "Pass --pagx-bin <path> or build it (cmake --build cmake-build-debug --target pagx)." >&2
+    exit 1
+  fi
+fi
+
+#--------------------------------------------------------------------------------------------------
+# Step 1: snapshot
+#--------------------------------------------------------------------------------------------------
+echo "[1/$([[ $DO_RENDER -eq 1 ]] && echo 4 || ([[ $DO_RESOLVE -eq 1 ]] && echo 3 || echo 2))] snapshot  $INPUT_ABS"
+node "$SCRIPT_DIR/snapshot.js" "$INPUT_ABS" -o "$SUBSET_HTML" "${SNAPSHOT_EXTRA_ARGS[@]:+${SNAPSHOT_EXTRA_ARGS[@]}}" \
+  || { echo "html2pagx: snapshot failed" >&2; exit 1; }
+
+#--------------------------------------------------------------------------------------------------
+# Step 2: pagx import
+#--------------------------------------------------------------------------------------------------
+echo "[2] import    $SUBSET_HTML"
+"$PAGX_BIN" import --input "$SUBSET_HTML" --output "$SUBSET_PAGX" 2>&1 \
+  | grep -v "warning: html: position: absolute on text leaf" \
+  || true
+
+if [[ ! -f "$SUBSET_PAGX" ]]; then
+  echo "html2pagx: pagx import did not produce $SUBSET_PAGX" >&2
+  exit 1
+fi
+
+if [[ "$DO_RESOLVE" -ne 1 ]]; then
+  echo "[done] wrote $SUBSET_PAGX (skipped resolve+render)"
+  exit 0
+fi
+
+#--------------------------------------------------------------------------------------------------
+# Step 3: pagx resolve
+#--------------------------------------------------------------------------------------------------
+echo "[3] resolve   $SUBSET_PAGX"
+"$PAGX_BIN" resolve "$SUBSET_PAGX" \
+  || { echo "html2pagx: pagx resolve failed" >&2; exit 1; }
+
+if [[ "$DO_RENDER" -ne 1 ]]; then
+  echo "[done] wrote $SUBSET_PAGX (skipped render)"
+  exit 0
+fi
+
+#--------------------------------------------------------------------------------------------------
+# Step 4: pagx render
+#--------------------------------------------------------------------------------------------------
+echo "[4] render    $SUBSET_PAGX  ->  $SUBSET_PNG (scale=$SCALE)"
+"$PAGX_BIN" render "$SUBSET_PAGX" --output "$SUBSET_PNG" --scale "$SCALE" \
+  || { echo "html2pagx: pagx render failed" >&2; exit 1; }
+
+echo "[done] $SUBSET_PNG"
