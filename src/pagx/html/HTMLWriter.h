@@ -60,7 +60,7 @@ class TextPath;
 class TrimPath;
 
 // Kappa value for 90-degree bezier arc approximation: 4 * (sqrt(2) - 1) / 3
-static constexpr float BEZIER_KAPPA = 0.5522847498307936f;
+inline constexpr float BEZIER_KAPPA = 0.5522847498307936f;
 
 //==============================================================================
 // Shared static utility functions
@@ -85,14 +85,6 @@ Color LerpColor(const Color& a, const Color& b, float t);
 Color SampleLinearGradient(const std::vector<ColorStop*>& stops, float t);
 
 std::string LayerTransformCSS(const Layer* layer);
-
-/**
- * Passthrough — returns the input text unchanged. Previously this function rewrote SHY→ZWSP and
- * injected ZWSP after '/' to align Chromium's line-breaker with tgfx's UAX-14 behaviour, but
- * modifying the author's text content masked the real line-breaking differences between tgfx and
- * CSS. Those differences are now accepted as-is and tracked as a tgfx alignment follow-up.
- */
-std::string RewriteLineBreakHints(const std::string& text);
 
 /**
  * HTML-local wrapper around pagx::BuildGroupMatrix that negates the `group->skew` angle so the
@@ -377,39 +369,6 @@ class HTMLWriter {
   // column 1 and the second `「世界」` onto column 2, while Chromium splits `「世界」` across
   // two columns).
   //
-  // Column transitions are detected by `|x_i - x_{i-1}| >= renderFontSize/2`. The threshold is
-  // intentionally large because Latin/digit glyphs in a CJK vertical column sit ~1.54px off
-  // the CJK baseline X (HarfBuzz vertical metrics for Noto Sans SC), and that small offset
-  // must NOT trigger a column break or every CJK<->Latin handoff inside a single column would
-  // be split (broke vertical.pagx's `2024年12月31日` and Latin/CJK mixed samples in an earlier
-  // attempt).
-  //
-  // Source `\n` characters are passed through untouched and suppress the very next auto-break
-  // so we don't emit two consecutive `<br>`s when the author already requested a column break
-  // that coincides with a tgfx column transition. If the source visible-codepoint count
-  // differs from the laid-out glyph count (ligature/cluster collapse) we return the input
-  // unchanged so the caller falls back to plain text. Returns the source text unchanged when
-  // no rewriting is needed (single column, non-vertical text, or null input) so callers can
-  // chain unconditionally. Lives on HTMLWriter so it can access Text's private `glyphData`
-  // through the existing `friend class HTMLWriter` declaration without adding a new friend.
-  static std::string RewriteVerticalColumnBreaks(const Text* text);
-
-  // Builds inline HTML content for a vertical-writing-mode Text inside a TextBox that uses
-  // `textAlign="justify"`. Replays tgfx's vertical layout pass: each glyph becomes an
-  // `inline-block` whose height equals tgfx's `vg.height` advance, and every glyph marked
-  // `canBreakBefore` in a non-last column receives a leading `margin-block-start` of
-  // `justifyGap = (boxHeight - sum(advances)) / breakCount`. Chromium's vertical inline flow
-  // then reproduces tgfx's per-token spacing verbatim — `春眠 Not 觉晓` no longer collapses
-  // "眠" towards the Latin run (the pre-2026-05-09 implementation stretched the "眠" wrapper
-  // across the whole Latin run and centred the glyph inside the inflated span, visibly
-  // misaligning against tgfx). Requires TextLayoutGlyphRun.advances + canBreakBefore to be
-  // populated (only vertical layouts emit them). Returns an empty string (caller falls back
-  // to plain text) when those fields are missing or when the source/glyph counts diverge.
-  // `boxHeight` is the TextBox's declared height; 0/NaN disables justify-gap distribution.
-  // Lives on HTMLWriter so it can access Text's private `glyphData` through the existing
-  // `friend class HTMLWriter` declaration without adding a new friend.
-  static std::string BuildVerticalJustifyContent(const Text* text, float boxHeight);
-
   // Color source conversions. `boxLeft`/`boxTop`/`boxWidth`/`boxHeight` describe the element
   // box (in the gradient source's coordinate space) that the CSS background will paint into.
   // They are used by linear-gradient to emulate PAGX's startPoint/endPoint semantics since

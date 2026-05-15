@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/HTMLExporter.h"
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -132,6 +133,11 @@ std::string HTMLExporter::ToHTML(const PAGXDocument& doc, const std::string& res
               << std::endl;
     return {};
   }
+  if (!std::filesystem::path(resourceDir).is_absolute()) {
+    std::cerr << "HTMLExporter::ToHTML: resourceDir must be an absolute path, got '" << resourceDir
+              << "'." << std::endl;
+    return {};
+  }
   // Derive the URL prefix used by <img src=...> from the resource directory's basename. This
   // assumes the caller will write the returned HTML string to a file located in resourceDir's
   // parent directory (ToFile enforces this layout automatically).
@@ -148,7 +154,7 @@ std::string HTMLExporter::ToHTML(const PAGXDocument& doc, const std::string& res
   ctx.docHeight = doc.height;
   ctx.staticImgDir = resourceDir;
   ctx.staticImgUrlPrefix = urlPrefix;
-  ctx.rasterScale = options.rasterScale;
+  ctx.rasterScale = std::clamp(options.rasterScale, 0.01f, 4.0f);
 
   // Pre-pass: for every compatible PlusDarker Layer, render a cropped backdrop PNG with the layer
   // temporarily hidden. The resulting base64 data URLs are consumed by writeLayer below to emit an

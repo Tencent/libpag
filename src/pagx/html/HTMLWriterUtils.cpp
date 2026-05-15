@@ -446,22 +446,33 @@ Color SampleLinearGradient(const std::vector<ColorStop*>& stops, float t) {
   if (stops.empty()) {
     return {};
   }
-  // Clamp t to [0, 1] then find the surrounding stops.
-  t = std::max(0.0f, std::min(1.0f, t));
-  if (t <= stops.front()->offset) {
-    return stops.front()->color;
-  }
-  if (t >= stops.back()->offset) {
-    return stops.back()->color;
-  }
-  for (size_t i = 1; i < stops.size(); i++) {
-    if (t <= stops[i]->offset) {
-      float range = stops[i]->offset - stops[i - 1]->offset;
-      float local = (range > 1e-6f) ? (t - stops[i - 1]->offset) / range : 0.0f;
-      return LerpColor(stops[i - 1]->color, stops[i]->color, local);
+  // Filter out null entries so every dereference below is safe.
+  std::vector<ColorStop*> valid;
+  valid.reserve(stops.size());
+  for (auto* s : stops) {
+    if (s) {
+      valid.push_back(s);
     }
   }
-  return stops.back()->color;
+  if (valid.empty()) {
+    return {};
+  }
+  // Clamp t to [0, 1] then find the surrounding stops.
+  t = std::max(0.0f, std::min(1.0f, t));
+  if (t <= valid.front()->offset) {
+    return valid.front()->color;
+  }
+  if (t >= valid.back()->offset) {
+    return valid.back()->color;
+  }
+  for (size_t i = 1; i < valid.size(); i++) {
+    if (t <= valid[i]->offset) {
+      float range = valid[i]->offset - valid[i - 1]->offset;
+      float local = (range > 1e-6f) ? (t - valid[i - 1]->offset) / range : 0.0f;
+      return LerpColor(valid[i - 1]->color, valid[i]->color, local);
+    }
+  }
+  return valid.back()->color;
 }
 
 std::string LayerTransformCSS(const Layer* layer) {
@@ -475,13 +486,6 @@ std::string LayerTransformCSS(const Layer* layer) {
     return {};
   }
   return MatrixTransformToCSS(m);
-}
-
-std::string RewriteLineBreakHints(const std::string& text) {
-  // Pass through the original text unchanged. Line-break differences between tgfx's UAX-14
-  // implementation and Chromium's CSS line-breaker are accepted as-is; modifying the author's
-  // text content (e.g. injecting ZWSP or replacing SHY) would mask those differences.
-  return text;
 }
 
 // HTML-local skew sign fix. Mirrors pagx::BuildGroupMatrix line-for-line except for one shear:
@@ -619,24 +623,6 @@ bool TextStartsWithRTL(const std::string& utf8Text) {
     // Digits, spaces, and other neutrals: keep scanning.
   }
   return false;
-}
-
-namespace {}  // namespace
-
-std::string HTMLWriter::RewriteVerticalColumnBreaks(const Text* text) {
-  // Return the original text unchanged. The previous implementation used tgfx glyph positions
-  // to detect column transitions and inject '\n' characters — that modified the author's text
-  // to compensate for CSS not matching tgfx's column-break decisions. The difference is now
-  // accepted and tracked as a tgfx alignment follow-up.
-  return text ? text->text : std::string{};
-}
-
-std::string HTMLWriter::BuildVerticalJustifyContent(const Text* /*text*/, float /*boxHeight*/) {
-  // Return empty so the caller falls back to standard CSS text-align:justify in vertical-rl.
-  // The previous implementation replayed tgfx's per-glyph justify gap distribution by injecting
-  // inline-block spacer spans — that compensated for CSS justify not matching tgfx's algorithm.
-  // The difference is now accepted and tracked as a tgfx alignment follow-up.
-  return {};
 }
 
 }  // namespace pagx

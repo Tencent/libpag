@@ -979,9 +979,7 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
   if (tb) {
     // For vertical TextBoxes inject <br> at every column break tgfx computed (see
     // RewriteVerticalColumnBreaks docs for rationale).
-    std::string innerText =
-        (tb->writingMode == WritingMode::Vertical) ? RewriteVerticalColumnBreaks(text) : text->text;
-    out.closeTagWithTextBreaks(RewriteLineBreakHints(innerText));
+    out.closeTagWithTextBreaks(text->text);
     // closeTagWithTextBreaks no longer emits trailing breaks (HTMLWriterLayer's
     // tbSpans/richTextSpans loops handle them with empty-line owner wrapping). For the
     // single-span writeText path there is no "next span" to consult, so emit the trailing
@@ -989,7 +987,7 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     // so inheriting the span's font-size for the empty line is the correct default.
     out.emitBreaks(HTMLBuilder::CountTrailingBreaks(text->text));
   } else {
-    out.closeTagWithText(RewriteLineBreakHints(text->text));
+    out.closeTagWithText(text->text);
   }
 }
 

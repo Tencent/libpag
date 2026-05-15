@@ -39,6 +39,7 @@ struct HTMLExportOptions {
    * for crisper rendering. The default is 2 (i.e. @2x assets), matching the typical
    * browser comparison output. This is unrelated to the runtime device pixel ratio — it
    * is a build-time decision baked into the PNG and cannot adapt to the viewer's display.
+   * Valid range: (0, 4]. Values outside this range are clamped.
    */
   float rasterScale = 2.0f;
 

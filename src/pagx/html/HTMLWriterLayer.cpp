@@ -1092,7 +1092,7 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
           if (!segStyle.empty()) {
             out.addAttr("style", segStyle);
           }
-          out.closeTagWithText(RewriteLineBreakHints(segments[si]));
+          out.closeTagWithText(segments[si]);
         }
         prevTrailingBreaks = HTMLBuilder::CountTrailingBreaks(span.text->text);
         prevFontSize = spanFontSize;
@@ -1107,29 +1107,14 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
       // computed (including justifyGap). CSS `text-align:justify` in vertical-rl does
       // not insert inter-CJK gaps (only inter-word), so we have to wrap the glyphs
       // ourselves to reproduce tgfx's justify distribution on mixed CJK/Latin runs.
-      bool usedPerCharDom = false;
-      if (tb->writingMode == WritingMode::Vertical && tb->textAlign == TextAlign::Justify) {
-        std::string justifiedContent = BuildVerticalJustifyContent(span.text, tb->height);
-        if (!justifiedContent.empty()) {
-          out.closeTagWithRawContent(justifiedContent);
-          usedPerCharDom = true;
-        }
-      }
-      if (!usedPerCharDom) {
+      {
         // Use closeTagWithTextBreaks so U+000A (from &#10;) inside the inner content
         // renders as <br> rather than being folded into a space by the browser's
         // default white-space handling. Leading/trailing <br>s are hoisted outside
         // the span by HTMLWriterLayer (above) so they can be wrapped in the
         // appropriate empty-line owner font-size.
-        //
-        // For vertical TextBoxes (non-justify path) inject <br> at every column
-        // break tgfx computed — Chromium otherwise uses its own line-breaker which
-        // doesn't know about PAGX's UAX-14 punctuation-squash rules and would split
-        // tokens like 「世界」 across columns where tgfx kept them together.
-        std::string spanText = (tb->writingMode == WritingMode::Vertical)
-                                   ? RewriteVerticalColumnBreaks(span.text)
-                                   : span.text->text;
-        out.closeTagWithTextBreaks(RewriteLineBreakHints(spanText));
+        std::string spanText = span.text->text;
+        out.closeTagWithTextBreaks(spanText);
       }
       prevTrailingBreaks = HTMLBuilder::CountTrailingBreaks(span.text->text);
       prevFontSize = spanFontSize;
@@ -1304,10 +1289,8 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
     //
     // For vertical TextBoxes inject <br> at every column break tgfx computed (same
     // rationale as the tbSpans path above).
-    std::string rtSpanText = (tb->writingMode == WritingMode::Vertical)
-                                 ? RewriteVerticalColumnBreaks(span.text)
-                                 : span.text->text;
-    out.closeTagWithTextBreaks(RewriteLineBreakHints(rtSpanText));
+    std::string rtSpanText = span.text->text;
+    out.closeTagWithTextBreaks(rtSpanText);
     rtPrevTrailingBreaks = HTMLBuilder::CountTrailingBreaks(span.text->text);
     rtPrevFontSize = rtSpanFontSize;
   }
