@@ -31,11 +31,14 @@ const __dirname = path.dirname(__filename);
 const fileHeaderPath = path.resolve(__dirname, '../../../.idea/fileTemplates/includes/PAG File Header.h');
 const banner = readFileSync(fileHeaderPath, 'utf-8');
 
+// ARCH selects the wasm output flavor: 'wasm-mt' (multi-threaded) or 'wasm' (single-threaded).
+const arch = process.env.ARCH || 'wasm-mt';
+
 // Copy WASM files to lib
 const copyWasmPlugin = {
   name: 'copy-wasm',
   writeBundle() {
-    const wasmDir = path.resolve(__dirname, '../wasm-mt');
+    const wasmDir = path.resolve(__dirname, `../${arch}`);
     const libDir = path.resolve(__dirname, '../lib');
 
     if (!existsSync(libDir)) {
@@ -57,6 +60,11 @@ const plugins = [
   alias({
     entries: [
       { find: '@tgfx', replacement: path.resolve(__dirname, '../../../third_party/tgfx/web/src') },
+      // Redirect the wasm glue import in pagx.ts to the requested arch's output directory.
+      {
+        find: '../../wasm-mt/pagx-viewer',
+        replacement: path.resolve(__dirname, `../${arch}/pagx-viewer`),
+      },
     ],
   }),
   {

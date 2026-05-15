@@ -95,7 +95,15 @@ npm run build:debug
 # Release 构建：压缩 JS、剥离 WASM 调试信息，针对生产环境优化。
 # 适合将 SDK 集成到正式产品时使用。
 npm run build:release
+
+# 单线程版本（不依赖 pthread / SharedArrayBuffer）。
+# 适合宿主页面无法启用跨域隔离（COOP/COEP）的场景。
+npm run build:debug:st
+npm run build:release:st
 ```
+
+> 提示：多线程（`wasm-mt`）与单线程（`wasm`）构建共享 `lib/` 下的同一组产物文件，
+> 后构建的版本会覆盖前一次的产物。
 
 两个命令都会在 `lib/` 目录下生成以下产物：
 
@@ -118,10 +126,14 @@ Chrome 扩展，然后打开 DevTools → Settings → Experiments，勾选
 
 | 命令 | 说明 |
 |------|------|
-| `npm run build:wasm` | 仅构建 WebAssembly 二进制（release） |
-| `npm run build:wasm:debug` | 仅构建 WebAssembly 二进制（debug） |
-| `npm run build:js` | 仅构建 JavaScript 产物（debug） |
-| `npm run build:js:release` | 仅构建 JavaScript 产物（release） |
+| `npm run build:wasm` | 仅构建 WebAssembly 二进制（多线程，release） |
+| `npm run build:wasm:debug` | 仅构建 WebAssembly 二进制（多线程，debug） |
+| `npm run build:wasm:st` | 仅构建 WebAssembly 二进制（单线程，release） |
+| `npm run build:wasm:st:debug` | 仅构建 WebAssembly 二进制（单线程，debug） |
+| `npm run build:js` | 仅构建 JavaScript 产物（多线程，debug） |
+| `npm run build:js:release` | 仅构建 JavaScript 产物（多线程，release） |
+| `npm run build:js:st` | 仅构建 JavaScript 产物（单线程，debug） |
+| `npm run build:js:st:release` | 仅构建 JavaScript 产物（单线程，release） |
 | `npm run build:types` | 输出 TypeScript 声明文件 |
 | `npm run clean` | 清理构建产物和缓存 |
 
