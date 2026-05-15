@@ -102,12 +102,28 @@ Options:
 
 /* eslint-disable no-undef, no-inner-declarations */
 function takeSnapshot(config) {
-  // Tags we never emit. Their subtree is also dropped (except <head> children that we
-  // explicitly preserve elsewhere).
+  // Tags we never emit. Their subtree is also dropped. The list mirrors the subset spec
+  // (anything outside `spec/html_subset.md` §2 has no PAGX mapping) plus the obvious
+  // non-visual / metadata tags. `<br>` and `<hr>` are dropped because the visual line
+  // breaks they introduce are captured by `Range.getClientRects()` on the surrounding
+  // text nodes — re-emitting them would either duplicate the break or create stray
+  // 0-height boxes.
   const DROP_TAGS = new Set([
     'script', 'style', 'link', 'meta', 'noscript',
     'iframe', 'object', 'embed', 'video', 'audio', 'canvas',
-    'br', 'hr',
+    'br', 'hr', 'wbr',
+    'head', 'title', 'base',
+    'template', 'slot', 'dialog', 'details', 'summary',
+    'map', 'area', 'source', 'track', 'param',
+    'form',  // visual styling lives on its children; <form> itself is structural
+  ]);
+
+  // <input> types that have no static text representation. Anything else (`text`,
+  // `email`, `password`, `search`, `url`, `tel`, `number`, `submit`, `button`, `reset`,
+  // empty/missing → defaults to `text`) is kept and surfaces its value/placeholder/label.
+  const NON_TEXT_INPUT_TYPES = new Set([
+    'checkbox', 'radio', 'file', 'range', 'color', 'image', 'hidden',
+    'date', 'datetime-local', 'month', 'time', 'week',
   ]);
 
   // Box-level (background) visual properties. Emitted on container/leaf wrappers.
@@ -134,19 +150,25 @@ function takeSnapshot(config) {
     'line-height',
     'text-align',
     'text-decoration-line',
+    'text-decoration-color',
     'white-space',
   ];
 
   const DEFAULT_VALUES = new Map([
     ['background-color', ['rgba(0, 0, 0, 0)', 'transparent']],
     ['background-image', ['none']],
-    ['border-radius',    ['0px']],
+    // Chromium's computed `border-radius` is the long-form `T R B L` even when authored
+    // as a single value; allow both shapes through the default filter.
+    ['border-radius',    ['0px', '0px 0px 0px 0px']],
     ['color',            ['rgb(0, 0, 0)']],
     ['font-style',       ['normal']],
     ['font-weight',      ['400', 'normal']],
     ['letter-spacing',   ['normal', '0px']],
     ['text-align',       ['start', 'left']],
     ['text-decoration-line', ['none']],
+    // Computed `text-decoration-color` defaults to `currentColor`; we forward it only
+    // when it differs from the element's `color`, so the default check is sufficient.
+    ['text-decoration-color', ['currentcolor']],
     ['white-space',      ['normal']],
     ['overflow',         ['visible']],
     ['opacity',          ['1']],
@@ -192,6 +214,22 @@ function takeSnapshot(config) {
     return value;
   }
 
+  // Chromium reports `border-radius` in its long-form (`T R B L`). The subset only
+  // accepts a single value, and authoring the long form (especially `0px 0px 0px 0px`)
+  // pollutes the diff. Collapse `T R B L` → single value when all four lengths agree,
+  // and drop entirely when they all collapse to zero. Mixed values are passed through
+  // verbatim and left to the importer to handle.
+  function normalizeBorderRadius(value) {
+    if (!value) return '';
+    const tokens = value.split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) return '';
+    if (tokens.every((t) => t === tokens[0])) {
+      if (tokens[0] === '0' || tokens[0] === '0px') return '';
+      return tokens[0];
+    }
+    return value;
+  }
+
   // PAGX supports `background-image` only when the value is one of the gradient
   // functions (linear/radial/conic). `url(...)` backgrounds — which would
   // otherwise originate from CSS-in-JS or stylesheets — must be authored as
@@ -211,24 +249,49 @@ function takeSnapshot(config) {
     if (prop === 'font-family') return simplifyFontFamily(value);
     if (prop === 'overflow') return normalizeOverflow(value);
     if (prop === 'background-image') return normalizeBackgroundImage(value);
+    if (prop === 'border-radius') return normalizeBorderRadius(value);
     return value;
   }
 
-  // Walk an SVG subtree and rewrite stroke="currentColor" / fill="currentColor" to the
-  // computed colour so the snapshot is self-contained.
+  // Walk an SVG subtree and rewrite `currentColor` / `context-fill` / `context-stroke`
+  // to the computed colour at that node so the snapshot is self-contained. The clone is
+  // detached from the document, so `getComputedStyle` can't resolve it directly; instead
+  // we walk the *original* subtree (where the cascade is live) and the clone in
+  // lockstep, propagating per-node `color` down the tree.
   function freezeSvg(svgEl) {
-    const cs = getComputedStyle(svgEl);
-    const fallback = cs.color || 'rgb(0, 0, 0)';
     const clone = svgEl.cloneNode(true);
-    const walk = (el, inherited) => {
-      let stroke = el.getAttribute && el.getAttribute('stroke');
-      let fill = el.getAttribute && el.getAttribute('fill');
-      const here = (stroke === 'currentColor' || fill === 'currentColor') ? inherited : inherited;
-      if (stroke === 'currentColor') el.setAttribute('stroke', here);
-      if (fill === 'currentColor') el.setAttribute('fill', here);
-      for (const c of el.children || []) walk(c, here);
+    const fallback = (getComputedStyle(svgEl).color || 'rgb(0, 0, 0)').trim();
+    const walk = (orig, dst, inheritedColor) => {
+      // SVG elements inherit `color` from their CSS parent. We only re-query
+      // getComputedStyle if the node is actually an element (text nodes inside <text>
+      // don't carry style on their own).
+      let here = inheritedColor;
+      if (orig && orig.nodeType === 1) {
+        const cs = getComputedStyle(orig);
+        if (cs && cs.color) here = cs.color.trim() || here;
+      }
+      if (dst && dst.nodeType === 1 && dst.getAttribute) {
+        const stroke = dst.getAttribute('stroke');
+        const fill = dst.getAttribute('fill');
+        if (stroke === 'currentColor' || stroke === 'context-stroke') {
+          dst.setAttribute('stroke', here);
+        }
+        if (fill === 'currentColor' || fill === 'context-fill') {
+          dst.setAttribute('fill', here);
+        }
+        // Inline `style="stroke: currentColor"` is uncommon but legal.
+        if (dst.style) {
+          if (dst.style.stroke === 'currentColor') dst.style.stroke = here;
+          if (dst.style.fill === 'currentColor') dst.style.fill = here;
+          if (dst.style.color === 'currentColor') dst.style.color = here;
+        }
+      }
+      const origKids = (orig && orig.children) || [];
+      const dstKids = (dst && dst.children) || [];
+      const n = Math.min(origKids.length, dstKids.length);
+      for (let i = 0; i < n; i++) walk(origKids[i], dstKids[i], here);
     };
-    walk(clone, fallback);
+    walk(svgEl, clone, fallback);
     return clone.outerHTML;
   }
 
@@ -246,9 +309,16 @@ function takeSnapshot(config) {
   // vertical band contains it. This matches Chromium's line-break decisions
   // exactly, so PAGX never has to re-wrap (which would diverge by a sub-pixel and
   // either overflow `overflow: hidden` or wrap "1.5w" into two lines).
-  function splitTextNodeIntoLines(textNode) {
+  //
+  // The host element's `white-space` controls whether embedded whitespace is collapsed
+  // (`normal`, `nowrap`) or preserved (`pre`, `pre-wrap`, `pre-line`). Collapsing in
+  // preserve modes would mangle code snippets, indentation, and other pre-formatted
+  // content.
+  function splitTextNodeIntoLines(textNode, whiteSpace) {
     const text = textNode.nodeValue || '';
     if (!text.trim()) return [];
+    const preserve = typeof whiteSpace === 'string' && whiteSpace.startsWith('pre');
+    const cleanLine = (s) => (preserve ? s : s.replace(/\s+/g, ' ').trim());
     const range = document.createRange();
     range.selectNodeContents(textNode);
     const lineRects = Array.from(range.getClientRects());
@@ -258,11 +328,11 @@ function takeSnapshot(config) {
     }
     if (lineRects.length === 1) {
       const out = [{
-        text: text.replace(/\s+/g, ' ').trim(),
+        text: cleanLine(text),
         rect: lineRects[0],
       }];
       range.detach && range.detach();
-      return out;
+      return out.filter((b) => b.text);
     }
     const buckets = lineRects.map((r) => ({ rect: r, chars: [] }));
     for (let i = 0; i < text.length; i++) {
@@ -284,7 +354,7 @@ function takeSnapshot(config) {
     range.detach && range.detach();
     return buckets
       .map((b) => ({
-        text: b.chars.join('').replace(/\s+/g, ' ').trim(),
+        text: cleanLine(b.chars.join('')),
         rect: b.rect,
       }))
       .filter((b) => b.text);
@@ -293,7 +363,8 @@ function takeSnapshot(config) {
   // Emit one absolutely-positioned, nowrap <span> per line of `textNode`,
   // positioned relative to `parentRect`.
   function emitTextSpans(textNode, parentRect, computed) {
-    const lines = splitTextNodeIntoLines(textNode);
+    const ws = computed.getPropertyValue('white-space');
+    const lines = splitTextNodeIntoLines(textNode, ws);
     const out = [];
     for (const line of lines) {
       const tl = line.rect.left - parentRect.left;
@@ -319,6 +390,64 @@ function takeSnapshot(config) {
     return rect.width > 0 && rect.height > 0;
   }
 
+  // True iff all four borders have the same non-zero width, the same `solid` style,
+  // and the same color — i.e. the only case where the subset's single `border`
+  // shorthand can losslessly express the page's border.
+  function isUniformBorder(computed) {
+    const sides = ['top', 'right', 'bottom', 'left'];
+    const w0 = computed.getPropertyValue('border-top-width');
+    const s0 = computed.getPropertyValue('border-top-style');
+    const c0 = computed.getPropertyValue('border-top-color');
+    if (s0 !== 'solid') return false;
+    if ((parseFloat(w0) || 0) <= 0) return false;
+    for (const side of sides) {
+      if (computed.getPropertyValue(`border-${side}-width`) !== w0) return false;
+      if (computed.getPropertyValue(`border-${side}-style`) !== s0) return false;
+      if (computed.getPropertyValue(`border-${side}-color`) !== c0) return false;
+    }
+    return true;
+  }
+
+  // Returns an array of HTML strings — one absolutely-positioned <div> per non-zero
+  // border side — to overlay onto the host box. Used when the element has an
+  // asymmetric border (e.g. `border-bottom: 1px solid #e5e7eb` on a list row).
+  function borderOverlayHTML(computed, width, height) {
+    if (isUniformBorder(computed)) return [];
+    const out = [];
+    const sides = [
+      { name: 'top',    horizontal: true,  position: 'top' },
+      { name: 'right',  horizontal: false, position: 'right' },
+      { name: 'bottom', horizontal: true,  position: 'bottom' },
+      { name: 'left',   horizontal: false, position: 'left' },
+    ];
+    for (const side of sides) {
+      const w = parseFloat(computed.getPropertyValue(`border-${side.name}-width`)) || 0;
+      if (w <= 0) continue;
+      const style = computed.getPropertyValue(`border-${side.name}-style`);
+      // The subset has no model for dashed/dotted/double per-side borders. Downgrade
+      // them to solid: it's an approximation but preserves the visual divider, which
+      // is what the page actually wanted.
+      if (style === 'none' || style === 'hidden') continue;
+      const color = computed.getPropertyValue(`border-${side.name}-color`).trim();
+      let left = 0;
+      let top = 0;
+      let w2 = 0;
+      let h2 = 0;
+      if (side.name === 'top') {
+        left = 0; top = 0; w2 = width; h2 = w;
+      } else if (side.name === 'bottom') {
+        left = 0; top = Math.max(0, height - w); w2 = width; h2 = w;
+      } else if (side.name === 'left') {
+        left = 0; top = 0; w2 = w; h2 = height;
+      } else /* right */ {
+        left = Math.max(0, width - w); top = 0; w2 = w; h2 = height;
+      }
+      out.push(`<div style="position: absolute; left: ${px(left)}; top: ${px(top)}; ` +
+        `width: ${px(w2)}; height: ${px(h2)}; background-color: ${color}"></div>`);
+    }
+    return out;
+  }
+
   // Build the style string for a kept element. `opts.box` includes background/border/
   // shadow/etc.; `opts.text` includes color/font-*; `opts.positioned` toggles the
   // absolute-positioning header (off for inline text children that ride on their
@@ -341,15 +470,17 @@ function takeSnapshot(config) {
         if (isDefault(prop, v)) continue;
         parts.push(`${prop}: ${v}`);
       }
-      // Border: only forward when it's a single, solid, same-on-all-sides border.
-      const bw = parseFloat(computed.getPropertyValue('border-top-width')) || 0;
-      if (bw > 0 &&
-          computed.getPropertyValue('border-top-style') === 'solid' &&
-          computed.getPropertyValue('border-right-width') === computed.getPropertyValue('border-top-width') &&
-          computed.getPropertyValue('border-bottom-width') === computed.getPropertyValue('border-top-width') &&
-          computed.getPropertyValue('border-left-width') === computed.getPropertyValue('border-top-width')) {
-        const bc = computed.getPropertyValue('border-top-color').trim();
-        parts.push(`border: ${px(bw)} solid ${bc}`);
+      // Border: only forward as a single CSS `border` when all four sides are the
+      // same width / style / color (the only form the subset accepts). Asymmetric
+      // borders — divider lines under a row, accent strips on a card — are emitted as
+      // overlay rectangles by emitBorderOverlays() and added to the child list, so
+      // they survive into PAGX even though the importer can't model per-side borders.
+      if (isUniformBorder(computed)) {
+        const bw = parseFloat(computed.getPropertyValue('border-top-width')) || 0;
+        if (bw > 0) {
+          const bc = computed.getPropertyValue('border-top-color').trim();
+          parts.push(`border: ${px(bw)} solid ${bc}`);
+        }
       }
       // box-shadow: pass through verbatim if non-none.
       const shadow = computed.getPropertyValue('box-shadow').trim();
@@ -359,11 +490,16 @@ function takeSnapshot(config) {
     }
 
     if (opts.text) {
+      const textColor = computed.getPropertyValue('color').trim();
       for (const prop of TEXT_PROPS) {
         const raw = computed.getPropertyValue(prop).trim();
         const v = normalizeValue(prop, raw);
         if (!v) continue;
         if (isDefault(prop, v)) continue;
+        // Only forward `text-decoration-color` when it actually differs from the
+        // text color; CSS treats them as the same when the value resolves to the
+        // initial `currentColor`, and emitting the duplicate adds noise.
+        if (prop === 'text-decoration-color' && v === textColor) continue;
         const outProp = prop === 'text-decoration-line' ? 'text-decoration' : prop;
         parts.push(`${outProp}: ${v}`);
       }
@@ -388,10 +524,23 @@ function takeSnapshot(config) {
   }
 
   // Synthesize text content for form elements (placeholder / value / button label).
+  // For checkboxes / radios / file pickers / colour swatches / date pickers there is
+  // no meaningful text to surface; their `value` attribute is metadata (`"on"`,
+  // hidden file path, ISO date) that would only confuse downstream rendering, so we
+  // return empty and let `classify` drop the element.
   function syntheticText(el) {
     const tag = el.tagName.toLowerCase();
-    if (tag === 'input' || tag === 'textarea') {
+    if (tag === 'textarea') {
       return (el.value || el.getAttribute('placeholder') || '').trim();
+    }
+    if (tag === 'input') {
+      const type = (el.getAttribute('type') || 'text').toLowerCase();
+      if (NON_TEXT_INPUT_TYPES.has(type)) return '';
+      return (el.value || el.getAttribute('placeholder') || '').trim();
+    }
+    if (tag === 'select') {
+      const opt = el.options && el.options[el.selectedIndex];
+      return opt ? (opt.text || opt.label || opt.value || '').trim() : '';
     }
     return '';
   }
@@ -405,16 +554,61 @@ function takeSnapshot(config) {
     if (parseFloat(computed.opacity) === 0) return null;
     if (tag === 'svg') return 'svg';
     if (tag === 'img') return 'img';
-    if (tag === 'input' || tag === 'textarea') {
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') {
       return syntheticText(el) ? 'text' : null;
     }
     return 'box';
+  }
+
+  // Emit every visible child of `el` (elements + non-empty text nodes) into a single
+  // HTML string, replaying browser paint order (flow-then-positioned, both in DOM
+  // order). Used by both the regular container path and by `display: contents` passes
+  // where the host element itself is suppressed.
+  function renderChildrenInto(el, parentRect) {
+    const items = [];
+    let domIndex = 0;
+    const hostComputed = getComputedStyle(el);
+    for (const n of el.childNodes) {
+      if (n.nodeType === Node.ELEMENT_NODE) {
+        const childComputed = getComputedStyle(n);
+        const isPositioned = childComputed.position !== 'static';
+        items.push({
+          positioned: isPositioned,
+          domIndex: domIndex++,
+          html: render(n, parentRect),
+        });
+      } else if (n.nodeType === Node.TEXT_NODE && n.nodeValue && n.nodeValue.trim()) {
+        const spans = emitTextSpans(n, parentRect, hostComputed);
+        if (spans.length > 0) {
+          items.push({
+            positioned: false,
+            domIndex: domIndex++,
+            html: spans.join(''),
+          });
+        }
+      }
+    }
+    items.sort((a, b) => {
+      if (a.positioned !== b.positioned) return a.positioned ? 1 : -1;
+      return a.domIndex - b.domIndex;
+    });
+    return items.map((it) => it.html).join('');
   }
 
   // Render a subtree rooted at `el` into a string. parentRect is its parent's
   // bounding rect (used to compute relative left/top).
   function render(el, parentRect) {
     const computed = getComputedStyle(el);
+
+    // `display: contents` makes the element generate no box, but its children still
+    // participate in the parent's layout. The element's own `getBoundingClientRect()`
+    // is 0×0 at its DOM-tree position, which would break every descendant's relative
+    // offset if we used it as their parent. Instead, render the children directly into
+    // `parentRect` (the element's CSS parent's rect) and drop the host entirely.
+    if (computed.display === 'contents') {
+      return renderChildrenInto(el, parentRect);
+    }
+
     const kind = classify(el, computed);
     if (!kind) return '';
 
@@ -441,7 +635,8 @@ function takeSnapshot(config) {
       const alt = escapeHtml(el.getAttribute('alt') || '');
       const imgStyle = `position: absolute; left: 0px; top: 0px; width: ${px(rect.width)}; height: ${px(rect.height)}`;
       const wrapperStyle = buildStyle(left, top, rect.width, rect.height, computed, { box: true });
-      return `<div style="${wrapperStyle}"><img src="${escapeHtml(src)}" alt="${alt}" style="${imgStyle}"/></div>`;
+      const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
+      return `<div style="${wrapperStyle}"><img src="${escapeHtml(src)}" alt="${alt}" style="${imgStyle}"/>${overlays}</div>`;
     }
 
     if (kind === 'text') {
@@ -471,7 +666,8 @@ function takeSnapshot(config) {
       if (placeholderColor) {
         textStyle = textStyle.replace(/(^|; )color: [^;]+/, `$1color: ${placeholderColor}`);
       }
-      return `<div style="${boxStyle}"><span style="${textStyle}">${escapeHtml(text)}</span></div>`;
+      const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
+      return `<div style="${boxStyle}"><span style="${textStyle}">${escapeHtml(text)}</span>${overlays}</div>`;
     }
 
     // Container or text-leaf box.
@@ -497,7 +693,8 @@ function takeSnapshot(config) {
       const boxStyle = buildStyle(left, top, rect.width, rect.height, computed, {
         box: true,
       });
-      return `<div style="${boxStyle}">${lineSpans.join('')}</div>`;
+      const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
+      return `<div style="${boxStyle}">${lineSpans.join('')}${overlays}</div>`;
     }
 
     // Container with element children (and optionally direct text). Per direct text
@@ -511,47 +708,26 @@ function takeSnapshot(config) {
     // direct text runs in DOM order, then positioned children (also in DOM order).
     // Otherwise an `<input bg-gray>` declared after an `<svg>` would paint over the
     // icon, an inline-flex bg-pill <button>'s positioned label would render under
-    // the bg, etc.
-    const childItems = [];
-    let domIndex = 0;
-    for (const n of el.childNodes) {
-      if (n.nodeType === Node.ELEMENT_NODE) {
-        const childComputed = getComputedStyle(n);
-        const isPositioned = childComputed.position !== 'static';
-        childItems.push({
-          kind: 'element',
-          positioned: isPositioned,
-          domIndex: domIndex++,
-          html: render(n, rect),
-        });
-      } else if (n.nodeType === Node.TEXT_NODE && n.nodeValue && n.nodeValue.trim()) {
-        // Emit one nowrap <span> per browser-determined line.
-        const spans = emitTextSpans(n, rect, computed);
-        if (spans.length > 0) {
-          childItems.push({
-            kind: 'text',
-            positioned: false,
-            domIndex: domIndex++,
-            html: spans.join(''),
-          });
-        }
-      }
-    }
-    childItems.sort((a, b) => {
-      if (a.positioned !== b.positioned) return a.positioned ? 1 : -1;
-      return a.domIndex - b.domIndex;
-    });
-    const childHTML = childItems.map((it) => it.html).join('');
+    // the bg, etc. Asymmetric border overlays paint *on top* of all children to match
+    // CSS, which renders borders after content.
+    const childHTML = renderChildrenInto(el, rect);
+    const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
 
     const style = buildStyle(left, top, rect.width, rect.height, computed, { box: true });
-    return `<div style="${style}">${childHTML}</div>`;
+    return `<div style="${style}">${childHTML}${overlays}</div>`;
   }
 
   // -------- entry --------
   const body = document.body;
-  const rootRect = { left: 0, top: 0, width: 0, height: 0 };
   body.style.margin = '0';
   body.style.padding = '0';
+  // If the page (or the user) scrolled before snapshot, every `getBoundingClientRect`
+  // call returns viewport-relative offsets shifted by the scroll position. Reset to
+  // (0,0) so that the body's own rect lands at the origin and every nested rect is
+  // measured against the document, not the current viewport.
+  if (typeof window.scrollTo === 'function') {
+    try { window.scrollTo(0, 0); } catch (_) { /* ignore */ }
+  }
   // Force layout flush.
   void body.offsetHeight;
 
@@ -560,8 +736,6 @@ function takeSnapshot(config) {
   const canvasHeight = Math.max(body.scrollHeight, document.documentElement.scrollHeight);
 
   const bodyRect = body.getBoundingClientRect();
-  rootRect.left = bodyRect.left;
-  rootRect.top = bodyRect.top;
 
   const parts = [];
   for (const c of body.children) {
@@ -569,13 +743,22 @@ function takeSnapshot(config) {
   }
 
   const title = (document.title || '').trim();
-  const bodyBg = getComputedStyle(body).getPropertyValue('background-color').trim();
+  const bodyComputed = getComputedStyle(body);
+  const bodyBg = bodyComputed.getPropertyValue('background-color').trim();
+  const bodyBgImage = normalizeBackgroundImage(
+    bodyComputed.getPropertyValue('background-image').trim(),
+  );
   const bodyStyle = [
     `width: ${canvasWidth}px`,
     `height: ${canvasHeight}px`,
   ];
   if (bodyBg && !['rgba(0, 0, 0, 0)', 'transparent'].includes(bodyBg)) {
     bodyStyle.push(`background-color: ${bodyBg}`);
+  }
+  // Body-level gradient (e.g. a full-page hero backdrop) would otherwise be lost
+  // because the snapshot's <body> only emits sizing + background-color.
+  if (bodyBgImage) {
+    bodyStyle.push(`background-image: ${bodyBgImage}`);
   }
 
   return {

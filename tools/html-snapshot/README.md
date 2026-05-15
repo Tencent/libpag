@@ -19,13 +19,27 @@ to settle, then walks the rendered DOM and produces a snapshot in which:
 - every box is `position: absolute` with `left/top/width/height` taken from
   `getBoundingClientRect()`, relative to its parent;
 - only the visual CSS properties allowed by the subset are forwarded
-  (`background-color`, `border`, `border-radius`, `box-shadow`, `color`,
-  `font-*`, `letter-spacing`, `line-height`, `text-align`, `opacity`,
-  `overflow`, `backdrop-filter`, …);
+  (`background-color`, `background-image` for gradients, `border`,
+  `border-radius`, `box-shadow`, `color`, `font-*`, `letter-spacing`,
+  `line-height`, `text-align`, `text-decoration`, `text-decoration-color`,
+  `opacity`, `overflow`, `backdrop-filter`, …);
 - Tailwind / utility classes are dropped (their effect is already baked into
   the computed style);
-- `<button>`, `<input>` etc. are rewritten to `<div>` / `<span>`;
-- inline `<svg>` icons are kept verbatim (with `currentColor` frozen);
+- `<button>`, `<input>` (text-bearing types only), `<textarea>` and `<select>`
+  are rewritten to `<div>` / `<span>`; their visible label / value /
+  placeholder / selected option is synthesised as the text content;
+- non-text inputs (`type="checkbox|radio|file|color|range|date|…"`) are
+  dropped, since their visual representation depends on browser/OS chrome
+  that PAGX has no model for;
+- inline `<svg>` icons are kept verbatim, with `currentColor` (and
+  `context-fill` / `context-stroke`) frozen per-element so per-node `color`
+  overrides survive;
+- `display: contents` elements are flattened to a transparent pass-through —
+  their box is suppressed and their children are positioned against the
+  element's CSS parent;
+- asymmetric borders (e.g. `border-bottom: 1px solid #e5e7eb` row dividers)
+  are emitted as 1-pixel overlay rectangles, since the subset's `border`
+  property only models same-on-all-sides borders;
 - relative `<img src>` paths are preserved so the importer can still resolve
   them.
 
@@ -107,9 +121,18 @@ pagx render xiaohongshu_react.subset.pagx -o xiaohongshu_react.subset.png --scal
 - Animations, hover states, and other dynamic effects are captured in whatever
   state the page is in when the snapshot is taken. Use `--wait-ms` or
   `--selector` to land on the desired frame.
-- Elements with `display: none` or `visibility: hidden` are dropped, which is
-  intentional: PAGX cannot represent hidden DOM nodes.
-- `<canvas>`, `<video>`, `<audio>`, `<iframe>` are dropped — they have no
-  static visual representation.
+- Elements with `display: none`, `visibility: hidden`, or `opacity: 0` are
+  dropped, which is intentional: PAGX cannot represent hidden DOM nodes.
+- `<canvas>`, `<video>`, `<audio>`, `<iframe>`, `<dialog>`, `<details>`,
+  `<template>`, `<slot>`, `<map>`/`<area>`, `<source>`/`<track>`, etc. are
+  dropped — they have no static visual representation.
+- Asymmetric borders are downgraded to overlay rectangles. Per-side `dashed` /
+  `dotted` borders are coerced to `solid` (the closest visual approximation
+  available in the subset).
+- An inline element (`<span>`, `<a>`) whose text wraps to multiple lines is
+  emitted as one bounding box; the per-line backgrounds CSS would paint are
+  not reproduced.
 - `getBoundingClientRect()` rounds to sub-pixel; the snapshot rounds to integer
   pixels to keep the output diff-friendly.
+- The page is force-scrolled to `(0, 0)` before measurement so that scroll
+  position never leaks into the captured coordinates.
