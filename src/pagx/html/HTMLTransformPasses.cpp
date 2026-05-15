@@ -37,6 +37,7 @@ namespace pagx::html_passes {
 namespace {
 
 using pagx::detail::ElementDefaults;
+using pagx::detail::IsBlankText;
 using pagx::detail::IsContainerTag;
 using pagx::detail::IsInlineRunTag;
 using pagx::detail::IsTextLeafTag;
@@ -50,8 +51,8 @@ using pagx::subset_props::IsDataAttribute;
 // importer so that the cascade carries identical semantics through both layers.
 const std::vector<std::string>& InheritableProperties() {
   static const std::vector<std::string> v = {
-      "color",          "font-family",     "font-size",            "font-weight",
-      "font-style",     "letter-spacing",  "line-height",          "text-align",
+      "color",           "font-family",           "font-size",   "font-weight",
+      "font-style",      "letter-spacing",        "line-height", "text-align",
       "text-decoration", "text-decoration-color", "white-space",
   };
   return v;
@@ -63,9 +64,9 @@ bool IsVoidElement(const std::string& tag) {
 }
 
 bool IsAllowedTag(const std::string& tag) {
-  return IsContainerTag(tag) || IsTextLeafTag(tag) || tag == "br" || tag == "img" ||
-         tag == "svg" || tag == "html" || tag == "head" || tag == "body" || tag == "title" ||
-         tag == "meta" || tag == "style";
+  return IsContainerTag(tag) || IsTextLeafTag(tag) || tag == "br" || tag == "img" || tag == "svg" ||
+         tag == "html" || tag == "head" || tag == "body" || tag == "title" || tag == "meta" ||
+         tag == "style";
 }
 
 // Strip non-element DOM nodes (comments, PIs, stray text-between-elements) from a parent.
@@ -222,24 +223,25 @@ void DocumentSkeletonPass::apply(const std::shared_ptr<DOMNode>& root, HTMLTrans
   // Inside <head>, keep only <title>, <meta>, <style>.
   if (head) {
     RemoveNonElementChildren(head);
-    TransformChildren(head, [&](const std::shared_ptr<DOMNode>&,
-                                const std::shared_ptr<DOMNode>&,
-                                const std::shared_ptr<DOMNode>& c) -> std::shared_ptr<DOMNode> {
-      if (c->name == "title" || c->name == "meta" || c->name == "style") {
-        return c;
-      }
-      if (c->name == "link") {
-        auto* rel = c->findAttribute("rel");
-        if (rel && ToLower(Trim(*rel)) == "stylesheet") {
-          ctx.warn("subset:external-stylesheet",
-                   "html: external <link rel=\"stylesheet\"> dropped", c);
-        }
-        return nullptr;  // drop silently
-      }
-      ctx.warn("subset:unsupported-tag",
-               "html: <" + c->name + "> inside <head> is not allowed; dropped", c);
-      return nullptr;
-    });
+    TransformChildren(head,
+                      [&](const std::shared_ptr<DOMNode>&, const std::shared_ptr<DOMNode>&,
+                          const std::shared_ptr<DOMNode>& c) -> std::shared_ptr<DOMNode> {
+                        if (c->name == "title" || c->name == "meta" || c->name == "style") {
+                          return c;
+                        }
+                        if (c->name == "link") {
+                          auto* rel = c->findAttribute("rel");
+                          if (rel && ToLower(Trim(*rel)) == "stylesheet") {
+                            ctx.warn("subset:external-stylesheet",
+                                     "html: external <link rel=\"stylesheet\"> dropped", c);
+                          }
+                          return nullptr;  // drop silently
+                        }
+                        ctx.warn("subset:unsupported-tag",
+                                 "html: <" + c->name + "> inside <head> is not allowed; dropped",
+                                 c);
+                        return nullptr;
+                      });
   }
 }
 
@@ -304,12 +306,12 @@ void StyleSheetCollectorPass::apply(const std::shared_ptr<DOMNode>& root,
 
   // Remove <style> elements unless preservation is requested.
   if (!ctx.options().preserveStyleBlock) {
-    TransformChildren(head, [&](const std::shared_ptr<DOMNode>&,
-                                const std::shared_ptr<DOMNode>&,
-                                const std::shared_ptr<DOMNode>& c) -> std::shared_ptr<DOMNode> {
-      if (c->type == DOMNodeType::Element && c->name == "style") return nullptr;
-      return c;
-    });
+    TransformChildren(head,
+                      [&](const std::shared_ptr<DOMNode>&, const std::shared_ptr<DOMNode>&,
+                          const std::shared_ptr<DOMNode>& c) -> std::shared_ptr<DOMNode> {
+                        if (c->type == DOMNodeType::Element && c->name == "style") return nullptr;
+                        return c;
+                      });
   }
 }
 
@@ -731,8 +733,8 @@ enum class CrossAlign { Start, Center, End, Stretch, Mixed };
 
 // Determines a single `align-items` value compatible with all children's cross-axis position
 // inside the parent's content box. Returns CrossAlign::Mixed when no single keyword fits.
-CrossAlign InferCrossAlign(const std::vector<ChildBox>& children, FlexAxis axis,
-                           float contentLow, float contentHigh, float tol) {
+CrossAlign InferCrossAlign(const std::vector<ChildBox>& children, FlexAxis axis, float contentLow,
+                           float contentHigh, float tol) {
   if (children.empty()) return CrossAlign::Mixed;
   bool stretchOk = true;
   bool startOk = true;
@@ -780,8 +782,8 @@ MainAxisFit InferMainAxisSpacing(const std::vector<ChildBox>& sorted, FlexAxis a
   };
   fit.paddingLeading = get(sorted.front(), true) - contentLow;
   fit.paddingTrailing = contentHigh - get(sorted.back(), false);
-  if (fit.paddingLeading < -tol) return fit;     // first child overflows the content box
-  if (fit.paddingTrailing < -tol) return fit;    // last child overflows the content box
+  if (fit.paddingLeading < -tol) return fit;   // first child overflows the content box
+  if (fit.paddingTrailing < -tol) return fit;  // last child overflows the content box
   if (fit.paddingLeading < 0) fit.paddingLeading = 0;
   if (fit.paddingTrailing < 0) fit.paddingTrailing = 0;
   if (sorted.size() == 1) {
@@ -894,39 +896,32 @@ void StripChildAbsolute(PropertyMap& childProps, FlexAxis axis, CrossAlign align
   }
 }
 
-// Reorders `parent`'s element children so that they appear in `sortedElements` order while
-// keeping any non-element (text) children in their original ordinal slots. This is needed
-// because `position: absolute` children render at their declared `left`/`top` regardless of
-// document order, but a flex container honours document order — so converting an absolute
-// layout whose DOM order doesn't match its visual order would re-shuffle the children.
-// Returns true when the order was changed.
+// Reorders `parent`'s element children to match `sortedElements`, while keeping any
+// non-element (text) children in their original ordinal slots. Required because flex
+// honours document order but the absolute children we just folded did not.
+// Returns true when the order changed.
 bool ReorderElementChildrenToMainAxis(const std::shared_ptr<DOMNode>& parent,
                                       const std::vector<ChildBox>& sortedElements) {
   if (!parent) return false;
   std::vector<std::shared_ptr<DOMNode>> all;
-  std::vector<std::shared_ptr<DOMNode>> elementsInDom;
+  size_t elementCount = 0;
+  bool needsReorder = false;
   for (auto c = parent->firstChild; c; c = c->nextSibling) {
     all.push_back(c);
-    if (c->type == DOMNodeType::Element) elementsInDom.push_back(c);
-  }
-  if (elementsInDom.size() != sortedElements.size()) return false;
-  bool needsReorder = false;
-  for (size_t i = 0; i < elementsInDom.size(); i++) {
-    if (elementsInDom[i] != sortedElements[i].node) {
-      needsReorder = true;
-      break;
-    }
-  }
-  if (!needsReorder) return false;
-  size_t idx = 0;
-  for (auto& c : all) {
     if (c->type == DOMNodeType::Element) {
-      c = sortedElements[idx++].node;
+      if (elementCount >= sortedElements.size()) return false;
+      if (c != sortedElements[elementCount].node) needsReorder = true;
+      elementCount++;
     }
   }
-  parent->firstChild = nullptr;
+  if (elementCount != sortedElements.size()) return false;
+  if (!needsReorder) return false;
+
+  size_t idx = 0;
   std::shared_ptr<DOMNode> prev;
+  parent->firstChild = nullptr;
   for (auto& c : all) {
+    if (c->type == DOMNodeType::Element) c = sortedElements[idx++].node;
     c->nextSibling = nullptr;
     if (!prev) {
       parent->firstChild = c;
@@ -1025,9 +1020,7 @@ void TryInferFlexOnContainer(const std::shared_ptr<DOMNode>& parent, HTMLTransfo
   CrossAlign align = InferCrossAlign(boxes, axis, crossContentLow, crossContentHigh, tol);
   if (align == CrossAlign::Mixed) {
     ctx.warn("subset:flex-inference-skipped",
-             "html: <" + tag +
-                 "> children have mixed cross-axis alignment; kept absolute",
-             parent);
+             "html: <" + tag + "> children have mixed cross-axis alignment; kept absolute", parent);
     return;
   }
 
@@ -1040,8 +1033,7 @@ void TryInferFlexOnContainer(const std::shared_ptr<DOMNode>& parent, HTMLTransfo
   MainAxisFit fit = InferMainAxisSpacing(sorted, axis, mainContentLow, mainContentHigh, tol);
   if (!fit.ok) {
     ctx.warn("subset:flex-inference-skipped",
-             "html: <" + tag +
-                 "> children have inconsistent main-axis spacing; kept absolute",
+             "html: <" + tag + "> children have inconsistent main-axis spacing; kept absolute",
              parent);
     return;
   }
@@ -1068,16 +1060,13 @@ void TryInferFlexOnContainer(const std::shared_ptr<DOMNode>& parent, HTMLTransfo
     StripChildAbsolute(*cp, axis, align);
   }
 
-  // Flex layout follows document order, but the original `position: absolute` children were
-  // placed at their declared coordinates regardless of source order. If the two diverge, we
-  // must rewrite the DOM child list to match the inferred axis order — otherwise the rewrite
-  // visually shuffles the children. The boxes are already non-overlapping along the main axis
-  // (InferAxis guaranteed it), so reordering them here is safe.
+  // Flex follows DOM order; the absolute children we just folded did not. Re-link the
+  // child list so the inferred axis order matches what the user saw.
   bool reordered = ReorderElementChildrenToMainAxis(parent, sorted);
 
   ctx.warn("subset:flex-inferred",
-           std::string("html: <") + tag + "> rewritten as display:flex (" + AxisName(axis) +
-               ", " + std::to_string(boxes.size()) + " children" +
+           "html: <" + tag + "> rewritten as display:flex (" + AxisName(axis) + ", " +
+               std::to_string(boxes.size()) + " children" +
                (reordered ? ", reordered to match position" : "") + ")",
            parent);
 }
@@ -1086,12 +1075,9 @@ void WalkInferFlex(const std::shared_ptr<DOMNode>& node, HTMLTransformContext& c
   if (!node || node->type != DOMNodeType::Element) return;
   // SVG subtrees are opaque (their absolute geometry is meaningful at a different layer).
   if (node->name == "svg") return;
-  // Recurse children first so that each container resolves its own flex spacing while its
-  // explicit width/height is still intact. If we processed the parent first and it folded
-  // its children into a `stretch` alignment, the child's cross-axis dimension would be
-  // erased before the child got a chance to use it — forcing the child's own inference to
-  // fall back to a children-bbox content range and silently dropping the parent-edge
-  // paddings (top bar / tab bar / category row, video grid horizontal padding, ...).
+  // Recurse children first: a parent that folds into `align-items: stretch` erases its
+  // children's cross-axis size, so each child must finish its own inference while its
+  // explicit width/height is still intact.
   auto child = node->firstChild;
   while (child) {
     WalkInferFlex(child, ctx);
@@ -1116,14 +1102,6 @@ void AbsoluteToFlexInferencePass::apply(const std::shared_ptr<DOMNode>& root,
 //==================================================================================================
 
 namespace {
-
-// Returns true when `text` consists entirely of ASCII whitespace.
-bool IsBlankText(const std::string& text) {
-  for (char c : text) {
-    if (!std::isspace(static_cast<unsigned char>(c))) return false;
-  }
-  return true;
-}
 
 // Wraps non-blank text children of a container into a synthetic `<p>` (or `<span>` when the
 // parent is itself a text leaf). Element children are left untouched.

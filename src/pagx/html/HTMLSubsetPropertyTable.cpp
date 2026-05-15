@@ -102,9 +102,9 @@ std::string TransformFlexDirection(const std::string& value, const PropertyConte
   std::string lc = ToLower(Trim(value));
   if (lc == "row" || lc == "column") return lc;
   if (lc == "row-reverse" || lc == "column-reverse") {
-    diags.warn("subset:unsupported-property",
-               "html: 'flex-direction: " + lc + "' is not supported; falling back to '" +
-                   (lc == "row-reverse" ? "row" : "column") + "'");
+    diags.warn("subset:unsupported-property", "html: 'flex-direction: " + lc +
+                                                  "' is not supported; falling back to '" +
+                                                  (lc == "row-reverse" ? "row" : "column") + "'");
     return lc == "row-reverse" ? "row" : "column";
   }
   return DropProperty("flex-direction", value, "is not a recognised keyword", diags);
@@ -177,8 +177,8 @@ std::string TransformPosition(const std::string& value, const PropertyContext& c
   if (lc == "absolute") return "absolute";
   if (lc == "static") return std::string();  // default; drop silently
   if (lc == "relative" || lc == "fixed" || lc == "sticky") {
-    diags.warn("subset:unsupported-property", "html: 'position: " + lc + "' on '" + ctx.ownerTag +
-                                                  "' downgraded to absolute");
+    diags.warn("subset:unsupported-property",
+               "html: 'position: " + lc + "' on '" + ctx.ownerTag + "' downgraded to absolute");
     return "absolute";
   }
   return DropProperty("position", value, "is not a recognised keyword", diags);
@@ -427,8 +427,8 @@ std::string ResolveLength(const std::string& value, const PropertyContext& ctx,
                         diagnostics);
   }
   if (lc.find("clamp(") == 0 || lc.find("min(") == 0 || lc.find("max(") == 0) {
-    return DropProperty(ctx.propertyName, value,
-                        "min/max/clamp() are not supported by the subset", diagnostics);
+    return DropProperty(ctx.propertyName, value, "min/max/clamp() are not supported by the subset",
+                        diagnostics);
   }
   float n = 0.0f;
   std::string unit;
@@ -444,34 +444,31 @@ std::string ResolveLength(const std::string& value, const PropertyContext& ctx,
   }
   if (unit == "em") {
     float base = IsFiniteNonZero(ctx.currentFontSizePx) ? ctx.currentFontSizePx : kRemBasePx;
-    diagnostics.warn("subset:unit-coerced",
-                     "html: '" + ctx.propertyName + ": " + trimmed + "' converted to " +
-                         FormatNumber(n * base) + "px");
+    diagnostics.warn("subset:unit-coerced", "html: '" + ctx.propertyName + ": " + trimmed +
+                                                "' converted to " + FormatNumber(n * base) + "px");
     return EmitPx(n * base);
   }
   if (unit == "rem") {
-    diagnostics.warn("subset:unit-coerced",
-                     "html: '" + ctx.propertyName + ": " + trimmed + "' converted to " +
-                         FormatNumber(n * kRemBasePx) + "px");
+    diagnostics.warn("subset:unit-coerced", "html: '" + ctx.propertyName + ": " + trimmed +
+                                                "' converted to " + FormatNumber(n * kRemBasePx) +
+                                                "px");
     return EmitPx(n * kRemBasePx);
   }
   if (unit == "vw" || unit == "vh") {
     float dim = unit == "vw" ? ctx.canvasWidth : ctx.canvasHeight;
     if (!IsFiniteNonZero(dim)) {
-      return DropProperty(ctx.propertyName, value,
-                          "vw/vh require a known canvas size to resolve", diagnostics);
+      return DropProperty(ctx.propertyName, value, "vw/vh require a known canvas size to resolve",
+                          diagnostics);
     }
     float px = n * dim / 100.0f;
-    diagnostics.warn("subset:unit-coerced",
-                     "html: '" + ctx.propertyName + ": " + trimmed + "' converted to " +
-                         FormatNumber(px) + "px");
+    diagnostics.warn("subset:unit-coerced", "html: '" + ctx.propertyName + ": " + trimmed +
+                                                "' converted to " + FormatNumber(px) + "px");
     return EmitPx(px);
   }
   if (unit == "pt") {
     float px = n * 4.0f / 3.0f;
-    diagnostics.warn("subset:unit-coerced",
-                     "html: '" + ctx.propertyName + ": " + trimmed + "' converted to " +
-                         FormatNumber(px) + "px");
+    diagnostics.warn("subset:unit-coerced", "html: '" + ctx.propertyName + ": " + trimmed +
+                                                "' converted to " + FormatNumber(px) + "px");
     return EmitPx(px);
   }
   return DropProperty(ctx.propertyName, value, "uses an unsupported unit '" + unit + "'",

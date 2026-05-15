@@ -156,8 +156,8 @@ HTMLSubsetTransformer::Result HTMLSubsetTransformer::Builder::run(
 // HTMLSubsetTransformer::Transform (default pipeline)
 //==================================================================================================
 
-HTMLSubsetTransformer::Result HTMLSubsetTransformer::Transform(
-    const std::shared_ptr<DOMNode>& root, const Options& options) {
+HTMLSubsetTransformer::Result HTMLSubsetTransformer::Transform(const std::shared_ptr<DOMNode>& root,
+                                                               const Options& options) {
   Builder builder;
   builder.withOptions(options).addDefaultPasses();
   return builder.run(root);

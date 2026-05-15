@@ -224,17 +224,19 @@ class HTMLParserContext {
   // <img> conversion.
   Layer* convertImage(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box);
 
-  // Folds the standard CSS rounded-image wrapper pattern (a container whose only role
-  // is to round-clip a single <img> child via `border-radius` + `overflow: hidden`) into
-  // a single Layer whose rounded Rectangle is filled directly by the image. Required
-  // because PAGX's only built-in clip primitive (`clipToBounds`) clips to rectangular
-  // bounds, which lets the image's square geometry leak past the wrapper's rounded
-  // corners (visible as a square avatar inside a circular ring).
-  //
-  // Returns true (with `layer` populated) on a successful fold; otherwise returns false
-  // and leaves `layer` unchanged for the caller's normal container-emission path.
+  // Folds the standard CSS rounded-image wrapper pattern (a container whose only role is
+  // to round-clip a single <img> child via `border-radius` + `overflow: hidden`) into a
+  // single Layer whose rounded Rectangle is filled directly by the image. PAGX's only
+  // clip primitive (`clipToBounds`) is rectangular, so a naive translation lets the
+  // image leak past the wrapper's rounded corners. Returns true (with `layer`
+  // populated) on a successful fold; otherwise leaves `layer` unchanged for the
+  // caller's normal container-emission path.
   bool foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& element,
                                const HTMLBoxAttributes& box, Layer* layer);
+
+  // Resolves a raw `src` URL to a final image source path: absolute URLs pass through,
+  // relative paths are anchored at the document's `_basePath`.
+  std::string resolveImageSource(const std::string& src) const;
 
   // Inline <svg> conversion.
   Layer* convertInlineSvg(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box);
@@ -422,6 +424,14 @@ inline std::string Trim(const std::string& s) {
   }
   size_t end = s.find_last_not_of(" \t\r\n");
   return s.substr(start, end - start + 1);
+}
+
+// Returns true when `text` is empty or consists entirely of ASCII whitespace.
+inline bool IsBlankText(const std::string& text) {
+  for (char c : text) {
+    if (!std::isspace(static_cast<unsigned char>(c))) return false;
+  }
+  return true;
 }
 
 // Split a CSS value list on top-level commas (commas inside parentheses are not split).

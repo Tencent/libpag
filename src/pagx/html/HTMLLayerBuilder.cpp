@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <string>
+#include "base/utils/MathUtil.h"
 #include "pagx/html/HTMLParserContext.h"
 #include "pagx/utils/StringParser.h"
 
@@ -54,6 +55,14 @@ void SerializeNode(std::string& out, const std::shared_ptr<DOMNode>& node) {
   out += "</";
   out += node->name;
   out.push_back('>');
+}
+
+// External `.svg` URL — i.e. ends with `.svg` and is not an inline `data:` URI. Such
+// sources route through an SVG import directive rather than a raster image fill.
+bool IsExternalSvgSrc(const std::string& src) {
+  if (src.size() <= 4) return false;
+  if (src.compare(0, 5, "data:") == 0) return false;
+  return ToLower(src.substr(src.size() - 4)) == ".svg";
 }
 
 }  // namespace
@@ -285,15 +294,9 @@ void HTMLParserContext::applyLayerAttributes(Layer* layer, const std::shared_ptr
 
 bool HTMLParserContext::foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& element,
                                                 const HTMLBoxAttributes& box, Layer* layer) {
-  // Pattern requirements on the wrapper. We need a rounded clip and nothing on the
-  // wrapper that would conflict with the folded image (no padding/flex/gap host split,
-  // no SVG-style import directive). The wrapper may still carry a background colour /
-  // gradient / border / shadow — those have already been emitted into `layer->contents`
-  // by applyBackgroundVisuals() and will render underneath the folded image fill.
   if (!box.borderRadiusSet || !box.clipOverflow) return false;
   if (requiresInnerHost(box)) return false;
 
-  // Locate the sole <img> child (no other elements, no significant text).
   std::shared_ptr<DOMNode> img = nullptr;
   for (auto c = element->getFirstChild(); c; c = c->getNextSibling()) {
     if (c->type == DOMNodeType::Element) {
@@ -301,46 +304,41 @@ bool HTMLParserContext::foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& 
       if (c->name != "img") return false;
       img = c;
     } else if (c->type == DOMNodeType::Text) {
-      if (!Trim(c->name).empty()) return false;
+      if (!IsBlankText(c->name)) return false;
     }
   }
   if (!img) return false;
 
-  // The image must exactly cover the wrapper's content box, anchored at top-left. If
-  // it's smaller / offset, the wrapper's rounded clip would shape only part of the
-  // visible image — folding then would stretch the image to fill the whole wrapper.
+  // Reject SVG sources up front: they ride an import directive, not a raster fill.
+  auto* srcAttr = img->findAttribute("src");
+  if (!srcAttr || srcAttr->empty()) return false;
+  const std::string& src = *srcAttr;
+  if (IsExternalSvgSrc(src)) return false;
+
+  // The image must exactly cover the wrapper's content box, anchored at top-left —
+  // otherwise the rounded clip would shape only part of the visible image and folding
+  // would stretch it across the wrapper.
   HTMLBoxAttributes imgBox = resolveBox(img);
-  auto closeTo = [](float a, float b) { return std::fabs(a - b) < 0.5f; };
   if (std::isnan(imgBox.widthPx) || std::isnan(box.widthPx) ||
-      !closeTo(imgBox.widthPx, box.widthPx)) {
+      !pag::FloatNearlyEqual(imgBox.widthPx, box.widthPx, 0.5f)) {
     return false;
   }
   if (std::isnan(imgBox.heightPx) || std::isnan(box.heightPx) ||
-      !closeTo(imgBox.heightPx, box.heightPx)) {
+      !pag::FloatNearlyEqual(imgBox.heightPx, box.heightPx, 0.5f)) {
     return false;
   }
   float imgLeft = std::isnan(imgBox.leftPx) ? 0.0f : imgBox.leftPx;
   float imgTop = std::isnan(imgBox.topPx) ? 0.0f : imgBox.topPx;
-  if (!closeTo(imgLeft, 0.0f) || !closeTo(imgTop, 0.0f)) return false;
+  if (!pag::FloatNearlyEqual(imgLeft, 0.0f, 0.5f) || !pag::FloatNearlyEqual(imgTop, 0.0f, 0.5f)) {
+    return false;
+  }
 
-  // Resolve the image source. SVG sources go through an import directive in the regular
-  // <img> path and can't be expressed as a fill pattern, so we leave them to the normal
-  // container/child route.
-  auto* srcAttr = img->findAttribute("src");
-  if (!srcAttr || srcAttr->empty()) return false;
-  const std::string& src = *srcAttr;
-  bool isSvg = src.size() > 4 && ToLower(src.substr(src.size() - 4)) == ".svg" &&
-               src.compare(0, 5, "data:") != 0;
-  if (isSvg) return false;
-
-  std::string resolved = LooksAbsolutePath(src) ? src : (_basePath + src);
-  auto* imageNode = registerImageResource(resolved);
+  auto* imageNode = registerImageResource(resolveImageSource(src));
   if (!imageNode) return false;
 
-  // Drop clipToBounds: the rounded Rectangle is now the actual fill geometry, so the
-  // additional rectangular scroll-rect clip the importer would have written from
-  // `overflow: hidden` is both redundant and (for the avatar case) misleading when
-  // diffing the output against the spec's expected shape pattern.
+  // The rounded Rectangle emitted by applyBackgroundVisuals() above is now the actual
+  // fill geometry, so the rectangular clip the importer would have written from
+  // `overflow: hidden` is redundant.
   layer->clipToBounds = false;
 
   auto fill = _document->makeNode<Fill>();
@@ -359,20 +357,18 @@ Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
     warn("html: <img> missing src; skipped");
     return nullptr;
   }
-  std::string src = *srcAttr;
-  if (src.size() > 4 && ToLower(src.substr(src.size() - 4)) == ".svg" &&
-      src.compare(0, 5, "data:") != 0) {
+  const std::string& src = *srcAttr;
+  if (IsExternalSvgSrc(src)) {
     auto layer = _document->makeNode<Layer>();
     applySizeAndPosition(layer, box);
     applyLayerAttributes(layer, element, box);
-    layer->importDirective.source = LooksAbsolutePath(src) ? src : (_basePath + src);
+    layer->importDirective.source = resolveImageSource(src);
     layer->importDirective.format = "svg";
     assignElementId(layer, element);
     return layer;
   }
 
-  std::string resolved = LooksAbsolutePath(src) ? src : (_basePath + src);
-  auto* imageNode = registerImageResource(resolved);
+  auto* imageNode = registerImageResource(resolveImageSource(src));
   if (!imageNode) return nullptr;
 
   auto layer = _document->makeNode<Layer>();
@@ -419,6 +415,10 @@ Image* HTMLParserContext::registerImageResource(const std::string& imageSource) 
   imageNode->filePath = imageSource;
   _imageSourceToId[imageSource] = imageNode;
   return imageNode;
+}
+
+std::string HTMLParserContext::resolveImageSource(const std::string& src) const {
+  return LooksAbsolutePath(src) ? src : (_basePath + src);
 }
 
 }  // namespace pagx
