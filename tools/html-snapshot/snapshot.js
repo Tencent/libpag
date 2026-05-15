@@ -731,11 +731,17 @@ function takeSnapshot(config) {
   // Force layout flush.
   void body.offsetHeight;
 
-  // Pick canvas size: prefer body scrollWidth/Height, fall back to viewport.
-  const canvasWidth = Math.max(body.scrollWidth, document.documentElement.scrollWidth);
-  const canvasHeight = Math.max(body.scrollHeight, document.documentElement.scrollHeight);
-
+  // Pick canvas size from the body itself. We deliberately do NOT consult
+  // `document.documentElement.scrollWidth/scrollHeight` here — the root element
+  // is sized to the viewport whenever the body is smaller, so a phone-sized mock
+  // (`<body style="width: 375px; height: 812px">`) would otherwise be inflated
+  // to the puppeteer viewport (1400x900) and rendered as a tiny island in the
+  // top-left corner. `body.scrollWidth/scrollHeight` already includes any child
+  // content that overflows past the body's declared size, so it correctly captures
+  // both fixed-size mocks and fluid pages whose content extends past the viewport.
   const bodyRect = body.getBoundingClientRect();
+  const canvasWidth = Math.max(body.scrollWidth, Math.round(bodyRect.width));
+  const canvasHeight = Math.max(body.scrollHeight, Math.round(bodyRect.height));
 
   const parts = [];
   for (const c of body.children) {
