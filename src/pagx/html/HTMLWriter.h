@@ -404,6 +404,8 @@ class HTMLWriter {
                                float bboxX = 0, float bboxY = 0, float bboxW = 0, float bboxH = 0);
 
   // Rendering
+  void emitFlexContainerStyle(std::string& style, const Layer* layer, bool isFlexItem);
+  void emitBlendAndIsolation(std::string& style, const Layer* layer);
   void writeLayerContents(HTMLBuilder& out, const Layer* layer, float alpha, bool distribute,
                           LayerPlacement targetPlacement);
   // Emits only the layer's inner children (background contents, composition, child layers,

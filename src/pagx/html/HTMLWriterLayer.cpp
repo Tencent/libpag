@@ -1412,6 +1412,91 @@ void HTMLWriter::writeLayerContents(HTMLBuilder& out, const Layer* layer, float 
 }
 
 //==============================================================================
+// HTMLWriter – layer helpers
+//==============================================================================
+
+void HTMLWriter::emitFlexContainerStyle(std::string& style, const Layer* layer, bool isFlexItem) {
+  style += ";display:flex;box-sizing:border-box";
+  if (layer->layout == LayoutMode::Horizontal) {
+    style += ";flex-direction:row";
+  } else {
+    style += ";flex-direction:column";
+  }
+  bool isSpace = layer->arrangement == Arrangement::SpaceBetween ||
+                 layer->arrangement == Arrangement::SpaceEvenly ||
+                 layer->arrangement == Arrangement::SpaceAround;
+  if (!isSpace && layer->gap > 0) {
+    style += ";gap:" + CssFloatToString(layer->gap) + "px";
+  }
+  if (!layer->padding.isZero()) {
+    style += ";padding:" + PaddingToCSS(layer->padding);
+  }
+  if (layer->alignment != Alignment::Stretch) {
+    style += ";align-items:";
+    style += AlignmentToCSS(layer->alignment);
+  }
+  if (layer->arrangement != Arrangement::Start) {
+    style += ";justify-content:";
+    style += ArrangementToCSS(layer->arrangement);
+  }
+  if (isSpace && isFlexItem && layer->flex <= 0) {
+    bool horizontal = layer->layout == LayoutMode::Horizontal;
+    auto bounds = layer->layoutBounds();
+    if (horizontal && std::isnan(layer->width) && bounds.width > 0) {
+      if (style.find("width:") == std::string::npos) {
+        style += ";width:" + CssFloatToString(bounds.width) + "px";
+      }
+    } else if (!horizontal && std::isnan(layer->height) && bounds.height > 0) {
+      if (style.find("height:") == std::string::npos) {
+        style += ";height:" + CssFloatToString(bounds.height) + "px";
+      }
+    }
+  }
+}
+
+void HTMLWriter::emitBlendAndIsolation(std::string& style, const Layer* layer) {
+  if (layer->blendMode != BlendMode::Normal) {
+    bool emittedPlusDarkerFilter = false;
+    if (layer->blendMode == BlendMode::PlusDarker) {
+      auto it = _ctx->plusDarkerBackdrops.find(layer);
+      if (it != _ctx->plusDarkerBackdrops.end()) {
+        emitPlusDarkerFilterDef(it->second);
+        style += ";filter:url(#" + it->second.filterId + ")";
+        emittedPlusDarkerFilter = true;
+      }
+    }
+    if (!emittedPlusDarkerFilter) {
+      auto blendStr = BlendModeToMixBlendMode(layer->blendMode);
+      if (blendStr) {
+        style += ";mix-blend-mode:";
+        style += blendStr;
+      }
+    }
+  }
+  bool needsPainterBlendIsolation = false;
+  for (auto* element : layer->contents) {
+    if (element == nullptr) {
+      continue;
+    }
+    auto et = element->nodeType();
+    if (et == NodeType::Fill) {
+      if (static_cast<const Fill*>(element)->blendMode != BlendMode::Normal) {
+        needsPainterBlendIsolation = true;
+        break;
+      }
+    } else if (et == NodeType::Stroke) {
+      if (static_cast<const Stroke*>(element)->blendMode != BlendMode::Normal) {
+        needsPainterBlendIsolation = true;
+        break;
+      }
+    }
+  }
+  if (!layer->passThroughBackground || needsPainterBlendIsolation) {
+    style += ";isolation:isolate";
+  }
+}
+
+//==============================================================================
 // HTMLWriter – layer
 //==============================================================================
 
@@ -1644,53 +1729,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
 
   // Flex container properties
   if (isFlexContainer) {
-    style += ";display:flex;box-sizing:border-box";
-    if (layer->layout == LayoutMode::Horizontal) {
-      style += ";flex-direction:row";
-    } else {
-      style += ";flex-direction:column";
-    }
-
-    // Space-* arrangement handling. PAGX's layout fully absorbs the declared gap into the
-    // redistribution (extraGap = (availableMain - totalChildMain) / denom). CSS flex instead
-    // treats `gap` as a minimum and adds justify-content's distribution on top. To make CSS
-    // match PAGX, emit `justify-content:space-*` natively but *drop* the declared gap, then
-    // make sure the container has a concrete main-axis size equal to PAGX's measured layout
-    // size (totalChildMain + totalGap when shrink-to-fit; the stretched parent size when
-    // stretched). Without the explicit size, a shrink-to-fit flex container would collapse to
-    // the children's bare total width and space-* would have no room to distribute.
-    bool isSpace = layer->arrangement == Arrangement::SpaceBetween ||
-                   layer->arrangement == Arrangement::SpaceEvenly ||
-                   layer->arrangement == Arrangement::SpaceAround;
-    if (!isSpace && layer->gap > 0) {
-      style += ";gap:" + CssFloatToString(layer->gap) + "px";
-    }
-    if (!layer->padding.isZero()) {
-      style += ";padding:" + PaddingToCSS(layer->padding);
-    }
-    if (layer->alignment != Alignment::Stretch) {
-      style += ";align-items:";
-      style += AlignmentToCSS(layer->alignment);
-    }
-    if (layer->arrangement != Arrangement::Start) {
-      style += ";justify-content:";
-      style += ArrangementToCSS(layer->arrangement);
-    }
-    // If a space-* row doesn't already carry an explicit main-axis size, pin it to the pagx
-    // measured size so CSS has the same distribution budget as the tgfx layout.
-    if (isSpace && isFlexItem && layer->flex <= 0) {
-      bool horizontal = layer->layout == LayoutMode::Horizontal;
-      auto bounds = layer->layoutBounds();
-      if (horizontal && std::isnan(layer->width) && bounds.width > 0) {
-        if (style.find("width:") == std::string::npos) {
-          style += ";width:" + CssFloatToString(bounds.width) + "px";
-        }
-      } else if (!horizontal && std::isnan(layer->height) && bounds.height > 0) {
-        if (style.find("height:") == std::string::npos) {
-          style += ";height:" + CssFloatToString(bounds.height) + "px";
-        }
-      }
-    }
+    emitFlexContainerStyle(style, layer, isFlexItem);
   }
 
   if (layer->preserve3D) {
@@ -1708,58 +1747,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   bool childDistribute = !groupOp && layerAlpha < 1.0f;
   bool suppressGroupOpacity = false;  // set by the box-shadow fallback path below
 
-  if (layer->blendMode != BlendMode::Normal) {
-    // PlusDarker takes a dedicated filter-based path when the pre-pass has rendered a backdrop
-    // for this layer; otherwise it falls through to the mix-blend-mode:darken approximation.
-    bool emittedPlusDarkerFilter = false;
-    if (layer->blendMode == BlendMode::PlusDarker) {
-      auto it = _ctx->plusDarkerBackdrops.find(layer);
-      if (it != _ctx->plusDarkerBackdrops.end()) {
-        emitPlusDarkerFilterDef(it->second);
-        style += ";filter:url(#" + it->second.filterId + ")";
-        emittedPlusDarkerFilter = true;
-      }
-    }
-    if (!emittedPlusDarkerFilter) {
-      auto blendStr = BlendModeToMixBlendMode(layer->blendMode);
-      if (blendStr) {
-        style += ";mix-blend-mode:";
-        style += blendStr;
-      }
-    }
-  }
-
-  // isolation: isolate is needed in two cases:
-  // 1) passThroughBackground=false: the Layer itself is a rendering boundary in PAGX semantics.
-  // 2) Any Fill/Stroke inside this Layer carries a non-default blendMode. In tgfx the painter
-  //    blend is confined to the Layer's own canvas (Fill#2 multiply only mixes with Fill#1
-  //    inside the same Layer, never with ancestor backgrounds). CSS mix-blend-mode defaults
-  //    to blending against the cumulative backdrop of the enclosing stacking context, so
-  //    without isolation here the multiply bleeds into whatever sits behind the Layer —
-  //    e.g. painter_multiple's red multiply mixing with the white card bg above, flooding
-  //    the blue Fill#1 with pink. Forcing isolation on the Layer box contains the blend to
-  //    the siblings that actually need it, matching tgfx's per-layer canvas semantics.
-  bool needsPainterBlendIsolation = false;
-  for (auto* element : layer->contents) {
-    if (element == nullptr) {
-      continue;
-    }
-    auto et = element->nodeType();
-    if (et == NodeType::Fill) {
-      if (static_cast<const Fill*>(element)->blendMode != BlendMode::Normal) {
-        needsPainterBlendIsolation = true;
-        break;
-      }
-    } else if (et == NodeType::Stroke) {
-      if (static_cast<const Stroke*>(element)->blendMode != BlendMode::Normal) {
-        needsPainterBlendIsolation = true;
-        break;
-      }
-    }
-  }
-  if (!layer->passThroughBackground || needsPainterBlendIsolation) {
-    style += ";isolation:isolate";
-  }
+  emitBlendAndIsolation(style, layer);
 
   if (!layer->antiAlias) {
     style += ";shape-rendering:crispEdges;image-rendering:pixelated";
