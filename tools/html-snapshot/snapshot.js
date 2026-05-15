@@ -258,8 +258,18 @@ function takeSnapshot(config) {
   // detached from the document, so `getComputedStyle` can't resolve it directly; instead
   // we walk the *original* subtree (where the cascade is live) and the clone in
   // lockstep, propagating per-node `color` down the tree.
-  function freezeSvg(svgEl) {
+  function freezeSvg(svgEl, rect) {
     const clone = svgEl.cloneNode(true);
+    // Inline SVGs in real pages usually rely on CSS classes (e.g. Tailwind `w-4 h-4`)
+    // to set their on-screen size and leave the `<svg>` element itself without
+    // `width`/`height` attributes. PAGX's import pipeline does not interpret those
+    // classes, so the resulting SVG would fall back to its viewBox extents (typically
+    // 24×24) and get clipped by its parent wrapper. Pin the dimensions here from the
+    // browser's measured rect so the importer scales the viewBox into the visible box.
+    if (rect && Number.isFinite(rect.width) && Number.isFinite(rect.height)) {
+      clone.setAttribute('width', String(Math.round(rect.width * 1000) / 1000));
+      clone.setAttribute('height', String(Math.round(rect.height * 1000) / 1000));
+    }
     const fallback = (getComputedStyle(svgEl).color || 'rgb(0, 0, 0)').trim();
     const walk = (orig, dst, inheritedColor) => {
       // SVG elements inherit `color` from their CSS parent. We only re-query
@@ -627,7 +637,7 @@ function takeSnapshot(config) {
       const wrapper = buildStyle(left, top, rect.width, rect.height, computed, {
         box: true, colorOnly: true,
       });
-      return `<div style="${wrapper}">${freezeSvg(el)}</div>`;
+      return `<div style="${wrapper}">${freezeSvg(el, rect)}</div>`;
     }
 
     if (kind === 'img') {
