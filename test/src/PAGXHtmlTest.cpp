@@ -35,7 +35,6 @@ static std::string LoadAndConvert(const std::string& pagxPath,
   if (doc == nullptr) {
     return "";
   }
-  doc->applyLayout();
   // Shared tmp asset dir for all string-assertion tests. Individual tests assert HTML text
   // content only; the PNG files written here are not validated, so cross-test filename
   // collisions (e.g. dgc0.png from two different samples) are harmless.
@@ -91,7 +90,6 @@ static ExportedSample ExportSampleHtmlToFile(const std::string& pagxPath,
     std::cerr << "ExportSampleHtmlToFile: failed to load " << pagxPath << "\n";
     return result;
   }
-  doc->applyLayout();
 
   result.width = static_cast<int>(doc->width);
   result.height = static_cast<int>(doc->height);
@@ -580,7 +578,6 @@ CLI_TEST(PAGXHtmlTest, ExportToFile) {
   auto doc = pagx::PAGXImporter::FromFile(
       ProjectPath::Absolute("resources/pagx_to_html/root_document.pagx"));
   ASSERT_TRUE(doc != nullptr);
-  doc->applyLayout();
 
   auto outPath = ProjectPath::Absolute("test/out/PAGXHtmlTest/export_to_file.html");
   auto dirPath = std::filesystem::path(outPath).parent_path();

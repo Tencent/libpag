@@ -169,18 +169,6 @@ static int ExportToSVG(const ExportOptions& options) {
   return 0;
 }
 
-// Wraps the HTML fragment returned by HTMLExporter::ToHTML in a complete <!DOCTYPE html>
-// document so that the output file can be opened directly in a browser. The body is sized to
-// the PAGX canvas.
-static std::string WrapAsHTMLDocument(const std::string& fragment, float width, float height) {
-  auto w = std::to_string(static_cast<int>(width));
-  auto h = std::to_string(static_cast<int>(height));
-  std::string bodyStyle = "margin:0;padding:0;width:" + w + "px;height:" + h +
-                          "px;overflow:hidden;font-family:sans-serif";
-  return "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<style>\nbody { " + bodyStyle +
-         " }\n</style>\n</head>\n<body>\n" + fragment + "\n</body>\n</html>\n";
-}
-
 static int ExportToHTML(const ExportOptions& options) {
   auto document = PAGXImporter::FromFile(options.inputFile);
   if (document == nullptr) {
@@ -191,45 +179,11 @@ static int ExportToHTML(const ExportOptions& options) {
     std::cerr << "pagx export: warning: " << error << "\n";
   }
 
-  document->applyLayout();
-
-  std::filesystem::path outputPath(options.outputFile);
-  auto outputDir = outputPath.parent_path();
-  if (outputDir.empty()) {
-    outputDir = std::filesystem::current_path();
-  }
-
-  // Resource directory convention: sibling directory named after the HTML file's stem, so the
-  // generated HTML references assets via "<stem>/…" relative URLs. This matches the new
-  // HTMLExporter contract enforced by ToFile, but we call ToHTML explicitly because CLI needs
-  // to wrap the fragment in a complete <!DOCTYPE html> document before writing it.
-  auto outputStem = outputPath.stem().string();
-  auto resourceDir = (outputDir / outputStem).string();
-  auto fragment = HTMLExporter::ToHTML(*document, resourceDir);
-  if (fragment.empty()) {
-    std::cerr << "pagx export: error: HTMLExporter produced empty output for '" << options.inputFile
-              << "'\n";
+  std::string errorMsg;
+  if (!HTMLExporter::ToFile(*document, options.outputFile, {}, &errorMsg)) {
+    std::cerr << "pagx export: error: " << (errorMsg.empty() ? "export failed" : errorMsg) << "\n";
     return 1;
   }
-
-  auto html = WrapAsHTMLDocument(fragment, document->width, document->height);
-
-  if (!outputDir.empty() && !std::filesystem::exists(outputDir)) {
-    std::error_code ec;
-    std::filesystem::create_directories(outputDir, ec);
-    if (ec) {
-      std::cerr << "pagx export: error: failed to create directory '" << outputDir.string()
-                << "': " << ec.message() << "\n";
-      return 1;
-    }
-  }
-  std::ofstream file(options.outputFile, std::ios::binary);
-  if (!file) {
-    std::cerr << "pagx export: error: failed to write '" << options.outputFile << "'\n";
-    return 1;
-  }
-  file.write(html.data(), static_cast<std::streamsize>(html.size()));
-  file.close();
 
   std::cout << "pagx export: wrote " << options.outputFile << "\n";
   return 0;

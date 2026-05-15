@@ -56,6 +56,19 @@ struct HTMLExportOptions {
    * The default is true.
    */
   bool extractStyleSheet = true;
+
+  /**
+   * When true, `ToFile` and `ToHTML` produce a complete HTML document (with `<!DOCTYPE html>`,
+   * `<html>`, `<head>`, and `<body>` tags) that can be opened directly in a browser. When false,
+   * only the inner HTML fragment is returned — callers are responsible for wrapping it.
+   *
+   * The default is true for `ToFile` (the most common use case is producing a standalone file)
+   * and false for `ToHTML` (the caller usually needs the fragment for embedding).
+   *
+   * Note: when this is not set explicitly, `ToFile` defaults to true and `ToHTML` defaults to
+   * false. Setting it explicitly overrides the per-method default.
+   */
+  int wrapFullDocument = -1;  // -1 = use per-method default
 };
 
 /**
@@ -86,11 +99,10 @@ class HTMLExporter {
    * stderr and returns an empty string. Use ToFile if you want resource-directory derivation
    * handled for you.
    *
-   * Precondition: `document.isLayoutApplied()` must return true — the exporter reads
-   * layout-resolved geometry (positions, sizes, text runs) produced by PAGXDocument::applyLayout
-   * and cannot derive them on the fly. Passing a document whose layout has not been applied
-   * silently produces an empty or degenerate HTML string rather than throwing; callers are
-   * responsible for invoking applyLayout() themselves.
+   * Precondition: the exporter reads layout-resolved geometry (positions, sizes, text runs)
+   * produced by PAGXDocument::applyLayout. If `document.isLayoutApplied()` returns false when
+   * ToHTML is called, the exporter automatically calls `document.applyLayout()` before
+   * proceeding — matching the behavior of SVGExporter and PPTExporter.
    *
    * Thread safety: this is a stateless static method and may be called concurrently from
    * multiple threads, provided that each thread passes a distinct document (or a document that
@@ -98,23 +110,22 @@ class HTMLExporter {
    * (so that concurrent writers do not race on the same filesystem location).
    *
    * Failure semantics: returns an empty string on internal failure, when the document has no
-   * visible content, or when `resourceDir` is empty. The distinct causes are not encoded in
-   * the return value; callers that need to tell them apart should validate inputs themselves
-   * before invoking ToHTML.
+   * visible content, or when `resourceDir` is empty. If `errorMsg` is not null, a human-readable
+   * description of the failure is written to `*errorMsg`.
    *
-   * Ownership: `document` is consumed by const reference. The exporter does not retain any
-   * pointer or reference to the document or its internal nodes beyond the duration of this
-   * call, so the caller is free to destroy or mutate `document` as soon as ToHTML returns.
+   * Ownership: `document` is passed by non-const reference so the exporter can call applyLayout
+   * if needed, but the exporter does not retain any pointer or reference to the document or its
+   * internal nodes beyond the duration of this call.
    *
-   * @param document The PAGX document to export. Must have had applyLayout() called.
+   * @param document The PAGX document to export. Layout is applied automatically if needed.
    * @param resourceDir Absolute directory path for auxiliary PNGs and copied images. Must not
    *                    be empty.
    * @param options Export options controlling output formatting.
-   * @return The generated HTML string, or an empty string if resourceDir is empty, the document
-   *         has no content, or the exporter encountered an internal failure.
+   * @param errorMsg Optional pointer to receive a human-readable error description on failure.
+   * @return The generated HTML string, or an empty string on failure.
    */
-  static std::string ToHTML(const PAGXDocument& document, const std::string& resourceDir,
-                            const Options& options = {});
+  static std::string ToHTML(PAGXDocument& document, const std::string& resourceDir,
+                            const Options& options = {}, std::string* errorMsg = nullptr);
 
   /**
    * Exports a PAGXDocument to an HTML file. Creates parent directories if they do not exist.
@@ -134,15 +145,16 @@ class HTMLExporter {
    * Precondition, thread safety, failure semantics, and document ownership follow the same
    * rules as ToHTML; see that method for details.
    *
-   * @param document The PAGX document to export. Must have had applyLayout() called.
+   * @param document The PAGX document to export. Layout is applied automatically if needed.
    * @param filePath The output file path, used verbatim (no validation performed by the
    *                 library).
    * @param options Export options controlling output formatting.
+   * @param errorMsg Optional pointer to receive a human-readable error description on failure.
    * @return True on success, false if the file could not be written or the document has no
    *         content.
    */
-  static bool ToFile(const PAGXDocument& document, const std::string& filePath,
-                     const Options& options = {});
+  static bool ToFile(PAGXDocument& document, const std::string& filePath,
+                     const Options& options = {}, std::string* errorMsg = nullptr);
 };
 
 }  // namespace pagx
