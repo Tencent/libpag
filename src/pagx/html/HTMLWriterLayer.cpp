@@ -191,6 +191,101 @@ static std::vector<bool> ComputeFillStrokePairing(const std::vector<Element*>& e
 }
 
 //==============================================================================
+// HTMLWriter – TextBox span helpers
+//==============================================================================
+
+// Builds the CSS style string for a single TextBox span (shared by renderTextBoxWithSpans and
+// renderTextBoxAsRichText). The caller passes the existing spanStyle prefix (which may already
+// contain white-space/tab-size from the tab detection in renderTextBoxWithSpans).
+std::string HTMLWriter::buildTextBoxSpanStyle(const Text* text, const Fill* fill,
+                                              const Stroke* stroke, const std::string& prefix) {
+  std::string style = prefix;
+  bool fontHoisted =
+      !_ctx->fontHoistSignature.fontFamily.empty() || _ctx->fontHoistSignature.renderFontSize > 0;
+  if (!fontHoisted) {
+    if (!text->fontFamily.empty()) {
+      if (!style.empty()) style += ';';
+      style += "font-family:'" + EscapeCssFontFamily(text->fontFamily) + "'";
+    }
+    if (!style.empty()) style += ';';
+    style += "font-size:" + CssFloatToString(text->renderFontSize()) + "px";
+    if (!text->fontStyle.empty()) {
+      if (text->fontStyle.find("Bold") != std::string::npos) {
+        style += ";font-weight:bold";
+      }
+      if (text->fontStyle.find("Italic") != std::string::npos) {
+        style += ";font-style:italic";
+      }
+    }
+    if (text->letterSpacing != 0.0f) {
+      style += ";letter-spacing:" + CssFloatToString(text->letterSpacing) + "px";
+    }
+  }
+  if (fill && fill->color) {
+    auto ct = fill->color->nodeType();
+    if (ct == NodeType::SolidColor) {
+      auto sc = static_cast<const SolidColor*>(fill->color);
+      if (!style.empty()) style += ';';
+      style += "color:" + ColorToRGBA(sc->color, fill->alpha);
+    } else {
+      float ca = 1.0f;
+      std::string css = colorToCSS(fill->color, &ca);
+      if (!css.empty()) {
+        if (!style.empty()) style += ';';
+        style += "background:" + css;
+        style += ";-webkit-background-clip:text;background-clip:text";
+        style += ";-webkit-text-fill-color:transparent";
+      }
+    }
+  }
+  if (text->fauxBold) {
+    if (!style.empty()) style += ';';
+    style += "font-weight:bold";
+  }
+  if (stroke && stroke->color && stroke->color->nodeType() == NodeType::SolidColor) {
+    auto sc = static_cast<const SolidColor*>(stroke->color);
+    bool hasFill = fill && fill->color;
+    auto strokeCss = ResolveTextStrokeCss(stroke->width, stroke->align, hasFill);
+    if (strokeCss.width > 0.0f) {
+      if (!style.empty()) style += ';';
+      style += "-webkit-text-stroke:" + CssFloatToString(strokeCss.width) + "px " +
+               ColorToRGBA(sc->color, stroke->alpha);
+      if (strokeCss.paintOrderStrokeFill) {
+        style += ";paint-order:stroke fill";
+      }
+    }
+  }
+  if (text->fauxItalic) {
+    if (!style.empty()) style += ';';
+    style += "font-style:italic";
+  }
+  return style;
+}
+
+// Emits between-span <br> elements for TextBox rendering. Empty lines are wrapped in the
+// owner span's font-size so the line box matches what tgfx computed.
+static void EmitBetweenSpanBreaks(HTMLBuilder& out, size_t prevTrailingBreaks, size_t leadingBreaks,
+                                  float prevFontSize, float spanFontSize, bool isFirstSpan) {
+  size_t totalBreaks = prevTrailingBreaks + leadingBreaks;
+  for (size_t bi = 0; bi < totalBreaks; ++bi) {
+    if (bi == 0 && isFirstSpan && prevTrailingBreaks == 0) {
+      // Leading \n at TextBox start: tgfx gives this empty line height 0. Emit nothing
+      // so Chromium starts the first content line at the box top.
+    } else if (bi == 0) {
+      out.emitBreaks(1);
+    } else {
+      float ownerFontSize = (bi <= prevTrailingBreaks) ? prevFontSize : spanFontSize;
+      if (ownerFontSize > 0) {
+        out.emitRaw("<span style=\"font-size:" + CssFloatToString(ownerFontSize) +
+                    "px\"><br></span>");
+      } else {
+        out.emitBreaks(1);
+      }
+    }
+  }
+}
+
+//==============================================================================
 // HTMLWriter – element processing
 //==============================================================================
 
@@ -939,122 +1034,20 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
     float prevFontSize = 0;
     bool isFirstSpan = true;
     for (auto& span : tbSpans) {
-      std::string spanStyle;
-      // When the span's text contains U+0009 (TAB) honour it by setting
-      // `white-space:pre-wrap` and an explicit `tab-size`. Applied at the span
-      // level (not the container) so pretty-printed indentation/newlines between
-      // container div and span tags are still collapsed normally; only the
-      // characters inside the span see pre-wrap. tgfx's tab stop is
-      // `effectiveFontSize * 4` (see TextLayout.cpp CreateTabGlyph).
+      // Detect TAB characters for pre-wrap handling.
+      std::string spanPrefix;
       if (span.text && span.text->text.find('\t') != std::string::npos) {
         float spanSize = span.text->renderFontSize();
-        spanStyle += "white-space:pre-wrap";
+        spanPrefix += "white-space:pre-wrap";
         if (spanSize > 0) {
-          spanStyle += ";tab-size:" + CssFloatToString(spanSize * 4) + "px";
+          spanPrefix += ";tab-size:" + CssFloatToString(spanSize * 4) + "px";
         }
       }
-      bool spanFontHoisted = !_ctx->fontHoistSignature.fontFamily.empty() ||
-                             _ctx->fontHoistSignature.renderFontSize > 0;
-      if (!spanFontHoisted) {
-        if (!span.text->fontFamily.empty()) {
-          if (!spanStyle.empty()) spanStyle += ';';
-          spanStyle += "font-family:'" + EscapeCssFontFamily(span.text->fontFamily) + "'";
-        }
-        if (!spanStyle.empty()) spanStyle += ';';
-        spanStyle += "font-size:" + CssFloatToString(span.text->renderFontSize()) + "px";
-        if (!span.text->fontStyle.empty()) {
-          if (span.text->fontStyle.find("Bold") != std::string::npos) {
-            spanStyle += ";font-weight:bold";
-          }
-          if (span.text->fontStyle.find("Italic") != std::string::npos) {
-            spanStyle += ";font-style:italic";
-          }
-        }
-        if (span.text->letterSpacing != 0.0f) {
-          spanStyle += ";letter-spacing:" + CssFloatToString(span.text->letterSpacing) + "px";
-        }
-      }
-      if (span.fill && span.fill->color) {
-        auto ct = span.fill->color->nodeType();
-        if (ct == NodeType::SolidColor) {
-          auto sc = static_cast<const SolidColor*>(span.fill->color);
-          if (!spanStyle.empty()) spanStyle += ';';
-          spanStyle += "color:" + ColorToRGBA(sc->color, span.fill->alpha);
-        } else {
-          float ca = 1.0f;
-          std::string css = colorToCSS(span.fill->color, &ca);
-          if (!css.empty()) {
-            if (!spanStyle.empty()) spanStyle += ';';
-            spanStyle += "background:" + css;
-            spanStyle += ";-webkit-background-clip:text;background-clip:text";
-            spanStyle += ";-webkit-text-fill-color:transparent";
-          }
-        }
-      }
-      if (span.text->fauxBold) {
-        if (!spanStyle.empty()) spanStyle += ';';
-        spanStyle += "font-weight:bold";
-      }
-      if (span.stroke && span.stroke->color &&
-          span.stroke->color->nodeType() == NodeType::SolidColor) {
-        auto sc = static_cast<const SolidColor*>(span.stroke->color);
-        bool hasFill = span.fill && span.fill->color;
-        auto strokeCss = ResolveTextStrokeCss(span.stroke->width, span.stroke->align, hasFill);
-        if (strokeCss.width > 0.0f) {
-          if (!spanStyle.empty()) spanStyle += ';';
-          spanStyle += "-webkit-text-stroke:" + CssFloatToString(strokeCss.width) + "px " +
-                       ColorToRGBA(sc->color, span.stroke->alpha);
-          if (strokeCss.paintOrderStrokeFill) {
-            spanStyle += ";paint-order:stroke fill";
-          }
-        }
-      }
-      if (span.text->fauxItalic) {
-        if (!spanStyle.empty()) spanStyle += ';';
-        spanStyle += "font-style:italic";
-      }
+      std::string spanStyle = buildTextBoxSpanStyle(span.text, span.fill, span.stroke, spanPrefix);
       float spanFontSize = span.text->renderFontSize();
-      // Emit between-span <br>s: prevTrailingBreaks (from prior span's trailing \n)
-      // plus CountLeadingBreaks(current span's text). The first <br> ends the prior
-      // span's content line and inherits its strut naturally; each subsequent <br>
-      // is an empty line whose strut comes from the corresponding `\n` owner. PAGX
-      // assigns ownership: \n_1..\n_{prevTrailingBreaks} → previous span; \n_{...} on
-      // → current span. Wrap empty-line `<br>`s in the owner's font-size so the line
-      // box matches what tgfx computed, instead of inheriting the container strut.
-      //
-      // Special case: the leading \n at the very start of the TextBox (first span's
-      // first leading break) has no preceding glyph in tgfx, so its
-      // pendingNewlineFontLineHeight is 0 and FinishLine assigns maxLineHeight=0 to
-      // that empty line. Wrap it in a zero-height span so Chromium doesn't allocate a
-      // full container line-height for what tgfx draws as a zero-height empty line
-      // (e.g. text "\nLine2\n\nLine4" should hug the box top in HTML the way it does
-      // in PAGX native).
       size_t leadingBreaks = HTMLBuilder::CountLeadingBreaks(span.text->text);
-      size_t totalBreaks = prevTrailingBreaks + leadingBreaks;
-      for (size_t bi = 0; bi < totalBreaks; ++bi) {
-        if (bi == 0 && isFirstSpan && prevTrailingBreaks == 0) {
-          // Leading \n at TextBox start: tgfx gives this empty line height 0 (its
-          // pendingNewlineFontLineHeight is 0 because no glyph precedes it). Emit
-          // nothing so Chromium starts the first content line at the box top, just
-          // like PAGX native — wrapping the <br> in any element still leaves the
-          // forced break consuming a full line-height in Chromium's inline formatting
-          // context.
-        } else if (bi == 0) {
-          // First <br> closes the previous span's last line — its line box is already
-          // sized by the prior span's content, so a bare <br> is sufficient.
-          out.emitBreaks(1);
-        } else {
-          // Empty-line <br>. \n_bi (1-indexed) owner: bi <= prevTrailingBreaks → prev,
-          // else current span.
-          float ownerFontSize = (bi <= prevTrailingBreaks) ? prevFontSize : spanFontSize;
-          if (ownerFontSize > 0) {
-            out.emitRaw("<span style=\"font-size:" + CssFloatToString(ownerFontSize) +
-                        "px\"><br></span>");
-          } else {
-            out.emitBreaks(1);
-          }
-        }
-      }
+      EmitBetweenSpanBreaks(out, prevTrailingBreaks, leadingBreaks, prevFontSize, spanFontSize,
+                            isFirstSpan);
       // Detect single-span horizontal justify-with-\n upfront — when true, we emit
       // a <div> per \n-segment instead of a single <span>...<br>... so each segment
       // becomes its own justify paragraph. CSS treats every <br> as a paragraph
@@ -1196,94 +1189,22 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
   size_t rtPrevTrailingBreaks = 0;
   float rtPrevFontSize = 0;
   for (auto& span : richTextSpans) {
-    std::string spanStyle = tb->wordWrap ? "" : "white-space:nowrap";
-    // Honour U+0009 TAB when present (see tbSpans branch for rationale).
+    std::string spanPrefix = tb->wordWrap ? "" : "white-space:nowrap";
     if (span.text && span.text->text.find('\t') != std::string::npos) {
       float spanSize = span.text->renderFontSize();
-      if (!spanStyle.empty()) spanStyle += ';';
-      spanStyle += "white-space:pre-wrap";
+      if (!spanPrefix.empty()) spanPrefix += ';';
+      spanPrefix += "white-space:pre-wrap";
       if (spanSize > 0) {
-        spanStyle += ";tab-size:" + CssFloatToString(spanSize * 4) + "px";
+        spanPrefix += ";tab-size:" + CssFloatToString(spanSize * 4) + "px";
       }
     }
-    bool spanFontHoisted =
-        !_ctx->fontHoistSignature.fontFamily.empty() || _ctx->fontHoistSignature.renderFontSize > 0;
-    if (!spanFontHoisted) {
-      if (!span.text->fontFamily.empty()) {
-        spanStyle += ";font-family:'" + EscapeCssFontFamily(span.text->fontFamily) + "'";
-      }
-      spanStyle += ";font-size:" + CssFloatToString(span.text->renderFontSize()) + "px";
-      if (!span.text->fontStyle.empty()) {
-        if (span.text->fontStyle.find("Bold") != std::string::npos) {
-          spanStyle += ";font-weight:bold";
-        }
-        if (span.text->fontStyle.find("Italic") != std::string::npos) {
-          spanStyle += ";font-style:italic";
-        }
-      }
-      if (span.text->letterSpacing != 0.0f) {
-        spanStyle += ";letter-spacing:" + CssFloatToString(span.text->letterSpacing) + "px";
-      }
-    }
-    if (span.fill && span.fill->color) {
-      auto ct = span.fill->color->nodeType();
-      if (ct == NodeType::SolidColor) {
-        auto sc = static_cast<const SolidColor*>(span.fill->color);
-        spanStyle += ";color:" + ColorToRGBA(sc->color, span.fill->alpha);
-      } else {
-        float ca = 1.0f;
-        std::string css = colorToCSS(span.fill->color, &ca);
-        if (!css.empty()) {
-          spanStyle += ";background:" + css;
-          spanStyle += ";-webkit-background-clip:text;background-clip:text";
-          spanStyle += ";-webkit-text-fill-color:transparent";
-        }
-      }
-    }
-    if (span.text->fauxBold) {
-      spanStyle += ";font-weight:bold";
-    }
-    if (span.stroke && span.stroke->color &&
-        span.stroke->color->nodeType() == NodeType::SolidColor) {
-      auto sc = static_cast<const SolidColor*>(span.stroke->color);
-      bool hasFill = span.fill && span.fill->color;
-      auto strokeCss = ResolveTextStrokeCss(span.stroke->width, span.stroke->align, hasFill);
-      if (strokeCss.width > 0.0f) {
-        spanStyle += ";-webkit-text-stroke:" + CssFloatToString(strokeCss.width) + "px " +
-                     ColorToRGBA(sc->color, span.stroke->alpha);
-        if (strokeCss.paintOrderStrokeFill) {
-          spanStyle += ";paint-order:stroke fill";
-        }
-      }
-    }
-    if (span.text->fauxItalic) {
-      spanStyle += ";font-style:italic";
-    }
+    std::string spanStyle = buildTextBoxSpanStyle(span.text, span.fill, span.stroke, spanPrefix);
     float rtSpanFontSize = span.text->renderFontSize();
-    // Emit between-span <br>s with empty-line owner wrapping (see tbSpans branch).
     size_t rtLeadingBreaks = HTMLBuilder::CountLeadingBreaks(span.text->text);
-    size_t rtTotalBreaks = rtPrevTrailingBreaks + rtLeadingBreaks;
-    for (size_t bi = 0; bi < rtTotalBreaks; ++bi) {
-      if (bi == 0) {
-        out.emitBreaks(1);
-      } else {
-        float ownerFontSize = (bi <= rtPrevTrailingBreaks) ? rtPrevFontSize : rtSpanFontSize;
-        if (ownerFontSize > 0) {
-          out.emitRaw("<span style=\"font-size:" + CssFloatToString(ownerFontSize) +
-                      "px\"><br></span>");
-        } else {
-          out.emitBreaks(1);
-        }
-      }
-    }
+    EmitBetweenSpanBreaks(out, rtPrevTrailingBreaks, rtLeadingBreaks, rtPrevFontSize,
+                          rtSpanFontSize, false);
     out.openTag("span");
     out.addAttr("style", spanStyle);
-    // Use closeTagWithTextBreaks so U+000A (from &#10;) inside the inner content
-    // renders as <br>; trailing breaks are handled by the next iteration via the
-    // between-span emission loop above.
-    //
-    // For vertical TextBoxes inject <br> at every column break tgfx computed (same
-    // rationale as the tbSpans path above).
     std::string rtSpanText = span.text->text;
     out.closeTagWithTextBreaks(rtSpanText);
     rtPrevTrailingBreaks = HTMLBuilder::CountTrailingBreaks(span.text->text);

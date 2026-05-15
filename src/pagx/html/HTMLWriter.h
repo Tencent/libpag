@@ -385,6 +385,10 @@ class HTMLWriter {
   // Color source conversions. `boxLeft`/`boxTop`/`boxWidth`/`boxHeight` describe the element
   // box (in the gradient source's coordinate space) that the CSS background will paint into.
   // They are used by linear-gradient to emulate PAGX's startPoint/endPoint semantics since
+  // Builds the CSS style string for a single TextBox span (font, fill, stroke, faux styles).
+  std::string buildTextBoxSpanStyle(const Text* text, const Fill* fill, const Stroke* stroke,
+                                    const std::string& prefix);
+
   // CSS linear-gradient's geometry is defined relative to the element's own box rather than
   // absolute coordinates. Pass zero/NaN sizes when the box is irrelevant (e.g. SVG fills).
   std::string colorToCSS(const ColorSource* src, float* outAlpha, float boxLeft = 0,
