@@ -224,6 +224,18 @@ class HTMLParserContext {
   // <img> conversion.
   Layer* convertImage(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box);
 
+  // Folds the standard CSS rounded-image wrapper pattern (a container whose only role
+  // is to round-clip a single <img> child via `border-radius` + `overflow: hidden`) into
+  // a single Layer whose rounded Rectangle is filled directly by the image. Required
+  // because PAGX's only built-in clip primitive (`clipToBounds`) clips to rectangular
+  // bounds, which lets the image's square geometry leak past the wrapper's rounded
+  // corners (visible as a square avatar inside a circular ring).
+  //
+  // Returns true (with `layer` populated) on a successful fold; otherwise returns false
+  // and leaves `layer` unchanged for the caller's normal container-emission path.
+  bool foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& element,
+                               const HTMLBoxAttributes& box, Layer* layer);
+
   // Inline <svg> conversion.
   Layer* convertInlineSvg(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box);
 

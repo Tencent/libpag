@@ -792,6 +792,17 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
     applyBackgroundVisuals(layer, box, /*addRectangle=*/true);
   }
 
+  // Standard CSS rounded-avatar pattern: <div style="border-radius:R; overflow:hidden">
+  // <img/></div>. The wrapper exists purely to clip the image to a rounded shape. PAGX's
+  // clipToBounds primitive clips to rectangular bounds only, so a naive translation
+  // leaves the image rectangle leaking past the wrapper's rounded corners (visible as a
+  // square avatar inside a circular ring). Fold the <img> into the wrapper layer: the
+  // rounded Rectangle from applyBackgroundVisuals() becomes the image's fill geometry,
+  // eliminating the need for any clipping at this level.
+  if (foldRoundedImageWrapper(element, box, layer)) {
+    return layer;
+  }
+
   Layer* contentHost = layer;
   if (needsInner) {
     auto inner = _document->makeNode<Layer>();

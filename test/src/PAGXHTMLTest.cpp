@@ -1473,6 +1473,59 @@ PAG_TEST(PAGXHTMLTest, ImgWithSvgSrcBecomesImportDirective) {
   EXPECT_EQ(CountElements<pagx::Rectangle>(leaf->contents), 0u);
 }
 
+// Regression: the standard CSS rounded-avatar pattern `<div border-radius +
+// overflow: hidden><img/></div>` used to translate to a wrapper Layer with
+// `clipToBounds="true"` plus a separate child Layer holding the image — and PAGX's
+// `clipToBounds` clips to rectangular bounds only, so the image's square geometry
+// leaked past the wrapper's rounded corners (square avatars inside circular rings).
+// The importer now folds the <img> into the wrapper's rounded Rectangle directly.
+PAG_TEST(PAGXHTMLTest, RoundedImageWrapperFoldsIntoRectangle) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:64px;height:64px">
+      <div style="width:64px;height:64px;border-radius:9999px;overflow:hidden">
+        <img src="avatar.png" style="position:absolute;left:0;top:0;width:64px;height:64px"/>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* wrapper = doc->layers.front()->children.front();
+  // The folded layer should have no children — the image lives in its contents.
+  EXPECT_TRUE(wrapper->children.empty());
+  // clipToBounds is dropped: the rounded Rectangle is now the actual fill geometry.
+  EXPECT_FALSE(wrapper->clipToBounds);
+  // Exactly one rounded Rectangle in contents (matching the wrapper's border-radius).
+  auto* rect = FindElementOfType<pagx::Rectangle>(wrapper);
+  ASSERT_NE(rect, nullptr);
+  EXPECT_GT(rect->roundness, 0.0f);
+  // And one Fill carrying the image pattern.
+  auto* fill = FindElementOfType<pagx::Fill>(wrapper);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = dynamic_cast<pagx::ImagePattern*>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  ASSERT_NE(pattern->image, nullptr);
+  EXPECT_NE(pattern->image->filePath.find("avatar.png"), std::string::npos);
+}
+
+// Sibling assertion: the fold only kicks in when the wrapper is purely an image
+// clip. A wrapper with multiple children must keep the standard container layout
+// even when it carries `border-radius` + `overflow: hidden` (the image stays in
+// its own child Layer so neighbouring content paints normally above it).
+PAG_TEST(PAGXHTMLTest, RoundedImageWrapperKeepsLayoutForExtraChildren) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:64px;height:80px">
+      <div style="width:64px;height:80px;border-radius:9999px;overflow:hidden">
+        <img src="avatar.png" style="position:absolute;left:0;top:0;width:64px;height:64px"/>
+        <div style="position:absolute;left:0;top:64px;width:64px;height:16px;background-color:#000"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* wrapper = doc->layers.front()->children.front();
+  EXPECT_TRUE(wrapper->clipToBounds);
+  // The image stayed in its own child layer (not folded into the wrapper).
+  EXPECT_FALSE(wrapper->children.empty());
+}
+
 PAG_TEST(PAGXHTMLTest, RepeatedImageSourceDeduplicated) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:160px;height:80px">

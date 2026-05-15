@@ -221,6 +221,40 @@ guide §Container Layout）：
   / `pagx resolve` 时展开。
 - `<img src="path.svg"/>` 视作外部导入：`Layer import="path.svg"/>`。
 
+### 7.1 圆角图片包装容器（CSS 头像模式）
+
+CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的容器把 `<img>` 裁剪成圆形
+（或圆角矩形）：
+
+```html
+<div style="border-radius: 9999px; overflow: hidden">
+  <img src="avatar.png" style="width: 64px; height: 64px"/>
+</div>
+```
+
+如果按字面翻译，转换器会输出一个带 `clipToBounds="true"` 的外层 Layer 加一个图片子 Layer，但
+`clipToBounds` 只能裁剪到**矩形**边界（见 `spec/pagx_spec.zh_CN.md` §5.5.2），导致图片的方形几何
+会越过包装容器的圆角，渲染成"方形头像装在圆环里"的视觉错误。为对齐 CSS 语义，当**所有**下列条件
+同时成立时，转换器会把 `<img>` 折叠到包装容器的圆角 `Rectangle` 上、由它直接作为图片填充几何：
+
+- 包装容器同时设置了 `border-radius: N` 与 `overflow: hidden`；
+- 包装容器没有 `padding` / `display: flex` / `gap`（否则需要走标准"外层背景 + 内层布局宿主"
+  双层结构）；
+- 包装容器只有唯一一个元素子节点（其余只允许是空白文本），且该子节点为 `<img>`；
+- 该 `<img>` 完全覆盖包装容器的内容区域（`width` / `height` 与父对齐，定位在 `(0, 0)`）。
+
+折叠后输出的是 PAGX 中圆角图片的标准模式：
+
+```xml
+<Layer width="64" height="64">
+  <Rectangle width="100%" height="100%" roundness="9999"/>
+  <Fill><ImagePattern image="@avatar"/></Fill>
+</Layer>
+```
+
+包装容器上声明的背景色 / 渐变 / 描边 / 阴影会保留在折叠后的图片填充之下（在图片透明像素处透出
+来，与 CSS 绘制顺序一致）。SVG 图片源（`.svg`）不会被折叠 —— 它们仍然走自己的外部导入指令通道。
+
 ## 8. 坐标 / 角度约定
 
 - HTML 坐标系与 PAGX 一致（左上原点，y 向下）。

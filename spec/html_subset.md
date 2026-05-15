@@ -234,6 +234,45 @@ to isolate its `<Fill>`.
 - `<img src="path.svg"/>` is converted into an external import directive
   (`Layer import="path.svg"/>`).
 
+### 7.1 Rounded image wrappers (CSS avatar pattern)
+
+The standard CSS rounded-avatar pattern wraps an `<img>` in a `border-radius` + `overflow:
+hidden` container to clip the image to a circular (or rounded-rect) shape:
+
+```html
+<div style="border-radius: 9999px; overflow: hidden">
+  <img src="avatar.png" style="width: 64px; height: 64px"/>
+</div>
+```
+
+A literal translation would emit a wrapper layer with `clipToBounds="true"` plus a child
+image layer — but `clipToBounds` clips to **rectangular** bounds only (see
+`spec/pagx_spec.md` §5.5.2), so the image's square geometry would leak past the wrapper's
+rounded corners. To match CSS semantics, the importer folds the `<img>` into the wrapper's
+rounded `Rectangle` directly when **all** of the following hold:
+
+- the wrapper has `border-radius: N` and `overflow: hidden`,
+- the wrapper has no `padding` / `display: flex` / `gap` (otherwise the importer needs the
+  standard outer-background + inner-padded host split),
+- the wrapper has exactly one element child, which is an `<img>` (no other elements; only
+  whitespace text), and
+- that `<img>` exactly covers the wrapper's content box (matching `width` / `height`,
+  anchored at `(0, 0)`).
+
+When folded, the emitted PAGX is the canonical rounded-image pattern:
+
+```xml
+<Layer width="64" height="64">
+  <Rectangle width="100%" height="100%" roundness="9999"/>
+  <Fill><ImagePattern image="@avatar"/></Fill>
+</Layer>
+```
+
+Any background colour / gradient / border / shadow declared on the wrapper is preserved
+underneath the folded image fill (i.e. it shows through the image's transparent pixels,
+matching CSS painting order). SVG image sources (`.svg`) are never folded — they go
+through their own external-import directive path.
+
 ## 8. Coordinate / Angle Conventions
 
 - All HTML coordinates are converted to PAGX's top-left origin (y-down).
