@@ -250,11 +250,14 @@ bool HTMLExporter::ToFile(PAGXDocument& document, const std::string& filePath,
   // ToFile defaults to wrapping as a full HTML document unless explicitly disabled.
   Options toFileOptions = options;
   if (toFileOptions.wrapFullDocument < 0) {
-    toFileOptions.wrapFullDocument = 1;
+    toFileOptions.wrapFullDocument = Options::WrapOn;
   }
 
   auto html = ToHTML(document, resourceDir.string(), toFileOptions, errorMsg);
   if (html.empty()) {
+    if (errorMsg && errorMsg->empty()) {
+      *errorMsg = "document produced no HTML output.";
+    }
     return false;
   }
   if (!parentDir.empty() && !std::filesystem::exists(parentDir)) {
@@ -275,7 +278,13 @@ bool HTMLExporter::ToFile(PAGXDocument& document, const std::string& filePath,
     return false;
   }
   file.write(html.data(), static_cast<std::streamsize>(html.size()));
-  return file.good();
+  if (!file.good()) {
+    if (errorMsg) {
+      *errorMsg = "write error after opening file: " + filePath;
+    }
+    return false;
+  }
+  return true;
 }
 
 }  // namespace pagx

@@ -178,6 +178,10 @@ static int ExportToHTML(const ExportOptions& options) {
   for (auto& error : document->errors) {
     std::cerr << "pagx export: warning: " << error << "\n";
   }
+  if (document->hasUnresolvedImports()) {
+    std::cerr << "pagx export: error: unresolved import directive, run 'pagx resolve' first\n";
+    return 1;
+  }
 
   std::string errorMsg;
   if (!HTMLExporter::ToFile(*document, options.outputFile, {}, &errorMsg)) {

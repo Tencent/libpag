@@ -66,9 +66,13 @@ struct HTMLExportOptions {
    * and false for `ToHTML` (the caller usually needs the fragment for embedding).
    *
    * Note: when this is not set explicitly, `ToFile` defaults to true and `ToHTML` defaults to
-   * false. Setting it explicitly overrides the per-method default.
+   * false. Setting it explicitly overrides the per-method default. Use the named constants
+   * below (WrapDefault / WrapOff / WrapOn) instead of raw integer literals.
    */
-  int wrapFullDocument = -1;  // -1 = use per-method default
+  static constexpr int WrapDefault = -1;
+  static constexpr int WrapOff = 0;
+  static constexpr int WrapOn = 1;
+  int wrapFullDocument = WrapDefault;
 };
 
 /**
