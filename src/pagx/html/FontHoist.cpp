@@ -16,6 +16,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/html/FontHoist.h"
+#include "pagx/html/HTMLWriter.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Text.h"
@@ -28,8 +29,10 @@ FontSignature SignatureOf(const Text* text) {
   FontSignature sig = {};
   sig.fontFamily = text->fontFamily;
   sig.renderFontSize = text->renderFontSize();
-  sig.bold = !text->fontStyle.empty() && text->fontStyle.find("Bold") != std::string::npos;
-  sig.italic = !text->fontStyle.empty() && text->fontStyle.find("Italic") != std::string::npos;
+  auto fontProps = ParseFontStyleToCSS(text->fontStyle);
+  sig.fontWeight = fontProps.weight;
+  sig.italic = fontProps.italic;
+  sig.oblique = fontProps.oblique;
   sig.letterSpacing = text->letterSpacing;
   // sig.lineHeight stays at default NaN — the per-glyph fontLineHeight source was removed.
   return sig;
@@ -129,13 +132,16 @@ std::string FontSignatureToCss(const FontSignature& sig) {
     if (!css.empty()) css += ';';
     css += "font-size:" + CssFloatToString(sig.renderFontSize) + "px";
   }
-  if (sig.bold) {
+  if (sig.fontWeight != 400) {
     if (!css.empty()) css += ';';
-    css += "font-weight:bold";
+    css += "font-weight:" + std::to_string(sig.fontWeight);
   }
   if (sig.italic) {
     if (!css.empty()) css += ';';
     css += "font-style:italic";
+  } else if (sig.oblique) {
+    if (!css.empty()) css += ';';
+    css += "font-style:oblique";
   }
   if (!std::isnan(sig.letterSpacing) && sig.letterSpacing != 0.0f) {
     if (!css.empty()) css += ';';

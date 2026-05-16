@@ -210,11 +210,14 @@ std::string HTMLWriter::buildTextBoxSpanStyle(const Text* text, const Fill* fill
     if (!style.empty()) style += ';';
     style += "font-size:" + CssFloatToString(text->renderFontSize()) + "px";
     if (!text->fontStyle.empty()) {
-      if (text->fontStyle.find("Bold") != std::string::npos) {
-        style += ";font-weight:bold";
+      auto fontProps = ParseFontStyleToCSS(text->fontStyle);
+      if (fontProps.weight != 400) {
+        style += ";font-weight:" + std::to_string(fontProps.weight);
       }
-      if (text->fontStyle.find("Italic") != std::string::npos) {
+      if (fontProps.italic) {
         style += ";font-style:italic";
+      } else if (fontProps.oblique) {
+        style += ";font-style:oblique";
       }
     }
     if (text->letterSpacing != 0.0f) {
@@ -1062,6 +1065,11 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
       // becomes its own justify paragraph. CSS treats every <br> as a paragraph
       // terminator for `text-align:justify` purposes, so this rewrite is the only
       // way to get the line-before-<br> justified the way tgfx does.
+      //
+      // PAGX justify semantic: lines before \n ARE justified.
+      // CSS justify semantic: lines before <br> are NOT justified (treated as last line).
+      // When tgfx aligns with CSS justify semantics (not justifying lines before \n),
+      // this paragraph-split logic should be removed.
       bool useJustifyParagraphSplit =
           tb->textAlign == TextAlign::Justify && tb->writingMode != WritingMode::Vertical &&
           tbSpans.size() == 1 && span.text && span.text->text.find('\n') != std::string::npos;

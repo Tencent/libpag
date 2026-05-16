@@ -34,12 +34,12 @@ CLI_TEST(FontHoistTest, SignatureEqualityBasic) {
   pagx::FontSignature sig1 = {};
   sig1.fontFamily = "Arial";
   sig1.renderFontSize = 16.0f;
-  sig1.bold = false;
+  sig1.fontWeight = 400;
   sig1.italic = false;
   pagx::FontSignature sig2 = {};
   sig2.fontFamily = "Arial";
   sig2.renderFontSize = 16.0f;
-  sig2.bold = false;
+  sig2.fontWeight = 400;
   sig2.italic = false;
   EXPECT_TRUE(sig1.equals(sig2));
 }
@@ -68,11 +68,11 @@ CLI_TEST(FontHoistTest, SignatureEqualityDiffBold) {
   pagx::FontSignature sig1 = {};
   sig1.fontFamily = "Arial";
   sig1.renderFontSize = 16.0f;
-  sig1.bold = true;
+  sig1.fontWeight = 700;
   pagx::FontSignature sig2 = {};
   sig2.fontFamily = "Arial";
   sig2.renderFontSize = 16.0f;
-  sig2.bold = false;
+  sig2.fontWeight = 400;
   EXPECT_FALSE(sig1.equals(sig2));
 }
 
@@ -112,10 +112,10 @@ CLI_TEST(FontHoistTest, CssOutputBoldItalic) {
   pagx::FontSignature sig = {};
   sig.fontFamily = "Arial";
   sig.renderFontSize = 16.0f;
-  sig.bold = true;
+  sig.fontWeight = 700;
   sig.italic = true;
   auto css = pagx::FontSignatureToCss(sig);
-  EXPECT_NE(css.find("font-weight:bold"), std::string::npos);
+  EXPECT_NE(css.find("font-weight:700"), std::string::npos);
   EXPECT_NE(css.find("font-style:italic"), std::string::npos);
 }
 

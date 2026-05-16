@@ -71,58 +71,6 @@ static size_t SVGDecodeUTF8Char(const char* data, size_t remaining, int32_t* uni
   return static_cast<size_t>(ptr - data);
 }
 
-// Approximate character advance widths as fractions of fontSize for common proportional fonts
-// (Arial / Helvetica). These values are derived from the actual glyph advance widths in
-// Arial at 2048 unitsPerEm, normalized to the range [0..1] of one em.
-bool IsCJKCodepoint(int32_t ch) {
-  return (ch >= 0x2E80 && ch <= 0x9FFF) || (ch >= 0xF900 && ch <= 0xFAFF) ||
-         (ch >= 0xFE30 && ch <= 0xFE4F) || (ch >= 0x20000 && ch <= 0x2FA1F) ||
-         (ch >= 0x30000 && ch <= 0x323AF) || (ch >= 0x3000 && ch <= 0x30FF) ||
-         (ch >= 0x3100 && ch <= 0x312F) || (ch >= 0xAC00 && ch <= 0xD7AF);
-}
-
-float EstimateCharAdvanceHTML(int32_t ch, float fontSize) {
-  if (IsCJKCodepoint(ch)) {
-    return fontSize;
-  }
-  if (ch == ' ') {
-    return fontSize * 0.28f;
-  }
-  if (ch == '\t') {
-    return fontSize * 4.0f;
-  }
-  // Per-character width ratios for ASCII printable range (Arial / Helvetica reference).
-  if (ch >= '!' && ch <= '~') {
-    // clang-format off
-    static const float WIDTHS[94] = {
-      // !      "      #      $      %      &      '      (      )      *
-      0.28f, 0.36f, 0.56f, 0.56f, 0.89f, 0.67f, 0.19f, 0.33f, 0.33f, 0.39f,
-      // +      ,      -      .      /      0      1      2      3      4
-      0.58f, 0.28f, 0.33f, 0.28f, 0.28f, 0.56f, 0.56f, 0.56f, 0.56f, 0.56f,
-      // 5      6      7      8      9      :      ;      <      =      >
-      0.56f, 0.56f, 0.56f, 0.56f, 0.56f, 0.28f, 0.28f, 0.58f, 0.58f, 0.58f,
-      // ?      @      A      B      C      D      E      F      G      H
-      0.56f, 1.02f, 0.67f, 0.67f, 0.72f, 0.72f, 0.67f, 0.61f, 0.78f, 0.72f,
-      // I      J      K      L      M      N      O      P      Q      R
-      0.28f, 0.50f, 0.67f, 0.56f, 0.83f, 0.72f, 0.78f, 0.67f, 0.78f, 0.72f,
-      // S      T      U      V      W      X      Y      Z      [      backslash
-      0.67f, 0.61f, 0.72f, 0.67f, 0.94f, 0.67f, 0.67f, 0.61f, 0.28f, 0.28f,
-      // ]      ^      _      `      a      b      c      d      e      f
-      0.28f, 0.47f, 0.56f, 0.33f, 0.56f, 0.56f, 0.50f, 0.56f, 0.56f, 0.28f,
-      // g      h      i      j      k      l      m      n      o      p
-      0.56f, 0.56f, 0.22f, 0.22f, 0.50f, 0.22f, 0.83f, 0.56f, 0.56f, 0.56f,
-      // q      r      s      t      u      v      w      x      y      z
-      0.56f, 0.33f, 0.50f, 0.28f, 0.56f, 0.50f, 0.72f, 0.50f, 0.50f, 0.50f,
-      // {      |      }      ~
-      0.33f, 0.26f, 0.33f, 0.58f,
-    };
-    // clang-format on
-    return fontSize * WIDTHS[ch - '!'];
-  }
-  // Fallback for non-ASCII Latin and other scripts.
-  return fontSize * 0.55f;
-}
-
 // RangeSelector shape functions
 static float SelectorShapeSquare(float) {
   return 1.0f;
@@ -756,6 +704,9 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       // GlyphRun.y is the alphabetic baseline. GlyphRun.bounds.height is the ascender height
       // (distance from baseline to the top of the tallest glyph in this run). CSS `top` is the
       // top of the line box, so subtract the ascender to convert baseline → line-box top.
+      // Note: CSS line-height:normal adds half-leading above the ascent; when the browser's
+      // half-leading differs from tgfx's, the vertical position will shift slightly. This is
+      // a tgfx alignment item — the exporter should not compensate.
       posY = run0->y - run0->bounds.height;
     } else {
       auto renderPos = text->renderPosition();
@@ -780,9 +731,11 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
             std::string gradId = _ctx->nextId("grad");
             localDefs.openTag("defs");
             localDefs.closeTagStart();
-            float bboxW = text->renderFontSize() * static_cast<float>(text->text.size()) * 0.6f;
-            float bboxH = text->renderFontSize();
-            writeSVGGradientDefInto(localDefs, fill->color, gradId, x, y - bboxH, bboxW, bboxH);
+            // Use the full document extent as the gradient region so the gradient is never
+            // clipped by an estimated text bounding box. The browser resolves the actual
+            // <text> element bounds at render time.
+            writeSVGGradientDefInto(localDefs, fill->color, gradId, 0, 0, _ctx->docWidth,
+                                    _ctx->docHeight);
             localDefs.closeTag();
             svgFillAttr = "url(#" + gradId + ")";
             fillAlpha = fill->alpha;
@@ -803,12 +756,15 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
           out.addAttr("font-family", EscapeCssFontFamily(text->fontFamily));
         }
         out.addAttr("font-size", CssFloatToString(text->renderFontSize()));
-        if (!text->fontStyle.empty()) {
-          if (text->fontStyle.find("Bold") != std::string::npos) {
-            out.addAttr("font-weight", "bold");
+        {
+          auto fontProps = ParseFontStyleToCSS(text->fontStyle);
+          if (fontProps.weight != 400) {
+            out.addAttr("font-weight", std::to_string(fontProps.weight));
           }
-          if (text->fontStyle.find("Italic") != std::string::npos) {
+          if (fontProps.italic) {
             out.addAttr("font-style", "italic");
+          } else if (fontProps.oblique) {
+            out.addAttr("font-style", "oblique");
           }
         }
         if (text->fauxBold) {
@@ -854,16 +810,6 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     }
     float ty = posY;
     style += "position:absolute;top:" + CssFloatToString(ty) + "px;white-space:pre";
-    // Determine whether this text will use background-clip:text (non-solid fill or stroke-only).
-    // background-clip:text already disables subpixel antialiasing, so using
-    // transform:translateX(-50%) for centering has no additional cost in that case, and it lets
-    // the span width track the actual glyph advance rather than being fixed at the tgfx-measured
-    // container half-width — preventing Chromium's slightly wider font metrics from clipping the
-    // leading/trailing edges of gradient text (constraint_text "WIDE TEXT"/"Horizontal" symptom).
-    // For solid-colour text we keep the original text-align+width approach to preserve subpixel
-    // antialiasing.
-    bool usesBackgroundClipText =
-        fill && fill->color && fill->color->nodeType() != NodeType::SolidColor;
     // Multi-line text with a non-Start anchor needs per-line alignment relative to the anchor
     // point. The single-line path below uses `width:posX*2` (center) or `width:posX` (end)
     // which only positions one line correctly — posX here is glyphRuns[0]'s x, i.e. the
@@ -884,14 +830,11 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
                  "px;transform:translateX(-100%);text-align:right";
       }
     } else if (text->textAnchor == TextAnchor::Center) {
-      if (usesBackgroundClipText) {
-        style +=
-            ";left:" + CssFloatToString(posX) + "px;transform:translateX(-50%);text-align:center";
-      } else {
-        style += ";left:0;width:" + CssFloatToString(posX * 2) + "px;text-align:center";
-      }
+      style +=
+          ";left:" + CssFloatToString(posX) + "px;transform:translateX(-50%);text-align:center";
     } else if (text->textAnchor == TextAnchor::End) {
-      style += ";left:0;width:" + CssFloatToString(posX) + "px;text-align:right";
+      style +=
+          ";left:" + CssFloatToString(posX) + "px;transform:translateX(-100%);text-align:right";
     } else {
       style += ";left:" + CssFloatToString(posX) + "px";
     }
@@ -913,11 +856,14 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       style += ";letter-spacing:" + CssFloatToString(text->letterSpacing) + "px";
     }
     if (!text->fontStyle.empty()) {
-      if (text->fontStyle.find("Bold") != std::string::npos) {
-        style += ";font-weight:bold";
+      auto fontProps = ParseFontStyleToCSS(text->fontStyle);
+      if (fontProps.weight != 400) {
+        style += ";font-weight:" + std::to_string(fontProps.weight);
       }
-      if (text->fontStyle.find("Italic") != std::string::npos) {
+      if (fontProps.italic) {
         style += ";font-style:italic";
+      } else if (fontProps.oblique) {
+        style += ";font-style:oblique";
       }
     }
   }
@@ -1328,8 +1274,9 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         if (!text->fontFamily.empty()) {
           fontFamily = "'" + EscapeCssFontFamily(text->fontFamily) + "'";
         }
-        bool isBold = text->fauxBold || text->fontStyle.find("Bold") != std::string::npos;
-        bool isItalic = text->fauxItalic || text->fontStyle.find("Italic") != std::string::npos;
+        auto fontProps = ParseFontStyleToCSS(text->fontStyle);
+        bool isBold = text->fauxBold || fontProps.weight >= 700;
+        bool isItalic = text->fauxItalic || fontProps.italic || fontProps.oblique;
 
         // Collect per-glyph positions from layoutRuns. Flatten all runs into a single
         // position list indexed by glyph order within this Text element.
@@ -1360,8 +1307,7 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
 
           // Build SVG transform. The glyph position (glyphX, glyphY) is baked into the
           // transform as a final translate so that rotation/scale pivot around the glyph's
-          // center (advance/2, 0) in the glyph's local space — matching the HTML span path's
-          // transform-origin:50% 0.8em behavior (approximated as advance/2 on the baseline).
+          // center (advance/2, 0) in the glyph's local space.
           float glyphX = (charIdx < glyphPositions.size()) ? glyphPositions[charIdx].x : 0;
           float glyphY = (charIdx < glyphPositions.size()) ? glyphPositions[charIdx].y : 0;
           float glyphAdv = (charIdx < glyphAdvances.size()) ? glyphAdvances[charIdx] : 0;
@@ -1450,34 +1396,28 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         // --- Original HTML <span> path for solid fills ---
         std::string containerStyle =
             "position:absolute;white-space:nowrap;top:" + CssFloatToString(ty) + "px";
-        // Use text-align + width instead of transform:translateX to avoid creating a compositing
-        // layer, which disables subpixel antialiasing and makes text look thinner.
-        bool tmUsesBackgroundClip =
-            fill && fill->color && fill->color->nodeType() != NodeType::SolidColor;
         if (text->textAnchor == TextAnchor::Center) {
-          if (tmUsesBackgroundClip) {
-            containerStyle += ";left:" + CssFloatToString(renderPos.x) +
-                              "px;transform:translateX(-50%);text-align:center";
-          } else {
-            containerStyle +=
-                ";left:0;width:" + CssFloatToString(renderPos.x * 2) + "px;text-align:center";
-          }
+          containerStyle += ";left:" + CssFloatToString(renderPos.x) +
+                            "px;transform:translateX(-50%);text-align:center";
         } else if (text->textAnchor == TextAnchor::End) {
-          containerStyle +=
-              ";left:0;width:" + CssFloatToString(renderPos.x) + "px;text-align:right";
+          containerStyle += ";left:" + CssFloatToString(renderPos.x) +
+                            "px;transform:translateX(-100%);text-align:right";
         } else {
           containerStyle += ";left:" + CssFloatToString(renderPos.x) + "px";
         }
         if (!text->fontFamily.empty()) {
           containerStyle += ";font-family:'" + EscapeCssFontFamily(text->fontFamily) + "'";
         }
-        containerStyle += ";font-size:0";
+        containerStyle += ";line-height:0";
         if (!text->fontStyle.empty()) {
-          if (text->fontStyle.find("Bold") != std::string::npos) {
-            containerStyle += ";font-weight:bold";
+          auto fontProps = ParseFontStyleToCSS(text->fontStyle);
+          if (fontProps.weight != 400) {
+            containerStyle += ";font-weight:" + std::to_string(fontProps.weight);
           }
-          if (text->fontStyle.find("Italic") != std::string::npos) {
+          if (fontProps.italic) {
             containerStyle += ";font-style:italic";
+          } else if (fontProps.oblique) {
+            containerStyle += ";font-style:oblique";
           }
         }
         if (text->letterSpacing != 0.0f) {
@@ -1550,12 +1490,11 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           }
           if (!transform.empty()) {
             charStyle += ";transform:" + transform;
-            // Align transform pivot with the glyph baseline & advance center (tgfx uses
-            // glyph.anchor = (advance/2, 0) on the alphabetic baseline). Without this,
-            // rotation/scale would pivot around the inline-block center (50% 50%), shifting
-            // glyphs incorrectly. 50% aligns with advance center; 0.8em approximates Arial
-            // ascent, placing the origin on the baseline.
-            charStyle += ";transform-origin:50% 0.8em";
+            // The anchor offset is already handled by translate(-anchor)/translate(anchor) in
+            // the transform chain, so the CSS default transform-origin (50% 50% — the center
+            // of the inline-block) is correct. Any remaining pivot difference between CSS's
+            // box-center and tgfx's baseline-center is a tgfx alignment item, not something
+            // the HTML exporter should compensate with a hardcoded font-metric approximation.
           }
           if (modifier->alpha < 1.0f) {
             float charAlpha = std::max(0.0f, 1.0f + (modifier->alpha - 1.0f) * absF);
@@ -1844,12 +1783,15 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         out.addAttr("font-family", EscapeCssFontFamily(text->fontFamily));
       }
       out.addAttr("font-size", CssFloatToString(renderFont));
-      if (!text->fontStyle.empty()) {
-        if (text->fontStyle.find("Bold") != std::string::npos) {
-          out.addAttr("font-weight", "bold");
+      {
+        auto fontProps = ParseFontStyleToCSS(text->fontStyle);
+        if (fontProps.weight != 400) {
+          out.addAttr("font-weight", std::to_string(fontProps.weight));
         }
-        if (text->fontStyle.find("Italic") != std::string::npos) {
+        if (fontProps.italic) {
           out.addAttr("font-style", "italic");
+        } else if (fontProps.oblique) {
+          out.addAttr("font-style", "oblique");
         }
       }
       if (text->fauxBold) {
@@ -1897,31 +1839,15 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
       // forceAlignment: use textLength + lengthAdjust="spacing" to spread characters
       // evenly across the effective path length. On a closed path, tgfx distributes N
       // equal gaps (including the junction between last and first character), but SVG
-      // textLength only creates N-1 gaps. Adjust textLength so the N-1 SVG gaps plus
-      // the implicit junction gap all equal (effectiveLength - totalAdvance) / N.
+      // textLength only creates N-1 gaps. Use svgTextLength = effectiveLength * (N-1)/N
+      // so the N-1 SVG gaps plus the implicit junction gap are all equal. This is exact
+      // when totalAdvance << effectiveLength and approximate otherwise; any remaining
+      // spacing difference versus tgfx is a tgfx alignment item.
       if (textPath->forceAlignment) {
         float svgTextLength = effectiveLength;
         if (isClosed && charCount > 1) {
-          // SVG gap = (svgTextLength - W) / (N-1), junction = effectiveLength - svgTextLength.
-          // Set both equal: svgTextLength = W + (N-1) * (effectiveLength - W) / N.
-          // We don't know the browser's W, but the ratio is the same if we just scale:
-          // svgTextLength = effectiveLength * (N-1) / N makes all gaps equal when
-          // totalAdvance << effectiveLength, but diverges when text fills more of the path.
-          // The exact formula requires W, which we approximate with EstimateCharAdvanceHTML.
-          float estAdvance = 0.0f;
-          const char* ep = text->text.c_str();
-          while (*ep) {
-            int32_t ech = 0;
-            size_t elen =
-                SVGDecodeUTF8Char(ep, text->text.size() - (ep - text->text.c_str()), &ech);
-            if (elen == 0) {
-              break;
-            }
-            estAdvance += EstimateCharAdvanceHTML(ech, renderFont) + text->letterSpacing;
-            ep += elen;
-          }
           float n = static_cast<float>(charCount);
-          svgTextLength = estAdvance + (n - 1.0f) * (effectiveLength - estAdvance) / n;
+          svgTextLength = effectiveLength * (n - 1.0f) / n;
         }
         out.addAttr("textLength", CssFloatToString(svgTextLength));
         out.addAttr("lengthAdjust", "spacing");

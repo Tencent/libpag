@@ -501,6 +501,43 @@ Matrix BuildGroupMatrixForHTML(const Group* group) {
   return m;
 }
 
+CSSFontProps ParseFontStyleToCSS(const std::string& fontStyle) {
+  CSSFontProps props;
+  if (fontStyle.empty()) {
+    return props;
+  }
+  // Weight keywords ordered to avoid substring false positives (e.g. "SemiBold" matching "Bold").
+  if (fontStyle.find("Thin") != std::string::npos ||
+      fontStyle.find("Hairline") != std::string::npos) {
+    props.weight = 100;
+  } else if (fontStyle.find("ExtraLight") != std::string::npos ||
+             fontStyle.find("UltraLight") != std::string::npos) {
+    props.weight = 200;
+  } else if (fontStyle.find("Light") != std::string::npos) {
+    props.weight = 300;
+  } else if (fontStyle.find("Medium") != std::string::npos) {
+    props.weight = 500;
+  } else if (fontStyle.find("SemiBold") != std::string::npos ||
+             fontStyle.find("DemiBold") != std::string::npos ||
+             fontStyle.find("Semibold") != std::string::npos) {
+    props.weight = 600;
+  } else if (fontStyle.find("ExtraBold") != std::string::npos ||
+             fontStyle.find("UltraBold") != std::string::npos) {
+    props.weight = 800;
+  } else if (fontStyle.find("Black") != std::string::npos ||
+             fontStyle.find("Heavy") != std::string::npos) {
+    props.weight = 900;
+  } else if (fontStyle.find("Bold") != std::string::npos) {
+    props.weight = 700;
+  }
+  if (fontStyle.find("Italic") != std::string::npos) {
+    props.italic = true;
+  } else if (fontStyle.find("Oblique") != std::string::npos) {
+    props.oblique = true;
+  }
+  return props;
+}
+
 const char* AlignmentToCSS(Alignment alignment) {
   switch (alignment) {
     case Alignment::Start:

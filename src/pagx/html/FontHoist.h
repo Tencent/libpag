@@ -37,16 +37,18 @@ class Element;
 struct FontSignature {
   std::string fontFamily = {};
   float renderFontSize = 0.0f;
-  bool bold = false;
+  int fontWeight = 400;
   bool italic = false;
+  bool oblique = false;
   float letterSpacing = std::nanf("");
   float lineHeight = std::nanf("");
 
   bool equals(const FontSignature& other) const {
     if (fontFamily != other.fontFamily) return false;
     if (renderFontSize != other.renderFontSize) return false;
-    if (bold != other.bold) return false;
+    if (fontWeight != other.fontWeight) return false;
     if (italic != other.italic) return false;
+    if (oblique != other.oblique) return false;
     if (!FloatEqNaN(letterSpacing, other.letterSpacing)) return false;
     if (!FloatEqNaN(lineHeight, other.lineHeight)) return false;
     return true;

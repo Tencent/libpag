@@ -136,8 +136,13 @@ float ComputeCubicBezierLength(Point p0, Point p1, Point p2, Point p3, int depth
 float ComputeQuadBezierLength(Point p0, Point p1, Point p2);
 
 // Text helpers
-bool IsCJKCodepoint(int32_t ch);
-float EstimateCharAdvanceHTML(int32_t ch, float fontSize);
+struct CSSFontProps {
+  int weight = 400;
+  bool italic = false;
+  bool oblique = false;
+};
+
+CSSFontProps ParseFontStyleToCSS(const std::string& fontStyle);
 float ApplySelectorShape(SelectorShape shape, float t);
 float CombineSelectorValues(SelectorMode mode, float a, float b);
 float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphIndex,
