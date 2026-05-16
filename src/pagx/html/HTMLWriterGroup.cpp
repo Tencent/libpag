@@ -81,7 +81,7 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
                                const std::vector<GeoInfo>& geos, const Fill* fill,
                                const Stroke* stroke, float alpha, const TrimPath* trim,
                                bool applyCopyAlphaDecay) {
-  if (rep->copies <= 0) {
+  if (rep->copies <= 0 || !std::isfinite(rep->copies)) {
     return;
   }
   float originOffsetX = _ctx->repeaterOriginOffsetX;

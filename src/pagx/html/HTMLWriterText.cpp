@@ -1296,7 +1296,8 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
       // multiple independently-transformed inline-block spans, but SVG fill="url(#...)" can.
       bool usesSVGTextGradient = fill && fill->color &&
                                  fill->color->nodeType() != NodeType::SolidColor &&
-                                 !(modifier->fillColor.has_value());
+                                 !(modifier->fillColor.has_value()) && text->glyphData != nullptr &&
+                                 !text->glyphData->layoutRuns.empty();
 
       if (usesSVGTextGradient) {
         // --- SVG <text> path for gradient fills ---

@@ -171,7 +171,7 @@ static void AppendPolystarCurve(std::string& d, float centerX, float centerY, fl
 }
 
 std::string BuildPolystarPath(const Polystar* ps) {
-  if (!(ps->pointCount > 0.0f)) {
+  if (!(ps->pointCount > 0.0f) || !std::isfinite(ps->pointCount)) {
     return {};
   }
   auto psCenter = ps->renderPosition();

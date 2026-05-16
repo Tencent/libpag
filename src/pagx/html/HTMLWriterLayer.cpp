@@ -606,10 +606,14 @@ void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha,
   auto savedTrim = state.curTrim;
   auto savedTextPath = state.curTextPath;
   auto savedTextModifier = state.curTextModifier;
+  auto savedHasMerge = state.hasMerge;
+  auto savedMergeMode = state.mergeMode;
   state.curFill = nullptr;
   state.curStroke = nullptr;
   state.hasTrim = false;
   state.curTrim = nullptr;
+  state.hasMerge = false;
+  state.mergeMode = MergePathMode::Append;
   // A Group defines its own element scope: TextPath/TextModifier declared outside the
   // Group must not bleed in and re-apply to Text children inside the Group. Clear them
   // so the flatten loop starts clean; they are restored after the Group exits.
@@ -717,6 +721,9 @@ void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha,
       // decay — we keep the default alpha=1 case (verify_c6) correct and flag the
       // restriction for follow-up if it surfaces.
       auto innerRep = static_cast<const Repeater*>(ge);
+      if (!std::isfinite(innerRep->copies) || innerRep->copies <= 0) {
+        break;
+      }
       int copies = static_cast<int>(std::ceil(innerRep->copies));
       if (copies <= 0 || groupGeos.empty()) {
         break;
@@ -840,6 +847,8 @@ void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha,
   state.curTrim = savedTrim;
   state.curTextPath = savedTextPath;
   state.curTextModifier = savedTextModifier;
+  state.hasMerge = savedHasMerge;
+  state.mergeMode = savedMergeMode;
   savedGeos.insert(savedGeos.end(), groupGeos.begin(), groupGeos.end());
   state.geos = std::move(savedGeos);
 }
@@ -1634,7 +1643,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         // Transform this rect through every Repeater copy matrix and compute union bounds.
         float uL = BBOX_SENTINEL_LARGE, uT = BBOX_SENTINEL_LARGE, uR = -BBOX_SENTINEL_LARGE,
               uB = -BBOX_SENTINEL_LARGE;
-        int n = static_cast<int>(std::ceil(repeater->copies));
+        int n = std::isfinite(repeater->copies) ? static_cast<int>(std::ceil(repeater->copies)) : 0;
         for (int i = 0; i < n; i++) {
           float prog = static_cast<float>(i) + repeater->offset;
           Matrix m = {};
