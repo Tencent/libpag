@@ -1408,7 +1408,7 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         if (!text->fontFamily.empty()) {
           containerStyle += ";font-family:'" + EscapeCssFontFamily(text->fontFamily) + "'";
         }
-        containerStyle += ";line-height:0";
+        containerStyle += ";font-size:0";
         if (!text->fontStyle.empty()) {
           auto fontProps = ParseFontStyleToCSS(text->fontStyle);
           if (fontProps.weight != 400) {
