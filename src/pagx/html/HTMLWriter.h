@@ -23,7 +23,7 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
-#include "pagx/html/FontHoist.h"
+#include "pagx/html/FontSignature.h"
 #include "pagx/html/HTMLBuilder.h"
 #include "pagx/html/HTMLPlusDarkerRenderer.h"
 #include "pagx/nodes/ColorSource.h"

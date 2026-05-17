@@ -15,7 +15,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/html/FontHoist.h"
+#include "pagx/html/FontSignature.h"
 #include "pagx/html/HTMLWriter.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/Group.h"

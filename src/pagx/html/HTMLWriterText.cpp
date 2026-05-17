@@ -24,7 +24,7 @@
 #include <string>
 #include "base/utils/MathUtil.h"
 #include "pagx/TextLayout.h"
-#include "pagx/html/FontHoist.h"
+#include "pagx/html/FontSignature.h"
 #include "pagx/html/HTMLWriter.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"

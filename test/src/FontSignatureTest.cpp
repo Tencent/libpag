@@ -18,7 +18,7 @@
 #include <cmath>
 #include "base/PAGTest.h"
 #include "pagx/PAGXDocument.h"
-#include "pagx/html/FontHoist.h"
+#include "pagx/html/FontSignature.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
@@ -30,7 +30,7 @@ namespace pag {
 
 // FontSignature::equals tests
 
-CLI_TEST(FontHoistTest, SignatureEqualityBasic) {
+CLI_TEST(FontSignatureTest, SignatureEqualityBasic) {
   pagx::FontSignature sig1 = {};
   sig1.fontFamily = "Arial";
   sig1.renderFontSize = 16.0f;
@@ -44,7 +44,7 @@ CLI_TEST(FontHoistTest, SignatureEqualityBasic) {
   EXPECT_TRUE(sig1.equals(sig2));
 }
 
-CLI_TEST(FontHoistTest, SignatureEqualityDiffFamily) {
+CLI_TEST(FontSignatureTest, SignatureEqualityDiffFamily) {
   pagx::FontSignature sig1 = {};
   sig1.fontFamily = "Arial";
   sig1.renderFontSize = 16.0f;
@@ -54,7 +54,7 @@ CLI_TEST(FontHoistTest, SignatureEqualityDiffFamily) {
   EXPECT_FALSE(sig1.equals(sig2));
 }
 
-CLI_TEST(FontHoistTest, SignatureEqualityDiffSize) {
+CLI_TEST(FontSignatureTest, SignatureEqualityDiffSize) {
   pagx::FontSignature sig1 = {};
   sig1.fontFamily = "Arial";
   sig1.renderFontSize = 16.0f;
@@ -64,7 +64,7 @@ CLI_TEST(FontHoistTest, SignatureEqualityDiffSize) {
   EXPECT_FALSE(sig1.equals(sig2));
 }
 
-CLI_TEST(FontHoistTest, SignatureEqualityDiffBold) {
+CLI_TEST(FontSignatureTest, SignatureEqualityDiffBold) {
   pagx::FontSignature sig1 = {};
   sig1.fontFamily = "Arial";
   sig1.renderFontSize = 16.0f;
@@ -76,7 +76,7 @@ CLI_TEST(FontHoistTest, SignatureEqualityDiffBold) {
   EXPECT_FALSE(sig1.equals(sig2));
 }
 
-CLI_TEST(FontHoistTest, SignatureEqualityNaN) {
+CLI_TEST(FontSignatureTest, SignatureEqualityNaN) {
   pagx::FontSignature sig1 = {};
   sig1.fontFamily = "Arial";
   sig1.renderFontSize = 16.0f;
@@ -95,7 +95,7 @@ CLI_TEST(FontHoistTest, SignatureEqualityNaN) {
 
 // FontSignatureToCss tests
 
-CLI_TEST(FontHoistTest, CssOutputFamilyAndSize) {
+CLI_TEST(FontSignatureTest, CssOutputFamilyAndSize) {
   pagx::FontSignature sig = {};
   sig.fontFamily = "Arial";
   sig.renderFontSize = 16.0f;
@@ -108,7 +108,7 @@ CLI_TEST(FontHoistTest, CssOutputFamilyAndSize) {
   EXPECT_EQ(css.find("letter-spacing:"), std::string::npos);
 }
 
-CLI_TEST(FontHoistTest, CssOutputBoldItalic) {
+CLI_TEST(FontSignatureTest, CssOutputBoldItalic) {
   pagx::FontSignature sig = {};
   sig.fontFamily = "Arial";
   sig.renderFontSize = 16.0f;
@@ -119,7 +119,7 @@ CLI_TEST(FontHoistTest, CssOutputBoldItalic) {
   EXPECT_NE(css.find("font-style:italic"), std::string::npos);
 }
 
-CLI_TEST(FontHoistTest, CssOutputLetterSpacing) {
+CLI_TEST(FontSignatureTest, CssOutputLetterSpacing) {
   pagx::FontSignature sig = {};
   sig.fontFamily = "Arial";
   sig.renderFontSize = 16.0f;
@@ -128,7 +128,7 @@ CLI_TEST(FontHoistTest, CssOutputLetterSpacing) {
   EXPECT_NE(css.find("letter-spacing:2px"), std::string::npos);
 }
 
-CLI_TEST(FontHoistTest, CssOutputLineHeight) {
+CLI_TEST(FontSignatureTest, CssOutputLineHeight) {
   pagx::FontSignature sig = {};
   sig.fontFamily = "Arial";
   sig.renderFontSize = 16.0f;
@@ -137,7 +137,7 @@ CLI_TEST(FontHoistTest, CssOutputLineHeight) {
   EXPECT_NE(css.find("line-height:18.4px"), std::string::npos);
 }
 
-CLI_TEST(FontHoistTest, CssOutputEmptySignature) {
+CLI_TEST(FontSignatureTest, CssOutputEmptySignature) {
   pagx::FontSignature sig = {};
   auto css = pagx::FontSignatureToCss(sig);
   // Empty signature with fontFamily="" and renderFontSize=0 produces no CSS.
@@ -156,7 +156,7 @@ static pagx::Text* MakeText(pagx::PAGXDocument* doc, const std::string& family, 
   return t;
 }
 
-CLI_TEST(FontHoistTest, CollectEmptyContents) {
+CLI_TEST(FontSignatureTest, CollectEmptyContents) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   std::vector<pagx::Element*> contents = {};
   auto sig = pagx::CollectUniformSignature(contents);
@@ -164,7 +164,7 @@ CLI_TEST(FontHoistTest, CollectEmptyContents) {
   EXPECT_EQ(sig.renderFontSize, 0.0f);
 }
 
-CLI_TEST(FontHoistTest, CollectSingleDirectText) {
+CLI_TEST(FontSignatureTest, CollectSingleDirectText) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto* t = MakeText(doc.get(), "Arial", 16);
   std::vector<pagx::Element*> contents = {t};
@@ -173,7 +173,7 @@ CLI_TEST(FontHoistTest, CollectSingleDirectText) {
   EXPECT_EQ(sig.renderFontSize, 16.0f);
 }
 
-CLI_TEST(FontHoistTest, CollectUniformDirectTexts) {
+CLI_TEST(FontSignatureTest, CollectUniformDirectTexts) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto* t1 = MakeText(doc.get(), "Arial", 16);
   auto* t2 = MakeText(doc.get(), "Arial", 16);
@@ -183,7 +183,7 @@ CLI_TEST(FontHoistTest, CollectUniformDirectTexts) {
   EXPECT_EQ(sig.renderFontSize, 16.0f);
 }
 
-CLI_TEST(FontHoistTest, CollectMismatchedDirectTexts) {
+CLI_TEST(FontSignatureTest, CollectMismatchedDirectTexts) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto* t1 = MakeText(doc.get(), "Arial", 16);
   auto* t2 = MakeText(doc.get(), "Arial", 24);
@@ -192,7 +192,7 @@ CLI_TEST(FontHoistTest, CollectMismatchedDirectTexts) {
   EXPECT_TRUE(sig.fontFamily.empty());
 }
 
-CLI_TEST(FontHoistTest, CollectTextWithGlyphRunsReturnsEmpty) {
+CLI_TEST(FontSignatureTest, CollectTextWithGlyphRunsReturnsEmpty) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto* t = MakeText(doc.get(), "Arial", 16);
   auto* gr = doc->makeNode<pagx::GlyphRun>();
@@ -203,7 +203,7 @@ CLI_TEST(FontHoistTest, CollectTextWithGlyphRunsReturnsEmpty) {
   EXPECT_TRUE(sig.fontFamily.empty());
 }
 
-CLI_TEST(FontHoistTest, CollectGroupTextsUniform) {
+CLI_TEST(FontSignatureTest, CollectGroupTextsUniform) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto* group = doc->makeNode<pagx::Group>();
   auto* t1 = MakeText(doc.get(), "Arial", 16);
@@ -216,7 +216,7 @@ CLI_TEST(FontHoistTest, CollectGroupTextsUniform) {
   EXPECT_EQ(sig.renderFontSize, 16.0f);
 }
 
-CLI_TEST(FontHoistTest, CollectGroupTextsMismatched) {
+CLI_TEST(FontSignatureTest, CollectGroupTextsMismatched) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto* group = doc->makeNode<pagx::Group>();
   auto* t1 = MakeText(doc.get(), "Arial", 16);
@@ -228,7 +228,7 @@ CLI_TEST(FontHoistTest, CollectGroupTextsMismatched) {
   EXPECT_TRUE(sig.fontFamily.empty());
 }
 
-CLI_TEST(FontHoistTest, CollectDirectTextAndGroupTextUniform) {
+CLI_TEST(FontSignatureTest, CollectDirectTextAndGroupTextUniform) {
   // Direct Text + Group Text with same signature → uniform
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto* direct = MakeText(doc.get(), "Arial", 16);
@@ -241,7 +241,7 @@ CLI_TEST(FontHoistTest, CollectDirectTextAndGroupTextUniform) {
   EXPECT_EQ(sig.renderFontSize, 16.0f);
 }
 
-CLI_TEST(FontHoistTest, CollectDirectTextAndGroupTextMismatched) {
+CLI_TEST(FontSignatureTest, CollectDirectTextAndGroupTextMismatched) {
   // The exact scenario from root_document.pagx: direct Text fontSize=24, Group Text fontSize=12
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto* direct = MakeText(doc.get(), "Arial", 24, "Bold");
@@ -253,7 +253,7 @@ CLI_TEST(FontHoistTest, CollectDirectTextAndGroupTextMismatched) {
   EXPECT_TRUE(sig.fontFamily.empty());
 }
 
-CLI_TEST(FontHoistTest, CollectGroupWithGlyphRunsTextReturnsEmpty) {
+CLI_TEST(FontSignatureTest, CollectGroupWithGlyphRunsTextReturnsEmpty) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto* group = doc->makeNode<pagx::Group>();
   auto* t = MakeText(doc.get(), "Arial", 16);
@@ -266,7 +266,7 @@ CLI_TEST(FontHoistTest, CollectGroupWithGlyphRunsTextReturnsEmpty) {
   EXPECT_TRUE(sig.fontFamily.empty());
 }
 
-CLI_TEST(FontHoistTest, CollectTextBoxTextsUniform) {
+CLI_TEST(FontSignatureTest, CollectTextBoxTextsUniform) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto* tb = doc->makeNode<pagx::TextBox>();
   auto* t1 = MakeText(doc.get(), "Arial", 16);
@@ -279,7 +279,7 @@ CLI_TEST(FontHoistTest, CollectTextBoxTextsUniform) {
   EXPECT_EQ(sig.renderFontSize, 16.0f);
 }
 
-CLI_TEST(FontHoistTest, CollectTextBoxWithGroupTexts) {
+CLI_TEST(FontSignatureTest, CollectTextBoxWithGroupTexts) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto* tb = doc->makeNode<pagx::TextBox>();
   auto* directText = MakeText(doc.get(), "Arial", 16);
@@ -294,7 +294,7 @@ CLI_TEST(FontHoistTest, CollectTextBoxWithGroupTexts) {
   EXPECT_EQ(sig.renderFontSize, 16.0f);
 }
 
-CLI_TEST(FontHoistTest, CollectMixedDirectAndGroupAndTextBox) {
+CLI_TEST(FontSignatureTest, CollectMixedDirectAndGroupAndTextBox) {
   // All three sources with uniform signature
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto* direct = MakeText(doc.get(), "Arial", 16);
@@ -310,7 +310,7 @@ CLI_TEST(FontHoistTest, CollectMixedDirectAndGroupAndTextBox) {
   EXPECT_EQ(sig.renderFontSize, 16.0f);
 }
 
-CLI_TEST(FontHoistTest, CollectNonTextElementsIgnored) {
+CLI_TEST(FontSignatureTest, CollectNonTextElementsIgnored) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto* fill = doc->makeNode<pagx::Fill>();
   auto* rect = doc->makeNode<pagx::Rectangle>();

@@ -21,7 +21,7 @@
 #include <string>
 #include <vector>
 #include "base/utils/MathUtil.h"
-#include "pagx/html/FontHoist.h"
+#include "pagx/html/FontSignature.h"
 #include "pagx/html/HTMLWriter.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
