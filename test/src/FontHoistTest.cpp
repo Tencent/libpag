@@ -115,7 +115,7 @@ CLI_TEST(FontHoistTest, CssOutputBoldItalic) {
   sig.fontWeight = 700;
   sig.italic = true;
   auto css = pagx::FontSignatureToCss(sig);
-  EXPECT_NE(css.find("font-weight:700"), std::string::npos);
+  EXPECT_NE(css.find("font-weight:bold"), std::string::npos);
   EXPECT_NE(css.find("font-style:italic"), std::string::npos);
 }
 

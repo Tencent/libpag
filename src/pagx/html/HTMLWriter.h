@@ -140,6 +140,13 @@ struct CSSFontProps {
   int weight = 400;
   bool italic = false;
   bool oblique = false;
+
+  // Returns CSS font-weight value: "normal" for 400, "bold" for 700, numeric string otherwise.
+  std::string weightString() const {
+    if (weight == 400) return "normal";
+    if (weight == 700) return "bold";
+    return std::to_string(weight);
+  }
 };
 
 CSSFontProps ParseFontStyleToCSS(const std::string& fontStyle);

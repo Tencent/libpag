@@ -134,7 +134,8 @@ std::string FontSignatureToCss(const FontSignature& sig) {
   }
   if (sig.fontWeight != 400) {
     if (!css.empty()) css += ';';
-    css += "font-weight:" + std::to_string(sig.fontWeight);
+    css += "font-weight:" +
+           std::string(sig.fontWeight == 700 ? "bold" : std::to_string(sig.fontWeight).c_str());
   }
   if (sig.italic) {
     if (!css.empty()) css += ';';

@@ -212,7 +212,7 @@ std::string HTMLWriter::buildTextBoxSpanStyle(const Text* text, const Fill* fill
     if (!text->fontStyle.empty()) {
       auto fontProps = ParseFontStyleToCSS(text->fontStyle);
       if (fontProps.weight != 400) {
-        style += ";font-weight:" + std::to_string(fontProps.weight);
+        style += ";font-weight:" + fontProps.weightString();
       }
       if (fontProps.italic) {
         style += ";font-style:italic";

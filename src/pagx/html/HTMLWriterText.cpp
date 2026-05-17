@@ -759,7 +759,7 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
         {
           auto fontProps = ParseFontStyleToCSS(text->fontStyle);
           if (fontProps.weight != 400) {
-            out.addAttr("font-weight", std::to_string(fontProps.weight));
+            out.addAttr("font-weight", fontProps.weightString());
           }
           if (fontProps.italic) {
             out.addAttr("font-style", "italic");
@@ -858,7 +858,7 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     if (!text->fontStyle.empty()) {
       auto fontProps = ParseFontStyleToCSS(text->fontStyle);
       if (fontProps.weight != 400) {
-        style += ";font-weight:" + std::to_string(fontProps.weight);
+        style += ";font-weight:" + fontProps.weightString();
       }
       if (fontProps.italic) {
         style += ";font-style:italic";
@@ -1412,7 +1412,7 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         if (!text->fontStyle.empty()) {
           auto fontProps = ParseFontStyleToCSS(text->fontStyle);
           if (fontProps.weight != 400) {
-            containerStyle += ";font-weight:" + std::to_string(fontProps.weight);
+            containerStyle += ";font-weight:" + fontProps.weightString();
           }
           if (fontProps.italic) {
             containerStyle += ";font-style:italic";
@@ -1786,7 +1786,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
       {
         auto fontProps = ParseFontStyleToCSS(text->fontStyle);
         if (fontProps.weight != 400) {
-          out.addAttr("font-weight", std::to_string(fontProps.weight));
+          out.addAttr("font-weight", fontProps.weightString());
         }
         if (fontProps.italic) {
           out.addAttr("font-style", "italic");
