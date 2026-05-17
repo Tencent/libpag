@@ -20,11 +20,14 @@
 
 #include <string>
 #include "pagx/nodes/PathData.h"
+#include "pagx/types/Matrix.h"
 
 namespace pagx {
 
 PathData PathDataFromSVGString(const std::string& d);
 
 std::string PathDataToSVGString(const PathData& path);
+
+std::string PathDataToSVGString(const PathData& path, const Matrix* transform);
 
 }  // namespace pagx

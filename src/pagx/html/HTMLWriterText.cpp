@@ -986,14 +986,69 @@ void HTMLWriter::writeEmbeddedShapeGlyphs(HTMLBuilder& out, const Text* text, co
   out.addAttr("style", svgStyle);
   out.closeTagStart();
   if (!paths.empty()) {
+    // Compute the union bounding box of all glyph paths (after transform) so that
+    // fitsToGeometry gradients use userSpaceOnUse with the overall bbox instead of
+    // objectBoundingBox. SVG applies objectBoundingBox independently to each child <path>
+    // within a <g>, causing per-glyph gradients instead of one continuous gradient.
+    float bboxX = 0, bboxY = 0, bboxW = 0, bboxH = 0;
+    std::string localGradId;
+    if (fill && fill->color && fill->color->nodeType() != NodeType::SolidColor) {
+      float minX = std::numeric_limits<float>::max();
+      float minY = std::numeric_limits<float>::max();
+      float maxX = std::numeric_limits<float>::lowest();
+      float maxY = std::numeric_limits<float>::lowest();
+      for (auto& gp : paths) {
+        auto pathBounds = const_cast<PathData*>(gp.pathData)->getBounds();
+        Point corners[4] = {
+            {pathBounds.x, pathBounds.y},
+            {pathBounds.x + pathBounds.width, pathBounds.y},
+            {pathBounds.x + pathBounds.width, pathBounds.y + pathBounds.height},
+            {pathBounds.x, pathBounds.y + pathBounds.height},
+        };
+        for (auto& c : corners) {
+          auto mapped = gp.transform.mapPoint(c);
+          minX = std::min(minX, mapped.x);
+          minY = std::min(minY, mapped.y);
+          maxX = std::max(maxX, mapped.x);
+          maxY = std::max(maxY, mapped.y);
+        }
+      }
+      if (maxX > minX && maxY > minY) {
+        bboxX = minX;
+        bboxY = minY;
+        bboxW = maxX - minX;
+        bboxH = maxY - minY;
+        localGradId = _ctx->nextId("lgrad");
+        HTMLBuilder localDefs;
+        localDefs.openTag("defs");
+        localDefs.closeTagStart();
+        writeSVGGradientDefInto(localDefs, fill->color, localGradId, bboxX, bboxY, bboxW, bboxH);
+        localDefs.closeTag();
+        out.emitRaw(localDefs.release());
+      }
+    }
     out.openTag("g");
-    applySVGFill(out, fill);
+    if (!localGradId.empty()) {
+      float fillAlpha = fill->alpha;
+      out.addAttr("fill", "url(#" + localGradId + ")");
+      if (fillAlpha < 1.0f) {
+        out.addAttr("fill-opacity", CssFloatToString(fillAlpha));
+      }
+    } else {
+      applySVGFill(out, fill);
+    }
     applySVGStroke(out, stroke);
     out.closeTagStart();
     for (auto& gp : paths) {
       out.openTag("path");
-      out.addAttr("transform", MatrixToCSS(gp.transform));
-      out.addAttr("d", PathDataToSVGString(*gp.pathData));
+      if (!localGradId.empty()) {
+        // When using userSpaceOnUse gradient, bake the transform into the path data so all
+        // paths share the same coordinate space as the gradient definition.
+        out.addAttr("d", PathDataToSVGString(*gp.pathData, &gp.transform));
+      } else {
+        out.addAttr("transform", MatrixToCSS(gp.transform));
+        out.addAttr("d", PathDataToSVGString(*gp.pathData));
+      }
       out.closeTagSelfClosing();
     }
     out.closeTag();  // </g>
