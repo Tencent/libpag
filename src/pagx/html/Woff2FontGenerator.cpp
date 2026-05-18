@@ -751,7 +751,8 @@ static std::vector<uint8_t> BuildCBDT(const Font* font) {
     // Setting BearingY = ppem - offset.y places the bitmap at em-box top when offset=0,
     // which aligns with cssTop = posY in the HTML emitter (span box starts at posY, no overflow).
     // Formula: bitmap_top = cssTop + fontSize - BearingY*(fontSize/ppem) = posY + offset.y*scale.
-    auto bearingX = static_cast<int8_t>(std::round(glyph->offset.x));
+    auto bearingX =
+        static_cast<int8_t>(std::clamp(static_cast<int>(std::round(glyph->offset.x)), -128, 127));
     int ppem = std::min(font->unitsPerEm, 255);
     auto bearingY = static_cast<int8_t>(
         std::clamp(static_cast<int>(std::round(ppem - glyph->offset.y)), -128, 127));

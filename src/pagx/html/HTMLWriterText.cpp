@@ -1060,6 +1060,9 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
       }
       const auto& fontResult = woff2It->second;
       float fontSize = text->glyphRuns[0]->fontSize;
+      if (embeddedFont->unitsPerEm == 0) {
+        continue;
+      }
       float scale = fontSize / static_cast<float>(embeddedFont->unitsPerEm);
       bool isBitmapFont =
           !embeddedFont->glyphs.empty() && embeddedFont->glyphs[0]->image != nullptr;
@@ -1600,7 +1603,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
 
       float totalAdvance = 0.0f;
       for (auto* run : text->glyphRuns) {
-        if (!run->font) {
+        if (!run->font || run->font->unitsPerEm == 0) {
           continue;
         }
         float scale = run->fontSize / run->font->unitsPerEm;
@@ -1647,7 +1650,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
       out.closeTagStart();
 
       for (auto* run : text->glyphRuns) {
-        if (!run->font) {
+        if (!run->font || run->font->unitsPerEm == 0) {
           continue;
         }
         float scale = run->fontSize / run->font->unitsPerEm;
@@ -2199,8 +2202,8 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
     style += ";font-family:'" + fontResult.familyName + "'";
     style += ";font-size:" + CssFloatToString(fontSize) + "px";
     // For gradient fills, extend span height to cover glyph rendering area below em-box.
-    bool hasGradient = !isBitmapFont && fill && fill->color &&
-                       fill->color->nodeType() != NodeType::SolidColor;
+    bool hasGradient =
+        !isBitmapFont && fill && fill->color && fill->color->nodeType() != NodeType::SolidColor;
     if (hasGradient) {
       style += ";padding-bottom:" + CssFloatToString(fontSize) + "px";
     }
@@ -2227,7 +2230,7 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
     if (isGradientFill) {
       bool first = true;
       for (auto* run : text->glyphRuns) {
-        if (!run->font) continue;
+        if (!run->font || run->font->unitsPerEm == 0) continue;
         float scale = fontSize / static_cast<float>(run->font->unitsPerEm);
         for (size_t i = 0; i < run->glyphs.size(); i++) {
           uint16_t gid = run->glyphs[i];
@@ -2262,7 +2265,7 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
     out.closeTagStart();
 
     for (auto* run : text->glyphRuns) {
-      if (!run->font) {
+      if (!run->font || run->font->unitsPerEm == 0) {
         continue;
       }
       for (size_t i = 0; i < run->glyphs.size(); i++) {
