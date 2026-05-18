@@ -2039,6 +2039,15 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
     if (ct == NodeType::SolidColor) {
       auto sc = static_cast<const SolidColor*>(fill->color);
       colorCss = ";color:" + ColorToRGBA(sc->color, fill->alpha);
+    } else {
+      // Gradient fill: use background-clip:text (standard CSS for gradient text).
+      float gradAlpha = 1.0f;
+      std::string css = colorToCSS(fill->color, &gradAlpha);
+      if (!css.empty()) {
+        colorCss = ";background:" + css;
+        colorCss += ";-webkit-background-clip:text;background-clip:text";
+        colorCss += ";-webkit-text-fill-color:transparent";
+      }
     }
   }
   std::string strokeCss;
@@ -2092,6 +2101,33 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
     // top + fontSize. To align the font glyph origin (baseline at y=0 in CFF) with the PAGX
     // coordinate (posY = glyph origin in screen space), we set top = posY - fontSize.
     float fontSize = text->glyphRuns.empty() ? 12.0f : text->glyphRuns[0]->fontSize;
+
+    // For gradient fills with per-glyph positioning, compute the total extent so each span
+    // can share the same gradient via background-size/background-position offset.
+    bool isGradientFill = fill && fill->color && fill->color->nodeType() != NodeType::SolidColor;
+    float totalMinX = 0, totalMaxX = 0;
+    if (isGradientFill) {
+      bool first = true;
+      for (auto* run : text->glyphRuns) {
+        if (!run->font) continue;
+        float scale = fontSize / static_cast<float>(run->font->unitsPerEm);
+        for (size_t i = 0; i < run->glyphs.size(); i++) {
+          uint16_t gid = run->glyphs[i];
+          if (gid == 0) continue;
+          float posX = run->x;
+          if (i < run->xOffsets.size()) posX += run->xOffsets[i];
+          if (i < run->positions.size()) posX += run->positions[i].x;
+          auto gi = static_cast<size_t>(gid) - 1;
+          float adv = (gi < run->font->glyphs.size()) ? run->font->glyphs[gi]->advance : 0;
+          float left = posX;
+          float right = posX + adv * scale;
+          if (first) { totalMinX = left; totalMaxX = right; first = false; }
+          else { totalMinX = std::min(totalMinX, left); totalMaxX = std::max(totalMaxX, right); }
+        }
+      }
+    }
+    float gradientWidth = totalMaxX - totalMinX;
+
     std::string containerStyle = "position:absolute;left:" + CssFloatToString(renderPos.x) +
                                  "px;top:" + CssFloatToString(renderPos.y) + "px";
     if (alpha < 1.0f) {
@@ -2131,7 +2167,21 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
                                 "px;top:" + CssFloatToString(cssTop) +
                                 "px;line-height:1;font-family:'" + fontResult.familyName + "'";
         charStyle += ";font-size:" + CssFloatToString(fontSize) + "px";
-        charStyle += colorCss + strokeCss;
+        if (isGradientFill && gradientWidth > 0) {
+          // For gradient fills, each span shares the same gradient stretched across the total
+          // extent. background-position offsets the gradient so it appears continuous.
+          float gradAlpha = 1.0f;
+          std::string gradCss = colorToCSS(fill->color, &gradAlpha);
+          charStyle += ";background:" + gradCss;
+          charStyle += ";background-size:" + CssFloatToString(gradientWidth) + "px " +
+                       CssFloatToString(fontSize) + "px";
+          charStyle += ";background-position:" + CssFloatToString(-(posX - totalMinX)) + "px 0";
+          charStyle += ";-webkit-background-clip:text;background-clip:text";
+          charStyle += ";-webkit-text-fill-color:transparent";
+        } else {
+          charStyle += colorCss;
+        }
+        charStyle += strokeCss;
 
         // Per-glyph transforms (anchors, scales, rotations, skews)
         std::string transform;
