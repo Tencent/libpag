@@ -45,6 +45,10 @@ namespace pagx {
 using pag::DegreesToRadians;
 using pag::FloatNearlyZero;
 
+//==============================================================================
+// Color Conversion
+//==============================================================================
+
 void ColorToRGB(const Color& color, int& r, int& g, int& b) {
   r = std::clamp(static_cast<int>(std::round(color.red * 255.0f)), 0, 255);
   g = std::clamp(static_cast<int>(std::round(color.green * 255.0f)), 0, 255);
@@ -87,6 +91,10 @@ std::string ColorToRGBA(const Color& color, float extra) {
   return "rgba(" + std::to_string(r) + "," + std::to_string(g) + "," + std::to_string(b) + "," +
          CssFloatToString(a) + ")";
 }
+
+//==============================================================================
+// Image Utilities
+//==============================================================================
 
 const char* DetectImageMime(const uint8_t* bytes, size_t size) {
   if (size >= 8 && bytes[0] == 0x89 && bytes[1] == 'P' && bytes[2] == 'N' && bytes[3] == 'G') {
@@ -284,6 +292,10 @@ std::pair<int, int> GetImageNativeSize(const Image* image) {
   return {codec->width(), codec->height()};
 }
 
+//==============================================================================
+// CSS Gradient Stops
+//==============================================================================
+
 std::string CSSStops(const std::vector<ColorStop*>& stops) {
   if (stops.empty()) {
     return "transparent,transparent";
@@ -321,6 +333,10 @@ std::string CSSStops(const std::vector<ColorStop*>& stops) {
   }
   return r;
 }
+
+//==============================================================================
+// Matrix & Transform
+//==============================================================================
 
 std::string MatrixToCSS(const Matrix& m) {
   std::string r = "matrix(";
@@ -417,6 +433,10 @@ std::string Matrix3DToCSS(const Matrix3D& m) {
   return r;
 }
 
+//==============================================================================
+// Blend Mode & Layout
+//==============================================================================
+
 const char* BlendModeToMixBlendMode(BlendMode mode) {
   auto svgStr = BlendModeToSVGString(mode);
   if (svgStr) {
@@ -500,6 +520,10 @@ Matrix BuildGroupMatrixForHTML(const Group* group) {
 
   return m;
 }
+
+//==============================================================================
+// Text & Font
+//==============================================================================
 
 CSSFontProps ParseFontStyleToCSS(const std::string& fontStyle) {
   CSSFontProps props;

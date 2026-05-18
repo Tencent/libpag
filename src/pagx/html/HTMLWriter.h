@@ -464,6 +464,12 @@ class HTMLWriter {
   void renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
                  const Stroke* stroke, float alpha, BlendMode painterBlend,
                  const TrimPath* trim = nullptr, MergePathMode mergeMode = MergePathMode::Append);
+  void renderSVGConicStroke(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
+                            const Stroke* stroke, float alpha, BlendMode painterBlend,
+                            const TrimPath* trim);
+  void emitStrokeClipDefs(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Stroke* stroke,
+                          const std::string& clipId, float x0, float y0, float sw, float sh);
+  static std::string GeoToSVGPathData(const GeoInfo& geo);
   void writeText(HTMLBuilder& out, const Text* text, const Fill* fill, const Stroke* stroke,
                  const TextBox* tb, float alpha);
   void writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>& geos,

@@ -187,26 +187,33 @@ struct CubicSolutions {
   size_t count = 0;
 };
 
+// Solves ax³ + bx² + cx + d = 0 using Shengjin's formula (盛金公式).
+// Returns up to 3 real roots. Ported from tgfx/src/core/TextSelector.cpp.
 static CubicSolutions SolveCubicEquation(double a, double b, double c, double d) {
   CubicSolutions solutions = {};
   if (a == 0) {
     return solutions;
   }
+  // Shengjin discriminants: A = b²-3ac, B = bc-9ad, C = c²-3bd, Δ = B²-4AC
   auto A = b * b - 3 * a * c;
   auto B = b * c - 9 * a * d;
   auto C = c * c - 3 * b * d;
   auto delta = B * B - 4 * A * C;
   if (A == 0 && B == 0) {
+    // Triple root: x = -b/(3a)
     solutions.values[solutions.count++] = -b / (3 * a);
   } else if (delta == 0 && A != 0) {
+    // Double root + single root
     auto k = B / A;
     solutions.values[solutions.count++] = -b / a + k;
     solutions.values[solutions.count++] = -0.5 * k;
   } else if (delta > 0) {
+    // Single real root (Cardano-like)
     auto y1 = A * b + 1.5 * a * (-B + std::sqrt(delta));
     auto y2 = A * b + 1.5 * a * (-B - std::sqrt(delta));
     solutions.values[solutions.count++] = (-b - std::cbrt(y1) - std::cbrt(y2)) / (3 * a);
   } else if (delta < 0 && A > 0) {
+    // Three distinct real roots (trigonometric method)
     auto t = (A * b - 1.5 * a * B) / (A * std::sqrt(A));
     if (-1 < t && t < 1) {
       auto theta = std::acos(t);
@@ -250,12 +257,14 @@ static float CalculateTriangleFactorBezier(float textCenter, float rangeStart, f
   double x4 = rangeCenter;
   double y4 = 1;
 
-  // Invert the cubic bezier x(t)=((1-t)^3 x1 + 3(1-t)^2 t x2 + 3(1-t) t^2 x3 + t^3 x4) for t.
+  // Invert the cubic bezier x(t) to find parameter t at position x.
+  // Rearranges x(t) = (1-t)³x1 + 3(1-t)²t·x2 + 3(1-t)t²·x3 + t³·x4 into standard cubic form.
   auto a = -x1 + 3 * x2 - 3 * x3 + x4;
   auto b = 3 * (x1 - 2 * x2 + x3);
   auto c = 3 * (-x1 + x2);
   auto d = x1 - x;
 
+  // Solve for t ∈ [0,1], then evaluate y(t) to get the triangle factor.
   double t = 0;
   auto solutions = SolveCubicEquation(a, b, c, d);
   for (size_t i = 0; i < solutions.count; i++) {
