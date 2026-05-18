@@ -440,10 +440,11 @@ CLI_TEST(PAGXHtmlTest, TextPath) {
 CLI_TEST(PAGXHtmlTest, ShapeGlyphRun) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/shape_glyph_run.pagx"));
   ASSERT_FALSE(html.empty());
-  // Embedded geometric shapes and bitmap images rendered via GlyphRun produce SVG paths and
-  // image elements (not HTML text spans, since these nodes carry no text/fontFamily).
-  EXPECT_NE(html.find("<path"), std::string::npos);
-  EXPECT_NE(html.find("<image"), std::string::npos);
+  // All embedded font glyphs (vector and bitmap) render via WOFF2 @font-face with PUA characters.
+  // No SVG <path> or <image> elements should be present for glyph rendering.
+  EXPECT_NE(html.find("@font-face"), std::string::npos);
+  EXPECT_NE(html.find("pagx-font-"), std::string::npos);
+  EXPECT_EQ(html.find("<path"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, TextRich) {

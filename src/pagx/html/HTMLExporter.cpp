@@ -25,6 +25,8 @@
 #include "pagx/html/HTMLBuilder.h"
 #include "pagx/html/HTMLStyleExtractor.h"
 #include "pagx/html/HTMLWriter.h"
+#include "pagx/html/Woff2FontGenerator.h"
+#include "pagx/nodes/Font.h"
 #include "pagx/utils/StringParser.h"
 
 namespace pagx {
@@ -180,6 +182,44 @@ std::string HTMLExporter::ToHTML(PAGXDocument& doc, const std::string& resourceD
   HTMLPlusDarkerRenderer::RenderAll(doc, resourceDir, urlPrefix, options.rasterScale,
                                     ctx.plusDarkerBackdrops);
 
+  // Pre-pass: build WOFF2 fonts for embedded vector fonts. Each Font resource that contains
+  // only vector glyphs (Glyph.path, no Glyph.image) is converted to a minimal OpenType-CFF
+  // font compressed as WOFF2. The resulting files are written to {resourceDir}/fonts/ and
+  // registered in ctx.woff2Fonts so writeEmbeddedShapeGlyphs can emit <span> with @font-face
+  // instead of SVG <path> elements.
+  std::string fontFaceRules;
+  for (auto& nodePtr : doc.nodes) {
+    if (nodePtr->nodeType() != NodeType::Font) {
+      continue;
+    }
+    auto* font = static_cast<Font*>(nodePtr.get());
+    if (font->glyphs.empty() || !font->glyphs[0]) {
+      continue;
+    }
+    // Both vector (path) and bitmap (image) fonts are supported.
+    if (!font->glyphs[0]->path && !font->glyphs[0]->image) {
+      continue;
+    }
+    std::string fontId = ctx.nextId("f");
+    auto result = BuildWoff2FromFont(font, fontId);
+    if (result.woff2Data.empty()) {
+      continue;
+    }
+    std::string filename = "font_" + fontId + ".woff2";
+    result.relativeUrl = urlPrefix + "fonts/" + filename;
+    std::string fontsDir = resourceDir + "/fonts";
+    std::error_code ec;
+    std::filesystem::create_directories(fontsDir, ec);
+    std::ofstream f(fontsDir + "/" + filename, std::ios::binary);
+    if (f.good()) {
+      f.write(reinterpret_cast<const char*>(result.woff2Data.data()),
+              static_cast<std::streamsize>(result.woff2Data.size()));
+    }
+    fontFaceRules += "@font-face{font-family:'" + result.familyName + "';src:url('" +
+                     result.relativeUrl + "') format('woff2')}\n";
+    ctx.woff2Fonts[font] = std::move(result);
+  }
+
   HTMLWriter writer(&defs, &ctx);
 
   // Root div
@@ -194,6 +234,14 @@ std::string HTMLExporter::ToHTML(PAGXDocument& doc, const std::string& resourceD
   HTMLBuilder body(1, 4096);
   for (auto* layer : doc.layers) {
     writer.writeLayer(body, layer);
+  }
+
+  // Insert @font-face rules for embedded WOFF2 fonts
+  if (!fontFaceRules.empty()) {
+    html.openTag("style");
+    html.closeTagStart();
+    html.addRawContent(fontFaceRules);
+    html.closeTag();  // </style>
   }
 
   // Insert SVG defs if any

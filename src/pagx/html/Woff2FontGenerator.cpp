@@ -23,7 +23,10 @@
 #include <cstring>
 #include <numeric>
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/Image.h"
 #include "pagx/nodes/PathData.h"
+#include "tgfx/core/Data.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace pagx {
 
@@ -49,6 +52,9 @@ static void WriteU32(std::vector<uint8_t>& buf, uint32_t v) {
   buf.push_back(static_cast<uint8_t>(v));
 }
 
+static void WriteI8(std::vector<uint8_t>& buf, int8_t v) {
+  buf.push_back(static_cast<uint8_t>(v));
+}
 
 static void WriteTag(std::vector<uint8_t>& buf, const char* tag) {
   buf.push_back(static_cast<uint8_t>(tag[0]));
@@ -175,11 +181,6 @@ static void EncodeDictOperator(std::vector<uint8_t>& buf, uint8_t op) {
   WriteU8(buf, op);
 }
 
-static void EncodeDictOperator2(std::vector<uint8_t>& buf, uint8_t op) {
-  WriteU8(buf, 12);
-  WriteU8(buf, op);
-}
-
 // --- CharString building ---
 
 static std::vector<uint8_t> BuildCharString(const PathData* path) {
@@ -192,26 +193,28 @@ static std::vector<uint8_t> BuildCharString(const PathData* path) {
   float curX = 0.0f;
   float curY = 0.0f;
 
+  // PAGX uses screen coordinates (Y axis points down), but CFF/OpenType uses typographic
+  // coordinates (Y axis points up). Negate all Y values during charstring encoding.
   path->forEach([&](PathVerb verb, const Point* pts) {
     switch (verb) {
       case PathVerb::Move: {
         float dx = pts[0].x - curX;
-        float dy = pts[0].y - curY;
+        float dy = -(pts[0].y) - curY;
         EncodeCFFNumber(cs, dx);
         EncodeCFFNumber(cs, dy);
         WriteU8(cs, 21);  // rmoveto
         curX = pts[0].x;
-        curY = pts[0].y;
+        curY = -(pts[0].y);
         break;
       }
       case PathVerb::Line: {
         float dx = pts[0].x - curX;
-        float dy = pts[0].y - curY;
+        float dy = -(pts[0].y) - curY;
         EncodeCFFNumber(cs, dx);
         EncodeCFFNumber(cs, dy);
         WriteU8(cs, 5);  // rlineto
         curX = pts[0].x;
-        curY = pts[0].y;
+        curY = -(pts[0].y);
         break;
       }
       case PathVerb::Quad: {
@@ -219,9 +222,9 @@ static std::vector<uint8_t> BuildCharString(const PathData* path) {
         // CP1 = P0 + 2/3 * (QCP - P0)
         // CP2 = P2 + 2/3 * (QCP - P2)
         float qcpX = pts[0].x;
-        float qcpY = pts[0].y;
+        float qcpY = -(pts[0].y);
         float endX = pts[1].x;
-        float endY = pts[1].y;
+        float endY = -(pts[1].y);
         float cp1X = curX + (2.0f / 3.0f) * (qcpX - curX);
         float cp1Y = curY + (2.0f / 3.0f) * (qcpY - curY);
         float cp2X = endX + (2.0f / 3.0f) * (qcpX - endX);
@@ -245,11 +248,11 @@ static std::vector<uint8_t> BuildCharString(const PathData* path) {
       }
       case PathVerb::Cubic: {
         float dx1 = pts[0].x - curX;
-        float dy1 = pts[0].y - curY;
+        float dy1 = -(pts[0].y) - curY;
         float dx2 = pts[1].x - pts[0].x;
-        float dy2 = pts[1].y - pts[0].y;
+        float dy2 = -(pts[1].y) - (-(pts[0].y));
         float dx3 = pts[2].x - pts[1].x;
-        float dy3 = pts[2].y - pts[1].y;
+        float dy3 = -(pts[2].y) - (-(pts[1].y));
         EncodeCFFNumber(cs, dx1);
         EncodeCFFNumber(cs, dy1);
         EncodeCFFNumber(cs, dx2);
@@ -258,7 +261,7 @@ static std::vector<uint8_t> BuildCharString(const PathData* path) {
         EncodeCFFNumber(cs, dy3);
         WriteU8(cs, 8);  // rrcurveto
         curX = pts[2].x;
-        curY = pts[2].y;
+        curY = -(pts[2].y);
         break;
       }
       case PathVerb::Close:
@@ -316,10 +319,10 @@ static std::vector<uint8_t> BuildCFF(const Font* font, const std::string& family
   std::vector<uint8_t> privateDict;
   // defaultWidthX = 0
   EncodeDictOperand(privateDict, 0);
-  EncodeDictOperator2(privateDict, 20);  // defaultWidthX
+  EncodeDictOperator(privateDict, 20);  // defaultWidthX (single-byte operator)
   // nominalWidthX = 0
   EncodeDictOperand(privateDict, 0);
-  EncodeDictOperator2(privateDict, 21);  // nominalWidthX
+  EncodeDictOperator(privateDict, 21);  // nominalWidthX (single-byte operator)
 
   // Now compute actual offsets and rebuild the CFF with correct Top DICT
   cff.clear();
@@ -507,7 +510,9 @@ static std::vector<uint8_t> BuildCmap(uint16_t numGlyphs) {
   uint16_t searchRange = 4;                        // 2 * (2^floor(log2(segCount))) = 2*2 = 4
   uint16_t entrySelector = 1;                      // floor(log2(segCount)) = 1
   uint16_t rangeShift = segCountX2 - searchRange;  // 0
-  uint16_t subtableLength = 14 + segCount * 8;     // format4 header + 4 arrays of segCount uint16s
+  // Format 4 layout: 7 uint16 header (14B) + endCode[segCount] + reservedPad(2B)
+  //                  + startCode[segCount] + idDelta[segCount] + idRangeOffset[segCount]
+  uint16_t subtableLength = 14 + segCount * 2 + 2 + segCount * 2 + segCount * 2 + segCount * 2;
 
   WriteU16(table, 4);               // format
   WriteU16(table, subtableLength);  // length
@@ -544,7 +549,7 @@ static std::vector<uint8_t> BuildCmap(uint16_t numGlyphs) {
 }
 
 static std::vector<uint8_t> BuildHead(const Font* font, int16_t xMin, int16_t yMin, int16_t xMax,
-                                      int16_t yMax) {
+                                      int16_t yMax, int16_t indexToLocFormat) {
   std::vector<uint8_t> table;
   WriteU16(table, 1);           // majorVersion
   WriteU16(table, 0);           // minorVersion
@@ -562,11 +567,11 @@ static std::vector<uint8_t> BuildHead(const Font* font, int16_t xMin, int16_t yM
   WriteI16(table, yMin);
   WriteI16(table, xMax);
   WriteI16(table, yMax);
-  WriteU16(table, 0);  // macStyle
-  WriteU16(table, 8);  // lowestRecPPEM
-  WriteI16(table, 2);  // fontDirectionHint
-  WriteI16(table, 1);  // indexToLocFormat (long)
-  WriteI16(table, 0);  // glyphDataFormat
+  WriteU16(table, 0);                 // macStyle
+  WriteU16(table, 8);                 // lowestRecPPEM
+  WriteI16(table, 2);                 // fontDirectionHint
+  WriteI16(table, indexToLocFormat);  // indexToLocFormat (0=short, 1=long)
+  WriteI16(table, 0);                 // glyphDataFormat
   return table;
 }
 
@@ -612,6 +617,26 @@ static std::vector<uint8_t> BuildMaxp(uint16_t numGlyphs) {
   std::vector<uint8_t> table;
   WriteU32(table, 0x00005000);  // version 0.5 (CFF)
   WriteU16(table, numGlyphs);
+  return table;
+}
+
+static std::vector<uint8_t> BuildMaxpTrueType(uint16_t numGlyphs) {
+  std::vector<uint8_t> table;
+  WriteU32(table, 0x00010000);  // version 1.0 (TrueType)
+  WriteU16(table, numGlyphs);   // numGlyphs
+  WriteU16(table, 0);           // maxPoints
+  WriteU16(table, 0);           // maxContours
+  WriteU16(table, 0);           // maxCompositePoints
+  WriteU16(table, 0);           // maxCompositeContours
+  WriteU16(table, 1);           // maxZones
+  WriteU16(table, 0);           // maxTwilightPoints
+  WriteU16(table, 0);           // maxStorage
+  WriteU16(table, 0);           // maxFunctionDefs
+  WriteU16(table, 0);           // maxInstructionDefs
+  WriteU16(table, 0);           // maxStackElements
+  WriteU16(table, 0);           // maxSizeOfInstructions
+  WriteU16(table, 0);           // maxComponentElements
+  WriteU16(table, 0);           // maxComponentDepth
   return table;
 }
 
@@ -662,6 +687,166 @@ static std::vector<uint8_t> BuildPost() {
   return table;
 }
 
+// --- Bitmap font table builders ---
+
+static std::vector<uint8_t> BuildEmptyGlyf(uint16_t numGlyphs) {
+  // Build a minimal glyf table with a single-point contour for each glyph. A truly empty
+  // glyph (numberOfContours=0) gets optimized away by WOFF2 encoders and fonttools, causing
+  // OTS to report "glyf: zero-length table". A single degenerate contour satisfies OTS while
+  // being invisible (zero-area). CBDT bitmaps take rendering priority over glyf outlines.
+  std::vector<uint8_t> table;
+  for (uint16_t i = 0; i < numGlyphs; i++) {
+    WriteI16(table, 1);  // numberOfContours = 1
+    WriteI16(table, 0);  // xMin
+    WriteI16(table, 0);  // yMin
+    WriteI16(table, 0);  // xMax
+    WriteI16(table, 0);  // yMax
+    // Simple glyph data:
+    WriteU16(table, 0);  // endPtsOfContours[0] = 0 (1 point)
+    WriteU16(table, 0);  // instructionLength = 0
+    WriteU8(table, 0x33);  // flags: xShort + yShort + xSame + ySame (point at 0,0)
+    // No coordinate data needed (all deltas are 0 with the Same flags)
+  }
+  return table;
+}
+
+static std::vector<uint8_t> BuildLoca(uint16_t numGlyphs) {
+  // Short format loca: (numGlyphs + 1) uint16 entries.
+  // Each glyph in BuildEmptyGlyf is 15 bytes. Short loca stores offset/2.
+  // Pad each glyph to 16 bytes (even) so offset/2 is exact.
+  // Actually, use long format loca (uint32 offsets) to avoid padding issues.
+  // Wait — head.indexToLocFormat must match. We set it to 0 (short). Let's use long (1).
+  // For simplicity: use long format loca (4 bytes per entry), 15 bytes per glyph.
+  std::vector<uint8_t> table;
+  for (uint16_t i = 0; i <= numGlyphs; i++) {
+    WriteU32(table, static_cast<uint32_t>(i) * 15);
+  }
+  return table;
+}
+
+static std::vector<uint8_t> BuildCBDT(const Font* font) {
+  std::vector<uint8_t> table;
+  // Header
+  WriteU16(table, 3);  // majorVersion
+  WriteU16(table, 0);  // minorVersion
+
+  // For each glyph: format 17 data (smallGlyphMetrics + dataLen + PNG bytes)
+  for (auto* glyph : font->glyphs) {
+    const Image* image = glyph->image;
+    const uint8_t* pngBytes = image->data->bytes();
+    size_t pngSize = image->data->size();
+
+    // Decode image to get dimensions
+    auto tgfxData = tgfx::Data::MakeWithCopy(pngBytes, pngSize);
+    auto codec = tgfx::ImageCodec::MakeFrom(std::move(tgfxData));
+    uint8_t width = 0;
+    uint8_t height = 0;
+    if (codec) {
+      width = static_cast<uint8_t>(std::min(codec->width(), 255));
+      height = static_cast<uint8_t>(std::min(codec->height(), 255));
+    }
+
+    // bearingX = offset.x, bearingY = height + offset.y (Y up in font coords)
+    auto bearingX = static_cast<int8_t>(std::round(glyph->offset.x));
+    auto bearingY = static_cast<int8_t>(std::round(static_cast<float>(height) + glyph->offset.y));
+    auto advance =
+        static_cast<uint8_t>(std::min(static_cast<int>(std::round(glyph->advance)), 255));
+
+    // SmallGlyphMetrics (5 bytes)
+    WriteU8(table, height);
+    WriteU8(table, width);
+    WriteI8(table, bearingX);
+    WriteI8(table, bearingY);
+    WriteU8(table, advance);
+
+    // dataLen (uint32 big-endian)
+    WriteU32(table, static_cast<uint32_t>(pngSize));
+
+    // Raw PNG data
+    table.insert(table.end(), pngBytes, pngBytes + pngSize);
+  }
+
+  return table;
+}
+
+static std::vector<uint8_t> BuildCBLC(const Font* font, uint16_t numGlyphs) {
+  std::vector<uint8_t> table;
+
+  // CBLC Header (8 bytes)
+  WriteU16(table, 3);  // majorVersion
+  WriteU16(table, 0);  // minorVersion
+  WriteU32(table, 1);  // numSizes
+
+  // BitmapSize record (48 bytes)
+  // We need to compute the offset to the IndexSubTableArray.
+  // BitmapSize starts at offset 8, is 48 bytes. IndexSubTableArray follows at offset 56.
+  uint32_t indexSubTableArrayOffset = 56;
+
+  // IndexSubTableArray (8 bytes) + IndexSubTable1 header (8 bytes) + offsets
+  uint16_t glyphCount = numGlyphs - 1;  // exclude .notdef
+  // IndexSubTable1 data: (glyphCount + 1) uint32 offsets
+  uint32_t indexSubTable1DataSize = (static_cast<uint32_t>(glyphCount) + 1) * 4;
+  uint32_t indexTablesSize = 8 + 8 + indexSubTable1DataSize;  // array entry + header + offsets
+
+  WriteU32(table, indexSubTableArrayOffset);
+  WriteU32(table, indexTablesSize);
+  WriteU32(table, 1);  // numberOfIndexSubTables
+  WriteU32(table, 0);  // colorRef
+
+  // sbitLineMetrics hori (12 bytes) - all zeros
+  for (int i = 0; i < 12; i++) {
+    WriteU8(table, 0);
+  }
+  // sbitLineMetrics vert (12 bytes) - all zeros
+  for (int i = 0; i < 12; i++) {
+    WriteU8(table, 0);
+  }
+
+  WriteU16(table, 1);                                     // startGlyphIndex
+  WriteU16(table, static_cast<uint16_t>(numGlyphs - 1));  // endGlyphIndex
+
+  uint8_t ppem = static_cast<uint8_t>(std::min(font->unitsPerEm, 255));
+  WriteU8(table, ppem);  // ppemX
+  WriteU8(table, ppem);  // ppemY
+  WriteU8(table, 32);    // bitDepth (RGBA)
+  WriteU8(table, 0x01);  // flags (horizontal)
+
+  // IndexSubTableArray entry (8 bytes)
+  WriteU16(table, 1);                                     // firstGlyphIndex
+  WriteU16(table, static_cast<uint16_t>(numGlyphs - 1));  // lastGlyphIndex
+  // additionalOffsetToIndexSubtable: offset from start of IndexSubTableArray to IndexSubTable
+  // The IndexSubTableArray itself is 8 bytes, so the IndexSubTable starts right after.
+  WriteU32(table, 8);
+
+  // IndexSubTable header (8 bytes)
+  WriteU16(table, 1);   // indexFormat = 1 (variable metrics, 4-byte offsets)
+  WriteU16(table, 17);  // imageFormat = 17 (small metrics + PNG)
+  // imageDataOffset: offset into CBDT where first glyph data starts (after CBDT header = 4 bytes)
+  WriteU32(table, 4);
+
+  // IndexSubTable1 data: (glyphCount + 1) uint32 offsets relative to imageDataOffset
+  // Each glyph's data: 5 bytes metrics + 4 bytes dataLen + PNG size
+  uint32_t currentOffset = 0;
+  for (uint16_t i = 0; i < glyphCount; i++) {
+    WriteU32(table, currentOffset);
+
+    const Image* image = font->glyphs[i]->image;
+    size_t pngSize = image->data->size();
+
+    // Decode to get dimensions for height/width in metrics
+    auto tgfxData = tgfx::Data::MakeWithCopy(image->data->bytes(), pngSize);
+    auto codec = tgfx::ImageCodec::MakeFrom(std::move(tgfxData));
+    (void)codec;  // dimensions already accounted for in CBDT
+
+    // Each glyph entry: 5 (metrics) + 4 (dataLen) + pngSize
+    currentOffset += static_cast<uint32_t>(5 + 4 + pngSize);
+  }
+  // Final offset marking end of last glyph's data
+  WriteU32(table, currentOffset);
+
+  return table;
+}
+
 // --- SFNT assembly ---
 
 struct TableEntry {
@@ -669,7 +854,7 @@ struct TableEntry {
   std::vector<uint8_t> data;
 };
 
-static std::vector<uint8_t> AssembleSFNT(std::vector<TableEntry>& tables) {
+static std::vector<uint8_t> AssembleSFNT(std::vector<TableEntry>& tables, bool isTrueType) {
   // Sort tables alphabetically by tag
   std::sort(tables.begin(), tables.end(),
             [](const TableEntry& a, const TableEntry& b) { return strcmp(a.tag, b.tag) < 0; });
@@ -688,7 +873,11 @@ static std::vector<uint8_t> AssembleSFNT(std::vector<TableEntry>& tables) {
   std::vector<uint8_t> sfnt;
 
   // Offset table (12 bytes)
-  WriteTag(sfnt, "OTTO");
+  if (isTrueType) {
+    WriteU32(sfnt, 0x00010000);  // TrueType magic
+  } else {
+    WriteTag(sfnt, "OTTO");  // CFF magic
+  }
   WriteU16(sfnt, numTables);
   WriteU16(sfnt, searchRange);
   WriteU16(sfnt, entrySelector);
@@ -752,100 +941,181 @@ Woff2FontResult BuildWoff2FromFont(const Font* font, const std::string& fontId) 
     return result;
   }
 
-  // Check that the font is vector-only
+  // Detect font type: vector (path) or bitmap (image)
+  bool isBitmapFont = (font->glyphs[0]->image != nullptr);
+
+  // Validate: all glyphs must be the same type
   for (auto* glyph : font->glyphs) {
-    if (glyph->image != nullptr || glyph->path == nullptr) {
-      return result;
+    if (isBitmapFont) {
+      if (glyph->image == nullptr || glyph->image->data == nullptr) {
+        return result;
+      }
+    } else {
+      if (glyph->path == nullptr) {
+        return result;
+      }
     }
   }
 
   std::string familyName = "pagx-font-" + fontId;
   uint16_t numGlyphs = static_cast<uint16_t>(font->glyphs.size() + 1);
 
-  // Compute global bounding box from all glyph paths
-  int16_t xMin = 0, yMin = 0, xMax = 0, yMax = 0;
-  bool hasBounds = false;
-  for (auto* glyph : font->glyphs) {
-    if (glyph->path == nullptr || glyph->path->isEmpty()) {
-      continue;
-    }
-    auto& points = glyph->path->points();
-    for (auto& pt : points) {
-      auto px = static_cast<int16_t>(std::floor(pt.x));
-      auto py = static_cast<int16_t>(std::floor(pt.y));
-      auto pxMax = static_cast<int16_t>(std::ceil(pt.x));
-      auto pyMax = static_cast<int16_t>(std::ceil(pt.y));
-      if (!hasBounds) {
-        xMin = px;
-        yMin = py;
-        xMax = pxMax;
-        yMax = pyMax;
-        hasBounds = true;
-      } else {
-        xMin = std::min(xMin, px);
-        yMin = std::min(yMin, py);
-        xMax = std::max(xMax, pxMax);
-        yMax = std::max(yMax, pyMax);
-      }
-    }
-  }
-
-  // Build tables
   std::vector<TableEntry> tables;
 
-  TableEntry cffEntry;
-  strcpy(cffEntry.tag, "CFF ");
-  cffEntry.data = BuildCFF(font, familyName);
-  tables.push_back(std::move(cffEntry));
+  if (isBitmapFont) {
+    // --- Bitmap font: TrueType with CBDT/CBLC ---
 
-  TableEntry os2Entry;
-  strcpy(os2Entry.tag, "OS/2");
-  os2Entry.data = BuildOS2(font, numGlyphs);
-  tables.push_back(std::move(os2Entry));
+    TableEntry cbdtEntry;
+    strcpy(cbdtEntry.tag, "CBDT");
+    cbdtEntry.data = BuildCBDT(font);
+    tables.push_back(std::move(cbdtEntry));
 
-  TableEntry cmapEntry;
-  strcpy(cmapEntry.tag, "cmap");
-  cmapEntry.data = BuildCmap(numGlyphs);
-  tables.push_back(std::move(cmapEntry));
+    TableEntry cblcEntry;
+    strcpy(cblcEntry.tag, "CBLC");
+    cblcEntry.data = BuildCBLC(font, numGlyphs);
+    tables.push_back(std::move(cblcEntry));
 
-  TableEntry headEntry;
-  strcpy(headEntry.tag, "head");
-  headEntry.data = BuildHead(font, xMin, yMin, xMax, yMax);
-  tables.push_back(std::move(headEntry));
+    TableEntry os2Entry;
+    strcpy(os2Entry.tag, "OS/2");
+    os2Entry.data = BuildOS2(font, numGlyphs);
+    tables.push_back(std::move(os2Entry));
 
-  TableEntry hheaEntry;
-  strcpy(hheaEntry.tag, "hhea");
-  hheaEntry.data = BuildHhea(font, numGlyphs);
-  tables.push_back(std::move(hheaEntry));
+    TableEntry cmapEntry;
+    strcpy(cmapEntry.tag, "cmap");
+    cmapEntry.data = BuildCmap(numGlyphs);
+    tables.push_back(std::move(cmapEntry));
 
-  TableEntry hmtxEntry;
-  strcpy(hmtxEntry.tag, "hmtx");
-  hmtxEntry.data = BuildHmtx(font);
-  tables.push_back(std::move(hmtxEntry));
+    TableEntry glyfEntry;
+    strcpy(glyfEntry.tag, "glyf");
+    glyfEntry.data = BuildEmptyGlyf(numGlyphs);
+    tables.push_back(std::move(glyfEntry));
 
-  TableEntry maxpEntry;
-  strcpy(maxpEntry.tag, "maxp");
-  maxpEntry.data = BuildMaxp(numGlyphs);
-  tables.push_back(std::move(maxpEntry));
+    TableEntry headEntry;
+    strcpy(headEntry.tag, "head");
+    headEntry.data = BuildHead(font, 0, 0, static_cast<int16_t>(font->unitsPerEm),
+                               static_cast<int16_t>(font->unitsPerEm), 1);  // 1 = long loca
+    tables.push_back(std::move(headEntry));
 
-  TableEntry nameEntry;
-  strcpy(nameEntry.tag, "name");
-  nameEntry.data = BuildName(familyName);
-  tables.push_back(std::move(nameEntry));
+    TableEntry hheaEntry;
+    strcpy(hheaEntry.tag, "hhea");
+    hheaEntry.data = BuildHhea(font, numGlyphs);
+    tables.push_back(std::move(hheaEntry));
 
-  TableEntry postEntry;
-  strcpy(postEntry.tag, "post");
-  postEntry.data = BuildPost();
-  tables.push_back(std::move(postEntry));
+    TableEntry hmtxEntry;
+    strcpy(hmtxEntry.tag, "hmtx");
+    hmtxEntry.data = BuildHmtx(font);
+    tables.push_back(std::move(hmtxEntry));
+
+    TableEntry locaEntry;
+    strcpy(locaEntry.tag, "loca");
+    locaEntry.data = BuildLoca(numGlyphs);
+    tables.push_back(std::move(locaEntry));
+
+    TableEntry maxpEntry;
+    strcpy(maxpEntry.tag, "maxp");
+    maxpEntry.data = BuildMaxpTrueType(numGlyphs);
+    tables.push_back(std::move(maxpEntry));
+
+    TableEntry nameEntry;
+    strcpy(nameEntry.tag, "name");
+    nameEntry.data = BuildName(familyName);
+    tables.push_back(std::move(nameEntry));
+
+    TableEntry postEntry;
+    strcpy(postEntry.tag, "post");
+    postEntry.data = BuildPost();
+    tables.push_back(std::move(postEntry));
+
+  } else {
+    // --- Vector font: CFF (existing logic) ---
+
+    // Compute global bounding box from all glyph paths (in typographic coordinates: Y flipped)
+    int16_t xMin = 0, yMin = 0, xMax = 0, yMax = 0;
+    bool hasBounds = false;
+    for (auto* glyph : font->glyphs) {
+      if (glyph->path == nullptr || glyph->path->isEmpty()) {
+        continue;
+      }
+      auto& points = glyph->path->points();
+      for (auto& pt : points) {
+        auto px = static_cast<int16_t>(std::floor(pt.x));
+        auto py = static_cast<int16_t>(std::floor(-pt.y));  // Y flip for typographic coords
+        auto pxMax = static_cast<int16_t>(std::ceil(pt.x));
+        auto pyMax = static_cast<int16_t>(std::ceil(-pt.y));
+        if (!hasBounds) {
+          xMin = std::min(px, pxMax);
+          yMin = std::min(py, pyMax);
+          xMax = std::max(px, pxMax);
+          yMax = std::max(py, pyMax);
+          hasBounds = true;
+        } else {
+          xMin = std::min({xMin, px, pxMax});
+          yMin = std::min({yMin, py, pyMax});
+          xMax = std::max({xMax, px, pxMax});
+          yMax = std::max({yMax, py, pyMax});
+        }
+      }
+    }
+
+    TableEntry cffEntry;
+    strcpy(cffEntry.tag, "CFF ");
+    cffEntry.data = BuildCFF(font, familyName);
+    tables.push_back(std::move(cffEntry));
+
+    TableEntry os2Entry;
+    strcpy(os2Entry.tag, "OS/2");
+    os2Entry.data = BuildOS2(font, numGlyphs);
+    tables.push_back(std::move(os2Entry));
+
+    TableEntry cmapEntry;
+    strcpy(cmapEntry.tag, "cmap");
+    cmapEntry.data = BuildCmap(numGlyphs);
+    tables.push_back(std::move(cmapEntry));
+
+    TableEntry headEntry;
+    strcpy(headEntry.tag, "head");
+    headEntry.data = BuildHead(font, xMin, yMin, xMax, yMax, 1);
+    tables.push_back(std::move(headEntry));
+
+    TableEntry hheaEntry;
+    strcpy(hheaEntry.tag, "hhea");
+    hheaEntry.data = BuildHhea(font, numGlyphs);
+    tables.push_back(std::move(hheaEntry));
+
+    TableEntry hmtxEntry;
+    strcpy(hmtxEntry.tag, "hmtx");
+    hmtxEntry.data = BuildHmtx(font);
+    tables.push_back(std::move(hmtxEntry));
+
+    TableEntry maxpEntry;
+    strcpy(maxpEntry.tag, "maxp");
+    maxpEntry.data = BuildMaxp(numGlyphs);
+    tables.push_back(std::move(maxpEntry));
+
+    TableEntry nameEntry;
+    strcpy(nameEntry.tag, "name");
+    nameEntry.data = BuildName(familyName);
+    tables.push_back(std::move(nameEntry));
+
+    TableEntry postEntry;
+    strcpy(postEntry.tag, "post");
+    postEntry.data = BuildPost();
+    tables.push_back(std::move(postEntry));
+  }
 
   // Assemble SFNT
-  std::vector<uint8_t> ttfData = AssembleSFNT(tables);
+  std::vector<uint8_t> ttfData = AssembleSFNT(tables, isBitmapFont);
 
-  // Compress to WOFF2
-  size_t maxSize = woff2::MaxWOFF2CompressedSize(ttfData.data(), ttfData.size());
+  // Compress to WOFF2. Disable transforms for bitmap fonts because the glyf table transform
+  // eliminates empty glyph outlines, producing a zero-length table that OTS rejects.
+  woff2::WOFF2Params params;
+  params.allow_transforms = !isBitmapFont;
+  size_t maxSize =
+      woff2::MaxWOFF2CompressedSize(ttfData.data(), ttfData.size(), params.extended_metadata);
   std::vector<uint8_t> woff2Buf(maxSize);
   size_t woff2Size = maxSize;
-  if (!woff2::ConvertTTFToWOFF2(ttfData.data(), ttfData.size(), woff2Buf.data(), &woff2Size)) {
+  if (!woff2::ConvertTTFToWOFF2(ttfData.data(), ttfData.size(), woff2Buf.data(), &woff2Size,
+                                params)) {
     return result;
   }
   woff2Buf.resize(woff2Size);

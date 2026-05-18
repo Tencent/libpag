@@ -949,164 +949,24 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
 // Correct call sites: writeText, only when text->text.empty() || text->fontFamily.empty().
 void HTMLWriter::writeEmbeddedShapeGlyphs(HTMLBuilder& out, const Text* text, const Fill* fill,
                                           const Stroke* stroke, float alpha) {
-  auto renderPos = text->renderPosition();
-  auto paths = ComputeGlyphPaths(*text, renderPos.x, renderPos.y);
-  bool hasBitmapGlyphs = false;
+  // All embedded font glyphs (vector and bitmap) are rendered via WOFF2 @font-face with PUA
+  // characters. This preserves text semantics (selectable, animatable per-character) instead of
+  // converting to SVG <path>/<image> which would lose those capabilities.
+  const Font* font = nullptr;
   for (auto* run : text->glyphRuns) {
-    if (!run->font) {
-      continue;
-    }
-    for (size_t i = 0; i < run->glyphs.size(); i++) {
-      uint16_t glyphID = run->glyphs[i];
-      if (glyphID == 0) {
-        continue;
-      }
-      auto glyphIndex = static_cast<size_t>(glyphID) - 1;
-      if (glyphIndex >= run->font->glyphs.size()) {
-        continue;
-      }
-      auto* glyph = run->font->glyphs[glyphIndex];
-      if (glyph && glyph->image) {
-        hasBitmapGlyphs = true;
-        break;
-      }
-    }
-    if (hasBitmapGlyphs) {
+    if (run->font) {
+      font = run->font;
       break;
     }
   }
-  if (paths.empty() && !hasBitmapGlyphs) {
+  if (!font) {
     return;
   }
-  std::string svgStyle = "position:absolute;left:0;top:0;overflow:visible";
-  if (alpha < 1.0f) {
-    svgStyle += ";opacity:" + CssFloatToString(alpha);
+  auto it = _ctx->woff2Fonts.find(font);
+  if (it == _ctx->woff2Fonts.end()) {
+    return;
   }
-  out.openTag("svg");
-  out.addAttr("style", svgStyle);
-  out.closeTagStart();
-  if (!paths.empty()) {
-    // Compute the union bounding box of all glyph paths (after transform) so that
-    // fitsToGeometry gradients use userSpaceOnUse with the overall bbox instead of
-    // objectBoundingBox. SVG applies objectBoundingBox independently to each child <path>
-    // within a <g>, causing per-glyph gradients instead of one continuous gradient.
-    float bboxX = 0, bboxY = 0, bboxW = 0, bboxH = 0;
-    std::string localGradId;
-    if (fill && fill->color && fill->color->nodeType() != NodeType::SolidColor) {
-      float minX = std::numeric_limits<float>::max();
-      float minY = std::numeric_limits<float>::max();
-      float maxX = std::numeric_limits<float>::lowest();
-      float maxY = std::numeric_limits<float>::lowest();
-      for (auto& gp : paths) {
-        auto pathBounds = const_cast<PathData*>(gp.pathData)->getBounds();
-        Point corners[4] = {
-            {pathBounds.x, pathBounds.y},
-            {pathBounds.x + pathBounds.width, pathBounds.y},
-            {pathBounds.x + pathBounds.width, pathBounds.y + pathBounds.height},
-            {pathBounds.x, pathBounds.y + pathBounds.height},
-        };
-        for (auto& c : corners) {
-          auto mapped = gp.transform.mapPoint(c);
-          minX = std::min(minX, mapped.x);
-          minY = std::min(minY, mapped.y);
-          maxX = std::max(maxX, mapped.x);
-          maxY = std::max(maxY, mapped.y);
-        }
-      }
-      if (maxX > minX && maxY > minY) {
-        bboxX = minX;
-        bboxY = minY;
-        bboxW = maxX - minX;
-        bboxH = maxY - minY;
-        localGradId = _ctx->nextId("lgrad");
-        HTMLBuilder localDefs;
-        localDefs.openTag("defs");
-        localDefs.closeTagStart();
-        writeSVGGradientDefInto(localDefs, fill->color, localGradId, bboxX, bboxY, bboxW, bboxH);
-        localDefs.closeTag();
-        out.emitRaw(localDefs.release());
-      }
-    }
-    out.openTag("g");
-    if (!localGradId.empty()) {
-      float fillAlpha = fill->alpha;
-      out.addAttr("fill", "url(#" + localGradId + ")");
-      if (fillAlpha < 1.0f) {
-        out.addAttr("fill-opacity", CssFloatToString(fillAlpha));
-      }
-    } else {
-      applySVGFill(out, fill);
-    }
-    applySVGStroke(out, stroke);
-    out.closeTagStart();
-    for (auto& gp : paths) {
-      out.openTag("path");
-      if (!localGradId.empty()) {
-        // When using userSpaceOnUse gradient, bake the transform into the path data so all
-        // paths share the same coordinate space as the gradient definition.
-        out.addAttr("d", PathDataToSVGString(*gp.pathData, &gp.transform));
-      } else {
-        out.addAttr("transform", MatrixToCSS(gp.transform));
-        out.addAttr("d", PathDataToSVGString(*gp.pathData));
-      }
-      out.closeTagSelfClosing();
-    }
-    out.closeTag();  // </g>
-  }
-  if (hasBitmapGlyphs) {
-    float textPosX = renderPos.x;
-    float textPosY = renderPos.y;
-    for (auto* run : text->glyphRuns) {
-      if (!run->font) {
-        continue;
-      }
-      float scale = run->fontSize / static_cast<float>(run->font->unitsPerEm);
-      float currentX = textPosX + run->x;
-      for (size_t i = 0; i < run->glyphs.size(); i++) {
-        uint16_t glyphID = run->glyphs[i];
-        if (glyphID == 0) {
-          continue;
-        }
-        auto glyphIndex = static_cast<size_t>(glyphID) - 1;
-        if (glyphIndex >= run->font->glyphs.size()) {
-          continue;
-        }
-        auto* glyph = run->font->glyphs[glyphIndex];
-        if (!glyph) {
-          continue;
-        }
-        float posX = 0;
-        float posY = 0;
-        if (i < run->positions.size()) {
-          posX = textPosX + run->x + run->positions[i].x;
-          posY = textPosY + run->y + run->positions[i].y;
-          if (i < run->xOffsets.size()) {
-            posX += run->xOffsets[i];
-          }
-        } else if (i < run->xOffsets.size()) {
-          posX = textPosX + run->x + run->xOffsets[i];
-          posY = textPosY + run->y;
-        } else {
-          posX = currentX;
-          posY = textPosY + run->y;
-        }
-        currentX += glyph->advance * scale;
-        if (!glyph->image) {
-          continue;
-        }
-        float ox = glyph->offset.x;
-        float oy = glyph->offset.y;
-        Matrix glyphMatrix =
-            Matrix::Translate(posX + ox * scale, posY + oy * scale) * Matrix::Scale(scale, scale);
-        std::string src = GetImageSrc(glyph->image, _ctx);
-        out.openTag("image");
-        out.addAttr("href", src);
-        out.addAttr("transform", MatrixToCSS(glyphMatrix));
-        out.closeTagSelfClosing();
-      }
-    }
-  }
-  out.closeTag();  // </svg>
+  writeEmbeddedShapeGlyphsAsFont(out, text, fill, stroke, alpha, it->second);
 }
 
 void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>& geos,
@@ -2130,6 +1990,176 @@ void HTMLWriter::applyTrimAttrsContinuous(HTMLBuilder& builder, const TrimPath* 
     float gap = 1.0f - seg1 - seg2;
     builder.addAttr("stroke-dasharray", CssFloatToString(seg2) + " " + CssFloatToString(gap) + " " +
                                             CssFloatToString(seg1));
+  }
+}
+
+//==============================================================================
+// HTMLWriter – WOFF2 font rendering path for embedded shape glyphs
+//==============================================================================
+
+// Encodes a Unicode codepoint as UTF-8 and appends to the string.
+static void AppendUTF8(std::string& out, uint32_t cp) {
+  if (cp < 0x80) {
+    out += static_cast<char>(cp);
+  } else if (cp < 0x800) {
+    out += static_cast<char>(0xC0 | (cp >> 6));
+    out += static_cast<char>(0x80 | (cp & 0x3F));
+  } else if (cp < 0x10000) {
+    out += static_cast<char>(0xE0 | (cp >> 12));
+    out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+    out += static_cast<char>(0x80 | (cp & 0x3F));
+  } else {
+    out += static_cast<char>(0xF0 | (cp >> 18));
+    out += static_cast<char>(0x80 | ((cp >> 12) & 0x3F));
+    out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+    out += static_cast<char>(0x80 | (cp & 0x3F));
+  }
+}
+
+void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* text,
+                                                const Fill* fill, const Stroke* stroke, float alpha,
+                                                const Woff2FontResult& fontResult) {
+  auto renderPos = text->renderPosition();
+  // Embedded shape glyphs always use per-glyph absolute positioning via xOffsets/positions.
+  // The "simple" no-transform path (single span) is only valid when there are NO xOffsets
+  // and NO per-glyph transforms — which is extremely rare for shape batching.
+  bool hasPerGlyphPositioning = false;
+  for (auto* run : text->glyphRuns) {
+    if (!run->xOffsets.empty() || !run->positions.empty() || !run->rotations.empty() ||
+        !run->scales.empty() || !run->skews.empty()) {
+      hasPerGlyphPositioning = true;
+      break;
+    }
+  }
+
+  // Build fill/stroke CSS shared by all spans.
+  std::string colorCss;
+  if (fill && fill->color) {
+    auto ct = fill->color->nodeType();
+    if (ct == NodeType::SolidColor) {
+      auto sc = static_cast<const SolidColor*>(fill->color);
+      colorCss = ";color:" + ColorToRGBA(sc->color, fill->alpha);
+    }
+  }
+  std::string strokeCss;
+  if (stroke && stroke->color && stroke->color->nodeType() == NodeType::SolidColor) {
+    auto sc = static_cast<const SolidColor*>(stroke->color);
+    bool hasFill = fill && fill->color;
+    auto resolved = ResolveTextStrokeCss(stroke->width, stroke->align, hasFill);
+    if (resolved.width > 0.0f) {
+      strokeCss = ";-webkit-text-stroke:" + CssFloatToString(resolved.width) + "px " +
+                  ColorToRGBA(sc->color, stroke->alpha);
+      if (resolved.paintOrderStrokeFill) {
+        strokeCss += ";paint-order:stroke fill";
+      }
+    }
+    if (!hasFill) {
+      strokeCss += ";-webkit-text-fill-color:transparent";
+    }
+  }
+
+  if (!hasPerGlyphPositioning) {
+    // Simple path: all glyphs as a single <span> with concatenated PUA characters.
+    std::string puaText;
+    for (auto* run : text->glyphRuns) {
+      for (auto glyphID : run->glyphs) {
+        if (glyphID == 0) {
+          continue;
+        }
+        uint32_t codepoint = 0xE000 + (glyphID - 1);
+        AppendUTF8(puaText, codepoint);
+      }
+    }
+    if (puaText.empty()) {
+      return;
+    }
+    float fontSize = text->glyphRuns.empty() ? 12.0f : text->glyphRuns[0]->fontSize;
+    std::string style = "position:absolute;left:" + CssFloatToString(renderPos.x) +
+                        "px;top:" + CssFloatToString(renderPos.y) + "px";
+    style += ";font-family:'" + fontResult.familyName + "'";
+    style += ";font-size:" + CssFloatToString(fontSize) + "px";
+    style += colorCss + strokeCss;
+    if (alpha < 1.0f) {
+      style += ";opacity:" + CssFloatToString(alpha);
+    }
+    out.openTag("span");
+    out.addAttr("style", style);
+    out.closeTagWithText(puaText);
+  } else {
+    // Per-glyph positioning path: each glyph is absolutely positioned to match the SVG path
+    // rendering. GlyphRun x/y/xOffsets/positions are in pixel coordinates (not design space).
+    // The font's ascender equals unitsPerEm, so the browser places the baseline at
+    // top + fontSize. To align the font glyph origin (baseline at y=0 in CFF) with the PAGX
+    // coordinate (posY = glyph origin in screen space), we set top = posY - fontSize.
+    float fontSize = text->glyphRuns.empty() ? 12.0f : text->glyphRuns[0]->fontSize;
+    std::string containerStyle = "position:absolute;left:" + CssFloatToString(renderPos.x) +
+                                 "px;top:" + CssFloatToString(renderPos.y) + "px";
+    if (alpha < 1.0f) {
+      containerStyle += ";opacity:" + CssFloatToString(alpha);
+    }
+    out.openTag("div");
+    out.addAttr("style", containerStyle);
+    out.closeTagStart();
+
+    for (auto* run : text->glyphRuns) {
+      if (!run->font) {
+        continue;
+      }
+      for (size_t i = 0; i < run->glyphs.size(); i++) {
+        uint16_t glyphID = run->glyphs[i];
+        if (glyphID == 0) {
+          continue;
+        }
+        // GlyphRun positions are in pixel coordinates (already scaled).
+        // posX/posY = the glyph origin position in screen space.
+        float posX = run->x;
+        float posY = run->y;
+        if (i < run->xOffsets.size()) {
+          posX += run->xOffsets[i];
+        }
+        if (i < run->positions.size()) {
+          posX += run->positions[i].x;
+          posY += run->positions[i].y;
+        }
+        // CSS left = pixel X. CSS top = pixel Y - fontSize (compensate for font ascent,
+        // since the browser renders baseline at top + ascent, and ascent = fontSize for our
+        // font where ascender = unitsPerEm).
+        float cssLeft = posX;
+        float cssTop = posY - fontSize;
+
+        std::string charStyle = "position:absolute;left:" + CssFloatToString(cssLeft) +
+                                "px;top:" + CssFloatToString(cssTop) +
+                                "px;line-height:1;font-family:'" + fontResult.familyName + "'";
+        charStyle += ";font-size:" + CssFloatToString(fontSize) + "px";
+        charStyle += colorCss + strokeCss;
+
+        // Per-glyph transforms (anchors, scales, rotations, skews)
+        std::string transform;
+        if (i < run->rotations.size() && !FloatNearlyZero(run->rotations[i])) {
+          transform += "rotate(" + CssFloatToString(run->rotations[i]) + "deg) ";
+        }
+        if (i < run->scales.size() && (!FloatNearlyZero(run->scales[i].x - 1.0f) ||
+                                       !FloatNearlyZero(run->scales[i].y - 1.0f))) {
+          transform += "scale(" + CssFloatToString(run->scales[i].x) + "," +
+                       CssFloatToString(run->scales[i].y) + ") ";
+        }
+        if (i < run->skews.size() && !FloatNearlyZero(run->skews[i])) {
+          // PAGX GlyphRun skew applies shear along the vertical axis (spec §6.5). In the
+          // typographic coordinate system (Y up), this corresponds to CSS skewX with negated
+          // angle because CSS operates in screen coordinates (Y down).
+          transform += "skewX(" + CssFloatToString(-run->skews[i]) + "deg) ";
+        }
+        if (!transform.empty()) {
+          charStyle += ";transform:" + transform;
+        }
+        std::string puaChar;
+        AppendUTF8(puaChar, 0xE000 + (glyphID - 1));
+        out.openTag("span");
+        out.addAttr("style", charStyle);
+        out.closeTagWithText(puaChar);
+      }
+    }
+    out.closeTag();  // </div>
   }
 }
 

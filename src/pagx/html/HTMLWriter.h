@@ -26,6 +26,7 @@
 #include "pagx/html/FontSignature.h"
 #include "pagx/html/HTMLBuilder.h"
 #include "pagx/html/HTMLPlusDarkerRenderer.h"
+#include "pagx/html/Woff2FontGenerator.h"
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
@@ -230,6 +231,11 @@ class HTMLWriterContext {
   // font CSS onto its own style attribute, so child Text spans should skip the font-* properties
   // that are already covered by this signature. Reset to empty when leaving the layer.
   FontSignature fontHoistSignature = {};
+
+  // Font* → Woff2FontResult mapping. Populated by HTMLExporter's pre-processing pass for every
+  // embedded vector Font resource. writeEmbeddedShapeGlyphs checks this mapping to decide whether
+  // to emit @font-face + PUA <span> (WOFF2 path) or fall back to the SVG <path> path.
+  std::unordered_map<const Font*, Woff2FontResult> woff2Fonts = {};
 
   // Cache: path d-string → assigned ID in global <defs>. Used to deduplicate repeated SVG paths
   // (e.g. from Repeater nodes) by emitting <path id="p0" d="..."/> once and referencing via <use>.
@@ -470,6 +476,12 @@ class HTMLWriter {
   // the CSS span path in writeText to preserve gradient fills and layout semantics.
   void writeEmbeddedShapeGlyphs(HTMLBuilder& out, const Text* text, const Fill* fill,
                                 const Stroke* stroke, float alpha);
+  // WOFF2 path: renders embedded vector glyphs as <span> elements referencing a generated
+  // @font-face WOFF2 font, using PUA Unicode characters. Falls through to the SVG <path>
+  // path in writeEmbeddedShapeGlyphs when no WOFF2 font is available for this Font resource.
+  void writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* text, const Fill* fill,
+                                      const Stroke* stroke, float alpha,
+                                      const Woff2FontResult& fontResult);
   // `parentMatrix` is the accumulated transform of any enclosing Groups that were flattened
   // into the current element stream (writeElements inlines flattened-Group geometry via
   // TransformPathDataToSVG but emits nested Groups by recursing into writeGroup). For Groups
