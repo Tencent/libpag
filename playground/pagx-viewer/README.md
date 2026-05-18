@@ -97,17 +97,25 @@ npm run build:debug
 # Release build: minified JS, stripped WASM, optimized for production.
 # Use this when integrating the SDK into a shipping product.
 npm run build:release
+
+# Single-threaded variants (no pthread / SharedArrayBuffer requirement).
+# Useful when the hosting page cannot enable cross-origin isolation.
+npm run build:debug:st
+npm run build:release:st
 ```
+
+> Note: both flavors coexist in `lib/`. The multi-threaded build keeps the canonical
+> filenames (`pagx-viewer.*`); the single-threaded build adds a `.st` infix (`pagx-viewer.st.*`).
 
 Both commands generate the following artifacts under `lib/`:
 
 | File | Format | Usage |
 |------|--------|-------|
-| `pagx-viewer.esm.js` | ESM | `import { PAGXInit } from 'pagx-viewer'` |
-| `pagx-viewer.cjs.js` | CJS | `const { PAGXInit } = require('pagx-viewer')` |
-| `pagx-viewer.umd.js` | UMD | Browser `<script>` tag |
-| `pagx-viewer.min.js` | UMD (minified) | Production use |
-| `pagx-viewer.wasm` | WebAssembly | Runtime dependency |
+| `pagx-viewer.esm.js` / `pagx-viewer.st.esm.js` | ESM | `import { PAGXInit } from 'pagx-viewer'` (mt) / `'pagx-viewer/st'` (st) |
+| `pagx-viewer.cjs.js` / `pagx-viewer.st.cjs.js` | CJS | `const { PAGXInit } = require('pagx-viewer')` (mt) / `require('pagx-viewer/st')` (st) |
+| `pagx-viewer.umd.js` / `pagx-viewer.st.umd.js` | UMD | Browser `<script>` tag |
+| `pagx-viewer.min.js` / `pagx-viewer.st.min.js` | UMD (minified) | Production use |
+| `pagx-viewer.wasm` / `pagx-viewer.st.wasm` | WebAssembly | Runtime dependency |
 
 To debug the C++ side, install the
 [C/C++ DevTools Support (DWARF)](https://chrome.google.com/webstore/detail/cc%20%20-devtools-support-dwa/pdcpmagijalfljmkmjngeonclgbbannb)
@@ -122,10 +130,14 @@ bundles), you can invoke the individual steps:
 
 | Command | Description |
 |---------|-------------|
-| `npm run build:wasm` | Build only the WebAssembly binary (release) |
-| `npm run build:wasm:debug` | Build only the WebAssembly binary (debug) |
-| `npm run build:js` | Build only the JavaScript bundles (debug) |
-| `npm run build:js:release` | Build only the JavaScript bundles (release) |
+| `npm run build:wasm` | Build only the WebAssembly binary (multi-threaded, release) |
+| `npm run build:wasm:debug` | Build only the WebAssembly binary (multi-threaded, debug) |
+| `npm run build:wasm:st` | Build only the WebAssembly binary (single-threaded, release) |
+| `npm run build:wasm:st:debug` | Build only the WebAssembly binary (single-threaded, debug) |
+| `npm run build:js` | Build only the JavaScript bundles (multi-threaded, debug) |
+| `npm run build:js:release` | Build only the JavaScript bundles (multi-threaded, release) |
+| `npm run build:js:st` | Build only the JavaScript bundles (single-threaded, debug) |
+| `npm run build:js:st:release` | Build only the JavaScript bundles (single-threaded, release) |
 | `npm run build:types` | Emit TypeScript declaration files |
 | `npm run clean` | Remove build artifacts and caches |
 
