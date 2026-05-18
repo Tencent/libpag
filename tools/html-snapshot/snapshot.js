@@ -175,6 +175,37 @@ function takeSnapshot(config) {
     'mix-blend-mode',
   ];
 
+  // Subset-allowed values for flex container properties. Match
+  // spec/html_subset.md §4.1 strictly: anything outside these is silently dropped
+  // so the flex container still wins. NOTE: emitting an unsupported value
+  // (e.g. `align-items: baseline`) makes the importer's flex-hint validator
+  // strip the entire `display: flex` declaration, which cascades into the
+  // children collapsing to (0,0). Be conservative.
+  const ALIGN_ITEMS_OK = new Set([
+    'stretch', 'center', 'flex-start', 'flex-end',
+  ]);
+  const JUSTIFY_CONTENT_OK = new Set([
+    'flex-start', 'flex-end', 'center',
+    'space-between', 'space-around', 'space-evenly',
+  ]);
+  // Computed `align-items` values that map cleanly to a subset value. CSS
+  // specifies that `normal` resolves to `stretch` for flex containers, so the
+  // visible behaviour matches even though the property name differs.
+  const ALIGN_ITEMS_ALIAS = new Map([
+    ['start', 'flex-start'],
+    ['end', 'flex-end'],
+    ['self-start', 'flex-start'],
+    ['self-end', 'flex-end'],
+    ['normal', 'stretch'],
+  ]);
+  const JUSTIFY_CONTENT_ALIAS = new Map([
+    ['start', 'flex-start'],
+    ['end', 'flex-end'],
+    ['left', 'flex-start'],
+    ['right', 'flex-end'],
+    ['normal', 'flex-start'],
+  ]);
+
   // Text-level visual properties. Emitted on text leaves only (or on inline text
   // children of mixed containers).
   const TEXT_PROPS = [
@@ -498,10 +529,16 @@ function takeSnapshot(config) {
   // Build the style string for a kept element. `opts.box` includes background/border/
   // shadow/etc.; `opts.text` includes color/font-*; `opts.positioned` toggles the
   // absolute-positioning header (off for inline text children that ride on their
-  // parent's box).
+  // parent's box). `opts.flexItem` swaps the absolute header for plain `width/height`
+  // so the element can participate in a parent flex flow without being taken out of
+  // it (PAGX's flex engine ignores items with `position: absolute` by spec; mixing
+  // them with flex siblings collapses the parent back to absolute on import).
   function buildStyle(left, top, width, height, computed, opts) {
     const parts = [];
-    if (opts.positioned !== false) {
+    if (opts.flexItem) {
+      parts.push(`width: ${px(width)}`);
+      parts.push(`height: ${px(height)}`);
+    } else if (opts.positioned !== false) {
       parts.push(`position: absolute`);
       parts.push(`left: ${px(left)}`);
       parts.push(`top: ${px(top)}`);
@@ -646,9 +683,227 @@ function takeSnapshot(config) {
     return items.map((it) => it.html).join('');
   }
 
+  // Collapse 4 px sides into the shortest CSS shorthand.
+  function paddingShorthand(t, r, b, l) {
+    const a = Math.max(0, Math.round(t));
+    const rr = Math.max(0, Math.round(r));
+    const bb = Math.max(0, Math.round(b));
+    const ll = Math.max(0, Math.round(l));
+    if (a === rr && rr === bb && bb === ll) return `${a}px`;
+    if (a === bb && ll === rr) return `${a}px ${rr}px`;
+    if (ll === rr) return `${a}px ${rr}px ${bb}px`;
+    return `${a}px ${rr}px ${bb}px ${ll}px`;
+  }
+
+  // Derives the subset-allowed gap value for a flex container along its main axis.
+  // CSS 'gap' is a 2-axis property; for `flex-direction: row` we want the column-gap
+  // (between siblings horizontally), for `column` we want the row-gap. Values that
+  // can't be parsed back into px are returned as ''.
+  function flexMainGapPx(computed, direction) {
+    const colRaw = computed.getPropertyValue('column-gap');
+    const rowRaw = computed.getPropertyValue('row-gap');
+    const main = direction === 'column' ? rowRaw : colRaw;
+    const v = parseFloat(main);
+    if (!isFinite(v) || v <= 0) return '';
+    return `${Math.round(v)}px`;
+  }
+
+  // Reads the live flex configuration of `el` and serialises it to a subset-shaped
+  // CSS string. Only the properties documented in spec/html_subset.md §4.1 are
+  // emitted — anything outside the allowed value set is silently dropped so the
+  // importer doesn't have to log warnings for normal-default values like
+  // `align-items: normal`.
+  function collectFlexProps(computed, hasMultipleVisibleItems) {
+    const direction = computed.getPropertyValue('flex-direction').trim() || 'row';
+    const dirOut = direction === 'column' || direction === 'column-reverse' ? 'column' : 'row';
+
+    const align = computed.getPropertyValue('align-items').trim();
+    const justify = computed.getPropertyValue('justify-content').trim();
+
+    const padT = parseFloat(computed.getPropertyValue('padding-top')) || 0;
+    const padR = parseFloat(computed.getPropertyValue('padding-right')) || 0;
+    const padB = parseFloat(computed.getPropertyValue('padding-bottom')) || 0;
+    const padL = parseFloat(computed.getPropertyValue('padding-left')) || 0;
+
+    const parts = [];
+    parts.push('display: flex');
+    parts.push(`flex-direction: ${dirOut}`);
+    if (hasMultipleVisibleItems) {
+      const gap = flexMainGapPx(computed, dirOut);
+      if (gap) parts.push(`gap: ${gap}`);
+    }
+    if (padT > 0 || padR > 0 || padB > 0 || padL > 0) {
+      parts.push(`padding: ${paddingShorthand(padT, padR, padB, padL)}`);
+    }
+    const alignNorm = ALIGN_ITEMS_ALIAS.get(align) || align;
+    if (alignNorm && ALIGN_ITEMS_OK.has(alignNorm) && alignNorm !== 'stretch') {
+      // `stretch` is the subset's flex default; emitting it adds noise without
+      // changing behaviour (and lets the importer's flex-hint validator focus
+      // on declarations that actually shift layout).
+      parts.push(`align-items: ${alignNorm}`);
+    }
+    const justifyNorm = JUSTIFY_CONTENT_ALIAS.get(justify) || justify;
+    if (justifyNorm && JUSTIFY_CONTENT_OK.has(justifyNorm) && justifyNorm !== 'flex-start') {
+      // Same rationale: `flex-start` is the subset default.
+      parts.push(`justify-content: ${justifyNorm}`);
+    }
+    return parts.join('; ');
+  }
+
+  // Returns true when `el` is a pure-text leaf (no element children, has direct
+  // text) whose rendered text spans more than one line. Such a leaf cannot be
+  // emitted as a clean flex item: under absolute positioning it would emit one
+  // <span> per line, but inside a flex item those abs spans can't anchor to the
+  // wrapper (the subset has no `position: relative`), so they would escape the
+  // wrapper. The cleaner alternative — collapsing all lines into a single
+  // <span> — lets PAGX rewrap on its own metrics, which diverges visibly from
+  // Chromium's wrap point. Bailing at the *parent* flex level keeps the
+  // subtree's visual layout intact while only sacrificing flex on this one
+  // container.
+  function isMultiLineTextLeafItem(el) {
+    let textNode = null;
+    for (const c of el.childNodes) {
+      if (c.nodeType === Node.ELEMENT_NODE) return false;
+      if (c.nodeType === Node.TEXT_NODE && c.nodeValue && c.nodeValue.trim()) {
+        if (!textNode) textNode = c;
+      }
+    }
+    if (!textNode) return false;
+    const ws = getComputedStyle(el).whiteSpace || '';
+    const range = document.createRange();
+    range.selectNodeContents(textNode);
+    const rects = range.getClientRects();
+    range.detach && range.detach();
+    if (rects.length <= 1) return false;
+    // 'pre*' whitespace modes preserve line breaks regardless of container width
+    // so multi-line is intentional, not a wrap; still bail since we can't emit
+    // multiple inline lines without abs spans.
+    return ws !== '' || rects.length > 1;
+  }
+
+  // Returns the visible element children of `el` that would render as flex items,
+  // or null when the element cannot safely be emitted as a flex container under the
+  // PAGX subset:
+  //   - any visible child is `position: absolute|fixed|sticky` (subset bans abs+flex
+  //     mixing — the importer downgrades flex to absolute on the parent),
+  //   - any non-blank text node sits directly under `el` (would become an anonymous
+  //     flex item, which the subset has no way to express),
+  //   - any visible child is `display: contents` (its grandchildren would need to be
+  //     flattened into the flex flow; deferred to a future iteration),
+  //   - any visible child is a multi-line pure-text leaf (see comment above).
+  // Returns the kept children (in DOM order) when the container is safe; an empty
+  // array is also rejected (no point declaring flex on a leaf).
+  function flexItemChildren(el) {
+    const out = [];
+    for (const c of el.childNodes) {
+      if (c.nodeType === Node.TEXT_NODE) {
+        if (c.nodeValue && c.nodeValue.trim()) return null;
+        continue;
+      }
+      if (c.nodeType !== Node.ELEMENT_NODE) continue;
+      const tag = c.tagName.toLowerCase();
+      if (DROP_TAGS.has(tag)) continue;
+      const cs = getComputedStyle(c);
+      if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+      if (parseFloat(cs.opacity) === 0) continue;
+      if (cs.display === 'contents') return null;
+      const pos = cs.position;
+      if (pos === 'absolute' || pos === 'fixed' || pos === 'sticky') return null;
+      if (isMultiLineTextLeafItem(c)) return null;
+      out.push(c);
+    }
+    return out.length ? out : null;
+  }
+
+  // Verify that re-stacking `children` with the declared `gap` along the main
+  // axis would land them where the browser actually painted them. If not, the
+  // live layout depends on something we drop on import — typically per-child
+  // `margin` (subset has no margin model), `flex` shorthand growing/shrinking,
+  // or a residual offset from a positioned ancestor — and emitting flex would
+  // shift the children visibly. Bailing here keeps the absolute positioning
+  // (which preserves the exact pixels) at the cost of one fewer flex container.
+  //
+  // Tolerance is tight (1.5px) to catch real margin/shrink mismatches but loose
+  // enough to absorb sub-pixel rounding from `getBoundingClientRect`.
+  function isFlexLayoutFaithful(children, computed) {
+    if (children.length < 2) return true;
+    const direction = computed.getPropertyValue('flex-direction').trim() || 'row';
+    const isRow = !direction.startsWith('column');
+    const justify = computed.getPropertyValue('justify-content').trim();
+    // space-between / space-around / space-evenly distribute leftover space
+    // between items, so the per-pair gap is whatever the engine computes — not
+    // the declared `gap`. Trust those layouts on faith: the visible cluster
+    // structure is what flex preserves.
+    if (justify === 'space-between' || justify === 'space-around' || justify === 'space-evenly') {
+      return true;
+    }
+    const gapRaw = isRow
+      ? computed.getPropertyValue('column-gap')
+      : computed.getPropertyValue('row-gap');
+    const declaredGap = parseFloat(gapRaw) || 0;
+    const rects = children.map((c) => c.getBoundingClientRect());
+    const TOLERANCE = 1.5;
+    for (let i = 0; i + 1 < rects.length; i++) {
+      const a = rects[i];
+      const b = rects[i + 1];
+      const measuredGap = isRow ? (b.left - a.right) : (b.top - a.bottom);
+      if (Math.abs(measuredGap - declaredGap) > TOLERANCE) return false;
+    }
+    return true;
+  }
+
+  // Returns a curated list of flex children when `el`'s computed style declares a
+  // subset-friendly flex configuration AND its border/wrapping/child shape don't
+  // require absolute positioning. `null` means "render as absolute".
+  function classifyFlexContainer(el, computed) {
+    const display = computed.display;
+    if (display !== 'flex' && display !== 'inline-flex') return null;
+    const wrap = computed.getPropertyValue('flex-wrap').trim();
+    if (wrap && wrap !== 'nowrap') return null;
+    const rect = el.getBoundingClientRect();
+    if (!nonZero(rect)) return null;
+    // Asymmetric borders are baked into per-side overlay rectangles by
+    // borderOverlayHTML(). Those rectangles use `position: absolute` and would not
+    // anchor correctly inside a non-positioned flex parent, so bail.
+    if (!isUniformBorder(computed)) {
+      const sides = ['top', 'right', 'bottom', 'left'];
+      let anyBorder = false;
+      for (const s of sides) {
+        const w = parseFloat(computed.getPropertyValue(`border-${s}-width`)) || 0;
+        if (w > 0) { anyBorder = true; break; }
+      }
+      if (anyBorder) return null;
+    }
+    const children = flexItemChildren(el);
+    if (!children) return null;
+    if (!isFlexLayoutFaithful(children, computed)) return null;
+    return children;
+  }
+
+  // Render an element + its subtree as a flex container. The container itself is
+  // either positioned absolutely against `parentRect` (default) or sized as a flex
+  // item against an outer flex parent (when `opts.flexItem` is true). Each child is
+  // recursed with `flexItem: true` so it doesn't carry `position: absolute`.
+  function renderFlexContainer(el, parentRect, computed, flexChildren, opts) {
+    const rect = el.getBoundingClientRect();
+    const left = rect.left - parentRect.left;
+    const top = rect.top - parentRect.top;
+    const wrapperBase = buildStyle(left, top, rect.width, rect.height, computed, {
+      box: true, ...opts,
+    });
+    const flexStyle = collectFlexProps(computed, flexChildren.length > 1);
+    const style = wrapperBase ? `${wrapperBase}; ${flexStyle}` : flexStyle;
+    const childParts = [];
+    for (const child of flexChildren) {
+      childParts.push(render(child, rect, { flexItem: true }));
+    }
+    return `<div style="${style}">${childParts.join('')}</div>`;
+  }
+
   // Render a subtree rooted at `el` into a string. parentRect is its parent's
   // bounding rect (used to compute relative left/top).
-  function render(el, parentRect) {
+  function render(el, parentRect, opts) {
+    opts = opts || {};
     const computed = getComputedStyle(el);
 
     // `display: contents` makes the element generate no box, but its children still
@@ -658,6 +913,19 @@ function takeSnapshot(config) {
     // `parentRect` (the element's CSS parent's rect) and drop the host entirely.
     if (computed.display === 'contents') {
       return renderChildrenInto(el, parentRect);
+    }
+
+    // Direct flex preservation: when the live computed style says this element is a
+    // flex container and its children can all participate as flex items, emit it as
+    // `display: flex` rather than baking everything into `position: absolute`. This
+    // keeps the author's flex-direction/gap/padding/align-items/justify-content
+    // verbatim instead of forcing the C++ AbsoluteToFlexInferencePass to re-derive
+    // them from box geometry. Layouts that don't qualify (mixed abs+flex children,
+    // flex-wrap, asymmetric borders, stray text, display:contents middlemen) fall
+    // through to the absolute path below — the inference pass remains a backstop.
+    const flexChildren = classifyFlexContainer(el, computed);
+    if (flexChildren) {
+      return renderFlexContainer(el, parentRect, computed, flexChildren, opts);
     }
 
     const kind = classify(el, computed);
@@ -676,7 +944,7 @@ function takeSnapshot(config) {
       // the full text-prop block would inject font-family / line-height noise from
       // the surrounding <button>'s defaults.
       const wrapper = buildStyle(left, top, rect.width, rect.height, computed, {
-        box: true, colorOnly: true,
+        box: true, colorOnly: true, ...opts,
       });
       return `<div style="${wrapper}">${freezeSvg(el, rect)}</div>`;
     }
@@ -684,8 +952,16 @@ function takeSnapshot(config) {
     if (kind === 'img') {
       const src = imgSrc(el);
       const alt = escapeHtml(el.getAttribute('alt') || '');
-      const imgStyle = `position: absolute; left: 0px; top: 0px; width: ${px(rect.width)}; height: ${px(rect.height)}`;
-      const wrapperStyle = buildStyle(left, top, rect.width, rect.height, computed, { box: true });
+      // Inside a flex parent the wrapper drops `position: absolute`, so the inner
+      // <img> can no longer anchor itself to (0,0) of the wrapper via abs positioning
+      // — switch it to `width: 100%; height: 100%` so it fills the wrapper via flow
+      // sizing instead.
+      const imgStyle = opts.flexItem
+        ? `width: 100%; height: 100%`
+        : `position: absolute; left: 0px; top: 0px; width: ${px(rect.width)}; height: ${px(rect.height)}`;
+      const wrapperStyle = buildStyle(left, top, rect.width, rect.height, computed, {
+        box: true, ...opts,
+      });
       const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
       return `<div style="${wrapperStyle}"><img src="${escapeHtml(src)}" alt="${alt}" style="${imgStyle}"/>${overlays}</div>`;
     }
@@ -707,8 +983,30 @@ function takeSnapshot(config) {
         : '';
 
       const boxStyle = buildStyle(left, top, rect.width, rect.height, computed, {
-        box: true,
+        box: true, ...opts,
       });
+      const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
+      // When the input itself is a flex item we can't carry an abs-positioned inner
+      // span (it would anchor to a positioned ancestor instead of the wrapper). Use
+      // an inner flex layout to vertically centre the text inside its padding box;
+      // PAGX's flex engine handles the nested arrangement. Force `white-space:
+      // nowrap` so PAGX's text engine doesn't re-wrap a single-line input value to
+      // two lines when its intrinsic width exceeds the wrapper by sub-pixel.
+      if (opts.flexItem) {
+        const padShort = paddingShorthand(padT, padR, padB, padL);
+        let textStyle = buildStyle(0, 0, 0, 0, computed, {
+          box: false, text: true, positioned: false,
+        });
+        if (placeholderColor) {
+          textStyle = textStyle.replace(/(^|; )color: [^;]+/, `$1color: ${placeholderColor}`);
+        }
+        const finalTextStyle = /white-space:/.test(textStyle)
+          ? textStyle
+          : (textStyle ? `${textStyle}; white-space: nowrap` : `white-space: nowrap`);
+        const inner = `display: flex; align-items: center` + (padShort === '0px' ? '' : `; padding: ${padShort}`);
+        const composed = boxStyle ? `${boxStyle}; ${inner}` : inner;
+        return `<div style="${composed}"><span style="${finalTextStyle}">${escapeHtml(text)}</span>${overlays}</div>`;
+      }
       const innerWidth = Math.max(0, rect.width - padL - padR);
       const innerHeight = Math.max(0, rect.height - padT - padB);
       let textStyle = buildStyle(padL, padT, innerWidth, innerHeight, computed, {
@@ -717,7 +1015,6 @@ function takeSnapshot(config) {
       if (placeholderColor) {
         textStyle = textStyle.replace(/(^|; )color: [^;]+/, `$1color: ${placeholderColor}`);
       }
-      const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
       return `<div style="${boxStyle}"><span style="${textStyle}">${escapeHtml(text)}</span>${overlays}</div>`;
     }
 
@@ -740,11 +1037,27 @@ function takeSnapshot(config) {
         for (const n of el.childNodes) if (n.nodeType === Node.TEXT_NODE) return n;
         return null;
       })();
-      const lineSpans = textNode ? emitTextSpans(textNode, rect, computed) : [];
       const boxStyle = buildStyle(left, top, rect.width, rect.height, computed, {
-        box: true,
+        box: true, ...opts,
       });
       const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
+      // Inside a flex parent the wrapper drops `position: absolute`, so per-line
+      // abs spans would lose their anchor. classifyFlexContainer guarantees
+      // single-line leaves only at this point (multi-line leaves cause the parent
+      // to bail to absolute). Force `white-space: nowrap` so PAGX's text engine
+      // doesn't introduce a phantom wrap when its intrinsic glyph metrics differ
+      // from Chromium's by a sub-pixel — the measured wrapper rect already
+      // matches Chromium's natural line width.
+      if (opts.flexItem) {
+        const baseTextStyle = buildStyle(0, 0, 0, 0, computed, {
+          box: false, text: true, positioned: false,
+        });
+        const textStyle = /white-space:/.test(baseTextStyle)
+          ? baseTextStyle
+          : (baseTextStyle ? `${baseTextStyle}; white-space: nowrap` : `white-space: nowrap`);
+        return `<div style="${boxStyle}"><span style="${textStyle}">${escapeHtml(directText)}</span>${overlays}</div>`;
+      }
+      const lineSpans = textNode ? emitTextSpans(textNode, rect, computed) : [];
       return `<div style="${boxStyle}">${lineSpans.join('')}${overlays}</div>`;
     }
 
@@ -764,7 +1077,9 @@ function takeSnapshot(config) {
     const childHTML = renderChildrenInto(el, rect);
     const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
 
-    const style = buildStyle(left, top, rect.width, rect.height, computed, { box: true });
+    const style = buildStyle(left, top, rect.width, rect.height, computed, {
+      box: true, ...opts,
+    });
     return `<div style="${style}">${childHTML}${overlays}</div>`;
   }
 
