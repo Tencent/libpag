@@ -95,17 +95,25 @@ npm run build:debug
 # Release 构建：压缩 JS、剥离 WASM 调试信息，针对生产环境优化。
 # 适合将 SDK 集成到正式产品时使用。
 npm run build:release
+
+# 单线程版本（不依赖 pthread / SharedArrayBuffer）。
+# 适合宿主页面无法启用跨域隔离（COOP/COEP）的场景。
+npm run build:debug:st
+npm run build:release:st
 ```
+
+> 提示：两种构建产物共存于 `lib/`，多线程版本沿用 `pagx-viewer.*` 命名，单线程版本通过
+> `.st` 中缀（`pagx-viewer.st.*`）区分，互不覆盖。
 
 两个命令都会在 `lib/` 目录下生成以下产物：
 
 | 文件 | 格式 | 用途 |
 |------|------|------|
-| `pagx-viewer.esm.js` | ESM | `import { PAGXInit } from 'pagx-viewer'` |
-| `pagx-viewer.cjs.js` | CJS | `const { PAGXInit } = require('pagx-viewer')` |
-| `pagx-viewer.umd.js` | UMD | 浏览器 `<script>` 标签引入 |
-| `pagx-viewer.min.js` | UMD（已压缩） | 生产环境使用 |
-| `pagx-viewer.wasm` | WebAssembly | 运行时依赖 |
+| `pagx-viewer.esm.js` / `pagx-viewer.st.esm.js` | ESM | `import { PAGXInit } from 'pagx-viewer'`（mt）/ `'pagx-viewer/st'`（st）|
+| `pagx-viewer.cjs.js` / `pagx-viewer.st.cjs.js` | CJS | `const { PAGXInit } = require('pagx-viewer')`（mt）/ `require('pagx-viewer/st')`（st）|
+| `pagx-viewer.umd.js` / `pagx-viewer.st.umd.js` | UMD | 浏览器 `<script>` 标签引入 |
+| `pagx-viewer.min.js` / `pagx-viewer.st.min.js` | UMD（已压缩） | 生产环境使用 |
+| `pagx-viewer.wasm` / `pagx-viewer.st.wasm` | WebAssembly | 运行时依赖 |
 
 如需调试 C++ 端代码，请安装
 [C/C++ DevTools Support (DWARF)](https://chrome.google.com/webstore/detail/cc%20%20-devtools-support-dwa/pdcpmagijalfljmkmjngeonclgbbannb)
@@ -118,10 +126,14 @@ Chrome 扩展，然后打开 DevTools → Settings → Experiments，勾选
 
 | 命令 | 说明 |
 |------|------|
-| `npm run build:wasm` | 仅构建 WebAssembly 二进制（release） |
-| `npm run build:wasm:debug` | 仅构建 WebAssembly 二进制（debug） |
-| `npm run build:js` | 仅构建 JavaScript 产物（debug） |
-| `npm run build:js:release` | 仅构建 JavaScript 产物（release） |
+| `npm run build:wasm` | 仅构建 WebAssembly 二进制（多线程，release） |
+| `npm run build:wasm:debug` | 仅构建 WebAssembly 二进制（多线程，debug） |
+| `npm run build:wasm:st` | 仅构建 WebAssembly 二进制（单线程，release） |
+| `npm run build:wasm:st:debug` | 仅构建 WebAssembly 二进制（单线程，debug） |
+| `npm run build:js` | 仅构建 JavaScript 产物（多线程，debug） |
+| `npm run build:js:release` | 仅构建 JavaScript 产物（多线程，release） |
+| `npm run build:js:st` | 仅构建 JavaScript 产物（单线程，debug） |
+| `npm run build:js:st:release` | 仅构建 JavaScript 产物（单线程，release） |
 | `npm run build:types` | 输出 TypeScript 声明文件 |
 | `npm run clean` | 清理构建产物和缓存 |
 

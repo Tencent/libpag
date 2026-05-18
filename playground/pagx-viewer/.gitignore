@@ -1,5 +1,6 @@
 # Build outputs
 wasm-mt/
+wasm/
 
 # Build cache
 build-pagx-viewer/
