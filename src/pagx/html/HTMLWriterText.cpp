@@ -2032,9 +2032,19 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
     }
   }
 
+  // Bitmap fonts (CBDT) render embedded PNG pixels directly — CSS color/fill has no effect on
+  // the bitmap content. Only vector (CFF) fonts respect CSS color for glyph rendering.
+  bool isBitmapFont = false;
+  for (auto* run : text->glyphRuns) {
+    if (run->font && !run->font->glyphs.empty() && run->font->glyphs[0]->image) {
+      isBitmapFont = true;
+      break;
+    }
+  }
+
   // Build fill/stroke CSS shared by all spans.
   std::string colorCss;
-  if (fill && fill->color) {
+  if (!isBitmapFont && fill && fill->color) {
     auto ct = fill->color->nodeType();
     if (ct == NodeType::SolidColor) {
       auto sc = static_cast<const SolidColor*>(fill->color);
@@ -2051,7 +2061,8 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
     }
   }
   std::string strokeCss;
-  if (stroke && stroke->color && stroke->color->nodeType() == NodeType::SolidColor) {
+  if (!isBitmapFont && stroke && stroke->color &&
+      stroke->color->nodeType() == NodeType::SolidColor) {
     auto sc = static_cast<const SolidColor*>(stroke->color);
     bool hasFill = fill && fill->color;
     auto resolved = ResolveTextStrokeCss(stroke->width, stroke->align, hasFill);
@@ -2066,6 +2077,9 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
       strokeCss += ";-webkit-text-fill-color:transparent";
     }
   }
+
+  // For bitmap fonts, Fill alpha is irrelevant (bitmap pixels carry their own alpha).
+  float effectiveAlpha = isBitmapFont ? 1.0f : alpha;
 
   if (!hasPerGlyphPositioning) {
     // Simple path: all glyphs as a single <span> with concatenated PUA characters.
@@ -2088,8 +2102,8 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
     style += ";font-family:'" + fontResult.familyName + "'";
     style += ";font-size:" + CssFloatToString(fontSize) + "px";
     style += colorCss + strokeCss;
-    if (alpha < 1.0f) {
-      style += ";opacity:" + CssFloatToString(alpha);
+    if (effectiveAlpha < 1.0f) {
+      style += ";opacity:" + CssFloatToString(effectiveAlpha);
     }
     out.openTag("span");
     out.addAttr("style", style);
@@ -2104,7 +2118,8 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
 
     // For gradient fills with per-glyph positioning, compute the total extent so each span
     // can share the same gradient via background-size/background-position offset.
-    bool isGradientFill = fill && fill->color && fill->color->nodeType() != NodeType::SolidColor;
+    bool isGradientFill =
+        !isBitmapFont && fill && fill->color && fill->color->nodeType() != NodeType::SolidColor;
     float totalMinX = 0, totalMaxX = 0;
     if (isGradientFill) {
       bool first = true;
@@ -2121,8 +2136,14 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
           float adv = (gi < run->font->glyphs.size()) ? run->font->glyphs[gi]->advance : 0;
           float left = posX;
           float right = posX + adv * scale;
-          if (first) { totalMinX = left; totalMaxX = right; first = false; }
-          else { totalMinX = std::min(totalMinX, left); totalMaxX = std::max(totalMaxX, right); }
+          if (first) {
+            totalMinX = left;
+            totalMaxX = right;
+            first = false;
+          } else {
+            totalMinX = std::min(totalMinX, left);
+            totalMaxX = std::max(totalMaxX, right);
+          }
         }
       }
     }
@@ -2130,8 +2151,8 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
 
     std::string containerStyle = "position:absolute;left:" + CssFloatToString(renderPos.x) +
                                  "px;top:" + CssFloatToString(renderPos.y) + "px";
-    if (alpha < 1.0f) {
-      containerStyle += ";opacity:" + CssFloatToString(alpha);
+    if (effectiveAlpha < 1.0f) {
+      containerStyle += ";opacity:" + CssFloatToString(effectiveAlpha);
     }
     out.openTag("div");
     out.addAttr("style", containerStyle);
@@ -2157,11 +2178,11 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
           posX += run->positions[i].x;
           posY += run->positions[i].y;
         }
-        // CSS left = pixel X. CSS top = pixel Y - fontSize (compensate for font ascent,
-        // since the browser renders baseline at top + ascent, and ascent = fontSize for our
-        // font where ascender = unitsPerEm).
+        // CSS left = pixel X. CSS top depends on font type:
+        // - Vector (CFF): top = posY - fontSize (baseline at top+ascent, ascent=fontSize)
+        // - Bitmap (CBDT): top = posY (BearingY=ppem places bitmap at em-box top)
         float cssLeft = posX;
-        float cssTop = posY - fontSize;
+        float cssTop = isBitmapFont ? posY : (posY - fontSize);
 
         std::string charStyle = "position:absolute;left:" + CssFloatToString(cssLeft) +
                                 "px;top:" + CssFloatToString(cssTop) +

@@ -702,10 +702,11 @@ static std::vector<uint8_t> BuildEmptyGlyf(uint16_t numGlyphs) {
     WriteI16(table, 0);  // xMax
     WriteI16(table, 0);  // yMax
     // Simple glyph data:
-    WriteU16(table, 0);  // endPtsOfContours[0] = 0 (1 point)
-    WriteU16(table, 0);  // instructionLength = 0
-    WriteU8(table, 0x33);  // flags: xShort + yShort + xSame + ySame (point at 0,0)
-    // No coordinate data needed (all deltas are 0 with the Same flags)
+    WriteU16(table, 0);    // endPtsOfContours[0] = 0 (1 point)
+    WriteU16(table, 0);    // instructionLength = 0
+    WriteU8(table, 0x31);  // flags: ON_CURVE | X_IS_SAME | Y_IS_SAME (delta 0,0 — no bytes)
+    // X_SHORT=0 + X_IS_SAME=1 means x delta=0 with no data bytes.
+    // Y_SHORT=0 + Y_IS_SAME=1 means y delta=0 with no data bytes.
   }
   return table;
 }
@@ -746,9 +747,14 @@ static std::vector<uint8_t> BuildCBDT(const Font* font) {
       height = static_cast<uint8_t>(std::min(codec->height(), 255));
     }
 
-    // bearingX = offset.x, bearingY = height + offset.y (Y up in font coords)
+    // SmallGlyphMetrics BearingY: distance from bitmap top to baseline (positive = above).
+    // Setting BearingY = ppem - offset.y places the bitmap at em-box top when offset=0,
+    // which aligns with cssTop = posY in the HTML emitter (span box starts at posY, no overflow).
+    // Formula: bitmap_top = cssTop + fontSize - BearingY*(fontSize/ppem) = posY + offset.y*scale.
     auto bearingX = static_cast<int8_t>(std::round(glyph->offset.x));
-    auto bearingY = static_cast<int8_t>(std::round(static_cast<float>(height) + glyph->offset.y));
+    int ppem = std::min(font->unitsPerEm, 255);
+    auto bearingY = static_cast<int8_t>(
+        std::clamp(static_cast<int>(std::round(ppem - glyph->offset.y)), -128, 127));
     auto advance =
         static_cast<uint8_t>(std::min(static_cast<int>(std::round(glyph->advance)), 255));
 
