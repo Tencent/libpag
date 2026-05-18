@@ -612,13 +612,24 @@ void SampleArcLengthLUT(const ArcLengthLUT& lut, float arcLength, Point* outPos,
 
 void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
                            const Stroke* stroke, const TextBox* tb, float alpha) {
-  // GlyphRun-only nodes (no text string, no fontFamily) contain embedded vector/bitmap shapes,
-  // not real text. Route them to writeEmbeddedShapeGlyphs so they render as SVG paths/images.
-  // Nodes that have both a text string and a fontFamily are real text and fall through to the
-  // normal CSS span path below, regardless of any glyphRuns they may also carry.
-  if (!text->glyphRuns.empty() && (text->text.empty() || text->fontFamily.empty())) {
-    writeEmbeddedShapeGlyphs(out, text, fill, stroke, alpha);
-    return;
+  // GlyphRun nodes that reference an embedded Font resource (registered in woff2Fonts) should
+  // always render via the WOFF2 path, regardless of whether they also carry text/fontFamily
+  // (those are fallback metadata for design tools, not rendering instructions).
+  if (!text->glyphRuns.empty()) {
+    const Font* font = nullptr;
+    for (auto* run : text->glyphRuns) {
+      if (run->font) {
+        font = run->font;
+        break;
+      }
+    }
+    if (font && _ctx->woff2Fonts.find(font) != _ctx->woff2Fonts.end()) {
+      writeEmbeddedShapeGlyphs(out, text, fill, stroke, alpha);
+      return;
+    }
+    if (text->text.empty() || text->fontFamily.empty()) {
+      return;
+    }
   }
   if (text->text.empty()) {
     return;
@@ -2175,10 +2186,24 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
       return;
     }
     float fontSize = text->glyphRuns.empty() ? 12.0f : text->glyphRuns[0]->fontSize;
-    std::string style = "position:absolute;left:" + CssFloatToString(renderPos.x) +
-                        "px;top:" + CssFloatToString(renderPos.y) + "px";
+    // For the simple path, posX/posY come from the GlyphRun's x/y + renderPos.
+    float posX = renderPos.x;
+    float posY = renderPos.y;
+    if (!text->glyphRuns.empty()) {
+      posX += text->glyphRuns[0]->x;
+      posY += text->glyphRuns[0]->y;
+    }
+    float cssTop = isBitmapFont ? posY : (posY - fontSize);
+    std::string style = "position:absolute;left:" + CssFloatToString(posX) +
+                        "px;top:" + CssFloatToString(cssTop) + "px;line-height:1";
     style += ";font-family:'" + fontResult.familyName + "'";
     style += ";font-size:" + CssFloatToString(fontSize) + "px";
+    // For gradient fills, extend span height to cover glyph rendering area below em-box.
+    bool hasGradient = !isBitmapFont && fill && fill->color &&
+                       fill->color->nodeType() != NodeType::SolidColor;
+    if (hasGradient) {
+      style += ";padding-bottom:" + CssFloatToString(fontSize) + "px";
+    }
     style += colorCss + strokeCss;
     if (effectiveAlpha < 1.0f) {
       style += ";opacity:" + CssFloatToString(effectiveAlpha);

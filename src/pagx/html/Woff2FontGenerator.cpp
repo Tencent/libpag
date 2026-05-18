@@ -950,14 +950,11 @@ Woff2FontResult BuildWoff2FromFont(const Font* font, const std::string& fontId) 
   // Detect font type: vector (path) or bitmap (image)
   bool isBitmapFont = (font->glyphs[0]->image != nullptr);
 
-  // Validate: all glyphs must be the same type
+  // Validate: all glyphs must be the same type. For vector fonts, glyphs without
+  // a path are treated as blank/space glyphs (advance only, no outline).
   for (auto* glyph : font->glyphs) {
     if (isBitmapFont) {
       if (glyph->image == nullptr || glyph->image->data == nullptr) {
-        return result;
-      }
-    } else {
-      if (glyph->path == nullptr) {
         return result;
       }
     }
