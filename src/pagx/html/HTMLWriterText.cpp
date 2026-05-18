@@ -2256,51 +2256,159 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
           posX += run->positions[i].x;
           posY += run->positions[i].y;
         }
+
+        bool hasRotation = i < run->rotations.size() && !FloatNearlyZero(run->rotations[i]);
+        bool hasGlyphScale = i < run->scales.size() && (!FloatNearlyZero(run->scales[i].x - 1.0f) ||
+                                                        !FloatNearlyZero(run->scales[i].y - 1.0f));
+        bool hasSkew = i < run->skews.size() && !FloatNearlyZero(run->skews[i]);
+        bool hasTransform = hasRotation || hasGlyphScale || hasSkew;
+
         // CSS left = pixel X. CSS top depends on font type:
         // - Vector (CFF): top = posY - fontSize (baseline at top+ascent, ascent=fontSize)
         // - Bitmap (CBDT): top = posY (BearingY=ppem places bitmap at em-box top)
         float cssLeft = posX;
         float cssTop = isBitmapFont ? posY : (posY - fontSize);
 
-        std::string charStyle = "position:absolute;left:" + CssFloatToString(cssLeft) +
-                                "px;top:" + CssFloatToString(cssTop) +
-                                "px;line-height:1;font-family:'" + fontResult.familyName + "'";
-        charStyle += ";font-size:" + CssFloatToString(fontSize) + "px";
+        std::string charStyle;
+        if (hasTransform && !(isGradientFill && gradientWidth > 0)) {
+          // When per-glyph transforms are present, compute the full CSS matrix that combines
+          // position + rotation/scale/skew around the PAGX anchor. We cannot use CSS
+          // transform-origin because PAGX's anchor arithmetic shifts only anchorX (not anchorY)
+          // before applying the rotation — the glyph's Y position (posY) participates in the
+          // rotation. CSS transform-origin subtracts origin from the local point before rotating,
+          // which produces different results when anchorY=0 but posY≠0.
+          //
+          // Native: T(-ax, -ay) * S(sx,sy) * Skew * R(θ) * T(ax, ay) * T(posX, posY) * S(fs/upm)
+          // We need: CSS matrix * browser_local_point = native screen position
+          // Browser renders glyph at local (px*fs/upm, fontSize + py*fs/upm) within the span.
+          // With span at (0,0), the CSS matrix encodes both position and transform.
+          auto gi = static_cast<size_t>(glyphID) - 1;
+          float glyphAdvance = (gi < run->font->glyphs.size()) ? run->font->glyphs[gi]->advance : 0;
+          float anchorX = glyphAdvance * 0.5f * (fontSize / run->font->unitsPerEm);
+          float anchorY = 0.0f;
+          if (i < run->anchors.size()) {
+            anchorX += run->anchors[i].x;
+            anchorY += run->anchors[i].y;
+          }
+
+          // Build linear part: S(sx,sy) * Skew * R(θ)
+          float cosR = 1.0f, sinR = 0.0f;
+          if (hasRotation) {
+            float rad = run->rotations[i] * static_cast<float>(M_PI) / 180.0f;
+            cosR = std::cos(rad);
+            sinR = std::sin(rad);
+          }
+          // R matrix: [cosR, -sinR; sinR, cosR]
+          float m00 = cosR, m01 = -sinR, m10 = sinR, m11 = cosR;
+
+          // Skew: [1, -tan(angle); 0, 1] (skewX — horizontal shear matching native shear.c)
+          if (hasSkew) {
+            float tanS = -std::tan(run->skews[i] * static_cast<float>(M_PI) / 180.0f);
+            // Skew * current: row0 += tanS * row1, row1 unchanged
+            float nm00 = m00 + tanS * m10;
+            float nm01 = m01 + tanS * m11;
+            m00 = nm00;
+            m01 = nm01;
+          }
+
+          // Scale: S(sx,sy) * current
+          float gsx = hasGlyphScale ? run->scales[i].x : 1.0f;
+          float gsy = hasGlyphScale ? run->scales[i].y : 1.0f;
+          m00 *= gsx;
+          m01 *= gsx;
+          m10 *= gsy;
+          m11 *= gsy;
+
+          // Translation: T(-ax,-ay) * [linear] * T(ax+posX, ay+cssTop)
+          // Full translation = [linear] * (ax+posX, ay+cssTop) + (-ax, -ay)
+          float tx = m00 * (anchorX + posX) + m01 * (anchorY + cssTop) - anchorX;
+          float ty = m10 * (anchorX + posX) + m11 * (anchorY + cssTop) - anchorY;
+
+          // CSS matrix(a, b, c, d, e, f) maps (x,y) to (a*x+c*y+e, b*x+d*y+f)
+          charStyle = "position:absolute;left:0;top:0;line-height:1;font-family:'" +
+                      fontResult.familyName + "'";
+          charStyle += ";font-size:" + CssFloatToString(fontSize) + "px";
+          charStyle += ";transform:matrix(" + CssFloatToString(m00) + "," + CssFloatToString(m10) +
+                       "," + CssFloatToString(m01) + "," + CssFloatToString(m11) + "," +
+                       CssFloatToString(tx) + "," + CssFloatToString(ty) + ")";
+          charStyle += ";transform-origin:0 0";
+        } else {
+          charStyle = "position:absolute;left:" + CssFloatToString(cssLeft) +
+                      "px;top:" + CssFloatToString(cssTop) + "px;line-height:1;font-family:'" +
+                      fontResult.familyName + "'";
+          charStyle += ";font-size:" + CssFloatToString(fontSize) + "px";
+        }
+
         if (isGradientFill && gradientWidth > 0) {
-          // For gradient fills, each span shares the same gradient stretched across the total
-          // extent. background-position offsets the gradient so it appears continuous.
           float gradAlpha = 1.0f;
           std::string gradCss = colorToCSS(fill->color, &gradAlpha);
           charStyle += ";background:" + gradCss;
-          charStyle += ";background-size:" + CssFloatToString(gradientWidth) + "px " +
-                       CssFloatToString(fontSize) + "px";
+          charStyle += ";background-size:" + CssFloatToString(gradientWidth) + "px 100%";
           charStyle += ";background-position:" + CssFloatToString(-(posX - totalMinX)) + "px 0";
           charStyle += ";-webkit-background-clip:text;background-clip:text";
           charStyle += ";-webkit-text-fill-color:transparent";
+          charStyle += ";padding-bottom:" + CssFloatToString(fontSize) + "px";
         } else {
           charStyle += colorCss;
         }
         charStyle += strokeCss;
 
-        // Per-glyph transforms (anchors, scales, rotations, skews)
-        std::string transform;
-        if (i < run->rotations.size() && !FloatNearlyZero(run->rotations[i])) {
-          transform += "rotate(" + CssFloatToString(run->rotations[i]) + "deg) ";
+        // For gradient fills that also have per-glyph transforms, use matrix() with the span
+        // at its normal left/top position (so gradient background-position works correctly).
+        // The matrix encodes the linear transform + position offset caused by the anchor-based
+        // rotation/scale/skew, with transform-origin:0 0 since all offsets are baked in.
+        if (hasTransform && isGradientFill && gradientWidth > 0) {
+          auto gi = static_cast<size_t>(glyphID) - 1;
+          float glyphAdvance = (gi < run->font->glyphs.size()) ? run->font->glyphs[gi]->advance : 0;
+          float anchorX = glyphAdvance * 0.5f * (fontSize / run->font->unitsPerEm);
+          float anchorY = 0.0f;
+          if (i < run->anchors.size()) {
+            anchorX += run->anchors[i].x;
+            anchorY += run->anchors[i].y;
+          }
+          // Build the same linear part as the non-gradient matrix path.
+          float cosR = 1.0f, sinR = 0.0f;
+          if (hasRotation) {
+            float rad = run->rotations[i] * static_cast<float>(M_PI) / 180.0f;
+            cosR = std::cos(rad);
+            sinR = std::sin(rad);
+          }
+          float m00 = cosR, m01 = -sinR, m10 = sinR, m11 = cosR;
+          if (hasSkew) {
+            float tanS = -std::tan(run->skews[i] * static_cast<float>(M_PI) / 180.0f);
+            float nm00 = m00 + tanS * m10;
+            float nm01 = m01 + tanS * m11;
+            m00 = nm00;
+            m01 = nm01;
+          }
+          float gsx = hasGlyphScale ? run->scales[i].x : 1.0f;
+          float gsy = hasGlyphScale ? run->scales[i].y : 1.0f;
+          m00 *= gsx;
+          m01 *= gsx;
+          m10 *= gsy;
+          m11 *= gsy;
+          // Compute the translation that the anchor-based transform produces relative to the
+          // span's (cssLeft, cssTop) position. This is the difference between the full native
+          // matrix translation and what CSS would produce with just left/top positioning.
+          // Native: Linear * (ax+posX, ay+cssTop) + (-ax,-ay) = full tx/ty from (0,0)
+          // CSS left/top already places span at (posX, cssTop), so the matrix translation is
+          // the residual: Linear*(ax, ay+cssTop-cssTop... no, let me derive properly.
+          // With span at (posX, cssTop) and transform-origin:0 0:
+          //   screen = (posX, cssTop) + matrix * local_point
+          //   We need: screen = native result = Linear*local_point + tx_full, ty_full
+          //   where tx_full = Linear*(ax+posX, ay+cssTop) + (-ax,-ay)  [from non-gradient path]
+          //   So: (posX,cssTop) + (dx,dy) + Linear*local = Linear*local + (tx_full, ty_full)
+          //   → dx = tx_full - posX, dy = ty_full - cssTop
+          float txFull = m00 * (anchorX + posX) + m01 * (anchorY + cssTop) - anchorX;
+          float tyFull = m10 * (anchorX + posX) + m11 * (anchorY + cssTop) - anchorY;
+          float dx = txFull - posX;
+          float dy = tyFull - cssTop;
+          charStyle += ";transform:matrix(" + CssFloatToString(m00) + "," + CssFloatToString(m10) +
+                       "," + CssFloatToString(m01) + "," + CssFloatToString(m11) + "," +
+                       CssFloatToString(dx) + "," + CssFloatToString(dy) + ")";
+          charStyle += ";transform-origin:0 0";
         }
-        if (i < run->scales.size() && (!FloatNearlyZero(run->scales[i].x - 1.0f) ||
-                                       !FloatNearlyZero(run->scales[i].y - 1.0f))) {
-          transform += "scale(" + CssFloatToString(run->scales[i].x) + "," +
-                       CssFloatToString(run->scales[i].y) + ") ";
-        }
-        if (i < run->skews.size() && !FloatNearlyZero(run->skews[i])) {
-          // PAGX GlyphRun skew applies shear along the vertical axis (spec §6.5). In the
-          // typographic coordinate system (Y up), this corresponds to CSS skewX with negated
-          // angle because CSS operates in screen coordinates (Y down).
-          transform += "skewX(" + CssFloatToString(-run->skews[i]) + "deg) ";
-        }
-        if (!transform.empty()) {
-          charStyle += ";transform:" + transform;
-        }
+
         std::string puaChar;
         AppendUTF8(puaChar, 0xE000 + (glyphID - 1));
         out.openTag("span");
