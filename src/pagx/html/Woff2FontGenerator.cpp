@@ -689,7 +689,7 @@ static std::vector<uint8_t> BuildPost() {
 
 // --- Bitmap font table builders ---
 
-static std::vector<uint8_t> BuildEmptyGlyf(uint16_t numGlyphs) {
+static std::vector<uint8_t> BuildPlaceholderGlyf(uint16_t numGlyphs) {
   // Build a minimal glyf table with a single-point contour for each glyph. A truly empty
   // glyph (numberOfContours=0) gets optimized away by WOFF2 encoders and fonttools, causing
   // OTS to report "glyf: zero-length table". A single degenerate contour satisfies OTS while
@@ -713,7 +713,7 @@ static std::vector<uint8_t> BuildEmptyGlyf(uint16_t numGlyphs) {
 
 static std::vector<uint8_t> BuildLoca(uint16_t numGlyphs) {
   // Short format loca: (numGlyphs + 1) uint16 entries.
-  // Each glyph in BuildEmptyGlyf is 15 bytes. Short loca stores offset/2.
+  // Each glyph in BuildPlaceholderGlyf is 15 bytes. Short loca stores offset/2.
   // Pad each glyph to 16 bytes (even) so offset/2 is exact.
   // Actually, use long format loca (uint32 offsets) to avoid padding issues.
   // Wait — head.indexToLocFormat must match. We set it to 0 (short). Let's use long (1).
@@ -993,7 +993,7 @@ Woff2FontResult BuildWoff2FromFont(const Font* font, const std::string& fontId) 
 
     TableEntry glyfEntry;
     strcpy(glyfEntry.tag, "glyf");
-    glyfEntry.data = BuildEmptyGlyf(numGlyphs);
+    glyfEntry.data = BuildPlaceholderGlyf(numGlyphs);
     tables.push_back(std::move(glyfEntry));
 
     TableEntry headEntry;
