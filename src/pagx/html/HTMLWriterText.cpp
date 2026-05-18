@@ -969,6 +969,8 @@ void HTMLWriter::writeEmbeddedShapeGlyphs(HTMLBuilder& out, const Text* text, co
   writeEmbeddedShapeGlyphsAsFont(out, text, fill, stroke, alpha, it->second);
 }
 
+static void AppendUTF8(std::string& out, uint32_t cp);
+
 void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>& geos,
                                    const TextModifier* modifier, const Fill* fill,
                                    const Stroke* stroke, const TextBox* /*tb*/, float alpha) {
@@ -1029,34 +1031,62 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
     }
 
     if (!text->glyphRuns.empty()) {
-      std::string svgStyle = "position:absolute;left:0;top:0;overflow:visible";
-      if (alpha < 1.0f) {
-        svgStyle += ";opacity:" + CssFloatToString(alpha);
+      // Embedded font GlyphRuns are rendered via WOFF2 @font-face + PUA characters.
+      // Look up the pre-generated WOFF2 font for this embedded font resource.
+      const Font* embeddedFont = nullptr;
+      for (auto* run : text->glyphRuns) {
+        if (run->font && !run->font->glyphs.empty()) {
+          embeddedFont = run->font;
+          break;
+        }
       }
-      out.openTag("svg");
-      out.addAttr("style", svgStyle);
+      if (!embeddedFont) {
+        continue;
+      }
+      auto woff2It = _ctx->woff2Fonts.find(embeddedFont);
+      if (woff2It == _ctx->woff2Fonts.end()) {
+        continue;
+      }
+      const auto& fontResult = woff2It->second;
+      float fontSize = text->glyphRuns[0]->fontSize;
+      float scale = fontSize / static_cast<float>(embeddedFont->unitsPerEm);
+      bool isBitmapFont =
+          !embeddedFont->glyphs.empty() && embeddedFont->glyphs[0]->image != nullptr;
+
+      // Container div positioned at the text's render origin.
+      std::string containerStyle = "position:absolute;left:0;top:0";
+      if (alpha < 1.0f) {
+        containerStyle += ";opacity:" + CssFloatToString(alpha);
+      }
+      out.openTag("div");
+      out.addAttr("style", containerStyle);
       out.closeTagStart();
+
       size_t glyphIdx = 0;
       for (auto* run : text->glyphRuns) {
         if (!run->font) {
           continue;
         }
-        float scale = run->fontSize / run->font->unitsPerEm;
         for (size_t i = 0; i < run->glyphs.size(); i++) {
           uint16_t glyphId = run->glyphs[i];
           if (glyphId == 0) {
             glyphIdx++;
             continue;
           }
-          auto* glyph = (glyphId > 0 && glyphId <= run->font->glyphs.size())
-                            ? run->font->glyphs[glyphId - 1]
-                            : nullptr;
-          if (!glyph || !glyph->path) {
+          auto glyphIndex = static_cast<size_t>(glyphId) - 1;
+          if (glyphIndex >= run->font->glyphs.size()) {
+            glyphIdx++;
+            continue;
+          }
+          auto* glyph = run->font->glyphs[glyphIndex];
+          if (!glyph) {
             glyphIdx++;
             continue;
           }
           float f = (glyphIdx < factors.size()) ? factors[glyphIdx] : 0.0f;
           float absF = std::abs(f);
+
+          // Compute glyph position (same logic as before).
           float gx = run->x;
           float gy = run->y;
           if (i < run->xOffsets.size()) {
@@ -1066,6 +1096,8 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
             gx += run->positions[i].x;
             gy += run->positions[i].y;
           }
+
+          // Compute CSS transform from TextModifier factors.
           float anchorX = glyph->advance * 0.5f * scale;
           float anchorY = 0;
           if (i < run->anchors.size()) {
@@ -1092,57 +1124,58 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           m = Matrix::Translate(modAnchorX, modAnchorY) * m;
           m = Matrix::Translate(modifier->position.x * f, modifier->position.y * f) * m;
           m = Matrix::Translate(gx, gy) * m;
-          float glyphAlpha = 1.0f;
-          if (modifier->alpha < 1.0f) {
-            glyphAlpha = std::max(0.0f, 1.0f + (modifier->alpha - 1.0f) * absF);
+
+          // Build CSS for this glyph span.
+          float cssLeft = m.tx;
+          float cssTop = isBitmapFont ? m.ty : (m.ty - fontSize);
+          // Extract the 2x2 part as CSS transform (exclude the translation already in left/top).
+          Matrix transformOnly = m;
+          transformOnly.tx = 0;
+          transformOnly.ty = 0;
+
+          std::string charStyle = "position:absolute;left:" + CssFloatToString(cssLeft) +
+                                  "px;top:" + CssFloatToString(cssTop) + "px";
+          charStyle += ";font-family:'" + fontResult.familyName + "'";
+          charStyle += ";font-size:" + CssFloatToString(fontSize) + "px;line-height:1";
+          if (!transformOnly.isIdentity()) {
+            charStyle += ";transform:matrix(" + CssFloatToString(transformOnly.a) + "," +
+                         CssFloatToString(transformOnly.b) + "," +
+                         CssFloatToString(transformOnly.c) + "," +
+                         CssFloatToString(transformOnly.d) + ",0,0)";
+            charStyle += ";transform-origin:0 0";
           }
-          out.openTag("g");
-          out.addAttr("transform", MatrixToCSS(m));
-          if (glyphAlpha < 1.0f) {
-            out.addAttr("opacity", CssFloatToString(glyphAlpha));
-          }
-          out.closeTagStart();
-          out.openTag("path");
-          out.addAttr("d", PathDataToSVGString(*glyph->path));
-          if (fill) {
+
+          // Apply fill color (with modifier blending).
+          if (!isBitmapFont && fill) {
             if (modifier->fillColor.has_value() && absF > 0.0f && fill->color &&
                 fill->color->nodeType() == NodeType::SolidColor) {
               auto baseSC = static_cast<const SolidColor*>(fill->color);
               Color blended = LerpColor(baseSC->color, modifier->fillColor.value(), absF);
-              out.addAttr("fill", ColorToSVGHex(blended));
-              float fa = blended.alpha * fill->alpha;
-              if (fa < 1.0f) {
-                out.addAttr("fill-opacity", CssFloatToString(fa));
-              }
-            } else {
-              applySVGFill(out, fill);
-            }
-          } else {
-            out.addAttr("fill", "none");
-          }
-          if (stroke) {
-            applySVGStroke(out, stroke);
-            if (modifier->strokeColor.has_value() && absF > 0) {
-              Color sc = modifier->strokeColor.value();
-              float blendFactor = sc.alpha * absF;
-              if (blendFactor > 0) {
-                out.addAttr("stroke", ColorToSVGHex(sc));
-                out.addAttr("stroke-opacity", CssFloatToString(blendFactor));
-              }
-            }
-            if (modifier->strokeWidth.has_value() && absF > 0) {
-              float origWidth = stroke->width;
-              float modWidth = modifier->strokeWidth.value();
-              float finalWidth = origWidth + (modWidth - origWidth) * absF;
-              out.addAttr("stroke-width", CssFloatToString(finalWidth));
+              charStyle += ";color:" + ColorToRGBA(blended, fill->alpha);
+            } else if (fill->color && fill->color->nodeType() == NodeType::SolidColor) {
+              auto sc = static_cast<const SolidColor*>(fill->color);
+              charStyle += ";color:" + ColorToRGBA(sc->color, fill->alpha);
             }
           }
-          out.closeTagSelfClosing();
-          out.closeTag();  // </g>
+
+          // Apply opacity from modifier.
+          float glyphAlpha = 1.0f;
+          if (modifier->alpha < 1.0f) {
+            glyphAlpha = std::max(0.0f, 1.0f + (modifier->alpha - 1.0f) * absF);
+          }
+          if (glyphAlpha < 1.0f) {
+            charStyle += ";opacity:" + CssFloatToString(glyphAlpha);
+          }
+
+          std::string puaChar;
+          AppendUTF8(puaChar, 0xE000 + (glyphId - 1));
+          out.openTag("span");
+          out.addAttr("style", charStyle);
+          out.closeTagWithText(puaChar);
           glyphIdx++;
         }
       }
-      out.closeTag();  // </svg>
+      out.closeTag();  // </div>
     } else {
       auto renderPos = text->renderPosition();
       auto renderFont = text->renderFontSize();
