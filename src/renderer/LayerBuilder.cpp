@@ -115,15 +115,22 @@
 
 namespace pagx {
 
-// Master switch to skip all PAGX layer effects (DropShadow/InnerShadow/BackgroundBlur styles
-// plus Blur/DropShadow/InnerShadow/Blend/ColorMatrix filters) during conversion to the tgfx
-// layer tree. Each effect normally forces tgfx to allocate an offscreen surface at render
-// time and run a sampling pass over the affected layer; large designs can carry hundreds of
-// shadow styles whose combined offscreen cost dominates the wasm heap. Flip this to 1 in
-// debug builds to measure how much of the rendering load is attributable to effects vs
-// actual layer geometry. The visual result with effects disabled is wrong (no shadows / no
-// blur), but everything downstream still parses, lays out, and renders without crashing.
-#define PAG_DISABLE_LAYER_EFFECTS 0
+// Per-category switches to skip PAGX layer effects during conversion to the tgfx layer tree.
+// Each effect normally forces tgfx to allocate an offscreen surface at render time and run a
+// sampling pass over the affected layer; large designs can carry hundreds of such effects
+// whose combined offscreen cost dominates the frame budget. Flip individual switches to 1 in
+// debug builds to measure how much of the rendering load is attributable to each effect type.
+// The visual result with an effect disabled is wrong (missing shadows / blur), but everything
+// downstream still parses, lays out, and renders without crashing.
+//
+// PAG_DISABLE_BACKGROUND_BLUR_STYLE: skips BackgroundBlurStyle (offscreen background snapshot
+//   plus blur pass; usually the heaviest single category in dense designs).
+// PAG_DISABLE_SHADOW_STYLES:         skips DropShadowStyle and InnerShadowStyle.
+// PAG_DISABLE_LAYER_FILTERS:         skips all LayerFilters (BlurFilter, DropShadow/InnerShadow
+//   filters, BlendFilter, ColorMatrixFilter). BlurFilter with very large sigma dominates here.
+#define PAG_DISABLE_BACKGROUND_BLUR_STYLE 0
+#define PAG_DISABLE_SHADOW_STYLES 0
+#define PAG_DISABLE_LAYER_FILTERS 0
 
 // Wasm linear memory size in bytes (HEAP8.byteLength equivalent). Returns -1 on non-wasm
 // platforms so the same probe can stay in cross-platform code without #ifdef noise at call
@@ -1002,7 +1009,6 @@ class LayerBuilderContext {
     }
 
     // Layer styles
-#if !PAG_DISABLE_LAYER_EFFECTS
     std::vector<std::shared_ptr<tgfx::LayerStyle>> styles;
     styles.reserve(node->styles.size());
     for (const auto& style : node->styles) {
@@ -1019,6 +1025,7 @@ class LayerBuilderContext {
     }
 
     // Layer filters
+#if !PAG_DISABLE_LAYER_FILTERS
     std::vector<std::shared_ptr<tgfx::LayerFilter>> filters;
     filters.reserve(node->filters.size());
     for (const auto& filter : node->filters) {
@@ -1030,7 +1037,7 @@ class LayerBuilderContext {
     if (!filters.empty()) {
       layer->setFilters(filters);
     }
-#endif  // !PAG_DISABLE_LAYER_EFFECTS
+#endif  // !PAG_DISABLE_LAYER_FILTERS
   }
 
   std::shared_ptr<tgfx::LayerStyle> convertLayerStyle(const LayerStyle* node) {
@@ -1040,6 +1047,9 @@ class LayerBuilderContext {
 
     switch (node->nodeType()) {
       case NodeType::DropShadowStyle: {
+#if PAG_DISABLE_SHADOW_STYLES
+        return nullptr;
+#else
         auto style = static_cast<const DropShadowStyle*>(node);
         auto tgfxStyle =
             tgfx::DropShadowStyle::Make(style->offsetX, style->offsetY, style->blurX, style->blurY,
@@ -1048,8 +1058,12 @@ class LayerBuilderContext {
           tgfxStyle->setBlendMode(ToTGFX(node->blendMode));
         }
         return tgfxStyle;
+#endif
       }
       case NodeType::InnerShadowStyle: {
+#if PAG_DISABLE_SHADOW_STYLES
+        return nullptr;
+#else
         auto style = static_cast<const InnerShadowStyle*>(node);
         auto tgfxStyle = tgfx::InnerShadowStyle::Make(style->offsetX, style->offsetY, style->blurX,
                                                       style->blurY, ToTGFX(style->color));
@@ -1057,8 +1071,12 @@ class LayerBuilderContext {
           tgfxStyle->setBlendMode(ToTGFX(node->blendMode));
         }
         return tgfxStyle;
+#endif
       }
       case NodeType::BackgroundBlurStyle: {
+#if PAG_DISABLE_BACKGROUND_BLUR_STYLE
+        return nullptr;
+#else
         auto style = static_cast<const pagx::BackgroundBlurStyle*>(node);
         auto tgfxStyle =
             tgfx::BackgroundBlurStyle::Make(style->blurX, style->blurY, ToTGFX(style->tileMode));
@@ -1066,6 +1084,7 @@ class LayerBuilderContext {
           tgfxStyle->setBlendMode(ToTGFX(node->blendMode));
         }
         return tgfxStyle;
+#endif
       }
       default:
         return nullptr;

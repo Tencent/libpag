@@ -18,6 +18,8 @@
 
 #include "GlyphRunRenderer.h"
 #include <cmath>
+#include <mutex>
+#include <unordered_map>
 #include "base/utils/MathUtil.h"
 #include "pagx/TextLayout.h"
 #include "pagx/nodes/Font.h"
@@ -32,6 +34,7 @@
 #include "tgfx/core/Path.h"
 #include "tgfx/core/RSXform.h"
 #include "tgfx/core/TextBlobBuilder.h"
+#include "tgfx/platform/Print.h"
 
 namespace pagx {
 
@@ -98,6 +101,24 @@ static void WriteGlyphsWithMode(tgfx::TextBlobBuilder& builder, const tgfx::Font
   }
 }
 
+// Cache of pagx::Font* -> tgfx::Typeface built from that Font's embedded glyph paths/images.
+// Without this cache, a CoCraft document with N TextBlobs would rebuild the same Typeface N
+// times because every BuildTypefaceFromFont() walks Font::glyphs and runs ToTGFX(SVGPath) for
+// each one — for a Chinese font referenced 800 times that's >2 GB of redundant SkPath copies
+// passing through wasm heap (each 200-glyph font instance retains ~600 KB of SkPath data).
+//
+// We use weak_ptr so the cache does not pin a Typeface alive past the document's natural
+// lifetime. PAGX Font pointers are stable across the document's lifetime and unique across
+// documents (the previous PAGXDocument is destroyed before the next one is parsed in PAGXView,
+// so there is no key-collision concern between successive loads). Lookup is O(1) and the
+// mutex serialises the rare miss path; once warm, hits never block.
+//
+// Why not key by content fingerprint? Two Fonts with identical glyph contents are almost
+// certainly the same Font* anyway because PAGXImporter dedupes resources by id. Hashing every
+// glyph's SVG path on every lookup would defeat the purpose.
+static std::shared_ptr<tgfx::Typeface> GetOrBuildPathTypeface(const Font* fontNode);
+static std::shared_ptr<tgfx::Typeface> GetOrBuildImageTypeface(const Font* fontNode);
+
 std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(const Font* fontNode) {
   if (fontNode == nullptr || fontNode->glyphs.empty()) {
     return nullptr;
@@ -114,45 +135,99 @@ std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(const Fo
     }
   }
 
-  std::shared_ptr<tgfx::Typeface> typeface = nullptr;
   if (hasPath && !hasImage) {
-    tgfx::PathTypefaceBuilder builder;
-    for (const auto& glyph : fontNode->glyphs) {
-      if (glyph->path != nullptr) {
-        auto path = ToTGFX(*glyph->path);
-        if (glyph->offset.x != 0 || glyph->offset.y != 0) {
-          path.transform(tgfx::Matrix::MakeTrans(glyph->offset.x, glyph->offset.y));
-        }
-        builder.addGlyph(path, glyph->advance);
-      } else {
-        builder.addGlyph(tgfx::Path(), glyph->advance);
-      }
-    }
-    typeface = builder.detach();
-  } else if (hasImage && !hasPath) {
-    tgfx::ImageTypefaceBuilder builder;
-    for (const auto& glyph : fontNode->glyphs) {
-      if (glyph->image != nullptr) {
-        std::shared_ptr<tgfx::ImageCodec> codec = nullptr;
-        auto imageNode = glyph->image;
-        if (imageNode->data != nullptr) {
-          codec = tgfx::ImageCodec::MakeFrom(ToTGFXData(imageNode->data));
-        } else if (imageNode->filePath.find("data:") == 0) {
-          auto data = DecodeBase64DataURI(imageNode->filePath);
-          if (data) {
-            codec = tgfx::ImageCodec::MakeFrom(ToTGFXData(data));
-          }
-        } else if (!imageNode->filePath.empty()) {
-          codec = tgfx::ImageCodec::MakeFrom(imageNode->filePath);
-        }
-        if (codec) {
-          builder.addGlyph(codec, ToTGFX(glyph->offset), glyph->advance);
-        }
-      }
-    }
-    typeface = builder.detach();
+    return GetOrBuildPathTypeface(fontNode);
   }
+  if (hasImage && !hasPath) {
+    return GetOrBuildImageTypeface(fontNode);
+  }
+  return nullptr;
+}
 
+namespace {
+// Both caches share one mutex because lookups happen on the LayerBuilder thread (single writer)
+// but we still want safe coexistence with any background construction that future LayerBuilder
+// changes might introduce. The maps live for the lifetime of the process; weak_ptr entries that
+// become expired are pruned lazily on the next miss for the same Font*.
+std::mutex& TypefaceCacheMutex() {
+  static std::mutex m;
+  return m;
+}
+
+std::unordered_map<const Font*, std::weak_ptr<tgfx::Typeface>>& PathTypefaceCache() {
+  static std::unordered_map<const Font*, std::weak_ptr<tgfx::Typeface>> cache;
+  return cache;
+}
+
+std::unordered_map<const Font*, std::weak_ptr<tgfx::Typeface>>& ImageTypefaceCache() {
+  static std::unordered_map<const Font*, std::weak_ptr<tgfx::Typeface>> cache;
+  return cache;
+}
+}  // namespace
+
+static std::shared_ptr<tgfx::Typeface> GetOrBuildPathTypeface(const Font* fontNode) {
+  std::lock_guard<std::mutex> guard(TypefaceCacheMutex());
+  auto& cache = PathTypefaceCache();
+  auto it = cache.find(fontNode);
+  if (it != cache.end()) {
+    if (auto live = it->second.lock()) {
+      return live;
+    }
+    cache.erase(it);
+  }
+  tgfx::PathTypefaceBuilder builder;
+  for (const auto& glyph : fontNode->glyphs) {
+    if (glyph->path != nullptr) {
+      auto path = ToTGFX(*glyph->path);
+      if (glyph->offset.x != 0 || glyph->offset.y != 0) {
+        path.transform(tgfx::Matrix::MakeTrans(glyph->offset.x, glyph->offset.y));
+      }
+      builder.addGlyph(path, glyph->advance);
+    } else {
+      builder.addGlyph(tgfx::Path(), glyph->advance);
+    }
+  }
+  auto typeface = builder.detach();
+  if (typeface) {
+    cache[fontNode] = typeface;
+  }
+  return typeface;
+}
+
+static std::shared_ptr<tgfx::Typeface> GetOrBuildImageTypeface(const Font* fontNode) {
+  std::lock_guard<std::mutex> guard(TypefaceCacheMutex());
+  auto& cache = ImageTypefaceCache();
+  auto it = cache.find(fontNode);
+  if (it != cache.end()) {
+    if (auto live = it->second.lock()) {
+      return live;
+    }
+    cache.erase(it);
+  }
+  tgfx::ImageTypefaceBuilder builder;
+  for (const auto& glyph : fontNode->glyphs) {
+    if (glyph->image != nullptr) {
+      std::shared_ptr<tgfx::ImageCodec> codec = nullptr;
+      auto imageNode = glyph->image;
+      if (imageNode->data != nullptr) {
+        codec = tgfx::ImageCodec::MakeFrom(ToTGFXData(imageNode->data));
+      } else if (imageNode->filePath.find("data:") == 0) {
+        auto data = DecodeBase64DataURI(imageNode->filePath);
+        if (data) {
+          codec = tgfx::ImageCodec::MakeFrom(ToTGFXData(data));
+        }
+      } else if (!imageNode->filePath.empty()) {
+        codec = tgfx::ImageCodec::MakeFrom(imageNode->filePath);
+      }
+      if (codec) {
+        builder.addGlyph(codec, ToTGFX(glyph->offset), glyph->advance);
+      }
+    }
+  }
+  auto typeface = builder.detach();
+  if (typeface) {
+    cache[fontNode] = typeface;
+  }
   return typeface;
 }
 
