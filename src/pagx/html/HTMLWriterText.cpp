@@ -1540,17 +1540,53 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
     }
     auto text = static_cast<const Text*>(g.element);
     if (!text->glyphRuns.empty()) {
-      std::string svgStyle = "position:absolute;left:0;top:0;overflow:visible";
-      if (alpha < 1.0f) {
-        svgStyle += ";opacity:" + CssFloatToString(alpha);
+      // Render embedded font glyphs along TextPath using WOFF2 @font-face + PUA characters.
+      // Each glyph is a positioned <span> with CSS transform for curve-following rotation.
+      const Font* font = nullptr;
+      for (auto* run : text->glyphRuns) {
+        if (run->font) {
+          font = run->font;
+          break;
+        }
       }
-      out.openTag("svg");
-      out.addAttr("style", svgStyle);
-      out.closeTagStart();
-      out.openTag("g");
-      applySVGFill(out, fill);
-      applySVGStroke(out, stroke);
-      out.closeTagStart();
+      if (!font) {
+        continue;
+      }
+      auto it = _ctx->woff2Fonts.find(font);
+      if (it == _ctx->woff2Fonts.end()) {
+        continue;
+      }
+      auto& fontResult = it->second;
+      float fontSize = text->glyphRuns[0]->fontSize;
+
+      bool isBitmapFont = !font->glyphs.empty() && font->glyphs[0]->image;
+
+      // Build fill CSS (same logic as writeEmbeddedShapeGlyphsAsFont).
+      std::string colorCss;
+      if (!isBitmapFont && fill && fill->color) {
+        if (fill->color->nodeType() == NodeType::SolidColor) {
+          auto sc = static_cast<const SolidColor*>(fill->color);
+          colorCss = ";color:" + ColorToRGBA(sc->color, fill->alpha);
+        }
+      }
+      std::string strokeCss;
+      if (!isBitmapFont && stroke && stroke->color &&
+          stroke->color->nodeType() == NodeType::SolidColor) {
+        auto sc = static_cast<const SolidColor*>(stroke->color);
+        bool hasFill = fill && fill->color;
+        auto resolved = ResolveTextStrokeCss(stroke->width, stroke->align, hasFill);
+        if (resolved.width > 0.0f) {
+          strokeCss = ";-webkit-text-stroke:" + CssFloatToString(resolved.width) + "px " +
+                      ColorToRGBA(sc->color, stroke->alpha);
+          if (resolved.paintOrderStrokeFill) {
+            strokeCss += ";paint-order:stroke fill";
+          }
+        }
+        if (!hasFill) {
+          strokeCss += ";-webkit-text-fill-color:transparent";
+        }
+      }
+
       float totalAdvance = 0.0f;
       for (auto* run : text->glyphRuns) {
         if (!run->font) {
@@ -1562,11 +1598,9 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
           if (glyphId == 0) {
             continue;
           }
-          auto* glyph = (glyphId > 0 && glyphId <= run->font->glyphs.size())
-                            ? run->font->glyphs[glyphId - 1]
-                            : nullptr;
-          if (glyph) {
-            totalAdvance += glyph->advance * scale;
+          auto gi = static_cast<size_t>(glyphId) - 1;
+          if (gi < run->font->glyphs.size()) {
+            totalAdvance += run->font->glyphs[gi]->advance * scale;
           }
         }
       }
@@ -1575,15 +1609,8 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         if (!run->font) {
           continue;
         }
-        for (size_t i = 0; i < run->glyphs.size(); i++) {
-          uint16_t glyphId = run->glyphs[i];
-          if (glyphId == 0) {
-            continue;
-          }
-          auto* glyph = (glyphId > 0 && glyphId <= run->font->glyphs.size())
-                            ? run->font->glyphs[glyphId - 1]
-                            : nullptr;
-          if (glyph) {
+        for (auto gid : run->glyphs) {
+          if (gid != 0) {
             glyphCount++;
           }
         }
@@ -1592,14 +1619,22 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
       if (textPath->forceAlignment && glyphCount > 1 && totalAdvance > 0) {
         extraSpacing = (effectiveLength - totalAdvance) / static_cast<float>(glyphCount - 1);
       }
-      // Normal mode uses per-glyph anchor decomposition relative to baselineOrigin; forceAlignment
-      // mode uses consecutive arc-length layout. See tgfx/src/layers/vectors/TextPath.cpp.
+
       float baselineAngleRad = textPath->baselineAngle * static_cast<float>(M_PI) / 180.0f;
       float baselineCos = std::cos(baselineAngleRad);
       float baselineSin = std::sin(baselineAngleRad);
       auto textRenderPos = text->renderPosition();
       auto baselineOrigin = textPath->renderBaselineOrigin();
       float currentArcPos = textPath->firstMargin;
+
+      std::string containerStyle = "position:absolute;left:0;top:0";
+      if (alpha < 1.0f) {
+        containerStyle += ";opacity:" + CssFloatToString(alpha);
+      }
+      out.openTag("div");
+      out.addAttr("style", containerStyle);
+      out.closeTagStart();
+
       for (auto* run : text->glyphRuns) {
         if (!run->font) {
           continue;
@@ -1610,14 +1645,12 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
           if (glyphId == 0) {
             continue;
           }
-          auto* glyph = (glyphId > 0 && glyphId <= run->font->glyphs.size())
-                            ? run->font->glyphs[glyphId - 1]
-                            : nullptr;
-          if (!glyph || !glyph->path) {
+          auto gi = static_cast<size_t>(glyphId) - 1;
+          if (gi >= run->font->glyphs.size()) {
             continue;
           }
+          auto* glyph = run->font->glyphs[gi];
           float glyphAdvance = glyph->advance * scale;
-          float pathOffset = 0.0f;
           float normalOffset = 0.0f;
           float tangent = 0;
           Point pos = {};
@@ -1627,11 +1660,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
             if (i < run->positions.size()) {
               normalOffset = run->positions[i].y;
             }
-            pathOffset = glyphCenterArc;
           } else {
-            // Compute the glyph anchor in layer space, then decompose its offset from
-            // baselineOrigin along the baseline angle into tangent (arc distance) and normal
-            // (perpendicular-to-curve offset) components.
             float glyphAnchorX = textRenderPos.x + run->x + glyphAdvance * 0.5f;
             float glyphAnchorY = textRenderPos.y + run->y;
             if (i < run->positions.size()) {
@@ -1649,28 +1678,44 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
             float dy = glyphAnchorY - baselineOrigin.y;
             float tangentDistance = dx * baselineCos + dy * baselineSin;
             normalOffset = dy * baselineCos - dx * baselineSin;
-            pathOffset = textPath->firstMargin + tangentDistance;
-            SampleArcLengthLUT(lut, pathOffset, &pos, &tangent, isClosed);
+            SampleArcLengthLUT(lut, textPath->firstMargin + tangentDistance, &pos, &tangent,
+                               isClosed);
           }
           float normalAngle = tangent + static_cast<float>(M_PI) / 2.0f;
           pos.x += normalOffset * std::cos(normalAngle);
           pos.y += normalOffset * std::sin(normalAngle);
-          Matrix m = Matrix::Scale(scale, scale);
-          m = Matrix::Translate(-glyph->advance / 2.0f, 0) * m;
+
+          // Position the span so glyph center aligns with the curve point.
+          // CFF font: baseline at top + fontSize, glyph origin at baseline.
+          // Bitmap font: bitmap top at top (BearingY = ppem).
+          float cssLeft = pos.x - glyphAdvance / 2.0f;
+          float cssTop = isBitmapFont ? pos.y : (pos.y - fontSize);
+
+          std::string charStyle = "position:absolute;left:" + CssFloatToString(cssLeft) +
+                                  "px;top:" + CssFloatToString(cssTop) +
+                                  "px;line-height:1;font-family:'" + fontResult.familyName + "'";
+          charStyle += ";font-size:" + CssFloatToString(fontSize) + "px";
+          charStyle += colorCss + strokeCss;
+
+          // Rotation: align glyph perpendicular to the curve tangent.
           if (textPath->perpendicular) {
             float angleDeg = tangent * 180.0f / static_cast<float>(M_PI) - textPath->baselineAngle;
-            m = Matrix::Rotate(angleDeg) * m;
+            if (!FloatNearlyZero(angleDeg)) {
+              charStyle += ";transform:rotate(" + CssFloatToString(angleDeg) + "deg)";
+              charStyle += ";transform-origin:" + CssFloatToString(glyphAdvance / 2.0f) + "px " +
+                           CssFloatToString(fontSize) + "px";
+            }
           }
-          m = Matrix::Translate(pos.x, pos.y) * m;
-          out.openTag("path");
-          out.addAttr("transform", MatrixToCSS(m));
-          out.addAttr("d", PathDataToSVGString(*glyph->path));
-          out.closeTagSelfClosing();
+
+          std::string puaChar;
+          AppendUTF8(puaChar, 0xE000 + glyphId - 1);
+          out.openTag("span");
+          out.addAttr("style", charStyle);
+          out.closeTagWithText(puaChar);
           currentArcPos += glyphAdvance + extraSpacing;
         }
       }
-      out.closeTag();  // </g>
-      out.closeTag();  // </svg>
+      out.closeTag();  // </div>
     } else {
       // SVG <text><textPath> approach: the browser handles baseline alignment, character
       // advance measurement, and perpendicular rotation natively, producing pixel-perfect
