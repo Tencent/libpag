@@ -56,6 +56,8 @@ if (DEFINED EMSCRIPTEN)
         # vendor_tools/lib-build wipes the intermediate build dir and only copies *.js / *.wasm
         # to the arch output dir, so the emscripten-generated *.symbols would be lost. Copy it
         # out manually right after link (POST_BUILD) so subsequent cleanup can't reach it.
+        # TODO(symbols): drop this workaround once vendor_tools exposes an extension point for
+        # extra artifacts (or once *.symbols is added to the web copy whitelist upstream).
         add_custom_command(TARGET pagx-viewer POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E make_directory ${VIEWER_OUTPUT_DIR}
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different

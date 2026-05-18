@@ -35,7 +35,11 @@ const banner = readFileSync(fileHeaderPath, 'utf-8');
 // Both flavors publish to the same lib/ directory; the multi-threaded build keeps the
 // canonical filenames (pagx-viewer.umd.js, pagx-viewer.wasm), while the single-threaded
 // build adds a `.st` infix (pagx-viewer.st.umd.js, pagx-viewer.st.wasm) to disambiguate.
+const SUPPORTED_ARCHS = ['wasm-mt', 'wasm'];
 const arch = process.env.ARCH || 'wasm-mt';
+if (!SUPPORTED_ARCHS.includes(arch)) {
+  throw new Error(`Unsupported ARCH: ${arch}. Expected one of ${SUPPORTED_ARCHS.join(', ')}.`);
+}
 const nameInfix = arch === 'wasm-mt' ? '' : '.st';
 const libDir = path.resolve(__dirname, '../lib');
 
@@ -60,8 +64,9 @@ const copyWasmPlugin = {
 };
 
 const plugins = [
-  // alias must run before resolve/esbuild so the wasm glue path in pagx.ts is rewritten to
-  // the requested ARCH before it is resolved to a concrete file on disk.
+  // MUST stay before resolve()/esbuild() — see PR #3436. Otherwise node-resolve will
+  // resolve `../../wasm-mt/pagx-viewer` to a concrete file before alias rewrites it,
+  // and the single-threaded bundle will silently inline the multi-threaded glue.
   alias({
     entries: [
       { find: '@tgfx', replacement: path.resolve(__dirname, '../../../third_party/tgfx/web/src') },

@@ -102,18 +102,18 @@ npm run build:debug:st
 npm run build:release:st
 ```
 
-> 提示：多线程（`wasm-mt`）与单线程（`wasm`）构建共享 `lib/` 下的同一组产物文件，
-> 后构建的版本会覆盖前一次的产物。
+> 提示：两种构建产物共存于 `lib/`，多线程版本沿用 `pagx-viewer.*` 命名，单线程版本通过
+> `.st` 中缀（`pagx-viewer.st.*`）区分，互不覆盖。
 
 两个命令都会在 `lib/` 目录下生成以下产物：
 
 | 文件 | 格式 | 用途 |
 |------|------|------|
-| `pagx-viewer.esm.js` | ESM | `import { PAGXInit } from 'pagx-viewer'` |
-| `pagx-viewer.cjs.js` | CJS | `const { PAGXInit } = require('pagx-viewer')` |
-| `pagx-viewer.umd.js` | UMD | 浏览器 `<script>` 标签引入 |
-| `pagx-viewer.min.js` | UMD（已压缩） | 生产环境使用 |
-| `pagx-viewer.wasm` | WebAssembly | 运行时依赖 |
+| `pagx-viewer.esm.js` / `pagx-viewer.st.esm.js` | ESM | `import { PAGXInit } from 'pagx-viewer'`（mt）/ `'pagx-viewer/st'`（st）|
+| `pagx-viewer.cjs.js` / `pagx-viewer.st.cjs.js` | CJS | `const { PAGXInit } = require('pagx-viewer')`（mt）/ `require('pagx-viewer/st')`（st）|
+| `pagx-viewer.umd.js` / `pagx-viewer.st.umd.js` | UMD | 浏览器 `<script>` 标签引入 |
+| `pagx-viewer.min.js` / `pagx-viewer.st.min.js` | UMD（已压缩） | 生产环境使用 |
+| `pagx-viewer.wasm` / `pagx-viewer.st.wasm` | WebAssembly | 运行时依赖 |
 
 如需调试 C++ 端代码，请安装
 [C/C++ DevTools Support (DWARF)](https://chrome.google.com/webstore/detail/cc%20%20-devtools-support-dwa/pdcpmagijalfljmkmjngeonclgbbannb)

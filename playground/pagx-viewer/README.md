@@ -104,18 +104,18 @@ npm run build:debug:st
 npm run build:release:st
 ```
 
-> Note: the multi-threaded (`wasm-mt`) and single-threaded (`wasm`) builds share the same output
-> files in `lib/`. Running a build of one flavor will overwrite the other's artifacts.
+> Note: both flavors coexist in `lib/`. The multi-threaded build keeps the canonical
+> filenames (`pagx-viewer.*`); the single-threaded build adds a `.st` infix (`pagx-viewer.st.*`).
 
 Both commands generate the following artifacts under `lib/`:
 
 | File | Format | Usage |
 |------|--------|-------|
-| `pagx-viewer.esm.js` | ESM | `import { PAGXInit } from 'pagx-viewer'` |
-| `pagx-viewer.cjs.js` | CJS | `const { PAGXInit } = require('pagx-viewer')` |
-| `pagx-viewer.umd.js` | UMD | Browser `<script>` tag |
-| `pagx-viewer.min.js` | UMD (minified) | Production use |
-| `pagx-viewer.wasm` | WebAssembly | Runtime dependency |
+| `pagx-viewer.esm.js` / `pagx-viewer.st.esm.js` | ESM | `import { PAGXInit } from 'pagx-viewer'` (mt) / `'pagx-viewer/st'` (st) |
+| `pagx-viewer.cjs.js` / `pagx-viewer.st.cjs.js` | CJS | `const { PAGXInit } = require('pagx-viewer')` (mt) / `require('pagx-viewer/st')` (st) |
+| `pagx-viewer.umd.js` / `pagx-viewer.st.umd.js` | UMD | Browser `<script>` tag |
+| `pagx-viewer.min.js` / `pagx-viewer.st.min.js` | UMD (minified) | Production use |
+| `pagx-viewer.wasm` / `pagx-viewer.st.wasm` | WebAssembly | Runtime dependency |
 
 To debug the C++ side, install the
 [C/C++ DevTools Support (DWARF)](https://chrome.google.com/webstore/detail/cc%20%20-devtools-support-dwa/pdcpmagijalfljmkmjngeonclgbbannb)
