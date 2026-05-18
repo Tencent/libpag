@@ -32,14 +32,20 @@ const fileHeaderPath = path.resolve(__dirname, '../../../.idea/fileTemplates/inc
 const banner = readFileSync(fileHeaderPath, 'utf-8');
 
 // ARCH selects the wasm output flavor: 'wasm-mt' (multi-threaded) or 'wasm' (single-threaded).
+// Both flavors publish to the same lib/ directory; the multi-threaded build keeps the
+// canonical filenames (pagx-viewer.umd.js, pagx-viewer.wasm), while the single-threaded
+// build adds a `.st` infix (pagx-viewer.st.umd.js, pagx-viewer.st.wasm) to disambiguate.
 const arch = process.env.ARCH || 'wasm-mt';
+const nameInfix = arch === 'wasm-mt' ? '' : '.st';
+const libDir = path.resolve(__dirname, '../lib');
 
-// Copy WASM files to lib
+// Copy the wasm next to the bundle. For the single-threaded build, the wasm is renamed
+// with the `.st` infix; the emcc glue's hard-coded `new URL("pagx-viewer.wasm", ...)` is
+// rewritten to the matching name later by script/fix-wasm-imports.js.
 const copyWasmPlugin = {
   name: 'copy-wasm',
   writeBundle() {
     const wasmDir = path.resolve(__dirname, `../${arch}`);
-    const libDir = path.resolve(__dirname, '../lib');
 
     if (!existsSync(libDir)) {
       mkdirSync(libDir, { recursive: true });
@@ -48,15 +54,14 @@ const copyWasmPlugin = {
     // Copy wasm file
     const wasmFile = path.join(wasmDir, 'pagx-viewer.wasm');
     if (existsSync(wasmFile)) {
-      copyFileSync(wasmFile, path.join(libDir, 'pagx-viewer.wasm'));
+      copyFileSync(wasmFile, path.join(libDir, `pagx-viewer${nameInfix}.wasm`));
     }
   },
 };
 
 const plugins = [
-  esbuild({ tsconfig: path.resolve(__dirname, '../tsconfig.json'), minify: false }),
-  resolve({ extensions: ['.ts', '.js'] }),
-  commonJs(),
+  // alias must run before resolve/esbuild so the wasm glue path in pagx.ts is rewritten to
+  // the requested ARCH before it is resolved to a concrete file on disk.
   alias({
     entries: [
       { find: '@tgfx', replacement: path.resolve(__dirname, '../../../third_party/tgfx/web/src') },
@@ -67,6 +72,9 @@ const plugins = [
       },
     ],
   }),
+  esbuild({ tsconfig: path.resolve(__dirname, '../tsconfig.json'), minify: false }),
+  resolve({ extensions: ['.ts', '.js'] }),
+  commonJs(),
   {
     name: 'preserve-import-meta-url',
     resolveImportMeta(property) {
@@ -79,7 +87,6 @@ const plugins = [
 ];
 
 const input = path.resolve(__dirname, '../src/ts/pagx.ts');
-const libDir = path.resolve(__dirname, '../lib');
 
 // UMD format (for script tag usage, mounts to window.pagxViewer)
 const umdConfig = {
@@ -90,7 +97,7 @@ const umdConfig = {
     format: 'umd',
     exports: 'named',
     sourcemap: true,
-    file: path.join(libDir, 'pagx-viewer.umd.js'),
+    file: path.join(libDir, `pagx-viewer${nameInfix}.umd.js`),
   },
   plugins: [...plugins],
 };
@@ -104,7 +111,7 @@ const umdMinConfig = {
     format: 'umd',
     exports: 'named',
     sourcemap: true,
-    file: path.join(libDir, 'pagx-viewer.min.js'),
+    file: path.join(libDir, `pagx-viewer${nameInfix}.min.js`),
   },
   plugins: [...plugins, terser()],
 };
@@ -113,8 +120,8 @@ const umdMinConfig = {
 const moduleConfig = {
   input,
   output: [
-    { banner, file: path.join(libDir, 'pagx-viewer.esm.js'), format: 'esm', sourcemap: true },
-    { banner, file: path.join(libDir, 'pagx-viewer.cjs.js'), format: 'cjs', exports: 'named', sourcemap: true },
+    { banner, file: path.join(libDir, `pagx-viewer${nameInfix}.esm.js`), format: 'esm', sourcemap: true },
+    { banner, file: path.join(libDir, `pagx-viewer${nameInfix}.cjs.js`), format: 'cjs', exports: 'named', sourcemap: true },
   ],
   plugins: [...plugins, copyWasmPlugin],
 };

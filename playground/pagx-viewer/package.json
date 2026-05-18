@@ -12,6 +12,12 @@
       "import": "./lib/pagx-viewer.esm.js",
       "require": "./lib/pagx-viewer.cjs.js",
       "default": "./lib/pagx-viewer.umd.js"
+    },
+    "./st": {
+      "types": "./types/playground/pagx-viewer/src/ts/pagx.d.ts",
+      "import": "./lib/pagx-viewer.st.esm.js",
+      "require": "./lib/pagx-viewer.st.cjs.js",
+      "default": "./lib/pagx-viewer.st.umd.js"
     }
   },
   "files": [

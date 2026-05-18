@@ -15,25 +15,6 @@ for (let i = 0; i < args.length; i++) {
     }
 }
 
-function getFilesInDir(dir, extension) {
-    let filesList = [];
-
-    const files = fs.readdirSync(dir);
-    files.forEach(file => {
-        const fullPath = path.join(dir, file);
-        const stat = fs.statSync(fullPath);
-
-        if (stat.isFile() && fullPath.endsWith(extension)) {
-            filesList.push(fullPath);
-        }
-        else if (stat.isDirectory()) {
-            filesList = filesList.concat(getFilesInDir(fullPath, extension));
-        }
-    });
-
-    return filesList;
-}
-
 function replaceInFile(filePath, searchString, replacement) {
     const data = fs.readFileSync(filePath, 'utf-8');
     if (data.includes(searchString)) {
@@ -43,18 +24,29 @@ function replaceInFile(filePath, searchString, replacement) {
     }
 }
 
-function replaceFileNameInFiles() {
-    const dir = path.resolve(__dirname, "../lib/");
-    const extension = '.js';
-    const searchString = 'pagx-viewer.js';
-    const files = getFilesInDir(dir, extension);
+// Multi-threaded build keeps canonical filenames (pagx-viewer.umd.js, pagx-viewer.wasm).
+// Single-threaded build adds a `.st` infix; the wasm reference baked into the emcc glue
+// must be rewritten so each bundle loads its matching wasm.
+const libDir = path.resolve(__dirname, '../lib');
+const isSt = argv.a === 'wasm';
+const nameInfix = isSt ? '.st' : '';
+const bundleNames = ['umd', 'esm', 'cjs', 'min'].map(
+    (kind) => `pagx-viewer${nameInfix}.${kind}.js`,
+);
 
-    files.forEach(file => {
-        const fileName = path.basename(file);
-        replaceInFile(file, searchString, fileName);
-    });
-}
-
-if(argv.a ==="wasm-mt"){
-    replaceFileNameInFiles();
+for (const bundleName of bundleNames) {
+    const filePath = path.join(libDir, bundleName);
+    if (!fs.existsSync(filePath)) {
+        continue;
+    }
+    if (isSt) {
+        // The emcc glue resolves `new URL("pagx-viewer.wasm", import.meta.url)`; redirect
+        // it to the renamed single-threaded wasm.
+        replaceInFile(filePath, 'pagx-viewer.wasm', 'pagx-viewer.st.wasm');
+    } else {
+        // The multi-threaded glue spawns pthread workers via
+        // `new URL("pagx-viewer.js", import.meta.url)`; redirect that to the actual bundle
+        // filename so the worker re-loads the same module.
+        replaceInFile(filePath, 'pagx-viewer.js', bundleName);
+    }
 }
