@@ -72,6 +72,7 @@ static napi_value Init(napi_env env, napi_value exports) {
                 pag::NativeDisplayLink::InitThreadSafeFunction(env);
   if (!result) {
     LOGE("PAG InitFailed");
+    return nullptr;
   }
   return exports;
 }
