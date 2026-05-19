@@ -52,6 +52,9 @@ namespace pagx {
 
 class Group;
 class HTMLWriterContext;
+class LinearGradient;
+class RadialGradient;
+class ConicGradient;
 class Polystar;
 class Repeater;
 class Text;
@@ -404,6 +407,14 @@ class HTMLWriter {
   // absolute coordinates. Pass zero/NaN sizes when the box is irrelevant (e.g. SVG fills).
   std::string colorToCSS(const ColorSource* src, float* outAlpha, float boxLeft = 0,
                          float boxTop = 0, float boxWidth = 0, float boxHeight = 0);
+  std::string buildLinearGradientCSS(const LinearGradient* g, float boxLeft, float boxTop,
+                                     float boxWidth, float boxHeight);
+  std::string buildRadialGradientCSS(const RadialGradient* g, float boxLeft, float boxTop,
+                                     float boxWidth, float boxHeight);
+  std::string buildConicGradientCSS(const ConicGradient* g, float boxLeft, float boxTop,
+                                    float boxWidth, float boxHeight);
+  std::string buildDiamondGradientCSS(const DiamondGradient* g, float boxLeft, float boxTop,
+                                      float boxWidth, float boxHeight);
   std::string colorToSVGFill(const ColorSource* src, float* outAlpha, float bboxX = 0,
                              float bboxY = 0, float bboxW = 0, float bboxH = 0);
   void writeSVGGradientDef(const ColorSource* src, const std::string& id, float bboxX = 0,
