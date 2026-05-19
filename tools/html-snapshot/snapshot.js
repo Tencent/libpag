@@ -760,6 +760,21 @@ function takeSnapshot(config) {
   // HTML string, replaying browser paint order (flow-then-positioned, both in DOM
   // order). Used by both the regular container path and by `display: contents` passes
   // where the host element itself is suppressed.
+  // Resolve a positioned element's z-index for paint-order sorting. Computed
+  // value `auto` means the author omitted z-index; CSS treats that as 0 for
+  // stacking purposes within the same stacking context. We DO NOT model real
+  // stacking contexts here — the subset flattens every box to `position:
+  // absolute`, so a single z-index dimension along the DOM is enough to
+  // capture the common "foreground decoration" pattern (a phone notch with
+  // `z-index: 50` painted over the gradient header, a sticky tab bar painted
+  // over the content beneath, …).
+  function resolveZIndex(computed) {
+    const raw = (computed.getPropertyValue('z-index') || '').trim();
+    if (!raw || raw === 'auto') return 0;
+    const v = parseInt(raw, 10);
+    return isFinite(v) ? v : 0;
+  }
+
   function renderChildrenInto(el, parentRect) {
     const items = [];
     let domIndex = 0;
@@ -770,6 +785,7 @@ function takeSnapshot(config) {
         const isPositioned = childComputed.position !== 'static';
         items.push({
           positioned: isPositioned,
+          zIndex: isPositioned ? resolveZIndex(childComputed) : 0,
           domIndex: domIndex++,
           html: render(n, parentRect),
         });
@@ -778,14 +794,21 @@ function takeSnapshot(config) {
         if (spans.length > 0) {
           items.push({
             positioned: false,
+            zIndex: 0,
             domIndex: domIndex++,
             html: spans.join(''),
           });
         }
       }
     }
+    // Replay CSS paint order: non-positioned (flow) children first, then
+    // positioned children sorted by z-index ascending, with DOM order as
+    // tie-break. Ignoring z-index lets a sibling that was authored earlier
+    // in the DOM but assigned a higher z-index (e.g. an iOS notch with
+    // `z-index: 50`) be hidden by a later sibling at `z-index: auto`.
     items.sort((a, b) => {
       if (a.positioned !== b.positioned) return a.positioned ? 1 : -1;
+      if (a.positioned && a.zIndex !== b.zIndex) return a.zIndex - b.zIndex;
       return a.domIndex - b.domIndex;
     });
     return items.map((it) => it.html).join('');
@@ -1342,7 +1365,7 @@ function takeSnapshot(config) {
     bodyStyle.push(`background-image: ${bodyBgImage}`);
   }
 
-  // The <style> block centralises three rendering invariants that the user-agent
+  // The <style> block centralises four rendering invariants that the user-agent
   // doesn't supply by default — without them, opening the snapshot in a browser
   // diverges from both the original page and `pagx render`'s output:
   //   - `box-sizing: border-box` on every box matches the semantics of
@@ -1358,12 +1381,22 @@ function takeSnapshot(config) {
   //   - `position: relative` on <body> makes it a containing block. Otherwise
   //     our `position: absolute` children resolve to the initial containing
   //     block (the viewport) and escape the body's coordinate system.
+  //   - `<html>` becomes a flex container that centres <body> horizontally
+  //     and pads it vertically. Without this, opening the snapshot in a
+  //     viewport wider/taller than the captured canvas left the body at
+  //     (0, 0) — any `box-shadow` extending above/left of the body (e.g. a
+  //     phone-frame's outer ring drawn at y = -12) would be clipped by the
+  //     browser viewport. Using flex on <html> doesn't change <body>'s
+  //     measured rect, so the pagx importer (which roots at <body> and
+  //     ignores <html>) still sees the same canvas.
   // Element selectors inside a single `<style>` block are inside the subset
   // (`spec/html_subset.md` §3.3); the pagx importer parses them, applies the
   // (no-op) declarations, and drops the `<style>` element.
   const styleBlock =
     'div,span,img,svg,body{box-sizing:border-box}' +
-    'body{margin:0;padding:0;position:relative}';
+    'html{min-height:100vh;display:flex;justify-content:center;' +
+    'align-items:flex-start;padding:32px 0}' +
+    'body{margin:0;padding:0;position:relative;flex-shrink:0}';
 
   return {
     html:
