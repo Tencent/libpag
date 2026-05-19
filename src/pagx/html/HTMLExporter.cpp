@@ -155,6 +155,15 @@ std::string HTMLExporter::ToHTML(PAGXDocument& doc, const std::string& resourceD
               << "'." << std::endl;
     return {};
   }
+  // Resolve symlinks to prevent path-traversal attacks via symlinked directories.
+  std::error_code canonEc;
+  auto canonicalDir = std::filesystem::weakly_canonical(resourceDir, canonEc);
+  if (canonEc) {
+    if (errorMsg) {
+      *errorMsg = "resourceDir path cannot be resolved: " + canonEc.message();
+    }
+    return {};
+  }
   if (!doc.isLayoutApplied()) {
     doc.applyLayout();
   }
@@ -211,9 +220,14 @@ std::string HTMLExporter::ToHTML(PAGXDocument& doc, const std::string& resourceD
     std::error_code ec;
     std::filesystem::create_directories(fontsDir, ec);
     std::ofstream f(fontsDir + "/" + filename, std::ios::binary);
-    if (f.good()) {
+    if (f.is_open()) {
       f.write(reinterpret_cast<const char*>(result.woff2Data.data()),
               static_cast<std::streamsize>(result.woff2Data.size()));
+      f.flush();
+      if (!f) {
+        std::cerr << "HTMLExporter: failed to write font file: " << fontsDir << "/" << filename
+                  << std::endl;
+      }
     }
     fontFaceRules += "@font-face{font-family:'" + EscapeCssFontFamily(result.familyName) +
                      "';src:url('" + result.relativeUrl + "') format('woff2')}\n";

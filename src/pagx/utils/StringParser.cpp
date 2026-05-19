@@ -407,7 +407,7 @@ std::string CssFloatToString(float value) {
     return "0";
   }
   char buf[32] = {};
-  snprintf(buf, sizeof(buf), "%.3f", value);
+  snprintf(buf, sizeof(buf), "%.4f", value);
   std::string s(buf);
   if (s.find('.') != std::string::npos) {
     size_t lastNonZero = s.find_last_not_of('0');

@@ -44,13 +44,13 @@ CLI_TEST(StringParserTest, CssFloatToString_Half) {
 }
 
 CLI_TEST(StringParserTest, CssFloatToString_AlphaQuantized) {
-  // 21/255, the alpha that previously emitted as "0.0823529".
-  EXPECT_EQ(pagx::CssFloatToString(21.0f / 255.0f), "0.082");
+  // 21/255 ≈ 0.08235, rounded to 4 decimal places.
+  EXPECT_EQ(pagx::CssFloatToString(21.0f / 255.0f), "0.0824");
 }
 
 CLI_TEST(StringParserTest, CssFloatToString_AngleSmallFraction) {
-  // Previously "-1.90915" (six significant digits).
-  EXPECT_EQ(pagx::CssFloatToString(-1.90915f), "-1.909");
+  // -1.90915 rounded to 4 decimal places.
+  EXPECT_EQ(pagx::CssFloatToString(-1.90915f), "-1.9092");
 }
 
 CLI_TEST(StringParserTest, CssFloatToString_AngleTwoDecimal) {
@@ -59,8 +59,8 @@ CLI_TEST(StringParserTest, CssFloatToString_AngleTwoDecimal) {
 }
 
 CLI_TEST(StringParserTest, CssFloatToString_MatrixCoeff45Deg) {
-  // sin/cos of 45° truncated from 0.7071067 to 3 dp.
-  EXPECT_EQ(pagx::CssFloatToString(0.7071067f), "0.707");
+  // sin/cos of 45° ≈ 0.7071067, rounded to 4 decimal places.
+  EXPECT_EQ(pagx::CssFloatToString(0.7071067f), "0.7071");
 }
 
 CLI_TEST(StringParserTest, CssFloatToString_PathLargeMagnitude) {

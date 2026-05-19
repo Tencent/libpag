@@ -313,7 +313,8 @@ std::string CSSStops(const std::vector<ColorStop*>& stops) {
   }
   if (stops.size() == 1) {
     auto c = ColorToRGBA(firstValid->color);
-    return c + "," + c;
+    auto pct = CssFloatToString(firstValid->offset * 100.0f);
+    return c + " " + pct + "%," + c + " " + pct + "%";
   }
   std::string r;
   r.reserve(stops.size() * 32);

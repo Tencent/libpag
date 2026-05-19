@@ -130,6 +130,12 @@ static void EncodeCFFNumber(std::vector<uint8_t>& buf, float val) {
 
 // --- CFF INDEX structure ---
 
+static void WriteOffsetValue(std::vector<uint8_t>& buf, uint32_t off, uint8_t offSize) {
+  for (int i = offSize - 1; i >= 0; i--) {
+    WriteU8(buf, static_cast<uint8_t>((off >> (i * 8)) & 0xFF));
+  }
+}
+
 static void WriteCFFIndex(std::vector<uint8_t>& buf,
                           const std::vector<std::vector<uint8_t>>& items) {
   uint16_t count = static_cast<uint16_t>(items.size());
@@ -155,15 +161,10 @@ static void WriteCFFIndex(std::vector<uint8_t>& buf,
   WriteU8(buf, offSize);
   // Write offset array (1-based)
   uint32_t offset = 1;
-  auto writeOffset = [&](uint32_t off) {
-    for (int i = offSize - 1; i >= 0; i--) {
-      WriteU8(buf, static_cast<uint8_t>((off >> (i * 8)) & 0xFF));
-    }
-  };
-  writeOffset(offset);
+  WriteOffsetValue(buf, offset, offSize);
   for (auto& item : items) {
     offset += static_cast<uint32_t>(item.size());
-    writeOffset(offset);
+    WriteOffsetValue(buf, offset, offSize);
   }
   // Write data
   for (auto& item : items) {
@@ -183,19 +184,12 @@ static void EncodeDictOperator(std::vector<uint8_t>& buf, uint8_t op) {
 
 // --- CharString building ---
 
-static std::vector<uint8_t> BuildCharString(const PathData* path) {
-  std::vector<uint8_t> cs;
-  if (path == nullptr || path->isEmpty()) {
-    WriteU8(cs, 14);  // endchar
-    return cs;
-  }
-
+struct CFFCharStringVisitor {
+  std::vector<uint8_t>& cs;
   float curX = 0.0f;
   float curY = 0.0f;
 
-  // PAGX uses screen coordinates (Y axis points down), but CFF/OpenType uses typographic
-  // coordinates (Y axis points up). Negate all Y values during charstring encoding.
-  path->forEach([&](PathVerb verb, const Point* pts) {
+  void operator()(PathVerb verb, const Point* pts) {
     switch (verb) {
       case PathVerb::Move: {
         float dx = pts[0].x - curX;
@@ -265,16 +259,41 @@ static std::vector<uint8_t> BuildCharString(const PathData* path) {
         break;
       }
       case PathVerb::Close:
-        // CFF closes subpath automatically; no operator needed.
         break;
     }
-  });
+  }
+};
+
+static std::vector<uint8_t> BuildCharString(const PathData* path) {
+  std::vector<uint8_t> cs;
+  if (path == nullptr || path->isEmpty()) {
+    WriteU8(cs, 14);  // endchar
+    return cs;
+  }
+
+  // PAGX uses screen coordinates (Y axis points down), but CFF/OpenType uses typographic
+  // coordinates (Y axis points up). Negate all Y values during charstring encoding.
+  CFFCharStringVisitor visitor{cs};
+  path->forEach(std::ref(visitor));
 
   WriteU8(cs, 14);  // endchar
   return cs;
 }
 
 // --- Table builders ---
+
+static std::vector<uint8_t> BuildCFFTopDict(uint32_t charsetOff, uint32_t charStringsOff,
+                                            uint32_t privateDictSize, uint32_t privateDictOff) {
+  std::vector<uint8_t> dict;
+  EncodeCFFInt(dict, static_cast<int32_t>(charsetOff));
+  EncodeDictOperator(dict, 15);
+  EncodeCFFInt(dict, static_cast<int32_t>(charStringsOff));
+  EncodeDictOperator(dict, 17);
+  EncodeCFFInt(dict, static_cast<int32_t>(privateDictSize));
+  EncodeCFFInt(dict, static_cast<int32_t>(privateDictOff));
+  EncodeDictOperator(dict, 18);
+  return dict;
+}
 
 static std::vector<uint8_t> BuildCFF(const Font* font, const std::string& familyName) {
   std::vector<uint8_t> cff;
@@ -369,24 +388,8 @@ static std::vector<uint8_t> BuildCFF(const Font* font, const std::string& family
   size_t afterNameIndex = cff.size();
 
   // Estimate top dict: we'll build it with 5-byte operands for all offsets
-  auto buildTopDict = [&](uint32_t charsetOff, uint32_t charStringsOff, uint32_t privateDictSize,
-                          uint32_t privateDictOff) -> std::vector<uint8_t> {
-    std::vector<uint8_t> dict;
-    // charset
-    EncodeCFFInt(dict, static_cast<int32_t>(charsetOff));
-    EncodeDictOperator(dict, 15);
-    // CharStrings
-    EncodeCFFInt(dict, static_cast<int32_t>(charStringsOff));
-    EncodeDictOperator(dict, 17);
-    // Private (size, offset)
-    EncodeCFFInt(dict, static_cast<int32_t>(privateDictSize));
-    EncodeCFFInt(dict, static_cast<int32_t>(privateDictOff));
-    EncodeDictOperator(dict, 18);
-    return dict;
-  };
-
-  // First pass with large placeholder offsets to get stable sizes
-  auto tempDict = buildTopDict(0xFFFF, 0xFFFF, static_cast<uint32_t>(privateDict.size()), 0xFFFF);
+  auto tempDict =
+      BuildCFFTopDict(0xFFFF, 0xFFFF, static_cast<uint32_t>(privateDict.size()), 0xFFFF);
   std::vector<std::vector<uint8_t>> topDictItems;
   topDictItems.push_back(tempDict);
   std::vector<uint8_t> topDictIndex;
@@ -403,8 +406,8 @@ static std::vector<uint8_t> BuildCFF(const Font* font, const std::string& family
       static_cast<uint32_t>(baseOffset + charset.size() + charStringsData.size());
 
   // Rebuild top dict with real offsets
-  auto finalDict = buildTopDict(charsetOffset, charStringsOffset,
-                                static_cast<uint32_t>(privateDict.size()), privateDictOffset);
+  auto finalDict = BuildCFFTopDict(charsetOffset, charStringsOffset,
+                                   static_cast<uint32_t>(privateDict.size()), privateDictOffset);
 
   // Check if size changed (it might due to different integer encoding sizes)
   topDictItems.clear();
@@ -413,14 +416,14 @@ static std::vector<uint8_t> BuildCFF(const Font* font, const std::string& family
   WriteCFFIndex(topDictIndex, topDictItems);
 
   if (topDictIndex.size() != topDictIndexSize) {
-    // Recompute with new size
+    // Offset encoding size changed (typically 1 iteration suffices to stabilize).
     topDictIndexSize = topDictIndex.size();
     baseOffset = afterNameIndex + topDictIndexSize + stringIndex.size() + globalSubrIndex.size();
     charsetOffset = static_cast<uint32_t>(baseOffset);
     charStringsOffset = static_cast<uint32_t>(baseOffset + charset.size());
     privateDictOffset = static_cast<uint32_t>(baseOffset + charset.size() + charStringsData.size());
-    finalDict = buildTopDict(charsetOffset, charStringsOffset,
-                             static_cast<uint32_t>(privateDict.size()), privateDictOffset);
+    finalDict = BuildCFFTopDict(charsetOffset, charStringsOffset,
+                                static_cast<uint32_t>(privateDict.size()), privateDictOffset);
     topDictItems.clear();
     topDictItems.push_back(finalDict);
     topDictIndex.clear();
@@ -466,14 +469,15 @@ static std::vector<uint8_t> BuildOS2(const Font* font, uint16_t numGlyphs) {
     WriteU8(table, 0);
   }
   // ulUnicodeRange1-4: set bit 57 (PUA) -> ulUnicodeRange3 bit 25
-  WriteU32(table, 0);                                              // ulUnicodeRange1
-  WriteU32(table, 0);                                              // ulUnicodeRange2
-  WriteU32(table, 0x02000000);                                     // ulUnicodeRange3 (bit 57 = PUA)
-  WriteU32(table, 0);                                              // ulUnicodeRange4
-  WriteTag(table, "    ");                                         // achVendID
-  WriteU16(table, 0);                                              // fsSelection
-  WriteU16(table, 0xE000);                                         // usFirstCharIndex
-  WriteU16(table, static_cast<uint16_t>(0xE000 + numGlyphs - 2));  // usLastCharIndex
+  WriteU32(table, 0);           // ulUnicodeRange1
+  WriteU32(table, 0);           // ulUnicodeRange2
+  WriteU32(table, 0x02000000);  // ulUnicodeRange3 (bit 57 = PUA)
+  WriteU32(table, 0);           // ulUnicodeRange4
+  WriteTag(table, "    ");      // achVendID
+  WriteU16(table, 0);           // fsSelection
+  WriteU16(table, 0xE000);      // usFirstCharIndex
+  WriteU16(table,
+           static_cast<uint16_t>(std::min(0xFFFFu, 0xE000u + numGlyphs - 2u)));  // usLastCharIndex
   auto upm = static_cast<int16_t>(font->unitsPerEm);
   WriteI16(table, upm);                         // sTypoAscender
   WriteI16(table, 0);                           // sTypoDescender
@@ -861,10 +865,13 @@ struct TableEntry {
   std::vector<uint8_t> data;
 };
 
+static bool CompareTableEntries(const TableEntry& a, const TableEntry& b) {
+  return strcmp(a.tag, b.tag) < 0;
+}
+
 static std::vector<uint8_t> AssembleSFNT(std::vector<TableEntry>& tables, bool isTrueType) {
   // Sort tables alphabetically by tag
-  std::sort(tables.begin(), tables.end(),
-            [](const TableEntry& a, const TableEntry& b) { return strcmp(a.tag, b.tag) < 0; });
+  std::sort(tables.begin(), tables.end(), CompareTableEntries);
 
   uint16_t numTables = static_cast<uint16_t>(tables.size());
   // searchRange = (2^floor(log2(numTables))) * 16
