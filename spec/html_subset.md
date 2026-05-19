@@ -140,11 +140,16 @@ Disallowed (warning + skip): `margin*`, `flex-wrap`, `flex-grow`, `flex-shrink`,
 | CSS | PAGX |
 |-----|------|
 | `position: absolute` + `left/right/top/bottom: N` | `includeInLayout="false"` + `left|right|top|bottom="N"` on the Layer |
+| `position: relative` | silently dropped (no-op) |
 | Negative offsets (e.g. `top: -6px`) | passed through unchanged |
 
-`position: relative`, `position: fixed`, `position: sticky`, and absolute positioning on
-text leaves (`<p>`, `<span>`) are warned and downgraded to absolute on the surrounding
-Layer.
+`position: relative` is dropped silently — PAGX has no containing-block concept (child
+Layers always anchor to their direct parent), so the declaration has no PAGX-side
+effect. Pairing `position: relative` with `left/right/top/bottom` offsets is therefore
+also a no-op (the offsets are ignored alongside the dropped position).
+
+`position: fixed`, `position: sticky`, and absolute positioning on text leaves
+(`<p>`, `<span>`) are warned and downgraded to absolute on the surrounding Layer.
 
 ### 4.4 Painting and Effects
 
@@ -326,7 +331,7 @@ Behaviour:
 | DocumentSkeleton | merges duplicate `<head>` / `<body>`, lowercases tags, strips comments / processing instructions, drops `<head>` children other than `<title>` / `<meta>` / `<style>` | `<script>` and other disallowed `<head>` content (`subset:unsupported-tag`); external `<link rel="stylesheet">` (`subset:external-stylesheet`); stray top-level elements between `<html>` and `<body>` (`subset:unsupported-tag`) |
 | StyleSheetCollector | inlines class- and element-selector rules from a single `<style>` block into the per-element cascade and removes the `<style>` element | universal `*`, descendant / pseudo / attribute selectors (`subset:unsupported-selector`); `@media`, `@font-face`, `@keyframes` and any other at-rule (`subset:unsupported-at-rule`) |
 | ComputedStyle | resolves the cascade (inherited → element defaults → element rules → class rules → inline `style`) and writes the merged map back as inline style | — |
-| PropertyFilter | converts `em` → px (resolved against the parent's computed `font-size`), `rem` → px (16-px base), `vw`/`vh` → px (resolved against canvas size), `pt` → px; collapses `flex: <grow> <shrink> <basis>` to `flex: <grow>` (`subset:flex-shorthand-collapsed`); downgrades `position: relative \| fixed \| sticky` to `position: absolute` | `margin*`, `transform*`, `clip-path`, `outline`, `float`, `order`, `align-content`, `align-self`, `direction`, `unicode-bidi`, `flex-wrap`, `flex-grow`, `flex-shrink`, `flex-basis`, `min-*`, `max-*`, `aspect-ratio`, `background-size`, `background-repeat`, `background-position`, `text-transform`, `text-indent`, `word-*`, `overflow-wrap`, `font-variant`, `font-stretch`, `font` shorthand, `grid-*`, per-side `border-*`, per-corner `border-*-radius`, `z-index`, `cursor`, `pointer-events`, `user-select`, `visibility` (`subset:unsupported-property`); `var()`, `calc()`, `min/max/clamp()` (`subset:unsupported-property`); other unknown units (`subset:unsupported-property`) |
+| PropertyFilter | converts `em` → px (resolved against the parent's computed `font-size`), `rem` → px (16-px base), `vw`/`vh` → px (resolved against canvas size), `pt` → px; collapses `flex: <grow> <shrink> <basis>` to `flex: <grow>` (`subset:flex-shorthand-collapsed`); silently drops `position: relative` (no-op in PAGX, see §4.3); downgrades `position: fixed \| sticky` to `position: absolute` | `margin*`, `transform*`, `clip-path`, `outline`, `float`, `order`, `align-content`, `align-self`, `direction`, `unicode-bidi`, `flex-wrap`, `flex-grow`, `flex-shrink`, `flex-basis`, `min-*`, `max-*`, `aspect-ratio`, `background-size`, `background-repeat`, `background-position`, `text-transform`, `text-indent`, `word-*`, `overflow-wrap`, `font-variant`, `font-stretch`, `font` shorthand, `grid-*`, per-side `border-*`, per-corner `border-*-radius`, `z-index`, `cursor`, `pointer-events`, `user-select`, `visibility` (`subset:unsupported-property`); `var()`, `calc()`, `min/max/clamp()` (`subset:unsupported-property`); other unknown units (`subset:unsupported-property`) |
 | AbsoluteToFlexInference *(opt-in: `Options::inferFlexFromAbsolute` / `--html-infer-flex`)* | rewrites a container whose children form a clean 1D row or column of `position: absolute` boxes into `display: flex` with inferred `gap`, `padding`, `align-items`, `flex-direction`; strips the children's `position` / `left` / `right` / `top` / `bottom` (`subset:flex-inferred`) | containers whose children overlap on both axes, mix cross-axis alignment, or have inconsistent main-axis spacing are left untouched (`subset:flex-inference-skipped`) |
 | StructureNormalization | wraps stray text inside a container in `<p>` (`subset:text-wrapped`); drops whitespace-only text nodes between elements; leaves `<svg>` subtrees opaque so the SVG resolver can see them verbatim | unknown tags (`<table>`, `<form>`, `<input>`, `<button>`, custom elements, etc.) are removed (`subset:unsupported-tag`); with `--html-preserve-unknown` they're kept as `<div data-html-unknown="<tag>">` instead |
 | InlineStyleEmitter | rewrites every element's resolved style map back into `style="…"` with alphabetically sorted properties for deterministic output; drops the now-redundant `class` attribute (kept when `Options::preserveClassAttribute` is true) | — |

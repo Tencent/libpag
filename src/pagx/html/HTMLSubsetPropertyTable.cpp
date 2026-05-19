@@ -176,7 +176,18 @@ std::string TransformPosition(const std::string& value, const PropertyContext& c
   std::string lc = ToLower(Trim(value));
   if (lc == "absolute") return "absolute";
   if (lc == "static") return std::string();  // default; drop silently
-  if (lc == "relative" || lc == "fixed" || lc == "sticky") {
+  // `position: relative` in CSS keeps the element in normal flow and only
+  // establishes a containing block for absolutely-positioned descendants. PAGX
+  // has no containing-block concept — child layers always anchor to their direct
+  // parent — so the declaration has no PAGX-side effect. Drop it silently and
+  // leave the element in flow, which matches both the CSS visual (when no
+  // offsets are paired with it) and the PAGX semantics for the surrounding
+  // layout. `tools/html-snapshot/snapshot.js` emits this on flex items
+  // specifically to give a real browser a containing block for the abs
+  // descendants in the subtree; downgrading to `absolute` instead would yank
+  // those flex items out of the parent's flex flow on import.
+  if (lc == "relative") return std::string();
+  if (lc == "fixed" || lc == "sticky") {
     diags.warn("subset:unsupported-property",
                "html: 'position: " + lc + "' on '" + ctx.ownerTag + "' downgraded to absolute");
     return "absolute";

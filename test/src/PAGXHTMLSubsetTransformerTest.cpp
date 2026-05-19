@@ -254,11 +254,30 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, VwResolvesAgainstCanvasWidth) {
   EXPECT_TRUE(StyleContains(div, "width: 400px"));
 }
 
-PAG_TEST(PAGXHTMLSubsetTransformerTest, PositionRelativeIsDowngradedToAbsolute) {
+PAG_TEST(PAGXHTMLSubsetTransformerTest, PositionRelativeIsDroppedSilently) {
+  // PAGX has no CSS-style containing-block concept (children always anchor to
+  // their direct parent), so `position: relative` is a no-op and we drop it
+  // without a warning. This lets the html-snapshot pipeline emit
+  // `position: relative` on flex items — needed so abs descendants anchor
+  // correctly when the snapshot is opened in a real browser — without the
+  // importer downgrading those flex items to `position: absolute` and yanking
+  // them out of the parent's flex flow.
   std::shared_ptr<pagx::DOMNode> root;
   auto result = RunTransform(
       R"HTML(<html><body style="width:1px;height:1px">
                <div style="position: relative; top: 0"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  auto div = FirstBodyChild(root, "div");
+  EXPECT_FALSE(StyleContains(div, "position:"));
+  EXPECT_FALSE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, PositionFixedIsDowngradedToAbsolute) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="position: fixed; top: 0"></div></body></html>)HTML",
       &root);
   ASSERT_TRUE(result.ok);
   auto div = FirstBodyChild(root, "div");

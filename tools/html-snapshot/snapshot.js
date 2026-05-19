@@ -533,9 +533,20 @@ function takeSnapshot(config) {
   // so the element can participate in a parent flex flow without being taken out of
   // it (PAGX's flex engine ignores items with `position: absolute` by spec; mixing
   // them with flex siblings collapses the parent back to absolute on import).
+  //
+  // Flex items also receive `position: relative`. Their subtree contains
+  // `position: absolute` descendants (every non-flex-item kept element is emitted
+  // as absolute), and without a positioned ancestor those descendants would
+  // escape the flex item entirely when the snapshot is opened in a real browser
+  // — they would anchor to whichever positioned ancestor lives higher up the
+  // tree, collapsing every card's content into a single overlapping cluster.
+  // The PAGX importer treats `position: relative` as a no-op (PAGX has no
+  // containing-block concept; all children anchor to their direct parent), so
+  // the declaration is dropped during import and the flex layout is preserved.
   function buildStyle(left, top, width, height, computed, opts) {
     const parts = [];
     if (opts.flexItem) {
+      parts.push(`position: relative`);
       parts.push(`width: ${px(width)}`);
       parts.push(`height: ${px(height)}`);
     } else if (opts.positioned !== false) {
