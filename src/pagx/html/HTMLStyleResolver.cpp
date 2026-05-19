@@ -389,10 +389,42 @@ void HTMLParserContext::parseBoxVisuals(HTMLBoxAttributes& box,
 
   const std::string& br = LookupProperty(props, "border-radius");
   if (!br.empty()) {
-    float v = parsePxLength(br);
-    if (!std::isnan(v)) {
-      box.borderRadiusPx = v;
-      box.borderRadiusSet = true;
+    // CSS `border-radius` shorthand accepts up to 4 lengths (top-left, top-right,
+    // bottom-right, bottom-left), with an optional '/' separating horizontal and
+    // vertical radii for elliptical corners. PAGX `Rectangle` exposes a single
+    // uniform `roundness`, so:
+    //   - elliptical form (containing '/'): warn and drop the value;
+    //   - asymmetric corner values: warn and approximate with the largest radius
+    //     so the corners that should be rounded stay rounded (corners that should
+    //     be square become rounded, but losing all rounding is the worse failure).
+    if (br.find('/') != std::string::npos) {
+      warn("html: elliptical border-radius '" + br + "' not supported by PAGX Rectangle; ignored");
+    } else {
+      auto tokens = SplitTopLevelWhitespace(br);
+      std::vector<float> nums;
+      for (auto& t : tokens) {
+        float v = parsePxLength(t);
+        if (std::isnan(v)) {
+          warn("html: invalid border-radius token '" + t + "'");
+          continue;
+        }
+        nums.push_back(v);
+      }
+      if (!nums.empty()) {
+        float maxR = nums[0];
+        bool asymmetric = false;
+        for (size_t i = 1; i < nums.size(); ++i) {
+          if (nums[i] != nums[0]) asymmetric = true;
+          if (nums[i] > maxR) maxR = nums[i];
+        }
+        if (asymmetric) {
+          warn("html: per-corner border-radius '" + br +
+               "' approximated with a single roundness (PAGX Rectangle does not "
+               "support per-corner radii)");
+        }
+        box.borderRadiusPx = maxR;
+        box.borderRadiusSet = true;
+      }
     }
   }
 
