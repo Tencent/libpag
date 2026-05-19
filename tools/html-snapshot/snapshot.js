@@ -501,15 +501,35 @@ function takeSnapshot(config) {
   }
 
   // Emit one absolutely-positioned, nowrap <span> per line of `textNode`,
-  // positioned relative to `parentRect`.
+  // positioned relative to `parentRect`. When the line's measured glyph rect
+  // is shorter than the computed `line-height` (Chromium's `getClientRects`
+  // reports glyph bounds for inline text, not the line box), expand each
+  // line span vertically to the full line-height and re-centre it around
+  // the original glyph mid-line. Without this PAGX's text engine, whose
+  // baseline / leading model differs from Chromium's by sub-pixel amounts,
+  // ends up rendering the final line a hair below the span's declared
+  // bottom — invisible on Latin block text but clipping descenders and
+  // bottom-heavy CJK strokes inside a `line-clamp` wrapper whose own height
+  // was pinned to exactly N × line-height. Same shift is applied to the
+  // line's top so the visible glyph centre still lines up with Chromium's
+  // measurement; the per-line stride (top-to-top) is already line-height,
+  // so consecutive expanded spans tile cleanly without overlap.
   function emitTextSpans(textNode, parentRect, computed) {
     const ws = computed.getPropertyValue('white-space');
     const lines = splitTextNodeIntoLines(textNode, ws);
+    const lineHeightPx = parseFloat(computed.getPropertyValue('line-height')) || 0;
     const out = [];
     for (const line of lines) {
+      let lt = line.rect.top;
+      let lh = line.rect.height;
+      if (lineHeightPx > lh + 0.1) {
+        const delta = (lineHeightPx - lh) / 2;
+        lt -= delta;
+        lh = lineHeightPx;
+      }
       const tl = line.rect.left - parentRect.left;
-      const tt = line.rect.top - parentRect.top;
-      const base = buildStyle(tl, tt, line.rect.width, line.rect.height, computed, {
+      const tt = lt - parentRect.top;
+      const base = buildStyle(tl, tt, line.rect.width, lh, computed, {
         box: false, text: true,
       });
       // Force nowrap on every line span so PAGX's text engine never re-breaks.
@@ -866,23 +886,42 @@ function takeSnapshot(config) {
     return ws !== '' || rects.length > 1;
   }
 
-  // Returns the visible element children of `el` that would render as flex items,
-  // or null when the element cannot safely be emitted as a flex container under the
-  // PAGX subset:
-  //   - any visible child is `position: absolute|fixed|sticky` (subset bans abs+flex
-  //     mixing — the importer downgrades flex to absolute on the parent),
-  //   - any non-blank text node sits directly under `el` (would become an anonymous
-  //     flex item, which the subset has no way to express),
-  //   - any visible child is `display: contents` (its grandchildren would need to be
-  //     flattened into the flex flow; deferred to a future iteration),
-  //   - any visible child is a multi-line pure-text leaf (see comment above).
-  // Returns the kept children (in DOM order) when the container is safe; an empty
-  // array is also rejected (no point declaring flex on a leaf).
+  // Returns the visible children of `el` that would render as flex items, or
+  // null when the element cannot safely be emitted as a flex container under
+  // the PAGX subset. Each returned entry is either
+  //   { kind: 'element', node: HTMLElement } — normal flex item, or
+  //   { kind: 'text', node: TextNode, rect: DOMRect } — an anonymous flex
+  //     item that wraps a bare text-node child (the CSS spec wraps these in
+  //     an anonymous box; PAGX has no concept of anonymous boxes, so we
+  //     emit an explicit <span> flex item for the text and use its measured
+  //     rect for sizing).
+  // Bail (return null) when:
+  //   - a visible child is `position: absolute|fixed|sticky` (subset bans
+  //     abs+flex mixing — the importer downgrades flex to absolute on the
+  //     parent),
+  //   - a bare text-node child wraps onto multiple lines (we can't express
+  //     "this single flex item is multi-line text" with one <span>),
+  //   - a visible child is `display: contents` (its grandchildren would need
+  //     to be flattened into the flex flow; deferred to a future iteration),
+  //   - a visible child is a multi-line pure-text leaf (see comment above).
+  // An empty result is also rejected (no point declaring flex on a leaf).
   function flexItemChildren(el) {
     const out = [];
     for (const c of el.childNodes) {
       if (c.nodeType === Node.TEXT_NODE) {
-        if (c.nodeValue && c.nodeValue.trim()) return null;
+        if (!c.nodeValue || !c.nodeValue.trim()) continue;
+        // Bail unless the text fits on a single line: a multi-line anonymous
+        // flex item would need a sized wrapper plus per-line spans, which
+        // pushes us back into the absolute world (PAGX flex items can't
+        // host absolutely-positioned line spans).
+        const range = document.createRange();
+        range.selectNodeContents(c);
+        const rects = range.getClientRects();
+        range.detach && range.detach();
+        if (rects.length !== 1) return null;
+        const r = rects[0];
+        if (r.width <= 0 || r.height <= 0) continue;
+        out.push({ kind: 'text', node: c, rect: r });
         continue;
       }
       if (c.nodeType !== Node.ELEMENT_NODE) continue;
@@ -894,7 +933,7 @@ function takeSnapshot(config) {
       const pos = cs.position;
       if (pos === 'absolute' || pos === 'fixed' || pos === 'sticky') return null;
       if (isMultiLineTextLeafItem(c)) return null;
-      out.push(c);
+      out.push({ kind: 'element', node: c });
     }
     return out.length ? out : null;
   }
@@ -925,7 +964,9 @@ function takeSnapshot(config) {
       ? computed.getPropertyValue('column-gap')
       : computed.getPropertyValue('row-gap');
     const declaredGap = parseFloat(gapRaw) || 0;
-    const rects = children.map((c) => c.getBoundingClientRect());
+    const rects = children.map((c) => (
+      c.kind === 'text' ? c.rect : c.node.getBoundingClientRect()
+    ));
     const TOLERANCE = 1.5;
     for (let i = 0; i + 1 < rects.length; i++) {
       const a = rects[i];
@@ -958,8 +999,12 @@ function takeSnapshot(config) {
 
   // Render an element + its subtree as a flex container. The container itself is
   // either positioned absolutely against `parentRect` (default) or sized as a flex
-  // item against an outer flex parent (when `opts.flexItem` is true). Each child is
-  // recursed with `flexItem: true` so it doesn't carry `position: absolute`.
+  // item against an outer flex parent (when `opts.flexItem` is true). Element
+  // children recurse through `render` with `flexItem: true`; anonymous text-node
+  // children are wrapped in a sized `<span>` flex item — the text inherits the
+  // container's `color`/`font-*` cascade, so the wrapper only needs the explicit
+  // dimensions to participate in flex layout (PAGX's flex engine then aligns it
+  // against its siblings via the container's `align-items` setting).
   function renderFlexContainer(el, parentRect, computed, flexChildren, opts) {
     const rect = el.getBoundingClientRect();
     const left = rect.left - parentRect.left;
@@ -971,9 +1016,28 @@ function takeSnapshot(config) {
     const style = joinStyles(wrapperBase, flexStyle);
     const childParts = [];
     for (const child of flexChildren) {
-      childParts.push(render(child, rect, { flexItem: true }));
+      if (child.kind === 'text') {
+        childParts.push(renderFlexTextItem(child, computed));
+      } else {
+        childParts.push(render(child.node, rect, { flexItem: true }));
+      }
     }
     return `<div style="${style}">${childParts.join('')}</div>`;
+  }
+
+  // Emit a bare text-node child of a flex container as a sized <span> flex
+  // item. The text inherits color/font-* from the container's computed style;
+  // we only need to forward the inherited text props plus the explicit
+  // dimensions (so the flex engine can place it). `withNowrap` is mandatory:
+  // the measured rect was for a single line and PAGX's text engine must not
+  // rewrap at a sub-pixel divergence.
+  function renderFlexTextItem(child, parentComputed) {
+    const r = child.rect;
+    const text = (child.node.nodeValue || '').replace(/\s+/g, ' ').trim();
+    const baseStyle = buildStyle(0, 0, r.width, r.height, parentComputed, {
+      box: false, text: true, flexItem: true,
+    });
+    return `<span style="${withNowrap(baseStyle)}">${escapeHtml(text)}</span>`;
   }
 
   // SVG icon: emit a wrapper carrying only `color` (so currentColor strokes/fills
@@ -1104,16 +1168,42 @@ function takeSnapshot(config) {
   //   - flex / inline-flex sources forward their full subset-shaped flex
   //     configuration (direction, padding, align-items, justify-content) so
   //     PAGX treats the inner span as a flex item and recentres it,
-  //   - block sources with padding forward the padding alone so the inline
-  //     span starts inside the padding box (Chromium's natural placement).
-  // Plain text wrappers (no padding, no flex) return ''.
+  //   - non-flex sources whose vertical padding is symmetric (the typical
+  //     case for buttons / badges / pill labels / count text — `px-N` with
+  //     no `py`, or no padding at all) emit `display: flex; align-items:
+  //     center` plus the source padding. This re-creates the implicit
+  //     vertical centring that the user-agent applies to `<button>` form
+  //     controls (and that line-height centring delivers for inline text
+  //     inside a box whose height equals the line height) under PAGX's text
+  //     engine, which otherwise lays the inner <span> flush against the top
+  //     of the wrapper. `justify-content` is derived from `text-align` so
+  //     centred labels (the default for `<button>`) stay centred and
+  //     end/right-aligned labels stay aligned.
+  //   - non-flex sources with asymmetric vertical padding fall back to
+  //     padding-only so the source's deliberately off-centre text isn't
+  //     re-centred (PAGX's flex centring would override the asymmetry).
   function textLeafInnerLayout(computed) {
     const display = computed.display;
     if (display === 'flex' || display === 'inline-flex') {
       return collectFlexProps(computed, false);
     }
     const pad = readPadding(computed);
-    if (pad.top > 0 || pad.right > 0 || pad.bottom > 0 || pad.left > 0) {
+    const hasPad = pad.top > 0 || pad.right > 0 || pad.bottom > 0 || pad.left > 0;
+    const symmetricVPad = Math.abs(pad.top - pad.bottom) < 0.5;
+    if (symmetricVPad) {
+      const parts = ['display: flex', 'align-items: center'];
+      const textAlign = (computed.getPropertyValue('text-align') || '').trim();
+      if (textAlign === 'center') {
+        parts.push('justify-content: center');
+      } else if (textAlign === 'right' || textAlign === 'end') {
+        parts.push('justify-content: flex-end');
+      }
+      if (hasPad) {
+        parts.push(`padding: ${paddingShorthand(pad.top, pad.right, pad.bottom, pad.left)}`);
+      }
+      return parts.join('; ');
+    }
+    if (hasPad) {
       return `padding: ${paddingShorthand(pad.top, pad.right, pad.bottom, pad.left)}`;
     }
     return '';
