@@ -1184,12 +1184,36 @@ function takeSnapshot(config) {
     bodyStyle.push(`background-image: ${bodyBgImage}`);
   }
 
+  // The <style> block centralises three rendering invariants that the user-agent
+  // doesn't supply by default — without them, opening the snapshot in a browser
+  // diverges from both the original page and `pagx render`'s output:
+  //   - `box-sizing: border-box` on every box matches the semantics of
+  //     `getBoundingClientRect()` (the source for our `width`/`height`): we
+  //     record padded/bordered extents, so the browser default `content-box`
+  //     would re-add padding on top and inflate every wrapper. The pagx
+  //     importer already treats border-box as the default
+  //     (HTMLStyleResolver.cpp), so this is purely browser-side parity.
+  //   - `margin: 0` / `padding: 0` on <body> cancel the user-agent 8px body
+  //     margin. The snapshot script already zeroes them on the live DOM
+  //     before measuring; without echoing that into the output, every
+  //     absolute child reads 8 px short on both axes when re-opened.
+  //   - `position: relative` on <body> makes it a containing block. Otherwise
+  //     our `position: absolute` children resolve to the initial containing
+  //     block (the viewport) and escape the body's coordinate system.
+  // Element selectors inside a single `<style>` block are inside the subset
+  // (`spec/html_subset.md` §3.3); the pagx importer parses them, applies the
+  // (no-op) declarations, and drops the `<style>` element.
+  const styleBlock =
+    'div,span,img,svg,body{box-sizing:border-box}' +
+    'body{margin:0;padding:0;position:relative}';
+
   return {
     html:
 `<!DOCTYPE html>
 <html>
   <head>
     <title>${title.replace(/</g, '&lt;').replace(/&/g, '&amp;')}</title>
+    <style>${styleBlock}</style>
   </head>
   <body style="${bodyStyle.join('; ')}">
 ${parts.join('')}
