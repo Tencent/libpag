@@ -447,37 +447,43 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type, Point mas
   std::string fillAttr = "white";
   float fillOpacity = 1.0f;
 
-  // Compute bounding box of mask geometry for SVG viewBox. Each element
-  // reports its final geometry through renderPosition/renderSize so authored
-  // shorthand like <Rectangle width="W" height="H"/> (which leaves the
-  // intrinsic size at {0,0}) is handled correctly.
-  float maxX = 0;
-  float maxY = 0;
+  // Compute bounding box of mask geometry for SVG viewBox. Track both min and max
+  // extents so that masks positioned at negative coordinates are fully enclosed.
+  float minX = 1e9f;
+  float minY = 1e9f;
+  float maxX = -1e9f;
+  float maxY = -1e9f;
   for (auto* e : mask->contents) {
     if (e->nodeType() == NodeType::Rectangle) {
       auto rect = static_cast<const Rectangle*>(e);
       auto pos = rect->renderPosition();
       auto sz = rect->renderSize();
+      minX = std::min(minX, pos.x - sz.width / 2);
+      minY = std::min(minY, pos.y - sz.height / 2);
       maxX = std::max(maxX, pos.x + sz.width / 2);
       maxY = std::max(maxY, pos.y + sz.height / 2);
     } else if (e->nodeType() == NodeType::Ellipse) {
       auto el = static_cast<const Ellipse*>(e);
       auto pos = el->renderPosition();
       auto sz = el->renderSize();
+      minX = std::min(minX, pos.x - sz.width / 2);
+      minY = std::min(minY, pos.y - sz.height / 2);
       maxX = std::max(maxX, pos.x + sz.width / 2);
       maxY = std::max(maxY, pos.y + sz.height / 2);
     } else if (e->nodeType() == NodeType::Polystar) {
       auto ps = static_cast<const Polystar*>(e);
       float r = std::max(ps->outerRadius, ps->innerRadius);
       auto pos = ps->renderPosition();
+      minX = std::min(minX, pos.x - r);
+      minY = std::min(minY, pos.y - r);
       maxX = std::max(maxX, pos.x + r);
       maxY = std::max(maxY, pos.y + r);
     }
   }
-  if (FloatNearlyZero(maxX)) {
+  if (minX >= 1e9f) {
+    minX = 0;
+    minY = 0;
     maxX = _ctx->docWidth;
-  }
-  if (FloatNearlyZero(maxY)) {
     maxY = _ctx->docHeight;
   }
 
@@ -486,9 +492,12 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type, Point mas
   // xmlns is required for SVG inside data: URLs — the browser parses this as a standalone SVG
   // document, not as part of the HTML5 DOM where xmlns would be redundant.
   svg.addAttr("xmlns", "http://www.w3.org/2000/svg");
-  svg.addAttr("width", CssFloatToString(maxX));
-  svg.addAttr("height", CssFloatToString(maxY));
-  svg.addAttr("viewBox", "0 0 " + CssFloatToString(maxX) + " " + CssFloatToString(maxY));
+  float svgW = maxX - minX;
+  float svgH = maxY - minY;
+  svg.addAttr("width", CssFloatToString(svgW));
+  svg.addAttr("height", CssFloatToString(svgH));
+  svg.addAttr("viewBox", CssFloatToString(minX) + " " + CssFloatToString(minY) + " " +
+                             CssFloatToString(svgW) + " " + CssFloatToString(svgH));
   svg.closeTagStart();
 
   if (useFillColor) {
