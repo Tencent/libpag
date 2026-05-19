@@ -80,6 +80,10 @@ static std::string DecodeHTMLEntities(const std::string& str) {
             valid = false;
             break;
           }
+          if (codePoint > 0x10FFFF) {
+            valid = false;
+            break;
+          }
         }
       } else {
         for (size_t j = numStart; j < end; j++) {
@@ -87,6 +91,10 @@ static std::string DecodeHTMLEntities(const std::string& str) {
           if (c >= '0' && c <= '9') {
             codePoint = codePoint * 10 + static_cast<unsigned long>(c - '0');
           } else {
+            valid = false;
+            break;
+          }
+          if (codePoint > 0x10FFFF) {
             valid = false;
             break;
           }
