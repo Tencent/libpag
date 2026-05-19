@@ -1065,11 +1065,28 @@ function takeSnapshot(config) {
 
   // SVG icon: emit a wrapper carrying only `color` (so currentColor strokes/fills
   // resolve correctly) plus the frozen SVG markup.
+  //
+  // The wrapper has explicit width/height pinned to the SVG's measured rect and
+  // `overflow: hidden`. Without further styling the inner <svg> renders as an
+  // inline replaced element on a line box whose height is the inherited
+  // `line-height` (e.g. 21px for `text-[14px]` ancestors). When line-height
+  // exceeds the wrapper height (typical for 12px status-bar glyphs in a 14px
+  // text context) the SVG anchors to the line's baseline rather than the
+  // wrapper rect, which shifts it down and clips the bottom (visible as the
+  // signal/wifi/battery icons sliding off the 9:41 baseline). Promote the
+  // wrapper to a centring flex box so the SVG sits at the rect's centre
+  // regardless of the inherited inline metrics; when the SVG's measured rect
+  // matches the wrapper rect (the common case) this is a no-op visually, and
+  // when the SVG is letterboxed inside its wrapper (e.g. an icon shrunk by a
+  // `max-w-*` ancestor) the centring matches the original layout better than
+  // the default top-left baseline placement.
   function renderSvg(el, parentRect, rect, left, top, computed, opts) {
     const wrapper = buildStyle(left, top, rect.width, rect.height, computed, {
       box: true, colorOnly: true, ...opts,
     });
-    return `<div style="${wrapper}">${freezeSvg(el, rect)}</div>`;
+    const innerLayout = 'display: flex; align-items: center; justify-content: center';
+    const composed = joinStyles(wrapper, innerLayout);
+    return `<div style="${composed}">${freezeSvg(el, rect)}</div>`;
   }
 
   // <img>: wrapper + nested <img> sized to fill it. Asymmetric borders are baked
