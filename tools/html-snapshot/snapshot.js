@@ -1090,6 +1090,19 @@ function takeSnapshot(config) {
   // full element rect, but the actual text sits inside the padding box; emitting
   // them as one rect would smear text over absolute siblings (e.g. the search
   // icon at `left: 16px` inside the same wrapper).
+  //
+  // Native form controls vertically centre their value/placeholder inside the
+  // padding box — that's a UA behaviour, not something we can read off computed
+  // style. A bare abs-positioned inner span at `top: pad.top` therefore drops
+  // short single-line text against the top of the wrapper (search bars in
+  // 40px-tall pills, "Email" labels in 48px login fields). Emit the wrapper as
+  // a flex container with `align-items: center` and the input's padding so the
+  // inner span rides centred regardless of `opts.flexItem` — the box still
+  // anchors via `position: absolute` (or `relative` when it's itself a flex
+  // item), so absolute overlay siblings keep their positioning context.
+  // `white-space: nowrap` is mandatory so PAGX's text engine doesn't re-wrap a
+  // single-line value to two lines when its intrinsic width exceeds the
+  // wrapper by sub-pixel.
   function renderTextInput(el, parentRect, rect, left, top, computed, opts) {
     const text = syntheticText(el);
     const pad = readPadding(computed);
@@ -1100,36 +1113,17 @@ function takeSnapshot(config) {
       box: true, ...opts,
     });
     const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
-
-    // When the input itself is a flex item we can't carry an abs-positioned inner
-    // span (it would anchor to a positioned ancestor instead of the wrapper). Use
-    // an inner flex layout to vertically centre the text inside its padding box;
-    // PAGX's flex engine handles the nested arrangement. Force `white-space:
-    // nowrap` so PAGX's text engine doesn't re-wrap a single-line input value to
-    // two lines when its intrinsic width exceeds the wrapper by sub-pixel.
-    if (opts.flexItem) {
-      const padShort = paddingShorthand(pad.top, pad.right, pad.bottom, pad.left);
-      let textStyle = buildStyle(0, 0, 0, 0, computed, {
-        box: false, text: true, positioned: false,
-      });
-      if (placeholderColor) {
-        textStyle = textStyle.replace(/(^|; )color: [^;]+/, `$1color: ${placeholderColor}`);
-      }
-      const finalTextStyle = withNowrap(textStyle);
-      const inner = `display: flex; align-items: center` + (padShort === '0px' ? '' : `; padding: ${padShort}`);
-      const composed = joinStyles(boxStyle, inner);
-      return `<div style="${composed}"><span style="${finalTextStyle}">${escapeHtml(text)}</span>${overlays}</div>`;
-    }
-
-    const innerWidth = Math.max(0, rect.width - pad.left - pad.right);
-    const innerHeight = Math.max(0, rect.height - pad.top - pad.bottom);
-    let textStyle = buildStyle(pad.left, pad.top, innerWidth, innerHeight, computed, {
-      box: false, text: true,
+    const padShort = paddingShorthand(pad.top, pad.right, pad.bottom, pad.left);
+    let textStyle = buildStyle(0, 0, 0, 0, computed, {
+      box: false, text: true, positioned: false,
     });
     if (placeholderColor) {
       textStyle = textStyle.replace(/(^|; )color: [^;]+/, `$1color: ${placeholderColor}`);
     }
-    return `<div style="${boxStyle}"><span style="${textStyle}">${escapeHtml(text)}</span>${overlays}</div>`;
+    const finalTextStyle = withNowrap(textStyle);
+    const inner = `display: flex; align-items: center` + (padShort === '0px' ? '' : `; padding: ${padShort}`);
+    const composed = joinStyles(boxStyle, inner);
+    return `<div style="${composed}"><span style="${finalTextStyle}">${escapeHtml(text)}</span>${overlays}</div>`;
   }
 
   // Pure-text leaf (no element children): emit one outer <div> carrying the box
