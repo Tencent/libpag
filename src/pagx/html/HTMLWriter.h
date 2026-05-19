@@ -62,6 +62,8 @@ class TextBox;
 class TextModifier;
 class TextPath;
 class TrimPath;
+class DropShadowStyle;
+class InnerShadowStyle;
 
 // Kappa value for 90-degree bezier arc approximation: 4 * (sqrt(2) - 1) / 3
 inline constexpr float BEZIER_KAPPA = 0.5522847498307936f;
@@ -350,6 +352,7 @@ class HTMLWriter {
                   LayoutMode parentLayout = LayoutMode::None);
 
  private:
+  friend struct ElementDispatchStateGuard;
   HTMLBuilder* _defs = nullptr;
   HTMLWriterContext* _ctx = nullptr;
 
@@ -474,6 +477,8 @@ class HTMLWriter {
   // semantics: clamp(Sc + Dc - 1, 0, 1). Called once per plusDarker layer at the point the
   // layer's <div> is emitted.
   void emitPlusDarkerFilterDef(const PlusDarkerBackdrop& backdrop);
+  std::string emitDropShadowFilterDef(const DropShadowStyle* ds);
+  std::string emitInnerShadowFilterDef(const InnerShadowStyle* is);
   void renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
                  const Stroke* stroke, float alpha, bool hasTrim, const TrimPath* trim,
                  bool hasMerge, MergePathMode mergeMode = MergePathMode::Append);
