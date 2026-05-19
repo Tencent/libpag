@@ -14,7 +14,7 @@
 #   -o, --output-dir <dir>     Write outputs to <dir> (default: same dir as input)
 #   --pagx-bin <path>          Path to the pagx CLI (default: $PAGX_BIN or
 #                              ../../cmake-build-debug/pagx relative to this script)
-#   --scale <N>                Render scale factor (default: 1)
+#   --scale <N>                Render scale factor (default: 2)
 #   --no-render                Stop after pagx resolve; do not produce PNG
 #   --no-resolve               Stop after pagx import; do not run resolve/render
 #   --no-infer-flex            Disable AbsoluteToFlexInference (default: on)
@@ -41,7 +41,7 @@ print_usage() {
 INPUT=""
 OUTPUT_DIR=""
 PAGX_BIN="$DEFAULT_PAGX_BIN"
-SCALE="1"
+SCALE="2"
 DO_RESOLVE=1
 DO_RENDER=1
 INFER_FLEX=1
