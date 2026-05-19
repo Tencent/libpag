@@ -1263,7 +1263,18 @@ function takeSnapshot(config) {
     if (!kind) return '';
 
     const rect = el.getBoundingClientRect();
-    if (!nonZero(rect) && !elementHasChildren(el) && !gatherDirectText(el) && !syntheticText(el)) {
+    // An empty leaf with a degenerate rect would render as nothing, so skip it.
+    // Exception: a flex item like `<div style="flex: 1"></div>` is a spacer that
+    // pushes its siblings along the main axis. Under `align-items: center` it
+    // reports a non-zero main-axis size but `height: 0` on the cross axis
+    // (there is no content to stretch). Dropping it would collapse the gap and
+    // shift every following sibling, so keep flex items that have any extent
+    // on either axis.
+    const rectIsDegenerate = opts.flexItem
+      ? (rect.width <= 0 && rect.height <= 0)
+      : !nonZero(rect);
+    if (rectIsDegenerate && !elementHasChildren(el) && !gatherDirectText(el) &&
+        !syntheticText(el)) {
       return '';
     }
 

@@ -142,8 +142,7 @@ std::string TransformFlexShrink(const std::string& value, const PropertyContext&
   // path: it would imply a layout that PAGX cannot honour and the author should know.
   std::string lc = ToLower(Trim(value));
   if (lc == "0" || lc == "0.0") return std::string();
-  return DropProperty("flex-shrink", value,
-                      "use 'flex: <N>' shorthand instead", diags);
+  return DropProperty("flex-shrink", value, "use 'flex: <N>' shorthand instead", diags);
 }
 
 std::string TransformFlex(const std::string& value, const PropertyContext&,
