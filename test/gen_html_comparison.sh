@@ -125,11 +125,24 @@ done
 # Preconditions
 #-------------------------------------------------------------------------
 
+# Rebuild all targets to ensure binaries match current source. This prevents
+# stale pagx CLI or PAGFullTest from producing HTML that disagrees with the
+# latest code (a common pitfall when only one target was rebuilt manually).
+echo "== rebuilding pagx and PAGFullTest targets =="
+cmake --build "$REPO/cmake-build-debug" --target pagx PAGFullTest 2>&1 | tail -5
+echo ""
+
 if [ ! -x "$PAGX_BIN" ]; then
   echo "error: pagx binary not found at $PAGX_BIN" >&2
   echo "       build it first: cmake --build cmake-build-debug --target pagx" >&2
   exit 1
 fi
+
+# Regenerate test-embedded HTMLs so they reflect the latest PAGFullTest binary.
+echo "== regenerating BatchConvertAll output =="
+rm -rf "$TEST_OUT"
+"$REPO/cmake-build-debug/PAGFullTest" --gtest_filter="PAGXHtmlTest.BatchConvertAll" 2>&1 | tail -3
+echo ""
 
 #-------------------------------------------------------------------------
 # Clean output
