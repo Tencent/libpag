@@ -110,6 +110,21 @@ Options:
 // 404) are logged and left in place: the snapshot will then fall back to the
 // original URL and render as an empty box rather than aborting the pipeline.
 async function inlineExternalImages() {
+  // Convert a Blob into a `data:` URI without the FileReader callback dance.
+  // Reading bytes via `arrayBuffer()` + chunked btoa avoids the "Maximum call
+  // stack size" trap that String.fromCharCode(...big) hits on large images.
+  async function blobToDataUri(blob) {
+    const buf = await blob.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    let binary = '';
+    const CHUNK = 0x8000;
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+    }
+    const mime = blob.type || 'application/octet-stream';
+    return `data:${mime};base64,${btoa(binary)}`;
+  }
+
   const imgs = Array.from(document.querySelectorAll('img'));
   await Promise.all(imgs.map(async (img) => {
     const src = img.currentSrc || img.src || img.getAttribute('src') || '';
@@ -122,16 +137,8 @@ async function inlineExternalImages() {
         console.warn(`html-snapshot: image fetch ${res.status} for ${src}`);
         return;
       }
-      const blob = await res.blob();
-      const dataUri = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(blob);
-      });
-      if (typeof dataUri === 'string' && dataUri.startsWith('data:')) {
-        img.setAttribute('data-snapshot-src', dataUri);
-      }
+      const dataUri = await blobToDataUri(await res.blob());
+      img.setAttribute('data-snapshot-src', dataUri);
     } catch (err) {
       console.warn(`html-snapshot: failed to inline ${src}: ${err && err.message}`);
     }
@@ -263,6 +270,61 @@ function takeSnapshot(config) {
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  // Join non-empty CSS declarations with `; ` so callers don't have to guard against
+  // empty fragments (e.g. when the box style is empty under a flex parent).
+  function joinStyles(...parts) {
+    return parts.filter(Boolean).join('; ');
+  }
+
+  // Append `white-space: nowrap` to a text style unless it already declares
+  // white-space. Used in every spot where a single-line text span sits inside
+  // a flex item or rides on a wrapper whose width was measured by Chromium —
+  // prevents PAGX's text engine from re-wrapping at a sub-pixel divergence.
+  function withNowrap(style) {
+    if (!style) return 'white-space: nowrap';
+    return /white-space:/.test(style) ? style : `${style}; white-space: nowrap`;
+  }
+
+  // Centralised visibility check. CSS `display: contents` is intentionally NOT
+  // considered hidden here — it generates no box of its own but its children
+  // still render, and the snapshot walker handles the pass-through separately.
+  function isVisible(computed) {
+    if (computed.display === 'none') return false;
+    if (computed.visibility === 'hidden') return false;
+    if (parseFloat(computed.opacity) === 0) return false;
+    return true;
+  }
+
+  function readPadding(computed) {
+    return {
+      top:    parseFloat(computed.getPropertyValue('padding-top'))    || 0,
+      right:  parseFloat(computed.getPropertyValue('padding-right'))  || 0,
+      bottom: parseFloat(computed.getPropertyValue('padding-bottom')) || 0,
+      left:   parseFloat(computed.getPropertyValue('padding-left'))   || 0,
+    };
+  }
+
+  function borderWidthOf(computed, side) {
+    return parseFloat(computed.getPropertyValue(`border-${side}-width`)) || 0;
+  }
+
+  function firstTextNodeChild(el) {
+    for (const n of el.childNodes) {
+      if (n.nodeType === Node.TEXT_NODE) return n;
+    }
+    return null;
+  }
+
+  // Style of the inner <img> element. Under absolute mode it pins itself to the
+  // wrapper's (0,0) and inherits the wrapper's size; under flex mode the wrapper
+  // is no longer absolutely positioned, so the image fills the wrapper via flow
+  // sizing instead.
+  function imageInnerStyle(rect, flexItem) {
+    if (flexItem) return `width: 100%; height: 100%`;
+    return `position: absolute; left: 0px; top: 0px; ` +
+      `width: ${px(rect.width)}; height: ${px(rect.height)}`;
   }
 
   // Strip quotes and take only the first family. Tailwind/system defaults expand to
@@ -451,8 +513,7 @@ function takeSnapshot(config) {
         box: false, text: true,
       });
       // Force nowrap on every line span so PAGX's text engine never re-breaks.
-      const style = /white-space:/.test(base) ? base : `${base}; white-space: nowrap`;
-      out.push(`<span style="${style}">${escapeHtml(line.text)}</span>`);
+      out.push(`<span style="${withNowrap(base)}">${escapeHtml(line.text)}</span>`);
     }
     return out;
   }
@@ -486,36 +547,37 @@ function takeSnapshot(config) {
     return true;
   }
 
+  function hasAnyBorder(computed) {
+    for (const s of ['top', 'right', 'bottom', 'left']) {
+      if (borderWidthOf(computed, s) > 0) return true;
+    }
+    return false;
+  }
+
   // Returns an array of HTML strings — one absolutely-positioned <div> per non-zero
   // border side — to overlay onto the host box. Used when the element has an
   // asymmetric border (e.g. `border-bottom: 1px solid #e5e7eb` on a list row).
   function borderOverlayHTML(computed, width, height) {
     if (isUniformBorder(computed)) return [];
     const out = [];
-    const sides = [
-      { name: 'top',    horizontal: true,  position: 'top' },
-      { name: 'right',  horizontal: false, position: 'right' },
-      { name: 'bottom', horizontal: true,  position: 'bottom' },
-      { name: 'left',   horizontal: false, position: 'left' },
-    ];
-    for (const side of sides) {
-      const w = parseFloat(computed.getPropertyValue(`border-${side.name}-width`)) || 0;
+    for (const side of ['top', 'right', 'bottom', 'left']) {
+      const w = borderWidthOf(computed, side);
       if (w <= 0) continue;
-      const style = computed.getPropertyValue(`border-${side.name}-style`);
+      const style = computed.getPropertyValue(`border-${side}-style`);
       // The subset has no model for dashed/dotted/double per-side borders. Downgrade
       // them to solid: it's an approximation but preserves the visual divider, which
       // is what the page actually wanted.
       if (style === 'none' || style === 'hidden') continue;
-      const color = computed.getPropertyValue(`border-${side.name}-color`).trim();
+      const color = computed.getPropertyValue(`border-${side}-color`).trim();
       let left = 0;
       let top = 0;
       let w2 = 0;
       let h2 = 0;
-      if (side.name === 'top') {
+      if (side === 'top') {
         left = 0; top = 0; w2 = width; h2 = w;
-      } else if (side.name === 'bottom') {
+      } else if (side === 'bottom') {
         left = 0; top = Math.max(0, height - w); w2 = width; h2 = w;
-      } else if (side.name === 'left') {
+      } else if (side === 'left') {
         left = 0; top = 0; w2 = w; h2 = height;
       } else /* right */ {
         left = Math.max(0, width - w); top = 0; w2 = w; h2 = height;
@@ -571,7 +633,7 @@ function takeSnapshot(config) {
       // overlay rectangles by emitBorderOverlays() and added to the child list, so
       // they survive into PAGX even though the importer can't model per-side borders.
       if (isUniformBorder(computed)) {
-        const bw = parseFloat(computed.getPropertyValue('border-top-width')) || 0;
+        const bw = borderWidthOf(computed, 'top');
         if (bw > 0) {
           const bc = computed.getPropertyValue('border-top-color').trim();
           parts.push(`border: ${px(bw)} solid ${bc}`);
@@ -648,9 +710,7 @@ function takeSnapshot(config) {
   function classify(el, computed) {
     const tag = el.tagName.toLowerCase();
     if (DROP_TAGS.has(tag)) return null;
-    if (computed.display === 'none') return null;
-    if (computed.visibility === 'hidden') return null;
-    if (parseFloat(computed.opacity) === 0) return null;
+    if (!isVisible(computed)) return null;
     if (tag === 'svg') return 'svg';
     if (tag === 'img') return 'img';
     if (tag === 'input' || tag === 'textarea' || tag === 'select') {
@@ -731,10 +791,7 @@ function takeSnapshot(config) {
     const align = computed.getPropertyValue('align-items').trim();
     const justify = computed.getPropertyValue('justify-content').trim();
 
-    const padT = parseFloat(computed.getPropertyValue('padding-top')) || 0;
-    const padR = parseFloat(computed.getPropertyValue('padding-right')) || 0;
-    const padB = parseFloat(computed.getPropertyValue('padding-bottom')) || 0;
-    const padL = parseFloat(computed.getPropertyValue('padding-left')) || 0;
+    const pad = readPadding(computed);
 
     const parts = [];
     parts.push('display: flex');
@@ -743,8 +800,8 @@ function takeSnapshot(config) {
       const gap = flexMainGapPx(computed, dirOut);
       if (gap) parts.push(`gap: ${gap}`);
     }
-    if (padT > 0 || padR > 0 || padB > 0 || padL > 0) {
-      parts.push(`padding: ${paddingShorthand(padT, padR, padB, padL)}`);
+    if (pad.top > 0 || pad.right > 0 || pad.bottom > 0 || pad.left > 0) {
+      parts.push(`padding: ${paddingShorthand(pad.top, pad.right, pad.bottom, pad.left)}`);
     }
     const alignNorm = ALIGN_ITEMS_ALIAS.get(align) || align;
     if (alignNorm && ALIGN_ITEMS_OK.has(alignNorm) && alignNorm !== 'stretch') {
@@ -815,8 +872,7 @@ function takeSnapshot(config) {
       const tag = c.tagName.toLowerCase();
       if (DROP_TAGS.has(tag)) continue;
       const cs = getComputedStyle(c);
-      if (cs.display === 'none' || cs.visibility === 'hidden') continue;
-      if (parseFloat(cs.opacity) === 0) continue;
+      if (!isVisible(cs)) continue;
       if (cs.display === 'contents') return null;
       const pos = cs.position;
       if (pos === 'absolute' || pos === 'fixed' || pos === 'sticky') return null;
@@ -876,15 +932,7 @@ function takeSnapshot(config) {
     // Asymmetric borders are baked into per-side overlay rectangles by
     // borderOverlayHTML(). Those rectangles use `position: absolute` and would not
     // anchor correctly inside a non-positioned flex parent, so bail.
-    if (!isUniformBorder(computed)) {
-      const sides = ['top', 'right', 'bottom', 'left'];
-      let anyBorder = false;
-      for (const s of sides) {
-        const w = parseFloat(computed.getPropertyValue(`border-${s}-width`)) || 0;
-        if (w > 0) { anyBorder = true; break; }
-      }
-      if (anyBorder) return null;
-    }
+    if (!isUniformBorder(computed) && hasAnyBorder(computed)) return null;
     const children = flexItemChildren(el);
     if (!children) return null;
     if (!isFlexLayoutFaithful(children, computed)) return null;
@@ -903,12 +951,137 @@ function takeSnapshot(config) {
       box: true, ...opts,
     });
     const flexStyle = collectFlexProps(computed, flexChildren.length > 1);
-    const style = wrapperBase ? `${wrapperBase}; ${flexStyle}` : flexStyle;
+    const style = joinStyles(wrapperBase, flexStyle);
     const childParts = [];
     for (const child of flexChildren) {
       childParts.push(render(child, rect, { flexItem: true }));
     }
     return `<div style="${style}">${childParts.join('')}</div>`;
+  }
+
+  // SVG icon: emit a wrapper carrying only `color` (so currentColor strokes/fills
+  // resolve correctly) plus the frozen SVG markup.
+  function renderSvg(el, parentRect, rect, left, top, computed, opts) {
+    const wrapper = buildStyle(left, top, rect.width, rect.height, computed, {
+      box: true, colorOnly: true, ...opts,
+    });
+    return `<div style="${wrapper}">${freezeSvg(el, rect)}</div>`;
+  }
+
+  // <img>: wrapper + nested <img> sized to fill it. Asymmetric borders are baked
+  // into overlay rectangles painted on top.
+  function renderImg(el, parentRect, rect, left, top, computed, opts) {
+    const src = imgSrc(el);
+    const alt = escapeHtml(el.getAttribute('alt') || '');
+    const imgStyle = imageInnerStyle(rect, opts.flexItem);
+    const wrapperStyle = buildStyle(left, top, rect.width, rect.height, computed, {
+      box: true, ...opts,
+    });
+    const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
+    return `<div style="${wrapperStyle}"><img src="${escapeHtml(src)}" alt="${alt}" style="${imgStyle}"/>${overlays}</div>`;
+  }
+
+  // <input> / <textarea> / <select>: outer box for bg/border/radius + inner span
+  // sitting inside the padding box. `<input>` paints its background across the
+  // full element rect, but the actual text sits inside the padding box; emitting
+  // them as one rect would smear text over absolute siblings (e.g. the search
+  // icon at `left: 16px` inside the same wrapper).
+  function renderTextInput(el, parentRect, rect, left, top, computed, opts) {
+    const text = syntheticText(el);
+    const pad = readPadding(computed);
+    const placeholderColor = (!el.value && el.getAttribute('placeholder'))
+      ? getComputedStyle(el, '::placeholder').getPropertyValue('color').trim()
+      : '';
+    const boxStyle = buildStyle(left, top, rect.width, rect.height, computed, {
+      box: true, ...opts,
+    });
+    const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
+
+    // When the input itself is a flex item we can't carry an abs-positioned inner
+    // span (it would anchor to a positioned ancestor instead of the wrapper). Use
+    // an inner flex layout to vertically centre the text inside its padding box;
+    // PAGX's flex engine handles the nested arrangement. Force `white-space:
+    // nowrap` so PAGX's text engine doesn't re-wrap a single-line input value to
+    // two lines when its intrinsic width exceeds the wrapper by sub-pixel.
+    if (opts.flexItem) {
+      const padShort = paddingShorthand(pad.top, pad.right, pad.bottom, pad.left);
+      let textStyle = buildStyle(0, 0, 0, 0, computed, {
+        box: false, text: true, positioned: false,
+      });
+      if (placeholderColor) {
+        textStyle = textStyle.replace(/(^|; )color: [^;]+/, `$1color: ${placeholderColor}`);
+      }
+      const finalTextStyle = withNowrap(textStyle);
+      const inner = `display: flex; align-items: center` + (padShort === '0px' ? '' : `; padding: ${padShort}`);
+      const composed = joinStyles(boxStyle, inner);
+      return `<div style="${composed}"><span style="${finalTextStyle}">${escapeHtml(text)}</span>${overlays}</div>`;
+    }
+
+    const innerWidth = Math.max(0, rect.width - pad.left - pad.right);
+    const innerHeight = Math.max(0, rect.height - pad.top - pad.bottom);
+    let textStyle = buildStyle(pad.left, pad.top, innerWidth, innerHeight, computed, {
+      box: false, text: true,
+    });
+    if (placeholderColor) {
+      textStyle = textStyle.replace(/(^|; )color: [^;]+/, `$1color: ${placeholderColor}`);
+    }
+    return `<div style="${boxStyle}"><span style="${textStyle}">${escapeHtml(text)}</span>${overlays}</div>`;
+  }
+
+  // Pure-text leaf (no element children): emit one outer <div> carrying the box
+  // styles plus one nowrap <span> per visually-rendered line. Each line span is
+  // placed at the text's *actual* rendered rect (from Range.getClientRects), not
+  // stretched to fill the parent box — otherwise the text inherits the parent
+  // height and clings to the top of the container instead of sitting where the
+  // browser's flex/baseline layout placed it (e.g. <button>搜索</button> with
+  // `inline-flex items-center`: button is 56×28, text is 24×16 centered at y=6).
+  // The wrapper carries background/border/radius/overflow so the visible box
+  // still spans the full element rect.
+  function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, opts) {
+    const boxStyle = buildStyle(left, top, rect.width, rect.height, computed, {
+      box: true, ...opts,
+    });
+    const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
+
+    // Inside a flex parent the wrapper drops `position: absolute`, so per-line
+    // abs spans would lose their anchor. classifyFlexContainer guarantees
+    // single-line leaves only at this point (multi-line leaves cause the parent
+    // to bail to absolute). Force `white-space: nowrap` so PAGX's text engine
+    // doesn't introduce a phantom wrap when its intrinsic glyph metrics differ
+    // from Chromium's by a sub-pixel — the measured wrapper rect already
+    // matches Chromium's natural line width.
+    if (opts.flexItem) {
+      const baseTextStyle = buildStyle(0, 0, 0, 0, computed, {
+        box: false, text: true, positioned: false,
+      });
+      const textStyle = withNowrap(baseTextStyle);
+      return `<div style="${boxStyle}"><span style="${textStyle}">${escapeHtml(directText)}</span>${overlays}</div>`;
+    }
+    const textNode = firstTextNodeChild(el);
+    const lineSpans = textNode ? emitTextSpans(textNode, rect, computed) : [];
+    return `<div style="${boxStyle}">${lineSpans.join('')}${overlays}</div>`;
+  }
+
+  // Container with element children (and optionally direct text). Per direct text
+  // node we measure the actual rendered rect via Range, so the text lands where
+  // the browser put it (next to an <svg>, inside a flex row, …) rather than being
+  // smeared across the whole parent and inheriting the parent's text-align.
+  //
+  // Paint order: browsers paint static-flow descendants first, then positioned
+  // descendants on top (z-index:auto → DOM order). Since we flatten every box to
+  // `position: absolute`, we must replay that order ourselves: flow children +
+  // direct text runs in DOM order, then positioned children (also in DOM order).
+  // Otherwise an `<input bg-gray>` declared after an `<svg>` would paint over the
+  // icon, an inline-flex bg-pill <button>'s positioned label would render under
+  // the bg, etc. Asymmetric border overlays paint *on top* of all children to match
+  // CSS, which renders borders after content.
+  function renderContainer(el, parentRect, rect, left, top, computed, opts) {
+    const childHTML = renderChildrenInto(el, rect);
+    const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
+    const style = buildStyle(left, top, rect.width, rect.height, computed, {
+      box: true, ...opts,
+    });
+    return `<div style="${style}">${childHTML}${overlays}</div>`;
   }
 
   // Render a subtree rooted at `el` into a string. parentRect is its parent's
@@ -950,148 +1123,15 @@ function takeSnapshot(config) {
     const left = rect.left - parentRect.left;
     const top = rect.top - parentRect.top;
 
-    if (kind === 'svg') {
-      // The wrapper carries the icon tint via `color`. We emit color only — emitting
-      // the full text-prop block would inject font-family / line-height noise from
-      // the surrounding <button>'s defaults.
-      const wrapper = buildStyle(left, top, rect.width, rect.height, computed, {
-        box: true, colorOnly: true, ...opts,
-      });
-      return `<div style="${wrapper}">${freezeSvg(el, rect)}</div>`;
-    }
+    if (kind === 'svg') return renderSvg(el, parentRect, rect, left, top, computed, opts);
+    if (kind === 'img') return renderImg(el, parentRect, rect, left, top, computed, opts);
+    if (kind === 'text') return renderTextInput(el, parentRect, rect, left, top, computed, opts);
 
-    if (kind === 'img') {
-      const src = imgSrc(el);
-      const alt = escapeHtml(el.getAttribute('alt') || '');
-      // Inside a flex parent the wrapper drops `position: absolute`, so the inner
-      // <img> can no longer anchor itself to (0,0) of the wrapper via abs positioning
-      // — switch it to `width: 100%; height: 100%` so it fills the wrapper via flow
-      // sizing instead.
-      const imgStyle = opts.flexItem
-        ? `width: 100%; height: 100%`
-        : `position: absolute; left: 0px; top: 0px; width: ${px(rect.width)}; height: ${px(rect.height)}`;
-      const wrapperStyle = buildStyle(left, top, rect.width, rect.height, computed, {
-        box: true, ...opts,
-      });
-      const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
-      return `<div style="${wrapperStyle}"><img src="${escapeHtml(src)}" alt="${alt}" style="${imgStyle}"/>${overlays}</div>`;
-    }
-
-    if (kind === 'text') {
-      const text = syntheticText(el);
-      // `<input>` paints its background across the full element rect, but the actual
-      // text sits inside the padding box. Split the output into an outer box <div>
-      // (carries the bg/border/radius) and an inner text <span> indented by the
-      // element's padding so it doesn't overlap absolute siblings (e.g. the search
-      // icon at `left: 16px` inside the same wrapper).
-      const padL = parseFloat(computed.getPropertyValue('padding-left')) || 0;
-      const padR = parseFloat(computed.getPropertyValue('padding-right')) || 0;
-      const padT = parseFloat(computed.getPropertyValue('padding-top')) || 0;
-      const padB = parseFloat(computed.getPropertyValue('padding-bottom')) || 0;
-
-      const placeholderColor = (!el.value && el.getAttribute('placeholder'))
-        ? getComputedStyle(el, '::placeholder').getPropertyValue('color').trim()
-        : '';
-
-      const boxStyle = buildStyle(left, top, rect.width, rect.height, computed, {
-        box: true, ...opts,
-      });
-      const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
-      // When the input itself is a flex item we can't carry an abs-positioned inner
-      // span (it would anchor to a positioned ancestor instead of the wrapper). Use
-      // an inner flex layout to vertically centre the text inside its padding box;
-      // PAGX's flex engine handles the nested arrangement. Force `white-space:
-      // nowrap` so PAGX's text engine doesn't re-wrap a single-line input value to
-      // two lines when its intrinsic width exceeds the wrapper by sub-pixel.
-      if (opts.flexItem) {
-        const padShort = paddingShorthand(padT, padR, padB, padL);
-        let textStyle = buildStyle(0, 0, 0, 0, computed, {
-          box: false, text: true, positioned: false,
-        });
-        if (placeholderColor) {
-          textStyle = textStyle.replace(/(^|; )color: [^;]+/, `$1color: ${placeholderColor}`);
-        }
-        const finalTextStyle = /white-space:/.test(textStyle)
-          ? textStyle
-          : (textStyle ? `${textStyle}; white-space: nowrap` : `white-space: nowrap`);
-        const inner = `display: flex; align-items: center` + (padShort === '0px' ? '' : `; padding: ${padShort}`);
-        const composed = boxStyle ? `${boxStyle}; ${inner}` : inner;
-        return `<div style="${composed}"><span style="${finalTextStyle}">${escapeHtml(text)}</span>${overlays}</div>`;
-      }
-      const innerWidth = Math.max(0, rect.width - padL - padR);
-      const innerHeight = Math.max(0, rect.height - padT - padB);
-      let textStyle = buildStyle(padL, padT, innerWidth, innerHeight, computed, {
-        box: false, text: true,
-      });
-      if (placeholderColor) {
-        textStyle = textStyle.replace(/(^|; )color: [^;]+/, `$1color: ${placeholderColor}`);
-      }
-      return `<div style="${boxStyle}"><span style="${textStyle}">${escapeHtml(text)}</span>${overlays}</div>`;
-    }
-
-    // Container or text-leaf box.
-    const hasElementKids = elementHasChildren(el);
     const directText = gatherDirectText(el);
-
-    // Pure-text leaf (no element children): emit one outer <div> carrying the box
-    // styles plus one nowrap <span> per visually-rendered line. Each line span is
-    // placed at the text's *actual* rendered rect (from Range.getClientRects), not
-    // stretched to fill the parent box — otherwise the text inherits the parent
-    // height and clings to the top of the container instead of sitting where the
-    // browser's flex/baseline layout placed it (e.g. <button>搜索</button> with
-    // `inline-flex items-center`: button is 56×28, text is 24×16 centered at y=6).
-    // The wrapper carries background/border/radius/overflow so the visible box
-    // still spans the full element rect (matches the hand-authored subset baseline
-    // for e.g. the <div bg=red><span text>小</span></div> logo pattern).
-    if (!hasElementKids && directText) {
-      const textNode = (() => {
-        for (const n of el.childNodes) if (n.nodeType === Node.TEXT_NODE) return n;
-        return null;
-      })();
-      const boxStyle = buildStyle(left, top, rect.width, rect.height, computed, {
-        box: true, ...opts,
-      });
-      const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
-      // Inside a flex parent the wrapper drops `position: absolute`, so per-line
-      // abs spans would lose their anchor. classifyFlexContainer guarantees
-      // single-line leaves only at this point (multi-line leaves cause the parent
-      // to bail to absolute). Force `white-space: nowrap` so PAGX's text engine
-      // doesn't introduce a phantom wrap when its intrinsic glyph metrics differ
-      // from Chromium's by a sub-pixel — the measured wrapper rect already
-      // matches Chromium's natural line width.
-      if (opts.flexItem) {
-        const baseTextStyle = buildStyle(0, 0, 0, 0, computed, {
-          box: false, text: true, positioned: false,
-        });
-        const textStyle = /white-space:/.test(baseTextStyle)
-          ? baseTextStyle
-          : (baseTextStyle ? `${baseTextStyle}; white-space: nowrap` : `white-space: nowrap`);
-        return `<div style="${boxStyle}"><span style="${textStyle}">${escapeHtml(directText)}</span>${overlays}</div>`;
-      }
-      const lineSpans = textNode ? emitTextSpans(textNode, rect, computed) : [];
-      return `<div style="${boxStyle}">${lineSpans.join('')}${overlays}</div>`;
+    if (!elementHasChildren(el) && directText) {
+      return renderTextLeaf(el, parentRect, rect, left, top, computed, directText, opts);
     }
-
-    // Container with element children (and optionally direct text). Per direct text
-    // node we measure the actual rendered rect via Range, so the text lands where
-    // the browser put it (next to an <svg>, inside a flex row, …) rather than being
-    // smeared across the whole parent and inheriting the parent's text-align.
-    //
-    // Paint order: browsers paint static-flow descendants first, then positioned
-    // descendants on top (z-index:auto → DOM order). Since we flatten every box to
-    // `position: absolute`, we must replay that order ourselves: flow children +
-    // direct text runs in DOM order, then positioned children (also in DOM order).
-    // Otherwise an `<input bg-gray>` declared after an `<svg>` would paint over the
-    // icon, an inline-flex bg-pill <button>'s positioned label would render under
-    // the bg, etc. Asymmetric border overlays paint *on top* of all children to match
-    // CSS, which renders borders after content.
-    const childHTML = renderChildrenInto(el, rect);
-    const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
-
-    const style = buildStyle(left, top, rect.width, rect.height, computed, {
-      box: true, ...opts,
-    });
-    return `<div style="${style}">${childHTML}${overlays}</div>`;
+    return renderContainer(el, parentRect, rect, left, top, computed, opts);
   }
 
   // -------- entry --------
