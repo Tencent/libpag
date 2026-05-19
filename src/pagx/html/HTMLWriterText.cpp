@@ -2260,6 +2260,13 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
     style += ";font-family:'" + fontResult.familyName + "'";
     style += ";font-size:" + CssFloatToString(fontSize) + "px";
     // For gradient fills, extend span height to cover glyph rendering area below em-box.
+    // Problem: CSS `background-clip:text` clips the gradient to the element's content box
+    // (bounded by line-height). Descenders (g, p, y) and baseline-shifted glyphs render below
+    // the content box, causing the gradient to be truncated at the baseline.
+    // Workaround: padding-bottom expands the content box downward so the gradient covers the
+    // full glyph extent. This relies on Chromium/WebKit including padding in the clip region
+    // for `background-clip:text` — a browser implementation detail, not guaranteed by CSS spec.
+    // If browser behavior changes, gradient text below the baseline may appear clipped.
     bool hasGradient =
         !isBitmapFont && fill && fill->color && fill->color->nodeType() != NodeType::SolidColor;
     if (hasGradient) {
@@ -2433,6 +2440,8 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
           charStyle += ";background-position:" + CssFloatToString(-(posX - totalMinX)) + "px 0";
           charStyle += ";-webkit-background-clip:text;background-clip:text";
           charStyle += ";-webkit-text-fill-color:transparent";
+          // See comment at line 2263: padding-bottom extends clip region for descenders.
+          // Browser-dependent: relies on Chromium/WebKit including padding in background-clip:text.
           charStyle += ";padding-bottom:" + CssFloatToString(fontSize) + "px";
         } else {
           charStyle += colorCss;
