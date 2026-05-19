@@ -137,7 +137,8 @@ static std::string WrapAsHTMLDocument(const std::string& fragment, float width, 
 }
 
 std::string HTMLExporter::ToHTML(PAGXDocument& doc, const std::string& resourceDir,
-                                 const Options& options, std::string* errorMsg) {
+                                 HTMLOutputMode mode, const Options& options,
+                                 std::string* errorMsg) {
   if (resourceDir.empty()) {
     if (errorMsg) {
       *errorMsg = "resourceDir must not be empty.";
@@ -283,9 +284,7 @@ std::string HTMLExporter::ToHTML(PAGXDocument& doc, const std::string& resourceD
 
   std::string result = std::string(GENERATED_COMMENT) + nativeHTML;
 
-  // wrapFullDocument: -1 = per-method default (false for ToHTML), 0 = false, 1 = true
-  bool wrap = options.wrapFullDocument > 0;
-  if (wrap) {
+  if (mode == HTMLOutputMode::FullDocument) {
     result = WrapAsHTMLDocument(result, doc.width, doc.height);
   }
 
@@ -309,13 +308,9 @@ bool HTMLExporter::ToFile(PAGXDocument& document, const std::string& filePath,
   auto parentDir = htmlPath.parent_path();
   auto resourceDir = parentDir / stem;
 
-  // ToFile defaults to wrapping as a full HTML document unless explicitly disabled.
-  Options toFileOptions = options;
-  if (toFileOptions.wrapFullDocument < 0) {
-    toFileOptions.wrapFullDocument = Options::WrapOn;
-  }
-
-  auto html = ToHTML(document, resourceDir.string(), toFileOptions, errorMsg);
+  // ToFile always produces a full HTML document (standalone file needs DOCTYPE).
+  auto html =
+      ToHTML(document, resourceDir.string(), HTMLOutputMode::FullDocument, options, errorMsg);
   if (html.empty()) {
     if (errorMsg && errorMsg->empty()) {
       *errorMsg = "document produced no HTML output.";

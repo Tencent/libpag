@@ -39,7 +39,7 @@ static std::string LoadAndConvert(const std::string& pagxPath,
   // content only; the PNG files written here are not validated, so cross-test filename
   // collisions (e.g. dgc0.png from two different samples) are harmless.
   auto tmpAssets = ProjectPath::Absolute("test/out/PAGXHtmlTest/tmp-assets");
-  return pagx::HTMLExporter::ToHTML(*doc, tmpAssets, options);
+  return pagx::HTMLExporter::ToHTML(*doc, tmpAssets, pagx::HTMLOutputMode::Fragment, options);
 }
 
 static std::vector<std::string> GetHtmlTestFiles() {
@@ -99,7 +99,8 @@ static ExportedSample ExportSampleHtmlToFile(const std::string& pagxPath,
   // the HTML file stem. Multiple samples in the same outDir therefore get independent asset
   // sub-directories (outDir/<baseName>/), no filename-prefix gymnastics required.
   auto resourceDir = outDir + "/" + baseName;
-  auto fragment = pagx::HTMLExporter::ToHTML(*doc, resourceDir, opts);
+  auto fragment =
+      pagx::HTMLExporter::ToHTML(*doc, resourceDir, pagx::HTMLOutputMode::Fragment, opts);
   if (fragment.empty()) {
     std::cerr << "ExportSampleHtmlToFile: ToHTML returned empty for " << baseName << "\n";
     return result;

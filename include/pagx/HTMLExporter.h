@@ -24,6 +24,16 @@
 namespace pagx {
 
 /**
+ * Controls whether ToHTML produces a fragment or a complete HTML document.
+ */
+enum class HTMLOutputMode {
+  /// Return only the inner HTML fragment (for embedding into an existing page).
+  Fragment,
+  /// Return a complete HTML document with <!DOCTYPE html>, <html>, <head>, and <body> tags.
+  FullDocument,
+};
+
+/**
  * Export options for HTMLExporter.
  *
  * ABI stability: this struct is part of the public API. New optional fields must be appended at
@@ -57,23 +67,6 @@ struct HTMLExportOptions {
    * The default is true.
    */
   bool extractStyleSheet = true;
-
-  /**
-   * When true, `ToFile` and `ToHTML` produce a complete HTML document (with `<!DOCTYPE html>`,
-   * `<html>`, `<head>`, and `<body>` tags) that can be opened directly in a browser. When false,
-   * only the inner HTML fragment is returned — callers are responsible for wrapping it.
-   *
-   * The default is true for `ToFile` (the most common use case is producing a standalone file)
-   * and false for `ToHTML` (the caller usually needs the fragment for embedding).
-   *
-   * Note: when this is not set explicitly, `ToFile` defaults to true and `ToHTML` defaults to
-   * false. Setting it explicitly overrides the per-method default. Use the named constants
-   * below (WrapDefault / WrapOff / WrapOn) instead of raw integer literals.
-   */
-  static constexpr int WrapDefault = -1;
-  static constexpr int WrapOff = 0;
-  static constexpr int WrapOn = 1;
-  int wrapFullDocument = WrapDefault;
 };
 
 /**
@@ -125,11 +118,13 @@ class HTMLExporter {
    * @param document The PAGX document to export. Layout is applied automatically if needed.
    * @param resourceDir Absolute directory path for auxiliary PNGs and copied images. Must not
    *                    be empty.
+   * @param mode Controls whether the output is a bare HTML fragment or a complete document.
    * @param options Export options controlling output formatting.
    * @param errorMsg Optional pointer to receive a human-readable error description on failure.
    * @return The generated HTML string, or an empty string on failure.
    */
   static std::string ToHTML(PAGXDocument& document, const std::string& resourceDir,
+                            HTMLOutputMode mode = HTMLOutputMode::Fragment,
                             const Options& options = {}, std::string* errorMsg = nullptr);
 
   /**
