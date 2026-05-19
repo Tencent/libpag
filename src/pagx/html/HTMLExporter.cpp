@@ -215,8 +215,8 @@ std::string HTMLExporter::ToHTML(PAGXDocument& doc, const std::string& resourceD
       f.write(reinterpret_cast<const char*>(result.woff2Data.data()),
               static_cast<std::streamsize>(result.woff2Data.size()));
     }
-    fontFaceRules += "@font-face{font-family:'" + result.familyName + "';src:url('" +
-                     result.relativeUrl + "') format('woff2')}\n";
+    fontFaceRules += "@font-face{font-family:'" + EscapeCssFontFamily(result.familyName) +
+                     "';src:url('" + result.relativeUrl + "') format('woff2')}\n";
     ctx.woff2Fonts[font] = std::move(result);
   }
 

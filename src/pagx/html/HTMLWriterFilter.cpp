@@ -654,6 +654,9 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type, Point mas
       case '"':
         encoded += "%22";
         break;
+      case '\'':
+        encoded += "%27";
+        break;
       default:
         encoded += c;
         break;
