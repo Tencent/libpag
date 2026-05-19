@@ -1072,11 +1072,51 @@ function takeSnapshot(config) {
         box: false, text: true, positioned: false,
       });
       const textStyle = withNowrap(baseTextStyle);
-      return `<div style="${boxStyle}"><span style="${textStyle}">${escapeHtml(directText)}</span>${overlays}</div>`;
+      // Mirror the source's own flex / padding declaration onto the wrapper so
+      // the inline span lands where the browser painted it. A text-only flex
+      // container — e.g. `<button class="inline-flex items-center
+      // justify-center h-7 px-3">+ 关注</button>` or `<span class="inline-flex
+      // items-center px-2 py-0.5">实名认证</span>` — measures its bounding
+      // rect with the centred padding included, but emitting just
+      // `width/height` on the wrapper would push the inline span to the
+      // wrapper's top-left corner (the visible "+ 关注" / "实名认证" badge
+      // misalignment). Re-emitting flex props makes the inner <span> a flex
+      // item that PAGX's flex engine re-centres on import. For non-flex
+      // wrappers we still want the source padding so the inline span starts
+      // inside the padding box.
+      const innerLayout = textLeafInnerLayout(computed);
+      const wrapperStyle = joinStyles(boxStyle, innerLayout);
+      return `<div style="${wrapperStyle}"><span style="${textStyle}">${escapeHtml(directText)}</span>${overlays}</div>`;
     }
     const textNode = firstTextNodeChild(el);
     const lineSpans = textNode ? emitTextSpans(textNode, rect, computed) : [];
     return `<div style="${boxStyle}">${lineSpans.join('')}${overlays}</div>`;
+  }
+
+  // Inner-layout declaration to apply on a text-leaf wrapper that's emitted as
+  // a flex item. The outer flexItem branch in renderTextLeaf cannot anchor
+  // an absolutely-positioned line span (the wrapper itself is no longer
+  // absolutely positioned), so the text becomes an inline <span> child of
+  // the wrapper. Without help that span hugs the wrapper's top-left corner
+  // and loses whatever flex centring / padding the source declared. We
+  // re-emit the source layout here so the wrapper behaves like the original
+  // box:
+  //   - flex / inline-flex sources forward their full subset-shaped flex
+  //     configuration (direction, padding, align-items, justify-content) so
+  //     PAGX treats the inner span as a flex item and recentres it,
+  //   - block sources with padding forward the padding alone so the inline
+  //     span starts inside the padding box (Chromium's natural placement).
+  // Plain text wrappers (no padding, no flex) return ''.
+  function textLeafInnerLayout(computed) {
+    const display = computed.display;
+    if (display === 'flex' || display === 'inline-flex') {
+      return collectFlexProps(computed, false);
+    }
+    const pad = readPadding(computed);
+    if (pad.top > 0 || pad.right > 0 || pad.bottom > 0 || pad.left > 0) {
+      return `padding: ${paddingShorthand(pad.top, pad.right, pad.bottom, pad.left)}`;
+    }
+    return '';
   }
 
   // Container with element children (and optionally direct text). Per direct text
