@@ -514,9 +514,39 @@ struct ArcLengthLUTVisitor {
 
 struct PathClosedCheckVisitor {
   bool& isClosed;
-  void operator()(PathVerb verb, const Point*) {
+  bool hasCloseVerb = false;
+  Point firstPoint = {};
+  Point lastPoint = {};
+  bool hasFirst = false;
+
+  void operator()(PathVerb verb, const Point* pts) {
     if (verb == PathVerb::Close) {
       isClosed = true;
+      hasCloseVerb = true;
+      return;
+    }
+    if (verb == PathVerb::Move) {
+      if (!hasFirst) {
+        firstPoint = pts[0];
+        hasFirst = true;
+      }
+      lastPoint = pts[0];
+    } else if (verb == PathVerb::Line) {
+      lastPoint = pts[0];
+    } else if (verb == PathVerb::Quad) {
+      lastPoint = pts[1];
+    } else if (verb == PathVerb::Cubic) {
+      lastPoint = pts[2];
+    }
+  }
+
+  void finalize() {
+    if (!isClosed && hasFirst) {
+      float dx = lastPoint.x - firstPoint.x;
+      float dy = lastPoint.y - firstPoint.y;
+      if (dx * dx + dy * dy < 1.0f) {
+        isClosed = true;
+      }
     }
   }
 };
@@ -1543,6 +1573,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
   bool isClosed = false;
   PathClosedCheckVisitor isClosedVisitor{isClosed};
   pathData.forEach(std::ref(isClosedVisitor));
+  isClosedVisitor.finalize();
   if (textPath->reversed) {
     PathData reversed = PathDataFromSVGString("");
     ReversePathData(pathData, reversed);
@@ -1852,16 +1883,15 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         q += len;
       }
 
-      // forceAlignment: use textLength + lengthAdjust="spacing" to spread characters
-      // evenly across the effective path length. On a closed path, tgfx distributes N
-      // equal gaps (including the junction between last and first character), but SVG
-      // textLength only creates N-1 gaps. Use svgTextLength = effectiveLength * (N-1)/N
-      // so the N-1 SVG gaps plus the implicit junction gap are all equal. This is exact
-      // when totalAdvance << effectiveLength and approximate otherwise; any remaining
-      // spacing difference versus tgfx is a tgfx alignment item.
+      // forceAlignment: use textLength + lengthAdjust="spacing" to spread characters evenly
+      // across the effective path length. For paths closed with a Z verb, SVG textLength
+      // creates N-1 gaps but tgfx creates N equal gaps; apply (N-1)/N correction so the
+      // junction gap matches the inter-character gaps. For geometrically-closed paths without
+      // a Z verb (e.g., arc circles ending at ~start), the path endpoint naturally provides
+      // the junction gap, so use the full effectiveLength.
       if (textPath->forceAlignment) {
         float svgTextLength = effectiveLength;
-        if (isClosed && charCount > 1) {
+        if (isClosed && isClosedVisitor.hasCloseVerb && charCount > 1) {
           float n = static_cast<float>(charCount);
           svgTextLength = effectiveLength * (n - 1.0f) / n;
         }
@@ -1888,12 +1918,31 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
       out.closeTagStart();
 
       // <textPath> referencing the path definition.
+      // SVG XML normalizes consecutive U+0020 spaces into one. Replace the second and
+      // subsequent spaces in a run with U+00A0 (NBSP) which is not an XML whitespace
+      // character and thus preserves the original character count for textLength spacing.
+      std::string textContent;
+      textContent.reserve(text->text.size() + 16);
+      bool prevSpace = false;
+      for (char c : text->text) {
+        if (c == ' ') {
+          if (prevSpace) {
+            textContent += "\xC2\xA0";  // U+00A0 NBSP in UTF-8
+          } else {
+            textContent += c;
+            prevSpace = true;
+          }
+        } else {
+          textContent += c;
+          prevSpace = false;
+        }
+      }
       out.openTag("textPath");
       out.addAttr("href", "#" + pathId);
       if (textPath->firstMargin > 0) {
         out.addAttr("startOffset", CssFloatToString(textPath->firstMargin));
       }
-      out.closeTagWithText(text->text);
+      out.closeTagWithText(textContent);
 
       out.closeTag();  // </text>
       out.closeTag();  // </svg>
