@@ -66,57 +66,6 @@ std::string PathDataToSVGString(const PathData& pathData) {
   return result;
 }
 
-std::string PathDataToSVGString(const PathData& pathData, const Matrix* transform) {
-  if (!transform) {
-    return PathDataToSVGString(pathData);
-  }
-  std::string result;
-  size_t pointIndex = 0;
-  const auto& verbs = pathData.verbs();
-  const auto& points = pathData.points();
-  result.reserve(verbs.size() * 24);
-
-  char buf[128] = {};
-  for (auto verb : verbs) {
-    const Point* pts = points.data() + pointIndex;
-    switch (verb) {
-      case PathVerb::Move: {
-        auto p = transform->mapPoint(pts[0]);
-        snprintf(buf, sizeof(buf), "M%g %g", p.x, p.y);
-        result += buf;
-        break;
-      }
-      case PathVerb::Line: {
-        auto p = transform->mapPoint(pts[0]);
-        snprintf(buf, sizeof(buf), "L%g %g", p.x, p.y);
-        result += buf;
-        break;
-      }
-      case PathVerb::Quad: {
-        auto p0 = transform->mapPoint(pts[0]);
-        auto p1 = transform->mapPoint(pts[1]);
-        snprintf(buf, sizeof(buf), "Q%g %g %g %g", p0.x, p0.y, p1.x, p1.y);
-        result += buf;
-        break;
-      }
-      case PathVerb::Cubic: {
-        auto p0 = transform->mapPoint(pts[0]);
-        auto p1 = transform->mapPoint(pts[1]);
-        auto p2 = transform->mapPoint(pts[2]);
-        snprintf(buf, sizeof(buf), "C%g %g %g %g %g %g", p0.x, p0.y, p1.x, p1.y, p2.x, p2.y);
-        result += buf;
-        break;
-      }
-      case PathVerb::Close:
-        result += "Z";
-        break;
-    }
-    pointIndex += PathData::PointsPerVerb(verb);
-  }
-
-  return result;
-}
-
 static void SkipWhitespaceAndCommas(const char*& ptr, const char* end) {
   while (ptr < end && (std::isspace(*ptr) || *ptr == ',')) {
     ++ptr;
