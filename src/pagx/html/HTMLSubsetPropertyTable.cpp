@@ -130,6 +130,22 @@ std::string TransformJustifyContent(const std::string& value, const PropertyCont
   return DropProperty("justify-content", value, "is not a recognised keyword", diags);
 }
 
+std::string TransformFlexShrink(const std::string& value, const PropertyContext&,
+                                HTMLTransformContext& diags) {
+  // `flex-shrink: 0` is emitted on every flex item by the html-snapshot tool so the
+  // subset HTML renders identically in a real browser (the live phone-shaped pages
+  // it targets routinely produce flex columns whose natural content height exceeds
+  // their declared size; the default `flex-shrink: 1` would crush each item and
+  // strand its absolutely-positioned descendants). PAGX's flex engine never shrinks
+  // items either, so `flex-shrink: 0` is a verbatim no-op for our renderer — drop
+  // it silently to keep import logs readable. Any other value still hits the warning
+  // path: it would imply a layout that PAGX cannot honour and the author should know.
+  std::string lc = ToLower(Trim(value));
+  if (lc == "0" || lc == "0.0") return std::string();
+  return DropProperty("flex-shrink", value,
+                      "use 'flex: <N>' shorthand instead", diags);
+}
+
 std::string TransformFlex(const std::string& value, const PropertyContext&,
                           HTMLTransformContext& diags) {
   std::string trimmed = Trim(value);
@@ -371,7 +387,10 @@ std::unordered_map<std::string, PropertyHandler> BuildTable() {
   AddDrop(t, "unicode-bidi", "is not in the subset");
   AddDrop(t, "flex-wrap", "is not in the subset");
   AddDrop(t, "flex-grow", "use 'flex: <N>' shorthand instead");
-  AddDrop(t, "flex-shrink", "use 'flex: <N>' shorthand instead");
+  // `flex-shrink` is handled as a transform because the canonical snapshot output
+  // emits `flex-shrink: 0` on every flex item; treating it as a generic drop would
+  // produce one warning per flex item with no actionable diagnostic.
+  AddTransform(t, "flex-shrink", &TransformFlexShrink);
   AddDrop(t, "flex-basis", "use 'flex: <N>' shorthand instead");
   AddDrop(t, "min-width", "is not in the subset");
   AddDrop(t, "max-width", "is not in the subset");

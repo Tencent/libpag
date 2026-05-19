@@ -605,12 +605,29 @@ function takeSnapshot(config) {
   // The PAGX importer treats `position: relative` as a no-op (PAGX has no
   // containing-block concept; all children anchor to their direct parent), so
   // the declaration is dropped during import and the flex layout is preserved.
+  //
+  // Flex items finally get `flex-shrink: 0`. Without it the browser applies the
+  // CSS default of `flex-shrink: 1`, which compresses every item proportionally
+  // whenever the flex container's natural content height exceeds its declared
+  // size (think a feed of post cards rendered into a 792-px phone screen with
+  // `overflow: hidden`: live content scrolls, but the snapshot is a flat
+  // capture, so the container is over-full by construction). The shrink would
+  // crush each item's measured height while leaving the `top: …px` offsets of
+  // its `position: absolute` descendants untouched — those descendants then
+  // leak outside the wrapper and disappear behind later siblings (the
+  // post's like row, topic banner, poll widget, etc. all vanish). PAGX's flex
+  // engine never shrinks, so the snapshot looked right under `pagx render` but
+  // diverged from Chromium; pinning the item size makes both engines agree.
+  // PAGX's importer warns about `flex-shrink` as outside the subset and drops
+  // it (HTMLStyleResolver.cpp), which is the desired no-op since PAGX already
+  // honours the explicit `height`.
   function buildStyle(left, top, width, height, computed, opts) {
     const parts = [];
     if (opts.flexItem) {
       parts.push(`position: relative`);
       parts.push(`width: ${px(width)}`);
       parts.push(`height: ${px(height)}`);
+      parts.push(`flex-shrink: 0`);
     } else if (opts.positioned !== false) {
       parts.push(`position: absolute`);
       parts.push(`left: ${px(left)}`);
