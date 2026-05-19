@@ -842,6 +842,9 @@ static std::vector<uint8_t> BuildCBLC(const Font* font, uint16_t numGlyphs) {
     WriteU32(table, currentOffset);
 
     const Image* image = font->glyphs[i]->image;
+    if (!image || !image->data) {
+      return {};
+    }
     size_t pngSize = image->data->size();
 
     // Decode to get dimensions for height/width in metrics
@@ -850,7 +853,11 @@ static std::vector<uint8_t> BuildCBLC(const Font* font, uint16_t numGlyphs) {
     (void)codec;  // dimensions already accounted for in CBDT
 
     // Each glyph entry: 5 (metrics) + 4 (dataLen) + pngSize
-    currentOffset += static_cast<uint32_t>(5 + 4 + pngSize);
+    size_t glyphSize = 5 + 4 + pngSize;
+    if (currentOffset > UINT32_MAX - glyphSize) {
+      return {};
+    }
+    currentOffset += static_cast<uint32_t>(glyphSize);
   }
   // Final offset marking end of last glyph's data
   WriteU32(table, currentOffset);
@@ -936,10 +943,12 @@ static std::vector<uint8_t> AssembleSFNT(std::vector<TableEntry>& tables, bool i
     if (strcmp(tables[i].tag, "head") == 0) {
       uint32_t headOffset = offsets[i];
       // checksumAdjustment is at byte offset 8 within head table
-      sfnt[headOffset + 8] = static_cast<uint8_t>(adjustment >> 24);
-      sfnt[headOffset + 9] = static_cast<uint8_t>(adjustment >> 16);
-      sfnt[headOffset + 10] = static_cast<uint8_t>(adjustment >> 8);
-      sfnt[headOffset + 11] = static_cast<uint8_t>(adjustment);
+      if (headOffset + 11 < sfnt.size()) {
+        sfnt[headOffset + 8] = static_cast<uint8_t>(adjustment >> 24);
+        sfnt[headOffset + 9] = static_cast<uint8_t>(adjustment >> 16);
+        sfnt[headOffset + 10] = static_cast<uint8_t>(adjustment >> 8);
+        sfnt[headOffset + 11] = static_cast<uint8_t>(adjustment);
+      }
       break;
     }
   }
