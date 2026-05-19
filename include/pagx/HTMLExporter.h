@@ -46,9 +46,10 @@ struct HTMLExportOptions {
   /**
    * When true, all inline `style="..."` attributes are consolidated into a
    * single internal stylesheet placed in the document <head>, and elements
-   * reference styles via generated class names (`.ps0`, `.ps1`, ...). This
-   * typically reduces HTML size by 10-25% for documents with repeated style
-   * declarations. When false, every style remains inline.
+   * reference styles via generated class names with semantic prefixes derived
+   * from element tag names (e.g., `.blend0`, `.layer1`, `.text2`, `.bg3`).
+   * This typically reduces HTML size by 10-25% for documents with repeated
+   * style declarations. When false, every style remains inline.
    *
    * The document's <body> `style` attribute is always kept inline because it
    * is unique per document and gains nothing from extraction.

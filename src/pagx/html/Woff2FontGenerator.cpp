@@ -913,6 +913,10 @@ static std::vector<uint8_t> AssembleSFNT(std::vector<TableEntry>& tables, bool i
   std::vector<uint32_t> offsets(numTables);
   uint32_t currentOffset = static_cast<uint32_t>(dataStart);
   for (size_t i = 0; i < numTables; i++) {
+    if (tables[i].data.size() > UINT32_MAX ||
+        currentOffset > UINT32_MAX - static_cast<uint32_t>(tables[i].data.size())) {
+      return {};
+    }
     offsets[i] = currentOffset;
     currentOffset += static_cast<uint32_t>(tables[i].data.size());
     // 4-byte align
