@@ -120,6 +120,8 @@ std::string EscapeCSSUrl(const std::string& url);
 
 std::string BuildPolystarPath(const Polystar* ps);
 std::string GetPathSVGString(const Path* path);
+// Reverses the winding direction of a PathData and returns the SVG path string.
+// Used for counter-clockwise stroke-clip paths that require inverted winding.
 std::string ReversePathDataToSVGString(const PathData& pathData);
 std::string RectToPathData(const Rectangle* r);
 std::string EllipseToPathData(const Ellipse* e);
@@ -400,6 +402,10 @@ class HTMLWriter {
   // box (in the gradient source's coordinate space) that the CSS background will paint into.
   // They are used by linear-gradient to emulate PAGX's startPoint/endPoint semantics since
   // Builds the CSS style string for a single TextBox span (font, fill, stroke, faux styles).
+  // Returns a semicolon-separated CSS property list (e.g. "font-size:12px;color:#FFF"). The
+  // `prefix` parameter supplies any inline CSS that should precede the span-specific styles
+  // (typically box-level properties like display/line-height inherited from the container).
+  // The returned string is never empty — at minimum the font-family is emitted.
   std::string buildTextBoxSpanStyle(const Text* text, const Fill* fill, const Stroke* stroke,
                                     const std::string& prefix);
 
@@ -433,6 +439,8 @@ class HTMLWriter {
   // Emits only the layer's inner children (background contents, composition, child layers,
   // foreground contents) without opening an outer layer <div>. Extracted so the BlurFilter
   // mirror-tile emission path can replay the same inner DOM inside each of the 9 mirrored tiles.
+  // Reads `childLayerOffsetX/Y` from the HTMLWriterContext; callers must set these before
+  // invoking (writeLayer sets them from the Repeater offset state for each child iteration).
   void writeLayerInner(HTMLBuilder& out, const Layer* layer, float contentAlpha,
                        bool childDistribute, bool isFlexContainer);
   // `containerPadding` is the padding of the nearest layout container (Layer / Group) supplying
@@ -451,6 +459,13 @@ class HTMLWriter {
   // are emitted inside the TextBox container instead of as stand-alone DOM wrappers.
   void renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
                                const std::vector<RichTextSpan>& richTextSpans);
+  // Flattens a Group's elements into inline geometry and painters. Saves the current
+  // fill/stroke/trim/merge/textPath/textModifier state at entry and restores it on exit, so
+  // the Group defines its own element scope. The `state` parameter is mutated during traversal
+  // (geos accumulated, fill/stroke updated) and restored to saved values before returning.
+  // `hasUpcomingRepeater` indicates whether a Repeater element follows this Group in its parent,
+  // affecting how geos are batched. `curTextBox` propagates the enclosing TextBox context for
+  // inline text elements.
   void flattenGroup(HTMLBuilder& out, const Group* group, float alpha, bool distribute,
                     LayerPlacement targetPlacement, bool hasUpcomingRepeater,
                     const TextBox* curTextBox, ElementDispatchState& state);
