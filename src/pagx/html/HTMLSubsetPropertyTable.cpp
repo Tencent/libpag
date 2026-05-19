@@ -23,13 +23,9 @@
 #include <cstring>
 #include <sstream>
 #include <string>
-#include "pagx/html/HTMLParserContext.h"
+#include "pagx/html/HTMLDetail.h"
 
-namespace pagx::subset_props {
-
-using pagx::detail::SplitTopLevelWhitespace;
-using pagx::detail::ToLower;
-using pagx::detail::Trim;
+namespace pagx::html {
 
 namespace {
 
@@ -52,28 +48,7 @@ bool ParseLengthComponent(const std::string& trimmed, float& outNumber, std::str
 }
 
 std::string FormatNumber(float v) {
-  // Use a stringstream with enough precision but no trailing zeros / scientific notation for
-  // small integers. CSS doesn't care about scale here; deterministic output matters.
-  if (std::isfinite(v)) {
-    float rounded = std::round(v * 1000.0f) / 1000.0f;
-    if (rounded == std::floor(rounded) && std::fabs(rounded) < 1e9f) {
-      std::ostringstream oss;
-      oss << static_cast<long long>(rounded);
-      return oss.str();
-    }
-  }
-  std::ostringstream oss;
-  oss.precision(6);
-  oss << v;
-  return oss.str();
-}
-
-// Re-stringifies a length as `<n>px` / `<n>%`.
-std::string EmitPx(float px) {
-  return FormatNumber(px) + "px";
-}
-std::string EmitPercent(float pct) {
-  return FormatNumber(pct) + "%";
+  return FormatRoundedNumber(v);
 }
 
 std::string DropProperty(const std::string& propertyName, const std::string& value,
@@ -527,4 +502,4 @@ bool IsDataAttribute(const std::string& name) {
   return name.size() > 5 && name.compare(0, 5, "data-") == 0;
 }
 
-}  // namespace pagx::subset_props
+}  // namespace pagx::html

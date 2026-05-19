@@ -21,7 +21,7 @@
 #include <memory>
 #include "pagx/html/HTMLTransformContext.h"
 
-namespace pagx::html_passes {
+namespace pagx::html {
 
 /**
  * Pass 1 — DocumentSkeleton.
@@ -147,4 +147,4 @@ class InlineStyleEmitterPass : public HTMLTransformPass {
   void apply(const std::shared_ptr<DOMNode>& root, HTMLTransformContext& ctx) override;
 };
 
-}  // namespace pagx::html_passes
+}  // namespace pagx::html

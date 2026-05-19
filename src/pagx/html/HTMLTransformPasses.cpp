@@ -29,23 +29,12 @@
 #include <utility>
 #include <vector>
 #include "pagx/html/HTMLCssCascade.h"
-#include "pagx/html/HTMLParserContext.h"
+#include "pagx/html/HTMLDetail.h"
 #include "pagx/html/HTMLSubsetPropertyTable.h"
 
-namespace pagx::html_passes {
+namespace pagx::html {
 
 namespace {
-
-using pagx::detail::ElementDefaults;
-using pagx::detail::IsBlankText;
-using pagx::detail::IsContainerTag;
-using pagx::detail::IsInlineRunTag;
-using pagx::detail::IsTextLeafTag;
-using pagx::detail::LowercaseTagsInPlace;
-using pagx::detail::ParseStyleString;
-using pagx::detail::ToLower;
-using pagx::detail::Trim;
-using pagx::subset_props::IsDataAttribute;
 
 // CSS properties that inherit by default in the subset. Mirrors `HTMLInheritedStyle` in the
 // importer so that the cascade carries identical semantics through both layers.
@@ -93,33 +82,9 @@ void RemoveNonElementChildren(const std::shared_ptr<DOMNode>& parent) {
 // Walk children of `parent` and call `fn(parent, prev, child)` for each child element. The
 // callback is allowed to remove or replace `child` via the returned new pointer (nullptr means
 // "delete this child"; any other pointer replaces it).
-template <typename Fn>
-void TransformChildren(const std::shared_ptr<DOMNode>& parent, Fn fn) {
-  std::shared_ptr<DOMNode> prev = nullptr;
-  auto child = parent->firstChild;
-  while (child) {
-    auto next = child->nextSibling;
-    auto replacement = fn(parent, prev, child);
-    if (!replacement) {
-      if (!prev) {
-        parent->firstChild = next;
-      } else {
-        prev->nextSibling = next;
-      }
-    } else {
-      if (replacement.get() != child.get()) {
-        replacement->nextSibling = next;
-        if (!prev) {
-          parent->firstChild = replacement;
-        } else {
-          prev->nextSibling = replacement;
-        }
-      }
-      prev = replacement;
-    }
-    child = next;
-  }
-}
+//
+// (TransformChildren has been removed: its only call sites used lambdas and the project rule
+// bans lambdas; the loop pattern is now inlined where needed.)
 
 std::shared_ptr<DOMNode> MakeElement(const std::string& name) {
   auto node = std::make_shared<DOMNode>();
@@ -223,25 +188,37 @@ void DocumentSkeletonPass::apply(const std::shared_ptr<DOMNode>& root, HTMLTrans
   // Inside <head>, keep only <title>, <meta>, <style>.
   if (head) {
     RemoveNonElementChildren(head);
-    TransformChildren(head,
-                      [&](const std::shared_ptr<DOMNode>&, const std::shared_ptr<DOMNode>&,
-                          const std::shared_ptr<DOMNode>& c) -> std::shared_ptr<DOMNode> {
-                        if (c->name == "title" || c->name == "meta" || c->name == "style") {
-                          return c;
-                        }
-                        if (c->name == "link") {
-                          auto* rel = c->findAttribute("rel");
-                          if (rel && ToLower(Trim(*rel)) == "stylesheet") {
-                            ctx.warn("subset:external-stylesheet",
-                                     "html: external <link rel=\"stylesheet\"> dropped", c);
-                          }
-                          return nullptr;  // drop silently
-                        }
-                        ctx.warn("subset:unsupported-tag",
-                                 "html: <" + c->name + "> inside <head> is not allowed; dropped",
-                                 c);
-                        return nullptr;
-                      });
+    std::shared_ptr<DOMNode> prevHeadChild = nullptr;
+    auto headChild = head->firstChild;
+    while (headChild) {
+      auto next = headChild->nextSibling;
+      bool drop = false;
+      if (headChild->name == "title" || headChild->name == "meta" || headChild->name == "style") {
+        // keep
+      } else if (headChild->name == "link") {
+        auto* rel = headChild->findAttribute("rel");
+        if (rel && ToLower(Trim(*rel)) == "stylesheet") {
+          ctx.warn("subset:external-stylesheet", "html: external <link rel=\"stylesheet\"> dropped",
+                   headChild);
+        }
+        drop = true;
+      } else {
+        ctx.warn("subset:unsupported-tag",
+                 "html: <" + headChild->name + "> inside <head> is not allowed; dropped",
+                 headChild);
+        drop = true;
+      }
+      if (drop) {
+        if (!prevHeadChild) {
+          head->firstChild = next;
+        } else {
+          prevHeadChild->nextSibling = next;
+        }
+      } else {
+        prevHeadChild = headChild;
+      }
+      headChild = next;
+    }
   }
 }
 
@@ -270,32 +247,32 @@ void StyleSheetCollectorPass::apply(const std::shared_ptr<DOMNode>& root,
   }
   if (!concatenated.empty()) {
     std::vector<std::string> droppedAt;
-    auto rules = css_cascade::TokenizeStyleSheet(concatenated, droppedAt);
+    auto rules = TokenizeStyleSheet(concatenated, droppedAt);
     for (auto& dropped : droppedAt) {
       ctx.warn("subset:unsupported-at-rule",
                "html: at-rule '" + dropped + "' dropped (not in subset)", nullptr);
     }
     for (auto& rule : rules) {
-      auto selectors = pagx::detail::SplitTopLevelCommas(rule.selectors);
+      auto selectors = SplitTopLevelCommas(rule.selectors);
       PropertyMap decls;
       ParseStyleString(rule.declarations, decls);
       if (decls.empty()) continue;
       for (auto& selRaw : selectors) {
         std::string sel = Trim(selRaw);
         if (sel.empty()) continue;
-        auto parsed = css_cascade::ClassifySelector(sel);
+        auto parsed = ClassifySelector(sel);
         switch (parsed.kind) {
-          case css_cascade::SelectorKind::Class:
+          case SelectorKind::Class:
             ctx.addClassRule(parsed.key, decls);
             break;
-          case css_cascade::SelectorKind::Element:
+          case SelectorKind::Element:
             ctx.addElementRule(parsed.key, decls);
             break;
-          case css_cascade::SelectorKind::Universal:
+          case SelectorKind::Universal:
             ctx.warn("subset:unsupported-selector",
                      "html: universal selector '*' is not allowed; rule dropped", nullptr);
             break;
-          case css_cascade::SelectorKind::Unsupported:
+          case SelectorKind::Unsupported:
             ctx.warn("subset:unsupported-selector",
                      "html: selector '" + sel + "' is not supported; rule dropped", nullptr);
             break;
@@ -306,12 +283,21 @@ void StyleSheetCollectorPass::apply(const std::shared_ptr<DOMNode>& root,
 
   // Remove <style> elements unless preservation is requested.
   if (!ctx.options().preserveStyleBlock) {
-    TransformChildren(head,
-                      [&](const std::shared_ptr<DOMNode>&, const std::shared_ptr<DOMNode>&,
-                          const std::shared_ptr<DOMNode>& c) -> std::shared_ptr<DOMNode> {
-                        if (c->type == DOMNodeType::Element && c->name == "style") return nullptr;
-                        return c;
-                      });
+    std::shared_ptr<DOMNode> prev = nullptr;
+    auto child = head->firstChild;
+    while (child) {
+      auto next = child->nextSibling;
+      if (child->type == DOMNodeType::Element && child->name == "style") {
+        if (!prev) {
+          head->firstChild = next;
+        } else {
+          prev->nextSibling = next;
+        }
+      } else {
+        prev = child;
+      }
+      child = next;
+    }
   }
 }
 
@@ -435,7 +421,7 @@ float FilterElement(const std::shared_ptr<DOMNode>& element, float parentFontSiz
   auto* resolved = ctx.findResolved(element.get());
   if (!resolved) return parentFontSizePx;
 
-  const auto& table = subset_props::SubsetPropertyTable();
+  const auto& table = SubsetPropertyTable();
   PropertyMap filtered;
 
   // Phase 1: resolve `font-size` first using the PARENT's font-size as the em base. CSS spec:
@@ -443,13 +429,13 @@ float FilterElement(const std::shared_ptr<DOMNode>& element, float parentFontSiz
   float ownFontSizePx = parentFontSizePx;
   auto fsIt = resolved->find("font-size");
   if (fsIt != resolved->end()) {
-    subset_props::PropertyContext pctx = {};
+    PropertyContext pctx = {};
     pctx.propertyName = "font-size";
     pctx.ownerTag = element->name;
     pctx.canvasWidth = ctx.canvasWidth();
     pctx.canvasHeight = ctx.canvasHeight();
     pctx.currentFontSizePx = parentFontSizePx;
-    std::string newValue = subset_props::ResolveLength(fsIt->second, pctx, ctx);
+    std::string newValue = ResolveLength(fsIt->second, pctx, ctx);
     if (!newValue.empty()) {
       filtered["font-size"] = newValue;
       float parsed = ParseResolvedFontSizePx(newValue);
@@ -475,17 +461,17 @@ float FilterElement(const std::shared_ptr<DOMNode>& element, float parentFontSiz
     }
     const auto& handler = handlerIt->second;
     switch (handler.action) {
-      case subset_props::PropAction::Keep:
+      case PropAction::Keep:
         filtered[propName] = Trim(propValue);
         break;
-      case subset_props::PropAction::Drop: {
+      case PropAction::Drop: {
         std::string msg = handler.dropMessage ? handler.dropMessage : "is not in the subset";
         ctx.warn("subset:unsupported-property",
                  "html: '" + propName + ": " + propValue + "' " + msg, element);
         break;
       }
-      case subset_props::PropAction::Transform: {
-        subset_props::PropertyContext pctx = {};
+      case PropAction::Transform: {
+        PropertyContext pctx = {};
         pctx.propertyName = propName;
         pctx.ownerTag = element->name;
         pctx.canvasWidth = ctx.canvasWidth();
@@ -568,6 +554,28 @@ std::string LookupResolvedLower(const PropertyMap& props, const std::string& key
   return ToLower(Trim(LookupResolved(props, key)));
 }
 
+// Expands a `padding` shorthand value (e.g. `4px 8px`) into top/right/bottom/left. Returns
+// false when any token is not a plain px length. The output buffers are written only on
+// success.
+bool ApplyPaddingShorthand(const std::string& value, float& top, float& right, float& bottom,
+                           float& left) {
+  auto tokens = SplitTopLevelWhitespace(value);
+  std::vector<float> nums;
+  nums.reserve(tokens.size());
+  for (auto& t : tokens) {
+    float px = 0.0f;
+    if (!ParseNormalisedPx(t, px)) return false;
+    nums.push_back(px);
+  }
+  if (nums.empty()) return false;
+  auto p = BuildPaddingShorthand(nums);
+  top = p.top;
+  right = p.right;
+  bottom = p.bottom;
+  left = p.left;
+  return true;
+}
+
 // Parses the resolved `padding` shorthand (1-4 px tokens) into top/right/bottom/left. Returns
 // false if the value is missing or any token is not a plain px length. Per-side `padding-*`
 // overrides (when present) win over the shorthand.
@@ -575,26 +583,11 @@ bool ParsePaddingFromResolved(const PropertyMap& props, float& top, float& right
                               float& left) {
   top = right = bottom = left = 0.0f;
   bool any = false;
-  auto applyShorthand = [&](const std::string& v) {
-    auto tokens = pagx::detail::SplitTopLevelWhitespace(v);
-    std::vector<float> nums;
-    nums.reserve(tokens.size());
-    for (auto& t : tokens) {
-      float px = 0.0f;
-      if (!ParseNormalisedPx(t, px)) return false;
-      nums.push_back(px);
-    }
-    if (nums.empty()) return false;
-    auto p = pagx::detail::BuildPaddingShorthand(nums);
-    top = p.top;
-    right = p.right;
-    bottom = p.bottom;
-    left = p.left;
-    any = true;
-    return true;
-  };
   auto sh = LookupResolved(props, "padding");
-  if (!sh.empty() && !applyShorthand(sh)) return false;
+  if (!sh.empty()) {
+    if (!ApplyPaddingShorthand(sh, top, right, bottom, left)) return false;
+    any = true;
+  }
   // Per-side overrides.
   float px = 0.0f;
   if (auto v = LookupResolved(props, "padding-top"); !v.empty() && ParseNormalisedPx(v, px)) {
@@ -616,33 +609,8 @@ bool ParsePaddingFromResolved(const PropertyMap& props, float& top, float& right
   return any || sh.empty();  // empty padding is fine (zeros)
 }
 
-// Builds a CSS px shorthand string from top/right/bottom/left, collapsing to the shortest
-// equivalent form ("N", "T R", "T R B" vs "T R B L").
-std::string EmitPaddingShorthand(float t, float r, float b, float l) {
-  auto fmt = [](float v) {
-    float rounded = std::round(v * 1000.0f) / 1000.0f;
-    if (rounded == std::floor(rounded) && std::fabs(rounded) < 1e9f) {
-      return std::to_string(static_cast<long long>(rounded)) + "px";
-    }
-    char buf[32];
-    std::snprintf(buf, sizeof(buf), "%g", static_cast<double>(rounded));
-    return std::string(buf) + "px";
-  };
-  if (t == r && r == b && b == l) return fmt(t);
-  if (t == b && l == r) return fmt(t) + " " + fmt(r);
-  if (l == r) return fmt(t) + " " + fmt(r) + " " + fmt(b);
-  return fmt(t) + " " + fmt(r) + " " + fmt(b) + " " + fmt(l);
-}
-
-std::string EmitPxValue(float v) {
-  float rounded = std::round(v * 1000.0f) / 1000.0f;
-  if (rounded == std::floor(rounded) && std::fabs(rounded) < 1e9f) {
-    return std::to_string(static_cast<long long>(rounded)) + "px";
-  }
-  char buf[32];
-  std::snprintf(buf, sizeof(buf), "%g", static_cast<double>(rounded));
-  return std::string(buf) + "px";
-}
+// Padding shorthand emission and per-axis px formatting are shared with the property table /
+// importer via HTMLDetail (`EmitPaddingShorthand`, `EmitPx`).
 
 struct ChildBox {
   std::shared_ptr<DOMNode> node;
@@ -683,39 +651,53 @@ bool ExtractAbsoluteBox(const PropertyMap& props, ChildBox& out) {
 
 enum class FlexAxis { Row, Column };
 
+// Comparators for sorting `ChildBox` along the row / column main axes. Hoisted out of
+// `InferAxis` to honour the project's "no lambdas" rule.
+bool ChildBoxLeftLess(const ChildBox& a, const ChildBox& b) {
+  return a.left < b.left;
+}
+bool ChildBoxTopLess(const ChildBox& a, const ChildBox& b) {
+  return a.top < b.top;
+}
+
+// Returns true when sorting `children` along `row` (true) or column (false) yields a sequence
+// with no main-axis overlap (within tolerance `tol`).
+bool IsAxisOrderedNoOverlap(const std::vector<ChildBox>& children, bool row, float tol) {
+  std::vector<ChildBox> sorted = children;
+  std::sort(sorted.begin(), sorted.end(), row ? ChildBoxLeftLess : ChildBoxTopLess);
+  for (size_t i = 0; i + 1 < sorted.size(); i++) {
+    float curEnd = row ? sorted[i].left + sorted[i].width : sorted[i].top + sorted[i].height;
+    float nextStart = row ? sorted[i + 1].left : sorted[i + 1].top;
+    if (nextStart < curEnd - tol) return false;  // overlap on main axis
+  }
+  return true;
+}
+
+// Returns the spread (max - min) of the main-axis starting offsets of `children`.
+float AxisStartSpread(const std::vector<ChildBox>& children, bool row) {
+  float lo = std::numeric_limits<float>::infinity();
+  float hi = -std::numeric_limits<float>::infinity();
+  for (const auto& c : children) {
+    float v = row ? c.left : c.top;
+    lo = std::min(lo, v);
+    hi = std::max(hi, v);
+  }
+  return hi - lo;
+}
+
 // Returns the inferred main axis when every child's bounding box is ordered along it without
 // overlap. When both axes are valid (single child / collinear), prefers the axis with the
 // larger spread. Returns std::nullopt-equivalent (false) when neither axis works.
 bool InferAxis(const std::vector<ChildBox>& children, float tol, FlexAxis& out) {
   if (children.size() < 2) return false;
-  auto axisOk = [&](bool row) {
-    auto sorted = children;
-    std::sort(sorted.begin(), sorted.end(), [&](const ChildBox& a, const ChildBox& b) {
-      return row ? a.left < b.left : a.top < b.top;
-    });
-    for (size_t i = 0; i + 1 < sorted.size(); i++) {
-      float curEnd = row ? sorted[i].left + sorted[i].width : sorted[i].top + sorted[i].height;
-      float nextStart = row ? sorted[i + 1].left : sorted[i + 1].top;
-      if (nextStart < curEnd - tol) return false;  // overlap on main axis
-    }
-    return true;
-  };
-  bool rowOk = axisOk(true);
-  bool colOk = axisOk(false);
+  bool rowOk = IsAxisOrderedNoOverlap(children, /*row=*/true, tol);
+  bool colOk = IsAxisOrderedNoOverlap(children, /*row=*/false, tol);
   if (rowOk && colOk) {
     // Both axes are non-overlapping — pick the one with the largest spread of starts so that a
     // genuine row-of-3 doesn't get classified as a column with three identical y values.
-    auto spread = [&](bool row) {
-      float lo = std::numeric_limits<float>::infinity();
-      float hi = -std::numeric_limits<float>::infinity();
-      for (const auto& c : children) {
-        float v = row ? c.left : c.top;
-        lo = std::min(lo, v);
-        hi = std::max(hi, v);
-      }
-      return hi - lo;
-    };
-    out = spread(true) >= spread(false) ? FlexAxis::Row : FlexAxis::Column;
+    out = AxisStartSpread(children, /*row=*/true) >= AxisStartSpread(children, /*row=*/false)
+              ? FlexAxis::Row
+              : FlexAxis::Column;
     return true;
   }
   if (rowOk) {
@@ -771,17 +753,20 @@ struct MainAxisFit {
   float gap = 0.0f;
 };
 
+// Returns the main-axis low (start) or high (end) coordinate of a child box on the given axis.
+// Hoisted out of `InferMainAxisSpacing` to honour the project's "no lambdas" rule.
+float GetMainAxisCoord(const ChildBox& c, FlexAxis axis, bool low) {
+  if (axis == FlexAxis::Row) {
+    return low ? c.left : c.left + c.width;
+  }
+  return low ? c.top : c.top + c.height;
+}
+
 MainAxisFit InferMainAxisSpacing(const std::vector<ChildBox>& sorted, FlexAxis axis,
                                  float contentLow, float contentHigh, float tol) {
   MainAxisFit fit = {};
-  auto get = [&](const ChildBox& c, bool low) {
-    if (axis == FlexAxis::Row) {
-      return low ? c.left : c.left + c.width;
-    }
-    return low ? c.top : c.top + c.height;
-  };
-  fit.paddingLeading = get(sorted.front(), true) - contentLow;
-  fit.paddingTrailing = contentHigh - get(sorted.back(), false);
+  fit.paddingLeading = GetMainAxisCoord(sorted.front(), axis, /*low=*/true) - contentLow;
+  fit.paddingTrailing = contentHigh - GetMainAxisCoord(sorted.back(), axis, /*low=*/false);
   if (fit.paddingLeading < -tol) return fit;   // first child overflows the content box
   if (fit.paddingTrailing < -tol) return fit;  // last child overflows the content box
   if (fit.paddingLeading < 0) fit.paddingLeading = 0;
@@ -791,11 +776,13 @@ MainAxisFit InferMainAxisSpacing(const std::vector<ChildBox>& sorted, FlexAxis a
     return fit;
   }
   // Compute every middle gap; require they all match within tolerance.
-  float first = get(sorted[1], true) - get(sorted[0], false);
+  float first = GetMainAxisCoord(sorted[1], axis, /*low=*/true) -
+                GetMainAxisCoord(sorted[0], axis, /*low=*/false);
   if (first < -tol) return fit;  // overlap (shouldn't happen — InferAxis guarded this)
   float gap = std::max(0.0f, first);
   for (size_t i = 1; i + 1 < sorted.size(); i++) {
-    float g = get(sorted[i + 1], true) - get(sorted[i], false);
+    float g = GetMainAxisCoord(sorted[i + 1], axis, /*low=*/true) -
+              GetMainAxisCoord(sorted[i], axis, /*low=*/false);
     if (std::fabs(g - first) > tol) return fit;
     gap = std::max(gap, std::max(0.0f, g));
   }
@@ -851,7 +838,7 @@ void ApplyFlexToParent(PropertyMap& parentProps, FlexAxis axis, float padTop, fl
   parentProps["display"] = "flex";
   parentProps["flex-direction"] = AxisName(axis);
   if (gap > 0.0f) {
-    parentProps["gap"] = EmitPxValue(gap);
+    parentProps["gap"] = EmitPx(gap);
   } else {
     parentProps.erase("gap");
   }
@@ -1026,9 +1013,8 @@ void TryInferFlexOnContainer(const std::shared_ptr<DOMNode>& parent, HTMLTransfo
 
   // Sort once along the main axis for spacing inference.
   std::vector<ChildBox> sorted = boxes;
-  std::sort(sorted.begin(), sorted.end(), [&](const ChildBox& a, const ChildBox& b) {
-    return axis == FlexAxis::Row ? a.left < b.left : a.top < b.top;
-  });
+  std::sort(sorted.begin(), sorted.end(),
+            axis == FlexAxis::Row ? ChildBoxLeftLess : ChildBoxTopLess);
 
   MainAxisFit fit = InferMainAxisSpacing(sorted, axis, mainContentLow, mainContentHigh, tol);
   if (!fit.ok) {
@@ -1220,6 +1206,14 @@ void StructureNormalizationPass::apply(const std::shared_ptr<DOMNode>& root,
 
 namespace {
 
+bool IsEmptyStyleAttribute(const DOMAttribute& a) {
+  return a.name == "style" && a.value.empty();
+}
+
+bool IsClassAttribute(const DOMAttribute& a) {
+  return a.name == "class";
+}
+
 void EmitStyleAttribute(const std::shared_ptr<DOMNode>& element, HTMLTransformContext& ctx) {
   auto* resolved = ctx.findResolved(element.get());
   if (!resolved) return;
@@ -1261,10 +1255,9 @@ void EmitStyleAttribute(const std::shared_ptr<DOMNode>& element, HTMLTransformCo
   }
   if (replaced && out.empty()) {
     // Drop the now-empty style attribute.
-    element->attributes.erase(
-        std::remove_if(element->attributes.begin(), element->attributes.end(),
-                       [](const DOMAttribute& a) { return a.name == "style" && a.value.empty(); }),
-        element->attributes.end());
+    element->attributes.erase(std::remove_if(element->attributes.begin(), element->attributes.end(),
+                                             IsEmptyStyleAttribute),
+                              element->attributes.end());
   }
 }
 
@@ -1275,8 +1268,7 @@ void EmitTree(const std::shared_ptr<DOMNode>& element, HTMLTransformContext& ctx
     EmitStyleAttribute(element, ctx);
     if (!ctx.options().preserveClassAttribute) {
       element->attributes.erase(
-          std::remove_if(element->attributes.begin(), element->attributes.end(),
-                         [](const DOMAttribute& a) { return a.name == "class"; }),
+          std::remove_if(element->attributes.begin(), element->attributes.end(), IsClassAttribute),
           element->attributes.end());
     }
   }
@@ -1300,4 +1292,4 @@ void InlineStyleEmitterPass::apply(const std::shared_ptr<DOMNode>& root,
   (void)IsVoidElement;  // referenced for future void-element handling; keep helper alive.
 }
 
-}  // namespace pagx::html_passes
+}  // namespace pagx::html

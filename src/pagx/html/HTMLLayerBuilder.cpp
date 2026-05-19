@@ -18,12 +18,13 @@
 
 #include <string>
 #include "base/utils/MathUtil.h"
+#include "pagx/html/HTMLDetail.h"
 #include "pagx/html/HTMLParserContext.h"
 #include "pagx/utils/StringParser.h"
 
 namespace pagx {
 
-using namespace pagx::detail;
+using namespace pagx::html;
 
 namespace {
 

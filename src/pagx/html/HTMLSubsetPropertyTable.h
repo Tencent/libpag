@@ -22,7 +22,7 @@
 #include <unordered_map>
 #include "pagx/html/HTMLTransformContext.h"
 
-namespace pagx::subset_props {
+namespace pagx::html {
 
 enum class PropAction {
   Keep,       // Pass the value through untouched.
@@ -91,4 +91,4 @@ std::string ResolveLengthShorthand(const std::string& value, const PropertyConte
  */
 bool IsDataAttribute(const std::string& name);
 
-}  // namespace pagx::subset_props
+}  // namespace pagx::html

@@ -20,23 +20,14 @@
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
+#include "pagx/html/HTMLDetail.h"
 #include "pagx/html/HTMLParserContext.h"
 
 namespace pagx {
 
-using namespace pagx::detail;
+using namespace pagx::html;
 
-namespace {
-
-// Reads `props[key]` (when present) into `slot`. Hoisted out of computeInherited to
-// keep with the project rule banning lambdas.
-void TakeProp(const std::unordered_map<std::string, std::string>& props, const std::string& key,
-              std::string& slot) {
-  auto it = props.find(key);
-  if (it != props.end()) slot = it->second;
-}
-
-}  // namespace
+namespace {}  // namespace
 
 void HTMLParserContext::collectStyles(const std::shared_ptr<DOMNode>& head) {
   auto child = head->getFirstChild();
@@ -183,17 +174,17 @@ HTMLInheritedStyle HTMLParserContext::computeInherited(const std::shared_ptr<DOM
                                                        const HTMLInheritedStyle& parent) {
   HTMLInheritedStyle out = parent;
   const auto& props = getResolvedStyle(element);
-  TakeProp(props, "color", out.color);
-  TakeProp(props, "font-family", out.fontFamily);
-  TakeProp(props, "font-size", out.fontSize);
-  TakeProp(props, "font-weight", out.fontWeight);
-  TakeProp(props, "font-style", out.fontStyle);
-  TakeProp(props, "letter-spacing", out.letterSpacing);
-  TakeProp(props, "line-height", out.lineHeight);
-  TakeProp(props, "text-align", out.textAlign);
-  TakeProp(props, "text-decoration", out.textDecoration);
-  TakeProp(props, "text-decoration-color", out.textDecorationColor);
-  TakeProp(props, "white-space", out.whiteSpace);
+  CopyProperty(props, "color", out.color);
+  CopyProperty(props, "font-family", out.fontFamily);
+  CopyProperty(props, "font-size", out.fontSize);
+  CopyProperty(props, "font-weight", out.fontWeight);
+  CopyProperty(props, "font-style", out.fontStyle);
+  CopyProperty(props, "letter-spacing", out.letterSpacing);
+  CopyProperty(props, "line-height", out.lineHeight);
+  CopyProperty(props, "text-align", out.textAlign);
+  CopyProperty(props, "text-decoration", out.textDecoration);
+  CopyProperty(props, "text-decoration-color", out.textDecorationColor);
+  CopyProperty(props, "white-space", out.whiteSpace);
   // Compute combined font-style label used by PAGX Text.
   bool isBold = false;
   if (!out.fontWeight.empty()) {

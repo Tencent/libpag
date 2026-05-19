@@ -22,7 +22,7 @@
 #include <vector>
 #include "pagx/html/HTMLTransformContext.h"
 
-namespace pagx::css_cascade {
+namespace pagx::html {
 
 enum class SelectorKind {
   Class,        // `.foo`
@@ -68,4 +68,4 @@ struct RawCssRule {
 std::vector<RawCssRule> TokenizeStyleSheet(const std::string& css,
                                            std::vector<std::string>& droppedAtRules);
 
-}  // namespace pagx::css_cascade
+}  // namespace pagx::html

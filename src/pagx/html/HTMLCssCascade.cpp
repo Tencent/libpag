@@ -18,12 +18,9 @@
 
 #include "pagx/html/HTMLCssCascade.h"
 #include <cctype>
-#include "pagx/html/HTMLParserContext.h"
+#include "pagx/html/HTMLDetail.h"
 
-namespace pagx::css_cascade {
-
-using pagx::detail::ToLower;
-using pagx::detail::Trim;
+namespace pagx::html {
 
 namespace {
 
@@ -186,4 +183,4 @@ std::vector<RawCssRule> TokenizeStyleSheet(const std::string& css,
   return rules;
 }
 
-}  // namespace pagx::css_cascade
+}  // namespace pagx::html

@@ -18,10 +18,8 @@
 
 #pragma once
 
-#include <cctype>
 #include <cmath>
 #include <cstdint>
-#include <cstdlib>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -29,6 +27,8 @@
 #include <vector>
 #include "pagx/HTMLImporter.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/html/HTMLBoxAttributes.h"
+#include "pagx/html/HTMLDetail.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorStop.h"
@@ -53,91 +53,6 @@
 #include "pagx/xml/XMLDOM.h"
 
 namespace pagx {
-
-/**
- * Maximum nesting depth tolerated during HTML traversal. Mirrors the SVG importer.
- */
-static constexpr int MAX_HTML_RECURSION_DEPTH = 128;
-
-/**
- * Default CSS font-size used for HTML text leaves before any user style is applied.
- */
-static constexpr float HTML_DEFAULT_FONT_SIZE = 14.0f;
-
-/**
- * Inherited CSS style properties that cascade down the element tree during HTML
- * traversal. Empty strings denote "not set" (preserved so that descendants can know
- * whether to inherit further or use their own defaults).
- */
-struct HTMLInheritedStyle {
-  std::string color = {};
-  std::string fontFamily = {};
-  std::string fontSize = {};
-  std::string fontWeight = {};
-  std::string fontStyle = {};
-  std::string fontStyleName = {};  // computed combination, e.g. "Bold Italic"
-  std::string letterSpacing = {};
-  std::string lineHeight = {};
-  std::string textAlign = {};
-  std::string textDecoration = {};
-  std::string textDecorationColor = {};
-  std::string whiteSpace = {};
-};
-
-/**
- * Resolved box-model attributes for a single HTML element. Anything left as NaN / empty
- * is "not specified" and falls back to PAGX defaults (which mirror CSS defaults for the
- * accepted subset).
- */
-struct HTMLBoxAttributes {
-  // Sizing
-  float widthPx = NAN;    // explicit px width
-  float widthPct = NAN;   // explicit % width (0-100)
-  float heightPx = NAN;   // explicit px height
-  float heightPct = NAN;  // explicit % height (0-100)
-
-  // Positioning (only when position: absolute)
-  bool absolute = false;
-  float leftPx = NAN;
-  float rightPx = NAN;
-  float topPx = NAN;
-  float bottomPx = NAN;
-
-  // Layout
-  bool displayFlex = false;
-  bool flexRow = true;  // default of CSS flex
-  float gapPx = 0.0f;
-  bool gapSet = false;
-  Padding padding = {};
-  bool paddingSet = false;
-  std::string alignItems = {};
-  std::string justifyContent = {};
-  float flexGrow = 0.0f;
-  bool flexGrowSet = false;
-
-  // Effects
-  Color backgroundColor = {0, 0, 0, 0, ColorSpace::SRGB};
-  bool backgroundColorSet = false;
-  std::string backgroundImage = {};
-
-  float borderRadiusPx = 0.0f;
-  bool borderRadiusSet = false;
-
-  float borderWidthPx = 0.0f;
-  Color borderColor = {0, 0, 0, 1, ColorSpace::SRGB};
-  bool borderSet = false;
-
-  std::string boxShadow = {};
-  std::string filter = {};
-  std::string backdropFilter = {};
-
-  float opacity = 1.0f;
-  bool opacitySet = false;
-
-  std::string mixBlendMode = {};
-
-  bool clipOverflow = false;
-};
 
 /**
  * Internal HTML parser implementation. Builds a PAGXDocument from an HTML DOM, applying
@@ -405,124 +320,5 @@ class HTMLParserContext {
   float _canvasHeight = 0;
   bool _hadHardError = false;
 };
-
-namespace detail {
-
-// Lower-case ASCII in place.
-inline std::string ToLower(std::string s) {
-  for (auto& c : s) {
-    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-  }
-  return s;
-}
-
-// Trim ASCII whitespace from both ends.
-inline std::string Trim(const std::string& s) {
-  size_t start = s.find_first_not_of(" \t\r\n");
-  if (start == std::string::npos) {
-    return {};
-  }
-  size_t end = s.find_last_not_of(" \t\r\n");
-  return s.substr(start, end - start + 1);
-}
-
-// Returns true when `text` is empty or consists entirely of ASCII whitespace.
-inline bool IsBlankText(const std::string& text) {
-  for (char c : text) {
-    if (!std::isspace(static_cast<unsigned char>(c))) return false;
-  }
-  return true;
-}
-
-// Split a CSS value list on top-level commas (commas inside parentheses are not split).
-std::vector<std::string> SplitTopLevelCommas(const std::string& s);
-
-// Split a CSS value on whitespace runs while respecting parenthesised groups (so
-// "0 2px 6px rgba(0,0,0,0.2)" yields four tokens).
-std::vector<std::string> SplitTopLevelWhitespace(const std::string& s);
-
-// Parse a CSS style string into a property map. Later properties override earlier ones.
-// Comments and parenthesised values are respected.
-void ParseStyleString(const std::string& styleStr,
-                      std::unordered_map<std::string, std::string>& out);
-
-// CSS named color table (CSS Color 3 + rebeccapurple).
-const std::unordered_map<std::string, uint32_t>& NamedColors();
-
-// Default style sheet by element tag.
-const std::unordered_map<std::string, std::string>& ElementDefaults();
-
-inline bool IsContainerTag(const std::string& tag) {
-  return tag == "div" || tag == "section" || tag == "header" || tag == "footer" || tag == "main" ||
-         tag == "aside" || tag == "nav" || tag == "article" || tag == "body";
-}
-
-inline bool IsTextLeafTag(const std::string& tag) {
-  return tag == "p" || tag == "h1" || tag == "h2" || tag == "h3" || tag == "h4" || tag == "h5" ||
-         tag == "h6" || tag == "span" || tag == "a";
-}
-
-inline bool IsInlineRunTag(const std::string& tag) {
-  return tag == "span" || tag == "a" || tag == "br";
-}
-
-// Lower-case the tag name of every element node in place.
-void LowercaseTagsInPlace(const std::shared_ptr<DOMNode>& node);
-
-// Escape XML text/attribute values for round-tripping inline SVG content.
-std::string EscapeXml(const std::string& text, bool isAttribute);
-
-// Try to parse a CSS angle in `deg`, `rad`, `turn`, or unitless (deg).
-float ParseAngle(const std::string& raw);
-
-// Returns the converted PAGX gradient angle (degrees, 0deg = +X axis) for a CSS angle
-// (degrees, 0deg = top, clockwise).
-inline float CssToPagxAngle(float cssDeg) {
-  return cssDeg - 90.0f;
-}
-
-// Convert CSS keyword direction ("to bottom right", etc.) to a CSS angle in degrees.
-float CssDirectionToAngle(const std::string& kw);
-
-// Pull the bracketed args of a function-like CSS value:
-// "linear-gradient(a, b, c)" -> "a, b, c".
-std::string ExtractParenArgs(const std::string& value);
-
-// Strip trailing slashes so file path resolution doesn't pick up wrong directories.
-std::string DirectoryOf(const std::string& filePath);
-
-bool LooksAbsolutePath(const std::string& src);
-
-// Returns the value of property `key` from `props`, or an empty string when absent.
-inline const std::string& LookupProperty(const std::unordered_map<std::string, std::string>& props,
-                                         const std::string& key) {
-  static const std::string emptyValue;
-  auto it = props.find(key);
-  return it == props.end() ? emptyValue : it->second;
-}
-
-// Convenience: lower-cased and trimmed lookup, used a lot when interpreting CSS keyword
-// values such as `display`, `position`, `align-items`.
-inline std::string LookupLowerTrimmed(const std::unordered_map<std::string, std::string>& props,
-                                      const std::string& key) {
-  return ToLower(Trim(LookupProperty(props, key)));
-}
-
-// Convert a CSS hex value (already parsed into a uint32_t) into a Color. When `hasAlpha`
-// is true the alpha channel is the most significant byte, otherwise alpha defaults to 1.
-Color HexToColor(uint32_t hex, bool hasAlpha);
-
-// Builds a Padding shorthand from 1-4 numbers (CSS top/right/bottom/left expansion).
-Padding BuildPaddingShorthand(const std::vector<float>& nums);
-
-// Parses a CSS dimension string into either an explicit pixel value or a percent value.
-// Returns true on success and writes one of `outPx` / `outPct` (the other stays NaN).
-bool ParseSizingDimension(const std::string& raw, float& outPx, float& outPct);
-
-// Collapse HTML whitespace in a single fragment: convert tabs/CR to spaces, collapse
-// adjacent ASCII whitespace, and trim leading/trailing whitespace at the fragment level.
-std::string CollapseHTMLWhitespace(const std::string& raw);
-
-}  // namespace detail
 
 }  // namespace pagx

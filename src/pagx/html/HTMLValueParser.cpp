@@ -21,12 +21,13 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include "pagx/html/HTMLDetail.h"
 #include "pagx/html/HTMLParserContext.h"
 #include "pagx/utils/StringParser.h"
 
 namespace pagx {
 
-using namespace pagx::detail;
+using namespace pagx::html;
 
 Color HTMLParserContext::parseColor(const std::string& valueRaw) {
   std::string value = Trim(valueRaw);

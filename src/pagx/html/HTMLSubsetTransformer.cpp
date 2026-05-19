@@ -119,15 +119,15 @@ HTMLSubsetTransformer::Builder& HTMLSubsetTransformer::Builder::withOptions(
 }
 
 HTMLSubsetTransformer::Builder& HTMLSubsetTransformer::Builder::addDefaultPasses() {
-  _impl->passes.push_back(std::make_unique<html_passes::DocumentSkeletonPass>());
-  _impl->passes.push_back(std::make_unique<html_passes::StyleSheetCollectorPass>());
-  _impl->passes.push_back(std::make_unique<html_passes::ComputedStylePass>());
-  _impl->passes.push_back(std::make_unique<html_passes::PropertyFilterPass>());
+  _impl->passes.push_back(std::make_unique<html::DocumentSkeletonPass>());
+  _impl->passes.push_back(std::make_unique<html::StyleSheetCollectorPass>());
+  _impl->passes.push_back(std::make_unique<html::ComputedStylePass>());
+  _impl->passes.push_back(std::make_unique<html::PropertyFilterPass>());
   // AbsoluteToFlexInference is always wired in; it self-disables when
   // `Options::inferFlexFromAbsolute` is false so the default pipeline behaviour is unchanged.
-  _impl->passes.push_back(std::make_unique<html_passes::AbsoluteToFlexInferencePass>());
-  _impl->passes.push_back(std::make_unique<html_passes::StructureNormalizationPass>());
-  _impl->passes.push_back(std::make_unique<html_passes::InlineStyleEmitterPass>());
+  _impl->passes.push_back(std::make_unique<html::AbsoluteToFlexInferencePass>());
+  _impl->passes.push_back(std::make_unique<html::StructureNormalizationPass>());
+  _impl->passes.push_back(std::make_unique<html::InlineStyleEmitterPass>());
   return *this;
 }
 
