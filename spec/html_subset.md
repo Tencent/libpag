@@ -159,7 +159,7 @@ also a no-op (the offsets are ignored alongside the dropped position).
 | `background-image: linear-gradient(angle, c1 [p], c2 [p], …)` | inline `<LinearGradient>` inside `<Fill>` (`startPoint`/`endPoint` derived from angle) |
 | `background-image: radial-gradient(…)` | inline `<RadialGradient>` (center/radius derived from `circle at … N%`) |
 | `background-image: conic-gradient(from angle, …)` | inline `<ConicGradient>` (CSS 0° = top, PAGX 0° = right; angle shifted by −90°) |
-| `border-radius: N` | `Rectangle.roundness = N` |
+| `border-radius: N` (px) or `N%` (resolved against `min(width, height)`; an element with a fixed px size and `border-radius: 50%` becomes a circle) | `Rectangle.roundness = N` |
 | `border: W solid C` | `<Stroke color="C" width="W" align="inside"/>` |
 | `box-shadow: X Y B C` (one or more, optional `inset`) | `<DropShadowStyle>` or `<InnerShadowStyle>` per shadow |
 | `opacity: A` | `Layer.alpha = A` |

@@ -146,7 +146,7 @@
 | `background-image: linear-gradient(angle, c1 [p], c2 [p], …)` | `<Fill>` 内嵌 `<LinearGradient>`（`startPoint`/`endPoint` 由角度推得） |
 | `background-image: radial-gradient(…)` | 内嵌 `<RadialGradient>` |
 | `background-image: conic-gradient(from angle, …)` | 内嵌 `<ConicGradient>`（CSS 0° = 顶，PAGX 0° = 右，自动 −90°） |
-| `border-radius: N` | `Rectangle.roundness = N` |
+| `border-radius: N`（px）或 `N%`（按 `min(width, height)` 解析；带固定 px 宽高且 `border-radius: 50%` 的元素会变成圆形） | `Rectangle.roundness = N` |
 | `border: W solid C` | `<Stroke color="C" width="W" align="inside"/>` |
 | `box-shadow: X Y B C`（多重、可加 `inset`） | 每个阴影一份 `<DropShadowStyle>` 或 `<InnerShadowStyle>` |
 | `opacity: A` | `Layer.alpha = A` |

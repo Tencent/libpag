@@ -181,6 +181,57 @@ PAG_TEST(PAGXHTMLTest, BorderRadiusMapsToRoundness) {
   EXPECT_FLOAT_EQ(rect->roundness, 12.0f);
 }
 
+// Regression: macOS-style traffic-light dots use `border-radius: 50%` on a square
+// element to draw circles. Percentage values must be resolved against the box's
+// known px dimensions (using min(width, height) since PAGX Rectangle exposes a
+// single uniform corner radius), so a 12x12 element with `border-radius: 50%`
+// becomes a true circle (roundness = 6).
+PAG_TEST(PAGXHTMLTest, BorderRadiusPercentBecomesCircleOnSquareBox) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:24px;height:24px">
+      <div style="width:12px;height:12px;background-color:#FF5F57;border-radius:50%"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  auto* rect = FindElementOfType<pagx::Rectangle>(div);
+  ASSERT_NE(rect, nullptr);
+  EXPECT_FLOAT_EQ(rect->roundness, 6.0f);
+}
+
+// On a non-square box `border-radius: 50%` would mean an ellipse in CSS, but
+// PAGX Rectangle only supports a single uniform radius. We resolve against the
+// shorter side so the result becomes the closest pill shape the primitive can
+// render (here: 40x12 -> roundness 6, i.e. semicircular ends, no over-rounding).
+PAG_TEST(PAGXHTMLTest, BorderRadiusPercentOnRectangleUsesShorterSide) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:60px;height:20px">
+      <div style="width:40px;height:12px;background-color:#28C840;border-radius:50%"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  auto* rect = FindElementOfType<pagx::Rectangle>(div);
+  ASSERT_NE(rect, nullptr);
+  EXPECT_FLOAT_EQ(rect->roundness, 6.0f);
+}
+
+// A percentage radius on an element whose width/height is not given in px
+// cannot be resolved at parse time (the parent's layout would be needed) — the
+// importer drops the value with a warning rather than rendering a wrong shape.
+PAG_TEST(PAGXHTMLTest, BorderRadiusPercentWithoutFixedSizeIsDropped) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50%;height:50%;background-color:#000;border-radius:50%"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  auto* rect = FindElementOfType<pagx::Rectangle>(div);
+  ASSERT_NE(rect, nullptr);
+  EXPECT_FLOAT_EQ(rect->roundness, 0.0f);
+}
+
 PAG_TEST(PAGXHTMLTest, BorderProducesStroke) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:60px;height:60px">

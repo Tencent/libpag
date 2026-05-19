@@ -389,24 +389,46 @@ void HTMLParserContext::parseBoxVisuals(HTMLBoxAttributes& box,
 
   const std::string& br = LookupProperty(props, "border-radius");
   if (!br.empty()) {
-    // CSS `border-radius` shorthand accepts up to 4 lengths (top-left, top-right,
-    // bottom-right, bottom-left), with an optional '/' separating horizontal and
-    // vertical radii for elliptical corners. PAGX `Rectangle` exposes a single
+    // CSS `border-radius` shorthand accepts up to 4 lengths or percentages (top-left,
+    // top-right, bottom-right, bottom-left), with an optional '/' separating horizontal
+    // and vertical radii for elliptical corners. PAGX `Rectangle` exposes a single
     // uniform `roundness`, so:
     //   - elliptical form (containing '/'): warn and drop the value;
     //   - asymmetric corner values: warn and approximate with the largest radius
     //     so the corners that should be rounded stay rounded (corners that should
-    //     be square become rounded, but losing all rounding is the worse failure).
+    //     be square become rounded, but losing all rounding is the worse failure);
+    //   - percentage tokens (e.g. `50%` for the classic pill / circle pattern) are
+    //     resolved against the box's known px dimensions. Because PAGX has only a
+    //     uniform corner radius, we resolve against `min(widthPx, heightPx)` so a
+    //     square element with `50%` produces a true circle. Percentages on elements
+    //     without a fixed px size are dropped with a warning.
     if (br.find('/') != std::string::npos) {
       warn("html: elliptical border-radius '" + br + "' not supported by PAGX Rectangle; ignored");
     } else {
       auto tokens = SplitTopLevelWhitespace(br);
       std::vector<float> nums;
       for (auto& t : tokens) {
-        float v = parsePxLength(t);
-        if (std::isnan(v)) {
-          warn("html: invalid border-radius token '" + t + "'");
-          continue;
+        std::string trimmed = Trim(t);
+        float v = NAN;
+        if (!trimmed.empty() && trimmed.back() == '%') {
+          char* end = nullptr;
+          float pct = std::strtof(trimmed.c_str(), &end);
+          if (end == trimmed.c_str()) {
+            warn("html: invalid border-radius token '" + t + "'");
+            continue;
+          }
+          if (std::isnan(box.widthPx) || std::isnan(box.heightPx)) {
+            warn("html: percentage border-radius '" + t +
+                 "' requires fixed px width/height on the same element; ignored");
+            continue;
+          }
+          v = pct * std::min(box.widthPx, box.heightPx) / 100.0f;
+        } else {
+          v = parsePxLength(trimmed);
+          if (std::isnan(v)) {
+            warn("html: invalid border-radius token '" + t + "'");
+            continue;
+          }
         }
         nums.push_back(v);
       }
