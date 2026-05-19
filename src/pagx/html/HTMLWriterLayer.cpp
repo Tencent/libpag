@@ -2215,7 +2215,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         _defs->openTag("feGaussianBlur");
         _defs->addAttr("in", "SourceGraphic");
         _defs->addAttr("stdDeviation",
-                       CssFloatToString(ds->blurX / 2) + " " + CssFloatToString(ds->blurY / 2));
+                       CssFloatToString(ds->blurX) + " " + CssFloatToString(ds->blurY));
         _defs->addAttr("result", "blur");
         _defs->closeTagSelfClosing();
         _defs->openTag("feOffset");
