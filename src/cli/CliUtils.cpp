@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CliUtils.h"
-#include <cctype>
-#include <cmath>
 #include <fstream>
 #include <iostream>
 #include "pagx/PAGXImporter.h"
@@ -78,59 +76,6 @@ bool WriteStringToFile(const std::string& content, const std::string& filePath,
     return false;
   }
   std::cout << command << ": wrote " << filePath << "\n";
-  return true;
-}
-
-bool MapFontStyleToCSS(const std::string& styleName, std::string* weight, std::string* style) {
-  std::string normalized;
-  normalized.reserve(styleName.size());
-  for (char c : styleName) {
-    if (c == ' ' || c == '-' || c == '_') {
-      continue;
-    }
-    normalized.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
-  }
-  bool italic = false;
-  const std::string italicTokens[] = {"italic", "oblique"};
-  for (const auto& token : italicTokens) {
-    auto pos = normalized.find(token);
-    if (pos != std::string::npos) {
-      italic = true;
-      normalized.erase(pos, token.size());
-      break;
-    }
-  }
-  struct WeightEntry {
-    const char* name;
-    const char* css;
-  };
-  static const WeightEntry weightTable[] = {
-      {"hairline", "100"},  {"thin", "100"},      {"extralight", "200"}, {"ultralight", "200"},
-      {"semilight", "300"}, {"light", "300"},     {"regular", "400"},    {"normal", "400"},
-      {"roman", "400"},     {"book", "400"},      {"medium", "500"},     {"semibold", "600"},
-      {"demibold", "600"},  {"extrabold", "800"}, {"ultrabold", "800"},  {"bold", "700"},
-      {"black", "900"},     {"heavy", "900"},
-  };
-  const char* matchedWeight = nullptr;
-  if (normalized.empty()) {
-    matchedWeight = "400";
-  } else {
-    for (const auto& entry : weightTable) {
-      if (normalized == entry.name) {
-        matchedWeight = entry.css;
-        break;
-      }
-    }
-  }
-  if (matchedWeight == nullptr) {
-    return false;
-  }
-  if (weight != nullptr) {
-    *weight = matchedWeight;
-  }
-  if (style != nullptr) {
-    *style = italic ? "italic" : "normal";
-  }
   return true;
 }
 
