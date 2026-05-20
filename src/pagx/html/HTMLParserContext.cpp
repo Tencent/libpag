@@ -165,25 +165,25 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
 // Diagnostics
 //==================================================================================================
 
+void HTMLParserContext::pushDiagnostic(std::string message) {
+  if (_document) {
+    _document->errors.push_back(std::move(message));
+  } else {
+    _pendingDiagnostics.push_back(std::move(message));
+  }
+}
+
 void HTMLParserContext::warn(const std::string& message) {
   if (_options.strict) {
     hardError(message);
     return;
   }
-  if (_document) {
-    _document->errors.push_back(message);
-  } else {
-    _pendingDiagnostics.push_back(message);
-  }
+  pushDiagnostic(message);
 }
 
 void HTMLParserContext::hardError(const std::string& message) {
   _hadHardError = true;
-  if (_document) {
-    _document->errors.push_back(message);
-  } else {
-    _pendingDiagnostics.push_back(message);
-  }
+  pushDiagnostic(message);
 }
 
 //==================================================================================================
@@ -223,8 +223,12 @@ bool HTMLParserContext::resolveCanvasSize(const std::shared_ptr<DOMNode>& body, 
 // ID handling
 //==================================================================================================
 
-void HTMLParserContext::collectAllIds(const std::shared_ptr<DOMNode>& node) {
+void HTMLParserContext::collectAllIds(const std::shared_ptr<DOMNode>& node, int depth) {
   if (!node) return;
+  if (depth >= MAX_HTML_RECURSION_DEPTH) {
+    warn("html: maximum recursion depth reached during id collection; subtree skipped");
+    return;
+  }
   if (node->type == DOMNodeType::Element) {
     auto* idAttr = node->findAttribute("id");
     if (idAttr && !idAttr->empty()) {
@@ -233,7 +237,7 @@ void HTMLParserContext::collectAllIds(const std::shared_ptr<DOMNode>& node) {
   }
   auto child = node->firstChild;
   while (child) {
-    collectAllIds(child);
+    collectAllIds(child, depth + 1);
     child = child->nextSibling;
   }
 }
@@ -274,6 +278,15 @@ bool HTMLParserContext::requiresInnerHost(const HTMLBoxAttributes& box) {
   return box.paddingSet || box.displayFlex || box.gapSet;
 }
 
+Layer* HTMLParserContext::createInnerHost(Layer* outer, const HTMLBoxAttributes& box) {
+  auto inner = _document->makeNode<Layer>();
+  inner->percentWidth = 100.0f;
+  inner->percentHeight = 100.0f;
+  applyLayoutAttributes(inner, box);
+  outer->children.push_back(inner);
+  return inner;
+}
+
 //==================================================================================================
 // Body / element conversion
 //==================================================================================================
@@ -291,19 +304,14 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
 
   bool hasBgVisuals = hasBackgroundVisuals(box);
   if (hasBgVisuals) {
-    applyBackgroundVisuals(layer, box, /*addRectangle=*/true);
+    applyBackgroundVisuals(layer, box);
   }
   applyLayerAttributes(layer, body, box);
 
   Layer* contentHost = layer;
   bool needsInnerHost = hasBgVisuals && (box.paddingSet || box.displayFlex);
   if (needsInnerHost) {
-    auto inner = _document->makeNode<Layer>();
-    inner->percentWidth = 100.0f;
-    inner->percentHeight = 100.0f;
-    applyLayoutAttributes(inner, box);
-    layer->children.push_back(inner);
-    contentHost = inner;
+    contentHost = createInnerHost(layer, box);
   } else {
     applyLayoutAttributes(layer, box);
   }
@@ -337,7 +345,8 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
     auto layer = _document->makeNode<Layer>();
     auto text = _document->makeNode<Text>();
     text->text = "\n";
-    text->fontFamily = inherited.fontFamily.empty() ? "Arial" : inherited.fontFamily;
+    text->fontFamily =
+        inherited.fontFamily.empty() ? HTML_DEFAULT_FONT_FAMILY : inherited.fontFamily;
     text->fontSize = HTML_DEFAULT_FONT_SIZE;
     layer->contents.push_back(text);
     return layer;
@@ -395,7 +404,7 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
   applyLayerAttributes(layer, element, box);
 
   if (hasBgVisuals) {
-    applyBackgroundVisuals(layer, box, /*addRectangle=*/true);
+    applyBackgroundVisuals(layer, box);
   }
 
   // Must run after applyBackgroundVisuals(): the fold reuses the rounded Rectangle just
@@ -406,12 +415,7 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
 
   Layer* contentHost = layer;
   if (needsInner) {
-    auto inner = _document->makeNode<Layer>();
-    inner->percentWidth = 100.0f;
-    inner->percentHeight = 100.0f;
-    applyLayoutAttributes(inner, box);
-    layer->children.push_back(inner);
-    contentHost = inner;
+    contentHost = createInnerHost(layer, box);
   } else {
     applyLayoutAttributes(layer, box);
   }
@@ -469,18 +473,11 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
 HTMLParserContext::TextFragment HTMLParserContext::makeTextFragment(
     const HTMLInheritedStyle& inherited) {
   TextFragment frag;
-  frag.fontFamily = inherited.fontFamily.empty() ? "Arial" : inherited.fontFamily;
+  frag.fontFamily = inherited.fontFamily.empty() ? HTML_DEFAULT_FONT_FAMILY : inherited.fontFamily;
   frag.fontStyleName = inherited.fontStyleName;
-  float fontSizePx =
-      inherited.fontSize.empty() ? HTML_DEFAULT_FONT_SIZE : parsePxLength(inherited.fontSize);
-  if (std::isnan(fontSizePx) || fontSizePx <= 0) fontSizePx = HTML_DEFAULT_FONT_SIZE;
-  frag.fontSize = fontSizePx;
-  if (!inherited.letterSpacing.empty()) {
-    float ls = parsePxLength(inherited.letterSpacing);
-    if (!std::isnan(ls)) frag.letterSpacing = ls;
-  }
-  std::string colorStr = inherited.color.empty() ? "#1E293B" : inherited.color;
-  frag.color = parseColor(colorStr);
+  frag.fontSize = inherited.fontSizePx;
+  frag.letterSpacing = inherited.letterSpacingPx;
+  frag.color = inherited.resolvedTextColor;
   frag.textDecoration = inherited.textDecoration;
   frag.fillImage = inherited.textFillImage;
   return frag;
@@ -506,7 +503,11 @@ void HTMLParserContext::appendTextFragment(std::vector<TextFragment>& out,
 
 void HTMLParserContext::collectTextFragments(const std::shared_ptr<DOMNode>& element,
                                              const HTMLInheritedStyle& inherited,
-                                             std::vector<TextFragment>& out) {
+                                             std::vector<TextFragment>& out, int depth) {
+  if (depth >= MAX_HTML_RECURSION_DEPTH) {
+    warn("html: maximum recursion depth reached inside text leaf; remaining inline runs skipped");
+    return;
+  }
   auto child = element->getFirstChild();
   while (child) {
     if (child->type == DOMNodeType::Text) {
@@ -516,7 +517,7 @@ void HTMLParserContext::collectTextFragments(const std::shared_ptr<DOMNode>& ele
         appendTextFragment(out, inherited, "\n");
       } else if (IsInlineRunTag(child->name)) {
         HTMLInheritedStyle childInherited = computeInherited(child, inherited);
-        collectTextFragments(child, childInherited, out);
+        collectTextFragments(child, childInherited, out, depth + 1);
       } else {
         warn("html: '<" + child->name + ">' not supported inside text leaf; skipped");
       }
@@ -530,15 +531,16 @@ Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& elemen
                                           const HTMLInheritedStyle& inherited) {
   std::vector<TextFragment> fragments;
   collectTextFragments(element, inherited, fragments);
-  for (auto& f : fragments) {
-    f.text = CollapseHTMLWhitespace(f.text);
+  size_t writeIndex = 0;
+  for (size_t i = 0; i < fragments.size(); ++i) {
+    fragments[i].text = CollapseHTMLWhitespace(fragments[i].text);
+    if (fragments[i].text.empty()) continue;
+    if (writeIndex != i) {
+      fragments[writeIndex] = std::move(fragments[i]);
+    }
+    ++writeIndex;
   }
-  std::vector<TextFragment> nonEmptyFragments;
-  nonEmptyFragments.reserve(fragments.size());
-  for (auto& f : fragments) {
-    if (!f.text.empty()) nonEmptyFragments.push_back(std::move(f));
-  }
-  fragments = std::move(nonEmptyFragments);
+  fragments.resize(writeIndex);
   if (fragments.empty()) {
     return nullptr;
   }
@@ -559,7 +561,7 @@ Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& elemen
 
   Layer* textHost = outer;
   if (hasBgVisuals) {
-    applyBackgroundVisuals(outer, box, /*addRectangle=*/true);
+    applyBackgroundVisuals(outer, box);
     auto inner = _document->makeNode<Layer>();
     inner->percentWidth = 100.0f;
     inner->percentHeight = 100.0f;
@@ -629,34 +631,12 @@ Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& elemen
       }
     }
     if (deco.find("underline") != std::string::npos) {
-      auto rect = _document->makeNode<Rectangle>();
-      rect->percentWidth = 100.0f;
-      rect->height = 1.0f;
-      rect->bottom = 0.0f;
-      if (decorationColorDiffers) {
-        auto group = _document->makeNode<Group>();
-        group->elements.push_back(rect);
-        group->elements.push_back(buildSolidFill(decorationColor));
-        textHost->contents.push_back(group);
-      } else {
-        textHost->contents.push_back(rect);
-        textHost->contents.push_back(buildSolidFill(decorationColor));
-      }
+      emitTextDecorationLine(textHost, textColor, decorationColor, decorationColorDiffers,
+                             /*bottom=*/0.0f, /*centerY=*/NAN);
     }
     if (deco.find("line-through") != std::string::npos) {
-      auto rect = _document->makeNode<Rectangle>();
-      rect->percentWidth = 100.0f;
-      rect->height = 1.0f;
-      rect->centerY = 0.0f;
-      if (decorationColorDiffers) {
-        auto group = _document->makeNode<Group>();
-        group->elements.push_back(rect);
-        group->elements.push_back(buildSolidFill(decorationColor));
-        textHost->contents.push_back(group);
-      } else {
-        textHost->contents.push_back(rect);
-        textHost->contents.push_back(buildSolidFill(decorationColor));
-      }
+      emitTextDecorationLine(textHost, textColor, decorationColor, decorationColorDiffers,
+                             /*bottom=*/NAN, /*centerY=*/0.0f);
     }
     if (deco.find("overline") != std::string::npos) {
       warn("html: text-decoration overline not supported");

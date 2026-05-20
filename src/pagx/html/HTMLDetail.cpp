@@ -24,6 +24,7 @@
 #include <cstdlib>
 #include <sstream>
 #include <utility>
+#include "pagx/html/HTMLBoxAttributes.h"
 
 namespace pagx::html {
 
@@ -187,8 +188,9 @@ const std::unordered_map<std::string, std::string>& ElementDefaults() {
   return table;
 }
 
-void LowercaseTagsInPlace(const std::shared_ptr<DOMNode>& node) {
+void LowercaseTagsInPlace(const std::shared_ptr<DOMNode>& node, int depth) {
   if (!node) return;
+  if (depth >= MAX_HTML_RECURSION_DEPTH) return;
   if (node->type == DOMNodeType::Element) {
     node->name = ToLower(std::move(node->name));
     // Inline SVG: SVG attribute and tag names are case-sensitive (viewBox,
@@ -206,7 +208,7 @@ void LowercaseTagsInPlace(const std::shared_ptr<DOMNode>& node) {
   }
   auto child = node->firstChild;
   while (child) {
-    LowercaseTagsInPlace(child);
+    LowercaseTagsInPlace(child, depth + 1);
     child = child->nextSibling;
   }
 }

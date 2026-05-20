@@ -20,6 +20,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
+#include "pagx/html/HTMLCssCascade.h"
 #include "pagx/html/HTMLDetail.h"
 #include "pagx/html/HTMLParserContext.h"
 
@@ -55,63 +56,34 @@ void HTMLParserContext::parseStyleBlock(const std::shared_ptr<DOMNode>& styleNod
   if (!textChild || textChild->type != DOMNodeType::Text) {
     return;
   }
-  const std::string& css = textChild->name;
-
-  size_t pos = 0;
-  while (pos < css.size()) {
-    while (pos < css.size() && std::isspace(static_cast<unsigned char>(css[pos]))) {
-      pos++;
-    }
-    if (pos >= css.size()) break;
-    if (pos + 1 < css.size() && css[pos] == '/' && css[pos + 1] == '*') {
-      auto commentEnd = css.find("*/", pos + 2);
-      pos = (commentEnd == std::string::npos) ? css.size() : commentEnd + 2;
-      continue;
-    }
-    size_t bracePos = css.find('{', pos);
-    if (bracePos == std::string::npos) break;
-    std::string selectorStr = Trim(css.substr(pos, bracePos - pos));
-    size_t closePos = css.find('}', bracePos);
-    if (closePos == std::string::npos) break;
-    std::string body = Trim(css.substr(bracePos + 1, closePos - bracePos - 1));
-    if (selectorStr.empty() || body.empty()) {
-      pos = closePos + 1;
-      continue;
-    }
-
-    auto selectors = SplitTopLevelCommas(selectorStr);
-    for (auto& sel : selectors) {
-      sel = Trim(sel);
+  std::vector<std::string> droppedAtRules;
+  auto rules = TokenizeStyleSheet(textChild->name, droppedAtRules);
+  for (auto& at : droppedAtRules) {
+    warn("html: at-rule '" + at + "' not supported in <style>; dropped");
+  }
+  for (auto& rule : rules) {
+    if (rule.declarations.empty()) continue;
+    auto selectors = SplitTopLevelCommas(rule.selectors);
+    for (auto& rawSel : selectors) {
+      std::string sel = Trim(rawSel);
       if (sel.empty()) continue;
-      if (sel == "*") {
+      ParsedSelector parsed = ClassifySelector(sel);
+      if (parsed.kind == SelectorKind::Universal) {
         warn("html: universal selector '*' not allowed in <style>; declarations dropped");
         continue;
       }
-      if (sel[0] == '.') {
-        std::string cls = sel.substr(1);
-        if (cls.find_first_of(" \t.>+~:[#") == std::string::npos) {
-          auto& slot = _cssClassRules[cls];
-          slot = slot.empty() ? body : (slot + ";" + body);
-          continue;
-        }
+      if (parsed.kind == SelectorKind::Class) {
+        auto& slot = _cssClassRules[parsed.key];
+        slot = slot.empty() ? rule.declarations : (slot + ";" + rule.declarations);
+        continue;
       }
-      // Element selector (lower-case ascii letters / digits only, e.g. body, h1, p).
-      bool allowed = !sel.empty();
-      for (char c : sel) {
-        if (!std::isalnum(static_cast<unsigned char>(c))) {
-          allowed = false;
-          break;
-        }
-      }
-      if (allowed) {
-        std::string lowered = ToLower(sel);
-        auto& slot = _cssElementRules[lowered];
-        slot = slot.empty() ? body : (slot + ";" + body);
+      if (parsed.kind == SelectorKind::Element) {
+        auto& slot = _cssElementRules[parsed.key];
+        slot = slot.empty() ? rule.declarations : (slot + ";" + rule.declarations);
         continue;
       }
       warn("html: unsupported selector '" + sel + "' in <style>; declarations dropped");
     }
-    pos = closePos + 1;
   }
 }
 
@@ -236,6 +208,24 @@ HTMLInheritedStyle HTMLParserContext::computeInherited(const std::shared_ptr<DOM
   if (textOverflow == "ellipsis") {
     warn("html: text-overflow: ellipsis is not implemented in PAGX");
   }
+
+  // Refresh the pre-resolved numeric forms so text-leaf conversion can read them directly
+  // without re-parsing strings for every fragment.
+  if (out.fontSize.empty()) {
+    out.fontSizePx = HTML_DEFAULT_FONT_SIZE;
+  } else {
+    float fontSizePx = parsePxLength(out.fontSize);
+    if (std::isnan(fontSizePx) || fontSizePx <= 0) fontSizePx = HTML_DEFAULT_FONT_SIZE;
+    out.fontSizePx = fontSizePx;
+  }
+  if (out.letterSpacing.empty()) {
+    out.letterSpacingPx = 0.0f;
+  } else {
+    float ls = parsePxLength(out.letterSpacing);
+    out.letterSpacingPx = std::isnan(ls) ? 0.0f : ls;
+  }
+  out.resolvedTextColor =
+      parseColor(out.color.empty() ? std::string(HTML_DEFAULT_TEXT_COLOR) : out.color);
   return out;
 }
 

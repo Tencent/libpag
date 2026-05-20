@@ -29,6 +29,12 @@ namespace pagx {
 
 using namespace pagx::html;
 
+namespace {
+
+constexpr float kHtmlPi = 3.14159265358979323846f;
+
+}  // namespace
+
 Color HTMLParserContext::parseColor(const std::string& valueRaw) {
   std::string value = Trim(valueRaw);
   if (value.empty()) {
@@ -84,6 +90,7 @@ Color HTMLParserContext::parseColor(const std::string& valueRaw) {
   if (it != named.end()) {
     return HexToColor(it->second, /*hasAlpha=*/false);
   }
+  warn("html: unrecognised color value '" + value + "'; falling back to opaque black");
   return {0, 0, 0, 1, ColorSpace::SRGB};
 }
 
@@ -258,7 +265,7 @@ LinearGradient* HTMLParserContext::parseLinearGradient(const std::string& value)
   if (!finaliseGradientStops(stops)) return nullptr;
 
   auto grad = _document->makeNode<LinearGradient>();
-  float angle = CssToPagxAngle(cssAngle) * 3.14159265358979323846f / 180.0f;
+  float angle = CssToPagxAngle(cssAngle) * kHtmlPi / 180.0f;
   float cx = 0.5f, cy = 0.5f;
   float half = 0.5f;
   grad->startPoint = {cx - std::cos(angle) * half, cy - std::sin(angle) * half};

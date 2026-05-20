@@ -28,8 +28,9 @@ using namespace pagx::html;
 
 namespace {
 
-void SerializeNode(std::string& out, const std::shared_ptr<DOMNode>& node) {
+void SerializeNode(std::string& out, const std::shared_ptr<DOMNode>& node, int depth) {
   if (!node) return;
+  if (depth >= MAX_HTML_RECURSION_DEPTH) return;
   if (node->type == DOMNodeType::Text) {
     out += EscapeXml(node->name, /*isAttribute=*/false);
     return;
@@ -50,7 +51,7 @@ void SerializeNode(std::string& out, const std::shared_ptr<DOMNode>& node) {
   out.push_back('>');
   auto child = node->firstChild;
   while (child) {
-    SerializeNode(out, child);
+    SerializeNode(out, child, depth + 1);
     child = child->nextSibling;
   }
   out += "</";
@@ -106,21 +107,29 @@ Fill* HTMLParserContext::buildTextFill(const TextFragment& fragment) {
     return buildSolidFill(fragment.color);
   }
   auto fill = _document->makeNode<Fill>();
-  std::string bg = Trim(fragment.fillImage);
-  std::string lower = ToLower(bg);
-  if (lower.compare(0, 16, "linear-gradient(") == 0) {
-    fill->color = parseLinearGradient(bg);
-  } else if (lower.compare(0, 16, "radial-gradient(") == 0) {
-    fill->color = parseRadialGradient(bg);
-  } else if (lower.compare(0, 15, "conic-gradient(") == 0) {
-    fill->color = parseConicGradient(bg);
-  }
+  fill->color = parseGradientByValue(fragment.fillImage);
   if (!fill->color) {
     // Unparseable gradient: fall back to solid color so text stays visible. This mirrors
     // what `applyBackgroundVisuals` does for an unparseable box gradient.
     return buildSolidFill(fragment.color);
   }
   return fill;
+}
+
+ColorSource* HTMLParserContext::parseGradientByValue(const std::string& value) {
+  std::string trimmed = Trim(value);
+  if (trimmed.empty()) return nullptr;
+  std::string lower = ToLower(trimmed);
+  if (lower.compare(0, 16, "linear-gradient(") == 0) {
+    return parseLinearGradient(trimmed);
+  }
+  if (lower.compare(0, 16, "radial-gradient(") == 0) {
+    return parseRadialGradient(trimmed);
+  }
+  if (lower.compare(0, 15, "conic-gradient(") == 0) {
+    return parseConicGradient(trimmed);
+  }
+  return nullptr;
 }
 
 void HTMLParserContext::applySizeAndPosition(Layer* layer, const HTMLBoxAttributes& box) {
@@ -149,37 +158,39 @@ void HTMLParserContext::applyLayoutAttributes(Layer* layer, const HTMLBoxAttribu
   if (box.gapSet) layer->gap = box.gapPx;
   if (box.paddingSet) layer->padding = box.padding;
   if (!box.alignItems.empty()) {
-    const std::string& a = box.alignItems;
-    if (a == "stretch") layer->alignment = Alignment::Stretch;
-    else if (a == "center")
-      layer->alignment = Alignment::Center;
-    else if (a == "flex-start" || a == "start")
-      layer->alignment = Alignment::Start;
-    else if (a == "flex-end" || a == "end")
-      layer->alignment = Alignment::End;
-    else
-      warn("html: unsupported align-items '" + a + "'");
+    static const std::unordered_map<std::string, Alignment> kAlignTable = {
+        {"stretch", Alignment::Stretch},  {"center", Alignment::Center},
+        {"flex-start", Alignment::Start}, {"start", Alignment::Start},
+        {"flex-end", Alignment::End},     {"end", Alignment::End},
+    };
+    auto it = kAlignTable.find(box.alignItems);
+    if (it != kAlignTable.end()) {
+      layer->alignment = it->second;
+    } else {
+      warn("html: unsupported align-items '" + box.alignItems + "'");
+    }
   }
   if (!box.justifyContent.empty()) {
-    const std::string& j = box.justifyContent;
-    if (j == "flex-start" || j == "start") layer->arrangement = Arrangement::Start;
-    else if (j == "center")
-      layer->arrangement = Arrangement::Center;
-    else if (j == "flex-end" || j == "end")
-      layer->arrangement = Arrangement::End;
-    else if (j == "space-between")
-      layer->arrangement = Arrangement::SpaceBetween;
-    else if (j == "space-evenly")
-      layer->arrangement = Arrangement::SpaceEvenly;
-    else if (j == "space-around")
-      layer->arrangement = Arrangement::SpaceAround;
-    else
-      warn("html: unsupported justify-content '" + j + "'");
+    static const std::unordered_map<std::string, Arrangement> kArrangeTable = {
+        {"flex-start", Arrangement::Start},
+        {"start", Arrangement::Start},
+        {"center", Arrangement::Center},
+        {"flex-end", Arrangement::End},
+        {"end", Arrangement::End},
+        {"space-between", Arrangement::SpaceBetween},
+        {"space-evenly", Arrangement::SpaceEvenly},
+        {"space-around", Arrangement::SpaceAround},
+    };
+    auto it = kArrangeTable.find(box.justifyContent);
+    if (it != kArrangeTable.end()) {
+      layer->arrangement = it->second;
+    } else {
+      warn("html: unsupported justify-content '" + box.justifyContent + "'");
+    }
   }
 }
 
-bool HTMLParserContext::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttributes& box,
-                                               bool addRectangle) {
+bool HTMLParserContext::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttributes& box) {
   // `background-clip: text` redirects the gradient to descendant text fills (see
   // `convertTextLeaf` -> `buildTextFill`). When the element also has a gradient
   // `background-image`, suppress the rectangle + gradient Fill that would otherwise
@@ -190,8 +201,8 @@ bool HTMLParserContext::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttrib
   }
   bool emitted = false;
   Rectangle* rect = nullptr;
-  if (addRectangle && (box.backgroundColorSet || !box.backgroundImage.empty() ||
-                       box.borderRadiusSet || box.borderSet)) {
+  if (box.backgroundColorSet || !box.backgroundImage.empty() || box.borderRadiusSet ||
+      box.borderSet) {
     rect = _document->makeNode<Rectangle>();
     rect->percentWidth = 100.0f;
     rect->percentHeight = 100.0f;
@@ -207,17 +218,14 @@ bool HTMLParserContext::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttrib
   } else if (rect && !box.backgroundImage.empty()) {
     auto fill = _document->makeNode<Fill>();
     std::string bg = Trim(box.backgroundImage);
-    std::string lower = ToLower(bg);
-    if (lower.compare(0, 16, "linear-gradient(") == 0) {
-      fill->color = parseLinearGradient(bg);
-    } else if (lower.compare(0, 16, "radial-gradient(") == 0) {
-      fill->color = parseRadialGradient(bg);
-    } else if (lower.compare(0, 15, "conic-gradient(") == 0) {
-      fill->color = parseConicGradient(bg);
-    } else if (lower.compare(0, 4, "url(") == 0) {
-      warn("html: background-image: url(...) not supported; use <img>");
-    } else {
-      warn("html: background-image '" + bg + "' not supported");
+    fill->color = parseGradientByValue(bg);
+    if (!fill->color) {
+      std::string lower = ToLower(bg);
+      if (lower.compare(0, 4, "url(") == 0) {
+        warn("html: background-image '" + bg + "' (url) not supported; use <img>");
+      } else {
+        warn("html: background-image '" + bg + "' not supported");
+      }
     }
     if (!fill->color && box.backgroundColorSet) {
       auto solid = _document->makeNode<SolidColor>();
@@ -366,16 +374,17 @@ bool HTMLParserContext::foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& 
   // would stretch it across the wrapper.
   HTMLBoxAttributes imgBox = resolveBox(img);
   if (std::isnan(imgBox.widthPx) || std::isnan(box.widthPx) ||
-      !pag::FloatNearlyEqual(imgBox.widthPx, box.widthPx, 0.5f)) {
+      !pag::FloatNearlyEqual(imgBox.widthPx, box.widthPx, HTML_IMAGE_WRAPPER_TOLERANCE_PX)) {
     return false;
   }
   if (std::isnan(imgBox.heightPx) || std::isnan(box.heightPx) ||
-      !pag::FloatNearlyEqual(imgBox.heightPx, box.heightPx, 0.5f)) {
+      !pag::FloatNearlyEqual(imgBox.heightPx, box.heightPx, HTML_IMAGE_WRAPPER_TOLERANCE_PX)) {
     return false;
   }
   float imgLeft = std::isnan(imgBox.leftPx) ? 0.0f : imgBox.leftPx;
   float imgTop = std::isnan(imgBox.topPx) ? 0.0f : imgBox.topPx;
-  if (!pag::FloatNearlyEqual(imgLeft, 0.0f, 0.5f) || !pag::FloatNearlyEqual(imgTop, 0.0f, 0.5f)) {
+  if (!pag::FloatNearlyEqual(imgLeft, 0.0f, HTML_IMAGE_WRAPPER_TOLERANCE_PX) ||
+      !pag::FloatNearlyEqual(imgTop, 0.0f, HTML_IMAGE_WRAPPER_TOLERANCE_PX)) {
     return false;
   }
 
@@ -450,7 +459,7 @@ Layer* HTMLParserContext::convertInlineSvg(const std::shared_ptr<DOMNode>& eleme
 
 std::string HTMLParserContext::serializeSvg(const std::shared_ptr<DOMNode>& svgNode) {
   std::string out;
-  SerializeNode(out, svgNode);
+  SerializeNode(out, svgNode, 0);
   return out;
 }
 
@@ -467,6 +476,26 @@ Image* HTMLParserContext::registerImageResource(const std::string& imageSource) 
 
 std::string HTMLParserContext::resolveImageSource(const std::string& src) const {
   return LooksAbsolutePath(src) ? src : (_basePath + src);
+}
+
+void HTMLParserContext::emitTextDecorationLine(Layer* host, const Color& /*textColor*/,
+                                               const Color& decorationColor,
+                                               bool decorationColorDiffers, float bottom,
+                                               float centerY) {
+  auto rect = _document->makeNode<Rectangle>();
+  rect->percentWidth = 100.0f;
+  rect->height = 1.0f;
+  if (!std::isnan(bottom)) rect->bottom = bottom;
+  if (!std::isnan(centerY)) rect->centerY = centerY;
+  if (decorationColorDiffers) {
+    auto group = _document->makeNode<Group>();
+    group->elements.push_back(rect);
+    group->elements.push_back(buildSolidFill(decorationColor));
+    host->contents.push_back(group);
+  } else {
+    host->contents.push_back(rect);
+    host->contents.push_back(buildSolidFill(decorationColor));
+  }
 }
 
 }  // namespace pagx

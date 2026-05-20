@@ -102,8 +102,10 @@ const std::unordered_map<std::string, std::string>& ElementDefaults();
 
 // ----- DOM helpers --------------------------------------------------------------------------
 
-// Lower-case the tag name of every element node in place.
-void LowercaseTagsInPlace(const std::shared_ptr<DOMNode>& node);
+// Lower-case the tag name of every element node in place. `depth` is internal recursion
+// bookkeeping; subtrees deeper than `MAX_HTML_RECURSION_DEPTH` are silently left alone to
+// preserve stack safety on pathological inputs.
+void LowercaseTagsInPlace(const std::shared_ptr<DOMNode>& node, int depth = 0);
 
 // Builds a synthetic `<span>` DOMNode wrapping a single text child. Used by the importer to
 // promote stray text content of a container into a text leaf without changing the surrounding

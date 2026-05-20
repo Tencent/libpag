@@ -79,7 +79,7 @@ class HTMLParserContext {
   // High-level traversal --------------------------------------------------------------
   void collectStyles(const std::shared_ptr<DOMNode>& head);
   void parseStyleBlock(const std::shared_ptr<DOMNode>& styleNode);
-  void collectAllIds(const std::shared_ptr<DOMNode>& node);
+  void collectAllIds(const std::shared_ptr<DOMNode>& node, int depth = 0);
 
   // body / canvas size detection
   bool resolveCanvasSize(const std::shared_ptr<DOMNode>& body, float& outW, float& outH);
@@ -119,7 +119,8 @@ class HTMLParserContext {
     std::string fillImage = {};
   };
   void collectTextFragments(const std::shared_ptr<DOMNode>& element,
-                            const HTMLInheritedStyle& inherited, std::vector<TextFragment>& out);
+                            const HTMLInheritedStyle& inherited, std::vector<TextFragment>& out,
+                            int depth = 0);
 
   // Builds a TextFragment whose style fields mirror `inherited`. The `text` field is
   // left empty for the caller to fill in.
@@ -217,7 +218,24 @@ class HTMLParserContext {
   // Applies background visuals: bg-color, bg-gradient, border, border-radius, box-shadow,
   // backdrop-filter. Returns true if any visual was applied (the caller should consider
   // the double-layer split for padded contents).
-  bool applyBackgroundVisuals(Layer* layer, const HTMLBoxAttributes& box, bool addRectangle);
+  bool applyBackgroundVisuals(Layer* layer, const HTMLBoxAttributes& box);
+
+  // Resolves a CSS gradient string ("linear-gradient(...)" / "radial-gradient(...)" /
+  // "conic-gradient(...)") into a registered gradient node. Returns nullptr when the
+  // value is empty, not a gradient, or fails to parse.
+  ColorSource* parseGradientByValue(const std::string& value);
+
+  // Emits a single text-decoration line (underline or line-through) onto `host`. When the
+  // decoration colour differs from the text colour the rectangle and its solid fill are
+  // wrapped in a Group so they don't bleed onto subsequent contents. `bottom` and
+  // `centerY` are mutually exclusive — pass NaN for the one that should not be set.
+  void emitTextDecorationLine(Layer* host, const Color& textColor, const Color& decorationColor,
+                              bool decorationColorDiffers, float bottom, float centerY);
+
+  // Creates the inner host Layer for the standard "outer background + inner padded
+  // container" double-layer pattern. Caller decides when to invoke based on
+  // `hasBackgroundVisuals(box) && requiresInnerHost(box)`.
+  Layer* createInnerHost(Layer* outer, const HTMLBoxAttributes& box);
 
   // Applies layer-level attributes that don't depend on background: opacity, blend mode,
   // filter chain, overflow clip, data-* attributes.
@@ -298,6 +316,11 @@ class HTMLParserContext {
   // Diagnostics ------------------------------------------------------------------------
   void warn(const std::string& message);
   void hardError(const std::string& message);
+
+  // Routes `message` to either `_document->errors` (when the document already exists) or
+  // `_pendingDiagnostics` (before the document is constructed). Used by both warn() and
+  // hardError() so the destination logic lives in exactly one place.
+  void pushDiagnostic(std::string message);
 
   // Member fields ----------------------------------------------------------------------
   HTMLImporter::Options _options = {};

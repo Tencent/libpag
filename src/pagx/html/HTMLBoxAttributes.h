@@ -37,6 +37,23 @@ static constexpr int MAX_HTML_RECURSION_DEPTH = 128;
 static constexpr float HTML_DEFAULT_FONT_SIZE = 14.0f;
 
 /**
+ * Default font family used when no `font-family` is inherited.
+ */
+static constexpr const char* HTML_DEFAULT_FONT_FAMILY = "Arial";
+
+/**
+ * Default text colour used when no `color` is inherited; matches the CSS default for
+ * <body> in `ElementDefaults()`.
+ */
+static constexpr const char* HTML_DEFAULT_TEXT_COLOR = "#1E293B";
+
+/**
+ * Pixel tolerance used when comparing image and wrapper geometry for the rounded-image
+ * fold optimisation in `foldRoundedImageWrapper`.
+ */
+static constexpr float HTML_IMAGE_WRAPPER_TOLERANCE_PX = 0.5f;
+
+/**
  * Inherited CSS style properties that cascade down the element tree during HTML
  * traversal. Empty strings denote "not set" (preserved so that descendants can know
  * whether to inherit further or use their own defaults).
@@ -58,6 +75,13 @@ struct HTMLInheritedStyle {
   // inherited from the nearest ancestor that combined `background-clip: text` with a gradient
   // `background-image`. Empty means descendants paint text with their own solid `color`.
   std::string textFillImage = {};
+
+  // Pre-resolved numeric forms of the cascade. Kept in lock-step with the string fields by
+  // `computeInherited` so text-leaf conversion doesn't re-parse the same `font-size` /
+  // `letter-spacing` / `color` strings for every fragment.
+  float fontSizePx = HTML_DEFAULT_FONT_SIZE;
+  float letterSpacingPx = 0.0f;
+  Color resolvedTextColor = {0, 0, 0, 1, ColorSpace::SRGB};
 };
 
 /**
