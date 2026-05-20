@@ -3,7 +3,7 @@
      TextPath along curved banner, rich text (multi-color Text in one TextBox), Composition reuse,
      MergePath union, ImagePattern fill, Mask with gradient fade, InnerShadowStyle,
      Fill placement="foreground" -->
-<pagx version="1.0" width="400" height="520">
+<pagx width="400" height="520">
   <Resources>
     <Image id="patternImg" source="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAFUlEQVR4nGP8Oo/7PwMSYELmECcAAKy6AqWSorM1AAAAAElFTkSuQmCC"/>
     <ImagePattern id="checkerPattern" image="@patternImg" tileModeX="repeat" tileModeY="repeat" matrix="3,0,0,3,0,0" scaleMode="none"/>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Layer x/y → transform: translate(x, y); demonstrates different x/y positions
      in a labeled grid layout showing how elements are positioned -->
-<pagx version="1.0" width="340" height="360">
+<pagx width="340" height="360">
   <!-- Light background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>

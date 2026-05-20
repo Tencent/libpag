@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Integration showcase — glassmorphism dashboard card combining LinearGradient, BackgroundBlurStyle,
      DropShadowStyle, groupOpacity, RoundCorner, Polystar stars, dashed Stroke, Text styles, data-* attributes -->
-<pagx version="1.0" width="420" height="320">
+<pagx width="420" height="320">
   <Resources>
     <!-- Dark gradient background -->
     <LinearGradient id="bgGrad" startPoint="0,0" endPoint="1,1">

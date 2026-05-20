@@ -2,7 +2,7 @@
 <!-- Tests: Integration showcase — geometric mandala pattern combining Repeater with rotation,
      Ellipse, Path, TrimPath, ConicGradient, blend modes (screen, multiply), alpha transparency,
      Stroke with round cap and various widths -->
-<pagx version="1.0" width="420" height="460">
+<pagx width="420" height="460">
   <Resources>
     <ConicGradient id="rainbowConic" center="210,210" startAngle="0" endAngle="360" fitsToGeometry="false">
       <ColorStop offset="0" color="#9333EA"/>

@@ -3,7 +3,7 @@
      path (resolved by PAGXImporter::FromFile against this PAGX file's directory); right tile
      uses an inline base64 data URI. Both should render identically across pagx render and the
      HTML exporter, verifying that GetImageSrc handles both forms transparently. -->
-<pagx version="1.0" width="420" height="220">
+<pagx width="420" height="220">
   <Resources>
     <!-- External file: a 256x256 photographic PNG that lives under resources/apitest/. -->
     <Image id="external" source="../apitest/test_timestretch.png"/>

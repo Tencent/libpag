@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Layer styles: DropShadowStyle (uniform/asymmetric blur, showBehindLayer), InnerShadowStyle, BackgroundBlurStyle -->
-<pagx version="1.0" width="480" height="480">
+<pagx width="480" height="480">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>

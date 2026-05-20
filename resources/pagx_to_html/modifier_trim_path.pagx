@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: TrimPath separate/continuous, start/end/offset, edge cases (start>end, wrap-around) -->
-<pagx version="1.0" width="460" height="420">
+<pagx width="460" height="420">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>

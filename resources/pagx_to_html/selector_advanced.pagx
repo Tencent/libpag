@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: RangeSelector advanced — unit="index", easeIn/easeOut, randomOrder+randomSeed, shape="round" -->
-<pagx version="1.0" width="420" height="420">
+<pagx width="420" height="420">
   <Resources>
     <LinearGradient id="titleGrad" startPoint="0,0" endPoint="1,0">
       <ColorStop offset="0" color="#8B5CF6"/>
