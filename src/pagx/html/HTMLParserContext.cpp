@@ -416,11 +416,32 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
     applyLayoutAttributes(layer, box);
   }
 
+  // CSS border-box: layout-flow content sits inside the border edge, so reserve the
+  // border width as additional padding on the layout host. Without this, children
+  // would start flush with the layer's outer edge and overlap the inside-aligned
+  // border stroke.
+  if (box.borderSet && box.borderWidthPx > 0 && contentHost->layout != LayoutMode::None) {
+    contentHost->padding.top += box.borderWidthPx;
+    contentHost->padding.right += box.borderWidthPx;
+    contentHost->padding.bottom += box.borderWidthPx;
+    contentHost->padding.left += box.borderWidthPx;
+  }
+
   auto child = element->getFirstChild();
   while (child) {
     if (child->type == DOMNodeType::Element) {
       auto* childLayer = convertElement(child, inherited, depth + 1);
       if (childLayer) {
+        // CSS border-box: position:absolute descendants are positioned relative to the
+        // parent's padding box, which sits inside the border. Shift their explicit
+        // left/right/top/bottom offsets by the border width so they don't overlap the
+        // border stroke.
+        if (box.borderSet && box.borderWidthPx > 0 && !childLayer->includeInLayout) {
+          if (!std::isnan(childLayer->left)) childLayer->left += box.borderWidthPx;
+          if (!std::isnan(childLayer->right)) childLayer->right += box.borderWidthPx;
+          if (!std::isnan(childLayer->top)) childLayer->top += box.borderWidthPx;
+          if (!std::isnan(childLayer->bottom)) childLayer->bottom += box.borderWidthPx;
+        }
         contentHost->children.push_back(childLayer);
       }
     } else if (child->type == DOMNodeType::Text) {

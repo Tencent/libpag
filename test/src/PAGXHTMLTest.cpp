@@ -249,6 +249,52 @@ PAG_TEST(PAGXHTMLTest, BorderProducesStroke) {
   EXPECT_EQ(stroke->align, pagx::StrokeAlign::Inside);
 }
 
+// Regression: with `box-sizing: border-box` (the only mode supported by the importer),
+// CSS positions absolutely-positioned descendants relative to the parent's padding box
+// (inside the border). The importer must shift the child's left/right/top/bottom
+// constraints by the parent's border width so the child does not overlap the inside
+// stroke.
+PAG_TEST(PAGXHTMLTest, BorderShiftsAbsoluteChildren) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="position:relative;width:60px;height:60px;border:10px solid #000">
+        <div style="position:absolute;left:0;top:0;width:40px;height:40px;background-color:#FFF"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* outer = doc->layers.front()->children.front();
+  ASSERT_EQ(outer->children.size(), 1u);
+  auto* inner = outer->children.front();
+  EXPECT_FALSE(inner->includeInLayout);
+  EXPECT_FLOAT_EQ(inner->left, 10.0f);
+  EXPECT_FLOAT_EQ(inner->top, 10.0f);
+}
+
+// Regression: layout-flow children of a bordered container must start inside the
+// border. The importer reserves the border width as additional padding on the
+// container so that flex children align with the inner edge of the stroke rather
+// than the outer edge.
+PAG_TEST(PAGXHTMLTest, BorderExpandsLayoutPadding) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="display:flex;flex-direction:column;width:60px;height:60px;
+                  padding:5px;border:4px solid #000;background-color:#FFF">
+        <div style="width:10px;height:10px"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* outer = doc->layers.front()->children.front();
+  // The double-host split puts layout/padding on the inner host.
+  ASSERT_EQ(outer->children.size(), 1u);
+  auto* host = outer->children.front();
+  EXPECT_FLOAT_EQ(host->padding.top, 9.0f);
+  EXPECT_FLOAT_EQ(host->padding.right, 9.0f);
+  EXPECT_FLOAT_EQ(host->padding.bottom, 9.0f);
+  EXPECT_FLOAT_EQ(host->padding.left, 9.0f);
+}
+
 PAG_TEST(PAGXHTMLTest, BoxShadowProducesDropShadowStyle) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:80px;height:80px">
