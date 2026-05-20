@@ -66,6 +66,21 @@ bool IsExternalSvgSrc(const std::string& src) {
   return ToLower(src.substr(src.size() - 4)) == ".svg";
 }
 
+// Maps a CSS `object-fit` keyword onto a PAGX `ScaleMode`. Empty input means
+// "unset" and yields the CSS default `fill` -> `Stretch` so a plain `<img>` with
+// explicit width/height matches the browser's stretch behaviour rather than the
+// `ImagePattern` default `LetterBox` (which preserves aspect ratio and would
+// shrink images whose intrinsic aspect differs from the box's).
+ScaleMode ResolveImageScaleMode(const std::string& objectFit) {
+  if (objectFit.empty() || objectFit == "fill") return ScaleMode::Stretch;
+  if (objectFit == "contain") return ScaleMode::LetterBox;
+  if (objectFit == "cover") return ScaleMode::Zoom;
+  // The SubsetTransformer normalises any other keyword to one of the above before
+  // emitting the subset HTML; reaching this branch means a hand-written subset
+  // file slipped through. Fall back to the CSS default.
+  return ScaleMode::Stretch;
+}
+
 }  // namespace
 
 Text* HTMLParserContext::buildTextElement(const TextFragment& fragment) {
@@ -345,6 +360,7 @@ bool HTMLParserContext::foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& 
   auto fill = _document->makeNode<Fill>();
   auto pattern = _document->makeNode<ImagePattern>();
   pattern->image = imageNode;
+  pattern->scaleMode = ResolveImageScaleMode(imgBox.objectFit);
   fill->color = pattern;
   layer->contents.push_back(fill);
   assignElementId(layer, element);
@@ -384,6 +400,7 @@ Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
   auto fill = _document->makeNode<Fill>();
   auto pattern = _document->makeNode<ImagePattern>();
   pattern->image = imageNode;
+  pattern->scaleMode = ResolveImageScaleMode(box.objectFit);
   fill->color = pattern;
   layer->contents.push_back(fill);
   assignElementId(layer, element);

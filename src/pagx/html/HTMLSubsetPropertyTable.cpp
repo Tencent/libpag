@@ -260,6 +260,24 @@ std::string TransformOpacity(const std::string& value, const PropertyContext&,
   return FormatNumber(v);
 }
 
+std::string TransformObjectFit(const std::string& value, const PropertyContext&,
+                               HTMLTransformContext& diags) {
+  std::string lc = ToLower(Trim(value));
+  if (lc.empty()) return std::string();
+  if (lc == "fill" || lc == "contain" || lc == "cover") return lc;
+  if (lc == "none") {
+    diags.warn("subset:unsupported-property",
+               "html: 'object-fit: none' is not supported; downgraded to 'contain'");
+    return "contain";
+  }
+  if (lc == "scale-down") {
+    diags.warn("subset:unsupported-property",
+               "html: 'object-fit: scale-down' is not supported; downgraded to 'contain'");
+    return "contain";
+  }
+  return DropProperty("object-fit", value, "is not a recognised keyword", diags);
+}
+
 std::string PassThrough(const std::string& value, const PropertyContext&, HTMLTransformContext&) {
   return Trim(value);
 }
@@ -327,6 +345,7 @@ std::unordered_map<std::string, PropertyHandler> BuildTable() {
   AddTransform(t, "opacity", &TransformOpacity);
   AddKeep(t, "mix-blend-mode");
   AddKeep(t, "overflow");
+  AddTransform(t, "object-fit", &TransformObjectFit);
 
   // Text
   AddKeep(t, "color");

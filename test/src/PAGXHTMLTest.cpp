@@ -1557,6 +1557,75 @@ PAG_TEST(PAGXHTMLTest, RoundedImageWrapperFoldsIntoRectangle) {
   EXPECT_NE(pattern->image->filePath.find("avatar.png"), std::string::npos);
 }
 
+// Regression: the importer used to leave `ImagePattern::scaleMode` at its
+// `LetterBox` default, but the CSS `<img>` default `object-fit: fill` is a
+// stretch. With intrinsic-aspect images that disagree with the box's, LetterBox
+// shrinks the image inside the box (visible empty bands along one axis), while
+// the browser stretches it edge-to-edge. The default must be Stretch, and the
+// `object-fit` keyword must drive the mode through both the regular image path
+// and the rounded-wrapper fold path.
+PAG_TEST(PAGXHTMLTest, ImageDefaultObjectFitIsStretch) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px">
+      <img src="logo.png" style="width:80px;height:80px"/>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(leaf);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = dynamic_cast<pagx::ImagePattern*>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Stretch);
+}
+
+PAG_TEST(PAGXHTMLTest, ImageObjectFitContainMapsToLetterBox) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px">
+      <img src="logo.png" style="width:80px;height:80px;object-fit:contain"/>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(leaf);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = dynamic_cast<pagx::ImagePattern*>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::LetterBox);
+}
+
+PAG_TEST(PAGXHTMLTest, ImageObjectFitCoverMapsToZoom) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px">
+      <img src="logo.png" style="width:80px;height:80px;object-fit:cover"/>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(leaf);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = dynamic_cast<pagx::ImagePattern*>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Zoom);
+}
+
+PAG_TEST(PAGXHTMLTest, RoundedImageWrapperRespectsObjectFit) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:64px;height:64px">
+      <div style="width:64px;height:64px;border-radius:9999px;overflow:hidden">
+        <img src="avatar.png" style="position:absolute;left:0;top:0;width:64px;height:64px;object-fit:cover"/>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* wrapper = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(wrapper);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = dynamic_cast<pagx::ImagePattern*>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Zoom);
+}
+
 // Sibling assertion: the fold only kicks in when the wrapper is purely an image
 // clip. A wrapper with multiple children must keep the standard container layout
 // even when it carries `border-radius` + `overflow: hidden` (the image stays in

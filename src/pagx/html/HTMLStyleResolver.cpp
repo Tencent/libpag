@@ -484,6 +484,8 @@ void HTMLParserContext::parseBoxVisuals(HTMLBoxAttributes& box,
     warn("html: overflow: " + overflow + " not fully supported");
   }
 
+  box.objectFit = LookupLowerTrimmed(props, "object-fit");
+
   static const char* kVisualsDisallowed[] = {
       "background-size", "background-repeat", "background-position", "outline", "transform-origin",
       "perspective",     "clip-path"};

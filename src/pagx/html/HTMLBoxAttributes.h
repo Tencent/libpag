@@ -109,6 +109,11 @@ struct HTMLBoxAttributes {
   std::string mixBlendMode = {};
 
   bool clipOverflow = false;
+
+  // Lower-cased CSS `object-fit` keyword for replaced elements (currently only
+  // `<img>`). Empty means "not set" and should fall back to the CSS default
+  // `fill`, which corresponds to PAGX `ScaleMode::Stretch`.
+  std::string objectFit = {};
 };
 
 }  // namespace pagx
