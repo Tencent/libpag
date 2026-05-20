@@ -146,6 +146,7 @@
 | `background-image: linear-gradient(angle, c1 [p], c2 [p], …)` | `<Fill>` 内嵌 `<LinearGradient>`（`startPoint`/`endPoint` 由角度推得） |
 | `background-image: radial-gradient(…)` | 内嵌 `<RadialGradient>` |
 | `background-image: conic-gradient(from angle, …)` | 内嵌 `<ConicGradient>`（CSS 0° = 顶，PAGX 0° = 右，自动 −90°） |
+| `background-clip: text`（别名 `-webkit-background-clip: text`） | 与 gradient `background-image` 同时设置时，渐变下沉到后代文字节点（`<TextBox>` / `<Text>` 的 `<Fill>` 内嵌渐变），本元素的矩形背景被抑制。无 gradient `background-image` 时该属性为无操作。 |
 | `border-radius: N`（px）或 `N%`（按 `min(width, height)` 解析；带固定 px 宽高且 `border-radius: 50%` 的元素会变成圆形） | `Rectangle.roundness = N` |
 | `border: W solid C` | `<Stroke color="C" width="W" align="inside"/>` |
 | `box-shadow: X Y B C`（多重、可加 `inset`） | 每个阴影一份 `<DropShadowStyle>` 或 `<InnerShadowStyle>` |

@@ -185,6 +185,20 @@ HTMLInheritedStyle HTMLParserContext::computeInherited(const std::shared_ptr<DOM
   CopyProperty(props, "text-decoration", out.textDecoration);
   CopyProperty(props, "text-decoration-color", out.textDecorationColor);
   CopyProperty(props, "white-space", out.whiteSpace);
+  // Propagate gradient text fill from the nearest clip-to-text ancestor. `out.textFillImage`
+  // already inherits the parent's value via `out = parent`; we only override when this element
+  // itself sets `background-clip: text` together with a gradient `background-image`.
+  std::string ownBgImage = LookupProperty(props, "background-image");
+  if (ownBgImage.empty()) {
+    const std::string& sh = LookupProperty(props, "background");
+    if (!sh.empty() && sh.find("gradient") != std::string::npos) {
+      ownBgImage = sh;
+    }
+  }
+  if (LookupLowerTrimmed(props, "background-clip") == "text" && !ownBgImage.empty() &&
+      ownBgImage.find("gradient") != std::string::npos) {
+    out.textFillImage = ownBgImage;
+  }
   // Compute combined font-style label used by PAGX Text.
   bool isBold = false;
   if (!out.fontWeight.empty()) {
@@ -376,6 +390,12 @@ void HTMLParserContext::parseBoxVisuals(HTMLBoxAttributes& box,
   }
   if (!bgImage.empty()) {
     box.backgroundImage = bgImage;
+  }
+  // `background-clip: text` is the only clip value the importer models. The subset transformer
+  // already normalises every other keyword to empty, so a non-empty value here equals `text`.
+  std::string bgClip = LookupLowerTrimmed(props, "background-clip");
+  if (bgClip == "text") {
+    box.backgroundClipText = true;
   }
 
   const std::string& br = LookupProperty(props, "border-radius");

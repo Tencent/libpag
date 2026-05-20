@@ -172,6 +172,18 @@ function takeSnapshot(config) {
     return '';
   }
 
+  // PAGX only models `background-clip: text` — combined with a gradient
+  // `background-image`, the importer routes the gradient to descendant text
+  // fills (so the text glyphs are filled with the gradient instead of the
+  // element painting a rectangular gradient). Every other clip value is
+  // dropped: PAGX has no `padding-box` / `content-box` distinction. Chromium
+  // computed style already coalesces `-webkit-background-clip` into the
+  // unprefixed `background-clip`, so a single schema entry suffices.
+  function normalizeBackgroundClip(value) {
+    if (!value) return '';
+    return value.trim().toLowerCase() === 'text' ? 'text' : '';
+  }
+
   // Master list of visual properties forwarded onto kept elements. The schema is
   // walked in declaration order, so the emit order in the output style attribute
   // matches the schema order — keep box-scope entries first, then text-scope
@@ -185,6 +197,9 @@ function takeSnapshot(config) {
     // Box-scope (background / decoration). Emitted on container & leaf wrappers.
     { prop: 'background-color', scope: 'box',  defaults: ['rgba(0, 0, 0, 0)', 'transparent'] },
     { prop: 'background-image', scope: 'box',  defaults: ['none'], normalize: normalizeBackgroundImage },
+    // `background-clip: text` is the only clip value the importer honours; everything
+    // else is normalised to '' so the snapshot doesn't carry useless `border-box` noise.
+    { prop: 'background-clip',  scope: 'box',  defaults: ['border-box'], normalize: normalizeBackgroundClip },
     // Chromium's computed `border-radius` is the long-form `T R B L` even when
     // authored as a single value; allow both shapes through the default filter.
     { prop: 'border-radius',    scope: 'box',  defaults: ['0px', '0px 0px 0px 0px'], normalize: normalizeBorderRadius },

@@ -54,6 +54,10 @@ struct HTMLInheritedStyle {
   std::string textDecoration = {};
   std::string textDecorationColor = {};
   std::string whiteSpace = {};
+  // Gradient string ("linear-gradient(...)" / "radial-gradient(...)" / "conic-gradient(...)")
+  // inherited from the nearest ancestor that combined `background-clip: text` with a gradient
+  // `background-image`. Empty means descendants paint text with their own solid `color`.
+  std::string textFillImage = {};
 };
 
 /**
@@ -91,6 +95,10 @@ struct HTMLBoxAttributes {
   Color backgroundColor = {0, 0, 0, 0, ColorSpace::SRGB};
   bool backgroundColorSet = false;
   std::string backgroundImage = {};
+  // True when computed style had `background-clip: text`. Only meaningful with a gradient
+  // `background-image`; the gradient is then routed onto descendant text fills instead of
+  // painting a rectangle on this element.
+  bool backgroundClipText = false;
 
   float borderRadiusPx = 0.0f;
   bool borderRadiusSet = false;

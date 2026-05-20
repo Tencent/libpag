@@ -201,6 +201,19 @@ std::string TransformBackgroundImage(const std::string& value, const PropertyCon
   return DropProperty("background-image", value, "is not a supported value", diags);
 }
 
+// `background-clip` only models the `text` keyword in PAGX. Combined with a gradient
+// `background-image` it tells the importer to route the gradient onto descendant text fills
+// instead of painting a rectangle. Other keywords (`border-box`, `padding-box`, …) are
+// silent no-ops; only unknown values produce a diagnostic.
+std::string TransformBackgroundClip(const std::string& value, const PropertyContext&,
+                                    HTMLTransformContext& diags) {
+  std::string lc = ToLower(Trim(value));
+  if (lc.empty() || lc == "border-box") return std::string();
+  if (lc == "text") return "text";
+  if (lc == "padding-box" || lc == "content-box") return std::string();
+  return DropProperty("background-clip", value, "is not a supported value", diags);
+}
+
 std::string TransformBorder(const std::string& value, const PropertyContext&,
                             HTMLTransformContext& diags) {
   std::string trimmed = Trim(value);
@@ -337,6 +350,7 @@ std::unordered_map<std::string, PropertyHandler> BuildTable() {
   // Painting / effects
   AddKeep(t, "background-color");
   AddTransform(t, "background-image", &TransformBackgroundImage);
+  AddTransform(t, "background-clip", &TransformBackgroundClip);
   AddTransform(t, "border", &TransformBorder);
   AddTransform(t, "border-radius", &TransformBorderRadius);
   AddKeep(t, "box-shadow");

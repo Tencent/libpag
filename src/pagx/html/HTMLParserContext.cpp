@@ -482,13 +482,14 @@ HTMLParserContext::TextFragment HTMLParserContext::makeTextFragment(
   std::string colorStr = inherited.color.empty() ? "#1E293B" : inherited.color;
   frag.color = parseColor(colorStr);
   frag.textDecoration = inherited.textDecoration;
+  frag.fillImage = inherited.textFillImage;
   return frag;
 }
 
 bool HTMLParserContext::fragmentsShareStyle(const TextFragment& a, const TextFragment& b) {
   return a.fontFamily == b.fontFamily && a.fontStyleName == b.fontStyleName &&
          a.fontSize == b.fontSize && a.letterSpacing == b.letterSpacing && a.color == b.color &&
-         a.textDecoration == b.textDecoration;
+         a.textDecoration == b.textDecoration && a.fillImage == b.fillImage;
 }
 
 void HTMLParserContext::appendTextFragment(std::vector<TextFragment>& out,
@@ -572,7 +573,7 @@ Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& elemen
   if (!needsTextBox) {
     const auto& f = fragments.front();
     textHost->contents.push_back(buildTextElement(f));
-    textHost->contents.push_back(buildSolidFill(f.color));
+    textHost->contents.push_back(buildTextFill(f));
   } else {
     auto textBox = _document->makeNode<TextBox>();
     // Anchor the TextBox to the host layer's content width so that wordWrap can engage. Without
@@ -604,11 +605,11 @@ Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& elemen
       const auto& f = fragments[i];
       if (i == 0) {
         textBox->elements.push_back(buildTextElement(f));
-        textBox->elements.push_back(buildSolidFill(f.color));
+        textBox->elements.push_back(buildTextFill(f));
       } else {
         auto group = _document->makeNode<Group>();
         group->elements.push_back(buildTextElement(f));
-        group->elements.push_back(buildSolidFill(f.color));
+        group->elements.push_back(buildTextFill(f));
         textBox->elements.push_back(group);
       }
     }

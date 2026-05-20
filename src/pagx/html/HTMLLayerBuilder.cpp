@@ -101,6 +101,28 @@ Fill* HTMLParserContext::buildSolidFill(const Color& color) {
   return fill;
 }
 
+Fill* HTMLParserContext::buildTextFill(const TextFragment& fragment) {
+  if (fragment.fillImage.empty()) {
+    return buildSolidFill(fragment.color);
+  }
+  auto fill = _document->makeNode<Fill>();
+  std::string bg = Trim(fragment.fillImage);
+  std::string lower = ToLower(bg);
+  if (lower.compare(0, 16, "linear-gradient(") == 0) {
+    fill->color = parseLinearGradient(bg);
+  } else if (lower.compare(0, 16, "radial-gradient(") == 0) {
+    fill->color = parseRadialGradient(bg);
+  } else if (lower.compare(0, 15, "conic-gradient(") == 0) {
+    fill->color = parseConicGradient(bg);
+  }
+  if (!fill->color) {
+    // Unparseable gradient: fall back to solid color so text stays visible. This mirrors
+    // what `applyBackgroundVisuals` does for an unparseable box gradient.
+    return buildSolidFill(fragment.color);
+  }
+  return fill;
+}
+
 void HTMLParserContext::applySizeAndPosition(Layer* layer, const HTMLBoxAttributes& box) {
   if (!std::isnan(box.widthPx)) layer->width = box.widthPx;
   if (!std::isnan(box.heightPx)) layer->height = box.heightPx;
@@ -158,6 +180,14 @@ void HTMLParserContext::applyLayoutAttributes(Layer* layer, const HTMLBoxAttribu
 
 bool HTMLParserContext::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttributes& box,
                                                bool addRectangle) {
+  // `background-clip: text` redirects the gradient to descendant text fills (see
+  // `convertTextLeaf` -> `buildTextFill`). When the element also has a gradient
+  // `background-image`, suppress the rectangle + gradient Fill that would otherwise
+  // paint a coloured block behind the text.
+  if (box.backgroundClipText && !box.backgroundImage.empty() &&
+      box.backgroundImage.find("gradient") != std::string::npos) {
+    return false;
+  }
   bool emitted = false;
   Rectangle* rect = nullptr;
   if (addRectangle && (box.backgroundColorSet || !box.backgroundImage.empty() ||

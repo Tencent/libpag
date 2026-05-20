@@ -1498,6 +1498,64 @@ PAG_TEST(PAGXHTMLTest, ConicGradientFrom90DegMapsToZero) {
   EXPECT_TRUE(NearlyEqual(cg->startAngle, 0.0f, 0.01f));
 }
 
+// Verifies CSS `background-clip: text` combined with a gradient `background-image` redirects
+// the gradient onto the descendant text fill. The element's own rectangle gradient must be
+// suppressed, and a `<TextBox>`-level `<Fill>` with the same `LinearGradient` must appear.
+PAG_TEST(PAGXHTMLTest, BackgroundClipTextRoutesGradientToTextFill) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:240px;height:80px">
+      <div style="position:absolute;left:0;top:0;width:240px;height:80px;
+                  background-image:linear-gradient(90deg, #FF0000 0%, #0000FF 100%);
+                  background-clip:text">
+        <span style="font-size:32px;font-weight:700">Hello</span>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* outer = doc->layers.front()->children.front();
+  ASSERT_NE(outer, nullptr);
+  // No Rectangle should be emitted on the clip-to-text wrapper: the gradient is consumed
+  // by the descendant text fill instead of painting a coloured block behind the glyphs.
+  EXPECT_EQ(CountElements<pagx::Rectangle>(outer->contents), 0u);
+  EXPECT_EQ(FindElementOfType<pagx::Fill>(outer), nullptr);
+  // The text leaf carries the gradient as its glyph fill.
+  auto* textLeaf = outer->children.front();
+  ASSERT_NE(textLeaf, nullptr);
+  auto* textBox = FindElementOfType<pagx::TextBox>(textLeaf);
+  pagx::Fill* textFill = nullptr;
+  if (textBox) {
+    textFill = FindElement<pagx::Fill>(textBox->elements);
+  } else {
+    textFill = FindElementOfType<pagx::Fill>(textLeaf);
+  }
+  ASSERT_NE(textFill, nullptr);
+  auto* lg = dynamic_cast<pagx::LinearGradient*>(textFill->color);
+  ASSERT_NE(lg, nullptr);
+  ASSERT_EQ(lg->colorStops.size(), 2u);
+  EXPECT_TRUE(ColorNear(lg->colorStops.front()->color, HexColor(0xFF0000)));
+  EXPECT_TRUE(ColorNear(lg->colorStops.back()->color, HexColor(0x0000FF)));
+}
+
+// Negative control: without `background-clip: text` the same gradient must still paint a
+// rectangle on the wrapper element (the existing behaviour must not regress).
+PAG_TEST(PAGXHTMLTest, GradientBackgroundWithoutClipKeepsRectangle) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:240px;height:80px">
+      <div style="position:absolute;left:0;top:0;width:240px;height:80px;
+                  background-image:linear-gradient(90deg, #FF0000 0%, #0000FF 100%)">
+        <span style="font-size:32px;font-weight:700">Hello</span>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* outer = doc->layers.front()->children.front();
+  ASSERT_NE(outer, nullptr);
+  EXPECT_EQ(CountElements<pagx::Rectangle>(outer->contents), 1u);
+  auto* fill = FindElementOfType<pagx::Fill>(outer);
+  ASSERT_NE(fill, nullptr);
+  EXPECT_NE(dynamic_cast<pagx::LinearGradient*>(fill->color), nullptr);
+}
+
 PAG_TEST(PAGXHTMLTest, AnchorHrefStoredAsCustomData) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">

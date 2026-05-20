@@ -113,6 +113,10 @@ class HTMLParserContext {
     float letterSpacing = 0.0f;
     Color color = {0, 0, 0, 1, ColorSpace::SRGB};
     std::string textDecoration = {};
+    // Gradient string copied from `HTMLInheritedStyle::textFillImage`. When non-empty,
+    // `buildTextFill` emits a gradient Fill instead of a solid Fill (matching CSS
+    // `background-clip: text` semantics from the nearest clip-to-text ancestor).
+    std::string fillImage = {};
   };
   void collectTextFragments(const std::shared_ptr<DOMNode>& element,
                             const HTMLInheritedStyle& inherited, std::vector<TextFragment>& out);
@@ -135,6 +139,11 @@ class HTMLParserContext {
 
   // Builds a Fill Element with a SolidColor of `color`.
   Fill* buildSolidFill(const Color& color);
+
+  // Builds a Fill from a TextFragment: emits a gradient Fill when `fragment.fillImage` is set,
+  // otherwise falls back to `buildSolidFill(fragment.color)`. Used by `convertTextLeaf` so a
+  // CSS `background-clip: text` ancestor can fill the glyphs with its gradient.
+  Fill* buildTextFill(const TextFragment& fragment);
 
   // <img> conversion.
   Layer* convertImage(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box);

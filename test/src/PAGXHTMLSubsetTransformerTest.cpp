@@ -203,6 +203,41 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, TransformIsDropped) {
   EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "transform"));
 }
 
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BackgroundClipTextIsKept) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="background-image: linear-gradient(90deg, #F00, #00F);
+                           background-clip: text"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "background-clip: text"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BackgroundClipBorderBoxIsDroppedSilently) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="background-clip: border-box"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "background-clip"));
+  EXPECT_FALSE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, WebkitBackgroundClipCoalescesToStandardName) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="background-image: linear-gradient(90deg, #F00, #00F);
+                           -webkit-background-clip: text"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  auto div = FirstBodyChild(root, "div");
+  EXPECT_TRUE(StyleContains(div, "background-clip: text"));
+  EXPECT_FALSE(StyleContains(div, "-webkit-background-clip"));
+}
+
 PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexShorthandCollapsesToGrow) {
   std::shared_ptr<pagx::DOMNode> root;
   auto result = RunTransform(

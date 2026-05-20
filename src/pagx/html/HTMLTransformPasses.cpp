@@ -310,6 +310,19 @@ namespace {
 void ResolveElement(const std::shared_ptr<DOMNode>& element, const PropertyMap& inherited,
                     HTMLTransformContext& ctx);
 
+// Moves a `-webkit-`-prefixed declaration onto its standard counterpart when the standard one
+// is absent, then erases the prefixed entry. Used during ComputedStylePass so the subset
+// property filter only has to register the canonical name.
+void CoalesceWebkitAlias(PropertyMap& resolved, const std::string& vendorName,
+                         const std::string& standardName) {
+  auto vendorIt = resolved.find(vendorName);
+  if (vendorIt == resolved.end()) return;
+  if (resolved.find(standardName) == resolved.end()) {
+    resolved[standardName] = vendorIt->second;
+  }
+  resolved.erase(vendorIt);
+}
+
 void ResolveTree(const std::shared_ptr<DOMNode>& element, const PropertyMap& inheritedIn,
                  HTMLTransformContext& ctx) {
   if (!element || element->type != DOMNodeType::Element) return;
@@ -381,6 +394,9 @@ void ResolveElement(const std::shared_ptr<DOMNode>& element, const PropertyMap& 
   if (styleAttr && !styleAttr->empty()) {
     ParseStyleString(*styleAttr, resolved);
   }
+  // Coalesce vendor aliases onto their standard names so the subset property table only
+  // needs to register the canonical form. The standard name wins when both are present.
+  CoalesceWebkitAlias(resolved, "-webkit-background-clip", "background-clip");
   ctx.setResolved(element.get(), std::move(resolved));
 }
 
