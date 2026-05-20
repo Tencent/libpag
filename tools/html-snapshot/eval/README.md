@@ -9,7 +9,7 @@ snapshot's layout-preserving rewrites.
 | File | Role |
 |------|------|
 | `baseline.js` | Render an original HTML in headless Chromium, save a PNG cropped to the body's measured rect — this is the ground truth. |
-| `compare.js`  | Pixel metrics (pixelmatch + mean RGB delta + luma SSIM), flex-retention counter, importer-warning parser. Importable as a module or runnable per-case. |
+| `compare.js`  | Pixel metrics (pixelmatch + mean RGB delta + luma SSIM), Chromium-based flex container counter (same method for live and subset), importer-warning parser. Importable as a module or runnable per-case. |
 | `run.js`      | Per-case driver: baseline → snapshot → import → resolve → render → compare. Emits `report.csv`, `report.md`, and `index.html`. |
 | `run.sh`      | Wrapper around `run.js`. |
 
@@ -45,8 +45,10 @@ Outputs land in `eval/out/<label>/`:
 | `pixelDiffRatio` | Fraction of differing pixels per `pixelmatch` (threshold 0.1, AA off). Lower is better. |
 | `meanRgbDelta` | Mean per-channel absolute difference (0..255). Lower is better. |
 | `flexLive` | Number of `display: flex \| inline-flex` elements in the live original DOM (Chromium-rendered). |
-| `flexSubset` | Number of `display: flex` declarations in the subset HTML. |
-| `flexRetention` | `flexSubset / flexLive`. Currently bounded above by 1 — the snapshot is allowed to *drop* flex (degenerate to absolute) but never to invent it. |
+| `flexSubset` | Same count, but on the rendered subset DOM. Both counts come from `getComputedStyle` over `document.body.querySelectorAll('*')`, so they are directly comparable. |
+| `flexDelta` | `flexSubset - flexLive`. Signed; positive means the subset emits more flex containers than the live DOM. |
+| `flexRetention` | `min(flexSubset, flexLive) / flexLive` — capped retention. 1.0 means the subset preserved at least every flex container in the live DOM. |
+| `flexInflation` | `flexSubset / flexLive` — raw ratio. Values above ~1.0 indicate the snapshot invented extra flex wrappers (regression signal). |
 | `importerWarnings` | Total `pagx import` warnings parsed from stderr. |
 | `flexInferred` | `subset:flex-inferred` warnings — C++ `AbsoluteToFlexInferencePass` recovered a flex layout from absolute children. |
 | `flexSkipped` | `subset:flex-inference-skipped` warnings — the C++ pass gave up and left the parent absolute. |

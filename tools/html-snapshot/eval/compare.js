@@ -8,8 +8,10 @@
  *   - meanRgbDelta:   mean per-channel absolute difference, 0..255
  *   - ssim:           luma-only SSIM (single-window block average) for a coarse
  *                     structural signal that survives subpixel offsets
- *   - flexRetained / flexTotal: ratio of flex containers preserved in the
- *                     subset HTML compared with the rendered live DOM
+ *   - flex live/subset counts: number of `display:flex|inline-flex` elements
+ *                     in the rendered live DOM vs. the rendered subset DOM
+ *                     (both measured via getComputedStyle, so the counts are
+ *                     directly comparable)
  *   - importerWarnings: warning count from `pagx import` stderr (parsed)
  *
  * The PNGs may differ in size when the snapshot fails to capture the full
@@ -120,32 +122,39 @@ function pixelMetrics(baselinePath, subsetPath, diffPath) {
   };
 }
 
-// Count `display: flex` declarations in the subset HTML, and (for context) in
-// the live original DOM measured at snapshot time. The ratio approximates how
-// much of the original flex layout survived the import.
-async function countFlexInLiveDom(puppeteer, htmlPath, viewportWidth, viewportHeight, waitMs) {
-  const browser = await puppeteer.launch({
-    headless: 'new',
-    args: ['--no-sandbox', '--font-render-hinting=none'],
-  });
+// Count flex containers in a rendered DOM. Both the live original HTML and the
+// subset HTML emitted by snapshot.js are rendered the same way and walked with
+// `getComputedStyle`, so the two counts are apples-to-apples. Counting the
+// subset via a `display:\s*flex` regex on the source (the previous approach)
+// inflates the count because each <div> wrapper emits its own style attribute,
+// and the live count uses computed style — the two metrics weren't comparable.
+async function countFlexInRenderedHtml(browser, htmlPath, opts = {}) {
+  const {
+    viewportWidth = 1400,
+    viewportHeight = 900,
+    waitMs = 0,
+    waitForRoot = false,
+  } = opts;
+  const page = await browser.newPage();
   try {
-    const page = await browser.newPage();
     await page.setViewport({ width: viewportWidth, height: viewportHeight, deviceScaleFactor: 1 });
     await page.goto('file://' + htmlPath, { waitUntil: 'networkidle0', timeout: 30000 });
-    try {
-      await page.waitForFunction(
-        'document.querySelector("#root") ? document.querySelector("#root").children.length > 0 : true',
-        { timeout: 10000 },
-      );
-    } catch (_) { /* not fatal */ }
+    if (waitForRoot) {
+      try {
+        await page.waitForFunction(
+          'document.querySelector("#root") ? document.querySelector("#root").children.length > 0 : true',
+          { timeout: 10000 },
+        );
+      } catch (_) { /* not fatal */ }
+    }
     if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
     // Capture the count before closing the page; otherwise the value would be
     // returned via a still-open evaluation handle that gets cancelled when the
     // browser shuts down (TargetCloseError surfaces as an unhandled rejection).
     const total = await page.evaluate(() => {
-      // Count every element whose computed display starts with `flex` (i.e.
-      // `flex` and `inline-flex`). We exclude `display: contents` and the
-      // synthetic <body> root.
+      // Count every body descendant whose computed display is `flex` or
+      // `inline-flex`. Excluding <html>/<body> avoids counting global style
+      // rules the snapshot pipeline injects (e.g. `html { display:flex }`).
       let n = 0;
       const all = document.body.querySelectorAll('*');
       for (const el of all) {
@@ -155,22 +164,10 @@ async function countFlexInLiveDom(puppeteer, htmlPath, viewportWidth, viewportHe
       }
       return n;
     });
-    await page.close();
     return total;
   } finally {
-    await browser.close();
+    await page.close();
   }
-}
-
-function countFlexInSubsetHtml(htmlPath) {
-  if (!fs.existsSync(htmlPath)) return 0;
-  const text = fs.readFileSync(htmlPath, 'utf8');
-  // Match `display: flex` (with any spacing) inside style="..." attributes.
-  const re = /display\s*:\s*flex\b/gi;
-  let count = 0;
-  let m;
-  while ((m = re.exec(text)) !== null) count++;
-  return count;
 }
 
 function countImporterWarnings(stderrPath) {
@@ -191,8 +188,7 @@ function countImporterWarnings(stderrPath) {
 
 module.exports = {
   pixelMetrics,
-  countFlexInLiveDom,
-  countFlexInSubsetHtml,
+  countFlexInRenderedHtml,
   countImporterWarnings,
 };
 
