@@ -182,12 +182,11 @@ tgfx::BackendRenderTarget ToTGFX(const BackendRenderTarget& renderTarget) {
   tgfx::GLFrameBufferInfo frameBuffer = {};
   frameBuffer.id = glInfo.id;
   frameBuffer.format = glInfo.format;
-  return {frameBuffer, renderTarget.width(), renderTarget.height()};
+  return tgfx::BackendRenderTarget(frameBuffer, renderTarget.width(), renderTarget.height());
 }
 
 tgfx::BackendSemaphore ToTGFX(const BackendSemaphore& semaphore) {
   tgfx::GLSyncInfo syncInfo = {semaphore.glSync()};
-  tgfx::BackendSemaphore glSemaphore = {syncInfo};
-  return glSemaphore;
+  return tgfx::BackendSemaphore(syncInfo);
 }
 }  // namespace pag

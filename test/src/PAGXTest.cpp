@@ -25,6 +25,7 @@
 #include "cli/CommandResolve.h"
 #include "cli/CommandVerify.h"
 #include "pagx/FontConfig.h"
+#include "pagx/HTMLExporter.h"
 #include "pagx/LayoutContext.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
@@ -5159,6 +5160,13 @@ PAGX_TEST(PAGXTest, TextBoxPaddingRoundTrip) {
   EXPECT_FLOAT_EQ(textBox2->padding.right, 12);
   EXPECT_FLOAT_EQ(textBox2->padding.bottom, 8);
   EXPECT_FLOAT_EQ(textBox2->padding.left, 12);
+}
+
+/**
+ * Test all HTML-related PAGX files in resources/pagx_to_html directory.
+ */
+PAGX_TEST(PAGXTest, HtmlFiles) {
+  TestPAGXDirectory(context, ProjectPath::Absolute("resources/pagx_to_html"), "html_native_");
 }
 
 }  // namespace pag

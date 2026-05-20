@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: TextPath advanced attributes: forceAlignment, perpendicular=false, margins -->
+<pagx version="1.0" width="420" height="440">
+  <Resources>
+    <PathData id="bannerArc" data="M 10,80 Q 130,0 260,80"/>
+    <PathData id="uprightArc" data="M 20,25 Q 130,0 240,25"/>
+    <PathData id="linePath" data="M 10,15 L 150,15"/>
+    <PathData id="wavyPath" data="M 10,25 Q 65,0 120,25 Q 175,50 230,25"/>
+    <PathData id="sPath" data="M 10,30 C 50,0 90,60 130,30 C 170,0 210,60 250,30"/>
+  </Resources>
+
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="10" alignment="stretch">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="4" alignment="center">
+      <Layer height="20">
+        <Text text="Text Path Advanced" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="Force alignment, perpendicular, margins, S-curve" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
+
+    <!-- Card -->
+    <Layer flex="1" layout="vertical" alignment="center" arrangement="center">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <Layer width="270" layout="vertical" gap="12" alignment="center" arrangement="center">
+
+        <!-- Banner arc: forceAlignment -->
+        <Layer width="270" height="90">
+          <Layer name="arcGuide" alpha="0.15">
+            <Path data="@bannerArc"/>
+            <Stroke color="#3B82F6" width="1"/>
+          </Layer>
+          <Text text="BANNER" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
+          <TextPath path="@bannerArc" forceAlignment="true"/>
+          <Fill color="#3B82F6"/>
+        </Layer>
+
+        <!-- Perpendicular=false -->
+        <Layer width="270" height="35">
+          <Layer name="uprightGuide" alpha="0.15">
+            <Path data="@uprightArc"/>
+            <Stroke color="#8B5CF6" width="1" dashes="4,3"/>
+          </Layer>
+          <Text text="UPRIGHT" fontFamily="Arial" fontStyle="Bold" fontSize="10"/>
+          <TextPath path="@uprightArc" perpendicular="false" forceAlignment="true"/>
+          <Fill color="#8B5CF6"/>
+        </Layer>
+
+        <!-- Margins line: firstMargin + lastMargin -->
+        <Layer width="160" height="25">
+          <Layer name="lineGuide" alpha="0.15">
+            <Path data="@linePath"/>
+            <Stroke color="#EC4899" width="1"/>
+          </Layer>
+          <Text text="MARGINS" fontFamily="Arial" fontSize="10"/>
+          <TextPath path="@linePath" forceAlignment="true" firstMargin="5" lastMargin="5"/>
+          <Fill color="#EC4899"/>
+        </Layer>
+
+        <!-- S-curve: forceAlignment -->
+        <Layer width="260" height="60">
+          <Layer name="sGuide" alpha="0.15">
+            <Path data="@sPath"/>
+            <Stroke color="#F59E0B" width="1"/>
+          </Layer>
+          <Text text="S-CURVE PATH" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
+          <TextPath path="@sPath" forceAlignment="true"/>
+          <Fill color="#F59E0B"/>
+        </Layer>
+
+        <!-- Wavy path: forceAlignment -->
+        <Layer width="240" height="55">
+          <Layer name="wavyGuide" alpha="0.15">
+            <Path data="@wavyPath"/>
+            <Stroke color="#10B981" width="1"/>
+          </Layer>
+          <Text text="FORCE ALIGN" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
+          <TextPath path="@wavyPath" forceAlignment="true"/>
+          <Fill color="#10B981"/>
+        </Layer>
+
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>

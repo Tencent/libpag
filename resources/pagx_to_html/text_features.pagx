@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Text features — letterSpacing, fauxBold, fauxItalic, CDATA multiline, TextBox overflow="visible" -->
+<pagx version="1.0" width="420" height="420">
+  <Resources>
+    <LinearGradient id="headerGrad" startPoint="0,0" endPoint="1,0">
+      <ColorStop offset="0" color="#6366F1"/>
+      <ColorStop offset="1" color="#EC4899"/>
+    </LinearGradient>
+  </Resources>
+
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="stretch">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="stretch">
+      <Layer height="20">
+        <Text text="Text Features" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="@headerGrad"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="letterSpacing, faux styles, CDATA, overflow" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
+
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16" gap="8" alignment="stretch">
+
+        <!-- 1. letterSpacing -->
+        <Layer layout="vertical" gap="2">
+          <Layer height="12">
+            <Text text="letterSpacing" fontFamily="Arial" fontSize="10"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+          <Layer height="28">
+            <Text text="SPACED OUT" fontFamily="Arial" fontStyle="Bold" fontSize="22" letterSpacing="8"/>
+            <Fill color="#3B82F6"/>
+          </Layer>
+        </Layer>
+
+        <!-- 2 & 3. fauxBold + fauxItalic side by side -->
+        <Layer layout="horizontal" gap="16" alignment="stretch">
+          <Layer flex="1" layout="vertical" gap="2">
+            <Layer height="12">
+              <Text text="fauxBold" fontFamily="Arial" fontSize="10"/>
+              <Fill color="#94A3B8"/>
+            </Layer>
+            <Layer height="24">
+              <Text text="Faux Bold Text" fontFamily="Arial" fontSize="20" fauxBold="true"/>
+              <Fill color="#8B5CF6"/>
+            </Layer>
+          </Layer>
+          <Layer flex="1" layout="vertical" gap="2">
+            <Layer height="12">
+              <Text text="fauxItalic" fontFamily="Arial" fontSize="10"/>
+              <Fill color="#94A3B8"/>
+            </Layer>
+            <Layer height="24">
+              <Text text="Faux Italic Text" fontFamily="Arial" fontSize="20" fauxItalic="true"/>
+              <Fill color="#EC4899"/>
+            </Layer>
+          </Layer>
+        </Layer>
+
+        <!-- 4 & 5. CDATA + overflow side by side -->
+        <Layer layout="horizontal" gap="16" alignment="stretch">
+          <!-- CDATA multiline -->
+          <Layer flex="1" layout="vertical" gap="2">
+            <Layer height="12">
+              <Text text="CDATA multiline" fontFamily="Arial" fontSize="10"/>
+              <Fill color="#94A3B8"/>
+            </Layer>
+            <Layer height="60">
+              <Text fontFamily="Arial" fontSize="16">
+<![CDATA[Line 1
+Line 2
+Line 3]]>
+              </Text>
+              <Fill color="#10B981"/>
+            </Layer>
+          </Layer>
+
+          <!-- TextBox overflow=visible -->
+          <Layer flex="1" layout="vertical" gap="2">
+            <Layer height="12">
+              <Text text="overflow=visible" fontFamily="Arial" fontSize="10"/>
+              <Fill color="#94A3B8"/>
+            </Layer>
+            <Layer width="140" height="50">
+              <Rectangle left="0" right="0" top="0" bottom="0"/>
+              <Stroke color="#F59E0B" width="1" dashes="4,3"/>
+              <TextBox left="0" right="0" top="0" bottom="0" overflow="visible" lineHeight="17">
+                <Text text="This text overflows the small box and remains visible beyond its boundaries." fontFamily="Arial" fontSize="14"/>
+                <Fill color="#F59E0B"/>
+              </TextBox>
+            </Layer>
+          </Layer>
+        </Layer>
+
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>

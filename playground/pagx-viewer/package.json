@@ -12,6 +12,12 @@
       "import": "./lib/pagx-viewer.esm.js",
       "require": "./lib/pagx-viewer.cjs.js",
       "default": "./lib/pagx-viewer.umd.js"
+    },
+    "./st": {
+      "types": "./types/playground/pagx-viewer/src/ts/pagx.d.ts",
+      "import": "./lib/pagx-viewer.st.esm.js",
+      "require": "./lib/pagx-viewer.st.cjs.js",
+      "default": "./lib/pagx-viewer.st.umd.js"
     }
   },
   "files": [
@@ -19,14 +25,20 @@
     "types"
   ],
   "scripts": {
-    "clean": "rimraf lib types wasm-mt build-pagx-viewer .*.md5",
+    "clean": "rimraf lib types wasm wasm-mt build-pagx-viewer .*.md5",
     "build:wasm": "node script/cmake.js -a wasm-mt",
     "build:wasm:debug": "node script/cmake.js -a wasm-mt --debug",
+    "build:wasm:st": "node script/cmake.js -a wasm",
+    "build:wasm:st:debug": "node script/cmake.js -a wasm --debug",
     "build:types": "tsc -p tsconfig.type.json",
-    "build:js": "rollup -c script/rollup.config.js && npm run build:types  && node script/fix-wasm-imports.js -a wasm-mt",
-    "build:js:release": "BUILD_MODE=release rollup -c script/rollup.config.js && npm run build:types && node script/fix-wasm-imports.js -a wasm-mt",
+    "build:js": "rollup -c script/rollup.config.js --environment ARCH:wasm-mt && npm run build:types && node script/fix-wasm-imports.js -a wasm-mt",
+    "build:js:release": "BUILD_MODE=release rollup -c script/rollup.config.js --environment ARCH:wasm-mt && npm run build:types && node script/fix-wasm-imports.js -a wasm-mt",
+    "build:js:st": "rollup -c script/rollup.config.js --environment ARCH:wasm && npm run build:types && node script/fix-wasm-imports.js -a wasm",
+    "build:js:st:release": "BUILD_MODE=release rollup -c script/rollup.config.js --environment ARCH:wasm && npm run build:types && node script/fix-wasm-imports.js -a wasm",
     "build:debug": "npm run build:wasm:debug && npm run build:js",
-    "build:release": "npm run build:wasm && npm run build:js:release"
+    "build:release": "npm run build:wasm && npm run build:js:release",
+    "build:debug:st": "npm run build:wasm:st:debug && npm run build:js:st",
+    "build:release:st": "npm run build:wasm:st && npm run build:js:st:release"
   },
   "devDependencies": {
     "@rollup/plugin-alias": "~5.1.1",

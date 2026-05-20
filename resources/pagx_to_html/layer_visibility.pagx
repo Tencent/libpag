@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Layer visible attribute → display:none; demonstrates visible vs hidden layers
+     with labeled indicators and ghost outline for the hidden element -->
+<pagx version="1.0" width="320" height="235">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="15,20,15,20" gap="6" alignment="stretch">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="18">
+        <Text text="Layer Visibility" fontFamily="Arial" fontStyle="Bold" fontSize="14" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="visible=true vs visible=false" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#64748B"/>
+      </Layer>
+    </Layer>
+
+    <!-- Content area: two columns -->
+    <Layer flex="1" layout="horizontal" padding="10" gap="12" alignment="center" arrangement="spaceEvenly">
+      <!-- Left: Visible layer -->
+      <Layer layout="vertical" gap="6" alignment="center" arrangement="center">
+        <Layer width="110" height="100">
+          <!-- Solid card -->
+          <Rectangle position="55,50" size="110,100" roundness="12"/>
+          <Fill color="#3B82F6"/>
+          <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#3B82F640"/>
+          <!-- Eye icon + Label -->
+          <Layer>
+            <Ellipse position="55,42" size="28,18"/>
+            <Stroke color="#FFFFFF" width="2"/>
+            <Group>
+              <Ellipse position="55,42" size="8,8"/>
+              <Text text="Visible" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="55,68" textAnchor="center"/>
+              <Fill color="#FFFFFF"/>
+            </Group>
+          </Layer>
+        </Layer>
+      </Layer>
+
+      <!-- Right: Hidden layer -->
+      <Layer layout="vertical" gap="6" alignment="center" arrangement="center">
+        <Layer width="110" height="100">
+          <!-- Hidden card (should not render) -->
+          <Layer visible="false">
+            <Rectangle position="55,50" size="110,100" roundness="12"/>
+            <Fill color="#EF4444"/>
+          </Layer>
+          <!-- Ghost outline -->
+          <Rectangle position="55,50" size="110,100" roundness="12"/>
+          <Stroke color="#CBD5E1" width="2" dashes="6,4"/>
+          <!-- Crossed-out eye icon + Label -->
+          <Layer>
+            <Ellipse position="55,42" size="28,18"/>
+            <Stroke color="#94A3B8" width="2"/>
+            <Group>
+              <Path data="M 32,22 L 58,42"/>
+              <Stroke color="#94A3B8" width="2" cap="round"/>
+            </Group>
+            <Group>
+              <Text text="Hidden" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="55,68" textAnchor="center"/>
+              <Fill color="#94A3B8"/>
+            </Group>
+          </Layer>
+        </Layer>
+      </Layer>
+    </Layer>
+
+    <!-- Footer note -->
+    <Layer height="12">
+      <Text text="Red card uses visible=&quot;false&quot; and should not render" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+      <Fill color="#94A3B8"/>
+    </Layer>
+  </Layer>
+</pagx>
