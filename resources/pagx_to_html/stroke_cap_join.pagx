@@ -4,7 +4,7 @@
      shapes are visually distinct. Caps are demoed on horizontal line segments; joins are demoed
      on V-shaped polylines with an acute bend. Reference guides (thin gray) mark the true path
      endpoints/corners so cap/join extensions beyond the mathematical path are obvious. -->
-<pagx version="1.0" width="440" height="360">
+<pagx width="440" height="360">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>

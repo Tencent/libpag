@@ -2,7 +2,7 @@
 <!-- Tests: Stroke dashOffset cycling through 0, dash+gap*0.25, dash+gap*0.5, dash+gap*0.75 to show
      the dash pattern shifts phase proportionally; the four rows use the same "12,6" pattern so
      an offset of 18 (= dash+gap) returns to the same visual as 0. -->
-<pagx version="1.0" width="420" height="320">
+<pagx width="420" height="320">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>

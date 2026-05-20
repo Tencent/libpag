@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: ConicGradient → CSS conic-gradient; angle convention (PAGX 0°=right, CSS 0°=up → +90°) -->
-<pagx version="1.0" width="390" height="280">
+<pagx width="390" height="280">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>

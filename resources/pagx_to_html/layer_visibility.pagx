@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Layer visible attribute → display:none; demonstrates visible vs hidden layers
      with labeled indicators and ghost outline for the hidden element -->
-<pagx version="1.0" width="320" height="235">
+<pagx width="320" height="235">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>

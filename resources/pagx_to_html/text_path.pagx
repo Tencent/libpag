@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: TextPath — text along curves with various configurations:
      bezier arc, straight line with margins, S-curve, forceAlignment -->
-<pagx version="1.0" width="420" height="420">
+<pagx width="420" height="420">
   <Resources>
     <PathData id="arcPath" data="M 10,110 Q 140,0 270,110"/>
     <PathData id="linePath" data="M 10,20 L 270,20"/>

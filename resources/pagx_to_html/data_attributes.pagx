@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: data-* custom attributes on various elements, id and name attributes -->
-<pagx version="1.0" width="340" height="240">
+<pagx width="340" height="240">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>

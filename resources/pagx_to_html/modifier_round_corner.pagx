@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: RoundCorner modifier → convert sharp corners to bezier arcs -->
-<pagx version="1.0" width="300" height="280">
+<pagx width="300" height="280">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
