@@ -347,20 +347,19 @@ bool HTMLParserContext::finaliseGradientStops(GradientStops& stops) {
   if (stops.empty()) return false;
   if (std::isnan(stops.front().first)) stops.front().first = 0.0f;
   if (std::isnan(stops.back().first)) stops.back().first = 1.0f;
-  for (size_t i = 1; i + 1 < stops.size(); i++) {
-    if (std::isnan(stops[i].first)) {
-      // Linear interpolation between bracketing known stops.
-      size_t prev = i - 1;
-      size_t next = i + 1;
-      while (next < stops.size() && std::isnan(stops[next].first)) next++;
-      if (next < stops.size()) {
-        float span = stops[next].first - stops[prev].first;
-        float steps = static_cast<float>(next - prev);
-        stops[i].first = stops[prev].first + span * 1.0f / steps;
-      } else {
-        stops[i].first = 1.0f;
-      }
-    }
+  // Walk left-to-right and resolve any NaN offset by interpolating from the previous known
+  // anchor to the next known anchor. Because `stops[i]` is updated in place, the next
+  // iteration's `prev` is the value we just wrote — that's intentional: filling a run of
+  // NaNs sequentially produces the same evenly spaced result as solving the whole run
+  // simultaneously, since each step's slope is recomputed against the remaining width.
+  for (size_t i = 1; i + 1 < stops.size(); ++i) {
+    if (!std::isnan(stops[i].first)) continue;
+    size_t next = i + 1;
+    while (next < stops.size() && std::isnan(stops[next].first)) ++next;
+    float prevOffset = stops[i - 1].first;
+    float nextOffset = next < stops.size() ? stops[next].first : 1.0f;
+    float steps = static_cast<float>(next - (i - 1));
+    stops[i].first = prevOffset + (nextOffset - prevOffset) / steps;
   }
   return true;
 }
