@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Rich text (multiple Text elements with independent Fill colors in shared TextBox) -->
+<pagx version="1.0" width="360" height="260">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="stretch">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Rich Text" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="Multi-color spans with shared TextBox" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
+
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <!-- Rich text: TextBox with Group children for independent styles -->
+      <TextBox left="20" right="20" top="15" bottom="15" lineHeight="32" textAlign="center" paragraphAlign="middle">
+        <Text text="Hello " fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+        <Fill color="#EF4444"/>
+        <Group>
+          <Text text="Beautiful " fontFamily="Arial" fontStyle="Italic" fontSize="24"/>
+          <Fill color="#3B82F6"/>
+        </Group>
+        <Group>
+          <Text text="World!&#10;" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+          <Fill color="#10B981"/>
+        </Group>
+        <Group>
+          <Text text="Mixed " fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+          <Fill color="#8B5CF6"/>
+        </Group>
+        <Group>
+          <Text text="Styles " fontFamily="Arial" fontStyle="Bold Italic" fontSize="20"/>
+          <Fill color="#F59E0B"/>
+        </Group>
+        <Group>
+          <Text text="in " fontFamily="Arial" fontSize="16"/>
+          <Fill color="#64748B"/>
+        </Group>
+        <Group>
+          <Text text="one " fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+          <Fill color="#EC4899"/>
+        </Group>
+        <Group>
+          <Text text="TextBox" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+          <Fill color="#06B6D4"/>
+        </Group>
+      </TextBox>
+    </Layer>
+  </Layer>
+</pagx>

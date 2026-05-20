@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Text element → HTML span; position.y=baseline, fontFamily, fontSize, letterSpacing, textAnchor, fauxBold/Italic -->
+<pagx version="1.0" width="420" height="420">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="stretch">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Text Basics" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="Anchors, spacing, faux styles, and font styles" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
+
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="6" padding="20,24,20,24" alignment="stretch">
+        <!-- Basic text: textAnchor=start (default) -->
+      <Layer layout="vertical" gap="2">
+        <Layer height="28">
+          <Text text="Hello World" fontFamily="Arial" fontSize="24"/>
+          <Fill color="#1F2937"/>
+        </Layer>
+        <Layer height="10">
+          <Text text="start" fontFamily="Arial" fontSize="8"/>
+          <Fill color="#94A3B8"/>
+        </Layer>
+      </Layer>
+
+      <!-- textAnchor=center -->
+      <Layer layout="vertical" gap="2" alignment="center">
+        <Layer height="28">
+          <Text text="Centered" fontFamily="Arial" fontSize="24" centerX="0" textAnchor="center"/>
+          <Fill color="#3B82F6"/>
+        </Layer>
+        <Layer height="10">
+          <Text text="center" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+          <Fill color="#94A3B8"/>
+        </Layer>
+      </Layer>
+
+      <!-- textAnchor=end -->
+      <Layer layout="vertical" gap="2">
+        <Layer height="28">
+          <Text text="Right Aligned" fontFamily="Arial" fontSize="24" right="0" textAnchor="end"/>
+          <Fill color="#10B981"/>
+        </Layer>
+        <Layer height="10">
+          <Text text="end" fontFamily="Arial" fontSize="8" right="0" textAnchor="end"/>
+          <Fill color="#94A3B8"/>
+        </Layer>
+      </Layer>
+
+      <!-- letterSpacing -->
+      <Layer height="32">
+        <Text text="SPACED" fontFamily="Arial" fontSize="28" letterSpacing="8"/>
+        <Fill color="#8B5CF6"/>
+      </Layer>
+
+      <!-- fauxBold -->
+      <Layer height="32">
+        <Text text="Faux Bold" fontFamily="Arial" fontSize="28" fauxBold="true"/>
+        <Fill color="#EF4444"/>
+      </Layer>
+
+      <!-- fauxItalic -->
+      <Layer height="32">
+        <Text text="Faux Italic" fontFamily="Arial" fontSize="28" fauxItalic="true"/>
+        <Fill color="#F59E0B"/>
+      </Layer>
+
+      <!-- fontStyle Bold Italic -->
+      <Layer height="28">
+        <Text text="Bold Italic" fontFamily="Arial" fontStyle="Bold Italic" fontSize="24"/>
+        <Fill color="#EC4899"/>
+      </Layer>
+    </Layer>
+    </Layer>
+  </Layer>
+</pagx>

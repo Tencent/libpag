@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Multi-geometry accumulated by one painter (each painter renders ALL accumulated geometries) -->
+<pagx version="1.0" width="320" height="300">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="stretch">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Accumulated Geometry" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="One painter renders all accumulated shapes" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
+
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16" gap="8" alignment="center" arrangement="center">
+        <!-- Shapes: Rectangle + Ellipse sharing one Fill + one Stroke -->
+        <Layer width="200" height="100">
+          <Rectangle position="55,50" size="80,80" roundness="8"/>
+          <Ellipse position="145,50" size="80,80"/>
+          <Fill color="#8B5CF6"/>
+          <Stroke color="#FFFFFF" width="2"/>
+        </Layer>
+
+        <!-- Labels. Each label wraps a fixed-width cell equal to its matching shape's width
+             (80px), and the gap between cells equals the gap between the two shape centers
+             minus one shape width (145 - 55 - 80 = 10). That keeps each label's cell center
+             aligned to its shape center even though the label row is narrower than the shape
+             row; without the per-cell width matching, the two labels would bunch up near the
+             label row's center and no longer sit under their shapes. Font size 10 matches the
+             subtitle's size — at 9px Chromium's anti-aliasing visibly thinned the glyphs
+             compared to tgfx's hinted rasterization. -->
+        <Layer layout="horizontal" gap="10" alignment="center" arrangement="center">
+          <Layer width="80" height="12">
+            <Text text="Rectangle" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+          <Layer width="80" height="12">
+            <Text text="Ellipse" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+
+        <Layer height="12">
+          <Text text="Shared Fill + Stroke" fontFamily="Arial" fontStyle="Bold" fontSize="9" centerX="0" textAnchor="center"/>
+          <Fill color="#94A3B8"/>
+        </Layer>
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>

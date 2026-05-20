@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Stroke lineCap (butt/round/square) and lineJoin (miter/round/bevel) across all six
+     enum values. Stroke widths are exaggerated (12px) so the end-cap silhouettes and corner
+     shapes are visually distinct. Caps are demoed on horizontal line segments; joins are demoed
+     on V-shaped polylines with an acute bend. Reference guides (thin gray) mark the true path
+     endpoints/corners so cap/join extensions beyond the mathematical path are obvious. -->
+<pagx version="1.0" width="440" height="360">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="12" alignment="stretch">
+
+    <!-- Title -->
+    <Layer layout="vertical" gap="2" alignment="stretch">
+      <Layer height="20">
+        <Text text="Stroke: Cap &amp; Join" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="lineCap butt/round/square, lineJoin miter/round/bevel" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
+
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16,20,16,20" gap="14" alignment="stretch">
+
+        <!-- Section A: lineCap row -->
+        <Layer layout="vertical" gap="6" alignment="stretch">
+          <Layer height="12">
+            <Text text="cap" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+          <Layer layout="horizontal" gap="8" alignment="stretch" arrangement="center">
+
+            <!-- cap = butt -->
+            <Layer flex="1" layout="vertical" gap="4" alignment="center">
+              <Layer height="10">
+                <Text text="butt" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+                <Fill color="#64748B"/>
+              </Layer>
+              <Layer width="100" height="48">
+                <!-- Reference guides (both endpoints in one Path). -->
+                <Path data="M 15,0 L 15,48 M 85,0 L 85,48"/>
+                <Stroke color="#CBD5E1" width="1"/>
+                <Group>
+                  <Path data="M 15,24 L 85,24"/>
+                  <Stroke color="#3B82F6" width="12" cap="butt"/>
+                </Group>
+              </Layer>
+            </Layer>
+
+            <!-- cap = round -->
+            <Layer flex="1" layout="vertical" gap="4" alignment="center">
+              <Layer height="10">
+                <Text text="round" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+                <Fill color="#64748B"/>
+              </Layer>
+              <Layer width="100" height="48">
+                <Path data="M 15,0 L 15,48 M 85,0 L 85,48"/>
+                <Stroke color="#CBD5E1" width="1"/>
+                <Group>
+                  <Path data="M 15,24 L 85,24"/>
+                  <Stroke color="#10B981" width="12" cap="round"/>
+                </Group>
+              </Layer>
+            </Layer>
+
+            <!-- cap = square -->
+            <Layer flex="1" layout="vertical" gap="4" alignment="center">
+              <Layer height="10">
+                <Text text="square" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+                <Fill color="#64748B"/>
+              </Layer>
+              <Layer width="100" height="48">
+                <Path data="M 15,0 L 15,48 M 85,0 L 85,48"/>
+                <Stroke color="#CBD5E1" width="1"/>
+                <Group>
+                  <Path data="M 15,24 L 85,24"/>
+                  <Stroke color="#F59E0B" width="12" cap="square"/>
+                </Group>
+              </Layer>
+            </Layer>
+          </Layer>
+        </Layer>
+
+        <!-- Divider -->
+        <Layer height="1">
+          <Rectangle left="0" right="0" top="0" bottom="0"/>
+          <Fill color="#E2E8F0"/>
+        </Layer>
+
+        <!-- Section B: lineJoin row -->
+        <Layer layout="vertical" gap="6" alignment="stretch">
+          <Layer height="12">
+            <Text text="join" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+          <Layer layout="horizontal" gap="8" alignment="stretch" arrangement="center">
+
+            <!-- join = miter -->
+            <Layer flex="1" layout="vertical" gap="4" alignment="center">
+              <Layer height="10">
+                <Text text="miter" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+                <Fill color="#64748B"/>
+              </Layer>
+              <Layer width="100" height="72">
+                <Path data="M 0,60 L 100,60"/>
+                <Stroke color="#CBD5E1" width="1"/>
+                <Group>
+                  <Path data="M 10,10 L 50,60 L 90,10"/>
+                  <Stroke color="#8B5CF6" width="12" join="miter" miterLimit="10"/>
+                </Group>
+              </Layer>
+            </Layer>
+
+            <!-- join = round -->
+            <Layer flex="1" layout="vertical" gap="4" alignment="center">
+              <Layer height="10">
+                <Text text="round" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+                <Fill color="#64748B"/>
+              </Layer>
+              <Layer width="100" height="72">
+                <Path data="M 0,60 L 100,60"/>
+                <Stroke color="#CBD5E1" width="1"/>
+                <Group>
+                  <Path data="M 10,10 L 50,60 L 90,10"/>
+                  <Stroke color="#EC4899" width="12" join="round"/>
+                </Group>
+              </Layer>
+            </Layer>
+
+            <!-- join = bevel -->
+            <Layer flex="1" layout="vertical" gap="4" alignment="center">
+              <Layer height="10">
+                <Text text="bevel" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+                <Fill color="#64748B"/>
+              </Layer>
+              <Layer width="100" height="72">
+                <Path data="M 0,60 L 100,60"/>
+                <Stroke color="#CBD5E1" width="1"/>
+                <Group>
+                  <Path data="M 10,10 L 50,60 L 90,10"/>
+                  <Stroke color="#0EA5E9" width="12" join="bevel"/>
+                </Group>
+              </Layer>
+            </Layer>
+          </Layer>
+        </Layer>
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>

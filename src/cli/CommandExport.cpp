@@ -17,9 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CommandExport.h"
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <string>
 #include "cli/CliUtils.h"
+#include "pagx/HTMLExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/PPTExporter.h"
 #include "pagx/SVGExporter.h"
@@ -45,7 +48,7 @@ static void PrintUsage() {
       << "Options:\n"
       << "  --input <file>              Input PAGX file (required)\n"
       << "  --output <file>             Output file (default: <input>.<format>)\n"
-      << "  --format <format>           Output format (svg, pptx; inferred from --output "
+      << "  --format <format>           Output format (svg, pptx, html; inferred from --output "
          "extension)\n"
       << "  --text-to-path              Convert text to path geometry (default: native text)\n"
       << "\n"
@@ -79,7 +82,8 @@ static void PrintUsage() {
       << "  pagx export --input icon.pagx --text-to-path     # convert text to paths\n"
       << "  pagx export --input icon.pagx --output out.pptx --ppt-no-bake-unsupported\n"
       << "                                                   # keep unsupported features "
-         "editable\n";
+         "editable\n"
+      << "  pagx export --input icon.pagx --output icon.html # PAGX to HTML\n";
 }
 
 static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
@@ -165,6 +169,30 @@ static int ExportToSVG(const ExportOptions& options) {
   return 0;
 }
 
+static int ExportToHTML(const ExportOptions& options) {
+  auto document = PAGXImporter::FromFile(options.inputFile);
+  if (document == nullptr) {
+    std::cerr << "pagx export: error: failed to load '" << options.inputFile << "'\n";
+    return 1;
+  }
+  for (auto& error : document->errors) {
+    std::cerr << "pagx export: warning: " << error << "\n";
+  }
+  if (document->hasUnresolvedImports()) {
+    std::cerr << "pagx export: error: unresolved import directive, run 'pagx resolve' first\n";
+    return 1;
+  }
+
+  std::string errorMsg;
+  if (!HTMLExporter::ToFile(*document, options.outputFile, {}, &errorMsg)) {
+    std::cerr << "pagx export: error: " << (errorMsg.empty() ? "export failed" : errorMsg) << "\n";
+    return 1;
+  }
+
+  std::cout << "pagx export: wrote " << options.outputFile << "\n";
+  return 0;
+}
+
 static int ExportToPPT(const ExportOptions& options) {
   auto document = PAGXImporter::FromFile(options.inputFile);
   if (document == nullptr) {
@@ -206,6 +234,10 @@ int RunExport(int argc, char* argv[]) {
   }
   if (options.format == "pptx") {
     return ExportToPPT(options);
+  }
+
+  if (options.format == "html") {
+    return ExportToHTML(options);
   }
 
   std::cerr << "pagx export: error: unsupported format '" << options.format << "'\n";

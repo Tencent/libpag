@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: RangeSelector unit="percentage" vs unit="index" — same text modifier with range [0.2, 0.8] expressed in each unit, showing how percentage scales with glyph count while index is absolute. -->
+<pagx version="1.0" width="420" height="360">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="stretch">
+    <!-- Title -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="RangeSelector Units" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="unit=percentage vs unit=index, start=0.2 end=0.8" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
+
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16,20,16,20" gap="10" alignment="stretch" arrangement="center">
+        <!-- Row 1: percentage, 5 glyphs -->
+        <Layer layout="vertical" gap="3" alignment="center">
+          <Layer height="12">
+            <Text text="percentage, N=5 → covers glyphs 1..3" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+          <Layer height="36">
+            <Text text="HELLO" fontFamily="Arial" fontStyle="Bold" fontSize="28" centerX="0" textAnchor="center"/>
+            <TextModifier alpha="0.25" fillColor="#EC4899">
+              <RangeSelector start="0.2" end="0.8" unit="percentage" shape="square"/>
+            </TextModifier>
+            <Fill color="#1E3A8A"/>
+          </Layer>
+        </Layer>
+
+        <!-- Row 2: percentage, 10 glyphs — scales proportionally -->
+        <Layer layout="vertical" gap="3" alignment="center">
+          <Layer height="12">
+            <Text text="percentage, N=10 → covers glyphs 2..7" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+          <Layer height="36">
+            <Text text="PERCENTAGE" fontFamily="Arial" fontStyle="Bold" fontSize="22" centerX="0" textAnchor="center"/>
+            <TextModifier alpha="0.25" fillColor="#EC4899">
+              <RangeSelector start="0.2" end="0.8" unit="percentage" shape="square"/>
+            </TextModifier>
+            <Fill color="#1E3A8A"/>
+          </Layer>
+        </Layer>
+
+        <!-- Row 3: index, 5 glyphs — absolute positions 0.2..0.8 -->
+        <Layer layout="vertical" gap="3" alignment="center">
+          <Layer height="12">
+            <Text text="index, N=5, start=1 end=3" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+          <Layer height="36">
+            <Text text="INDEX" fontFamily="Arial" fontStyle="Bold" fontSize="28" centerX="0" textAnchor="center"/>
+            <TextModifier alpha="0.25" fillColor="#10B981">
+              <RangeSelector start="1" end="3" unit="index" shape="square"/>
+            </TextModifier>
+            <Fill color="#065F46"/>
+          </Layer>
+        </Layer>
+
+        <!-- Row 4: index, 10 glyphs — same absolute window 1..3, leaves most untouched -->
+        <Layer layout="vertical" gap="3" alignment="center">
+          <Layer height="12">
+            <Text text="index, N=10, start=1 end=3 (same range → fewer covered)" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+          <Layer height="36">
+            <Text text="ABSOLUTELY" fontFamily="Arial" fontStyle="Bold" fontSize="22" centerX="0" textAnchor="center"/>
+            <TextModifier alpha="0.25" fillColor="#10B981">
+              <RangeSelector start="1" end="3" unit="index" shape="square"/>
+            </TextModifier>
+            <Fill color="#065F46"/>
+          </Layer>
+        </Layer>
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>
